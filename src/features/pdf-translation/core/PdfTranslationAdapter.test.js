@@ -725,4 +725,455 @@ describe('PdfTranslationAdapter', () => {
       expect(mapped[0].translatedText).toBe('اسم عمر')
     })
   })
+
+  describe('semantic context mapping', () => {
+    it('KPI block receives regionType', () => {
+      const adapter = new PdfTranslationAdapter()
+      const block = makeParagraphBlock('blk-kpi', 'Revenue')
+      block.roleMetadata.regionId = 'region-kpi'
+      const semanticRegions = [{
+        id: 'region-kpi',
+        boundingBox: { x: 40, y: 100, width: 200, height: 60 },
+        childRegionIds: [],
+        blockIds: ['blk-kpi'],
+        metadata: {
+          semantic: {
+            type: 'kpi-candidate',
+            confidence: 0.85,
+            signals: {},
+            metrics: []
+          }
+        }
+      }]
+
+      const items = adapter.toProviderItems([block], semanticRegions)
+
+      expect(items).toHaveLength(1)
+      expect(items[0].semanticContext).toBeDefined()
+      expect(items[0].semanticContext.regionType).toBe('kpi-candidate')
+    })
+
+    it('Financial metric receives financialSubtype', () => {
+      const adapter = new PdfTranslationAdapter()
+      const block = makeParagraphBlock('blk-fin', '$12.5B')
+      block.roleMetadata.regionId = 'region-fin'
+      const semanticRegions = [{
+        id: 'region-fin',
+        boundingBox: { x: 40, y: 100, width: 200, height: 60 },
+        childRegionIds: [],
+        blockIds: ['blk-fin'],
+        metadata: {
+          semantic: {
+            type: 'kpi-candidate',
+            confidence: 0.9,
+            signals: {},
+            metrics: [{
+              label: 'Revenue',
+              value: '$12.5B',
+              unit: 'currency',
+              financial: { subtype: 'metric-with-delta', magnitude: 'B', polarity: 'neutral' }
+            }]
+          }
+        }
+      }]
+
+      const items = adapter.toProviderItems([block], semanticRegions)
+
+      expect(items[0].semanticContext).toBeDefined()
+      expect(items[0].semanticContext.financialSubtype).toBe('metric-with-delta')
+    })
+
+    it('Statement fragment sets statementFragment=true', () => {
+      const adapter = new PdfTranslationAdapter()
+      const block = makeParagraphBlock('blk-stmt', 'Revenue: $12.3B')
+      block.roleMetadata.regionId = 'region-stmt'
+      const semanticRegions = [{
+        id: 'region-stmt',
+        boundingBox: { x: 40, y: 100, width: 400, height: 100 },
+        childRegionIds: [],
+        blockIds: ['blk-stmt'],
+        metadata: {
+          semantic: {
+            type: 'key-value-candidate',
+            confidence: 0.8,
+            signals: {},
+            pairs: [],
+            financialStatement: {
+              type: 'statement-fragment',
+              confidence: 0.8,
+              rowCount: 4,
+              totalRowCount: 1,
+              negativeRowCount: 0,
+              hasConsistentCurrency: true,
+              primaryCurrency: '$',
+              sourceLineIndices: [0, 1, 2, 3],
+              signals: {}
+            }
+          }
+        }
+      }]
+
+      const items = adapter.toProviderItems([block], semanticRegions)
+
+      expect(items[0].semanticContext).toBeDefined()
+      expect(items[0].semanticContext.statementFragment).toBe(true)
+    })
+
+    it('Dashboard member sets dashboardGroup=true', () => {
+      const adapter = new PdfTranslationAdapter()
+      const block = makeParagraphBlock('blk-dash', '12,300')
+      block.roleMetadata.regionId = 'region-dash'
+      const semanticRegions = [{
+        id: 'region-dash',
+        boundingBox: { x: 40, y: 100, width: 100, height: 50 },
+        childRegionIds: [],
+        blockIds: ['blk-dash'],
+        metadata: {
+          semantic: {
+            type: 'kpi-candidate',
+            confidence: 0.9,
+            signals: {},
+            metrics: [],
+            dashboardGroup: {
+              groupId: 'dashboard-p1-r0',
+              layout: 'row',
+              confidence: 0.85,
+              regionIds: ['region-dash', 'region-dash2'],
+              role: 'member'
+            }
+          }
+        }
+      }]
+
+      const items = adapter.toProviderItems([block], semanticRegions)
+
+      expect(items[0].semanticContext).toBeDefined()
+      expect(items[0].semanticContext.dashboardGroup).toBe(true)
+    })
+
+    it('Parent/child relationships map correctly', () => {
+      const adapter = new PdfTranslationAdapter()
+      const blockChild = makeParagraphBlock('blk-child', 'Revenue')
+      blockChild.roleMetadata.regionId = 'region-child'
+      const blockParent = makeParagraphBlock('blk-parent', 'Total $100B')
+      blockParent.roleMetadata.regionId = 'region-parent'
+
+      const semanticRegions = [
+        {
+          id: 'region-parent',
+          boundingBox: { x: 40, y: 100, width: 500, height: 200 },
+          childRegionIds: ['region-child'],
+          blockIds: ['blk-parent'],
+          metadata: {
+            semantic: {
+              type: 'kpi-candidate',
+              confidence: 0.8,
+              signals: {},
+              metrics: [],
+              relationships: {
+                parentRegionId: null,
+                childRegionIds: ['region-child'],
+                previousRegionId: null,
+                nextRegionId: null,
+                dashboardGroupId: null
+              }
+            }
+          }
+        },
+        {
+          id: 'region-child',
+          boundingBox: { x: 60, y: 120, width: 200, height: 80 },
+          childRegionIds: [],
+          blockIds: ['blk-child'],
+          metadata: {
+            semantic: {
+              type: 'kpi-candidate',
+              confidence: 0.9,
+              signals: {},
+              metrics: [],
+              relationships: {
+                parentRegionId: 'region-parent',
+                childRegionIds: [],
+                previousRegionId: null,
+                nextRegionId: null,
+                dashboardGroupId: null
+              }
+            }
+          }
+        }
+      ]
+
+      const items = adapter.toProviderItems([blockChild, blockParent], semanticRegions)
+
+      const childItem = items.find((it) => it.blockId === 'blk-child')
+      const parentItem = items.find((it) => it.blockId === 'blk-parent')
+
+      expect(childItem.semanticContext).toBeDefined()
+      expect(childItem.semanticContext.relationshipRole).toBe('child')
+
+      expect(parentItem.semanticContext).toBeDefined()
+      expect(parentItem.semanticContext.relationshipRole).toBe('parent')
+    })
+
+    it('Standalone region maps relationshipRole=standalone', () => {
+      const adapter = new PdfTranslationAdapter()
+      const block = makeParagraphBlock('blk-stand', 'Hello')
+      block.roleMetadata.regionId = 'region-stand'
+      const semanticRegions = [{
+        id: 'region-stand',
+        boundingBox: { x: 40, y: 100, width: 200, height: 60 },
+        childRegionIds: [],
+        blockIds: ['blk-stand'],
+        metadata: {
+          semantic: {
+            type: 'kpi-candidate',
+            confidence: 0.7,
+            signals: {},
+            metrics: [],
+            relationships: {
+              parentRegionId: null,
+              childRegionIds: [],
+              previousRegionId: null,
+              nextRegionId: null,
+              dashboardGroupId: null
+            }
+          }
+        }
+      }]
+
+      const items = adapter.toProviderItems([block], semanticRegions)
+
+      expect(items[0].semanticContext).toBeDefined()
+      expect(items[0].semanticContext.relationshipRole).toBe('standalone')
+    })
+
+    it('Missing semantic metadata omits semanticContext', () => {
+      const adapter = new PdfTranslationAdapter()
+      const block = makeParagraphBlock('blk-no-sem', 'Hello world')
+
+      const items = adapter.toProviderItems([block])
+
+      expect(items[0].semanticContext).toBeUndefined()
+    })
+
+    it('Block with no regionId omits semanticContext', () => {
+      const adapter = new PdfTranslationAdapter()
+      const block = makeParagraphBlock('blk-no-region', 'Hello')
+      const semanticRegions = [{
+        id: 'other-region',
+        boundingBox: { x: 40, y: 100, width: 200, height: 60 },
+        childRegionIds: [],
+        blockIds: [],
+        metadata: {
+          semantic: {
+            type: 'kpi-candidate',
+            confidence: 0.8,
+            signals: {},
+            metrics: []
+          }
+        }
+      }]
+
+      const items = adapter.toProviderItems([block], semanticRegions)
+
+      expect(items[0].semanticContext).toBeUndefined()
+    })
+
+    it('Provider items remain frozen', () => {
+      const adapter = new PdfTranslationAdapter()
+      const block = makeParagraphBlock('blk-frozen', '$12.5B')
+      block.roleMetadata.regionId = 'region-frozen'
+      const semanticRegions = [{
+        id: 'region-frozen',
+        boundingBox: { x: 40, y: 100, width: 200, height: 60 },
+        childRegionIds: [],
+        blockIds: ['blk-frozen'],
+        metadata: {
+          semantic: {
+            type: 'kpi-candidate',
+            confidence: 0.9,
+            signals: {},
+            metrics: [{
+              label: 'Revenue',
+              value: '$12.5B',
+              unit: 'currency',
+              financial: { subtype: 'summary-row', magnitude: 'B', polarity: 'neutral' }
+            }],
+            relationships: {
+              parentRegionId: null,
+              childRegionIds: [],
+              previousRegionId: null,
+              nextRegionId: null,
+              dashboardGroupId: null
+            }
+          }
+        }
+      }]
+
+      const items = adapter.toProviderItems([block], semanticRegions)
+
+      expect(Object.isFrozen(items[0].semanticContext)).toBe(true)
+    })
+
+    it('Existing adapter output unchanged except additive semanticContext', () => {
+      const adapter = new PdfTranslationAdapter()
+      const block = makeParagraphBlock('blk-additive', 'Revenue: $12.3B')
+      block.roleMetadata.regionId = 'region-add'
+      const semanticRegions = [{
+        id: 'region-add',
+        boundingBox: { x: 40, y: 100, width: 300, height: 60 },
+        childRegionIds: [],
+        blockIds: ['blk-additive'],
+        metadata: {
+          semantic: {
+            type: 'key-value-candidate',
+            confidence: 0.8,
+            signals: {},
+            pairs: [],
+            financialStatement: { type: 'statement-fragment', confidence: 0.8, rowCount: 3, totalRowCount: 0, negativeRowCount: 0, hasConsistentCurrency: true, primaryCurrency: '$', sourceLineIndices: [0, 1, 2], signals: {} },
+            relationships: { parentRegionId: null, childRegionIds: [], previousRegionId: null, nextRegionId: null, dashboardGroupId: null }
+          }
+        }
+      }]
+
+      const itemsWithout = adapter.toProviderItems([block])
+      const itemsWith = adapter.toProviderItems([block], semanticRegions)
+
+      const withoutCtx = itemsWithout[0]
+      const withCtx = itemsWith[0]
+
+      expect(withCtx.i).toBe(withoutCtx.i)
+      expect(withCtx.b).toBe(withoutCtx.b)
+      expect(withCtx.blockId).toBe(withoutCtx.blockId)
+      expect(withCtx.r).toBe(withoutCtx.r)
+      expect(withCtx.t).toBe(withoutCtx.t)
+      expect(withCtx.text).toBe(withoutCtx.text)
+      expect(withCtx.sourceTextHash).toBe(withoutCtx.sourceTextHash)
+      expect(withCtx.pageNumber).toBe(withoutCtx.pageNumber)
+      expect(withCtx.columnIndex).toBe(withoutCtx.columnIndex)
+      expect(withCtx.readingOrderIndex).toBe(withoutCtx.readingOrderIndex)
+      expect(withCtx.position).toBe(withoutCtx.position)
+
+      expect(withCtx.semanticContext).toBeDefined()
+      expect(withCtx.semanticContext.regionType).toBe('key-value-candidate')
+      expect(withCtx.semanticContext.statementFragment).toBe(true)
+      expect(withCtx.semanticContext.relationshipRole).toBe('standalone')
+      expect(withoutCtx.semanticContext).toBeUndefined()
+    })
+
+    it('readingRole is metric for single-metric KPI', () => {
+      const adapter = new PdfTranslationAdapter()
+      const block = makeParagraphBlock('blk-rr-metric', '$12.5B')
+      block.roleMetadata.regionId = 'region-rr'
+      const semanticRegions = [{
+        id: 'region-rr',
+        boundingBox: { x: 40, y: 100, width: 200, height: 60 },
+        childRegionIds: [],
+        blockIds: ['blk-rr-metric'],
+        metadata: {
+          semantic: {
+            type: 'kpi-candidate',
+            confidence: 0.9,
+            signals: {},
+            metrics: [{ label: 'Revenue', value: '$12.5B', unit: 'currency' }]
+          }
+        }
+      }]
+
+      const items = adapter.toProviderItems([block], semanticRegions)
+
+      expect(items[0].semanticContext.readingRole).toBe('metric')
+    })
+
+    it('readingRole is summary for key-value-candidate', () => {
+      const adapter = new PdfTranslationAdapter()
+      const block = makeParagraphBlock('blk-rr-kv', 'Revenue: $12.3B')
+      block.roleMetadata.regionId = 'region-rr-kv'
+      const semanticRegions = [{
+        id: 'region-rr-kv',
+        boundingBox: { x: 40, y: 100, width: 300, height: 60 },
+        childRegionIds: [],
+        blockIds: ['blk-rr-kv'],
+        metadata: {
+          semantic: {
+            type: 'key-value-candidate',
+            confidence: 0.8,
+            signals: {},
+            pairs: [
+              { label: 'Revenue', value: '$12.3B', separator: 'colon', financial: null },
+              { label: 'Assets', value: '$8.2B', separator: 'colon', financial: null }
+            ]
+          }
+        }
+      }]
+
+      const items = adapter.toProviderItems([block], semanticRegions)
+
+      expect(items[0].semanticContext.readingRole).toBe('summary')
+    })
+
+    it('financialSubtype unified across key-value pairs', () => {
+      const adapter = new PdfTranslationAdapter()
+      const block = makeParagraphBlock('blk-kv-fin', 'Revenue: $12.3B')
+      block.roleMetadata.regionId = 'region-kv-fin'
+      const semanticRegions = [{
+        id: 'region-kv-fin',
+        boundingBox: { x: 40, y: 100, width: 300, height: 60 },
+        childRegionIds: [],
+        blockIds: ['blk-kv-fin'],
+        metadata: {
+          semantic: {
+            type: 'key-value-candidate',
+            confidence: 0.8,
+            signals: {},
+            pairs: [
+              { label: 'Revenue', value: '$12.3B', separator: 'colon', financial: { subtype: 'summary-row', magnitude: 'B', polarity: 'neutral' } },
+              { label: 'Assets', value: '$8.2B', separator: 'colon', financial: { subtype: 'summary-row', magnitude: 'B', polarity: 'neutral' } }
+            ]
+          }
+        }
+      }]
+
+      const items = adapter.toProviderItems([block], semanticRegions)
+
+      expect(items[0].semanticContext.financialSubtype).toBe('summary-row')
+    })
+
+    it('financialSubtype omitted when pairs have mixed subtypes', () => {
+      const adapter = new PdfTranslationAdapter()
+      const block = makeParagraphBlock('blk-kv-mix', 'Revenue: $12.3B')
+      block.roleMetadata.regionId = 'region-kv-mix'
+      const semanticRegions = [{
+        id: 'region-kv-mix',
+        boundingBox: { x: 40, y: 100, width: 300, height: 60 },
+        childRegionIds: [],
+        blockIds: ['blk-kv-mix'],
+        metadata: {
+          semantic: {
+            type: 'key-value-candidate',
+            confidence: 0.8,
+            signals: {},
+            pairs: [
+              { label: 'Revenue', value: '$12.3B', separator: 'colon', financial: { subtype: 'summary-row', magnitude: 'B', polarity: 'neutral' } },
+              { label: 'Loss', value: '($5B)', separator: 'colon', financial: { subtype: 'total-row', polarity: 'negative' } }
+            ]
+          }
+        }
+      }]
+
+      const items = adapter.toProviderItems([block], semanticRegions)
+
+      expect(items[0].semanticContext.financialSubtype).toBeUndefined()
+    })
+
+    it('toProviderItems works without semanticRegions parameter', () => {
+      const adapter = new PdfTranslationAdapter()
+      const block = makeParagraphBlock('blk-no-param', 'Revenue')
+
+      const items = adapter.toProviderItems([block])
+
+      expect(items).toHaveLength(1)
+      expect(items[0].semanticContext).toBeUndefined()
+    })
+  })
 })

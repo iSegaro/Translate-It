@@ -6,11 +6,91 @@ import { normalizePdfText } from './PdfBlockIdentity.js'
 const STRUCTURED_BLOCK_MAX_LINES = 30
 const STRUCTURED_MAX_CELLS_PER_LINE = 10
 
+const READING_ROLE_KPI = 'metric'
+const READING_ROLE_KV = 'summary'
+const RELATIONSHIP_ROLE_PARENT = 'parent'
+const RELATIONSHIP_ROLE_CHILD = 'child'
+const RELATIONSHIP_ROLE_STANDALONE = 'standalone'
+
 function isStructuredBlock(block) {
   if (block?.roleMetadata?.isStructured !== true) return false
   if (!Array.isArray(block?.lines) || block.lines.length === 0) return false
   if (block.lines.length > STRUCTURED_BLOCK_MAX_LINES) return false
   return block.lines.length > 1 || block.lines.some((line) => line.items?.length > 1)
+}
+
+function buildSemanticContext(block, semanticRegions) {
+  if (!semanticRegions || semanticRegions.length === 0) return undefined
+
+  const regionId = block.roleMetadata?.regionId
+  if (!regionId) return undefined
+
+  const regionMap = new Map()
+  for (const r of semanticRegions) {
+    regionMap.set(r.id, r)
+  }
+
+  const region = regionMap.get(regionId)
+  if (!region) return undefined
+
+  const semantic = region.metadata?.semantic
+  if (!semantic) return undefined
+
+  const context = {}
+
+  if (semantic.type) {
+    context.regionType = semantic.type
+  }
+
+  if (semantic.type === 'kpi-candidate' && Array.isArray(semantic.metrics) && semantic.metrics.length === 1) {
+    const metric = semantic.metrics[0]
+    if (metric.financial?.subtype) {
+      context.financialSubtype = metric.financial.subtype
+    }
+  }
+
+  if (semantic.type === 'key-value-candidate') {
+    if (semantic.pairs?.length === 1 && semantic.pairs[0].financial?.subtype) {
+      context.financialSubtype = semantic.pairs[0].financial.subtype
+    } else if (semantic.pairs?.length > 1) {
+      const subtypes = semantic.pairs.map((p) => p.financial?.subtype).filter(Boolean)
+      if (subtypes.length > 0) {
+        const unique = [...new Set(subtypes)]
+        if (unique.length === 1) {
+          context.financialSubtype = unique[0]
+        }
+      }
+    }
+  }
+
+  if (semantic.financialStatement) {
+    context.statementFragment = true
+  }
+
+  if (semantic.dashboardGroup) {
+    context.dashboardGroup = true
+  }
+
+  if (semantic.metrics?.length === 1) {
+    context.readingRole = READING_ROLE_KPI
+  } else if (semantic.type === 'key-value-candidate') {
+    context.readingRole = READING_ROLE_KV
+  }
+
+  const relationships = semantic.relationships
+  if (relationships) {
+    if (relationships.childRegionIds?.length > 0) {
+      context.relationshipRole = RELATIONSHIP_ROLE_PARENT
+    } else if (relationships.parentRegionId) {
+      context.relationshipRole = RELATIONSHIP_ROLE_CHILD
+    } else {
+      context.relationshipRole = RELATIONSHIP_ROLE_STANDALONE
+    }
+  }
+
+  if (Object.keys(context).length === 0) return undefined
+
+  return Object.freeze(context)
 }
 
 function normalizeTranslatedText(value) {
@@ -55,11 +135,12 @@ function extractBlockId(translatedItem, originalItem) {
 }
 
 export class PdfTranslationAdapter {
-  toProviderItems(blocks = []) {
+  toProviderItems(blocks = [], semanticRegions = []) {
     const items = []
 
     for (let blockIndex = 0; blockIndex < blocks.length; blockIndex++) {
       const block = blocks[blockIndex]
+      const semanticContext = buildSemanticContext(block, semanticRegions)
 
       if (isStructuredBlock(block)) {
         for (let lineIndex = 0; lineIndex < block.lines.length; lineIndex++) {
@@ -88,7 +169,8 @@ export class PdfTranslationAdapter {
                 tableRowIndex: cell.rowIndex ?? null,
                 tableColumnIndex: cell.columnIndex ?? null,
                 colSpanCandidate: cell.colSpanCandidate || false,
-                estimatedColSpan: cell.estimatedColSpan || 1
+                estimatedColSpan: cell.estimatedColSpan || 1,
+                ...(semanticContext && { semanticContext })
               })
             }
           } else {
@@ -105,7 +187,8 @@ export class PdfTranslationAdapter {
               pageNumber: block.pageNumber,
               columnIndex: block.columnIndex,
               readingOrderIndex: block.readingOrderIndex,
-              position: items.length
+              position: items.length,
+              ...(semanticContext && { semanticContext })
             })
           }
         }
@@ -121,7 +204,8 @@ export class PdfTranslationAdapter {
           pageNumber: block.pageNumber,
           columnIndex: block.columnIndex,
           readingOrderIndex: block.readingOrderIndex,
-          position: items.length
+          position: items.length,
+          ...(semanticContext && { semanticContext })
         })
       }
     }
