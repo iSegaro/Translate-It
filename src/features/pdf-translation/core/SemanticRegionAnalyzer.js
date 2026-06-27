@@ -2,8 +2,9 @@
  * SemanticRegionAnalyzer — diagnostic-only semantic metadata enrichment.
  *
  * Phase L6a-L6b: Adds KPI candidate and key-value candidate detection
- * for non-table regions. This is diagnostic-only — no rendering, translation,
- * or adapter changes.
+ * for non-table regions. Phase L6d-a adds financial signal enrichment
+ * (delta, polarity, magnitude, period) to metrics and pairs.
+ * All diagnostic-only — no rendering, translation, or adapter changes.
  *
  * Pipeline position: after analyzeTableRegions, before buildMetadata.
  */
@@ -21,6 +22,14 @@ const PERCENTAGE_PATTERN = /%/
 const NUMERIC_PATTERN = /^[\d.,\s+\-–—$€£¥₹BMKbmk%]+$/
 const SHORT_LINE_THRESHOLD = 20
 const DOT_LEADER_PATTERN = /\.{3,}|…/
+
+const DELTA_PATTERN = /^[+\-–—]?\s*[\d.,]+\s*%/
+const PAREN_NEGATIVE_PATTERN = /^\(.*\)$/
+const MAGNITUDE_PATTERN = /[BMKTbmkt](?:n|N)?$/
+const PERIOD_PATTERN = /\b(YoY|QoQ|MoM|YTD|FY|TTM|CAGR|vs\s*LY|vs\s*Last\s*Year|vs\s*Prior|vs\s*Prior\s*Year)\b/i
+const FINANCIAL_VOCABULARY_PATTERN = /\b(?:revenue|income|expense|asset|liabilit|equity|margin|profit|loss|cash.?flow|EBITDA|EPS|dividend|depreciation|amortization|working.?capital|retained|operating|net.?income|gross.?profit|total|subtotal|current|non.?current|earnings|BITDA|ROI|ROE|ROA)\b/i
+const PAREN_VALUE_PATTERN = /^\([\d.,\s+\-–—$€£¥₹BMKbmk%]+\)$/
+const DELTA_VALUE_PATTERN = /^[+\-–—]?\s*[\d.,]+\s*%\s*(?:YoY|QoQ|MoM|YTD|FY|TTM|CAGR|vs\s*LY|vs\s*Last\s*Year|vs\s*Prior\s*Year)?$/i
 
 const WEIGHT_NUMERIC_RATIO = 0.3
 const WEIGHT_SHORT_LINE_RATIO = 0.2
@@ -56,6 +65,75 @@ function isLabelLine(text) {
   if (trimmed.length > 25) return false
   if (isNumericDominant(trimmed)) return false
   return true
+}
+
+function isFinancialValue(text) {
+  if (!text) return false
+  const trimmed = text.trim()
+  if (!trimmed) return false
+  if (isNumericDominant(trimmed)) return true
+  if (PAREN_VALUE_PATTERN.test(trimmed)) return true
+  if (DELTA_VALUE_PATTERN.test(trimmed)) return true
+  return false
+}
+
+function extractMagnitude(text) {
+  if (!text) return null
+  const stripped = text.replace(/^\(/, '').replace(/\)$/, '')
+  const match = stripped.match(MAGNITUDE_PATTERN)
+  if (!match) return null
+  const suffix = match[0].charAt(0)
+  if (suffix === 'B' || suffix === 'b') return 'B'
+  if (suffix === 'M' || suffix === 'm') return 'M'
+  if (suffix === 'K' || suffix === 'k') return 'K'
+  if (suffix === 'T' || suffix === 't') return 'T'
+  return null
+}
+
+function detectPolarity(valueText) {
+  if (!valueText) return 'neutral'
+  if (PAREN_NEGATIVE_PATTERN.test(valueText)) return 'negative'
+  const trimmed = valueText.trim()
+  if (/^[+\u002B]/.test(trimmed)) return 'positive'
+  if (/^[-\u2013\u2014]/.test(trimmed)) return 'negative'
+  return 'neutral'
+}
+
+function extractDeltaAndPeriod(text) {
+  if (!text) return { delta: null, period: null }
+
+  const periodMatch = text.match(PERIOD_PATTERN)
+  const period = periodMatch ? periodMatch[1] : null
+
+  const deltaMatch = text.match(DELTA_PATTERN)
+  const delta = deltaMatch ? deltaMatch[0].trim() : null
+
+  if (period && !delta) {
+    const numericPart = text.replace(PERIOD_PATTERN, '').trim()
+    if (/^[+\-\u2013\u2014]/.test(numericPart) || PERCENTAGE_PATTERN.test(numericPart)) {
+      return { delta: numericPart, period }
+    }
+  }
+
+  return { delta, period }
+}
+
+function buildFinancialMetadata(valueText, labelText) {
+  const hasVocabulary = FINANCIAL_VOCABULARY_PATTERN.test(labelText || '')
+  const magnitude = extractMagnitude(valueText || '')
+  const polarity = detectPolarity(valueText || '')
+  const { delta, period } = extractDeltaAndPeriod(valueText || '')
+
+  const hasAnySignal = hasVocabulary || magnitude || delta || period || polarity !== 'neutral'
+  if (!hasAnySignal) return null
+
+  return Object.freeze({
+    hasEnglishFinancialVocabularySignal: hasVocabulary,
+    polarity,
+    magnitude,
+    period,
+    delta
+  })
 }
 
 function getRegionLineEntries(region, lines) {
@@ -105,7 +183,8 @@ function detectKeyValuePairs(region, lines) {
           labelLineIndex: sourceIndex,
           valueLineIndex: sourceIndex,
           labelBbox: Object.freeze({ x: line.boundingBox.x, y: line.boundingBox.y, width: line.boundingBox.width * 0.4, height: line.boundingBox.height }),
-          valueBbox: Object.freeze({ x: line.boundingBox.x + line.boundingBox.width * 0.45, y: line.boundingBox.y, width: line.boundingBox.width * 0.55, height: line.boundingBox.height })
+          valueBbox: Object.freeze({ x: line.boundingBox.x + line.boundingBox.width * 0.45, y: line.boundingBox.y, width: line.boundingBox.width * 0.55, height: line.boundingBox.height }),
+          financial: buildFinancialMetadata(value, label)
         }))
         colonPairCount++
         continue
@@ -125,7 +204,8 @@ function detectKeyValuePairs(region, lines) {
             labelLineIndex: sourceIndex,
             valueLineIndex: sourceIndex,
             labelBbox: Object.freeze({ x: line.boundingBox.x, y: line.boundingBox.y, width: line.boundingBox.width * 0.5, height: line.boundingBox.height }),
-            valueBbox: Object.freeze({ x: line.boundingBox.x + line.boundingBox.width * 0.55, y: line.boundingBox.y, width: line.boundingBox.width * 0.45, height: line.boundingBox.height })
+            valueBbox: Object.freeze({ x: line.boundingBox.x + line.boundingBox.width * 0.55, y: line.boundingBox.y, width: line.boundingBox.width * 0.45, height: line.boundingBox.height }),
+            financial: buildFinancialMetadata(value, label)
           }))
           dotLeaderCount++
           continue
@@ -147,7 +227,8 @@ function detectKeyValuePairs(region, lines) {
             labelLineIndex: sourceIndex,
             valueLineIndex: sourceIndex,
             labelBbox: Object.freeze({ x: sorted[0].x, y: sorted[0].y || line.boundingBox.y, width: sorted[0].width || 60, height: sorted[0].height || line.boundingBox.height }),
-            valueBbox: Object.freeze({ x: sorted[1].x, y: sorted[1].y || line.boundingBox.y, width: sorted[1].width || 60, height: sorted[1].height || line.boundingBox.height })
+            valueBbox: Object.freeze({ x: sorted[1].x, y: sorted[1].y || line.boundingBox.y, width: sorted[1].width || 60, height: sorted[1].height || line.boundingBox.height }),
+            financial: buildFinancialMetadata(value, label)
           }))
           horizontalPairCount++
         }
@@ -274,7 +355,7 @@ function detectMetrics(region, lines) {
     const text = (line.text || '').trim()
     if (!text) continue
 
-    if (isNumericDominant(text)) {
+    if (isFinancialValue(text)) {
       let unit = null
       if (CURRENCY_PATTERN.test(text)) unit = 'currency'
       else if (PERCENTAGE_PATTERN.test(text)) unit = 'percentage'
@@ -304,7 +385,8 @@ function detectMetrics(region, lines) {
         unit,
         delta: null,
         valueLineIndex: sourceIndex,
-        labelLineIndex: labelSourceIndex
+        labelLineIndex: labelSourceIndex,
+        financial: buildFinancialMetadata(text, label)
       }))
     }
   }

@@ -696,4 +696,284 @@ describe('SemanticRegionAnalyzer', () => {
       expect(Object.isFrozen(result[1].metadata.semantic.dashboardGroup)).toBe(true)
     })
   })
+
+  describe('financial signal detection', () => {
+    it('KPI metric with currency magnitude', () => {
+      const region = makeRegion('paragraph', {
+        boundingBox: { x: 40, y: 100, width: 200, height: 60 }
+      })
+      const lines = [
+        makeLine(100, { text: 'Revenue', fontSize: 12 }),
+        makeLine(120, { text: '$12.5B', fontSize: 24 })
+      ]
+
+      const result = analyzeSemanticRegions([region], lines, [])
+
+      const metric = result[0].metadata.semantic.metrics[0]
+      expect(metric.financial).toBeDefined()
+      expect(metric.financial.magnitude).toBe('B')
+      expect(metric.financial.polarity).toBe('neutral')
+    })
+
+    it('KPI metric with million magnitude', () => {
+      const region = makeRegion('paragraph', {
+        boundingBox: { x: 40, y: 100, width: 200, height: 60 }
+      })
+      const lines = [
+        makeLine(100, { text: 'Profit', fontSize: 12 }),
+        makeLine(120, { text: '€3.2M', fontSize: 20 })
+      ]
+
+      const result = analyzeSemanticRegions([region], lines, [])
+
+      expect(result[0].metadata.semantic.metrics[0].financial.magnitude).toBe('M')
+    })
+
+    it('parenthesized negative value', () => {
+      const region = makeRegion('paragraph', {
+        boundingBox: { x: 40, y: 100, width: 200, height: 60 }
+      })
+      const lines = [
+        makeLine(100, { text: 'Net Loss', fontSize: 12 }),
+        makeLine(120, { text: '($1.2B)', fontSize: 24 })
+      ]
+
+      const result = analyzeSemanticRegions([region], lines, [])
+
+      const metric = result[0].metadata.semantic.metrics[0]
+      expect(metric.financial).toBeDefined()
+      expect(metric.financial.polarity).toBe('negative')
+      expect(metric.financial.magnitude).toBe('B')
+    })
+
+    it('explicit negative value', () => {
+      const region = makeRegion('paragraph', {
+        boundingBox: { x: 40, y: 100, width: 200, height: 60 }
+      })
+      const lines = [
+        makeLine(100, { text: 'Decline', fontSize: 12 }),
+        makeLine(120, { text: '-3.4%', fontSize: 20 })
+      ]
+
+      const result = analyzeSemanticRegions([region], lines, [])
+
+      expect(result[0].metadata.semantic.metrics[0].financial.polarity).toBe('negative')
+    })
+
+    it('positive delta', () => {
+      const region = makeRegion('paragraph', {
+        boundingBox: { x: 40, y: 100, width: 200, height: 60 }
+      })
+      const lines = [
+        makeLine(100, { text: 'Growth', fontSize: 12 }),
+        makeLine(120, { text: '+18.4%', fontSize: 20 })
+      ]
+
+      const result = analyzeSemanticRegions([region], lines, [])
+
+      const financial = result[0].metadata.semantic.metrics[0].financial
+      expect(financial.polarity).toBe('positive')
+      expect(financial.delta).toBe('+18.4%')
+    })
+
+    it('YoY period extraction', () => {
+      const region = makeRegion('paragraph', {
+        boundingBox: { x: 40, y: 100, width: 200, height: 60 }
+      })
+      const lines = [
+        makeLine(100, { text: 'Growth', fontSize: 12 }),
+        makeLine(120, { text: '+18.4% YoY', fontSize: 20 })
+      ]
+
+      const result = analyzeSemanticRegions([region], lines, [])
+
+      const financial = result[0].metadata.semantic.metrics[0].financial
+      expect(financial.delta).toBe('+18.4%')
+      expect(financial.period).toBe('YoY')
+    })
+
+    it('QoQ period extraction', () => {
+      const region = makeRegion('paragraph', {
+        boundingBox: { x: 40, y: 100, width: 200, height: 60 }
+      })
+      const lines = [
+        makeLine(100, { text: 'Change', fontSize: 12 }),
+        makeLine(120, { text: '-2.1% QoQ', fontSize: 20 })
+      ]
+
+      const result = analyzeSemanticRegions([region], lines, [])
+
+      const financial = result[0].metadata.semantic.metrics[0].financial
+      expect(financial.delta).toBe('-2.1%')
+      expect(financial.period).toBe('QoQ')
+    })
+
+    it('MoM period extraction', () => {
+      const region = makeRegion('paragraph', {
+        boundingBox: { x: 40, y: 100, width: 200, height: 60 }
+      })
+      const lines = [
+        makeLine(100, { text: 'Trend', fontSize: 12 }),
+        makeLine(120, { text: '+5% MoM', fontSize: 20 })
+      ]
+
+      const result = analyzeSemanticRegions([region], lines, [])
+
+      expect(result[0].metadata.semantic.metrics[0].financial.period).toBe('MoM')
+    })
+
+    it('vs LY period extraction', () => {
+      const region = makeRegion('paragraph', {
+        boundingBox: { x: 40, y: 100, width: 200, height: 60 }
+      })
+      const lines = [
+        makeLine(100, { text: 'Performance', fontSize: 12 }),
+        makeLine(120, { text: '+12% vs LY', fontSize: 20 })
+      ]
+
+      const result = analyzeSemanticRegions([region], lines, [])
+
+      const financial = result[0].metadata.semantic.metrics[0].financial
+      expect(financial.delta).toBe('+12%')
+      expect(financial.period).toBe('vs LY')
+    })
+
+    it('English financial label sets hasEnglishFinancialVocabularySignal: true', () => {
+      const region = makeRegion('paragraph', {
+        boundingBox: { x: 40, y: 100, width: 200, height: 60 }
+      })
+      const lines = [
+        makeLine(100, { text: 'Revenue', fontSize: 12 }),
+        makeLine(120, { text: '$12.5B', fontSize: 24 })
+      ]
+
+      const result = analyzeSemanticRegions([region], lines, [])
+
+      expect(result[0].metadata.semantic.metrics[0].financial.hasEnglishFinancialVocabularySignal).toBe(true)
+    })
+
+    it('non-English label with currency and magnitude still gets financial metadata', () => {
+      const region = makeRegion('paragraph', {
+        boundingBox: { x: 40, y: 100, width: 200, height: 60 }
+      })
+      const lines = [
+        makeLine(100, { text: 'Umsatz', fontSize: 12 }),
+        makeLine(120, { text: '$12.5B', fontSize: 24 })
+      ]
+
+      const result = analyzeSemanticRegions([region], lines, [])
+
+      const financial = result[0].metadata.semantic.metrics[0].financial
+      expect(financial).toBeDefined()
+      expect(financial.hasEnglishFinancialVocabularySignal).toBe(false)
+      expect(financial.magnitude).toBe('B')
+    })
+
+    it('non-English label without financial numeric signal does not get financial metadata', () => {
+      const region = makeRegion('paragraph', {
+        boundingBox: { x: 40, y: 100, width: 200, height: 60 }
+      })
+      const lines = [
+        makeLine(100, { text: 'Anzahl', fontSize: 12 }),
+        makeLine(120, { text: '1,234', fontSize: 24 })
+      ]
+
+      const result = analyzeSemanticRegions([region], lines, [])
+
+      expect(result[0].metadata.semantic.metrics[0].financial).toBeNull()
+    })
+
+    it('non-financial vocabulary has no vocabulary signal', () => {
+      const region = makeRegion('paragraph', {
+        boundingBox: { x: 40, y: 100, width: 200, height: 60 }
+      })
+      const lines = [
+        makeLine(100, { text: 'Count', fontSize: 12 }),
+        makeLine(120, { text: '1,234', fontSize: 24 })
+      ]
+
+      const result = analyzeSemanticRegions([region], lines, [])
+
+      const financial = result[0].metadata.semantic.metrics[0].financial
+      expect(financial).toBeNull()
+    })
+
+    it('non-financial key-value has no financial metadata', () => {
+      const region = makeRegion('paragraph', {
+        boundingBox: { x: 40, y: 100, width: 300, height: 60 }
+      })
+      const lines = [
+        makeLine(100, { text: 'Name: Alice', fontSize: 12 }),
+        makeLine(120, { text: 'Age: 30', fontSize: 12 })
+      ]
+
+      const result = analyzeSemanticRegions([region], lines, [])
+
+      expect(result[0].metadata.semantic.type).toBe('key-value-candidate')
+      expect(result[0].metadata.semantic.pairs[0].financial).toBeNull()
+      expect(result[0].metadata.semantic.pairs[1].financial).toBeNull()
+    })
+
+    it('financial key-value pair has financial metadata', () => {
+      const region = makeRegion('paragraph', {
+        boundingBox: { x: 40, y: 100, width: 300, height: 60 }
+      })
+      const lines = [
+        makeLine(100, { text: 'Revenue: $12.3B', fontSize: 12 }),
+        makeLine(120, { text: 'Assets: 4.2B', fontSize: 12 })
+      ]
+
+      const result = analyzeSemanticRegions([region], lines, [])
+
+      expect(result[0].metadata.semantic.type).toBe('key-value-candidate')
+      expect(result[0].metadata.semantic.pairs[0].financial).toBeDefined()
+      expect(result[0].metadata.semantic.pairs[0].financial.magnitude).toBe('B')
+      expect(result[0].metadata.semantic.pairs[0].financial.hasEnglishFinancialVocabularySignal).toBe(true)
+    })
+
+    it('table/heading/list regions still skipped', () => {
+      const table = makeRegion('table', { boundingBox: { x: 40, y: 100, width: 200, height: 60 } })
+      const heading = makeRegion('heading', { boundingBox: { x: 40, y: 200, width: 200, height: 30 } })
+      const list = makeRegion('list', { boundingBox: { x: 40, y: 300, width: 200, height: 60 } })
+      const lines = [
+        makeLine(100, { text: 'Revenue', fontSize: 12 }),
+        makeLine(120, { text: '$12.5B', fontSize: 24 })
+      ]
+
+      const result = analyzeSemanticRegions([table, heading, list], lines, [])
+
+      expect(result[0].metadata.semantic).toBeUndefined()
+      expect(result[1].metadata.semantic).toBeUndefined()
+      expect(result[2].metadata.semantic).toBeUndefined()
+    })
+
+    it('financial metadata objects are frozen', () => {
+      const region = makeRegion('paragraph', {
+        boundingBox: { x: 40, y: 100, width: 200, height: 60 }
+      })
+      const lines = [
+        makeLine(100, { text: 'Revenue', fontSize: 12 }),
+        makeLine(120, { text: '$12.5B', fontSize: 24 })
+      ]
+
+      const result = analyzeSemanticRegions([region], lines, [])
+
+      const financial = result[0].metadata.semantic.metrics[0].financial
+      expect(Object.isFrozen(financial)).toBe(true)
+    })
+
+    it('KPI with no financial signals has null financial', () => {
+      const region = makeRegion('paragraph', {
+        boundingBox: { x: 40, y: 100, width: 200, height: 60 }
+      })
+      const lines = [
+        makeLine(100, { text: 'Count', fontSize: 12 }),
+        makeLine(120, { text: '1,234', fontSize: 24 })
+      ]
+
+      const result = analyzeSemanticRegions([region], lines, [])
+
+      expect(result[0].metadata.semantic.metrics[0].financial).toBeNull()
+    })
+  })
 })
