@@ -2219,6 +2219,18 @@
   "window_close": {
     "message": "閉じる"
   },
+  "pdf_windows_host_aria_label": {
+    "message": "PDF翻訳ウィンドウ"
+  },
+  "pdf_windows_host_selected_text": {
+    "message": "選択されたテキスト"
+  },
+  "pdf_windows_host_copied": {
+    "message": "コピーしました"
+  },
+  "pdf_windows_host_copy_failed": {
+    "message": "コピーに失敗しました"
+  },
   "window_tts_no_text": {
     "message": "読み上げるテキストがありません"
   },

@@ -2219,6 +2219,18 @@
   "window_close": {
     "message": "Close"
   },
+  "pdf_windows_host_aria_label": {
+    "message": "PDF translation window"
+  },
+  "pdf_windows_host_selected_text": {
+    "message": "Selected text"
+  },
+  "pdf_windows_host_copied": {
+    "message": "Copied"
+  },
+  "pdf_windows_host_copy_failed": {
+    "message": "Copy failed"
+  },
   "window_tts_no_text": {
     "message": "No text available for speech"
   },

@@ -103,15 +103,7 @@
       </section>
     </main>
 
-    <PdfSelectionAction
-      :is-selected="isSelected"
-      :selection-position="selectionPosition"
-      :is-translating="isSelectionTranslating"
-      :translated-text="translatedText"
-      :translation-error="selectionTranslationError"
-      @translate="translateSelection"
-      @dismiss="dismissSelection"
-    />
+    <PdfWindowsHost />
   </div>
 </template>
 
@@ -124,13 +116,12 @@ import PdfViewerLayout from './components/PdfViewerLayout.vue'
 import PdfTranslatedPane from './components/PdfTranslatedPane.vue'
 import PdfOcrConsentPrompt from './components/PdfOcrConsentPrompt.vue'
 import PdfOcrProgress from './components/PdfOcrProgress.vue'
+import PdfWindowsHost from './components/PdfWindowsHost.vue'
 import { usePdfViewerController } from './composables/usePdfViewerController.js'
 import { usePdfBilingualMode } from './composables/usePdfBilingualMode.js'
 import { usePdfExport } from './composables/usePdfExport.js'
 import { usePdfBlockSelection } from './composables/usePdfBlockSelection.js'
 import { usePdfOcr } from './composables/usePdfOcr.js'
-import { usePdfSelectionAction } from './composables/usePdfSelectionAction.js'
-import PdfSelectionAction from './components/PdfSelectionAction.vue'
 
 const {
   error,
@@ -254,27 +245,13 @@ function handleClearCache() {
   void clearDocumentCache()
 }
 
-const {
-  isSelected,
-  selectionPosition,
-  isTranslating: isSelectionTranslating,
-  translatedText,
-  translationError: selectionTranslationError,
-  start: startSelectionAction,
-  stop: stopSelectionAction,
-  translateSelection,
-  dismiss: dismissSelection
-} = usePdfSelectionAction()
-
 onMounted(() => {
-  startSelectionAction()
   if (import.meta.env.DEV) {
     import('./debug/pdfOverlayDiagnostics.js')
   }
 })
 
 onBeforeUnmount(() => {
-  stopSelectionAction()
   void cleanup()
 })
 </script>

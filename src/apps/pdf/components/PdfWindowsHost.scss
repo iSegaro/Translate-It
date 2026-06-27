@@ -1,0 +1,194 @@
+.pdf-windows-host {
+  position: fixed;
+  z-index: 2147483647;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 14px 16px;
+  border: 1px solid rgba(124, 139, 255, 0.26);
+  border-radius: 16px;
+  background:
+    linear-gradient(180deg, rgba(16, 19, 26, 0.96) 0%, rgba(10, 13, 20, 0.98) 100%);
+  color: #e6edf7;
+  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.38);
+  backdrop-filter: blur(14px);
+  transform: translateX(-50%);
+  max-width: min(420px, calc(100vw - 24px));
+  pointer-events: auto;
+}
+
+.pdf-windows-host__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.pdf-windows-host__title-group {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.pdf-windows-host__title {
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: rgba(230, 237, 247, 0.92);
+}
+
+.pdf-windows-host__status {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 3px 8px;
+  border-radius: 999px;
+}
+
+.pdf-windows-host__status--copied {
+  background: rgba(34, 197, 94, 0.14);
+  color: #86efac;
+}
+
+.pdf-windows-host__status--failed {
+  background: rgba(239, 68, 68, 0.16);
+  color: #fca5a5;
+}
+
+.pdf-windows-host__icon-button {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  color: rgba(230, 237, 247, 0.72);
+  font-size: 22px;
+  line-height: 1;
+  padding: 0 2px;
+  cursor: pointer;
+
+  &:hover {
+    color: #ffffff;
+  }
+}
+
+.pdf-windows-host__body {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+}
+
+.pdf-windows-host__source {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.pdf-windows-host__label {
+  font-size: 11px;
+  font-weight: 700;
+  color: rgba(230, 237, 247, 0.58);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.pdf-windows-host__text,
+.pdf-windows-host__translation,
+.pdf-windows-host__state {
+  font-size: 14px;
+  line-height: 1.55;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.pdf-windows-host__text--source {
+  color: rgba(230, 237, 247, 0.86);
+  max-height: 96px;
+  overflow: auto;
+  padding-right: 4px;
+}
+
+.pdf-windows-host__state--loading {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: rgba(230, 237, 247, 0.84);
+}
+
+.pdf-windows-host__state--error {
+  color: #fda4af;
+  background: rgba(239, 68, 68, 0.1);
+  border: 1px solid rgba(239, 68, 68, 0.16);
+  border-radius: 12px;
+  padding: 10px 12px;
+}
+
+.pdf-windows-host__translation {
+  color: #f8fafc;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  padding: 12px;
+  max-height: 160px;
+  overflow: auto;
+}
+
+.pdf-windows-host__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.pdf-windows-host__primary-button,
+.pdf-windows-host__secondary-button {
+  appearance: none;
+  border: 0;
+  border-radius: 10px;
+  padding: 9px 12px;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: transform 0.15s ease, opacity 0.15s ease, background 0.15s ease;
+}
+
+.pdf-windows-host__primary-button {
+  background: linear-gradient(180deg, #6b7cff 0%, #5267f3 100%);
+  color: white;
+}
+
+.pdf-windows-host__secondary-button {
+  background: rgba(255, 255, 255, 0.08);
+  color: rgba(230, 237, 247, 0.92);
+}
+
+.pdf-windows-host__primary-button:hover,
+.pdf-windows-host__secondary-button:hover {
+  transform: translateY(-1px);
+}
+
+.pdf-windows-host__primary-button:disabled,
+.pdf-windows-host__secondary-button:disabled {
+  opacity: 0.6;
+  cursor: progress;
+  transform: none;
+}
+
+.pdf-windows-host__spinner {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  border: 2px solid rgba(255, 255, 255, 0.28);
+  border-top-color: white;
+  animation: pdf-windows-host-spin 0.75s linear infinite;
+}
+
+.pdf-windows-host__spinner--button {
+  width: 12px;
+  height: 12px;
+}
+
+@keyframes pdf-windows-host-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}

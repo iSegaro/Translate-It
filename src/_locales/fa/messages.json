@@ -2219,6 +2219,18 @@
   "window_close": {
     "message": "بستن"
   },
+  "pdf_windows_host_aria_label": {
+    "message": "پنجره ترجمه PDF"
+  },
+  "pdf_windows_host_selected_text": {
+    "message": "متن انتخاب‌شده"
+  },
+  "pdf_windows_host_copied": {
+    "message": "کپی شد"
+  },
+  "pdf_windows_host_copy_failed": {
+    "message": "کپی ناموفق بود"
+  },
   "window_tts_no_text": {
     "message": "متنی برای خواندن موجود نیست"
   },
