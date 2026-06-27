@@ -370,11 +370,40 @@ function buildCanonicalGrid(cells, rowCount, columnCount) {
       continue
     }
     const sorted = [...rowCells].sort((a, b) => a.columnIndex - b.columnIndex)
-    const frozenCells = sorted.map((c) => Object.freeze({
-      cellId: c.cellId,
-      rowIndex: c.rowIndex,
-      columnIndex: c.columnIndex
-    }))
+    const occupiedColumns = new Set(sorted.map((c) => c.columnIndex))
+    const frozenCells = sorted.map((c) => {
+      let colSpan = 1
+      let spanType = 'none'
+
+      if (
+        c.colSpanCandidate &&
+        c.estimatedColSpan > 1 &&
+        c.estimatedColSpan <= columnCount
+      ) {
+        const startCol = c.columnIndex
+        const spanEnd = startCol + c.estimatedColSpan
+        let allCoveredMissing = true
+        for (let col = startCol + 1; col < spanEnd; col++) {
+          if (occupiedColumns.has(col)) {
+            allCoveredMissing = false
+            break
+          }
+        }
+        if (allCoveredMissing) {
+          colSpan = c.estimatedColSpan
+          spanType = 'colspan-candidate'
+        }
+      }
+
+      return Object.freeze({
+        cellId: c.cellId,
+        rowIndex: c.rowIndex,
+        columnIndex: c.columnIndex,
+        colSpan,
+        rowSpan: 1,
+        spanType
+      })
+    })
     gridRows.push(Object.freeze(frozenCells))
   }
 

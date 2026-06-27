@@ -1936,7 +1936,10 @@ describe('TableRegionAnalyzer', () => {
       expect(typeof cell.cellId).toBe('string')
       expect(typeof cell.rowIndex).toBe('number')
       expect(typeof cell.columnIndex).toBe('number')
-      expect(Object.keys(cell)).toEqual(['cellId', 'rowIndex', 'columnIndex'])
+      expect(typeof cell.colSpan).toBe('number')
+      expect(typeof cell.rowSpan).toBe('number')
+      expect(typeof cell.spanType).toBe('string')
+      expect(Object.keys(cell)).toEqual(['cellId', 'rowIndex', 'columnIndex', 'colSpan', 'rowSpan', 'spanType'])
     })
 
     it('sparse row is preserved when row has fewer cells', () => {
@@ -1966,6 +1969,189 @@ describe('TableRegionAnalyzer', () => {
       expect(grid.rows[0]).toHaveLength(2)
       expect(grid.rows[1]).toHaveLength(1)
       expect(grid.rows[2]).toHaveLength(2)
+    })
+
+    it('normal cells get colSpan=1, rowSpan=1, spanType=none', () => {
+      const region = makeRegion('table', {
+        id: 'p1-r0',
+        boundingBox: { x: 40, y: 100, width: 300, height: 60 }
+      })
+      const lines = [
+        makeLine(100, {
+          regionId: 'p1-r0',
+          items: [makeItem('A', 40, 60), makeItem('B', 180, 60)]
+        }),
+        makeLine(120, {
+          regionId: 'p1-r0',
+          items: [makeItem('C', 40, 60), makeItem('D', 180, 60)]
+        })
+      ]
+
+      const result = analyzeTableRegions([region], lines, [])
+      const cell = result[0].metadata.table.grid.rows[0][0]
+
+      expect(cell.colSpan).toBe(1)
+      expect(cell.rowSpan).toBe(1)
+      expect(cell.spanType).toBe('none')
+    })
+
+    it('safe merged header gets colSpan=2', () => {
+      const region = makeRegion('table', {
+        id: 'p1-r0',
+        boundingBox: { x: 40, y: 100, width: 400, height: 80 }
+      })
+      const lines = [
+        makeLine(100, {
+          regionId: 'p1-r0',
+          items: [makeItem('Personal Info', 40, 180)]
+        }),
+        makeLine(130, {
+          regionId: 'p1-r0',
+          items: [makeItem('Name', 40, 60), makeItem('Age', 200, 60)]
+        }),
+        makeLine(150, {
+          regionId: 'p1-r0',
+          items: [makeItem('Alice', 40, 60), makeItem('30', 200, 60)]
+        })
+      ]
+
+      const result = analyzeTableRegions([region], lines, [])
+      const grid = result[0].metadata.table.grid
+      const headerCell = grid.rows[0].find((c) => c.cellId.includes('r0-c0'))
+
+      expect(headerCell.colSpan).toBe(2)
+      expect(headerCell.rowSpan).toBe(1)
+      expect(headerCell.spanType).toBe('colspan-candidate')
+    })
+
+    it('unsafe span rejected when neighbor cell exists', () => {
+      const region = makeRegion('table', {
+        id: 'p1-r0',
+        boundingBox: { x: 40, y: 100, width: 400, height: 80 }
+      })
+      const lines = [
+        makeLine(100, {
+          regionId: 'p1-r0',
+          items: [makeItem('Wide', 40, 180), makeItem('Neighbor', 200, 60)]
+        }),
+        makeLine(130, {
+          regionId: 'p1-r0',
+          items: [makeItem('A', 40, 60), makeItem('B', 200, 60)]
+        }),
+        makeLine(150, {
+          regionId: 'p1-r0',
+          items: [makeItem('C', 40, 60), makeItem('D', 200, 60)]
+        })
+      ]
+
+      const result = analyzeTableRegions([region], lines, [])
+      const grid = result[0].metadata.table.grid
+      const wideCell = grid.rows[0].find((c) => c.cellId.includes('r0-c0'))
+
+      expect(wideCell.colSpan).toBe(1)
+      expect(wideCell.spanType).toBe('none')
+    })
+
+    it('span accepted when estimatedColSpan equals columnCount', () => {
+      const region = makeRegion('table', {
+        id: 'p1-r0',
+        boundingBox: { x: 40, y: 100, width: 400, height: 80 }
+      })
+      const lines = [
+        makeLine(100, {
+          regionId: 'p1-r0',
+          items: [makeItem('Header', 40, 300)]
+        }),
+        makeLine(130, {
+          regionId: 'p1-r0',
+          items: [makeItem('A', 40, 60), makeItem('B', 200, 60)]
+        })
+      ]
+
+      const result = analyzeTableRegions([region], lines, [])
+      const table = result[0].metadata.table
+
+      expect(table.columnCount).toBe(2)
+      const headerCell = table.grid.rows[0].find((c) => c.cellId.includes('r0-c0'))
+      expect(headerCell.colSpan).toBe(2)
+      expect(headerCell.spanType).toBe('colspan-candidate')
+    })
+
+    it('rowSpan is always 1', () => {
+      const region = makeRegion('table', {
+        id: 'p1-r0',
+        boundingBox: { x: 40, y: 100, width: 400, height: 100 }
+      })
+      const lines = [
+        makeLine(100, {
+          regionId: 'p1-r0',
+          items: [makeItem('Header', 40, 180)]
+        }),
+        makeLine(130, {
+          regionId: 'p1-r0',
+          items: [makeItem('A', 40, 60), makeItem('B', 200, 60)]
+        }),
+        makeLine(150, {
+          regionId: 'p1-r0',
+          items: [makeItem('C', 40, 60), makeItem('D', 200, 60)]
+        })
+      ]
+
+      const result = analyzeTableRegions([region], lines, [])
+      const allCells = result[0].metadata.table.grid.rows.flat()
+
+      expect(allCells.every((c) => c.rowSpan === 1)).toBe(true)
+    })
+
+    it('grid cell objects are frozen', () => {
+      const region = makeRegion('table', {
+        id: 'p1-r0',
+        boundingBox: { x: 40, y: 100, width: 300, height: 60 }
+      })
+      const lines = [
+        makeLine(100, {
+          regionId: 'p1-r0',
+          items: [makeItem('A', 40), makeItem('B', 180)]
+        }),
+        makeLine(120, {
+          regionId: 'p1-r0',
+          items: [makeItem('C', 40), makeItem('D', 180)]
+        })
+      ]
+
+      const result = analyzeTableRegions([region], lines, [])
+      const cell = result[0].metadata.table.grid.rows[0][0]
+
+      expect(Object.isFrozen(cell)).toBe(true)
+    })
+
+    it('existing table.cells are unchanged', () => {
+      const region = makeRegion('table', {
+        id: 'p1-r0',
+        boundingBox: { x: 40, y: 100, width: 400, height: 80 }
+      })
+      const lines = [
+        makeLine(100, {
+          regionId: 'p1-r0',
+          items: [makeItem('Header', 40, 180)]
+        }),
+        makeLine(130, {
+          regionId: 'p1-r0',
+          items: [makeItem('A', 40, 60), makeItem('B', 200, 60)]
+        }),
+        makeLine(150, {
+          regionId: 'p1-r0',
+          items: [makeItem('C', 40, 60), makeItem('D', 200, 60)]
+        })
+      ]
+
+      const result = analyzeTableRegions([region], lines, [])
+      const cells = result[0].metadata.table.cells
+      const headerCell = cells.find((c) => c.text === 'Header')
+
+      expect(headerCell.colSpanCandidate).toBe(true)
+      expect(headerCell.estimatedColSpan).toBe(2)
+      expect(headerCell.text).toBe('Header')
     })
   })
 
