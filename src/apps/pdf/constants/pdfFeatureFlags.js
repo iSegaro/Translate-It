@@ -17,3 +17,10 @@
  * instead of raw PDF item geometry.
  */
 export const PDF_OVERLAY_USE_CELL_MASKS = false
+
+/**
+ * Enable dev-only mask overlay diagnostics.
+ * When true and import.meta.env.DEV, logs source-vs-mask geometry comparison.
+ * Requires PDF_OVERLAY_USE_CELL_MASKS to also be true for meaningful output.
+ */
+export const PDF_OVERLAY_MASK_DIAGNOSTICS = false

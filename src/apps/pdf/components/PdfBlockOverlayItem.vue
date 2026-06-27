@@ -64,13 +64,14 @@
 </template>
 
 <script setup>
-import { computed, onBeforeUnmount } from 'vue'
+import { computed, onBeforeUnmount, watch } from 'vue'
 import { resolveFontFamily, resolveAscent, resolveDescent, detectTextDirection, buildOverlayBaseStyle, OVERLAY_BACKGROUND } from '../utils/pdfOverlayTypography.js'
 import { sampleCanvasBackgroundColor, clearColorCache } from '../utils/pdfCanvasSampler.js'
 import { usePdfTextFitter } from '../composables/usePdfTextFitter.js'
 import { resolvePdfCellOverlayWidth } from '@/features/pdf-translation/core/PdfCellSpanLayout.js'
 import { resolveCellOverlayGeometry } from '../utils/pdfMaskGeometry.js'
-import { PDF_OVERLAY_USE_CELL_MASKS } from '../constants/pdfFeatureFlags.js'
+import { PDF_OVERLAY_USE_CELL_MASKS, PDF_OVERLAY_MASK_DIAGNOSTICS } from '../constants/pdfFeatureFlags.js'
+import { buildCellMaskOverlayDiagnostics } from '../utils/pdfMaskOverlayDiagnostics.js'
 import PdfCellOverlayItem from './PdfCellOverlayItem.vue'
 import PdfLineOverlayItem from './PdfLineOverlayItem.vue'
 
@@ -252,6 +253,24 @@ const cellOverlayData = computed(() => {
     }
   }).filter(Boolean)
 })
+
+if (import.meta.env.DEV && PDF_OVERLAY_MASK_DIAGNOSTICS) {
+  const maskDiagnostics = computed(() => {
+    if (!props.maskMap || !translatedCells.value) return []
+
+    return buildCellMaskOverlayDiagnostics({
+      block: props.block,
+      translatedCells: translatedCells.value,
+      maskMap: props.maskMap
+    })
+  })
+
+  watch(maskDiagnostics, (diags) => {
+    if (diags.length > 0) {
+      console.debug(`[PdfBlockOverlayItem] Mask overlay diagnostics for ${props.block.id}:`, diags)
+    }
+  }, { immediate: true })
+}
 
 const lineOverlayData = computed(() => {
   if (!useLineOverlay.value) return []
