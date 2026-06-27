@@ -1763,4 +1763,298 @@ describe('SemanticRegionAnalyzer', () => {
       expect(selectFinancialEntries(semantic)).toBeNull()
     })
   })
+
+  describe('semantic relationships', () => {
+    it('previous / next ordering in reading order', () => {
+      const regions = [
+        makeRegion('paragraph', { id: 'p1-r0', boundingBox: { x: 40, y: 300, width: 200, height: 60 } }),
+        makeRegion('paragraph', { id: 'p1-r1', boundingBox: { x: 40, y: 100, width: 200, height: 60 } }),
+        makeRegion('paragraph', { id: 'p1-r2', boundingBox: { x: 40, y: 200, width: 200, height: 60 } })
+      ]
+      const lines = [
+        makeLine(310, { text: '12,300', fontSize: 24, x: 40, width: 200 }),
+        makeLine(325, { text: 'Revenue', fontSize: 12, x: 40, width: 200 }),
+        makeLine(110, { text: '18.4', fontSize: 24, x: 40, width: 200 }),
+        makeLine(125, { text: 'Growth', fontSize: 12, x: 40, width: 200 }),
+        makeLine(210, { text: '4,500', fontSize: 24, x: 40, width: 200 }),
+        makeLine(225, { text: 'Profit', fontSize: 12, x: 40, width: 200 })
+      ]
+
+      const result = analyzeSemanticRegions(regions, lines, [])
+
+      const r0 = result[0].metadata.semantic.relationships
+      const r1 = result[1].metadata.semantic.relationships
+      const r2 = result[2].metadata.semantic.relationships
+
+      expect(r0.previousRegionId).toBe('p1-r2')
+      expect(r0.nextRegionId).toBeNull()
+      expect(r1.previousRegionId).toBeNull()
+      expect(r1.nextRegionId).toBe('p1-r2')
+      expect(r2.previousRegionId).toBe('p1-r1')
+      expect(r2.nextRegionId).toBe('p1-r0')
+    })
+
+    it('left-to-right ordering within same row', () => {
+      const regions = [
+        makeRegion('paragraph', { id: 'p1-r0', boundingBox: { x: 200, y: 100, width: 100, height: 50 } }),
+        makeRegion('paragraph', { id: 'p1-r1', boundingBox: { x: 40, y: 100, width: 100, height: 50 } }),
+        makeRegion('paragraph', { id: 'p1-r2', boundingBox: { x: 360, y: 100, width: 100, height: 50 } })
+      ]
+      const lines = [
+        makeLine(110, { text: '55', fontSize: 24, x: 200, width: 100 }),
+        makeLine(125, { text: 'Rate', fontSize: 12, x: 200, width: 100 }),
+        makeLine(110, { text: '12,300', fontSize: 24, x: 40, width: 100 }),
+        makeLine(125, { text: 'Revenue', fontSize: 12, x: 40, width: 100 }),
+        makeLine(110, { text: '4,500', fontSize: 24, x: 360, width: 100 }),
+        makeLine(125, { text: 'Profit', fontSize: 12, x: 360, width: 100 })
+      ]
+
+      const result = analyzeSemanticRegions(regions, lines, [])
+
+      const r0 = result[0].metadata.semantic.relationships
+      const r1 = result[1].metadata.semantic.relationships
+      const r2 = result[2].metadata.semantic.relationships
+
+      expect(r1.nextRegionId).toBe('p1-r0')
+      expect(r0.nextRegionId).toBe('p1-r2')
+      expect(r2.nextRegionId).toBeNull()
+    })
+
+    it('dashboardGroupId propagation', () => {
+      const regions = [
+        makeRegion('paragraph', { id: 'p1-r0', boundingBox: { x: 40, y: 100, width: 100, height: 50 } }),
+        makeRegion('paragraph', { id: 'p1-r1', boundingBox: { x: 160, y: 100, width: 100, height: 50 } })
+      ]
+      const lines = [
+        makeLine(110, { text: '12,300', fontSize: 24, x: 40, width: 100 }),
+        makeLine(125, { text: 'Revenue', fontSize: 12, x: 40, width: 100 }),
+        makeLine(110, { text: '18.4', fontSize: 24, x: 160, width: 100 }),
+        makeLine(125, { text: 'Growth', fontSize: 12, x: 160, width: 100 })
+      ]
+
+      const result = analyzeSemanticRegions(regions, lines, [])
+
+      const r0 = result[0].metadata.semantic.relationships
+      const r1 = result[1].metadata.semantic.relationships
+
+      expect(r0.dashboardGroupId).toBe(result[0].metadata.semantic.dashboardGroup.groupId)
+      expect(r1.dashboardGroupId).toBe(result[1].metadata.semantic.dashboardGroup.groupId)
+      expect(r0.dashboardGroupId).toBe(r1.dashboardGroupId)
+    })
+
+    it('dashboardGroupId is null for ungrouped regions', () => {
+      const regions = [
+        makeRegion('paragraph', { id: 'p1-r0', boundingBox: { x: 40, y: 100, width: 100, height: 50 } })
+      ]
+      const lines = [
+        makeLine(110, { text: '12,300', fontSize: 24, x: 40, width: 100 }),
+        makeLine(125, { text: 'Revenue', fontSize: 12, x: 40, width: 100 })
+      ]
+
+      const result = analyzeSemanticRegions(regions, lines, [])
+
+      expect(result[0].metadata.semantic.relationships.dashboardGroupId).toBeNull()
+    })
+
+    it('contained region parent assignment', () => {
+      const regions = [
+        makeRegion('paragraph', { id: 'outer', boundingBox: { x: 40, y: 100, width: 400, height: 200 } }),
+        makeRegion('paragraph', { id: 'inner', boundingBox: { x: 60, y: 120, width: 100, height: 50 } })
+      ]
+      const lines = [
+        makeLine(110, { text: 'Revenue', fontSize: 12, x: 40, width: 400 }),
+        makeLine(130, { text: '$12.5B', fontSize: 24, x: 60, width: 100 }),
+        makeLine(150, { text: 'Growth', fontSize: 12, x: 60, width: 100 }),
+        makeLine(170, { text: '18.4%', fontSize: 20, x: 60, width: 100 }),
+        makeLine(250, { text: 'More', fontSize: 12, x: 40, width: 400 })
+      ]
+
+      const result = analyzeSemanticRegions(regions, lines, [])
+
+      const outer = result[0].metadata.semantic.relationships
+      const inner = result[1].metadata.semantic.relationships
+
+      expect(inner.parentRegionId).toBe('outer')
+      expect(outer.childRegionIds).toContain('inner')
+    })
+
+    it('nested containment chooses nearest parent', () => {
+      const regions = [
+        makeRegion('paragraph', { id: 'grand', boundingBox: { x: 40, y: 100, width: 500, height: 140 } }),
+        makeRegion('paragraph', { id: 'parent', boundingBox: { x: 60, y: 120, width: 300, height: 80 } }),
+        makeRegion('paragraph', { id: 'child', boundingBox: { x: 80, y: 135, width: 120, height: 50 } })
+      ]
+      const lines = [
+        makeLine(110, { text: 'Total', fontSize: 12, x: 40, width: 500 }),
+        makeLine(160, { text: '$100B', fontSize: 24, x: 40, width: 500 }),
+        makeLine(140, { text: 'Revenue', fontSize: 12, x: 60, width: 300 }),
+        makeLine(170, { text: '$50B', fontSize: 24, x: 60, width: 300 })
+      ]
+
+      const result = analyzeSemanticRegions(regions, lines, [])
+
+      const parentRel = result[1].metadata.semantic.relationships
+      expect(parentRel.parentRegionId).toBe('grand')
+    })
+
+    it('no parent when regions merely overlap but do not contain', () => {
+      const regions = [
+        makeRegion('paragraph', { id: 'a', boundingBox: { x: 40, y: 100, width: 200, height: 100 } }),
+        makeRegion('paragraph', { id: 'b', boundingBox: { x: 140, y: 150, width: 200, height: 100 } })
+      ]
+      const lines = [
+        makeLine(110, { text: 'Revenue', fontSize: 12, x: 40, width: 200 }),
+        makeLine(130, { text: '$12.5B', fontSize: 24, x: 40, width: 200 }),
+        makeLine(160, { text: 'Growth', fontSize: 12, x: 140, width: 200 }),
+        makeLine(180, { text: '18.4%', fontSize: 20, x: 140, width: 200 })
+      ]
+
+      const result = analyzeSemanticRegions(regions, lines, [])
+
+      expect(result[0].metadata.semantic.relationships.parentRegionId).toBeNull()
+      expect(result[1].metadata.semantic.relationships.parentRegionId).toBeNull()
+    })
+
+    it('no parent when regions are equal', () => {
+      const regions = [
+        makeRegion('paragraph', { id: 'a', boundingBox: { x: 40, y: 100, width: 200, height: 100 } }),
+        makeRegion('paragraph', { id: 'b', boundingBox: { x: 40, y: 100, width: 200, height: 100 } })
+      ]
+      const lines = [
+        makeLine(110, { text: 'Revenue', fontSize: 12, x: 40, width: 200 }),
+        makeLine(130, { text: '$12.5B', fontSize: 24, x: 40, width: 200 }),
+        makeLine(160, { text: 'Growth', fontSize: 12, x: 40, width: 200 }),
+        makeLine(180, { text: '18.4%', fontSize: 20, x: 40, width: 200 })
+      ]
+
+      const result = analyzeSemanticRegions(regions, lines, [])
+
+      expect(result[0].metadata.semantic.relationships.parentRegionId).toBeNull()
+      expect(result[1].metadata.semantic.relationships.parentRegionId).toBeNull()
+    })
+
+    it('frozen relationship objects', () => {
+      const regions = [
+        makeRegion('paragraph', { id: 'p1-r0', boundingBox: { x: 40, y: 100, width: 200, height: 60 } }),
+        makeRegion('paragraph', { id: 'p1-r1', boundingBox: { x: 40, y: 200, width: 200, height: 60 } })
+      ]
+      const lines = [
+        makeLine(110, { text: 'Revenue', fontSize: 12, x: 40, width: 200 }),
+        makeLine(130, { text: '$12.5B', fontSize: 24, x: 40, width: 200 }),
+        makeLine(210, { text: 'Growth', fontSize: 12, x: 40, width: 200 }),
+        makeLine(230, { text: '18.4%', fontSize: 20, x: 40, width: 200 })
+      ]
+
+      const result = analyzeSemanticRegions(regions, lines, [])
+
+      const rel = result[0].metadata.semantic.relationships
+      expect(Object.isFrozen(rel)).toBe(true)
+      expect(Object.isFrozen(rel.childRegionIds)).toBe(true)
+    })
+
+    it('frozen child arrays', () => {
+      const regions = [
+        makeRegion('paragraph', { id: 'outer', boundingBox: { x: 40, y: 100, width: 400, height: 200 } }),
+        makeRegion('paragraph', { id: 'inner1', boundingBox: { x: 60, y: 120, width: 120, height: 80 } }),
+        makeRegion('paragraph', { id: 'inner2', boundingBox: { x: 60, y: 190, width: 120, height: 80 } })
+      ]
+      const lines = [
+        makeLine(150, { text: '$30B', fontSize: 24, x: 60, width: 120 }),
+        makeLine(170, { text: 'Revenue', fontSize: 12, x: 60, width: 120 }),
+        makeLine(210, { text: '$15B', fontSize: 24, x: 60, width: 120 }),
+        makeLine(230, { text: 'Cost', fontSize: 12, x: 60, width: 120 })
+      ]
+
+      const result = analyzeSemanticRegions(regions, lines, [])
+
+      const outerRel = result[0].metadata.semantic.relationships
+      expect(Object.isFrozen(outerRel.childRegionIds)).toBe(true)
+      expect(outerRel.childRegionIds).toContain('inner1')
+      expect(outerRel.childRegionIds).toContain('inner2')
+    })
+
+    it('backward compatibility: non-semantic regions have no relationships', () => {
+      const regions = [
+        makeRegion('heading', { id: 'h0', boundingBox: { x: 40, y: 50, width: 200, height: 30 } }),
+        makeRegion('paragraph', { id: 'p0', boundingBox: { x: 40, y: 100, width: 200, height: 60 } })
+      ]
+      const lines = [
+        makeLine(55, { text: 'Title', fontSize: 18, x: 40, width: 200 }),
+        makeLine(110, { text: 'Revenue', fontSize: 12, x: 40, width: 200 }),
+        makeLine(130, { text: '$12.5B', fontSize: 24, x: 40, width: 200 })
+      ]
+
+      const result = analyzeSemanticRegions(regions, lines, [])
+
+      expect(result[0].metadata.semantic).toBeUndefined()
+      expect(result[1].metadata.semantic).toBeDefined()
+      expect(result[1].metadata.semantic.relationships).toBeDefined()
+      expect(result[1].metadata.semantic.relationships.previousRegionId).toBeNull()
+    })
+
+    it('single semantic region has null previous and next', () => {
+      const regions = [
+        makeRegion('paragraph', { id: 'p1-r0', boundingBox: { x: 40, y: 100, width: 200, height: 60 } })
+      ]
+      const lines = [
+        makeLine(110, { text: 'Revenue', fontSize: 12, x: 40, width: 200 }),
+        makeLine(130, { text: '$12.5B', fontSize: 24, x: 40, width: 200 })
+      ]
+
+      const result = analyzeSemanticRegions(regions, lines, [])
+
+      const rel = result[0].metadata.semantic.relationships
+      expect(rel.previousRegionId).toBeNull()
+      expect(rel.nextRegionId).toBeNull()
+      expect(rel.parentRegionId).toBeNull()
+      expect(rel.childRegionIds).toHaveLength(0)
+    })
+
+    it('empty input returns empty array', () => {
+      const result = analyzeSemanticRegions([], [], [])
+
+      expect(result).toEqual([])
+      expect(Object.isFrozen(result)).toBe(true)
+    })
+
+    it('no semantic regions means no relationships', () => {
+      const regions = [
+        makeRegion('heading', { id: 'h0', boundingBox: { x: 40, y: 100, width: 200, height: 30 } })
+      ]
+      const lines = [
+        makeLine(105, { text: 'Title', fontSize: 18, x: 40, width: 200 })
+      ]
+
+      const result = analyzeSemanticRegions(regions, lines, [])
+
+      expect(result[0].metadata.semantic).toBeUndefined()
+    })
+
+    it('previous/next skips non-semantic regions', () => {
+      const regions = [
+        makeRegion('heading', { id: 'h0', boundingBox: { x: 40, y: 50, width: 200, height: 30 } }),
+        makeRegion('paragraph', { id: 'p1-r0', boundingBox: { x: 40, y: 100, width: 200, height: 60 } }),
+        makeRegion('list', { id: 'l0', boundingBox: { x: 40, y: 180, width: 200, height: 30 } }),
+        makeRegion('paragraph', { id: 'p1-r1', boundingBox: { x: 40, y: 220, width: 200, height: 60 } })
+      ]
+      const lines = [
+        makeLine(55, { text: 'Title', fontSize: 18, x: 40, width: 200 }),
+        makeLine(110, { text: 'Revenue', fontSize: 12, x: 40, width: 200 }),
+        makeLine(130, { text: '$12.5B', fontSize: 24, x: 40, width: 200 }),
+        makeLine(185, { text: '• Item', fontSize: 12, x: 40, width: 200 }),
+        makeLine(230, { text: 'Growth', fontSize: 12, x: 40, width: 200 }),
+        makeLine(250, { text: '18.4%', fontSize: 20, x: 40, width: 200 })
+      ]
+
+      const result = analyzeSemanticRegions(regions, lines, [])
+
+      const r0 = result[1].metadata.semantic.relationships
+      const r1 = result[3].metadata.semantic.relationships
+
+      expect(r0.previousRegionId).toBeNull()
+      expect(r0.nextRegionId).toBe('p1-r1')
+      expect(r1.previousRegionId).toBe('p1-r0')
+      expect(r1.nextRegionId).toBeNull()
+    })
+  })
 })

@@ -6,7 +6,9 @@
  * (delta, polarity, magnitude, period) to metrics and pairs.
  * Phase L6d-b adds three-line metric parsing: delta lines attach to
  * the nearest value metric instead of becoming standalone metrics.
- * All diagnostic-only — no rendering, translation, or adapter changes.
+ * Phase L6e adds semantic relationships (parent/child, ordering, dashboard)
+ * between detected regions. All diagnostic-only — no rendering, translation,
+ * or adapter changes.
  *
  * Pipeline position: after analyzeTableRegions, before buildMetadata.
  */
@@ -907,12 +909,109 @@ function getMedianFontSizeForRegions(regions, lines) {
 }
 
 /**
- * Enrich non-table regions with semantic metadata for KPI candidates
- * and detect dashboard groups.
+ * Check if bounding box A fully contains bounding box B.
+ * Uses strict containment (edges must be inside, not just touching).
+ */
+function bboxContains(a, b) {
+  return a.x < b.x && a.y < b.y && a.x + a.width > b.x + b.width && a.y + a.height > b.y + b.height
+}
+
+/**
+ * Build semantic relationships between enriched regions.
+ *
+ * Populates `semantic.relationships` on each region that has semantic metadata.
+ * Relationships include parent/child containment, reading-order links, and
+ * dashboard group membership. Only geometric containment is used for parent/child.
+ *
+ * @param {Object[]} enrichedRegions — regions with semantic metadata and dashboard groups
+ * @returns {Object[]} new frozen array with relationships attached
+ */
+function buildRelationships(enrichedRegions) {
+  const semanticRegions = enrichedRegions.filter((r) => r.metadata?.semantic != null)
+
+  if (semanticRegions.length === 0) return enrichedRegions
+
+  const readingOrder = [...semanticRegions].sort((a, b) => {
+    const ay = a.boundingBox.y
+    const by = b.boundingBox.y
+    if (Math.abs(ay - by) > 5) return ay - by
+    return a.boundingBox.x - b.boundingBox.x
+  })
+
+  const orderedIds = readingOrder.map((r) => r.id)
+  const orderedMap = new Map()
+  for (let i = 0; i < orderedIds.length; i++) {
+    orderedMap.set(orderedIds[i], { prev: i > 0 ? orderedIds[i - 1] : null, next: i < orderedIds.length - 1 ? orderedIds[i + 1] : null })
+  }
+
+  const containedBy = new Map()
+  for (const region of semanticRegions) {
+    let smallestParent = null
+    let smallestArea = Infinity
+
+    for (const candidate of semanticRegions) {
+      if (candidate.id === region.id) continue
+      if (bboxContains(candidate.boundingBox, region.boundingBox)) {
+        const area = candidate.boundingBox.width * candidate.boundingBox.height
+        if (area < smallestArea) {
+          smallestArea = area
+          smallestParent = candidate.id
+        }
+      }
+    }
+
+    containedBy.set(region.id, smallestParent)
+  }
+
+  const childrenMap = new Map()
+  for (const [childId, parentId] of containedBy) {
+    if (parentId == null) continue
+    if (!childrenMap.has(parentId)) childrenMap.set(parentId, [])
+    childrenMap.get(parentId).push(childId)
+  }
+
+  const relationshipMap = new Map()
+  for (const region of semanticRegions) {
+    const id = region.id
+    const order = orderedMap.get(id)
+    const dashboardGroupId = region.metadata?.semantic?.dashboardGroup?.groupId || null
+
+    relationshipMap.set(id, Object.freeze({
+      parentRegionId: containedBy.get(id) || null,
+      childRegionIds: Object.freeze(childrenMap.get(id) || []),
+      previousRegionId: order?.prev || null,
+      nextRegionId: order?.next || null,
+      dashboardGroupId
+    }))
+  }
+
+  return enrichedRegions.map((region) => {
+    const rel = relationshipMap.get(region.id)
+    if (!rel) return region
+
+    return Object.freeze({
+      ...region,
+      childRegionIds: Object.freeze([...region.childRegionIds]),
+      blockIds: Object.freeze([...region.blockIds]),
+      metadata: Object.freeze({
+        ...region.metadata,
+        semantic: Object.freeze({
+          ...region.metadata.semantic,
+          relationships: rel
+        })
+      })
+    })
+  })
+}
+
+/**
+ * Enrich non-table regions with semantic metadata for KPI candidates,
+ * detect dashboard groups, and build semantic relationships.
  *
  * Returns a new frozen array of regions. For regions that match KPI candidate
  * criteria, adds a `semantic` field to metadata. Non-matching regions are unchanged.
  * Dashboard groups are detected and attached to member regions.
+ * Relationships between semantic regions are computed and attached.
  * Does NOT mutate input regions.
  *
  * @param {Object[]} regions — classified regions from analyzeTableRegions
@@ -946,5 +1045,6 @@ export function analyzeSemanticRegions(regions = [], lines = [], blocks = []) { 
     })
   })
 
-  return Object.freeze(detectDashboardGroups(enrichedRegions, lines))
+  const withDashboard = detectDashboardGroups(enrichedRegions, lines)
+  return Object.freeze(buildRelationships(withDashboard))
 }
