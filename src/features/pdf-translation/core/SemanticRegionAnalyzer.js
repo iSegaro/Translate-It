@@ -585,6 +585,128 @@ function computeConfidence(signals) {
   )
 }
 
+function detectFinancialStatement(entries) {
+  if (!entries || entries.length < 3) return null
+
+  const financialRows = entries.filter((e) => e.financial != null)
+  if (financialRows.length < 3) return null
+
+  const multipleFinancialRows = financialRows.length >= 3
+
+  const currencyCounts = new Map()
+  const magnitudeCounts = new Map()
+  for (const row of financialRows) {
+    const val = row.value || ''
+    const currencyMatch = val.match(CURRENCY_PATTERN)
+    if (currencyMatch) {
+      currencyCounts.set(currencyMatch[0], (currencyCounts.get(currencyMatch[0]) || 0) + 1)
+    }
+    const mag = row.financial.magnitude
+    if (mag) {
+      magnitudeCounts.set(mag, (magnitudeCounts.get(mag) || 0) + 1)
+    }
+  }
+
+  let hasConsistentCurrency = false
+  let primaryCurrency = null
+  const totalRows = financialRows.length
+  for (const [symbol, count] of currencyCounts) {
+    if (count / totalRows >= 0.5) {
+      hasConsistentCurrency = true
+      primaryCurrency = symbol
+      break
+    }
+  }
+  if (!hasConsistentCurrency) {
+    for (const [, count] of magnitudeCounts) {
+      if (count / totalRows >= 0.5) {
+        hasConsistentCurrency = true
+        break
+      }
+    }
+  }
+
+  let totalRowCount = 0
+  let negativeRowCount = 0
+  let vocabularyCount = 0
+
+  for (const row of financialRows) {
+    const f = row.financial
+    if (f.subtypes && f.subtypes.includes('total-row')) totalRowCount++
+    if (f.polarity === 'negative') negativeRowCount++
+    if (f.hasEnglishFinancialVocabularySignal) vocabularyCount++
+  }
+
+  const totalSubtotalPresence = totalRowCount > 0
+  const negativeValuePresence = negativeRowCount > 0
+  const financialVocabularyDensity = vocabularyCount / totalRows >= 0.5
+
+  const signalCount = [
+    multipleFinancialRows,
+    hasConsistentCurrency,
+    totalSubtotalPresence,
+    negativeValuePresence,
+    financialVocabularyDensity
+  ].filter(Boolean).length
+
+  if (signalCount < 3) return null
+
+  const sourceIndices = []
+  for (const row of financialRows) {
+    const idx = row.valueLineIndex ?? row.labelLineIndex
+    if (idx != null && !sourceIndices.includes(idx)) {
+      sourceIndices.push(idx)
+    }
+  }
+  sourceIndices.sort((a, b) => a - b)
+
+  return Object.freeze({
+    type: 'statement-fragment',
+    confidence: Math.round((signalCount / 5) * 100) / 100,
+    rowCount: financialRows.length,
+    totalRowCount,
+    negativeRowCount,
+    hasConsistentCurrency,
+    primaryCurrency,
+    sourceLineIndices: Object.freeze(sourceIndices),
+    signals: Object.freeze({
+      multipleFinancialRows,
+      currencyConsistency: hasConsistentCurrency,
+      totalSubtotalPresence,
+      negativeValuePresence,
+      financialVocabularyDensity
+    })
+  })
+}
+
+export function selectFinancialEntries(semantic) {
+  const pairs = semantic.pairs
+  const metrics = semantic.metrics
+
+  if (!pairs && !metrics) return null
+  if (pairs && !metrics) return pairs
+  if (!pairs && metrics) return metrics
+
+  const pairFinancialCount = pairs.filter((e) => e.financial != null).length
+  const metricFinancialCount = metrics.filter((e) => e.financial != null).length
+
+  return pairFinancialCount >= metricFinancialCount ? pairs : metrics
+}
+
+function attachFinancialStatement(semantic) {
+  if (!semantic) return null
+  const entries = selectFinancialEntries(semantic)
+  if (!entries) return semantic
+
+  const financialStatement = detectFinancialStatement(entries)
+  if (!financialStatement) return semantic
+
+  return Object.freeze({
+    ...semantic,
+    financialStatement
+  })
+}
+
 function buildSemanticMetadata(region, lines) {
   const regionType = region.type
   if (regionType === REGION_TYPE_TABLE || regionType === REGION_TYPE_HEADING || regionType === REGION_TYPE_LIST) {
@@ -599,7 +721,7 @@ function buildSemanticMetadata(region, lines) {
 
   if (kpiConfidence >= KPI_CONFIDENCE_THRESHOLD && kpiConfidence >= kvConfidence) {
     const metrics = detectMetrics(region, lines)
-    return Object.freeze({
+    return attachFinancialStatement(Object.freeze({
       type: 'kpi-candidate',
       confidence: Math.round(kpiConfidence * 100) / 100,
       signals: Object.freeze({
@@ -610,16 +732,16 @@ function buildSemanticMetadata(region, lines) {
         lineCount: kpiSignals.lineCount
       }),
       metrics: Object.freeze(metrics)
-    })
+    }))
   }
 
   if (kvConfidence >= KV_CONFIDENCE_THRESHOLD && kvConfidence > kpiConfidence) {
-    return kvSemantic
+    return attachFinancialStatement(kvSemantic)
   }
 
   if (kpiConfidence >= KPI_CONFIDENCE_THRESHOLD) {
     const metrics = detectMetrics(region, lines)
-    return Object.freeze({
+    return attachFinancialStatement(Object.freeze({
       type: 'kpi-candidate',
       confidence: Math.round(kpiConfidence * 100) / 100,
       signals: Object.freeze({
@@ -630,11 +752,11 @@ function buildSemanticMetadata(region, lines) {
         lineCount: kpiSignals.lineCount
       }),
       metrics: Object.freeze(metrics)
-    })
+    }))
   }
 
   if (kvConfidence >= KV_CONFIDENCE_THRESHOLD) {
-    return kvSemantic
+    return attachFinancialStatement(kvSemantic)
   }
 
   return null

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { analyzeSemanticRegions } from './SemanticRegionAnalyzer.js'
+import { analyzeSemanticRegions, selectFinancialEntries } from './SemanticRegionAnalyzer.js'
 
 function makeRegion(type, { id = 'p1-r0', boundingBox = { x: 40, y: 100, width: 200, height: 60 }, metadata = {} } = {}) {
   return {
@@ -1435,6 +1435,332 @@ describe('SemanticRegionAnalyzer', () => {
       const financial = result[0].metadata.semantic.metrics[0].financial
       expect(financial.subtype).toBe('summary-row')
       expect(financial.subtypes).toContain('summary-row')
+    })
+  })
+
+  describe('financial statement fragment detection', () => {
+    it('balance-sheet fragment gets financialStatement', () => {
+      const region = makeRegion('paragraph', {
+        boundingBox: { x: 40, y: 100, width: 400, height: 100 }
+      })
+      const lines = [
+        makeLine(100, { text: 'Current Assets: $8.2B', fontSize: 12 }),
+        makeLine(120, { text: 'Cash: $2.1B', fontSize: 12 }),
+        makeLine(140, { text: 'Accounts Receivable: $3.4B', fontSize: 12 }),
+        makeLine(160, { text: 'Total Current Assets: $13.7B', fontSize: 12 })
+      ]
+
+      const result = analyzeSemanticRegions([region], lines, [])
+
+      const fs = result[0].metadata.semantic.financialStatement
+      expect(fs).toBeDefined()
+      expect(fs.type).toBe('statement-fragment')
+      expect(fs.rowCount).toBe(4)
+      expect(fs.totalRowCount).toBe(1)
+    })
+
+    it('income-statement fragment gets financialStatement', () => {
+      const region = makeRegion('paragraph', {
+        boundingBox: { x: 40, y: 100, width: 400, height: 120 }
+      })
+      const lines = [
+        makeLine(100, { text: 'Revenue: $12.3B', fontSize: 12 }),
+        makeLine(120, { text: 'Cost of Revenue: ($4.1B)', fontSize: 12 }),
+        makeLine(140, { text: 'Gross Profit: $8.2B', fontSize: 12 }),
+        makeLine(160, { text: 'Operating Expense: ($5.1B)', fontSize: 12 }),
+        makeLine(180, { text: 'Operating Income: $3.1B', fontSize: 12 }),
+        makeLine(200, { text: 'Net Income: $2.4B', fontSize: 12 })
+      ]
+
+      const result = analyzeSemanticRegions([region], lines, [])
+
+      const fs = result[0].metadata.semantic.financialStatement
+      expect(fs).toBeDefined()
+      expect(fs.type).toBe('statement-fragment')
+      expect(fs.rowCount).toBe(6)
+      expect(fs.totalRowCount).toBe(4)
+      expect(fs.negativeRowCount).toBe(2)
+    })
+
+    it('totalRowCount counts total-row subtypes', () => {
+      const region = makeRegion('paragraph', {
+        boundingBox: { x: 40, y: 100, width: 400, height: 100 }
+      })
+      const lines = [
+        makeLine(100, { text: 'Assets: $8.2B', fontSize: 12 }),
+        makeLine(120, { text: 'Liabilities: $4.1B', fontSize: 12 }),
+        makeLine(140, { text: 'Total Equity: $4.1B', fontSize: 12 }),
+        makeLine(160, { text: 'Total Liabilities and Equity: $8.2B', fontSize: 12 })
+      ]
+
+      const result = analyzeSemanticRegions([region], lines, [])
+
+      const fs = result[0].metadata.semantic.financialStatement
+      expect(fs).toBeDefined()
+      expect(fs.totalRowCount).toBe(2)
+    })
+
+    it('negativeRowCount counts negative polarity entries', () => {
+      const region = makeRegion('paragraph', {
+        boundingBox: { x: 40, y: 100, width: 400, height: 100 }
+      })
+      const lines = [
+        makeLine(100, { text: 'Revenue: $12.3B', fontSize: 12 }),
+        makeLine(120, { text: 'Expenses: ($5.1B)', fontSize: 12 }),
+        makeLine(140, { text: 'Losses: ($2.1B)', fontSize: 12 }),
+        makeLine(160, { text: 'Net: $5.1B', fontSize: 12 })
+      ]
+
+      const result = analyzeSemanticRegions([region], lines, [])
+
+      const fs = result[0].metadata.semantic.financialStatement
+      expect(fs).toBeDefined()
+      expect(fs.negativeRowCount).toBe(2)
+    })
+
+    it('hasConsistentCurrency and primaryCurrency', () => {
+      const region = makeRegion('paragraph', {
+        boundingBox: { x: 40, y: 100, width: 400, height: 100 }
+      })
+      const lines = [
+        makeLine(100, { text: 'Revenue: $12.3B', fontSize: 12 }),
+        makeLine(120, { text: 'Assets: $8.2B', fontSize: 12 }),
+        makeLine(140, { text: 'Liabilities: $4.1B', fontSize: 12 }),
+        makeLine(160, { text: 'Equity: $4.1B', fontSize: 12 })
+      ]
+
+      const result = analyzeSemanticRegions([region], lines, [])
+
+      const fs = result[0].metadata.semantic.financialStatement
+      expect(fs).toBeDefined()
+      expect(fs.hasConsistentCurrency).toBe(true)
+      expect(fs.primaryCurrency).toBe('$')
+    })
+
+    it('insufficient rows does not attach', () => {
+      const region = makeRegion('paragraph', {
+        boundingBox: { x: 40, y: 100, width: 300, height: 60 }
+      })
+      const lines = [
+        makeLine(100, { text: 'Revenue: $12.3B', fontSize: 12 }),
+        makeLine(120, { text: 'Assets: 4.2B', fontSize: 12 })
+      ]
+
+      const result = analyzeSemanticRegions([region], lines, [])
+
+      expect(result[0].metadata.semantic.financialStatement).toBeUndefined()
+    })
+
+    it('insufficient signals does not attach', () => {
+      const region = makeRegion('paragraph', {
+        boundingBox: { x: 40, y: 100, width: 400, height: 100 }
+      })
+      const lines = [
+        makeLine(100, { text: 'Alpha: $1.0B', fontSize: 12 }),
+        makeLine(120, { text: 'Beta: $2.0B', fontSize: 12 }),
+        makeLine(140, { text: 'Gamma: $3.0B', fontSize: 12 })
+      ]
+
+      const result = analyzeSemanticRegions([region], lines, [])
+
+      const fs = result[0].metadata.semantic.financialStatement
+      expect(fs).toBeUndefined()
+    })
+
+    it('non-financial key-value has no financialStatement', () => {
+      const region = makeRegion('paragraph', {
+        boundingBox: { x: 40, y: 100, width: 300, height: 60 }
+      })
+      const lines = [
+        makeLine(100, { text: 'Name: Alice', fontSize: 12 }),
+        makeLine(120, { text: 'Age: 30', fontSize: 12 })
+      ]
+
+      const result = analyzeSemanticRegions([region], lines, [])
+
+      expect(result[0].metadata.semantic.financialStatement).toBeUndefined()
+    })
+
+    it('table region skipped', () => {
+      const region = makeRegion('table', {
+        boundingBox: { x: 40, y: 100, width: 400, height: 100 }
+      })
+      const lines = [
+        makeLine(100, { text: 'Revenue: $12.3B', fontSize: 12 }),
+        makeLine(120, { text: 'Assets: $8.2B', fontSize: 12 }),
+        makeLine(140, { text: 'Liabilities: $4.1B', fontSize: 12 })
+      ]
+
+      const result = analyzeSemanticRegions([region], lines, [])
+
+      expect(result[0].metadata.semantic).toBeUndefined()
+    })
+
+    it('sourceLineIndices correctness', () => {
+      const region = makeRegion('paragraph', {
+        boundingBox: { x: 40, y: 100, width: 400, height: 100 }
+      })
+      const lines = [
+        makeLine(100, { text: 'Revenue: $12.3B', fontSize: 12 }),
+        makeLine(120, { text: 'Assets: $8.2B', fontSize: 12 }),
+        makeLine(140, { text: 'Liabilities: $4.1B', fontSize: 12 }),
+        makeLine(160, { text: 'Total: $12.3B', fontSize: 12 })
+      ]
+
+      const result = analyzeSemanticRegions([region], lines, [])
+
+      const fs = result[0].metadata.semantic.financialStatement
+      expect(fs).toBeDefined()
+      expect(fs.sourceLineIndices).toEqual([0, 1, 2, 3])
+    })
+
+    it('confidence equals signalCount / 5', () => {
+      const region = makeRegion('paragraph', {
+        boundingBox: { x: 40, y: 100, width: 400, height: 100 }
+      })
+      const lines = [
+        makeLine(100, { text: 'Revenue: $12.3B', fontSize: 12 }),
+        makeLine(120, { text: 'Expenses: ($5.1B)', fontSize: 12 }),
+        makeLine(140, { text: 'Total Costs: $4.1B', fontSize: 12 }),
+        makeLine(160, { text: 'Net: $7.2B', fontSize: 12 })
+      ]
+
+      const result = analyzeSemanticRegions([region], lines, [])
+
+      const fs = result[0].metadata.semantic.financialStatement
+      expect(fs).toBeDefined()
+      expect(fs.confidence).toBeGreaterThan(0)
+      expect(fs.confidence).toBeLessThanOrEqual(1)
+    })
+
+    it('pair subtypes remain preserved', () => {
+      const region = makeRegion('paragraph', {
+        boundingBox: { x: 40, y: 100, width: 400, height: 100 }
+      })
+      const lines = [
+        makeLine(100, { text: 'Revenue: $12.3B', fontSize: 12 }),
+        makeLine(120, { text: 'Assets: $8.2B', fontSize: 12 }),
+        makeLine(140, { text: 'Total Equity: $4.1B', fontSize: 12 })
+      ]
+
+      const result = analyzeSemanticRegions([region], lines, [])
+
+      const totalPair = result[0].metadata.semantic.pairs.find((p) => p.label === 'Total Equity')
+      expect(totalPair.financial.subtype).toBe('total-row')
+      expect(result[0].metadata.semantic.financialStatement).toBeDefined()
+    })
+
+    it('financialStatement objects are frozen', () => {
+      const region = makeRegion('paragraph', {
+        boundingBox: { x: 40, y: 100, width: 400, height: 100 }
+      })
+      const lines = [
+        makeLine(100, { text: 'Revenue: $12.3B', fontSize: 12 }),
+        makeLine(120, { text: 'Assets: $8.2B', fontSize: 12 }),
+        makeLine(140, { text: 'Liabilities: $4.1B', fontSize: 12 }),
+        makeLine(160, { text: 'Total Equity: $4.1B', fontSize: 12 })
+      ]
+
+      const result = analyzeSemanticRegions([region], lines, [])
+
+      const fs = result[0].metadata.semantic.financialStatement
+      expect(Object.isFrozen(fs)).toBe(true)
+      expect(Object.isFrozen(fs.sourceLineIndices)).toBe(true)
+      expect(Object.isFrozen(fs.signals)).toBe(true)
+    })
+
+    it('financialVocabularyDensity signal', () => {
+      const region = makeRegion('paragraph', {
+        boundingBox: { x: 40, y: 100, width: 400, height: 100 }
+      })
+      const lines = [
+        makeLine(100, { text: 'Revenue: $12.3B', fontSize: 12 }),
+        makeLine(120, { text: 'Income: $8.2B', fontSize: 12 }),
+        makeLine(140, { text: 'Profit: $4.1B', fontSize: 12 })
+      ]
+
+      const result = analyzeSemanticRegions([region], lines, [])
+
+      const fs = result[0].metadata.semantic.financialStatement
+      expect(fs).toBeDefined()
+      expect(fs.signals.financialVocabularyDensity).toBe(true)
+    })
+  })
+
+  describe('selectFinancialEntries', () => {
+    it('only pairs returns pairs', () => {
+      const semantic = {
+        type: 'key-value-candidate',
+        pairs: [
+          { label: 'A', value: '$1B', financial: { polarity: 'neutral' } },
+          { label: 'B', value: '$2B', financial: { polarity: 'neutral' } },
+          { label: 'C', value: '$3B', financial: { polarity: 'neutral' } }
+        ]
+      }
+      expect(selectFinancialEntries(semantic)).toBe(semantic.pairs)
+    })
+
+    it('only metrics returns metrics', () => {
+      const semantic = {
+        type: 'kpi-candidate',
+        metrics: [
+          { label: 'A', value: '$1B', financial: { polarity: 'neutral' } },
+          { label: 'B', value: '$2B', financial: { polarity: 'neutral' } },
+          { label: 'C', value: '$3B', financial: { polarity: 'neutral' } }
+        ]
+      }
+      expect(selectFinancialEntries(semantic)).toBe(semantic.metrics)
+    })
+
+    it('both collections: pairs wins with more financial entries', () => {
+      const semantic = {
+        type: 'kpi-candidate',
+        pairs: [
+          { label: 'A', value: '$1B', financial: { polarity: 'neutral' } },
+          { label: 'B', value: '$2B', financial: { polarity: 'neutral' } },
+          { label: 'C', value: '$3B', financial: { polarity: 'neutral' } }
+        ],
+        metrics: [
+          { label: 'D', value: '$4B', financial: { polarity: 'neutral' } },
+          { label: 'E', value: 'plain', financial: null }
+        ]
+      }
+      expect(selectFinancialEntries(semantic)).toBe(semantic.pairs)
+    })
+
+    it('both collections: metrics wins with more financial entries', () => {
+      const semantic = {
+        type: 'kpi-candidate',
+        pairs: [
+          { label: 'A', value: '$1B', financial: { polarity: 'neutral' } }
+        ],
+        metrics: [
+          { label: 'D', value: '$4B', financial: { polarity: 'neutral' } },
+          { label: 'E', value: '$5B', financial: { polarity: 'neutral' } },
+          { label: 'F', value: '$6B', financial: { polarity: 'neutral' } }
+        ]
+      }
+      expect(selectFinancialEntries(semantic)).toBe(semantic.metrics)
+    })
+
+    it('tie prefers pairs', () => {
+      const semantic = {
+        type: 'kpi-candidate',
+        pairs: [
+          { label: 'A', value: '$1B', financial: { polarity: 'neutral' } },
+          { label: 'B', value: '$2B', financial: { polarity: 'neutral' } }
+        ],
+        metrics: [
+          { label: 'D', value: '$4B', financial: { polarity: 'neutral' } },
+          { label: 'E', value: '$5B', financial: { polarity: 'neutral' } }
+        ]
+      }
+      expect(selectFinancialEntries(semantic)).toBe(semantic.pairs)
+    })
+
+    it('neither exists returns null', () => {
+      const semantic = { type: 'kpi-candidate' }
+      expect(selectFinancialEntries(semantic)).toBeNull()
     })
   })
 })
