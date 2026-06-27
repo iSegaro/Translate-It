@@ -7,6 +7,7 @@
     <span
       ref="textRef"
       class="pdf-cell-overlay-item__text"
+      :style="textStyle"
     >{{ cellText }}</span>
   </div>
 </template>
@@ -70,34 +71,39 @@ const { textRef, resolvedFontSize } = usePdfTextFitter({
 
 const textDirection = computed(() => detectTextDirection(props.cellText))
 
-const cellStyle = computed(() => {
-  const base = {
-    ...buildOverlayPositionStyle(props.item, props.scale),
-    ...buildOverlayBaseStyle(props.backgroundColor),
-    contain: 'paint',
-    fontSize: `${resolvedFontSize.value}px`,
-    fontFamily: resolveFontFamily(props.fontFamily),
-    lineHeight: `${computeLineHeight(props.ascent, props.descent)}`,
-    textAlign: 'left'
+const cellStyle = computed(() => ({
+  ...buildOverlayPositionStyle(props.item, props.scale),
+  ...buildOverlayBaseStyle(props.backgroundColor),
+  contain: 'paint',
+  fontSize: `${resolvedFontSize.value}px`,
+  fontFamily: resolveFontFamily(props.fontFamily),
+  lineHeight: `${computeLineHeight(props.ascent, props.descent)}`
+}))
+
+const textStyle = computed(() => {
+  const isRtl = textDirection.value === 'rtl'
+  const style = {
+    display: 'block',
+    whiteSpace: 'nowrap',
+    overflow: 'hidden',
+    textOverflow: 'ellipsis',
+    maxWidth: '100%',
+    textAlign: isRtl ? 'end' : 'left'
   }
 
   if (props.cellPadding) {
     const p = props.cellPadding
-    base.padding = `${p.top}px ${p.right}px ${p.bottom}px ${p.left}px`
+    style.padding = `${p.top}px ${p.right}px ${p.bottom}px ${p.left}px`
   } else {
-    base.padding = '0 1px'
+    style.padding = '0 1px'
   }
 
-  return base
+  return style
 })
 </script>
 
 <style scoped>
 .pdf-cell-overlay-item__text {
-  display: block;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  max-width: 100%;
+  box-sizing: border-box;
 }
 </style>

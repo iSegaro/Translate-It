@@ -64,7 +64,7 @@ describe('PdfCellOverlayItem', () => {
     expect(wrapper.find('.pdf-cell-overlay-item').attributes('dir')).toBe('rtl')
   })
 
-  it('RTL cell still has text-align left', () => {
+  it('RTL cell has text-align end on inner span', () => {
     const wrapper = mount(PdfCellOverlayItem, {
       props: {
         cellText: 'مرحبا بالعالم',
@@ -74,11 +74,12 @@ describe('PdfCellOverlayItem', () => {
     })
 
     const el = wrapper.find('.pdf-cell-overlay-item')
+    const span = wrapper.find('.pdf-cell-overlay-item__text')
     expect(el.attributes('dir')).toBe('rtl')
-    expect(el.attributes('style')).toContain('text-align: left')
+    expect(span.attributes('style')).toContain('text-align: end')
   })
 
-  it('cell overlay includes horizontal padding', () => {
+  it('cell overlay padding applies to inner span', () => {
     const wrapper = mount(PdfCellOverlayItem, {
       props: {
         cellText: 'Test',
@@ -87,8 +88,8 @@ describe('PdfCellOverlayItem', () => {
       }
     })
 
-    const el = wrapper.find('.pdf-cell-overlay-item')
-    expect(el.attributes('style')).toContain('padding: 0px 1px')
+    const span = wrapper.find('.pdf-cell-overlay-item__text')
+    expect(span.attributes('style')).toContain('padding: 0px 1px')
   })
 
   it('text span has white-space nowrap for single-line table mode', () => {
