@@ -531,4 +531,169 @@ describe('SemanticRegionAnalyzer', () => {
       expect(Object.isFrozen(result[0].metadata.semantic.pairs[0].valueBbox)).toBe(true)
     })
   })
+
+  describe('dashboard group detection', () => {
+    it('horizontal KPI row gets dashboardGroup', () => {
+      const regions = [
+        makeRegion('paragraph', { id: 'p1-r0', boundingBox: { x: 40, y: 100, width: 100, height: 50 } }),
+        makeRegion('paragraph', { id: 'p1-r1', boundingBox: { x: 160, y: 100, width: 100, height: 50 } }),
+        makeRegion('paragraph', { id: 'p1-r2', boundingBox: { x: 280, y: 100, width: 100, height: 50 } })
+      ]
+      const lines = [
+        makeLine(110, { text: '12,300', fontSize: 24, x: 40, width: 100 }),
+        makeLine(125, { text: 'Revenue', fontSize: 12, x: 40, width: 100 }),
+        makeLine(110, { text: '18.4', fontSize: 24, x: 160, width: 100 }),
+        makeLine(125, { text: 'Growth', fontSize: 12, x: 160, width: 100 }),
+        makeLine(110, { text: '4,500', fontSize: 24, x: 280, width: 100 }),
+        makeLine(125, { text: 'Profit', fontSize: 12, x: 280, width: 100 })
+      ]
+
+      const result = analyzeSemanticRegions(regions, lines, [])
+
+      expect(result[0].metadata.semantic).toBeDefined()
+      expect(result[0].metadata.semantic.dashboardGroup).toBeDefined()
+      expect(result[0].metadata.semantic.dashboardGroup.layout).toBe('row')
+      expect(result[0].metadata.semantic.dashboardGroup.regionIds).toHaveLength(3)
+      expect(result[0].metadata.semantic.dashboardGroup.role).toBe('member')
+    })
+
+    it('2x2 KPI regions get dashboardGroups as separate rows (grid detection deferred)', () => {
+      const regions = [
+        makeRegion('paragraph', { id: 'p1-r0', boundingBox: { x: 40, y: 100, width: 100, height: 50 } }),
+        makeRegion('paragraph', { id: 'p1-r1', boundingBox: { x: 160, y: 100, width: 100, height: 50 } }),
+        makeRegion('paragraph', { id: 'p1-r2', boundingBox: { x: 40, y: 170, width: 100, height: 50 } }),
+        makeRegion('paragraph', { id: 'p1-r3', boundingBox: { x: 160, y: 170, width: 100, height: 50 } })
+      ]
+      const lines = [
+        makeLine(110, { text: '12,300', fontSize: 24, x: 40, width: 100 }),
+        makeLine(125, { text: 'Revenue', fontSize: 12, x: 40, width: 100 }),
+        makeLine(110, { text: '18.4', fontSize: 24, x: 160, width: 100 }),
+        makeLine(125, { text: 'Growth', fontSize: 12, x: 160, width: 100 }),
+        makeLine(180, { text: '4,500', fontSize: 24, x: 40, width: 100 }),
+        makeLine(195, { text: 'Profit', fontSize: 12, x: 40, width: 100 }),
+        makeLine(180, { text: '55', fontSize: 24, x: 160, width: 100 }),
+        makeLine(195, { text: 'Rate', fontSize: 12, x: 160, width: 100 })
+      ]
+
+      const result = analyzeSemanticRegions(regions, lines, [])
+
+      expect(result[0].metadata.semantic).toBeDefined()
+      expect(result[0].metadata.semantic.dashboardGroup).toBeDefined()
+      expect(result[0].metadata.semantic.dashboardGroup.layout).toBe('row')
+      expect(result[0].metadata.semantic.dashboardGroup.regionIds.length).toBeGreaterThanOrEqual(2)
+    })
+
+    it('single KPI does not get dashboardGroup', () => {
+      const regions = [
+        makeRegion('paragraph', { id: 'p1-r0', boundingBox: { x: 40, y: 100, width: 100, height: 50 } })
+      ]
+      const lines = [
+        makeLine(100, { text: '12,300', fontSize: 24 }),
+        makeLine(120, { text: 'Revenue', fontSize: 12 })
+      ]
+
+      const result = analyzeSemanticRegions(regions, lines, [])
+
+      expect(result[0].metadata.semantic).toBeDefined()
+      expect(result[0].metadata.semantic.dashboardGroup).toBeUndefined()
+    })
+
+    it('unrelated far KPIs are not grouped', () => {
+      const regions = [
+        makeRegion('paragraph', { id: 'p1-r0', boundingBox: { x: 40, y: 100, width: 100, height: 50 } }),
+        makeRegion('paragraph', { id: 'p1-r1', boundingBox: { x: 40, y: 500, width: 100, height: 50 } })
+      ]
+      const lines = [
+        makeLine(100, { text: '12,300', fontSize: 24 }),
+        makeLine(120, { text: 'Revenue', fontSize: 12 }),
+        makeLine(500, { text: '8,100', fontSize: 24 }),
+        makeLine(520, { text: 'Cost', fontSize: 12 })
+      ]
+
+      const result = analyzeSemanticRegions(regions, lines, [])
+
+      expect(result[0].metadata.semantic).toBeDefined()
+      expect(result[0].metadata.semantic.dashboardGroup).toBeUndefined()
+      expect(result[1].metadata.semantic).toBeDefined()
+      expect(result[1].metadata.semantic.dashboardGroup).toBeUndefined()
+    })
+
+    it('paragraph regions are ignored', () => {
+      const regions = [
+        makeRegion('paragraph', { id: 'p1-r0', boundingBox: { x: 40, y: 100, width: 400, height: 80 } }),
+        makeRegion('paragraph', { id: 'p1-r1', boundingBox: { x: 40, y: 200, width: 400, height: 80 } })
+      ]
+      const lines = [
+        makeLine(100, { text: 'This is a normal paragraph with long text.', fontSize: 12 }),
+        makeLine(120, { text: 'Another line of regular text.', fontSize: 12 }),
+        makeLine(200, { text: 'More text follows here.', fontSize: 12 }),
+        makeLine(220, { text: 'And more text.', fontSize: 12 })
+      ]
+
+      const result = analyzeSemanticRegions(regions, lines, [])
+
+      expect(result[0].metadata.semantic).toBeUndefined()
+      expect(result[1].metadata.semantic).toBeUndefined()
+    })
+
+    it('existing semantic.type is preserved', () => {
+      const regions = [
+        makeRegion('paragraph', { id: 'p1-r0', boundingBox: { x: 40, y: 100, width: 100, height: 50 } }),
+        makeRegion('paragraph', { id: 'p1-r1', boundingBox: { x: 160, y: 100, width: 100, height: 50 } })
+      ]
+      const lines = [
+        makeLine(110, { text: '12,300', fontSize: 24, x: 40, width: 100 }),
+        makeLine(125, { text: 'Revenue', fontSize: 12, x: 40, width: 100 }),
+        makeLine(110, { text: '18.4', fontSize: 24, x: 160, width: 100 }),
+        makeLine(125, { text: 'Growth', fontSize: 12, x: 160, width: 100 })
+      ]
+
+      const result = analyzeSemanticRegions(regions, lines, [])
+
+      expect(result[0].metadata.semantic.type).toBe('kpi-candidate')
+      expect(result[1].metadata.semantic.type).toBe('kpi-candidate')
+    })
+
+    it('regionIds include all group members', () => {
+      const regions = [
+        makeRegion('paragraph', { id: 'p1-r0', boundingBox: { x: 40, y: 100, width: 100, height: 50 } }),
+        makeRegion('paragraph', { id: 'p1-r1', boundingBox: { x: 160, y: 100, width: 100, height: 50 } }),
+        makeRegion('paragraph', { id: 'p1-r2', boundingBox: { x: 280, y: 100, width: 100, height: 50 } })
+      ]
+      const lines = [
+        makeLine(110, { text: '12,300', fontSize: 24, x: 40, width: 100 }),
+        makeLine(125, { text: 'Revenue', fontSize: 12, x: 40, width: 100 }),
+        makeLine(110, { text: '18.4', fontSize: 24, x: 160, width: 100 }),
+        makeLine(125, { text: 'Growth', fontSize: 12, x: 160, width: 100 }),
+        makeLine(110, { text: '4,500', fontSize: 24, x: 280, width: 100 }),
+        makeLine(125, { text: 'Profit', fontSize: 12, x: 280, width: 100 })
+      ]
+
+      const result = analyzeSemanticRegions(regions, lines, [])
+
+      const regionIds = result[0].metadata.semantic.dashboardGroup.regionIds
+      expect(regionIds).toContain('p1-r0')
+      expect(regionIds).toContain('p1-r1')
+      expect(regionIds).toContain('p1-r2')
+    })
+
+    it('dashboardGroup objects are frozen', () => {
+      const regions = [
+        makeRegion('paragraph', { id: 'p1-r0', boundingBox: { x: 40, y: 100, width: 100, height: 50 } }),
+        makeRegion('paragraph', { id: 'p1-r1', boundingBox: { x: 160, y: 100, width: 100, height: 50 } })
+      ]
+      const lines = [
+        makeLine(110, { text: '12,300', fontSize: 24, x: 40, width: 100 }),
+        makeLine(125, { text: 'Revenue', fontSize: 12, x: 40, width: 100 }),
+        makeLine(110, { text: '18.4', fontSize: 24, x: 160, width: 100 }),
+        makeLine(125, { text: 'Growth', fontSize: 12, x: 160, width: 100 })
+      ]
+
+      const result = analyzeSemanticRegions(regions, lines, [])
+
+      expect(Object.isFrozen(result[0].metadata.semantic.dashboardGroup)).toBe(true)
+      expect(Object.isFrozen(result[0].metadata.semantic.dashboardGroup.regionIds)).toBe(true)
+      expect(Object.isFrozen(result[1].metadata.semantic.dashboardGroup)).toBe(true)
+    })
+  })
 })

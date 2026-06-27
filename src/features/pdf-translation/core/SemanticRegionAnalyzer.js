@@ -384,11 +384,157 @@ function buildSemanticMetadata(region, lines) {
   return null
 }
 
+const DASHBOARD_MIN_REGIONS = 2
+const DASHBOARD_Y_TOLERANCE_MULTIPLIER = 2
+const DASHBOARD_SIZE_SIMILARITY = 0.35
+const DASHBOARD_MAX_GAP_MULTIPLIER = 4
+
+function detectDashboardGroups(enrichedRegions, lines) {
+  const semanticRegions = enrichedRegions.filter((r) => {
+    const semanticType = r.metadata?.semantic?.type
+    return semanticType === 'kpi-candidate' || semanticType === 'key-value-candidate'
+  })
+
+  if (semanticRegions.length < DASHBOARD_MIN_REGIONS) {
+    return enrichedRegions
+  }
+
+  const medianFontSize = getMedianFontSizeForRegions(semanticRegions, lines)
+  const yTolerance = medianFontSize * DASHBOARD_Y_TOLERANCE_MULTIPLIER
+  const maxGap = medianFontSize * DASHBOARD_MAX_GAP_MULTIPLIER
+
+  const sorted = [...semanticRegions].sort((a, b) => {
+    const ay = a.boundingBox.y
+    const by = b.boundingBox.y
+    if (Math.abs(ay - by) <= yTolerance) return a.boundingBox.x - b.boundingBox.x
+    return ay - by
+  })
+
+  const groups = []
+  let currentGroup = [sorted[0]]
+
+  for (let i = 1; i < sorted.length; i++) {
+    const prev = currentGroup[currentGroup.length - 1]
+    const curr = sorted[i]
+
+    const yDiff = Math.abs(prev.boundingBox.y - curr.boundingBox.y)
+    const sizeDiffW = Math.abs(prev.boundingBox.width - curr.boundingBox.width) / Math.max(prev.boundingBox.width, 1)
+    const sizeDiffH = Math.abs(prev.boundingBox.height - curr.boundingBox.height) / Math.max(prev.boundingBox.height, 1)
+    const xGap = curr.boundingBox.x - (prev.boundingBox.x + prev.boundingBox.width)
+
+    const sameRow = yDiff <= yTolerance
+    const similarSize = sizeDiffW <= DASHBOARD_SIZE_SIMILARITY && sizeDiffH <= DASHBOARD_SIZE_SIMILARITY
+    const closeEnough = xGap <= maxGap && xGap >= -maxGap
+
+    if (sameRow && similarSize && closeEnough) {
+      currentGroup.push(curr)
+    } else {
+      if (currentGroup.length >= DASHBOARD_MIN_REGIONS) {
+        groups.push(currentGroup)
+      }
+      currentGroup = [curr]
+    }
+  }
+
+  if (currentGroup.length >= DASHBOARD_MIN_REGIONS) {
+    groups.push(currentGroup)
+  }
+
+  if (groups.length === 0) {
+    return enrichedRegions
+  }
+
+  const groupIdSet = new Map()
+  for (const group of groups) {
+    const groupId = `dashboard-${group[0].id}`
+    const regionIds = group.map((r) => r.id)
+
+    let layout = 'row'
+    if (group.length >= 2) {
+      const allSameY = group.every((r) => Math.abs(r.boundingBox.y - group[0].boundingBox.y) <= yTolerance)
+      const allDifferentX = new Set(group.map((r) => Math.round(r.boundingBox.x))).size === group.length
+
+      if (allSameY && allDifferentX) {
+        layout = 'row'
+      } else if (!allSameY && group.every((r) => Math.abs(r.boundingBox.x - group[0].boundingBox.x) <= yTolerance)) {
+        layout = 'column'
+      } else {
+        layout = 'grid'
+      }
+    }
+
+    // NOTE: Grid detection is limited — the grouping pass only forms same-row groups,
+    // so a 2x2 grid produces two row-groups instead of one grid-group.
+    // Multi-row grid merging is deferred to a future phase.
+
+    const avgConfidence = group.reduce((sum, r) => sum + (r.metadata?.semantic?.confidence || 0), 0) / group.length
+    const confidence = Math.round(avgConfidence * 100) / 100
+
+    for (const r of group) {
+      groupIdSet.set(r.id, Object.freeze({
+        groupId,
+        layout,
+        confidence,
+        regionIds: Object.freeze(regionIds),
+        role: 'member'
+      }))
+    }
+  }
+
+  return enrichedRegions.map((region) => {
+    const dashboardGroup = groupIdSet.get(region.id)
+    if (!dashboardGroup) return region
+
+    return Object.freeze({
+      ...region,
+      childRegionIds: Object.freeze([...region.childRegionIds]),
+      blockIds: Object.freeze([...region.blockIds]),
+      metadata: Object.freeze({
+        ...region.metadata,
+        semantic: Object.freeze({
+          ...region.metadata.semantic,
+          dashboardGroup
+        })
+      })
+    })
+  })
+}
+
+function getMedianFontSizeForRegions(regions, lines) {
+  const regionLines = []
+  for (const region of regions) {
+    for (const line of lines) {
+      if (!line.boundingBox) continue
+      const bb = line.boundingBox
+      const rbb = region.boundingBox
+      const centerX = bb.x + bb.width / 2
+      const centerY = bb.y + bb.height / 2
+      if (
+        centerX >= rbb.x &&
+        centerX <= rbb.x + rbb.width &&
+        centerY >= rbb.y &&
+        centerY <= rbb.y + rbb.height
+      ) {
+        regionLines.push(line)
+      }
+    }
+  }
+
+  const sizes = regionLines.map((l) => l.fontSize || 12)
+  if (!sizes.length) return 12
+
+  const sorted = [...sizes].sort((a, b) => a - b)
+  const mid = Math.floor(sorted.length / 2)
+  return sorted.length % 2 === 0 ? (sorted[mid - 1] + sorted[mid]) / 2 : sorted[mid]
+}
+
 /**
- * Enrich non-table regions with semantic metadata for KPI candidates.
+ * Enrich non-table regions with semantic metadata for KPI candidates
+ * and detect dashboard groups.
  *
  * Returns a new frozen array of regions. For regions that match KPI candidate
  * criteria, adds a `semantic` field to metadata. Non-matching regions are unchanged.
+ * Dashboard groups are detected and attached to member regions.
  * Does NOT mutate input regions.
  *
  * @param {Object[]} regions — classified regions from analyzeTableRegions
@@ -422,5 +568,5 @@ export function analyzeSemanticRegions(regions = [], lines = [], blocks = []) { 
     })
   })
 
-  return Object.freeze(enrichedRegions)
+  return Object.freeze(detectDashboardGroups(enrichedRegions, lines))
 }
