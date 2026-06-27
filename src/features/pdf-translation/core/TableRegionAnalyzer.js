@@ -327,7 +327,7 @@ function iqrFilteredMedian(values) {
   return filtered.length >= 2 ? median(filtered) : median(values)
 }
 
-function buildCanonicalGrid(cells, rowCount, columnCount) {
+function buildCanonicalGrid(cells, rowCount, columnCount, rows) {
   if (!cells.length || rowCount < 2 || columnCount < 2) {
     return Object.freeze({ rows: Object.freeze([]), columns: Object.freeze([]), occupancy: Object.freeze([]) })
   }
@@ -423,12 +423,23 @@ function buildCanonicalGrid(cells, rowCount, columnCount) {
     }
 
     const rowCellByColumn = rowCells ? new Map(rowCells.map((gc) => [gc.columnIndex, gc])) : null
+    const rowMeta = rows[r]
+    const rowY = rowMeta ? rowMeta.y : 0
+    const rowHeight = rowMeta ? rowMeta.height : 0
 
     const row = []
     for (let c = 0; c < columnCount; c++) {
       const gridCell = rowCellByColumn ? rowCellByColumn.get(c) : null
+      const colMeta = gridColumns[c]
 
       if (gridCell) {
+        let bbWidth = colMeta.width
+        if (gridCell.colSpan > 1) {
+          const spanEnd = Math.min(c + gridCell.colSpan, columnCount)
+          const lastCol = gridColumns[spanEnd - 1]
+          bbWidth = (lastCol.x + lastCol.width) - colMeta.x
+        }
+
         row.push(Object.freeze({
           rowIndex: r,
           columnIndex: c,
@@ -436,7 +447,13 @@ function buildCanonicalGrid(cells, rowCount, columnCount) {
           cellId: gridCell.cellId,
           ownerCellId: gridCell.cellId,
           colSpan: gridCell.colSpan,
-          rowSpan: 1
+          rowSpan: 1,
+          boundingBox: Object.freeze({
+            x: colMeta.x,
+            y: rowY,
+            width: Math.round(bbWidth * 100) / 100,
+            height: rowHeight
+          })
         }))
       } else if (coveredBy.has(c)) {
         row.push(Object.freeze({
@@ -446,7 +463,13 @@ function buildCanonicalGrid(cells, rowCount, columnCount) {
           cellId: null,
           ownerCellId: coveredBy.get(c),
           colSpan: 1,
-          rowSpan: 1
+          rowSpan: 1,
+          boundingBox: Object.freeze({
+            x: colMeta.x,
+            y: rowY,
+            width: colMeta.width,
+            height: rowHeight
+          })
         }))
       } else {
         row.push(Object.freeze({
@@ -456,7 +479,13 @@ function buildCanonicalGrid(cells, rowCount, columnCount) {
           cellId: null,
           ownerCellId: null,
           colSpan: 1,
-          rowSpan: 1
+          rowSpan: 1,
+          boundingBox: Object.freeze({
+            x: colMeta.x,
+            y: rowY,
+            width: colMeta.width,
+            height: rowHeight
+          })
         }))
       }
     }
@@ -476,7 +505,7 @@ function buildTableMetadata(region, lines) {
   const cells = detectTableCells(region, lines, columns, rows)
 
   const hasSpanCandidates = cells.some((cell) => cell.colSpanCandidate === true)
-  const grid = buildCanonicalGrid(cells, rows.length, columns.length)
+  const grid = buildCanonicalGrid(cells, rows.length, columns.length, rows)
 
   return Object.freeze({
     columnCount: columns.length,

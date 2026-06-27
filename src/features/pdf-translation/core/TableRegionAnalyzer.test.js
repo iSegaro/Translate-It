@@ -2408,6 +2408,211 @@ describe('TableRegionAnalyzer', () => {
       expect(headerCell.estimatedColSpan).toBe(2)
       expect(headerCell.text).toBe('Header')
     })
+
+    it('simple 2x2 occupancy boundingBox', () => {
+      const region = makeRegion('table', {
+        id: 'p1-r0',
+        boundingBox: { x: 40, y: 100, width: 300, height: 60 }
+      })
+      const lines = [
+        makeLine(100, {
+          regionId: 'p1-r0',
+          items: [makeItem('A', 40, 60), makeItem('B', 180, 60)]
+        }),
+        makeLine(120, {
+          regionId: 'p1-r0',
+          items: [makeItem('C', 40, 60), makeItem('D', 180, 60)]
+        })
+      ]
+
+      const result = analyzeTableRegions([region], lines, [])
+      const occ = result[0].metadata.table.grid.occupancy
+
+      expect(occ[0][0].boundingBox.x).toBe(40)
+      expect(occ[0][0].boundingBox.y).toBe(100)
+      expect(occ[0][1].boundingBox.x).toBe(180)
+      expect(occ[1][0].boundingBox.y).toBe(120)
+    })
+
+    it('missing cell gets canonical boundingBox', () => {
+      const region = makeRegion('table', {
+        id: 'p1-r0',
+        boundingBox: { x: 40, y: 100, width: 300, height: 60 }
+      })
+      const lines = [
+        makeLine(100, {
+          regionId: 'p1-r0',
+          items: [makeItem('A', 40, 60), makeItem('B', 180, 60)]
+        }),
+        makeLine(120, {
+          regionId: 'p1-r0',
+          items: [makeItem('C', 40, 60)]
+        })
+      ]
+
+      const result = analyzeTableRegions([region], lines, [])
+      const missing = result[0].metadata.table.grid.occupancy[1][1]
+
+      expect(missing.state).toBe('missing')
+      expect(missing.boundingBox).toBeDefined()
+      expect(typeof missing.boundingBox.x).toBe('number')
+      expect(typeof missing.boundingBox.width).toBe('number')
+    })
+
+    it('covered cell gets slot boundingBox', () => {
+      const region = makeRegion('table', {
+        id: 'p1-r0',
+        boundingBox: { x: 40, y: 100, width: 400, height: 80 }
+      })
+      const lines = [
+        makeLine(100, {
+          regionId: 'p1-r0',
+          items: [makeItem('Header', 40, 200)]
+        }),
+        makeLine(130, {
+          regionId: 'p1-r0',
+          items: [makeItem('A', 40, 60), makeItem('B', 200, 60)]
+        }),
+        makeLine(150, {
+          regionId: 'p1-r0',
+          items: [makeItem('C', 40, 60), makeItem('D', 200, 60)]
+        })
+      ]
+
+      const result = analyzeTableRegions([region], lines, [])
+      const covered = result[0].metadata.table.grid.occupancy[0][1]
+
+      expect(covered.state).toBe('covered')
+      expect(covered.boundingBox.width).toBe(result[0].metadata.table.grid.columns[1].width)
+    })
+
+    it('colspan owner gets expanded boundingBox', () => {
+      const region = makeRegion('table', {
+        id: 'p1-r0',
+        boundingBox: { x: 40, y: 100, width: 400, height: 80 }
+      })
+      const lines = [
+        makeLine(100, {
+          regionId: 'p1-r0',
+          items: [makeItem('Header', 40, 200)]
+        }),
+        makeLine(130, {
+          regionId: 'p1-r0',
+          items: [makeItem('A', 40, 60), makeItem('B', 200, 60)]
+        }),
+        makeLine(150, {
+          regionId: 'p1-r0',
+          items: [makeItem('C', 40, 60), makeItem('D', 200, 60)]
+        })
+      ]
+
+      const result = analyzeTableRegions([region], lines, [])
+      const occ = result[0].metadata.table.grid.occupancy
+      const owner = occ[0][0]
+      const col0 = result[0].metadata.table.grid.columns[0]
+      const col1 = result[0].metadata.table.grid.columns[1]
+
+      expect(owner.state).toBe('occupied')
+      expect(owner.colSpan).toBe(2)
+      expect(owner.boundingBox.width).toBe(Math.round((col1.x + col1.width - col0.x) * 100) / 100)
+    })
+
+    it('boundingBox uses row y/height', () => {
+      const region = makeRegion('table', {
+        id: 'p1-r0',
+        boundingBox: { x: 40, y: 100, width: 300, height: 60 }
+      })
+      const lines = [
+        makeLine(100, {
+          regionId: 'p1-r0',
+          fontSize: 14,
+          items: [makeItem('A', 40, 60), makeItem('B', 180, 60)]
+        }),
+        makeLine(130, {
+          regionId: 'p1-r0',
+          fontSize: 12,
+          items: [makeItem('C', 40, 60), makeItem('D', 180, 60)]
+        })
+      ]
+
+      const result = analyzeTableRegions([region], lines, [])
+      const occ = result[0].metadata.table.grid.occupancy
+
+      expect(occ[0][0].boundingBox.y).toBe(100)
+      expect(occ[0][0].boundingBox.height).toBe(14)
+      expect(occ[1][0].boundingBox.y).toBe(130)
+      expect(occ[1][0].boundingBox.height).toBe(12)
+    })
+
+    it('boundingBox uses canonical column x/width', () => {
+      const region = makeRegion('table', {
+        id: 'p1-r0',
+        boundingBox: { x: 40, y: 100, width: 400, height: 80 }
+      })
+      const lines = [
+        makeLine(100, {
+          regionId: 'p1-r0',
+          items: [makeItem('A', 42, 58), makeItem('B', 182, 58)]
+        }),
+        makeLine(120, {
+          regionId: 'p1-r0',
+          items: [makeItem('C', 40, 60), makeItem('D', 180, 60)]
+        })
+      ]
+
+      const result = analyzeTableRegions([region], lines, [])
+      const occ = result[0].metadata.table.grid.occupancy
+      const cols = result[0].metadata.table.grid.columns
+
+      expect(occ[0][0].boundingBox.x).toBe(cols[0].x)
+      expect(occ[0][0].boundingBox.width).toBe(cols[0].width)
+    })
+
+    it('all boundingBox objects are frozen', () => {
+      const region = makeRegion('table', {
+        id: 'p1-r0',
+        boundingBox: { x: 40, y: 100, width: 300, height: 60 }
+      })
+      const lines = [
+        makeLine(100, {
+          regionId: 'p1-r0',
+          items: [makeItem('A', 40), makeItem('B', 180)]
+        }),
+        makeLine(120, {
+          regionId: 'p1-r0',
+          items: [makeItem('C', 40), makeItem('D', 180)]
+        })
+      ]
+
+      const result = analyzeTableRegions([region], lines, [])
+      const allCells = result[0].metadata.table.grid.occupancy.flat()
+
+      expect(allCells.every((c) => Object.isFrozen(c.boundingBox))).toBe(true)
+    })
+
+    it('existing grid.rows unchanged with boundingBox', () => {
+      const region = makeRegion('table', {
+        id: 'p1-r0',
+        boundingBox: { x: 40, y: 100, width: 300, height: 60 }
+      })
+      const lines = [
+        makeLine(100, {
+          regionId: 'p1-r0',
+          items: [makeItem('A', 40, 60), makeItem('B', 180, 60)]
+        }),
+        makeLine(120, {
+          regionId: 'p1-r0',
+          items: [makeItem('C', 40, 60), makeItem('D', 180, 60)]
+        })
+      ]
+
+      const result = analyzeTableRegions([region], lines, [])
+      const grid = result[0].metadata.table.grid
+
+      expect(grid.rows[0]).toHaveLength(2)
+      expect(grid.rows[1]).toHaveLength(2)
+      expect(grid.rows[0][0]).not.toHaveProperty('boundingBox')
+    })
   })
 
   describe('enrichBlocksWithTableMetadata', () => {
