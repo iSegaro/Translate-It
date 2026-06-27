@@ -20,7 +20,8 @@
         :font-family="block.roleMetadata?.fontFamily"
         :ascent="block.roleMetadata?.ascent"
         :descent="block.roleMetadata?.descent"
-        :background-color="backgroundColor"
+        :background-color="cell.backgroundColor || backgroundColor"
+        :cell-padding="cell.padding"
         :data-pdf-line-index="lineIdx"
         :data-pdf-cell-index="cellIdx"
       />
@@ -68,6 +69,7 @@ import { resolveFontFamily, resolveAscent, resolveDescent, detectTextDirection, 
 import { sampleCanvasBackgroundColor, clearColorCache } from '../utils/pdfCanvasSampler.js'
 import { usePdfTextFitter } from '../composables/usePdfTextFitter.js'
 import { resolvePdfCellOverlayWidth } from '@/features/pdf-translation/core/PdfCellSpanLayout.js'
+import { resolveCellOverlayGeometry } from '../utils/pdfMaskGeometry.js'
 import PdfCellOverlayItem from './PdfCellOverlayItem.vue'
 import PdfLineOverlayItem from './PdfLineOverlayItem.vue'
 
@@ -89,6 +91,9 @@ const props = defineProps({
     default: null
   }
 })
+
+const CELL_GAP_EXPANSION_RATIO = 0.4
+const PDF_OVERLAY_USE_CELL_MASKS = false
 
 const scale = computed(() => props.pageMetric?.scale || 1)
 
@@ -159,8 +164,6 @@ const useCellOverlay = computed(() => {
   return useLineOverlay.value
 })
 
-const CELL_GAP_EXPANSION_RATIO = 0.4
-
 const cellOverlayData = computed(() => {
   if (!useCellOverlay.value) return []
 
@@ -218,14 +221,32 @@ const cellOverlayData = computed(() => {
 
         const cellHeight = Math.round(Math.max(item.height || 0, item.fontSize ? item.fontSize * 0.8 : blockFontSize.value * 0.8) * 10) / 10
 
+        const absoluteItem = {
+          x: item.x,
+          y: item.y,
+          width: cellWidth,
+          height: cellHeight
+        }
+
+        let mask = null
+        if (PDF_OVERLAY_USE_CELL_MASKS && props.maskMap && cellMeta?.cellIds) {
+          const cellId = cellMeta.cellIds[cellIdx]
+          if (cellId) {
+            mask = props.maskMap.get(cellId) || null
+          }
+        }
+
+        const geometry = resolveCellOverlayGeometry({
+          item: absoluteItem,
+          blockBbox,
+          mask
+        })
+
         return {
           text: cellText,
-          item: {
-            x: item.x - blockBbox.x,
-            y: item.y - blockBbox.y,
-            width: cellWidth,
-            height: cellHeight
-          }
+          item: { x: geometry.x, y: geometry.y, width: geometry.width, height: geometry.height },
+          padding: geometry.padding,
+          backgroundColor: mask ? backgroundColor.value : undefined
         }
       }).filter(Boolean)
     }

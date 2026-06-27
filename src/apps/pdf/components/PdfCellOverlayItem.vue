@@ -48,6 +48,10 @@ const props = defineProps({
   backgroundColor: {
     type: String,
     default: OVERLAY_BACKGROUND
+  },
+  cellPadding: {
+    type: Object,
+    default: null
   }
 })
 
@@ -66,16 +70,26 @@ const { textRef, resolvedFontSize } = usePdfTextFitter({
 
 const textDirection = computed(() => detectTextDirection(props.cellText))
 
-const cellStyle = computed(() => ({
-  ...buildOverlayPositionStyle(props.item, props.scale),
-  ...buildOverlayBaseStyle(props.backgroundColor),
-  contain: 'paint',
-  fontSize: `${resolvedFontSize.value}px`,
-  fontFamily: resolveFontFamily(props.fontFamily),
-  lineHeight: `${computeLineHeight(props.ascent, props.descent)}`,
-  textAlign: 'left',
-  padding: '0 1px'
-}))
+const cellStyle = computed(() => {
+  const base = {
+    ...buildOverlayPositionStyle(props.item, props.scale),
+    ...buildOverlayBaseStyle(props.backgroundColor),
+    contain: 'paint',
+    fontSize: `${resolvedFontSize.value}px`,
+    fontFamily: resolveFontFamily(props.fontFamily),
+    lineHeight: `${computeLineHeight(props.ascent, props.descent)}`,
+    textAlign: 'left'
+  }
+
+  if (props.cellPadding) {
+    const p = props.cellPadding
+    base.padding = `${p.top}px ${p.right}px ${p.bottom}px ${p.left}px`
+  } else {
+    base.padding = '0 1px'
+  }
+
+  return base
+})
 </script>
 
 <style scoped>
