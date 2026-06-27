@@ -180,3 +180,142 @@ describe('PdfPageSession OCR state', () => {
     expect(session.ocrError).toBeNull()
   })
 })
+
+describe('PdfPageSession pageMaskModel', () => {
+  it('getPageMaskModel returns empty model before hydrate', () => {
+    const session = new PdfPageSession({ documentIdentity: 'doc-1', pageNumber: 1 })
+    const model = session.getPageMaskModel()
+
+    expect(model.masks).toHaveLength(0)
+    expect(model.metadata.totalMasks).toBe(0)
+  })
+
+  it('getPageMaskModel builds model from pageLayout', async () => {
+    const page = {
+      pageNumber: 1,
+      getTextContent: vi.fn().mockResolvedValue({
+        items: [
+          {
+            str: 'Hello',
+            transform: [1, 0, 0, 14, 40, 650],
+            width: 30,
+            height: 14,
+            dir: 'ltr'
+          }
+        ]
+      })
+    }
+
+    const session = new PdfPageSession({ documentIdentity: 'doc-1', pageNumber: 1 })
+    await session.hydrate(page, { naturalWidth: 500, naturalHeight: 700 })
+
+    const model = session.getPageMaskModel()
+
+    expect(model).toBeDefined()
+    expect(model.masks).toBeDefined()
+    expect(model.metadata).toBeDefined()
+  })
+
+  it('getPageMaskModel returns same cached object on repeated calls', async () => {
+    const page = {
+      pageNumber: 1,
+      getTextContent: vi.fn().mockResolvedValue({
+        items: [
+          {
+            str: 'Hello',
+            transform: [1, 0, 0, 14, 40, 650],
+            width: 30,
+            height: 14,
+            dir: 'ltr'
+          }
+        ]
+      })
+    }
+
+    const session = new PdfPageSession({ documentIdentity: 'doc-1', pageNumber: 1 })
+    await session.hydrate(page, { naturalWidth: 500, naturalHeight: 700 })
+
+    const first = session.getPageMaskModel()
+    const second = session.getPageMaskModel()
+
+    expect(first).toBe(second)
+  })
+
+  it('hydrate clears stale pageMaskModel', async () => {
+    const page = {
+      pageNumber: 1,
+      getTextContent: vi.fn().mockResolvedValue({
+        items: [
+          {
+            str: 'Hello',
+            transform: [1, 0, 0, 14, 40, 650],
+            width: 30,
+            height: 14,
+            dir: 'ltr'
+          }
+        ]
+      })
+    }
+
+    const session = new PdfPageSession({ documentIdentity: 'doc-1', pageNumber: 1 })
+    await session.hydrate(page, { naturalWidth: 500, naturalHeight: 700 })
+
+    const first = session.getPageMaskModel()
+    session.reset()
+    await session.hydrate(page, { naturalWidth: 500, naturalHeight: 700 })
+    const second = session.getPageMaskModel()
+
+    expect(first).not.toBe(second)
+  })
+
+  it('pageLayout is not mutated with masks', async () => {
+    const page = {
+      pageNumber: 1,
+      getTextContent: vi.fn().mockResolvedValue({
+        items: [
+          {
+            str: 'Hello',
+            transform: [1, 0, 0, 14, 40, 650],
+            width: 30,
+            height: 14,
+            dir: 'ltr'
+          }
+        ]
+      })
+    }
+
+    const session = new PdfPageSession({ documentIdentity: 'doc-1', pageNumber: 1 })
+    await session.hydrate(page, { naturalWidth: 500, naturalHeight: 700 })
+
+    session.getPageMaskModel()
+
+    expect(session.pageLayout.masks).toBeUndefined()
+  })
+
+  it('reset clears pageMaskModel cache', async () => {
+    const page = {
+      pageNumber: 1,
+      getTextContent: vi.fn().mockResolvedValue({
+        items: [
+          {
+            str: 'Hello',
+            transform: [1, 0, 0, 14, 40, 650],
+            width: 30,
+            height: 14,
+            dir: 'ltr'
+          }
+        ]
+      })
+    }
+
+    const session = new PdfPageSession({ documentIdentity: 'doc-1', pageNumber: 1 })
+    await session.hydrate(page, { naturalWidth: 500, naturalHeight: 700 })
+
+    const first = session.getPageMaskModel()
+    session.reset()
+    const second = session.getPageMaskModel()
+
+    expect(first).not.toBe(second)
+    expect(second.masks).toHaveLength(0)
+  })
+})

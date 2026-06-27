@@ -2,6 +2,7 @@ import { PdfLogicalBlockBuilder } from './PdfLogicalBlockBuilder.js'
 import { buildPdfTextLinesFromItems } from './PdfLayoutAnalyzer.js'
 import { detectLayoutRegions } from './LayoutRegionDetector.js'
 import { buildPageLayoutModel, createEmptyPageLayoutModel } from './PageLayoutModel.js'
+import { buildPageMaskModel } from './PageMaskModelBuilder.js'
 
 function normalizePageSize(pageMetric = null) {
   return {
@@ -22,6 +23,7 @@ export class PdfPageSession {
     this.lines = []
     this.logicalBlocks = []
     this.pageLayout = createEmptyPageLayoutModel(pageNumber)
+    this.pageMaskModel = null
     this.loaded = false
     this.loadedAt = 0
     this.displayScale = 1
@@ -74,6 +76,7 @@ export class PdfPageSession {
       blocks: this.logicalBlocks,
       regions: detectedRegions
     })
+    this.pageMaskModel = null
     this.loaded = true
     this.loadedAt = Date.now()
 
@@ -122,12 +125,22 @@ export class PdfPageSession {
     return this.pageLayout
   }
 
+  getPageMaskModel() {
+    if (this.pageMaskModel) {
+      return this.pageMaskModel
+    }
+
+    this.pageMaskModel = buildPageMaskModel(this.pageLayout)
+    return this.pageMaskModel
+  }
+
   reset() {
     this.pageSize = null
     this.textContent = null
     this.lines = []
     this.logicalBlocks = []
     this.pageLayout = createEmptyPageLayoutModel(this.pageNumber)
+    this.pageMaskModel = null
     this.loaded = false
     this.loadedAt = 0
     this.displayScale = 1
