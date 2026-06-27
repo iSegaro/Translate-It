@@ -65,7 +65,8 @@ describe('PdfTranslationCoordinator', () => {
     session = {
       getVisibleLogicalBlocks: vi.fn(),
       setBlockTranslationState: vi.fn(),
-      getBlockTranslationState: vi.fn().mockReturnValue({ status: 'idle' })
+      getBlockTranslationState: vi.fn().mockReturnValue({ status: 'idle' }),
+      getPageLayout: vi.fn().mockReturnValue(null)
     }
   })
 
@@ -261,5 +262,93 @@ describe('PdfTranslationCoordinator', () => {
       translatedText: '',
       error: 'Empty translation result'
     }))
+  })
+
+  it('passes pageLayout regions as semanticRegions to batch planner', async () => {
+    const coordinator = new PdfTranslationCoordinator(session)
+    session.getVisibleLogicalBlocks.mockResolvedValue([
+      { id: 'block-a', text: 'Revenue', role: 'paragraph', sourceTextHash: 'hash-a', roleMetadata: { regionId: 'region-a' } }
+    ])
+    session.getPageLayout.mockReturnValue({
+      regions: [{
+        id: 'region-a',
+        boundingBox: { x: 40, y: 100, width: 200, height: 60 },
+        childRegionIds: [],
+        blockIds: ['block-a'],
+        metadata: {
+          semantic: {
+            type: 'kpi-candidate',
+            confidence: 0.9,
+            signals: {},
+            metrics: [{ label: 'Revenue', value: '$12.3B', unit: 'currency' }]
+          }
+        }
+      }]
+    })
+    sendRegularMessageMock.mockResolvedValue({
+      success: true,
+      translatedText: JSON.stringify([{ blockId: 'block-a', text: 'Ingresos' }]),
+      provider: 'google',
+      sourceLanguage: 'en',
+      targetLanguage: 'es'
+    })
+
+    const summary = await coordinator.translateVisibleBlocks()
+
+    expect(summary.status).toBe('translated')
+
+    const sentMessage = sendRegularMessageMock.mock.calls[0][0]
+    expect(sentMessage.data.options.contextMetadata).toBeDefined()
+    expect(sentMessage.data.options.contextMetadata.semanticHint).toBeDefined()
+    expect(sentMessage.data.options.contextMetadata.semanticHint.regionTypes).toEqual(['kpi-candidate'])
+  })
+
+  it('omits semanticHint when pageLayout has no semantic regions', async () => {
+    const coordinator = new PdfTranslationCoordinator(session)
+    session.getVisibleLogicalBlocks.mockResolvedValue([
+      { id: 'block-a', text: 'Hello', role: 'paragraph', sourceTextHash: 'hash-a' }
+    ])
+    session.getPageLayout.mockReturnValue({
+      regions: [{
+        id: 'region-a',
+        boundingBox: { x: 40, y: 100, width: 200, height: 60 },
+        childRegionIds: [],
+        blockIds: ['block-a'],
+        metadata: {}
+      }]
+    })
+    sendRegularMessageMock.mockResolvedValue({
+      success: true,
+      translatedText: JSON.stringify([{ blockId: 'block-a', text: 'Hola' }]),
+      provider: 'google',
+      sourceLanguage: 'en',
+      targetLanguage: 'es'
+    })
+
+    const summary = await coordinator.translateVisibleBlocks()
+
+    expect(summary.status).toBe('translated')
+
+    const sentMessage = sendRegularMessageMock.mock.calls[0][0]
+    expect(sentMessage.data.options.contextMetadata).toBeUndefined()
+  })
+
+  it('handles missing getPageLayout gracefully', async () => {
+    session.getPageLayout = undefined
+    const coordinator = new PdfTranslationCoordinator(session)
+    session.getVisibleLogicalBlocks.mockResolvedValue([
+      { id: 'block-a', text: 'Hello', role: 'paragraph', sourceTextHash: 'hash-a' }
+    ])
+    sendRegularMessageMock.mockResolvedValue({
+      success: true,
+      translatedText: JSON.stringify([{ blockId: 'block-a', text: 'Hola' }]),
+      provider: 'google',
+      sourceLanguage: 'en',
+      targetLanguage: 'es'
+    })
+
+    const summary = await coordinator.translateVisibleBlocks()
+
+    expect(summary.status).toBe('translated')
   })
 })

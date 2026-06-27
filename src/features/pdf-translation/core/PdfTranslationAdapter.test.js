@@ -1176,4 +1176,333 @@ describe('PdfTranslationAdapter', () => {
       expect(items[0].semanticContext).toBeUndefined()
     })
   })
+
+  describe('buildSemanticBatchHint', () => {
+    it('returns null when no semanticContext exists', () => {
+      const adapter = new PdfTranslationAdapter()
+      const items = adapter.toProviderItems([
+        { id: 'blk-1', text: 'Hello', sourceTextHash: 'h1' }
+      ])
+
+      const hint = adapter.buildSemanticBatchHint(items)
+
+      expect(hint).toBeNull()
+    })
+
+    it('collects regionTypes', () => {
+      const adapter = new PdfTranslationAdapter()
+      const items = [
+        { blockId: 'b1', semanticContext: { regionType: 'kpi-candidate' } },
+        { blockId: 'b2', semanticContext: { regionType: 'key-value-candidate' } }
+      ]
+
+      const hint = adapter.buildSemanticBatchHint(items)
+
+      expect(hint.regionTypes).toEqual(['kpi-candidate', 'key-value-candidate'])
+    })
+
+    it('collects financialSubtypes', () => {
+      const adapter = new PdfTranslationAdapter()
+      const items = [
+        { blockId: 'b1', semanticContext: { regionType: 'kpi-candidate', financialSubtype: 'metric-with-delta' } },
+        { blockId: 'b2', semanticContext: { regionType: 'kpi-candidate', financialSubtype: 'summary-row' } }
+      ]
+
+      const hint = adapter.buildSemanticBatchHint(items)
+
+      expect(hint.financialSubtypes).toEqual(['metric-with-delta', 'summary-row'])
+    })
+
+    it('sets hasStatementFragment', () => {
+      const adapter = new PdfTranslationAdapter()
+      const items = [
+        { blockId: 'b1', semanticContext: { regionType: 'key-value-candidate', statementFragment: true } },
+        { blockId: 'b2', semanticContext: { regionType: 'kpi-candidate' } }
+      ]
+
+      const hint = adapter.buildSemanticBatchHint(items)
+
+      expect(hint.hasStatementFragment).toBe(true)
+    })
+
+    it('sets hasDashboardGroup', () => {
+      const adapter = new PdfTranslationAdapter()
+      const items = [
+        { blockId: 'b1', semanticContext: { regionType: 'kpi-candidate', dashboardGroup: true } }
+      ]
+
+      const hint = adapter.buildSemanticBatchHint(items)
+
+      expect(hint.hasDashboardGroup).toBe(true)
+    })
+
+    it('collects readingRoles', () => {
+      const adapter = new PdfTranslationAdapter()
+      const items = [
+        { blockId: 'b1', semanticContext: { readingRole: 'metric' } },
+        { blockId: 'b2', semanticContext: { readingRole: 'summary' } },
+        { blockId: 'b3', semanticContext: { readingRole: 'metric' } }
+      ]
+
+      const hint = adapter.buildSemanticBatchHint(items)
+
+      expect(hint.readingRoles).toEqual(['metric', 'summary'])
+    })
+
+    it('collects relationshipRoles', () => {
+      const adapter = new PdfTranslationAdapter()
+      const items = [
+        { blockId: 'b1', semanticContext: { relationshipRole: 'parent' } },
+        { blockId: 'b2', semanticContext: { relationshipRole: 'child' } },
+        { blockId: 'b3', semanticContext: { relationshipRole: 'standalone' } }
+      ]
+
+      const hint = adapter.buildSemanticBatchHint(items)
+
+      expect(hint.relationshipRoles).toEqual(['parent', 'child', 'standalone'])
+    })
+
+    it('de-duplicates arrays', () => {
+      const adapter = new PdfTranslationAdapter()
+      const items = [
+        { blockId: 'b1', semanticContext: { regionType: 'kpi-candidate', readingRole: 'metric' } },
+        { blockId: 'b2', semanticContext: { regionType: 'kpi-candidate', readingRole: 'metric' } },
+        { blockId: 'b3', semanticContext: { regionType: 'kpi-candidate', readingRole: 'metric' } }
+      ]
+
+      const hint = adapter.buildSemanticBatchHint(items)
+
+      expect(hint.regionTypes).toEqual(['kpi-candidate'])
+      expect(hint.readingRoles).toEqual(['metric'])
+    })
+
+    it('returned hint object and arrays are frozen', () => {
+      const adapter = new PdfTranslationAdapter()
+      const items = [
+        { blockId: 'b1', semanticContext: { regionType: 'kpi-candidate', readingRole: 'metric', financialSubtype: 'summary-row' } }
+      ]
+
+      const hint = adapter.buildSemanticBatchHint(items)
+
+      expect(Object.isFrozen(hint)).toBe(true)
+      expect(Object.isFrozen(hint.regionTypes)).toBe(true)
+      expect(Object.isFrozen(hint.financialSubtypes)).toBe(true)
+      expect(Object.isFrozen(hint.readingRoles)).toBe(true)
+      expect(Object.isFrozen(hint.relationshipRoles)).toBe(true)
+    })
+
+    it('hasSemanticContext is true when hint exists', () => {
+      const adapter = new PdfTranslationAdapter()
+      const items = [
+        { blockId: 'b1', semanticContext: { dashboardGroup: true } }
+      ]
+
+      const hint = adapter.buildSemanticBatchHint(items)
+
+      expect(hint.hasSemanticContext).toBe(true)
+    })
+
+    it('returns null for empty items array', () => {
+      const adapter = new PdfTranslationAdapter()
+
+      const hint = adapter.buildSemanticBatchHint([])
+
+      expect(hint).toBeNull()
+    })
+
+    it('returns null for items with only undefined semanticContext', () => {
+      const adapter = new PdfTranslationAdapter()
+      const items = [
+        { blockId: 'b1', text: 'Hello' },
+        { blockId: 'b2', text: 'World' }
+      ]
+
+      const hint = adapter.buildSemanticBatchHint(items)
+
+      expect(hint).toBeNull()
+    })
+  })
+
+  describe('buildTranslationRequest with semanticHint', () => {
+    it('includes contextMetadata.semanticHint when present', () => {
+      const adapter = new PdfTranslationAdapter()
+
+      const request = adapter.buildTranslationRequest([
+        { blockId: 'block-a', text: 'Hello', sourceTextHash: 'hash-a' }
+      ], {
+        provider: 'google',
+        sourceLanguage: 'en',
+        targetLanguage: 'es',
+        messageId: 'msg-1',
+        sessionId: 'session-1',
+        semanticHint: {
+          hasSemanticContext: true,
+          regionTypes: ['kpi-candidate'],
+          financialSubtypes: ['summary-row'],
+          hasStatementFragment: false,
+          hasDashboardGroup: true,
+          readingRoles: ['metric'],
+          relationshipRoles: ['standalone']
+        }
+      })
+
+      expect(request.data.options.contextMetadata).toBeDefined()
+      expect(request.data.options.contextMetadata.semanticHint).toEqual({
+        hasSemanticContext: true,
+        regionTypes: ['kpi-candidate'],
+        financialSubtypes: ['summary-row'],
+        hasStatementFragment: false,
+        hasDashboardGroup: true,
+        readingRoles: ['metric'],
+        relationshipRoles: ['standalone']
+      })
+    })
+
+    it('existing request shape unchanged when no semanticHint', () => {
+      const adapter = new PdfTranslationAdapter()
+
+      const request = adapter.buildTranslationRequest([
+        { blockId: 'block-a', text: 'Hello', sourceTextHash: 'hash-a' }
+      ], {
+        provider: 'google',
+        sourceLanguage: 'en',
+        targetLanguage: 'es',
+        messageId: 'msg-1',
+        sessionId: 'session-1'
+      })
+
+      expect(request.data.options.contextMetadata).toBeUndefined()
+      expect(request.data.options.rawJsonPayload).toBe(true)
+      expect(request.data.options.pdfTranslation).toBe(true)
+      expect(request.data.options.sessionId).toBe('session-1')
+    })
+
+    it('existing request shape unchanged when semanticHint is null', () => {
+      const adapter = new PdfTranslationAdapter()
+
+      const request = adapter.buildTranslationRequest([
+        { blockId: 'block-a', text: 'Hello', sourceTextHash: 'hash-a' }
+      ], {
+        provider: 'google',
+        sourceLanguage: 'en',
+        targetLanguage: 'es',
+        messageId: 'msg-1',
+        sessionId: 'session-1',
+        semanticHint: null
+      })
+
+      expect(request.data.options.contextMetadata).toBeUndefined()
+    })
+
+    it('preserves existing contextMetadata without semanticHint', () => {
+      const adapter = new PdfTranslationAdapter()
+
+      const existingMetadata = { dialogueContext: 'previous exchange', pageTitle: 'Report' }
+      const request = adapter.buildTranslationRequest([
+        { blockId: 'block-a', text: 'Hello', sourceTextHash: 'hash-a' }
+      ], {
+        provider: 'google',
+        sourceLanguage: 'en',
+        targetLanguage: 'es',
+        messageId: 'msg-1',
+        sessionId: 'session-1',
+        contextMetadata: existingMetadata
+      })
+
+      expect(request.data.options.contextMetadata).toEqual(existingMetadata)
+      expect(request.data.options.contextMetadata.dialogueContext).toBe('previous exchange')
+      expect(request.data.options.contextMetadata.pageTitle).toBe('Report')
+    })
+
+    it('merges contextMetadata and semanticHint additively', () => {
+      const adapter = new PdfTranslationAdapter()
+
+      const request = adapter.buildTranslationRequest([
+        { blockId: 'block-a', text: 'Hello', sourceTextHash: 'hash-a' }
+      ], {
+        provider: 'google',
+        sourceLanguage: 'en',
+        targetLanguage: 'es',
+        messageId: 'msg-1',
+        sessionId: 'session-1',
+        contextMetadata: { dialogueContext: 'previous exchange', pageTitle: 'Report' },
+        semanticHint: {
+          hasSemanticContext: true,
+          regionTypes: ['kpi-candidate'],
+          financialSubtypes: [],
+          hasStatementFragment: false,
+          hasDashboardGroup: true,
+          readingRoles: [],
+          relationshipRoles: []
+        }
+      })
+
+      expect(request.data.options.contextMetadata.dialogueContext).toBe('previous exchange')
+      expect(request.data.options.contextMetadata.pageTitle).toBe('Report')
+      expect(request.data.options.contextMetadata.semanticHint).toBeDefined()
+      expect(request.data.options.contextMetadata.semanticHint.regionTypes).toEqual(['kpi-candidate'])
+    })
+
+    it('explicit semanticHint overrides contextMetadata.semanticHint', () => {
+      const adapter = new PdfTranslationAdapter()
+
+      const request = adapter.buildTranslationRequest([
+        { blockId: 'block-a', text: 'Hello', sourceTextHash: 'hash-a' }
+      ], {
+        provider: 'google',
+        sourceLanguage: 'en',
+        targetLanguage: 'es',
+        messageId: 'msg-1',
+        sessionId: 'session-1',
+        contextMetadata: {
+          dialogueContext: 'context',
+          semanticHint: { hasSemanticContext: false, regionTypes: [], financialSubtypes: [], hasStatementFragment: false, hasDashboardGroup: false, readingRoles: [], relationshipRoles: [] }
+        },
+        semanticHint: {
+          hasSemanticContext: true,
+          regionTypes: ['kpi-candidate'],
+          financialSubtypes: [],
+          hasStatementFragment: false,
+          hasDashboardGroup: false,
+          readingRoles: [],
+          relationshipRoles: []
+        }
+      })
+
+      expect(request.data.options.contextMetadata.dialogueContext).toBe('context')
+      expect(request.data.options.contextMetadata.semanticHint.regionTypes).toEqual(['kpi-candidate'])
+    })
+
+    it('preserves existing options when adding semanticHint', () => {
+      const adapter = new PdfTranslationAdapter()
+
+      const request = adapter.buildTranslationRequest([
+        { blockId: 'block-a', text: 'Hello', sourceTextHash: 'hash-a' }
+      ], {
+        provider: 'google',
+        sourceLanguage: 'en',
+        targetLanguage: 'es',
+        messageId: 'msg-1',
+        sessionId: 'session-1',
+        documentIdentity: 'pdf-123',
+        pageNumbers: [1, 2],
+        semanticHint: {
+          hasSemanticContext: true,
+          regionTypes: ['kpi-candidate'],
+          financialSubtypes: [],
+          hasStatementFragment: false,
+          hasDashboardGroup: false,
+          readingRoles: [],
+          relationshipRoles: []
+        }
+      })
+
+      expect(request.data.options.rawJsonPayload).toBe(true)
+      expect(request.data.options.pdfTranslation).toBe(true)
+      expect(request.data.options.sessionId).toBe('session-1')
+      expect(request.data.options.documentIdentity).toBe('pdf-123')
+      expect(request.data.options.pageNumbers).toEqual([1, 2])
+      expect(request.data.options.contextMetadata.semanticHint).toBeDefined()
+    })
+  })
 })

@@ -213,6 +213,60 @@ export class PdfTranslationAdapter {
     return items
   }
 
+  buildSemanticBatchHint(items = []) {
+    const regionTypes = []
+    const financialSubtypes = []
+    const readingRoles = []
+    const relationshipRoles = []
+    let hasStatementFragment = false
+    let hasDashboardGroup = false
+
+    for (const item of items) {
+      const ctx = item.semanticContext
+      if (!ctx) continue
+
+      if (ctx.regionType && !regionTypes.includes(ctx.regionType)) {
+        regionTypes.push(ctx.regionType)
+      }
+
+      if (ctx.financialSubtype && !financialSubtypes.includes(ctx.financialSubtype)) {
+        financialSubtypes.push(ctx.financialSubtype)
+      }
+
+      if (ctx.statementFragment) {
+        hasStatementFragment = true
+      }
+
+      if (ctx.dashboardGroup) {
+        hasDashboardGroup = true
+      }
+
+      if (ctx.readingRole && !readingRoles.includes(ctx.readingRole)) {
+        readingRoles.push(ctx.readingRole)
+      }
+
+      if (ctx.relationshipRole && !relationshipRoles.includes(ctx.relationshipRole)) {
+        relationshipRoles.push(ctx.relationshipRole)
+      }
+    }
+
+    if (regionTypes.length === 0 && financialSubtypes.length === 0 &&
+        !hasStatementFragment && !hasDashboardGroup &&
+        readingRoles.length === 0 && relationshipRoles.length === 0) {
+      return null
+    }
+
+    return Object.freeze({
+      hasSemanticContext: true,
+      regionTypes: Object.freeze(regionTypes),
+      financialSubtypes: Object.freeze(financialSubtypes),
+      hasStatementFragment,
+      hasDashboardGroup,
+      readingRoles: Object.freeze(readingRoles),
+      relationshipRoles: Object.freeze(relationshipRoles)
+    })
+  }
+
   buildTranslationRequest(items, {
     provider,
     sourceLanguage,
@@ -220,8 +274,15 @@ export class PdfTranslationAdapter {
     messageId,
     sessionId,
     documentIdentity = '',
-    pageNumbers = []
+    pageNumbers = [],
+    semanticHint = null,
+    contextMetadata = null
   }) {
+    const resolvedContextMetadata = {
+      ...(contextMetadata || {}),
+      ...(semanticHint != null && { semanticHint })
+    }
+
     return {
       action: MessageActions.TRANSLATE,
       messageId,
@@ -241,7 +302,10 @@ export class PdfTranslationAdapter {
           pdfTranslation: true,
           documentIdentity,
           pageNumbers,
-          sessionId
+          sessionId,
+          ...(Object.keys(resolvedContextMetadata).length > 0 && {
+            contextMetadata: resolvedContextMetadata
+          })
         }
       }
     }

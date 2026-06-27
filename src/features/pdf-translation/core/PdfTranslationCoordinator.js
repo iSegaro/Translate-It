@@ -56,6 +56,7 @@ export class PdfTranslationCoordinator {
 
       const pageLayout = this.session.getPageLayout?.() || null
       const enrichedBlocks = enrichBlocksWithTableMetadata(visibleBlocks, pageLayout)
+      const semanticRegions = pageLayout?.regions || []
 
       const provider = await this._resolveProvider()
       const sourceLanguage = await getSourceLanguageAsync()
@@ -63,7 +64,8 @@ export class PdfTranslationCoordinator {
       const optimizationLevel = await getProviderOptimizationLevelAsync(provider)
       const batches = this.batchPlanner.plan(enrichedBlocks, {
         providerName: provider,
-        optimizationLevel
+        optimizationLevel,
+        semanticRegions
       })
 
       let translatedCount = 0
@@ -76,6 +78,7 @@ export class PdfTranslationCoordinator {
 
         this._markBlocksLoading(batch.blocks)
 
+        const semanticHint = this.adapter.buildSemanticBatchHint(batch.items)
         const messageId = this._buildMessageId(runId, batch.batchId)
         this.activeRequestIds.add(messageId)
 
@@ -89,7 +92,8 @@ export class PdfTranslationCoordinator {
               messageId,
               sessionId: String(runId),
               documentIdentity: this.session.documentIdentity,
-              pageNumbers: batch.blocks.map((block) => block.pageNumber)
+              pageNumbers: batch.blocks.map((block) => block.pageNumber),
+              semanticHint
             })
           )
         } catch (error) {
