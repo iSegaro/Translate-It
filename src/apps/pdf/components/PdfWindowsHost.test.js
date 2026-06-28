@@ -748,6 +748,26 @@ describe('PdfWindowsHost', () => {
     expect(clipboardWriteTextMock).toHaveBeenCalledWith('Normal bold text')
   })
 
+  it('keeps the footer visible when a long translation is rendered', async () => {
+    sendRegularMessageMock.mockResolvedValueOnce({
+      success: true,
+      translatedText: Array.from({ length: 40 }, (_, index) => `Line ${index + 1}`).join('\n'),
+      sourceLanguage: 'en',
+      mode: 'selection-manager'
+    })
+
+    await showSelectionIcon('Long body')
+    await openWindowFromSelectionIcon(wrapper)
+    await flushPromises()
+
+    expect(wrapper.find('[data-testid="translation-window-footer"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="translation-window-footer-retry"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="translation-window-footer-target-language"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="translation-window-footer-detected-language"]').exists()).toBe(true)
+    expect(wrapper.find('.pdf-windows-host__body').exists()).toBe(true)
+    expect(wrapper.get('[data-testid="pdf-windows-host"]').classes()).not.toContain('pdf-windows-host--docked')
+  })
+
   it('keeps shared TranslationDisplay toolbar actions out of PdfWindowsHost while preserving PDF-local actions', async () => {
     sendRegularMessageMock.mockResolvedValueOnce({
       success: true,

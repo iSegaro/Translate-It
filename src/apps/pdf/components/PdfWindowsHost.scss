@@ -21,13 +21,16 @@
   box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
   transform: none;
   max-width: min(350px, 85vw);
+  max-height: min(400px, 80vh);
   pointer-events: auto;
   box-sizing: border-box;
+  overflow: hidden;
 }
 
 .pdf-windows-host--docked {
   max-width: calc(100vw - 24px);
-  max-height: calc(100vh - 24px);
+  max-height: none;
+  height: 100vh;
   overflow: hidden;
 }
 
@@ -98,6 +101,12 @@
   flex-direction: column;
   gap: 10px;
   min-width: 0;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+  padding-right: 6px;
+  padding-bottom: 2px;
+  box-sizing: border-box;
 }
 
 .pdf-windows-host__source {
@@ -155,8 +164,8 @@
   border: none;
   border-radius: 0;
   padding: 0;
-  max-height: 150px;
-  overflow: auto;
+  max-height: none;
+  overflow: visible;
 }
 
 .pdf-windows-host__translation.ti-translation-display.theme-dark,
@@ -172,6 +181,19 @@
 .pdf-windows-host__translation--markdown,
 .pdf-windows-host__translation--dictionary {
   white-space: normal;
+}
+
+.pdf-windows-host__body::-webkit-scrollbar {
+  width: 8px;
+}
+
+.pdf-windows-host__body::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.16);
+  border-radius: 999px;
+}
+
+.pdf-windows-host__body::-webkit-scrollbar-track {
+  background: transparent;
 }
 
 .pdf-windows-host__translation.ti-translation-display {
@@ -218,6 +240,7 @@
 
 .pdf-windows-host__footer {
   margin-top: -2px;
+  flex-shrink: 0;
 }
 
 .pdf-windows-host__dock-resize-handle {
