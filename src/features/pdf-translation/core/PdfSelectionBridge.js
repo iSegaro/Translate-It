@@ -16,9 +16,15 @@ export class PdfSelectionBridge extends ResourceTracker {
     this.viewerRootRef = viewerRootRef
     this.lastSelectionSignature = ''
     this.isStarted = false
+    this.isPointerDown = false
+    this.hasPendingSelectionChange = false
     this._documentListenerOptions = { capture: true }
     this._windowListenerOptions = { capture: true }
     this.handleSelectionChange = this.handleSelectionChange.bind(this)
+    this.handlePointerDown = this.handlePointerDown.bind(this)
+    this.handlePointerUp = this.handlePointerUp.bind(this)
+    this.handlePointerCancel = this.handlePointerCancel.bind(this)
+    this.handleWindowBlur = this.handleWindowBlur.bind(this)
   }
 
   get viewerRoot() {
@@ -30,7 +36,10 @@ export class PdfSelectionBridge extends ResourceTracker {
 
     this.isStarted = true
     this.addEventListener(document, 'selectionchange', this.handleSelectionChange, this._documentListenerOptions)
-    this.addEventListener(window, 'blur', this.handleSelectionChange, this._windowListenerOptions)
+    this.addEventListener(document, 'pointerdown', this.handlePointerDown, this._documentListenerOptions)
+    this.addEventListener(document, 'pointerup', this.handlePointerUp, this._documentListenerOptions)
+    this.addEventListener(document, 'pointercancel', this.handlePointerCancel, this._documentListenerOptions)
+    this.addEventListener(window, 'blur', this.handleWindowBlur, this._windowListenerOptions)
     logger.debug('PDF selection bridge started')
   }
 
@@ -38,15 +47,61 @@ export class PdfSelectionBridge extends ResourceTracker {
     if (!this.isStarted) return
 
     this.removeEventListener(document, 'selectionchange', this.handleSelectionChange, this._documentListenerOptions)
-    this.removeEventListener(window, 'blur', this.handleSelectionChange, this._windowListenerOptions)
+    this.removeEventListener(document, 'pointerdown', this.handlePointerDown, this._documentListenerOptions)
+    this.removeEventListener(document, 'pointerup', this.handlePointerUp, this._documentListenerOptions)
+    this.removeEventListener(document, 'pointercancel', this.handlePointerCancel, this._documentListenerOptions)
+    this.removeEventListener(window, 'blur', this.handleWindowBlur, this._windowListenerOptions)
     this.cleanup()
     this.isStarted = false
     logger.debug('PDF selection bridge stopped')
   }
 
+  handlePointerDown(event) {
+    const target = event?.target
+    const viewerRoot = this.viewerRoot
+
+    if (!viewerRoot || !target || !viewerRoot.contains(target)) {
+      return
+    }
+
+    this.isPointerDown = true
+    this.hasPendingSelectionChange = false
+  }
+
+  handlePointerUp() {
+    if (!this.isPointerDown) {
+      return
+    }
+
+    this.isPointerDown = false
+
+    if (!this.hasPendingSelectionChange) {
+      return
+    }
+
+    this.hasPendingSelectionChange = false
+    this.handleSelectionChange()
+  }
+
+  handlePointerCancel() {
+    this.isPointerDown = false
+    this.hasPendingSelectionChange = false
+  }
+
+  handleWindowBlur() {
+    this.isPointerDown = false
+    this.hasPendingSelectionChange = false
+    this.clearSelection()
+  }
+
   handleSelectionChange() {
     const viewerRoot = this.viewerRoot
     const selection = document.getSelection?.()
+
+    if (this.isPointerDown) {
+      this.hasPendingSelectionChange = true
+      return
+    }
 
     if (!isSelectionInsidePdfTextLayer(selection, viewerRoot)) {
       this.clearSelection()
@@ -78,6 +133,9 @@ export class PdfSelectionBridge extends ResourceTracker {
   }
 
   clearSelection() {
+    this.isPointerDown = false
+    this.hasPendingSelectionChange = false
+
     if (!this.lastSelectionSignature) return
 
     this.lastSelectionSignature = ''

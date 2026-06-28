@@ -85,6 +85,71 @@ describe('PdfSelectionBridge', () => {
         source: 'pdf-viewer',
         isPdf: true
       })
+      }))
+  })
+
+  it('defers selection emission while the pointer is down and flushes after pointer up', () => {
+    const { viewerRoot, selection } = createSelection()
+    getSelectionMock.mockReturnValue(selection)
+    const bridge = new PdfSelectionBridge(ref(viewerRoot))
+
+    bridge.handlePointerDown({ target: viewerRoot.firstChild })
+    bridge.handleSelectionChange()
+
+    expect(emitMock).not.toHaveBeenCalled()
+
+    bridge.handlePointerUp()
+
+    expect(emitMock).toHaveBeenCalledWith('global-selection-change', expect.objectContaining({
+      text: 'PDF text',
+      context: expect.objectContaining({
+        source: 'pdf-viewer',
+        isPdf: true
+      })
+    }))
+  })
+
+  it('does not emit while pointer selection is canceled', () => {
+    const { viewerRoot, selection } = createSelection()
+    getSelectionMock.mockReturnValue(selection)
+    const bridge = new PdfSelectionBridge(ref(viewerRoot))
+
+    bridge.handlePointerDown({ target: viewerRoot.firstChild })
+    bridge.handleSelectionChange()
+    bridge.handlePointerCancel()
+
+    expect(emitMock).not.toHaveBeenCalled()
+    expect(bridge.isPointerDown).toBe(false)
+    expect(bridge.hasPendingSelectionChange).toBe(false)
+  })
+
+  it('clears pending pointer selection on blur without emitting', () => {
+    const { viewerRoot, selection } = createSelection()
+    getSelectionMock.mockReturnValue(selection)
+    const bridge = new PdfSelectionBridge(ref(viewerRoot))
+
+    bridge.handlePointerDown({ target: viewerRoot.firstChild })
+    bridge.handleSelectionChange()
+    bridge.handleWindowBlur()
+
+    expect(emitMock).not.toHaveBeenCalled()
+    expect(bridge.isPointerDown).toBe(false)
+    expect(bridge.hasPendingSelectionChange).toBe(false)
+  })
+
+  it('still emits immediately for keyboard or other non-pointer selection changes', () => {
+    const { viewerRoot, selection } = createSelection()
+    getSelectionMock.mockReturnValue(selection)
+    const bridge = new PdfSelectionBridge(ref(viewerRoot))
+
+    bridge.handleSelectionChange()
+
+    expect(emitMock).toHaveBeenCalledWith('global-selection-change', expect.objectContaining({
+      text: 'PDF text',
+      context: expect.objectContaining({
+        source: 'pdf-viewer',
+        isPdf: true
+      })
     }))
   })
 
@@ -95,12 +160,18 @@ describe('PdfSelectionBridge', () => {
     bridge.start()
 
     expect(documentAddSpy).toHaveBeenCalledWith('selectionchange', bridge.handleSelectionChange, { capture: true })
-    expect(windowAddSpy).toHaveBeenCalledWith('blur', bridge.handleSelectionChange, { capture: true })
+    expect(documentAddSpy).toHaveBeenCalledWith('pointerdown', bridge.handlePointerDown, { capture: true })
+    expect(documentAddSpy).toHaveBeenCalledWith('pointerup', bridge.handlePointerUp, { capture: true })
+    expect(documentAddSpy).toHaveBeenCalledWith('pointercancel', bridge.handlePointerCancel, { capture: true })
+    expect(windowAddSpy).toHaveBeenCalledWith('blur', bridge.handleWindowBlur, { capture: true })
 
     bridge.destroy()
 
     expect(documentRemoveSpy).toHaveBeenCalledWith('selectionchange', bridge.handleSelectionChange, { capture: true })
-    expect(windowRemoveSpy).toHaveBeenCalledWith('blur', bridge.handleSelectionChange, { capture: true })
+    expect(documentRemoveSpy).toHaveBeenCalledWith('pointerdown', bridge.handlePointerDown, { capture: true })
+    expect(documentRemoveSpy).toHaveBeenCalledWith('pointerup', bridge.handlePointerUp, { capture: true })
+    expect(documentRemoveSpy).toHaveBeenCalledWith('pointercancel', bridge.handlePointerCancel, { capture: true })
+    expect(windowRemoveSpy).toHaveBeenCalledWith('blur', bridge.handleWindowBlur, { capture: true })
     expect(bridge.isStarted).toBe(false)
   })
 })
