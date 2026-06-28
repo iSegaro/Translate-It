@@ -170,42 +170,42 @@ export function getPdfDockedWindowPosition(dockMode, dockedWidth, viewport = get
   return null
 }
 
-export function buildPdfSelectionIconStyle(selectionPosition, viewport = getViewportSize(), margin = PDF_WINDOW_LAYOUT.MARGIN) {
-  const rect = normalizePdfWindowPosition(selectionPosition)
-  if (!rect) {
+export function buildPdfSelectionIconStyle(selectionPosition, _viewport = getViewportSize(), margin = PDF_WINDOW_LAYOUT.MARGIN) {
+  const size = PDF_SELECTION_ICON_LAYOUT.SIZE
+  const viewportWidth = Number(_viewport?.width) || 0
+  const viewportHeight = Number(_viewport?.height) || 0
+
+  const buildFallbackStyle = () => {
+    const left = clamp(margin, margin, Math.max(margin, viewportWidth - size - margin))
+    const top = clamp(margin, margin, Math.max(margin, viewportHeight - size - margin))
+
     return {
       position: 'fixed',
-      left: `${margin}px`,
-      top: `${margin}px`,
-      width: `${PDF_SELECTION_ICON_LAYOUT.SIZE}px`,
-      height: `${PDF_SELECTION_ICON_LAYOUT.SIZE}px`,
+      left: `${left}px`,
+      top: `${top}px`,
+      width: `${size}px`,
+      height: `${size}px`,
       zIndex: PDF_WINDOW_LAYOUT.Z_INDEX
     }
   }
 
-  const size = PDF_SELECTION_ICON_LAYOUT.SIZE
-  const width = size
-  const height = size
-  const anchorX = rect.x + (Number(selectionPosition?.width) || 0) / 2
-  const preferredLeft = anchorX - (width / 2)
-  const belowTop = rect.y + (Number(selectionPosition?.height) || 0) + PDF_SELECTION_ICON_LAYOUT.GAP
-  const aboveTop = rect.y - height - PDF_SELECTION_ICON_LAYOUT.GAP
-
-  let left = clamp(preferredLeft, margin, Math.max(margin, viewport.width - width - margin))
-  let top = belowTop
-
-  if (top + height + margin > viewport.height) {
-    top = Math.max(margin, aboveTop)
+  if (!selectionPosition) {
+    return buildFallbackStyle()
   }
 
-  top = clamp(top, margin, Math.max(margin, viewport.height - height - margin))
+  const left = Number(selectionPosition.x)
+  const top = Number(selectionPosition.y)
+
+  if (!Number.isFinite(left) || !Number.isFinite(top)) {
+    return buildFallbackStyle()
+  }
 
   return {
     position: 'fixed',
     left: `${left}px`,
     top: `${top}px`,
-    width: `${width}px`,
-    height: `${height}px`,
+    width: `${size}px`,
+    height: `${size}px`,
     zIndex: PDF_WINDOW_LAYOUT.Z_INDEX
   }
 }
