@@ -2,6 +2,8 @@ import { ref } from 'vue'
 import {
   clampPdfWindowPosition,
   getViewportSize,
+  getPdfDockedWindowPosition,
+  PDF_DOCK_LAYOUT,
   PDF_WINDOW_LAYOUT
 } from '@/apps/pdf/utils/pdfWindowGeometry.js'
 
@@ -27,6 +29,7 @@ export function usePdfWindowDrag({
 } = {}) {
   const isDragging = ref(false)
   let dragOffset = { x: 0, y: 0 }
+  let dragOriginMode = 'none'
   let cleanupListeners = null
 
   function clearDragListeners() {
@@ -50,13 +53,14 @@ export function usePdfWindowDrag({
 
     const viewport = getViewportSize()
     const coords = getPointerCoordinates(event)
-    const currentPosition = dockMode?.value !== 'none'
-      ? { x: position.value.x, y: position.value.y }
+    const dockedPosition = dockMode?.value !== 'none'
+      ? getPdfDockedWindowPosition(dockMode.value, hostSize.value.width, viewport, PDF_WINDOW_LAYOUT.MARGIN)
+      : null
+    const currentPosition = dockedPosition
+      ? { x: dockedPosition.x, y: dockedPosition.y }
       : clampPdfWindowPosition(position.value, hostSize.value, viewport)
 
-    if (dockMode?.value !== 'none') {
-      onDockModeChange?.('none')
-    }
+    dragOriginMode = dockMode?.value || 'none'
 
     manualPosition.value = true
     dragOffset = {
@@ -70,22 +74,67 @@ export function usePdfWindowDrag({
       }
 
       const nextCoords = getPointerCoordinates(moveEvent)
+      const viewport = getViewportSize()
+      // Mirror the web window behavior: snap when the pointer approaches an edge
+      // and break away from a dock when the pointer moves back into the page.
+      const edgeThreshold = PDF_DOCK_LAYOUT.SNAP_THRESHOLD
+      const breakThreshold = PDF_DOCK_LAYOUT.BREAK_THRESHOLD
+
+      if (dockMode?.value === 'none') {
+        if (nextCoords.x < edgeThreshold) {
+          onDockModeChange?.('left')
+          return
+        }
+
+        if (nextCoords.x > viewport.width - edgeThreshold) {
+          onDockModeChange?.('right')
+          return
+        }
+
+        const nextPosition = clampPdfWindowPosition({
+          x: nextCoords.x - dragOffset.x,
+          y: nextCoords.y - dragOffset.y
+        }, hostSize.value, viewport, PDF_WINDOW_LAYOUT.MARGIN)
+
+        position.value = nextPosition
+        onPositionChange?.(nextPosition)
+        return
+      }
+
+      const shouldUndock = (
+        (dragOriginMode === 'left' || dockMode.value === 'left')
+        && nextCoords.x > breakThreshold
+      ) || (
+        (dragOriginMode === 'right' || dockMode.value === 'right')
+        && nextCoords.x < viewport.width - breakThreshold
+      )
+
+      if (!shouldUndock) {
+        return
+      }
+
+      onDockModeChange?.('none')
+
       const nextPosition = clampPdfWindowPosition({
         x: nextCoords.x - dragOffset.x,
         y: nextCoords.y - dragOffset.y
-      }, hostSize.value, getViewportSize(), PDF_WINDOW_LAYOUT.MARGIN)
+      }, hostSize.value, viewport, PDF_WINDOW_LAYOUT.MARGIN)
 
       position.value = nextPosition
       onPositionChange?.(nextPosition)
     }
 
     const handleStop = () => {
-      const nextPosition = clampPdfWindowPosition(position.value, hostSize.value, getViewportSize())
+      const viewport = getViewportSize()
+      const nextPosition = clampPdfWindowPosition(position.value, hostSize.value, viewport)
       position.value = nextPosition
 
       clearDragListeners()
-      onPersistPosition?.(nextPosition)
+      if (dockMode?.value === 'none') {
+        onPersistPosition?.(nextPosition)
+      }
       onDragEnd?.(nextPosition)
+      dragOriginMode = 'none'
     }
 
     document.addEventListener('pointermove', handleMove, { capture: true })
@@ -107,6 +156,7 @@ export function usePdfWindowDrag({
 
   function cleanup() {
     clearDragListeners()
+    dragOriginMode = 'none'
   }
 
   return {

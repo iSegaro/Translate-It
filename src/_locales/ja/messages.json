@@ -2225,20 +2225,14 @@
   "pdf_windows_host_selected_text": {
     "message": "選択されたテキスト"
   },
+  "pdf_windows_host_detected_language": {
+    "message": "検出された言語"
+  },
   "pdf_windows_host_copied": {
     "message": "コピーしました"
   },
   "pdf_windows_host_copy_failed": {
     "message": "コピーに失敗しました"
-  },
-  "pdf_windows_host_dock_left": {
-    "message": "左にドック"
-  },
-  "pdf_windows_host_dock_right": {
-    "message": "右にドック"
-  },
-  "pdf_windows_host_undock": {
-    "message": "ドック解除"
   },
   "window_tts_no_text": {
     "message": "読み上げるテキストがありません"

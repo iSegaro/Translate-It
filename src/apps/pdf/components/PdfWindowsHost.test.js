@@ -371,6 +371,76 @@ describe('PdfWindowsHost', () => {
     expect(badge.text()).toBe('English')
   })
 
+  it('renders the target language badge after translation and updates it on the next translation when the target language changes', async () => {
+    sendRegularMessageMock.mockResolvedValueOnce({
+      success: true,
+      translatedText: 'Target language result',
+      sourceLanguage: 'en',
+      mode: 'selection-manager'
+    })
+
+    await showSelectionIcon('Target me')
+    await openWindowFromSelectionIcon(wrapper)
+    await flushPromises()
+
+    const targetBadge = wrapper.get('[data-testid="pdf-windows-host-target-language"]')
+    expect(targetBadge.exists()).toBe(true)
+    expect(targetBadge.text()).toBe('Persian (Farsi)')
+
+    getTargetLanguageAsyncMock.mockResolvedValueOnce('ja')
+    sendRegularMessageMock.mockResolvedValueOnce({
+      success: true,
+      translatedText: 'Updated target result',
+      sourceLanguage: 'en',
+      mode: 'selection-manager'
+    })
+
+    await showSelectionIcon('Target update me', { x: 150, y: 210, width: 90, height: 18 })
+    await openWindowFromSelectionIcon(wrapper)
+    await flushPromises()
+
+    expect(wrapper.get('[data-testid="pdf-windows-host-target-language"]').text()).toBe('Japanese')
+  })
+
+  it('hides the target language badge for auto or unknown target language values', async () => {
+    getTargetLanguageAsyncMock.mockResolvedValueOnce('auto')
+    sendRegularMessageMock.mockResolvedValueOnce({
+      success: true,
+      translatedText: 'Auto target result',
+      sourceLanguage: 'en',
+      mode: 'selection-manager'
+    })
+
+    await showSelectionIcon('Auto target')
+    await openWindowFromSelectionIcon(wrapper)
+    await flushPromises()
+
+    expect(wrapper.find('[data-testid="pdf-windows-host-target-language"]').exists()).toBe(false)
+
+    wrapper.unmount()
+    wrapper = mount(PdfWindowsHost, {
+      props: {
+        pdfFingerprint: 'pdf-doc-1'
+      },
+      attachTo: document.body
+    })
+    await flushPromises()
+
+    getTargetLanguageAsyncMock.mockResolvedValueOnce('xx-unknown')
+    sendRegularMessageMock.mockResolvedValueOnce({
+      success: true,
+      translatedText: 'Unknown target result',
+      sourceLanguage: 'en',
+      mode: 'selection-manager'
+    })
+
+    await showSelectionIcon('Unknown target')
+    await openWindowFromSelectionIcon(wrapper)
+    await flushPromises()
+
+    expect(wrapper.find('[data-testid="pdf-windows-host-target-language"]').exists()).toBe(false)
+  })
+
   it('prefers detectedSourceLanguage over sourceLanguage when rendering the badge', async () => {
     sendRegularMessageMock.mockResolvedValueOnce({
       success: true,
@@ -463,6 +533,14 @@ describe('PdfWindowsHost', () => {
     expect(wrapper.get('[data-testid="pdf-windows-host-provider-selector"]').attributes('data-mode')).toBe('compact')
     expect(wrapper.get('[data-testid="pdf-windows-host-provider-selector"]').attributes('data-is-global')).toBe('false')
     expect(wrapper.get('[data-testid="pdf-windows-host-provider-select"]').element.value).toBe('deepl')
+  })
+
+  it('does not render explicit dock buttons', async () => {
+    await showSelectionIcon('No dock buttons')
+    await openWindowFromSelectionIcon(wrapper)
+
+    expect(wrapper.find('[data-testid="pdf-windows-host-dock-left"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="pdf-windows-host-dock-right"]').exists()).toBe(false)
   })
 
   it('updates only the local provider selection and does not auto-translate', async () => {
@@ -761,11 +839,14 @@ describe('PdfWindowsHost', () => {
     expect(wrapper.find('[data-testid="pdf-windows-host"]').exists()).toBe(false)
   })
 
-  it('docks left and right and clamps dock resize width', async () => {
+  it('docks by dragging near viewport edges and clamps dock resize width', async () => {
     await showSelectionIcon('Dock me')
     await openWindowFromSelectionIcon(wrapper)
 
-    await wrapper.get('[data-testid="pdf-windows-host-dock-left"]').trigger('click')
+    const header = wrapper.get('.pdf-windows-host__header')
+    dispatchPointerEvent(header.element, 'pointerdown', { clientX: 180, clientY: 210 })
+    dispatchPointerEvent(document, 'pointermove', { clientX: 4, clientY: 210 })
+    dispatchPointerEvent(document, 'pointerup', { clientX: 4, clientY: 210 })
     await flushPromises()
     expect(wrapper.get('[data-testid="pdf-windows-host"]').classes()).toContain('pdf-windows-host--dock-left')
     expect(wrapper.find('[data-testid="pdf-windows-host-resize-handle"]').exists()).toBe(true)
@@ -781,16 +862,50 @@ describe('PdfWindowsHost', () => {
     expect(dockedWidth).toBeLessThanOrEqual(expectedMaxDockedWidth)
     expect(dockedWidth).toBeGreaterThanOrEqual(280)
 
-    await wrapper.get('[data-testid="pdf-windows-host-dock-right"]').trigger('click')
+    dispatchPointerEvent(header.element, 'pointerdown', { clientX: 20, clientY: 210 })
+    dispatchPointerEvent(document, 'pointermove', { clientX: 540, clientY: 210 })
+    dispatchPointerEvent(document, 'pointerup', { clientX: 540, clientY: 210 })
+    await flushPromises()
+    expect(wrapper.get('[data-testid="pdf-windows-host"]').classes()).not.toContain('pdf-windows-host--dock-left')
+    expect(wrapper.get('[data-testid="pdf-windows-host"]').classes()).not.toContain('pdf-windows-host--dock-right')
+
+    dispatchPointerEvent(header.element, 'pointerdown', { clientX: 520, clientY: 210 })
+    dispatchPointerEvent(document, 'pointermove', { clientX: window.innerWidth - 4, clientY: 210 })
+    dispatchPointerEvent(document, 'pointerup', { clientX: window.innerWidth - 4, clientY: 210 })
     await flushPromises()
     expect(wrapper.get('[data-testid="pdf-windows-host"]').classes()).toContain('pdf-windows-host--dock-right')
+  })
+
+  it('keeps the dock mode unchanged while dragging within the breakaway threshold and retains the resize handle', async () => {
+    await showSelectionIcon('Stable dock')
+    await openWindowFromSelectionIcon(wrapper)
+
+    const header = wrapper.get('.pdf-windows-host__header')
+    dispatchPointerEvent(header.element, 'pointerdown', { clientX: 180, clientY: 210 })
+    dispatchPointerEvent(document, 'pointermove', { clientX: 4, clientY: 210 })
+    dispatchPointerEvent(document, 'pointerup', { clientX: 4, clientY: 210 })
+    await flushPromises()
+
+    expect(wrapper.get('[data-testid="pdf-windows-host"]').classes()).toContain('pdf-windows-host--dock-left')
+    expect(wrapper.find('[data-testid="pdf-windows-host-resize-handle"]').exists()).toBe(true)
+
+    dispatchPointerEvent(header.element, 'pointerdown', { clientX: 20, clientY: 210 })
+    dispatchPointerEvent(document, 'pointermove', { clientX: 72, clientY: 210 })
+    dispatchPointerEvent(document, 'pointerup', { clientX: 72, clientY: 210 })
+    await flushPromises()
+
+    expect(wrapper.get('[data-testid="pdf-windows-host"]').classes()).toContain('pdf-windows-host--dock-left')
+    expect(wrapper.find('[data-testid="pdf-windows-host-resize-handle"]').exists()).toBe(true)
   })
 
   it('translates directly without the icon when docked', async () => {
     await showSelectionIcon('Dock direct')
     await openWindowFromSelectionIcon(wrapper)
 
-    await wrapper.get('[data-testid="pdf-windows-host-dock-left"]').trigger('click')
+    const header = wrapper.get('.pdf-windows-host__header')
+    dispatchPointerEvent(header.element, 'pointerdown', { clientX: 180, clientY: 210 })
+    dispatchPointerEvent(document, 'pointermove', { clientX: 4, clientY: 210 })
+    dispatchPointerEvent(document, 'pointerup', { clientX: 4, clientY: 210 })
     await flushPromises()
     sendRegularMessageMock.mockClear()
 

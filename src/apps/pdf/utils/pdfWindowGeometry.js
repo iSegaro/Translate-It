@@ -9,6 +9,11 @@ export const PDF_WINDOW_LAYOUT = {
   DEFAULT_GLOBAL_POSITION: { x: 72, y: 72 }
 }
 
+export const PDF_DOCK_LAYOUT = {
+  SNAP_THRESHOLD: 30,
+  BREAK_THRESHOLD: 100
+}
+
 export const PDF_SELECTION_ICON_LAYOUT = {
   SIZE: 32,
   GAP: 8
@@ -141,6 +146,28 @@ export function buildPdfDockedWindowStyle(dockMode, dockedWidth, viewport = getV
   }
 
   return {}
+}
+
+export function getPdfDockedWindowPosition(dockMode, dockedWidth, viewport = getViewportSize(), margin = PDF_WINDOW_LAYOUT.MARGIN) {
+  const width = clampPdfDockedWidth(dockedWidth, viewport.width)
+
+  if (dockMode === 'left') {
+    return {
+      x: margin,
+      y: margin,
+      width
+    }
+  }
+
+  if (dockMode === 'right') {
+    return {
+      x: Math.max(margin, (viewport.width || 0) - width - margin),
+      y: margin,
+      width
+    }
+  }
+
+  return null
 }
 
 export function buildPdfSelectionIconStyle(selectionPosition, viewport = getViewportSize(), margin = PDF_WINDOW_LAYOUT.MARGIN) {

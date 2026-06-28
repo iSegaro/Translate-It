@@ -77,12 +77,12 @@
   color: rgba(230, 237, 247, 0.9);
 }
 
-.pdf-windows-host__detected-language {
+.pdf-windows-host__language-badge {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   min-height: 18px;
-  max-width: 80px;
+  max-width: 112px;
   padding: 2px 8px;
   border-radius: 10px;
   font-size: 10px;
@@ -96,6 +96,14 @@
   text-overflow: ellipsis;
   pointer-events: none;
   user-select: none;
+}
+
+.pdf-windows-host__language-badge--target {
+  background: #283038;
+}
+
+.pdf-windows-host__language-badge--detected {
+  background: #3c4043;
 }
 
 .pdf-windows-host__header-actions {
@@ -176,14 +184,6 @@
 
 .pdf-windows-host__action-button--original {
   min-width: 38px;
-}
-
-.pdf-windows-host__action-button--dock {
-  min-width: 0;
-  width: auto;
-  padding: 0 8px;
-  font-size: 10px;
-  opacity: 0.82;
 }
 
 .pdf-windows-host__icon-button {

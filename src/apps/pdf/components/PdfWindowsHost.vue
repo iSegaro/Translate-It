@@ -82,8 +82,20 @@
         </div>
 
         <span
+          v-if="targetLanguageName"
+          class="pdf-windows-host__language-badge pdf-windows-host__language-badge--target"
+          :title="t('target_language_label')"
+          :aria-label="`${t('target_language_label')}: ${targetLanguageName}`"
+          data-testid="pdf-windows-host-target-language"
+        >
+          {{ targetLanguageName }}
+        </span>
+
+        <span
           v-if="detectedLanguageName"
-          class="pdf-windows-host__detected-language"
+          class="pdf-windows-host__language-badge pdf-windows-host__language-badge--detected"
+          :title="t('pdf_windows_host_detected_language')"
+          :aria-label="`${t('pdf_windows_host_detected_language')}: ${detectedLanguageName}`"
           data-testid="pdf-windows-host-detected-language"
         >
           {{ detectedLanguageName }}
@@ -110,32 +122,6 @@
               d="M11.99 2C6.47 2 2 6.48 2 12s4.47 10 9.99 10C17.52 22 22 17.52 22 12S17.52 2 11.99 2zM12 20c-4.42 0-8-3.58-8-8s3.58-8 8-8s8 3.58 8 8s-3.58 8-8 8zm-2-9.41V12h2.59L15 14.41V16h-4v-1.59L8.59 12H7v-2h3.59L13 7.59V6h4v1.59L14.41 10H12v.59z"
             />
           </svg>
-        </button>
-
-        <button
-          class="pdf-windows-host__action-button pdf-windows-host__action-button--dock"
-          type="button"
-          :class="{ 'is-active': dockMode === 'left' }"
-          :title="dockMode === 'left' ? t('pdf_windows_host_undock') : t('pdf_windows_host_dock_left')"
-          :aria-label="dockMode === 'left' ? t('pdf_windows_host_undock') : t('pdf_windows_host_dock_left')"
-          data-testid="pdf-windows-host-dock-left"
-          @click.stop="handleDockLeft"
-          @pointerdown.stop
-        >
-          {{ t('pdf_windows_host_dock_left') }}
-        </button>
-
-        <button
-          class="pdf-windows-host__action-button pdf-windows-host__action-button--dock"
-          type="button"
-          :class="{ 'is-active': dockMode === 'right' }"
-          :title="dockMode === 'right' ? t('pdf_windows_host_undock') : t('pdf_windows_host_dock_right')"
-          :aria-label="dockMode === 'right' ? t('pdf_windows_host_undock') : t('pdf_windows_host_dock_right')"
-          data-testid="pdf-windows-host-dock-right"
-          @click.stop="handleDockRight"
-          @pointerdown.stop
-        >
-          {{ t('pdf_windows_host_dock_right') }}
         </button>
 
         <button
@@ -334,6 +320,7 @@ const {
   isProviderReady,
   showOriginal,
   detectedLanguageName,
+  targetLanguageName,
   translationError,
   isTranslating,
   isCopying,
@@ -360,8 +347,6 @@ const {
   toggleShowOriginal,
   handleProviderChange,
   handlePinToggle,
-  handleDockLeft,
-  handleDockRight,
   handleDockResize,
   startDrag
 } = usePdfWindowsHost({

@@ -35,6 +35,29 @@ function isPdfSelectionContext(context) {
   return context.source === 'pdf-viewer' || context.isPdf === true
 }
 
+function resolveLanguageDisplayName(code) {
+  if (typeof code !== 'string') {
+    return ''
+  }
+
+  const normalizedCode = code.trim()
+  if (!normalizedCode || normalizedCode.toLowerCase() === AUTO_DETECT_VALUE) {
+    return ''
+  }
+
+  const languageName = getLanguageNameFromCode(normalizedCode)
+  if (!languageName) {
+    return ''
+  }
+
+  const normalizedName = languageName.trim().toLowerCase()
+  if (!normalizedName || normalizedName === normalizedCode.toLowerCase()) {
+    return ''
+  }
+
+  return languageName.charAt(0).toUpperCase() + languageName.slice(1)
+}
+
 async function copyTextToClipboard(text) {
   if (!text) return false
 
@@ -106,23 +129,10 @@ export function usePdfWindowsHost(options = {}) {
     || translationMode.value === TranslationMode.LEGACY_DICTIONARY
   ))
   const detectedLanguageName = computed(() => {
-    const code = detectedSourceLanguage.value
-    if (!code || code === AUTO_DETECT_VALUE) {
-      return ''
-    }
-
-    const name = getLanguageNameFromCode(code)
-    if (!name || name === AUTO_DETECT_VALUE) {
-      return ''
-    }
-
-    const normalizedCode = code.trim().toLowerCase()
-    const normalizedName = name.trim().toLowerCase()
-    if (!normalizedName || normalizedName === normalizedCode) {
-      return ''
-    }
-
-    return name.charAt(0).toUpperCase() + name.slice(1)
+    return resolveLanguageDisplayName(detectedSourceLanguage.value)
+  })
+  const targetLanguageName = computed(() => {
+    return resolveLanguageDisplayName(translationTargetLanguage.value)
   })
   const iconStyle = computed(() => (
     isIconVisible.value
@@ -333,26 +343,11 @@ export function usePdfWindowsHost(options = {}) {
     return isPdfSelectionContext(detail?.context)
   }
 
-  async function handleDockModeChange(nextMode) {
-    docking.setDockMode(nextMode)
-    placement.markManualPosition()
-    await persistGlobalPreferences()
-    await scheduleHostStyleRefresh()
-  }
-
   async function handlePinToggle() {
     docking.togglePin()
     placement.markManualPosition()
     await persistGlobalPreferences()
     await scheduleHostStyleRefresh()
-  }
-
-  async function handleDockLeft() {
-    await handleDockModeChange(docking.dockMode.value === 'left' ? 'none' : 'left')
-  }
-
-  async function handleDockRight() {
-    await handleDockModeChange(docking.dockMode.value === 'right' ? 'none' : 'right')
   }
 
   async function handleDockResize(event) {
@@ -700,6 +695,7 @@ export function usePdfWindowsHost(options = {}) {
     showOriginal,
     detectedSourceLanguage,
     detectedLanguageName,
+    targetLanguageName,
     translatedText,
     translationError,
     isTranslating,
@@ -711,7 +707,6 @@ export function usePdfWindowsHost(options = {}) {
     speakableText,
     hasSpeakableText,
     isDictionaryResult,
-    translatedText,
     translationTargetLanguage,
     translatedDisplayMetadata,
     isPinned: docking.isPinned,
@@ -728,8 +723,6 @@ export function usePdfWindowsHost(options = {}) {
     toggleShowOriginal,
     handleProviderChange,
     handlePinToggle,
-    handleDockLeft,
-    handleDockRight,
     handleDockResize,
     startDrag: drag.startDrag,
     refreshHostStyle,

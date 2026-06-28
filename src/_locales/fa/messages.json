@@ -2225,20 +2225,14 @@
   "pdf_windows_host_selected_text": {
     "message": "متن انتخاب‌شده"
   },
+  "pdf_windows_host_detected_language": {
+    "message": "زبان تشخیص‌داده‌شده"
+  },
   "pdf_windows_host_copied": {
     "message": "کپی شد"
   },
   "pdf_windows_host_copy_failed": {
     "message": "کپی ناموفق بود"
-  },
-  "pdf_windows_host_dock_left": {
-    "message": "اتصال به چپ"
-  },
-  "pdf_windows_host_dock_right": {
-    "message": "اتصال به راست"
-  },
-  "pdf_windows_host_undock": {
-    "message": "جدا کردن"
   },
   "window_tts_no_text": {
     "message": "متنی برای خواندن موجود نیست"
