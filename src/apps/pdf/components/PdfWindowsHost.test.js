@@ -571,33 +571,135 @@ describe('PdfWindowsHost', () => {
     expect(wrapper.find('[data-testid="pdf-windows-host-dock-right"]').exists()).toBe(false)
   })
 
-  it('updates only the local provider selection and does not auto-translate', async () => {
+  it('auto-retranslates the visible selection when the provider changes and clears stale state', async () => {
+    sendRegularMessageMock
+      .mockResolvedValueOnce({
+        success: true,
+        translatedText: 'Provider initial result',
+        sourceLanguage: 'en',
+        mode: 'selection-manager'
+      })
+      .mockImplementationOnce(() => new Promise((resolve) => {
+        sendRegularMessageMock.__resolveProviderChange = resolve
+      }))
+
     await showSelectionIcon('Provider switch')
     await openWindowFromSelectionIcon(wrapper)
-    sendRegularMessageMock.mockClear()
+    await flushPromises()
+
+    expect(wrapper.get('[data-testid="pdf-windows-host-result"]').text()).toContain('Provider initial result')
+    expect(wrapper.get('[data-testid="translation-window-toolbar-detected-language"]').text()).toBe('English')
 
     const providerSelect = wrapper.get('[data-testid="translation-window-toolbar-provider-select"]')
     await providerSelect.setValue('deepl')
     await flushPromises()
 
     expect(providerSelect.element.value).toBe('deepl')
-    expect(sendRegularMessageMock).not.toHaveBeenCalled()
+    expect(wrapper.find('[data-testid="pdf-windows-host-result"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="pdf-windows-host-error"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="pdf-windows-host-loading"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="translation-window-toolbar-detected-language"]').exists()).toBe(false)
+    expect(sendRegularMessageMock).toHaveBeenCalledTimes(2)
     expect(storageSetMock).not.toHaveBeenCalled()
     expect(globalThis.__pdfWindowsHostStorageState.pdfWindowsHostLayout).toBeDefined()
+
+    sendRegularMessageMock.__resolveProviderChange({
+      success: true,
+      translatedText: 'Provider updated result',
+      sourceLanguage: 'fa',
+      mode: 'selection-manager'
+    })
+    await flushPromises()
+
+    expect(wrapper.get('[data-testid="pdf-windows-host-result"]').text()).toContain('Provider updated result')
+    expect(wrapper.get('[data-testid="translation-window-toolbar-detected-language"]').text()).toBe('Persian (Farsi)')
+    expect(sendRegularMessageMock).toHaveBeenLastCalledWith(expect.objectContaining({
+      data: expect.objectContaining({
+        provider: 'deepl',
+        text: 'Provider switch',
+        mode: 'selection-manager'
+      })
+    }))
   })
 
-  it('handles provider-change events with the same local-only handler', async () => {
+  it('handles provider-change events with the same local-only handler and retriggers translation', async () => {
+    sendRegularMessageMock
+      .mockResolvedValueOnce({
+        success: true,
+        translatedText: 'Provider contract result',
+        sourceLanguage: 'en',
+        mode: 'selection-manager'
+      })
+      .mockImplementationOnce(() => new Promise((resolve) => {
+        sendRegularMessageMock.__resolveProviderContract = resolve
+      }))
+
     await showSelectionIcon('Provider contract')
     await openWindowFromSelectionIcon(wrapper)
-    sendRegularMessageMock.mockClear()
+    await flushPromises()
 
     const providerSelector = wrapper.findComponent({ name: 'ProviderSelector' })
     providerSelector.vm.$emit('provider-change', 'openai')
     await flushPromises()
 
     expect(wrapper.get('[data-testid="translation-window-toolbar-provider-select"]').element.value).toBe('openai')
-    expect(sendRegularMessageMock).not.toHaveBeenCalled()
+    expect(wrapper.find('[data-testid="pdf-windows-host-loading"]').exists()).toBe(true)
+    expect(sendRegularMessageMock).toHaveBeenCalledTimes(2)
+
+    sendRegularMessageMock.__resolveProviderContract({
+      success: true,
+      translatedText: 'Provider contract updated',
+      sourceLanguage: 'fa',
+      mode: 'selection-manager'
+    })
+    await flushPromises()
+
+    expect(wrapper.get('[data-testid="pdf-windows-host-result"]').text()).toContain('Provider contract updated')
     expect(storageSetMock).not.toHaveBeenCalled()
+  })
+
+  it('retranslates immediately when the provider changes during an active translation request', async () => {
+    let resolveInitialTranslation
+    sendRegularMessageMock.mockImplementationOnce(() => new Promise((resolve) => {
+      resolveInitialTranslation = resolve
+    }))
+
+    await showSelectionIcon('In-flight provider switch')
+    await openWindowFromSelectionIcon(wrapper)
+    await flushPromises()
+
+    expect(wrapper.find('[data-testid="pdf-windows-host-loading"]').exists()).toBe(true)
+
+    const providerSelector = wrapper.findComponent({ name: 'ProviderSelector' })
+    providerSelector.vm.$emit('provider-change', 'deepl')
+    await flushPromises()
+
+    expect(wrapper.get('[data-testid="translation-window-toolbar-provider-select"]').element.value).toBe('deepl')
+    expect(sendRegularMessageMock).toHaveBeenCalledTimes(2)
+
+    resolveInitialTranslation({
+      success: true,
+      translatedText: 'Stale in-flight result',
+      sourceLanguage: 'en',
+      mode: 'selection-manager'
+    })
+    await flushPromises()
+
+    expect(wrapper.find('[data-testid="pdf-windows-host-loading"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="pdf-windows-host-result"]').exists()).toBe(true)
+    expect(wrapper.text()).not.toContain('Stale in-flight result')
+  })
+
+  it('does not auto-translate while only the icon stage is visible', async () => {
+    await showSelectionIcon('Icon stage only')
+    sendRegularMessageMock.mockClear()
+
+    await wrapper.vm.handleProviderChange('deepl')
+    await flushPromises()
+
+    expect(sendRegularMessageMock).not.toHaveBeenCalled()
+    expect(wrapper.find('[data-testid="pdf-windows-host-icon-stage"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="pdf-windows-host"]').exists()).toBe(false)
   })
 
   it('renders normal markdown translation results through SafeMarkdownPreview and cleans copy/TTS input', async () => {
@@ -701,20 +803,23 @@ describe('PdfWindowsHost', () => {
     }))
   })
 
-  it('clears stale translation state when the provider changes', async () => {
+  it('clears stale translation state and retriggers translation when the provider changes', async () => {
     sendRegularMessageMock.mockResolvedValueOnce({
       success: true,
       translatedText: 'Stale result',
       sourceLanguage: 'en',
       mode: 'selection-manager'
     })
+    let resolveProviderChange
+    sendRegularMessageMock.mockImplementationOnce(() => new Promise((resolve) => {
+      resolveProviderChange = resolve
+    }))
 
     await showSelectionIcon('Clear me')
     await openWindowFromSelectionIcon(wrapper)
 
     expect(wrapper.find('[data-testid="pdf-windows-host-result"]').text()).toContain('Stale result')
     expect(wrapper.get('[data-testid="translation-window-toolbar-detected-language"]').text()).toBe('English')
-    sendRegularMessageMock.mockClear()
 
     const providerSelector = wrapper.findComponent({ name: 'ProviderSelector' })
     providerSelector.vm.$emit('update:modelValue', 'deepl')
@@ -722,9 +827,21 @@ describe('PdfWindowsHost', () => {
 
     expect(wrapper.find('[data-testid="pdf-windows-host-result"]').exists()).toBe(false)
     expect(wrapper.find('[data-testid="pdf-windows-host-error"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="pdf-windows-host-loading"]').exists()).toBe(true)
     expect(wrapper.find('[data-testid="translation-window-toolbar-detected-language"]').exists()).toBe(false)
     expect(wrapper.get('[data-testid="translation-window-toolbar-provider-select"]').element.value).toBe('deepl')
-    expect(sendRegularMessageMock).not.toHaveBeenCalled()
+    expect(sendRegularMessageMock).toHaveBeenCalledTimes(2)
+
+    resolveProviderChange({
+      success: true,
+      translatedText: 'Translated after provider change',
+      sourceLanguage: 'fa',
+      mode: 'selection-manager'
+    })
+    await flushPromises()
+
+    expect(wrapper.get('[data-testid="pdf-windows-host-result"]').text()).toContain('Translated after provider change')
+    expect(wrapper.get('[data-testid="translation-window-toolbar-detected-language"]').text()).toBe('Persian (Farsi)')
   })
 
   it('keeps plain text output readable through SafeMarkdownPreview', async () => {

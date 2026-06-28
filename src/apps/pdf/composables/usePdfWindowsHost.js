@@ -118,7 +118,6 @@ export function usePdfWindowsHost(options = {}) {
 
   const hasTranslatedResult = computed(() => !!translatedText.value)
   const hasError = computed(() => !!translationError.value)
-  const canTranslate = computed(() => isVisible.value && !!selectedText.value && !isTranslating.value)
   const speakableText = computed(() => (
     showOriginal.value
       ? selectedText.value
@@ -254,7 +253,7 @@ export function usePdfWindowsHost(options = {}) {
     showOriginal.value = !showOriginal.value
   }
 
-  function handleProviderChange(nextProvider) {
+  async function handleProviderChange(nextProvider) {
     const normalizedProvider = typeof nextProvider === 'string' ? nextProvider.trim() : ''
     if (!normalizedProvider || normalizedProvider === selectedProvider.value) {
       return
@@ -270,6 +269,10 @@ export function usePdfWindowsHost(options = {}) {
     translationMode.value = TranslationMode.Selection
     translationTargetLanguage.value = AUTO_DETECT_VALUE
     clearCopyFeedback()
+
+    if (isVisible.value && selectedText.value) {
+      await translateSelection()
+    }
   }
 
   function shouldTranslateDirectlyOnSelection() {
@@ -566,7 +569,7 @@ export function usePdfWindowsHost(options = {}) {
   }
 
   async function retryTranslation() {
-    return translateSelection(selectedText.value)
+    return translateSelection()
   }
 
   async function copyTranslation() {
@@ -725,7 +728,6 @@ export function usePdfWindowsHost(options = {}) {
     isTranslating,
     isCopying,
     copyStatus,
-    canTranslate,
     hasTranslatedResult,
     hasError,
     speakableText,

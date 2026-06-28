@@ -38,9 +38,6 @@
       @pointerdown.stop="startDrag"
     >
       <div class="pdf-windows-host__title-group">
-        <span class="pdf-windows-host__title">
-          {{ t('translateSelectedText') }}
-        </span>
         <span
           v-if="copyStatus"
           class="pdf-windows-host__status"
@@ -180,21 +177,6 @@
 
       <div class="pdf-windows-host__actions">
         <button
-          v-if="!hasTranslatedResult && !hasError"
-          class="pdf-windows-host__primary-button"
-          type="button"
-          data-testid="pdf-windows-host-translate"
-          :disabled="!canTranslate"
-          @click.stop="translateSelection()"
-        >
-          <span
-            v-if="isTranslating"
-            class="pdf-windows-host__spinner pdf-windows-host__spinner--button"
-          />
-          <span>{{ t('translateSelectedText') }}</span>
-        </button>
-
-        <button
           v-if="hasTranslatedResult || hasError"
           class="pdf-windows-host__secondary-button"
           type="button"
@@ -251,7 +233,6 @@ const {
   translationError,
   isTranslating,
   copyStatus,
-  canTranslate,
   hasTranslatedResult,
   hasError,
   speakableText,
@@ -265,7 +246,6 @@ const {
   isDocked,
   isResizing,
   isDragging,
-  translateSelection,
   retryTranslation,
   copyTranslation,
   dismissHost,

@@ -70,13 +70,6 @@
   gap: 6px;
 }
 
-.pdf-windows-host__title {
-  font-size: 12px;
-  font-weight: 700;
-  letter-spacing: 0.02em;
-  color: rgba(230, 237, 247, 0.9);
-}
-
 .pdf-windows-host__status {
   font-size: 10px;
   font-weight: 600;
@@ -219,7 +212,6 @@
   gap: 8px;
 }
 
-.pdf-windows-host__primary-button,
 .pdf-windows-host__secondary-button {
   appearance: none;
   border: 0;
@@ -231,41 +223,19 @@
   transition: transform 0.15s ease, opacity 0.15s ease, background 0.15s ease;
 }
 
-.pdf-windows-host__primary-button {
-  background: linear-gradient(180deg, #6b7cff 0%, #5267f3 100%);
-  color: white;
-}
-
 .pdf-windows-host__secondary-button {
   background: rgba(255, 255, 255, 0.08);
   color: rgba(230, 237, 247, 0.92);
 }
 
-.pdf-windows-host__primary-button:hover,
 .pdf-windows-host__secondary-button:hover {
   transform: translateY(-1px);
 }
 
-.pdf-windows-host__primary-button:disabled,
 .pdf-windows-host__secondary-button:disabled {
   opacity: 0.6;
   cursor: progress;
   transform: none;
-}
-
-.pdf-windows-host__spinner {
-  display: inline-block;
-  width: 14px;
-  height: 14px;
-  border-radius: 50%;
-  border: 2px solid rgba(255, 255, 255, 0.28);
-  border-top-color: white;
-  animation: pdf-windows-host-spin 0.75s linear infinite;
-}
-
-.pdf-windows-host__spinner--button {
-  width: 12px;
-  height: 12px;
 }
 
 .pdf-windows-host__dock-resize-handle {
@@ -285,10 +255,4 @@
 
 .pdf-windows-host--dock-right .pdf-windows-host__dock-resize-handle {
   left: -4px;
-}
-
-@keyframes pdf-windows-host-spin {
-  to {
-    transform: rotate(360deg);
-  }
 }
