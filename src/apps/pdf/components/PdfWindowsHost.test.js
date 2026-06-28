@@ -129,7 +129,7 @@ vi.mock('@/components/shared/TTSButton.vue', () => ({
   default: {
     name: 'TTSButton',
     props: ['text', 'language', 'disabled', 'isDictionary'],
-    template: '<button data-testid="pdf-windows-host-tts" :data-text="text" :data-language="language" :data-dictionary="isDictionary" :disabled="disabled">{{ text }}</button>'
+    template: '<button class="tts-button-stub" :data-text="text" :data-language="language" :data-dictionary="isDictionary" :disabled="disabled">{{ text }}</button>'
   }
 }))
 
@@ -140,14 +140,16 @@ vi.mock('@/components/shared/ProviderSelector.vue', () => ({
     emits: ['update:modelValue', 'provider-change'],
     template: `
       <div
-        data-testid="pdf-windows-host-provider-selector"
+        class="provider-selector-stub"
         :data-mode="mode"
         :data-is-global="isGlobal"
+        :data-allow-default="allowDefault"
+        :data-allow-set-default="allowSetDefault"
         :data-only-configured="onlyConfigured"
         :data-required-feature="requiredFeature"
       >
         <select
-          data-testid="pdf-windows-host-provider-select"
+          data-testid="translation-window-toolbar-provider-select"
           :value="modelValue"
           :disabled="disabled"
           @change="$emit('update:modelValue', $event.target.value)"
@@ -290,9 +292,9 @@ describe('PdfWindowsHost', () => {
 
     expect(wrapper.find('[data-testid="pdf-windows-host"]').exists()).toBe(true)
     expect(wrapper.find('.pdf-windows-host__source').exists()).toBe(false)
-    expect(wrapper.find('[data-testid="pdf-windows-host-toggle-original"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="translation-window-toolbar-original"]').exists()).toBe(true)
     expect(wrapper.find('[data-testid="pdf-windows-host-loading"]').exists()).toBe(true)
-    expect(wrapper.get('[data-testid="pdf-windows-host-tts"]').attributes('data-text')).toBe('PDF text')
+    expect(wrapper.get('[data-testid="translation-window-toolbar-tts"]').attributes('data-text')).toBe('PDF text')
 
     resolveTranslation({
       success: true,
@@ -328,14 +330,14 @@ describe('PdfWindowsHost', () => {
       resolveTranslation = resolve
     }))
 
-    expect(wrapper.find('[data-testid="pdf-windows-host-tts"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="translation-window-toolbar-tts"]').exists()).toBe(false)
 
     await showSelectionIcon('Speak me')
-    expect(wrapper.find('[data-testid="pdf-windows-host-tts"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="translation-window-toolbar-tts"]').exists()).toBe(false)
 
     await openWindowFromSelectionIcon(wrapper)
 
-    const ttsButton = wrapper.get('[data-testid="pdf-windows-host-tts"]')
+    const ttsButton = wrapper.get('[data-testid="translation-window-toolbar-tts"]')
     expect(ttsButton.exists()).toBe(true)
     expect(ttsButton.attributes('data-text')).toBe('Speak me')
 
@@ -356,25 +358,25 @@ describe('PdfWindowsHost', () => {
     await showSelectionIcon('Toggle me')
     await openWindowFromSelectionIcon(wrapper)
 
-    expect(wrapper.get('[data-testid="pdf-windows-host-tts"]').attributes('data-text')).toBe('Translated result')
+    expect(wrapper.get('[data-testid="translation-window-toolbar-tts"]').attributes('data-text')).toBe('Translated result')
 
-    await wrapper.get('[data-testid="pdf-windows-host-toggle-original"]').trigger('click')
+    await wrapper.get('[data-testid="translation-window-toolbar-original"]').trigger('click')
     await flushPromises()
 
     expect(wrapper.find('.pdf-windows-host__source').exists()).toBe(true)
-    expect(wrapper.get('[data-testid="pdf-windows-host-tts"]').attributes('data-text')).toBe('Toggle me')
+    expect(wrapper.get('[data-testid="translation-window-toolbar-tts"]').attributes('data-text')).toBe('Toggle me')
 
-    await wrapper.get('[data-testid="pdf-windows-host-copy"]').trigger('click')
+    await wrapper.get('[data-testid="translation-window-toolbar-copy"]').trigger('click')
     await flushPromises()
 
     expect(clipboardWriteTextMock).toHaveBeenCalledWith('Translated result')
     expect(clipboardWriteTextMock).not.toHaveBeenCalledWith('Toggle me')
 
-    await wrapper.get('[data-testid="pdf-windows-host-toggle-original"]').trigger('click')
+    await wrapper.get('[data-testid="translation-window-toolbar-original"]').trigger('click')
     await flushPromises()
 
     expect(wrapper.find('.pdf-windows-host__source').exists()).toBe(false)
-    expect(wrapper.get('[data-testid="pdf-windows-host-tts"]').attributes('data-text')).toBe('Translated result')
+    expect(wrapper.get('[data-testid="translation-window-toolbar-tts"]').attributes('data-text')).toBe('Translated result')
     expect(storageSetMock).not.toHaveBeenCalled()
   })
 
@@ -390,7 +392,7 @@ describe('PdfWindowsHost', () => {
     await openWindowFromSelectionIcon(wrapper)
     await flushPromises()
 
-    const badge = wrapper.get('[data-testid="pdf-windows-host-detected-language"]')
+    const badge = wrapper.get('[data-testid="translation-window-toolbar-detected-language"]')
     expect(badge.exists()).toBe(true)
     expect(badge.text()).toBe('English')
   })
@@ -407,7 +409,7 @@ describe('PdfWindowsHost', () => {
     await openWindowFromSelectionIcon(wrapper)
     await flushPromises()
 
-    const targetBadge = wrapper.get('[data-testid="pdf-windows-host-target-language"]')
+    const targetBadge = wrapper.get('[data-testid="translation-window-toolbar-target-language"]')
     expect(targetBadge.exists()).toBe(true)
     expect(targetBadge.text()).toBe('Persian (Farsi)')
 
@@ -423,7 +425,7 @@ describe('PdfWindowsHost', () => {
     await openWindowFromSelectionIcon(wrapper)
     await flushPromises()
 
-    expect(wrapper.get('[data-testid="pdf-windows-host-target-language"]').text()).toBe('Japanese')
+    expect(wrapper.get('[data-testid="translation-window-toolbar-target-language"]').text()).toBe('Japanese')
   })
 
   it('hides the target language badge for auto or unknown target language values', async () => {
@@ -439,7 +441,7 @@ describe('PdfWindowsHost', () => {
     await openWindowFromSelectionIcon(wrapper)
     await flushPromises()
 
-    expect(wrapper.find('[data-testid="pdf-windows-host-target-language"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="translation-window-toolbar-target-language"]').exists()).toBe(false)
 
     wrapper.unmount()
     wrapper = mount(PdfWindowsHost, {
@@ -462,7 +464,7 @@ describe('PdfWindowsHost', () => {
     await openWindowFromSelectionIcon(wrapper)
     await flushPromises()
 
-    expect(wrapper.find('[data-testid="pdf-windows-host-target-language"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="translation-window-toolbar-target-language"]').exists()).toBe(false)
   })
 
   it('prefers detectedSourceLanguage over sourceLanguage when rendering the badge', async () => {
@@ -478,7 +480,7 @@ describe('PdfWindowsHost', () => {
     await openWindowFromSelectionIcon(wrapper)
     await flushPromises()
 
-    const badge = wrapper.get('[data-testid="pdf-windows-host-detected-language"]')
+    const badge = wrapper.get('[data-testid="translation-window-toolbar-detected-language"]')
     expect(badge.exists()).toBe(true)
     expect(badge.text()).toBe('Persian (Farsi)')
   })
@@ -495,7 +497,7 @@ describe('PdfWindowsHost', () => {
     await openWindowFromSelectionIcon(wrapper)
     await flushPromises()
 
-    expect(wrapper.find('[data-testid="pdf-windows-host-detected-language"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="translation-window-toolbar-detected-language"]').exists()).toBe(false)
   })
 
   it('hides the detected language badge for unknown or invalid source language values', async () => {
@@ -510,7 +512,7 @@ describe('PdfWindowsHost', () => {
     await openWindowFromSelectionIcon(wrapper)
     await flushPromises()
 
-    expect(wrapper.find('[data-testid="pdf-windows-host-detected-language"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="translation-window-toolbar-detected-language"]').exists()).toBe(false)
   })
 
   it('resets the original text toggle on a new selection', async () => {
@@ -522,7 +524,7 @@ describe('PdfWindowsHost', () => {
 
     await showSelectionIcon('First selection')
     await openWindowFromSelectionIcon(wrapper)
-    await wrapper.get('[data-testid="pdf-windows-host-toggle-original"]').trigger('click')
+    await wrapper.get('[data-testid="translation-window-toolbar-original"]').trigger('click')
     await flushPromises()
     expect(wrapper.find('.pdf-windows-host__source').exists()).toBe(true)
 
@@ -531,8 +533,8 @@ describe('PdfWindowsHost', () => {
 
     await openWindowFromSelectionIcon(wrapper)
     expect(wrapper.find('.pdf-windows-host__source').exists()).toBe(false)
-    expect(wrapper.find('[data-testid="pdf-windows-host-detected-language"]').exists()).toBe(false)
-    expect(wrapper.get('[data-testid="pdf-windows-host-tts"]').attributes('data-text')).toBe('Translated text')
+    expect(wrapper.find('[data-testid="translation-window-toolbar-detected-language"]').exists()).toBe(false)
+    expect(wrapper.get('[data-testid="translation-window-toolbar-tts"]').attributes('data-text')).toBe('Translated text')
   })
 
   it('initializes the local provider switcher from PDF provider resolution', async () => {
@@ -550,13 +552,15 @@ describe('PdfWindowsHost', () => {
     await showSelectionIcon('Initial provider')
 
     expect(getEffectiveProviderAsyncMock).toHaveBeenCalledWith('pdf-translation')
-    expect(wrapper.find('[data-testid="pdf-windows-host-provider-selector"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="translation-window-toolbar-provider-selector"]').exists()).toBe(false)
 
     await openWindowFromSelectionIcon(wrapper)
 
-    expect(wrapper.get('[data-testid="pdf-windows-host-provider-selector"]').attributes('data-mode')).toBe('compact')
-    expect(wrapper.get('[data-testid="pdf-windows-host-provider-selector"]').attributes('data-is-global')).toBe('false')
-    expect(wrapper.get('[data-testid="pdf-windows-host-provider-select"]').element.value).toBe('deepl')
+    expect(wrapper.get('[data-testid="translation-window-toolbar-provider-selector"]').attributes('data-mode')).toBe('icon-only')
+    expect(wrapper.get('[data-testid="translation-window-toolbar-provider-selector"]').attributes('data-is-global')).toBe('false')
+    expect(wrapper.get('[data-testid="translation-window-toolbar-provider-selector"]').attributes('data-allow-default')).toBe('false')
+    expect(wrapper.get('[data-testid="translation-window-toolbar-provider-selector"]').attributes('data-allow-set-default')).toBe('false')
+    expect(wrapper.get('[data-testid="translation-window-toolbar-provider-select"]').element.value).toBe('deepl')
   })
 
   it('does not render explicit dock buttons', async () => {
@@ -572,7 +576,7 @@ describe('PdfWindowsHost', () => {
     await openWindowFromSelectionIcon(wrapper)
     sendRegularMessageMock.mockClear()
 
-    const providerSelect = wrapper.get('[data-testid="pdf-windows-host-provider-select"]')
+    const providerSelect = wrapper.get('[data-testid="translation-window-toolbar-provider-select"]')
     await providerSelect.setValue('deepl')
     await flushPromises()
 
@@ -591,7 +595,7 @@ describe('PdfWindowsHost', () => {
     providerSelector.vm.$emit('provider-change', 'openai')
     await flushPromises()
 
-    expect(wrapper.get('[data-testid="pdf-windows-host-provider-select"]').element.value).toBe('openai')
+    expect(wrapper.get('[data-testid="translation-window-toolbar-provider-select"]').element.value).toBe('openai')
     expect(sendRegularMessageMock).not.toHaveBeenCalled()
     expect(storageSetMock).not.toHaveBeenCalled()
   })
@@ -627,10 +631,10 @@ describe('PdfWindowsHost', () => {
     expect(result.text()).toContain('Normal')
     expect(result.text()).toContain('bold')
     expect(result.text()).not.toContain('**')
-    expect(wrapper.get('[data-testid="pdf-windows-host-tts"]').attributes('data-dictionary')).toBe('false')
-    expect(wrapper.get('[data-testid="pdf-windows-host-tts"]').attributes('data-text')).toBe('Normal **bold** text')
+    expect(wrapper.get('[data-testid="translation-window-toolbar-tts"]').attributes('data-dictionary')).toBe('false')
+    expect(wrapper.get('[data-testid="translation-window-toolbar-tts"]').attributes('data-text')).toBe('Normal **bold** text')
 
-    await wrapper.get('[data-testid="pdf-windows-host-copy"]').trigger('click')
+    await wrapper.get('[data-testid="translation-window-toolbar-copy"]').trigger('click')
     await flushPromises()
 
     expect(clipboardWriteTextMock).toHaveBeenCalledWith('Normal bold text')
@@ -648,10 +652,11 @@ describe('PdfWindowsHost', () => {
     await flushPromises()
 
     expect(wrapper.find('.action-toolbar-stub').exists()).toBe(false)
-    expect(wrapper.find('[data-testid="pdf-windows-host-copy"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="translation-window-toolbar"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="translation-window-toolbar-copy"]').exists()).toBe(true)
     expect(wrapper.find('[data-testid="pdf-windows-host-retry"]').exists()).toBe(true)
-    expect(wrapper.find('[data-testid="pdf-windows-host-tts"]').exists()).toBe(true)
-    expect(wrapper.find('[data-testid="pdf-windows-host-provider-selector"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="translation-window-toolbar-tts"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="translation-window-toolbar-provider-selector"]').exists()).toBe(true)
   })
 
   it('uses the currently selected local provider for the next translation and retry actions', async () => {
@@ -664,7 +669,7 @@ describe('PdfWindowsHost', () => {
     await showSelectionIcon('Provider selected text')
     await openWindowFromSelectionIcon(wrapper)
 
-    await wrapper.get('[data-testid="pdf-windows-host-provider-select"]').setValue('deepl')
+    await wrapper.get('[data-testid="translation-window-toolbar-provider-select"]').setValue('deepl')
     await flushPromises()
     sendRegularMessageMock.mockClear()
 
@@ -708,7 +713,7 @@ describe('PdfWindowsHost', () => {
     await openWindowFromSelectionIcon(wrapper)
 
     expect(wrapper.find('[data-testid="pdf-windows-host-result"]').text()).toContain('Stale result')
-    expect(wrapper.get('[data-testid="pdf-windows-host-detected-language"]').text()).toBe('English')
+    expect(wrapper.get('[data-testid="translation-window-toolbar-detected-language"]').text()).toBe('English')
     sendRegularMessageMock.mockClear()
 
     const providerSelector = wrapper.findComponent({ name: 'ProviderSelector' })
@@ -717,8 +722,8 @@ describe('PdfWindowsHost', () => {
 
     expect(wrapper.find('[data-testid="pdf-windows-host-result"]').exists()).toBe(false)
     expect(wrapper.find('[data-testid="pdf-windows-host-error"]').exists()).toBe(false)
-    expect(wrapper.find('[data-testid="pdf-windows-host-detected-language"]').exists()).toBe(false)
-    expect(wrapper.get('[data-testid="pdf-windows-host-provider-select"]').element.value).toBe('deepl')
+    expect(wrapper.find('[data-testid="translation-window-toolbar-detected-language"]').exists()).toBe(false)
+    expect(wrapper.get('[data-testid="translation-window-toolbar-provider-select"]').element.value).toBe('deepl')
     expect(sendRegularMessageMock).not.toHaveBeenCalled()
   })
 
@@ -753,8 +758,8 @@ describe('PdfWindowsHost', () => {
     expect(result.text()).toContain('hello')
     expect(result.text()).toContain('a greeting')
     expect(result.text()).not.toContain('**')
-    expect(wrapper.get('[data-testid="pdf-windows-host-tts"]').attributes('data-dictionary')).toBe('true')
-    expect(wrapper.get('[data-testid="pdf-windows-host-tts"]').attributes('data-text')).toBe('**Noun**: hello\n- a greeting')
+    expect(wrapper.get('[data-testid="translation-window-toolbar-tts"]').attributes('data-dictionary')).toBe('true')
+    expect(wrapper.get('[data-testid="translation-window-toolbar-tts"]').attributes('data-text')).toBe('**Noun**: hello\n- a greeting')
   })
 
   it('renders errors and retries using the current selected text', async () => {
@@ -804,12 +809,12 @@ describe('PdfWindowsHost', () => {
     await showSelectionIcon('Retry badge')
     await openWindowFromSelectionIcon(wrapper)
 
-    expect(wrapper.find('[data-testid="pdf-windows-host-detected-language"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="translation-window-toolbar-detected-language"]').exists()).toBe(false)
 
     await wrapper.get('[data-testid="pdf-windows-host-retry"]').trigger('click')
     await flushPromises()
 
-    expect(wrapper.get('[data-testid="pdf-windows-host-detected-language"]').text()).toBe('Persian (Farsi)')
+    expect(wrapper.get('[data-testid="translation-window-toolbar-detected-language"]').text()).toBe('Persian (Farsi)')
   })
 
   it('copies a normal markdown translation as cleaned plain text', async () => {
@@ -822,7 +827,7 @@ describe('PdfWindowsHost', () => {
     await showSelectionIcon('Copy me')
     await openWindowFromSelectionIcon(wrapper)
 
-    await wrapper.get('[data-testid="pdf-windows-host-copy"]').trigger('click')
+    await wrapper.get('[data-testid="translation-window-toolbar-copy"]').trigger('click')
     await flushPromises()
 
     expect(clipboardWriteTextMock).toHaveBeenCalledWith('Copy this text')
@@ -833,7 +838,7 @@ describe('PdfWindowsHost', () => {
     await showSelectionIcon('Pin me')
     await openWindowFromSelectionIcon(wrapper)
 
-    await wrapper.get('[data-testid="pdf-windows-host-pin"]').trigger('click')
+    await wrapper.get('[data-testid="translation-window-toolbar-pin"]').trigger('click')
     await flushPromises()
 
     document.body.dispatchEvent(new MouseEvent('pointerdown', {
@@ -850,7 +855,7 @@ describe('PdfWindowsHost', () => {
     await flushPromises()
     expect(wrapper.find('[data-testid="pdf-windows-host"]').exists()).toBe(true)
 
-    await wrapper.get('[data-testid="pdf-windows-host-pin"]').trigger('click')
+    await wrapper.get('[data-testid="translation-window-toolbar-pin"]').trigger('click')
     await flushPromises()
 
     document.body.dispatchEvent(new MouseEvent('pointerdown', {
@@ -946,14 +951,14 @@ describe('PdfWindowsHost', () => {
     expect(wrapper.find('[data-testid="pdf-windows-host"]').exists()).toBe(true)
     await flushPromises()
     expect(sendRegularMessageMock).toHaveBeenCalledTimes(1)
-    expect(wrapper.find('[data-testid="pdf-windows-host-detected-language"]').text()).toBe('English')
+    expect(wrapper.find('[data-testid="translation-window-toolbar-detected-language"]').text()).toBe('English')
   })
 
   it('translates directly when a visible pinned window receives a new selection', async () => {
     await showSelectionIcon('Pinned visible')
     await openWindowFromSelectionIcon(wrapper)
 
-    await wrapper.get('[data-testid="pdf-windows-host-pin"]').trigger('click')
+    await wrapper.get('[data-testid="translation-window-toolbar-pin"]').trigger('click')
     await flushPromises()
     sendRegularMessageMock.mockClear()
 
@@ -969,7 +974,7 @@ describe('PdfWindowsHost', () => {
     expect(wrapper.find('[data-testid="pdf-windows-host-icon-stage"]').exists()).toBe(false)
     expect(wrapper.find('[data-testid="pdf-windows-host"]').exists()).toBe(true)
     expect(sendRegularMessageMock).toHaveBeenCalledTimes(1)
-    expect(wrapper.get('[data-testid="pdf-windows-host-detected-language"]').text()).toBe('Persian (Farsi)')
+    expect(wrapper.get('[data-testid="translation-window-toolbar-detected-language"]').text()).toBe('Persian (Farsi)')
   })
 
   it('drags the floating window and restores persisted positions by fingerprint and global fallback', async () => {
@@ -1054,7 +1059,7 @@ describe('PdfWindowsHost', () => {
     await showSelectionIcon('Dismiss me')
     await openWindowFromSelectionIcon(wrapper)
 
-    await wrapper.get('[data-testid="pdf-windows-host-toggle-original"]').trigger('click')
+    await wrapper.get('[data-testid="translation-window-toolbar-original"]').trigger('click')
     await flushPromises()
     expect(wrapper.find('.pdf-windows-host__source').exists()).toBe(true)
 

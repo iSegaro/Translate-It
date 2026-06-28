@@ -2,6 +2,7 @@
   <div
     class="translation-window-toolbar"
     :class="theme"
+    data-testid="translation-window-toolbar"
   >
     <div class="ti-header-actions">
       <ProviderSelector
@@ -14,7 +15,9 @@
         :only-configured="providerSelectorOnlyConfigured"
         :required-feature="providerSelectorRequiredFeature"
         class="ti-window-provider-selector"
+        data-testid="translation-window-toolbar-provider-selector"
         @update:model-value="handleProviderChange"
+        @provider-change="handleProviderChange"
         @mousedown.stop
         @touchstart.stop
       />
@@ -26,6 +29,7 @@
         :class="{ 'ti-active': isPinned }"
         :title="pinTitle"
         :aria-label="pinTitle"
+        data-testid="translation-window-toolbar-pin"
         @click.stop="emit('toggle-pin')"
         @mousedown.stop
         @touchstart.stop
@@ -48,6 +52,7 @@
         class="ti-action-btn"
         :title="copyTitle"
         :aria-label="copyTitle"
+        data-testid="translation-window-toolbar-copy"
         @click.stop="emit('copy')"
         @mousedown.stop
         @touchstart.stop
@@ -72,6 +77,7 @@
         size="sm"
         variant="secondary"
         class="ti-smart-tts-btn"
+        data-testid="translation-window-toolbar-tts"
         @mousedown.stop
         @touchstart.stop
         @tts-started="forwardTtsStarted"
@@ -87,6 +93,7 @@
         :class="{ 'ti-original-visible': showOriginal }"
         :title="originalTitle"
         :aria-label="originalTitle"
+        data-testid="translation-window-toolbar-original"
         @click.stop="emit('toggle-original')"
         @mousedown.stop
         @touchstart.stop
@@ -108,6 +115,7 @@
       <span
         v-if="targetLanguageLabel"
         class="ti-target-language-label"
+        data-testid="translation-window-toolbar-target-language"
       >
         {{ targetLanguageLabel }}
       </span>
@@ -115,6 +123,7 @@
       <span
         v-if="detectedLanguageLabel"
         class="ti-detected-language-label"
+        data-testid="translation-window-toolbar-detected-language"
       >
         {{ detectedLanguageLabel }}
       </span>
@@ -125,6 +134,7 @@
         class="ti-action-btn"
         :title="closeTitle"
         :aria-label="closeTitle"
+        data-testid="translation-window-toolbar-close"
         @click.stop="emit('close')"
         @mousedown.stop
         @touchstart.stop
@@ -145,6 +155,7 @@
 </template>
 
 <script setup>
+import { ref } from 'vue';
 import './TranslationWindowToolbar.scss';
 import ProviderSelector from '@/components/shared/ProviderSelector.vue';
 import TTSButton from '@/components/shared/TTSButton.vue';
@@ -197,8 +208,23 @@ const emit = defineEmits([
   'tts-state-changed',
 ]);
 
+const lastProviderChangeValue = ref('');
+
 const handleProviderChange = (newProvider) => {
-  emit('provider-change', newProvider);
+  const normalizedProvider = typeof newProvider === 'string' ? newProvider.trim() : '';
+
+  if (!normalizedProvider || normalizedProvider === lastProviderChangeValue.value) {
+    return;
+  }
+
+  lastProviderChangeValue.value = normalizedProvider;
+  queueMicrotask(() => {
+    if (lastProviderChangeValue.value === normalizedProvider) {
+      lastProviderChangeValue.value = '';
+    }
+  });
+
+  emit('provider-change', normalizedProvider);
 };
 
 const forwardTtsStarted = (...args) => emit('tts-started', ...args);

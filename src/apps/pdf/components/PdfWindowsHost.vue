@@ -50,93 +50,42 @@
         </span>
       </div>
 
-      <div class="pdf-windows-host__header-actions">
-        <button
-          class="pdf-windows-host__action-button pdf-windows-host__action-button--pin"
-          type="button"
-          :class="{ 'is-active': isPinned }"
-          :title="isPinned ? t('window_unpin') : t('window_pin')"
-          :aria-label="isPinned ? t('window_unpin') : t('window_pin')"
-          data-testid="pdf-windows-host-pin"
-          @click.stop="handlePinToggle"
-          @pointerdown.stop
-        >
-          {{ isPinned ? t('window_unpin') : t('window_pin') }}
-        </button>
-
-        <div
-          v-if="isProviderReady"
-          class="pdf-windows-host__provider-switcher"
-          data-testid="pdf-windows-host-provider-switcher"
-        >
-          <ProviderSelector
-            mode="compact"
-            :model-value="selectedProvider"
-            :is-global="false"
-            :allow-default="false"
-            :allow-set-default="false"
-            :only-configured="true"
-            required-feature="translation"
-            @update:model-value="handleProviderChange"
-            @provider-change="handleProviderChange"
-          />
-        </div>
-
-        <span
-          v-if="targetLanguageName"
-          class="pdf-windows-host__language-badge pdf-windows-host__language-badge--target"
-          :title="t('target_language_label')"
-          :aria-label="`${t('target_language_label')}: ${targetLanguageName}`"
-          data-testid="pdf-windows-host-target-language"
-        >
-          {{ targetLanguageName }}
-        </span>
-
-        <span
-          v-if="detectedLanguageName"
-          class="pdf-windows-host__language-badge pdf-windows-host__language-badge--detected"
-          :title="t('pdf_windows_host_detected_language')"
-          :aria-label="`${t('pdf_windows_host_detected_language')}: ${detectedLanguageName}`"
-          data-testid="pdf-windows-host-detected-language"
-        >
-          {{ detectedLanguageName }}
-        </span>
-
-        <button
-          class="pdf-windows-host__action-button pdf-windows-host__action-button--original"
-          type="button"
-          :class="{ 'is-active': showOriginal }"
-          :title="showOriginal ? t('window_hide_original') : t('window_show_original')"
-          :aria-label="showOriginal ? t('window_hide_original') : t('window_show_original')"
-          data-testid="pdf-windows-host-toggle-original"
-          @click.stop="toggleShowOriginal"
-          @pointerdown.stop
-        >
-          <svg
-            width="16"
-            height="16"
-            viewBox="0 0 24 24"
-            aria-hidden="true"
-          >
-            <path
-              fill="currentColor"
-              d="M11.99 2C6.47 2 2 6.48 2 12s4.47 10 9.99 10C17.52 22 22 17.52 22 12S17.52 2 11.99 2zM12 20c-4.42 0-8-3.58-8-8s3.58-8 8-8s8 3.58 8 8s-3.58 8-8 8zm-2-9.41V12h2.59L15 14.41V16h-4v-1.59L8.59 12H7v-2h3.59L13 7.59V6h4v1.59L14.41 10H12v.59z"
-            />
-          </svg>
-        </button>
-
-        <button
-          class="pdf-windows-host__icon-button"
-          type="button"
-          :title="t('window_close')"
-          :aria-label="t('window_close')"
-          data-testid="pdf-windows-host-close"
-          @click.stop="dismissHost"
-          @pointerdown.stop
-        >
-          ×
-        </button>
-      </div>
+      <TranslationWindowToolbar
+        class="pdf-windows-host__toolbar"
+        :provider="selectedProvider"
+        theme="dark"
+        :is-pinned="isPinned"
+        :show-original="showOriginal"
+        :is-dictionary="isDictionaryResult"
+        :tts-text="speakableText"
+        tts-language="auto"
+        :target-language-label="targetLanguageName"
+        :detected-language-label="detectedLanguageName"
+        :pin-title="isPinned ? t('window_unpin') : t('window_pin')"
+        :copy-title="t('window_copy_translation')"
+        :original-title="showOriginal ? t('window_hide_original') : t('window_show_original')"
+        :close-title="t('window_close')"
+        provider-selector-mode="icon-only"
+        :provider-selector-is-global="false"
+        :provider-selector-allow-default="false"
+        :provider-selector-allow-set-default="false"
+        :provider-selector-only-configured="true"
+        provider-selector-required-feature="translation"
+        :show-provider-selector="isProviderReady"
+        :show-pin-button="true"
+        :show-copy-button="hasTranslatedResult"
+        :show-tts-button="hasSpeakableText"
+        :show-original-button="true"
+        :show-close-button="true"
+        @pointerdown.stop
+        @mousedown.stop
+        @touchstart.stop
+        @provider-change="handleProviderChange"
+        @toggle-pin="handlePinToggle"
+        @copy="copyTranslation"
+        @toggle-original="toggleShowOriginal"
+        @close="dismissHost"
+      />
     </header>
 
     <div class="pdf-windows-host__body">
@@ -246,17 +195,6 @@
         </button>
 
         <button
-          v-if="hasTranslatedResult"
-          class="pdf-windows-host__secondary-button"
-          type="button"
-          data-testid="pdf-windows-host-copy"
-          :disabled="isCopying"
-          @click.stop="copyTranslation()"
-        >
-          {{ t('window_copy_translation') }}
-        </button>
-
-        <button
           v-if="hasTranslatedResult || hasError"
           class="pdf-windows-host__secondary-button"
           type="button"
@@ -266,17 +204,6 @@
         >
           {{ t('action_retry') }}
         </button>
-
-        <TTSButton
-          v-if="hasSpeakableText"
-          class="pdf-windows-host__tts-button"
-          :text="speakableText"
-          language="auto"
-          size="sm"
-          variant="secondary"
-          :disabled="isTranslating"
-          :is-dictionary="isDictionaryResult"
-        />
       </div>
     </div>
 
@@ -293,8 +220,7 @@
 import { toRef } from 'vue'
 import { useUnifiedI18n } from '@/composables/shared/useUnifiedI18n.js'
 import { usePdfWindowsHost } from '../composables/usePdfWindowsHost.js'
-import ProviderSelector from '@/components/shared/ProviderSelector.vue'
-import TTSButton from '@/components/shared/TTSButton.vue'
+import TranslationWindowToolbar from '@/components/shared/TranslationWindowToolbar.vue'
 import TranslationDisplay from '@/components/shared/TranslationDisplay.vue'
 import PdfTranslationIcon from './PdfTranslationIcon.vue'
 import './PdfWindowsHost.scss'
@@ -324,7 +250,6 @@ const {
   targetLanguageName,
   translationError,
   isTranslating,
-  isCopying,
   copyStatus,
   canTranslate,
   hasTranslatedResult,

@@ -94,7 +94,9 @@ describe('TranslationWindowToolbar.vue', () => {
       props: baseProps,
     });
 
-    await wrapper.find('.provider-selector-stub').trigger('click');
+    const providerSelector = wrapper.findComponent({ name: 'ProviderSelector' });
+    providerSelector.vm.$emit('update:modelValue', 'deepl');
+    providerSelector.vm.$emit('provider-change', 'deepl');
     expect(wrapper.emitted('provider-change')).toEqual([['deepl']]);
 
     await wrapper.find('.ti-action-btn[title="window_pin"]').trigger('click');
@@ -120,6 +122,26 @@ describe('TranslationWindowToolbar.vue', () => {
 
     await wrapper.find('.ti-action-btn[title="window_close"]').trigger('click');
     expect(wrapper.emitted('close')).toEqual([[]]);
+  });
+
+  it('keeps provider dedupe state isolated between toolbar instances', () => {
+    const first = mount(TranslationWindowToolbar, {
+      props: baseProps,
+    });
+    const second = mount(TranslationWindowToolbar, {
+      props: baseProps,
+    });
+
+    const firstSelector = first.findComponent({ name: 'ProviderSelector' });
+    const secondSelector = second.findComponent({ name: 'ProviderSelector' });
+
+    firstSelector.vm.$emit('update:modelValue', 'deepl');
+    firstSelector.vm.$emit('provider-change', 'deepl');
+    secondSelector.vm.$emit('update:modelValue', 'openai');
+    secondSelector.vm.$emit('provider-change', 'openai');
+
+    expect(first.emitted('provider-change')).toEqual([['deepl']]);
+    expect(second.emitted('provider-change')).toEqual([['openai']]);
   });
 
   it('does not import the WindowsManager stack', () => {

@@ -77,59 +77,6 @@
   color: rgba(230, 237, 247, 0.9);
 }
 
-.pdf-windows-host__language-badge {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-height: 18px;
-  max-width: 112px;
-  padding: 2px 8px;
-  border-radius: 10px;
-  font-size: 10px;
-  font-weight: 600;
-  letter-spacing: 0;
-  color: #e8eaed;
-  background: #3c4043;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  pointer-events: none;
-  user-select: none;
-}
-
-.pdf-windows-host__language-badge--target {
-  background: #283038;
-}
-
-.pdf-windows-host__language-badge--detected {
-  background: #3c4043;
-}
-
-.pdf-windows-host__header-actions {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex-wrap: wrap;
-}
-
-.pdf-windows-host__provider-switcher {
-  display: flex;
-  align-items: center;
-  flex: 0 1 150px;
-  min-width: 140px;
-  max-width: 180px;
-}
-
-.pdf-windows-host__provider-switcher .ti-provider-compact-container {
-  width: 100%;
-}
-
-.pdf-windows-host__provider-switcher .ti-provider-select {
-  width: 100%;
-  min-width: 140px;
-}
-
 .pdf-windows-host__status {
   font-size: 10px;
   font-weight: 600;
@@ -148,47 +95,9 @@
   color: #f6b7c1;
 }
 
-.pdf-windows-host__action-button,
-.pdf-windows-host__icon-button {
-  appearance: none;
-  border: 0;
-  background: rgba(255, 255, 255, 0.06);
-  color: rgba(230, 237, 247, 0.84);
-  border-radius: 6px;
-  padding: 0;
-  width: 28px;
-  height: 28px;
-  font-size: 11px;
-  line-height: 1;
-  cursor: pointer;
-  transition: transform 0.15s ease, background 0.15s ease, color 0.15s ease;
-}
-
-.pdf-windows-host__action-button:hover,
-.pdf-windows-host__icon-button:hover {
-  transform: translateY(-1px);
-  background: rgba(255, 255, 255, 0.1);
-  color: #ffffff;
-}
-
-.pdf-windows-host__action-button.is-active {
-  background: rgba(107, 124, 255, 0.22);
-  color: #ffffff;
-}
-
-.pdf-windows-host__action-button--pin {
-  min-width: 92px;
-  width: auto;
-  padding: 0 10px;
-}
-
-.pdf-windows-host__action-button--original {
-  min-width: 38px;
-}
-
-.pdf-windows-host__icon-button {
-  font-size: 20px;
-  padding: 0;
+.pdf-windows-host__toolbar {
+  flex: 1 1 auto;
+  min-width: 0;
 }
 
 .pdf-windows-host__body {
