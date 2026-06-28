@@ -41,7 +41,7 @@
   >
     <header
       class="pdf-windows-host__header"
-      @pointerdown.stop="startDrag"
+      @pointerdown.capture="handleHeaderPointerDown"
     >
       <div class="pdf-windows-host__title-group">
         <span
@@ -79,12 +79,9 @@
         :show-tts-button="hasSpeakableText"
         :show-original-button="true"
         :show-close-button="true"
-        @pointerdown.stop="handleHostPointerDown"
         @pointerup.stop="handleHostPointerUp"
         @pointercancel.stop="handleHostPointerCancel"
-        @mousedown.stop="handleHostPointerDown"
         @mouseup.stop="handleHostPointerUp"
-        @touchstart.stop="handleHostPointerDown"
         @provider-change="handleProviderChange"
         @toggle-pin="handlePinToggle"
         @copy="copyTranslation"
@@ -277,4 +274,35 @@ const {
 } = usePdfWindowsHost({
   pdfFingerprint
 })
+
+function isHeaderInteractiveTarget(event) {
+  const target = event?.target
+  if (!(target instanceof HTMLElement)) {
+    return false
+  }
+
+  return !!target.closest(
+    [
+      'button',
+      'select',
+      'input',
+      'textarea',
+      'a',
+      '[role="button"]',
+      '[role="menuitem"]',
+      '[contenteditable="true"]',
+      '.ti-window-provider-selector',
+      '.ti-action-btn',
+      '.ti-smart-tts-btn'
+    ].join(',')
+  )
+}
+
+function handleHeaderPointerDown(event) {
+  if (isHeaderInteractiveTarget(event)) {
+    return
+  }
+
+  startDrag(event)
+}
 </script>

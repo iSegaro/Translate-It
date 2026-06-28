@@ -1093,6 +1093,49 @@ describe('PdfWindowsHost', () => {
     expect(wrapper.get('[data-testid="pdf-windows-host"]').classes()).toContain('pdf-windows-host--dock-right')
   })
 
+  it('starts dragging from empty header space', async () => {
+    await showSelectionIcon('Header drag')
+    await openWindowFromSelectionIcon(wrapper)
+    await flushPromises()
+
+    const host = wrapper.get('[data-testid="pdf-windows-host"]')
+    const header = wrapper.get('.pdf-windows-host__header')
+    const initialLeft = host.element.style.left
+
+    dispatchPointerEvent(header.element, 'pointerdown', { clientX: 300, clientY: 190 })
+    dispatchPointerEvent(document, 'pointermove', { clientX: 340, clientY: 220 })
+    dispatchPointerEvent(document, 'pointerup', { clientX: 340, clientY: 220 })
+    await flushPromises()
+
+    expect(wrapper.get('[data-testid="pdf-windows-host"]').element.style.left).not.toBe(initialLeft)
+  })
+
+  it('keeps toolbar controls clickable at minimum docked width', async () => {
+    await showSelectionIcon('Toolbar minimum width')
+    await openWindowFromSelectionIcon(wrapper)
+    await flushPromises()
+
+    const header = wrapper.get('.pdf-windows-host__header')
+    dispatchPointerEvent(header.element, 'pointerdown', { clientX: 180, clientY: 210 })
+    dispatchPointerEvent(document, 'pointermove', { clientX: 4, clientY: 210 })
+    dispatchPointerEvent(document, 'pointerup', { clientX: 4, clientY: 210 })
+    await flushPromises()
+
+    const dockHandle = wrapper.get('[data-testid="pdf-windows-host-resize-handle"]')
+    dispatchPointerEvent(dockHandle.element, 'pointerdown', { clientX: 4, clientY: 40 })
+    dispatchPointerEvent(document, 'pointermove', { clientX: -2000, clientY: 40 })
+    dispatchPointerEvent(document, 'pointerup', { clientX: -2000, clientY: 40 })
+    await flushPromises()
+
+    expect(wrapper.get('[data-testid="pdf-windows-host"]').classes()).toContain('pdf-windows-host--dock-left')
+
+    await wrapper.get('[data-testid="translation-window-toolbar-original"]').trigger('click')
+    await flushPromises()
+
+    expect(wrapper.find('.pdf-windows-host__source').exists()).toBe(true)
+    expect(wrapper.get('[data-testid="translation-window-toolbar-original"]').classes()).toContain('ti-original-visible')
+  })
+
   it('keeps the dock mode unchanged while dragging within the breakaway threshold and retains the resize handle', async () => {
     await showSelectionIcon('Stable dock')
     await openWindowFromSelectionIcon(wrapper)

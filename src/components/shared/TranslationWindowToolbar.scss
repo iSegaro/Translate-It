@@ -48,10 +48,10 @@
     display: flex !important;
     align-items: center !important;
     gap: 8px !important;
-    flex: 1 !important;
+    flex: 0 1 auto !important;
     justify-content: flex-end !important;
     min-width: 0 !important;
-    overflow: hidden !important;
+    overflow: visible !important;
   }
 
   .ti-target-language-label,
@@ -98,6 +98,7 @@
     justify-content: center !important;
     width: 28px !important;
     height: 28px !important;
+    flex: 0 0 28px !important;
     border: none !important;
     border-radius: 6px !important;
     cursor: pointer !important;
