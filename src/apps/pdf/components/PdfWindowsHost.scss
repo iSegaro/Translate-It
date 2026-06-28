@@ -136,6 +136,10 @@
   min-width: 92px;
 }
 
+.pdf-windows-host__action-button--original {
+  min-width: 38px;
+}
+
 .pdf-windows-host__icon-button {
   font-size: 20px;
   padding: 7px 10px;
@@ -176,6 +180,10 @@
   max-height: 96px;
   overflow: auto;
   padding-right: 4px;
+}
+
+.pdf-windows-host__source {
+  animation: pdf-windows-host-fade-in 0.18s ease;
 }
 
 .pdf-windows-host__state--loading {
@@ -237,6 +245,18 @@
 .pdf-windows-host__translation--dictionary .simple-markdown h5,
 .pdf-windows-host__translation--dictionary .simple-markdown h6 {
   margin-top: 0;
+}
+
+@keyframes pdf-windows-host-fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(-2px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .pdf-windows-host__actions {

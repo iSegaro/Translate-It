@@ -88,7 +88,7 @@ vi.mock('@/components/shared/TTSButton.vue', () => ({
   default: {
     name: 'TTSButton',
     props: ['text', 'language', 'disabled', 'isDictionary'],
-    template: '<button data-testid="pdf-windows-host-tts" :data-text="text" :data-dictionary="isDictionary" :disabled="disabled">{{ text }}</button>'
+    template: '<button data-testid="pdf-windows-host-tts" :data-text="text" :data-language="language" :data-dictionary="isDictionary" :disabled="disabled">{{ text }}</button>'
   }
 }))
 
@@ -224,7 +224,8 @@ describe('PdfWindowsHost', () => {
     await flushPromises()
 
     expect(wrapper.find('[data-testid="pdf-windows-host"]').exists()).toBe(true)
-    expect(wrapper.text()).toContain('PDF text')
+    expect(wrapper.find('.pdf-windows-host__source').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="pdf-windows-host-toggle-original"]').exists()).toBe(true)
     expect(wrapper.get('[data-testid="pdf-windows-host-tts"]').attributes('data-text')).toBe('PDF text')
   })
 
@@ -241,6 +242,76 @@ describe('PdfWindowsHost', () => {
     const ttsButton = wrapper.get('[data-testid="pdf-windows-host-tts"]')
     expect(ttsButton.exists()).toBe(true)
     expect(ttsButton.attributes('data-text')).toBe('Speak me')
+  })
+
+  it('toggles the original source text visibility and switches TTS input between source and translated text', async () => {
+    sendRegularMessageMock.mockResolvedValueOnce({
+      success: true,
+      translatedText: 'Translated result',
+      mode: 'selection-manager'
+    })
+
+    emitSelection({
+      text: 'Toggle me',
+      position: { x: 120, y: 180, width: 90, height: 18 },
+      context: { source: 'pdf-viewer', isPdf: true }
+    })
+    await flushPromises()
+
+    expect(wrapper.find('.pdf-windows-host__source').exists()).toBe(false)
+
+    await wrapper.get('[data-testid="pdf-windows-host-translate"]').trigger('click')
+    await flushPromises()
+
+    expect(wrapper.get('[data-testid="pdf-windows-host-tts"]').attributes('data-text')).toBe('Translated result')
+
+    await wrapper.get('[data-testid="pdf-windows-host-toggle-original"]').trigger('click')
+    await flushPromises()
+
+    expect(wrapper.find('.pdf-windows-host__source').exists()).toBe(true)
+    expect(wrapper.get('[data-testid="pdf-windows-host-tts"]').attributes('data-text')).toBe('Toggle me')
+
+    await wrapper.get('[data-testid="pdf-windows-host-copy"]').trigger('click')
+    await flushPromises()
+
+    expect(clipboardWriteTextMock).toHaveBeenCalledWith('Translated result')
+    expect(clipboardWriteTextMock).not.toHaveBeenCalledWith('Toggle me')
+
+    await wrapper.get('[data-testid="pdf-windows-host-toggle-original"]').trigger('click')
+    await flushPromises()
+
+    expect(wrapper.find('.pdf-windows-host__source').exists()).toBe(false)
+    expect(wrapper.get('[data-testid="pdf-windows-host-tts"]').attributes('data-text')).toBe('Translated result')
+    expect(storageSetMock).not.toHaveBeenCalled()
+  })
+
+  it('resets the original text toggle on a new selection', async () => {
+    sendRegularMessageMock.mockResolvedValueOnce({
+      success: true,
+      translatedText: 'Translated once',
+      mode: 'selection-manager'
+    })
+
+    emitSelection({
+      text: 'First selection',
+      position: { x: 120, y: 180, width: 90, height: 18 },
+      context: { source: 'pdf-viewer', isPdf: true }
+    })
+    await flushPromises()
+
+    await wrapper.get('[data-testid="pdf-windows-host-toggle-original"]').trigger('click')
+    await flushPromises()
+    expect(wrapper.find('.pdf-windows-host__source').exists()).toBe(true)
+
+    emitSelection({
+      text: 'Second selection',
+      position: { x: 140, y: 200, width: 90, height: 18 },
+      context: { source: 'pdf-viewer', isPdf: true }
+    })
+    await flushPromises()
+
+    expect(wrapper.find('.pdf-windows-host__source').exists()).toBe(false)
+    expect(wrapper.get('[data-testid="pdf-windows-host-tts"]').attributes('data-text')).toBe('Second selection')
   })
 
   it('initializes the local provider switcher from PDF provider resolution', async () => {
@@ -705,6 +776,10 @@ describe('PdfWindowsHost', () => {
     })
     await flushPromises()
 
+    await wrapper.get('[data-testid="pdf-windows-host-toggle-original"]').trigger('click')
+    await flushPromises()
+    expect(wrapper.find('.pdf-windows-host__source').exists()).toBe(true)
+
     emitSelectionClear({
       context: { source: 'pdf-viewer', isPdf: true }
     })
@@ -728,6 +803,7 @@ describe('PdfWindowsHost', () => {
       context: { source: 'pdf-viewer', isPdf: true }
     })
     await flushPromises()
+    expect(wrapper.find('.pdf-windows-host__source').exists()).toBe(false)
 
     document.body.dispatchEvent(new Event('pointerdown', { bubbles: true }))
     await flushPromises()

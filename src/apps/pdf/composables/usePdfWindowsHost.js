@@ -70,6 +70,7 @@ export function usePdfWindowsHost(options = {}) {
   const copyStatus = ref('')
   const selectedProvider = ref('')
   const isProviderReady = ref(false)
+  const showOriginal = ref(false)
   const translationMode = ref(TranslationMode.Selection)
   const selectionSessionId = ref(0)
   const hostStyle = ref({})
@@ -89,7 +90,11 @@ export function usePdfWindowsHost(options = {}) {
   const hasTranslatedResult = computed(() => !!translatedText.value)
   const hasError = computed(() => !!translationError.value)
   const canTranslate = computed(() => isVisible.value && !!selectedText.value && !isTranslating.value)
-  const speakableText = computed(() => translatedText.value || selectedText.value)
+  const speakableText = computed(() => (
+    showOriginal.value
+      ? selectedText.value
+      : translatedText.value || selectedText.value
+  ))
   const hasSpeakableText = computed(() => !!speakableText.value?.trim())
   const isDictionaryResult = computed(() => (
     translationMode.value === TranslationMode.Dictionary_Translation
@@ -176,10 +181,15 @@ export function usePdfWindowsHost(options = {}) {
     translationError.value = ''
     isTranslating.value = false
     isCopying.value = false
+    showOriginal.value = false
     translationMode.value = TranslationMode.Selection
     clearCopyFeedback()
     hostStyle.value = {}
     activeRequestSessionId = 0
+  }
+
+  function toggleShowOriginal() {
+    showOriginal.value = !showOriginal.value
   }
 
   function handleProviderChange(nextProvider) {
@@ -316,6 +326,7 @@ export function usePdfWindowsHost(options = {}) {
     translatedText.value = ''
     translationError.value = ''
     isTranslating.value = false
+    showOriginal.value = false
     translationMode.value = TranslationMode.Selection
     clearCopyFeedback()
 
@@ -563,6 +574,7 @@ export function usePdfWindowsHost(options = {}) {
     selectedText,
     selectedProvider,
     isProviderReady,
+    showOriginal,
     translatedText,
     translationError,
     isTranslating,
@@ -585,6 +597,7 @@ export function usePdfWindowsHost(options = {}) {
     retryTranslation,
     copyTranslation,
     dismissHost,
+    toggleShowOriginal,
     handleProviderChange,
     handlePinToggle,
     handleDockLeft,

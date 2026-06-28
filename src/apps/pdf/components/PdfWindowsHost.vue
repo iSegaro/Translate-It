@@ -67,6 +67,29 @@
         </div>
 
         <button
+          class="pdf-windows-host__action-button pdf-windows-host__action-button--original"
+          type="button"
+          :class="{ 'is-active': showOriginal }"
+          :title="showOriginal ? t('window_hide_original') : t('window_show_original')"
+          :aria-label="showOriginal ? t('window_hide_original') : t('window_show_original')"
+          data-testid="pdf-windows-host-toggle-original"
+          @click.stop="toggleShowOriginal"
+          @pointerdown.stop
+        >
+          <svg
+            width="16"
+            height="16"
+            viewBox="0 0 24 24"
+            aria-hidden="true"
+          >
+            <path
+              fill="currentColor"
+              d="M11.99 2C6.47 2 2 6.48 2 12s4.47 10 9.99 10C17.52 22 22 17.52 22 12S17.52 2 11.99 2zM12 20c-4.42 0-8-3.58-8-8s3.58-8 8-8s8 3.58 8 8s-3.58 8-8 8zm-2-9.41V12h2.59L15 14.41V16h-4v-1.59L8.59 12H7v-2h3.59L13 7.59V6h4v1.59L14.41 10H12v.59z"
+            />
+          </svg>
+        </button>
+
+        <button
           class="pdf-windows-host__action-button"
           type="button"
           :class="{ 'is-active': dockMode === 'left' }"
@@ -107,7 +130,10 @@
     </header>
 
     <div class="pdf-windows-host__body">
-      <div class="pdf-windows-host__source">
+      <div
+        v-if="showOriginal"
+        class="pdf-windows-host__source"
+      >
         <div class="pdf-windows-host__label">
           {{ t('pdf_windows_host_selected_text') }}
         </div>
@@ -230,6 +256,7 @@ const {
   selectedText,
   selectedProvider,
   isProviderReady,
+  showOriginal,
   translationError,
   isTranslating,
   isCopying,
@@ -250,6 +277,7 @@ const {
   retryTranslation,
   copyTranslation,
   dismissHost,
+  toggleShowOriginal,
   handleProviderChange,
   handlePinToggle,
   handleDockLeft,
