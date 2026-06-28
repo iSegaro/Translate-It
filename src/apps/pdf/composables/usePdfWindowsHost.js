@@ -21,6 +21,7 @@ import { usePdfWindowDrag } from './usePdfWindowDrag.js'
 import { usePdfWindowPlacement } from './usePdfWindowPlacement.js'
 import { AUTO_DETECT_VALUE } from '@/shared/constants/core.js'
 import { getLanguageNameFromCode } from '@/shared/config/languageConstants.js'
+import { buildPdfSelectionIconStyle, getViewportSize } from '@/apps/pdf/utils/pdfWindowGeometry.js'
 
 const logger = getScopedLogger(LOG_COMPONENTS.PDF, 'usePdfWindowsHost')
 const COPY_FEEDBACK_TIMEOUT_MS = 1200
@@ -73,9 +74,11 @@ export function usePdfWindowsHost(options = {}) {
   const isProviderReady = ref(false)
   const showOriginal = ref(false)
   const detectedSourceLanguage = ref('')
+  const isIconVisible = ref(false)
   const translationMode = ref(TranslationMode.Selection)
   const selectionSessionId = ref(0)
   const hostStyle = ref({})
+  const viewportTick = ref(0)
 
   const placement = usePdfWindowPlacement()
   const docking = usePdfWindowDocking({
@@ -132,6 +135,11 @@ export function usePdfWindowsHost(options = {}) {
       enableMarkdown: true
     })
   })
+  const iconStyle = computed(() => (
+    isIconVisible.value
+      ? (viewportTick.value, buildPdfSelectionIconStyle(selectionPosition.value, getViewportSize()))
+      : {}
+  ))
 
   function resolvePdfFingerprint() {
     const fingerprint = unref(pdfFingerprintSource)
@@ -194,10 +202,11 @@ export function usePdfWindowsHost(options = {}) {
     refreshHostStyle()
   }
 
-  function resetVisibleState() {
-    isVisible.value = false
-    selectedText.value = ''
-    selectionPosition.value = null
+  function hideIconStage() {
+    isIconVisible.value = false
+  }
+
+  function clearWindowContent() {
     translatedText.value = ''
     translationError.value = ''
     detectedSourceLanguage.value = ''
@@ -206,8 +215,20 @@ export function usePdfWindowsHost(options = {}) {
     showOriginal.value = false
     translationMode.value = TranslationMode.Selection
     clearCopyFeedback()
-    hostStyle.value = {}
     activeRequestSessionId = 0
+  }
+
+  function hideWindowStage() {
+    isVisible.value = false
+    clearWindowContent()
+    hostStyle.value = {}
+  }
+
+  function resetVisibleState() {
+    selectedText.value = ''
+    selectionPosition.value = null
+    hideIconStage()
+    hideWindowStage()
   }
 
   function toggleShowOriginal() {
@@ -229,6 +250,39 @@ export function usePdfWindowsHost(options = {}) {
     isTranslating.value = false
     translationMode.value = TranslationMode.Selection
     clearCopyFeedback()
+  }
+
+  function shouldTranslateDirectlyOnSelection() {
+    return docking.isDocked.value || (isVisible.value && docking.isPinned.value)
+  }
+
+  function showIconForSelection(position) {
+    hideWindowStage()
+    isIconVisible.value = true
+    placement.setSelectionPosition(position, { followSelection: true })
+  }
+
+  async function showWindowForSelection(position, { translateImmediately = false } = {}) {
+    hideIconStage()
+    clearWindowContent()
+    isVisible.value = true
+    placement.setSelectionPosition(position, {
+      followSelection: !placement.manualPosition.value
+    })
+    await scheduleHostStyleRefresh()
+
+    if (translateImmediately) {
+      await translateSelection()
+    }
+  }
+
+  async function openWindowFromIcon() {
+    if (!isIconVisible.value || !selectedText.value) {
+      return false
+    }
+
+    await showWindowForSelection(selectionPosition.value, { translateImmediately: true })
+    return true
   }
 
   async function persistGlobalPreferences() {
@@ -332,7 +386,7 @@ export function usePdfWindowsHost(options = {}) {
     const position = detail?.position || null
 
     if (!text || !position) {
-      if (docking.isPinned.value) {
+      if (isVisible.value && docking.isPinned.value) {
         return
       }
 
@@ -343,21 +397,16 @@ export function usePdfWindowsHost(options = {}) {
     selectionSessionId.value += 1
     activeRequestSessionId = 0
 
-    isVisible.value = true
     selectedText.value = text
     selectionPosition.value = position
-    translatedText.value = ''
-    translationError.value = ''
-    detectedSourceLanguage.value = ''
-    isTranslating.value = false
-    showOriginal.value = false
-    translationMode.value = TranslationMode.Selection
-    clearCopyFeedback()
+    hideIconStage()
 
-    const followSelection = !docking.isPinned.value && !docking.isDocked.value && !placement.manualPosition.value
-    placement.setSelectionPosition(position, { followSelection })
+    if (shouldTranslateDirectlyOnSelection()) {
+      void showWindowForSelection(position, { translateImmediately: true })
+      return
+    }
 
-    void scheduleHostStyleRefresh()
+    showIconForSelection(position)
   }
 
   function handleSelectionClear(detail) {
@@ -365,7 +414,7 @@ export function usePdfWindowsHost(options = {}) {
       return
     }
 
-    if (docking.isPinned.value) {
+    if (isVisible.value && docking.isPinned.value) {
       return
     }
 
@@ -523,28 +572,45 @@ export function usePdfWindowsHost(options = {}) {
   }
 
   function handleEscapeKey(event) {
-    if (event.key === 'Escape' && isVisible.value) {
+    if (event.key === 'Escape' && (isVisible.value || isIconVisible.value)) {
       dismissHost()
     }
   }
 
   function handleDocumentPointerDown(event) {
-    if (!isVisible.value || docking.isPinned.value) {
+    if (!isVisible.value && !isIconVisible.value) {
+      return
+    }
+
+    if (isVisible.value && docking.isPinned.value) {
       return
     }
 
     const root = hostRef.value
-    if (root && !root.contains(event.target)) {
+    const iconRoot = iconHostRef.value
+    const isInsideIcon = iconRoot && iconRoot.contains(event.target)
+
+    if ((root && root.contains(event.target)) || isInsideIcon) {
+      return
+    }
+
+    if (isVisible.value || isIconVisible.value) {
       dismissHost()
     }
   }
 
   function handleViewportChange() {
+    if (isIconVisible.value) {
+      viewportTick.value += 1
+    }
+
     if (isVisible.value) {
       placement.ensurePositionWithinViewport()
       void scheduleHostStyleRefresh()
     }
   }
+
+  const iconHostRef = ref(null)
 
   const drag = usePdfWindowDrag({
     tracker,
@@ -620,6 +686,9 @@ export function usePdfWindowsHost(options = {}) {
   })
 
   return {
+    iconHostRef,
+    isIconVisible,
+    iconStyle,
     hostRef,
     hostStyle,
     isVisible,
@@ -651,6 +720,7 @@ export function usePdfWindowsHost(options = {}) {
     retryTranslation,
     copyTranslation,
     dismissHost,
+    openWindowFromIcon,
     toggleShowOriginal,
     handleProviderChange,
     handlePinToggle,

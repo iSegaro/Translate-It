@@ -137,6 +137,20 @@ function emitSelectionClear(detail = {}) {
   eventHandlers['global-selection-clear']?.(detail)
 }
 
+async function showSelectionIcon(text, position = { x: 120, y: 180, width: 90, height: 18 }) {
+  emitSelection({
+    text,
+    position,
+    context: { source: 'pdf-viewer', isPdf: true }
+  })
+  await flushPromises()
+}
+
+async function openWindowFromSelectionIcon(wrapper) {
+  await wrapper.get('[data-testid="pdf-translation-icon"]').trigger('click')
+  await flushPromises()
+}
+
 function dispatchPointerEvent(target, type, options = {}) {
   target.dispatchEvent(new MouseEvent(type, {
     bubbles: true,
@@ -207,6 +221,11 @@ describe('PdfWindowsHost', () => {
   })
 
   it('opens for PDF selection events and ignores non-PDF selections', async () => {
+    let resolveTranslation
+    sendRegularMessageMock.mockImplementationOnce(() => new Promise((resolve) => {
+      resolveTranslation = resolve
+    }))
+
     emitSelection({
       text: 'PDF text',
       position: { x: 120, y: 180, width: 90, height: 18 },
@@ -215,33 +234,51 @@ describe('PdfWindowsHost', () => {
     await flushPromises()
 
     expect(wrapper.find('[data-testid="pdf-windows-host"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="pdf-windows-host-icon-stage"]').exists()).toBe(false)
 
-    emitSelection({
-      text: 'PDF text',
-      position: { x: 120, y: 180, width: 90, height: 18 },
-      context: { source: 'pdf-viewer', isPdf: true }
-    })
-    await flushPromises()
+    await showSelectionIcon('PDF text')
+
+    expect(wrapper.find('[data-testid="pdf-windows-host"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="pdf-windows-host-icon-stage"]').exists()).toBe(true)
+    expect(sendRegularMessageMock).not.toHaveBeenCalled()
+
+    await openWindowFromSelectionIcon(wrapper)
 
     expect(wrapper.find('[data-testid="pdf-windows-host"]').exists()).toBe(true)
     expect(wrapper.find('.pdf-windows-host__source').exists()).toBe(false)
     expect(wrapper.find('[data-testid="pdf-windows-host-toggle-original"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="pdf-windows-host-loading"]').exists()).toBe(true)
     expect(wrapper.get('[data-testid="pdf-windows-host-tts"]').attributes('data-text')).toBe('PDF text')
-  })
 
-  it('renders TTS for selected source text before translation and hides it when there is no speakable text', async () => {
-    expect(wrapper.find('[data-testid="pdf-windows-host-tts"]').exists()).toBe(false)
-
-    emitSelection({
-      text: 'Speak me',
-      position: { x: 120, y: 180, width: 90, height: 18 },
-      context: { source: 'pdf-viewer', isPdf: true }
+    resolveTranslation({
+      success: true,
+      translatedText: 'Translated text'
     })
     await flushPromises()
+  })
+
+  it('renders TTS for selected source text after the icon opens the window and hides it when there is no speakable text', async () => {
+    let resolveTranslation
+    sendRegularMessageMock.mockImplementationOnce(() => new Promise((resolve) => {
+      resolveTranslation = resolve
+    }))
+
+    expect(wrapper.find('[data-testid="pdf-windows-host-tts"]').exists()).toBe(false)
+
+    await showSelectionIcon('Speak me')
+    expect(wrapper.find('[data-testid="pdf-windows-host-tts"]').exists()).toBe(false)
+
+    await openWindowFromSelectionIcon(wrapper)
 
     const ttsButton = wrapper.get('[data-testid="pdf-windows-host-tts"]')
     expect(ttsButton.exists()).toBe(true)
     expect(ttsButton.attributes('data-text')).toBe('Speak me')
+
+    resolveTranslation({
+      success: true,
+      translatedText: 'Translated text'
+    })
+    await flushPromises()
   })
 
   it('toggles the original source text visibility and switches TTS input between source and translated text', async () => {
@@ -251,17 +288,8 @@ describe('PdfWindowsHost', () => {
       mode: 'selection-manager'
     })
 
-    emitSelection({
-      text: 'Toggle me',
-      position: { x: 120, y: 180, width: 90, height: 18 },
-      context: { source: 'pdf-viewer', isPdf: true }
-    })
-    await flushPromises()
-
-    expect(wrapper.find('.pdf-windows-host__source').exists()).toBe(false)
-
-    await wrapper.get('[data-testid="pdf-windows-host-translate"]').trigger('click')
-    await flushPromises()
+    await showSelectionIcon('Toggle me')
+    await openWindowFromSelectionIcon(wrapper)
 
     expect(wrapper.get('[data-testid="pdf-windows-host-tts"]').attributes('data-text')).toBe('Translated result')
 
@@ -293,14 +321,8 @@ describe('PdfWindowsHost', () => {
       mode: 'selection-manager'
     })
 
-    emitSelection({
-      text: 'Detect me',
-      position: { x: 120, y: 180, width: 90, height: 18 },
-      context: { source: 'pdf-viewer', isPdf: true }
-    })
-    await flushPromises()
-
-    await wrapper.get('[data-testid="pdf-windows-host-translate"]').trigger('click')
+    await showSelectionIcon('Detect me')
+    await openWindowFromSelectionIcon(wrapper)
     await flushPromises()
 
     const badge = wrapper.get('[data-testid="pdf-windows-host-detected-language"]')
@@ -317,14 +339,8 @@ describe('PdfWindowsHost', () => {
       mode: 'selection-manager'
     })
 
-    emitSelection({
-      text: 'Prefer me',
-      position: { x: 120, y: 180, width: 90, height: 18 },
-      context: { source: 'pdf-viewer', isPdf: true }
-    })
-    await flushPromises()
-
-    await wrapper.get('[data-testid="pdf-windows-host-translate"]').trigger('click')
+    await showSelectionIcon('Prefer me')
+    await openWindowFromSelectionIcon(wrapper)
     await flushPromises()
 
     const badge = wrapper.get('[data-testid="pdf-windows-host-detected-language"]')
@@ -340,14 +356,8 @@ describe('PdfWindowsHost', () => {
       mode: 'selection-manager'
     })
 
-    emitSelection({
-      text: 'Auto me',
-      position: { x: 120, y: 180, width: 90, height: 18 },
-      context: { source: 'pdf-viewer', isPdf: true }
-    })
-    await flushPromises()
-
-    await wrapper.get('[data-testid="pdf-windows-host-translate"]').trigger('click')
+    await showSelectionIcon('Auto me')
+    await openWindowFromSelectionIcon(wrapper)
     await flushPromises()
 
     expect(wrapper.find('[data-testid="pdf-windows-host-detected-language"]').exists()).toBe(false)
@@ -361,14 +371,8 @@ describe('PdfWindowsHost', () => {
       mode: 'selection-manager'
     })
 
-    emitSelection({
-      text: 'Unknown me',
-      position: { x: 120, y: 180, width: 90, height: 18 },
-      context: { source: 'pdf-viewer', isPdf: true }
-    })
-    await flushPromises()
-
-    await wrapper.get('[data-testid="pdf-windows-host-translate"]').trigger('click')
+    await showSelectionIcon('Unknown me')
+    await openWindowFromSelectionIcon(wrapper)
     await flushPromises()
 
     expect(wrapper.find('[data-testid="pdf-windows-host-detected-language"]').exists()).toBe(false)
@@ -381,27 +385,19 @@ describe('PdfWindowsHost', () => {
       mode: 'selection-manager'
     })
 
-    emitSelection({
-      text: 'First selection',
-      position: { x: 120, y: 180, width: 90, height: 18 },
-      context: { source: 'pdf-viewer', isPdf: true }
-    })
-    await flushPromises()
-
+    await showSelectionIcon('First selection')
+    await openWindowFromSelectionIcon(wrapper)
     await wrapper.get('[data-testid="pdf-windows-host-toggle-original"]').trigger('click')
     await flushPromises()
     expect(wrapper.find('.pdf-windows-host__source').exists()).toBe(true)
 
-    emitSelection({
-      text: 'Second selection',
-      position: { x: 140, y: 200, width: 90, height: 18 },
-      context: { source: 'pdf-viewer', isPdf: true }
-    })
-    await flushPromises()
+    await showSelectionIcon('Second selection', { x: 140, y: 200, width: 90, height: 18 })
+    expect(wrapper.find('[data-testid="pdf-windows-host-icon-stage"]').exists()).toBe(true)
 
+    await openWindowFromSelectionIcon(wrapper)
     expect(wrapper.find('.pdf-windows-host__source').exists()).toBe(false)
     expect(wrapper.find('[data-testid="pdf-windows-host-detected-language"]').exists()).toBe(false)
-    expect(wrapper.get('[data-testid="pdf-windows-host-tts"]').attributes('data-text')).toBe('Second selection')
+    expect(wrapper.get('[data-testid="pdf-windows-host-tts"]').attributes('data-text')).toBe('Translated text')
   })
 
   it('initializes the local provider switcher from PDF provider resolution', async () => {
@@ -416,27 +412,22 @@ describe('PdfWindowsHost', () => {
       },
       attachTo: document.body
     })
-    emitSelection({
-      text: 'Initial provider',
-      position: { x: 120, y: 180, width: 90, height: 18 },
-      context: { source: 'pdf-viewer', isPdf: true }
-    })
-    await flushPromises()
-    await flushPromises()
+    await showSelectionIcon('Initial provider')
 
     expect(getEffectiveProviderAsyncMock).toHaveBeenCalledWith('pdf-translation')
+    expect(wrapper.find('[data-testid="pdf-windows-host-provider-selector"]').exists()).toBe(false)
+
+    await openWindowFromSelectionIcon(wrapper)
+
     expect(wrapper.get('[data-testid="pdf-windows-host-provider-selector"]').attributes('data-mode')).toBe('compact')
     expect(wrapper.get('[data-testid="pdf-windows-host-provider-selector"]').attributes('data-is-global')).toBe('false')
     expect(wrapper.get('[data-testid="pdf-windows-host-provider-select"]').element.value).toBe('deepl')
   })
 
   it('updates only the local provider selection and does not auto-translate', async () => {
-    emitSelection({
-      text: 'Provider switch',
-      position: { x: 120, y: 180, width: 90, height: 18 },
-      context: { source: 'pdf-viewer', isPdf: true }
-    })
-    await flushPromises()
+    await showSelectionIcon('Provider switch')
+    await openWindowFromSelectionIcon(wrapper)
+    sendRegularMessageMock.mockClear()
 
     const providerSelect = wrapper.get('[data-testid="pdf-windows-host-provider-select"]')
     await providerSelect.setValue('deepl')
@@ -449,12 +440,9 @@ describe('PdfWindowsHost', () => {
   })
 
   it('handles provider-change events with the same local-only handler', async () => {
-    emitSelection({
-      text: 'Provider contract',
-      position: { x: 120, y: 180, width: 90, height: 18 },
-      context: { source: 'pdf-viewer', isPdf: true }
-    })
-    await flushPromises()
+    await showSelectionIcon('Provider contract')
+    await openWindowFromSelectionIcon(wrapper)
+    sendRegularMessageMock.mockClear()
 
     const providerSelector = wrapper.findComponent({ name: 'ProviderSelector' })
     providerSelector.vm.$emit('provider-change', 'openai')
@@ -472,15 +460,8 @@ describe('PdfWindowsHost', () => {
       mode: 'selection-manager'
     })
 
-    emitSelection({
-      text: 'Hello PDF',
-      position: { x: 120, y: 180, width: 90, height: 18 },
-      context: { source: 'pdf-viewer', isPdf: true }
-    })
-    await flushPromises()
-
-    await wrapper.get('[data-testid="pdf-windows-host-translate"]').trigger('click')
-    await flushPromises()
+    await showSelectionIcon('Hello PDF')
+    await openWindowFromSelectionIcon(wrapper)
 
     expect(sendRegularMessageMock).toHaveBeenCalledWith(expect.objectContaining({
       action: 'TRANSLATE',
@@ -519,20 +500,18 @@ describe('PdfWindowsHost', () => {
       mode: 'selection-manager'
     })
 
-    emitSelection({
-      text: 'Provider selected text',
-      position: { x: 120, y: 180, width: 90, height: 18 },
-      context: { source: 'pdf-viewer', isPdf: true }
-    })
-    await flushPromises()
+    await showSelectionIcon('Provider selected text')
+    await openWindowFromSelectionIcon(wrapper)
 
     await wrapper.get('[data-testid="pdf-windows-host-provider-select"]').setValue('deepl')
     await flushPromises()
+    sendRegularMessageMock.mockClear()
 
-    await wrapper.get('[data-testid="pdf-windows-host-translate"]').trigger('click')
+    await showSelectionIcon('Provider selected text 2', { x: 150, y: 210, width: 90, height: 18 })
     await flushPromises()
+    await openWindowFromSelectionIcon(wrapper)
 
-    expect(sendRegularMessageMock).toHaveBeenCalledWith(expect.objectContaining({
+    expect(sendRegularMessageMock).toHaveBeenLastCalledWith(expect.objectContaining({
       data: expect.objectContaining({
         provider: 'deepl',
         mode: 'selection-manager'
@@ -564,17 +543,12 @@ describe('PdfWindowsHost', () => {
       mode: 'selection-manager'
     })
 
-    emitSelection({
-      text: 'Clear me',
-      position: { x: 120, y: 180, width: 90, height: 18 },
-      context: { source: 'pdf-viewer', isPdf: true }
-    })
-    await flushPromises()
+    await showSelectionIcon('Clear me')
+    await openWindowFromSelectionIcon(wrapper)
 
-    await wrapper.get('[data-testid="pdf-windows-host-translate"]').trigger('click')
-    await flushPromises()
     expect(wrapper.find('[data-testid="pdf-windows-host-result"]').text()).toContain('Stale result')
     expect(wrapper.get('[data-testid="pdf-windows-host-detected-language"]').text()).toBe('English')
+    sendRegularMessageMock.mockClear()
 
     const providerSelector = wrapper.findComponent({ name: 'ProviderSelector' })
     providerSelector.vm.$emit('update:modelValue', 'deepl')
@@ -584,7 +558,7 @@ describe('PdfWindowsHost', () => {
     expect(wrapper.find('[data-testid="pdf-windows-host-error"]').exists()).toBe(false)
     expect(wrapper.find('[data-testid="pdf-windows-host-detected-language"]').exists()).toBe(false)
     expect(wrapper.get('[data-testid="pdf-windows-host-provider-select"]').element.value).toBe('deepl')
-    expect(sendRegularMessageMock).toHaveBeenCalledTimes(1)
+    expect(sendRegularMessageMock).not.toHaveBeenCalled()
   })
 
   it('keeps plain text output readable through SafeMarkdownPreview', async () => {
@@ -594,15 +568,8 @@ describe('PdfWindowsHost', () => {
       mode: 'selection-manager'
     })
 
-    emitSelection({
-      text: 'Plain source',
-      position: { x: 120, y: 180, width: 90, height: 18 },
-      context: { source: 'pdf-viewer', isPdf: true }
-    })
-    await flushPromises()
-
-    await wrapper.get('[data-testid="pdf-windows-host-translate"]').trigger('click')
-    await flushPromises()
+    await showSelectionIcon('Plain source')
+    await openWindowFromSelectionIcon(wrapper)
 
     const result = wrapper.get('[data-testid="pdf-windows-host-result"]')
     expect(result.find('.simple-markdown').exists()).toBe(true)
@@ -616,15 +583,8 @@ describe('PdfWindowsHost', () => {
       mode: 'dictionary'
     })
 
-    emitSelection({
-      text: 'hello',
-      position: { x: 120, y: 180, width: 90, height: 18 },
-      context: { source: 'pdf-viewer', isPdf: true }
-    })
-    await flushPromises()
-
-    await wrapper.get('[data-testid="pdf-windows-host-translate"]').trigger('click')
-    await flushPromises()
+    await showSelectionIcon('hello')
+    await openWindowFromSelectionIcon(wrapper)
 
     const result = wrapper.get('[data-testid="pdf-windows-host-result"]')
     expect(result.find('.simple-markdown').exists()).toBe(true)
@@ -647,15 +607,8 @@ describe('PdfWindowsHost', () => {
         translatedText: 'Recovered result'
       })
 
-    emitSelection({
-      text: 'Retry me',
-      position: { x: 120, y: 180, width: 90, height: 18 },
-      context: { source: 'pdf-viewer', isPdf: true }
-    })
-    await flushPromises()
-
-    await wrapper.get('[data-testid="pdf-windows-host-translate"]').trigger('click')
-    await flushPromises()
+    await showSelectionIcon('Retry me')
+    await openWindowFromSelectionIcon(wrapper)
 
     expect(wrapper.find('[data-testid="pdf-windows-host-error"]').text()).toContain('Provider unavailable')
 
@@ -687,15 +640,8 @@ describe('PdfWindowsHost', () => {
         detectedSourceLanguage: 'fa'
       })
 
-    emitSelection({
-      text: 'Retry badge',
-      position: { x: 120, y: 180, width: 90, height: 18 },
-      context: { source: 'pdf-viewer', isPdf: true }
-    })
-    await flushPromises()
-
-    await wrapper.get('[data-testid="pdf-windows-host-translate"]').trigger('click')
-    await flushPromises()
+    await showSelectionIcon('Retry badge')
+    await openWindowFromSelectionIcon(wrapper)
 
     expect(wrapper.find('[data-testid="pdf-windows-host-detected-language"]').exists()).toBe(false)
 
@@ -712,15 +658,8 @@ describe('PdfWindowsHost', () => {
       mode: 'selection-manager'
     })
 
-    emitSelection({
-      text: 'Copy me',
-      position: { x: 120, y: 180, width: 90, height: 18 },
-      context: { source: 'pdf-viewer', isPdf: true }
-    })
-    await flushPromises()
-
-    await wrapper.get('[data-testid="pdf-windows-host-translate"]').trigger('click')
-    await flushPromises()
+    await showSelectionIcon('Copy me')
+    await openWindowFromSelectionIcon(wrapper)
 
     await wrapper.get('[data-testid="pdf-windows-host-copy"]').trigger('click')
     await flushPromises()
@@ -730,12 +669,8 @@ describe('PdfWindowsHost', () => {
   })
 
   it('pins the window so outside clicks and clear events do not dismiss it until unpinned', async () => {
-    emitSelection({
-      text: 'Pin me',
-      position: { x: 120, y: 180, width: 90, height: 18 },
-      context: { source: 'pdf-viewer', isPdf: true }
-    })
-    await flushPromises()
+    await showSelectionIcon('Pin me')
+    await openWindowFromSelectionIcon(wrapper)
 
     await wrapper.get('[data-testid="pdf-windows-host-pin"]').trigger('click')
     await flushPromises()
@@ -768,12 +703,8 @@ describe('PdfWindowsHost', () => {
   })
 
   it('docks left and right and clamps dock resize width', async () => {
-    emitSelection({
-      text: 'Dock me',
-      position: { x: 120, y: 180, width: 90, height: 18 },
-      context: { source: 'pdf-viewer', isPdf: true }
-    })
-    await flushPromises()
+    await showSelectionIcon('Dock me')
+    await openWindowFromSelectionIcon(wrapper)
 
     await wrapper.get('[data-testid="pdf-windows-host-dock-left"]').trigger('click')
     await flushPromises()
@@ -796,13 +727,56 @@ describe('PdfWindowsHost', () => {
     expect(wrapper.get('[data-testid="pdf-windows-host"]').classes()).toContain('pdf-windows-host--dock-right')
   })
 
-  it('drags the floating window and restores persisted positions by fingerprint and global fallback', async () => {
-    emitSelection({
-      text: 'Drag me',
-      position: { x: 120, y: 180, width: 90, height: 18 },
-      context: { source: 'pdf-viewer', isPdf: true }
-    })
+  it('translates directly without the icon when docked', async () => {
+    await showSelectionIcon('Dock direct')
+    await openWindowFromSelectionIcon(wrapper)
+
+    await wrapper.get('[data-testid="pdf-windows-host-dock-left"]').trigger('click')
     await flushPromises()
+    sendRegularMessageMock.mockClear()
+
+    sendRegularMessageMock.mockResolvedValueOnce({
+      success: true,
+      translatedText: 'Docked translation',
+      sourceLanguage: 'en'
+    })
+
+    await showSelectionIcon('Dock direct updated')
+    await flushPromises()
+
+    expect(wrapper.find('[data-testid="pdf-windows-host-icon-stage"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="pdf-windows-host"]').exists()).toBe(true)
+    await flushPromises()
+    expect(sendRegularMessageMock).toHaveBeenCalledTimes(1)
+    expect(wrapper.find('[data-testid="pdf-windows-host-detected-language"]').text()).toBe('English')
+  })
+
+  it('translates directly when a visible pinned window receives a new selection', async () => {
+    await showSelectionIcon('Pinned visible')
+    await openWindowFromSelectionIcon(wrapper)
+
+    await wrapper.get('[data-testid="pdf-windows-host-pin"]').trigger('click')
+    await flushPromises()
+    sendRegularMessageMock.mockClear()
+
+    sendRegularMessageMock.mockResolvedValueOnce({
+      success: true,
+      translatedText: 'Pinned translation',
+      sourceLanguage: 'fa'
+    })
+
+    await showSelectionIcon('Pinned direct selection', { x: 180, y: 220, width: 90, height: 18 })
+    await flushPromises()
+
+    expect(wrapper.find('[data-testid="pdf-windows-host-icon-stage"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="pdf-windows-host"]').exists()).toBe(true)
+    expect(sendRegularMessageMock).toHaveBeenCalledTimes(1)
+    expect(wrapper.get('[data-testid="pdf-windows-host-detected-language"]').text()).toBe('Persian (Farsi)')
+  })
+
+  it('drags the floating window and restores persisted positions by fingerprint and global fallback', async () => {
+    await showSelectionIcon('Drag me')
+    await openWindowFromSelectionIcon(wrapper)
 
     const header = wrapper.get('.pdf-windows-host__header')
     dispatchPointerEvent(header.element, 'pointerdown', { clientX: 180, clientY: 210 })
@@ -826,12 +800,10 @@ describe('PdfWindowsHost', () => {
     })
     await flushPromises()
 
-    emitSelection({
-      text: 'Doc restore',
-      position: { x: 20, y: 20, width: 80, height: 18 },
-      context: { source: 'pdf-viewer', isPdf: true }
-    })
-    await flushPromises()
+    await showSelectionIcon('Doc restore', { x: 20, y: 20, width: 80, height: 18 })
+    expect(fingerprintRestored.find('[data-testid="pdf-windows-host-icon-stage"]').exists()).toBe(true)
+
+    await openWindowFromSelectionIcon(fingerprintRestored)
 
     expect(fingerprintRestored.get('[data-testid="pdf-windows-host"]').element.style.left).toBe(`${globalThis.__pdfWindowsHostStorageState.pdfWindowsHostLayout.documents['pdf-doc-1'].position.x}px`)
     expect(fingerprintRestored.get('[data-testid="pdf-windows-host"]').element.style.top).toBe(`${globalThis.__pdfWindowsHostStorageState.pdfWindowsHostLayout.documents['pdf-doc-1'].position.y}px`)
@@ -843,12 +815,10 @@ describe('PdfWindowsHost', () => {
     })
     await flushPromises()
 
-    emitSelection({
-      text: 'Global fallback',
-      position: { x: 20, y: 20, width: 80, height: 18 },
-      context: { source: 'pdf-viewer', isPdf: true }
-    })
-    await flushPromises()
+    await showSelectionIcon('Global fallback', { x: 20, y: 20, width: 80, height: 18 })
+    expect(globalFallback.find('[data-testid="pdf-windows-host-icon-stage"]').exists()).toBe(true)
+
+    await openWindowFromSelectionIcon(globalFallback)
 
     expect(globalFallback.get('[data-testid="pdf-windows-host"]').element.style.left).toBe('88px')
     expect(globalFallback.get('[data-testid="pdf-windows-host"]').element.style.top).toBe('96px')
@@ -862,22 +832,12 @@ describe('PdfWindowsHost', () => {
       resolveTranslation = resolve
     }))
 
-    emitSelection({
-      text: 'Old selection',
-      position: { x: 120, y: 180, width: 90, height: 18 },
-      context: { source: 'pdf-viewer', isPdf: true }
-    })
-    await flushPromises()
-
-    await wrapper.get('[data-testid="pdf-windows-host-translate"]').trigger('click')
+    await showSelectionIcon('Old selection')
+    await openWindowFromSelectionIcon(wrapper)
     await flushPromises()
     expect(wrapper.find('[data-testid="pdf-windows-host-loading"]').exists()).toBe(true)
 
-    emitSelection({
-      text: 'New selection',
-      position: { x: 160, y: 220, width: 90, height: 18 },
-      context: { source: 'pdf-viewer', isPdf: true }
-    })
+    await showSelectionIcon('New selection', { x: 160, y: 220, width: 90, height: 18 })
     await flushPromises()
 
     resolveTranslation({
@@ -886,31 +846,19 @@ describe('PdfWindowsHost', () => {
     })
     await flushPromises()
 
-    expect(wrapper.text()).toContain('New selection')
+    expect(wrapper.find('[data-testid="pdf-windows-host-icon-stage"]').exists()).toBe(true)
     expect(wrapper.text()).not.toContain('Stale result')
     expect(wrapper.find('[data-testid="pdf-windows-host-loading"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="pdf-windows-host"]').exists()).toBe(false)
   })
 
   it('dismisses on PDF selection clear, Escape key, and outside click', async () => {
-    emitSelection({
-      text: 'Dismiss me',
-      position: { x: 120, y: 180, width: 90, height: 18 },
-      context: { source: 'pdf-viewer', isPdf: true }
-    })
-    await flushPromises()
+    await showSelectionIcon('Dismiss me')
+    await openWindowFromSelectionIcon(wrapper)
 
     await wrapper.get('[data-testid="pdf-windows-host-toggle-original"]').trigger('click')
     await flushPromises()
     expect(wrapper.find('.pdf-windows-host__source').exists()).toBe(true)
-
-    sendRegularMessageMock.mockResolvedValueOnce({
-      success: true,
-      translatedText: 'Dismissed result',
-      sourceLanguage: 'en'
-    })
-    await wrapper.get('[data-testid="pdf-windows-host-translate"]').trigger('click')
-    await flushPromises()
-    expect(wrapper.get('[data-testid="pdf-windows-host-detected-language"]').text()).toBe('English')
 
     emitSelectionClear({
       context: { source: 'pdf-viewer', isPdf: true }
@@ -918,24 +866,14 @@ describe('PdfWindowsHost', () => {
     await flushPromises()
     expect(wrapper.find('[data-testid="pdf-windows-host"]').exists()).toBe(false)
 
-    emitSelection({
-      text: 'Dismiss me again',
-      position: { x: 120, y: 180, width: 90, height: 18 },
-      context: { source: 'pdf-viewer', isPdf: true }
-    })
-    await flushPromises()
+    await showSelectionIcon('Dismiss me again')
 
     document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
     await flushPromises()
     expect(wrapper.find('[data-testid="pdf-windows-host"]').exists()).toBe(false)
 
-    emitSelection({
-      text: 'Dismiss me one more time',
-      position: { x: 120, y: 180, width: 90, height: 18 },
-      context: { source: 'pdf-viewer', isPdf: true }
-    })
-    await flushPromises()
-    expect(wrapper.find('.pdf-windows-host__source').exists()).toBe(false)
+    await showSelectionIcon('Dismiss me one more time')
+    expect(wrapper.find('[data-testid="pdf-windows-host-icon-stage"]').exists()).toBe(true)
 
     document.body.dispatchEvent(new Event('pointerdown', { bubbles: true }))
     await flushPromises()

@@ -9,6 +9,11 @@ export const PDF_WINDOW_LAYOUT = {
   DEFAULT_GLOBAL_POSITION: { x: 72, y: 72 }
 }
 
+export const PDF_SELECTION_ICON_LAYOUT = {
+  SIZE: 32,
+  GAP: 8
+}
+
 function clamp(value, min, max) {
   return Math.min(max, Math.max(min, value))
 }
@@ -136,4 +141,44 @@ export function buildPdfDockedWindowStyle(dockMode, dockedWidth, viewport = getV
   }
 
   return {}
+}
+
+export function buildPdfSelectionIconStyle(selectionPosition, viewport = getViewportSize(), margin = PDF_WINDOW_LAYOUT.MARGIN) {
+  const rect = normalizePdfWindowPosition(selectionPosition)
+  if (!rect) {
+    return {
+      position: 'fixed',
+      left: `${margin}px`,
+      top: `${margin}px`,
+      width: `${PDF_SELECTION_ICON_LAYOUT.SIZE}px`,
+      height: `${PDF_SELECTION_ICON_LAYOUT.SIZE}px`,
+      zIndex: PDF_WINDOW_LAYOUT.Z_INDEX
+    }
+  }
+
+  const size = PDF_SELECTION_ICON_LAYOUT.SIZE
+  const width = size
+  const height = size
+  const anchorX = rect.x + (Number(selectionPosition?.width) || 0) / 2
+  const preferredLeft = anchorX - (width / 2)
+  const belowTop = rect.y + (Number(selectionPosition?.height) || 0) + PDF_SELECTION_ICON_LAYOUT.GAP
+  const aboveTop = rect.y - height - PDF_SELECTION_ICON_LAYOUT.GAP
+
+  let left = clamp(preferredLeft, margin, Math.max(margin, viewport.width - width - margin))
+  let top = belowTop
+
+  if (top + height + margin > viewport.height) {
+    top = Math.max(margin, aboveTop)
+  }
+
+  top = clamp(top, margin, Math.max(margin, viewport.height - height - margin))
+
+  return {
+    position: 'fixed',
+    left: `${left}px`,
+    top: `${top}px`,
+    width: `${width}px`,
+    height: `${height}px`,
+    zIndex: PDF_WINDOW_LAYOUT.Z_INDEX
+  }
 }

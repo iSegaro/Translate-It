@@ -1,0 +1,33 @@
+.pdf-translation-icon {
+  appearance: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: 1px solid rgba(124, 139, 255, 0.24);
+  border-radius: 999px;
+  background: #2d2d2d;
+  color: #e0e0e0;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.18);
+  cursor: pointer;
+  transition: transform 0.15s ease, background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+
+.pdf-translation-icon:hover {
+  transform: translateY(-1px);
+  background: #333333;
+  border-color: rgba(124, 139, 255, 0.4);
+  color: #ffffff;
+}
+
+.pdf-translation-icon:active {
+  transform: translateY(0);
+}
+
+.pdf-translation-icon__svg {
+  display: block;
+  width: 16px;
+  height: 16px;
+}

@@ -1,5 +1,20 @@
 <template>
   <section
+    v-if="isIconVisible"
+    ref="iconHostRef"
+    class="pdf-windows-host__icon-stage"
+    :style="iconStyle"
+    data-testid="pdf-windows-host-icon-stage"
+    @click.stop
+  >
+    <PdfTranslationIcon
+      :title="t('translateSelectedText')"
+      :aria-label="t('translateSelectedText')"
+      @click="openWindowFromIcon"
+    />
+  </section>
+
+  <section
     v-if="isVisible"
     ref="hostRef"
     class="pdf-windows-host"
@@ -245,6 +260,7 @@ import { usePdfWindowsHost } from '../composables/usePdfWindowsHost.js'
 import ProviderSelector from '@/components/shared/ProviderSelector.vue'
 import TTSButton from '@/components/shared/TTSButton.vue'
 import SafeMarkdownPreview from '@/components/shared/SafeMarkdownPreview.vue'
+import PdfTranslationIcon from './PdfTranslationIcon.vue'
 import './PdfWindowsHost.scss'
 
 const props = defineProps({
@@ -258,6 +274,9 @@ const { t } = useUnifiedI18n()
 const pdfFingerprint = toRef(props, 'pdfFingerprint')
 
 const {
+  iconHostRef,
+  isIconVisible,
+  iconStyle,
   hostRef,
   hostStyle,
   isVisible,
@@ -286,6 +305,7 @@ const {
   retryTranslation,
   copyTranslation,
   dismissHost,
+  openWindowFromIcon,
   toggleShowOriginal,
   handleProviderChange,
   handlePinToggle,
