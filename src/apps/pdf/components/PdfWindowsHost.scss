@@ -186,6 +186,34 @@
   overflow: auto;
 }
 
+.pdf-windows-host__translation--plain {
+  white-space: pre-wrap;
+}
+
+.pdf-windows-host__translation--dictionary {
+  white-space: normal;
+}
+
+.pdf-windows-host__translation--dictionary.safe-markdown-preview {
+  color: inherit;
+}
+
+.pdf-windows-host__translation--dictionary .simple-markdown > :last-child {
+  margin-bottom: 0;
+}
+
+.pdf-windows-host__translation--dictionary .simple-markdown p,
+.pdf-windows-host__translation--dictionary .simple-markdown ul,
+.pdf-windows-host__translation--dictionary .simple-markdown ol,
+.pdf-windows-host__translation--dictionary .simple-markdown h1,
+.pdf-windows-host__translation--dictionary .simple-markdown h2,
+.pdf-windows-host__translation--dictionary .simple-markdown h3,
+.pdf-windows-host__translation--dictionary .simple-markdown h4,
+.pdf-windows-host__translation--dictionary .simple-markdown h5,
+.pdf-windows-host__translation--dictionary .simple-markdown h6 {
+  margin-top: 0;
+}
+
 .pdf-windows-host__actions {
   display: flex;
   flex-wrap: wrap;

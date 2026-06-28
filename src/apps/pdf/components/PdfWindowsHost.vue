@@ -115,9 +115,16 @@
         {{ translationError }}
       </div>
 
+      <SafeMarkdownPreview
+        v-else-if="hasTranslatedResult && isDictionaryResult"
+        class="pdf-windows-host__translation pdf-windows-host__translation--dictionary"
+        :html="translatedDisplayHtml"
+        data-testid="pdf-windows-host-result"
+      />
+
       <div
         v-else-if="hasTranslatedResult"
-        class="pdf-windows-host__translation"
+        class="pdf-windows-host__translation pdf-windows-host__translation--plain"
         data-testid="pdf-windows-host-result"
       >
         {{ translatedText }}
@@ -169,6 +176,7 @@
           size="sm"
           variant="secondary"
           :disabled="isTranslating"
+          :is-dictionary="isDictionaryResult"
         />
       </div>
     </div>
@@ -187,6 +195,7 @@ import { toRef } from 'vue'
 import { useUnifiedI18n } from '@/composables/shared/useUnifiedI18n.js'
 import { usePdfWindowsHost } from '../composables/usePdfWindowsHost.js'
 import TTSButton from '@/components/shared/TTSButton.vue'
+import SafeMarkdownPreview from '@/components/shared/SafeMarkdownPreview.vue'
 import './PdfWindowsHost.scss'
 
 const props = defineProps({
@@ -214,6 +223,8 @@ const {
   hasError,
   speakableText,
   hasSpeakableText,
+  isDictionaryResult,
+  translatedDisplayHtml,
   isPinned,
   dockMode,
   isDocked,

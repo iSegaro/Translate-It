@@ -13,6 +13,8 @@ import {
 import { sendRegularMessage } from '@/shared/messaging/core/UnifiedMessaging.js'
 import { getScopedLogger } from '@/shared/logging/logger.js'
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js'
+import { SimpleMarkdown, ExtractionStrategy } from '@/shared/utils/text/markdown.js'
+import { renderMarkdownPreview } from '@/shared/utils/text/markdownPreview.js'
 import { loadPdfWindowLayout, savePdfWindowLayout, savePdfWindowPosition } from './usePdfWindowPersistence.js'
 import { usePdfWindowDocking } from './usePdfWindowDocking.js'
 import { usePdfWindowDrag } from './usePdfWindowDrag.js'
@@ -66,6 +68,7 @@ export function usePdfWindowsHost(options = {}) {
   const isTranslating = ref(false)
   const isCopying = ref(false)
   const copyStatus = ref('')
+  const translationMode = ref(TranslationMode.Selection)
   const selectionSessionId = ref(0)
   const hostStyle = ref({})
 
@@ -86,6 +89,21 @@ export function usePdfWindowsHost(options = {}) {
   const canTranslate = computed(() => isVisible.value && !!selectedText.value && !isTranslating.value)
   const speakableText = computed(() => translatedText.value || selectedText.value)
   const hasSpeakableText = computed(() => !!speakableText.value?.trim())
+  const isDictionaryResult = computed(() => (
+    translationMode.value === TranslationMode.Dictionary_Translation
+    || translationMode.value === TranslationMode.LEGACY_DICTIONARY
+  ))
+  const translatedDisplayHtml = computed(() => {
+    if (!hasTranslatedResult.value || !isDictionaryResult.value) {
+      return ''
+    }
+
+    return renderMarkdownPreview(translatedText.value, {
+      fallbackDir: 'ltr',
+      isDictionary: true,
+      enableMarkdown: true
+    })
+  })
 
   function resolvePdfFingerprint() {
     const fingerprint = unref(pdfFingerprintSource)
@@ -145,6 +163,7 @@ export function usePdfWindowsHost(options = {}) {
     translationError.value = ''
     isTranslating.value = false
     isCopying.value = false
+    translationMode.value = TranslationMode.Selection
     clearCopyFeedback()
     hostStyle.value = {}
     activeRequestSessionId = 0
@@ -268,6 +287,7 @@ export function usePdfWindowsHost(options = {}) {
     translatedText.value = ''
     translationError.value = ''
     isTranslating.value = false
+    translationMode.value = TranslationMode.Selection
     clearCopyFeedback()
 
     const followSelection = !docking.isPinned.value && !docking.isDocked.value && !placement.manualPosition.value
@@ -340,7 +360,6 @@ export function usePdfWindowsHost(options = {}) {
             targetLanguage,
             // PDF selection uses the standard selection route, but provider resolution stays PDF-specific.
             mode: TranslationMode.Selection,
-            enableDictionary: false,
             isExplicitProvider: true
           },
           MessageContexts.PDF_TRANSLATION
@@ -354,6 +373,7 @@ export function usePdfWindowsHost(options = {}) {
       if (response?.success && typeof response.translatedText === 'string') {
         translatedText.value = response.translatedText
         translationError.value = ''
+        translationMode.value = response?.mode || response?.translationMode || TranslationMode.Selection
         return true
       }
 
@@ -368,6 +388,7 @@ export function usePdfWindowsHost(options = {}) {
       logger.error('PDF selection translation failed:', error)
       translationError.value = error?.message || 'Translation failed'
       translatedText.value = ''
+      translationMode.value = TranslationMode.Selection
       return false
     } finally {
       if (activeRequestSessionId === requestSessionId) {
@@ -389,7 +410,10 @@ export function usePdfWindowsHost(options = {}) {
     isCopying.value = true
 
     try {
-      const success = await copyTextToClipboard(translatedText.value)
+      const textToCopy = isDictionaryResult.value
+        ? SimpleMarkdown.getCleanTranslation(translatedText.value, ExtractionStrategy.CLEAN_DICT)
+        : translatedText.value
+      const success = await copyTextToClipboard(textToCopy)
       setCopyStatus(success ? 'copied' : 'failed')
       return success
     } catch (error) {
@@ -512,6 +536,8 @@ export function usePdfWindowsHost(options = {}) {
     hasError,
     speakableText,
     hasSpeakableText,
+    isDictionaryResult,
+    translatedDisplayHtml,
     isPinned: docking.isPinned,
     dockMode: docking.dockMode,
     dockedWidth: docking.dockedWidth,

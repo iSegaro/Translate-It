@@ -68,11 +68,13 @@ const getTargetLanguageAsyncMock = vi.fn(async () => 'fa')
 vi.mock('@/shared/config/config.js', () => ({
   TranslationMode: {
     PDF: 'pdf-translation',
-    Selection: 'selection-manager'
+    Selection: 'selection-manager',
+    Dictionary_Translation: 'dictionary',
+    LEGACY_DICTIONARY: 'legacy-dictionary'
   },
-    getEffectiveProviderAsync: getEffectiveProviderAsyncMock,
-    getSourceLanguageAsync: vi.fn(async () => 'auto'),
-    getTargetLanguageAsync: getTargetLanguageAsyncMock
+  getEffectiveProviderAsync: getEffectiveProviderAsyncMock,
+  getSourceLanguageAsync: vi.fn(async () => 'auto'),
+  getTargetLanguageAsync: getTargetLanguageAsyncMock
 }))
 
 vi.mock('@/composables/shared/useUnifiedI18n.js', () => ({
@@ -84,8 +86,8 @@ vi.mock('@/composables/shared/useUnifiedI18n.js', () => ({
 vi.mock('@/components/shared/TTSButton.vue', () => ({
   default: {
     name: 'TTSButton',
-    props: ['text', 'language', 'disabled'],
-    template: '<button data-testid="pdf-windows-host-tts" :data-text="text" :disabled="disabled">{{ text }}</button>'
+    props: ['text', 'language', 'disabled', 'isDictionary'],
+    template: '<button data-testid="pdf-windows-host-tts" :data-text="text" :data-dictionary="isDictionary" :disabled="disabled">{{ text }}</button>'
   }
 }))
 
@@ -231,15 +233,41 @@ describe('PdfWindowsHost', () => {
         sourceLanguage: 'auto',
         targetLanguage: 'fa',
         mode: 'selection-manager',
-        enableDictionary: false,
         isExplicitProvider: true
       })
     }))
+    expect(sendRegularMessageMock.mock.calls[0][0].data.enableDictionary).toBeUndefined()
     expect(getEffectiveProviderAsyncMock).toHaveBeenCalledWith('pdf-translation')
     expect(getTargetLanguageAsyncMock).toHaveBeenCalled()
     expect(wrapper.find('[data-testid="pdf-windows-host-loading"]').exists()).toBe(false)
     expect(wrapper.find('[data-testid="pdf-windows-host-result"]').text()).toContain('Translated text')
     expect(wrapper.get('[data-testid="pdf-windows-host-tts"]').attributes('data-text')).toBe('Translated text')
+  })
+
+  it('renders dictionary-formatted translation results without raw markdown artifacts', async () => {
+    sendRegularMessageMock.mockResolvedValueOnce({
+      success: true,
+      translatedText: '**Noun**: hello\n- a greeting',
+      mode: 'dictionary'
+    })
+
+    emitSelection({
+      text: 'hello',
+      position: { x: 120, y: 180, width: 90, height: 18 },
+      context: { source: 'pdf-viewer', isPdf: true }
+    })
+    await flushPromises()
+
+    await wrapper.get('[data-testid="pdf-windows-host-translate"]').trigger('click')
+    await flushPromises()
+
+    const result = wrapper.get('[data-testid="pdf-windows-host-result"]')
+    expect(result.find('.simple-markdown').exists()).toBe(true)
+    expect(result.text()).toContain('Noun')
+    expect(result.text()).toContain('hello')
+    expect(result.text()).toContain('a greeting')
+    expect(result.text()).not.toContain('**')
+    expect(wrapper.get('[data-testid="pdf-windows-host-tts"]').attributes('data-dictionary')).toBe('true')
   })
 
   it('renders errors and retries using the current selected text', async () => {
