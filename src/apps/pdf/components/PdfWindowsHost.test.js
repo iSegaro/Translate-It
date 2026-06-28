@@ -213,7 +213,13 @@ describe('PdfWindowsHost', () => {
     expect(ttsButton.attributes('data-text')).toBe('Speak me')
   })
 
-  it('translates selected text, renders success, and maps the PDF request correctly', async () => {
+  it('renders normal markdown translation results through SafeMarkdownPreview and cleans copy/TTS input', async () => {
+    sendRegularMessageMock.mockResolvedValueOnce({
+      success: true,
+      translatedText: 'Normal **bold** text',
+      mode: 'selection-manager'
+    })
+
     emitSelection({
       text: 'Hello PDF',
       position: { x: 120, y: 180, width: 90, height: 18 },
@@ -240,8 +246,40 @@ describe('PdfWindowsHost', () => {
     expect(getEffectiveProviderAsyncMock).toHaveBeenCalledWith('pdf-translation')
     expect(getTargetLanguageAsyncMock).toHaveBeenCalled()
     expect(wrapper.find('[data-testid="pdf-windows-host-loading"]').exists()).toBe(false)
-    expect(wrapper.find('[data-testid="pdf-windows-host-result"]').text()).toContain('Translated text')
-    expect(wrapper.get('[data-testid="pdf-windows-host-tts"]').attributes('data-text')).toBe('Translated text')
+    const result = wrapper.get('[data-testid="pdf-windows-host-result"]')
+    expect(result.find('.simple-markdown').exists()).toBe(true)
+    expect(result.text()).toContain('Normal')
+    expect(result.text()).toContain('bold')
+    expect(result.text()).not.toContain('**')
+    expect(wrapper.get('[data-testid="pdf-windows-host-tts"]').attributes('data-dictionary')).toBe('false')
+    expect(wrapper.get('[data-testid="pdf-windows-host-tts"]').attributes('data-text')).toBe('Normal **bold** text')
+
+    await wrapper.get('[data-testid="pdf-windows-host-copy"]').trigger('click')
+    await flushPromises()
+
+    expect(clipboardWriteTextMock).toHaveBeenCalledWith('Normal bold text')
+  })
+
+  it('keeps plain text output readable through SafeMarkdownPreview', async () => {
+    sendRegularMessageMock.mockResolvedValueOnce({
+      success: true,
+      translatedText: 'Plain translated text',
+      mode: 'selection-manager'
+    })
+
+    emitSelection({
+      text: 'Plain source',
+      position: { x: 120, y: 180, width: 90, height: 18 },
+      context: { source: 'pdf-viewer', isPdf: true }
+    })
+    await flushPromises()
+
+    await wrapper.get('[data-testid="pdf-windows-host-translate"]').trigger('click')
+    await flushPromises()
+
+    const result = wrapper.get('[data-testid="pdf-windows-host-result"]')
+    expect(result.find('.simple-markdown').exists()).toBe(true)
+    expect(result.text()).toBe('Plain translated text')
   })
 
   it('renders dictionary-formatted translation results without raw markdown artifacts', async () => {
@@ -268,6 +306,7 @@ describe('PdfWindowsHost', () => {
     expect(result.text()).toContain('a greeting')
     expect(result.text()).not.toContain('**')
     expect(wrapper.get('[data-testid="pdf-windows-host-tts"]').attributes('data-dictionary')).toBe('true')
+    expect(wrapper.get('[data-testid="pdf-windows-host-tts"]').attributes('data-text')).toBe('**Noun**: hello\n- a greeting')
   })
 
   it('renders errors and retries using the current selected text', async () => {
@@ -309,7 +348,13 @@ describe('PdfWindowsHost', () => {
     expect(wrapper.find('[data-testid="pdf-windows-host-result"]').text()).toContain('Recovered result')
   })
 
-  it('copies the translated result', async () => {
+  it('copies a normal markdown translation as cleaned plain text', async () => {
+    sendRegularMessageMock.mockResolvedValueOnce({
+      success: true,
+      translatedText: 'Copy **this** text',
+      mode: 'selection-manager'
+    })
+
     emitSelection({
       text: 'Copy me',
       position: { x: 120, y: 180, width: 90, height: 18 },
@@ -323,7 +368,7 @@ describe('PdfWindowsHost', () => {
     await wrapper.get('[data-testid="pdf-windows-host-copy"]').trigger('click')
     await flushPromises()
 
-    expect(clipboardWriteTextMock).toHaveBeenCalledWith('Translated text')
+    expect(clipboardWriteTextMock).toHaveBeenCalledWith('Copy this text')
     expect(wrapper.text()).toContain('pdf_windows_host_copied')
   })
 

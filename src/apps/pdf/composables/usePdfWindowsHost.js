@@ -94,13 +94,13 @@ export function usePdfWindowsHost(options = {}) {
     || translationMode.value === TranslationMode.LEGACY_DICTIONARY
   ))
   const translatedDisplayHtml = computed(() => {
-    if (!hasTranslatedResult.value || !isDictionaryResult.value) {
+    if (!hasTranslatedResult.value) {
       return ''
     }
 
     return renderMarkdownPreview(translatedText.value, {
       fallbackDir: 'ltr',
-      isDictionary: true,
+      isDictionary: isDictionaryResult.value,
       enableMarkdown: true
     })
   })
@@ -412,7 +412,7 @@ export function usePdfWindowsHost(options = {}) {
     try {
       const textToCopy = isDictionaryResult.value
         ? SimpleMarkdown.getCleanTranslation(translatedText.value, ExtractionStrategy.CLEAN_DICT)
-        : translatedText.value
+        : SimpleMarkdown.getCleanTranslation(translatedText.value, ExtractionStrategy.FULL_TEXT)
       const success = await copyTextToClipboard(textToCopy)
       setCopyStatus(success ? 'copied' : 'failed')
       return success

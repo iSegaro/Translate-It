@@ -116,19 +116,15 @@
       </div>
 
       <SafeMarkdownPreview
-        v-else-if="hasTranslatedResult && isDictionaryResult"
-        class="pdf-windows-host__translation pdf-windows-host__translation--dictionary"
+        v-else-if="hasTranslatedResult"
+        class="pdf-windows-host__translation"
+        :class="{
+          'pdf-windows-host__translation--dictionary': isDictionaryResult,
+          'pdf-windows-host__translation--markdown': !isDictionaryResult
+        }"
         :html="translatedDisplayHtml"
         data-testid="pdf-windows-host-result"
       />
-
-      <div
-        v-else-if="hasTranslatedResult"
-        class="pdf-windows-host__translation pdf-windows-host__translation--plain"
-        data-testid="pdf-windows-host-result"
-      >
-        {{ translatedText }}
-      </div>
 
       <div class="pdf-windows-host__actions">
         <button
@@ -213,7 +209,6 @@ const {
   hostStyle,
   isVisible,
   selectedText,
-  translatedText,
   translationError,
   isTranslating,
   isCopying,
