@@ -285,6 +285,95 @@ describe('PdfWindowsHost', () => {
     expect(storageSetMock).not.toHaveBeenCalled()
   })
 
+  it('renders the detected language badge after a successful translation', async () => {
+    sendRegularMessageMock.mockResolvedValueOnce({
+      success: true,
+      translatedText: 'Detected language result',
+      sourceLanguage: 'en',
+      mode: 'selection-manager'
+    })
+
+    emitSelection({
+      text: 'Detect me',
+      position: { x: 120, y: 180, width: 90, height: 18 },
+      context: { source: 'pdf-viewer', isPdf: true }
+    })
+    await flushPromises()
+
+    await wrapper.get('[data-testid="pdf-windows-host-translate"]').trigger('click')
+    await flushPromises()
+
+    const badge = wrapper.get('[data-testid="pdf-windows-host-detected-language"]')
+    expect(badge.exists()).toBe(true)
+    expect(badge.text()).toBe('English')
+  })
+
+  it('prefers detectedSourceLanguage over sourceLanguage when rendering the badge', async () => {
+    sendRegularMessageMock.mockResolvedValueOnce({
+      success: true,
+      translatedText: 'Preferred detected result',
+      sourceLanguage: 'en',
+      detectedSourceLanguage: 'fa',
+      mode: 'selection-manager'
+    })
+
+    emitSelection({
+      text: 'Prefer me',
+      position: { x: 120, y: 180, width: 90, height: 18 },
+      context: { source: 'pdf-viewer', isPdf: true }
+    })
+    await flushPromises()
+
+    await wrapper.get('[data-testid="pdf-windows-host-translate"]').trigger('click')
+    await flushPromises()
+
+    const badge = wrapper.get('[data-testid="pdf-windows-host-detected-language"]')
+    expect(badge.exists()).toBe(true)
+    expect(badge.text()).toBe('Persian (Farsi)')
+  })
+
+  it('hides the detected language badge for missing or auto source language values', async () => {
+    sendRegularMessageMock.mockResolvedValueOnce({
+      success: true,
+      translatedText: 'Auto source result',
+      sourceLanguage: 'auto',
+      mode: 'selection-manager'
+    })
+
+    emitSelection({
+      text: 'Auto me',
+      position: { x: 120, y: 180, width: 90, height: 18 },
+      context: { source: 'pdf-viewer', isPdf: true }
+    })
+    await flushPromises()
+
+    await wrapper.get('[data-testid="pdf-windows-host-translate"]').trigger('click')
+    await flushPromises()
+
+    expect(wrapper.find('[data-testid="pdf-windows-host-detected-language"]').exists()).toBe(false)
+  })
+
+  it('hides the detected language badge for unknown or invalid source language values', async () => {
+    sendRegularMessageMock.mockResolvedValueOnce({
+      success: true,
+      translatedText: 'Unknown source result',
+      sourceLanguage: 'xx-unknown',
+      mode: 'selection-manager'
+    })
+
+    emitSelection({
+      text: 'Unknown me',
+      position: { x: 120, y: 180, width: 90, height: 18 },
+      context: { source: 'pdf-viewer', isPdf: true }
+    })
+    await flushPromises()
+
+    await wrapper.get('[data-testid="pdf-windows-host-translate"]').trigger('click')
+    await flushPromises()
+
+    expect(wrapper.find('[data-testid="pdf-windows-host-detected-language"]').exists()).toBe(false)
+  })
+
   it('resets the original text toggle on a new selection', async () => {
     sendRegularMessageMock.mockResolvedValueOnce({
       success: true,
@@ -311,6 +400,7 @@ describe('PdfWindowsHost', () => {
     await flushPromises()
 
     expect(wrapper.find('.pdf-windows-host__source').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="pdf-windows-host-detected-language"]').exists()).toBe(false)
     expect(wrapper.get('[data-testid="pdf-windows-host-tts"]').attributes('data-text')).toBe('Second selection')
   })
 
@@ -470,6 +560,7 @@ describe('PdfWindowsHost', () => {
     sendRegularMessageMock.mockResolvedValueOnce({
       success: true,
       translatedText: 'Stale result',
+      sourceLanguage: 'en',
       mode: 'selection-manager'
     })
 
@@ -483,6 +574,7 @@ describe('PdfWindowsHost', () => {
     await wrapper.get('[data-testid="pdf-windows-host-translate"]').trigger('click')
     await flushPromises()
     expect(wrapper.find('[data-testid="pdf-windows-host-result"]').text()).toContain('Stale result')
+    expect(wrapper.get('[data-testid="pdf-windows-host-detected-language"]').text()).toBe('English')
 
     const providerSelector = wrapper.findComponent({ name: 'ProviderSelector' })
     providerSelector.vm.$emit('update:modelValue', 'deepl')
@@ -490,6 +582,7 @@ describe('PdfWindowsHost', () => {
 
     expect(wrapper.find('[data-testid="pdf-windows-host-result"]').exists()).toBe(false)
     expect(wrapper.find('[data-testid="pdf-windows-host-error"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="pdf-windows-host-detected-language"]').exists()).toBe(false)
     expect(wrapper.get('[data-testid="pdf-windows-host-provider-select"]').element.value).toBe('deepl')
     expect(sendRegularMessageMock).toHaveBeenCalledTimes(1)
   })
@@ -580,6 +673,36 @@ describe('PdfWindowsHost', () => {
       })
     }))
     expect(wrapper.find('[data-testid="pdf-windows-host-result"]').text()).toContain('Recovered result')
+  })
+
+  it('updates the detected language badge on retry using the latest response', async () => {
+    sendRegularMessageMock
+      .mockResolvedValueOnce({
+        success: false,
+        error: { message: 'Provider unavailable' }
+      })
+      .mockResolvedValueOnce({
+        success: true,
+        translatedText: 'Recovered result',
+        detectedSourceLanguage: 'fa'
+      })
+
+    emitSelection({
+      text: 'Retry badge',
+      position: { x: 120, y: 180, width: 90, height: 18 },
+      context: { source: 'pdf-viewer', isPdf: true }
+    })
+    await flushPromises()
+
+    await wrapper.get('[data-testid="pdf-windows-host-translate"]').trigger('click')
+    await flushPromises()
+
+    expect(wrapper.find('[data-testid="pdf-windows-host-detected-language"]').exists()).toBe(false)
+
+    await wrapper.get('[data-testid="pdf-windows-host-retry"]').trigger('click')
+    await flushPromises()
+
+    expect(wrapper.get('[data-testid="pdf-windows-host-detected-language"]').text()).toBe('Persian (Farsi)')
   })
 
   it('copies a normal markdown translation as cleaned plain text', async () => {
@@ -779,6 +902,15 @@ describe('PdfWindowsHost', () => {
     await wrapper.get('[data-testid="pdf-windows-host-toggle-original"]').trigger('click')
     await flushPromises()
     expect(wrapper.find('.pdf-windows-host__source').exists()).toBe(true)
+
+    sendRegularMessageMock.mockResolvedValueOnce({
+      success: true,
+      translatedText: 'Dismissed result',
+      sourceLanguage: 'en'
+    })
+    await wrapper.get('[data-testid="pdf-windows-host-translate"]').trigger('click')
+    await flushPromises()
+    expect(wrapper.get('[data-testid="pdf-windows-host-detected-language"]').text()).toBe('English')
 
     emitSelectionClear({
       context: { source: 'pdf-viewer', isPdf: true }

@@ -26,6 +26,13 @@
           {{ t('translateSelectedText') }}
         </span>
         <span
+          v-if="detectedLanguageName"
+          class="pdf-windows-host__detected-language"
+          data-testid="pdf-windows-host-detected-language"
+        >
+          {{ detectedLanguageName }}
+        </span>
+        <span
           v-if="copyStatus"
           class="pdf-windows-host__status"
           :class="`pdf-windows-host__status--${copyStatus}`"
@@ -61,7 +68,7 @@
             :allow-set-default="false"
             :only-configured="true"
             required-feature="translation"
-            @update:modelValue="handleProviderChange"
+            @update:model-value="handleProviderChange"
             @provider-change="handleProviderChange"
           />
         </div>
@@ -257,6 +264,7 @@ const {
   selectedProvider,
   isProviderReady,
   showOriginal,
+  detectedLanguageName,
   translationError,
   isTranslating,
   isCopying,

@@ -20,6 +20,7 @@ import { usePdfWindowDocking } from './usePdfWindowDocking.js'
 import { usePdfWindowDrag } from './usePdfWindowDrag.js'
 import { usePdfWindowPlacement } from './usePdfWindowPlacement.js'
 import { AUTO_DETECT_VALUE } from '@/shared/constants/core.js'
+import { getLanguageNameFromCode } from '@/shared/config/languageConstants.js'
 
 const logger = getScopedLogger(LOG_COMPONENTS.PDF, 'usePdfWindowsHost')
 const COPY_FEEDBACK_TIMEOUT_MS = 1200
@@ -71,6 +72,7 @@ export function usePdfWindowsHost(options = {}) {
   const selectedProvider = ref('')
   const isProviderReady = ref(false)
   const showOriginal = ref(false)
+  const detectedSourceLanguage = ref('')
   const translationMode = ref(TranslationMode.Selection)
   const selectionSessionId = ref(0)
   const hostStyle = ref({})
@@ -100,6 +102,25 @@ export function usePdfWindowsHost(options = {}) {
     translationMode.value === TranslationMode.Dictionary_Translation
     || translationMode.value === TranslationMode.LEGACY_DICTIONARY
   ))
+  const detectedLanguageName = computed(() => {
+    const code = detectedSourceLanguage.value
+    if (!code || code === AUTO_DETECT_VALUE) {
+      return ''
+    }
+
+    const name = getLanguageNameFromCode(code)
+    if (!name || name === AUTO_DETECT_VALUE) {
+      return ''
+    }
+
+    const normalizedCode = code.trim().toLowerCase()
+    const normalizedName = name.trim().toLowerCase()
+    if (!normalizedName || normalizedName === normalizedCode) {
+      return ''
+    }
+
+    return name.charAt(0).toUpperCase() + name.slice(1)
+  })
   const translatedDisplayHtml = computed(() => {
     if (!hasTranslatedResult.value) {
       return ''
@@ -179,6 +200,7 @@ export function usePdfWindowsHost(options = {}) {
     selectionPosition.value = null
     translatedText.value = ''
     translationError.value = ''
+    detectedSourceLanguage.value = ''
     isTranslating.value = false
     isCopying.value = false
     showOriginal.value = false
@@ -203,6 +225,7 @@ export function usePdfWindowsHost(options = {}) {
     activeRequestSessionId = 0
     translatedText.value = ''
     translationError.value = ''
+    detectedSourceLanguage.value = ''
     isTranslating.value = false
     translationMode.value = TranslationMode.Selection
     clearCopyFeedback()
@@ -325,6 +348,7 @@ export function usePdfWindowsHost(options = {}) {
     selectionPosition.value = position
     translatedText.value = ''
     translationError.value = ''
+    detectedSourceLanguage.value = ''
     isTranslating.value = false
     showOriginal.value = false
     translationMode.value = TranslationMode.Selection
@@ -391,6 +415,7 @@ export function usePdfWindowsHost(options = {}) {
     isTranslating.value = true
     translationError.value = ''
     translatedText.value = ''
+    detectedSourceLanguage.value = ''
     clearCopyFeedback()
 
     try {
@@ -417,6 +442,9 @@ export function usePdfWindowsHost(options = {}) {
       if (response?.success && typeof response.translatedText === 'string') {
         translatedText.value = response.translatedText
         translationError.value = ''
+        detectedSourceLanguage.value = normalizeDetectedSourceLanguage(
+          response?.detectedSourceLanguage ?? response?.sourceLanguage
+        )
         translationMode.value = response?.mode || response?.translationMode || TranslationMode.Selection
         isProviderReady.value = true
         return true
@@ -424,6 +452,7 @@ export function usePdfWindowsHost(options = {}) {
 
       translationError.value = response?.error?.message || response?.message || 'Translation failed'
       translatedText.value = ''
+      detectedSourceLanguage.value = ''
       return false
     } catch (error) {
       if (requestSessionId !== selectionSessionId.value || activeRequestSessionId !== requestSessionId) {
@@ -433,6 +462,7 @@ export function usePdfWindowsHost(options = {}) {
       logger.error('PDF selection translation failed:', error)
       translationError.value = error?.message || 'Translation failed'
       translatedText.value = ''
+      detectedSourceLanguage.value = ''
       translationMode.value = TranslationMode.Selection
       return false
     } finally {
@@ -441,6 +471,28 @@ export function usePdfWindowsHost(options = {}) {
         activeRequestSessionId = 0
       }
     }
+  }
+
+  function normalizeDetectedSourceLanguage(code) {
+    if (typeof code !== 'string') {
+      return ''
+    }
+
+    const normalizedCode = code.trim()
+    if (!normalizedCode || normalizedCode.toLowerCase() === AUTO_DETECT_VALUE) {
+      return ''
+    }
+
+    const languageName = getLanguageNameFromCode(normalizedCode)
+    if (!languageName || languageName.toLowerCase() === AUTO_DETECT_VALUE) {
+      return ''
+    }
+
+    if (languageName.trim().toLowerCase() === normalizedCode.toLowerCase()) {
+      return ''
+    }
+
+    return normalizedCode
   }
 
   async function retryTranslation() {
@@ -575,6 +627,8 @@ export function usePdfWindowsHost(options = {}) {
     selectedProvider,
     isProviderReady,
     showOriginal,
+    detectedSourceLanguage,
+    detectedLanguageName,
     translatedText,
     translationError,
     isTranslating,
