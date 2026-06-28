@@ -24,8 +24,11 @@ async function initializeApp() {
 
     setupBrowserAPIGlobals()
 
+    const { default: i18n } = await import('@/utils/i18n/plugin.js')
+
     const app = configureVueForCSP(createApp(PdfApp))
     app.use(pinia)
+    app.use(i18n)
     app.config.globalProperties.$isExtension = true
     app.config.globalProperties.$context = 'pdf'
 

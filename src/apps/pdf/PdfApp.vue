@@ -96,10 +96,10 @@
       </PdfDropzone>
 
       <section
-        v-if="error || exportError || ocrError || selectionTranslationError"
+        v-if="error || exportError || ocrError"
         class="pdf-app__error"
       >
-        {{ error || exportError || ocrError || selectionTranslationError }}
+        {{ error || exportError || ocrError }}
       </section>
     </main>
 
