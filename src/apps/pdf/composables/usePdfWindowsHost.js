@@ -103,6 +103,7 @@ export function usePdfWindowsHost(options = {}) {
   const selectionSessionId = ref(0)
   const hostStyle = ref({})
   const viewportTick = ref(0)
+  const isInternalHostInteraction = ref(false)
 
   const placement = usePdfWindowPlacement()
   const docking = usePdfWindowDocking({
@@ -115,6 +116,7 @@ export function usePdfWindowsHost(options = {}) {
   let activeRequestSessionId = 0
   let listenerId = 0
   let copyFeedbackTimeoutId = null
+  let internalHostInteractionResetTimerId = null
 
   const hasTranslatedResult = computed(() => !!translatedText.value)
   const hasError = computed(() => !!translationError.value)
@@ -214,6 +216,39 @@ export function usePdfWindowsHost(options = {}) {
     isIconTransitionPending.value = false
   }
 
+  function clearInternalHostInteraction() {
+    if (internalHostInteractionResetTimerId !== null) {
+      tracker.clearTimer(internalHostInteractionResetTimerId)
+      internalHostInteractionResetTimerId = null
+    }
+
+    isInternalHostInteraction.value = false
+  }
+
+  function markInternalHostInteraction() {
+    if (internalHostInteractionResetTimerId !== null) {
+      tracker.clearTimer(internalHostInteractionResetTimerId)
+      internalHostInteractionResetTimerId = null
+    }
+
+    isInternalHostInteraction.value = true
+  }
+
+  function scheduleInternalHostInteractionClear() {
+    if (!isInternalHostInteraction.value) {
+      return
+    }
+
+    if (internalHostInteractionResetTimerId !== null) {
+      tracker.clearTimer(internalHostInteractionResetTimerId)
+    }
+
+    internalHostInteractionResetTimerId = tracker.trackTimeout(() => {
+      isInternalHostInteraction.value = false
+      internalHostInteractionResetTimerId = null
+    }, 0)
+  }
+
   function handleIconPointerDown() {
     if (!isIconVisible.value) {
       return
@@ -247,6 +282,7 @@ export function usePdfWindowsHost(options = {}) {
     hideIconStage()
     hideWindowStage()
     clearIconTransitionPending()
+    clearInternalHostInteraction()
   }
 
   function toggleShowOriginal() {
@@ -429,6 +465,10 @@ export function usePdfWindowsHost(options = {}) {
     }
 
     if (isIconTransitionPending.value) {
+      return
+    }
+
+    if (isInternalHostInteraction.value) {
       return
     }
 
@@ -634,6 +674,22 @@ export function usePdfWindowsHost(options = {}) {
     }
   }
 
+  function handleHostPointerDown() {
+    if (!isVisible.value) {
+      return
+    }
+
+    markInternalHostInteraction()
+  }
+
+  function handleHostPointerUp() {
+    scheduleInternalHostInteractionClear()
+  }
+
+  function handleHostPointerCancel() {
+    clearInternalHostInteraction()
+  }
+
   const iconHostRef = ref(null)
 
   const drag = usePdfWindowDrag({
@@ -747,6 +803,9 @@ export function usePdfWindowsHost(options = {}) {
     dismissHost,
     openWindowFromIcon,
     handleIconPointerDown,
+    handleHostPointerDown,
+    handleHostPointerUp,
+    handleHostPointerCancel,
     toggleShowOriginal,
     handleProviderChange,
     handlePinToggle,

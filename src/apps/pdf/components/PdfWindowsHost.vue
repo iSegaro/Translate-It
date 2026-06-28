@@ -32,6 +32,12 @@
     :aria-label="t('pdf_windows_host_aria_label')"
     data-testid="pdf-windows-host"
     @click.stop
+    @pointerdown.capture="handleHostPointerDown"
+    @pointerup.capture="handleHostPointerUp"
+    @pointercancel.capture="handleHostPointerCancel"
+    @mousedown.capture="handleHostPointerDown"
+    @mouseup.capture="handleHostPointerUp"
+    @mouseleave.capture="handleHostPointerCancel"
   >
     <header
       class="pdf-windows-host__header"
@@ -74,9 +80,12 @@
         :show-tts-button="hasSpeakableText"
         :show-original-button="true"
         :show-close-button="true"
-        @pointerdown.stop
-        @mousedown.stop
-        @touchstart.stop
+        @pointerdown.stop="handleHostPointerDown"
+        @pointerup.stop="handleHostPointerUp"
+        @pointercancel.stop="handleHostPointerCancel"
+        @mousedown.stop="handleHostPointerDown"
+        @mouseup.stop="handleHostPointerUp"
+        @touchstart.stop="handleHostPointerDown"
         @provider-change="handleProviderChange"
         @toggle-pin="handlePinToggle"
         @copy="copyTranslation"
@@ -85,7 +94,14 @@
       />
     </header>
 
-    <div class="pdf-windows-host__body">
+    <div
+      class="pdf-windows-host__body"
+      @pointerdown="handleHostPointerDown"
+      @pointerup="handleHostPointerUp"
+      @pointercancel="handleHostPointerCancel"
+      @mousedown="handleHostPointerDown"
+      @mouseup="handleHostPointerUp"
+    >
       <div
         v-if="showOriginal"
         class="pdf-windows-host__source"
@@ -252,6 +268,9 @@ const {
   openWindowFromIcon,
   toggleShowOriginal,
   handleIconPointerDown,
+  handleHostPointerDown,
+  handleHostPointerUp,
+  handleHostPointerCancel,
   handleProviderChange,
   handlePinToggle,
   handleDockResize,

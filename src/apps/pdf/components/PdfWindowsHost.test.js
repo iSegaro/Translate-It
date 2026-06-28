@@ -1200,6 +1200,39 @@ describe('PdfWindowsHost', () => {
     expect(wrapper.find('[data-testid="pdf-windows-host"]').exists()).toBe(false)
   })
 
+  it('keeps the unpinned window open for internal toolbar and body interactions until the close button is used', async () => {
+    await showSelectionIcon('Internal interaction')
+    await openWindowFromSelectionIcon(wrapper)
+
+    const internalSelectors = [
+      '[data-testid="translation-window-toolbar"]',
+      '.pdf-windows-host__body',
+      '[data-testid="translation-window-toolbar-provider-select"]',
+      '[data-testid="translation-window-toolbar-copy"]',
+      '[data-testid="translation-window-toolbar-tts"]',
+      '[data-testid="translation-window-toolbar-original"]'
+    ]
+
+    for (const selector of internalSelectors) {
+      const target = wrapper.get(selector)
+      await target.trigger('pointerdown')
+      emitSelectionClear({
+        context: { source: 'pdf-viewer', isPdf: true }
+      })
+      await flushPromises()
+
+      expect(wrapper.find('[data-testid="pdf-windows-host"]').exists()).toBe(true)
+
+      await target.trigger('pointerup')
+      await flushPromises()
+    }
+
+    await wrapper.get('[data-testid="translation-window-toolbar-close"]').trigger('click')
+    await flushPromises()
+
+    expect(wrapper.find('[data-testid="pdf-windows-host"]').exists()).toBe(false)
+  })
+
   it('cleans up all listeners on unmount and does not import the WindowsManager stack', async () => {
     expect(windowsManagerImported).toBe(false)
 
