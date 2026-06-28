@@ -1257,7 +1257,7 @@ describe('PdfWindowsHost', () => {
     expect(wrapper.get('[data-testid="translation-window-footer-detected-language"]').text()).toBe('Persian (Farsi)')
   })
 
-  it('drags the floating window and restores persisted positions by fingerprint and global fallback', async () => {
+  it('drags the floating window and persists positions by fingerprint and global fallback', async () => {
     await showSelectionIcon('Drag me')
     await openWindowFromSelectionIcon(wrapper)
 
@@ -1287,9 +1287,8 @@ describe('PdfWindowsHost', () => {
     expect(fingerprintRestored.find('[data-testid="pdf-windows-host-icon-stage"]').exists()).toBe(true)
 
     await openWindowFromSelectionIcon(fingerprintRestored)
-
-    expect(fingerprintRestored.get('[data-testid="pdf-windows-host"]').element.style.left).toBe(`${globalThis.__pdfWindowsHostStorageState.pdfWindowsHostLayout.documents['pdf-doc-1'].position.x}px`)
-    expect(fingerprintRestored.get('[data-testid="pdf-windows-host"]').element.style.top).toBe(`${globalThis.__pdfWindowsHostStorageState.pdfWindowsHostLayout.documents['pdf-doc-1'].position.y}px`)
+    expect(globalThis.__pdfWindowsHostStorageState.pdfWindowsHostLayout.documents['pdf-doc-1']).toBeDefined()
+    expect(globalThis.__pdfWindowsHostStorageState.pdfWindowsHostLayout.global.defaultPosition).toEqual({ x: 88, y: 96 })
 
     fingerprintRestored.unmount()
 
@@ -1302,11 +1301,35 @@ describe('PdfWindowsHost', () => {
     expect(globalFallback.find('[data-testid="pdf-windows-host-icon-stage"]').exists()).toBe(true)
 
     await openWindowFromSelectionIcon(globalFallback)
-
-    expect(globalFallback.get('[data-testid="pdf-windows-host"]').element.style.left).toBe('88px')
-    expect(globalFallback.get('[data-testid="pdf-windows-host"]').element.style.top).toBe('96px')
+    expect(globalThis.__pdfWindowsHostStorageState.pdfWindowsHostLayout.global.defaultPosition).toEqual({ x: 88, y: 96 })
 
     globalFallback.unmount()
+  })
+
+  it('anchors a fresh icon-click open to the current selection instead of a previously persisted floating position', async () => {
+    await showSelectionIcon('Persist anchor me')
+    await openWindowFromSelectionIcon(wrapper)
+
+    const header = wrapper.get('.pdf-windows-host__header')
+    dispatchPointerEvent(header.element, 'pointerdown', { clientX: 180, clientY: 210 })
+    dispatchPointerEvent(document, 'pointermove', { clientX: 320, clientY: 280 })
+    dispatchPointerEvent(document, 'pointerup', { clientX: 320, clientY: 280 })
+    await flushPromises()
+
+    const persistedLeft = wrapper.get('[data-testid="pdf-windows-host"]').element.style.left
+    const persistedTop = wrapper.get('[data-testid="pdf-windows-host"]').element.style.top
+
+    await wrapper.get('[data-testid="translation-window-toolbar-close"]').trigger('click')
+    await flushPromises()
+
+    await showSelectionIcon('Fresh icon anchor', { x: 24, y: 28, width: 96, height: 18 })
+    expect(wrapper.find('[data-testid="pdf-windows-host-icon-stage"]').exists()).toBe(true)
+
+    await openWindowFromSelectionIcon(wrapper)
+    await flushPromises()
+
+    expect(wrapper.get('[data-testid="pdf-windows-host"]').element.style.left).not.toBe(persistedLeft)
+    expect(wrapper.get('[data-testid="pdf-windows-host"]').element.style.top).not.toBe(persistedTop)
   })
 
   it('ignores stale results after a newer PDF selection arrives', async () => {

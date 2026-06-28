@@ -327,10 +327,13 @@ export function usePdfWindowsHost(options = {}) {
     placement.setSelectionPosition(position, { followSelection: true })
   }
 
-  async function showWindowForSelection(position, { translateImmediately = false } = {}) {
+  async function showWindowForSelection(position, { translateImmediately = false, anchorToSelection = false } = {}) {
     hideIconStage()
     clearWindowContent()
     isVisible.value = true
+    if (anchorToSelection) {
+      placement.resetManualPosition()
+    }
     placement.setSelectionPosition(position, {
       followSelection: !placement.manualPosition.value
     })
@@ -349,7 +352,10 @@ export function usePdfWindowsHost(options = {}) {
     isIconTransitionPending.value = true
 
     try {
-      await showWindowForSelection(selectionPosition.value, { translateImmediately: true })
+      await showWindowForSelection(selectionPosition.value, {
+        translateImmediately: true,
+        anchorToSelection: true
+      })
       return true
     } finally {
       clearIconTransitionPending()
