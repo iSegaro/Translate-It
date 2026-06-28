@@ -234,6 +234,11 @@ export function usePdfWindowsHost(options = {}) {
     isInternalHostInteraction.value = true
   }
 
+  function markDropdownInteraction() {
+    markInternalHostInteraction()
+    scheduleInternalHostInteractionClear()
+  }
+
   function scheduleInternalHostInteractionClear() {
     if (!isInternalHostInteraction.value) {
       return
@@ -295,6 +300,7 @@ export function usePdfWindowsHost(options = {}) {
       return
     }
 
+    markDropdownInteraction()
     selectedProvider.value = normalizedProvider
     selectionSessionId.value += 1
     activeRequestSessionId = 0
@@ -653,8 +659,23 @@ export function usePdfWindowsHost(options = {}) {
     const root = hostRef.value
     const iconRoot = iconHostRef.value
     const isInsideIcon = iconRoot && iconRoot.contains(event.target)
+    const path = typeof event?.composedPath === 'function' ? event.composedPath() : []
+    const isProviderDropdownInteraction = path.some((node) => {
+      if (!(node instanceof HTMLElement)) {
+        return false
+      }
 
-    if ((root && root.contains(event.target)) || isInsideIcon) {
+      return node.classList.contains('ti-provider-dropdown-menu')
+        || node.classList.contains('ti-provider-dropdown-list')
+        || node.classList.contains('ti-dropdown-item')
+        || node.classList.contains('ti-set-default-btn')
+    })
+
+    if ((root && root.contains(event.target)) || isInsideIcon || isProviderDropdownInteraction) {
+      if (isProviderDropdownInteraction) {
+        markDropdownInteraction()
+      }
+
       return
     }
 

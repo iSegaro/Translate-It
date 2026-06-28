@@ -857,6 +857,63 @@ describe('PdfWindowsHost', () => {
     expect(wrapper.get('[data-testid="translation-window-footer-target-language"]').text()).toBe('Persian (Farsi)')
   })
 
+  it('keeps the window open for teleported provider dropdown interactions and retriggers translation', async () => {
+    sendRegularMessageMock
+      .mockResolvedValueOnce({
+        success: true,
+        translatedText: 'Dropdown initial result',
+        sourceLanguage: 'en',
+        mode: 'selection-manager'
+      })
+      .mockImplementationOnce(() => new Promise((resolve) => {
+        sendRegularMessageMock.__resolveDropdownProviderChange = resolve
+      }))
+
+    await showSelectionIcon('Dropdown provider selection')
+    await openWindowFromSelectionIcon(wrapper)
+    await flushPromises()
+
+    const dropdownMenu = document.createElement('div')
+    dropdownMenu.className = 'ti-provider-dropdown-menu'
+    const dropdownList = document.createElement('div')
+    dropdownList.className = 'ti-provider-dropdown-list'
+    const dropdownItem = document.createElement('button')
+    dropdownItem.type = 'button'
+    dropdownItem.className = 'ti-dropdown-item'
+    dropdownList.appendChild(dropdownItem)
+    dropdownMenu.appendChild(dropdownList)
+    document.body.appendChild(dropdownMenu)
+
+    dropdownItem.dispatchEvent(new MouseEvent('pointerdown', {
+      bubbles: true,
+      cancelable: true
+    }))
+    await flushPromises()
+
+    expect(wrapper.find('[data-testid="pdf-windows-host"]').exists()).toBe(true)
+
+    const providerSelector = wrapper.findComponent({ name: 'ProviderSelector' })
+    providerSelector.vm.$emit('provider-change', 'deepl')
+    await flushPromises()
+
+    expect(wrapper.find('[data-testid="pdf-windows-host"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="pdf-windows-host-loading"]').exists()).toBe(true)
+    expect(sendRegularMessageMock).toHaveBeenCalledTimes(2)
+
+    sendRegularMessageMock.__resolveDropdownProviderChange({
+      success: true,
+      translatedText: 'Dropdown provider updated',
+      sourceLanguage: 'fa',
+      mode: 'selection-manager'
+    })
+    await flushPromises()
+
+    expect(wrapper.find('[data-testid="pdf-windows-host-result"]').text()).toContain('Dropdown provider updated')
+    expect(wrapper.get('[data-testid="translation-window-toolbar-detected-language"]').text()).toBe('Persian (Farsi)')
+
+    document.body.removeChild(dropdownMenu)
+  })
+
   it('keeps plain text output readable through SafeMarkdownPreview', async () => {
     sendRegularMessageMock.mockResolvedValueOnce({
       success: true,

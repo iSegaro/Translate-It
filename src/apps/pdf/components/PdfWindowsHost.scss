@@ -150,13 +150,23 @@
 }
 
 .pdf-windows-host__translation {
-  color: #f8fafc;
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 10px;
-  padding: 10px;
+  color: inherit;
+  background: transparent;
+  border: none;
+  border-radius: 0;
+  padding: 0;
   max-height: 150px;
   overflow: auto;
+}
+
+.pdf-windows-host__translation.ti-translation-display.theme-dark,
+.pdf-windows-host__translation.ti-translation-display.is-dark {
+  background-color: transparent !important;
+  border-color: transparent !important;
+}
+
+.pdf-windows-host__translation.ti-translation-display .ti-translation-content {
+  background: transparent !important;
 }
 
 .pdf-windows-host__translation--markdown,
