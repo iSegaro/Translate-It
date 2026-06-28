@@ -1076,6 +1076,31 @@ describe('PdfWindowsHost', () => {
     expect(wrapper.find('[data-testid="pdf-windows-host"]').exists()).toBe(false)
   })
 
+  it('shows the icon first when the window is pinned but currently closed', async () => {
+    await showSelectionIcon('Pinned closed')
+    await openWindowFromSelectionIcon(wrapper)
+
+    await wrapper.get('[data-testid="translation-window-toolbar-pin"]').trigger('click')
+    await flushPromises()
+
+    await wrapper.get('[data-testid="translation-window-toolbar-close"]').trigger('click')
+    await flushPromises()
+
+    sendRegularMessageMock.mockClear()
+
+    await showSelectionIcon('Pinned closed again', { x: 140, y: 200, width: 90, height: 18 })
+
+    expect(wrapper.find('[data-testid="pdf-windows-host-icon-stage"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="pdf-windows-host"]').exists()).toBe(false)
+    expect(sendRegularMessageMock).not.toHaveBeenCalled()
+
+    await openWindowFromSelectionIcon(wrapper)
+    await flushPromises()
+
+    expect(wrapper.find('[data-testid="pdf-windows-host"]').exists()).toBe(true)
+    expect(sendRegularMessageMock).toHaveBeenCalledTimes(1)
+  })
+
   it('docks by dragging near viewport edges and clamps dock resize width', async () => {
     await showSelectionIcon('Dock me')
     await openWindowFromSelectionIcon(wrapper)

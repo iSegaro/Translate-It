@@ -318,7 +318,7 @@ export function usePdfWindowsHost(options = {}) {
   }
 
   function shouldTranslateDirectlyOnSelection() {
-    return docking.isDocked.value || (isVisible.value && docking.isPinned.value)
+    return isVisible.value && (docking.isDocked.value || docking.isPinned.value)
   }
 
   function showIconForSelection(position) {
