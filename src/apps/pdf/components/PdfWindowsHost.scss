@@ -3,17 +3,15 @@
   z-index: 2147483647;
   display: flex;
   flex-direction: column;
-  gap: 12px;
-  padding: 14px 16px;
-  border: 1px solid rgba(124, 139, 255, 0.26);
-  border-radius: 16px;
-  background:
-    linear-gradient(180deg, rgba(16, 19, 26, 0.96) 0%, rgba(10, 13, 20, 0.98) 100%);
-  color: #e6edf7;
-  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.38);
-  backdrop-filter: blur(14px);
+  gap: 10px;
+  padding: 12px 12px 10px;
+  border: 1px solid #424242;
+  border-radius: 14px;
+  background: #2d2d2d;
+  color: #e0e0e0;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
   transform: none;
-  max-width: min(420px, calc(100vw - 24px));
+  max-width: min(350px, 85vw);
   pointer-events: auto;
   box-sizing: border-box;
 }
@@ -41,10 +39,15 @@
 
 .pdf-windows-host__header {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   justify-content: space-between;
-  gap: 16px;
+  gap: 12px;
   cursor: grab;
+  padding: 8px 10px;
+  margin: -12px -12px 0;
+  border-bottom: 1px solid #424242;
+  background: #333333;
+  border-radius: 14px 14px 0 0;
 }
 
 .pdf-windows-host--dragging .pdf-windows-host__header {
@@ -55,29 +58,35 @@
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
 }
 
 .pdf-windows-host__title {
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 700;
   letter-spacing: 0.02em;
-  color: rgba(230, 237, 247, 0.92);
+  color: rgba(230, 237, 247, 0.9);
 }
 
 .pdf-windows-host__detected-language {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-height: 20px;
+  min-height: 18px;
+  max-width: 80px;
   padding: 2px 8px;
-  border-radius: 999px;
-  font-size: 11px;
+  border-radius: 10px;
+  font-size: 10px;
   font-weight: 600;
-  letter-spacing: 0.01em;
-  color: #dbe4ff;
-  background: rgba(107, 124, 255, 0.16);
-  border: 1px solid rgba(107, 124, 255, 0.26);
+  letter-spacing: 0;
+  color: #e8eaed;
+  background: #3c4043;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  pointer-events: none;
+  user-select: none;
 }
 
 .pdf-windows-host__header-actions {
@@ -90,9 +99,9 @@
 .pdf-windows-host__provider-switcher {
   display: flex;
   align-items: center;
-  flex: 0 1 180px;
-  min-width: 160px;
-  max-width: 220px;
+  flex: 0 1 150px;
+  min-width: 140px;
+  max-width: 180px;
 }
 
 .pdf-windows-host__provider-switcher .ti-provider-compact-container {
@@ -101,35 +110,38 @@
 
 .pdf-windows-host__provider-switcher .ti-provider-select {
   width: 100%;
-  min-width: 160px;
+  min-width: 140px;
 }
 
 .pdf-windows-host__status {
-  font-size: 11px;
+  font-size: 10px;
   font-weight: 600;
-  padding: 3px 8px;
-  border-radius: 999px;
+  padding: 2px 8px;
+  border-radius: 10px;
+  line-height: 1.2;
 }
 
 .pdf-windows-host__status--copied {
-  background: rgba(34, 197, 94, 0.14);
-  color: #86efac;
+  background: #2e4a3c;
+  color: #b7f7ce;
 }
 
 .pdf-windows-host__status--failed {
-  background: rgba(239, 68, 68, 0.16);
-  color: #fca5a5;
+  background: #4a2f35;
+  color: #f6b7c1;
 }
 
 .pdf-windows-host__action-button,
 .pdf-windows-host__icon-button {
   appearance: none;
   border: 0;
-  background: rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.06);
   color: rgba(230, 237, 247, 0.84);
-  border-radius: 10px;
-  padding: 8px 10px;
-  font-size: 12px;
+  border-radius: 6px;
+  padding: 0;
+  width: 28px;
+  height: 28px;
+  font-size: 11px;
   line-height: 1;
   cursor: pointer;
   transition: transform 0.15s ease, background 0.15s ease, color 0.15s ease;
@@ -138,7 +150,7 @@
 .pdf-windows-host__action-button:hover,
 .pdf-windows-host__icon-button:hover {
   transform: translateY(-1px);
-  background: rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.1);
   color: #ffffff;
 }
 
@@ -149,50 +161,60 @@
 
 .pdf-windows-host__action-button--pin {
   min-width: 92px;
+  width: auto;
+  padding: 0 10px;
 }
 
 .pdf-windows-host__action-button--original {
   min-width: 38px;
 }
 
+.pdf-windows-host__action-button--dock {
+  min-width: 0;
+  width: auto;
+  padding: 0 8px;
+  font-size: 10px;
+  opacity: 0.82;
+}
+
 .pdf-windows-host__icon-button {
   font-size: 20px;
-  padding: 7px 10px;
+  padding: 0;
 }
 
 .pdf-windows-host__body {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 10px;
   min-width: 0;
 }
 
 .pdf-windows-host__source {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 5px;
 }
 
 .pdf-windows-host__label {
-  font-size: 11px;
+  font-size: 10px;
   font-weight: 700;
   color: rgba(230, 237, 247, 0.58);
   text-transform: uppercase;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.06em;
 }
 
 .pdf-windows-host__text,
 .pdf-windows-host__translation,
 .pdf-windows-host__state {
-  font-size: 14px;
-  line-height: 1.55;
+  font-size: 13px;
+  line-height: 1.45;
   white-space: pre-wrap;
   word-break: break-word;
 }
 
 .pdf-windows-host__text--source {
   color: rgba(230, 237, 247, 0.86);
-  max-height: 96px;
+  max-height: 90px;
   overflow: auto;
   padding-right: 4px;
 }
@@ -210,19 +232,19 @@
 
 .pdf-windows-host__state--error {
   color: #fda4af;
-  background: rgba(239, 68, 68, 0.1);
-  border: 1px solid rgba(239, 68, 68, 0.16);
-  border-radius: 12px;
-  padding: 10px 12px;
+  background: rgba(239, 68, 68, 0.08);
+  border: 1px solid rgba(239, 68, 68, 0.14);
+  border-radius: 10px;
+  padding: 9px 10px;
 }
 
 .pdf-windows-host__translation {
   color: #f8fafc;
   background: rgba(255, 255, 255, 0.04);
   border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 12px;
-  padding: 12px;
-  max-height: 160px;
+  border-radius: 10px;
+  padding: 10px;
+  max-height: 150px;
   overflow: auto;
 }
 

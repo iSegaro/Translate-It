@@ -26,13 +26,6 @@
           {{ t('translateSelectedText') }}
         </span>
         <span
-          v-if="detectedLanguageName"
-          class="pdf-windows-host__detected-language"
-          data-testid="pdf-windows-host-detected-language"
-        >
-          {{ detectedLanguageName }}
-        </span>
-        <span
           v-if="copyStatus"
           class="pdf-windows-host__status"
           :class="`pdf-windows-host__status--${copyStatus}`"
@@ -73,6 +66,14 @@
           />
         </div>
 
+        <span
+          v-if="detectedLanguageName"
+          class="pdf-windows-host__detected-language"
+          data-testid="pdf-windows-host-detected-language"
+        >
+          {{ detectedLanguageName }}
+        </span>
+
         <button
           class="pdf-windows-host__action-button pdf-windows-host__action-button--original"
           type="button"
@@ -97,7 +98,7 @@
         </button>
 
         <button
-          class="pdf-windows-host__action-button"
+          class="pdf-windows-host__action-button pdf-windows-host__action-button--dock"
           type="button"
           :class="{ 'is-active': dockMode === 'left' }"
           :title="dockMode === 'left' ? t('pdf_windows_host_undock') : t('pdf_windows_host_dock_left')"
@@ -110,7 +111,7 @@
         </button>
 
         <button
-          class="pdf-windows-host__action-button"
+          class="pdf-windows-host__action-button pdf-windows-host__action-button--dock"
           type="button"
           :class="{ 'is-active': dockMode === 'right' }"
           :title="dockMode === 'right' ? t('pdf_windows_host_undock') : t('pdf_windows_host_dock_right')"
