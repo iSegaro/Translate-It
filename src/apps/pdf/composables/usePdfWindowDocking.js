@@ -1,5 +1,5 @@
 import { computed, ref } from 'vue'
-import { clampPdfDockedWidth, PDF_WINDOW_LAYOUT } from './usePdfWindowPlacement.js'
+import { clampPdfDockedWidth, PDF_WINDOW_LAYOUT } from '@/apps/pdf/utils/pdfWindowGeometry.js'
 
 function normalizeDockMode(mode) {
   if (mode === 'left' || mode === 'right') return mode

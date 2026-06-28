@@ -1,5 +1,9 @@
 import { ref } from 'vue'
-import { clampPdfWindowPosition, getViewportSize, PDF_WINDOW_LAYOUT } from './usePdfWindowPlacement.js'
+import {
+  clampPdfWindowPosition,
+  getViewportSize,
+  PDF_WINDOW_LAYOUT
+} from '@/apps/pdf/utils/pdfWindowGeometry.js'
 
 function getPointerCoordinates(event) {
   return {

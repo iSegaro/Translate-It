@@ -1,7 +1,7 @@
 import { storageCore } from '@/shared/storage/core/StorageCore.js'
 import { getScopedLogger } from '@/shared/logging/logger.js'
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js'
-import { PDF_WINDOW_LAYOUT } from './usePdfWindowPlacement.js'
+import { PDF_WINDOW_LAYOUT } from '@/apps/pdf/utils/pdfWindowGeometry.js'
 
 const logger = getScopedLogger(LOG_COMPONENTS.PDF, 'usePdfWindowPersistence')
 export const PDF_WINDOWS_HOST_STORAGE_KEY = 'pdfWindowsHostLayout'
