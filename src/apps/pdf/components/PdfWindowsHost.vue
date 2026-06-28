@@ -48,6 +48,24 @@
           {{ isPinned ? t('window_unpin') : t('window_pin') }}
         </button>
 
+        <div
+          v-if="isProviderReady"
+          class="pdf-windows-host__provider-switcher"
+          data-testid="pdf-windows-host-provider-switcher"
+        >
+          <ProviderSelector
+            mode="compact"
+            :model-value="selectedProvider"
+            :is-global="false"
+            :allow-default="false"
+            :allow-set-default="false"
+            :only-configured="true"
+            required-feature="translation"
+            @update:modelValue="handleProviderChange"
+            @provider-change="handleProviderChange"
+          />
+        </div>
+
         <button
           class="pdf-windows-host__action-button"
           type="button"
@@ -190,6 +208,7 @@
 import { toRef } from 'vue'
 import { useUnifiedI18n } from '@/composables/shared/useUnifiedI18n.js'
 import { usePdfWindowsHost } from '../composables/usePdfWindowsHost.js'
+import ProviderSelector from '@/components/shared/ProviderSelector.vue'
 import TTSButton from '@/components/shared/TTSButton.vue'
 import SafeMarkdownPreview from '@/components/shared/SafeMarkdownPreview.vue'
 import './PdfWindowsHost.scss'
@@ -209,6 +228,8 @@ const {
   hostStyle,
   isVisible,
   selectedText,
+  selectedProvider,
+  isProviderReady,
   translationError,
   isTranslating,
   isCopying,
@@ -229,6 +250,7 @@ const {
   retryTranslation,
   copyTranslation,
   dismissHost,
+  handleProviderChange,
   handlePinToggle,
   handleDockLeft,
   handleDockRight,

@@ -68,6 +68,8 @@ export function usePdfWindowsHost(options = {}) {
   const isTranslating = ref(false)
   const isCopying = ref(false)
   const copyStatus = ref('')
+  const selectedProvider = ref('')
+  const isProviderReady = ref(false)
   const translationMode = ref(TranslationMode.Selection)
   const selectionSessionId = ref(0)
   const hostStyle = ref({})
@@ -119,6 +121,17 @@ export function usePdfWindowsHost(options = {}) {
     copyStatus.value = ''
   }
 
+  async function hydrateSelectedProvider() {
+    const provider = await getEffectiveProviderAsync(TranslationMode.PDF)
+
+    if (!selectedProvider.value && provider) {
+      selectedProvider.value = provider
+    }
+
+    isProviderReady.value = true
+    return selectedProvider.value || provider
+  }
+
   function setCopyStatus(status) {
     copyStatus.value = status
 
@@ -167,6 +180,22 @@ export function usePdfWindowsHost(options = {}) {
     clearCopyFeedback()
     hostStyle.value = {}
     activeRequestSessionId = 0
+  }
+
+  function handleProviderChange(nextProvider) {
+    const normalizedProvider = typeof nextProvider === 'string' ? nextProvider.trim() : ''
+    if (!normalizedProvider || normalizedProvider === selectedProvider.value) {
+      return
+    }
+
+    selectedProvider.value = normalizedProvider
+    selectionSessionId.value += 1
+    activeRequestSessionId = 0
+    translatedText.value = ''
+    translationError.value = ''
+    isTranslating.value = false
+    translationMode.value = TranslationMode.Selection
+    clearCopyFeedback()
   }
 
   async function persistGlobalPreferences() {
@@ -336,10 +365,14 @@ export function usePdfWindowsHost(options = {}) {
     }
 
     const [provider, sourceLanguage, targetLanguage] = await Promise.all([
-      getEffectiveProviderAsync(TranslationMode.PDF),
+      selectedProvider.value ? Promise.resolve(selectedProvider.value) : getEffectiveProviderAsync(TranslationMode.PDF),
       getSourceLanguageAsync(),
       getTargetLanguageAsync()
     ])
+
+    if (!selectedProvider.value && provider) {
+      selectedProvider.value = provider
+    }
 
     const requestSessionId = selectionSessionId.value
     activeRequestSessionId = requestSessionId
@@ -374,6 +407,7 @@ export function usePdfWindowsHost(options = {}) {
         translatedText.value = response.translatedText
         translationError.value = ''
         translationMode.value = response?.mode || response?.translationMode || TranslationMode.Selection
+        isProviderReady.value = true
         return true
       }
 
@@ -486,6 +520,7 @@ export function usePdfWindowsHost(options = {}) {
 
       dismissHost()
       await hydrateLayoutState()
+      await hydrateSelectedProvider()
     },
     { immediate: true }
   )
@@ -526,6 +561,8 @@ export function usePdfWindowsHost(options = {}) {
     hostStyle,
     isVisible,
     selectedText,
+    selectedProvider,
+    isProviderReady,
     translatedText,
     translationError,
     isTranslating,
@@ -548,6 +585,7 @@ export function usePdfWindowsHost(options = {}) {
     retryTranslation,
     copyTranslation,
     dismissHost,
+    handleProviderChange,
     handlePinToggle,
     handleDockLeft,
     handleDockRight,

@@ -6,6 +6,13 @@ import path from 'node:path'
 const eventHandlers = {}
 const unsubscribeMocks = []
 let windowsManagerImported = false
+const storageSetMock = vi.fn(async (data) => {
+  globalThis.__pdfWindowsHostStorageState = {
+    ...(globalThis.__pdfWindowsHostStorageState || {}),
+    ...data
+  }
+  return true
+})
 
 const sendRegularMessageMock = vi.fn()
 
@@ -33,13 +40,7 @@ vi.mock('@/shared/storage/core/StorageCore.js', () => ({
 
       return { ...state }
     }),
-    set: vi.fn(async (data) => {
-      globalThis.__pdfWindowsHostStorageState = {
-        ...(globalThis.__pdfWindowsHostStorageState || {}),
-        ...data
-      }
-      return true
-    }),
+    set: storageSetMock,
     on: vi.fn(),
     off: vi.fn()
   }
@@ -88,6 +89,34 @@ vi.mock('@/components/shared/TTSButton.vue', () => ({
     name: 'TTSButton',
     props: ['text', 'language', 'disabled', 'isDictionary'],
     template: '<button data-testid="pdf-windows-host-tts" :data-text="text" :data-dictionary="isDictionary" :disabled="disabled">{{ text }}</button>'
+  }
+}))
+
+vi.mock('@/components/shared/ProviderSelector.vue', () => ({
+  default: {
+    name: 'ProviderSelector',
+    props: ['modelValue', 'mode', 'isGlobal', 'allowDefault', 'allowSetDefault', 'onlyConfigured', 'requiredFeature', 'disabled'],
+    emits: ['update:modelValue', 'provider-change'],
+    template: `
+      <div
+        data-testid="pdf-windows-host-provider-selector"
+        :data-mode="mode"
+        :data-is-global="isGlobal"
+        :data-only-configured="onlyConfigured"
+        :data-required-feature="requiredFeature"
+      >
+        <select
+          data-testid="pdf-windows-host-provider-select"
+          :value="modelValue"
+          :disabled="disabled"
+          @change="$emit('update:modelValue', $event.target.value)"
+        >
+          <option value="googlev2">googlev2</option>
+          <option value="deepl">deepl</option>
+          <option value="openai">openai</option>
+        </select>
+      </div>
+    `
   }
 }))
 
@@ -142,6 +171,7 @@ describe('PdfWindowsHost', () => {
     sendRegularMessageMock.mockResolvedValue({ success: true, translatedText: 'Translated text' })
     getEffectiveProviderAsyncMock.mockClear()
     getTargetLanguageAsyncMock.mockClear()
+    storageSetMock.mockClear()
 
     Object.keys(eventHandlers).forEach((key) => {
       delete eventHandlers[key]
@@ -213,6 +243,67 @@ describe('PdfWindowsHost', () => {
     expect(ttsButton.attributes('data-text')).toBe('Speak me')
   })
 
+  it('initializes the local provider switcher from PDF provider resolution', async () => {
+    wrapper.unmount()
+    wrapper = null
+    getEffectiveProviderAsyncMock.mockClear()
+    getEffectiveProviderAsyncMock.mockResolvedValueOnce('deepl')
+
+    wrapper = mount(PdfWindowsHost, {
+      props: {
+        pdfFingerprint: 'pdf-doc-1'
+      },
+      attachTo: document.body
+    })
+    emitSelection({
+      text: 'Initial provider',
+      position: { x: 120, y: 180, width: 90, height: 18 },
+      context: { source: 'pdf-viewer', isPdf: true }
+    })
+    await flushPromises()
+    await flushPromises()
+
+    expect(getEffectiveProviderAsyncMock).toHaveBeenCalledWith('pdf-translation')
+    expect(wrapper.get('[data-testid="pdf-windows-host-provider-selector"]').attributes('data-mode')).toBe('compact')
+    expect(wrapper.get('[data-testid="pdf-windows-host-provider-selector"]').attributes('data-is-global')).toBe('false')
+    expect(wrapper.get('[data-testid="pdf-windows-host-provider-select"]').element.value).toBe('deepl')
+  })
+
+  it('updates only the local provider selection and does not auto-translate', async () => {
+    emitSelection({
+      text: 'Provider switch',
+      position: { x: 120, y: 180, width: 90, height: 18 },
+      context: { source: 'pdf-viewer', isPdf: true }
+    })
+    await flushPromises()
+
+    const providerSelect = wrapper.get('[data-testid="pdf-windows-host-provider-select"]')
+    await providerSelect.setValue('deepl')
+    await flushPromises()
+
+    expect(providerSelect.element.value).toBe('deepl')
+    expect(sendRegularMessageMock).not.toHaveBeenCalled()
+    expect(storageSetMock).not.toHaveBeenCalled()
+    expect(globalThis.__pdfWindowsHostStorageState.pdfWindowsHostLayout).toBeDefined()
+  })
+
+  it('handles provider-change events with the same local-only handler', async () => {
+    emitSelection({
+      text: 'Provider contract',
+      position: { x: 120, y: 180, width: 90, height: 18 },
+      context: { source: 'pdf-viewer', isPdf: true }
+    })
+    await flushPromises()
+
+    const providerSelector = wrapper.findComponent({ name: 'ProviderSelector' })
+    providerSelector.vm.$emit('provider-change', 'openai')
+    await flushPromises()
+
+    expect(wrapper.get('[data-testid="pdf-windows-host-provider-select"]').element.value).toBe('openai')
+    expect(sendRegularMessageMock).not.toHaveBeenCalled()
+    expect(storageSetMock).not.toHaveBeenCalled()
+  })
+
   it('renders normal markdown translation results through SafeMarkdownPreview and cleans copy/TTS input', async () => {
     sendRegularMessageMock.mockResolvedValueOnce({
       success: true,
@@ -258,6 +349,78 @@ describe('PdfWindowsHost', () => {
     await flushPromises()
 
     expect(clipboardWriteTextMock).toHaveBeenCalledWith('Normal bold text')
+  })
+
+  it('uses the currently selected local provider for the next translation and retry actions', async () => {
+    sendRegularMessageMock.mockResolvedValue({
+      success: true,
+      translatedText: 'Translated with local provider',
+      mode: 'selection-manager'
+    })
+
+    emitSelection({
+      text: 'Provider selected text',
+      position: { x: 120, y: 180, width: 90, height: 18 },
+      context: { source: 'pdf-viewer', isPdf: true }
+    })
+    await flushPromises()
+
+    await wrapper.get('[data-testid="pdf-windows-host-provider-select"]').setValue('deepl')
+    await flushPromises()
+
+    await wrapper.get('[data-testid="pdf-windows-host-translate"]').trigger('click')
+    await flushPromises()
+
+    expect(sendRegularMessageMock).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({
+        provider: 'deepl',
+        mode: 'selection-manager'
+      })
+    }))
+
+    sendRegularMessageMock.mockResolvedValueOnce({
+      success: true,
+      translatedText: 'Retry with selected provider',
+      mode: 'selection-manager'
+    })
+
+    await wrapper.get('[data-testid="pdf-windows-host-retry"]').trigger('click')
+    await flushPromises()
+
+    expect(sendRegularMessageMock).toHaveBeenLastCalledWith(expect.objectContaining({
+      data: expect.objectContaining({
+        provider: 'deepl',
+        mode: 'selection-manager'
+      })
+    }))
+  })
+
+  it('clears stale translation state when the provider changes', async () => {
+    sendRegularMessageMock.mockResolvedValueOnce({
+      success: true,
+      translatedText: 'Stale result',
+      mode: 'selection-manager'
+    })
+
+    emitSelection({
+      text: 'Clear me',
+      position: { x: 120, y: 180, width: 90, height: 18 },
+      context: { source: 'pdf-viewer', isPdf: true }
+    })
+    await flushPromises()
+
+    await wrapper.get('[data-testid="pdf-windows-host-translate"]').trigger('click')
+    await flushPromises()
+    expect(wrapper.find('[data-testid="pdf-windows-host-result"]').text()).toContain('Stale result')
+
+    const providerSelector = wrapper.findComponent({ name: 'ProviderSelector' })
+    providerSelector.vm.$emit('update:modelValue', 'deepl')
+    await flushPromises()
+
+    expect(wrapper.find('[data-testid="pdf-windows-host-result"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="pdf-windows-host-error"]').exists()).toBe(false)
+    expect(wrapper.get('[data-testid="pdf-windows-host-provider-select"]').element.value).toBe('deepl')
+    expect(sendRegularMessageMock).toHaveBeenCalledTimes(1)
   })
 
   it('keeps plain text output readable through SafeMarkdownPreview', async () => {
