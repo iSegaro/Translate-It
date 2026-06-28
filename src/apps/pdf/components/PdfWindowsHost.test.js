@@ -2,6 +2,7 @@ import { mount, flushPromises } from '@vue/test-utils'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import fs from 'node:fs'
 import path from 'node:path'
+import { ref } from 'vue'
 
 const eventHandlers = {}
 const unsubscribeMocks = []
@@ -82,6 +83,46 @@ vi.mock('@/composables/shared/useUnifiedI18n.js', () => ({
   useUnifiedI18n: () => ({
     t: (key) => key
   })
+}))
+
+vi.mock('@/composables/shared/useTextDirection.js', () => ({
+  useTextDirection: (contentRef) => {
+    const text = typeof contentRef?.value === 'string' ? contentRef.value : ''
+    const rtlCount = (text.match(/[\u0590-\u05FF\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\uFB50-\uFDFF\uFE70-\uFEFF]/g) || []).length
+    const direction = rtlCount > 0 ? 'rtl' : 'ltr'
+
+    return {
+      direction: ref(direction),
+      textAlign: ref(direction === 'rtl' ? 'right' : 'left')
+    }
+  }
+}))
+
+vi.mock('@/composables/shared/useFont.js', () => ({
+  useFont: () => ({
+    fontStyles: ref({}),
+    cssVariables: ref({})
+  })
+}))
+
+vi.mock('@/features/settings/stores/settings.js', () => ({
+  useSettingsStore: () => ({
+    isDarkTheme: false
+  })
+}))
+
+vi.mock('@/components/shared/ActionToolbar.vue', () => ({
+  default: {
+    name: 'ActionToolbar',
+    template: '<div class="action-toolbar-stub" />'
+  }
+}))
+
+vi.mock('@/components/base/LoadingSpinner.vue', () => ({
+  default: {
+    name: 'LoadingSpinner',
+    template: '<div class="loading-spinner-stub" />'
+  }
 }))
 
 vi.mock('@/components/shared/TTSButton.vue', () => ({
@@ -491,6 +532,24 @@ describe('PdfWindowsHost', () => {
     await flushPromises()
 
     expect(clipboardWriteTextMock).toHaveBeenCalledWith('Normal bold text')
+  })
+
+  it('keeps shared TranslationDisplay toolbar actions out of PdfWindowsHost while preserving PDF-local actions', async () => {
+    sendRegularMessageMock.mockResolvedValueOnce({
+      success: true,
+      translatedText: 'Toolbar parity check',
+      mode: 'selection-manager'
+    })
+
+    await showSelectionIcon('Toolbar check')
+    await openWindowFromSelectionIcon(wrapper)
+    await flushPromises()
+
+    expect(wrapper.find('.action-toolbar-stub').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="pdf-windows-host-copy"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="pdf-windows-host-retry"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="pdf-windows-host-tts"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="pdf-windows-host-provider-selector"]').exists()).toBe(true)
   })
 
   it('uses the currently selected local provider for the next translation and retry actions', async () => {

@@ -14,7 +14,6 @@ import { sendRegularMessage } from '@/shared/messaging/core/UnifiedMessaging.js'
 import { getScopedLogger } from '@/shared/logging/logger.js'
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js'
 import { SimpleMarkdown, ExtractionStrategy } from '@/shared/utils/text/markdown.js'
-import { renderMarkdownPreview } from '@/shared/utils/text/markdownPreview.js'
 import { loadPdfWindowLayout, savePdfWindowLayout, savePdfWindowPosition } from './usePdfWindowPersistence.js'
 import { usePdfWindowDocking } from './usePdfWindowDocking.js'
 import { usePdfWindowDrag } from './usePdfWindowDrag.js'
@@ -76,6 +75,7 @@ export function usePdfWindowsHost(options = {}) {
   const detectedSourceLanguage = ref('')
   const isIconVisible = ref(false)
   const translationMode = ref(TranslationMode.Selection)
+  const translationTargetLanguage = ref(AUTO_DETECT_VALUE)
   const selectionSessionId = ref(0)
   const hostStyle = ref({})
   const viewportTick = ref(0)
@@ -124,21 +124,15 @@ export function usePdfWindowsHost(options = {}) {
 
     return name.charAt(0).toUpperCase() + name.slice(1)
   })
-  const translatedDisplayHtml = computed(() => {
-    if (!hasTranslatedResult.value) {
-      return ''
-    }
-
-    return renderMarkdownPreview(translatedText.value, {
-      fallbackDir: 'ltr',
-      isDictionary: isDictionaryResult.value,
-      enableMarkdown: true
-    })
-  })
   const iconStyle = computed(() => (
     isIconVisible.value
       ? (viewportTick.value, buildPdfSelectionIconStyle(selectionPosition.value, getViewportSize()))
       : {}
+  ))
+  const translatedDisplayMetadata = computed(() => (
+    hasTranslatedResult.value
+      ? { mode: translationMode.value, targetLanguage: translationTargetLanguage.value }
+      : null
   ))
 
   function resolvePdfFingerprint() {
@@ -214,6 +208,7 @@ export function usePdfWindowsHost(options = {}) {
     isCopying.value = false
     showOriginal.value = false
     translationMode.value = TranslationMode.Selection
+    translationTargetLanguage.value = AUTO_DETECT_VALUE
     clearCopyFeedback()
     activeRequestSessionId = 0
   }
@@ -249,6 +244,7 @@ export function usePdfWindowsHost(options = {}) {
     detectedSourceLanguage.value = ''
     isTranslating.value = false
     translationMode.value = TranslationMode.Selection
+    translationTargetLanguage.value = AUTO_DETECT_VALUE
     clearCopyFeedback()
   }
 
@@ -448,11 +444,14 @@ export function usePdfWindowsHost(options = {}) {
       return false
     }
 
+    let resolvedTargetLanguage = AUTO_DETECT_VALUE
     const [provider, sourceLanguage, targetLanguage] = await Promise.all([
       selectedProvider.value ? Promise.resolve(selectedProvider.value) : getEffectiveProviderAsync(TranslationMode.PDF),
       getSourceLanguageAsync(),
       getTargetLanguageAsync()
     ])
+
+    resolvedTargetLanguage = targetLanguage || AUTO_DETECT_VALUE
 
     if (!selectedProvider.value && provider) {
       selectedProvider.value = provider
@@ -465,6 +464,7 @@ export function usePdfWindowsHost(options = {}) {
     translationError.value = ''
     translatedText.value = ''
     detectedSourceLanguage.value = ''
+    translationTargetLanguage.value = resolvedTargetLanguage
     clearCopyFeedback()
 
     try {
@@ -502,6 +502,7 @@ export function usePdfWindowsHost(options = {}) {
       translationError.value = response?.error?.message || response?.message || 'Translation failed'
       translatedText.value = ''
       detectedSourceLanguage.value = ''
+      translationTargetLanguage.value = resolvedTargetLanguage
       return false
     } catch (error) {
       if (requestSessionId !== selectionSessionId.value || activeRequestSessionId !== requestSessionId) {
@@ -512,6 +513,7 @@ export function usePdfWindowsHost(options = {}) {
       translationError.value = error?.message || 'Translation failed'
       translatedText.value = ''
       detectedSourceLanguage.value = ''
+      translationTargetLanguage.value = resolvedTargetLanguage
       translationMode.value = TranslationMode.Selection
       return false
     } finally {
@@ -709,7 +711,9 @@ export function usePdfWindowsHost(options = {}) {
     speakableText,
     hasSpeakableText,
     isDictionaryResult,
-    translatedDisplayHtml,
+    translatedText,
+    translationTargetLanguage,
+    translatedDisplayMetadata,
     isPinned: docking.isPinned,
     dockMode: docking.dockMode,
     dockedWidth: docking.dockedWidth,

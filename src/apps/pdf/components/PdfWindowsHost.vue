@@ -170,8 +170,26 @@
         class="pdf-windows-host__state pdf-windows-host__state--loading"
         data-testid="pdf-windows-host-loading"
       >
-        <span class="pdf-windows-host__spinner" />
-        <span>{{ t('window_loading_alt') }}</span>
+        <TranslationDisplay
+          class="pdf-windows-host__translation"
+          :class="{
+            'pdf-windows-host__translation--dictionary': isDictionaryResult,
+            'pdf-windows-host__translation--markdown': !isDictionaryResult
+          }"
+          :content="translatedText"
+          :language="translationTargetLanguage"
+          :is-loading="true"
+          :error="''"
+          :error-type="''"
+          :mode="'compact'"
+          :placeholder="''"
+          :enable-markdown="true"
+          :show-toolbar="false"
+          :show-copy-button="false"
+          :show-tts-button="false"
+          :show-fade-in-animation="false"
+          :last-translation="translatedDisplayMetadata"
+        />
       </div>
 
       <div
@@ -179,17 +197,48 @@
         class="pdf-windows-host__state pdf-windows-host__state--error"
         data-testid="pdf-windows-host-error"
       >
-        {{ translationError }}
+        <TranslationDisplay
+          class="pdf-windows-host__translation"
+          :class="{
+            'pdf-windows-host__translation--dictionary': isDictionaryResult,
+            'pdf-windows-host__translation--markdown': !isDictionaryResult
+          }"
+          :content="translatedText"
+          :language="translationTargetLanguage"
+          :is-loading="false"
+          :error="translationError"
+          :error-type="''"
+          :mode="'compact'"
+          :placeholder="''"
+          :enable-markdown="true"
+          :show-toolbar="false"
+          :show-copy-button="false"
+          :show-tts-button="false"
+          :show-fade-in-animation="false"
+          :last-translation="translatedDisplayMetadata"
+        />
       </div>
 
-      <SafeMarkdownPreview
+      <TranslationDisplay
         v-else-if="hasTranslatedResult"
         class="pdf-windows-host__translation"
         :class="{
           'pdf-windows-host__translation--dictionary': isDictionaryResult,
           'pdf-windows-host__translation--markdown': !isDictionaryResult
         }"
-        :html="translatedDisplayHtml"
+        :content="translatedText"
+        :language="translationTargetLanguage"
+        :is-loading="false"
+        :error="''"
+        :error-type="''"
+        :mode="'compact'"
+        :placeholder="''"
+        :enable-markdown="true"
+        :show-toolbar="false"
+        :show-copy-button="false"
+        :show-tts-button="false"
+        :show-fade-in-animation="false"
+        :last-translation="translatedDisplayMetadata"
         data-testid="pdf-windows-host-result"
       />
 
@@ -259,7 +308,7 @@ import { useUnifiedI18n } from '@/composables/shared/useUnifiedI18n.js'
 import { usePdfWindowsHost } from '../composables/usePdfWindowsHost.js'
 import ProviderSelector from '@/components/shared/ProviderSelector.vue'
 import TTSButton from '@/components/shared/TTSButton.vue'
-import SafeMarkdownPreview from '@/components/shared/SafeMarkdownPreview.vue'
+import TranslationDisplay from '@/components/shared/TranslationDisplay.vue'
 import PdfTranslationIcon from './PdfTranslationIcon.vue'
 import './PdfWindowsHost.scss'
 
@@ -295,7 +344,9 @@ const {
   speakableText,
   hasSpeakableText,
   isDictionaryResult,
-  translatedDisplayHtml,
+  translatedText,
+  translationTargetLanguage,
+  translatedDisplayMetadata,
   isPinned,
   dockMode,
   isDocked,
