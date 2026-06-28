@@ -62,7 +62,6 @@
         :is-dictionary="isDictionaryResult"
         :tts-text="speakableText"
         tts-language="auto"
-        :target-language-label="targetLanguageName"
         :detected-language-label="detectedLanguageName"
         :pin-title="isPinned ? t('window_unpin') : t('window_pin')"
         :copy-title="t('window_copy_translation')"
@@ -190,20 +189,19 @@
         :last-translation="translatedDisplayMetadata"
         data-testid="pdf-windows-host-result"
       />
-
-      <div class="pdf-windows-host__actions">
-        <button
-          v-if="hasTranslatedResult || hasError"
-          class="pdf-windows-host__secondary-button"
-          type="button"
-          data-testid="pdf-windows-host-retry"
-          :disabled="isTranslating || !selectedText"
-          @click.stop="retryTranslation()"
-        >
-          {{ t('action_retry') }}
-        </button>
-      </div>
     </div>
+
+    <TranslationWindowFooter
+      class="pdf-windows-host__footer"
+      :target-language-label="targetLanguageName"
+      :show-target-language="!!targetLanguageName"
+      :show-retry="hasTranslatedResult || hasError"
+      :retry-disabled="isTranslating || !selectedText"
+      :retry-title="t('action_retry')"
+      :retry-aria-label="t('action_retry')"
+      theme="dark"
+      @retry="retryTranslation"
+    />
 
     <div
       v-if="isDocked"
@@ -219,6 +217,7 @@ import { toRef } from 'vue'
 import { useUnifiedI18n } from '@/composables/shared/useUnifiedI18n.js'
 import { usePdfWindowsHost } from '../composables/usePdfWindowsHost.js'
 import TranslationWindowToolbar from '@/components/shared/TranslationWindowToolbar.vue'
+import TranslationWindowFooter from '@/components/shared/TranslationWindowFooter.vue'
 import TranslationDisplay from '@/components/shared/TranslationDisplay.vue'
 import PdfTranslationIcon from './PdfTranslationIcon.vue'
 import './PdfWindowsHost.scss'

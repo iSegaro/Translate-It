@@ -1,0 +1,83 @@
+<template>
+  <div
+    v-if="showFooter"
+    class="translation-window-footer"
+    :class="theme"
+    data-testid="translation-window-footer"
+  >
+    <span
+      v-if="showTargetLanguage && targetLanguageLabel"
+      class="ti-footer-target-language-label"
+      data-testid="translation-window-footer-target-language"
+    >
+      {{ targetLanguageLabel }}
+    </span>
+
+    <button
+      v-if="showRetry"
+      type="button"
+      class="ti-footer-action-btn"
+      :disabled="retryDisabled"
+      :title="retryTitle"
+      :aria-label="retryAriaLabel"
+      data-testid="translation-window-footer-retry"
+      @click.stop="emit('retry')"
+      @mousedown.stop
+      @touchstart.stop
+    >
+      <img
+        src="@/icons/ui/retry.svg"
+        alt=""
+        aria-hidden="true"
+        class="ti-footer-action-icon"
+      >
+    </button>
+  </div>
+</template>
+
+<script setup>
+import { computed } from 'vue'
+import './TranslationWindowFooter.scss'
+
+defineOptions({
+  name: 'TranslationWindowFooter'
+})
+
+const props = defineProps({
+  targetLanguageLabel: {
+    type: String,
+    default: ''
+  },
+  showTargetLanguage: {
+    type: Boolean,
+    default: true
+  },
+  showRetry: {
+    type: Boolean,
+    default: false
+  },
+  retryDisabled: {
+    type: Boolean,
+    default: false
+  },
+  retryTitle: {
+    type: String,
+    default: ''
+  },
+  retryAriaLabel: {
+    type: String,
+    default: ''
+  },
+  theme: {
+    type: String,
+    default: 'light',
+    validator: (value) => ['light', 'dark'].includes(value)
+  }
+})
+
+const emit = defineEmits(['retry'])
+
+const showFooter = computed(() => (
+  (props.showTargetLanguage && !!props.targetLanguageLabel) || props.showRetry
+))
+</script>
