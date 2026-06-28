@@ -10,6 +10,7 @@
     <PdfTranslationIcon
       :title="t('translateSelectedText')"
       :aria-label="t('translateSelectedText')"
+      @pointerdown="handleIconPointerDown"
       @click="openWindowFromIcon"
     />
   </section>
@@ -345,6 +346,7 @@ const {
   dismissHost,
   openWindowFromIcon,
   toggleShowOriginal,
+  handleIconPointerDown,
   handleProviderChange,
   handlePinToggle,
   handleDockResize,

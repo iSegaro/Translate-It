@@ -97,6 +97,7 @@ export function usePdfWindowsHost(options = {}) {
   const showOriginal = ref(false)
   const detectedSourceLanguage = ref('')
   const isIconVisible = ref(false)
+  const isIconTransitionPending = ref(false)
   const translationMode = ref(TranslationMode.Selection)
   const translationTargetLanguage = ref(AUTO_DETECT_VALUE)
   const selectionSessionId = ref(0)
@@ -210,6 +211,18 @@ export function usePdfWindowsHost(options = {}) {
     isIconVisible.value = false
   }
 
+  function clearIconTransitionPending() {
+    isIconTransitionPending.value = false
+  }
+
+  function handleIconPointerDown() {
+    if (!isIconVisible.value) {
+      return
+    }
+
+    isIconTransitionPending.value = true
+  }
+
   function clearWindowContent() {
     translatedText.value = ''
     translationError.value = ''
@@ -234,6 +247,7 @@ export function usePdfWindowsHost(options = {}) {
     selectionPosition.value = null
     hideIconStage()
     hideWindowStage()
+    clearIconTransitionPending()
   }
 
   function toggleShowOriginal() {
@@ -287,8 +301,14 @@ export function usePdfWindowsHost(options = {}) {
       return false
     }
 
-    await showWindowForSelection(selectionPosition.value, { translateImmediately: true })
-    return true
+    isIconTransitionPending.value = true
+
+    try {
+      await showWindowForSelection(selectionPosition.value, { translateImmediately: true })
+      return true
+    } finally {
+      clearIconTransitionPending()
+    }
   }
 
   async function persistGlobalPreferences() {
@@ -402,6 +422,10 @@ export function usePdfWindowsHost(options = {}) {
 
   function handleSelectionClear(detail) {
     if (!isPdfSelectionContext(detail?.context)) {
+      return
+    }
+
+    if (isIconTransitionPending.value) {
       return
     }
 
@@ -720,6 +744,7 @@ export function usePdfWindowsHost(options = {}) {
     copyTranslation,
     dismissHost,
     openWindowFromIcon,
+    handleIconPointerDown,
     toggleShowOriginal,
     handleProviderChange,
     handlePinToggle,

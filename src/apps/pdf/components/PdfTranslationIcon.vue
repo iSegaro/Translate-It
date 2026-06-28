@@ -6,7 +6,7 @@
     :aria-label="ariaLabel"
     data-testid="pdf-translation-icon"
     @click.stop="emit('click')"
-    @pointerdown.stop
+    @pointerdown.stop.prevent="emit('pointerdown', $event)"
   >
     <svg
       class="pdf-translation-icon__svg"
@@ -60,5 +60,5 @@ defineProps({
   }
 })
 
-const emit = defineEmits(['click'])
+const emit = defineEmits(['click', 'pointerdown'])
 </script>

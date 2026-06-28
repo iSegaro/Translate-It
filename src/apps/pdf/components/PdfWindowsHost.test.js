@@ -188,7 +188,10 @@ async function showSelectionIcon(text, position = { x: 120, y: 180, width: 90, h
 }
 
 async function openWindowFromSelectionIcon(wrapper) {
-  await wrapper.get('[data-testid="pdf-translation-icon"]').trigger('click')
+  const icon = wrapper.get('[data-testid="pdf-translation-icon"]')
+  await icon.trigger('pointerdown')
+  await flushPromises()
+  await icon.trigger('click')
   await flushPromises()
 }
 
@@ -296,6 +299,27 @@ describe('PdfWindowsHost', () => {
       translatedText: 'Translated text'
     })
     await flushPromises()
+  })
+
+  it('keeps the selection icon transition alive until the icon click opens the window', async () => {
+    await showSelectionIcon('Transition me')
+
+    const icon = wrapper.get('[data-testid="pdf-translation-icon"]')
+    await icon.trigger('pointerdown')
+    emitSelectionClear({
+      context: { source: 'pdf-viewer', isPdf: true }
+    })
+    await flushPromises()
+
+    expect(wrapper.find('[data-testid="pdf-windows-host-icon-stage"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="pdf-windows-host"]').exists()).toBe(false)
+
+    await icon.trigger('click')
+    await flushPromises()
+
+    expect(wrapper.find('[data-testid="pdf-windows-host-icon-stage"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="pdf-windows-host"]').exists()).toBe(true)
+    expect(sendRegularMessageMock).toHaveBeenCalledTimes(1)
   })
 
   it('renders TTS for selected source text after the icon opens the window and hides it when there is no speakable text', async () => {
