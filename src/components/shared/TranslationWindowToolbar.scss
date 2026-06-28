@@ -1,0 +1,141 @@
+.translation-window-toolbar {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  width: 100% !important;
+  min-width: 0 !important;
+  overflow: visible !important;
+
+  &.light {
+    .ti-action-btn,
+    .ti-smart-tts-btn {
+      background-color: #f0f0f0 !important;
+      color: #555 !important;
+    }
+
+    .ti-detected-language-label,
+    .ti-target-language-label {
+      background-color: #f1f3f4 !important;
+      color: #5f6368 !important;
+    }
+  }
+
+  &.dark {
+    .ti-action-btn,
+    .ti-smart-tts-btn {
+      background-color: #424242 !important;
+      color: #e0e0e0 !important;
+    }
+
+    .ti-detected-language-label,
+    .ti-target-language-label {
+      background-color: #3c4043 !important;
+      color: #e8eaed !important;
+      border-color: rgba(255, 255, 255, 0.1) !important;
+    }
+  }
+
+  .ti-header-actions {
+    display: flex !important;
+    align-items: center !important;
+    gap: 8px !important;
+    overflow: visible !important;
+    min-width: 0 !important;
+    flex-shrink: 0 !important;
+  }
+
+  .ti-header-close {
+    display: flex !important;
+    align-items: center !important;
+    gap: 8px !important;
+    flex: 1 !important;
+    justify-content: flex-end !important;
+    min-width: 0 !important;
+    overflow: hidden !important;
+  }
+
+  .ti-target-language-label,
+  .ti-detected-language-label {
+    font-size: 10px !important;
+    padding: 2px 8px !important;
+    border-radius: 10px !important;
+    font-weight: 600 !important;
+    text-transform: capitalize !important;
+    white-space: nowrap !important;
+    pointer-events: none !important;
+    user-select: none !important;
+    line-height: 1.2 !important;
+    opacity: 0.9 !important;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05) !important;
+    border: 1px solid rgba(0, 0, 0, 0.05) !important;
+    max-width: 80px !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    flex-shrink: 1 !important;
+  }
+
+  .ti-window-provider-selector {
+    position: relative !important;
+    top: auto !important;
+    left: auto !important;
+    z-index: 150 !important;
+    width: 28px !important;
+    height: 28px !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    flex-shrink: 0 !important;
+
+    &.ti-dropdown-open {
+      z-index: 2000 !important;
+    }
+  }
+
+  .ti-action-btn,
+  .ti-smart-tts-btn {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    width: 28px !important;
+    height: 28px !important;
+    border: none !important;
+    border-radius: 6px !important;
+    cursor: pointer !important;
+    transition: background-color 0.2s ease !important;
+    padding: 0 !important;
+    margin: 0 !important;
+
+    &:hover {
+      background: rgba(255, 255, 255, 0.1) !important;
+    }
+
+    &:disabled {
+      opacity: 0.5 !important;
+      cursor: not-allowed !important;
+    }
+  }
+
+  .ti-action-btn {
+    &.ti-original-visible,
+    &.ti-active {
+      background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%) !important;
+      border: 1px solid rgba(59, 130, 246, 0.3) !important;
+      color: #1e40af !important;
+    }
+  }
+
+  .ti-smart-tts-btn {
+    transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1) !important;
+    position: relative !important;
+    min-width: 28px !important;
+    min-height: 28px !important;
+
+    .ti-icon-container {
+      opacity: 1 !important;
+    }
+
+    .ti-tts-icon {
+      opacity: 1 !important;
+    }
+  }
+}

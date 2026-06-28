@@ -247,6 +247,21 @@ describe('TranslationWindow.vue', () => {
     expect(windowRoot.classes()).toContain('dock-left');
   });
 
+  it('renders the extracted shared toolbar controls with the existing handlers', () => {
+    const wrapper = mount(TranslationWindow, {
+      props: baseProps,
+    });
+
+    expect(wrapper.findComponent({ name: 'TranslationWindowToolbar' }).exists()).toBe(true);
+    expect(wrapper.findComponent({ name: 'ProviderSelector' }).exists()).toBe(true);
+    expect(wrapper.findComponent({ name: 'TTSButton' }).exists()).toBe(true);
+    expect(wrapper.find('.ti-action-btn[title="window_pin"]').exists()).toBe(true);
+    expect(wrapper.find('.ti-action-btn[title="window_copy_translation"]').exists()).toBe(true);
+    expect(wrapper.find('.ti-action-btn[title="window_show_original"]').exists()).toBe(true);
+    expect(wrapper.find('.ti-detected-language-label').text()).toBe('English');
+    expect(wrapper.find('.ti-action-btn[title="window_close"]').exists()).toBe(true);
+  });
+
   it('uses system theme for auto mode and updates without remounting', async () => {
     globalThis.__mockSettingsStore.settings.THEME = 'auto';
 
