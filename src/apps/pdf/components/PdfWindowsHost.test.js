@@ -1066,6 +1066,8 @@ describe('PdfWindowsHost', () => {
     dispatchPointerEvent(document, 'pointerup', { clientX: 4, clientY: 210 })
     await flushPromises()
     expect(wrapper.get('[data-testid="pdf-windows-host"]').classes()).toContain('pdf-windows-host--dock-left')
+    expect(wrapper.get('[data-testid="pdf-windows-host"]').element.style.left).toBe('0px')
+    expect(wrapper.get('[data-testid="pdf-windows-host"]').element.style.top).toBe('0px')
     expect(wrapper.find('[data-testid="pdf-windows-host-resize-handle"]').exists()).toBe(true)
 
     const resizeHandle = wrapper.get('[data-testid="pdf-windows-host-resize-handle"]')
@@ -1091,6 +1093,8 @@ describe('PdfWindowsHost', () => {
     dispatchPointerEvent(document, 'pointerup', { clientX: window.innerWidth - 4, clientY: 210 })
     await flushPromises()
     expect(wrapper.get('[data-testid="pdf-windows-host"]').classes()).toContain('pdf-windows-host--dock-right')
+    expect(wrapper.get('[data-testid="pdf-windows-host"]').element.style.right).toBe('0px')
+    expect(wrapper.get('[data-testid="pdf-windows-host"]').element.style.top).toBe('0px')
   })
 
   it('starts dragging from empty header space', async () => {

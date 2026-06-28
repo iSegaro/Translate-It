@@ -121,48 +121,48 @@ export function buildPdfFloatingWindowStyle(position, dimensions = {}, viewport 
   }
 }
 
-export function buildPdfDockedWindowStyle(dockMode, dockedWidth, viewport = getViewportSize(), margin = PDF_WINDOW_LAYOUT.MARGIN) {
+export function buildPdfDockedWindowStyle(dockMode, dockedWidth, viewport = getViewportSize()) {
   const width = clampPdfDockedWidth(dockedWidth, viewport.width)
   const baseStyle = {
     position: 'fixed',
-    top: `${margin}px`,
+    top: '0px',
     width: `${width}px`,
     zIndex: PDF_WINDOW_LAYOUT.Z_INDEX,
-    maxHeight: `calc(100vh - ${margin * 2}px)`
+    maxHeight: '100vh'
   }
 
   if (dockMode === 'left') {
     return {
       ...baseStyle,
-      left: `${margin}px`
+      left: '0px'
     }
   }
 
   if (dockMode === 'right') {
     return {
       ...baseStyle,
-      right: `${margin}px`
+      right: '0px'
     }
   }
 
   return {}
 }
 
-export function getPdfDockedWindowPosition(dockMode, dockedWidth, viewport = getViewportSize(), margin = PDF_WINDOW_LAYOUT.MARGIN) {
+export function getPdfDockedWindowPosition(dockMode, dockedWidth, viewport = getViewportSize()) {
   const width = clampPdfDockedWidth(dockedWidth, viewport.width)
 
   if (dockMode === 'left') {
     return {
-      x: margin,
-      y: margin,
+      x: 0,
+      y: 0,
       width
     }
   }
 
   if (dockMode === 'right') {
     return {
-      x: Math.max(margin, (viewport.width || 0) - width - margin),
-      y: margin,
+      x: Math.max(0, (viewport.width || 0) - width),
+      y: 0,
       width
     }
   }
