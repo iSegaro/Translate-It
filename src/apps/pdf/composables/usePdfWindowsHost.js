@@ -4,7 +4,12 @@ import { pageEventBus } from '@/core/PageEventBus.js'
 import { SELECTION_EVENTS } from '@/features/text-selection/events/SelectionEvents.js'
 import { MessageActions } from '@/shared/messaging/core/MessageActions.js'
 import { MessageContexts, MessageFormat } from '@/shared/messaging/core/MessagingCore.js'
-import { TranslationMode } from '@/shared/config/config.js'
+import {
+  TranslationMode,
+  getEffectiveProviderAsync,
+  getSourceLanguageAsync,
+  getTargetLanguageAsync
+} from '@/shared/config/config.js'
 import { sendRegularMessage } from '@/shared/messaging/core/UnifiedMessaging.js'
 import { getScopedLogger } from '@/shared/logging/logger.js'
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js'
@@ -12,6 +17,7 @@ import { loadPdfWindowLayout, savePdfWindowLayout, savePdfWindowPosition } from 
 import { usePdfWindowDocking } from './usePdfWindowDocking.js'
 import { usePdfWindowDrag } from './usePdfWindowDrag.js'
 import { usePdfWindowPlacement } from './usePdfWindowPlacement.js'
+import { AUTO_DETECT_VALUE } from '@/shared/constants/core.js'
 
 const logger = getScopedLogger(LOG_COMPONENTS.PDF, 'usePdfWindowsHost')
 const COPY_FEEDBACK_TIMEOUT_MS = 1200
@@ -309,6 +315,12 @@ export function usePdfWindowsHost(options = {}) {
       return false
     }
 
+    const [provider, sourceLanguage, targetLanguage] = await Promise.all([
+      getEffectiveProviderAsync(TranslationMode.PDF),
+      getSourceLanguageAsync(),
+      getTargetLanguageAsync()
+    ])
+
     const requestSessionId = selectionSessionId.value
     activeRequestSessionId = requestSessionId
 
@@ -323,8 +335,13 @@ export function usePdfWindowsHost(options = {}) {
           MessageActions.TRANSLATE,
           {
             text: normalizedText,
+            provider,
+            sourceLanguage: sourceLanguage || AUTO_DETECT_VALUE,
+            targetLanguage,
+            // PDF selection uses the standard selection route, but provider resolution stays PDF-specific.
             mode: TranslationMode.Selection,
-            enableDictionary: false
+            enableDictionary: false,
+            isExplicitProvider: true
           },
           MessageContexts.PDF_TRANSLATION
         )

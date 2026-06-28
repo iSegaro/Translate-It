@@ -62,6 +62,19 @@ vi.mock('@/shared/messaging/core/UnifiedMessaging.js', () => ({
   sendRegularMessage: sendRegularMessageMock
 }))
 
+const getEffectiveProviderAsyncMock = vi.fn(async () => 'googlev2')
+const getTargetLanguageAsyncMock = vi.fn(async () => 'fa')
+
+vi.mock('@/shared/config/config.js', () => ({
+  TranslationMode: {
+    PDF: 'pdf-translation',
+    Selection: 'selection-manager'
+  },
+    getEffectiveProviderAsync: getEffectiveProviderAsyncMock,
+    getSourceLanguageAsync: vi.fn(async () => 'auto'),
+    getTargetLanguageAsync: getTargetLanguageAsyncMock
+}))
+
 vi.mock('@/composables/shared/useUnifiedI18n.js', () => ({
   useUnifiedI18n: () => ({
     t: (key) => key
@@ -125,6 +138,8 @@ describe('PdfWindowsHost', () => {
     }
     sendRegularMessageMock.mockReset()
     sendRegularMessageMock.mockResolvedValue({ success: true, translatedText: 'Translated text' })
+    getEffectiveProviderAsyncMock.mockClear()
+    getTargetLanguageAsyncMock.mockClear()
 
     Object.keys(eventHandlers).forEach((key) => {
       delete eventHandlers[key]
@@ -212,10 +227,16 @@ describe('PdfWindowsHost', () => {
       context: 'pdf-translation',
       data: expect.objectContaining({
         text: 'Hello PDF',
+        provider: 'googlev2',
+        sourceLanguage: 'auto',
+        targetLanguage: 'fa',
         mode: 'selection-manager',
-        enableDictionary: false
+        enableDictionary: false,
+        isExplicitProvider: true
       })
     }))
+    expect(getEffectiveProviderAsyncMock).toHaveBeenCalledWith('pdf-translation')
+    expect(getTargetLanguageAsyncMock).toHaveBeenCalled()
     expect(wrapper.find('[data-testid="pdf-windows-host-loading"]').exists()).toBe(false)
     expect(wrapper.find('[data-testid="pdf-windows-host-result"]').text()).toContain('Translated text')
     expect(wrapper.get('[data-testid="pdf-windows-host-tts"]').attributes('data-text')).toBe('Translated text')
