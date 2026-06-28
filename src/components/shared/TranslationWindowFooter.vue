@@ -5,13 +5,32 @@
     :class="theme"
     data-testid="translation-window-footer"
   >
-    <span
-      v-if="showTargetLanguage && targetLanguageLabel"
-      class="ti-footer-target-language-label"
-      data-testid="translation-window-footer-target-language"
-    >
-      {{ targetLanguageLabel }}
-    </span>
+    <div class="ti-footer-labels">
+      <span
+        v-if="showDetectedLanguage && detectedLanguageLabel"
+        class="ti-footer-detected-language-label"
+        data-testid="translation-window-footer-detected-language"
+      >
+        {{ detectedLanguageLabel }}
+      </span>
+
+      <span
+        v-if="showDetectedLanguage && detectedLanguageLabel && showTargetLanguage && targetLanguageLabel"
+        class="ti-footer-language-separator"
+        aria-hidden="true"
+        data-testid="translation-window-footer-language-separator"
+      >
+        &gt;
+      </span>
+
+      <span
+        v-if="showTargetLanguage && targetLanguageLabel"
+        class="ti-footer-target-language-label"
+        data-testid="translation-window-footer-target-language"
+      >
+        {{ targetLanguageLabel }}
+      </span>
+    </div>
 
     <button
       v-if="showRetry"
@@ -44,6 +63,14 @@ defineOptions({
 })
 
 const props = defineProps({
+  detectedLanguageLabel: {
+    type: String,
+    default: ''
+  },
+  showDetectedLanguage: {
+    type: Boolean,
+    default: true
+  },
   targetLanguageLabel: {
     type: String,
     default: ''
@@ -78,6 +105,8 @@ const props = defineProps({
 const emit = defineEmits(['retry'])
 
 const showFooter = computed(() => (
-  (props.showTargetLanguage && !!props.targetLanguageLabel) || props.showRetry
+  (props.showDetectedLanguage && !!props.detectedLanguageLabel)
+  || (props.showTargetLanguage && !!props.targetLanguageLabel)
+  || props.showRetry
 ))
 </script>

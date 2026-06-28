@@ -62,7 +62,6 @@
         :is-dictionary="isDictionaryResult"
         :tts-text="speakableText"
         tts-language="auto"
-        :detected-language-label="detectedLanguageName"
         :pin-title="isPinned ? t('window_unpin') : t('window_pin')"
         :copy-title="t('window_copy_translation')"
         :original-title="showOriginal ? t('window_hide_original') : t('window_show_original')"
@@ -190,6 +189,8 @@
 
     <TranslationWindowFooter
       class="pdf-windows-host__footer"
+      :detected-language-label="detectedLanguageName"
+      :show-detected-language="!!detectedLanguageName"
       :target-language-label="targetLanguageName"
       :show-target-language="!!targetLanguageName"
       :show-retry="hasTranslatedResult || hasError"

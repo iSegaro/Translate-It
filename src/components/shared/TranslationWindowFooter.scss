@@ -10,6 +10,7 @@
   overflow: visible !important;
 
   &.light {
+    .ti-footer-detected-language-label,
     .ti-footer-target-language-label,
     .ti-footer-action-btn {
       background-color: #f1f3f4 !important;
@@ -19,6 +20,7 @@
   }
 
   &.dark {
+    .ti-footer-detected-language-label,
     .ti-footer-target-language-label,
     .ti-footer-action-btn {
       background-color: #3c4043 !important;
@@ -27,8 +29,17 @@
     }
   }
 
+  .ti-footer-labels {
+    display: flex !important;
+    align-items: center !important;
+    gap: 8px !important;
+    min-width: 0 !important;
+    flex: 1 1 auto !important;
+    overflow: hidden !important;
+  }
+
+  .ti-footer-detected-language-label,
   .ti-footer-target-language-label {
-    margin-right: auto !important;
     font-size: 10px !important;
     padding: 2px 8px !important;
     border-radius: 10px !important;
@@ -45,6 +56,16 @@
     overflow: hidden !important;
     text-overflow: ellipsis !important;
     flex-shrink: 1 !important;
+  }
+
+  .ti-footer-language-separator {
+    flex-shrink: 0 !important;
+    color: inherit !important;
+    opacity: 0.7 !important;
+    font-size: 11px !important;
+    line-height: 1 !important;
+    user-select: none !important;
+    pointer-events: none !important;
   }
 
   .ti-footer-action-btn {
