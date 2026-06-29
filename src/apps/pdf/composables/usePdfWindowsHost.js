@@ -35,6 +35,26 @@ function isPdfSelectionContext(context) {
   return context.source === 'pdf-viewer' || context.isPdf === true
 }
 
+function isPrimaryPointerDismissEvent(event) {
+  if (!event || typeof event !== 'object') {
+    return false
+  }
+
+  if (event.isPrimary === false) {
+    return false
+  }
+
+  if (typeof event.button === 'number' && event.button !== 0) {
+    return false
+  }
+
+  if (typeof event.buttons === 'number' && event.buttons > 1) {
+    return false
+  }
+
+  return true
+}
+
 function resolveLanguageDisplayName(code) {
   if (typeof code !== 'string') {
     return ''
@@ -492,7 +512,7 @@ export function usePdfWindowsHost(options = {}) {
       return
     }
 
-    if (detail?.reason === 'window-blur' && isVisible.value) {
+    if (detail?.reason === 'window-blur') {
       return
     }
 
@@ -500,20 +520,17 @@ export function usePdfWindowsHost(options = {}) {
       return
     }
 
-    const activeElement = typeof document !== 'undefined' ? document.activeElement : null
-    if (isVisible.value && hostRef.value?.contains(activeElement)) {
-      return
-    }
-
     if (isInternalHostInteraction.value) {
       return
     }
 
-    if (isVisible.value && docking.isPinned.value) {
+    if (isVisible.value) {
       return
     }
 
-    dismissHost()
+    if (isIconVisible.value || selectedText.value) {
+      dismissHost()
+    }
   }
 
   function registerListener(target, event, handler, options) {
@@ -680,6 +697,10 @@ export function usePdfWindowsHost(options = {}) {
 
   function handleDocumentPointerDown(event) {
     if (!isVisible.value && !isIconVisible.value) {
+      return
+    }
+
+    if (!isPrimaryPointerDismissEvent(event)) {
       return
     }
 

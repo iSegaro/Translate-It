@@ -264,6 +264,31 @@ function dispatchPointerEvent(target, type, options = {}) {
   }))
 }
 
+function dispatchOutsidePointerDown(options = {}) {
+  if (typeof PointerEvent === 'function') {
+    document.body.dispatchEvent(new PointerEvent('pointerdown', {
+      bubbles: true,
+      cancelable: true,
+      pointerType: options.pointerType ?? 'mouse',
+      isPrimary: options.isPrimary ?? true,
+      button: options.button ?? 0,
+      buttons: options.buttons ?? (options.button === 0 ? 1 : 0),
+      clientX: options.clientX ?? 4,
+      clientY: options.clientY ?? 4
+    }))
+    return
+  }
+
+  document.body.dispatchEvent(new MouseEvent('pointerdown', {
+    bubbles: true,
+    cancelable: true,
+    button: options.button ?? 0,
+    buttons: options.buttons ?? (options.button === 0 ? 1 : 0),
+    clientX: options.clientX ?? 4,
+    clientY: options.clientY ?? 4
+  }))
+}
+
 describe('PdfWindowsHost', () => {
   let wrapper
   let addEventListenerSpy
@@ -1204,6 +1229,16 @@ describe('PdfWindowsHost', () => {
     expect(ttsStopMock).toHaveBeenCalledTimes(1)
   })
 
+  it('keeps the PDF translation icon visible when the browser window blurs before the window opens', async () => {
+    await showSelectionIcon('Icon blur selection')
+
+    window.dispatchEvent(new Event('blur'))
+    await flushPromises()
+
+    expect(wrapper.find('[data-testid="pdf-windows-host-icon-stage"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="pdf-windows-host"]').exists()).toBe(false)
+  })
+
   it('keeps plain text output readable through SafeMarkdownPreview', async () => {
     sendRegularMessageMock.mockResolvedValueOnce({
       success: true,
@@ -1628,7 +1663,7 @@ describe('PdfWindowsHost', () => {
     expect(wrapper.find('[data-testid="pdf-windows-host"]').exists()).toBe(false)
   })
 
-  it('dismisses on PDF selection clear, Escape key, and outside click', async () => {
+  it('keeps the visible PDF window open on selection clear or blur, but still dismisses on Escape and outside click', async () => {
     await showSelectionIcon('Dismiss me')
     await openWindowFromSelectionIcon(wrapper)
 
@@ -1640,7 +1675,11 @@ describe('PdfWindowsHost', () => {
       context: { source: 'pdf-viewer', isPdf: true }
     })
     await flushPromises()
-    expect(wrapper.find('[data-testid="pdf-windows-host"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="pdf-windows-host"]').exists()).toBe(true)
+
+    window.dispatchEvent(new Event('blur'))
+    await flushPromises()
+    expect(wrapper.find('[data-testid="pdf-windows-host"]').exists()).toBe(true)
 
     await showSelectionIcon('Dismiss me again')
 
@@ -1651,8 +1690,43 @@ describe('PdfWindowsHost', () => {
     await showSelectionIcon('Dismiss me one more time')
     expect(wrapper.find('[data-testid="pdf-windows-host-icon-stage"]').exists()).toBe(true)
 
-    document.body.dispatchEvent(new Event('pointerdown', { bubbles: true }))
+    dispatchOutsidePointerDown({ button: 0 })
     await flushPromises()
+    expect(wrapper.find('[data-testid="pdf-windows-host"]').exists()).toBe(false)
+  })
+
+  it('dismisses on primary left-click outside but ignores right and middle clicks', async () => {
+    await showSelectionIcon('Primary dismissal')
+    await openWindowFromSelectionIcon(wrapper)
+
+    dispatchOutsidePointerDown({ button: 0, buttons: 1 })
+    await flushPromises()
+    expect(wrapper.find('[data-testid="pdf-windows-host"]').exists()).toBe(false)
+
+    await showSelectionIcon('Right click stay open')
+    await openWindowFromSelectionIcon(wrapper)
+
+    dispatchOutsidePointerDown({ button: 2, buttons: 2 })
+    await flushPromises()
+    expect(wrapper.find('[data-testid="pdf-windows-host"]').exists()).toBe(true)
+
+    dispatchOutsidePointerDown({ button: 1, buttons: 4 })
+    await flushPromises()
+    expect(wrapper.find('[data-testid="pdf-windows-host"]').exists()).toBe(true)
+  })
+
+  it('dismisses on a primary touch pointer outside the PDF window', async () => {
+    await showSelectionIcon('Touch dismissal')
+    await openWindowFromSelectionIcon(wrapper)
+
+    dispatchOutsidePointerDown({
+      button: 0,
+      buttons: 1,
+      pointerType: 'touch',
+      isPrimary: true
+    })
+    await flushPromises()
+
     expect(wrapper.find('[data-testid="pdf-windows-host"]').exists()).toBe(false)
   })
 
