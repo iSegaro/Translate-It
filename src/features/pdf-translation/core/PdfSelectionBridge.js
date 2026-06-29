@@ -91,7 +91,7 @@ export class PdfSelectionBridge extends ResourceTracker {
   handleWindowBlur() {
     this.isPointerDown = false
     this.hasPendingSelectionChange = false
-    this.clearSelection()
+    this.clearSelection('window-blur')
   }
 
   handleSelectionChange() {
@@ -104,13 +104,13 @@ export class PdfSelectionBridge extends ResourceTracker {
     }
 
     if (!isSelectionInsidePdfTextLayer(selection, viewerRoot)) {
-      this.clearSelection()
+      this.clearSelection('selection-empty')
       return
     }
 
     const payload = buildPdfSelectionPayload(selection, viewerRoot)
     if (!payload) {
-      this.clearSelection()
+      this.clearSelection('selection-empty')
       return
     }
 
@@ -132,7 +132,7 @@ export class PdfSelectionBridge extends ResourceTracker {
     })
   }
 
-  clearSelection() {
+  clearSelection(reason = 'selection-empty') {
     this.isPointerDown = false
     this.hasPendingSelectionChange = false
 
@@ -140,7 +140,7 @@ export class PdfSelectionBridge extends ResourceTracker {
 
     this.lastSelectionSignature = ''
     pageEventBus.emit(SELECTION_EVENTS.GLOBAL_SELECTION_CLEAR, {
-      reason: 'pdf-selection-cleared',
+      reason,
       context: {
         source: 'pdf-viewer',
         isPdf: true

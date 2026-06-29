@@ -137,6 +137,23 @@ describe('PdfSelectionBridge', () => {
     expect(bridge.hasPendingSelectionChange).toBe(false)
   })
 
+  it('emits a window-blur reason when clearing an active PDF selection on blur', () => {
+    const { viewerRoot, selection } = createSelection()
+    getSelectionMock.mockReturnValue(selection)
+    const bridge = new PdfSelectionBridge(ref(viewerRoot))
+
+    bridge.handleSelectionChange()
+    bridge.handleWindowBlur()
+
+    expect(emitMock).toHaveBeenCalledWith('global-selection-clear', expect.objectContaining({
+      reason: 'window-blur',
+      context: expect.objectContaining({
+        source: 'pdf-viewer',
+        isPdf: true
+      })
+    }))
+  })
+
   it('still emits immediately for keyboard or other non-pointer selection changes', () => {
     const { viewerRoot, selection } = createSelection()
     getSelectionMock.mockReturnValue(selection)

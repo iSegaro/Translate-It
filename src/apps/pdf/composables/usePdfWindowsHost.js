@@ -492,7 +492,16 @@ export function usePdfWindowsHost(options = {}) {
       return
     }
 
+    if (detail?.reason === 'window-blur' && isVisible.value) {
+      return
+    }
+
     if (isIconTransitionPending.value) {
+      return
+    }
+
+    const activeElement = typeof document !== 'undefined' ? document.activeElement : null
+    if (isVisible.value && hostRef.value?.contains(activeElement)) {
       return
     }
 

@@ -1141,6 +1141,69 @@ describe('PdfWindowsHost', () => {
     document.body.removeChild(dropdownMenu)
   })
 
+  it('keeps the PDF window open when toolbar TTS starts while the original PDF selection is still active', async () => {
+    sendRegularMessageMock.mockResolvedValueOnce({
+      success: true,
+      translatedText: 'Selection still active',
+      sourceLanguage: 'en',
+      mode: 'selection-manager'
+    })
+
+    await showSelectionIcon('Active selection')
+    await openWindowFromSelectionIcon(wrapper)
+    await flushPromises()
+
+    const ttsButton = wrapper.get('[data-testid="translation-window-toolbar-tts"]')
+    ttsButton.element.focus()
+    await ttsButton.trigger('pointerdown')
+    await ttsButton.trigger('click')
+    await flushPromises()
+
+    emitSelectionClear({
+      context: { source: 'pdf-viewer', isPdf: true }
+    })
+    await flushPromises()
+
+    expect(wrapper.find('[data-testid="pdf-windows-host"]').exists()).toBe(true)
+    expect(ttsStopMock).not.toHaveBeenCalled()
+
+    await wrapper.get('[data-testid="translation-window-toolbar-close"]').trigger('click')
+    await flushPromises()
+
+    expect(ttsStopMock).toHaveBeenCalledTimes(1)
+    expect(sendMessageMock).toHaveBeenCalledWith(expect.objectContaining({
+      action: 'TTS_STOP',
+      context: 'tts-smart'
+    }))
+  })
+
+  it('keeps the visible PDF window open when the browser window blurs while toolbar TTS is active', async () => {
+    sendRegularMessageMock.mockResolvedValueOnce({
+      success: true,
+      translatedText: 'Blur safe result',
+      sourceLanguage: 'en',
+      mode: 'selection-manager'
+    })
+
+    await showSelectionIcon('Blur safe selection')
+    await openWindowFromSelectionIcon(wrapper)
+    await flushPromises()
+
+    await wrapper.get('[data-testid="translation-window-toolbar-tts"]').trigger('click')
+    await flushPromises()
+
+    window.dispatchEvent(new Event('blur'))
+    await flushPromises()
+
+    expect(wrapper.find('[data-testid="pdf-windows-host"]').exists()).toBe(true)
+    expect(ttsStopMock).not.toHaveBeenCalled()
+
+    await wrapper.get('[data-testid="translation-window-toolbar-close"]').trigger('click')
+    await flushPromises()
+
+    expect(ttsStopMock).toHaveBeenCalledTimes(1)
+  })
+
   it('keeps plain text output readable through SafeMarkdownPreview', async () => {
     sendRegularMessageMock.mockResolvedValueOnce({
       success: true,
