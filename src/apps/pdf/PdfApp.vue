@@ -108,12 +108,6 @@
         </template>
       </PdfDropzone>
 
-      <section
-        v-if="error || exportError || ocrError"
-        class="pdf-app__error"
-      >
-        {{ error || exportError || ocrError }}
-      </section>
     </main>
 
     <PdfWindowsHost :pdf-fingerprint="pdfFingerprint" />
@@ -359,14 +353,6 @@ onBeforeUnmount(() => {
 .pdf-app__empty-text {
   margin: 0;
   color: rgba(230, 237, 247, 0.7);
-}
-
-.pdf-app__error {
-  margin-top: 16px;
-  padding: 12px 16px;
-  border-radius: 12px;
-  background: rgba(239, 68, 68, 0.14);
-  color: #fecaca;
 }
 
 @media (max-width: 960px) {

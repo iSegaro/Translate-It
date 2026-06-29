@@ -270,6 +270,22 @@ describe('PdfApp', () => {
     expect(wrapper.text()).toContain('HTML export downloaded successfully.')
   })
 
+  it.each([
+    ['PDF load', { error: 'Failed to open the PDF file.' }],
+    ['export', { exportError: 'Failed to export as TXT.' }],
+    ['OCR', { ocrError: 'OCR failed.' }]
+  ])('shows only the banner for %s errors', async (_label, bannerState) => {
+    createMocks({ bannerState })
+
+    const wrapper = mount(PdfApp)
+    await flushPromises()
+    await flushPromises()
+
+    expect(wrapper.find('.pdf-status-banner').exists()).toBe(true)
+    expect(wrapper.find('.pdf-app__error').exists()).toBe(false)
+    expect(wrapper.text()).toContain(bannerState.error || bannerState.exportError || bannerState.ocrError)
+  })
+
   it('does not show export success when export fails', async () => {
     createMocks()
     mockPdfExport.exportTxt.mockImplementation(() => {
