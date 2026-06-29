@@ -3,6 +3,7 @@ import { buildPageMaskModel } from './PageMaskModelBuilder.js'
 import {
   createStructuredLayoutCell,
   createStructuredLayoutColumn,
+  createStructuredLayoutGroup,
   createStructuredLayoutGrid,
   createStructuredLayoutModel,
   createStructuredLayoutRegion,
@@ -305,6 +306,7 @@ function makeStructuredPageLayout({
   pageNumber = 1,
   pageSize = makePageSize(),
   structuredRegions = [],
+  structuredGroups = [],
   regions = [],
   blocks = []
 } = {}) {
@@ -319,10 +321,49 @@ function makeStructuredPageLayout({
         pageNumber,
         pageSize,
         regions: structuredRegions,
-        groups: []
+        groups: structuredGroups
       })
     }
   }
+}
+
+function makeStructuredGroup(groupId, {
+  kind = 'grid',
+  layout = 'row',
+  confidence = 0.9,
+  boundingBox = null,
+  regionIds = [],
+  regionKinds = [],
+  sourceRegionType = null
+} = {}) {
+  return createStructuredLayoutGroup({
+    id: groupId,
+    groupId,
+    kind,
+    layout,
+    confidence,
+    boundingBox,
+    regionIds,
+    regionKinds,
+    relationships: {
+      memberRegionIds: regionIds
+    },
+    sourceReferences: {
+      blockIds: [],
+      lineIds: [],
+      sourceLineIndices: [],
+      sourceItemIndices: [],
+      sourceRegionId: groupId,
+      sourceRegionType,
+      groupId,
+      groupRegionIds: regionIds
+    },
+    structureSignals: {
+      confidence,
+      layout,
+      memberCount: regionIds.length
+    }
+  })
 }
 
 describe('PageMaskModelBuilder', () => {
@@ -535,6 +576,232 @@ describe('PageMaskModelBuilder', () => {
       expect(result.metadata.rowMasks).toBe(0)
     })
 
+    it('creates conservative region masks for KPI and key-value regions', () => {
+      const kpiRegionId = 'kpi-r0'
+      const kpiRegion = makeStructuredRegion(kpiRegionId, {
+        kind: 'kpi',
+        subtype: 'kpi-card',
+        boundingBox: { x: 40, y: 100, width: 180, height: 40 },
+        confidence: 0.82,
+        sourceRegionType: 'semantic',
+        classificationSource: 'semantic-kpi',
+        cells: [
+          makeStructuredCell(kpiRegionId, {
+            id: `${kpiRegionId}-label`,
+            rowIndex: 0,
+            columnIndex: 0,
+            boundingBox: { x: 40, y: 100, width: 70, height: 14 },
+            role: 'label',
+            sourceRegionType: 'semantic'
+          }),
+          makeStructuredCell(kpiRegionId, {
+            id: `${kpiRegionId}-value`,
+            rowIndex: 0,
+            columnIndex: 1,
+            boundingBox: { x: 120, y: 100, width: 60, height: 14 },
+            role: 'value',
+            sourceRegionType: 'semantic'
+          })
+        ],
+        rows: [
+          makeStructuredRow(kpiRegionId, {
+            rowIndex: 0,
+            boundingBox: { x: 40, y: 100, width: 180, height: 14 },
+            cellIds: [`${kpiRegionId}-label`, `${kpiRegionId}-value`],
+            sourceRegionType: 'semantic'
+          })
+        ],
+        columns: [
+          makeStructuredColumn(kpiRegionId, {
+            columnIndex: 0,
+            x: 40,
+            width: 70,
+            cellIds: [`${kpiRegionId}-label`],
+            sourceRegionType: 'semantic'
+          }),
+          makeStructuredColumn(kpiRegionId, {
+            columnIndex: 1,
+            x: 120,
+            width: 60,
+            cellIds: [`${kpiRegionId}-value`],
+            sourceRegionType: 'semantic'
+          })
+        ]
+      })
+
+      const kvRegionId = 'kv-r1'
+      const kvRegion = makeStructuredRegion(kvRegionId, {
+        kind: 'key-value',
+        subtype: 'key-value-grid',
+        boundingBox: { x: 40, y: 160, width: 180, height: 22 },
+        confidence: 0.74,
+        sourceRegionType: 'semantic',
+        classificationSource: 'semantic-key-value',
+        cells: [
+          makeStructuredCell(kvRegionId, {
+            id: `${kvRegionId}-label`,
+            rowIndex: 0,
+            columnIndex: 0,
+            boundingBox: { x: 40, y: 160, width: 80, height: 12 },
+            role: 'label',
+            sourceRegionType: 'semantic'
+          }),
+          makeStructuredCell(kvRegionId, {
+            id: `${kvRegionId}-value`,
+            rowIndex: 0,
+            columnIndex: 1,
+            boundingBox: { x: 130, y: 160, width: 90, height: 12 },
+            role: 'value',
+            sourceRegionType: 'semantic'
+          })
+        ],
+        rows: [
+          makeStructuredRow(kvRegionId, {
+            rowIndex: 0,
+            boundingBox: { x: 40, y: 160, width: 180, height: 12 },
+            cellIds: [`${kvRegionId}-label`, `${kvRegionId}-value`],
+            sourceRegionType: 'semantic'
+          })
+        ],
+        columns: [
+          makeStructuredColumn(kvRegionId, {
+            columnIndex: 0,
+            x: 40,
+            width: 80,
+            cellIds: [`${kvRegionId}-label`],
+            sourceRegionType: 'semantic'
+          }),
+          makeStructuredColumn(kvRegionId, {
+            columnIndex: 1,
+            x: 130,
+            width: 90,
+            cellIds: [`${kvRegionId}-value`],
+            sourceRegionType: 'semantic'
+          })
+        ]
+      })
+
+      const result = buildPageMaskModel(makeStructuredPageLayout({
+        structuredRegions: [kpiRegion, kvRegion]
+      }))
+
+      const regionMasks = result.masks.filter((mask) => mask.type === 'region')
+      expect(regionMasks).toHaveLength(2)
+      expect(regionMasks.map((mask) => mask.ownerId)).toEqual([
+        `structured-region:${kpiRegionId}`,
+        `structured-region:${kvRegionId}`
+      ])
+      expect(regionMasks.map((mask) => mask.source)).toEqual(['structured-region', 'structured-region'])
+      expect(result.metadata.regionMasks).toBe(2)
+    })
+
+    it('does not create broad region masks for tables', () => {
+      const regionId = 'table-r0'
+      const structuredCell = makeStructuredCell(regionId, {
+        id: `${regionId}-c0`,
+        rowIndex: 0,
+        columnIndex: 0,
+        boundingBox: { x: 40, y: 100, width: 80, height: 20 }
+      })
+      const structuredRegion = makeStructuredRegion(regionId, {
+        rows: [makeStructuredRow(regionId, {
+          rowIndex: 0,
+          boundingBox: { x: 40, y: 100, width: 80, height: 20 },
+          cellIds: [structuredCell.id]
+        })],
+        columns: [makeStructuredColumn(regionId, {
+          columnIndex: 0,
+          x: 40,
+          width: 80,
+          cellIds: [structuredCell.id]
+        })],
+        cells: [structuredCell],
+        boundingBox: { x: 40, y: 100, width: 80, height: 20 }
+      })
+
+      const result = buildPageMaskModel(makeStructuredPageLayout({
+        structuredRegions: [structuredRegion]
+      }))
+
+      expect(result.masks.some((mask) => mask.type === 'region')).toBe(false)
+      expect(result.metadata.regionMasks).toBe(0)
+    })
+
+    it('skips low-confidence and oversized region masks', () => {
+      const lowConfidenceRegion = makeStructuredRegion('low-conf', {
+        kind: 'kpi',
+        subtype: 'kpi-card',
+        confidence: 0.4,
+        boundingBox: { x: 40, y: 100, width: 120, height: 30 },
+        cells: [
+          makeStructuredCell('low-conf', {
+            id: 'low-conf-c0',
+            rowIndex: 0,
+            columnIndex: 0,
+            boundingBox: { x: 40, y: 100, width: 120, height: 30 },
+            sourceRegionType: 'semantic'
+          })
+        ],
+        rows: [
+          makeStructuredRow('low-conf', {
+            rowIndex: 0,
+            boundingBox: { x: 40, y: 100, width: 120, height: 30 },
+            cellIds: ['low-conf-c0'],
+            sourceRegionType: 'semantic'
+          })
+        ],
+        columns: [
+          makeStructuredColumn('low-conf', {
+            columnIndex: 0,
+            x: 40,
+            width: 120,
+            cellIds: ['low-conf-c0'],
+            sourceRegionType: 'semantic'
+          })
+        ]
+      })
+
+      const oversizedRegion = makeStructuredRegion('oversized', {
+        kind: 'key-value',
+        subtype: 'key-value-grid',
+        confidence: 0.95,
+        boundingBox: { x: 20, y: 20, width: 500, height: 700 },
+        cells: [
+          makeStructuredCell('oversized', {
+            id: 'oversized-c0',
+            rowIndex: 0,
+            columnIndex: 0,
+            boundingBox: { x: 20, y: 20, width: 250, height: 20 },
+            sourceRegionType: 'semantic'
+          })
+        ],
+        rows: [
+          makeStructuredRow('oversized', {
+            rowIndex: 0,
+            boundingBox: { x: 20, y: 20, width: 250, height: 20 },
+            cellIds: ['oversized-c0'],
+            sourceRegionType: 'semantic'
+          })
+        ],
+        columns: [
+          makeStructuredColumn('oversized', {
+            columnIndex: 0,
+            x: 20,
+            width: 250,
+            cellIds: ['oversized-c0'],
+            sourceRegionType: 'semantic'
+          })
+        ]
+      })
+
+      const result = buildPageMaskModel(makeStructuredPageLayout({
+        structuredRegions: [lowConfidenceRegion, oversizedRegion]
+      }))
+
+      expect(result.masks.some((mask) => mask.type === 'region')).toBe(false)
+      expect(result.metadata.regionMasks).toBe(0)
+    })
+
     it('keeps simple structured 2x2 tables row-mask free', () => {
       const regionId = 's-r1'
       const cells = [
@@ -593,6 +860,7 @@ describe('PageMaskModelBuilder', () => {
       expect(result.masks).toHaveLength(4)
       expect(result.masks.every((mask) => mask.source === 'structured-cell')).toBe(true)
       expect(result.metadata.rowMasks).toBe(0)
+      expect(result.metadata.regionMasks).toBe(0)
     })
 
     it('creates conservative row masks from canonical structured rows', () => {
@@ -744,6 +1012,7 @@ describe('PageMaskModelBuilder', () => {
       expect(result.masks).toHaveLength(1)
       expect(result.masks[0].source).toBe('table-occupancy')
       expect(result.masks[0].ownerId).toBe('legacy-cell')
+      expect(result.metadata.regionMasks).toBe(0)
     })
 
     it('ignores unknown structured regions and keeps them classification-only', () => {
@@ -767,6 +1036,7 @@ describe('PageMaskModelBuilder', () => {
       expect(result.metadata.totalMasks).toBe(0)
       expect(result.metadata.cellMasks).toBe(0)
       expect(result.metadata.rowMasks).toBe(0)
+      expect(result.metadata.regionMasks).toBe(0)
     })
   })
 
@@ -955,6 +1225,224 @@ describe('PageMaskModelBuilder', () => {
       expect(Object.isFrozen(rowMask)).toBe(true)
       expect(Object.isFrozen(rowMask.boundingBox)).toBe(true)
       expect(Object.isFrozen(rowMask.padding)).toBe(true)
+    })
+  })
+
+  describe('group masks', () => {
+    it('creates a conservative group mask for safe dashboard groups', () => {
+      const regionA = makeStructuredRegion('grp-r0', {
+        kind: 'kpi',
+        subtype: 'kpi-card',
+        boundingBox: { x: 40, y: 100, width: 120, height: 40 },
+        confidence: 0.84,
+        sourceRegionType: 'semantic',
+        cells: [
+          makeStructuredCell('grp-r0', {
+            id: 'grp-r0-c0',
+            rowIndex: 0,
+            columnIndex: 0,
+            boundingBox: { x: 40, y: 100, width: 120, height: 40 },
+            sourceRegionType: 'semantic'
+          })
+        ],
+        rows: [makeStructuredRow('grp-r0', {
+          rowIndex: 0,
+          boundingBox: { x: 40, y: 100, width: 120, height: 40 },
+          cellIds: ['grp-r0-c0'],
+          sourceRegionType: 'semantic'
+        })],
+        columns: [makeStructuredColumn('grp-r0', {
+          columnIndex: 0,
+          x: 40,
+          width: 120,
+          cellIds: ['grp-r0-c0'],
+          sourceRegionType: 'semantic'
+        })]
+      })
+
+      const regionB = makeStructuredRegion('grp-r1', {
+        kind: 'key-value',
+        subtype: 'key-value-grid',
+        boundingBox: { x: 180, y: 100, width: 120, height: 40 },
+        confidence: 0.81,
+        sourceRegionType: 'semantic',
+        cells: [
+          makeStructuredCell('grp-r1', {
+            id: 'grp-r1-c0',
+            rowIndex: 0,
+            columnIndex: 0,
+            boundingBox: { x: 180, y: 100, width: 120, height: 40 },
+            sourceRegionType: 'semantic'
+          })
+        ],
+        rows: [makeStructuredRow('grp-r1', {
+          rowIndex: 0,
+          boundingBox: { x: 180, y: 100, width: 120, height: 40 },
+          cellIds: ['grp-r1-c0'],
+          sourceRegionType: 'semantic'
+        })],
+        columns: [makeStructuredColumn('grp-r1', {
+          columnIndex: 0,
+          x: 180,
+          width: 120,
+          cellIds: ['grp-r1-c0'],
+          sourceRegionType: 'semantic'
+        })]
+      })
+
+      const group = makeStructuredGroup('dashboard-1', {
+        boundingBox: null,
+        confidence: 0.83,
+        regionIds: [regionA.id, regionB.id],
+        regionKinds: [regionA.kind, regionB.kind]
+      })
+
+      const result = buildPageMaskModel(makeStructuredPageLayout({
+        structuredRegions: [regionA, regionB],
+        structuredGroups: [group]
+      }))
+
+      const groupMasks = result.masks.filter((mask) => mask.type === 'group')
+      expect(groupMasks).toHaveLength(1)
+      expect(groupMasks[0].ownerId).toBe('structured-group:dashboard-1')
+      expect(groupMasks[0].source).toBe('structured-group')
+    })
+
+    it('skips low-confidence and oversized groups', () => {
+      const lowConfidenceRegionA = makeStructuredRegion('big-r0', {
+        kind: 'kpi',
+        subtype: 'kpi-card',
+        boundingBox: { x: 20, y: 20, width: 120, height: 40 },
+        confidence: 0.9,
+        sourceRegionType: 'semantic',
+        cells: [makeStructuredCell('big-r0', {
+          id: 'big-r0-c0',
+          rowIndex: 0,
+          columnIndex: 0,
+          boundingBox: { x: 20, y: 20, width: 120, height: 40 },
+          sourceRegionType: 'semantic'
+        })],
+        rows: [makeStructuredRow('big-r0', {
+          rowIndex: 0,
+          boundingBox: { x: 20, y: 20, width: 120, height: 40 },
+          cellIds: ['big-r0-c0'],
+          sourceRegionType: 'semantic'
+        })],
+        columns: [makeStructuredColumn('big-r0', {
+          columnIndex: 0,
+          x: 20,
+          width: 120,
+          cellIds: ['big-r0-c0'],
+          sourceRegionType: 'semantic'
+        })]
+      })
+
+      const lowConfidenceRegionB = makeStructuredRegion('big-r1', {
+        kind: 'key-value',
+        subtype: 'key-value-grid',
+        boundingBox: { x: 180, y: 20, width: 120, height: 40 },
+        confidence: 0.9,
+        sourceRegionType: 'semantic',
+        cells: [makeStructuredCell('big-r1', {
+          id: 'big-r1-c0',
+          rowIndex: 0,
+          columnIndex: 0,
+          boundingBox: { x: 180, y: 20, width: 120, height: 40 },
+          sourceRegionType: 'semantic'
+        })],
+        rows: [makeStructuredRow('big-r1', {
+          rowIndex: 0,
+          boundingBox: { x: 180, y: 20, width: 120, height: 40 },
+          cellIds: ['big-r1-c0'],
+          sourceRegionType: 'semantic'
+        })],
+        columns: [makeStructuredColumn('big-r1', {
+          columnIndex: 0,
+          x: 180,
+          width: 120,
+          cellIds: ['big-r1-c0'],
+          sourceRegionType: 'semantic'
+        })]
+      })
+
+      const oversizedRegionA = makeStructuredRegion('big-r2', {
+        kind: 'kpi',
+        subtype: 'kpi-card',
+        boundingBox: { x: 10, y: 10, width: 260, height: 700 },
+        confidence: 0.9,
+        sourceRegionType: 'semantic',
+        cells: [makeStructuredCell('big-r2', {
+          id: 'big-r2-c0',
+          rowIndex: 0,
+          columnIndex: 0,
+          boundingBox: { x: 10, y: 10, width: 260, height: 700 },
+          sourceRegionType: 'semantic'
+        })],
+        rows: [makeStructuredRow('big-r2', {
+          rowIndex: 0,
+          boundingBox: { x: 10, y: 10, width: 260, height: 700 },
+          cellIds: ['big-r2-c0'],
+          sourceRegionType: 'semantic'
+        })],
+        columns: [makeStructuredColumn('big-r2', {
+          columnIndex: 0,
+          x: 10,
+          width: 260,
+          cellIds: ['big-r2-c0'],
+          sourceRegionType: 'semantic'
+        })]
+      })
+
+      const oversizedRegionB = makeStructuredRegion('big-r3', {
+        kind: 'key-value',
+        subtype: 'key-value-grid',
+        boundingBox: { x: 300, y: 10, width: 260, height: 700 },
+        confidence: 0.9,
+        sourceRegionType: 'semantic',
+        cells: [makeStructuredCell('big-r3', {
+          id: 'big-r3-c0',
+          rowIndex: 0,
+          columnIndex: 0,
+          boundingBox: { x: 300, y: 10, width: 260, height: 700 },
+          sourceRegionType: 'semantic'
+        })],
+        rows: [makeStructuredRow('big-r3', {
+          rowIndex: 0,
+          boundingBox: { x: 300, y: 10, width: 260, height: 700 },
+          cellIds: ['big-r3-c0'],
+          sourceRegionType: 'semantic'
+        })],
+        columns: [makeStructuredColumn('big-r3', {
+          columnIndex: 0,
+          x: 300,
+          width: 260,
+          cellIds: ['big-r3-c0'],
+          sourceRegionType: 'semantic'
+        })]
+      })
+
+      const lowConfidenceGroup = makeStructuredGroup('dashboard-low', {
+        confidence: 0.4,
+        regionIds: [lowConfidenceRegionA.id, lowConfidenceRegionB.id],
+        regionKinds: [lowConfidenceRegionA.kind, lowConfidenceRegionB.kind]
+      })
+      const oversizedGroup = makeStructuredGroup('dashboard-big', {
+        confidence: 0.93,
+        regionIds: [oversizedRegionA.id, oversizedRegionB.id],
+        regionKinds: [oversizedRegionA.kind, oversizedRegionB.kind]
+      })
+
+      const result = buildPageMaskModel(makeStructuredPageLayout({
+        structuredRegions: [
+          lowConfidenceRegionA,
+          lowConfidenceRegionB,
+          oversizedRegionA,
+          oversizedRegionB
+        ],
+        structuredGroups: [lowConfidenceGroup, oversizedGroup]
+      }))
+
+      expect(result.masks.some((mask) => mask.type === 'group')).toBe(false)
     })
   })
 

@@ -1,7 +1,7 @@
 /**
  * PageMaskModelBuilder — diagnostic-only mask generation for PDF pages.
  *
- * Phase 3a: Generates mask metadata from an existing pageLayout.
+ * Phase 3a/3b: Generates mask metadata from an existing pageLayout.
  * Masks describe which areas of the page should be covered during
  * overlay rendering or export. This phase is diagnostic-only — no
  * consumer reads masks yet.
@@ -16,6 +16,13 @@ const BLOCK_PADDING = Object.freeze({ top: 1, right: 1, bottom: 1, left: 1 })
 const ROW_PADDING = Object.freeze({ top: 1, right: 2, bottom: 1, left: 2 })
 const NUMERIC_PATTERN = /^[\d.,\s+\-–—$€£¥₹BMKbmk%()]+$/
 const ROW_MIN_OCCUPIED_CELLS = 3
+const STRUCTURED_REGION_MIN_CONFIDENCE = 0.7
+const STRUCTURED_REGION_MAX_AREA_RATIO = 0.35
+const STRUCTURED_REGION_MAX_CELL_COUNT = 8
+const STRUCTURED_GROUP_MIN_CONFIDENCE = 0.7
+const STRUCTURED_GROUP_MAX_AREA_RATIO = 0.45
+const STRUCTURED_GROUP_MAX_MEMBER_COUNT = 6
+const STRUCTURED_REGION_KINDS = new Set(['kpi', 'key-value'])
 
 function clampBBox(bbox, pageSize) {
   if (!bbox) return null
@@ -73,6 +80,43 @@ function unionBoundingBoxes(boxes = []) {
   })
 }
 
+function getPageArea(pageLayout = null) {
+  const width = pageLayout?.pageSize?.width
+  const height = pageLayout?.pageSize?.height
+  if (!Number.isFinite(width) || !Number.isFinite(height) || width <= 0 || height <= 0) {
+    return null
+  }
+
+  return width * height
+}
+
+function getBoundingBoxArea(bbox = null) {
+  if (!isValidBoundingBox(bbox)) return 0
+  return bbox.width * bbox.height
+}
+
+function getCoverageRatio(bboxes = [], regionBBox = null) {
+  if (!isValidBoundingBox(regionBBox)) return 0
+
+  const union = unionBoundingBoxes(bboxes)
+  if (!isValidBoundingBox(union)) return 0
+
+  const regionArea = getBoundingBoxArea(regionBBox)
+  if (!Number.isFinite(regionArea) || regionArea <= 0) return 0
+
+  return getBoundingBoxArea(union) / regionArea
+}
+
+function isConservativeMaskBBoxSafe(bbox, pageLayout, maxAreaRatio) {
+  if (!isValidBoundingBox(bbox)) return false
+
+  const pageArea = getPageArea(pageLayout)
+  if (!Number.isFinite(pageArea) || pageArea <= 0) return false
+
+  const ratio = getBoundingBoxArea(bbox) / pageArea
+  return Number.isFinite(ratio) && ratio > 0 && ratio <= maxAreaRatio
+}
+
 function resolveContentHint(text, block, region) {
   if (block?.role === 'heading') return 'heading'
 
@@ -90,6 +134,15 @@ function getStructuredRegions(pageLayout) {
   }
 
   return Array.isArray(structuredLayout.regions) ? structuredLayout.regions : []
+}
+
+function getStructuredGroups(pageLayout) {
+  const structuredLayout = pageLayout?.metadata?.structured
+  if (!isStructuredLayoutModel(structuredLayout)) {
+    return []
+  }
+
+  return Array.isArray(structuredLayout.groups) ? structuredLayout.groups : []
 }
 
 function getStructuredRegionCellMap(region = null) {
@@ -151,6 +204,59 @@ function isStructuredRowMaskCandidate(region, row, rowCells) {
   }
 
   return hasEnoughCells
+}
+
+function getStructuredRegionCellCount(region = null) {
+  return Array.isArray(region?.cells) ? region.cells.length : 0
+}
+
+function isStructuredRegionMaskCandidate(region, bbox, pageLayout) {
+  if (!region || !STRUCTURED_REGION_KINDS.has(region.kind)) return false
+  if (!Number.isFinite(region.confidence) || region.confidence < STRUCTURED_REGION_MIN_CONFIDENCE) return false
+  if (!isConservativeMaskBBoxSafe(bbox, pageLayout, STRUCTURED_REGION_MAX_AREA_RATIO)) return false
+
+  const cellCount = getStructuredRegionCellCount(region)
+  if (cellCount <= 0 || cellCount > STRUCTURED_REGION_MAX_CELL_COUNT) return false
+
+  const coverageRatio = getCoverageRatio(
+    Array.isArray(region.cells) ? region.cells.map((cell) => cell?.boundingBox).filter(Boolean) : [],
+    bbox
+  )
+  if (coverageRatio >= 0.8) return false
+
+  return true
+}
+
+function buildStructuredRegionMasks(pageLayout) {
+  const structuredRegions = getStructuredRegions(pageLayout)
+  const masks = []
+
+  for (const region of structuredRegions) {
+    const regionId = region?.id || region?.regionId || null
+    if (!regionId) continue
+    if (!isStructuredRegionMaskCandidate(region, region.boundingBox, pageLayout)) continue
+
+    const bbox = clampBBox(region.boundingBox, pageLayout.pageSize)
+    if (!bbox) continue
+
+    masks.push(Object.freeze({
+      id: `mask-${pageLayout.pageNumber}-structured-region-${regionId}`,
+      type: 'region',
+      source: 'structured-region',
+      boundingBox: bbox,
+      padding: capPadding(CELL_PADDING, bbox.width, bbox.height),
+      backgroundStrategy: 'sample',
+      priority: 70,
+      contentHint: 'text',
+      ownerId: `structured-region:${regionId}`,
+      regionKind: region.kind,
+      subtype: region.subtype || null,
+      confidence: region.confidence,
+      sourceReferences: region.sourceReferences
+    }))
+  }
+
+  return masks
 }
 
 function buildStructuredCellMasks(pageLayout) {
@@ -282,6 +388,86 @@ function buildStructuredRowMasks(pageLayout) {
   return { masks, regionIdsWithStructuredMasks }
 }
 
+function getStructuredGroupMemberRegions(group = null, regionMap = null) {
+  if (!group || !regionMap) return []
+
+  const memberRegionIds = Array.isArray(group.regionIds) ? group.regionIds : []
+  return memberRegionIds
+    .map((regionId) => regionMap.get(regionId) || null)
+    .filter(Boolean)
+}
+
+function getStructuredGroupBoundingBox(group = null, memberRegions = [], pageLayout = null) {
+  const explicitBoundingBox = clampBBox(group?.boundingBox || null, pageLayout?.pageSize)
+  if (isConservativeMaskBBoxSafe(explicitBoundingBox, pageLayout, STRUCTURED_GROUP_MAX_AREA_RATIO)) {
+    return explicitBoundingBox
+  }
+
+  const memberBoundingBoxes = memberRegions
+    .map((region) => region?.boundingBox || null)
+    .filter((box) => isValidBoundingBox(box))
+
+  if (memberBoundingBoxes.length < 2) {
+    return null
+  }
+
+  const unionBoundingBox = clampBBox(unionBoundingBoxes(memberBoundingBoxes), pageLayout?.pageSize)
+  if (!isConservativeMaskBBoxSafe(unionBoundingBox, pageLayout, STRUCTURED_GROUP_MAX_AREA_RATIO)) {
+    return null
+  }
+
+  return unionBoundingBox
+}
+
+function isStructuredGroupMaskCandidate(group = null, memberRegions = [], bbox = null, pageLayout = null) {
+  if (!group || group.kind !== 'grid') return false
+  if (!Number.isFinite(group.confidence) || group.confidence < STRUCTURED_GROUP_MIN_CONFIDENCE) return false
+  if (!bbox) return false
+  if (!Number.isFinite(getPageArea(pageLayout)) || getPageArea(pageLayout) <= 0) return false
+  if (memberRegions.length < 2 || memberRegions.length > STRUCTURED_GROUP_MAX_MEMBER_COUNT) return false
+
+  return true
+}
+
+function buildStructuredGroupMasks(pageLayout) {
+  const structuredRegions = getStructuredRegions(pageLayout)
+  const structuredGroups = getStructuredGroups(pageLayout)
+  const regionMap = new Map(structuredRegions.map((region) => [region?.id || region?.regionId || null, region]).filter(([id]) => !!id))
+  const masks = []
+
+  for (const group of structuredGroups) {
+    const groupId = group?.id || group?.groupId || null
+    if (!groupId) continue
+
+    const memberRegions = getStructuredGroupMemberRegions(group, regionMap)
+    const bbox = getStructuredGroupBoundingBox(group, memberRegions, pageLayout)
+    if (!isStructuredGroupMaskCandidate(group, memberRegions, bbox, pageLayout)) continue
+
+    masks.push(Object.freeze({
+      id: `mask-${pageLayout.pageNumber}-structured-group-${groupId}`,
+      type: 'group',
+      source: 'structured-group',
+      boundingBox: bbox,
+      padding: capPadding(ROW_PADDING, bbox.width, bbox.height),
+      backgroundStrategy: 'sample',
+      priority: 60,
+      contentHint: 'text',
+      ownerId: `structured-group:${groupId}`,
+      groupId,
+      groupKind: group.kind,
+      layout: group.layout || null,
+      confidence: group.confidence,
+      regionIds: group.regionIds,
+      regionKinds: group.regionKinds,
+      sourceReferences: group.sourceReferences,
+      relationships: group.relationships,
+      structureSignals: group.structureSignals
+    }))
+  }
+
+  return masks
+}
+
 function buildLegacyRowMasks(pageLayout, skipRegionIds = new Set()) {
   const masks = []
 
@@ -399,6 +585,8 @@ export function buildPageMaskModel(pageLayout) {
 
   const structuredCellResult = buildStructuredCellMasks(pageLayout)
   const structuredRowResult = buildStructuredRowMasks(pageLayout)
+  const structuredRegionMasks = buildStructuredRegionMasks(pageLayout)
+  const structuredGroupMasks = buildStructuredGroupMasks(pageLayout)
 
   const tableRegionIds = new Set()
   for (const region of pageLayout.regions) {
@@ -416,7 +604,10 @@ export function buildPageMaskModel(pageLayout) {
     ...buildLegacyRowMasks(pageLayout, structuredRowResult.regionIdsWithStructuredMasks)
   ]
   const blockMasks = buildBlockMasks(pageLayout, tableRegionIds)
-  const regionMasks = []
+  const regionMasks = [
+    ...structuredRegionMasks,
+    ...structuredGroupMasks
+  ]
 
   const masks = [...cellMasks, ...rowMasks, ...blockMasks, ...regionMasks]
 
