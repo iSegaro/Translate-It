@@ -17,6 +17,13 @@ const storageSetMock = vi.fn(async (data) => {
 
 const sendRegularMessageMock = vi.fn()
 const sendMessageMock = vi.fn()
+const ttsStopMock = vi.fn(async () => {
+  sendMessageMock({
+    action: 'TTS_STOP',
+    context: 'tts-smart'
+  })
+  return true
+})
 
 vi.mock('@/shared/storage/core/StorageCore.js', () => ({
   storageCore: {
@@ -135,7 +142,40 @@ vi.mock('@/components/shared/TTSButton.vue', () => ({
   default: {
     name: 'TTSButton',
     props: ['text', 'language', 'disabled', 'isDictionary'],
-    template: '<button class="tts-button-stub" :data-text="text" :data-language="language" :data-dictionary="isDictionary" :disabled="disabled">{{ text }}</button>'
+    emits: ['tts-started', 'tts-stopped', 'tts-error', 'state-changed'],
+    setup(_, { expose }) {
+      const isPlaying = ref(false)
+
+      const start = async () => {
+        isPlaying.value = true
+        return true
+      }
+
+      const stop = async () => {
+        if (!isPlaying.value) {
+          return true
+        }
+
+        isPlaying.value = false
+        ttsStopMock()
+        sendMessageMock({
+          action: 'TTS_STOP',
+          context: 'tts-smart'
+        })
+        return true
+      }
+
+      expose({
+        start,
+        stop
+      })
+
+      return {
+        start,
+        stop
+      }
+    },
+    template: '<button class="tts-button-stub" :data-text="text" :data-language="language" :data-dictionary="isDictionary" :disabled="disabled" @click="start">{{ text }}</button>'
   }
 }))
 
@@ -234,6 +274,7 @@ describe('PdfWindowsHost', () => {
 
   beforeEach(async () => {
     windowsManagerImported = false
+    ttsStopMock.mockClear()
     globalThis.__pdfWindowsHostStorageState = {
       pdfWindowsHostLayout: {
         version: 1,
@@ -301,7 +342,7 @@ describe('PdfWindowsHost', () => {
     await flushPromises()
 
     expect(wrapper.find('[data-testid="pdf-windows-host"]').exists()).toBe(false)
-    expect(wrapper.find('[data-testid="pdf-windows-host-icon-stage"]').exists()).toBe(false)
+    expect(wrapper.get('[data-testid="pdf-windows-host-icon-stage"]').isVisible()).toBe(false)
 
     await showSelectionIcon('PDF text')
 
@@ -341,7 +382,7 @@ describe('PdfWindowsHost', () => {
     await translateButton.trigger('click')
     await flushPromises()
 
-    expect(wrapper.find('[data-testid="pdf-windows-host-icon-stage"]').exists()).toBe(false)
+    expect(wrapper.get('[data-testid="pdf-windows-host-icon-stage"]').isVisible()).toBe(false)
     expect(wrapper.find('[data-testid="pdf-windows-host"]').exists()).toBe(true)
     expect(sendRegularMessageMock).toHaveBeenCalledTimes(1)
   })
@@ -389,6 +430,129 @@ describe('PdfWindowsHost', () => {
     expect(wrapper.find('[data-testid="pdf-windows-host"]').exists()).toBe(false)
     expect(wrapper.find('[data-testid="pdf-windows-host-icon-stage"]').exists()).toBe(true)
     expect(sendRegularMessageMock).not.toHaveBeenCalled()
+  })
+
+  it('stops selection-stage TTS when the PDF icon is dismissed or replaced, but not when it transitions into the window', async () => {
+    await showSelectionIcon('Dismiss speak')
+    await clickSelectionTtsButton(wrapper)
+
+    const hasTtsStopCall = () => sendMessageMock.mock.calls.some(([message]) => message?.action === 'TTS_STOP')
+
+    sendMessageMock.mockClear()
+
+    emitSelectionClear({
+      context: { source: 'pdf-viewer', isPdf: true }
+    })
+    await flushPromises()
+
+    expect(hasTtsStopCall()).toBe(true)
+
+    sendMessageMock.mockClear()
+
+    await showSelectionIcon('Transition speak')
+    await clickSelectionTtsButton(wrapper)
+    sendMessageMock.mockClear()
+
+    const translateButton = wrapper.get('[data-testid="pdf-translation-icon"]').get('.ti-icon-btn--translate')
+    await translateButton.trigger('pointerdown')
+    await flushPromises()
+    await translateButton.trigger('click')
+    await flushPromises()
+
+    expect(hasTtsStopCall()).toBe(false)
+
+    sendMessageMock.mockClear()
+
+    await wrapper.get('[data-testid="translation-window-toolbar-close"]').trigger('click')
+    await flushPromises()
+
+    expect(hasTtsStopCall()).toBe(true)
+
+    sendMessageMock.mockClear()
+
+    await showSelectionIcon('Replaced speak')
+    await clickSelectionTtsButton(wrapper)
+    sendMessageMock.mockClear()
+
+    await showSelectionIcon('Replaced speak next', { x: 160, y: 220, width: 90, height: 18 })
+    await flushPromises()
+
+    expect(hasTtsStopCall()).toBe(true)
+  })
+
+  it('stops window TTS when the PDF window is dismissed', async () => {
+    sendRegularMessageMock.mockResolvedValueOnce({
+      success: true,
+      translatedText: 'Translated text',
+      mode: 'selection-manager'
+    })
+
+    await showSelectionIcon('Window speak')
+    await openWindowFromSelectionIcon(wrapper)
+    await flushPromises()
+
+    await wrapper.get('[data-testid="translation-window-toolbar-tts"]').trigger('click')
+    await flushPromises()
+
+    ttsStopMock.mockClear()
+    sendMessageMock.mockClear()
+
+    await wrapper.get('[data-testid="translation-window-toolbar-close"]').trigger('click')
+    await flushPromises()
+
+    expect(ttsStopMock).toHaveBeenCalledTimes(1)
+    expect(sendMessageMock).toHaveBeenCalledWith(expect.objectContaining({
+      action: 'TTS_STOP',
+      context: 'tts-smart'
+    }))
+  })
+
+  it('does not send a redundant TTS stop when the PDF window is dismissed while idle', async () => {
+    sendRegularMessageMock.mockResolvedValueOnce({
+      success: true,
+      translatedText: 'Translated text',
+      mode: 'selection-manager'
+    })
+
+    await showSelectionIcon('Idle window')
+    await openWindowFromSelectionIcon(wrapper)
+    await flushPromises()
+
+    ttsStopMock.mockClear()
+    sendMessageMock.mockClear()
+
+    await wrapper.get('[data-testid="translation-window-toolbar-close"]').trigger('click')
+    await flushPromises()
+
+    expect(ttsStopMock).not.toHaveBeenCalled()
+    expect(sendMessageMock.mock.calls.some(([message]) => message?.action === 'TTS_STOP')).toBe(false)
+  })
+
+  it('stops visible window TTS once when a new selection replaces the window', async () => {
+    sendRegularMessageMock.mockResolvedValueOnce({
+      success: true,
+      translatedText: 'Translated text',
+      mode: 'selection-manager'
+    })
+
+    await showSelectionIcon('Replace window')
+    await openWindowFromSelectionIcon(wrapper)
+    await flushPromises()
+
+    await wrapper.get('[data-testid="translation-window-toolbar-tts"]').trigger('click')
+    await flushPromises()
+
+    ttsStopMock.mockClear()
+    sendMessageMock.mockClear()
+
+    await showSelectionIcon('Replacement text', { x: 190, y: 240, width: 110, height: 18 })
+    await flushPromises()
+
+    expect(ttsStopMock).toHaveBeenCalledTimes(1)
+    expect(sendMessageMock).toHaveBeenCalledWith(expect.objectContaining({
+      action: 'TTS_STOP',
+      context: 'tts-smart'
+    }))
   })
 
   it('toggles the original source text visibility and switches TTS input between source and translated text', async () => {
@@ -1270,7 +1434,7 @@ describe('PdfWindowsHost', () => {
     await showSelectionIcon('Dock direct updated')
     await flushPromises()
 
-    expect(wrapper.find('[data-testid="pdf-windows-host-icon-stage"]').exists()).toBe(false)
+    expect(wrapper.get('[data-testid="pdf-windows-host-icon-stage"]').isVisible()).toBe(false)
     expect(wrapper.find('[data-testid="pdf-windows-host"]').exists()).toBe(true)
     await flushPromises()
     expect(sendRegularMessageMock).toHaveBeenCalledTimes(1)
@@ -1294,7 +1458,7 @@ describe('PdfWindowsHost', () => {
     await showSelectionIcon('Pinned direct selection', { x: 180, y: 220, width: 90, height: 18 })
     await flushPromises()
 
-    expect(wrapper.find('[data-testid="pdf-windows-host-icon-stage"]').exists()).toBe(false)
+    expect(wrapper.get('[data-testid="pdf-windows-host-icon-stage"]').isVisible()).toBe(false)
     expect(wrapper.find('[data-testid="pdf-windows-host"]').exists()).toBe(true)
     expect(sendRegularMessageMock).toHaveBeenCalledTimes(1)
     expect(wrapper.get('[data-testid="translation-window-footer-detected-language"]').text()).toBe('Persian (Farsi)')

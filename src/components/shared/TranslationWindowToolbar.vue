@@ -71,6 +71,7 @@
 
       <TTSButton
         v-if="showTTSButton"
+        ref="ttsButtonRef"
         :text="ttsText"
         :language="ttsLanguage"
         :is-dictionary="isDictionary"
@@ -209,6 +210,7 @@ const emit = defineEmits([
 ]);
 
 const lastProviderChangeValue = ref('');
+const ttsButtonRef = ref(null);
 
 const handleProviderChange = (newProvider) => {
   const normalizedProvider = typeof newProvider === 'string' ? newProvider.trim() : '';
@@ -227,8 +229,14 @@ const handleProviderChange = (newProvider) => {
   emit('provider-change', normalizedProvider);
 };
 
+const stopTTS = async (options = {}) => ttsButtonRef.value?.stop?.(options) ?? true;
+
 const forwardTtsStarted = (...args) => emit('tts-started', ...args);
 const forwardTtsStopped = (...args) => emit('tts-stopped', ...args);
 const forwardTtsError = (...args) => emit('tts-error', ...args);
 const forwardTtsStateChanged = (...args) => emit('tts-state-changed', ...args);
+
+defineExpose({
+  stopTTS,
+});
 </script>

@@ -1,6 +1,6 @@
 <template>
   <section
-    v-if="isIconVisible"
+    v-show="isIconVisible"
     ref="iconHostRef"
     class="pdf-windows-host__icon-stage"
     :style="iconStyle"
@@ -8,6 +8,7 @@
     @click.stop
   >
     <PdfTranslationIcon
+      ref="selectionIconRef"
       :title="t('translateSelectedText')"
       :aria-label="t('translateSelectedText')"
       :text="selectedText"
@@ -55,6 +56,7 @@
       </div>
 
       <TranslationWindowToolbar
+        ref="toolbarRef"
         class="pdf-windows-host__toolbar"
         :provider="selectedProvider"
         theme="dark"
@@ -233,6 +235,8 @@ const pdfFingerprint = toRef(props, 'pdfFingerprint')
 
 const {
   iconHostRef,
+  toolbarRef,
+  selectionIconRef,
   isIconVisible,
   iconStyle,
   hostRef,

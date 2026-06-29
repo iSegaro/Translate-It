@@ -1,4 +1,4 @@
-import { computed, nextTick, onMounted, ref, unref, watch } from 'vue'
+import { computed, nextTick, onMounted, onUnmounted, ref, unref, watch } from 'vue'
 import { useResourceTracker } from '@/composables/core/useResourceTracker.js'
 import { pageEventBus } from '@/core/PageEventBus.js'
 import { SELECTION_EVENTS } from '@/features/text-selection/events/SelectionEvents.js'
@@ -84,6 +84,8 @@ export function usePdfWindowsHost(options = {}) {
   const pdfFingerprintSource = options.pdfFingerprint ?? ref('')
 
   const hostRef = ref(null)
+  const toolbarRef = ref(null)
+  const selectionIconRef = ref(null)
   const isVisible = ref(false)
   const selectedText = ref('')
   const selectionPosition = ref(null)
@@ -262,6 +264,14 @@ export function usePdfWindowsHost(options = {}) {
     isIconTransitionPending.value = true
   }
 
+  function stopSelectionIconTTS() {
+    return selectionIconRef.value?.stopSelectionTTS?.()
+  }
+
+  function stopWindowTTS() {
+    return toolbarRef.value?.stopTTS?.()
+  }
+
   function clearWindowContent() {
     translatedText.value = ''
     translationError.value = ''
@@ -275,7 +285,10 @@ export function usePdfWindowsHost(options = {}) {
     activeRequestSessionId = 0
   }
 
-  function hideWindowStage() {
+  function hideWindowStage({ stopTTS = true } = {}) {
+    if (stopTTS) {
+      void stopWindowTTS()
+    }
     isVisible.value = false
     clearWindowContent()
     hostStyle.value = {}
@@ -322,7 +335,7 @@ export function usePdfWindowsHost(options = {}) {
   }
 
   function showIconForSelection(position) {
-    hideWindowStage()
+    hideWindowStage({ stopTTS: false })
     isIconVisible.value = true
     placement.setSelectionPosition(position, { followSelection: true })
   }
@@ -402,6 +415,7 @@ export function usePdfWindowsHost(options = {}) {
   function dismissHost() {
     selectionSessionId.value += 1
     activeRequestSessionId = 0
+    void stopSelectionIconTTS()
 
     if (isVisible.value && docking.dockMode.value === 'none') {
       void persistCurrentPosition()
@@ -458,6 +472,8 @@ export function usePdfWindowsHost(options = {}) {
 
     selectionSessionId.value += 1
     activeRequestSessionId = 0
+    void stopSelectionIconTTS()
+    void stopWindowTTS()
 
     selectedText.value = text
     selectionPosition.value = position
@@ -792,8 +808,15 @@ export function usePdfWindowsHost(options = {}) {
     registerListener(window, 'resize', handleViewportChange)
   })
 
+  onUnmounted(() => {
+    void stopWindowTTS()
+    void stopSelectionIconTTS()
+  })
+
   return {
     iconHostRef,
+    toolbarRef,
+    selectionIconRef,
     isIconVisible,
     iconStyle,
     hostRef,

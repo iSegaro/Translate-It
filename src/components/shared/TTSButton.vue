@@ -233,6 +233,8 @@ const buttonLabel = computed(() => {
 
 
 // Methods
+const stop = async (options = {}) => tts.stop(options)
+
 const handleClick = async () => {
   if (props.disabled) return
   
@@ -268,7 +270,7 @@ const handleClick = async () => {
       case 'loading':
       case 'playing':
         // Stop current TTS
-        result = await tts.stop()
+        result = await stop()
         if (result) {
           localTTSId.value = null
           emit('tts-stopped')
@@ -291,7 +293,7 @@ const handleClick = async () => {
 
       default:
         logger.warn('[TTSButton] Unknown effective state:', effectiveState.value)
-        await tts.stop()
+        await stop()
         localTTSId.value = null
         if (result) emit('tts-stopped')
     }
@@ -313,5 +315,9 @@ watch(() => tts.ttsState.value, (newState, oldState) => {
       canStop: tts.canStop.value
     })
   }
+})
+
+defineExpose({
+  stop
 })
 </script>

@@ -16,7 +16,7 @@
 </template>
 
 <script setup>
-import { computed, onUnmounted, ref } from 'vue'
+import { computed, ref } from 'vue'
 import SelectionActionPill from '@/components/shared/SelectionActionPill.vue'
 import { useUnifiedI18n } from '@/composables/shared/useUnifiedI18n.js'
 import { useTTSSmart } from '@/features/tts/composables/useTTSSmart.js'
@@ -48,13 +48,16 @@ const settingsStore = useSettingsStore()
 const tts = useTTSSmart()
 const { t } = useUnifiedI18n()
 const localTTSId = ref(null)
+const activeSelectionText = ref('')
 
 const showTranslate = computed(() => settingsStore.settings.SHOW_TRANSLATE_ICON_IN_TOOLBAR !== false)
 const showTTS = computed(() => settingsStore.settings.SHOW_TTS_ICON_IN_TOOLBAR !== false)
 const isDarkTheme = computed(() => settingsStore.isDarkTheme)
 
 const isThisTTSActive = computed(() => {
-  if (tts.ttsState.value === 'error' && tts.lastText.value === props.text) {
+  const trackedText = activeSelectionText.value || props.text
+
+  if (tts.ttsState.value === 'error' && tts.lastText.value === trackedText) {
     return true
   }
 
@@ -109,6 +112,7 @@ const handleTTSClick = async () => {
 
   try {
     let result = false
+    activeSelectionText.value = props.text
 
     switch (effectiveTTSState.value) {
       case 'idle':
@@ -146,9 +150,17 @@ const handleTTSClick = async () => {
   }
 }
 
-onUnmounted(() => {
-  if (isThisTTSActive.value) {
-    void tts.stop()
+const stopSelectionTTS = () => {
+  if (!isThisTTSActive.value) {
+    return false
   }
+
+  const stopResult = tts.stop()
+  void stopResult
+  return true
+}
+
+defineExpose({
+  stopSelectionTTS
 })
 </script>
