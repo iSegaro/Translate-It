@@ -23,12 +23,25 @@
 export function resolvePdfCellOverlayWidth({
   item,
   line,
+  structuredCell = null,
   translatedCellMetadata,
   cellIndex,
   fallbackWidth
 }) {
   if (!item || !Number.isFinite(fallbackWidth) || fallbackWidth <= 0) {
     return fallbackWidth || 0
+  }
+
+  if (structuredCell?.colSpan && structuredCell.colSpan > 1) {
+    const lineRight = (line?.boundingBox?.x || 0) + (line?.boundingBox?.width || 0)
+    if (!Number.isFinite(lineRight) || lineRight <= 0) {
+      return fallbackWidth
+    }
+
+    const spanWidth = Math.min(fallbackWidth * structuredCell.colSpan, lineRight - item.x)
+    if (Number.isFinite(spanWidth) && spanWidth > 0) {
+      return Math.max(fallbackWidth, spanWidth)
+    }
   }
 
   const colSpanCandidates = translatedCellMetadata?.colSpanCandidates

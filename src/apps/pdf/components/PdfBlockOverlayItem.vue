@@ -178,7 +178,8 @@ const cellOverlayData = computed(() => {
       columnIndices: lc.columnIndices,
       rowIndices: lc.rowIndices,
       colSpanCandidates: lc.colSpanCandidates,
-      estimatedColSpans: lc.estimatedColSpans
+      estimatedColSpans: lc.estimatedColSpans,
+      structuredCells: lc.structuredCells
     })
   }
 
@@ -189,11 +190,13 @@ const cellOverlayData = computed(() => {
     const translatedCellTexts = translatedCellMap.get(lineIndex)
     const cellTexts = translatedCellTexts || lineItems.map((item) => item.text || '')
     const cellMeta = translatedCellMetaMap.get(lineIndex) || null
+    const structuredCells = cellMeta?.structuredCells || null
 
     return {
       cells: cellTexts.map((cellText, cellIdx) => {
         const item = lineItems[cellIdx]
         if (!item) return null
+        const structuredCell = structuredCells?.[cellIdx] || null
 
         const lineRight = (line.boundingBox?.x || 0) + (line.boundingBox?.width || 0)
         const isLastCell = cellIdx === cellTexts.length - 1
@@ -216,15 +219,19 @@ const cellOverlayData = computed(() => {
           nextItem: isLastCell ? null : lineItems[cellIdx + 1],
           line,
           translatedCellMetadata: cellMeta,
+          structuredCell,
           cellIndex: cellIdx,
           fallbackWidth
         })
 
-        const cellHeight = Math.round(Math.max(item.height || 0, item.fontSize ? item.fontSize * 0.8 : blockFontSize.value * 0.8) * 10) / 10
+        const structuredBox = structuredCell?.boundingBox || null
+        const cellHeight = structuredBox?.height != null
+          ? structuredBox.height
+          : Math.round(Math.max(item.height || 0, item.fontSize ? item.fontSize * 0.8 : blockFontSize.value * 0.8) * 10) / 10
 
         const absoluteItem = {
-          x: item.x,
-          y: item.y,
+          x: structuredBox?.x ?? item.x,
+          y: structuredBox?.y ?? item.y,
           width: cellWidth,
           height: cellHeight
         }
@@ -240,6 +247,7 @@ const cellOverlayData = computed(() => {
         const geometry = resolveCellOverlayGeometry({
           item: absoluteItem,
           blockBbox,
+          structuredCell,
           mask
         })
 

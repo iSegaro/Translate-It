@@ -77,6 +77,24 @@ describe('resolvePdfCellOverlayWidth', () => {
     expect(result).toBe(240)
   })
 
+  it('prefers canonical structured cell colSpan over legacy span metadata', () => {
+    const result = resolvePdfCellOverlayWidth({
+      item: baseItem,
+      line: baseLine,
+      structuredCell: {
+        colSpan: 3
+      },
+      translatedCellMetadata: {
+        colSpanCandidates: [false],
+        estimatedColSpans: [1]
+      },
+      cellIndex: 0,
+      fallbackWidth: 80
+    })
+
+    expect(result).toBe(240)
+  })
+
   it('caps width by lineRight', () => {
     const result = resolvePdfCellOverlayWidth({
       item: { x: 200, width: 60, right: 260 },

@@ -551,6 +551,52 @@ describe('PdfBlockOverlayItem', () => {
   })
 
   describe('cell-level overlay for structured blocks with translatedCells', () => {
+    it('prefers structured cell bounding boxes when available', () => {
+      const wrapper = mount(PdfBlockOverlayItem, {
+        props: {
+          block: {
+            id: 'block-structured',
+            boundingBox: { x: 100, y: 200, width: 400, height: 80 },
+            lines: [
+              {
+                boundingBox: { x: 100, y: 200, width: 400, height: 30 },
+                items: [
+                  { x: 100, y: 200, width: 150, height: 30 },
+                  { x: 260, y: 200, width: 150, height: 30 }
+                ],
+                text: 'Header A  Header B'
+              }
+            ],
+            roleMetadata: { fontSize: 12, lineCount: 1, isStructured: true },
+            translationState: {
+              status: 'translated',
+              translatedText: 'هدر الف هدر ب',
+              translatedCells: [
+                {
+                  lineIndex: 0,
+                  cells: ['هدر الف', 'هدر ب'],
+                  structuredCells: [
+                    { boundingBox: { x: 120, y: 210, width: 120, height: 18 }, colSpan: 2, rowSpan: 1, spanType: 'merged', role: 'header' },
+                    { boundingBox: { x: 260, y: 210, width: 150, height: 18 }, colSpan: 1, rowSpan: 1, spanType: 'none', role: 'header' }
+                  ]
+                }
+              ]
+            }
+          },
+          pageMetric: { scale: 1 }
+        }
+      })
+
+      const cellItems = wrapper.findAll('.pdf-cell-overlay-item')
+      expect(cellItems.length).toBe(2)
+
+      const firstCellStyle = cellItems[0].attributes('style')
+      expect(firstCellStyle).toContain('left: 20px')
+      expect(firstCellStyle).toContain('top: 10px')
+      expect(firstCellStyle).toContain('width: 120px')
+      expect(firstCellStyle).toContain('height: 18px')
+    })
+
     it('renders PdfCellOverlayItem components when translatedCells has multi-cell lines', () => {
       const wrapper = mount(PdfBlockOverlayItem, {
         props: {
@@ -580,6 +626,49 @@ describe('PdfBlockOverlayItem', () => {
       expect(cellItems[0].text()).toBe('هدر الف')
       expect(cellItems[1].text()).toBe('مقدار ۱')
       expect(cellItems[2].text()).toBe('مقدار ۲')
+    })
+
+    it('preserves structured colSpan metadata in cell width resolution', () => {
+      const wrapper = mount(PdfBlockOverlayItem, {
+        props: {
+          block: {
+            id: 'block-span',
+            boundingBox: { x: 100, y: 200, width: 400, height: 80 },
+            lines: [
+              {
+                boundingBox: { x: 100, y: 200, width: 400, height: 30 },
+                items: [
+                  { x: 100, y: 200, width: 120, height: 30 },
+                  { x: 230, y: 200, width: 120, height: 30 }
+                ],
+                text: 'Metric  Value'
+              }
+            ],
+            roleMetadata: { fontSize: 12, lineCount: 1, isStructured: true },
+            translationState: {
+              status: 'translated',
+              translatedText: 'مقدار ارزش',
+              translatedCells: [
+                {
+                  lineIndex: 0,
+                  cells: ['مقدار', 'ارزش'],
+                  structuredCells: [
+                    { colSpan: 2, rowSpan: 1, spanType: 'merged', role: 'value' },
+                    { colSpan: 1, rowSpan: 1, spanType: 'none', role: 'value' }
+                  ]
+                }
+              ]
+            }
+          },
+          pageMetric: { scale: 1 }
+        }
+      })
+
+      const cellItems = wrapper.findAll('.pdf-cell-overlay-item')
+      expect(cellItems.length).toBe(2)
+
+      const firstCellStyle = cellItems[0].attributes('style')
+      expect(firstCellStyle).toContain('width: 248px')
     })
 
     it('positions cells using inferred column widths from neighbor positions', () => {
