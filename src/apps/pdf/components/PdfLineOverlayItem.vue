@@ -14,6 +14,7 @@
 <script setup>
 import { computed } from 'vue'
 import { resolveFontFamily, computeLineHeight, detectTextDirection, buildOverlayBaseStyle, buildOverlayPositionStyle, OVERLAY_BACKGROUND } from '../utils/pdfOverlayTypography.js'
+import { buildVerticalPaintBleedBoxShadow } from '../utils/pdfOverlayPaintGeometry.js'
 import { usePdfTextFitter } from '../composables/usePdfTextFitter.js'
 
 const props = defineProps({
@@ -71,7 +72,8 @@ const lineStyle = computed(() => ({
   ...buildOverlayBaseStyle(props.backgroundColor),
   fontSize: `${resolvedFontSize.value}px`,
   fontFamily: resolveFontFamily(props.fontFamily),
-  lineHeight: `${computeLineHeight(props.ascent, props.descent)}`
+  lineHeight: `${computeLineHeight(props.ascent, props.descent)}`,
+  boxShadow: buildVerticalPaintBleedBoxShadow(props.backgroundColor)
 }))
 </script>
 

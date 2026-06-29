@@ -66,6 +66,7 @@
 <script setup>
 import { computed, onBeforeUnmount, watch } from 'vue'
 import { resolveFontFamily, resolveAscent, resolveDescent, detectTextDirection, buildOverlayBaseStyle, OVERLAY_BACKGROUND } from '../utils/pdfOverlayTypography.js'
+import { buildVerticalPaintBleedBoxShadow } from '../utils/pdfOverlayPaintGeometry.js'
 import { sampleCanvasBackgroundColor, clearColorCache } from '../utils/pdfCanvasSampler.js'
 import { usePdfTextFitter } from '../composables/usePdfTextFitter.js'
 import { resolvePdfCellOverlayWidth } from '@/features/pdf-translation/core/PdfCellSpanLayout.js'
@@ -341,6 +342,7 @@ const overlayStyle = computed(() => {
     fontSize: `${resolvedFontSize.value}px`,
     fontFamily: fontFamily.value,
     lineHeight: `${computedLineHeight.value}`,
+    boxShadow: buildVerticalPaintBleedBoxShadow(backgroundColor.value),
     ...overlayBaseStyle.value
   }
 })

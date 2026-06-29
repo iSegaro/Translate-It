@@ -107,6 +107,25 @@ describe('PdfLineOverlayItem', () => {
     expect(style).toContain('line-height: 1')
     expect(style).toContain('background: rgb(255, 255, 255)')
     expect(style).toContain('overflow: hidden')
+    expect(style).toContain('box-shadow:')
+  })
+
+  it('applies conservative vertical paint bleed for RTL text', () => {
+    const wrapper = mount(PdfLineOverlayItem, {
+      props: {
+        lineText: 'سطر آزمایشی',
+        boundingBox: { x: 0, y: 0, width: 200, height: 20 },
+        scale: 1,
+        fontSize: 12
+      }
+    })
+
+    const el = wrapper.find('.pdf-line-overlay-item')
+    const style = el.attributes('style')
+    expect(style).toContain('background: rgb(255, 255, 255)')
+    expect(style).toContain('box-shadow:')
+    expect(style).toContain('-4px')
+    expect(style).toContain('4px')
   })
 
   it('applies ascent/descent for line-height', () => {

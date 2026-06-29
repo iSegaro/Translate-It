@@ -103,6 +103,8 @@ describe('PdfBlockOverlayItem', () => {
 
     const el = wrapper.find('.pdf-block-overlay-item')
     expect(el.attributes('style')).toContain('background: rgb(255, 255, 255)')
+    expect(el.attributes('style')).toContain('box-shadow:')
+    expect(el.attributes('style')).toContain('-4px')
   })
 
   it('has text ref attached for adaptive fitting', () => {
@@ -381,6 +383,32 @@ describe('PdfBlockOverlayItem', () => {
       expect(line2Style).toContain('top: 70px')
     })
 
+    it('applies conservative vertical paint bleed for line overlays', () => {
+      const wrapper = mount(PdfBlockOverlayItem, {
+        props: {
+          block: {
+            id: 'block-bleed',
+            boundingBox: { x: 10, y: 20, width: 200, height: 80 },
+            lines: [
+              { boundingBox: { x: 10, y: 20, width: 200, height: 30 }, text: 'سطر 1' },
+              { boundingBox: { x: 10, y: 55, width: 200, height: 30 }, text: 'سطر 2' }
+            ],
+            roleMetadata: { fontSize: 12, lineCount: 2, isMultiLine: true, isStructured: true },
+            translationState: { status: 'translated', translatedText: 'سطر 1\nسطر 2' }
+          },
+          pageMetric: { scale: 1 }
+        }
+      })
+
+      const lineItems = wrapper.findAll('.pdf-line-overlay-item')
+      expect(lineItems.length).toBe(2)
+      const style = lineItems[0].attributes('style')
+      expect(style).toContain('box-shadow:')
+      expect(style).toContain('-4px')
+      expect(style).toContain('4px')
+      expect(style).toContain('background: rgb(255, 255, 255)')
+    })
+
     it('converts line coordinates to relative when block has non-zero offset', () => {
       const wrapper = mount(PdfBlockOverlayItem, {
         props: {
@@ -548,6 +576,26 @@ describe('PdfBlockOverlayItem', () => {
       const blockText = wrapper.find('.pdf-block-overlay-item__text')
       expect(blockText.exists()).toBe(true)
     })
+  })
+
+  it('applies conservative vertical paint bleed for block overlays', () => {
+    const wrapper = mount(PdfBlockOverlayItem, {
+      props: {
+        block: {
+          id: 'block-rtl',
+          boundingBox: { x: 10, y: 20, width: 200, height: 40 },
+          roleMetadata: { fontSize: 12 },
+          translationState: { status: 'translated', translatedText: 'مرحبا بالعالم' }
+        },
+        pageMetric: { scale: 1 }
+      }
+    })
+
+    const el = wrapper.find('.pdf-block-overlay-item')
+    expect(el.attributes('style')).toContain('background: rgb(255, 255, 255)')
+    expect(el.attributes('style')).toContain('box-shadow:')
+    expect(el.attributes('style')).toContain('-4px')
+    expect(el.attributes('style')).toContain('4px')
   })
 
   describe('cell-level overlay for structured blocks with translatedCells', () => {
