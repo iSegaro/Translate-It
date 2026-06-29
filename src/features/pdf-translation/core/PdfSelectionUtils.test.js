@@ -135,7 +135,7 @@ describe('PdfSelectionUtils', () => {
     })
   })
 
-  it('compensates for page scroll when positioning the icon', () => {
+  it('ignores page scroll when positioning the icon because the icon is viewport-fixed', () => {
     restoreViewport?.()
     restoreViewport = mockPdfViewport({
       width: 200,
@@ -149,8 +149,8 @@ describe('PdfSelectionUtils', () => {
     })
 
     expect(buildPdfSelectionPosition(selection)).toMatchObject({
-      x: 58,
-      y: 61,
+      x: 38,
+      y: 31,
       width: 80,
       height: 18
     })
