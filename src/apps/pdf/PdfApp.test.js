@@ -1,6 +1,6 @@
-import { describe, beforeEach, expect, it, vi } from 'vitest'
+import { afterEach, describe, beforeEach, expect, it, vi } from 'vitest'
 import { mount } from '@vue/test-utils'
-import { ref } from 'vue'
+import { nextTick, ref } from 'vue'
 import PdfApp from './PdfApp.vue'
 
 let mockViewerController
@@ -87,7 +87,9 @@ vi.mock('./components/PdfWindowsHost.vue', () => ({
   }
 }))
 
-const flushPromises = () => new Promise((resolve) => setTimeout(resolve, 0))
+vi.mock('./debug/pdfOverlayDiagnostics.js', () => ({}))
+
+const flushPromises = () => nextTick()
 
 function createMocks({
   bannerState = null,
@@ -134,9 +136,9 @@ function createMocks({
     canExport: ref(false),
     isPartialExport: ref(false),
     exportError: ref(''),
-    exportTxt: vi.fn(),
-    exportMarkdown: vi.fn(),
-    exportHtml: vi.fn(),
+    exportTxt: vi.fn().mockReturnValue(false),
+    exportMarkdown: vi.fn().mockReturnValue(false),
+    exportHtml: vi.fn().mockReturnValue(false),
     clearExportError: vi.fn()
   }
 
@@ -174,7 +176,13 @@ function createMocks({
 
 describe('PdfApp', () => {
   beforeEach(() => {
+    vi.useRealTimers()
     createMocks()
+  })
+
+  afterEach(() => {
+    vi.useRealTimers()
+    vi.clearAllTimers()
   })
 
   it('renders the status banner outside the viewer content flow when active', async () => {
@@ -212,5 +220,70 @@ describe('PdfApp', () => {
     expect(wrapper.find('.pdf-status-banner').exists()).toBe(false)
     expect(wrapper.find('.pdf-app__status-row').exists()).toBe(false)
     expect(wrapper.find('.pdf-viewer-layout-stub').exists()).toBe(true)
+  })
+
+  it('shows a transient TXT export success banner', async () => {
+    vi.useFakeTimers()
+    createMocks()
+    mockPdfExport.exportTxt.mockReturnValue(true)
+
+    const wrapper = mount(PdfApp)
+    await flushPromises()
+
+    wrapper.findComponent({ name: 'PdfToolbar' }).vm.$emit('export-txt')
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('TXT export ready')
+    expect(wrapper.text()).toContain('TXT export downloaded successfully.')
+
+    vi.advanceTimersByTime(2200)
+    await flushPromises()
+
+    expect(wrapper.find('.pdf-status-banner').exists()).toBe(false)
+  })
+
+  it('shows a Markdown export success banner', async () => {
+    createMocks()
+    mockPdfExport.exportMarkdown.mockReturnValue(true)
+
+    const wrapper = mount(PdfApp)
+    await flushPromises()
+
+    wrapper.findComponent({ name: 'PdfToolbar' }).vm.$emit('export-markdown')
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('Markdown export ready')
+    expect(wrapper.text()).toContain('Markdown export downloaded successfully.')
+  })
+
+  it('shows an HTML export success banner', async () => {
+    createMocks()
+    mockPdfExport.exportHtml.mockReturnValue(true)
+
+    const wrapper = mount(PdfApp)
+    await flushPromises()
+
+    wrapper.findComponent({ name: 'PdfToolbar' }).vm.$emit('export-html')
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('HTML export ready')
+    expect(wrapper.text()).toContain('HTML export downloaded successfully.')
+  })
+
+  it('does not show export success when export fails', async () => {
+    createMocks()
+    mockPdfExport.exportTxt.mockImplementation(() => {
+      mockPdfExport.exportError.value = 'Failed to export as TXT.'
+      return false
+    })
+
+    const wrapper = mount(PdfApp)
+    await flushPromises()
+
+    wrapper.findComponent({ name: 'PdfToolbar' }).vm.$emit('export-txt')
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('Failed to export as TXT.')
+    expect(wrapper.text()).not.toContain('TXT export ready')
   })
 })

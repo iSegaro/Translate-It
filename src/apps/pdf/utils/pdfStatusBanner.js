@@ -9,6 +9,7 @@ export function buildPdfStatusBannerState({
   ocrError = '',
   isLoading = false,
   isTranslating = false,
+  exportSuccess = null,
   restoredTranslationCount = 0,
   isPartialExport = false
 } = {}) {
@@ -57,6 +58,16 @@ export function buildPdfStatusBannerState({
       title: 'Partial translation',
       message: partialMessage,
       detail: ''
+    }
+  }
+
+  if (exportSuccess) {
+    return {
+      visible: true,
+      variant: exportSuccess.variant || 'success',
+      title: exportSuccess.title || 'Export ready',
+      message: exportSuccess.message || '',
+      detail: exportSuccess.detail || ''
     }
   }
 

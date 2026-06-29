@@ -181,6 +181,9 @@ const {
 } = usePdfExport(translationTick)
 
 const pdfViewerRef = ref(null)
+const exportSuccess = ref(null)
+const exportSuccessTimer = ref(null)
+const EXPORT_SUCCESS_DURATION_MS = 2200
 
 const {
   isBlockTargetingActive,
@@ -217,6 +220,7 @@ const pdfStatusBanner = computed(() => buildPdfStatusBannerState({
   ocrError: ocrError.value,
   isLoading: isLoading.value,
   isTranslating: isTranslating.value,
+  exportSuccess: exportSuccess.value,
   restoredTranslationCount: restoredTranslationCount.value,
   isPartialExport: isPartialExport.value
 }))
@@ -252,23 +256,56 @@ function handleCancelTranslation() {
 }
 
 function handleExportTxt() {
+  clearExportSuccess()
   clearExportError()
-  exportTxt()
+  if (exportTxt()) {
+    showExportSuccess('TXT')
+  }
 }
 
 function handleExportMarkdown() {
+  clearExportSuccess()
   clearExportError()
-  exportMarkdown()
+  if (exportMarkdown()) {
+    showExportSuccess('Markdown')
+  }
 }
 
 function handleExportHtml() {
+  clearExportSuccess()
   clearExportError()
   const canvasDataUrls = pdfViewerRef.value?.collectCanvasDataUrls?.() || new Map()
-  exportHtml(canvasDataUrls)
+  if (exportHtml(canvasDataUrls)) {
+    showExportSuccess('HTML')
+  }
 }
 
 function handleClearCache() {
   void clearDocumentCache()
+}
+
+function clearExportSuccess() {
+  if (exportSuccessTimer.value) {
+    clearTimeout(exportSuccessTimer.value)
+    exportSuccessTimer.value = null
+  }
+
+  exportSuccess.value = null
+}
+
+function showExportSuccess(formatLabel) {
+  clearExportSuccess()
+  exportSuccess.value = {
+    variant: 'success',
+    title: `${formatLabel} export ready`,
+    message: `${formatLabel} export downloaded successfully.`,
+    detail: ''
+  }
+
+  exportSuccessTimer.value = setTimeout(() => {
+    exportSuccess.value = null
+    exportSuccessTimer.value = null
+  }, EXPORT_SUCCESS_DURATION_MS)
 }
 
 onMounted(() => {
@@ -278,6 +315,7 @@ onMounted(() => {
 })
 
 onBeforeUnmount(() => {
+  clearExportSuccess()
   void cleanup()
 })
 </script>
