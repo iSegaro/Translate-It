@@ -6,6 +6,114 @@ import { PdfTranslationAdapter } from './PdfTranslationAdapter.js'
 import { PdfTranslationBatchPlanner } from './PdfTranslationBatchPlanner.js'
 import { enrichBlocksWithTableMetadata } from './TableRegionAnalyzer.js'
 
+function isFiniteNumber(value) {
+  return typeof value === 'number' && Number.isFinite(value)
+}
+
+function cloneStructuredValue(value) {
+  if (value == null) return value
+
+  if (typeof globalThis.structuredClone === 'function') {
+    return globalThis.structuredClone(value)
+  }
+
+  return JSON.parse(JSON.stringify(value))
+}
+
+function cloneTranslatedCellLine(line = null) {
+  if (!line || typeof line !== 'object') return null
+
+  const nextLine = {
+    lineIndex: line.lineIndex,
+    cells: Array.isArray(line.cells) ? [...line.cells] : []
+  }
+
+  const metadataKeys = ['cellIds', 'columnIndices', 'rowIndices', 'colSpanCandidates', 'estimatedColSpans']
+  for (const key of metadataKeys) {
+    if (line[key] == null) continue
+    nextLine[key] = Array.isArray(line[key]) ? [...line[key]] : []
+  }
+
+  if (line.structuredCells != null) {
+    nextLine.structuredCells = Array.isArray(line.structuredCells)
+      ? line.structuredCells.map((cell) => (cell == null ? null : cloneStructuredValue(cell)))
+      : []
+  }
+
+  return nextLine
+}
+
+function cloneTranslatedCells(translatedCells = null) {
+  if (!Array.isArray(translatedCells) || translatedCells.length === 0) {
+    return null
+  }
+
+  const cloned = translatedCells.map((line) => cloneTranslatedCellLine(line)).filter(Boolean)
+  return cloned.length > 0 ? cloned : null
+}
+
+function mergeStructuredTranslatedCells(existingCells = null, incomingCells = null) {
+  const current = Array.isArray(existingCells) ? existingCells : []
+  const next = Array.isArray(incomingCells) ? incomingCells : []
+
+  if (current.length === 0) {
+    return cloneTranslatedCells(next)
+  }
+
+  if (next.length === 0) {
+    return cloneTranslatedCells(current)
+  }
+
+  const allHaveLineIndex = [...current, ...next].every((line) => line && isFiniteNumber(line.lineIndex))
+
+  if (allHaveLineIndex) {
+    const mergedByLineIndex = new Map()
+
+    for (const line of current) {
+      const cloned = cloneTranslatedCellLine(line)
+      if (!cloned) continue
+      mergedByLineIndex.set(cloned.lineIndex, cloned)
+    }
+
+    for (const line of next) {
+      const cloned = cloneTranslatedCellLine(line)
+      if (!cloned) continue
+      mergedByLineIndex.set(cloned.lineIndex, cloned)
+    }
+
+    return [...mergedByLineIndex.keys()]
+      .sort((a, b) => a - b)
+      .map((lineIndex) => mergedByLineIndex.get(lineIndex))
+      .filter(Boolean)
+  }
+
+  if (current.length === next.length) {
+    const merged = cloneTranslatedCells(current) || []
+    for (let i = 0; i < next.length; i++) {
+      const cloned = cloneTranslatedCellLine(next[i])
+      if (cloned) {
+        merged[i] = cloned
+      }
+    }
+    return merged.length > 0 ? merged : null
+  }
+
+  return cloneTranslatedCells(next)
+}
+
+function deriveStructuredTranslatedText(translatedCells = null) {
+  if (!Array.isArray(translatedCells) || translatedCells.length === 0) return ''
+
+  const lines = []
+  for (const line of translatedCells) {
+    if (!line || typeof line !== 'object' || !Array.isArray(line.cells)) continue
+    const cells = line.cells.filter((cell) => typeof cell === 'string' && cell.length > 0)
+    lines.push(cells.join(' '))
+  }
+
+  return lines.join('\n').trim()
+}
+
 export class PdfTranslationCoordinator {
   constructor(session, {
     adapter = new PdfTranslationAdapter(),
@@ -213,9 +321,18 @@ export class PdfTranslationCoordinator {
       }
 
       translatedCount += 1
+      const currentState = this.session.getBlockTranslationState(result.blockId)
+      const mergedTranslatedCells = mergeStructuredTranslatedCells(
+        currentState?.translatedCells || null,
+        result.translatedCells || null
+      )
+      const nextTranslatedText = mergedTranslatedCells
+        ? deriveStructuredTranslatedText(mergedTranslatedCells)
+        : result.translatedText
+
       this.session.setBlockTranslationState(result.blockId, {
-        translatedText: result.translatedText,
-        translatedCells: result.translatedCells || null,
+        translatedText: nextTranslatedText,
+        translatedCells: mergedTranslatedCells,
         status: 'translated',
         provider: result.provider || '',
         sourceLanguage: result.sourceLanguage || '',

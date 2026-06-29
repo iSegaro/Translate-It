@@ -45,8 +45,61 @@ function createDeferred() {
   return { promise, resolve, reject }
 }
 
+function createStructuredCell({
+  blockId,
+  regionId,
+  rowIndex,
+  columnIndex,
+  text,
+  role
+}) {
+  return {
+    id: `${blockId}-r${rowIndex}-c${columnIndex}`,
+    regionId,
+    rowIndex,
+    columnIndex,
+    rowSpan: 1,
+    colSpan: 1,
+    spanType: 'cell',
+    role,
+    text,
+    boundingBox: {
+      x: 10 + (columnIndex * 40),
+      y: 100 + (rowIndex * 12),
+      width: role === 'page-number' ? 24 : 120,
+      height: 12
+    },
+    sourceReferences: {
+      blockIds: [blockId],
+      lineIds: [`${blockId}-line-${rowIndex}`],
+      sourceLineIndices: [rowIndex],
+      sourceItemIndices: [columnIndex],
+      groupRegionIds: []
+    },
+    spanCandidate: false,
+    estimatedRowSpan: 1,
+    estimatedColSpan: 1,
+    confidence: 1
+  }
+}
+
 describe('PdfTranslationCoordinator', () => {
   let session
+  let translationStateStore
+
+  const getDefaultTranslationState = (blockId) => ({
+    blockId,
+    translatedText: '',
+    translatedCells: null,
+    status: 'idle',
+    provider: '',
+    sourceLanguage: '',
+    targetLanguage: '',
+    sourceTextHash: '',
+    translationSettingsHash: '',
+    updatedAt: 0,
+    error: null
+  })
 
   beforeEach(() => {
     sendRegularMessageMock.mockReset()
@@ -62,10 +115,21 @@ describe('PdfTranslationCoordinator', () => {
     getTargetLanguageAsyncMock.mockResolvedValue('es')
     getTranslationApiAsyncMock.mockResolvedValue('google')
 
+    translationStateStore = new Map()
     session = {
       getVisibleLogicalBlocks: vi.fn(),
-      setBlockTranslationState: vi.fn(),
-      getBlockTranslationState: vi.fn().mockReturnValue({ status: 'idle' }),
+      setBlockTranslationState: vi.fn((blockId, patch = {}) => {
+        const current = translationStateStore.get(blockId) || getDefaultTranslationState(blockId)
+        const next = {
+          ...current,
+          ...patch,
+          blockId,
+          updatedAt: patch.updatedAt || Date.now()
+        }
+        translationStateStore.set(blockId, next)
+        return next
+      }),
+      getBlockTranslationState: vi.fn((blockId) => translationStateStore.get(blockId) || getDefaultTranslationState(blockId)),
       getPageLayout: vi.fn().mockReturnValue(null)
     }
   })
@@ -289,6 +353,149 @@ describe('PdfTranslationCoordinator', () => {
       status: 'translated',
       translatedText: 'Mundo'
     }))
+  })
+
+  it('merges partial structured batch results across batches for the same block', async () => {
+    const block = {
+      id: 'block-a',
+      text: 'Table of Contents',
+      role: 'table-region',
+      sourceTextHash: 'hash-a',
+      roleMetadata: {
+        isStructured: true
+      }
+    }
+
+    const structuredItem = (lineIndex, cellIndex, text, role) => ({
+      blockId: block.id,
+      sourceTextHash: block.sourceTextHash,
+      isStructured: true,
+      lineIndex,
+      cellIndex,
+      text,
+      t: text,
+      cellId: `${block.id}-cell-${lineIndex}-${cellIndex}`,
+      tableRowIndex: lineIndex,
+      tableColumnIndex: cellIndex,
+      structuredCell: createStructuredCell({
+        blockId: block.id,
+        regionId: 'region-toc',
+        rowIndex: lineIndex,
+        columnIndex: cellIndex,
+        text,
+        role
+      })
+    })
+
+    const batchPlanner = {
+      plan: vi.fn(() => ([
+        {
+          batchId: 'pdf-batch-0',
+          blocks: [block],
+          items: [
+            structuredItem(0, 0, 'فهرست مطالب', 'title'),
+            structuredItem(0, 1, '3', 'page-number'),
+            structuredItem(1, 0, 'اختصارات', 'title'),
+            structuredItem(1, 1, '4', 'page-number')
+          ]
+        },
+        {
+          batchId: 'pdf-batch-1',
+          blocks: [block],
+          items: [
+            structuredItem(1, 0, 'اختصارات به‌روز', 'title'),
+            structuredItem(1, 1, '4', 'page-number'),
+            structuredItem(2, 0, 'بیانیه مأموریت', 'title'),
+            structuredItem(2, 1, '7', 'page-number'),
+            structuredItem(3, 0, 'بخش یک', 'title'),
+            structuredItem(3, 1, '12', 'page-number')
+          ]
+        },
+        {
+          batchId: 'pdf-batch-2',
+          blocks: [block],
+          items: [
+            structuredItem(4, 0, 'حاکمیت', 'title'),
+            structuredItem(4, 1, '18', 'page-number'),
+            structuredItem(5, 0, 'پیوست', 'title'),
+            structuredItem(5, 1, '24', 'page-number')
+          ]
+        }
+      ]))
+    }
+
+    const coordinator = new PdfTranslationCoordinator(session, { batchPlanner })
+    session.getVisibleLogicalBlocks.mockResolvedValue([block])
+
+    sendRegularMessageMock
+      .mockResolvedValueOnce({
+        success: true,
+        results: [
+          { blockId: block.id, t: 'فهرست مطالب', text: 'فهرست مطالب', status: 'translated', provider: 'google' },
+          { blockId: block.id, t: '3', text: '3', status: 'translated', provider: 'google' },
+          { blockId: block.id, t: 'اختصارات', text: 'اختصارات', status: 'translated', provider: 'google' },
+          { blockId: block.id, t: '4', text: '4', status: 'translated', provider: 'google' }
+        ],
+        provider: 'google',
+        sourceLanguage: 'en',
+        targetLanguage: 'fa'
+      })
+      .mockResolvedValueOnce({
+        success: true,
+        results: [
+          { blockId: block.id, t: 'اختصارات به‌روز', text: 'اختصارات به‌روز', status: 'translated', provider: 'google' },
+          { blockId: block.id, t: '4', text: '4', status: 'translated', provider: 'google' },
+          { blockId: block.id, t: 'بیانیه مأموریت', text: 'بیانیه مأموریت', status: 'translated', provider: 'google' },
+          { blockId: block.id, t: '7', text: '7', status: 'translated', provider: 'google' },
+          { blockId: block.id, t: 'بخش یک', text: 'بخش یک', status: 'translated', provider: 'google' },
+          { blockId: block.id, t: '12', text: '12', status: 'translated', provider: 'google' }
+        ],
+        provider: 'google',
+        sourceLanguage: 'en',
+        targetLanguage: 'fa'
+      })
+      .mockResolvedValueOnce({
+        success: true,
+        results: [
+          { blockId: block.id, t: 'حاکمیت', text: 'حاکمیت', status: 'translated', provider: 'google' },
+          { blockId: block.id, t: '18', text: '18', status: 'translated', provider: 'google' },
+          { blockId: block.id, t: 'پیوست', text: 'پیوست', status: 'translated', provider: 'google' },
+          { blockId: block.id, t: '24', text: '24', status: 'translated', provider: 'google' }
+        ],
+        provider: 'google',
+        sourceLanguage: 'en',
+        targetLanguage: 'fa'
+      })
+
+    const summary = await coordinator.translateVisibleBlocks()
+
+    expect(summary).toEqual({
+      status: 'translated',
+      translatedCount: 3,
+      failedCount: 0,
+      totalCount: 3
+    })
+
+    const finalState = translationStateStore.get(block.id)
+    expect(finalState).toBeDefined()
+    expect(finalState.translatedCells).toHaveLength(6)
+    expect(finalState.translatedCells.map((line) => line.lineIndex)).toEqual([0, 1, 2, 3, 4, 5])
+    expect(finalState.translatedCells[1].cells).toEqual(['اختصارات به‌روز', '4'])
+    expect(finalState.translatedCells[1].structuredCells[0]).toEqual(expect.objectContaining({
+      id: 'block-a-r1-c0',
+      regionId: 'region-toc',
+      rowIndex: 1,
+      columnIndex: 0,
+      text: 'اختصارات به‌روز'
+    }))
+    expect(finalState.translatedText).toBe([
+      'فهرست مطالب 3',
+      'اختصارات به‌روز 4',
+      'بیانیه مأموریت 7',
+      'بخش یک 12',
+      'حاکمیت 18',
+      'پیوست 24'
+    ].join('\n'))
   })
 
   it('marks blocks with empty translatedText as error, not translated', async () => {

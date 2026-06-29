@@ -3,7 +3,6 @@ import { TranslationMode } from '@/shared/config/config.js'
 import { MessageContexts } from '@/shared/messaging/core/MessagingConstants.js'
 import { normalizePdfText } from './PdfBlockIdentity.js'
 
-const STRUCTURED_BLOCK_MAX_LINES = 30
 const STRUCTURED_MAX_CELLS_PER_LINE = 10
 
 const READING_ROLE_KPI = 'metric'
@@ -15,7 +14,6 @@ const RELATIONSHIP_ROLE_STANDALONE = 'standalone'
 function isStructuredBlock(block) {
   if (block?.roleMetadata?.isStructured !== true) return false
   if (!Array.isArray(block?.lines) || block.lines.length === 0) return false
-  if (block.lines.length > STRUCTURED_BLOCK_MAX_LINES) return false
   return block.lines.length > 1 || block.lines.some((line) => line.items?.length > 1)
 }
 

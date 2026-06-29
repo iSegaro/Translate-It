@@ -565,16 +565,33 @@ describe('PdfTranslationAdapter', () => {
       expect(items.filter((i) => i.blockId === 'p2')).toHaveLength(1)
     })
 
-    it('does not emit per-line items for structured blocks exceeding line count cap', () => {
+    it('emits per-line items and preserves row boundaries for long structured blocks', () => {
       const adapter = new PdfTranslationAdapter()
       const longLines = Array.from({ length: 35 }, (_, i) => `Line ${i}`)
       const block = makeStructuredBlock('big-block', longLines)
 
       const items = adapter.toProviderItems([block])
 
-      expect(items).toHaveLength(1)
-      expect(items[0].isStructured).toBeUndefined()
-      expect(items[0].t).toBe(longLines.join(' '))
+      expect(items).toHaveLength(35)
+      expect(items.every((item) => item.isStructured === true)).toBe(true)
+      expect(items.map((item) => item.lineIndex)).toEqual(longLines.map((_, index) => index))
+
+      const response = {
+        success: true,
+        streaming: true,
+        results: longLines.map((_, index) => ({
+          blockId: 'big-block',
+          t: `ترجمه ${index}`
+        }))
+      }
+
+      const mapped = adapter.mapBatchResponse(items, response)
+
+      expect(mapped).toHaveLength(1)
+      expect(mapped[0].translatedCells).toBeUndefined()
+      expect(mapped[0].translatedText.split('\n')).toHaveLength(longLines.length)
+      expect(mapped[0].translatedText).toContain('ترجمه 0')
+      expect(mapped[0].translatedText).toContain(`ترجمه ${longLines.length - 1}`)
     })
 
     it('returns undefined translatedCells for single-item structured blocks', () => {
