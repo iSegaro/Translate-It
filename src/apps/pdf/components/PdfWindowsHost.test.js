@@ -16,6 +16,7 @@ const storageSetMock = vi.fn(async (data) => {
 })
 
 const sendRegularMessageMock = vi.fn()
+const sendMessageMock = vi.fn()
 
 vi.mock('@/shared/storage/core/StorageCore.js', () => ({
   storageCore: {
@@ -61,7 +62,8 @@ vi.mock('@/core/PageEventBus.js', () => ({
 }))
 
 vi.mock('@/shared/messaging/core/UnifiedMessaging.js', () => ({
-  sendRegularMessage: sendRegularMessageMock
+  sendRegularMessage: sendRegularMessageMock,
+  sendMessage: sendMessageMock
 }))
 
 const getEffectiveProviderAsyncMock = vi.fn(async () => 'googlev2')
@@ -107,7 +109,11 @@ vi.mock('@/composables/shared/useFont.js', () => ({
 
 vi.mock('@/features/settings/stores/settings.js', () => ({
   useSettingsStore: () => ({
-    isDarkTheme: false
+    isDarkTheme: false,
+    settings: {
+      SHOW_TRANSLATE_ICON_IN_TOOLBAR: true,
+      SHOW_TTS_ICON_IN_TOOLBAR: true
+    }
   })
 }))
 
@@ -191,9 +197,22 @@ async function showSelectionIcon(text, position = { x: 120, y: 180, width: 90, h
 
 async function openWindowFromSelectionIcon(wrapper) {
   const icon = wrapper.get('[data-testid="pdf-translation-icon"]')
-  await icon.trigger('pointerdown')
+  const translateButton = icon.get('.ti-icon-btn--translate')
+  await translateButton.trigger('pointerdown')
   await flushPromises()
-  await icon.trigger('click')
+  await translateButton.trigger('click')
+  await flushPromises()
+}
+
+async function clickSelectionTtsButton(wrapper) {
+  const icon = wrapper.get('[data-testid="pdf-translation-icon"]')
+  const buttons = icon.findAll('button')
+
+  if (buttons.length < 2) {
+    throw new Error('Expected both translate and TTS buttons to be rendered')
+  }
+
+  await buttons[1].trigger('click')
   await flushPromises()
 }
 
@@ -229,6 +248,8 @@ describe('PdfWindowsHost', () => {
     }
     sendRegularMessageMock.mockReset()
     sendRegularMessageMock.mockResolvedValue({ success: true, translatedText: 'Translated text' })
+    sendMessageMock.mockReset()
+    sendMessageMock.mockResolvedValue({ success: true })
     getEffectiveProviderAsyncMock.mockClear()
     getTargetLanguageAsyncMock.mockClear()
     storageSetMock.mockClear()
@@ -307,7 +328,8 @@ describe('PdfWindowsHost', () => {
     await showSelectionIcon('Transition me')
 
     const icon = wrapper.get('[data-testid="pdf-translation-icon"]')
-    await icon.trigger('pointerdown')
+    const translateButton = icon.get('.ti-icon-btn--translate')
+    await translateButton.trigger('pointerdown')
     emitSelectionClear({
       context: { source: 'pdf-viewer', isPdf: true }
     })
@@ -316,7 +338,7 @@ describe('PdfWindowsHost', () => {
     expect(wrapper.find('[data-testid="pdf-windows-host-icon-stage"]').exists()).toBe(true)
     expect(wrapper.find('[data-testid="pdf-windows-host"]').exists()).toBe(false)
 
-    await icon.trigger('click')
+    await translateButton.trigger('click')
     await flushPromises()
 
     expect(wrapper.find('[data-testid="pdf-windows-host-icon-stage"]').exists()).toBe(false)
@@ -346,6 +368,27 @@ describe('PdfWindowsHost', () => {
       translatedText: 'Translated text'
     })
     await flushPromises()
+  })
+
+  it('speaks selected text from the selection icon without opening the translation window', async () => {
+    await showSelectionIcon('Speak before open')
+
+    expect(wrapper.find('[data-testid="pdf-windows-host"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="pdf-windows-host-icon-stage"]').exists()).toBe(true)
+
+    await clickSelectionTtsButton(wrapper)
+
+    expect(sendMessageMock).toHaveBeenCalledWith(expect.objectContaining({
+      context: 'tts-smart',
+      action: expect.any(String),
+      data: expect.objectContaining({
+        text: 'Speak before open',
+        language: 'auto'
+      })
+    }))
+    expect(wrapper.find('[data-testid="pdf-windows-host"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="pdf-windows-host-icon-stage"]').exists()).toBe(true)
+    expect(sendRegularMessageMock).not.toHaveBeenCalled()
   })
 
   it('toggles the original source text visibility and switches TTS input between source and translated text', async () => {

@@ -10,6 +10,7 @@
     <PdfTranslationIcon
       :title="t('translateSelectedText')"
       :aria-label="t('translateSelectedText')"
+      :text="selectedText"
       @pointerdown="handleIconPointerDown"
       @click="openWindowFromIcon"
     />

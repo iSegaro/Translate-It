@@ -1,55 +1,29 @@
 <template>
-  <button
-    class="pdf-translation-icon"
-    type="button"
+  <SelectionActionPill
     :title="title"
     :aria-label="ariaLabel"
+    :show-translate="showTranslate"
+    :show-tts="showTTS"
+    :tts-state="effectiveTTSState"
+    :tts-title="ttsTitle"
+    :tts-aria-label="ttsTitle"
+    :theme="isDarkTheme ? 'dark' : 'light'"
     data-testid="pdf-translation-icon"
-    @click.stop="emit('click')"
-    @pointerdown.stop.prevent="emit('pointerdown', $event)"
-  >
-    <svg
-      class="pdf-translation-icon__svg"
-      viewBox="0 0 64 64"
-      aria-hidden="true"
-    >
-      <!-- Mirrors the normal web-page TranslationIcon translate glyph for visual parity. -->
-      <path
-        fill="currentColor"
-        d="M 1.5,-0.5 C 10.5,-0.5 19.5,-0.5 28.5,-0.5C 30.4285,3.28543 31.7618,7.28543 32.5,11.5C 33.5946,16.7841 35.2613,21.7841 37.5,26.5C 37.8333,27.8333 38.1667,29.1667 38.5,30.5C 39.6047,34.3517 40.938,38.0184 42.5,41.5C 43.1098,42.391 43.4431,43.391 43.5,44.5C 43.4326,45.9587 43.7659,47.2921 44.5,48.5C 39.5,49.1667 34.5,49.8333 29.5,50.5C 19.4176,50.8074 9.41756,50.4741 -0.5,49.5C -0.5,33.5 -0.5,17.5 -0.5,1.5C 0.5,1.16667 1.16667,0.5 1.5,-0.5 Z"
-      />
-      <path
-        fill="#e1eae1"
-        d="M 16.5,10.5 C 17.8221,10.33 18.9887,10.6634 20,11.5C 23.3371,19.3461 26.1705,27.3461 28.5,35.5C 27.1779,35.67 26.0113,35.3366 25,34.5C 24.6954,29.6915 22.1954,27.6915 17.5,28.5C 15.8333,28.8333 14.1667,29.1667 12.5,29.5C 11.8333,31.1667 11.1667,32.8333 10.5,34.5C 9.27704,35.6139 7.94371,35.7805 6.5,35C 9.70148,26.7659 13.0348,18.5992 16.5,10.5 Z"
-      />
-      <path
-        fill="#25a640"
-        d="M 20.5,23.5 C 18.7354,24.4614 16.7354,24.7947 14.5,24.5C 15.562,21.4844 16.7286,18.4844 18,15.5C 19.1356,18.0964 19.969,20.763 20.5,23.5 Z"
-      />
-      <path
-        fill="#93c298"
-        d="M 20.5,23.5 C 21.0431,23.56 21.3764,23.8933 21.5,24.5C 19.0268,25.7969 16.6934,25.7969 14.5,24.5C 16.7354,24.7947 18.7354,24.4614 20.5,23.5 Z"
-      />
-      <path
-        fill="#e5eae8"
-        d="M 38.5,30.5 C 42.8839,30.1744 47.2172,30.5078 51.5,31.5C 49.9912,36.3416 47.8245,36.6749 45,32.5C 44.0754,33.0465 43.2421,33.7132 42.5,34.5C 46.3171,37.0423 46.3171,39.3756 42.5,41.5C 40.938,38.0184 39.6047,34.3517 38.5,30.5 Z"
-      />
-      <path
-        fill="#2d9397"
-        d="M 44.5,48.5 C 45.8333,49.1667 45.8333,49.8333 44.5,50.5C 39.5,50.5 34.5,50.5 29.5,50.5C 34.5,49.8333 39.5,49.1667 44.5,48.5 Z"
-      />
-      <path
-        fill="#1c66c0"
-        d="M 29.5,50.5 C 34.5,50.5 39.5,50.5 44.5,50.5C 41.5136,54.817 38.1803,58.817 34.5,62.5C 32.8346,58.505 31.1679,54.505 29.5,50.5 Z"
-      />
-    </svg>
-  </button>
+    @translate-pointerdown="emit('pointerdown', $event)"
+    @translate="handleTranslateClick"
+    @tts="handleTTSClick"
+  />
 </template>
 
 <script setup>
-import './PdfTranslationIcon.scss'
+import { computed, onUnmounted, ref } from 'vue'
+import SelectionActionPill from '@/components/shared/SelectionActionPill.vue'
+import { useUnifiedI18n } from '@/composables/shared/useUnifiedI18n.js'
+import { useTTSSmart } from '@/features/tts/composables/useTTSSmart.js'
+import { useSettingsStore } from '@/features/settings/stores/settings.js'
+import { getLanguageNameFromCode } from '@/shared/config/languageConstants.js'
 
-defineProps({
+const props = defineProps({
   title: {
     type: String,
     default: ''
@@ -57,8 +31,124 @@ defineProps({
   ariaLabel: {
     type: String,
     default: ''
+  },
+  text: {
+    type: String,
+    default: ''
+  },
+  disabled: {
+    type: Boolean,
+    default: false
   }
 })
 
 const emit = defineEmits(['click', 'pointerdown'])
+
+const settingsStore = useSettingsStore()
+const tts = useTTSSmart()
+const { t } = useUnifiedI18n()
+const localTTSId = ref(null)
+
+const showTranslate = computed(() => settingsStore.settings.SHOW_TRANSLATE_ICON_IN_TOOLBAR !== false)
+const showTTS = computed(() => settingsStore.settings.SHOW_TTS_ICON_IN_TOOLBAR !== false)
+const isDarkTheme = computed(() => settingsStore.isDarkTheme)
+
+const isThisTTSActive = computed(() => {
+  if (tts.ttsState.value === 'error' && tts.lastText.value === props.text) {
+    return true
+  }
+
+  return !!(localTTSId.value && tts.currentTTSId.value === localTTSId.value)
+})
+
+const effectiveTTSState = computed(() => {
+  if (tts.ttsState.value === 'loading' && localTTSId.value?.startsWith('pending_')) {
+    return 'loading'
+  }
+
+  if (isThisTTSActive.value) {
+    return tts.ttsState.value
+  }
+
+  return 'idle'
+})
+
+const ttsTitle = computed(() => {
+  const displayLang = tts.detectedLanguage.value
+    ? getLanguageNameFromCode(tts.detectedLanguage.value)
+    : ''
+  const langName = displayLang
+    ? displayLang.charAt(0).toUpperCase() + displayLang.slice(1)
+    : ''
+  const langSuffix = langName ? ` (${langName})` : ''
+
+  switch (effectiveTTSState.value) {
+    case 'idle':
+      return `${t('action_speak_text') || 'Speak text'}${langSuffix}`
+    case 'loading':
+      return t('window_loading_alt') || 'Loading...'
+    case 'playing':
+      return `${t('action_stop_speaking') || 'Stop speaking'}${langSuffix}`
+    case 'error':
+      return tts.errorMessage.value || 'TTS error'
+    default:
+      return 'Text to speech'
+  }
+})
+
+const handleTranslateClick = () => {
+  if (props.disabled) return
+
+  emit('click')
+}
+
+const handleTTSClick = async () => {
+  if (props.disabled || !props.text?.trim()) {
+    return
+  }
+
+  try {
+    let result = false
+
+    switch (effectiveTTSState.value) {
+      case 'idle':
+        localTTSId.value = `pending_${Date.now()}`
+        result = await tts.speak(props.text, 'auto')
+        if (result) {
+          localTTSId.value = tts.currentTTSId.value
+        } else {
+          localTTSId.value = null
+        }
+        break
+      case 'loading':
+      case 'playing':
+        result = await tts.stop()
+        if (result) {
+          localTTSId.value = null
+        }
+        break
+      case 'error':
+        localTTSId.value = `pending_retry_${Date.now()}`
+        result = await tts.speak(props.text, 'auto')
+        if (result) {
+          localTTSId.value = tts.currentTTSId.value
+        } else {
+          localTTSId.value = null
+        }
+        break
+      default:
+        localTTSId.value = null
+        await tts.stop()
+    }
+  } catch (error) {
+    console.warn('[PdfTranslationIcon] TTS toggle error:', error)
+    localTTSId.value = null
+  }
+}
+
+onUnmounted(() => {
+  if (isThisTTSActive.value) {
+    void tts.stop()
+  }
+})
 </script>
