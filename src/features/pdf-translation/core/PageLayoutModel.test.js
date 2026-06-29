@@ -41,6 +41,117 @@ describe('PageLayoutModel', () => {
       expect(model.metadata.structured.regions[0].kind).toBe('unknown')
     })
 
+    it('exposes canonical structured metadata while preserving metadata.table', () => {
+      const lines = [
+        { text: 'Name', boundingBox: { x: 40, y: 100, width: 80, height: 20 }, fontSize: 12, items: [] },
+        { text: 'Personal Info', boundingBox: { x: 160, y: 100, width: 140, height: 20 }, fontSize: 12, items: [] }
+      ]
+      const table = {
+        columnCount: 2,
+        rowCount: 2,
+        hasSpanCandidates: true,
+        hasMergedCells: false,
+        hasMultiLevelHeaders: false,
+        columns: [
+          { x: 40, width: 80, align: 'left', itemCount: 2, averageWidth: 72 },
+          { x: 160, width: 80, align: 'right', itemCount: 2, averageWidth: 70 }
+        ],
+        rows: [
+          { index: 0, y: 100, height: 20, lineIndices: [0], lineCount: 1 },
+          { index: 1, y: 124, height: 20, lineIndices: [1], lineCount: 1 }
+        ],
+        cells: [
+          {
+            cellId: 'p1-r0-c0-i0',
+            rowIndex: 0,
+            columnIndex: 0,
+            text: 'Name',
+            boundingBox: { x: 40, y: 100, width: 80, height: 20 },
+            sourceLineIndex: 0,
+            sourceItemIndex: 0,
+            spanCandidate: false,
+            estimatedColSpan: 1
+          },
+          {
+            cellId: 'p1-r0-c1-i1',
+            rowIndex: 0,
+            columnIndex: 1,
+            text: 'Personal Info',
+            boundingBox: { x: 160, y: 100, width: 140, height: 20 },
+            sourceLineIndex: 0,
+            sourceItemIndex: 1,
+            spanCandidate: true,
+            estimatedColSpan: 2
+          }
+        ],
+        grid: {
+          rows: [
+            [
+              { cellId: 'p1-r0-c0-i0', rowIndex: 0, columnIndex: 0, colSpan: 1, rowSpan: 1, spanType: 'none' },
+              { cellId: 'p1-r0-c1-i1', rowIndex: 0, columnIndex: 1, colSpan: 2, rowSpan: 1, spanType: 'colspan-candidate' }
+            ],
+            [
+              { cellId: 'p1-r1-c0-i0', rowIndex: 1, columnIndex: 0, colSpan: 1, rowSpan: 1, spanType: 'none' },
+              { cellId: 'p1-r1-c1-i1', rowIndex: 1, columnIndex: 1, colSpan: 1, rowSpan: 1, spanType: 'none' }
+            ]
+          ],
+          columns: [
+            { columnIndex: 0, x: 40, width: 80 },
+            { columnIndex: 1, x: 160, width: 80 }
+          ],
+          occupancy: [
+            [
+              { rowIndex: 0, columnIndex: 0, state: 'occupied', cellId: 'p1-r0-c0-i0', ownerCellId: 'p1-r0-c0-i0', rowSpan: 1, colSpan: 1, boundingBox: { x: 40, y: 100, width: 80, height: 20 } },
+              { rowIndex: 0, columnIndex: 1, state: 'occupied', cellId: 'p1-r0-c1-i1', ownerCellId: 'p1-r0-c1-i1', rowSpan: 1, colSpan: 2, boundingBox: { x: 160, y: 100, width: 140, height: 20 } }
+            ],
+            [
+              { rowIndex: 1, columnIndex: 0, state: 'occupied', cellId: 'p1-r1-c0-i0', ownerCellId: 'p1-r1-c0-i0', rowSpan: 1, colSpan: 1, boundingBox: { x: 40, y: 124, width: 80, height: 20 } },
+              { rowIndex: 1, columnIndex: 1, state: 'occupied', cellId: 'p1-r1-c1-i1', ownerCellId: 'p1-r1-c1-i1', rowSpan: 1, colSpan: 1, boundingBox: { x: 160, y: 124, width: 80, height: 20 } }
+            ]
+          ]
+        }
+      }
+
+      const region = {
+        id: 'p1-r0',
+        type: 'table',
+        boundingBox: { x: 40, y: 100, width: 240, height: 44 },
+        childRegionIds: [],
+        blockIds: ['block-1'],
+        metadata: {
+          lineCount: 2,
+          table
+        }
+      }
+
+      const model = buildPageLayoutModel({
+        pageNumber: 1,
+        pageSize: { width: 500, height: 700 },
+        lines,
+        blocks: [
+          { id: 'block-1', role: 'table-region', pageNumber: 1, readingOrderIndex: 0, columnIndex: 0, roleMetadata: { isStructured: true } }
+        ],
+        regions: [region]
+      })
+
+      const structuredRegion = model.metadata.structured.regions[0]
+      const tableMetadata = model.regions[0].metadata.table
+
+      expect(structuredRegion.kind).toBe('table')
+      expect(structuredRegion.rows).toHaveLength(tableMetadata.rows.length)
+      expect(structuredRegion.columns).toHaveLength(tableMetadata.columns.length)
+      expect(structuredRegion.cells).toHaveLength(tableMetadata.cells.length)
+      expect(structuredRegion.grid.dimensions).toEqual({
+        rowCount: tableMetadata.rows.length,
+        columnCount: tableMetadata.columns.length
+      })
+      expect(structuredRegion.compatibility.table).toBe(tableMetadata)
+      expect(model.regions[0].metadata.table).toBe(tableMetadata)
+      if (tableMetadata.grid?.occupancy?.length > 0 && tableMetadata.grid.occupancy[0]?.[1]) {
+        expect(structuredRegion.grid.occupancy[0][1].colSpan).toBe(tableMetadata.grid.occupancy[0][1].colSpan)
+      }
+    })
+
     it('sorts reading order by pageNumber then readingOrderIndex then columnIndex', () => {
       const blocks = [
         { id: 'b-right', role: 'paragraph', pageNumber: 1, readingOrderIndex: 0, columnIndex: 1 },

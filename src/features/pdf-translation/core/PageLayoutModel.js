@@ -130,7 +130,8 @@ export function buildPageLayoutModel({ pageNumber = 0, pageSize = null, lines = 
   const structuredLayout = analyzeStructuredLayout({
     pageNumber,
     pageSize: normalizedPageSize,
-    regions: enrichedRegions
+    regions: enrichedRegions,
+    lines: frozenLines
   })
   const metadata = buildMetadata(frozenLines, frozenBlocks, enrichedRegions, structuredLayout, pageNumber, normalizedPageSize)
 
