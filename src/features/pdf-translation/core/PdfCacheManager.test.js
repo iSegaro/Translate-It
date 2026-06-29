@@ -30,13 +30,56 @@ describe('PdfCacheManager', () => {
   it('loadDocument returns cached data', async () => {
     mockStorage.pdfDocumentCache = {
       'doc-1': {
-        translations: { b1: { blockId: 'b1', translatedText: 'Hello' } },
+        translations: {
+          b1: {
+            blockId: 'b1',
+            translatedText: 'Hello',
+            translatedCells: [
+              {
+                lineIndex: 0,
+                cells: ['Hello'],
+                structuredCells: [
+                  {
+                    id: 'c1',
+                    regionId: 'r1',
+                    rowIndex: 0,
+                    columnIndex: 0,
+                    rowSpan: 1,
+                    colSpan: 1,
+                    spanType: 'none',
+                    role: 'value',
+                    text: 'Hello',
+                    boundingBox: { x: 10, y: 20, width: 30, height: 14 },
+                    sourceReferences: {
+                      blockIds: ['b1'],
+                      lineIds: [],
+                      sourceLineIndices: [0],
+                      sourceItemIndices: [0],
+                      groupRegionIds: []
+                    },
+                    blockIds: ['b1'],
+                    lineIds: [],
+                    sourceLineIndex: 0,
+                    sourceItemIndex: 0,
+                    spanCandidate: false,
+                    estimatedRowSpan: 1,
+                    estimatedColSpan: 1,
+                    confidence: 0.9
+                  }
+                ]
+              }
+            ],
+            translationSettingsHash: 'hash-1'
+          }
+        },
         ocr: { '1': { pageNumber: 1, ocrLanguage: 'eng' } }
       }
     }
 
     const result = await manager.loadDocument('doc-1')
     expect(result.translations.b1.translatedText).toBe('Hello')
+    expect(result.translations.b1.translatedCells[0].structuredCells[0].id).toBe('c1')
+    expect(result.translations.b1.translationSettingsHash).toBe('hash-1')
     expect(result.ocr['1'].ocrLanguage).toBe('eng')
   })
 

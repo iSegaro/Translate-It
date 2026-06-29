@@ -1,13 +1,144 @@
 import { computed, ref } from 'vue'
 import { getScopedLogger } from '@/shared/logging/logger.js'
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js'
+import { getProviderOptimizationLevelAsync, getSourceLanguageAsync, getTargetLanguageAsync, getTranslationApiAsync } from '@/shared/config/config.js'
 import { pdfDocumentSession } from '@/features/pdf-translation/core/PdfDocumentSession.js'
 import { PdfTranslationCoordinator } from '@/features/pdf-translation/core/PdfTranslationCoordinator.js'
 import { pdfCacheManager } from '@/features/pdf-translation/core/PdfCacheManager.js'
 import { pdfHistoryManager } from '@/features/pdf-translation/core/PdfHistoryManager.js'
+import { sha256HexFromText } from '@/features/pdf-translation/core/PdfBlockIdentity.js'
 
 const logger = getScopedLogger(LOG_COMPONENTS.PDF, 'usePdfViewerController')
 const pdfTranslationCoordinator = new PdfTranslationCoordinator(pdfDocumentSession)
+
+function isFiniteNumber(value) {
+  return typeof value === 'number' && Number.isFinite(value)
+}
+
+function isBoundingBoxLike(value) {
+  return !!value && typeof value === 'object' &&
+    isFiniteNumber(value.x) &&
+    isFiniteNumber(value.y) &&
+    isFiniteNumber(value.width) &&
+    isFiniteNumber(value.height)
+}
+
+function isSourceReferencesLike(value) {
+  return !!value && typeof value === 'object' &&
+    Array.isArray(value.blockIds) &&
+    Array.isArray(value.lineIds) &&
+    Array.isArray(value.sourceLineIndices) &&
+    Array.isArray(value.sourceItemIndices) &&
+    Array.isArray(value.groupRegionIds)
+}
+
+function isStructuredCellLike(value) {
+  return !!value && typeof value === 'object' &&
+    typeof value.id === 'string' &&
+    typeof value.regionId === 'string' &&
+    isFiniteNumber(value.rowIndex) &&
+    isFiniteNumber(value.columnIndex) &&
+    isFiniteNumber(value.rowSpan) &&
+    isFiniteNumber(value.colSpan) &&
+    typeof value.spanType === 'string' &&
+    typeof value.role === 'string' &&
+    typeof value.text === 'string' &&
+    (value.boundingBox == null || isBoundingBoxLike(value.boundingBox)) &&
+    isSourceReferencesLike(value.sourceReferences) &&
+    typeof value.spanCandidate === 'boolean' &&
+    isFiniteNumber(value.estimatedRowSpan) &&
+    isFiniteNumber(value.estimatedColSpan) &&
+    isFiniteNumber(value.confidence)
+}
+
+function cloneSerializable(value) {
+  if (value == null) return value
+
+  if (typeof globalThis.structuredClone === 'function') {
+    return globalThis.structuredClone(value)
+  }
+
+  return JSON.parse(JSON.stringify(value))
+}
+
+async function resolveTranslationSettings() {
+  const [provider, sourceLanguage, targetLanguage] = await Promise.all([
+    getTranslationApiAsync(),
+    getSourceLanguageAsync(),
+    getTargetLanguageAsync()
+  ])
+
+  const optimizationLevel = await getProviderOptimizationLevelAsync(provider)
+
+  return {
+    provider,
+    sourceLanguage,
+    targetLanguage,
+    optimizationLevel
+  }
+}
+
+async function buildTranslationSettingsHash() {
+  const settings = await resolveTranslationSettings()
+  return await sha256HexFromText(JSON.stringify({
+    provider: settings.provider || '',
+    sourceLanguage: settings.sourceLanguage || '',
+    targetLanguage: settings.targetLanguage || '',
+    optimizationLevel: settings.optimizationLevel ?? null
+  }))
+}
+
+function normalizeStructuredCells(translatedCells = []) {
+  if (!Array.isArray(translatedCells) || translatedCells.length === 0) return null
+
+  const normalized = []
+  for (const line of translatedCells) {
+    if (!line || typeof line !== 'object') return null
+    if (!isFiniteNumber(line.lineIndex) || !Array.isArray(line.cells)) return null
+    if (!line.cells.every((cell) => typeof cell === 'string')) return null
+
+    const nextLine = {
+      lineIndex: line.lineIndex,
+      cells: cloneSerializable(line.cells)
+    }
+
+    const metadataKeys = ['cellIds', 'columnIndices', 'rowIndices', 'colSpanCandidates', 'estimatedColSpans']
+    for (const key of metadataKeys) {
+      if (line[key] == null) continue
+      if (!Array.isArray(line[key])) return null
+      nextLine[key] = cloneSerializable(line[key])
+    }
+
+    if (line.structuredCells != null) {
+      if (!Array.isArray(line.structuredCells)) return null
+      if (!line.structuredCells.every((cell) => cell == null || isStructuredCellLike(cell))) return null
+      nextLine.structuredCells = cloneSerializable(line.structuredCells)
+    }
+
+    normalized.push(nextLine)
+  }
+
+  return normalized
+}
+
+function deriveTranslatedTextFromStructuredCells(translatedCells = []) {
+  if (!Array.isArray(translatedCells) || translatedCells.length === 0) return ''
+
+  const lines = []
+  for (const line of translatedCells) {
+    if (!line || typeof line !== 'object' || !Array.isArray(line.cells)) continue
+    const cells = line.cells.filter((cell) => typeof cell === 'string' && cell.length > 0)
+    if (cells.length > 0) {
+      lines.push(cells.join(' '))
+    }
+  }
+
+  return lines.join('\n').trim()
+}
+
+function hasTranslationSettingsHash(entry = null) {
+  return typeof entry?.translationSettingsHash === 'string' && entry.translationSettingsHash.length > 0
+}
 
 export function usePdfViewerController() {
   const currentFile = ref(null)
@@ -177,6 +308,7 @@ export function usePdfViewerController() {
     if (!documentIdentity) return
 
     try {
+      const currentTranslationSettingsHash = await buildTranslationSettingsHash()
       const cache = await pdfCacheManager.loadDocument(documentIdentity)
       let translationCount = 0
       let ocrPageCount = 0
@@ -186,18 +318,38 @@ export function usePdfViewerController() {
         if (state.status === 'translated') continue
 
         const block = findBlockById(blockId)
-        if (block && block.sourceTextHash === entry.sourceTextHash) {
-          pdfDocumentSession.setBlockTranslationState(blockId, {
-            translatedText: entry.translatedText,
-            status: 'translated',
-            provider: entry.provider || '',
-            sourceLanguage: entry.sourceLanguage || '',
-            targetLanguage: entry.targetLanguage || '',
-            sourceTextHash: entry.sourceTextHash,
-            error: null
-          })
-          translationCount++
+        if (!block || block.sourceTextHash !== entry.sourceTextHash) continue
+
+        if (hasTranslationSettingsHash(entry) && entry.translationSettingsHash !== currentTranslationSettingsHash) {
+          continue
         }
+
+        const normalizedTranslatedCells = normalizeStructuredCells(entry.translatedCells)
+        const translatedText = (typeof entry.translatedText === 'string' && entry.translatedText.trim().length > 0)
+          ? entry.translatedText
+          : deriveTranslatedTextFromStructuredCells(normalizedTranslatedCells || [])
+
+        if (!translatedText) continue
+
+        const nextState = {
+          translatedText,
+          status: 'translated',
+          provider: entry.provider || '',
+          sourceLanguage: entry.sourceLanguage || '',
+          targetLanguage: entry.targetLanguage || '',
+          sourceTextHash: entry.sourceTextHash,
+          translationSettingsHash: hasTranslationSettingsHash(entry)
+            ? entry.translationSettingsHash
+            : '',
+          error: null
+        }
+
+        if (normalizedTranslatedCells) {
+          nextState.translatedCells = normalizedTranslatedCells
+        }
+
+        pdfDocumentSession.setBlockTranslationState(blockId, nextState)
+        translationCount++
       }
 
       for (const [pageNumber, ocrEntry] of Object.entries(cache.ocr)) {
@@ -232,20 +384,24 @@ export function usePdfViewerController() {
     const documentIdentity = pdfDocumentSession.documentIdentity
     if (!documentIdentity) return
 
+    const translationSettingsHash = await buildTranslationSettingsHash()
+
     const entries = {}
     for (const [blockId, state] of pdfDocumentSession.translationStates) {
       if (state.status === 'translated') {
+        const translatedCells = normalizeStructuredCells(state.translatedCells)
         entries[blockId] = {
           blockId,
           documentIdentity,
           pageNumber: state.pageNumber || 0,
           sourceTextHash: state.sourceTextHash || '',
           translatedText: state.translatedText || '',
+          ...(translatedCells && { translatedCells }),
           status: state.status,
           provider: state.provider || '',
           sourceLanguage: state.sourceLanguage || '',
           targetLanguage: state.targetLanguage || '',
-          translationSettingsHash: '',
+          translationSettingsHash,
           updatedAt: state.updatedAt || Date.now()
         }
       }

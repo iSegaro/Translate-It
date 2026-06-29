@@ -199,11 +199,13 @@ export class PdfDocumentSession extends ResourceTracker {
     return this.translationStates.get(blockId) || {
       blockId,
       translatedText: '',
+      translatedCells: null,
       status: 'idle',
       provider: '',
       sourceLanguage: '',
       targetLanguage: '',
       sourceTextHash: '',
+      translationSettingsHash: '',
       updatedAt: 0,
       error: null
     }
