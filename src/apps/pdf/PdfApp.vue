@@ -27,6 +27,19 @@
       @clear-cache="handleClearCache"
     />
 
+    <div
+      v-if="pdfStatusBanner"
+      class="pdf-app__status-row"
+    >
+      <PdfStatusBanner
+        :visible="Boolean(pdfStatusBanner)"
+        :variant="pdfStatusBanner.variant || 'info'"
+        :title="pdfStatusBanner.title || ''"
+        :message="pdfStatusBanner.message || ''"
+        :detail="pdfStatusBanner.detail || ''"
+      />
+    </div>
+
     <main class="pdf-app__content">
       <PdfOcrConsentPrompt
         :visible="isOcrPromptVisible"
@@ -108,7 +121,7 @@
 </template>
 
 <script setup>
-import { onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import PdfToolbar from './components/PdfToolbar.vue'
 import PdfDropzone from './components/PdfDropzone.vue'
 import PdfViewer from './components/PdfViewer.vue'
@@ -116,12 +129,14 @@ import PdfViewerLayout from './components/PdfViewerLayout.vue'
 import PdfTranslatedPane from './components/PdfTranslatedPane.vue'
 import PdfOcrConsentPrompt from './components/PdfOcrConsentPrompt.vue'
 import PdfOcrProgress from './components/PdfOcrProgress.vue'
+import PdfStatusBanner from './components/PdfStatusBanner.vue'
 import PdfWindowsHost from './components/PdfWindowsHost.vue'
 import { usePdfViewerController } from './composables/usePdfViewerController.js'
 import { usePdfBilingualMode } from './composables/usePdfBilingualMode.js'
 import { usePdfExport } from './composables/usePdfExport.js'
 import { usePdfBlockSelection } from './composables/usePdfBlockSelection.js'
 import { usePdfOcr } from './composables/usePdfOcr.js'
+import { buildPdfStatusBannerState } from './utils/pdfStatusBanner.js'
 
 const {
   error,
@@ -195,6 +210,16 @@ const {
 
 const isDragOver = ref(false)
 const viewerWidth = ref(960)
+
+const pdfStatusBanner = computed(() => buildPdfStatusBannerState({
+  error: error.value,
+  exportError: exportError.value,
+  ocrError: ocrError.value,
+  isLoading: isLoading.value,
+  isTranslating: isTranslating.value,
+  restoredTranslationCount: restoredTranslationCount.value,
+  isPartialExport: isPartialExport.value
+}))
 
 watch(hasDocument, (has) => {
   if (has) {
@@ -275,6 +300,10 @@ onBeforeUnmount(() => {
   min-height: 0;
 }
 
+.pdf-app__status-row {
+  padding: 20px 28px 0;
+}
+
 .pdf-app__empty {
   min-height: 480px;
   display: grid;
@@ -303,6 +332,10 @@ onBeforeUnmount(() => {
 }
 
 @media (max-width: 960px) {
+  .pdf-app__status-row {
+    padding: 16px 16px 0;
+  }
+
   .pdf-app__content {
     padding: 16px;
   }
