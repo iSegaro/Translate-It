@@ -50,6 +50,37 @@ function makeStructuredBlockWithCells(id, lineTexts, lineItems) {
   }
 }
 
+function makeCanonicalStructuredCell(overrides = {}) {
+  return {
+    id: 'canonical-cell-0',
+    cellId: 'canonical-cell-0',
+    regionId: 'region-canonical',
+    rowIndex: 0,
+    columnIndex: 0,
+    rowSpan: 1,
+    colSpan: 1,
+    spanType: 'none',
+    role: 'metric',
+    text: 'Revenue',
+    boundingBox: { x: 40, y: 100, width: 80, height: 20 },
+    sourceReferences: {
+      blockIds: ['block-canonical'],
+      lineIds: [],
+      sourceLineIndices: [0],
+      sourceItemIndices: [0],
+      sourceRegionId: 'region-canonical',
+      sourceRegionType: 'kpi',
+      groupId: null,
+      groupRegionIds: []
+    },
+    spanCandidate: false,
+    estimatedRowSpan: 1,
+    estimatedColSpan: 1,
+    confidence: 0.95,
+    ...overrides
+  }
+}
+
 function makeParagraphBlock(id, text, extra = {}) {
   return {
     id,
@@ -343,6 +374,103 @@ describe('PdfTranslationAdapter', () => {
       expect(mapped[0].blockId).toBe('sched-4')
       expect(mapped[0].translatedText).toBe('سطر 1\nسطر 2 ستون 2')
       expect(mapped[0].translatedCells).toHaveLength(2)
+    })
+
+    it('preserves canonical structured cell metadata when structured regions are provided', () => {
+      const adapter = new PdfTranslationAdapter()
+      const structuredCell0 = makeCanonicalStructuredCell({
+        id: 'canonical-cell-0',
+        cellId: 'canonical-cell-0',
+        columnIndex: 0,
+        text: 'Revenue'
+      })
+      const structuredCell1 = makeCanonicalStructuredCell({
+        id: 'canonical-cell-1',
+        cellId: 'canonical-cell-1',
+        columnIndex: 1,
+        text: '12.5B',
+        sourceReferences: {
+          blockIds: ['block-canonical'],
+          lineIds: [],
+          sourceLineIndices: [0],
+          sourceItemIndices: [1],
+          sourceRegionId: 'region-canonical',
+          sourceRegionType: 'kpi',
+          groupId: null,
+          groupRegionIds: []
+        }
+      })
+      const block = makeStructuredBlockWithCells('block-canonical', ['Revenue 12.5B'], [[
+        {
+          text: 'Revenue',
+          x: 40,
+          y: 200,
+          width: 120,
+          height: 14,
+          cellId: structuredCell0.cellId,
+          rowIndex: 0,
+          columnIndex: 0,
+          structuredCell: structuredCell0
+        },
+        {
+          text: '12.5B',
+          x: 180,
+          y: 200,
+          width: 120,
+          height: 14,
+          cellId: structuredCell1.cellId,
+          rowIndex: 0,
+          columnIndex: 1,
+          structuredCell: structuredCell1
+        }
+      ]])
+      block.roleMetadata.regionId = 'region-canonical'
+
+      const structuredRegions = [{
+        id: 'region-canonical',
+        kind: 'kpi',
+        subtype: 'kpi-card',
+        confidence: 0.91,
+        structureSignals: {
+          semantic: {
+            metricCount: 1
+          }
+        },
+        relationships: {},
+        sourceReferences: {},
+        cells: [structuredCell0, structuredCell1]
+      }]
+
+      const items = adapter.toProviderItems([block], [], structuredRegions)
+
+      expect(items).toHaveLength(2)
+      expect(items[0].semanticContext).toEqual(expect.objectContaining({
+        regionType: 'kpi-candidate',
+        readingRole: 'metric'
+      }))
+      expect(items[0].structuredCell).toBe(structuredCell0)
+      expect(items[1].structuredCell).toBe(structuredCell1)
+
+      const mapped = adapter.mapBatchResponse(items, {
+        success: true,
+        translatedText: JSON.stringify([
+          { blockId: 'block-canonical', text: 'Revenue' },
+          { blockId: 'block-canonical', text: '12.5B' }
+        ]),
+        provider: 'googlev2',
+        sourceLanguage: 'en',
+        targetLanguage: 'fa'
+      }, {
+        provider: 'googlev2',
+        sourceLanguage: 'en',
+        targetLanguage: 'fa'
+      })
+
+      expect(mapped).toHaveLength(1)
+      expect(mapped[0].translatedText).toBe('Revenue 12.5B')
+      expect(mapped[0].translatedCells).toHaveLength(1)
+      expect(mapped[0].translatedCells[0].cells).toEqual(['Revenue', '12.5B'])
+      expect(mapped[0].translatedCells[0].structuredCells).toEqual([structuredCell0, structuredCell1])
     })
 
     it('keeps normal block parts joined with space', () => {

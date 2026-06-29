@@ -116,6 +116,69 @@ describe('PdfTranslationCoordinator', () => {
     }))
   })
 
+  it('passes canonical structured regions to the batch planner before legacy regions', async () => {
+    const batchPlanner = {
+      plan: vi.fn(() => [])
+    }
+    const coordinator = new PdfTranslationCoordinator(session, { batchPlanner })
+
+    const structuredRegions = [{
+      id: 'region-structured',
+      kind: 'kpi',
+      subtype: 'kpi-card',
+      structureSignals: {
+        semantic: {
+          metricCount: 1
+        }
+      },
+      sourceReferences: {},
+      relationships: {},
+      cells: []
+    }]
+
+    const legacyRegions = [{
+      id: 'region-legacy',
+      metadata: {
+        semantic: {
+          type: 'key-value-candidate',
+          confidence: 0.5,
+          metrics: []
+        }
+      }
+    }]
+
+    session.getVisibleLogicalBlocks.mockResolvedValue([
+      {
+        id: 'block-a',
+        text: 'Hello',
+        role: 'paragraph',
+        sourceTextHash: 'hash-a',
+        roleMetadata: {
+          regionId: 'region-structured'
+        }
+      }
+    ])
+    session.getPageLayout.mockReturnValue({
+      regions: legacyRegions,
+      metadata: {
+        structured: {
+          regions: structuredRegions
+        }
+      }
+    })
+
+    await coordinator.translateVisibleBlocks()
+
+    expect(batchPlanner.plan).toHaveBeenCalledTimes(1)
+    expect(batchPlanner.plan).toHaveBeenCalledWith(
+      expect.any(Array),
+      expect.objectContaining({
+        semanticRegions: legacyRegions,
+        structuredRegions
+      })
+    )
+  })
+
   it('drops stale results after cancellation and does not write translated state', async () => {
     const coordinator = new PdfTranslationCoordinator(session)
     const deferred = createDeferred()

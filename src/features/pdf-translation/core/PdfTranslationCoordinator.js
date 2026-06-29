@@ -57,6 +57,7 @@ export class PdfTranslationCoordinator {
       const pageLayout = this.session.getPageLayout?.() || null
       const enrichedBlocks = enrichBlocksWithTableMetadata(visibleBlocks, pageLayout)
       const semanticRegions = pageLayout?.regions || []
+      const structuredRegions = pageLayout?.metadata?.structured?.regions || []
 
       const provider = await this._resolveProvider()
       const sourceLanguage = await getSourceLanguageAsync()
@@ -65,7 +66,8 @@ export class PdfTranslationCoordinator {
       const batches = this.batchPlanner.plan(enrichedBlocks, {
         providerName: provider,
         optimizationLevel,
-        semanticRegions
+        semanticRegions,
+        structuredRegions
       })
 
       let translatedCount = 0

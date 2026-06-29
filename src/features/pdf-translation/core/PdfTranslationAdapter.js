@@ -19,11 +19,17 @@ function isStructuredBlock(block) {
   return block.lines.length > 1 || block.lines.some((line) => line.items?.length > 1)
 }
 
-function buildSemanticContext(block, semanticRegions) {
-  if (!semanticRegions || semanticRegions.length === 0) return undefined
-
+function buildSemanticContext(block, semanticRegions, structuredRegions = []) {
   const regionId = block.roleMetadata?.regionId
   if (!regionId) return undefined
+
+  const structuredRegion = findRegionById(structuredRegions, regionId)
+  const structuredContext = buildStructuredContextFromRegion(structuredRegion)
+  if (structuredContext) {
+    return structuredContext
+  }
+
+  if (!semanticRegions || semanticRegions.length === 0) return undefined
 
   const regionMap = new Map()
   for (const r of semanticRegions) {
@@ -134,13 +140,125 @@ function extractBlockId(translatedItem, originalItem) {
   return originalItem.blockId || originalItem.b || originalItem.i
 }
 
+function findRegionById(regions = [], regionId = '') {
+  if (!regionId || !Array.isArray(regions) || regions.length === 0) return null
+
+  return regions.find((region) => region?.id === regionId || region?.regionId === regionId) || null
+}
+
+function buildStructuredContextFromRegion(region = null) {
+  if (!region || typeof region !== 'object') return undefined
+
+  const context = {}
+
+  if (region.kind === 'table') {
+    context.regionType = 'table'
+  } else if (region.kind === 'kpi') {
+    context.regionType = 'kpi-candidate'
+  } else if (region.kind === 'key-value') {
+    context.regionType = 'key-value-candidate'
+  } else if (typeof region.kind === 'string' && region.kind.length > 0) {
+    context.regionType = region.kind
+  }
+
+  if (region.subtype === 'financial-kpi' || region.subtype === 'financial-key-value') {
+    context.financialSubtype = region.subtype
+  }
+
+  if (region.kind === 'kpi') {
+    const metricCount = region.structureSignals?.semantic?.metricCount ?? region.structureSignals?.kpi?.metricCount ?? 0
+    if (metricCount === 1) {
+      context.readingRole = READING_ROLE_KPI
+    }
+  } else if (region.kind === 'key-value') {
+    context.readingRole = READING_ROLE_KV
+  }
+
+  const groupId = region.groupId || region.relationships?.groupId || region.sourceReferences?.groupId || region.structureSignals?.semantic?.dashboardGroupId || null
+  if (groupId) {
+    context.dashboardGroup = true
+  }
+
+  const relationshipSource = region.compatibility?.semantic?.relationships || region.structureSignals?.semantic?.relationships || null
+  if (relationshipSource) {
+    if (relationshipSource.childRegionIds?.length > 0) {
+      context.relationshipRole = RELATIONSHIP_ROLE_PARENT
+    } else if (relationshipSource.parentRegionId) {
+      context.relationshipRole = RELATIONSHIP_ROLE_CHILD
+    } else {
+      context.relationshipRole = RELATIONSHIP_ROLE_STANDALONE
+    }
+  } else if (!context.relationshipRole && groupId) {
+    context.relationshipRole = RELATIONSHIP_ROLE_STANDALONE
+  }
+
+  const compatSemantic = region.compatibility?.semantic || null
+  if (compatSemantic) {
+    if (!context.financialSubtype) {
+      if (compatSemantic.type === 'kpi-candidate' && Array.isArray(compatSemantic.metrics) && compatSemantic.metrics.length === 1) {
+        const metric = compatSemantic.metrics[0]
+        if (metric.financial?.subtype) {
+          context.financialSubtype = metric.financial.subtype
+        }
+      } else if (compatSemantic.type === 'key-value-candidate') {
+        if (compatSemantic.pairs?.length === 1 && compatSemantic.pairs[0].financial?.subtype) {
+          context.financialSubtype = compatSemantic.pairs[0].financial.subtype
+        } else if (compatSemantic.pairs?.length > 1) {
+          const subtypes = compatSemantic.pairs.map((pair) => pair.financial?.subtype).filter(Boolean)
+          if (subtypes.length > 0) {
+            const unique = [...new Set(subtypes)]
+            if (unique.length === 1) {
+              context.financialSubtype = unique[0]
+            }
+          }
+        }
+      }
+    }
+
+    if (!context.statementFragment && compatSemantic.financialStatement) {
+      context.statementFragment = true
+    }
+
+    if (!context.dashboardGroup && compatSemantic.dashboardGroup) {
+      context.dashboardGroup = true
+    }
+
+    if (!context.readingRole) {
+      if (compatSemantic.metrics?.length === 1) {
+        context.readingRole = READING_ROLE_KPI
+      } else if (compatSemantic.type === 'key-value-candidate') {
+        context.readingRole = READING_ROLE_KV
+      }
+    }
+
+    if (!context.relationshipRole && compatSemantic.relationships) {
+      const relationships = compatSemantic.relationships
+      if (relationships.childRegionIds?.length > 0) {
+        context.relationshipRole = RELATIONSHIP_ROLE_PARENT
+      } else if (relationships.parentRegionId) {
+        context.relationshipRole = RELATIONSHIP_ROLE_CHILD
+      } else {
+        context.relationshipRole = RELATIONSHIP_ROLE_STANDALONE
+      }
+    }
+  }
+
+  if (Object.keys(context).length === 0) return undefined
+
+  return Object.freeze(context)
+}
+
+function hasStructuredCellMetadata(item = null) {
+  return item?.structuredCell != null && typeof item.structuredCell === 'object'
+}
+
 export class PdfTranslationAdapter {
-  toProviderItems(blocks = [], semanticRegions = []) {
+  toProviderItems(blocks = [], semanticRegions = [], structuredRegions = []) {
     const items = []
 
     for (let blockIndex = 0; blockIndex < blocks.length; blockIndex++) {
       const block = blocks[blockIndex]
-      const semanticContext = buildSemanticContext(block, semanticRegions)
+      const semanticContext = buildSemanticContext(block, semanticRegions, structuredRegions)
 
       if (isStructuredBlock(block)) {
         for (let lineIndex = 0; lineIndex < block.lines.length; lineIndex++) {
@@ -170,6 +288,7 @@ export class PdfTranslationAdapter {
                 tableColumnIndex: cell.columnIndex ?? null,
                 colSpanCandidate: cell.colSpanCandidate || false,
                 estimatedColSpan: cell.estimatedColSpan || 1,
+                ...(hasStructuredCellMetadata(cell) && { structuredCell: cell.structuredCell }),
                 ...(semanticContext && { semanticContext })
               })
             }
@@ -188,6 +307,7 @@ export class PdfTranslationAdapter {
               columnIndex: block.columnIndex,
               readingOrderIndex: block.readingOrderIndex,
               position: items.length,
+              ...(hasStructuredCellMetadata(line.items?.[0]) && { structuredCell: line.items[0].structuredCell }),
               ...(semanticContext && { semanticContext })
             })
           }
@@ -371,7 +491,7 @@ export class PdfTranslationAdapter {
 
       if (group.isStructured && lineIndex != null) {
         if (!group.lineResults.has(lineIndex)) {
-          group.lineResults.set(lineIndex, { cells: [], cellIds: [], columnIndices: [], rowIndices: [], colSpanCandidates: [], estimatedColSpans: [], lineText: '' })
+          group.lineResults.set(lineIndex, { cells: [], cellIds: [], columnIndices: [], rowIndices: [], colSpanCandidates: [], estimatedColSpans: [], structuredCells: [], lineText: '' })
         }
         const lineResult = group.lineResults.get(lineIndex)
 
@@ -382,8 +502,10 @@ export class PdfTranslationAdapter {
           if (originalItem.tableRowIndex != null) lineResult.rowIndices[cellIndex] = originalItem.tableRowIndex
           if (originalItem.colSpanCandidate != null) lineResult.colSpanCandidates[cellIndex] = originalItem.colSpanCandidate
           if (originalItem.estimatedColSpan != null) lineResult.estimatedColSpans[cellIndex] = originalItem.estimatedColSpan
+          if (hasStructuredCellMetadata(originalItem)) lineResult.structuredCells[cellIndex] = originalItem.structuredCell
         } else {
           lineResult.lineText = translatedText
+          if (hasStructuredCellMetadata(originalItem)) lineResult.structuredCells[0] = originalItem.structuredCell
         }
       } else {
         group.parts.push(translatedText)
@@ -429,7 +551,8 @@ export class PdfTranslationAdapter {
     if (!entry.isStructured || entry.lineResults.size === 0) return null
 
     const hasAnyCells = [...entry.lineResults.values()].some((lr) => lr.cells.length > 0)
-    if (!hasAnyCells) return null
+    const hasAnyStructuredCells = [...entry.lineResults.values()].some((lr) => Array.isArray(lr.structuredCells) && lr.structuredCells.some((cell) => cell != null))
+    if (!hasAnyCells && !hasAnyStructuredCells) return null
 
     const sortedIndices = [...entry.lineResults.keys()].sort((a, b) => a - b)
     return sortedIndices.map((lineIndex) => {
@@ -439,6 +562,10 @@ export class PdfTranslationAdapter {
         : [normalizeCellText(lr.lineText || '')]
 
       const result = { lineIndex, cells }
+      const hasStructuredCells = Array.isArray(lr.structuredCells) && lr.structuredCells.some((cell) => cell != null)
+      if (hasStructuredCells) {
+        result.structuredCells = lr.structuredCells.map((cell) => cell || null)
+      }
 
       const hasCellIds = lr.cellIds && lr.cellIds.some((id) => id != null)
       if (hasCellIds) {
@@ -535,7 +662,14 @@ export class PdfTranslationAdapter {
         sourceLanguage: lastResult.sourceLanguage || sourceLanguage || '',
         targetLanguage: lastResult.targetLanguage || targetLanguage || '',
         sourceTextHash: representativeItem?.sourceTextHash || '',
-        error: translatedText ? null : 'Empty translation result'
+        error: translatedText ? null : 'Empty translation result',
+        ...(blockItems.some((item) => hasStructuredCellMetadata(item)) && {
+          translatedCells: [{
+            lineIndex: 0,
+            cells: [normalizeCellText(translatedText)],
+            structuredCells: blockItems.map((item) => (hasStructuredCellMetadata(item) ? item.structuredCell : null))
+          }]
+        })
       }
     })
   }
@@ -553,7 +687,7 @@ export class PdfTranslationAdapter {
       if (lineIndex == null) continue
 
       if (!lineResults.has(lineIndex)) {
-        lineResults.set(lineIndex, { cells: [], cellIds: [], columnIndices: [], rowIndices: [], colSpanCandidates: [], estimatedColSpans: [], lineText: '' })
+        lineResults.set(lineIndex, { cells: [], cellIds: [], columnIndices: [], rowIndices: [], colSpanCandidates: [], estimatedColSpans: [], structuredCells: [], lineText: '' })
       }
       const lr = lineResults.get(lineIndex)
       const text = results[i] ? extractTranslatedString(results[i].t || results[i].text || results[i].translatedText) : ''
@@ -565,8 +699,10 @@ export class PdfTranslationAdapter {
         if (item.tableRowIndex != null) lr.rowIndices[item.cellIndex] = item.tableRowIndex
         if (item.colSpanCandidate != null) lr.colSpanCandidates[item.cellIndex] = item.colSpanCandidate
         if (item.estimatedColSpan != null) lr.estimatedColSpans[item.cellIndex] = item.estimatedColSpan
+        if (hasStructuredCellMetadata(item)) lr.structuredCells[item.cellIndex] = item.structuredCell
       } else if (!lr.lineText) {
         lr.lineText = text
+        if (hasStructuredCellMetadata(item)) lr.structuredCells[0] = item.structuredCell
       }
     }
 
@@ -580,7 +716,8 @@ export class PdfTranslationAdapter {
     })
 
     const hasAnyCells = [...lineResults.values()].some((lr) => lr.cells.length > 0)
-    const translatedCells = hasAnyCells
+    const hasAnyStructuredCells = [...lineResults.values()].some((lr) => Array.isArray(lr.structuredCells) && lr.structuredCells.some((cell) => cell != null))
+    const translatedCells = (hasAnyCells || hasAnyStructuredCells)
       ? sortedIndices.map((idx) => {
         const lr = lineResults.get(idx)
         const cells = lr.cells.length > 0
@@ -588,6 +725,10 @@ export class PdfTranslationAdapter {
           : [normalizeCellText(lr.lineText || '')]
 
         const result = { lineIndex: idx, cells }
+        const hasStructuredCells = Array.isArray(lr.structuredCells) && lr.structuredCells.some((cell) => cell != null)
+        if (hasStructuredCells) {
+          result.structuredCells = lr.structuredCells.map((cell) => cell || null)
+        }
 
         const hasCellIds = lr.cellIds && lr.cellIds.some((id) => id != null)
         if (hasCellIds) {

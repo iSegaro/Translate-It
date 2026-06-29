@@ -39,6 +39,37 @@ function makeItem(text, x, width = 60) {
   }
 }
 
+function makeStructuredCell(overrides = {}) {
+  return {
+    id: 'structured-cell-0',
+    cellId: 'structured-cell-0',
+    regionId: 'p1-r0',
+    rowIndex: 0,
+    columnIndex: 0,
+    rowSpan: 2,
+    colSpan: 1,
+    spanType: 'merged',
+    role: 'value',
+    text: 'Revenue',
+    boundingBox: { x: 40, y: 100, width: 80, height: 20 },
+    sourceReferences: {
+      blockIds: ['b1'],
+      lineIds: [],
+      sourceLineIndices: [0],
+      sourceItemIndices: [0],
+      sourceRegionId: 'p1-r0',
+      sourceRegionType: 'table',
+      groupId: null,
+      groupRegionIds: []
+    },
+    spanCandidate: true,
+    estimatedRowSpan: 2,
+    estimatedColSpan: 1,
+    confidence: 0.92,
+    ...overrides
+  }
+}
+
 describe('TableRegionAnalyzer', () => {
   describe('adds table metadata only to table regions', () => {
     it('adds table metadata to table region', () => {
@@ -115,6 +146,74 @@ describe('TableRegionAnalyzer', () => {
       expect(result[0].metadata.dominantBlockRole).toBe('table-cell')
       expect(result[0].metadata.hasStructuredBlocks).toBe(true)
       expect(result[0].metadata.table).toBeDefined()
+    })
+  })
+
+  describe('canonical structured metadata enrichment', () => {
+    it('prefers canonical structured cells over legacy table cells and preserves structured metadata', () => {
+      const structuredCell = makeStructuredCell()
+      const legacyCell = {
+        cellId: 'legacy-cell-0',
+        rowIndex: 0,
+        columnIndex: 0,
+        text: 'Legacy Revenue',
+        boundingBox: { x: 40, y: 100, width: 80, height: 20 },
+        sourceLineIndex: 0,
+        sourceItemIndex: 0,
+        spanCandidate: false,
+        estimatedColSpan: 1
+      }
+
+      const blocks = [{
+        id: 'b1',
+        text: 'Revenue 12.5B',
+        lines: [{
+          text: 'Revenue 12.5B',
+          boundingBox: { x: 40, y: 100, width: 200, height: 20 },
+          items: [
+            { text: 'Revenue', x: 40, right: 120, width: 80, height: 20 },
+            { text: '12.5B', x: 160, right: 200, width: 40, height: 20 }
+          ]
+        }]
+      }]
+
+      const pageLayout = {
+        lines: [{
+          text: 'Revenue 12.5B',
+          boundingBox: { x: 40, y: 100, width: 200, height: 20 },
+          items: blocks[0].lines[0].items
+        }],
+        regions: [makeRegion('table', {
+          metadata: {
+            table: {
+              cells: [legacyCell]
+            }
+          }
+        })],
+        metadata: {
+          structured: {
+            regions: [{
+              id: 'p1-r0',
+              cells: [structuredCell]
+            }]
+          }
+        }
+      }
+
+      const result = enrichBlocksWithTableMetadata(blocks, pageLayout)
+      const item = result[0].lines[0].items[0]
+
+      expect(item.cellId).toBe(structuredCell.cellId)
+      expect(item.rowIndex).toBe(structuredCell.rowIndex)
+      expect(item.columnIndex).toBe(structuredCell.columnIndex)
+      expect(item.rowSpan).toBe(structuredCell.rowSpan)
+      expect(item.colSpan).toBe(structuredCell.colSpan)
+      expect(item.spanType).toBe(structuredCell.spanType)
+      expect(item.role).toBe(structuredCell.role)
+      expect(item.boundingBox).toEqual(structuredCell.boundingBox)
+      expect(item.sourceReferences).toBe(structuredCell.sourceReferences)
+      expect(item.structuredCell).toBe(structuredCell)
+      expect(item.structuredCell).not.toBe(legacyCell)
     })
   })
 

@@ -149,6 +149,42 @@ function getRegionLines(region, lines) {
   return regionLines
 }
 
+function getStructuredCellSourceKey(cell = null) {
+  if (!cell || typeof cell !== 'object') return null
+
+  const sourceLineIndex = Number.isInteger(cell.sourceLineIndex)
+    ? cell.sourceLineIndex
+    : Number.isInteger(cell.sourceReferences?.sourceLineIndices?.[0])
+      ? cell.sourceReferences.sourceLineIndices[0]
+      : null
+  const sourceItemIndex = Number.isInteger(cell.sourceItemIndex)
+    ? cell.sourceItemIndex
+    : Number.isInteger(cell.sourceReferences?.sourceItemIndices?.[0])
+      ? cell.sourceReferences.sourceItemIndices[0]
+      : null
+
+  if (sourceLineIndex == null || sourceItemIndex == null) {
+    return null
+  }
+
+  return `${sourceLineIndex}:${sourceItemIndex}`
+}
+
+function buildStructuredCellLookup(structuredRegions = []) {
+  const lookup = new Map()
+
+  for (const region of structuredRegions) {
+    const cells = Array.isArray(region?.cells) ? region.cells : []
+    for (const cell of cells) {
+      const key = getStructuredCellSourceKey(cell)
+      if (!key || lookup.has(key)) continue
+      lookup.set(key, cell)
+    }
+  }
+
+  return lookup
+}
+
 function detectTableRows(region, lines) {
   const regionLineEntries = getRegionLines(region, lines)
 
@@ -574,20 +610,24 @@ export function analyzeTableRegions(regions = [], lines = [], blocks = []) { // 
  * @returns {Object[]} new blocks with enriched line items
  */
 export function enrichBlocksWithTableMetadata(blocks = [], pageLayout = null) {
-  if (!pageLayout || !pageLayout.regions) return blocks
+  if (!pageLayout) return blocks
 
-  const tableCellsBySourceKey = new Map()
-  for (const region of pageLayout.regions) {
+  const structuredCellsBySourceKey = buildStructuredCellLookup(pageLayout.metadata?.structured?.regions || [])
+
+  const legacyTableCellsBySourceKey = new Map()
+  for (const region of pageLayout.regions || []) {
     const table = region.metadata?.table
     if (!table || !table.cells) continue
 
     for (const cell of table.cells) {
       const key = `${cell.sourceLineIndex}:${cell.sourceItemIndex}`
-      tableCellsBySourceKey.set(key, cell)
+      if (!legacyTableCellsBySourceKey.has(key)) {
+        legacyTableCellsBySourceKey.set(key, cell)
+      }
     }
   }
 
-  if (tableCellsBySourceKey.size === 0) return blocks
+  if (structuredCellsBySourceKey.size === 0 && legacyTableCellsBySourceKey.size === 0) return blocks
 
   const pageLines = pageLayout.lines || []
   const pageIndexByGeometry = new Map()
@@ -619,20 +659,48 @@ export function enrichBlocksWithTableMetadata(blocks = [], pageLayout = null) {
       let itemsChanged = false
       const enrichedItems = line.items.map((item, itemIndex) => {
         const key = `${resolvedSourceLineIndex}:${itemIndex}`
-        const cellMeta = tableCellsBySourceKey.get(key)
+        const structuredCellMeta = structuredCellsBySourceKey.get(key) || null
+        const cellMeta = structuredCellMeta || legacyTableCellsBySourceKey.get(key)
 
         if (!cellMeta) return item
         if (item.cellId === cellMeta.cellId) return item
 
         itemsChanged = true
-        return {
+        const enrichedItem = {
           ...item,
           cellId: cellMeta.cellId,
           rowIndex: cellMeta.rowIndex,
           columnIndex: cellMeta.columnIndex,
-          colSpanCandidate: cellMeta.colSpanCandidate,
-          estimatedColSpan: cellMeta.estimatedColSpan
+          colSpanCandidate: cellMeta.colSpanCandidate ?? cellMeta.spanCandidate ?? false,
+          estimatedColSpan: cellMeta.estimatedColSpan || cellMeta.colSpan || 1
         }
+
+        if (cellMeta.rowSpan != null) {
+          enrichedItem.rowSpan = cellMeta.rowSpan
+        }
+        if (cellMeta.estimatedRowSpan != null) {
+          enrichedItem.estimatedRowSpan = cellMeta.estimatedRowSpan
+        }
+        if (cellMeta.colSpan != null) {
+          enrichedItem.colSpan = cellMeta.colSpan
+        }
+        if (cellMeta.spanType != null) {
+          enrichedItem.spanType = cellMeta.spanType
+        }
+        if (cellMeta.role != null) {
+          enrichedItem.role = cellMeta.role
+        }
+        if (cellMeta.boundingBox != null) {
+          enrichedItem.boundingBox = cellMeta.boundingBox
+        }
+        if (cellMeta.sourceReferences != null) {
+          enrichedItem.sourceReferences = cellMeta.sourceReferences
+        }
+        if (structuredCellMeta) {
+          enrichedItem.structuredCell = structuredCellMeta
+        }
+
+        return enrichedItem
       })
 
       if (!itemsChanged) return line

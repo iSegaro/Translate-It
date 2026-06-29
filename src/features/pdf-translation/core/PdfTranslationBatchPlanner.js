@@ -11,10 +11,11 @@ export class PdfTranslationBatchPlanner {
   plan(blocks = [], {
     providerName,
     optimizationLevel = 3,
-    semanticRegions = []
+    semanticRegions = [],
+    structuredRegions = []
   } = {}) {
     const providerConfig = getProviderConfiguration(providerName, optimizationLevel)
-    const items = this.adapter.toProviderItems(blocks, semanticRegions)
+    const items = this.adapter.toProviderItems(blocks, semanticRegions, structuredRegions)
     const batchConfig = providerConfig?.batching?.modeOverrides?.[TranslationMode.PDF] || {}
     const baseBatchSize = batchConfig.optimalSize || providerConfig?.batching?.optimalSize || providerConfig?.batching?.maxChunksPerBatch || 8
     const characterLimit = batchConfig.characterLimit || providerConfig?.batching?.characterLimit || providerConfig?.batching?.maxChars || 5000
