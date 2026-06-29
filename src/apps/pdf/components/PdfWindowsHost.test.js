@@ -1344,7 +1344,6 @@ describe('PdfWindowsHost', () => {
     await flushPromises()
 
     expect(clipboardWriteTextMock).toHaveBeenCalledWith('Copy this text')
-    expect(wrapper.text()).toContain('pdf_windows_host_copied')
   })
 
   it('pins the window so outside clicks and clear events do not dismiss it until unpinned', async () => {

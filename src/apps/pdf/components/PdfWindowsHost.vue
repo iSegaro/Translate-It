@@ -45,15 +45,7 @@
       class="pdf-windows-host__header"
       @pointerdown.capture="handleHeaderPointerDown"
     >
-      <div class="pdf-windows-host__title-group">
-        <span
-          v-if="copyStatus"
-          class="pdf-windows-host__status"
-          :class="`pdf-windows-host__status--${copyStatus}`"
-        >
-          {{ copyStatus === 'copied' ? t('pdf_windows_host_copied') : t('pdf_windows_host_copy_failed') }}
-        </span>
-      </div>
+      <div class="pdf-windows-host__title-group" />
 
       <TranslationWindowToolbar
         ref="toolbarRef"
@@ -250,7 +242,6 @@ const {
   targetLanguageName,
   translationError,
   isTranslating,
-  copyStatus,
   hasTranslatedResult,
   hasError,
   speakableText,

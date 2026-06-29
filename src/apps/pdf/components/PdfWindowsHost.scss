@@ -73,24 +73,6 @@
   gap: 6px;
 }
 
-.pdf-windows-host__status {
-  font-size: 10px;
-  font-weight: 600;
-  padding: 2px 8px;
-  border-radius: 10px;
-  line-height: 1.2;
-}
-
-.pdf-windows-host__status--copied {
-  background: #2e4a3c;
-  color: #b7f7ce;
-}
-
-.pdf-windows-host__status--failed {
-  background: #4a2f35;
-  color: #f6b7c1;
-}
-
 .pdf-windows-host__toolbar {
   flex: 1 1 auto;
   min-width: 0;

@@ -23,8 +23,6 @@ import { getLanguageNameFromCode } from '@/shared/config/languageConstants.js'
 import { buildPdfSelectionIconStyle, getViewportSize } from '@/apps/pdf/utils/pdfWindowGeometry.js'
 
 const logger = getScopedLogger(LOG_COMPONENTS.PDF, 'usePdfWindowsHost')
-const COPY_FEEDBACK_TIMEOUT_MS = 1200
-
 function isPdfSelectionContext(context) {
   if (!context) return false
 
@@ -113,7 +111,6 @@ export function usePdfWindowsHost(options = {}) {
   const translationError = ref('')
   const isTranslating = ref(false)
   const isCopying = ref(false)
-  const copyStatus = ref('')
   const selectedProvider = ref('')
   const isProviderReady = ref(false)
   const showOriginal = ref(false)
@@ -137,7 +134,6 @@ export function usePdfWindowsHost(options = {}) {
   let cleanupRegistered = false
   let activeRequestSessionId = 0
   let listenerId = 0
-  let copyFeedbackTimeoutId = null
   let internalHostInteractionResetTimerId = null
 
   const hasTranslatedResult = computed(() => !!translatedText.value)
@@ -174,15 +170,6 @@ export function usePdfWindowsHost(options = {}) {
     return typeof fingerprint === 'string' ? fingerprint.trim() : ''
   }
 
-  function clearCopyFeedback() {
-    if (copyFeedbackTimeoutId !== null) {
-      tracker.clearTimer(copyFeedbackTimeoutId)
-      copyFeedbackTimeoutId = null
-    }
-
-    copyStatus.value = ''
-  }
-
   async function hydrateSelectedProvider() {
     const provider = await getEffectiveProviderAsync(TranslationMode.PDF)
 
@@ -192,24 +179,6 @@ export function usePdfWindowsHost(options = {}) {
 
     isProviderReady.value = true
     return selectedProvider.value || provider
-  }
-
-  function setCopyStatus(status) {
-    copyStatus.value = status
-
-    if (!status) {
-      clearCopyFeedback()
-      return
-    }
-
-    if (copyFeedbackTimeoutId !== null) {
-      tracker.clearTimer(copyFeedbackTimeoutId)
-    }
-
-    copyFeedbackTimeoutId = tracker.trackTimeout(() => {
-      copyStatus.value = ''
-      copyFeedbackTimeoutId = null
-    }, COPY_FEEDBACK_TIMEOUT_MS)
   }
 
   function refreshHostStyle() {
@@ -301,7 +270,6 @@ export function usePdfWindowsHost(options = {}) {
     showOriginal.value = false
     translationMode.value = TranslationMode.Selection
     translationTargetLanguage.value = AUTO_DETECT_VALUE
-    clearCopyFeedback()
     activeRequestSessionId = 0
   }
 
@@ -343,7 +311,6 @@ export function usePdfWindowsHost(options = {}) {
     isTranslating.value = false
     translationMode.value = TranslationMode.Selection
     translationTargetLanguage.value = AUTO_DETECT_VALUE
-    clearCopyFeedback()
 
     if (isVisible.value && selectedText.value) {
       await translateSelection()
@@ -581,7 +548,6 @@ export function usePdfWindowsHost(options = {}) {
     translatedText.value = ''
     detectedSourceLanguage.value = ''
     translationTargetLanguage.value = resolvedTargetLanguage
-    clearCopyFeedback()
 
     try {
       const response = await sendRegularMessage(
@@ -677,12 +643,9 @@ export function usePdfWindowsHost(options = {}) {
       const textToCopy = isDictionaryResult.value
         ? SimpleMarkdown.getCleanTranslation(translatedText.value, ExtractionStrategy.CLEAN_DICT)
         : SimpleMarkdown.getCleanTranslation(translatedText.value, ExtractionStrategy.FULL_TEXT)
-      const success = await copyTextToClipboard(textToCopy)
-      setCopyStatus(success ? 'copied' : 'failed')
-      return success
+      return await copyTextToClipboard(textToCopy)
     } catch (error) {
       logger.error('Failed to copy translated PDF text:', error)
-      setCopyStatus('failed')
       return false
     } finally {
       isCopying.value = false
@@ -863,7 +826,6 @@ export function usePdfWindowsHost(options = {}) {
     translationError,
     isTranslating,
     isCopying,
-    copyStatus,
     hasTranslatedResult,
     hasError,
     speakableText,
