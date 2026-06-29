@@ -1,3 +1,8 @@
+import {
+  registerPdfTextLayerSelectionShell,
+  unregisterPdfTextLayerSelectionShell
+} from './PdfTextLayerSelectionShell.js'
+
 const CSS_CLASS = 'textLayer'
 
 const IDENTITY = [1, 0, 0, 1, 0, 0]
@@ -19,6 +24,7 @@ export class PdfTextLayerRenderer {
   constructor(container) {
     this.container = container
     this.textDivs = []
+    this.textLayer = null
   }
 
   async render(page, viewport, containerWidth, containerHeight) {
@@ -106,6 +112,7 @@ export class PdfTextLayerRenderer {
     }
 
     this.container.appendChild(layerDiv)
+    this.textLayer = layerDiv
 
     for (let i = 0; i < textDivs.length; i++) {
       const span = textDivs[i]
@@ -121,10 +128,17 @@ export class PdfTextLayerRenderer {
         span.style.transform = `scaleX(${scaleX.toFixed(4)}) ${span.style.transform || ''}`.trim()
       }
     }
+
+    registerPdfTextLayerSelectionShell(layerDiv)
   }
 
   clear() {
+    if (this.textLayer) {
+      unregisterPdfTextLayerSelectionShell(this.textLayer)
+    }
+
     this.textDivs = []
+    this.textLayer = null
     if (this.container) {
       this.container.replaceChildren()
     }

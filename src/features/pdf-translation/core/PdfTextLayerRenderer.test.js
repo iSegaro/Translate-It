@@ -20,9 +20,10 @@ describe('PdfTextLayerRenderer', () => {
     expect(page.getTextContent).toHaveBeenCalledOnce()
     const layerDiv = container.querySelector('.textLayer')
     expect(layerDiv).not.toBeNull()
-    expect(layerDiv.children.length).toBe(2)
-    expect(layerDiv.children[0].textContent).toBe('Hello')
-    expect(layerDiv.children[1].textContent).toBe('World')
+    const spans = layerDiv.querySelectorAll('span')
+    expect(spans.length).toBe(2)
+    expect(spans[0].textContent).toBe('Hello')
+    expect(spans[1].textContent).toBe('World')
   })
 
   it('positions spans using left/top percentages', async () => {
@@ -255,8 +256,9 @@ describe('PdfTextLayerRenderer', () => {
     await renderer.render(page, { scale: 1 })
 
     const layerDiv = container.querySelector('.textLayer')
-    expect(layerDiv.children.length).toBe(1)
-    expect(layerDiv.children[0].textContent).toBe('Real text')
+    const spans = layerDiv.querySelectorAll('span')
+    expect(spans.length).toBe(1)
+    expect(spans[0].textContent).toBe('Real text')
   })
 
   it('handles missing item.transform gracefully', async () => {
@@ -344,5 +346,27 @@ describe('PdfTextLayerRenderer', () => {
     const layerDiv = container.querySelector('.textLayer')
     expect(layerDiv).not.toBeNull()
     expect(layerDiv.querySelector('span').textContent).toBe('Select me')
+  })
+
+  it('adds and removes the text-layer selection sentinel with the rendered layer', async () => {
+    const container = document.createElement('div')
+    const renderer = new PdfTextLayerRenderer(container)
+    const page = {
+      getTextContent: vi.fn().mockResolvedValue({
+        items: [{ str: 'Selectable', transform: [1, 0, 0, 1, 0, 0], width: 80, height: 12 }]
+      })
+    }
+
+    await renderer.render(page, { scale: 1 })
+
+    const layerDiv = container.querySelector('.textLayer')
+    const sentinel = layerDiv.querySelector('.endOfContent')
+    expect(sentinel).not.toBeNull()
+    expect(layerDiv.lastElementChild).toBe(sentinel)
+
+    renderer.clear()
+
+    expect(container.querySelector('.textLayer')).toBeNull()
+    expect(sentinel.isConnected).toBe(false)
   })
 })

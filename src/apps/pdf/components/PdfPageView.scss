@@ -1,4 +1,5 @@
 /* PdfPageView.scss – Global text-layer styles for PDF.js text rendering */
+/* stylelint-disable selector-class-pattern, property-no-vendor-prefix -- PDF.js text-layer classes and browser properties must match the upstream selection contract. */
 .pdf-page__text-layer .textLayer {
   position: absolute;
   text-align: initial;
@@ -23,14 +24,31 @@
     user-select: text;
 
     --font-height: 0;
+
     font-size: calc(var(--total-scale-factor, 1) * var(--font-height));
 
     --rotate: 0deg;
+
     transform: rotate(var(--rotate));
 
     &::selection {
       background: Highlight;
       color: transparent;
     }
+  }
+
+  .endOfContent {
+    display: block;
+    position: absolute;
+    inset: 100% 0 0;
+    z-index: 0;
+    cursor: default;
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    user-select: none;
+  }
+
+  &.selecting .endOfContent {
+    top: 0;
   }
 }
