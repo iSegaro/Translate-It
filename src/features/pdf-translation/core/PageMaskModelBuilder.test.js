@@ -1,5 +1,17 @@
 import { describe, it, expect } from 'vitest'
 import { buildPageMaskModel } from './PageMaskModelBuilder.js'
+import {
+  createStructuredLayoutCell,
+  createStructuredLayoutColumn,
+  createStructuredLayoutGrid,
+  createStructuredLayoutModel,
+  createStructuredLayoutRegion,
+  createStructuredLayoutRow,
+  STRUCTURED_REGION_KIND_KEY_VALUE,
+  STRUCTURED_REGION_KIND_TABLE,
+  STRUCTURED_REGION_KIND_UNKNOWN,
+  STRUCTURED_SPAN_TYPE_NONE
+} from './StructuredLayoutModel.js'
 
 function makePageSize(width = 612, height = 792) {
   return Object.freeze({ width, height })
@@ -85,6 +97,232 @@ function makeOccupancyCell(rowIndex, columnIndex, state, {
     rowSpan: 1,
     boundingBox: Object.freeze(boundingBox)
   })
+}
+
+function uniqueNumbers(values = []) {
+  return [...new Set(values.filter((value) => Number.isInteger(value)))]
+}
+
+function makeStructuredCell(regionId, {
+  id = `${regionId}-r0-c0`,
+  rowIndex = 0,
+  columnIndex = 0,
+  boundingBox = { x: 40, y: 100, width: 60, height: 14 },
+  rowSpan = 1,
+  colSpan = 1,
+  spanType = STRUCTURED_SPAN_TYPE_NONE,
+  role = 'cell',
+  text = 'Structured cell',
+  confidence = 0.9,
+  sourceLineIndex = rowIndex,
+  sourceItemIndex = columnIndex,
+  spanCandidate = false,
+  estimatedRowSpan = 1,
+  estimatedColSpan = 1,
+  sourceRegionType = STRUCTURED_REGION_KIND_TABLE
+} = {}) {
+  return createStructuredLayoutCell({
+    id,
+    cellId: id,
+    regionId,
+    rowIndex,
+    columnIndex,
+    rowSpan,
+    colSpan,
+    spanType,
+    role,
+    text,
+    boundingBox,
+    sourceReferences: {
+      blockIds: ['block-1'],
+      lineIds: [],
+      sourceLineIndices: [sourceLineIndex],
+      sourceItemIndices: [sourceItemIndex],
+      sourceRegionId: regionId,
+      sourceRegionType
+    },
+    spanCandidate,
+    estimatedRowSpan,
+    estimatedColSpan,
+    confidence
+  })
+}
+
+function makeStructuredRow(regionId, {
+  rowIndex = 0,
+  boundingBox = null,
+  cellIds = [],
+  sourceLineIndices = [rowIndex],
+  sourceItemIndices = [],
+  sourceRegionType = STRUCTURED_REGION_KIND_TABLE
+} = {}) {
+  return createStructuredLayoutRow({
+    id: `${regionId}-row-${rowIndex}`,
+    rowIndex,
+    boundingBox,
+    cellIds,
+    sourceReferences: {
+      blockIds: ['block-1'],
+      lineIds: [],
+      sourceLineIndices,
+      sourceItemIndices,
+      sourceRegionId: regionId,
+      sourceRegionType
+    }
+  })
+}
+
+function makeStructuredColumn(regionId, {
+  columnIndex = 0,
+  x = 40,
+  width = 60,
+  cellIds = [],
+  sourceLineIndices = [],
+  sourceItemIndices = [],
+  sourceRegionType = STRUCTURED_REGION_KIND_TABLE
+} = {}) {
+  return createStructuredLayoutColumn({
+    id: `${regionId}-col-${columnIndex}`,
+    columnIndex,
+    x,
+    width,
+    cellIds,
+    sourceReferences: {
+      blockIds: ['block-1'],
+      lineIds: [],
+      sourceLineIndices,
+      sourceItemIndices,
+      sourceRegionId: regionId,
+      sourceRegionType
+    }
+  })
+}
+
+function makeStructuredRegion(regionId, {
+  kind = STRUCTURED_REGION_KIND_TABLE,
+  subtype = 'table',
+  boundingBox = { x: 40, y: 100, width: 300, height: 60 },
+  rows = [],
+  columns = [],
+  cells = [],
+  blockIds = ['block-1'],
+  sourceRegionType = kind,
+  confidence = 0.9,
+  classificationSource = 'table',
+  structureSignals = null
+} = {}) {
+  const occupancy = rows.map((row) => {
+    return columns.map((column) => {
+      const cell = cells.find((entry) => entry.rowIndex === row.rowIndex && entry.columnIndex === column.columnIndex) || null
+      if (cell) {
+        return Object.freeze({
+          rowIndex: row.rowIndex,
+          columnIndex: column.columnIndex,
+          state: 'occupied',
+          cellId: cell.id,
+          ownerCellId: cell.id,
+          rowSpan: cell.rowSpan,
+          colSpan: cell.colSpan,
+          boundingBox: cell.boundingBox ? Object.freeze({ ...cell.boundingBox }) : null
+        })
+      }
+
+      return Object.freeze({
+        rowIndex: row.rowIndex,
+        columnIndex: column.columnIndex,
+        state: 'missing',
+        cellId: null,
+        ownerCellId: null,
+        rowSpan: 1,
+        colSpan: 1,
+        boundingBox: null
+      })
+    })
+  })
+
+  const grid = createStructuredLayoutGrid({
+    dimensions: { rowCount: rows.length, columnCount: columns.length },
+    rows,
+    columns,
+    occupancy
+  })
+
+  const rowIds = rows.map((row) => row.id)
+  const columnIds = columns.map((column) => column.id)
+  const cellIds = cells.map((cell) => cell.id)
+
+  return createStructuredLayoutRegion({
+    id: regionId,
+    kind,
+    subtype,
+    confidence,
+    sourceRegionType,
+    boundingBox,
+    rows,
+    columns,
+    cells,
+    spans: [],
+    grid,
+    relationships: {
+      rowIds,
+      columnIds,
+      cellIds,
+      spanIds: [],
+      rowToCellIds: rows.map((row) => row.cellIds),
+      columnToCellIds: columns.map((column) => column.cellIds),
+      spanToCellIds: [],
+      sourceBlockIds: blockIds,
+      sourceLineIndices: uniqueNumbers(cells.flatMap((cell) => cell.sourceReferences.sourceLineIndices || [])),
+      sourceItemIndices: uniqueNumbers(cells.flatMap((cell) => cell.sourceReferences.sourceItemIndices || [])),
+      groupId: null,
+      groupRegionIds: []
+    },
+    structureSignals: structureSignals || {
+      sourceType: kind === STRUCTURED_REGION_KIND_TABLE ? 'table' : 'semantic',
+      classificationSource,
+      confidence
+    },
+    sourceReferences: {
+      blockIds,
+      lineIds: [],
+      sourceLineIndices: uniqueNumbers(cells.flatMap((cell) => cell.sourceReferences.sourceLineIndices || [])),
+      sourceItemIndices: uniqueNumbers(cells.flatMap((cell) => cell.sourceReferences.sourceItemIndices || [])),
+      sourceRegionId: regionId,
+      sourceRegionType,
+      groupId: null,
+      groupRegionIds: []
+    },
+    blockIds,
+    childRegionIds: [],
+    lineCount: rows.length,
+    groupId: null,
+    groupLayout: null,
+    classificationSource
+  })
+}
+
+function makeStructuredPageLayout({
+  pageNumber = 1,
+  pageSize = makePageSize(),
+  structuredRegions = [],
+  regions = [],
+  blocks = []
+} = {}) {
+  return {
+    pageNumber,
+    pageSize,
+    lines: [],
+    blocks,
+    regions,
+    metadata: {
+      structured: createStructuredLayoutModel({
+        pageNumber,
+        pageSize,
+        regions: structuredRegions,
+        groups: []
+      })
+    }
+  }
 }
 
 describe('PageMaskModelBuilder', () => {
@@ -249,6 +487,286 @@ describe('PageMaskModelBuilder', () => {
       const rowMasks = result.masks.filter((m) => m.type === 'row')
       expect(cellMasks).toHaveLength(3)
       expect(rowMasks.length).toBeGreaterThanOrEqual(1)
+    })
+  })
+
+  describe('structured-first masks', () => {
+    it('creates cell masks from canonical structured cells', () => {
+      const regionId = 's-r0'
+      const cells = [
+        makeStructuredCell(regionId, {
+          id: `${regionId}-c0`,
+          rowIndex: 0,
+          columnIndex: 0,
+          boundingBox: { x: 40, y: 100, width: 60, height: 14 }
+        }),
+        makeStructuredCell(regionId, {
+          id: `${regionId}-c1`,
+          rowIndex: 0,
+          columnIndex: 1,
+          boundingBox: { x: 120, y: 100, width: 60, height: 14 }
+        })
+      ]
+      const rows = [
+        makeStructuredRow(regionId, {
+          rowIndex: 0,
+          boundingBox: { x: 40, y: 100, width: 140, height: 14 },
+          cellIds: cells.map((cell) => cell.id)
+        })
+      ]
+      const columns = [
+        makeStructuredColumn(regionId, { columnIndex: 0, x: 40, width: 60, cellIds: [cells[0].id] }),
+        makeStructuredColumn(regionId, { columnIndex: 1, x: 120, width: 60, cellIds: [cells[1].id] })
+      ]
+      const structuredRegion = makeStructuredRegion(regionId, {
+        rows,
+        columns,
+        cells,
+        boundingBox: { x: 40, y: 100, width: 140, height: 14 }
+      })
+
+      const result = buildPageMaskModel(makeStructuredPageLayout({
+        structuredRegions: [structuredRegion]
+      }))
+
+      expect(result.masks).toHaveLength(2)
+      expect(result.masks.every((mask) => mask.source === 'structured-cell')).toBe(true)
+      expect(result.metadata.cellMasks).toBe(2)
+      expect(result.metadata.rowMasks).toBe(0)
+    })
+
+    it('keeps simple structured 2x2 tables row-mask free', () => {
+      const regionId = 's-r1'
+      const cells = [
+        makeStructuredCell(regionId, {
+          id: `${regionId}-c0`,
+          rowIndex: 0,
+          columnIndex: 0,
+          boundingBox: { x: 40, y: 100, width: 60, height: 14 }
+        }),
+        makeStructuredCell(regionId, {
+          id: `${regionId}-c1`,
+          rowIndex: 0,
+          columnIndex: 1,
+          boundingBox: { x: 120, y: 100, width: 60, height: 14 }
+        }),
+        makeStructuredCell(regionId, {
+          id: `${regionId}-c2`,
+          rowIndex: 1,
+          columnIndex: 0,
+          boundingBox: { x: 40, y: 120, width: 60, height: 14 }
+        }),
+        makeStructuredCell(regionId, {
+          id: `${regionId}-c3`,
+          rowIndex: 1,
+          columnIndex: 1,
+          boundingBox: { x: 120, y: 120, width: 60, height: 14 }
+        })
+      ]
+      const rows = [
+        makeStructuredRow(regionId, {
+          rowIndex: 0,
+          boundingBox: { x: 40, y: 100, width: 140, height: 14 },
+          cellIds: [cells[0].id, cells[1].id]
+        }),
+        makeStructuredRow(regionId, {
+          rowIndex: 1,
+          boundingBox: { x: 40, y: 120, width: 140, height: 14 },
+          cellIds: [cells[2].id, cells[3].id]
+        })
+      ]
+      const columns = [
+        makeStructuredColumn(regionId, { columnIndex: 0, x: 40, width: 60, cellIds: [cells[0].id, cells[2].id] }),
+        makeStructuredColumn(regionId, { columnIndex: 1, x: 120, width: 60, cellIds: [cells[1].id, cells[3].id] })
+      ]
+      const structuredRegion = makeStructuredRegion(regionId, {
+        rows,
+        columns,
+        cells,
+        boundingBox: { x: 40, y: 100, width: 140, height: 34 }
+      })
+
+      const result = buildPageMaskModel(makeStructuredPageLayout({
+        structuredRegions: [structuredRegion]
+      }))
+
+      expect(result.masks).toHaveLength(4)
+      expect(result.masks.every((mask) => mask.source === 'structured-cell')).toBe(true)
+      expect(result.metadata.rowMasks).toBe(0)
+    })
+
+    it('creates conservative row masks from canonical structured rows', () => {
+      const regionId = 'kv-r0'
+      const cells = [
+        makeStructuredCell(regionId, {
+          id: `${regionId}-label`,
+          rowIndex: 0,
+          columnIndex: 0,
+          boundingBox: { x: 40, y: 100, width: 80, height: 14 },
+          role: 'label',
+          text: 'Revenue',
+          sourceRegionType: STRUCTURED_REGION_KIND_KEY_VALUE
+        }),
+        makeStructuredCell(regionId, {
+          id: `${regionId}-value`,
+          rowIndex: 0,
+          columnIndex: 1,
+          boundingBox: { x: 140, y: 100, width: 80, height: 14 },
+          role: 'value',
+          text: '12.5B',
+          sourceRegionType: STRUCTURED_REGION_KIND_KEY_VALUE
+        })
+      ]
+      const rows = [
+        makeStructuredRow(regionId, {
+          rowIndex: 0,
+          boundingBox: { x: 40, y: 100, width: 180, height: 14 },
+          cellIds: cells.map((cell) => cell.id),
+          sourceRegionType: STRUCTURED_REGION_KIND_KEY_VALUE
+        })
+      ]
+      const columns = [
+        makeStructuredColumn(regionId, {
+          columnIndex: 0,
+          x: 40,
+          width: 80,
+          cellIds: [cells[0].id],
+          sourceRegionType: STRUCTURED_REGION_KIND_KEY_VALUE
+        }),
+        makeStructuredColumn(regionId, {
+          columnIndex: 1,
+          x: 140,
+          width: 80,
+          cellIds: [cells[1].id],
+          sourceRegionType: STRUCTURED_REGION_KIND_KEY_VALUE
+        })
+      ]
+      const structuredRegion = makeStructuredRegion(regionId, {
+        kind: STRUCTURED_REGION_KIND_KEY_VALUE,
+        subtype: 'key-value-grid',
+        rows,
+        columns,
+        cells,
+        boundingBox: { x: 40, y: 100, width: 180, height: 14 },
+        sourceRegionType: STRUCTURED_REGION_KIND_KEY_VALUE,
+        classificationSource: 'semantic'
+      })
+
+      const result = buildPageMaskModel(makeStructuredPageLayout({
+        structuredRegions: [structuredRegion]
+      }))
+
+      const rowMasks = result.masks.filter((mask) => mask.type === 'row')
+      expect(rowMasks).toHaveLength(1)
+      expect(rowMasks[0].source).toBe('structured-row')
+      expect(rowMasks[0].boundingBox).toEqual({ x: 40, y: 100, width: 180, height: 14 })
+      expect(result.metadata.rowMasks).toBe(1)
+    })
+
+    it('prefers canonical structured cells over legacy table metadata when both exist', () => {
+      const regionId = 'p1-r0'
+      const structuredCell = makeStructuredCell(regionId, {
+        id: `${regionId}-c0`,
+        rowIndex: 0,
+        columnIndex: 0,
+        boundingBox: { x: 60, y: 100, width: 80, height: 20 }
+      })
+      const structuredRow = makeStructuredRow(regionId, {
+        rowIndex: 0,
+        boundingBox: { x: 60, y: 100, width: 80, height: 20 },
+        cellIds: [structuredCell.id]
+      })
+      const structuredColumn = makeStructuredColumn(regionId, {
+        columnIndex: 0,
+        x: 60,
+        width: 80,
+        cellIds: [structuredCell.id]
+      })
+      const structuredRegion = makeStructuredRegion(regionId, {
+        rows: [structuredRow],
+        columns: [structuredColumn],
+        cells: [structuredCell],
+        boundingBox: { x: 60, y: 100, width: 80, height: 20 }
+      })
+      const legacyRegion = makeTableRegion(regionId, {
+        occupancy: [
+          [makeOccupancyCell(0, 0, 'occupied', { cellId: 'legacy-cell', boundingBox: { x: 10, y: 100, width: 120, height: 20 } })]
+        ]
+      })
+
+      const result = buildPageMaskModel(makeStructuredPageLayout({
+        structuredRegions: [structuredRegion],
+        regions: [legacyRegion]
+      }))
+
+      const structuredMask = result.masks.find((mask) => mask.ownerId === structuredCell.id)
+      expect(structuredMask.source).toBe('structured-cell')
+      expect(structuredMask.boundingBox).toEqual(structuredCell.boundingBox)
+      expect(result.masks.some((mask) => mask.source === 'table-occupancy')).toBe(false)
+    })
+
+    it('falls back safely to legacy table metadata when structured geometry is invalid', () => {
+      const regionId = 'p1-r0'
+      const invalidCell = makeStructuredCell(regionId, {
+        id: `${regionId}-c0`,
+        rowIndex: 0,
+        columnIndex: 0,
+        boundingBox: null
+      })
+      const invalidRow = makeStructuredRow(regionId, {
+        rowIndex: 0,
+        boundingBox: null,
+        cellIds: [invalidCell.id]
+      })
+      const invalidColumn = makeStructuredColumn(regionId, {
+        columnIndex: 0,
+        x: 10,
+        width: 120,
+        cellIds: [invalidCell.id]
+      })
+      const structuredRegion = makeStructuredRegion(regionId, {
+        rows: [invalidRow],
+        columns: [invalidColumn],
+        cells: [invalidCell],
+        boundingBox: { x: 10, y: 100, width: 120, height: 20 }
+      })
+      const legacyRegion = makeTableRegion(regionId, {
+        occupancy: [
+          [makeOccupancyCell(0, 0, 'occupied', { cellId: 'legacy-cell', boundingBox: { x: 10, y: 100, width: 120, height: 20 } })]
+        ]
+      })
+
+      const result = buildPageMaskModel(makeStructuredPageLayout({
+        structuredRegions: [structuredRegion],
+        regions: [legacyRegion]
+      }))
+
+      expect(result.masks).toHaveLength(1)
+      expect(result.masks[0].source).toBe('table-occupancy')
+      expect(result.masks[0].ownerId).toBe('legacy-cell')
+    })
+
+    it('ignores unknown structured regions and keeps them classification-only', () => {
+      const regionId = 'u-r0'
+      const unknownRegion = makeStructuredRegion(regionId, {
+        kind: STRUCTURED_REGION_KIND_UNKNOWN,
+        subtype: 'unknown',
+        rows: [],
+        columns: [],
+        cells: [],
+        boundingBox: { x: 40, y: 100, width: 120, height: 20 },
+        sourceRegionType: STRUCTURED_REGION_KIND_UNKNOWN,
+        classificationSource: 'fallback'
+      })
+
+      const result = buildPageMaskModel(makeStructuredPageLayout({
+        structuredRegions: [unknownRegion]
+      }))
+
+      expect(result.masks).toHaveLength(0)
+      expect(result.metadata.totalMasks).toBe(0)
+      expect(result.metadata.cellMasks).toBe(0)
+      expect(result.metadata.rowMasks).toBe(0)
     })
   })
 
