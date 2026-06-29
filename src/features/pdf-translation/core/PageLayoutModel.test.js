@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { buildPageLayoutModel, isPageLayoutModel, createEmptyPageLayoutModel, REGION_TYPE_UNKNOWN } from './PageLayoutModel.js'
+import { createEmptyStructuredLayoutModel } from './StructuredLayoutModel.js'
 
 describe('PageLayoutModel', () => {
   describe('buildPageLayoutModel', () => {
@@ -23,13 +24,21 @@ describe('PageLayoutModel', () => {
       expect(model.regions[0].id).toBe('p1-r0')
       expect(model.regions[0].blockIds).toEqual(['block-1'])
       expect(model.readingOrder).toEqual(['block-1'])
-      expect(model.metadata).toEqual({
-        lineCount: 2,
-        blockCount: 1,
+      expect(model.metadata.lineCount).toBe(2)
+      expect(model.metadata.blockCount).toBe(1)
+      expect(model.metadata.regionCount).toBe(1)
+      expect(model.metadata.hasStructuredBlocks).toBe(false)
+      expect(model.metadata.structuredBlockCount).toBe(0)
+      expect(model.metadata.structured.pageNumber).toBe(1)
+      expect(model.metadata.structured.pageSize).toEqual({ width: 500, height: 700 })
+      expect(model.metadata.structured.summary).toMatchObject({
         regionCount: 1,
-        hasStructuredBlocks: false,
-        structuredBlockCount: 0
+        structuredRegionCount: 0,
+        fallbackRegionCount: 1,
+        hasStructuredContent: false
       })
+      expect(model.metadata.structured.regions).toHaveLength(1)
+      expect(model.metadata.structured.regions[0].kind).toBe('unknown')
     })
 
     it('sorts reading order by pageNumber then readingOrderIndex then columnIndex', () => {
@@ -175,6 +184,7 @@ describe('PageLayoutModel', () => {
       expect(model.metadata.regionCount).toBe(0)
       expect(model.metadata.hasStructuredBlocks).toBe(false)
       expect(model.metadata.structuredBlockCount).toBe(0)
+      expect(model.metadata.structured).toEqual(createEmptyStructuredLayoutModel(1))
     })
   })
 
@@ -206,6 +216,24 @@ describe('PageLayoutModel', () => {
 
     it('returns false for object missing metadata', () => {
       expect(isPageLayoutModel({ pageNumber: 1, lines: [], blocks: [], regions: [], readingOrder: [] })).toBe(false)
+    })
+
+    it('returns false for object with invalid structured metadata', () => {
+      expect(isPageLayoutModel({
+        pageNumber: 1,
+        lines: [],
+        blocks: [],
+        regions: [],
+        readingOrder: [],
+        metadata: {
+          lineCount: 0,
+          blockCount: 0,
+          regionCount: 0,
+          hasStructuredBlocks: false,
+          structuredBlockCount: 0,
+          structured: {}
+        }
+      })).toBe(false)
     })
   })
 

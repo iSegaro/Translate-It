@@ -5,9 +5,11 @@
  * It wraps existing lines and blocks, adding a `regions` array for spatial grouping
  * and a `readingOrder` for deterministic element traversal.
  *
- * Phase L5a: Diagnostic-only table metadata enrichment. Table regions receive
- * minimal table metadata structure. No consumer uses table metadata for
- * building, rendering, or translation yet.
+ * Phase 2d: Additive structured-layout metadata enrichment. Table regions keep
+ * their existing table metadata intact while the page model now exposes a
+ * richer `metadata.structured` layer for tables, KPI/card layouts, key-value
+ * grids, and dashboard-like groupings. No consumer uses structured metadata
+ * for building, rendering, or translation yet.
  */
 
 /**
@@ -40,6 +42,7 @@
  * @property {number} regionCount — total layout regions detected
  * @property {boolean} hasStructuredBlocks — true if any block has roleMetadata.isStructured === true
  * @property {number} structuredBlockCount — number of blocks with roleMetadata.isStructured === true
+ * @property {StructuredLayoutModel} structured — additive page-level structured layout metadata
  */
 
 /**
@@ -56,6 +59,8 @@ import { detectLayoutRegions } from './LayoutRegionDetector.js'
 import { classifyLayoutRegions } from './LayoutRegionClassifier.js'
 import { analyzeTableRegions } from './TableRegionAnalyzer.js'
 import { analyzeSemanticRegions } from './SemanticRegionAnalyzer.js'
+import { analyzeStructuredLayout } from './StructuredLayoutAnalyzer.js'
+import { createEmptyStructuredLayoutModel, isStructuredLayoutModel } from './StructuredLayoutModel.js'
 
 const REGION_TYPE_UNKNOWN = 'unknown'
 
@@ -71,7 +76,7 @@ function buildReadingOrder(blocks) {
     .map((block) => block.id)
 }
 
-function buildMetadata(lines, blocks, regions) {
+function buildMetadata(lines, blocks, regions, structuredLayout, pageNumber = 0, pageSize = null) {
   let structuredBlockCount = 0
   for (const block of blocks) {
     if (block.roleMetadata?.isStructured === true) {
@@ -84,7 +89,8 @@ function buildMetadata(lines, blocks, regions) {
     blockCount: blocks.length,
     regionCount: regions.length,
     hasStructuredBlocks: structuredBlockCount > 0,
-    structuredBlockCount
+    structuredBlockCount,
+    structured: structuredLayout || createEmptyStructuredLayoutModel(pageNumber, pageSize)
   })
 }
 
@@ -93,8 +99,9 @@ function buildMetadata(lines, blocks, regions) {
  *
  * Populates regions via conservative vertical-gap grouping (Phase L2),
  * classifies them via block-role heuristics (Phase L3), enriches
- * table regions with minimal table metadata (Phase L5a), and detects
- * KPI candidates in non-table regions (Phase L6a).
+ * table regions with minimal table metadata (Phase L5a), detects KPI
+ * candidates in non-table regions (Phase L6a), and bridges the output into
+ * additive structured-layout metadata (Phase 2d).
  * Does NOT modify block building, rendering, or translation behavior.
  *
  * @param {Object} options
@@ -120,7 +127,12 @@ export function buildPageLayoutModel({ pageNumber = 0, pageSize = null, lines = 
   const classifiedRegions = classifyLayoutRegions(detectedRegions, frozenLines, frozenBlocks)
   const tableEnrichedRegions = analyzeTableRegions(classifiedRegions)
   const enrichedRegions = analyzeSemanticRegions(tableEnrichedRegions, frozenLines, frozenBlocks)
-  const metadata = buildMetadata(frozenLines, frozenBlocks, enrichedRegions)
+  const structuredLayout = analyzeStructuredLayout({
+    pageNumber,
+    pageSize: normalizedPageSize,
+    regions: enrichedRegions
+  })
+  const metadata = buildMetadata(frozenLines, frozenBlocks, enrichedRegions, structuredLayout, pageNumber, normalizedPageSize)
 
   return Object.freeze({
     pageNumber,
@@ -152,7 +164,8 @@ export function isPageLayoutModel(value) {
     typeof value.metadata.blockCount === 'number' &&
     typeof value.metadata.regionCount === 'number' &&
     typeof value.metadata.hasStructuredBlocks === 'boolean' &&
-    typeof value.metadata.structuredBlockCount === 'number'
+    typeof value.metadata.structuredBlockCount === 'number' &&
+    isStructuredLayoutModel(value.metadata.structured)
   )
 }
 
