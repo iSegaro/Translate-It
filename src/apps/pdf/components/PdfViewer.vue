@@ -69,7 +69,8 @@ const visiblePageNumbers = ref(new Set())
 const highlightedBounds = ref(null)
 let intersectionObserver = null
 let resizeObserver = null
-let lastWidth = 0
+let lastLayoutWidth = 0
+let lastLayoutHeight = 0
 let lastCurrentPage = 0
 
 usePdfSelectionBridge(viewerRoot)
@@ -229,11 +230,21 @@ function emitCurrentPage(nextVisible) {
   }
 }
 
-function emitWidthIfNeeded() {
+function emitLayoutIfNeeded() {
   const width = Math.floor(viewerRoot.value?.clientWidth || 0)
-  if (width > 0 && width !== lastWidth) {
-    lastWidth = width
-    emit('layout-change', width)
+  const height = Math.floor(viewerRoot.value?.parentElement?.clientHeight || 0)
+
+  if (
+    width > 0 &&
+    height > 0 &&
+    (width !== lastLayoutWidth || height !== lastLayoutHeight)
+  ) {
+    lastLayoutWidth = width
+    lastLayoutHeight = height
+    emit('layout-change', {
+      width,
+      height
+    })
   }
 }
 
@@ -262,12 +273,15 @@ function setupObservers() {
   })
 
   resizeObserver = new ResizeObserver(() => {
-    emitWidthIfNeeded()
+    emitLayoutIfNeeded()
   })
 
   resizeObserver.observe(viewerRoot.value)
+  if (viewerRoot.value.parentElement) {
+    resizeObserver.observe(viewerRoot.value.parentElement)
+  }
   refreshObservationTargets()
-  emitWidthIfNeeded()
+  emitLayoutIfNeeded()
 }
 
 watch(
@@ -275,7 +289,7 @@ watch(
   async () => {
     await nextTick()
     refreshObservationTargets()
-    emitWidthIfNeeded()
+    emitLayoutIfNeeded()
     emitCurrentPage(visiblePageNumbers.value)
   },
   { deep: true }
@@ -309,5 +323,4 @@ function collectCanvasDataUrls() {
 
 defineExpose({ collectCanvasDataUrls })
 </script>
-
 

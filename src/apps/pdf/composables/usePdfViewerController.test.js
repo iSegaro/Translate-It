@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { sha256HexFromText } from '@/features/pdf-translation/core/PdfBlockIdentity.js'
 
 const openFileMock = vi.fn()
+const rebuildPageMetricsMock = vi.fn()
 const cleanupDocumentMock = vi.fn().mockResolvedValue()
 const cancelActiveTranslationMock = vi.fn().mockResolvedValue()
 const translateVisibleBlocksMock = vi.fn()
@@ -15,6 +16,7 @@ const getTranslationApiAsyncMock = vi.fn()
 
 const session = {
   openFile: openFileMock,
+  rebuildPageMetrics: rebuildPageMetricsMock,
   cleanupDocument: cleanupDocumentMock,
   documentIdentity: 'doc-1',
   pdfFingerprint: 'fingerprint-1',
@@ -164,6 +166,7 @@ async function loadControllerWithCacheEntry(cacheEntry, block = createBlock()) {
 describe('usePdfViewerController cache persistence', () => {
   beforeEach(() => {
     openFileMock.mockReset()
+    rebuildPageMetricsMock.mockReset()
     cleanupDocumentMock.mockReset().mockResolvedValue()
     cancelActiveTranslationMock.mockReset().mockResolvedValue()
     translateVisibleBlocksMock.mockReset()
@@ -388,5 +391,49 @@ describe('usePdfViewerController cache persistence', () => {
     expect(entries[block.id].translatedCells).toHaveLength(1)
     expect(entries[block.id].translatedCells[0].structuredCells[0].id).toBe('cell-2')
     expect(entries[block.id].translationSettingsHash).toHaveLength(64)
+  })
+
+  it('forwards the layout object to openFile and recomputeLayout', async () => {
+    openFileMock.mockResolvedValue(createOpenState())
+    rebuildPageMetricsMock.mockResolvedValue(createOpenState())
+    pdfCacheManager.loadDocument.mockResolvedValue({
+      translations: {},
+      ocr: {}
+    })
+
+    const controller = usePdfViewerController()
+    const file = {
+      type: 'application/pdf',
+      name: 'doc.pdf',
+      arrayBuffer: vi.fn().mockResolvedValue(new ArrayBuffer(8))
+    }
+
+    await controller.loadPdfFile(file, {
+      width: 800,
+      height: 600,
+      zoomMode: 'fit-page',
+      zoomPercent: 100
+    })
+
+    expect(openFileMock).toHaveBeenCalledWith(file, {
+      width: 800,
+      height: 600,
+      zoomMode: 'fit-page',
+      zoomPercent: 100
+    })
+
+    await controller.recomputeLayout({
+      width: 900,
+      height: 700,
+      zoomMode: 'percent',
+      zoomPercent: 125
+    })
+
+    expect(rebuildPageMetricsMock).toHaveBeenCalledWith({
+      width: 900,
+      height: 700,
+      zoomMode: 'percent',
+      zoomPercent: 125
+    })
   })
 })

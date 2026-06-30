@@ -68,6 +68,62 @@ describe('PdfDocumentSession', () => {
     expect(state.pageMetrics[1].pageNumber).toBe(2)
   })
 
+  it('rebuildPageMetrics uses the smaller width or height scale for fit-page', async () => {
+    session.totalPages = 1
+    session.pdfDocument = {
+      numPages: 1,
+      getPage: vi.fn(async () => ({
+        pageNumber: 1,
+        cleanup: vi.fn(),
+        getTextContent: vi.fn().mockResolvedValue({
+          items: []
+        }),
+        getViewport: ({ scale }) => ({
+          width: 500 * scale,
+          height: 600 * scale
+        })
+      }))
+    }
+
+    const state = await session.rebuildPageMetrics({
+      width: 400,
+      height: 400,
+      zoomMode: 'fit-page',
+      zoomPercent: 100
+    })
+
+    expect(state.pageMetrics).toHaveLength(1)
+    expect(state.pageMetrics[0].scale).toBeCloseTo(352 / 600, 6)
+  })
+
+  it('rebuildPageMetrics applies percent zoom on top of fit-width scale', async () => {
+    session.totalPages = 1
+    session.pdfDocument = {
+      numPages: 1,
+      getPage: vi.fn(async () => ({
+        pageNumber: 1,
+        cleanup: vi.fn(),
+        getTextContent: vi.fn().mockResolvedValue({
+          items: []
+        }),
+        getViewport: ({ scale }) => ({
+          width: 500 * scale,
+          height: 600 * scale
+        })
+      }))
+    }
+
+    const state = await session.rebuildPageMetrics({
+      width: 400,
+      height: 400,
+      zoomMode: 'percent',
+      zoomPercent: 125
+    })
+
+    expect(state.pageMetrics).toHaveLength(1)
+    expect(state.pageMetrics[0].scale).toBeCloseTo((352 / 500) * 1.25, 6)
+  })
+
   it('keeps visible logical block identity stable across page metric rebuilds', async () => {
     session.pageMetrics = [
       {

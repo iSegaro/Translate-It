@@ -181,9 +181,14 @@ const pdfViewerRef = ref(null)
 const exportSuccess = ref(null)
 const exportSuccessTimer = ref(null)
 const EXPORT_SUCCESS_DURATION_MS = 2200
+const DEFAULT_VIEWER_WIDTH = 960
 const currentPageNumber = ref(0)
 const zoomMode = ref('fit-width')
 const zoomPercent = ref(100)
+const viewerLayout = ref({
+  width: 0,
+  height: 0
+})
 const zoomPercentOptions = [50, 75, 100, 125, 150, 200]
 
 const {
@@ -213,7 +218,6 @@ const {
 })
 
 const isDragOver = ref(false)
-const viewerWidth = ref(960)
 
 const pdfStatusBanner = computed(() => buildPdfStatusBannerState({
   error: error.value,
@@ -225,11 +229,6 @@ const pdfStatusBanner = computed(() => buildPdfStatusBannerState({
   isPartialExport: isPartialExport.value
 }))
 
-const zoomMultiplier = computed(() => {
-  if (zoomMode.value === 'fit-width') return 1
-  return zoomPercent.value / 100
-})
-
 watch(hasDocument, (has) => {
   if (has) {
     refreshOcrCandidates()
@@ -238,19 +237,27 @@ watch(hasDocument, (has) => {
 
 async function handleFileSelected(file) {
   resetPresentationState()
-  const loaded = await loadPdfFile(file, getEffectiveViewerWidth())
+  const loaded = await loadPdfFile(file, buildLayoutRequest())
   if (loaded) {
     isDragOver.value = false
     currentPageNumber.value = pageCount.value > 0 ? 1 : 0
   }
 }
 
-function handleLayoutChange(width) {
-  if (!width || width === viewerWidth.value) return
+function handleLayoutChange(layout = null) {
+  const nextLayout = normalizeLayout(layout)
+  const currentLayout = viewerLayout.value
 
-  viewerWidth.value = width
+  if (
+    nextLayout.width === currentLayout.width &&
+    nextLayout.height === currentLayout.height
+  ) {
+    return
+  }
+
+  viewerLayout.value = nextLayout
   if (hasDocument.value) {
-    void recomputeLayout(getEffectiveViewerWidth(width))
+    void recomputeLayout(buildLayoutRequest(nextLayout))
   }
 }
 
@@ -266,6 +273,19 @@ function handleTranslatedPaneCurrentPageChange(pageNumber) {
 
 function handleZoomChange({ mode, value }) {
   const nextMode = mode === 'fit-width' ? 'fit-width' : 'percent'
+  if (mode === 'fit-page') {
+    if (zoomMode.value === 'fit-page') {
+      return
+    }
+
+    zoomMode.value = 'fit-page'
+
+    if (hasDocument.value) {
+      void recomputeLayout(buildLayoutRequest())
+    }
+    return
+  }
+
   const nextPercent = nextMode === 'fit-width' ? 100 : clampZoomPercent(Number(value))
   const currentMode = zoomMode.value
   const currentPercent = zoomPercent.value
@@ -283,7 +303,7 @@ function handleZoomChange({ mode, value }) {
   }
 
   if (hasDocument.value) {
-    void recomputeLayout(getEffectiveViewerWidth())
+    void recomputeLayout(buildLayoutRequest())
   }
 }
 
@@ -305,7 +325,7 @@ function handleZoomStep(direction) {
   zoomPercent.value = nextPercent
 
   if (hasDocument.value) {
-    void recomputeLayout(getEffectiveViewerWidth())
+    void recomputeLayout(buildLayoutRequest())
   }
 }
 
@@ -313,6 +333,10 @@ function resetPresentationState() {
   currentPageNumber.value = 0
   zoomMode.value = 'fit-width'
   zoomPercent.value = 100
+  viewerLayout.value = {
+    width: 0,
+    height: 0
+  }
 }
 
 function handleTranslateVisiblePages() {
@@ -385,10 +409,28 @@ function clampZoomPercent(value) {
   return nearest || 100
 }
 
-function getEffectiveViewerWidth(width = viewerWidth.value) {
-  const baseWidth = Number(width) || 0
-  if (baseWidth <= 0) return baseWidth
-  return Math.max(1, Math.round(baseWidth * zoomMultiplier.value))
+function normalizeLayout(layout = null) {
+  if (typeof layout === 'number') {
+    return {
+      width: Math.max(0, Math.floor(Number(layout) || 0)),
+      height: 0
+    }
+  }
+
+  return {
+    width: Math.max(0, Math.floor(Number(layout?.width) || 0)),
+    height: Math.max(0, Math.floor(Number(layout?.height) || 0))
+  }
+}
+
+function buildLayoutRequest(layout = viewerLayout.value) {
+  const normalizedLayout = normalizeLayout(layout)
+  return {
+    width: normalizedLayout.width > 0 ? normalizedLayout.width : DEFAULT_VIEWER_WIDTH,
+    height: normalizedLayout.height,
+    zoomMode: zoomMode.value,
+    zoomPercent: zoomPercent.value
+  }
 }
 
 onMounted(() => {
@@ -402,5 +444,3 @@ onBeforeUnmount(() => {
   void cleanup()
 })
 </script>
-
-

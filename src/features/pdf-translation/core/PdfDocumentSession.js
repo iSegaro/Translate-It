@@ -11,6 +11,24 @@ const PAGE_MARGIN = 24
 const MIN_SCALE = 0.4
 const MAX_SCALE = 2.0
 
+function normalizeLayoutRequest(layoutRequest = null) {
+  if (typeof layoutRequest === 'number') {
+    return {
+      width: Number(layoutRequest) || 0,
+      height: 0,
+      zoomMode: 'fit-width',
+      zoomPercent: 100
+    }
+  }
+
+  return {
+    width: Number(layoutRequest?.width) || 0,
+    height: Number(layoutRequest?.height) || 0,
+    zoomMode: layoutRequest?.zoomMode || 'fit-width',
+    zoomPercent: Number(layoutRequest?.zoomPercent) || 100
+  }
+}
+
 export class PdfDocumentSession extends ResourceTracker {
   constructor() {
     super('pdf-document-session')
@@ -37,7 +55,7 @@ export class PdfDocumentSession extends ResourceTracker {
     return getPdfWorkerUrl()
   }
 
-  async openFile(file, viewerWidth) {
+  async openFile(file, layoutRequest) {
     if (!file) throw new Error('No PDF file provided')
 
     await this.cleanupDocument()
@@ -57,7 +75,7 @@ export class PdfDocumentSession extends ResourceTracker {
     this.translationStates.clear()
     this.targetedBlockId = null
 
-    await this._buildPageMetrics(viewerWidth)
+    await this._buildPageMetrics(layoutRequest)
 
     logger.info('PDF document opened:', {
       fileName: this.fileName,
@@ -86,14 +104,33 @@ export class PdfDocumentSession extends ResourceTracker {
     return ''
   }
 
-  async _buildPageMetrics(viewerWidth) {
-    const usableWidth = Math.max(320, (viewerWidth || 0) - PAGE_MARGIN * 2)
+  async _buildPageMetrics(layoutRequest) {
+    const {
+      width: viewerWidth,
+      height: viewerHeight,
+      zoomMode,
+      zoomPercent
+    } = normalizeLayoutRequest(layoutRequest)
+
+    const usableWidth = Math.max(320, viewerWidth - PAGE_MARGIN * 2)
+    const usableHeight = Math.max(0, viewerHeight - PAGE_MARGIN * 2)
     const metrics = []
 
     for (let pageNumber = 1; pageNumber <= this.totalPages; pageNumber += 1) {
       const page = await this.pdfDocument.getPage(pageNumber)
       const viewport = page.getViewport({ scale: 1 })
-      const scale = Math.min(MAX_SCALE, Math.max(MIN_SCALE, usableWidth / viewport.width))
+      const widthScale = usableWidth / viewport.width
+      const heightScale = usableHeight > 0 ? usableHeight / viewport.height : widthScale
+      const percentScale = widthScale * (zoomPercent / 100)
+
+      let scale = widthScale
+      if (zoomMode === 'fit-page') {
+        scale = Math.min(widthScale, heightScale)
+      } else if (zoomMode === 'percent') {
+        scale = percentScale
+      }
+
+      scale = Math.min(MAX_SCALE, Math.max(MIN_SCALE, scale))
       const displayViewport = page.getViewport({ scale })
 
       metrics.push({
@@ -112,13 +149,13 @@ export class PdfDocumentSession extends ResourceTracker {
     this.pageScale = metrics[0]?.scale || 1
   }
 
-  async rebuildPageMetrics(viewerWidth) {
+  async rebuildPageMetrics(layoutRequest) {
     if (!this.pdfDocument) {
       return this.getState()
     }
 
     this._cancelAllRenders()
-    await this._buildPageMetrics(viewerWidth)
+    await this._buildPageMetrics(layoutRequest)
 
     logger.info('PDF page metrics rebuilt:', {
       fileName: this.fileName,

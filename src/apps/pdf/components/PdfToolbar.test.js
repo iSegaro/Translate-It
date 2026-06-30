@@ -31,6 +31,7 @@ describe('PdfToolbar', () => {
     expect(wrapper.find('.pdf-toolbar__file-name').text()).toBe('very-long-document-name.pdf')
     expect(wrapper.find('.pdf-toolbar__file-name').attributes('title')).toBe('very-long-document-name.pdf')
     expect(wrapper.find('.pdf-toolbar__page-indicator').text()).toBe('5 / 12')
+    expect(wrapper.find('option[value="fit-page"]').exists()).toBe(true)
 
     await wrapper.find('.pdf-toolbar__mode-button--active').trigger('click')
     expect(wrapper.emitted('mode-change')).toBeTruthy()
@@ -69,6 +70,9 @@ describe('PdfToolbar', () => {
 
     await wrapper.find('.pdf-toolbar__zoom-select').setValue('125')
     expect(wrapper.emitted('zoom-change')?.at(-1)?.[0]).toEqual({ mode: 'percent', value: 125 })
+
+    await wrapper.find('.pdf-toolbar__zoom-select').setValue('fit-page')
+    expect(wrapper.emitted('zoom-change')?.at(-1)?.[0]).toEqual({ mode: 'fit-page', value: 100 })
 
     await wrapper.findAll('button').find((button) => button.text().trim() === '+')?.trigger('click')
     expect(wrapper.emitted('zoom-step')?.at(-1)?.[0]).toBe(1)

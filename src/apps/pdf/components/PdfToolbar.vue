@@ -56,6 +56,9 @@
             <option value="fit-width">
               Fit Width
             </option>
+            <option value="fit-page">
+              Fit Page
+            </option>
             <option
               v-for="option in zoomPercentOptions"
               :key="option"
@@ -235,6 +238,7 @@ const translationStatusLabel = computed(() => {
 
 const zoomSelectValue = computed(() => {
   if (props.zoomMode === 'fit-width') return 'fit-width'
+  if (props.zoomMode === 'fit-page') return 'fit-page'
   return String(props.zoomPercent || 100)
 })
 
@@ -263,6 +267,11 @@ function handleZoomSelectChange(event) {
     return
   }
 
+  if (value === 'fit-page') {
+    emit('zoom-change', { mode: 'fit-page', value: props.zoomPercent || 100 })
+    return
+  }
+
   const percent = Number(value)
   if (!Number.isFinite(percent)) return
   emit('zoom-change', { mode: 'percent', value: percent })
@@ -276,5 +285,4 @@ function handleFileInputChange(event) {
   event.target.value = ''
 }
 </script>
-
 

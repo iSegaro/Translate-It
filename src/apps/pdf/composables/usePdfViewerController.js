@@ -228,7 +228,7 @@ export function usePdfViewerController() {
     restoredOcrPageCount.value = 0
   }
 
-  async function loadPdfFile(file, viewerWidth) {
+  async function loadPdfFile(file, layoutRequest) {
     if (!file) return false
 
     if (file.type !== 'application/pdf' && !file.name?.toLowerCase().endsWith('.pdf')) {
@@ -243,7 +243,7 @@ export function usePdfViewerController() {
       resetLoadedDocument()
       currentFile.value = file
 
-      const nextState = await pdfDocumentSession.openFile(file, viewerWidth)
+      const nextState = await pdfDocumentSession.openFile(file, layoutRequest)
       applySessionState(nextState)
 
       await restoreFromCache(pdfDocumentSession.documentIdentity)
@@ -262,13 +262,13 @@ export function usePdfViewerController() {
     }
   }
 
-  async function recomputeLayout(viewerWidth) {
+  async function recomputeLayout(layoutRequest) {
     if (isLoading.value || !currentFile.value) {
       return false
     }
 
     try {
-      const nextState = await pdfDocumentSession.rebuildPageMetrics(viewerWidth)
+      const nextState = await pdfDocumentSession.rebuildPageMetrics(layoutRequest)
       applySessionState(nextState)
       return true
     } catch (layoutError) {

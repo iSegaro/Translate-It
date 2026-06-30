@@ -128,4 +128,46 @@ describe('PdfViewer', () => {
 
     wrapper.unmount()
   })
+
+  it('emits both width and height for layout changes', async () => {
+    const session = {
+      updateVisiblePages: vi.fn()
+    }
+
+    const widthDescriptor = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'clientWidth')
+    const heightDescriptor = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'clientHeight')
+
+    try {
+      Object.defineProperty(HTMLElement.prototype, 'clientWidth', {
+        configurable: true,
+        get: () => 960
+      })
+      Object.defineProperty(HTMLElement.prototype, 'clientHeight', {
+        configurable: true,
+        get: () => 720
+      })
+
+      const wrapper = mount(PdfViewer, {
+        props: {
+          pages: [{ pageNumber: 1, width: 100, height: 100, scale: 1 }],
+          session
+        },
+        attachTo: document.body
+      })
+
+      await nextTick()
+      await nextTick()
+
+      expect(wrapper.emitted('layout-change')?.at(-1)?.[0]).toEqual({ width: 960, height: 720 })
+
+      wrapper.unmount()
+    } finally {
+      if (widthDescriptor) {
+        Object.defineProperty(HTMLElement.prototype, 'clientWidth', widthDescriptor)
+      }
+      if (heightDescriptor) {
+        Object.defineProperty(HTMLElement.prototype, 'clientHeight', heightDescriptor)
+      }
+    }
+  })
 })
