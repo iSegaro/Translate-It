@@ -1,6 +1,8 @@
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { mount } from '@vue/test-utils'
 import PdfTranslatedPane from './PdfTranslatedPane.vue'
+
+let intersectionCallback
 
 vi.mock('./PdfTranslatedBlock.vue', () => ({
   default: {
@@ -11,6 +13,23 @@ vi.mock('./PdfTranslatedBlock.vue', () => ({
 }))
 
 describe('PdfTranslatedPane', () => {
+  beforeEach(() => {
+    intersectionCallback = null
+
+    vi.stubGlobal('IntersectionObserver', class IntersectionObserver {
+      constructor(callback) {
+        intersectionCallback = callback
+      }
+
+      observe() {}
+      disconnect() {}
+    })
+  })
+
+  afterEach(() => {
+    vi.unstubAllGlobals()
+  })
+
   it('renders empty state when no translated data', () => {
     const wrapper = mount(PdfTranslatedPane, {
       props: { translatedPageData: [] }
@@ -82,5 +101,30 @@ describe('PdfTranslatedPane', () => {
     expect(pages).toHaveLength(2)
     expect(pages[0].text()).toContain('Page 1')
     expect(pages[1].text()).toContain('Page 2')
+  })
+
+  it('emits the top-most visible translated page', async () => {
+    const wrapper = mount(PdfTranslatedPane, {
+      props: {
+        translatedPageData: [
+          { pageNumber: 1, width: 100, height: 200, blocks: [{ id: 'b1', text: 'Page 1 block', translationState: { status: 'idle' } }] },
+          { pageNumber: 2, width: 100, height: 200, blocks: [{ id: 'b2', text: 'Page 2 block', translationState: { status: 'idle' } }] }
+        ]
+      },
+      attachTo: document.body
+    })
+
+    await wrapper.vm.$nextTick()
+
+    intersectionCallback?.([
+      { target: { dataset: { pageNumber: '2' } }, isIntersecting: true },
+      { target: { dataset: { pageNumber: '1' } }, isIntersecting: true }
+    ])
+
+    await wrapper.vm.$nextTick()
+
+    expect(wrapper.emitted('current-page-change')?.at(-1)?.[0]).toBe(1)
+
+    wrapper.unmount()
   })
 })

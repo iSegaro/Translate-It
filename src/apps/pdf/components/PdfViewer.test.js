@@ -33,6 +33,7 @@ const resizeObserveMock = vi.fn()
 const resizeDisconnectMock = vi.fn()
 let intersectionObserverClass
 let resizeObserverClass
+let intersectionCallback
 
 describe('PdfViewer', () => {
   beforeEach(() => {
@@ -40,9 +41,12 @@ describe('PdfViewer', () => {
     disconnectMock.mockClear()
     resizeObserveMock.mockClear()
     resizeDisconnectMock.mockClear()
+    intersectionCallback = null
 
     intersectionObserverClass = class IntersectionObserver {
-      constructor() {}
+      constructor(callback) {
+        intersectionCallback = callback
+      }
       observe(target) {
         observeMock(target)
       }
@@ -80,6 +84,47 @@ describe('PdfViewer', () => {
     await nextTick()
 
     expect(observeMock).toHaveBeenCalledWith(pageRootEl)
+
+    wrapper.unmount()
+  })
+
+  it('emits the top-most visible page as the current page', async () => {
+    const session = {
+      updateVisiblePages: vi.fn()
+    }
+
+    const wrapper = mount(PdfViewer, {
+      props: {
+        pages: [
+          { pageNumber: 1, width: 100, height: 100, scale: 1 },
+          { pageNumber: 2, width: 100, height: 100, scale: 1 }
+        ],
+        session
+      },
+      attachTo: document.body
+    })
+
+    await nextTick()
+    await nextTick()
+
+    intersectionCallback?.([
+      { target: { dataset: { pageNumber: '2' } }, isIntersecting: true },
+      { target: { dataset: { pageNumber: '1' } }, isIntersecting: true }
+    ])
+
+    await nextTick()
+
+    expect(wrapper.emitted('current-page-change')?.at(-1)?.[0]).toBe(1)
+    expect(session.updateVisiblePages).toHaveBeenCalled()
+
+    intersectionCallback?.([
+      { target: { dataset: { pageNumber: '1' } }, isIntersecting: false },
+      { target: { dataset: { pageNumber: '2' } }, isIntersecting: true }
+    ])
+
+    await nextTick()
+
+    expect(wrapper.emitted('current-page-change')?.at(-1)?.[0]).toBe(2)
 
     wrapper.unmount()
   })

@@ -1,0 +1,11 @@
+.pdf-viewer {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  align-items: center;
+  position: relative;
+
+  &--targeting {
+    cursor: crosshair;
+  }
+}

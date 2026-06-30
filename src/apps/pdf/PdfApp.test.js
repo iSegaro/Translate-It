@@ -32,7 +32,7 @@ vi.mock('./composables/usePdfOcr.js', () => ({
 vi.mock('./components/PdfToolbar.vue', () => ({
   default: {
     name: 'PdfToolbar',
-    props: ['fileName', 'pageCount', 'workerLabel'],
+    props: ['fileName', 'pageCount', 'currentPageNumber', 'zoomMode', 'zoomPercent'],
     template: '<header class="pdf-toolbar-stub" />'
   }
 }))

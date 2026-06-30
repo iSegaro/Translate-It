@@ -1,5 +1,8 @@
 <template>
-  <div class="pdf-translated-pane">
+  <div
+    ref="rootEl"
+    class="pdf-translated-pane"
+  >
     <div
       v-if="!hasTranslatedData"
       class="pdf-translated-pane__empty"
@@ -20,6 +23,7 @@
         v-for="page in translatedPageData"
         :key="page.pageNumber"
         class="pdf-translated-page"
+        :data-page-number="page.pageNumber"
       >
         <div class="pdf-translated-page__header">
           Page {{ page.pageNumber }}
@@ -55,9 +59,10 @@
 </template>
 
 <script setup>
-import { computed } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import PdfTranslatedBlock from './PdfTranslatedBlock.vue'
 import PdfOcrStatus from './PdfOcrStatus.vue'
+import './PdfTranslatedPane.scss'
 
 const props = defineProps({
   translatedPageData: {
@@ -70,67 +75,89 @@ const props = defineProps({
   }
 })
 
+const emit = defineEmits(['current-page-change'])
+const rootEl = ref(null)
+let pageIntersectionObserver = null
+let lastCurrentPage = 0
+
 const hasTranslatedData = computed(() => {
   return props.translatedPageData.some(page => page.blocks.length > 0)
 })
+
+function disconnectObserver() {
+  pageIntersectionObserver?.disconnect()
+  pageIntersectionObserver = null
+}
+
+function emitCurrentPage(nextVisiblePages) {
+  const visiblePages = [...nextVisiblePages].filter((pageNumber) => Number.isFinite(Number(pageNumber)))
+  const currentPage = visiblePages.length > 0
+    ? Math.min(...visiblePages)
+    : (lastCurrentPage || props.translatedPageData[0]?.pageNumber || 0)
+
+  if (currentPage !== lastCurrentPage) {
+    lastCurrentPage = currentPage
+    emit('current-page-change', currentPage)
+  }
+}
+
+function refreshObservationTargets() {
+  if (!pageIntersectionObserver || !rootEl.value) return
+
+  const pages = rootEl.value.querySelectorAll('.pdf-translated-page')
+  for (const pageEl of pages) {
+    pageIntersectionObserver.observe(pageEl)
+  }
+}
+
+function setupObserver() {
+  disconnectObserver()
+  if (!rootEl.value) return
+  if (typeof IntersectionObserver !== 'function') return
+
+  const scrollRoot = rootEl.value.parentElement
+  if (!scrollRoot) return
+
+  pageIntersectionObserver = new IntersectionObserver((entries) => {
+    const nextVisible = new Set()
+
+    for (const entry of entries) {
+      const pageNumber = Number(entry.target?.dataset?.pageNumber)
+      if (!pageNumber) continue
+
+      if (entry.isIntersecting) {
+        nextVisible.add(pageNumber)
+      }
+    }
+
+    emitCurrentPage(nextVisible)
+  }, {
+    root: scrollRoot,
+    threshold: 0.25
+  })
+
+  refreshObservationTargets()
+  emitCurrentPage(new Set())
+}
+
+watch(
+  () => props.translatedPageData,
+  async () => {
+    await nextTick()
+    refreshObservationTargets()
+    emitCurrentPage(new Set())
+  },
+  { deep: true }
+)
+
+onMounted(() => {
+  setupObserver()
+})
+
+onBeforeUnmount(() => {
+  disconnectObserver()
+  lastCurrentPage = 0
+})
 </script>
 
-<style scoped lang="scss">
-.pdf-translated-pane {
-  display: flex;
-  flex-direction: column;
-  gap: 20px;
-}
 
-.pdf-translated-pane__empty {
-  display: grid;
-  place-items: center;
-  min-height: 300px;
-  text-align: center;
-  padding: 32px;
-}
-
-.pdf-translated-pane__empty-title {
-  font-size: 18px;
-  font-weight: 700;
-  margin: 0 0 8px;
-}
-
-.pdf-translated-pane__empty-text {
-  margin: 0;
-  color: rgba(230, 237, 247, 0.7);
-  font-size: 14px;
-}
-
-.pdf-translated-pane__pages {
-  display: flex;
-  flex-direction: column;
-  gap: 20px;
-}
-
-.pdf-translated-page {
-  background: rgba(255, 255, 255, 0.04);
-  border-radius: 12px;
-  padding: 16px;
-  border: 1px solid rgba(255, 255, 255, 0.06);
-}
-
-.pdf-translated-page__header {
-  font-size: 13px;
-  font-weight: 700;
-  color: rgba(230, 237, 247, 0.68);
-  margin-bottom: 12px;
-}
-
-.pdf-translated-page__empty {
-  color: rgba(230, 237, 247, 0.5);
-  font-size: 13px;
-  font-style: italic;
-}
-
-.pdf-translated-page__blocks {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-</style>

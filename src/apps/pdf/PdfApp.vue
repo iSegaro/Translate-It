@@ -2,20 +2,25 @@
   <div class="pdf-app">
     <PdfToolbar
       :file-name="fileName"
+      :page-count="pageCount"
+      :current-page-number="currentPageNumber"
       :is-loading="isLoading"
       :is-translating="isTranslating"
       :can-translate-visible-pages="canTranslateVisiblePages"
       :can-export="canExport"
-      :is-partial-export="isPartialExport"
       :is-block-targeting-active="isBlockTargetingActive"
       :scanned-page-count="scannedPageCount"
       :is-ocr-processing="isOcrProcessing"
       :viewer-mode="viewerMode"
+      :zoom-mode="zoomMode"
+      :zoom-percent="zoomPercent"
       :translation-summary="translationSummary"
       @file-selected="handleFileSelected"
       @translate-visible="handleTranslateVisiblePages"
       @cancel-translation="handleCancelTranslation"
       @mode-change="setMode"
+      @zoom-step="handleZoomStep"
+      @zoom-change="handleZoomChange"
       @export-txt="handleExportTxt"
       @export-markdown="handleExportMarkdown"
       @export-html="handleExportHtml"
@@ -87,6 +92,7 @@
                 :show-overlay="showOverlayLayer"
                 :overlay-page-data="translatedPageData"
                 @layout-change="handleLayoutChange"
+                @current-page-change="handleCurrentPageChange"
                 @block-pointer-move="handleBlockPointerMove"
                 @block-click="handleBlockClick"
               />
@@ -99,6 +105,7 @@
               <PdfTranslatedPane
                 :translated-page-data="translatedPageData"
                 :highlighted-block-id="highlightedBlockId"
+                @current-page-change="handleTranslatedPaneCurrentPageChange"
               />
             </template>
           </PdfViewerLayout>
@@ -128,6 +135,7 @@ import { usePdfExport } from './composables/usePdfExport.js'
 import { usePdfBlockSelection } from './composables/usePdfBlockSelection.js'
 import { usePdfOcr } from './composables/usePdfOcr.js'
 import { buildPdfStatusBannerState } from './utils/pdfStatusBanner.js'
+import './PdfApp.scss'
 
 const {
   error,
@@ -136,11 +144,11 @@ const {
   isLoading,
   isTranslating,
   canTranslateVisiblePages,
+  pageCount,
   pageMetrics,
   translationSummary,
   translatedPageData,
   translationTick,
-  restoredTranslationCount,
   pdfFingerprint,
   session,
   loadPdfFile,
@@ -173,6 +181,10 @@ const pdfViewerRef = ref(null)
 const exportSuccess = ref(null)
 const exportSuccessTimer = ref(null)
 const EXPORT_SUCCESS_DURATION_MS = 2200
+const currentPageNumber = ref(0)
+const zoomMode = ref('fit-width')
+const zoomPercent = ref(100)
+const zoomPercentOptions = [50, 75, 100, 125, 150, 200]
 
 const {
   isBlockTargetingActive,
@@ -210,9 +222,13 @@ const pdfStatusBanner = computed(() => buildPdfStatusBannerState({
   isLoading: isLoading.value,
   isTranslating: isTranslating.value,
   exportSuccess: exportSuccess.value,
-  restoredTranslationCount: restoredTranslationCount.value,
   isPartialExport: isPartialExport.value
 }))
+
+const zoomMultiplier = computed(() => {
+  if (zoomMode.value === 'fit-width') return 1
+  return zoomPercent.value / 100
+})
 
 watch(hasDocument, (has) => {
   if (has) {
@@ -221,9 +237,11 @@ watch(hasDocument, (has) => {
 })
 
 async function handleFileSelected(file) {
-  const loaded = await loadPdfFile(file, viewerWidth.value)
+  resetPresentationState()
+  const loaded = await loadPdfFile(file, getEffectiveViewerWidth())
   if (loaded) {
     isDragOver.value = false
+    currentPageNumber.value = pageCount.value > 0 ? 1 : 0
   }
 }
 
@@ -232,8 +250,69 @@ function handleLayoutChange(width) {
 
   viewerWidth.value = width
   if (hasDocument.value) {
-    void recomputeLayout(width)
+    void recomputeLayout(getEffectiveViewerWidth(width))
   }
+}
+
+function handleCurrentPageChange(pageNumber) {
+  if (!Number.isFinite(Number(pageNumber))) return
+  currentPageNumber.value = Number(pageNumber) || 0
+}
+
+function handleTranslatedPaneCurrentPageChange(pageNumber) {
+  if (showOriginalPane.value) return
+  handleCurrentPageChange(pageNumber)
+}
+
+function handleZoomChange({ mode, value }) {
+  const nextMode = mode === 'fit-width' ? 'fit-width' : 'percent'
+  const nextPercent = nextMode === 'fit-width' ? 100 : clampZoomPercent(Number(value))
+  const currentMode = zoomMode.value
+  const currentPercent = zoomPercent.value
+
+  if (currentMode === nextMode && currentPercent === nextPercent) {
+    return
+  }
+
+  if (nextMode === 'fit-width') {
+    zoomMode.value = 'fit-width'
+    zoomPercent.value = 100
+  } else if (Number.isFinite(Number(value))) {
+    zoomMode.value = 'percent'
+    zoomPercent.value = nextPercent
+  }
+
+  if (hasDocument.value) {
+    void recomputeLayout(getEffectiveViewerWidth())
+  }
+}
+
+function handleZoomStep(direction) {
+  const currentPercent = zoomMode.value === 'percent' ? zoomPercent.value : 100
+  const currentIndex = zoomPercentOptions.indexOf(currentPercent)
+  const safeIndex = currentIndex >= 0 ? currentIndex : zoomPercentOptions.indexOf(100)
+  const nextIndex = Math.min(
+    zoomPercentOptions.length - 1,
+    Math.max(0, safeIndex + Number(direction || 0))
+  )
+  const nextPercent = zoomPercentOptions[nextIndex] || 100
+
+  if (zoomMode.value === 'percent' && zoomPercent.value === nextPercent) {
+    return
+  }
+
+  zoomMode.value = 'percent'
+  zoomPercent.value = nextPercent
+
+  if (hasDocument.value) {
+    void recomputeLayout(getEffectiveViewerWidth())
+  }
+}
+
+function resetPresentationState() {
+  currentPageNumber.value = 0
+  zoomMode.value = 'fit-width'
+  zoomPercent.value = 100
 }
 
 function handleTranslateVisiblePages() {
@@ -297,6 +376,21 @@ function showExportSuccess(formatLabel) {
   }, EXPORT_SUCCESS_DURATION_MS)
 }
 
+function clampZoomPercent(value) {
+  const nearest = zoomPercentOptions.reduce((best, option) => {
+    if (!best) return option
+    return Math.abs(option - value) < Math.abs(best - value) ? option : best
+  }, 0)
+
+  return nearest || 100
+}
+
+function getEffectiveViewerWidth(width = viewerWidth.value) {
+  const baseWidth = Number(width) || 0
+  if (baseWidth <= 0) return baseWidth
+  return Math.max(1, Math.round(baseWidth * zoomMultiplier.value))
+}
+
 onMounted(() => {
   if (import.meta.env.DEV) {
     import('./debug/pdfOverlayDiagnostics.js')
@@ -309,67 +403,4 @@ onBeforeUnmount(() => {
 })
 </script>
 
-<style scoped lang="scss">
-.pdf-app {
-  min-height: 100vh;
-  display: flex;
-  flex-direction: column;
-  --pdf-toolbar-sticky-height: 52px;
-  background:
-    radial-gradient(circle at top left, rgba(90, 92, 255, 0.18), transparent 35%),
-    linear-gradient(180deg, #10131a 0%, #0b0e13 100%);
-  color: #e6edf7;
-  font-family: Inter, "Segoe UI", system-ui, sans-serif;
-}
 
-.pdf-app__content {
-  flex: 1;
-  padding: 16px 28px 28px;
-  min-height: 0;
-}
-
-.pdf-app__status-row {
-  position: sticky;
-  top: var(--pdf-toolbar-sticky-height);
-  z-index: 25;
-  padding: 10px 28px 0;
-  pointer-events: none;
-}
-
-.pdf-app__status-row :deep(.pdf-status-banner) {
-  pointer-events: none;
-}
-
-.pdf-app__empty {
-  min-height: 480px;
-  display: grid;
-  place-items: center;
-  text-align: center;
-  padding: 32px;
-}
-
-.pdf-app__empty-title {
-  font-size: 20px;
-  font-weight: 700;
-  margin: 0 0 8px;
-}
-
-.pdf-app__empty-text {
-  margin: 0;
-  color: rgba(230, 237, 247, 0.7);
-}
-
-@media (max-width: 1100px) {
-  .pdf-app {
-    --pdf-toolbar-sticky-height: 96px;
-  }
-
-  .pdf-app__status-row {
-    padding: 8px 16px 0;
-  }
-
-  .pdf-app__content {
-    padding: 16px;
-  }
-}
-</style>

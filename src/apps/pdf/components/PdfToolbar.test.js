@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest'
+import { describe, expect, it } from 'vitest'
 import { mount } from '@vue/test-utils'
 import PdfToolbar from './PdfToolbar.vue'
 
@@ -8,17 +8,17 @@ describe('PdfToolbar', () => {
       props: {
         fileName: 'very-long-document-name.pdf',
         pageCount: 12,
-        workerLabel: 'configured',
+        currentPageNumber: 5,
         isLoading: false,
         isTranslating: false,
         canTranslateVisiblePages: true,
         canExport: true,
-        isPartialExport: false,
         isBlockTargetingActive: false,
         scannedPageCount: 0,
         isOcrProcessing: false,
-        restoredTranslationCount: 0,
         viewerMode: 'bilingual',
+        zoomMode: 'fit-width',
+        zoomPercent: 100,
         translationSummary: {
           status: 'idle',
           translatedCount: 0,
@@ -30,6 +30,7 @@ describe('PdfToolbar', () => {
 
     expect(wrapper.find('.pdf-toolbar__file-name').text()).toBe('very-long-document-name.pdf')
     expect(wrapper.find('.pdf-toolbar__file-name').attributes('title')).toBe('very-long-document-name.pdf')
+    expect(wrapper.find('.pdf-toolbar__page-indicator').text()).toBe('5 / 12')
 
     await wrapper.find('.pdf-toolbar__mode-button--active').trigger('click')
     expect(wrapper.emitted('mode-change')).toBeTruthy()
@@ -39,15 +40,18 @@ describe('PdfToolbar', () => {
     const wrapper = mount(PdfToolbar, {
       props: {
         fileName: 'demo.pdf',
+        pageCount: 12,
+        currentPageNumber: 1,
         isLoading: false,
         isTranslating: false,
         canTranslateVisiblePages: true,
         canExport: true,
-        isPartialExport: false,
         isBlockTargetingActive: false,
         scannedPageCount: 0,
         isOcrProcessing: false,
         viewerMode: 'bilingual',
+        zoomMode: 'fit-width',
+        zoomPercent: 100,
         translationSummary: {
           status: 'idle',
           translatedCount: 0,
@@ -62,17 +66,27 @@ describe('PdfToolbar', () => {
 
     await wrapper.findAll('button').find((button) => button.text().includes('Export TXT'))?.trigger('click')
     expect(wrapper.emitted('export-txt')).toBeTruthy()
+
+    await wrapper.find('.pdf-toolbar__zoom-select').setValue('125')
+    expect(wrapper.emitted('zoom-change')?.at(-1)?.[0]).toEqual({ mode: 'percent', value: 125 })
+
+    await wrapper.findAll('button').find((button) => button.text().trim() === '+')?.trigger('click')
+    expect(wrapper.emitted('zoom-step')?.at(-1)?.[0]).toBe(1)
   })
 
   it('keeps the current labels while loading', () => {
     const wrapper = mount(PdfToolbar, {
       props: {
         fileName: 'demo.pdf',
+        pageCount: 2,
+        currentPageNumber: 1,
         isLoading: true,
         canTranslateVisiblePages: false,
         canExport: false,
         isTranslating: false,
-        viewerMode: 'bilingual'
+        viewerMode: 'bilingual',
+        zoomMode: 'fit-width',
+        zoomPercent: 100
       }
     })
 

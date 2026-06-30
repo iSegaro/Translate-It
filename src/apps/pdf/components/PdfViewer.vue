@@ -33,6 +33,7 @@ import PdfPageView from './PdfPageView.vue'
 import PdfBlockHighlightOverlay from './PdfBlockHighlightOverlay.vue'
 import { getPdfPageRootElement } from '../utils/pageViewInstance.js'
 import { usePdfSelectionBridge } from '../composables/usePdfSelectionBridge.js'
+import './PdfViewer.scss'
 
 const props = defineProps({
   pages: {
@@ -61,7 +62,7 @@ const props = defineProps({
   }
 })
 
-const emit = defineEmits(['layout-change', 'block-pointer-move', 'block-click'])
+const emit = defineEmits(['layout-change', 'current-page-change', 'block-pointer-move', 'block-click'])
 const viewerRoot = ref(null)
 const pageViews = new Map()
 const visiblePageNumbers = ref(new Set())
@@ -69,6 +70,7 @@ const highlightedBounds = ref(null)
 let intersectionObserver = null
 let resizeObserver = null
 let lastWidth = 0
+let lastCurrentPage = 0
 
 usePdfSelectionBridge(viewerRoot)
 
@@ -207,6 +209,24 @@ function refreshObservationTargets() {
 function updateVisiblePages(nextVisible) {
   visiblePageNumbers.value = nextVisible
   props.session.updateVisiblePages(nextVisible)
+  emitCurrentPage(nextVisible)
+}
+
+function emitCurrentPage(nextVisible) {
+  const visiblePages = [...nextVisible].filter((pageNumber) => Number.isFinite(Number(pageNumber)))
+  const currentPage = visiblePages.length > 0
+    ? Math.min(...visiblePages)
+    : (lastCurrentPage || props.pages[0]?.pageNumber || 0)
+
+  if (currentPage && currentPage !== lastCurrentPage) {
+    lastCurrentPage = currentPage
+    emit('current-page-change', currentPage)
+  }
+
+  if (!currentPage && lastCurrentPage !== 0) {
+    lastCurrentPage = 0
+    emit('current-page-change', 0)
+  }
 }
 
 function emitWidthIfNeeded() {
@@ -256,12 +276,14 @@ watch(
     await nextTick()
     refreshObservationTargets()
     emitWidthIfNeeded()
+    emitCurrentPage(visiblePageNumbers.value)
   },
   { deep: true }
 )
 
 onMounted(() => {
   setupObservers()
+  emitCurrentPage(visiblePageNumbers.value)
 })
 
 onBeforeUnmount(() => {
@@ -288,16 +310,4 @@ function collectCanvasDataUrls() {
 defineExpose({ collectCanvasDataUrls })
 </script>
 
-<style scoped lang="scss">
-.pdf-viewer {
-  display: flex;
-  flex-direction: column;
-  gap: 24px;
-  align-items: center;
-  position: relative;
 
-  &--targeting {
-    cursor: crosshair;
-  }
-}
-</style>
