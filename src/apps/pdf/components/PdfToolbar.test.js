@@ -13,7 +13,6 @@ describe('PdfToolbar', () => {
         isTranslating: false,
         canTranslateVisiblePages: true,
         canExport: true,
-        isBlockTargetingActive: false,
         scannedPageCount: 0,
         isOcrProcessing: false,
         viewerMode: 'bilingual',
@@ -32,7 +31,6 @@ describe('PdfToolbar', () => {
     expect(wrapper.find('.pdf-toolbar__file-name').attributes('title')).toBe('very-long-document-name.pdf')
     expect(wrapper.find('.pdf-toolbar__page-indicator').text()).toBe('5 / 12')
     expect(wrapper.find('option[value="fit-page"]').exists()).toBe(true)
-    expect(wrapper.find('.pdf-toolbar__button--targeting').exists()).toBe(false)
 
     await wrapper.find('.pdf-toolbar__mode-button--active').trigger('click')
     expect(wrapper.emitted('mode-change')).toBeTruthy()
@@ -48,7 +46,6 @@ describe('PdfToolbar', () => {
         isTranslating: false,
         canTranslateVisiblePages: true,
         canExport: true,
-        isBlockTargetingActive: false,
         scannedPageCount: 0,
         isOcrProcessing: false,
         viewerMode: 'bilingual',

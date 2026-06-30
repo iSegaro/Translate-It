@@ -242,20 +242,6 @@
   min-width: 88px;
 }
 
-.pdf-toolbar__button--targeting {
-  background: rgba(90, 92, 255, 0.12);
-  color: #c4c6ff;
-
-  &:hover {
-    background: rgba(90, 92, 255, 0.2);
-  }
-
-  &--active {
-    background: rgba(90, 92, 255, 0.3);
-    color: #e6edf7;
-  }
-}
-
 .pdf-toolbar__button--ocr {
   background: rgba(244, 184, 96, 0.12);
   color: #f4b860;

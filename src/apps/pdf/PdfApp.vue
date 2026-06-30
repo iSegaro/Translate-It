@@ -8,7 +8,6 @@
       :is-translating="isTranslating"
       :can-translate-visible-pages="canTranslateVisiblePages"
       :can-export="canExport"
-      :is-block-targeting-active="isBlockTargetingActive"
       :scanned-page-count="scannedPageCount"
       :is-ocr-processing="isOcrProcessing"
       :viewer-mode="viewerMode"
@@ -24,7 +23,6 @@
       @export-txt="handleExportTxt"
       @export-markdown="handleExportMarkdown"
       @export-html="handleExportHtml"
-      @toggle-block-targeting="toggleBlockTargeting"
       @request-ocr="requestOcr"
       @clear-cache="handleClearCache"
     />
@@ -194,7 +192,6 @@ const zoomPercentOptions = [50, 75, 100, 125, 150, 200]
 const {
   isBlockTargetingActive,
   highlightedBlockId,
-  toggleBlockTargeting,
   handleBlockPointerMove,
   handleBlockClick
 } = usePdfBlockSelection()

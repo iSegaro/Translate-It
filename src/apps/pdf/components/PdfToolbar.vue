@@ -205,7 +205,6 @@ const props = defineProps({
   isTranslating: { type: Boolean, default: false },
   canTranslateVisiblePages: { type: Boolean, default: false },
   canExport: { type: Boolean, default: false },
-  isBlockTargetingActive: { type: Boolean, default: false },
   scannedPageCount: { type: Number, default: 0 },
   isOcrProcessing: { type: Boolean, default: false },
   viewerMode: { type: String, default: 'bilingual' },
@@ -222,7 +221,7 @@ const props = defineProps({
   }
 })
 
-const emit = defineEmits(['file-selected', 'translate-visible', 'mode-change', 'cancel-translation', 'export-txt', 'export-markdown', 'export-html', 'toggle-block-targeting', 'request-ocr', 'clear-cache', 'zoom-step', 'zoom-change'])
+const emit = defineEmits(['file-selected', 'translate-visible', 'mode-change', 'cancel-translation', 'export-txt', 'export-markdown', 'export-html', 'request-ocr', 'clear-cache', 'zoom-step', 'zoom-change'])
 const fileInput = ref(null)
 const exportMenuRef = ref(null)
 const exportMenuTriggerRef = ref(null)
