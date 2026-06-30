@@ -94,6 +94,12 @@
   cursor: pointer;
   min-width: 126px;
   max-width: 180px;
+  outline: none;
+
+  &:focus-visible {
+    outline: 2px solid rgba(106, 165, 255, 0.95);
+    outline-offset: 2px;
+  }
 }
 
 .pdf-toolbar__actions {
@@ -116,9 +122,15 @@
   font-weight: 600;
   cursor: pointer;
   transition: background 0.15s ease, color 0.15s ease;
+  outline: none;
 
   &:hover {
     background: rgba(255, 255, 255, 0.14);
+  }
+
+  &:focus-visible {
+    outline: 2px solid rgba(106, 165, 255, 0.95);
+    outline-offset: 2px;
   }
 
   &:disabled {
@@ -155,6 +167,11 @@
   &:hover {
     background: rgba(255, 255, 255, 0.06);
     color: #e6edf7;
+  }
+
+  &:focus-visible {
+    outline: none;
+    box-shadow: inset 0 0 0 2px rgba(106, 165, 255, 0.95);
   }
 
   &--active {
@@ -208,10 +225,16 @@
   text-align: left;
   cursor: pointer;
   transition: background 0.15s ease, color 0.15s ease;
+  outline: none;
 
   &:hover,
   &:focus-visible {
     background: rgba(255, 255, 255, 0.08);
+  }
+
+  &:focus-visible {
+    outline: 2px solid rgba(106, 165, 255, 0.9);
+    outline-offset: 2px;
   }
 }
 
@@ -262,8 +285,25 @@
 
 @media (max-width: 1100px) {
   .pdf-toolbar {
+    padding: 8px 16px;
+    gap: 8px 12px;
+    min-height: 44px;
     grid-template-columns: minmax(0, 1fr);
     justify-items: stretch;
+  }
+
+  .pdf-toolbar__title-block {
+    gap: 2px;
+  }
+
+  .pdf-toolbar__file-name {
+    max-width: min(30vw, 320px);
+    font-size: 13px;
+  }
+
+  .pdf-toolbar__progress {
+    padding: 3px 8px;
+    font-size: 12px;
   }
 
   .pdf-toolbar__title-block,
@@ -274,6 +314,7 @@
 
   .pdf-toolbar__center-group {
     justify-content: flex-start;
+    gap: 10px;
   }
 
   .pdf-toolbar__mode-group,
@@ -282,11 +323,44 @@
     justify-content: flex-start;
   }
 
+  .pdf-toolbar__mode-group {
+    gap: 8px;
+  }
+
+  .pdf-toolbar__mode-button {
+    padding: 6px 10px;
+    font-size: 12px;
+  }
+
+  .pdf-toolbar__view-group {
+    gap: 8px;
+  }
+
+  .pdf-toolbar__page-indicator {
+    padding: 5px 8px;
+    font-size: 12px;
+  }
+
+  .pdf-toolbar__zoom-group {
+    gap: 6px;
+  }
+
   .pdf-toolbar__zoom-select {
+    padding: 7px 12px;
     min-width: 120px;
   }
 
   .pdf-toolbar__actions {
     justify-content: flex-start;
+    gap: 6px;
+  }
+
+  .pdf-toolbar__button {
+    padding: 7px 12px;
+    font-size: 12px;
+  }
+
+  .pdf-toolbar__button--menu-trigger {
+    min-width: 78px;
   }
 }
