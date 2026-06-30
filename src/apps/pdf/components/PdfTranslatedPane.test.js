@@ -55,6 +55,10 @@ describe('PdfTranslatedPane', () => {
   it('renders pages with blocks', () => {
     const wrapper = mount(PdfTranslatedPane, {
       props: {
+        viewerMode: 'bilingual',
+        pageMetrics: [
+          { pageNumber: 1, width: 100, height: 200 }
+        ],
         translatedPageData: [
           {
             pageNumber: 1,
@@ -72,6 +76,73 @@ describe('PdfTranslatedPane', () => {
     expect(wrapper.find('.pdf-translated-page').exists()).toBe(true)
     expect(wrapper.text()).toContain('Page 1')
     expect(wrapper.findAll('.mock-block')).toHaveLength(2)
+  })
+
+  it('applies page-height normalization in bilingual mode', () => {
+    const wrapper = mount(PdfTranslatedPane, {
+      props: {
+        viewerMode: 'bilingual',
+        pageMetrics: [
+          { pageNumber: 1, width: 100, height: 240 }
+        ],
+        translatedPageData: [
+          {
+            pageNumber: 1,
+            width: 100,
+            height: 120,
+            blocks: [
+              { id: 'b1', text: 'First block', translationState: { status: 'translated', translatedText: 'Primer bloque' } }
+            ]
+          }
+        ]
+      }
+    })
+
+    expect(wrapper.find('.pdf-translated-page__body').attributes('style')).toContain('min-height: 240px')
+  })
+
+  it('does not apply page-height normalization in translated-only mode', () => {
+    const wrapper = mount(PdfTranslatedPane, {
+      props: {
+        viewerMode: 'translated',
+        pageMetrics: [
+          { pageNumber: 1, width: 100, height: 240 }
+        ],
+        translatedPageData: [
+          {
+            pageNumber: 1,
+            width: 100,
+            height: 120,
+            blocks: [
+              { id: 'b1', text: 'First block', translationState: { status: 'translated', translatedText: 'Primer bloque' } }
+            ]
+          }
+        ]
+      }
+    })
+
+    expect(wrapper.find('.pdf-translated-page__body').attributes('style') || '').not.toContain('min-height')
+  })
+
+  it('renders normally when page metrics are missing', () => {
+    const wrapper = mount(PdfTranslatedPane, {
+      props: {
+        viewerMode: 'bilingual',
+        translatedPageData: [
+          {
+            pageNumber: 1,
+            width: 100,
+            height: 120,
+            blocks: [
+              { id: 'b1', text: 'First block', translationState: { status: 'translated', translatedText: 'Primer bloque' } }
+            ]
+          }
+        ]
+      }
+    })
+
+    expect(wrapper.find('.pdf-translated-page').exists()).toBe(true)
+    expect(wrapper.find('.pdf-translated-page__body').exists()).toBe(true)
   })
 
   it('renders empty page message when page has no blocks but other pages do', () => {

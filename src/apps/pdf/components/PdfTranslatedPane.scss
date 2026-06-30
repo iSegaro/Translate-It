@@ -44,6 +44,12 @@
   margin-bottom: 12px;
 }
 
+.pdf-translated-page__body {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
 .pdf-translated-page__empty {
   color: rgba(230, 237, 247, 0.5);
   font-size: 13px;

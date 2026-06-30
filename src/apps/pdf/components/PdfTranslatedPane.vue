@@ -30,28 +30,33 @@
         </div>
 
         <div
-          v-if="page.blocks.length === 0"
-          class="pdf-translated-page__empty"
+          class="pdf-translated-page__body"
+          :style="getPageBodyStyle(page.pageNumber)"
         >
-          <PdfOcrStatus
-            :is-scanned-candidate="page.isScannedCandidate"
-            :is-ocr-complete="page.isOcrComplete"
-            :ocr-error="page.ocrError"
-          />
-          <span v-if="!page.isScannedCandidate && !page.isOcrComplete">No text blocks on this page</span>
-        </div>
+          <div
+            v-if="page.blocks.length === 0"
+            class="pdf-translated-page__empty"
+          >
+            <PdfOcrStatus
+              :is-scanned-candidate="page.isScannedCandidate"
+              :is-ocr-complete="page.isOcrComplete"
+              :ocr-error="page.ocrError"
+            />
+            <span v-if="!page.isScannedCandidate && !page.isOcrComplete">No text blocks on this page</span>
+          </div>
 
-        <div
-          v-else
-          class="pdf-translated-page__blocks"
-        >
-          <PdfTranslatedBlock
-            v-for="block in page.blocks"
-            :key="block.id"
-            :block="block"
-            :translation-state="block.translationState"
-            :highlighted="block.id === highlightedBlockId"
-          />
+          <div
+            v-else
+            class="pdf-translated-page__blocks"
+          >
+            <PdfTranslatedBlock
+              v-for="block in page.blocks"
+              :key="block.id"
+              :block="block"
+              :translation-state="block.translationState"
+              :highlighted="block.id === highlightedBlockId"
+            />
+          </div>
         </div>
       </div>
     </div>
@@ -72,6 +77,14 @@ const props = defineProps({
   highlightedBlockId: {
     type: String,
     default: null
+  },
+  pageMetrics: {
+    type: Array,
+    default: () => []
+  },
+  viewerMode: {
+    type: String,
+    default: 'bilingual'
   }
 })
 
@@ -83,6 +96,21 @@ let lastCurrentPage = 0
 const hasTranslatedData = computed(() => {
   return props.translatedPageData.some(page => page.blocks.length > 0)
 })
+
+const isBilingualMode = computed(() => props.viewerMode === 'bilingual')
+
+function getPageBodyStyle(pageNumber) {
+  if (!isBilingualMode.value) return {}
+
+  const metric = props.pageMetrics.find((page) => page.pageNumber === pageNumber)
+  const minHeight = Math.max(0, Math.floor(Number(metric?.height) || 0))
+
+  if (!minHeight) return {}
+
+  return {
+    minHeight: `${minHeight}px`
+  }
+}
 
 function disconnectObserver() {
   pageIntersectionObserver?.disconnect()
@@ -159,5 +187,3 @@ onBeforeUnmount(() => {
   lastCurrentPage = 0
 })
 </script>
-
-

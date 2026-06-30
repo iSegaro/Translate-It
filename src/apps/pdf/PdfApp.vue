@@ -103,6 +103,8 @@
               <PdfTranslatedPane
                 :translated-page-data="translatedPageData"
                 :highlighted-block-id="highlightedBlockId"
+                :page-metrics="pageMetrics"
+                :viewer-mode="viewerMode"
                 @current-page-change="handleTranslatedPaneCurrentPageChange"
               />
             </template>
