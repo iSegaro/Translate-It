@@ -15,13 +15,6 @@
           {{ fileName || 'PDF Viewer' }}
         </span>
       </div>
-
-      <span
-        v-if="translationSummary.totalCount > 0"
-        class="pdf-toolbar__progress"
-      >
-        {{ translationStatusLabel }}
-      </span>
     </div>
 
     <div
@@ -280,21 +273,6 @@ const modeOptions = [
   { value: 'translated', label: 'Translated' },
   { value: 'translated-pdf', label: 'Translated PDF View' }
 ]
-
-const translationStatusLabel = computed(() => {
-  const { translatedCount, failedCount, totalCount, status } = props.translationSummary
-  if (!totalCount) return ''
-
-  if (status === 'error') {
-    return 'Translation failed'
-  }
-
-  if (failedCount > 0) {
-    return `Translated ${translatedCount}/${totalCount} blocks, ${failedCount} failed`
-  }
-
-  return `Translated ${translatedCount}/${totalCount} blocks`
-})
 
 const zoomSelectValue = computed(() => {
   if (props.zoomMode === 'fit-width') return 'fit-width'

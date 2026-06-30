@@ -52,18 +52,6 @@
   line-height: 1.2;
 }
 
-.pdf-toolbar__progress {
-  display: inline-flex;
-  align-items: center;
-  width: fit-content;
-  max-width: 100%;
-  padding: 4px 10px;
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.07);
-  color: rgba(230, 237, 247, 0.66);
-  font-size: 13px;
-}
-
 .pdf-toolbar__center-group {
   display: flex;
   align-items: center;
