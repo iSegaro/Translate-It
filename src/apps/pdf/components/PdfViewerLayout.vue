@@ -6,6 +6,7 @@
     <div
       v-if="showOriginalPane"
       class="pdf-viewer-layout__pane pdf-viewer-layout__pane--original"
+      ref="originalPaneRef"
     >
       <slot name="original" />
     </div>
@@ -13,6 +14,7 @@
     <div
       v-if="showTranslatedPane"
       class="pdf-viewer-layout__pane pdf-viewer-layout__pane--translated"
+      ref="translatedPaneRef"
     >
       <slot name="translated" />
     </div>
@@ -20,7 +22,9 @@
 </template>
 
 <script setup>
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
+import { usePdfScrollSync } from '../composables/usePdfScrollSync.js'
+import './PdfViewerLayout.scss'
 
 const props = defineProps({
   viewerMode: {
@@ -37,39 +41,21 @@ const props = defineProps({
   }
 })
 
+const originalPaneRef = ref(null)
+const translatedPaneRef = ref(null)
+
 const layoutClasses = computed(() => ({
   'pdf-viewer-layout--original': props.viewerMode === 'original',
   'pdf-viewer-layout--bilingual': props.viewerMode === 'bilingual',
   'pdf-viewer-layout--translated': props.viewerMode === 'translated',
   'pdf-viewer-layout--translated-pdf': props.viewerMode === 'translated-pdf'
 }))
+
+usePdfScrollSync(
+  originalPaneRef,
+  translatedPaneRef,
+  computed(() => props.viewerMode === 'bilingual' && props.showOriginalPane && props.showTranslatedPane)
+)
 </script>
 
-<style scoped lang="scss">
-.pdf-viewer-layout {
-  display: grid;
-  gap: 24px;
-  width: 100%;
-  min-height: 0;
 
-  &--original,
-  &--translated,
-  &--translated-pdf {
-    grid-template-columns: 1fr;
-  }
-
-  &--bilingual {
-    grid-template-columns: 1fr 1fr;
-
-    @media (max-width: 768px) {
-      grid-template-columns: 1fr;
-    }
-  }
-}
-
-.pdf-viewer-layout__pane {
-  min-width: 0;
-  overflow-y: auto;
-  max-height: calc(100vh - 120px);
-}
-</style>
