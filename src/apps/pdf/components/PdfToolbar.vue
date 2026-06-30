@@ -82,16 +82,6 @@
 
     <div class="pdf-toolbar__actions">
       <button
-        v-if="fileName"
-        class="pdf-toolbar__button pdf-toolbar__button--targeting"
-        :class="{ 'pdf-toolbar__button--targeting-active': isBlockTargetingActive }"
-        type="button"
-        @click="$emit('toggle-block-targeting')"
-      >
-        {{ isBlockTargetingActive ? 'Cancel Selection' : 'Select Block' }}
-      </button>
-
-      <button
         v-if="scannedPageCount > 0 && !isOcrProcessing"
         class="pdf-toolbar__button pdf-toolbar__button--ocr"
         type="button"
@@ -136,29 +126,51 @@
 
       <div
         v-if="fileName && canExport"
-        class="pdf-toolbar__export-group"
+        ref="exportMenuRef"
+        class="pdf-toolbar__export-dropdown"
       >
         <button
-          class="pdf-toolbar__button pdf-toolbar__button--export"
+          ref="exportMenuTriggerRef"
+          class="pdf-toolbar__button pdf-toolbar__button--menu-trigger"
           type="button"
-          @click="$emit('export-txt')"
+          aria-label="Export options"
+          aria-haspopup="menu"
+          :aria-expanded="exportMenuOpen"
+          @click="toggleExportMenu"
         >
-          Export TXT
+          Export
         </button>
-        <button
-          class="pdf-toolbar__button pdf-toolbar__button--export"
-          type="button"
-          @click="$emit('export-markdown')"
+
+        <div
+          v-if="exportMenuOpen"
+          class="pdf-toolbar__export-menu"
+          role="menu"
         >
-          Export Markdown
-        </button>
-        <button
-          class="pdf-toolbar__button pdf-toolbar__button--export"
-          type="button"
-          @click="$emit('export-html')"
-        >
-          Export HTML
-        </button>
+          <button
+            class="pdf-toolbar__export-item"
+            type="button"
+            role="menuitem"
+            @click="handleExportAction('export-txt')"
+          >
+            Export TXT
+          </button>
+          <button
+            class="pdf-toolbar__export-item"
+            type="button"
+            role="menuitem"
+            @click="handleExportAction('export-markdown')"
+          >
+            Export Markdown
+          </button>
+          <button
+            class="pdf-toolbar__export-item"
+            type="button"
+            role="menuitem"
+            @click="handleExportAction('export-html')"
+          >
+            Export HTML
+          </button>
+        </div>
       </div>
 
       <button
@@ -182,7 +194,7 @@
 </template>
 
 <script setup>
-import { computed, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import './PdfToolbar.scss'
 
 const props = defineProps({
@@ -212,6 +224,9 @@ const props = defineProps({
 
 const emit = defineEmits(['file-selected', 'translate-visible', 'mode-change', 'cancel-translation', 'export-txt', 'export-markdown', 'export-html', 'toggle-block-targeting', 'request-ocr', 'clear-cache', 'zoom-step', 'zoom-change'])
 const fileInput = ref(null)
+const exportMenuRef = ref(null)
+const exportMenuTriggerRef = ref(null)
+const exportMenuOpen = ref(false)
 const zoomPercentOptions = [50, 75, 100, 125, 150, 200]
 
 const modeOptions = [
@@ -260,6 +275,44 @@ function openFilePicker() {
   fileInput.value?.click()
 }
 
+function toggleExportMenu() {
+  exportMenuOpen.value = !exportMenuOpen.value
+}
+
+function closeExportMenu() {
+  exportMenuOpen.value = false
+}
+
+function handleExportAction(eventName) {
+  emit(eventName)
+  closeExportMenu()
+}
+
+function handleDocumentPointerDown(event) {
+  if (!exportMenuOpen.value) return
+  if (exportMenuRef.value?.contains(event.target)) return
+  closeExportMenu()
+}
+
+function handleDocumentKeyDown(event) {
+  if (!exportMenuOpen.value) return
+  if (event.key === 'Escape') {
+    event.preventDefault()
+    closeExportMenu()
+    exportMenuTriggerRef.value?.focus?.()
+  }
+}
+
+onMounted(() => {
+  document.addEventListener('pointerdown', handleDocumentPointerDown, true)
+  document.addEventListener('keydown', handleDocumentKeyDown)
+})
+
+onBeforeUnmount(() => {
+  document.removeEventListener('pointerdown', handleDocumentPointerDown, true)
+  document.removeEventListener('keydown', handleDocumentKeyDown)
+})
+
 function handleZoomSelectChange(event) {
   const value = event.target.value
   if (value === 'fit-width') {
@@ -285,4 +338,3 @@ function handleFileInputChange(event) {
   event.target.value = ''
 }
 </script>
-

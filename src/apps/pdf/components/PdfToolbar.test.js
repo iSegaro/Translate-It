@@ -32,6 +32,7 @@ describe('PdfToolbar', () => {
     expect(wrapper.find('.pdf-toolbar__file-name').attributes('title')).toBe('very-long-document-name.pdf')
     expect(wrapper.find('.pdf-toolbar__page-indicator').text()).toBe('5 / 12')
     expect(wrapper.find('option[value="fit-page"]').exists()).toBe(true)
+    expect(wrapper.find('.pdf-toolbar__button--targeting').exists()).toBe(false)
 
     await wrapper.find('.pdf-toolbar__mode-button--active').trigger('click')
     expect(wrapper.emitted('mode-change')).toBeTruthy()
@@ -65,8 +66,19 @@ describe('PdfToolbar', () => {
     await wrapper.findAll('button').find((button) => button.text().includes('Translate Visible Pages'))?.trigger('click')
     expect(wrapper.emitted('translate-visible')).toBeTruthy()
 
+    await wrapper.find('.pdf-toolbar__button--menu-trigger').trigger('click')
+    expect(wrapper.find('.pdf-toolbar__export-menu').exists()).toBe(true)
+
     await wrapper.findAll('button').find((button) => button.text().includes('Export TXT'))?.trigger('click')
     expect(wrapper.emitted('export-txt')).toBeTruthy()
+
+    await wrapper.find('.pdf-toolbar__button--menu-trigger').trigger('click')
+    await wrapper.findAll('button').find((button) => button.text().includes('Export Markdown'))?.trigger('click')
+    expect(wrapper.emitted('export-markdown')).toBeTruthy()
+
+    await wrapper.find('.pdf-toolbar__button--menu-trigger').trigger('click')
+    await wrapper.findAll('button').find((button) => button.text().includes('Export HTML'))?.trigger('click')
+    expect(wrapper.emitted('export-html')).toBeTruthy()
 
     await wrapper.find('.pdf-toolbar__zoom-select').setValue('125')
     expect(wrapper.emitted('zoom-change')?.at(-1)?.[0]).toEqual({ mode: 'percent', value: 125 })

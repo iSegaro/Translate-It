@@ -172,25 +172,51 @@
   }
 }
 
-.pdf-toolbar__export-group {
-  display: flex;
-  gap: 8px;
-}
-
-.pdf-toolbar__button--export {
-  background: rgba(255, 255, 255, 0.08);
-  color: #e6edf7;
-  font-size: 13px;
-  padding: 8px 12px;
-
-  &:hover {
-    background: rgba(255, 255, 255, 0.14);
-  }
-}
-
 .pdf-toolbar__button--zoom {
   min-width: 34px;
   padding-inline: 10px;
+}
+
+.pdf-toolbar__export-dropdown {
+  position: relative;
+}
+
+.pdf-toolbar__export-menu {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  z-index: 40;
+  display: grid;
+  gap: 4px;
+  min-width: 190px;
+  padding: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 14px;
+  background: rgba(13, 16, 22, 0.98);
+  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.28);
+}
+
+.pdf-toolbar__export-item {
+  appearance: none;
+  border: 0;
+  border-radius: 10px;
+  padding: 10px 12px;
+  background: transparent;
+  color: #e6edf7;
+  font-size: 13px;
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+
+  &:hover,
+  &:focus-visible {
+    background: rgba(255, 255, 255, 0.08);
+  }
+}
+
+.pdf-toolbar__button--menu-trigger {
+  min-width: 88px;
 }
 
 .pdf-toolbar__button--targeting {
