@@ -1,12 +1,20 @@
 <template>
   <header class="pdf-toolbar">
     <div class="pdf-toolbar__title-block">
-      <span
-        class="pdf-toolbar__file-name"
-        :title="fileName || 'PDF Viewer'"
-      >
-        {{ fileName || 'PDF Viewer' }}
-      </span>
+      <div class="pdf-toolbar__file-row">
+        <img
+          class="pdf-toolbar__file-icon"
+          src="@/icons/ui/page.png"
+          alt=""
+          aria-hidden="true"
+        >
+        <span
+          class="pdf-toolbar__file-name"
+          :title="fileName || 'PDF Viewer'"
+        >
+          {{ fileName || 'PDF Viewer' }}
+        </span>
+      </div>
 
       <span
         v-if="translationSummary.totalCount > 0"
@@ -98,15 +106,6 @@
       </span>
 
       <button
-        class="pdf-toolbar__button"
-        type="button"
-        :disabled="isLoading"
-        @click="openFilePicker"
-      >
-        {{ isLoading ? 'Loading...' : 'Open PDF' }}
-      </button>
-
-      <button
         v-if="isTranslating"
         class="pdf-toolbar__button pdf-toolbar__button--cancel"
         type="button"
@@ -125,24 +124,78 @@
       </button>
 
       <div
+        ref="moreMenuRef"
+        class="pdf-toolbar__export-dropdown"
+      >
+        <button
+          ref="moreMenuTriggerRef"
+          class="pdf-toolbar__button pdf-toolbar__button--menu-trigger pdf-toolbar__button--icon-trigger"
+          type="button"
+          aria-label="More actions"
+          aria-haspopup="menu"
+          :aria-expanded="activeMenu === 'more'"
+          @click="toggleMenu('more')"
+        >
+          <span
+            class="pdf-toolbar__menu-trigger-icon"
+            aria-hidden="true"
+          >
+            <span />
+            <span />
+            <span />
+          </span>
+        </button>
+
+        <div
+          v-if="activeMenu === 'more'"
+          class="pdf-toolbar__export-menu"
+          role="menu"
+        >
+          <button
+            class="pdf-toolbar__export-item"
+            type="button"
+            role="menuitem"
+            :disabled="isLoading"
+            @click="handleOpenPdfAction"
+          >
+            {{ isLoading ? 'Loading...' : 'Open PDF' }}
+          </button>
+          <button
+            v-if="fileName"
+            class="pdf-toolbar__export-item"
+            type="button"
+            role="menuitem"
+            @click="handleClearCacheAction"
+          >
+            Clear Cache
+          </button>
+        </div>
+      </div>
+
+      <div
         v-if="fileName && canExport"
         ref="exportMenuRef"
         class="pdf-toolbar__export-dropdown"
       >
         <button
           ref="exportMenuTriggerRef"
-          class="pdf-toolbar__button pdf-toolbar__button--menu-trigger"
+          class="pdf-toolbar__button pdf-toolbar__button--menu-trigger pdf-toolbar__button--icon-trigger"
           type="button"
           aria-label="Export options"
           aria-haspopup="menu"
-          :aria-expanded="exportMenuOpen"
-          @click="toggleExportMenu"
+          :aria-expanded="activeMenu === 'export'"
+          @click="toggleMenu('export')"
         >
-          Export
+          <img
+            class="pdf-toolbar__button-icon"
+            src="@/icons/ui/download.svg"
+            alt=""
+            aria-hidden="true"
+          >
         </button>
 
         <div
-          v-if="exportMenuOpen"
+          v-if="activeMenu === 'export'"
           class="pdf-toolbar__export-menu"
           role="menu"
         >
@@ -172,15 +225,6 @@
           </button>
         </div>
       </div>
-
-      <button
-        v-if="fileName"
-        class="pdf-toolbar__button pdf-toolbar__button--clear"
-        type="button"
-        @click="$emit('clear-cache')"
-      >
-        Clear Cache
-      </button>
 
       <input
         ref="fileInput"
@@ -225,7 +269,9 @@ const emit = defineEmits(['file-selected', 'translate-visible', 'mode-change', '
 const fileInput = ref(null)
 const exportMenuRef = ref(null)
 const exportMenuTriggerRef = ref(null)
-const exportMenuOpen = ref(false)
+const moreMenuRef = ref(null)
+const moreMenuTriggerRef = ref(null)
+const activeMenu = ref(null)
 const zoomPercentOptions = [50, 75, 100, 125, 150, 200]
 
 const modeOptions = [
@@ -274,31 +320,70 @@ function openFilePicker() {
   fileInput.value?.click()
 }
 
-function toggleExportMenu() {
-  exportMenuOpen.value = !exportMenuOpen.value
+function toggleMenu(menuName) {
+  activeMenu.value = activeMenu.value === menuName ? null : menuName
 }
 
-function closeExportMenu() {
-  exportMenuOpen.value = false
+function closeMenus() {
+  activeMenu.value = null
 }
 
 function handleExportAction(eventName) {
   emit(eventName)
-  closeExportMenu()
+  closeMenus()
+}
+
+function handleOpenPdfAction() {
+  openFilePicker()
+  closeMenus()
+}
+
+function handleClearCacheAction() {
+  emit('clear-cache')
+  closeMenus()
+}
+
+function getActiveMenuRefs() {
+  if (activeMenu.value === 'export') {
+    return {
+      menuRef: exportMenuRef.value,
+      triggerRef: exportMenuTriggerRef.value
+    }
+  }
+
+  if (activeMenu.value === 'more') {
+    return {
+      menuRef: moreMenuRef.value,
+      triggerRef: moreMenuTriggerRef.value
+    }
+  }
+
+  return {
+    menuRef: null,
+    triggerRef: null
+  }
 }
 
 function handleDocumentPointerDown(event) {
-  if (!exportMenuOpen.value) return
-  if (exportMenuRef.value?.contains(event.target)) return
-  closeExportMenu()
+  if (!activeMenu.value) return
+
+  const { menuRef, triggerRef } = getActiveMenuRefs()
+  if (menuRef?.contains(event.target) || triggerRef?.contains(event.target)) return
+  closeMenus()
 }
 
 function handleDocumentKeyDown(event) {
-  if (!exportMenuOpen.value) return
+  if (!activeMenu.value) return
+
   if (event.key === 'Escape') {
     event.preventDefault()
-    closeExportMenu()
-    exportMenuTriggerRef.value?.focus?.()
+    const activeMenuName = activeMenu.value
+    closeMenus()
+    if (activeMenuName === 'export') {
+      exportMenuTriggerRef.value?.focus?.()
+    } else if (activeMenuName === 'more') {
+      moreMenuTriggerRef.value?.focus?.()
+    }
   }
 }
 

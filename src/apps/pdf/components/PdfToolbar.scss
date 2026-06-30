@@ -21,11 +21,28 @@
   flex-direction: column;
   gap: 4px;
   justify-self: start;
+  overflow: hidden;
+}
+
+.pdf-toolbar__file-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.pdf-toolbar__file-icon {
+  width: 18px;
+  height: 18px;
+  flex: 0 0 auto;
+  opacity: 0.82;
 }
 
 .pdf-toolbar__file-name {
   display: block;
-  max-width: min(36vw, 440px);
+  flex: 1 1 auto;
+  min-width: 0;
+  max-width: 100%;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -87,13 +104,14 @@
   appearance: none;
   border: 1px solid rgba(255, 255, 255, 0.12);
   border-radius: 999px;
-  padding: 8px 14px;
+  padding: 8px 12px 8px 14px;
   background: rgba(255, 255, 255, 0.08);
   color: #e6edf7;
   font-weight: 600;
   cursor: pointer;
-  min-width: 126px;
-  max-width: 180px;
+  width: max-content;
+  min-width: 0;
+  max-width: none;
   outline: none;
 
   &:focus-visible {
@@ -239,7 +257,43 @@
 }
 
 .pdf-toolbar__button--menu-trigger {
-  min-width: 88px;
+  min-width: 0;
+}
+
+.pdf-toolbar__button--icon-trigger {
+  display: inline-grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  padding: 0;
+}
+
+.pdf-toolbar__button-icon {
+  width: 18px;
+  height: 18px;
+  display: block;
+  object-fit: contain;
+}
+
+.pdf-toolbar__menu-trigger-icon {
+  display: inline-flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 3px;
+  width: 16px;
+  height: 16px;
+}
+
+.pdf-toolbar__menu-trigger-icon span {
+  display: block;
+  width: 100%;
+  height: 2px;
+  border-radius: 999px;
+  background: currentColor;
+}
+
+.pdf-toolbar__button--icon-trigger:focus-visible {
+  box-shadow: 0 0 0 2px rgba(106, 165, 255, 0.95);
 }
 
 .pdf-toolbar__button--ocr {
@@ -282,8 +336,16 @@
     gap: 2px;
   }
 
+  .pdf-toolbar__file-row {
+    gap: 6px;
+  }
+
+  .pdf-toolbar__file-icon {
+    width: 16px;
+    height: 16px;
+  }
+
   .pdf-toolbar__file-name {
-    max-width: min(30vw, 320px);
     font-size: 13px;
   }
 
@@ -332,8 +394,7 @@
   }
 
   .pdf-toolbar__zoom-select {
-    padding: 7px 12px;
-    min-width: 120px;
+    padding: 7px 11px 7px 13px;
   }
 
   .pdf-toolbar__actions {
@@ -347,6 +408,11 @@
   }
 
   .pdf-toolbar__button--menu-trigger {
-    min-width: 78px;
+    min-width: 0;
+  }
+
+  .pdf-toolbar__button--icon-trigger {
+    width: 36px;
+    height: 36px;
   }
 }

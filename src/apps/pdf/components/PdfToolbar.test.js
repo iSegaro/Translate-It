@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { mount } from '@vue/test-utils'
 import PdfToolbar from './PdfToolbar.vue'
 
@@ -27,16 +27,21 @@ describe('PdfToolbar', () => {
       }
     })
 
+    expect(wrapper.find('.pdf-toolbar__file-row').exists()).toBe(true)
+    expect(wrapper.find('.pdf-toolbar__file-icon').exists()).toBe(true)
     expect(wrapper.find('.pdf-toolbar__file-name').text()).toBe('very-long-document-name.pdf')
     expect(wrapper.find('.pdf-toolbar__file-name').attributes('title')).toBe('very-long-document-name.pdf')
     expect(wrapper.find('.pdf-toolbar__page-indicator').text()).toBe('5 / 12')
     expect(wrapper.find('option[value="fit-page"]').exists()).toBe(true)
+    expect(wrapper.find('.pdf-toolbar__zoom-select').exists()).toBe(true)
+    expect(wrapper.find('.pdf-toolbar__button[aria-label="More actions"]').exists()).toBe(true)
+    expect(wrapper.find('.pdf-toolbar__button[aria-label="Export options"]').exists()).toBe(true)
 
     await wrapper.find('.pdf-toolbar__mode-button--active').trigger('click')
     expect(wrapper.emitted('mode-change')).toBeTruthy()
   })
 
-  it('emits export and translate actions', async () => {
+  it('keeps Open PDF and Clear Cache in the hamburger menu and export in the export menu', async () => {
     const wrapper = mount(PdfToolbar, {
       props: {
         fileName: 'demo.pdf',
@@ -60,20 +65,40 @@ describe('PdfToolbar', () => {
       }
     })
 
-    await wrapper.findAll('button').find((button) => button.text().includes('Translate Visible Pages'))?.trigger('click')
+    const toolbarButtons = () => wrapper.findAll('.pdf-toolbar__actions button')
+
+    expect(toolbarButtons().some((button) => button.text().includes('Open PDF'))).toBe(false)
+    expect(toolbarButtons().some((button) => button.text().includes('Clear Cache'))).toBe(false)
+
+    await toolbarButtons().find((button) => button.text().includes('Translate Visible Pages'))?.trigger('click')
     expect(wrapper.emitted('translate-visible')).toBeTruthy()
 
-    await wrapper.find('.pdf-toolbar__button--menu-trigger').trigger('click')
+    await wrapper.find('.pdf-toolbar__button[aria-label="More actions"]').trigger('click')
+    expect(wrapper.find('.pdf-toolbar__export-menu').exists()).toBe(true)
+    expect(wrapper.find('.pdf-toolbar__export-menu').text()).toContain('Open PDF')
+    expect(wrapper.find('.pdf-toolbar__export-menu').text()).toContain('Clear Cache')
+
+    const fileInput = wrapper.find('input[type="file"]')
+    const clickSpy = vi.spyOn(fileInput.element, 'click').mockImplementation(() => {})
+
+    await wrapper.find('.pdf-toolbar__export-menu button').trigger('click')
+    expect(clickSpy).toHaveBeenCalled()
+
+    await wrapper.find('.pdf-toolbar__button[aria-label="More actions"]').trigger('click')
+    await wrapper.find('.pdf-toolbar__export-menu button:nth-child(2)').trigger('click')
+    expect(wrapper.emitted('clear-cache')).toBeTruthy()
+
+    await wrapper.find('.pdf-toolbar__button[aria-label="Export options"]').trigger('click')
     expect(wrapper.find('.pdf-toolbar__export-menu').exists()).toBe(true)
 
     await wrapper.findAll('button').find((button) => button.text().includes('Export TXT'))?.trigger('click')
     expect(wrapper.emitted('export-txt')).toBeTruthy()
 
-    await wrapper.find('.pdf-toolbar__button--menu-trigger').trigger('click')
+    await wrapper.find('.pdf-toolbar__button[aria-label="Export options"]').trigger('click')
     await wrapper.findAll('button').find((button) => button.text().includes('Export Markdown'))?.trigger('click')
     expect(wrapper.emitted('export-markdown')).toBeTruthy()
 
-    await wrapper.find('.pdf-toolbar__button--menu-trigger').trigger('click')
+    await wrapper.find('.pdf-toolbar__button[aria-label="Export options"]').trigger('click')
     await wrapper.findAll('button').find((button) => button.text().includes('Export HTML'))?.trigger('click')
     expect(wrapper.emitted('export-html')).toBeTruthy()
 
@@ -87,7 +112,7 @@ describe('PdfToolbar', () => {
     expect(wrapper.emitted('zoom-step')?.at(-1)?.[0]).toBe(1)
   })
 
-  it('keeps the current labels while loading', () => {
+  it('keeps the current labels while loading', async () => {
     const wrapper = mount(PdfToolbar, {
       props: {
         fileName: 'demo.pdf',
@@ -104,6 +129,8 @@ describe('PdfToolbar', () => {
     })
 
     expect(wrapper.text()).toContain('demo.pdf')
-    expect(wrapper.text()).toContain('Loading...')
+
+    await wrapper.find('.pdf-toolbar__button[aria-label="More actions"]').trigger('click')
+    expect(wrapper.find('.pdf-toolbar__export-menu').text()).toContain('Loading...')
   })
 })
