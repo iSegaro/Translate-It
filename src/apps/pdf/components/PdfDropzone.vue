@@ -1,7 +1,10 @@
 <template>
   <section
     class="pdf-dropzone"
-    :class="{ 'is-drag-over': isDragOver }"
+    :class="{
+      'is-drag-over': isDragOver,
+      'pdf-dropzone--document': hasDocument
+    }"
     @dragenter.prevent="handleDragEnter"
     @dragover.prevent="handleDragOver"
     @dragleave.prevent="handleDragLeave"
@@ -57,6 +60,15 @@ function handleDrop(event) {
   background: rgba(12, 15, 22, 0.7);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
   overflow: hidden;
+}
+
+.pdf-dropzone--document {
+  min-height: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  overflow: visible;
 }
 
 .pdf-dropzone.is-drag-over {

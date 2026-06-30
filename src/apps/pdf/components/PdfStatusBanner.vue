@@ -74,27 +74,28 @@ const bannerClasses = computed(() => ({
 
 <style scoped lang="scss">
 .pdf-status-banner {
-  display: grid;
-  grid-template-columns: auto 1fr;
-  gap: 14px;
-  align-items: start;
-  padding: 14px 16px;
-  border-radius: 14px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px;
+  border-radius: 12px;
   border: 1px solid rgba(255, 255, 255, 0.08);
   background: rgba(255, 255, 255, 0.04);
   color: #e6edf7;
-  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.18);
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.16);
   margin-bottom: 0;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .pdf-status-banner__icon {
   display: grid;
   place-items: center;
-  width: 28px;
-  height: 28px;
+  width: 24px;
+  height: 24px;
   border-radius: 999px;
   font-weight: 800;
-  font-size: 15px;
+  font-size: 13px;
   line-height: 1;
   color: #0b0e13;
   background: rgba(230, 237, 247, 0.88);
@@ -102,6 +103,9 @@ const bannerClasses = computed(() => ({
 
 .pdf-status-banner__content {
   min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
 }
 
 .pdf-status-banner__title,
@@ -111,20 +115,20 @@ const bannerClasses = computed(() => ({
 }
 
 .pdf-status-banner__title {
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 800;
   letter-spacing: 0.01em;
 }
 
 .pdf-status-banner__message {
-  margin-top: 4px;
-  font-size: 13px;
+  margin-top: 0;
+  font-size: 12px;
   color: rgba(230, 237, 247, 0.84);
 }
 
 .pdf-status-banner__detail {
-  margin-top: 6px;
-  font-size: 12px;
+  margin-top: 0;
+  font-size: 11px;
   color: rgba(230, 237, 247, 0.66);
 }
 

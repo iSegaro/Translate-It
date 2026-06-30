@@ -2,8 +2,6 @@
   <div class="pdf-app">
     <PdfToolbar
       :file-name="fileName"
-      :page-count="pageCount"
-      :worker-label="workerLabel"
       :is-loading="isLoading"
       :is-translating="isTranslating"
       :can-translate-visible-pages="canTranslateVisiblePages"
@@ -12,7 +10,6 @@
       :is-block-targeting-active="isBlockTargetingActive"
       :scanned-page-count="scannedPageCount"
       :is-ocr-processing="isOcrProcessing"
-      :restored-translation-count="restoredTranslationCount"
       :viewer-mode="viewerMode"
       :translation-summary="translationSummary"
       @file-selected="handleFileSelected"
@@ -139,14 +136,12 @@ const {
   isLoading,
   isTranslating,
   canTranslateVisiblePages,
-  pageCount,
   pageMetrics,
   translationSummary,
   translatedPageData,
   translationTick,
   restoredTranslationCount,
   pdfFingerprint,
-  workerLabel,
   session,
   loadPdfFile,
   recomputeLayout,
@@ -319,6 +314,7 @@ onBeforeUnmount(() => {
   min-height: 100vh;
   display: flex;
   flex-direction: column;
+  --pdf-toolbar-sticky-height: 52px;
   background:
     radial-gradient(circle at top left, rgba(90, 92, 255, 0.18), transparent 35%),
     linear-gradient(180deg, #10131a 0%, #0b0e13 100%);
@@ -328,12 +324,20 @@ onBeforeUnmount(() => {
 
 .pdf-app__content {
   flex: 1;
-  padding: 20px 28px 28px;
+  padding: 16px 28px 28px;
   min-height: 0;
 }
 
 .pdf-app__status-row {
-  padding: 20px 28px 0;
+  position: sticky;
+  top: var(--pdf-toolbar-sticky-height);
+  z-index: 25;
+  padding: 10px 28px 0;
+  pointer-events: none;
+}
+
+.pdf-app__status-row :deep(.pdf-status-banner) {
+  pointer-events: none;
 }
 
 .pdf-app__empty {
@@ -355,9 +359,13 @@ onBeforeUnmount(() => {
   color: rgba(230, 237, 247, 0.7);
 }
 
-@media (max-width: 960px) {
+@media (max-width: 1100px) {
+  .pdf-app {
+    --pdf-toolbar-sticky-height: 96px;
+  }
+
   .pdf-app__status-row {
-    padding: 16px 16px 0;
+    padding: 8px 16px 0;
   }
 
   .pdf-app__content {
