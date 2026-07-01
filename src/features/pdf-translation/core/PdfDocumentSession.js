@@ -54,6 +54,7 @@ export class PdfDocumentSession extends ResourceTracker {
     this._pageIndexCache = new Map()
     this._outline = null
     this._linkAnnotationCache = new Map()
+    this._pendingHydrations = null
   }
 
   get workerUrl() {
@@ -200,23 +201,53 @@ export class PdfDocumentSession extends ResourceTracker {
     const metric = this.pageMetrics[pageNumber - 1]
     if (!metric) return null
 
+    // 1. Fast path: already hydrated and stored
     const existingSession = this.pageSessions.get(pageNumber)
-    const pageSession = existingSession || new PdfPageSession({
-      documentIdentity: this.documentIdentity,
-      pageNumber
-    })
-
-    pageSession.updateDocumentIdentity(this.documentIdentity)
-
-    if (pageSession.loaded && pageSession.getLogicalBlocks().length > 0) {
-      this.pageSessions.set(pageNumber, pageSession)
-      return pageSession
+    if (existingSession) {
+      existingSession.updateDocumentIdentity(this.documentIdentity)
+      if (existingSession.loaded && existingSession.getLogicalBlocks().length > 0) {
+        return existingSession
+      }
     }
 
-    const page = await this.pdfDocument.getPage(pageNumber)
-    await pageSession.hydrate(page, metric)
-    this.pageSessions.set(pageNumber, pageSession)
-    return pageSession
+    // 2. In-flight dedup: another call is already hydrating this page
+    if (this._pendingHydrations?.has(pageNumber)) {
+      return this._pendingHydrations.get(pageNumber)
+    }
+
+    // 3. Start new hydration and cache its promise
+    if (!this._pendingHydrations) {
+      this._pendingHydrations = new Map()
+    }
+
+    const promise = this._hydratePageSession(pageNumber, metric)
+    this._pendingHydrations.set(pageNumber, promise)
+
+    return promise
+  }
+
+  async _hydratePageSession(pageNumber, metric) {
+    try {
+      const existingSession = this.pageSessions.get(pageNumber)
+      const pageSession = existingSession || new PdfPageSession({
+        documentIdentity: this.documentIdentity,
+        pageNumber
+      })
+      pageSession.updateDocumentIdentity(this.documentIdentity)
+
+      // Re-check: a previous call may have completed while this one waited
+      if (pageSession.loaded && pageSession.getLogicalBlocks().length > 0) {
+        this.pageSessions.set(pageNumber, pageSession)
+        return pageSession
+      }
+
+      const page = await this.pdfDocument.getPage(pageNumber)
+      await pageSession.hydrate(page, metric)
+      this.pageSessions.set(pageNumber, pageSession)
+      return pageSession
+    } finally {
+      this._pendingHydrations?.delete(pageNumber)
+    }
   }
 
   async getVisiblePageSessions() {
@@ -225,16 +256,27 @@ export class PdfDocumentSession extends ResourceTracker {
     }
 
     const pageNumbers = [...this.visiblePageNumbers].sort((a, b) => a - b)
-    const sessions = []
+    const sessionMap = new Map()
 
-    for (const pageNumber of pageNumbers) {
-      const pageSession = await this._getPageSession(pageNumber)
-      if (pageSession) {
-        sessions.push(pageSession)
+    const results = await Promise.allSettled(
+      pageNumbers.map(async (pageNumber) => {
+        const session = await this._getPageSession(pageNumber)
+        if (session) {
+          sessionMap.set(pageNumber, session)
+        }
+      })
+    )
+
+    for (let i = 0; i < results.length; i++) {
+      if (results[i].status === 'rejected') {
+        logger.warn('Failed to hydrate page session:', {
+          pageNumber: pageNumbers[i],
+          reason: results[i].reason
+        })
       }
     }
 
-    return sessions
+    return pageNumbers.map((pageNumber) => sessionMap.get(pageNumber)).filter(Boolean)
   }
 
   async getVisibleLogicalBlocks() {
@@ -735,6 +777,7 @@ export class PdfDocumentSession extends ResourceTracker {
     this._pageIndexCache.clear()
     this._outline = null
     this._linkAnnotationCache.clear()
+    this._pendingHydrations = null
     this.pdfFingerprint = ''
     this.documentIdentity = ''
     this.displayName = ''
