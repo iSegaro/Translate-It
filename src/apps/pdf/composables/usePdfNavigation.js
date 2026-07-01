@@ -37,16 +37,17 @@ export function usePdfNavigation(viewerRef) {
 
   // ── Ancestor Path ────────────────────────────────────────
 
-  function computeExpandedDests(activeDest) {
+  function computeExpandedDests(activeDest, activeIndex = -1) {
     if (!activeDest || _flatNodes.length === 0) {
       return new Set()
     }
 
-    let activeIndex = -1
-    for (let i = _flatNodes.length - 1; i >= 0; i--) {
-      if (_flatNodes[i].node.dest === activeDest) {
-        activeIndex = i
-        break
+    if (activeIndex < 0) {
+      for (let i = _flatNodes.length - 1; i >= 0; i--) {
+        if (_flatNodes[i].node.dest === activeDest) {
+          activeIndex = i
+          break
+        }
       }
     }
 
@@ -117,36 +118,60 @@ export function usePdfNavigation(viewerRef) {
       return
     }
 
-    const seen = new Set()
     const unresolvedDests = []
-    for (const entry of _flatNodes) {
+    const seen = new Set()
+    const evaluatedKeys = new Set()
+    let best = null
+    let bestIndex = -1
+    let bestPage = 0
+
+    for (let i = 0; i < _flatNodes.length; i++) {
+      const entry = _flatNodes[i]
       if (!entry.node.dest) continue
+
       const key = destKey(entry.node.dest)
-      if (!_pageCache.has(key) && !seen.has(key)) {
-        seen.add(key)
-        unresolvedDests.push(entry.node.dest)
+      const resolved = _pageCache.get(key)
+
+      if (resolved === undefined) {
+        if (!seen.has(key)) {
+          seen.add(key)
+          unresolvedDests.push(entry.node.dest)
+        }
+        continue
+      }
+
+      evaluatedKeys.add(key)
+      if (resolved != null && resolved <= page && resolved >= bestPage) {
+        best = entry.node.dest
+        bestIndex = i
+        bestPage = resolved
       }
     }
 
     if (unresolvedDests.length > 0) {
       await Promise.all(unresolvedDests.map((d) => resolvePageNumber(d)))
-    }
 
-    if (generation !== _activeGeneration) return
+      if (generation !== _activeGeneration) return
 
-    let best = null
-    for (const entry of _flatNodes) {
-      if (!entry.node.dest) continue
-      const key = destKey(entry.node.dest)
-      const resolved = _pageCache.get(key)
-      if (resolved !== undefined && resolved <= page) {
-        best = entry.node.dest
+      for (let i = 0; i < _flatNodes.length; i++) {
+        const entry = _flatNodes[i]
+        if (!entry.node.dest) continue
+
+        const key = destKey(entry.node.dest)
+        if (evaluatedKeys.has(key)) continue
+
+        const resolved = _pageCache.get(key)
+        if (resolved != null && resolved <= page && resolved >= bestPage) {
+          best = entry.node.dest
+          bestIndex = i
+          bestPage = resolved
+        }
       }
     }
 
     activeOutlineDest.value = best
 
-    const nextExpanded = computeExpandedDests(best)
+    const nextExpanded = computeExpandedDests(best, bestIndex)
     if (!setsEqual(expandedDests.value, nextExpanded)) {
       expandedDests.value = nextExpanded
     }
