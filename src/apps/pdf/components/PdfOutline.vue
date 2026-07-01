@@ -20,6 +20,7 @@
         :key="nodeKey(node)"
         :node="node"
         :active-dest="activeDest"
+        :expanded-dests="expandedDests"
         @navigate="handleNavigate"
       />
     </ul>
@@ -41,6 +42,10 @@ defineProps({
   },
   activeDest: {
     type: [String, Array, null],
+    default: null
+  },
+  expandedDests: {
+    type: Object,
     default: null
   }
 })

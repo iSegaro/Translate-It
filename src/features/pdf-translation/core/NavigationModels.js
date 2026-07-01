@@ -204,3 +204,21 @@ export function createLinkAnnotation(rawAnnotation) {
     newWindow: rawAnnotation.newWindow || false
   })
 }
+
+// ===== Destination Key Utility ================================
+
+/**
+ * Generate a stable string key for a navigation destination.
+ *
+ * PDF destinations may be strings (named destinations) or arrays
+ * (explicit [page, ...] destinations). This function normalizes
+ * either form into a unique string suitable for use as a Map key
+ * or Set member.
+ *
+ * @param {string|Array|null} dest - The navigation destination
+ * @returns {string} A stable string key
+ */
+export function destKey(dest) {
+  if (!dest) return ''
+  return typeof dest === 'string' ? dest : JSON.stringify(dest)
+}

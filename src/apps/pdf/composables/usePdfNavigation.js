@@ -1,7 +1,7 @@
 import { ref, computed, nextTick, watch } from 'vue'
 import { getScopedLogger } from '@/shared/logging/logger.js'
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js'
-import { NavigationTargetType } from '@/features/pdf-translation/core/NavigationModels.js'
+import { NavigationTargetType, destKey } from '@/features/pdf-translation/core/NavigationModels.js'
 
 const logger = getScopedLogger(LOG_COMPONENTS.PDF, 'usePdfNavigation')
 
@@ -10,6 +10,7 @@ export function usePdfNavigation(viewerRef) {
   const isNavigating = ref(false)
   const outline = ref(null)
   const activeOutlineDest = ref(null)
+  const expandedDests = ref(new Set())
 
   const hasOutline = computed(() => Array.isArray(outline.value) && outline.value.length > 0)
 
@@ -34,11 +35,53 @@ export function usePdfNavigation(viewerRef) {
     _flatNodes = outline.value ? flattenNodes(outline.value) : []
   }
 
-  // ── Lazy Resolution ──────────────────────────────────────
+  // ── Ancestor Path ────────────────────────────────────────
 
-  function destKey(dest) {
-    return typeof dest === 'string' ? dest : JSON.stringify(dest)
+  function computeExpandedDests(activeDest) {
+    if (!activeDest || _flatNodes.length === 0) {
+      return new Set()
+    }
+
+    let activeIndex = -1
+    for (let i = _flatNodes.length - 1; i >= 0; i--) {
+      if (_flatNodes[i].node.dest === activeDest) {
+        activeIndex = i
+        break
+      }
+    }
+
+    if (activeIndex < 0) {
+      return new Set()
+    }
+
+    const expanded = new Set()
+    expanded.add(destKey(activeDest))
+
+    let currentDepth = _flatNodes[activeIndex].depth
+
+    for (let i = activeIndex - 1; i >= 0 && currentDepth > 0; i--) {
+      const entry = _flatNodes[i]
+      if (entry.depth === currentDepth - 1) {
+        if (entry.node.dest) {
+          expanded.add(destKey(entry.node.dest))
+        }
+        currentDepth = entry.depth
+      }
+    }
+
+    return expanded
   }
+
+  function setsEqual(a, b) {
+    if (a === b) return true
+    if (a.size !== b.size) return false
+    for (const val of a) {
+      if (!b.has(val)) return false
+    }
+    return true
+  }
+
+  // ── Lazy Resolution ──────────────────────────────────────
 
   async function resolvePageNumber(dest) {
     if (!dest || !_session) return null
@@ -102,6 +145,11 @@ export function usePdfNavigation(viewerRef) {
     }
 
     activeOutlineDest.value = best
+
+    const nextExpanded = computeExpandedDests(best)
+    if (!setsEqual(expandedDests.value, nextExpanded)) {
+      expandedDests.value = nextExpanded
+    }
   }
 
   watch(currentPage, () => {
@@ -169,6 +217,7 @@ export function usePdfNavigation(viewerRef) {
     _pageCache.clear()
     _flatNodes = []
     activeOutlineDest.value = null
+    expandedDests.value = new Set()
 
     try {
       const loadedOutline = await documentSession.loadOutline()
@@ -196,6 +245,7 @@ export function usePdfNavigation(viewerRef) {
     isNavigating.value = false
     outline.value = null
     activeOutlineDest.value = null
+    expandedDests.value = new Set()
     _flatNodes = []
     _pageCache.clear()
   }
@@ -206,6 +256,7 @@ export function usePdfNavigation(viewerRef) {
     outline,
     hasOutline,
     activeOutlineDest,
+    expandedDests,
     navigateToPage,
     navigateToDestination,
     attachDocument,

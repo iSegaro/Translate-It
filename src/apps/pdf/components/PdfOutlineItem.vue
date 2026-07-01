@@ -32,6 +32,7 @@
         :key="nodeKey(child)"
         :node="child"
         :active-dest="activeDest"
+        :expanded-dests="expandedDests"
         @navigate="$emit('navigate', $event)"
       />
     </ul>
@@ -39,7 +40,8 @@
 </template>
 
 <script setup>
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
+import { destKey } from '@/features/pdf-translation/core/NavigationModels.js'
 
 const props = defineProps({
   node: {
@@ -49,15 +51,29 @@ const props = defineProps({
   activeDest: {
     type: [String, Array, null],
     default: null
+  },
+  expandedDests: {
+    type: Object,
+    default: null
   }
 })
 
 const emit = defineEmits(['navigate'])
 
-const isExpanded = ref(false)
+const userState = ref(null)
 
 const hasChildren = computed(() => {
   return Array.isArray(props.node.items) && props.node.items.length > 0
+})
+
+const isExpanded = computed(() => {
+  if (userState.value !== null) return userState.value
+  if (!props.expandedDests || !props.node.dest) return false
+  return props.expandedDests.has(destKey(props.node.dest))
+})
+
+watch(() => props.activeDest, () => {
+  userState.value = null
 })
 
 const isActive = computed(() => {
@@ -81,7 +97,7 @@ function nodeKey(node) {
 }
 
 function toggle() {
-  isExpanded.value = !isExpanded.value
+  userState.value = !isExpanded.value
 }
 
 function handleClick() {

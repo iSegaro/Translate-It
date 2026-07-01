@@ -70,6 +70,7 @@
           :outline="pdfOutline"
           :visible="isOutlineVisible && hasOutline"
           :active-dest="activeOutlineDest"
+          :expanded-dests="expandedDests"
           @close="isOutlineVisible = false"
           @navigate="handleOutlineNavigate"
         />
@@ -208,6 +209,7 @@ const {
   outline: pdfOutline,
   hasOutline,
   activeOutlineDest,
+  expandedDests,
   navigateToPage,
   navigateToDestination,
   attachDocument,
