@@ -200,7 +200,7 @@ const {
 } = usePdfExport(translationTick)
 
 const pdfViewerRef = ref(null)
-/* eslint-disable no-unused-vars -- currentPage, isNavigating, attachDocument exposed for future phases */
+/* eslint-disable no-unused-vars -- currentPage, attachDocument exposed for future phases */
 const {
   currentPage,
   isNavigating,
@@ -305,6 +305,7 @@ function handleLayoutChange(layout = null) {
 }
 
 function handleCurrentPageChange(pageNumber) {
+  if (isNavigating.value) return
   if (!Number.isFinite(Number(pageNumber))) return
   currentPageNumber.value = Number(pageNumber) || 0
 }
