@@ -438,7 +438,7 @@ export class PdfDocumentSession extends ResourceTracker {
       return null
     }
 
-    const cacheKey = String(pageRef)
+    const cacheKey = `${pageRef.num}:${pageRef.gen}`
     if (this._pageIndexCache.has(cacheKey)) {
       return this._pageIndexCache.get(cacheKey)
     }
@@ -465,7 +465,7 @@ export class PdfDocumentSession extends ResourceTracker {
    * Extract top, left, and zoom parameters from a destination array.
    *
    * Handles all PDF destination zoom types:
-   *   - XYZ:  [ref, 'XYZ', top, left, zoom]
+   *   - XYZ:  [ref, 'XYZ', left, top, zoom]
    *   - FitH: [ref, 'FitH', top]
    *   - FitV: [ref, 'FitV', left]
    *   - Fit:  [ref, 'Fit']  (no params)
@@ -477,31 +477,36 @@ export class PdfDocumentSession extends ResourceTracker {
    * @private
    */
   _extractDestinationParams(destArray) {
-    const zoomType = typeof destArray[1] === 'string' ? destArray[1] : ''
-    const rawTop = Number(destArray[2])
-    const rawLeft = Number(destArray[3])
-    const rawZoom = Number(destArray[4])
+    const zoomType = destArray[1]?.name ?? (typeof destArray[1] === 'string' ? destArray[1] : '')
 
     let top = null
     let left = null
     let zoom = null
 
     switch (zoomType) {
-      case 'XYZ':
-        top = Number.isFinite(rawTop) ? rawTop : null
+      case 'XYZ': {
+        const rawLeft = Number(destArray[2])
+        const rawTop = Number(destArray[3])
+        const rawZoom = Number(destArray[4])
         left = Number.isFinite(rawLeft) ? rawLeft : null
+        top = Number.isFinite(rawTop) ? rawTop : null
         zoom = Number.isFinite(rawZoom) ? rawZoom : null
         break
+      }
 
       case 'FitH':
-      case 'FitBH':
+      case 'FitBH': {
+        const rawTop = Number(destArray[2])
         top = Number.isFinite(rawTop) ? rawTop : null
         break
+      }
 
       case 'FitV':
-      case 'FitBV':
+      case 'FitBV': {
+        const rawLeft = Number(destArray[2])
         left = Number.isFinite(rawLeft) ? rawLeft : null
         break
+      }
 
       case 'Fit':
       case 'FitR':
