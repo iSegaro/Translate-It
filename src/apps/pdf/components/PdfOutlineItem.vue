@@ -78,7 +78,7 @@ watch(() => props.activeDest, () => {
 
 const isActive = computed(() => {
   if (!props.activeDest || !props.node.dest) return false
-  return props.activeDest === props.node.dest
+  return destKey(props.activeDest) === destKey(props.node.dest)
 })
 
 const labelStyle = computed(() => {
