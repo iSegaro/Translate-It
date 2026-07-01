@@ -19,6 +19,7 @@
         v-for="node in outline"
         :key="nodeKey(node)"
         :node="node"
+        :active-dest="activeDest"
         @navigate="handleNavigate"
       />
     </ul>
@@ -37,6 +38,10 @@ defineProps({
   visible: {
     type: Boolean,
     default: false
+  },
+  activeDest: {
+    type: [String, Array, null],
+    default: null
   }
 })
 

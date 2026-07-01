@@ -2,6 +2,7 @@
   <li class="pdf-outline-item">
     <div
       class="pdf-outline-item__row"
+      :class="{ 'pdf-outline-item__row--active': isActive }"
       @click="handleClick"
     >
       <button
@@ -30,6 +31,7 @@
         v-for="child in node.items"
         :key="nodeKey(child)"
         :node="child"
+        :active-dest="activeDest"
         @navigate="$emit('navigate', $event)"
       />
     </ul>
@@ -43,6 +45,10 @@ const props = defineProps({
   node: {
     type: Object,
     required: true
+  },
+  activeDest: {
+    type: [String, Array, null],
+    default: null
   }
 })
 
@@ -52,6 +58,11 @@ const isExpanded = ref(false)
 
 const hasChildren = computed(() => {
   return Array.isArray(props.node.items) && props.node.items.length > 0
+})
+
+const isActive = computed(() => {
+  if (!props.activeDest || !props.node.dest) return false
+  return props.activeDest === props.node.dest
 })
 
 const labelStyle = computed(() => {

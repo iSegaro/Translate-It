@@ -69,6 +69,7 @@
         <PdfOutline
           :outline="pdfOutline"
           :visible="isOutlineVisible && hasOutline"
+          :active-dest="activeOutlineDest"
           @close="isOutlineVisible = false"
           @navigate="handleOutlineNavigate"
         />
@@ -206,6 +207,7 @@ const {
   isNavigating,
   outline: pdfOutline,
   hasOutline,
+  activeOutlineDest,
   navigateToPage,
   navigateToDestination,
   attachDocument,

@@ -97,6 +97,11 @@
   &:hover {
     background: rgba(230, 237, 247, 0.06);
   }
+
+  &--active {
+    background: rgba(90, 92, 255, 0.15);
+    color: #a5aaff;
+  }
 }
 
 .pdf-outline-item__toggle {
