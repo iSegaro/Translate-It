@@ -321,6 +321,44 @@ function collectCanvasDataUrls() {
   return dataUrls
 }
 
-defineExpose({ collectCanvasDataUrls })
+function getScrollContainer() {
+  return viewerRoot.value?.parentElement || null
+}
+
+function getPageElement(pageNumber) {
+  const instance = pageViews.get(pageNumber)
+  return getPdfPageRootElement(instance) || null
+}
+
+function scrollToPage(pageNumber, options = {}) {
+  const num = Number(pageNumber)
+  if (!Number.isInteger(num) || num < 1) return
+
+  const pageEl = getPageElement(num)
+  if (!pageEl) return
+
+  const container = getScrollContainer()
+  if (!container) return
+
+  const containerRect = container.getBoundingClientRect()
+  const pageRect = pageEl.getBoundingClientRect()
+
+  const offsetInContainer = pageRect.top - containerRect.top + container.scrollTop
+  const targetTop = offsetInContainer + (Number(options.top) || 0)
+
+  const scrollBehavior = options.behavior === 'instant' ? 'auto' : 'smooth'
+
+  container.scrollTo({
+    top: targetTop,
+    behavior: scrollBehavior
+  })
+}
+
+defineExpose({
+  collectCanvasDataUrls,
+  scrollToPage,
+  getScrollContainer,
+  getPageElement
+})
 </script>
 
