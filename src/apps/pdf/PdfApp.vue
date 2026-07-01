@@ -3,7 +3,7 @@
     <PdfToolbar
       :file-name="fileName"
       :page-count="pageCount"
-      :current-page-number="currentPageNumber"
+      :current-page-number="currentPage"
       :is-loading="isLoading"
       :is-translating="isTranslating"
       :can-translate-visible-pages="canTranslateVisiblePages"
@@ -94,6 +94,7 @@
 
           <template #document>
             <PdfViewerLayout
+              ref="pdfViewerLayoutRef"
               :viewer-mode="viewerMode"
               :show-original-pane="showOriginalPane"
               :show-translated-pane="showTranslatedPane"
@@ -111,6 +112,7 @@
                   :show-overlay="showOverlayLayer"
                   :overlay-page-data="translatedPageData"
                   :navigate-to-destination="navigateToDestination"
+                  :scroll-container="originalScrollContainer"
                   @layout-change="handleLayoutChange"
                   @current-page-change="handleCurrentPageChange"
                   @block-pointer-move="handleBlockPointerMove"
@@ -127,6 +129,7 @@
                   :highlighted-block-id="highlightedBlockId"
                   :page-metrics="pageMetrics"
                   :viewer-mode="viewerMode"
+                  :scroll-container="originalScrollContainer"
                   @current-page-change="handleTranslatedPaneCurrentPageChange"
                 />
               </template>
@@ -202,7 +205,8 @@ const {
 } = usePdfExport(translationTick)
 
 const pdfViewerRef = ref(null)
-/* eslint-disable no-unused-vars -- currentPage, attachDocument exposed for future phases */
+const pdfViewerLayoutRef = ref(null)
+const originalScrollContainer = computed(() => pdfViewerLayoutRef.value?.scrollContainer ?? null)
 const {
   currentPage,
   isNavigating,
@@ -215,12 +219,10 @@ const {
   attachDocument,
   detachDocument
 } = usePdfNavigation(pdfViewerRef)
-/* eslint-enable no-unused-vars */
 const exportSuccess = ref(null)
 const exportSuccessTimer = ref(null)
 const EXPORT_SUCCESS_DURATION_MS = 2200
 const DEFAULT_VIEWER_WIDTH = 960
-const currentPageNumber = ref(0)
 const zoomMode = ref('fit-width')
 const zoomPercent = ref(100)
 const viewerLayout = ref({
@@ -286,7 +288,6 @@ async function handleFileSelected(file) {
   const loaded = await loadPdfFile(file, buildLayoutRequest())
   if (loaded) {
     isDragOver.value = false
-    currentPageNumber.value = pageCount.value > 0 ? 1 : 0
     void attachDocument(session)
   }
 }
@@ -311,7 +312,7 @@ function handleLayoutChange(layout = null) {
 function handleCurrentPageChange(pageNumber) {
   if (isNavigating.value) return
   if (!Number.isFinite(Number(pageNumber))) return
-  currentPageNumber.value = Number(pageNumber) || 0
+  currentPage.value = Number(pageNumber) || 0
 }
 
 function handleTranslatedPaneCurrentPageChange(pageNumber) {
@@ -378,7 +379,7 @@ function handleZoomStep(direction) {
 }
 
 function resetPresentationState() {
-  currentPageNumber.value = 0
+  currentPage.value = 0
   zoomMode.value = 'fit-width'
   zoomPercent.value = 100
   viewerLayout.value = {

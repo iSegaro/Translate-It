@@ -85,6 +85,10 @@ const props = defineProps({
   viewerMode: {
     type: String,
     default: 'bilingual'
+  },
+  scrollContainer: {
+    type: HTMLElement,
+    default: null
   }
 })
 
@@ -143,7 +147,12 @@ function setupObserver() {
   if (!rootEl.value) return
   if (typeof IntersectionObserver !== 'function') return
 
-  const scrollRoot = rootEl.value.parentElement
+  // The scroll container is injected by the layout owner, not discovered via
+  // DOM traversal. This keeps PdfTranslatedPane decoupled from the surrounding
+  // DOM structure and reusable in embedded contexts (split view, modal, iframe).
+  // The layout always provides scrollContainer. The DOM fallback exists
+  // only for backward compatibility if the component is used standalone.
+  const scrollRoot = props.scrollContainer || rootEl.value.parentElement
   if (!scrollRoot) return
 
   pageIntersectionObserver = new IntersectionObserver((entries) => {

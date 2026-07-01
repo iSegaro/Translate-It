@@ -271,6 +271,41 @@ The canvas is the **canonical geometric reference** for destination coordinates 
 
 The scroll geometry was validated against the official pdf.js geometry model. Both implementations compute `scrollPosition = elementOffsetFromScrollContainer + viewportCoordinate`, confirming mathematical equivalence.
 
+### Current Page Ownership
+
+A single `currentPage` value serves as the **source of truth** for the current page. All navigation sources converge on this value, and all consumers read from it:
+
+- **Outline clicks**: `navigateToDestination()` → `navigateToPage()` → sets `currentPage`.
+- **Link annotations**: Same pipeline as outline clicks.
+- **Manual scrolling**: The viewer's page visibility detection (rooted at the scroll container) determines which pages are visible and emits `current-page-change`. The application bridges this event to `currentPage`.
+- **Browser history, keyboard navigation, search results**: Future features will call `navigateToPage()` or update `currentPage` directly.
+
+The toolbar page indicator reads `currentPage` directly. There is no intermediate display state — the toolbar always reflects the same value as the navigation composable.
+
+A page-change observer in `usePdfNavigation` triggers `updateActiveOutline()` on every page change. This recomputes `activeOutlineDest` (the active outline node) and `expandedDests` (the ancestor path for auto-expansion). The outline and toolbar always reflect the same page state because they share the same source.
+
+This ownership may move to a future Viewer State layer, but the consumer contract — all navigation sources update one value, all consumers observe it — will remain unchanged.
+
+### Scroll Container Ownership
+
+The layout owns the scroll container. The viewer and translated pane receive it as an explicit dependency — they never discover it via DOM traversal.
+
+```
+PdfViewerLayout (owns the scroll container, makes it available to the parent)
+    │
+    ├── PdfViewer (receives scroll container dependency)
+    │     └── Page visibility detection rooted at the scroll container
+    │
+    └── PdfTranslatedPane (receives scroll container dependency)
+          └── Page visibility detection rooted at the scroll container
+```
+
+**Why the layout owns the scroll container**: The scroll container is defined by the layout's CSS rules (overflow and height constraints). Only the layout knows which element scrolls. Consumer components should not traverse the DOM to find it.
+
+**Why consumers receive it as an explicit dependency**: This keeps the viewer and translated pane decoupled from the surrounding DOM structure. They can be embedded in different contexts (split view, modal, iframe) without modification — the parent simply provides the appropriate scroll container.
+
+**Fallback behavior**: `PdfTranslatedPane` retains a DOM fallback for backward compatibility if used outside the normal component hierarchy. `PdfViewer` falls back to viewport-based observation. In normal operation within PdfApp, the dependency is always provided.
+
 ---
 
 ## Text Layer Architecture

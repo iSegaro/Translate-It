@@ -56,6 +56,10 @@ usePdfScrollSync(
   translatedPaneRef,
   computed(() => props.viewerMode === 'bilingual' && props.showOriginalPane && props.showTranslatedPane)
 )
+
+defineExpose({
+  scrollContainer: originalPaneRef
+})
 </script>
 
 

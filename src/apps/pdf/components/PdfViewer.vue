@@ -64,6 +64,10 @@ const props = defineProps({
   navigateToDestination: {
     type: Function,
     default: null
+  },
+  scrollContainer: {
+    type: HTMLElement,
+    default: null
   }
 })
 
@@ -237,7 +241,7 @@ function emitCurrentPage(nextVisible) {
 
 function emitLayoutIfNeeded() {
   const width = Math.floor(viewerRoot.value?.clientWidth || 0)
-  const height = Math.floor(viewerRoot.value?.parentElement?.clientHeight || 0)
+  const height = Math.floor(props.scrollContainer?.clientHeight || viewerRoot.value?.clientHeight || 0)
 
   if (
     width > 0 &&
@@ -257,6 +261,11 @@ function setupObservers() {
   disconnectObservers()
   if (!viewerRoot.value) return
 
+  // The scroll container is injected by the layout owner, not discovered via
+  // DOM traversal. This keeps PdfViewer decoupled from the surrounding DOM
+  // structure and reusable in embedded contexts (split view, modal, iframe).
+  const root = props.scrollContainer || null
+
   intersectionObserver = new IntersectionObserver((entries) => {
     const nextVisible = new Set(visiblePageNumbers.value)
 
@@ -273,7 +282,7 @@ function setupObservers() {
 
     updateVisiblePages(nextVisible)
   }, {
-    root: viewerRoot.value,
+    root,
     threshold: 0.25
   })
 
@@ -282,8 +291,8 @@ function setupObservers() {
   })
 
   resizeObserver.observe(viewerRoot.value)
-  if (viewerRoot.value.parentElement) {
-    resizeObserver.observe(viewerRoot.value.parentElement)
+  if (root) {
+    resizeObserver.observe(root)
   }
   refreshObservationTargets()
   emitLayoutIfNeeded()
@@ -327,7 +336,7 @@ function collectCanvasDataUrls() {
 }
 
 function getScrollContainer() {
-  return viewerRoot.value?.parentElement || null
+  return props.scrollContainer || null
 }
 
 function getPageElement(pageNumber) {
