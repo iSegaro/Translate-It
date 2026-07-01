@@ -16,6 +16,7 @@
       :visible="visiblePageNumbers.has(page.pageNumber)"
       :show-overlay="showOverlay"
       :overlay-blocks="getPageOverlayBlocks(page.pageNumber)"
+      :navigate-to-destination="navigateToDestination"
     />
 
     <PdfBlockHighlightOverlay
@@ -59,6 +60,10 @@ const props = defineProps({
   overlayPageData: {
     type: Array,
     default: () => []
+  },
+  navigateToDestination: {
+    type: Function,
+    default: null
   }
 })
 

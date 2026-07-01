@@ -148,7 +148,8 @@ export class PdfDocumentSession extends ResourceTracker {
         height: displayViewport.height,
         naturalWidth: viewport.width,
         naturalHeight: viewport.height,
-        scale
+        scale,
+        viewport: displayViewport
       })
 
       page.cleanup?.()
@@ -562,6 +563,22 @@ export class PdfDocumentSession extends ResourceTracker {
    */
   getOutline() {
     return this._outline
+  }
+
+  // ── Viewport ────────────────────────────────────────────────
+
+  /**
+   * Get the viewport for a specific page.
+   *
+   * Returns the cached viewport from page metrics, which was created
+   * during layout computation using the page's display scale.
+   *
+   * @param {number} pageNumber - 1-based page number
+   * @returns {object|null} The pdf.js viewport object, or null if unavailable
+   */
+  getPageViewport(pageNumber) {
+    const metric = this.pageMetrics[pageNumber - 1]
+    return metric?.viewport || null
   }
 
   // ── Link Annotations ──────────────────────────────────────

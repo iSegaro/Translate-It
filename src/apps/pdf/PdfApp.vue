@@ -89,6 +89,7 @@
                 :highlighted-block-id="highlightedBlockId"
                 :show-overlay="showOverlayLayer"
                 :overlay-page-data="translatedPageData"
+                :navigate-to-destination="navigateToDestination"
                 @layout-change="handleLayoutChange"
                 @current-page-change="handleCurrentPageChange"
                 @block-pointer-move="handleBlockPointerMove"
@@ -179,7 +180,7 @@ const {
 } = usePdfExport(translationTick)
 
 const pdfViewerRef = ref(null)
-/* eslint-disable no-unused-vars -- navigation APIs exposed for future phases */
+/* eslint-disable no-unused-vars -- currentPage, isNavigating, outline, hasOutline, attachDocument exposed for future phases */
 const {
   currentPage,
   isNavigating,

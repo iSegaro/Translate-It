@@ -14,6 +14,12 @@
         class="pdf-page__text-layer"
         :style="textLayerStyle"
       />
+      <PdfLinkOverlay
+        :session="session"
+        :page-number="page.pageNumber"
+        :visible="visible"
+        :navigate-to-destination="navigateToDestination"
+      />
       <PdfOverlayLayer
         v-if="showOverlay"
         :blocks="overlayBlocks"
@@ -30,6 +36,7 @@
 import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue'
 import { PdfTextLayerRenderer } from '@/features/pdf-translation/core/PdfTextLayerRenderer.js'
 import PdfOverlayLayer from './PdfOverlayLayer.vue'
+import PdfLinkOverlay from './PdfLinkOverlay.vue'
 import './PdfPageView.scss'
 
 const props = defineProps({
@@ -52,6 +59,10 @@ const props = defineProps({
   overlayBlocks: {
     type: Array,
     default: () => []
+  },
+  navigateToDestination: {
+    type: Function,
+    default: null
   }
 })
 
@@ -123,39 +134,3 @@ onBeforeUnmount(() => {
   textLayerRenderer = null
 })
 </script>
-
-<style scoped lang="scss">
-.pdf-page {
-  position: relative;
-  border-radius: 16px;
-  padding: 16px;
-  box-sizing: content-box;
-  background: #f5f7fb;
-  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.28);
-  color: #11161d;
-}
-
-.pdf-page__label {
-  margin-bottom: 12px;
-  font-size: 13px;
-  font-weight: 700;
-  color: rgba(17, 22, 29, 0.68);
-}
-
-.pdf-page__stage {
-  position: relative;
-  display: grid;
-}
-
-.pdf-page__stage canvas,
-.pdf-page__text-layer {
-  grid-area: 1 / 1;
-}
-
-.pdf-page__text-layer {
-  position: absolute;
-  inset: 0;
-  overflow: hidden;
-  transform-origin: 0 0;
-}
-</style>
