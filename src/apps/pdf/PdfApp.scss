@@ -47,6 +47,69 @@
   color: rgba(230, 237, 247, 0.7);
 }
 
+/* ── Workspace (Outline + Viewer) ────────── */
+
+.pdf-app__workspace {
+  display: flex;
+  gap: 16px;
+  min-height: 0;
+}
+
+/* ── Outline Toggle ──────────────────────── */
+
+.pdf-app__outline-toggle {
+  position: fixed;
+  left: 28px;
+  bottom: 28px;
+  z-index: 20;
+  width: 40px;
+  height: 40px;
+  border: none;
+  border-radius: 10px;
+  background: rgba(16, 19, 26, 0.7);
+  border: 1px solid rgba(230, 237, 247, 0.1);
+  color: rgba(230, 237, 247, 0.6);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  backdrop-filter: blur(8px);
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+
+  &:hover {
+    background: rgba(16, 19, 26, 0.9);
+    color: #e6edf7;
+    border-color: rgba(230, 237, 247, 0.2);
+  }
+
+  &--active {
+    background: rgba(90, 92, 255, 0.2);
+    border-color: rgba(90, 92, 255, 0.4);
+    color: #a5aaff;
+  }
+}
+
+.pdf-app__outline-toggle-icon {
+  display: block;
+  width: 14px;
+  height: 10px;
+  position: relative;
+
+  &::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 1.5px;
+    background: currentColor;
+    border-radius: 1px;
+    box-shadow:
+      0 4px 0 currentColor,
+      0 8px 0 currentColor;
+  }
+}
+
 @media (max-width: 1100px) {
   .pdf-app {
     --pdf-toolbar-sticky-height: 96px;

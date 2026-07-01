@@ -54,65 +54,84 @@
         @cancel="cancelOcr"
       />
 
-      <PdfDropzone
-        :has-document="hasDocument"
-        :is-drag-over="isDragOver"
-        @file-selected="handleFileSelected"
-        @drag-state-change="isDragOver = $event"
-      >
-        <template #empty>
-          <div class="pdf-app__empty">
-            <p class="pdf-app__empty-title">
-              Drop a PDF here or choose one from disk.
-            </p>
-            <p class="pdf-app__empty-text">
-              This MVP uses the dedicated viewer only. No native browser interception is active.
-            </p>
-          </div>
-        </template>
+      <div class="pdf-app__workspace">
+        <button
+          v-if="hasDocument && hasOutline"
+          class="pdf-app__outline-toggle"
+          :class="{ 'pdf-app__outline-toggle--active': isOutlineVisible }"
+          type="button"
+          aria-label="Toggle outline"
+          @click="toggleOutline"
+        >
+          <span class="pdf-app__outline-toggle-icon" />
+        </button>
 
-        <template #document>
-          <PdfViewerLayout
-            :viewer-mode="viewerMode"
-            :show-original-pane="showOriginalPane"
-            :show-translated-pane="showTranslatedPane"
-          >
-            <template
-              v-if="showOriginalPane"
-              #original
+        <PdfOutline
+          :outline="pdfOutline"
+          :visible="isOutlineVisible && hasOutline"
+          @close="isOutlineVisible = false"
+          @navigate="handleOutlineNavigate"
+        />
+
+        <PdfDropzone
+          :has-document="hasDocument"
+          :is-drag-over="isDragOver"
+          @file-selected="handleFileSelected"
+          @drag-state-change="isDragOver = $event"
+        >
+          <template #empty>
+            <div class="pdf-app__empty">
+              <p class="pdf-app__empty-title">
+                Drop a PDF here or choose one from disk.
+              </p>
+              <p class="pdf-app__empty-text">
+                This MVP uses the dedicated viewer only. No native browser interception is active.
+              </p>
+            </div>
+          </template>
+
+          <template #document>
+            <PdfViewerLayout
+              :viewer-mode="viewerMode"
+              :show-original-pane="showOriginalPane"
+              :show-translated-pane="showTranslatedPane"
             >
-              <PdfViewer
-                ref="pdfViewerRef"
-                :pages="pageMetrics"
-                :session="session"
-                :is-block-targeting-active="isBlockTargetingActive"
-                :highlighted-block-id="highlightedBlockId"
-                :show-overlay="showOverlayLayer"
-                :overlay-page-data="translatedPageData"
-                :navigate-to-destination="navigateToDestination"
-                @layout-change="handleLayoutChange"
-                @current-page-change="handleCurrentPageChange"
-                @block-pointer-move="handleBlockPointerMove"
-                @block-click="handleBlockClick"
-              />
-            </template>
+              <template
+                v-if="showOriginalPane"
+                #original
+              >
+                <PdfViewer
+                  ref="pdfViewerRef"
+                  :pages="pageMetrics"
+                  :session="session"
+                  :is-block-targeting-active="isBlockTargetingActive"
+                  :highlighted-block-id="highlightedBlockId"
+                  :show-overlay="showOverlayLayer"
+                  :overlay-page-data="translatedPageData"
+                  :navigate-to-destination="navigateToDestination"
+                  @layout-change="handleLayoutChange"
+                  @current-page-change="handleCurrentPageChange"
+                  @block-pointer-move="handleBlockPointerMove"
+                  @block-click="handleBlockClick"
+                />
+              </template>
 
-            <template
-              v-if="showTranslatedPane"
-              #translated
-            >
-              <PdfTranslatedPane
-                :translated-page-data="translatedPageData"
-                :highlighted-block-id="highlightedBlockId"
-                :page-metrics="pageMetrics"
-                :viewer-mode="viewerMode"
-                @current-page-change="handleTranslatedPaneCurrentPageChange"
-              />
-            </template>
-          </PdfViewerLayout>
-        </template>
-      </PdfDropzone>
-
+              <template
+                v-if="showTranslatedPane"
+                #translated
+              >
+                <PdfTranslatedPane
+                  :translated-page-data="translatedPageData"
+                  :highlighted-block-id="highlightedBlockId"
+                  :page-metrics="pageMetrics"
+                  :viewer-mode="viewerMode"
+                  @current-page-change="handleTranslatedPaneCurrentPageChange"
+                />
+              </template>
+            </PdfViewerLayout>
+          </template>
+        </PdfDropzone>
+      </div>
     </main>
 
     <PdfWindowsHost :pdf-fingerprint="pdfFingerprint" />
@@ -130,6 +149,7 @@ import PdfOcrConsentPrompt from './components/PdfOcrConsentPrompt.vue'
 import PdfOcrProgress from './components/PdfOcrProgress.vue'
 import PdfStatusBanner from './components/PdfStatusBanner.vue'
 import PdfWindowsHost from './components/PdfWindowsHost.vue'
+import PdfOutline from './components/PdfOutline.vue'
 import { usePdfViewerController } from './composables/usePdfViewerController.js'
 import { usePdfBilingualMode } from './composables/usePdfBilingualMode.js'
 import { usePdfExport } from './composables/usePdfExport.js'
@@ -180,7 +200,7 @@ const {
 } = usePdfExport(translationTick)
 
 const pdfViewerRef = ref(null)
-/* eslint-disable no-unused-vars -- currentPage, isNavigating, outline, hasOutline, attachDocument exposed for future phases */
+/* eslint-disable no-unused-vars -- currentPage, isNavigating, attachDocument exposed for future phases */
 const {
   currentPage,
   isNavigating,
@@ -231,6 +251,15 @@ const {
 })
 
 const isDragOver = ref(false)
+const isOutlineVisible = ref(false)
+
+function toggleOutline() {
+  isOutlineVisible.value = !isOutlineVisible.value
+}
+
+function handleOutlineNavigate(dest) {
+  navigateToDestination(dest)
+}
 
 const pdfStatusBanner = computed(() => buildPdfStatusBannerState({
   error: error.value,
