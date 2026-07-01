@@ -17,6 +17,7 @@ The PDF Translation feature is a **self-contained, dedicated PDF viewer and tran
 - [Module Boundaries](#module-boundaries)
 - [PDF Application Architecture](#pdf-application-architecture)
 - [PDF Viewer Lifecycle](#pdf-viewer-lifecycle)
+- [PDF Navigation](#pdf-navigation)
 - [Text Layer Architecture](#text-layer-architecture)
 - [Selection Integration](#selection-integration)
 - [Logical Block Model](#logical-block-model)
@@ -217,6 +218,58 @@ PdfApp
    ├── Revoke object URL
    └── Clear all Maps (pageSessions, translationStates, renderTasks)
 ```
+
+---
+
+## PDF Navigation
+
+### Destination Coordinate Model
+
+PDF destinations provide coordinates in **PDF user space** — a coordinate system where the origin is at the bottom-left corner of the page, the X-axis points right, and the Y-axis points up. Units are PDF points (1/72 inch).
+
+The pdf.js `PageViewport` class converts these coordinates into CSS pixel coordinates via `viewport.convertToViewportPoint(left, top)`. This method applies a single affine transform that handles:
+
+- **Scaling** — multiplying by the display scale factor.
+- **Y-axis inversion** — flipping from bottom-up PDF space to top-down CSS space.
+- **Page rotation** — rotating coordinates when the page has a non-zero rotation angle.
+
+After calling `convertToViewportPoint()`, the result is a `[cssX, cssY]` pair measured in CSS pixels relative to the **rendered canvas origin** (top-left corner of the canvas element). No manual scale multiplication, Y-flip, or rotation correction should ever be performed after this call — the viewport transform already encodes all necessary adjustments.
+
+**Architectural Invariant**: Navigation coordinates remain in PDF user space until the final viewport conversion performed by `PageViewport.convertToViewportPoint()`. No intermediate code should manually interpret, scale, rotate, or flip PDF coordinates. All coordinate-system transformations are delegated to the pdf.js viewport transform to ensure correctness and avoid duplicated geometry logic. Future changes must preserve this invariant.
+
+### Scroll Coordinate Conversion
+
+The viewer's scroll implementation navigates to a specific destination using the following algorithm:
+
+```
+1. Resolve destination → { pageNumber, left, top, zoom }
+2. Obtain the page viewport for the target page
+3. Convert PDF coordinates: [cssX, cssY] = viewport.convertToViewportPoint(left, top)
+4. Measure the canvas position relative to the scroll container
+5. Convert viewport coordinates into scroll-space:
+      canvasOffsetY = canvas.top - container.top + container.scrollTop
+6. Scroll to:
+      container.scrollTo({ top: canvasOffsetY + cssY })
+```
+
+Step 5 converts the canvas's visual position (which changes as the container scrolls) into an absolute scroll offset. The expression `canvas.top - container.top` yields the canvas's position relative to the container's visible top edge; adding `container.scrollTop` restores the absolute scroll position of the canvas origin. Step 6 then adds the viewport Y coordinate to place the target point at the container's top edge.
+
+### Why Canvas Is Used as the Reference Element
+
+The viewport coordinates returned by `convertToViewportPoint()` are defined relative to the **canvas origin** — the top-left corner of the rendered canvas element.
+
+The page wrapper contains layout elements (padding and page metadata such as the page label) above the canvas. The wrapper's top edge does **not** coincide with the canvas origin. Using the wrapper as the reference instead of the canvas would introduce an offset equal to the cumulative height of these layout elements, producing inaccurate scroll positions.
+
+The canvas is the **canonical geometric reference** for destination coordinates because it is the element that the viewport transform is anchored to. All viewport coordinate calculations must use the canvas as the origin.
+
+### Design Notes
+
+- This implementation follows the same geometry model as the official pdf.js viewer: `elementPosition + viewportCoordinate`. The pdf.js `scrollIntoView()` function accumulates `offsetTop` values from the page element up to the scroll container and adds the viewport coordinate. The viewer's `getBoundingClientRect()`-based approach achieves the same result without depending on the `offsetParent` chain, which is more robust for DOM hierarchies where the scroll container is not a positioned element.
+- Zoom values are forwarded through the navigation pipeline (`NavigationTarget.zoom`) but are intentionally ignored by the scroll implementation until destination-controlled zoom is implemented. When a destination specifies a zoom value, the official pdf.js viewer may adjust the viewer scale before scrolling; this behavior is not yet supported.
+
+### Verification Note
+
+The scroll geometry was validated against the official pdf.js geometry model. Both implementations compute `scrollPosition = elementOffsetFromScrollContainer + viewportCoordinate`, confirming mathematical equivalence.
 
 ---
 

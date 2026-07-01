@@ -339,23 +339,47 @@ function scrollToPage(pageNumber, options = {}) {
   const num = Number(pageNumber)
   if (!Number.isInteger(num) || num < 1) return
 
-  const pageEl = getPageElement(num)
-  if (!pageEl) return
+  const instance = pageViews.get(num)
+  if (!instance) return
 
   const container = getScrollContainer()
   if (!container) return
 
+  const hasPosition = Number.isFinite(Number(options.top)) || Number.isFinite(Number(options.left))
+
+  if (!hasPosition) {
+    const pageEl = getPdfPageRootElement(instance)
+    if (!pageEl) return
+
+    const containerRect = container.getBoundingClientRect()
+    const pageRect = pageEl.getBoundingClientRect()
+
+    container.scrollTo({
+      top: pageRect.top - containerRect.top + container.scrollTop,
+      behavior: options.behavior === 'instant' ? 'auto' : 'smooth'
+    })
+    return
+  }
+
+  const canvasEl = instance.getCanvasEl?.()
+  if (!canvasEl) return
+
+  const viewport = props.session.getPageViewport(num)
+  if (!viewport) return
+
+  const [cssX, cssY] = viewport.convertToViewportPoint(
+    Number(options.left) || 0,
+    Number(options.top) || 0
+  )
+
+  const canvasRect = canvasEl.getBoundingClientRect()
   const containerRect = container.getBoundingClientRect()
-  const pageRect = pageEl.getBoundingClientRect()
 
-  const offsetInContainer = pageRect.top - containerRect.top + container.scrollTop
-  const targetTop = offsetInContainer + (Number(options.top) || 0)
-
-  const scrollBehavior = options.behavior === 'instant' ? 'auto' : 'smooth'
+  const canvasOffsetY = canvasRect.top - containerRect.top + container.scrollTop
 
   container.scrollTo({
-    top: targetTop,
-    behavior: scrollBehavior
+    top: canvasOffsetY + cssY,
+    behavior: options.behavior === 'instant' ? 'auto' : 'smooth'
   })
 }
 

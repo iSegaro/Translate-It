@@ -200,7 +200,11 @@ export function usePdfNavigation(viewerRef) {
       }
 
       if (target.type === NavigationTargetType.PAGE) {
-        navigateToPage(target.pageNumber)
+        navigateToPage(target.pageNumber, {
+          left: target.left,
+          top: target.top,
+          zoom: target.zoom
+        })
         return
       }
 
