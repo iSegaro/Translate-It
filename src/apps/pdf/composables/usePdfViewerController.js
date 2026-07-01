@@ -1,4 +1,4 @@
-import { computed, ref } from 'vue'
+import { computed, reactive, ref, shallowRef } from 'vue'
 import { getScopedLogger } from '@/shared/logging/logger.js'
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js'
 import { getProviderOptimizationLevelAsync, getSourceLanguageAsync, getTargetLanguageAsync, getTranslationApiAsync } from '@/shared/config/config.js'
@@ -161,7 +161,83 @@ export function usePdfViewerController() {
   const restoredTranslationCount = ref(0)
   const restoredOcrPageCount = ref(0)
 
-  pdfTranslationCoordinator.onStateChange = () => {
+  const _pageDataMap = reactive(new Map())
+
+  const _translatedPageData = shallowRef([])
+
+  function _buildBlocksForPage(pageSession) {
+    const logicalBlocks = pageSession.getLogicalBlocks()
+    const blocks = []
+
+    for (const block of logicalBlocks) {
+      blocks.push(reactive({
+        ...block,
+        translationState: pdfDocumentSession.getBlockTranslationState(block.id)
+      }))
+    }
+
+    blocks.sort((a, b) => (a.readingOrderIndex ?? 0) - (b.readingOrderIndex ?? 0))
+    return blocks
+  }
+
+  function _syncMissingPageSessions() {
+    let changed = false
+
+    for (const [pageNumber, pageSession] of pdfDocumentSession.pageSessions) {
+      if (_pageDataMap.has(pageNumber)) continue
+
+      const metric = pageMetrics.value.find((m) => m.pageNumber === pageNumber)
+      _pageDataMap.set(pageNumber, reactive({
+        pageNumber,
+        width: metric?.width ?? 0,
+        height: metric?.height ?? 0,
+        blocks: _buildBlocksForPage(pageSession)
+      }))
+      changed = true
+    }
+
+    if (changed) {
+      _translatedPageData.value = [..._pageDataMap.values()]
+    }
+
+    return changed
+  }
+
+  function _updateBlockStates(blockIds = []) {
+    if (blockIds.length === 0) return
+
+    for (const blockId of blockIds) {
+      for (const pageData of _pageDataMap.values()) {
+        const block = pageData.blocks.find((b) => b.id === blockId)
+        if (block) {
+          block.translationState = pdfDocumentSession.getBlockTranslationState(blockId)
+          break
+        }
+      }
+    }
+  }
+
+  function _rebuildPageData() {
+    _pageDataMap.clear()
+
+    for (const metric of pageMetrics.value) {
+      const pageSession = pdfDocumentSession.pageSessions.get(metric.pageNumber)
+      const blocks = pageSession ? _buildBlocksForPage(pageSession) : []
+
+      _pageDataMap.set(metric.pageNumber, reactive({
+        pageNumber: metric.pageNumber,
+        width: metric.width,
+        height: metric.height,
+        blocks
+      }))
+    }
+
+    _translatedPageData.value = [..._pageDataMap.values()]
+  }
+
+  pdfTranslationCoordinator.onStateChange = (updatedBlockIds) => {
+    _syncMissingPageSessions()
+    _updateBlockStates(updatedBlockIds)
     translationTick.value += 1
   }
 
@@ -169,35 +245,7 @@ export function usePdfViewerController() {
   const canTranslateVisiblePages = computed(() => hasDocument.value && !isLoading.value && !isTranslating.value)
   const workerUrl = computed(() => pdfDocumentSession.workerUrl)
 
-  const translatedPageData = computed(() => {
-    translationTick.value
-
-    if (!hasDocument.value) return []
-
-    return pageMetrics.value.map((metric) => {
-      const blocks = []
-      const pageSession = pdfDocumentSession.pageSessions.get(metric.pageNumber)
-
-      if (pageSession) {
-        const logicalBlocks = pageSession.getLogicalBlocks()
-        for (const block of logicalBlocks) {
-          blocks.push({
-            ...block,
-            translationState: pdfDocumentSession.getBlockTranslationState(block.id)
-          })
-        }
-
-        blocks.sort((a, b) => (a.readingOrderIndex ?? 0) - (b.readingOrderIndex ?? 0))
-      }
-
-      return {
-        pageNumber: metric.pageNumber,
-        width: metric.width,
-        height: metric.height,
-        blocks
-      }
-    })
-  })
+  const translatedPageData = computed(() => _translatedPageData.value)
 
   function applySessionState(state) {
     fileName.value = state.fileName
@@ -206,6 +254,7 @@ export function usePdfViewerController() {
     pageScale.value = state.pageScale
     pdfFingerprint.value = state.pdfFingerprint || ''
     workerLabel.value = state.workerUrl ? 'configured' : 'pending'
+    _rebuildPageData()
   }
 
   function resetLoadedDocument() {
@@ -226,6 +275,8 @@ export function usePdfViewerController() {
     translationTick.value = 0
     restoredTranslationCount.value = 0
     restoredOcrPageCount.value = 0
+    _pageDataMap.clear()
+    _translatedPageData.value = []
   }
 
   async function loadPdfFile(file, layoutRequest) {
@@ -363,6 +414,12 @@ export function usePdfViewerController() {
       if (translationCount > 0 || ocrPageCount > 0) {
         restoredTranslationCount.value = translationCount
         restoredOcrPageCount.value = ocrPageCount
+
+        _syncMissingPageSessions()
+
+        const restoredBlockIds = Object.keys(cache.translations)
+        _updateBlockStates(restoredBlockIds)
+
         translationTick.value += 1
         logger.info('Restored from cache:', { documentIdentity, translationCount, ocrPageCount })
       }

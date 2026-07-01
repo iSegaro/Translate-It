@@ -296,7 +296,9 @@ export class PdfTranslationCoordinator {
         error: null
       })
     }
-    this._notifyStateChange()
+
+    const blockIds = blocks.map((block) => block.id).filter(Boolean)
+    this._notifyStateChange(blockIds)
   }
 
   _applyBatchResults(batchResults = []) {
@@ -342,13 +344,14 @@ export class PdfTranslationCoordinator {
       })
     }
 
-    this._notifyStateChange()
+    const blockIds = batchResults.map((result) => result?.blockId).filter(Boolean)
+    this._notifyStateChange(blockIds)
     return { translatedCount, failedCount }
   }
 
-  _notifyStateChange() {
+  _notifyStateChange(updatedBlockIds = []) {
     if (this.onStateChange) {
-      this.onStateChange()
+      this.onStateChange(updatedBlockIds)
     }
   }
 

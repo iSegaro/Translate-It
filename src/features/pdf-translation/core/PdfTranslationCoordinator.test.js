@@ -299,8 +299,8 @@ describe('PdfTranslationCoordinator', () => {
     await coordinator.translateVisibleBlocks()
 
     expect(onStateChange).toHaveBeenCalledTimes(2)
-    expect(onStateChange).toHaveBeenNthCalledWith(1)
-    expect(onStateChange).toHaveBeenNthCalledWith(2)
+    expect(onStateChange).toHaveBeenNthCalledWith(1, ['block-a'])
+    expect(onStateChange).toHaveBeenNthCalledWith(2, ['block-a'])
   })
 
   it('does not throw when onStateChange is not provided', async () => {

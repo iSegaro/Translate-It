@@ -183,8 +183,7 @@ watch(
     await nextTick()
     refreshObservationTargets()
     emitCurrentPage(new Set())
-  },
-  { deep: true }
+  }
 )
 
 onMounted(() => {
