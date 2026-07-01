@@ -1,11 +1,11 @@
-import { ref, computed } from 'vue'
+import { ref, computed, nextTick } from 'vue'
 import { getScopedLogger } from '@/shared/logging/logger.js'
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js'
 import { NavigationTargetType } from '@/features/pdf-translation/core/NavigationModels.js'
 
 const logger = getScopedLogger(LOG_COMPONENTS.PDF, 'usePdfNavigation')
 
-export function usePdfNavigation() {
+export function usePdfNavigation(viewerRef) {
   const currentPage = ref(0)
   const isNavigating = ref(false)
   const outline = ref(null)
@@ -14,7 +14,7 @@ export function usePdfNavigation() {
 
   let _session = null
 
-  function navigateToPage(pageNumber) {
+  function navigateToPage(pageNumber, options = {}) {
     if (!_session) {
       logger.warn('navigateToPage called without attached document')
       return
@@ -26,9 +26,19 @@ export function usePdfNavigation() {
       return
     }
 
-    isNavigating.value = false
+    isNavigating.value = true
     currentPage.value = num
-    logger.info('Navigation target set:', { pageNumber: num })
+
+    const viewer = viewerRef?.value
+    if (viewer?.scrollToPage) {
+      viewer.scrollToPage(num, options)
+    }
+
+    void nextTick(() => {
+      isNavigating.value = false
+    })
+
+    logger.info('Navigation executed:', { pageNumber: num })
   }
 
   async function navigateToDestination(dest) {
@@ -61,8 +71,17 @@ export function usePdfNavigation() {
 
     try {
       const loadedOutline = await documentSession.loadOutline()
+
+      if (_session !== documentSession) {
+        return
+      }
+
       outline.value = loadedOutline
     } catch (error) {
+      if (_session !== documentSession) {
+        return
+      }
+
       logger.warn('Failed to load outline on attach:', error)
       outline.value = null
     }

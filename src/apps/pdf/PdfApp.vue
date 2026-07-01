@@ -134,6 +134,7 @@ import { usePdfBilingualMode } from './composables/usePdfBilingualMode.js'
 import { usePdfExport } from './composables/usePdfExport.js'
 import { usePdfBlockSelection } from './composables/usePdfBlockSelection.js'
 import { usePdfOcr } from './composables/usePdfOcr.js'
+import { usePdfNavigation } from './composables/usePdfNavigation.js'
 import { buildPdfStatusBannerState } from './utils/pdfStatusBanner.js'
 import './PdfApp.scss'
 
@@ -178,6 +179,18 @@ const {
 } = usePdfExport(translationTick)
 
 const pdfViewerRef = ref(null)
+/* eslint-disable no-unused-vars -- navigation APIs exposed for future phases */
+const {
+  currentPage,
+  isNavigating,
+  outline: pdfOutline,
+  hasOutline,
+  navigateToPage,
+  navigateToDestination,
+  attachDocument,
+  detachDocument
+} = usePdfNavigation(pdfViewerRef)
+/* eslint-enable no-unused-vars */
 const exportSuccess = ref(null)
 const exportSuccessTimer = ref(null)
 const EXPORT_SUCCESS_DURATION_MS = 2200
@@ -240,6 +253,7 @@ async function handleFileSelected(file) {
   if (loaded) {
     isDragOver.value = false
     currentPageNumber.value = pageCount.value > 0 ? 1 : 0
+    void attachDocument(session)
   }
 }
 
@@ -440,6 +454,7 @@ onMounted(() => {
 
 onBeforeUnmount(() => {
   clearExportSuccess()
+  detachDocument()
   void cleanup()
 })
 </script>
