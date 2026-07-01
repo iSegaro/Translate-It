@@ -5,7 +5,7 @@ import { ensurePdfJsConfigured, getPdfWorkerUrl, loadPdfDocumentFromFile } from 
 import { PdfTextLayerRenderer } from './PdfTextLayerRenderer.js'
 import { PdfPageSession } from './PdfPageSession.js'
 import { sha256HexFromArrayBuffer } from './PdfBlockIdentity.js'
-import { createPageTarget } from './NavigationModels.js'
+import { createPageTarget, createOutlineNode } from './NavigationModels.js'
 
 const logger = getScopedLogger(LOG_COMPONENTS.PDF, 'PdfDocumentSession')
 const PAGE_MARGIN = 24
@@ -52,6 +52,7 @@ export class PdfDocumentSession extends ResourceTracker {
     this._pendingCleanup = null
     this._destinationCache = new Map()
     this._pageIndexCache = new Map()
+    this._outline = null
   }
 
   get workerUrl() {
@@ -79,6 +80,7 @@ export class PdfDocumentSession extends ResourceTracker {
     this.targetedBlockId = null
     this._destinationCache.clear()
     this._pageIndexCache.clear()
+    this._outline = null
 
     await this._buildPageMetrics(layoutRequest)
 
@@ -507,6 +509,59 @@ export class PdfDocumentSession extends ResourceTracker {
     return { top, left, zoom }
   }
 
+  // ── Outline Loading ────────────────────────────────────────
+
+  /**
+   * Load the PDF outline (bookmarks) tree.
+   *
+   * Uses pdfDocument.getOutline() and normalizes the result
+   * via createOutlineNode(). The outline is cached — subsequent
+   * calls return the cached value without re-fetching.
+   *
+   * @returns {Promise<Array<object>|null>} Normalized outline tree, or null if none
+   */
+  async loadOutline() {
+    if (!this.pdfDocument) {
+      return null
+    }
+
+    if (this._outline !== null) {
+      return this._outline
+    }
+
+    try {
+      const rawOutline = await this.pdfDocument.getOutline()
+
+      if (!rawOutline || !Array.isArray(rawOutline) || rawOutline.length === 0) {
+        this._outline = null
+        return null
+      }
+
+      const outline = rawOutline
+        .map(createOutlineNode)
+        .filter(Boolean)
+
+      this._outline = outline.length > 0 ? outline : null
+      return this._outline
+    } catch (error) {
+      logger.warn('Failed to load PDF outline:', error)
+      this._outline = null
+      return null
+    }
+  }
+
+  /**
+   * Get the cached outline tree.
+   *
+   * Returns null if outline has not been loaded yet.
+   * Does not trigger loading — use loadOutline() first.
+   *
+   * @returns {Array<object>|null} Cached outline, or null if not loaded
+   */
+  getOutline() {
+    return this._outline
+  }
+
   async renderPage(pageNumber, canvasEl, textLayerRenderer) {
     if (!this.pdfDocument || !canvasEl) return false
 
@@ -609,6 +664,7 @@ export class PdfDocumentSession extends ResourceTracker {
     this.targetedBlockId = null
     this._destinationCache.clear()
     this._pageIndexCache.clear()
+    this._outline = null
     this.pdfFingerprint = ''
     this.documentIdentity = ''
     this.displayName = ''
