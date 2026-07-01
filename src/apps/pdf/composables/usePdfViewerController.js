@@ -165,15 +165,21 @@ export function usePdfViewerController() {
 
   const _translatedPageData = shallowRef([])
 
+  const _blockIndex = new Map()
+
+  const _pageMetricIndex = new Map()
+
   function _buildBlocksForPage(pageSession) {
     const logicalBlocks = pageSession.getLogicalBlocks()
     const blocks = []
 
     for (const block of logicalBlocks) {
-      blocks.push(reactive({
+      const reactiveBlock = reactive({
         ...block,
         translationState: pdfDocumentSession.getBlockTranslationState(block.id)
-      }))
+      })
+      blocks.push(reactiveBlock)
+      _blockIndex.set(block.id, reactiveBlock)
     }
 
     blocks.sort((a, b) => (a.readingOrderIndex ?? 0) - (b.readingOrderIndex ?? 0))
@@ -186,7 +192,7 @@ export function usePdfViewerController() {
     for (const [pageNumber, pageSession] of pdfDocumentSession.pageSessions) {
       if (_pageDataMap.has(pageNumber)) continue
 
-      const metric = pageMetrics.value.find((m) => m.pageNumber === pageNumber)
+      const metric = _pageMetricIndex.get(pageNumber)
       _pageDataMap.set(pageNumber, reactive({
         pageNumber,
         width: metric?.width ?? 0,
@@ -207,20 +213,21 @@ export function usePdfViewerController() {
     if (blockIds.length === 0) return
 
     for (const blockId of blockIds) {
-      for (const pageData of _pageDataMap.values()) {
-        const block = pageData.blocks.find((b) => b.id === blockId)
-        if (block) {
-          block.translationState = pdfDocumentSession.getBlockTranslationState(blockId)
-          break
-        }
+      const block = _blockIndex.get(blockId)
+      if (block) {
+        block.translationState = pdfDocumentSession.getBlockTranslationState(blockId)
       }
     }
   }
 
   function _rebuildPageData() {
     _pageDataMap.clear()
+    _blockIndex.clear()
+    _pageMetricIndex.clear()
 
     for (const metric of pageMetrics.value) {
+      _pageMetricIndex.set(metric.pageNumber, metric)
+
       const pageSession = pdfDocumentSession.pageSessions.get(metric.pageNumber)
       const blocks = pageSession ? _buildBlocksForPage(pageSession) : []
 
@@ -276,6 +283,8 @@ export function usePdfViewerController() {
     restoredTranslationCount.value = 0
     restoredOcrPageCount.value = 0
     _pageDataMap.clear()
+    _blockIndex.clear()
+    _pageMetricIndex.clear()
     _translatedPageData.value = []
   }
 
