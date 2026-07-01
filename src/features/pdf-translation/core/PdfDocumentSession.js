@@ -1,11 +1,11 @@
 import ResourceTracker from '@/core/memory/ResourceTracker.js'
 import { getScopedLogger } from '@/shared/logging/logger.js'
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js'
-import { ensurePdfJsConfigured, getPdfWorkerUrl, loadPdfDocumentFromFile } from './pdfjs.js'
+import { ensurePdfJsConfigured, getPdfWorkerUrl, loadPdfDocumentFromFile, AnnotationType } from './pdfjs.js'
 import { PdfTextLayerRenderer } from './PdfTextLayerRenderer.js'
 import { PdfPageSession } from './PdfPageSession.js'
 import { sha256HexFromArrayBuffer } from './PdfBlockIdentity.js'
-import { createPageTarget, createOutlineNode } from './NavigationModels.js'
+import { createPageTarget, createOutlineNode, createLinkAnnotation } from './NavigationModels.js'
 
 const logger = getScopedLogger(LOG_COMPONENTS.PDF, 'PdfDocumentSession')
 const PAGE_MARGIN = 24
@@ -53,6 +53,7 @@ export class PdfDocumentSession extends ResourceTracker {
     this._destinationCache = new Map()
     this._pageIndexCache = new Map()
     this._outline = null
+    this._linkAnnotationCache = new Map()
   }
 
   get workerUrl() {
@@ -81,6 +82,7 @@ export class PdfDocumentSession extends ResourceTracker {
     this._destinationCache.clear()
     this._pageIndexCache.clear()
     this._outline = null
+    this._linkAnnotationCache.clear()
 
     await this._buildPageMetrics(layoutRequest)
 
@@ -562,6 +564,51 @@ export class PdfDocumentSession extends ResourceTracker {
     return this._outline
   }
 
+  // ── Link Annotations ──────────────────────────────────────
+
+  /**
+   * Get link annotations for a specific page.
+   *
+   * Fetches annotations via pdfPage.getAnnotations(), filters for
+   * LINK type, and normalizes them via createLinkAnnotation().
+   * Results are cached per page.
+   *
+   * @param {number} pageNumber - 1-based page number
+   * @returns {Promise<Array<object>>} Array of normalized link annotations
+   */
+  async getLinkAnnotations(pageNumber) {
+    if (!this.pdfDocument) {
+      return []
+    }
+
+    if (this._linkAnnotationCache.has(pageNumber)) {
+      return this._linkAnnotationCache.get(pageNumber)
+    }
+
+    const metric = this.pageMetrics[pageNumber - 1]
+    if (!metric) {
+      this._linkAnnotationCache.set(pageNumber, [])
+      return []
+    }
+
+    try {
+      const page = await this.pdfDocument.getPage(pageNumber)
+      const rawAnnotations = await page.getAnnotations({ intent: 'display' })
+
+      const linkAnnotations = rawAnnotations
+        .filter((a) => a.annotationType === AnnotationType.LINK)
+        .map(createLinkAnnotation)
+        .filter(Boolean)
+
+      this._linkAnnotationCache.set(pageNumber, linkAnnotations)
+      return linkAnnotations
+    } catch (error) {
+      logger.warn(`Failed to load annotations for page ${pageNumber}:`, error)
+      this._linkAnnotationCache.set(pageNumber, [])
+      return []
+    }
+  }
+
   async renderPage(pageNumber, canvasEl, textLayerRenderer) {
     if (!this.pdfDocument || !canvasEl) return false
 
@@ -665,6 +712,7 @@ export class PdfDocumentSession extends ResourceTracker {
     this._destinationCache.clear()
     this._pageIndexCache.clear()
     this._outline = null
+    this._linkAnnotationCache.clear()
     this.pdfFingerprint = ''
     this.documentIdentity = ''
     this.displayName = ''
