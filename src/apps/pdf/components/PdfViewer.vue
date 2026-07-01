@@ -305,8 +305,7 @@ watch(
     refreshObservationTargets()
     emitLayoutIfNeeded()
     emitCurrentPage(visiblePageNumbers.value)
-  },
-  { deep: true }
+  }
 )
 
 onMounted(() => {
