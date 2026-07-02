@@ -250,7 +250,6 @@ export function usePdfViewerController() {
   pdfTranslationCoordinator.onStateChange = (updatedBlockIds) => {
     _syncMissingPageSessions()
     _updateBlockStates(updatedBlockIds)
-    translationTick.value += 1
   }
 
   const hasDocument = computed(() => pageCount.value > 0 && pageMetrics.value.length > 0)
@@ -365,6 +364,7 @@ export function usePdfViewerController() {
       }
       return false
     } finally {
+      translationTick.value += 1
       isTranslating.value = false
     }
   }
