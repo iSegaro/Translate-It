@@ -97,7 +97,7 @@
           <template #document>
             <PdfViewerLayout
               ref="pdfViewerLayoutRef"
-              :viewer-mode="viewerMode"
+              :layout-mode="layoutMode"
               :show-original-pane="showOriginalPane"
               :show-translated-pane="showTranslatedPane"
             >

@@ -25,13 +25,14 @@
 
 <script setup>
 import { computed, ref } from 'vue'
+import { LAYOUT_MODE } from '../composables/usePdfBilingualMode.js'
 import { usePdfScrollSync } from '../composables/usePdfScrollSync.js'
 import './PdfViewerLayout.scss'
 
 const props = defineProps({
-  viewerMode: {
+  layoutMode: {
     type: String,
-    default: 'bilingual'
+    default: LAYOUT_MODE.SINGLE
   },
   showOriginalPane: {
     type: Boolean,
@@ -67,16 +68,14 @@ function focusPane(event) {
 }
 
 const layoutClasses = computed(() => ({
-  'pdf-viewer-layout--original': props.viewerMode === 'original',
-  'pdf-viewer-layout--bilingual': props.viewerMode === 'bilingual',
-  'pdf-viewer-layout--translated': props.viewerMode === 'translated',
-  'pdf-viewer-layout--translated-pdf': props.viewerMode === 'translated-pdf'
+  'pdf-viewer-layout--single': props.layoutMode === LAYOUT_MODE.SINGLE,
+  'pdf-viewer-layout--side-by-side': props.layoutMode === LAYOUT_MODE.SIDE_BY_SIDE
 }))
 
 usePdfScrollSync(
   originalPaneRef,
   translatedPaneRef,
-  computed(() => props.viewerMode === 'bilingual' && props.showOriginalPane && props.showTranslatedPane)
+  computed(() => props.layoutMode === LAYOUT_MODE.SIDE_BY_SIDE && props.showOriginalPane && props.showTranslatedPane)
 )
 
 defineExpose({

@@ -4,13 +4,11 @@
   width: 100%;
   min-height: 0;
 
-  &--original,
-  &--translated,
-  &--translated-pdf {
+  &--single {
     grid-template-columns: 1fr;
   }
 
-  &--bilingual {
+  &--side-by-side {
     grid-template-columns: 1fr 1fr;
 
     @media (max-width: 768px) {

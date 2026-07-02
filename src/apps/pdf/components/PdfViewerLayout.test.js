@@ -3,10 +3,10 @@ import { mount } from '@vue/test-utils'
 import PdfViewerLayout from './PdfViewerLayout.vue'
 
 describe('PdfViewerLayout', () => {
-  it('renders bilingual layout with two panes', () => {
+  it('renders side-by-side layout with two panes', () => {
     const wrapper = mount(PdfViewerLayout, {
       props: {
-        viewerMode: 'bilingual',
+        layoutMode: 'side-by-side',
         showOriginalPane: true,
         showTranslatedPane: true
       },
@@ -16,15 +16,15 @@ describe('PdfViewerLayout', () => {
       }
     })
 
-    expect(wrapper.classes()).toContain('pdf-viewer-layout--bilingual')
+    expect(wrapper.classes()).toContain('pdf-viewer-layout--side-by-side')
     expect(wrapper.find('.original-pane').exists()).toBe(true)
     expect(wrapper.find('.translated-pane').exists()).toBe(true)
   })
 
-  it('renders only original pane in original mode', () => {
+  it('renders only original pane in single layout', () => {
     const wrapper = mount(PdfViewerLayout, {
       props: {
-        viewerMode: 'original',
+        layoutMode: 'single',
         showOriginalPane: true,
         showTranslatedPane: false
       },
@@ -34,15 +34,15 @@ describe('PdfViewerLayout', () => {
       }
     })
 
-    expect(wrapper.classes()).toContain('pdf-viewer-layout--original')
+    expect(wrapper.classes()).toContain('pdf-viewer-layout--single')
     expect(wrapper.find('.original-pane').exists()).toBe(true)
     expect(wrapper.find('.translated-pane').exists()).toBe(false)
   })
 
-  it('renders only translated pane in translated mode', () => {
+  it('renders only translated pane in single layout', () => {
     const wrapper = mount(PdfViewerLayout, {
       props: {
-        viewerMode: 'translated',
+        layoutMode: 'single',
         showOriginalPane: false,
         showTranslatedPane: true
       },
@@ -52,22 +52,21 @@ describe('PdfViewerLayout', () => {
       }
     })
 
-    expect(wrapper.classes()).toContain('pdf-viewer-layout--translated')
+    expect(wrapper.classes()).toContain('pdf-viewer-layout--single')
     expect(wrapper.find('.original-pane').exists()).toBe(false)
     expect(wrapper.find('.translated-pane').exists()).toBe(true)
   })
 
-  it('applies correct mode class', () => {
+  it('applies correct layout class', () => {
     const wrapper = mount(PdfViewerLayout, {
       props: {
-        viewerMode: 'bilingual',
+        layoutMode: 'side-by-side',
         showOriginalPane: true,
         showTranslatedPane: true
       }
     })
 
-    expect(wrapper.classes()).toContain('pdf-viewer-layout--bilingual')
-    expect(wrapper.classes()).not.toContain('pdf-viewer-layout--original')
-    expect(wrapper.classes()).not.toContain('pdf-viewer-layout--translated')
+    expect(wrapper.classes()).toContain('pdf-viewer-layout--side-by-side')
+    expect(wrapper.classes()).not.toContain('pdf-viewer-layout--single')
   })
 })
