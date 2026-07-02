@@ -188,6 +188,11 @@ export function usePdfViewerController() {
 
   function _syncMissingPageSessions() {
     let changed = false
+    const pageSessionCount = pdfDocumentSession.pageSessions.size
+
+    if (pageSessionCount === 0 || _pageDataMap.size >= pageSessionCount) {
+      return false
+    }
 
     for (const [pageNumber, pageSession] of pdfDocumentSession.pageSessions) {
       if (_pageDataMap.has(pageNumber)) continue
@@ -229,13 +234,13 @@ export function usePdfViewerController() {
       _pageMetricIndex.set(metric.pageNumber, metric)
 
       const pageSession = pdfDocumentSession.pageSessions.get(metric.pageNumber)
-      const blocks = pageSession ? _buildBlocksForPage(pageSession) : []
+      if (!pageSession) continue
 
       _pageDataMap.set(metric.pageNumber, reactive({
         pageNumber: metric.pageNumber,
         width: metric.width,
         height: metric.height,
-        blocks
+        blocks: _buildBlocksForPage(pageSession)
       }))
     }
 
