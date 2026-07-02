@@ -77,58 +77,11 @@ const VALID_LAYOUT_MODES = new Set(Object.values(LAYOUT_MODE))
  *       is implemented.
  */
 
-// ──────────────────────────────────────────
-// Legacy constants (migration compat)
-// ──────────────────────────────────────────
-
-const VIEWER_MODES = Object.freeze({
-  ORIGINAL: 'original',
-  BILINGUAL: 'bilingual',
-  TRANSLATED: 'translated',
-  TRANSLATED_PDF: 'translated-pdf'
-})
-
-const MODE_ORDER = [
-  VIEWER_MODES.ORIGINAL,
-  VIEWER_MODES.BILINGUAL,
-  VIEWER_MODES.TRANSLATED,
-  VIEWER_MODES.TRANSLATED_PDF
-]
-
-// ──────────────────────────────────────────
-// Mapping: (contentView, layoutMode) ↔ viewerMode
-// ──────────────────────────────────────────
-
-function deriveViewerMode(contentView, layoutMode) {
-  if (contentView === CONTENT_VIEW.ORIGINAL) return VIEWER_MODES.ORIGINAL
-  if (contentView === CONTENT_VIEW.TRANSLATED_PDF) return VIEWER_MODES.TRANSLATED_PDF
-
-  return layoutMode === LAYOUT_MODE.SIDE_BY_SIDE
-    ? VIEWER_MODES.BILINGUAL
-    : VIEWER_MODES.TRANSLATED
-}
-
-function parseLegacyMode(mode) {
-  switch (mode) {
-    case VIEWER_MODES.ORIGINAL:
-      return { contentView: CONTENT_VIEW.ORIGINAL, layoutMode: LAYOUT_MODE.SINGLE }
-    case VIEWER_MODES.TRANSLATED:
-      return { contentView: CONTENT_VIEW.TRANSLATION, layoutMode: LAYOUT_MODE.SINGLE }
-    case VIEWER_MODES.BILINGUAL:
-      return { contentView: CONTENT_VIEW.TRANSLATION, layoutMode: LAYOUT_MODE.SIDE_BY_SIDE }
-    case VIEWER_MODES.TRANSLATED_PDF:
-      return { contentView: CONTENT_VIEW.TRANSLATED_PDF, layoutMode: LAYOUT_MODE.SINGLE }
-    default:
-      return null
-  }
-}
-
 export function usePdfBilingualMode() {
-  // ── Internal state (single source of truth) ──────────────────
   const contentView = ref(CONTENT_VIEW.ORIGINAL)
   const layoutMode = ref(LAYOUT_MODE.SINGLE)
 
-  // ── Safety net: enforce invariant at the reactivity level ───
+  // Safety net: enforce invariant at the reactivity level.
   // Sync flush ensures layoutMode is corrected immediately when
   // contentView changes, before any computed or watcher reads stale state.
   watch(contentView, (newVal) => {
@@ -138,22 +91,14 @@ export function usePdfBilingualMode() {
     }
   }, { flush: 'sync' })
 
-  // ── Derived: legacy viewerMode (migration compat) ───────────
-  const viewerMode = computed(() => deriveViewerMode(contentView.value, layoutMode.value))
-
-  // ── Legacy computed flags (migration compat) ────────────────
-  const isOriginalOnly = computed(() => viewerMode.value === VIEWER_MODES.ORIGINAL)
-  const isBilingual = computed(() => viewerMode.value === VIEWER_MODES.BILINGUAL)
-  const isTranslatedOnly = computed(() => viewerMode.value === VIEWER_MODES.TRANSLATED)
-  const isTranslatedPdf = computed(() => viewerMode.value === VIEWER_MODES.TRANSLATED_PDF)
-
   const showOriginalPane = computed(() => {
     return contentView.value !== CONTENT_VIEW.TRANSLATION || layoutMode.value === LAYOUT_MODE.SIDE_BY_SIDE
   })
   const showTranslatedPane = computed(() => contentView.value === CONTENT_VIEW.TRANSLATION)
   const showOverlayLayer = computed(() => contentView.value === CONTENT_VIEW.TRANSLATED_PDF)
 
-  // ── New public API ──────────────────────────────────────────
+  const isSideBySide = computed(() => layoutMode.value === LAYOUT_MODE.SIDE_BY_SIDE)
+
   function setContentView(val) {
     if (!VALID_CONTENT_VIEWS.has(val)) {
       logger.warn('Invalid content view:', val)
@@ -179,57 +124,20 @@ export function usePdfBilingualMode() {
     logger.info('Layout mode changed:', { layoutMode: val })
   }
 
-  const isSideBySide = computed(() => layoutMode.value === LAYOUT_MODE.SIDE_BY_SIDE)
-
-  // ── Legacy public API (migration compat) ────────────────────
-  // Uses direct ref assignment for atomic mode transitions.
-  // This intentionally bypasses setContentView/setLayoutMode to:
-  //   1. Avoid redundant log messages for a single mode switch
-  //   2. Ensure both refs update in the same synchronous block
-  // The sync watch on contentView still enforces invariants.
-  function setMode(mode) {
-    const parsed = parseLegacyMode(mode)
-
-    if (!parsed) {
-      logger.warn('Invalid viewer mode:', mode)
-      return
-    }
-
-    contentView.value = parsed.contentView
-    layoutMode.value = parsed.layoutMode
-    logger.info('Viewer mode changed:', { mode, contentView: parsed.contentView, layoutMode: parsed.layoutMode })
-  }
-
-  function cycleMode() {
-    const currentIndex = MODE_ORDER.indexOf(viewerMode.value)
-    const nextIndex = (currentIndex + 1) % MODE_ORDER.length
-    setMode(MODE_ORDER[nextIndex])
-  }
-
   function reset() {
     contentView.value = CONTENT_VIEW.ORIGINAL
     layoutMode.value = LAYOUT_MODE.SINGLE
   }
 
   return {
-    // New API
     contentView,
     layoutMode,
     setContentView,
     setLayoutMode,
     isSideBySide,
-
-    // Legacy API (migration compat)
-    viewerMode,
-    isOriginalOnly,
-    isBilingual,
-    isTranslatedOnly,
-    isTranslatedPdf,
     showOriginalPane,
     showTranslatedPane,
     showOverlayLayer,
-    setMode,
-    cycleMode,
     reset
   }
 }

@@ -192,7 +192,6 @@ const {
 const {
   contentView,
   layoutMode,
-  viewerMode,
   showOriginalPane,
   showTranslatedPane,
   showOverlayLayer,

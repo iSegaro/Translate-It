@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { usePdfBilingualMode } from './usePdfBilingualMode.js'
 
 describe('usePdfBilingualMode', () => {
-  // ── Legacy API backward compat ────────────────────────────────
+  // ── Initial state ────────────────────────────────────────────
 
   it('defaults to original content view and single layout', () => {
     const { contentView, layoutMode } = usePdfBilingualMode()
@@ -11,131 +11,40 @@ describe('usePdfBilingualMode', () => {
     expect(layoutMode.value).toBe('single')
   })
 
-  it('defaults to original viewer mode (legacy compat)', () => {
-    const { viewerMode, isOriginalOnly, isBilingual } = usePdfBilingualMode()
+  it('defaults visibility correctly', () => {
+    const { showOriginalPane, showTranslatedPane, showOverlayLayer } = usePdfBilingualMode()
 
-    expect(viewerMode.value).toBe('original')
-    expect(isOriginalOnly.value).toBe(true)
-    expect(isBilingual.value).toBe(false)
-  })
-
-  it('sets viewer mode correctly (legacy compat)', () => {
-    const { viewerMode, setMode, isOriginalOnly, isTranslatedOnly } = usePdfBilingualMode()
-
-    setMode('original')
-    expect(viewerMode.value).toBe('original')
-    expect(isOriginalOnly.value).toBe(true)
-    expect(isTranslatedOnly.value).toBe(false)
-
-    setMode('translated')
-    expect(viewerMode.value).toBe('translated')
-    expect(isTranslatedOnly.value).toBe(true)
-    expect(isOriginalOnly.value).toBe(false)
-  })
-
-  it('ignores invalid viewer modes', () => {
-    const { viewerMode, setMode } = usePdfBilingualMode()
-    const loggerWarn = vi.fn()
-
-    vi.stubGlobal('console', { warn: loggerWarn })
-
-    setMode('invalid')
-    expect(viewerMode.value).toBe('original')
-  })
-
-  it('cycles through modes in order (legacy compat)', () => {
-    const { viewerMode, cycleMode } = usePdfBilingualMode()
-
-    expect(viewerMode.value).toBe('original')
-    cycleMode()
-    expect(viewerMode.value).toBe('bilingual')
-    cycleMode()
-    expect(viewerMode.value).toBe('translated')
-    cycleMode()
-    expect(viewerMode.value).toBe('translated-pdf')
-    cycleMode()
-    expect(viewerMode.value).toBe('original')
-  })
-
-  it('resets to original mode (legacy compat)', () => {
-    const { viewerMode, setMode, reset } = usePdfBilingualMode()
-
-    setMode('translated')
-    expect(viewerMode.value).toBe('translated')
-
-    reset()
-    expect(viewerMode.value).toBe('original')
-  })
-
-  it('computes showOriginalPane and showTranslatedPane (legacy compat)', () => {
-    const { setMode, showOriginalPane, showTranslatedPane } = usePdfBilingualMode()
-
-    setMode('original')
     expect(showOriginalPane.value).toBe(true)
     expect(showTranslatedPane.value).toBe(false)
-
-    setMode('translated')
-    expect(showOriginalPane.value).toBe(false)
-    expect(showTranslatedPane.value).toBe(true)
-
-    setMode('bilingual')
-    expect(showOriginalPane.value).toBe(true)
-    expect(showTranslatedPane.value).toBe(true)
-
-    setMode('translated-pdf')
-    expect(showOriginalPane.value).toBe(true)
-    expect(showTranslatedPane.value).toBe(false)
+    expect(showOverlayLayer.value).toBe(false)
   })
 
-  it('computes isTranslatedPdf and showOverlayLayer (legacy compat)', () => {
-    const { setMode, isTranslatedPdf, showOverlayLayer } = usePdfBilingualMode()
-
-    setMode('original')
-    expect(isTranslatedPdf.value).toBe(false)
-    expect(showOverlayLayer.value).toBe(false)
-
-    setMode('bilingual')
-    expect(isTranslatedPdf.value).toBe(false)
-    expect(showOverlayLayer.value).toBe(false)
-
-    setMode('translated')
-    expect(isTranslatedPdf.value).toBe(false)
-    expect(showOverlayLayer.value).toBe(false)
-
-    setMode('translated-pdf')
-    expect(isTranslatedPdf.value).toBe(true)
-    expect(showOverlayLayer.value).toBe(true)
-  })
-
-  // ── New domain model ──────────────────────────────────────────
+  // ── contentView ──────────────────────────────────────────────
 
   describe('contentView', () => {
     it('sets content view to original', () => {
-      const { contentView, layoutMode, viewerMode, setContentView } = usePdfBilingualMode()
+      const { contentView, layoutMode, setContentView } = usePdfBilingualMode()
 
       setContentView('original')
 
       expect(contentView.value).toBe('original')
       expect(layoutMode.value).toBe('single')
-      expect(viewerMode.value).toBe('original')
     })
 
     it('sets content view to translation', () => {
-      const { contentView, viewerMode, setContentView } = usePdfBilingualMode()
+      const { contentView, setContentView } = usePdfBilingualMode()
 
       setContentView('translation')
 
       expect(contentView.value).toBe('translation')
-      expect(viewerMode.value).toBe('translated')
     })
 
     it('sets content view to translated-pdf', () => {
-      const { contentView, viewerMode, showOverlayLayer, setContentView } = usePdfBilingualMode()
+      const { contentView, showOverlayLayer, setContentView } = usePdfBilingualMode()
 
       setContentView('translated-pdf')
 
       expect(contentView.value).toBe('translated-pdf')
-      expect(viewerMode.value).toBe('translated-pdf')
       expect(showOverlayLayer.value).toBe(true)
     })
 
@@ -175,6 +84,8 @@ describe('usePdfBilingualMode', () => {
       expect(layoutMode.value).toBe('single')
     })
   })
+
+  // ── layoutMode ───────────────────────────────────────────────
 
   describe('layoutMode', () => {
     it('sets layout mode to single', () => {
@@ -227,6 +138,8 @@ describe('usePdfBilingualMode', () => {
     })
   })
 
+  // ── isSideBySide ─────────────────────────────────────────────
+
   describe('isSideBySide', () => {
     it('is true when layout is side-by-side', () => {
       const { isSideBySide, setContentView, setLayoutMode } = usePdfBilingualMode()
@@ -244,26 +157,52 @@ describe('usePdfBilingualMode', () => {
     })
   })
 
-  describe('invariant enforcement via legacy API', () => {
-    it('bilingual mode maps to translation + side-by-side', () => {
-      const { contentView, layoutMode, viewerMode, setMode } = usePdfBilingualMode()
+  // ── Visibility ───────────────────────────────────────────────
 
-      setMode('bilingual')
+  describe('visibility', () => {
+    it('shows original pane when content is original', () => {
+      const { showOriginalPane, showTranslatedPane, showOverlayLayer, setContentView } = usePdfBilingualMode()
 
-      expect(contentView.value).toBe('translation')
-      expect(layoutMode.value).toBe('side-by-side')
-      expect(viewerMode.value).toBe('bilingual')
+      setContentView('original')
+
+      expect(showOriginalPane.value).toBe(true)
+      expect(showTranslatedPane.value).toBe(false)
+      expect(showOverlayLayer.value).toBe(false)
     })
 
-    it('translated mode maps to translation + single', () => {
-      const { contentView, layoutMode, setMode } = usePdfBilingualMode()
+    it('shows both panes in translation + side-by-side', () => {
+      const { showOriginalPane, showTranslatedPane, showOverlayLayer, setContentView, setLayoutMode } = usePdfBilingualMode()
 
-      setMode('translated')
+      setContentView('translation')
+      setLayoutMode('side-by-side')
 
-      expect(contentView.value).toBe('translation')
-      expect(layoutMode.value).toBe('single')
+      expect(showOriginalPane.value).toBe(true)
+      expect(showTranslatedPane.value).toBe(true)
+      expect(showOverlayLayer.value).toBe(false)
+    })
+
+    it('shows only translated pane in translation + single', () => {
+      const { showOriginalPane, showTranslatedPane, showOverlayLayer, setContentView } = usePdfBilingualMode()
+
+      setContentView('translation')
+
+      expect(showOriginalPane.value).toBe(false)
+      expect(showTranslatedPane.value).toBe(true)
+      expect(showOverlayLayer.value).toBe(false)
+    })
+
+    it('shows original pane with overlay in translated-pdf', () => {
+      const { showOriginalPane, showTranslatedPane, showOverlayLayer, setContentView } = usePdfBilingualMode()
+
+      setContentView('translated-pdf')
+
+      expect(showOriginalPane.value).toBe(true)
+      expect(showTranslatedPane.value).toBe(false)
+      expect(showOverlayLayer.value).toBe(true)
     })
   })
+
+  // ── reset ────────────────────────────────────────────────────
 
   describe('reset', () => {
     it('resets both axes to defaults', () => {

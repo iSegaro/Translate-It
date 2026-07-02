@@ -258,7 +258,6 @@ const props = defineProps({
   canExport: { type: Boolean, default: false },
   scannedPageCount: { type: Number, default: 0 },
   isOcrProcessing: { type: Boolean, default: false },
-  viewerMode: { type: String, default: 'bilingual' },
   contentView: { type: String, default: CONTENT_VIEW.ORIGINAL },
   layoutMode: { type: String, default: LAYOUT_MODE.SINGLE },
   zoomMode: { type: String, default: 'fit-width' },
@@ -274,7 +273,7 @@ const props = defineProps({
   }
 })
 
-const emit = defineEmits(['file-selected', 'translate-visible', 'mode-change', 'cancel-translation', 'content-view-change', 'layout-mode-change', 'export-txt', 'export-markdown', 'export-html', 'request-ocr', 'clear-cache', 'zoom-step', 'zoom-change'])
+const emit = defineEmits(['file-selected', 'translate-visible', 'cancel-translation', 'content-view-change', 'layout-mode-change', 'export-txt', 'export-markdown', 'export-html', 'request-ocr', 'clear-cache', 'zoom-step', 'zoom-change'])
 const fileInput = ref(null)
 const exportMenuRef = ref(null)
 const exportMenuTriggerRef = ref(null)

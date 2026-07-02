@@ -125,11 +125,13 @@ function createMocks({
   }
 
   mockBilingualMode = {
-    viewerMode: ref('translated-pdf'),
+    contentView: ref('translated-pdf'),
+    layoutMode: ref('single'),
     showOriginalPane: ref(true),
     showTranslatedPane: ref(true),
     showOverlayLayer: ref(true),
-    setMode: vi.fn()
+    setContentView: vi.fn(),
+    setLayoutMode: vi.fn()
   }
 
   mockPdfExport = {

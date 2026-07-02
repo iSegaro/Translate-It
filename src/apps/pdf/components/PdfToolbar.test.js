@@ -15,7 +15,6 @@ describe('PdfToolbar', () => {
         canExport: true,
         scannedPageCount: 0,
         isOcrProcessing: false,
-        viewerMode: 'bilingual',
         zoomMode: 'fit-width',
         zoomPercent: 100,
         translationSummary: {
@@ -46,7 +45,6 @@ describe('PdfToolbar', () => {
         fileName: 'demo.pdf',
         pageCount: 12,
         currentPageNumber: 1,
-        viewerMode: 'bilingual',
         contentView: 'original',
         layoutMode: 'single',
         zoomMode: 'fit-width',
@@ -71,7 +69,6 @@ describe('PdfToolbar', () => {
         fileName: 'demo.pdf',
         pageCount: 12,
         currentPageNumber: 1,
-        viewerMode: 'translated',
         contentView: 'translation',
         layoutMode: 'single',
         zoomMode: 'fit-width',
@@ -87,19 +84,6 @@ describe('PdfToolbar', () => {
     expect(wrapper.emitted('layout-mode-change')?.[0]?.[0]).toBe('side-by-side')
   })
 
-  it('accepts legacy viewerMode prop without error (backward compat)', () => {
-    const wrapper = mount(PdfToolbar, {
-      props: {
-        fileName: 'demo.pdf',
-        pageCount: 1,
-        currentPageNumber: 1,
-        viewerMode: 'bilingual'
-      }
-    })
-
-    expect(wrapper.find('.pdf-toolbar').exists()).toBe(true)
-  })
-
   it('keeps Open PDF and Clear Cache in the hamburger menu and export in the export menu', async () => {
     const wrapper = mount(PdfToolbar, {
       props: {
@@ -112,7 +96,6 @@ describe('PdfToolbar', () => {
         canExport: true,
         scannedPageCount: 0,
         isOcrProcessing: false,
-        viewerMode: 'bilingual',
         zoomMode: 'fit-width',
         zoomPercent: 100,
         translationSummary: {
@@ -181,7 +164,6 @@ describe('PdfToolbar', () => {
         canTranslateVisiblePages: false,
         canExport: false,
         isTranslating: false,
-        viewerMode: 'bilingual',
         zoomMode: 'fit-width',
         zoomPercent: 100
       }
