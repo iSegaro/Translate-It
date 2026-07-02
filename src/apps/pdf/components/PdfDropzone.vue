@@ -54,6 +54,7 @@ function handleDrop(event) {
 
 <style scoped lang="scss">
 .pdf-dropzone {
+  flex: 1;
   min-height: calc(100vh - 140px);
   border: 1px dashed rgba(255, 255, 255, 0.18);
   border-radius: 24px;
