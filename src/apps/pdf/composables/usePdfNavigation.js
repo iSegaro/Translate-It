@@ -181,6 +181,22 @@ export function usePdfNavigation(viewerRef) {
     void updateActiveOutline()
   })
 
+  // ── Validation ───────────────────────────────────────────
+
+  const ALLOWED_PROTOCOLS = Object.freeze(['http:', 'https:', 'mailto:', 'tel:'])
+  const REJECTED_PROTOCOLS = Object.freeze(['javascript:', 'data:', 'vbscript:'])
+
+  function isValidNavigationUrl(url) {
+    try {
+      const parsed = new URL(url, window.location.href)
+      if (REJECTED_PROTOCOLS.includes(parsed.protocol)) return false
+      if (!ALLOWED_PROTOCOLS.includes(parsed.protocol)) return false
+      return true
+    } catch {
+      return false
+    }
+  }
+
   // ── Navigation ───────────────────────────────────────────
 
   function navigateToPage(pageNumber, options = {}) {
@@ -239,6 +255,47 @@ export function usePdfNavigation(viewerRef) {
     }
   }
 
+  function handleNavigationTarget(target) {
+    if (!target) {
+      return
+    }
+
+    switch (target.type) {
+      case NavigationTargetType.PAGE:
+        navigateToDestination(target.dest)
+        break
+
+      case NavigationTargetType.URI:
+        if (!isValidNavigationUrl(target.url)) {
+          logger.warn('Rejected unsafe URL:', target.url)
+          return
+        }
+
+        const openedWindow = window.open(
+          target.url,
+          '_blank',
+          'noopener,noreferrer'
+        )
+
+        if (!openedWindow) {
+          logger.warn('Failed to open URL — popup may have been blocked:', target.url)
+        }
+        break
+
+      case NavigationTargetType.ACTION:
+        logger.warn('Named action not yet implemented:', target.action)
+        break
+
+      case NavigationTargetType.EXTERNAL_FILE:
+        logger.warn('External file navigation not supported:', target.fileName)
+        break
+
+      case NavigationTargetType.UNSUPPORTED:
+        logger.warn('Unsupported navigation target:', target.reason)
+        break
+    }
+  }
+
   // ── Lifecycle ────────────────────────────────────────────
 
   async function attachDocument(documentSession) {
@@ -288,6 +345,7 @@ export function usePdfNavigation(viewerRef) {
     expandedDests,
     navigateToPage,
     navigateToDestination,
+    handleNavigationTarget,
     attachDocument,
     detachDocument
   }

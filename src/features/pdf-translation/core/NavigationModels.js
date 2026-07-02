@@ -178,6 +178,38 @@ export function createOutlineNode(rawNode) {
 // ===== Link Annotation =====
 
 /**
+ * Classify an annotation's navigation action into a typed target.
+ *
+ * @param {object} annotation - Normalized annotation fields
+ * @param {string|null} annotation.url
+ * @param {*} annotation.dest
+ * @param {string|null} annotation.action
+ * @param {boolean} annotation.newWindow
+ * @returns {PageTarget|UriTarget|ActionTarget|UnsupportedTarget}
+ */
+export function classifyAnnotationTarget({ url, dest, action, newWindow }) {
+  if (typeof dest === 'string' || Array.isArray(dest) || typeof dest === 'number') {
+    return Object.freeze({
+      type: NavigationTargetType.PAGE,
+      dest
+    })
+  }
+
+  if (url) {
+    return createUriTarget({ url, newWindow })
+  }
+
+  if (action) {
+    if (Object.values(NamedActionType).includes(action)) {
+      return createActionTarget({ action })
+    }
+    return createUnsupportedTarget({ reason: `Unrecognized action: ${action}`, originalDest: action })
+  }
+
+  return createUnsupportedTarget({ reason: 'No recognizable action type in annotation' })
+}
+
+/**
  * Create a normalized link annotation from pdf.js getAnnotations() data.
  *
  * @param {object} rawAnnotation - Raw annotation data from pdf.js
@@ -188,7 +220,7 @@ export function createLinkAnnotation(rawAnnotation) {
 
   const rect = rawAnnotation.rect || [0, 0, 0, 0]
 
-  return Object.freeze({
+  const annotation = {
     id: String(rawAnnotation.id || ''),
     type: Number(rawAnnotation.annotationType) || 0,
     rect: Object.freeze({
@@ -202,6 +234,11 @@ export function createLinkAnnotation(rawAnnotation) {
     unsafeUrl: rawAnnotation.unsafeUrl || null,
     action: rawAnnotation.action || null,
     newWindow: rawAnnotation.newWindow || false
+  }
+
+  return Object.freeze({
+    ...annotation,
+    target: classifyAnnotationTarget(annotation)
   })
 }
 

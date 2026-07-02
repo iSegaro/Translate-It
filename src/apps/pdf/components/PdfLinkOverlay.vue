@@ -34,7 +34,7 @@ const props = defineProps({
     type: Boolean,
     default: false
   },
-  navigateToDestination: {
+  handleNavigationTarget: {
     type: Function,
     default: null
   }
@@ -113,9 +113,7 @@ function normalizeAnnotation(annotation, viewport) {
 
   return {
     id: annotation.id,
-    dest: annotation.dest,
-    url: annotation.url,
-    newWindow: annotation.newWindow,
+    target: annotation.target,
     style: {
       left: `${left / containerWidth * 100}%`,
       top: `${top / containerHeight * 100}%`,
@@ -129,17 +127,8 @@ function handleLinkClick(event, link) {
   event.preventDefault()
   event.stopPropagation()
 
-  if (link.dest) {
-    if (props.navigateToDestination) {
-      props.navigateToDestination(link.dest)
-    }
-    return
-  }
-
-  if (link.url) {
-    const newWindow = link.newWindow !== false
-    window.open(link.url, newWindow ? '_blank' : '_self', 'noopener,noreferrer')
-    return
+  if (props.handleNavigationTarget && link.target) {
+    props.handleNavigationTarget(link.target)
   }
 }
 

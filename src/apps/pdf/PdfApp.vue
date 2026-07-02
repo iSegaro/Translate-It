@@ -111,7 +111,7 @@
                   :highlighted-block-id="highlightedBlockId"
                   :show-overlay="showOverlayLayer"
                   :overlay-page-data="translatedPageData"
-                  :navigate-to-destination="navigateToDestination"
+                  :handle-navigation-target="handleNavigationTarget"
                   :scroll-container="originalScrollContainer"
                   @layout-change="handleLayoutChange"
                   @current-page-change="handleCurrentPageChange"
@@ -216,6 +216,7 @@ const {
   expandedDests,
   navigateToPage,
   navigateToDestination,
+  handleNavigationTarget,
   attachDocument,
   detachDocument
 } = usePdfNavigation(pdfViewerRef)

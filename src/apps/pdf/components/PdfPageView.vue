@@ -18,7 +18,7 @@
         :session="session"
         :page-number="page.pageNumber"
         :visible="visible"
-        :navigate-to-destination="navigateToDestination"
+        :handle-navigation-target="handleNavigationTarget"
       />
       <PdfOverlayLayer
         v-if="showOverlay"
@@ -60,7 +60,7 @@ const props = defineProps({
     type: Array,
     default: () => []
   },
-  navigateToDestination: {
+  handleNavigationTarget: {
     type: Function,
     default: null
   }
