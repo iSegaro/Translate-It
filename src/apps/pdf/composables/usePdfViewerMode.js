@@ -49,32 +49,46 @@ export { LAYOUT_MODE }
 const VALID_LAYOUT_MODES = new Set(Object.values(LAYOUT_MODE))
 
 /**
+ * @readonly
+ * @enum {string}
+ *
+ * viewerRole — the role of a PdfViewer instance in the layout.
+ *
+ * | Value       | Meaning                                              |
+ * |-------------|------------------------------------------------------|
+ * | 'original'  | Primary viewer — owns layout, pagination, interaction |
+ * | 'overlay'   | Secondary viewer — read-only canvas + overlay only    |
+ */
+const VIEWER_ROLE = Object.freeze({
+  ORIGINAL: 'original',
+  OVERLAY: 'overlay'
+})
+export { VIEWER_ROLE }
+
+/**
  * Valid combinations of (contentView, layoutMode).
  *
- * ┌──────────────────┬──────────────┬───────┬────────────────────────┐
- * │ contentView      │ layoutMode   │ valid │ note                   │
- * ├──────────────────┼──────────────┼───────┼────────────────────────┤
- * │ original         │ single       │ ✅    │ Original PDF only      │
- * │ translation      │ single       │ ✅    │ Translation text only  │
- * │ translation      │ side-by-side │ ✅    │ Original + translation │
- * │ translated-pdf   │ single       │ ✅    │ Translated PDF overlay │
- * │ original         │ side-by-side │ ❌    │ Not meaningful         │
- * │ translated-pdf   │ side-by-side │ 🚧    │ Planned for later      │
- * └──────────────────┴──────────────┴───────┴────────────────────────┘
+ * ┌──────────────────┬──────────────┬───────┬───────────────────────────────┐
+ * │ contentView      │ layoutMode   │ valid │ note                          │
+ * ├──────────────────┼──────────────┼───────┼───────────────────────────────┤
+ * │ original         │ single       │ ✅    │ Original PDF only             │
+ * │ translation      │ single       │ ✅    │ Translation text only         │
+ * │ translation      │ side-by-side │ ✅    │ Original + translation text   │
+ * │ translated-pdf   │ single       │ ✅    │ Original PDF + overlay         │
+ * │ translated-pdf   │ side-by-side │ ✅    │ Original PDF + Translated PDF │
+ * │ original         │ side-by-side │ ❌    │ Not meaningful                │
+ * └──────────────────┴──────────────┴───────┴───────────────────────────────┘
  *
  * Invariants:
- *   1. If contentView !== 'translation', layoutMode MUST be 'single'.
- *   2. If layoutMode is 'side-by-side', contentView MUST be 'translation'.
+ *   1. If contentView is 'original', layoutMode MUST be 'single'.
+ *   2. If layoutMode is 'side-by-side', contentView MUST be 'translation'
+ *      or 'translated-pdf'.
  *
  * Transition rules:
- *   1. Setting contentView to anything other than 'translation' while
- *      layoutMode is 'side-by-side' automatically resets layoutMode → 'single'.
- *   2. Setting layoutMode to 'side-by-side' while contentView !== 'translation'
+ *   1. Setting contentView to 'original' while layoutMode is 'side-by-side'
+ *      automatically resets layoutMode → 'single'.
+ *   2. Setting layoutMode to 'side-by-side' while contentView is 'original'
  *      is rejected (silent no-op with a warning).
- *
- * Note: 'translated-pdf' + 'side-by-side' is explicitly invalid for now.
- *       Remove this restriction when the Translated PDF side-by-side feature
- *       is implemented.
  */
 
 export function usePdfViewerMode() {
@@ -85,7 +99,7 @@ export function usePdfViewerMode() {
   // Sync flush ensures layoutMode is corrected immediately when
   // contentView changes, before any computed or watcher reads stale state.
   watch(contentView, (newVal) => {
-    if (newVal !== CONTENT_VIEW.TRANSLATION && layoutMode.value === LAYOUT_MODE.SIDE_BY_SIDE) {
+    if (newVal === CONTENT_VIEW.ORIGINAL && layoutMode.value === LAYOUT_MODE.SIDE_BY_SIDE) {
       layoutMode.value = LAYOUT_MODE.SINGLE
       logger.info('Layout reset to single (content view no longer supports side-by-side)', { contentView: newVal })
     }
@@ -94,8 +108,13 @@ export function usePdfViewerMode() {
   const showOriginalPane = computed(() => {
     return contentView.value !== CONTENT_VIEW.TRANSLATION || layoutMode.value === LAYOUT_MODE.SIDE_BY_SIDE
   })
-  const showTranslatedPane = computed(() => contentView.value === CONTENT_VIEW.TRANSLATION)
-  const showOverlayLayer = computed(() => contentView.value === CONTENT_VIEW.TRANSLATED_PDF)
+  const showTranslatedTextPane = computed(() => contentView.value === CONTENT_VIEW.TRANSLATION)
+  const showTranslatedPdfPane = computed(() => {
+    return contentView.value === CONTENT_VIEW.TRANSLATED_PDF && layoutMode.value === LAYOUT_MODE.SIDE_BY_SIDE
+  })
+  const showOverlayLayer = computed(() => {
+    return contentView.value === CONTENT_VIEW.TRANSLATED_PDF && layoutMode.value === LAYOUT_MODE.SINGLE
+  })
 
   const isSideBySide = computed(() => layoutMode.value === LAYOUT_MODE.SIDE_BY_SIDE)
 
@@ -115,7 +134,7 @@ export function usePdfViewerMode() {
       return
     }
 
-    if (val === LAYOUT_MODE.SIDE_BY_SIDE && contentView.value !== CONTENT_VIEW.TRANSLATION) {
+    if (val === LAYOUT_MODE.SIDE_BY_SIDE && contentView.value === CONTENT_VIEW.ORIGINAL) {
       logger.warn('Side-by-side layout is not allowed with content view:', contentView.value)
       return
     }
@@ -136,7 +155,8 @@ export function usePdfViewerMode() {
     setLayoutMode,
     isSideBySide,
     showOriginalPane,
-    showTranslatedPane,
+    showTranslatedTextPane,
+    showTranslatedPdfPane,
     showOverlayLayer,
     reset
   }
