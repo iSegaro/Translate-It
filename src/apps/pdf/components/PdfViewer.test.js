@@ -118,8 +118,8 @@ describe('PdfViewer', () => {
     await nextTick()
 
     visibilityCallback?.([
-      { target: { dataset: { pageNumber: '2' } }, isIntersecting: true },
-      { target: { dataset: { pageNumber: '1' } }, isIntersecting: true }
+      { target: { dataset: { pageNumber: '2' } }, isIntersecting: true, intersectionRatio: 0.5 },
+      { target: { dataset: { pageNumber: '1' } }, isIntersecting: true, intersectionRatio: 0.5 }
     ])
 
     await nextTick()
@@ -128,8 +128,8 @@ describe('PdfViewer', () => {
     expect(session.updateVisiblePages).toHaveBeenCalled()
 
     visibilityCallback?.([
-      { target: { dataset: { pageNumber: '1' } }, isIntersecting: false },
-      { target: { dataset: { pageNumber: '2' } }, isIntersecting: true }
+      { target: { dataset: { pageNumber: '1' } }, isIntersecting: false, intersectionRatio: 0 },
+      { target: { dataset: { pageNumber: '2' } }, isIntersecting: true, intersectionRatio: 0.5 }
     ])
 
     await nextTick()

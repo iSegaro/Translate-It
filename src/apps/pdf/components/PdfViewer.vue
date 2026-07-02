@@ -279,7 +279,7 @@ function setupObservers() {
       const pageNumber = Number(entry.target?.dataset?.pageNumber)
       if (!pageNumber) continue
 
-      if (entry.isIntersecting) {
+      if (entry.intersectionRatio >= 0.25) {
         nextVisible.add(pageNumber)
       } else {
         nextVisible.delete(pageNumber)

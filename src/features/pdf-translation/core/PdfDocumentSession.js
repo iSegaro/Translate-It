@@ -53,7 +53,7 @@ export class PdfDocumentSession extends ResourceTracker {
     this.targetedBlockId = null
     this._renderer = new PdfRenderer({
       scheduleTimeout: (fn, ms) => this.trackTimeout(fn, ms),
-      cancelTimeout: (id) => this.clearTimeout(id)
+      cancelTimeout: (id) => this.clearTimer(id)
     })
     this._resolver = new PdfDestinationResolver()
     this._outlineRepository = new PdfOutlineRepository()
