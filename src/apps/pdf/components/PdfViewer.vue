@@ -29,11 +29,12 @@
 </template>
 
 <script setup>
-import { nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import PdfPageView from './PdfPageView.vue'
 import PdfBlockHighlightOverlay from './PdfBlockHighlightOverlay.vue'
 import { getPdfPageRootElement } from '../utils/pageViewInstance.js'
 import { usePdfSelectionBridge } from '../composables/usePdfSelectionBridge.js'
+import { VIEWER_ROLE } from '../composables/usePdfViewerMode.js'
 import './PdfViewer.scss'
 
 const props = defineProps({
@@ -44,6 +45,11 @@ const props = defineProps({
   session: {
     type: Object,
     required: true
+  },
+  viewerRole: {
+    type: String,
+    default: VIEWER_ROLE.ORIGINAL,
+    validator: (v) => Object.values(VIEWER_ROLE).includes(v)
   },
   isBlockTargetingActive: {
     type: Boolean,
@@ -84,7 +90,11 @@ let lastLayoutWidth = 0
 let lastLayoutHeight = 0
 let lastCurrentPage = 0
 
-usePdfSelectionBridge(viewerRoot)
+const isOriginalRole = computed(() => props.viewerRole === VIEWER_ROLE.ORIGINAL)
+
+if (props.viewerRole === VIEWER_ROLE.ORIGINAL) {
+  usePdfSelectionBridge(viewerRoot)
+}
 
 function getPageOverlayBlocks(pageNumber) {
   const pageData = props.overlayPageData.find((p) => p.pageNumber === pageNumber)
@@ -116,6 +126,7 @@ function resolvePageFromPoint(clientX, clientY) {
 }
 
 function handlePointerMove(event) {
+  if (!isOriginalRole.value) return
   if (!props.isBlockTargetingActive) return
 
   const pagePoint = resolvePageFromPoint(event.clientX, event.clientY)
@@ -128,12 +139,14 @@ function handlePointerMove(event) {
 }
 
 function handlePointerLeave() {
+  if (!isOriginalRole.value) return
   if (!props.isBlockTargetingActive) return
 
   emit('block-pointer-move', { pageNumber: 0, x: -1, y: -1 })
 }
 
 function handleClick(event) {
+  if (!isOriginalRole.value) return
   if (!props.isBlockTargetingActive) return
 
   const pagePoint = resolvePageFromPoint(event.clientX, event.clientY)
@@ -224,11 +237,19 @@ function refreshObservationTargets() {
 
 function updateVisiblePages(nextVisible) {
   visiblePageNumbers.value = nextVisible
-  props.session.updateVisiblePages(nextVisible)
-  emitCurrentPage(nextVisible)
+
+  if (isOriginalRole.value) {
+    props.session.updateVisiblePages(nextVisible)
+  }
+
+  if (isOriginalRole.value) {
+    emitCurrentPage(nextVisible)
+  }
 }
 
 function emitCurrentPage(nextVisible) {
+  if (!isOriginalRole.value) return
+
   const visiblePages = [...nextVisible].filter((pageNumber) => Number.isFinite(Number(pageNumber)))
   const currentPage = visiblePages.length > 0
     ? Math.min(...visiblePages)
@@ -246,6 +267,8 @@ function emitCurrentPage(nextVisible) {
 }
 
 function emitLayoutIfNeeded() {
+  if (!isOriginalRole.value) return
+
   const width = Math.floor(viewerRoot.value?.clientWidth || 0)
   const height = Math.floor(props.scrollContainer?.clientHeight || viewerRoot.value?.clientHeight || 0)
 
@@ -307,7 +330,10 @@ function setupObservers() {
     }
 
     renderCandidatePageNumbers.value = nextRenderable
-    props.session.updateRenderCandidates(nextRenderable)
+
+    if (isOriginalRole.value) {
+      props.session.updateRenderCandidates(nextRenderable)
+    }
   }, {
     root,
     threshold: 0
@@ -330,22 +356,31 @@ watch(
   async () => {
     await nextTick()
     refreshObservationTargets()
-    emitLayoutIfNeeded()
-    emitCurrentPage(visiblePageNumbers.value)
+
+    if (isOriginalRole.value) {
+      emitLayoutIfNeeded()
+      emitCurrentPage(visiblePageNumbers.value)
+    }
   }
 )
 
 onMounted(() => {
   setupObservers()
-  emitCurrentPage(visiblePageNumbers.value)
+
+  if (isOriginalRole.value) {
+    emitCurrentPage(visiblePageNumbers.value)
+  }
 })
 
 onBeforeUnmount(() => {
   disconnectObservers()
   visiblePageNumbers.value = new Set()
   renderCandidatePageNumbers.value = new Set()
-  props.session.updateVisiblePages(new Set())
-  props.session.updateRenderCandidates(new Set())
+
+  if (isOriginalRole.value) {
+    props.session.updateVisiblePages(new Set())
+    props.session.updateRenderCandidates(new Set())
+  }
 })
 
 function collectCanvasDataUrls() {
