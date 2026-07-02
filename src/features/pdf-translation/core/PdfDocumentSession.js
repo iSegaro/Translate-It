@@ -44,6 +44,7 @@ export class PdfDocumentSession extends ResourceTracker {
     this.pageMetrics = []
     this.pageScale = 1
     this.visiblePageNumbers = new Set()
+    this._renderCandidatePageNumbers = new Set()
     this.pageSessions = new Map()
     this.pdfFingerprint = ''
     this.documentIdentity = ''
@@ -195,7 +196,12 @@ export class PdfDocumentSession extends ResourceTracker {
 
   updateVisiblePages(pageNumbers) {
     this.visiblePageNumbers = new Set(pageNumbers)
-    this._renderer.scheduleCleanup(this.visiblePageNumbers)
+    this._scheduleCleanup()
+  }
+
+  updateRenderCandidates(pageNumbers) {
+    this._renderCandidatePageNumbers = new Set(pageNumbers)
+    this._scheduleCleanup()
   }
 
   async _getPageSession(pageNumber) {
@@ -491,13 +497,18 @@ export class PdfDocumentSession extends ResourceTracker {
   }
 
   _scheduleCleanup() {
-    this._renderer.scheduleCleanup(this.visiblePageNumbers)
+    const merged = new Set([
+      ...this.visiblePageNumbers,
+      ...this._renderCandidatePageNumbers
+    ])
+    this._renderer.scheduleCleanup(merged)
   }
 
   async cleanupDocument() {
     this._renderer.cancelScheduledCleanup()
     this._cancelAllRenders()
     this.visiblePageNumbers.clear()
+    this._renderCandidatePageNumbers.clear()
     this.pageSessions.clear()
     this.translationStates.clear()
     this.targetedBlockId = null

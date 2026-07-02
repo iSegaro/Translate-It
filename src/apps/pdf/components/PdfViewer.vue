@@ -13,7 +13,7 @@
       :ref="(instance) => registerPageView(page.pageNumber, instance)"
       :page="page"
       :session="session"
-      :visible="visiblePageNumbers.has(page.pageNumber)"
+      :visible="renderCandidatePageNumbers.has(page.pageNumber)"
       :show-overlay="showOverlay"
       :overlay-blocks="getPageOverlayBlocks(page.pageNumber)"
       :handle-navigation-target="handleNavigationTarget"
@@ -75,8 +75,10 @@ const emit = defineEmits(['layout-change', 'current-page-change', 'block-pointer
 const viewerRoot = ref(null)
 const pageViews = new Map()
 const visiblePageNumbers = ref(new Set())
+const renderCandidatePageNumbers = ref(new Set())
 const highlightedBounds = ref(null)
 let intersectionObserver = null
+let renderCandidateObserver = null
 let resizeObserver = null
 let lastLayoutWidth = 0
 let lastLayoutHeight = 0
@@ -191,21 +193,24 @@ function registerPageView(pageNumber, instance) {
 
   pageViews.set(pageNumber, instance)
   const rootEl = getPdfPageRootElement(instance)
-  if (intersectionObserver && rootEl) {
+  if (intersectionObserver && renderCandidateObserver && rootEl) {
     rootEl.dataset.pageNumber = String(pageNumber)
     intersectionObserver.observe(rootEl)
+    renderCandidateObserver.observe(rootEl)
   }
 }
 
 function disconnectObservers() {
   intersectionObserver?.disconnect()
+  renderCandidateObserver?.disconnect()
   resizeObserver?.disconnect()
   intersectionObserver = null
+  renderCandidateObserver = null
   resizeObserver = null
 }
 
 function refreshObservationTargets() {
-  if (!intersectionObserver) return
+  if (!intersectionObserver || !renderCandidateObserver) return
 
   for (const [pageNumber, instance] of pageViews.entries()) {
     const rootEl = getPdfPageRootElement(instance)
@@ -213,6 +218,7 @@ function refreshObservationTargets() {
 
     rootEl.dataset.pageNumber = String(pageNumber)
     intersectionObserver.observe(rootEl)
+    renderCandidateObserver.observe(rootEl)
   }
 }
 
@@ -286,6 +292,27 @@ function setupObservers() {
     threshold: 0.25
   })
 
+  renderCandidateObserver = new IntersectionObserver((entries) => {
+    const nextRenderable = new Set(renderCandidatePageNumbers.value)
+
+    for (const entry of entries) {
+      const pageNumber = Number(entry.target?.dataset?.pageNumber)
+      if (!pageNumber) continue
+
+      if (entry.isIntersecting) {
+        nextRenderable.add(pageNumber)
+      } else {
+        nextRenderable.delete(pageNumber)
+      }
+    }
+
+    renderCandidatePageNumbers.value = nextRenderable
+    props.session.updateRenderCandidates(nextRenderable)
+  }, {
+    root,
+    threshold: 0
+  })
+
   resizeObserver = new ResizeObserver(() => {
     emitLayoutIfNeeded()
   })
@@ -316,7 +343,9 @@ onMounted(() => {
 onBeforeUnmount(() => {
   disconnectObservers()
   visiblePageNumbers.value = new Set()
+  renderCandidatePageNumbers.value = new Set()
   props.session.updateVisiblePages(new Set())
+  props.session.updateRenderCandidates(new Set())
 })
 
 function collectCanvasDataUrls() {

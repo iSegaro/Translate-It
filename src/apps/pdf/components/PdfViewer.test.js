@@ -33,7 +33,8 @@ const resizeObserveMock = vi.fn()
 const resizeDisconnectMock = vi.fn()
 let intersectionObserverClass
 let resizeObserverClass
-let intersectionCallback
+let visibilityCallback
+let renderCallback
 
 describe('PdfViewer', () => {
   beforeEach(() => {
@@ -41,11 +42,18 @@ describe('PdfViewer', () => {
     disconnectMock.mockClear()
     resizeObserveMock.mockClear()
     resizeDisconnectMock.mockClear()
-    intersectionCallback = null
+    visibilityCallback = null
+    renderCallback = null
+    let instanceCount = 0
 
     intersectionObserverClass = class IntersectionObserver {
       constructor(callback) {
-        intersectionCallback = callback
+        this._index = instanceCount++
+        if (this._index === 0) {
+          visibilityCallback = callback
+        } else {
+          renderCallback = callback
+        }
       }
       observe(target) {
         observeMock(target)
@@ -74,7 +82,8 @@ describe('PdfViewer', () => {
       props: {
         pages: [{ pageNumber: 1, width: 100, height: 100, scale: 1 }],
         session: {
-          updateVisiblePages: vi.fn()
+          updateVisiblePages: vi.fn(),
+          updateRenderCandidates: vi.fn()
         }
       },
       attachTo: document.body
@@ -90,7 +99,8 @@ describe('PdfViewer', () => {
 
   it('emits the top-most visible page as the current page', async () => {
     const session = {
-      updateVisiblePages: vi.fn()
+      updateVisiblePages: vi.fn(),
+      updateRenderCandidates: vi.fn()
     }
 
     const wrapper = mount(PdfViewer, {
@@ -107,7 +117,7 @@ describe('PdfViewer', () => {
     await nextTick()
     await nextTick()
 
-    intersectionCallback?.([
+    visibilityCallback?.([
       { target: { dataset: { pageNumber: '2' } }, isIntersecting: true },
       { target: { dataset: { pageNumber: '1' } }, isIntersecting: true }
     ])
@@ -117,7 +127,7 @@ describe('PdfViewer', () => {
     expect(wrapper.emitted('current-page-change')?.at(-1)?.[0]).toBe(1)
     expect(session.updateVisiblePages).toHaveBeenCalled()
 
-    intersectionCallback?.([
+    visibilityCallback?.([
       { target: { dataset: { pageNumber: '1' } }, isIntersecting: false },
       { target: { dataset: { pageNumber: '2' } }, isIntersecting: true }
     ])
@@ -131,7 +141,8 @@ describe('PdfViewer', () => {
 
   it('emits both width and height for layout changes', async () => {
     const session = {
-      updateVisiblePages: vi.fn()
+      updateVisiblePages: vi.fn(),
+      updateRenderCandidates: vi.fn()
     }
 
     const widthDescriptor = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'clientWidth')
