@@ -234,13 +234,12 @@ export function usePdfViewerController() {
       _pageMetricIndex.set(metric.pageNumber, metric)
 
       const pageSession = pdfDocumentSession.pageSessions.get(metric.pageNumber)
-      if (!pageSession) continue
 
       _pageDataMap.set(metric.pageNumber, reactive({
         pageNumber: metric.pageNumber,
         width: metric.width,
         height: metric.height,
-        blocks: _buildBlocksForPage(pageSession)
+        blocks: pageSession ? _buildBlocksForPage(pageSession) : []
       }))
     }
 
