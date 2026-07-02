@@ -7,6 +7,8 @@
       v-if="showOriginalPane"
       class="pdf-viewer-layout__pane pdf-viewer-layout__pane--original"
       ref="originalPaneRef"
+      tabindex="-1"
+      @click="focusPane"
     >
       <slot name="original" />
     </div>
@@ -43,6 +45,26 @@ const props = defineProps({
 
 const originalPaneRef = ref(null)
 const translatedPaneRef = ref(null)
+
+const INTERACTIVE_TAGS = new Set(['button', 'input', 'textarea', 'select', 'a'])
+
+function focusPane(event) {
+  const target = event.target
+  if (target instanceof HTMLElement) {
+    const tag = target.tagName.toLowerCase()
+    if (INTERACTIVE_TAGS.has(tag)) {
+      return
+    }
+    if (target.isContentEditable) {
+      return
+    }
+  }
+
+  const pane = originalPaneRef.value
+  if (pane && document.activeElement !== pane) {
+    pane.focus({ preventScroll: true })
+  }
+}
 
 const layoutClasses = computed(() => ({
   'pdf-viewer-layout--original': props.viewerMode === 'original',

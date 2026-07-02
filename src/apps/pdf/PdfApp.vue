@@ -161,6 +161,7 @@ import { usePdfExport } from './composables/usePdfExport.js'
 import { usePdfBlockSelection } from './composables/usePdfBlockSelection.js'
 import { usePdfOcr } from './composables/usePdfOcr.js'
 import { usePdfNavigation } from './composables/usePdfNavigation.js'
+import { usePdfKeyboard } from './composables/usePdfKeyboard.js'
 import { buildPdfStatusBannerState } from './utils/pdfStatusBanner.js'
 import './PdfApp.scss'
 
@@ -255,6 +256,13 @@ const {
     translationTick.value += 1
     refreshOcrCandidates()
   }
+})
+
+usePdfKeyboard({
+  currentPage,
+  totalPages: pageCount,
+  navigateToPage,
+  containerRef: originalScrollContainer
 })
 
 const isDragOver = ref(false)
