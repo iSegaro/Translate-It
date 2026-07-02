@@ -2,7 +2,7 @@ import ResourceTracker from '@/core/memory/ResourceTracker.js'
 import { getScopedLogger } from '@/shared/logging/logger.js'
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js'
 import { ensurePdfJsConfigured, getPdfWorkerUrl, loadPdfDocumentFromFile, AnnotationType } from './pdfjs.js'
-import { PdfTextLayerRenderer } from './PdfTextLayerRenderer.js'
+import { PdfRenderer } from './PdfRenderer.js'
 import { PdfPageSession } from './PdfPageSession.js'
 import { sha256HexFromArrayBuffer } from './PdfBlockIdentity.js'
 import { createPageTarget, createOutlineNode, createLinkAnnotation } from './NavigationModels.js'
@@ -40,7 +40,6 @@ export class PdfDocumentSession extends ResourceTracker {
     this.fileName = ''
     this.totalPages = 0
     this.pageMetrics = []
-    this.renderTasks = new Map()
     this.pageScale = 1
     this.visiblePageNumbers = new Set()
     this.pageSessions = new Map()
@@ -49,8 +48,11 @@ export class PdfDocumentSession extends ResourceTracker {
     this.displayName = ''
     this.translationStates = new Map()
     this.targetedBlockId = null
-    this._pendingCleanup = null
     this._destinationCache = new Map()
+    this._renderer = new PdfRenderer({
+      scheduleTimeout: (fn, ms) => this.trackTimeout(fn, ms),
+      cancelTimeout: (id) => this.clearTimeout(id)
+    })
     this._pageIndexCache = new Map()
     this._outline = null
     this._linkAnnotationCache = new Map()
@@ -166,7 +168,7 @@ export class PdfDocumentSession extends ResourceTracker {
       return this.getState()
     }
 
-    this._cancelAllRenders()
+    this._renderer.cancelAll()
     await this._buildPageMetrics(layoutRequest)
 
     logger.info('PDF page metrics rebuilt:', {
@@ -193,7 +195,7 @@ export class PdfDocumentSession extends ResourceTracker {
 
   updateVisiblePages(pageNumbers) {
     this.visiblePageNumbers = new Set(pageNumbers)
-    this._scheduleCleanup()
+    this._renderer.scheduleCleanup(this.visiblePageNumbers)
   }
 
   async _getPageSession(pageNumber) {
@@ -715,100 +717,25 @@ export class PdfDocumentSession extends ResourceTracker {
   }
 
   async renderPage(pageNumber, canvasEl, textLayerRenderer) {
-    if (!this.pdfDocument || !canvasEl) return false
-
     const metric = this.pageMetrics[pageNumber - 1]
     if (!metric) return false
-
-    const previous = this.renderTasks.get(pageNumber)
-    previous?.cancel?.()
-
-    const page = await this.pdfDocument.getPage(pageNumber)
-    const viewport = page.getViewport({ scale: metric.scale })
-
-    canvasEl.width = Math.floor(viewport.width)
-    canvasEl.height = Math.floor(viewport.height)
-    canvasEl.style.width = `${Math.floor(viewport.width)}px`
-    canvasEl.style.height = `${Math.floor(viewport.height)}px`
-
-    const context = canvasEl.getContext('2d', { alpha: false, willReadFrequently: true })
-    if (!context) {
-      throw new Error('Canvas 2D context not available')
-    }
-
-    const renderTask = page.render({
-      canvasContext: context,
-      viewport,
-      intent: 'display'
-    })
-
-    this.renderTasks.set(pageNumber, renderTask)
-
-    try {
-      await renderTask.promise
-      if (textLayerRenderer instanceof PdfTextLayerRenderer) {
-        const cw = Math.floor(viewport.width)
-        const ch = Math.floor(viewport.height)
-        await textLayerRenderer.render(page, viewport, cw, ch)
-      }
-      return true
-    } catch (error) {
-      if (error?.name !== 'RenderingCancelledException') {
-        logger.warn(`Failed to render page ${pageNumber}:`, error)
-      }
-      return false
-    } finally {
-      if (this.renderTasks.get(pageNumber) === renderTask) {
-        this.renderTasks.delete(pageNumber)
-      }
-      page.cleanup?.()
-    }
+    return this._renderer.renderPage(this.pdfDocument, metric, pageNumber, canvasEl, textLayerRenderer)
   }
 
   clearPage(pageNumber, canvasEl, textLayerRenderer) {
-    this.renderTasks.get(pageNumber)?.cancel?.()
-    this.renderTasks.delete(pageNumber)
-
-    if (canvasEl) {
-      const context = canvasEl.getContext('2d')
-      context?.clearRect(0, 0, canvasEl.width, canvasEl.height)
-      canvasEl.width = 0
-      canvasEl.height = 0
-    }
-
-    if (textLayerRenderer instanceof PdfTextLayerRenderer) {
-      textLayerRenderer.clear()
-    }
+    this._renderer.clearPage(pageNumber, canvasEl, textLayerRenderer)
   }
 
   _cancelAllRenders() {
-    for (const renderTask of this.renderTasks.values()) {
-      renderTask.cancel?.()
-    }
-    this.renderTasks.clear()
+    this._renderer.cancelAll()
   }
 
   _scheduleCleanup() {
-    if (this._pendingCleanup) {
-      clearTimeout(this._pendingCleanup)
-    }
-
-    this._pendingCleanup = this.trackTimeout(() => {
-      this._pendingCleanup = null
-      for (const [pageNumber, renderTask] of this.renderTasks.entries()) {
-        if (!this.visiblePageNumbers.has(pageNumber)) {
-          renderTask.cancel?.()
-        }
-      }
-    }, 200)
+    this._renderer.scheduleCleanup(this.visiblePageNumbers)
   }
 
   async cleanupDocument() {
-    if (this._pendingCleanup) {
-      this.clearTimeout(this._pendingCleanup)
-      this._pendingCleanup = null
-    }
-
+    this._renderer.cancelScheduledCleanup()
     this._cancelAllRenders()
     this.visiblePageNumbers.clear()
     this.pageSessions.clear()
@@ -850,6 +777,7 @@ export class PdfDocumentSession extends ResourceTracker {
 
   async destroy() {
     await this.cleanupDocument()
+    this._renderer.destroy()
     super.destroy()
   }
 }
