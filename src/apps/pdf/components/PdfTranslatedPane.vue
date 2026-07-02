@@ -65,6 +65,7 @@
 
 <script setup>
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { LAYOUT_MODE } from '../composables/usePdfBilingualMode.js'
 import PdfTranslatedBlock from './PdfTranslatedBlock.vue'
 import PdfOcrStatus from './PdfOcrStatus.vue'
 import './PdfTranslatedPane.scss'
@@ -82,9 +83,9 @@ const props = defineProps({
     type: Array,
     default: () => []
   },
-  viewerMode: {
+  layoutMode: {
     type: String,
-    default: 'bilingual'
+    default: LAYOUT_MODE.SINGLE
   },
   scrollContainer: {
     type: HTMLElement,
@@ -101,10 +102,10 @@ const hasTranslatedData = computed(() => {
   return props.translatedPageData.some(page => page.blocks.length > 0)
 })
 
-const isBilingualMode = computed(() => props.viewerMode === 'bilingual')
+const isSideBySide = computed(() => props.layoutMode === LAYOUT_MODE.SIDE_BY_SIDE)
 
 function getPageBodyStyle(pageNumber) {
-  if (!isBilingualMode.value) return {}
+  if (!isSideBySide.value) return {}
 
   const metric = props.pageMetrics.find((page) => page.pageNumber === pageNumber)
   const minHeight = Math.max(0, Math.floor(Number(metric?.height) || 0))

@@ -130,7 +130,7 @@
                   :translated-page-data="translatedPageData"
                   :highlighted-block-id="highlightedBlockId"
                   :page-metrics="pageMetrics"
-                  :viewer-mode="viewerMode"
+                  :layout-mode="layoutMode"
                   :scroll-container="originalScrollContainer"
                   @current-page-change="handleTranslatedPaneCurrentPageChange"
                 />

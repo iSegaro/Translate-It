@@ -55,7 +55,7 @@ describe('PdfTranslatedPane', () => {
   it('renders pages with blocks', () => {
     const wrapper = mount(PdfTranslatedPane, {
       props: {
-        viewerMode: 'bilingual',
+        layoutMode: 'side-by-side',
         pageMetrics: [
           { pageNumber: 1, width: 100, height: 200 }
         ],
@@ -78,10 +78,10 @@ describe('PdfTranslatedPane', () => {
     expect(wrapper.findAll('.mock-block')).toHaveLength(2)
   })
 
-  it('applies page-height normalization in bilingual mode', () => {
+  it('applies page-height normalization in side-by-side layout', () => {
     const wrapper = mount(PdfTranslatedPane, {
       props: {
-        viewerMode: 'bilingual',
+        layoutMode: 'side-by-side',
         pageMetrics: [
           { pageNumber: 1, width: 100, height: 240 }
         ],
@@ -101,10 +101,10 @@ describe('PdfTranslatedPane', () => {
     expect(wrapper.find('.pdf-translated-page__body').attributes('style')).toContain('min-height: 240px')
   })
 
-  it('does not apply page-height normalization in translated-only mode', () => {
+  it('does not apply page-height normalization in single layout', () => {
     const wrapper = mount(PdfTranslatedPane, {
       props: {
-        viewerMode: 'translated',
+        layoutMode: 'single',
         pageMetrics: [
           { pageNumber: 1, width: 100, height: 240 }
         ],
@@ -127,7 +127,7 @@ describe('PdfTranslatedPane', () => {
   it('renders normally when page metrics are missing', () => {
     const wrapper = mount(PdfTranslatedPane, {
       props: {
-        viewerMode: 'bilingual',
+        layoutMode: 'side-by-side',
         translatedPageData: [
           {
             pageNumber: 1,
