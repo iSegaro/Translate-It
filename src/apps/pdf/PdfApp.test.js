@@ -56,6 +56,7 @@ vi.mock('./components/PdfViewerLayout.vue', () => ({
 vi.mock('./components/PdfViewer.vue', () => ({
   default: {
     name: 'PdfViewer',
+    props: ['viewerRole', 'showOverlay', 'isBlockTargetingActive', 'highlightedBlockId', 'handleNavigationTarget'],
     template: '<div class="pdf-viewer-stub" />'
   }
 }))
@@ -129,8 +130,10 @@ function createMocks({
     contentView: ref('translated-pdf'),
     layoutMode: ref('single'),
     showOriginalPane: ref(true),
-    showTranslatedPane: ref(true),
+    showTranslatedTextPane: ref(false),
+    showTranslatedPdfPane: ref(false),
     showOverlayLayer: ref(true),
+    isSideBySide: ref(false),
     setContentView: vi.fn(),
     setLayoutMode: vi.fn()
   }
@@ -304,5 +307,115 @@ describe('PdfApp', () => {
 
     expect(wrapper.text()).toContain('Failed to export as TXT.')
     expect(wrapper.text()).not.toContain('TXT export ready')
+  })
+
+  // ── Rendering modes ──────────────────────────────────────────
+
+  describe('rendering modes', () => {
+    it('original + single renders one PdfViewer without overlay', async () => {
+      createMocks()
+      mockViewerMode.contentView.value = 'original'
+      mockViewerMode.layoutMode.value = 'single'
+      mockViewerMode.showOriginalPane.value = true
+      mockViewerMode.showTranslatedTextPane.value = false
+      mockViewerMode.showTranslatedPdfPane.value = false
+      mockViewerMode.showOverlayLayer.value = false
+
+      const wrapper = mount(PdfApp)
+      await flushPromises()
+
+      const viewers = wrapper.findAllComponents({ name: 'PdfViewer' })
+      expect(viewers).toHaveLength(1)
+      expect(viewers[0].props('viewerRole')).toBe('original')
+      expect(viewers[0].props('showOverlay')).toBe(false)
+      expect(wrapper.findComponent({ name: 'PdfTranslatedPane' }).exists()).toBe(false)
+    })
+
+    it('translation + single renders only PdfTranslatedPane', async () => {
+      createMocks()
+      mockViewerMode.contentView.value = 'translation'
+      mockViewerMode.layoutMode.value = 'single'
+      mockViewerMode.showOriginalPane.value = false
+      mockViewerMode.showTranslatedTextPane.value = true
+      mockViewerMode.showTranslatedPdfPane.value = false
+      mockViewerMode.showOverlayLayer.value = false
+
+      const wrapper = mount(PdfApp)
+      await flushPromises()
+
+      expect(wrapper.findAllComponents({ name: 'PdfViewer' })).toHaveLength(0)
+      expect(wrapper.findComponent({ name: 'PdfTranslatedPane' }).exists()).toBe(true)
+    })
+
+    it('translation + side-by-side renders PdfViewer and PdfTranslatedPane', async () => {
+      createMocks()
+      mockViewerMode.contentView.value = 'translation'
+      mockViewerMode.layoutMode.value = 'side-by-side'
+      mockViewerMode.showOriginalPane.value = true
+      mockViewerMode.showTranslatedTextPane.value = true
+      mockViewerMode.showTranslatedPdfPane.value = false
+      mockViewerMode.showOverlayLayer.value = false
+      mockViewerMode.isSideBySide.value = true
+
+      const wrapper = mount(PdfApp)
+      await flushPromises()
+
+      const viewers = wrapper.findAllComponents({ name: 'PdfViewer' })
+      expect(viewers).toHaveLength(1)
+      expect(viewers[0].props('viewerRole')).toBe('original')
+      expect(viewers[0].props('showOverlay')).toBe(false)
+      expect(wrapper.findComponent({ name: 'PdfTranslatedPane' }).exists()).toBe(true)
+    })
+
+    it('translated-pdf + single renders one PdfViewer with overlay', async () => {
+      createMocks()
+      mockViewerMode.contentView.value = 'translated-pdf'
+      mockViewerMode.layoutMode.value = 'single'
+      mockViewerMode.showOriginalPane.value = true
+      mockViewerMode.showTranslatedTextPane.value = false
+      mockViewerMode.showTranslatedPdfPane.value = false
+      mockViewerMode.showOverlayLayer.value = true
+      mockViewerMode.isSideBySide.value = false
+
+      const wrapper = mount(PdfApp)
+      await flushPromises()
+
+      const viewers = wrapper.findAllComponents({ name: 'PdfViewer' })
+      expect(viewers).toHaveLength(1)
+      expect(viewers[0].props('viewerRole')).toBe('original')
+      expect(viewers[0].props('showOverlay')).toBe(true)
+      expect(wrapper.findComponent({ name: 'PdfTranslatedPane' }).exists()).toBe(false)
+    })
+
+    it('translated-pdf + side-by-side renders two PdfViewers', async () => {
+      createMocks()
+      mockViewerMode.contentView.value = 'translated-pdf'
+      mockViewerMode.layoutMode.value = 'side-by-side'
+      mockViewerMode.showOriginalPane.value = true
+      mockViewerMode.showTranslatedTextPane.value = false
+      mockViewerMode.showTranslatedPdfPane.value = true
+      mockViewerMode.showOverlayLayer.value = false
+      mockViewerMode.isSideBySide.value = true
+
+      const wrapper = mount(PdfApp)
+      await flushPromises()
+
+      const viewers = wrapper.findAllComponents({ name: 'PdfViewer' })
+      expect(viewers).toHaveLength(2)
+
+      expect(viewers[0].props('viewerRole')).toBe('original')
+      expect(viewers[0].props('showOverlay')).toBe(false)
+      expect(viewers[0].props('isBlockTargetingActive')).toBe(false)
+      expect(viewers[0].props('highlightedBlockId')).toBe('')
+      expect(viewers[0].props('handleNavigationTarget')).toBeTruthy()
+
+      expect(viewers[1].props('viewerRole')).toBe('overlay')
+      expect(viewers[1].props('showOverlay')).toBe(true)
+      expect(viewers[1].props('isBlockTargetingActive')).toBeUndefined()
+      expect(viewers[1].props('highlightedBlockId')).toBeUndefined()
+      expect(viewers[1].props('handleNavigationTarget')).toBeUndefined()
+
+      expect(wrapper.findComponent({ name: 'PdfTranslatedPane' }).exists()).toBe(false)
+    })
   })
 })
