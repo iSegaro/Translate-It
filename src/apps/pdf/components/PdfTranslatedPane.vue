@@ -65,7 +65,7 @@
 
 <script setup>
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
-import { LAYOUT_MODE } from '../composables/usePdfBilingualMode.js'
+import { LAYOUT_MODE } from '../composables/usePdfViewerMode.js'
 import PdfTranslatedBlock from './PdfTranslatedBlock.vue'
 import PdfOcrStatus from './PdfOcrStatus.vue'
 import './PdfTranslatedPane.scss'

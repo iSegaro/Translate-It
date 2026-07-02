@@ -2,7 +2,7 @@ import { computed, ref, watch } from 'vue'
 import { getScopedLogger } from '@/shared/logging/logger.js'
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js'
 
-const logger = getScopedLogger(LOG_COMPONENTS.PDF, 'usePdfBilingualMode')
+const logger = getScopedLogger(LOG_COMPONENTS.PDF, 'usePdfViewerMode')
 
 // ───────────────────────────────────────────────────────────
 // Domain model — architectural contract
@@ -77,7 +77,7 @@ const VALID_LAYOUT_MODES = new Set(Object.values(LAYOUT_MODE))
  *       is implemented.
  */
 
-export function usePdfBilingualMode() {
+export function usePdfViewerMode() {
   const contentView = ref(CONTENT_VIEW.ORIGINAL)
   const layoutMode = ref(LAYOUT_MODE.SINGLE)
 

@@ -245,7 +245,7 @@
 
 <script setup>
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
-import { CONTENT_VIEW, LAYOUT_MODE } from '../composables/usePdfBilingualMode.js'
+import { CONTENT_VIEW, LAYOUT_MODE } from '../composables/usePdfViewerMode.js'
 import './PdfToolbar.scss'
 
 const props = defineProps({

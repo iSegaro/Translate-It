@@ -158,7 +158,7 @@ import PdfStatusBanner from './components/PdfStatusBanner.vue'
 import PdfWindowsHost from './components/PdfWindowsHost.vue'
 import PdfOutline from './components/PdfOutline.vue'
 import { usePdfViewerController } from './composables/usePdfViewerController.js'
-import { usePdfBilingualMode } from './composables/usePdfBilingualMode.js'
+import { usePdfViewerMode } from './composables/usePdfViewerMode.js'
 import { usePdfExport } from './composables/usePdfExport.js'
 import { usePdfBlockSelection } from './composables/usePdfBlockSelection.js'
 import { usePdfOcr } from './composables/usePdfOcr.js'
@@ -197,7 +197,7 @@ const {
   showOverlayLayer,
   setContentView,
   setLayoutMode
-} = usePdfBilingualMode()
+} = usePdfViewerMode()
 
 const {
   canExport,

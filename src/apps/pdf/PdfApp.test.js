@@ -4,7 +4,7 @@ import { nextTick, ref } from 'vue'
 import PdfApp from './PdfApp.vue'
 
 let mockViewerController
-let mockBilingualMode
+let mockViewerMode
 let mockPdfExport
 let mockBlockSelection
 let mockPdfOcr
@@ -13,8 +13,8 @@ vi.mock('./composables/usePdfViewerController.js', () => ({
   usePdfViewerController: () => mockViewerController
 }))
 
-vi.mock('./composables/usePdfBilingualMode.js', () => ({
-  usePdfBilingualMode: () => mockBilingualMode
+vi.mock('./composables/usePdfViewerMode.js', () => ({
+  usePdfViewerMode: () => mockViewerMode
 }))
 
 vi.mock('./composables/usePdfExport.js', () => ({
@@ -124,7 +124,7 @@ function createMocks({
     cleanup: vi.fn()
   }
 
-  mockBilingualMode = {
+  mockViewerMode = {
     contentView: ref('translated-pdf'),
     layoutMode: ref('single'),
     showOriginalPane: ref(true),

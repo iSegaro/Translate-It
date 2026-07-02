@@ -1,18 +1,18 @@
 import { describe, expect, it, vi } from 'vitest'
-import { usePdfBilingualMode } from './usePdfBilingualMode.js'
+import { usePdfViewerMode } from './usePdfViewerMode.js'
 
-describe('usePdfBilingualMode', () => {
+describe('usePdfViewerMode', () => {
   // ── Initial state ────────────────────────────────────────────
 
   it('defaults to original content view and single layout', () => {
-    const { contentView, layoutMode } = usePdfBilingualMode()
+    const { contentView, layoutMode } = usePdfViewerMode()
 
     expect(contentView.value).toBe('original')
     expect(layoutMode.value).toBe('single')
   })
 
   it('defaults visibility correctly', () => {
-    const { showOriginalPane, showTranslatedPane, showOverlayLayer } = usePdfBilingualMode()
+    const { showOriginalPane, showTranslatedPane, showOverlayLayer } = usePdfViewerMode()
 
     expect(showOriginalPane.value).toBe(true)
     expect(showTranslatedPane.value).toBe(false)
@@ -23,7 +23,7 @@ describe('usePdfBilingualMode', () => {
 
   describe('contentView', () => {
     it('sets content view to original', () => {
-      const { contentView, layoutMode, setContentView } = usePdfBilingualMode()
+      const { contentView, layoutMode, setContentView } = usePdfViewerMode()
 
       setContentView('original')
 
@@ -32,7 +32,7 @@ describe('usePdfBilingualMode', () => {
     })
 
     it('sets content view to translation', () => {
-      const { contentView, setContentView } = usePdfBilingualMode()
+      const { contentView, setContentView } = usePdfViewerMode()
 
       setContentView('translation')
 
@@ -40,7 +40,7 @@ describe('usePdfBilingualMode', () => {
     })
 
     it('sets content view to translated-pdf', () => {
-      const { contentView, showOverlayLayer, setContentView } = usePdfBilingualMode()
+      const { contentView, showOverlayLayer, setContentView } = usePdfViewerMode()
 
       setContentView('translated-pdf')
 
@@ -49,7 +49,7 @@ describe('usePdfBilingualMode', () => {
     })
 
     it('ignores invalid content view values', () => {
-      const { contentView, setContentView } = usePdfBilingualMode()
+      const { contentView, setContentView } = usePdfViewerMode()
       const loggerWarn = vi.fn()
       vi.stubGlobal('console', { warn: loggerWarn })
 
@@ -59,7 +59,7 @@ describe('usePdfBilingualMode', () => {
     })
 
     it('auto-resets layout to single when leaving translation', () => {
-      const { contentView, layoutMode, setContentView, setLayoutMode } = usePdfBilingualMode()
+      const { contentView, layoutMode, setContentView, setLayoutMode } = usePdfViewerMode()
 
       setContentView('translation')
       setLayoutMode('side-by-side')
@@ -72,7 +72,7 @@ describe('usePdfBilingualMode', () => {
     })
 
     it('auto-resets layout to single when switching from translation to translated-pdf', () => {
-      const { contentView, layoutMode, setContentView, setLayoutMode } = usePdfBilingualMode()
+      const { contentView, layoutMode, setContentView, setLayoutMode } = usePdfViewerMode()
 
       setContentView('translation')
       setLayoutMode('side-by-side')
@@ -89,7 +89,7 @@ describe('usePdfBilingualMode', () => {
 
   describe('layoutMode', () => {
     it('sets layout mode to single', () => {
-      const { layoutMode, setLayoutMode } = usePdfBilingualMode()
+      const { layoutMode, setLayoutMode } = usePdfViewerMode()
 
       setLayoutMode('single')
 
@@ -97,7 +97,7 @@ describe('usePdfBilingualMode', () => {
     })
 
     it('sets layout mode to side-by-side when content view supports it', () => {
-      const { contentView, layoutMode, isSideBySide, setContentView, setLayoutMode } = usePdfBilingualMode()
+      const { contentView, layoutMode, isSideBySide, setContentView, setLayoutMode } = usePdfViewerMode()
 
       setContentView('translation')
       setLayoutMode('side-by-side')
@@ -107,7 +107,7 @@ describe('usePdfBilingualMode', () => {
     })
 
     it('rejects side-by-side when content view is original', () => {
-      const { layoutMode, setLayoutMode } = usePdfBilingualMode()
+      const { layoutMode, setLayoutMode } = usePdfViewerMode()
       const loggerWarn = vi.fn()
       vi.stubGlobal('console', { warn: loggerWarn })
 
@@ -117,7 +117,7 @@ describe('usePdfBilingualMode', () => {
     })
 
     it('rejects side-by-side when content view is translated-pdf', () => {
-      const { contentView, layoutMode, setContentView, setLayoutMode } = usePdfBilingualMode()
+      const { contentView, layoutMode, setContentView, setLayoutMode } = usePdfViewerMode()
       const loggerWarn = vi.fn()
       vi.stubGlobal('console', { warn: loggerWarn })
 
@@ -128,7 +128,7 @@ describe('usePdfBilingualMode', () => {
     })
 
     it('ignores invalid layout mode values', () => {
-      const { layoutMode, setLayoutMode } = usePdfBilingualMode()
+      const { layoutMode, setLayoutMode } = usePdfViewerMode()
       const loggerWarn = vi.fn()
       vi.stubGlobal('console', { warn: loggerWarn })
 
@@ -142,7 +142,7 @@ describe('usePdfBilingualMode', () => {
 
   describe('isSideBySide', () => {
     it('is true when layout is side-by-side', () => {
-      const { isSideBySide, setContentView, setLayoutMode } = usePdfBilingualMode()
+      const { isSideBySide, setContentView, setLayoutMode } = usePdfViewerMode()
 
       setContentView('translation')
       setLayoutMode('side-by-side')
@@ -151,7 +151,7 @@ describe('usePdfBilingualMode', () => {
     })
 
     it('is false when layout is single', () => {
-      const { isSideBySide } = usePdfBilingualMode()
+      const { isSideBySide } = usePdfViewerMode()
 
       expect(isSideBySide.value).toBe(false)
     })
@@ -161,7 +161,7 @@ describe('usePdfBilingualMode', () => {
 
   describe('visibility', () => {
     it('shows original pane when content is original', () => {
-      const { showOriginalPane, showTranslatedPane, showOverlayLayer, setContentView } = usePdfBilingualMode()
+      const { showOriginalPane, showTranslatedPane, showOverlayLayer, setContentView } = usePdfViewerMode()
 
       setContentView('original')
 
@@ -171,7 +171,7 @@ describe('usePdfBilingualMode', () => {
     })
 
     it('shows both panes in translation + side-by-side', () => {
-      const { showOriginalPane, showTranslatedPane, showOverlayLayer, setContentView, setLayoutMode } = usePdfBilingualMode()
+      const { showOriginalPane, showTranslatedPane, showOverlayLayer, setContentView, setLayoutMode } = usePdfViewerMode()
 
       setContentView('translation')
       setLayoutMode('side-by-side')
@@ -182,7 +182,7 @@ describe('usePdfBilingualMode', () => {
     })
 
     it('shows only translated pane in translation + single', () => {
-      const { showOriginalPane, showTranslatedPane, showOverlayLayer, setContentView } = usePdfBilingualMode()
+      const { showOriginalPane, showTranslatedPane, showOverlayLayer, setContentView } = usePdfViewerMode()
 
       setContentView('translation')
 
@@ -192,7 +192,7 @@ describe('usePdfBilingualMode', () => {
     })
 
     it('shows original pane with overlay in translated-pdf', () => {
-      const { showOriginalPane, showTranslatedPane, showOverlayLayer, setContentView } = usePdfBilingualMode()
+      const { showOriginalPane, showTranslatedPane, showOverlayLayer, setContentView } = usePdfViewerMode()
 
       setContentView('translated-pdf')
 
@@ -206,7 +206,7 @@ describe('usePdfBilingualMode', () => {
 
   describe('reset', () => {
     it('resets both axes to defaults', () => {
-      const { contentView, layoutMode, setContentView, setLayoutMode, reset } = usePdfBilingualMode()
+      const { contentView, layoutMode, setContentView, setLayoutMode, reset } = usePdfViewerMode()
 
       setContentView('translation')
       setLayoutMode('side-by-side')

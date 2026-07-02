@@ -25,7 +25,7 @@
 
 <script setup>
 import { computed, ref } from 'vue'
-import { LAYOUT_MODE } from '../composables/usePdfBilingualMode.js'
+import { LAYOUT_MODE } from '../composables/usePdfViewerMode.js'
 import { usePdfScrollSync } from '../composables/usePdfScrollSync.js'
 import './PdfViewerLayout.scss'
 
