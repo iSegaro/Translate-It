@@ -6,7 +6,8 @@ import { PdfRenderer } from './PdfRenderer.js'
 import { PdfPageSession } from './PdfPageSession.js'
 import { sha256HexFromArrayBuffer } from './PdfBlockIdentity.js'
 import { PdfDestinationResolver } from './PdfDestinationResolver.js'
-import { createOutlineNode, createLinkAnnotation } from './NavigationModels.js'
+import { PdfOutlineRepository } from './PdfOutlineRepository.js'
+import { createLinkAnnotation } from './NavigationModels.js'
 
 const logger = getScopedLogger(LOG_COMPONENTS.PDF, 'PdfDocumentSession')
 const PAGE_MARGIN = 24
@@ -54,7 +55,7 @@ export class PdfDocumentSession extends ResourceTracker {
       cancelTimeout: (id) => this.clearTimeout(id)
     })
     this._resolver = new PdfDestinationResolver()
-    this._outline = null
+    this._outlineRepository = new PdfOutlineRepository()
     this._linkAnnotationCache = new Map()
     this._pendingHydrations = null
     this._blockIndex = new Map()
@@ -84,7 +85,7 @@ export class PdfDocumentSession extends ResourceTracker {
     this.translationStates.clear()
     this.targetedBlockId = null
     this._resolver.clearCaches()
-    this._outline = null
+    this._outlineRepository.clear()
     this._linkAnnotationCache.clear()
 
     await this._buildPageMetrics(layoutRequest)
@@ -423,33 +424,7 @@ export class PdfDocumentSession extends ResourceTracker {
    * @returns {Promise<Array<object>|null>} Normalized outline tree, or null if none
    */
   async loadOutline() {
-    if (!this.pdfDocument) {
-      return null
-    }
-
-    if (this._outline !== null) {
-      return this._outline
-    }
-
-    try {
-      const rawOutline = await this.pdfDocument.getOutline()
-
-      if (!rawOutline || !Array.isArray(rawOutline) || rawOutline.length === 0) {
-        this._outline = null
-        return null
-      }
-
-      const outline = rawOutline
-        .map(createOutlineNode)
-        .filter(Boolean)
-
-      this._outline = outline.length > 0 ? outline : null
-      return this._outline
-    } catch (error) {
-      logger.warn('Failed to load PDF outline:', error)
-      this._outline = null
-      return null
-    }
+    return this._outlineRepository.load({ pdfDocument: this.pdfDocument })
   }
 
   /**
@@ -461,7 +436,7 @@ export class PdfDocumentSession extends ResourceTracker {
    * @returns {Array<object>|null} Cached outline, or null if not loaded
    */
   getOutline() {
-    return this._outline
+    return this._outlineRepository.get()
   }
 
   // ── Viewport ────────────────────────────────────────────────
@@ -551,7 +526,7 @@ export class PdfDocumentSession extends ResourceTracker {
     this.translationStates.clear()
     this.targetedBlockId = null
     this._resolver.clearCaches()
-    this._outline = null
+    this._outlineRepository.clear()
     this._linkAnnotationCache.clear()
     this._pendingHydrations = null
     this._blockIndex.clear()
