@@ -37,8 +37,67 @@ describe('PdfToolbar', () => {
     expect(wrapper.find('.pdf-toolbar__button[aria-label="More actions"]').exists()).toBe(true)
     expect(wrapper.find('.pdf-toolbar__button[aria-label="Export options"]').exists()).toBe(true)
 
+    expect(wrapper.find('.pdf-toolbar__mode-button--active').exists()).toBe(true)
+  })
+
+  it('emits content-view-change when a content view button is clicked', async () => {
+    const wrapper = mount(PdfToolbar, {
+      props: {
+        fileName: 'demo.pdf',
+        pageCount: 12,
+        currentPageNumber: 1,
+        viewerMode: 'bilingual',
+        contentView: 'original',
+        layoutMode: 'single',
+        zoomMode: 'fit-width',
+        zoomPercent: 100
+      }
+    })
+
     await wrapper.find('.pdf-toolbar__mode-button--active').trigger('click')
-    expect(wrapper.emitted('mode-change')).toBeTruthy()
+    expect(wrapper.emitted('content-view-change')).toBeTruthy()
+    expect(wrapper.emitted('content-view-change')?.[0]?.[0]).toBe('original')
+
+    const translationButton = wrapper.findAll('.pdf-toolbar__mode-button').find(
+      (btn) => btn.text().includes('Translation')
+    )
+    await translationButton?.trigger('click')
+    expect(wrapper.emitted('content-view-change')?.[1]?.[0]).toBe('translation')
+  })
+
+  it('emits layout-mode-change when a layout mode button is clicked', async () => {
+    const wrapper = mount(PdfToolbar, {
+      props: {
+        fileName: 'demo.pdf',
+        pageCount: 12,
+        currentPageNumber: 1,
+        viewerMode: 'translated',
+        contentView: 'translation',
+        layoutMode: 'single',
+        zoomMode: 'fit-width',
+        zoomPercent: 100
+      }
+    })
+
+    const sideBySideButton = wrapper.findAll('.pdf-toolbar__mode-button').find(
+      (btn) => btn.text().includes('Side by Side')
+    )
+    await sideBySideButton?.trigger('click')
+    expect(wrapper.emitted('layout-mode-change')).toBeTruthy()
+    expect(wrapper.emitted('layout-mode-change')?.[0]?.[0]).toBe('side-by-side')
+  })
+
+  it('accepts legacy viewerMode prop without error (backward compat)', () => {
+    const wrapper = mount(PdfToolbar, {
+      props: {
+        fileName: 'demo.pdf',
+        pageCount: 1,
+        currentPageNumber: 1,
+        viewerMode: 'bilingual'
+      }
+    })
+
+    expect(wrapper.find('.pdf-toolbar').exists()).toBe(true)
   })
 
   it('keeps Open PDF and Clear Cache in the hamburger menu and export in the export menu', async () => {

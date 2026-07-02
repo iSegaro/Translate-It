@@ -23,14 +23,27 @@
     >
       <div class="pdf-toolbar__mode-group">
         <button
-          v-for="modeOption in modeOptions"
-          :key="modeOption.value"
+          v-for="opt in contentOptions"
+          :key="opt.value"
           class="pdf-toolbar__mode-button"
-          :class="{ 'pdf-toolbar__mode-button--active': viewerMode === modeOption.value }"
+          :class="{ 'pdf-toolbar__mode-button--active': contentView === opt.value }"
           type="button"
-          @click="$emit('mode-change', modeOption.value)"
+          @click="$emit('content-view-change', opt.value)"
         >
-          {{ modeOption.label }}
+          {{ opt.label }}
+        </button>
+      </div>
+
+      <div class="pdf-toolbar__mode-group">
+        <button
+          v-for="opt in layoutOptions"
+          :key="opt.value"
+          class="pdf-toolbar__mode-button"
+          :class="{ 'pdf-toolbar__mode-button--active': layoutMode === opt.value }"
+          type="button"
+          @click="$emit('layout-mode-change', opt.value)"
+        >
+          {{ opt.label }}
         </button>
       </div>
 
@@ -232,6 +245,7 @@
 
 <script setup>
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
+import { CONTENT_VIEW, LAYOUT_MODE } from '../composables/usePdfBilingualMode.js'
 import './PdfToolbar.scss'
 
 const props = defineProps({
@@ -245,6 +259,8 @@ const props = defineProps({
   scannedPageCount: { type: Number, default: 0 },
   isOcrProcessing: { type: Boolean, default: false },
   viewerMode: { type: String, default: 'bilingual' },
+  contentView: { type: String, default: CONTENT_VIEW.ORIGINAL },
+  layoutMode: { type: String, default: LAYOUT_MODE.SINGLE },
   zoomMode: { type: String, default: 'fit-width' },
   zoomPercent: { type: Number, default: 100 },
   translationSummary: {
@@ -258,7 +274,7 @@ const props = defineProps({
   }
 })
 
-const emit = defineEmits(['file-selected', 'translate-visible', 'mode-change', 'cancel-translation', 'export-txt', 'export-markdown', 'export-html', 'request-ocr', 'clear-cache', 'zoom-step', 'zoom-change'])
+const emit = defineEmits(['file-selected', 'translate-visible', 'mode-change', 'cancel-translation', 'content-view-change', 'layout-mode-change', 'export-txt', 'export-markdown', 'export-html', 'request-ocr', 'clear-cache', 'zoom-step', 'zoom-change'])
 const fileInput = ref(null)
 const exportMenuRef = ref(null)
 const exportMenuTriggerRef = ref(null)
@@ -267,11 +283,15 @@ const moreMenuTriggerRef = ref(null)
 const activeMenu = ref(null)
 const zoomPercentOptions = [50, 75, 100, 125, 150, 200]
 
-const modeOptions = [
-  { value: 'original', label: 'Original' },
-  { value: 'bilingual', label: 'Bilingual' },
-  { value: 'translated', label: 'Translated' },
-  { value: 'translated-pdf', label: 'Translated PDF View' }
+const contentOptions = [
+  { value: CONTENT_VIEW.ORIGINAL, label: 'Original' },
+  { value: CONTENT_VIEW.TRANSLATION, label: 'Translation' },
+  { value: CONTENT_VIEW.TRANSLATED_PDF, label: 'Translated PDF' }
+]
+
+const layoutOptions = [
+  { value: LAYOUT_MODE.SINGLE, label: 'Single' },
+  { value: LAYOUT_MODE.SIDE_BY_SIDE, label: 'Side by Side' }
 ]
 
 const zoomSelectValue = computed(() => {
