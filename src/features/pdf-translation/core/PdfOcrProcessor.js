@@ -60,7 +60,7 @@ export class PdfOcrProcessor {
         pageHeight: viewport.height
       })
 
-      pageSession?.setOcrBlocks(blocks, tesseractLang)
+      this.session.setPageOcrBlocks(pageNumber, blocks, tesseractLang)
 
       logger.info('OCR completed for page:', {
         pageNumber,

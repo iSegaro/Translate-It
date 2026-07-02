@@ -55,6 +55,7 @@ export class PdfDocumentSession extends ResourceTracker {
     this._outline = null
     this._linkAnnotationCache = new Map()
     this._pendingHydrations = null
+    this._blockIndex = new Map()
   }
 
   get workerUrl() {
@@ -244,6 +245,7 @@ export class PdfDocumentSession extends ResourceTracker {
       const page = await this.pdfDocument.getPage(pageNumber)
       await pageSession.hydrate(page, metric)
       this.pageSessions.set(pageNumber, pageSession)
+      this._indexPageSession(pageSession)
       return pageSession
     } finally {
       this._pendingHydrations?.delete(pageNumber)
@@ -346,6 +348,45 @@ export class PdfDocumentSession extends ResourceTracker {
       ...block,
       translationState: this.getBlockTranslationState(block.id)
     }))
+  }
+
+  // ── Source Block Index ────────────────────────────────────
+  //
+  // Invariant:
+  //   Every source block currently reachable through pageSessions
+  //   is indexed exactly once in _blockIndex.
+  //
+  // Maintenance points (keep in sync when modifying this class):
+  //   - _hydratePageSession    → _indexPageSession
+  //   - setPageOcrBlocks       → _indexPageSession
+  //   - cleanupDocument         → _blockIndex.clear
+
+  _indexPageSession(pageSession) {
+    for (const block of pageSession.allBlocks) {
+      this._blockIndex.set(block.id, block)
+    }
+  }
+
+  setPageOcrBlocks(pageNumber, blocks, language) {
+    const pageSession = this.pageSessions.get(pageNumber)
+    if (!pageSession) return
+
+    pageSession.setOcrBlocks(blocks, language)
+    this._indexPageSession(pageSession)
+  }
+
+  /**
+   * Find a source block by ID.
+   *
+   * Pure O(1) lookup against the canonical _blockIndex.
+   * Relies on callers maintaining the invariant.
+   *
+   * @param {string} blockId
+   * @returns {object|null}
+   */
+  findSourceBlock(blockId) {
+    if (!blockId) return null
+    return this._blockIndex.get(blockId) ?? null
   }
 
   // ── Destination Resolution ─────────────────────────────────
@@ -778,6 +819,7 @@ export class PdfDocumentSession extends ResourceTracker {
     this._outline = null
     this._linkAnnotationCache.clear()
     this._pendingHydrations = null
+    this._blockIndex.clear()
     this.pdfFingerprint = ''
     this.documentIdentity = ''
     this.displayName = ''

@@ -377,7 +377,7 @@ export function usePdfViewerController() {
         const state = pdfDocumentSession.getBlockTranslationState(blockId)
         if (state.status === 'translated') continue
 
-        const block = findBlockById(blockId)
+        const block = pdfDocumentSession.findSourceBlock(blockId)
         if (!block || block.sourceTextHash !== entry.sourceTextHash) continue
 
         if (hasTranslationSettingsHash(entry) && entry.translationSettingsHash !== currentTranslationSettingsHash) {
@@ -415,7 +415,7 @@ export function usePdfViewerController() {
       for (const [pageNumber, ocrEntry] of Object.entries(cache.ocr)) {
         const pageSession = pdfDocumentSession.pageSessions.get(Number(pageNumber))
         if (pageSession && !pageSession.hasOcrForLanguage(ocrEntry.ocrLanguage)) {
-          pageSession.setOcrBlocks(ocrEntry.ocrBlocks || [], ocrEntry.ocrLanguage)
+          pdfDocumentSession.setPageOcrBlocks(Number(pageNumber), ocrEntry.ocrBlocks || [], ocrEntry.ocrLanguage)
           ocrPageCount++
         }
       }
@@ -435,15 +435,6 @@ export function usePdfViewerController() {
     } catch (cacheError) {
       logger.warn('Failed to restore from cache:', cacheError)
     }
-  }
-
-  function findBlockById(blockId) {
-    for (const [, pageSession] of pdfDocumentSession.pageSessions) {
-      for (const block of pageSession.allBlocks) {
-        if (block.id === blockId) return block
-      }
-    }
-    return null
   }
 
   async function saveTranslationsToCache() {

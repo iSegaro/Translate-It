@@ -46,7 +46,16 @@ const session = {
     error: null
   }),
   getPageLayout: vi.fn().mockReturnValue(null),
-  getVisibleLogicalBlocks: vi.fn().mockResolvedValue([])
+  getVisibleLogicalBlocks: vi.fn().mockResolvedValue([]),
+  findSourceBlock: vi.fn((blockId) => {
+    for (const [, pageSession] of session.pageSessions) {
+      for (const block of pageSession.allBlocks) {
+        if (block.id === blockId) return block
+      }
+    }
+    return null
+  }),
+  setPageOcrBlocks: vi.fn()
 }
 
 vi.mock('@/shared/config/config.js', () => ({
