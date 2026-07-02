@@ -10,14 +10,16 @@
       :can-export="canExport"
       :scanned-page-count="scannedPageCount"
       :is-ocr-processing="isOcrProcessing"
-      :viewer-mode="viewerMode"
+      :content-view="contentView"
+      :layout-mode="layoutMode"
       :zoom-mode="zoomMode"
       :zoom-percent="zoomPercent"
       :translation-summary="translationSummary"
       @file-selected="handleFileSelected"
       @translate-visible="handleTranslateVisiblePages"
       @cancel-translation="handleCancelTranslation"
-      @mode-change="setMode"
+      @content-view-change="setContentView"
+      @layout-mode-change="setLayoutMode"
       @zoom-step="handleZoomStep"
       @zoom-change="handleZoomChange"
       @export-txt="handleExportTxt"
@@ -188,11 +190,14 @@ const {
 } = usePdfViewerController()
 
 const {
+  contentView,
+  layoutMode,
   viewerMode,
   showOriginalPane,
   showTranslatedPane,
   showOverlayLayer,
-  setMode
+  setContentView,
+  setLayoutMode
 } = usePdfBilingualMode()
 
 const {
