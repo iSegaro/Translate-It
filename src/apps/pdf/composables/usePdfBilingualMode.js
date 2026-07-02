@@ -14,7 +14,7 @@ const VIEWER_MODES = Object.freeze({
 const MODE_ORDER = [VIEWER_MODES.ORIGINAL, VIEWER_MODES.BILINGUAL, VIEWER_MODES.TRANSLATED, VIEWER_MODES.TRANSLATED_PDF]
 
 export function usePdfBilingualMode() {
-  const viewerMode = ref(VIEWER_MODES.BILINGUAL)
+  const viewerMode = ref(VIEWER_MODES.ORIGINAL)
 
   const isOriginalOnly = computed(() => viewerMode.value === VIEWER_MODES.ORIGINAL)
   const isBilingual = computed(() => viewerMode.value === VIEWER_MODES.BILINGUAL)
@@ -41,7 +41,7 @@ export function usePdfBilingualMode() {
   }
 
   function reset() {
-    viewerMode.value = VIEWER_MODES.BILINGUAL
+    viewerMode.value = VIEWER_MODES.ORIGINAL
   }
 
   return {

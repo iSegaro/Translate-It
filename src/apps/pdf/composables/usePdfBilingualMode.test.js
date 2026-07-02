@@ -2,11 +2,12 @@ import { describe, expect, it, vi } from 'vitest'
 import { usePdfBilingualMode } from './usePdfBilingualMode.js'
 
 describe('usePdfBilingualMode', () => {
-  it('defaults to bilingual mode', () => {
-    const { viewerMode, isBilingual } = usePdfBilingualMode()
+  it('defaults to original mode', () => {
+    const { viewerMode, isOriginalOnly, isBilingual } = usePdfBilingualMode()
 
-    expect(viewerMode.value).toBe('bilingual')
-    expect(isBilingual.value).toBe(true)
+    expect(viewerMode.value).toBe('original')
+    expect(isOriginalOnly.value).toBe(true)
+    expect(isBilingual.value).toBe(false)
   })
 
   it('sets viewer mode correctly', () => {
@@ -30,12 +31,14 @@ describe('usePdfBilingualMode', () => {
     vi.stubGlobal('console', { warn: loggerWarn })
 
     setMode('invalid')
-    expect(viewerMode.value).toBe('bilingual')
+    expect(viewerMode.value).toBe('original')
   })
 
   it('cycles through modes in order', () => {
     const { viewerMode, cycleMode } = usePdfBilingualMode()
 
+    expect(viewerMode.value).toBe('original')
+    cycleMode()
     expect(viewerMode.value).toBe('bilingual')
     cycleMode()
     expect(viewerMode.value).toBe('translated')
@@ -43,18 +46,16 @@ describe('usePdfBilingualMode', () => {
     expect(viewerMode.value).toBe('translated-pdf')
     cycleMode()
     expect(viewerMode.value).toBe('original')
-    cycleMode()
-    expect(viewerMode.value).toBe('bilingual')
   })
 
-  it('resets to bilingual mode', () => {
+  it('resets to original mode', () => {
     const { viewerMode, setMode, reset } = usePdfBilingualMode()
 
-    setMode('original')
-    expect(viewerMode.value).toBe('original')
+    setMode('translated')
+    expect(viewerMode.value).toBe('translated')
 
     reset()
-    expect(viewerMode.value).toBe('bilingual')
+    expect(viewerMode.value).toBe('original')
   })
 
   it('computes showOriginalPane and showTranslatedPane', () => {
