@@ -1,6 +1,10 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { mount } from '@vue/test-utils'
 import PdfViewerLayout from './PdfViewerLayout.vue'
+
+vi.mock('../composables/usePdfScrollSync.js', () => ({
+  usePdfScrollSync: vi.fn()
+}))
 
 describe('PdfViewerLayout', () => {
   it('renders side-by-side layout with two panes', () => {
@@ -68,5 +72,22 @@ describe('PdfViewerLayout', () => {
 
     expect(wrapper.classes()).toContain('pdf-viewer-layout--side-by-side')
     expect(wrapper.classes()).not.toContain('pdf-viewer-layout--single')
+  })
+
+  it('exposes scrollContainer and translatedPaneRef', () => {
+    const wrapper = mount(PdfViewerLayout, {
+      props: {
+        layoutMode: 'side-by-side',
+        showOriginalPane: true,
+        showTranslatedPane: true
+      },
+      slots: {
+        original: '<div class="original-pane">Original</div>',
+        translated: '<div class="translated-pane">Translated</div>'
+      }
+    })
+
+    expect(wrapper.vm.scrollContainer).toBeTruthy()
+    expect(wrapper.vm.translatedPaneRef).toBeTruthy()
   })
 })

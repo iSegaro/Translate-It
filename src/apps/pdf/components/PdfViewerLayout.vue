@@ -79,7 +79,8 @@ usePdfScrollSync(
 )
 
 defineExpose({
-  scrollContainer: originalPaneRef
+  scrollContainer: originalPaneRef,
+  translatedPaneRef
 })
 </script>
 
