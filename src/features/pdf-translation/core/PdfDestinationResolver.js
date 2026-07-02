@@ -10,7 +10,7 @@ export class PdfDestinationResolver {
     this._pageIndexCache = new Map()
   }
 
-  resolve({ pdfDocument, totalPages, destination }) {
+  resolveDestination({ pdfDocument, totalPages, destination }) {
     if (!pdfDocument) return null
 
     const ctx = Object.freeze({ pdfDocument, totalPages })
