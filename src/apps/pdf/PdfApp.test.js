@@ -14,7 +14,8 @@ vi.mock('./composables/usePdfViewerController.js', () => ({
 }))
 
 vi.mock('./composables/usePdfViewerMode.js', () => ({
-  usePdfViewerMode: () => mockViewerMode
+  usePdfViewerMode: () => mockViewerMode,
+  VIEWER_ROLE: { ORIGINAL: 'original', OVERLAY: 'overlay' }
 }))
 
 vi.mock('./composables/usePdfExport.js', () => ({

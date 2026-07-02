@@ -99,7 +99,7 @@
               ref="pdfViewerLayoutRef"
               :layout-mode="layoutMode"
               :show-original-pane="showOriginalPane"
-              :show-translated-pane="showTranslatedPane"
+              :show-translated-pane="showTranslatedTextPane || showTranslatedPdfPane"
             >
               <template
                 v-if="showOriginalPane"
@@ -107,6 +107,7 @@
               >
                 <PdfViewer
                   ref="pdfViewerRef"
+                  :viewer-role="VIEWER_ROLE.ORIGINAL"
                   :pages="pageMetrics"
                   :session="session"
                   :is-block-targeting-active="isBlockTargetingActive"
@@ -122,17 +123,24 @@
                 />
               </template>
 
-              <template
-                v-if="showTranslatedPane"
-                #translated
-              >
+              <template #translated>
                 <PdfTranslatedPane
+                  v-if="showTranslatedTextPane"
                   :translated-page-data="translatedPageData"
                   :highlighted-block-id="highlightedBlockId"
                   :page-metrics="pageMetrics"
                   :layout-mode="layoutMode"
                   :scroll-container="originalScrollContainer"
                   @current-page-change="handleTranslatedPaneCurrentPageChange"
+                />
+                <PdfViewer
+                  v-if="showTranslatedPdfPane"
+                  :viewer-role="VIEWER_ROLE.OVERLAY"
+                  :pages="pageMetrics"
+                  :session="session"
+                  :show-overlay="true"
+                  :overlay-page-data="translatedPageData"
+                  :scroll-container="translatedScrollContainer"
                 />
               </template>
             </PdfViewerLayout>
@@ -158,7 +166,7 @@ import PdfStatusBanner from './components/PdfStatusBanner.vue'
 import PdfWindowsHost from './components/PdfWindowsHost.vue'
 import PdfOutline from './components/PdfOutline.vue'
 import { usePdfViewerController } from './composables/usePdfViewerController.js'
-import { usePdfViewerMode } from './composables/usePdfViewerMode.js'
+import { usePdfViewerMode, VIEWER_ROLE } from './composables/usePdfViewerMode.js'
 import { usePdfExport } from './composables/usePdfExport.js'
 import { usePdfBlockSelection } from './composables/usePdfBlockSelection.js'
 import { usePdfOcr } from './composables/usePdfOcr.js'
@@ -193,7 +201,8 @@ const {
   contentView,
   layoutMode,
   showOriginalPane,
-  showTranslatedPane,
+  showTranslatedTextPane,
+  showTranslatedPdfPane,
   showOverlayLayer,
   setContentView,
   setLayoutMode
@@ -212,6 +221,7 @@ const {
 const pdfViewerRef = ref(null)
 const pdfViewerLayoutRef = ref(null)
 const originalScrollContainer = computed(() => pdfViewerLayoutRef.value?.scrollContainer ?? null)
+const translatedScrollContainer = computed(() => pdfViewerLayoutRef.value?.translatedPaneRef ?? null)
 const {
   currentPage,
   isNavigating,
