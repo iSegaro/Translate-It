@@ -343,6 +343,10 @@ function getPageElement(pageNumber) {
   return getPdfPageRootElement(instance) || null
 }
 
+function isFiniteCoordinate(v) {
+  return v != null && Number.isFinite(Number(v))
+}
+
 function scrollToPage(pageNumber, options = {}) {
   const num = Number(pageNumber)
   if (!Number.isInteger(num) || num < 1) return
@@ -353,7 +357,7 @@ function scrollToPage(pageNumber, options = {}) {
   const container = getScrollContainer()
   if (!container) return
 
-  const hasPosition = Number.isFinite(Number(options.top)) || Number.isFinite(Number(options.left))
+  const hasPosition = isFiniteCoordinate(options.top) || isFiniteCoordinate(options.left)
 
   if (!hasPosition) {
     const pageEl = getPdfPageRootElement(instance)
