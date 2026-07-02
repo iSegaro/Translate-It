@@ -15,10 +15,11 @@ describe('usePdfViewerMode', () => {
   // ── Initial state ────────────────────────────────────────────
 
   it('defaults to original content view and single layout', () => {
-    const { contentView, layoutMode } = usePdfViewerMode()
+    const { contentView, layoutMode, selectedLayoutMode } = usePdfViewerMode()
 
     expect(contentView.value).toBe('original')
     expect(layoutMode.value).toBe('single')
+    expect(selectedLayoutMode.value).toBe('single')
   })
 
   it('defaults visibility correctly', () => {
@@ -69,8 +70,8 @@ describe('usePdfViewerMode', () => {
       expect(contentView.value).toBe('original')
     })
 
-    it('auto-resets layout to single when switching to original', () => {
-      const { contentView, layoutMode, setContentView, setLayoutMode } = usePdfViewerMode()
+    it('effective layout is single in original even when side-by-side is selected', () => {
+      const { contentView, layoutMode, selectedLayoutMode, setContentView, setLayoutMode } = usePdfViewerMode()
 
       setContentView('translation')
       setLayoutMode('side-by-side')
@@ -80,6 +81,7 @@ describe('usePdfViewerMode', () => {
 
       expect(contentView.value).toBe('original')
       expect(layoutMode.value).toBe('single')
+      expect(selectedLayoutMode.value).toBe('side-by-side')
     })
 
     it('preserves side-by-side when switching from translation to translated-pdf', () => {
@@ -127,14 +129,43 @@ describe('usePdfViewerMode', () => {
       expect(isSideBySide.value).toBe(true)
     })
 
-    it('rejects side-by-side when content view is original', () => {
-      const { layoutMode, setLayoutMode } = usePdfViewerMode()
-      const loggerWarn = vi.fn()
-      vi.stubGlobal('console', { warn: loggerWarn })
+    it('stores side-by-side preference even when content view is original', () => {
+      const { layoutMode, selectedLayoutMode, setLayoutMode } = usePdfViewerMode()
 
       setLayoutMode('side-by-side')
 
+      expect(selectedLayoutMode.value).toBe('side-by-side')
       expect(layoutMode.value).toBe('single')
+    })
+
+    it('preserves side-by-side preference through original cycle', () => {
+      const { contentView, layoutMode, selectedLayoutMode, setContentView, setLayoutMode } = usePdfViewerMode()
+
+      setContentView('translation')
+      setLayoutMode('side-by-side')
+      expect(layoutMode.value).toBe('side-by-side')
+
+      setContentView('original')
+      expect(layoutMode.value).toBe('single')
+      expect(selectedLayoutMode.value).toBe('side-by-side')
+
+      setContentView('translation')
+      expect(layoutMode.value).toBe('side-by-side')
+    })
+
+    it('preserves side-by-side preference through original to translated-pdf cycle', () => {
+      const { contentView, layoutMode, selectedLayoutMode, setContentView, setLayoutMode } = usePdfViewerMode()
+
+      setContentView('translation')
+      setLayoutMode('side-by-side')
+      expect(layoutMode.value).toBe('side-by-side')
+
+      setContentView('original')
+      expect(layoutMode.value).toBe('single')
+      expect(selectedLayoutMode.value).toBe('side-by-side')
+
+      setContentView('translated-pdf')
+      expect(layoutMode.value).toBe('side-by-side')
     })
 
     it('ignores invalid layout mode values', () => {

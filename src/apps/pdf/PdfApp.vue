@@ -11,7 +11,7 @@
       :scanned-page-count="scannedPageCount"
       :is-ocr-processing="isOcrProcessing"
       :content-view="contentView"
-      :layout-mode="layoutMode"
+      :layout-mode="selectedLayoutMode"
       :zoom-mode="zoomMode"
       :zoom-percent="zoomPercent"
       :translation-summary="translationSummary"
@@ -200,6 +200,7 @@ const {
 const {
   contentView,
   layoutMode,
+  selectedLayoutMode,
   showOriginalPane,
   showTranslatedTextPane,
   showTranslatedPdfPane,

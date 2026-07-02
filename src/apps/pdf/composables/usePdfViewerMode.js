@@ -1,4 +1,4 @@
-import { computed, ref, watch } from 'vue'
+import { computed, ref } from 'vue'
 import { getScopedLogger } from '@/shared/logging/logger.js'
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js'
 
@@ -66,6 +66,13 @@ const VIEWER_ROLE = Object.freeze({
 export { VIEWER_ROLE }
 
 /**
+ * Viewing modes terminology:
+ *
+ *   selectedLayoutMode — the user's persistent preference (never auto-corrected)
+ *   layoutMode         — the effective value used for rendering
+ *                        (follows selectedLayoutMode, but is always SINGLE
+ *                         when contentView is ORIGINAL)
+ *
  * Valid combinations of (contentView, layoutMode).
  *
  * ┌──────────────────┬──────────────┬───────┬───────────────────────────────┐
@@ -78,32 +85,19 @@ export { VIEWER_ROLE }
  * │ translated-pdf   │ side-by-side │ ✅    │ Original PDF + Translated PDF │
  * │ original         │ side-by-side │ ❌    │ Not meaningful                │
  * └──────────────────┴──────────────┴───────┴───────────────────────────────┘
- *
- * Invariants:
- *   1. If contentView is 'original', layoutMode MUST be 'single'.
- *   2. If layoutMode is 'side-by-side', contentView MUST be 'translation'
- *      or 'translated-pdf'.
- *
- * Transition rules:
- *   1. Setting contentView to 'original' while layoutMode is 'side-by-side'
- *      automatically resets layoutMode → 'single'.
- *   2. Setting layoutMode to 'side-by-side' while contentView is 'original'
- *      is rejected (silent no-op with a warning).
  */
 
 export function usePdfViewerMode() {
   const contentView = ref(CONTENT_VIEW.ORIGINAL)
-  const layoutMode = ref(LAYOUT_MODE.SINGLE)
+  const selectedLayoutMode = ref(LAYOUT_MODE.SINGLE)
 
-  // Safety net: enforce invariant at the reactivity level.
-  // Sync flush ensures layoutMode is corrected immediately when
-  // contentView changes, before any computed or watcher reads stale state.
-  watch(contentView, (newVal) => {
-    if (newVal === CONTENT_VIEW.ORIGINAL && layoutMode.value === LAYOUT_MODE.SIDE_BY_SIDE) {
-      layoutMode.value = LAYOUT_MODE.SINGLE
-      logger.info('Layout reset to single (content view no longer supports side-by-side)', { contentView: newVal })
+  const layoutMode = computed(() => {
+    if (contentView.value === CONTENT_VIEW.ORIGINAL) {
+      return LAYOUT_MODE.SINGLE
     }
-  }, { flush: 'sync' })
+
+    return selectedLayoutMode.value
+  })
 
   const showOriginalPane = computed(() => {
     return contentView.value !== CONTENT_VIEW.TRANSLATION || layoutMode.value === LAYOUT_MODE.SIDE_BY_SIDE
@@ -134,23 +128,19 @@ export function usePdfViewerMode() {
       return
     }
 
-    if (val === LAYOUT_MODE.SIDE_BY_SIDE && contentView.value === CONTENT_VIEW.ORIGINAL) {
-      logger.warn('Side-by-side layout is not allowed with content view:', contentView.value)
-      return
-    }
-
-    layoutMode.value = val
-    logger.info('Layout mode changed:', { layoutMode: val })
+    selectedLayoutMode.value = val
+    logger.info('Layout mode preference changed:', { selectedLayoutMode: val })
   }
 
   function reset() {
     contentView.value = CONTENT_VIEW.ORIGINAL
-    layoutMode.value = LAYOUT_MODE.SINGLE
+    selectedLayoutMode.value = LAYOUT_MODE.SINGLE
   }
 
   return {
     contentView,
     layoutMode,
+    selectedLayoutMode,
     setContentView,
     setLayoutMode,
     isSideBySide,
