@@ -5,7 +5,8 @@ import { ensurePdfJsConfigured, getPdfWorkerUrl, loadPdfDocumentFromFile, Annota
 import { PdfRenderer } from './PdfRenderer.js'
 import { PdfPageSession } from './PdfPageSession.js'
 import { sha256HexFromArrayBuffer } from './PdfBlockIdentity.js'
-import { createPageTarget, createOutlineNode, createLinkAnnotation } from './NavigationModels.js'
+import { PdfDestinationResolver } from './PdfDestinationResolver.js'
+import { createOutlineNode, createLinkAnnotation } from './NavigationModels.js'
 
 const logger = getScopedLogger(LOG_COMPONENTS.PDF, 'PdfDocumentSession')
 const PAGE_MARGIN = 24
@@ -48,12 +49,11 @@ export class PdfDocumentSession extends ResourceTracker {
     this.displayName = ''
     this.translationStates = new Map()
     this.targetedBlockId = null
-    this._destinationCache = new Map()
     this._renderer = new PdfRenderer({
       scheduleTimeout: (fn, ms) => this.trackTimeout(fn, ms),
       cancelTimeout: (id) => this.clearTimeout(id)
     })
-    this._pageIndexCache = new Map()
+    this._resolver = new PdfDestinationResolver()
     this._outline = null
     this._linkAnnotationCache = new Map()
     this._pendingHydrations = null
@@ -83,8 +83,7 @@ export class PdfDocumentSession extends ResourceTracker {
     this.pageSessions.clear()
     this.translationStates.clear()
     this.targetedBlockId = null
-    this._destinationCache.clear()
-    this._pageIndexCache.clear()
+    this._resolver.clearCaches()
     this._outline = null
     this._linkAnnotationCache.clear()
 
@@ -404,202 +403,12 @@ export class PdfDocumentSession extends ResourceTracker {
    * @param {string|Array|number|null} dest - The destination to resolve
    * @returns {Promise<object|null>} NavigationTarget or null when resolution fails
    */
-  async resolveDestination(dest) {
-    if (!this.pdfDocument) {
-      return null
-    }
-
-    try {
-      if (typeof dest === 'number') {
-        return this._resolvePageNumber(dest)
-      }
-
-      if (typeof dest === 'string') {
-        return this._resolveNamedDestination(dest)
-      }
-
-      if (Array.isArray(dest)) {
-        return this._resolveExplicitDestination(dest)
-      }
-
-      return null
-    } catch (error) {
-      logger.warn('Failed to resolve destination:', error)
-      return null
-    }
-  }
-
-  /**
-   * Resolve a direct page number into a NavigationTarget.
-   *
-   * @param {number} pageNumber - 1-based page number
-   * @returns {object|null} PageTarget or null if out of range
-   * @private
-   */
-  _resolvePageNumber(pageNumber) {
-    if (!Number.isInteger(pageNumber)) {
-      return null
-    }
-
-    if (pageNumber < 1 || pageNumber > this.totalPages) {
-      return null
-    }
-
-    return createPageTarget({ pageNumber })
-  }
-
-  /**
-   * Resolve a named destination string into a NavigationTarget.
-   *
-   * Looks up the named destination via pdfDocument.getDestination(),
-   * then recursively resolves the resulting explicit destination array.
-   *
-   * @param {string} name - The named destination identifier
-   * @returns {Promise<object|null>} NavigationTarget or null
-   * @private
-   */
-  async _resolveNamedDestination(name) {
-    if (!name || typeof name !== 'string') {
-      return null
-    }
-
-    const cacheKey = `named:${name}`
-    if (this._destinationCache.has(cacheKey)) {
-      return this._destinationCache.get(cacheKey)
-    }
-
-    const explicitDest = await this.pdfDocument.getDestination(name)
-    if (!explicitDest) {
-      this._destinationCache.set(cacheKey, null)
-      return null
-    }
-
-    const target = await this._resolveExplicitDestination(explicitDest)
-    this._destinationCache.set(cacheKey, target)
-    return target
-  }
-
-  /**
-   * Resolve an explicit destination array into a NavigationTarget.
-   *
-   * Destination array format (PDF spec):
-   *   [0] page reference (RefProxy object)
-   *   [1] zoom type: 'XYZ' | 'Fit' | 'FitH' | 'FitV' | 'FitBH' | 'FitBV'
-   *   [2] top (for FitH, XYZ)
-   *   [3] left (for FitV, XYZ)
-   *   [4] zoom (for XYZ)
-   *
-   * @param {Array} destArray - The explicit destination array
-   * @returns {Promise<object|null>} NavigationTarget or null
-   * @private
-   */
-  async _resolveExplicitDestination(destArray) {
-    if (!Array.isArray(destArray) || destArray.length < 1) {
-      return null
-    }
-
-    const pageRef = destArray[0]
-    const pageNumber = await this._getPageNumberFromRef(pageRef)
-
-    if (pageNumber === null) {
-      return null
-    }
-
-    const params = this._extractDestinationParams(destArray)
-    return createPageTarget({ pageNumber, ...params })
-  }
-
-  /**
-   * Convert a pdf.js page reference (RefProxy) to a 1-based page number.
-   *
-   * Uses pdfDocument.getPageIndex() with caching to avoid repeated worker calls.
-   *
-   * @param {*} pageRef - The page reference from a destination array
-   * @returns {Promise<number|null>} 1-based page number or null
-   * @private
-   */
-  async _getPageNumberFromRef(pageRef) {
-    if (!pageRef) {
-      return null
-    }
-
-    const cacheKey = `${pageRef.num}:${pageRef.gen}`
-    if (this._pageIndexCache.has(cacheKey)) {
-      return this._pageIndexCache.get(cacheKey)
-    }
-
-    try {
-      const pageIndex = await this.pdfDocument.getPageIndex(pageRef)
-      const pageNumber = pageIndex + 1
-
-      if (pageNumber < 1 || pageNumber > this.totalPages) {
-        this._pageIndexCache.set(cacheKey, null)
-        return null
-      }
-
-      this._pageIndexCache.set(cacheKey, pageNumber)
-      return pageNumber
-    } catch (error) {
-      logger.warn('Failed to resolve page index from ref:', error)
-      this._pageIndexCache.set(cacheKey, null)
-      return null
-    }
-  }
-
-  /**
-   * Extract top, left, and zoom parameters from a destination array.
-   *
-   * Handles all PDF destination zoom types:
-   *   - XYZ:  [ref, 'XYZ', left, top, zoom]
-   *   - FitH: [ref, 'FitH', top]
-   *   - FitV: [ref, 'FitV', left]
-   *   - Fit:  [ref, 'Fit']  (no params)
-   *   - FitBH: [ref, 'FitBH', top]
-   *   - FitBV: [ref, 'FitBV', left]
-   *
-   * @param {Array} destArray - The explicit destination array
-   * @returns {object} { top, left, zoom }
-   * @private
-   */
-  _extractDestinationParams(destArray) {
-    const zoomType = destArray[1]?.name ?? (typeof destArray[1] === 'string' ? destArray[1] : '')
-
-    let top = null
-    let left = null
-    let zoom = null
-
-    switch (zoomType) {
-      case 'XYZ': {
-        const rawLeft = Number(destArray[2])
-        const rawTop = Number(destArray[3])
-        const rawZoom = Number(destArray[4])
-        left = Number.isFinite(rawLeft) ? rawLeft : null
-        top = Number.isFinite(rawTop) ? rawTop : null
-        zoom = Number.isFinite(rawZoom) ? rawZoom : null
-        break
-      }
-
-      case 'FitH':
-      case 'FitBH': {
-        const rawTop = Number(destArray[2])
-        top = Number.isFinite(rawTop) ? rawTop : null
-        break
-      }
-
-      case 'FitV':
-      case 'FitBV': {
-        const rawLeft = Number(destArray[2])
-        left = Number.isFinite(rawLeft) ? rawLeft : null
-        break
-      }
-
-      case 'Fit':
-      case 'FitR':
-      default:
-        break
-    }
-
-    return { top, left, zoom }
+  resolveDestination(dest) {
+    return this._resolver.resolveDestination({
+      pdfDocument: this.pdfDocument,
+      totalPages: this.totalPages,
+      destination: dest
+    })
   }
 
   // ── Outline Loading ────────────────────────────────────────
@@ -741,8 +550,7 @@ export class PdfDocumentSession extends ResourceTracker {
     this.pageSessions.clear()
     this.translationStates.clear()
     this.targetedBlockId = null
-    this._destinationCache.clear()
-    this._pageIndexCache.clear()
+    this._resolver.clearCaches()
     this._outline = null
     this._linkAnnotationCache.clear()
     this._pendingHydrations = null
