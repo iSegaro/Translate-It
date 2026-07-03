@@ -25,17 +25,20 @@ export class PdfTextLayerRenderer {
     this.container = container
     this.textDivs = []
     this.textLayer = null
+    this._renderSeq = 0
   }
 
   async render(page, viewport, containerWidth, containerHeight) {
     if (!this.container || !page || !viewport) return
 
     this.clear()
+    const renderSeq = ++this._renderSeq
 
     const textContent = await page.getTextContent({
       includeMarkedContent: true,
       disableNormalization: true
     })
+    if (renderSeq !== this._renderSeq) return
     if (!textContent?.items?.length) return
 
     const layerDiv = document.createElement('div')
@@ -56,8 +59,7 @@ export class PdfTextLayerRenderer {
     const pageTransform = [1, 0, 0, -1, -pageX, pageY + pageHeight]
 
     const styles = textContent.styles || {}
-    const textDivs = this.textDivs
-
+    const spans = []
     const itemMeta = []
 
     for (const item of textContent.items) {
@@ -102,7 +104,7 @@ export class PdfTextLayerRenderer {
         spanStyle.setProperty('--rotate', `${(angle * 180 / Math.PI).toFixed(2)}deg`)
       }
 
-      textDivs.push(span)
+      spans.push(span)
       layerDiv.appendChild(span)
 
       itemMeta.push({
@@ -111,11 +113,14 @@ export class PdfTextLayerRenderer {
       })
     }
 
+    if (renderSeq !== this._renderSeq) return
+
     this.container.appendChild(layerDiv)
     this.textLayer = layerDiv
+    this.textDivs = spans
 
-    for (let i = 0; i < textDivs.length; i++) {
-      const span = textDivs[i]
+    for (let i = 0; i < spans.length; i++) {
+      const span = spans[i]
       const { pdfWidth, str } = itemMeta[i]
       if (pdfWidth <= 0) continue
       if (str.length <= 1) continue
@@ -133,6 +138,8 @@ export class PdfTextLayerRenderer {
   }
 
   clear() {
+    this._renderSeq++
+
     if (this.textLayer) {
       unregisterPdfTextLayerSelectionShell(this.textLayer)
     }

@@ -302,7 +302,7 @@ function setupObservers() {
       const pageNumber = Number(entry.target?.dataset?.pageNumber)
       if (!pageNumber) continue
 
-      if (entry.intersectionRatio >= 0.25) {
+      if (entry.isIntersecting) {
         nextVisible.add(pageNumber)
       } else {
         nextVisible.delete(pageNumber)
@@ -312,7 +312,7 @@ function setupObservers() {
     updateVisiblePages(nextVisible)
   }, {
     root,
-    threshold: 0.25
+    threshold: 0
   })
 
   renderCandidateObserver = new IntersectionObserver((entries) => {

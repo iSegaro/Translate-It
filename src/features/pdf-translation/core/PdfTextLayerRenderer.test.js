@@ -369,4 +369,161 @@ describe('PdfTextLayerRenderer', () => {
     expect(container.querySelector('.textLayer')).toBeNull()
     expect(sentinel.isConnected).toBe(false)
   })
+
+  describe('concurrent render safety', () => {
+    function deferredGetTextContent(items) {
+      let resolve
+      const promise = new Promise((res) => { resolve = res })
+      const mock = vi.fn(() => promise)
+      return { mock, resolve: () => resolve({ items }), promise }
+    }
+
+    it('stale render after overlapping call does not append DOM', async () => {
+      const container = document.createElement('div')
+      const renderer = new PdfTextLayerRenderer(container)
+      const { mock: firstMock, resolve: firstResolve } = deferredGetTextContent([
+        { str: 'Stale', transform: [1, 0, 0, 1, 10, 20], width: 50, height: 12 }
+      ])
+      const { mock: secondMock, resolve: secondResolve } = deferredGetTextContent([
+        { str: 'Fresh', transform: [1, 0, 0, 1, 10, 20], width: 50, height: 12 }
+      ])
+
+      const firstPage = { getTextContent: firstMock }
+      const secondPage = { getTextContent: secondMock }
+
+      const firstRender = renderer.render(firstPage, { scale: 1 })
+      // Let the first render hit the await
+      await new Promise((resolve) => setTimeout(resolve, 0))
+
+      const secondRender = renderer.render(secondPage, { scale: 1 })
+      await new Promise((resolve) => setTimeout(resolve, 0))
+
+      secondResolve()
+      await secondRender
+
+      expect(container.querySelector('.textLayer')).not.toBeNull()
+      const spans = container.querySelectorAll('span')
+      expect(spans.length).toBe(1)
+      expect(spans[0].textContent).toBe('Fresh')
+
+      firstResolve()
+      await firstRender
+
+      // Stale render should NOT have appended anything
+      const spansAfterStale = container.querySelectorAll('span')
+      expect(spansAfterStale.length).toBe(1)
+      expect(spansAfterStale[0].textContent).toBe('Fresh')
+    })
+
+    it('latest render always wins when calls overlap', async () => {
+      const container = document.createElement('div')
+      const renderer = new PdfTextLayerRenderer(container)
+      const { mock, resolve: res1 } = deferredGetTextContent([
+        { str: 'Alpha', transform: [1, 0, 0, 1, 10, 20], width: 50, height: 12 }
+      ])
+      const page1 = { getTextContent: mock }
+
+      const render1 = renderer.render(page1, { scale: 1 })
+      await new Promise((resolve) => setTimeout(resolve, 0))
+
+      const render2 = renderer.render(page1, { scale: 1 })
+      await new Promise((resolve) => setTimeout(resolve, 0))
+
+      const render3 = renderer.render(page1, { scale: 1 })
+      await new Promise((resolve) => setTimeout(resolve, 0))
+
+      res1()
+      await Promise.all([render1, render2, render3])
+
+      const spans = container.querySelectorAll('span')
+      expect(spans.length).toBe(1)
+    })
+
+    it('clear during in-flight render prevents stale DOM mutation', async () => {
+      const container = document.createElement('div')
+      const renderer = new PdfTextLayerRenderer(container)
+      const { mock, resolve } = deferredGetTextContent([
+        { str: 'Cancelled', transform: [1, 0, 0, 1, 10, 20], width: 50, height: 12 }
+      ])
+      const page = { getTextContent: mock }
+
+      const renderPromise = renderer.render(page, { scale: 1 })
+      await new Promise((resolve) => setTimeout(resolve, 0))
+
+      renderer.clear()
+
+      resolve()
+      await renderPromise
+
+      expect(container.querySelector('.textLayer')).toBeNull()
+      expect(container.children.length).toBe(0)
+    })
+
+    it('clear inflight after stale render does not throw', async () => {
+      const container = document.createElement('div')
+      const renderer = new PdfTextLayerRenderer(container)
+      const { mock: m1, resolve: r1 } = deferredGetTextContent([
+        { str: 'One', transform: [1, 0, 0, 1, 10, 20], width: 50, height: 12 }
+      ])
+      const { mock: m2, resolve: r2 } = deferredGetTextContent([
+        { str: 'Two', transform: [1, 0, 0, 1, 10, 20], width: 50, height: 12 }
+      ])
+      const p1 = { getTextContent: m1 }
+      const p2 = { getTextContent: m2 }
+
+      renderer.render(p1, { scale: 1 })
+      await new Promise((resolve) => setTimeout(resolve, 0))
+
+      renderer.render(p2, { scale: 1 })
+      await new Promise((resolve) => setTimeout(resolve, 0))
+
+      r2()
+      await new Promise((resolve) => setTimeout(resolve, 0))
+
+      expect(() => renderer.clear()).not.toThrow()
+
+      r1()
+      await new Promise((resolve) => setTimeout(resolve, 0))
+
+      expect(() => renderer.clear()).not.toThrow()
+    })
+
+    it('itemMeta and spans stay aligned during overlapping renders', async () => {
+      const container = document.createElement('div')
+      const renderer = new PdfTextLayerRenderer(container)
+      const { mock: m1, resolve: r1 } = deferredGetTextContent([
+        { str: 'A', transform: [1, 0, 0, 1, 10, 20], width: 50, height: 12 },
+        { str: 'B', transform: [1, 0, 0, 1, 70, 20], width: 50, height: 12 },
+        { str: 'C', transform: [1, 0, 0, 1, 130, 20], width: 50, height: 12 }
+      ])
+      const { mock: m2, resolve: r2 } = deferredGetTextContent([
+        { str: 'X', transform: [1, 0, 0, 1, 10, 20], width: 50, height: 12 },
+        { str: 'Y', transform: [1, 0, 0, 1, 70, 20], width: 50, height: 12 }
+      ])
+      const p1 = { getTextContent: m1 }
+      const p2 = { getTextContent: m2 }
+
+      renderer.render(p1, { scale: 1 })
+      await new Promise((resolve) => setTimeout(resolve, 0))
+
+      renderer.render(p2, { scale: 1 })
+      await new Promise((resolve) => setTimeout(resolve, 0))
+
+      r2()
+      await new Promise((resolve) => setTimeout(resolve, 0))
+
+      const spans = container.querySelectorAll('span')
+      expect(spans.length).toBe(2)
+      expect(spans[0].textContent).toBe('X')
+      expect(spans[1].textContent).toBe('Y')
+
+      r1()
+      await new Promise((resolve) => setTimeout(resolve, 0))
+
+      const spansAfter = container.querySelectorAll('span')
+      expect(spansAfter.length).toBe(2)
+      expect(spansAfter[0].textContent).toBe('X')
+      expect(spansAfter[1].textContent).toBe('Y')
+    })
+  })
 })
