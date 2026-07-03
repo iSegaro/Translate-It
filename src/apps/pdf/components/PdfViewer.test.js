@@ -140,6 +140,42 @@ describe('PdfViewer', () => {
     wrapper.unmount()
   })
 
+  it('does not emit a fallback current page before observer visibility exists', async () => {
+    const initialPages = [{ pageNumber: 1, width: 100, height: 100, scale: 1 }]
+    const wrapper = mount(PdfViewer, {
+      props: {
+        pages: initialPages,
+        session: {
+          updateVisiblePages: vi.fn(),
+          updateRenderCandidates: vi.fn()
+        }
+      },
+      attachTo: document.body
+    })
+
+    await nextTick()
+    await nextTick()
+
+    expect(wrapper.emitted('current-page-change')).toBeFalsy()
+
+    await wrapper.setProps({
+      pages: [{ pageNumber: 1, width: 120, height: 120, scale: 1 }]
+    })
+    await nextTick()
+    await nextTick()
+
+    expect(wrapper.emitted('current-page-change')).toBeFalsy()
+
+    visibilityCallback?.([
+      { target: { dataset: { pageNumber: '1' } }, isIntersecting: true, intersectionRatio: 0.5 }
+    ])
+    await nextTick()
+
+    expect(wrapper.emitted('current-page-change')?.at(-1)?.[0]).toBe(1)
+
+    wrapper.unmount()
+  })
+
   it('emits both width and height for layout changes', async () => {
     const session = {
       updateVisiblePages: vi.fn(),

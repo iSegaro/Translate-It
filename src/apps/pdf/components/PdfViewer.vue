@@ -359,7 +359,9 @@ watch(
 
     if (isOriginalRole.value) {
       emitLayoutIfNeeded()
-      emitCurrentPage(visiblePageNumbers.value)
+      if (visiblePageNumbers.value.size > 0) {
+        emitCurrentPage(visiblePageNumbers.value)
+      }
     }
   }
 )
@@ -375,7 +377,7 @@ watch(
 onMounted(() => {
   setupObservers()
 
-  if (isOriginalRole.value) {
+  if (isOriginalRole.value && visiblePageNumbers.value.size > 0) {
     emitCurrentPage(visiblePageNumbers.value)
   }
 })
