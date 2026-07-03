@@ -19,7 +19,7 @@
       @file-selected="handleFileSelected"
       @translate-visible="handleTranslateVisiblePages"
       @cancel-translation="handleCancelTranslation"
-      @content-view-change="setContentView"
+      @content-view-change="handleContentViewChange"
       @layout-mode-change="setLayoutMode"
       @zoom-step="handleZoomStep"
       @zoom-change="handleZoomChange"
@@ -322,6 +322,29 @@ async function handleFileSelected(file) {
   if (loaded) {
     isDragOver.value = false
     void attachDocument(session)
+  }
+}
+
+async function handleContentViewChange(nextView) {
+  const sourceParams = resolveScrollAnchor()
+  const anchor = captureScrollAnchor(sourceParams.container, sourceParams.selector)
+
+  setContentView(nextView)
+
+  await nextTick()
+
+  const isTargetTranslation = nextView === CONTENT_VIEW.TRANSLATION
+  const targetContainer = isTargetTranslation
+    ? translatedScrollContainer.value
+    : originalScrollContainer.value
+  const targetSelector = isTargetTranslation
+    ? '.pdf-translated-page[data-page-number]'
+    : '.pdf-page[data-page-number]'
+
+  restoreScrollAnchor(anchor, targetContainer, targetSelector)
+
+  if (isSideBySide.value) {
+    pdfViewerLayoutRef.value?.syncNow?.()
   }
 }
 
