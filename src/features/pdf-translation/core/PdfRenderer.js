@@ -5,18 +5,39 @@ import { PdfTextLayerRenderer } from './PdfTextLayerRenderer.js'
 const logger = getScopedLogger(LOG_COMPONENTS.PDF, 'PdfRenderer')
 const RENDER_CLEANUP_DELAY_MS = 200
 
+const CANVAS_ID_KEY = Symbol('pdfRendererCanvasId')
+
 export class PdfRenderer {
   constructor({ scheduleTimeout, cancelTimeout } = {}) {
     this.renderTasks = new Map()
     this._cleanupTimeout = null
     this._scheduleTimeout = scheduleTimeout || ((fn, ms) => setTimeout(fn, ms))
     this._cancelTimeout = cancelTimeout || ((id) => clearTimeout(id))
+    this._nextCanvasId = 0
+  }
+
+  _getCanvasId(canvasEl) {
+    if (!canvasEl) return ''
+    if (!canvasEl[CANVAS_ID_KEY]) {
+      canvasEl[CANVAS_ID_KEY] = String(++this._nextCanvasId)
+    }
+    return canvasEl[CANVAS_ID_KEY]
+  }
+
+  _taskKey(pageNumber, canvasEl) {
+    return `${pageNumber}:${this._getCanvasId(canvasEl)}`
+  }
+
+  static _parsePageNumber(key) {
+    const colon = key.indexOf(':')
+    return colon > 0 ? Number(key.slice(0, colon)) : NaN
   }
 
   async renderPage(pdfDocument, metric, pageNumber, canvasEl, textLayerRenderer) {
     if (!pdfDocument || !canvasEl || !metric) return false
 
-    const previous = this.renderTasks.get(pageNumber)
+    const key = this._taskKey(pageNumber, canvasEl)
+    const previous = this.renderTasks.get(key)
     previous?.cancel?.()
 
     const page = await pdfDocument.getPage(pageNumber)
@@ -38,7 +59,7 @@ export class PdfRenderer {
       intent: 'display'
     })
 
-    this.renderTasks.set(pageNumber, renderTask)
+    this.renderTasks.set(key, renderTask)
 
     try {
       await renderTask.promise
@@ -54,16 +75,17 @@ export class PdfRenderer {
       }
       return false
     } finally {
-      if (this.renderTasks.get(pageNumber) === renderTask) {
-        this.renderTasks.delete(pageNumber)
+      if (this.renderTasks.get(key) === renderTask) {
+        this.renderTasks.delete(key)
       }
       page.cleanup?.()
     }
   }
 
   clearPage(pageNumber, canvasEl, textLayerRenderer) {
-    this.renderTasks.get(pageNumber)?.cancel?.()
-    this.renderTasks.delete(pageNumber)
+    const key = this._taskKey(pageNumber, canvasEl)
+    this.renderTasks.get(key)?.cancel?.()
+    this.renderTasks.delete(key)
 
     if (canvasEl) {
       const context = canvasEl.getContext('2d')
@@ -96,8 +118,9 @@ export class PdfRenderer {
 
     this._cleanupTimeout = this._scheduleTimeout(() => {
       this._cleanupTimeout = null
-      for (const [pageNumber, renderTask] of this.renderTasks.entries()) {
-        if (!visiblePageNumbers.has(pageNumber)) {
+      for (const [key, renderTask] of this.renderTasks.entries()) {
+        const pageNumber = PdfRenderer._parsePageNumber(key)
+        if (!Number.isFinite(pageNumber) || !visiblePageNumbers.has(pageNumber)) {
           renderTask.cancel?.()
         }
       }
