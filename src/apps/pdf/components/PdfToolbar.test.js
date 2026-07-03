@@ -48,7 +48,8 @@ describe('PdfToolbar', () => {
         contentView: 'original',
         layoutMode: 'single',
         zoomMode: 'fit-width',
-        zoomPercent: 100
+        zoomPercent: 100,
+        showTranslationOption: true
       }
     })
 
@@ -61,6 +62,46 @@ describe('PdfToolbar', () => {
     )
     await translationButton?.trigger('click')
     expect(wrapper.emitted('content-view-change')?.[1]?.[0]).toBe('translation')
+  })
+
+  it('hides Translation option when showTranslationOption is false', async () => {
+    const wrapper = mount(PdfToolbar, {
+      props: {
+        fileName: 'demo.pdf',
+        pageCount: 12,
+        currentPageNumber: 1,
+        contentView: 'original',
+        showTranslationOption: false
+      }
+    })
+
+    const allButtons = wrapper.findAll('.pdf-toolbar__mode-button')
+    const contentButtons = allButtons.filter(
+      btn => ['Original', 'Translation', 'Translated PDF'].some(label => btn.text().includes(label))
+    )
+    expect(contentButtons).toHaveLength(2)
+    expect(contentButtons[0].text()).toBe('Original')
+    expect(contentButtons[1].text()).toBe('Translated PDF')
+    expect(contentButtons.some(btn => btn.text().includes('Translation'))).toBe(false)
+  })
+
+  it('shows Translation option when showTranslationOption is true', async () => {
+    const wrapper = mount(PdfToolbar, {
+      props: {
+        fileName: 'demo.pdf',
+        pageCount: 12,
+        currentPageNumber: 1,
+        contentView: 'translation',
+        showTranslationOption: true
+      }
+    })
+
+    const allButtons = wrapper.findAll('.pdf-toolbar__mode-button')
+    const contentButtons = allButtons.filter(
+      btn => ['Original', 'Translation', 'Translated PDF'].some(label => btn.text().includes(label))
+    )
+    expect(contentButtons).toHaveLength(3)
+    expect(contentButtons.some(btn => btn.text().includes('Translation'))).toBe(true)
   })
 
   it('emits layout-mode-change when a layout mode button is clicked', async () => {

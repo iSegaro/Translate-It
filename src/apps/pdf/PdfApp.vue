@@ -14,6 +14,7 @@
       :layout-mode="selectedLayoutMode"
       :zoom-mode="zoomMode"
       :zoom-percent="zoomPercent"
+      :show-translation-option="hasAnyTranslation"
       :translation-summary="translationSummary"
       @file-selected="handleFileSelected"
       @translate-visible="handleTranslateVisiblePages"
@@ -166,7 +167,7 @@ import PdfStatusBanner from './components/PdfStatusBanner.vue'
 import PdfWindowsHost from './components/PdfWindowsHost.vue'
 import PdfOutline from './components/PdfOutline.vue'
 import { usePdfViewerController } from './composables/usePdfViewerController.js'
-import { usePdfViewerMode, VIEWER_ROLE } from './composables/usePdfViewerMode.js'
+import { usePdfViewerMode, CONTENT_VIEW, VIEWER_ROLE } from './composables/usePdfViewerMode.js'
 import { usePdfExport } from './composables/usePdfExport.js'
 import { usePdfBlockSelection } from './composables/usePdfBlockSelection.js'
 import { usePdfOcr } from './composables/usePdfOcr.js'
@@ -182,6 +183,7 @@ const {
   isLoading,
   isTranslating,
   canTranslateVisiblePages,
+  hasAnyTranslation,
   pageCount,
   pageMetrics,
   translationSummary,
@@ -305,6 +307,12 @@ const pdfStatusBanner = computed(() => buildPdfStatusBannerState({
 watch(hasDocument, (has) => {
   if (has) {
     refreshOcrCandidates()
+  }
+})
+
+watch(hasAnyTranslation, (has) => {
+  if (!has && !isTranslating.value && contentView.value === CONTENT_VIEW.TRANSLATION) {
+    setContentView(CONTENT_VIEW.ORIGINAL)
   }
 })
 

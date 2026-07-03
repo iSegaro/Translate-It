@@ -262,6 +262,7 @@ const props = defineProps({
   layoutMode: { type: String, default: LAYOUT_MODE.SINGLE },
   zoomMode: { type: String, default: 'fit-width' },
   zoomPercent: { type: Number, default: 100 },
+  showTranslationOption: { type: Boolean, default: false },
   translationSummary: {
     type: Object,
     default: () => ({
@@ -282,11 +283,16 @@ const moreMenuTriggerRef = ref(null)
 const activeMenu = ref(null)
 const zoomPercentOptions = [50, 75, 100, 125, 150, 200]
 
-const contentOptions = [
+const allContentOptions = [
   { value: CONTENT_VIEW.ORIGINAL, label: 'Original' },
   { value: CONTENT_VIEW.TRANSLATION, label: 'Translation' },
   { value: CONTENT_VIEW.TRANSLATED_PDF, label: 'Translated PDF' }
 ]
+
+const contentOptions = computed(() => {
+  if (props.showTranslationOption) return allContentOptions
+  return allContentOptions.filter(opt => opt.value !== CONTENT_VIEW.TRANSLATION)
+})
 
 const layoutOptions = [
   { value: LAYOUT_MODE.SINGLE, label: 'Single' },

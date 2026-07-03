@@ -103,6 +103,7 @@ function createMocks({
     hasDocument: ref(hasDocument),
     isLoading: ref(false),
     isTranslating: ref(false),
+    hasAnyTranslation: ref(false),
     canTranslateVisiblePages: ref(true),
     pageCount: ref(12),
     pageMetrics: ref([]),

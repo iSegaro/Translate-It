@@ -257,6 +257,12 @@ export function usePdfViewerController() {
 
   const translatedPageData = computed(() => _translatedPageData.value)
 
+  const hasAnyTranslation = computed(() => {
+    return translatedPageData.value.some(page =>
+      page.blocks.some(block => block.translationState?.status === 'translated')
+    )
+  })
+
   function applySessionState(state) {
     fileName.value = state.fileName
     pageCount.value = state.totalPages
@@ -512,6 +518,7 @@ export function usePdfViewerController() {
     pageMetrics,
     pageScale,
     isTranslating,
+    hasAnyTranslation,
     canTranslateVisiblePages,
     pdfFingerprint,
     translationSummary,
