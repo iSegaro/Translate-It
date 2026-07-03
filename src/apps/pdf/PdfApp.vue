@@ -250,6 +250,8 @@ const viewerLayout = ref({
   height: 0
 })
 const zoomPercentOptions = [50, 75, 100, 125, 150, 200]
+let contentTransitionSeq = 0
+let layoutChangeSeq = 0
 
 const {
   isBlockTargetingActive,
@@ -326,9 +328,14 @@ async function handleFileSelected(file) {
 }
 
 async function handleContentViewChange(nextView) {
-  const sourceParams = resolveScrollAnchor()
+  // In side-by-side mode, capture from the translated pane — the user reads translations,
+  // and the original pane may be out of sync due to approximate page-boundary mapping
+  const sourceParams = (showTranslatedTextPane.value && showOriginalPane.value && translatedScrollContainer.value)
+    ? { container: translatedScrollContainer.value, selector: '.pdf-translated-page[data-page-number]' }
+    : resolveScrollAnchor()
   const anchor = captureScrollAnchor(sourceParams.container, sourceParams.selector)
 
+  contentTransitionSeq += 1
   setContentView(nextView)
 
   await nextTick()
@@ -364,12 +371,20 @@ async function handleLayoutChange(layout = null) {
     return
   }
 
+  layoutChangeSeq += 1
+  const layoutSeq = layoutChangeSeq
+  const contentSeqAtStart = contentTransitionSeq
+
   const { container, selector } = resolveScrollAnchor()
   const anchor = captureScrollAnchor(container, selector)
   viewerLayout.value = nextLayout
   if (hasDocument.value) {
     await recomputeLayout(buildLayoutRequest(nextLayout))
     await nextTick()
+
+    if (contentSeqAtStart !== contentTransitionSeq) return
+    if (layoutSeq !== layoutChangeSeq) return
+
     restoreScrollAnchor(anchor, container, selector)
     pdfViewerLayoutRef.value?.syncNow?.()
   }
