@@ -3,7 +3,7 @@ import { mount } from '@vue/test-utils'
 import PdfViewerLayout from './PdfViewerLayout.vue'
 
 vi.mock('../composables/usePdfScrollSync.js', () => ({
-  usePdfScrollSync: vi.fn()
+  usePdfScrollSync: vi.fn(() => ({ syncNow: vi.fn() }))
 }))
 
 describe('PdfViewerLayout', () => {

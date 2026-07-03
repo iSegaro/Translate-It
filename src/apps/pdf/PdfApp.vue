@@ -201,6 +201,7 @@ const {
   contentView,
   layoutMode,
   selectedLayoutMode,
+  isSideBySide,
   showOriginalPane,
   showTranslatedTextPane,
   showTranslatedPdfPane,
@@ -316,7 +317,7 @@ async function handleFileSelected(file) {
   }
 }
 
-function handleLayoutChange(layout = null) {
+async function handleLayoutChange(layout = null) {
   const nextLayout = normalizeLayout(layout)
   const currentLayout = viewerLayout.value
 
@@ -327,9 +328,13 @@ function handleLayoutChange(layout = null) {
     return
   }
 
+  const anchor = captureZoomScrollAnchor()
   viewerLayout.value = nextLayout
   if (hasDocument.value) {
-    void recomputeLayout(buildLayoutRequest(nextLayout))
+    await recomputeLayout(buildLayoutRequest(nextLayout))
+    await nextTick()
+    restoreZoomScrollAnchor(anchor)
+    pdfViewerLayoutRef.value?.syncNow?.()
   }
 }
 
@@ -358,6 +363,7 @@ async function handleZoomChange({ mode, value }) {
       await recomputeLayout(buildLayoutRequest())
       await nextTick()
       restoreZoomScrollAnchor(anchor)
+      pdfViewerLayoutRef.value?.syncNow?.()
     }
     return
   }
@@ -384,6 +390,7 @@ async function handleZoomChange({ mode, value }) {
     await recomputeLayout(buildLayoutRequest())
     await nextTick()
     restoreZoomScrollAnchor(anchor)
+    pdfViewerLayoutRef.value?.syncNow?.()
   }
 }
 
@@ -410,6 +417,7 @@ async function handleZoomStep(direction) {
     await recomputeLayout(buildLayoutRequest())
     await nextTick()
     restoreZoomScrollAnchor(anchor)
+    pdfViewerLayoutRef.value?.syncNow?.()
   }
 }
 

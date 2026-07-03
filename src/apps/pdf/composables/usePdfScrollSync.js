@@ -161,16 +161,7 @@ export function usePdfScrollSync(originalPaneRef, translatedPaneRef, enabledRef)
 
       if (!pending || !isEnabled.value) return
 
-      const sourceKind = pending.sourcePane === originalPaneRef.value ? 'original' : 'translated'
-      const targetKind = pending.targetPane === originalPaneRef.value ? 'original' : 'translated'
-
-      if (syncByPageBoundary(pending.sourcePane, pending.targetPane, sourceKind, targetKind, (pane) => {
-        suppressSource = pane
-      })) {
-        return
-      }
-
-      syncScroll(pending.sourcePane, pending.targetPane)
+      runSync(pending.sourcePane, pending.targetPane)
     })
   }
 
@@ -198,6 +189,19 @@ export function usePdfScrollSync(originalPaneRef, translatedPaneRef, enabledRef)
     scheduleSync(sourcePane, targetPane)
   }
 
+  function runSync(sourcePane, targetPane) {
+    const sourceKind = sourcePane === originalPaneRef.value ? 'original' : 'translated'
+    const targetKind = targetPane === originalPaneRef.value ? 'original' : 'translated'
+
+    if (syncByPageBoundary(sourcePane, targetPane, sourceKind, targetKind, (pane) => {
+      suppressSource = pane
+    })) {
+      return
+    }
+
+    syncScroll(sourcePane, targetPane)
+  }
+
   function setupListeners() {
     detachListeners()
     cancelFrame()
@@ -215,6 +219,8 @@ export function usePdfScrollSync(originalPaneRef, translatedPaneRef, enabledRef)
       originalPane.removeEventListener('scroll', handleOriginalScroll)
       translatedPane.removeEventListener('scroll', handleTranslatedScroll)
     }
+
+    runSync(originalPane, translatedPane)
   }
 
   watch(
@@ -228,4 +234,17 @@ export function usePdfScrollSync(originalPaneRef, translatedPaneRef, enabledRef)
     cancelFrame()
     clearSuppression()
   })
+
+  function syncNow() {
+    if (!isEnabled.value) return
+
+    const original = originalPaneRef.value
+    const translated = translatedPaneRef.value
+    if (!original || !translated) return
+
+    suppressSource = null
+    runSync(original, translated)
+  }
+
+  return { syncNow }
 }
