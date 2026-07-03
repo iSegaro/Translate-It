@@ -334,6 +334,7 @@ async function handleContentViewChange(nextView) {
   await nextTick()
 
   const isTargetTranslation = nextView === CONTENT_VIEW.TRANSLATION
+  const isSourceTranslation = sourceParams.selector === '.pdf-translated-page[data-page-number]'
   const targetContainer = isTargetTranslation
     ? translatedScrollContainer.value
     : originalScrollContainer.value
@@ -341,7 +342,11 @@ async function handleContentViewChange(nextView) {
     ? '.pdf-translated-page[data-page-number]'
     : '.pdf-page[data-page-number]'
 
-  restoreScrollAnchor(anchor, targetContainer, targetSelector)
+  if (isSourceTranslation !== isTargetTranslation) {
+    restoreScrollAnchor(anchor ? { pageNumber: anchor.pageNumber, offsetRatio: 0 } : null, targetContainer, targetSelector)
+  } else {
+    restoreScrollAnchor(anchor, targetContainer, targetSelector)
+  }
 
   if (isSideBySide.value) {
     pdfViewerLayoutRef.value?.syncNow?.()
