@@ -338,7 +338,7 @@ async function handleContentViewChange(nextView) {
   const previousView = contentView.value
   const owner = resolveAnchorOwner()
   let anchor = captureOwnedScrollAnchor(owner)
-  anchor = applyContentTransitionLogicalFallback(anchor, owner, previousView, nextView)
+  anchor = normalizeTranslatedAnchor(anchor, owner, previousView, nextView)
 
   beginControlledTransition()
   setContentView(nextView)
@@ -592,7 +592,7 @@ function getLogicalCurrentPageNumber() {
   return Number.isInteger(pageNumber) && pageNumber > 0 ? pageNumber : null
 }
 
-function applyContentTransitionLogicalFallback(anchor, owner, previousView, nextView) {
+function normalizeTranslatedAnchor(anchor, owner, previousView, nextView) {
   if (!isTranslatedTextPdfBackedTransition(previousView, nextView)) return anchor
   if (owner !== PDF_SCROLL_OWNER.TRANSLATED) return anchor
 
