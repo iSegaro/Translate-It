@@ -266,6 +266,13 @@ function emitCurrentPage(nextVisible) {
   }
 }
 
+function emitCurrentPageIfVisible() {
+  if (!isOriginalRole.value) return
+  if (visiblePageNumbers.value.size === 0) return
+
+  emitCurrentPage(visiblePageNumbers.value)
+}
+
 function emitLayoutIfNeeded() {
   if (!isOriginalRole.value) return
 
@@ -359,9 +366,7 @@ watch(
 
     if (isOriginalRole.value) {
       emitLayoutIfNeeded()
-      if (visiblePageNumbers.value.size > 0) {
-        emitCurrentPage(visiblePageNumbers.value)
-      }
+      emitCurrentPageIfVisible()
     }
   }
 )
@@ -377,9 +382,7 @@ watch(
 onMounted(() => {
   setupObservers()
 
-  if (isOriginalRole.value && visiblePageNumbers.value.size > 0) {
-    emitCurrentPage(visiblePageNumbers.value)
-  }
+  emitCurrentPageIfVisible()
 })
 
 onBeforeUnmount(() => {
