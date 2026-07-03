@@ -220,7 +220,14 @@ export function usePdfScrollSync(originalPaneRef, translatedPaneRef, enabledRef)
       translatedPane.removeEventListener('scroll', handleTranslatedScroll)
     }
 
-    runSync(originalPane, translatedPane)
+    if (
+      translatedPane.scrollTop > SCROLL_POSITION_EPSILON &&
+      originalPane.scrollTop < SCROLL_POSITION_EPSILON
+    ) {
+      runSync(translatedPane, originalPane)
+    } else {
+      runSync(originalPane, translatedPane)
+    }
   }
 
   watch(

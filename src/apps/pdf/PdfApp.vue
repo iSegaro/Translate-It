@@ -328,12 +328,13 @@ async function handleLayoutChange(layout = null) {
     return
   }
 
-  const anchor = captureZoomScrollAnchor()
+  const { container, selector } = resolveScrollAnchor()
+  const anchor = captureScrollAnchor(container, selector)
   viewerLayout.value = nextLayout
   if (hasDocument.value) {
     await recomputeLayout(buildLayoutRequest(nextLayout))
     await nextTick()
-    restoreZoomScrollAnchor(anchor)
+    restoreScrollAnchor(anchor, container, selector)
     pdfViewerLayoutRef.value?.syncNow?.()
   }
 }
@@ -359,10 +360,11 @@ async function handleZoomChange({ mode, value }) {
     zoomMode.value = 'fit-page'
 
     if (hasDocument.value) {
-      const anchor = captureZoomScrollAnchor()
+      const { container, selector } = resolveScrollAnchor()
+      const anchor = captureScrollAnchor(container, selector)
       await recomputeLayout(buildLayoutRequest())
       await nextTick()
-      restoreZoomScrollAnchor(anchor)
+      restoreScrollAnchor(anchor, container, selector)
       pdfViewerLayoutRef.value?.syncNow?.()
     }
     return
@@ -376,7 +378,8 @@ async function handleZoomChange({ mode, value }) {
     return
   }
 
-  const anchor = captureZoomScrollAnchor()
+  const { container, selector } = resolveScrollAnchor()
+  const anchor = captureScrollAnchor(container, selector)
 
   if (nextMode === 'fit-width') {
     zoomMode.value = 'fit-width'
@@ -389,7 +392,7 @@ async function handleZoomChange({ mode, value }) {
   if (hasDocument.value) {
     await recomputeLayout(buildLayoutRequest())
     await nextTick()
-    restoreZoomScrollAnchor(anchor)
+    restoreScrollAnchor(anchor, container, selector)
     pdfViewerLayoutRef.value?.syncNow?.()
   }
 }
@@ -408,7 +411,8 @@ async function handleZoomStep(direction) {
     return
   }
 
-  const anchor = captureZoomScrollAnchor()
+  const { container, selector } = resolveScrollAnchor()
+  const anchor = captureScrollAnchor(container, selector)
 
   zoomMode.value = 'percent'
   zoomPercent.value = nextPercent
@@ -416,7 +420,7 @@ async function handleZoomStep(direction) {
   if (hasDocument.value) {
     await recomputeLayout(buildLayoutRequest())
     await nextTick()
-    restoreZoomScrollAnchor(anchor)
+    restoreScrollAnchor(anchor, container, selector)
     pdfViewerLayoutRef.value?.syncNow?.()
   }
 }
@@ -431,13 +435,22 @@ function resetPresentationState() {
   }
 }
 
-function captureZoomScrollAnchor() {
-  const container = originalScrollContainer.value
+function resolveScrollAnchor() {
+  if (!showOriginalPane.value && showTranslatedTextPane.value) {
+    const container = translatedScrollContainer.value
+    if (container) {
+      return { container, selector: '.pdf-translated-page[data-page-number]' }
+    }
+  }
+  return { container: originalScrollContainer.value, selector: '.pdf-page[data-page-number]' }
+}
+
+function captureScrollAnchor(container, pageSelector) {
   if (!container) return null
 
   const scrollTop = container.scrollTop
   const containerRect = container.getBoundingClientRect()
-  const pageElements = container.querySelectorAll('.pdf-page[data-page-number]')
+  const pageElements = container.querySelectorAll(pageSelector)
   if (!pageElements.length) return null
 
   let best = null
@@ -475,13 +488,12 @@ function captureZoomScrollAnchor() {
   return { pageNumber, offsetRatio }
 }
 
-function restoreZoomScrollAnchor(anchor) {
-  if (!anchor) return
+function restoreScrollAnchor(anchor, container, pageSelector) {
+  if (!anchor || !container) return
 
-  const container = originalScrollContainer.value
-  if (!container) return
-
-  const pageEl = container.querySelector(`.pdf-page[data-page-number="${anchor.pageNumber}"]`)
+  const pageEl = [...container.querySelectorAll(pageSelector)].find(
+    (el) => Number(el.dataset.pageNumber) === anchor.pageNumber
+  )
   if (!pageEl) return
 
   const pageRect = pageEl.getBoundingClientRect()
