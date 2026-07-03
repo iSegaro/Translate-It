@@ -155,7 +155,7 @@
 </template>
 
 <script setup>
-import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, unref, watch } from 'vue'
 import PdfToolbar from './components/PdfToolbar.vue'
 import PdfDropzone from './components/PdfDropzone.vue'
 import PdfViewer from './components/PdfViewer.vue'
@@ -243,6 +243,7 @@ const exportSuccess = ref(null)
 const exportSuccessTimer = ref(null)
 const EXPORT_SUCCESS_DURATION_MS = 2200
 const DEFAULT_VIEWER_WIDTH = 960
+
 const zoomMode = ref('fit-width')
 const zoomPercent = ref(100)
 const viewerLayout = ref({
@@ -254,6 +255,7 @@ let contentTransitionSeq = 0
 let layoutChangeSeq = 0
 let suppressedLayoutRestoreSeq = 0
 let suppressedLayoutRestoreFrameId = null
+let pendingPdfBackedAnchor = null
 
 const PDF_SCROLL_OWNER = Object.freeze({
   ORIGINAL: 'original',
@@ -337,10 +339,22 @@ async function handleFileSelected(file) {
 async function handleContentViewChange(nextView) {
   const previousView = contentView.value
   const owner = resolveAnchorOwner()
-  let anchor = captureOwnedScrollAnchor(owner)
-  anchor = normalizeTranslatedAnchor(anchor, owner, previousView, nextView)
+  const isPdfBackedTransition = isPdfBackedPdfTransition(previousView, nextView)
+  const ownerTarget = resolveOwnerScrollTarget(owner)
+
+  let anchor = isPdfBackedTransition
+    ? (capturePdfBackedScrollAnchor(owner) || captureScrollAnchor(ownerTarget.container, ownerTarget.selector))
+    : captureScrollAnchor(ownerTarget.container, ownerTarget.selector)
+
+  if (!isPdfBackedTransition) {
+    anchor = normalizeTranslatedAnchor(anchor, owner, previousView, nextView)
+  }
 
   beginControlledTransition()
+  pendingPdfBackedAnchor = isPdfBackedTransition && anchor?.pdfPoint
+    ? { transitionSeq: contentTransitionSeq, anchor }
+    : null
+
   setContentView(nextView)
 
   await nextTick()
@@ -355,12 +369,20 @@ async function handleContentViewChange(nextView) {
 
 async function handleLayoutModeChange(mode) {
   const owner = resolveAnchorOwner()
-  const anchor = captureOwnedScrollAnchor(owner)
+  const anchor = capturePdfAwareOwnedScrollAnchor(owner)
 
   beginControlledTransition()
+  pendingPdfBackedAnchor = anchor?.pdfPoint
+    ? { transitionSeq: contentTransitionSeq, anchor }
+    : null
   setLayoutMode(mode)
 
   await nextTick()
+
+  if (anchor?.pdfPoint) {
+    scheduleControlledTransitionSuppressionClear()
+    return
+  }
 
   const restoredOwner = restoreOwnedScrollAnchor(anchor)
 
@@ -385,19 +407,41 @@ async function handleLayoutChange(layout = null) {
   const layoutSeq = layoutChangeSeq
   const contentSeqAtStart = contentTransitionSeq
   const suppressRestoreForControlledTransition = suppressedLayoutRestoreSeq === contentSeqAtStart
+  const pendingPdfAnchor = pendingPdfBackedAnchor?.transitionSeq === contentSeqAtStart
+    ? pendingPdfBackedAnchor.anchor
+    : null
 
+  const owner = resolveAnchorOwner()
   const { container, selector } = resolveScrollAnchor()
-  const anchor = captureScrollAnchor(container, selector)
+  const anchor = isPdfBackedContentView(contentView.value)
+    ? (capturePdfBackedScrollAnchor(owner) || captureScrollAnchor(container, selector))
+    : captureScrollAnchor(container, selector)
   viewerLayout.value = nextLayout
   if (hasDocument.value) {
     await recomputeLayout(buildLayoutRequest(nextLayout))
     await nextTick()
 
-    if (contentSeqAtStart !== contentTransitionSeq) return
-    if (layoutSeq !== layoutChangeSeq) return
-    if (suppressRestoreForControlledTransition || suppressedLayoutRestoreSeq === contentSeqAtStart) return
+    if (contentSeqAtStart !== contentTransitionSeq) {
+      return
+    }
+    if (layoutSeq !== layoutChangeSeq) {
+      return
+    }
+    if (pendingPdfAnchor) {
+      pendingPdfBackedAnchor = null
+      restoreOwnedScrollAnchor(pendingPdfAnchor)
+      syncFromOwner(resolveAnchorOwner())
+      return
+    }
+    if (suppressRestoreForControlledTransition || suppressedLayoutRestoreSeq === contentSeqAtStart) {
+      return
+    }
 
-    restoreScrollAnchor(anchor, container, selector)
+    if (anchor?.pdfPoint) {
+      restoreOwnedScrollAnchor(anchor)
+    } else {
+      restoreScrollAnchor(anchor, container, selector)
+    }
     syncFromOwner(resolveAnchorOwner())
   }
 }
@@ -499,6 +543,7 @@ function resetPresentationState() {
 }
 
 function beginControlledTransition() {
+  pendingPdfBackedAnchor = null
   contentTransitionSeq += 1
   suppressedLayoutRestoreSeq = contentTransitionSeq
   clearControlledTransitionSuppressionTimer()
@@ -575,6 +620,94 @@ function captureOwnedScrollAnchor(owner) {
   return anchor ? { ...anchor, owner: target.owner } : null
 }
 
+function capturePdfAwareOwnedScrollAnchor(owner) {
+  if (isPdfBackedContentView(contentView.value)) {
+    return capturePdfBackedScrollAnchor(owner) || captureOwnedScrollAnchor(owner)
+  }
+
+  return captureOwnedScrollAnchor(owner)
+}
+
+function isPdfBackedPdfTransition(previousView, nextView) {
+  return isPdfBackedContentView(previousView) && isPdfBackedContentView(nextView) && previousView !== nextView
+}
+
+function getPdfSession() {
+  return unref(session) ?? null
+}
+
+function findBestScrollAnchorTarget(container, pageSelector) {
+  if (!container) return null
+
+  const containerRect = container.getBoundingClientRect()
+  const pageElements = container.querySelectorAll(pageSelector)
+  if (!pageElements.length) return null
+
+  let best = null
+
+  for (const el of pageElements) {
+    const rect = el.getBoundingClientRect()
+    if (rect.bottom <= containerRect.top) continue
+    if (rect.top >= containerRect.bottom) continue
+
+    const dist = Math.abs(rect.top - containerRect.top)
+    if (!best || dist < best.dist) {
+      best = { el, rect, dist }
+    }
+  }
+
+  if (!best) {
+    for (const el of pageElements) {
+      const rect = el.getBoundingClientRect()
+      if (rect.bottom <= containerRect.top) continue
+      best = { el, rect }
+      break
+    }
+  }
+
+  return best
+}
+
+function capturePdfBackedScrollAnchor(owner) {
+  const target = resolveOwnerScrollTarget(owner)
+  const best = findBestScrollAnchorTarget(target.container, target.selector)
+  if (!best) {
+    return null
+  }
+
+  const pageEl = best.el
+  const canvasEl = getPageCanvasElement(pageEl)
+  const pdfSession = getPdfSession()
+  const pageNumber = Number(pageEl.dataset.pageNumber)
+  const viewport = pdfSession?.getPageViewport?.(pageNumber)
+  if (!canvasEl || !viewport?.convertToPdfPoint) {
+    return null
+  }
+
+  if (!Number.isInteger(pageNumber) || pageNumber < 1) {
+    return null
+  }
+
+  const container = target.container
+  const containerRect = container.getBoundingClientRect()
+  const canvasRect = canvasEl.getBoundingClientRect()
+  const offsetRatio = best.rect.height > 0
+    ? Math.max(0, Math.min(1, (container.scrollTop - (best.rect.top - containerRect.top + container.scrollTop)) / best.rect.height))
+    : 0
+
+  const cssX = (containerRect.left + (containerRect.width / 2)) - canvasRect.left
+  const cssY = containerRect.top - canvasRect.top
+  const [pdfX, pdfY] = viewport.convertToPdfPoint(cssX, cssY)
+  const anchor = {
+    owner: target.owner,
+    pageNumber,
+    offsetRatio,
+    pdfPoint: { x: pdfX, y: pdfY }
+  }
+
+  return anchor
+}
+
 function isPdfBackedContentView(view) {
   return view === CONTENT_VIEW.ORIGINAL || view === CONTENT_VIEW.TRANSLATED_PDF
 }
@@ -612,6 +745,12 @@ function restoreOwnedScrollAnchor(anchor) {
   if (!anchor) return null
 
   const preferredTarget = resolveOwnerScrollTarget(anchor.owner)
+  const pdfSession = getPdfSession()
+
+  if (anchor.pdfPoint && restorePdfBackedScrollAnchor(anchor, preferredTarget.container, preferredTarget.selector, pdfSession)) {
+    return preferredTarget.owner
+  }
+
   const preferredAnchor = preferredTarget.owner === anchor.owner
     ? anchor
     : { ...anchor, owner: preferredTarget.owner, offsetRatio: 0 }
@@ -632,6 +771,46 @@ function restoreOwnedScrollAnchor(anchor) {
   return restoreScrollAnchor(fallbackAnchor, fallbackTarget.container, fallbackTarget.selector)
     ? fallbackTarget.owner
     : null
+}
+
+function restorePdfBackedScrollAnchor(anchor, container, pageSelector, pdfSession) {
+  if (!anchor?.pdfPoint || !container || !pdfSession) {
+    return false
+  }
+
+  const pageEl = [...container.querySelectorAll(pageSelector)].find(
+    (el) => Number(el.dataset.pageNumber) === anchor.pageNumber
+  )
+  if (!pageEl) {
+    return false
+  }
+
+  const canvasEl = getPageCanvasElement(pageEl)
+  if (!canvasEl) {
+    return false
+  }
+
+  const viewport = pdfSession.getPageViewport?.(anchor.pageNumber)
+  if (!viewport?.convertToViewportPoint) {
+    return false
+  }
+
+  const [, cssY] = viewport.convertToViewportPoint(anchor.pdfPoint.x, anchor.pdfPoint.y)
+  const canvasRect = canvasEl.getBoundingClientRect()
+  const containerRect = container.getBoundingClientRect()
+  const canvasOffsetTop = canvasRect.top - containerRect.top + container.scrollTop
+  const targetScrollTop = canvasOffsetTop + cssY
+
+  container.scrollTo({
+    top: targetScrollTop,
+    behavior: 'instant'
+  })
+
+  return true
+}
+
+function getPageCanvasElement(pageEl) {
+  return pageEl?.querySelector('canvas') || null
 }
 
 function syncFromOwner(owner) {
@@ -682,19 +861,24 @@ function captureScrollAnchor(container, pageSelector) {
 }
 
 function restoreScrollAnchor(anchor, container, pageSelector) {
-  if (!anchor || !container) return false
+  if (!anchor || !container) {
+    return false
+  }
 
   const pageEl = [...container.querySelectorAll(pageSelector)].find(
     (el) => Number(el.dataset.pageNumber) === anchor.pageNumber
   )
-  if (!pageEl) return false
+  if (!pageEl) {
+    return false
+  }
 
   const pageRect = pageEl.getBoundingClientRect()
   const containerRect = container.getBoundingClientRect()
   const pageOffsetTop = pageRect.top - containerRect.top + container.scrollTop
+  const targetScrollTop = pageOffsetTop + pageRect.height * anchor.offsetRatio
 
   container.scrollTo({
-    top: pageOffsetTop + pageRect.height * anchor.offsetRatio,
+    top: targetScrollTop,
     behavior: 'instant'
   })
   return true

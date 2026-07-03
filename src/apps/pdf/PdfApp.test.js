@@ -9,6 +9,7 @@ let mockPdfExport
 let mockBlockSelection
 let mockPdfOcr
 let mockLayoutSyncFromPane
+let mockPdfViewport
 
 vi.mock('./composables/usePdfViewerController.js', () => ({
   usePdfViewerController: () => mockViewerController
@@ -54,6 +55,13 @@ vi.mock('./components/PdfViewerLayout.vue', () => ({
     name: 'PdfViewerLayout',
     props: ['showOriginalPane', 'showTranslatedPane'],
     setup(props, { expose }) {
+      const getOriginalPageStep = () => (props.showTranslatedPane ? 100 : 120)
+      const translatedPageStep = 100
+      const originalCanvasOffset = 24
+      const translatedCanvasOffset = 12
+      const getOriginalCanvasHeight = () => (getOriginalPageStep() - 48)
+      const translatedCanvasHeight = 76
+
       const original = document.createElement('div')
       const translated = document.createElement('div')
       original.className = 'mock-original-scroll'
@@ -68,18 +76,33 @@ vi.mock('./components/PdfViewerLayout.vue', () => ({
         originalPage.className = 'pdf-page'
         originalPage.dataset.pageNumber = String(pageNumber)
         originalPage.getBoundingClientRect = () => {
-          const top = ((pageNumber - 1) * 100) - original.scrollTop
-          return { top, bottom: top + 100, height: 100, left: 0, right: 300, width: 300 }
+          const pageStep = getOriginalPageStep()
+          const top = ((pageNumber - 1) * pageStep) - original.scrollTop
+          return { top, bottom: top + pageStep, height: pageStep, left: 0, right: 300, width: 300 }
         }
+        const originalCanvas = document.createElement('canvas')
+        originalCanvas.getBoundingClientRect = () => {
+          const pageStep = getOriginalPageStep()
+          const canvasHeight = getOriginalCanvasHeight()
+          const top = ((pageNumber - 1) * pageStep) - original.scrollTop + originalCanvasOffset
+          return { top, bottom: top + canvasHeight, height: canvasHeight, left: 0, right: 260, width: 260 }
+        }
+        originalPage.appendChild(originalCanvas)
         original.appendChild(originalPage)
 
         const translatedPage = document.createElement('div')
         translatedPage.className = 'pdf-translated-page pdf-page'
         translatedPage.dataset.pageNumber = String(pageNumber)
         translatedPage.getBoundingClientRect = () => {
-          const top = ((pageNumber - 1) * 100) - translated.scrollTop
-          return { top, bottom: top + 100, height: 100, left: 0, right: 300, width: 300 }
+          const top = ((pageNumber - 1) * translatedPageStep) - translated.scrollTop
+          return { top, bottom: top + translatedPageStep, height: translatedPageStep, left: 0, right: 300, width: 300 }
         }
+        const translatedCanvas = document.createElement('canvas')
+        translatedCanvas.getBoundingClientRect = () => {
+          const top = ((pageNumber - 1) * translatedPageStep) - translated.scrollTop + translatedCanvasOffset
+          return { top, bottom: top + translatedCanvasHeight, height: translatedCanvasHeight, left: 0, right: 260, width: 260 }
+        }
+        translatedPage.appendChild(translatedCanvas)
         translated.appendChild(translatedPage)
       }
 
@@ -142,11 +165,17 @@ vi.mock('./components/PdfWindowsHost.vue', () => ({
 vi.mock('./debug/pdfOverlayDiagnostics.js', () => ({}))
 
 const flushPromises = () => nextTick()
+const waitAnimationFrame = () => new Promise(resolve => requestAnimationFrame(resolve))
 
 function createMocks({
   bannerState = null,
-  hasDocument = true
+  hasDocument = true,
+  sessionAsRef = true
 } = {}) {
+  const sessionMock = {
+    getPageViewport: vi.fn(() => mockPdfViewport)
+  }
+
   mockViewerController = {
     error: ref(''),
     fileName: ref('demo.pdf'),
@@ -168,7 +197,7 @@ function createMocks({
     restoredTranslationCount: ref(0),
     pdfFingerprint: ref('fingerprint'),
     workerLabel: ref('worker'),
-    session: ref(null),
+    session: sessionAsRef ? ref(sessionMock) : sessionMock,
     loadPdfFile: vi.fn().mockResolvedValue(true),
     recomputeLayout: vi.fn().mockResolvedValue(undefined),
     translateVisiblePages: vi.fn(),
@@ -195,6 +224,10 @@ function createMocks({
     })
   }
   mockLayoutSyncFromPane = vi.fn()
+  mockPdfViewport = {
+    convertToPdfPoint: vi.fn((x, y) => [x / 2, y / 2]),
+    convertToViewportPoint: vi.fn((x, y) => [x * 2, y * 2])
+  }
 
   mockPdfExport = {
     canExport: ref(false),
@@ -494,8 +527,8 @@ describe('PdfApp', () => {
   })
 
   describe('scroll anchor ownership transitions', () => {
-    function mountInMode({ contentView, layoutMode }) {
-      createMocks()
+    function mountInMode({ contentView, layoutMode, sessionAsRef = true }) {
+      createMocks({ sessionAsRef })
       mockViewerMode.contentView.value = contentView
       mockViewerMode.layoutMode.value = layoutMode
       updateModeDerivedState()
@@ -539,7 +572,7 @@ describe('PdfApp', () => {
       wrapper.unmount()
     })
 
-    it('syncs from original for translated-pdf single to side-by-side', async () => {
+    it('captures pdf-backed anchor for translated-pdf single to side-by-side', async () => {
       const wrapper = mountInMode({ contentView: 'translated-pdf', layoutMode: 'single' })
       await flushPromises()
 
@@ -548,8 +581,76 @@ describe('PdfApp', () => {
 
       await emitToolbar(wrapper, 'layout-mode-change', 'side-by-side')
 
+      expect(mockViewerMode.setLayoutMode).toHaveBeenCalledWith('side-by-side')
       expect(layout.scrollContainer.scrollTop).toBe(100)
-      expect(mockLayoutSyncFromPane).toHaveBeenLastCalledWith('original')
+      expect(mockLayoutSyncFromPane).not.toHaveBeenCalled()
+
+      wrapper.unmount()
+    })
+
+    it('uses pdf-backed anchors for translated-pdf layout mode toggles', async () => {
+      const wrapper = mountInMode({ contentView: 'translated-pdf', layoutMode: 'single' })
+      await flushPromises()
+
+      const layout = wrapper.findComponent({ name: 'PdfViewerLayout' }).vm
+      const originalPane = layout.scrollContainer
+      originalPane.scrollTop = 900
+
+      await emitToolbar(wrapper, 'layout-mode-change', 'side-by-side')
+
+      expect(mockPdfViewport.convertToPdfPoint).toHaveBeenCalledWith(150, 36)
+      expect(mockPdfViewport.convertToViewportPoint).not.toHaveBeenCalled()
+      expect(originalPane.scrollTop).toBe(900)
+
+      wrapper.unmount()
+    })
+
+    it('defers pdf-backed scroll restore on repeated translated-pdf layout toggles', async () => {
+      const wrapper = mountInMode({ contentView: 'translated-pdf', layoutMode: 'single' })
+      await flushPromises()
+
+      const layout = wrapper.findComponent({ name: 'PdfViewerLayout' }).vm
+      const originalPane = layout.scrollContainer
+      originalPane.scrollTop = 900
+
+      await emitToolbar(wrapper, 'layout-mode-change', 'side-by-side')
+      expect(originalPane.scrollTop).toBe(900)
+
+      await emitToolbar(wrapper, 'layout-mode-change', 'single')
+      expect(originalPane.scrollTop).toBe(900)
+
+      await emitToolbar(wrapper, 'layout-mode-change', 'side-by-side')
+      expect(originalPane.scrollTop).toBe(900)
+
+      expect(mockPdfViewport.convertToPdfPoint).toHaveBeenCalledTimes(3)
+      expect(mockPdfViewport.convertToViewportPoint).not.toHaveBeenCalled()
+
+      wrapper.unmount()
+    })
+
+    it('uses pdf-backed anchors when translated-pdf layout recomputes page metrics', async () => {
+      const wrapper = mountInMode({ contentView: 'translated-pdf', layoutMode: 'single' })
+      await flushPromises()
+
+      const layout = wrapper.findComponent({ name: 'PdfViewerLayout' }).vm
+      const originalPane = layout.scrollContainer
+      originalPane.scrollTop = 900
+
+      await emitToolbar(wrapper, 'layout-mode-change', 'side-by-side')
+      await waitAnimationFrame()
+      await flushPromises()
+
+      mockPdfViewport.convertToPdfPoint.mockClear()
+      mockPdfViewport.convertToViewportPoint.mockClear()
+      mockViewerController.recomputeLayout.mockClear()
+      originalPane.scrollTop = 760
+
+      wrapper.findComponent({ name: 'PdfViewer' }).vm.$emit('layout-change', { width: 800, height: 600 })
+      await flushPromises()
+
+      expect(mockViewerController.recomputeLayout).toHaveBeenCalled()
+      expect(mockPdfViewport.convertToPdfPoint).toHaveBeenCalledWith(150, -64)
+      expect(originalPane.scrollTop).toBe(760)
 
       wrapper.unmount()
     })
@@ -607,7 +708,7 @@ describe('PdfApp', () => {
       wrapper.findComponent({ name: 'PdfViewer' }).vm.$emit('layout-change', { width: 800, height: 600 })
       await flushPromises()
 
-      expect(originalPane.scrollTop).toBe(600)
+      expect(originalPane.scrollTop).toBe(720)
       expect(originalPane.scrollTo).toHaveBeenCalledTimes(1)
 
       wrapper.unmount()
@@ -631,8 +732,88 @@ describe('PdfApp', () => {
       wrapper.findComponent({ name: 'PdfViewer' }).vm.$emit('layout-change', { width: 800, height: 600 })
       await flushPromises()
 
-      expect(originalPane.scrollTop).toBe(600)
+      expect(originalPane.scrollTop).toBe(720)
       expect(originalPane.scrollTo).toHaveBeenCalledTimes(1)
+
+      wrapper.unmount()
+    })
+
+    it('preserves pdf-backed scroll position across original and translated-pdf toggles', async () => {
+      const wrapper = mountInMode({ contentView: 'original', layoutMode: 'side-by-side' })
+      await flushPromises()
+
+      const layout = wrapper.findComponent({ name: 'PdfViewerLayout' }).vm
+      const originalPane = layout.scrollContainer
+      originalPane.scrollTop = 900
+
+      await emitToolbar(wrapper, 'content-view-change', 'translated-pdf')
+
+      expect(mockViewerMode.setContentView).toHaveBeenCalledWith('translated-pdf')
+      expect(mockPdfViewport.convertToPdfPoint).toHaveBeenCalledWith(150, 36)
+      expect(mockPdfViewport.convertToViewportPoint).toHaveBeenCalledWith(75, 18)
+      expect(originalPane.scrollTop).toBe(760)
+
+      await emitToolbar(wrapper, 'content-view-change', 'original')
+
+      expect(mockViewerMode.setContentView).toHaveBeenCalledWith('original')
+      expect(originalPane.scrollTop).toBe(920)
+      expect(mockPdfViewport.convertToPdfPoint).toHaveBeenCalledTimes(2)
+      expect(mockPdfViewport.convertToViewportPoint).toHaveBeenCalledTimes(2)
+
+      wrapper.unmount()
+    })
+
+    it('uses getPageViewport from a runtime-shaped plain session object', async () => {
+      const wrapper = mountInMode({
+        contentView: 'original',
+        layoutMode: 'side-by-side',
+        sessionAsRef: false
+      })
+      await flushPromises()
+
+      const layout = wrapper.findComponent({ name: 'PdfViewerLayout' }).vm
+      layout.scrollContainer.scrollTop = 900
+
+      await emitToolbar(wrapper, 'content-view-change', 'translated-pdf')
+
+      expect(mockViewerController.session.getPageViewport).toHaveBeenCalledWith(8)
+      expect(mockPdfViewport.convertToPdfPoint).toHaveBeenCalledWith(150, 36)
+      expect(mockPdfViewport.convertToViewportPoint).toHaveBeenCalledWith(75, 18)
+
+      wrapper.unmount()
+    })
+
+    it('preserves the top-of-page pdf-backed position', async () => {
+      const wrapper = mountInMode({ contentView: 'original', layoutMode: 'side-by-side' })
+      await flushPromises()
+
+      const layout = wrapper.findComponent({ name: 'PdfViewerLayout' }).vm
+      const originalPane = layout.scrollContainer
+      originalPane.scrollTop = 864
+
+      await emitToolbar(wrapper, 'content-view-change', 'translated-pdf')
+
+      expect(mockPdfViewport.convertToPdfPoint).toHaveBeenCalledWith(150, 0)
+      expect(mockPdfViewport.convertToViewportPoint).toHaveBeenCalledWith(75, 0)
+      expect(originalPane.scrollTop).toBe(724)
+
+      wrapper.unmount()
+    })
+
+    it('falls back when the canvas is missing', async () => {
+      const wrapper = mountInMode({ contentView: 'original', layoutMode: 'side-by-side' })
+      await flushPromises()
+
+      const layout = wrapper.findComponent({ name: 'PdfViewerLayout' }).vm
+      const originalPane = layout.scrollContainer
+      const pageEightCanvas = originalPane.querySelector('.pdf-page[data-page-number="8"] canvas')
+      pageEightCanvas?.remove()
+      originalPane.scrollTop = 900
+
+      await emitToolbar(wrapper, 'content-view-change', 'translated-pdf')
+
+      expect(mockPdfViewport.convertToPdfPoint).not.toHaveBeenCalled()
+      expect(originalPane.scrollTop).toBe(700)
 
       wrapper.unmount()
     })
