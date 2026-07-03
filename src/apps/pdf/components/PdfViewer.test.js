@@ -183,6 +183,42 @@ describe('PdfViewer', () => {
     }
   })
 
+  it('rebuilds observers when scroll container changes', async () => {
+    const session = {
+      updateVisiblePages: vi.fn(),
+      updateRenderCandidates: vi.fn()
+    }
+    const firstRoot = document.createElement('div')
+    const secondRoot = document.createElement('div')
+
+    const wrapper = mount(PdfViewer, {
+      props: {
+        pages: [{ pageNumber: 1, width: 100, height: 100, scale: 1 }],
+        session,
+        scrollContainer: firstRoot
+      },
+      attachTo: document.body
+    })
+
+    await nextTick()
+    await nextTick()
+
+    expect(resizeObserveMock).toHaveBeenCalledWith(firstRoot)
+    const disconnectCount = disconnectMock.mock.calls.length
+    const resizeDisconnectCount = resizeDisconnectMock.mock.calls.length
+
+    await wrapper.setProps({ scrollContainer: secondRoot })
+    await nextTick()
+    await nextTick()
+
+    expect(disconnectMock.mock.calls.length).toBeGreaterThan(disconnectCount)
+    expect(resizeDisconnectMock.mock.calls.length).toBeGreaterThan(resizeDisconnectCount)
+    expect(resizeObserveMock).toHaveBeenCalledWith(secondRoot)
+    expect(observeMock).toHaveBeenCalledWith(pageRootEl)
+
+    wrapper.unmount()
+  })
+
   // ── viewerRole ───────────────────────────────────────────────
 
   describe('viewerRole', () => {

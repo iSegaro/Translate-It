@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { mount } from '@vue/test-utils'
 import { defineComponent, nextTick, ref } from 'vue'
-import { usePdfScrollSync } from './usePdfScrollSync.js'
+import { SCROLL_SYNC_PANE, usePdfScrollSync } from './usePdfScrollSync.js'
 
 function createHostComponent({ enabled = true } = {}) {
   return defineComponent({
@@ -10,12 +10,13 @@ function createHostComponent({ enabled = true } = {}) {
       const translatedPaneRef = ref(null)
       const isEnabled = ref(enabled)
 
-      usePdfScrollSync(originalPaneRef, translatedPaneRef, isEnabled)
+      const scrollSync = usePdfScrollSync(originalPaneRef, translatedPaneRef, isEnabled)
 
       return {
         originalPaneRef,
         translatedPaneRef,
-        isEnabled
+        isEnabled,
+        ...scrollSync
       }
     },
     template: `
@@ -258,6 +259,64 @@ describe('usePdfScrollSync', () => {
     await nextTick()
 
     expect(translatedPane.scrollTop).toBe(0)
+
+    wrapper.unmount()
+  })
+
+  it('syncs immediately from the requested owner', async () => {
+    const Host = createHostComponent({ enabled: true })
+    const wrapper = mount(Host)
+    await nextTick()
+
+    const originalPane = wrapper.find('.original-pane').element
+    const translatedPane = wrapper.find('.translated-pane').element
+
+    setScrollMetrics(originalPane, { scrollHeight: 2600, clientHeight: 600, scrollTop: 0, top: 0, height: 2000 })
+    setScrollMetrics(translatedPane, { scrollHeight: 1800, clientHeight: 400, scrollTop: 820, top: 0, height: 1400 })
+
+    const originalPages = originalPane.querySelectorAll('.original-page')
+    const translatedPages = translatedPane.querySelectorAll('.translated-page')
+
+    originalPages.forEach((pageEl, index) => {
+      setPageMetrics(pageEl, originalPane, {
+        offsetTop: index * 1000,
+        height: 1000
+      })
+    })
+
+    translatedPages.forEach((pageEl, index) => {
+      setPageMetrics(pageEl, translatedPane, {
+        offsetTop: index * 700,
+        height: 700
+      })
+      setScrollMetrics(pageEl.querySelector('.pdf-translated-page__body'), {
+        scrollHeight: 0,
+        clientHeight: 0,
+        top: index * 700 + 40,
+        height: 660
+      })
+    })
+
+    wrapper.vm.syncFromPane(SCROLL_SYNC_PANE.TRANSLATED)
+
+    expect(originalPane.scrollTop).toBe(1182)
+
+    wrapper.unmount()
+  })
+
+  it('does not run heuristic initial sync when enabled', async () => {
+    const Host = createHostComponent({ enabled: true })
+    const wrapper = mount(Host)
+
+    const originalPane = wrapper.find('.original-pane').element
+    const translatedPane = wrapper.find('.translated-pane').element
+    originalPane.scrollTop = 0
+    translatedPane.scrollTop = 500
+
+    await nextTick()
+
+    expect(originalPane.scrollTop).toBe(0)
+    expect(translatedPane.scrollTop).toBe(500)
 
     wrapper.unmount()
   })

@@ -1,6 +1,12 @@
 import { computed, onBeforeUnmount, watch } from 'vue'
 
 const SCROLL_POSITION_EPSILON = 1
+const SCROLL_SYNC_PANE = Object.freeze({
+  ORIGINAL: 'original',
+  TRANSLATED: 'translated'
+})
+
+export { SCROLL_SYNC_PANE }
 
 function clampRatio(value) {
   if (!Number.isFinite(value)) return 0
@@ -220,14 +226,9 @@ export function usePdfScrollSync(originalPaneRef, translatedPaneRef, enabledRef)
       translatedPane.removeEventListener('scroll', handleTranslatedScroll)
     }
 
-    if (
-      translatedPane.scrollTop > SCROLL_POSITION_EPSILON &&
-      originalPane.scrollTop < SCROLL_POSITION_EPSILON
-    ) {
-      runSync(translatedPane, originalPane)
-    } else {
-      runSync(originalPane, translatedPane)
-    }
+    // Controlled view/layout transitions restore their authoritative anchor and
+    // then explicitly choose the sync direction. Avoid heuristic initial writes
+    // here so setup cannot overwrite that restored owner.
   }
 
   watch(
@@ -242,7 +243,7 @@ export function usePdfScrollSync(originalPaneRef, translatedPaneRef, enabledRef)
     clearSuppression()
   })
 
-  function syncNow() {
+  function syncFromPane(owner) {
     if (!isEnabled.value) return
 
     const original = originalPaneRef.value
@@ -250,8 +251,17 @@ export function usePdfScrollSync(originalPaneRef, translatedPaneRef, enabledRef)
     if (!original || !translated) return
 
     suppressSource = null
+    if (owner === SCROLL_SYNC_PANE.TRANSLATED) {
+      runSync(translated, original)
+      return
+    }
+
     runSync(original, translated)
   }
 
-  return { syncNow }
+  function syncNow() {
+    syncFromPane(SCROLL_SYNC_PANE.ORIGINAL)
+  }
+
+  return { syncFromPane, syncNow }
 }

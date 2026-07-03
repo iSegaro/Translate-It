@@ -364,6 +364,14 @@ watch(
   }
 )
 
+watch(
+  () => props.scrollContainer,
+  async () => {
+    await nextTick()
+    setupObservers()
+  }
+)
+
 onMounted(() => {
   setupObservers()
 
@@ -466,4 +474,3 @@ defineExpose({
   getPageElement
 })
 </script>
-

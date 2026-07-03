@@ -8,6 +8,7 @@ let mockViewerMode
 let mockPdfExport
 let mockBlockSelection
 let mockPdfOcr
+let mockLayoutSyncFromPane
 
 vi.mock('./composables/usePdfViewerController.js', () => ({
   usePdfViewerController: () => mockViewerController
@@ -15,6 +16,8 @@ vi.mock('./composables/usePdfViewerController.js', () => ({
 
 vi.mock('./composables/usePdfViewerMode.js', () => ({
   usePdfViewerMode: () => mockViewerMode,
+  CONTENT_VIEW: { ORIGINAL: 'original', TRANSLATION: 'translation', TRANSLATED_PDF: 'translated-pdf' },
+  LAYOUT_MODE: { SINGLE: 'single', SIDE_BY_SIDE: 'side-by-side' },
   VIEWER_ROLE: { ORIGINAL: 'original', OVERLAY: 'overlay' }
 }))
 
@@ -33,7 +36,7 @@ vi.mock('./composables/usePdfOcr.js', () => ({
 vi.mock('./components/PdfToolbar.vue', () => ({
   default: {
     name: 'PdfToolbar',
-    props: ['fileName', 'pageCount', 'currentPageNumber', 'zoomMode', 'zoomPercent'],
+    props: ['fileName', 'pageCount', 'currentPageNumber', 'zoomMode', 'zoomPercent', 'contentView', 'layoutMode'],
     template: '<header class="pdf-toolbar-stub" />'
   }
 }))
@@ -49,6 +52,52 @@ vi.mock('./components/PdfDropzone.vue', () => ({
 vi.mock('./components/PdfViewerLayout.vue', () => ({
   default: {
     name: 'PdfViewerLayout',
+    props: ['showOriginalPane', 'showTranslatedPane'],
+    setup(props, { expose }) {
+      const original = document.createElement('div')
+      const translated = document.createElement('div')
+      original.className = 'mock-original-scroll'
+      translated.className = 'mock-translated-scroll'
+      original.scrollTo = vi.fn(({ top }) => { original.scrollTop = top })
+      translated.scrollTo = vi.fn(({ top }) => { translated.scrollTop = top })
+      original.getBoundingClientRect = () => ({ top: 0, bottom: 500, height: 500, left: 0, right: 300, width: 300 })
+      translated.getBoundingClientRect = () => ({ top: 0, bottom: 500, height: 500, left: 0, right: 300, width: 300 })
+
+      for (let pageNumber = 1; pageNumber <= 12; pageNumber++) {
+        const originalPage = document.createElement('div')
+        originalPage.className = 'pdf-page'
+        originalPage.dataset.pageNumber = String(pageNumber)
+        originalPage.getBoundingClientRect = () => {
+          const top = ((pageNumber - 1) * 100) - original.scrollTop
+          return { top, bottom: top + 100, height: 100, left: 0, right: 300, width: 300 }
+        }
+        original.appendChild(originalPage)
+
+        const translatedPage = document.createElement('div')
+        translatedPage.className = 'pdf-translated-page pdf-page'
+        translatedPage.dataset.pageNumber = String(pageNumber)
+        translatedPage.getBoundingClientRect = () => {
+          const top = ((pageNumber - 1) * 100) - translated.scrollTop
+          return { top, bottom: top + 100, height: 100, left: 0, right: 300, width: 300 }
+        }
+        translated.appendChild(translatedPage)
+      }
+
+      const exposed = {
+        syncFromPane: mockLayoutSyncFromPane
+      }
+      Object.defineProperties(exposed, {
+        scrollContainer: {
+          get: () => props.showOriginalPane ? original : null
+        },
+        translatedPaneRef: {
+          get: () => props.showTranslatedPane ? translated : null
+        }
+      })
+      expose(exposed)
+
+      return {}
+    },
     template: '<div class="pdf-viewer-layout-stub"><slot name="original" /><slot name="translated" /></div>'
   }
 }))
@@ -56,7 +105,7 @@ vi.mock('./components/PdfViewerLayout.vue', () => ({
 vi.mock('./components/PdfViewer.vue', () => ({
   default: {
     name: 'PdfViewer',
-    props: ['viewerRole', 'showOverlay', 'isBlockTargetingActive', 'highlightedBlockId', 'handleNavigationTarget'],
+    props: ['viewerRole', 'showOverlay', 'isBlockTargetingActive', 'highlightedBlockId', 'handleNavigationTarget', 'scrollContainer'],
     template: '<div class="pdf-viewer-stub" />'
   }
 }))
@@ -64,6 +113,7 @@ vi.mock('./components/PdfViewer.vue', () => ({
 vi.mock('./components/PdfTranslatedPane.vue', () => ({
   default: {
     name: 'PdfTranslatedPane',
+    props: ['scrollContainer'],
     template: '<div class="pdf-translated-pane-stub" />'
   }
 }))
@@ -135,9 +185,16 @@ function createMocks({
     showTranslatedPdfPane: ref(false),
     showOverlayLayer: ref(true),
     isSideBySide: ref(false),
-    setContentView: vi.fn(),
-    setLayoutMode: vi.fn()
+    setContentView: vi.fn((value) => {
+      mockViewerMode.contentView.value = value
+      updateModeDerivedState()
+    }),
+    setLayoutMode: vi.fn((value) => {
+      mockViewerMode.layoutMode.value = value
+      updateModeDerivedState()
+    })
   }
+  mockLayoutSyncFromPane = vi.fn()
 
   mockPdfExport = {
     canExport: ref(false),
@@ -179,6 +236,18 @@ function createMocks({
     mockPdfExport.exportError.value = bannerState.exportError || ''
     mockPdfOcr.ocrError.value = bannerState.ocrError || ''
   }
+}
+
+function updateModeDerivedState() {
+  const contentView = mockViewerMode.contentView.value
+  const layoutMode = mockViewerMode.layoutMode.value
+  const isSideBySide = layoutMode === 'side-by-side' && contentView !== 'original'
+
+  mockViewerMode.isSideBySide.value = isSideBySide
+  mockViewerMode.showOriginalPane.value = contentView !== 'translation' || isSideBySide
+  mockViewerMode.showTranslatedTextPane.value = contentView === 'translation'
+  mockViewerMode.showTranslatedPdfPane.value = contentView === 'translated-pdf' && isSideBySide
+  mockViewerMode.showOverlayLayer.value = contentView === 'translated-pdf' && !isSideBySide
 }
 
 describe('PdfApp', () => {
@@ -365,7 +434,9 @@ describe('PdfApp', () => {
       expect(viewers).toHaveLength(1)
       expect(viewers[0].props('viewerRole')).toBe('original')
       expect(viewers[0].props('showOverlay')).toBe(false)
+      expect(viewers[0].props('scrollContainer')).toBe(wrapper.findComponent({ name: 'PdfViewerLayout' }).vm.scrollContainer)
       expect(wrapper.findComponent({ name: 'PdfTranslatedPane' }).exists()).toBe(true)
+      expect(wrapper.findComponent({ name: 'PdfTranslatedPane' }).props('scrollContainer')).toBe(wrapper.findComponent({ name: 'PdfViewerLayout' }).vm.translatedPaneRef)
     })
 
     it('translated-pdf + single renders one PdfViewer with overlay', async () => {
@@ -406,17 +477,164 @@ describe('PdfApp', () => {
 
       expect(viewers[0].props('viewerRole')).toBe('original')
       expect(viewers[0].props('showOverlay')).toBe(false)
+      expect(viewers[0].props('scrollContainer')).toBe(wrapper.findComponent({ name: 'PdfViewerLayout' }).vm.scrollContainer)
       expect(viewers[0].props('isBlockTargetingActive')).toBe(false)
       expect(viewers[0].props('highlightedBlockId')).toBe('')
       expect(viewers[0].props('handleNavigationTarget')).toBeTruthy()
 
       expect(viewers[1].props('viewerRole')).toBe('overlay')
       expect(viewers[1].props('showOverlay')).toBe(true)
+      expect(viewers[1].props('scrollContainer')).toBe(wrapper.findComponent({ name: 'PdfViewerLayout' }).vm.translatedPaneRef)
       expect(viewers[1].props('isBlockTargetingActive')).toBeUndefined()
       expect(viewers[1].props('highlightedBlockId')).toBeUndefined()
       expect(viewers[1].props('handleNavigationTarget')).toBeUndefined()
 
       expect(wrapper.findComponent({ name: 'PdfTranslatedPane' }).exists()).toBe(false)
+    })
+  })
+
+  describe('scroll anchor ownership transitions', () => {
+    function mountInMode({ contentView, layoutMode }) {
+      createMocks()
+      mockViewerMode.contentView.value = contentView
+      mockViewerMode.layoutMode.value = layoutMode
+      updateModeDerivedState()
+      return mount(PdfApp)
+    }
+
+    async function emitToolbar(wrapper, eventName, value) {
+      wrapper.findComponent({ name: 'PdfToolbar' }).vm.$emit(eventName, value)
+      await flushPromises()
+    }
+
+    it('keeps translated pane as final writer for translation single to side-by-side', async () => {
+      const wrapper = mountInMode({ contentView: 'translation', layoutMode: 'single' })
+      await flushPromises()
+
+      const layout = wrapper.findComponent({ name: 'PdfViewerLayout' }).vm
+      layout.translatedPaneRef.scrollTop = 100
+
+      await emitToolbar(wrapper, 'layout-mode-change', 'side-by-side')
+
+      expect(mockViewerMode.setLayoutMode).toHaveBeenCalledWith('side-by-side')
+      expect(layout.translatedPaneRef.scrollTop).toBe(100)
+      expect(mockLayoutSyncFromPane).toHaveBeenLastCalledWith('translated')
+
+      wrapper.unmount()
+    })
+
+    it('preserves translated anchor for translation side-by-side to single without secondary sync', async () => {
+      const wrapper = mountInMode({ contentView: 'translation', layoutMode: 'side-by-side' })
+      await flushPromises()
+
+      const layout = wrapper.findComponent({ name: 'PdfViewerLayout' }).vm
+      layout.translatedPaneRef.scrollTop = 100
+
+      await emitToolbar(wrapper, 'layout-mode-change', 'single')
+
+      expect(mockViewerMode.setLayoutMode).toHaveBeenCalledWith('single')
+      expect(layout.translatedPaneRef.scrollTop).toBe(100)
+      expect(mockLayoutSyncFromPane).not.toHaveBeenCalled()
+
+      wrapper.unmount()
+    })
+
+    it('syncs from original for translated-pdf single to side-by-side', async () => {
+      const wrapper = mountInMode({ contentView: 'translated-pdf', layoutMode: 'single' })
+      await flushPromises()
+
+      const layout = wrapper.findComponent({ name: 'PdfViewerLayout' }).vm
+      layout.scrollContainer.scrollTop = 100
+
+      await emitToolbar(wrapper, 'layout-mode-change', 'side-by-side')
+
+      expect(layout.scrollContainer.scrollTop).toBe(100)
+      expect(mockLayoutSyncFromPane).toHaveBeenLastCalledWith('original')
+
+      wrapper.unmount()
+    })
+
+    it('preserves page when switching original to translation', async () => {
+      const wrapper = mountInMode({ contentView: 'original', layoutMode: 'single' })
+      await flushPromises()
+
+      const layout = wrapper.findComponent({ name: 'PdfViewerLayout' }).vm
+      layout.scrollContainer.scrollTop = 100
+
+      await emitToolbar(wrapper, 'content-view-change', 'translation')
+
+      expect(mockViewerMode.setContentView).toHaveBeenCalledWith('translation')
+      expect(layout.translatedPaneRef.scrollTop).toBe(100)
+      expect(mockLayoutSyncFromPane).not.toHaveBeenCalled()
+
+      wrapper.unmount()
+    })
+
+    it('does not drift on repeated translation layout toggles', async () => {
+      const wrapper = mountInMode({ contentView: 'translation', layoutMode: 'single' })
+      await flushPromises()
+
+      const layout = wrapper.findComponent({ name: 'PdfViewerLayout' }).vm
+      layout.translatedPaneRef.scrollTop = 100
+
+      await emitToolbar(wrapper, 'layout-mode-change', 'side-by-side')
+      await emitToolbar(wrapper, 'layout-mode-change', 'single')
+      await emitToolbar(wrapper, 'layout-mode-change', 'side-by-side')
+
+      expect(layout.translatedPaneRef.scrollTop).toBe(100)
+      expect(mockLayoutSyncFromPane).toHaveBeenCalledTimes(2)
+      expect(mockLayoutSyncFromPane).toHaveBeenNthCalledWith(1, 'translated')
+      expect(mockLayoutSyncFromPane).toHaveBeenNthCalledWith(2, 'translated')
+
+      wrapper.unmount()
+    })
+
+    it('uses logical current page when translated DOM capture is stale during translation to original', async () => {
+      const wrapper = mountInMode({ contentView: 'original', layoutMode: 'single' })
+      await flushPromises()
+
+      const layout = wrapper.findComponent({ name: 'PdfViewerLayout' }).vm
+      const originalPane = layout.scrollContainer
+      originalPane.scrollTop = 600
+      wrapper.findComponent({ name: 'PdfViewer' }).vm.$emit('current-page-change', 7)
+      await flushPromises()
+
+      await emitToolbar(wrapper, 'content-view-change', 'translation')
+      layout.translatedPaneRef.scrollTop = 0
+      originalPane.scrollTo.mockClear()
+
+      await emitToolbar(wrapper, 'content-view-change', 'original')
+      wrapper.findComponent({ name: 'PdfViewer' }).vm.$emit('layout-change', { width: 800, height: 600 })
+      await flushPromises()
+
+      expect(originalPane.scrollTop).toBe(600)
+      expect(originalPane.scrollTo).toHaveBeenCalledTimes(1)
+
+      wrapper.unmount()
+    })
+
+    it('uses logical current page when translated DOM capture is stale during translation to translated-pdf', async () => {
+      const wrapper = mountInMode({ contentView: 'original', layoutMode: 'single' })
+      await flushPromises()
+
+      const layout = wrapper.findComponent({ name: 'PdfViewerLayout' }).vm
+      const originalPane = layout.scrollContainer
+      originalPane.scrollTop = 600
+      wrapper.findComponent({ name: 'PdfViewer' }).vm.$emit('current-page-change', 7)
+      await flushPromises()
+
+      await emitToolbar(wrapper, 'content-view-change', 'translation')
+      layout.translatedPaneRef.scrollTop = 0
+      originalPane.scrollTo.mockClear()
+
+      await emitToolbar(wrapper, 'content-view-change', 'translated-pdf')
+      wrapper.findComponent({ name: 'PdfViewer' }).vm.$emit('layout-change', { width: 800, height: 600 })
+      await flushPromises()
+
+      expect(originalPane.scrollTop).toBe(600)
+      expect(originalPane.scrollTo).toHaveBeenCalledTimes(1)
+
+      wrapper.unmount()
     })
   })
 })

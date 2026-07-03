@@ -20,7 +20,7 @@
       @translate-visible="handleTranslateVisiblePages"
       @cancel-translation="handleCancelTranslation"
       @content-view-change="handleContentViewChange"
-      @layout-mode-change="setLayoutMode"
+      @layout-mode-change="handleLayoutModeChange"
       @zoom-step="handleZoomStep"
       @zoom-change="handleZoomChange"
       @export-txt="handleExportTxt"
@@ -131,7 +131,7 @@
                   :highlighted-block-id="highlightedBlockId"
                   :page-metrics="pageMetrics"
                   :layout-mode="layoutMode"
-                  :scroll-container="originalScrollContainer"
+                  :scroll-container="translatedScrollContainer"
                   @current-page-change="handleTranslatedPaneCurrentPageChange"
                 />
                 <PdfViewer
@@ -252,6 +252,13 @@ const viewerLayout = ref({
 const zoomPercentOptions = [50, 75, 100, 125, 150, 200]
 let contentTransitionSeq = 0
 let layoutChangeSeq = 0
+let suppressedLayoutRestoreSeq = 0
+let suppressedLayoutRestoreFrameId = null
+
+const PDF_SCROLL_OWNER = Object.freeze({
+  ORIGINAL: 'original',
+  TRANSLATED: 'translated'
+})
 
 const {
   isBlockTargetingActive,
@@ -328,36 +335,39 @@ async function handleFileSelected(file) {
 }
 
 async function handleContentViewChange(nextView) {
-  // In side-by-side mode, capture from the translated pane — the user reads translations,
-  // and the original pane may be out of sync due to approximate page-boundary mapping
-  const sourceParams = (showTranslatedTextPane.value && showOriginalPane.value && translatedScrollContainer.value)
-    ? { container: translatedScrollContainer.value, selector: '.pdf-translated-page[data-page-number]' }
-    : resolveScrollAnchor()
-  const anchor = captureScrollAnchor(sourceParams.container, sourceParams.selector)
+  const previousView = contentView.value
+  const owner = resolveAnchorOwner()
+  let anchor = captureOwnedScrollAnchor(owner)
+  anchor = applyContentTransitionLogicalFallback(anchor, owner, previousView, nextView)
 
-  contentTransitionSeq += 1
+  beginControlledTransition()
   setContentView(nextView)
 
   await nextTick()
 
-  const isTargetTranslation = nextView === CONTENT_VIEW.TRANSLATION
-  const isSourceTranslation = sourceParams.selector === '.pdf-translated-page[data-page-number]'
-  const targetContainer = isTargetTranslation
-    ? translatedScrollContainer.value
-    : originalScrollContainer.value
-  const targetSelector = isTargetTranslation
-    ? '.pdf-translated-page[data-page-number]'
-    : '.pdf-page[data-page-number]'
-
-  if (isSourceTranslation !== isTargetTranslation) {
-    restoreScrollAnchor(anchor ? { pageNumber: anchor.pageNumber, offsetRatio: 0 } : null, targetContainer, targetSelector)
-  } else {
-    restoreScrollAnchor(anchor, targetContainer, targetSelector)
-  }
+  const restoredOwner = restoreOwnedScrollAnchor(anchor)
 
   if (isSideBySide.value) {
-    pdfViewerLayoutRef.value?.syncNow?.()
+    syncFromOwner(restoredOwner || anchor?.owner || owner)
   }
+  scheduleControlledTransitionSuppressionClear()
+}
+
+async function handleLayoutModeChange(mode) {
+  const owner = resolveAnchorOwner()
+  const anchor = captureOwnedScrollAnchor(owner)
+
+  beginControlledTransition()
+  setLayoutMode(mode)
+
+  await nextTick()
+
+  const restoredOwner = restoreOwnedScrollAnchor(anchor)
+
+  if (isSideBySide.value) {
+    syncFromOwner(restoredOwner || anchor?.owner || owner)
+  }
+  scheduleControlledTransitionSuppressionClear()
 }
 
 async function handleLayoutChange(layout = null) {
@@ -374,6 +384,7 @@ async function handleLayoutChange(layout = null) {
   layoutChangeSeq += 1
   const layoutSeq = layoutChangeSeq
   const contentSeqAtStart = contentTransitionSeq
+  const suppressRestoreForControlledTransition = suppressedLayoutRestoreSeq === contentSeqAtStart
 
   const { container, selector } = resolveScrollAnchor()
   const anchor = captureScrollAnchor(container, selector)
@@ -384,9 +395,10 @@ async function handleLayoutChange(layout = null) {
 
     if (contentSeqAtStart !== contentTransitionSeq) return
     if (layoutSeq !== layoutChangeSeq) return
+    if (suppressRestoreForControlledTransition || suppressedLayoutRestoreSeq === contentSeqAtStart) return
 
     restoreScrollAnchor(anchor, container, selector)
-    pdfViewerLayoutRef.value?.syncNow?.()
+    syncFromOwner(resolveAnchorOwner())
   }
 }
 
@@ -416,7 +428,7 @@ async function handleZoomChange({ mode, value }) {
       await recomputeLayout(buildLayoutRequest())
       await nextTick()
       restoreScrollAnchor(anchor, container, selector)
-      pdfViewerLayoutRef.value?.syncNow?.()
+      syncFromOwner(resolveAnchorOwner())
     }
     return
   }
@@ -444,7 +456,7 @@ async function handleZoomChange({ mode, value }) {
     await recomputeLayout(buildLayoutRequest())
     await nextTick()
     restoreScrollAnchor(anchor, container, selector)
-    pdfViewerLayoutRef.value?.syncNow?.()
+    syncFromOwner(resolveAnchorOwner())
   }
 }
 
@@ -472,7 +484,7 @@ async function handleZoomStep(direction) {
     await recomputeLayout(buildLayoutRequest())
     await nextTick()
     restoreScrollAnchor(anchor, container, selector)
-    pdfViewerLayoutRef.value?.syncNow?.()
+    syncFromOwner(resolveAnchorOwner())
   }
 }
 
@@ -486,6 +498,32 @@ function resetPresentationState() {
   }
 }
 
+function beginControlledTransition() {
+  contentTransitionSeq += 1
+  suppressedLayoutRestoreSeq = contentTransitionSeq
+  clearControlledTransitionSuppressionTimer()
+}
+
+function clearControlledTransitionSuppressionTimer() {
+  if (suppressedLayoutRestoreFrameId != null) {
+    cancelAnimationFrame(suppressedLayoutRestoreFrameId)
+    suppressedLayoutRestoreFrameId = null
+  }
+}
+
+function scheduleControlledTransitionSuppressionClear() {
+  const seq = suppressedLayoutRestoreSeq
+  if (!seq) return
+
+  clearControlledTransitionSuppressionTimer()
+  suppressedLayoutRestoreFrameId = requestAnimationFrame(() => {
+    suppressedLayoutRestoreFrameId = null
+    if (suppressedLayoutRestoreSeq === seq) {
+      suppressedLayoutRestoreSeq = 0
+    }
+  })
+}
+
 function resolveScrollAnchor() {
   if (!showOriginalPane.value && showTranslatedTextPane.value) {
     const container = translatedScrollContainer.value
@@ -494,6 +532,110 @@ function resolveScrollAnchor() {
     }
   }
   return { container: originalScrollContainer.value, selector: '.pdf-page[data-page-number]' }
+}
+
+function resolveAnchorOwner(explicitOwner = null) {
+  if (explicitOwner === PDF_SCROLL_OWNER.ORIGINAL || explicitOwner === PDF_SCROLL_OWNER.TRANSLATED) {
+    return explicitOwner
+  }
+
+  return contentView.value === CONTENT_VIEW.TRANSLATION
+    ? PDF_SCROLL_OWNER.TRANSLATED
+    : PDF_SCROLL_OWNER.ORIGINAL
+}
+
+function resolveOwnerScrollTarget(owner) {
+  if (owner === PDF_SCROLL_OWNER.TRANSLATED) {
+    if (showTranslatedTextPane.value && translatedScrollContainer.value) {
+      return { owner, container: translatedScrollContainer.value, selector: '.pdf-translated-page[data-page-number]' }
+    }
+
+    if (showTranslatedPdfPane.value && translatedScrollContainer.value) {
+      return { owner, container: translatedScrollContainer.value, selector: '.pdf-page[data-page-number]' }
+    }
+  }
+
+  if (originalScrollContainer.value) {
+    return { owner: PDF_SCROLL_OWNER.ORIGINAL, container: originalScrollContainer.value, selector: '.pdf-page[data-page-number]' }
+  }
+
+  if (translatedScrollContainer.value) {
+    const selector = showTranslatedTextPane.value
+      ? '.pdf-translated-page[data-page-number]'
+      : '.pdf-page[data-page-number]'
+    return { owner: PDF_SCROLL_OWNER.TRANSLATED, container: translatedScrollContainer.value, selector }
+  }
+
+  return { owner, container: null, selector: '.pdf-page[data-page-number]' }
+}
+
+function captureOwnedScrollAnchor(owner) {
+  const target = resolveOwnerScrollTarget(owner)
+  const anchor = captureScrollAnchor(target.container, target.selector)
+  return anchor ? { ...anchor, owner: target.owner } : null
+}
+
+function isPdfBackedContentView(view) {
+  return view === CONTENT_VIEW.ORIGINAL || view === CONTENT_VIEW.TRANSLATED_PDF
+}
+
+function isTranslatedTextPdfBackedTransition(previousView, nextView) {
+  return (
+    previousView === CONTENT_VIEW.TRANSLATION && isPdfBackedContentView(nextView)
+  ) || (
+    isPdfBackedContentView(previousView) && nextView === CONTENT_VIEW.TRANSLATION
+  )
+}
+
+function getLogicalCurrentPageNumber() {
+  const pageNumber = Number(currentPage.value)
+  return Number.isInteger(pageNumber) && pageNumber > 0 ? pageNumber : null
+}
+
+function applyContentTransitionLogicalFallback(anchor, owner, previousView, nextView) {
+  if (!isTranslatedTextPdfBackedTransition(previousView, nextView)) return anchor
+  if (owner !== PDF_SCROLL_OWNER.TRANSLATED) return anchor
+
+  const pageNumber = getLogicalCurrentPageNumber()
+  if (!pageNumber) return anchor
+
+  if (anchor?.pageNumber === pageNumber) return anchor
+
+  return {
+    ...(anchor || { owner }),
+    pageNumber,
+    offsetRatio: 0
+  }
+}
+
+function restoreOwnedScrollAnchor(anchor) {
+  if (!anchor) return null
+
+  const preferredTarget = resolveOwnerScrollTarget(anchor.owner)
+  const preferredAnchor = preferredTarget.owner === anchor.owner
+    ? anchor
+    : { ...anchor, owner: preferredTarget.owner, offsetRatio: 0 }
+  const restoredOwner = restoreScrollAnchor(preferredAnchor, preferredTarget.container, preferredTarget.selector)
+    ? preferredTarget.owner
+    : null
+
+  if (restoredOwner) return restoredOwner
+
+  const fallbackOwner = anchor.owner === PDF_SCROLL_OWNER.TRANSLATED
+    ? PDF_SCROLL_OWNER.ORIGINAL
+    : PDF_SCROLL_OWNER.TRANSLATED
+  const fallbackTarget = resolveOwnerScrollTarget(fallbackOwner)
+  const fallbackAnchor = fallbackTarget.owner === anchor.owner
+    ? anchor
+    : { ...anchor, owner: fallbackTarget.owner, offsetRatio: 0 }
+
+  return restoreScrollAnchor(fallbackAnchor, fallbackTarget.container, fallbackTarget.selector)
+    ? fallbackTarget.owner
+    : null
+}
+
+function syncFromOwner(owner) {
+  pdfViewerLayoutRef.value?.syncFromPane?.(resolveAnchorOwner(owner))
 }
 
 function captureScrollAnchor(container, pageSelector) {
@@ -540,12 +682,12 @@ function captureScrollAnchor(container, pageSelector) {
 }
 
 function restoreScrollAnchor(anchor, container, pageSelector) {
-  if (!anchor || !container) return
+  if (!anchor || !container) return false
 
   const pageEl = [...container.querySelectorAll(pageSelector)].find(
     (el) => Number(el.dataset.pageNumber) === anchor.pageNumber
   )
-  if (!pageEl) return
+  if (!pageEl) return false
 
   const pageRect = pageEl.getBoundingClientRect()
   const containerRect = container.getBoundingClientRect()
@@ -555,6 +697,7 @@ function restoreScrollAnchor(anchor, container, pageSelector) {
     top: pageOffsetTop + pageRect.height * anchor.offsetRatio,
     behavior: 'instant'
   })
+  return true
 }
 
 function handleTranslateVisiblePages() {
@@ -658,6 +801,7 @@ onMounted(() => {
 })
 
 onBeforeUnmount(() => {
+  clearControlledTransitionSuppressionTimer()
   clearExportSuccess()
   detachDocument()
   void cleanup()

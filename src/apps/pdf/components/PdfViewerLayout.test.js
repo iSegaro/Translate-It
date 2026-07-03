@@ -3,7 +3,7 @@ import { mount } from '@vue/test-utils'
 import PdfViewerLayout from './PdfViewerLayout.vue'
 
 vi.mock('../composables/usePdfScrollSync.js', () => ({
-  usePdfScrollSync: vi.fn(() => ({ syncNow: vi.fn() }))
+  usePdfScrollSync: vi.fn(() => ({ syncFromPane: vi.fn(), syncNow: vi.fn() }))
 }))
 
 describe('PdfViewerLayout', () => {
@@ -74,7 +74,7 @@ describe('PdfViewerLayout', () => {
     expect(wrapper.classes()).not.toContain('pdf-viewer-layout--single')
   })
 
-  it('exposes scrollContainer and translatedPaneRef', () => {
+  it('exposes scroll containers and directional sync API', () => {
     const wrapper = mount(PdfViewerLayout, {
       props: {
         layoutMode: 'side-by-side',
@@ -89,5 +89,6 @@ describe('PdfViewerLayout', () => {
 
     expect(wrapper.vm.scrollContainer).toBeTruthy()
     expect(wrapper.vm.translatedPaneRef).toBeTruthy()
+    expect(wrapper.vm.syncFromPane).toBeTruthy()
   })
 })
