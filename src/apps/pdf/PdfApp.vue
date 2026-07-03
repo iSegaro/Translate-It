@@ -154,7 +154,7 @@
 </template>
 
 <script setup>
-import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import PdfToolbar from './components/PdfToolbar.vue'
 import PdfDropzone from './components/PdfDropzone.vue'
 import PdfViewer from './components/PdfViewer.vue'
@@ -344,7 +344,7 @@ function handleTranslatedPaneCurrentPageChange(pageNumber) {
   handleCurrentPageChange(pageNumber)
 }
 
-function handleZoomChange({ mode, value }) {
+async function handleZoomChange({ mode, value }) {
   const nextMode = mode === 'fit-width' ? 'fit-width' : 'percent'
   if (mode === 'fit-page') {
     if (zoomMode.value === 'fit-page') {
@@ -354,7 +354,10 @@ function handleZoomChange({ mode, value }) {
     zoomMode.value = 'fit-page'
 
     if (hasDocument.value) {
-      void recomputeLayout(buildLayoutRequest())
+      const anchor = captureZoomScrollAnchor()
+      await recomputeLayout(buildLayoutRequest())
+      await nextTick()
+      restoreZoomScrollAnchor(anchor)
     }
     return
   }
@@ -367,6 +370,8 @@ function handleZoomChange({ mode, value }) {
     return
   }
 
+  const anchor = captureZoomScrollAnchor()
+
   if (nextMode === 'fit-width') {
     zoomMode.value = 'fit-width'
     zoomPercent.value = 100
@@ -376,11 +381,13 @@ function handleZoomChange({ mode, value }) {
   }
 
   if (hasDocument.value) {
-    void recomputeLayout(buildLayoutRequest())
+    await recomputeLayout(buildLayoutRequest())
+    await nextTick()
+    restoreZoomScrollAnchor(anchor)
   }
 }
 
-function handleZoomStep(direction) {
+async function handleZoomStep(direction) {
   const currentPercent = zoomMode.value === 'percent' ? zoomPercent.value : 100
   const currentIndex = zoomPercentOptions.indexOf(currentPercent)
   const safeIndex = currentIndex >= 0 ? currentIndex : zoomPercentOptions.indexOf(100)
@@ -394,11 +401,15 @@ function handleZoomStep(direction) {
     return
   }
 
+  const anchor = captureZoomScrollAnchor()
+
   zoomMode.value = 'percent'
   zoomPercent.value = nextPercent
 
   if (hasDocument.value) {
-    void recomputeLayout(buildLayoutRequest())
+    await recomputeLayout(buildLayoutRequest())
+    await nextTick()
+    restoreZoomScrollAnchor(anchor)
   }
 }
 
@@ -410,6 +421,69 @@ function resetPresentationState() {
     width: 0,
     height: 0
   }
+}
+
+function captureZoomScrollAnchor() {
+  const container = originalScrollContainer.value
+  if (!container) return null
+
+  const scrollTop = container.scrollTop
+  const containerRect = container.getBoundingClientRect()
+  const pageElements = container.querySelectorAll('.pdf-page[data-page-number]')
+  if (!pageElements.length) return null
+
+  let best = null
+
+  for (const el of pageElements) {
+    const rect = el.getBoundingClientRect()
+    if (rect.bottom <= containerRect.top) continue
+    if (rect.top >= containerRect.bottom) continue
+
+    const dist = Math.abs(rect.top - containerRect.top)
+    if (!best || dist < best.dist) {
+      best = { el, rect, dist }
+    }
+  }
+
+  if (!best) {
+    for (const el of pageElements) {
+      const rect = el.getBoundingClientRect()
+      if (rect.bottom <= containerRect.top) continue
+      best = { el, rect }
+      break
+    }
+  }
+
+  if (!best) return null
+
+  const pageNumber = Number(best.el.dataset.pageNumber)
+  if (!Number.isInteger(pageNumber) || pageNumber < 1) return null
+
+  const pageOffsetTop = best.rect.top - containerRect.top + scrollTop
+  const offsetRatio = best.rect.height > 0
+    ? Math.max(0, Math.min(1, (scrollTop - pageOffsetTop) / best.rect.height))
+    : 0
+
+  return { pageNumber, offsetRatio }
+}
+
+function restoreZoomScrollAnchor(anchor) {
+  if (!anchor) return
+
+  const container = originalScrollContainer.value
+  if (!container) return
+
+  const pageEl = container.querySelector(`.pdf-page[data-page-number="${anchor.pageNumber}"]`)
+  if (!pageEl) return
+
+  const pageRect = pageEl.getBoundingClientRect()
+  const containerRect = container.getBoundingClientRect()
+  const pageOffsetTop = pageRect.top - containerRect.top + container.scrollTop
+
+  container.scrollTo({
+    top: pageOffsetTop + pageRect.height * anchor.offsetRatio,
+    behavior: 'instant'
+  })
 }
 
 function handleTranslateVisiblePages() {
