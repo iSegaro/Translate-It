@@ -67,6 +67,13 @@
         </button>
       </div>
 
+      <img
+        class="pdf-toolbar__separator"
+        src="@/icons/ui/separator.svg"
+        alt=""
+        aria-hidden="true"
+      >
+
       <div class="pdf-toolbar__page-group">
         <input
           class="pdf-toolbar__page-input"
@@ -78,6 +85,13 @@
         <span class="pdf-toolbar__page-separator">/</span>
         <span class="pdf-toolbar__page-total">{{ pageCount || 0 }}</span>
       </div>
+
+      <img
+        class="pdf-toolbar__separator"
+        src="@/icons/ui/separator.svg"
+        alt=""
+        aria-hidden="true"
+      >
 
       <div class="pdf-toolbar__zoom-group">
         <button

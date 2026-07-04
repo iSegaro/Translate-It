@@ -1,8 +1,10 @@
+@use 'components/toolbar-variables' as *;
+
 .pdf-app {
   min-height: 100vh;
   display: flex;
   flex-direction: column;
-  --pdf-toolbar-sticky-height: 52px;
+  --pdf-toolbar-sticky-height: #{$tb-toolbar-height};
   background:
     radial-gradient(circle at top left, rgba(90, 92, 255, 0.18), transparent 35%),
     linear-gradient(180deg, #10131a 0%, #0b0e13 100%);
