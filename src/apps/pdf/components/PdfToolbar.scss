@@ -75,13 +75,6 @@
   object-fit: contain;
 }
 
-.pdf-toolbar__file-icon {
-  width: 18px;
-  height: 18px;
-  flex: 0 0 auto;
-  opacity: 0.78;
-}
-
 .pdf-toolbar__file-name {
   display: block;
   flex: 1 1 auto;
@@ -97,11 +90,12 @@
 }
 
 .pdf-toolbar__separator {
-  width: 2px;
+  width: 1px;
   height: 24px;
   display: block;
   flex-shrink: 0;
-  background: $tb-border-hover;
+  margin: 0 16px;
+  background: $tb-text-tertiary;
 }
 
 .pdf-toolbar__center-group {
@@ -174,12 +168,6 @@
   flex-shrink: 0;
 }
 
-.pdf-toolbar__mode-label {
-  @media (max-width: 1100px) {
-    display: inline;
-  }
-}
-
 .pdf-toolbar__page-group {
   display: inline-flex;
   align-items: center;
@@ -190,19 +178,23 @@
 }
 
 .pdf-toolbar__page-input {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
   width: 28px;
   padding: 3px 2px;
   border: 1px solid $tb-border;
   border-radius: 4px;
-  background: transparent;
+  background: $tb-control-hover;
   color: $tb-text-primary;
   font-size: 13px;
   font-weight: 500;
   text-align: center;
   outline: none;
+  -moz-appearance: textfield;
+
+  &::-webkit-inner-spin-button,
+  &::-webkit-outer-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+  }
 
   &:hover {
     border-color: $tb-border-hover;
@@ -332,7 +324,7 @@
   border-left: 1px solid $tb-border;
   border-right: 1px solid $tb-border;
   padding: 3px 6px;
-  background: transparent;
+  background: $tb-control-hover;
   color: $tb-text-primary;
   font-size: 12px;
   font-weight: 600;
@@ -341,10 +333,6 @@
   min-width: 40px;
   text-align: center;
   outline: none;
-
-  &:hover {
-    background: $tb-control-hover;
-  }
 
   &:focus-visible {
     outline: none;
@@ -487,11 +475,6 @@
 
   .pdf-toolbar__separator {
     display: none;
-  }
-
-  .pdf-toolbar__file-icon {
-    width: 16px;
-    height: 16px;
   }
 
   .pdf-toolbar__file-name {

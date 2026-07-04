@@ -10,19 +10,19 @@
           aria-label="Toggle outline"
           @click="$emit('toggle-outline')"
         >
-          <img
+          <svg
             class="pdf-toolbar__outline-icon"
-            src="@/icons/ui/outline.svg"
-            alt=""
+            viewBox="0 0 16 16"
+            xmlns="http://www.w3.org/2000/svg"
+            fill="none"
             aria-hidden="true"
           >
+            <g fill="currentColor">
+              <path d="M6.5 7.25a.75.75 0 01.75-.75h4a.75.75 0 010 1.5h-4a.75.75 0 01-.75-.75zM4.75 3.5a.75.75 0 000 1.5h.01a.75.75 0 000-1.5h-.01zM4 7.25a.75.75 0 01.75-.75h.01a.75.75 0 010 1.5h-.01A.75.75 0 014 7.25zM4.75 9.5a.75.75 0 000 1.5h.01a.75.75 0 000-1.5h-.01zM6.5 4.25a.75.75 0 01.75-.75h2.5a.75.75 0 010 1.5h-2.5a.75.75 0 01-.75-.75zM7.25 9.5a.75.75 0 000 1.5h3a.75.75 0 000-1.5h-3z"/>
+              <path fill-rule="evenodd" d="M1 2.25A2.25 2.25 0 013.25 0h9.5A2.25 2.25 0 0115 2.25v11.5A2.25 2.25 0 0112.75 16h-9.5A2.25 2.25 0 011 13.75V2.25zm2.25-.75a.75.75 0 00-.75.75v11.5c0 .414.336.75.75.75h9.5a.75.75 0 00.75-.75V2.25a.75.75 0 00-.75-.75h-9.5z" clip-rule="evenodd"/>
+            </g>
+          </svg>
         </button>
-        <img
-          class="pdf-toolbar__file-icon"
-          src="@/icons/ui/page.png"
-          alt=""
-          aria-hidden="true"
-        >
         <span
           class="pdf-toolbar__file-name"
           :title="fileName || 'PDF Viewer'"
@@ -54,16 +54,20 @@
           class="pdf-toolbar__mode-button"
           :class="{ 'pdf-toolbar__mode-button--active': isSideBySide }"
           type="button"
+          aria-label="Side by Side"
           :aria-pressed="isSideBySide"
           @click="handleLayoutModeToggle"
         >
-          <img
+          <svg
             class="pdf-toolbar__mode-icon"
-            src="@/icons/ui/split-screen.svg"
-            alt=""
+            viewBox="0 0 32 32"
+            xmlns="http://www.w3.org/2000/svg"
             aria-hidden="true"
           >
-          <span class="pdf-toolbar__mode-label">Side by Side</span>
+            <rect x="15" y="4" width="2" height="24" fill="currentColor"/>
+            <path d="M10,7V25H4V7h6m0-2H4A2,2,0,0,0,2,7V25a2,2,0,0,0,2,2h6a2,2,0,0,0,2-2V7a2,2,0,0,0-2-2Z" fill="currentColor"/>
+            <path d="M28,7V25H22V7h6m0-2H22a2,2,0,0,0-2,2V25a2,2,0,0,0,2,2h6a2,2,0,0,0,2-2V7a2,2,0,0,0-2-2Z" fill="currentColor"/>
+          </svg>
         </button>
       </div>
 
@@ -228,12 +232,16 @@
           :aria-expanded="activeMenu === 'export'"
           @click="toggleMenu('export')"
         >
-          <img
+          <svg
             class="pdf-toolbar__button-icon"
-            src="@/icons/ui/download.svg"
-            alt=""
+            viewBox="0 0 24 24"
+            xmlns="http://www.w3.org/2000/svg"
+            fill="none"
             aria-hidden="true"
           >
+            <path opacity="0.5" fill-rule="evenodd" clip-rule="evenodd" d="M3 14.25C3.41421 14.25 3.75 14.5858 3.75 15C3.75 16.4354 3.75159 17.4365 3.85315 18.1919C3.9518 18.9257 4.13225 19.3142 4.40901 19.591C4.68577 19.8678 5.07435 20.0482 5.80812 20.1469C6.56347 20.2484 7.56459 20.25 9 20.25H15C16.4354 20.25 17.4365 20.2484 18.1919 20.1469C18.9257 20.0482 19.3142 19.8678 19.591 19.591C19.8678 19.3142 20.0482 18.9257 20.1469 18.1919C20.2484 17.4365 20.25 16.4354 20.25 15C20.25 14.5858 20.5858 14.25 21 14.25C21.4142 14.25 21.75 14.5858 21.75 15V15.0549C21.75 16.4225 21.75 17.5248 21.6335 18.3918C21.5125 19.2919 21.2536 20.0497 20.6517 20.6516C20.0497 21.2536 19.2919 21.5125 18.3918 21.6335C17.5248 21.75 16.4225 21.75 15.0549 21.75H8.94513C7.57754 21.75 6.47522 21.75 5.60825 21.6335C4.70814 21.5125 3.95027 21.2536 3.34835 20.6517C2.74643 20.0497 2.48754 19.2919 2.36652 18.3918C2.24996 17.5248 2.24998 16.4225 2.25 15.0549C2.25 15.0366 2.25 15.0183 2.25 15C2.25 14.5858 2.58579 14.25 3 14.25Z" fill="currentColor"/>
+            <path fill-rule="evenodd" clip-rule="evenodd" d="M12 16.75C12.2106 16.75 12.4114 16.6615 12.5535 16.5061L16.5535 12.1311C16.833 11.8254 16.8118 11.351 16.5061 11.0715C16.2004 10.792 15.726 10.8132 15.4465 11.1189L12.75 14.0682V3C12.75 2.58579 12.4142 2.25 12 2.25C11.5858 2.25 11.25 2.58579 11.25 3V14.0682L8.55353 11.1189C8.27403 10.8132 7.79963 10.792 7.49393 11.0715C7.18823 11.351 7.16698 11.8254 7.44648 12.1311L11.4465 16.5061C11.5886 16.6615 11.7894 16.75 12 16.75Z" fill="currentColor"/>
+          </svg>
         </button>
 
         <div

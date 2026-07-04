@@ -27,7 +27,6 @@ describe('PdfToolbar', () => {
     })
 
     expect(wrapper.find('.pdf-toolbar__file-row').exists()).toBe(true)
-    expect(wrapper.find('.pdf-toolbar__file-icon').exists()).toBe(true)
     expect(wrapper.find('.pdf-toolbar__file-name').text()).toBe('very-long-document-name.pdf')
     expect(wrapper.find('.pdf-toolbar__file-name').attributes('title')).toBe('very-long-document-name.pdf')
     expect(wrapper.find('.pdf-toolbar__page-input').exists()).toBe(true)
@@ -118,9 +117,7 @@ describe('PdfToolbar', () => {
       }
     })
 
-    const sideBySideButton = wrapper.findAll('.pdf-toolbar__mode-button').find(
-      (btn) => btn.text().includes('Side by Side')
-    )
+    const sideBySideButton = wrapper.find('.pdf-toolbar__mode-button[aria-label="Side by Side"]')
     await sideBySideButton?.trigger('click')
     expect(wrapper.emitted('layout-mode-change')).toBeTruthy()
     expect(wrapper.emitted('layout-mode-change')?.[0]?.[0]).toBe('side-by-side')
