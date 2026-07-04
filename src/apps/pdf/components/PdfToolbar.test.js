@@ -17,6 +17,7 @@ describe('PdfToolbar', () => {
         isOcrProcessing: false,
         zoomMode: 'fit-width',
         zoomPercent: 100,
+        showTranslationOption: true,
         translationSummary: {
           status: 'idle',
           translatedCount: 0,
@@ -64,7 +65,7 @@ describe('PdfToolbar', () => {
     expect(wrapper.emitted('content-view-change')?.[1]?.[0]).toBe('translation')
   })
 
-  it('hides Translation option when showTranslationOption is false', async () => {
+  it('hides the entire mode section when showTranslationOption is false', async () => {
     const wrapper = mount(PdfToolbar, {
       props: {
         fileName: 'demo.pdf',
@@ -75,14 +76,9 @@ describe('PdfToolbar', () => {
       }
     })
 
-    const allButtons = wrapper.findAll('.pdf-toolbar__mode-button')
-    const contentButtons = allButtons.filter(
-      btn => ['Original', 'Translation', 'Translated PDF'].some(label => btn.text().includes(label))
-    )
-    expect(contentButtons).toHaveLength(2)
-    expect(contentButtons[0].text()).toBe('Original')
-    expect(contentButtons[1].text()).toBe('Translated PDF')
-    expect(contentButtons.some(btn => btn.text().includes('Translation'))).toBe(false)
+    expect(wrapper.find('.pdf-toolbar__mode-group--content').exists()).toBe(false)
+    expect(wrapper.find('.pdf-toolbar__mode-group--layout').exists()).toBe(false)
+    expect(wrapper.find('.pdf-toolbar__mode-button').exists()).toBe(false)
   })
 
   it('shows Translation option when showTranslationOption is true', async () => {
@@ -113,7 +109,8 @@ describe('PdfToolbar', () => {
         contentView: 'translation',
         layoutMode: 'single',
         zoomMode: 'fit-width',
-        zoomPercent: 100
+        zoomPercent: 100,
+        showTranslationOption: true
       }
     })
 

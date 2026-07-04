@@ -323,7 +323,7 @@ watch(hasDocument, (has) => {
 })
 
 watch(hasAnyTranslation, (has) => {
-  if (!has && !isTranslating.value && contentView.value === CONTENT_VIEW.TRANSLATION) {
+  if (!has && !isTranslating.value && contentView.value !== CONTENT_VIEW.ORIGINAL) {
     setContentView(CONTENT_VIEW.ORIGINAL)
   }
 })

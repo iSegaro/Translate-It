@@ -36,45 +36,47 @@
       v-if="fileName"
       class="pdf-toolbar__center-group"
     >
-      <div class="pdf-toolbar__mode-group pdf-toolbar__mode-group--content">
-        <button
-          v-for="opt in contentOptions"
-          :key="opt.value"
-          class="pdf-toolbar__mode-button"
-          :class="{ 'pdf-toolbar__mode-button--active': contentView === opt.value }"
-          type="button"
-          @click="$emit('content-view-change', opt.value)"
-        >
-          {{ opt.label }}
-        </button>
-      </div>
-
-      <div class="pdf-toolbar__mode-group pdf-toolbar__mode-group--layout">
-        <button
-          class="pdf-toolbar__mode-button"
-          :class="{ 'pdf-toolbar__mode-button--active': isSideBySide }"
-          type="button"
-          aria-label="Side by Side"
-          :aria-pressed="isSideBySide"
-          @click="handleLayoutModeToggle"
-        >
-          <svg
-            class="pdf-toolbar__mode-icon"
-            viewBox="0 0 32 32"
-            xmlns="http://www.w3.org/2000/svg"
-            aria-hidden="true"
+      <template v-if="showTranslationOption">
+        <div class="pdf-toolbar__mode-group pdf-toolbar__mode-group--content">
+          <button
+            v-for="opt in contentOptions"
+            :key="opt.value"
+            class="pdf-toolbar__mode-button"
+            :class="{ 'pdf-toolbar__mode-button--active': contentView === opt.value }"
+            type="button"
+            @click="$emit('content-view-change', opt.value)"
           >
-            <rect x="15" y="4" width="2" height="24" fill="currentColor"/>
-            <path d="M10,7V25H4V7h6m0-2H4A2,2,0,0,0,2,7V25a2,2,0,0,0,2,2h6a2,2,0,0,0,2-2V7a2,2,0,0,0-2-2Z" fill="currentColor"/>
-            <path d="M28,7V25H22V7h6m0-2H22a2,2,0,0,0-2,2V25a2,2,0,0,0,2,2h6a2,2,0,0,0,2-2V7a2,2,0,0,0-2-2Z" fill="currentColor"/>
-          </svg>
-        </button>
-      </div>
+            {{ opt.label }}
+          </button>
+        </div>
 
-      <span
-        class="pdf-toolbar__separator"
-        aria-hidden="true"
-      ></span>
+        <div class="pdf-toolbar__mode-group pdf-toolbar__mode-group--layout">
+          <button
+            class="pdf-toolbar__mode-button"
+            :class="{ 'pdf-toolbar__mode-button--active': isSideBySide }"
+            type="button"
+            aria-label="Side by Side"
+            :aria-pressed="isSideBySide"
+            @click="handleLayoutModeToggle"
+          >
+            <svg
+              class="pdf-toolbar__mode-icon"
+              viewBox="0 0 32 32"
+              xmlns="http://www.w3.org/2000/svg"
+              aria-hidden="true"
+            >
+              <rect x="15" y="4" width="2" height="24" fill="currentColor"/>
+              <path d="M10,7V25H4V7h6m0-2H4A2,2,0,0,0,2,7V25a2,2,0,0,0,2,2h6a2,2,0,0,0,2-2V7a2,2,0,0,0-2-2Z" fill="currentColor"/>
+              <path d="M28,7V25H22V7h6m0-2H22a2,2,0,0,0-2,2V25a2,2,0,0,0,2,2h6a2,2,0,0,0,2-2V7a2,2,0,0,0-2-2Z" fill="currentColor"/>
+            </svg>
+          </button>
+        </div>
+
+        <span
+          class="pdf-toolbar__separator"
+          aria-hidden="true"
+        ></span>
+      </template>
 
       <div class="pdf-toolbar__page-group">
         <input
