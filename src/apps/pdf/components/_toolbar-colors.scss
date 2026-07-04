@@ -1,0 +1,26 @@
+// ── Toolbar Color Tokens ──────────────────────────────────────────
+// Single source of truth for all toolbar colors.
+
+// Surface
+$tb-surface:            rgba(24, 26, 30, 0.95);
+
+// Borders
+$tb-border:             rgba(255, 255, 255, 0.06);  // toolbar bottom bar, inputs, zoom group
+$tb-border-group:       rgba(255, 255, 255, 0.10);  // mode-group border
+$tb-border-hover:       rgba(255, 255, 255, 0.12);  // input:hover, dropdown border
+$tb-border-focus:       rgba(255, 255, 255, 0.20);  // input:focus border color
+
+// Text hierarchy
+$tb-text-primary:       rgba(255, 255, 255, 0.90);
+$tb-text-secondary:     rgba(255, 255, 255, 0.65);
+$tb-text-tertiary:      rgba(255, 255, 255, 0.48);
+
+// Interactive overlays
+$tb-control-hover:      rgba(255, 255, 255, 0.08);  // transparent-control hover + action-button default fill
+$tb-control-active:     rgba(255, 255, 255, 0.04);  // press state
+$tb-control-selected:   rgba(255, 255, 255, 0.10);  // selected/active mode indicator
+$tb-control-strong:     rgba(255, 255, 255, 0.14);  // action-button hover (stronger lift)
+
+// Focus rings
+$tb-focus:              rgba(106, 165, 255, 0.95);
+$tb-focus-soft:         rgba(106, 165, 255, 0.90);

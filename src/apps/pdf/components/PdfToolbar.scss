@@ -1,4 +1,5 @@
 @use 'toolbar-variables' as *;
+@use 'toolbar-colors' as *;
 
 .pdf-toolbar {
   position: sticky;
@@ -11,8 +12,8 @@
   padding: $tb-padding-y 16px;
   min-height: $tb-toolbar-height;
   box-sizing: border-box;
-  border-bottom: $tb-border-width solid rgba(255, 255, 255, 0.06);
-  background: rgba(13, 16, 22, 0.94);
+  border-bottom: $tb-border-width solid $tb-border;
+  background: $tb-surface;
   backdrop-filter: blur(14px);
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
 }
@@ -42,28 +43,28 @@
   border: none;
   border-radius: 4px;
   background: transparent;
-  color: rgba(230, 237, 247, 0.65);
+  color: $tb-text-secondary;
   cursor: pointer;
   transition: background 0.15s ease, color 0.15s ease;
   flex-shrink: 0;
 
   &:hover {
-    background: rgba(255, 255, 255, 0.08);
-    color: #e6edf7;
+    background: $tb-control-hover;
+    color: $tb-text-primary;
   }
 
   &:active {
-    background: rgba(255, 255, 255, 0.04);
+    background: $tb-control-active;
   }
 
   &:focus-visible {
-    outline: 2px solid rgba(106, 165, 255, 0.95);
+    outline: 2px solid $tb-focus;
     outline-offset: 2px;
   }
 
   &--active {
-    background: rgba(255, 255, 255, 0.10);
-    color: #e6edf7;
+    background: $tb-control-selected;
+    color: $tb-text-primary;
   }
 }
 
@@ -89,7 +90,7 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  color: #e6edf7;
+  color: $tb-text-primary;
   font-size: 13px;
   font-weight: 500;
   line-height: 1.2;
@@ -117,7 +118,7 @@
   display: inline-flex;
   align-items: center;
   border-radius: 6px;
-  border: 1px solid rgba(255, 255, 255, 0.10);
+  border: 1px solid $tb-border-group;
   overflow: hidden;
 
   &--content {
@@ -138,7 +139,7 @@
   border: 0;
   padding: 4px 7px;
   background: transparent;
-  color: rgba(230, 237, 247, 0.7);
+  color: $tb-text-secondary;
   font-size: 12px;
   font-weight: 600;
   cursor: pointer;
@@ -146,22 +147,22 @@
   white-space: nowrap;
 
   &:hover {
-    background: rgba(255, 255, 255, 0.06);
-    color: #e6edf7;
+    background: $tb-control-hover;
+    color: $tb-text-primary;
   }
 
   &:active {
-    background: rgba(255, 255, 255, 0.02);
+    background: $tb-control-active;
   }
 
   &:focus-visible {
     outline: none;
-    box-shadow: inset 0 0 0 2px rgba(106, 165, 255, 0.95);
+    box-shadow: inset 0 0 0 2px $tb-focus;
   }
 
   &--active {
-    background: rgba(90, 92, 255, 0.2);
-    color: #e6edf7;
+    background: $tb-control-selected;
+    color: $tb-text-primary;
   }
 }
 
@@ -183,7 +184,7 @@
   display: inline-flex;
   align-items: center;
   gap: 2px;
-  color: rgba(230, 237, 247, 0.78);
+  color: $tb-text-secondary;
   font-size: 13px;
   font-weight: 600;
 }
@@ -194,33 +195,33 @@
   justify-content: center;
   width: 28px;
   padding: 3px 2px;
-  border: 1px solid rgba(255, 255, 255, 0.06);
+  border: 1px solid $tb-border;
   border-radius: 4px;
   background: transparent;
-  color: #e6edf7;
+  color: $tb-text-primary;
   font-size: 13px;
   font-weight: 500;
   text-align: center;
   outline: none;
 
   &:hover {
-    border-color: rgba(255, 255, 255, 0.12);
+    border-color: $tb-border-hover;
   }
 
   &:focus-visible {
-    border-color: rgba(255, 255, 255, 0.2);
-    outline: 2px solid rgba(106, 165, 255, 0.95);
+    border-color: $tb-border-focus;
+    outline: 2px solid $tb-focus;
     outline-offset: 1px;
   }
 }
 
 .pdf-toolbar__page-separator {
   margin: 0 2px;
-  color: rgba(230, 237, 247, 0.5);
+  color: $tb-text-tertiary;
 }
 
 .pdf-toolbar__page-total {
-  color: rgba(230, 237, 247, 0.78);
+  color: $tb-text-secondary;
   font-size: 13px;
   font-weight: 500;
 }
@@ -240,8 +241,8 @@
   border: 0;
   border-radius: 6px;
   padding: 5px 8px;
-  background: rgba(255, 255, 255, 0.08);
-  color: #e6edf7;
+  background: $tb-control-hover;
+  color: $tb-text-primary;
   font-size: 12px;
   font-weight: 600;
   cursor: pointer;
@@ -249,15 +250,15 @@
   outline: none;
 
   &:hover {
-    background: rgba(255, 255, 255, 0.14);
+    background: $tb-control-strong;
   }
 
   &:active {
-    background: rgba(255, 255, 255, 0.04);
+    background: $tb-control-active;
   }
 
   &:focus-visible {
-    outline: 2px solid rgba(106, 165, 255, 0.95);
+    outline: 2px solid $tb-focus;
     outline-offset: 2px;
   }
 
@@ -284,7 +285,7 @@
   display: inline-flex;
   align-items: center;
   border-radius: 6px;
-  border: 1px solid rgba(255, 255, 255, 0.06);
+  border: 1px solid $tb-border;
   overflow: hidden;
 }
 
@@ -295,7 +296,7 @@
   height: 24px;
   padding: 0 5px;
   background: transparent;
-  color: rgba(230, 237, 247, 0.65);
+  color: $tb-text-secondary;
   font-size: 12px;
   font-weight: 600;
   cursor: pointer;
@@ -305,17 +306,17 @@
   justify-content: center;
 
   &:hover {
-    background: rgba(255, 255, 255, 0.06);
-    color: #e6edf7;
+    background: $tb-control-hover;
+    color: $tb-text-primary;
   }
 
   &:active {
-    background: rgba(255, 255, 255, 0.02);
+    background: $tb-control-active;
   }
 
   &:focus-visible {
     outline: none;
-    box-shadow: inset 0 0 0 2px rgba(106, 165, 255, 0.95);
+    box-shadow: inset 0 0 0 2px $tb-focus;
   }
 
   &:disabled {
@@ -328,11 +329,11 @@
 .pdf-toolbar__zoom-select {
   appearance: none;
   border: 0;
-  border-left: 1px solid rgba(255, 255, 255, 0.06);
-  border-right: 1px solid rgba(255, 255, 255, 0.06);
+  border-left: 1px solid $tb-border;
+  border-right: 1px solid $tb-border;
   padding: 3px 6px;
   background: transparent;
-  color: #e6edf7;
+  color: $tb-text-primary;
   font-size: 12px;
   font-weight: 600;
   cursor: pointer;
@@ -342,12 +343,12 @@
   outline: none;
 
   &:hover {
-    background: rgba(255, 255, 255, 0.06);
+    background: $tb-control-hover;
   }
 
   &:focus-visible {
     outline: none;
-    box-shadow: inset 0 0 0 2px rgba(106, 165, 255, 0.95);
+    box-shadow: inset 0 0 0 2px $tb-focus;
   }
 }
 
@@ -364,9 +365,9 @@
   gap: 4px;
   min-width: 190px;
   padding: 8px;
-  border: 1px solid rgba(255, 255, 255, 0.12);
+  border: 1px solid $tb-border-hover;
   border-radius: 14px;
-  background: rgba(13, 16, 22, 0.98);
+  background: $tb-surface;
   box-shadow: 0 18px 40px rgba(0, 0, 0, 0.28);
 }
 
@@ -376,7 +377,7 @@
   border-radius: 10px;
   padding: 10px 12px;
   background: transparent;
-  color: #e6edf7;
+  color: $tb-text-primary;
   font-size: 13px;
   font-weight: 600;
   text-align: left;
@@ -386,11 +387,11 @@
 
   &:hover,
   &:focus-visible {
-    background: rgba(255, 255, 255, 0.08);
+    background: $tb-control-hover;
   }
 
   &:focus-visible {
-    outline: 2px solid rgba(106, 165, 255, 0.9);
+    outline: 2px solid $tb-focus-soft;
     outline-offset: 2px;
   }
 }
@@ -432,7 +433,7 @@
 }
 
 .pdf-toolbar__button--icon-trigger:focus-visible {
-  box-shadow: 0 0 0 2px rgba(106, 165, 255, 0.95);
+  box-shadow: 0 0 0 2px $tb-focus;
 }
 
 .pdf-toolbar__button--ocr {
@@ -445,7 +446,7 @@
 }
 
 .pdf-toolbar__ocr-status {
-  color: rgba(230, 237, 247, 0.6);
+  color: $tb-text-tertiary;
   font-size: 13px;
   font-style: italic;
 }
