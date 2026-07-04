@@ -2,7 +2,7 @@
 // Single source of truth for all toolbar colors.
 
 // Surface
-$tb-surface:            rgba(24, 26, 30, 0.95);
+$tb-surface:            rgb(55, 55, 55);          // #373737 — medium gray, matches Chrome PDF Viewer
 
 // Borders
 $tb-border:             rgba(255, 255, 255, 0.06);  // toolbar bottom bar, inputs, zoom group

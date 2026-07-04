@@ -97,11 +97,11 @@
 }
 
 .pdf-toolbar__separator {
-  width: 1px;
-  height: 16px;
+  width: 2px;
+  height: 24px;
   display: block;
   flex-shrink: 0;
-  opacity: 0.5;
+  background: $tb-border-hover;
 }
 
 .pdf-toolbar__center-group {
