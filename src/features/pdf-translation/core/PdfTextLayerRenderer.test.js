@@ -526,4 +526,64 @@ describe('PdfTextLayerRenderer', () => {
       expect(spansAfter[1].textContent).toBe('Y')
     })
   })
+
+  describe('cached textContent', () => {
+    it('skips page.getTextContent when textContent is provided', async () => {
+      const container = document.createElement('div')
+      const renderer = new PdfTextLayerRenderer(container)
+      const getTextContent = vi.fn()
+      const page = { getTextContent }
+      const cachedContent = {
+        items: [
+          { str: 'Cached', transform: [1, 0, 0, 1, 10, 20], width: 50, height: 12 }
+        ]
+      }
+
+      await renderer.render(page, { scale: 1 }, 600, 800, cachedContent)
+
+      expect(getTextContent).not.toHaveBeenCalled()
+    })
+
+    it('renders correctly from cached textContent', async () => {
+      const container = document.createElement('div')
+      const renderer = new PdfTextLayerRenderer(container)
+      const page = {
+        getTextContent: vi.fn()
+      }
+      const cachedContent = {
+        items: [
+          { str: 'Alpha', transform: [1, 0, 0, 1, 10, 20], width: 50, height: 12 },
+          { str: 'Beta', transform: [1, 0, 0, 1, 70, 20], width: 50, height: 12 }
+        ]
+      }
+
+      await renderer.render(page, { scale: 1 }, 600, 800, cachedContent)
+
+      expect(page.getTextContent).not.toHaveBeenCalled()
+      const layerDiv = container.querySelector('.textLayer')
+      expect(layerDiv).not.toBeNull()
+      const spans = layerDiv.querySelectorAll('span')
+      expect(spans.length).toBe(2)
+      expect(spans[0].textContent).toBe('Alpha')
+      expect(spans[1].textContent).toBe('Beta')
+    })
+
+    it('falls back to page.getTextContent when textContent is not provided', async () => {
+      const container = document.createElement('div')
+      const renderer = new PdfTextLayerRenderer(container)
+      const page = {
+        getTextContent: vi.fn().mockResolvedValue({
+          items: [
+            { str: 'Fallback', transform: [1, 0, 0, 1, 10, 20], width: 50, height: 12 }
+          ]
+        })
+      }
+
+      await renderer.render(page, { scale: 1 })
+
+      expect(page.getTextContent).toHaveBeenCalledOnce()
+      const span = container.querySelector('span')
+      expect(span.textContent).toBe('Fallback')
+    })
+  })
 })

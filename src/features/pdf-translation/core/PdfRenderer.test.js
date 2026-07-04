@@ -120,7 +120,7 @@ describe('PdfRenderer', () => {
       const metric = { scale: 1.5 }
 
       // Start render and wait for it to reach the deferred promise
-      const promise = renderer.renderPage(pdfDocument, metric, 1, canvas, null)
+      const promise = renderer.renderPage({ pdfDocument, metric, pageNumber: 1, canvas, textLayerRenderer: null })
       await flushMicrotasks()
       // Resolve the deferred render
       deferredRenders[0].resolve()
@@ -133,17 +133,17 @@ describe('PdfRenderer', () => {
     })
 
     it('returns false when pdfDocument is missing', async () => {
-      const result = await renderer.renderPage(null, { scale: 1 }, 1, createMockCanvas(), null)
+      const result = await renderer.renderPage({ pdfDocument: null, metric: { scale: 1 }, pageNumber: 1, canvas: createMockCanvas(), textLayerRenderer: null })
       expect(result).toBe(false)
     })
 
     it('returns false when canvas is missing', async () => {
-      const result = await renderer.renderPage(pdfDocument, { scale: 1 }, 1, null, null)
+      const result = await renderer.renderPage({ pdfDocument, metric: { scale: 1 }, pageNumber: 1, canvas: null, textLayerRenderer: null })
       expect(result).toBe(false)
     })
 
     it('returns false when metric is missing', async () => {
-      const result = await renderer.renderPage(pdfDocument, null, 1, createMockCanvas(), null)
+      const result = await renderer.renderPage({ pdfDocument, metric: null, pageNumber: 1, canvas: createMockCanvas(), textLayerRenderer: null })
       expect(result).toBe(false)
     })
 
@@ -152,7 +152,7 @@ describe('PdfRenderer', () => {
       const metric = { scale: 1 }
 
       // Start first render and let it store its task
-      const firstPromise = renderer.renderPage(pdfDocument, metric, 1, canvas, null)
+      const firstPromise = renderer.renderPage({ pdfDocument, metric, pageNumber: 1, canvas, textLayerRenderer: null })
       await flushMicrotasks()
 
       const key = renderer._taskKey(1, canvas)
@@ -160,7 +160,7 @@ describe('PdfRenderer', () => {
       expect(firstTask).toBeDefined()
 
       // Start second render for the same page+canvas — this cancels the first
-      const secondPromise = renderer.renderPage(pdfDocument, metric, 1, canvas, null)
+      const secondPromise = renderer.renderPage({ pdfDocument, metric, pageNumber: 1, canvas, textLayerRenderer: null })
       await flushMicrotasks()
 
       // First task was cancelled
@@ -188,7 +188,7 @@ describe('PdfRenderer', () => {
       const metric = { scale: 1 }
       const textLayer = new PdfTextLayerRenderer()
 
-      const promise = renderer.renderPage(pdfDocument, metric, 1, canvas, textLayer)
+      const promise = renderer.renderPage({ pdfDocument, metric, pageNumber: 1, canvas, textLayerRenderer: textLayer })
       await flushMicrotasks()
       deferredRenders[0].resolve()
       const result = await promise
@@ -206,8 +206,8 @@ describe('PdfRenderer', () => {
 
       // Start both renders concurrently (as the two viewers would)
       // The key difference from the old code: now each canvas gets its own task key
-      const promiseA = renderer.renderPage(pdfDocument, metric, 1, canvasA, null)
-      const promiseB = renderer.renderPage(pdfDocument, metric, 1, canvasB, null)
+      const promiseA = renderer.renderPage({ pdfDocument, metric, pageNumber: 1, canvas: canvasA, textLayerRenderer: null })
+      const promiseB = renderer.renderPage({ pdfDocument, metric, pageNumber: 1, canvas: canvasB, textLayerRenderer: null })
       await flushMicrotasks()
 
       // Both should have created their render tasks without cancelling each other
@@ -231,8 +231,8 @@ describe('PdfRenderer', () => {
       const metric = { scale: 1 }
 
       // Start both renders
-      const promiseA = renderer.renderPage(pdfDocument, metric, 1, canvasA, null)
-      const promiseB = renderer.renderPage(pdfDocument, metric, 1, canvasB, null)
+      const promiseA = renderer.renderPage({ pdfDocument, metric, pageNumber: 1, canvas: canvasA, textLayerRenderer: null })
+      const promiseB = renderer.renderPage({ pdfDocument, metric, pageNumber: 1, canvas: canvasB, textLayerRenderer: null })
       await flushMicrotasks()
 
       // Both tasks stored independently

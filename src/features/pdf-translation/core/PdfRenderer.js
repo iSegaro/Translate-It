@@ -33,7 +33,14 @@ export class PdfRenderer {
     return colon > 0 ? Number(key.slice(0, colon)) : NaN
   }
 
-  async renderPage(pdfDocument, metric, pageNumber, canvasEl, textLayerRenderer) {
+  async renderPage({
+    pdfDocument,
+    metric,
+    pageNumber,
+    canvas: canvasEl,
+    textLayerRenderer,
+    pageSession
+  }) {
     if (!pdfDocument || !canvasEl || !metric) return false
 
     const key = this._taskKey(pageNumber, canvasEl)
@@ -66,7 +73,8 @@ export class PdfRenderer {
       if (textLayerRenderer instanceof PdfTextLayerRenderer) {
         const cw = Math.floor(viewport.width)
         const ch = Math.floor(viewport.height)
-        await textLayerRenderer.render(page, viewport, cw, ch)
+        const textContent = pageSession?.textContent ?? null
+        await textLayerRenderer.render(page, viewport, cw, ch, textContent)
       }
       return true
     } catch (error) {

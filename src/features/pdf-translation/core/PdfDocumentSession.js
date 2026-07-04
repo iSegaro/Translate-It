@@ -485,7 +485,15 @@ export class PdfDocumentSession extends ResourceTracker {
   async renderPage(pageNumber, canvasEl, textLayerRenderer) {
     const metric = this.pageMetrics[pageNumber - 1]
     if (!metric) return false
-    return this._renderer.renderPage(this.pdfDocument, metric, pageNumber, canvasEl, textLayerRenderer)
+    const pageSession = this.pageSessions.get(pageNumber) || null
+    return this._renderer.renderPage({
+      pdfDocument: this.pdfDocument,
+      metric,
+      pageNumber,
+      canvas: canvasEl,
+      textLayerRenderer,
+      pageSession
+    })
   }
 
   clearPage(pageNumber, canvasEl, textLayerRenderer) {

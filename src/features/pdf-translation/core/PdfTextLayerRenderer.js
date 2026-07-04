@@ -28,16 +28,18 @@ export class PdfTextLayerRenderer {
     this._renderSeq = 0
   }
 
-  async render(page, viewport, containerWidth, containerHeight) {
+  async render(page, viewport, containerWidth, containerHeight, textContent) {
     if (!this.container || !page || !viewport) return
 
     this.clear()
     const renderSeq = ++this._renderSeq
 
-    const textContent = await page.getTextContent({
-      includeMarkedContent: true,
-      disableNormalization: true
-    })
+    if (!textContent) {
+      textContent = await page.getTextContent({
+        includeMarkedContent: true,
+        disableNormalization: true
+      })
+    }
     if (renderSeq !== this._renderSeq) return
     if (!textContent?.items?.length) return
 
