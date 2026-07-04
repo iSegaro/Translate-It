@@ -1,0 +1,154 @@
+function findBestScrollAnchorTarget(container, pageSelector) {
+  if (!container) return null
+
+  const containerRect = container.getBoundingClientRect()
+  const pageElements = container.querySelectorAll(pageSelector)
+  if (!pageElements.length) return null
+
+  let best = null
+
+  for (const el of pageElements) {
+    const rect = el.getBoundingClientRect()
+    if (rect.bottom <= containerRect.top) continue
+    if (rect.top >= containerRect.bottom) continue
+
+    const dist = Math.abs(rect.top - containerRect.top)
+    if (!best || dist < best.dist) {
+      best = { el, rect, dist }
+    }
+  }
+
+  if (!best) {
+    for (const el of pageElements) {
+      const rect = el.getBoundingClientRect()
+      if (rect.bottom <= containerRect.top) continue
+      best = { el, rect }
+      break
+    }
+  }
+
+  return best
+}
+
+function getPageCanvasElement(pageEl) {
+  return pageEl?.querySelector('canvas') || null
+}
+
+function findPageElement(container, pageSelector, pageNumber) {
+  return [...container.querySelectorAll(pageSelector)].find(
+    (el) => Number(el.dataset.pageNumber) === pageNumber
+  ) || null
+}
+
+function captureScrollAnchor(container, pageSelector) {
+  if (!container) return null
+
+  const scrollTop = container.scrollTop
+  const containerRect = container.getBoundingClientRect()
+  const best = findBestScrollAnchorTarget(container, pageSelector)
+  if (!best) return null
+
+  const pageNumber = Number(best.el.dataset.pageNumber)
+  if (!Number.isInteger(pageNumber) || pageNumber < 1) return null
+
+  const pageOffsetTop = best.rect.top - containerRect.top + scrollTop
+  const offsetRatio = best.rect.height > 0
+    ? Math.max(0, Math.min(1, (scrollTop - pageOffsetTop) / best.rect.height))
+    : 0
+
+  return { pageNumber, offsetRatio }
+}
+
+function restoreScrollAnchor(anchor, container, pageSelector) {
+  if (!anchor || !container) {
+    return false
+  }
+
+  const pageEl = findPageElement(container, pageSelector, anchor.pageNumber)
+  if (!pageEl) {
+    return false
+  }
+
+  const pageRect = pageEl.getBoundingClientRect()
+  const containerRect = container.getBoundingClientRect()
+  const pageOffsetTop = pageRect.top - containerRect.top + container.scrollTop
+  const targetScrollTop = pageOffsetTop + pageRect.height * anchor.offsetRatio
+
+  container.scrollTo({
+    top: targetScrollTop,
+    behavior: 'instant'
+  })
+  return true
+}
+
+function capturePdfBackedScrollAnchor(container, pageSelector, pdfSession) {
+  const best = findBestScrollAnchorTarget(container, pageSelector)
+  if (!best) return null
+
+  const pageEl = best.el
+  const canvasEl = getPageCanvasElement(pageEl)
+  const pageNumber = Number(pageEl.dataset.pageNumber)
+  const viewport = pdfSession?.getPageViewport?.(pageNumber)
+  if (!canvasEl || !viewport?.convertToPdfPoint) return null
+  if (!Number.isInteger(pageNumber) || pageNumber < 1) return null
+
+  const containerRect = container.getBoundingClientRect()
+  const canvasRect = canvasEl.getBoundingClientRect()
+
+  const cssX = (containerRect.left + (containerRect.width / 2)) - canvasRect.left
+  const cssY = containerRect.top - canvasRect.top
+  const [pdfX, pdfY] = viewport.convertToPdfPoint(cssX, cssY)
+
+  const offsetRatio = best.rect.height > 0
+    ? Math.max(0, Math.min(1, (containerRect.top - best.rect.top) / best.rect.height))
+    : 0
+
+  return {
+    pageNumber,
+    offsetRatio,
+    pdfPoint: { x: pdfX, y: pdfY }
+  }
+}
+
+function restorePdfBackedScrollAnchor(anchor, container, pageSelector, pdfSession) {
+  if (!anchor?.pdfPoint || !container || !pdfSession) {
+    return false
+  }
+
+  const pageEl = findPageElement(container, pageSelector, anchor.pageNumber)
+  if (!pageEl) {
+    return false
+  }
+
+  const canvasEl = getPageCanvasElement(pageEl)
+  if (!canvasEl) {
+    return false
+  }
+
+  const viewport = pdfSession.getPageViewport?.(anchor.pageNumber)
+  if (!viewport?.convertToViewportPoint) {
+    return false
+  }
+
+  const [, cssY] = viewport.convertToViewportPoint(anchor.pdfPoint.x, anchor.pdfPoint.y)
+  const canvasRect = canvasEl.getBoundingClientRect()
+  const containerRect = container.getBoundingClientRect()
+  const canvasOffsetTop = canvasRect.top - containerRect.top + container.scrollTop
+  const targetScrollTop = canvasOffsetTop + cssY
+
+  container.scrollTo({
+    top: targetScrollTop,
+    behavior: 'instant'
+  })
+
+  return true
+}
+
+export {
+  findBestScrollAnchorTarget,
+  getPageCanvasElement,
+  captureScrollAnchor,
+  restoreScrollAnchor,
+  capturePdfBackedScrollAnchor,
+  restorePdfBackedScrollAnchor
+}
