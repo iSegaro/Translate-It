@@ -2,6 +2,21 @@
   <header class="pdf-toolbar">
     <div class="pdf-toolbar__title-block">
       <div class="pdf-toolbar__file-row">
+        <button
+          v-if="hasOutline"
+          class="pdf-toolbar__outline-toggle"
+          :class="{ 'pdf-toolbar__outline-toggle--active': isOutlineVisible }"
+          type="button"
+          aria-label="Toggle outline"
+          @click="$emit('toggle-outline')"
+        >
+          <img
+            class="pdf-toolbar__outline-icon"
+            src="@/icons/ui/outline.svg"
+            alt=""
+            aria-hidden="true"
+          >
+        </button>
         <img
           class="pdf-toolbar__file-icon"
           src="@/icons/ui/page.png"
@@ -21,7 +36,7 @@
       v-if="fileName"
       class="pdf-toolbar__center-group"
     >
-      <div class="pdf-toolbar__mode-group">
+      <div class="pdf-toolbar__mode-group pdf-toolbar__mode-group--content">
         <button
           v-for="opt in contentOptions"
           :key="opt.value"
@@ -34,7 +49,7 @@
         </button>
       </div>
 
-      <div class="pdf-toolbar__mode-group">
+      <div class="pdf-toolbar__mode-group pdf-toolbar__mode-group--layout">
         <button
           class="pdf-toolbar__mode-button"
           :class="{ 'pdf-toolbar__mode-button--active': isSideBySide }"
@@ -42,54 +57,66 @@
           :aria-pressed="isSideBySide"
           @click="handleLayoutModeToggle"
         >
-          Side by Side
+          <img
+            class="pdf-toolbar__mode-icon"
+            src="@/icons/ui/split-screen.svg"
+            alt=""
+            aria-hidden="true"
+          >
+          <span class="pdf-toolbar__mode-label">Side by Side</span>
         </button>
       </div>
 
-      <div class="pdf-toolbar__view-group">
-        <span class="pdf-toolbar__page-indicator">
-          {{ currentPageLabel }}
-        </span>
+      <div class="pdf-toolbar__page-group">
+        <input
+          class="pdf-toolbar__page-input"
+          type="number"
+          min="1"
+          :value="currentPageDisplayValue"
+          readonly
+        >
+        <span class="pdf-toolbar__page-separator">/</span>
+        <span class="pdf-toolbar__page-total">{{ pageCount || 0 }}</span>
+      </div>
 
-        <div class="pdf-toolbar__zoom-group">
-          <button
-            class="pdf-toolbar__button pdf-toolbar__button--zoom"
-            type="button"
-            :disabled="!hasZoomOut"
-            @click="$emit('zoom-step', -1)"
-          >
-            -
-          </button>
+      <div class="pdf-toolbar__zoom-group">
+        <button
+          class="pdf-toolbar__zoom-button pdf-toolbar__zoom-button--out"
+          type="button"
+          :disabled="!hasZoomOut"
+          @click="$emit('zoom-step', -1)"
+        >
+          −
+        </button>
 
-          <select
-            class="pdf-toolbar__zoom-select"
-            :value="zoomSelectValue"
-            @change="handleZoomSelectChange"
+        <select
+          class="pdf-toolbar__zoom-select"
+          :value="zoomSelectValue"
+          @change="handleZoomSelectChange"
+        >
+          <option value="fit-width">
+            Fit Width
+          </option>
+          <option value="fit-page">
+            Fit Page
+          </option>
+          <option
+            v-for="option in zoomPercentOptions"
+            :key="option"
+            :value="String(option)"
           >
-            <option value="fit-width">
-              Fit Width
-            </option>
-            <option value="fit-page">
-              Fit Page
-            </option>
-            <option
-              v-for="option in zoomPercentOptions"
-              :key="option"
-              :value="String(option)"
-            >
-              {{ option }}%
-            </option>
-          </select>
+            {{ option }}%
+          </option>
+        </select>
 
-          <button
-            class="pdf-toolbar__button pdf-toolbar__button--zoom"
-            type="button"
-            :disabled="!hasZoomIn"
-            @click="$emit('zoom-step', 1)"
-          >
-            +
-          </button>
-        </div>
+        <button
+          class="pdf-toolbar__zoom-button pdf-toolbar__zoom-button--in"
+          type="button"
+          :disabled="!hasZoomIn"
+          @click="$emit('zoom-step', 1)"
+        >
+          +
+        </button>
       </div>
     </div>
 
@@ -262,6 +289,8 @@ const props = defineProps({
   zoomMode: { type: String, default: 'fit-width' },
   zoomPercent: { type: Number, default: 100 },
   showTranslationOption: { type: Boolean, default: false },
+  hasOutline: { type: Boolean, default: false },
+  isOutlineVisible: { type: Boolean, default: false },
   translationSummary: {
     type: Object,
     default: () => ({
@@ -273,7 +302,7 @@ const props = defineProps({
   }
 })
 
-const emit = defineEmits(['file-selected', 'translate-visible', 'cancel-translation', 'content-view-change', 'layout-mode-change', 'export-txt', 'export-markdown', 'export-html', 'request-ocr', 'clear-cache', 'zoom-step', 'zoom-change'])
+const emit = defineEmits(['file-selected', 'translate-visible', 'cancel-translation', 'content-view-change', 'layout-mode-change', 'toggle-outline', 'export-txt', 'export-markdown', 'export-html', 'request-ocr', 'clear-cache', 'zoom-step', 'zoom-change'])
 const fileInput = ref(null)
 const exportMenuRef = ref(null)
 const exportMenuTriggerRef = ref(null)
@@ -301,15 +330,15 @@ const zoomSelectValue = computed(() => {
   return String(props.zoomPercent || 100)
 })
 
-const currentPageLabel = computed(() => {
+const currentPageDisplayValue = computed(() => {
   const total = Number(props.pageCount) || 0
   const current = Number(props.currentPageNumber) || 0
 
   if (!total) {
-    return '0 / 0'
+    return '0'
   }
 
-  return `${current || 1} / ${total}`
+  return String(current || 1)
 })
 
 const hasZoomOut = computed(() => props.zoomMode !== 'fit-width' || props.zoomPercent > zoomPercentOptions[0])

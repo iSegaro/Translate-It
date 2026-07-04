@@ -6,8 +6,8 @@
   grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
   gap: 12px 18px;
   align-items: center;
-  padding: 10px 20px;
-  min-height: 48px;
+  padding: 8px 20px;
+  min-height: 44px;
   box-sizing: border-box;
   border-bottom: 1px solid rgba(255, 255, 255, 0.08);
   background: rgba(13, 16, 22, 0.94);
@@ -29,6 +29,43 @@
   align-items: center;
   gap: 8px;
   min-width: 0;
+}
+
+.pdf-toolbar__outline-toggle {
+  display: inline-grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: rgba(230, 237, 247, 0.65);
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+  flex-shrink: 0;
+
+  &:hover {
+    background: rgba(255, 255, 255, 0.08);
+    color: #e6edf7;
+  }
+
+  &:focus-visible {
+    outline: 2px solid rgba(106, 165, 255, 0.95);
+    outline-offset: 2px;
+  }
+
+  &--active {
+    background: rgba(90, 92, 255, 0.2);
+    color: #a5aaff;
+  }
+}
+
+.pdf-toolbar__outline-icon {
+  width: 16px;
+  height: 16px;
+  display: block;
+  object-fit: contain;
 }
 
 .pdf-toolbar__file-icon {
@@ -56,56 +93,113 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 16px;
+  gap: 12px;
   min-width: 0;
   justify-self: center;
   flex-wrap: wrap;
 }
 
-.pdf-toolbar__view-group {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  min-width: 0;
-}
-
-.pdf-toolbar__page-indicator {
+.pdf-toolbar__mode-group {
   display: inline-flex;
   align-items: center;
-  padding: 6px 10px;
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.07);
+  border-radius: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  overflow: hidden;
+
+  &--content {
+    gap: 0;
+  }
+
+  &--layout {
+    .pdf-toolbar__mode-button {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+    }
+  }
+}
+
+.pdf-toolbar__mode-button {
+  appearance: none;
+  border: 0;
+  padding: 5px 8px;
+  background: transparent;
+  color: rgba(230, 237, 247, 0.7);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+  white-space: nowrap;
+
+  &:hover {
+    background: rgba(255, 255, 255, 0.06);
+    color: #e6edf7;
+  }
+
+  &:focus-visible {
+    outline: none;
+    box-shadow: inset 0 0 0 2px rgba(106, 165, 255, 0.95);
+  }
+
+  &--active {
+    background: rgba(90, 92, 255, 0.2);
+    color: #e6edf7;
+  }
+}
+
+.pdf-toolbar__mode-icon {
+  width: 14px;
+  height: 14px;
+  display: block;
+  object-fit: contain;
+  flex-shrink: 0;
+}
+
+.pdf-toolbar__mode-label {
+  @media (max-width: 1100px) {
+    display: inline;
+  }
+}
+
+.pdf-toolbar__page-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
   color: rgba(230, 237, 247, 0.78);
   font-size: 13px;
   font-weight: 700;
-  white-space: nowrap;
 }
 
-.pdf-toolbar__zoom-group {
+.pdf-toolbar__page-input {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
-  min-width: 0;
-}
-
-.pdf-toolbar__zoom-select {
-  appearance: none;
+  justify-content: center;
+  width: 32px;
+  padding: 4px 2px;
   border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: 999px;
-  padding: 8px 12px 8px 14px;
-  background: rgba(255, 255, 255, 0.08);
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.07);
   color: #e6edf7;
-  font-weight: 600;
-  cursor: pointer;
-  width: max-content;
-  min-width: 0;
-  max-width: none;
+  font-size: 13px;
+  font-weight: 700;
+  text-align: center;
   outline: none;
 
   &:focus-visible {
     outline: 2px solid rgba(106, 165, 255, 0.95);
-    outline-offset: 2px;
+    outline-offset: 1px;
   }
+}
+
+.pdf-toolbar__page-separator {
+  margin: 0 2px;
+  color: rgba(230, 237, 247, 0.5);
+}
+
+.pdf-toolbar__page-total {
+  color: rgba(230, 237, 247, 0.78);
+  font-size: 13px;
+  font-weight: 700;
 }
 
 .pdf-toolbar__actions {
@@ -122,9 +216,10 @@
   appearance: none;
   border: 0;
   border-radius: 999px;
-  padding: 8px 14px;
+  padding: 7px 12px;
   background: rgba(255, 255, 255, 0.08);
   color: #e6edf7;
+  font-size: 12px;
   font-weight: 600;
   cursor: pointer;
   transition: background 0.15s ease, color 0.15s ease;
@@ -149,26 +244,38 @@
   display: none;
 }
 
-.pdf-toolbar__mode-group {
+.pdf-toolbar__button--cancel {
+  background: rgba(239, 68, 68, 0.15);
+  color: #fecaca;
+
+  &:hover {
+    background: rgba(239, 68, 68, 0.25);
+  }
+}
+
+.pdf-toolbar__zoom-group {
   display: inline-flex;
   align-items: center;
-  gap: 12px;
-  min-width: 0;
-  border-radius: 999px;
+  border-radius: 6px;
   border: 1px solid rgba(255, 255, 255, 0.12);
   overflow: hidden;
 }
 
-.pdf-toolbar__mode-button {
+.pdf-toolbar__zoom-button {
   appearance: none;
   border: 0;
-  padding: 7px 12px;
+  min-width: 28px;
+  height: 28px;
+  padding: 0 6px;
   background: transparent;
   color: rgba(230, 237, 247, 0.7);
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 600;
   cursor: pointer;
   transition: background 0.15s ease, color 0.15s ease;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 
   &:hover {
     background: rgba(255, 255, 255, 0.06);
@@ -180,24 +287,37 @@
     box-shadow: inset 0 0 0 2px rgba(106, 165, 255, 0.95);
   }
 
-  &--active {
-    background: rgba(90, 92, 255, 0.2);
-    color: #e6edf7;
+  &:disabled {
+    opacity: 0.5;
+    cursor: default;
+    pointer-events: none;
   }
 }
 
-.pdf-toolbar__button--cancel {
-  background: rgba(239, 68, 68, 0.15);
-  color: #fecaca;
+.pdf-toolbar__zoom-select {
+  appearance: none;
+  border: 0;
+  border-left: 1px solid rgba(255, 255, 255, 0.12);
+  border-right: 1px solid rgba(255, 255, 255, 0.12);
+  padding: 4px 8px;
+  background: transparent;
+  color: #e6edf7;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  width: auto;
+  min-width: 44px;
+  text-align: center;
+  outline: none;
 
   &:hover {
-    background: rgba(239, 68, 68, 0.25);
+    background: rgba(255, 255, 255, 0.06);
   }
-}
 
-.pdf-toolbar__button--zoom {
-  min-width: 34px;
-  padding-inline: 10px;
+  &:focus-visible {
+    outline: none;
+    box-shadow: inset 0 0 0 2px rgba(106, 165, 255, 0.95);
+  }
 }
 
 .pdf-toolbar__export-dropdown {
@@ -251,8 +371,8 @@
 .pdf-toolbar__button--icon-trigger {
   display: inline-grid;
   place-items: center;
-  width: 38px;
-  height: 38px;
+  width: 36px;
+  height: 36px;
   padding: 0;
 }
 
@@ -328,6 +448,11 @@
     gap: 6px;
   }
 
+  .pdf-toolbar__outline-toggle {
+    width: 28px;
+    height: 28px;
+  }
+
   .pdf-toolbar__file-icon {
     width: 16px;
     height: 16px;
@@ -354,35 +479,19 @@
   }
 
   .pdf-toolbar__mode-group,
-  .pdf-toolbar__view-group {
+  .pdf-toolbar__page-group,
+  .pdf-toolbar__zoom-group {
     flex-wrap: wrap;
     justify-content: flex-start;
   }
 
-  .pdf-toolbar__mode-group {
-    gap: 8px;
-  }
-
   .pdf-toolbar__mode-button {
-    padding: 6px 10px;
-    font-size: 12px;
+    padding: 5px 7px;
+    font-size: 11px;
   }
 
-  .pdf-toolbar__view-group {
-    gap: 8px;
-  }
-
-  .pdf-toolbar__page-indicator {
-    padding: 5px 8px;
-    font-size: 12px;
-  }
-
-  .pdf-toolbar__zoom-group {
-    gap: 6px;
-  }
-
-  .pdf-toolbar__zoom-select {
-    padding: 7px 11px 7px 13px;
+  .pdf-toolbar__page-input {
+    width: 28px;
   }
 
   .pdf-toolbar__actions {
@@ -391,8 +500,8 @@
   }
 
   .pdf-toolbar__button {
-    padding: 7px 12px;
-    font-size: 12px;
+    padding: 6px 10px;
+    font-size: 11px;
   }
 
   .pdf-toolbar__button--menu-trigger {
@@ -400,7 +509,7 @@
   }
 
   .pdf-toolbar__button--icon-trigger {
-    width: 36px;
-    height: 36px;
+    width: 34px;
+    height: 34px;
   }
 }

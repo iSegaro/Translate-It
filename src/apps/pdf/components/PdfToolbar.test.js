@@ -30,8 +30,9 @@ describe('PdfToolbar', () => {
     expect(wrapper.find('.pdf-toolbar__file-icon').exists()).toBe(true)
     expect(wrapper.find('.pdf-toolbar__file-name').text()).toBe('very-long-document-name.pdf')
     expect(wrapper.find('.pdf-toolbar__file-name').attributes('title')).toBe('very-long-document-name.pdf')
-    expect(wrapper.find('.pdf-toolbar__page-indicator').text()).toBe('5 / 12')
-    expect(wrapper.find('option[value="fit-page"]').exists()).toBe(true)
+    expect(wrapper.find('.pdf-toolbar__page-input').exists()).toBe(true)
+    expect(wrapper.find('.pdf-toolbar__page-input').element.value).toBe('5')
+    expect(wrapper.find('.pdf-toolbar__page-total').text()).toBe('12')
     expect(wrapper.find('.pdf-toolbar__zoom-select').exists()).toBe(true)
     expect(wrapper.find('.pdf-toolbar__button[aria-label="More actions"]').exists()).toBe(true)
     expect(wrapper.find('.pdf-toolbar__button[aria-label="Export options"]').exists()).toBe(true)
@@ -214,5 +215,62 @@ describe('PdfToolbar', () => {
 
     await wrapper.find('.pdf-toolbar__button[aria-label="More actions"]').trigger('click')
     expect(wrapper.find('.pdf-toolbar__export-menu').text()).toContain('Loading...')
+  })
+
+  it('shows outline toggle button when hasOutline is true', async () => {
+    const wrapper = mount(PdfToolbar, {
+      props: {
+        fileName: 'demo.pdf',
+        pageCount: 1,
+        currentPageNumber: 1,
+        hasOutline: true,
+        isOutlineVisible: false
+      }
+    })
+
+    expect(wrapper.find('.pdf-toolbar__outline-toggle').exists()).toBe(true)
+    expect(wrapper.find('.pdf-toolbar__outline-toggle--active').exists()).toBe(false)
+  })
+
+  it('hides outline toggle button when hasOutline is false', async () => {
+    const wrapper = mount(PdfToolbar, {
+      props: {
+        fileName: 'demo.pdf',
+        pageCount: 1,
+        currentPageNumber: 1,
+        hasOutline: false
+      }
+    })
+
+    expect(wrapper.find('.pdf-toolbar__outline-toggle').exists()).toBe(false)
+  })
+
+  it('emits toggle-outline when outline button is clicked', async () => {
+    const wrapper = mount(PdfToolbar, {
+      props: {
+        fileName: 'demo.pdf',
+        pageCount: 1,
+        currentPageNumber: 1,
+        hasOutline: true,
+        isOutlineVisible: false
+      }
+    })
+
+    await wrapper.find('.pdf-toolbar__outline-toggle').trigger('click')
+    expect(wrapper.emitted('toggle-outline')).toBeTruthy()
+  })
+
+  it('applies active class to outline toggle when outline is visible', async () => {
+    const wrapper = mount(PdfToolbar, {
+      props: {
+        fileName: 'demo.pdf',
+        pageCount: 1,
+        currentPageNumber: 1,
+        hasOutline: true,
+        isOutlineVisible: true
+      }
+    })
+
+    expect(wrapper.find('.pdf-toolbar__outline-toggle--active').exists()).toBe(true)
   })
 })

@@ -15,8 +15,11 @@
       :zoom-mode="zoomMode"
       :zoom-percent="zoomPercent"
       :show-translation-option="hasAnyTranslation"
+      :has-outline="hasOutline"
+      :is-outline-visible="isOutlineVisible"
       :translation-summary="translationSummary"
       @file-selected="handleFileSelected"
+      @toggle-outline="toggleOutline"
       @translate-visible="handleTranslateVisiblePages"
       @cancel-translation="handleCancelTranslation"
       @content-view-change="handleContentViewChange"
@@ -58,17 +61,6 @@
       />
 
       <div class="pdf-app__workspace">
-        <button
-          v-if="hasDocument && hasOutline"
-          class="pdf-app__outline-toggle"
-          :class="{ 'pdf-app__outline-toggle--active': isOutlineVisible }"
-          type="button"
-          aria-label="Toggle outline"
-          @click="toggleOutline"
-        >
-          <span class="pdf-app__outline-toggle-icon" />
-        </button>
-
         <PdfOutline
           :outline="pdfOutline"
           :visible="isOutlineVisible && hasOutline"
