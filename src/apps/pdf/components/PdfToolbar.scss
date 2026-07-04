@@ -11,7 +11,7 @@
   padding: $tb-padding-y 16px;
   min-height: $tb-toolbar-height;
   box-sizing: border-box;
-  border-bottom: $tb-border-width solid rgba(255, 255, 255, 0.08);
+  border-bottom: $tb-border-width solid rgba(255, 255, 255, 0.06);
   background: rgba(13, 16, 22, 0.94);
   backdrop-filter: blur(14px);
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
@@ -91,7 +91,7 @@
   white-space: nowrap;
   color: #e6edf7;
   font-size: 13px;
-  font-weight: 600;
+  font-weight: 500;
   line-height: 1.2;
 }
 
@@ -107,7 +107,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 8px;
+  gap: 6px;
   min-width: 0;
   justify-self: center;
   flex-wrap: wrap;
@@ -136,7 +136,7 @@
 .pdf-toolbar__mode-button {
   appearance: none;
   border: 0;
-  padding: 5px 8px;
+  padding: 4px 7px;
   background: transparent;
   color: rgba(230, 237, 247, 0.7);
   font-size: 12px;
@@ -199,7 +199,7 @@
   background: transparent;
   color: #e6edf7;
   font-size: 13px;
-  font-weight: 600;
+  font-weight: 500;
   text-align: center;
   outline: none;
 
@@ -222,7 +222,7 @@
 .pdf-toolbar__page-total {
   color: rgba(230, 237, 247, 0.78);
   font-size: 13px;
-  font-weight: 600;
+  font-weight: 500;
 }
 
 .pdf-toolbar__actions {
@@ -239,7 +239,7 @@
   appearance: none;
   border: 0;
   border-radius: 6px;
-  padding: 6px 10px;
+  padding: 5px 8px;
   background: rgba(255, 255, 255, 0.08);
   color: #e6edf7;
   font-size: 12px;
@@ -510,7 +510,7 @@
 
   .pdf-toolbar__center-group {
     justify-content: flex-start;
-    gap: 10px;
+    gap: 8px;
   }
 
   .pdf-toolbar__mode-group,
@@ -521,7 +521,7 @@
   }
 
   .pdf-toolbar__mode-button {
-    padding: 5px 7px;
+    padding: 4px 6px;
     font-size: 11px;
   }
 
@@ -535,7 +535,7 @@
   }
 
   .pdf-toolbar__button {
-    padding: 6px 10px;
+    padding: 5px 8px;
     font-size: 11px;
   }
 
