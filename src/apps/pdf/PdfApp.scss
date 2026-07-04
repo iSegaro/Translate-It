@@ -14,7 +14,7 @@
 
 .pdf-app__content {
   flex: 1;
-  padding: 16px 28px 28px;
+  padding: 0 28px 28px;
   min-height: 0;
 }
 
@@ -67,6 +67,6 @@
   }
 
   .pdf-app__content {
-    padding: 16px;
+    padding: 0 16px 16px;
   }
 }
