@@ -36,14 +36,13 @@
 
       <div class="pdf-toolbar__mode-group">
         <button
-          v-for="opt in layoutOptions"
-          :key="opt.value"
           class="pdf-toolbar__mode-button"
-          :class="{ 'pdf-toolbar__mode-button--active': layoutMode === opt.value }"
+          :class="{ 'pdf-toolbar__mode-button--active': isSideBySide }"
           type="button"
-          @click="$emit('layout-mode-change', opt.value)"
+          :aria-pressed="isSideBySide"
+          @click="handleLayoutModeToggle"
         >
-          {{ opt.label }}
+          Side by Side
         </button>
       </div>
 
@@ -294,10 +293,7 @@ const contentOptions = computed(() => {
   return allContentOptions.filter(opt => opt.value !== CONTENT_VIEW.TRANSLATION)
 })
 
-const layoutOptions = [
-  { value: LAYOUT_MODE.SINGLE, label: 'Single' },
-  { value: LAYOUT_MODE.SIDE_BY_SIDE, label: 'Side by Side' }
-]
+const isSideBySide = computed(() => props.layoutMode === LAYOUT_MODE.SIDE_BY_SIDE)
 
 const zoomSelectValue = computed(() => {
   if (props.zoomMode === 'fit-width') return 'fit-width'
@@ -415,6 +411,10 @@ function handleZoomSelectChange(event) {
   const percent = Number(value)
   if (!Number.isFinite(percent)) return
   emit('zoom-change', { mode: 'percent', value: percent })
+}
+
+function handleLayoutModeToggle() {
+  emit('layout-mode-change', isSideBySide.value ? LAYOUT_MODE.SINGLE : LAYOUT_MODE.SIDE_BY_SIDE)
 }
 
 function handleFileInputChange(event) {
