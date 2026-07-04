@@ -68,7 +68,7 @@
     transform: rotate(var(--rotate));
 
     &::selection {
-      background: Highlight;
+      background: rgba(51, 144, 255, 0.30);
       color: transparent;
     }
   }
