@@ -265,7 +265,7 @@ export function usePdfNavigation(viewerRef) {
         navigateToDestination(target.dest)
         break
 
-      case NavigationTargetType.URI:
+      case NavigationTargetType.URI: {
         if (!isValidNavigationUrl(target.url)) {
           logger.warn('Rejected unsafe URL:', target.url)
           return
@@ -281,6 +281,7 @@ export function usePdfNavigation(viewerRef) {
           logger.warn('Failed to open URL — popup may have been blocked:', target.url)
         }
         break
+      }
 
       case NavigationTargetType.ACTION:
         logger.warn('Named action not yet implemented:', target.action)

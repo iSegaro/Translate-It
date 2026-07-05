@@ -456,7 +456,7 @@ function scrollToPage(pageNumber, options = {}) {
   const viewport = props.session.getPageViewport(num)
   if (!viewport) return
 
-  const [cssX, cssY] = viewport.convertToViewportPoint(
+  const [, cssY] = viewport.convertToViewportPoint(
     Number(options.left) || 0,
     Number(options.top) || 0
   )

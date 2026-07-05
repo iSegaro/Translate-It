@@ -110,7 +110,7 @@ describe('usePdfViewerMode', () => {
     })
 
     it('sets layout mode to side-by-side when content is translation', () => {
-      const { contentView, layoutMode, isSideBySide, setContentView, setLayoutMode } = usePdfViewerMode()
+      const { layoutMode, isSideBySide, setContentView, setLayoutMode } = usePdfViewerMode()
 
       setContentView('translation')
       setLayoutMode('side-by-side')
@@ -120,7 +120,7 @@ describe('usePdfViewerMode', () => {
     })
 
     it('sets layout mode to side-by-side when content is translated-pdf', () => {
-      const { contentView, layoutMode, isSideBySide, setContentView, setLayoutMode } = usePdfViewerMode()
+      const { layoutMode, isSideBySide, setContentView, setLayoutMode } = usePdfViewerMode()
 
       setContentView('translated-pdf')
       setLayoutMode('side-by-side')
@@ -139,7 +139,7 @@ describe('usePdfViewerMode', () => {
     })
 
     it('preserves side-by-side preference through original cycle', () => {
-      const { contentView, layoutMode, selectedLayoutMode, setContentView, setLayoutMode } = usePdfViewerMode()
+      const { layoutMode, selectedLayoutMode, setContentView, setLayoutMode } = usePdfViewerMode()
 
       setContentView('translation')
       setLayoutMode('side-by-side')
@@ -154,7 +154,7 @@ describe('usePdfViewerMode', () => {
     })
 
     it('preserves side-by-side preference through original to translated-pdf cycle', () => {
-      const { contentView, layoutMode, selectedLayoutMode, setContentView, setLayoutMode } = usePdfViewerMode()
+      const { layoutMode, selectedLayoutMode, setContentView, setLayoutMode } = usePdfViewerMode()
 
       setContentView('translation')
       setLayoutMode('side-by-side')

@@ -231,8 +231,8 @@ describe('PdfRenderer', () => {
       const metric = { scale: 1 }
 
       // Start both renders
-      const promiseA = renderer.renderPage({ pdfDocument, metric, pageNumber: 1, canvas: canvasA, textLayerRenderer: null })
-      const promiseB = renderer.renderPage({ pdfDocument, metric, pageNumber: 1, canvas: canvasB, textLayerRenderer: null })
+      renderer.renderPage({ pdfDocument, metric, pageNumber: 1, canvas: canvasA, textLayerRenderer: null })
+      renderer.renderPage({ pdfDocument, metric, pageNumber: 1, canvas: canvasB, textLayerRenderer: null })
       await flushMicrotasks()
 
       // Both tasks stored independently

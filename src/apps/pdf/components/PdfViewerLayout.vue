@@ -5,8 +5,8 @@
   >
     <div
       v-if="showOriginalPane"
-      class="pdf-viewer-layout__pane pdf-viewer-layout__pane--original"
       ref="originalPaneRef"
+      class="pdf-viewer-layout__pane pdf-viewer-layout__pane--original"
       tabindex="-1"
       @click="focusPane"
     >
@@ -15,8 +15,8 @@
 
     <div
       v-if="showTranslatedPane"
-      class="pdf-viewer-layout__pane pdf-viewer-layout__pane--translated"
       ref="translatedPaneRef"
+      class="pdf-viewer-layout__pane pdf-viewer-layout__pane--translated"
     >
       <slot name="translated" />
     </div>
