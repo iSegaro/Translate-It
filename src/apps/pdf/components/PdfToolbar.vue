@@ -186,56 +186,6 @@
       >
         {{ isTranslating ? 'Translating...' : 'Translate Visible Pages' }}
       </button>
-
-      <div
-        ref="moreMenuRef"
-        class="pdf-toolbar__export-dropdown"
-      >
-        <button
-          ref="moreMenuTriggerRef"
-          class="pdf-toolbar__button pdf-toolbar__button--menu-trigger pdf-toolbar__button--icon-trigger"
-          type="button"
-          aria-label="More actions"
-          aria-haspopup="menu"
-          :aria-expanded="activeMenu === 'more'"
-          @click="toggleMenu('more')"
-        >
-          <span
-            class="pdf-toolbar__menu-trigger-icon"
-            aria-hidden="true"
-          >
-            <span />
-            <span />
-            <span />
-          </span>
-        </button>
-
-        <div
-          v-if="activeMenu === 'more'"
-          class="pdf-toolbar__export-menu"
-          role="menu"
-        >
-          <button
-            class="pdf-toolbar__export-item"
-            type="button"
-            role="menuitem"
-            :disabled="isLoading"
-            @click="handleOpenPdfAction"
-          >
-            {{ isLoading ? 'Loading...' : 'Open PDF' }}
-          </button>
-          <button
-            v-if="fileName"
-            class="pdf-toolbar__export-item"
-            type="button"
-            role="menuitem"
-            @click="handleClearCacheAction"
-          >
-            Clear Cache
-          </button>
-        </div>
-      </div>
-
       <div
         v-if="fileName && canExport"
         ref="exportMenuRef"
@@ -301,6 +251,56 @@
             @click="handleExportAction('export-html')"
           >
             Export HTML
+          </button>
+        </div>
+      </div>
+
+      <div
+        ref="moreMenuRef"
+        class="pdf-toolbar__export-dropdown"
+      >
+        <button
+          ref="moreMenuTriggerRef"
+          class="pdf-toolbar__button pdf-toolbar__button--menu-trigger pdf-toolbar__button--icon-trigger"
+          type="button"
+          aria-label="More actions"
+          aria-haspopup="menu"
+          :aria-expanded="activeMenu === 'more'"
+          @click="toggleMenu('more')"
+        >
+          <span
+            class="pdf-toolbar__menu-trigger-icon"
+            aria-hidden="true"
+          >
+            <span />
+            <span />
+            <span />
+          </span>
+        </button>
+
+        <div
+          v-if="activeMenu === 'more'"
+          class="pdf-toolbar__export-menu"
+          role="menu"
+        >
+          <button
+            class="pdf-toolbar__export-item"
+            type="button"
+            role="menuitem"
+            :disabled="isLoading"
+            @click="handleOpenPdfAction"
+          >
+            {{ isLoading ? 'Loading...' : 'Open PDF' }}
+          </button>
+          <button
+            v-if="fileName"
+            class="pdf-toolbar__export-item"
+
+            type="button"
+            role="menuitem"
+            @click="handleClearCacheAction"
+          >
+            Clear Cache
           </button>
         </div>
       </div>
