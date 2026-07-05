@@ -317,12 +317,10 @@ export function createPdfTransitionController({
   }
 
   async function handleZoomChange({ mode, value }) {
-    if (mode === 'fit-page') {
-      if (zoomMode.value === 'fit-page') {
-        return
-      }
+    async function applyFitMode(fitMode) {
+      if (zoomMode.value === fitMode) return
 
-      zoomMode.value = 'fit-page'
+      zoomMode.value = fitMode
 
       if (hasDocument.value) {
         const { container, selector } = resolveScrollAnchor()
@@ -332,43 +330,38 @@ export function createPdfTransitionController({
         restoreScrollAnchor(anchor, container, selector)
         syncFromOwner(resolveAnchorOwner())
       }
-      return
     }
 
-    if (mode === 'fit-width') {
-      if (zoomMode.value === 'fit-width') {
-        return
-      }
+    switch (mode) {
+      case 'fit-page':
+      case 'fit-width':
+        await applyFitMode(mode)
+        break
 
-      zoomMode.value = 'fit-width'
+      case 'percent': {
+        const nextPercent = clampZoomPercent(Number(value))
 
-      if (hasDocument.value) {
+        if (zoomMode.value === 'percent' && zoomPercent.value === nextPercent) {
+          return
+        }
+
         const { container, selector } = resolveScrollAnchor()
         const anchor = captureScrollAnchor(container, selector)
-        await recomputeLayout(buildLayoutRequest())
-        await nextTick()
-        restoreScrollAnchor(anchor, container, selector)
-        syncFromOwner(resolveAnchorOwner())
+
+        zoomMode.value = 'percent'
+        zoomPercent.value = nextPercent
+
+        if (hasDocument.value) {
+          await recomputeLayout(buildLayoutRequest())
+          await nextTick()
+          restoreScrollAnchor(anchor, container, selector)
+          syncFromOwner(resolveAnchorOwner())
+        }
+        break
       }
-      return
-    }
 
-    const nextPercent = clampZoomPercent(Number(value))
-    if (zoomMode.value === 'percent' && zoomPercent.value === nextPercent) {
-      return
-    }
-
-    const { container, selector } = resolveScrollAnchor()
-    const anchor = captureScrollAnchor(container, selector)
-
-    zoomMode.value = 'percent'
-    zoomPercent.value = nextPercent
-
-    if (hasDocument.value) {
-      await recomputeLayout(buildLayoutRequest())
-      await nextTick()
-      restoreScrollAnchor(anchor, container, selector)
-      syncFromOwner(resolveAnchorOwner())
+      default:
+        break
     }
   }
 
