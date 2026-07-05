@@ -7,7 +7,8 @@
           class="pdf-toolbar__outline-toggle"
           :class="{ 'pdf-toolbar__outline-toggle--active': isOutlineVisible }"
           type="button"
-          aria-label="Toggle outline"
+          :aria-label="TOOLTIP_OUTLINE"
+          :title="TOOLTIP_OUTLINE"
           @click="$emit('toggle-outline')"
         >
           <SvgIcon :src="outlineIcon" :size="16" />
@@ -44,7 +45,8 @@
             class="pdf-toolbar__mode-button"
             :class="{ 'pdf-toolbar__mode-button--active': isSideBySide }"
             type="button"
-            aria-label="Side by Side"
+            :aria-label="TOOLTIP_SIDE_BY_SIDE"
+            :title="TOOLTIP_SIDE_BY_SIDE"
             :aria-pressed="isSideBySide"
             @click="handleLayoutModeToggle"
           >
@@ -80,6 +82,8 @@
           class="pdf-toolbar__zoom-button pdf-toolbar__zoom-button--out"
           type="button"
           :disabled="!hasZoomOut"
+          :aria-label="TOOLTIP_ZOOM_OUT"
+          :title="TOOLTIP_ZOOM_OUT"
           @click="$emit('zoom-step', -1)"
         >
           −
@@ -103,6 +107,8 @@
           class="pdf-toolbar__zoom-button pdf-toolbar__zoom-button--in"
           type="button"
           :disabled="!hasZoomIn"
+          :aria-label="TOOLTIP_ZOOM_IN"
+          :title="TOOLTIP_ZOOM_IN"
           @click="$emit('zoom-step', 1)"
         >
           +
@@ -169,7 +175,8 @@
           ref="exportMenuTriggerRef"
           class="pdf-toolbar__button pdf-toolbar__button--menu-trigger pdf-toolbar__button--icon-trigger"
           type="button"
-          aria-label="Export options"
+          :aria-label="TOOLTIP_EXPORT"
+          :title="TOOLTIP_EXPORT"
           aria-haspopup="menu"
           :aria-expanded="activeMenu === 'export'"
           @click="toggleMenu('export')"
@@ -217,7 +224,8 @@
           ref="moreMenuTriggerRef"
           class="pdf-toolbar__button pdf-toolbar__button--menu-trigger pdf-toolbar__button--icon-trigger"
           type="button"
-          aria-label="More actions"
+          :aria-label="TOOLTIP_MORE"
+          :title="TOOLTIP_MORE"
           aria-haspopup="menu"
           :aria-expanded="activeMenu === 'more'"
           @click="toggleMenu('more')"
@@ -280,6 +288,13 @@ import fitPageIcon from '@/icons/ui/fit-page.svg?url'
 import fitWidthIcon from '@/icons/ui/fit-width.svg?url'
 import downloadIcon from '@/icons/ui/download.svg?url'
 import './PdfToolbar.scss'
+
+const TOOLTIP_OUTLINE = 'Toggle outline'
+const TOOLTIP_SIDE_BY_SIDE = 'Side by Side'
+const TOOLTIP_ZOOM_OUT = 'Zoom out'
+const TOOLTIP_ZOOM_IN = 'Zoom in'
+const TOOLTIP_EXPORT = 'Export options'
+const TOOLTIP_MORE = 'More actions'
 
 const props = defineProps({
   fileName: { type: String, default: '' },
