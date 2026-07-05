@@ -379,6 +379,11 @@
   width: $tb-icon-trigger-size;
   height: $tb-icon-trigger-size;
   padding: 0;
+  background: transparent;
+
+  &:hover {
+    background: $tb-control-hover;
+  }
 }
 
 
