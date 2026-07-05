@@ -68,13 +68,6 @@
   }
 }
 
-.pdf-toolbar__outline-icon {
-  width: 16px;
-  height: 16px;
-  display: block;
-  object-fit: contain;
-}
-
 .pdf-toolbar__file-name {
   display: block;
   flex: 1 1 auto;
@@ -159,13 +152,6 @@
   }
 }
 
-.pdf-toolbar__mode-icon {
-  width: 14px;
-  height: 14px;
-  display: block;
-  object-fit: contain;
-  flex-shrink: 0;
-}
 
 .pdf-toolbar__page-group {
   display: inline-flex;
@@ -395,12 +381,6 @@
   padding: 0;
 }
 
-.pdf-toolbar__button-icon {
-  width: 18px;
-  height: 18px;
-  display: block;
-  object-fit: contain;
-}
 
 .pdf-toolbar__menu-trigger-icon {
   display: inline-flex;
