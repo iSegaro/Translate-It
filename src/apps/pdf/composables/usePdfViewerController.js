@@ -186,6 +186,20 @@ export function usePdfViewerController() {
     return blocks
   }
 
+  function _hydratePageBlocks(page, pageSession) {
+    if (page.blocks.length > 0) {
+      return false
+    }
+
+    const logicalBlocks = pageSession.getLogicalBlocks()
+    if (logicalBlocks.length === 0) {
+      return false
+    }
+
+    page.blocks = _buildBlocksForPage(pageSession)
+    return true
+  }
+
   function _syncMissingPageSessions() {
     let changed = false
     const pageSessionCount = pdfDocumentSession.pageSessions.size
@@ -207,9 +221,7 @@ export function usePdfViewerController() {
         continue
       }
 
-      const page = _pageDataMap.get(pageNumber)
-      if (page.blocks.length === 0 && pageSession.getLogicalBlocks().length > 0) {
-        page.blocks = _buildBlocksForPage(pageSession)
+      if (_hydratePageBlocks(_pageDataMap.get(pageNumber), pageSession)) {
         changed = true
       }
     }
