@@ -132,6 +132,17 @@ export function createPdfTransitionController({
     return captureOwnedScrollAnchor(owner)
   }
 
+  function capturePdfAwareScrollAnchor() {
+    const { container, selector } = resolveScrollAnchor()
+    const pdfSession = unref(session) ?? null
+    const rawAnchor = isPdfBackedContentView(contentView.value)
+      && capturePdfBackedScrollAnchor(container, selector, pdfSession)
+    const anchor = rawAnchor
+      ? { owner: resolveAnchorOwner(), ...rawAnchor }
+      : captureScrollAnchor(container, selector)
+    return { anchor, container, selector }
+  }
+
   function isPdfBackedPdfTransition(previousView, nextView) {
     return isPdfBackedContentView(previousView) && isPdfBackedContentView(nextView) && previousView !== nextView
   }
@@ -323,11 +334,14 @@ export function createPdfTransitionController({
       zoomMode.value = fitMode
 
       if (hasDocument.value) {
-        const { container, selector } = resolveScrollAnchor()
-        const anchor = captureScrollAnchor(container, selector)
+        const { anchor, container, selector } = capturePdfAwareScrollAnchor()
         await recomputeLayout(buildLayoutRequest())
         await nextTick()
-        restoreScrollAnchor(anchor, container, selector)
+        if (anchor?.pdfPoint) {
+          restoreOwnedScrollAnchor(anchor)
+        } else {
+          restoreScrollAnchor(anchor, container, selector)
+        }
         syncFromOwner(resolveAnchorOwner())
       }
     }
@@ -345,8 +359,7 @@ export function createPdfTransitionController({
           return
         }
 
-        const { container, selector } = resolveScrollAnchor()
-        const anchor = captureScrollAnchor(container, selector)
+        const { anchor, container, selector } = capturePdfAwareScrollAnchor()
 
         zoomMode.value = 'percent'
         zoomPercent.value = nextPercent
@@ -354,7 +367,11 @@ export function createPdfTransitionController({
         if (hasDocument.value) {
           await recomputeLayout(buildLayoutRequest())
           await nextTick()
-          restoreScrollAnchor(anchor, container, selector)
+          if (anchor?.pdfPoint) {
+            restoreOwnedScrollAnchor(anchor)
+          } else {
+            restoreScrollAnchor(anchor, container, selector)
+          }
           syncFromOwner(resolveAnchorOwner())
         }
         break
@@ -379,8 +396,7 @@ export function createPdfTransitionController({
       return
     }
 
-    const { container, selector } = resolveScrollAnchor()
-    const anchor = captureScrollAnchor(container, selector)
+    const { anchor, container, selector } = capturePdfAwareScrollAnchor()
 
     zoomMode.value = 'percent'
     zoomPercent.value = nextPercent
@@ -388,7 +404,11 @@ export function createPdfTransitionController({
     if (hasDocument.value) {
       await recomputeLayout(buildLayoutRequest())
       await nextTick()
-      restoreScrollAnchor(anchor, container, selector)
+      if (anchor?.pdfPoint) {
+        restoreOwnedScrollAnchor(anchor)
+      } else {
+        restoreScrollAnchor(anchor, container, selector)
+      }
       syncFromOwner(resolveAnchorOwner())
     }
   }
