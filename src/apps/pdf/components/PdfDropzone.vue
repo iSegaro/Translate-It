@@ -70,6 +70,8 @@ function handleDrop(event) {
   background: transparent;
   box-shadow: none;
   overflow: visible;
+  display: flex;
+  flex-direction: column;
 }
 
 .pdf-dropzone.is-drag-over {

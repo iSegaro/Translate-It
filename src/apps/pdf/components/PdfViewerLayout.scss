@@ -3,13 +3,16 @@
   gap: 24px;
   width: 100%;
   min-height: 0;
+  flex: 1;
 
   &--single {
     grid-template-columns: 1fr;
+    grid-template-rows: 1fr;
   }
 
   &--side-by-side {
     grid-template-columns: 1fr 1fr;
+    grid-template-rows: 1fr;
 
     @media (max-width: 768px) {
       grid-template-columns: 1fr;
@@ -20,5 +23,4 @@
 .pdf-viewer-layout__pane {
   min-width: 0;
   overflow-y: auto;
-  max-height: calc(100vh - var(--pdf-toolbar-sticky-height));
 }
