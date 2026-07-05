@@ -183,7 +183,7 @@ describe('PdfToolbar', () => {
     await wrapper.find('.pdf-toolbar__zoom-select').setValue('125')
     expect(wrapper.emitted('zoom-change')?.at(-1)?.[0]).toEqual({ mode: 'percent', value: 125 })
 
-    await wrapper.find('.pdf-toolbar__zoom-select').setValue('fit-page')
+    await wrapper.find('.pdf-toolbar__button[title="Fit to page"]').trigger('click')
     expect(wrapper.emitted('zoom-change')?.at(-1)?.[0]).toEqual({ mode: 'fit-page', value: 100 })
 
     await wrapper.findAll('button').find((button) => button.text().trim() === '+')?.trigger('click')

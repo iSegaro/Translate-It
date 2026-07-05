@@ -126,12 +126,6 @@
           :value="zoomSelectValue"
           @change="handleZoomSelectChange"
         >
-          <option value="fit-width">
-            Fit Width
-          </option>
-          <option value="fit-page">
-            Fit Page
-          </option>
           <option
             v-for="option in zoomPercentOptions"
             :key="option"
@@ -150,6 +144,34 @@
           +
         </button>
       </div>
+
+      <span
+        class="pdf-toolbar__separator"
+        aria-hidden="true"
+      />
+
+      <button
+        class="pdf-toolbar__button pdf-toolbar__button--icon-trigger"
+        type="button"
+        :aria-label="fitToggleTooltip"
+        :title="fitToggleTooltip"
+        @click="handleFitToggle"
+      >
+        <img
+          v-if="fitToggleIcon === 'fit-page'"
+          :src="fitPageIcon"
+          class="pdf-toolbar__button-icon"
+          aria-hidden="true"
+          alt=""
+        >
+        <img
+          v-else
+          :src="fitWidthIcon"
+          class="pdf-toolbar__button-icon"
+          aria-hidden="true"
+          alt=""
+        >
+      </button>
     </div>
 
     <div class="pdf-toolbar__actions">
@@ -319,6 +341,8 @@
 <script setup>
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { CONTENT_VIEW, LAYOUT_MODE } from '../composables/usePdfViewerMode.js'
+import fitPageIcon from '@/icons/ui/fit-page.svg'
+import fitWidthIcon from '@/icons/ui/fit-width.svg'
 import './PdfToolbar.scss'
 
 const props = defineProps({
@@ -371,10 +395,16 @@ const contentOptions = computed(() => {
 
 const isSideBySide = computed(() => props.layoutMode === LAYOUT_MODE.SIDE_BY_SIDE)
 
-const zoomSelectValue = computed(() => {
-  if (props.zoomMode === 'fit-width') return 'fit-width'
-  if (props.zoomMode === 'fit-page') return 'fit-page'
-  return String(props.zoomPercent || 100)
+const zoomSelectValue = computed(() => String(props.zoomPercent || 100))
+
+const fitToggleIcon = computed(() => {
+  if (props.zoomMode === 'fit-page') return 'fit-width'
+  return 'fit-page'
+})
+
+const fitToggleTooltip = computed(() => {
+  if (fitToggleIcon.value === 'fit-width') return 'Fit to width'
+  return 'Fit to page'
 })
 
 const currentPageDisplayValue = computed(() => {
@@ -473,20 +503,14 @@ onBeforeUnmount(() => {
 })
 
 function handleZoomSelectChange(event) {
-  const value = event.target.value
-  if (value === 'fit-width') {
-    emit('zoom-change', { mode: 'fit-width', value: 100 })
-    return
-  }
-
-  if (value === 'fit-page') {
-    emit('zoom-change', { mode: 'fit-page', value: props.zoomPercent || 100 })
-    return
-  }
-
-  const percent = Number(value)
+  const percent = Number(event.target.value)
   if (!Number.isFinite(percent)) return
   emit('zoom-change', { mode: 'percent', value: percent })
+}
+
+function handleFitToggle() {
+  const mode = fitToggleIcon.value
+  emit('zoom-change', { mode, value: mode === 'fit-width' ? 100 : (props.zoomPercent || 100) })
 }
 
 function handleLayoutModeToggle() {
