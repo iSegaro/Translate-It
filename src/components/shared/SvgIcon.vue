@@ -34,7 +34,7 @@ const iconSize = computed(() => {
 const maskStyle = computed(() => ({
   width: iconSize.value,
   height: iconSize.value,
-  maskImage: `url(${props.src})`,
-  WebkitMaskImage: `url(${props.src})`
+  maskImage: `url("${props.src}")`,
+  WebkitMaskImage: `url("${props.src}")`
 }))
 </script>
