@@ -317,7 +317,6 @@ export function createPdfTransitionController({
   }
 
   async function handleZoomChange({ mode, value }) {
-    const nextMode = mode === 'fit-width' ? 'fit-width' : 'percent'
     if (mode === 'fit-page') {
       if (zoomMode.value === 'fit-page') {
         return
@@ -336,24 +335,34 @@ export function createPdfTransitionController({
       return
     }
 
-    const nextPercent = nextMode === 'fit-width' ? 100 : clampZoomPercent(Number(value))
-    const currentMode = zoomMode.value
-    const currentPercent = zoomPercent.value
+    if (mode === 'fit-width') {
+      if (zoomMode.value === 'fit-width') {
+        return
+      }
 
-    if (currentMode === nextMode && currentPercent === nextPercent) {
+      zoomMode.value = 'fit-width'
+
+      if (hasDocument.value) {
+        const { container, selector } = resolveScrollAnchor()
+        const anchor = captureScrollAnchor(container, selector)
+        await recomputeLayout(buildLayoutRequest())
+        await nextTick()
+        restoreScrollAnchor(anchor, container, selector)
+        syncFromOwner(resolveAnchorOwner())
+      }
+      return
+    }
+
+    const nextPercent = clampZoomPercent(Number(value))
+    if (zoomMode.value === 'percent' && zoomPercent.value === nextPercent) {
       return
     }
 
     const { container, selector } = resolveScrollAnchor()
     const anchor = captureScrollAnchor(container, selector)
 
-    if (nextMode === 'fit-width') {
-      zoomMode.value = 'fit-width'
-      zoomPercent.value = 100
-    } else if (Number.isFinite(Number(value))) {
-      zoomMode.value = 'percent'
-      zoomPercent.value = nextPercent
-    }
+    zoomMode.value = 'percent'
+    zoomPercent.value = nextPercent
 
     if (hasDocument.value) {
       await recomputeLayout(buildLayoutRequest())
@@ -364,7 +373,7 @@ export function createPdfTransitionController({
   }
 
   async function handleZoomStep(direction) {
-    const currentPercent = zoomMode.value === 'percent' ? zoomPercent.value : 100
+    const currentPercent = zoomPercent.value
     const currentIndex = ZOOM_PERCENT_OPTIONS.indexOf(currentPercent)
     const safeIndex = currentIndex >= 0 ? currentIndex : ZOOM_PERCENT_OPTIONS.indexOf(100)
     const nextIndex = Math.min(
