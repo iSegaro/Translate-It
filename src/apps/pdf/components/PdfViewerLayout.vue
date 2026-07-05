@@ -41,6 +41,10 @@ const props = defineProps({
   showTranslatedPane: {
     type: Boolean,
     default: true
+  },
+  suppressScrollSync: {
+    type: Boolean,
+    default: false
   }
 })
 
@@ -75,7 +79,7 @@ const layoutClasses = computed(() => ({
 const { syncFromPane, syncNow } = usePdfScrollSync(
   originalPaneRef,
   translatedPaneRef,
-  computed(() => props.layoutMode === LAYOUT_MODE.SIDE_BY_SIDE && props.showOriginalPane && props.showTranslatedPane)
+  computed(() => props.layoutMode === LAYOUT_MODE.SIDE_BY_SIDE && props.showOriginalPane && props.showTranslatedPane && !props.suppressScrollSync)
 )
 
 defineExpose({
@@ -85,4 +89,3 @@ defineExpose({
   syncNow
 })
 </script>
-

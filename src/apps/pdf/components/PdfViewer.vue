@@ -30,12 +30,17 @@
 
 <script setup>
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { getScopedLogger } from '@/shared/logging/logger.js'
+import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js'
 import PdfPageView from './PdfPageView.vue'
 import PdfBlockHighlightOverlay from './PdfBlockHighlightOverlay.vue'
 import { getPdfPageRootElement } from '../utils/pageViewInstance.js'
+import { getPrimaryPage } from '../utils/pdfViewportPageResolver.js'
 import { usePdfSelectionBridge } from '../composables/usePdfSelectionBridge.js'
 import { VIEWER_ROLE } from '../composables/usePdfViewerMode.js'
 import './PdfViewer.scss'
+
+const logger = getScopedLogger(LOG_COMPONENTS.PDF, 'PdfViewerPrimaryPageTrace')
 
 const props = defineProps({
   pages: {
@@ -71,6 +76,10 @@ const props = defineProps({
     type: Function,
     default: null
   },
+  suppressCurrentPageUpdates: {
+    type: Boolean,
+    default: false
+  },
   scrollContainer: {
     type: HTMLElement,
     default: null
@@ -86,6 +95,8 @@ const highlightedBounds = ref(null)
 let intersectionObserver = null
 let renderCandidateObserver = null
 let resizeObserver = null
+let scrollRoot = null
+let currentPageFrameId = null
 let lastLayoutWidth = 0
 let lastLayoutHeight = 0
 let lastCurrentPage = 0
@@ -217,6 +228,11 @@ function disconnectObservers() {
   intersectionObserver?.disconnect()
   renderCandidateObserver?.disconnect()
   resizeObserver?.disconnect()
+  if (scrollRoot) {
+    scrollRoot.removeEventListener('scroll', handleScroll)
+    scrollRoot = null
+  }
+  cancelCurrentPageFrame()
   intersectionObserver = null
   renderCandidateObserver = null
   resizeObserver = null
@@ -243,34 +259,60 @@ function updateVisiblePages(nextVisible) {
   }
 
   if (isOriginalRole.value) {
-    emitCurrentPage(nextVisible)
+    scheduleCurrentPageUpdate()
   }
 }
 
-function emitCurrentPage(nextVisible) {
-  if (!isOriginalRole.value) return
+watch(
+  () => props.suppressCurrentPageUpdates,
+  (suppress) => {
+    if (suppress) {
+      cancelCurrentPageFrame()
+    }
+  }
+)
 
-  const visiblePages = [...nextVisible].filter((pageNumber) => Number.isFinite(Number(pageNumber)))
-  const currentPage = visiblePages.length > 0
-    ? Math.min(...visiblePages)
-    : (lastCurrentPage || props.pages[0]?.pageNumber || 0)
+function cancelCurrentPageFrame() {
+  if (currentPageFrameId != null) {
+    cancelAnimationFrame(currentPageFrameId)
+    currentPageFrameId = null
+  }
+}
+
+function emitCurrentPageFromResolver(force = false) {
+  if (!isOriginalRole.value) return
+  if (!force && props.suppressCurrentPageUpdates) return
+
+  const currentPage = getPrimaryPage(scrollRoot || props.scrollContainer || viewerRoot.value || null, '.pdf-page[data-page-number]')
+  if (!currentPage) return
 
   if (currentPage && currentPage !== lastCurrentPage) {
     lastCurrentPage = currentPage
+    logger.debug(`[PDF Primary Page] ${JSON.stringify({ emittedCurrentPage: currentPage, scrollTop: scrollRoot?.scrollTop ?? props.scrollContainer?.scrollTop ?? null, timestamp: new Date().toISOString() })}`)
     emit('current-page-change', currentPage)
   }
+}
 
-  if (!currentPage && lastCurrentPage !== 0) {
-    lastCurrentPage = 0
-    emit('current-page-change', 0)
-  }
+function scheduleCurrentPageUpdate() {
+  if (!isOriginalRole.value) return
+  if (props.suppressCurrentPageUpdates) return
+  if (currentPageFrameId != null) return
+
+  currentPageFrameId = requestAnimationFrame(() => {
+    currentPageFrameId = null
+    emitCurrentPageFromResolver()
+  })
+}
+
+function handleScroll() {
+  scheduleCurrentPageUpdate()
 }
 
 function emitCurrentPageIfVisible() {
   if (!isOriginalRole.value) return
-  if (visiblePageNumbers.value.size === 0) return
+  if (props.suppressCurrentPageUpdates) return
 
-  emitCurrentPage(visiblePageNumbers.value)
+  emitCurrentPageFromResolver()
 }
 
 function emitLayoutIfNeeded() {
@@ -300,7 +342,11 @@ function setupObservers() {
   // The scroll container is injected by the layout owner, not discovered via
   // DOM traversal. This keeps PdfViewer decoupled from the surrounding DOM
   // structure and reusable in embedded contexts (split view, modal, iframe).
-  const root = props.scrollContainer || null
+  scrollRoot = props.scrollContainer || null
+
+  if (scrollRoot) {
+    scrollRoot.addEventListener('scroll', handleScroll, { passive: true })
+  }
 
   intersectionObserver = new IntersectionObserver((entries) => {
     const nextVisible = new Set(visiblePageNumbers.value)
@@ -318,7 +364,7 @@ function setupObservers() {
 
     updateVisiblePages(nextVisible)
   }, {
-    root,
+    root: scrollRoot,
     threshold: 0
   })
 
@@ -342,7 +388,7 @@ function setupObservers() {
       props.session.updateRenderCandidates(nextRenderable)
     }
   }, {
-    root,
+    root: scrollRoot,
     threshold: 0
   })
 
@@ -351,11 +397,12 @@ function setupObservers() {
   })
 
   resizeObserver.observe(viewerRoot.value)
-  if (root) {
-    resizeObserver.observe(root)
+  if (scrollRoot) {
+    resizeObserver.observe(scrollRoot)
   }
   refreshObservationTargets()
   emitLayoutIfNeeded()
+  emitCurrentPageIfVisible()
 }
 
 watch(
@@ -381,8 +428,6 @@ watch(
 
 onMounted(() => {
   setupObservers()
-
-  emitCurrentPageIfVisible()
 })
 
 onBeforeUnmount(() => {
@@ -476,6 +521,7 @@ defineExpose({
   collectCanvasDataUrls,
   scrollToPage,
   getScrollContainer,
-  getPageElement
+  getPageElement,
+  refreshCurrentPage: () => emitCurrentPageFromResolver(true)
 })
 </script>

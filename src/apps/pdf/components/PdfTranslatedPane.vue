@@ -65,10 +65,15 @@
 
 <script setup>
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { getScopedLogger } from '@/shared/logging/logger.js'
+import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js'
 import { LAYOUT_MODE } from '../composables/usePdfViewerMode.js'
+import { getPrimaryPage } from '../utils/pdfViewportPageResolver.js'
 import PdfTranslatedBlock from './PdfTranslatedBlock.vue'
 import PdfOcrStatus from './PdfOcrStatus.vue'
 import './PdfTranslatedPane.scss'
+
+const logger = getScopedLogger(LOG_COMPONENTS.PDF, 'PdfTranslatedPanePrimaryPageTrace')
 
 const props = defineProps({
   translatedPageData: {
@@ -90,12 +95,18 @@ const props = defineProps({
   scrollContainer: {
     type: HTMLElement,
     default: null
+  },
+  suppressCurrentPageUpdates: {
+    type: Boolean,
+    default: false
   }
 })
 
 const emit = defineEmits(['current-page-change'])
 const rootEl = ref(null)
 let pageIntersectionObserver = null
+let scrollRoot = null
+let currentPageFrameId = null
 let lastCurrentPage = 0
 
 const hasTranslatedData = computed(() => {
@@ -120,18 +131,54 @@ function getPageBodyStyle(pageNumber) {
 function disconnectObserver() {
   pageIntersectionObserver?.disconnect()
   pageIntersectionObserver = null
+  if (scrollRoot) {
+    scrollRoot.removeEventListener('scroll', handleScroll)
+    scrollRoot = null
+  }
+  cancelCurrentPageFrame()
 }
 
-function emitCurrentPage(nextVisiblePages) {
-  const visiblePages = [...nextVisiblePages].filter((pageNumber) => Number.isFinite(Number(pageNumber)))
-  const currentPage = visiblePages.length > 0
-    ? Math.min(...visiblePages)
-    : (lastCurrentPage || props.translatedPageData[0]?.pageNumber || 0)
+function cancelCurrentPageFrame() {
+  if (currentPageFrameId != null) {
+    cancelAnimationFrame(currentPageFrameId)
+    currentPageFrameId = null
+  }
+}
+
+watch(
+  () => props.suppressCurrentPageUpdates,
+  (suppress) => {
+    if (suppress) {
+      cancelCurrentPageFrame()
+    }
+  }
+)
+
+function emitCurrentPage(force = false) {
+  if (!force && props.suppressCurrentPageUpdates) return
+
+  const currentPage = getPrimaryPage(scrollRoot || props.scrollContainer || rootEl.value?.parentElement || null, '.pdf-translated-page[data-page-number]')
+  if (!currentPage) return
 
   if (currentPage !== lastCurrentPage) {
     lastCurrentPage = currentPage
+    logger.debug(`[PDF Primary Page] ${JSON.stringify({ emittedCurrentPage: currentPage, scrollTop: scrollRoot?.scrollTop ?? props.scrollContainer?.scrollTop ?? rootEl.value?.parentElement?.scrollTop ?? null, timestamp: new Date().toISOString() })}`)
     emit('current-page-change', currentPage)
   }
+}
+
+function scheduleCurrentPageUpdate() {
+  if (props.suppressCurrentPageUpdates) return
+  if (currentPageFrameId != null) return
+
+  currentPageFrameId = requestAnimationFrame(() => {
+    currentPageFrameId = null
+    emitCurrentPage()
+  })
+}
+
+function handleScroll() {
+  scheduleCurrentPageUpdate()
 }
 
 function refreshObservationTargets() {
@@ -146,36 +193,36 @@ function refreshObservationTargets() {
 function setupObserver() {
   disconnectObserver()
   if (!rootEl.value) return
-  if (typeof IntersectionObserver !== 'function') return
 
   // The scroll container is injected by the layout owner, not discovered via
   // DOM traversal. This keeps PdfTranslatedPane decoupled from the surrounding
   // DOM structure and reusable in embedded contexts (split view, modal, iframe).
   // The layout always provides scrollContainer. The DOM fallback exists
   // only for backward compatibility if the component is used standalone.
-  const scrollRoot = props.scrollContainer || rootEl.value.parentElement
+  scrollRoot = props.scrollContainer || rootEl.value.parentElement
   if (!scrollRoot) return
 
-  pageIntersectionObserver = new IntersectionObserver((entries) => {
-    const nextVisible = new Set()
+  scrollRoot.addEventListener('scroll', handleScroll, { passive: true })
 
+  if (typeof IntersectionObserver !== 'function') {
+    emitCurrentPage()
+    return
+  }
+
+  pageIntersectionObserver = new IntersectionObserver((entries) => {
     for (const entry of entries) {
       const pageNumber = Number(entry.target?.dataset?.pageNumber)
       if (!pageNumber) continue
-
-      if (entry.isIntersecting) {
-        nextVisible.add(pageNumber)
-      }
     }
 
-    emitCurrentPage(nextVisible)
+    emitCurrentPage()
   }, {
     root: scrollRoot,
     threshold: 0.25
   })
 
   refreshObservationTargets()
-  emitCurrentPage(new Set())
+  emitCurrentPage()
 }
 
 watch(
@@ -183,7 +230,7 @@ watch(
   async () => {
     await nextTick()
     refreshObservationTargets()
-    emitCurrentPage(new Set())
+    emitCurrentPage()
   }
 )
 
@@ -194,5 +241,9 @@ onMounted(() => {
 onBeforeUnmount(() => {
   disconnectObserver()
   lastCurrentPage = 0
+})
+
+defineExpose({
+  refreshCurrentPage: () => emitCurrentPage(true)
 })
 </script>

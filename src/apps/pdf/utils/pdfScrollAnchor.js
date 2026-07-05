@@ -1,34 +1,14 @@
-function findBestScrollAnchorTarget(container, pageSelector) {
-  if (!container) return null
+import { getScopedLogger } from '@/shared/logging/logger.js'
+import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js'
+import { findPrimaryPageTarget } from './pdfViewportPageResolver.js'
 
-  const containerRect = container.getBoundingClientRect()
-  const pageElements = container.querySelectorAll(pageSelector)
-  if (!pageElements.length) return null
+const logger = getScopedLogger(LOG_COMPONENTS.PDF, 'pdfScrollAnchorTrace')
 
-  let best = null
-
-  for (const el of pageElements) {
-    const rect = el.getBoundingClientRect()
-    if (rect.bottom <= containerRect.top) continue
-    if (rect.top >= containerRect.bottom) continue
-
-    const dist = Math.abs(rect.top - containerRect.top)
-    if (!best || dist < best.dist) {
-      best = { el, rect, dist }
-    }
-  }
-
-  if (!best) {
-    for (const el of pageElements) {
-      const rect = el.getBoundingClientRect()
-      if (rect.bottom <= containerRect.top) continue
-      best = { el, rect }
-      break
-    }
-  }
-
-  return best
+function traceJson(message, data) {
+  return `${message} ${JSON.stringify(data)}`
 }
+
+const findBestScrollAnchorTarget = findPrimaryPageTarget
 
 function getPageCanvasElement(pageEl) {
   return pageEl?.querySelector('canvas') || null
@@ -103,6 +83,18 @@ function capturePdfBackedScrollAnchor(container, pageSelector, pdfSession) {
     ? Math.max(0, Math.min(1, (containerRect.top - best.rect.top) / best.rect.height))
     : 0
 
+  logger.debug(traceJson('[PDF Anchor Trace] capturePdfBackedScrollAnchor', {
+    pageNumber,
+    pageRectTop: best.rect.top,
+    canvasRectTop: canvasRect.top,
+    containerRectTop: containerRect.top,
+    cssX,
+    cssY,
+    pdfPointX: pdfX,
+    pdfPointY: pdfY,
+    offsetRatio
+  }))
+
   return {
     pageNumber,
     offsetRatio,
@@ -130,16 +122,31 @@ function restorePdfBackedScrollAnchor(anchor, container, pageSelector, pdfSessio
     return false
   }
 
-  const [, cssY] = viewport.convertToViewportPoint(anchor.pdfPoint.x, anchor.pdfPoint.y)
+  const viewportPoint = viewport.convertToViewportPoint(anchor.pdfPoint.x, anchor.pdfPoint.y)
+  const [, cssY] = viewportPoint
   const canvasRect = canvasEl.getBoundingClientRect()
   const containerRect = container.getBoundingClientRect()
   const canvasOffsetTop = canvasRect.top - containerRect.top + container.scrollTop
   const targetScrollTop = canvasOffsetTop + cssY
 
+  logger.debug(traceJson('[PDF Anchor Trace] restorePdfBackedScrollAnchor', {
+    pageNumber: anchor.pageNumber,
+    pdfPoint: anchor.pdfPoint,
+    viewportPoint,
+    cssY,
+    canvasOffsetTop,
+    targetScrollTop
+  }))
+
   container.scrollTo({
     top: targetScrollTop,
     behavior: 'instant'
   })
+
+  logger.debug(traceJson('[PDF Anchor Trace] restorePdfBackedScrollAnchor completed', {
+    restoredPageNumber: anchor.pageNumber,
+    finalScrollTop: container.scrollTop
+  }))
 
   return true
 }

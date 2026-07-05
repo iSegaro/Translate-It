@@ -53,7 +53,7 @@ vi.mock('./components/PdfDropzone.vue', () => ({
 vi.mock('./components/PdfViewerLayout.vue', () => ({
   default: {
     name: 'PdfViewerLayout',
-    props: ['showOriginalPane', 'showTranslatedPane'],
+    props: ['showOriginalPane', 'showTranslatedPane', 'suppressScrollSync'],
     setup(props, { expose }) {
       const getOriginalPageStep = () => (props.showTranslatedPane ? 100 : 120)
       const translatedPageStep = 100
@@ -640,6 +640,9 @@ describe('PdfApp', () => {
       await waitAnimationFrame()
       await flushPromises()
 
+      const translatedPane = layout.translatedPaneRef
+      translatedPane.scrollTop = 320
+
       mockPdfViewport.convertToPdfPoint.mockClear()
       mockPdfViewport.convertToViewportPoint.mockClear()
       mockViewerController.recomputeLayout.mockClear()
@@ -650,7 +653,79 @@ describe('PdfApp', () => {
 
       expect(mockViewerController.recomputeLayout).toHaveBeenCalled()
       expect(mockPdfViewport.convertToPdfPoint).toHaveBeenCalledWith(150, -64)
+      expect(mockLayoutSyncFromPane).not.toHaveBeenCalled()
       expect(originalPane.scrollTop).toBe(760)
+      expect(translatedPane.scrollTop).toBe(320)
+
+      wrapper.unmount()
+    })
+
+    it('suppresses layout-change restore during fit-page zoom transitions', async () => {
+      const wrapper = mountInMode({ contentView: 'original', layoutMode: 'side-by-side' })
+      await flushPromises()
+
+      const layout = wrapper.findComponent({ name: 'PdfViewerLayout' }).vm
+      const originalPane = layout.scrollContainer
+      originalPane.scrollTop = 900
+      originalPane.scrollTo.mockClear()
+
+      let emittedLayoutChange = false
+      mockViewerController.recomputeLayout.mockImplementation(async () => {
+        if (emittedLayoutChange) return
+        emittedLayoutChange = true
+        wrapper.findComponent({ name: 'PdfViewer' }).vm.$emit('layout-change', { width: 800, height: 600 })
+      })
+
+      await emitToolbar(wrapper, 'zoom-change', { mode: 'fit-page', value: 100 })
+      await flushPromises()
+
+      expect(mockViewerController.recomputeLayout).toHaveBeenCalled()
+      expect(originalPane.scrollTop).toBe(864)
+      expect(originalPane.scrollTo).toHaveBeenCalledTimes(1)
+
+      wrapper.unmount()
+    })
+
+    it('normalizes the original anchor when leaving fit-page near the top of a page', async () => {
+      const wrapper = mountInMode({ contentView: 'original', layoutMode: 'side-by-side' })
+      await flushPromises()
+
+      const layout = wrapper.findComponent({ name: 'PdfViewerLayout' }).vm
+      const originalPane = layout.scrollContainer
+
+      await emitToolbar(wrapper, 'zoom-change', { mode: 'fit-page', value: 100 })
+      await flushPromises()
+
+      mockPdfViewport.convertToPdfPoint.mockClear()
+      mockPdfViewport.convertToViewportPoint.mockClear()
+
+      const pageEl = originalPane.querySelector('.pdf-page[data-page-number="12"]')
+      const canvasEl = pageEl?.querySelector('canvas')
+      if (pageEl) {
+        pageEl.getBoundingClientRect = () => ({
+          top: 0,
+          bottom: 100,
+          height: 100,
+          left: 0,
+          right: 300,
+          width: 300
+        })
+      }
+      if (canvasEl) {
+        canvasEl.getBoundingClientRect = () => ({
+          top: 24,
+          bottom: 64,
+          height: 40,
+          left: 0,
+          right: 260,
+          width: 260
+        })
+      }
+
+      await emitToolbar(wrapper, 'zoom-change', { mode: 'fit-width', value: 100 })
+      await flushPromises()
+
+      expect(mockPdfViewport.convertToPdfPoint).toHaveBeenCalledWith(0, 0)
 
       wrapper.unmount()
     })

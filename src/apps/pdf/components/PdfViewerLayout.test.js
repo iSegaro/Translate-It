@@ -2,8 +2,12 @@ import { describe, expect, it, vi } from 'vitest'
 import { mount } from '@vue/test-utils'
 import PdfViewerLayout from './PdfViewerLayout.vue'
 
+const { usePdfScrollSyncMock } = vi.hoisted(() => ({
+  usePdfScrollSyncMock: vi.fn(() => ({ syncFromPane: vi.fn(), syncNow: vi.fn() }))
+}))
+
 vi.mock('../composables/usePdfScrollSync.js', () => ({
-  usePdfScrollSync: vi.fn(() => ({ syncFromPane: vi.fn(), syncNow: vi.fn() }))
+  usePdfScrollSync: usePdfScrollSyncMock
 }))
 
 describe('PdfViewerLayout', () => {
@@ -90,5 +94,19 @@ describe('PdfViewerLayout', () => {
     expect(wrapper.vm.scrollContainer).toBeTruthy()
     expect(wrapper.vm.translatedPaneRef).toBeTruthy()
     expect(wrapper.vm.syncFromPane).toBeTruthy()
+  })
+
+  it('disables scroll sync when suppression is enabled', () => {
+    mount(PdfViewerLayout, {
+      props: {
+        layoutMode: 'side-by-side',
+        showOriginalPane: true,
+        showTranslatedPane: true,
+        suppressScrollSync: true
+      }
+    })
+
+    expect(usePdfScrollSyncMock).toHaveBeenCalled()
+    expect(usePdfScrollSyncMock.mock.calls.at(-1)[2].value).toBe(false)
   })
 })

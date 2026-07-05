@@ -2,7 +2,18 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { mount } from '@vue/test-utils'
 import PdfTranslatedPane from './PdfTranslatedPane.vue'
 
-let intersectionCallback
+function buildRect(top, height = 100, width = 300, left = 0) {
+  return {
+    top,
+    bottom: top + height,
+    left,
+    right: left + width,
+    width,
+    height,
+    x: left,
+    y: top
+  }
+}
 
 vi.mock('./PdfTranslatedBlock.vue', () => ({
   default: {
@@ -14,12 +25,8 @@ vi.mock('./PdfTranslatedBlock.vue', () => ({
 
 describe('PdfTranslatedPane', () => {
   beforeEach(() => {
-    intersectionCallback = null
-
     vi.stubGlobal('IntersectionObserver', class IntersectionObserver {
-      constructor(callback) {
-        intersectionCallback = callback
-      }
+      constructor() {}
 
       observe() {}
       disconnect() {}
@@ -174,7 +181,7 @@ describe('PdfTranslatedPane', () => {
     expect(pages[1].text()).toContain('Page 2')
   })
 
-  it('emits the top-most visible translated page', async () => {
+  it('emits the primary translated page', async () => {
     const wrapper = mount(PdfTranslatedPane, {
       props: {
         translatedPageData: [
@@ -185,16 +192,24 @@ describe('PdfTranslatedPane', () => {
       attachTo: document.body
     })
 
-    await wrapper.vm.$nextTick()
-
-    intersectionCallback?.([
-      { target: { dataset: { pageNumber: '2' } }, isIntersecting: true },
-      { target: { dataset: { pageNumber: '1' } }, isIntersecting: true }
-    ])
+    wrapper.element.parentElement.getBoundingClientRect = () => buildRect(0, 500, 300)
 
     await wrapper.vm.$nextTick()
 
-    expect(wrapper.emitted('current-page-change')?.at(-1)?.[0]).toBe(1)
+    const pages = wrapper.findAll('.pdf-translated-page')
+    pages[0].element.getBoundingClientRect = () => buildRect(10, 200, 300)
+    pages[1].element.getBoundingClientRect = () => buildRect(120, 200, 300)
+
+    await wrapper.vm.$nextTick()
+
+    pages[0].element.getBoundingClientRect = () => buildRect(-40, 200, 300)
+    pages[1].element.getBoundingClientRect = () => buildRect(20, 200, 300)
+
+    wrapper.element.parentElement?.dispatchEvent(new Event('scroll'))
+    await new Promise(resolve => requestAnimationFrame(resolve))
+    await wrapper.vm.$nextTick()
+
+    expect(wrapper.emitted('current-page-change')?.at(-1)?.[0]).toBe(2)
 
     wrapper.unmount()
   })

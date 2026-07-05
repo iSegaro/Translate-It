@@ -1,11 +1,25 @@
-import { defineComponent, h, nextTick } from 'vue'
+import { defineComponent, h, nextTick, onMounted, ref } from 'vue'
 import { mount } from '@vue/test-utils'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-const { pageRootEl } = vi.hoisted(() => {
-  const pageRootEl = document.createElement('article')
-  return { pageRootEl }
+const { pageRootEls, pageRectMap } = vi.hoisted(() => {
+  const pageRootEls = new Map()
+  const pageRectMap = new Map()
+  return { pageRootEls, pageRectMap }
 })
+
+function buildRect(top, height = 100, width = 300, left = 0) {
+  return {
+    top,
+    bottom: top + height,
+    left,
+    right: left + width,
+    width,
+    height,
+    x: left,
+    y: top
+  }
+}
 
 vi.mock('./PdfPageView.vue', () => ({
   default: defineComponent({
@@ -15,12 +29,22 @@ vi.mock('./PdfPageView.vue', () => ({
       session: { type: Object, required: true },
       visible: { type: Boolean, default: false }
     },
-    setup(_, { expose }) {
-      expose({
-        getRootEl: () => pageRootEl,
-        rootEl: pageRootEl
+    setup(props, { expose }) {
+      const rootEl = ref(null)
+
+      onMounted(() => {
+        if (!rootEl.value) return
+
+        rootEl.value.dataset.pageNumber = String(props.page.pageNumber)
+        rootEl.value.getBoundingClientRect = () => pageRectMap.get(props.page.pageNumber) || buildRect(0)
+        pageRootEls.set(props.page.pageNumber, rootEl.value)
       })
-      return () => h('article')
+
+      expose({
+        getRootEl: () => rootEl.value,
+        rootEl
+      })
+      return () => h('article', { ref: rootEl, class: 'pdf-page' })
     }
   })
 }))
@@ -36,6 +60,7 @@ let intersectionObserverClass
 let resizeObserverClass
 let visibilityCallback
 let renderCallback
+const waitAnimationFrame = () => new Promise(resolve => requestAnimationFrame(resolve))
 
 describe('PdfViewer', () => {
   beforeEach(() => {
@@ -43,6 +68,8 @@ describe('PdfViewer', () => {
     disconnectMock.mockClear()
     resizeObserveMock.mockClear()
     resizeDisconnectMock.mockClear()
+    pageRootEls.clear()
+    pageRectMap.clear()
     visibilityCallback = null
     renderCallback = null
     let instanceCount = 0
@@ -90,19 +117,23 @@ describe('PdfViewer', () => {
       attachTo: document.body
     })
 
+    wrapper.find('.pdf-viewer').element.getBoundingClientRect = () => buildRect(0, 500, 300)
+
     await nextTick()
     await nextTick()
 
-    expect(observeMock).toHaveBeenCalledWith(pageRootEl)
+    expect(observeMock).toHaveBeenCalledWith(pageRootEls.get(1))
 
     wrapper.unmount()
   })
 
-  it('emits the top-most visible page as the current page', async () => {
+  it('emits the primary page as the current page', async () => {
     const session = {
       updateVisiblePages: vi.fn(),
       updateRenderCandidates: vi.fn()
     }
+    pageRectMap.set(1, buildRect(10, 100, 300))
+    pageRectMap.set(2, buildRect(120, 100, 300))
 
     const wrapper = mount(PdfViewer, {
       props: {
@@ -115,24 +146,23 @@ describe('PdfViewer', () => {
       attachTo: document.body
     })
 
-    await nextTick()
-    await nextTick()
+    wrapper.find('.pdf-viewer').element.getBoundingClientRect = () => buildRect(0, 500, 300)
 
-    visibilityCallback?.([
-      { target: { dataset: { pageNumber: '2' } }, isIntersecting: true, intersectionRatio: 0.5 },
-      { target: { dataset: { pageNumber: '1' } }, isIntersecting: true, intersectionRatio: 0.5 }
-    ])
-
+    await nextTick()
     await nextTick()
 
     expect(wrapper.emitted('current-page-change')?.at(-1)?.[0]).toBe(1)
-    expect(session.updateVisiblePages).toHaveBeenCalled()
 
-    visibilityCallback?.([
-      { target: { dataset: { pageNumber: '1' } }, isIntersecting: false, intersectionRatio: 0 },
-      { target: { dataset: { pageNumber: '2' } }, isIntersecting: true, intersectionRatio: 0.5 }
-    ])
+    pageRectMap.set(1, buildRect(-60, 100, 300))
+    pageRectMap.set(2, buildRect(20, 100, 300))
+    await wrapper.setProps({
+      pages: [
+        { pageNumber: 1, width: 100, height: 100, scale: 1 },
+        { pageNumber: 2, width: 100, height: 100, scale: 1 }
+      ]
+    })
 
+    await waitAnimationFrame()
     await nextTick()
 
     expect(wrapper.emitted('current-page-change')?.at(-1)?.[0]).toBe(2)
@@ -140,11 +170,12 @@ describe('PdfViewer', () => {
     wrapper.unmount()
   })
 
-  it('does not emit a fallback current page before observer visibility exists', async () => {
-    const initialPages = [{ pageNumber: 1, width: 100, height: 100, scale: 1 }]
+  it('emits current page from geometry without waiting for observer visibility', async () => {
+    pageRectMap.set(1, buildRect(10, 100, 300))
+
     const wrapper = mount(PdfViewer, {
       props: {
-        pages: initialPages,
+        pages: [{ pageNumber: 1, width: 100, height: 100, scale: 1 }],
         session: {
           updateVisiblePages: vi.fn(),
           updateRenderCandidates: vi.fn()
@@ -154,21 +185,6 @@ describe('PdfViewer', () => {
     })
 
     await nextTick()
-    await nextTick()
-
-    expect(wrapper.emitted('current-page-change')).toBeFalsy()
-
-    await wrapper.setProps({
-      pages: [{ pageNumber: 1, width: 120, height: 120, scale: 1 }]
-    })
-    await nextTick()
-    await nextTick()
-
-    expect(wrapper.emitted('current-page-change')).toBeFalsy()
-
-    visibilityCallback?.([
-      { target: { dataset: { pageNumber: '1' } }, isIntersecting: true, intersectionRatio: 0.5 }
-    ])
     await nextTick()
 
     expect(wrapper.emitted('current-page-change')?.at(-1)?.[0]).toBe(1)
@@ -250,7 +266,7 @@ describe('PdfViewer', () => {
     expect(disconnectMock.mock.calls.length).toBeGreaterThan(disconnectCount)
     expect(resizeDisconnectMock.mock.calls.length).toBeGreaterThan(resizeDisconnectCount)
     expect(resizeObserveMock).toHaveBeenCalledWith(secondRoot)
-    expect(observeMock).toHaveBeenCalledWith(pageRootEl)
+    expect(observeMock).toHaveBeenCalledWith(pageRootEls.get(1))
 
     wrapper.unmount()
   })

@@ -93,6 +93,7 @@
               :layout-mode="layoutMode"
               :show-original-pane="showOriginalPane"
               :show-translated-pane="showTranslatedTextPane || showTranslatedPdfPane"
+              :suppress-scroll-sync="suppressScrollSync"
             >
               <template
                 v-if="showOriginalPane"
@@ -103,6 +104,7 @@
                   :viewer-role="VIEWER_ROLE.ORIGINAL"
                   :pages="pageMetrics"
                   :session="session"
+                  :suppress-current-page-updates="currentPageUpdatesSuppressed"
                   :is-block-targeting-active="isBlockTargetingActive"
                   :highlighted-block-id="highlightedBlockId"
                   :show-overlay="showOverlayLayer"
@@ -119,11 +121,13 @@
               <template #translated>
                 <PdfTranslatedPane
                   v-if="showTranslatedTextPane"
+                  ref="pdfTranslatedPaneRef"
                   :translated-page-data="translatedPageData"
                   :highlighted-block-id="highlightedBlockId"
                   :page-metrics="pageMetrics"
                   :layout-mode="layoutMode"
                   :scroll-container="translatedScrollContainer"
+                  :suppress-current-page-updates="currentPageUpdatesSuppressed"
                   @current-page-change="handleTranslatedPaneCurrentPageChange"
                 />
                 <PdfViewer
@@ -131,6 +135,7 @@
                   :viewer-role="VIEWER_ROLE.OVERLAY"
                   :pages="pageMetrics"
                   :session="session"
+                  :suppress-current-page-updates="currentPageUpdatesSuppressed"
                   :show-overlay="true"
                   :overlay-page-data="translatedPageData"
                   :scroll-container="translatedScrollContainer"
@@ -216,6 +221,7 @@ const {
 } = usePdfExport(translationTick)
 
 const pdfViewerRef = ref(null)
+const pdfTranslatedPaneRef = ref(null)
 const pdfViewerLayoutRef = ref(null)
 const originalScrollContainer = computed(() => pdfViewerLayoutRef.value?.scrollContainer ?? null)
 const translatedScrollContainer = computed(() => pdfViewerLayoutRef.value?.translatedPaneRef ?? null)
@@ -268,17 +274,19 @@ usePdfKeyboard({
   containerRef: originalScrollContainer
 })
 
-const {
-  handleContentViewChange,
-  handleLayoutModeChange,
-  handleLayoutChange,
-  handleZoomChange,
-  handleZoomStep,
-  buildLayoutRequest,
-  resetViewerState,
-  zoomMode,
-  zoomPercent
-} = createPdfTransitionController({
+  const {
+    handleContentViewChange,
+    handleLayoutModeChange,
+    handleLayoutChange,
+    handleZoomChange,
+    handleZoomStep,
+    buildLayoutRequest,
+    resetViewerState,
+    currentPageUpdatesSuppressed,
+    suppressScrollSync,
+    zoomMode,
+    zoomPercent
+  } = createPdfTransitionController({
   contentView,
   isSideBySide,
   showOriginalPane,
@@ -292,6 +300,8 @@ const {
   currentPage,
   originalScrollContainer,
   translatedScrollContainer,
+  pdfViewerRef,
+  pdfTranslatedPaneRef,
   pdfViewerLayoutRef
 })
 
