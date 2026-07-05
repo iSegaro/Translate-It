@@ -190,21 +190,28 @@ export function usePdfViewerController() {
     let changed = false
     const pageSessionCount = pdfDocumentSession.pageSessions.size
 
-    if (pageSessionCount === 0 || _pageDataMap.size >= pageSessionCount) {
+    if (pageSessionCount === 0) {
       return false
     }
 
     for (const [pageNumber, pageSession] of pdfDocumentSession.pageSessions) {
-      if (_pageDataMap.has(pageNumber)) continue
+      if (!_pageDataMap.has(pageNumber)) {
+        const metric = _pageMetricIndex.get(pageNumber)
+        _pageDataMap.set(pageNumber, reactive({
+          pageNumber,
+          width: metric?.width ?? 0,
+          height: metric?.height ?? 0,
+          blocks: _buildBlocksForPage(pageSession)
+        }))
+        changed = true
+        continue
+      }
 
-      const metric = _pageMetricIndex.get(pageNumber)
-      _pageDataMap.set(pageNumber, reactive({
-        pageNumber,
-        width: metric?.width ?? 0,
-        height: metric?.height ?? 0,
-        blocks: _buildBlocksForPage(pageSession)
-      }))
-      changed = true
+      const page = _pageDataMap.get(pageNumber)
+      if (page.blocks.length === 0 && pageSession.getLogicalBlocks().length > 0) {
+        page.blocks = _buildBlocksForPage(pageSession)
+        changed = true
+      }
     }
 
     if (changed) {

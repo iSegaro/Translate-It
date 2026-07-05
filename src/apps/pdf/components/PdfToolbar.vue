@@ -290,7 +290,7 @@
 </template>
 
 <script setup>
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { CONTENT_VIEW, LAYOUT_MODE } from '../composables/usePdfViewerMode.js'
 import './PdfToolbar.scss'
 
