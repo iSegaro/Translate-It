@@ -361,6 +361,92 @@ describe('PdfDocumentSession', () => {
     })
   })
 
+  describe('batched metrics building', () => {
+    const BATCH_SIZE = 8
+
+    it('fetches all pages across multiple batches with correct call count', async () => {
+      const PAGE_COUNT = 25
+      session.totalPages = PAGE_COUNT
+      session.pdfDocument.numPages = PAGE_COUNT
+
+      const state = await session.rebuildPageMetrics(640)
+
+      expect(pdfDocument.getPage).toHaveBeenCalledTimes(PAGE_COUNT)
+      expect(state.pageMetrics).toHaveLength(PAGE_COUNT)
+    })
+
+    it('preserves pageNumber order across batches', async () => {
+      const PAGE_COUNT = 25
+      session.totalPages = PAGE_COUNT
+      session.pdfDocument.numPages = PAGE_COUNT
+
+      const state = await session.rebuildPageMetrics(640)
+
+      for (let i = 0; i < PAGE_COUNT; i++) {
+        expect(state.pageMetrics[i].pageNumber).toBe(i + 1)
+      }
+    })
+
+    it('produces correct metric shape for every page after batched fetch', async () => {
+      const PAGE_COUNT = 25
+      session.totalPages = PAGE_COUNT
+      session.pdfDocument.numPages = PAGE_COUNT
+
+      const state = await session.rebuildPageMetrics(640)
+
+      for (let i = 0; i < PAGE_COUNT; i++) {
+        const metric = state.pageMetrics[i]
+        expect(metric).toHaveProperty('pageNumber', i + 1)
+        expect(metric).toHaveProperty('width')
+        expect(metric).toHaveProperty('height')
+        expect(metric).toHaveProperty('naturalWidth')
+        expect(metric).toHaveProperty('naturalHeight')
+        expect(metric).toHaveProperty('scale')
+        expect(metric).toHaveProperty('viewport')
+        expect(metric.viewport).toHaveProperty('width')
+        expect(metric.viewport).toHaveProperty('height')
+        expect(metric.width).toBeGreaterThan(0)
+        expect(metric.height).toBeGreaterThan(0)
+        expect(metric.scale).toBeGreaterThan(0)
+      }
+    })
+
+    it('skips getPage entirely on cached rebuild after batched first open', async () => {
+      const PAGE_COUNT = 25
+      session.totalPages = PAGE_COUNT
+      session.pdfDocument.numPages = PAGE_COUNT
+
+      await session.rebuildPageMetrics(640)
+      pdfDocument.getPage.mockClear()
+      await session.rebuildPageMetrics(800)
+
+      expect(pdfDocument.getPage).not.toHaveBeenCalled()
+    })
+
+    it('produces identical metrics between uncached and cached rebuild for 25 pages', async () => {
+      const PAGE_COUNT = 25
+      session.totalPages = PAGE_COUNT
+      session.pdfDocument.numPages = PAGE_COUNT
+      session._naturalPageViewports.clear()
+
+      const uncachedState = await session.rebuildPageMetrics(640)
+      const cachedState = await session.rebuildPageMetrics(640)
+
+      for (let i = 0; i < PAGE_COUNT; i++) {
+        const uncached = uncachedState.pageMetrics[i]
+        const cached = cachedState.pageMetrics[i]
+        expect(cached.pageNumber).toBe(uncached.pageNumber)
+        expect(cached.width).toBe(uncached.width)
+        expect(cached.height).toBe(uncached.height)
+        expect(cached.scale).toBe(uncached.scale)
+        expect(cached.naturalWidth).toBe(uncached.naturalWidth)
+        expect(cached.naturalHeight).toBe(uncached.naturalHeight)
+        expect(cached.viewport.width).toBe(uncached.viewport.width)
+        expect(cached.viewport.height).toBe(uncached.viewport.height)
+      }
+    })
+  })
+
   describe('natural viewport cache', () => {
     it('populates cache on first rebuild', async () => {
       await session.rebuildPageMetrics(640)

@@ -150,17 +150,33 @@ export class PdfDocumentSession extends ResourceTracker {
     const usableHeight = availableCanvasHeight > 0
       ? availableCanvasHeight
       : Math.max(0, viewerHeight - PAGE_MARGIN * 2)
+    const BATCH_SIZE = 8
     const metrics = []
 
-    for (let pageNumber = 1; pageNumber <= this.totalPages; pageNumber += 1) {
-      let naturalViewport = this._naturalPageViewports.get(pageNumber)
+    for (let start = 1; start <= this.totalPages; start += BATCH_SIZE) {
+      const end = Math.min(start + BATCH_SIZE - 1, this.totalPages)
+      const batch = []
 
-      if (!naturalViewport) {
-        const page = await this.pdfDocument.getPage(pageNumber)
-        naturalViewport = page.getViewport({ scale: 1 })
-        this._naturalPageViewports.set(pageNumber, naturalViewport)
-        page.cleanup?.()
+      for (let pageNumber = start; pageNumber <= end; pageNumber += 1) {
+        if (!this._naturalPageViewports.has(pageNumber)) {
+          batch.push(
+            this.pdfDocument.getPage(pageNumber).then(page => {
+              const viewport = page.getViewport({ scale: 1 })
+              this._naturalPageViewports.set(pageNumber, viewport)
+              page.cleanup?.()
+            })
+          )
+        }
       }
+
+      if (batch.length > 0) {
+        await Promise.all(batch)
+      }
+    }
+
+    for (let pageNumber = 1; pageNumber <= this.totalPages; pageNumber += 1) {
+      const naturalViewport = this._naturalPageViewports.get(pageNumber)
+      if (!naturalViewport) continue
 
       const widthScale = usableWidth / naturalViewport.width
       const heightScale = usableHeight > 0 ? usableHeight / naturalViewport.height : widthScale
