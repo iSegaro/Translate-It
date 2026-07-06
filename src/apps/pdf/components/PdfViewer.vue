@@ -101,7 +101,6 @@ const visiblePageNumbers = ref(new Set())
 const renderCandidatePageNumbers = ref(new Set())
 const highlightedBounds = ref(null)
 let intersectionObserver = null
-let renderCandidateObserver = null
 let resizeObserver = null
 let scrollRoot = null
 let currentPageFrameId = null
@@ -229,16 +228,14 @@ function registerPageView(pageNumber, instance) {
 
   pageViews.set(pageNumber, instance)
   const rootEl = getPdfPageRootElement(instance)
-  if (intersectionObserver && renderCandidateObserver && rootEl) {
+  if (intersectionObserver && rootEl) {
     rootEl.dataset.pageNumber = String(pageNumber)
     intersectionObserver.observe(rootEl)
-    renderCandidateObserver.observe(rootEl)
   }
 }
 
 function disconnectObservers() {
   intersectionObserver?.disconnect()
-  renderCandidateObserver?.disconnect()
   resizeObserver?.disconnect()
   if (scrollRoot) {
     scrollRoot.removeEventListener('scroll', handleScroll)
@@ -247,12 +244,11 @@ function disconnectObservers() {
   cancelCurrentPageFrame()
   cancelRenderWindowFrame()
   intersectionObserver = null
-  renderCandidateObserver = null
   resizeObserver = null
 }
 
 function refreshObservationTargets() {
-  if (!intersectionObserver || !renderCandidateObserver) return
+  if (!intersectionObserver) return
 
   for (const [pageNumber, instance] of pageViews.entries()) {
     const rootEl = getPdfPageRootElement(instance)
@@ -260,7 +256,6 @@ function refreshObservationTargets() {
 
     rootEl.dataset.pageNumber = String(pageNumber)
     intersectionObserver.observe(rootEl)
-    renderCandidateObserver.observe(rootEl)
   }
 }
 
@@ -408,13 +403,6 @@ function setupObservers() {
   }
 
   intersectionObserver = new IntersectionObserver(() => {
-    scheduleRenderWindowUpdate()
-  }, {
-    root: scrollRoot,
-    threshold: 0
-  })
-
-  renderCandidateObserver = new IntersectionObserver(() => {
     scheduleRenderWindowUpdate()
   }, {
     root: scrollRoot,
