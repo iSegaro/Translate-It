@@ -1,6 +1,8 @@
+@use '../../../assets/styles/base/variables' as *;
+
 .pdf-viewer-layout {
   display: grid;
-  gap: 24px;
+  gap: $spacing-xl;
   width: 100%;
   min-height: 0;
   flex: 1;

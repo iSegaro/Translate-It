@@ -53,9 +53,12 @@ function handleDrop(event) {
 </script>
 
 <style scoped lang="scss">
+@use '../../../assets/styles/base/variables' as *;
+
 .pdf-dropzone {
   flex: 1;
   min-height: calc(100vh - 140px);
+  margin: 0 28px;
   border: 1px dashed rgba(255, 255, 255, 0.18);
   border-radius: 24px;
   background: rgba(12, 15, 22, 0.35);
@@ -65,6 +68,7 @@ function handleDrop(event) {
 
 .pdf-dropzone--document {
   min-height: 0;
+  margin: 0;
   border: 0;
   border-radius: 0;
   background: transparent;
@@ -77,5 +81,15 @@ function handleDrop(event) {
 .pdf-dropzone.is-drag-over {
   border-color: #f4b860;
   box-shadow: 0 0 0 2px rgba(244, 184, 96, 0.18);
+}
+
+@media (max-width: 1100px) {
+  .pdf-dropzone {
+    margin: 0 $spacing-md;
+  }
+
+  .pdf-dropzone--document {
+    margin: 0;
+  }
 }
 </style>

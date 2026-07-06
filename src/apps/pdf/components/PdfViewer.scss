@@ -1,9 +1,11 @@
+@use '../../../assets/styles/base/variables' as *;
+
 .pdf-viewer {
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: $spacing-md;
   position: relative;
-  padding: 16px 0 24px;
+  padding: $spacing-md 0 $spacing-xl;
 
   &--targeting {
     cursor: crosshair;
