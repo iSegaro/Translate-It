@@ -308,6 +308,92 @@ PdfViewerLayout (owns the scroll container, makes it available to the parent)
 
 ---
 
+## Zoom and Scroll Transition Architecture
+
+### Anchor Model
+
+Scroll position is captured and restored using one of two anchor types:
+
+| Type | Shape | Representation |
+|------|-------|----------------|
+| **DOM anchor** | `{ pageNumber, offsetRatio }` | Ratio of scroll offset within the page element's DOM rect |
+| **PDF-backed anchor** | `{ pageNumber, offsetRatio, pdfPoint: { x, y } }` | Same as DOM, plus a PDF-space coordinate captured from the canvas viewport |
+
+Both types share `pageNumber` and `offsetRatio` so they can be restored via the generic `restoreScrollAnchor()` if PDF precision is unavailable. The `pdfPoint` field, when present, enables pixel-precise restoration via `restorePdfBackedScrollAnchor()`.
+
+Captured anchors are tagged with an `owner` field (`'original'` or `'translated'`) that routes restoration to the correct scroll container.
+
+### Controlled Zoom Sequence
+
+Zoom changes (fit-page, fit-width, percent, step) follow a guarded sequence to prevent layout corruption:
+
+```
+beginControlledZoomSuppression()
+beginScrollSyncSuppression()
+  captureControlledTransitionAnchors()
+  // caller normalizes anchors (fit-page policy)
+  runWithCurrentPageSuppression()
+    recomputeLayout()
+    nextTick()
+    applyDeferredZoomLayout()
+    restoreControlledTransitionAnchors()
+endControlledZoomSuppression()
+scheduleScrollSyncSuppressionClear()
+refreshCurrentPage()
+```
+
+The **suppression guard** (`controlledZoomSeq`) prevents `handleLayoutChange()` from triggering its own recompute/restore cycle while a zoom transition is in progress. Without this guard, a layout resize during zoom would race with the zoom's own `recomputeLayout`, causing a doubled restore or a stale anchor restore. The guard is a sequence number (not a boolean) so that overlapping zoom gestures can be safely managed.
+
+### Deferred Layout (`deferredZoomLayout`)
+
+When a window resize occurs during an active controlled zoom (signaled by `controlledZoomSeq > 0`), the layout change is deferred rather than discarded. The deferred layout is stored in `deferredZoomLayout` and applied after the zoom's `recomputeLayout` completes, during `applyDeferredZoomLayout()`. This ensures the final layout reflects the latest window size without racing against the zoom transition.
+
+### Fit Page Entry
+
+When entering Fit Page mode, the captured PDF-backed anchor is normalized via `normalizeFitPagePdfAnchor()`:
+- `pdfPoint.y` is snapped to the page's top edge in PDF space (`convertToPdfPoint(0, 0)`)
+- `offsetRatio` is set to `0`
+
+This is necessary because after Fit Page recompute, the page's rendered height changes. The original `pdfPoint.y` would reference a position that no longer corresponds to the same visual location. Snapping to the page top ensures the anchor resolves unambiguously at any zoom level.
+
+### Fit Page Exit
+
+When leaving Fit Page mode from a position near the page top (within 1% of the page height), the anchor is normalized via `normalizeFitPageDomRootAnchor()`:
+- `pdfPoint` is dropped entirely
+- Only `pageNumber` and `offsetRatio: 0` are preserved
+
+The captured `pdfPoint` was computed at the Fit Page viewport geometry. Once zoom mode changes, that `pdfPoint` is stale — the viewport transform from the old zoom level no longer applies. Dropping it forces a DOM-based `restoreScrollAnchor()` that resolves to the page top using the current DOM layout, which is always correct regardless of zoom mode.
+
+When exiting Fit Page from a scrolled position (below 1%), the anchor is used as-captured (no normalization). The existing `pdfPoint` remains valid because the viewport geometry change is small enough that the PDF-backed restore produces an acceptable result.
+
+### Side-by-Side Translated Anchor Policy
+
+During zoom transitions in side-by-side mode, the translated pane's anchor is **derived from the original pane's anchor** rather than using the captured translated anchor directly:
+
+```js
+deriveTranslatedAnchorFromOriginal(originalAnchor)
+  → { owner: 'translated', pageNumber, offsetRatio }
+```
+
+This ensures both panes scroll to the same page and relative offset after zoom recompute. Using the separately captured translated anchor risks mismatch when the layout shifts asymmetrically between the two panes (e.g., different content heights causing different scroll positions).
+
+### Orchestration (`runControlledZoomTransition`)
+
+The `runControlledZoomTransition()` helper owns the invariant orchestration sequence (suppression, recompute, deferred layout drain, anchor restore, cleanup). It accepts pre-resolved anchors and does not make policy decisions:
+
+| Helper Owns | Caller Owns |
+|---|---|
+| `beginControlledZoomSuppression` | Anchor capture timing |
+| `beginScrollSyncSuppression` | Anchor normalization (fit-page policy) |
+| `runWithCurrentPageSuppression` | Zoom mode/percent updates |
+| `recomputeLayout` / `nextTick` | Early-return guards |
+| `applyDeferredZoomLayout` | Translated anchor resolution |
+| `restoreControlledTransitionAnchors` | |
+| Cleanup (suppression + scroll sync) | |
+| `refreshCurrentPage` | |
+
+---
+
 ## Text Layer Architecture
 
 ### Why Custom Renderer Instead of `TextLayerBuilder`

@@ -259,6 +259,12 @@ export function createPdfTransitionController({
     }
   }
 
+  /**
+   * In side-by-side mode, derive the translated pane's zoom anchor
+   * from the original pane's anchor so both panes show the same page
+   * and offset after zoom. Falls back to the captured translated anchor
+   * when derivation is not possible.
+   */
   function resolveTranslatedZoomAnchor(originalAnchor, capturedTranslatedAnchor) {
     if (!isSideBySide.value) return capturedTranslatedAnchor
     return deriveTranslatedAnchorFromOriginal(originalAnchor) || capturedTranslatedAnchor
@@ -273,6 +279,12 @@ export function createPdfTransitionController({
     await nextTick()
   }
 
+  /**
+   * Snap a PDF-backed anchor's pdfPoint.y to the page top in PDF space.
+   * When entering Fit Page mode, the anchor must represent the page's
+   * top edge so that after zoom recompute, scroll restores to the
+   * page top regardless of zoom level.
+   */
   function normalizeFitPagePdfAnchor(anchor) {
     if (!anchor) return anchor
     if (isPdfAnchor(anchor)) {
@@ -288,6 +300,12 @@ export function createPdfTransitionController({
     return { ...anchor, offsetRatio: 0 }
   }
 
+  /**
+   * Strip pdfPoint, converting any anchor to a pure DOM-root anchor.
+   * Used when leaving Fit Page near the page top: the existing pdfPoint
+   * is stale for the new zoom mode's viewport geometry. Dropping it
+   * forces a DOM-based restore that resolves unambiguously to page top.
+   */
   function normalizeFitPageDomRootAnchor(anchor) {
     if (!anchor?.pageNumber) return anchor
     return {
@@ -441,6 +459,9 @@ export function createPdfTransitionController({
       return
     }
 
+    // During active controlled zoom, defer layout changes to avoid
+    // corrupting the zoom's recomputeLayout cycle. The deferred layout
+    // is applied after zoom recompute completes.
     if (controlledZoomSeq > 0) {
       deferredZoomLayout = nextLayout
       viewerLayout.value = nextLayout

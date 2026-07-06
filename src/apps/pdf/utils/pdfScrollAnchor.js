@@ -97,6 +97,18 @@ function capturePdfBackedScrollAnchor(container, pageSelector, pdfSession) {
   }
 }
 
+/**
+ * Restore scroll position using either PDF-backed precision or
+ * Fit Page DOM-root positioning.
+ *
+ * When `options.zoomMode === 'fit-page'`: scroll to the DOM top of
+ * the target page via findPageDomTop. Ignores pdfPoint entirely.
+ * Otherwise: use pdfPoint + viewport conversion for pixel-precise
+ * restoration relative to the canvas origin.
+ *
+ * The dispatch is driven by zoom mode, not anchor shape. A PDF-backed
+ * anchor passed with zoomMode 'fit-page' is treated as DOM-root.
+ */
 function restorePdfBackedScrollAnchor(anchor, container, pageSelector, pdfSession, options = {}) {
   if (!anchor || !container) {
     return false
