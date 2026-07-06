@@ -58,6 +58,7 @@ function getPageGeometry(pageElement, scrollContainer) {
     width,
     centerY: top + (height / 2),
     visibilityHint: height > 0 ? clampRatio(visibleHeight / height) : 0,
+    viewportHeight: Number(containerRect.height || 0),
     element: pageElement,
     rect: pageRect
   }

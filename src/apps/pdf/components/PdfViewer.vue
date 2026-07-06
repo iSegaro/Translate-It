@@ -35,13 +35,15 @@ import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js'
 import PdfPageView from './PdfPageView.vue'
 import PdfBlockHighlightOverlay from './PdfBlockHighlightOverlay.vue'
 import { getPdfPageRootElement } from '../utils/pageViewInstance.js'
-import { getPrimaryPage } from '../utils/pdfViewportPageResolver.js'
 import {
   getCanvasScrollTop,
   getElementClientMetrics,
+  getPageGeometries,
   getPageGeometry,
+  getScrollMetrics,
   getScrollSpaceTop
 } from '../utils/pdfGeometryModel.js'
+import { CURRENT_PAGE_SOURCE, resolvePrimaryVisiblePage } from '../utils/pdfCurrentPageResolver.js'
 import { usePdfSelectionBridge } from '../composables/usePdfSelectionBridge.js'
 import { VIEWER_ROLE } from '../composables/usePdfViewerMode.js'
 import './PdfViewer.scss'
@@ -292,12 +294,15 @@ function emitCurrentPageFromResolver(force = false) {
   if (!isOriginalRole.value) return
   if (!force && props.suppressCurrentPageUpdates) return
 
-  const currentPage = getPrimaryPage(scrollRoot || props.scrollContainer || viewerRoot.value || null, '.pdf-page[data-page-number]')
+  const container = scrollRoot || props.scrollContainer || viewerRoot.value || null
+  const pageGeometries = getPageGeometries(container, '.pdf-page[data-page-number]')
+  const { scrollTop } = getScrollMetrics(container)
+  const currentPage = resolvePrimaryVisiblePage(scrollTop, pageGeometries)
   if (!currentPage) return
 
   if (currentPage && currentPage !== lastCurrentPage) {
     lastCurrentPage = currentPage
-    logger.debug(`[PDF Primary Page] ${JSON.stringify({ emittedCurrentPage: currentPage, scrollTop: scrollRoot?.scrollTop ?? props.scrollContainer?.scrollTop ?? null, timestamp: new Date().toISOString() })}`)
+    logger.debug(`[PDF Primary Page] ${JSON.stringify({ emittedCurrentPage: currentPage, currentPageSource: CURRENT_PAGE_SOURCE, scrollTop, timestamp: new Date().toISOString() })}`)
     emit('current-page-change', currentPage)
   }
 }

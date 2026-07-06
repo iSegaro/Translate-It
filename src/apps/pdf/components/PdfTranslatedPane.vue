@@ -68,7 +68,8 @@ import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { getScopedLogger } from '@/shared/logging/logger.js'
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js'
 import { LAYOUT_MODE } from '../composables/usePdfViewerMode.js'
-import { getPrimaryPage } from '../utils/pdfViewportPageResolver.js'
+import { getPageGeometries, getScrollMetrics } from '../utils/pdfGeometryModel.js'
+import { CURRENT_PAGE_SOURCE, resolvePrimaryVisiblePage } from '../utils/pdfCurrentPageResolver.js'
 import PdfTranslatedBlock from './PdfTranslatedBlock.vue'
 import PdfOcrStatus from './PdfOcrStatus.vue'
 import './PdfTranslatedPane.scss'
@@ -157,12 +158,15 @@ watch(
 function emitCurrentPage(force = false) {
   if (!force && props.suppressCurrentPageUpdates) return
 
-  const currentPage = getPrimaryPage(scrollRoot || props.scrollContainer || rootEl.value?.parentElement || null, '.pdf-translated-page[data-page-number]')
+  const container = scrollRoot || props.scrollContainer || rootEl.value?.parentElement || null
+  const pageGeometries = getPageGeometries(container, '.pdf-translated-page[data-page-number]')
+  const { scrollTop } = getScrollMetrics(container)
+  const currentPage = resolvePrimaryVisiblePage(scrollTop, pageGeometries)
   if (!currentPage) return
 
   if (currentPage !== lastCurrentPage) {
     lastCurrentPage = currentPage
-    logger.debug(`[PDF Primary Page] ${JSON.stringify({ emittedCurrentPage: currentPage, scrollTop: scrollRoot?.scrollTop ?? props.scrollContainer?.scrollTop ?? rootEl.value?.parentElement?.scrollTop ?? null, timestamp: new Date().toISOString() })}`)
+    logger.debug(`[PDF Primary Page] ${JSON.stringify({ emittedCurrentPage: currentPage, currentPageSource: CURRENT_PAGE_SOURCE, scrollTop, timestamp: new Date().toISOString() })}`)
     emit('current-page-change', currentPage)
   }
 }

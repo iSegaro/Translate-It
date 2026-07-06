@@ -441,7 +441,7 @@ describe('PdfViewer', () => {
       await nextTick()
 
       const viewerEl = wrapper.find('.pdf-viewer')
-      viewerEl.trigger('pointermove', { clientX: 0, clientY: 0 })
+      viewerEl.element.dispatchEvent(new Event('pointermove', { bubbles: true }))
 
       expect(wrapper.emitted('block-pointer-move')).toBeFalsy()
 
