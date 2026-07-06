@@ -583,7 +583,8 @@ describe('PdfApp', () => {
 
       expect(mockViewerMode.setLayoutMode).toHaveBeenCalledWith('side-by-side')
       expect(layout.scrollContainer.scrollTop).toBe(100)
-      expect(mockLayoutSyncFromPane).not.toHaveBeenCalled()
+      expect(mockLayoutSyncFromPane).toHaveBeenCalledTimes(1)
+      expect(mockLayoutSyncFromPane).toHaveBeenLastCalledWith('original')
 
       wrapper.unmount()
     })
@@ -601,6 +602,8 @@ describe('PdfApp', () => {
       expect(mockPdfViewport.convertToPdfPoint).toHaveBeenCalledWith(150, 36)
       expect(mockPdfViewport.convertToViewportPoint).not.toHaveBeenCalled()
       expect(originalPane.scrollTop).toBe(900)
+      expect(mockLayoutSyncFromPane).toHaveBeenCalledTimes(1)
+      expect(mockLayoutSyncFromPane).toHaveBeenLastCalledWith('original')
 
       wrapper.unmount()
     })
@@ -615,12 +618,16 @@ describe('PdfApp', () => {
 
       await emitToolbar(wrapper, 'layout-mode-change', 'side-by-side')
       expect(originalPane.scrollTop).toBe(900)
+      expect(mockLayoutSyncFromPane).toHaveBeenCalledTimes(1)
+      expect(mockLayoutSyncFromPane).toHaveBeenLastCalledWith('original')
 
       await emitToolbar(wrapper, 'layout-mode-change', 'single')
       expect(originalPane.scrollTop).toBe(900)
 
       await emitToolbar(wrapper, 'layout-mode-change', 'side-by-side')
       expect(originalPane.scrollTop).toBe(900)
+      expect(mockLayoutSyncFromPane).toHaveBeenCalledTimes(2)
+      expect(mockLayoutSyncFromPane).toHaveBeenLastCalledWith('original')
 
       expect(mockPdfViewport.convertToPdfPoint).toHaveBeenCalledTimes(3)
       expect(mockPdfViewport.convertToViewportPoint).not.toHaveBeenCalled()
@@ -653,7 +660,8 @@ describe('PdfApp', () => {
 
       expect(mockViewerController.recomputeLayout).toHaveBeenCalled()
       expect(mockPdfViewport.convertToPdfPoint).toHaveBeenCalledWith(150, -64)
-      expect(mockLayoutSyncFromPane).not.toHaveBeenCalled()
+      expect(mockLayoutSyncFromPane).toHaveBeenCalledTimes(1)
+      expect(mockLayoutSyncFromPane).toHaveBeenLastCalledWith('original')
       expect(originalPane.scrollTop).toBe(760)
       expect(translatedPane.scrollTop).toBe(320)
 

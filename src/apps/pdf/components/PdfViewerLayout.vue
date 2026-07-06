@@ -76,7 +76,7 @@ const layoutClasses = computed(() => ({
   'pdf-viewer-layout--side-by-side': props.layoutMode === LAYOUT_MODE.SIDE_BY_SIDE
 }))
 
-const { syncFromPane, syncNow } = usePdfScrollSync(
+const { syncFromPane, syncNow, setScrollSyncSuppressed } = usePdfScrollSync(
   originalPaneRef,
   translatedPaneRef,
   computed(() => props.layoutMode === LAYOUT_MODE.SIDE_BY_SIDE && props.showOriginalPane && props.showTranslatedPane && !props.suppressScrollSync)
@@ -86,6 +86,7 @@ defineExpose({
   scrollContainer: originalPaneRef,
   translatedPaneRef,
   syncFromPane,
-  syncNow
+  syncNow,
+  setScrollSyncSuppressed
 })
 </script>

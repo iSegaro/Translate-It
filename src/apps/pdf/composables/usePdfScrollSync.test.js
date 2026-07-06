@@ -263,6 +263,38 @@ describe('usePdfScrollSync', () => {
     wrapper.unmount()
   })
 
+  it('does not sync while temporarily suppressed, then resumes', async () => {
+    globalThis.requestAnimationFrame = (callback) => {
+      callback()
+      return 1
+    }
+    globalThis.cancelAnimationFrame = vi.fn()
+
+    const Host = createHostComponent({ enabled: true })
+    const wrapper = mount(Host)
+    await nextTick()
+
+    const originalPane = wrapper.find('.original-pane').element
+    const translatedPane = wrapper.find('.translated-pane').element
+
+    setScrollMetrics(originalPane, { scrollHeight: 1500, clientHeight: 500, scrollTop: 500, top: 0, height: 1000 })
+    setScrollMetrics(translatedPane, { scrollHeight: 1200, clientHeight: 600, scrollTop: 0, top: 0, height: 600 })
+
+    wrapper.vm.setScrollSyncSuppressed(true)
+    originalPane.dispatchEvent(new Event('scroll'))
+    await nextTick()
+
+    expect(translatedPane.scrollTop).toBe(0)
+
+    wrapper.vm.setScrollSyncSuppressed(false)
+    originalPane.dispatchEvent(new Event('scroll'))
+    await nextTick()
+
+    expect(translatedPane.scrollTop).toBe(300)
+
+    wrapper.unmount()
+  })
+
   it('syncs immediately from the requested owner', async () => {
     const Host = createHostComponent({ enabled: true })
     const wrapper = mount(Host)

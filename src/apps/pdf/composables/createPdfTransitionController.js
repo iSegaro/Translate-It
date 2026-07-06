@@ -121,6 +121,7 @@ export function createPdfTransitionController({
   }
 
   function beginScrollSyncSuppression() {
+    pdfViewerLayoutRef.value?.setScrollSyncSuppressed?.(true)
     suppressScrollSync.value = true
     clearScrollSyncSuppressionTimer()
   }
@@ -140,6 +141,7 @@ export function createPdfTransitionController({
     clearScrollSyncSuppressionTimer()
     scrollSyncSuppressionFrameId = requestAnimationFrame(() => {
       scrollSyncSuppressionFrameId = null
+      pdfViewerLayoutRef.value?.setScrollSyncSuppressed?.(false)
       suppressScrollSync.value = false
     })
   }
@@ -406,6 +408,12 @@ export function createPdfTransitionController({
     setLayoutMode(mode)
 
     await nextTick()
+
+    if (isSideBySide.value && showTranslatedPdfPane.value) {
+      syncFromOwner(owner)
+      scheduleControlledTransitionSuppressionClear()
+      return
+    }
 
     if (anchor?.pdfPoint) {
       scheduleControlledTransitionSuppressionClear()

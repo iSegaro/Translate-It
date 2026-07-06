@@ -1,4 +1,4 @@
-import { computed, onBeforeUnmount, watch } from 'vue'
+import { computed, onBeforeUnmount, ref, watch } from 'vue'
 
 const SCROLL_POSITION_EPSILON = 1
 const SCROLL_SYNC_PANE = Object.freeze({
@@ -114,6 +114,7 @@ function syncByPageBoundary(sourcePane, targetPane, sourceKind, targetKind, setS
 
 export function usePdfScrollSync(originalPaneRef, translatedPaneRef, enabledRef) {
   const isEnabled = computed(() => Boolean(enabledRef?.value))
+  const isScrollSyncSuppressed = ref(false)
 
   let frameId = null
   let pendingSource = null
@@ -127,6 +128,13 @@ export function usePdfScrollSync(originalPaneRef, translatedPaneRef, enabledRef)
     }
 
     pendingSource = null
+  }
+
+  function setScrollSyncSuppressed(value) {
+    isScrollSyncSuppressed.value = Boolean(value)
+    if (isScrollSyncSuppressed.value) {
+      cancelFrame()
+    }
   }
 
   function clearSuppression() {
@@ -165,7 +173,7 @@ export function usePdfScrollSync(originalPaneRef, translatedPaneRef, enabledRef)
       const pending = pendingSource
       pendingSource = null
 
-      if (!pending || !isEnabled.value) return
+      if (!pending || !isEnabled.value || isScrollSyncSuppressed.value) return
 
       runSync(pending.sourcePane, pending.targetPane)
     })
@@ -174,7 +182,7 @@ export function usePdfScrollSync(originalPaneRef, translatedPaneRef, enabledRef)
   function handleOriginalScroll() {
     const sourcePane = originalPaneRef.value
     const targetPane = translatedPaneRef.value
-    if (!isEnabled.value || !sourcePane || !targetPane) return
+    if (!isEnabled.value || isScrollSyncSuppressed.value || !sourcePane || !targetPane) return
     if (suppressSource === sourcePane) {
       clearSuppression()
       return
@@ -186,7 +194,7 @@ export function usePdfScrollSync(originalPaneRef, translatedPaneRef, enabledRef)
   function handleTranslatedScroll() {
     const sourcePane = translatedPaneRef.value
     const targetPane = originalPaneRef.value
-    if (!isEnabled.value || !sourcePane || !targetPane) return
+    if (!isEnabled.value || isScrollSyncSuppressed.value || !sourcePane || !targetPane) return
     if (suppressSource === sourcePane) {
       clearSuppression()
       return
@@ -244,7 +252,7 @@ export function usePdfScrollSync(originalPaneRef, translatedPaneRef, enabledRef)
   })
 
   function syncFromPane(owner) {
-    if (!isEnabled.value) return
+    if (!isEnabled.value || isScrollSyncSuppressed.value) return
 
     const original = originalPaneRef.value
     const translated = translatedPaneRef.value
@@ -263,5 +271,5 @@ export function usePdfScrollSync(originalPaneRef, translatedPaneRef, enabledRef)
     syncFromPane(SCROLL_SYNC_PANE.ORIGINAL)
   }
 
-  return { syncFromPane, syncNow }
+  return { syncFromPane, syncNow, setScrollSyncSuppressed }
 }
