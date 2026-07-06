@@ -1,4 +1,5 @@
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
+import { syncScroll as syncScrollViaGeometry } from '../utils/pdfGeometrySyncEngine.js'
 
 const SCROLL_POSITION_EPSILON = 1
 const SCROLL_SYNC_PANE = Object.freeze({
@@ -7,6 +8,8 @@ const SCROLL_SYNC_PANE = Object.freeze({
 })
 
 export { SCROLL_SYNC_PANE }
+
+const PAGE_SELECTOR = '[data-page-number]'
 
 function clampRatio(value) {
   if (!Number.isFinite(value)) return 0
@@ -17,99 +20,32 @@ function getScrollableRange(element) {
   return Math.max(0, Number(element?.scrollHeight || 0) - Number(element?.clientHeight || 0))
 }
 
-function getPageNumber(element) {
-  return Number(element?.dataset?.pageNumber)
+function pageHeightResolver(geometry) {
+  const el = geometry.element
+  if (!el) return geometry.height
+
+  const body = el.querySelector('.pdf-translated-page__body')
+  if (!body) return geometry.height
+
+  const bodyRect = body.getBoundingClientRect()
+  return Number(bodyRect.height) || geometry.height
 }
 
-function getPageElements(pane) {
-  return pane?.querySelectorAll?.('[data-page-number]') || []
-}
+function syncByRatio(sourcePane, targetPane, setSuppression) {
+  const sourceRange = getScrollableRange(sourcePane)
+  const targetRange = getScrollableRange(targetPane)
 
-function getPageBodyElement(pageElement) {
-  return pageElement?.querySelector?.('.pdf-translated-page__body') || pageElement
-}
+  if (sourceRange <= 0 || targetRange <= 0) return
 
-function getElementTopRelativeToPane(element, pane) {
-  if (!element || !pane) return 0
-  const elementRect = element.getBoundingClientRect()
-  const paneRect = pane.getBoundingClientRect()
-  return elementRect.top - paneRect.top + pane.scrollTop
-}
-
-function findPageForScrollTop(pane, scrollTop) {
-  const pages = [...getPageElements(pane)]
-    .map((pageElement) => {
-      const rect = pageElement.getBoundingClientRect()
-      return {
-        pageElement,
-        pageNumber: getPageNumber(pageElement),
-        top: getElementTopRelativeToPane(pageElement, pane),
-        height: rect.height
-      }
-    })
-    .filter((page) => Number.isFinite(page.pageNumber))
-
-  if (!pages.length) return null
-
-  let bestPage = pages[0]
-  for (const page of pages) {
-    if (page.top <= scrollTop) {
-      bestPage = page
-      continue
-    }
-
-    break
-  }
-
-  return bestPage
-}
-
-function getEffectivePageHeight(pageElement, pane, paneKind) {
-  if (!pageElement || !pane) return 0
-
-  if (paneKind === 'translated') {
-    const body = getPageBodyElement(pageElement)
-    const bodyRect = body?.getBoundingClientRect?.()
-    if (bodyRect && Number(bodyRect.height) > 0) {
-      return Number(bodyRect.height)
-    }
-  }
-
-  const rect = pageElement.getBoundingClientRect()
-  return Number(rect.height || 0)
-}
-
-function getPageOffsetTop(pageElement, pane) {
-  if (!pageElement || !pane) return 0
-  return getElementTopRelativeToPane(pageElement, pane)
-}
-
-function syncByPageBoundary(sourcePane, targetPane, sourceKind, targetKind, setSuppression) {
-  const sourceScrollTop = Number(sourcePane.scrollTop || 0)
-  const sourcePage = findPageForScrollTop(sourcePane, sourceScrollTop)
-  if (!sourcePage?.pageElement || !Number.isFinite(sourcePage.pageNumber)) return false
-
-  const targetPage = [...getPageElements(targetPane)].find((pageElement) => {
-    return getPageNumber(pageElement) === sourcePage.pageNumber
-  })
-  if (!targetPage) return false
-
-  const sourceHeight = getEffectivePageHeight(sourcePage.pageElement, sourcePane, sourceKind)
-  const targetHeight = getEffectivePageHeight(targetPage, targetPane, targetKind)
-  if (sourceHeight <= 0 || targetHeight <= 0) return false
-
-  const sourceOffsetTop = getPageOffsetTop(sourcePage.pageElement, sourcePane)
-  const targetOffsetTop = getPageOffsetTop(targetPage, targetPane)
-  const ratio = clampRatio((sourceScrollTop - sourceOffsetTop) / sourceHeight)
-  const nextScrollTop = Math.round(targetOffsetTop + (ratio * targetHeight))
+  const ratio = clampRatio(Number(sourcePane.scrollTop || 0) / sourceRange)
+  const nextScrollTop = Math.round(ratio * targetRange)
 
   if (Math.abs(Number(targetPane.scrollTop || 0) - nextScrollTop) <= SCROLL_POSITION_EPSILON) {
-    return true
+    return
   }
 
   setSuppression(targetPane)
   targetPane.scrollTop = nextScrollTop
-  return true
 }
 
 export function usePdfScrollSync(originalPaneRef, translatedPaneRef, enabledRef) {
@@ -144,23 +80,6 @@ export function usePdfScrollSync(originalPaneRef, translatedPaneRef, enabledRef)
   function detachListeners() {
     cleanupListeners()
     cleanupListeners = () => {}
-  }
-
-  function syncScroll(sourcePane, targetPane) {
-    const sourceRange = getScrollableRange(sourcePane)
-    const targetRange = getScrollableRange(targetPane)
-
-    if (sourceRange <= 0 || targetRange <= 0) return
-
-    const ratio = clampRatio(Number(sourcePane.scrollTop || 0) / sourceRange)
-    const nextScrollTop = Math.round(ratio * targetRange)
-
-    if (Math.abs(Number(targetPane.scrollTop || 0) - nextScrollTop) <= SCROLL_POSITION_EPSILON) {
-      return
-    }
-
-    suppressSource = targetPane
-    targetPane.scrollTop = nextScrollTop
   }
 
   function scheduleSync(sourcePane, targetPane) {
@@ -204,16 +123,33 @@ export function usePdfScrollSync(originalPaneRef, translatedPaneRef, enabledRef)
   }
 
   function runSync(sourcePane, targetPane) {
-    const sourceKind = sourcePane === originalPaneRef.value ? 'original' : 'translated'
-    const targetKind = targetPane === originalPaneRef.value ? 'original' : 'translated'
+    const result = syncScrollViaGeometry({
+      sourceScrollTop: Number(sourcePane.scrollTop || 0),
+      sourceContainer: sourcePane,
+      targetContainer: targetPane,
+      pageSelector: PAGE_SELECTOR,
+      heightResolver: pageHeightResolver
+    })
 
-    if (syncByPageBoundary(sourcePane, targetPane, sourceKind, targetKind, (pane) => {
-      suppressSource = pane
-    })) {
+    if (
+      result
+      && Number.isFinite(result.targetScrollTop)
+      && result.sourceGeometry?.height > 0
+    ) {
+      const nextScrollTop = Math.round(result.targetScrollTop)
+
+      if (Math.abs(Number(targetPane.scrollTop || 0) - nextScrollTop) <= SCROLL_POSITION_EPSILON) {
+        return
+      }
+
+      suppressSource = targetPane
+      targetPane.scrollTop = nextScrollTop
       return
     }
 
-    syncScroll(sourcePane, targetPane)
+    syncByRatio(sourcePane, targetPane, (pane) => {
+      suppressSource = pane
+    })
   }
 
   function setupListeners() {

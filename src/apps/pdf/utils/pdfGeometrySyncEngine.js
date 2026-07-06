@@ -20,15 +20,35 @@ function getPageRatioFromGeometry(scrollTop, geometry) {
   return Math.min(1, Math.max(0, ratio))
 }
 
+function resolveEffectiveGeometries(container, selector, heightResolver) {
+  const geometries = getPageGeometries(container, selector)
+  if (!heightResolver) return geometries
+
+  return geometries.map((geo) => {
+    const height = heightResolver(geo)
+    if (Number.isFinite(height) && height > 0 && height !== geo.height) {
+      return {
+        ...geo,
+        height,
+        bottom: geo.top + height,
+        centerY: geo.top + (height / 2)
+      }
+    }
+
+    return geo
+  })
+}
+
 function buildSyncState({
   sourceScrollTop,
   sourceContainer,
   targetContainer,
-  pageSelector
+  pageSelector,
+  heightResolver
 } = {}) {
   const selector = normalizeSelector(pageSelector)
-  const sourceGeometries = getPageGeometries(sourceContainer, selector)
-  const targetGeometries = getPageGeometries(targetContainer, selector)
+  const sourceGeometries = resolveEffectiveGeometries(sourceContainer, selector, heightResolver)
+  const targetGeometries = resolveEffectiveGeometries(targetContainer, selector, heightResolver)
   const pageNumber = resolveCurrentPage(sourceScrollTop, sourceGeometries)
   const sourceGeometry = pageNumber ? getGeometryForPage(sourceGeometries, pageNumber) : null
   if (!sourceGeometry) {
@@ -70,13 +90,15 @@ function syncScroll({
   sourceScrollTop,
   sourceContainer,
   targetContainer,
-  pageSelector
+  pageSelector,
+  heightResolver
 } = {}) {
   const syncState = buildSyncState({
     sourceScrollTop,
     sourceContainer,
     targetContainer,
-    pageSelector
+    pageSelector,
+    heightResolver
   })
 
   const targetScrollTop = mapAnchorToTargetScroll({
