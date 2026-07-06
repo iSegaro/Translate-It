@@ -124,11 +124,9 @@ The PDF Translation feature is a **self-contained, dedicated PDF viewer and tran
 ┌───────────▼─────────────────────────────────────────────────────┐
 │                   Geometry / Anchor Layer (utils/)               │
 │  Active:                                                        │
-│    pdfGeometryModel · pdfCurrentPageResolver · pdfRenderWindow  │
-│    pdfScrollAnchor · pdfFitPageFootprint · pdfViewportPage      │
-│    Resolver                                                     │
-│  Prepared (not runtime-active):                                 │
-│    pdfCanonicalAnchor · pdfGeometrySyncEngine                   │
+│    pdfGeometryModel · pdfCurrentPageResolver · pdfRenderWindow   │
+│    pdfScrollAnchor · pdfFitPageFootprint · pdfViewportPage       │
+│    Resolver · pdfCanonicalAnchor · pdfGeometrySyncEngine         │
 └─────────────────────────────────────────────────────────────────┘
             │
 ┌───────────▼─────────────────────────────────────────────────────┐
@@ -220,8 +218,8 @@ PdfApp
 | `pdfCurrentPageResolver` | Current page from geometry data (scroll-based) |
 | `pdfRenderWindowResolver` | Render window computation (visible pages, buffer) |
 | `pdfScrollAnchor` | Scroll anchor capture/restore for zoom/layout transitions |
-| `pdfCanonicalAnchor` | Canonical anchor model (prepared infrastructure, not runtime-active) |
-| `pdfGeometrySyncEngine` | Geometry-based scroll sync (prepared infrastructure, not integrated) |
+| `pdfCanonicalAnchor` | Canonical anchor model — runtime-active (used by geometry sync engine) |
+| `pdfGeometrySyncEngine` | Geometry-based scroll sync — runtime-active (delegated from usePdfScrollSync) |
 | `pdfFitPageFootprint` | Fit Page canvas slot computation |
 | `pdfViewportPageResolver` | Thin wrapper: find primary page target from geometry |
 
@@ -239,7 +237,7 @@ PdfApp
 | `usePdfViewerController` | Document lifecycle, translation, cache restore | `pdfDocumentSession`, `PdfTranslationCoordinator` |
 | `usePdfNavigation` | Outline/destination resolution, page navigation | `PdfDestinationResolver`, `PdfOutlineRepository` |
 | `createPdfTransitionController` | Zoom/layout transitions, anchor capture/restore | `pdfScrollAnchor`, `pdfFitPageFootprint` |
-| `usePdfScrollSync` | Side-by-side scroll synchronization | DOM geometry with page-boundary matching and proportional page offset |
+| `usePdfScrollSync` | Side-by-side scroll synchronization | Delegates to pdfGeometrySyncEngine; falls back to proportional ratio |
 | `usePdfBilingualMode` | Viewer mode state (original/bilingual/translated) | Standalone |
 | `usePdfExport` | Export to TXT/Markdown | `PdfExportCollector`, `PdfExportFormatter` |
 | `usePdfBlockSelection` | Block targeting mode | `PdfBlockTargetingManager` |
@@ -285,11 +283,13 @@ The page list within the scroll pane uses `padding: 16px 0 24px` to provide vert
    ├── Cancel active translation (if any)
    ├── Reset all state (pageMetrics, translationSummary, etc.)
    ├── pdfDocumentSession.openFile(file, viewerWidth)
-   │   ├── Create object URL
-   │   ├── Load PDF via pdfjs-dist (useSystemFonts: true)
-   │   ├── Compute document identity (fingerprint → SHA-256 fallback)
-   │   ├── Build page metrics (dimensions, scale per page)
-   │   └── Return state snapshot
+    │   ├── Create object URL
+    │   ├── Load PDF via pdfjs-dist (useSystemFonts: true)
+    │   ├── Compute document identity (fingerprint → SHA-256 fallback)
+    │   ├── Build page metrics (dimensions, scale per page)
+    │   │   └── First call caches natural (scale=1) viewports in
+    │   │       _naturalPageViewports; rebuilds reuse cached copy
+    │   └── Return state snapshot
    ├── restoreFromCache(documentIdentity)
    │   ├── pdfCacheManager.loadDocument(documentIdentity)
    │   ├── Validate sourceTextHash for each cached entry
@@ -319,7 +319,8 @@ The page list within the scroll pane uses `padding: 16px 0 24px` to provide vert
    ├── Cancel all active render tasks
    ├── Destroy pdfjs document object
    ├── Revoke object URL
-   └── Clear all Maps (pageSessions, translationStates, renderTasks)
+   ├── Clear all Maps (pageSessions, translationStates, renderTasks)
+   └── _naturalPageViewports.clear()
 ```
 
 ---
@@ -628,32 +629,29 @@ Scroll synchronization between the original and translated panes in side-by-side
 
 **Principle**: A single scroll pane is designated as the source. When the source scrolls, the target pane's scroll position is recalculated to match the same logical page region. Synchronization is disabled when the user manually scrolls the target pane (loop suppression via `suppressSource`).
 
-### Synchronization Strategy
+### Delegation to Geometry Engine
 
-Two strategies are attempted in order:
+`usePdfScrollSync` delegates scroll synchronization to `pdfGeometrySyncEngine`:
 
-| Strategy | Method | When Used |
-|----------|--------|-----------|
-| **Page-boundary matching** | `syncByPageBoundary()` | Default, used for most scroll events |
-| **Scroll-range ratio** | `syncScroll()` | Fallback when page-boundary matching fails |
+```
+handleOriginalScroll / handleTranslatedScroll
+  └─ scheduleSync(sourcePane, targetPane)
+       └─ runSync(sourcePane, targetPane)
+            ├─ [Primary] syncScrollViaGeometry()  (pdfGeometrySyncEngine)
+            │     ├─ buildSyncState() → resolveEffectiveGeometries()
+            │     │                    → resolveCurrentPage()
+            │     │                    → createCanonicalAnchor()
+            │     │                          (pdfCanonicalAnchor, ANCHOR_SOURCE.GEOMETRY)
+            │     └─ mapAnchorToTargetScroll() → resolveDOMScrollFromAnchor()
+            │
+            └─ [Fallback] syncByRatio()  (proportional ratio, no geometry)
+```
 
-**Page-boundary matching**:
-
-1. Find the current page in the source pane by iterating DOM page elements and comparing `getBoundingClientRect()` to the scroll container viewport.
-2. Compute the ratio of scroll position within that page: `ratio = (scrollTop - pageTop) / pageHeight`.
-3. Find the corresponding page in the target pane.
-4. Set `target.scrollTop = targetPageTop + targetPageHeight * ratio`.
-
-**Scroll-range ratio fallback**:
-
-1. Compute `ratio = source.scrollTop / (source.scrollHeight - source.clientHeight)`.
-2. Set `target.scrollTop = ratio * (target.scrollHeight - target.clientHeight)`.
-
-The fallback is less accurate when source and target have different content heights (different zoom levels, reflowed translations) but prevents complete desynchronization.
+The primary path uses geometry from `pdfGeometryModel.getPageGeometries()`, resolves the current page via `pdfCurrentPageResolver.resolveCurrentPage()`, creates a canonical anchor via `pdfCanonicalAnchor.createCanonicalAnchor()`, and maps it to the target pane's DOM layout.
 
 ### Suppression Loop Guard
 
-When `syncScroll` or `syncByPageBoundary` writes to the target pane's `scrollTop`, the target's scroll handler fires. This would trigger the source again, creating an infinite loop. The guard mechanism:
+When the geometry engine writes to the target pane's `scrollTop`, the target's scroll handler fires and would retrigger the source. The guard mechanism:
 
 1. Before writing to the target, set `suppressSource = targetPane`.
 2. In `handleTargetScroll()`, if `suppressSource === targetPane`, skip the sync.
@@ -661,10 +659,8 @@ When `syncScroll` or `syncByPageBoundary` writes to the target pane's `scrollTop
 
 ### Limitations
 
-- Uses `getBoundingClientRect()` for every page element on each sync trigger — O(n) forced layout per scroll event.
-- The page-boundary matching duplicates logic from `pdfGeometryModel.resolvePageFromScroll()`.
-- The scroll-range ratio fallback accumulates drift when panes have different content heights.
-- The geometry-based sync engine (`pdfGeometrySyncEngine`) is prepared infrastructure using the canonical anchor model (`pdfCanonicalAnchor`) but has not been integrated. Future work should migrate `usePdfScrollSync` to use the geometry engine for improved reliability.
+- Uses `getBoundingClientRect()` via `pdfGeometryModel.getPageGeometries()` — O(n) forced layout per scroll event.
+- The scroll-range ratio fallback (when geometry sync returns an invalid height) accumulates drift with different pane content heights.
 
 ---
 
@@ -1234,9 +1230,9 @@ User clicks "OCR Scanned Pages"
 
 The text layer renderer uses viewport diagonal scale factors for font height computation rather than transformed corner bounding boxes. For most PDFs this is accurate, but rotated or heavily skewed text may have minor positioning offsets. **Impact**: Low — affects a small percentage of PDFs with non-standard rotations.
 
-### 2. Scroll Synchronization Limitations
+### 2. Scroll Synchronization O(n) Geometry Queries
 
-Scroll synchronization exists (`usePdfScrollSync`) but uses DOM geometry with page-boundary matching and proportional page offset, with a scroll-range ratio fallback for edge cases. A geometry-based engine (`pdfGeometrySyncEngine`) is prepared infrastructure and not yet integrated. **Impact**: Low — functional for normal use, minor drift edge cases.
+Scroll synchronization (`usePdfScrollSync`) calls `getBoundingClientRect()` for every page element on each sync trigger via `pdfGeometryModel.getPageGeometries()`. **Impact**: Low — functional for normal use, minor forced layout overhead.
 
 ### 3. No Cross-Pane Block Highlighting
 
@@ -1254,31 +1250,27 @@ The text layer uses a constant `ASCENT_RATIO = 0.8` for font ascent computation 
 
 ## Future Extension Points
 
-### 1. Geometry-Based Scroll Synchronization
-
-Scroll synchronization is implemented via `usePdfScrollSync` using DOM geometry with page-boundary matching and proportional page offset, with a scroll-range ratio fallback. A geometry-based engine (`pdfGeometrySyncEngine`) is prepared infrastructure using `pdfCanonicalAnchor` and `pdfGeometryModel` but has not been integrated. Future work should migrate the composable to use the geometry engine, eliminating duplicated DOM-geometry math and improving reliability with reflowed content.
-
-### 2. Cross-Pane Block Highlighting
+### 1. Cross-Pane Block Highlighting
 
 Block IDs are stable and shared between panes. A highlight overlay system (similar to `PdfBlockHighlightOverlay`) could be extended to the translated pane to show correspondence.
 
-### 3. Auto-Translation on Open
+### 2. Auto-Translation on Open
 
 The translation pipeline is triggered manually but could be extended to auto-translate visible pages after a configurable delay.
 
-### 4. Full-Document Translation
+### 3. Full-Document Translation
 
 The batch planner and coordinator already support arbitrary page lists. A "translate all pages" mode could iterate through all pages sequentially.
 
-### 5. Translated PDF Regeneration
+### 4. Translated PDF Regeneration
 
 The export system currently produces TXT/Markdown. A PDF regeneration pipeline (e.g., using pdf-lib) could overlay translated text onto the original PDF.
 
-### 6. Provider-Specific PDF Optimization
+### 5. Provider-Specific PDF Optimization
 
 The batch planner already supports per-provider overrides via `modeOverrides[TranslationMode.PDF]`. This can be extended with PDF-specific prompt engineering for AI providers.
 
-### 7. Advanced Table Detection
+### 6. Advanced Table Detection
 
 The layout analyzer currently uses gap-based column detection and role classification. More sophisticated table detection (grid analysis, cell merging) could improve table translation quality.
 
