@@ -1,8 +1,9 @@
 .pdf-viewer {
   display: flex;
   flex-direction: column;
-  gap: 24px;
+  gap: 16px;
   position: relative;
+  padding: 16px 0 24px;
 
   &--targeting {
     cursor: crosshair;
