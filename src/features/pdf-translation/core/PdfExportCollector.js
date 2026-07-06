@@ -3,14 +3,12 @@ export class PdfExportCollector {
     this.session = session
   }
 
-  collectTranslatedBlocks() {
+  async collectTranslatedBlocks() {
     const allBlocks = []
-    const pageSessions = this.session.pageSessions
-
-    const sortedPageNumbers = [...pageSessions.keys()].sort((a, b) => a - b)
+    const sortedPageNumbers = [...this.session.pageSessions.keys()].sort((a, b) => a - b)
 
     for (const pageNumber of sortedPageNumbers) {
-      const pageSession = pageSessions.get(pageNumber)
+      const pageSession = await this.session.getPageSession(pageNumber)
       if (!pageSession) continue
 
       const blocks = pageSession.getLogicalBlocks()
@@ -39,14 +37,12 @@ export class PdfExportCollector {
     return allBlocks
   }
 
-  collectAllBlocks() {
+  async collectAllBlocks() {
     const allBlocks = []
-    const pageSessions = this.session.pageSessions
-
-    const sortedPageNumbers = [...pageSessions.keys()].sort((a, b) => a - b)
+    const sortedPageNumbers = [...this.session.pageSessions.keys()].sort((a, b) => a - b)
 
     for (const pageNumber of sortedPageNumbers) {
-      const pageSession = pageSessions.get(pageNumber)
+      const pageSession = await this.session.getPageSession(pageNumber)
       if (!pageSession) continue
 
       const blocks = pageSession.getLogicalBlocks()
@@ -74,29 +70,32 @@ export class PdfExportCollector {
   }
 
   getExportStats() {
-    const allBlocks = this.collectAllBlocks()
-    const translatedBlocks = this.collectTranslatedBlocks()
-    const totalPages = this.session.totalPages
-    const pagesWithTranslations = new Set(translatedBlocks.map((b) => b.pageNumber))
+    let translatedCount = 0
+    let failedCount = 0
+    let totalCount = 0
+
+    for (const state of this.session.translationStates.values()) {
+      totalCount++
+      if (state.status === 'translated') translatedCount++
+      if (state.status === 'error') failedCount++
+    }
 
     return {
-      totalBlocks: allBlocks.length,
-      translatedCount: translatedBlocks.length,
-      failedCount: allBlocks.filter((b) => b.status === 'error').length,
-      totalPages,
-      translatedPageCount: pagesWithTranslations.size,
-      isPartial: translatedBlocks.length < allBlocks.length && allBlocks.length > 0,
-      hasTranslatedBlocks: translatedBlocks.length > 0
+      totalBlocks: totalCount,
+      translatedCount,
+      failedCount,
+      totalPages: this.session.totalPages,
+      isPartial: translatedCount < totalCount && totalCount > 0,
+      hasTranslatedBlocks: translatedCount > 0
     }
   }
 
-  collectSpatialBlocks(canvasDataUrls = new Map()) {
+  async collectSpatialBlocks(canvasDataUrls = new Map()) {
     const pages = []
-    const pageSessions = this.session.pageSessions
-    const sortedPageNumbers = [...pageSessions.keys()].sort((a, b) => a - b)
+    const sortedPageNumbers = [...this.session.pageSessions.keys()].sort((a, b) => a - b)
 
     for (const pageNumber of sortedPageNumbers) {
-      const pageSession = pageSessions.get(pageNumber)
+      const pageSession = await this.session.getPageSession(pageNumber)
       if (!pageSession) continue
 
       const metric = this.session.pageMetrics?.find((m) => m.pageNumber === pageNumber)

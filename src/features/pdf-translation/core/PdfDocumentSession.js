@@ -214,7 +214,7 @@ export class PdfDocumentSession extends ResourceTracker {
     this._scheduleCleanup()
   }
 
-  async _getPageSession(pageNumber) {
+  async getPageSession(pageNumber) {
     if (!this.pdfDocument) return null
 
     const metric = this.pageMetrics[pageNumber - 1]
@@ -280,7 +280,7 @@ export class PdfDocumentSession extends ResourceTracker {
 
     const results = await Promise.allSettled(
       pageNumbers.map(async (pageNumber) => {
-        const session = await this._getPageSession(pageNumber)
+        const session = await this.getPageSession(pageNumber)
         if (session) {
           sessionMap.set(pageNumber, session)
         }
@@ -358,7 +358,9 @@ export class PdfDocumentSession extends ResourceTracker {
 
   getVisibleTranslationStates() {
     const visibleBlocks = []
-    for (const pageSession of this.pageSessions.values()) {
+    for (const pageNumber of this.visiblePageNumbers) {
+      const pageSession = this.pageSessions.get(pageNumber)
+      if (!pageSession) continue
       visibleBlocks.push(...pageSession.getLogicalBlocks())
     }
 

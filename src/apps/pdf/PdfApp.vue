@@ -371,27 +371,27 @@ function handleCancelTranslation() {
   void cancelTranslation()
 }
 
-function handleExportTxt() {
+async function handleExportTxt() {
   clearExportSuccess()
   clearExportError()
-  if (exportTxt()) {
+  if (await exportTxt()) {
     showExportSuccess('TXT')
   }
 }
 
-function handleExportMarkdown() {
+async function handleExportMarkdown() {
   clearExportSuccess()
   clearExportError()
-  if (exportMarkdown()) {
+  if (await exportMarkdown()) {
     showExportSuccess('Markdown')
   }
 }
 
-function handleExportHtml() {
+async function handleExportHtml() {
   clearExportSuccess()
   clearExportError()
   const canvasDataUrls = pdfViewerRef.value?.collectCanvasDataUrls?.() || new Map()
-  if (exportHtml(canvasDataUrls)) {
+  if (await exportHtml(canvasDataUrls)) {
     showExportSuccess('HTML')
   }
 }

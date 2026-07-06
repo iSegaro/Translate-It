@@ -233,9 +233,9 @@ function createMocks({
     canExport: ref(false),
     isPartialExport: ref(false),
     exportError: ref(''),
-    exportTxt: vi.fn().mockReturnValue(false),
-    exportMarkdown: vi.fn().mockReturnValue(false),
-    exportHtml: vi.fn().mockReturnValue(false),
+    exportTxt: vi.fn().mockResolvedValue(false),
+    exportMarkdown: vi.fn().mockResolvedValue(false),
+    exportHtml: vi.fn().mockResolvedValue(false),
     clearExportError: vi.fn()
   }
 
@@ -334,12 +334,13 @@ describe('PdfApp', () => {
   it('shows a transient TXT export success banner', async () => {
     vi.useFakeTimers()
     createMocks()
-    mockPdfExport.exportTxt.mockReturnValue(true)
+    mockPdfExport.exportTxt.mockResolvedValue(true)
 
     const wrapper = mount(PdfApp)
     await flushPromises()
 
     wrapper.findComponent({ name: 'PdfToolbar' }).vm.$emit('export-txt')
+    await flushPromises()
     await flushPromises()
 
     expect(wrapper.text()).toContain('TXT export ready')
@@ -347,18 +348,20 @@ describe('PdfApp', () => {
 
     vi.advanceTimersByTime(2200)
     await flushPromises()
+    await flushPromises()
 
     expect(wrapper.find('.pdf-status-banner').exists()).toBe(false)
   })
 
   it('shows a Markdown export success banner', async () => {
     createMocks()
-    mockPdfExport.exportMarkdown.mockReturnValue(true)
+    mockPdfExport.exportMarkdown.mockResolvedValue(true)
 
     const wrapper = mount(PdfApp)
     await flushPromises()
 
     wrapper.findComponent({ name: 'PdfToolbar' }).vm.$emit('export-markdown')
+    await flushPromises()
     await flushPromises()
 
     expect(wrapper.text()).toContain('Markdown export ready')
@@ -367,12 +370,13 @@ describe('PdfApp', () => {
 
   it('shows an HTML export success banner', async () => {
     createMocks()
-    mockPdfExport.exportHtml.mockReturnValue(true)
+    mockPdfExport.exportHtml.mockResolvedValue(true)
 
     const wrapper = mount(PdfApp)
     await flushPromises()
 
     wrapper.findComponent({ name: 'PdfToolbar' }).vm.$emit('export-html')
+    await flushPromises()
     await flushPromises()
 
     expect(wrapper.text()).toContain('HTML export ready')
@@ -397,7 +401,7 @@ describe('PdfApp', () => {
 
   it('does not show export success when export fails', async () => {
     createMocks()
-    mockPdfExport.exportTxt.mockImplementation(() => {
+    mockPdfExport.exportTxt.mockImplementation(async () => {
       mockPdfExport.exportError.value = 'Failed to export as TXT.'
       return false
     })

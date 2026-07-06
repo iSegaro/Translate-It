@@ -20,11 +20,11 @@ export function usePdfExport(translationTick) {
   const canExport = computed(() => exportStats.value.hasTranslatedBlocks)
   const isPartialExport = computed(() => exportStats.value.isPartial)
 
-  function exportTxt() {
+  async function exportTxt() {
     try {
       exportError.value = ''
 
-      const blocks = collector.collectTranslatedBlocks()
+      const blocks = await collector.collectTranslatedBlocks()
       if (blocks.length === 0) {
         exportError.value = 'No translated blocks to export.'
         return false
@@ -44,11 +44,11 @@ export function usePdfExport(translationTick) {
     }
   }
 
-  function exportMarkdown() {
+  async function exportMarkdown() {
     try {
       exportError.value = ''
 
-      const blocks = collector.collectTranslatedBlocks()
+      const blocks = await collector.collectTranslatedBlocks()
       if (blocks.length === 0) {
         exportError.value = 'No translated blocks to export.'
         return false
@@ -72,11 +72,11 @@ export function usePdfExport(translationTick) {
     exportError.value = ''
   }
 
-  function exportHtml(canvasDataUrls = new Map()) {
+  async function exportHtml(canvasDataUrls = new Map()) {
     try {
       exportError.value = ''
 
-      const pages = collector.collectSpatialBlocks(canvasDataUrls)
+      const pages = await collector.collectSpatialBlocks(canvasDataUrls)
       if (pages.length === 0) {
         exportError.value = 'No translated blocks to export.'
         return false
