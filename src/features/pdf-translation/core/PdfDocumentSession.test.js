@@ -39,10 +39,17 @@ describe('PdfDocumentSession', () => {
             }
           ]
         }),
-        getViewport: ({ scale }) => ({
-          width: 100 * pageNumber * scale,
-          height: 200 * pageNumber * scale
-        })
+        getViewport: ({ scale }) => {
+          const vp = {
+            width: 100 * pageNumber * scale,
+            height: 200 * pageNumber * scale
+          }
+          vp.clone = ({ scale: s }) => ({
+            width: vp.width * s,
+            height: vp.height * s
+          })
+          return vp
+        }
       })),
       destroy: vi.fn().mockResolvedValue(undefined)
     }
@@ -351,6 +358,63 @@ describe('PdfDocumentSession', () => {
       vi.advanceTimersByTime(200)
 
       expect(session.pageSessions.get(1).loaded).toBe(true)
+    })
+  })
+
+  describe('natural viewport cache', () => {
+    it('populates cache on first rebuild', async () => {
+      await session.rebuildPageMetrics(640)
+      expect(session._naturalPageViewports.size).toBe(2)
+      expect(session._naturalPageViewports.get(1)).toBeDefined()
+      expect(session._naturalPageViewports.get(1).width).toBe(100)
+    })
+
+    it('reuses cache and avoids getPage on subsequent rebuild', async () => {
+      await session.rebuildPageMetrics(640)
+      pdfDocument.getPage.mockClear()
+      await session.rebuildPageMetrics(800)
+      expect(pdfDocument.getPage).not.toHaveBeenCalled()
+    })
+
+    it('preserves natural dimensions across rebuilds with different zoom', async () => {
+      await session.rebuildPageMetrics(640)
+      const naturalWidth1 = session.pageMetrics[0].naturalWidth
+      const naturalHeight1 = session.pageMetrics[0].naturalHeight
+
+      await session.rebuildPageMetrics(1200)
+
+      expect(session.pageMetrics[0].naturalWidth).toBe(naturalWidth1)
+      expect(session.pageMetrics[0].naturalHeight).toBe(naturalHeight1)
+      expect(session.pageMetrics[0].width).not.toBe(100)
+    })
+
+    it('clears cache on cleanupDocument', async () => {
+      await session.rebuildPageMetrics(640)
+      expect(session._naturalPageViewports.size).toBe(2)
+      await session.cleanupDocument()
+      expect(session._naturalPageViewports.size).toBe(0)
+    })
+
+    it('produces identical metrics between cached and uncached rebuilds with same layout', async () => {
+      const layout = 640
+
+      session._naturalPageViewports.clear()
+      const uncachedState = await session.rebuildPageMetrics(layout)
+
+      const cachedState = await session.rebuildPageMetrics(layout)
+
+      for (let i = 0; i < uncachedState.pageMetrics.length; i++) {
+        const uncached = uncachedState.pageMetrics[i]
+        const cached = cachedState.pageMetrics[i]
+        expect(cached.pageNumber).toBe(uncached.pageNumber)
+        expect(cached.width).toBe(uncached.width)
+        expect(cached.height).toBe(uncached.height)
+        expect(cached.scale).toBe(uncached.scale)
+        expect(cached.naturalWidth).toBe(uncached.naturalWidth)
+        expect(cached.naturalHeight).toBe(uncached.naturalHeight)
+        expect(cached.viewport.width).toBe(uncached.viewport.width)
+        expect(cached.viewport.height).toBe(uncached.viewport.height)
+      }
     })
   })
 })

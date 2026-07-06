@@ -64,6 +64,7 @@ export class PdfDocumentSession extends ResourceTracker {
     this._linkAnnotationRepository = new PdfLinkAnnotationRepository()
     this._pendingHydrations = null
     this._blockIndex = new Map()
+    this._naturalPageViewports = new Map()
   }
 
   get workerUrl() {
@@ -122,6 +123,17 @@ export class PdfDocumentSession extends ResourceTracker {
     return ''
   }
 
+  async _resolveDisplayViewport(naturalViewport, pageNumber, scale) {
+    if (typeof naturalViewport.clone === 'function') {
+      return naturalViewport.clone({ scale })
+    }
+
+    const page = await this.pdfDocument.getPage(pageNumber)
+    const displayViewport = page.getViewport({ scale })
+    page.cleanup?.()
+    return displayViewport
+  }
+
   async _buildPageMetrics(layoutRequest) {
     const {
       width: viewerWidth,
@@ -141,10 +153,17 @@ export class PdfDocumentSession extends ResourceTracker {
     const metrics = []
 
     for (let pageNumber = 1; pageNumber <= this.totalPages; pageNumber += 1) {
-      const page = await this.pdfDocument.getPage(pageNumber)
-      const viewport = page.getViewport({ scale: 1 })
-      const widthScale = usableWidth / viewport.width
-      const heightScale = usableHeight > 0 ? usableHeight / viewport.height : widthScale
+      let naturalViewport = this._naturalPageViewports.get(pageNumber)
+
+      if (!naturalViewport) {
+        const page = await this.pdfDocument.getPage(pageNumber)
+        naturalViewport = page.getViewport({ scale: 1 })
+        this._naturalPageViewports.set(pageNumber, naturalViewport)
+        page.cleanup?.()
+      }
+
+      const widthScale = usableWidth / naturalViewport.width
+      const heightScale = usableHeight > 0 ? usableHeight / naturalViewport.height : widthScale
       const percentScale = widthScale * (zoomPercent / 100)
 
       let scale = widthScale
@@ -155,19 +174,18 @@ export class PdfDocumentSession extends ResourceTracker {
       }
 
       scale = Math.min(MAX_SCALE, Math.max(MIN_SCALE, scale))
-      const displayViewport = page.getViewport({ scale })
+
+      const displayViewport = await this._resolveDisplayViewport(naturalViewport, pageNumber, scale)
 
       metrics.push({
         pageNumber,
         width: displayViewport.width,
         height: displayViewport.height,
-        naturalWidth: viewport.width,
-        naturalHeight: viewport.height,
+        naturalWidth: naturalViewport.width,
+        naturalHeight: naturalViewport.height,
         scale,
         viewport: displayViewport
       })
-
-      page.cleanup?.()
     }
 
     this.pageMetrics = metrics
@@ -562,6 +580,7 @@ export class PdfDocumentSession extends ResourceTracker {
     this._linkAnnotationRepository.clear()
     this._pendingHydrations = null
     this._blockIndex.clear()
+    this._naturalPageViewports.clear()
     this.pdfFingerprint = ''
     this.documentIdentity = ''
     this.displayName = ''
