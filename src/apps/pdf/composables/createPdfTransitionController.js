@@ -349,7 +349,7 @@ export function createPdfTransitionController({
     const preferredTarget = resolveOwnerScrollTarget(anchor.owner)
     const pdfSession = unref(session) ?? null
 
-    if (anchor.pdfPoint && restorePdfBackedScrollAnchor(anchor, preferredTarget.container, preferredTarget.selector, pdfSession)) {
+    if (anchor.pdfPoint && restorePdfBackedScrollAnchor(anchor, preferredTarget.container, preferredTarget.selector, pdfSession, { zoomMode: zoomMode.value })) {
       return preferredTarget.owner
     }
 

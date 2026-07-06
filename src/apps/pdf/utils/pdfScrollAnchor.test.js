@@ -360,4 +360,25 @@ describe('restorePdfBackedScrollAnchor', () => {
     expect(result).toBe(true)
     expect(container.scrollTop).toBe(canvasOffset + 36)
   })
+
+  it('restores fit-page to the page DOM root instead of the canvas anchor', () => {
+    const scrollTop = 0
+    const pageStep = 400
+    const canvasOffset = 24
+    const container = buildContainer(scrollTop)
+    const pages = [buildPageElement(1, pageStep, scrollTop, { canvasOffset })]
+    renderPages(container, pages)
+
+    const mockViewport = {
+      convertToViewportPoint: () => [0, 200]
+    }
+    const pdfSession = { getPageViewport: () => mockViewport }
+
+    const result = restorePdfBackedScrollAnchor(
+      { pageNumber: 1, pdfPoint: { x: 75, y: 100 } }, container, 'div', pdfSession, { zoomMode: 'fit-page' }
+    )
+
+    expect(result).toBe(true)
+    expect(container.scrollTop).toBe(0)
+  })
 })

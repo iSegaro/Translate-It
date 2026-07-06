@@ -715,7 +715,7 @@ describe('PdfApp', () => {
       await emitToolbar(wrapper, 'zoom-change', { mode: 'fit-page', value: 100 })
       await flushPromises()
 
-      expect(originalPane.scrollTop).toBe(864)
+      expect(originalPane.scrollTop).toBe(840)
 
       wrapper.unmount()
     })
@@ -731,7 +731,7 @@ describe('PdfApp', () => {
       await emitToolbar(wrapper, 'zoom-change', { mode: 'fit-page', value: 100 })
       await flushPromises()
 
-      expect(originalPane.scrollTop).toBe(864)
+      expect(originalPane.scrollTop).toBe(840)
 
       wrapper.unmount()
     })

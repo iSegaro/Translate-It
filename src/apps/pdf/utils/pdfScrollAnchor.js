@@ -20,6 +20,17 @@ function findPageElement(container, pageSelector, pageNumber) {
   ) || null
 }
 
+function findPageDomTop(container, pageSelector, pageNumber) {
+  if (!container) return null
+
+  const pageEl = findPageElement(container, pageSelector, pageNumber)
+  if (!pageEl) return null
+
+  const pageRect = pageEl.getBoundingClientRect()
+  const containerRect = container.getBoundingClientRect()
+  return pageRect.top - containerRect.top + container.scrollTop
+}
+
 function captureScrollAnchor(container, pageSelector) {
   if (!container) return null
 
@@ -102,13 +113,33 @@ function capturePdfBackedScrollAnchor(container, pageSelector, pdfSession) {
   }
 }
 
-function restorePdfBackedScrollAnchor(anchor, container, pageSelector, pdfSession) {
-  if (!anchor?.pdfPoint || !container || !pdfSession) {
+function restorePdfBackedScrollAnchor(anchor, container, pageSelector, pdfSession, options = {}) {
+  if (!anchor || !container) {
     return false
   }
 
   const pageEl = findPageElement(container, pageSelector, anchor.pageNumber)
   if (!pageEl) {
+    return false
+  }
+
+  if (options.zoomMode === 'fit-page') {
+    const targetScrollTop = findPageDomTop(container, pageSelector, anchor.pageNumber)
+    if (!Number.isFinite(targetScrollTop)) return false
+
+    logger.debug(traceJson('[PDF Anchor Trace] restorePdfBackedScrollAnchor fit-page DOM root', {
+      pageNumber: anchor.pageNumber,
+      targetScrollTop
+    }))
+
+    container.scrollTo({
+      top: targetScrollTop,
+      behavior: 'instant'
+    })
+    return true
+  }
+
+  if (!anchor.pdfPoint || !pdfSession) {
     return false
   }
 
@@ -154,6 +185,7 @@ function restorePdfBackedScrollAnchor(anchor, container, pageSelector, pdfSessio
 export {
   findBestScrollAnchorTarget,
   getPageCanvasElement,
+  findPageDomTop,
   captureScrollAnchor,
   restoreScrollAnchor,
   capturePdfBackedScrollAnchor,
