@@ -167,6 +167,5 @@ export {
   restoreScrollAnchor,
   capturePdfBackedScrollAnchor,
   restorePdfBackedScrollAnchor,
-  isPdfAnchor,
-  isDomAnchor
+  isPdfAnchor
 }
