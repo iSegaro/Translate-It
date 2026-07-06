@@ -1,12 +1,8 @@
 import { nextTick, onBeforeUnmount, ref, unref } from 'vue'
 import { CONTENT_VIEW } from './usePdfViewerMode.js'
-import { captureScrollAnchor, restoreScrollAnchor, capturePdfBackedScrollAnchor, restorePdfBackedScrollAnchor, isPdfAnchor } from '../utils/pdfScrollAnchor.js'
+import { captureScrollAnchor, capturePdfBackedScrollAnchor, isPdfAnchor } from '../utils/pdfScrollAnchor.js'
 import { resolvePdfCanvasSlot } from '../utils/pdfFitPageFootprint.js'
-
-const PDF_SCROLL_OWNER = Object.freeze({
-  ORIGINAL: 'original',
-  TRANSLATED: 'translated'
-})
+import { createPdfTransitionAnchor, PDF_SCROLL_OWNER, isPdfBackedContentView } from './createPdfTransitionAnchor.js'
 
 const ZOOM_PERCENT_OPTIONS = [50, 75, 100, 125, 150, 200]
 
@@ -43,6 +39,32 @@ export function createPdfTransitionController({
   const viewerLayout = ref({ width: 0, height: 0 })
   const currentPageUpdatesSuppressed = ref(false)
   const suppressScrollSync = ref(false)
+
+  const {
+    resolveAnchorOwner,
+    resolveOwnerScrollTarget,
+    resolveLayoutTransitionTarget,
+    captureOwnedScrollAnchor,
+    captureLayoutTransitionAnchor,
+    capturePdfAwareOwnedScrollAnchor,
+    captureControlledTransitionAnchors,
+    restoreOwnedScrollAnchor,
+    restoreControlledTransitionAnchors,
+    deriveTranslatedAnchorFromOriginal,
+    resolveTranslatedZoomAnchor,
+    normalizeFitPagePdfAnchor,
+    normalizeFitPageDomRootAnchor
+  } = createPdfTransitionAnchor({
+    contentView,
+    isSideBySide,
+    showTranslatedTextPane,
+    showTranslatedPdfPane,
+    session,
+    originalScrollContainer,
+    translatedScrollContainer,
+    zoomMode,
+    currentPage
+  })
 
   onBeforeUnmount(() => {
     clearControlledTransitionSuppressionTimer()
@@ -133,131 +155,16 @@ export function createPdfTransitionController({
     })
   }
 
-  function resolveAnchorOwner(explicitOwner) {
-    if (explicitOwner === PDF_SCROLL_OWNER.ORIGINAL || explicitOwner === PDF_SCROLL_OWNER.TRANSLATED) {
-      return explicitOwner
-    }
-
-    return contentView.value === CONTENT_VIEW.TRANSLATION
-      ? PDF_SCROLL_OWNER.TRANSLATED
-      : PDF_SCROLL_OWNER.ORIGINAL
+  function isPdfBackedPdfTransition(previousView, nextView) {
+    return isPdfBackedContentView(previousView) && isPdfBackedContentView(nextView) && previousView !== nextView
   }
 
-  function resolveOwnerScrollTarget(owner) {
-    if (owner === PDF_SCROLL_OWNER.TRANSLATED) {
-      if (showTranslatedTextPane.value && translatedScrollContainer.value) {
-        return { owner, container: translatedScrollContainer.value, selector: '.pdf-translated-page[data-page-number]' }
-      }
-
-      if (showTranslatedPdfPane.value && translatedScrollContainer.value) {
-        return { owner, container: translatedScrollContainer.value, selector: '.pdf-page[data-page-number]' }
-      }
-    }
-
-    if (originalScrollContainer.value) {
-      return { owner: PDF_SCROLL_OWNER.ORIGINAL, container: originalScrollContainer.value, selector: '.pdf-page[data-page-number]' }
-    }
-
-    if (translatedScrollContainer.value) {
-      const selector = showTranslatedTextPane.value
-        ? '.pdf-translated-page[data-page-number]'
-        : '.pdf-page[data-page-number]'
-      return { owner: PDF_SCROLL_OWNER.TRANSLATED, container: translatedScrollContainer.value, selector }
-    }
-
-    return { owner, container: null, selector: '.pdf-page[data-page-number]' }
-  }
-
-  function captureOwnedScrollAnchor(owner) {
-    const target = resolveOwnerScrollTarget(owner)
-    const anchor = captureScrollAnchor(target.container, target.selector)
-    return anchor ? { ...anchor, owner: target.owner } : null
-  }
-
-  function capturePdfAwareOwnedScrollAnchor(owner) {
-    if (isPdfBackedContentView(contentView.value)) {
-      const target = resolveOwnerScrollTarget(owner)
-      const pdfSession = unref(session) ?? null
-      const pdfAnchor = capturePdfBackedScrollAnchor(target.container, target.selector, pdfSession)
-      return pdfAnchor
-        ? { owner, ...pdfAnchor }
-        : captureOwnedScrollAnchor(owner)
-    }
-
-    return captureOwnedScrollAnchor(owner)
-  }
-
-  function captureLayoutTransitionAnchor(owner) {
-    const target = resolveLayoutTransitionTarget(owner)
-    if (!target.container) return null
-
-    if (owner === PDF_SCROLL_OWNER.ORIGINAL) {
-      const pdfSession = unref(session) ?? null
-      const pdfAnchor = capturePdfBackedScrollAnchor(target.container, target.selector, pdfSession)
-      if (pdfAnchor) {
-        return { owner, ...pdfAnchor }
-      }
-    }
-
-    const anchor = captureScrollAnchor(target.container, target.selector)
-    return anchor ? { owner, ...anchor } : null
-  }
-
-  function captureControlledTransitionAnchors() {
-    return {
-      originalAnchor: captureLayoutTransitionAnchor(PDF_SCROLL_OWNER.ORIGINAL),
-      translatedAnchor: captureLayoutTransitionAnchor(PDF_SCROLL_OWNER.TRANSLATED)
-    }
-  }
-
-  function resolveLayoutTransitionTarget(owner) {
-    if (owner === PDF_SCROLL_OWNER.ORIGINAL) {
-      return {
-        owner,
-        container: originalScrollContainer.value,
-        selector: '.pdf-page[data-page-number]'
-      }
-    }
-
-    return {
-      owner: PDF_SCROLL_OWNER.TRANSLATED,
-      container: translatedScrollContainer.value,
-      selector: showTranslatedTextPane.value
-        ? '.pdf-translated-page[data-page-number]'
-        : '.pdf-page[data-page-number]'
-    }
-  }
-
-  function restoreControlledTransitionAnchors({ originalAnchor, translatedAnchor }) {
-    const restoredOriginalOwner = restoreOwnedScrollAnchor(originalAnchor)
-
-    if (translatedAnchor) {
-      const translatedTarget = resolveLayoutTransitionTarget(PDF_SCROLL_OWNER.TRANSLATED)
-      restoreScrollAnchor(translatedAnchor, translatedTarget.container, translatedTarget.selector)
-    }
-
-    return restoredOriginalOwner
-  }
-
-  function deriveTranslatedAnchorFromOriginal(originalAnchor) {
-    if (!originalAnchor?.pageNumber) return null
-
-    return {
-      owner: PDF_SCROLL_OWNER.TRANSLATED,
-      pageNumber: originalAnchor.pageNumber,
-      offsetRatio: originalAnchor.offsetRatio ?? 0
-    }
-  }
-
-  /**
-   * In side-by-side mode, derive the translated pane's zoom anchor
-   * from the original pane's anchor so both panes show the same page
-   * and offset after zoom. Falls back to the captured translated anchor
-   * when derivation is not possible.
-   */
-  function resolveTranslatedZoomAnchor(originalAnchor, capturedTranslatedAnchor) {
-    if (!isSideBySide.value) return capturedTranslatedAnchor
-    return deriveTranslatedAnchorFromOriginal(originalAnchor) || capturedTranslatedAnchor
+  function isTranslatedTextPdfBackedTransition(previousView, nextView) {
+    return (
+      previousView === CONTENT_VIEW.TRANSLATION && isPdfBackedContentView(nextView)
+    ) || (
+      isPdfBackedContentView(previousView) && nextView === CONTENT_VIEW.TRANSLATION
+    )
   }
 
   async function applyDeferredZoomLayout() {
@@ -267,58 +174,6 @@ export function createPdfTransitionController({
     deferredZoomLayout = null
     await recomputeLayout(buildLayoutRequest(pendingLayout))
     await nextTick()
-  }
-
-  /**
-   * Snap a PDF-backed anchor's pdfPoint.y to the page top in PDF space.
-   * When entering Fit Page mode, the anchor must represent the page's
-   * top edge so that after zoom recompute, scroll restores to the
-   * page top regardless of zoom level.
-   */
-  function normalizeFitPagePdfAnchor(anchor) {
-    if (!anchor) return anchor
-    if (isPdfAnchor(anchor)) {
-      const viewport = unref(session)?.getPageViewport?.(anchor.pageNumber)
-      const topPdfPoint = viewport?.convertToPdfPoint?.(0, 0) || null
-      const topPdfY = Number(topPdfPoint?.[1])
-
-      const normalizedAnchor = Number.isFinite(topPdfY)
-        ? { ...anchor, pdfPoint: { ...anchor.pdfPoint, y: topPdfY }, offsetRatio: 0 }
-        : { ...anchor, offsetRatio: 0 }
-      return normalizedAnchor
-    }
-    return { ...anchor, offsetRatio: 0 }
-  }
-
-  /**
-   * Strip pdfPoint, converting any anchor to a pure DOM-root anchor.
-   * Used when leaving Fit Page near the page top: the existing pdfPoint
-   * is stale for the new zoom mode's viewport geometry. Dropping it
-   * forces a DOM-based restore that resolves unambiguously to page top.
-   */
-  function normalizeFitPageDomRootAnchor(anchor) {
-    if (!anchor?.pageNumber) return anchor
-    return {
-      owner: anchor.owner,
-      pageNumber: anchor.pageNumber,
-      offsetRatio: 0
-    }
-  }
-
-  function isPdfBackedPdfTransition(previousView, nextView) {
-    return isPdfBackedContentView(previousView) && isPdfBackedContentView(nextView) && previousView !== nextView
-  }
-
-  function isPdfBackedContentView(view) {
-    return view === CONTENT_VIEW.ORIGINAL || view === CONTENT_VIEW.TRANSLATED_PDF
-  }
-
-  function isTranslatedTextPdfBackedTransition(previousView, nextView) {
-    return (
-      previousView === CONTENT_VIEW.TRANSLATION && isPdfBackedContentView(nextView)
-    ) || (
-      isPdfBackedContentView(previousView) && nextView === CONTENT_VIEW.TRANSLATION
-    )
   }
 
   function normalizeTranslatedAnchor(anchor, owner, previousView, nextView) {
@@ -336,38 +191,6 @@ export function createPdfTransitionController({
       pageNumber: resolvedPage,
       offsetRatio: 0
     }
-  }
-
-  function restoreOwnedScrollAnchor(anchor) {
-    if (!anchor) return null
-
-    const preferredTarget = resolveOwnerScrollTarget(anchor.owner)
-    const pdfSession = unref(session) ?? null
-
-    if (isPdfAnchor(anchor) && restorePdfBackedScrollAnchor(anchor, preferredTarget.container, preferredTarget.selector, pdfSession, { zoomMode: zoomMode.value })) {
-      return preferredTarget.owner
-    }
-
-    const preferredAnchor = preferredTarget.owner === anchor.owner
-      ? anchor
-      : { ...anchor, owner: preferredTarget.owner, offsetRatio: 0 }
-    const restoredOwner = restoreScrollAnchor(preferredAnchor, preferredTarget.container, preferredTarget.selector)
-      ? preferredTarget.owner
-      : null
-
-    if (restoredOwner) return restoredOwner
-
-    const fallbackOwner = anchor.owner === PDF_SCROLL_OWNER.TRANSLATED
-      ? PDF_SCROLL_OWNER.ORIGINAL
-      : PDF_SCROLL_OWNER.TRANSLATED
-    const fallbackTarget = resolveOwnerScrollTarget(fallbackOwner)
-    const fallbackAnchor = fallbackTarget.owner === anchor.owner
-      ? anchor
-      : { ...anchor, owner: fallbackTarget.owner, offsetRatio: 0 }
-
-    return restoreScrollAnchor(fallbackAnchor, fallbackTarget.container, fallbackTarget.selector)
-      ? fallbackTarget.owner
-      : null
   }
 
   function syncFromOwner(owner) {
