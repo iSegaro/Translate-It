@@ -36,6 +36,12 @@ import PdfPageView from './PdfPageView.vue'
 import PdfBlockHighlightOverlay from './PdfBlockHighlightOverlay.vue'
 import { getPdfPageRootElement } from '../utils/pageViewInstance.js'
 import { getPrimaryPage } from '../utils/pdfViewportPageResolver.js'
+import {
+  getCanvasScrollTop,
+  getElementClientMetrics,
+  getPageGeometry,
+  getScrollSpaceTop
+} from '../utils/pdfGeometryModel.js'
 import { usePdfSelectionBridge } from '../composables/usePdfSelectionBridge.js'
 import { VIEWER_ROLE } from '../composables/usePdfViewerMode.js'
 import './PdfViewer.scss'
@@ -119,7 +125,10 @@ function resolvePageFromPoint(clientX, clientY) {
     const rootEl = getPdfPageRootElement(instance)
     if (!rootEl) continue
 
-    const rect = rootEl.getBoundingClientRect()
+    const geometry = getPageGeometry(rootEl, props.scrollContainer || viewerRoot.value)
+    const rect = geometry?.rect
+    if (!rect) continue
+
     if (clientX >= rect.left && clientX <= rect.right && clientY >= rect.top && clientY <= rect.bottom) {
       const pageMetric = props.pages.find((p) => p.pageNumber === pageNumber)
       const x = clientX - rect.left
@@ -318,8 +327,10 @@ function emitCurrentPageIfVisible() {
 function emitLayoutIfNeeded() {
   if (!isOriginalRole.value) return
 
-  const width = Math.floor(viewerRoot.value?.clientWidth || 0)
-  const height = Math.floor(props.scrollContainer?.clientHeight || viewerRoot.value?.clientHeight || 0)
+  const viewerMetrics = getElementClientMetrics(viewerRoot.value)
+  const scrollMetrics = getElementClientMetrics(props.scrollContainer)
+  const width = Math.floor(viewerMetrics.width)
+  const height = Math.floor(scrollMetrics.height || viewerMetrics.height)
 
   if (
     width > 0 &&
@@ -485,11 +496,11 @@ function scrollToPage(pageNumber, options = {}) {
     const pageEl = getPdfPageRootElement(instance)
     if (!pageEl) return
 
-    const containerRect = container.getBoundingClientRect()
-    const pageRect = pageEl.getBoundingClientRect()
+    const targetScrollTop = getScrollSpaceTop(pageEl, container)
+    if (!Number.isFinite(targetScrollTop)) return
 
     container.scrollTo({
-      top: pageRect.top - containerRect.top + container.scrollTop,
+      top: targetScrollTop,
       behavior: options.behavior === 'instant' ? 'auto' : 'smooth'
     })
     return
@@ -506,13 +517,11 @@ function scrollToPage(pageNumber, options = {}) {
     Number(options.top) || 0
   )
 
-  const canvasRect = canvasEl.getBoundingClientRect()
-  const containerRect = container.getBoundingClientRect()
-
-  const canvasOffsetY = canvasRect.top - containerRect.top + container.scrollTop
+  const targetScrollTop = getCanvasScrollTop(canvasEl, container, cssY)
+  if (!Number.isFinite(targetScrollTop)) return
 
   container.scrollTo({
-    top: canvasOffsetY + cssY,
+    top: targetScrollTop,
     behavior: options.behavior === 'instant' ? 'auto' : 'smooth'
   })
 }
