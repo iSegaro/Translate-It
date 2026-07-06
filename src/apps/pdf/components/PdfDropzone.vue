@@ -58,7 +58,7 @@ function handleDrop(event) {
   min-height: calc(100vh - 140px);
   border: 1px dashed rgba(255, 255, 255, 0.18);
   border-radius: 24px;
-  background: rgba(12, 15, 22, 0.7);
+  background: rgba(12, 15, 22, 0.35);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
   overflow: hidden;
 }
