@@ -291,7 +291,7 @@ export function createPdfTransitionController({
     await nextTick()
   }
 
-  function normalizeFitPageAnchor(anchor) {
+  function normalizeFitPagePdfAnchor(anchor) {
     if (!anchor) return anchor
     if (anchor.pdfPoint) {
       const viewport = unref(session)?.getPageViewport?.(anchor.pageNumber)
@@ -301,13 +301,22 @@ export function createPdfTransitionController({
       const normalizedAnchor = Number.isFinite(topPdfY)
         ? { ...anchor, pdfPoint: { ...anchor.pdfPoint, y: topPdfY }, offsetRatio: 0 }
         : { ...anchor, offsetRatio: 0 }
-      logger.debug(traceJson('[PDF Zoom Trace] normalizeFitPageAnchor', {
+      logger.debug(traceJson('[PDF Zoom Trace] normalizeFitPagePdfAnchor', {
         originalAnchor: anchor,
         normalizedAnchor
       }))
       return normalizedAnchor
     }
     return { ...anchor, offsetRatio: 0 }
+  }
+
+  function normalizeFitPageDomRootAnchor(anchor) {
+    if (!anchor?.pageNumber) return anchor
+    return {
+      owner: anchor.owner,
+      pageNumber: anchor.pageNumber,
+      offsetRatio: 0
+    }
   }
 
   function isPdfBackedPdfTransition(previousView, nextView) {
@@ -535,9 +544,9 @@ export function createPdfTransitionController({
               && fitMode !== 'fit-page'
               && anchors.originalAnchor?.offsetRatio <= 0.01
             const restoredOriginalAnchor = fitMode === 'fit-page'
-              ? normalizeFitPageAnchor(anchors.originalAnchor)
+              ? normalizeFitPagePdfAnchor(anchors.originalAnchor)
               : shouldNormalizeExitFromFitPage
-                ? normalizeFitPageAnchor(anchors.originalAnchor)
+                ? normalizeFitPageDomRootAnchor(anchors.originalAnchor)
                 : anchors.originalAnchor
             const activeTarget = resolveScrollAnchor()
             logger.debug(traceJson('[PDF Zoom Trace] applyFitMode before recomputeLayout', {

@@ -754,7 +754,7 @@ describe('PdfApp', () => {
       wrapper.unmount()
     })
 
-    it('normalizes the original anchor when leaving fit-page near the top of a page', async () => {
+    it('uses a DOM page anchor when leaving fit-page near the top of a page', async () => {
       const wrapper = mountInMode({ contentView: 'original', layoutMode: 'side-by-side' })
       await flushPromises()
 
@@ -793,7 +793,8 @@ describe('PdfApp', () => {
       await emitToolbar(wrapper, 'zoom-change', { mode: 'fit-width', value: 100 })
       await flushPromises()
 
-      expect(mockPdfViewport.convertToPdfPoint).toHaveBeenCalledWith(0, 0)
+      expect(mockPdfViewport.convertToPdfPoint).toHaveBeenCalled()
+      expect(mockPdfViewport.convertToViewportPoint).not.toHaveBeenCalled()
 
       wrapper.unmount()
     })
