@@ -694,6 +694,24 @@ describe('PdfApp', () => {
       wrapper.unmount()
     })
 
+    it('derives translated zoom anchor from original when translated pane is stale', async () => {
+      const wrapper = mountInMode({ contentView: 'translated-pdf', layoutMode: 'side-by-side' })
+      await flushPromises()
+
+      const layout = wrapper.findComponent({ name: 'PdfViewerLayout' }).vm
+      const originalPane = layout.scrollContainer
+      const translatedPane = layout.translatedPaneRef
+      originalPane.scrollTop = 900
+      translatedPane.scrollTop = 0
+
+      await emitToolbar(wrapper, 'zoom-change', { mode: 'fit-page', value: 100 })
+      await flushPromises()
+
+      expect(translatedPane.scrollTop).toBe(900)
+
+      wrapper.unmount()
+    })
+
     it('normalizes the original anchor when leaving fit-page near the top of a page', async () => {
       const wrapper = mountInMode({ contentView: 'original', layoutMode: 'side-by-side' })
       await flushPromises()

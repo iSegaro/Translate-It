@@ -264,6 +264,16 @@ export function createPdfTransitionController({
     return restoredOriginalOwner
   }
 
+  function deriveTranslatedAnchorFromOriginal(originalAnchor) {
+    if (!originalAnchor?.pageNumber) return null
+
+    return {
+      owner: PDF_SCROLL_OWNER.TRANSLATED,
+      pageNumber: originalAnchor.pageNumber,
+      offsetRatio: originalAnchor.offsetRatio ?? 0
+    }
+  }
+
   function normalizeFitPageAnchor(anchor) {
     if (!anchor) return anchor
     if (anchor.pdfPoint) {
@@ -517,7 +527,9 @@ export function createPdfTransitionController({
             await nextTick()
             restoreControlledTransitionAnchors({
               originalAnchor: restoredOriginalAnchor,
-              translatedAnchor: anchors.translatedAnchor
+              translatedAnchor: isSideBySide.value
+                ? deriveTranslatedAnchorFromOriginal(restoredOriginalAnchor) || anchors.translatedAnchor
+                : anchors.translatedAnchor
             })
           })
         } finally {
@@ -554,7 +566,9 @@ export function createPdfTransitionController({
               await nextTick()
               restoreControlledTransitionAnchors({
                 originalAnchor,
-                translatedAnchor
+                translatedAnchor: isSideBySide.value
+                  ? deriveTranslatedAnchorFromOriginal(originalAnchor) || translatedAnchor
+                  : translatedAnchor
                 })
             })
           } finally {
@@ -597,7 +611,9 @@ export function createPdfTransitionController({
           await nextTick()
           restoreControlledTransitionAnchors({
             originalAnchor,
-            translatedAnchor
+            translatedAnchor: isSideBySide.value
+              ? deriveTranslatedAnchorFromOriginal(originalAnchor) || translatedAnchor
+              : translatedAnchor
           })
         })
       } finally {
