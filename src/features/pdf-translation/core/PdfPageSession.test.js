@@ -181,6 +181,130 @@ describe('PdfPageSession OCR state', () => {
   })
 })
 
+describe('PdfPageSession release', () => {
+  it('clears heavy fields but preserves OCR data and identity', () => {
+    const session = new PdfPageSession({ documentIdentity: 'doc-1', pageNumber: 1 })
+    session.pageSize = { width: 500, height: 700 }
+    session.textContent = { items: [{ str: 'hello' }] }
+    session.lines = [{ text: 'hello' }]
+    session.logicalBlocks = [{ id: 'block-1' }]
+    session.pageMaskModel = { masks: [] }
+    session.setOcrBlocks([{ id: 'ocr-1' }], 'eng')
+    session.loaded = true
+    session.loadedAt = 1000
+    session.displayScale = 1.5
+
+    session.release()
+
+    expect(session.pageNumber).toBe(1)
+    expect(session.documentIdentity).toBe('doc-1')
+    expect(session.pageSize).toEqual({ width: 500, height: 700 })
+    expect(session.displayScale).toBe(1.5)
+    expect(session.ocrBlocks).toEqual([{ id: 'ocr-1' }])
+    expect(session.ocrLanguage).toBe('eng')
+
+    expect(session.textContent).toBeNull()
+    expect(session.lines).toEqual([])
+    expect(session.logicalBlocks).toEqual([])
+    expect(session.pageMaskModel).toBeNull()
+    expect(session.loaded).toBe(false)
+    expect(session.loadedAt).toBe(0)
+  })
+
+  it('supports hydrate → release → hydrate cycle', async () => {
+    const page = {
+      pageNumber: 1,
+      getTextContent: vi.fn().mockResolvedValue({
+        items: [
+          {
+            str: 'Hello',
+            transform: [1, 0, 0, 14, 40, 650],
+            width: 30,
+            height: 14,
+            dir: 'ltr'
+          }
+        ]
+      })
+    }
+
+    const session = new PdfPageSession({ documentIdentity: 'doc-1', pageNumber: 1 })
+
+    await session.hydrate(page, { naturalWidth: 500, naturalHeight: 700 })
+    expect(session.loaded).toBe(true)
+    expect(session.getLogicalBlocks()).toHaveLength(1)
+    expect(page.getTextContent).toHaveBeenCalledTimes(1)
+
+    session.release()
+    expect(session.loaded).toBe(false)
+    expect(session.getLogicalBlocks()).toHaveLength(0)
+
+    page.getTextContent.mockClear()
+    await session.hydrate(page, { naturalWidth: 500, naturalHeight: 700 })
+    expect(session.loaded).toBe(true)
+    expect(session.getLogicalBlocks()).toHaveLength(1)
+    expect(page.getTextContent).toHaveBeenCalledTimes(1)
+  })
+
+  it('preserves OCR data after release and hydration recovers text blocks', async () => {
+    const page = {
+      pageNumber: 1,
+      getTextContent: vi.fn().mockResolvedValue({
+        items: [
+          {
+            str: 'Hello',
+            transform: [1, 0, 0, 14, 40, 650],
+            width: 30,
+            height: 14,
+            dir: 'ltr'
+          }
+        ]
+      })
+    }
+
+    const session = new PdfPageSession({ documentIdentity: 'doc-1', pageNumber: 1 })
+    await session.hydrate(page, { naturalWidth: 500, naturalHeight: 700 })
+    session.setOcrBlocks([{ id: 'ocr-1' }], 'eng')
+
+    session.release()
+
+    expect(session.ocrBlocks).toEqual([{ id: 'ocr-1' }])
+    expect(session.ocrLanguage).toBe('eng')
+  })
+
+  it('is idempotent — second call is a no-op', () => {
+    const session = new PdfPageSession({ documentIdentity: 'doc-1', pageNumber: 1 })
+    session.loaded = true
+    session.textContent = { items: [] }
+
+    session.release()
+    const firstState = {
+      loaded: session.loaded,
+      textContent: session.textContent,
+      loadedAt: session.loadedAt
+    }
+
+    session.release()
+    expect(session.loaded).toBe(firstState.loaded)
+    expect(session.textContent).toBe(firstState.textContent)
+    expect(session.loadedAt).toBe(firstState.loadedAt)
+  })
+
+  it('is a no-op when called on never-hydrated session', () => {
+    const session = new PdfPageSession({ documentIdentity: 'doc-1', pageNumber: 1 })
+    const initialState = {
+      loaded: session.loaded,
+      textContent: session.textContent,
+      loadedAt: session.loadedAt
+    }
+
+    session.release()
+
+    expect(session.loaded).toBe(initialState.loaded)
+    expect(session.textContent).toBe(initialState.textContent)
+    expect(session.loadedAt).toBe(initialState.loadedAt)
+  })
+})
+
 describe('PdfPageSession pageMaskModel', () => {
   it('getPageMaskModel returns empty model before hydrate', () => {
     const session = new PdfPageSession({ documentIdentity: 'doc-1', pageNumber: 1 })

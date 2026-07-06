@@ -375,14 +375,33 @@ export class PdfDocumentSession extends ResourceTracker {
   //   is indexed exactly once in _blockIndex.
   //
   // Maintenance points (keep in sync when modifying this class):
-  //   - _hydratePageSession    → _indexPageSession
-  //   - setPageOcrBlocks       → _indexPageSession
-  //   - cleanupDocument         → _blockIndex.clear
+  //   - _hydratePageSession     → _indexPageSession
+  //   - setPageOcrBlocks        → _indexPageSession
+  //   - unindexPageSession       → _blockIndex.delete (per-block)
+  //   - releasePageSession       → unindexPageSession + pageSession.release
+  //   - cleanupDocument          → _blockIndex.clear
 
   _indexPageSession(pageSession) {
     for (const block of pageSession.allBlocks) {
       this._blockIndex.set(block.id, block)
     }
+  }
+
+  unindexPageSession(pageNumber) {
+    const pageSession = this.pageSessions.get(pageNumber)
+    if (!pageSession) return
+
+    for (const block of pageSession.allBlocks) {
+      this._blockIndex.delete(block.id)
+    }
+  }
+
+  releasePageSession(pageNumber) {
+    const pageSession = this.pageSessions.get(pageNumber)
+    if (!pageSession) return
+
+    this.unindexPageSession(pageNumber)
+    pageSession.release()
   }
 
   setPageOcrBlocks(pageNumber, blocks, language) {

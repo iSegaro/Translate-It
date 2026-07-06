@@ -205,4 +205,72 @@ describe('PdfDocumentSession', () => {
     expect(firstBlocks[0].sourceTextHash).toHaveLength(64)
     expect(session.pageSessions.get(1)?.loaded).toBe(true)
   })
+
+  it('unindexPageSession removes blocks from _blockIndex', async () => {
+    session.documentIdentity = 'fingerprint-1'
+    session.pageMetrics = [
+      { pageNumber: 1, width: 100, height: 200, naturalWidth: 100, naturalHeight: 200, scale: 1 },
+      { pageNumber: 2, width: 100, height: 200, naturalWidth: 100, naturalHeight: 200, scale: 1 }
+    ]
+    session.updateVisiblePages([1, 2])
+    const sessions = await session.getVisiblePageSessions()
+
+    expect(session._blockIndex.size).toBe(2)
+    expect(session.findSourceBlock(sessions[0].logicalBlocks[0].id)).toBeTruthy()
+
+    session.unindexPageSession(1)
+
+    expect(session.findSourceBlock(sessions[0].logicalBlocks[0].id)).toBeNull()
+    expect(session._blockIndex.size).toBe(1)
+  })
+
+  it('unindexPageSession is a no-op for missing page', () => {
+    expect(() => session.unindexPageSession(99)).not.toThrow()
+  })
+
+  it('releasePageSession releases session and cleans block index', async () => {
+    session.documentIdentity = 'fingerprint-1'
+    session.pageMetrics = [
+      { pageNumber: 1, width: 100, height: 200, naturalWidth: 100, naturalHeight: 200, scale: 1 }
+    ]
+    session.updateVisiblePages([1])
+    await session.getVisiblePageSessions()
+
+    const pageSession = session.pageSessions.get(1)
+    expect(pageSession.loaded).toBe(true)
+    expect(session._blockIndex.size).toBeGreaterThan(0)
+
+    session.releasePageSession(1)
+
+    expect(pageSession.loaded).toBe(false)
+    expect(pageSession.textContent).toBeNull()
+    expect(pageSession.logicalBlocks).toEqual([])
+    expect(session._blockIndex.size).toBe(0)
+  })
+
+  it('releasePageSession is a no-op for missing page', () => {
+    expect(() => session.releasePageSession(99)).not.toThrow()
+  })
+
+  it('releasePageSession followed by getVisiblePageSessions re-hydrates the page', async () => {
+    session.documentIdentity = 'fingerprint-1'
+    session.pageMetrics = [
+      { pageNumber: 1, width: 100, height: 200, naturalWidth: 100, naturalHeight: 200, scale: 1 },
+      { pageNumber: 2, width: 100, height: 200, naturalWidth: 100, naturalHeight: 200, scale: 1 }
+    ]
+    session.updateVisiblePages([1, 2])
+    await session.getVisiblePageSessions()
+
+    const initialCallCount = pdfDocument.getPage.mock.calls.length
+
+    session.releasePageSession(1)
+    expect(session.pageSessions.get(1).loaded).toBe(false)
+
+    await session.getVisiblePageSessions()
+
+    expect(session.pageSessions.get(1).loaded).toBe(true)
+    expect(session.pageSessions.get(1).getLogicalBlocks()).toHaveLength(1)
+    expect(session._blockIndex.size).toBe(2)
+    expect(pdfDocument.getPage).toHaveBeenCalledTimes(initialCallCount + 1)
+  })
 })
