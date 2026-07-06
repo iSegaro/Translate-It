@@ -372,6 +372,38 @@ describe('PdfRenderer', () => {
       vi.advanceTimersByTime(200)
       expect(task.cancel).not.toHaveBeenCalled()
     })
+
+    it('calls the onCleanup callback after the cleanup delay', () => {
+      const onCleanup = vi.fn()
+
+      renderer.scheduleCleanup(new Set([1]), onCleanup)
+      expect(onCleanup).not.toHaveBeenCalled()
+
+      vi.advanceTimersByTime(200)
+      expect(onCleanup).toHaveBeenCalledTimes(1)
+    })
+
+    it('does not call onCleanup when rescheduled before timeout fires', () => {
+      const onCleanup = vi.fn()
+
+      renderer.scheduleCleanup(new Set([1]), onCleanup)
+      renderer.scheduleCleanup(new Set([1]))
+
+      vi.advanceTimersByTime(200)
+      expect(onCleanup).not.toHaveBeenCalled()
+    })
+
+    it('calls onCleanup for the most recent scheduled cleanup', () => {
+      const firstCleanup = vi.fn()
+      const secondCleanup = vi.fn()
+
+      renderer.scheduleCleanup(new Set([1]), firstCleanup)
+      renderer.scheduleCleanup(new Set([1]), secondCleanup)
+
+      vi.advanceTimersByTime(200)
+      expect(firstCleanup).not.toHaveBeenCalled()
+      expect(secondCleanup).toHaveBeenCalledTimes(1)
+    })
   })
 
   describe('destroy', () => {

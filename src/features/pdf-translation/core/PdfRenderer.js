@@ -121,17 +121,20 @@ export class PdfRenderer {
     }
   }
 
-  scheduleCleanup(visiblePageNumbers) {
+  // keepSet contains pages that should remain render/session active
+  // (visible pages + render candidates).
+  scheduleCleanup(keepSet, onCleanup) {
     this.cancelScheduledCleanup()
 
     this._cleanupTimeout = this._scheduleTimeout(() => {
       this._cleanupTimeout = null
       for (const [key, renderTask] of this.renderTasks.entries()) {
         const pageNumber = PdfRenderer._parsePageNumber(key)
-        if (!Number.isFinite(pageNumber) || !visiblePageNumbers.has(pageNumber)) {
+        if (!Number.isFinite(pageNumber) || !keepSet.has(pageNumber)) {
           renderTask.cancel?.()
         }
       }
+      onCleanup?.()
     }, RENDER_CLEANUP_DELAY_MS)
   }
 

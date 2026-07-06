@@ -540,7 +540,13 @@ export class PdfDocumentSession extends ResourceTracker {
       ...this.visiblePageNumbers,
       ...this._renderCandidatePageNumbers
     ])
-    this._renderer.scheduleCleanup(merged)
+    this._renderer.scheduleCleanup(merged, () => {
+      for (const [pageNumber] of this.pageSessions) {
+        if (!merged.has(pageNumber)) {
+          this.releasePageSession(pageNumber)
+        }
+      }
+    })
   }
 
   async cleanupDocument() {

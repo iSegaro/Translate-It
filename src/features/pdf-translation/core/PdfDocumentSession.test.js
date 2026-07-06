@@ -273,4 +273,84 @@ describe('PdfDocumentSession', () => {
     expect(session._blockIndex.size).toBe(2)
     expect(pdfDocument.getPage).toHaveBeenCalledTimes(initialCallCount + 1)
   })
+
+  describe('automatic page session release via _scheduleCleanup', () => {
+    beforeEach(() => {
+      vi.useFakeTimers()
+    })
+
+    afterEach(() => {
+      vi.useRealTimers()
+    })
+
+    it('releases sessions outside the merged keep set after cleanup delay', async () => {
+      session.documentIdentity = 'fingerprint-1'
+      session.pageMetrics = [
+        { pageNumber: 1, width: 100, height: 200, naturalWidth: 100, naturalHeight: 200, scale: 1 },
+        { pageNumber: 2, width: 100, height: 200, naturalWidth: 100, naturalHeight: 200, scale: 1 },
+        { pageNumber: 3, width: 100, height: 200, naturalWidth: 100, naturalHeight: 200, scale: 1 }
+      ]
+      session.totalPages = 3
+
+      session.updateVisiblePages([1, 2, 3])
+      await session.getVisiblePageSessions()
+
+      expect(session.pageSessions.get(1).loaded).toBe(true)
+      expect(session.pageSessions.get(2).loaded).toBe(true)
+      expect(session.pageSessions.get(3).loaded).toBe(true)
+
+      session.updateVisiblePages([1, 2])
+      session.updateRenderCandidates(new Set([1, 2]))
+
+      vi.advanceTimersByTime(200)
+
+      expect(session.pageSessions.get(1).loaded).toBe(true)
+      expect(session.pageSessions.get(2).loaded).toBe(true)
+      expect(session.pageSessions.get(3).loaded).toBe(false)
+    })
+
+    it('preserves sessions in the render candidate set', async () => {
+      session.documentIdentity = 'fingerprint-1'
+      session.pageMetrics = [
+        { pageNumber: 1, width: 100, height: 200, naturalWidth: 100, naturalHeight: 200, scale: 1 },
+        { pageNumber: 2, width: 100, height: 200, naturalWidth: 100, naturalHeight: 200, scale: 1 }
+      ]
+      session.totalPages = 2
+
+      session.updateVisiblePages([1, 2])
+      await session.getVisiblePageSessions()
+      expect(session.pageSessions.get(1).loaded).toBe(true)
+      expect(session.pageSessions.get(2).loaded).toBe(true)
+
+      session.updateVisiblePages([1])
+      session.updateRenderCandidates(new Set([1, 2]))
+
+      vi.advanceTimersByTime(200)
+
+      expect(session.pageSessions.get(1).loaded).toBe(true)
+      expect(session.pageSessions.get(2).loaded).toBe(true)
+    })
+
+    it('does not release sessions when rescheduled before timeout fires', async () => {
+      session.documentIdentity = 'fingerprint-1'
+      session.pageMetrics = [
+        { pageNumber: 1, width: 100, height: 200, naturalWidth: 100, naturalHeight: 200, scale: 1 }
+      ]
+      session.totalPages = 1
+
+      session.updateVisiblePages([1])
+      await session.getVisiblePageSessions()
+      expect(session.pageSessions.get(1).loaded).toBe(true)
+
+      session.updateVisiblePages([])
+      session.updateRenderCandidates(new Set())
+
+      session.updateVisiblePages([1])
+      session.updateRenderCandidates(new Set([1]))
+
+      vi.advanceTimersByTime(200)
+
+      expect(session.pageSessions.get(1).loaded).toBe(true)
+    })
+  })
 })
