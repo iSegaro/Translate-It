@@ -16,8 +16,31 @@ The PDF Translation feature is a **self-contained, dedicated PDF viewer and tran
 - [Architectural Overview](#architectural-overview)
 - [Module Boundaries](#module-boundaries)
 - [PDF Application Architecture](#pdf-application-architecture)
+  - [Render Tree](#render-tree)
+  - [Key Application Utilities](#key-application-utilities)
+  - [Key Application Constants](#key-application-constants)
+  - [Composable Responsibilities](#composable-responsibilities)
+  - [Presentation Architecture](#presentation-architecture)
 - [PDF Viewer Lifecycle](#pdf-viewer-lifecycle)
+  - [File Loading Sequence](#file-loading-sequence)
+  - [Page Rendering Sequence](#page-rendering-sequence)
+  - [Cleanup Sequence](#cleanup-sequence)
+- [Geometry Layer](#geometry-layer)
 - [PDF Navigation](#pdf-navigation)
+  - [Destination Coordinate Model](#destination-coordinate-model)
+  - [Scroll Coordinate Conversion](#scroll-coordinate-conversion)
+  - [Current Page Ownership](#current-page-ownership)
+  - [Scroll Container Ownership](#scroll-container-ownership)
+- [Zoom and Scroll Transition Architecture](#zoom-and-scroll-transition-architecture)
+  - [Anchor Model](#anchor-model)
+  - [Controlled Zoom Sequence](#controlled-zoom-sequence)
+  - [Deferred Layout](#deferred-layout)
+  - [Fit Page Entry](#fit-page-entry)
+  - [Fit Page Exit](#fit-page-exit)
+  - [Side-by-Side Translated Anchor Policy](#side-by-side-translated-anchor-policy)
+  - [Orchestration](#orchestration)
+- [Fit Page Footprint Model](#fit-page-footprint-model)
+- [Scroll Synchronization](#scroll-synchronization)
 - [Text Layer Architecture](#text-layer-architecture)
 - [Selection Integration](#selection-integration)
 - [Logical Block Model](#logical-block-model)
@@ -57,7 +80,6 @@ The PDF Translation feature is a **self-contained, dedicated PDF viewer and tran
 3. **No translated PDF regeneration** — Output is text-based export, not a translated PDF file.
 4. **No advanced table reconstruction** — Tables are translated as flat text blocks.
 5. **No translated search** — Search operates on the original text only.
-6. **No scroll synchronization** — Original and translated panes scroll independently.
 
 ---
 
@@ -100,20 +122,49 @@ The PDF Translation feature is a **self-contained, dedicated PDF viewer and tran
 └─────────────────────────────────────────────────────────────────┘
             │
 ┌───────────▼─────────────────────────────────────────────────────┐
+│                   Geometry / Anchor Layer (utils/)               │
+│  Active:                                                        │
+│    pdfGeometryModel · pdfCurrentPageResolver · pdfRenderWindow  │
+│    pdfScrollAnchor · pdfFitPageFootprint · pdfViewportPage      │
+│    Resolver                                                     │
+│  Prepared (not runtime-active):                                 │
+│    pdfCanonicalAnchor · pdfGeometrySyncEngine                   │
+└─────────────────────────────────────────────────────────────────┘
+            │
+┌───────────▼─────────────────────────────────────────────────────┐
 │                    pdfjs-dist (Rendering)                        │
 │  PDF parsing, canvas rendering, text content extraction          │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
----
+### Application Layer Detail
 
-## Module Boundaries
+```
+PdfApp.vue
+├── usePdfViewerController       (document lifecycle, translation)
+├── createPdfTransitionController (zoom, layout, anchor management)
+├── usePdfNavigation              (destination resolution, outline)
+├── usePdfOcr                    (scanned page detection)
+├── usePdfExport                  (TXT/Markdown export)
+├── usePdfBlockSelection          (block targeting mode)
+├── usePdfSelectionBridge        (text selection bridge)
+├── PdfToolbar
+├── PdfDropzone
+└── PdfViewerLayout
+    ├── PdfViewer (original pane)
+    │   └── PdfPageView × N
+    └── PdfTranslatedPane (translated pane)
+```
+
+---
 
 ### Two-Layer Architecture
 
 | Layer | Directory | Purpose | Framework |
 |-------|-----------|---------|-----------|
 | **Application Layer** | `src/apps/pdf/` | Vue components, composables, UI | Vue 3 + Pinia |
+| **Application Utils (Geometry)** | `src/apps/pdf/utils/` | DOM geometry, anchor, footprint, page resolvers | Vanilla JS |
+| **Application Constants** | `src/apps/pdf/constants/` | Layout contract constants (DOM footprint) | Vanilla JS |
 | **Feature Layer** | `src/features/pdf-translation/core/` | Domain logic, state management, orchestration | Vanilla JS + ResourceTracker |
 
 **Key Principle**: The feature layer is **framework-agnostic**. It uses no Vue reactivity — translation states are stored in `Map` objects on `PdfDocumentSession`. Composables in the application layer bridge feature-layer classes to Vue's reactive system via refs and computed properties.
@@ -147,28 +198,80 @@ PdfApp
 ├── PdfToolbar (file info, mode selector, action buttons)
 ├── PdfOcrConsentPrompt (user consent before OCR)
 ├── PdfOcrProgress (progress bar during OCR)
+├── PdfOutlinePanel (outline/bookmarks sidebar)
 ├── PdfDropzone (drag-and-drop or empty state)
-│   └── PdfViewerLayout (CSS Grid: single/dual pane)
-│       ├── PdfViewer (original pane, scrollable page list)
-│       │   ├── PdfPageView × N (canvas + text layer per page)
+│   └── PdfViewerLayout (CSS Grid: single/dual pane, owns scroll containers)
+│       ├── PdfViewer (original pane, scrollable page list, scrollToPage exposed)
+│       │   ├── PdfPageView × N (canvas + text layer + link overlay per page)
+│       │   ├── PdfLinkOverlay × N (clickable link hitboxes)
+│       │   ├── PdfOverlayLayer × N (translated block overlays)
 │       │   └── PdfBlockHighlightOverlay × N (targeting highlight)
-│       └── PdfTranslatedPane (translated blocks per page)
+│       └── PdfTranslatedPane (translated blocks per page, own scroll container)
 │           ├── PdfTranslatedBlock × M
 │           └── PdfOcrStatus × N
 └── PdfSelectionAction (floating translate button + result popup)
 ```
+
+### Key Application Utilities (src/apps/pdf/utils/)
+
+| Utility | Purpose |
+|---------|---------|
+| `pdfGeometryModel` | DOM geometry queries (page rects, scroll space, canvas offset) |
+| `pdfCurrentPageResolver` | Current page from geometry data (scroll-based) |
+| `pdfRenderWindowResolver` | Render window computation (visible pages, buffer) |
+| `pdfScrollAnchor` | Scroll anchor capture/restore for zoom/layout transitions |
+| `pdfCanonicalAnchor` | Canonical anchor model (prepared infrastructure, not runtime-active) |
+| `pdfGeometrySyncEngine` | Geometry-based scroll sync (prepared infrastructure, not integrated) |
+| `pdfFitPageFootprint` | Fit Page canvas slot computation |
+| `pdfViewportPageResolver` | Thin wrapper: find primary page target from geometry |
+
+### Key Application Constants (src/apps/pdf/constants/)
+
+| Constants File | Purpose |
+|---------------|---------|
+| `pdfLayoutConstants` | DOM footprint dimensions (page padding, label, viewer gaps) |
+| `pdfFeatureFlags` | Feature-level toggles (cell masks, diagnostics) |
 
 ### Composable Responsibilities
 
 | Composable | Purpose | Key Dependencies |
 |------------|---------|-----------------|
 | `usePdfViewerController` | Document lifecycle, translation, cache restore | `pdfDocumentSession`, `PdfTranslationCoordinator` |
+| `usePdfNavigation` | Outline/destination resolution, page navigation | `PdfDestinationResolver`, `PdfOutlineRepository` |
+| `createPdfTransitionController` | Zoom/layout transitions, anchor capture/restore | `pdfScrollAnchor`, `pdfFitPageFootprint` |
+| `usePdfScrollSync` | Side-by-side scroll synchronization | DOM geometry with page-boundary matching and proportional page offset |
 | `usePdfBilingualMode` | Viewer mode state (original/bilingual/translated) | Standalone |
 | `usePdfExport` | Export to TXT/Markdown | `PdfExportCollector`, `PdfExportFormatter` |
 | `usePdfBlockSelection` | Block targeting mode | `PdfBlockTargetingManager` |
 | `usePdfOcr` | OCR detection + processing workflow | `PdfOcrDetector`, `PdfOcrProcessor` |
 | `usePdfSelectionAction` | Text selection translation popup | `pageEventBus`, `UnifiedMessaging` |
 | `usePdfSelectionBridge` | Lifecycle wrapper for `PdfSelectionBridge` | `PdfSelectionBridge` |
+| `usePdfKeyboard` | Keyboard shortcut navigation | Standalone |
+
+### Presentation Architecture
+
+The PDF viewer uses a Chrome-like workspace design with clear ownership of visual surfaces.
+
+**Document surface** (`PdfApp.scss`):
+
+The `.pdf-app__content` element owns the document background (`#2c2c2c`), providing a neutral dark canvas behind light-colored PDF pages. The drop zone and layout components do not set their own background — the document surface is inherited.
+
+**Page appearance** (`PdfPageView.scss`):
+
+Pages render as white paper (`#ffffff`) with a subtle box shadow. A page label with page number is displayed above each canvas, styled in neutral gray. Page padding ensures canvas content does not meet the page edge.
+
+**Scrollbar behavior**:
+
+PDF context uses the native browser scrollbar (no custom scrollbar styling). The scroll container uses `scrollbar-gutter: stable` to prevent layout shift when the scrollbar appears/disappears. Non-PDF extension contexts (popup, options, sidepanel) retain themed scrollbar styling.
+
+**Spacing ownership** (`PdfDropzone.vue`):
+
+- **Empty state**: The drop zone applies `margin: 0 28px` for reasonable inset within the dark surface.
+- **Loaded state**: `.pdf-dropzone--document` sets `margin: 0` so the scroll pane is flush with the document surface, allowing the scrollbar to sit at the right edge.
+
+**Viewer padding** (`PdfViewer.scss`):
+
+The page list within the scroll pane uses `padding: 16px 0 24px` to provide vertical breathing room. These values correspond to the `PDF_VIEWER_PADDING_TOP` and `PDF_VIEWER_PADDING_BOTTOM` layout constants.
 
 ---
 
@@ -221,6 +324,63 @@ PdfApp
 
 ---
 
+## Geometry Layer
+
+The Geometry layer is a set of pure utility modules in `src/apps/pdf/utils/` that separate **PDF coordinate space** from **DOM coordinate space**. These modules are framework-agnostic and have no Vue reactivity dependency.
+
+### Separation of Concerns
+
+| Domain | Owner | Coordinates | Source |
+|--------|-------|-------------|--------|
+| **PDF space** | `PdfDocumentSession` page metrics | PDF points (1/72 inch), bottom-left origin | `pdfjs-dist` viewport transform |
+| **DOM space** | Geometry utilities (`pdfGeometryModel`) | CSS pixels, top-left origin | `getBoundingClientRect()` |
+
+`page.height` and `page.width` represent scaled PDF viewport dimensions — the canvas/stage area. The DOM page wrapper may be taller (label, padding, gap), but those dimensions belong to the CSS/DOM layer, not to the PDF metric contract.
+
+### pdfGeometryModel
+
+**File**: `src/apps/pdf/utils/pdfGeometryModel.js`
+
+Provides geometry queries on the DOM:
+
+- `getPageGeometry(element, container)` — returns `{ top, bottom, height, width, centerY, visibilityHint }` for a page element relative to its scroll container.
+- `getPageGeometries(container, selector)` — returns geometry for all matching page elements.
+- `resolvePageFromScroll(scrollTop, pageGeometries)` — finds the page containing a scroll position (assumes pre-sorted geometries).
+- `getPageRatio(scrollTop, pageGeometry)` — returns `[0,1]` ratio of scroll position within a page.
+- `getScrollMetrics(container)` — returns `scrollTop`, `scrollHeight`, `clientHeight`.
+- `getScrollSpaceTop(element, container)` — returns the element's absolute scroll position.
+- `getCanvasScrollTop(canvas, container, cssY)` — returns the scroll position to place a canvas-relative Y coordinate at the container top.
+- `findPrimaryPageGeometry(container, selector)` — legacy visible-page selection for backward compatibility.
+
+### pdfCurrentPageResolver
+
+**File**: `src/apps/pdf/utils/pdfCurrentPageResolver.js`
+
+Determines current page from geometry data. Two resolution strategies:
+
+- `resolveCurrentPage(scrollTop, pageGeometries)` — returns the page containing `scrollTop`, or nearest page by distance if in a gap.
+- `resolvePrimaryVisiblePage(scrollTop, pageGeometries)` — among pages visible in the viewport, returns the page whose top edge is closest to the viewport top edge. Falls back to `resolveCurrentPage()` when nothing is visible.
+
+Used by `PdfViewer.emitCurrentPageFromResolver()` and `PdfViewerLayout.syncFromPane()`. The primary strategy preserves legacy observable behavior (first visible page nearest top).
+
+### pdfRenderWindowResolver
+
+**File**: `src/apps/pdf/utils/pdfRenderWindowResolver.js`
+
+Computes render windows from geometry:
+
+- `computeVisiblePages({ scrollTop, viewportHeight, pageGeometries })` — pages overlapping the viewport.
+- `expandRenderWindow({ visiblePages, pageGeometries, bufferPages })` — expands visible set with adjacent pages.
+- `resolveRenderWindow({ scrollTop, container, pageSelector, bufferPages })` — returns `{ visiblePages, renderPages, primaryPage }`.
+
+Render decisions are geometry-driven. IntersectionObserver only schedules re-evaluation; it is not the source of truth for which pages are visible.
+
+### Relationship to Navigation
+
+The navigation system (`scrollToPage()`) uses GeometryModel primitives (`getCanvasScrollTop`, `getScrollSpaceTop`) to convert PDF viewport coordinates into DOM scroll positions. The `currentPage` value used by the toolbar and outline highlighting is computed from geometry data via `resolveRenderWindow().primaryPage`, not from IntersectionObserver entries.
+
+---
+
 ## PDF Navigation
 
 ### Destination Coordinate Model
@@ -242,17 +402,20 @@ After calling `convertToViewportPoint()`, the result is a `[cssX, cssY]` pair me
 The viewer's scroll implementation navigates to a specific destination using the following algorithm:
 
 ```
-1. Resolve destination → { pageNumber, left, top, zoom }
+1. Resolve destination → { pageNumber, left, top, zoom } (PdfDestinationResolver)
 2. Obtain the page viewport for the target page
 3. Convert PDF coordinates: [cssX, cssY] = viewport.convertToViewportPoint(left, top)
 4. Measure the canvas position relative to the scroll container
+       canvasOffsetY = getScrollSpaceTop(canvas, container)
 5. Convert viewport coordinates into scroll-space:
-      canvasOffsetY = canvas.top - container.top + container.scrollTop
+       canvasOffsetY = canvas.top - container.top + container.scrollTop
 6. Scroll to:
-      container.scrollTo({ top: canvasOffsetY + cssY })
+       container.scrollTo({ top: canvasOffsetY + cssY })
 ```
 
-Step 5 converts the canvas's visual position (which changes as the container scrolls) into an absolute scroll offset. The expression `canvas.top - container.top` yields the canvas's position relative to the container's visible top edge; adding `container.scrollTop` restores the absolute scroll position of the canvas origin. Step 6 then adds the viewport Y coordinate to place the target point at the container's top edge.
+Step 4 uses `getScrollSpaceTop()` from `pdfGeometryModel` (equivalent to `canvasRect.top - containerRect.top + container.scrollTop`). Step 5 converts the canvas's visual position (which changes as the container scrolls) into an absolute scroll offset. Step 6 then adds the viewport Y coordinate to place the target point at the container's top edge.
+
+For destinations without explicit top/left coordinates (pure page navigation), the viewer uses `getScrollSpaceTop(pageElement, container)` directly from the page wrapper element, scrolling the page top to the container top.
 
 ### Why Canvas Is Used as the Reference Element
 
@@ -391,6 +554,117 @@ The `runControlledZoomTransition()` helper owns the invariant orchestration sequ
 | `restoreControlledTransitionAnchors` | |
 | Cleanup (suppression + scroll sync) | |
 | `refreshCurrentPage` | |
+
+---
+
+## Fit Page Footprint Model
+
+### Problem
+
+Fit Page mode calculates PDF scale so each page visually fits within the available viewer area. The scale uses the PDF canvas height, but the rendered DOM page wrapper is taller than the canvas — it includes page padding, a page label with margin, and external viewer spacing (gaps between pages). This mismatch caused navigation drift: later pages accumulated offset error because the actual page pitch exceeded the calculated pitch.
+
+### Architecture Decision (Option C)
+
+Fit Page uses an **explicit layout footprint model** to derive the canvas slot from viewer dimensions. PDF metrics remain pure — `page.height` stays as the PDF canvas height. The DOM footprint is computed separately.
+
+### Ownership
+
+| Dimension | Owner | Semantic |
+|-----------|-------|----------|
+| `page.width` | PDF metric | Scaled PDF viewport width |
+| `page.height` | PDF metric | Scaled PDF viewport height |
+| `viewport` | PDF metric | pdf.js PageViewport (coordinate conversion) |
+| `viewerWidth` / `viewerHeight` | Application layout | Scroll container client dimensions |
+| `availableCanvasWidth` | Footprint model | `viewerWidth - PAGE_MARGIN * 2` |
+| `availableCanvasHeight` | Footprint model | `viewerHeight - viewerChrome - pageChrome` |
+| `pageChromeHeight` | Footprint model | Padding top/bottom + label height + label margin |
+| `viewerChromeHeight` | Footprint model | Viewer padding top + bottom |
+
+### Fit Page Flow
+
+```
+viewerWidth, viewerHeight
+    │
+    ▼
+pdfFitPageFootprint.resolvePdfCanvasSlot({ width, height })
+    │
+    ├── availableCanvasWidth  = viewerWidth  - PAGE_MARGIN * 2
+    ├── availableCanvasHeight = viewerHeight - viewerChrome - pageChrome
+    └── pageChrome = paddingTop + paddingBottom + labelHeight + labelMargin
+    │
+    ▼
+buildLayoutRequest includes { availableCanvasWidth, availableCanvasHeight }
+    │
+    ▼
+PdfDocumentSession._buildPageMetrics()
+    │
+    ├── usableWidth  = availableCanvasWidth  (or fallback to PAGE_MARGIN math)
+    ├── usableHeight = availableCanvasHeight (or fallback to PAGE_MARGIN math)
+    ├── fit-page: scale = min(widthScale, heightScale)
+    └── fit-width: scale = widthScale (height slot ignored)
+```
+
+The resulting `page.height` is the scaled canvas height, not the DOM wrapper height. The footprint constants are defined in `pdfLayoutConstants.js` and must be kept in sync with the corresponding CSS values in `PdfViewer.scss` and `PdfPageView.scss`.
+
+### Why page.height Remains Canvas Height
+
+Three invariants depend on `page.height` being the PDF viewport height:
+
+1. **Coordinate conversion**: `viewport.convertToViewportPoint()` returns CSS coordinates relative to the canvas origin. The stage must match the PDF viewport dimensions.
+2. **Canvas sizing**: `PdfRenderer` sets `canvas.width/height` and `canvas.style.width/height` from the viewport. The stage reserves this exact height.
+3. **Overlay positioning**: `PdfOverlayLayer` and `PdfLinkOverlay` position elements using viewport-relative percentages. Changing `page.height` would break these coordinate mappings.
+
+The stage element (`pdf-page__stage`) now explicitly reserves the canvas height via `stageStyle: height: page.height`. The page wrapper uses `width` only; its actual height is determined by DOM layout (stage + label + padding). This prevents the wrapper height from changing when a canvas renders vs. being cleared.
+
+---
+
+## Scroll Synchronization
+
+### Architecture
+
+Scroll synchronization between the original and translated panes in side-by-side mode is implemented by `usePdfScrollSync`.
+
+**File**: `src/apps/pdf/composables/usePdfScrollSync.js`
+
+**Principle**: A single scroll pane is designated as the source. When the source scrolls, the target pane's scroll position is recalculated to match the same logical page region. Synchronization is disabled when the user manually scrolls the target pane (loop suppression via `suppressSource`).
+
+### Synchronization Strategy
+
+Two strategies are attempted in order:
+
+| Strategy | Method | When Used |
+|----------|--------|-----------|
+| **Page-boundary matching** | `syncByPageBoundary()` | Default, used for most scroll events |
+| **Scroll-range ratio** | `syncScroll()` | Fallback when page-boundary matching fails |
+
+**Page-boundary matching**:
+
+1. Find the current page in the source pane by iterating DOM page elements and comparing `getBoundingClientRect()` to the scroll container viewport.
+2. Compute the ratio of scroll position within that page: `ratio = (scrollTop - pageTop) / pageHeight`.
+3. Find the corresponding page in the target pane.
+4. Set `target.scrollTop = targetPageTop + targetPageHeight * ratio`.
+
+**Scroll-range ratio fallback**:
+
+1. Compute `ratio = source.scrollTop / (source.scrollHeight - source.clientHeight)`.
+2. Set `target.scrollTop = ratio * (target.scrollHeight - target.clientHeight)`.
+
+The fallback is less accurate when source and target have different content heights (different zoom levels, reflowed translations) but prevents complete desynchronization.
+
+### Suppression Loop Guard
+
+When `syncScroll` or `syncByPageBoundary` writes to the target pane's `scrollTop`, the target's scroll handler fires. This would trigger the source again, creating an infinite loop. The guard mechanism:
+
+1. Before writing to the target, set `suppressSource = targetPane`.
+2. In `handleTargetScroll()`, if `suppressSource === targetPane`, skip the sync.
+3. After the next animation frame, clear suppression.
+
+### Limitations
+
+- Uses `getBoundingClientRect()` for every page element on each sync trigger — O(n) forced layout per scroll event.
+- The page-boundary matching duplicates logic from `pdfGeometryModel.resolvePageFromScroll()`.
+- The scroll-range ratio fallback accumulates drift when panes have different content heights.
+- The geometry-based sync engine (`pdfGeometrySyncEngine`) is prepared infrastructure using the canonical anchor model (`pdfCanonicalAnchor`) but has not been integrated. Future work should migrate `usePdfScrollSync` to use the geometry engine for improved reliability.
 
 ---
 
@@ -960,9 +1234,9 @@ User clicks "OCR Scanned Pages"
 
 The text layer renderer uses viewport diagonal scale factors for font height computation rather than transformed corner bounding boxes. For most PDFs this is accurate, but rotated or heavily skewed text may have minor positioning offsets. **Impact**: Low — affects a small percentage of PDFs with non-standard rotations.
 
-### 2. No Scroll Synchronization
+### 2. Scroll Synchronization Limitations
 
-Original and translated panes scroll independently. Users must manually align corresponding blocks. **Impact**: Medium UX inconvenience for bilingual mode.
+Scroll synchronization exists (`usePdfScrollSync`) but uses DOM geometry with page-boundary matching and proportional page offset, with a scroll-range ratio fallback for edge cases. A geometry-based engine (`pdfGeometrySyncEngine`) is prepared infrastructure and not yet integrated. **Impact**: Low — functional for normal use, minor drift edge cases.
 
 ### 3. No Cross-Pane Block Highlighting
 
@@ -980,9 +1254,9 @@ The text layer uses a constant `ASCENT_RATIO = 0.8` for font ascent computation 
 
 ## Future Extension Points
 
-### 1. Scroll Synchronization
+### 1. Geometry-Based Scroll Synchronization
 
-The `PdfViewer` component uses `IntersectionObserver` for page visibility. Scroll position data is available and could be used to synchronize scrolling between original and translated panes.
+Scroll synchronization is implemented via `usePdfScrollSync` using DOM geometry with page-boundary matching and proportional page offset, with a scroll-range ratio fallback. A geometry-based engine (`pdfGeometrySyncEngine`) is prepared infrastructure using `pdfCanonicalAnchor` and `pdfGeometryModel` but has not been integrated. Future work should migrate the composable to use the geometry engine, eliminating duplicated DOM-geometry math and improving reliability with reflowed content.
 
 ### 2. Cross-Pane Block Highlighting
 
@@ -1010,4 +1284,4 @@ The layout analyzer currently uses gap-based column detection and role classific
 
 ---
 
-**Last Updated**: June 2026
+**Last Updated**: July 2026
