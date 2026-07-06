@@ -1,22 +1,6 @@
 import { nextTick, onBeforeUnmount, ref, unref } from 'vue'
 import { CONTENT_VIEW } from './usePdfViewerMode.js'
 import { captureScrollAnchor, restoreScrollAnchor, capturePdfBackedScrollAnchor, restorePdfBackedScrollAnchor } from '../utils/pdfScrollAnchor.js'
-import { getScopedLogger } from '@/shared/logging/logger.js'
-import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js'
-
-const logger = getScopedLogger(LOG_COMPONENTS.PDF, 'createPdfTransitionControllerTrace')
-
-function traceJson(message, data) {
-  return `${message} ${JSON.stringify(data)}`
-}
-
-function traceCurrentPageCapture(container, anchor, currentPageRef) {
-  logger.debug(traceJson('[PDF Anchor Trace] capturePdfBackedScrollAnchor context', {
-    capturedPageNumber: anchor?.pageNumber ?? null,
-    currentPage: Number(currentPageRef?.value) || 0,
-    scrollTop: container?.scrollTop ?? null
-  }))
-}
 
 const PDF_SCROLL_OWNER = Object.freeze({
   ORIGINAL: 'original',
@@ -205,7 +189,6 @@ export function createPdfTransitionController({
       const target = resolveOwnerScrollTarget(owner)
       const pdfSession = unref(session) ?? null
       const pdfAnchor = capturePdfBackedScrollAnchor(target.container, target.selector, pdfSession)
-      traceCurrentPageCapture(target.container, pdfAnchor, currentPage)
       return pdfAnchor
         ? { owner, ...pdfAnchor }
         : captureOwnedScrollAnchor(owner)
@@ -222,7 +205,6 @@ export function createPdfTransitionController({
       const pdfSession = unref(session) ?? null
       const pdfAnchor = capturePdfBackedScrollAnchor(target.container, target.selector, pdfSession)
       if (pdfAnchor) {
-        traceCurrentPageCapture(target.container, pdfAnchor, currentPage)
         return { owner, ...pdfAnchor }
       }
     }
@@ -301,10 +283,6 @@ export function createPdfTransitionController({
       const normalizedAnchor = Number.isFinite(topPdfY)
         ? { ...anchor, pdfPoint: { ...anchor.pdfPoint, y: topPdfY }, offsetRatio: 0 }
         : { ...anchor, offsetRatio: 0 }
-      logger.debug(traceJson('[PDF Zoom Trace] normalizeFitPagePdfAnchor', {
-        originalAnchor: anchor,
-        normalizedAnchor
-      }))
       return normalizedAnchor
     }
     return { ...anchor, offsetRatio: 0 }
@@ -386,15 +364,6 @@ export function createPdfTransitionController({
 
   function syncFromOwner(owner) {
     pdfViewerLayoutRef.value?.syncFromPane?.(resolveAnchorOwner(owner))
-
-    const target = resolveOwnerScrollTarget(owner)
-    const pdfSession = unref(session) ?? null
-    logger.debug(traceJson('[PDF Zoom Trace] syncFromOwner', {
-      owner,
-      scrollTop: target.container?.scrollTop ?? null,
-      currentPage: Number(currentPage.value) || 0,
-      visiblePageNumbers: pdfSession?.visiblePageNumbers ? [...pdfSession.visiblePageNumbers] : []
-    }))
   }
 
   async function handleContentViewChange(nextView) {
@@ -405,9 +374,6 @@ export function createPdfTransitionController({
 
     const pdfSession = unref(session) ?? null
     const rawAnchor = isPdfBackedTransition && capturePdfBackedScrollAnchor(ownerTarget.container, ownerTarget.selector, pdfSession)
-    if (rawAnchor) {
-      traceCurrentPageCapture(ownerTarget.container, rawAnchor, currentPage)
-    }
     let anchor = rawAnchor
       ? { owner, ...rawAnchor }
       : captureScrollAnchor(ownerTarget.container, ownerTarget.selector)
@@ -485,7 +451,6 @@ export function createPdfTransitionController({
     const layoutSeq = layoutChangeSeq
     const contentSeqAtStart = contentTransitionSeq
     const suppressRestoreForControlledTransition = suppressedLayoutRestoreSeq === contentSeqAtStart
-    const suppressRestoreForControlledZoom = controlledZoomLayoutRestoreSeq > 0
     const pendingPdfAnchor = pendingPdfBackedAnchor?.transitionSeq === contentSeqAtStart
       ? pendingPdfBackedAnchor.anchor
       : null
@@ -511,9 +476,6 @@ export function createPdfTransitionController({
             originalAnchor: pendingPdfAnchor,
             translatedAnchor: anchors.translatedAnchor
           })
-          return
-        }
-        if (suppressRestoreForControlledZoom) {
           return
         }
         if (suppressRestoreForControlledTransition || suppressedLayoutRestoreSeq === contentSeqAtStart) {
@@ -548,13 +510,6 @@ export function createPdfTransitionController({
               : shouldNormalizeExitFromFitPage
                 ? normalizeFitPageDomRootAnchor(anchors.originalAnchor)
                 : anchors.originalAnchor
-            const activeTarget = resolveScrollAnchor()
-            logger.debug(traceJson('[PDF Zoom Trace] applyFitMode before recomputeLayout', {
-              previousZoomMode,
-              targetZoomMode: fitMode,
-              scrollTop: activeTarget.container?.scrollTop ?? null,
-              currentPage: Number(currentPage.value) || 0
-            }))
             await recomputeLayout(buildLayoutRequest())
             await nextTick()
             await applyPendingControlledZoomLayout()

@@ -1,8 +1,3 @@
-import { getScopedLogger } from '@/shared/logging/logger.js'
-import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js'
-
-const logger = getScopedLogger(LOG_COMPONENTS.PDF, 'pdfViewportPageResolverTrace')
-
 function getPageElements(container, pageSelector) {
   if (!container || !pageSelector) return []
 
@@ -17,7 +12,6 @@ function findPrimaryPageTarget(container, pageSelector) {
   if (pageElements.length === 0) return null
 
   let best = null
-  const visiblePages = []
 
   for (const el of pageElements) {
     const pageNumber = Number(el.dataset.pageNumber)
@@ -26,17 +20,6 @@ function findPrimaryPageTarget(container, pageSelector) {
     const rect = el.getBoundingClientRect()
     if (rect.bottom <= containerRect.top) continue
     if (rect.top >= containerRect.bottom) continue
-
-    const visibleHeight = Math.max(0, Math.min(rect.bottom, containerRect.bottom) - Math.max(rect.top, containerRect.top))
-    const distanceToViewportTop = Math.abs(rect.top - containerRect.top)
-    visiblePages.push({
-      pageNumber,
-      top: rect.top,
-      bottom: rect.bottom,
-      height: rect.height,
-      visibleHeight,
-      distanceToViewportTop
-    })
 
     const dist = Math.abs(rect.top - containerRect.top)
     if (!best || dist < best.dist) {
@@ -55,18 +38,6 @@ function findPrimaryPageTarget(container, pageSelector) {
       best = { el, rect, pageNumber }
       break
     }
-  }
-
-  if (best) {
-    const selectionReason = best.dist != null ? 'closest-top' : 'first-visible'
-    logger.debug(JSON.stringify({
-      message: '[PrimaryPageResolver]',
-      viewportTop: containerRect.top,
-      viewportBottom: containerRect.bottom,
-      pages: visiblePages,
-      selectedPage: best.pageNumber,
-      selectionReason
-    }))
   }
 
   return best
