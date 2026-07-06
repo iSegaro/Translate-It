@@ -1,6 +1,6 @@
 import { nextTick, onBeforeUnmount, ref, unref } from 'vue'
 import { CONTENT_VIEW } from './usePdfViewerMode.js'
-import { captureScrollAnchor, restoreScrollAnchor, capturePdfBackedScrollAnchor, restorePdfBackedScrollAnchor } from '../utils/pdfScrollAnchor.js'
+import { captureScrollAnchor, restoreScrollAnchor, capturePdfBackedScrollAnchor, restorePdfBackedScrollAnchor, isPdfAnchor } from '../utils/pdfScrollAnchor.js'
 
 const PDF_SCROLL_OWNER = Object.freeze({
   ORIGINAL: 'original',
@@ -275,7 +275,7 @@ export function createPdfTransitionController({
 
   function normalizeFitPagePdfAnchor(anchor) {
     if (!anchor) return anchor
-    if (anchor.pdfPoint) {
+    if (isPdfAnchor(anchor)) {
       const viewport = unref(session)?.getPageViewport?.(anchor.pageNumber)
       const topPdfPoint = viewport?.convertToPdfPoint?.(0, 0) || null
       const topPdfY = Number(topPdfPoint?.[1])
@@ -336,7 +336,7 @@ export function createPdfTransitionController({
     const preferredTarget = resolveOwnerScrollTarget(anchor.owner)
     const pdfSession = unref(session) ?? null
 
-    if (anchor.pdfPoint && restorePdfBackedScrollAnchor(anchor, preferredTarget.container, preferredTarget.selector, pdfSession, { zoomMode: zoomMode.value })) {
+    if (isPdfAnchor(anchor) && restorePdfBackedScrollAnchor(anchor, preferredTarget.container, preferredTarget.selector, pdfSession, { zoomMode: zoomMode.value })) {
       return preferredTarget.owner
     }
 
@@ -383,7 +383,7 @@ export function createPdfTransitionController({
     }
 
     beginControlledTransition()
-    pendingPdfBackedAnchor = isPdfBackedTransition && anchor?.pdfPoint
+    pendingPdfBackedAnchor = isPdfBackedTransition && isPdfAnchor(anchor)
       ? { transitionSeq: contentTransitionSeq, anchor }
       : null
 
@@ -404,7 +404,7 @@ export function createPdfTransitionController({
     const anchor = capturePdfAwareOwnedScrollAnchor(owner)
 
     beginControlledTransition()
-    pendingPdfBackedAnchor = anchor?.pdfPoint
+    pendingPdfBackedAnchor = isPdfAnchor(anchor)
       ? { transitionSeq: contentTransitionSeq, anchor }
       : null
     setLayoutMode(mode)
@@ -417,7 +417,7 @@ export function createPdfTransitionController({
       return
     }
 
-    if (anchor?.pdfPoint) {
+    if (isPdfAnchor(anchor)) {
       scheduleControlledTransitionSuppressionClear()
       return
     }

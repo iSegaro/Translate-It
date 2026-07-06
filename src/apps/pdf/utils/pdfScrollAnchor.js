@@ -2,6 +2,10 @@ import { findPrimaryPageTarget } from './pdfViewportPageResolver.js'
 
 const findBestScrollAnchorTarget = findPrimaryPageTarget
 
+function isPdfAnchor(anchor) {
+  return anchor?.pdfPoint != null
+}
+
 function getPageCanvasElement(pageEl) {
   return pageEl?.querySelector('canvas') || null
 }
@@ -114,7 +118,7 @@ function restorePdfBackedScrollAnchor(anchor, container, pageSelector, pdfSessio
     return true
   }
 
-  if (!anchor.pdfPoint || !pdfSession) {
+  if (!isPdfAnchor(anchor) || !pdfSession) {
     return false
   }
 
@@ -150,5 +154,7 @@ export {
   captureScrollAnchor,
   restoreScrollAnchor,
   capturePdfBackedScrollAnchor,
-  restorePdfBackedScrollAnchor
+  restorePdfBackedScrollAnchor,
+  isPdfAnchor,
+  isDomAnchor
 }
