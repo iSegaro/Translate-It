@@ -669,7 +669,7 @@ describe('PdfApp', () => {
     })
 
     it('suppresses layout-change restore during fit-page zoom transitions', async () => {
-      const wrapper = mountInMode({ contentView: 'original', layoutMode: 'side-by-side' })
+      const wrapper = mountInMode({ contentView: 'original', layoutMode: 'single' })
       await flushPromises()
 
       const layout = wrapper.findComponent({ name: 'PdfViewerLayout' }).vm
@@ -686,10 +686,52 @@ describe('PdfApp', () => {
 
       await emitToolbar(wrapper, 'zoom-change', { mode: 'fit-page', value: 100 })
       await flushPromises()
+      await flushPromises()
+      await flushPromises()
 
-      expect(mockViewerController.recomputeLayout).toHaveBeenCalled()
-      expect(originalPane.scrollTop).toBe(864)
+      expect(mockViewerController.recomputeLayout).toHaveBeenCalledTimes(2)
+      expect(mockViewerController.recomputeLayout).toHaveBeenNthCalledWith(2, {
+        width: 800,
+        height: 600,
+        zoomMode: 'fit-page',
+        zoomPercent: 100
+      })
       expect(originalPane.scrollTo).toHaveBeenCalledTimes(1)
+      expect(originalPane.scrollTo.mock.invocationCallOrder[0]).toBeGreaterThan(
+        mockViewerController.recomputeLayout.mock.invocationCallOrder[1]
+      )
+
+      wrapper.unmount()
+    })
+
+    it('snaps original single fit-page zoom to the current page top', async () => {
+      const wrapper = mountInMode({ contentView: 'original', layoutMode: 'single' })
+      await flushPromises()
+
+      const layout = wrapper.findComponent({ name: 'PdfViewerLayout' }).vm
+      const originalPane = layout.scrollContainer
+      originalPane.scrollTop = 900
+
+      await emitToolbar(wrapper, 'zoom-change', { mode: 'fit-page', value: 100 })
+      await flushPromises()
+
+      expect(originalPane.scrollTop).toBe(864)
+
+      wrapper.unmount()
+    })
+
+    it('snaps translated-pdf single fit-page zoom to the current page top', async () => {
+      const wrapper = mountInMode({ contentView: 'translated-pdf', layoutMode: 'single' })
+      await flushPromises()
+
+      const layout = wrapper.findComponent({ name: 'PdfViewerLayout' }).vm
+      const originalPane = layout.scrollContainer
+      originalPane.scrollTop = 900
+
+      await emitToolbar(wrapper, 'zoom-change', { mode: 'fit-page', value: 100 })
+      await flushPromises()
+
+      expect(originalPane.scrollTop).toBe(864)
 
       wrapper.unmount()
     })

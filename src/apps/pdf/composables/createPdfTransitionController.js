@@ -52,6 +52,7 @@ export function createPdfTransitionController({
   let scrollSyncSuppressionFrameId = null
   let controlledZoomLayoutRestoreSeq = 0
   let pendingPdfBackedAnchor = null
+  let pendingControlledZoomLayout = null
 
   const zoomMode = ref('fit-width')
   const zoomPercent = ref(100)
@@ -62,6 +63,7 @@ export function createPdfTransitionController({
   onBeforeUnmount(() => {
     clearControlledTransitionSuppressionTimer()
     clearScrollSyncSuppressionTimer()
+    pendingControlledZoomLayout = null
   })
 
   function beginControlledTransition() {
@@ -128,6 +130,7 @@ export function createPdfTransitionController({
 
   function beginControlledZoomLayoutRestoreSuppression() {
     controlledZoomLayoutRestoreSeq += 1
+    pendingControlledZoomLayout = null
     return controlledZoomLayoutRestoreSeq
   }
 
@@ -272,6 +275,20 @@ export function createPdfTransitionController({
       pageNumber: originalAnchor.pageNumber,
       offsetRatio: originalAnchor.offsetRatio ?? 0
     }
+  }
+
+  function resolveTranslatedZoomAnchor(originalAnchor, capturedTranslatedAnchor) {
+    if (!isSideBySide.value) return capturedTranslatedAnchor
+    return deriveTranslatedAnchorFromOriginal(originalAnchor) || capturedTranslatedAnchor
+  }
+
+  async function applyPendingControlledZoomLayout() {
+    const pendingLayout = pendingControlledZoomLayout
+    if (!pendingLayout) return
+
+    pendingControlledZoomLayout = null
+    await recomputeLayout(buildLayoutRequest(pendingLayout))
+    await nextTick()
   }
 
   function normalizeFitPageAnchor(anchor) {
@@ -449,6 +466,12 @@ export function createPdfTransitionController({
       return
     }
 
+    if (controlledZoomLayoutRestoreSeq > 0) {
+      pendingControlledZoomLayout = nextLayout
+      viewerLayout.value = nextLayout
+      return
+    }
+
     layoutChangeSeq += 1
     const layoutSeq = layoutChangeSeq
     const contentSeqAtStart = contentTransitionSeq
@@ -525,14 +548,14 @@ export function createPdfTransitionController({
             }))
             await recomputeLayout(buildLayoutRequest())
             await nextTick()
+            await applyPendingControlledZoomLayout()
             restoreControlledTransitionAnchors({
               originalAnchor: restoredOriginalAnchor,
-              translatedAnchor: isSideBySide.value
-                ? deriveTranslatedAnchorFromOriginal(restoredOriginalAnchor) || anchors.translatedAnchor
-                : anchors.translatedAnchor
+              translatedAnchor: resolveTranslatedZoomAnchor(restoredOriginalAnchor, anchors.translatedAnchor)
             })
           })
         } finally {
+          pendingControlledZoomLayout = null
           endControlledZoomLayoutRestoreSuppression(zoomLayoutRestoreSeq)
           scheduleScrollSyncSuppressionClear()
         }
@@ -564,14 +587,14 @@ export function createPdfTransitionController({
             await runWithCurrentPageSuppression(async () => {
               await recomputeLayout(buildLayoutRequest())
               await nextTick()
+              await applyPendingControlledZoomLayout()
               restoreControlledTransitionAnchors({
                 originalAnchor,
-                translatedAnchor: isSideBySide.value
-                  ? deriveTranslatedAnchorFromOriginal(originalAnchor) || translatedAnchor
-                  : translatedAnchor
-                })
+                translatedAnchor: resolveTranslatedZoomAnchor(originalAnchor, translatedAnchor)
+              })
             })
           } finally {
+            pendingControlledZoomLayout = null
             endControlledZoomLayoutRestoreSuppression(zoomLayoutRestoreSeq)
             scheduleScrollSyncSuppressionClear()
           }
@@ -603,20 +626,22 @@ export function createPdfTransitionController({
     zoomPercent.value = nextPercent
 
     if (hasDocument.value) {
+      const zoomLayoutRestoreSeq = beginControlledZoomLayoutRestoreSuppression()
       beginScrollSyncSuppression()
       try {
         await runWithCurrentPageSuppression(async () => {
           const { originalAnchor, translatedAnchor } = captureControlledTransitionAnchors()
           await recomputeLayout(buildLayoutRequest())
           await nextTick()
+          await applyPendingControlledZoomLayout()
           restoreControlledTransitionAnchors({
             originalAnchor,
-            translatedAnchor: isSideBySide.value
-              ? deriveTranslatedAnchorFromOriginal(originalAnchor) || translatedAnchor
-              : translatedAnchor
+            translatedAnchor: resolveTranslatedZoomAnchor(originalAnchor, translatedAnchor)
           })
         })
       } finally {
+        pendingControlledZoomLayout = null
+        endControlledZoomLayoutRestoreSuppression(zoomLayoutRestoreSeq)
         scheduleScrollSyncSuppressionClear()
       }
       refreshCurrentPage()
