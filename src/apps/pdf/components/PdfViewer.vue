@@ -38,12 +38,12 @@ import { getPdfPageRootElement } from '../utils/pageViewInstance.js'
 import {
   getCanvasScrollTop,
   getElementClientMetrics,
-  getPageGeometries,
   getPageGeometry,
   getScrollMetrics,
   getScrollSpaceTop
 } from '../utils/pdfGeometryModel.js'
-import { CURRENT_PAGE_SOURCE, resolvePrimaryVisiblePage } from '../utils/pdfCurrentPageResolver.js'
+import { CURRENT_PAGE_SOURCE } from '../utils/pdfCurrentPageResolver.js'
+import { resolveRenderWindow } from '../utils/pdfRenderWindowResolver.js'
 import { usePdfSelectionBridge } from '../composables/usePdfSelectionBridge.js'
 import { VIEWER_ROLE } from '../composables/usePdfViewerMode.js'
 import './PdfViewer.scss'
@@ -105,6 +105,7 @@ let renderCandidateObserver = null
 let resizeObserver = null
 let scrollRoot = null
 let currentPageFrameId = null
+let renderWindowFrameId = null
 let lastLayoutWidth = 0
 let lastLayoutHeight = 0
 let lastCurrentPage = 0
@@ -244,6 +245,7 @@ function disconnectObservers() {
     scrollRoot = null
   }
   cancelCurrentPageFrame()
+  cancelRenderWindowFrame()
   intersectionObserver = null
   renderCandidateObserver = null
   resizeObserver = null
@@ -274,6 +276,14 @@ function updateVisiblePages(nextVisible) {
   }
 }
 
+function updateRenderCandidates(nextRenderable) {
+  renderCandidatePageNumbers.value = nextRenderable
+
+  if (isOriginalRole.value) {
+    props.session.updateRenderCandidates(nextRenderable)
+  }
+}
+
 watch(
   () => props.suppressCurrentPageUpdates,
   (suppress) => {
@@ -290,14 +300,46 @@ function cancelCurrentPageFrame() {
   }
 }
 
+function cancelRenderWindowFrame() {
+  if (renderWindowFrameId != null) {
+    cancelAnimationFrame(renderWindowFrameId)
+    renderWindowFrameId = null
+  }
+}
+
+function applyRenderWindow() {
+  const container = scrollRoot || props.scrollContainer || viewerRoot.value || null
+  const renderWindow = resolveRenderWindow({
+    container,
+    pageSelector: '.pdf-page[data-page-number]',
+    bufferPages: 1
+  })
+
+  updateVisiblePages(new Set(renderWindow.visiblePages))
+  updateRenderCandidates(new Set(renderWindow.renderPages))
+}
+
+function scheduleRenderWindowUpdate() {
+  if (renderWindowFrameId != null) return
+
+  renderWindowFrameId = requestAnimationFrame(() => {
+    renderWindowFrameId = null
+    applyRenderWindow()
+  })
+}
+
 function emitCurrentPageFromResolver(force = false) {
   if (!isOriginalRole.value) return
   if (!force && props.suppressCurrentPageUpdates) return
 
   const container = scrollRoot || props.scrollContainer || viewerRoot.value || null
-  const pageGeometries = getPageGeometries(container, '.pdf-page[data-page-number]')
   const { scrollTop } = getScrollMetrics(container)
-  const currentPage = resolvePrimaryVisiblePage(scrollTop, pageGeometries)
+  const currentPage = resolveRenderWindow({
+    scrollTop,
+    container,
+    pageSelector: '.pdf-page[data-page-number]',
+    bufferPages: 1
+  }).primaryPage
   if (!currentPage) return
 
   if (currentPage && currentPage !== lastCurrentPage) {
@@ -319,6 +361,7 @@ function scheduleCurrentPageUpdate() {
 }
 
 function handleScroll() {
+  scheduleRenderWindowUpdate()
   scheduleCurrentPageUpdate()
 }
 
@@ -364,45 +407,15 @@ function setupObservers() {
     scrollRoot.addEventListener('scroll', handleScroll, { passive: true })
   }
 
-  intersectionObserver = new IntersectionObserver((entries) => {
-    const nextVisible = new Set(visiblePageNumbers.value)
-
-    for (const entry of entries) {
-      const pageNumber = Number(entry.target?.dataset?.pageNumber)
-      if (!pageNumber) continue
-
-      if (entry.isIntersecting) {
-        nextVisible.add(pageNumber)
-      } else {
-        nextVisible.delete(pageNumber)
-      }
-    }
-
-    updateVisiblePages(nextVisible)
+  intersectionObserver = new IntersectionObserver(() => {
+    scheduleRenderWindowUpdate()
   }, {
     root: scrollRoot,
     threshold: 0
   })
 
-  renderCandidateObserver = new IntersectionObserver((entries) => {
-    const nextRenderable = new Set(renderCandidatePageNumbers.value)
-
-    for (const entry of entries) {
-      const pageNumber = Number(entry.target?.dataset?.pageNumber)
-      if (!pageNumber) continue
-
-      if (entry.isIntersecting) {
-        nextRenderable.add(pageNumber)
-      } else {
-        nextRenderable.delete(pageNumber)
-      }
-    }
-
-    renderCandidatePageNumbers.value = nextRenderable
-
-    if (isOriginalRole.value) {
-      props.session.updateRenderCandidates(nextRenderable)
-    }
+  renderCandidateObserver = new IntersectionObserver(() => {
+    scheduleRenderWindowUpdate()
   }, {
     root: scrollRoot,
     threshold: 0
@@ -418,6 +431,7 @@ function setupObservers() {
   }
   refreshObservationTargets()
   emitLayoutIfNeeded()
+  applyRenderWindow()
   emitCurrentPageIfVisible()
 }
 
@@ -426,6 +440,7 @@ watch(
   async () => {
     await nextTick()
     refreshObservationTargets()
+    applyRenderWindow()
 
     if (isOriginalRole.value) {
       emitLayoutIfNeeded()
