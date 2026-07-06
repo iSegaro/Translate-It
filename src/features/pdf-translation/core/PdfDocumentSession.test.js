@@ -88,12 +88,45 @@ describe('PdfDocumentSession', () => {
     const state = await session.rebuildPageMetrics({
       width: 400,
       height: 400,
+      availableCanvasWidth: 352,
+      availableCanvasHeight: 300,
       zoomMode: 'fit-page',
       zoomPercent: 100
     })
 
     expect(state.pageMetrics).toHaveLength(1)
-    expect(state.pageMetrics[0].scale).toBeCloseTo(352 / 600, 6)
+    expect(state.pageMetrics[0].scale).toBeCloseTo(300 / 600, 6)
+    expect(state.pageMetrics[0].height).toBeCloseTo(300, 6)
+  })
+
+  it('keeps fit-width scale compatible when an explicit canvas slot is provided', async () => {
+    session.totalPages = 1
+    session.pdfDocument = {
+      numPages: 1,
+      getPage: vi.fn(async () => ({
+        pageNumber: 1,
+        cleanup: vi.fn(),
+        getTextContent: vi.fn().mockResolvedValue({
+          items: []
+        }),
+        getViewport: ({ scale }) => ({
+          width: 500 * scale,
+          height: 600 * scale
+        })
+      }))
+    }
+
+    const state = await session.rebuildPageMetrics({
+      width: 400,
+      height: 400,
+      availableCanvasWidth: 352,
+      availableCanvasHeight: 300,
+      zoomMode: 'fit-width',
+      zoomPercent: 100
+    })
+
+    expect(state.pageMetrics).toHaveLength(1)
+    expect(state.pageMetrics[0].scale).toBeCloseTo(352 / 500, 6)
   })
 
   it('rebuildPageMetrics applies percent zoom on top of fit-width scale', async () => {

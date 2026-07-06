@@ -1,6 +1,7 @@
 import { nextTick, onBeforeUnmount, ref, unref } from 'vue'
 import { CONTENT_VIEW } from './usePdfViewerMode.js'
 import { captureScrollAnchor, restoreScrollAnchor, capturePdfBackedScrollAnchor, restorePdfBackedScrollAnchor, isPdfAnchor } from '../utils/pdfScrollAnchor.js'
+import { resolvePdfCanvasSlot } from '../utils/pdfFitPageFootprint.js'
 
 const PDF_SCROLL_OWNER = Object.freeze({
   ORIGINAL: 'original',
@@ -14,7 +15,6 @@ const DEFAULT_VIEWER_WIDTH = 960
 export function createPdfTransitionController({
   contentView,
   isSideBySide,
-  showOriginalPane,
   showTranslatedTextPane,
   showTranslatedPdfPane,
   setContentView,
@@ -131,16 +131,6 @@ export function createPdfTransitionController({
       pdfViewerLayoutRef.value?.setScrollSyncSuppressed?.(false)
       suppressScrollSync.value = false
     })
-  }
-
-  function resolveScrollAnchor() {
-    if (!showOriginalPane.value && showTranslatedTextPane.value) {
-      const container = translatedScrollContainer.value
-      if (container) {
-        return { container, selector: '.pdf-translated-page[data-page-number]' }
-      }
-    }
-    return { container: originalScrollContainer.value, selector: '.pdf-page[data-page-number]' }
   }
 
   function resolveAnchorOwner(explicitOwner) {
@@ -619,9 +609,12 @@ export function createPdfTransitionController({
 
   function buildLayoutRequest(layout = viewerLayout.value) {
     const normalizedLayout = normalizeLayout(layout)
+    const canvasSlot = resolvePdfCanvasSlot(normalizedLayout)
     return {
       width: normalizedLayout.width > 0 ? normalizedLayout.width : DEFAULT_VIEWER_WIDTH,
       height: normalizedLayout.height,
+      availableCanvasWidth: canvasSlot.availableCanvasWidth,
+      availableCanvasHeight: canvasSlot.availableCanvasHeight,
       zoomMode: zoomMode.value,
       zoomPercent: zoomPercent.value
     }

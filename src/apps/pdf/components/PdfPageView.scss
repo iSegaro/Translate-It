@@ -15,6 +15,7 @@
 .pdf-page__label {
   margin-bottom: 12px;
   font-size: 13px;
+  line-height: 16px;
   font-weight: 700;
   color: rgba(60, 64, 67, 0.82);
 }
@@ -27,6 +28,10 @@
 .pdf-page__stage canvas,
 .pdf-page__text-layer {
   grid-area: 1 / 1;
+}
+
+.pdf-page__stage canvas {
+  display: block;
 }
 
 .pdf-page__text-layer {

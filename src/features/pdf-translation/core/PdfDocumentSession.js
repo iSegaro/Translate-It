@@ -19,6 +19,8 @@ function normalizeLayoutRequest(layoutRequest = null) {
     return {
       width: Number(layoutRequest) || 0,
       height: 0,
+      availableCanvasWidth: 0,
+      availableCanvasHeight: 0,
       zoomMode: 'fit-width',
       zoomPercent: 100
     }
@@ -27,6 +29,8 @@ function normalizeLayoutRequest(layoutRequest = null) {
   return {
     width: Number(layoutRequest?.width) || 0,
     height: Number(layoutRequest?.height) || 0,
+    availableCanvasWidth: Number(layoutRequest?.availableCanvasWidth) || 0,
+    availableCanvasHeight: Number(layoutRequest?.availableCanvasHeight) || 0,
     zoomMode: layoutRequest?.zoomMode || 'fit-width',
     zoomPercent: Number(layoutRequest?.zoomPercent) || 100
   }
@@ -122,12 +126,18 @@ export class PdfDocumentSession extends ResourceTracker {
     const {
       width: viewerWidth,
       height: viewerHeight,
+      availableCanvasWidth,
+      availableCanvasHeight,
       zoomMode,
       zoomPercent
     } = normalizeLayoutRequest(layoutRequest)
 
-    const usableWidth = Math.max(320, viewerWidth - PAGE_MARGIN * 2)
-    const usableHeight = Math.max(0, viewerHeight - PAGE_MARGIN * 2)
+    const usableWidth = availableCanvasWidth > 0
+      ? availableCanvasWidth
+      : Math.max(320, viewerWidth - PAGE_MARGIN * 2)
+    const usableHeight = availableCanvasHeight > 0
+      ? availableCanvasHeight
+      : Math.max(0, viewerHeight - PAGE_MARGIN * 2)
     const metrics = []
 
     for (let pageNumber = 1; pageNumber <= this.totalPages; pageNumber += 1) {

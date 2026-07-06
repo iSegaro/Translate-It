@@ -693,6 +693,8 @@ describe('PdfApp', () => {
       expect(mockViewerController.recomputeLayout).toHaveBeenNthCalledWith(2, {
         width: 800,
         height: 600,
+        availableCanvasWidth: 752,
+        availableCanvasHeight: 500,
         zoomMode: 'fit-page',
         zoomPercent: 100
       })

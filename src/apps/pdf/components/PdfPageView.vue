@@ -7,7 +7,10 @@
     <div class="pdf-page__label">
       Page {{ page.pageNumber }}
     </div>
-    <div class="pdf-page__stage">
+    <div
+      class="pdf-page__stage"
+      :style="stageStyle"
+    >
       <canvas ref="canvasEl" />
       <div
         ref="textLayerEl"
@@ -72,8 +75,12 @@ const textLayerEl = ref(null)
 let textLayerRenderer = null
 
 const pageStyle = computed(() => ({
+  width: `${Math.floor(props.page.width)}px`
+}))
+
+const stageStyle = computed(() => ({
   width: `${Math.floor(props.page.width)}px`,
-  minHeight: `${Math.floor(props.page.height)}px`
+  height: `${Math.floor(props.page.height)}px`
 }))
 
 const textLayerStyle = computed(() => ({
