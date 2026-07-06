@@ -105,6 +105,7 @@ let resizeObserver = null
 let scrollRoot = null
 let currentPageFrameId = null
 let renderWindowFrameId = null
+let initialExpansionFrameId = null
 let lastLayoutWidth = 0
 let lastLayoutHeight = 0
 let lastCurrentPage = 0
@@ -243,6 +244,7 @@ function disconnectObservers() {
   }
   cancelCurrentPageFrame()
   cancelRenderWindowFrame()
+  cancelInitialExpansion()
   intersectionObserver = null
   resizeObserver = null
 }
@@ -302,7 +304,16 @@ function cancelRenderWindowFrame() {
   }
 }
 
+function cancelInitialExpansion() {
+  if (initialExpansionFrameId != null) {
+    cancelAnimationFrame(initialExpansionFrameId)
+    initialExpansionFrameId = null
+  }
+}
+
 function applyRenderWindow() {
+  cancelInitialExpansion()
+
   const container = scrollRoot || props.scrollContainer || viewerRoot.value || null
   const renderWindow = resolveRenderWindow({
     container,
@@ -311,7 +322,18 @@ function applyRenderWindow() {
   })
 
   updateVisiblePages(new Set(renderWindow.visiblePages))
-  updateRenderCandidates(new Set(renderWindow.renderPages))
+
+  if (renderCandidatePageNumbers.value.size === 0 && renderWindow.primaryPage) {
+    const primaryOnly = new Set([renderWindow.primaryPage])
+    updateRenderCandidates(primaryOnly)
+
+    initialExpansionFrameId = requestAnimationFrame(() => {
+      initialExpansionFrameId = null
+      updateRenderCandidates(new Set(renderWindow.renderPages))
+    })
+  } else {
+    updateRenderCandidates(new Set(renderWindow.renderPages))
+  }
 }
 
 function scheduleRenderWindowUpdate() {

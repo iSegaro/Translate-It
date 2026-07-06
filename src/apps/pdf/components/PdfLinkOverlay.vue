@@ -44,6 +44,7 @@ const links = ref([])
 const hasLinks = ref(false)
 
 let fetchGeneration = 0
+let deferredLinks = true
 
 async function fetchLinks() {
   if (!props.visible || !props.session) {
@@ -135,6 +136,14 @@ function handleLinkClick(event, link) {
 watch(
   () => [props.visible, props.pageNumber, props.session],
   () => {
+    if (props.visible && deferredLinks) {
+      deferredLinks = false
+      requestAnimationFrame(() => {
+        fetchLinks()
+      })
+      return
+    }
+
     fetchLinks()
   },
   { immediate: true }
