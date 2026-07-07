@@ -22,7 +22,7 @@
         :page-number="page.pageNumber"
         :visible="visible"
         :handle-navigation-target="handleNavigationTarget"
-      />
+    />
       <PdfOverlayLayer
         v-if="showOverlay"
         :blocks="overlayBlocks"
@@ -72,6 +72,10 @@ const props = defineProps({
   handleNavigationTarget: {
     type: Function,
     default: null
+  },
+  clearOnUnmount: {
+    type: Boolean,
+    default: true
   }
 })
 
@@ -189,7 +193,9 @@ watch(
 )
 
 onBeforeUnmount(() => {
-  clearPage('unmount')
+  if (props.clearOnUnmount) {
+    clearPage('unmount')
+  }
   textLayerRenderer?.destroy()
   textLayerRenderer = null
 })

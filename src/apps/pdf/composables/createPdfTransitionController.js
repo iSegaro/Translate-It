@@ -159,6 +159,12 @@ export function createPdfTransitionController({
     })
   }
 
+  async function refreshRenderWindowAfterLayoutTransition() {
+    await nextTick()
+    await new Promise(resolve => requestAnimationFrame(resolve))
+    pdfViewerRef.value?.refreshRenderWindow?.()
+  }
+
   function isPdfBackedPdfTransition(previousView, nextView) {
     return isPdfBackedContentView(previousView) && isPdfBackedContentView(nextView) && previousView !== nextView
   }
@@ -267,6 +273,7 @@ export function createPdfTransitionController({
       scheduleControlledTransitionSuppressionClear()
     } finally {
       renderWindowEvictionFrozen.value = false
+      await refreshRenderWindowAfterLayoutTransition()
     }
   }
 

@@ -1,4 +1,4 @@
-import { defineComponent, h, nextTick, onMounted, ref } from 'vue'
+import { defineComponent, h, nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
 import { mount } from '@vue/test-utils'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -27,7 +27,8 @@ vi.mock('./PdfPageView.vue', () => ({
     props: {
       page: { type: Object, required: true },
       session: { type: Object, required: true },
-      visible: { type: Boolean, default: false }
+      visible: { type: Boolean, default: false },
+      clearOnUnmount: { type: Boolean, default: true }
     },
     setup(props, { expose }) {
       const rootEl = ref(null)
@@ -38,6 +39,12 @@ vi.mock('./PdfPageView.vue', () => ({
         rootEl.value.dataset.pageNumber = String(props.page.pageNumber)
         rootEl.value.getBoundingClientRect = () => pageRectMap.get(props.page.pageNumber) || buildRect(0)
         pageRootEls.set(props.page.pageNumber, rootEl.value)
+      })
+
+      onBeforeUnmount(() => {
+        if (props.clearOnUnmount) {
+          props.session.clearPage?.(props.page.pageNumber)
+        }
       })
 
       expose({
@@ -96,6 +103,11 @@ function setPageTops(tops) {
 
 function lastRenderCandidates(session) {
   const lastCall = session.updateRenderCandidates.mock.calls.at(-1)
+  return lastCall ? [...lastCall[0]].sort((a, b) => a - b) : []
+}
+
+function lastVisiblePages(session) {
+  const lastCall = session.updateVisiblePages.mock.calls.at(-1)
   return lastCall ? [...lastCall[0]].sort((a, b) => a - b) : []
 }
 
@@ -331,17 +343,19 @@ describe('PdfViewer', () => {
     await nextTick()
 
     expect(lastRenderCandidates(session)).toEqual([1, 2, 3])
+    expect(lastVisiblePages(session)).toEqual([2])
 
     await wrapper.setProps({ freezeRenderWindowEviction: true })
     setPageTops({ 1: -300, 2: -200, 3: -100, 4: 0 })
     await updatePages(wrapper)
 
     expect(lastRenderCandidates(session)).toEqual([1, 2, 3])
+    expect(lastVisiblePages(session)).toEqual([2])
 
     wrapper.unmount()
   })
 
-  it('seeds only the primary page when eviction is frozen and no candidates exist', async () => {
+  it('does not seed render candidates while eviction is frozen', async () => {
     const session = createSession()
     setPageTops({ 1: -100, 2: 0, 3: 100, 4: 200 })
 
@@ -359,12 +373,13 @@ describe('PdfViewer', () => {
     await nextTick()
     await nextTick()
 
-    expect(lastRenderCandidates(session)).toEqual([2])
+    expect(session.updateVisiblePages).not.toHaveBeenCalled()
+    expect(session.updateRenderCandidates).not.toHaveBeenCalled()
 
     wrapper.unmount()
   })
 
-  it('recomputes the final render window when eviction freeze is released', async () => {
+  it('recomputes the final render window through explicit refresh after eviction freeze is released', async () => {
     const session = createSession()
     setPageTops({ 1: -100, 2: 0, 3: 100, 4: 200 })
 
@@ -389,7 +404,10 @@ describe('PdfViewer', () => {
 
     await wrapper.setProps({ freezeRenderWindowEviction: false })
     await nextTick()
-    await nextTick()
+
+    expect(lastRenderCandidates(session)).toEqual([1, 2, 3])
+
+    wrapper.vm.refreshRenderWindow()
 
     expect(lastRenderCandidates(session)).toEqual([3, 4])
 
@@ -571,6 +589,30 @@ describe('PdfViewer', () => {
       expect(session.updateRenderCandidates).not.toHaveBeenCalled()
 
       wrapper.unmount()
+    })
+
+    it('does not let overlay page unmount clear shared session pages', async () => {
+      const session = {
+        updateVisiblePages: vi.fn(),
+        updateRenderCandidates: vi.fn(),
+        clearPage: vi.fn()
+      }
+
+      const wrapper = mount(PdfViewer, {
+        props: {
+          pages: [{ pageNumber: 82, width: 100, height: 100, scale: 1 }],
+          session,
+          viewerRole: VIEWER_ROLE.OVERLAY
+        },
+        attachTo: document.body
+      })
+
+      await nextTick()
+      await nextTick()
+
+      wrapper.unmount()
+
+      expect(session.clearPage).not.toHaveBeenCalled()
     })
 
     it('does not emit block-pointer-move for overlay role', async () => {

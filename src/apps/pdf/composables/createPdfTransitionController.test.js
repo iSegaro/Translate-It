@@ -41,7 +41,7 @@ function createController(options = {}) {
   const setLayoutMode = vi.fn()
   const recomputeLayout = options.recomputeLayout || vi.fn().mockResolvedValue()
 
-  const pdfViewerRef = ref(null)
+  const pdfViewerRef = ref(options.pdfViewerRef ?? null)
   const pdfTranslatedPaneRef = ref(null)
   const pdfViewerLayoutRef = ref({
     setScrollSyncSuppressed: vi.fn(),
@@ -343,7 +343,7 @@ describe('createPdfTransitionController', () => {
       scrollAnchor.isPdfAnchor.mockReturnValue(false)
       anchorFns.restoreOwnedScrollAnchor.mockReturnValue(PDF_SCROLL_OWNER.ORIGINAL)
 
-      await ctrl.handleLayoutModeChange('side-by-side')
+      const layoutModeTransition = ctrl.handleLayoutModeChange('side-by-side')
 
       anchorFns.captureControlledTransitionAnchors.mockReturnValue({
         originalAnchor: domAnchor,
@@ -355,6 +355,7 @@ describe('createPdfTransitionController', () => {
       })
 
       await ctrl.handleLayoutChange({ width: 800, height: 600 })
+      await layoutModeTransition
 
       expect(recomputeLayout).toHaveBeenCalled()
       expect(ctrl.renderWindowEvictionFrozen.value).toBe(false)
@@ -608,6 +609,24 @@ describe('createPdfTransitionController', () => {
 
       expect(anchorFns.capturePdfAwareOwnedScrollAnchor).toHaveBeenCalledBefore(anchorFns.restoreOwnedScrollAnchor)
       expect(setLayoutMode).toHaveBeenCalledBefore(anchorFns.restoreOwnedScrollAnchor)
+    })
+
+    it('refreshes render window after layout mode thaw', async () => {
+      const refreshRenderWindow = vi.fn()
+      const { ctrl } = createController({
+        pdfViewerRef: { refreshRenderWindow }
+      })
+
+      const domAnchor = { pageNumber: 3, offsetRatio: 0.25 }
+      anchorFns.resolveAnchorOwner.mockReturnValue(PDF_SCROLL_OWNER.ORIGINAL)
+      anchorFns.capturePdfAwareOwnedScrollAnchor.mockReturnValue(domAnchor)
+      scrollAnchor.isPdfAnchor.mockReturnValue(false)
+      anchorFns.restoreOwnedScrollAnchor.mockReturnValue(PDF_SCROLL_OWNER.ORIGINAL)
+
+      await ctrl.handleLayoutModeChange('single')
+
+      expect(ctrl.renderWindowEvictionFrozen.value).toBe(false)
+      expect(refreshRenderWindow).toHaveBeenCalledTimes(1)
     })
 
     it('captures, zooms, and restores in correct order for zoom transition', async () => {

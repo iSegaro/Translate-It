@@ -124,6 +124,25 @@ describe('PdfPageView', () => {
     expect(session.clearPage).toHaveBeenCalledTimes(1)
   })
 
+  it('does not clear on unmount when render lifecycle is not owned', async () => {
+    const session = createSession()
+    const wrapper = mount(PdfPageView, {
+      props: {
+        page: createPage(),
+        session,
+        visible: true,
+        clearOnUnmount: false
+      }
+    })
+
+    await settleWatchers()
+    session.clearPage.mockClear()
+
+    wrapper.unmount()
+
+    expect(session.clearPage).not.toHaveBeenCalled()
+  })
+
   it('does not render or clear a hidden page when dimensions and scale change', async () => {
     const session = createSession()
     const wrapper = mount(PdfPageView, {

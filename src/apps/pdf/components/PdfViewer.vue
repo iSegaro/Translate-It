@@ -17,6 +17,7 @@
       :show-overlay="showOverlay"
       :overlay-blocks="getPageOverlayBlocks(page.pageNumber)"
       :handle-navigation-target="handleNavigationTarget"
+      :clear-on-unmount="ownsPageRenderLifecycle"
     />
 
     <PdfBlockHighlightOverlay
@@ -115,6 +116,7 @@ let lastLayoutHeight = 0
 let lastCurrentPage = 0
 
 const isOriginalRole = computed(() => props.viewerRole === VIEWER_ROLE.ORIGINAL)
+const ownsPageRenderLifecycle = computed(() => props.viewerRole === VIEWER_ROLE.ORIGINAL)
 
 if (props.viewerRole === VIEWER_ROLE.ORIGINAL) {
   usePdfSelectionBridge(viewerRoot)
@@ -302,16 +304,6 @@ watch(
   }
 )
 
-watch(
-  () => props.freezeRenderWindowEviction,
-  async (frozen, wasFrozen) => {
-    if (!frozen && wasFrozen) {
-      await nextTick()
-      applyRenderWindow()
-    }
-  }
-)
-
 function cancelCurrentPageFrame() {
   if (currentPageFrameId != null) {
     cancelAnimationFrame(currentPageFrameId)
@@ -336,6 +328,10 @@ function cancelInitialExpansion() {
 function applyRenderWindow() {
   cancelInitialExpansion()
 
+  if (props.freezeRenderWindowEviction) {
+    return
+  }
+
   const container = scrollRoot || props.scrollContainer || viewerRoot.value || null
   const renderWindow = resolveRenderWindow({
     container,
@@ -354,17 +350,6 @@ function applyRenderWindow() {
   })
 
   updateVisiblePages(new Set(renderWindow.visiblePages))
-
-  if (props.freezeRenderWindowEviction && renderCandidatePageNumbers.value.size > 0) {
-    return
-  }
-
-  if (props.freezeRenderWindowEviction) {
-    updateRenderCandidates(renderWindow.primaryPage
-      ? new Set([renderWindow.primaryPage])
-      : new Set())
-    return
-  }
 
   if (renderCandidatePageNumbers.value.size === 0 && renderWindow.primaryPage) {
     const primaryOnly = new Set([renderWindow.primaryPage])
@@ -604,6 +589,7 @@ defineExpose({
   scrollToPage,
   getScrollContainer,
   getPageElement,
+  refreshRenderWindow: applyRenderWindow,
   refreshCurrentPage: () => emitCurrentPageFromResolver(true)
 })
 </script>
