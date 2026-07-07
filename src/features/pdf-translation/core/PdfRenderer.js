@@ -58,6 +58,19 @@ export class PdfRenderer {
     renderCanvas.width = newWidth
     renderCanvas.height = newHeight
 
+    logger.info('[PDF Zoom Trace] renderPage start', {
+      pageNumber,
+      canvasWidth: canvasEl.width,
+      canvasHeight: canvasEl.height,
+      hasReusableCanvas,
+      viewportWidth: newWidth,
+      viewportHeight: newHeight
+    })
+
+    if (hasReusableCanvas) {
+      logger.info('[PDF Zoom Trace] renderPage strategy', { pageNumber, strategy: 'temp-canvas' })
+    }
+
     canvasEl.style.width = `${newWidth}px`
     canvasEl.style.height = `${newHeight}px`
 
@@ -80,6 +93,7 @@ export class PdfRenderer {
         canvasEl.width = newWidth
         canvasEl.height = newHeight
         const visibleCtx = canvasEl.getContext('2d', { alpha: false })
+        logger.info('[PDF Zoom Trace] drawImage blit', { pageNumber, timestamp: Date.now() })
         visibleCtx.drawImage(renderCanvas, 0, 0)
       }
       if (textLayerRenderer instanceof PdfTextLayerRenderer) {
@@ -92,6 +106,8 @@ export class PdfRenderer {
     } catch (error) {
       if (error?.name !== 'RenderingCancelledException') {
         logger.warn(`Failed to render page ${pageNumber}:`, error)
+      } else {
+        logger.info('[PDF Zoom Trace] render cancelled', { pageNumber, timestamp: Date.now() })
       }
       return false
     } finally {
@@ -103,6 +119,15 @@ export class PdfRenderer {
   }
 
   clearPage(pageNumber, canvasEl, textLayerRenderer) {
+    logger.info('[PDF Clear Trace] renderer.clearPage', {
+      pageNumber,
+      timestamp: Date.now(),
+      canvasExists: !!canvasEl,
+      canvasWidth: canvasEl?.width ?? -1,
+      canvasHeight: canvasEl?.height ?? -1,
+      hasTextLayer: !!(textLayerRenderer instanceof PdfTextLayerRenderer)
+    })
+
     const key = this._taskKey(pageNumber, canvasEl)
     this.renderTasks.get(key)?.cancel?.()
     this.renderTasks.delete(key)

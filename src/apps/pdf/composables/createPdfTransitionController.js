@@ -3,8 +3,11 @@ import { CONTENT_VIEW } from './usePdfViewerMode.js'
 import { captureScrollAnchor, capturePdfBackedScrollAnchor, isPdfAnchor } from '../utils/pdfScrollAnchor.js'
 import { resolvePdfCanvasSlot } from '../utils/pdfFitPageFootprint.js'
 import { createPdfTransitionAnchor, PDF_SCROLL_OWNER, isPdfBackedContentView } from './createPdfTransitionAnchor.js'
+import { getScopedLogger } from '@/shared/logging/logger.js'
+import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js'
 
 const ZOOM_PERCENT_OPTIONS = [50, 75, 100, 125, 150, 200]
+const trace = getScopedLogger(LOG_COMPONENTS.PDF, 'PdfZoomTrace')
 
 const DEFAULT_VIEWER_WIDTH = 960
 
@@ -39,6 +42,7 @@ export function createPdfTransitionController({
   const viewerLayout = ref({ width: 0, height: 0 })
   const currentPageUpdatesSuppressed = ref(false)
   const suppressScrollSync = ref(false)
+  const renderWindowEvictionFrozen = ref(false)
 
   const {
     resolveAnchorOwner,
@@ -324,24 +328,32 @@ export function createPdfTransitionController({
   }
 
   async function runControlledZoomTransition(resolvedOriginalAnchor, finalTranslatedAnchor) {
+    trace.info('[PDF Zoom Trace] zoom transition start', { mode: unref(zoomMode), percent: unref(zoomPercent), timestamp: Date.now() })
     const zoomSeq = beginControlledZoomSuppression()
+    renderWindowEvictionFrozen.value = true
     beginScrollSyncSuppression()
     try {
       await runWithCurrentPageSuppression(async () => {
+        trace.info('[PDF Zoom Trace] before recomputeLayout', { timestamp: Date.now() })
         await recomputeLayout(buildLayoutRequest())
+        trace.info('[PDF Zoom Trace] after recomputeLayout', { timestamp: Date.now() })
         await nextTick()
         await applyDeferredZoomLayout()
+        trace.info('[PDF Zoom Trace] before restoreControlledTransitionAnchors', { timestamp: Date.now() })
         restoreControlledTransitionAnchors({
           originalAnchor: resolvedOriginalAnchor,
           translatedAnchor: finalTranslatedAnchor
         })
+        trace.info('[PDF Zoom Trace] after restoreControlledTransitionAnchors', { timestamp: Date.now() })
       })
     } finally {
       deferredZoomLayout = null
+      renderWindowEvictionFrozen.value = false
       endControlledZoomSuppression(zoomSeq)
       scheduleScrollSyncSuppressionClear()
     }
     refreshCurrentPage()
+    trace.info('[PDF Zoom Trace] zoom transition end', { timestamp: Date.now() })
   }
 
   async function handleZoomChange({ mode, value }) {
@@ -465,6 +477,7 @@ export function createPdfTransitionController({
     handleZoomChange,
     handleZoomStep,
     currentPageUpdatesSuppressed,
+    renderWindowEvictionFrozen,
     suppressScrollSync,
     buildLayoutRequest,
     resetViewerState,

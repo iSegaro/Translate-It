@@ -39,7 +39,7 @@ function createController(options = {}) {
 
   const setContentView = vi.fn((val) => { contentView.value = val })
   const setLayoutMode = vi.fn()
-  const recomputeLayout = vi.fn().mockResolvedValue()
+  const recomputeLayout = options.recomputeLayout || vi.fn().mockResolvedValue()
 
   const pdfViewerRef = ref(null)
   const pdfTranslatedPaneRef = ref(null)
@@ -377,6 +377,58 @@ describe('createPdfTransitionController', () => {
       expect(anchorFns.captureControlledTransitionAnchors).toHaveBeenCalled()
       expect(recomputeLayout).toHaveBeenCalled()
     })
+
+    it('keeps render window eviction frozen through recompute and anchor restoration', async () => {
+      const { ctrl, recomputeLayout } = createController()
+
+      anchorFns.captureControlledTransitionAnchors.mockReturnValue({
+        originalAnchor: { pageNumber: 1, offsetRatio: 0.5, owner: PDF_SCROLL_OWNER.ORIGINAL },
+        translatedAnchor: null
+      })
+      anchorFns.resolveTranslatedZoomAnchor.mockReturnValue(null)
+      anchorFns.restoreControlledTransitionAnchors.mockImplementation(() => {
+        expect(ctrl.renderWindowEvictionFrozen.value).toBe(true)
+        return PDF_SCROLL_OWNER.ORIGINAL
+      })
+      anchorFns.normalizeFitPagePdfAnchor.mockImplementation((a) => a)
+      recomputeLayout.mockImplementationOnce(() => {
+        expect(ctrl.renderWindowEvictionFrozen.value).toBe(true)
+        return Promise.resolve()
+      })
+
+      expect(ctrl.renderWindowEvictionFrozen.value).toBe(false)
+
+      await ctrl.handleZoomChange({ mode: 'fit-page' })
+
+      expect(recomputeLayout).toHaveBeenCalled()
+      expect(anchorFns.restoreControlledTransitionAnchors).toHaveBeenCalled()
+      expect(ctrl.renderWindowEvictionFrozen.value).toBe(false)
+    })
+
+    it('keeps render window eviction frozen while applying deferred layout', async () => {
+      const { ctrl, recomputeLayout } = createController()
+
+      anchorFns.captureControlledTransitionAnchors.mockReturnValue({
+        originalAnchor: { pageNumber: 1, offsetRatio: 0.5, owner: PDF_SCROLL_OWNER.ORIGINAL },
+        translatedAnchor: null
+      })
+      anchorFns.resolveTranslatedZoomAnchor.mockReturnValue(null)
+      anchorFns.restoreControlledTransitionAnchors.mockReturnValue(PDF_SCROLL_OWNER.ORIGINAL)
+      anchorFns.normalizeFitPagePdfAnchor.mockImplementation((a) => a)
+      recomputeLayout
+        .mockImplementationOnce(async () => {
+          await ctrl.handleLayoutChange({ width: 500, height: 400 })
+        })
+        .mockImplementationOnce(() => {
+          expect(ctrl.renderWindowEvictionFrozen.value).toBe(true)
+          return Promise.resolve()
+        })
+
+      await ctrl.handleZoomChange({ mode: 'fit-page' })
+
+      expect(recomputeLayout).toHaveBeenCalledTimes(2)
+      expect(ctrl.renderWindowEvictionFrozen.value).toBe(false)
+    })
   })
 
   describe('handleZoomStep', () => {
@@ -515,6 +567,7 @@ describe('createPdfTransitionController', () => {
       await expect(ctrl.handleZoomChange({ mode: 'fit-page' })).rejects.toThrow('layout failed')
 
       expect(ctrl.currentPageUpdatesSuppressed.value).toBe(false)
+      expect(ctrl.renderWindowEvictionFrozen.value).toBe(false)
 
       anchorFns.captureControlledTransitionAnchors.mockReturnValue({
         originalAnchor: { pageNumber: 1, offsetRatio: 0.5, owner: PDF_SCROLL_OWNER.ORIGINAL },

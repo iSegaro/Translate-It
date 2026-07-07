@@ -128,7 +128,7 @@ vi.mock('./components/PdfViewerLayout.vue', () => ({
 vi.mock('./components/PdfViewer.vue', () => ({
   default: {
     name: 'PdfViewer',
-    props: ['viewerRole', 'showOverlay', 'isBlockTargetingActive', 'highlightedBlockId', 'handleNavigationTarget', 'scrollContainer'],
+    props: ['viewerRole', 'showOverlay', 'isBlockTargetingActive', 'highlightedBlockId', 'handleNavigationTarget', 'scrollContainer', 'freezeRenderWindowEviction'],
     template: '<div class="pdf-viewer-stub" />'
   }
 }))
@@ -518,10 +518,12 @@ describe('PdfApp', () => {
       expect(viewers[0].props('isBlockTargetingActive')).toBe(false)
       expect(viewers[0].props('highlightedBlockId')).toBe('')
       expect(viewers[0].props('handleNavigationTarget')).toBeTruthy()
+      expect(viewers[0].props('freezeRenderWindowEviction')).toBe(false)
 
       expect(viewers[1].props('viewerRole')).toBe('overlay')
       expect(viewers[1].props('showOverlay')).toBe(true)
       expect(viewers[1].props('scrollContainer')).toBe(wrapper.findComponent({ name: 'PdfViewerLayout' }).vm.translatedPaneRef)
+      expect(viewers[1].props('freezeRenderWindowEviction')).toBe(false)
       expect(viewers[1].props('isBlockTargetingActive')).toBeUndefined()
       expect(viewers[1].props('highlightedBlockId')).toBeUndefined()
       expect(viewers[1].props('handleNavigationTarget')).toBeUndefined()

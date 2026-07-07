@@ -105,6 +105,7 @@
                   :pages="pageMetrics"
                   :session="session"
                   :suppress-current-page-updates="currentPageUpdatesSuppressed"
+                  :freeze-render-window-eviction="renderWindowEvictionFrozen"
                   :is-block-targeting-active="isBlockTargetingActive"
                   :highlighted-block-id="highlightedBlockId"
                   :show-overlay="showOverlayLayer"
@@ -136,6 +137,7 @@
                   :pages="pageMetrics"
                   :session="session"
                   :suppress-current-page-updates="currentPageUpdatesSuppressed"
+                  :freeze-render-window-eviction="renderWindowEvictionFrozen"
                   :show-overlay="true"
                   :overlay-page-data="translatedPageData"
                   :scroll-container="translatedScrollContainer"
@@ -283,6 +285,7 @@ usePdfKeyboard({
     buildLayoutRequest,
     resetViewerState,
     currentPageUpdatesSuppressed,
+    renderWindowEvictionFrozen,
     suppressScrollSync,
     zoomMode,
     zoomPercent

@@ -88,6 +88,10 @@ const props = defineProps({
     type: Boolean,
     default: false
   },
+  freezeRenderWindowEviction: {
+    type: Boolean,
+    default: false
+  },
   scrollContainer: {
     type: HTMLElement,
     default: null
@@ -262,6 +266,10 @@ function refreshObservationTargets() {
 }
 
 function updateVisiblePages(nextVisible) {
+  logger.info('[PDF Zoom Trace] updateVisiblePages', {
+    nextVisible: [...nextVisible],
+    timestamp: Date.now()
+  })
   visiblePageNumbers.value = nextVisible
 
   if (isOriginalRole.value) {
@@ -274,6 +282,10 @@ function updateVisiblePages(nextVisible) {
 }
 
 function updateRenderCandidates(nextRenderable) {
+  logger.info('[PDF Zoom Trace] updateRenderCandidates', {
+    nextRenderable: [...nextRenderable],
+    timestamp: Date.now()
+  })
   renderCandidatePageNumbers.value = nextRenderable
 
   if (isOriginalRole.value) {
@@ -281,11 +293,32 @@ function updateRenderCandidates(nextRenderable) {
   }
 }
 
+function resolveNextRenderCandidates(renderWindow) {
+  if (!props.freezeRenderWindowEviction) {
+    return new Set(renderWindow.renderPages)
+  }
+
+  return new Set([
+    ...renderCandidatePageNumbers.value,
+    ...renderWindow.renderPages
+  ])
+}
+
 watch(
   () => props.suppressCurrentPageUpdates,
   (suppress) => {
     if (suppress) {
       cancelCurrentPageFrame()
+    }
+  }
+)
+
+watch(
+  () => props.freezeRenderWindowEviction,
+  async (frozen, wasFrozen) => {
+    if (!frozen && wasFrozen) {
+      await nextTick()
+      applyRenderWindow()
     }
   }
 )
@@ -321,9 +354,19 @@ function applyRenderWindow() {
     bufferPages: 1
   })
 
+  const scrollTop = container?.scrollTop ?? 0
+  logger.info('[PDF Zoom Trace] applyRenderWindow', {
+    scrollTop,
+    primaryPage: renderWindow.primaryPage,
+    visiblePages: renderWindow.visiblePages,
+    renderPages: renderWindow.renderPages,
+    candidateCount: renderCandidatePageNumbers.value.size,
+    timestamp: Date.now()
+  })
+
   updateVisiblePages(new Set(renderWindow.visiblePages))
 
-  if (renderCandidatePageNumbers.value.size === 0 && renderWindow.primaryPage) {
+  if (!props.freezeRenderWindowEviction && renderCandidatePageNumbers.value.size === 0 && renderWindow.primaryPage) {
     const primaryOnly = new Set([renderWindow.primaryPage])
     updateRenderCandidates(primaryOnly)
 
@@ -332,7 +375,7 @@ function applyRenderWindow() {
       updateRenderCandidates(new Set(renderWindow.renderPages))
     })
   } else {
-    updateRenderCandidates(new Set(renderWindow.renderPages))
+    updateRenderCandidates(resolveNextRenderCandidates(renderWindow))
   }
 }
 

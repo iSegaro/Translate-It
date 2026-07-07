@@ -62,6 +62,48 @@ let visibilityCallback
 let renderCallback
 const waitAnimationFrame = () => new Promise(resolve => requestAnimationFrame(resolve))
 
+function createSession() {
+  return {
+    updateVisiblePages: vi.fn(),
+    updateRenderCandidates: vi.fn()
+  }
+}
+
+function createPages(count = 4) {
+  return Array.from({ length: count }, (_, index) => ({
+    pageNumber: index + 1,
+    width: 100,
+    height: 100,
+    scale: 1
+  }))
+}
+
+function setViewerViewport(wrapper, { height = 100, scrollTop = 0 } = {}) {
+  const viewerEl = wrapper.find('.pdf-viewer').element
+  Object.defineProperty(viewerEl, 'clientHeight', {
+    configurable: true,
+    get: () => height
+  })
+  viewerEl.scrollTop = scrollTop
+  viewerEl.getBoundingClientRect = () => buildRect(0, height, 300)
+}
+
+function setPageTops(tops) {
+  for (const [pageNumber, top] of Object.entries(tops)) {
+    pageRectMap.set(Number(pageNumber), buildRect(top, 100, 300))
+  }
+}
+
+function lastRenderCandidates(session) {
+  const lastCall = session.updateRenderCandidates.mock.calls.at(-1)
+  return lastCall ? [...lastCall[0]].sort((a, b) => a - b) : []
+}
+
+async function updatePages(wrapper) {
+  await wrapper.setProps({ pages: createPages() })
+  await nextTick()
+}
+
 describe('PdfViewer', () => {
   beforeEach(() => {
     observeMock.mockClear()
@@ -267,6 +309,92 @@ describe('PdfViewer', () => {
     expect(resizeDisconnectMock.mock.calls.length).toBeGreaterThan(resizeDisconnectCount)
     expect(resizeObserveMock).toHaveBeenCalledWith(secondRoot)
     expect(observeMock).toHaveBeenCalledWith(pageRootEls.get(1))
+
+    wrapper.unmount()
+  })
+
+  it('preserves old render candidates and adds new ones while eviction is frozen', async () => {
+    const session = createSession()
+    setPageTops({ 1: -100, 2: 0, 3: 100, 4: 200 })
+
+    const wrapper = mount(PdfViewer, {
+      props: {
+        pages: createPages(),
+        session
+      },
+      attachTo: document.body
+    })
+
+    setViewerViewport(wrapper)
+    await updatePages(wrapper)
+    await waitAnimationFrame()
+    await nextTick()
+
+    expect(lastRenderCandidates(session)).toEqual([1, 2, 3])
+
+    await wrapper.setProps({ freezeRenderWindowEviction: true })
+    setPageTops({ 1: -300, 2: -200, 3: -100, 4: 0 })
+    await updatePages(wrapper)
+
+    expect(lastRenderCandidates(session)).toEqual([1, 2, 3, 4])
+
+    wrapper.unmount()
+  })
+
+  it('recomputes the final render window when eviction freeze is released', async () => {
+    const session = createSession()
+    setPageTops({ 1: -100, 2: 0, 3: 100, 4: 200 })
+
+    const wrapper = mount(PdfViewer, {
+      props: {
+        pages: createPages(),
+        session
+      },
+      attachTo: document.body
+    })
+
+    setViewerViewport(wrapper)
+    await updatePages(wrapper)
+    await waitAnimationFrame()
+    await nextTick()
+    expect(lastRenderCandidates(session)).toEqual([1, 2, 3])
+
+    await wrapper.setProps({ freezeRenderWindowEviction: true })
+    setPageTops({ 1: -300, 2: -200, 3: -100, 4: 0 })
+    await updatePages(wrapper)
+    expect(lastRenderCandidates(session)).toEqual([1, 2, 3, 4])
+
+    await wrapper.setProps({ freezeRenderWindowEviction: false })
+    await nextTick()
+    await nextTick()
+
+    expect(lastRenderCandidates(session)).toEqual([3, 4])
+
+    wrapper.unmount()
+  })
+
+  it('shrinks render candidates normally when eviction is not frozen', async () => {
+    const session = createSession()
+    setPageTops({ 1: -100, 2: 0, 3: 100, 4: 200 })
+
+    const wrapper = mount(PdfViewer, {
+      props: {
+        pages: createPages(),
+        session
+      },
+      attachTo: document.body
+    })
+
+    setViewerViewport(wrapper)
+    await updatePages(wrapper)
+    await waitAnimationFrame()
+    await nextTick()
+    expect(lastRenderCandidates(session)).toEqual([1, 2, 3])
+
+    setPageTops({ 1: -300, 2: -200, 3: -100, 4: 0 })
+    await updatePages(wrapper)
+
+    expect(lastRenderCandidates(session)).toEqual([3, 4])
 
     wrapper.unmount()
   })
