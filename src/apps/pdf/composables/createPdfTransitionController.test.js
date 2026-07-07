@@ -201,6 +201,58 @@ describe('createPdfTransitionController', () => {
       expect(anchorFns.restoreOwnedScrollAnchor).toHaveBeenCalledWith(domAnchor)
     })
 
+    it('freezes render window eviction before layout mode changes', async () => {
+      const { ctrl, setLayoutMode } = createController()
+
+      const domAnchor = { pageNumber: 2, offsetRatio: 0.5 }
+      anchorFns.resolveAnchorOwner.mockReturnValue(PDF_SCROLL_OWNER.ORIGINAL)
+      anchorFns.capturePdfAwareOwnedScrollAnchor.mockReturnValue(domAnchor)
+      scrollAnchor.isPdfAnchor.mockReturnValue(false)
+      anchorFns.restoreOwnedScrollAnchor.mockReturnValue(PDF_SCROLL_OWNER.ORIGINAL)
+      setLayoutMode.mockImplementation(() => {
+        expect(ctrl.renderWindowEvictionFrozen.value).toBe(true)
+      })
+
+      await ctrl.handleLayoutModeChange('side-by-side')
+
+      expect(setLayoutMode).toHaveBeenCalledWith('side-by-side')
+      expect(ctrl.renderWindowEvictionFrozen.value).toBe(false)
+    })
+
+    it('keeps render window eviction frozen during layout anchor restore', async () => {
+      const { ctrl } = createController()
+
+      const domAnchor = { pageNumber: 2, offsetRatio: 0.5 }
+      anchorFns.resolveAnchorOwner.mockReturnValue(PDF_SCROLL_OWNER.ORIGINAL)
+      anchorFns.capturePdfAwareOwnedScrollAnchor.mockReturnValue(domAnchor)
+      scrollAnchor.isPdfAnchor.mockReturnValue(false)
+      anchorFns.restoreOwnedScrollAnchor.mockImplementation(() => {
+        expect(ctrl.renderWindowEvictionFrozen.value).toBe(true)
+        return PDF_SCROLL_OWNER.ORIGINAL
+      })
+
+      await ctrl.handleLayoutModeChange('side-by-side')
+
+      expect(anchorFns.restoreOwnedScrollAnchor).toHaveBeenCalledWith(domAnchor)
+      expect(ctrl.renderWindowEvictionFrozen.value).toBe(false)
+    })
+
+    it('releases render window eviction freeze when layout mode change throws', async () => {
+      const { ctrl, setLayoutMode } = createController()
+
+      const domAnchor = { pageNumber: 2, offsetRatio: 0.5 }
+      anchorFns.resolveAnchorOwner.mockReturnValue(PDF_SCROLL_OWNER.ORIGINAL)
+      anchorFns.capturePdfAwareOwnedScrollAnchor.mockReturnValue(domAnchor)
+      scrollAnchor.isPdfAnchor.mockReturnValue(false)
+      setLayoutMode.mockImplementation(() => {
+        throw new Error('layout failed')
+      })
+
+      await expect(ctrl.handleLayoutModeChange('side-by-side')).rejects.toThrow('layout failed')
+
+      expect(ctrl.renderWindowEvictionFrozen.value).toBe(false)
+    })
+
     it('skips DOM restore when anchor is PDF-backed', async () => {
       const { ctrl, setLayoutMode } = createController()
 

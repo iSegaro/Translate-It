@@ -242,27 +242,32 @@ export function createPdfTransitionController({
     pendingPdfBackedAnchor = isPdfAnchor(anchor)
       ? { transitionSeq: contentTransitionSeq, anchor }
       : null
-    setLayoutMode(mode)
+    renderWindowEvictionFrozen.value = true
+    try {
+      setLayoutMode(mode)
 
-    await nextTick()
+      await nextTick()
 
-    if (isSideBySide.value && showTranslatedPdfPane.value) {
-      syncFromOwner(owner)
+      if (isSideBySide.value && showTranslatedPdfPane.value) {
+        syncFromOwner(owner)
+        scheduleControlledTransitionSuppressionClear()
+        return
+      }
+
+      if (isPdfAnchor(anchor)) {
+        scheduleControlledTransitionSuppressionClear()
+        return
+      }
+
+      const restoredOwner = restoreOwnedScrollAnchor(anchor)
+
+      if (isSideBySide.value) {
+        syncFromOwner(restoredOwner || anchor?.owner || owner)
+      }
       scheduleControlledTransitionSuppressionClear()
-      return
+    } finally {
+      renderWindowEvictionFrozen.value = false
     }
-
-    if (isPdfAnchor(anchor)) {
-      scheduleControlledTransitionSuppressionClear()
-      return
-    }
-
-    const restoredOwner = restoreOwnedScrollAnchor(anchor)
-
-    if (isSideBySide.value) {
-      syncFromOwner(restoredOwner || anchor?.owner || owner)
-    }
-    scheduleControlledTransitionSuppressionClear()
   }
 
   async function handleLayoutChange(layout = null) {
