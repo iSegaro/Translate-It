@@ -49,21 +49,47 @@ function createMockPage(pageNumber, deferredStore) {
   return page
 }
 
-function createMockCanvas() {
+function createMockCanvas(initialWidth = 0, initialHeight = 0) {
   const style = {}
+  const context = {
+    clearRect: vi.fn(),
+    drawImage: vi.fn()
+  }
   return {
-    width: 0,
-    height: 0,
+    width: initialWidth,
+    height: initialHeight,
     style,
-    getContext: vi.fn(() => ({
-      clearRect: vi.fn()
-    }))
+    getContext: vi.fn(() => context)
   }
 }
 
 async function flushMicrotasks() {
   await new Promise(resolve => setTimeout(resolve, 0))
 }
+
+function createMockTempCanvas() {
+  const context = {
+    clearRect: vi.fn(),
+    drawImage: vi.fn()
+  }
+  return {
+    width: 0,
+    height: 0,
+    style: {},
+    getContext: vi.fn(() => context)
+  }
+}
+
+beforeEach(() => {
+  vi.spyOn(document, 'createElement').mockImplementation((tag) => {
+    if (tag === 'canvas') return createMockTempCanvas()
+    throw new Error(`Unexpected document.createElement('${tag}')`)
+  })
+})
+
+afterEach(() => {
+  vi.restoreAllMocks()
+})
 
 describe('PdfRenderer', () => {
   let renderer
@@ -195,6 +221,66 @@ describe('PdfRenderer', () => {
 
       expect(result).toBe(true)
       expect(textLayer.render).toHaveBeenCalled()
+    })
+
+    it('renders directly to visible canvas when canvas has no existing content', async () => {
+      const canvas = createMockCanvas()
+      const metric = { scale: 2 }
+
+      const promise = renderer.renderPage({ pdfDocument, metric, pageNumber: 1, canvas, textLayerRenderer: null })
+      await flushMicrotasks()
+
+      const ctx = canvas.getContext.mock.results[0].value
+      expect(canvas.width).toBe(1200)
+      expect(canvas.height).toBe(1600)
+      expect(ctx.drawImage).not.toHaveBeenCalled()
+
+      deferredRenders[0].resolve()
+      const result = await promise
+      expect(result).toBe(true)
+    })
+
+    it('uses temp canvas and blit when canvas has existing content', async () => {
+      const canvas = createMockCanvas(800, 600)
+      const metric = { scale: 2 }
+
+      const promise = renderer.renderPage({ pdfDocument, metric, pageNumber: 1, canvas, textLayerRenderer: null })
+      await flushMicrotasks()
+
+      expect(canvas.width).toBe(800)
+      expect(canvas.height).toBe(600)
+      expect(canvas.style.width).toBe('1200px')
+      expect(canvas.style.height).toBe('1600px')
+
+      deferredRenders[0].resolve()
+      const result = await promise
+
+      expect(result).toBe(true)
+      expect(canvas.width).toBe(1200)
+      expect(canvas.height).toBe(1600)
+
+      const ctx = canvas.getContext.mock.results[0].value
+      expect(ctx.drawImage).toHaveBeenCalled()
+    })
+
+    it('preserves visible canvas content when temp render is cancelled', async () => {
+      const canvas = createMockCanvas(800, 600)
+      const metric = { scale: 2 }
+
+      const promise = renderer.renderPage({ pdfDocument, metric, pageNumber: 1, canvas, textLayerRenderer: null })
+      await flushMicrotasks()
+
+      expect(canvas.width).toBe(800)
+      expect(canvas.height).toBe(600)
+
+      renderer.cancelAll()
+
+      expect(canvas.width).toBe(800)
+      expect(canvas.height).toBe(600)
+
+      deferredRenders[0].resolve()
+      const result = await promise
+      expect(result).toBe(false)
     })
   })
 

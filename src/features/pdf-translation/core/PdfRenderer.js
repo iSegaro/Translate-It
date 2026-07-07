@@ -50,12 +50,18 @@ export class PdfRenderer {
     const page = await pdfDocument.getPage(pageNumber)
     const viewport = page.getViewport({ scale: metric.scale })
 
-    canvasEl.width = Math.floor(viewport.width)
-    canvasEl.height = Math.floor(viewport.height)
-    canvasEl.style.width = `${Math.floor(viewport.width)}px`
-    canvasEl.style.height = `${Math.floor(viewport.height)}px`
+    const newWidth = Math.floor(viewport.width)
+    const newHeight = Math.floor(viewport.height)
 
-    const context = canvasEl.getContext('2d', { alpha: false, willReadFrequently: true })
+    const hasReusableCanvas = canvasEl.width > 0 && canvasEl.height > 0
+    const renderCanvas = hasReusableCanvas ? document.createElement('canvas') : canvasEl
+    renderCanvas.width = newWidth
+    renderCanvas.height = newHeight
+
+    canvasEl.style.width = `${newWidth}px`
+    canvasEl.style.height = `${newHeight}px`
+
+    const context = renderCanvas.getContext('2d', { alpha: false, willReadFrequently: true })
     if (!context) {
       throw new Error('Canvas 2D context not available')
     }
@@ -70,6 +76,12 @@ export class PdfRenderer {
 
     try {
       await renderTask.promise
+      if (hasReusableCanvas) {
+        canvasEl.width = newWidth
+        canvasEl.height = newHeight
+        const visibleCtx = canvasEl.getContext('2d', { alpha: false })
+        visibleCtx.drawImage(renderCanvas, 0, 0)
+      }
       if (textLayerRenderer instanceof PdfTextLayerRenderer) {
         const cw = Math.floor(viewport.width)
         const ch = Math.floor(viewport.height)
