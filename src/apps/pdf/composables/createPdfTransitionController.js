@@ -36,6 +36,7 @@ export function createPdfTransitionController({
   let controlledZoomSeq = 0
   let pendingPdfBackedAnchor = null
   let deferredZoomLayout = null
+  let renderWindowFreezeDepth = 0
 
   const zoomMode = ref('fit-width')
   const zoomPercent = ref(100)
@@ -43,6 +44,18 @@ export function createPdfTransitionController({
   const currentPageUpdatesSuppressed = ref(false)
   const suppressScrollSync = ref(false)
   const renderWindowEvictionFrozen = ref(false)
+
+  function acquireRenderWindowFreeze() {
+    renderWindowFreezeDepth += 1
+    renderWindowEvictionFrozen.value = true
+  }
+
+  function releaseRenderWindowFreeze() {
+    renderWindowFreezeDepth = Math.max(0, renderWindowFreezeDepth - 1)
+    if (renderWindowFreezeDepth === 0) {
+      renderWindowEvictionFrozen.value = false
+    }
+  }
 
   const {
     resolveAnchorOwner,
@@ -248,7 +261,7 @@ export function createPdfTransitionController({
     pendingPdfBackedAnchor = isPdfAnchor(anchor)
       ? { transitionSeq: contentTransitionSeq, anchor }
       : null
-    renderWindowEvictionFrozen.value = true
+    acquireRenderWindowFreeze()
     try {
       setLayoutMode(mode)
 
@@ -272,7 +285,7 @@ export function createPdfTransitionController({
       }
       scheduleControlledTransitionSuppressionClear()
     } finally {
-      renderWindowEvictionFrozen.value = false
+      releaseRenderWindowFreeze()
       await refreshRenderWindowAfterLayoutTransition()
     }
   }
@@ -312,7 +325,7 @@ export function createPdfTransitionController({
 
     beginScrollSyncSuppression()
     if (shouldFreezeRenderWindow) {
-      renderWindowEvictionFrozen.value = true
+      acquireRenderWindowFreeze()
     }
     try {
       viewerLayout.value = nextLayout
@@ -342,7 +355,7 @@ export function createPdfTransitionController({
       }
     } finally {
       if (shouldFreezeRenderWindow) {
-        renderWindowEvictionFrozen.value = false
+        releaseRenderWindowFreeze()
       }
       scheduleScrollSyncSuppressionClear()
     }
@@ -351,7 +364,7 @@ export function createPdfTransitionController({
   async function runControlledZoomTransition(resolvedOriginalAnchor, finalTranslatedAnchor) {
     trace.info('[PDF Zoom Trace] zoom transition start', { mode: unref(zoomMode), percent: unref(zoomPercent), timestamp: Date.now() })
     const zoomSeq = beginControlledZoomSuppression()
-    renderWindowEvictionFrozen.value = true
+    acquireRenderWindowFreeze()
     beginScrollSyncSuppression()
     try {
       await runWithCurrentPageSuppression(async () => {
@@ -369,7 +382,7 @@ export function createPdfTransitionController({
       })
     } finally {
       deferredZoomLayout = null
-      renderWindowEvictionFrozen.value = false
+      releaseRenderWindowFreeze()
       endControlledZoomSuppression(zoomSeq)
       scheduleScrollSyncSuppressionClear()
     }

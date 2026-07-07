@@ -531,6 +531,39 @@ describe('createPdfTransitionController', () => {
       expect(recomputeLayout).toHaveBeenCalledTimes(2)
       expect(ctrl.renderWindowEvictionFrozen.value).toBe(false)
     })
+
+    it('nested handleLayoutChange does not prematurely release freeze from handleLayoutModeChange', async () => {
+      const { ctrl, recomputeLayout } = createController()
+
+      const domAnchor = { pageNumber: 2, offsetRatio: 0.5 }
+      anchorFns.resolveAnchorOwner.mockReturnValue(PDF_SCROLL_OWNER.ORIGINAL)
+      anchorFns.capturePdfAwareOwnedScrollAnchor.mockReturnValue(domAnchor)
+      scrollAnchor.isPdfAnchor.mockReturnValue(false)
+
+      let innerResolve = null
+      recomputeLayout.mockImplementationOnce(() => {
+        return new Promise((resolve) => { innerResolve = resolve })
+      })
+
+      anchorFns.captureControlledTransitionAnchors.mockReturnValue({
+        originalAnchor: domAnchor,
+        translatedAnchor: null
+      })
+
+      const layoutModePromise = ctrl.handleLayoutModeChange('side-by-side')
+      const layoutChangePromise = ctrl.handleLayoutChange({ width: 800, height: 600 })
+
+      expect(ctrl.renderWindowEvictionFrozen.value).toBe(true)
+
+      await layoutModePromise
+
+      expect(ctrl.renderWindowEvictionFrozen.value).toBe(true)
+
+      innerResolve()
+      await layoutChangePromise
+
+      expect(ctrl.renderWindowEvictionFrozen.value).toBe(false)
+    })
   })
 
   describe('handleZoomStep', () => {
