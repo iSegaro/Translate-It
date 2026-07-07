@@ -293,17 +293,6 @@ function updateRenderCandidates(nextRenderable) {
   }
 }
 
-function resolveNextRenderCandidates(renderWindow) {
-  if (!props.freezeRenderWindowEviction) {
-    return new Set(renderWindow.renderPages)
-  }
-
-  return new Set([
-    ...renderCandidatePageNumbers.value,
-    ...renderWindow.renderPages
-  ])
-}
-
 watch(
   () => props.suppressCurrentPageUpdates,
   (suppress) => {
@@ -366,7 +355,18 @@ function applyRenderWindow() {
 
   updateVisiblePages(new Set(renderWindow.visiblePages))
 
-  if (!props.freezeRenderWindowEviction && renderCandidatePageNumbers.value.size === 0 && renderWindow.primaryPage) {
+  if (props.freezeRenderWindowEviction && renderCandidatePageNumbers.value.size > 0) {
+    return
+  }
+
+  if (props.freezeRenderWindowEviction) {
+    updateRenderCandidates(renderWindow.primaryPage
+      ? new Set([renderWindow.primaryPage])
+      : new Set())
+    return
+  }
+
+  if (renderCandidatePageNumbers.value.size === 0 && renderWindow.primaryPage) {
     const primaryOnly = new Set([renderWindow.primaryPage])
     updateRenderCandidates(primaryOnly)
 
@@ -375,7 +375,7 @@ function applyRenderWindow() {
       updateRenderCandidates(new Set(renderWindow.renderPages))
     })
   } else {
-    updateRenderCandidates(resolveNextRenderCandidates(renderWindow))
+    updateRenderCandidates(new Set(renderWindow.renderPages))
   }
 }
 

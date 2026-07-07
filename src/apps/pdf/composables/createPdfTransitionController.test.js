@@ -301,7 +301,7 @@ describe('createPdfTransitionController', () => {
     })
 
     it('restores pending PDF-backed anchor during resize after content view change', async () => {
-      const { ctrl } = createController()
+      const { ctrl, recomputeLayout } = createController()
 
       anchorFns.resolveAnchorOwner.mockReturnValue(PDF_SCROLL_OWNER.ORIGINAL)
       anchorFns.resolveOwnerScrollTarget.mockReturnValue({
@@ -319,6 +319,10 @@ describe('createPdfTransitionController', () => {
         originalAnchor: null,
         translatedAnchor: null
       })
+      recomputeLayout.mockImplementationOnce(() => {
+        expect(ctrl.renderWindowEvictionFrozen.value).toBe(true)
+        return Promise.resolve()
+      })
 
       await ctrl.handleLayoutChange({ width: 800, height: 600 })
 
@@ -327,6 +331,51 @@ describe('createPdfTransitionController', () => {
           originalAnchor: expect.objectContaining({ pdfPoint: { x: 0, y: 0 } })
         })
       )
+      expect(ctrl.renderWindowEvictionFrozen.value).toBe(false)
+    })
+
+    it('freezes render window eviction for layout recompute during controlled layout transition', async () => {
+      const { ctrl, recomputeLayout } = createController()
+
+      const domAnchor = { pageNumber: 2, offsetRatio: 0.5 }
+      anchorFns.resolveAnchorOwner.mockReturnValue(PDF_SCROLL_OWNER.ORIGINAL)
+      anchorFns.capturePdfAwareOwnedScrollAnchor.mockReturnValue(domAnchor)
+      scrollAnchor.isPdfAnchor.mockReturnValue(false)
+      anchorFns.restoreOwnedScrollAnchor.mockReturnValue(PDF_SCROLL_OWNER.ORIGINAL)
+
+      await ctrl.handleLayoutModeChange('side-by-side')
+
+      anchorFns.captureControlledTransitionAnchors.mockReturnValue({
+        originalAnchor: domAnchor,
+        translatedAnchor: null
+      })
+      recomputeLayout.mockImplementationOnce(() => {
+        expect(ctrl.renderWindowEvictionFrozen.value).toBe(true)
+        return Promise.resolve()
+      })
+
+      await ctrl.handleLayoutChange({ width: 800, height: 600 })
+
+      expect(recomputeLayout).toHaveBeenCalled()
+      expect(ctrl.renderWindowEvictionFrozen.value).toBe(false)
+    })
+
+    it('releases render window eviction freeze when controlled layout recompute fails', async () => {
+      const { ctrl, recomputeLayout } = createController()
+
+      const domAnchor = { pageNumber: 2, offsetRatio: 0.5 }
+      anchorFns.resolveAnchorOwner.mockReturnValue(PDF_SCROLL_OWNER.ORIGINAL)
+      anchorFns.capturePdfAwareOwnedScrollAnchor.mockReturnValue(domAnchor)
+      scrollAnchor.isPdfAnchor.mockReturnValue(false)
+      anchorFns.restoreOwnedScrollAnchor.mockReturnValue(PDF_SCROLL_OWNER.ORIGINAL)
+
+      await ctrl.handleLayoutModeChange('side-by-side')
+
+      recomputeLayout.mockRejectedValueOnce(new Error('layout failed'))
+
+      await expect(ctrl.handleLayoutChange({ width: 800, height: 600 })).rejects.toThrow('layout failed')
+
+      expect(ctrl.renderWindowEvictionFrozen.value).toBe(false)
     })
 
     it('captures, recomputes, and restores for normal resize', async () => {

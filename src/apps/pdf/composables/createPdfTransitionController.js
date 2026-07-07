@@ -297,10 +297,16 @@ export function createPdfTransitionController({
     const pendingPdfAnchor = pendingPdfBackedAnchor?.transitionSeq === contentSeqAtStart
       ? pendingPdfBackedAnchor.anchor
       : null
+    const shouldFreezeRenderWindow = !!pendingPdfAnchor || (
+      contentSeqAtStart > 0 && suppressedLayoutRestoreSeq === contentSeqAtStart
+    )
 
     const anchors = captureControlledTransitionAnchors()
 
     beginScrollSyncSuppression()
+    if (shouldFreezeRenderWindow) {
+      renderWindowEvictionFrozen.value = true
+    }
     try {
       viewerLayout.value = nextLayout
       if (hasDocument.value) {
@@ -328,6 +334,9 @@ export function createPdfTransitionController({
         restoreControlledTransitionAnchors(anchors)
       }
     } finally {
+      if (shouldFreezeRenderWindow) {
+        renderWindowEvictionFrozen.value = false
+      }
       scheduleScrollSyncSuppressionClear()
     }
   }

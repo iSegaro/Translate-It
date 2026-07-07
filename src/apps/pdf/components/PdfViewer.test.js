@@ -313,7 +313,7 @@ describe('PdfViewer', () => {
     wrapper.unmount()
   })
 
-  it('preserves old render candidates and adds new ones while eviction is frozen', async () => {
+  it('keeps existing render candidates unchanged while eviction is frozen', async () => {
     const session = createSession()
     setPageTops({ 1: -100, 2: 0, 3: 100, 4: 200 })
 
@@ -336,7 +336,30 @@ describe('PdfViewer', () => {
     setPageTops({ 1: -300, 2: -200, 3: -100, 4: 0 })
     await updatePages(wrapper)
 
-    expect(lastRenderCandidates(session)).toEqual([1, 2, 3, 4])
+    expect(lastRenderCandidates(session)).toEqual([1, 2, 3])
+
+    wrapper.unmount()
+  })
+
+  it('seeds only the primary page when eviction is frozen and no candidates exist', async () => {
+    const session = createSession()
+    setPageTops({ 1: -100, 2: 0, 3: 100, 4: 200 })
+
+    const wrapper = mount(PdfViewer, {
+      props: {
+        pages: [],
+        session,
+        freezeRenderWindowEviction: true
+      },
+      attachTo: document.body
+    })
+
+    setViewerViewport(wrapper)
+    await wrapper.setProps({ pages: createPages() })
+    await nextTick()
+    await nextTick()
+
+    expect(lastRenderCandidates(session)).toEqual([2])
 
     wrapper.unmount()
   })
@@ -362,7 +385,7 @@ describe('PdfViewer', () => {
     await wrapper.setProps({ freezeRenderWindowEviction: true })
     setPageTops({ 1: -300, 2: -200, 3: -100, 4: 0 })
     await updatePages(wrapper)
-    expect(lastRenderCandidates(session)).toEqual([1, 2, 3, 4])
+    expect(lastRenderCandidates(session)).toEqual([1, 2, 3])
 
     await wrapper.setProps({ freezeRenderWindowEviction: false })
     await nextTick()
