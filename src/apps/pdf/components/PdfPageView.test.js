@@ -165,4 +165,24 @@ describe('PdfPageView', () => {
     expect(session.renderPage).not.toHaveBeenCalled()
     expect(session.clearPage).not.toHaveBeenCalled()
   })
+
+  it('does not call session.renderPage when visible becomes false during nextTick gap', async () => {
+    const session = createSession()
+    const wrapper = mount(PdfPageView, {
+      props: {
+        page: createPage(),
+        session,
+        visible: true
+      }
+    })
+
+    // The immediate watcher fires renderPage(), which hits await nextTick() and yields.
+    // Before that nextTick resolves, set visible=false to trigger the zombie-render guard.
+    await wrapper.setProps({ visible: false })
+
+    // Flush remaining promises so the stale nextTick resolves.
+    await flushPromises()
+
+    expect(session.renderPage).not.toHaveBeenCalled()
+  })
 })

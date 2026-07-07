@@ -132,6 +132,7 @@ async function renderPage() {
   })
 
   await nextTick()
+  if (!props.visible || !canvasEl.value) return
   const renderer = ensureTextLayerRenderer()
   if (!renderer) return
 
