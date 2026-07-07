@@ -414,6 +414,124 @@ describe('PdfViewer', () => {
     wrapper.unmount()
   })
 
+  it('does not let a render-window RAF scheduled before thaw mutate candidates after epoch changes', async () => {
+    const session = createSession()
+    setPageTops({ 1: -100, 2: 0, 3: 100, 4: 200 })
+
+    const wrapper = mount(PdfViewer, {
+      props: {
+        pages: createPages(),
+        session
+      },
+      attachTo: document.body
+    })
+
+    setViewerViewport(wrapper)
+    await updatePages(wrapper)
+    await waitAnimationFrame()
+    await nextTick()
+    expect(lastRenderCandidates(session)).toEqual([1, 2, 3])
+
+    await wrapper.setProps({ freezeRenderWindowEviction: true })
+    setPageTops({ 1: -300, 2: -200, 3: -100, 4: 0 })
+    visibilityCallback?.([])
+    await wrapper.setProps({ freezeRenderWindowEviction: false })
+    await waitAnimationFrame()
+    await nextTick()
+
+    expect(lastRenderCandidates(session)).toEqual([1, 2, 3])
+
+    wrapper.unmount()
+  })
+
+  it('does not let a pages watcher queued before thaw mutate candidates after epoch changes', async () => {
+    const session = createSession()
+    setPageTops({ 1: -100, 2: 0, 3: 100, 4: 200 })
+
+    const wrapper = mount(PdfViewer, {
+      props: {
+        pages: createPages(),
+        session
+      },
+      attachTo: document.body
+    })
+
+    setViewerViewport(wrapper)
+    await updatePages(wrapper)
+    await waitAnimationFrame()
+    await nextTick()
+    expect(lastRenderCandidates(session)).toEqual([1, 2, 3])
+
+    await wrapper.setProps({ freezeRenderWindowEviction: true })
+    setPageTops({ 1: -300, 2: -200, 3: -100, 4: 0 })
+    const pagesUpdate = wrapper.setProps({ pages: createPages().map(page => ({ ...page, width: page.width + 1 })) })
+    await nextTick()
+    await wrapper.setProps({ freezeRenderWindowEviction: false })
+    await pagesUpdate
+    await nextTick()
+
+    expect(lastRenderCandidates(session)).toEqual([1, 2, 3])
+
+    wrapper.unmount()
+  })
+
+  it('lets explicit refresh bypass stale epoch but not active freeze', async () => {
+    const session = createSession()
+    setPageTops({ 1: -100, 2: 0, 3: 100, 4: 200 })
+
+    const wrapper = mount(PdfViewer, {
+      props: {
+        pages: createPages(),
+        session
+      },
+      attachTo: document.body
+    })
+
+    setViewerViewport(wrapper)
+    await updatePages(wrapper)
+    await waitAnimationFrame()
+    await nextTick()
+    expect(lastRenderCandidates(session)).toEqual([1, 2, 3])
+
+    await wrapper.setProps({ freezeRenderWindowEviction: true })
+    setPageTops({ 1: -300, 2: -200, 3: -100, 4: 0 })
+    wrapper.vm.refreshRenderWindow()
+    expect(lastRenderCandidates(session)).toEqual([1, 2, 3])
+
+    await wrapper.setProps({ freezeRenderWindowEviction: false })
+    wrapper.vm.refreshRenderWindow()
+    expect(lastRenderCandidates(session)).toEqual([3, 4])
+
+    wrapper.unmount()
+  })
+
+  it('does not let stale initial expansion mutate candidates after epoch changes', async () => {
+    const session = createSession()
+    setPageTops({ 1: -100, 2: 0, 3: 100, 4: 200 })
+
+    const wrapper = mount(PdfViewer, {
+      props: {
+        pages: createPages(),
+        session
+      },
+      attachTo: document.body
+    })
+
+    setViewerViewport(wrapper)
+    await nextTick()
+    await nextTick()
+    expect(lastRenderCandidates(session)).toEqual([2])
+
+    await wrapper.setProps({ freezeRenderWindowEviction: true })
+    await wrapper.setProps({ freezeRenderWindowEviction: false })
+    await waitAnimationFrame()
+    await nextTick()
+
+    expect(lastRenderCandidates(session)).toEqual([2])
+
+    wrapper.unmount()
+  })
+
   it('shrinks render candidates normally when eviction is not frozen', async () => {
     const session = createSession()
     setPageTops({ 1: -100, 2: 0, 3: 100, 4: 200 })

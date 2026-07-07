@@ -114,6 +114,7 @@ let initialExpansionFrameId = null
 let lastLayoutWidth = 0
 let lastLayoutHeight = 0
 let lastCurrentPage = 0
+let renderWindowEpoch = 0
 
 const isOriginalRole = computed(() => props.viewerRole === VIEWER_ROLE.ORIGINAL)
 const ownsPageRenderLifecycle = computed(() => props.viewerRole === VIEWER_ROLE.ORIGINAL)
@@ -304,6 +305,16 @@ watch(
   }
 )
 
+watch(
+  () => props.freezeRenderWindowEviction,
+  () => {
+    renderWindowEpoch += 1
+    cancelRenderWindowFrame()
+    cancelInitialExpansion()
+  },
+  { flush: 'sync' }
+)
+
 function cancelCurrentPageFrame() {
   if (currentPageFrameId != null) {
     cancelAnimationFrame(currentPageFrameId)
@@ -325,10 +336,14 @@ function cancelInitialExpansion() {
   }
 }
 
-function applyRenderWindow() {
+function applyRenderWindow({ epoch = renderWindowEpoch, force = false } = {}) {
   cancelInitialExpansion()
 
   if (props.freezeRenderWindowEviction) {
+    return
+  }
+
+  if (!force && epoch !== renderWindowEpoch) {
     return
   }
 
@@ -355,8 +370,10 @@ function applyRenderWindow() {
     const primaryOnly = new Set([renderWindow.primaryPage])
     updateRenderCandidates(primaryOnly)
 
+    const expansionEpoch = renderWindowEpoch
     initialExpansionFrameId = requestAnimationFrame(() => {
       initialExpansionFrameId = null
+      if (expansionEpoch !== renderWindowEpoch || props.freezeRenderWindowEviction) return
       updateRenderCandidates(new Set(renderWindow.renderPages))
     })
   } else {
@@ -367,9 +384,10 @@ function applyRenderWindow() {
 function scheduleRenderWindowUpdate() {
   if (renderWindowFrameId != null) return
 
+  const epoch = renderWindowEpoch
   renderWindowFrameId = requestAnimationFrame(() => {
     renderWindowFrameId = null
-    applyRenderWindow()
+    applyRenderWindow({ epoch })
   })
 }
 
@@ -476,9 +494,11 @@ function setupObservers() {
 watch(
   () => props.pages,
   async () => {
+    const epoch = renderWindowEpoch
     await nextTick()
+    if (epoch !== renderWindowEpoch) return
     refreshObservationTargets()
-    applyRenderWindow()
+    applyRenderWindow({ epoch })
 
     if (isOriginalRole.value) {
       emitLayoutIfNeeded()
@@ -589,7 +609,7 @@ defineExpose({
   scrollToPage,
   getScrollContainer,
   getPageElement,
-  refreshRenderWindow: applyRenderWindow,
+  refreshRenderWindow: () => applyRenderWindow({ force: true }),
   refreshCurrentPage: () => emitCurrentPageFromResolver(true)
 })
 </script>
