@@ -7,6 +7,16 @@ const RENDER_CLEANUP_DELAY_MS = 200
 
 const CANVAS_ID_KEY = Symbol('pdfRendererCanvasId')
 
+export const PDF_RENDER_RESULT_STATUS = Object.freeze({
+  SUCCESS: 'success',
+  CANCELLED: 'cancelled',
+  FAILED: 'failed'
+})
+
+export function createPdfRenderResult(status, error = null) {
+  return error ? { status, error } : { status }
+}
+
 export class PdfRenderer {
   constructor({ scheduleTimeout, cancelTimeout } = {}) {
     this.renderTasks = new Map()
@@ -41,7 +51,9 @@ export class PdfRenderer {
     textLayerRenderer,
     pageSession
   }) {
-    if (!pdfDocument || !canvasEl || !metric) return false
+    if (!pdfDocument || !canvasEl || !metric) {
+      return createPdfRenderResult(PDF_RENDER_RESULT_STATUS.FAILED)
+    }
 
     const key = this._taskKey(pageNumber, canvasEl)
     const previous = this.renderTasks.get(key)
@@ -102,14 +114,19 @@ export class PdfRenderer {
         const textContent = pageSession?.textContent ?? null
         await textLayerRenderer.render(page, viewport, cw, ch, textContent)
       }
-      return true
+      return createPdfRenderResult(PDF_RENDER_RESULT_STATUS.SUCCESS)
     } catch (error) {
       if (error?.name !== 'RenderingCancelledException') {
         logger.warn(`Failed to render page ${pageNumber}:`, error)
       } else {
         logger.info('[PDF Zoom Trace] render cancelled', { pageNumber, timestamp: Date.now() })
       }
-      return false
+      return createPdfRenderResult(
+        error?.name === 'RenderingCancelledException'
+          ? PDF_RENDER_RESULT_STATUS.CANCELLED
+          : PDF_RENDER_RESULT_STATUS.FAILED,
+        error
+      )
     } finally {
       if (this.renderTasks.get(key) === renderTask) {
         this.renderTasks.delete(key)

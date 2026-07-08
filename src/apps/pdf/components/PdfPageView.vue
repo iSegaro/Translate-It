@@ -37,6 +37,7 @@
 
 <script setup>
 import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue'
+import { PDF_RENDER_RESULT_STATUS } from '@/features/pdf-translation/core/PdfRenderer.js'
 import { PdfTextLayerRenderer } from '@/features/pdf-translation/core/PdfTextLayerRenderer.js'
 import PdfOverlayLayer from './PdfOverlayLayer.vue'
 import PdfLinkOverlay from './PdfLinkOverlay.vue'
@@ -90,7 +91,7 @@ const props = defineProps({
     default: true
   }
 })
-const emit = defineEmits(['render-started', 'render-committed', 'render-failed'])
+const emit = defineEmits(['render-started', 'render-committed', 'render-cancelled', 'render-failed'])
 
 const rootEl = ref(null)
 const canvasEl = ref(null)
@@ -150,12 +151,16 @@ async function renderPage() {
   if (!renderer) return
 
   emit('render-started', props.page.pageNumber)
-  const rendered = await props.session.renderPage(props.page.pageNumber, canvasEl.value, renderer)
+  const result = await props.session.renderPage(props.page.pageNumber, canvasEl.value, renderer)
 
-  if (rendered && props.visible && props.renderAllowed && canvasEl.value) {
-    emit('render-committed', props.page.pageNumber)
-  } else if (!rendered && props.visible && props.renderAllowed && canvasEl.value) {
-    emit('render-failed', props.page.pageNumber)
+  if (props.visible && props.renderAllowed && canvasEl.value) {
+    if (result?.status === PDF_RENDER_RESULT_STATUS.SUCCESS) {
+      emit('render-committed', props.page.pageNumber)
+    } else if (result?.status === PDF_RENDER_RESULT_STATUS.CANCELLED) {
+      emit('render-cancelled', props.page.pageNumber)
+    } else {
+      emit('render-failed', props.page.pageNumber)
+    }
   }
 
   trace.info('[PDF Zoom Trace] renderPage complete', {

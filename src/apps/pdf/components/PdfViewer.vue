@@ -23,6 +23,7 @@
       :clear-on-unmount="ownsPageRenderLifecycle"
       @render-started="handleRenderStarted"
       @render-committed="handleRenderCommitted"
+      @render-cancelled="handleRenderCancelled"
       @render-failed="handleRenderFailed"
     />
 
@@ -423,6 +424,12 @@ function handleRenderFailed(pageNumber) {
   if (!isOriginalRole.value) return
 
   applySchedulerResult(renderScheduler.markRenderFailed(pageNumber))
+}
+
+function handleRenderCancelled(pageNumber) {
+  if (!isOriginalRole.value) return
+
+  applySchedulerResult(renderScheduler.markRenderCancelled(pageNumber))
 }
 
 function scheduleRenderWindowUpdate() {

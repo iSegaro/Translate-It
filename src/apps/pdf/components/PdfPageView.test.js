@@ -1,6 +1,7 @@
 import { flushPromises, mount } from '@vue/test-utils'
 import { nextTick } from 'vue'
 import { describe, expect, it, vi } from 'vitest'
+import { PDF_RENDER_RESULT_STATUS } from '@/features/pdf-translation/core/PdfRenderer.js'
 import PdfPageView from './PdfPageView.vue'
 
 vi.mock('@/features/pdf-translation/core/PdfTextLayerRenderer.js', () => ({
@@ -25,7 +26,7 @@ vi.mock('./PdfLinkOverlay.vue', () => ({
 
 function createSession() {
   return {
-    renderPage: vi.fn().mockResolvedValue(true),
+    renderPage: vi.fn().mockResolvedValue({ status: PDF_RENDER_RESULT_STATUS.SUCCESS }),
     clearPage: vi.fn(),
     getPageMaskModel: vi.fn(() => null)
   }
@@ -207,9 +208,9 @@ describe('PdfPageView', () => {
     expect(wrapper.emitted('render-failed')).toBeFalsy()
   })
 
-  it('does not emit render-committed when a cancelled render returns false', async () => {
+  it('emits render-cancelled when render is cancelled', async () => {
     const session = createSession()
-    session.renderPage.mockResolvedValue(false)
+    session.renderPage.mockResolvedValue({ status: PDF_RENDER_RESULT_STATUS.CANCELLED })
     const wrapper = mount(PdfPageView, {
       props: {
         page: createPage(),
@@ -223,13 +224,14 @@ describe('PdfPageView', () => {
     await settleWatchers()
 
     expect(wrapper.emitted('render-started')).toEqual([[3]])
+    expect(wrapper.emitted('render-cancelled')).toEqual([[3]])
     expect(wrapper.emitted('render-committed')).toBeFalsy()
-    expect(wrapper.emitted('render-failed')).toEqual([[3]])
+    expect(wrapper.emitted('render-failed')).toBeFalsy()
   })
 
-  it('does not emit render-committed when a failed render returns false', async () => {
+  it('emits render-failed when render fails', async () => {
     const session = createSession()
-    session.renderPage.mockResolvedValue(false)
+    session.renderPage.mockResolvedValue({ status: PDF_RENDER_RESULT_STATUS.FAILED })
     const wrapper = mount(PdfPageView, {
       props: {
         page: createPage(),
@@ -243,8 +245,9 @@ describe('PdfPageView', () => {
     await settleWatchers()
 
     expect(wrapper.emitted('render-started')).toEqual([[3]])
-    expect(wrapper.emitted('render-committed')).toBeFalsy()
     expect(wrapper.emitted('render-failed')).toEqual([[3]])
+    expect(wrapper.emitted('render-committed')).toBeFalsy()
+    expect(wrapper.emitted('render-cancelled')).toBeFalsy()
   })
 
   it('does not emit render-committed after render completes for a hidden page', async () => {
@@ -265,11 +268,12 @@ describe('PdfPageView', () => {
     await wrapper.setProps({ visible: true })
     await flushPromises()
     await wrapper.setProps({ visible: false })
-    resolveRender(true)
+    resolveRender({ status: PDF_RENDER_RESULT_STATUS.SUCCESS })
     await settleWatchers()
 
     expect(wrapper.emitted('render-started')).toEqual([[3]])
     expect(wrapper.emitted('render-committed')).toBeFalsy()
+    expect(wrapper.emitted('render-cancelled')).toBeFalsy()
     expect(wrapper.emitted('render-failed')).toBeFalsy()
   })
 

@@ -2,7 +2,7 @@ import ResourceTracker from '@/core/memory/ResourceTracker.js'
 import { getScopedLogger } from '@/shared/logging/logger.js'
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js'
 import { ensurePdfJsConfigured, getPdfWorkerUrl, loadPdfDocumentFromFile } from './pdfjs.js'
-import { PdfRenderer } from './PdfRenderer.js'
+import { PdfRenderer, PDF_RENDER_RESULT_STATUS, createPdfRenderResult } from './PdfRenderer.js'
 import { PdfPageSession } from './PdfPageSession.js'
 import { sha256HexFromArrayBuffer } from './PdfBlockIdentity.js'
 import { PdfDestinationResolver } from './PdfDestinationResolver.js'
@@ -552,7 +552,7 @@ export class PdfDocumentSession extends ResourceTracker {
 
   async renderPage(pageNumber, canvasEl, textLayerRenderer) {
     const metric = this.pageMetrics[pageNumber - 1]
-    if (!metric) return false
+    if (!metric) return createPdfRenderResult(PDF_RENDER_RESULT_STATUS.FAILED)
     const pageSession = this.pageSessions.get(pageNumber) || null
     return this._renderer.renderPage({
       pdfDocument: this.pdfDocument,

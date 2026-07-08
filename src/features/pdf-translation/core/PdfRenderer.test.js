@@ -7,7 +7,7 @@ vi.mock('./PdfTextLayerRenderer.js', () => ({
   }
 }))
 
-const { PdfRenderer } = await import('./PdfRenderer.js')
+const { PdfRenderer, PDF_RENDER_RESULT_STATUS } = await import('./PdfRenderer.js')
 
 function createMockPage(pageNumber, deferredStore) {
   const state = { cancelled: false }
@@ -152,25 +152,25 @@ describe('PdfRenderer', () => {
       deferredRenders[0].resolve()
       const result = await promise
 
-      expect(result).toBe(true)
+      expect(result.status).toBe(PDF_RENDER_RESULT_STATUS.SUCCESS)
       expect(pdfDocument.getPage).toHaveBeenCalledWith(1)
       expect(canvas.width).toBe(900)
       expect(canvas.height).toBe(1200)
     })
 
-    it('returns false when pdfDocument is missing', async () => {
+    it('returns failed result when pdfDocument is missing', async () => {
       const result = await renderer.renderPage({ pdfDocument: null, metric: { scale: 1 }, pageNumber: 1, canvas: createMockCanvas(), textLayerRenderer: null })
-      expect(result).toBe(false)
+      expect(result.status).toBe(PDF_RENDER_RESULT_STATUS.FAILED)
     })
 
-    it('returns false when canvas is missing', async () => {
+    it('returns failed result when canvas is missing', async () => {
       const result = await renderer.renderPage({ pdfDocument, metric: { scale: 1 }, pageNumber: 1, canvas: null, textLayerRenderer: null })
-      expect(result).toBe(false)
+      expect(result.status).toBe(PDF_RENDER_RESULT_STATUS.FAILED)
     })
 
-    it('returns false when metric is missing', async () => {
+    it('returns failed result when metric is missing', async () => {
       const result = await renderer.renderPage({ pdfDocument, metric: null, pageNumber: 1, canvas: createMockCanvas(), textLayerRenderer: null })
-      expect(result).toBe(false)
+      expect(result.status).toBe(PDF_RENDER_RESULT_STATUS.FAILED)
     })
 
     it('cancels previous render for the same canvas and page before starting new one', async () => {
@@ -204,8 +204,8 @@ describe('PdfRenderer', () => {
       deferredRenders[1].resolve()
 
       const [r1, r2] = await Promise.all([firstPromise, secondPromise])
-      expect(r1).toBe(false)
-      expect(r2).toBe(true)
+      expect(r1.status).toBe(PDF_RENDER_RESULT_STATUS.CANCELLED)
+      expect(r2.status).toBe(PDF_RENDER_RESULT_STATUS.SUCCESS)
     })
 
     it('renders text layer when PdfTextLayerRenderer is provided and render succeeds', async () => {
@@ -219,7 +219,7 @@ describe('PdfRenderer', () => {
       deferredRenders[0].resolve()
       const result = await promise
 
-      expect(result).toBe(true)
+      expect(result.status).toBe(PDF_RENDER_RESULT_STATUS.SUCCESS)
       expect(textLayer.render).toHaveBeenCalled()
     })
 
@@ -237,7 +237,7 @@ describe('PdfRenderer', () => {
 
       deferredRenders[0].resolve()
       const result = await promise
-      expect(result).toBe(true)
+      expect(result.status).toBe(PDF_RENDER_RESULT_STATUS.SUCCESS)
     })
 
     it('uses temp canvas and blit when canvas has existing content', async () => {
@@ -255,7 +255,7 @@ describe('PdfRenderer', () => {
       deferredRenders[0].resolve()
       const result = await promise
 
-      expect(result).toBe(true)
+      expect(result.status).toBe(PDF_RENDER_RESULT_STATUS.SUCCESS)
       expect(canvas.width).toBe(1200)
       expect(canvas.height).toBe(1600)
 
@@ -280,7 +280,7 @@ describe('PdfRenderer', () => {
 
       deferredRenders[0].resolve()
       const result = await promise
-      expect(result).toBe(false)
+      expect(result.status).toBe(PDF_RENDER_RESULT_STATUS.CANCELLED)
     })
   })
 
@@ -304,8 +304,8 @@ describe('PdfRenderer', () => {
       deferredRenders[1].resolve()
 
       const [resultA, resultB] = await Promise.all([promiseA, promiseB])
-      expect(resultA).toBe(true)
-      expect(resultB).toBe(true)
+      expect(resultA.status).toBe(PDF_RENDER_RESULT_STATUS.SUCCESS)
+      expect(resultB.status).toBe(PDF_RENDER_RESULT_STATUS.SUCCESS)
 
       // Both tasks cleaned up in finally blocks
       expect(renderer.renderTasks.size).toBe(0)

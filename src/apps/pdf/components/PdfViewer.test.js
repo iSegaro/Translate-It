@@ -33,7 +33,7 @@ vi.mock('./PdfPageView.vue', () => ({
       renderPriorityGroup: { type: String, default: '' },
       clearOnUnmount: { type: Boolean, default: true }
     },
-    emits: ['render-started', 'render-committed', 'render-failed'],
+    emits: ['render-started', 'render-committed', 'render-cancelled', 'render-failed'],
     setup(props, { expose }) {
       const rootEl = ref(null)
 
