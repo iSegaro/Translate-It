@@ -9,6 +9,7 @@ import { PdfDestinationResolver } from './PdfDestinationResolver.js'
 import { PdfOutlineRepository } from './PdfOutlineRepository.js'
 import { PdfLinkAnnotationRepository } from './PdfLinkAnnotationRepository.js'
 import { PdfPageContentRepository } from './PdfPageContentRepository.js'
+import { PdfTranslationState } from './PdfTranslationState.js'
 
 const logger = getScopedLogger(LOG_COMPONENTS.PDF, 'PdfDocumentSession')
 const PAGE_MARGIN = 24
@@ -53,7 +54,6 @@ export class PdfDocumentSession extends ResourceTracker {
     this.pdfFingerprint = ''
     this.documentIdentity = ''
     this.displayName = ''
-    this.translationStates = new Map()
     this.targetedBlockId = null
     this._renderer = new PdfRenderer({
       scheduleTimeout: (fn, ms) => this.trackTimeout(fn, ms),
@@ -64,6 +64,7 @@ export class PdfDocumentSession extends ResourceTracker {
     this._outlineRepository = new PdfOutlineRepository()
     this._linkAnnotationRepository = new PdfLinkAnnotationRepository()
     this._pageContentRepository = new PdfPageContentRepository()
+    this._translationState = new PdfTranslationState()
     this._naturalPageViewports = new Map()
   }
 
@@ -77,6 +78,14 @@ export class PdfDocumentSession extends ResourceTracker {
 
   get _blockIndex() {
     return this._pageContentRepository.blockIndex
+  }
+
+  get translationStates() {
+    return this._translationState.map
+  }
+
+  set translationStates(nextMap) {
+    this._translationState.map = nextMap
   }
 
   get workerUrl() {
@@ -100,7 +109,7 @@ export class PdfDocumentSession extends ResourceTracker {
     this.displayName = this.fileName
     this.documentIdentity = await this._resolveDocumentIdentity(file, document)
     this._pageContentRepository.reset()
-    this.translationStates.clear()
+    this.resetTranslationStates()
     this.targetedBlockId = null
     this._resolver.clearCaches()
     this._outlineRepository.clear()
@@ -292,47 +301,19 @@ export class PdfDocumentSession extends ResourceTracker {
   }
 
   getBlockTranslationState(blockId) {
-    return this.translationStates.get(blockId) || {
-      blockId,
-      translatedText: '',
-      translatedCells: null,
-      status: 'idle',
-      provider: '',
-      sourceLanguage: '',
-      targetLanguage: '',
-      sourceTextHash: '',
-      translationSettingsHash: '',
-      updatedAt: 0,
-      error: null
-    }
+    return this._translationState.getBlockTranslationState(blockId)
   }
 
   setBlockTranslationState(blockId, patch = {}) {
-    if (!blockId) return null
-
-    const current = this.getBlockTranslationState(blockId)
-    const next = {
-      ...current,
-      ...patch,
-      blockId,
-      updatedAt: patch.updatedAt || Date.now()
-    }
-
-    this.translationStates.set(blockId, next)
-    return next
+    return this._translationState.setBlockTranslationState(blockId, patch)
   }
 
   updateBlockTranslationStates(blockStates = []) {
-    const updatedStates = []
-    for (const blockState of blockStates) {
-      if (!blockState?.blockId) continue
-      updatedStates.push(this.setBlockTranslationState(blockState.blockId, blockState))
-    }
-    return updatedStates
+    return this._translationState.updateBlockTranslationStates(blockStates)
   }
 
   resetTranslationStates() {
-    this.translationStates.clear()
+    this._translationState.resetTranslationStates()
   }
 
   setTargetedBlock(blockId) {
@@ -571,7 +552,7 @@ export class PdfDocumentSession extends ResourceTracker {
     this.visiblePageNumbers.clear()
     this._renderCandidatePageNumbers.clear()
     this._pageContentRepository.reset()
-    this.translationStates.clear()
+    this.resetTranslationStates()
     this.targetedBlockId = null
     this._resolver.clearCaches()
     this._outlineRepository.clear()
