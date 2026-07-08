@@ -46,7 +46,7 @@ import {
 } from '../utils/pdfGeometryModel.js'
 import { CURRENT_PAGE_SOURCE } from '../utils/pdfCurrentPageResolver.js'
 import { resolveRenderWindow } from '../utils/pdfRenderWindowResolver.js'
-import { PdfRenderWindowState } from '../rendering/PdfRenderWindowState.js'
+import { PdfRenderScheduler } from '../rendering/PdfRenderScheduler.js'
 import { usePdfSelectionBridge } from '../composables/usePdfSelectionBridge.js'
 import { VIEWER_ROLE } from '../composables/usePdfViewerMode.js'
 import './PdfViewer.scss'
@@ -104,7 +104,7 @@ const props = defineProps({
 const emit = defineEmits(['layout-change', 'current-page-change', 'block-pointer-move', 'block-click'])
 const viewerRoot = ref(null)
 const pageViews = new Map()
-const renderWindowState = new PdfRenderWindowState()
+const renderScheduler = new PdfRenderScheduler()
 const visiblePageNumbers = ref(new Set())
 const renderCandidatePageNumbers = ref(new Set())
 const highlightedBounds = ref(null)
@@ -321,7 +321,7 @@ watch(
   () => {
     renderWindowEpoch += 1
     cancelRenderWindowFrame()
-    renderWindowState.update({ frozen: true })
+    renderScheduler.updateWindow({ frozen: true })
   },
   { flush: 'sync' }
 )
@@ -342,7 +342,7 @@ function cancelRenderWindowFrame() {
 
 function applyRenderWindow({ epoch = renderWindowEpoch, force = false } = {}) {
   if (props.freezeRenderWindowEviction) {
-    renderWindowState.update({ frozen: true })
+    renderScheduler.updateWindow({ frozen: true })
     return
   }
 
@@ -368,22 +368,22 @@ function applyRenderWindow({ epoch = renderWindowEpoch, force = false } = {}) {
   })
 
   updateVisiblePages(new Set(renderWindow.visiblePages))
-  renderWindowState.update({
+  renderScheduler.updateWindow({
     visiblePages: renderWindow.visiblePages,
     renderPages: renderWindow.renderPages,
     primaryPage: renderWindow.primaryPage,
     frozen: props.freezeRenderWindowEviction
   })
-  updateRenderCandidates(renderWindowState.getEffectiveCandidates())
+  updateRenderCandidates(renderScheduler.getEffectiveCandidates())
 }
 
 function handleRenderCommitted(pageNumber) {
   if (!isOriginalRole.value) return
-  if (!renderWindowState.hasPending()) return
+  if (!renderScheduler.hasPending()) return
 
-  const previousCandidates = renderWindowState.getEffectiveCandidates()
-  renderWindowState.markRendered(pageNumber)
-  const nextCandidates = renderWindowState.getEffectiveCandidates()
+  const previousCandidates = renderScheduler.getEffectiveCandidates()
+  renderScheduler.markRendered(pageNumber)
+  const nextCandidates = renderScheduler.getEffectiveCandidates()
 
   if (!setsEqual(previousCandidates, nextCandidates)) {
     updateRenderCandidates(nextCandidates)
@@ -532,7 +532,7 @@ onBeforeUnmount(() => {
   disconnectObservers()
   visiblePageNumbers.value = new Set()
   renderCandidatePageNumbers.value = new Set()
-  renderWindowState.reset()
+  renderScheduler.reset()
 
   if (isOriginalRole.value) {
     props.session.updateVisiblePages(new Set())
