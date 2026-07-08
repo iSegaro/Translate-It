@@ -13,8 +13,10 @@ export const PDF_RENDER_RESULT_STATUS = Object.freeze({
   FAILED: 'failed'
 })
 
-export function createPdfRenderResult(status, error = null) {
-  return error ? { status, error } : { status }
+export function createPdfRenderResult(status, error = null, bitmap = null) {
+  const result = error ? { status, error } : { status }
+  if (bitmap) result.bitmap = bitmap
+  return result
 }
 
 export class PdfRenderer {
@@ -101,6 +103,15 @@ export class PdfRenderer {
 
     try {
       await renderTask.promise
+
+      // Create bitmap for cache before blitting to visible canvas
+      let bitmap = null
+      try {
+        bitmap = await createImageBitmap(renderCanvas)
+      } catch {
+        // Bitmap creation failed — continue without cache entry
+      }
+
       if (hasReusableCanvas) {
         canvasEl.width = newWidth
         canvasEl.height = newHeight
@@ -114,7 +125,7 @@ export class PdfRenderer {
         const textContent = pageSession?.textContent ?? null
         await textLayerRenderer.render(page, viewport, cw, ch, textContent)
       }
-      return createPdfRenderResult(PDF_RENDER_RESULT_STATUS.SUCCESS)
+      return createPdfRenderResult(PDF_RENDER_RESULT_STATUS.SUCCESS, null, bitmap)
     } catch (error) {
       if (error?.name !== 'RenderingCancelledException') {
         logger.warn(`Failed to render page ${pageNumber}:`, error)

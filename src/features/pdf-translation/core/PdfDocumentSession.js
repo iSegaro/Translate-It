@@ -3,6 +3,7 @@ import { getScopedLogger } from '@/shared/logging/logger.js'
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js'
 import { ensurePdfJsConfigured, getPdfWorkerUrl, loadPdfDocumentFromFile } from './pdfjs.js'
 import { PdfRenderer, PDF_RENDER_RESULT_STATUS, createPdfRenderResult } from './PdfRenderer.js'
+import { PdfBitmapCache } from './PdfBitmapCache.js'
 import { PdfPageSession } from './PdfPageSession.js'
 import { sha256HexFromArrayBuffer } from './PdfBlockIdentity.js'
 import { PdfDestinationResolver } from './PdfDestinationResolver.js'
@@ -59,6 +60,7 @@ export class PdfDocumentSession extends ResourceTracker {
       scheduleTimeout: (fn, ms) => this.trackTimeout(fn, ms),
       cancelTimeout: (id) => this.clearTimer(id)
     })
+    this._bitmapCache = new PdfBitmapCache()
     this._resolver = new PdfDestinationResolver()
     this._outlineRepository = new PdfOutlineRepository()
     this._linkAnnotationRepository = new PdfLinkAnnotationRepository()
@@ -214,6 +216,7 @@ export class PdfDocumentSession extends ResourceTracker {
     }
 
     this._renderer.cancelAll()
+    this._bitmapCache.clear()
     await this._buildPageMetrics(layoutRequest)
 
     logger.info('[PDF Clear Trace] page metrics rebuilt:', {
@@ -553,8 +556,40 @@ export class PdfDocumentSession extends ResourceTracker {
   async renderPage(pageNumber, canvasEl, textLayerRenderer) {
     const metric = this.pageMetrics[pageNumber - 1]
     if (!metric) return createPdfRenderResult(PDF_RENDER_RESULT_STATUS.FAILED)
+
+    const cacheKey = PdfBitmapCache.buildKey(this.documentIdentity, pageNumber, metric.scale)
+
+    // Cache hit: draw bitmap and render text layer without pdf.js render
+    const cachedBitmap = this._bitmapCache.get(cacheKey)
+    if (cachedBitmap) {
+      canvasEl.width = cachedBitmap.width
+      canvasEl.height = cachedBitmap.height
+      canvasEl.style.width = `${cachedBitmap.width}px`
+      canvasEl.style.height = `${cachedBitmap.height}px`
+      const ctx = canvasEl.getContext('2d', { alpha: false })
+      ctx.drawImage(cachedBitmap, 0, 0)
+
+      // Render text layer if textLayerRenderer is provided
+      if (this.pdfDocument && textLayerRenderer) {
+        try {
+          const page = await this.pdfDocument.getPage(pageNumber)
+          const pageSession = this.pageSessions.get(pageNumber) || null
+          const cw = Math.floor(cachedBitmap.width)
+          const ch = Math.floor(cachedBitmap.height)
+          const textContent = pageSession?.textContent ?? null
+          await textLayerRenderer.render(page, metric.viewport, cw, ch, textContent)
+          page.cleanup?.()
+        } catch {
+          // Text layer render failed — canvas is still valid
+        }
+      }
+
+      return createPdfRenderResult(PDF_RENDER_RESULT_STATUS.SUCCESS)
+    }
+
+    // Cache miss: render via PdfRenderer
     const pageSession = this.pageSessions.get(pageNumber) || null
-    return this._renderer.renderPage({
+    const result = await this._renderer.renderPage({
       pdfDocument: this.pdfDocument,
       metric,
       pageNumber,
@@ -562,6 +597,16 @@ export class PdfDocumentSession extends ResourceTracker {
       textLayerRenderer,
       pageSession
     })
+
+    // Cache bitmap only on successful render
+    if (result.status === PDF_RENDER_RESULT_STATUS.SUCCESS && result.bitmap) {
+      this._bitmapCache.set(cacheKey, result.bitmap, {
+        width: result.bitmap.width,
+        height: result.bitmap.height
+      })
+    }
+
+    return result
   }
 
   cancelRenderPage(pageNumber, canvasEl) {
@@ -612,6 +657,7 @@ export class PdfDocumentSession extends ResourceTracker {
     this._pendingHydrations = null
     this._blockIndex.clear()
     this._naturalPageViewports.clear()
+    this._bitmapCache.clear()
     this.pdfFingerprint = ''
     this.documentIdentity = ''
     this.displayName = ''
@@ -642,6 +688,7 @@ export class PdfDocumentSession extends ResourceTracker {
 
   async destroy() {
     await this.cleanupDocument()
+    this._bitmapCache.clear()
     this._renderer.destroy()
     super.destroy()
   }

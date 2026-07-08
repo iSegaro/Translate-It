@@ -7,6 +7,14 @@ vi.mock('./PdfTextLayerRenderer.js', () => ({
   }
 }))
 
+// Mock createImageBitmap globally
+const mockCreateImageBitmap = vi.fn().mockResolvedValue({
+  width: 100,
+  height: 100,
+  close: vi.fn()
+})
+vi.stubGlobal('createImageBitmap', mockCreateImageBitmap)
+
 const { PdfRenderer, PDF_RENDER_RESULT_STATUS } = await import('./PdfRenderer.js')
 
 function createMockPage(pageNumber, deferredStore) {
@@ -84,6 +92,12 @@ beforeEach(() => {
   vi.spyOn(document, 'createElement').mockImplementation((tag) => {
     if (tag === 'canvas') return createMockTempCanvas()
     throw new Error(`Unexpected document.createElement('${tag}')`)
+  })
+  mockCreateImageBitmap.mockReset()
+  mockCreateImageBitmap.mockResolvedValue({
+    width: 100,
+    height: 100,
+    close: vi.fn()
   })
 })
 
@@ -281,6 +295,63 @@ describe('PdfRenderer', () => {
       deferredRenders[0].resolve()
       const result = await promise
       expect(result.status).toBe(PDF_RENDER_RESULT_STATUS.CANCELLED)
+    })
+
+    it('returns bitmap on successful render', async () => {
+      const mockBitmap = { width: 900, height: 1200, close: vi.fn() }
+      mockCreateImageBitmap.mockResolvedValueOnce(mockBitmap)
+
+      const canvas = createMockCanvas()
+      const metric = { scale: 1.5 }
+
+      const promise = renderer.renderPage({ pdfDocument, metric, pageNumber: 1, canvas, textLayerRenderer: null })
+      await flushMicrotasks()
+      deferredRenders[0].resolve()
+      const result = await promise
+
+      expect(result.status).toBe(PDF_RENDER_RESULT_STATUS.SUCCESS)
+      expect(result.bitmap).toBe(mockBitmap)
+      expect(mockCreateImageBitmap).toHaveBeenCalled()
+    })
+
+    it('returns no bitmap when createImageBitmap fails', async () => {
+      mockCreateImageBitmap.mockRejectedValueOnce(new Error('bitmap creation failed'))
+
+      const canvas = createMockCanvas()
+      const metric = { scale: 1 }
+
+      const promise = renderer.renderPage({ pdfDocument, metric, pageNumber: 1, canvas, textLayerRenderer: null })
+      await flushMicrotasks()
+      deferredRenders[0].resolve()
+      const result = await promise
+
+      expect(result.status).toBe(PDF_RENDER_RESULT_STATUS.SUCCESS)
+      expect(result.bitmap).toBeUndefined()
+    })
+
+    it('returns no bitmap on cancelled render', async () => {
+      const canvas = createMockCanvas()
+      const metric = { scale: 1 }
+
+      const promise = renderer.renderPage({ pdfDocument, metric, pageNumber: 1, canvas, textLayerRenderer: null })
+      await flushMicrotasks()
+      renderer.cancelAll()
+      deferredRenders[0].resolve()
+      const result = await promise
+
+      expect(result.status).toBe(PDF_RENDER_RESULT_STATUS.CANCELLED)
+      expect(result.bitmap).toBeUndefined()
+      expect(mockCreateImageBitmap).not.toHaveBeenCalled()
+    })
+
+    it('returns no bitmap on failed render', async () => {
+      const canvas = createMockCanvas()
+      const metric = { scale: 1 }
+
+      const result = await renderer.renderPage({ pdfDocument: null, metric, pageNumber: 1, canvas, textLayerRenderer: null })
+
+      expect(result.status).toBe(PDF_RENDER_RESULT_STATUS.FAILED)
+      expect(result.bitmap).toBeUndefined()
     })
   })
 
