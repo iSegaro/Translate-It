@@ -108,6 +108,32 @@ describe('PdfPageView', () => {
     expect(session.renderPage).toHaveBeenCalledTimes(1)
   })
 
+  it('accepts render priority props without changing render behavior', async () => {
+    const session = createSession()
+    const wrapper = mount(PdfPageView, {
+      props: {
+        page: createPage(),
+        session,
+        visible: true,
+        renderPriority: 0,
+        renderPriorityGroup: 'primary-visible'
+      }
+    })
+
+    await settleWatchers()
+    session.renderPage.mockClear()
+
+    await wrapper.setProps({
+      renderPriority: 2,
+      renderPriorityGroup: 'near-buffer'
+    })
+    await settleWatchers()
+
+    expect(session.renderPage).not.toHaveBeenCalled()
+    expect(wrapper.props('renderPriority')).toBe(2)
+    expect(wrapper.props('renderPriorityGroup')).toBe('near-buffer')
+  })
+
   it('emits render-committed after a successful render', async () => {
     const session = createSession()
     const wrapper = mount(PdfPageView, {

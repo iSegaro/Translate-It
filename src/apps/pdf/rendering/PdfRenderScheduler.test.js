@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { PDF_RENDER_JOB_STATE } from './PdfRenderJobState.js'
-import { PdfRenderScheduler } from './PdfRenderScheduler.js'
+import { PDF_RENDER_PRIORITY_GROUP, PdfRenderScheduler } from './PdfRenderScheduler.js'
 
 function toArray(pageSet) {
   return [...pageSet].sort((a, b) => a - b)
@@ -14,8 +14,46 @@ describe('PdfRenderScheduler', () => {
 
     expect(result.changed).toBe(true)
     expect(toArray(result.candidates)).toEqual([1, 2, 3])
+    expect(result.plan.map(item => item.pageNumber)).toEqual([2, 1, 3])
     expect(toArray(scheduler.getEffectiveCandidates())).toEqual([1, 2, 3])
     expect(scheduler.hasPending()).toBe(false)
+  })
+
+  it('orders render plan by primary, visible pages, then buffer distance', () => {
+    const scheduler = new PdfRenderScheduler()
+
+    const result = scheduler.updateWindow({
+      visiblePages: [9, 10],
+      renderPages: [1, 8, 9, 10, 11, 12],
+      primaryPage: 10
+    })
+
+    expect(result.plan).toEqual([
+      { pageNumber: 10, priority: 0, priorityGroup: PDF_RENDER_PRIORITY_GROUP.PRIMARY_VISIBLE },
+      { pageNumber: 9, priority: 1, priorityGroup: PDF_RENDER_PRIORITY_GROUP.VISIBLE },
+      { pageNumber: 11, priority: 2, priorityGroup: PDF_RENDER_PRIORITY_GROUP.NEAR_BUFFER },
+      { pageNumber: 8, priority: 3, priorityGroup: PDF_RENDER_PRIORITY_GROUP.FAR_BUFFER },
+      { pageNumber: 12, priority: 4, priorityGroup: PDF_RENDER_PRIORITY_GROUP.FAR_BUFFER },
+      { pageNumber: 1, priority: 5, priorityGroup: PDF_RENDER_PRIORITY_GROUP.FAR_BUFFER }
+    ])
+  })
+
+  it('keeps render plan ordering deterministic', () => {
+    const scheduler = new PdfRenderScheduler()
+
+    const first = scheduler.updateWindow({
+      visiblePages: [5, 6],
+      renderPages: [8, 4, 6, 5, 7],
+      primaryPage: 6
+    }).plan
+    const second = scheduler.updateWindow({
+      visiblePages: [5, 6],
+      renderPages: [8, 4, 6, 5, 7],
+      primaryPage: 6
+    }).plan
+
+    expect(first).toEqual(second)
+    expect(first.map(item => item.pageNumber)).toEqual([6, 5, 7, 4, 8])
   })
 
   it('does not report false changes for repeated equivalent updates', () => {

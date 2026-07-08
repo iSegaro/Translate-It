@@ -14,6 +14,8 @@
       :page="page"
       :session="session"
       :visible="renderCandidatePageNumbers.has(page.pageNumber)"
+      :render-priority="getRenderPriority(page.pageNumber)"
+      :render-priority-group="getRenderPriorityGroup(page.pageNumber)"
       :show-overlay="showOverlay"
       :overlay-blocks="getPageOverlayBlocks(page.pageNumber)"
       :handle-navigation-target="handleNavigationTarget"
@@ -109,6 +111,7 @@ const pageViews = new Map()
 const renderScheduler = new PdfRenderScheduler()
 const visiblePageNumbers = ref(new Set())
 const renderCandidatePageNumbers = ref(new Set())
+const renderPlanByPageNumber = ref(new Map())
 const highlightedBounds = ref(null)
 let intersectionObserver = null
 let resizeObserver = null
@@ -299,6 +302,20 @@ function updateRenderCandidates(nextRenderable) {
   }
 }
 
+function updateRenderPlan(plan = []) {
+  renderPlanByPageNumber.value = new Map(
+    plan.map(item => [item.pageNumber, item])
+  )
+}
+
+function getRenderPriority(pageNumber) {
+  return renderPlanByPageNumber.value.get(pageNumber)?.priority ?? null
+}
+
+function getRenderPriorityGroup(pageNumber) {
+  return renderPlanByPageNumber.value.get(pageNumber)?.priorityGroup ?? ''
+}
+
 watch(
   () => props.suppressCurrentPageUpdates,
   (suppress) => {
@@ -366,6 +383,7 @@ function applyRenderWindow({ epoch = renderWindowEpoch, force = false } = {}) {
     primaryPage: renderWindow.primaryPage,
     frozen: props.freezeRenderWindowEviction
   })
+  updateRenderPlan(result.plan)
   if (result.changed) {
     updateRenderCandidates(result.candidates)
   }
@@ -534,6 +552,7 @@ onBeforeUnmount(() => {
   disconnectObservers()
   visiblePageNumbers.value = new Set()
   renderCandidatePageNumbers.value = new Set()
+  renderPlanByPageNumber.value = new Map()
   renderScheduler.reset()
 
   if (isOriginalRole.value) {

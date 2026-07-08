@@ -28,6 +28,8 @@ vi.mock('./PdfPageView.vue', () => ({
       page: { type: Object, required: true },
       session: { type: Object, required: true },
       visible: { type: Boolean, default: false },
+      renderPriority: { type: Number, default: null },
+      renderPriorityGroup: { type: String, default: '' },
       clearOnUnmount: { type: Boolean, default: true }
     },
     emits: ['render-started', 'render-committed', 'render-failed'],
@@ -717,6 +719,29 @@ describe('PdfViewer', () => {
     })
 
     expect(lastRenderCandidates(session)).toEqual([3, 4, 5])
+
+    wrapper.unmount()
+  })
+
+  it('passes render priority metadata to page views', async () => {
+    const { wrapper } = await mountViewerWithPages({ count: 6 })
+
+    await applyWindow(wrapper, {
+      ...createFarPageTops(6),
+      1: -100,
+      2: 0,
+      3: 100
+    })
+
+    const pageViews = wrapper.findAllComponents({ name: 'PdfPageView' })
+    const page2 = pageViews.find(component => component.props('page').pageNumber === 2)
+    const page1 = pageViews.find(component => component.props('page').pageNumber === 1)
+    const page3 = pageViews.find(component => component.props('page').pageNumber === 3)
+
+    expect(page2.props('renderPriority')).toBe(0)
+    expect(page2.props('renderPriorityGroup')).toBe('primary-visible')
+    expect(page1.props('renderPriorityGroup')).toBe('near-buffer')
+    expect(page3.props('renderPriorityGroup')).toBe('near-buffer')
 
     wrapper.unmount()
   })

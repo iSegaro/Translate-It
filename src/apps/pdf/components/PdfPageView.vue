@@ -61,6 +61,14 @@ const props = defineProps({
     type: Boolean,
     default: false
   },
+  renderPriority: {
+    type: Number,
+    default: null
+  },
+  renderPriorityGroup: {
+    type: String,
+    default: ''
+  },
   showOverlay: {
     type: Boolean,
     default: false
