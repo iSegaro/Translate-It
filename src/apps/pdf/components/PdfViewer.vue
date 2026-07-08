@@ -335,6 +335,13 @@ function applySchedulerResult(result) {
   if (result.changed) {
     updateRenderCandidates(result.candidates)
   }
+  if (result.cancelRenderPages?.size > 0 && isOriginalRole.value) {
+    for (const pageNumber of result.cancelRenderPages) {
+      const instance = pageViews.get(pageNumber)
+      if (!instance) continue
+      instance.cancelRender?.()
+    }
+  }
 }
 
 watch(

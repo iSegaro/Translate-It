@@ -564,6 +564,10 @@ export class PdfDocumentSession extends ResourceTracker {
     })
   }
 
+  cancelRenderPage(pageNumber, canvasEl) {
+    return this._renderer.cancelRender(pageNumber, canvasEl)
+  }
+
   clearPage(pageNumber, canvasEl, textLayerRenderer) {
     logger.info('[PDF Clear Trace] session.clearPage', {
       pageNumber,

@@ -55,6 +55,7 @@ export class PdfRenderScheduler {
     this._lastCandidates = new Set()
     this._lastRenderPlan = []
     this._lastRenderAllowedPages = new Set()
+    this._reportedCancelRenderPages = new Set()
   }
 
   updateWindow({ visiblePages, renderPages, primaryPage, frozen = false } = {}) {
@@ -83,6 +84,7 @@ export class PdfRenderScheduler {
 
   markRendered(pageNumber) {
     this._renderJobState.markCommitted(pageNumber)
+    this._reportedCancelRenderPages.delete(pageNumber)
 
     if (!this._renderWindowState.hasPending()) {
       const renderAllowedChanged = this._applyRenderAllowedPages()
@@ -103,22 +105,26 @@ export class PdfRenderScheduler {
     this._lastCandidates = new Set()
     this._lastRenderPlan = []
     this._lastRenderAllowedPages = new Set()
+    this._reportedCancelRenderPages = new Set()
   }
 
   markRenderStarted(pageNumber) {
     this._renderJobState.markStarted(pageNumber)
+    this._reportedCancelRenderPages.delete(pageNumber)
     const renderAllowedChanged = this._applyRenderAllowedPages()
     return this._result({ candidatesChanged: false, renderAllowedChanged })
   }
 
   markRenderFailed(pageNumber) {
     this._renderJobState.markFailed(pageNumber)
+    this._reportedCancelRenderPages.delete(pageNumber)
     const renderAllowedChanged = this._applyRenderAllowedPages()
     return this._result({ candidatesChanged: false, renderAllowedChanged })
   }
 
   markRenderCancelled(pageNumber) {
     this._renderJobState.markCancelled(pageNumber)
+    this._reportedCancelRenderPages.delete(pageNumber)
     const renderAllowedChanged = this._applyRenderAllowedPages()
     return this._result({ candidatesChanged: false, renderAllowedChanged })
   }
@@ -166,13 +172,32 @@ export class PdfRenderScheduler {
     return true
   }
 
+  _computeCancelRenderPages() {
+    const allowedPages = this._lastRenderAllowedPages
+    const cancelPages = new Set()
+
+    for (const [pageNumber, state] of this._renderJobState.snapshot()) {
+      if (
+        state === PDF_RENDER_JOB_STATE.RENDERING &&
+        !allowedPages.has(pageNumber) &&
+        !this._reportedCancelRenderPages.has(pageNumber)
+      ) {
+        cancelPages.add(pageNumber)
+        this._reportedCancelRenderPages.add(pageNumber)
+      }
+    }
+
+    return cancelPages
+  }
+
   _result({ candidatesChanged, renderAllowedChanged }) {
     return {
       changed: candidatesChanged,
       candidates: cloneSet(this._lastCandidates),
       plan: this.getRenderPlan(),
       renderAllowedChanged,
-      renderAllowedPages: this.getRenderAllowedPages()
+      renderAllowedPages: this.getRenderAllowedPages(),
+      cancelRenderPages: this._computeCancelRenderPages()
     }
   }
 

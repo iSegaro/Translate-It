@@ -115,13 +115,19 @@ const pageMaskModel = computed(() => {
   return props.session?.getPageMaskModel?.() || null
 })
 
+function cancelRender() {
+  if (!canvasEl.value) return
+  props.session.cancelRenderPage(props.page.pageNumber, canvasEl.value)
+}
+
 defineExpose({
   getRootEl: () => rootEl.value,
   getCanvasEl: () => canvasEl.value,
   getTextLayerEl: () => textLayerEl.value,
   rootEl,
   canvasEl,
-  textLayerEl
+  textLayerEl,
+  cancelRender
 })
 
 function ensureTextLayerRenderer() {

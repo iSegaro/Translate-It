@@ -161,6 +161,18 @@ export class PdfRenderer {
     }
   }
 
+  cancelRender(pageNumber, canvasEl) {
+    const key = this._taskKey(pageNumber, canvasEl)
+    const renderTask = this.renderTasks.get(key)
+    if (!renderTask) return false
+
+    renderTask.cancel?.()
+    this.renderTasks.delete(key)
+
+    logger.info('[PDF Zoom Trace] cancelRender', { pageNumber, timestamp: Date.now() })
+    return true
+  }
+
   cancelAll() {
     for (const renderTask of this.renderTasks.values()) {
       renderTask.cancel?.()
