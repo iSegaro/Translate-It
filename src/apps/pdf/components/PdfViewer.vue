@@ -38,26 +38,18 @@
 
 <script setup>
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
-import { getScopedLogger } from '@/shared/logging/logger.js'
-import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js'
 import PdfPageView from './PdfPageView.vue'
 import PdfBlockHighlightOverlay from './PdfBlockHighlightOverlay.vue'
 import { getPdfPageRootElement } from '../utils/pageViewInstance.js'
-import {
-  getCanvasScrollTop,
-  getElementClientMetrics,
-  getPageGeometry,
-  getScrollMetrics,
-  getScrollSpaceTop
-} from '../utils/pdfGeometryModel.js'
-import { CURRENT_PAGE_SOURCE } from '../utils/pdfCurrentPageResolver.js'
+import { getCanvasScrollTop, getPageGeometry, getScrollSpaceTop } from '../utils/pdfGeometryModel.js'
 import { resolveRenderWindow } from '../utils/pdfRenderWindowResolver.js'
 import { PdfRenderScheduler } from '../rendering/PdfRenderScheduler.js'
 import { usePdfSelectionBridge } from '../composables/usePdfSelectionBridge.js'
+import { usePdfScrollObservation } from '../composables/usePdfScrollObservation.js'
+import { usePdfLayoutMonitor } from '../composables/usePdfLayoutMonitor.js'
+import { usePdfCurrentPage } from '../composables/usePdfCurrentPage.js'
 import { VIEWER_ROLE } from '../composables/usePdfViewerMode.js'
 import './PdfViewer.scss'
-
-const logger = getScopedLogger(LOG_COMPONENTS.PDF, 'PdfViewerPrimaryPageTrace')
 
 const props = defineProps({
   pages: {
@@ -116,18 +108,51 @@ const renderCandidatePageNumbers = ref(new Set())
 const renderAllowedPageNumbers = ref(new Set())
 const renderPlanByPageNumber = ref(new Map())
 const highlightedBounds = ref(null)
-let intersectionObserver = null
-let resizeObserver = null
-let scrollRoot = null
-let currentPageFrameId = null
 let renderWindowFrameId = null
-let lastLayoutWidth = 0
-let lastLayoutHeight = 0
-let lastCurrentPage = 0
 let renderWindowEpoch = 0
 
 const isOriginalRole = computed(() => props.viewerRole === VIEWER_ROLE.ORIGINAL)
 const ownsPageRenderLifecycle = computed(() => props.viewerRole === VIEWER_ROLE.ORIGINAL)
+
+const {
+  cancelCurrentPageFrame,
+  emitCurrentPageFromResolver,
+  scheduleCurrentPageUpdate,
+  currentPageIfVisible
+} = usePdfCurrentPage({
+  isOriginalRole,
+  suppressCurrentPageUpdates: computed(() => props.suppressCurrentPageUpdates),
+  getContainer: () => scrollRoot.value || props.scrollContainer || viewerRoot.value || null,
+  onCurrentPageChange: (page) => emit('current-page-change', page)
+})
+
+const {
+  emitLayoutIfNeeded,
+  setupLayoutObservation,
+  disconnectLayoutObservation
+} = usePdfLayoutMonitor({
+  viewerRoot,
+  scrollContainer: computed(() => props.scrollContainer),
+  isOriginalRole,
+  onLayoutChange: (layout) => emit('layout-change', layout)
+})
+
+const {
+  scrollRoot,
+  setupScrollObservation,
+  disconnectScrollObservation,
+  refreshObservationTargets,
+  observePageView,
+  unregisterPageView
+} = usePdfScrollObservation({
+  viewerRoot,
+  scrollContainer: computed(() => props.scrollContainer),
+  onScroll: () => {
+    scheduleRenderWindowUpdate()
+    scheduleCurrentPageUpdate()
+  },
+  getPageViews: () => pageViews
+})
 
 if (props.viewerRole === VIEWER_ROLE.ORIGINAL) {
   usePdfSelectionBridge(viewerRoot)
@@ -240,48 +265,23 @@ function getBlockBounds(blockId) {
 
 function registerPageView(pageNumber, instance) {
   if (!instance) {
+    unregisterPageView(pageNumber)
     pageViews.delete(pageNumber)
     return
   }
 
   pageViews.set(pageNumber, instance)
-  const rootEl = getPdfPageRootElement(instance)
-  if (intersectionObserver && rootEl) {
-    rootEl.dataset.pageNumber = String(pageNumber)
-    intersectionObserver.observe(rootEl)
-  }
+  observePageView(pageNumber, instance)
 }
 
 function disconnectObservers() {
-  intersectionObserver?.disconnect()
-  resizeObserver?.disconnect()
-  if (scrollRoot) {
-    scrollRoot.removeEventListener('scroll', handleScroll)
-    scrollRoot = null
-  }
+  disconnectScrollObservation()
+  disconnectLayoutObservation()
   cancelCurrentPageFrame()
   cancelRenderWindowFrame()
-  intersectionObserver = null
-  resizeObserver = null
-}
-
-function refreshObservationTargets() {
-  if (!intersectionObserver) return
-
-  for (const [pageNumber, instance] of pageViews.entries()) {
-    const rootEl = getPdfPageRootElement(instance)
-    if (!rootEl) continue
-
-    rootEl.dataset.pageNumber = String(pageNumber)
-    intersectionObserver.observe(rootEl)
-  }
 }
 
 function updateVisiblePages(nextVisible) {
-  logger.info('[PDF Zoom Trace] updateVisiblePages', {
-    nextVisible: [...nextVisible],
-    timestamp: Date.now()
-  })
   visiblePageNumbers.value = nextVisible
 
   if (isOriginalRole.value) {
@@ -294,10 +294,6 @@ function updateVisiblePages(nextVisible) {
 }
 
 function updateRenderCandidates(nextRenderable) {
-  logger.info('[PDF Zoom Trace] updateRenderCandidates', {
-    nextRenderable: [...nextRenderable],
-    timestamp: Date.now()
-  })
   renderCandidatePageNumbers.value = nextRenderable
 
   if (isOriginalRole.value) {
@@ -363,13 +359,6 @@ watch(
   { flush: 'sync' }
 )
 
-function cancelCurrentPageFrame() {
-  if (currentPageFrameId != null) {
-    cancelAnimationFrame(currentPageFrameId)
-    currentPageFrameId = null
-  }
-}
-
 function cancelRenderWindowFrame() {
   if (renderWindowFrameId != null) {
     cancelAnimationFrame(renderWindowFrameId)
@@ -387,21 +376,11 @@ function applyRenderWindow({ epoch = renderWindowEpoch, force = false } = {}) {
     return
   }
 
-  const container = scrollRoot || props.scrollContainer || viewerRoot.value || null
+  const container = scrollRoot.value || props.scrollContainer || viewerRoot.value || null
   const renderWindow = resolveRenderWindow({
     container,
     pageSelector: '.pdf-page[data-page-number]',
     bufferPages: 1
-  })
-
-  const scrollTop = container?.scrollTop ?? 0
-  logger.info('[PDF Zoom Trace] applyRenderWindow', {
-    scrollTop,
-    primaryPage: renderWindow.primaryPage,
-    visiblePages: renderWindow.visiblePages,
-    renderPages: renderWindow.renderPages,
-    candidateCount: renderCandidatePageNumbers.value.size,
-    timestamp: Date.now()
   })
 
   updateVisiblePages(new Set(renderWindow.visiblePages))
@@ -449,104 +428,19 @@ function scheduleRenderWindowUpdate() {
   })
 }
 
-function emitCurrentPageFromResolver(force = false) {
-  if (!isOriginalRole.value) return
-  if (!force && props.suppressCurrentPageUpdates) return
-
-  const container = scrollRoot || props.scrollContainer || viewerRoot.value || null
-  const { scrollTop } = getScrollMetrics(container)
-  const currentPage = resolveRenderWindow({
-    scrollTop,
-    container,
-    pageSelector: '.pdf-page[data-page-number]',
-    bufferPages: 1
-  }).primaryPage
-  if (!currentPage) return
-
-  if (currentPage && currentPage !== lastCurrentPage) {
-    lastCurrentPage = currentPage
-    logger.debug(`[PDF Primary Page] ${JSON.stringify({ emittedCurrentPage: currentPage, currentPageSource: CURRENT_PAGE_SOURCE, scrollTop, timestamp: new Date().toISOString() })}`)
-    emit('current-page-change', currentPage)
-  }
-}
-
-function scheduleCurrentPageUpdate() {
-  if (!isOriginalRole.value) return
-  if (props.suppressCurrentPageUpdates) return
-  if (currentPageFrameId != null) return
-
-  currentPageFrameId = requestAnimationFrame(() => {
-    currentPageFrameId = null
-    emitCurrentPageFromResolver()
-  })
-}
-
-function handleScroll() {
-  scheduleRenderWindowUpdate()
-  scheduleCurrentPageUpdate()
-}
-
-function emitCurrentPageIfVisible() {
-  if (!isOriginalRole.value) return
-  if (props.suppressCurrentPageUpdates) return
-
-  emitCurrentPageFromResolver()
-}
-
-function emitLayoutIfNeeded() {
-  if (!isOriginalRole.value) return
-
-  const viewerMetrics = getElementClientMetrics(viewerRoot.value)
-  const scrollMetrics = getElementClientMetrics(props.scrollContainer)
-  const width = Math.floor(viewerMetrics.width)
-  const height = Math.floor(scrollMetrics.height || viewerMetrics.height)
-
-  if (
-    width > 0 &&
-    height > 0 &&
-    (width !== lastLayoutWidth || height !== lastLayoutHeight)
-  ) {
-    lastLayoutWidth = width
-    lastLayoutHeight = height
-    emit('layout-change', {
-      width,
-      height
-    })
-  }
-}
-
 function setupObservers() {
   disconnectObservers()
   if (!viewerRoot.value) return
 
-  // The scroll container is injected by the layout owner, not discovered via
-  // DOM traversal. This keeps PdfViewer decoupled from the surrounding DOM
-  // structure and reusable in embedded contexts (split view, modal, iframe).
-  scrollRoot = props.scrollContainer || null
+  setupScrollObservation()
 
-  if (scrollRoot) {
-    scrollRoot.addEventListener('scroll', handleScroll, { passive: true })
+  if (scrollRoot.value) {
+    setupLayoutObservation()
   }
 
-  intersectionObserver = new IntersectionObserver(() => {
-    scheduleRenderWindowUpdate()
-  }, {
-    root: scrollRoot,
-    threshold: 0
-  })
-
-  resizeObserver = new ResizeObserver(() => {
-    emitLayoutIfNeeded()
-  })
-
-  resizeObserver.observe(viewerRoot.value)
-  if (scrollRoot) {
-    resizeObserver.observe(scrollRoot)
-  }
-  refreshObservationTargets()
   emitLayoutIfNeeded()
   applyRenderWindow()
-  emitCurrentPageIfVisible()
+  currentPageIfVisible()
 }
 
 watch(
@@ -560,7 +454,7 @@ watch(
 
     if (isOriginalRole.value) {
       emitLayoutIfNeeded()
-      emitCurrentPageIfVisible()
+      currentPageIfVisible()
     }
   }
 )
