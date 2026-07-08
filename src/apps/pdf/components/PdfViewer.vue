@@ -14,6 +14,7 @@
       :page="page"
       :session="session"
       :visible="renderCandidatePageNumbers.has(page.pageNumber)"
+      :render-allowed="isRenderAllowed(page.pageNumber)"
       :render-priority="getRenderPriority(page.pageNumber)"
       :render-priority-group="getRenderPriorityGroup(page.pageNumber)"
       :show-overlay="showOverlay"
@@ -111,6 +112,7 @@ const pageViews = new Map()
 const renderScheduler = new PdfRenderScheduler()
 const visiblePageNumbers = ref(new Set())
 const renderCandidatePageNumbers = ref(new Set())
+const renderAllowedPageNumbers = ref(new Set())
 const renderPlanByPageNumber = ref(new Map())
 const highlightedBounds = ref(null)
 let intersectionObserver = null
@@ -316,6 +318,24 @@ function getRenderPriorityGroup(pageNumber) {
   return renderPlanByPageNumber.value.get(pageNumber)?.priorityGroup ?? ''
 }
 
+function updateRenderAllowedPages(pageNumbers = new Set()) {
+  renderAllowedPageNumbers.value = new Set(pageNumbers)
+}
+
+function isRenderAllowed(pageNumber) {
+  return renderAllowedPageNumbers.value.has(pageNumber)
+}
+
+function applySchedulerResult(result) {
+  updateRenderPlan(result.plan)
+  if (result.renderAllowedChanged) {
+    updateRenderAllowedPages(result.renderAllowedPages)
+  }
+  if (result.changed) {
+    updateRenderCandidates(result.candidates)
+  }
+}
+
 watch(
   () => props.suppressCurrentPageUpdates,
   (suppress) => {
@@ -383,31 +403,26 @@ function applyRenderWindow({ epoch = renderWindowEpoch, force = false } = {}) {
     primaryPage: renderWindow.primaryPage,
     frozen: props.freezeRenderWindowEviction
   })
-  updateRenderPlan(result.plan)
-  if (result.changed) {
-    updateRenderCandidates(result.candidates)
-  }
+  applySchedulerResult(result)
 }
 
 function handleRenderCommitted(pageNumber) {
   if (!isOriginalRole.value) return
 
   const result = renderScheduler.markRendered(pageNumber)
-  if (result.changed) {
-    updateRenderCandidates(result.candidates)
-  }
+  applySchedulerResult(result)
 }
 
 function handleRenderStarted(pageNumber) {
   if (!isOriginalRole.value) return
 
-  renderScheduler.markRenderStarted(pageNumber)
+  applySchedulerResult(renderScheduler.markRenderStarted(pageNumber))
 }
 
 function handleRenderFailed(pageNumber) {
   if (!isOriginalRole.value) return
 
-  renderScheduler.markRenderFailed(pageNumber)
+  applySchedulerResult(renderScheduler.markRenderFailed(pageNumber))
 }
 
 function scheduleRenderWindowUpdate() {
@@ -552,6 +567,7 @@ onBeforeUnmount(() => {
   disconnectObservers()
   visiblePageNumbers.value = new Set()
   renderCandidatePageNumbers.value = new Set()
+  renderAllowedPageNumbers.value = new Set()
   renderPlanByPageNumber.value = new Map()
   renderScheduler.reset()
 

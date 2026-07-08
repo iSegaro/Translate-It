@@ -28,6 +28,7 @@ vi.mock('./PdfPageView.vue', () => ({
       page: { type: Object, required: true },
       session: { type: Object, required: true },
       visible: { type: Boolean, default: false },
+      renderAllowed: { type: Boolean, default: true },
       renderPriority: { type: Number, default: null },
       renderPriorityGroup: { type: String, default: '' },
       clearOnUnmount: { type: Boolean, default: true }
@@ -742,6 +743,35 @@ describe('PdfViewer', () => {
     expect(page2.props('renderPriorityGroup')).toBe('primary-visible')
     expect(page1.props('renderPriorityGroup')).toBe('near-buffer')
     expect(page3.props('renderPriorityGroup')).toBe('near-buffer')
+
+    wrapper.unmount()
+  })
+
+  it('passes render eligibility to page views', async () => {
+    const { wrapper } = await mountViewerWithPages({ count: 6 })
+
+    await applyWindow(wrapper, {
+      ...createFarPageTops(6),
+      1: -100,
+      2: 0,
+      3: 100
+    })
+
+    const pageViews = wrapper.findAllComponents({ name: 'PdfPageView' })
+    const page1 = pageViews.find(component => component.props('page').pageNumber === 1)
+    const page2 = pageViews.find(component => component.props('page').pageNumber === 2)
+    const page3 = pageViews.find(component => component.props('page').pageNumber === 3)
+
+    expect(page1.props('renderAllowed')).toBe(false)
+    expect(page2.props('renderAllowed')).toBe(true)
+    expect(page3.props('renderAllowed')).toBe(false)
+
+    page2.vm.$emit('render-started', 2)
+    await nextTick()
+
+    expect(page1.props('renderAllowed')).toBe(true)
+    expect(page2.props('renderAllowed')).toBe(true)
+    expect(page3.props('renderAllowed')).toBe(true)
 
     wrapper.unmount()
   })

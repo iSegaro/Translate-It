@@ -1,5 +1,5 @@
 import { PdfRenderWindowState } from './PdfRenderWindowState.js'
-import { PdfRenderJobState } from './PdfRenderJobState.js'
+import { PDF_RENDER_JOB_STATE, PdfRenderJobState } from './PdfRenderJobState.js'
 
 export const PDF_RENDER_PRIORITY_GROUP = Object.freeze({
   PRIMARY_VISIBLE: 'primary-visible',
@@ -54,6 +54,7 @@ export class PdfRenderScheduler {
     this._renderJobState = new PdfRenderJobState()
     this._lastCandidates = new Set()
     this._lastRenderPlan = []
+    this._lastRenderAllowedPages = new Set()
   }
 
   updateWindow({ visiblePages, renderPages, primaryPage, frozen = false } = {}) {
@@ -65,7 +66,7 @@ export class PdfRenderScheduler {
     })
 
     if (frozen) {
-      return this._unchangedResult()
+      return this._result({ candidatesChanged: false, renderAllowedChanged: false })
     }
 
     this._lastRenderPlan = this._buildRenderPlan({
@@ -74,19 +75,26 @@ export class PdfRenderScheduler {
       primaryPage
     })
 
-    return this._candidateTransitionResult(this._renderWindowState.getEffectiveCandidates())
+    const candidatesChanged = this._applyCandidateTransition(this._renderWindowState.getEffectiveCandidates())
+    const renderAllowedChanged = this._applyRenderAllowedPages()
+
+    return this._result({ candidatesChanged, renderAllowedChanged })
   }
 
   markRendered(pageNumber) {
     this._renderJobState.markCommitted(pageNumber)
 
     if (!this._renderWindowState.hasPending()) {
-      return this._unchangedResult()
+      const renderAllowedChanged = this._applyRenderAllowedPages()
+      return this._result({ candidatesChanged: false, renderAllowedChanged })
     }
 
     this._renderWindowState.markRendered(pageNumber)
 
-    return this._candidateTransitionResult(this._renderWindowState.getEffectiveCandidates())
+    const candidatesChanged = this._applyCandidateTransition(this._renderWindowState.getEffectiveCandidates())
+    const renderAllowedChanged = this._applyRenderAllowedPages()
+
+    return this._result({ candidatesChanged, renderAllowedChanged })
   }
 
   reset() {
@@ -94,18 +102,25 @@ export class PdfRenderScheduler {
     this._renderJobState.reset()
     this._lastCandidates = new Set()
     this._lastRenderPlan = []
+    this._lastRenderAllowedPages = new Set()
   }
 
   markRenderStarted(pageNumber) {
     this._renderJobState.markStarted(pageNumber)
+    const renderAllowedChanged = this._applyRenderAllowedPages()
+    return this._result({ candidatesChanged: false, renderAllowedChanged })
   }
 
   markRenderFailed(pageNumber) {
     this._renderJobState.markFailed(pageNumber)
+    const renderAllowedChanged = this._applyRenderAllowedPages()
+    return this._result({ candidatesChanged: false, renderAllowedChanged })
   }
 
   markRenderCancelled(pageNumber) {
     this._renderJobState.markCancelled(pageNumber)
+    const renderAllowedChanged = this._applyRenderAllowedPages()
+    return this._result({ candidatesChanged: false, renderAllowedChanged })
   }
 
   getRenderJobState(pageNumber) {
@@ -120,6 +135,10 @@ export class PdfRenderScheduler {
     return clonePlan(this._lastRenderPlan)
   }
 
+  getRenderAllowedPages() {
+    return cloneSet(this._lastRenderAllowedPages)
+  }
+
   getEffectiveCandidates() {
     return this._renderWindowState.getEffectiveCandidates()
   }
@@ -128,25 +147,62 @@ export class PdfRenderScheduler {
     return this._renderWindowState.hasPending()
   }
 
-  _candidateTransitionResult(candidates) {
+  _applyCandidateTransition(candidates) {
     if (setsEqual(this._lastCandidates, candidates)) {
-      return this._unchangedResult()
+      return false
     }
 
     this._lastCandidates = cloneSet(candidates)
+    return true
+  }
+
+  _applyRenderAllowedPages() {
+    const nextAllowedPages = this._buildRenderAllowedPages()
+    if (setsEqual(this._lastRenderAllowedPages, nextAllowedPages)) {
+      return false
+    }
+
+    this._lastRenderAllowedPages = nextAllowedPages
+    return true
+  }
+
+  _result({ candidatesChanged, renderAllowedChanged }) {
     return {
-      changed: true,
-      candidates: cloneSet(candidates),
-      plan: this.getRenderPlan()
+      changed: candidatesChanged,
+      candidates: cloneSet(this._lastCandidates),
+      plan: this.getRenderPlan(),
+      renderAllowedChanged,
+      renderAllowedPages: this.getRenderAllowedPages()
     }
   }
 
-  _unchangedResult() {
-    return {
-      changed: false,
-      candidates: cloneSet(this._lastCandidates),
-      plan: this.getRenderPlan()
+  _buildRenderAllowedPages() {
+    const candidatePages = cloneSet(this._lastCandidates)
+    const visibleItems = this._lastRenderPlan.filter(item => (
+      item.priorityGroup === PDF_RENDER_PRIORITY_GROUP.PRIMARY_VISIBLE ||
+      item.priorityGroup === PDF_RENDER_PRIORITY_GROUP.VISIBLE
+    ))
+
+    if (visibleItems.length === 0) {
+      return candidatePages
     }
+
+    const primaryItem = visibleItems.find(item => item.priorityGroup === PDF_RENDER_PRIORITY_GROUP.PRIMARY_VISIBLE)
+    if (!primaryItem) {
+      return new Set(visibleItems.map(item => item.pageNumber))
+    }
+
+    if (!this._hasRenderStarted(primaryItem.pageNumber)) {
+      return new Set([primaryItem.pageNumber])
+    }
+
+    const visiblePages = new Set(visibleItems.map(item => item.pageNumber))
+    const allVisibleStarted = visibleItems.every(item => this._hasRenderStarted(item.pageNumber))
+    return allVisibleStarted ? candidatePages : visiblePages
+  }
+
+  _hasRenderStarted(pageNumber) {
+    return this._renderJobState.getState(pageNumber) !== PDF_RENDER_JOB_STATE.IDLE
   }
 
   _buildRenderPlan({ visiblePages, renderPages, primaryPage } = {}) {

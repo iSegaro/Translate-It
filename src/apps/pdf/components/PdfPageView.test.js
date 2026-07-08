@@ -134,6 +134,60 @@ describe('PdfPageView', () => {
     expect(wrapper.props('renderPriorityGroup')).toBe('near-buffer')
   })
 
+  it('does not render while renderAllowed is false', async () => {
+    const session = createSession()
+    mount(PdfPageView, {
+      props: {
+        page: createPage(),
+        session,
+        visible: true,
+        renderAllowed: false
+      }
+    })
+
+    await settleWatchers()
+
+    expect(session.renderPage).not.toHaveBeenCalled()
+  })
+
+  it('renders when renderAllowed changes to true', async () => {
+    const session = createSession()
+    const wrapper = mount(PdfPageView, {
+      props: {
+        page: createPage(),
+        session,
+        visible: true,
+        renderAllowed: false
+      }
+    })
+
+    await settleWatchers()
+    await wrapper.setProps({ renderAllowed: true })
+    await settleWatchers()
+
+    expect(session.renderPage).toHaveBeenCalledTimes(1)
+  })
+
+  it('does not clear an existing page when renderAllowed becomes false', async () => {
+    const session = createSession()
+    const wrapper = mount(PdfPageView, {
+      props: {
+        page: createPage(),
+        session,
+        visible: true,
+        renderAllowed: true
+      }
+    })
+
+    await settleWatchers()
+    session.clearPage.mockClear()
+
+    await wrapper.setProps({ renderAllowed: false })
+    await settleWatchers()
+
+    expect(session.clearPage).not.toHaveBeenCalled()
+  })
+
   it('emits render-committed after a successful render', async () => {
     const session = createSession()
     const wrapper = mount(PdfPageView, {

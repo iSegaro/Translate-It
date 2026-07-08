@@ -15,8 +15,89 @@ describe('PdfRenderScheduler', () => {
     expect(result.changed).toBe(true)
     expect(toArray(result.candidates)).toEqual([1, 2, 3])
     expect(result.plan.map(item => item.pageNumber)).toEqual([2, 1, 3])
+    expect(toArray(result.renderAllowedPages)).toEqual([2])
     expect(toArray(scheduler.getEffectiveCandidates())).toEqual([1, 2, 3])
     expect(scheduler.hasPending()).toBe(false)
+  })
+
+  it('allows only the primary visible page before render starts', () => {
+    const scheduler = new PdfRenderScheduler()
+
+    const result = scheduler.updateWindow({
+      visiblePages: [2, 3],
+      renderPages: [1, 2, 3, 4],
+      primaryPage: 2
+    })
+
+    expect(result.renderAllowedChanged).toBe(true)
+    expect(toArray(result.renderAllowedPages)).toEqual([2])
+  })
+
+  it('allows remaining visible pages after primary starts', () => {
+    const scheduler = new PdfRenderScheduler()
+
+    scheduler.updateWindow({
+      visiblePages: [2, 3],
+      renderPages: [1, 2, 3, 4],
+      primaryPage: 2
+    })
+    const result = scheduler.markRenderStarted(2)
+
+    expect(result.renderAllowedChanged).toBe(true)
+    expect(toArray(result.renderAllowedPages)).toEqual([2, 3])
+  })
+
+  it('allows buffer pages after visible pages have started', () => {
+    const scheduler = new PdfRenderScheduler()
+
+    scheduler.updateWindow({
+      visiblePages: [2, 3],
+      renderPages: [1, 2, 3, 4],
+      primaryPage: 2
+    })
+    scheduler.markRenderStarted(2)
+    const result = scheduler.markRenderStarted(3)
+
+    expect(result.renderAllowedChanged).toBe(true)
+    expect(toArray(result.renderAllowedPages)).toEqual([1, 2, 3, 4])
+  })
+
+  it('allows visible pages when no primary exists', () => {
+    const scheduler = new PdfRenderScheduler()
+
+    const result = scheduler.updateWindow({
+      visiblePages: [2, 3],
+      renderPages: [1, 2, 3, 4],
+      primaryPage: null
+    })
+
+    expect(toArray(result.renderAllowedPages)).toEqual([2, 3])
+  })
+
+  it('allows effective candidates when no visible pages exist', () => {
+    const scheduler = new PdfRenderScheduler()
+
+    const result = scheduler.updateWindow({
+      visiblePages: [],
+      renderPages: [1, 2],
+      primaryPage: null
+    })
+
+    expect(toArray(result.renderAllowedPages)).toEqual([1, 2])
+  })
+
+  it('failed primary does not block visible-page eligibility', () => {
+    const scheduler = new PdfRenderScheduler()
+
+    scheduler.updateWindow({
+      visiblePages: [2, 3],
+      renderPages: [1, 2, 3, 4],
+      primaryPage: 2
+    })
+    const result = scheduler.markRenderFailed(2)
+
+    expect(result.renderAllowedChanged).toBe(true)
+    expect(toArray(result.renderAllowedPages)).toEqual([2, 3])
   })
 
   it('orders render plan by primary, visible pages, then buffer distance', () => {

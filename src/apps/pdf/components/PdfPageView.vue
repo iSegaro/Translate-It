@@ -61,6 +61,10 @@ const props = defineProps({
     type: Boolean,
     default: false
   },
+  renderAllowed: {
+    type: Boolean,
+    default: true
+  },
   renderPriority: {
     type: Number,
     default: null
@@ -128,7 +132,7 @@ function ensureTextLayerRenderer() {
 }
 
 async function renderPage() {
-  if (!props.visible || !canvasEl.value) return
+  if (!props.visible || !props.renderAllowed || !canvasEl.value) return
 
   const startTime = Date.now()
   trace.info('[PDF Zoom Trace] renderPage start', {
@@ -141,16 +145,16 @@ async function renderPage() {
   })
 
   await nextTick()
-  if (!props.visible || !canvasEl.value) return
+  if (!props.visible || !props.renderAllowed || !canvasEl.value) return
   const renderer = ensureTextLayerRenderer()
   if (!renderer) return
 
   emit('render-started', props.page.pageNumber)
   const rendered = await props.session.renderPage(props.page.pageNumber, canvasEl.value, renderer)
 
-  if (rendered && props.visible && canvasEl.value) {
+  if (rendered && props.visible && props.renderAllowed && canvasEl.value) {
     emit('render-committed', props.page.pageNumber)
-  } else if (!rendered && props.visible && canvasEl.value) {
+  } else if (!rendered && props.visible && props.renderAllowed && canvasEl.value) {
     emit('render-failed', props.page.pageNumber)
   }
 
@@ -185,14 +189,15 @@ function clearPage(caller) {
 }
 
 watch(
-  () => props.visible,
-  async (visible, oldVisible) => {
-    if (visible) {
+  () => [props.visible, props.renderAllowed],
+  async ([visible, renderAllowed], oldState = []) => {
+    const [oldVisible] = oldState
+    if (visible && renderAllowed) {
       await renderPage()
       return
     }
 
-    if (oldVisible === true) {
+    if (!visible && oldVisible === true) {
       clearPage('watcher')
     }
   },
@@ -202,7 +207,7 @@ watch(
 watch(
   () => [props.page.scale, props.page.width, props.page.height],
   async () => {
-    if (props.visible) {
+    if (props.visible && props.renderAllowed) {
       await renderPage()
     }
   },
