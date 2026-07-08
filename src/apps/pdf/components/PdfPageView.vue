@@ -78,7 +78,7 @@ const props = defineProps({
     default: true
   }
 })
-const emit = defineEmits(['render-committed'])
+const emit = defineEmits(['render-started', 'render-committed', 'render-failed'])
 
 const rootEl = ref(null)
 const canvasEl = ref(null)
@@ -137,10 +137,13 @@ async function renderPage() {
   const renderer = ensureTextLayerRenderer()
   if (!renderer) return
 
+  emit('render-started', props.page.pageNumber)
   const rendered = await props.session.renderPage(props.page.pageNumber, canvasEl.value, renderer)
 
   if (rendered && props.visible && canvasEl.value) {
     emit('render-committed', props.page.pageNumber)
+  } else if (!rendered && props.visible && canvasEl.value) {
+    emit('render-failed', props.page.pageNumber)
   }
 
   trace.info('[PDF Zoom Trace] renderPage complete', {

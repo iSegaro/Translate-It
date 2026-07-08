@@ -30,7 +30,7 @@ vi.mock('./PdfPageView.vue', () => ({
       visible: { type: Boolean, default: false },
       clearOnUnmount: { type: Boolean, default: true }
     },
-    emits: ['render-committed'],
+    emits: ['render-started', 'render-committed', 'render-failed'],
     setup(props, { expose }) {
       const rootEl = ref(null)
 
@@ -672,6 +672,30 @@ describe('PdfViewer', () => {
     expect(beforeCommit).toEqual([1, 2, 3, 70])
     expect(afterCommit).toEqual([1, 2, 3, 70])
     expect(session.updateRenderCandidates).not.toHaveBeenCalled()
+
+    wrapper.unmount()
+  })
+
+  it('ignores overlay render lifecycle events', async () => {
+    const { wrapper, session } = await mountViewerWithPages({ viewerRole: VIEWER_ROLE.OVERLAY })
+
+    await applyWindow(wrapper, {
+      ...createFarPageTops(75),
+      1: -100,
+      2: 0,
+      3: 100
+    })
+
+    const page2 = wrapper.findAllComponents({ name: 'PdfPageView' })
+      .find(component => component.props('page').pageNumber === 2)
+
+    page2.vm.$emit('render-started', 2)
+    page2.vm.$emit('render-failed', 2)
+    page2.vm.$emit('render-committed', 2)
+    await nextTick()
+
+    expect(session.updateRenderCandidates).not.toHaveBeenCalled()
+    expect(session.updateVisiblePages).not.toHaveBeenCalled()
 
     wrapper.unmount()
   })

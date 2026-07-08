@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { PDF_RENDER_JOB_STATE } from './PdfRenderJobState.js'
 import { PdfRenderScheduler } from './PdfRenderScheduler.js'
 
 function toArray(pageSet) {
@@ -44,6 +45,31 @@ describe('PdfRenderScheduler', () => {
     expect(toArray(commitResult.candidates)).toEqual([69, 70, 71])
     expect(toArray(scheduler.getEffectiveCandidates())).toEqual([69, 70, 71])
     expect(scheduler.hasPending()).toBe(false)
+    expect(scheduler.getRenderJobState(70)).toBe(PDF_RENDER_JOB_STATE.COMMITTED)
+  })
+
+  it('stores render job lifecycle state', () => {
+    const scheduler = new PdfRenderScheduler()
+
+    scheduler.markRenderStarted(2)
+    expect(scheduler.getRenderJobState(2)).toBe(PDF_RENDER_JOB_STATE.RENDERING)
+
+    scheduler.markRenderFailed(2)
+    expect(scheduler.getRenderJobState(2)).toBe(PDF_RENDER_JOB_STATE.FAILED)
+
+    scheduler.markRenderCancelled(3)
+    expect(scheduler.getRenderJobState(3)).toBe(PDF_RENDER_JOB_STATE.CANCELLED)
+  })
+
+  it('resets render job state with scheduler reset', () => {
+    const scheduler = new PdfRenderScheduler()
+
+    scheduler.markRenderStarted(1)
+    scheduler.updateWindow({ visiblePages: [1], renderPages: [1, 2, 3], primaryPage: 1 })
+    scheduler.reset()
+
+    expect(scheduler.getRenderJobState(1)).toBe(PDF_RENDER_JOB_STATE.IDLE)
+    expect(scheduler.getRenderJobSnapshot().size).toBe(0)
   })
 
   it('reports pending commit change only once', () => {

@@ -18,7 +18,9 @@
       :overlay-blocks="getPageOverlayBlocks(page.pageNumber)"
       :handle-navigation-target="handleNavigationTarget"
       :clear-on-unmount="ownsPageRenderLifecycle"
+      @render-started="handleRenderStarted"
       @render-committed="handleRenderCommitted"
+      @render-failed="handleRenderFailed"
     />
 
     <PdfBlockHighlightOverlay
@@ -376,6 +378,18 @@ function handleRenderCommitted(pageNumber) {
   if (result.changed) {
     updateRenderCandidates(result.candidates)
   }
+}
+
+function handleRenderStarted(pageNumber) {
+  if (!isOriginalRole.value) return
+
+  renderScheduler.markRenderStarted(pageNumber)
+}
+
+function handleRenderFailed(pageNumber) {
+  if (!isOriginalRole.value) return
+
+  renderScheduler.markRenderFailed(pageNumber)
 }
 
 function scheduleRenderWindowUpdate() {

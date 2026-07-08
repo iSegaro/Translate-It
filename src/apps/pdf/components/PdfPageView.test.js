@@ -122,7 +122,9 @@ describe('PdfPageView', () => {
     await wrapper.setProps({ visible: true })
     await settleWatchers()
 
+    expect(wrapper.emitted('render-started')).toEqual([[3]])
     expect(wrapper.emitted('render-committed')).toEqual([[3]])
+    expect(wrapper.emitted('render-failed')).toBeFalsy()
   })
 
   it('does not emit render-committed when a cancelled render returns false', async () => {
@@ -140,7 +142,9 @@ describe('PdfPageView', () => {
     await wrapper.setProps({ visible: true })
     await settleWatchers()
 
+    expect(wrapper.emitted('render-started')).toEqual([[3]])
     expect(wrapper.emitted('render-committed')).toBeFalsy()
+    expect(wrapper.emitted('render-failed')).toEqual([[3]])
   })
 
   it('does not emit render-committed when a failed render returns false', async () => {
@@ -158,7 +162,9 @@ describe('PdfPageView', () => {
     await wrapper.setProps({ visible: true })
     await settleWatchers()
 
+    expect(wrapper.emitted('render-started')).toEqual([[3]])
     expect(wrapper.emitted('render-committed')).toBeFalsy()
+    expect(wrapper.emitted('render-failed')).toEqual([[3]])
   })
 
   it('does not emit render-committed after render completes for a hidden page', async () => {
@@ -182,7 +188,9 @@ describe('PdfPageView', () => {
     resolveRender(true)
     await settleWatchers()
 
+    expect(wrapper.emitted('render-started')).toEqual([[3]])
     expect(wrapper.emitted('render-committed')).toBeFalsy()
+    expect(wrapper.emitted('render-failed')).toBeFalsy()
   })
 
   it('clears a page when it leaves the render window', async () => {
@@ -264,6 +272,8 @@ describe('PdfPageView', () => {
     await flushPromises()
 
     expect(session.renderPage).not.toHaveBeenCalled()
+    expect(wrapper.emitted('render-started')).toBeFalsy()
     expect(wrapper.emitted('render-committed')).toBeFalsy()
+    expect(wrapper.emitted('render-failed')).toBeFalsy()
   })
 })

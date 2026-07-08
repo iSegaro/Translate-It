@@ -1,4 +1,5 @@
 import { PdfRenderWindowState } from './PdfRenderWindowState.js'
+import { PdfRenderJobState } from './PdfRenderJobState.js'
 
 function cloneSet(values) {
   return new Set(values)
@@ -17,6 +18,7 @@ function setsEqual(first, second) {
 export class PdfRenderScheduler {
   constructor() {
     this._renderWindowState = new PdfRenderWindowState()
+    this._renderJobState = new PdfRenderJobState()
     this._lastCandidates = new Set()
   }
 
@@ -36,6 +38,8 @@ export class PdfRenderScheduler {
   }
 
   markRendered(pageNumber) {
+    this._renderJobState.markCommitted(pageNumber)
+
     if (!this._renderWindowState.hasPending()) {
       return this._unchangedResult()
     }
@@ -47,7 +51,28 @@ export class PdfRenderScheduler {
 
   reset() {
     this._renderWindowState.reset()
+    this._renderJobState.reset()
     this._lastCandidates = new Set()
+  }
+
+  markRenderStarted(pageNumber) {
+    this._renderJobState.markStarted(pageNumber)
+  }
+
+  markRenderFailed(pageNumber) {
+    this._renderJobState.markFailed(pageNumber)
+  }
+
+  markRenderCancelled(pageNumber) {
+    this._renderJobState.markCancelled(pageNumber)
+  }
+
+  getRenderJobState(pageNumber) {
+    return this._renderJobState.getState(pageNumber)
+  }
+
+  getRenderJobSnapshot() {
+    return this._renderJobState.snapshot()
   }
 
   getEffectiveCandidates() {
