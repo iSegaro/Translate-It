@@ -4,11 +4,11 @@ import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js'
 import { ensurePdfJsConfigured, getPdfWorkerUrl, loadPdfDocumentFromFile } from './pdfjs.js'
 import { PdfRenderer, PDF_RENDER_RESULT_STATUS, createPdfRenderResult } from './PdfRenderer.js'
 import { PdfBitmapCache } from './PdfBitmapCache.js'
-import { PdfPageSession } from './PdfPageSession.js'
 import { sha256HexFromArrayBuffer } from './PdfBlockIdentity.js'
 import { PdfDestinationResolver } from './PdfDestinationResolver.js'
 import { PdfOutlineRepository } from './PdfOutlineRepository.js'
 import { PdfLinkAnnotationRepository } from './PdfLinkAnnotationRepository.js'
+import { PdfPageContentRepository } from './PdfPageContentRepository.js'
 
 const logger = getScopedLogger(LOG_COMPONENTS.PDF, 'PdfDocumentSession')
 const PAGE_MARGIN = 24
@@ -50,7 +50,6 @@ export class PdfDocumentSession extends ResourceTracker {
     this.pageScale = 1
     this.visiblePageNumbers = new Set()
     this._renderCandidatePageNumbers = new Set()
-    this.pageSessions = new Map()
     this.pdfFingerprint = ''
     this.documentIdentity = ''
     this.displayName = ''
@@ -64,9 +63,20 @@ export class PdfDocumentSession extends ResourceTracker {
     this._resolver = new PdfDestinationResolver()
     this._outlineRepository = new PdfOutlineRepository()
     this._linkAnnotationRepository = new PdfLinkAnnotationRepository()
-    this._pendingHydrations = null
-    this._blockIndex = new Map()
+    this._pageContentRepository = new PdfPageContentRepository()
     this._naturalPageViewports = new Map()
+  }
+
+  get pageSessions() {
+    return this._pageContentRepository.pageSessions
+  }
+
+  get _pendingHydrations() {
+    return this._pageContentRepository.pendingHydrations
+  }
+
+  get _blockIndex() {
+    return this._pageContentRepository.blockIndex
   }
 
   get workerUrl() {
@@ -89,7 +99,7 @@ export class PdfDocumentSession extends ResourceTracker {
     this.pdfFingerprint = document.fingerprint || ''
     this.displayName = this.fileName
     this.documentIdentity = await this._resolveDocumentIdentity(file, document)
-    this.pageSessions.clear()
+    this._pageContentRepository.reset()
     this.translationStates.clear()
     this.targetedBlockId = null
     this._resolver.clearCaches()
@@ -255,93 +265,30 @@ export class PdfDocumentSession extends ResourceTracker {
   }
 
   async getPageSession(pageNumber) {
-    if (!this.pdfDocument) return null
-
-    const metric = this.pageMetrics[pageNumber - 1]
-    if (!metric) return null
-
-    // 1. Fast path: already hydrated and stored
-    const existingSession = this.pageSessions.get(pageNumber)
-    if (existingSession) {
-      existingSession.updateDocumentIdentity(this.documentIdentity)
-      if (existingSession.loaded && existingSession.getLogicalBlocks().length > 0) {
-        return existingSession
-      }
-    }
-
-    // 2. In-flight dedup: another call is already hydrating this page
-    if (this._pendingHydrations?.has(pageNumber)) {
-      return this._pendingHydrations.get(pageNumber)
-    }
-
-    // 3. Start new hydration and cache its promise
-    if (!this._pendingHydrations) {
-      this._pendingHydrations = new Map()
-    }
-
-    const promise = this._hydratePageSession(pageNumber, metric)
-    this._pendingHydrations.set(pageNumber, promise)
-
-    return promise
-  }
-
-  async _hydratePageSession(pageNumber, metric) {
-    try {
-      const existingSession = this.pageSessions.get(pageNumber)
-      const pageSession = existingSession || new PdfPageSession({
-        documentIdentity: this.documentIdentity,
-        pageNumber
-      })
-      pageSession.updateDocumentIdentity(this.documentIdentity)
-
-      // Re-check: a previous call may have completed while this one waited
-      if (pageSession.loaded && pageSession.getLogicalBlocks().length > 0) {
-        this.pageSessions.set(pageNumber, pageSession)
-        return pageSession
-      }
-
-      const page = await this.pdfDocument.getPage(pageNumber)
-      await pageSession.hydrate(page, metric)
-      this.pageSessions.set(pageNumber, pageSession)
-      this._indexPageSession(pageSession)
-      return pageSession
-    } finally {
-      this._pendingHydrations?.delete(pageNumber)
-    }
+    return this._pageContentRepository.getPageSession({
+      pdfDocument: this.pdfDocument,
+      pageMetrics: this.pageMetrics,
+      documentIdentity: this.documentIdentity,
+      pageNumber
+    })
   }
 
   async getVisiblePageSessions() {
-    if (!this.pdfDocument || this.visiblePageNumbers.size === 0) {
-      return []
-    }
-
-    const pageNumbers = [...this.visiblePageNumbers].sort((a, b) => a - b)
-    const sessionMap = new Map()
-
-    const results = await Promise.allSettled(
-      pageNumbers.map(async (pageNumber) => {
-        const session = await this.getPageSession(pageNumber)
-        if (session) {
-          sessionMap.set(pageNumber, session)
-        }
-      })
-    )
-
-    for (let i = 0; i < results.length; i++) {
-      if (results[i].status === 'rejected') {
-        logger.warn('Failed to hydrate page session:', {
-          pageNumber: pageNumbers[i],
-          reason: results[i].reason
-        })
-      }
-    }
-
-    return pageNumbers.map((pageNumber) => sessionMap.get(pageNumber)).filter(Boolean)
+    return this._pageContentRepository.getVisiblePageSessions({
+      pdfDocument: this.pdfDocument,
+      pageMetrics: this.pageMetrics,
+      documentIdentity: this.documentIdentity,
+      visiblePageNumbers: this.visiblePageNumbers
+    })
   }
 
   async getVisibleLogicalBlocks() {
-    const pageSessions = await this.getVisiblePageSessions()
-    return pageSessions.flatMap((pageSession) => pageSession.getLogicalBlocks())
+    return this._pageContentRepository.getVisibleLogicalBlocks({
+      pdfDocument: this.pdfDocument,
+      pageMetrics: this.pageMetrics,
+      documentIdentity: this.documentIdentity,
+      visiblePageNumbers: this.visiblePageNumbers
+    })
   }
 
   getBlockTranslationState(blockId) {
@@ -410,48 +357,20 @@ export class PdfDocumentSession extends ResourceTracker {
     }))
   }
 
-  // ── Source Block Index ────────────────────────────────────
-  //
-  // Invariant:
-  //   Every source block currently reachable through pageSessions
-  //   is indexed exactly once in _blockIndex.
-  //
-  // Maintenance points (keep in sync when modifying this class):
-  //   - _hydratePageSession     → _indexPageSession
-  //   - setPageOcrBlocks        → _indexPageSession
-  //   - unindexPageSession       → _blockIndex.delete (per-block)
-  //   - releasePageSession       → unindexPageSession + pageSession.release
-  //   - cleanupDocument          → _blockIndex.clear
-
   _indexPageSession(pageSession) {
-    for (const block of pageSession.allBlocks) {
-      this._blockIndex.set(block.id, block)
-    }
+    this._pageContentRepository._indexPageSession(pageSession)
   }
 
   unindexPageSession(pageNumber) {
-    const pageSession = this.pageSessions.get(pageNumber)
-    if (!pageSession) return
-
-    for (const block of pageSession.allBlocks) {
-      this._blockIndex.delete(block.id)
-    }
+    this._pageContentRepository.unindexPageSession(pageNumber)
   }
 
   releasePageSession(pageNumber) {
-    const pageSession = this.pageSessions.get(pageNumber)
-    if (!pageSession) return
-
-    this.unindexPageSession(pageNumber)
-    pageSession.release()
+    this._pageContentRepository.releasePageSession(pageNumber)
   }
 
   setPageOcrBlocks(pageNumber, blocks, language) {
-    const pageSession = this.pageSessions.get(pageNumber)
-    if (!pageSession) return
-
-    pageSession.setOcrBlocks(blocks, language)
-    this._indexPageSession(pageSession)
+    this._pageContentRepository.setPageOcrBlocks(pageNumber, blocks, language)
   }
 
   /**
@@ -464,8 +383,7 @@ export class PdfDocumentSession extends ResourceTracker {
    * @returns {object|null}
    */
   findSourceBlock(blockId) {
-    if (!blockId) return null
-    return this._blockIndex.get(blockId) ?? null
+    return this._pageContentRepository.findSourceBlock(blockId)
   }
 
   // ── Destination Resolution ─────────────────────────────────
@@ -652,14 +570,12 @@ export class PdfDocumentSession extends ResourceTracker {
     this._cancelAllRenders()
     this.visiblePageNumbers.clear()
     this._renderCandidatePageNumbers.clear()
-    this.pageSessions.clear()
+    this._pageContentRepository.reset()
     this.translationStates.clear()
     this.targetedBlockId = null
     this._resolver.clearCaches()
     this._outlineRepository.clear()
     this._linkAnnotationRepository.clear()
-    this._pendingHydrations = null
-    this._blockIndex.clear()
     this._naturalPageViewports.clear()
     this._bitmapCache.clear()
     this.pdfFingerprint = ''
