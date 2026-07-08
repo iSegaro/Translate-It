@@ -556,12 +556,15 @@ describe('PdfDocumentSession', () => {
 
      await cacheSession.renderPage(1, canvas, null)
      mockRenderer.renderPage.mockClear()
+     mockPdfDocument.getPage.mockClear()
 
      const canvas2 = { width: 0, height: 0, style: {}, getContext: vi.fn(() => ({ drawImage: vi.fn() })) }
      await cacheSession.renderPage(1, canvas2, null)
 
      // Cache hit — renderer should not be called
      expect(mockRenderer.renderPage).not.toHaveBeenCalled()
+     // Cache hit — pdfDocument.getPage should not be called
+     expect(mockPdfDocument.getPage).not.toHaveBeenCalled()
      expect(canvas2.width).toBe(mockBitmap.width)
      expect(canvas2.height).toBe(mockBitmap.height)
    })
@@ -622,6 +625,7 @@ describe('PdfDocumentSession', () => {
      await cacheSession.renderPage(1, canvas, mockTextLayer)
      mockRenderer.renderPage.mockClear()
      mockTextLayer.render.mockClear()
+     mockPdfDocument.getPage.mockClear()
 
      // Second render — cache hit
      const canvas2 = { width: 0, height: 0, style: {}, getContext: vi.fn(() => ({ drawImage: vi.fn() })) }
@@ -629,8 +633,18 @@ describe('PdfDocumentSession', () => {
 
      // Renderer not called (cache hit)
      expect(mockRenderer.renderPage).not.toHaveBeenCalled()
+     // pdfDocument.getPage not called (cache hit bypasses pdf.js)
+     expect(mockPdfDocument.getPage).not.toHaveBeenCalled()
      // Text layer still rendered
      expect(mockTextLayer.render).toHaveBeenCalled()
+     // Text layer called with options object (no page)
+     expect(mockTextLayer.render).toHaveBeenCalledWith(
+       expect.objectContaining({
+         pageNumber: 1,
+         viewport: expect.any(Object),
+         textContent: expect.any(Object)
+       })
+     )
    })
 
    it('destroy clears cache', async () => {

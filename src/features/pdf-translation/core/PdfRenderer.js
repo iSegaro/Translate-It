@@ -123,7 +123,14 @@ export class PdfRenderer {
         const cw = Math.floor(viewport.width)
         const ch = Math.floor(viewport.height)
         const textContent = pageSession?.textContent ?? null
-        await textLayerRenderer.render(page, viewport, cw, ch, textContent)
+        await textLayerRenderer.render({
+          pageNumber,
+          viewport,
+          containerWidth: cw,
+          containerHeight: ch,
+          textContent,
+          page
+        })
       }
       return createPdfRenderResult(PDF_RENDER_RESULT_STATUS.SUCCESS, null, bitmap)
     } catch (error) {

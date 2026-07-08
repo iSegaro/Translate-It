@@ -15,7 +15,7 @@ describe('PdfTextLayerRenderer', () => {
       })
     }
 
-    await renderer.render(page, { scale: 1 })
+    await renderer.render({ pageNumber: 1, viewport: { scale: 1 }, page })
 
     expect(page.getTextContent).toHaveBeenCalledOnce()
     const layerDiv = container.querySelector('.textLayer')
@@ -37,7 +37,7 @@ describe('PdfTextLayerRenderer', () => {
       })
     }
 
-    await renderer.render(page, { scale: 1, rawDims: { pageWidth: 800, pageHeight: 600, pageX: 0, pageY: 0 } })
+    await renderer.render({ pageNumber: 1, viewport: { scale: 1, rawDims: { pageWidth: 800, pageHeight: 600, pageX: 0, pageY: 0 } }, page })
 
     const span = container.querySelector('span')
     // jsdom drops trailing zeros in percentage values
@@ -56,7 +56,7 @@ describe('PdfTextLayerRenderer', () => {
       })
     }
 
-    await renderer.render(page, { scale: 1 })
+    await renderer.render({ pageNumber: 1, viewport: { scale: 1 }, page })
 
     const span = container.querySelector('span')
     const fontHeight = span.style.getPropertyValue('--font-height')
@@ -74,7 +74,7 @@ describe('PdfTextLayerRenderer', () => {
       })
     }
 
-    await renderer.render(page, { scale: 1 })
+    await renderer.render({ pageNumber: 1, viewport: { scale: 1 }, page })
 
     const span = container.querySelector('span')
     expect(span.style.getPropertyValue('--rotate')).toMatch(/deg$/)
@@ -94,7 +94,7 @@ describe('PdfTextLayerRenderer', () => {
       })
     }
 
-    await renderer.render(page, { scale: 1 })
+    await renderer.render({ pageNumber: 1, viewport: { scale: 1 }, page })
 
     const span = container.querySelector('span')
     // jsdom returns 0 width, so scaleX is skipped - this is expected
@@ -114,7 +114,7 @@ describe('PdfTextLayerRenderer', () => {
       })
     }
 
-    await renderer.render(page, { scale: 1 })
+    await renderer.render({ pageNumber: 1, viewport: { scale: 1 }, page })
 
     const span = container.querySelector('span')
     const transform = span.style.transform
@@ -132,7 +132,7 @@ describe('PdfTextLayerRenderer', () => {
       })
     }
 
-    await renderer.render(page, { scale: 1 })
+    await renderer.render({ pageNumber: 1, viewport: { scale: 1 }, page })
 
     const span = container.querySelector('span')
     const transform = span.style.transform
@@ -152,7 +152,7 @@ describe('PdfTextLayerRenderer', () => {
       })
     }
 
-    await renderer.render(page, { scale: 1 })
+    await renderer.render({ pageNumber: 1, viewport: { scale: 1 }, page })
 
     const span = container.querySelector('span')
     const transform = span.style.transform
@@ -194,7 +194,7 @@ describe('PdfTextLayerRenderer', () => {
       })
     }
 
-    await renderer.render(page, { scale: 1, rawDims: { pageWidth: 800, pageHeight: 600, pageX: 50, pageY: 100 } })
+    await renderer.render({ pageNumber: 1, viewport: { scale: 1, rawDims: { pageWidth: 800, pageHeight: 600, pageX: 50, pageY: 100 } }, page })
 
     const span = container.querySelector('span')
     expect(span.style.left).toBeDefined()
@@ -216,7 +216,7 @@ describe('PdfTextLayerRenderer', () => {
     // tx[4] = 1*100 + 0*200 + (-50) = 50
     // left% = (50 - 50) / 800 = 0%
     // Without the fix, left% would be 50/800 = 6.25%
-    await renderer.render(page, { scale: 1, rawDims: { pageWidth: 800, pageHeight: 600, pageX: 50, pageY: 0 } })
+    await renderer.render({ pageNumber: 1, viewport: { scale: 1, rawDims: { pageWidth: 800, pageHeight: 600, pageX: 50, pageY: 0 } }, page })
 
     const span = container.querySelector('span')
     expect(parseFloat(span.style.left)).toBeCloseTo(0, 1)
@@ -233,7 +233,7 @@ describe('PdfTextLayerRenderer', () => {
       })
     }
 
-    await renderer.render(page, { scale: 1, rawDims: { pageWidth: 800, pageHeight: 600, pageX: 0, pageY: 0 } })
+    await renderer.render({ pageNumber: 1, viewport: { scale: 1, rawDims: { pageWidth: 800, pageHeight: 600, pageX: 0, pageY: 0 } }, page })
 
     const span = container.querySelector('span')
     // tx[4] = 100 - 0 = 100, left% = 100/800 = 12.5%
@@ -253,7 +253,7 @@ describe('PdfTextLayerRenderer', () => {
       })
     }
 
-    await renderer.render(page, { scale: 1 })
+    await renderer.render({ pageNumber: 1, viewport: { scale: 1 }, page })
 
     const layerDiv = container.querySelector('.textLayer')
     const spans = layerDiv.querySelectorAll('span')
@@ -272,7 +272,7 @@ describe('PdfTextLayerRenderer', () => {
       })
     }
 
-    await renderer.render(page, { scale: 1 })
+    await renderer.render({ pageNumber: 1, viewport: { scale: 1 }, page })
 
     const span = container.querySelector('span')
     expect(span).not.toBeNull()
@@ -290,7 +290,7 @@ describe('PdfTextLayerRenderer', () => {
       })
     }
 
-    await renderer.render(page, {})
+    await renderer.render({ pageNumber: 1, viewport: {}, page })
 
     const span = container.querySelector('span')
     expect(span).not.toBeNull()
@@ -306,7 +306,7 @@ describe('PdfTextLayerRenderer', () => {
       })
     }
 
-    await renderer.render(page, { scale: 1 })
+    await renderer.render({ pageNumber: 1, viewport: { scale: 1 }, page })
     expect(container.querySelector('.textLayer')).not.toBeNull()
 
     renderer.clear()
@@ -328,7 +328,7 @@ describe('PdfTextLayerRenderer', () => {
       getTextContent: vi.fn().mockResolvedValue({ items: [] })
     }
 
-    await renderer.render(page, { scale: 1 })
+    await renderer.render({ pageNumber: 1, viewport: { scale: 1 }, page })
     expect(container.querySelector('.textLayer')).toBeNull()
   })
 
@@ -341,7 +341,7 @@ describe('PdfTextLayerRenderer', () => {
       })
     }
 
-    await renderer.render(page, { scale: 1 })
+    await renderer.render({ pageNumber: 1, viewport: { scale: 1 }, page })
 
     const layerDiv = container.querySelector('.textLayer')
     expect(layerDiv).not.toBeNull()
@@ -357,7 +357,7 @@ describe('PdfTextLayerRenderer', () => {
       })
     }
 
-    await renderer.render(page, { scale: 1 })
+    await renderer.render({ pageNumber: 1, viewport: { scale: 1 }, page })
 
     const layerDiv = container.querySelector('.textLayer')
     const sentinel = layerDiv.querySelector('.endOfContent')
@@ -391,11 +391,11 @@ describe('PdfTextLayerRenderer', () => {
       const firstPage = { getTextContent: firstMock }
       const secondPage = { getTextContent: secondMock }
 
-      const firstRender = renderer.render(firstPage, { scale: 1 })
+      const firstRender = renderer.render({ pageNumber: 1, viewport: { scale: 1 }, page: firstPage })
       // Let the first render hit the await
       await new Promise((resolve) => setTimeout(resolve, 0))
 
-      const secondRender = renderer.render(secondPage, { scale: 1 })
+      const secondRender = renderer.render({ pageNumber: 1, viewport: { scale: 1 }, page: secondPage })
       await new Promise((resolve) => setTimeout(resolve, 0))
 
       secondResolve()
@@ -423,13 +423,13 @@ describe('PdfTextLayerRenderer', () => {
       ])
       const page1 = { getTextContent: mock }
 
-      const render1 = renderer.render(page1, { scale: 1 })
+      const render1 = renderer.render({ pageNumber: 1, viewport: { scale: 1 }, page: page1 })
       await new Promise((resolve) => setTimeout(resolve, 0))
 
-      const render2 = renderer.render(page1, { scale: 1 })
+      const render2 = renderer.render({ pageNumber: 1, viewport: { scale: 1 }, page: page1 })
       await new Promise((resolve) => setTimeout(resolve, 0))
 
-      const render3 = renderer.render(page1, { scale: 1 })
+      const render3 = renderer.render({ pageNumber: 1, viewport: { scale: 1 }, page: page1 })
       await new Promise((resolve) => setTimeout(resolve, 0))
 
       res1()
@@ -447,7 +447,7 @@ describe('PdfTextLayerRenderer', () => {
       ])
       const page = { getTextContent: mock }
 
-      const renderPromise = renderer.render(page, { scale: 1 })
+      const renderPromise = renderer.render({ pageNumber: 1, viewport: { scale: 1 }, page })
       await new Promise((resolve) => setTimeout(resolve, 0))
 
       renderer.clear()
@@ -471,10 +471,10 @@ describe('PdfTextLayerRenderer', () => {
       const p1 = { getTextContent: m1 }
       const p2 = { getTextContent: m2 }
 
-      renderer.render(p1, { scale: 1 })
+      renderer.render({ pageNumber: 1, viewport: { scale: 1 }, page: p1 })
       await new Promise((resolve) => setTimeout(resolve, 0))
 
-      renderer.render(p2, { scale: 1 })
+      renderer.render({ pageNumber: 1, viewport: { scale: 1 }, page: p2 })
       await new Promise((resolve) => setTimeout(resolve, 0))
 
       r2()
@@ -503,10 +503,10 @@ describe('PdfTextLayerRenderer', () => {
       const p1 = { getTextContent: m1 }
       const p2 = { getTextContent: m2 }
 
-      renderer.render(p1, { scale: 1 })
+      renderer.render({ pageNumber: 1, viewport: { scale: 1 }, page: p1 })
       await new Promise((resolve) => setTimeout(resolve, 0))
 
-      renderer.render(p2, { scale: 1 })
+      renderer.render({ pageNumber: 1, viewport: { scale: 1 }, page: p2 })
       await new Promise((resolve) => setTimeout(resolve, 0))
 
       r2()
@@ -539,7 +539,7 @@ describe('PdfTextLayerRenderer', () => {
         ]
       }
 
-      await renderer.render(page, { scale: 1 }, 600, 800, cachedContent)
+      await renderer.render({ pageNumber: 1, viewport: { scale: 1 }, containerWidth: 600, containerHeight: 800, textContent: cachedContent, page })
 
       expect(getTextContent).not.toHaveBeenCalled()
     })
@@ -557,7 +557,7 @@ describe('PdfTextLayerRenderer', () => {
         ]
       }
 
-      await renderer.render(page, { scale: 1 }, 600, 800, cachedContent)
+      await renderer.render({ pageNumber: 1, viewport: { scale: 1 }, containerWidth: 600, containerHeight: 800, textContent: cachedContent, page })
 
       expect(page.getTextContent).not.toHaveBeenCalled()
       const layerDiv = container.querySelector('.textLayer')
@@ -579,11 +579,37 @@ describe('PdfTextLayerRenderer', () => {
         })
       }
 
-      await renderer.render(page, { scale: 1 })
+      await renderer.render({ pageNumber: 1, viewport: { scale: 1 }, page })
 
       expect(page.getTextContent).toHaveBeenCalledOnce()
       const span = container.querySelector('span')
       expect(span.textContent).toBe('Fallback')
+    })
+
+    it('renders without page when textContent is provided', async () => {
+      const container = document.createElement('div')
+      const renderer = new PdfTextLayerRenderer(container)
+      const cachedContent = {
+        items: [
+          { str: 'No page needed', transform: [1, 0, 0, 1, 10, 20], width: 100, height: 12 }
+        ]
+      }
+
+      await renderer.render({ pageNumber: 1, viewport: { scale: 1 }, textContent: cachedContent })
+
+      const layerDiv = container.querySelector('.textLayer')
+      expect(layerDiv).not.toBeNull()
+      const span = layerDiv.querySelector('span')
+      expect(span.textContent).toBe('No page needed')
+    })
+
+    it('returns early when no page and no textContent', async () => {
+      const container = document.createElement('div')
+      const renderer = new PdfTextLayerRenderer(container)
+
+      await renderer.render({ pageNumber: 1, viewport: { scale: 1 } })
+
+      expect(container.querySelector('.textLayer')).toBeNull()
     })
   })
 })

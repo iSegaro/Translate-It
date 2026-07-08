@@ -31,14 +31,15 @@ export class PdfTextLayerRenderer {
     this._renderSeq = 0
   }
 
-  async render(page, viewport, containerWidth, containerHeight, textContent) {
-    if (!this.container || !page || !viewport) return
+  async render({ pageNumber, viewport, containerWidth, containerHeight, textContent, page }) {
+    if (!this.container || !viewport) return
 
-    trace.info('[PDF Zoom Trace] textLayer render start', { pageNumber: page.pageNumber, timestamp: Date.now() })
+    trace.info('[PDF Zoom Trace] textLayer render start', { pageNumber, timestamp: Date.now() })
     this.clear()
     const renderSeq = ++this._renderSeq
 
     if (!textContent) {
+      if (!page) return
       textContent = await page.getTextContent({
         includeMarkedContent: true,
         disableNormalization: true
@@ -121,7 +122,7 @@ export class PdfTextLayerRenderer {
 
     if (renderSeq !== this._renderSeq) return
 
-    trace.info('[PDF Zoom Trace] textLayer render complete', { pageNumber: page.pageNumber, timestamp: Date.now() })
+    trace.info('[PDF Zoom Trace] textLayer render complete', { pageNumber, timestamp: Date.now() })
     this.container.appendChild(layerDiv)
     this.textLayer = layerDiv
     this.textDivs = spans

@@ -569,16 +569,20 @@ export class PdfDocumentSession extends ResourceTracker {
       const ctx = canvasEl.getContext('2d', { alpha: false })
       ctx.drawImage(cachedBitmap, 0, 0)
 
-      // Render text layer if textLayerRenderer is provided
-      if (this.pdfDocument && textLayerRenderer) {
+      // Render text layer without pdf.js page retrieval
+      if (textLayerRenderer) {
         try {
-          const page = await this.pdfDocument.getPage(pageNumber)
           const pageSession = this.pageSessions.get(pageNumber) || null
           const cw = Math.floor(cachedBitmap.width)
           const ch = Math.floor(cachedBitmap.height)
           const textContent = pageSession?.textContent ?? null
-          await textLayerRenderer.render(page, metric.viewport, cw, ch, textContent)
-          page.cleanup?.()
+          await textLayerRenderer.render({
+            pageNumber,
+            viewport: metric.viewport,
+            containerWidth: cw,
+            containerHeight: ch,
+            textContent
+          })
         } catch {
           // Text layer render failed — canvas is still valid
         }
