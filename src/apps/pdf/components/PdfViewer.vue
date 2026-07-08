@@ -42,8 +42,7 @@ import PdfPageView from './PdfPageView.vue'
 import PdfBlockHighlightOverlay from './PdfBlockHighlightOverlay.vue'
 import { getPdfPageRootElement } from '../utils/pageViewInstance.js'
 import { getCanvasScrollTop, getPageGeometry, getScrollSpaceTop } from '../utils/pdfGeometryModel.js'
-import { resolveRenderWindow } from '../utils/pdfRenderWindowResolver.js'
-import { PdfRenderScheduler } from '../rendering/PdfRenderScheduler.js'
+import { usePdfRenderPipeline } from '../composables/usePdfRenderPipeline.js'
 import { usePdfSelectionBridge } from '../composables/usePdfSelectionBridge.js'
 import { usePdfScrollObservation } from '../composables/usePdfScrollObservation.js'
 import { usePdfLayoutMonitor } from '../composables/usePdfLayoutMonitor.js'
@@ -102,17 +101,37 @@ const props = defineProps({
 const emit = defineEmits(['layout-change', 'current-page-change', 'block-pointer-move', 'block-click'])
 const viewerRoot = ref(null)
 const pageViews = new Map()
-const renderScheduler = new PdfRenderScheduler()
-const visiblePageNumbers = ref(new Set())
-const renderCandidatePageNumbers = ref(new Set())
-const renderAllowedPageNumbers = ref(new Set())
-const renderPlanByPageNumber = ref(new Map())
 const highlightedBounds = ref(null)
-let renderWindowFrameId = null
-let renderWindowEpoch = 0
 
 const isOriginalRole = computed(() => props.viewerRole === VIEWER_ROLE.ORIGINAL)
 const ownsPageRenderLifecycle = computed(() => props.viewerRole === VIEWER_ROLE.ORIGINAL)
+
+const {
+  renderCandidatePageNumbers,
+  getRenderPriority,
+  getRenderPriorityGroup,
+  isRenderAllowed,
+  applyRenderWindow,
+  scheduleRenderWindowUpdate,
+  cancelRenderWindowFrame,
+  handleRenderStarted,
+  handleRenderCommitted,
+  handleRenderCancelled,
+  handleRenderFailed,
+  onFreezeChange,
+  reset: resetRenderPipeline
+} = usePdfRenderPipeline({
+  isOriginalRole,
+  freezeRenderWindowEviction: computed(() => props.freezeRenderWindowEviction),
+  getContainer: () => scrollRoot.value || props.scrollContainer || viewerRoot.value || null,
+  getPageView: (pageNumber) => pageViews.get(pageNumber),
+  onVisiblePagesChange: (nextVisible) => {
+    props.session.updateVisiblePages(nextVisible)
+  },
+  onRenderCandidatesChange: (nextRenderable) => {
+    props.session.updateRenderCandidates(nextRenderable)
+  }
+})
 
 const {
   cancelCurrentPageFrame,
@@ -281,65 +300,6 @@ function disconnectObservers() {
   cancelRenderWindowFrame()
 }
 
-function updateVisiblePages(nextVisible) {
-  visiblePageNumbers.value = nextVisible
-
-  if (isOriginalRole.value) {
-    props.session.updateVisiblePages(nextVisible)
-  }
-
-  if (isOriginalRole.value) {
-    scheduleCurrentPageUpdate()
-  }
-}
-
-function updateRenderCandidates(nextRenderable) {
-  renderCandidatePageNumbers.value = nextRenderable
-
-  if (isOriginalRole.value) {
-    props.session.updateRenderCandidates(nextRenderable)
-  }
-}
-
-function updateRenderPlan(plan = []) {
-  renderPlanByPageNumber.value = new Map(
-    plan.map(item => [item.pageNumber, item])
-  )
-}
-
-function getRenderPriority(pageNumber) {
-  return renderPlanByPageNumber.value.get(pageNumber)?.priority ?? null
-}
-
-function getRenderPriorityGroup(pageNumber) {
-  return renderPlanByPageNumber.value.get(pageNumber)?.priorityGroup ?? ''
-}
-
-function updateRenderAllowedPages(pageNumbers = new Set()) {
-  renderAllowedPageNumbers.value = new Set(pageNumbers)
-}
-
-function isRenderAllowed(pageNumber) {
-  return renderAllowedPageNumbers.value.has(pageNumber)
-}
-
-function applySchedulerResult(result) {
-  updateRenderPlan(result.plan)
-  if (result.renderAllowedChanged) {
-    updateRenderAllowedPages(result.renderAllowedPages)
-  }
-  if (result.changed) {
-    updateRenderCandidates(result.candidates)
-  }
-  if (result.cancelRenderPages?.size > 0 && isOriginalRole.value) {
-    for (const pageNumber of result.cancelRenderPages) {
-      const instance = pageViews.get(pageNumber)
-      if (!instance) continue
-      instance.cancelRender?.()
-    }
-  }
-}
-
 watch(
   () => props.suppressCurrentPageUpdates,
   (suppress) => {
@@ -352,81 +312,10 @@ watch(
 watch(
   () => props.freezeRenderWindowEviction,
   () => {
-    renderWindowEpoch += 1
-    cancelRenderWindowFrame()
-    renderScheduler.updateWindow({ frozen: true })
+    onFreezeChange()
   },
   { flush: 'sync' }
 )
-
-function cancelRenderWindowFrame() {
-  if (renderWindowFrameId != null) {
-    cancelAnimationFrame(renderWindowFrameId)
-    renderWindowFrameId = null
-  }
-}
-
-function applyRenderWindow({ epoch = renderWindowEpoch, force = false } = {}) {
-  if (props.freezeRenderWindowEviction) {
-    renderScheduler.updateWindow({ frozen: true })
-    return
-  }
-
-  if (!force && epoch !== renderWindowEpoch) {
-    return
-  }
-
-  const container = scrollRoot.value || props.scrollContainer || viewerRoot.value || null
-  const renderWindow = resolveRenderWindow({
-    container,
-    pageSelector: '.pdf-page[data-page-number]',
-    bufferPages: 1
-  })
-
-  updateVisiblePages(new Set(renderWindow.visiblePages))
-  const result = renderScheduler.updateWindow({
-    visiblePages: renderWindow.visiblePages,
-    renderPages: renderWindow.renderPages,
-    primaryPage: renderWindow.primaryPage,
-    frozen: props.freezeRenderWindowEviction
-  })
-  applySchedulerResult(result)
-}
-
-function handleRenderCommitted(pageNumber) {
-  if (!isOriginalRole.value) return
-
-  const result = renderScheduler.markRendered(pageNumber)
-  applySchedulerResult(result)
-}
-
-function handleRenderStarted(pageNumber) {
-  if (!isOriginalRole.value) return
-
-  applySchedulerResult(renderScheduler.markRenderStarted(pageNumber))
-}
-
-function handleRenderFailed(pageNumber) {
-  if (!isOriginalRole.value) return
-
-  applySchedulerResult(renderScheduler.markRenderFailed(pageNumber))
-}
-
-function handleRenderCancelled(pageNumber) {
-  if (!isOriginalRole.value) return
-
-  applySchedulerResult(renderScheduler.markRenderCancelled(pageNumber))
-}
-
-function scheduleRenderWindowUpdate() {
-  if (renderWindowFrameId != null) return
-
-  const epoch = renderWindowEpoch
-  renderWindowFrameId = requestAnimationFrame(() => {
-    renderWindowFrameId = null
-    applyRenderWindow({ epoch })
-  })
-}
 
 function setupObservers() {
   disconnectObservers()
@@ -446,11 +335,9 @@ function setupObservers() {
 watch(
   () => props.pages,
   async () => {
-    const epoch = renderWindowEpoch
     await nextTick()
-    if (epoch !== renderWindowEpoch) return
     refreshObservationTargets()
-    applyRenderWindow({ epoch })
+    applyRenderWindow()
 
     if (isOriginalRole.value) {
       emitLayoutIfNeeded()
@@ -473,16 +360,7 @@ onMounted(() => {
 
 onBeforeUnmount(() => {
   disconnectObservers()
-  visiblePageNumbers.value = new Set()
-  renderCandidatePageNumbers.value = new Set()
-  renderAllowedPageNumbers.value = new Set()
-  renderPlanByPageNumber.value = new Map()
-  renderScheduler.reset()
-
-  if (isOriginalRole.value) {
-    props.session.updateVisiblePages(new Set())
-    props.session.updateRenderCandidates(new Set())
-  }
+  resetRenderPipeline()
 })
 
 function collectCanvasDataUrls() {
