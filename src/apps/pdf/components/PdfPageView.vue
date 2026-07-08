@@ -22,7 +22,7 @@
         :page-number="page.pageNumber"
         :visible="visible"
         :handle-navigation-target="handleNavigationTarget"
-    />
+      />
       <PdfOverlayLayer
         v-if="showOverlay"
         :blocks="overlayBlocks"
@@ -78,6 +78,7 @@ const props = defineProps({
     default: true
   }
 })
+const emit = defineEmits(['render-committed'])
 
 const rootEl = ref(null)
 const canvasEl = ref(null)
@@ -136,7 +137,11 @@ async function renderPage() {
   const renderer = ensureTextLayerRenderer()
   if (!renderer) return
 
-  await props.session.renderPage(props.page.pageNumber, canvasEl.value, renderer)
+  const rendered = await props.session.renderPage(props.page.pageNumber, canvasEl.value, renderer)
+
+  if (rendered && props.visible && canvasEl.value) {
+    emit('render-committed', props.page.pageNumber)
+  }
 
   trace.info('[PDF Zoom Trace] renderPage complete', {
     pageNumber: props.page.pageNumber,

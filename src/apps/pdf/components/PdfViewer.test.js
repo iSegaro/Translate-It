@@ -30,6 +30,7 @@ vi.mock('./PdfPageView.vue', () => ({
       visible: { type: Boolean, default: false },
       clearOnUnmount: { type: Boolean, default: true }
     },
+    emits: ['render-committed'],
     setup(props, { expose }) {
       const rootEl = ref(null)
 
@@ -113,6 +114,37 @@ function lastVisiblePages(session) {
 
 async function updatePages(wrapper) {
   await wrapper.setProps({ pages: createPages() })
+  await nextTick()
+}
+
+function createFarPageTops(count, defaultTop = 10000) {
+  const tops = {}
+  for (let pageNumber = 1; pageNumber <= count; pageNumber += 1) {
+    tops[pageNumber] = defaultTop + pageNumber * 200
+  }
+  return tops
+}
+
+async function mountViewerWithPages({ count = 75, session = createSession(), viewerRole = VIEWER_ROLE.ORIGINAL } = {}) {
+  const pages = createPages(count)
+  const wrapper = mount(PdfViewer, {
+    props: {
+      pages,
+      session,
+      viewerRole
+    },
+    attachTo: document.body
+  })
+
+  setViewerViewport(wrapper)
+  await nextTick()
+  await nextTick()
+  return { wrapper, session, pages }
+}
+
+async function applyWindow(wrapper, tops) {
+  setPageTops(tops)
+  wrapper.vm.refreshRenderWindow()
   await nextTick()
 }
 
@@ -505,7 +537,7 @@ describe('PdfViewer', () => {
     wrapper.unmount()
   })
 
-  it('does not let stale initial expansion mutate candidates after epoch changes', async () => {
+  it('does not mutate candidates from stale scheduled work after epoch changes', async () => {
     const session = createSession()
     setPageTops({ 1: -100, 2: 0, 3: 100, 4: 200 })
 
@@ -518,16 +550,17 @@ describe('PdfViewer', () => {
     })
 
     setViewerViewport(wrapper)
+    wrapper.vm.refreshRenderWindow()
     await nextTick()
     await nextTick()
-    expect(lastRenderCandidates(session)).toEqual([2])
+    expect(lastRenderCandidates(session)).toEqual([1, 2, 3])
 
     await wrapper.setProps({ freezeRenderWindowEviction: true })
     await wrapper.setProps({ freezeRenderWindowEviction: false })
     await waitAnimationFrame()
     await nextTick()
 
-    expect(lastRenderCandidates(session)).toEqual([2])
+    expect(lastRenderCandidates(session)).toEqual([1, 2, 3])
 
     wrapper.unmount()
   })
@@ -554,6 +587,149 @@ describe('PdfViewer', () => {
     await updatePages(wrapper)
 
     expect(lastRenderCandidates(session)).toEqual([3, 4])
+
+    wrapper.unmount()
+  })
+
+  it('keeps committed pages alive during a disjoint jump', async () => {
+    const { wrapper, session } = await mountViewerWithPages()
+
+    await applyWindow(wrapper, {
+      ...createFarPageTops(75),
+      1: -100,
+      2: 0,
+      3: 100
+    })
+    expect(lastRenderCandidates(session)).toEqual([1, 2, 3])
+
+    await applyWindow(wrapper, {
+      ...createFarPageTops(75),
+      69: -100,
+      70: 0,
+      71: 100
+    })
+
+    expect(lastRenderCandidates(session)).toEqual([1, 2, 3, 70])
+
+    wrapper.unmount()
+  })
+
+  it('commits pending replacement when destination render commits', async () => {
+    const { wrapper, session } = await mountViewerWithPages()
+
+    await applyWindow(wrapper, {
+      ...createFarPageTops(75),
+      1: -100,
+      2: 0,
+      3: 100
+    })
+    await applyWindow(wrapper, {
+      ...createFarPageTops(75),
+      69: -100,
+      70: 0,
+      71: 100
+    })
+
+    const page70 = wrapper.findAllComponents({ name: 'PdfPageView' })
+      .find(component => component.props('page').pageNumber === 70)
+    page70.vm.$emit('render-committed', 70)
+    await nextTick()
+
+    expect(lastRenderCandidates(session)).toEqual([69, 70, 71])
+
+    wrapper.unmount()
+  })
+
+  it('does not commit pending replacement from overlay render commits', async () => {
+    const { wrapper, session } = await mountViewerWithPages({ viewerRole: VIEWER_ROLE.OVERLAY })
+
+    await applyWindow(wrapper, {
+      ...createFarPageTops(75),
+      1: -100,
+      2: 0,
+      3: 100
+    })
+    await applyWindow(wrapper, {
+      ...createFarPageTops(75),
+      69: -100,
+      70: 0,
+      71: 100
+    })
+
+    const beforeCommit = wrapper.findAllComponents({ name: 'PdfPageView' })
+      .filter(component => component.props('visible'))
+      .map(component => component.props('page').pageNumber)
+      .sort((a, b) => a - b)
+    const page70 = wrapper.findAllComponents({ name: 'PdfPageView' })
+      .find(component => component.props('page').pageNumber === 70)
+    page70.vm.$emit('render-committed', 70)
+    await nextTick()
+    const afterCommit = wrapper.findAllComponents({ name: 'PdfPageView' })
+      .filter(component => component.props('visible'))
+      .map(component => component.props('page').pageNumber)
+      .sort((a, b) => a - b)
+
+    expect(beforeCommit).toEqual([1, 2, 3, 70])
+    expect(afterCommit).toEqual([1, 2, 3, 70])
+    expect(session.updateRenderCandidates).not.toHaveBeenCalled()
+
+    wrapper.unmount()
+  })
+
+  it('commits overlapping windows immediately through render-window state', async () => {
+    const { wrapper, session } = await mountViewerWithPages({ count: 6 })
+
+    await applyWindow(wrapper, {
+      ...createFarPageTops(6),
+      1: -100,
+      2: 0,
+      3: 100
+    })
+    await applyWindow(wrapper, {
+      ...createFarPageTops(6),
+      3: -100,
+      4: 0,
+      5: 100
+    })
+
+    expect(lastRenderCandidates(session)).toEqual([3, 4, 5])
+
+    wrapper.unmount()
+  })
+
+  it('clears pending replacement while frozen and preserves committed candidates', async () => {
+    const { wrapper, session } = await mountViewerWithPages()
+
+    await applyWindow(wrapper, {
+      ...createFarPageTops(75),
+      1: -100,
+      2: 0,
+      3: 100
+    })
+    await applyWindow(wrapper, {
+      ...createFarPageTops(75),
+      69: -100,
+      70: 0,
+      71: 100
+    })
+    expect(lastRenderCandidates(session)).toEqual([1, 2, 3, 70])
+
+    await wrapper.setProps({ freezeRenderWindowEviction: true })
+    await applyWindow(wrapper, {
+      ...createFarPageTops(75),
+      69: -100,
+      70: 0,
+      71: 100
+    })
+    expect(lastRenderCandidates(session)).toEqual([1, 2, 3, 70])
+
+    await wrapper.setProps({ freezeRenderWindowEviction: false })
+    const page70 = wrapper.findAllComponents({ name: 'PdfPageView' })
+      .find(component => component.props('page').pageNumber === 70)
+    page70.vm.$emit('render-committed', 70)
+    await nextTick()
+
+    expect(lastRenderCandidates(session)).toEqual([1, 2, 3, 70])
 
     wrapper.unmount()
   })

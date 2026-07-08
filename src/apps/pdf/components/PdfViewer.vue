@@ -18,6 +18,7 @@
       :overlay-blocks="getPageOverlayBlocks(page.pageNumber)"
       :handle-navigation-target="handleNavigationTarget"
       :clear-on-unmount="ownsPageRenderLifecycle"
+      @render-committed="handleRenderCommitted"
     />
 
     <PdfBlockHighlightOverlay
@@ -45,6 +46,7 @@ import {
 } from '../utils/pdfGeometryModel.js'
 import { CURRENT_PAGE_SOURCE } from '../utils/pdfCurrentPageResolver.js'
 import { resolveRenderWindow } from '../utils/pdfRenderWindowResolver.js'
+import { PdfRenderWindowState } from '../rendering/PdfRenderWindowState.js'
 import { usePdfSelectionBridge } from '../composables/usePdfSelectionBridge.js'
 import { VIEWER_ROLE } from '../composables/usePdfViewerMode.js'
 import './PdfViewer.scss'
@@ -102,6 +104,7 @@ const props = defineProps({
 const emit = defineEmits(['layout-change', 'current-page-change', 'block-pointer-move', 'block-click'])
 const viewerRoot = ref(null)
 const pageViews = new Map()
+const renderWindowState = new PdfRenderWindowState()
 const visiblePageNumbers = ref(new Set())
 const renderCandidatePageNumbers = ref(new Set())
 const highlightedBounds = ref(null)
@@ -110,7 +113,6 @@ let resizeObserver = null
 let scrollRoot = null
 let currentPageFrameId = null
 let renderWindowFrameId = null
-let initialExpansionFrameId = null
 let lastLayoutWidth = 0
 let lastLayoutHeight = 0
 let lastCurrentPage = 0
@@ -251,7 +253,6 @@ function disconnectObservers() {
   }
   cancelCurrentPageFrame()
   cancelRenderWindowFrame()
-  cancelInitialExpansion()
   intersectionObserver = null
   resizeObserver = null
 }
@@ -296,6 +297,16 @@ function updateRenderCandidates(nextRenderable) {
   }
 }
 
+function setsEqual(first, second) {
+  if (first.size !== second.size) return false
+
+  for (const value of first) {
+    if (!second.has(value)) return false
+  }
+
+  return true
+}
+
 watch(
   () => props.suppressCurrentPageUpdates,
   (suppress) => {
@@ -310,7 +321,7 @@ watch(
   () => {
     renderWindowEpoch += 1
     cancelRenderWindowFrame()
-    cancelInitialExpansion()
+    renderWindowState.update({ frozen: true })
   },
   { flush: 'sync' }
 )
@@ -329,17 +340,9 @@ function cancelRenderWindowFrame() {
   }
 }
 
-function cancelInitialExpansion() {
-  if (initialExpansionFrameId != null) {
-    cancelAnimationFrame(initialExpansionFrameId)
-    initialExpansionFrameId = null
-  }
-}
-
 function applyRenderWindow({ epoch = renderWindowEpoch, force = false } = {}) {
-  cancelInitialExpansion()
-
   if (props.freezeRenderWindowEviction) {
+    renderWindowState.update({ frozen: true })
     return
   }
 
@@ -365,19 +368,25 @@ function applyRenderWindow({ epoch = renderWindowEpoch, force = false } = {}) {
   })
 
   updateVisiblePages(new Set(renderWindow.visiblePages))
+  renderWindowState.update({
+    visiblePages: renderWindow.visiblePages,
+    renderPages: renderWindow.renderPages,
+    primaryPage: renderWindow.primaryPage,
+    frozen: props.freezeRenderWindowEviction
+  })
+  updateRenderCandidates(renderWindowState.getEffectiveCandidates())
+}
 
-  if (renderCandidatePageNumbers.value.size === 0 && renderWindow.primaryPage) {
-    const primaryOnly = new Set([renderWindow.primaryPage])
-    updateRenderCandidates(primaryOnly)
+function handleRenderCommitted(pageNumber) {
+  if (!isOriginalRole.value) return
+  if (!renderWindowState.hasPending()) return
 
-    const expansionEpoch = renderWindowEpoch
-    initialExpansionFrameId = requestAnimationFrame(() => {
-      initialExpansionFrameId = null
-      if (expansionEpoch !== renderWindowEpoch || props.freezeRenderWindowEviction) return
-      updateRenderCandidates(new Set(renderWindow.renderPages))
-    })
-  } else {
-    updateRenderCandidates(new Set(renderWindow.renderPages))
+  const previousCandidates = renderWindowState.getEffectiveCandidates()
+  renderWindowState.markRendered(pageNumber)
+  const nextCandidates = renderWindowState.getEffectiveCandidates()
+
+  if (!setsEqual(previousCandidates, nextCandidates)) {
+    updateRenderCandidates(nextCandidates)
   }
 }
 
@@ -523,6 +532,7 @@ onBeforeUnmount(() => {
   disconnectObservers()
   visiblePageNumbers.value = new Set()
   renderCandidatePageNumbers.value = new Set()
+  renderWindowState.reset()
 
   if (isOriginalRole.value) {
     props.session.updateVisiblePages(new Set())
