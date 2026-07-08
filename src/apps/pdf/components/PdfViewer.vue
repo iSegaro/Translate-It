@@ -297,16 +297,6 @@ function updateRenderCandidates(nextRenderable) {
   }
 }
 
-function setsEqual(first, second) {
-  if (first.size !== second.size) return false
-
-  for (const value of first) {
-    if (!second.has(value)) return false
-  }
-
-  return true
-}
-
 watch(
   () => props.suppressCurrentPageUpdates,
   (suppress) => {
@@ -368,25 +358,23 @@ function applyRenderWindow({ epoch = renderWindowEpoch, force = false } = {}) {
   })
 
   updateVisiblePages(new Set(renderWindow.visiblePages))
-  renderScheduler.updateWindow({
+  const result = renderScheduler.updateWindow({
     visiblePages: renderWindow.visiblePages,
     renderPages: renderWindow.renderPages,
     primaryPage: renderWindow.primaryPage,
     frozen: props.freezeRenderWindowEviction
   })
-  updateRenderCandidates(renderScheduler.getEffectiveCandidates())
+  if (result.changed) {
+    updateRenderCandidates(result.candidates)
+  }
 }
 
 function handleRenderCommitted(pageNumber) {
   if (!isOriginalRole.value) return
-  if (!renderScheduler.hasPending()) return
 
-  const previousCandidates = renderScheduler.getEffectiveCandidates()
-  renderScheduler.markRendered(pageNumber)
-  const nextCandidates = renderScheduler.getEffectiveCandidates()
-
-  if (!setsEqual(previousCandidates, nextCandidates)) {
-    updateRenderCandidates(nextCandidates)
+  const result = renderScheduler.markRendered(pageNumber)
+  if (result.changed) {
+    updateRenderCandidates(result.candidates)
   }
 }
 
