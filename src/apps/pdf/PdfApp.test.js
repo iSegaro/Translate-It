@@ -527,7 +527,7 @@ describe('PdfApp', () => {
       expect(viewers[1].props('freezeRenderWindowEviction')).toBe(false)
       expect(viewers[1].props('isBlockTargetingActive')).toBeUndefined()
       expect(viewers[1].props('highlightedBlockId')).toBeUndefined()
-      expect(viewers[1].props('handleNavigationTarget')).toBeUndefined()
+      expect(viewers[1].props('handleNavigationTarget')).toBeTruthy()
 
       expect(wrapper.findComponent({ name: 'PdfTranslatedPane' }).exists()).toBe(false)
     })

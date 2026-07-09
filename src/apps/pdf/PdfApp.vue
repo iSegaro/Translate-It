@@ -141,6 +141,7 @@
                   :freeze-render-window-eviction="renderWindowEvictionFrozen"
                   :show-overlay="true"
                   :overlay-page-data="translatedPageData"
+                  :handle-navigation-target="handleNavigationTarget"
                   :scroll-container="translatedScrollContainer"
                 />
               </template>
