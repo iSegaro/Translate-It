@@ -200,7 +200,7 @@ export class PdfDocumentSession extends ResourceTracker {
 
       const widthScale = usableWidth / naturalViewport.width
       const heightScale = usableHeight > 0 ? usableHeight / naturalViewport.height : widthScale
-      const percentScale = widthScale * (zoomPercent / 100)
+      const percentScale = zoomPercent / 100
 
       let scale = widthScale
       if (zoomMode === 'fit-page') {

@@ -136,7 +136,14 @@ describe('PdfDocumentSession', () => {
     expect(state.pageMetrics[0].scale).toBeCloseTo(352 / 500, 6)
   })
 
-  it('rebuildPageMetrics applies percent zoom on top of fit-width scale', async () => {
+  it.each([
+    [50, 0.5],
+    [75, 0.75],
+    [100, 1],
+    [125, 1.25],
+    [150, 1.5],
+    [200, 2]
+  ])('rebuildPageMetrics applies %s percent as absolute scale %s', async (zoomPercent, expectedScale) => {
     session.totalPages = 1
     session.pdfDocument = {
       numPages: 1,
@@ -157,11 +164,12 @@ describe('PdfDocumentSession', () => {
       width: 400,
       height: 400,
       zoomMode: 'percent',
-      zoomPercent: 125
+      zoomPercent
     })
 
     expect(state.pageMetrics).toHaveLength(1)
-    expect(state.pageMetrics[0].scale).toBeCloseTo((352 / 500) * 1.25, 6)
+    expect(state.pageMetrics[0].scale).toBeCloseTo(expectedScale, 6)
+    expect(state.pageMetrics[0].width).toBeCloseTo(500 * expectedScale, 6)
   })
 
   it('keeps visible logical block identity stable across page metric rebuilds', async () => {
@@ -612,10 +620,27 @@ describe('PdfDocumentSession', () => {
      // Cache hit — pdfDocument.getPage should not be called
      expect(mockPdfDocument.getPage).not.toHaveBeenCalled()
      expect(canvas2.width).toBe(mockBitmap.width)
-     expect(canvas2.height).toBe(mockBitmap.height)
-   })
+      expect(canvas2.height).toBe(mockBitmap.height)
+    })
 
-   it('does not cache on failed render', async () => {
+    it('uses scale in bitmap cache keys', async () => {
+      const canvas = { width: 0, height: 0, style: {}, getContext: vi.fn(() => ({ drawImage: vi.fn() })) }
+      await cacheSession.renderPage(1, canvas, null)
+      expect(cacheSession._bitmapCache.size).toBe(1)
+
+      mockRenderer.renderPage.mockClear()
+      cacheSession.pageMetrics = [
+        { pageNumber: 1, width: 800, height: 1000, scale: 2, viewport: { width: 800, height: 1000 } }
+      ]
+
+      const canvas2 = { width: 0, height: 0, style: {}, getContext: vi.fn(() => ({ drawImage: vi.fn() })) }
+      await cacheSession.renderPage(1, canvas2, null)
+
+      expect(mockRenderer.renderPage).toHaveBeenCalledTimes(1)
+      expect(cacheSession._bitmapCache.size).toBe(2)
+    })
+
+    it('does not cache on failed render', async () => {
      mockRenderer.renderPage.mockResolvedValueOnce({ status: 'failed' })
      const canvas = { width: 0, height: 0, style: {}, getContext: vi.fn(() => ({ drawImage: vi.fn() })) }
 
