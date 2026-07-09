@@ -91,19 +91,18 @@ export class PdfRenderer {
     try {
       await renderTask.promise
 
-      // Create bitmap for cache before blitting to visible canvas
-      let bitmap = null
-      try {
-        bitmap = await createImageBitmap(renderCanvas)
-      } catch {
-        // Bitmap creation failed — continue without cache entry
-      }
-
       if (hasReusableCanvas) {
         canvasEl.width = newWidth
         canvasEl.height = newHeight
         const visibleCtx = canvasEl.getContext('2d', { alpha: false })
         visibleCtx.drawImage(renderCanvas, 0, 0)
+      }
+
+      let bitmap = null
+      try {
+        bitmap = await createImageBitmap(renderCanvas)
+      } catch {
+        // Bitmap creation failed — continue without cache entry
       }
       if (textLayerRenderer instanceof PdfTextLayerRenderer) {
         const cw = Math.floor(viewport.width)
