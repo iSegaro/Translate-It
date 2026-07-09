@@ -13,18 +13,27 @@ The PDF Translation feature is a **self-contained, dedicated PDF viewer and tran
 ## Table of Contents
 
 - [Goals and Non-Goals](#goals-and-non-goals)
+- [Architecture Responsibilities](#architecture-responsibilities)
 - [Architectural Overview](#architectural-overview)
-- [Module Boundaries](#module-boundaries)
+- [Architecture Evolution](#architecture-evolution)
 - [PDF Application Architecture](#pdf-application-architecture)
   - [Render Tree](#render-tree)
-  - [Key Application Utilities](#key-application-utilities)
-  - [Key Application Constants](#key-application-constants)
+  - [Key Application Utilities](#key-application-utilities-srcappspdfutils)
+  - [Key Application Constants](#key-application-constants-srcappspdfconstants)
   - [Composable Responsibilities](#composable-responsibilities)
   - [Presentation Architecture](#presentation-architecture)
 - [PDF Viewer Lifecycle](#pdf-viewer-lifecycle)
   - [File Loading Sequence](#file-loading-sequence)
   - [Page Rendering Sequence](#page-rendering-sequence)
   - [Cleanup Sequence](#cleanup-sequence)
+- [Render Pipeline](#render-pipeline)
+  - [Ownership Boundaries](#ownership-boundaries)
+  - [PdfRenderer](#pdfrenderer)
+  - [PdfRenderScheduler](#pdfrenderscheduler)
+  - [PdfRenderWindowState](#pdfrenderwindowstate)
+  - [PdfRenderJobState](#pdfrenderjobstate)
+  - [usePdfRenderPipeline](#usepdfrenderpipeline)
+  - [Render Flow](#render-flow)
 - [Geometry Layer](#geometry-layer)
 - [PDF Navigation](#pdf-navigation)
   - [Destination Coordinate Model](#destination-coordinate-model)
@@ -34,11 +43,11 @@ The PDF Translation feature is a **self-contained, dedicated PDF viewer and tran
 - [Zoom and Scroll Transition Architecture](#zoom-and-scroll-transition-architecture)
   - [Anchor Model](#anchor-model)
   - [Controlled Zoom Sequence](#controlled-zoom-sequence)
-  - [Deferred Layout](#deferred-layout)
+  - [Deferred Layout](#deferred-layout-deferredzoomlayout)
   - [Fit Page Entry](#fit-page-entry)
   - [Fit Page Exit](#fit-page-exit)
   - [Side-by-Side Translated Anchor Policy](#side-by-side-translated-anchor-policy)
-  - [Orchestration](#orchestration)
+  - [Orchestration](#orchestration-runcontrolledzoomtransition)
 - [Fit Page Footprint Model](#fit-page-footprint-model)
 - [Scroll Synchronization](#scroll-synchronization)
 - [Text Layer Architecture](#text-layer-architecture)
@@ -48,6 +57,12 @@ The PDF Translation feature is a **self-contained, dedicated PDF viewer and tran
 - [Bilingual Rendering Model](#bilingual-rendering-model)
 - [OCR Fallback Architecture](#ocr-fallback-architecture)
 - [Cache Architecture](#cache-architecture)
+  - [Cache Identity](#cache-identity)
+  - [Cache Structure](#cache-structure)
+  - [Restoration Flow](#restoration-flow)
+  - [Bitmap Cache (`PdfBitmapCache`)](#bitmap-cache-pdfbitmapcache)
+- [Page Content Repository (`PdfPageContentRepository`)](#page-content-repository-pdfpagecontentrepository)
+- [Translation State (`PdfTranslationState`)](#translation-state-pdftranslationstate)
 - [History Architecture](#history-architecture)
 - [Export Architecture](#export-architecture)
 - [Block Targeting](#block-targeting)
@@ -57,6 +72,8 @@ The PDF Translation feature is a **self-contained, dedicated PDF viewer and tran
 - [Major Design Decisions](#major-design-decisions)
 - [Known Technical Debt](#known-technical-debt)
 - [Future Extension Points](#future-extension-points)
+- [Architectural Principles](#architectural-principles)
+- [Architecture Status](#architecture-status)
 
 ---
 
@@ -83,69 +100,74 @@ The PDF Translation feature is a **self-contained, dedicated PDF viewer and tran
 
 ---
 
+## Architecture Responsibilities
+
+| Layer / Component | Primary Responsibility |
+|-------------------|------------------------|
+| PdfApp | Feature orchestration — wires composables, manages app lifecycle |
+| PdfViewer | UI orchestration — renders page list, manages scroll, delegates to page views |
+| usePdfRenderPipeline | Render coordination — bridges scheduler to Vue reactivity, manages render window |
+| PdfDocumentSession | Document façade — delegates to subsystems, owns lifecycle and metrics |
+| PdfRenderer | PDF rendering only — render/cancel/clear, no scheduling or state ownership |
+| PdfBitmapCache | Bitmap storage — LRU eviction, memory budget, GPU-safe resource management |
+| PdfPageContentRepository | Page content lifecycle — sessions, hydration, block indexing, OCR mutation |
+| PdfTranslationState | Translation state — per-block status, statistics, update/reset |
+| PdfRenderScheduler | Render policy — candidates, eligibility, priority, cancellation targets |
+| PdfRenderWindowState | Render window — committed vs. pending candidate sets |
+| PdfRenderJobState | Render lifecycle — per-page state machine (idle → rendering → committed/failed/cancelled) |
+
+---
+
 ## Architectural Overview
 
+The system is divided into two main layers: the **Document Layer** (state, caching, rendering) and the **Viewer Layer** (UI orchestration, scheduling, presentation).
+
+### Document Layer
+
 ```
-┌─────────────────────────────────────────────────────────────────┐
-│                        PdfApp.vue (Root)                        │
-│  usePdfViewerController │ usePdfBilingualMode │ usePdfExport    │
-│  usePdfBlockSelection   │ usePdfOcr           │ usePdfSelection │
-└───────────┬─────────────────────────────────────────────────────┘
-            │
-┌───────────▼─────────────────────────────────────────────────────┐
-│                    Feature Layer (core/)                         │
-│                                                                 │
-│  ┌──────────────────┐  ┌────────────────────┐  ┌─────────────┐ │
-│  │ PdfDocument      │  │ PdfTranslation     │  │ PdfLayout   │ │
-│  │ Session          │  │ Coordinator        │  │ Analyzer    │ │
-│  │ (Singleton)      │  │ (Orchestrator)     │  │             │ │
-│  └──────┬───────────┘  └──────┬─────────────┘  └──────┬──────┘ │
-│         │                     │                       │        │
-│  ┌──────▼──────┐    ┌────────▼────────┐    ┌─────────▼──────┐ │
-│  │PdfPageSession│    │PdfTranslation   │    │PdfLogicalBlock │ │
-│  │ (Per-page)  │    │Adapter + Batch  │    │Builder         │ │
-│  └──────┬──────┘    │Planner          │    └────────────────┘ │
-│         │           └────────┬────────┘                        │
-│  ┌──────▼──────┐    ┌───────▼───────┐                          │
-│  │PdfTextLayer │    │UnifiedMessaging│                          │
-│  │Renderer     │    │(to background) │                          │
-│  └─────────────┘    └───────────────┘                          │
-│                                                                 │
-│  ┌────────────┐  ┌──────────────┐  ┌──────────────┐            │
-│  │PdfCache    │  │PdfHistory    │  │PdfExport     │            │
-│  │Manager     │  │Manager       │  │Collector+    │            │
-│  └────────────┘  └──────────────┘  │Formatter     │            │
-│                                     └──────────────┘            │
-│  ┌────────────────────────────────────────────────┐            │
-│  │ OCR Pipeline: PdfOcrDetector → PdfOcrProcessor │            │
-│  └────────────────────────────────────────────────┘            │
-└─────────────────────────────────────────────────────────────────┘
-            │
-┌───────────▼─────────────────────────────────────────────────────┐
-│                   Geometry / Anchor Layer (utils/)               │
-│  Active:                                                        │
-│    pdfGeometryModel · pdfCurrentPageResolver · pdfRenderWindow   │
-│    pdfScrollAnchor · pdfFitPageFootprint · pdfViewportPage       │
-│    Resolver · pdfCanonicalAnchor · pdfGeometrySyncEngine         │
-└─────────────────────────────────────────────────────────────────┘
-            │
-┌───────────▼─────────────────────────────────────────────────────┐
-│                    pdfjs-dist (Rendering)                        │
-│  PDF parsing, canvas rendering, text content extraction          │
-└─────────────────────────────────────────────────────────────────┘
+Document
+    │
+    ▼
+PdfDocumentSession
+    ├── PdfPageContentRepository
+    │       └── PdfPageSession × N
+    ├── PdfTranslationState
+    ├── PdfBitmapCache
+    ├── PdfRenderer
+    ├── Navigation Repositories
+    └── Metrics
 ```
+
+**PdfDocumentSession** is the top-level façade for a single PDF document. It delegates domain responsibilities to purpose-built subsystems and owns document lifecycle (open, cleanup, metrics).
+
+### Viewer Layer
+
+```
+Viewer
+    │
+    ▼
+usePdfRenderPipeline
+    │
+    ▼
+PdfRenderScheduler
+    ├── PdfRenderWindowState
+    └── PdfRenderJobState
+```
+
+**usePdfRenderPipeline** is the Vue composable that bridges the feature layer to the view layer. It owns the scheduler instance, render window lifecycle, and reactive state for page views. The scheduler is a pure-state policy engine with no DOM or Vue ownership.
 
 ### Application Layer Detail
 
 ```
 PdfApp.vue
-├── usePdfViewerController       (document lifecycle, translation)
+├── usePdfViewerController        (document lifecycle, translation)
+├── usePdfRenderPipeline          (render scheduling, window state)
 ├── createPdfTransitionController (zoom, layout, anchor management)
 ├── usePdfNavigation              (destination resolution, outline)
-├── usePdfOcr                    (scanned page detection)
+├── usePdfOcr                     (scanned page detection)
 ├── usePdfExport                  (TXT/Markdown export)
 ├── usePdfBlockSelection          (block targeting mode)
-├── usePdfSelectionBridge        (text selection bridge)
+├── usePdfSelectionBridge         (text selection bridge)
 ├── PdfToolbar
 ├── PdfDropzone
 └── PdfViewerLayout
@@ -165,7 +187,7 @@ PdfApp.vue
 | **Application Constants** | `src/apps/pdf/constants/` | Layout contract constants (DOM footprint) | Vanilla JS |
 | **Feature Layer** | `src/features/pdf-translation/core/` | Domain logic, state management, orchestration | Vanilla JS + ResourceTracker |
 
-**Key Principle**: The feature layer is **framework-agnostic**. It uses no Vue reactivity — translation states are stored in `Map` objects on `PdfDocumentSession`. Composables in the application layer bridge feature-layer classes to Vue's reactive system via refs and computed properties.
+**Key Principle**: The feature layer is **framework-agnostic**. It uses no Vue reactivity — translation states are managed by `PdfTranslationState` and page content by `PdfPageContentRepository`, both composed within `PdfDocumentSession`. Composables in the application layer bridge feature-layer classes to Vue's reactive system via refs and computed properties.
 
 ### Singletons
 
@@ -173,9 +195,34 @@ Three services are module-level singletons shared across all composables:
 
 | Singleton | Purpose | Storage Key |
 |-----------|---------|-------------|
-| `pdfDocumentSession` | Document lifecycle, page sessions, translation state | N/A (in-memory) |
+| `pdfDocumentSession` | Document lifecycle façade — delegates to PdfPageContentRepository, PdfTranslationState, PdfBitmapCache, PdfRenderer, and navigation repositories | N/A (in-memory) |
 | `pdfCacheManager` | Persistent translation + OCR cache | `pdfDocumentCache` |
 | `pdfHistoryManager` | Document open/translation history | `pdfTranslationHistory` |
+
+---
+
+## Architecture Evolution
+
+The PDF architecture evolved incrementally through a series of focused decompositions. Each milestone solved a specific structural problem without disrupting the overall system.
+
+| Milestone | What It Solved |
+|-----------|----------------|
+| [**Geometry Layer**](#geometry-layer) | Separated PDF coordinate space from DOM coordinate space, enabling coordinate conversions without mixing concerns. |
+| [**Canonical Scroll Anchors**](#anchor-model) | Provided deterministic scroll position capture and restore across zoom/layout transitions. |
+| [**Current Page Resolver**](#pdfcurrentpageresolver) | Unified current-page detection under a single source of truth, eliminating duplicate detection paths. |
+| **Geometry Sync Engine** | Enabled accurate side-by-side scroll synchronization using geometry-based canonical anchors instead of fragile ratio heuristics. |
+| [**Render Window Resolver**](#pdfrenderwindowresolver) | Determined visible pages from geometry rather than IntersectionObserver, making render decisions data-driven. |
+| [**Render Scheduler**](#pdfrenderscheduler) | Extracted scheduling policy from the viewer, enabling deterministic, testable render decisions. |
+| [**Render Window State**](#pdfrenderwindowstate) | Managed committed vs. pending render candidates, preventing churn during rapid scroll. |
+| [**Render Job State**](#pdfrenderjobstate) | Provided per-page lifecycle tracking with typed state transitions. |
+| **Render Eligibility** | Added primary-page-first rendering strategy, ensuring the most important page renders before secondaries. |
+| **Typed Render Results** | Replaced implicit success/failure with structured result objects (`{status, bitmap, error}`). |
+| **Cancellation Pipeline** | Enabled targeted cancellation of non-essential renders via `_reportedCancelRenderPages`. |
+| [**Bitmap Cache**](#bitmap-cache-pdfbitmapcache) | Added GPU-accelerated LRU bitmap caching, eliminating redundant pdf.js renders on scroll-back. |
+| [**PdfPageContentRepository**](#page-content-repository-pdfpagecontentrepository) | Extracted page sessions, hydration, and block indexing from the session, reducing monolithic responsibility. |
+| [**PdfTranslationState**](#translation-state-pdftranslationstate) | Extracted translation state management from the session, enabling clean state operations without lifecycle coupling. |
+| [**usePdfRenderPipeline**](#usepdfrenderpipeline) | Centralized render scheduling lifecycle in a single composable, replacing scattered viewer logic. |
+| **Session-owned Cleanup Scheduling** | Moved cleanup timer ownership from PdfRenderer to PdfDocumentSession, enforcing single-responsibility. |
 
 ---
 
@@ -235,6 +282,7 @@ PdfApp
 | Composable | Purpose | Key Dependencies |
 |------------|---------|-----------------|
 | `usePdfViewerController` | Document lifecycle, translation, cache restore | `pdfDocumentSession`, `PdfTranslationCoordinator` |
+| `usePdfRenderPipeline` | Render scheduling, window state, candidate/allowed pages | `PdfRenderScheduler`, `pdfRenderWindowResolver` |
 | `usePdfNavigation` | Outline/destination resolution, page navigation | `PdfDestinationResolver`, `PdfOutlineRepository` |
 | `createPdfTransitionController` | Zoom/layout transitions, anchor capture/restore | `pdfScrollAnchor`, `pdfFitPageFootprint` |
 | `usePdfScrollSync` | Side-by-side scroll synchronization | Delegates to pdfGeometrySyncEngine; falls back to proportional ratio |
@@ -306,7 +354,9 @@ The page list within the scroll pane uses `padding: 16px 0 24px` to provide vert
    ├── Create positioned <span> elements (left/top %, font-size, rotation)
    ├── Append to DOM
    └── Post-render: measure widths → apply scaleX for accuracy
-3. PdfDocumentSession.renderPage() renders canvas via pdfjs page.render()
+3. PdfDocumentSession.renderPage() checks bitmap cache
+   ├── Cache hit: drawImage() from cached ImageBitmap + text layer
+   └── Cache miss: PdfRenderer renders via pdfjs page.render()
 4. When hidden: clearPage() cancels render, clears canvas + text layer
 ```
 
@@ -316,11 +366,100 @@ The page list within the scroll pane uses `padding: 16px 0 24px` to provide vert
 1. PdfApp unmounts
 2. Each composable calls its cleanup
 3. pdfDocumentSession.cleanupDocument()
+   ├── Cancel scheduled cleanup timer
    ├── Cancel all active render tasks
    ├── Destroy pdfjs document object
    ├── Revoke object URL
    ├── Clear all Maps (pageSessions, translationStates, renderTasks)
    └── _naturalPageViewports.clear()
+```
+
+Cleanup scheduling is owned by `PdfDocumentSession`, not by `PdfRenderer`. The session tracks visible and render-candidate page numbers, then schedules a delayed cleanup (`RENDER_CLEANUP_DELAY_MS`) that cancels renders outside the active set and releases out-of-scope page sessions. The renderer provides only the immediate `cancelRendersOutside(keepSet)` primitive.
+
+---
+
+## Render Pipeline
+
+The render pipeline is a layered system where each component owns a single, well-defined responsibility. No component owns more than one concern.
+
+### Ownership Boundaries
+
+| Component | Owns | Does NOT Own |
+|-----------|------|--------------|
+| **PdfRenderer** | Render / cancel / clear | Scheduling, queues, DOM ownership, cleanup timers |
+| **PdfRenderScheduler** | Policy only — candidates, plan, eligibility, cancellation targets | DOM, Vue reactivity, rendering |
+| **PdfRenderWindowState** | Committed vs. pending candidate page sets | Rendering, scheduling policy |
+| **PdfRenderJobState** | Per-page lifecycle state (IDLE → RENDERING → COMMITTED/FAILED/CANCELLED) | Rendering, scheduling |
+| **usePdfRenderPipeline** | Scheduler instance, render window lifecycle, reactive state, lifecycle event handlers | Rendering, PDF.js |
+| **PdfDocumentSession** | Cleanup scheduling, bitmap cache coordination, page session lifecycle | Rendering decisions, UI |
+
+### PdfRenderer
+
+**File**: `src/features/pdf-translation/core/PdfRenderer.js`
+
+A pure render service. Provides `renderPage()`, `clearPage()`, `cancelRender()`, `cancelAll()`, `cancelRendersOutside()`, and `destroy()`. Tracks render tasks per `pageNumber:canvasId`. Returns structured result objects (`{status, bitmap, error}`). Owns no scheduling, no queues, no timers, no DOM ownership.
+
+### PdfRenderScheduler
+
+**File**: `src/apps/pdf/rendering/PdfRenderScheduler.js`
+
+A pure-state policy engine. Receives render window updates and produces a sorted render plan, effective candidates, allowed-render pages, and cancellation targets. Composes `PdfRenderWindowState` and `PdfRenderJobState` internally. Has no DOM, no Vue reactivity, no rendering logic.
+
+**Key methods**: `updateWindow()`, `markRendered()`, `markRenderStarted()`, `markRenderFailed()`, `markRenderCancelled()`, `getRenderPlan()`, `getRenderAllowedPages()`, `getEffectiveCandidates()`.
+
+### PdfRenderWindowState
+
+**File**: `src/apps/pdf/rendering/PdfRenderWindowState.js`
+
+Manages committed vs. pending candidate page sets for the render window. When the render set changes, it defers commit until the primary page has rendered, preventing churn during rapid scroll. Exposes `getEffectiveCandidates()` for the scheduler to consume.
+
+### PdfRenderJobState
+
+**File**: `src/apps/pdf/rendering/PdfRenderJobState.js`
+
+Tracks per-page render lifecycle state. Transitions: IDLE → RENDERING → COMMITTED (success), or FAILED/CANCELLED. Provides `snapshot()` for diagnostic reads and `resetPage()`/`reset()` for cleanup.
+
+### usePdfRenderPipeline
+
+**File**: `src/apps/pdf/composables/usePdfRenderPipeline.js`
+
+The Vue composable that bridges the feature layer to the view layer. Owns the scheduler instance, render window state, render candidate/allowed reactive refs, and lifecycle event handlers. Uses `requestAnimationFrame` for coalesced render window updates. Handles freeze/unfreeze of render window eviction during pinch-zoom.
+
+### Render Flow
+
+```
+Scroll / Layout
+      │
+      ▼
+resolveRenderWindow()
+      │
+      ▼
+PdfRenderScheduler
+      │
+      ├── PdfRenderWindowState (committed vs. pending candidates)
+      ├── PdfRenderJobState (per-page lifecycle)
+      ├── Render plan (sorted by priority + distance)
+      ├── Effective candidates (committed ∪ pending visible+primary)
+      └── Cancellation targets (rendering pages not in allowed set)
+      │
+      ▼
+PdfPageView
+      │
+      ▼
+PdfDocumentSession
+      │
+      ▼
+Bitmap Cache
+      │
+      ├── Hit → drawImage() + text layer
+      │
+      └── Miss
+             │
+             ▼
+        PdfRenderer
+             │
+             ▼
+        pdf.js render
 ```
 
 ---
@@ -1010,6 +1149,131 @@ loadPdfFile()
             └── Set OCR blocks
 ```
 
+### Bitmap Cache (`PdfBitmapCache`)
+
+**File**: `src/features/pdf-translation/core/PdfBitmapCache.js`
+
+An in-memory LRU cache for rendered `ImageBitmap` objects. Coordinated by `PdfDocumentSession`, not by `PdfRenderer`.
+
+#### Ownership
+
+`PdfDocumentSession` owns the bitmap cache instance. The renderer has no knowledge of caching — it returns bitmaps and the session decides whether to store or retrieve them.
+
+#### Cache Key
+
+```
+${documentIdentity}:${pageNumber}:${scale}
+```
+
+Each page at a specific scale produces a unique cache entry.
+
+#### LRU Policy
+
+- **Max size**: 64 MB (configurable via `maxSizeBytes`).
+- **Eviction**: LRU — least-recently-used entries are evicted first when the cache exceeds the size limit.
+- **Size estimation**: 4 bytes per pixel (RGBA). Each entry's size is computed from canvas dimensions at render time.
+- **Resource safety**: Evicted and cleared entries have `ImageBitmap.close()` called to release GPU memory.
+
+#### Cache Hit Path
+
+```
+PdfPageView.render()
+    → PdfDocumentSession.renderPage()
+        → bitmapCache.get(documentIdentity, pageNumber, scale)
+            → HIT: drawImage() from cached bitmap + text layer
+```
+
+No pdf.js call on cache hit. The cached `ImageBitmap` is drawn directly onto the canvas via `ctx.drawImage()`, which is GPU-accelerated.
+
+#### Cache Miss Path
+
+```
+PdfPageView.render()
+    → PdfDocumentSession.renderPage()
+        → bitmapCache.get() → MISS
+            → PdfRenderer.renderPage()
+                → pdf.js page.render()
+                    → Returns {status, bitmap}
+                        → bitmapCache.set(documentIdentity, pageNumber, scale, bitmap)
+```
+
+The renderer returns a structured result including the bitmap. The session stores it in the cache for subsequent renders of the same page at the same scale.
+
+#### Invalidation
+
+- **`clearPage()`**: Does NOT invalidate the cache. A cleared canvas can be re-rendered from cache.
+- **`cleanupDocument()`**: Clears the entire cache (document is being closed).
+- **`rebuildPageMetrics()`**: Clears the entire cache (scale factors changed).
+- **`destroy()`**: Clears the entire cache and releases all resources.
+- **`invalidatePage(pageNumber)`**: Evicts all cache entries for a specific page across all scales and documents.
+
+---
+
+## Page Content Repository (`PdfPageContentRepository`)
+
+**File**: `src/features/pdf-translation/core/PdfPageContentRepository.js`
+
+Owns all page-level content: sessions, hydration, block indexing, OCR mutation, and release lifecycle. `PdfDocumentSession` delegates to this repository via forwarded accessors (`pageSessions`, `_pendingHydrations`, `_blockIndex`).
+
+### Responsibilities
+
+| Concern | Owner Method |
+|---------|-------------|
+| **Page sessions** | `getPageSession(pageNumber)` — lazy-creates `PdfPageSession` per page |
+| **Hydration** | `hydratePageSession(pageNumber)` — fetches PDF page data via `pdfDocument.getPage()`, builds layout blocks |
+| **In-flight dedup** | `_pendingHydrations` map — concurrent requests for the same page share one promise |
+| **Block index** | `_blockIndex` map (blockId → block) — O(1) lookup across all pages |
+| **Bulk retrieval** | `getVisiblePageSessions(pages)`, `getVisibleLogicalBlocks(pages)` — viewport-based queries |
+| **OCR mutation** | `setPageOcrBlocks(pageNumber, blocks)` — updates session with OCR-derived blocks, re-indexes |
+| **Release** | `releasePageSession(pageNumber)` — removes session from active map, unindexes blocks |
+| **Reset** | `reset()` — clears all sessions, pending hydrations, and block index |
+
+### Block Index
+
+The `_blockIndex` is a global `Map<blockId, block>` maintained across all pages. When a page session is hydrated, its blocks are indexed. When a page is released, its blocks are unindexed. This enables O(1) block lookup by ID without scanning page sessions.
+
+---
+
+## Translation State (`PdfTranslationState`)
+
+**File**: `src/features/pdf-translation/core/PdfTranslationState.js`
+
+A pure state container for per-block translation tracking. No external dependencies, no DOM, no Vue reactivity.
+
+### Responsibilities
+
+| Concern | Method |
+|---------|--------|
+| **State map** | `Map<blockId, TranslationState>` — per-block translation data |
+| **Get** | `getBlockTranslationState(blockId)` — returns state or default idle state |
+| **Set** | `setBlockTranslationState(blockId, update)` — creates or updates state |
+| **Bulk update** | `updateBlockTranslationStates(entries)` — batch update |
+| **Reset** | `resetBlockTranslationState(blockId)` — reverts to idle |
+| **Analytics** | `hasAnyTranslated()`, `getStats()` — translated/failed/total counts |
+| **Iteration** | `entries()`, `values()` — for cache restore and batch processing |
+| **Map accessor** | `translationStates` getter/setter — raw map access for session façade |
+
+### Compatibility Façade
+
+`PdfDocumentSession` remains the public façade for translation state. External callers (coordinator, cache restore, export) interact through session methods that delegate to `PdfTranslationState` internally. The `translationStates` getter on the session returns the underlying map, preserving backward compatibility.
+
+### Translation State Shape
+
+```javascript
+{
+    translatedText: string,
+    translatedCells: Map | null,
+    status: 'idle' | 'translated' | 'error',
+    provider: string,
+    sourceLanguage: string,
+    targetLanguage: string,
+    sourceTextHash: string,
+    translatedTextHash: string,
+    translationSettingsHash: string,
+    error: Error | null
+}
+```
+
 ---
 
 ## History Architecture
@@ -1273,6 +1537,42 @@ The batch planner already supports per-provider overrides via `modeOverrides[Tra
 ### 6. Advanced Table Detection
 
 The layout analyzer currently uses gap-based column detection and role classification. More sophisticated table detection (grid analysis, cell merging) could improve table translation quality.
+
+---
+
+## Architectural Principles
+
+The following principles govern the PDF architecture. They are implementation-oriented, not aspirational — every principle reflects a concrete decision in the codebase.
+
+1. **Rendering policy is separated from rendering execution.** PdfRenderScheduler decides *what* to render. PdfRenderer decides *how* to render. Neither owns both concerns.
+
+2. **Document state is separated from viewer state.** PdfDocumentSession owns document-level state (pages, translations, cache). usePdfRenderPipeline owns viewer-level state (render window, candidates, scheduling). Neither reaches into the other's domain.
+
+3. **Feature layer is framework-agnostic.** The feature layer uses vanilla JS with no Vue reactivity. Composables bridge feature-layer classes to Vue's reactive system via refs and computed properties.
+
+4. **Ownership is explicit.** Every piece of state has a single owner. If a component needs data it doesn't own, it receives it as a dependency or reads it through a public accessor — never reaches into internal structures.
+
+5. **Each subsystem has a single primary responsibility.** PdfBitmapCache stores bitmaps. PdfPageContentRepository manages page content. PdfTranslationState tracks translation status. No subsystem does more than one thing.
+
+6. **PdfRenderer owns rendering only.** It has no scheduling logic, no cleanup timers, no DOM ownership beyond the canvas it renders into. It returns results and lets the caller decide what to do with them.
+
+7. **Scheduling is deterministic and side-effect free.** PdfRenderScheduler receives inputs and produces outputs. It makes no DOM queries, performs no async work, and triggers no side effects.
+
+8. **Bitmap caching is coordinated by the document session, not the renderer.** The renderer returns bitmaps. The session decides whether to cache, retrieve, or invalidate them. The renderer has no knowledge of caching.
+
+9. **Viewer composables orchestrate UI behavior without owning feature state.** usePdfRenderPipeline coordinates between the scheduler and Vue reactivity but does not own page sessions, translation states, or document lifecycle.
+
+10. **Prefer delegation over large monolithic classes.** PdfDocumentSession delegates to PdfPageContentRepository, PdfTranslationState, and PdfBitmapCache. Each delegation is a focused subsystem with its own lifecycle.
+
+---
+
+## Architecture Status
+
+The core PDF architecture is considered stable. The planned architectural decomposition roadmap has been completed — PdfDocumentSession has been decomposed into focused subsystems, the render pipeline has been fully extracted, and ownership boundaries are explicit and enforced.
+
+Future work should prioritize **user-facing features**, **UX improvements**, **bug fixes**, and **measured performance optimizations** rather than additional architectural decomposition. The current structure supports these goals without requiring further restructuring.
+
+Architectural refactoring should only be performed when justified by **new requirements** or **measurable problems** — not as a default mode of improvement. The architecture is not frozen; it is simply no longer a priority for decomposition.
 
 ---
 
