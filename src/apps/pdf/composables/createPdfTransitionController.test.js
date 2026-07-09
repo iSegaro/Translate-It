@@ -300,7 +300,7 @@ describe('createPdfTransitionController', () => {
       expect(anchorFns.restoreControlledTransitionAnchors).toHaveBeenCalled()
     })
 
-    it('restores pending PDF-backed anchor during resize after content view change', async () => {
+    it('does not restore stale PDF-backed anchor during resize after successful content view restore', async () => {
       const { ctrl, recomputeLayout } = createController()
 
       anchorFns.resolveAnchorOwner.mockReturnValue(PDF_SCROLL_OWNER.ORIGINAL)
@@ -312,25 +312,26 @@ describe('createPdfTransitionController', () => {
 
       scrollAnchor.capturePdfBackedScrollAnchor.mockReturnValue({ pageNumber: 1, pdfPoint: { x: 0, y: 0 } })
       scrollAnchor.isPdfAnchor.mockReturnValue(true)
+      anchorFns.restoreOwnedScrollAnchor.mockReturnValue(PDF_SCROLL_OWNER.ORIGINAL)
 
       await ctrl.handleContentViewChange(CONTENT_VIEW.TRANSLATED_PDF)
+      await new Promise(resolve => requestAnimationFrame(resolve))
 
-      anchorFns.captureControlledTransitionAnchors.mockReturnValue({
-        originalAnchor: null,
+      const freshAnchors = {
+        originalAnchor: { pageNumber: 40, offsetRatio: 0.25, owner: PDF_SCROLL_OWNER.ORIGINAL },
         translatedAnchor: null
+      }
+      anchorFns.captureControlledTransitionAnchors.mockReturnValue({
+        ...freshAnchors
       })
       recomputeLayout.mockImplementationOnce(() => {
-        expect(ctrl.renderWindowEvictionFrozen.value).toBe(true)
+        expect(ctrl.renderWindowEvictionFrozen.value).toBe(false)
         return Promise.resolve()
       })
 
       await ctrl.handleLayoutChange({ width: 800, height: 600 })
 
-      expect(anchorFns.restoreControlledTransitionAnchors).toHaveBeenCalledWith(
-        expect.objectContaining({
-          originalAnchor: expect.objectContaining({ pdfPoint: { x: 0, y: 0 } })
-        })
-      )
+      expect(anchorFns.restoreControlledTransitionAnchors).toHaveBeenCalledWith(freshAnchors)
       expect(ctrl.renderWindowEvictionFrozen.value).toBe(false)
     })
 

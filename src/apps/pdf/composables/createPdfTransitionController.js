@@ -242,6 +242,9 @@ export function createPdfTransitionController({
     await nextTick()
 
     const restoredOwner = restoreOwnedScrollAnchor(anchor)
+    if (restoredOwner && isPdfBackedTransition && isPdfAnchor(anchor)) {
+      pendingPdfBackedAnchor = null
+    }
 
     if (isSideBySide.value) {
       syncFromOwner(restoredOwner || anchor?.owner || owner)
