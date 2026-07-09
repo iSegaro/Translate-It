@@ -23,6 +23,7 @@
 .pdf-page__stage {
   position: relative;
   display: grid;
+  overflow: hidden;
 }
 
 .pdf-page__stage canvas,
