@@ -19,7 +19,7 @@ vi.mock('@/shared/managers/SettingsManager.js', () => ({
 
 const { PdfSelectionBridge } = await import('./PdfSelectionBridge.js')
 
-function createSelection(text = 'PDF text') {
+function createSelection(text = 'PDF text', rect = { left: 20, top: 24, width: 90, height: 18, bottom: 42 }) {
   const viewerRoot = document.createElement('div')
   const textLayer = document.createElement('div')
   textLayer.className = 'textLayer'
@@ -34,7 +34,7 @@ function createSelection(text = 'PDF text') {
     getRangeAt: () => ({
       startContainer: span,
       endContainer: span,
-      getBoundingClientRect: () => ({ left: 20, top: 24, width: 90, height: 18, bottom: 42 })
+      getBoundingClientRect: () => rect
     }),
     toString: () => text
   }
@@ -105,6 +105,50 @@ describe('PdfSelectionBridge', () => {
       context: expect.objectContaining({
         source: 'pdf-viewer',
         isPdf: true
+      })
+    }))
+  })
+
+  it('emits the interaction anchor for pointer-originated paragraph selections', () => {
+    const { viewerRoot, selection } = createSelection('Triple click paragraph', {
+      left: 220,
+      top: 300,
+      width: 420,
+      height: 24,
+      bottom: 324
+    })
+    getSelectionMock.mockReturnValue(selection)
+    const bridge = new PdfSelectionBridge(ref(viewerRoot))
+
+    bridge.handlePointerDown({ target: viewerRoot.firstChild })
+    bridge.handleSelectionChange()
+    bridge.handlePointerUp({ clientX: 260, clientY: 310, pointerType: 'mouse' })
+
+    expect(emitMock).toHaveBeenCalledWith('global-selection-change', expect.objectContaining({
+      text: 'Triple click paragraph',
+      position: expect.objectContaining({
+        x: 260,
+        y: 322,
+        width: 420,
+        height: 24
+      })
+    }))
+    expect(emitMock.mock.calls[0][1]).not.toHaveProperty('interactionAnchor')
+  })
+
+  it('uses the pointerup position for drag selections', () => {
+    const { viewerRoot, selection } = createSelection('Dragged PDF text')
+    getSelectionMock.mockReturnValue(selection)
+    const bridge = new PdfSelectionBridge(ref(viewerRoot))
+
+    bridge.handlePointerDown({ target: viewerRoot.firstChild })
+    bridge.handleSelectionChange()
+    bridge.handlePointerUp({ clientX: 480, clientY: 520, pointerType: 'mouse' })
+
+    expect(emitMock).toHaveBeenCalledWith('global-selection-change', expect.objectContaining({
+      position: expect.objectContaining({
+        x: 480,
+        y: 532
       })
     }))
   })
@@ -204,9 +248,57 @@ describe('PdfSelectionBridge', () => {
 
     expect(emitMock).toHaveBeenCalledWith('global-selection-change', expect.objectContaining({
       text: 'PDF text',
+      position: expect.objectContaining({
+        x: 53,
+        y: 45
+      }),
       context: expect.objectContaining({
         source: 'pdf-viewer',
         isPdf: true
+      })
+    }))
+  })
+
+  it('discards the interaction anchor on selection clear', () => {
+    const { viewerRoot, selection } = createSelection('Pointer selection')
+    getSelectionMock.mockReturnValue(selection)
+    const bridge = new PdfSelectionBridge(ref(viewerRoot))
+
+    bridge.handlePointerDown({ target: viewerRoot.firstChild })
+    bridge.handleSelectionChange()
+    bridge.handlePointerUp({ clientX: 320, clientY: 360, pointerType: 'mouse' })
+
+    expect(bridge.interactionAnchor).not.toBeNull()
+
+    bridge.clearSelection('selection-empty')
+
+    expect(bridge.interactionAnchor).toBeNull()
+  })
+
+  it('does not leak a previous interaction anchor into a new pointer interaction', () => {
+    const first = createSelection('First selection')
+    getSelectionMock.mockReturnValue(first.selection)
+    const bridge = new PdfSelectionBridge(ref(first.viewerRoot))
+
+    bridge.handlePointerDown({ target: first.viewerRoot.firstChild })
+    bridge.handleSelectionChange()
+    bridge.handlePointerUp({ clientX: 300, clientY: 340, pointerType: 'mouse' })
+    expect(emitMock.mock.calls[0][1].position).toMatchObject({ x: 300, y: 352 })
+
+    emitMock.mockClear()
+    getSelectionMock.mockReturnValue({
+      ...first.selection,
+      toString: () => 'Second selection'
+    })
+    bridge.handlePointerDown({ target: first.viewerRoot.firstChild })
+    bridge.handleSelectionChange()
+    bridge.handlePointerUp()
+
+    expect(emitMock).toHaveBeenCalledWith('global-selection-change', expect.objectContaining({
+      text: 'Second selection',
+      position: expect.objectContaining({
+        x: 53,
+        y: 45
       })
     }))
   })

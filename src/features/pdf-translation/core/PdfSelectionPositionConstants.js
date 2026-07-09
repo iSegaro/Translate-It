@@ -1,0 +1,1 @@
+export const POINTER_SELECTION_GAP = 12
