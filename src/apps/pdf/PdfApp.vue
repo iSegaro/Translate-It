@@ -194,6 +194,7 @@ const {
   loadPdfFile,
   recomputeLayout,
   translateVisiblePages,
+  hydrateVisiblePageBlocks,
   cancelTranslation,
   clearDocumentCache,
   cleanup
@@ -358,7 +359,11 @@ async function handleFileSelected(file) {
 function handleCurrentPageChange(pageNumber) {
   if (isNavigating.value) return
   if (!Number.isFinite(Number(pageNumber))) return
-  currentPage.value = Number(pageNumber) || 0
+  const nextPage = Number(pageNumber) || 0
+  currentPage.value = nextPage
+  if (nextPage > 0 && showOverlayLayer.value) {
+    void hydrateVisiblePageBlocks(new Set([nextPage]))
+  }
 }
 
 function handleTranslatedPaneCurrentPageChange(pageNumber) {

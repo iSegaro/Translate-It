@@ -186,6 +186,38 @@ export function usePdfViewerController() {
     return blocks
   }
 
+  function _refreshExistingBlocks(blocks = []) {
+    for (const block of blocks) {
+      if (!block?.id) continue
+      block.translationState = pdfDocumentSession.getBlockTranslationState(block.id)
+      _blockIndex.set(block.id, block)
+    }
+    return blocks
+  }
+
+  function _resolveBlocksForPageSession(pageSession, existingPage = null) {
+    if (pageSession) {
+      const blocks = _buildBlocksForPage(pageSession)
+      if (blocks.length > 0) return blocks
+    }
+
+    if (existingPage?.blocks?.length > 0) {
+      return _refreshExistingBlocks(existingPage.blocks)
+    }
+
+    return []
+  }
+
+  function _buildPageDataForMetric(metric, existingPage = null) {
+    const pageSession = pdfDocumentSession.pageSessions.get(metric.pageNumber)
+    return reactive({
+      pageNumber: metric.pageNumber,
+      width: metric.width,
+      height: metric.height,
+      blocks: _resolveBlocksForPageSession(pageSession, existingPage)
+    })
+  }
+
   function _hydratePageBlocks(page, pageSession) {
     if (page.blocks.length > 0) {
       return false
@@ -245,24 +277,41 @@ export function usePdfViewerController() {
   }
 
   function _rebuildPageData() {
+    const previousPageData = new Map(_pageDataMap)
     _pageDataMap.clear()
     _blockIndex.clear()
     _pageMetricIndex.clear()
 
     for (const metric of pageMetrics.value) {
       _pageMetricIndex.set(metric.pageNumber, metric)
-
-      const pageSession = pdfDocumentSession.pageSessions.get(metric.pageNumber)
-
-      _pageDataMap.set(metric.pageNumber, reactive({
-        pageNumber: metric.pageNumber,
-        width: metric.width,
-        height: metric.height,
-        blocks: pageSession ? _buildBlocksForPage(pageSession) : []
-      }))
+      _pageDataMap.set(metric.pageNumber, _buildPageDataForMetric(metric, previousPageData.get(metric.pageNumber)))
     }
 
     _translatedPageData.value = [..._pageDataMap.values()]
+  }
+
+  async function hydrateVisiblePageBlocks(pageNumbers = pdfDocumentSession.visiblePageNumbers) {
+    const numbers = [...(pageNumbers || [])]
+      .map((pageNumber) => Number(pageNumber))
+      .filter((pageNumber) => Number.isInteger(pageNumber) && pageNumber > 0)
+    if (numbers.length === 0) return false
+
+    let changed = false
+    for (const pageNumber of numbers) {
+      const page = _pageDataMap.get(pageNumber)
+      if (!page || page.blocks.length > 0) continue
+
+      const pageSession = await pdfDocumentSession.getPageSession?.(pageNumber)
+      if (pageSession && _hydratePageBlocks(page, pageSession)) {
+        changed = true
+      }
+    }
+
+    if (changed) {
+      _translatedPageData.value = [..._pageDataMap.values()]
+    }
+
+    return changed
   }
 
   pdfTranslationCoordinator.onStateChange = (updatedBlockIds) => {
@@ -553,6 +602,7 @@ export function usePdfViewerController() {
     loadPdfFile,
     recomputeLayout,
     translateVisiblePages,
+    hydrateVisiblePageBlocks,
     cancelTranslation,
     clearDocumentCache,
     clearAllPdfCache,

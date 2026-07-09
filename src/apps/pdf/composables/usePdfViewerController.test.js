@@ -46,6 +46,8 @@ const session = {
     error: null
   }),
   getPageLayout: vi.fn().mockReturnValue(null),
+  getPageSession: vi.fn(),
+  visiblePageNumbers: new Set(),
   getVisibleLogicalBlocks: vi.fn().mockResolvedValue([]),
   findSourceBlock: vi.fn((blockId) => {
     for (const [, pageSession] of session.pageSessions) {
@@ -190,6 +192,8 @@ describe('usePdfViewerController cache persistence', () => {
     session.pageSessions = new Map()
     session.translationStates = new Map()
     session.documentIdentity = 'doc-1'
+    session.visiblePageNumbers = new Set()
+    session.getPageSession.mockReset()
   })
 
   it('restores plain translatedText cache entries', async () => {
@@ -444,5 +448,75 @@ describe('usePdfViewerController cache persistence', () => {
       zoomMode: 'percent',
       zoomPercent: 125
     })
+  })
+
+  it('preserves existing page blocks when layout rebuild sees a released session', async () => {
+    const block = createBlock()
+    const { controller } = await loadControllerWithCacheEntry(null, block)
+
+    expect(controller.translatedPageData.value[0].blocks).toHaveLength(1)
+
+    session.pageSessions.set(1, {
+      allBlocks: [],
+      getLogicalBlocks: () => []
+    })
+    rebuildPageMetricsMock.mockResolvedValue({
+      ...createOpenState(),
+      pageMetrics: [{ pageNumber: 1, width: 720, height: 900, scale: 1.2 }]
+    })
+
+    await controller.recomputeLayout({ width: 900, height: 700 })
+
+    const [page] = controller.translatedPageData.value
+    expect(page.width).toBe(720)
+    expect(page.height).toBe(900)
+    expect(page.blocks).toHaveLength(1)
+    expect(page.blocks[0].id).toBe(block.id)
+  })
+
+  it('keeps translated block state exposed after release and layout rebuild', async () => {
+    const block = createBlock()
+    const { controller } = await loadControllerWithCacheEntry(null, block)
+    session.translationStates.set(block.id, {
+      blockId: block.id,
+      status: 'translated',
+      translatedText: 'ترجمه',
+      sourceTextHash: block.sourceTextHash
+    })
+
+    session.pageSessions.set(1, {
+      allBlocks: [],
+      getLogicalBlocks: () => []
+    })
+    rebuildPageMetricsMock.mockResolvedValue(createOpenState())
+
+    await controller.recomputeLayout({ width: 900, height: 700 })
+
+    const [page] = controller.translatedPageData.value
+    expect(page.blocks).toHaveLength(1)
+    expect(page.blocks[0].translationState.status).toBe('translated')
+    expect(page.blocks[0].translationState.translatedText).toBe('ترجمه')
+  })
+
+  it('rehydrates visible pages with empty app-level blocks', async () => {
+    const block = createBlock()
+    pdfCacheManager.loadDocument.mockResolvedValue({ translations: {}, ocr: {} })
+    openFileMock.mockResolvedValue(createOpenState())
+    session.pageSessions = new Map()
+    session.getPageSession.mockResolvedValue({
+      allBlocks: [block],
+      getLogicalBlocks: () => [block]
+    })
+
+    const controller = usePdfViewerController()
+    await controller.loadPdfFile({ type: 'application/pdf', name: 'doc.pdf' }, 800)
+
+    expect(controller.translatedPageData.value[0].blocks).toHaveLength(0)
+
+    await controller.hydrateVisiblePageBlocks(new Set([1]))
+
+    expect(session.getPageSession).toHaveBeenCalledWith(1)
+    expect(controller.translatedPageData.value[0].blocks).toHaveLength(1)
+    expect(controller.translatedPageData.value[0].blocks[0].id).toBe(block.id)
   })
 })
