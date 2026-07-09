@@ -1,12 +1,9 @@
-import { getScopedLogger } from '@/shared/logging/logger.js'
-import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js'
 import {
   registerPdfTextLayerSelectionShell,
   unregisterPdfTextLayerSelectionShell
 } from './PdfTextLayerSelectionShell.js'
 
 const CSS_CLASS = 'textLayer'
-const trace = getScopedLogger(LOG_COMPONENTS.PDF, 'PdfTextLayerTrace')
 
 const IDENTITY = [1, 0, 0, 1, 0, 0]
 
@@ -34,7 +31,6 @@ export class PdfTextLayerRenderer {
   async render({ pageNumber, viewport, containerWidth, containerHeight, textContent, page }) {
     if (!this.container || !viewport) return
 
-    trace.info('[PDF Zoom Trace] textLayer render start', { pageNumber, timestamp: Date.now() })
     this.clear()
     const renderSeq = ++this._renderSeq
 
@@ -122,7 +118,6 @@ export class PdfTextLayerRenderer {
 
     if (renderSeq !== this._renderSeq) return
 
-    trace.info('[PDF Zoom Trace] textLayer render complete', { pageNumber, timestamp: Date.now() })
     this.container.appendChild(layerDiv)
     this.textLayer = layerDiv
     this.textDivs = spans
@@ -147,7 +142,6 @@ export class PdfTextLayerRenderer {
 
   clear() {
     this._renderSeq++
-    trace.info('[PDF Zoom Trace] textLayer clear', { timestamp: Date.now() })
 
     if (this.textLayer) {
       unregisterPdfTextLayerSelectionShell(this.textLayer)

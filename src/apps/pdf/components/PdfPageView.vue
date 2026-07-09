@@ -41,13 +41,7 @@ import { PDF_RENDER_RESULT_STATUS } from '@/features/pdf-translation/core/PdfRen
 import { PdfTextLayerRenderer } from '@/features/pdf-translation/core/PdfTextLayerRenderer.js'
 import PdfOverlayLayer from './PdfOverlayLayer.vue'
 import PdfLinkOverlay from './PdfLinkOverlay.vue'
-import { getScopedLogger } from '@/shared/logging/logger.js'
-import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js'
 import './PdfPageView.scss'
-
-const trace = getScopedLogger(LOG_COMPONENTS.PDF, 'PdfPageViewTrace')
-
-let _clearPageCounter = 0
 
 const props = defineProps({
   page: {
@@ -141,16 +135,6 @@ function ensureTextLayerRenderer() {
 async function renderPage() {
   if (!props.visible || !props.renderAllowed || !canvasEl.value) return
 
-  const startTime = Date.now()
-  trace.info('[PDF Zoom Trace] renderPage start', {
-    pageNumber: props.page.pageNumber,
-    visible: props.visible,
-    scale: props.page.scale,
-    width: props.page.width,
-    height: props.page.height,
-    timestamp: startTime
-  })
-
   await nextTick()
   if (!props.visible || !props.renderAllowed || !canvasEl.value) return
   const renderer = ensureTextLayerRenderer()
@@ -169,33 +153,9 @@ async function renderPage() {
     }
   }
 
-  trace.info('[PDF Zoom Trace] renderPage complete', {
-    pageNumber: props.page.pageNumber,
-    duration: Date.now() - startTime,
-    timestamp: Date.now()
-  })
 }
 
 function clearPage(caller) {
-  _clearPageCounter++
-  trace.info('[PDF Clear Trace] clearPage', {
-    pageNumber: props.page.pageNumber,
-    caller: caller || 'unknown',
-    reason: caller === 'watcher'
-      ? 'watcher:visible=false'
-      : caller === 'unmount'
-        ? 'component:onBeforeUnmount'
-        : caller === 'page-metrics-changed'
-          ? 'watcher:visible=false+pageMetricsChanged'
-          : caller === 'render-window-update'
-            ? 'watcher:visible=false+renderWindowChanged'
-            : 'unknown',
-    timestamp: Date.now(),
-    zoomTransitionActive: !!(props.session._renderCandidatePageNumbers?.size > 0),
-    currentScale: props.page.scale,
-    visible: props.visible,
-    sequence: _clearPageCounter
-  })
   props.session.clearPage(props.page.pageNumber, canvasEl.value, textLayerRenderer)
 }
 

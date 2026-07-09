@@ -237,15 +237,6 @@ export class PdfDocumentSession extends ResourceTracker {
     this._bitmapCache.clear()
     await this._buildPageMetrics(layoutRequest)
 
-    logger.info('[PDF Clear Trace] page metrics rebuilt:', {
-      fileName: this.fileName,
-      totalPages: this.totalPages,
-      pageScale: this.pageScale,
-      timestamp: Date.now(),
-      visibleCount: this.visiblePageNumbers.size,
-      candidateCount: this._renderCandidatePageNumbers.size
-    })
-
     return this.getState()
   }
 
@@ -516,14 +507,6 @@ export class PdfDocumentSession extends ResourceTracker {
   }
 
   clearPage(pageNumber, canvasEl, textLayerRenderer) {
-    logger.info('[PDF Clear Trace] session.clearPage', {
-      pageNumber,
-      timestamp: Date.now(),
-      visible: this.visiblePageNumbers?.has(pageNumber),
-      candidate: this._renderCandidatePageNumbers?.has(pageNumber),
-      totalVisible: this.visiblePageNumbers?.size ?? 0,
-      totalCandidates: this._renderCandidatePageNumbers?.size ?? 0
-    })
     this._renderer.clearPage(pageNumber, canvasEl, textLayerRenderer)
   }
 
