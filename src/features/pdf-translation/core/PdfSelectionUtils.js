@@ -19,6 +19,56 @@ function getElementFromNode(node) {
   return node.parentElement || null
 }
 
+function isNearlyMatchingRect(rect, targetRect, tolerance = 2) {
+  if (!rect || !targetRect) return false
+
+  return Math.abs(rect.left - targetRect.left) <= tolerance &&
+    Math.abs(rect.top - targetRect.top) <= tolerance &&
+    Math.abs(getRectRight(rect) - getRectRight(targetRect)) <= tolerance &&
+    Math.abs(getRectBottom(rect) - getRectBottom(targetRect)) <= tolerance
+}
+
+function getRectRight(rect) {
+  return typeof rect?.right === 'number' ? rect.right : rect.left + rect.width
+}
+
+function getRectBottom(rect) {
+  return typeof rect?.bottom === 'number' ? rect.bottom : rect.top + rect.height
+}
+
+function getRangeTextLayer(range) {
+  return getElementFromNode(range?.commonAncestorContainer)?.closest?.(PDF_TEXT_LAYER_SELECTOR)
+    || getElementFromNode(range?.startContainer)?.closest?.(PDF_TEXT_LAYER_SELECTOR)
+    || getElementFromNode(range?.endContainer)?.closest?.(PDF_TEXT_LAYER_SELECTOR)
+    || null
+}
+
+function isUsableSelectionAnchorRect(rect, textLayerRect) {
+  if (!rect || rect.width === 0 || rect.height === 0) return false
+  if (!textLayerRect) return true
+  if (isNearlyMatchingRect(rect, textLayerRect)) return false
+
+  const textLayerArea = textLayerRect.width * textLayerRect.height
+  if (textLayerArea <= 0) return true
+
+  const rectArea = rect.width * rect.height
+  const isFullLayerSized = rectArea >= textLayerArea * 0.9 &&
+    rect.width >= textLayerRect.width * 0.9 &&
+    rect.height >= textLayerRect.height * 0.9
+
+  return !isFullLayerSized
+}
+
+function resolveSelectionAnchorRect(range, fallbackRect) {
+  const textLayerRect = getRangeTextLayer(range)?.getBoundingClientRect?.() || null
+  const validRects = Array.from(range.getClientRects?.() || [])
+    .filter((rect) => isUsableSelectionAnchorRect(rect, textLayerRect))
+
+  return validRects.length > 0
+    ? validRects[validRects.length - 1]
+    : fallbackRect
+}
+
 export function isSelectionInsidePdfTextLayer(selection, viewerRoot) {
   if (!selection || !viewerRoot || selection.isCollapsed || selection.rangeCount === 0) {
     return false
@@ -40,19 +90,20 @@ export function buildPdfSelectionPosition(selection) {
   }
 
   const range = selection.getRangeAt(0)
-  const rect = range.getBoundingClientRect?.()
+  const boundingRect = range.getBoundingClientRect?.()
 
-  if (!rect || (rect.width === 0 && rect.height === 0)) {
+  if (!boundingRect || (boundingRect.width === 0 && boundingRect.height === 0)) {
     return null
   }
 
-  const bottom = typeof rect.bottom === 'number' ? rect.bottom : rect.top + rect.height
+  const rect = resolveSelectionAnchorRect(range, boundingRect)
+  const bottom = getRectBottom(rect)
   const viewport = getViewportSize()
   const iconSize = WindowsConfig.POSITIONING.ICON_SIZE
   const offset = WindowsConfig.POSITIONING.SELECTION_OFFSET
   const margin = WindowsConfig.POSITIONING.VIEWPORT_MARGIN
   const rectLeft = rect.left
-  const rectRight = typeof rect.right === 'number' ? rect.right : rect.left + rect.width
+  const rectRight = getRectRight(rect)
   const preferredX = rect.left + rect.width / 2 - iconSize / 2
   const preferredY = bottom + offset
 
