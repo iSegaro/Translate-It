@@ -3,7 +3,6 @@ import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js'
 import { PdfTextLayerRenderer } from './PdfTextLayerRenderer.js'
 
 const logger = getScopedLogger(LOG_COMPONENTS.PDF, 'PdfRenderer')
-const RENDER_CLEANUP_DELAY_MS = 200
 
 const CANVAS_ID_KEY = Symbol('pdfRendererCanvasId')
 
@@ -20,11 +19,8 @@ export function createPdfRenderResult(status, error = null, bitmap = null) {
 }
 
 export class PdfRenderer {
-  constructor({ scheduleTimeout, cancelTimeout } = {}) {
+  constructor() {
     this.renderTasks = new Map()
-    this._cleanupTimeout = null
-    this._scheduleTimeout = scheduleTimeout || ((fn, ms) => setTimeout(fn, ms))
-    this._cancelTimeout = cancelTimeout || ((id) => clearTimeout(id))
     this._nextCanvasId = 0
   }
 
@@ -198,32 +194,16 @@ export class PdfRenderer {
     this.renderTasks.clear()
   }
 
-  cancelScheduledCleanup() {
-    if (this._cleanupTimeout) {
-      this._cancelTimeout(this._cleanupTimeout)
-      this._cleanupTimeout = null
+  cancelRendersOutside(keepSet) {
+    for (const [key, renderTask] of this.renderTasks.entries()) {
+      const pageNumber = PdfRenderer._parsePageNumber(key)
+      if (!Number.isFinite(pageNumber) || !keepSet.has(pageNumber)) {
+        renderTask.cancel?.()
+      }
     }
   }
 
-  // keepSet contains pages that should remain render/session active
-  // (visible pages + render candidates).
-  scheduleCleanup(keepSet, onCleanup) {
-    this.cancelScheduledCleanup()
-
-    this._cleanupTimeout = this._scheduleTimeout(() => {
-      this._cleanupTimeout = null
-      for (const [key, renderTask] of this.renderTasks.entries()) {
-        const pageNumber = PdfRenderer._parsePageNumber(key)
-        if (!Number.isFinite(pageNumber) || !keepSet.has(pageNumber)) {
-          renderTask.cancel?.()
-        }
-      }
-      onCleanup?.()
-    }, RENDER_CLEANUP_DELAY_MS)
-  }
-
   destroy() {
-    this.cancelScheduledCleanup()
     this.cancelAll()
   }
 }

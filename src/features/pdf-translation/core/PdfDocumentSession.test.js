@@ -359,11 +359,58 @@ describe('PdfDocumentSession', () => {
 
       expect(session.pageSessions.get(1).loaded).toBe(true)
     })
+
+    it('cancels render tasks outside the merged keep set after cleanup delay', async () => {
+      const canvas1 = { width: 1, height: 1 }
+      const canvas2 = { width: 1, height: 1 }
+      const task1 = { cancel: vi.fn(), promise: Promise.resolve() }
+      const task2 = { cancel: vi.fn(), promise: Promise.resolve() }
+
+      session._renderer.renderTasks.set(session._renderer._taskKey(1, canvas1), task1)
+      session._renderer.renderTasks.set(session._renderer._taskKey(2, canvas2), task2)
+
+      session.updateVisiblePages([1])
+      session.updateRenderCandidates(new Set([1]))
+
+      vi.advanceTimersByTime(199)
+      expect(task1.cancel).not.toHaveBeenCalled()
+      expect(task2.cancel).not.toHaveBeenCalled()
+
+      vi.advanceTimersByTime(1)
+      expect(task1.cancel).not.toHaveBeenCalled()
+      expect(task2.cancel).toHaveBeenCalled()
+    })
+
+    it('does not cancel render tasks when rescheduled into the keep set', () => {
+      const canvas = { width: 1, height: 1 }
+      const task = { cancel: vi.fn(), promise: Promise.resolve() }
+
+      session._renderer.renderTasks.set(session._renderer._taskKey(1, canvas), task)
+
+      session.updateVisiblePages([])
+      session.updateRenderCandidates(new Set())
+      session.updateVisiblePages([1])
+      session.updateRenderCandidates(new Set([1]))
+
+      vi.advanceTimersByTime(200)
+
+      expect(task.cancel).not.toHaveBeenCalled()
+    })
+
+    it('cleanupDocument cancels pending cleanup', async () => {
+      const cancelRendersOutside = vi.spyOn(session._renderer, 'cancelRendersOutside')
+
+      session.updateVisiblePages([])
+      session.updateRenderCandidates(new Set())
+
+      await session.cleanupDocument()
+      vi.advanceTimersByTime(200)
+
+      expect(cancelRendersOutside).not.toHaveBeenCalled()
+    })
   })
 
   describe('batched metrics building', () => {
-    const BATCH_SIZE = 8
-
     it('fetches all pages across multiple batches with correct call count', async () => {
       const PAGE_COUNT = 25
       session.totalPages = PAGE_COUNT
@@ -519,13 +566,12 @@ describe('PdfDocumentSession', () => {
          status: 'success',
          bitmap: mockBitmap
        }),
-       cancelRender: vi.fn().mockReturnValue(false),
-       clearPage: vi.fn(),
-       cancelAll: vi.fn(),
-       scheduleCleanup: vi.fn(),
-       cancelScheduledCleanup: vi.fn(),
-       destroy: vi.fn()
-     }
+        cancelRender: vi.fn().mockReturnValue(false),
+        clearPage: vi.fn(),
+        cancelAll: vi.fn(),
+        cancelRendersOutside: vi.fn(),
+        destroy: vi.fn()
+      }
      mockPdfDocument = {
        getPage: vi.fn().mockResolvedValue({
          pageNumber: 1,

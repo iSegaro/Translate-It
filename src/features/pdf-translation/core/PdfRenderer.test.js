@@ -458,16 +458,8 @@ describe('PdfRenderer', () => {
     })
   })
 
-  describe('scheduleCleanup', () => {
-    beforeEach(() => {
-      vi.useFakeTimers()
-    })
-
-    afterEach(() => {
-      vi.useRealTimers()
-    })
-
-    it('cancels all render tasks for pages not in the visible set', () => {
+  describe('cancelRendersOutside', () => {
+    it('cancels all render tasks for pages not in the keep set', () => {
       const canvas1 = createMockCanvas()
       const canvas2 = createMockCanvas()
       const task1 = { cancel: vi.fn(), promise: Promise.resolve() }
@@ -476,14 +468,13 @@ describe('PdfRenderer', () => {
       renderer.renderTasks.set(renderer._taskKey(1, canvas1), task1)
       renderer.renderTasks.set(renderer._taskKey(2, canvas2), task2)
 
-      renderer.scheduleCleanup(new Set([1]))
-      vi.advanceTimersByTime(200)
+      renderer.cancelRendersOutside(new Set([1]))
 
       expect(task1.cancel).not.toHaveBeenCalled()
       expect(task2.cancel).toHaveBeenCalled()
     })
 
-    it('preserves all render tasks when all pages are visible', () => {
+    it('preserves all render tasks when all pages are kept', () => {
       const canvas1 = createMockCanvas()
       const canvas2 = createMockCanvas()
       const task1 = { cancel: vi.fn(), promise: Promise.resolve() }
@@ -492,8 +483,7 @@ describe('PdfRenderer', () => {
       renderer.renderTasks.set(renderer._taskKey(1, canvas1), task1)
       renderer.renderTasks.set(renderer._taskKey(2, canvas2), task2)
 
-      renderer.scheduleCleanup(new Set([1, 2]))
-      vi.advanceTimersByTime(200)
+      renderer.cancelRendersOutside(new Set([1, 2]))
 
       expect(task1.cancel).not.toHaveBeenCalled()
       expect(task2.cancel).not.toHaveBeenCalled()
@@ -508,79 +498,24 @@ describe('PdfRenderer', () => {
       renderer.renderTasks.set(renderer._taskKey(2, canvasA), taskA)
       renderer.renderTasks.set(renderer._taskKey(2, canvasB), taskB)
 
-      renderer.scheduleCleanup(new Set([1]))
-      vi.advanceTimersByTime(200)
+      renderer.cancelRendersOutside(new Set([1]))
 
       expect(taskA.cancel).toHaveBeenCalled()
       expect(taskB.cancel).toHaveBeenCalled()
     })
-
-    it('debounces and resets the timer on each call', () => {
-      const canvas = createMockCanvas()
-      const task = { cancel: vi.fn(), promise: Promise.resolve() }
-
-      renderer.renderTasks.set(renderer._taskKey(1, canvas), task)
-      renderer.scheduleCleanup(new Set())
-      renderer.scheduleCleanup(new Set([1]))
-
-      vi.advanceTimersByTime(200)
-      expect(task.cancel).not.toHaveBeenCalled()
-
-      vi.advanceTimersByTime(200)
-      expect(task.cancel).not.toHaveBeenCalled()
-    })
-
-    it('calls the onCleanup callback after the cleanup delay', () => {
-      const onCleanup = vi.fn()
-
-      renderer.scheduleCleanup(new Set([1]), onCleanup)
-      expect(onCleanup).not.toHaveBeenCalled()
-
-      vi.advanceTimersByTime(200)
-      expect(onCleanup).toHaveBeenCalledTimes(1)
-    })
-
-    it('does not call onCleanup when rescheduled before timeout fires', () => {
-      const onCleanup = vi.fn()
-
-      renderer.scheduleCleanup(new Set([1]), onCleanup)
-      renderer.scheduleCleanup(new Set([1]))
-
-      vi.advanceTimersByTime(200)
-      expect(onCleanup).not.toHaveBeenCalled()
-    })
-
-    it('calls onCleanup for the most recent scheduled cleanup', () => {
-      const firstCleanup = vi.fn()
-      const secondCleanup = vi.fn()
-
-      renderer.scheduleCleanup(new Set([1]), firstCleanup)
-      renderer.scheduleCleanup(new Set([1]), secondCleanup)
-
-      vi.advanceTimersByTime(200)
-      expect(firstCleanup).not.toHaveBeenCalled()
-      expect(secondCleanup).toHaveBeenCalledTimes(1)
-    })
   })
 
   describe('destroy', () => {
-    it('cancels scheduled cleanup and all render tasks', () => {
-      vi.useFakeTimers()
-
+    it('cancels all render tasks', () => {
       const canvas = createMockCanvas()
       const task = { cancel: vi.fn(), promise: Promise.resolve() }
 
       renderer.renderTasks.set(renderer._taskKey(1, canvas), task)
-      renderer.scheduleCleanup(new Set())
 
       renderer.destroy()
 
       expect(task.cancel).toHaveBeenCalled()
       expect(renderer.renderTasks.size).toBe(0)
-
-      vi.advanceTimersByTime(200)
-
-      vi.useRealTimers()
     })
   })
 })

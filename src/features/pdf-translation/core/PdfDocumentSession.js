@@ -15,6 +15,7 @@ const logger = getScopedLogger(LOG_COMPONENTS.PDF, 'PdfDocumentSession')
 const PAGE_MARGIN = 24
 const MIN_SCALE = 0.4
 const MAX_SCALE = 2.0
+const RENDER_CLEANUP_DELAY_MS = 200
 
 function normalizeLayoutRequest(layoutRequest = null) {
   if (typeof layoutRequest === 'number') {
@@ -55,10 +56,8 @@ export class PdfDocumentSession extends ResourceTracker {
     this.documentIdentity = ''
     this.displayName = ''
     this.targetedBlockId = null
-    this._renderer = new PdfRenderer({
-      scheduleTimeout: (fn, ms) => this.trackTimeout(fn, ms),
-      cancelTimeout: (id) => this.clearTimer(id)
-    })
+    this._renderer = new PdfRenderer()
+    this._cleanupTimeout = null
     this._bitmapCache = new PdfBitmapCache()
     this._resolver = new PdfDestinationResolver()
     this._outlineRepository = new PdfOutlineRepository()
@@ -533,21 +532,33 @@ export class PdfDocumentSession extends ResourceTracker {
   }
 
   _scheduleCleanup() {
+    this._cancelScheduledCleanup()
+
     const merged = new Set([
       ...this.visiblePageNumbers,
       ...this._renderCandidatePageNumbers
     ])
-    this._renderer.scheduleCleanup(merged, () => {
+
+    this._cleanupTimeout = this.trackTimeout(() => {
+      this._cleanupTimeout = null
+      this._renderer.cancelRendersOutside(merged)
       for (const [pageNumber] of this.pageSessions) {
         if (!merged.has(pageNumber)) {
           this.releasePageSession(pageNumber)
         }
       }
-    })
+    }, RENDER_CLEANUP_DELAY_MS)
+  }
+
+  _cancelScheduledCleanup() {
+    if (this._cleanupTimeout) {
+      this.clearTimer(this._cleanupTimeout)
+      this._cleanupTimeout = null
+    }
   }
 
   async cleanupDocument() {
-    this._renderer.cancelScheduledCleanup()
+    this._cancelScheduledCleanup()
     this._cancelAllRenders()
     this.visiblePageNumbers.clear()
     this._renderCandidatePageNumbers.clear()
