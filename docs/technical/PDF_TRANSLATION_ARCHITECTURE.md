@@ -1512,6 +1512,26 @@ The text layer uses a constant `ASCENT_RATIO = 0.8` for font ascent computation 
 
 ---
 
+## Browser Diagnostics
+
+This viewer intentionally allows a small set of browser diagnostics that reflect normal runtime behavior rather than architectural defects. Treat these warnings as signals to investigate only when they correlate with measurable rendering regressions, UI jank, or correctness issues.
+
+### Canvas2D Readback Warning
+
+The overlay system samples canvas pixels to derive appropriate overlay background colors. That sampling path uses repeated `getImageData()` reads, so Chrome may report that `willReadFrequently` would improve readback performance.
+
+The audit found this to be an expected performance hint, not a correctness issue. Sampling is cached per block and scale, so the warning alone is not sufficient justification to change the rendering pipeline. Applying `willReadFrequently` broadly can reduce GPU acceleration for canvas writes, so it should only be considered if profiling shows measurable benefit.
+
+Do not change this behavior solely to silence DevTools.
+
+### ResizeObserver Warning
+
+The viewer intentionally reacts to layout changes during zoom, layout-mode transitions, and viewer resizing. `ResizeObserver` emits layout updates that eventually trigger page-metric recomputation and DOM updates, so Chrome may report `ResizeObserver loop completed with undelivered notifications` during those transitions.
+
+The audit found no evidence of an infinite loop, rendering defect, or architectural problem. Existing guards already prevent unnecessary layout recomputation and recursive updates. This warning should not be treated as a bug on its own.
+
+Revisit only if the warning coincides with measurable UI jank, rendering regressions, or other performance issues.
+
 ## Future Extension Points
 
 ### 1. Cross-Pane Block Highlighting
