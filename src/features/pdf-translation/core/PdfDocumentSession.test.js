@@ -597,7 +597,7 @@ describe('PdfDocumentSession', () => {
    })
 
    it('caches bitmap on successful render', async () => {
-     const canvas = { width: 0, height: 0, style: {}, getContext: vi.fn(() => ({ drawImage: vi.fn() })) }
+     const canvas = { width: 0, height: 0, style: {}, getContext: vi.fn(() => ({ drawImage: vi.fn(), fillRect: vi.fn() })) }
 
      await cacheSession.renderPage(1, canvas, null)
 
@@ -606,13 +606,13 @@ describe('PdfDocumentSession', () => {
    })
 
    it('uses cache on second render for same page/scale', async () => {
-     const canvas = { width: 0, height: 0, style: {}, getContext: vi.fn(() => ({ drawImage: vi.fn() })) }
+     const canvas = { width: 0, height: 0, style: {}, getContext: vi.fn(() => ({ drawImage: vi.fn(), fillRect: vi.fn() })) }
 
      await cacheSession.renderPage(1, canvas, null)
      mockRenderer.renderPage.mockClear()
      mockPdfDocument.getPage.mockClear()
 
-     const canvas2 = { width: 0, height: 0, style: {}, getContext: vi.fn(() => ({ drawImage: vi.fn() })) }
+     const canvas2 = { width: 0, height: 0, style: {}, getContext: vi.fn(() => ({ drawImage: vi.fn(), fillRect: vi.fn() })) }
      await cacheSession.renderPage(1, canvas2, null)
 
      // Cache hit — renderer should not be called
@@ -624,7 +624,7 @@ describe('PdfDocumentSession', () => {
     })
 
     it('uses scale in bitmap cache keys', async () => {
-      const canvas = { width: 0, height: 0, style: {}, getContext: vi.fn(() => ({ drawImage: vi.fn() })) }
+      const canvas = { width: 0, height: 0, style: {}, getContext: vi.fn(() => ({ drawImage: vi.fn(), fillRect: vi.fn() })) }
       await cacheSession.renderPage(1, canvas, null)
       expect(cacheSession._bitmapCache.size).toBe(1)
 
@@ -633,7 +633,7 @@ describe('PdfDocumentSession', () => {
         { pageNumber: 1, width: 800, height: 1000, scale: 2, viewport: { width: 800, height: 1000 } }
       ]
 
-      const canvas2 = { width: 0, height: 0, style: {}, getContext: vi.fn(() => ({ drawImage: vi.fn() })) }
+      const canvas2 = { width: 0, height: 0, style: {}, getContext: vi.fn(() => ({ drawImage: vi.fn(), fillRect: vi.fn() })) }
       await cacheSession.renderPage(1, canvas2, null)
 
       expect(mockRenderer.renderPage).toHaveBeenCalledTimes(1)
@@ -642,7 +642,7 @@ describe('PdfDocumentSession', () => {
 
     it('does not cache on failed render', async () => {
      mockRenderer.renderPage.mockResolvedValueOnce({ status: 'failed' })
-     const canvas = { width: 0, height: 0, style: {}, getContext: vi.fn(() => ({ drawImage: vi.fn() })) }
+     const canvas = { width: 0, height: 0, style: {}, getContext: vi.fn(() => ({ drawImage: vi.fn(), fillRect: vi.fn() })) }
 
      await cacheSession.renderPage(1, canvas, null)
 
@@ -651,7 +651,7 @@ describe('PdfDocumentSession', () => {
 
    it('does not cache on cancelled render', async () => {
      mockRenderer.renderPage.mockResolvedValueOnce({ status: 'cancelled' })
-     const canvas = { width: 0, height: 0, style: {}, getContext: vi.fn(() => ({ drawImage: vi.fn() })) }
+     const canvas = { width: 0, height: 0, style: {}, getContext: vi.fn(() => ({ drawImage: vi.fn(), fillRect: vi.fn() })) }
 
      await cacheSession.renderPage(1, canvas, null)
 
@@ -659,7 +659,7 @@ describe('PdfDocumentSession', () => {
    })
 
    it('clearPage preserves cache', async () => {
-     const canvas = { width: 0, height: 0, style: {}, getContext: vi.fn(() => ({ drawImage: vi.fn() })) }
+     const canvas = { width: 0, height: 0, style: {}, getContext: vi.fn(() => ({ drawImage: vi.fn(), fillRect: vi.fn() })) }
      await cacheSession.renderPage(1, canvas, null)
      expect(cacheSession._bitmapCache.size).toBe(1)
 
@@ -669,7 +669,7 @@ describe('PdfDocumentSession', () => {
    })
 
    it('cleanupDocument clears cache', async () => {
-     const canvas = { width: 0, height: 0, style: {}, getContext: vi.fn(() => ({ drawImage: vi.fn() })) }
+     const canvas = { width: 0, height: 0, style: {}, getContext: vi.fn(() => ({ drawImage: vi.fn(), fillRect: vi.fn() })) }
      await cacheSession.renderPage(1, canvas, null)
      expect(cacheSession._bitmapCache.size).toBe(1)
 
@@ -679,7 +679,7 @@ describe('PdfDocumentSession', () => {
    })
 
    it('rebuildPageMetrics clears cache', async () => {
-     const canvas = { width: 0, height: 0, style: {}, getContext: vi.fn(() => ({ drawImage: vi.fn() })) }
+     const canvas = { width: 0, height: 0, style: {}, getContext: vi.fn(() => ({ drawImage: vi.fn(), fillRect: vi.fn() })) }
      await cacheSession.renderPage(1, canvas, null)
      expect(cacheSession._bitmapCache.size).toBe(1)
 
@@ -690,7 +690,7 @@ describe('PdfDocumentSession', () => {
 
    it('cache hit still renders text layer when textLayerRenderer provided', async () => {
      const mockTextLayer = { render: vi.fn().mockResolvedValue(undefined) }
-     const canvas = { width: 0, height: 0, style: {}, getContext: vi.fn(() => ({ drawImage: vi.fn() })) }
+     const canvas = { width: 0, height: 0, style: {}, getContext: vi.fn(() => ({ drawImage: vi.fn(), fillRect: vi.fn() })) }
 
      // First render — cache miss
      await cacheSession.renderPage(1, canvas, mockTextLayer)
@@ -699,7 +699,7 @@ describe('PdfDocumentSession', () => {
      mockPdfDocument.getPage.mockClear()
 
      // Second render — cache hit
-     const canvas2 = { width: 0, height: 0, style: {}, getContext: vi.fn(() => ({ drawImage: vi.fn() })) }
+     const canvas2 = { width: 0, height: 0, style: {}, getContext: vi.fn(() => ({ drawImage: vi.fn(), fillRect: vi.fn() })) }
      await cacheSession.renderPage(1, canvas2, mockTextLayer)
 
      // Renderer not called (cache hit)
@@ -719,7 +719,7 @@ describe('PdfDocumentSession', () => {
    })
 
    it('destroy clears cache', async () => {
-     const canvas = { width: 0, height: 0, style: {}, getContext: vi.fn(() => ({ drawImage: vi.fn() })) }
+     const canvas = { width: 0, height: 0, style: {}, getContext: vi.fn(() => ({ drawImage: vi.fn(), fillRect: vi.fn() })) }
      await cacheSession.renderPage(1, canvas, null)
      expect(cacheSession._bitmapCache.size).toBe(1)
 
@@ -729,7 +729,7 @@ describe('PdfDocumentSession', () => {
    })
 
    it('scrolling away and back reuses cached bitmap', async () => {
-     const canvas1 = { width: 0, height: 0, style: {}, getContext: vi.fn(() => ({ drawImage: vi.fn() })) }
+     const canvas1 = { width: 0, height: 0, style: {}, getContext: vi.fn(() => ({ drawImage: vi.fn(), fillRect: vi.fn() })) }
      await cacheSession.renderPage(1, canvas1, null)
      expect(cacheSession._bitmapCache.size).toBe(1)
      mockRenderer.renderPage.mockClear()
@@ -739,7 +739,7 @@ describe('PdfDocumentSession', () => {
      expect(cacheSession._bitmapCache.size).toBe(1)
 
      // Scroll back — cache hit, renderer not called
-     const canvas2 = { width: 0, height: 0, style: {}, getContext: vi.fn(() => ({ drawImage: vi.fn() })) }
+     const canvas2 = { width: 0, height: 0, style: {}, getContext: vi.fn(() => ({ drawImage: vi.fn(), fillRect: vi.fn() })) }
      await cacheSession.renderPage(1, canvas2, null)
      expect(mockRenderer.renderPage).not.toHaveBeenCalled()
      expect(cacheSession._bitmapCache.size).toBe(1)

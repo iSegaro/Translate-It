@@ -10,6 +10,7 @@ import { PdfOutlineRepository } from './PdfOutlineRepository.js'
 import { PdfLinkAnnotationRepository } from './PdfLinkAnnotationRepository.js'
 import { PdfPageContentRepository } from './PdfPageContentRepository.js'
 import { PdfTranslationState } from './PdfTranslationState.js'
+import { PDF_PAGE_BACKGROUND } from './pdfRenderingConstants.js'
 
 const logger = getScopedLogger(LOG_COMPONENTS.PDF, 'PdfDocumentSession')
 const PAGE_MARGIN = 24
@@ -456,6 +457,8 @@ export class PdfDocumentSession extends ResourceTracker {
       canvasEl.style.width = `${cachedBitmap.width}px`
       canvasEl.style.height = `${cachedBitmap.height}px`
       const ctx = canvasEl.getContext('2d', { alpha: false })
+      ctx.fillStyle = PDF_PAGE_BACKGROUND
+      ctx.fillRect(0, 0, cachedBitmap.width, cachedBitmap.height)
       ctx.drawImage(cachedBitmap, 0, 0)
 
       // Render text layer without pdf.js page retrieval

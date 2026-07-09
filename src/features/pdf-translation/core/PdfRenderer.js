@@ -1,11 +1,11 @@
 import { getScopedLogger } from '@/shared/logging/logger.js'
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js'
 import { PdfTextLayerRenderer } from './PdfTextLayerRenderer.js'
+import { PDF_PAGE_BACKGROUND } from './pdfRenderingConstants.js'
 
 const logger = getScopedLogger(LOG_COMPONENTS.PDF, 'PdfRenderer')
 
 const CANVAS_ID_KEY = Symbol('pdfRendererCanvasId')
-const PDF_PAGE_BACKGROUND = '#fff'
 
 export const PDF_RENDER_RESULT_STATUS = Object.freeze({
   SUCCESS: 'success',
