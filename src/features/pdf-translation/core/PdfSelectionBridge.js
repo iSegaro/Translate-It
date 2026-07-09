@@ -15,6 +15,7 @@ export class PdfSelectionBridge extends ResourceTracker {
     super('pdf-selection-bridge')
     this.viewerRootRef = viewerRootRef
     this.lastSelectionSignature = ''
+    this.hasActiveSelection = false
     this.isStarted = false
     this.isPointerDown = false
     this.hasPendingSelectionChange = false
@@ -60,7 +61,11 @@ export class PdfSelectionBridge extends ResourceTracker {
     const target = event?.target
     const viewerRoot = this.viewerRoot
 
-    if (!viewerRoot || !target || !viewerRoot.contains(target)) {
+    if (!viewerRoot || !target) {
+      return
+    }
+
+    if (!viewerRoot.contains(target) && !this.hasActiveSelection) {
       return
     }
 
@@ -120,6 +125,7 @@ export class PdfSelectionBridge extends ResourceTracker {
     }
 
     this.lastSelectionSignature = signature
+    this.hasActiveSelection = true
     pageEventBus.emit(SELECTION_EVENTS.GLOBAL_SELECTION_CHANGE, {
       text: payload.text,
       position: payload.position,
@@ -136,9 +142,10 @@ export class PdfSelectionBridge extends ResourceTracker {
     this.isPointerDown = false
     this.hasPendingSelectionChange = false
 
-    if (!this.lastSelectionSignature) return
+    if (!this.hasActiveSelection) return
 
     this.lastSelectionSignature = ''
+    this.hasActiveSelection = false
     pageEventBus.emit(SELECTION_EVENTS.GLOBAL_SELECTION_CLEAR, {
       reason,
       context: {

@@ -123,6 +123,47 @@ describe('PdfSelectionBridge', () => {
     expect(bridge.hasPendingSelectionChange).toBe(false)
   })
 
+  it('defers clearing an active PDF selection until pointer up finalizes selection', () => {
+    const { viewerRoot, selection } = createSelection()
+    getSelectionMock.mockReturnValue(selection)
+    const bridge = new PdfSelectionBridge(ref(viewerRoot))
+
+    bridge.handleSelectionChange()
+    emitMock.mockClear()
+
+    getSelectionMock.mockReturnValue({
+      isCollapsed: true,
+      rangeCount: 0,
+      toString: () => ''
+    })
+
+    bridge.handlePointerDown({ target: document.body })
+    bridge.handleSelectionChange()
+
+    expect(emitMock).not.toHaveBeenCalled()
+
+    bridge.handlePointerUp()
+
+    expect(emitMock).toHaveBeenCalledWith('global-selection-clear', expect.objectContaining({
+      reason: 'selection-empty',
+      context: expect.objectContaining({
+        source: 'pdf-viewer',
+        isPdf: true
+      })
+    }))
+  })
+
+  it('tracks pointer lifecycle independently from selection dedupe signature', () => {
+    const { viewerRoot } = createSelection()
+    const bridge = new PdfSelectionBridge(ref(viewerRoot))
+    bridge.hasActiveSelection = true
+    bridge.lastSelectionSignature = ''
+
+    bridge.handlePointerDown({ target: document.body })
+
+    expect(bridge.isPointerDown).toBe(true)
+  })
+
   it('clears pending pointer selection on blur without emitting', () => {
     const { viewerRoot, selection } = createSelection()
     getSelectionMock.mockReturnValue(selection)

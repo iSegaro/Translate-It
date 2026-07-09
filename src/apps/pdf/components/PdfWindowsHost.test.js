@@ -1692,6 +1692,13 @@ describe('PdfWindowsHost', () => {
     dispatchOutsidePointerDown({ button: 0 })
     await flushPromises()
     expect(wrapper.find('[data-testid="pdf-windows-host"]').exists()).toBe(false)
+    expect(wrapper.get('[data-testid="pdf-windows-host-icon-stage"]').isVisible()).toBe(true)
+
+    emitSelectionClear({
+      context: { source: 'pdf-viewer', isPdf: true }
+    })
+    await flushPromises()
+    expect(wrapper.get('[data-testid="pdf-windows-host-icon-stage"]').isVisible()).toBe(false)
   })
 
   it('dismisses on primary left-click outside but ignores right and middle clicks', async () => {

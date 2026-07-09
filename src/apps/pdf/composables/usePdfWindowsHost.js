@@ -671,6 +671,10 @@ export function usePdfWindowsHost(options = {}) {
       return
     }
 
+    if (isIconVisible.value && !isVisible.value) {
+      return
+    }
+
     const root = hostRef.value
     const iconRoot = iconHostRef.value
     const isInsideIcon = iconRoot && iconRoot.contains(event.target)
