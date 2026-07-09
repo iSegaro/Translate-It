@@ -98,10 +98,11 @@ const props = defineProps({
   }
 })
 
-const emit = defineEmits(['layout-change', 'current-page-change', 'block-pointer-move', 'block-click'])
+const emit = defineEmits(['layout-change', 'current-page-change', 'visible-pages-change', 'block-pointer-move', 'block-click'])
 const viewerRoot = ref(null)
 const pageViews = new Map()
 const highlightedBounds = ref(null)
+let lastEmittedVisiblePages = new Set()
 
 const isOriginalRole = computed(() => props.viewerRole === VIEWER_ROLE.ORIGINAL)
 const ownsPageRenderLifecycle = computed(() => props.viewerRole === VIEWER_ROLE.ORIGINAL)
@@ -127,6 +128,7 @@ const {
   getPageView: (pageNumber) => pageViews.get(pageNumber),
   onVisiblePagesChange: (nextVisible) => {
     props.session.updateVisiblePages(nextVisible)
+    emitVisiblePagesIfChanged(nextVisible)
   },
   onRenderCandidatesChange: (nextRenderable) => {
     props.session.updateRenderCandidates(nextRenderable)
@@ -180,6 +182,22 @@ if (props.viewerRole === VIEWER_ROLE.ORIGINAL) {
 function getPageOverlayBlocks(pageNumber) {
   const pageData = props.overlayPageData.find((p) => p.pageNumber === pageNumber)
   return pageData?.blocks || []
+}
+
+function arePageSetsEqual(first, second) {
+  if (first.size !== second.size) return false
+  for (const pageNumber of first) {
+    if (!second.has(pageNumber)) return false
+  }
+  return true
+}
+
+function emitVisiblePagesIfChanged(nextVisible) {
+  const nextSet = new Set(nextVisible || [])
+  if (arePageSetsEqual(lastEmittedVisiblePages, nextSet)) return
+
+  lastEmittedVisiblePages = nextSet
+  emit('visible-pages-change', new Set(nextSet))
 }
 
 function resolvePageFromPoint(clientX, clientY) {

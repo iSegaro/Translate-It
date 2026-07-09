@@ -259,6 +259,35 @@ describe('PdfViewer', () => {
     wrapper.unmount()
   })
 
+  it('emits visible-pages-change only when the visible set changes', async () => {
+    const { wrapper } = await mountViewerWithPages({ count: 3 })
+
+    await applyWindow(wrapper, {
+      1: 0,
+      2: 120,
+      3: 1000
+    })
+    const firstCount = wrapper.emitted('visible-pages-change')?.length || 0
+    expect([...wrapper.emitted('visible-pages-change')?.at(-1)?.[0]].sort((a, b) => a - b)).toEqual([1])
+
+    await applyWindow(wrapper, {
+      1: 0,
+      2: 120,
+      3: 1000
+    })
+    expect(wrapper.emitted('visible-pages-change')?.length || 0).toBe(firstCount)
+
+    await applyWindow(wrapper, {
+      1: -120,
+      2: 0,
+      3: 120
+    })
+    expect(wrapper.emitted('visible-pages-change')?.length || 0).toBe(firstCount + 1)
+    expect([...wrapper.emitted('visible-pages-change')?.at(-1)?.[0]].sort((a, b) => a - b)).toEqual([2])
+
+    wrapper.unmount()
+  })
+
   it('emits current page from geometry without waiting for observer visibility', async () => {
     pageRectMap.set(1, buildRect(10, 100, 300))
 

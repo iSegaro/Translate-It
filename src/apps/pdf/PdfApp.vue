@@ -114,6 +114,7 @@
                   :scroll-container="originalScrollContainer"
                   @layout-change="handleLayoutChange"
                   @current-page-change="handleCurrentPageChange"
+                  @visible-pages-change="handleVisiblePagesChange"
                   @block-pointer-move="handleBlockPointerMove"
                   @block-click="handleBlockClick"
                 />
@@ -359,11 +360,15 @@ async function handleFileSelected(file) {
 function handleCurrentPageChange(pageNumber) {
   if (isNavigating.value) return
   if (!Number.isFinite(Number(pageNumber))) return
-  const nextPage = Number(pageNumber) || 0
-  currentPage.value = nextPage
-  if (nextPage > 0 && showOverlayLayer.value) {
-    void hydrateVisiblePageBlocks(new Set([nextPage]))
-  }
+  currentPage.value = Number(pageNumber) || 0
+}
+
+function handleVisiblePagesChange(pageNumbers) {
+  if (contentView.value !== CONTENT_VIEW.TRANSLATED_PDF) return
+  const pages = new Set(pageNumbers || [])
+  if (pages.size === 0) return
+
+  void hydrateVisiblePageBlocks(pages)
 }
 
 function handleTranslatedPaneCurrentPageChange(pageNumber) {

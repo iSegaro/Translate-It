@@ -201,6 +201,7 @@ function createMocks({
     loadPdfFile: vi.fn().mockResolvedValue(true),
     recomputeLayout: vi.fn().mockResolvedValue(undefined),
     translateVisiblePages: vi.fn(),
+    hydrateVisiblePageBlocks: vi.fn().mockResolvedValue(false),
     cancelTranslation: vi.fn(),
     clearDocumentCache: vi.fn().mockResolvedValue(undefined),
     cleanup: vi.fn()
@@ -862,6 +863,55 @@ describe('PdfApp', () => {
 
       expect(originalPane.scrollTop).toBe(720)
       expect(originalPane.scrollTo).toHaveBeenCalledTimes(1)
+
+      wrapper.unmount()
+    })
+
+    it('does not hydrate translated-pdf blocks from current-page-change', async () => {
+      const wrapper = mountInMode({ contentView: 'translated-pdf', layoutMode: 'single' })
+      await flushPromises()
+
+      wrapper.findComponent({ name: 'PdfViewer' }).vm.$emit('current-page-change', 7)
+      await flushPromises()
+
+      expect(mockViewerController.hydrateVisiblePageBlocks).not.toHaveBeenCalled()
+
+      wrapper.unmount()
+    })
+
+    it('hydrates translated-pdf blocks from visible-pages-change', async () => {
+      const wrapper = mountInMode({ contentView: 'translated-pdf', layoutMode: 'single' })
+      await flushPromises()
+
+      wrapper.findComponent({ name: 'PdfViewer' }).vm.$emit('visible-pages-change', new Set([2, 3]))
+      await flushPromises()
+
+      expect(mockViewerController.hydrateVisiblePageBlocks).toHaveBeenCalledTimes(1)
+      expect([...mockViewerController.hydrateVisiblePageBlocks.mock.calls[0][0]]).toEqual([2, 3])
+
+      wrapper.unmount()
+    })
+
+    it('ignores empty visible-pages-change events', async () => {
+      const wrapper = mountInMode({ contentView: 'translated-pdf', layoutMode: 'single' })
+      await flushPromises()
+
+      wrapper.findComponent({ name: 'PdfViewer' }).vm.$emit('visible-pages-change', new Set())
+      await flushPromises()
+
+      expect(mockViewerController.hydrateVisiblePageBlocks).not.toHaveBeenCalled()
+
+      wrapper.unmount()
+    })
+
+    it('ignores visible-pages-change outside translated-pdf mode', async () => {
+      const wrapper = mountInMode({ contentView: 'original', layoutMode: 'single' })
+      await flushPromises()
+
+      wrapper.findComponent({ name: 'PdfViewer' }).vm.$emit('visible-pages-change', new Set([2]))
+      await flushPromises()
+
+      expect(mockViewerController.hydrateVisiblePageBlocks).not.toHaveBeenCalled()
 
       wrapper.unmount()
     })
