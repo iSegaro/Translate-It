@@ -102,27 +102,19 @@ export function usePdfRenderPipeline({
   }
 
   function handleRenderCommitted(pageNumber) {
-    if (!isOriginalRole.value) return
-
     const result = renderScheduler.markRendered(pageNumber)
     applySchedulerResult(result)
   }
 
   function handleRenderStarted(pageNumber) {
-    if (!isOriginalRole.value) return
-
     applySchedulerResult(renderScheduler.markRenderStarted(pageNumber))
   }
 
   function handleRenderFailed(pageNumber) {
-    if (!isOriginalRole.value) return
-
     applySchedulerResult(renderScheduler.markRenderFailed(pageNumber))
   }
 
   function handleRenderCancelled(pageNumber) {
-    if (!isOriginalRole.value) return
-
     applySchedulerResult(renderScheduler.markRenderCancelled(pageNumber))
   }
 
@@ -157,8 +149,10 @@ export function usePdfRenderPipeline({
     renderAllowedPageNumbers.value = new Set()
     renderPlanByPageNumber.value = new Map()
 
-    onVisiblePagesChange?.(new Set())
-    onRenderCandidatesChange?.(new Set())
+    if (isOriginalRole.value) {
+      onVisiblePagesChange?.(new Set())
+      onRenderCandidatesChange?.(new Set())
+    }
   }
 
   return {

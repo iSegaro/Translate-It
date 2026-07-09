@@ -21,6 +21,33 @@ function createMockDeps(overrides = {}) {
   }
 }
 
+function createPageElement(pageNumber, top, height = 100, container) {
+  return {
+    dataset: { pageNumber: String(pageNumber) },
+    getBoundingClientRect: () => ({
+      top: top - Number(container.scrollTop || 0),
+      bottom: top - Number(container.scrollTop || 0) + height,
+      left: 0,
+      right: 300,
+      width: 300,
+      height
+    })
+  }
+}
+
+function createContainer({ scrollTop = 100, clientHeight = 150, pageCount = 8, pageHeight = 100 } = {}) {
+  const container = {
+    scrollTop,
+    clientHeight,
+    getBoundingClientRect: () => ({ top: 0, left: 0, right: 300, bottom: clientHeight, width: 300, height: clientHeight }),
+    querySelectorAll: vi.fn(() => container.pages)
+  }
+  container.pages = Array.from({ length: pageCount }, (_, index) => (
+    createPageElement(index + 1, index * pageHeight, pageHeight, container)
+  ))
+  return container
+}
+
 describe('usePdfRenderPipeline', () => {
   it('initializes with empty state', () => {
     const deps = createMockDeps()
@@ -83,9 +110,87 @@ describe('usePdfRenderPipeline', () => {
     const pipeline = usePdfRenderPipeline(deps)
 
     pipeline.handleRenderStarted(1)
+    pipeline.reset()
 
     expect(deps.onVisiblePagesChange).not.toHaveBeenCalled()
     expect(deps.onRenderCandidatesChange).not.toHaveBeenCalled()
+  })
+
+  it('overlay role expands local allowed pages after primary render starts', () => {
+    const container = createContainer({ scrollTop: 100, clientHeight: 150 })
+    const deps = createMockDeps({
+      isOriginalRole: { value: false },
+      getContainer: vi.fn(() => container)
+    })
+    const pipeline = usePdfRenderPipeline(deps)
+
+    pipeline.applyRenderWindow()
+
+    expect(toArray(pipeline.renderCandidatePageNumbers.value)).toEqual([1, 2, 3, 4])
+    expect(toArray(pipeline.renderAllowedPageNumbers.value)).toEqual([2])
+
+    pipeline.handleRenderStarted(2)
+
+    expect(toArray(pipeline.renderAllowedPageNumbers.value)).toEqual([2, 3])
+    expect(deps.onVisiblePagesChange).not.toHaveBeenCalled()
+    expect(deps.onRenderCandidatesChange).not.toHaveBeenCalled()
+  })
+
+  it('overlay role commits pending render window replacement after destination render commits', () => {
+    const container = createContainer({ scrollTop: 0, clientHeight: 100 })
+    const deps = createMockDeps({
+      isOriginalRole: { value: false },
+      getContainer: vi.fn(() => container)
+    })
+    const pipeline = usePdfRenderPipeline(deps)
+
+    pipeline.applyRenderWindow()
+    expect(toArray(pipeline.renderCandidatePageNumbers.value)).toEqual([1, 2])
+
+    container.scrollTop = 600
+    pipeline.applyRenderWindow()
+    expect(toArray(pipeline.renderCandidatePageNumbers.value)).toEqual([1, 2, 7])
+
+    pipeline.handleRenderCommitted(7)
+
+    expect(toArray(pipeline.renderCandidatePageNumbers.value)).toEqual([6, 7, 8])
+    expect(deps.onVisiblePagesChange).not.toHaveBeenCalled()
+    expect(deps.onRenderCandidatesChange).not.toHaveBeenCalled()
+  })
+
+  it('overlay role handles failed and cancelled lifecycle events locally', () => {
+    const container = createContainer({ scrollTop: 100, clientHeight: 150 })
+    const deps = createMockDeps({
+      isOriginalRole: { value: false },
+      getContainer: vi.fn(() => container)
+    })
+    const pipeline = usePdfRenderPipeline(deps)
+
+    pipeline.applyRenderWindow()
+    pipeline.handleRenderFailed(2)
+
+    expect(toArray(pipeline.renderAllowedPageNumbers.value)).toEqual([2, 3])
+
+    pipeline.handleRenderCancelled(3)
+
+    expect(toArray(pipeline.renderAllowedPageNumbers.value)).toEqual([1, 2, 3, 4])
+    expect(deps.onVisiblePagesChange).not.toHaveBeenCalled()
+    expect(deps.onRenderCandidatesChange).not.toHaveBeenCalled()
+  })
+
+  it('original role still updates shared callbacks and local lifecycle state', () => {
+    const container = createContainer({ scrollTop: 100, clientHeight: 150 })
+    const deps = createMockDeps({
+      getContainer: vi.fn(() => container)
+    })
+    const pipeline = usePdfRenderPipeline(deps)
+
+    pipeline.applyRenderWindow()
+    pipeline.handleRenderStarted(2)
+
+    expect(toArray(pipeline.renderAllowedPageNumbers.value)).toEqual([2, 3])
+    expect(deps.onVisiblePagesChange).toHaveBeenCalledWith(new Set([2, 3]))
+    expect(deps.onRenderCandidatesChange).toHaveBeenCalledWith(new Set([1, 2, 3, 4]))
   })
 
   it('reset clears all state and calls callbacks', () => {

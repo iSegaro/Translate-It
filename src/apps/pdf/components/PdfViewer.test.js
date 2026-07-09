@@ -672,7 +672,7 @@ describe('PdfViewer', () => {
     wrapper.unmount()
   })
 
-  it('does not commit pending replacement from overlay render commits', async () => {
+  it('commits pending replacement locally from overlay render commits', async () => {
     const { wrapper, session } = await mountViewerWithPages({ viewerRole: VIEWER_ROLE.OVERLAY })
 
     await applyWindow(wrapper, {
@@ -702,13 +702,13 @@ describe('PdfViewer', () => {
       .sort((a, b) => a - b)
 
     expect(beforeCommit).toEqual([1, 2, 3, 70])
-    expect(afterCommit).toEqual([1, 2, 3, 70])
+    expect(afterCommit).toEqual([69, 70, 71])
     expect(session.updateRenderCandidates).not.toHaveBeenCalled()
 
     wrapper.unmount()
   })
 
-  it('ignores overlay render lifecycle events', async () => {
+  it('processes overlay render lifecycle events without shared session updates', async () => {
     const { wrapper, session } = await mountViewerWithPages({ viewerRole: VIEWER_ROLE.OVERLAY })
 
     await applyWindow(wrapper, {
@@ -721,7 +721,16 @@ describe('PdfViewer', () => {
     const page2 = wrapper.findAllComponents({ name: 'PdfPageView' })
       .find(component => component.props('page').pageNumber === 2)
 
+    const page3 = wrapper.findAllComponents({ name: 'PdfPageView' })
+      .find(component => component.props('page').pageNumber === 3)
+
+    expect(page3.props('renderAllowed')).toBe(false)
+
     page2.vm.$emit('render-started', 2)
+    await nextTick()
+
+    expect(page3.props('renderAllowed')).toBe(true)
+
     page2.vm.$emit('render-failed', 2)
     page2.vm.$emit('render-committed', 2)
     await nextTick()
