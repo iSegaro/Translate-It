@@ -5,6 +5,7 @@ import { PdfTextLayerRenderer } from './PdfTextLayerRenderer.js'
 const logger = getScopedLogger(LOG_COMPONENTS.PDF, 'PdfRenderer')
 
 const CANVAS_ID_KEY = Symbol('pdfRendererCanvasId')
+const PDF_PAGE_BACKGROUND = '#fff'
 
 export const PDF_RENDER_RESULT_STATUS = Object.freeze({
   SUCCESS: 'success',
@@ -75,6 +76,9 @@ export class PdfRenderer {
     if (!context) {
       throw new Error('Canvas 2D context not available')
     }
+
+    context.fillStyle = PDF_PAGE_BACKGROUND
+    context.fillRect(0, 0, newWidth, newHeight)
 
     const renderTask = page.render({
       canvasContext: context,

@@ -61,7 +61,8 @@ function createMockCanvas(initialWidth = 0, initialHeight = 0) {
   const style = {}
   const context = {
     clearRect: vi.fn(),
-    drawImage: vi.fn()
+    drawImage: vi.fn(),
+    fillRect: vi.fn()
   }
   return {
     width: initialWidth,
@@ -78,7 +79,8 @@ async function flushMicrotasks() {
 function createMockTempCanvas() {
   const context = {
     clearRect: vi.fn(),
-    drawImage: vi.fn()
+    drawImage: vi.fn(),
+    fillRect: vi.fn()
   }
   return {
     width: 0,
