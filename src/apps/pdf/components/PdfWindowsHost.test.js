@@ -412,6 +412,51 @@ describe('PdfWindowsHost', () => {
     expect(sendRegularMessageMock).toHaveBeenCalledTimes(1)
   })
 
+  it('keeps the icon alive for toolbar-surface pointerdown and preserves the normal icon click action', async () => {
+    await showSelectionIcon('Toolbar surface')
+
+    const icon = wrapper.get('[data-testid="pdf-translation-icon"]')
+    const translateButton = icon.get('.ti-icon-btn--translate')
+
+    dispatchPointerEvent(translateButton.element, 'pointerdown', { button: 0, buttons: 1 })
+    await flushPromises()
+
+    expect(wrapper.get('[data-testid="pdf-windows-host-icon-stage"]').isVisible()).toBe(true)
+    expect(wrapper.find('[data-testid="pdf-windows-host"]').exists()).toBe(false)
+
+    await translateButton.trigger('click')
+    await flushPromises()
+
+    expect(wrapper.get('[data-testid="pdf-windows-host-icon-stage"]').isVisible()).toBe(false)
+    expect(wrapper.find('[data-testid="pdf-windows-host"]').exists()).toBe(true)
+  })
+
+  it('dismisses the icon-only toolbar from transparent stage, PDF toolbar, and application chrome clicks', async () => {
+    await showSelectionIcon('Transparent stage')
+
+    dispatchPointerEvent(wrapper.get('[data-testid="pdf-windows-host-icon-stage"]').element, 'pointerdown', { button: 0, buttons: 1 })
+    await flushPromises()
+
+    expect(wrapper.get('[data-testid="pdf-windows-host-icon-stage"]').isVisible()).toBe(false)
+
+    const pdfToolbar = document.createElement('header')
+    pdfToolbar.className = 'pdf-toolbar'
+    document.body.appendChild(pdfToolbar)
+
+    await showSelectionIcon('PDF toolbar click')
+    dispatchPointerEvent(pdfToolbar, 'pointerdown', { button: 0, buttons: 1 })
+    pdfToolbar.remove()
+    await flushPromises()
+
+    expect(wrapper.get('[data-testid="pdf-windows-host-icon-stage"]').isVisible()).toBe(false)
+
+    await showSelectionIcon('Application chrome click')
+    dispatchOutsidePointerDown({ button: 0 })
+    await flushPromises()
+
+    expect(wrapper.get('[data-testid="pdf-windows-host-icon-stage"]').isVisible()).toBe(false)
+  })
+
   it('renders TTS for selected source text after the icon opens the window and hides it when there is no speakable text', async () => {
     let resolveTranslation
     sendRegularMessageMock.mockImplementationOnce(() => new Promise((resolve) => {
@@ -1692,7 +1737,7 @@ describe('PdfWindowsHost', () => {
     dispatchOutsidePointerDown({ button: 0 })
     await flushPromises()
     expect(wrapper.find('[data-testid="pdf-windows-host"]').exists()).toBe(false)
-    expect(wrapper.get('[data-testid="pdf-windows-host-icon-stage"]').isVisible()).toBe(true)
+    expect(wrapper.get('[data-testid="pdf-windows-host-icon-stage"]').isVisible()).toBe(false)
 
     emitSelectionClear({
       context: { source: 'pdf-viewer', isPdf: true }

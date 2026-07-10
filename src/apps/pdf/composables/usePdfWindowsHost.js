@@ -671,14 +671,11 @@ export function usePdfWindowsHost(options = {}) {
       return
     }
 
-    if (isIconVisible.value && !isVisible.value) {
-      return
-    }
-
     const root = hostRef.value
-    const iconRoot = iconHostRef.value
-    const isInsideIcon = iconRoot && iconRoot.contains(event.target)
     const path = typeof event?.composedPath === 'function' ? event.composedPath() : []
+    const isInsideIcon = path.some((node) => (
+      node instanceof HTMLElement && node.matches('[data-translate-ui="true"]')
+    ))
     const isProviderDropdownInteraction = path.some((node) => {
       if (!(node instanceof HTMLElement)) {
         return false
