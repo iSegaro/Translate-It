@@ -1,13 +1,23 @@
 /* PdfOutline.scss */
 .pdf-outline {
-  width: 260px;
-  min-width: 260px;
-  overflow-y: auto;
+  width: 0;
+  min-width: 0;
+  overflow: hidden;
+  flex: 0 0 auto;
+  margin-right: 0;
   background: rgba(16, 19, 26, 0.6);
   border-right: 1px solid rgba(230, 237, 247, 0.08);
   border-radius: 12px;
   display: flex;
   flex-direction: column;
+  transition: width 0.16s ease, margin-right 0.16s ease;
+}
+
+.pdf-outline--visible {
+  width: 260px;
+  margin-right: 16px;
+  overflow-y: auto;
+  overflow-x: hidden;
 }
 
 .pdf-outline__header {

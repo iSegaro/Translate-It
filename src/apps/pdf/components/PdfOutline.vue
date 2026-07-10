@@ -1,7 +1,7 @@
 <template>
   <nav
-    v-show="visible"
     class="pdf-outline"
+    :class="{ 'pdf-outline--visible': visible }"
   >
     <div class="pdf-outline__header">
       <span class="pdf-outline__title">Outline</span>
