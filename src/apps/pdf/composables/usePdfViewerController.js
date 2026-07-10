@@ -402,6 +402,12 @@ export function usePdfViewerController() {
   }
 
   async function recomputeLayout(layoutRequest) {
+    console.log('[LAYOUT-DIAG][layout]', JSON.stringify({
+      reason: 'recomputeLayout',
+      isLoading: isLoading.value,
+      width: layoutRequest?.width,
+      height: layoutRequest?.height
+    }))
     if (isLoading.value || !currentFile.value) {
       return false
     }

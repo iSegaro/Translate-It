@@ -158,6 +158,8 @@ const {
   onLayoutChange: (layout) => emit('layout-change', layout)
 })
 
+let _scrollCallbackSeq = 0
+
 const {
   scrollRoot,
   setupScrollObservation,
@@ -169,6 +171,17 @@ const {
   viewerRoot,
   scrollContainer: computed(() => props.scrollContainer),
   onScroll: () => {
+    _scrollCallbackSeq += 1
+    const seq = _scrollCallbackSeq
+    console.log('[LAYOUT-DIAG][event-chain]', JSON.stringify({
+      source: 'PdfViewer.onScroll',
+      seq,
+      trigger: 'scroll-or-intersection',
+      layoutMode: 'N/A',
+      contentView: 'N/A',
+      currentPageSuppressed: props.suppressCurrentPageUpdates,
+      renderWindowFrozen: props.freezeRenderWindowEviction
+    }))
     scheduleRenderWindowUpdate()
     scheduleCurrentPageUpdate()
   },
@@ -339,6 +352,11 @@ function setupObservers() {
   disconnectObservers()
   if (!viewerRoot.value) return
 
+  console.log('[LAYOUT-DIAG][event-chain]', JSON.stringify({
+    source: 'PdfViewer.setupObservers',
+    reason: 'page-watch-change'
+  }))
+
   setupScrollObservation()
 
   if (scrollRoot.value) {
@@ -460,7 +478,21 @@ defineExpose({
   scrollToPage,
   getScrollContainer,
   getPageElement,
-  refreshRenderWindow: () => applyRenderWindow({ force: true }),
-  refreshCurrentPage: () => emitCurrentPageFromResolver(true)
+  refreshRenderWindow: () => {
+    console.log('[LAYOUT-DIAG][event-chain]', JSON.stringify({
+      source: 'refreshRenderWindow',
+      reason: 'exposed-call',
+      triggerType: 'explicit-refresh'
+    }))
+    applyRenderWindow({ force: true })
+  },
+  refreshCurrentPage: () => {
+    console.log('[LAYOUT-DIAG][event-chain]', JSON.stringify({
+      source: 'refreshCurrentPage',
+      reason: 'exposed-call',
+      triggerType: 'explicit-refresh'
+    }))
+    emitCurrentPageFromResolver(true, 'explicit-refresh')
+  }
 })
 </script>

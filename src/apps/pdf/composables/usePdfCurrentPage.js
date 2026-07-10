@@ -23,7 +23,7 @@ export function usePdfCurrentPage({
     }
   }
 
-  function emitCurrentPageFromResolver(force = false) {
+  function emitCurrentPageFromResolver(force = false, triggerType = null) {
     if (!isOriginalRole.value) return
     if (!force && suppressCurrentPageUpdates.value) return
 
@@ -31,6 +31,16 @@ export function usePdfCurrentPage({
     if (!container) return
 
     const { scrollTop } = getScrollMetrics(container)
+    const pageElements = container.querySelectorAll(PAGE_SELECTOR)
+    console.log('[LAYOUT-DIAG][resolver-context]', JSON.stringify({
+      scrollTop,
+      containerScrollHeight: container.scrollHeight,
+      containerClientHeight: container.clientHeight,
+      pageElementCount: pageElements.length,
+      firstPageNumber: pageElements.length > 0 ? Number(pageElements[0]?.dataset?.pageNumber) : null,
+      lastPageNumber: pageElements.length > 0 ? Number(pageElements[pageElements.length - 1]?.dataset?.pageNumber) : null,
+      isSuppressed: suppressCurrentPageUpdates.value
+    }))
     const currentPage = resolveRenderWindow({
       scrollTop,
       container,
@@ -40,28 +50,67 @@ export function usePdfCurrentPage({
     if (!currentPage) return
 
     if (currentPage !== lastCurrentPage) {
+      const prevPage = lastCurrentPage
       lastCurrentPage = currentPage
       logger.debug(`[PDF Primary Page] ${JSON.stringify({ emittedCurrentPage: currentPage, currentPageSource: CURRENT_PAGE_SOURCE, scrollTop, timestamp: new Date().toISOString() })}`)
+      console.log('[LAYOUT-DIAG][current-page]', JSON.stringify({
+        previousPage: prevPage,
+        newPage: currentPage,
+        reason: 'scroll-observer',
+        eventSource: 'scroll',
+        scrollTop,
+        isSuppressed: suppressCurrentPageUpdates.value
+      }))
       onCurrentPageChange(currentPage)
     }
   }
 
   function scheduleCurrentPageUpdate() {
     if (!isOriginalRole.value) return
-    if (suppressCurrentPageUpdates.value) return
+    if (suppressCurrentPageUpdates.value) {
+      console.log('[LAYOUT-DIAG][event-chain]', JSON.stringify({
+        source: 'scheduleCurrentPageUpdate',
+        reason: 'suppressed-skip',
+        triggerType: null
+      }))
+      return
+    }
     if (currentPageFrameId != null) return
+
+    console.log('[LAYOUT-DIAG][event-chain]', JSON.stringify({
+      source: 'scheduleCurrentPageUpdate',
+      reason: 'scheduled',
+      triggerType: 'scroll-or-intersection'
+    }))
 
     currentPageFrameId = requestAnimationFrame(() => {
       currentPageFrameId = null
-      emitCurrentPageFromResolver()
+      console.log('[LAYOUT-DIAG][event-chain]', JSON.stringify({
+        source: 'requestAnimationFrame',
+        reason: 'current-page RA fires',
+        triggerType: 'scroll-or-intersection'
+      }))
+      emitCurrentPageFromResolver(false, 'scroll')
     })
   }
 
   function currentPageIfVisible() {
     if (!isOriginalRole.value) return
-    if (suppressCurrentPageUpdates.value) return
+    if (suppressCurrentPageUpdates.value) {
+      console.log('[LAYOUT-DIAG][event-chain]', JSON.stringify({
+        source: 'currentPageIfVisible',
+        reason: 'suppressed-skip',
+        triggerType: null
+      }))
+      return
+    }
 
-    emitCurrentPageFromResolver()
+    console.log('[LAYOUT-DIAG][event-chain]', JSON.stringify({
+      source: 'currentPageIfVisible',
+      reason: 'executing',
+      triggerType: 'explicit-refresh'
+    }))
+    emitCurrentPageFromResolver(false, 'explicit-refresh')
   }
 
   return {

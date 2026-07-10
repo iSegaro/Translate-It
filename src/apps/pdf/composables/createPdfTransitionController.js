@@ -187,6 +187,12 @@ export function createPdfTransitionController({
   }
 
   async function applyDeferredZoomLayout() {
+    console.log('[LAYOUT-DIAG][layout]', JSON.stringify({
+      reason: 'applyDeferredZoomLayout',
+      controlledZoomSeq,
+      contentTransitionSeq,
+      suppressedLayoutRestoreSeq
+    }))
     const pendingLayout = deferredZoomLayout
     if (!pendingLayout) return
 
@@ -217,6 +223,15 @@ export function createPdfTransitionController({
   }
 
   async function handleContentViewChange(nextView) {
+    console.log('[LAYOUT-DIAG][transition-start]', JSON.stringify({
+      seq: contentTransitionSeq,
+      fromView: contentView.value,
+      toView: nextView,
+      layoutMode: isSideBySide.value ? 'side-by-side' : 'single',
+      currentPage: currentPage.value,
+      originalScrollTop: originalScrollContainer.value?.scrollTop ?? 0,
+      translatedScrollTop: translatedScrollContainer.value?.scrollTop ?? 0
+    }))
     const previousView = contentView.value
     const owner = resolveAnchorOwner()
     const isPdfBackedTransition = isPdfBackedPdfTransition(previousView, nextView)
@@ -253,6 +268,27 @@ export function createPdfTransitionController({
   }
 
   async function handleLayoutModeChange(mode) {
+    console.log('[LAYOUT-DIAG][event-chain]', JSON.stringify({
+      source: 'handleLayoutModeChange',
+      reason: 'toolbar-toggle',
+      mode,
+      contentView: contentView.value,
+      currentPage: currentPage.value,
+      contentTransitionSeq,
+      controlledZoomSeq,
+      suppressedLayoutRestoreSeq,
+      renderWindowFrozen: renderWindowEvictionFrozen.value,
+      currentPageSuppressed: currentPageUpdatesSuppressed.value
+    }))
+    console.log('[LAYOUT-DIAG][transition-start]', JSON.stringify({
+      seq: contentTransitionSeq,
+      fromLayout: viewerLayout.value,
+      toLayout: mode,
+      contentView: contentView.value,
+      currentPage: currentPage.value,
+      originalScrollTop: originalScrollContainer.value?.scrollTop ?? 0,
+      translatedScrollTop: translatedScrollContainer.value?.scrollTop ?? 0
+    }))
     const owner = resolveAnchorOwner()
     const anchor = capturePdfAwareOwnedScrollAnchor(owner)
 
@@ -269,11 +305,25 @@ export function createPdfTransitionController({
       if (isSideBySide.value && showTranslatedPdfPane.value) {
         syncFromOwner(owner)
         scheduleControlledTransitionSuppressionClear()
+        console.log('[LAYOUT-DIAG][transition-end]', JSON.stringify({
+          seq: contentTransitionSeq,
+          currentPage: currentPage.value,
+          originalScrollTop: originalScrollContainer.value?.scrollTop ?? 0,
+          translatedScrollTop: translatedScrollContainer.value?.scrollTop ?? 0,
+          layoutMode: mode
+        }))
         return
       }
 
       if (isPdfAnchor(anchor)) {
         scheduleControlledTransitionSuppressionClear()
+        console.log('[LAYOUT-DIAG][transition-end]', JSON.stringify({
+          seq: contentTransitionSeq,
+          currentPage: currentPage.value,
+          originalScrollTop: originalScrollContainer.value?.scrollTop ?? 0,
+          translatedScrollTop: translatedScrollContainer.value?.scrollTop ?? 0,
+          layoutMode: mode
+        }))
         return
       }
 
@@ -286,12 +336,37 @@ export function createPdfTransitionController({
     } finally {
       releaseRenderWindowFreeze()
       await refreshRenderWindowAfterLayoutTransition()
+      console.log('[LAYOUT-DIAG][transition-end]', JSON.stringify({
+        seq: contentTransitionSeq,
+        currentPage: currentPage.value,
+        originalScrollTop: originalScrollContainer.value?.scrollTop ?? 0,
+        translatedScrollTop: translatedScrollContainer.value?.scrollTop ?? 0,
+        layoutMode: mode
+      }))
     }
   }
 
   async function handleLayoutChange(layout = null) {
     const nextLayout = normalizeLayout(layout)
     const currentLayout = viewerLayout.value
+
+    console.log('[LAYOUT-DIAG][event-chain]', JSON.stringify({
+      source: 'handleLayoutChange',
+      reason: 'layout-change-event',
+      nextWidth: nextLayout.width,
+      nextHeight: nextLayout.height,
+      currentWidth: currentLayout.width,
+      currentHeight: currentLayout.height,
+      sameSize: nextLayout.width === currentLayout.width && nextLayout.height === currentLayout.height,
+      contentTransitionSeq,
+      controlledZoomSeq,
+      suppressedLayoutRestoreSeq,
+      hasPendingPdfBackedAnchor: !!pendingPdfBackedAnchor,
+      renderWindowFrozen: renderWindowEvictionFrozen.value,
+      currentPageSuppressed: currentPageUpdatesSuppressed.value,
+      layoutMode: isSideBySide.value ? 'side-by-side' : 'single',
+      contentView: contentView.value
+    }))
 
     if (
       nextLayout.width === currentLayout.width &&
@@ -319,6 +394,17 @@ export function createPdfTransitionController({
     const shouldFreezeRenderWindow = !!pendingPdfAnchor || (
       contentSeqAtStart > 0 && suppressedLayoutRestoreSeq === contentSeqAtStart
     )
+
+    console.log('[LAYOUT-DIAG][layout]', JSON.stringify({
+      seq: layoutChangeSeq,
+      reason: 'handleLayoutChange',
+      controlledZoomSeq,
+      contentTransitionSeq: contentSeqAtStart,
+      suppressedLayoutRestoreSeq,
+      suppressRestoreForControlledTransition,
+      hasPendingPdfAnchor: !!pendingPdfAnchor,
+      shouldFreezeRenderWindow
+    }))
 
     const anchors = captureControlledTransitionAnchors()
 

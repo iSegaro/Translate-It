@@ -18,6 +18,7 @@ export function usePdfRenderPipeline({
 
   let renderWindowFrameId = null
   let renderWindowEpoch = 0
+  let _renderWindowEventId = 0
 
   function updateVisiblePages(nextVisible) {
     visiblePageNumbers.value = nextVisible
@@ -75,12 +76,31 @@ export function usePdfRenderPipeline({
   }
 
   function applyRenderWindow({ epoch = renderWindowEpoch, force = false } = {}) {
-    if (freezeRenderWindowEviction.value) {
+    _renderWindowEventId += 1
+    const applyEventId = _renderWindowEventId
+    const frozen = freezeRenderWindowEviction.value
+    if (frozen) {
+      console.log('[LAYOUT-DIAG][event-chain]', JSON.stringify({
+        source: 'applyRenderWindow',
+        eventId: applyEventId,
+        reason: 'frozen-skip',
+        epoch,
+        currentEpoch: renderWindowEpoch,
+        frozen
+      }))
       renderScheduler.updateWindow({ frozen: true })
       return
     }
 
     if (!force && epoch !== renderWindowEpoch) {
+      console.log('[LAYOUT-DIAG][event-chain]', JSON.stringify({
+        source: 'applyRenderWindow',
+        eventId: applyEventId,
+        reason: 'stale-epoch-skip',
+        epoch,
+        currentEpoch: renderWindowEpoch,
+        force
+      }))
       return
     }
 
@@ -91,12 +111,25 @@ export function usePdfRenderPipeline({
       bufferPages: 1
     })
 
+    console.log('[LAYOUT-DIAG][event-chain]', JSON.stringify({
+      source: 'applyRenderWindow',
+      eventId: applyEventId,
+      reason: 'applied',
+      epoch,
+      currentEpoch: renderWindowEpoch,
+      force,
+      frozen,
+      visiblePageCount: renderWindow.visiblePages?.length ?? 0,
+      primaryPage: renderWindow.primaryPage,
+      scrollTop: container?.scrollTop ?? 0
+    }))
+
     updateVisiblePages(new Set(renderWindow.visiblePages))
     const result = renderScheduler.updateWindow({
       visiblePages: renderWindow.visiblePages,
       renderPages: renderWindow.renderPages,
       primaryPage: renderWindow.primaryPage,
-      frozen: freezeRenderWindowEviction.value
+      frozen: frozen
     })
     applySchedulerResult(result)
   }
@@ -126,11 +159,27 @@ export function usePdfRenderPipeline({
   }
 
   function scheduleRenderWindowUpdate() {
+    _renderWindowEventId += 1
+    const schedEventId = _renderWindowEventId
+    console.log('[LAYOUT-DIAG][event-chain]', JSON.stringify({
+      source: 'scheduleRenderWindowUpdate',
+      eventId: schedEventId,
+      hasPendingFrame: renderWindowFrameId != null,
+      epoch: renderWindowEpoch,
+      frozen: freezeRenderWindowEviction.value
+    }))
     if (renderWindowFrameId != null) return
 
     const epoch = renderWindowEpoch
     renderWindowFrameId = requestAnimationFrame(() => {
       renderWindowFrameId = null
+      console.log('[LAYOUT-DIAG][event-chain]', JSON.stringify({
+        source: 'requestAnimationFrame',
+        eventId: schedEventId,
+        reason: 'render-window RA fires',
+        epoch,
+        currentEpoch: renderWindowEpoch
+      }))
       applyRenderWindow({ epoch })
     })
   }
