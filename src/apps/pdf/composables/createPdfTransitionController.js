@@ -471,10 +471,14 @@ export function createPdfTransitionController({
 
   function buildLayoutRequest(layout = viewerLayout.value) {
     const normalizedLayout = normalizeLayout(layout)
-    const canvasSlot = resolvePdfCanvasSlot(normalizedLayout)
-    return {
+    const effectiveLayout = {
       width: normalizedLayout.width > 0 ? normalizedLayout.width : DEFAULT_VIEWER_WIDTH,
-      height: normalizedLayout.height,
+      height: normalizedLayout.height
+    }
+    const canvasSlot = resolvePdfCanvasSlot(effectiveLayout)
+    return {
+      width: effectiveLayout.width,
+      height: effectiveLayout.height,
       availableCanvasWidth: canvasSlot.availableCanvasWidth,
       availableCanvasHeight: canvasSlot.availableCanvasHeight,
       zoomMode: zoomMode.value,
