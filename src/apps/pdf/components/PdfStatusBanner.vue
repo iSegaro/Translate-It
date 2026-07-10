@@ -79,10 +79,14 @@ const bannerClasses = computed(() => ({
   gap: 12px;
   padding: 10px 14px;
   border-radius: 12px;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(32, 33, 36, 0.88);
+  backdrop-filter: saturate(140%) blur(12px);
+  -webkit-backdrop-filter: saturate(140%) blur(12px);
   color: #e6edf7;
-  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.16);
+  box-shadow:
+    0 4px 16px rgba(0, 0, 0, 0.28),
+    0 1px 0 rgba(255, 255, 255, 0.04) inset;
   margin-bottom: 0;
   width: 100%;
   box-sizing: border-box;
@@ -98,7 +102,7 @@ const bannerClasses = computed(() => ({
   font-size: 13px;
   line-height: 1;
   color: #0b0e13;
-  background: rgba(230, 237, 247, 0.88);
+  background: rgba(230, 237, 247, 0.94);
 }
 
 .pdf-status-banner__content {
@@ -123,27 +127,27 @@ const bannerClasses = computed(() => ({
 .pdf-status-banner__message {
   margin-top: 0;
   font-size: 12px;
-  color: rgba(230, 237, 247, 0.84);
+  color: rgba(230, 237, 247, 0.92);
 }
 
 .pdf-status-banner__detail {
   margin-top: 0;
   font-size: 11px;
-  color: rgba(230, 237, 247, 0.66);
+  color: rgba(230, 237, 247, 0.76);
 }
 
 .pdf-status-banner--success {
-  border-color: rgba(45, 212, 191, 0.18);
-  background: rgba(45, 212, 191, 0.08);
+  border-color: rgba(45, 212, 191, 0.2);
+  background: rgba(24, 35, 35, 0.9);
 }
 
 .pdf-status-banner--warning {
-  border-color: rgba(245, 158, 11, 0.18);
-  background: rgba(245, 158, 11, 0.08);
+  border-color: rgba(245, 158, 11, 0.2);
+  background: rgba(35, 30, 21, 0.9);
 }
 
 .pdf-status-banner--error {
-  border-color: rgba(248, 113, 113, 0.22);
-  background: rgba(248, 113, 113, 0.1);
+  border-color: rgba(248, 113, 113, 0.24);
+  background: rgba(38, 24, 26, 0.92);
 }
 </style>

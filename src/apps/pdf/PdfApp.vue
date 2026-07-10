@@ -33,123 +33,127 @@
       @clear-cache="handleClearCache"
     />
 
-    <div
-      v-if="pdfStatusBanner"
-      class="pdf-app__status-row"
-    >
-      <PdfStatusBanner
-        :visible="Boolean(pdfStatusBanner)"
-        :variant="pdfStatusBanner.variant || 'info'"
-        :title="pdfStatusBanner.title || ''"
-        :message="pdfStatusBanner.message || ''"
-        :detail="pdfStatusBanner.detail || ''"
-      />
-    </div>
+    <section class="pdf-app__viewport">
+      <div class="pdf-app__status-layer">
+        <div
+          v-if="pdfStatusBanner"
+          class="pdf-app__status-row"
+        >
+          <PdfStatusBanner
+            :visible="Boolean(pdfStatusBanner)"
+            :variant="pdfStatusBanner.variant || 'info'"
+            :title="pdfStatusBanner.title || ''"
+            :message="pdfStatusBanner.message || ''"
+            :detail="pdfStatusBanner.detail || ''"
+          />
+        </div>
 
-    <main class="pdf-app__content">
-      <PdfOcrConsentPrompt
-        :visible="isOcrPromptVisible"
-        :page-count="scannedPageCount"
-        @confirm="confirmOcr"
-        @cancel="dismissOcrPrompt"
-      />
+        <PdfOcrProgress
+          :processing="isOcrProcessing"
+          :progress="ocrProgress"
+          @cancel="cancelOcr"
+        />
+      </div>
 
-      <PdfOcrProgress
-        :processing="isOcrProcessing"
-        :progress="ocrProgress"
-        @cancel="cancelOcr"
-      />
-
-      <div class="pdf-app__workspace">
-        <PdfOutline
-          :outline="pdfOutline"
-          :visible="isOutlineVisible && hasOutline"
-          :active-dest="activeOutlineDest"
-          :expanded-dests="expandedDests"
-          @close="isOutlineVisible = false"
-          @navigate="handleOutlineNavigate"
+      <main class="pdf-app__content">
+        <PdfOcrConsentPrompt
+          :visible="isOcrPromptVisible"
+          :page-count="scannedPageCount"
+          @confirm="confirmOcr"
+          @cancel="dismissOcrPrompt"
         />
 
-        <PdfDropzone
-          :has-document="hasDocument"
-          :is-drag-over="isDragOver"
-          @file-selected="handleFileSelected"
-          @drag-state-change="isDragOver = $event"
-        >
-          <template #empty>
-            <div class="pdf-app__empty">
-              <p class="pdf-app__empty-title">
-                Drop a PDF here or choose one from disk.
-              </p>
-              <p class="pdf-app__empty-text">
-                This MVP uses the dedicated viewer only. No native browser interception is active.
-              </p>
-            </div>
-          </template>
+        <div class="pdf-app__workspace">
+          <PdfOutline
+            :outline="pdfOutline"
+            :visible="isOutlineVisible && hasOutline"
+            :active-dest="activeOutlineDest"
+            :expanded-dests="expandedDests"
+            @close="isOutlineVisible = false"
+            @navigate="handleOutlineNavigate"
+          />
 
-          <template #document>
-            <PdfViewerLayout
-              ref="pdfViewerLayoutRef"
-              :layout-mode="layoutMode"
-              :show-original-pane="showOriginalPane"
-              :show-translated-pane="showTranslatedTextPane || showTranslatedPdfPane"
-              :suppress-scroll-sync="suppressScrollSync"
-            >
-              <template
-                v-if="showOriginalPane"
-                #original
+          <PdfDropzone
+            :has-document="hasDocument"
+            :is-drag-over="isDragOver"
+            @file-selected="handleFileSelected"
+            @drag-state-change="isDragOver = $event"
+          >
+            <template #empty>
+              <div class="pdf-app__empty">
+                <p class="pdf-app__empty-title">
+                  Drop a PDF here or choose one from disk.
+                </p>
+                <p class="pdf-app__empty-text">
+                  This MVP uses the dedicated viewer only. No native browser interception is active.
+                </p>
+              </div>
+            </template>
+
+            <template #document>
+              <PdfViewerLayout
+                ref="pdfViewerLayoutRef"
+                :layout-mode="layoutMode"
+                :show-original-pane="showOriginalPane"
+                :show-translated-pane="showTranslatedTextPane || showTranslatedPdfPane"
+                :suppress-scroll-sync="suppressScrollSync"
               >
-                <PdfViewer
-                  ref="pdfViewerRef"
-                  :viewer-role="VIEWER_ROLE.ORIGINAL"
-                  :pages="pageMetrics"
-                  :session="session"
-                  :suppress-current-page-updates="currentPageUpdatesSuppressed"
-                  :freeze-render-window-eviction="renderWindowEvictionFrozen"
-                  :is-block-targeting-active="isBlockTargetingActive"
-                  :highlighted-block-id="highlightedBlockId"
-                  :show-overlay="showOverlayLayer"
-                  :overlay-page-data="translatedPageData"
-                  :handle-navigation-target="handleNavigationTarget"
-                  :scroll-container="originalScrollContainer"
-                  @layout-change="handleLayoutChange"
-                  @current-page-change="handleCurrentPageChange"
-                  @visible-pages-change="handleVisiblePagesChange"
-                  @block-pointer-move="handleBlockPointerMove"
-                  @block-click="handleBlockClick"
-                />
-              </template>
+                <template
+                  v-if="showOriginalPane"
+                  #original
+                >
+                  <PdfViewer
+                    ref="pdfViewerRef"
+                    :viewer-role="VIEWER_ROLE.ORIGINAL"
+                    :pages="pageMetrics"
+                    :session="session"
+                    :suppress-current-page-updates="currentPageUpdatesSuppressed"
+                    :freeze-render-window-eviction="renderWindowEvictionFrozen"
+                    :is-block-targeting-active="isBlockTargetingActive"
+                    :highlighted-block-id="highlightedBlockId"
+                    :show-overlay="showOverlayLayer"
+                    :overlay-page-data="translatedPageData"
+                    :handle-navigation-target="handleNavigationTarget"
+                    :scroll-container="originalScrollContainer"
+                    @layout-change="handleLayoutChange"
+                    @current-page-change="handleCurrentPageChange"
+                    @visible-pages-change="handleVisiblePagesChange"
+                    @block-pointer-move="handleBlockPointerMove"
+                    @block-click="handleBlockClick"
+                  />
+                </template>
 
-              <template #translated>
-                <PdfTranslatedPane
-                  v-if="showTranslatedTextPane"
-                  ref="pdfTranslatedPaneRef"
-                  :translated-page-data="translatedPageData"
-                  :highlighted-block-id="highlightedBlockId"
-                  :page-metrics="pageMetrics"
-                  :layout-mode="layoutMode"
-                  :scroll-container="translatedScrollContainer"
-                  :suppress-current-page-updates="currentPageUpdatesSuppressed"
-                  @current-page-change="handleTranslatedPaneCurrentPageChange"
-                />
-                <PdfViewer
-                  v-if="showTranslatedPdfPane"
-                  :viewer-role="VIEWER_ROLE.OVERLAY"
-                  :pages="pageMetrics"
-                  :session="session"
-                  :suppress-current-page-updates="currentPageUpdatesSuppressed"
-                  :freeze-render-window-eviction="renderWindowEvictionFrozen"
-                  :show-overlay="true"
-                  :overlay-page-data="translatedPageData"
-                  :handle-navigation-target="handleNavigationTarget"
-                  :scroll-container="translatedScrollContainer"
-                />
-              </template>
-            </PdfViewerLayout>
-          </template>
-        </PdfDropzone>
-      </div>
-    </main>
+                <template #translated>
+                  <PdfTranslatedPane
+                    v-if="showTranslatedTextPane"
+                    ref="pdfTranslatedPaneRef"
+                    :translated-page-data="translatedPageData"
+                    :highlighted-block-id="highlightedBlockId"
+                    :page-metrics="pageMetrics"
+                    :layout-mode="layoutMode"
+                    :scroll-container="translatedScrollContainer"
+                    :suppress-current-page-updates="currentPageUpdatesSuppressed"
+                    @current-page-change="handleTranslatedPaneCurrentPageChange"
+                  />
+                  <PdfViewer
+                    v-if="showTranslatedPdfPane"
+                    :viewer-role="VIEWER_ROLE.OVERLAY"
+                    :pages="pageMetrics"
+                    :session="session"
+                    :suppress-current-page-updates="currentPageUpdatesSuppressed"
+                    :freeze-render-window-eviction="renderWindowEvictionFrozen"
+                    :show-overlay="true"
+                    :overlay-page-data="translatedPageData"
+                    :handle-navigation-target="handleNavigationTarget"
+                    :scroll-container="translatedScrollContainer"
+                  />
+                </template>
+              </PdfViewerLayout>
+            </template>
+          </PdfDropzone>
+        </div>
+      </main>
+    </section>
 
     <PdfWindowsHost :pdf-fingerprint="pdfFingerprint" />
   </div>
