@@ -400,6 +400,33 @@ describe('PdfApp', () => {
     expect(wrapper.text()).toContain(bannerState.error || bannerState.exportError || bannerState.ocrError)
   })
 
+  it('dismisses persistent error banner without mutating app state', async () => {
+    createMocks({
+      bannerState: {
+        error: 'Failed to open the PDF file.'
+      }
+    })
+
+    const wrapper = mount(PdfApp)
+    await flushPromises()
+    await flushPromises()
+
+    expect(wrapper.find('.pdf-status-banner').exists()).toBe(true)
+
+    await wrapper.find('.pdf-status-banner__dismiss').trigger('click')
+    await flushPromises()
+
+    expect(wrapper.find('.pdf-status-banner').exists()).toBe(false)
+    expect(mockViewerController.error.value).toBe('Failed to open the PDF file.')
+
+    mockViewerController.error.value = 'A different PDF error.'
+    await flushPromises()
+    await flushPromises()
+
+    expect(wrapper.find('.pdf-status-banner').exists()).toBe(true)
+    expect(wrapper.text()).toContain('A different PDF error.')
+  })
+
   it('does not show export success when export fails', async () => {
     createMocks()
     mockPdfExport.exportTxt.mockImplementation(async () => {

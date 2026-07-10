@@ -36,15 +36,17 @@
     <section class="pdf-app__viewport">
       <div class="pdf-app__status-layer">
         <div
-          v-if="pdfStatusBanner"
+          v-if="isPdfStatusBannerVisible"
           class="pdf-app__status-row"
         >
           <PdfStatusBanner
-            :visible="Boolean(pdfStatusBanner)"
+            :visible="isPdfStatusBannerVisible"
             :variant="pdfStatusBanner.variant || 'info'"
             :title="pdfStatusBanner.title || ''"
             :message="pdfStatusBanner.message || ''"
             :detail="pdfStatusBanner.detail || ''"
+            :dismissible="isPdfStatusBannerDismissible"
+            @dismiss="dismissPdfStatusBanner"
           />
         </div>
 
@@ -179,7 +181,7 @@ import { usePdfOcr } from './composables/usePdfOcr.js'
 import { usePdfNavigation } from './composables/usePdfNavigation.js'
 import { usePdfKeyboard } from './composables/usePdfKeyboard.js'
 import { createPdfTransitionController } from './composables/createPdfTransitionController.js'
-import { buildPdfStatusBannerState } from './utils/pdfStatusBanner.js'
+import { createPdfStatusBannerController } from './utils/pdfStatusBanner.js'
 import './PdfApp.scss'
 
 const {
@@ -250,6 +252,8 @@ const {
 const exportSuccess = ref(null)
 const exportSuccessTimer = ref(null)
 const EXPORT_SUCCESS_DURATION_MS = 2200
+const dismissedPdfStatusBannerKey = ref('')
+const pdfStatusBannerController = createPdfStatusBannerController()
 
 const {
   isBlockTargetingActive,
@@ -326,7 +330,7 @@ function handleOutlineNavigate(dest) {
   navigateToDestination(dest)
 }
 
-const pdfStatusBanner = computed(() => buildPdfStatusBannerState({
+const pdfStatusBanner = computed(() => pdfStatusBannerController.build({
   error: error.value,
   exportError: exportError.value,
   ocrError: ocrError.value,
@@ -335,6 +339,13 @@ const pdfStatusBanner = computed(() => buildPdfStatusBannerState({
   exportSuccess: exportSuccess.value,
   isPartialExport: isPartialExport.value
 }))
+
+const isPdfStatusBannerDismissible = computed(() => pdfStatusBanner.value?.variant === 'error')
+const isPdfStatusBannerVisible = computed(() => {
+  if (!pdfStatusBanner.value) return false
+  if (!isPdfStatusBannerDismissible.value) return true
+  return dismissedPdfStatusBannerKey.value !== pdfStatusBanner.value.id
+})
 
 watch(hasDocument, (has) => {
   if (has) {
@@ -416,6 +427,11 @@ async function handleExportHtml() {
 
 function handleClearCache() {
   void clearDocumentCache()
+}
+
+function dismissPdfStatusBanner() {
+  if (!pdfStatusBanner.value?.id || !isPdfStatusBannerDismissible.value) return
+  dismissedPdfStatusBannerKey.value = pdfStatusBanner.value.id
 }
 
 function clearExportSuccess() {

@@ -1,13 +1,20 @@
-import { describe, expect, it } from 'vitest'
-import { buildPdfStatusBannerState } from './pdfStatusBanner.js'
+import { beforeEach, describe, expect, it } from 'vitest'
+import { createPdfStatusBannerController } from './pdfStatusBanner.js'
 
 describe('buildPdfStatusBannerState', () => {
+  let controller
+
+  beforeEach(() => {
+    controller = createPdfStatusBannerController()
+  })
+
   it('returns null when idle', () => {
-    expect(buildPdfStatusBannerState()).toBeNull()
+    expect(controller.build()).toBeNull()
   })
 
   it('builds a loading banner', () => {
-    expect(buildPdfStatusBannerState({ isLoading: true })).toEqual({
+    expect(controller.build({ isLoading: true })).toEqual({
+      id: 'opening',
       visible: true,
       variant: 'info',
       title: 'Opening PDF',
@@ -17,7 +24,8 @@ describe('buildPdfStatusBannerState', () => {
   })
 
   it('builds a translating banner', () => {
-    expect(buildPdfStatusBannerState({ isTranslating: true })).toEqual({
+    expect(controller.build({ isTranslating: true })).toEqual({
+      id: 'translating',
       visible: true,
       variant: 'info',
       title: 'Translating visible pages',
@@ -27,7 +35,8 @@ describe('buildPdfStatusBannerState', () => {
   })
 
   it('builds a cache-restore banner', () => {
-    expect(buildPdfStatusBannerState({ restoredTranslationCount: 2 })).toEqual({
+    expect(controller.build({ restoredTranslationCount: 2 })).toEqual({
+      id: 'cache-restored',
       visible: true,
       variant: 'success',
       title: 'Restored from cache',
@@ -37,7 +46,8 @@ describe('buildPdfStatusBannerState', () => {
   })
 
   it('builds a partial export warning banner', () => {
-    expect(buildPdfStatusBannerState({ isPartialExport: true })).toEqual({
+    expect(controller.build({ isPartialExport: true })).toEqual({
+      id: 'partial-export',
       visible: true,
       variant: 'warning',
       title: 'Partial translation',
@@ -47,7 +57,7 @@ describe('buildPdfStatusBannerState', () => {
   })
 
   it('builds an export success banner', () => {
-    expect(buildPdfStatusBannerState({
+    expect(controller.build({
       exportSuccess: {
         variant: 'success',
         title: 'TXT export ready',
@@ -55,6 +65,7 @@ describe('buildPdfStatusBannerState', () => {
         detail: ''
       }
     })).toEqual({
+      id: 'export-success',
       visible: true,
       variant: 'success',
       title: 'TXT export ready',
@@ -64,7 +75,7 @@ describe('buildPdfStatusBannerState', () => {
   })
 
   it('keeps partial export above success', () => {
-    expect(buildPdfStatusBannerState({
+    expect(controller.build({
       isPartialExport: true,
       exportSuccess: {
         variant: 'success',
@@ -73,6 +84,7 @@ describe('buildPdfStatusBannerState', () => {
         detail: ''
       }
     })).toEqual({
+      id: 'partial-export',
       visible: true,
       variant: 'warning',
       title: 'Partial translation',
@@ -82,7 +94,7 @@ describe('buildPdfStatusBannerState', () => {
   })
 
   it('prefers error state over other states', () => {
-    expect(buildPdfStatusBannerState({
+    expect(controller.build({
       error: 'Failed to open the PDF file.',
       isLoading: true,
       restoredTranslationCount: 3,
@@ -93,11 +105,39 @@ describe('buildPdfStatusBannerState', () => {
         detail: ''
       }
     })).toEqual({
+      id: 'error:1',
       visible: true,
       variant: 'error',
       title: 'PDF error',
       message: 'Failed to open the PDF file.',
       detail: ''
     })
+  })
+
+  it('keeps same error id until source changes or clears', () => {
+    const first = controller.build({ error: 'Failed again.' })
+    const second = controller.build({ error: 'Failed again.' })
+    const third = controller.build({ error: 'Different error.' })
+
+    expect(first).toMatchObject({
+      id: 'error:1',
+      variant: 'error',
+      title: 'PDF error',
+      message: 'Failed again.'
+    })
+
+    expect(second.id).toBe(first.id)
+    expect(third.id).toBe('error:2')
+  })
+
+  it('keeps controllers independent', () => {
+    const firstController = createPdfStatusBannerController()
+    const secondController = createPdfStatusBannerController()
+
+    const first = firstController.build({ error: 'Boom' })
+    const second = secondController.build({ error: 'Boom' })
+
+    expect(first.id).toBe('error:1')
+    expect(second.id).toBe('error:1')
   })
 })

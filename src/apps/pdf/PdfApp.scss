@@ -47,11 +47,11 @@
 .pdf-app__status-row {
   width: 100%;
   display: flex;
-  pointer-events: none;
+  pointer-events: auto;
 }
 
 .pdf-app__status-row .pdf-status-banner {
-  pointer-events: none;
+  pointer-events: auto;
 }
 
 .pdf-app__status-layer .pdf-ocr-progress {

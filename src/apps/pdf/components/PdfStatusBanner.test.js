@@ -20,6 +20,21 @@ describe('PdfStatusBanner', () => {
     expect(wrapper.classes()).toContain('pdf-status-banner--warning')
   })
 
+  it('shows dismiss button when dismissible', async () => {
+    const wrapper = mount(PdfStatusBanner, {
+      props: {
+        visible: true,
+        dismissible: true,
+        variant: 'error',
+        title: 'PDF error',
+        message: 'Failed to open the PDF file.'
+      }
+    })
+
+    await wrapper.find('.pdf-status-banner__dismiss').trigger('click')
+    expect(wrapper.emitted('dismiss')).toBeTruthy()
+  })
+
   it('hides itself when not visible', () => {
     const wrapper = mount(PdfStatusBanner, {
       props: {
