@@ -98,13 +98,16 @@ export function createPdfTransitionController({
   }
 
   function clearPendingPdfBackedAnchor(reason = '', transitionSeq = null) {
-    if (!pendingPdfBackedAnchor) return
+    if (!pendingPdfBackedAnchor) {
+      return { cleared: false, releasedCurrentPageSuppression: false }
+    }
 
     if (transitionSeq != null && pendingPdfBackedAnchor.transitionSeq !== transitionSeq) {
-      return
+      return { cleared: false, releasedCurrentPageSuppression: false }
     }
 
     const { transitionSeq: pendingTransitionSeq, anchor, ownsCurrentPageSuppression } = pendingPdfBackedAnchor
+    let releasedCurrentPageSuppression = false
     if (ownsCurrentPageSuppression) {
       endCurrentPageSuppression({
         owner: 'pending-pdf-anchor',
@@ -112,8 +115,10 @@ export function createPdfTransitionController({
         pageNumber: anchor?.pageNumber ?? null,
         reason
       })
+      releasedCurrentPageSuppression = true
     }
     pendingPdfBackedAnchor = null
+    return { cleared: true, releasedCurrentPageSuppression }
   }
 
   const {
@@ -340,7 +345,10 @@ export function createPdfTransitionController({
           nextWidth: viewerLayout.value.width
         }))
         if (!isSideBySide.value && !showTranslatedPdfPane.value) {
-          clearPendingPdfBackedAnchor('provisional-restore-no-layout-change', contentTransitionSeq)
+          const clearResult = clearPendingPdfBackedAnchor('provisional-restore-no-layout-change', contentTransitionSeq)
+          if (clearResult.releasedCurrentPageSuppression) {
+            refreshCurrentPage()
+          }
         }
       }
 
@@ -381,14 +389,24 @@ export function createPdfTransitionController({
 
     beginControlledTransition()
     pendingPdfBackedAnchor = isPdfAnchor(anchor)
-      ? { transitionSeq: contentTransitionSeq, anchor, ownsCurrentPageSuppression: false }
+      ? { transitionSeq: contentTransitionSeq, anchor, ownsCurrentPageSuppression: true }
       : null
     acquireRenderWindowFreeze()
-    beginCurrentPageSuppression({
-      owner: 'layout-mode',
-      transitionSeq: contentTransitionSeq,
-      reason: 'layout-mode-transition'
-    })
+    const ownsPendingPdfSuppression = !!pendingPdfBackedAnchor
+    if (ownsPendingPdfSuppression) {
+      beginCurrentPageSuppression({
+        owner: 'pending-pdf-anchor',
+        transitionSeq: contentTransitionSeq,
+        pageNumber: anchor?.pageNumber ?? null,
+        reason: 'layout-mode-pending-anchor'
+      })
+    } else {
+      beginCurrentPageSuppression({
+        owner: 'layout-mode',
+        transitionSeq: contentTransitionSeq,
+        reason: 'layout-mode-transition'
+      })
+    }
     try {
       setLayoutMode(mode)
 
@@ -437,12 +455,14 @@ export function createPdfTransitionController({
           layoutMode: mode
         }))
       } finally {
-        endCurrentPageSuppression({
-          owner: 'layout-mode',
-          transitionSeq: contentTransitionSeq,
-          reason: 'layout-mode-transition'
-        })
-        refreshCurrentPage()
+        if (!ownsPendingPdfSuppression) {
+          endCurrentPageSuppression({
+            owner: 'layout-mode',
+            transitionSeq: contentTransitionSeq,
+            reason: 'layout-mode-transition'
+          })
+          refreshCurrentPage()
+        }
       }
     }
   }
@@ -601,7 +621,10 @@ export function createPdfTransitionController({
               currentWidth: currentLayout.width,
               nextWidth: nextLayout.width
             }))
-            clearPendingPdfBackedAnchor('authoritative-layout-consume', contentSeqAtStart)
+            const clearResult = clearPendingPdfBackedAnchor('authoritative-layout-consume', contentSeqAtStart)
+            if (clearResult.releasedCurrentPageSuppression) {
+              refreshCurrentPage()
+            }
             console.log('[LAYOUT-DIAG][layout-race]', JSON.stringify({
               action: 'restored',
               layoutSeq,
