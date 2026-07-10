@@ -693,7 +693,7 @@ describe('PdfApp', () => {
       await flushPromises()
 
       expect(mockViewerController.recomputeLayout).toHaveBeenCalled()
-      expect(mockPdfViewport.convertToPdfPoint).toHaveBeenCalledWith(150, -64)
+      expect(mockPdfViewport.convertToPdfPoint).not.toHaveBeenCalled()
       expect(mockLayoutSyncFromPane).toHaveBeenCalledTimes(1)
       expect(mockLayoutSyncFromPane).toHaveBeenLastCalledWith('original')
       expect(originalPane.scrollTop).toBe(760)

@@ -213,4 +213,32 @@ describe('PdfTranslatedPane', () => {
 
     wrapper.unmount()
   })
+
+  it('suppresses explicit translated current-page refresh while current-page updates are suppressed', async () => {
+    const wrapper = mount(PdfTranslatedPane, {
+      props: {
+        suppressCurrentPageUpdates: true,
+        translatedPageData: [
+          { pageNumber: 1, width: 100, height: 200, blocks: [{ id: 'b1', text: 'Page 1 block', translationState: { status: 'idle' } }] }
+        ]
+      },
+      attachTo: document.body
+    })
+
+    wrapper.element.parentElement.getBoundingClientRect = () => buildRect(0, 500, 300)
+    await wrapper.vm.$nextTick()
+
+    const page = wrapper.find('.pdf-translated-page')
+    page.element.getBoundingClientRect = () => buildRect(10, 200, 300)
+    wrapper.vm.refreshCurrentPage()
+
+    expect(wrapper.emitted('current-page-change')).toBeFalsy()
+
+    await wrapper.setProps({ suppressCurrentPageUpdates: false })
+    wrapper.vm.refreshCurrentPage()
+
+    expect(wrapper.emitted('current-page-change')?.at(-1)?.[0]).toBe(1)
+
+    wrapper.unmount()
+  })
 })

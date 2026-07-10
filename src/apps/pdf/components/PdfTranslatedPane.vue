@@ -157,7 +157,7 @@ watch(
 )
 
 function emitCurrentPage(force = false) {
-  if (!force && props.suppressCurrentPageUpdates) return
+  if (props.suppressCurrentPageUpdates) return
 
   const container = scrollRoot || props.scrollContainer || rootEl.value?.parentElement || null
   const { scrollTop } = getScrollMetrics(container)

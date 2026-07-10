@@ -310,6 +310,32 @@ describe('PdfViewer', () => {
     wrapper.unmount()
   })
 
+  it('suppresses explicit current-page refresh while current-page updates are suppressed', async () => {
+    pageRectMap.set(1, buildRect(10, 100, 300))
+
+    const wrapper = mount(PdfViewer, {
+      props: {
+        pages: [{ pageNumber: 1, width: 100, height: 100, scale: 1 }],
+        session: createSession(),
+        suppressCurrentPageUpdates: true
+      },
+      attachTo: document.body
+    })
+
+    await nextTick()
+    await nextTick()
+    wrapper.vm.refreshCurrentPage()
+
+    expect(wrapper.emitted('current-page-change')).toBeFalsy()
+
+    await wrapper.setProps({ suppressCurrentPageUpdates: false })
+    wrapper.vm.refreshCurrentPage()
+
+    expect(wrapper.emitted('current-page-change')?.at(-1)?.[0]).toBe(1)
+
+    wrapper.unmount()
+  })
+
   it('emits both width and height for layout changes', async () => {
     const session = {
       updateVisiblePages: vi.fn(),

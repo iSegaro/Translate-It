@@ -25,7 +25,7 @@ export function usePdfCurrentPage({
 
   function emitCurrentPageFromResolver(force = false, triggerType = null) {
     if (!isOriginalRole.value) return
-    if (!force && suppressCurrentPageUpdates.value) return
+    if (suppressCurrentPageUpdates.value) return
 
     const container = getContainer() || null
     if (!container) return
