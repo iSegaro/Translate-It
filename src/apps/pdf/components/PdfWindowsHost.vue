@@ -18,7 +18,21 @@
   </section>
 
   <section
-    v-if="isVisible"
+    v-if="isVisible && windowPhase === 'loading'"
+    class="pdf-windows-host pdf-windows-host--loading"
+    :style="loadingWindowStyle"
+    data-translate-ui="true"
+    data-testid="pdf-windows-host-loading"
+    @click.stop
+  >
+    <LoadingSpinner
+      size="sm"
+      class="pdf-windows-host__loading-spinner"
+    />
+  </section>
+
+  <section
+    v-if="isVisible && windowPhase === 'ready'"
     ref="hostRef"
     class="pdf-windows-host"
     :class="{
@@ -209,6 +223,7 @@
 import { toRef } from 'vue'
 import { useUnifiedI18n } from '@/composables/shared/useUnifiedI18n.js'
 import { usePdfWindowsHost } from '../composables/usePdfWindowsHost.js'
+import LoadingSpinner from '@/components/base/LoadingSpinner.vue'
 import TranslationWindowToolbar from '@/components/shared/TranslationWindowToolbar.vue'
 import TranslationWindowFooter from '@/components/shared/TranslationWindowFooter.vue'
 import TranslationDisplay from '@/components/shared/TranslationDisplay.vue'
@@ -233,6 +248,8 @@ const {
   iconStyle,
   hostRef,
   hostStyle,
+  windowPhase,
+  loadingWindowStyle,
   isVisible,
   selectedText,
   selectedProvider,

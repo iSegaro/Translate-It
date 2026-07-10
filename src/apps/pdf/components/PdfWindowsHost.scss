@@ -27,6 +27,20 @@
   overflow: hidden;
 }
 
+.pdf-windows-host--loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border-radius: 50%;
+  border-color: #555;
+  max-width: none;
+  max-height: none;
+  overflow: visible;
+}
+
 .pdf-windows-host--docked {
   max-width: calc(100vw - 24px);
   max-height: none;

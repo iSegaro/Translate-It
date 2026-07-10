@@ -20,7 +20,7 @@ import { usePdfWindowDrag } from './usePdfWindowDrag.js'
 import { usePdfWindowPlacement } from './usePdfWindowPlacement.js'
 import { AUTO_DETECT_VALUE } from '@/shared/constants/core.js'
 import { getLanguageNameFromCode } from '@/shared/config/languageConstants.js'
-import { buildPdfSelectionIconStyle, getViewportSize } from '@/apps/pdf/utils/pdfWindowGeometry.js'
+import { buildPdfSelectionIconStyle, PDF_WINDOW_LAYOUT, getViewportSize } from '@/apps/pdf/utils/pdfWindowGeometry.js'
 
 const logger = getScopedLogger(LOG_COMPONENTS.PDF, 'usePdfWindowsHost')
 function isPdfSelectionContext(context) {
@@ -123,6 +123,20 @@ export function usePdfWindowsHost(options = {}) {
   const hostStyle = ref({})
   const viewportTick = ref(0)
   const isInternalHostInteraction = ref(false)
+
+  const WINDOW_PHASE = Object.freeze({ LOADING: 'loading', READY: 'ready' })
+  const windowPhase = ref(WINDOW_PHASE.LOADING)
+  const loadingWindowStyle = computed(() => {
+    const pos = selectionPosition.value
+    if (!pos) return { display: 'none' }
+
+    return {
+      position: 'fixed',
+      left: `${pos.x}px`,
+      top: `${pos.y}px`,
+      zIndex: PDF_WINDOW_LAYOUT.Z_INDEX
+    }
+  })
 
   const placement = usePdfWindowPlacement()
   const docking = usePdfWindowDocking({
@@ -328,9 +342,19 @@ export function usePdfWindowsHost(options = {}) {
   }
 
   async function showWindowForSelection(position, { translateImmediately = false, anchorToSelection = false } = {}) {
+    const wasAlreadyVisible = isVisible.value
     hideIconStage()
     clearWindowContent()
     isVisible.value = true
+
+    // Existing windows (docked/pinned re-translation, provider change, etc.)
+    // stay open and update in-place instead of returning to the loading presentation.
+    if (!wasAlreadyVisible) {
+      windowPhase.value = WINDOW_PHASE.LOADING
+    } else {
+      windowPhase.value = WINDOW_PHASE.READY
+    }
+
     if (anchorToSelection) {
       placement.resetManualPosition()
     }
@@ -340,7 +364,11 @@ export function usePdfWindowsHost(options = {}) {
     await scheduleHostStyleRefresh()
 
     if (translateImmediately) {
-      await translateSelection()
+      try {
+        await translateSelection()
+      } finally {
+        windowPhase.value = WINDOW_PHASE.READY
+      }
     }
   }
 
@@ -837,6 +865,8 @@ export function usePdfWindowsHost(options = {}) {
     isPinned: docking.isPinned,
     dockMode: docking.dockMode,
     dockedWidth: docking.dockedWidth,
+    windowPhase,
+    loadingWindowStyle,
     isDocked: docking.isDocked,
     isResizing: docking.isResizing,
     isDragging: drag.isDragging,
