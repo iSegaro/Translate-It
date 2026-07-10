@@ -3,12 +3,14 @@ import { CONTENT_VIEW } from './usePdfViewerMode.js'
 import { captureScrollAnchor, capturePdfBackedScrollAnchor, isPdfAnchor } from '../utils/pdfScrollAnchor.js'
 import { resolvePdfCanvasSlot } from '../utils/pdfFitPageFootprint.js'
 import { createPdfTransitionAnchor, PDF_SCROLL_OWNER, isPdfBackedContentView } from './createPdfTransitionAnchor.js'
+import { resolveEffectivePaneTopology, doesTopologyChange } from '../utils/pdfViewerTopology.js'
 const ZOOM_PERCENT_OPTIONS = [50, 75, 100, 125, 150, 200]
 
 const DEFAULT_VIEWER_WIDTH = 960
 
 export function createPdfTransitionController({
   contentView,
+  selectedLayoutMode,
   isSideBySide,
   showTranslatedTextPane,
   showTranslatedPdfPane,
@@ -294,9 +296,31 @@ export function createPdfTransitionController({
       translatedScrollTop: translatedScrollContainer.value?.scrollTop ?? 0
     }))
     const previousView = contentView.value
+    const previousTopology = resolveEffectivePaneTopology({
+      contentView: previousView,
+      selectedLayoutMode: selectedLayoutMode?.value
+    })
+    const nextTopology = resolveEffectivePaneTopology({
+      contentView: nextView,
+      selectedLayoutMode: selectedLayoutMode?.value
+    })
+    const geometryChangeExpected = doesTopologyChange(previousTopology, nextTopology)
     const owner = resolveAnchorOwner()
     const isPdfBackedTransition = isPdfBackedPdfTransition(previousView, nextView)
     const ownerTarget = resolveOwnerScrollTarget(owner)
+
+    console.log('[LAYOUT-DIAG][topology]', JSON.stringify({
+      previousContentView: previousTopology.contentView,
+      nextContentView: nextTopology.contentView,
+      previousEffectiveLayout: previousTopology.effectiveLayout,
+      nextEffectiveLayout: nextTopology.effectiveLayout,
+      previousPaneCount: previousTopology.paneCount,
+      nextPaneCount: nextTopology.paneCount,
+      previousPaneRoles: previousTopology.paneRoles,
+      nextPaneRoles: nextTopology.paneRoles,
+      geometryChangeExpected,
+      provisionalClearAllowed: !geometryChangeExpected
+    }))
 
     const pdfSession = unref(session) ?? null
     const rawAnchor = isPdfBackedTransition && capturePdfBackedScrollAnchor(ownerTarget.container, ownerTarget.selector, pdfSession)
@@ -344,7 +368,7 @@ export function createPdfTransitionController({
           currentWidth: viewerLayout.value.width,
           nextWidth: viewerLayout.value.width
         }))
-        if (!isSideBySide.value && !showTranslatedPdfPane.value) {
+        if (!geometryChangeExpected) {
           const clearResult = clearPendingPdfBackedAnchor('provisional-restore-no-layout-change', contentTransitionSeq)
           if (clearResult.releasedCurrentPageSuppression) {
             refreshCurrentPage()

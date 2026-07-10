@@ -301,23 +301,24 @@ usePdfKeyboard({
     zoomMode,
     zoomPercent
   } = createPdfTransitionController({
-  contentView,
-  isSideBySide,
-  showOriginalPane,
-  showTranslatedTextPane,
-  showTranslatedPdfPane,
-  setContentView,
-  setLayoutMode,
-  session,
-  hasDocument,
-  recomputeLayout,
-  currentPage,
-  originalScrollContainer,
-  translatedScrollContainer,
-  pdfViewerRef,
-  pdfTranslatedPaneRef,
-  pdfViewerLayoutRef
-})
+    contentView,
+    selectedLayoutMode,
+    isSideBySide,
+    showOriginalPane,
+    showTranslatedTextPane,
+    showTranslatedPdfPane,
+    setContentView,
+    setLayoutMode,
+    session,
+    hasDocument,
+    recomputeLayout,
+    currentPage,
+    originalScrollContainer,
+    translatedScrollContainer,
+    pdfViewerRef,
+    pdfTranslatedPaneRef,
+    pdfViewerLayoutRef
+  })
 
 const isDragOver = ref(false)
 const isOutlineVisible = ref(false)

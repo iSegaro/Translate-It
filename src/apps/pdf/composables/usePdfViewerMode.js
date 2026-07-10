@@ -1,6 +1,8 @@
 import { computed, ref } from 'vue'
 import { getScopedLogger } from '@/shared/logging/logger.js'
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js'
+import { CONTENT_VIEW, LAYOUT_MODE } from '../constants/pdfViewerConstants.js'
+import { resolveEffectivePaneTopology } from '../utils/pdfViewerTopology.js'
 
 const logger = getScopedLogger(LOG_COMPONENTS.PDF, 'usePdfViewerMode')
 
@@ -20,14 +22,7 @@ const logger = getScopedLogger(LOG_COMPONENTS.PDF, 'usePdfViewerMode')
  * | 'translation'    | Show the translated text content         |
  * | 'translated-pdf' | Show the translated PDF overlay          |
  */
-const CONTENT_VIEW = Object.freeze({
-  ORIGINAL: 'original',
-  TRANSLATION: 'translation',
-  TRANSLATED_PDF: 'translated-pdf'
-})
 export { CONTENT_VIEW }
-
-const VALID_CONTENT_VIEWS = new Set(Object.values(CONTENT_VIEW))
 
 /**
  * @readonly
@@ -40,12 +35,9 @@ const VALID_CONTENT_VIEWS = new Set(Object.values(CONTENT_VIEW))
  * | 'single'        | Single-pane layout (one column)            |
  * | 'side-by-side'  | Two-pane layout (side-by-side columns)     |
  */
-const LAYOUT_MODE = Object.freeze({
-  SINGLE: 'single',
-  SIDE_BY_SIDE: 'side-by-side'
-})
 export { LAYOUT_MODE }
 
+const VALID_CONTENT_VIEWS = new Set(Object.values(CONTENT_VIEW))
 const VALID_LAYOUT_MODES = new Set(Object.values(LAYOUT_MODE))
 
 /**
@@ -99,12 +91,17 @@ export function usePdfViewerMode() {
     return selectedLayoutMode.value
   })
 
+  const effectivePaneTopology = computed(() => resolveEffectivePaneTopology({
+    contentView: contentView.value,
+    selectedLayoutMode: selectedLayoutMode.value
+  }))
+
   const showOriginalPane = computed(() => {
-    return contentView.value !== CONTENT_VIEW.TRANSLATION || layoutMode.value === LAYOUT_MODE.SIDE_BY_SIDE
+    return effectivePaneTopology.value.showOriginalPane
   })
-  const showTranslatedTextPane = computed(() => contentView.value === CONTENT_VIEW.TRANSLATION)
+  const showTranslatedTextPane = computed(() => effectivePaneTopology.value.showTranslatedTextPane)
   const showTranslatedPdfPane = computed(() => {
-    return contentView.value === CONTENT_VIEW.TRANSLATED_PDF && layoutMode.value === LAYOUT_MODE.SIDE_BY_SIDE
+    return effectivePaneTopology.value.showTranslatedPdfPane
   })
   const showOverlayLayer = computed(() => {
     return contentView.value === CONTENT_VIEW.TRANSLATED_PDF && layoutMode.value === LAYOUT_MODE.SINGLE
