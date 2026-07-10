@@ -146,9 +146,7 @@
   font-size: 13px;
   line-height: 1.4;
   color: #e6edf7;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  overflow-wrap: anywhere;
 }
 
 .pdf-outline-item__children {
