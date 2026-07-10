@@ -33,7 +33,7 @@
       @clear-cache="handleClearCache"
     />
 
-    <section class="pdf-app__viewport">
+    <div class="pdf-app__viewport">
       <div class="pdf-app__status-layer">
         <div
           v-if="isPdfStatusBannerVisible"
@@ -155,7 +155,7 @@
           </PdfDropzone>
         </div>
       </main>
-    </section>
+    </div>
 
     <PdfWindowsHost :pdf-fingerprint="pdfFingerprint" />
   </div>
