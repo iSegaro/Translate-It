@@ -406,9 +406,23 @@ export function usePdfViewerController() {
       return false
     }
 
+    console.log('[TRACE]', JSON.stringify({
+      t: Date.now(),
+      site: 'recomputeLayout_begin',
+      width: layoutRequest?.width
+    }))
+
     try {
       const nextState = await pdfDocumentSession.rebuildPageMetrics(layoutRequest)
       applySessionState(nextState)
+
+      console.log('[TRACE]', JSON.stringify({
+        t: Date.now(),
+        site: 'recomputeLayout_end',
+        metricsLen: pageMetrics.value?.length,
+        pageScale: pageScale.value
+      }))
+
       return true
     } catch (layoutError) {
       logger.warn('Failed to recompute PDF layout:', layoutError)

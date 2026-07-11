@@ -57,10 +57,23 @@ function restoreScrollAnchor(anchor, container, pageSelector) {
   const pageOffsetTop = pageRect.top - containerRect.top + container.scrollTop
   const targetScrollTop = pageOffsetTop + pageRect.height * anchor.offsetRatio
 
+  const beforeScrollTop = container.scrollTop
+
   container.scrollTo({
     top: targetScrollTop,
     behavior: 'instant'
   })
+
+  console.log('[TRACE]', JSON.stringify({
+    t: Date.now(),
+    site: 'restoreScrollAnchor',
+    pg: anchor.pageNumber,
+    offRat: anchor.offsetRatio,
+    tgtST: Math.round(targetScrollTop),
+    befST: Math.round(beforeScrollTop),
+    aftST: Math.round(container.scrollTop),
+    cont: container.className?.slice(0, 40)
+  }))
 
   return true
 }
@@ -119,6 +132,14 @@ function restorePdfBackedScrollAnchor(anchor, container, pageSelector, pdfSessio
       top: targetScrollTop,
       behavior: 'instant'
     })
+    console.log('[TRACE]', JSON.stringify({
+      t: Date.now(),
+      site: 'restorePdfFitPage',
+      pg: anchor.pageNumber,
+      tgtST: Math.round(targetScrollTop),
+      aftST: Math.round(container.scrollTop),
+      cont: container.className?.slice(0, 40)
+    }))
     return true
   }
 
@@ -141,6 +162,15 @@ function restorePdfBackedScrollAnchor(anchor, container, pageSelector, pdfSessio
     top: targetScrollTop,
     behavior: 'instant'
   })
+
+  console.log('[TRACE]', JSON.stringify({
+    t: Date.now(),
+    site: 'restorePdfBacked',
+    pg: anchor.pageNumber,
+    tgtST: Math.round(targetScrollTop),
+    aftST: Math.round(container.scrollTop),
+    cont: container.className?.slice(0, 40)
+  }))
 
   return true
 }

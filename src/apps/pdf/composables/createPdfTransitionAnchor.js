@@ -145,7 +145,21 @@ export function createPdfTransitionAnchor({
     const preferredTarget = resolveOwnerScrollTarget(anchor.owner)
     const pdfSession = unref(session) ?? null
 
+    console.log('[TRACE]', JSON.stringify({
+      t: Date.now(),
+      site: 'restoreOwnedScrollAnchor_ENTER',
+      owner: anchor.owner,
+      pg: anchor.pageNumber,
+      offRat: anchor.offsetRatio,
+      isPdf: isPdfAnchor(anchor)
+    }))
+
     if (isPdfAnchor(anchor) && restorePdfBackedScrollAnchor(anchor, preferredTarget.container, preferredTarget.selector, pdfSession, { zoomMode: zoomMode.value })) {
+      console.log('[TRACE]', JSON.stringify({
+        t: Date.now(),
+        site: 'restoreOwnedScrollAnchor_EXIT_pdfBacked',
+        owner: preferredTarget.owner
+      }))
       return preferredTarget.owner
     }
 
@@ -156,7 +170,14 @@ export function createPdfTransitionAnchor({
       ? preferredTarget.owner
       : null
 
-    if (restoredOwner) return restoredOwner
+    if (restoredOwner) {
+      console.log('[TRACE]', JSON.stringify({
+        t: Date.now(),
+        site: 'restoreOwnedScrollAnchor_EXIT_preferred',
+        owner: restoredOwner
+      }))
+      return restoredOwner
+    }
 
     const fallbackOwner = anchor.owner === PDF_SCROLL_OWNER.TRANSLATED
       ? PDF_SCROLL_OWNER.ORIGINAL
@@ -166,6 +187,13 @@ export function createPdfTransitionAnchor({
       ? anchor
       : { ...anchor, owner: fallbackTarget.owner, offsetRatio: 0 }
 
+    console.log('[TRACE]', JSON.stringify({
+      t: Date.now(),
+      site: 'restoreOwnedScrollAnchor_FALLBACK',
+      fallbackOwner,
+      fallbackPg: fallbackAnchor?.pageNumber
+    }))
+
     const fallbackRestored = restoreScrollAnchor(fallbackAnchor, fallbackTarget.container, fallbackTarget.selector)
     if (fallbackRestored) {
       return fallbackTarget.owner
@@ -174,12 +202,25 @@ export function createPdfTransitionAnchor({
   }
 
   function restoreControlledTransitionAnchors({ originalAnchor, translatedAnchor }) {
+    console.log('[TRACE]', JSON.stringify({
+      t: Date.now(),
+      site: 'restoreControlledAnchors_ENTER',
+      origPg: originalAnchor?.pageNumber,
+      transPg: translatedAnchor?.pageNumber
+    }))
+
     const restoredOriginalOwner = restoreOwnedScrollAnchor(originalAnchor)
 
     if (translatedAnchor) {
       const translatedTarget = resolveLayoutTransitionTarget(PDF_SCROLL_OWNER.TRANSLATED)
       restoreScrollAnchor(translatedAnchor, translatedTarget.container, translatedTarget.selector)
     }
+
+    console.log('[TRACE]', JSON.stringify({
+      t: Date.now(),
+      site: 'restoreControlledAnchors_EXIT',
+      restoredOwner: restoredOriginalOwner
+    }))
 
     return restoredOriginalOwner
   }

@@ -137,6 +137,12 @@ export function createPdfTransitionController({
     contentTransitionSeq += 1
     suppressedLayoutRestoreSeq = contentTransitionSeq
     clearControlledTransitionSuppressionTimer()
+    console.log('[TRACE]', JSON.stringify({
+      t: Date.now(),
+      site: 'beginControlledTransition',
+      seq: contentTransitionSeq,
+      suppressedSeq: suppressedLayoutRestoreSeq
+    }))
   }
 
   function clearControlledTransitionSuppressionTimer() {
@@ -176,11 +182,20 @@ export function createPdfTransitionController({
       suppressedLayoutRestoreFrameId = null
       if (suppressedLayoutRestoreSeq === seq) {
         suppressedLayoutRestoreSeq = 0
+        console.log('[TRACE]', JSON.stringify({
+          t: Date.now(),
+          site: 'rAF_clearSuppressedRestoreSeq',
+          seq
+        }))
       }
     })
   }
 
   function beginScrollSyncSuppression() {
+    console.log('[TRACE]', JSON.stringify({
+      t: Date.now(),
+      site: 'beginScrollSyncSuppression'
+    }))
     pdfViewerLayoutRef.value?.setScrollSyncSuppressed?.(true)
     suppressScrollSync.value = true
     clearScrollSyncSuppressionTimer()
@@ -204,6 +219,10 @@ export function createPdfTransitionController({
       scrollSyncSuppressionFrameId = null
       pdfViewerLayoutRef.value?.setScrollSyncSuppressed?.(false)
       suppressScrollSync.value = false
+      console.log('[TRACE]', JSON.stringify({
+        t: Date.now(),
+        site: 'rAF_clearScrollSyncSuppression'
+      }))
     })
   }
 
@@ -280,6 +299,19 @@ export function createPdfTransitionController({
       anchor = normalizeTranslatedAnchor(anchor, owner, previousView, nextView)
     }
 
+    console.log('[TRACE]', JSON.stringify({
+      t: Date.now(),
+      site: 'handleContentViewChange',
+      ev: 'anchor-captured',
+      prev: previousView,
+      next: nextView,
+      geoChange: geometryChangeExpected,
+      owner,
+      anchorPg: anchor?.pageNumber,
+      anchorOff: anchor?.offsetRatio,
+      isPdfBacked: isPdfBackedTransition
+    }))
+
     beginControlledTransition()
     pendingPdfBackedAnchor = isPdfBackedTransition && isPdfAnchor(anchor)
       ? { transitionSeq: contentTransitionSeq, anchor, ownsCurrentPageSuppression: true }
@@ -298,7 +330,23 @@ export function createPdfTransitionController({
     try {
       await nextTick()
 
+      console.log('[TRACE]', JSON.stringify({
+        t: Date.now(),
+        site: 'handleContentViewChange',
+        ev: 'post-nextTick',
+        origST: originalScrollContainer.value?.scrollTop
+      }))
+
       const restoredOwner = restoreOwnedScrollAnchor(anchor)
+      console.log('[TRACE]', JSON.stringify({
+        t: Date.now(),
+        site: 'handleContentViewChange',
+        ev: 'post-restore',
+        restoredOwner,
+        origST: originalScrollContainer.value?.scrollTop,
+        isSideBySide: isSideBySide.value
+      }))
+
       if (restoredOwner && isPdfBackedTransition && isPdfAnchor(anchor)) {
         if (!geometryChangeExpected) {
           const clearResult = clearPendingPdfBackedAnchor('provisional-restore-no-layout-change', contentTransitionSeq)
@@ -409,6 +457,18 @@ export function createPdfTransitionController({
       : null
     const suppressRestoreForControlledTransition = suppressedLayoutRestoreSeq === contentSeqAtStart
     const pendingPdfAnchor = pendingPdfAnchorForTransition
+
+    console.log('[TRACE]', JSON.stringify({
+      t: Date.now(),
+      site: 'handleLayoutChange',
+      ev: 'enter',
+      layout: nextLayout,
+      contentSeq: contentSeqAtStart,
+      suppressRestore: suppressRestoreForControlledTransition,
+      pendingPdf: !!pendingPdfAnchor,
+      origST: originalScrollContainer.value?.scrollTop
+    }))
+
     const shouldFreezeRenderWindow = !!pendingPdfAnchor || (
       contentSeqAtStart > 0 && suppressedLayoutRestoreSeq === contentSeqAtStart
     )
@@ -426,13 +486,43 @@ export function createPdfTransitionController({
         await recomputeLayout(buildLayoutRequest(nextLayout))
         await nextTick()
 
+        console.log('[TRACE]', JSON.stringify({
+          t: Date.now(),
+          site: 'handleLayoutChange',
+          ev: 'post-recompute',
+          origST: originalScrollContainer.value?.scrollTop,
+          origScrollH: originalScrollContainer.value?.scrollHeight
+        }))
+
         if (contentSeqAtStart !== contentTransitionSeq) {
+          console.log('[TRACE]', JSON.stringify({
+            t: Date.now(),
+            site: 'handleLayoutChange',
+            ev: 'early-return-stale-seq',
+            expected: contentSeqAtStart,
+            actual: contentTransitionSeq
+          }))
           return
         }
         if (layoutSeq !== layoutChangeSeq) {
+          console.log('[TRACE]', JSON.stringify({
+            t: Date.now(),
+            site: 'handleLayoutChange',
+            ev: 'early-return-stale-layout-seq',
+            expected: layoutSeq,
+            actual: layoutChangeSeq
+          }))
           return
         }
         if (pendingPdfAnchor) {
+          console.log('[TRACE]', JSON.stringify({
+            t: Date.now(),
+            site: 'handleLayoutChange',
+            ev: 'restoring-pendingPdfAnchor',
+            pg: pendingPdfAnchor.pageNumber,
+            capturedOrigPg: capturedAnchors?.originalAnchor?.pageNumber,
+            capturedTransPg: capturedAnchors?.translatedAnchor?.pageNumber
+          }))
           try {
             restoreControlledTransitionAnchors({
               originalAnchor: pendingPdfAnchor,
@@ -447,17 +537,48 @@ export function createPdfTransitionController({
           return
         }
         if (suppressRestoreForControlledTransition || suppressedLayoutRestoreSeq === contentSeqAtStart) {
+          console.log('[TRACE]', JSON.stringify({
+            t: Date.now(),
+            site: 'handleLayoutChange',
+            ev: 'early-return-suppressed',
+            suppress: suppressRestoreForControlledTransition,
+            suppressedSeq: suppressedLayoutRestoreSeq,
+            contentSeq: contentSeqAtStart,
+            capturedOrigPg: capturedAnchors?.originalAnchor?.pageNumber,
+            capturedTransPg: capturedAnchors?.translatedAnchor?.pageNumber
+          }))
           return
         }
 
+        console.log('[TRACE]', JSON.stringify({
+          t: Date.now(),
+          site: 'handleLayoutChange',
+          ev: 'restoring-captured-anchors',
+          origPg: capturedAnchors?.originalAnchor?.pageNumber,
+          transPg: capturedAnchors?.translatedAnchor?.pageNumber
+        }))
         restoreControlledTransitionAnchors(capturedAnchors)
       }
     } finally {
+      console.log('[TRACE]', JSON.stringify({
+        t: Date.now(),
+        site: 'handleLayoutChange',
+        ev: 'finally',
+        shouldFreeze: shouldFreezeRenderWindow,
+        origST: originalScrollContainer.value?.scrollTop
+      }))
       if (shouldFreezeRenderWindow) {
         releaseRenderWindowFreeze()
       }
       scheduleScrollSyncSuppressionClear()
     }
+
+    console.log('[TRACE]', JSON.stringify({
+      t: Date.now(),
+      site: 'handleLayoutChange',
+      ev: 'exit',
+      origST: originalScrollContainer.value?.scrollTop
+    }))
   }
 
   async function runControlledZoomTransition(resolvedOriginalAnchor, finalTranslatedAnchor) {
