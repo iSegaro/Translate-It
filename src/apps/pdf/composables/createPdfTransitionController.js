@@ -346,6 +346,7 @@ export function createPdfTransitionController({
     }
 
     let renderWindowFreezeAcquired = false
+    let primaryErrorDuringCleanup = null
 
     try {
       acquireRenderWindowFreeze()
@@ -386,6 +387,7 @@ export function createPdfTransitionController({
         syncFromOwner(restoredOwner || anchor?.owner || owner)
       }
     } catch (error) {
+      primaryErrorDuringCleanup = error
       const clearResult = clearPendingTransitionRestore('layout-mode-error', contentTransitionSeq)
       if (clearResult.releasedCurrentPageSuppression) {
         refreshCurrentPage()
@@ -396,7 +398,15 @@ export function createPdfTransitionController({
         if (renderWindowFreezeAcquired) {
           releaseRenderWindowFreeze()
         }
-        await refreshRenderWindowAfterLayoutTransition()
+        try {
+          await refreshRenderWindowAfterLayoutTransition()
+        } catch (cleanupError) {
+          if (primaryErrorDuringCleanup) {
+            console.warn('[PdfTransitionController] Cleanup error suppressed:', cleanupError)
+          } else {
+            throw cleanupError
+          }
+        }
       } finally {
         if (!layoutPdfAnchor) {
           endCurrentPageSuppression({
