@@ -9,46 +9,11 @@ export function usePdfScrollObservation({
 } = {}) {
   const scrollRoot = ref(null)
   let intersectionObserver = null
-  let _scrollEventId = 0
-
-  function intersectionCallback(entries) {
-    const entryDetails = entries.map((entry) => ({
-      pageNumber: Number(entry.target?.dataset?.pageNumber ?? 0),
-      isIntersecting: entry.isIntersecting,
-      intersectionRatio: Math.round(entry.intersectionRatio * 100) / 100,
-      boundingClientRect: entry.boundingClientRect ? {
-        top: Math.round(entry.boundingClientRect.top),
-        bottom: Math.round(entry.boundingClientRect.bottom),
-        height: Math.round(entry.boundingClientRect.height)
-      } : null
-    }))
-    _scrollEventId += 1
-    console.log('[LAYOUT-DIAG][event-chain]', JSON.stringify({
-      source: 'IntersectionObserver',
-      eventId: _scrollEventId,
-      entries: entryDetails,
-      rootScrollTop: scrollRoot.value?.scrollTop ?? 0,
-      rootScrollHeight: scrollRoot.value?.scrollHeight ?? 0
-    }))
-    onScroll()
-  }
-
-  function scrollCallback() {
-    _scrollEventId += 1
-    console.log('[LAYOUT-DIAG][event-chain]', JSON.stringify({
-      source: 'scroll',
-      eventId: _scrollEventId,
-      scrollTop: scrollRoot.value?.scrollTop ?? 0,
-      scrollHeight: scrollRoot.value?.scrollHeight ?? 0,
-      clientHeight: scrollRoot.value?.clientHeight ?? 0
-    }))
-    onScroll()
-  }
 
   function disconnectScrollObservation() {
     intersectionObserver?.disconnect()
     if (scrollRoot.value) {
-      scrollRoot.value.removeEventListener('scroll', scrollCallback)
+      scrollRoot.value.removeEventListener('scroll', onScroll)
       scrollRoot.value = null
     }
     intersectionObserver = null
@@ -84,10 +49,12 @@ export function usePdfScrollObservation({
     scrollRoot.value = scrollContainer.value || null
 
     if (scrollRoot.value) {
-      scrollRoot.value.addEventListener('scroll', scrollCallback, { passive: true })
+      scrollRoot.value.addEventListener('scroll', onScroll, { passive: true })
     }
 
-    intersectionObserver = new IntersectionObserver(intersectionCallback, {
+    intersectionObserver = new IntersectionObserver(() => {
+      onScroll()
+    }, {
       root: scrollRoot.value,
       threshold: 0
     })

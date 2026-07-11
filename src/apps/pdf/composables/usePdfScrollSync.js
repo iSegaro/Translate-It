@@ -123,8 +123,6 @@ export function usePdfScrollSync(originalPaneRef, translatedPaneRef, enabledRef)
   }
 
   function runSync(sourcePane, targetPane) {
-    const sourceBefore = sourcePane.scrollTop
-    const targetBefore = targetPane.scrollTop
     const result = syncScrollViaGeometry({
       sourceScrollTop: Number(sourcePane.scrollTop || 0),
       sourceContainer: sourcePane,
@@ -146,34 +144,12 @@ export function usePdfScrollSync(originalPaneRef, translatedPaneRef, enabledRef)
 
       suppressSource = targetPane
       targetPane.scrollTop = nextScrollTop
-      console.log('[LAYOUT-DIAG][sync]', JSON.stringify({
-        syncMode: 'geometry',
-        sourceScrollTop: sourceBefore,
-        targetBefore,
-        targetAfter: targetPane.scrollTop,
-        suppressionActive: isScrollSyncSuppressed.value,
-        pageNumber: result.pageNumber,
-        pageRatio: result.pageRatio ?? null,
-        sourceGeometryHeight: result.sourceGeometry?.height ?? null,
-        targetScrollTopComputed: result.targetScrollTop
-      }))
       return
     }
 
-    const ratio = sourcePane.scrollHeight > sourcePane.clientHeight
-      ? Number(sourcePane.scrollTop || 0) / (sourcePane.scrollHeight - sourcePane.clientHeight)
-      : 0
     syncByRatio(sourcePane, targetPane, (pane) => {
       suppressSource = pane
     })
-    console.log('[LAYOUT-DIAG][sync]', JSON.stringify({
-      syncMode: 'ratio-fallback',
-      sourceScrollTop: sourceBefore,
-      targetBefore,
-      targetAfter: targetPane.scrollTop,
-      suppressionActive: isScrollSyncSuppressed.value,
-      ratio
-    }))
   }
 
   function setupListeners() {

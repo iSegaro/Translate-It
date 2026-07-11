@@ -374,52 +374,10 @@ async function handleFileSelected(file) {
   }
 }
 
-let _currentPageEmitSeq = 0
-
 function handleCurrentPageChange(pageNumber) {
-  _currentPageEmitSeq += 1
-  if (isNavigating.value) {
-    console.log('[LAYOUT-DIAG][event-chain]', JSON.stringify({
-      source: 'handleCurrentPageChange',
-      seq: _currentPageEmitSeq,
-      reason: 'skipped-navigating',
-      pageNumber,
-      previousEmittedPage: currentPage.value,
-      isNavigating: isNavigating.value
-    }))
-    return
-  }
-  if (!Number.isFinite(Number(pageNumber))) {
-    console.log('[LAYOUT-DIAG][event-chain]', JSON.stringify({
-      source: 'handleCurrentPageChange',
-      seq: _currentPageEmitSeq,
-      reason: 'skipped-invalid',
-      pageNumber,
-      previousEmittedPage: currentPage.value,
-      isNavigating: isNavigating.value
-    }))
-    return
-  }
-  const previousPage = currentPage.value
+  if (isNavigating.value) return
+  if (!Number.isFinite(Number(pageNumber))) return
   currentPage.value = Number(pageNumber) || 0
-  console.log('[LAYOUT-DIAG][current-page]', JSON.stringify({
-    previousPage,
-    newPage: currentPage.value,
-    reason: 'scroll-observer event',
-    eventSource: 'PdfViewer@current-page-change',
-    isNavigating: isNavigating.value
-  }))
-  console.log('[LAYOUT-DIAG][event-chain]', JSON.stringify({
-    source: 'handleCurrentPageChange',
-    seq: _currentPageEmitSeq,
-    reason: 'emitted',
-    pageNumber,
-    previousEmittedPage: previousPage,
-    newEmittedPage: currentPage.value,
-    changed: previousPage !== currentPage.value,
-    isNavigating: isNavigating.value,
-    currentPageUpdatesSuppressed: currentPageUpdatesSuppressed.value
-  }))
 }
 
 function handleVisiblePagesChange(pageNumbers) {

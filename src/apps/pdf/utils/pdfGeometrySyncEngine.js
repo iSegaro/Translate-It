@@ -49,17 +49,6 @@ function buildSyncState({
   const selector = normalizeSelector(pageSelector)
   const sourceGeometries = resolveEffectiveGeometries(sourceContainer, selector, heightResolver)
   const targetGeometries = resolveEffectiveGeometries(targetContainer, selector, heightResolver)
-  const sourceFirstGeo = sourceGeometries.length > 0 ? { pageNumber: sourceGeometries[0]?.pageNumber, top: sourceGeometries[0]?.top } : null
-  const sourceLastGeo = sourceGeometries.length > 0 ? { pageNumber: sourceGeometries[sourceGeometries.length - 1]?.pageNumber, bottom: sourceGeometries[sourceGeometries.length - 1]?.bottom } : null
-  console.log('[LAYOUT-DIAG][geometry]', JSON.stringify({
-    source: 'buildSyncState',
-    geometryCount: sourceGeometries.length,
-    firstPage: sourceFirstGeo,
-    lastPage: sourceLastGeo,
-    scrollTop: sourceScrollTop,
-    sourceScrollHeight: sourceContainer?.scrollHeight ?? 0,
-    sourceClientHeight: sourceContainer?.clientHeight ?? 0
-  }))
   const pageNumber = resolveCurrentPage(sourceScrollTop, sourceGeometries)
   const sourceGeometry = pageNumber ? getGeometryForPage(sourceGeometries, pageNumber) : null
   if (!sourceGeometry) {

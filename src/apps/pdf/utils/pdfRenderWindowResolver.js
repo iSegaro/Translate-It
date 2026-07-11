@@ -58,17 +58,6 @@ function resolveRenderWindow({
 } = {}) {
   const pageGeometries = getPageGeometries(container, pageSelector)
   const scrollMetrics = getScrollMetrics(container)
-  const firstGeo = pageGeometries.length > 0 ? { pageNumber: pageGeometries[0]?.pageNumber, top: pageGeometries[0]?.top } : null
-  const lastGeo = pageGeometries.length > 0 ? { pageNumber: pageGeometries[pageGeometries.length - 1]?.pageNumber, bottom: pageGeometries[pageGeometries.length - 1]?.bottom } : null
-  console.log('[LAYOUT-DIAG][geometry]', JSON.stringify({
-    source: 'resolveRenderWindow',
-    geometryCount: pageGeometries.length,
-    firstPage: firstGeo,
-    lastPage: lastGeo,
-    scrollTop: scrollMetrics.scrollTop,
-    containerScrollHeight: scrollMetrics.scrollHeight,
-    containerClientHeight: scrollMetrics.clientHeight
-  }))
   const resolvedScrollTop = Number.isFinite(Number(scrollTop))
     ? Number(scrollTop)
     : scrollMetrics.scrollTop

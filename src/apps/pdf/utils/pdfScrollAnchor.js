@@ -47,49 +47,21 @@ function captureScrollAnchor(container, pageSelector) {
 }
 
 function restoreScrollAnchor(anchor, container, pageSelector) {
-  if (!anchor || !container) {
-    console.log('[LAYOUT-DIAG][restore]', JSON.stringify({
-      caller: 'restoreScrollAnchor',
-      success: false,
-      reason: !anchor ? 'no anchor' : 'no container'
-    }))
-    return false
-  }
+  if (!anchor || !container) return false
 
   const pageEl = findPageElement(container, pageSelector, anchor.pageNumber)
-  if (!pageEl) {
-    console.log('[LAYOUT-DIAG][restore]', JSON.stringify({
-      caller: 'restoreScrollAnchor',
-      success: false,
-      reason: 'page not found',
-      page: anchor.pageNumber
-    }))
-    return false
-  }
+  if (!pageEl) return false
 
   const pageRect = pageEl.getBoundingClientRect()
   const containerRect = container.getBoundingClientRect()
   const pageOffsetTop = pageRect.top - containerRect.top + container.scrollTop
   const targetScrollTop = pageOffsetTop + pageRect.height * anchor.offsetRatio
-  const scrollTopBefore = container.scrollTop
 
   container.scrollTo({
     top: targetScrollTop,
     behavior: 'instant'
   })
 
-  console.log('[LAYOUT-DIAG][restore]', JSON.stringify({
-    caller: 'restoreScrollAnchor',
-    success: true,
-    owner: 'scroll-anchor',
-    anchorType: 'DOM',
-    page: anchor.pageNumber,
-    offsetRatio: anchor.offsetRatio,
-    pdfPoint: null,
-    requestedScrollTop: targetScrollTop,
-    scrollTopBefore,
-    scrollTopAfter: container.scrollTop
-  }))
   return true
 }
 
@@ -135,89 +107,28 @@ function capturePdfBackedScrollAnchor(container, pageSelector, pdfSession) {
  * anchor passed with zoomMode 'fit-page' is treated as DOM-root.
  */
 function restorePdfBackedScrollAnchor(anchor, container, pageSelector, pdfSession, options = {}) {
-  if (!anchor || !container) {
-    console.log('[LAYOUT-DIAG][restore]', JSON.stringify({
-      caller: 'restorePdfBackedScrollAnchor',
-      success: false,
-      reason: !anchor ? 'no anchor' : 'no container'
-    }))
-    return false
-  }
+  if (!anchor || !container) return false
 
   const pageEl = findPageElement(container, pageSelector, anchor.pageNumber)
-  if (!pageEl) {
-    console.log('[LAYOUT-DIAG][restore]', JSON.stringify({
-      caller: 'restorePdfBackedScrollAnchor',
-      success: false,
-      reason: 'page not found',
-      page: anchor.pageNumber
-    }))
-    return false
-  }
+  if (!pageEl) return false
 
   if (options.zoomMode === 'fit-page') {
     const targetScrollTop = findPageDomTop(container, pageSelector, anchor.pageNumber)
-    if (!Number.isFinite(targetScrollTop)) {
-      console.log('[LAYOUT-DIAG][restore]', JSON.stringify({
-        caller: 'restorePdfBackedScrollAnchor(fit-page)',
-        success: false,
-        reason: 'dom top not finite',
-        page: anchor.pageNumber
-      }))
-      return false
-    }
-    const scrollTopBefore = container.scrollTop
+    if (!Number.isFinite(targetScrollTop)) return false
     container.scrollTo({
       top: targetScrollTop,
       behavior: 'instant'
     })
-    console.log('[LAYOUT-DIAG][restore]', JSON.stringify({
-      caller: 'restorePdfBackedScrollAnchor(fit-page)',
-      success: true,
-      owner: 'pdf-backed',
-      anchorType: 'fit-page-DOM',
-      page: anchor.pageNumber,
-      offsetRatio: anchor.offsetRatio,
-      pdfPoint: anchor.pdfPoint ?? null,
-      requestedScrollTop: targetScrollTop,
-      scrollTopBefore,
-      scrollTopAfter: container.scrollTop
-    }))
     return true
   }
 
-  if (!isPdfAnchor(anchor) || !pdfSession) {
-    console.log('[LAYOUT-DIAG][restore]', JSON.stringify({
-      caller: 'restorePdfBackedScrollAnchor',
-      success: false,
-      reason: !isPdfAnchor(anchor) ? 'not pdf anchor' : 'no pdf session',
-      page: anchor.pageNumber,
-      hasPdfPoint: !!anchor.pdfPoint
-    }))
-    return false
-  }
+  if (!isPdfAnchor(anchor) || !pdfSession) return false
 
   const canvasEl = getPageCanvasElement(pageEl)
-  if (!canvasEl) {
-    console.log('[LAYOUT-DIAG][restore]', JSON.stringify({
-      caller: 'restorePdfBackedScrollAnchor',
-      success: false,
-      reason: 'no canvas element',
-      page: anchor.pageNumber
-    }))
-    return false
-  }
+  if (!canvasEl) return false
 
   const viewport = pdfSession.getPageViewport?.(anchor.pageNumber)
-  if (!viewport?.convertToViewportPoint) {
-    console.log('[LAYOUT-DIAG][restore]', JSON.stringify({
-      caller: 'restorePdfBackedScrollAnchor',
-      success: false,
-      reason: 'no viewport conversion',
-      page: anchor.pageNumber
-    }))
-    return false
-  }
+  if (!viewport?.convertToViewportPoint) return false
 
   const viewportPoint = viewport.convertToViewportPoint(anchor.pdfPoint.x, anchor.pdfPoint.y)
   const [, cssY] = viewportPoint
@@ -225,25 +136,12 @@ function restorePdfBackedScrollAnchor(anchor, container, pageSelector, pdfSessio
   const containerRect = container.getBoundingClientRect()
   const canvasOffsetTop = canvasRect.top - containerRect.top + container.scrollTop
   const targetScrollTop = canvasOffsetTop + cssY
-  const scrollTopBefore = container.scrollTop
 
   container.scrollTo({
     top: targetScrollTop,
     behavior: 'instant'
   })
 
-  console.log('[LAYOUT-DIAG][restore]', JSON.stringify({
-    caller: 'restorePdfBackedScrollAnchor',
-    success: true,
-    owner: 'pdf-backed',
-    anchorType: 'PDF',
-    page: anchor.pageNumber,
-    offsetRatio: anchor.offsetRatio,
-    pdfPoint: anchor.pdfPoint ?? null,
-    requestedScrollTop: targetScrollTop,
-    scrollTopBefore,
-    scrollTopAfter: container.scrollTop
-  }))
   return true
 }
 

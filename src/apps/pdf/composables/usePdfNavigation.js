@@ -177,13 +177,7 @@ export function usePdfNavigation(viewerRef) {
     }
   }
 
-  watch(currentPage, (newPage, oldPage) => {
-    console.log('[LAYOUT-DIAG][current-page]', JSON.stringify({
-      previousPage: oldPage,
-      newPage,
-      reason: 'currentPage ref changed',
-      eventSource: 'unknown(usePdfNavigation watch)'
-    }))
+  watch(currentPage, () => {
     void updateActiveOutline()
   })
 
@@ -218,15 +212,7 @@ export function usePdfNavigation(viewerRef) {
     }
 
     isNavigating.value = true
-    const previousPage = currentPage.value
     currentPage.value = num
-
-    console.log('[LAYOUT-DIAG][current-page]', JSON.stringify({
-      previousPage,
-      newPage: num,
-      reason: 'explicit navigation',
-      eventSource: 'navigateToPage'
-    }))
 
     const viewer = viewerRef?.value
     if (viewer?.scrollToPage) {

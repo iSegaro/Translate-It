@@ -63,39 +63,15 @@ export function createPdfTransitionController({
   function beginCurrentPageSuppression({ owner = 'layout-mode', transitionSeq = null, pageNumber = null, reason = '' } = {}) {
     currentPageSuppressionDepth += 1
     syncCurrentPageSuppressionState()
-    console.log('[LAYOUT-DIAG][current-page-suppression]', JSON.stringify({
-      action: 'acquire',
-      owner,
-      depth: currentPageSuppressionDepth,
-      transitionSeq,
-      pageNumber,
-      reason
-    }))
   }
 
   function endCurrentPageSuppression({ owner = 'layout-mode', transitionSeq = null, pageNumber = null, reason = '' } = {}) {
     if (currentPageSuppressionDepth === 0) {
-      console.log('[LAYOUT-DIAG][current-page-suppression]', JSON.stringify({
-        action: 'underflow-prevented',
-        owner,
-        depth: currentPageSuppressionDepth,
-        transitionSeq,
-        pageNumber,
-        reason
-      }))
       syncCurrentPageSuppressionState()
       return
     }
 
     currentPageSuppressionDepth = Math.max(0, currentPageSuppressionDepth - 1)
-    console.log('[LAYOUT-DIAG][current-page-suppression]', JSON.stringify({
-      action: currentPageSuppressionDepth > 0 ? 'retained' : 'release',
-      owner,
-      depth: currentPageSuppressionDepth,
-      transitionSeq,
-      pageNumber,
-      reason
-    }))
     syncCurrentPageSuppressionState()
   }
 
@@ -250,12 +226,6 @@ export function createPdfTransitionController({
   }
 
   async function applyDeferredZoomLayout() {
-    console.log('[LAYOUT-DIAG][layout]', JSON.stringify({
-      reason: 'applyDeferredZoomLayout',
-      controlledZoomSeq,
-      contentTransitionSeq,
-      suppressedLayoutRestoreSeq
-    }))
     const pendingLayout = deferredZoomLayout
     if (!pendingLayout) return
 
@@ -286,15 +256,6 @@ export function createPdfTransitionController({
   }
 
   async function handleContentViewChange(nextView) {
-    console.log('[LAYOUT-DIAG][transition-start]', JSON.stringify({
-      seq: contentTransitionSeq,
-      fromView: contentView.value,
-      toView: nextView,
-      layoutMode: isSideBySide.value ? 'side-by-side' : 'single',
-      currentPage: currentPage.value,
-      originalScrollTop: originalScrollContainer.value?.scrollTop ?? 0,
-      translatedScrollTop: translatedScrollContainer.value?.scrollTop ?? 0
-    }))
     const previousView = contentView.value
     const previousTopology = resolveEffectivePaneTopology({
       contentView: previousView,
@@ -308,19 +269,6 @@ export function createPdfTransitionController({
     const owner = resolveAnchorOwner()
     const isPdfBackedTransition = isPdfBackedPdfTransition(previousView, nextView)
     const ownerTarget = resolveOwnerScrollTarget(owner)
-
-    console.log('[LAYOUT-DIAG][topology]', JSON.stringify({
-      previousContentView: previousTopology.contentView,
-      nextContentView: nextTopology.contentView,
-      previousEffectiveLayout: previousTopology.effectiveLayout,
-      nextEffectiveLayout: nextTopology.effectiveLayout,
-      previousPaneCount: previousTopology.paneCount,
-      nextPaneCount: nextTopology.paneCount,
-      previousPaneRoles: previousTopology.paneRoles,
-      nextPaneRoles: nextTopology.paneRoles,
-      geometryChangeExpected,
-      provisionalClearAllowed: !geometryChangeExpected
-    }))
 
     const pdfSession = unref(session) ?? null
     const rawAnchor = isPdfBackedTransition && capturePdfBackedScrollAnchor(ownerTarget.container, ownerTarget.selector, pdfSession)
@@ -343,14 +291,6 @@ export function createPdfTransitionController({
         pageNumber: pendingPdfBackedAnchor.anchor?.pageNumber ?? null,
         reason: 'content-transition-pending-anchor'
       })
-      console.log('[LAYOUT-DIAG][pending-anchor]', JSON.stringify({
-        action: 'created',
-        transitionSeq: pendingPdfBackedAnchor.transitionSeq,
-        pageNumber: pendingPdfBackedAnchor.anchor?.pageNumber ?? null,
-        widthChanged: null,
-        currentWidth: viewerLayout.value.width,
-        nextWidth: viewerLayout.value.width
-      }))
     }
 
     setContentView(nextView)
@@ -360,14 +300,6 @@ export function createPdfTransitionController({
 
       const restoredOwner = restoreOwnedScrollAnchor(anchor)
       if (restoredOwner && isPdfBackedTransition && isPdfAnchor(anchor)) {
-        console.log('[LAYOUT-DIAG][pending-anchor]', JSON.stringify({
-          action: 'provisional-restore',
-          transitionSeq: contentTransitionSeq,
-          pageNumber: anchor?.pageNumber ?? null,
-          widthChanged: null,
-          currentWidth: viewerLayout.value.width,
-          nextWidth: viewerLayout.value.width
-        }))
         if (!geometryChangeExpected) {
           const clearResult = clearPendingPdfBackedAnchor('provisional-restore-no-layout-change', contentTransitionSeq)
           if (clearResult.releasedCurrentPageSuppression) {
@@ -387,27 +319,6 @@ export function createPdfTransitionController({
   }
 
   async function handleLayoutModeChange(mode) {
-    console.log('[LAYOUT-DIAG][event-chain]', JSON.stringify({
-      source: 'handleLayoutModeChange',
-      reason: 'toolbar-toggle',
-      mode,
-      contentView: contentView.value,
-      currentPage: currentPage.value,
-      contentTransitionSeq,
-      controlledZoomSeq,
-      suppressedLayoutRestoreSeq,
-      renderWindowFrozen: renderWindowEvictionFrozen.value,
-      currentPageSuppressed: currentPageUpdatesSuppressed.value
-    }))
-    console.log('[LAYOUT-DIAG][transition-start]', JSON.stringify({
-      seq: contentTransitionSeq,
-      fromLayout: viewerLayout.value,
-      toLayout: mode,
-      contentView: contentView.value,
-      currentPage: currentPage.value,
-      originalScrollTop: originalScrollContainer.value?.scrollTop ?? 0,
-      translatedScrollTop: translatedScrollContainer.value?.scrollTop ?? 0
-    }))
     const owner = resolveAnchorOwner()
     const anchor = capturePdfAwareOwnedScrollAnchor(owner)
 
@@ -439,25 +350,11 @@ export function createPdfTransitionController({
       if (isSideBySide.value && showTranslatedPdfPane.value) {
         syncFromOwner(owner)
         scheduleControlledTransitionSuppressionClear()
-        console.log('[LAYOUT-DIAG][transition-end]', JSON.stringify({
-          seq: contentTransitionSeq,
-          currentPage: currentPage.value,
-          originalScrollTop: originalScrollContainer.value?.scrollTop ?? 0,
-          translatedScrollTop: translatedScrollContainer.value?.scrollTop ?? 0,
-          layoutMode: mode
-        }))
         return
       }
 
       if (isPdfAnchor(anchor)) {
         scheduleControlledTransitionSuppressionClear()
-        console.log('[LAYOUT-DIAG][transition-end]', JSON.stringify({
-          seq: contentTransitionSeq,
-          currentPage: currentPage.value,
-          originalScrollTop: originalScrollContainer.value?.scrollTop ?? 0,
-          translatedScrollTop: translatedScrollContainer.value?.scrollTop ?? 0,
-          layoutMode: mode
-        }))
         return
       }
 
@@ -471,13 +368,6 @@ export function createPdfTransitionController({
       try {
         releaseRenderWindowFreeze()
         await refreshRenderWindowAfterLayoutTransition()
-        console.log('[LAYOUT-DIAG][transition-end]', JSON.stringify({
-          seq: contentTransitionSeq,
-          currentPage: currentPage.value,
-          originalScrollTop: originalScrollContainer.value?.scrollTop ?? 0,
-          translatedScrollTop: translatedScrollContainer.value?.scrollTop ?? 0,
-          layoutMode: mode
-        }))
       } finally {
         if (!ownsPendingPdfSuppression) {
           endCurrentPageSuppression({
@@ -494,24 +384,6 @@ export function createPdfTransitionController({
   async function handleLayoutChange(layout = null) {
     const nextLayout = normalizeLayout(layout)
     const currentLayout = viewerLayout.value
-
-    console.log('[LAYOUT-DIAG][event-chain]', JSON.stringify({
-      source: 'handleLayoutChange',
-      reason: 'layout-change-event',
-      nextWidth: nextLayout.width,
-      nextHeight: nextLayout.height,
-      currentWidth: currentLayout.width,
-      currentHeight: currentLayout.height,
-      sameSize: nextLayout.width === currentLayout.width && nextLayout.height === currentLayout.height,
-      contentTransitionSeq,
-      controlledZoomSeq,
-      suppressedLayoutRestoreSeq,
-      hasPendingPdfBackedAnchor: !!pendingPdfBackedAnchor,
-      renderWindowFrozen: renderWindowEvictionFrozen.value,
-      currentPageSuppressed: currentPageUpdatesSuppressed.value,
-      layoutMode: isSideBySide.value ? 'side-by-side' : 'single',
-      contentView: contentView.value
-    }))
 
     if (
       nextLayout.width === currentLayout.width &&
@@ -532,20 +404,9 @@ export function createPdfTransitionController({
     layoutChangeSeq += 1
     const layoutSeq = layoutChangeSeq
     const contentSeqAtStart = contentTransitionSeq
-    const widthChanged = nextLayout.width !== currentLayout.width
     const pendingPdfAnchorForTransition = pendingPdfBackedAnchor?.transitionSeq === contentSeqAtStart
       ? pendingPdfBackedAnchor.anchor
       : null
-    if (pendingPdfBackedAnchor && pendingPdfBackedAnchor.transitionSeq !== contentSeqAtStart) {
-      console.log('[LAYOUT-DIAG][pending-anchor]', JSON.stringify({
-        action: 'stale-discarded',
-        transitionSeq: pendingPdfBackedAnchor.transitionSeq,
-        pageNumber: pendingPdfBackedAnchor.anchor?.pageNumber ?? null,
-        widthChanged,
-        currentWidth: currentLayout.width,
-        nextWidth: nextLayout.width
-      }))
-    }
     const suppressRestoreForControlledTransition = suppressedLayoutRestoreSeq === contentSeqAtStart
     const pendingPdfAnchor = pendingPdfAnchorForTransition
     const shouldFreezeRenderWindow = !!pendingPdfAnchor || (
@@ -555,38 +416,6 @@ export function createPdfTransitionController({
     const translatedAnchor = pendingPdfAnchorForTransition
       ? deriveTranslatedAnchorFromOriginal?.(pendingPdfAnchorForTransition) || null
       : capturedAnchors.translatedAnchor
-    if (pendingPdfAnchorForTransition) {
-      console.log('[LAYOUT-DIAG][layout-race]', JSON.stringify({
-        action: 'pending-anchor-wins',
-        layoutSeq,
-        currentLayoutSeq: layoutChangeSeq,
-        contentSeqAtStart,
-        currentContentSeq: contentTransitionSeq,
-        pendingPage: pendingPdfAnchorForTransition?.pageNumber ?? null,
-        widthChanged
-      }))
-      console.log('[LAYOUT-DIAG][translated-sync]', JSON.stringify({
-        action: 'derived-from-original',
-        transitionSeq: contentSeqAtStart,
-        layoutSeq,
-        originalPage: pendingPdfAnchorForTransition?.pageNumber ?? null,
-        derivedTranslatedPage: translatedAnchor?.pageNumber ?? null,
-        originalOffsetRatio: pendingPdfAnchorForTransition?.offsetRatio ?? null,
-        derivedOffsetRatio: translatedAnchor?.offsetRatio ?? null
-      }))
-    }
-
-    console.log('[LAYOUT-DIAG][layout]', JSON.stringify({
-      seq: layoutChangeSeq,
-      reason: 'handleLayoutChange',
-      controlledZoomSeq,
-      contentTransitionSeq: contentSeqAtStart,
-      suppressedLayoutRestoreSeq,
-      suppressRestoreForControlledTransition,
-      hasPendingPdfAnchor: !!pendingPdfAnchor,
-      shouldFreezeRenderWindow
-    }))
-
     beginScrollSyncSuppression()
     if (shouldFreezeRenderWindow) {
       acquireRenderWindowFreeze()
@@ -598,66 +427,22 @@ export function createPdfTransitionController({
         await nextTick()
 
         if (contentSeqAtStart !== contentTransitionSeq) {
-          console.log('[LAYOUT-DIAG][layout-race]', JSON.stringify({
-            action: 'stale-transition',
-            layoutSeq,
-            currentLayoutSeq: layoutChangeSeq,
-            contentSeqAtStart,
-            currentContentSeq: contentTransitionSeq,
-            pendingPage: pendingPdfAnchorForTransition?.pageNumber ?? null,
-            widthChanged
-          }))
           return
         }
         if (layoutSeq !== layoutChangeSeq) {
-          console.log('[LAYOUT-DIAG][layout-race]', JSON.stringify({
-            action: 'stale-layout',
-            layoutSeq,
-            currentLayoutSeq: layoutChangeSeq,
-            contentSeqAtStart,
-            currentContentSeq: contentTransitionSeq,
-            pendingPage: pendingPdfAnchorForTransition?.pageNumber ?? null,
-            widthChanged
-          }))
           return
         }
         if (pendingPdfAnchor) {
-          console.log('[LAYOUT-DIAG][translated-sync]', JSON.stringify({
-            action: 'restore-input',
-            transitionSeq: contentSeqAtStart,
-            layoutSeq,
-            originalPage: pendingPdfAnchor?.pageNumber ?? null,
-            translatedPage: translatedAnchor?.pageNumber ?? null,
-            originalOffsetRatio: pendingPdfAnchor?.offsetRatio ?? null,
-            derivedOffsetRatio: translatedAnchor?.offsetRatio ?? null
-          }))
           try {
             restoreControlledTransitionAnchors({
               originalAnchor: pendingPdfAnchor,
               translatedAnchor
             })
           } finally {
-            console.log('[LAYOUT-DIAG][pending-anchor]', JSON.stringify({
-              action: 'consumed',
-              transitionSeq: contentSeqAtStart,
-              pageNumber: pendingPdfAnchor?.pageNumber ?? null,
-              widthChanged,
-              currentWidth: currentLayout.width,
-              nextWidth: nextLayout.width
-            }))
             const clearResult = clearPendingPdfBackedAnchor('authoritative-layout-consume', contentSeqAtStart)
             if (clearResult.releasedCurrentPageSuppression) {
               refreshCurrentPage()
             }
-            console.log('[LAYOUT-DIAG][layout-race]', JSON.stringify({
-              action: 'restored',
-              layoutSeq,
-              currentLayoutSeq: layoutChangeSeq,
-              contentSeqAtStart,
-              currentContentSeq: contentTransitionSeq,
-              pendingPage: pendingPdfAnchor?.pageNumber ?? null,
-              widthChanged
-            }))
           }
           return
         }

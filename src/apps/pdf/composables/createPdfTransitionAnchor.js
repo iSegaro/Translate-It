@@ -94,33 +94,10 @@ export function createPdfTransitionAnchor({
       const target = resolveOwnerScrollTarget(owner)
       const pdfSession = unref(session) ?? null
       const pdfAnchor = capturePdfBackedScrollAnchor(target.container, target.selector, pdfSession)
-      const result = pdfAnchor ? { owner, ...pdfAnchor } : captureOwnedScrollAnchor(owner)
-      if (result) {
-        console.log('[LAYOUT-DIAG][capture]', JSON.stringify({
-          owner,
-          anchorType: isPdfAnchor(result) ? 'PDF' : 'DOM',
-          pageNumber: result.pageNumber,
-          offsetRatio: result.offsetRatio,
-          pdfPoint: result.pdfPoint ?? null,
-          scrollTop: target.container?.scrollTop ?? 0
-        }))
-      }
-      return result
+      return pdfAnchor ? { owner, ...pdfAnchor } : captureOwnedScrollAnchor(owner)
     }
 
-    const result = captureOwnedScrollAnchor(owner)
-    if (result) {
-      const target = resolveOwnerScrollTarget(owner)
-      console.log('[LAYOUT-DIAG][capture]', JSON.stringify({
-        owner,
-        anchorType: 'DOM',
-        pageNumber: result.pageNumber,
-        offsetRatio: result.offsetRatio,
-        pdfPoint: null,
-        scrollTop: target.container?.scrollTop ?? 0
-      }))
-    }
-    return result
+    return captureOwnedScrollAnchor(owner)
   }
 
   function captureLayoutTransitionAnchor(owner) {
@@ -140,29 +117,10 @@ export function createPdfTransitionAnchor({
   }
 
   function captureControlledTransitionAnchors() {
-    const originalAnchor = captureLayoutTransitionAnchor(PDF_SCROLL_OWNER.ORIGINAL)
-    const translatedAnchor = captureLayoutTransitionAnchor(PDF_SCROLL_OWNER.TRANSLATED)
-    if (originalAnchor) {
-      console.log('[LAYOUT-DIAG][capture]', JSON.stringify({
-        owner: 'original',
-        anchorType: isPdfAnchor(originalAnchor) ? 'PDF' : 'DOM',
-        pageNumber: originalAnchor.pageNumber,
-        offsetRatio: originalAnchor.offsetRatio,
-        pdfPoint: originalAnchor.pdfPoint ?? null,
-        scrollTop: originalScrollContainer.value?.scrollTop ?? 0
-      }))
+    return {
+      originalAnchor: captureLayoutTransitionAnchor(PDF_SCROLL_OWNER.ORIGINAL),
+      translatedAnchor: captureLayoutTransitionAnchor(PDF_SCROLL_OWNER.TRANSLATED)
     }
-    if (translatedAnchor) {
-      console.log('[LAYOUT-DIAG][capture]', JSON.stringify({
-        owner: 'translated',
-        anchorType: isPdfAnchor(translatedAnchor) ? 'PDF' : 'DOM',
-        pageNumber: translatedAnchor.pageNumber,
-        offsetRatio: translatedAnchor.offsetRatio,
-        pdfPoint: translatedAnchor.pdfPoint ?? null,
-        scrollTop: translatedScrollContainer.value?.scrollTop ?? 0
-      }))
-    }
-    return { originalAnchor, translatedAnchor }
   }
 
   function deriveTranslatedAnchorFromOriginal(originalAnchor) {
@@ -188,16 +146,6 @@ export function createPdfTransitionAnchor({
     const pdfSession = unref(session) ?? null
 
     if (isPdfAnchor(anchor) && restorePdfBackedScrollAnchor(anchor, preferredTarget.container, preferredTarget.selector, pdfSession, { zoomMode: zoomMode.value })) {
-      console.log('[LAYOUT-DIAG][restore]', JSON.stringify({
-        caller: 'restoreOwnedScrollAnchor',
-        owner: anchor.owner,
-        anchorType: 'PDF',
-        page: anchor.pageNumber,
-        offsetRatio: anchor.offsetRatio,
-        pdfPoint: anchor.pdfPoint ?? null,
-        scrollTopBefore: preferredTarget.container?.scrollTop ?? 0,
-        scrollTopAfter: preferredTarget.container?.scrollTop ?? 0
-      }))
       return preferredTarget.owner
     }
 
@@ -220,32 +168,12 @@ export function createPdfTransitionAnchor({
 
     const fallbackRestored = restoreScrollAnchor(fallbackAnchor, fallbackTarget.container, fallbackTarget.selector)
     if (fallbackRestored) {
-      console.log('[LAYOUT-DIAG][restore]', JSON.stringify({
-        caller: 'restoreOwnedScrollAnchor(backup)',
-        owner: anchor.owner,
-        anchorType: 'DOM',
-        page: anchor.pageNumber,
-        offsetRatio: anchor.offsetRatio,
-        pdfPoint: null,
-        scrollTopBefore: fallbackTarget.container?.scrollTop ?? 0,
-        scrollTopAfter: fallbackTarget.container?.scrollTop ?? 0
-      }))
       return fallbackTarget.owner
     }
     return null
   }
 
   function restoreControlledTransitionAnchors({ originalAnchor, translatedAnchor }) {
-    console.log('[LAYOUT-DIAG][restore]', JSON.stringify({
-      caller: 'restoreControlledTransitionAnchors',
-      originalOwner: (originalAnchor ?? {}).owner ?? null,
-      originalPage: (originalAnchor ?? {}).pageNumber ?? null,
-      originalOffsetRatio: (originalAnchor ?? {}).offsetRatio ?? null,
-      originalPdfPoint: (originalAnchor ?? {}).pdfPoint ?? null,
-      translatedOwner: (translatedAnchor ?? {}).owner ?? null,
-      translatedPage: (translatedAnchor ?? {}).pageNumber ?? null,
-      translatedOffsetRatio: (translatedAnchor ?? {}).offsetRatio ?? null
-    }))
     const restoredOriginalOwner = restoreOwnedScrollAnchor(originalAnchor)
 
     if (translatedAnchor) {
