@@ -40,6 +40,15 @@ The PDF Translation feature is a **self-contained, dedicated PDF viewer and tran
   - [Scroll Coordinate Conversion](#scroll-coordinate-conversion)
   - [Current Page Ownership](#current-page-ownership)
   - [Scroll Container Ownership](#scroll-container-ownership)
+- [Transition Controller Architecture](#transition-controller-architecture)
+  - [Transition Ownership](#transition-ownership)
+  - [The Transition Token (`pendingTransitionRestore`)](#the-transition-token-pendingtransitionrestore)
+  - [Original Pane Layout Ownership (`doesOriginalPaneLayoutChange`)](#original-pane-layout-ownership-doesoriginalpanelayoutchange)
+  - [Current Page Suppression](#current-page-suppression)
+  - [Render Window Freeze](#render-window-freeze)
+  - [Unchanged-Dimension Completion](#unchanged-dimension-completion)
+  - [Transition Invariants](#transition-invariants)
+  - [Error Handling](#error-handling)
 - [Zoom and Scroll Transition Architecture](#zoom-and-scroll-transition-architecture)
   - [Anchor Model](#anchor-model)
   - [Controlled Zoom Sequence](#controlled-zoom-sequence)
@@ -608,6 +617,154 @@ PdfViewerLayout (owns the scroll container, makes it available to the parent)
 **Why consumers receive it as an explicit dependency**: This keeps the viewer and translated pane decoupled from the surrounding DOM structure. They can be embedded in different contexts (split view, modal, iframe) without modification — the parent simply provides the appropriate scroll container.
 
 **Fallback behavior**: `PdfTranslatedPane` retains a DOM fallback for backward compatibility if used outside the normal component hierarchy. `PdfViewer` falls back to viewport-based observation. In normal operation within PdfApp, the dependency is always provided.
+
+---
+
+## Transition Controller Architecture
+
+The transition controller (`createPdfTransitionController`) orchestrates zoom transitions, layout-mode changes, and viewport resize handling. It owns the lifecycle of scroll anchor capture/restore, current-page suppression, render-window freeze, and scroll-sync suppression — ensuring deterministic transition completion without races.
+
+### Transition Ownership
+
+Every content-view transition has exactly one completion owner. Ownership is determined at transition start and never transferred.
+
+**Three completion paths:**
+
+| Path | When | Owner | Suppression Release |
+|------|------|-------|--------------------|
+| **Inline completion** | Original pane effective layout does not change | `handleContentViewChange` | Immediately — token consumed inline, suppression released, current page refreshed |
+| **Layout-owned completion** | Original pane effective layout changes | `handleLayoutChange` | Delegated — token carries `ownsCurrentPageSuppression: true`; consumed when layout geometry is applied |
+| **Unchanged-dimension completion** | `handleLayoutChange` fires with identical dimensions | `handleLayoutChange` early-return | Token consumed (if matching), suppression released, current page refreshed — no `recomputeLayout` |
+
+The decision function is `doesOriginalPaneLayoutChange(previousTopology, nextTopology)`:
+- If the Original pane is absent in the target topology → no layout change needed → inline completion
+- If the Original pane is newly mounted → layout change expected → delegated to layout
+- If the Original pane remains but its effective layout (single vs. side-by-side) changes → delegated to layout
+- If the Original pane remains with the same effective layout → inline completion (even if secondary panes changed)
+
+**Why the Original pane**: Only the Original pane produces PDF-backed scroll anchors. If the Original pane's layout footprint is stable, the anchor remains valid without a geometry recompute. Changes to secondary panes (translated text appearing/disappearing) don't require layout-owned completion.
+
+**Determinism**: Ownership is computed from topology alone — no timeouts, no fallbacks, no rAF polling. Exactly one path completes every transition.
+
+### The Transition Token (`pendingTransitionRestore`)
+
+A single token that bridges content-view transitions to layout changes:
+
+| Property | Purpose |
+|----------|---------|
+| `transitionSeq` | Monotonic counter — only the matching sequence can consume this token |
+| `pdfAnchor` | PDF-backed scroll anchor (null for DOM-only transitions) |
+| `ownerAnchor` | Owner-tagged scroll anchor for non-PDF transitions |
+| `ownsCurrentPageSuppression` | Whether this token is responsible for releasing suppression |
+
+**Lifecycle**:
+
+Every token creation begins with `beginControlledTransition()`, which invalidates any previous token. This ensures transition ownership never overlaps — a new transition always starts from a clean state. Only after invalidation is the new token created.
+
+```
+Created:  beginControlledTransition()
+  │         └─ Invalidates any previous token
+  │
+  └── handleContentViewChange() or handleLayoutModeChange() sets new token
+  │
+  ├── Consumed: handleLayoutChange() (via clearPendingTransitionRestore)
+  │     └─ Performs anchor restoration + suppression release + page refresh
+  │
+  ├── Consumed: inline in handleContentViewChange() (when !completionOwnedByLayout)
+  │     └─ Suppression released, page refreshed — no layout involvement
+  │
+  └── Consumed: unchanged-dimension early return in handleLayoutChange()
+        └─ Token matched by seq, consumed, suppression released, page refreshed
+```
+
+**Rules**:
+- At most one token exists at any time
+- `beginControlledTransition()` always replaces a previous token before creating a new one
+- `clearPendingTransitionRestore()` is the only destruction path — it validates `transitionSeq` match and clears the token
+- A stale token (mismatched seq) cannot be consumed — `clearPendingTransitionRestore` with a different transition sequence returns `{ cleared: false }`
+
+### Original Pane Layout Ownership (`doesOriginalPaneLayoutChange`)
+
+A topology-only decision function that determines whether the Original pane's layout footprint changes:
+
+| Previous | Next | Result | Rationale |
+|----------|------|--------|-----------|
+| Original (single) | Translation (single) | `false` | Original pane gone — no layout to defer to |
+| Original (single) | Side-by-side (translated-pdf) | `true` | Original pane layout changes (single → side-by-side) |
+| Translation (single) | Side-by-side (translated-pdf) | `true` | Original pane newly mounted in side-by-side |
+| Translation (side-by-side) | Translation (single) | `false` | Original pane is in both — effective layout stays single |
+| Translated PDF (side-by-side) | Original (single) | `true` | Original pane layout changes (side-by-side → single) |
+| Translated PDF (side-by-side) | Translation (single) | `false` | Original pane removed |
+| Original (single) | Side-by-side preference but effective single | `false` | Layout mode preference doesn't change effective topology |
+
+**Architectural note**: This function intentionally reasons only about the Original PDF pane. It is NOT a generic viewer-topology comparison. Changes affecting only translated panes (e.g., translated text appearing or disappearing) do not necessarily require layout-owned transition completion. The completion decision is based on the geometry that owns PDF-backed anchors — only the Original pane produces them.
+
+### Current Page Suppression
+
+Suppresses `currentPage` update notifications during transitions to prevent intermediate page values.
+
+**Reference-counted depth**: `currentPageSuppressionDepth` tracks nested suppression requests. The reactive ref `currentPageUpdatesSuppressed` mirrors `depth > 0`.
+
+| Owner | Context | Acquired | Released |
+|-------|---------|----------|----------|
+| **Transition-owned** | Content view change (completion delegated) | `handleContentViewChange` — token owns suppression | When token consumed by `handleLayoutChange` |
+| **Transition-owned** | Layout mode change (PDF-backed, layout changes) | `handleLayoutModeChange` — token owns suppression | When token consumed by `handleLayoutChange` |
+| **Layout-owned** | Layout mode change (no PDF anchor or no layout change) | `handleLayoutModeChange` | In `finally` block — always released |
+| **Zoom-owned** | Controlled zoom | `runWithCurrentPageSuppression` | In `finally` block — bracketed by begin/end |
+
+The implementation tracks these with internal labels (`pending-transition`, `layout-mode`, `zoom`) but the architectural ownership model is what matters: transition-owned suppression is released by token consumption, layout-owned and zoom-owned suppression are released by `finally` blocks.
+
+**Invariant**: Suppression depth never negative — `endCurrentPageSuppression` clamps at 0.
+
+### Render Window Freeze
+
+Prevents render-window eviction during layout transitions, avoiding visual flicker from intermediate page sets.
+
+| Context | Acquired | Released |
+|---------|----------|----------|
+| Layout mode change | `handleLayoutModeChange` | In `finally` block — always released |
+| Layout geometry change (with active transition token) | `handleLayoutChange` | In `finally` block — always released |
+| Controlled zoom | `runControlledZoomTransition` | In `finally` block — always released |
+
+**Balanced ref-count**: `renderWindowFreezeDepth` tracks nested freeze requests. Every `acquireRenderWindowFreeze` has a matching `releaseRenderWindowFreeze` in a `finally` block. After layout mode changes, `refreshRenderWindowAfterLayoutTransition()` refreshes the render window after freeze release.
+
+### Unchanged-Dimension Completion
+
+When `handleLayoutChange` receives dimensions identical to the current layout, it is not a no-op — it is a lifecycle completion path:
+
+```
+handleLayoutChange({ width, height })
+  ├── width  === currentLayout.width
+  └── height === currentLayout.height
+        │
+        ▼
+  getPendingTransitionRestoreForCurrentTransition(contentSeqAtStart)
+        │
+        ├── Token found → clearPendingTransitionRestore('layout-no-dimension-change-consume')
+        │     ├── Token consumed, suppression released
+        │     └── refreshCurrentPage()
+        │
+        └── No token → return (no-op)
+```
+
+This prevents delegated lifecycle leaks: when a content view change delegates completion to layout, but the first layout callback has unchanged dimensions, the token must still be consumed. Without this path, suppression would remain active indefinitely.
+
+### Transition Invariants
+
+1. **At most one pending transition token** — `beginControlledTransition` clears any previous token before creating a new one.
+2. **Exactly one completion owner per transition** — inline, layout-owned, or unchanged-dimension. Never zero, never two.
+3. **Token consumption requires sequence match** — `clearPendingTransitionRestore` validates `transitionSeq` match before clearing.
+4. **Stale transitions cannot restore anchors** — content sequence guard (`contentSeqAtStart !== contentTransitionSeq`) and layout sequence guard (`layoutSeq !== layoutChangeSeq`) both prevent stale restoration.
+5. **Suppression depth never negative** — clamped by `Math.max(0, ...)` in `endCurrentPageSuppression`.
+6. **Render window freeze ref-count balanced** — every `acquireRenderWindowFreeze` has matching `releaseRenderWindowFreeze` in `finally`.
+7. **Scroll sync suppression cleared on every layout exit** — `scheduleScrollSyncSuppressionClear()` in `finally` block.
+
+### Error Handling
+
+- **Primary error preserved**: if the transition operation throws, the `catch` block clears resources (token, suppression) and re-throws the original error.
+- **Cleanup errors never mask primary failures**: if cleanup (`refreshRenderWindowAfterLayoutTransition`) also throws while a primary error exists, `console.warn` suppresses the cleanup error and the primary error propagates.
+- **Cleanup errors propagate when no primary error**: if cleanup throws but the transition body succeeded, the cleanup error is thrown — the caller sees it.
+- **Cleanup always runs**: `finally` blocks execute on every exit path — render window freeze released, scroll sync suppression cleared, current page refreshed.
 
 ---
 
