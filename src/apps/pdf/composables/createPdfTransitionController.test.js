@@ -11,6 +11,18 @@ vi.mock('../utils/pdfFitPageFootprint.js', () => ({
   resolvePdfCanvasSlot: vi.fn(() => ({ availableCanvasWidth: 800, availableCanvasHeight: 600 }))
 }))
 
+const mockTopologyRef = vi.hoisted(() => ({ doesTopologyChange: null, realDoesTopologyChange: null }))
+
+vi.mock('../utils/pdfViewerTopology.js', async () => {
+  const mod = await vi.importActual('../utils/pdfViewerTopology.js')
+  mockTopologyRef.realDoesTopologyChange = mod.doesTopologyChange
+  mockTopologyRef.doesTopologyChange = vi.fn((prev, next) => mod.doesTopologyChange(prev, next))
+  return {
+    resolveEffectivePaneTopology: mod.resolveEffectivePaneTopology,
+    doesTopologyChange: mockTopologyRef.doesTopologyChange
+  }
+})
+
 vi.mock('./createPdfTransitionAnchor.js', () => {
   const PDF_SCROLL_OWNER = Object.freeze({ ORIGINAL: 'original', TRANSLATED: 'translated' })
   return {
@@ -85,6 +97,12 @@ let anchorFns
 
 beforeEach(() => {
   vi.clearAllMocks()
+
+  if (mockTopologyRef.doesTopologyChange && mockTopologyRef.realDoesTopologyChange) {
+    mockTopologyRef.doesTopologyChange.mockImplementation(
+      (prev, next) => mockTopologyRef.realDoesTopologyChange(prev, next)
+    )
+  }
 
   anchorFns = {
     resolveAnchorOwner: vi.fn(),
@@ -674,6 +692,51 @@ describe('createPdfTransitionController', () => {
 
       expect(pdfViewerLayoutRef.value.syncFromPane).toHaveBeenCalled()
     })
+
+    it('consumes suppression token when non-PDF translation has no geometry change', async () => {
+      const refreshCurrentPage = vi.fn()
+      const { ctrl } = createController({ pdfViewerRef: { refreshCurrentPage } })
+
+      mockTopologyRef.doesTopologyChange.mockReturnValue(false)
+
+      anchorFns.resolveAnchorOwner.mockReturnValue(PDF_SCROLL_OWNER.ORIGINAL)
+      anchorFns.resolveOwnerScrollTarget.mockReturnValue({
+        owner: PDF_SCROLL_OWNER.ORIGINAL,
+        container: document.createElement('div'),
+        selector: '.pdf-page[data-page-number]'
+      })
+      scrollAnchor.captureScrollAnchor.mockReturnValue({ pageNumber: 13, offsetRatio: 0.25 })
+      scrollAnchor.isPdfAnchor.mockReturnValue(false)
+      anchorFns.restoreOwnedScrollAnchor.mockReturnValue(PDF_SCROLL_OWNER.ORIGINAL)
+
+      await ctrl.handleContentViewChange(CONTENT_VIEW.TRANSLATION)
+
+      expect(ctrl.currentPageUpdatesSuppressed.value).toBe(false)
+      expect(ctrl.__debugCurrentPageSuppression.getDepth()).toBe(0)
+      expect(refreshCurrentPage).toHaveBeenCalledTimes(1)
+      expect(anchorFns.restoreControlledTransitionAnchors).not.toHaveBeenCalled()
+    })
+
+    it('keeps suppression active when non-PDF translation changes geometry', async () => {
+      const refreshCurrentPage = vi.fn()
+      const { ctrl } = createController({ pdfViewerRef: { refreshCurrentPage } })
+
+      anchorFns.resolveAnchorOwner.mockReturnValue(PDF_SCROLL_OWNER.ORIGINAL)
+      anchorFns.resolveOwnerScrollTarget.mockReturnValue({
+        owner: PDF_SCROLL_OWNER.ORIGINAL,
+        container: document.createElement('div'),
+        selector: '.pdf-page[data-page-number]'
+      })
+      scrollAnchor.captureScrollAnchor.mockReturnValue({ pageNumber: 13, offsetRatio: 0.25 })
+      scrollAnchor.isPdfAnchor.mockReturnValue(false)
+      anchorFns.restoreOwnedScrollAnchor.mockReturnValue(PDF_SCROLL_OWNER.ORIGINAL)
+
+      await ctrl.handleContentViewChange(CONTENT_VIEW.TRANSLATION)
+
+      expect(ctrl.currentPageUpdatesSuppressed.value).toBe(true)
+      expect(ctrl.__debugCurrentPageSuppression.getDepth()).toBe(1)
+      expect(refreshCurrentPage).not.toHaveBeenCalled()
+    })
   })
 
   describe('handleLayoutModeChange', () => {
@@ -1026,6 +1089,362 @@ describe('createPdfTransitionController', () => {
       } finally {
         vi.useRealTimers()
       }
+    })
+
+    it('restores captured anchors in suppressed branch during non-PDF text transition', async () => {
+      const recomputeLayout = vi.fn().mockResolvedValue(true)
+      const { ctrl } = createController({ recomputeLayout })
+
+      const domAnchor = { pageNumber: 31, offsetRatio: 0.25, owner: PDF_SCROLL_OWNER.ORIGINAL }
+      anchorFns.resolveAnchorOwner.mockReturnValue(PDF_SCROLL_OWNER.ORIGINAL)
+      anchorFns.resolveOwnerScrollTarget.mockReturnValue({
+        owner: PDF_SCROLL_OWNER.ORIGINAL,
+        container: document.createElement('div'),
+        selector: '.pdf-page[data-page-number]'
+      })
+      scrollAnchor.captureScrollAnchor.mockReturnValue(domAnchor)
+      scrollAnchor.isPdfAnchor.mockReturnValue(false)
+      anchorFns.restoreOwnedScrollAnchor.mockReturnValue(PDF_SCROLL_OWNER.ORIGINAL)
+
+      const capturedAnchors = {
+        originalAnchor: domAnchor,
+        translatedAnchor: null
+      }
+      anchorFns.captureControlledTransitionAnchors.mockReturnValue(capturedAnchors)
+      anchorFns.restoreControlledTransitionAnchors.mockReturnValue(PDF_SCROLL_OWNER.ORIGINAL)
+
+      await ctrl.handleContentViewChange(CONTENT_VIEW.TRANSLATION)
+
+      // No rAF advance — suppressedLayoutRestoreSeq still matches contentSeqAtStart
+      await ctrl.handleLayoutChange({ width: 800, height: 600 })
+
+      expect(anchorFns.restoreControlledTransitionAnchors).toHaveBeenCalledWith(capturedAnchors)
+    })
+
+    it('skips restore via stale content sequence guard before suppressed branch', async () => {
+      const deferredRecompute = createDeferred()
+      const recomputeLayout = vi.fn().mockReturnValue(deferredRecompute.promise)
+      const { ctrl } = createController({ recomputeLayout })
+
+      const domAnchor = { pageNumber: 31, offsetRatio: 0.25, owner: PDF_SCROLL_OWNER.ORIGINAL }
+      anchorFns.resolveAnchorOwner.mockReturnValue(PDF_SCROLL_OWNER.ORIGINAL)
+      anchorFns.resolveOwnerScrollTarget.mockReturnValue({
+        owner: PDF_SCROLL_OWNER.ORIGINAL,
+        container: document.createElement('div'),
+        selector: '.pdf-page[data-page-number]'
+      })
+      scrollAnchor.captureScrollAnchor.mockReturnValue(domAnchor)
+      scrollAnchor.isPdfAnchor.mockReturnValue(false)
+      anchorFns.restoreOwnedScrollAnchor.mockReturnValue(PDF_SCROLL_OWNER.ORIGINAL)
+      anchorFns.captureControlledTransitionAnchors.mockReturnValue({
+        originalAnchor: domAnchor,
+        translatedAnchor: null
+      })
+      scrollAnchor.capturePdfBackedScrollAnchor.mockReturnValue(null)
+
+      await ctrl.handleContentViewChange(CONTENT_VIEW.TRANSLATION)
+
+      const layoutPromise = ctrl.handleLayoutChange({ width: 800, height: 600 })
+
+      // Start a second transition — increments contentTransitionSeq
+      await ctrl.handleContentViewChange(CONTENT_VIEW.ORIGINAL)
+
+      deferredRecompute.resolve()
+      await layoutPromise
+
+      expect(anchorFns.restoreControlledTransitionAnchors).not.toHaveBeenCalled()
+    })
+
+    it('skips restore via stale layout sequence guard before suppressed branch', async () => {
+      const firstRecompute = createDeferred()
+      const secondRecompute = createDeferred()
+      const recomputeLayout = vi.fn()
+        .mockReturnValueOnce(firstRecompute.promise)
+        .mockReturnValueOnce(secondRecompute.promise)
+      const { ctrl } = createController({ recomputeLayout })
+
+      const domAnchor = { pageNumber: 31, offsetRatio: 0.25, owner: PDF_SCROLL_OWNER.ORIGINAL }
+      anchorFns.resolveAnchorOwner.mockReturnValue(PDF_SCROLL_OWNER.ORIGINAL)
+      anchorFns.resolveOwnerScrollTarget.mockReturnValue({
+        owner: PDF_SCROLL_OWNER.ORIGINAL,
+        container: document.createElement('div'),
+        selector: '.pdf-page[data-page-number]'
+      })
+      scrollAnchor.captureScrollAnchor.mockReturnValue(domAnchor)
+      scrollAnchor.isPdfAnchor.mockReturnValue(false)
+      anchorFns.restoreOwnedScrollAnchor.mockReturnValue(PDF_SCROLL_OWNER.ORIGINAL)
+      anchorFns.captureControlledTransitionAnchors.mockReturnValue({
+        originalAnchor: domAnchor,
+        translatedAnchor: null
+      })
+      anchorFns.restoreControlledTransitionAnchors.mockReturnValue(PDF_SCROLL_OWNER.ORIGINAL)
+      scrollAnchor.capturePdfBackedScrollAnchor.mockReturnValue(null)
+
+      await ctrl.handleContentViewChange(CONTENT_VIEW.TRANSLATION)
+
+      const firstLayout = ctrl.handleLayoutChange({ width: 800, height: 600 })
+      const secondLayout = ctrl.handleLayoutChange({ width: 900, height: 600 })
+
+      secondRecompute.resolve()
+      await secondLayout
+
+      expect(anchorFns.restoreControlledTransitionAnchors).toHaveBeenCalledTimes(1)
+
+      firstRecompute.resolve()
+      await firstLayout
+
+      expect(anchorFns.restoreControlledTransitionAnchors).toHaveBeenCalledTimes(1)
+    })
+
+    it('restores from pending PDF anchor not captured anchors in suppressed branch', async () => {
+      const recomputeLayout = vi.fn().mockResolvedValue(true)
+      const { ctrl } = createController({ recomputeLayout, isSideBySide: true, showTranslatedPdfPane: true })
+
+      const pendingAnchor = { pageNumber: 35, offsetRatio: 0.25, pdfPoint: { x: 10, y: 20 } }
+      const capturedAnchor = { owner: PDF_SCROLL_OWNER.ORIGINAL, pageNumber: 48, offsetRatio: 0.4 }
+
+      anchorFns.resolveAnchorOwner.mockReturnValue(PDF_SCROLL_OWNER.ORIGINAL)
+      anchorFns.resolveOwnerScrollTarget.mockReturnValue({
+        owner: PDF_SCROLL_OWNER.ORIGINAL,
+        container: document.createElement('div'),
+        selector: '.pdf-page[data-page-number]'
+      })
+      scrollAnchor.capturePdfBackedScrollAnchor.mockReturnValue(pendingAnchor)
+      scrollAnchor.isPdfAnchor.mockImplementation((anchor) => !!anchor?.pdfPoint)
+      anchorFns.restoreOwnedScrollAnchor.mockReturnValue(PDF_SCROLL_OWNER.ORIGINAL)
+      anchorFns.deriveTranslatedAnchorFromOriginal.mockReturnValue({
+        owner: PDF_SCROLL_OWNER.TRANSLATED,
+        pageNumber: 35,
+        offsetRatio: 0.25
+      })
+      anchorFns.captureControlledTransitionAnchors.mockReturnValue({
+        originalAnchor: capturedAnchor,
+        translatedAnchor: null
+      })
+      anchorFns.restoreControlledTransitionAnchors.mockReturnValue(PDF_SCROLL_OWNER.ORIGINAL)
+
+      await ctrl.handleContentViewChange(CONTENT_VIEW.TRANSLATED_PDF)
+
+      // No rAF advance — suppressedLayoutRestoreSeq still matches, but
+      // pendingPdfBackedAnchor path at line 517 handles restore first
+      await ctrl.handleLayoutChange({ width: 800, height: 600 })
+
+      expect(anchorFns.restoreControlledTransitionAnchors).toHaveBeenCalledTimes(1)
+      expect(anchorFns.restoreControlledTransitionAnchors).toHaveBeenCalledWith({
+        originalAnchor: expect.objectContaining({ pageNumber: 35 }),
+        translatedAnchor: expect.objectContaining({ pageNumber: 35 })
+      })
+      expect(anchorFns.restoreControlledTransitionAnchors).not.toHaveBeenCalledWith({
+        originalAnchor: capturedAnchor,
+        translatedAnchor: null
+      })
+    })
+
+    it('suppresses current-page updates during non-PDF Original to Translation transition', async () => {
+      const recomputeLayout = vi.fn().mockResolvedValue(true)
+      const { ctrl } = createController({ recomputeLayout })
+
+      const domAnchor = { pageNumber: 33, offsetRatio: 0.25, owner: PDF_SCROLL_OWNER.ORIGINAL }
+      anchorFns.resolveAnchorOwner.mockReturnValue(PDF_SCROLL_OWNER.ORIGINAL)
+      anchorFns.resolveOwnerScrollTarget.mockReturnValue({
+        owner: PDF_SCROLL_OWNER.ORIGINAL,
+        container: document.createElement('div'),
+        selector: '.pdf-page[data-page-number]'
+      })
+      scrollAnchor.captureScrollAnchor.mockReturnValue(domAnchor)
+      scrollAnchor.isPdfAnchor.mockReturnValue(false)
+      anchorFns.restoreOwnedScrollAnchor.mockReturnValue(PDF_SCROLL_OWNER.ORIGINAL)
+      anchorFns.captureControlledTransitionAnchors.mockReturnValue({
+        originalAnchor: domAnchor,
+        translatedAnchor: null
+      })
+      anchorFns.restoreControlledTransitionAnchors.mockReturnValue(PDF_SCROLL_OWNER.ORIGINAL)
+
+      await ctrl.handleContentViewChange(CONTENT_VIEW.TRANSLATION)
+
+      // After handleContentViewChange: token created, suppression active
+      expect(ctrl.currentPageUpdatesSuppressed.value).toBe(true)
+
+      // Advance timers so rAF clears — normal Chromium path
+      await vi.useFakeTimers()
+      vi.advanceTimersByTime(100)
+      await ctrl.handleLayoutChange({ width: 800, height: 600 })
+      vi.useRealTimers()
+
+      // After restore and token consume: suppression released
+      expect(ctrl.currentPageUpdatesSuppressed.value).toBe(false)
+    })
+
+    it('suppresses current-page updates during non-PDF Translation to Original transition', async () => {
+      const recomputeLayout = vi.fn().mockResolvedValue(true)
+      const { ctrl } = createController({ recomputeLayout, contentView: CONTENT_VIEW.TRANSLATION })
+
+      // Capture from translated pane
+      anchorFns.resolveAnchorOwner.mockReturnValue(PDF_SCROLL_OWNER.TRANSLATED)
+      anchorFns.resolveOwnerScrollTarget.mockReturnValue({
+        owner: PDF_SCROLL_OWNER.TRANSLATED,
+        container: document.createElement('div'),
+        selector: '.pdf-translated-page[data-page-number]'
+      })
+      scrollAnchor.captureScrollAnchor.mockReturnValue({ pageNumber: 45, offsetRatio: 0.3 })
+      scrollAnchor.isPdfAnchor.mockReturnValue(false)
+      anchorFns.restoreOwnedScrollAnchor.mockReturnValue(PDF_SCROLL_OWNER.TRANSLATED)
+      anchorFns.captureControlledTransitionAnchors.mockReturnValue({
+        originalAnchor: null,
+        translatedAnchor: { pageNumber: 45, offsetRatio: 0.3, owner: PDF_SCROLL_OWNER.TRANSLATED }
+      })
+      anchorFns.restoreControlledTransitionAnchors.mockReturnValue(PDF_SCROLL_OWNER.TRANSLATED)
+
+      await ctrl.handleContentViewChange(CONTENT_VIEW.ORIGINAL)
+
+      expect(ctrl.currentPageUpdatesSuppressed.value).toBe(true)
+
+      await vi.useFakeTimers()
+      vi.advanceTimersByTime(100)
+      await ctrl.handleLayoutChange({ width: 800, height: 600 })
+      vi.useRealTimers()
+
+      expect(ctrl.currentPageUpdatesSuppressed.value).toBe(false)
+    })
+
+    it('releases suppression after restore in suppressed Firefox-style path', async () => {
+      const recomputeLayout = vi.fn().mockResolvedValue(true)
+      const { ctrl } = createController({ recomputeLayout })
+
+      const domAnchor = { pageNumber: 33, offsetRatio: 0.25, owner: PDF_SCROLL_OWNER.ORIGINAL }
+      anchorFns.resolveAnchorOwner.mockReturnValue(PDF_SCROLL_OWNER.ORIGINAL)
+      anchorFns.resolveOwnerScrollTarget.mockReturnValue({
+        owner: PDF_SCROLL_OWNER.ORIGINAL,
+        container: document.createElement('div'),
+        selector: '.pdf-page[data-page-number]'
+      })
+      scrollAnchor.captureScrollAnchor.mockReturnValue(domAnchor)
+      scrollAnchor.isPdfAnchor.mockReturnValue(false)
+      anchorFns.restoreOwnedScrollAnchor.mockReturnValue(PDF_SCROLL_OWNER.ORIGINAL)
+      anchorFns.captureControlledTransitionAnchors.mockReturnValue({
+        originalAnchor: domAnchor,
+        translatedAnchor: null
+      })
+      anchorFns.restoreControlledTransitionAnchors.mockReturnValue(PDF_SCROLL_OWNER.ORIGINAL)
+
+      await ctrl.handleContentViewChange(CONTENT_VIEW.TRANSLATION)
+
+      expect(ctrl.currentPageUpdatesSuppressed.value).toBe(true)
+
+      // No rAF advance — suppressed branch fires (Firefox-style)
+      await ctrl.handleLayoutChange({ width: 800, height: 600 })
+
+      expect(ctrl.currentPageUpdatesSuppressed.value).toBe(false)
+      expect(anchorFns.restoreControlledTransitionAnchors).toHaveBeenCalledTimes(1)
+    })
+
+    it('consumes generic transition token once for PDF-backed path without double restore', async () => {
+      const recomputeLayout = vi.fn().mockResolvedValue(true)
+      const { ctrl } = createController({ recomputeLayout, isSideBySide: true, showTranslatedPdfPane: true })
+
+      const pendingAnchor = { pageNumber: 35, offsetRatio: 0.25, pdfPoint: { x: 10, y: 20 } }
+      anchorFns.resolveAnchorOwner.mockReturnValue(PDF_SCROLL_OWNER.ORIGINAL)
+      anchorFns.resolveOwnerScrollTarget.mockReturnValue({
+        owner: PDF_SCROLL_OWNER.ORIGINAL,
+        container: document.createElement('div'),
+        selector: '.pdf-page[data-page-number]'
+      })
+      scrollAnchor.capturePdfBackedScrollAnchor.mockReturnValue(pendingAnchor)
+      scrollAnchor.isPdfAnchor.mockImplementation((anchor) => !!anchor?.pdfPoint)
+      anchorFns.restoreOwnedScrollAnchor.mockReturnValue(PDF_SCROLL_OWNER.ORIGINAL)
+      anchorFns.deriveTranslatedAnchorFromOriginal.mockReturnValue({
+        owner: PDF_SCROLL_OWNER.TRANSLATED,
+        pageNumber: 35,
+        offsetRatio: 0.25
+      })
+      anchorFns.captureControlledTransitionAnchors.mockReturnValue({
+        originalAnchor: { owner: PDF_SCROLL_OWNER.ORIGINAL, pageNumber: 48, offsetRatio: 0.4 },
+        translatedAnchor: null
+      })
+      anchorFns.restoreControlledTransitionAnchors.mockReturnValue(PDF_SCROLL_OWNER.ORIGINAL)
+
+      await ctrl.handleContentViewChange(CONTENT_VIEW.TRANSLATED_PDF)
+
+      expect(ctrl.currentPageUpdatesSuppressed.value).toBe(true)
+
+      // No rAF advance — pending anchor path fires, consumes token once
+      await ctrl.handleLayoutChange({ width: 800, height: 600 })
+
+      expect(ctrl.currentPageUpdatesSuppressed.value).toBe(false)
+      // Only one restore call — no double restore
+      expect(anchorFns.restoreControlledTransitionAnchors).toHaveBeenCalledTimes(1)
+    })
+
+    it('clears old generic transition token when stale content sequence fires', async () => {
+      const deferredRecompute = createDeferred()
+      const recomputeLayout = vi.fn().mockReturnValue(deferredRecompute.promise)
+      const { ctrl } = createController({ recomputeLayout })
+
+      const domAnchor = { pageNumber: 33, offsetRatio: 0.25, owner: PDF_SCROLL_OWNER.ORIGINAL }
+      anchorFns.resolveAnchorOwner.mockReturnValue(PDF_SCROLL_OWNER.ORIGINAL)
+      anchorFns.resolveOwnerScrollTarget.mockReturnValue({
+        owner: PDF_SCROLL_OWNER.ORIGINAL,
+        container: document.createElement('div'),
+        selector: '.pdf-page[data-page-number]'
+      })
+      scrollAnchor.captureScrollAnchor.mockReturnValue(domAnchor)
+      scrollAnchor.isPdfAnchor.mockReturnValue(false)
+      anchorFns.restoreOwnedScrollAnchor.mockReturnValue(PDF_SCROLL_OWNER.ORIGINAL)
+      anchorFns.captureControlledTransitionAnchors.mockReturnValue({
+        originalAnchor: domAnchor,
+        translatedAnchor: null
+      })
+      anchorFns.restoreControlledTransitionAnchors.mockReturnValue(PDF_SCROLL_OWNER.ORIGINAL)
+      scrollAnchor.capturePdfBackedScrollAnchor.mockReturnValue(null)
+
+      await ctrl.handleContentViewChange(CONTENT_VIEW.TRANSLATION)
+
+      expect(ctrl.currentPageUpdatesSuppressed.value).toBe(true)
+
+      const staleLayoutPromise = ctrl.handleLayoutChange({ width: 800, height: 600 })
+
+      // Second transition clears old token via beginControlledTransition
+      await ctrl.handleContentViewChange(CONTENT_VIEW.ORIGINAL)
+
+      expect(ctrl.currentPageUpdatesSuppressed.value).toBe(true)
+
+      deferredRecompute.resolve()
+      await staleLayoutPromise
+
+      // Stale seq guard returned early — no restore
+      expect(anchorFns.restoreControlledTransitionAnchors).not.toHaveBeenCalled()
+    })
+
+    it('releases suppression when authoritative restore throws', async () => {
+      const recomputeLayout = vi.fn().mockResolvedValue(true)
+      const { ctrl } = createController({ recomputeLayout })
+
+      const domAnchor = { pageNumber: 33, offsetRatio: 0.25, owner: PDF_SCROLL_OWNER.ORIGINAL }
+      anchorFns.resolveAnchorOwner.mockReturnValue(PDF_SCROLL_OWNER.ORIGINAL)
+      anchorFns.resolveOwnerScrollTarget.mockReturnValue({
+        owner: PDF_SCROLL_OWNER.ORIGINAL,
+        container: document.createElement('div'),
+        selector: '.pdf-page[data-page-number]'
+      })
+      scrollAnchor.captureScrollAnchor.mockReturnValue(domAnchor)
+      scrollAnchor.isPdfAnchor.mockReturnValue(false)
+      anchorFns.restoreOwnedScrollAnchor.mockReturnValue(PDF_SCROLL_OWNER.ORIGINAL)
+      anchorFns.captureControlledTransitionAnchors.mockReturnValue({
+        originalAnchor: domAnchor,
+        translatedAnchor: null
+      })
+      anchorFns.restoreControlledTransitionAnchors.mockImplementation(() => {
+        throw new Error('restore failed')
+      })
+
+      await ctrl.handleContentViewChange(CONTENT_VIEW.TRANSLATION)
+
+      expect(ctrl.currentPageUpdatesSuppressed.value).toBe(true)
+
+      await expect(ctrl.handleLayoutChange({ width: 800, height: 600 })).rejects.toThrow('restore failed')
+
+      expect(ctrl.currentPageUpdatesSuppressed.value).toBe(false)
+      expect(ctrl.__debugCurrentPageSuppression.getDepth()).toBe(0)
     })
   })
 
