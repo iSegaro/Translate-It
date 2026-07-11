@@ -11,15 +11,23 @@ vi.mock('../utils/pdfFitPageFootprint.js', () => ({
   resolvePdfCanvasSlot: vi.fn(() => ({ availableCanvasWidth: 800, availableCanvasHeight: 600 }))
 }))
 
-const mockTopologyRef = vi.hoisted(() => ({ doesTopologyChange: null, realDoesTopologyChange: null }))
+const mockTopologyRef = vi.hoisted(() => ({
+  doesTopologyChange: null,
+  realDoesTopologyChange: null,
+  doesOriginalPaneLayoutChange: null,
+  realDoesOriginalPaneLayoutChange: null
+}))
 
 vi.mock('../utils/pdfViewerTopology.js', async () => {
   const mod = await vi.importActual('../utils/pdfViewerTopology.js')
   mockTopologyRef.realDoesTopologyChange = mod.doesTopologyChange
+  mockTopologyRef.realDoesOriginalPaneLayoutChange = mod.doesOriginalPaneLayoutChange
   mockTopologyRef.doesTopologyChange = vi.fn((prev, next) => mod.doesTopologyChange(prev, next))
+  mockTopologyRef.doesOriginalPaneLayoutChange = vi.fn((prev, next) => mod.doesOriginalPaneLayoutChange(prev, next))
   return {
     resolveEffectivePaneTopology: mod.resolveEffectivePaneTopology,
-    doesTopologyChange: mockTopologyRef.doesTopologyChange
+    doesTopologyChange: mockTopologyRef.doesTopologyChange,
+    doesOriginalPaneLayoutChange: mockTopologyRef.doesOriginalPaneLayoutChange
   }
 })
 
@@ -101,6 +109,11 @@ beforeEach(() => {
   if (mockTopologyRef.doesTopologyChange && mockTopologyRef.realDoesTopologyChange) {
     mockTopologyRef.doesTopologyChange.mockImplementation(
       (prev, next) => mockTopologyRef.realDoesTopologyChange(prev, next)
+    )
+  }
+  if (mockTopologyRef.doesOriginalPaneLayoutChange && mockTopologyRef.realDoesOriginalPaneLayoutChange) {
+    mockTopologyRef.doesOriginalPaneLayoutChange.mockImplementation(
+      (prev, next) => mockTopologyRef.realDoesOriginalPaneLayoutChange(prev, next)
     )
   }
 
@@ -1119,6 +1132,98 @@ describe('createPdfTransitionController', () => {
       await ctrl.handleLayoutChange({ width: 0, height: 0 })
 
       expect(recomputeLayout).not.toHaveBeenCalled()
+    })
+
+    it('consumes delegated transition token on unchanged-dimension layout callback', async () => {
+      const pdfViewerRef = { refreshCurrentPage: vi.fn() }
+      const recomputeLayout = vi.fn().mockResolvedValue(true)
+      const { ctrl } = createController({
+        recomputeLayout,
+        contentView: CONTENT_VIEW.TRANSLATION,
+        pdfViewerRef
+      })
+
+      const domAnchor = { pageNumber: 33, offsetRatio: 0.25, owner: PDF_SCROLL_OWNER.ORIGINAL }
+      anchorFns.resolveAnchorOwner.mockReturnValue(PDF_SCROLL_OWNER.ORIGINAL)
+      anchorFns.resolveOwnerScrollTarget.mockReturnValue({
+        owner: PDF_SCROLL_OWNER.ORIGINAL,
+        container: document.createElement('div'),
+        selector: '.pdf-page[data-page-number]'
+      })
+      scrollAnchor.captureScrollAnchor.mockReturnValue(domAnchor)
+      scrollAnchor.isPdfAnchor.mockReturnValue(false)
+      anchorFns.restoreOwnedScrollAnchor.mockReturnValue(PDF_SCROLL_OWNER.ORIGINAL)
+      anchorFns.captureControlledTransitionAnchors.mockReturnValue({
+        originalAnchor: domAnchor,
+        translatedAnchor: null
+      })
+      anchorFns.restoreControlledTransitionAnchors.mockReturnValue(PDF_SCROLL_OWNER.ORIGINAL)
+
+      await ctrl.handleContentViewChange(CONTENT_VIEW.ORIGINAL)
+
+      expect(ctrl.currentPageUpdatesSuppressed.value).toBe(true)
+
+      await ctrl.handleLayoutChange({ width: 0, height: 0 })
+
+      expect(recomputeLayout).not.toHaveBeenCalled()
+      expect(pdfViewerRef.refreshCurrentPage).toHaveBeenCalledTimes(1)
+      expect(ctrl.currentPageUpdatesSuppressed.value).toBe(false)
+      expect(ctrl.__debugGetSuppressionState().pendingToken).toBe(null)
+      expect(ctrl.__debugCurrentPageSuppression.getDepth()).toBe(0)
+    })
+
+    it('keeps unchanged-dimension no-op when no transition token exists', async () => {
+      const pdfViewerRef = { refreshCurrentPage: vi.fn() }
+      const { ctrl, recomputeLayout } = createController({ pdfViewerRef })
+
+      await ctrl.handleLayoutChange({ width: 0, height: 0 })
+
+      expect(recomputeLayout).not.toHaveBeenCalled()
+      expect(pdfViewerRef.refreshCurrentPage).not.toHaveBeenCalled()
+      expect(ctrl.currentPageUpdatesSuppressed.value).toBe(false)
+      expect(ctrl.__debugGetSuppressionState().pendingToken).toBe(null)
+    })
+
+    it('preserves stale transition token when unchanged dimensions do not match seq', async () => {
+      const pdfViewerRef = { refreshCurrentPage: vi.fn() }
+      const recomputeLayout = vi.fn().mockResolvedValue(true)
+      const { ctrl } = createController({
+        recomputeLayout,
+        contentView: CONTENT_VIEW.TRANSLATION,
+        pdfViewerRef
+      })
+
+      const domAnchor = { pageNumber: 33, offsetRatio: 0.25, owner: PDF_SCROLL_OWNER.ORIGINAL }
+      anchorFns.resolveAnchorOwner.mockReturnValue(PDF_SCROLL_OWNER.ORIGINAL)
+      anchorFns.resolveOwnerScrollTarget.mockReturnValue({
+        owner: PDF_SCROLL_OWNER.ORIGINAL,
+        container: document.createElement('div'),
+        selector: '.pdf-page[data-page-number]'
+      })
+      scrollAnchor.captureScrollAnchor.mockReturnValue(domAnchor)
+      scrollAnchor.isPdfAnchor.mockReturnValue(false)
+      anchorFns.restoreOwnedScrollAnchor.mockReturnValue(PDF_SCROLL_OWNER.ORIGINAL)
+      anchorFns.captureControlledTransitionAnchors.mockReturnValue({
+        originalAnchor: domAnchor,
+        translatedAnchor: null
+      })
+      anchorFns.restoreControlledTransitionAnchors.mockReturnValue(PDF_SCROLL_OWNER.ORIGINAL)
+
+      await ctrl.handleContentViewChange(CONTENT_VIEW.ORIGINAL)
+
+      ctrl.__debugSetPendingTransitionRestore({
+        transitionSeq: 0,
+        pdfAnchor: null,
+        ownsCurrentPageSuppression: true
+      })
+
+      await ctrl.handleLayoutChange({ width: 0, height: 0 })
+
+      expect(recomputeLayout).not.toHaveBeenCalled()
+      expect(pdfViewerRef.refreshCurrentPage).not.toHaveBeenCalled()
+      expect(ctrl.currentPageUpdatesSuppressed.value).toBe(true)
+      expect(ctrl.__debugGetSuppressionState().pendingToken).toEqual({ seq: 0, owns: true })
+      expect(ctrl.__debugCurrentPageSuppression.getDepth()).toBe(1)
     })
 
     it('defers layout change during controlled zoom and applies after zoom', async () => {

@@ -37,3 +37,9 @@ export function doesTopologyChange(previousTopology, nextTopology) {
     previousTopology.showTranslatedTextPane !== nextTopology.showTranslatedTextPane ||
     previousTopology.showTranslatedPdfPane !== nextTopology.showTranslatedPdfPane
 }
+
+export function doesOriginalPaneLayoutChange(previousTopology, nextTopology) {
+  if (!nextTopology.showOriginalPane) return false
+  if (!previousTopology.showOriginalPane && nextTopology.showOriginalPane) return true
+  return previousTopology.effectiveLayout !== nextTopology.effectiveLayout
+}
