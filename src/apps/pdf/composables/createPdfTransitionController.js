@@ -291,9 +291,9 @@ export function createPdfTransitionController({
       reason: pdfAnchorForRestore ? 'content-transition-pdf-backed' : 'content-transition-text'
     })
 
-    setContentView(nextView)
-
     try {
+      setContentView(nextView)
+
       await nextTick()
 
       console.log('[TRACE]', JSON.stringify({
@@ -344,23 +344,29 @@ export function createPdfTransitionController({
       ownerAnchor: layoutPdfAnchor ? null : anchor,
       ownsCurrentPageSuppression: !!layoutPdfAnchor
     }
-    acquireRenderWindowFreeze()
-    const ownsPendingPdfSuppression = !!layoutPdfAnchor
-    if (ownsPendingPdfSuppression) {
-      beginCurrentPageSuppression({
-        owner: 'pending-transition',
-        transitionSeq: contentTransitionSeq,
-        pageNumber: anchor?.pageNumber ?? null,
-        reason: 'layout-mode-pdf-backed'
-      })
-    } else {
-      beginCurrentPageSuppression({
-        owner: 'layout-mode',
-        transitionSeq: contentTransitionSeq,
-        reason: 'layout-mode-transition'
-      })
-    }
+
+    let renderWindowFreezeAcquired = false
+
     try {
+      acquireRenderWindowFreeze()
+      renderWindowFreezeAcquired = true
+
+      const ownsPendingPdfSuppression = !!layoutPdfAnchor
+      if (ownsPendingPdfSuppression) {
+        beginCurrentPageSuppression({
+          owner: 'pending-transition',
+          transitionSeq: contentTransitionSeq,
+          pageNumber: anchor?.pageNumber ?? null,
+          reason: 'layout-mode-pdf-backed'
+        })
+      } else {
+        beginCurrentPageSuppression({
+          owner: 'layout-mode',
+          transitionSeq: contentTransitionSeq,
+          reason: 'layout-mode-transition'
+        })
+      }
+
       setLayoutMode(mode)
 
       await nextTick()
@@ -379,12 +385,20 @@ export function createPdfTransitionController({
       if (isSideBySide.value) {
         syncFromOwner(restoredOwner || anchor?.owner || owner)
       }
+    } catch (error) {
+      const clearResult = clearPendingTransitionRestore('layout-mode-error', contentTransitionSeq)
+      if (clearResult.releasedCurrentPageSuppression) {
+        refreshCurrentPage()
+      }
+      throw error
     } finally {
       try {
-        releaseRenderWindowFreeze()
+        if (renderWindowFreezeAcquired) {
+          releaseRenderWindowFreeze()
+        }
         await refreshRenderWindowAfterLayoutTransition()
       } finally {
-        if (!ownsPendingPdfSuppression) {
+        if (!layoutPdfAnchor) {
           endCurrentPageSuppression({
             owner: 'layout-mode',
             transitionSeq: contentTransitionSeq,

@@ -738,6 +738,32 @@ describe('createPdfTransitionController', () => {
       expect(ctrl.__debugCurrentPageSuppression.getDepth()).toBe(1)
       expect(refreshCurrentPage).not.toHaveBeenCalled()
     })
+
+    it('clears token and releases suppression when setContentView throws', async () => {
+      const refreshCurrentPage = vi.fn()
+      const { ctrl, setContentView } = createController({
+        pdfViewerRef: { refreshCurrentPage }
+      })
+
+      const domAnchor = { pageNumber: 1, offsetRatio: 0, owner: PDF_SCROLL_OWNER.ORIGINAL }
+      anchorFns.resolveAnchorOwner.mockReturnValue(PDF_SCROLL_OWNER.ORIGINAL)
+      anchorFns.resolveOwnerScrollTarget.mockReturnValue({
+        owner: PDF_SCROLL_OWNER.ORIGINAL,
+        container: document.createElement('div'),
+        selector: '.pdf-page[data-page-number]'
+      })
+      scrollAnchor.captureScrollAnchor.mockReturnValue(domAnchor)
+      scrollAnchor.isPdfAnchor.mockReturnValue(false)
+      setContentView.mockImplementation(() => {
+        throw new Error('content view failed')
+      })
+
+      await expect(ctrl.handleContentViewChange(CONTENT_VIEW.TRANSLATION)).rejects.toThrow('content view failed')
+
+      expect(ctrl.currentPageUpdatesSuppressed.value).toBe(false)
+      expect(ctrl.__debugCurrentPageSuppression.getDepth()).toBe(0)
+      expect(refreshCurrentPage).toHaveBeenCalledTimes(1)
+    })
   })
 
   describe('handleLayoutModeChange', () => {
@@ -868,6 +894,7 @@ describe('createPdfTransitionController', () => {
       await expect(ctrl.handleLayoutModeChange('side-by-side')).rejects.toThrow('layout failed')
 
       expect(ctrl.renderWindowEvictionFrozen.value).toBe(false)
+      expect(ctrl.__debugCurrentPageSuppression.getDepth()).toBe(0)
     })
 
     it('releases current-page suppression when layout mode change throws', async () => {
@@ -891,6 +918,51 @@ describe('createPdfTransitionController', () => {
 
       expect(ctrl.currentPageUpdatesSuppressed.value).toBe(false)
       expect(ctrl.renderWindowEvictionFrozen.value).toBe(false)
+      expect(refreshCurrentPage).toHaveBeenCalledTimes(1)
+      expect(ctrl.__debugCurrentPageSuppression.getDepth()).toBe(0)
+    })
+
+    it('clears token and releases freeze when setLayoutMode throws for PDF-backed transition', async () => {
+      const refreshCurrentPage = vi.fn()
+      const { ctrl, setLayoutMode } = createController({
+        pdfViewerRef: { refreshRenderWindow: vi.fn(), refreshCurrentPage }
+      })
+
+      const pdfAnchor = { pageNumber: 1, offsetRatio: 0, pdfPoint: { x: 0, y: 0 } }
+      anchorFns.resolveAnchorOwner.mockReturnValue(PDF_SCROLL_OWNER.ORIGINAL)
+      anchorFns.capturePdfAwareOwnedScrollAnchor.mockReturnValue(pdfAnchor)
+      scrollAnchor.isPdfAnchor.mockReturnValue(true)
+      setLayoutMode.mockImplementation(() => {
+        throw new Error('layout failed')
+      })
+
+      await expect(ctrl.handleLayoutModeChange('single')).rejects.toThrow('layout failed')
+
+      expect(ctrl.currentPageUpdatesSuppressed.value).toBe(false)
+      expect(ctrl.renderWindowEvictionFrozen.value).toBe(false)
+      expect(ctrl.__debugCurrentPageSuppression.getDepth()).toBe(0)
+      expect(refreshCurrentPage).toHaveBeenCalledTimes(1)
+    })
+
+    it('clears token and releases freeze when restoreOwnedScrollAnchor throws in layout mode change', async () => {
+      const refreshCurrentPage = vi.fn()
+      const { ctrl } = createController({
+        pdfViewerRef: { refreshRenderWindow: vi.fn(), refreshCurrentPage }
+      })
+
+      const domAnchor = { pageNumber: 2, offsetRatio: 0.5 }
+      anchorFns.resolveAnchorOwner.mockReturnValue(PDF_SCROLL_OWNER.ORIGINAL)
+      anchorFns.capturePdfAwareOwnedScrollAnchor.mockReturnValue(domAnchor)
+      scrollAnchor.isPdfAnchor.mockReturnValue(false)
+      anchorFns.restoreOwnedScrollAnchor.mockImplementation(() => {
+        throw new Error('restore failed')
+      })
+
+      await expect(ctrl.handleLayoutModeChange('side-by-side')).rejects.toThrow('restore failed')
+
+      expect(ctrl.currentPageUpdatesSuppressed.value).toBe(false)
+      expect(ctrl.renderWindowEvictionFrozen.value).toBe(false)
+      expect(ctrl.__debugCurrentPageSuppression.getDepth()).toBe(0)
       expect(refreshCurrentPage).toHaveBeenCalledTimes(1)
     })
 
