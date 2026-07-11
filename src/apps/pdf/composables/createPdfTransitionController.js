@@ -68,12 +68,12 @@ export function createPdfTransitionController({
     currentPageUpdatesSuppressed.value = currentPageSuppressionDepth > 0
   }
 
-  function beginCurrentPageSuppression({ owner = 'layout-mode', transitionSeq = null, pageNumber = null, reason = '', prevTopology = null, nextTopology = null } = {}) {
+  function beginCurrentPageSuppression() {
     currentPageSuppressionDepth += 1
     syncCurrentPageSuppressionState()
   }
 
-  function endCurrentPageSuppression({ owner = 'layout-mode', transitionSeq = null, pageNumber = null, reason = '' } = {}) {
+  function endCurrentPageSuppression() {
     if (currentPageSuppressionDepth === 0) {
       syncCurrentPageSuppressionState()
       return
@@ -95,12 +95,7 @@ export function createPdfTransitionController({
     const { transitionSeq: pendingTokenSeq, pdfAnchor, ownsCurrentPageSuppression } = pendingTransitionRestore
     let releasedCurrentPageSuppression = false
     if (ownsCurrentPageSuppression) {
-      endCurrentPageSuppression({
-        owner: 'pending-transition',
-        transitionSeq: pendingTokenSeq,
-        pageNumber: pdfAnchor?.pageNumber ?? null,
-        reason
-      })
+      endCurrentPageSuppression()
       releasedCurrentPageSuppression = true
     }
     pendingTransitionRestore = null
@@ -110,9 +105,6 @@ export function createPdfTransitionController({
   const {
     resolveAnchorOwner,
     resolveOwnerScrollTarget,
-    resolveLayoutTransitionTarget,
-    captureOwnedScrollAnchor,
-    captureLayoutTransitionAnchor,
     capturePdfAwareOwnedScrollAnchor,
     captureControlledTransitionAnchors,
     restoreOwnedScrollAnchor,
@@ -164,11 +156,11 @@ export function createPdfTransitionController({
   }
 
   async function runWithCurrentPageSuppression(work) {
-    beginCurrentPageSuppression({ owner: 'zoom', reason: 'controlled-zoom' })
+    beginCurrentPageSuppression()
     try {
       return await work()
     } finally {
-      endCurrentPageSuppression({ owner: 'zoom', reason: 'controlled-zoom' })
+      endCurrentPageSuppression()
     }
   }
 
@@ -280,14 +272,7 @@ export function createPdfTransitionController({
       ownsCurrentPageSuppression: true
     }
 
-    beginCurrentPageSuppression({
-      owner: 'pending-transition',
-      transitionSeq: contentTransitionSeq,
-      pageNumber: anchor?.pageNumber ?? null,
-      reason: pdfAnchorForRestore ? 'content-transition-pdf-backed' : 'content-transition-text',
-      prevTopology: previousTopology,
-      nextTopology
-    })
+    beginCurrentPageSuppression()
 
     try {
       setContentView(nextView)
@@ -347,22 +332,9 @@ export function createPdfTransitionController({
       renderWindowFreezeAcquired = true
 
       if (ownsPendingPdfSuppression) {
-        beginCurrentPageSuppression({
-          owner: 'pending-transition',
-          transitionSeq: contentTransitionSeq,
-          pageNumber: anchor?.pageNumber ?? null,
-          reason: 'layout-mode-pdf-backed',
-          prevTopology,
-          nextTopology
-        })
+        beginCurrentPageSuppression()
       } else {
-        beginCurrentPageSuppression({
-          owner: 'layout-mode',
-          transitionSeq: contentTransitionSeq,
-          reason: layoutPdfAnchor ? 'layout-mode-pdf-backed-unchanged' : 'layout-mode-transition',
-          prevTopology,
-          nextTopology
-        })
+        beginCurrentPageSuppression()
       }
 
       setLayoutMode(mode)
@@ -406,11 +378,7 @@ export function createPdfTransitionController({
         }
       } finally {
         if (!ownsPendingPdfSuppression) {
-          endCurrentPageSuppression({
-            owner: 'layout-mode',
-            transitionSeq: contentTransitionSeq,
-            reason: 'layout-mode-transition'
-          })
+          endCurrentPageSuppression()
           refreshCurrentPage()
         }
       }
