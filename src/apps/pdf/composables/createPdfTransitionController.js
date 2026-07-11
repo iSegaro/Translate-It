@@ -28,8 +28,6 @@ export function createPdfTransitionController({
 }) {
   let contentTransitionSeq = 0
   let layoutChangeSeq = 0
-  let suppressedLayoutRestoreSeq = 0
-  let suppressedLayoutRestoreFrameId = null
   let scrollSyncSuppressionFrameId = null
   let controlledZoomSeq = 0
   let pendingTransitionRestore = null
@@ -127,7 +125,6 @@ export function createPdfTransitionController({
   })
 
   onBeforeUnmount(() => {
-    clearControlledTransitionSuppressionTimer()
     clearScrollSyncSuppressionTimer()
     clearPendingTransitionRestore('unmount')
     deferredZoomLayout = null
@@ -136,21 +133,6 @@ export function createPdfTransitionController({
   function beginControlledTransition() {
     clearPendingTransitionRestore('begin-controlled-transition')
     contentTransitionSeq += 1
-    suppressedLayoutRestoreSeq = contentTransitionSeq
-    clearControlledTransitionSuppressionTimer()
-    console.log('[TRACE]', JSON.stringify({
-      t: Date.now(),
-      site: 'beginControlledTransition',
-      seq: contentTransitionSeq,
-      suppressedSeq: suppressedLayoutRestoreSeq
-    }))
-  }
-
-  function clearControlledTransitionSuppressionTimer() {
-    if (suppressedLayoutRestoreFrameId != null) {
-      cancelAnimationFrame(suppressedLayoutRestoreFrameId)
-      suppressedLayoutRestoreFrameId = null
-    }
   }
 
   function clearScrollSyncSuppressionTimer() {
@@ -172,24 +154,6 @@ export function createPdfTransitionController({
     } finally {
       endCurrentPageSuppression({ owner: 'zoom', reason: 'controlled-zoom' })
     }
-  }
-
-  function scheduleControlledTransitionSuppressionClear() {
-    const seq = suppressedLayoutRestoreSeq
-    if (!seq) return
-
-    clearControlledTransitionSuppressionTimer()
-    suppressedLayoutRestoreFrameId = requestAnimationFrame(() => {
-      suppressedLayoutRestoreFrameId = null
-      if (suppressedLayoutRestoreSeq === seq) {
-        suppressedLayoutRestoreSeq = 0
-        console.log('[TRACE]', JSON.stringify({
-          t: Date.now(),
-          site: 'rAF_clearSuppressedRestoreSeq',
-          seq
-        }))
-      }
-    })
   }
 
   function beginScrollSyncSuppression() {
@@ -359,7 +323,6 @@ export function createPdfTransitionController({
       if (isSideBySide.value) {
         syncFromOwner(restoredOwner || anchor?.owner || owner)
       }
-      scheduleControlledTransitionSuppressionClear()
     } catch (error) {
       const errorClearResult = clearPendingTransitionRestore('content-view-error', contentTransitionSeq)
       if (errorClearResult.releasedCurrentPageSuppression) {
@@ -404,12 +367,10 @@ export function createPdfTransitionController({
 
       if (isSideBySide.value && showTranslatedPdfPane.value) {
         syncFromOwner(owner)
-        scheduleControlledTransitionSuppressionClear()
         return
       }
 
       if (isPdfAnchor(anchor)) {
-        scheduleControlledTransitionSuppressionClear()
         return
       }
 
@@ -418,7 +379,6 @@ export function createPdfTransitionController({
       if (isSideBySide.value) {
         syncFromOwner(restoredOwner || anchor?.owner || owner)
       }
-      scheduleControlledTransitionSuppressionClear()
     } finally {
       try {
         releaseRenderWindowFreeze()
@@ -464,7 +424,6 @@ export function createPdfTransitionController({
       : null
     const pdfAnchorFromToken = pendingTransitionRestoreForTransition?.pdfAnchor ?? null
     const ownerAnchorFromToken = pendingTransitionRestoreForTransition?.ownerAnchor ?? null
-    const suppressRestoreForControlledTransition = suppressedLayoutRestoreSeq === contentSeqAtStart
     const pendingPdfAnchor = pdfAnchorFromToken
 
     console.log('[TRACE]', JSON.stringify({
@@ -473,15 +432,13 @@ export function createPdfTransitionController({
       ev: 'enter',
       layout: nextLayout,
       contentSeq: contentSeqAtStart,
-      suppressRestore: suppressRestoreForControlledTransition,
       pendingPdf: !!pendingPdfAnchor,
       hasOwnerAnchor: !!ownerAnchorFromToken,
       origST: originalScrollContainer.value?.scrollTop
     }))
 
-    const shouldFreezeRenderWindow = !!pendingPdfAnchor || (
-      contentSeqAtStart > 0 && suppressedLayoutRestoreSeq === contentSeqAtStart
-    )
+    const shouldFreezeRenderWindow =
+      contentSeqAtStart > 0 && pendingTransitionRestoreForTransition != null
     let capturedAnchors = pendingTransitionRestoreForTransition?.pdfAnchor
       ? null
       : ownerAnchorFromToken
@@ -564,40 +521,11 @@ export function createPdfTransitionController({
           }
           return
         }
-        if (suppressRestoreForControlledTransition || suppressedLayoutRestoreSeq === contentSeqAtStart) {
-          console.log('[TRACE]', JSON.stringify({
-            t: Date.now(),
-            site: 'handleLayoutChange',
-            ev: 'early-return-suppressed',
-            suppress: suppressRestoreForControlledTransition,
-            suppressedSeq: suppressedLayoutRestoreSeq,
-            contentSeq: contentSeqAtStart,
-            capturedOrigPg: capturedAnchors?.originalAnchor?.pageNumber,
-            capturedTransPg: capturedAnchors?.translatedAnchor?.pageNumber
-          }))
-          try {
-            restoreControlledTransitionAnchors(capturedAnchors)
-          } finally {
-            const suppressedClearResult = clearPendingTransitionRestore('suppressed-layout-consume', contentSeqAtStart)
-            if (suppressedClearResult.releasedCurrentPageSuppression) {
-              refreshCurrentPage()
-            }
-          }
-          return
-        }
-
-        console.log('[TRACE]', JSON.stringify({
-          t: Date.now(),
-          site: 'handleLayoutChange',
-          ev: 'restoring-captured-anchors',
-          origPg: capturedAnchors?.originalAnchor?.pageNumber,
-          transPg: capturedAnchors?.translatedAnchor?.pageNumber
-        }))
         try {
           restoreControlledTransitionAnchors(capturedAnchors)
         } finally {
-          const normalClearResult = clearPendingTransitionRestore('layout-consume', contentSeqAtStart)
-          if (normalClearResult.releasedCurrentPageSuppression) {
+          const clearResult = clearPendingTransitionRestore('layout-consume', contentSeqAtStart)
+          if (clearResult.releasedCurrentPageSuppression) {
             refreshCurrentPage()
           }
         }
