@@ -155,6 +155,18 @@ export function createPdfTransitionController({
     pdfTranslatedPaneRef.value?.refreshCurrentPage?.()
   }
 
+  function completePendingTransition(reason, transitionSeq, hasPrimaryError = false) {
+    const clearResult = clearPendingTransitionRestore(reason, transitionSeq)
+    if (clearResult.releasedCurrentPageSuppression) {
+      if (hasPrimaryError) {
+        try { refreshCurrentPage() } catch (_) { /* best-effort */ }
+      } else {
+        refreshCurrentPage()
+      }
+    }
+    return clearResult
+  }
+
   async function runWithCurrentPageSuppression(work) {
     beginCurrentPageSuppression()
     try {
@@ -395,12 +407,7 @@ export function createPdfTransitionController({
       nextLayout.width === currentLayout.width &&
       nextLayout.height === currentLayout.height
     ) {
-      if (pendingTransitionRestoreForTransition) {
-        const clearResult = clearPendingTransitionRestore('layout-no-dimension-change-consume', contentSeqAtStart)
-        if (clearResult.releasedCurrentPageSuppression) {
-          refreshCurrentPage()
-        }
-      }
+      completePendingTransition('layout-no-dimension-change-consume', contentSeqAtStart)
       return
     }
 
@@ -417,37 +424,38 @@ export function createPdfTransitionController({
     const layoutSeq = layoutChangeSeq
     const pdfAnchorFromToken = pendingTransitionRestoreForTransition?.pdfAnchor ?? null
     const ownerAnchorFromToken = pendingTransitionRestoreForTransition?.ownerAnchor ?? null
-    const pendingPdfAnchor = pdfAnchorFromToken
 
     const shouldFreezeRenderWindow =
       contentSeqAtStart > 0 && pendingTransitionRestoreForTransition != null
-    let capturedAnchors = pendingTransitionRestoreForTransition?.pdfAnchor
-      ? null
-      : ownerAnchorFromToken
-        ? null
-        : (captureControlledTransitionAnchors() || { originalAnchor: null, translatedAnchor: null })
-    const translatedAnchor = pendingTransitionRestoreForTransition?.pdfAnchor
-      ? deriveTranslatedAnchorFromOriginal?.(pendingTransitionRestoreForTransition.pdfAnchor) || null
-      : capturedAnchors?.translatedAnchor ?? null
 
-    if (ownerAnchorFromToken && !pendingTransitionRestoreForTransition?.pdfAnchor) {
-      if (ownerAnchorFromToken.owner === PDF_SCROLL_OWNER.ORIGINAL) {
-        capturedAnchors = {
-          originalAnchor: ownerAnchorFromToken,
-          translatedAnchor: deriveTranslatedAnchorFromOriginal?.(ownerAnchorFromToken) || null
-        }
-      } else {
-        capturedAnchors = {
-          originalAnchor: deriveOriginalAnchorFromTranslated(ownerAnchorFromToken),
-          translatedAnchor: ownerAnchorFromToken
+    try {
+      const pendingPdfAnchor = pdfAnchorFromToken
+      let capturedAnchors = pendingTransitionRestoreForTransition?.pdfAnchor
+        ? null
+        : ownerAnchorFromToken
+          ? null
+          : (captureControlledTransitionAnchors() || { originalAnchor: null, translatedAnchor: null })
+      const translatedAnchor = pendingTransitionRestoreForTransition?.pdfAnchor
+        ? deriveTranslatedAnchorFromOriginal?.(pendingTransitionRestoreForTransition.pdfAnchor) || null
+        : capturedAnchors?.translatedAnchor ?? null
+
+      if (ownerAnchorFromToken && !pendingTransitionRestoreForTransition?.pdfAnchor) {
+        if (ownerAnchorFromToken.owner === PDF_SCROLL_OWNER.ORIGINAL) {
+          capturedAnchors = {
+            originalAnchor: ownerAnchorFromToken,
+            translatedAnchor: deriveTranslatedAnchorFromOriginal?.(ownerAnchorFromToken) || null
+          }
+        } else {
+          capturedAnchors = {
+            originalAnchor: deriveOriginalAnchorFromTranslated(ownerAnchorFromToken),
+            translatedAnchor: ownerAnchorFromToken
+          }
         }
       }
-    }
-    beginScrollSyncSuppression()
-    if (shouldFreezeRenderWindow) {
-      acquireRenderWindowFreeze()
-    }
-    try {
+      beginScrollSyncSuppression()
+      if (shouldFreezeRenderWindow) {
+        acquireRenderWindowFreeze()
+      }
       viewerLayout.value = nextLayout
       if (hasDocument.value) {
         await recomputeLayout(buildLayoutRequest(nextLayout))
@@ -466,22 +474,19 @@ export function createPdfTransitionController({
               translatedAnchor
             })
           } finally {
-            const clearResult = clearPendingTransitionRestore('authoritative-layout-consume', contentSeqAtStart)
-            if (clearResult.releasedCurrentPageSuppression) {
-              refreshCurrentPage()
-            }
+            completePendingTransition('authoritative-layout-consume', contentSeqAtStart)
           }
           return
         }
         try {
           restoreControlledTransitionAnchors(capturedAnchors)
         } finally {
-          const clearResult = clearPendingTransitionRestore('layout-consume', contentSeqAtStart)
-          if (clearResult.releasedCurrentPageSuppression) {
-            refreshCurrentPage()
-          }
+          completePendingTransition('layout-consume', contentSeqAtStart)
         }
       }
+    } catch (error) {
+      completePendingTransition('layout-error', contentSeqAtStart, true)
+      throw error
     } finally {
       if (shouldFreezeRenderWindow) {
         releaseRenderWindowFreeze()

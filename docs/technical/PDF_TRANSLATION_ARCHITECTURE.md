@@ -765,6 +765,13 @@ This prevents delegated lifecycle leaks: when a content view change delegates co
 - **Cleanup errors never mask primary failures**: if cleanup (`refreshRenderWindowAfterLayoutTransition`) also throws while a primary error exists, `console.warn` suppresses the cleanup error and the primary error propagates.
 - **Cleanup errors propagate when no primary error**: if cleanup throws but the transition body succeeded, the cleanup error is thrown — the caller sees it.
 - **Cleanup always runs**: `finally` blocks execute on every exit path — render window freeze released, scroll sync suppression cleared, current page refreshed.
+- **Deterministic error recovery in `handleLayoutChange`**: once transition ownership begins (when a matching `pendingTransitionRestore` is found), all operations capable of throwing are protected by a `try`/`catch`/`finally` block. On terminal failure, the `catch` block consumes the transition token, releases suppression, and performs a best-effort `refreshCurrentPage()` before rethrowing the original error. This ensures no token or suppression leak regardless of where the failure occurs:
+  - Anchor capture (`captureControlledTransitionAnchors`, `deriveTranslatedAnchorFromOriginal`, `deriveOriginalAnchorFromTranslated`)
+  - `beginScrollSyncSuppression`
+  - `recomputeLayout` rejection
+  - `restoreControlledTransitionAnchors` (already safe via inner `finally`)
+- **Unchanged-dimension completion and inner `finally` cleanup** use the same `completePendingTransition()` helper, ensuring the current-page refresh policy is consistent across all exit paths.
+- **Current-page refresh is best-effort during error cleanup**: if a primary error already exists, `refreshCurrentPage()` is wrapped in a try/catch to prevent it from masking the original failure.
 
 ---
 
