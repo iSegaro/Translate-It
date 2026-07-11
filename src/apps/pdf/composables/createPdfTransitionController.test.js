@@ -115,6 +115,7 @@ beforeEach(() => {
     restoreOwnedScrollAnchor: vi.fn(),
     restoreControlledTransitionAnchors: vi.fn(),
     deriveTranslatedAnchorFromOriginal: vi.fn(),
+    deriveOriginalAnchorFromTranslated: vi.fn(),
     resolveTranslatedZoomAnchor: vi.fn(),
     normalizeFitPagePdfAnchor: vi.fn(),
     normalizeFitPageDomRootAnchor: vi.fn()
@@ -1445,6 +1446,118 @@ describe('createPdfTransitionController', () => {
 
       expect(ctrl.currentPageUpdatesSuppressed.value).toBe(false)
       expect(ctrl.__debugCurrentPageSuppression.getDepth()).toBe(0)
+    })
+
+    it('restores both panes from ownerAnchor after Translation single switches to side-by-side', async () => {
+      const { ctrl, recomputeLayout } = createController({ contentView: CONTENT_VIEW.TRANSLATION })
+
+      const translatedAnchor = { owner: PDF_SCROLL_OWNER.TRANSLATED, pageNumber: 28, offsetRatio: 0.3 }
+      anchorFns.resolveAnchorOwner.mockReturnValue(PDF_SCROLL_OWNER.TRANSLATED)
+      anchorFns.capturePdfAwareOwnedScrollAnchor.mockReturnValue(translatedAnchor)
+      scrollAnchor.isPdfAnchor.mockReturnValue(false)
+      anchorFns.restoreOwnedScrollAnchor.mockReturnValue(PDF_SCROLL_OWNER.TRANSLATED)
+      anchorFns.deriveOriginalAnchorFromTranslated.mockReturnValue({ owner: PDF_SCROLL_OWNER.ORIGINAL, pageNumber: 28, offsetRatio: 0 })
+
+      await ctrl.handleLayoutModeChange('side-by-side')
+
+      anchorFns.captureControlledTransitionAnchors.mockReturnValue({
+        originalAnchor: { owner: PDF_SCROLL_OWNER.ORIGINAL, pageNumber: 1, offsetRatio: 0 },
+        translatedAnchor
+      })
+      recomputeLayout.mockResolvedValue()
+
+      await ctrl.handleLayoutChange({ width: 800, height: 600 })
+
+      expect(anchorFns.captureControlledTransitionAnchors).not.toHaveBeenCalled()
+      expect(anchorFns.restoreControlledTransitionAnchors).toHaveBeenCalledWith({
+        originalAnchor: expect.objectContaining({ pageNumber: 28 }),
+        translatedAnchor: expect.objectContaining({ pageNumber: 28 })
+      })
+    })
+
+    it('restores both panes from ownerAnchor after Original single switches to side-by-side', async () => {
+      const { ctrl, recomputeLayout } = createController()
+
+      const originalAnchor = { owner: PDF_SCROLL_OWNER.ORIGINAL, pageNumber: 14, offsetRatio: 0.5 }
+      anchorFns.resolveAnchorOwner.mockReturnValue(PDF_SCROLL_OWNER.ORIGINAL)
+      anchorFns.capturePdfAwareOwnedScrollAnchor.mockReturnValue(originalAnchor)
+      scrollAnchor.isPdfAnchor.mockReturnValue(false)
+      anchorFns.restoreOwnedScrollAnchor.mockReturnValue(PDF_SCROLL_OWNER.ORIGINAL)
+      anchorFns.deriveTranslatedAnchorFromOriginal.mockReturnValue({ owner: PDF_SCROLL_OWNER.TRANSLATED, pageNumber: 14, offsetRatio: 0.5 })
+
+      await ctrl.handleLayoutModeChange('side-by-side')
+
+      anchorFns.captureControlledTransitionAnchors.mockReturnValue({
+        originalAnchor,
+        translatedAnchor: { owner: PDF_SCROLL_OWNER.TRANSLATED, pageNumber: 1, offsetRatio: 0 }
+      })
+      recomputeLayout.mockResolvedValue()
+
+      await ctrl.handleLayoutChange({ width: 800, height: 600 })
+
+      expect(anchorFns.captureControlledTransitionAnchors).not.toHaveBeenCalled()
+      expect(anchorFns.restoreControlledTransitionAnchors).toHaveBeenCalledWith({
+        originalAnchor: expect.objectContaining({ pageNumber: 14 }),
+        translatedAnchor: expect.objectContaining({ pageNumber: 14 })
+      })
+    })
+
+    it('does not use ownerAnchor when pdfAnchor is present and authoritative', async () => {
+      const { ctrl, recomputeLayout } = createController({ isSideBySide: true, showTranslatedPdfPane: true })
+
+      const pdfAnchor = { owner: PDF_SCROLL_OWNER.ORIGINAL, pageNumber: 5, pdfPoint: { x: 0, y: 0 } }
+      anchorFns.resolveAnchorOwner.mockReturnValue(PDF_SCROLL_OWNER.ORIGINAL)
+      anchorFns.capturePdfAwareOwnedScrollAnchor.mockReturnValue(pdfAnchor)
+      scrollAnchor.isPdfAnchor.mockReturnValue(true)
+      anchorFns.restoreOwnedScrollAnchor.mockReturnValue(PDF_SCROLL_OWNER.ORIGINAL)
+
+      await ctrl.handleLayoutModeChange('side-by-side')
+
+      const freshAnchors = {
+        originalAnchor: { owner: PDF_SCROLL_OWNER.ORIGINAL, pageNumber: 40, offsetRatio: 0.25 },
+        translatedAnchor: null
+      }
+      anchorFns.captureControlledTransitionAnchors.mockReturnValue(freshAnchors)
+      anchorFns.deriveTranslatedAnchorFromOriginal.mockReturnValue({ owner: PDF_SCROLL_OWNER.TRANSLATED, pageNumber: 5, offsetRatio: 0 })
+      recomputeLayout.mockResolvedValue()
+
+      await ctrl.handleLayoutChange({ width: 800, height: 600 })
+
+      expect(anchorFns.restoreControlledTransitionAnchors).toHaveBeenCalledWith({
+        originalAnchor: expect.objectContaining(pdfAnchor),
+        translatedAnchor: expect.anything()
+      })
+      expect(anchorFns.restoreControlledTransitionAnchors).not.toHaveBeenCalledWith(freshAnchors)
+      expect(anchorFns.deriveOriginalAnchorFromTranslated).not.toHaveBeenCalled()
+    })
+
+    it('falls back to captureControlledTransitionAnchors when token has no ownerAnchor or pdfAnchor', async () => {
+      const { ctrl, recomputeLayout } = createController()
+
+      anchorFns.resolveAnchorOwner.mockReturnValue(PDF_SCROLL_OWNER.ORIGINAL)
+      anchorFns.resolveOwnerScrollTarget.mockReturnValue({
+        owner: PDF_SCROLL_OWNER.ORIGINAL,
+        container: document.createElement('div'),
+        selector: '.pdf-page[data-page-number]'
+      })
+      scrollAnchor.captureScrollAnchor.mockReturnValue({ pageNumber: 3, offsetRatio: 0.5 })
+      scrollAnchor.isPdfAnchor.mockReturnValue(false)
+      anchorFns.restoreOwnedScrollAnchor.mockReturnValue(PDF_SCROLL_OWNER.ORIGINAL)
+
+      await ctrl.handleContentViewChange(CONTENT_VIEW.TRANSLATED_PDF)
+      await new Promise(resolve => requestAnimationFrame(resolve))
+
+      const freshAnchors = {
+        originalAnchor: { owner: PDF_SCROLL_OWNER.ORIGINAL, pageNumber: 10, offsetRatio: 0.5 },
+        translatedAnchor: null
+      }
+      anchorFns.captureControlledTransitionAnchors.mockReturnValue(freshAnchors)
+      recomputeLayout.mockResolvedValue()
+
+      await ctrl.handleLayoutChange({ width: 800, height: 600 })
+
+      expect(anchorFns.captureControlledTransitionAnchors).toHaveBeenCalled()
+      expect(anchorFns.restoreControlledTransitionAnchors).toHaveBeenCalledWith(freshAnchors)
     })
   })
 

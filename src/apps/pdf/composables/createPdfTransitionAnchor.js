@@ -133,6 +133,16 @@ export function createPdfTransitionAnchor({
     }
   }
 
+  function deriveOriginalAnchorFromTranslated(translatedAnchor) {
+    if (!translatedAnchor?.pageNumber) return null
+
+    return {
+      owner: PDF_SCROLL_OWNER.ORIGINAL,
+      pageNumber: translatedAnchor.pageNumber,
+      offsetRatio: 0
+    }
+  }
+
   function resolveTranslatedZoomAnchor(originalAnchor, capturedTranslatedAnchor) {
     if (!isSideBySide.value) return capturedTranslatedAnchor
 
@@ -263,6 +273,7 @@ export function createPdfTransitionAnchor({
     restoreOwnedScrollAnchor,
     restoreControlledTransitionAnchors,
     deriveTranslatedAnchorFromOriginal,
+    deriveOriginalAnchorFromTranslated,
     resolveTranslatedZoomAnchor,
     normalizeFitPagePdfAnchor,
     normalizeFitPageDomRootAnchor

@@ -315,6 +315,48 @@ describe('createPdfTransitionAnchor', () => {
     })
   })
 
+  describe('deriveOriginalAnchorFromTranslated', () => {
+    it('derives original anchor from translated', () => {
+      const anchor = createAnchor()
+      const result = anchor.deriveOriginalAnchorFromTranslated({ pageNumber: 28, offsetRatio: 0.75, owner: PDF_SCROLL_OWNER.TRANSLATED })
+      expect(result).toEqual({ owner: PDF_SCROLL_OWNER.ORIGINAL, pageNumber: 28, offsetRatio: 0 })
+    })
+
+    it('resets offsetRatio to 0', () => {
+      const anchor = createAnchor()
+      const result = anchor.deriveOriginalAnchorFromTranslated({ pageNumber: 5, offsetRatio: 0.5, owner: PDF_SCROLL_OWNER.TRANSLATED })
+      expect(result.offsetRatio).toBe(0)
+    })
+
+    it('preserves pageNumber from source', () => {
+      const anchor = createAnchor()
+      const result = anchor.deriveOriginalAnchorFromTranslated({ pageNumber: 28, offsetRatio: 0.3, owner: PDF_SCROLL_OWNER.TRANSLATED })
+      expect(result.pageNumber).toBe(28)
+    })
+
+    it('strips pdfPoint if present', () => {
+      const anchor = createAnchor()
+      const result = anchor.deriveOriginalAnchorFromTranslated({
+        pageNumber: 28,
+        offsetRatio: 0.5,
+        owner: PDF_SCROLL_OWNER.TRANSLATED,
+        pdfPoint: { x: 100, y: 200 }
+      })
+      expect(result).toEqual({ owner: PDF_SCROLL_OWNER.ORIGINAL, pageNumber: 28, offsetRatio: 0 })
+      expect(result.pdfPoint).toBeUndefined()
+    })
+
+    it('returns null for null anchor', () => {
+      const anchor = createAnchor()
+      expect(anchor.deriveOriginalAnchorFromTranslated(null)).toBeNull()
+    })
+
+    it('returns null for anchor without pageNumber', () => {
+      const anchor = createAnchor()
+      expect(anchor.deriveOriginalAnchorFromTranslated({ offsetRatio: 0.5, owner: PDF_SCROLL_OWNER.TRANSLATED })).toBeNull()
+    })
+  })
+
   describe('resolveTranslatedZoomAnchor', () => {
     it('returns capturedTranslatedAnchor when not side-by-side', () => {
       const anchor = createAnchor({ isSideBySide: false })

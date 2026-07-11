@@ -110,6 +110,7 @@ export function createPdfTransitionController({
     restoreOwnedScrollAnchor,
     restoreControlledTransitionAnchors,
     deriveTranslatedAnchorFromOriginal,
+    deriveOriginalAnchorFromTranslated,
     resolveTranslatedZoomAnchor,
     normalizeFitPagePdfAnchor,
     normalizeFitPageDomRootAnchor
@@ -377,6 +378,7 @@ export function createPdfTransitionController({
     pendingTransitionRestore = {
       transitionSeq: contentTransitionSeq,
       pdfAnchor: layoutPdfAnchor,
+      ownerAnchor: layoutPdfAnchor ? null : anchor,
       ownsCurrentPageSuppression: !!layoutPdfAnchor
     }
     acquireRenderWindowFreeze()
@@ -461,6 +463,7 @@ export function createPdfTransitionController({
       ? pendingTransitionRestore
       : null
     const pdfAnchorFromToken = pendingTransitionRestoreForTransition?.pdfAnchor ?? null
+    const ownerAnchorFromToken = pendingTransitionRestoreForTransition?.ownerAnchor ?? null
     const suppressRestoreForControlledTransition = suppressedLayoutRestoreSeq === contentSeqAtStart
     const pendingPdfAnchor = pdfAnchorFromToken
 
@@ -472,16 +475,35 @@ export function createPdfTransitionController({
       contentSeq: contentSeqAtStart,
       suppressRestore: suppressRestoreForControlledTransition,
       pendingPdf: !!pendingPdfAnchor,
+      hasOwnerAnchor: !!ownerAnchorFromToken,
       origST: originalScrollContainer.value?.scrollTop
     }))
 
     const shouldFreezeRenderWindow = !!pendingPdfAnchor || (
       contentSeqAtStart > 0 && suppressedLayoutRestoreSeq === contentSeqAtStart
     )
-    const capturedAnchors = pendingTransitionRestoreForTransition?.pdfAnchor ? null : (captureControlledTransitionAnchors() || { originalAnchor: null, translatedAnchor: null })
+    let capturedAnchors = pendingTransitionRestoreForTransition?.pdfAnchor
+      ? null
+      : ownerAnchorFromToken
+        ? null
+        : (captureControlledTransitionAnchors() || { originalAnchor: null, translatedAnchor: null })
     const translatedAnchor = pendingTransitionRestoreForTransition?.pdfAnchor
       ? deriveTranslatedAnchorFromOriginal?.(pendingTransitionRestoreForTransition.pdfAnchor) || null
-      : capturedAnchors.translatedAnchor
+      : capturedAnchors?.translatedAnchor ?? null
+
+    if (ownerAnchorFromToken && !pendingTransitionRestoreForTransition?.pdfAnchor) {
+      if (ownerAnchorFromToken.owner === PDF_SCROLL_OWNER.ORIGINAL) {
+        capturedAnchors = {
+          originalAnchor: ownerAnchorFromToken,
+          translatedAnchor: deriveTranslatedAnchorFromOriginal?.(ownerAnchorFromToken) || null
+        }
+      } else {
+        capturedAnchors = {
+          originalAnchor: deriveOriginalAnchorFromTranslated(ownerAnchorFromToken),
+          translatedAnchor: ownerAnchorFromToken
+        }
+      }
+    }
     beginScrollSyncSuppression()
     if (shouldFreezeRenderWindow) {
       acquireRenderWindowFreeze()
