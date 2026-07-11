@@ -718,7 +718,7 @@ describe('createPdfTransitionController', () => {
       expect(anchorFns.restoreControlledTransitionAnchors).not.toHaveBeenCalled()
     })
 
-    it('keeps suppression active when non-PDF translation changes geometry', async () => {
+    it('releases suppression when Original single transitions to Translation single', async () => {
       const refreshCurrentPage = vi.fn()
       const { ctrl } = createController({ pdfViewerRef: { refreshCurrentPage } })
 
@@ -729,6 +729,57 @@ describe('createPdfTransitionController', () => {
         selector: '.pdf-page[data-page-number]'
       })
       scrollAnchor.captureScrollAnchor.mockReturnValue({ pageNumber: 13, offsetRatio: 0.25 })
+      scrollAnchor.isPdfAnchor.mockReturnValue(false)
+      anchorFns.restoreOwnedScrollAnchor.mockReturnValue(PDF_SCROLL_OWNER.ORIGINAL)
+
+      await ctrl.handleContentViewChange(CONTENT_VIEW.TRANSLATION)
+
+      expect(ctrl.currentPageUpdatesSuppressed.value).toBe(false)
+      expect(ctrl.__debugCurrentPageSuppression.getDepth()).toBe(0)
+      expect(refreshCurrentPage).toHaveBeenCalledTimes(1)
+      expect(anchorFns.restoreControlledTransitionAnchors).not.toHaveBeenCalled()
+    })
+
+    it('releases suppression from Translated PDF single to Translation single', async () => {
+      const refreshCurrentPage = vi.fn()
+      const { ctrl } = createController({
+        contentView: CONTENT_VIEW.TRANSLATED_PDF,
+        pdfViewerRef: { refreshCurrentPage }
+      })
+
+      anchorFns.resolveAnchorOwner.mockReturnValue(PDF_SCROLL_OWNER.ORIGINAL)
+      anchorFns.resolveOwnerScrollTarget.mockReturnValue({
+        owner: PDF_SCROLL_OWNER.ORIGINAL,
+        container: document.createElement('div'),
+        selector: '.pdf-page[data-page-number]'
+      })
+      scrollAnchor.captureScrollAnchor.mockReturnValue({ pageNumber: 5, offsetRatio: 0.3 })
+      scrollAnchor.isPdfAnchor.mockReturnValue(false)
+      anchorFns.restoreOwnedScrollAnchor.mockReturnValue(PDF_SCROLL_OWNER.ORIGINAL)
+
+      await ctrl.handleContentViewChange(CONTENT_VIEW.TRANSLATION)
+
+      expect(ctrl.currentPageUpdatesSuppressed.value).toBe(false)
+      expect(ctrl.__debugCurrentPageSuppression.getDepth()).toBe(0)
+      expect(refreshCurrentPage).toHaveBeenCalledTimes(1)
+    })
+
+    it('keeps suppression active when transitioning to Translation side-by-side', async () => {
+      const refreshCurrentPage = vi.fn()
+      const { ctrl } = createController({
+        contentView: CONTENT_VIEW.ORIGINAL,
+        isSideBySide: true,
+        selectedLayoutMode: LAYOUT_MODE.SIDE_BY_SIDE,
+        pdfViewerRef: { refreshCurrentPage }
+      })
+
+      anchorFns.resolveAnchorOwner.mockReturnValue(PDF_SCROLL_OWNER.ORIGINAL)
+      anchorFns.resolveOwnerScrollTarget.mockReturnValue({
+        owner: PDF_SCROLL_OWNER.ORIGINAL,
+        container: document.createElement('div'),
+        selector: '.pdf-page[data-page-number]'
+      })
+      scrollAnchor.captureScrollAnchor.mockReturnValue({ pageNumber: 10, offsetRatio: 0.5 })
       scrollAnchor.isPdfAnchor.mockReturnValue(false)
       anchorFns.restoreOwnedScrollAnchor.mockReturnValue(PDF_SCROLL_OWNER.ORIGINAL)
 
@@ -767,6 +818,29 @@ describe('createPdfTransitionController', () => {
   })
 
   describe('handleLayoutModeChange', () => {
+    it('releases suppression from Side-by-side Translation to Translation single', async () => {
+      const refreshCurrentPage = vi.fn()
+      const { ctrl } = createController({
+        contentView: CONTENT_VIEW.TRANSLATION,
+        isSideBySide: true,
+        selectedLayoutMode: LAYOUT_MODE.SIDE_BY_SIDE,
+        pdfViewerRef: { refreshCurrentPage }
+      })
+
+      anchorFns.resolveAnchorOwner.mockReturnValue(PDF_SCROLL_OWNER.ORIGINAL)
+      anchorFns.capturePdfAwareOwnedScrollAnchor.mockReturnValue({
+        pageNumber: 7,
+        offsetRatio: 0.4
+      })
+      scrollAnchor.isPdfAnchor.mockReturnValue(false)
+      anchorFns.restoreOwnedScrollAnchor.mockReturnValue(PDF_SCROLL_OWNER.ORIGINAL)
+
+      await ctrl.handleLayoutModeChange(LAYOUT_MODE.SINGLE)
+
+      expect(ctrl.currentPageUpdatesSuppressed.value).toBe(false)
+      expect(refreshCurrentPage).toHaveBeenCalledTimes(1)
+    })
+
     it('captures PDF-aware anchor and restores via DOM path', async () => {
       const { ctrl, setLayoutMode } = createController()
 
@@ -1214,7 +1288,7 @@ describe('createPdfTransitionController', () => {
       expect(anchorFns.restoreControlledTransitionAnchors).toHaveBeenCalledWith(anchors)
     })
 
-    it('keeps render window frozen during deferred recompute in transition-backed layout change', async () => {
+    it('does not freeze render window for layout change after transition completion owned inline', async () => {
       const deferredRecompute = createDeferred()
       const recomputeLayout = vi.fn().mockReturnValue(deferredRecompute.promise)
       const { ctrl } = createController({ recomputeLayout })
@@ -1241,7 +1315,7 @@ describe('createPdfTransitionController', () => {
 
       const layoutPromise = ctrl.handleLayoutChange({ width: 800, height: 600 })
 
-      expect(ctrl.renderWindowEvictionFrozen.value).toBe(true)
+      expect(ctrl.renderWindowEvictionFrozen.value).toBe(false)
 
       deferredRecompute.resolve()
       await layoutPromise
@@ -1428,7 +1502,7 @@ describe('createPdfTransitionController', () => {
       })
     })
 
-    it('suppresses current-page updates during non-PDF Original to Translation transition', async () => {
+    it('releases suppression inline for Original to Translation transition via topology ownership', async () => {
       const recomputeLayout = vi.fn().mockResolvedValue(true)
       const { ctrl } = createController({ recomputeLayout })
 
@@ -1450,10 +1524,11 @@ describe('createPdfTransitionController', () => {
 
       await ctrl.handleContentViewChange(CONTENT_VIEW.TRANSLATION)
 
-      // After handleContentViewChange: token created, suppression active
-      expect(ctrl.currentPageUpdatesSuppressed.value).toBe(true)
+      // completionOwnedByLayout = false (nextTopology.showOriginalPane = false)
+      // Token consumed inline during provisional restore
+      expect(ctrl.currentPageUpdatesSuppressed.value).toBe(false)
 
-      // handleLayoutChange consumes token and releases suppression
+      // Subsequent layout change proceeds without transition ownership
       await ctrl.handleLayoutChange({ width: 800, height: 600 })
 
       expect(ctrl.currentPageUpdatesSuppressed.value).toBe(false)
@@ -1488,7 +1563,7 @@ describe('createPdfTransitionController', () => {
       expect(ctrl.currentPageUpdatesSuppressed.value).toBe(false)
     })
 
-    it('releases suppression after restore', async () => {
+    it('completes transition inline without needing layout restore for suppression release', async () => {
       const recomputeLayout = vi.fn().mockResolvedValue(true)
       const { ctrl } = createController({ recomputeLayout })
 
@@ -1510,7 +1585,8 @@ describe('createPdfTransitionController', () => {
 
       await ctrl.handleContentViewChange(CONTENT_VIEW.TRANSLATION)
 
-      expect(ctrl.currentPageUpdatesSuppressed.value).toBe(true)
+      // Suppression already released — completion owned inline, not by layout
+      expect(ctrl.currentPageUpdatesSuppressed.value).toBe(false)
 
       await ctrl.handleLayoutChange({ width: 800, height: 600 })
 
@@ -1579,11 +1655,12 @@ describe('createPdfTransitionController', () => {
 
       await ctrl.handleContentViewChange(CONTENT_VIEW.TRANSLATION)
 
-      expect(ctrl.currentPageUpdatesSuppressed.value).toBe(true)
+      // Token consumed inline (completionOwnedByLayout = false)
+      expect(ctrl.currentPageUpdatesSuppressed.value).toBe(false)
 
       const staleLayoutPromise = ctrl.handleLayoutChange({ width: 800, height: 600 })
 
-      // Second transition clears old token via beginControlledTransition
+      // Second transition begins (TRANSLATION→ORIGINAL), completion owned by layout
       await ctrl.handleContentViewChange(CONTENT_VIEW.ORIGINAL)
 
       expect(ctrl.currentPageUpdatesSuppressed.value).toBe(true)
@@ -1619,8 +1696,10 @@ describe('createPdfTransitionController', () => {
 
       await ctrl.handleContentViewChange(CONTENT_VIEW.TRANSLATION)
 
-      expect(ctrl.currentPageUpdatesSuppressed.value).toBe(true)
+      // Suppression already released inline (completionOwnedByLayout = false)
+      expect(ctrl.currentPageUpdatesSuppressed.value).toBe(false)
 
+      // handleLayoutChange still performs capture+restore for generic layout
       await expect(ctrl.handleLayoutChange({ width: 800, height: 600 })).rejects.toThrow('restore failed')
 
       expect(ctrl.currentPageUpdatesSuppressed.value).toBe(false)

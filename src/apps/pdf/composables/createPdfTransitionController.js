@@ -250,6 +250,7 @@ export function createPdfTransitionController({
       selectedLayoutMode: selectedLayoutMode?.value
     })
     const geometryChangeExpected = doesTopologyChange(previousTopology, nextTopology)
+    const completionOwnedByLayout = geometryChangeExpected && nextTopology.showOriginalPane
     const owner = resolveAnchorOwner()
     const isPdfBackedTransition = isPdfBackedPdfTransition(previousView, nextView)
     const ownerTarget = resolveOwnerScrollTarget(owner)
@@ -313,8 +314,8 @@ export function createPdfTransitionController({
         isSideBySide: isSideBySide.value
       }))
 
-      if (!geometryChangeExpected) {
-        const clearResult = clearPendingTransitionRestore('provisional-restore-no-layout-change', contentTransitionSeq)
+      if (!completionOwnedByLayout) {
+        const clearResult = clearPendingTransitionRestore('provisional-complete', contentTransitionSeq)
         if (clearResult.releasedCurrentPageSuppression) {
           refreshCurrentPage()
         }
