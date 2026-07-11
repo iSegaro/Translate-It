@@ -135,10 +135,13 @@ export function usePdfRenderPipeline({
     })
   }
 
-  function onFreezeChange() {
+  function onFreezeChange(isFrozen) {
     renderWindowEpoch += 1
     cancelRenderWindowFrame()
-    renderScheduler.updateWindow({ frozen: true })
+    renderScheduler.updateWindow({ frozen: isFrozen })
+    if (isFrozen === false) {
+      applyRenderWindow()
+    }
   }
 
   function reset() {

@@ -469,7 +469,7 @@ describe('PdfViewer', () => {
     wrapper.unmount()
   })
 
-  it('recomputes the final render window through explicit refresh after eviction freeze is released', async () => {
+  it('recomputes the final render window on eviction freeze release and emits authoritative visible pages', async () => {
     const session = createSession()
     setPageTops({ 1: -100, 2: 0, 3: 100, 4: 200 })
 
@@ -494,10 +494,6 @@ describe('PdfViewer', () => {
 
     await wrapper.setProps({ freezeRenderWindowEviction: false })
     await nextTick()
-
-    expect(lastRenderCandidates(session)).toEqual([1, 2, 3])
-
-    wrapper.vm.refreshRenderWindow()
 
     expect(lastRenderCandidates(session)).toEqual([3, 4])
 
@@ -529,7 +525,7 @@ describe('PdfViewer', () => {
     await waitAnimationFrame()
     await nextTick()
 
-    expect(lastRenderCandidates(session)).toEqual([1, 2, 3])
+    expect(lastRenderCandidates(session)).toEqual([3, 4])
 
     wrapper.unmount()
   })
@@ -560,7 +556,7 @@ describe('PdfViewer', () => {
     await pagesUpdate
     await nextTick()
 
-    expect(lastRenderCandidates(session)).toEqual([1, 2, 3])
+    expect(lastRenderCandidates(session)).toEqual([3, 4])
 
     wrapper.unmount()
   })
@@ -840,7 +836,7 @@ describe('PdfViewer', () => {
     wrapper.unmount()
   })
 
-  it('clears pending replacement while frozen and preserves committed candidates', async () => {
+  it('recomputes window from settled geometry after unfreeze and continues pending replacement lifecycle', async () => {
     const { wrapper, session } = await mountViewerWithPages()
 
     await applyWindow(wrapper, {
@@ -872,7 +868,7 @@ describe('PdfViewer', () => {
     page70.vm.$emit('render-committed', 70)
     await nextTick()
 
-    expect(lastRenderCandidates(session)).toEqual([1, 2, 3, 70])
+    expect(lastRenderCandidates(session)).toEqual([69, 70, 71])
 
     wrapper.unmount()
   })

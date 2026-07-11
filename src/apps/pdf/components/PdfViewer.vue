@@ -336,8 +336,8 @@ watch(
 
 watch(
   () => props.freezeRenderWindowEviction,
-  () => {
-    onFreezeChange()
+  (isFrozen) => {
+    onFreezeChange(isFrozen)
   },
   { flush: 'sync' }
 )
@@ -353,7 +353,6 @@ function setupObservers() {
   }
 
   emitLayoutIfNeeded()
-  applyRenderWindow()
   currentPageIfVisible()
 }
 
@@ -376,6 +375,7 @@ watch(
   async () => {
     await nextTick()
     setupObservers()
+    applyRenderWindow()
   }
 )
 

@@ -218,7 +218,47 @@ describe('usePdfRenderPipeline', () => {
     const deps = createMockDeps()
     const pipeline = usePdfRenderPipeline(deps)
 
-    expect(() => pipeline.onFreezeChange()).not.toThrow()
+    expect(() => pipeline.onFreezeChange(true)).not.toThrow()
+  })
+
+  it('onFreezeChange(true) suppresses onVisiblePagesChange while frozen', () => {
+    const container = createContainer({ scrollTop: 100, clientHeight: 150 })
+    const deps = createMockDeps({
+      freezeRenderWindowEviction: { value: false },
+      getContainer: vi.fn(() => container)
+    })
+    const pipeline = usePdfRenderPipeline(deps)
+
+    pipeline.applyRenderWindow()
+
+    expect(deps.onVisiblePagesChange).toHaveBeenCalledTimes(1)
+    expect(deps.onVisiblePagesChange).toHaveBeenCalledWith(new Set([2, 3]))
+
+    deps.onVisiblePagesChange.mockClear()
+
+    deps.freezeRenderWindowEviction.value = true
+    container.scrollTop = 300
+    pipeline.applyRenderWindow()
+
+    expect(deps.onVisiblePagesChange).not.toHaveBeenCalled()
+  })
+
+  it('onFreezeChange(false) emits authoritative visible pages exactly once', () => {
+    const container = createContainer({ scrollTop: 100, clientHeight: 150 })
+    const deps = createMockDeps({
+      freezeRenderWindowEviction: { value: true },
+      getContainer: vi.fn(() => container)
+    })
+    const pipeline = usePdfRenderPipeline(deps)
+
+    pipeline.applyRenderWindow()
+    deps.onVisiblePagesChange.mockClear()
+
+    deps.freezeRenderWindowEviction.value = false
+    pipeline.onFreezeChange(false)
+
+    expect(deps.onVisiblePagesChange).toHaveBeenCalledTimes(1)
+    expect(deps.onVisiblePagesChange).toHaveBeenCalledWith(new Set([2, 3]))
   })
 
   it('getRenderPriority returns null for unknown page', () => {
