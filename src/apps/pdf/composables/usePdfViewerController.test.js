@@ -520,3 +520,95 @@ describe('usePdfViewerController cache persistence', () => {
     expect(controller.translatedPageData.value[0].blocks[0].id).toBe(block.id)
   })
 })
+
+describe('usePdfViewerController error lifecycle', () => {
+  beforeEach(() => {
+    openFileMock.mockReset()
+    rebuildPageMetricsMock.mockReset()
+    cleanupDocumentMock.mockReset().mockResolvedValue()
+    cancelActiveTranslationMock.mockReset().mockResolvedValue()
+    translateVisibleBlocksMock.mockReset()
+    saveTranslationsMock.mockReset().mockResolvedValue()
+    updateAfterOpenMock.mockReset().mockResolvedValue()
+    updateAfterTranslationMock.mockReset().mockResolvedValue()
+    getProviderOptimizationLevelAsyncMock.mockReset().mockResolvedValue(3)
+    getSourceLanguageAsyncMock.mockReset().mockResolvedValue('auto')
+    getTargetLanguageAsyncMock.mockReset().mockResolvedValue('fa')
+    getTranslationApiAsyncMock.mockReset().mockResolvedValue('googlev2')
+
+    session.pageSessions = new Map()
+    session.translationStates = new Map()
+    session.documentIdentity = 'doc-1'
+    session.visiblePageNumbers = new Set()
+    session.getPageSession.mockReset()
+  })
+
+  it('clears stale error before translation retry', async () => {
+    const block = createBlock()
+    const { controller } = await loadControllerWithCacheEntry(null, block)
+
+    controller.error.value = 'Stale error'
+
+    translateVisibleBlocksMock.mockImplementation(async () => {
+      expect(controller.error.value).toBe('')
+      return {
+        status: 'translated',
+        translatedCount: 0,
+        failedCount: 0,
+        totalCount: 0
+      }
+    })
+
+    session.getVisibleLogicalBlocks.mockResolvedValue([block])
+    session.getPageLayout.mockReturnValue(null)
+
+    await controller.translateVisiblePages()
+
+    expect(controller.error.value).toBe('')
+  })
+
+  it('sets error when translation fails after clearing stale error', async () => {
+    const block = createBlock()
+    const { controller } = await loadControllerWithCacheEntry(null, block)
+
+    controller.error.value = 'Stale error'
+
+    translateVisibleBlocksMock.mockRejectedValue(new Error('Translation failed'))
+
+    session.getVisibleLogicalBlocks.mockResolvedValue([block])
+    session.getPageLayout.mockReturnValue(null)
+
+    await controller.translateVisiblePages()
+
+    expect(controller.error.value).toBe('Translation failed')
+  })
+
+  it('clears stale error before recomputeLayout', async () => {
+    const block = createBlock()
+    const { controller } = await loadControllerWithCacheEntry(null, block)
+
+    controller.error.value = 'Stale error'
+
+    rebuildPageMetricsMock.mockImplementation(async () => {
+      expect(controller.error.value).toBe('')
+      return createOpenState()
+    })
+
+    await controller.recomputeLayout({ width: 800, height: 600 })
+
+    expect(controller.error.value).toBe('')
+  })
+
+  it('sets error when recomputeLayout fails after clearing stale error', async () => {
+    const block = createBlock()
+    const { controller } = await loadControllerWithCacheEntry(null, block)
+
+    controller.error.value = 'Stale error'
+
+    rebuildPageMetricsMock.mockRejectedValue(new Error('Layout failed'))
+
+    await controller.recomputeLayout({ width: 800, height: 600 })
+
+    expect(controller.error.value).toBe('Layout failed')
+  })
+})

@@ -19,7 +19,8 @@ describe('buildPdfStatusBannerState', () => {
       variant: 'info',
       title: 'Opening PDF',
       message: 'Loading PDF and rebuilding visible pages.',
-      detail: ''
+      detail: '',
+      dismissible: false
     })
   })
 
@@ -30,7 +31,8 @@ describe('buildPdfStatusBannerState', () => {
       variant: 'info',
       title: 'Translating visible pages',
       message: 'Translating visible pages.',
-      detail: ''
+      detail: '',
+      dismissible: false
     })
   })
 
@@ -41,18 +43,20 @@ describe('buildPdfStatusBannerState', () => {
       variant: 'success',
       title: 'Restored from cache',
       message: 'Restored 2 cached translation(s).',
-      detail: ''
+      detail: '',
+      dismissible: true
     })
   })
 
   it('builds a partial export warning banner', () => {
     expect(controller.build({ isPartialExport: true })).toEqual({
-      id: 'partial-export',
+      id: 'partial-export:0',
       visible: true,
       variant: 'warning',
       title: 'Partial translation',
       message: 'Partial translation available. Not all blocks are translated yet.',
-      detail: ''
+      detail: '',
+      dismissible: true
     })
   })
 
@@ -70,7 +74,8 @@ describe('buildPdfStatusBannerState', () => {
       variant: 'success',
       title: 'TXT export ready',
       message: 'TXT export downloaded successfully.',
-      detail: ''
+      detail: '',
+      dismissible: true
     })
   })
 
@@ -84,12 +89,13 @@ describe('buildPdfStatusBannerState', () => {
         detail: ''
       }
     })).toEqual({
-      id: 'partial-export',
+      id: 'partial-export:0',
       visible: true,
       variant: 'warning',
       title: 'Partial translation',
       message: 'Partial translation available. Not all blocks are translated yet.',
-      detail: ''
+      detail: '',
+      dismissible: true
     })
   })
 
@@ -110,7 +116,8 @@ describe('buildPdfStatusBannerState', () => {
       variant: 'error',
       title: 'PDF error',
       message: 'Failed to open the PDF file.',
-      detail: ''
+      detail: '',
+      dismissible: true
     })
   })
 
@@ -130,6 +137,15 @@ describe('buildPdfStatusBannerState', () => {
     expect(third.id).toBe('error:2')
   })
 
+  it('generates new id after error clears and returns', () => {
+    const first = controller.build({ error: 'Same error.' })
+    expect(first.id).toBe('error:1')
+
+    controller.build({})
+    const second = controller.build({ error: 'Same error.' })
+    expect(second.id).toBe('error:2')
+  })
+
   it('keeps controllers independent', () => {
     const firstController = createPdfStatusBannerController()
     const secondController = createPdfStatusBannerController()
@@ -139,5 +155,37 @@ describe('buildPdfStatusBannerState', () => {
 
     expect(first.id).toBe('error:1')
     expect(second.id).toBe('error:1')
+  })
+
+  it('uses translationOccurrenceId in partial banner id', () => {
+    expect(controller.build({ isPartialExport: true, translationOccurrenceId: 1 })).toMatchObject({
+      id: 'partial-export:1',
+      variant: 'warning'
+    })
+  })
+
+  it('generates different partial ids for different occurrences', () => {
+    const first = controller.build({ isPartialExport: true, translationOccurrenceId: 1 })
+    const second = controller.build({ isPartialExport: true, translationOccurrenceId: 2 })
+    expect(first.id).toBe('partial-export:1')
+    expect(second.id).toBe('partial-export:2')
+    expect(first.id).not.toBe(second.id)
+  })
+
+  it('keeps same partial id across same-occurrence recomputations', () => {
+    const first = controller.build({ isPartialExport: true, translationOccurrenceId: 5 })
+    const second = controller.build({ isPartialExport: true, translationOccurrenceId: 5 })
+    expect(first.id).toBe('partial-export:5')
+    expect(second.id).toBe(first.id)
+  })
+
+  it('uses new partial id after successful translation between partials', () => {
+    const first = controller.build({ isPartialExport: true, translationOccurrenceId: 1 })
+    expect(first.id).toBe('partial-export:1')
+
+    controller.build({ isPartialExport: false, translationOccurrenceId: 2 })
+
+    const third = controller.build({ isPartialExport: true, translationOccurrenceId: 3 })
+    expect(third.id).toBe('partial-export:3')
   })
 })

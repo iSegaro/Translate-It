@@ -45,7 +45,7 @@
             :title="pdfStatusBanner.title || ''"
             :message="pdfStatusBanner.message || ''"
             :detail="pdfStatusBanner.detail || ''"
-            :dismissible="isPdfStatusBannerDismissible"
+            :dismissible="pdfStatusBanner?.dismissible ?? false"
             @dismiss="dismissPdfStatusBanner"
           />
         </div>
@@ -338,14 +338,20 @@ const pdfStatusBanner = computed(() => pdfStatusBannerController.build({
   isLoading: isLoading.value,
   isTranslating: isTranslating.value,
   exportSuccess: exportSuccess.value,
-  isPartialExport: isPartialExport.value
+  isPartialExport: isPartialExport.value,
+  translationOccurrenceId: translationSummary.value?.translationOccurrenceId ?? 0
 }))
 
-const isPdfStatusBannerDismissible = computed(() => pdfStatusBanner.value?.variant === 'error')
 const isPdfStatusBannerVisible = computed(() => {
-  if (!pdfStatusBanner.value) return false
-  if (!isPdfStatusBannerDismissible.value) return true
-  return dismissedPdfStatusBannerKey.value !== pdfStatusBanner.value.id
+  if (!pdfStatusBanner.value) {
+    return false
+  }
+  const dismissed = dismissedPdfStatusBannerKey.value
+  const bid = pdfStatusBanner.value.id
+  if (dismissed === bid) {
+    return false
+  }
+  return true
 })
 
 watch(hasDocument, (has) => {
@@ -431,7 +437,9 @@ function handleClearCache() {
 }
 
 function dismissPdfStatusBanner() {
-  if (!pdfStatusBanner.value?.id || !isPdfStatusBannerDismissible.value) return
+  if (!pdfStatusBanner.value?.id || !pdfStatusBanner.value.dismissible) {
+    return
+  }
   dismissedPdfStatusBannerKey.value = pdfStatusBanner.value.id
 }
 

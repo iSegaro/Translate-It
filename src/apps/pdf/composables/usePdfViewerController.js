@@ -406,6 +406,7 @@ export function usePdfViewerController() {
       return false
     }
 
+    error.value = ''
     try {
       const nextState = await pdfDocumentSession.rebuildPageMetrics(layoutRequest)
       applySessionState(nextState)
@@ -422,6 +423,8 @@ export function usePdfViewerController() {
     if (!canTranslateVisiblePages.value) {
       return false
     }
+
+    error.value = ''
 
     try {
       isTranslating.value = true

@@ -7,26 +7,26 @@ function createErrorBannerIdFactory() {
   let sequence = 0
   let lastKind = ''
   let lastSource = ''
-  let lastId = ''
+  let lastActive = false
 
   return {
     next(kind, source) {
-      const signatureChanged = lastKind !== kind || lastSource !== source
-      if (signatureChanged) {
+      const active = kind !== ''
+
+      if (active && (!lastActive || lastKind !== kind || lastSource !== source)) {
         sequence += 1
         lastKind = kind
         lastSource = source
-        lastId = `${kind}:${sequence}`
       }
 
-      return lastId || `${kind}:${sequence}`
+      lastActive = active
+      return active ? `${kind}:${sequence}` : ''
     }
   }
 }
 
 export function createPdfStatusBannerController() {
   const errorIdFactory = createErrorBannerIdFactory()
-
   function build({
     error = '',
     exportError = '',
@@ -35,7 +35,11 @@ export function createPdfStatusBannerController() {
     isTranslating = false,
     exportSuccess = null,
     restoredTranslationCount = 0,
-    isPartialExport = false
+    isPartialExport = false,
+    // Domain-level identity for one completed translation occurrence.
+    // Stable across reactive recomputations of the same occurrence.
+    // UI dismiss key uses this to distinguish independent translation outcomes.
+    translationOccurrenceId = 0
   } = {}) {
     const loadingMessage = 'Loading PDF and rebuilding visible pages.'
     const translatingMessage = 'Translating visible pages.'
@@ -45,17 +49,19 @@ export function createPdfStatusBannerController() {
     const partialMessage = 'Partial translation available. Not all blocks are translated yet.'
 
     const errorMessage = buildMessageFromError(error) || buildMessageFromError(exportError) || buildMessageFromError(ocrError)
-    if (errorMessage) {
-      const kind = error ? 'error' : exportError ? 'export-error' : 'ocr-error'
-      const source = error || exportError || ocrError || ''
+    const errorKind = errorMessage ? (error ? 'error' : exportError ? 'export-error' : 'ocr-error') : ''
+    const errorSource = errorMessage || ''
+    const errorId = errorIdFactory.next(errorKind, errorSource)
 
+    if (errorMessage) {
       return {
-        id: errorIdFactory.next(kind, source),
+        id: errorId,
         visible: true,
         variant: 'error',
         title: 'PDF error',
         message: errorMessage,
-        detail: ''
+        detail: '',
+        dismissible: true
       }
     }
 
@@ -66,7 +72,8 @@ export function createPdfStatusBannerController() {
         variant: 'info',
         title: 'Opening PDF',
         message: loadingMessage,
-        detail: ''
+        detail: '',
+        dismissible: false
       }
     }
 
@@ -77,18 +84,20 @@ export function createPdfStatusBannerController() {
         variant: 'info',
         title: 'Translating visible pages',
         message: translatingMessage,
-        detail: ''
+        detail: '',
+        dismissible: false
       }
     }
 
     if (isPartialExport) {
       return {
-        id: 'partial-export',
+        id: `partial-export:${translationOccurrenceId}`,
         visible: true,
         variant: 'warning',
         title: 'Partial translation',
         message: partialMessage,
-        detail: ''
+        detail: '',
+        dismissible: true
       }
     }
 
@@ -99,7 +108,8 @@ export function createPdfStatusBannerController() {
         variant: exportSuccess.variant || 'success',
         title: exportSuccess.title || 'Export ready',
         message: exportSuccess.message || '',
-        detail: exportSuccess.detail || ''
+        detail: exportSuccess.detail || '',
+        dismissible: true
       }
     }
 
@@ -110,10 +120,10 @@ export function createPdfStatusBannerController() {
         variant: 'success',
         title: 'Restored from cache',
         message: restoredMessage,
-        detail: ''
+        detail: '',
+        dismissible: true
       }
     }
-
     return null
   }
 

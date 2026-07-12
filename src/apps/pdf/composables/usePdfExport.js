@@ -18,7 +18,9 @@ export function usePdfExport(translationTick) {
   })
 
   const canExport = computed(() => exportStats.value.hasTranslatedBlocks)
-  const isPartialExport = computed(() => exportStats.value.isPartial)
+  const isPartialExport = computed(() => {
+    return exportStats.value.isPartial
+  })
 
   async function exportTxt() {
     try {

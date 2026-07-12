@@ -131,7 +131,8 @@ export class PdfTranslationCoordinator {
       status: 'idle',
       translatedCount: 0,
       failedCount: 0,
-      totalCount: 0
+      totalCount: 0,
+      translationOccurrenceId: 0
     }
   }
 
@@ -157,7 +158,8 @@ export class PdfTranslationCoordinator {
           status: translatedCount > 0 ? 'translated' : 'idle',
           translatedCount,
           failedCount: 0,
-          totalCount: translatedCount
+          totalCount: translatedCount,
+          translationOccurrenceId: runId
         }
         return this.lastSummary
       }
@@ -235,7 +237,8 @@ export class PdfTranslationCoordinator {
           status: 'cancelled',
           translatedCount,
           failedCount,
-          totalCount: translatedCount + failedCount
+          totalCount: translatedCount + failedCount,
+          translationOccurrenceId: runId
         }
         return this.lastSummary
       }
@@ -244,7 +247,8 @@ export class PdfTranslationCoordinator {
         status: failedCount > 0 ? 'partial' : 'translated',
         translatedCount,
         failedCount,
-        totalCount: translatedCount + failedCount
+        totalCount: translatedCount + failedCount,
+        translationOccurrenceId: runId
       }
 
       return this.lastSummary

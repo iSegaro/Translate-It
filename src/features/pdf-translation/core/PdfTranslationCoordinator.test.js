@@ -157,7 +157,8 @@ describe('PdfTranslationCoordinator', () => {
       status: 'translated',
       translatedCount: 2,
       failedCount: 0,
-      totalCount: 2
+      totalCount: 2,
+      translationOccurrenceId: 1
     })
     expect(session.setBlockTranslationState).toHaveBeenCalledWith('block-a', expect.objectContaining({
       status: 'translated',
@@ -343,7 +344,8 @@ describe('PdfTranslationCoordinator', () => {
       status: 'translated',
       translatedCount: 2,
       failedCount: 0,
-      totalCount: 2
+      totalCount: 2,
+      translationOccurrenceId: 1
     })
     expect(session.setBlockTranslationState).toHaveBeenCalledWith('block-a', expect.objectContaining({
       status: 'translated',
@@ -473,7 +475,8 @@ describe('PdfTranslationCoordinator', () => {
       status: 'translated',
       translatedCount: 3,
       failedCount: 0,
-      totalCount: 3
+      totalCount: 3,
+      translationOccurrenceId: 1
     })
 
     const finalState = translationStateStore.get(block.id)
@@ -521,7 +524,8 @@ describe('PdfTranslationCoordinator', () => {
       status: 'partial',
       translatedCount: 1,
       failedCount: 1,
-      totalCount: 2
+      totalCount: 2,
+      translationOccurrenceId: 1
     })
     expect(session.setBlockTranslationState).toHaveBeenCalledWith('block-a', expect.objectContaining({
       status: 'translated',
