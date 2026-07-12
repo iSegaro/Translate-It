@@ -63,7 +63,7 @@ The PDF Translation feature is a **self-contained, dedicated PDF viewer and tran
 - [Selection Integration](#selection-integration)
 - [Logical Block Model](#logical-block-model)
 - [Translation Pipeline](#translation-pipeline)
-- [Bilingual Rendering Model](#bilingual-rendering-model)
+- [Viewer Mode Model](#viewer-mode-model)
 - [OCR Fallback Architecture](#ocr-fallback-architecture)
 - [Cache Architecture](#cache-architecture)
   - [Cache Identity](#cache-identity)
@@ -263,7 +263,7 @@ PdfApp
 │       └── PdfTranslatedPane (translated blocks per page, own scroll container)
 │           ├── PdfTranslatedBlock × M
 │           └── PdfOcrStatus × N
-└── PdfSelectionAction (floating translate button + result popup)
+└── PdfWindowsHost (floating translation icon + draggable/resizable result window)
 ```
 
 ### Key Application Utilities (src/apps/pdf/utils/)
@@ -295,12 +295,12 @@ PdfApp
 | `usePdfNavigation` | Outline/destination resolution, page navigation | `PdfDestinationResolver`, `PdfOutlineRepository` |
 | `createPdfTransitionController` | Zoom/layout transitions, anchor capture/restore | `pdfScrollAnchor`, `pdfFitPageFootprint` |
 | `usePdfScrollSync` | Side-by-side scroll synchronization | Delegates to pdfGeometrySyncEngine; falls back to proportional ratio |
-| `usePdfBilingualMode` | Viewer mode state (original/bilingual/translated) | Standalone |
+| `usePdfViewerMode` | Viewer mode state — contentView (original/translation/translated-pdf) + layoutMode (single/side-by-side) | Standalone |
 | `usePdfExport` | Export to TXT/Markdown | `PdfExportCollector`, `PdfExportFormatter` |
 | `usePdfBlockSelection` | Block targeting mode | `PdfBlockTargetingManager` |
 | `usePdfOcr` | OCR detection + processing workflow | `PdfOcrDetector`, `PdfOcrProcessor` |
-| `usePdfSelectionAction` | Text selection translation popup | `pageEventBus`, `UnifiedMessaging` |
 | `usePdfSelectionBridge` | Lifecycle wrapper for `PdfSelectionBridge` | `PdfSelectionBridge` |
+| `usePdfWindowsHost` | Selection-to-translation UI — floating icon + draggable/resizable window | `pageEventBus`, `UnifiedMessaging` |
 | `usePdfKeyboard` | Keyboard shortcut navigation | Standalone |
 
 ### Presentation Architecture
@@ -585,12 +585,29 @@ The scroll geometry was validated against the official pdf.js geometry model. Bo
 
 ### Current Page Ownership
 
-A single `currentPage` value serves as the **source of truth** for the current page. All navigation sources converge on this value, and all consumers read from it:
+A single `currentPage` ref (owned by `usePdfNavigation`) serves as the **source of truth** for the current page. All navigation sources converge on this value, and all consumers read from it.
+
+**Resolution pipeline for scroll-based updates:**
+
+```
+scroll
+    → scheduleCurrentPageUpdate()
+        → requestAnimationFrame boundary
+            → geometry-based current page resolution
+                → primary page from scroll position + page geometries
+            → current-page-change event
+    → handleCurrentPageChange()
+        → currentPage = primary page
+```
+
+The pipeline is geometry-driven. The viewer resolves the current page from scroll position and DOM geometry — no `IntersectionObserver` entries are involved. Results are throttled through `requestAnimationFrame` to avoid redundant computation. The current implementation derives the current page through the render-window resolution pipeline. The architectural contract is geometry-based page detection, not a specific implementation.
+
+**Other sources**:
 
 - **Outline clicks**: `navigateToDestination()` → `navigateToPage()` → sets `currentPage`.
 - **Link annotations**: Same pipeline as outline clicks.
-- **Manual scrolling**: The viewer's page visibility detection (rooted at the scroll container) determines which pages are visible and emits `current-page-change`. The application bridges this event to `currentPage`.
-- **Browser history, keyboard navigation, search results**: Future features will call `navigateToPage()` or update `currentPage` directly.
+- **Keyboard navigation**: `usePdfKeyboard` calls `navigateToPage()`.
+- **Browser history, search results**: Future features will call `navigateToPage()` or update `currentPage` directly.
 
 The toolbar page indicator reads `currentPage` directly. There is no intermediate display state — the toolbar always reflects the same value as the navigation composable.
 
@@ -712,7 +729,7 @@ Suppresses `currentPage` update notifications during transitions to prevent inte
 | **Layout-owned** | Layout mode change (no PDF anchor or no layout change) | `handleLayoutModeChange` | In `finally` block — always released |
 | **Zoom-owned** | Controlled zoom | `runWithCurrentPageSuppression` | In `finally` block — bracketed by begin/end |
 
-The implementation tracks these with internal labels (`pending-transition`, `layout-mode`, `zoom`) but the architectural ownership model is what matters: transition-owned suppression is released by token consumption, layout-owned and zoom-owned suppression are released by `finally` blocks.
+These are architectural ownership concepts, not runtime labels. The implementation tracks only a reference-counted depth — no owner metadata is stored. Transition-owned suppression is released by token consumption; layout-owned and zoom-owned suppression are released by `finally` blocks.
 
 **Invariant**: Suppression depth never negative — `endCurrentPageSuppression` clamps at 0.
 
@@ -1012,13 +1029,13 @@ The renderer positions invisible, selectable text spans over the PDF canvas usin
 
 The PDF viewer runs as an **extension-internal page** (`extension://.../pdf.html`). Content-script features — including WindowsManager, Desktop FAB, and Mobile FAB — are loaded by the content script system and are **never injected into extension pages**. Therefore, the PDF viewer implements its own selection-to-translation flow.
 
-The selection event contract (`SELECTION_EVENTS.GLOBAL_SELECTION_CHANGE`) is **shared** across the extension. On web pages, WindowsManager subscribes to this event. In the PDF viewer, `usePdfSelectionAction` subscribes instead. The payload format is identical, enabling potential future cross-context integration.
+The selection event contract (`SELECTION_EVENTS.GLOBAL_SELECTION_CHANGE`) is **shared** across the extension. On web pages, WindowsManager subscribes to this event. In the PDF viewer, `usePdfWindowsHost` owns the subscription and `PdfWindowsHost` renders the UI. The payload format is identical, enabling potential future cross-context integration.
 
 ### PdfSelectionBridge
 
 **File**: `src/features/pdf-translation/core/PdfSelectionBridge.js`
 
-Bridges native browser text selection within the PDF text layer to the extension's selection event system.
+Bridges native browser text selection within the PDF text layer to the extension's selection event system. Created by `usePdfSelectionBridge` in `PdfViewer.vue`.
 
 **Flow**:
 
@@ -1044,23 +1061,27 @@ PdfSelectionBridge.handleSelectionChange()
         })
             │
             ▼
-    usePdfSelectionAction (PDF-specific subscriber)
+    usePdfWindowsHost (PDF-specific subscriber)
+            │
+            ▼
+    PdfWindowsHost (renders UI)
 ```
 
-### PdfSelectionAction (PDF-Specific Translation UI)
+### PdfWindowsHost (PDF-Specific Translation UI)
 
-**Composable**: `src/apps/pdf/composables/usePdfSelectionAction.js`
-**Component**: `src/apps/pdf/components/PdfSelectionAction.vue`
+**Ownership**: `usePdfWindowsHost` owns the subscription lifecycle and coordination logic. `PdfWindowsHost` renders the UI.
 
-Since WindowsManager cannot run in the PDF viewer, `usePdfSelectionAction` provides the selection-to-translation flow:
+**Composable**: `src/apps/pdf/composables/usePdfWindowsHost.js`
+**Component**: `src/apps/pdf/components/PdfWindowsHost.vue`
 
-1. **Listens** to `GLOBAL_SELECTION_CHANGE` and `GLOBAL_SELECTION_CLEAR` on `pageEventBus`.
-2. **Stores** selected text and position in local Vue refs.
-3. **Renders** a floating translate button (`PdfSelectionAction.vue`) at the selection position.
-4. On user click, **sends** a translation request directly via `UnifiedMessaging.sendRegularMessage()` with `TranslationMode.Selection`.
-5. **Displays** the translated result (or error) in a positioned popup below the selection.
+Since WindowsManager cannot run in the PDF viewer, `PdfWindowsHost` provides the selection-to-translation flow:
 
-This is a self-contained, PDF-specific implementation. It does not share components or state with WindowsManager.
+1. `usePdfWindowsHost` **subscribes** to `GLOBAL_SELECTION_CHANGE` and `GLOBAL_SELECTION_CLEAR` on `pageEventBus`.
+2. `PdfWindowsHost` **renders** a floating `PdfTranslationIcon` at the selection position when text is selected.
+3. On user click, `usePdfWindowsHost` **sends** a translation request via `UnifiedMessaging.sendRegularMessage()` with `TranslationMode.Selection`.
+4. `PdfWindowsHost` **displays** the translated result in a draggable, resizable, dockable window with full toolbar (provider selector, pin, copy, TTS, original toggle).
+
+`PdfWindowsHost` is a self-contained, PDF-specific implementation. It does not share components or state with WindowsManager, but reuses shared UI components (`TranslationWindowToolbar`, `TranslationWindowFooter`, `TranslationDisplay`).
 
 ### Shared Event Contract
 
@@ -1205,15 +1226,33 @@ Uses **run ID pattern** — a monotonic counter (`activeRunId`) ensures only the
 
 ---
 
-## Bilingual Rendering Model
+## Viewer Mode Model
 
-### Viewer Modes
+### Independent State Machines
 
-| Mode | Layout | Description |
-|------|--------|-------------|
-| `original` | Single pane | PDF canvas with text layer only |
-| `bilingual` | Side-by-side | Original pane (left) + Translated pane (right) |
-| `translated` | Single pane | Translated blocks only |
+Viewer presentation is governed by two independent state machines:
+
+| State Machine | Values | Description |
+|---------------|--------|-------------|
+| **contentView** | `original`, `translation`, `translated-pdf` | WHAT content to display |
+| **layoutMode** | `single`, `side-by-side` | HOW to arrange the visible panes |
+
+`contentView` and `layoutMode` are independent state machines. The valid combinations are intentionally constrained by viewer semantics:
+
+- `original` contentView always resolves to `single` layout — side-by-side original panes have no semantic meaning.
+- All other contentView values (`translation`, `translated-pdf`) can use either `single` or `side-by-side`.
+
+The selected `layoutMode` preference is always preserved. The effective layout may differ when viewer semantics impose constraints: `original` contentView always resolves to the effective `single` layout regardless of the selected preference, but the selected preference is retained so that switching back to `translation` or `translated-pdf` restores the preferred layout automatically.
+
+### Valid Combinations
+
+| contentView | layoutMode | Original Pane | Translated Text Pane | Translated PDF Pane |
+|-------------|------------|---------------|----------------------|----------------------|
+| `original` | `single` | Rendered | Hidden | Hidden |
+| `translation` | `single` | Hidden | Rendered | Hidden |
+| `translation` | `side-by-side` | Rendered | Rendered | Hidden |
+| `translated-pdf` | `single` | Rendered | Hidden | Overlay on original |
+| `translated-pdf` | `side-by-side` | Rendered | Hidden | Rendered (own pane) |
 
 ### Adaptive Translated Pane
 
@@ -1549,9 +1588,12 @@ Browser selectionchange
         → isSelectionInsidePdfTextLayer()
         → buildPdfSelectionPayload()
         → pageEventBus.emit(GLOBAL_SELECTION_CHANGE)
-            → usePdfSelectionAction (PDF subscriber)
-                → PdfSelectionAction.vue (floating translate button)
-                → User clicks → sendRegularMessage() → Background
+            → usePdfWindowsHost (subscriber)
+                → PdfWindowsHost (UI)
+                    → PdfTranslationIcon (floating translate button)
+                    → User clicks → sendRegularMessage() → Background
+                  or
+                → User dismisses → GLOBAL_SELECTION_CLEAR → hide icon
 ```
 
 ### Translation Event Flow
@@ -1595,8 +1637,8 @@ User clicks "OCR Scanned Pages"
 | External Module | Used By | Purpose |
 |----------------|---------|---------|
 | `ResourceTracker` | PdfDocumentSession, PdfSelectionBridge, PdfBlockTargetingManager | Memory-safe event listener / timeout tracking |
-| `pageEventBus` + `SELECTION_EVENTS` | PdfSelectionBridge, usePdfSelectionAction | Decoupled selection event system |
-| `UnifiedMessaging` | PdfTranslationCoordinator, PdfTranslationAdapter, usePdfSelectionAction | Extension message passing to background |
+| `pageEventBus` + `SELECTION_EVENTS` | PdfSelectionBridge, usePdfWindowsHost | Decoupled selection event system |
+| `UnifiedMessaging` | PdfTranslationCoordinator, PdfTranslationAdapter, usePdfWindowsHost | Extension message passing to background |
 | `storageCore` | PdfCacheManager, PdfHistoryManager | Persistent storage |
 | `settingsManager` | PdfSelectionBridge | Reads selection translation mode |
 | `recognizeStructured` | PdfOcrProcessor | Tesseract.js OCR engine |
