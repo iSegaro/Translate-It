@@ -338,7 +338,7 @@ const pdfStatusBanner = computed(() => pdfStatusBannerController.build({
   isLoading: isLoading.value,
   isTranslating: isTranslating.value,
   exportSuccess: exportSuccess.value,
-  isPartialExport: isPartialExport.value,
+  translationStatus: translationSummary.value?.status ?? 'idle',
   translationOccurrenceId: translationSummary.value?.translationOccurrenceId ?? 0
 }))
 
