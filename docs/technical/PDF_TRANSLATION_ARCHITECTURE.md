@@ -74,6 +74,7 @@ The PDF Translation feature is a **self-contained, dedicated PDF viewer and tran
 - [Translation State (`PdfTranslationState`)](#translation-state-pdftranslationstate)
 - [History Architecture](#history-architecture)
 - [Export Architecture](#export-architecture)
+- [Status Banner Architecture](#status-banner-architecture)
 - [Block Targeting](#block-targeting)
 - [Storage Model](#storage-model)
 - [Event Flow](#event-flow)
@@ -124,6 +125,7 @@ The PDF Translation feature is a **self-contained, dedicated PDF viewer and tran
 | PdfRenderScheduler | Render policy — candidates, eligibility, priority, cancellation targets |
 | PdfRenderWindowState | Render window — committed vs. pending candidate sets |
 | PdfRenderJobState | Render lifecycle — per-page state machine (idle → rendering → committed/failed/cancelled) |
+| PdfStatusBannerController | Status banner display — priority, identity, dismissal |
 
 ---
 
@@ -169,7 +171,7 @@ PdfRenderScheduler
 
 ```
 PdfApp.vue
-├── usePdfViewerController        (document lifecycle, translation)
+├── usePdfViewerController        (document lifecycle, translation, translationSummary)
 ├── usePdfRenderPipeline          (render scheduling, window state)
 ├── createPdfTransitionController (zoom, layout, anchor management)
 ├── usePdfNavigation              (destination resolution, outline)
@@ -177,8 +179,11 @@ PdfApp.vue
 ├── usePdfExport                  (TXT/Markdown export)
 ├── usePdfBlockSelection          (block targeting mode)
 ├── usePdfSelectionBridge         (text selection bridge)
+├── createPdfStatusBannerController (banner state, priority, identity)
+│   └── pdfStatusBanner (computed)
 ├── PdfToolbar
 ├── PdfDropzone
+├── PdfStatusBanner                 (rendered status banner)
 └── PdfViewerLayout
     ├── PdfViewer (original pane)
     │   └── PdfPageView × N
@@ -263,6 +268,7 @@ PdfApp
 │       └── PdfTranslatedPane (translated blocks per page, own scroll container)
 │           ├── PdfTranslatedBlock × M
 │           └── PdfOcrStatus × N
+├── PdfStatusBanner (status messages — error, loading, translating, partial, export success, cache restored)
 └── PdfWindowsHost (floating translation icon + draggable/resizable result window)
 ```
 
@@ -290,7 +296,7 @@ PdfApp
 
 | Composable | Purpose | Key Dependencies |
 |------------|---------|-----------------|
-| `usePdfViewerController` | Document lifecycle, translation, cache restore | `pdfDocumentSession`, `PdfTranslationCoordinator` |
+| `usePdfViewerController` | Document lifecycle, translation, cache restore — owns translationSummary | `pdfDocumentSession`, `PdfTranslationCoordinator` |
 | `usePdfRenderPipeline` | Render scheduling, window state, candidate/allowed pages | `PdfRenderScheduler`, `pdfRenderWindowResolver` |
 | `usePdfNavigation` | Outline/destination resolution, page navigation | `PdfDestinationResolver`, `PdfOutlineRepository` |
 | `createPdfTransitionController` | Zoom/layout transitions, anchor capture/restore | `pdfScrollAnchor`, `pdfFitPageFootprint` |
@@ -1203,8 +1209,64 @@ translateVisibleBlocks()
     │       ├── Apply results to session state
     │       └── Notify state change (triggers Vue reactivity)
     │
-    └── 7. Return summary: { status, translatedCount, failedCount, totalCount }
+    └── 7. Return summary: { status, translatedCount, failedCount, totalCount, translationOccurrenceId }
 ```
+
+### Translation Outcome
+
+`translateVisibleBlocks()` returns a `translationSummary` contract representing the outcome of exactly one translation run.
+
+**Return shape:**
+
+```javascript
+{
+    status: 'idle' | 'translated' | 'partial' | 'cancelled' | 'error',
+    translatedCount: number,
+    failedCount: number,
+    totalCount: number,
+    translationOccurrenceId: number
+}
+```
+
+**Field semantics:**
+
+| Field | Meaning |
+|-------|---------|
+| `status` | Overall translation run outcome |
+| `translatedCount` | Number of blocks successfully translated |
+| `failedCount` | Number of blocks that failed |
+| `totalCount` | Total visible blocks processed |
+| `translationOccurrenceId` | Monotonic identity for this translation occurrence |
+
+**Status semantics:**
+
+| Status | Meaning | Banner Display |
+|--------|---------|----------------|
+| `idle` | No translation has run | No banner |
+| `translated` | All visible blocks translated | No banner |
+| `partial` | Some blocks failed or were skipped | Warning banner |
+| `cancelled` | Translation was cancelled by user | No banner |
+| `error` | Fatal translation error | No banner (surfaced via separate error state — see below) |
+
+`translationSummary.status = 'error'` represents the outcome of the translation run itself. The visible error banner is driven by the dedicated error state (`error`, `exportError`, `ocrError`) in the banner priority chain — not by `translationSummary.status`. These are separate concerns: the domain-level outcome is owned by `translationSummary`, while banner rendering is controlled by the priority chain.
+
+**Producer:** `PdfTranslationCoordinator.translateVisibleBlocks()` creates the summary at the end of each translation run.
+
+**State owner:** `usePdfViewerController` receives the summary and stores it in the reactive `translationSummary` ref.
+
+**Consumer:** `PdfApp` reads `translationSummary` to drive both the toolbar (`PdfToolbar` prop) and the status banner. See [Status Banner Architecture](#status-banner-architecture).
+
+The ownership chain is: `PdfTranslationCoordinator` (produces) → `usePdfViewerController` (owns reactive state) → `PdfApp` (consumes).
+
+**Lifetime:** A new summary is created on every `translateVisiblePages()` call. The previous summary is replaced. The `translationSummary` ref is reset to idle on document close or new file load.
+
+**Identity:** `translationOccurrenceId` is a strictly increasing counter internal to `PdfTranslationCoordinator`. It exists solely as a **stable identity** for consumers that must distinguish independent translation outcomes across reactive recomputations. It is NOT:
+- `translationTick` (reactive invalidation counter)
+- a UI sequence number
+- an export counter
+- a document-level counter
+
+It identifies one specific translation occurrence. The same occurrence always carries the same ID. A new translation run always gets a new ID.
 
 ### Cancellation
 
@@ -1533,10 +1595,165 @@ usePdfExport.exportTxt() / exportMarkdown()
 ### Export Stats
 
 Reactive via `translationTick`:
-- `totalBlocks`, `translatedCount`, `failedCount`
-- `totalPages`, `translatedPageCount`
-- `isPartial` (not all blocks translated)
-- `hasTranslatedBlocks` (at least one block translated)
+
+| Field | Meaning |
+|-------|---------|
+| `totalBlocks` | Total blocks in `translationStates` |
+| `translatedCount` | Blocks with status `translated` |
+| `failedCount` | Blocks with status `error` |
+| `totalPages` | Total pages in the document |
+| `isPartial` | `translatedCount < totalCount && totalCount > 0` |
+| `hasTranslatedBlocks` | `translatedCount > 0` |
+
+**Architectural note:** The status banner does NOT read from `getExportStats()`. Partial-translation display is driven entirely by `translationSummary.status === 'partial'`, not by `isPartial`. These metrics model intentionally different concerns: export metrics represent cumulative document export readiness, while `translationSummary` represents only the latest translation occurrence. They must remain independent. See [Status Banner Architecture](#status-banner-architecture).
+
+---
+
+## Status Banner Architecture
+
+### Overview
+
+The status banner is a single-line notification bar displayed above the viewer content area. It shows the current state of the PDF application: loading progress, translation activity, errors, partial translation warnings, export success confirmations, and cache-restore notifications.
+
+**Ownership:** `PdfApp` owns the banner controller instance (`createPdfStatusBannerController`) and the reactive `pdfStatusBanner` computed that drives it. The banner is rendered by the `PdfStatusBanner` component as a sibling of the viewer layout, outside the scroll pane.
+
+**Architectural principle:** The status banner is a presentation-layer concern. It aggregates state from multiple subsystems and selects exactly one message to display based on a fixed priority chain. It does not own or mutate any subsystem state.
+
+**Separation from export:** The status banner does NOT read from `getExportStats()`. Partial-translation display is driven by `translationSummary.status === 'partial'`, not by `exportStats.isPartial`. Export completeness and translation outcome are completely separated concerns.
+
+### Data Flow & Inputs
+
+```
+PdfTranslationCoordinator
+    │
+    ▼
+translationSummary
+    │
+    ▼
+PdfApp (computed)
+    │
+    ▼
+pdfStatusBannerController.build()
+    │
+    ▼
+PdfStatusBanner
+```
+
+The `pdfStatusBannerController.build()` function accepts these inputs:
+
+| Input | Source | Purpose |
+|-------|--------|---------|
+| `error` | `usePdfViewerController` | PDF load or render error message |
+| `exportError` | `usePdfExport` | Export failure message |
+| `ocrError` | `usePdfOcr` | OCR failure message |
+| `isLoading` | `usePdfViewerController` | Document is loading |
+| `isTranslating` | `usePdfViewerController` | Translation in progress |
+| `exportSuccess` | `PdfApp` (local ref) | Post-export success notification |
+| `restoredTranslationCount` | `usePdfViewerController` | Number of cached translations restored |
+| `translationStatus` | `usePdfViewerController.translationSummary.status` | Translation run outcome |
+| `translationOccurrenceId` | `usePdfViewerController.translationSummary.translationOccurrenceId` | Identity of the translation run |
+
+All inputs are owned by PdfApp and passed synchronously on every reactive re-evaluation. The banner controller is a pure function with no internal state beyond the error ID factory.
+
+### Identity Model
+
+The status banner uses two separate identity systems for different banner types.
+
+**Error Identity**
+
+Managed by `ErrorBannerIdFactory` inside `pdfStatusBannerController`:
+
+```
+  same error message
+       │
+       ▼
+ ErrorBannerIdFactory
+       │
+       ├── error still active → keep same ID
+       │
+       └── error clears → next error with same message → new ID
+```
+
+The factory tracks the last active error kind (`error`, `export-error`, `ocr-error`) and source message. While an error is active, the same message produces the same ID. When the error clears and returns (even with the same text), a new ID is generated.
+
+**ID format:** `error:<sequence>`, `export-error:<sequence>`, or `ocr-error:<sequence>`.
+
+**Partial Identity**
+
+The partial-translation banner uses `translationOccurrenceId` as its identity source:
+
+```
+  translationOccurrenceId
+       │
+       ▼
+  partial-export:<translationOccurrenceId>
+       │
+       ├── same occurrence → same ID
+       │
+       └── new occurrence → new ID
+```
+
+**ID format:** `partial-export:<translationOccurrenceId>`.
+
+**Dismiss Lifecycle**
+
+Banner dismissal is identity-based:
+
+```
+  banner.id
+       │
+       ▼
+  user dismisses → dismissedBannerKey = banner.id
+       │
+       ▼
+  next reactive compute → compare banner.id === dismissedBannerKey
+       │
+       ├── match → banner is hidden
+       │
+       └── no match → banner is shown
+```
+
+When a new translation run produces a new `translationOccurrenceId`, the partial banner gets a new ID. The dismiss key no longer matches, so the banner reappears automatically. Dismissal is purely a UI preference — it never modifies application state.
+
+### Priority Chain
+
+Exactly one banner may be visible at any time. The first matching condition wins.
+
+```
+  Error
+    │
+    ▼
+  Loading
+    │
+    ▼
+  Translating
+    │
+    ▼
+  translationStatus === 'partial'
+    │
+    ▼
+  Export Success
+    │
+    ▼
+  Cache Restored
+    │
+    ▼
+  None (no banner)
+```
+
+| Priority | Condition | Banner Variant | Dismissible |
+|----------|-----------|----------------|-------------|
+| 1 (highest) | `error \|\| exportError \|\| ocrError` | Error | Yes |
+| 2 | `isLoading` | Info | No |
+| 3 | `isTranslating` | Info | No |
+| 4 | `translationStatus === 'partial'` | Warning | Yes |
+| 5 | `exportSuccess` | Success | Yes |
+| 6 | `restoredTranslationCount > 0` | Success | Yes |
+| 7 | None of the above | No banner | — |
+
+Higher-priority conditions are checked first. If multiple conditions could apply, only the highest-priority banner is displayed.
+
+**Architectural contract:** The priority chain is deterministic — given identical inputs, the same banner always wins. Exactly one banner may exist at any time. Lower-priority states never render while a higher-priority state is active. This is not merely current behavior; it is an enforced architectural invariant.
 
 ---
 
