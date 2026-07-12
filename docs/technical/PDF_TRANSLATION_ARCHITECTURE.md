@@ -759,6 +759,8 @@ This prevents delegated lifecycle leaks: when a content view change delegates co
 6. **Render window freeze ref-count balanced** — every `acquireRenderWindowFreeze` has matching `releaseRenderWindowFreeze` in `finally`.
 7. **Scroll sync suppression cleared on every layout exit** — `scheduleScrollSyncSuppressionClear()` in `finally` block.
 
+**Scroll-sync suppression timing**: Scroll-sync suppression is released via `requestAnimationFrame` rather than synchronously. This is an intentional architectural timing guarantee: layout geometry may still be settling during the synchronous execution of the transition exit. Releasing suppression immediately would allow scroll-sync to read unstable scroll offsets or trigger reflow while layout is still in flux. The `requestAnimationFrame` boundary provides a deterministic point after layout has settled but before normal interaction resumes — the same frame guarantees consistent geometry for both panes.
+
 ### Error Handling
 
 - **Primary error preserved**: if the transition operation throws, the `catch` block clears resources (token, suppression) and re-throws the original error.

@@ -343,11 +343,7 @@ export function createPdfTransitionController({
       acquireRenderWindowFreeze()
       renderWindowFreezeAcquired = true
 
-      if (ownsPendingPdfSuppression) {
-        beginCurrentPageSuppression()
-      } else {
-        beginCurrentPageSuppression()
-      }
+      beginCurrentPageSuppression()
 
       setLayoutMode(mode)
 
