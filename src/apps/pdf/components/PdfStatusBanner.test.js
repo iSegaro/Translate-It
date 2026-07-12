@@ -9,14 +9,12 @@ describe('PdfStatusBanner', () => {
         visible: true,
         variant: 'warning',
         title: 'Partial translation',
-        message: 'Partial translation available.',
-        detail: 'Some blocks are still missing.'
+        message: 'Partial translation available.'
       }
     })
 
     expect(wrapper.text()).toContain('Partial translation')
     expect(wrapper.text()).toContain('Partial translation available.')
-    expect(wrapper.text()).toContain('Some blocks are still missing.')
     expect(wrapper.classes()).toContain('pdf-status-banner--warning')
   })
 

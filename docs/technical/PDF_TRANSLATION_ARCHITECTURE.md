@@ -1254,7 +1254,7 @@ translateVisibleBlocks()
 
 **State owner:** `usePdfViewerController` receives the summary and stores it in the reactive `translationSummary` ref.
 
-**Consumer:** `PdfApp` reads `translationSummary` to drive both the toolbar (`PdfToolbar` prop) and the status banner. See [Status Banner Architecture](#status-banner-architecture).
+**Consumer:** `PdfApp` reads `translationSummary` to drive the status banner. See [Status Banner Architecture](#status-banner-architecture).
 
 The ownership chain is: `PdfTranslationCoordinator` (produces) → `usePdfViewerController` (owns reactive state) → `PdfApp` (consumes).
 

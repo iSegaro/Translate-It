@@ -54,27 +54,27 @@ export function createPdfStatusBannerController() {
     const errorId = errorIdFactory.next(errorKind, errorSource)
 
     if (errorMessage) {
-      return { id: errorId, visible: true, variant: 'error', title: 'PDF error', message: errorMessage, detail: '', dismissible: true }
+      return { id: errorId, visible: true, variant: 'error', title: 'PDF error', message: errorMessage, dismissible: true }
     }
 
     if (isLoading) {
-      return { id: 'opening', visible: true, variant: 'info', title: 'Opening PDF', message: loadingMessage, detail: '', dismissible: false }
+      return { id: 'opening', visible: true, variant: 'info', title: 'Opening PDF', message: loadingMessage, dismissible: false }
     }
 
     if (isTranslating) {
-      return { id: 'translating', visible: true, variant: 'info', title: 'Translating visible pages', message: translatingMessage, detail: '', dismissible: false }
+      return { id: 'translating', visible: true, variant: 'info', title: 'Translating visible pages', message: translatingMessage, dismissible: false }
     }
 
     if (translationStatus === 'partial') {
-      return { id: `partial-export:${translationOccurrenceId}`, visible: true, variant: 'warning', title: 'Partial translation', message: partialMessage, detail: '', dismissible: true }
+      return { id: `partial-export:${translationOccurrenceId}`, visible: true, variant: 'warning', title: 'Partial translation', message: partialMessage, dismissible: true }
     }
 
     if (exportSuccess) {
-      return { id: 'export-success', visible: true, variant: exportSuccess.variant || 'success', title: exportSuccess.title || 'Export ready', message: exportSuccess.message || '', detail: exportSuccess.detail || '', dismissible: true }
+      return { id: 'export-success', visible: true, variant: exportSuccess.variant || 'success', title: exportSuccess.title || 'Export ready', message: exportSuccess.message || '', dismissible: true }
     }
 
     if (restoredTranslationCount > 0) {
-      return { id: 'cache-restored', visible: true, variant: 'success', title: 'Restored from cache', message: restoredMessage, detail: '', dismissible: true }
+      return { id: 'cache-restored', visible: true, variant: 'success', title: 'Restored from cache', message: restoredMessage, dismissible: true }
     }
 
     return null

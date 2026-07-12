@@ -155,7 +155,8 @@ export function usePdfViewerController() {
     status: 'idle',
     translatedCount: 0,
     failedCount: 0,
-    totalCount: 0
+    totalCount: 0,
+    translationOccurrenceId: 0
   })
   const translationTick = ref(0)
   const restoredTranslationCount = ref(0)
@@ -355,7 +356,8 @@ export function usePdfViewerController() {
       status: 'idle',
       translatedCount: 0,
       failedCount: 0,
-      totalCount: 0
+      totalCount: 0,
+      translationOccurrenceId: 0
     }
     isTranslating.value = false
     translationTick.value = 0
@@ -439,7 +441,8 @@ export function usePdfViewerController() {
         status: 'error',
         translatedCount: 0,
         failedCount: 0,
-        totalCount: 0
+        totalCount: 0,
+        translationOccurrenceId: 0
       }
       return false
     } finally {

@@ -29,12 +29,6 @@
       <p class="pdf-status-banner__message">
         {{ message }}
       </p>
-      <p
-        v-if="detail"
-        class="pdf-status-banner__detail"
-      >
-        {{ detail }}
-      </p>
     </div>
   </section>
 </template>
@@ -57,10 +51,6 @@ const props = defineProps({
     default: ''
   },
   message: {
-    type: String,
-    default: ''
-  },
-  detail: {
     type: String,
     default: ''
   },

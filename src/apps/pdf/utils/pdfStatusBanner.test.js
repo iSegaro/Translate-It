@@ -19,7 +19,6 @@ describe('buildPdfStatusBannerState', () => {
       variant: 'info',
       title: 'Opening PDF',
       message: 'Loading PDF and rebuilding visible pages.',
-      detail: '',
       dismissible: false
     })
   })
@@ -31,7 +30,6 @@ describe('buildPdfStatusBannerState', () => {
       variant: 'info',
       title: 'Translating visible pages',
       message: 'Translating visible pages.',
-      detail: '',
       dismissible: false
     })
   })
@@ -43,7 +41,6 @@ describe('buildPdfStatusBannerState', () => {
       variant: 'success',
       title: 'Restored from cache',
       message: 'Restored 2 cached translation(s).',
-      detail: '',
       dismissible: true
     })
   })
@@ -55,7 +52,6 @@ describe('buildPdfStatusBannerState', () => {
       variant: 'warning',
       title: 'Partial translation',
       message: 'Partial translation available. Not all blocks are translated yet.',
-      detail: '',
       dismissible: true
     })
   })
@@ -74,7 +70,6 @@ describe('buildPdfStatusBannerState', () => {
       variant: 'success',
       title: 'TXT export ready',
       message: 'TXT export downloaded successfully.',
-      detail: '',
       dismissible: true
     })
   })
@@ -94,7 +89,6 @@ describe('buildPdfStatusBannerState', () => {
       variant: 'warning',
       title: 'Partial translation',
       message: 'Partial translation available. Not all blocks are translated yet.',
-      detail: '',
       dismissible: true
     })
   })
@@ -116,7 +110,6 @@ describe('buildPdfStatusBannerState', () => {
       variant: 'error',
       title: 'PDF error',
       message: 'Failed to open the PDF file.',
-      detail: '',
       dismissible: true
     })
   })

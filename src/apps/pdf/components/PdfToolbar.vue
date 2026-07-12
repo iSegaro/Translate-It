@@ -313,15 +313,6 @@ const props = defineProps({
   showTranslationOption: { type: Boolean, default: false },
   hasOutline: { type: Boolean, default: false },
   isOutlineVisible: { type: Boolean, default: false },
-  translationSummary: {
-    type: Object,
-    default: () => ({
-      status: 'idle',
-      translatedCount: 0,
-      failedCount: 0,
-      totalCount: 0
-    })
-  }
 })
 
 const emit = defineEmits(['file-selected', 'translate-visible', 'cancel-translation', 'content-view-change', 'layout-mode-change', 'toggle-outline', 'export-txt', 'export-markdown', 'export-html', 'request-ocr', 'clear-cache', 'zoom-step', 'zoom-change'])

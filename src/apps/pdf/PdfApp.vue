@@ -17,7 +17,6 @@
       :show-translation-option="hasAnyTranslation"
       :has-outline="hasOutline"
       :is-outline-visible="isOutlineVisible"
-      :translation-summary="translationSummary"
       @file-selected="handleFileSelected"
       @toggle-outline="toggleOutline"
       @translate-visible="handleTranslateVisiblePages"

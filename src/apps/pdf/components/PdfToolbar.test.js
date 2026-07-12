@@ -18,12 +18,7 @@ describe('PdfToolbar', () => {
         zoomMode: 'fit-width',
         zoomPercent: 100,
         showTranslationOption: true,
-        translationSummary: {
-          status: 'idle',
-          translatedCount: 0,
-          failedCount: 0,
-          totalCount: 0
-        }
+
       }
     })
 
@@ -134,12 +129,7 @@ describe('PdfToolbar', () => {
         isOcrProcessing: false,
         zoomMode: 'fit-width',
         zoomPercent: 100,
-        translationSummary: {
-          status: 'idle',
-          translatedCount: 0,
-          failedCount: 0,
-          totalCount: 0
-        }
+
       }
     })
 
