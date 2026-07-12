@@ -232,7 +232,6 @@ function createMocks({
 
   mockPdfExport = {
     canExport: ref(false),
-    isPartialExport: ref(false),
     exportError: ref(''),
     exportTxt: vi.fn().mockResolvedValue(false),
     exportMarkdown: vi.fn().mockResolvedValue(false),
@@ -265,7 +264,6 @@ function createMocks({
     mockViewerController.isLoading.value = Boolean(bannerState.isLoading)
     mockViewerController.isTranslating.value = Boolean(bannerState.isTranslating)
     mockViewerController.restoredTranslationCount.value = bannerState.restoredTranslationCount ?? 0
-    mockPdfExport.isPartialExport.value = Boolean(bannerState.isPartialExport)
     mockViewerController.error.value = bannerState.error || ''
     mockPdfExport.exportError.value = bannerState.exportError || ''
     mockPdfOcr.ocrError.value = bannerState.ocrError || ''

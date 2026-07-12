@@ -223,7 +223,6 @@ const {
 
 const {
   canExport,
-  isPartialExport,
   exportError,
   exportTxt,
   exportMarkdown,
