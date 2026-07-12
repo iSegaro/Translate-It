@@ -169,13 +169,6 @@ const {
   viewerRoot,
   scrollContainer: computed(() => props.scrollContainer),
   onScroll: () => {
-    const cnt = scrollRoot.value || props.scrollContainer
-    console.log('[TRACE]', JSON.stringify({
-      t: Date.now(),
-      site: 'PdfViewer_onScroll',
-      origST: cnt?.scrollTop,
-      role: props.viewerRole
-    }))
     scheduleRenderWindowUpdate()
     scheduleCurrentPageUpdate()
   },

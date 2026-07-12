@@ -377,16 +377,7 @@ async function handleFileSelected(file) {
 function handleCurrentPageChange(pageNumber) {
   if (isNavigating.value) return
   if (!Number.isFinite(Number(pageNumber))) return
-  const prev = currentPage.value
   currentPage.value = Number(pageNumber) || 0
-  if (prev !== currentPage.value) {
-    console.log('[TRACE]', JSON.stringify({
-      t: Date.now(),
-      site: 'currentPage_change',
-      from: prev,
-      to: currentPage.value
-    }))
-  }
 }
 
 function handleVisiblePagesChange(pageNumbers) {

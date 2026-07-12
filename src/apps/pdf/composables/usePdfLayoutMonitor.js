@@ -20,14 +20,6 @@ export function usePdfLayoutMonitor({
     const height = Math.floor(scrollMetrics.height || viewerMetrics.height)
 
     if (width > 0 && height > 0 && (width !== lastLayoutWidth || height !== lastLayoutHeight)) {
-      console.log('[TRACE]', JSON.stringify({
-        t: Date.now(),
-        site: 'ResizeObserver_fire',
-        width,
-        height,
-        prevW: lastLayoutWidth,
-        prevH: lastLayoutHeight
-      }))
       lastLayoutWidth = width
       lastLayoutHeight = height
       onLayoutChange({ width, height })

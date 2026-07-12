@@ -39,7 +39,6 @@ function pageHeightResolver(geometry) {
 
     const ratio = clampRatio(Number(sourcePane.scrollTop || 0) / sourceRange)
     const nextScrollTop = Math.round(ratio * targetRange)
-    const isOrigTarget = targetPane === originalPaneRef.value
 
     if (Math.abs(Number(targetPane.scrollTop || 0) - nextScrollTop) <= SCROLL_POSITION_EPSILON) {
       return
@@ -47,16 +46,6 @@ function pageHeightResolver(geometry) {
 
     setSuppression(targetPane)
     targetPane.scrollTop = nextScrollTop
-
-    if (isOrigTarget) {
-      console.log('[TRACE]', JSON.stringify({
-        t: Date.now(),
-        site: 'scrollSync_syncByRatio',
-        dir: 'translated->original',
-        ratio,
-        tgtST: nextScrollTop
-      }))
-    }
   }
 
 export function usePdfScrollSync(originalPaneRef, translatedPaneRef, enabledRef) {
@@ -111,17 +100,6 @@ export function usePdfScrollSync(originalPaneRef, translatedPaneRef, enabledRef)
 
   function handleOriginalScroll() {
     const sourcePane = originalPaneRef.value
-    if (sourcePane) {
-      console.log('[TRACE]', JSON.stringify({
-        t: Date.now(),
-        site: 'scrollSync_origScroll',
-        st: sourcePane.scrollTop,
-        enabled: isEnabled.value,
-        suppressed: isScrollSyncSuppressed.value,
-        supSrc: suppressSource === sourcePane
-      }))
-    }
-
     const targetPane = translatedPaneRef.value
     if (!isEnabled.value || isScrollSyncSuppressed.value || !sourcePane || !targetPane) return
     if (suppressSource === sourcePane) {
@@ -159,7 +137,6 @@ export function usePdfScrollSync(originalPaneRef, translatedPaneRef, enabledRef)
       && result.sourceGeometry?.height > 0
     ) {
       const nextScrollTop = Math.round(result.targetScrollTop)
-      const isOrigTarget = targetPane === originalPaneRef.value
 
       if (Math.abs(Number(targetPane.scrollTop || 0) - nextScrollTop) <= SCROLL_POSITION_EPSILON) {
         return
@@ -167,17 +144,6 @@ export function usePdfScrollSync(originalPaneRef, translatedPaneRef, enabledRef)
 
       suppressSource = targetPane
       targetPane.scrollTop = nextScrollTop
-
-      if (isOrigTarget) {
-        console.log('[TRACE]', JSON.stringify({
-          t: Date.now(),
-          site: 'scrollSync_runSync',
-          dir: 'translated->original',
-          srcPg: result.pageNumber,
-          tgtST: nextScrollTop,
-          srcST: sourcePane.scrollTop
-        }))
-      }
       return
     }
 
@@ -227,16 +193,6 @@ export function usePdfScrollSync(originalPaneRef, translatedPaneRef, enabledRef)
     const original = originalPaneRef.value
     const translated = translatedPaneRef.value
     if (!original || !translated) return
-
-    console.log('[TRACE]', JSON.stringify({
-      t: Date.now(),
-      site: 'syncFromPane',
-      owner,
-      isEnabled: isEnabled.value,
-      suppressed: isScrollSyncSuppressed.value,
-      origST: original.scrollTop,
-      transST: translated.scrollTop
-    }))
 
     suppressSource = null
     if (owner === SCROLL_SYNC_PANE.TRANSLATED) {
