@@ -134,6 +134,17 @@ function createBlock({ id = 'block-a', sourceTextHash = 'hash-a' } = {}) {
   }
 }
 
+function createDeferred() {
+  let resolve
+  let reject
+  const promise = new Promise((res, rej) => {
+    resolve = res
+    reject = rej
+  })
+
+  return { promise, resolve, reject }
+}
+
 async function loadControllerWithCacheEntry(cacheEntry, block = createBlock()) {
   pdfCacheManager.loadDocument.mockResolvedValue({
     translations: cacheEntry ? { [block.id]: cacheEntry } : {},
@@ -565,6 +576,38 @@ describe('usePdfViewerController error lifecycle', () => {
     await controller.translateVisiblePages()
 
     expect(controller.error.value).toBe('')
+  })
+
+  it('ignores duplicate translation requests without clearing active loading state', async () => {
+    const block = createBlock()
+    const translation = createDeferred()
+    const { controller } = await loadControllerWithCacheEntry(null, block)
+
+    translateVisibleBlocksMock.mockReturnValueOnce(translation.promise)
+    session.getVisibleLogicalBlocks.mockResolvedValue([block])
+    session.getPageLayout.mockReturnValue(null)
+
+    const firstRequest = controller.translateVisiblePages()
+
+    expect(controller.isTranslating.value).toBe(true)
+    expect(translateVisibleBlocksMock).toHaveBeenCalledTimes(1)
+
+    const duplicateResult = await controller.translateVisiblePages()
+
+    expect(duplicateResult).toBe(false)
+    expect(translateVisibleBlocksMock).toHaveBeenCalledTimes(1)
+    expect(controller.isTranslating.value).toBe(true)
+
+    translation.resolve({
+      status: 'translated',
+      translatedCount: 1,
+      failedCount: 0,
+      totalCount: 1
+    })
+
+    await firstRequest
+
+    expect(controller.isTranslating.value).toBe(false)
   })
 
   it('sets error when translation fails after clearing stale error', async () => {

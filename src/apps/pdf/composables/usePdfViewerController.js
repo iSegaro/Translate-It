@@ -422,6 +422,10 @@ export function usePdfViewerController() {
   }
 
   async function translateVisiblePages() {
+    if (isTranslating.value) {
+      return false
+    }
+
     if (!canTranslateVisiblePages.value) {
       return false
     }

@@ -156,7 +156,8 @@
         allow-default
         only-configured
         :loading="isTranslating"
-        :disabled="!canTranslateVisiblePages"
+        :disabled="!canTranslateVisiblePages && !isTranslating"
+        :dropdown-disabled="isTranslating"
         @provider-change="handleProviderChange"
         @translate="handleTranslateRequest"
         @cancel="$emit('cancel-translation')"

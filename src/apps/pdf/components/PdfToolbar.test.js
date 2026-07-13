@@ -18,11 +18,12 @@ vi.mock('@/components/shared/ProviderSelector.vue', () => ({
     name: 'ProviderSelector',
     template: `
       <div>
-        <button class="mock-provider-selector" @click="$emit('translate', { provider: 'googlev2' })" />
-        <button class="mock-provider-change-a" @click="$emit('provider-change', 'deepl'); $emit('translate', { provider: 'deepl' })" />
-        <button class="mock-provider-change-b" @click="$emit('provider-change', 'openai'); $emit('translate', { provider: 'openai' })" />
+        <button class="mock-provider-selector" :disabled="disabled" @click="$emit(loading ? 'cancel' : 'translate', { provider: 'googlev2' })" />
+        <button class="mock-provider-change-a" :disabled="disabled || dropdownDisabled" @click="$emit('provider-change', 'deepl'); $emit('translate', { provider: 'deepl' })" />
+        <button class="mock-provider-change-b" :disabled="disabled || dropdownDisabled" @click="$emit('provider-change', 'openai'); $emit('translate', { provider: 'openai' })" />
       </div>
     `,
+    props: ['disabled', 'dropdownDisabled', 'loading'],
     emits: ['translate', 'cancel', 'provider-change', 'update:modelValue']
   }
 }))
@@ -235,6 +236,67 @@ describe('PdfToolbar', () => {
 
     await wrapper.findAll('button').find((button) => button.text().trim() === '+')?.trigger('click')
     expect(wrapper.emitted('zoom-step')?.at(-1)?.[0]).toBe(1)
+  })
+
+  it('keeps the main provider selector action cancellable while translating', async () => {
+    const wrapper = mount(PdfToolbar, {
+      props: {
+        fileName: 'demo.pdf',
+        pageCount: 12,
+        currentPageNumber: 1,
+        isTranslating: true,
+        canTranslateVisiblePages: false
+      }
+    })
+
+    const mainButton = wrapper.find('.mock-provider-selector')
+
+    expect(mainButton.attributes('disabled')).toBeUndefined()
+
+    await mainButton.trigger('click')
+
+    expect(wrapper.emitted('cancel-translation')).toHaveLength(1)
+    expect(wrapper.emitted('translate-visible')).toBeFalsy()
+  })
+
+  it('disables provider selection while translating', async () => {
+    const wrapper = mount(PdfToolbar, {
+      props: {
+        fileName: 'demo.pdf',
+        pageCount: 12,
+        currentPageNumber: 1,
+        isTranslating: true,
+        canTranslateVisiblePages: false
+      }
+    })
+
+    const dropdownButton = wrapper.find('.mock-provider-change-a')
+
+    expect(dropdownButton.attributes('disabled')).toBeDefined()
+
+    await dropdownButton.trigger('click')
+
+    expect(settingsStoreMock.updateSettingAndPersist).not.toHaveBeenCalled()
+    expect(wrapper.emitted('translate-visible')).toBeFalsy()
+  })
+
+  it('keeps provider selector idle behavior unchanged', async () => {
+    const wrapper = mount(PdfToolbar, {
+      props: {
+        fileName: 'demo.pdf',
+        pageCount: 12,
+        currentPageNumber: 1,
+        isTranslating: false,
+        canTranslateVisiblePages: true
+      }
+    })
+
+    expect(wrapper.find('.mock-provider-selector').attributes('disabled')).toBeUndefined()
+    expect(wrapper.find('.mock-provider-change-a').attributes('disabled')).toBeUndefined()
+
+    await wrapper.find('.mock-provider-selector').trigger('click')
+
+    expect(wrapper.emitted('translate-visible')).toHaveLength(1)
   })
 
   it('waits for PDF provider persistence before translating after provider change', async () => {

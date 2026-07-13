@@ -38,7 +38,7 @@
         type="button"
         class="ti-provider-dropdown-area"
         :class="{ 'ti-active': isDropdownOpen }"
-        :disabled="disabled"
+        :disabled="isProviderSelectionDisabled"
         @click.stop="toggleDropdown"
         @keydown="handleKeydown"
       >
@@ -47,7 +47,7 @@
           alt="Dropdown"
           type="inline"
           class="ti-dropdown-arrow"
-          :disabled="disabled"
+          :disabled="isProviderSelectionDisabled"
         />
       </button>
     </div>
@@ -58,14 +58,14 @@
     v-else-if="mode === 'button'"
     ref="selectorRef"
     class="ti-provider-button-container"
-    :class="{ 'ti-dropdown-open': isDropdownOpen, 'is-disabled': disabled }"
+    :class="{ 'ti-dropdown-open': isDropdownOpen, 'is-disabled': isProviderSelectionDisabled }"
     v-bind="$attrs"
   >
     <button
       ref="triggerBtnRef"
       class="ti-provider-button"
       :class="{ 'ti-active': isDropdownOpen }"
-      :disabled="disabled"
+      :disabled="isProviderSelectionDisabled"
       @click="toggleDropdown"
       @keydown="handleKeydown"
     >
@@ -82,7 +82,7 @@
         type="inline"
         class="dropdown-arrow"
         :class="{ rotated: isDropdownOpen }"
-        :disabled="disabled"
+        :disabled="isProviderSelectionDisabled"
       />
     </button>
   </div>
@@ -92,7 +92,7 @@
     v-else-if="mode === 'icon-only'"
     ref="selectorRef"
     class="ti-provider-icon-only-container"
-    :class="{ 'ti-dropdown-open': isDropdownOpen, 'is-disabled': disabled }"
+    :class="{ 'ti-dropdown-open': isDropdownOpen, 'is-disabled': isProviderSelectionDisabled }"
     v-bind="$attrs"
   >
     <button
@@ -100,7 +100,7 @@
       class="ti-provider-icon-button"
       :class="{ 'ti-active': isDropdownOpen }"
       :title="currentProviderName"
-      :disabled="disabled"
+      :disabled="isProviderSelectionDisabled"
       @click="toggleDropdown"
       @keydown="handleKeydown"
     >
@@ -118,14 +118,14 @@
     v-else-if="mode === 'mobile'"
     ref="selectorRef"
     class="ti-provider-mobile-container"
-    :class="{ 'ti-dropdown-open': isDropdownOpen, 'is-disabled': disabled }"
+    :class="{ 'ti-dropdown-open': isDropdownOpen, 'is-disabled': isProviderSelectionDisabled }"
     v-bind="$attrs"
   >
     <button
       ref="triggerBtnRef"
       class="ti-provider-mobile-button"
       :class="{ 'ti-active': isDropdownOpen }"
-      :disabled="disabled"
+      :disabled="isProviderSelectionDisabled"
       @click="toggleDropdown"
       @keydown="handleKeydown"
     >
@@ -142,7 +142,7 @@
         type="inline"
         class="dropdown-arrow"
         :class="{ rotated: isDropdownOpen }"
-        :disabled="disabled"
+        :disabled="isProviderSelectionDisabled"
       />
     </button>
   </div>
@@ -151,14 +151,14 @@
   <div
     v-else
     class="ti-provider-compact-container"
-    :class="{ 'is-disabled': disabled }"
+    :class="{ 'is-disabled': isProviderSelectionDisabled }"
     v-bind="$attrs"
   >
     <select
       :value="currentProvider"
       class="ti-provider-select"
       :class="{ 'is-dark': settingsStore.isDarkTheme }"
-      :disabled="disabled"
+      :disabled="isProviderSelectionDisabled"
       @change="handleProviderChange"
     >
       <option
@@ -328,6 +328,10 @@ const props = defineProps({
     type: Boolean,
     default: false
   },
+  dropdownDisabled: {
+    type: Boolean,
+    default: false
+  },
   isGlobal: {
     type: Boolean,
     default: true
@@ -399,6 +403,8 @@ const isRTL = computed(() => {
     return false;
   }
 })
+
+const isProviderSelectionDisabled = computed(() => props.disabled || props.dropdownDisabled)
 
 /**
  * Computed property to identify the current global default provider
@@ -785,7 +791,7 @@ const handleTranslate = () => {
  * Toggles the provider selection dropdown
  */
 const toggleDropdown = () => {
-  if (props.disabled) return;
+  if (isProviderSelectionDisabled.value) return;
 
   // Deactivate select element mode if it's active when user interacts with this control
   if (isSelectModeActive.value) {
