@@ -16,7 +16,6 @@ const logger = getScopedLogger(LOG_COMPONENTS.PDF, 'PdfDocumentSession')
 const PAGE_MARGIN = 24
 const MIN_SCALE = 0.4
 const MAX_SCALE = 2.0
-const RENDER_CLEANUP_DELAY_MS = 200
 
 function normalizeLayoutRequest(layoutRequest = null) {
   if (typeof layoutRequest === 'number') {
@@ -52,13 +51,11 @@ export class PdfDocumentSession extends ResourceTracker {
     this.pageMetrics = []
     this.pageScale = 1
     this.visiblePageNumbers = new Set()
-    this._renderCandidatePageNumbers = new Set()
     this.pdfFingerprint = ''
     this.documentIdentity = ''
     this.displayName = ''
     this.targetedBlockId = null
     this._renderer = new PdfRenderer()
-    this._cleanupTimeout = null
     this._bitmapCache = new PdfBitmapCache()
     this._resolver = new PdfDestinationResolver()
     this._outlineRepository = new PdfOutlineRepository()
@@ -256,12 +253,6 @@ export class PdfDocumentSession extends ResourceTracker {
 
   updateVisiblePages(pageNumbers) {
     this.visiblePageNumbers = new Set(pageNumbers)
-    this._scheduleCleanup()
-  }
-
-  updateRenderCandidates(pageNumbers) {
-    this._renderCandidatePageNumbers = new Set(pageNumbers)
-    this._scheduleCleanup()
   }
 
   async getPageSession(pageNumber) {
@@ -331,14 +322,6 @@ export class PdfDocumentSession extends ResourceTracker {
 
   _indexPageSession(pageSession) {
     this._pageContentRepository._indexPageSession(pageSession)
-  }
-
-  unindexPageSession(pageNumber) {
-    this._pageContentRepository.unindexPageSession(pageNumber)
-  }
-
-  releasePageSession(pageNumber) {
-    this._pageContentRepository.releasePageSession(pageNumber)
   }
 
   setPageOcrBlocks(pageNumber, blocks, language) {
@@ -517,36 +500,9 @@ export class PdfDocumentSession extends ResourceTracker {
     this._renderer.cancelAll()
   }
 
-  _scheduleCleanup() {
-    this._cancelScheduledCleanup()
-
-    const merged = new Set([
-      ...this.visiblePageNumbers,
-      ...this._renderCandidatePageNumbers
-    ])
-
-    this._cleanupTimeout = this.trackTimeout(() => {
-      this._cleanupTimeout = null
-      for (const [pageNumber] of this.pageSessions) {
-        if (!merged.has(pageNumber)) {
-          this.releasePageSession(pageNumber)
-        }
-      }
-    }, RENDER_CLEANUP_DELAY_MS)
-  }
-
-  _cancelScheduledCleanup() {
-    if (this._cleanupTimeout) {
-      this.clearTimer(this._cleanupTimeout)
-      this._cleanupTimeout = null
-    }
-  }
-
   async cleanupDocument() {
-    this._cancelScheduledCleanup()
     this._cancelAllRenders()
     this.visiblePageNumbers.clear()
-    this._renderCandidatePageNumbers.clear()
     this._pageContentRepository.reset()
     this.resetTranslationStates()
     this.targetedBlockId = null

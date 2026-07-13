@@ -130,23 +130,6 @@ export class PdfPageContentRepository {
     }
   }
 
-  unindexPageSession(pageNumber) {
-    const pageSession = this.pageSessions.get(pageNumber)
-    if (!pageSession) return
-
-    for (const block of pageSession.allBlocks) {
-      this._blockIndex.delete(block.id)
-    }
-  }
-
-  releasePageSession(pageNumber) {
-    const pageSession = this.pageSessions.get(pageNumber)
-    if (!pageSession) return
-
-    this.unindexPageSession(pageNumber)
-    pageSession.release()
-  }
-
   setPageOcrBlocks(pageNumber, blocks, language) {
     const pageSession = this.pageSessions.get(pageNumber)
     if (!pageSession) return

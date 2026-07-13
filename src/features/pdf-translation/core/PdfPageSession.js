@@ -134,26 +134,6 @@ export class PdfPageSession {
     return this.pageMaskModel
   }
 
-  /**
-   * Releases heavy in-memory data (text content, layout, and derived blocks)
-   * while preserving identity metadata and OCR results.
-   *
-   * The session can later be rehydrated via hydrate().
-   *
-   * Safe to call multiple times.
-   */
-  release() {
-    if (!this.loaded) return
-    this.textContent = null
-    this.lines = []
-    this.logicalBlocks = []
-    this.pageLayout = createEmptyPageLayoutModel(this.pageNumber)
-    this.pageMaskModel = null
-    this.logicalBlockBuilder = new PdfLogicalBlockBuilder()
-    this.loaded = false
-    this.loadedAt = 0
-  }
-
   reset() {
     this.pageSize = null
     this.textContent = null

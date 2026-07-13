@@ -129,9 +129,6 @@ const {
   onVisiblePagesChange: (nextVisible) => {
     props.session.updateVisiblePages(nextVisible)
     emitVisiblePagesIfChanged(nextVisible)
-  },
-  onRenderCandidatesChange: (nextRenderable) => {
-    props.session.updateRenderCandidates(nextRenderable)
   }
 })
 

@@ -7,8 +7,7 @@ export function usePdfRenderPipeline({
   freezeRenderWindowEviction,
   getContainer,
   getPageView,
-  onVisiblePagesChange,
-  onRenderCandidatesChange
+  onVisiblePagesChange
 } = {}) {
   const renderScheduler = new PdfRenderScheduler()
   const visiblePageNumbers = ref(new Set())
@@ -29,10 +28,6 @@ export function usePdfRenderPipeline({
 
   function updateRenderCandidates(nextRenderable) {
     renderCandidatePageNumbers.value = nextRenderable
-
-    if (isOriginalRole.value) {
-      onRenderCandidatesChange?.(nextRenderable)
-    }
   }
 
   function updateRenderPlan(plan = []) {
@@ -154,7 +149,6 @@ export function usePdfRenderPipeline({
 
     if (isOriginalRole.value) {
       onVisiblePagesChange?.(new Set())
-      onRenderCandidatesChange?.(new Set())
     }
   }
 

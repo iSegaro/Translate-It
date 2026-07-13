@@ -116,20 +116,6 @@ describe('PdfPageContentRepository', () => {
     expect(repository.findSourceBlock('ocr-1')).toBe(ocrBlock)
   })
 
-  it('releasePageSession removes index entries and releases session memory', async () => {
-    const pageSession = await repository.getPageSession({ ...context, pageNumber: 1 })
-    const [block] = pageSession.getLogicalBlocks()
-
-    expect(repository.findSourceBlock(block.id)).toBe(block)
-
-    repository.releasePageSession(1)
-
-    expect(pageSession.loaded).toBe(false)
-    expect(pageSession.textContent).toBeNull()
-    expect(pageSession.logicalBlocks).toEqual([])
-    expect(repository.findSourceBlock(block.id)).toBeNull()
-  })
-
   it('reset clears sessions, pending hydrations, and block index', async () => {
     const page = createPage(1)
     page.getTextContent = vi.fn(() => new Promise(() => {}))
