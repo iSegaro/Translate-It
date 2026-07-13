@@ -84,7 +84,6 @@ export function createPdfTransitionController({
   }
 
   function clearPendingTransitionRestore(transitionSeq = null) {
-
     if (!pendingTransitionRestore) {
       return { cleared: false, releasedCurrentPageSuppression: false }
     }
@@ -129,7 +128,7 @@ export function createPdfTransitionController({
 
   onBeforeUnmount(() => {
     clearScrollSyncSuppressionTimer()
-    clearPendingTransitionRestore('unmount')
+    clearPendingTransitionRestore()
     deferredZoomLayout = null
   })
 
@@ -140,7 +139,7 @@ export function createPdfTransitionController({
   }
 
   function beginControlledTransition() {
-    clearPendingTransitionRestore('begin-controlled-transition')
+    clearPendingTransitionRestore()
     contentTransitionSeq += 1
   }
 
@@ -156,8 +155,8 @@ export function createPdfTransitionController({
     pdfTranslatedPaneRef.value?.refreshCurrentPage?.()
   }
 
-  function completePendingTransition(reason, transitionSeq, hasPrimaryError = false) {
-    const clearResult = clearPendingTransitionRestore(reason, transitionSeq)
+  function completePendingTransition(transitionSeq, hasPrimaryError = false) {
+    const clearResult = clearPendingTransitionRestore(transitionSeq)
     if (clearResult.releasedCurrentPageSuppression) {
       if (hasPrimaryError) {
         try { refreshCurrentPage() } catch { /* best-effort */ }
@@ -295,7 +294,7 @@ export function createPdfTransitionController({
       const restoredOwner = restoreOwnedScrollAnchor(anchor)
 
       if (!completionOwnedByLayout) {
-        const clearResult = clearPendingTransitionRestore('provisional-complete', contentTransitionSeq)
+        const clearResult = clearPendingTransitionRestore(contentTransitionSeq)
         if (clearResult.releasedCurrentPageSuppression) {
           refreshCurrentPage()
         }
@@ -305,7 +304,7 @@ export function createPdfTransitionController({
         syncFromOwner(restoredOwner || anchor?.owner || owner)
       }
     } catch (error) {
-      const errorClearResult = clearPendingTransitionRestore('content-view-error', contentTransitionSeq)
+      const errorClearResult = clearPendingTransitionRestore(contentTransitionSeq)
       if (errorClearResult.releasedCurrentPageSuppression) {
         refreshCurrentPage()
       }
@@ -338,9 +337,12 @@ export function createPdfTransitionController({
     }
 
     let renderWindowFreezeAcquired = false
-    let primaryErrorDuringCleanup = null
+    let operationError = null
+    let recoveryError = null
+    let cleanupStageError = null
+    let refreshRenderWindowError = null
 
-    try {
+    async function performLayoutModeChange() {
       acquireRenderWindowFreeze()
       renderWindowFreezeAcquired = true
 
@@ -364,33 +366,57 @@ export function createPdfTransitionController({
       if (isSideBySide.value) {
         syncFromOwner(restoredOwner || anchor?.owner || owner)
       }
+    }
+
+    try {
+      await performLayoutModeChange()
     } catch (error) {
-      primaryErrorDuringCleanup = error
-      const clearResult = clearPendingTransitionRestore('layout-mode-error', contentTransitionSeq)
-      if (clearResult.releasedCurrentPageSuppression) {
-        refreshCurrentPage()
-      }
-      throw error
-    } finally {
+      operationError = error
       try {
-        if (renderWindowFreezeAcquired) {
-          releaseRenderWindowFreeze()
-        }
-        try {
-          await refreshRenderWindowAfterLayoutTransition()
-        } catch (cleanupError) {
-          if (primaryErrorDuringCleanup) {
-            console.warn('[PdfTransitionController] Cleanup error suppressed:', cleanupError)
-          } else {
-            throw cleanupError
-          }
-        }
-      } finally {
-        if (!ownsPendingPdfSuppression) {
-          endCurrentPageSuppression()
+        const clearResult = clearPendingTransitionRestore(contentTransitionSeq)
+        if (clearResult.releasedCurrentPageSuppression) {
           refreshCurrentPage()
         }
+      } catch (error) {
+        recoveryError = error
       }
+    }
+
+    try {
+      if (renderWindowFreezeAcquired) {
+        releaseRenderWindowFreeze()
+      }
+      try {
+        await refreshRenderWindowAfterLayoutTransition()
+      } catch (cleanupError) {
+        refreshRenderWindowError = cleanupError
+      }
+
+      if (operationError && refreshRenderWindowError) {
+        console.warn('[PdfTransitionController] Cleanup error suppressed:', refreshRenderWindowError)
+      }
+    } catch (error) {
+      cleanupStageError = error
+    }
+
+    if (!ownsPendingPdfSuppression) {
+      endCurrentPageSuppression()
+      refreshCurrentPage()
+    }
+
+    if (cleanupStageError) {
+      throw cleanupStageError
+    }
+
+    if (operationError) {
+      if (recoveryError) {
+        throw recoveryError
+      }
+      throw operationError
+    }
+
+    if (refreshRenderWindowError) {
+      throw refreshRenderWindowError
     }
   }
 
@@ -404,7 +430,7 @@ export function createPdfTransitionController({
       nextLayout.width === currentLayout.width &&
       nextLayout.height === currentLayout.height
     ) {
-      completePendingTransition('layout-no-dimension-change-consume', contentSeqAtStart)
+      completePendingTransition(contentSeqAtStart)
       return
     }
 
@@ -471,18 +497,18 @@ export function createPdfTransitionController({
               translatedAnchor
             })
           } finally {
-            completePendingTransition('authoritative-layout-consume', contentSeqAtStart)
+            completePendingTransition(contentSeqAtStart)
           }
           return
         }
         try {
           restoreControlledTransitionAnchors(capturedAnchors)
         } finally {
-          completePendingTransition('layout-consume', contentSeqAtStart)
+          completePendingTransition(contentSeqAtStart)
         }
       }
     } catch (error) {
-      completePendingTransition('layout-error', contentSeqAtStart, true)
+      completePendingTransition(contentSeqAtStart, true)
       throw error
     } finally {
       if (shouldFreezeRenderWindow) {

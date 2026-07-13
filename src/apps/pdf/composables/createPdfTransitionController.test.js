@@ -1031,6 +1031,30 @@ describe('createPdfTransitionController', () => {
       expect(refreshCurrentPage).toHaveBeenCalledTimes(1)
     })
 
+    it('runs cleanup and propagates recovery error when current-page refresh fails after an operation error', async () => {
+      const recoveryError = new Error('recovery refresh failed')
+      const refreshRenderWindow = vi.fn()
+      const refreshCurrentPage = vi.fn(() => { throw recoveryError })
+      const { ctrl, setLayoutMode } = createController({
+        pdfViewerRef: { refreshRenderWindow, refreshCurrentPage }
+      })
+
+      const pdfAnchor = { pageNumber: 1, offsetRatio: 0, pdfPoint: { x: 0, y: 0 } }
+      anchorFns.resolveAnchorOwner.mockReturnValue(PDF_SCROLL_OWNER.ORIGINAL)
+      anchorFns.capturePdfAwareOwnedScrollAnchor.mockReturnValue(pdfAnchor)
+      scrollAnchor.isPdfAnchor.mockReturnValue(true)
+      setLayoutMode.mockImplementation(() => {
+        throw new Error('operation failed')
+      })
+
+      await expect(ctrl.handleLayoutModeChange('side-by-side')).rejects.toBe(recoveryError)
+
+      expect(refreshRenderWindow).toHaveBeenCalledTimes(1)
+      expect(ctrl.renderWindowEvictionFrozen.value).toBe(false)
+      expect(ctrl.currentPageUpdatesSuppressed.value).toBe(false)
+      expect(ctrl.__debugCurrentPageSuppression.getDepth()).toBe(0)
+    })
+
     it('clears token and releases freeze when restoreOwnedScrollAnchor throws in layout mode change', async () => {
       const refreshCurrentPage = vi.fn()
       const { ctrl } = createController({
@@ -1092,6 +1116,37 @@ describe('createPdfTransitionController', () => {
       expect(console.warn).toHaveBeenCalled()
     })
 
+    it('logs render cleanup failure before final cleanup error propagates', async () => {
+      const renderCleanupError = new Error('render cleanup failed')
+      const finalCleanupError = new Error('final cleanup failed')
+      const refreshRenderWindow = vi.fn(() => { throw renderCleanupError })
+      const refreshCurrentPage = vi.fn(() => { throw finalCleanupError })
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+      const { ctrl, setLayoutMode } = createController({
+        pdfViewerRef: { refreshRenderWindow, refreshCurrentPage }
+      })
+
+      const domAnchor = { pageNumber: 2, offsetRatio: 0.5 }
+      anchorFns.resolveAnchorOwner.mockReturnValue(PDF_SCROLL_OWNER.ORIGINAL)
+      anchorFns.capturePdfAwareOwnedScrollAnchor.mockReturnValue(domAnchor)
+      scrollAnchor.isPdfAnchor.mockReturnValue(false)
+      setLayoutMode.mockImplementation(() => {
+        throw new Error('operation failed')
+      })
+
+      await expect(ctrl.handleLayoutModeChange('side-by-side')).rejects.toBe(finalCleanupError)
+
+      expect(warnSpy).toHaveBeenCalledWith(
+        '[PdfTransitionController] Cleanup error suppressed:',
+        renderCleanupError
+      )
+      expect(refreshRenderWindow).toHaveBeenCalledTimes(1)
+      expect(ctrl.renderWindowEvictionFrozen.value).toBe(false)
+      expect(ctrl.__debugCurrentPageSuppression.getDepth()).toBe(0)
+
+      warnSpy.mockRestore()
+    })
+
     it('propagates cleanup error when no primary error occurred', async () => {
       const refreshRenderWindow = vi.fn(() => { throw new Error('cleanup failed') })
       const { ctrl } = createController({
@@ -1106,6 +1161,44 @@ describe('createPdfTransitionController', () => {
 
       await expect(ctrl.handleLayoutModeChange('side-by-side')).rejects.toThrow('cleanup failed')
 
+      expect(ctrl.renderWindowEvictionFrozen.value).toBe(false)
+      expect(ctrl.__debugCurrentPageSuppression.getDepth()).toBe(0)
+    })
+
+    it('propagates cleanup error from the translated PDF side-by-side early return', async () => {
+      const refreshRenderWindow = vi.fn(() => { throw new Error('cleanup failed') })
+      const { ctrl } = createController({
+        isSideBySide: true,
+        showTranslatedPdfPane: true,
+        pdfViewerRef: { refreshRenderWindow, refreshCurrentPage: vi.fn() }
+      })
+
+      const domAnchor = { pageNumber: 2, offsetRatio: 0.5 }
+      anchorFns.resolveAnchorOwner.mockReturnValue(PDF_SCROLL_OWNER.ORIGINAL)
+      anchorFns.capturePdfAwareOwnedScrollAnchor.mockReturnValue(domAnchor)
+      scrollAnchor.isPdfAnchor.mockReturnValue(false)
+
+      await expect(ctrl.handleLayoutModeChange('side-by-side')).rejects.toThrow('cleanup failed')
+
+      expect(anchorFns.restoreOwnedScrollAnchor).not.toHaveBeenCalled()
+      expect(ctrl.renderWindowEvictionFrozen.value).toBe(false)
+      expect(ctrl.__debugCurrentPageSuppression.getDepth()).toBe(0)
+    })
+
+    it('propagates cleanup error from the PDF-anchor early return', async () => {
+      const refreshRenderWindow = vi.fn(() => { throw new Error('cleanup failed') })
+      const { ctrl } = createController({
+        pdfViewerRef: { refreshRenderWindow, refreshCurrentPage: vi.fn() }
+      })
+
+      const pdfAnchor = { pageNumber: 2, offsetRatio: 0, pdfPoint: { x: 0, y: 0 } }
+      anchorFns.resolveAnchorOwner.mockReturnValue(PDF_SCROLL_OWNER.ORIGINAL)
+      anchorFns.capturePdfAwareOwnedScrollAnchor.mockReturnValue(pdfAnchor)
+      scrollAnchor.isPdfAnchor.mockReturnValue(true)
+
+      await expect(ctrl.handleLayoutModeChange('single')).rejects.toThrow('cleanup failed')
+
+      expect(anchorFns.restoreOwnedScrollAnchor).not.toHaveBeenCalled()
       expect(ctrl.renderWindowEvictionFrozen.value).toBe(false)
       expect(ctrl.__debugCurrentPageSuppression.getDepth()).toBe(0)
     })
