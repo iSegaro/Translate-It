@@ -185,7 +185,7 @@ export function usePdfWindowsHost(options = {}) {
   }
 
   async function hydrateSelectedProvider() {
-    const provider = await getEffectiveProviderAsync(TranslationMode.PDF)
+    const provider = await getEffectiveProviderAsync(TranslationMode.Selection)
 
     if (!selectedProvider.value && provider) {
       selectedProvider.value = provider
@@ -557,7 +557,7 @@ export function usePdfWindowsHost(options = {}) {
 
     let resolvedTargetLanguage = AUTO_DETECT_VALUE
     const [provider, sourceLanguage, targetLanguage] = await Promise.all([
-      selectedProvider.value ? Promise.resolve(selectedProvider.value) : getEffectiveProviderAsync(TranslationMode.PDF),
+      selectedProvider.value ? Promise.resolve(selectedProvider.value) : getEffectiveProviderAsync(TranslationMode.Selection),
       getSourceLanguageAsync(),
       getTargetLanguageAsync()
     ])

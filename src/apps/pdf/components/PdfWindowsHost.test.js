@@ -808,7 +808,7 @@ describe('PdfWindowsHost', () => {
     })
     await showSelectionIcon('Initial provider')
 
-    expect(getEffectiveProviderAsyncMock).toHaveBeenCalledWith('pdf-translation')
+    expect(getEffectiveProviderAsyncMock).toHaveBeenCalledWith('selection-manager')
     expect(wrapper.find('[data-testid="translation-window-toolbar-provider-selector"]').exists()).toBe(false)
 
     await openWindowFromSelectionIcon(wrapper)
@@ -1022,7 +1022,7 @@ describe('PdfWindowsHost', () => {
       })
     }))
     expect(sendRegularMessageMock.mock.calls[0][0].data.enableDictionary).toBeUndefined()
-    expect(getEffectiveProviderAsyncMock).toHaveBeenCalledWith('pdf-translation')
+    expect(getEffectiveProviderAsyncMock).toHaveBeenCalledWith('selection-manager')
     expect(getTargetLanguageAsyncMock).toHaveBeenCalled()
     expect(wrapper.find('[data-testid="pdf-windows-host-loading"]').exists()).toBe(false)
     const result = wrapper.get('[data-testid="pdf-windows-host-result"]')

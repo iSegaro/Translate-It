@@ -169,6 +169,7 @@
         :is-global="false"
         allow-default
         only-configured
+        required-feature="bulk"
         :loading="isTranslating"
         :disabled="!canTranslateVisiblePages && !isTranslating"
         :dropdown-disabled="isTranslating"
