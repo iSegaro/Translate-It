@@ -95,9 +95,6 @@
                 <p class="pdf-app__empty-title">
                   Drop a PDF here or choose one from disk.
                 </p>
-                <p class="pdf-app__empty-text">
-                  This MVP uses the dedicated viewer only. No native browser interception is active.
-                </p>
               </div>
             </template>
 
