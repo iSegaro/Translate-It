@@ -19,6 +19,7 @@
 }
 
 .pdf-toolbar__title-block {
+  grid-column: 1;
   min-width: 0;
   display: flex;
   flex-direction: column;
@@ -92,6 +93,7 @@
 }
 
 .pdf-toolbar__center-group {
+  grid-column: 2;
   display: flex;
   align-items: center;
   gap: 6px;
@@ -204,6 +206,7 @@
 }
 
 .pdf-toolbar__actions {
+  grid-column: 3;
   display: flex;
   align-items: center;
   justify-content: flex-end;
@@ -473,6 +476,7 @@
   .pdf-toolbar__title-block,
   .pdf-toolbar__center-group,
   .pdf-toolbar__actions {
+    grid-column: 1;
     justify-self: stretch;
   }
 
