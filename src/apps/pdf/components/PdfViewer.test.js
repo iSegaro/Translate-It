@@ -722,56 +722,5 @@ describe('PdfViewer', () => {
       expect(session.clearPage).not.toHaveBeenCalled()
     })
 
-    it('does not emit block-pointer-move for overlay role', async () => {
-      const session = {
-        updateVisiblePages: vi.fn(),
-        
-      }
-
-      const wrapper = mount(PdfViewer, {
-        props: {
-          pages: [{ pageNumber: 1, width: 100, height: 100, scale: 1 }],
-          session,
-          viewerRole: VIEWER_ROLE.OVERLAY,
-          isBlockTargetingActive: true
-        },
-        attachTo: document.body
-      })
-
-      await nextTick()
-
-      const viewerEl = wrapper.find('.pdf-viewer')
-      viewerEl.element.dispatchEvent(new Event('pointermove', { bubbles: true }))
-
-      expect(wrapper.emitted('block-pointer-move')).toBeFalsy()
-
-      wrapper.unmount()
-    })
-
-    it('does not emit block-click for overlay role', async () => {
-      const session = {
-        updateVisiblePages: vi.fn(),
-        
-      }
-
-      const wrapper = mount(PdfViewer, {
-        props: {
-          pages: [{ pageNumber: 1, width: 100, height: 100, scale: 1 }],
-          session,
-          viewerRole: VIEWER_ROLE.OVERLAY,
-          isBlockTargetingActive: true
-        },
-        attachTo: document.body
-      })
-
-      await nextTick()
-
-      const viewerEl = wrapper.find('.pdf-viewer')
-      viewerEl.trigger('click')
-
-      expect(wrapper.emitted('block-click')).toBeFalsy()
-
-      wrapper.unmount()
-    })
   })
 })

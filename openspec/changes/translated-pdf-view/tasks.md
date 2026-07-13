@@ -24,8 +24,7 @@
 - [x] 4.1 Add `PdfOverlayLayer` to `PdfPageView.vue` template, positioned in the stage grid alongside canvas and text layer.
 - [x] 4.2 Pass `translatedPageData`, `translationStates`, `pageMetric`, and `showOverlay` props from `PdfViewer.vue` through to `PdfPageView.vue`.
 - [x] 4.3 Wire `usePdfBilingualMode` overlay visibility into `PdfApp.vue` and `PdfViewer.vue`.
-- [x] 4.4 Ensure `PdfBlockHighlightOverlay` renders above the overlay layer (z-index ordering).
-- [x] 4.5 Add integration test for overlay rendering in `translated-pdf` mode.
+- [x] 4.4 Add integration test for overlay rendering in `translated-pdf` mode.
 
 ## 5. OCR and Edge Cases (Phase 1)
 
@@ -37,8 +36,6 @@
 ## 6. Selection and Interaction (Phase 1)
 
 - [x] 6.1 Verify native text selection works on overlay DOM elements.
-- [x] 6.2 Ensure overlay layer does not block pointer events for block targeting (pass-through for non-text areas).
-- [x] 6.3 Test block targeting highlight renders correctly with overlay layer active.
 
 ## 7. Performance and Polish (Phase 1)
 

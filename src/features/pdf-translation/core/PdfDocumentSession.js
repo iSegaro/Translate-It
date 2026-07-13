@@ -54,7 +54,6 @@ export class PdfDocumentSession extends ResourceTracker {
     this.pdfFingerprint = ''
     this.documentIdentity = ''
     this.displayName = ''
-    this.targetedBlockId = null
     this._renderer = new PdfRenderer()
     this._bitmapCache = new PdfBitmapCache()
     this._resolver = new PdfDestinationResolver()
@@ -107,11 +106,9 @@ export class PdfDocumentSession extends ResourceTracker {
     this.documentIdentity = await this._resolveDocumentIdentity(file, document)
     this._pageContentRepository.reset()
     this.resetTranslationStates()
-    this.targetedBlockId = null
     this._resolver.clearCaches()
     this._outlineRepository.clear()
     this._linkAnnotationRepository.clear()
-
     await this._buildPageMetrics(layoutRequest)
 
     logger.info('PDF document opened:', {
@@ -296,14 +293,6 @@ export class PdfDocumentSession extends ResourceTracker {
 
   resetTranslationStates() {
     this._translationState.resetTranslationStates()
-  }
-
-  setTargetedBlock(blockId) {
-    this.targetedBlockId = blockId || null
-  }
-
-  clearTargetedBlock() {
-    this.targetedBlockId = null
   }
 
   getVisibleTranslationStates() {
@@ -505,7 +494,6 @@ export class PdfDocumentSession extends ResourceTracker {
     this.visiblePageNumbers.clear()
     this._pageContentRepository.reset()
     this.resetTranslationStates()
-    this.targetedBlockId = null
     this._resolver.clearCaches()
     this._outlineRepository.clear()
     this._linkAnnotationRepository.clear()

@@ -54,7 +54,6 @@
               :key="block.id"
               :block="block"
               :translation-state="block.translationState"
-              :highlighted="block.id === highlightedBlockId"
             />
           </div>
         </div>
@@ -81,10 +80,6 @@ const props = defineProps({
   translatedPageData: {
     type: Array,
     default: () => []
-  },
-  highlightedBlockId: {
-    type: String,
-    default: null
   },
   pageMetrics: {
     type: Array,

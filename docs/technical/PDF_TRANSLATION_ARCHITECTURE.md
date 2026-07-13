@@ -75,7 +75,6 @@ The PDF Translation feature is a **self-contained, dedicated PDF viewer and tran
 - [History Architecture](#history-architecture)
 - [Export Architecture](#export-architecture)
 - [Status Banner Architecture](#status-banner-architecture)
-- [Block Targeting](#block-targeting)
 - [Storage Model](#storage-model)
 - [Event Flow](#event-flow)
 - [Cross-Feature Dependencies](#cross-feature-dependencies)
@@ -177,7 +176,6 @@ PdfApp.vue
 ├── usePdfNavigation              (destination resolution, outline)
 ├── usePdfOcr                     (scanned page detection)
 ├── usePdfExport                  (TXT/Markdown export)
-├── usePdfBlockSelection          (block targeting mode)
 ├── usePdfSelectionBridge         (text selection bridge)
 ├── createPdfStatusBannerController (banner state, priority, identity)
 │   └── pdfStatusBanner (computed)
@@ -263,8 +261,7 @@ PdfApp
 │       ├── PdfViewer (original pane, scrollable page list, scrollToPage exposed)
 │       │   ├── PdfPageView × N (canvas + text layer + link overlay per page)
 │       │   ├── PdfLinkOverlay × N (clickable link hitboxes)
-│       │   ├── PdfOverlayLayer × N (translated block overlays)
-│       │   └── PdfBlockHighlightOverlay × N (targeting highlight)
+│       │   └── PdfOverlayLayer × N (translated block overlays)
 │       └── PdfTranslatedPane (translated blocks per page, own scroll container)
 │           ├── PdfTranslatedBlock × M
 │           └── PdfOcrStatus × N
@@ -303,7 +300,6 @@ PdfApp
 | `usePdfScrollSync` | Side-by-side scroll synchronization | Delegates to pdfGeometrySyncEngine; falls back to proportional ratio |
 | `usePdfViewerMode` | Viewer mode state — contentView (original/translation/translated-pdf) + layoutMode (single/side-by-side) | Standalone |
 | `usePdfExport` | Export to TXT/Markdown | `PdfExportCollector`, `PdfExportFormatter` |
-| `usePdfBlockSelection` | Block targeting mode | `PdfBlockTargetingManager` |
 | `usePdfOcr` | OCR detection + processing workflow | `PdfOcrDetector`, `PdfOcrProcessor` |
 | `usePdfSelectionBridge` | Lifecycle wrapper for `PdfSelectionBridge` | `PdfSelectionBridge` |
 | `usePdfWindowsHost` | Selection-to-translation UI — floating icon + draggable/resizable window | `pageEventBus`, `UnifiedMessaging` |
@@ -1761,31 +1757,6 @@ Higher-priority conditions are checked first. If multiple conditions could apply
 
 ---
 
-## Block Targeting
-
-### Interactive Selection Mode
-
-When block targeting is active:
-1. User moves pointer over the PDF — the nearest block is highlighted.
-2. User clicks — the targeted block is set on `pdfDocumentSession`.
-3. Targeting mode deactivates.
-
-### Architecture
-
-```
-PdfBlockTargetingManager
-    ├── activate() / deactivate()
-    ├── handlePointerMove({ pageNumber, x, y })
-    │   └── PdfBlockTargetAdapter.findBlockAtPoint()
-    │       └── Smallest-area block containing point (6px tolerance)
-    ├── handleClick({ pageNumber, x, y })
-    │   ├── Find block at point
-    │   ├── pdfDocumentSession.setTargetedBlock(blockId)
-    │   └── Deactivate targeting
-    └── getBlockBounds(blockId)
-        └── Returns bounding rect for overlay rendering
-```
-
 ---
 
 ## Storage Model
@@ -1857,7 +1828,7 @@ User clicks "OCR Scanned Pages"
 
 | External Module | Used By | Purpose |
 |----------------|---------|---------|
-| `ResourceTracker` | PdfDocumentSession, PdfSelectionBridge, PdfBlockTargetingManager | Memory-safe event listener / timeout tracking |
+| `ResourceTracker` | PdfDocumentSession, PdfSelectionBridge | Memory-safe event listener / timeout tracking |
 | `pageEventBus` + `SELECTION_EVENTS` | PdfSelectionBridge, usePdfWindowsHost | Decoupled selection event system |
 | `UnifiedMessaging` | PdfTranslationCoordinator, PdfTranslationAdapter, usePdfWindowsHost | Extension message passing to background |
 | `storageCore` | PdfCacheManager, PdfHistoryManager | Persistent storage |
@@ -1965,7 +1936,7 @@ Revisit only if the warning coincides with measurable UI jank, rendering regress
 
 ### 1. Cross-Pane Block Highlighting
 
-Block IDs are stable and shared between panes. A highlight overlay system (similar to `PdfBlockHighlightOverlay`) could be extended to the translated pane to show correspondence.
+Block IDs are stable and shared between panes. A highlight overlay system could be extended to the translated pane to show correspondence.
 
 ### 2. Auto-Translation on Open
 

@@ -70,15 +70,6 @@ The system SHALL preserve all translation state when switching between modes. Tr
 - **WHEN** the user switches from `translated-pdf` to `bilingual` and back to `translated-pdf`
 - **THEN** all previously translated blocks SHALL still be visible in the overlay
 
-### Requirement: Overlay mode integrates with block targeting
-
-The system SHALL support block targeting (hover/click highlighting) in overlay mode. The `PdfBlockHighlightOverlay` SHALL function correctly when the overlay layer is active.
-
-#### Scenario: Block targeting in overlay mode
-
-- **WHEN** the user activates block targeting in `translated-pdf` mode and hovers over a block
-- **THEN** the block highlight SHALL appear over both the canvas and overlay layers
-
 ### Requirement: Export buttons available in all modes with translations
 
 The system SHALL display export buttons (TXT, Markdown, HTML) in the toolbar regardless of viewer mode, when translations exist.

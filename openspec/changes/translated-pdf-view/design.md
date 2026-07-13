@@ -6,7 +6,6 @@ The existing infrastructure provides:
 - `PdfLogicalBlock` with `boundingBox` (page coordinates), `normalizedBoundingBox` (0-1), `roleMetadata.fontSize`, `roleMetadata.fontFamily`, `roleMetadata.ascent`, `roleMetadata.descent`, `roleMetadata.isStructured`, `lines[]` with per-line bounding boxes and item geometry.
 - `PdfDocumentSession.translationStates` storing `translatedText` and `translatedCells` per block ID.
 - `PdfTranslationAdapter` emitting per-cell provider items for structured blocks with `translatedCells` in the response.
-- `PdfBlockHighlightOverlay` demonstrating coordinate-based positioning over the canvas.
 - `PdfTextLayerRenderer` showing how to position elements at page coordinates.
 - `PdfCacheManager` with block-based translation cache reusable across modes.
 - Table detection via `isTableLikeLine()` producing `table-cell` and `table-region` roles.

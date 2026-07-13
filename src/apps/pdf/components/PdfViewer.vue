@@ -2,10 +2,6 @@
   <div
     ref="viewerRoot"
     class="pdf-viewer"
-    :class="{ 'pdf-viewer--targeting': isBlockTargetingActive }"
-    @pointermove="handlePointerMove"
-    @pointerleave="handlePointerLeave"
-    @click="handleClick"
   >
     <PdfPageView
       v-for="page in pages"
@@ -26,22 +22,14 @@
       @render-cancelled="handleRenderCancelled"
       @render-failed="handleRenderFailed"
     />
-
-    <PdfBlockHighlightOverlay
-      v-for="page in pages"
-      :key="`overlay-${page.pageNumber}`"
-      :block-bounds="highlightedBounds"
-      :page-number="page.pageNumber"
-    />
   </div>
 </template>
 
 <script setup>
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import PdfPageView from './PdfPageView.vue'
-import PdfBlockHighlightOverlay from './PdfBlockHighlightOverlay.vue'
 import { getPdfPageRootElement } from '../utils/pageViewInstance.js'
-import { getCanvasScrollTop, getPageGeometry, getScrollSpaceTop } from '../utils/pdfGeometryModel.js'
+import { getCanvasScrollTop, getScrollSpaceTop } from '../utils/pdfGeometryModel.js'
 import { usePdfRenderPipeline } from '../composables/usePdfRenderPipeline.js'
 import { usePdfSelectionBridge } from '../composables/usePdfSelectionBridge.js'
 import { usePdfScrollObservation } from '../composables/usePdfScrollObservation.js'
@@ -63,14 +51,6 @@ const props = defineProps({
     type: String,
     default: VIEWER_ROLE.ORIGINAL,
     validator: (v) => Object.values(VIEWER_ROLE).includes(v)
-  },
-  isBlockTargetingActive: {
-    type: Boolean,
-    default: false
-  },
-  highlightedBlockId: {
-    type: String,
-    default: null
   },
   showOverlay: {
     type: Boolean,
@@ -98,10 +78,9 @@ const props = defineProps({
   }
 })
 
-const emit = defineEmits(['layout-change', 'current-page-change', 'visible-pages-change', 'block-pointer-move', 'block-click'])
+const emit = defineEmits(['layout-change', 'current-page-change', 'visible-pages-change'])
 const viewerRoot = ref(null)
 const pageViews = new Map()
-const highlightedBounds = ref(null)
 let lastEmittedVisiblePages = new Set()
 
 const isOriginalRole = computed(() => props.viewerRole === VIEWER_ROLE.ORIGINAL)
@@ -195,106 +174,6 @@ function emitVisiblePagesIfChanged(nextVisible) {
 
   lastEmittedVisiblePages = nextSet
   emit('visible-pages-change', new Set(nextSet))
-}
-
-function resolvePageFromPoint(clientX, clientY) {
-  if (!viewerRoot.value) return null
-
-  for (const [pageNumber, instance] of pageViews.entries()) {
-    const rootEl = getPdfPageRootElement(instance)
-    if (!rootEl) continue
-
-    const geometry = getPageGeometry(rootEl, props.scrollContainer || viewerRoot.value)
-    const rect = geometry?.rect
-    if (!rect) continue
-
-    if (clientX >= rect.left && clientX <= rect.right && clientY >= rect.top && clientY <= rect.bottom) {
-      const pageMetric = props.pages.find((p) => p.pageNumber === pageNumber)
-      const x = clientX - rect.left
-      const y = clientY - rect.top
-
-      return {
-        pageNumber,
-        x: x / (pageMetric?.scale || 1),
-        y: y / (pageMetric?.scale || 1)
-      }
-    }
-  }
-
-  return null
-}
-
-function handlePointerMove(event) {
-  if (!isOriginalRole.value) return
-  if (!props.isBlockTargetingActive) return
-
-  const pagePoint = resolvePageFromPoint(event.clientX, event.clientY)
-  if (!pagePoint) {
-    emit('block-pointer-move', { pageNumber: 0, x: 0, y: 0 })
-    return
-  }
-
-  emit('block-pointer-move', pagePoint)
-}
-
-function handlePointerLeave() {
-  if (!isOriginalRole.value) return
-  if (!props.isBlockTargetingActive) return
-
-  emit('block-pointer-move', { pageNumber: 0, x: -1, y: -1 })
-}
-
-function handleClick(event) {
-  if (!isOriginalRole.value) return
-  if (!props.isBlockTargetingActive) return
-
-  const pagePoint = resolvePageFromPoint(event.clientX, event.clientY)
-  if (!pagePoint) return
-
-  emit('block-click', pagePoint)
-}
-
-watch(
-  () => props.highlightedBlockId,
-  (blockId) => {
-    if (!blockId) {
-      highlightedBounds.value = null
-      return
-    }
-
-    highlightedBounds.value = getBlockBounds(blockId)
-  }
-)
-
-function getBlockBounds(blockId) {
-  for (const [, instance] of pageViews.entries()) {
-    const rootEl = getPdfPageRootElement(instance)
-    if (!rootEl) continue
-
-    const pageNumber = Number(rootEl.dataset?.pageNumber)
-    if (!pageNumber) continue
-
-    const pageSession = props.session.pageSessions?.get(pageNumber)
-    if (!pageSession) continue
-
-    const blocks = pageSession.getLogicalBlocks()
-    for (const block of blocks) {
-      if (block.id === blockId && block.boundingBox) {
-        const pageMetric = props.pages.find((p) => p.pageNumber === pageNumber)
-        const scale = pageMetric?.scale || 1
-
-        return {
-          pageNumber,
-          x: block.boundingBox.x * scale,
-          y: block.boundingBox.y * scale,
-          width: block.boundingBox.width * scale,
-          height: block.boundingBox.height * scale
-        }
-      }
-    }
-  }
-
-  return null
 }
 
 function registerPageView(pageNumber, instance) {

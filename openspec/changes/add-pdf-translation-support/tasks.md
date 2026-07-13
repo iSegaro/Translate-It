@@ -46,8 +46,7 @@ The following items are deferred to future phases:
 ## 7. PDF-aware Select Element
 
 - [x] 7.1 Add a PDF block target adapter that maps pointer coordinates to logical blocks.
-- [x] 7.2 Integrate PDF block targeting into the viewer without coupling to DOM Select Element translation.
-- [x] 7.3 Add hover/highlight geometry support for PDF block targets in original and translated panes.
+- [x] 7.2 Add hover/highlight geometry support for PDF block targets in original and translated panes.
 
 ## 8. OCR Fallback
 

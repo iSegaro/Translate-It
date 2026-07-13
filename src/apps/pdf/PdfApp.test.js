@@ -18,7 +18,7 @@ if (!window.matchMedia) {
 let mockViewerController
 let mockViewerMode
 let mockPdfExport
-let mockBlockSelection
+
 let mockPdfOcr
 let mockLayoutSyncFromPane
 let mockPdfViewport
@@ -36,10 +36,6 @@ vi.mock('./composables/usePdfViewerMode.js', () => ({
 
 vi.mock('./composables/usePdfExport.js', () => ({
   usePdfExport: () => mockPdfExport
-}))
-
-vi.mock('./composables/usePdfBlockSelection.js', () => ({
-  usePdfBlockSelection: () => mockBlockSelection
 }))
 
 vi.mock('./composables/usePdfOcr.js', () => ({
@@ -153,7 +149,7 @@ vi.mock('./components/PdfViewerLayout.vue', () => ({
 vi.mock('./components/PdfViewer.vue', () => ({
   default: {
     name: 'PdfViewer',
-    props: ['viewerRole', 'showOverlay', 'isBlockTargetingActive', 'highlightedBlockId', 'handleNavigationTarget', 'scrollContainer', 'freezeRenderWindowEviction'],
+    props: ['viewerRole', 'showOverlay', 'handleNavigationTarget', 'scrollContainer', 'freezeRenderWindowEviction'],
     template: '<div class="pdf-viewer-stub" />'
   }
 }))
@@ -268,14 +264,6 @@ function createMocks({
     exportMarkdown: vi.fn().mockResolvedValue(false),
     exportHtml: vi.fn().mockResolvedValue(false),
     clearExportError: vi.fn()
-  }
-
-  mockBlockSelection = {
-    isBlockTargetingActive: ref(false),
-    highlightedBlockId: ref(''),
-    toggleBlockTargeting: vi.fn(),
-    handleBlockPointerMove: vi.fn(),
-    handleBlockClick: vi.fn()
   }
 
   mockPdfOcr = {
@@ -585,8 +573,6 @@ describe('PdfApp', () => {
       expect(viewers[0].props('viewerRole')).toBe('original')
       expect(viewers[0].props('showOverlay')).toBe(false)
       expect(viewers[0].props('scrollContainer')).toBe(wrapper.findComponent({ name: 'PdfViewerLayout' }).vm.scrollContainer)
-      expect(viewers[0].props('isBlockTargetingActive')).toBe(false)
-      expect(viewers[0].props('highlightedBlockId')).toBe('')
       expect(viewers[0].props('handleNavigationTarget')).toBeTruthy()
       expect(viewers[0].props('freezeRenderWindowEviction')).toBe(false)
 
@@ -594,8 +580,6 @@ describe('PdfApp', () => {
       expect(viewers[1].props('showOverlay')).toBe(true)
       expect(viewers[1].props('scrollContainer')).toBe(wrapper.findComponent({ name: 'PdfViewerLayout' }).vm.translatedPaneRef)
       expect(viewers[1].props('freezeRenderWindowEviction')).toBe(false)
-      expect(viewers[1].props('isBlockTargetingActive')).toBeUndefined()
-      expect(viewers[1].props('highlightedBlockId')).toBeUndefined()
       expect(viewers[1].props('handleNavigationTarget')).toBeTruthy()
 
       expect(wrapper.findComponent({ name: 'PdfTranslatedPane' }).exists()).toBe(false)

@@ -117,8 +117,6 @@
                     :session="session"
                     :suppress-current-page-updates="currentPageUpdatesSuppressed"
                     :freeze-render-window-eviction="renderWindowEvictionFrozen"
-                    :is-block-targeting-active="isBlockTargetingActive"
-                    :highlighted-block-id="highlightedBlockId"
                     :show-overlay="showOverlayLayer"
                     :overlay-page-data="translatedPageData"
                     :handle-navigation-target="handleNavigationTarget"
@@ -126,8 +124,6 @@
                     @layout-change="handleLayoutChange"
                     @current-page-change="handleCurrentPageChange"
                     @visible-pages-change="handleVisiblePagesChange"
-                    @block-pointer-move="handleBlockPointerMove"
-                    @block-click="handleBlockClick"
                   />
                 </template>
 
@@ -136,7 +132,6 @@
                     v-if="showTranslatedTextPane"
                     ref="pdfTranslatedPaneRef"
                     :translated-page-data="translatedPageData"
-                    :highlighted-block-id="highlightedBlockId"
                     :page-metrics="pageMetrics"
                     :layout-mode="layoutMode"
                     :scroll-container="translatedScrollContainer"
@@ -182,7 +177,6 @@ import PdfOutline from './components/PdfOutline.vue'
 import { usePdfViewerController } from './composables/usePdfViewerController.js'
 import { usePdfViewerMode, CONTENT_VIEW, VIEWER_ROLE } from './composables/usePdfViewerMode.js'
 import { usePdfExport } from './composables/usePdfExport.js'
-import { usePdfBlockSelection } from './composables/usePdfBlockSelection.js'
 import { usePdfOcr } from './composables/usePdfOcr.js'
 import { usePdfNavigation } from './composables/usePdfNavigation.js'
 import { usePdfKeyboard } from './composables/usePdfKeyboard.js'
@@ -262,13 +256,6 @@ const exportSuccessTimer = ref(null)
 const EXPORT_SUCCESS_DURATION_MS = 2200
 const dismissedPdfStatusBannerKey = ref('')
 const pdfStatusBannerController = createPdfStatusBannerController()
-
-const {
-  isBlockTargetingActive,
-  highlightedBlockId,
-  handleBlockPointerMove,
-  handleBlockClick
-} = usePdfBlockSelection()
 
 const {
   scannedPageCount,
