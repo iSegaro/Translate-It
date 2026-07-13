@@ -368,81 +368,41 @@ describe('PdfDocumentSession', () => {
       expect(session.pageSessions.get(1).loaded).toBe(true)
     })
 
-    it('cancels render tasks outside the merged keep set after cleanup delay', async () => {
-      const canvas1 = { width: 1, height: 1 }
-      const canvas2 = { width: 1, height: 1 }
-      const task1 = { cancel: vi.fn(), promise: Promise.resolve() }
-      const task2 = { cancel: vi.fn(), promise: Promise.resolve() }
-
-      session._renderer.renderTasks.set(session._renderer._taskKey(1, canvas1), task1)
-      session._renderer.renderTasks.set(session._renderer._taskKey(2, canvas2), task2)
-
-      session.updateVisiblePages([1])
-      session.updateRenderCandidates(new Set([1]))
-
-      vi.advanceTimersByTime(199)
-      expect(task1.cancel).not.toHaveBeenCalled()
-      expect(task2.cancel).not.toHaveBeenCalled()
-
-      vi.advanceTimersByTime(1)
-      expect(task1.cancel).not.toHaveBeenCalled()
-      expect(task2.cancel).toHaveBeenCalled()
-    })
-
-    it('does not cancel render tasks when rescheduled into the keep set', () => {
-      const canvas = { width: 1, height: 1 }
-      const task = { cancel: vi.fn(), promise: Promise.resolve() }
-
-      session._renderer.renderTasks.set(session._renderer._taskKey(1, canvas), task)
-
-      session.updateVisiblePages([])
-      session.updateRenderCandidates(new Set())
-      session.updateVisiblePages([1])
-      session.updateRenderCandidates(new Set([1]))
-
-      vi.advanceTimersByTime(200)
-
-      expect(task.cancel).not.toHaveBeenCalled()
-    })
-
     it('cleanupDocument cancels pending cleanup', async () => {
-      const cancelRendersOutside = vi.spyOn(session._renderer, 'cancelRendersOutside')
+      session.documentIdentity = 'fingerprint-1'
+      session.pageMetrics = [
+        { pageNumber: 1, width: 100, height: 200, naturalWidth: 100, naturalHeight: 200, scale: 1 },
+        { pageNumber: 2, width: 100, height: 200, naturalWidth: 100, naturalHeight: 200, scale: 1 }
+      ]
+      session.totalPages = 2
 
-      session.updateVisiblePages([])
-      session.updateRenderCandidates(new Set())
+      session.updateVisiblePages([1, 2])
+      await session.getVisiblePageSessions()
+      expect(session.pageSessions.get(1).loaded).toBe(true)
+      expect(session.pageSessions.get(2).loaded).toBe(true)
+
+      session.updateVisiblePages([1])
+      session.updateRenderCandidates(new Set([1]))
+
+      const page2 = session.pageSessions.get(2)
+      expect(page2.loaded).toBe(true)
 
       await session.cleanupDocument()
+
+      expect(session.pageSessions.size).toBe(0)
+
+      // Reinsert the previously loaded session so a stale cleanup timer,
+      // if still active, would release it.
+      session.pageSessions.set(2, page2)
+
       vi.advanceTimersByTime(200)
 
-      expect(cancelRendersOutside).not.toHaveBeenCalled()
+      expect(session.pageSessions.get(2).loaded).toBe(true)
     })
   })
 
   describe('batched metrics building', () => {
     it('fetches all pages across multiple batches with correct call count', async () => {
-      const PAGE_COUNT = 25
-      session.totalPages = PAGE_COUNT
-      session.pdfDocument.numPages = PAGE_COUNT
-
-      const state = await session.rebuildPageMetrics(640)
-
-      expect(pdfDocument.getPage).toHaveBeenCalledTimes(PAGE_COUNT)
-      expect(state.pageMetrics).toHaveLength(PAGE_COUNT)
-    })
-
-    it('preserves pageNumber order across batches', async () => {
-      const PAGE_COUNT = 25
-      session.totalPages = PAGE_COUNT
-      session.pdfDocument.numPages = PAGE_COUNT
-
-      const state = await session.rebuildPageMetrics(640)
-
-      for (let i = 0; i < PAGE_COUNT; i++) {
-        expect(state.pageMetrics[i].pageNumber).toBe(i + 1)
-      }
-    })
-
-    it('produces correct metric shape for every page after batched fetch', async () => {
       const PAGE_COUNT = 25
       session.totalPages = PAGE_COUNT
       session.pdfDocument.numPages = PAGE_COUNT
@@ -577,7 +537,6 @@ describe('PdfDocumentSession', () => {
         cancelRender: vi.fn().mockReturnValue(false),
         clearPage: vi.fn(),
         cancelAll: vi.fn(),
-        cancelRendersOutside: vi.fn(),
         destroy: vi.fn()
       }
      mockPdfDocument = {

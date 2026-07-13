@@ -170,15 +170,6 @@ export class PdfRenderer {
     this.renderTasks.clear()
   }
 
-  cancelRendersOutside(keepSet) {
-    for (const [key, renderTask] of this.renderTasks.entries()) {
-      const pageNumber = PdfRenderer._parsePageNumber(key)
-      if (!Number.isFinite(pageNumber) || !keepSet.has(pageNumber)) {
-        renderTask.cancel?.()
-      }
-    }
-  }
-
   destroy() {
     this.cancelAll()
   }

@@ -460,53 +460,6 @@ describe('PdfRenderer', () => {
     })
   })
 
-  describe('cancelRendersOutside', () => {
-    it('cancels all render tasks for pages not in the keep set', () => {
-      const canvas1 = createMockCanvas()
-      const canvas2 = createMockCanvas()
-      const task1 = { cancel: vi.fn(), promise: Promise.resolve() }
-      const task2 = { cancel: vi.fn(), promise: Promise.resolve() }
-
-      renderer.renderTasks.set(renderer._taskKey(1, canvas1), task1)
-      renderer.renderTasks.set(renderer._taskKey(2, canvas2), task2)
-
-      renderer.cancelRendersOutside(new Set([1]))
-
-      expect(task1.cancel).not.toHaveBeenCalled()
-      expect(task2.cancel).toHaveBeenCalled()
-    })
-
-    it('preserves all render tasks when all pages are kept', () => {
-      const canvas1 = createMockCanvas()
-      const canvas2 = createMockCanvas()
-      const task1 = { cancel: vi.fn(), promise: Promise.resolve() }
-      const task2 = { cancel: vi.fn(), promise: Promise.resolve() }
-
-      renderer.renderTasks.set(renderer._taskKey(1, canvas1), task1)
-      renderer.renderTasks.set(renderer._taskKey(2, canvas2), task2)
-
-      renderer.cancelRendersOutside(new Set([1, 2]))
-
-      expect(task1.cancel).not.toHaveBeenCalled()
-      expect(task2.cancel).not.toHaveBeenCalled()
-    })
-
-    it('cancels tasks for all canvases when their page is not visible', () => {
-      const canvasA = createMockCanvas()
-      const canvasB = createMockCanvas()
-      const taskA = { cancel: vi.fn(), promise: Promise.resolve() }
-      const taskB = { cancel: vi.fn(), promise: Promise.resolve() }
-
-      renderer.renderTasks.set(renderer._taskKey(2, canvasA), taskA)
-      renderer.renderTasks.set(renderer._taskKey(2, canvasB), taskB)
-
-      renderer.cancelRendersOutside(new Set([1]))
-
-      expect(taskA.cancel).toHaveBeenCalled()
-      expect(taskB.cancel).toHaveBeenCalled()
-    })
-  })
-
   describe('destroy', () => {
     it('cancels all render tasks', () => {
       const canvas = createMockCanvas()

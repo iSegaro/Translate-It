@@ -389,7 +389,7 @@ The page list within the scroll pane uses `padding: 16px 0 24px` to provide vert
    └── _naturalPageViewports.clear()
 ```
 
-Cleanup scheduling is owned by `PdfDocumentSession`, not by `PdfRenderer`. The session tracks visible and render-candidate page numbers, then schedules a delayed cleanup (`RENDER_CLEANUP_DELAY_MS`) that cancels renders outside the active set and releases out-of-scope page sessions. The renderer provides only the immediate `cancelRendersOutside(keepSet)` primitive.
+Cleanup scheduling is owned by `PdfDocumentSession`, not by `PdfRenderer`. The session tracks visible and render-candidate page numbers, then schedules a delayed cleanup (`RENDER_CLEANUP_DELAY_MS`) that releases out-of-scope page sessions. The renderer provides the immediate cancel primitives (`cancelRender()`, `clearPage()`, `cancelAll()`) that the session or its delegates invoke.
 
 ---
 
@@ -412,7 +412,7 @@ The render pipeline is a layered system where each component owns a single, well
 
 **File**: `src/features/pdf-translation/core/PdfRenderer.js`
 
-A pure render service. Provides `renderPage()`, `clearPage()`, `cancelRender()`, `cancelAll()`, `cancelRendersOutside()`, and `destroy()`. Tracks render tasks per `pageNumber:canvasId`. Returns structured result objects (`{status, bitmap, error}`). Owns no scheduling, no queues, no timers, no DOM ownership.
+A pure render service. Provides `renderPage()`, `clearPage()`, `cancelRender()`, `cancelAll()`, and `destroy()`. Tracks render tasks per `pageNumber:canvasId`. Returns structured result objects (`{status, bitmap, error}`). Owns no scheduling, no queues, no timers, no DOM ownership.
 
 ### PdfRenderScheduler
 

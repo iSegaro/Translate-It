@@ -527,7 +527,6 @@ export class PdfDocumentSession extends ResourceTracker {
 
     this._cleanupTimeout = this.trackTimeout(() => {
       this._cleanupTimeout = null
-      this._renderer.cancelRendersOutside(merged)
       for (const [pageNumber] of this.pageSessions) {
         if (!merged.has(pageNumber)) {
           this.releasePageSession(pageNumber)
