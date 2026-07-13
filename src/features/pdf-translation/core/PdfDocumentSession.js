@@ -17,6 +17,31 @@ const PAGE_MARGIN = 24
 const MIN_SCALE = 0.4
 const MAX_SCALE = 2.0
 
+function normalizePageNumberSet(pageNumbers = []) {
+  const normalized = new Set()
+
+  if (!pageNumbers || typeof pageNumbers[Symbol.iterator] !== 'function') {
+    return normalized
+  }
+
+  for (const value of pageNumbers) {
+    const pageNumber = Number(value)
+    if (Number.isInteger(pageNumber) && pageNumber > 0) {
+      normalized.add(pageNumber)
+    }
+  }
+
+  return normalized
+}
+
+function arePageSetsEqual(first, second) {
+  if (first.size !== second.size) return false
+  for (const pageNumber of first) {
+    if (!second.has(pageNumber)) return false
+  }
+  return true
+}
+
 function normalizeLayoutRequest(layoutRequest = null) {
   if (typeof layoutRequest === 'number') {
     return {
@@ -62,6 +87,7 @@ export class PdfDocumentSession extends ResourceTracker {
     this._pageContentRepository = new PdfPageContentRepository()
     this._translationState = new PdfTranslationState()
     this._naturalPageViewports = new Map()
+    this._documentGeneration = 0
   }
 
   get pageSessions() {
@@ -87,6 +113,17 @@ export class PdfDocumentSession extends ResourceTracker {
   get workerUrl() {
     return getPdfWorkerUrl()
   }
+
+  get documentGeneration() {
+    return this._documentGeneration
+  }
+
+  _advanceDocumentGeneration() {
+    this._documentGeneration += 1
+    return this._documentGeneration
+  }
+
+  _isDocumentGenerationCurrent = (generation) => generation === this._documentGeneration
 
   async openFile(file, layoutRequest) {
     if (!file) throw new Error('No PDF file provided')
@@ -249,32 +286,59 @@ export class PdfDocumentSession extends ResourceTracker {
   }
 
   updateVisiblePages(pageNumbers) {
-    this.visiblePageNumbers = new Set(pageNumbers)
+    const nextVisible = normalizePageNumberSet(pageNumbers)
+    if (arePageSetsEqual(this.visiblePageNumbers, nextVisible)) return
+
+    const newlyVisible = [...nextVisible].filter((pageNumber) => !this.visiblePageNumbers.has(pageNumber))
+    this.visiblePageNumbers = nextVisible
+
+    if (newlyVisible.length > 0) {
+      this._hydrateVisiblePagesInBackground(newlyVisible)
+    }
+  }
+
+  _createHydrationContext() {
+    return {
+      pdfDocument: this.pdfDocument,
+      pageMetrics: this.pageMetrics,
+      documentIdentity: this.documentIdentity,
+      documentGeneration: this._documentGeneration,
+      isDocumentGenerationCurrent: this._isDocumentGenerationCurrent
+    }
+  }
+
+  _hydrateVisiblePagesInBackground(pageNumbers) {
+    const context = this._createHydrationContext()
+
+    for (const pageNumber of pageNumbers) {
+      this._pageContentRepository.getPageSession({
+        ...context,
+        pageNumber
+      }).catch((error) => {
+        if (this._isDocumentGenerationCurrent(context.documentGeneration)) {
+          logger.warn('Failed to hydrate visible page session:', { pageNumber, error })
+        }
+      })
+    }
   }
 
   async getPageSession(pageNumber) {
     return this._pageContentRepository.getPageSession({
-      pdfDocument: this.pdfDocument,
-      pageMetrics: this.pageMetrics,
-      documentIdentity: this.documentIdentity,
+      ...this._createHydrationContext(),
       pageNumber
     })
   }
 
   async getVisiblePageSessions() {
     return this._pageContentRepository.getVisiblePageSessions({
-      pdfDocument: this.pdfDocument,
-      pageMetrics: this.pageMetrics,
-      documentIdentity: this.documentIdentity,
+      ...this._createHydrationContext(),
       visiblePageNumbers: this.visiblePageNumbers
     })
   }
 
   async getVisibleLogicalBlocks() {
     return this._pageContentRepository.getVisibleLogicalBlocks({
-      pdfDocument: this.pdfDocument,
-      pageMetrics: this.pageMetrics,
-      documentIdentity: this.documentIdentity,
+      ...this._createHydrationContext(),
       visiblePageNumbers: this.visiblePageNumbers
     })
   }
@@ -490,6 +554,7 @@ export class PdfDocumentSession extends ResourceTracker {
   }
 
   async cleanupDocument() {
+    this._advanceDocumentGeneration()
     this._cancelAllRenders()
     this.visiblePageNumbers.clear()
     this._pageContentRepository.reset()

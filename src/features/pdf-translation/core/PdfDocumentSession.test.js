@@ -221,6 +221,130 @@ describe('PdfDocumentSession', () => {
     expect(session.pageSessions.get(1)?.loaded).toBe(true)
   })
 
+  it('starts background hydration for visible pages', async () => {
+    session.pageMetrics = [
+      { pageNumber: 1, width: 100, height: 200, naturalWidth: 100, naturalHeight: 200, scale: 1 }
+    ]
+    session.totalPages = 1
+    session.documentIdentity = 'fingerprint-1'
+    const hydrateSpy = vi.spyOn(session._pageContentRepository, 'getPageSession')
+
+    session.updateVisiblePages([1])
+    await Promise.resolve()
+
+    expect(hydrateSpy).toHaveBeenCalledWith(expect.objectContaining({ pageNumber: 1 }))
+    expect(pdfDocument.getPage).toHaveBeenCalledWith(1)
+  })
+
+  it('no-ops when visible page set is unchanged', async () => {
+    session.pageMetrics = [
+      { pageNumber: 1, width: 100, height: 200, naturalWidth: 100, naturalHeight: 200, scale: 1 },
+      { pageNumber: 2, width: 100, height: 200, naturalWidth: 100, naturalHeight: 200, scale: 1 }
+    ]
+    const hydrateSpy = vi.spyOn(session._pageContentRepository, 'getPageSession')
+
+    session.updateVisiblePages([1, 2])
+    session.updateVisiblePages([2, 1])
+
+    expect(hydrateSpy).toHaveBeenCalledTimes(2)
+  })
+
+  it('hydrates only newly visible pages for overlapping updates', async () => {
+    session.pageMetrics = [
+      { pageNumber: 1, width: 100, height: 200, naturalWidth: 100, naturalHeight: 200, scale: 1 },
+      { pageNumber: 2, width: 100, height: 200, naturalWidth: 100, naturalHeight: 200, scale: 1 },
+      { pageNumber: 3, width: 100, height: 200, naturalWidth: 100, naturalHeight: 200, scale: 1 }
+    ]
+    const hydrateSpy = vi.spyOn(session._pageContentRepository, 'getPageSession')
+
+    session.updateVisiblePages([1, 2])
+    session.updateVisiblePages([2, 3])
+
+    const hydratedPages = hydrateSpy.mock.calls.map(([args]) => args.pageNumber)
+    expect(hydratedPages).toEqual([1, 2, 3])
+  })
+
+  it('keeps lazy getPageSession hydration working without visibility', async () => {
+    session.pageMetrics = [
+      { pageNumber: 1, width: 100, height: 200, naturalWidth: 100, naturalHeight: 200, scale: 1 }
+    ]
+    session.totalPages = 1
+    session.documentIdentity = 'fingerprint-1'
+
+    const pageSession = await session.getPageSession(1)
+
+    expect(pageSession?.loaded).toBe(true)
+    expect(session.pageSessions.get(1)).toBe(pageSession)
+  })
+
+  it('discards stale background hydration after a different document opens', async () => {
+    let resolveTextContent
+    session.pageMetrics = [
+      { pageNumber: 1, width: 100, height: 200, naturalWidth: 100, naturalHeight: 200, scale: 1 }
+    ]
+    session.documentIdentity = 'doc-a'
+    session.pdfDocument = {
+      numPages: 1,
+      getPage: vi.fn(async () => ({
+        pageNumber: 1,
+        cleanup: vi.fn(),
+        getTextContent: vi.fn(() => new Promise((resolve) => {
+          resolveTextContent = () => resolve({
+            items: [{ str: 'Old document text', transform: [1, 0, 0, 14, 40, 650], width: 100, height: 14, dir: 'ltr' }],
+            styles: null
+          })
+        })),
+        getViewport: ({ scale }) => ({ width: 100 * scale, height: 200 * scale })
+      }))
+    }
+
+    session.updateVisiblePages([1])
+    await Promise.resolve()
+    await session.cleanupDocument()
+    session.documentIdentity = 'doc-b'
+    session.pageMetrics = [
+      { pageNumber: 1, width: 100, height: 200, naturalWidth: 100, naturalHeight: 200, scale: 1 }
+    ]
+    resolveTextContent()
+    await Promise.resolve()
+
+    expect(session.pageSessions.size).toBe(0)
+  })
+
+  it('discards stale background hydration after the same document is reopened', async () => {
+    let resolveTextContent
+    session.pageMetrics = [
+      { pageNumber: 1, width: 100, height: 200, naturalWidth: 100, naturalHeight: 200, scale: 1 }
+    ]
+    session.documentIdentity = 'same-doc'
+    session.pdfDocument = {
+      numPages: 1,
+      getPage: vi.fn(async () => ({
+        pageNumber: 1,
+        cleanup: vi.fn(),
+        getTextContent: vi.fn(() => new Promise((resolve) => {
+          resolveTextContent = () => resolve({
+            items: [{ str: 'Old same document text', transform: [1, 0, 0, 14, 40, 650], width: 100, height: 14, dir: 'ltr' }],
+            styles: null
+          })
+        })),
+        getViewport: ({ scale }) => ({ width: 100 * scale, height: 200 * scale })
+      }))
+    }
+
+    session.updateVisiblePages([1])
+    await Promise.resolve()
+    await session.cleanupDocument()
+    session.documentIdentity = 'same-doc'
+    session.pageMetrics = [
+      { pageNumber: 1, width: 100, height: 200, naturalWidth: 100, naturalHeight: 200, scale: 1 }
+    ]
+    resolveTextContent()
+    await Promise.resolve()
+
+    expect(session.pageSessions.size).toBe(0)
+  })
+
   describe('batched metrics building', () => {
     it('fetches all pages across multiple batches with correct call count', async () => {
       const PAGE_COUNT = 25

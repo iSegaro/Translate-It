@@ -19,15 +19,30 @@ export class PdfPageContentRepository {
     return this._pendingHydrations
   }
 
-  async getPageSession({ pdfDocument, pageMetrics, documentIdentity, pageNumber }) {
+  _isHydrationCurrent({ documentGeneration, isDocumentGenerationCurrent } = {}) {
+    if (typeof isDocumentGenerationCurrent !== 'function') return true
+    return isDocumentGenerationCurrent(documentGeneration)
+  }
+
+  async getPageSession({
+    pdfDocument,
+    pageMetrics,
+    documentIdentity,
+    pageNumber,
+    documentGeneration,
+    isDocumentGenerationCurrent
+  }) {
     if (!pdfDocument) return null
 
     const metric = pageMetrics[pageNumber - 1]
     if (!metric) return null
 
+    const lifecycle = { documentGeneration, isDocumentGenerationCurrent }
+
     // 1. Fast path: already hydrated and stored
     const existingSession = this.pageSessions.get(pageNumber)
     if (existingSession) {
+      if (!this._isHydrationCurrent(lifecycle)) return null
       existingSession.updateDocumentIdentity(documentIdentity)
       if (existingSession.loaded && existingSession.getLogicalBlocks().length > 0) {
         return existingSession
@@ -48,39 +63,66 @@ export class PdfPageContentRepository {
       pdfDocument,
       documentIdentity,
       pageNumber,
-      metric
+      metric,
+      documentGeneration,
+      isDocumentGenerationCurrent
     })
     this._pendingHydrations.set(pageNumber, promise)
+
+    const clearPending = () => {
+      if (this._pendingHydrations?.get(pageNumber) === promise) {
+        this._pendingHydrations.delete(pageNumber)
+      }
+    }
+    promise.then(clearPending, clearPending)
 
     return promise
   }
 
-  async _hydratePageSession({ pdfDocument, documentIdentity, pageNumber, metric }) {
-    try {
-      const existingSession = this.pageSessions.get(pageNumber)
-      const pageSession = existingSession || new PdfPageSession({
-        documentIdentity,
-        pageNumber
-      })
-      pageSession.updateDocumentIdentity(documentIdentity)
+  async _hydratePageSession({
+    pdfDocument,
+    documentIdentity,
+    pageNumber,
+    metric,
+    documentGeneration,
+    isDocumentGenerationCurrent
+  }) {
+    const lifecycle = { documentGeneration, isDocumentGenerationCurrent }
+    const existingSession = this.pageSessions.get(pageNumber)
 
-      // Re-check: a previous call may have completed while this one waited
-      if (pageSession.loaded && pageSession.getLogicalBlocks().length > 0) {
-        this.pageSessions.set(pageNumber, pageSession)
-        return pageSession
-      }
+    if (!this._isHydrationCurrent(lifecycle)) return null
 
-      const page = await pdfDocument.getPage(pageNumber)
-      await pageSession.hydrate(page, metric)
-      this.pageSessions.set(pageNumber, pageSession)
-      this._indexPageSession(pageSession)
-      return pageSession
-    } finally {
-      this._pendingHydrations?.delete(pageNumber)
+    // Re-check: a previous call may have completed while this one waited
+    if (existingSession?.loaded && existingSession.getLogicalBlocks().length > 0) {
+      if (!this._isHydrationCurrent(lifecycle)) return null
+      existingSession.updateDocumentIdentity(documentIdentity)
+      this.pageSessions.set(pageNumber, existingSession)
+      return existingSession
     }
+
+    const page = await pdfDocument.getPage(pageNumber)
+    if (!this._isHydrationCurrent(lifecycle)) return null
+
+    const pageSession = new PdfPageSession({
+      documentIdentity,
+      pageNumber
+    })
+    await pageSession.hydrate(page, metric)
+    if (!this._isHydrationCurrent(lifecycle)) return null
+
+    this.pageSessions.set(pageNumber, pageSession)
+    this._indexPageSession(pageSession)
+    return pageSession
   }
 
-  async getVisiblePageSessions({ pdfDocument, pageMetrics, documentIdentity, visiblePageNumbers }) {
+  async getVisiblePageSessions({
+    pdfDocument,
+    pageMetrics,
+    documentIdentity,
+    visiblePageNumbers,
+    documentGeneration,
+    isDocumentGenerationCurrent
+  }) {
     if (!pdfDocument || visiblePageNumbers.size === 0) {
       return []
     }
@@ -94,6 +136,8 @@ export class PdfPageContentRepository {
           pdfDocument,
           pageMetrics,
           documentIdentity,
+          documentGeneration,
+          isDocumentGenerationCurrent,
           pageNumber
         })
         if (session) {
@@ -114,11 +158,20 @@ export class PdfPageContentRepository {
     return pageNumbers.map((pageNumber) => sessionMap.get(pageNumber)).filter(Boolean)
   }
 
-  async getVisibleLogicalBlocks({ pdfDocument, pageMetrics, documentIdentity, visiblePageNumbers }) {
+  async getVisibleLogicalBlocks({
+    pdfDocument,
+    pageMetrics,
+    documentIdentity,
+    visiblePageNumbers,
+    documentGeneration,
+    isDocumentGenerationCurrent
+  }) {
     const pageSessions = await this.getVisiblePageSessions({
       pdfDocument,
       pageMetrics,
       documentIdentity,
+      documentGeneration,
+      isDocumentGenerationCurrent,
       visiblePageNumbers
     })
     return pageSessions.flatMap((pageSession) => pageSession.getLogicalBlocks())
