@@ -253,7 +253,7 @@ const cellOverlayData = computed(() => {
         })
 
         return {
-          text: cellText,
+          text: typeof cellText === 'string' ? cellText : '',
           item: { x: geometry.x, y: geometry.y, width: geometry.width, height: geometry.height },
           padding: geometry.padding,
           backgroundColor: mask ? backgroundColor.value : undefined
