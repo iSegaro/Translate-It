@@ -256,10 +256,10 @@ export const useSettingsStore = defineStore('settings', () => {
     // 3. Validation
     const provider = findProviderById(resolvedId);
     const needsBulk = [
-      TranslationMode.Page, 
-      TranslationMode.Select_Element, 
-      TranslationMode.Field,
-      TranslationMode.MouseHover
+      TranslationMode.Page,
+      TranslationMode.PDF,
+      TranslationMode.Select_Element,
+      TranslationMode.Field
     ].includes(mode);
 
     if (needsBulk && provider && !provider.features?.includes('bulk')) {
