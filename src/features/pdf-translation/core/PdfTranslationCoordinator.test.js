@@ -1,11 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const sendRegularMessageMock = vi.fn()
-const getModeProvidersAsyncMock = vi.fn()
+const getEffectiveProviderAsyncMock = vi.fn()
 const getProviderOptimizationLevelAsyncMock = vi.fn()
 const getSourceLanguageAsyncMock = vi.fn()
 const getTargetLanguageAsyncMock = vi.fn()
-const getTranslationApiAsyncMock = vi.fn()
 
 vi.mock('@/shared/messaging/core/UnifiedMessaging.js', () => ({
   sendRegularMessage: sendRegularMessageMock
@@ -16,11 +15,10 @@ vi.mock('@/shared/config/config.js', () => ({
     Select_Element: 'select-element',
     PDF: 'pdf-translation'
   },
-  getModeProvidersAsync: getModeProvidersAsyncMock,
+  getEffectiveProviderAsync: getEffectiveProviderAsyncMock,
   getProviderOptimizationLevelAsync: getProviderOptimizationLevelAsyncMock,
   getSourceLanguageAsync: getSourceLanguageAsyncMock,
-  getTargetLanguageAsync: getTargetLanguageAsyncMock,
-  getTranslationApiAsync: getTranslationApiAsyncMock
+  getTargetLanguageAsync: getTargetLanguageAsyncMock
 }))
 
 vi.mock('@/features/translation/core/ProviderConfigurations.js', () => ({
@@ -103,17 +101,15 @@ describe('PdfTranslationCoordinator', () => {
 
   beforeEach(() => {
     sendRegularMessageMock.mockReset()
-    getModeProvidersAsyncMock.mockReset()
+    getEffectiveProviderAsyncMock.mockReset()
     getProviderOptimizationLevelAsyncMock.mockReset()
     getSourceLanguageAsyncMock.mockReset()
     getTargetLanguageAsyncMock.mockReset()
-    getTranslationApiAsyncMock.mockReset()
 
-    getModeProvidersAsyncMock.mockResolvedValue({})
+    getEffectiveProviderAsyncMock.mockResolvedValue('google')
     getProviderOptimizationLevelAsyncMock.mockResolvedValue(3)
     getSourceLanguageAsyncMock.mockResolvedValue('auto')
     getTargetLanguageAsyncMock.mockResolvedValue('es')
-    getTranslationApiAsyncMock.mockResolvedValue('google')
 
     translationStateStore = new Map()
     session = {

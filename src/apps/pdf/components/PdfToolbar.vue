@@ -149,23 +149,18 @@
         OCR processing...
       </span>
 
-      <button
-        v-if="isTranslating"
-        class="pdf-toolbar__button pdf-toolbar__button--cancel"
-        type="button"
-        @click="$emit('cancel-translation')"
-      >
-        Cancel
-      </button>
-
-      <button
-        class="pdf-toolbar__button pdf-toolbar__button--accent"
-        type="button"
+      <ProviderSelector
+        :model-value="pdfProviderValue"
+        mode="split"
+        :is-global="false"
+        allow-default
+        only-configured
+        :loading="isTranslating"
         :disabled="!canTranslateVisiblePages"
-        @click="$emit('translate-visible')"
-      >
-        {{ isTranslating ? 'Translating...' : 'Translate Visible Pages' }}
-      </button>
+        @provider-change="handleProviderChange"
+        @translate="handleTranslateRequest"
+        @cancel="$emit('cancel-translation')"
+      />
       <div
         v-if="fileName && canExport"
         ref="exportMenuRef"
@@ -281,7 +276,12 @@
 <script setup>
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { CONTENT_VIEW, LAYOUT_MODE } from '../composables/usePdfViewerMode.js'
+import { TranslationMode } from '@/shared/config/config.js'
+import { useSettingsStore } from '@/features/settings/stores/settings.js'
+import { getScopedLogger } from '@/shared/logging/logger.js'
+import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js'
 import SvgIcon from '@/components/shared/SvgIcon.vue'
+import ProviderSelector from '@/components/shared/ProviderSelector.vue'
 import outlineIcon from '@/icons/ui/outline.svg?url'
 import splitScreenIcon from '@/icons/ui/split-screen.svg?url'
 import fitPageIcon from '@/icons/ui/fit-page.svg?url'
@@ -316,6 +316,75 @@ const props = defineProps({
 })
 
 const emit = defineEmits(['file-selected', 'translate-visible', 'cancel-translation', 'content-view-change', 'layout-mode-change', 'toggle-outline', 'export-txt', 'export-markdown', 'export-html', 'request-ocr', 'clear-cache', 'zoom-step', 'zoom-change'])
+
+const logger = getScopedLogger(LOG_COMPONENTS.PDF, 'PdfToolbar')
+const settingsStore = useSettingsStore()
+
+const pdfProviderValue = computed(() => {
+  return settingsStore.settings?.MODE_PROVIDERS?.[TranslationMode.PDF] || 'default'
+})
+
+const providerPersistenceState = {
+  sequence: 0,
+  latest: null,
+  running: null
+}
+
+const persistPdfProvider = async (providerId) => {
+  const modeProviders = {
+    ...(settingsStore.settings?.MODE_PROVIDERS || {}),
+    [TranslationMode.PDF]: providerId === 'default' ? null : providerId
+  }
+  await settingsStore.updateSettingAndPersist('MODE_PROVIDERS', modeProviders)
+}
+
+const handleProviderChange = (providerId) => {
+  providerPersistenceState.latest = {
+    sequence: ++providerPersistenceState.sequence,
+    providerId
+  }
+
+  if (!providerPersistenceState.running) {
+    providerPersistenceState.running = runProviderPersistenceQueue()
+  }
+}
+
+const runProviderPersistenceQueue = async () => {
+  try {
+    while (providerPersistenceState.latest) {
+      const ownership = providerPersistenceState.latest
+      providerPersistenceState.latest = null
+
+      try {
+        await persistPdfProvider(ownership.providerId)
+      } catch (error) {
+        if (ownership.sequence === providerPersistenceState.sequence && !providerPersistenceState.latest) {
+          logger.error('Failed to persist PDF provider selection:', error)
+          return
+        }
+
+        continue
+      }
+
+      if (ownership.sequence === providerPersistenceState.sequence && !providerPersistenceState.latest) {
+        emit('translate-visible')
+        return
+      }
+    }
+  } finally {
+    providerPersistenceState.running = null
+
+    if (providerPersistenceState.latest) {
+      providerPersistenceState.running = runProviderPersistenceQueue()
+    }
+  }
+}
+
+const handleTranslateRequest = () => {
+  if (providerPersistenceState.running) return
+  emit('translate-visible')
+}
+
 const fileInput = ref(null)
 const exportMenuRef = ref(null)
 const exportMenuTriggerRef = ref(null)

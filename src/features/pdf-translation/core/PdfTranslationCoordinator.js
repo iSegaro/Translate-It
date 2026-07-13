@@ -1,4 +1,4 @@
-import { TranslationMode, getProviderOptimizationLevelAsync, getSourceLanguageAsync, getTargetLanguageAsync, getTranslationApiAsync, getModeProvidersAsync } from '@/shared/config/config.js'
+import { TranslationMode, getProviderOptimizationLevelAsync, getSourceLanguageAsync, getTargetLanguageAsync, getEffectiveProviderAsync } from '@/shared/config/config.js'
 import { sendRegularMessage } from '@/shared/messaging/core/UnifiedMessaging.js'
 import { MessageActions } from '@/shared/messaging/core/MessageActions.js'
 import { MessageContexts } from '@/shared/messaging/core/MessagingConstants.js'
@@ -169,7 +169,7 @@ export class PdfTranslationCoordinator {
       const semanticRegions = pageLayout?.regions || []
       const structuredRegions = pageLayout?.metadata?.structured?.regions || []
 
-      const provider = await this._resolveProvider()
+      const provider = await getEffectiveProviderAsync(TranslationMode.PDF)
       const sourceLanguage = await getSourceLanguageAsync()
       const targetLanguage = await getTargetLanguageAsync()
       const optimizationLevel = await getProviderOptimizationLevelAsync(provider)
@@ -357,16 +357,6 @@ export class PdfTranslationCoordinator {
     if (this.onStateChange) {
       this.onStateChange(updatedBlockIds)
     }
-  }
-
-  async _resolveProvider() {
-    const modeProviders = await getModeProvidersAsync()
-    const modeProvider = modeProviders?.[TranslationMode.PDF]
-    if (modeProvider && modeProvider !== 'default') {
-      return modeProvider
-    }
-
-    return await getTranslationApiAsync()
   }
 
   _buildMessageId(runId, batchId) {

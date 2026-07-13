@@ -1,8 +1,65 @@
-import { describe, expect, it, vi } from 'vitest'
-import { mount } from '@vue/test-utils'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { flushPromises, mount } from '@vue/test-utils'
+
+const settingsStoreMock = vi.hoisted(() => ({
+  settings: { MODE_PROVIDERS: {} },
+  updateSettingAndPersist: vi.fn(() => Promise.resolve(true))
+}))
+
+const loggerMock = vi.hoisted(() => ({
+  debug: vi.fn(),
+  info: vi.fn(),
+  warn: vi.fn(),
+  error: vi.fn()
+}))
+
+vi.mock('@/components/shared/ProviderSelector.vue', () => ({
+  default: {
+    name: 'ProviderSelector',
+    template: `
+      <div>
+        <button class="mock-provider-selector" @click="$emit('translate', { provider: 'googlev2' })" />
+        <button class="mock-provider-change-a" @click="$emit('provider-change', 'deepl'); $emit('translate', { provider: 'deepl' })" />
+        <button class="mock-provider-change-b" @click="$emit('provider-change', 'openai'); $emit('translate', { provider: 'openai' })" />
+      </div>
+    `,
+    emits: ['translate', 'cancel', 'provider-change', 'update:modelValue']
+  }
+}))
+
+vi.mock('@/features/settings/stores/settings.js', () => ({
+  useSettingsStore: () => settingsStoreMock
+}))
+
+vi.mock('@/shared/logging/logger.js', () => ({
+  getScopedLogger: () => loggerMock
+}))
+
 import PdfToolbar from './PdfToolbar.vue'
+import { TranslationMode } from '@/shared/config/config.js'
+
+function createDeferred() {
+  let resolve
+  let reject
+  const promise = new Promise((res, rej) => {
+    resolve = res
+    reject = rej
+  })
+
+  return { promise, resolve, reject }
+}
 
 describe('PdfToolbar', () => {
+  beforeEach(() => {
+    settingsStoreMock.settings.MODE_PROVIDERS = {}
+    settingsStoreMock.updateSettingAndPersist.mockReset()
+    settingsStoreMock.updateSettingAndPersist.mockResolvedValue(true)
+    loggerMock.debug.mockReset()
+    loggerMock.info.mockReset()
+    loggerMock.warn.mockReset()
+    loggerMock.error.mockReset()
+  })
+
   it('renders the file name and keeps core actions available', async () => {
     const wrapper = mount(PdfToolbar, {
       props: {
@@ -138,7 +195,7 @@ describe('PdfToolbar', () => {
     expect(toolbarButtons().some((button) => button.text().includes('Open PDF'))).toBe(false)
     expect(toolbarButtons().some((button) => button.text().includes('Clear Cache'))).toBe(false)
 
-    await toolbarButtons().find((button) => button.text().includes('Translate Visible Pages'))?.trigger('click')
+    await wrapper.find('.mock-provider-selector').trigger('click')
     expect(wrapper.emitted('translate-visible')).toBeTruthy()
 
     await wrapper.find('.pdf-toolbar__button[aria-label="More actions"]').trigger('click')
@@ -178,6 +235,140 @@ describe('PdfToolbar', () => {
 
     await wrapper.findAll('button').find((button) => button.text().trim() === '+')?.trigger('click')
     expect(wrapper.emitted('zoom-step')?.at(-1)?.[0]).toBe(1)
+  })
+
+  it('waits for PDF provider persistence before translating after provider change', async () => {
+    const persistence = createDeferred()
+    settingsStoreMock.updateSettingAndPersist.mockImplementationOnce((key, value) => {
+      return persistence.promise.then(() => {
+        settingsStoreMock.settings[key] = value
+        return true
+      })
+    })
+
+    const wrapper = mount(PdfToolbar, {
+      props: {
+        fileName: 'demo.pdf',
+        pageCount: 12,
+        currentPageNumber: 1,
+        canTranslateVisiblePages: true
+      }
+    })
+
+    await wrapper.find('.mock-provider-change-a').trigger('click')
+
+    expect(settingsStoreMock.updateSettingAndPersist).toHaveBeenCalledWith(
+      'MODE_PROVIDERS',
+      expect.objectContaining({ [TranslationMode.PDF]: 'deepl' })
+    )
+    expect(wrapper.emitted('translate-visible')).toBeFalsy()
+
+    persistence.resolve(true)
+    await flushPromises()
+
+    expect(settingsStoreMock.settings.MODE_PROVIDERS[TranslationMode.PDF]).toBe('deepl')
+    expect(wrapper.emitted('translate-visible')).toHaveLength(1)
+  })
+
+  it('serializes rapid PDF provider changes so the latest selection persists and translates once', async () => {
+    const firstPersistence = createDeferred()
+    const secondPersistence = createDeferred()
+    settingsStoreMock.updateSettingAndPersist
+      .mockImplementationOnce((key, value) => {
+        return firstPersistence.promise.then(() => {
+          settingsStoreMock.settings[key] = value
+          return true
+        })
+      })
+      .mockImplementationOnce((key, value) => {
+        return secondPersistence.promise.then(() => {
+          settingsStoreMock.settings[key] = value
+          return true
+        })
+      })
+
+    const wrapper = mount(PdfToolbar, {
+      props: {
+        fileName: 'demo.pdf',
+        pageCount: 12,
+        currentPageNumber: 1,
+        canTranslateVisiblePages: true
+      }
+    })
+
+    await wrapper.find('.mock-provider-change-a').trigger('click')
+    await wrapper.find('.mock-provider-change-b').trigger('click')
+
+    expect(settingsStoreMock.updateSettingAndPersist).toHaveBeenCalledTimes(1)
+
+    firstPersistence.resolve(true)
+    await flushPromises()
+    expect(settingsStoreMock.updateSettingAndPersist).toHaveBeenCalledTimes(2)
+    expect(wrapper.emitted('translate-visible')).toBeFalsy()
+
+    secondPersistence.resolve(true)
+    await flushPromises()
+
+    expect(settingsStoreMock.settings.MODE_PROVIDERS[TranslationMode.PDF]).toBe('openai')
+    expect(wrapper.emitted('translate-visible')).toHaveLength(1)
+  })
+
+  it('does not log stale PDF provider persistence failures when the latest selection succeeds', async () => {
+    const firstPersistence = createDeferred()
+    const secondPersistence = createDeferred()
+    settingsStoreMock.updateSettingAndPersist
+      .mockImplementationOnce(() => firstPersistence.promise)
+      .mockImplementationOnce((key, value) => {
+        return secondPersistence.promise.then(() => {
+          settingsStoreMock.settings[key] = value
+          return true
+        })
+      })
+
+    const wrapper = mount(PdfToolbar, {
+      props: {
+        fileName: 'demo.pdf',
+        pageCount: 12,
+        currentPageNumber: 1,
+        canTranslateVisiblePages: true
+      }
+    })
+
+    await wrapper.find('.mock-provider-change-a').trigger('click')
+    await wrapper.find('.mock-provider-change-b').trigger('click')
+
+    firstPersistence.reject(new Error('stale failed'))
+    await flushPromises()
+
+    expect(loggerMock.error).not.toHaveBeenCalled()
+    expect(wrapper.emitted('translate-visible')).toBeFalsy()
+
+    secondPersistence.resolve(true)
+    await flushPromises()
+
+    expect(settingsStoreMock.settings.MODE_PROVIDERS[TranslationMode.PDF]).toBe('openai')
+    expect(loggerMock.error).not.toHaveBeenCalled()
+    expect(wrapper.emitted('translate-visible')).toHaveLength(1)
+  })
+
+  it('logs latest PDF provider persistence failures without translating', async () => {
+    const error = new Error('storage failed')
+    settingsStoreMock.updateSettingAndPersist.mockRejectedValueOnce(error)
+
+    const wrapper = mount(PdfToolbar, {
+      props: {
+        fileName: 'demo.pdf',
+        pageCount: 12,
+        currentPageNumber: 1,
+        canTranslateVisiblePages: true
+      }
+    })
+
+    await wrapper.find('.mock-provider-change-a').trigger('click')
+    await flushPromises()
+
+    expect(loggerMock.error).toHaveBeenCalledWith('Failed to persist PDF provider selection:', error)
+    expect(wrapper.emitted('translate-visible')).toBeFalsy()
   })
 
   it('keeps the current labels while loading', async () => {
