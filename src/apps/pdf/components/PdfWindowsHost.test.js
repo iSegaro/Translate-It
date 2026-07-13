@@ -377,17 +377,20 @@ describe('PdfWindowsHost', () => {
 
     await openWindowFromSelectionIcon(wrapper)
 
-    expect(wrapper.find('[data-testid="pdf-windows-host"]').exists()).toBe(true)
-    expect(wrapper.find('.pdf-windows-host__source').exists()).toBe(false)
-    expect(wrapper.find('[data-testid="translation-window-toolbar-original"]').exists()).toBe(true)
-    expect(wrapper.find('[data-testid="pdf-windows-host-loading"]').exists()).toBe(true)
-    expect(wrapper.get('[data-testid="translation-window-toolbar-tts"]').attributes('data-text')).toBe('PDF text')
+    expect(wrapper.find('.pdf-windows-host--loading').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="pdf-windows-host"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="translation-window-toolbar"]').exists()).toBe(false)
 
     resolveTranslation({
       success: true,
       translatedText: 'Translated text'
     })
     await flushPromises()
+
+    expect(wrapper.find('.pdf-windows-host--loading').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="pdf-windows-host"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="translation-window-toolbar"]').exists()).toBe(true)
+    expect(wrapper.get('[data-testid="pdf-windows-host-result"]').text()).toContain('Translated text')
   })
 
   it('keeps the selection icon transition alive until the icon click opens the window', async () => {
@@ -455,30 +458,6 @@ describe('PdfWindowsHost', () => {
     await flushPromises()
 
     expect(wrapper.get('[data-testid="pdf-windows-host-icon-stage"]').isVisible()).toBe(false)
-  })
-
-  it('renders TTS for selected source text after the icon opens the window and hides it when there is no speakable text', async () => {
-    let resolveTranslation
-    sendRegularMessageMock.mockImplementationOnce(() => new Promise((resolve) => {
-      resolveTranslation = resolve
-    }))
-
-    expect(wrapper.find('[data-testid="translation-window-toolbar-tts"]').exists()).toBe(false)
-
-    await showSelectionIcon('Speak me')
-    expect(wrapper.find('[data-testid="translation-window-toolbar-tts"]').exists()).toBe(false)
-
-    await openWindowFromSelectionIcon(wrapper)
-
-    const ttsButton = wrapper.get('[data-testid="translation-window-toolbar-tts"]')
-    expect(ttsButton.exists()).toBe(true)
-    expect(ttsButton.attributes('data-text')).toBe('Speak me')
-
-    resolveTranslation({
-      success: true,
-      translatedText: 'Translated text'
-    })
-    await flushPromises()
   })
 
   it('speaks selected text from the selection icon without opening the translation window', async () => {
@@ -943,24 +922,58 @@ describe('PdfWindowsHost', () => {
 
   it('retranslates immediately when the provider changes during an active translation request', async () => {
     let resolveInitialTranslation
-    sendRegularMessageMock.mockImplementationOnce(() => new Promise((resolve) => {
-      resolveInitialTranslation = resolve
-    }))
+    let resolvePendingProviderTranslation
+    sendRegularMessageMock
+      .mockImplementationOnce(() => new Promise((resolve) => {
+        resolveInitialTranslation = resolve
+      }))
+      .mockImplementationOnce(() => new Promise((resolve) => {
+        resolvePendingProviderTranslation = resolve
+      }))
+      .mockResolvedValueOnce({
+        success: true,
+        translatedText: 'Latest provider result',
+        sourceLanguage: 'fa',
+        mode: 'selection-manager'
+      })
 
     await showSelectionIcon('In-flight provider switch')
     await openWindowFromSelectionIcon(wrapper)
     await flushPromises()
 
-    expect(wrapper.find('[data-testid="pdf-windows-host-loading"]').exists()).toBe(true)
+    expect(wrapper.find('.pdf-windows-host--loading').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="pdf-windows-host"]').exists()).toBe(false)
+
+    resolveInitialTranslation({
+      success: true,
+      translatedText: 'Initial provider result',
+      sourceLanguage: 'en',
+      mode: 'selection-manager'
+    })
+    await flushPromises()
+
+    expect(wrapper.find('[data-testid="pdf-windows-host"]').exists()).toBe(true)
+    expect(wrapper.get('[data-testid="pdf-windows-host-result"]').text()).toContain('Initial provider result')
 
     const providerSelector = wrapper.findComponent({ name: 'ProviderSelector' })
     providerSelector.vm.$emit('provider-change', 'deepl')
     await flushPromises()
 
     expect(wrapper.get('[data-testid="translation-window-toolbar-provider-select"]').element.value).toBe('deepl')
-    expect(sendRegularMessageMock).toHaveBeenCalledTimes(2)
+    expect(wrapper.find('[data-testid="pdf-windows-host"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="pdf-windows-host-loading"]').exists()).toBe(true)
 
-    resolveInitialTranslation({
+    providerSelector.vm.$emit('provider-change', 'openai')
+    await flushPromises()
+
+    expect(wrapper.get('[data-testid="translation-window-toolbar-provider-select"]').element.value).toBe('openai')
+    expect(sendRegularMessageMock).toHaveBeenCalledTimes(3)
+    expect(sendRegularMessageMock).toHaveBeenNthCalledWith(3, expect.objectContaining({
+      data: expect.objectContaining({ provider: 'openai' })
+    }))
+    expect(wrapper.get('[data-testid="pdf-windows-host-result"]').text()).toContain('Latest provider result')
+
+    resolvePendingProviderTranslation({
       success: true,
       translatedText: 'Stale in-flight result',
       sourceLanguage: 'en',
@@ -970,6 +983,7 @@ describe('PdfWindowsHost', () => {
 
     expect(wrapper.find('[data-testid="pdf-windows-host-loading"]').exists()).toBe(false)
     expect(wrapper.find('[data-testid="pdf-windows-host-result"]').exists()).toBe(true)
+    expect(wrapper.text()).toContain('Latest provider result')
     expect(wrapper.text()).not.toContain('Stale in-flight result')
   })
 
