@@ -689,7 +689,7 @@ describe('createPdfTransitionController', () => {
     })
 
     it('triggers side-by-side sync after restore when isSideBySide is true', async () => {
-      const { ctrl, setContentView, pdfViewerLayoutRef } = createController({ isSideBySide: true })
+      const { ctrl, pdfViewerLayoutRef } = createController({ isSideBySide: true })
 
       anchorFns.resolveAnchorOwner.mockReturnValue(PDF_SCROLL_OWNER.ORIGINAL)
       anchorFns.resolveOwnerScrollTarget.mockReturnValue({
@@ -1997,7 +1997,7 @@ describe('createPdfTransitionController', () => {
 
     it('consumes matching token and releases suppression when recomputeLayout rejects', async () => {
       const pdfViewerRef = { refreshCurrentPage: vi.fn() }
-      const { ctrl } = createController({
+      createController({
         contentView: CONTENT_VIEW.TRANSLATION,
         pdfViewerRef
       })
@@ -2387,7 +2387,7 @@ describe('createPdfTransitionController', () => {
 
   describe('orchestration path', () => {
     it('captures anchor, updates state, and restores in correct order for layout mode change', async () => {
-      const { ctrl, setLayoutMode, recomputeLayout, pdfViewerLayoutRef } = createController()
+      const { ctrl, setLayoutMode } = createController()
 
       const domAnchor = { pageNumber: 3, offsetRatio: 0.25 }
       anchorFns.resolveAnchorOwner.mockReturnValue(PDF_SCROLL_OWNER.ORIGINAL)

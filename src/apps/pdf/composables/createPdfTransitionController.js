@@ -83,7 +83,8 @@ export function createPdfTransitionController({
     syncCurrentPageSuppressionState()
   }
 
-  function clearPendingTransitionRestore(reason = '', transitionSeq = null) {
+  function clearPendingTransitionRestore(transitionSeq = null) {
+
     if (!pendingTransitionRestore) {
       return { cleared: false, releasedCurrentPageSuppression: false }
     }
@@ -92,7 +93,7 @@ export function createPdfTransitionController({
       return { cleared: false, releasedCurrentPageSuppression: false }
     }
 
-    const { transitionSeq: pendingTokenSeq, pdfAnchor, ownsCurrentPageSuppression } = pendingTransitionRestore
+    const { ownsCurrentPageSuppression } = pendingTransitionRestore
     let releasedCurrentPageSuppression = false
     if (ownsCurrentPageSuppression) {
       endCurrentPageSuppression()
@@ -159,7 +160,7 @@ export function createPdfTransitionController({
     const clearResult = clearPendingTransitionRestore(reason, transitionSeq)
     if (clearResult.releasedCurrentPageSuppression) {
       if (hasPrimaryError) {
-        try { refreshCurrentPage() } catch (_) { /* best-effort */ }
+        try { refreshCurrentPage() } catch { /* best-effort */ }
       } else {
         refreshCurrentPage()
       }

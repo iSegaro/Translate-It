@@ -28,7 +28,7 @@ export class PdfTextLayerRenderer {
     this._renderSeq = 0
   }
 
-  async render({ pageNumber, viewport, containerWidth, containerHeight, textContent, page }) {
+  async render({ viewport, containerWidth, containerHeight, textContent, page }) {
     if (!this.container || !viewport) return
 
     this.clear()

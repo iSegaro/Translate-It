@@ -23,7 +23,7 @@ export function usePdfCurrentPage({
     }
   }
 
-  function emitCurrentPageFromResolver(force = false) {
+  function emitCurrentPageFromResolver() {
     if (!isOriginalRole.value) return
     if (suppressCurrentPageUpdates.value) return
 

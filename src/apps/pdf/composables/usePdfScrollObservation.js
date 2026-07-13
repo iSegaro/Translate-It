@@ -39,7 +39,7 @@ export function usePdfScrollObservation({
     }
   }
 
-  function unregisterPageView(_pageNumber) {
+  function unregisterPageView() {
   }
 
   function setupScrollObservation() {

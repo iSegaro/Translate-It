@@ -155,7 +155,7 @@ async function renderPage() {
 
 }
 
-function clearPage(caller) {
+function clearPage() {
   props.session.clearPage(props.page.pageNumber, canvasEl.value, textLayerRenderer)
 }
 
@@ -169,7 +169,7 @@ watch(
     }
 
     if (!visible && oldVisible === true) {
-      clearPage('watcher')
+      clearPage()
     }
   },
   { immediate: true, flush: 'post' }
@@ -187,7 +187,7 @@ watch(
 
 onBeforeUnmount(() => {
   if (props.clearOnUnmount) {
-    clearPage('unmount')
+    clearPage()
   }
   textLayerRenderer?.destroy()
   textLayerRenderer = null

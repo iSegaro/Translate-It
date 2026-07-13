@@ -11,7 +11,10 @@
           :title="TOOLTIP_OUTLINE"
           @click="$emit('toggle-outline')"
         >
-          <SvgIcon :src="outlineIcon" :size="16" />
+          <SvgIcon
+            :src="outlineIcon"
+            :size="16"
+          />
         </button>
         <span
           class="pdf-toolbar__file-name"
@@ -50,7 +53,10 @@
             :aria-pressed="isSideBySide"
             @click="handleLayoutModeToggle"
           >
-            <SvgIcon :src="splitScreenIcon" :size="14" />
+            <SvgIcon
+              :src="splitScreenIcon"
+              :size="14"
+            />
           </button>
         </div>
 
@@ -127,8 +133,16 @@
         :title="fitToggleTooltip"
         @click="handleFitToggle"
       >
-        <SvgIcon v-if="fitToggleIcon === 'fit-page'" :src="fitPageIcon" :size="18" />
-        <SvgIcon v-else :src="fitWidthIcon" :size="18" />
+        <SvgIcon
+          v-if="fitToggleIcon === 'fit-page'"
+          :src="fitPageIcon"
+          :size="18"
+        />
+        <SvgIcon
+          v-else
+          :src="fitWidthIcon"
+          :size="18"
+        />
       </button>
     </div>
 
@@ -177,7 +191,10 @@
           :aria-expanded="activeMenu === 'export'"
           @click="toggleMenu('export')"
         >
-          <SvgIcon :src="downloadIcon" :size="18" />
+          <SvgIcon
+            :src="downloadIcon"
+            :size="18"
+          />
         </button>
 
         <div
@@ -262,7 +279,6 @@
           </button>
         </div>
       </div>
-
     </div>
   </header>
 </template>

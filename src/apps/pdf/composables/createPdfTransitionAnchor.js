@@ -27,8 +27,7 @@ export function createPdfTransitionAnchor({
   session,
   originalScrollContainer,
   translatedScrollContainer,
-  zoomMode,
-  currentPage
+  zoomMode
 }) {
   function resolveAnchorOwner(explicitOwner) {
     if (explicitOwner === PDF_SCROLL_OWNER.ORIGINAL || explicitOwner === PDF_SCROLL_OWNER.TRANSLATED) {

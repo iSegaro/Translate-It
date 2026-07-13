@@ -70,7 +70,6 @@ const resizeDisconnectMock = vi.fn()
 let intersectionObserverClass
 let resizeObserverClass
 let visibilityCallback
-let renderCallback
 const waitAnimationFrame = () => new Promise(resolve => requestAnimationFrame(resolve))
 
 function createSession() {
@@ -154,7 +153,6 @@ describe('PdfViewer', () => {
     pageRootEls.clear()
     pageRectMap.clear()
     visibilityCallback = null
-    renderCallback = null
     let instanceCount = 0
 
     intersectionObserverClass = class IntersectionObserver {
@@ -162,8 +160,6 @@ describe('PdfViewer', () => {
         this._index = instanceCount++
         if (this._index === 0) {
           visibilityCallback = callback
-        } else {
-          renderCallback = callback
         }
       }
       observe(target) {
@@ -460,7 +456,7 @@ describe('PdfViewer', () => {
   })
 
   it('commits pending replacement locally from overlay render commits', async () => {
-    const { wrapper, session } = await mountViewerWithPages({ viewerRole: VIEWER_ROLE.OVERLAY })
+    const { wrapper } = await mountViewerWithPages({ viewerRole: VIEWER_ROLE.OVERLAY })
 
     await applyWindow(wrapper, {
       ...createFarPageTops(75),

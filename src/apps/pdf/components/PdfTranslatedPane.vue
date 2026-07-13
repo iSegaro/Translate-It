@@ -156,7 +156,7 @@ watch(
   }
 )
 
-function emitCurrentPage(force = false) {
+function emitCurrentPage() {
   if (props.suppressCurrentPageUpdates) return
 
   const container = scrollRoot || props.scrollContainer || rootEl.value?.parentElement || null
