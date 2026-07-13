@@ -44,18 +44,18 @@
       @mousedown.stop
       @touchstart.stop
     >
-      <img
-        src="@/icons/ui/retry.svg"
-        alt=""
-        aria-hidden="true"
-        class="ti-footer-action-icon"
-      >
+      <SvgIcon
+        :src="retryIcon"
+        :size="14"
+      />
     </button>
   </div>
 </template>
 
 <script setup>
 import { computed } from 'vue'
+import SvgIcon from './SvgIcon.vue'
+import retryIcon from '@/icons/ui/retry.svg?url'
 import './TranslationWindowFooter.scss'
 
 defineOptions({

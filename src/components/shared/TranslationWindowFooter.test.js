@@ -80,7 +80,7 @@ describe('TranslationWindowFooter', () => {
 
     const retryButton = wrapper.get('[data-testid="translation-window-footer-retry"]')
     expect(retryButton.text().trim()).toBe('')
-    expect(retryButton.find('img.ti-footer-action-icon').exists()).toBe(true)
+    expect(retryButton.find('span.svg-icon').exists()).toBe(true)
 
     await retryButton.trigger('click')
     expect(wrapper.emitted('retry')).toEqual([[]])

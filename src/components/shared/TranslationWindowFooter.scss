@@ -91,16 +91,8 @@
       cursor: not-allowed !important;
     }
 
-    svg {
+    .svg-icon {
       display: block !important;
-    }
-
-    .ti-footer-action-icon {
-      width: 14px !important;
-      height: 14px !important;
-      display: block !important;
-      object-fit: contain !important;
-      flex-shrink: 0 !important;
     }
   }
 }
