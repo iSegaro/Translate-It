@@ -27,6 +27,35 @@
   overflow: hidden;
 }
 
+// Light theme override — uses global :root.theme-light contract.
+// Keep in sync with TranslationWindow light theme colors.
+:root.theme-light .pdf-windows-host {
+  background: #ffffff;
+  color: #2c3e50;
+  border-color: #e8e8e8;
+
+  .pdf-windows-host__header {
+    background: #f7f7f7;
+    border-bottom-color: #e8e8e8;
+  }
+
+  .pdf-windows-host__label {
+    color: #5f6368;
+  }
+
+  .pdf-windows-host__text--source {
+    color: inherit;
+  }
+
+  .pdf-windows-host__state--loading {
+    color: #5f6368;
+  }
+
+  .pdf-windows-host__body::-webkit-scrollbar-thumb {
+    background: rgba(0, 0, 0, 0.16);
+  }
+}
+
 .pdf-windows-host--loading {
   display: flex;
   align-items: center;
