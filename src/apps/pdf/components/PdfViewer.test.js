@@ -257,7 +257,8 @@ describe('PdfViewer', () => {
       3: 1000
     })
     const firstCount = wrapper.emitted('visible-pages-change')?.length || 0
-    expect([...wrapper.emitted('visible-pages-change')?.at(-1)?.[0]].sort((a, b) => a - b)).toEqual([1])
+    const firstVisiblePages = wrapper.emitted('visible-pages-change')?.at(-1)?.[0] || []
+    expect([...firstVisiblePages].sort((a, b) => a - b)).toEqual([1])
 
     await applyWindow(wrapper, {
       1: 0,
@@ -272,7 +273,8 @@ describe('PdfViewer', () => {
       3: 120
     })
     expect(wrapper.emitted('visible-pages-change')?.length || 0).toBe(firstCount + 1)
-    expect([...wrapper.emitted('visible-pages-change')?.at(-1)?.[0]].sort((a, b) => a - b)).toEqual([2])
+    const lastVisiblePages = wrapper.emitted('visible-pages-change')?.at(-1)?.[0] || []
+    expect([...lastVisiblePages].sort((a, b) => a - b)).toEqual([2])
 
     wrapper.unmount()
   })
