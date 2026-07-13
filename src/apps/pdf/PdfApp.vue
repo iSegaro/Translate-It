@@ -191,6 +191,8 @@ import { usePdfNavigation } from './composables/usePdfNavigation.js'
 import { usePdfKeyboard } from './composables/usePdfKeyboard.js'
 import { createPdfTransitionController } from './composables/createPdfTransitionController.js'
 import { createPdfStatusBannerController } from './utils/pdfStatusBanner.js'
+import { useSettingsStore } from '@/features/settings/stores/settings.js'
+import { applyTheme } from '@/utils/ui/theme.js'
 import './PdfApp.scss'
 
 const {
@@ -331,6 +333,16 @@ usePdfKeyboard({
 
 const isDragOver = ref(false)
 const isOutlineVisible = ref(false)
+
+const settingsStore = useSettingsStore()
+
+let removeThemeMessageListener = null
+let themeMediaQuery = null
+let themeMqHandler = null
+
+watch(() => settingsStore.settings.THEME, (theme) => {
+  applyTheme(theme || 'auto')
+}, { immediate: true })
 
 function toggleOutline() {
   isOutlineVisible.value = !isOutlineVisible.value
@@ -500,11 +512,37 @@ onMounted(() => {
   if (import.meta.env.DEV) {
     import('./debug/pdfOverlayDiagnostics.js')
   }
+
+  const handler = (message) => {
+    if (message.action === 'THEME_CHANGED') {
+      applyTheme(message.payload.theme)
+    }
+  }
+  browser.runtime.onMessage.addListener(handler)
+  removeThemeMessageListener = () => browser.runtime.onMessage.removeListener(handler)
+
+  const mq = window.matchMedia('(prefers-color-scheme: dark)')
+  const mqHandler = () => {
+    if (settingsStore.settings.THEME === 'auto') {
+      applyTheme('auto')
+    }
+  }
+  mq.addEventListener('change', mqHandler)
+  themeMediaQuery = mq
+  themeMqHandler = mqHandler
 })
 
 onBeforeUnmount(() => {
   clearExportSuccess()
   detachDocument()
   void cleanup()
+
+  if (removeThemeMessageListener) {
+    removeThemeMessageListener()
+    removeThemeMessageListener = null
+  }
+  if (themeMediaQuery && themeMqHandler) {
+    themeMediaQuery.removeEventListener('change', themeMqHandler)
+  }
 })
 </script>

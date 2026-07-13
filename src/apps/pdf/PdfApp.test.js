@@ -3,6 +3,18 @@ import { mount } from '@vue/test-utils'
 import { computed, nextTick, ref } from 'vue'
 import PdfApp from './PdfApp.vue'
 
+// jsdom does not implement matchMedia — stub it before component mount
+if (!window.matchMedia) {
+  window.matchMedia = vi.fn().mockImplementation((query) => ({
+    matches: false,
+    media: query,
+    onchange: null,
+    addEventListener: vi.fn(),
+    removeEventListener: vi.fn(),
+    dispatchEvent: vi.fn()
+  }))
+}
+
 let mockViewerController
 let mockViewerMode
 let mockPdfExport
@@ -32,6 +44,19 @@ vi.mock('./composables/usePdfBlockSelection.js', () => ({
 
 vi.mock('./composables/usePdfOcr.js', () => ({
   usePdfOcr: () => mockPdfOcr
+}))
+
+vi.mock('@/features/settings/stores/settings.js', () => ({
+  useSettingsStore: () => ({
+    isDarkTheme: false,
+    settings: {
+      THEME: 'auto'
+    }
+  })
+}))
+
+vi.mock('@/utils/ui/theme.js', () => ({
+  applyTheme: vi.fn()
 }))
 
 vi.mock('./components/PdfToolbar.vue', () => ({

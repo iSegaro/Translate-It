@@ -65,7 +65,7 @@
         ref="toolbarRef"
         class="pdf-windows-host__toolbar"
         :provider="selectedProvider"
-        theme="dark"
+        :theme="isDarkTheme ? 'dark' : 'light'"
         :is-pinned="isPinned"
         :show-original="showOriginal"
         :is-dictionary="isDictionaryResult"
@@ -206,7 +206,7 @@
       :retry-disabled="isTranslating || !selectedText"
       :retry-title="t('action_retry')"
       :retry-aria-label="t('action_retry')"
-      theme="dark"
+      :theme="isDarkTheme ? 'dark' : 'light'"
       @retry="retryTranslation"
     />
 
@@ -220,9 +220,10 @@
 </template>
 
 <script setup>
-import { toRef } from 'vue'
+import { computed, toRef } from 'vue'
 import { useUnifiedI18n } from '@/composables/shared/useUnifiedI18n.js'
 import { usePdfWindowsHost } from '../composables/usePdfWindowsHost.js'
+import { useSettingsStore } from '@/features/settings/stores/settings.js'
 import LoadingSpinner from '@/components/base/LoadingSpinner.vue'
 import TranslationWindowToolbar from '@/components/shared/TranslationWindowToolbar.vue'
 import TranslationWindowFooter from '@/components/shared/TranslationWindowFooter.vue'
@@ -239,6 +240,9 @@ const props = defineProps({
 
 const { t } = useUnifiedI18n()
 const pdfFingerprint = toRef(props, 'pdfFingerprint')
+
+const settingsStore = useSettingsStore()
+const isDarkTheme = computed(() => settingsStore.isDarkTheme)
 
 const {
   iconHostRef,
