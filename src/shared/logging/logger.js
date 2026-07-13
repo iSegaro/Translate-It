@@ -128,10 +128,9 @@ function shouldLog(component, level) {
 
   const componentLevel = getComponentLogLevel(component);
   
-  // Logic: 
-  // 1. If a component level is explicitly set to something other than the default, respect it.
-  // 2. Otherwise, if debugOverride is active, allow everything up to DEBUG.
-  // 3. Otherwise, use the standard filtering logic.
+  // Component filtering only (level ≤ componentLevel).
+  // Global Debug Mode is applied later by SafeConsole and does not
+  // participate in filtering decisions here.
   const shouldLogValue = level <= componentLevel;
 
   // Cache the result
