@@ -24,3 +24,16 @@ $tb-control-strong:     rgba(255, 255, 255, 0.14);  // action-button hover (stro
 // Focus rings
 $tb-focus:              rgba(106, 165, 255, 0.95);
 $tb-focus-soft:         rgba(106, 165, 255, 0.90);
+
+// ── CSS custom property overrides for child components ──────────────
+// ProviderSelector inherits --color-text from the global :root theme.
+// Inside the always-dark toolbar, override it so text reads on the dark surface.
+.pdf-toolbar {
+  // ProviderSelector text contrast on the always-dark PDF toolbar.
+  --color-text: #{$tb-text-primary};
+}
+
+.pdf-toolbar .ti-dropdown-arrow {
+  filter: invert(1);
+  opacity: 0.9;
+}
