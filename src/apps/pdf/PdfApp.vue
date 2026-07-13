@@ -17,7 +17,6 @@
       :show-translation-option="hasAnyTranslation"
       :has-outline="hasOutline"
       :is-outline-visible="isOutlineVisible"
-      @file-selected="handleFileSelected"
       @toggle-outline="toggleOutline"
       @translate-visible="handleTranslateVisiblePages"
       @cancel-translation="handleCancelTranslation"
@@ -30,7 +29,17 @@
       @export-html="handleExportHtml"
       @request-ocr="requestOcr"
       @clear-cache="handleClearCache"
+      @request-open-pdf="requestOpenPdf"
     />
+
+    <input
+      ref="fileInput"
+      class="pdf-app__file-input"
+      hidden
+      type="file"
+      accept="application/pdf,.pdf"
+      @change="handleFileInputChange"
+    >
 
     <div class="pdf-app__viewport">
       <div class="pdf-app__status-layer">
@@ -79,6 +88,7 @@
             :is-drag-over="isDragOver"
             @file-selected="handleFileSelected"
             @drag-state-change="isDragOver = $event"
+            @request-open-pdf="requestOpenPdf"
           >
             <template #empty>
               <div class="pdf-app__empty">
@@ -232,6 +242,7 @@ const {
 const pdfViewerRef = ref(null)
 const pdfTranslatedPaneRef = ref(null)
 const pdfViewerLayoutRef = ref(null)
+const fileInput = ref(null)
 const originalScrollContainer = computed(() => pdfViewerLayoutRef.value?.scrollContainer ?? null)
 const translatedScrollContainer = computed(() => pdfViewerLayoutRef.value?.translatedPaneRef ?? null)
 const {
@@ -375,6 +386,26 @@ async function handleFileSelected(file) {
   if (loaded) {
     isDragOver.value = false
     void attachDocument(session)
+  }
+}
+
+function requestOpenPdf() {
+  const input = fileInput.value
+  if (!input) return
+
+  input.value = ''
+  input.click()
+}
+
+async function handleFileInputChange(event) {
+  const [file] = event.target.files || []
+
+  try {
+    if (file) {
+      await handleFileSelected(file)
+    }
+  } finally {
+    event.target.value = ''
   }
 }
 

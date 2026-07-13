@@ -5,10 +5,16 @@
       'is-drag-over': isDragOver,
       'pdf-dropzone--document': hasDocument
     }"
+    :role="hasDocument ? undefined : 'button'"
+    :tabindex="hasDocument ? undefined : 0"
+    :aria-label="hasDocument ? undefined : 'Open PDF'"
     @dragenter.prevent="handleDragEnter"
     @dragover.prevent="handleDragOver"
     @dragleave.prevent="handleDragLeave"
     @drop.prevent="handleDrop"
+    @click="handleClick"
+    @keydown.enter.prevent="handleClick"
+    @keydown.space.prevent="handleClick"
   >
     <slot
       v-if="!hasDocument"
@@ -22,12 +28,12 @@
 </template>
 
 <script setup>
-defineProps({
+const props = defineProps({
   hasDocument: { type: Boolean, default: false },
   isDragOver: { type: Boolean, default: false }
 })
 
-const emit = defineEmits(['file-selected', 'drag-state-change'])
+const emit = defineEmits(['file-selected', 'drag-state-change', 'request-open-pdf'])
 
 function handleDragEnter() {
   emit('drag-state-change', true)
@@ -50,6 +56,12 @@ function handleDrop(event) {
     emit('file-selected', file)
   }
 }
+
+function handleClick() {
+  if (!props.hasDocument) {
+    emit('request-open-pdf')
+  }
+}
 </script>
 
 <style scoped lang="scss">
@@ -64,6 +76,10 @@ function handleDrop(event) {
   background: rgba(12, 15, 22, 0.35);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
   overflow: hidden;
+}
+
+.pdf-dropzone:not(.pdf-dropzone--document) {
+  cursor: pointer;
 }
 
 .pdf-dropzone--document {

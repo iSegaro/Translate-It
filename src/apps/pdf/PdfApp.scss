@@ -14,6 +14,10 @@
   font-family: Inter, "Segoe UI", system-ui, sans-serif;
 }
 
+.pdf-app__file-input {
+  display: none !important;
+}
+
 .pdf-app__viewport {
   position: relative;
   flex: 1;

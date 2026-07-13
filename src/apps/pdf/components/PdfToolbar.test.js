@@ -204,11 +204,8 @@ describe('PdfToolbar', () => {
     expect(wrapper.find('.pdf-toolbar__export-menu').text()).toContain('Open PDF')
     expect(wrapper.find('.pdf-toolbar__export-menu').text()).toContain('Clear Cache')
 
-    const fileInput = wrapper.find('input[type="file"]')
-    const clickSpy = vi.spyOn(fileInput.element, 'click').mockImplementation(() => {})
-
     await wrapper.find('.pdf-toolbar__export-menu button').trigger('click')
-    expect(clickSpy).toHaveBeenCalled()
+    expect(wrapper.emitted('request-open-pdf')).toHaveLength(1)
 
     await wrapper.find('.pdf-toolbar__button[aria-label="More actions"]').trigger('click')
     await wrapper.find('.pdf-toolbar__export-menu button:nth-child(2)').trigger('click')

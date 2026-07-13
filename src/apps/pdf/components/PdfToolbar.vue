@@ -263,13 +263,6 @@
         </div>
       </div>
 
-      <input
-        ref="fileInput"
-        class="pdf-toolbar__file-input"
-        type="file"
-        accept="application/pdf,.pdf"
-        @change="handleFileInputChange"
-      >
     </div>
   </header>
 </template>
@@ -316,7 +309,7 @@ const props = defineProps({
   isOutlineVisible: { type: Boolean, default: false },
 })
 
-const emit = defineEmits(['file-selected', 'translate-visible', 'cancel-translation', 'content-view-change', 'layout-mode-change', 'toggle-outline', 'export-txt', 'export-markdown', 'export-html', 'request-ocr', 'clear-cache', 'zoom-step', 'zoom-change'])
+const emit = defineEmits(['request-open-pdf', 'translate-visible', 'cancel-translation', 'content-view-change', 'layout-mode-change', 'toggle-outline', 'export-txt', 'export-markdown', 'export-html', 'request-ocr', 'clear-cache', 'zoom-step', 'zoom-change'])
 
 const logger = getScopedLogger(LOG_COMPONENTS.PDF, 'PdfToolbar')
 const settingsStore = useSettingsStore()
@@ -386,7 +379,6 @@ const handleTranslateRequest = () => {
   emit('translate-visible')
 }
 
-const fileInput = ref(null)
 const exportMenuRef = ref(null)
 const exportMenuTriggerRef = ref(null)
 const moreMenuRef = ref(null)
@@ -433,10 +425,6 @@ const currentPageDisplayValue = computed(() => {
 const hasZoomOut = computed(() => props.zoomMode !== 'fit-width' || props.zoomPercent > zoomPercentOptions[0])
 const hasZoomIn = computed(() => props.zoomMode !== 'fit-width' || props.zoomPercent < zoomPercentOptions[zoomPercentOptions.length - 1])
 
-function openFilePicker() {
-  fileInput.value?.click()
-}
-
 function toggleMenu(menuName) {
   activeMenu.value = activeMenu.value === menuName ? null : menuName
 }
@@ -451,7 +439,7 @@ function handleExportAction(eventName) {
 }
 
 function handleOpenPdfAction() {
-  openFilePicker()
+  emit('request-open-pdf')
   closeMenus()
 }
 
@@ -529,11 +517,4 @@ function handleLayoutModeToggle() {
   emit('layout-mode-change', isSideBySide.value ? LAYOUT_MODE.SINGLE : LAYOUT_MODE.SIDE_BY_SIDE)
 }
 
-function handleFileInputChange(event) {
-  const [file] = event.target.files || []
-  if (file) {
-    emit('file-selected', file)
-  }
-  event.target.value = ''
-}
 </script>

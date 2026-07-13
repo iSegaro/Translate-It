@@ -367,6 +367,54 @@ describe('PdfApp', () => {
     expect(wrapper.text()).toContain('Markdown export downloaded successfully.')
   })
 
+  it('clicks hidden file input when open pdf is requested', async () => {
+    createMocks()
+
+    const wrapper = mount(PdfApp)
+    await flushPromises()
+
+    const fileInput = wrapper.find('input[type="file"]')
+    let currentValue = 'stale.pdf'
+    Object.defineProperty(fileInput.element, 'value', {
+      configurable: true,
+      get: () => currentValue,
+      set: (next) => {
+        currentValue = next
+      }
+    })
+    const clickSpy = vi.spyOn(fileInput.element, 'click').mockImplementation(() => {
+      expect(currentValue).toBe('')
+    })
+
+    wrapper.findComponent({ name: 'PdfToolbar' }).vm.$emit('request-open-pdf')
+    await flushPromises()
+
+    expect(clickSpy).toHaveBeenCalledTimes(1)
+    clickSpy.mockRestore()
+  })
+
+  it('loads selected pdf and resets hidden input value', async () => {
+    createMocks()
+
+    const wrapper = mount(PdfApp)
+    await flushPromises()
+
+    const fileInput = wrapper.find('input[type="file"]')
+    const file = new File(['pdf'], 'sample.pdf', { type: 'application/pdf' })
+
+    Object.defineProperty(fileInput.element, 'files', {
+      configurable: true,
+      value: [file]
+    })
+
+    fileInput.element.dispatchEvent(new Event('change'))
+    await flushPromises()
+    await flushPromises()
+
+    expect(mockViewerController.loadPdfFile).toHaveBeenCalledWith(file, expect.any(Object))
+    expect(fileInput.element.value).toBe('')
+  })
+
   it('shows an HTML export success banner', async () => {
     createMocks()
     mockPdfExport.exportHtml.mockResolvedValue(true)

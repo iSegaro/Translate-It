@@ -36,4 +36,20 @@ describe('PdfDropzone', () => {
     expect(wrapper.find('.empty-state').exists()).toBe(false)
     expect(wrapper.classes()).toContain('pdf-dropzone--document')
   })
+
+  it('requests open pdf when empty dropzone is clicked', async () => {
+    const wrapper = mount(PdfDropzone, {
+      props: {
+        hasDocument: false,
+        isDragOver: false
+      },
+      slots: {
+        empty: '<div class="empty-state">Empty</div>'
+      }
+    })
+
+    await wrapper.trigger('click')
+
+    expect(wrapper.emitted('request-open-pdf')).toHaveLength(1)
+  })
 })
