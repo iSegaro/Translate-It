@@ -1,11 +1,11 @@
 # ADR-003: Core PDF Viewer Ownership and Lifecycle Decisions
 
-**Status:** Proposed
+**Status:** Accepted
 
 > **Note**
 >
-> This ADR is currently **Proposed**.
-> It becomes **Accepted** only after the implementation has been completed and the resulting architecture has been validated through testing and architectural review.
+> This ADR is **Accepted**.
+> Implementation is complete. All cleanup scheduling, release lifecycle, and render-candidate reporting have been removed. PageSession lifetime follows document lifetime with no intermediate destruction paths. Tests were aligned with the current architecture. An independent architecture audit confirmed the result matches the documented decisions.
 
 **Scope:** Core PDF Viewer Architecture
 

@@ -194,7 +194,6 @@ describe('PdfViewer', () => {
         pages: [{ pageNumber: 1, width: 100, height: 100, scale: 1 }],
         session: {
           updateVisiblePages: vi.fn(),
-          updateRenderCandidates: vi.fn()
         }
       },
       attachTo: document.body
@@ -213,7 +212,7 @@ describe('PdfViewer', () => {
   it('emits the primary page as the current page', async () => {
     const session = {
       updateVisiblePages: vi.fn(),
-      updateRenderCandidates: vi.fn()
+      
     }
     pageRectMap.set(1, buildRect(10, 100, 300))
     pageRectMap.set(2, buildRect(120, 100, 300))
@@ -290,7 +289,7 @@ describe('PdfViewer', () => {
         pages: [{ pageNumber: 1, width: 100, height: 100, scale: 1 }],
         session: {
           updateVisiblePages: vi.fn(),
-          updateRenderCandidates: vi.fn()
+          
         }
       },
       attachTo: document.body
@@ -333,7 +332,7 @@ describe('PdfViewer', () => {
   it('emits both width and height for layout changes', async () => {
     const session = {
       updateVisiblePages: vi.fn(),
-      updateRenderCandidates: vi.fn()
+      
     }
 
     const widthDescriptor = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'clientWidth')
@@ -376,7 +375,7 @@ describe('PdfViewer', () => {
   it('rebuilds observers when scroll container changes', async () => {
     const session = {
       updateVisiblePages: vi.fn(),
-      updateRenderCandidates: vi.fn()
+      
     }
     const firstRoot = document.createElement('div')
     const secondRoot = document.createElement('div')
@@ -588,7 +587,7 @@ describe('PdfViewer', () => {
           pages: [{ pageNumber: 1, width: 100, height: 100, scale: 1 }],
           session: {
             updateVisiblePages: vi.fn(),
-            updateRenderCandidates: vi.fn()
+            
           }
         }
       })
@@ -599,7 +598,7 @@ describe('PdfViewer', () => {
     it('does not emit layout-change for overlay role', async () => {
       const session = {
         updateVisiblePages: vi.fn(),
-        updateRenderCandidates: vi.fn()
+        
       }
 
       const widthDescriptor = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'clientWidth')
@@ -643,7 +642,7 @@ describe('PdfViewer', () => {
     it('does not emit current-page-change for overlay role', async () => {
       const session = {
         updateVisiblePages: vi.fn(),
-        updateRenderCandidates: vi.fn()
+        
       }
 
       const wrapper = mount(PdfViewer, {
@@ -675,7 +674,7 @@ describe('PdfViewer', () => {
     it('does not call session.updateVisiblePages for overlay role', async () => {
       const session = {
         updateVisiblePages: vi.fn(),
-        updateRenderCandidates: vi.fn()
+        
       }
 
       const wrapper = mount(PdfViewer, {
@@ -704,7 +703,7 @@ describe('PdfViewer', () => {
     it('does not let overlay page unmount clear shared session pages', async () => {
       const session = {
         updateVisiblePages: vi.fn(),
-        updateRenderCandidates: vi.fn(),
+        
         clearPage: vi.fn()
       }
 
@@ -728,7 +727,7 @@ describe('PdfViewer', () => {
     it('does not emit block-pointer-move for overlay role', async () => {
       const session = {
         updateVisiblePages: vi.fn(),
-        updateRenderCandidates: vi.fn()
+        
       }
 
       const wrapper = mount(PdfViewer, {
@@ -754,7 +753,7 @@ describe('PdfViewer', () => {
     it('does not emit block-click for overlay role', async () => {
       const session = {
         updateVisiblePages: vi.fn(),
-        updateRenderCandidates: vi.fn()
+        
       }
 
       const wrapper = mount(PdfViewer, {

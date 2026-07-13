@@ -236,7 +236,7 @@ The PDF architecture evolved incrementally through a series of focused decomposi
 | [**PdfPageContentRepository**](#page-content-repository-pdfpagecontentrepository) | Extracted page sessions, hydration, and block indexing from the session, reducing monolithic responsibility. |
 | [**PdfTranslationState**](#translation-state-pdftranslationstate) | Extracted translation state management from the session, enabling clean state operations without lifecycle coupling. |
 | [**usePdfRenderPipeline**](#usepdfrenderpipeline) | Centralized render scheduling lifecycle in a single composable, replacing scattered viewer logic. |
-| **Session-owned Cleanup Scheduling** | Moved cleanup timer ownership from PdfRenderer to PdfDocumentSession, enforcing single-responsibility. |
+| **Session-owned Cleanup Scheduling** | Moved cleanup timer ownership from PdfRenderer to PdfDocumentSession. Later removed by ADR-003 — document-lifetime PageSession ownership proved simpler, eliminating cleanup scheduling entirely. |
 
 ---
 
@@ -375,21 +375,22 @@ The page list within the scroll pane uses `padding: 16px 0 24px` to provide vert
 4. When hidden: clearPage() cancels render, clears canvas + text layer
 ```
 
-### Cleanup Sequence
+### Document Close / Replacement
 
 ```
-1. PdfApp unmounts
-2. Each composable calls its cleanup
-3. pdfDocumentSession.cleanupDocument()
-   ├── Cancel scheduled cleanup timer
-   ├── Cancel all active render tasks
-   ├── Destroy pdfjs document object
-   ├── Revoke object URL
-   ├── Clear all Maps (pageSessions, translationStates, renderTasks)
-   └── _naturalPageViewports.clear()
+Document close / replacement
+    ├── Cancel all active render tasks
+    ├── Reset PageContentRepository (clears all page sessions, pending hydrations, block index)
+    ├── Reset translation state
+    ├── Clear navigation caches (destination resolver, outline, link annotations)
+    ├── Clear natural page viewports
+    ├── Clear bitmap cache
+    ├── Destroy pdf.js loading task + document
+    ├── Revoke object URL
+    └── Clear document metadata
 ```
 
-Cleanup scheduling is owned by `PdfDocumentSession`, not by `PdfRenderer`. The session tracks visible and render-candidate page numbers, then schedules a delayed cleanup (`RENDER_CLEANUP_DELAY_MS`) that releases out-of-scope page sessions. The renderer provides the immediate cancel primitives (`cancelRender()`, `clearPage()`, `cancelAll()`) that the session or its delegates invoke.
+PageSession lifetime follows document lifetime. Sessions hydrate once on first access and remain hydrated until the document closes or is replaced. There is no intermediate cleanup scheduling, no release lifecycle, and no viewer-driven eviction. The renderer provides immediate cancel primitives (`cancelRender()`, `clearPage()`, `cancelAll()`) used during document cleanup.
 
 ---
 
@@ -406,7 +407,7 @@ The render pipeline is a layered system where each component owns a single, well
 | **PdfRenderWindowState** | Committed vs. pending candidate page sets | Rendering, scheduling policy |
 | **PdfRenderJobState** | Per-page lifecycle state (IDLE → RENDERING → COMMITTED/FAILED/CANCELLED) | Rendering, scheduling |
 | **usePdfRenderPipeline** | Scheduler instance, render window lifecycle, reactive state, lifecycle event handlers | Rendering, PDF.js |
-| **PdfDocumentSession** | Cleanup scheduling, bitmap cache coordination, page session lifecycle | Rendering decisions, UI |
+| **PdfDocumentSession** | Document lifecycle, bitmap cache coordination, page session lifecycle, renderer ownership | Rendering decisions, UI |
 
 ### PdfRenderer
 
@@ -1480,7 +1481,7 @@ The renderer returns a structured result including the bitmap. The session store
 
 **File**: `src/features/pdf-translation/core/PdfPageContentRepository.js`
 
-Owns all page-level content: sessions, hydration, block indexing, OCR mutation, and release lifecycle. `PdfDocumentSession` delegates to this repository via forwarded accessors (`pageSessions`, `_pendingHydrations`, `_blockIndex`).
+Owns all page-level content: sessions, hydration, block indexing, and OCR mutation. `PdfDocumentSession` delegates to this repository via forwarded accessors (`pageSessions`, `_pendingHydrations`, `_blockIndex`).
 
 ### Responsibilities
 
@@ -1492,12 +1493,15 @@ Owns all page-level content: sessions, hydration, block indexing, OCR mutation, 
 | **Block index** | `_blockIndex` map (blockId → block) — O(1) lookup across all pages |
 | **Bulk retrieval** | `getVisiblePageSessions(pages)`, `getVisibleLogicalBlocks(pages)` — viewport-based queries |
 | **OCR mutation** | `setPageOcrBlocks(pageNumber, blocks)` — updates session with OCR-derived blocks, re-indexes |
-| **Release** | `releasePageSession(pageNumber)` — removes session from active map, unindexes blocks |
 | **Reset** | `reset()` — clears all sessions, pending hydrations, and block index |
+
+### Lifecycle
+
+PageSessions are lazy-hydrated on first access and retained for the document lifetime. The repository never evicts or releases individual sessions — they persist until `reset()` is called (on document close or replacement). There is no per-page release, no rehydration after release, and no cleanup scheduling.
 
 ### Block Index
 
-The `_blockIndex` is a global `Map<blockId, block>` maintained across all pages. When a page session is hydrated, its blocks are indexed. When a page is released, its blocks are unindexed. This enables O(1) block lookup by ID without scanning page sessions.
+The `_blockIndex` is a global `Map<blockId, block>` maintained across all pages. When a page session is hydrated, its blocks are indexed. Blocks remain indexed for the session's lifetime and are cleared only when the repository is reset. This enables O(1) block lookup by ID without scanning page sessions.
 
 ---
 
