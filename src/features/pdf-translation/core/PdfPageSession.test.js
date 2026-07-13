@@ -167,18 +167,6 @@ describe('PdfPageSession OCR state', () => {
     expect(session.allBlocks).toHaveLength(2)
   })
 
-  it('reset clears OCR state', () => {
-    const session = new PdfPageSession({ documentIdentity: 'doc-1', pageNumber: 1 })
-    session.setOcrBlocks([{ id: 'ocr-1' }], 'eng')
-    session.ocrError = 'some error'
-
-    session.reset()
-
-    expect(session.ocrBlocks).toEqual([])
-    expect(session.ocrLanguage).toBeNull()
-    expect(session.ocrCompletedAt).toBe(0)
-    expect(session.ocrError).toBeNull()
-  })
 })
 
 describe('PdfPageSession pageMaskModel', () => {
@@ -241,33 +229,6 @@ describe('PdfPageSession pageMaskModel', () => {
     expect(first).toBe(second)
   })
 
-  it('hydrate clears stale pageMaskModel', async () => {
-    const page = {
-      pageNumber: 1,
-      getTextContent: vi.fn().mockResolvedValue({
-        items: [
-          {
-            str: 'Hello',
-            transform: [1, 0, 0, 14, 40, 650],
-            width: 30,
-            height: 14,
-            dir: 'ltr'
-          }
-        ]
-      })
-    }
-
-    const session = new PdfPageSession({ documentIdentity: 'doc-1', pageNumber: 1 })
-    await session.hydrate(page, { naturalWidth: 500, naturalHeight: 700 })
-
-    const first = session.getPageMaskModel()
-    session.reset()
-    await session.hydrate(page, { naturalWidth: 500, naturalHeight: 700 })
-    const second = session.getPageMaskModel()
-
-    expect(first).not.toBe(second)
-  })
-
   it('pageLayout is not mutated with masks', async () => {
     const page = {
       pageNumber: 1,
@@ -292,30 +253,4 @@ describe('PdfPageSession pageMaskModel', () => {
     expect(session.pageLayout.masks).toBeUndefined()
   })
 
-  it('reset clears pageMaskModel cache', async () => {
-    const page = {
-      pageNumber: 1,
-      getTextContent: vi.fn().mockResolvedValue({
-        items: [
-          {
-            str: 'Hello',
-            transform: [1, 0, 0, 14, 40, 650],
-            width: 30,
-            height: 14,
-            dir: 'ltr'
-          }
-        ]
-      })
-    }
-
-    const session = new PdfPageSession({ documentIdentity: 'doc-1', pageNumber: 1 })
-    await session.hydrate(page, { naturalWidth: 500, naturalHeight: 700 })
-
-    const first = session.getPageMaskModel()
-    session.reset()
-    const second = session.getPageMaskModel()
-
-    expect(first).not.toBe(second)
-    expect(second.masks).toHaveLength(0)
-  })
 })

@@ -25,7 +25,6 @@ export class PdfPageSession {
     this.pageLayout = createEmptyPageLayoutModel(pageNumber)
     this.pageMaskModel = null
     this.loaded = false
-    this.loadedAt = 0
     this.displayScale = 1
     this.logicalBlockBuilder = new PdfLogicalBlockBuilder()
     this.ocrBlocks = []
@@ -48,10 +47,6 @@ export class PdfPageSession {
     this.displayScale = Number(pageMetric?.scale) || this.displayScale || 1
 
     if (this.loaded && this.textContent && this.logicalBlocks.length) {
-      return this
-    }
-
-    if (this.loaded && !this.textContent) {
       return this
     }
 
@@ -78,7 +73,6 @@ export class PdfPageSession {
     })
     this.pageMaskModel = null
     this.loaded = true
-    this.loadedAt = Date.now()
 
     return this
   }
@@ -132,21 +126,5 @@ export class PdfPageSession {
 
     this.pageMaskModel = buildPageMaskModel(this.pageLayout)
     return this.pageMaskModel
-  }
-
-  reset() {
-    this.pageSize = null
-    this.textContent = null
-    this.lines = []
-    this.logicalBlocks = []
-    this.pageLayout = createEmptyPageLayoutModel(this.pageNumber)
-    this.pageMaskModel = null
-    this.loaded = false
-    this.loadedAt = 0
-    this.displayScale = 1
-    this.ocrBlocks = []
-    this.ocrLanguage = null
-    this.ocrCompletedAt = 0
-    this.ocrError = null
   }
 }
