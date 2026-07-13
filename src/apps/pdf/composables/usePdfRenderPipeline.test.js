@@ -16,7 +16,6 @@ function createMockDeps(overrides = {}) {
     })),
     getPageView: vi.fn(() => null),
     onVisiblePagesChange: vi.fn(),
-    onRenderCandidatesChange: vi.fn(),
     ...overrides
   }
 }
@@ -113,7 +112,6 @@ describe('usePdfRenderPipeline', () => {
     pipeline.reset()
 
     expect(deps.onVisiblePagesChange).not.toHaveBeenCalled()
-    expect(deps.onRenderCandidatesChange).not.toHaveBeenCalled()
   })
 
   it('overlay role expands local allowed pages after primary render starts', () => {
@@ -133,7 +131,6 @@ describe('usePdfRenderPipeline', () => {
 
     expect(toArray(pipeline.renderAllowedPageNumbers.value)).toEqual([2, 3])
     expect(deps.onVisiblePagesChange).not.toHaveBeenCalled()
-    expect(deps.onRenderCandidatesChange).not.toHaveBeenCalled()
   })
 
   it('overlay role commits pending render window replacement after destination render commits', () => {
@@ -155,7 +152,6 @@ describe('usePdfRenderPipeline', () => {
 
     expect(toArray(pipeline.renderCandidatePageNumbers.value)).toEqual([6, 7, 8])
     expect(deps.onVisiblePagesChange).not.toHaveBeenCalled()
-    expect(deps.onRenderCandidatesChange).not.toHaveBeenCalled()
   })
 
   it('overlay role handles failed and cancelled lifecycle events locally', () => {
@@ -175,7 +171,6 @@ describe('usePdfRenderPipeline', () => {
 
     expect(toArray(pipeline.renderAllowedPageNumbers.value)).toEqual([1, 2, 3, 4])
     expect(deps.onVisiblePagesChange).not.toHaveBeenCalled()
-    expect(deps.onRenderCandidatesChange).not.toHaveBeenCalled()
   })
 
   it('original role still updates shared callbacks and local lifecycle state', () => {
@@ -190,7 +185,6 @@ describe('usePdfRenderPipeline', () => {
 
     expect(toArray(pipeline.renderAllowedPageNumbers.value)).toEqual([2, 3])
     expect(deps.onVisiblePagesChange).toHaveBeenCalledWith(new Set([2, 3]))
-    expect(deps.onRenderCandidatesChange).toHaveBeenCalledWith(new Set([1, 2, 3, 4]))
   })
 
   it('reset clears all state and calls callbacks', () => {
@@ -204,7 +198,6 @@ describe('usePdfRenderPipeline', () => {
     expect(toArray(pipeline.renderAllowedPageNumbers.value)).toEqual([])
     expect(pipeline.isRenderAllowed(1)).toBe(false)
     expect(deps.onVisiblePagesChange).toHaveBeenCalledWith(new Set())
-    expect(deps.onRenderCandidatesChange).toHaveBeenCalledWith(new Set())
   })
 
   it('cancelRenderWindowFrame is callable without error', () => {
