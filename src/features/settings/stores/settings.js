@@ -24,17 +24,7 @@ function getDefaultSettings() {
     EXTENSION_ENABLED: CONFIG.EXTENSION_ENABLED ?? true,
     ENABLE_TRANSLATION_HISTORY: CONFIG.ENABLE_TRANSLATION_HISTORY ?? true,
     TRANSLATION_API: CONFIG.TRANSLATION_API || ProviderRegistryIds.GOOGLE_V2,
-    MODE_PROVIDERS: CONFIG.MODE_PROVIDERS || {
-      [TranslationMode.Field]: null,
-      [TranslationMode.Select_Element]: null,
-      [TranslationMode.Selection]: null,
-      [TranslationMode.Page]: null,
-      [TranslationMode.Dictionary_Translation]: null,
-      [TranslationMode.Popup_Translate]: null,
-      [TranslationMode.Sidepanel_Translate]: null,
-      [TranslationMode.ScreenCapture]: null,
-      [TranslationMode.MouseHover]: null
-    },
+    MODE_PROVIDERS: CONFIG.MODE_PROVIDERS,
     SOURCE_LANGUAGE: CONFIG.SOURCE_LANGUAGE || 'auto',
     TARGET_LANGUAGE: CONFIG.TARGET_LANGUAGE || 'en',
     LANGUAGE_DETECTION_PREFERENCES: CONFIG.LANGUAGE_DETECTION_PREFERENCES || {
