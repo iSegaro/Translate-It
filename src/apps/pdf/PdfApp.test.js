@@ -1,6 +1,6 @@
 import { afterEach, describe, beforeEach, expect, it, vi } from 'vitest'
 import { mount } from '@vue/test-utils'
-import { nextTick, ref } from 'vue'
+import { computed, nextTick, ref } from 'vue'
 import PdfApp from './PdfApp.vue'
 
 let mockViewerController
@@ -207,21 +207,27 @@ function createMocks({
     cleanup: vi.fn()
   }
 
+  const contentView = ref('translated-pdf')
+  const selectedLayoutMode = ref('single')
+  const layoutMode = computed(() => (
+    contentView.value === 'original' ? 'single' : selectedLayoutMode.value
+  ))
+  const isSideBySide = computed(() => layoutMode.value === 'side-by-side')
+
   mockViewerMode = {
-    contentView: ref('translated-pdf'),
-    layoutMode: ref('single'),
-    showOriginalPane: ref(true),
-    showTranslatedTextPane: ref(false),
-    showTranslatedPdfPane: ref(false),
-    showOverlayLayer: ref(true),
-    isSideBySide: ref(false),
+    contentView,
+    selectedLayoutMode,
+    layoutMode,
+    showOriginalPane: computed(() => contentView.value !== 'translation' || isSideBySide.value),
+    showTranslatedTextPane: computed(() => contentView.value === 'translation'),
+    showTranslatedPdfPane: computed(() => contentView.value === 'translated-pdf' && isSideBySide.value),
+    showOverlayLayer: computed(() => contentView.value === 'translated-pdf' && layoutMode.value === 'single'),
+    isSideBySide,
     setContentView: vi.fn((value) => {
-      mockViewerMode.contentView.value = value
-      updateModeDerivedState()
+      contentView.value = value
     }),
     setLayoutMode: vi.fn((value) => {
-      mockViewerMode.layoutMode.value = value
-      updateModeDerivedState()
+      selectedLayoutMode.value = value
     })
   }
   mockLayoutSyncFromPane = vi.fn()
@@ -268,18 +274,6 @@ function createMocks({
     mockPdfExport.exportError.value = bannerState.exportError || ''
     mockPdfOcr.ocrError.value = bannerState.ocrError || ''
   }
-}
-
-function updateModeDerivedState() {
-  const contentView = mockViewerMode.contentView.value
-  const layoutMode = mockViewerMode.layoutMode.value
-  const isSideBySide = layoutMode === 'side-by-side' && contentView !== 'original'
-
-  mockViewerMode.isSideBySide.value = isSideBySide
-  mockViewerMode.showOriginalPane.value = contentView !== 'translation' || isSideBySide
-  mockViewerMode.showTranslatedTextPane.value = contentView === 'translation'
-  mockViewerMode.showTranslatedPdfPane.value = contentView === 'translated-pdf' && isSideBySide
-  mockViewerMode.showOverlayLayer.value = contentView === 'translated-pdf' && !isSideBySide
 }
 
 describe('PdfApp', () => {
@@ -496,11 +490,7 @@ describe('PdfApp', () => {
     it('original + single renders one PdfViewer without overlay', async () => {
       createMocks()
       mockViewerMode.contentView.value = 'original'
-      mockViewerMode.layoutMode.value = 'single'
-      mockViewerMode.showOriginalPane.value = true
-      mockViewerMode.showTranslatedTextPane.value = false
-      mockViewerMode.showTranslatedPdfPane.value = false
-      mockViewerMode.showOverlayLayer.value = false
+      mockViewerMode.selectedLayoutMode.value = 'single'
 
       const wrapper = mount(PdfApp)
       await flushPromises()
@@ -515,11 +505,7 @@ describe('PdfApp', () => {
     it('translation + single renders only PdfTranslatedPane', async () => {
       createMocks()
       mockViewerMode.contentView.value = 'translation'
-      mockViewerMode.layoutMode.value = 'single'
-      mockViewerMode.showOriginalPane.value = false
-      mockViewerMode.showTranslatedTextPane.value = true
-      mockViewerMode.showTranslatedPdfPane.value = false
-      mockViewerMode.showOverlayLayer.value = false
+      mockViewerMode.selectedLayoutMode.value = 'single'
 
       const wrapper = mount(PdfApp)
       await flushPromises()
@@ -531,12 +517,7 @@ describe('PdfApp', () => {
     it('translation + side-by-side renders PdfViewer and PdfTranslatedPane', async () => {
       createMocks()
       mockViewerMode.contentView.value = 'translation'
-      mockViewerMode.layoutMode.value = 'side-by-side'
-      mockViewerMode.showOriginalPane.value = true
-      mockViewerMode.showTranslatedTextPane.value = true
-      mockViewerMode.showTranslatedPdfPane.value = false
-      mockViewerMode.showOverlayLayer.value = false
-      mockViewerMode.isSideBySide.value = true
+      mockViewerMode.selectedLayoutMode.value = 'side-by-side'
 
       const wrapper = mount(PdfApp)
       await flushPromises()
@@ -553,12 +534,7 @@ describe('PdfApp', () => {
     it('translated-pdf + single renders one PdfViewer with overlay', async () => {
       createMocks()
       mockViewerMode.contentView.value = 'translated-pdf'
-      mockViewerMode.layoutMode.value = 'single'
-      mockViewerMode.showOriginalPane.value = true
-      mockViewerMode.showTranslatedTextPane.value = false
-      mockViewerMode.showTranslatedPdfPane.value = false
-      mockViewerMode.showOverlayLayer.value = true
-      mockViewerMode.isSideBySide.value = false
+      mockViewerMode.selectedLayoutMode.value = 'single'
 
       const wrapper = mount(PdfApp)
       await flushPromises()
@@ -573,12 +549,7 @@ describe('PdfApp', () => {
     it('translated-pdf + side-by-side renders two PdfViewers', async () => {
       createMocks()
       mockViewerMode.contentView.value = 'translated-pdf'
-      mockViewerMode.layoutMode.value = 'side-by-side'
-      mockViewerMode.showOriginalPane.value = true
-      mockViewerMode.showTranslatedTextPane.value = false
-      mockViewerMode.showTranslatedPdfPane.value = true
-      mockViewerMode.showOverlayLayer.value = false
-      mockViewerMode.isSideBySide.value = true
+      mockViewerMode.selectedLayoutMode.value = 'side-by-side'
 
       const wrapper = mount(PdfApp)
       await flushPromises()
@@ -607,11 +578,10 @@ describe('PdfApp', () => {
   })
 
   describe('scroll anchor ownership transitions', () => {
-    function mountInMode({ contentView, layoutMode, sessionAsRef = true }) {
+    function mountInMode({ contentView, selectedLayoutMode, sessionAsRef = true }) {
       createMocks({ sessionAsRef })
       mockViewerMode.contentView.value = contentView
-      mockViewerMode.layoutMode.value = layoutMode
-      updateModeDerivedState()
+      mockViewerMode.selectedLayoutMode.value = selectedLayoutMode
       return mount(PdfApp)
     }
 
@@ -621,7 +591,7 @@ describe('PdfApp', () => {
     }
 
     it('keeps translated pane as final writer for translation single to side-by-side', async () => {
-      const wrapper = mountInMode({ contentView: 'translation', layoutMode: 'single' })
+      const wrapper = mountInMode({ contentView: 'translation', selectedLayoutMode: 'single' })
       await flushPromises()
 
       const layout = wrapper.findComponent({ name: 'PdfViewerLayout' }).vm
@@ -637,7 +607,7 @@ describe('PdfApp', () => {
     })
 
     it('preserves translated anchor for translation side-by-side to single without secondary sync', async () => {
-      const wrapper = mountInMode({ contentView: 'translation', layoutMode: 'side-by-side' })
+      const wrapper = mountInMode({ contentView: 'translation', selectedLayoutMode: 'side-by-side' })
       await flushPromises()
 
       const layout = wrapper.findComponent({ name: 'PdfViewerLayout' }).vm
@@ -653,7 +623,7 @@ describe('PdfApp', () => {
     })
 
     it('captures pdf-backed anchor for translated-pdf single to side-by-side', async () => {
-      const wrapper = mountInMode({ contentView: 'translated-pdf', layoutMode: 'single' })
+      const wrapper = mountInMode({ contentView: 'translated-pdf', selectedLayoutMode: 'single' })
       await flushPromises()
 
       const layout = wrapper.findComponent({ name: 'PdfViewerLayout' }).vm
@@ -670,7 +640,7 @@ describe('PdfApp', () => {
     })
 
     it('uses pdf-backed anchors for translated-pdf layout mode toggles', async () => {
-      const wrapper = mountInMode({ contentView: 'translated-pdf', layoutMode: 'single' })
+      const wrapper = mountInMode({ contentView: 'translated-pdf', selectedLayoutMode: 'single' })
       await flushPromises()
 
       const layout = wrapper.findComponent({ name: 'PdfViewerLayout' }).vm
@@ -689,7 +659,7 @@ describe('PdfApp', () => {
     })
 
     it('defers pdf-backed scroll restore on repeated translated-pdf layout toggles', async () => {
-      const wrapper = mountInMode({ contentView: 'translated-pdf', layoutMode: 'single' })
+      const wrapper = mountInMode({ contentView: 'translated-pdf', selectedLayoutMode: 'single' })
       await flushPromises()
 
       const layout = wrapper.findComponent({ name: 'PdfViewerLayout' }).vm
@@ -716,7 +686,7 @@ describe('PdfApp', () => {
     })
 
     it('uses pdf-backed anchors when translated-pdf layout recomputes page metrics', async () => {
-      const wrapper = mountInMode({ contentView: 'translated-pdf', layoutMode: 'single' })
+      const wrapper = mountInMode({ contentView: 'translated-pdf', selectedLayoutMode: 'single' })
       await flushPromises()
 
       const layout = wrapper.findComponent({ name: 'PdfViewerLayout' }).vm
@@ -749,7 +719,7 @@ describe('PdfApp', () => {
     })
 
     it('suppresses layout-change restore during fit-page zoom transitions', async () => {
-      const wrapper = mountInMode({ contentView: 'original', layoutMode: 'single' })
+      const wrapper = mountInMode({ contentView: 'original', selectedLayoutMode: 'single' })
       await flushPromises()
 
       const layout = wrapper.findComponent({ name: 'PdfViewerLayout' }).vm
@@ -787,7 +757,7 @@ describe('PdfApp', () => {
     })
 
     it('snaps original single fit-page zoom to the current page top', async () => {
-      const wrapper = mountInMode({ contentView: 'original', layoutMode: 'single' })
+      const wrapper = mountInMode({ contentView: 'original', selectedLayoutMode: 'single' })
       await flushPromises()
 
       const layout = wrapper.findComponent({ name: 'PdfViewerLayout' }).vm
@@ -803,7 +773,7 @@ describe('PdfApp', () => {
     })
 
     it('snaps translated-pdf single fit-page zoom to the current page top', async () => {
-      const wrapper = mountInMode({ contentView: 'translated-pdf', layoutMode: 'single' })
+      const wrapper = mountInMode({ contentView: 'translated-pdf', selectedLayoutMode: 'single' })
       await flushPromises()
 
       const layout = wrapper.findComponent({ name: 'PdfViewerLayout' }).vm
@@ -819,7 +789,7 @@ describe('PdfApp', () => {
     })
 
     it('derives translated zoom anchor from original when translated pane is stale', async () => {
-      const wrapper = mountInMode({ contentView: 'translated-pdf', layoutMode: 'side-by-side' })
+      const wrapper = mountInMode({ contentView: 'translated-pdf', selectedLayoutMode: 'side-by-side' })
       await flushPromises()
 
       const layout = wrapper.findComponent({ name: 'PdfViewerLayout' }).vm
@@ -837,7 +807,7 @@ describe('PdfApp', () => {
     })
 
     it('uses a DOM page anchor when leaving fit-page near the top of a page', async () => {
-      const wrapper = mountInMode({ contentView: 'original', layoutMode: 'side-by-side' })
+      const wrapper = mountInMode({ contentView: 'original', selectedLayoutMode: 'side-by-side' })
       await flushPromises()
 
       const layout = wrapper.findComponent({ name: 'PdfViewerLayout' }).vm
@@ -882,7 +852,7 @@ describe('PdfApp', () => {
     })
 
     it('preserves page when switching original to translation', async () => {
-      const wrapper = mountInMode({ contentView: 'original', layoutMode: 'single' })
+      const wrapper = mountInMode({ contentView: 'original', selectedLayoutMode: 'single' })
       await flushPromises()
 
       const layout = wrapper.findComponent({ name: 'PdfViewerLayout' }).vm
@@ -898,7 +868,7 @@ describe('PdfApp', () => {
     })
 
     it('does not drift on repeated translation layout toggles', async () => {
-      const wrapper = mountInMode({ contentView: 'translation', layoutMode: 'single' })
+      const wrapper = mountInMode({ contentView: 'translation', selectedLayoutMode: 'single' })
       await flushPromises()
 
       const layout = wrapper.findComponent({ name: 'PdfViewerLayout' }).vm
@@ -917,7 +887,7 @@ describe('PdfApp', () => {
     })
 
     it('uses logical current page when translated DOM capture is stale during translation to original', async () => {
-      const wrapper = mountInMode({ contentView: 'original', layoutMode: 'single' })
+      const wrapper = mountInMode({ contentView: 'original', selectedLayoutMode: 'single' })
       await flushPromises()
 
       const layout = wrapper.findComponent({ name: 'PdfViewerLayout' }).vm
@@ -941,7 +911,7 @@ describe('PdfApp', () => {
     })
 
     it('does not hydrate translated-pdf blocks from current-page-change', async () => {
-      const wrapper = mountInMode({ contentView: 'translated-pdf', layoutMode: 'single' })
+      const wrapper = mountInMode({ contentView: 'translated-pdf', selectedLayoutMode: 'single' })
       await flushPromises()
 
       wrapper.findComponent({ name: 'PdfViewer' }).vm.$emit('current-page-change', 7)
@@ -953,7 +923,7 @@ describe('PdfApp', () => {
     })
 
     it('hydrates translated-pdf blocks from visible-pages-change', async () => {
-      const wrapper = mountInMode({ contentView: 'translated-pdf', layoutMode: 'single' })
+      const wrapper = mountInMode({ contentView: 'translated-pdf', selectedLayoutMode: 'single' })
       await flushPromises()
 
       wrapper.findComponent({ name: 'PdfViewer' }).vm.$emit('visible-pages-change', new Set([2, 3]))
@@ -966,7 +936,7 @@ describe('PdfApp', () => {
     })
 
     it('ignores empty visible-pages-change events', async () => {
-      const wrapper = mountInMode({ contentView: 'translated-pdf', layoutMode: 'single' })
+      const wrapper = mountInMode({ contentView: 'translated-pdf', selectedLayoutMode: 'single' })
       await flushPromises()
 
       wrapper.findComponent({ name: 'PdfViewer' }).vm.$emit('visible-pages-change', new Set())
@@ -978,7 +948,7 @@ describe('PdfApp', () => {
     })
 
     it('ignores visible-pages-change outside translated-pdf mode', async () => {
-      const wrapper = mountInMode({ contentView: 'original', layoutMode: 'single' })
+      const wrapper = mountInMode({ contentView: 'original', selectedLayoutMode: 'single' })
       await flushPromises()
 
       wrapper.findComponent({ name: 'PdfViewer' }).vm.$emit('visible-pages-change', new Set([2]))
@@ -990,7 +960,7 @@ describe('PdfApp', () => {
     })
 
     it('uses logical current page when translated DOM capture is stale during translation to translated-pdf', async () => {
-      const wrapper = mountInMode({ contentView: 'original', layoutMode: 'single' })
+      const wrapper = mountInMode({ contentView: 'original', selectedLayoutMode: 'single' })
       await flushPromises()
 
       const layout = wrapper.findComponent({ name: 'PdfViewerLayout' }).vm
@@ -1014,7 +984,7 @@ describe('PdfApp', () => {
     })
 
     it('preserves pdf-backed scroll position across original and translated-pdf toggles', async () => {
-      const wrapper = mountInMode({ contentView: 'original', layoutMode: 'side-by-side' })
+      const wrapper = mountInMode({ contentView: 'original', selectedLayoutMode: 'side-by-side' })
       await flushPromises()
 
       const layout = wrapper.findComponent({ name: 'PdfViewerLayout' }).vm
@@ -1041,7 +1011,7 @@ describe('PdfApp', () => {
     it('uses getPageViewport from a runtime-shaped plain session object', async () => {
       const wrapper = mountInMode({
         contentView: 'original',
-        layoutMode: 'side-by-side',
+        selectedLayoutMode: 'side-by-side',
         sessionAsRef: false
       })
       await flushPromises()
@@ -1059,7 +1029,7 @@ describe('PdfApp', () => {
     })
 
     it('preserves the top-of-page pdf-backed position', async () => {
-      const wrapper = mountInMode({ contentView: 'original', layoutMode: 'side-by-side' })
+      const wrapper = mountInMode({ contentView: 'original', selectedLayoutMode: 'side-by-side' })
       await flushPromises()
 
       const layout = wrapper.findComponent({ name: 'PdfViewerLayout' }).vm
@@ -1076,7 +1046,7 @@ describe('PdfApp', () => {
     })
 
     it('falls back when the canvas is missing', async () => {
-      const wrapper = mountInMode({ contentView: 'original', layoutMode: 'side-by-side' })
+      const wrapper = mountInMode({ contentView: 'original', selectedLayoutMode: 'side-by-side' })
       await flushPromises()
 
       const layout = wrapper.findComponent({ name: 'PdfViewerLayout' }).vm
