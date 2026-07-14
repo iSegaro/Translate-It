@@ -245,7 +245,7 @@ describe('PdfToolbar', () => {
 
     const ocrButton = wrapper.find('.pdf-toolbar__button--ocr')
     expect(ocrButton.exists()).toBe(true)
-    expect(ocrButton.text()).toBe('OCR Pages')
+    expect(ocrButton.text()).toBe('OCR Page')
 
     await ocrButton.trigger('click')
     expect(wrapper.emitted('request-ocr')).toHaveLength(1)

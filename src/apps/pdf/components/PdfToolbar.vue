@@ -153,7 +153,7 @@
         type="button"
         @click="$emit('request-ocr')"
       >
-        OCR Pages
+        OCR Page
       </button>
 
       <span
