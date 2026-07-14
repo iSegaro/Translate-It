@@ -652,6 +652,52 @@ describe('usePdfViewerController cache persistence', () => {
     expect(controller.translatedPageData.value[0].blocks).toHaveLength(1)
     expect(controller.translatedPageData.value[0].blocks[0].id).toBe(block.id)
   })
+
+  it('refreshes only OCR-completed page wrappers from committed sessions without hydration or layout recompute', async () => {
+    const pageOneBlock = createBlock({ id: 'ocr-1', sourceTextHash: 'hash-ocr-1' })
+    const pageTwoBlock = { ...createBlock({ id: 'text-2', sourceTextHash: 'hash-text-2' }), pageNumber: 2 }
+    session.getDocumentCacheSnapshot.mockResolvedValue({ translations: {}, ocr: {} })
+    session.pageSessions = new Map([
+      [2, { allBlocks: [pageTwoBlock], getLogicalBlocks: () => [pageTwoBlock] }]
+    ])
+    openFileMock.mockResolvedValue({
+      ...createOpenState(),
+      totalPages: 2,
+      pageMetrics: [
+        { pageNumber: 1, width: 600, height: 800, scale: 1 },
+        { pageNumber: 2, width: 620, height: 820, scale: 1 }
+      ]
+    })
+
+    const controller = usePdfViewerController()
+    await controller.loadPdfFile({ type: 'application/pdf', name: 'doc.pdf' }, 800)
+    const originalPageData = controller.translatedPageData.value
+    const unaffectedPage = originalPageData.find((page) => page.pageNumber === 2)
+
+    expect(originalPageData.find((page) => page.pageNumber === 1).blocks).toHaveLength(0)
+    session.translationStates.set(pageOneBlock.id, {
+      blockId: pageOneBlock.id,
+      status: 'translated',
+      translatedText: 'ترجمه OCR',
+      sourceTextHash: pageOneBlock.sourceTextHash
+    })
+    session.pageSessions.set(1, { allBlocks: [pageOneBlock], getLogicalBlocks: () => [pageOneBlock] })
+    session.pageSessions.set(3, { allBlocks: [{ ...pageOneBlock, id: 'orphan-3', pageNumber: 3 }], getLogicalBlocks: () => [{ ...pageOneBlock, id: 'orphan-3', pageNumber: 3 }] })
+
+    const changed = controller.refreshTranslatedPageBlocks([1, 1, 3, 999])
+
+    expect(changed).toBe(true)
+    expect(controller.translatedPageData.value).not.toBe(originalPageData)
+    expect(controller.translatedPageData.value.find((page) => page.pageNumber === 1).blocks[0]).toEqual(expect.objectContaining({
+      id: pageOneBlock.id,
+      text: pageOneBlock.text,
+      translationState: expect.objectContaining({ translatedText: 'ترجمه OCR' })
+    }))
+    expect(controller.translatedPageData.value.map((page) => page.pageNumber)).toEqual([1, 2])
+    expect(controller.translatedPageData.value.find((page) => page.pageNumber === 2)).toBe(unaffectedPage)
+    expect(session.getPageSession).not.toHaveBeenCalled()
+    expect(rebuildPageMetricsMock).not.toHaveBeenCalled()
+  })
 })
 
 describe('usePdfViewerController error lifecycle', () => {

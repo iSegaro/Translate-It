@@ -20,6 +20,7 @@ let mockViewerMode
 let mockPdfExport
 
 let mockPdfOcr
+let mockPdfOcrOptions
 let mockLayoutSyncFromPane
 let mockPdfViewport
 
@@ -39,7 +40,10 @@ vi.mock('./composables/usePdfExport.js', () => ({
 }))
 
 vi.mock('./composables/usePdfOcr.js', () => ({
-  usePdfOcr: () => mockPdfOcr
+  usePdfOcr: (options) => {
+    mockPdfOcrOptions = options
+    return mockPdfOcr
+  }
 }))
 
 vi.mock('@/features/settings/stores/settings.js', () => ({
@@ -223,6 +227,7 @@ function createMocks({
     recomputeLayout: vi.fn().mockResolvedValue(undefined),
     translateVisiblePages: vi.fn(),
     hydrateVisiblePageBlocks: vi.fn().mockResolvedValue(false),
+    refreshTranslatedPageBlocks: vi.fn(),
     cancelTranslation: vi.fn(),
     clearDocumentCache: vi.fn().mockResolvedValue(undefined),
     cleanup: vi.fn()
@@ -257,7 +262,7 @@ function createMocks({
     convertToViewportPoint: vi.fn((x, y) => [x * 2, y * 2])
   }
 
-  mockPdfExport = {
+    mockPdfExport = {
     canExport: ref(false),
     exportError: ref(''),
     exportTxt: vi.fn().mockResolvedValue(false),
@@ -336,6 +341,26 @@ describe('PdfApp', () => {
     expect(wrapper.find('.pdf-status-banner').exists()).toBe(false)
     expect(wrapper.find('.pdf-app__status-row').exists()).toBe(false)
     expect(wrapper.find('.pdf-viewer-layout-stub').exists()).toBe(true)
+  })
+
+  it('refreshes OCR page wrappers before incrementing translationTick on OCR completion', async () => {
+    createMocks()
+    const order = []
+    mockViewerController.refreshTranslatedPageBlocks.mockImplementation(() => {
+      order.push(`refresh:${mockViewerController.translationTick.value}`)
+      return true
+    })
+
+    mount(PdfApp)
+    await flushPromises()
+
+    mockPdfOcrOptions.onOcrComplete({ pageNumbers: [2, 1] })
+
+    expect(mockViewerController.refreshTranslatedPageBlocks).toHaveBeenCalledWith([2, 1])
+    expect(mockViewerController.translationTick.value).toBe(1)
+    expect(order).toEqual(['refresh:0'])
+    expect(mockPdfOcr.refreshOcrCandidates).toHaveBeenCalled()
+    expect(mockViewerController.recomputeLayout).not.toHaveBeenCalled()
   })
 
   it('shows a transient TXT export success banner', async () => {
@@ -594,6 +619,7 @@ describe('PdfApp', () => {
       mockViewerMode.selectedLayoutMode.value = selectedLayoutMode
       return mount(PdfApp)
     }
+    mockPdfOcrOptions = null
 
     async function emitToolbar(wrapper, eventName, value) {
       wrapper.findComponent({ name: 'PdfToolbar' }).vm.$emit(eventName, value)

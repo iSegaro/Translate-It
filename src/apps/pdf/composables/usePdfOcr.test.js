@@ -68,11 +68,11 @@ function createScannedPageSession(pageNumber, overrides = {}) {
   }
 }
 
-function mountComposable() {
+function mountComposable(options = {}) {
   let api
   const wrapper = mount(defineComponent({
     setup() {
-      api = usePdfOcr()
+      api = usePdfOcr(options)
       return () => null
     }
   }))
@@ -159,6 +159,23 @@ describe('usePdfOcr', () => {
     await api.confirmOcr()
 
     expect(mockProcessPages).toHaveBeenCalledWith([1, 2], expect.any(Object))
+    wrapper.unmount()
+  })
+
+  it('emits captured OCR batch page numbers on completion', async () => {
+    const onOcrComplete = vi.fn()
+    const { api, wrapper } = mountComposable({ onOcrComplete })
+    mockPdfDocumentSession.pageSessions.set(1, createScannedPageSession(1))
+    mockPdfDocumentSession.pageSessions.set(2, createScannedPageSession(2))
+    mockPdfDocumentSession.visiblePageNumbers = new Set([1, 2])
+    api.refreshOcrCandidates()
+    api.requestOcr()
+
+    mockPdfDocumentSession.visiblePageNumbers = new Set([2])
+    visibleListener?.({ pages: [2] })
+    await api.confirmOcr()
+
+    expect(onOcrComplete).toHaveBeenCalledWith({ pageNumbers: [1, 2] })
     wrapper.unmount()
   })
 

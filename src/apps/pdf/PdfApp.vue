@@ -205,6 +205,7 @@ const {
   recomputeLayout,
   translateVisiblePages,
   hydrateVisiblePageBlocks,
+  refreshTranslatedPageBlocks,
   cancelTranslation,
   clearDocumentCache,
   cleanup
@@ -270,7 +271,8 @@ const {
   cancelOcr,
   dismissOcrPrompt
 } = usePdfOcr({
-  onOcrComplete: () => {
+  onOcrComplete: ({ pageNumbers } = {}) => {
+    refreshTranslatedPageBlocks(pageNumbers)
     translationTick.value += 1
     refreshOcrCandidates()
   }

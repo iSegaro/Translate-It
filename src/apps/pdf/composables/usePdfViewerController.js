@@ -95,7 +95,10 @@ export function usePdfViewerController() {
   }
 
   function _buildBlocksForPage(pageSession) {
-    const logicalBlocks = pageSession.getLogicalBlocks()
+    return _buildBlocksForLogicalBlocks(pageSession.getLogicalBlocks())
+  }
+
+  function _buildBlocksForLogicalBlocks(logicalBlocks = []) {
     const blocks = []
 
     for (const block of logicalBlocks) {
@@ -230,6 +233,37 @@ export function usePdfViewerController() {
       if (pageSession && _hydratePageBlocks(page, pageSession)) {
         changed = true
       }
+    }
+
+    if (changed) {
+      _translatedPageData.value = [..._pageDataMap.values()]
+    }
+
+    return changed
+  }
+
+  function refreshTranslatedPageBlocks(pageNumbers = []) {
+    const numbers = [...new Set([...(pageNumbers || [])]
+      .map((pageNumber) => Number(pageNumber))
+      .filter((pageNumber) => Number.isInteger(pageNumber) && pageNumber > 0))]
+    if (numbers.length === 0) return false
+
+    let changed = false
+    for (const pageNumber of numbers) {
+      const sourceBlocks = pdfDocumentSession.getPageSourceBlocks?.(pageNumber) || []
+      if (sourceBlocks.length === 0) continue
+
+      const page = _pageDataMap.get(pageNumber)
+      if (!page) continue
+
+      const previousBlocks = page?.blocks || []
+      for (const block of previousBlocks) {
+        if (block?.id) _blockIndex.delete(block.id)
+      }
+      const nextBlocks = _buildBlocksForLogicalBlocks(sourceBlocks)
+
+      page.blocks = nextBlocks
+      changed = true
     }
 
     if (changed) {
@@ -512,6 +546,7 @@ export function usePdfViewerController() {
     recomputeLayout,
     translateVisiblePages,
     hydrateVisiblePageBlocks,
+    refreshTranslatedPageBlocks,
     cancelTranslation,
     clearDocumentCache,
     clearAllPdfCache,

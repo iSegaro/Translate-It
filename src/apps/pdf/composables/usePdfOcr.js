@@ -61,7 +61,7 @@ export function usePdfOcr({ onOcrComplete } = {}) {
       await saveOcrToCache(pageNumbers)
 
       refreshOcrCandidates()
-      onOcrComplete?.()
+      onOcrComplete?.({ pageNumbers })
 
       logger.info('OCR completed for pages:', { pageNumbers, language: ocrLanguage.value })
     } catch (error) {
