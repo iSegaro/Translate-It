@@ -298,6 +298,36 @@ describe('PdfDocumentSession', () => {
     expect(listener).not.toHaveBeenCalled()
   })
 
+  it('notifies consumers when visible page set changes', () => {
+    const listener = vi.fn()
+    session.onVisiblePagesChanged(listener)
+
+    session.updateVisiblePages([2, 1])
+
+    expect(listener).toHaveBeenCalledTimes(1)
+    expect(listener).toHaveBeenCalledWith({ pages: [1, 2] })
+  })
+
+  it('does not notify visible page listeners for identical sets', () => {
+    const listener = vi.fn()
+    session.onVisiblePagesChanged(listener)
+
+    session.updateVisiblePages([1, 2])
+    session.updateVisiblePages([2, 1])
+
+    expect(listener).toHaveBeenCalledTimes(1)
+  })
+
+  it('unsubscribes visible page listeners', () => {
+    const listener = vi.fn()
+    const unsubscribe = session.onVisiblePagesChanged(listener)
+
+    unsubscribe()
+    session.updateVisiblePages([1])
+
+    expect(listener).not.toHaveBeenCalled()
+  })
+
   it('does not emit duplicate notifications for deduped hydration', async () => {
     let resolveTextContent
     session.pageMetrics = [

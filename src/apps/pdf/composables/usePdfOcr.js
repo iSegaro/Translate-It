@@ -103,8 +103,13 @@ export function usePdfOcr({ onOcrComplete } = {}) {
     refreshOcrCandidates()
   })
 
+  const unsubscribeVisiblePagesChanged = pdfDocumentSession.onVisiblePagesChanged?.(() => {
+    refreshOcrCandidates()
+  })
+
   onBeforeUnmount(() => {
     unsubscribePageSessionCommitted?.()
+    unsubscribeVisiblePagesChanged?.()
     processor.cancel()
   })
 

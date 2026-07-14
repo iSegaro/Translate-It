@@ -86,6 +86,7 @@ export class PdfDocumentSession extends ResourceTracker {
     this._outlineRepository = new PdfOutlineRepository()
     this._linkAnnotationRepository = new PdfLinkAnnotationRepository()
     this._pageSessionCommittedListeners = new Set()
+    this._visiblePagesChangedListeners = new Set()
     this._pageContentRepository = new PdfPageContentRepository({
       onPageSessionCommitted: (pageSession) => this._notifyPageSessionCommitted(pageSession),
       restorePersistedPageData: (pageSession, generation) => this._restorePersistedPageData(pageSession, generation)
@@ -246,6 +247,31 @@ export class PdfDocumentSession extends ResourceTracker {
         listener(event)
       } catch (error) {
         logger.warn('Page session commit listener failed:', { pageNumber: event.pageNumber, error })
+      }
+    }
+  }
+
+  onVisiblePagesChanged(listener) {
+    if (typeof listener !== 'function') {
+      return () => {}
+    }
+
+    this._visiblePagesChangedListeners.add(listener)
+    return () => {
+      this._visiblePagesChangedListeners.delete(listener)
+    }
+  }
+
+  _notifyVisiblePagesChanged() {
+    const event = {
+      pages: [...this.visiblePageNumbers].sort((a, b) => a - b)
+    }
+
+    for (const listener of this._visiblePagesChangedListeners) {
+      try {
+        listener(event)
+      } catch (error) {
+        logger.warn('Visible pages listener failed:', { pages: event.pages, error })
       }
     }
   }
@@ -417,6 +443,7 @@ export class PdfDocumentSession extends ResourceTracker {
 
     const newlyVisible = [...nextVisible].filter((pageNumber) => !this.visiblePageNumbers.has(pageNumber))
     this.visiblePageNumbers = nextVisible
+    this._notifyVisiblePagesChanged()
 
     if (newlyVisible.length > 0) {
       this._hydrateVisiblePagesInBackground(newlyVisible)
@@ -724,6 +751,7 @@ export class PdfDocumentSession extends ResourceTracker {
   async destroy() {
     await this.cleanupDocument()
     this._pageSessionCommittedListeners.clear()
+    this._visiblePagesChangedListeners.clear()
     this._bitmapCache.clear()
     this._renderer.destroy()
     super.destroy()

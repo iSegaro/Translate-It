@@ -3,6 +3,7 @@ import { defineComponent } from 'vue'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 let commitListener = null
+let visibleListener = null
 let mockProcessPages = vi.fn()
 
 const mockPdfDocumentSession = {
@@ -15,6 +16,14 @@ const mockPdfDocumentSession = {
     return vi.fn(() => {
       if (commitListener === listener) {
         commitListener = null
+      }
+    })
+  }),
+  onVisiblePagesChanged: vi.fn((listener) => {
+    visibleListener = listener
+    return vi.fn(() => {
+      if (visibleListener === listener) {
+        visibleListener = null
       }
     })
   })
@@ -73,12 +82,14 @@ function mountComposable() {
 describe('usePdfOcr', () => {
   beforeEach(() => {
     commitListener = null
+    visibleListener = null
     mockProcessPages = vi.fn(async () => [])
     mockPdfDocumentSession.pageSessions = new Map()
     mockPdfDocumentSession.visiblePageNumbers = new Set()
     mockPdfDocumentSession.documentIdentity = 'doc-1'
     mockPdfDocumentSession.getPageSession.mockClear()
     mockPdfDocumentSession.onPageSessionCommitted.mockClear()
+    mockPdfDocumentSession.onVisiblePagesChanged.mockClear()
   })
 
   it('refreshes OCR candidates when a PageSession commit notification arrives', () => {
@@ -105,6 +116,38 @@ describe('usePdfOcr', () => {
     wrapper.unmount()
   })
 
+  it('refreshes OCR candidates when visible pages change', () => {
+    const { api, wrapper } = mountComposable()
+    mockPdfDocumentSession.pageSessions.set(1, createScannedPageSession(1))
+    mockPdfDocumentSession.visiblePageNumbers = new Set([1])
+
+    visibleListener?.({ pages: [1] })
+
+    expect(api.scannedPageCount.value).toBe(1)
+    expect(api.scannedPageNumbers.value).toEqual([1])
+    wrapper.unmount()
+  })
+
+  it('updates candidates while scrolling down and up across hydrated pages', () => {
+    const { api, wrapper } = mountComposable()
+    mockPdfDocumentSession.pageSessions.set(1, createScannedPageSession(1, { logicalBlocks: [{ id: 'text-1' }] }))
+    mockPdfDocumentSession.pageSessions.set(2, createScannedPageSession(2))
+    mockPdfDocumentSession.pageSessions.set(3, createScannedPageSession(3))
+
+    mockPdfDocumentSession.visiblePageNumbers = new Set([2, 3])
+    visibleListener?.({ pages: [2, 3] })
+    expect(api.scannedPageNumbers.value).toEqual([2, 3])
+
+    mockPdfDocumentSession.visiblePageNumbers = new Set([1, 2])
+    visibleListener?.({ pages: [1, 2] })
+    expect(api.scannedPageNumbers.value).toEqual([2])
+
+    mockPdfDocumentSession.visiblePageNumbers = new Set([3])
+    visibleListener?.({ pages: [3] })
+    expect(api.scannedPageNumbers.value).toEqual([3])
+    wrapper.unmount()
+  })
+
   it('keeps OCR completion refresh behavior', async () => {
     const { api, wrapper } = mountComposable()
     const pageSession = createScannedPageSession(1)
@@ -124,12 +167,14 @@ describe('usePdfOcr', () => {
     wrapper.unmount()
   })
 
-  it('removes hydration listener on unmount', () => {
+  it('removes lifecycle listeners on unmount', () => {
     const { wrapper } = mountComposable()
 
     expect(commitListener).toEqual(expect.any(Function))
+    expect(visibleListener).toEqual(expect.any(Function))
     wrapper.unmount()
 
     expect(commitListener).toBeNull()
+    expect(visibleListener).toBeNull()
   })
 })
