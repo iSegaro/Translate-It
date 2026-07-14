@@ -500,6 +500,22 @@ export class PdfDocumentSession extends ResourceTracker {
     return this._translationState.getBlockTranslationState(blockId)
   }
 
+  forEachCommittedPage(callback) {
+    if (typeof callback !== 'function') return
+
+    const pageNumbers = [...this.pageSessions.keys()].sort((a, b) => a - b)
+    for (const pageNumber of pageNumbers) {
+      callback(pageNumber)
+    }
+  }
+
+  getPageSourceBlocks(pageNumber) {
+    const normalizedPageNumber = Number(pageNumber)
+    if (!Number.isInteger(normalizedPageNumber) || normalizedPageNumber <= 0) return []
+
+    return this.pageSessions.get(normalizedPageNumber)?.getLogicalBlocks?.() || []
+  }
+
   setBlockTranslationState(blockId, patch = {}) {
     return this._translationState.setBlockTranslationState(blockId, patch)
   }

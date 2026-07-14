@@ -7,59 +7,11 @@ import { PdfTranslationCoordinator } from '@/features/pdf-translation/core/PdfTr
 import { pdfCacheManager } from '@/features/pdf-translation/core/PdfCacheManager.js'
 import { pdfHistoryManager } from '@/features/pdf-translation/core/PdfHistoryManager.js'
 import { sha256HexFromText } from '@/features/pdf-translation/core/PdfBlockIdentity.js'
+import { restoreCachedPdfTranslations, normalizeStructuredCells } from '@/features/pdf-translation/core/PdfTranslationCacheRestore.js'
+import { createTranslationRestoreContext } from '@/features/pdf-translation/core/PdfTranslationRestoreContext.js'
 
 const logger = getScopedLogger(LOG_COMPONENTS.PDF, 'usePdfViewerController')
 const pdfTranslationCoordinator = new PdfTranslationCoordinator(pdfDocumentSession)
-
-function isFiniteNumber(value) {
-  return typeof value === 'number' && Number.isFinite(value)
-}
-
-function isBoundingBoxLike(value) {
-  return !!value && typeof value === 'object' &&
-    isFiniteNumber(value.x) &&
-    isFiniteNumber(value.y) &&
-    isFiniteNumber(value.width) &&
-    isFiniteNumber(value.height)
-}
-
-function isSourceReferencesLike(value) {
-  return !!value && typeof value === 'object' &&
-    Array.isArray(value.blockIds) &&
-    Array.isArray(value.lineIds) &&
-    Array.isArray(value.sourceLineIndices) &&
-    Array.isArray(value.sourceItemIndices) &&
-    Array.isArray(value.groupRegionIds)
-}
-
-function isStructuredCellLike(value) {
-  return !!value && typeof value === 'object' &&
-    typeof value.id === 'string' &&
-    typeof value.regionId === 'string' &&
-    isFiniteNumber(value.rowIndex) &&
-    isFiniteNumber(value.columnIndex) &&
-    isFiniteNumber(value.rowSpan) &&
-    isFiniteNumber(value.colSpan) &&
-    typeof value.spanType === 'string' &&
-    typeof value.role === 'string' &&
-    typeof value.text === 'string' &&
-    (value.boundingBox == null || isBoundingBoxLike(value.boundingBox)) &&
-    isSourceReferencesLike(value.sourceReferences) &&
-    typeof value.spanCandidate === 'boolean' &&
-    isFiniteNumber(value.estimatedRowSpan) &&
-    isFiniteNumber(value.estimatedColSpan) &&
-    isFiniteNumber(value.confidence)
-}
-
-function cloneSerializable(value) {
-  if (value == null) return value
-
-  if (typeof globalThis.structuredClone === 'function') {
-    return globalThis.structuredClone(value)
-  }
-
-  return JSON.parse(JSON.stringify(value))
-}
 
 async function resolveTranslationSettings() {
   const [provider, sourceLanguage, targetLanguage] = await Promise.all([
@@ -78,66 +30,19 @@ async function resolveTranslationSettings() {
   }
 }
 
-async function buildTranslationSettingsHash() {
+async function buildTranslationSettings() {
   const settings = await resolveTranslationSettings()
-  return await sha256HexFromText(JSON.stringify({
+  const translationSettingsHash = await sha256HexFromText(JSON.stringify({
     provider: settings.provider || '',
     sourceLanguage: settings.sourceLanguage || '',
     targetLanguage: settings.targetLanguage || '',
     optimizationLevel: settings.optimizationLevel ?? null
   }))
-}
 
-function normalizeStructuredCells(translatedCells = []) {
-  if (!Array.isArray(translatedCells) || translatedCells.length === 0) return null
-
-  const normalized = []
-  for (const line of translatedCells) {
-    if (!line || typeof line !== 'object') return null
-    if (!isFiniteNumber(line.lineIndex) || !Array.isArray(line.cells)) return null
-    if (!line.cells.every((cell) => typeof cell === 'string')) return null
-
-    const nextLine = {
-      lineIndex: line.lineIndex,
-      cells: cloneSerializable(line.cells)
-    }
-
-    const metadataKeys = ['cellIds', 'columnIndices', 'rowIndices', 'colSpanCandidates', 'estimatedColSpans']
-    for (const key of metadataKeys) {
-      if (line[key] == null) continue
-      if (!Array.isArray(line[key])) return null
-      nextLine[key] = cloneSerializable(line[key])
-    }
-
-    if (line.structuredCells != null) {
-      if (!Array.isArray(line.structuredCells)) return null
-      if (!line.structuredCells.every((cell) => cell == null || isStructuredCellLike(cell))) return null
-      nextLine.structuredCells = cloneSerializable(line.structuredCells)
-    }
-
-    normalized.push(nextLine)
+  return {
+    ...settings,
+    translationSettingsHash
   }
-
-  return normalized
-}
-
-function deriveTranslatedTextFromStructuredCells(translatedCells = []) {
-  if (!Array.isArray(translatedCells) || translatedCells.length === 0) return ''
-
-  const lines = []
-  for (const line of translatedCells) {
-    if (!line || typeof line !== 'object' || !Array.isArray(line.cells)) continue
-    const cells = line.cells.filter((cell) => typeof cell === 'string' && cell.length > 0)
-    if (cells.length > 0) {
-      lines.push(cells.join(' '))
-    }
-  }
-
-  return lines.join('\n').trim()
-}
-
-function hasTranslationSettingsHash(entry = null) {
-  return typeof entry?.translationSettingsHash === 'string' && entry.translationSettingsHash.length > 0
 }
 
 export function usePdfViewerController() {
@@ -169,6 +74,25 @@ export function usePdfViewerController() {
   const _blockIndex = new Map()
 
   const _pageMetricIndex = new Map()
+  let translationRestoreContext = null
+  let unsubscribePageSessionCommitted = null
+  let disposed = false
+
+  function createRestoreContext() {
+    translationRestoreContext?.dispose?.()
+    translationRestoreContext = createTranslationRestoreContext({
+      documentGeneration: pdfDocumentSession.documentGeneration,
+      getDocumentGeneration: () => pdfDocumentSession.documentGeneration,
+      resolveSettings: buildTranslationSettings
+    })
+    return translationRestoreContext
+  }
+
+  function ensurePageSessionCommitSubscription() {
+    if (unsubscribePageSessionCommitted || typeof pdfDocumentSession.onPageSessionCommitted !== 'function') return
+
+    unsubscribePageSessionCommitted = pdfDocumentSession.onPageSessionCommitted(({ pageNumber }) => restoreCachedTranslationsForPage(pageNumber, translationRestoreContext))
+  }
 
   function _buildBlocksForPage(pageSession) {
     const logicalBlocks = pageSession.getLogicalBlocks()
@@ -315,6 +239,41 @@ export function usePdfViewerController() {
     return changed
   }
 
+  async function restoreCachedTranslationsForPage(pageNumber, context) {
+    if (!context?.isCurrent?.() || !context.tryBeginPageRestore(pageNumber)) return
+
+    try {
+      const sourceBlocks = pdfDocumentSession.getPageSourceBlocks?.(pageNumber) || []
+      if (sourceBlocks.length === 0) return
+
+      const [cache, settings] = await Promise.all([
+        pdfDocumentSession.getDocumentCacheSnapshot(),
+        context.settingsHashPromise
+      ])
+
+      if (!context.isCurrent()) return
+
+      const { restoredBlockIds } = restoreCachedPdfTranslations({
+        session: pdfDocumentSession,
+        cacheTranslations: cache.translations,
+        sourceBlocks,
+        settings
+      })
+
+      if (!context.isCurrent() || disposed || restoredBlockIds.length === 0) return
+
+      restoredTranslationCount.value += restoredBlockIds.length
+      _syncMissingPageSessions()
+      _updateBlockStates(restoredBlockIds)
+      translationTick.value += 1
+      logger.info('Restored PDF translations from cache:', { pageNumber, count: restoredBlockIds.length })
+    } catch (cacheError) {
+      logger.warn('Failed to restore PDF translations from cache:', { pageNumber, error: cacheError })
+    } finally {
+      context.finishPageRestore(pageNumber)
+    }
+  }
+
   pdfTranslationCoordinator.onStateChange = (updatedBlockIds) => {
     _syncMissingPageSessions()
     _updateBlockStates(updatedBlockIds)
@@ -378,6 +337,7 @@ export function usePdfViewerController() {
     }
 
     try {
+      disposed = false
       isLoading.value = true
       error.value = ''
       await pdfTranslationCoordinator.cancelActiveTranslation('document-replaced')
@@ -385,9 +345,15 @@ export function usePdfViewerController() {
       currentFile.value = file
 
       const nextState = await pdfDocumentSession.openFile(file, layoutRequest)
+      const restoreContext = createRestoreContext()
+      ensurePageSessionCommitSubscription()
       applySessionState(nextState)
 
-      await restoreFromCache(pdfDocumentSession.documentIdentity)
+      const restoreTasks = []
+      pdfDocumentSession.forEachCommittedPage?.((pageNumber) => {
+        restoreTasks.push(restoreCachedTranslationsForPage(pageNumber, restoreContext))
+      })
+      await Promise.all(restoreTasks)
 
       pdfHistoryManager.updateAfterOpen(pdfDocumentSession).catch(() => {})
 
@@ -455,74 +421,11 @@ export function usePdfViewerController() {
     }
   }
 
-  async function restoreFromCache(documentIdentity) {
-    if (!documentIdentity) return
-
-    try {
-      const currentTranslationSettingsHash = await buildTranslationSettingsHash()
-      const cache = await pdfDocumentSession.getDocumentCacheSnapshot()
-      let translationCount = 0
-
-      for (const [blockId, entry] of Object.entries(cache.translations)) {
-        const state = pdfDocumentSession.getBlockTranslationState(blockId)
-        if (state.status === 'translated') continue
-
-        const block = pdfDocumentSession.findSourceBlock(blockId)
-        if (!block || block.sourceTextHash !== entry.sourceTextHash) continue
-
-        if (hasTranslationSettingsHash(entry) && entry.translationSettingsHash !== currentTranslationSettingsHash) {
-          continue
-        }
-
-        const normalizedTranslatedCells = normalizeStructuredCells(entry.translatedCells)
-        const translatedText = (typeof entry.translatedText === 'string' && entry.translatedText.trim().length > 0)
-          ? entry.translatedText
-          : deriveTranslatedTextFromStructuredCells(normalizedTranslatedCells || [])
-
-        if (!translatedText) continue
-
-        const nextState = {
-          translatedText,
-          status: 'translated',
-          provider: entry.provider || '',
-          sourceLanguage: entry.sourceLanguage || '',
-          targetLanguage: entry.targetLanguage || '',
-          sourceTextHash: entry.sourceTextHash,
-          translationSettingsHash: hasTranslationSettingsHash(entry)
-            ? entry.translationSettingsHash
-            : '',
-          error: null
-        }
-
-        if (normalizedTranslatedCells) {
-          nextState.translatedCells = normalizedTranslatedCells
-        }
-
-        pdfDocumentSession.setBlockTranslationState(blockId, nextState)
-        translationCount++
-      }
-
-      if (translationCount > 0) {
-        restoredTranslationCount.value = translationCount
-
-        _syncMissingPageSessions()
-
-        const restoredBlockIds = Object.keys(cache.translations)
-        _updateBlockStates(restoredBlockIds)
-
-        translationTick.value += 1
-        logger.info('Restored from cache:', { documentIdentity, translationCount })
-      }
-    } catch (cacheError) {
-      logger.warn('Failed to restore from cache:', cacheError)
-    }
-  }
-
   async function saveTranslationsToCache() {
     const documentIdentity = pdfDocumentSession.documentIdentity
     if (!documentIdentity) return
 
-    const translationSettingsHash = await buildTranslationSettingsHash()
+    const { translationSettingsHash } = await buildTranslationSettings()
 
     const entries = {}
     for (const [blockId, state] of pdfDocumentSession.translationStates) {
@@ -573,6 +476,11 @@ export function usePdfViewerController() {
   }
 
   async function cleanup() {
+    disposed = true
+    unsubscribePageSessionCommitted?.()
+    unsubscribePageSessionCommitted = null
+    translationRestoreContext?.dispose?.()
+    translationRestoreContext = null
     await pdfTranslationCoordinator.cancelActiveTranslation('viewer-cleanup')
     await pdfDocumentSession.destroy()
     resetLoadedDocument()

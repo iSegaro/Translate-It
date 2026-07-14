@@ -284,6 +284,31 @@ describe('PdfDocumentSession', () => {
     expect(listener).toHaveBeenCalledWith({ pageNumber: 1 })
   })
 
+  it('returns committed page source blocks without hydrating unavailable pages', async () => {
+    session.pageMetrics = [
+      { pageNumber: 1, width: 100, height: 200, naturalWidth: 100, naturalHeight: 200, scale: 1 },
+      { pageNumber: 2, width: 100, height: 200, naturalWidth: 100, naturalHeight: 200, scale: 1 }
+    ]
+    session.totalPages = 2
+
+    const pageSession = await session.getPageSession(1)
+    const blocks = session.getPageSourceBlocks(1)
+
+    expect(blocks).toEqual(pageSession.getLogicalBlocks())
+    expect(session.getPageSourceBlocks(2)).toEqual([])
+    expect(pdfDocument.getPage).toHaveBeenCalledTimes(1)
+  })
+
+  it('traverses committed pages in page order', async () => {
+    session.pageSessions.set(3, { getLogicalBlocks: () => [] })
+    session.pageSessions.set(1, { getLogicalBlocks: () => [] })
+    const visitedPages = []
+
+    session.forEachCommittedPage((pageNumber) => visitedPages.push(pageNumber))
+
+    expect(visitedPages).toEqual([1, 3])
+  })
+
   it('unsubscribes PageSession commit listeners', async () => {
     session.pageMetrics = [
       { pageNumber: 1, width: 100, height: 200, naturalWidth: 100, naturalHeight: 200, scale: 1 }

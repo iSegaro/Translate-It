@@ -13,6 +13,7 @@ const getProviderOptimizationLevelAsyncMock = vi.fn()
 const getSourceLanguageAsyncMock = vi.fn()
 const getTargetLanguageAsyncMock = vi.fn()
 const getTranslationApiAsyncMock = vi.fn()
+let pageSessionCommittedListener = null
 
 const session = {
   openFile: openFileMock,
@@ -47,6 +48,19 @@ const session = {
   }),
   getPageLayout: vi.fn().mockReturnValue(null),
   getPageSession: vi.fn(),
+  getPageSourceBlocks: vi.fn((pageNumber) => session.pageSessions.get(pageNumber)?.getLogicalBlocks?.() || []),
+  forEachCommittedPage: vi.fn((callback) => {
+    for (const pageNumber of [...session.pageSessions.keys()].sort((a, b) => a - b)) {
+      callback(pageNumber)
+    }
+  }),
+  onPageSessionCommitted: vi.fn((listener) => {
+    pageSessionCommittedListener = listener
+    return vi.fn(() => {
+      if (pageSessionCommittedListener === listener) pageSessionCommittedListener = null
+    })
+  }),
+  documentGeneration: 1,
   visiblePageNumbers: new Set(),
   getVisibleLogicalBlocks: vi.fn().mockResolvedValue([]),
   getDocumentCacheSnapshot: vi.fn().mockResolvedValue({ translations: {}, ocr: {} }),
@@ -146,6 +160,15 @@ function createDeferred() {
   return { promise, resolve, reject }
 }
 
+async function createSettingsHash({ provider = 'googlev2', sourceLanguage = 'auto', targetLanguage = 'fa', optimizationLevel = 3 } = {}) {
+  return sha256HexFromText(JSON.stringify({
+    provider,
+    sourceLanguage,
+    targetLanguage,
+    optimizationLevel
+  }))
+}
+
 async function loadControllerWithCacheEntry(cacheEntry, block = createBlock()) {
   session.getDocumentCacheSnapshot.mockResolvedValue({
     translations: cacheEntry ? { [block.id]: cacheEntry } : {},
@@ -188,6 +211,7 @@ async function loadControllerWithCacheEntry(cacheEntry, block = createBlock()) {
 
 describe('usePdfViewerController cache persistence', () => {
   beforeEach(() => {
+    pageSessionCommittedListener = null
     openFileMock.mockReset()
     rebuildPageMetricsMock.mockReset()
     cleanupDocumentMock.mockReset().mockResolvedValue()
@@ -204,9 +228,15 @@ describe('usePdfViewerController cache persistence', () => {
     session.pageSessions = new Map()
     session.translationStates = new Map()
     session.documentIdentity = 'doc-1'
+    session.documentGeneration = 1
     session.visiblePageNumbers = new Set()
     session.getPageSession.mockReset()
+    session.getPageSourceBlocks.mockClear()
+    session.forEachCommittedPage.mockClear()
+    session.onPageSessionCommitted.mockClear()
     session.getDocumentCacheSnapshot.mockReset().mockResolvedValue({ translations: {}, ocr: {} })
+    session.setBlockTranslationState.mockClear()
+    session.getBlockTranslationState.mockClear()
     session.setPageOcrBlocks.mockClear()
   })
 
@@ -216,8 +246,9 @@ describe('usePdfViewerController cache persistence', () => {
       blockId: block.id,
       translatedText: 'درآمد ۱۲٫۵ میلیارد',
       sourceTextHash: block.sourceTextHash,
+      translationSettingsHash: await createSettingsHash(),
       provider: 'googlev2',
-      sourceLanguage: 'en',
+      sourceLanguage: 'auto',
       targetLanguage: 'fa'
     }, block)
 
@@ -226,7 +257,7 @@ describe('usePdfViewerController cache persistence', () => {
     expect(restoreCall[1].translatedText).toBe('درآمد ۱۲٫۵ میلیارد')
     expect(restoreCall[1].translatedCells).toBeUndefined()
     expect(restoreCall[1].provider).toBe('googlev2')
-    expect(restoreCall[1].sourceLanguage).toBe('en')
+    expect(restoreCall[1].sourceLanguage).toBe('auto')
     expect(restoreCall[1].targetLanguage).toBe('fa')
     expect(restoreCall[1].sourceTextHash).toBe(block.sourceTextHash)
     expect(controller.restoredTranslationCount.value).toBe(1)
@@ -300,12 +331,7 @@ describe('usePdfViewerController cache persistence', () => {
         }
       ],
       sourceTextHash: block.sourceTextHash,
-      translationSettingsHash: await sha256HexFromText(JSON.stringify({
-        provider: 'googlev2',
-        sourceLanguage: 'auto',
-        targetLanguage: 'fa',
-        optimizationLevel: 3
-      })),
+      translationSettingsHash: await createSettingsHash(),
       provider: 'googlev2',
       sourceLanguage: 'auto',
       targetLanguage: 'fa'
@@ -334,6 +360,7 @@ describe('usePdfViewerController cache persistence', () => {
         }
       ],
       sourceTextHash: block.sourceTextHash,
+      translationSettingsHash: await createSettingsHash(),
       provider: 'googlev2',
       sourceLanguage: 'auto',
       targetLanguage: 'fa'
@@ -374,6 +401,71 @@ describe('usePdfViewerController cache persistence', () => {
     }, block)
 
     expect(session.setBlockTranslationState).not.toHaveBeenCalled()
+  })
+
+  it('restores cached translations for late committed pages through the shared page pipeline', async () => {
+    const openBlock = createBlock({ id: 'open-block', sourceTextHash: 'hash-open' })
+    const lateBlock = createBlock({ id: 'late-block', sourceTextHash: 'hash-late' })
+    const translationSettingsHash = await createSettingsHash()
+
+    session.getDocumentCacheSnapshot.mockResolvedValue({
+      translations: {
+        [openBlock.id]: {
+          blockId: openBlock.id,
+          translatedText: 'باز',
+          sourceTextHash: openBlock.sourceTextHash,
+          translationSettingsHash,
+          provider: 'googlev2',
+          sourceLanguage: 'auto',
+          targetLanguage: 'fa'
+        },
+        [lateBlock.id]: {
+          blockId: lateBlock.id,
+          translatedText: 'دیر',
+          sourceTextHash: lateBlock.sourceTextHash,
+          translationSettingsHash,
+          provider: 'googlev2',
+          sourceLanguage: 'auto',
+          targetLanguage: 'fa'
+        }
+      },
+      ocr: {}
+    })
+    session.pageSessions = new Map([
+      [1, { allBlocks: [openBlock], getLogicalBlocks: () => [openBlock] }]
+    ])
+    openFileMock.mockResolvedValue(createOpenState())
+
+    const controller = usePdfViewerController()
+    await controller.loadPdfFile({ type: 'application/pdf', name: 'doc.pdf' }, 800)
+
+    expect(session.setBlockTranslationState).toHaveBeenCalledWith(openBlock.id, expect.objectContaining({ translatedText: 'باز' }))
+    expect(session.setBlockTranslationState).not.toHaveBeenCalledWith(lateBlock.id, expect.anything())
+
+    session.pageSessions.set(2, { allBlocks: [lateBlock], getLogicalBlocks: () => [lateBlock] })
+    await pageSessionCommittedListener?.({ pageNumber: 2 })
+
+    expect(session.setBlockTranslationState).toHaveBeenCalledWith(lateBlock.id, expect.objectContaining({ translatedText: 'دیر' }))
+    expect(controller.restoredTranslationCount.value).toBe(2)
+    expect(controller.translationTick.value).toBe(2)
+  })
+
+  it('does not finish page restore when duplicate begin returns false', async () => {
+    const block = createBlock()
+    const cache = createDeferred()
+    session.getDocumentCacheSnapshot.mockReturnValue(cache.promise)
+    session.pageSessions = new Map([[1, { allBlocks: [block], getLogicalBlocks: () => [block] }]])
+    openFileMock.mockResolvedValue(createOpenState())
+
+    const controller = usePdfViewerController()
+    const load = controller.loadPdfFile({ type: 'application/pdf', name: 'doc.pdf' }, 800)
+    await Promise.resolve()
+
+    await pageSessionCommittedListener?.({ pageNumber: 1 })
+    cache.resolve({ translations: {}, ocr: {} })
+    await load
+
+    expect(session.getDocumentCacheSnapshot).toHaveBeenCalledTimes(1)
   })
 
   it('saves translatedCells and translationSettingsHash to cache', async () => {
@@ -580,8 +672,11 @@ describe('usePdfViewerController error lifecycle', () => {
     session.pageSessions = new Map()
     session.translationStates = new Map()
     session.documentIdentity = 'doc-1'
+    session.documentGeneration = 1
     session.visiblePageNumbers = new Set()
     session.getPageSession.mockReset()
+    session.setBlockTranslationState.mockClear()
+    session.getBlockTranslationState.mockClear()
   })
 
   it('clears stale error before translation retry', async () => {
