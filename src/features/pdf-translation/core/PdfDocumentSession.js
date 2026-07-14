@@ -10,6 +10,7 @@ import { PdfOutlineRepository } from './PdfOutlineRepository.js'
 import { PdfLinkAnnotationRepository } from './PdfLinkAnnotationRepository.js'
 import { PdfPageContentRepository } from './PdfPageContentRepository.js'
 import { PdfTranslationState } from './PdfTranslationState.js'
+import { pdfCacheManager } from './PdfCacheManager.js'
 import { PDF_PAGE_BACKGROUND } from './pdfRenderingConstants.js'
 
 const logger = getScopedLogger(LOG_COMPONENTS.PDF, 'PdfDocumentSession')
@@ -86,11 +87,15 @@ export class PdfDocumentSession extends ResourceTracker {
     this._linkAnnotationRepository = new PdfLinkAnnotationRepository()
     this._pageSessionCommittedListeners = new Set()
     this._pageContentRepository = new PdfPageContentRepository({
-      onPageSessionCommitted: (pageSession) => this._notifyPageSessionCommitted(pageSession)
+      onPageSessionCommitted: (pageSession) => this._notifyPageSessionCommitted(pageSession),
+      restorePersistedPageData: (pageSession, generation) => this._restorePersistedPageData(pageSession, generation)
     })
     this._translationState = new PdfTranslationState()
     this._naturalPageViewports = new Map()
     this._documentGeneration = 0
+    this._documentCacheGeneration = 0
+    this._documentCachePromise = Promise.resolve({ translations: {}, ocr: {} })
+    this._documentCacheSnapshot = { translations: {}, ocr: {} }
   }
 
   get pageSessions() {
@@ -127,6 +132,96 @@ export class PdfDocumentSession extends ResourceTracker {
   }
 
   _isDocumentGenerationCurrent = (generation) => generation === this._documentGeneration
+
+  _emptyDocumentCache() {
+    return { translations: {}, ocr: {} }
+  }
+
+  _startDocumentCacheLoad(documentIdentity, generation = this._documentGeneration) {
+    const emptyCache = this._emptyDocumentCache()
+    this._documentCacheGeneration = generation
+    this._documentCacheSnapshot = emptyCache
+
+    if (!documentIdentity) {
+      this._documentCachePromise = Promise.resolve(emptyCache)
+      return this._documentCachePromise
+    }
+
+    this._documentCachePromise = pdfCacheManager.loadDocument(documentIdentity)
+      .then((cache) => {
+        if (!this._isDocumentGenerationCurrent(generation)) {
+          return emptyCache
+        }
+
+        const snapshot = {
+          translations: cache?.translations || {},
+          ocr: cache?.ocr || {}
+        }
+        this._documentCacheSnapshot = snapshot
+        return snapshot
+      })
+      .catch((error) => {
+        if (this._isDocumentGenerationCurrent(generation)) {
+          logger.warn('Failed to load PDF document cache:', error)
+        }
+        return emptyCache
+      })
+
+    return this._documentCachePromise
+  }
+
+  async _getDocumentCacheSnapshot(generation) {
+    if (generation !== this._documentCacheGeneration) {
+      return this._emptyDocumentCache()
+    }
+
+    const cache = await this._documentCachePromise
+    if (!this._isDocumentGenerationCurrent(generation)) {
+      return this._emptyDocumentCache()
+    }
+
+    return cache || this._emptyDocumentCache()
+  }
+
+  async getDocumentCacheSnapshot() {
+    return this._getDocumentCacheSnapshot(this._documentGeneration)
+  }
+
+  _isCachedOcrEntryValid(entry) {
+    return !!entry &&
+      typeof entry === 'object' &&
+      Array.isArray(entry.ocrBlocks) &&
+      typeof entry.ocrLanguage === 'string' &&
+      entry.ocrLanguage.length > 0
+  }
+
+  async _restorePersistedPageData(pageSession, generation) {
+    if (!pageSession || !this._isDocumentGenerationCurrent(generation)) return
+
+    try {
+      const cache = await this._getDocumentCacheSnapshot(generation)
+      if (!this._isDocumentGenerationCurrent(generation)) return
+
+      const ocrEntry = cache.ocr?.[pageSession.pageNumber]
+      if (!ocrEntry) return
+
+      if (!this._isCachedOcrEntryValid(ocrEntry)) {
+        logger.warn('Skipped invalid cached OCR entry:', { pageNumber: pageSession.pageNumber })
+        return
+      }
+
+      if (pageSession.hasOcrForLanguage(ocrEntry.ocrLanguage)) return
+
+      pageSession.setOcrBlocks(ocrEntry.ocrBlocks, ocrEntry.ocrLanguage)
+      if (Number.isFinite(Number(ocrEntry.ocrCompletedAt))) {
+        pageSession.ocrCompletedAt = Number(ocrEntry.ocrCompletedAt)
+      }
+    } catch (error) {
+      if (this._isDocumentGenerationCurrent(generation)) {
+        logger.warn('Failed to restore persisted page data:', { pageNumber: pageSession.pageNumber, error })
+      }
+    }
+  }
 
   onPageSessionCommitted(listener) {
     if (typeof listener !== 'function') {
@@ -171,6 +266,7 @@ export class PdfDocumentSession extends ResourceTracker {
     this.pdfFingerprint = document.fingerprint || ''
     this.displayName = this.fileName
     this.documentIdentity = await this._resolveDocumentIdentity(file, document)
+    this._startDocumentCacheLoad(this.documentIdentity, this._documentGeneration)
     this._pageContentRepository.reset()
     this.resetTranslationStates()
     this._resolver.clearCaches()
@@ -597,6 +693,9 @@ export class PdfDocumentSession extends ResourceTracker {
     this.pdfFingerprint = ''
     this.documentIdentity = ''
     this.displayName = ''
+    this._documentCacheGeneration = this._documentGeneration
+    this._documentCacheSnapshot = this._emptyDocumentCache()
+    this._documentCachePromise = Promise.resolve(this._documentCacheSnapshot)
 
     try {
       await this.loadingTask?.destroy?.()

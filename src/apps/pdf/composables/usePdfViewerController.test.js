@@ -49,6 +49,7 @@ const session = {
   getPageSession: vi.fn(),
   visiblePageNumbers: new Set(),
   getVisibleLogicalBlocks: vi.fn().mockResolvedValue([]),
+  getDocumentCacheSnapshot: vi.fn().mockResolvedValue({ translations: {}, ocr: {} }),
   findSourceBlock: vi.fn((blockId) => {
     for (const [, pageSession] of session.pageSessions) {
       for (const block of pageSession.allBlocks) {
@@ -146,7 +147,7 @@ function createDeferred() {
 }
 
 async function loadControllerWithCacheEntry(cacheEntry, block = createBlock()) {
-  pdfCacheManager.loadDocument.mockResolvedValue({
+  session.getDocumentCacheSnapshot.mockResolvedValue({
     translations: cacheEntry ? { [block.id]: cacheEntry } : {},
     ocr: {}
   })
@@ -205,6 +206,8 @@ describe('usePdfViewerController cache persistence', () => {
     session.documentIdentity = 'doc-1'
     session.visiblePageNumbers = new Set()
     session.getPageSession.mockReset()
+    session.getDocumentCacheSnapshot.mockReset().mockResolvedValue({ translations: {}, ocr: {} })
+    session.setPageOcrBlocks.mockClear()
   })
 
   it('restores plain translatedText cache entries', async () => {
@@ -227,6 +230,33 @@ describe('usePdfViewerController cache persistence', () => {
     expect(restoreCall[1].targetLanguage).toBe('fa')
     expect(restoreCall[1].sourceTextHash).toBe(block.sourceTextHash)
     expect(controller.restoredTranslationCount.value).toBe(1)
+  })
+
+  it('does not restore OCR from the controller cache path', async () => {
+    session.getDocumentCacheSnapshot.mockResolvedValue({
+      translations: {},
+      ocr: {
+        1: {
+          pageNumber: 1,
+          ocrLanguage: 'eng',
+          ocrBlocks: [{ id: 'ocr-1', text: 'cached', pageNumber: 1 }]
+        }
+      }
+    })
+    session.pageSessions = new Map([
+      [1, {
+        allBlocks: [],
+        getLogicalBlocks: () => [],
+        hasOcrForLanguage: vi.fn(() => false)
+      }]
+    ])
+    openFileMock.mockResolvedValue(createOpenState())
+
+    const controller = usePdfViewerController()
+    await controller.loadPdfFile({ type: 'application/pdf', name: 'doc.pdf' }, 800)
+
+    expect(session.setPageOcrBlocks).not.toHaveBeenCalled()
+    expect(controller.restoredOcrPageCount.value).toBe(0)
   })
 
   it('restores structured translatedCells cache entries', async () => {
@@ -420,7 +450,7 @@ describe('usePdfViewerController cache persistence', () => {
   it('forwards the layout object to openFile and recomputeLayout', async () => {
     openFileMock.mockResolvedValue(createOpenState())
     rebuildPageMetricsMock.mockResolvedValue(createOpenState())
-    pdfCacheManager.loadDocument.mockResolvedValue({
+    session.getDocumentCacheSnapshot.mockResolvedValue({
       translations: {},
       ocr: {}
     })
@@ -511,7 +541,7 @@ describe('usePdfViewerController cache persistence', () => {
 
   it('rehydrates visible pages with empty app-level blocks', async () => {
     const block = createBlock()
-    pdfCacheManager.loadDocument.mockResolvedValue({ translations: {}, ocr: {} })
+    session.getDocumentCacheSnapshot.mockResolvedValue({ translations: {}, ocr: {} })
     openFileMock.mockResolvedValue(createOpenState())
     session.pageSessions = new Map()
     session.getPageSession.mockResolvedValue({

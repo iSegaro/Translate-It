@@ -5,12 +5,15 @@ import { PdfPageSession } from './PdfPageSession.js'
 const logger = getScopedLogger(LOG_COMPONENTS.PDF, 'PdfPageContentRepository')
 
 export class PdfPageContentRepository {
-  constructor({ onPageSessionCommitted = null } = {}) {
+  constructor({ onPageSessionCommitted = null, restorePersistedPageData = null } = {}) {
     this.pageSessions = new Map()
     this._pendingHydrations = null
     this._blockIndex = new Map()
     this._onPageSessionCommitted = typeof onPageSessionCommitted === 'function'
       ? onPageSessionCommitted
+      : null
+    this._restorePersistedPageData = typeof restorePersistedPageData === 'function'
+      ? restorePersistedPageData
       : null
   }
 
@@ -111,6 +114,9 @@ export class PdfPageContentRepository {
       pageNumber
     })
     await pageSession.hydrate(page, metric)
+    if (!this._isHydrationCurrent(lifecycle)) return null
+
+    await this._restorePersistedPageData?.(pageSession, documentGeneration)
     if (!this._isHydrationCurrent(lifecycle)) return null
 
     this.pageSessions.set(pageNumber, pageSession)

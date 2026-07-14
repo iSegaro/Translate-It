@@ -460,9 +460,8 @@ export function usePdfViewerController() {
 
     try {
       const currentTranslationSettingsHash = await buildTranslationSettingsHash()
-      const cache = await pdfCacheManager.loadDocument(documentIdentity)
+      const cache = await pdfDocumentSession.getDocumentCacheSnapshot()
       let translationCount = 0
-      let ocrPageCount = 0
 
       for (const [blockId, entry] of Object.entries(cache.translations)) {
         const state = pdfDocumentSession.getBlockTranslationState(blockId)
@@ -503,17 +502,8 @@ export function usePdfViewerController() {
         translationCount++
       }
 
-      for (const [pageNumber, ocrEntry] of Object.entries(cache.ocr)) {
-        const pageSession = pdfDocumentSession.pageSessions.get(Number(pageNumber))
-        if (pageSession && !pageSession.hasOcrForLanguage(ocrEntry.ocrLanguage)) {
-          pdfDocumentSession.setPageOcrBlocks(Number(pageNumber), ocrEntry.ocrBlocks || [], ocrEntry.ocrLanguage)
-          ocrPageCount++
-        }
-      }
-
-      if (translationCount > 0 || ocrPageCount > 0) {
+      if (translationCount > 0) {
         restoredTranslationCount.value = translationCount
-        restoredOcrPageCount.value = ocrPageCount
 
         _syncMissingPageSessions()
 
@@ -521,7 +511,7 @@ export function usePdfViewerController() {
         _updateBlockStates(restoredBlockIds)
 
         translationTick.value += 1
-        logger.info('Restored from cache:', { documentIdentity, translationCount, ocrPageCount })
+        logger.info('Restored from cache:', { documentIdentity, translationCount })
       }
     } catch (cacheError) {
       logger.warn('Failed to restore from cache:', cacheError)
