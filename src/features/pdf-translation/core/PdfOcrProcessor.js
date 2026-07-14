@@ -53,7 +53,7 @@ export class PdfOcrProcessor {
 
       if (this._cancelled) return []
 
-      const blocks = this._createBlocksFromResult(result, {
+      const blocks = await this._createBlocksFromResult(result, {
         pageNumber,
         language: tesseractLang,
         pageWidth: viewport.width,
@@ -123,7 +123,7 @@ export class PdfOcrProcessor {
    * Uses structured line data when available (each line gets its own bounding box).
    * Falls back to splitting plain text by newlines with synthetic bounding boxes.
    */
-  _createBlocksFromResult(result, { pageNumber, language, pageWidth, pageHeight }) {
+  async _createBlocksFromResult(result, { pageNumber, language, pageWidth, pageHeight }) {
     if (result.lines.length > 0) {
       return this._createBlocksFromLines(result.lines, {
         pageNumber,
@@ -141,7 +141,7 @@ export class PdfOcrProcessor {
     })
   }
 
-  _createBlocksFromLines(tesseractLines, { pageNumber, language, pageWidth, pageHeight }) {
+  async _createBlocksFromLines(tesseractLines, { pageNumber, language, pageWidth, pageHeight }) {
     const blocks = []
     const scaleX = pageWidth / Math.max(...tesseractLines.map((l) => l.bbox?.x1 || pageWidth), 1)
     const scaleY = pageHeight / Math.max(...tesseractLines.map((l) => l.bbox?.y1 || pageHeight), 1)
@@ -152,7 +152,7 @@ export class PdfOcrProcessor {
       if (!lineText) continue
 
       const bbox = line.bbox || {}
-      const block = createPdfLogicalBlock({
+      const block = await createPdfLogicalBlock({
         documentIdentity: this.session.documentIdentity,
         pageNumber,
         role: 'paragraph',
@@ -185,7 +185,7 @@ export class PdfOcrProcessor {
    * Produces synthetic bounding boxes distributed evenly across the page.
    * Used only when Tesseract structured line data is unavailable.
    */
-  _createBlocksFromPlainText(text, { pageNumber, language, pageWidth, pageHeight }) {
+  async _createBlocksFromPlainText(text, { pageNumber, language, pageWidth, pageHeight }) {
     if (!text || !text.trim()) return []
 
     const lines = text.split('\n').filter((line) => line.trim().length > 0)
@@ -195,7 +195,7 @@ export class PdfOcrProcessor {
       const lineText = lines[i].trim()
       if (!lineText) continue
 
-      const block = createPdfLogicalBlock({
+      const block = await createPdfLogicalBlock({
         documentIdentity: this.session.documentIdentity,
         pageNumber,
         role: 'paragraph',
