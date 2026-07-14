@@ -5,10 +5,10 @@
   >
     <div class="pdf-ocr-consent__content">
       <p class="pdf-ocr-consent__message">
-        {{ pageCount }} scanned page(s) detected. OCR can extract text from these pages.
+        {{ pageCount }} scanned {{ pageCount === 1 ? 'page is' : 'pages are' }} currently visible.
       </p>
       <p class="pdf-ocr-consent__detail">
-        OCR runs locally in your browser. No images are sent externally.
+        OCR can extract selectable text from these pages. Run OCR?
       </p>
       <div class="pdf-ocr-consent__actions">
         <button

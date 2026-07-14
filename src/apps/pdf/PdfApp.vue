@@ -68,7 +68,7 @@
       <main class="pdf-app__content">
         <PdfOcrConsentPrompt
           :visible="isOcrPromptVisible"
-          :page-count="scannedPageCount"
+          :page-count="ocrBatch.pageNumbers.length"
           @confirm="confirmOcr"
           @cancel="dismissOcrPrompt"
         />
@@ -259,6 +259,7 @@ const pdfStatusBannerController = createPdfStatusBannerController()
 
 const {
   scannedPageCount,
+  ocrBatch,
   isOcrPromptVisible,
   isOcrProcessing,
   ocrProgress,

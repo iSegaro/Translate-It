@@ -1,4 +1,4 @@
-import { onBeforeUnmount, ref } from 'vue'
+import { onBeforeUnmount, reactive, ref } from 'vue'
 import { getScopedLogger } from '@/shared/logging/logger.js'
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js'
 import { getSourceLanguageAsync } from '@/shared/config/config.js'
@@ -15,6 +15,7 @@ export function usePdfOcr({ onOcrComplete } = {}) {
 
   const scannedPageCount = ref(0)
   const scannedPageNumbers = ref([])
+  const ocrBatch = reactive({ pageNumbers: [] })
   const isOcrPromptVisible = ref(false)
   const isOcrProcessing = ref(false)
   const ocrProgress = ref({ current: 0, total: 0, pageNumber: 0 })
@@ -33,6 +34,7 @@ export function usePdfOcr({ onOcrComplete } = {}) {
     if (scannedPageCount.value === 0) return
 
     ocrError.value = ''
+    ocrBatch.pageNumbers = [...scannedPageNumbers.value]
     isOcrPromptVisible.value = true
   }
 
@@ -47,7 +49,7 @@ export function usePdfOcr({ onOcrComplete } = {}) {
       const sourceLang = await getSourceLanguageAsync()
       ocrLanguage.value = sourceLang || 'eng'
 
-      const pageNumbers = [...scannedPageNumbers.value]
+      const pageNumbers = [...ocrBatch.pageNumbers]
 
       await processor.processPages(pageNumbers, {
         language: ocrLanguage.value,
@@ -116,6 +118,7 @@ export function usePdfOcr({ onOcrComplete } = {}) {
   return {
     scannedPageCount,
     scannedPageNumbers,
+    ocrBatch,
     isOcrPromptVisible,
     isOcrProcessing,
     ocrProgress,

@@ -153,7 +153,7 @@
         type="button"
         @click="$emit('request-ocr')"
       >
-        OCR Pages ({{ scannedPageCount }})
+        OCR Pages
       </button>
 
       <span

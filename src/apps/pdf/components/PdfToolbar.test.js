@@ -235,6 +235,36 @@ describe('PdfToolbar', () => {
     expect(wrapper.emitted('zoom-step')?.at(-1)?.[0]).toBe(1)
   })
 
+  it('shows OCR button without count when scanned pages exist', async () => {
+    const wrapper = mount(PdfToolbar, {
+      props: {
+        scannedPageCount: 3,
+        isOcrProcessing: false
+      }
+    })
+
+    const ocrButton = wrapper.find('.pdf-toolbar__button--ocr')
+    expect(ocrButton.exists()).toBe(true)
+    expect(ocrButton.text()).toBe('OCR Pages')
+
+    await ocrButton.trigger('click')
+    expect(wrapper.emitted('request-ocr')).toHaveLength(1)
+  })
+
+  it('hides OCR button while processing or without scanned pages', async () => {
+    const wrapper = mount(PdfToolbar, {
+      props: {
+        scannedPageCount: 0,
+        isOcrProcessing: false
+      }
+    })
+
+    expect(wrapper.find('.pdf-toolbar__button--ocr').exists()).toBe(false)
+
+    await wrapper.setProps({ scannedPageCount: 2, isOcrProcessing: true })
+    expect(wrapper.find('.pdf-toolbar__button--ocr').exists()).toBe(false)
+  })
+
   it('keeps the main provider selector action cancellable while translating', async () => {
     const wrapper = mount(PdfToolbar, {
       props: {

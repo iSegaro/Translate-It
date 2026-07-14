@@ -128,6 +128,40 @@ describe('usePdfOcr', () => {
     wrapper.unmount()
   })
 
+  it('captures prompt batch when OCR is requested', () => {
+    const { api, wrapper } = mountComposable()
+    mockPdfDocumentSession.pageSessions.set(1, createScannedPageSession(1))
+    mockPdfDocumentSession.pageSessions.set(2, createScannedPageSession(2))
+    mockPdfDocumentSession.visiblePageNumbers = new Set([1, 2])
+    api.refreshOcrCandidates()
+
+    api.requestOcr()
+    expect(api.ocrBatch.pageNumbers).toEqual([1, 2])
+    expect(api.ocrBatch.pageNumbers.length).toBe(2)
+
+    mockPdfDocumentSession.visiblePageNumbers = new Set([2])
+    visibleListener?.({ pages: [2] })
+    expect(api.scannedPageCount.value).toBe(1)
+    expect(api.ocrBatch.pageNumbers.length).toBe(2)
+    wrapper.unmount()
+  })
+
+  it('processes the OCR batch captured when the prompt opened', async () => {
+    const { api, wrapper } = mountComposable()
+    mockPdfDocumentSession.pageSessions.set(1, createScannedPageSession(1))
+    mockPdfDocumentSession.pageSessions.set(2, createScannedPageSession(2))
+    mockPdfDocumentSession.visiblePageNumbers = new Set([1, 2])
+    api.refreshOcrCandidates()
+    api.requestOcr()
+
+    mockPdfDocumentSession.visiblePageNumbers = new Set([2])
+    visibleListener?.({ pages: [2] })
+    await api.confirmOcr()
+
+    expect(mockProcessPages).toHaveBeenCalledWith([1, 2], expect.any(Object))
+    wrapper.unmount()
+  })
+
   it('updates candidates while scrolling down and up across hydrated pages', () => {
     const { api, wrapper } = mountComposable()
     mockPdfDocumentSession.pageSessions.set(1, createScannedPageSession(1, { logicalBlocks: [{ id: 'text-1' }] }))

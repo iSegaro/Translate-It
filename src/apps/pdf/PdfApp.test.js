@@ -268,6 +268,7 @@ function createMocks({
 
   mockPdfOcr = {
     scannedPageCount: ref(0),
+    ocrBatch: { pageNumbers: [] },
     isOcrPromptVisible: ref(false),
     isOcrProcessing: ref(false),
     ocrProgress: ref(0),
