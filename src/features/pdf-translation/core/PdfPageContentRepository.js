@@ -5,10 +5,13 @@ import { PdfPageSession } from './PdfPageSession.js'
 const logger = getScopedLogger(LOG_COMPONENTS.PDF, 'PdfPageContentRepository')
 
 export class PdfPageContentRepository {
-  constructor() {
+  constructor({ onPageSessionCommitted = null } = {}) {
     this.pageSessions = new Map()
     this._pendingHydrations = null
     this._blockIndex = new Map()
+    this._onPageSessionCommitted = typeof onPageSessionCommitted === 'function'
+      ? onPageSessionCommitted
+      : null
   }
 
   get blockIndex() {
@@ -112,6 +115,7 @@ export class PdfPageContentRepository {
 
     this.pageSessions.set(pageNumber, pageSession)
     this._indexPageSession(pageSession)
+    this._onPageSessionCommitted?.(pageSession)
     return pageSession
   }
 

@@ -236,6 +236,67 @@ describe('PdfDocumentSession', () => {
     expect(pdfDocument.getPage).toHaveBeenCalledWith(1)
   })
 
+  it('notifies consumers after PageSession commits', async () => {
+    session.pageMetrics = [
+      { pageNumber: 1, width: 100, height: 200, naturalWidth: 100, naturalHeight: 200, scale: 1 }
+    ]
+    session.totalPages = 1
+    session.documentIdentity = 'fingerprint-1'
+    const listener = vi.fn()
+
+    session.onPageSessionCommitted(listener)
+    await session.getPageSession(1)
+
+    expect(listener).toHaveBeenCalledTimes(1)
+    expect(listener).toHaveBeenCalledWith({ pageNumber: 1 })
+  })
+
+  it('unsubscribes PageSession commit listeners', async () => {
+    session.pageMetrics = [
+      { pageNumber: 1, width: 100, height: 200, naturalWidth: 100, naturalHeight: 200, scale: 1 }
+    ]
+    session.totalPages = 1
+    const listener = vi.fn()
+    const unsubscribe = session.onPageSessionCommitted(listener)
+
+    unsubscribe()
+    await session.getPageSession(1)
+
+    expect(listener).not.toHaveBeenCalled()
+  })
+
+  it('does not emit duplicate notifications for deduped hydration', async () => {
+    let resolveTextContent
+    session.pageMetrics = [
+      { pageNumber: 1, width: 100, height: 200, naturalWidth: 100, naturalHeight: 200, scale: 1 }
+    ]
+    session.totalPages = 1
+    session.pdfDocument = {
+      numPages: 1,
+      getPage: vi.fn(async () => ({
+        pageNumber: 1,
+        cleanup: vi.fn(),
+        getTextContent: vi.fn(() => new Promise((resolve) => {
+          resolveTextContent = () => resolve({
+            items: [{ str: 'Delayed text', transform: [1, 0, 0, 14, 40, 650], width: 100, height: 14, dir: 'ltr' }],
+            styles: null
+          })
+        })),
+        getViewport: ({ scale }) => ({ width: 100 * scale, height: 200 * scale })
+      }))
+    }
+    const listener = vi.fn()
+    session.onPageSessionCommitted(listener)
+
+    const first = session.getPageSession(1)
+    const second = session.getPageSession(1)
+    await Promise.resolve()
+    resolveTextContent()
+    await Promise.all([first, second])
+
+    expect(listener).toHaveBeenCalledTimes(1)
+  })
+
   it('no-ops when visible page set is unchanged', async () => {
     session.pageMetrics = [
       { pageNumber: 1, width: 100, height: 200, naturalWidth: 100, naturalHeight: 200, scale: 1 },
@@ -283,6 +344,8 @@ describe('PdfDocumentSession', () => {
       { pageNumber: 1, width: 100, height: 200, naturalWidth: 100, naturalHeight: 200, scale: 1 }
     ]
     session.documentIdentity = 'doc-a'
+    const listener = vi.fn()
+    session.onPageSessionCommitted(listener)
     session.pdfDocument = {
       numPages: 1,
       getPage: vi.fn(async () => ({
@@ -309,6 +372,7 @@ describe('PdfDocumentSession', () => {
     await Promise.resolve()
 
     expect(session.pageSessions.size).toBe(0)
+    expect(listener).not.toHaveBeenCalled()
   })
 
   it('discards stale background hydration after the same document is reopened', async () => {
@@ -317,6 +381,8 @@ describe('PdfDocumentSession', () => {
       { pageNumber: 1, width: 100, height: 200, naturalWidth: 100, naturalHeight: 200, scale: 1 }
     ]
     session.documentIdentity = 'same-doc'
+    const listener = vi.fn()
+    session.onPageSessionCommitted(listener)
     session.pdfDocument = {
       numPages: 1,
       getPage: vi.fn(async () => ({
@@ -343,6 +409,25 @@ describe('PdfDocumentSession', () => {
     await Promise.resolve()
 
     expect(session.pageSessions.size).toBe(0)
+    expect(listener).not.toHaveBeenCalled()
+  })
+
+  it('does not notify consumers when hydration fails', async () => {
+    session.pageMetrics = [
+      { pageNumber: 1, width: 100, height: 200, naturalWidth: 100, naturalHeight: 200, scale: 1 }
+    ]
+    session.pdfDocument = {
+      numPages: 1,
+      getPage: vi.fn(async () => {
+        throw new Error('getPage failed')
+      })
+    }
+    const listener = vi.fn()
+    session.onPageSessionCommitted(listener)
+
+    await expect(session.getPageSession(1)).rejects.toThrow('getPage failed')
+
+    expect(listener).not.toHaveBeenCalled()
   })
 
   describe('batched metrics building', () => {

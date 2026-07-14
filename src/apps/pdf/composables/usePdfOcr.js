@@ -99,7 +99,12 @@ export function usePdfOcr({ onOcrComplete } = {}) {
     }
   }
 
+  const unsubscribePageSessionCommitted = pdfDocumentSession.onPageSessionCommitted?.(() => {
+    refreshOcrCandidates()
+  })
+
   onBeforeUnmount(() => {
+    unsubscribePageSessionCommitted?.()
     processor.cancel()
   })
 

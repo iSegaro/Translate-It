@@ -84,7 +84,10 @@ export class PdfDocumentSession extends ResourceTracker {
     this._resolver = new PdfDestinationResolver()
     this._outlineRepository = new PdfOutlineRepository()
     this._linkAnnotationRepository = new PdfLinkAnnotationRepository()
-    this._pageContentRepository = new PdfPageContentRepository()
+    this._pageSessionCommittedListeners = new Set()
+    this._pageContentRepository = new PdfPageContentRepository({
+      onPageSessionCommitted: (pageSession) => this._notifyPageSessionCommitted(pageSession)
+    })
     this._translationState = new PdfTranslationState()
     this._naturalPageViewports = new Map()
     this._documentGeneration = 0
@@ -124,6 +127,33 @@ export class PdfDocumentSession extends ResourceTracker {
   }
 
   _isDocumentGenerationCurrent = (generation) => generation === this._documentGeneration
+
+  onPageSessionCommitted(listener) {
+    if (typeof listener !== 'function') {
+      return () => {}
+    }
+
+    this._pageSessionCommittedListeners.add(listener)
+    return () => {
+      this._pageSessionCommittedListeners.delete(listener)
+    }
+  }
+
+  _notifyPageSessionCommitted(pageSession) {
+    if (!pageSession) return
+
+    const event = {
+      pageNumber: pageSession.pageNumber
+    }
+
+    for (const listener of this._pageSessionCommittedListeners) {
+      try {
+        listener(event)
+      } catch (error) {
+        logger.warn('Page session commit listener failed:', { pageNumber: event.pageNumber, error })
+      }
+    }
+  }
 
   async openFile(file, layoutRequest) {
     if (!file) throw new Error('No PDF file provided')
@@ -594,6 +624,7 @@ export class PdfDocumentSession extends ResourceTracker {
 
   async destroy() {
     await this.cleanupDocument()
+    this._pageSessionCommittedListeners.clear()
     this._bitmapCache.clear()
     this._renderer.destroy()
     super.destroy()
