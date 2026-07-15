@@ -79,7 +79,7 @@ function createRuntimeScoringResult() {
         documentId: 'doc-01',
         regionId: 'region-01',
         status: 'recognized',
-        metrics: { cer: 0.5 },
+        metrics: { cer: 0.5, wer: 0.25, deletionRate: 0, rtlOrderCorrect: null },
         normalization: { predicted: 'a', expected: 'b' },
         diagnostics: {},
         metadata: { future: { retained: true } }
@@ -323,6 +323,39 @@ describe('Region OCR scored artifact writer input contract', () => {
     expect(validateScoredArtifactWriterInput(input).errors).toContainEqual(expect.objectContaining({
       code: 'sample_status_mismatch',
       path: '$.runtimeScoringResult.sampleScores[1].status'
+    }))
+  })
+
+  it('accepts recognized runtime metrics matching SCORED_RESULT requirements', () => {
+    const input = createInput()
+
+    expect(validateScoredArtifactWriterInput(input)).toMatchObject({ valid: true, errors: [] })
+  })
+
+  it.each(['cer', 'wer', 'deletionRate', 'rtlOrderCorrect'])('rejects recognized runtime metrics missing %s', (metricId) => {
+    const input = createInput()
+    delete input.runtimeScoringResult.sampleScores[0].metrics[metricId]
+
+    expect(validateScoredArtifactWriterInput(input).errors).toContainEqual(expect.objectContaining({
+      code: 'incompatible_scored_metrics',
+      path: '$.runtimeScoringResult.sampleScores[0].metrics'
+    }))
+  })
+
+  it.each([
+    ['failed', RegionExecutionStatus.FAILED],
+    ['cancelled', RegionExecutionStatus.CANCELLED],
+    ['skipped', RegionExecutionStatus.SKIPPED]
+  ])('rejects %s runtime metrics when populated', (_, status) => {
+    const input = createInput()
+    input.rawSamples[1].status = status
+    if (status === RegionExecutionStatus.FAILED) input.rawSamples[1].error = { name: 'Error', message: 'failed' }
+    input.runtimeScoringResult.sampleScores[1].status = status
+    input.runtimeScoringResult.sampleScores[1].metrics = { cer: 0 }
+
+    expect(validateScoredArtifactWriterInput(input).errors).toContainEqual(expect.objectContaining({
+      code: 'incompatible_scored_metrics',
+      path: '$.runtimeScoringResult.sampleScores[1].metrics'
     }))
   })
 

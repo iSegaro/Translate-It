@@ -1,10 +1,12 @@
 import {
   IDENTIFIER_PATTERN,
+  SCORE_METRICS_SCHEMA,
   SHA256_PATTERN,
   TIMESTAMP_PATTERN,
   VERSION_PATTERN,
   validateBenchmarkArtifact
 } from '../schemas/index.js'
+import { validateSchemaValue } from '../schemas/schemaValidator.js'
 
 function error(code, path, message, details) {
   return details === undefined
@@ -121,6 +123,27 @@ function artifactReferencesMatch(left, right) {
     left?.contentHash === right?.contentHash
 }
 
+function validateRuntimeScoreMetrics(sampleScore, path, errors) {
+  const metrics = sampleScore?.metrics
+  if (!metrics || typeof metrics !== 'object' || Array.isArray(metrics)) {
+    errors.push(error('incompatible_scored_metrics', path, 'Runtime metrics must be persistable as SCORED_RESULT metrics'))
+    return
+  }
+
+  if (sampleScore.status !== 'recognized') {
+    if (Object.keys(metrics).length > 0) {
+      errors.push(error('incompatible_scored_metrics', path, 'Non-recognized samples must have empty metrics'))
+    }
+    return
+  }
+
+  const metricErrors = []
+  validateSchemaValue(metrics, SCORE_METRICS_SCHEMA, path, metricErrors)
+  if (metricErrors.length > 0) {
+    errors.push(error('incompatible_scored_metrics', path, 'Recognized sample metrics must match SCORED_RESULT metric requirements'))
+  }
+}
+
 function validateRawRun(rawRun, errors) {
   if (!rawRun || typeof rawRun !== 'object' || Array.isArray(rawRun)) {
     errors.push(error('invalid_artifact', '$.rawRun', 'Artifact must be an object'))
@@ -213,6 +236,8 @@ function validateRawSamples(rawSamples, rawRun, rawRunValid, runtimeScoringResul
   })
 
   runtimeScoringResult.sampleScores.forEach((sampleScore, index) => {
+    validateRuntimeScoreMetrics(sampleScore, `$.runtimeScoringResult.sampleScores[${index}].metrics`, errors)
+
     const rawSample = byIdentity.get(executionIdentity(sampleScore))
     if (!rawSample) {
       errors.push(error('runtime_artifact_identity_mismatch', `$.runtimeScoringResult.sampleScores[${index}]`, 'Runtime scoring result must match RAW sample identity', {
