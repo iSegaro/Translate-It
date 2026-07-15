@@ -66,6 +66,7 @@ function createInput() {
     raster: { width: 100, height: 50, pixelCount: 5000, rgbaBytes: 20000 },
     memory: { peakDeltaBytes: null, measurementMethod: null }
   }))
+  sampleDescriptors[0].recognition = { rawOutput: { text: 'raw' } }
 
   return { corpus, runResult, runDescriptor, sampleDescriptors }
 }
@@ -200,6 +201,32 @@ describe('Region OCR raw artifact writer input contract', () => {
       expect.objectContaining({ code: 'invalid_run_mode', path: '$.sampleDescriptors[0].runMode' }),
       expect.objectContaining({ code: 'missing_required_field', path: '$.sampleDescriptors[0].renderPlan' })
     ]))
+  })
+
+  it('validates descriptor-owned artifact payload by execution status', () => {
+    const missingRecognition = createInput()
+    delete missingRecognition.sampleDescriptors[0].recognition
+    expect(validateRawArtifactWriterInput(missingRecognition).errors).toContainEqual(expect.objectContaining({
+      code: 'missing_recognition',
+      path: '$.sampleDescriptors[0].recognition'
+    }))
+
+    const failed = createInput()
+    failed.runResult.regionResults[0] = executionResult('doc-01', 'region-01', RegionExecutionStatus.FAILED)
+    failed.sampleDescriptors[0].executionResult = failed.runResult.regionResults[0]
+    delete failed.sampleDescriptors[0].recognition
+    expect(validateRawArtifactWriterInput(failed).errors).toContainEqual(expect.objectContaining({
+      code: 'missing_failure',
+      path: '$.sampleDescriptors[0].error'
+    }))
+
+    const cancelled = createInput()
+    cancelled.runResult.regionResults[0] = executionResult('doc-01', 'region-01', RegionExecutionStatus.CANCELLED)
+    cancelled.sampleDescriptors[0].executionResult = cancelled.runResult.regionResults[0]
+    expect(validateRawArtifactWriterInput(cancelled).errors).toContainEqual(expect.objectContaining({
+      code: 'incompatible_status_data',
+      path: '$.sampleDescriptors[0].recognition'
+    }))
   })
 
   it('preserves unknown fields and deeply freezes finalized descriptors', () => {

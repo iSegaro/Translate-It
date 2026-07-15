@@ -244,6 +244,23 @@ function validateSampleDescriptor(descriptor, index, expectedResult, errors) {
   }
 }
 
+function validateArtifactStatusPayload(descriptor, index, errors) {
+  const path = `$.sampleDescriptors[${index}]`
+  const status = descriptor?.executionResult?.status
+  if (status === RegionExecutionStatus.RECOGNIZED && !descriptor.recognition) {
+    errors.push(error('missing_recognition', `${path}.recognition`, 'Recognized samples require descriptor-owned recognition output'))
+  }
+  if (status === RegionExecutionStatus.FAILED && !descriptor.error) {
+    errors.push(error('missing_failure', `${path}.error`, 'Failed samples require descriptor-owned failure information'))
+  }
+  if (status !== RegionExecutionStatus.RECOGNIZED && descriptor?.recognition) {
+    errors.push(error('incompatible_status_data', `${path}.recognition`, 'Only recognized samples may include recognition output'))
+  }
+  if (status !== RegionExecutionStatus.FAILED && descriptor?.error) {
+    errors.push(error('incompatible_status_data', `${path}.error`, 'Only failed samples may include failure information'))
+  }
+}
+
 function validateDescriptorIdentity(descriptor, index, runResultByIdentity, errors) {
   const path = `$.sampleDescriptors[${index}].executionResult`
   if (!descriptor?.executionResult) return
@@ -377,6 +394,7 @@ export function validateRawArtifactWriterInput(input) {
 
   sampleDescriptors.forEach((descriptor, index) => {
     validateSampleDescriptor(descriptor, index, null, errors)
+    validateArtifactStatusPayload(descriptor, index, errors)
     validateDescriptorIdentity(descriptor, index, runResultByIdentity, errors)
   })
   validateDescriptorOrdering(sampleDescriptors, regionResults, errors)
