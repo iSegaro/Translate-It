@@ -44,7 +44,9 @@ import { usePdfScrollObservation } from '../composables/usePdfScrollObservation.
 import { usePdfLayoutMonitor } from '../composables/usePdfLayoutMonitor.js'
 import { usePdfCurrentPage } from '../composables/usePdfCurrentPage.js'
 import { usePdfRegionSelectionController } from '../composables/usePdfRegionSelectionController.js'
+import { usePdfRegionOcr } from '../composables/usePdfRegionOcr.js'
 import { VIEWER_ROLE } from '../composables/usePdfViewerMode.js'
+import { mapPageLocalCssRectToPdfRegion } from '@/features/pdf-translation/core/PdfRegionMapper.js'
 import './PdfViewer.scss'
 
 const props = defineProps({
@@ -88,6 +90,14 @@ const props = defineProps({
   regionSelectionActive: {
     type: Boolean,
     default: false
+  },
+  regionOcrScale: {
+    type: Number,
+    default: null
+  },
+  regionOcrLanguage: {
+    type: String,
+    default: ''
   }
 })
 
@@ -103,8 +113,34 @@ const ownsPageRenderLifecycle = computed(() => props.viewerRole === VIEWER_ROLE.
 const regionSelectionEnabled = computed(() => isOriginalRole.value && props.regionSelectionActive)
 const regionSelection = usePdfRegionSelectionController({
   active: regionSelectionEnabled,
-  onComplete: (payload) => emit('region-selection-complete', payload)
+  onComplete: handleRegionSelectionComplete
 })
+const {
+  executeRegionOcr,
+  cancelRegionOcr
+} = usePdfRegionOcr()
+
+function handleRegionSelectionComplete(payload) {
+  emit('region-selection-complete', payload)
+  if (!regionSelectionEnabled.value) return
+
+  const viewport = props.session?.getPageViewport?.(payload?.pageNumber)
+  if (!viewport) return
+
+  const region = mapPageLocalCssRectToPdfRegion({
+    pageNumber: payload.pageNumber,
+    rect: payload.rect,
+    viewport
+  })
+  if (!region) return
+
+  executeRegionOcr({
+    region,
+    pdfDocument: props.session?.pdfDocument,
+    scale: props.regionOcrScale,
+    language: props.regionOcrLanguage
+  })
+}
 
 const {
   renderCandidatePageNumbers,
@@ -231,6 +267,13 @@ watch(
   { flush: 'sync' }
 )
 
+watch(
+  regionSelectionEnabled,
+  (enabled) => {
+    if (!enabled) cancelRegionOcr()
+  }
+)
+
 function setupObservers() {
   disconnectObservers()
   if (!viewerRoot.value) return
@@ -273,6 +316,7 @@ onMounted(() => {
 })
 
 onBeforeUnmount(() => {
+  cancelRegionOcr()
   disconnectObservers()
   resetRenderPipeline()
 })
