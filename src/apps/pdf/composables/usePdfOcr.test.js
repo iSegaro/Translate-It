@@ -92,39 +92,41 @@ describe('usePdfOcr', () => {
     mockPdfDocumentSession.onVisiblePagesChanged.mockClear()
   })
 
-  it('refreshes OCR candidates when a PageSession commit notification arrives', () => {
+  it('refreshes OCR recommendations when a PageSession commit notification arrives', () => {
     const { api, wrapper } = mountComposable()
     mockPdfDocumentSession.pageSessions.set(1, createScannedPageSession(1))
     mockPdfDocumentSession.visiblePageNumbers.add(1)
 
     commitListener?.({ pageNumber: 1 })
 
-    expect(api.scannedPageCount.value).toBe(1)
-    expect(api.scannedPageNumbers.value).toEqual([1])
+    expect(api.ocrRecommendationCount.value).toBe(1)
+    api.requestOcr()
+    expect(api.ocrBatch.pageNumbers).toEqual([1])
     wrapper.unmount()
   })
 
-  it('does not hydrate while refreshing OCR candidates', () => {
+  it('does not hydrate while refreshing OCR recommendations', () => {
     const { api, wrapper } = mountComposable()
     mockPdfDocumentSession.pageSessions.set(1, createScannedPageSession(1))
     mockPdfDocumentSession.visiblePageNumbers.add(1)
 
-    api.refreshOcrCandidates()
+    api.refreshOcrRecommendations()
 
-    expect(api.scannedPageCount.value).toBe(1)
+    expect(api.ocrRecommendationCount.value).toBe(1)
     expect(mockPdfDocumentSession.getPageSession).not.toHaveBeenCalled()
     wrapper.unmount()
   })
 
-  it('refreshes OCR candidates when visible pages change', () => {
+  it('refreshes OCR recommendations when visible pages change', () => {
     const { api, wrapper } = mountComposable()
     mockPdfDocumentSession.pageSessions.set(1, createScannedPageSession(1))
     mockPdfDocumentSession.visiblePageNumbers = new Set([1])
 
     visibleListener?.({ pages: [1] })
 
-    expect(api.scannedPageCount.value).toBe(1)
-    expect(api.scannedPageNumbers.value).toEqual([1])
+    expect(api.ocrRecommendationCount.value).toBe(1)
+    api.requestOcr()
+    expect(api.ocrBatch.pageNumbers).toEqual([1])
     wrapper.unmount()
   })
 
@@ -133,7 +135,7 @@ describe('usePdfOcr', () => {
     mockPdfDocumentSession.pageSessions.set(1, createScannedPageSession(1))
     mockPdfDocumentSession.pageSessions.set(2, createScannedPageSession(2))
     mockPdfDocumentSession.visiblePageNumbers = new Set([1, 2])
-    api.refreshOcrCandidates()
+    api.refreshOcrRecommendations()
 
     api.requestOcr()
     expect(api.ocrBatch.pageNumbers).toEqual([1, 2])
@@ -141,7 +143,7 @@ describe('usePdfOcr', () => {
 
     mockPdfDocumentSession.visiblePageNumbers = new Set([2])
     visibleListener?.({ pages: [2] })
-    expect(api.scannedPageCount.value).toBe(1)
+    expect(api.ocrRecommendationCount.value).toBe(1)
     expect(api.ocrBatch.pageNumbers.length).toBe(2)
     wrapper.unmount()
   })
@@ -151,7 +153,7 @@ describe('usePdfOcr', () => {
     mockPdfDocumentSession.pageSessions.set(1, createScannedPageSession(1))
     mockPdfDocumentSession.pageSessions.set(2, createScannedPageSession(2))
     mockPdfDocumentSession.visiblePageNumbers = new Set([1, 2])
-    api.refreshOcrCandidates()
+    api.refreshOcrRecommendations()
     api.requestOcr()
 
     mockPdfDocumentSession.visiblePageNumbers = new Set([2])
@@ -168,7 +170,7 @@ describe('usePdfOcr', () => {
     mockPdfDocumentSession.pageSessions.set(1, createScannedPageSession(1))
     mockPdfDocumentSession.pageSessions.set(2, createScannedPageSession(2))
     mockPdfDocumentSession.visiblePageNumbers = new Set([1, 2])
-    api.refreshOcrCandidates()
+    api.refreshOcrRecommendations()
     api.requestOcr()
 
     mockPdfDocumentSession.visiblePageNumbers = new Set([2])
@@ -179,7 +181,7 @@ describe('usePdfOcr', () => {
     wrapper.unmount()
   })
 
-  it('updates candidates while scrolling down and up across hydrated pages', () => {
+  it('updates recommendations while scrolling down and up across hydrated pages', () => {
     const { api, wrapper } = mountComposable()
     mockPdfDocumentSession.pageSessions.set(1, createScannedPageSession(1, { logicalBlocks: [{ id: 'text-1' }] }))
     mockPdfDocumentSession.pageSessions.set(2, createScannedPageSession(2))
@@ -187,15 +189,18 @@ describe('usePdfOcr', () => {
 
     mockPdfDocumentSession.visiblePageNumbers = new Set([2, 3])
     visibleListener?.({ pages: [2, 3] })
-    expect(api.scannedPageNumbers.value).toEqual([2, 3])
+    api.requestOcr()
+    expect(api.ocrBatch.pageNumbers).toEqual([2, 3])
 
     mockPdfDocumentSession.visiblePageNumbers = new Set([1, 2])
     visibleListener?.({ pages: [1, 2] })
-    expect(api.scannedPageNumbers.value).toEqual([2])
+    api.requestOcr()
+    expect(api.ocrBatch.pageNumbers).toEqual([2])
 
     mockPdfDocumentSession.visiblePageNumbers = new Set([3])
     visibleListener?.({ pages: [3] })
-    expect(api.scannedPageNumbers.value).toEqual([3])
+    api.requestOcr()
+    expect(api.ocrBatch.pageNumbers).toEqual([3])
     wrapper.unmount()
   })
 
@@ -204,8 +209,8 @@ describe('usePdfOcr', () => {
     const pageSession = createScannedPageSession(1)
     mockPdfDocumentSession.pageSessions.set(1, pageSession)
     mockPdfDocumentSession.visiblePageNumbers.add(1)
-    api.refreshOcrCandidates()
-    expect(api.scannedPageCount.value).toBe(1)
+    api.refreshOcrRecommendations()
+    expect(api.ocrRecommendationCount.value).toBe(1)
 
     mockProcessPages = vi.fn(async () => {
       pageSession.ocrBlocks = [{ id: 'ocr-1' }]
@@ -214,7 +219,7 @@ describe('usePdfOcr', () => {
 
     await api.confirmOcr()
 
-    expect(api.scannedPageCount.value).toBe(0)
+    expect(api.ocrRecommendationCount.value).toBe(0)
     wrapper.unmount()
   })
 

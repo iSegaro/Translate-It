@@ -71,7 +71,7 @@ describe('PdfToolbar', () => {
         isTranslating: false,
         canTranslateVisiblePages: true,
         canExport: true,
-        scannedPageCount: 0,
+        ocrRecommendationCount: 0,
         isOcrProcessing: false,
         zoomMode: 'fit-width',
         zoomPercent: 100,
@@ -183,7 +183,7 @@ describe('PdfToolbar', () => {
         isTranslating: false,
         canTranslateVisiblePages: true,
         canExport: true,
-        scannedPageCount: 0,
+        ocrRecommendationCount: 0,
         isOcrProcessing: false,
         zoomMode: 'fit-width',
         zoomPercent: 100,
@@ -235,10 +235,10 @@ describe('PdfToolbar', () => {
     expect(wrapper.emitted('zoom-step')?.at(-1)?.[0]).toBe(1)
   })
 
-  it('shows OCR button without count when scanned pages exist', async () => {
+  it('shows OCR button without count when OCR recommendations exist', async () => {
     const wrapper = mount(PdfToolbar, {
       props: {
-        scannedPageCount: 3,
+        ocrRecommendationCount: 3,
         isOcrProcessing: false
       }
     })
@@ -251,17 +251,17 @@ describe('PdfToolbar', () => {
     expect(wrapper.emitted('request-ocr')).toHaveLength(1)
   })
 
-  it('hides OCR button while processing or without scanned pages', async () => {
+  it('hides OCR button while processing or without OCR recommendations', async () => {
     const wrapper = mount(PdfToolbar, {
       props: {
-        scannedPageCount: 0,
+        ocrRecommendationCount: 0,
         isOcrProcessing: false
       }
     })
 
     expect(wrapper.find('.pdf-toolbar__button--ocr').exists()).toBe(false)
 
-    await wrapper.setProps({ scannedPageCount: 2, isOcrProcessing: true })
+    await wrapper.setProps({ ocrRecommendationCount: 2, isOcrProcessing: true })
     expect(wrapper.find('.pdf-toolbar__button--ocr').exists()).toBe(false)
   })
 

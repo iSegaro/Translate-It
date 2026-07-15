@@ -148,7 +148,7 @@
 
     <div class="pdf-toolbar__actions">
       <button
-        v-if="scannedPageCount > 0 && !isOcrProcessing"
+        v-if="ocrRecommendationCount > 0 && !isOcrProcessing"
         class="pdf-toolbar__button pdf-toolbar__button--ocr"
         type="button"
         @click="$emit('request-ocr')"
@@ -315,7 +315,7 @@ const props = defineProps({
   isTranslating: { type: Boolean, default: false },
   canTranslateVisiblePages: { type: Boolean, default: false },
   canExport: { type: Boolean, default: false },
-  scannedPageCount: { type: Number, default: 0 },
+  ocrRecommendationCount: { type: Number, default: 0 },
   isOcrProcessing: { type: Boolean, default: false },
   contentView: { type: String, default: CONTENT_VIEW.ORIGINAL },
   layoutMode: { type: String, default: LAYOUT_MODE.SINGLE },

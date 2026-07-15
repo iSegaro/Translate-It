@@ -3,18 +3,18 @@ import { getScopedLogger } from '@/shared/logging/logger.js'
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js'
 import { getSourceLanguageAsync } from '@/shared/config/config.js'
 import { pdfDocumentSession } from '@/features/pdf-translation/core/PdfDocumentSession.js'
-import { PdfOcrDetector } from '@/features/pdf-translation/core/PdfOcrDetector.js'
+import { PdfOcrRecommendationEngine } from '@/features/pdf-translation/core/PdfOcrRecommendationEngine.js'
 import { PdfOcrProcessor } from '@/features/pdf-translation/core/PdfOcrProcessor.js'
 import { pdfCacheManager } from '@/features/pdf-translation/core/PdfCacheManager.js'
 
 const logger = getScopedLogger(LOG_COMPONENTS.PDF, 'usePdfOcr')
 
 export function usePdfOcr({ onOcrComplete } = {}) {
-  const detector = new PdfOcrDetector(pdfDocumentSession)
+  const recommendationEngine = new PdfOcrRecommendationEngine(pdfDocumentSession)
   const processor = new PdfOcrProcessor(pdfDocumentSession)
 
-  const scannedPageCount = ref(0)
-  const scannedPageNumbers = ref([])
+  const ocrRecommendationCount = ref(0)
+  const ocrRecommendations = ref([])
   const ocrBatch = reactive({ pageNumbers: [] })
   const isOcrPromptVisible = ref(false)
   const isOcrProcessing = ref(false)
@@ -22,19 +22,18 @@ export function usePdfOcr({ onOcrComplete } = {}) {
   const ocrError = ref('')
   const ocrLanguage = ref('eng')
 
-  function refreshOcrCandidates() {
-    const candidates = detector.detectScannedPages()
-    const pending = candidates.filter((c) => !c.alreadyOcrd)
+  function refreshOcrRecommendations() {
+    const recommendations = recommendationEngine.getRecommendations()
 
-    scannedPageCount.value = pending.length
-    scannedPageNumbers.value = pending.map((c) => c.pageNumber)
+    ocrRecommendationCount.value = recommendations.length
+    ocrRecommendations.value = recommendations
   }
 
   function requestOcr() {
-    if (scannedPageCount.value === 0) return
+    if (ocrRecommendationCount.value === 0) return
 
     ocrError.value = ''
-    ocrBatch.pageNumbers = [...scannedPageNumbers.value]
+    ocrBatch.pageNumbers = [...ocrRecommendations.value]
     isOcrPromptVisible.value = true
   }
 
@@ -60,7 +59,7 @@ export function usePdfOcr({ onOcrComplete } = {}) {
 
       await saveOcrToCache(pageNumbers)
 
-      refreshOcrCandidates()
+      refreshOcrRecommendations()
       onOcrComplete?.({ pageNumbers })
 
       logger.info('OCR completed for pages:', { pageNumbers, language: ocrLanguage.value })
@@ -102,11 +101,11 @@ export function usePdfOcr({ onOcrComplete } = {}) {
   }
 
   const unsubscribePageSessionCommitted = pdfDocumentSession.onPageSessionCommitted?.(() => {
-    refreshOcrCandidates()
+    refreshOcrRecommendations()
   })
 
   const unsubscribeVisiblePagesChanged = pdfDocumentSession.onVisiblePagesChanged?.(() => {
-    refreshOcrCandidates()
+    refreshOcrRecommendations()
   })
 
   onBeforeUnmount(() => {
@@ -116,15 +115,14 @@ export function usePdfOcr({ onOcrComplete } = {}) {
   })
 
   return {
-    scannedPageCount,
-    scannedPageNumbers,
+    ocrRecommendationCount,
     ocrBatch,
     isOcrPromptVisible,
     isOcrProcessing,
     ocrProgress,
     ocrError,
     ocrLanguage,
-    refreshOcrCandidates,
+    refreshOcrRecommendations,
     requestOcr,
     confirmOcr,
     cancelOcr,

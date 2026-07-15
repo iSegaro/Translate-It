@@ -8,7 +8,7 @@
       :is-translating="isTranslating"
       :can-translate-visible-pages="canTranslateVisiblePages"
       :can-export="canExport"
-      :scanned-page-count="scannedPageCount"
+      :ocr-recommendation-count="ocrRecommendationCount"
       :is-ocr-processing="isOcrProcessing"
       :content-view="contentView"
       :layout-mode="selectedLayoutMode"
@@ -259,13 +259,13 @@ const dismissedPdfStatusBannerKey = ref('')
 const pdfStatusBannerController = createPdfStatusBannerController()
 
 const {
-  scannedPageCount,
+  ocrRecommendationCount,
   ocrBatch,
   isOcrPromptVisible,
   isOcrProcessing,
   ocrProgress,
   ocrError,
-  refreshOcrCandidates,
+  refreshOcrRecommendations,
   requestOcr,
   confirmOcr,
   cancelOcr,
@@ -274,7 +274,7 @@ const {
   onOcrComplete: ({ pageNumbers } = {}) => {
     refreshTranslatedPageBlocks(pageNumbers)
     translationTick.value += 1
-    refreshOcrCandidates()
+    refreshOcrRecommendations()
   }
 })
 
@@ -364,7 +364,7 @@ const isPdfStatusBannerVisible = computed(() => {
 
 watch(hasDocument, (has) => {
   if (has) {
-    refreshOcrCandidates()
+    refreshOcrRecommendations()
   }
 })
 

@@ -62,7 +62,7 @@ vi.mock('@/utils/ui/theme.js', () => ({
 vi.mock('./components/PdfToolbar.vue', () => ({
   default: {
     name: 'PdfToolbar',
-    props: ['fileName', 'pageCount', 'currentPageNumber', 'zoomMode', 'zoomPercent', 'contentView', 'layoutMode'],
+    props: ['fileName', 'pageCount', 'currentPageNumber', 'zoomMode', 'zoomPercent', 'contentView', 'layoutMode', 'ocrRecommendationCount'],
     template: '<header class="pdf-toolbar-stub" />'
   }
 }))
@@ -272,13 +272,13 @@ function createMocks({
   }
 
   mockPdfOcr = {
-    scannedPageCount: ref(0),
+    ocrRecommendationCount: ref(0),
     ocrBatch: { pageNumbers: [] },
     isOcrPromptVisible: ref(false),
     isOcrProcessing: ref(false),
     ocrProgress: ref(0),
     ocrError: ref(''),
-    refreshOcrCandidates: vi.fn(),
+    refreshOcrRecommendations: vi.fn(),
     requestOcr: vi.fn(),
     confirmOcr: vi.fn(),
     cancelOcr: vi.fn(),
@@ -359,7 +359,7 @@ describe('PdfApp', () => {
     expect(mockViewerController.refreshTranslatedPageBlocks).toHaveBeenCalledWith([2, 1])
     expect(mockViewerController.translationTick.value).toBe(1)
     expect(order).toEqual(['refresh:0'])
-    expect(mockPdfOcr.refreshOcrCandidates).toHaveBeenCalled()
+    expect(mockPdfOcr.refreshOcrRecommendations).toHaveBeenCalled()
     expect(mockViewerController.recomputeLayout).not.toHaveBeenCalled()
   })
 
