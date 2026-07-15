@@ -31,6 +31,23 @@
   grid-area: 1 / 1;
 }
 
+.pdf-region-selection-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 10;
+  cursor: crosshair;
+  touch-action: none;
+  user-select: none;
+}
+
+.pdf-region-selection-overlay__rect {
+  position: absolute;
+  box-sizing: border-box;
+  border: 1px solid #1a73e8;
+  background: rgba(26, 115, 232, 0.16);
+  pointer-events: none;
+}
+
 .pdf-page__stage canvas {
   display: block;
 }

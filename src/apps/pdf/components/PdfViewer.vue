@@ -17,10 +17,18 @@
       :overlay-blocks="getPageOverlayBlocks(page.pageNumber)"
       :handle-navigation-target="handleNavigationTarget"
       :clear-on-unmount="ownsPageRenderLifecycle"
+      :region-selection-active="regionSelectionEnabled"
+      :region-selection-rect="regionSelection.activePageNumber.value === page.pageNumber ? regionSelection.rect.value : null"
       @render-started="handleRenderStarted"
       @render-committed="handleRenderCommitted"
       @render-cancelled="handleRenderCancelled"
       @render-failed="handleRenderFailed"
+      @region-selection-pointer-down="regionSelection.handlePointerDown"
+      @region-selection-pointer-move="regionSelection.handlePointerMove"
+      @region-selection-pointer-up="regionSelection.handlePointerUp"
+      @region-selection-pointer-cancel="regionSelection.handlePointerCancel"
+      @region-selection-lost-pointer-capture="regionSelection.handleLostPointerCapture"
+      @region-selection-page-unmounted="regionSelection.handlePageUnmount"
     />
   </div>
 </template>
@@ -35,6 +43,7 @@ import { usePdfSelectionBridge } from '../composables/usePdfSelectionBridge.js'
 import { usePdfScrollObservation } from '../composables/usePdfScrollObservation.js'
 import { usePdfLayoutMonitor } from '../composables/usePdfLayoutMonitor.js'
 import { usePdfCurrentPage } from '../composables/usePdfCurrentPage.js'
+import { usePdfRegionSelectionController } from '../composables/usePdfRegionSelectionController.js'
 import { VIEWER_ROLE } from '../composables/usePdfViewerMode.js'
 import './PdfViewer.scss'
 
@@ -75,16 +84,27 @@ const props = defineProps({
   scrollContainer: {
     type: HTMLElement,
     default: null
+  },
+  regionSelectionActive: {
+    type: Boolean,
+    default: false
   }
 })
 
-const emit = defineEmits(['layout-change', 'current-page-change', 'visible-pages-change'])
+const emit = defineEmits(['layout-change', 'current-page-change', 'visible-pages-change', 'region-selection-complete'])
 const viewerRoot = ref(null)
 const pageViews = new Map()
 let lastEmittedVisiblePages = new Set()
 
 const isOriginalRole = computed(() => props.viewerRole === VIEWER_ROLE.ORIGINAL)
 const ownsPageRenderLifecycle = computed(() => props.viewerRole === VIEWER_ROLE.ORIGINAL)
+// Engineering-only activation.
+// Product-facing activation will be introduced in Region OCR UI phase.
+const regionSelectionEnabled = computed(() => isOriginalRole.value && props.regionSelectionActive)
+const regionSelection = usePdfRegionSelectionController({
+  active: regionSelectionEnabled,
+  onComplete: (payload) => emit('region-selection-complete', payload)
+})
 
 const {
   renderCandidatePageNumbers,

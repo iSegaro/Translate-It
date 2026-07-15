@@ -31,9 +31,22 @@ vi.mock('./PdfPageView.vue', () => ({
       renderAllowed: { type: Boolean, default: true },
       renderPriority: { type: Number, default: null },
       renderPriorityGroup: { type: String, default: '' },
-      clearOnUnmount: { type: Boolean, default: true }
+      clearOnUnmount: { type: Boolean, default: true },
+      regionSelectionActive: { type: Boolean, default: false },
+      regionSelectionRect: { type: Object, default: null }
     },
-    emits: ['render-started', 'render-committed', 'render-cancelled', 'render-failed'],
+    emits: [
+      'render-started',
+      'render-committed',
+      'render-cancelled',
+      'render-failed',
+      'region-selection-pointer-down',
+      'region-selection-pointer-move',
+      'region-selection-pointer-up',
+      'region-selection-pointer-cancel',
+      'region-selection-lost-pointer-capture',
+      'region-selection-page-unmounted'
+    ],
     setup(props, { expose }) {
       const rootEl = ref(null)
 
@@ -182,6 +195,68 @@ describe('PdfViewer', () => {
 
     vi.stubGlobal('IntersectionObserver', intersectionObserverClass)
     vi.stubGlobal('ResizeObserver', resizeObserverClass)
+  })
+
+  it('keeps one originating page active and emits its completed CSS rectangle', async () => {
+    const { wrapper } = await mountViewerWithPages({ count: 2 })
+    await wrapper.setProps({ regionSelectionActive: true })
+    const pageViews = wrapper.findAllComponents({ name: 'PdfPageView' })
+    const surface = document.createElement('div')
+    const captured = new Set()
+    surface.getBoundingClientRect = () => buildRect(20, 100, 100, 10)
+    surface.setPointerCapture = (pointerId) => captured.add(pointerId)
+    surface.hasPointerCapture = (pointerId) => captured.has(pointerId)
+    surface.releasePointerCapture = (pointerId) => captured.delete(pointerId)
+    const event = (clientX, clientY) => ({
+      button: 0,
+      isPrimary: true,
+      pointerId: 7,
+      clientX,
+      clientY,
+      currentTarget: surface,
+      preventDefault: vi.fn()
+    })
+
+    pageViews[0].vm.$emit('region-selection-pointer-down', 1, event(30, 40))
+    await nextTick()
+
+    expect(pageViews[0].props('regionSelectionRect')).toEqual({ x: 20, y: 20, width: 0, height: 0 })
+    expect(pageViews[1].props('regionSelectionRect')).toBeNull()
+
+    pageViews[0].vm.$emit('region-selection-pointer-up', 1, event(80, 90))
+    await nextTick()
+
+    expect(wrapper.emitted('region-selection-complete')).toEqual([[
+      { pageNumber: 1, rect: { x: 20, y: 20, width: 50, height: 50 } }
+    ]])
+    wrapper.unmount()
+  })
+
+  it('cancels selection when the originating page unmounts', async () => {
+    const { wrapper } = await mountViewerWithPages({ count: 1 })
+    await wrapper.setProps({ regionSelectionActive: true })
+    const pageView = wrapper.findComponent({ name: 'PdfPageView' })
+    const surface = document.createElement('div')
+    surface.getBoundingClientRect = () => buildRect(0, 100, 100)
+    surface.setPointerCapture = vi.fn()
+    surface.releasePointerCapture = vi.fn()
+    const event = {
+      button: 0,
+      isPrimary: true,
+      pointerId: 1,
+      clientX: 10,
+      clientY: 10,
+      currentTarget: surface,
+      preventDefault: vi.fn()
+    }
+
+    pageView.vm.$emit('region-selection-pointer-down', 1, event)
+    pageView.vm.$emit('region-selection-page-unmounted', 1)
+    pageView.vm.$emit('region-selection-pointer-up', 1, { ...event, clientX: 50, clientY: 50 })
+    await nextTick()
+
+    expect(wrapper.emitted('region-selection-complete')).toBeFalsy()
+    wrapper.unmount()
   })
 
   it('observes raw page root elements from exposed page views', async () => {

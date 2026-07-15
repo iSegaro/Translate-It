@@ -68,6 +68,46 @@ describe('PdfPageView', () => {
     expect(wrapper.find('.pdf-page__stage').attributes('style')).toContain('height: 700px')
   })
 
+  it('mounts the region selection overlay inside the page stage', () => {
+    const wrapper = mount(PdfPageView, {
+      props: {
+        page: createPage(),
+        session: createSession(),
+        visible: false,
+        regionSelectionActive: true,
+        regionSelectionRect: { x: 10, y: 20, width: 30, height: 40 }
+      }
+    })
+
+    const stage = wrapper.find('.pdf-page__stage')
+    expect(stage.find('.pdf-region-selection-overlay').exists()).toBe(true)
+    expect(stage.find('.pdf-region-selection-overlay__rect').exists()).toBe(true)
+  })
+
+  it('forwards region pointer events from stage to viewer owner', async () => {
+    const wrapper = mount(PdfPageView, {
+      props: {
+        page: createPage(),
+        session: createSession(),
+        visible: false,
+        regionSelectionActive: true,
+        regionSelectionRect: { x: 10, y: 20, width: 30, height: 40 }
+      }
+    })
+
+    await wrapper.find('.pdf-page__stage').trigger('pointerdown')
+    await wrapper.find('.pdf-page__stage').trigger('pointermove')
+    await wrapper.find('.pdf-page__stage').trigger('pointerup')
+    await wrapper.find('.pdf-page__stage').trigger('pointercancel')
+    await wrapper.find('.pdf-page__stage').trigger('lostpointercapture')
+
+    expect(wrapper.emitted('region-selection-pointer-down')).toBeTruthy()
+    expect(wrapper.emitted('region-selection-pointer-move')).toBeTruthy()
+    expect(wrapper.emitted('region-selection-pointer-up')).toBeTruthy()
+    expect(wrapper.emitted('region-selection-pointer-cancel')).toBeTruthy()
+    expect(wrapper.emitted('region-selection-lost-pointer-capture')).toBeTruthy()
+  })
+
   it('does not clear an initially hidden page when metrics change', async () => {
     const session = createSession()
     const wrapper = mount(PdfPageView, {

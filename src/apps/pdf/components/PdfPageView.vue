@@ -10,6 +10,11 @@
     <div
       class="pdf-page__stage"
       :style="stageStyle"
+      @pointerdown="emit('region-selection-pointer-down', page.pageNumber, $event)"
+      @pointermove="emit('region-selection-pointer-move', page.pageNumber, $event)"
+      @pointerup="emit('region-selection-pointer-up', page.pageNumber, $event)"
+      @pointercancel="emit('region-selection-pointer-cancel', page.pageNumber, $event)"
+      @lostpointercapture="emit('region-selection-lost-pointer-capture', page.pageNumber, $event)"
     >
       <canvas ref="canvasEl" />
       <div
@@ -31,6 +36,10 @@
         :canvas="canvasEl"
         :page-mask-model="pageMaskModel"
       />
+      <PdfRegionSelectionOverlay
+        :active="regionSelectionActive"
+        :rect="regionSelectionRect"
+      />
     </div>
   </article>
 </template>
@@ -41,6 +50,7 @@ import { PDF_RENDER_RESULT_STATUS } from '@/features/pdf-translation/core/PdfRen
 import { PdfTextLayerRenderer } from '@/features/pdf-translation/core/PdfTextLayerRenderer.js'
 import PdfOverlayLayer from './PdfOverlayLayer.vue'
 import PdfLinkOverlay from './PdfLinkOverlay.vue'
+import PdfRegionSelectionOverlay from './PdfRegionSelectionOverlay.vue'
 import './PdfPageView.scss'
 
 const props = defineProps({
@@ -83,9 +93,28 @@ const props = defineProps({
   clearOnUnmount: {
     type: Boolean,
     default: true
+  },
+  regionSelectionActive: {
+    type: Boolean,
+    default: false
+  },
+  regionSelectionRect: {
+    type: Object,
+    default: null
   }
 })
-const emit = defineEmits(['render-started', 'render-committed', 'render-cancelled', 'render-failed'])
+const emit = defineEmits([
+  'render-started',
+  'render-committed',
+  'render-cancelled',
+  'render-failed',
+  'region-selection-pointer-down',
+  'region-selection-pointer-move',
+  'region-selection-pointer-up',
+  'region-selection-pointer-cancel',
+  'region-selection-lost-pointer-capture',
+  'region-selection-page-unmounted'
+])
 
 const rootEl = ref(null)
 const canvasEl = ref(null)
@@ -186,6 +215,7 @@ watch(
 )
 
 onBeforeUnmount(() => {
+  emit('region-selection-page-unmounted', props.page.pageNumber)
   if (props.clearOnUnmount) {
     clearPage()
   }
