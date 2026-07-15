@@ -129,6 +129,7 @@ function createArtifacts() {
     scorer: { id: 'edit-distance', version: '1.0.0', parameters: {} },
     samples: [{
       sampleRef: reference(sample),
+      status: 'recognized',
       metrics: { cer: 0, wer: 0, deletionRate: 0, rtlOrderCorrect: null }
     }]
   }
@@ -245,6 +246,42 @@ describe('Region OCR benchmark artifact schemas', () => {
       valid: true,
       errors: []
     })
+  })
+
+  it('accepts SCORED_RESULT recognized sample with populated metrics', () => {
+    const { scored } = createArtifacts()
+
+    expect(validateBenchmarkArtifact(scored)).toMatchObject({ valid: true, errors: [] })
+  })
+
+  it('rejects SCORED_RESULT recognized sample with empty metrics', () => {
+    const { scored } = createArtifacts()
+    scored.samples[0].metrics = {}
+
+    expect(validateBenchmarkArtifact(scored).errors).toEqual(expect.arrayContaining([
+      expect.objectContaining({ code: 'missing_required_field', path: '$.samples[0].metrics.cer' }),
+      expect.objectContaining({ code: 'missing_required_field', path: '$.samples[0].metrics.wer' }),
+      expect.objectContaining({ code: 'missing_required_field', path: '$.samples[0].metrics.deletionRate' }),
+      expect.objectContaining({ code: 'missing_required_field', path: '$.samples[0].metrics.rtlOrderCorrect' })
+    ]))
+  })
+
+  it.each(['failed', 'cancelled', 'skipped'])('accepts SCORED_RESULT %s sample with empty metrics', (status) => {
+    const { scored } = createArtifacts()
+    scored.samples[0].status = status
+    scored.samples[0].metrics = {}
+
+    expect(validateBenchmarkArtifact(scored)).toMatchObject({ valid: true, errors: [] })
+  })
+
+  it.each(['failed', 'cancelled', 'skipped'])('rejects SCORED_RESULT %s sample with populated metrics', (status) => {
+    const { scored } = createArtifacts()
+    scored.samples[0].status = status
+
+    expect(validateBenchmarkArtifact(scored).errors).toContainEqual(expect.objectContaining({
+      code: 'incompatible_status_metrics',
+      path: '$.samples[0].metrics'
+    }))
   })
 
   it('keeps RAW_RUN independently finalizable without RAW_SAMPLE references', () => {

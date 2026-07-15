@@ -5,7 +5,7 @@ import {
   TIMESTAMP_PATTERN,
   VERSION_PATTERN
 } from './artifactModels.js'
-import { ARTIFACT_SCHEMAS, getBenchmarkArtifactSchema } from './artifactSchemas.js'
+import { ARTIFACT_SCHEMAS, SCORE_METRICS_SCHEMA, getBenchmarkArtifactSchema } from './artifactSchemas.js'
 
 function error(code, path, message, details) {
   return details === undefined
@@ -221,6 +221,7 @@ function validateReferenceSemantics(artifact, errors) {
       validateReferenceType(artifact.corpusRef, [ARTIFACT_TYPES.CORPUS_MANIFEST], '$.corpusRef', errors)
       artifact.samples?.forEach((sample, index) => {
         validateReferenceType(sample?.sampleRef, [ARTIFACT_TYPES.RAW_SAMPLE], `$.samples[${index}].sampleRef`, errors)
+        validateScoredSampleSemantics(sample, `$.samples[${index}]`, errors)
       })
       break
     case ARTIFACT_TYPES.COMPARISON_RESULT:
@@ -237,6 +238,17 @@ function validateReferenceSemantics(artifact, errors) {
         errors
       )
       break
+  }
+}
+
+function validateScoredSampleSemantics(sample, path, errors) {
+  if (!sample || typeof sample !== 'object' || !sample.metrics || typeof sample.metrics !== 'object') return
+  if (sample.status === 'recognized') {
+    validateSchemaValue(sample.metrics, SCORE_METRICS_SCHEMA, `${path}.metrics`, errors)
+    return
+  }
+  if (['failed', 'cancelled', 'skipped'].includes(sample.status) && Object.keys(sample.metrics).length > 0) {
+    errors.push(error('incompatible_status_metrics', `${path}.metrics`, 'Only recognized samples may include metrics'))
   }
 }
 

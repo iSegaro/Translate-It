@@ -266,7 +266,7 @@ export const RAW_SAMPLE_SCHEMA = artifactSchema(
   }
 )
 
-const scoreMetrics = object(
+export const SCORE_METRICS_SCHEMA = object(
   ['cer', 'wer', 'deletionRate', 'rtlOrderCorrect'],
   {
     cer: number({ minimum: 0 }),
@@ -277,10 +277,11 @@ const scoreMetrics = object(
 )
 
 const scoredSample = object(
-  ['sampleRef', 'metrics'],
+  ['sampleRef', 'status', 'metrics'],
   {
     sampleRef: ARTIFACT_REFERENCE_SCHEMA,
-    metrics: scoreMetrics
+    status: string({ enum: SAMPLE_STATUSES }),
+    metrics: { type: 'object', additionalProperties: true }
   }
 )
 

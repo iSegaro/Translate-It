@@ -90,6 +90,55 @@ function clone(value) {
   return structuredClone(value)
 }
 
+function refOf(artifact) {
+  return {
+    artifactType: artifact.artifactType,
+    artifactId: artifact.artifactId,
+    schemaVersion: artifact.schemaVersion,
+    contentHash: artifact.contentHash
+  }
+}
+
+function scoredResultFor(run, samples) {
+  return {
+    schemaVersion: '1.0.0',
+    artifactType: ARTIFACT_TYPES.SCORED_RESULT,
+    artifactId: 'scored-result-001',
+    contentHash: `sha256:${'7'.repeat(64)}`,
+    createdAt: CREATED_AT,
+    scoredResultId: 'scored-result-001',
+    rawRunRef: refOf(run),
+    corpusRef: clone(run.corpusRef),
+    normalizationPolicy: { id: 'normalizer', version: '1.0.0', parameters: {} },
+    scorer: { id: 'scorer', version: '1.0.0', parameters: {} },
+    samples: samples.map((sample) => ({
+      sampleRef: refOf(sample),
+      status: sample.status,
+      metrics: sample.status === 'recognized'
+        ? { cer: 0, wer: 0, deletionRate: 0, rtlOrderCorrect: null }
+        : {}
+    }))
+  }
+}
+
+function withStatus(sample, status) {
+  const next = clone(sample)
+  next.status = status
+  delete next.recognition
+  delete next.error
+  if (status === 'recognized') next.recognition = { rawOutput: { text: 'raw' } }
+  if (status === 'failed') next.error = { name: 'Error', message: 'failed' }
+  return next
+}
+
+function secondScoredResult(scored) {
+  const next = clone(scored)
+  next.artifactId = 'scored-result-002'
+  next.scoredResultId = 'scored-result-002'
+  next.contentHash = `sha256:${'8'.repeat(64)}`
+  return next
+}
+
 describe('Region OCR benchmark artifact loader', () => {
   it('loads and freezes a single RAW_RUN artifact', () => {
     const { run } = createArtifacts()
@@ -255,6 +304,189 @@ describe('Region OCR benchmark artifact loader', () => {
         code: 'incompatible_policy',
         path: '$[1].policy'
       }))
+    }
+  })
+
+  it.each(['recognized', 'failed', 'cancelled', 'skipped'])('accepts SCORED_RESULT sample status matching RAW_SAMPLE %s', (status) => {
+    const { run, samples } = createArtifacts()
+    const sample = withStatus(samples[0], status)
+    const scored = scoredResultFor(run, [sample])
+
+    expect(() => loadBenchmarkArtifactBundle([clone(run), sample, scored])).not.toThrow()
+  })
+
+  it.each([
+    ['recognized', 'failed'],
+    ['recognized', 'cancelled'],
+    ['recognized', 'skipped'],
+    ['failed', 'recognized'],
+    ['cancelled', 'recognized'],
+    ['skipped', 'recognized']
+  ])('rejects SCORED_RESULT status %s referencing RAW_SAMPLE status %s', (scoredStatus, rawStatus) => {
+    const { run, samples } = createArtifacts()
+    const sample = withStatus(samples[0], rawStatus)
+    const scored = scoredResultFor(run, [sample])
+    scored.samples[0].status = scoredStatus
+    scored.samples[0].metrics = scoredStatus === 'recognized'
+      ? { cer: 0, wer: 0, deletionRate: 0, rtlOrderCorrect: null }
+      : {}
+
+    expect(() => loadBenchmarkArtifactBundle([clone(run), sample, scored])).toThrow(BenchmarkArtifactLoaderValidationError)
+    try {
+      loadBenchmarkArtifactBundle([clone(run), sample, scored])
+    } catch (caught) {
+      expect(caught.errors).toContainEqual(expect.objectContaining({
+        code: 'incompatible_sample_status',
+        path: '$[2].samples[0].status',
+        details: { expected: rawStatus, received: scoredStatus }
+      }))
+    }
+  })
+
+  it('does not emit status mismatch when SCORED_RESULT sampleRef is unresolved', () => {
+    const { run, samples } = createArtifacts()
+    const scored = scoredResultFor(run, [samples[0]])
+    scored.samples[0].sampleRef.contentHash = `sha256:${'6'.repeat(64)}`
+    scored.samples[0].status = 'skipped'
+
+    try {
+      loadBenchmarkArtifactBundle([clone(run), clone(samples[0]), scored])
+    } catch (caught) {
+      expect(caught.errors).toContainEqual(expect.objectContaining({
+        code: 'unresolved_sample_reference',
+        path: '$[2].samples[0].sampleRef'
+      }))
+      expect(caught.errors.map(({ code }) => code)).not.toContain('incompatible_sample_status')
+    }
+  })
+
+  it('rejects SCORED_RESULT rawRunRef that does not resolve to bundle RAW_RUN', () => {
+    const { run, samples } = createArtifacts()
+    const scored = scoredResultFor(run, [samples[0]])
+    scored.rawRunRef.contentHash = `sha256:${'6'.repeat(64)}`
+
+    expect(() => loadBenchmarkArtifactBundle([clone(run), clone(samples[0]), scored])).toThrow(BenchmarkArtifactLoaderValidationError)
+    try {
+      loadBenchmarkArtifactBundle([clone(run), clone(samples[0]), scored])
+    } catch (caught) {
+      expect(caught.errors).toContainEqual(expect.objectContaining({
+        code: 'unresolved_raw_run_reference',
+        path: '$[2].rawRunRef'
+      }))
+    }
+  })
+
+  it('rejects SCORED_RESULT corpusRef that differs from RAW_RUN corpusRef', () => {
+    const { run, samples } = createArtifacts()
+    const scored = scoredResultFor(run, [samples[0]])
+    scored.corpusRef.contentHash = `sha256:${'6'.repeat(64)}`
+
+    expect(() => loadBenchmarkArtifactBundle([clone(run), clone(samples[0]), scored])).toThrow(BenchmarkArtifactLoaderValidationError)
+    try {
+      loadBenchmarkArtifactBundle([clone(run), clone(samples[0]), scored])
+    } catch (caught) {
+      expect(caught.errors).toContainEqual(expect.objectContaining({
+        code: 'incompatible_corpus_reference',
+        path: '$[2].corpusRef'
+      }))
+    }
+  })
+
+  it('rejects duplicate SCORED_RESULT sampleRef entries', () => {
+    const { run, samples } = createArtifacts()
+    const scored = scoredResultFor(run, [samples[0], samples[0]])
+
+    expect(() => loadBenchmarkArtifactBundle([clone(run), clone(samples[0]), scored])).toThrow(BenchmarkArtifactLoaderValidationError)
+    try {
+      loadBenchmarkArtifactBundle([clone(run), clone(samples[0]), scored])
+    } catch (caught) {
+      expect(caught.errors).toContainEqual(expect.objectContaining({
+        code: 'duplicate_sample_reference',
+        path: '$[2].samples[1].sampleRef'
+      }))
+    }
+  })
+
+  it('rejects SCORED_RESULT missing one RAW_SAMPLE reference', () => {
+    const { run, samples } = createArtifacts()
+    const scored = scoredResultFor(run, [samples[0]])
+
+    expect(() => loadBenchmarkArtifactBundle([clone(run), clone(samples[0]), clone(samples[1]), scored])).toThrow(BenchmarkArtifactLoaderValidationError)
+    try {
+      loadBenchmarkArtifactBundle([clone(run), clone(samples[0]), clone(samples[1]), scored])
+    } catch (caught) {
+      expect(caught.errors).toContainEqual(expect.objectContaining({
+        code: 'missing_scored_sample_reference',
+        path: '$[3].samples',
+        details: {
+          artifactId: samples[1].artifactId,
+          sampleId: samples[1].sampleId,
+          documentId: samples[1].caseRef.documentId,
+          regionId: samples[1].caseRef.regionId
+        }
+      }))
+    }
+  })
+
+  it('rejects SCORED_RESULT missing multiple RAW_SAMPLE references deterministically', () => {
+    const { run, samples } = createArtifacts()
+    const scored = scoredResultFor(run, [])
+
+    expect(() => loadBenchmarkArtifactBundle([clone(run), clone(samples[0]), clone(samples[1]), scored])).toThrow(BenchmarkArtifactLoaderValidationError)
+    try {
+      loadBenchmarkArtifactBundle([clone(run), clone(samples[0]), clone(samples[1]), scored])
+    } catch (caught) {
+      expect(caught.errors.filter(({ code }) => code === 'missing_scored_sample_reference')).toEqual([
+        expect.objectContaining({
+          path: '$[3].samples',
+          details: expect.objectContaining({ artifactId: samples[0].artifactId })
+        }),
+        expect.objectContaining({
+          path: '$[3].samples',
+          details: expect.objectContaining({ artifactId: samples[1].artifactId })
+        })
+      ])
+    }
+  })
+
+  it('rejects empty SCORED_RESULT samples when RAW_SAMPLE artifacts exist', () => {
+    const { run, samples } = createArtifacts()
+    const scored = scoredResultFor(run, [])
+
+    expect(() => loadBenchmarkArtifactBundle([clone(run), clone(samples[0]), scored])).toThrow(BenchmarkArtifactLoaderValidationError)
+    try {
+      loadBenchmarkArtifactBundle([clone(run), clone(samples[0]), scored])
+    } catch (caught) {
+      expect(caught.errors).toContainEqual(expect.objectContaining({
+        code: 'missing_scored_sample_reference',
+        path: '$[2].samples'
+      }))
+    }
+  })
+
+  it('accepts SCORED_RESULT with complete RAW_SAMPLE coverage', () => {
+    const { run, samples } = createArtifacts()
+    const scored = scoredResultFor(run, samples)
+
+    expect(() => loadBenchmarkArtifactBundle([clone(run), clone(samples[0]), clone(samples[1]), scored])).not.toThrow()
+  })
+
+  it('validates each SCORED_RESULT coverage independently', () => {
+    const { run, samples } = createArtifacts()
+    const complete = scoredResultFor(run, samples)
+    const incomplete = secondScoredResult(scoredResultFor(run, [samples[0]]))
+
+    expect(() => loadBenchmarkArtifactBundle([clone(run), clone(samples[0]), clone(samples[1]), complete, incomplete])).toThrow(BenchmarkArtifactLoaderValidationError)
+    try {
+      loadBenchmarkArtifactBundle([clone(run), clone(samples[0]), clone(samples[1]), complete, incomplete])
+    } catch (caught) {
+      expect(caught.errors).toEqual([
+        expect.objectContaining({
+          code: 'missing_scored_sample_reference',
+          path: '$[4].samples',
+          details: expect.objectContaining({ artifactId: samples[1].artifactId })
+        })
+      ])
     }
   })
 

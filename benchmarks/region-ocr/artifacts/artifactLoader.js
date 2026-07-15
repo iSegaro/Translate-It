@@ -60,6 +60,73 @@ function sampleIdentity(sample) {
   ])
 }
 
+function artifactReferenceKey(reference) {
+  return JSON.stringify([
+    reference?.artifactType,
+    reference?.artifactId,
+    reference?.schemaVersion,
+    reference?.contentHash
+  ])
+}
+
+function validateScoredResultRelationships(artifacts, errors) {
+  const rawSamples = []
+  const rawSamplesByRef = new Map()
+  const rawRun = artifacts.find((artifact) => artifact?.artifactType === ARTIFACT_TYPES.RAW_RUN)
+  artifacts.forEach((artifact) => {
+    if (artifact?.artifactType === ARTIFACT_TYPES.RAW_SAMPLE) {
+      rawSamples.push(artifact)
+      rawSamplesByRef.set(artifactReferenceKey(artifact), artifact)
+    }
+  })
+
+  artifacts.forEach((artifact, artifactIndex) => {
+    if (artifact?.artifactType !== ARTIFACT_TYPES.SCORED_RESULT) return
+    if (rawRun && !artifactRefMatches(artifact.rawRunRef, rawRun)) {
+      errors.push(error('unresolved_raw_run_reference', `$[${artifactIndex}].rawRunRef`, 'SCORED_RESULT rawRunRef must resolve to the bundle RAW_RUN'))
+    }
+    if (rawRun && !artifactRefsEqual(artifact.corpusRef, rawRun.corpusRef)) {
+      errors.push(error('incompatible_corpus_reference', `$[${artifactIndex}].corpusRef`, 'SCORED_RESULT corpusRef must match RAW_RUN corpusRef'))
+    }
+
+    const sampleRefs = new Map()
+    const resolvedSampleRefs = new Set()
+    ;(artifact.samples || []).forEach((sample, sampleIndex) => {
+      const refKey = artifactReferenceKey(sample?.sampleRef)
+      if (sampleRefs.has(refKey)) {
+        errors.push(error('duplicate_sample_reference', `$[${artifactIndex}].samples[${sampleIndex}].sampleRef`, 'SCORED_RESULT sampleRef must be unique within the artifact', {
+          firstPath: sampleRefs.get(refKey)
+        }))
+      } else {
+        sampleRefs.set(refKey, `$[${artifactIndex}].samples[${sampleIndex}].sampleRef`)
+      }
+
+      const rawSample = rawSamplesByRef.get(refKey)
+      if (!rawSample) {
+        errors.push(error('unresolved_sample_reference', `$[${artifactIndex}].samples[${sampleIndex}].sampleRef`, 'SCORED_RESULT sampleRef must resolve to a RAW_SAMPLE in the bundle'))
+        return
+      }
+      resolvedSampleRefs.add(refKey)
+      if (sample.status !== rawSample.status) {
+        errors.push(error('incompatible_sample_status', `$[${artifactIndex}].samples[${sampleIndex}].status`, 'SCORED_RESULT sample status must match referenced RAW_SAMPLE status', {
+          expected: rawSample.status,
+          received: sample.status
+        }))
+      }
+    })
+
+    rawSamples.forEach((rawSample) => {
+      if (resolvedSampleRefs.has(artifactReferenceKey(rawSample))) return
+      errors.push(error('missing_scored_sample_reference', `$[${artifactIndex}].samples`, 'SCORED_RESULT samples must include every RAW_SAMPLE in the bundle', {
+        artifactId: rawSample.artifactId,
+        sampleId: rawSample.sampleId,
+        documentId: rawSample.caseRef?.documentId,
+        regionId: rawSample.caseRef?.regionId
+      }))
+    })
+  })
+}
+
 function validateRawBundleRelationships(artifacts, errors) {
   const rawRuns = artifacts
     .map((artifact, index) => ({ artifact, index }))
@@ -114,15 +181,17 @@ function validateRawBundleRelationships(artifacts, errors) {
 function validateBundleRelationships(artifacts) {
   const errors = []
   const types = new Set(artifacts.map((artifact) => artifact?.artifactType))
-  const rawOnly = [...types].every((type) => [ARTIFACT_TYPES.RAW_RUN, ARTIFACT_TYPES.RAW_SAMPLE].includes(type))
+  const rawScoredTypes = [ARTIFACT_TYPES.RAW_RUN, ARTIFACT_TYPES.RAW_SAMPLE, ARTIFACT_TYPES.SCORED_RESULT]
+  const rawScoredOnly = [...types].every((type) => rawScoredTypes.includes(type))
 
   if (types.has(ARTIFACT_TYPES.RAW_RUN) || types.has(ARTIFACT_TYPES.RAW_SAMPLE)) {
-    if (!rawOnly) {
-      errors.push(error('incompatible_artifact_combination', '$', 'RAW bundles may contain only RAW_RUN and RAW_SAMPLE artifacts', {
+    if (!rawScoredOnly) {
+      errors.push(error('incompatible_artifact_combination', '$', 'RAW/SCORED bundles may contain only RAW_RUN, RAW_SAMPLE, and SCORED_RESULT artifacts', {
         artifactTypes: [...types].sort()
       }))
     } else {
       validateRawBundleRelationships(artifacts, errors)
+      validateScoredResultRelationships(artifacts, errors)
     }
   }
 
