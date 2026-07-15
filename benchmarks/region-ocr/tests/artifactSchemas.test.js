@@ -220,6 +220,33 @@ describe('Region OCR benchmark artifact schemas', () => {
     }
   })
 
+  it.each(['recognized', 'failed', 'cancelled', 'skipped'])('accepts RAW_SAMPLE status %s', (status) => {
+    const { sample } = createArtifacts()
+    sample.status = status
+    delete sample.recognition
+    delete sample.error
+    if (status === 'recognized') {
+      sample.recognition = { rawOutput: { text: 'recognized text' } }
+    }
+    if (status === 'failed') {
+      sample.error = { name: 'Error', message: 'failed' }
+    }
+
+    expect(validateBenchmarkArtifact(sample)).toMatchObject({ valid: true, errors: [] })
+  })
+
+  it('accepts skipped RAW_SAMPLE without recognition or error payload', () => {
+    const { sample } = createArtifacts()
+    sample.status = 'skipped'
+    delete sample.recognition
+    delete sample.error
+
+    expect(validateBenchmarkArtifact(sample)).toMatchObject({
+      valid: true,
+      errors: []
+    })
+  })
+
   it('keeps RAW_RUN independently finalizable without RAW_SAMPLE references', () => {
     const { run } = createArtifacts()
     const schema = getBenchmarkArtifactSchema(ARTIFACT_TYPES.RAW_RUN, '1.0.0')

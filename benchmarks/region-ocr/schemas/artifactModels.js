@@ -26,7 +26,7 @@ export const SUPPORTED_SCHEMA_VERSIONS = Object.freeze(
 )
 
 export const RUN_MODES = Object.freeze(['cold', 'warm'])
-export const SAMPLE_STATUSES = Object.freeze(['recognized', 'cancelled', 'failed'])
+export const SAMPLE_STATUSES = Object.freeze(['recognized', 'cancelled', 'failed', 'skipped'])
 export const COMPARISON_COMPATIBILITY = Object.freeze(['compatible', 'partial', 'incompatible'])
 export const REPORT_FORMATS = Object.freeze(['json', 'csv', 'markdown', 'html'])
 export const DOCUMENT_TYPES = Object.freeze([
