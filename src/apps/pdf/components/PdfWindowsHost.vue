@@ -279,6 +279,7 @@ const {
   retryTranslation,
   copyTranslation,
   dismissHost,
+  openTranslation,
   openWindowFromIcon,
   toggleShowOriginal,
   handleIconPointerDown,
@@ -292,6 +293,8 @@ const {
 } = usePdfWindowsHost({
   pdfFingerprint
 })
+
+defineExpose({ openTranslation })
 
 function isHeaderInteractiveTarget(event) {
   const target = event?.target

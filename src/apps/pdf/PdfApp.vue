@@ -124,6 +124,7 @@
                     @layout-change="handleLayoutChange"
                     @current-page-change="handleCurrentPageChange"
                     @visible-pages-change="handleVisiblePagesChange"
+                    @region-ocr-recognized="handleRegionOcrRecognized"
                   />
                 </template>
 
@@ -158,7 +159,10 @@
       </main>
     </div>
 
-    <PdfWindowsHost :pdf-fingerprint="pdfFingerprint" />
+    <PdfWindowsHost
+      ref="pdfWindowsHostRef"
+      :pdf-fingerprint="pdfFingerprint"
+    />
   </div>
 </template>
 
@@ -234,6 +238,7 @@ const {
 } = usePdfExport(translationTick)
 
 const pdfViewerRef = ref(null)
+const pdfWindowsHostRef = ref(null)
 const pdfTranslatedPaneRef = ref(null)
 const pdfViewerLayoutRef = ref(null)
 const fileInput = ref(null)
@@ -420,6 +425,16 @@ function handleVisiblePagesChange(pageNumbers) {
   if (pages.size === 0) return
 
   void hydrateVisiblePageBlocks(pages)
+}
+
+function handleRegionOcrRecognized(payload) {
+  const text = typeof payload?.text === 'string' ? payload.text.trim() : ''
+  if (!text || !payload?.position) return
+
+  void pdfWindowsHostRef.value?.openTranslation?.({
+    text,
+    position: payload.position
+  })
 }
 
 function handleTranslatedPaneCurrentPageChange(pageNumber) {

@@ -16,11 +16,11 @@ function deferredOutcome() {
   return { promise, resolve }
 }
 
-function mountRegionOcr(createExecutor) {
+function mountRegionOcr(createExecutor, options = {}) {
   let api
   wrapper = mount(defineComponent({
     setup() {
-      api = usePdfRegionOcr({ createExecutor })
+      api = usePdfRegionOcr({ createExecutor, ...options })
       return () => h('div')
     }
   }))
@@ -178,5 +178,24 @@ describe('usePdfRegionOcr', () => {
 
     expect(api.outcome.value).toEqual({ status: 'recognized', data: { text: 'ok', lines: [], confidence: 1 } })
     expect(api.isProcessing.value).toBe(false)
+  })
+
+  it('invokes recognized callback only for current recognized outcome', async () => {
+    const first = deferredOutcome()
+    const second = deferredOutcome()
+    const onRecognized = vi.fn()
+    const execute = vi.fn()
+      .mockReturnValueOnce({ promise: first.promise, cancel: vi.fn() })
+      .mockReturnValueOnce({ promise: second.promise, cancel: vi.fn() })
+    const api = mountRegionOcr(() => ({ execute }), { onRecognized })
+
+    const staleRun = api.executeRegionOcr({ region, pdfDocument: {}, scale: 1, language: 'eng' })
+    const currentRun = api.executeRegionOcr({ region, pdfDocument: {}, scale: 1, language: 'eng' })
+    first.resolve({ status: 'recognized', data: { text: 'stale', lines: [], confidence: 1 } })
+    second.resolve({ status: 'recognized', data: { text: 'current', lines: [], confidence: 2 } })
+    await Promise.all([staleRun, currentRun])
+
+    expect(onRecognized).toHaveBeenCalledOnce()
+    expect(onRecognized).toHaveBeenCalledWith({ text: 'current', lines: [], confidence: 2 })
   })
 })

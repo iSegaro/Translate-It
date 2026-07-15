@@ -1,7 +1,10 @@
 import { onBeforeUnmount, ref } from 'vue'
 import { PdfRegionOcrExecutor } from '@/features/pdf-translation/core/PdfRegionOcrExecutor.js'
 
-export function usePdfRegionOcr({ createExecutor = (options) => new PdfRegionOcrExecutor(options) } = {}) {
+export function usePdfRegionOcr({
+  createExecutor = (options) => new PdfRegionOcrExecutor(options),
+  onRecognized
+} = {}) {
   const outcome = ref(null)
   const isProcessing = ref(false)
   let activeOperation = null
@@ -30,6 +33,9 @@ export function usePdfRegionOcr({ createExecutor = (options) => new PdfRegionOcr
     outcome.value = result
     activeOperation = null
     isProcessing.value = false
+    if (result?.status === 'recognized') {
+      onRecognized?.(result.data)
+    }
     return result
   }
 

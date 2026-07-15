@@ -8,6 +8,7 @@
       Page {{ page.pageNumber }}
     </div>
     <div
+      ref="stageEl"
       class="pdf-page__stage"
       :style="stageStyle"
       @pointerdown="emit('region-selection-pointer-down', page.pageNumber, $event)"
@@ -117,6 +118,7 @@ const emit = defineEmits([
 ])
 
 const rootEl = ref(null)
+const stageEl = ref(null)
 const canvasEl = ref(null)
 const textLayerEl = ref(null)
 let textLayerRenderer = null
@@ -145,9 +147,11 @@ function cancelRender() {
 
 defineExpose({
   getRootEl: () => rootEl.value,
+  getStageEl: () => stageEl.value,
   getCanvasEl: () => canvasEl.value,
   getTextLayerEl: () => textLayerEl.value,
   rootEl,
+  stageEl,
   canvasEl,
   textLayerEl,
   cancelRender

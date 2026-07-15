@@ -390,6 +390,26 @@ export function usePdfWindowsHost(options = {}) {
     }
   }
 
+  async function openTranslation({ text, position } = {}) {
+    const normalizedText = typeof text === 'string' ? text.trim() : ''
+    const positionValues = [position?.x, position?.y, position?.width, position?.height]
+    if (!normalizedText || !positionValues.every(Number.isFinite)) return false
+
+    selectionSessionId.value += 1
+    activeRequestSessionId = 0
+    void stopSelectionIconTTS()
+    void stopWindowTTS()
+    selectedText.value = normalizedText
+    selectionPosition.value = position
+    hideIconStage()
+
+    await showWindowForSelection(position, {
+      translateImmediately: true,
+      anchorToSelection: true
+    })
+    return true
+  }
+
   async function persistGlobalPreferences() {
     const fingerprint = resolvePdfFingerprint()
     await savePdfWindowLayout({
@@ -874,6 +894,7 @@ export function usePdfWindowsHost(options = {}) {
     retryTranslation,
     copyTranslation,
     dismissHost,
+    openTranslation,
     openWindowFromIcon,
     handleIconPointerDown,
     handleHostPointerDown,

@@ -393,6 +393,36 @@ describe('PdfWindowsHost', () => {
     expect(wrapper.get('[data-testid="pdf-windows-host-result"]').text()).toContain('Translated text')
   })
 
+  it('opens direct supplied text in existing loading and translation flow without selection icon', async () => {
+    let resolveTranslation
+    sendRegularMessageMock.mockImplementationOnce(() => new Promise((resolve) => {
+      resolveTranslation = resolve
+    }))
+
+    const operation = wrapper.vm.openTranslation({
+      text: '  Region OCR text  ',
+      position: { x: 40, y: 60, width: 120, height: 80, _isViewportRelative: true }
+    })
+    await flushPromises()
+
+    expect(wrapper.find('[data-testid="pdf-windows-host-icon-stage"]').isVisible()).toBe(false)
+    expect(wrapper.find('.pdf-windows-host--loading').exists()).toBe(true)
+    expect(sendRegularMessageMock).toHaveBeenCalledWith(expect.objectContaining({
+      action: 'TRANSLATE',
+      context: 'pdf-translation',
+      data: expect.objectContaining({
+        text: 'Region OCR text',
+        mode: 'selection-manager'
+      })
+    }))
+
+    resolveTranslation({ success: true, translatedText: 'Region translated' })
+    await operation
+    await flushPromises()
+
+    expect(wrapper.get('[data-testid="pdf-windows-host-result"]').text()).toContain('Region translated')
+  })
+
   it('keeps the selection icon transition alive until the icon click opens the window', async () => {
     await showSelectionIcon('Transition me')
 

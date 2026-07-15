@@ -1,6 +1,6 @@
 import { afterEach, describe, beforeEach, expect, it, vi } from 'vitest'
 import { mount } from '@vue/test-utils'
-import { computed, nextTick, ref } from 'vue'
+import { computed, defineComponent, h, nextTick, ref } from 'vue'
 import PdfApp from './PdfApp.vue'
 
 // jsdom does not implement matchMedia — stub it before component mount
@@ -23,6 +23,7 @@ let mockPdfOcr
 let mockPdfOcrOptions
 let mockLayoutSyncFromPane
 let mockPdfViewport
+const openTranslationMock = vi.fn()
 
 vi.mock('./composables/usePdfViewerController.js', () => ({
   usePdfViewerController: () => mockViewerController
@@ -154,6 +155,7 @@ vi.mock('./components/PdfViewer.vue', () => ({
   default: {
     name: 'PdfViewer',
     props: ['viewerRole', 'showOverlay', 'handleNavigationTarget', 'scrollContainer', 'freezeRenderWindowEviction'],
+    emits: ['layout-change', 'current-page-change', 'visible-pages-change', 'region-ocr-recognized'],
     template: '<div class="pdf-viewer-stub" />'
   }
 }))
@@ -181,10 +183,13 @@ vi.mock('./components/PdfOcrProgress.vue', () => ({
 }))
 
 vi.mock('./components/PdfWindowsHost.vue', () => ({
-  default: {
+  default: defineComponent({
     name: 'PdfWindowsHost',
-    template: '<div class="pdf-windows-host-stub" />'
-  }
+    setup(_, { expose }) {
+      expose({ openTranslation: openTranslationMock })
+      return () => h('div', { class: 'pdf-windows-host-stub' })
+    }
+  })
 }))
 
 vi.mock('./debug/pdfOverlayDiagnostics.js', () => ({}))
@@ -298,6 +303,7 @@ function createMocks({
 describe('PdfApp', () => {
   beforeEach(() => {
     vi.useRealTimers()
+    openTranslationMock.mockReset()
     createMocks()
   })
 
@@ -361,6 +367,38 @@ describe('PdfApp', () => {
     expect(order).toEqual(['refresh:0'])
     expect(mockPdfOcr.refreshOcrRecommendations).toHaveBeenCalled()
     expect(mockViewerController.recomputeLayout).not.toHaveBeenCalled()
+  })
+
+  it('forwards only recognized text and position to PdfWindowsHost', async () => {
+    const wrapper = mount(PdfApp)
+    await flushPromises()
+    const payload = {
+      text: 'recognized text',
+      position: { x: 20, y: 30, width: 40, height: 50, _isViewportRelative: true }
+    }
+
+    wrapper.findComponent({ name: 'PdfViewer' }).vm.$emit('region-ocr-recognized', {
+      ...payload,
+      confidence: 99,
+      lines: [{ text: 'ignored' }]
+    })
+    await flushPromises()
+
+    expect(openTranslationMock).toHaveBeenCalledOnce()
+    expect(openTranslationMock).toHaveBeenCalledWith(payload)
+  })
+
+  it('does not open translation for empty recognized text', async () => {
+    const wrapper = mount(PdfApp)
+    await flushPromises()
+
+    wrapper.findComponent({ name: 'PdfViewer' }).vm.$emit('region-ocr-recognized', {
+      text: '   ',
+      position: { x: 20, y: 30, width: 40, height: 50, _isViewportRelative: true }
+    })
+    await flushPromises()
+
+    expect(openTranslationMock).not.toHaveBeenCalled()
   })
 
   it('shows a transient TXT export success banner', async () => {

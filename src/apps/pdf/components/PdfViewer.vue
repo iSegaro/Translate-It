@@ -101,10 +101,17 @@ const props = defineProps({
   }
 })
 
-const emit = defineEmits(['layout-change', 'current-page-change', 'visible-pages-change', 'region-selection-complete'])
+const emit = defineEmits([
+  'layout-change',
+  'current-page-change',
+  'visible-pages-change',
+  'region-selection-complete',
+  'region-ocr-recognized'
+])
 const viewerRoot = ref(null)
 const pageViews = new Map()
 let lastEmittedVisiblePages = new Set()
+let activeRegionPosition = null
 
 const isOriginalRole = computed(() => props.viewerRole === VIEWER_ROLE.ORIGINAL)
 const ownsPageRenderLifecycle = computed(() => props.viewerRole === VIEWER_ROLE.ORIGINAL)
@@ -118,14 +125,47 @@ const regionSelection = usePdfRegionSelectionController({
 const {
   executeRegionOcr,
   cancelRegionOcr
-} = usePdfRegionOcr()
+} = usePdfRegionOcr({
+  onRecognized: (data) => {
+    const text = typeof data?.text === 'string' ? data.text.trim() : ''
+    const position = activeRegionPosition
+    activeRegionPosition = null
+    if (!text || !position || !isOriginalRole.value) return
+    emit('region-ocr-recognized', { text, position })
+  }
+})
+
+function resolveRegionViewportPosition(pageNumber, rect) {
+  const stageRect = pageViews.get(pageNumber)?.getStageEl?.()?.getBoundingClientRect?.()
+  if (!stageRect || !rect) return null
+
+  const values = [stageRect.left, stageRect.top, rect.x, rect.y, rect.width, rect.height]
+  if (!values.every(Number.isFinite)) return null
+
+  return {
+    x: stageRect.left + rect.x,
+    y: stageRect.top + rect.y,
+    width: rect.width,
+    height: rect.height,
+    _isViewportRelative: true
+  }
+}
 
 function handleRegionSelectionComplete(payload) {
+  // Interaction event.
+  // Emitted whenever the user completes a region selection,
+  // regardless of whether OCR starts successfully.
   emit('region-selection-complete', payload)
+  
+  activeRegionPosition = null
+  cancelRegionOcr()
   if (!regionSelectionEnabled.value) return
 
   const viewport = props.session?.getPageViewport?.(payload?.pageNumber)
   if (!viewport) return
+
+  const position = resolveRegionViewportPosition(payload.pageNumber, payload.rect)
+  if (!position) return
 
   const region = mapPageLocalCssRectToPdfRegion({
     pageNumber: payload.pageNumber,
@@ -133,6 +173,8 @@ function handleRegionSelectionComplete(payload) {
     viewport
   })
   if (!region) return
+
+  activeRegionPosition = position
 
   executeRegionOcr({
     region,
@@ -270,7 +312,10 @@ watch(
 watch(
   regionSelectionEnabled,
   (enabled) => {
-    if (!enabled) cancelRegionOcr()
+    if (!enabled) {
+      activeRegionPosition = null
+      cancelRegionOcr()
+    }
   }
 )
 
@@ -316,6 +361,7 @@ onMounted(() => {
 })
 
 onBeforeUnmount(() => {
+  activeRegionPosition = null
   cancelRegionOcr()
   disconnectObservers()
   resetRenderPipeline()
