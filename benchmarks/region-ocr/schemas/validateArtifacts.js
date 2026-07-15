@@ -75,6 +75,191 @@ function validateCorpusRegionSemantics(artifact, errors) {
   })
 }
 
+function sortedValues(values) {
+  return [...values].sort()
+}
+
+function sameValues(left, right) {
+  return left.length === right.length && left.every((value, index) => value === right[index])
+}
+
+function numbersMatch(expected, received) {
+  return Math.abs(expected - received) <= Number.EPSILON * Math.max(1, Math.abs(expected), Math.abs(received))
+}
+
+function validateLabelSet(actual, expected, path, code, message, errors) {
+  const received = sortedValues(actual)
+  if (!sameValues(received, expected)) {
+    errors.push(error(code, path, message, { expected, received }))
+  }
+}
+
+function validateComparisonSemantics(artifact, errors) {
+  if (!Array.isArray(artifact.candidates)) return
+  const labels = artifact.candidates.map((candidate) => candidate?.label).filter((label) => typeof label === 'string')
+  const expectedLabels = sortedValues(labels)
+  const metrics = artifact.metrics && typeof artifact.metrics === 'object' && !Array.isArray(artifact.metrics) ? artifact.metrics : {}
+  const matrix = artifact.comparisonMatrix && typeof artifact.comparisonMatrix === 'object' && !Array.isArray(artifact.comparisonMatrix) ? artifact.comparisonMatrix : {}
+  const metricIds = sortedValues(Object.keys(metrics))
+  const candidatesByLabel = new Map(artifact.candidates.map((candidate) => [candidate?.label, candidate]))
+
+  artifact.candidates.forEach((candidate, index) => {
+    validateReferenceType(candidate?.scoredResultRef, [ARTIFACT_TYPES.SCORED_RESULT], `$.candidates[${index}].scoredResultRef`, errors)
+    validateLabelSet(
+      Object.keys(candidate?.summary?.metrics || {}),
+      metricIds,
+      `$.candidates[${index}].summary.metrics`,
+      'candidate_summary_metric_set_mismatch',
+      'Candidate summary metrics must match comparison artifact metrics',
+      errors
+    )
+  })
+
+  Object.entries(metrics).forEach(([metricId, comparison]) => {
+    validateLabelSet(
+      (comparison?.candidateValues || []).map((value) => value?.label).filter((label) => typeof label === 'string'),
+      expectedLabels,
+      `$.metrics.${metricId}.candidateValues`,
+      'invalid_metric_structure',
+      'Metric candidate values must match comparison candidates',
+      errors
+    )
+    validateLabelSet(
+      Object.keys(comparison?.pairwiseDifferences || {}),
+      expectedLabels,
+      `$.metrics.${metricId}.pairwiseDifferences`,
+      'invalid_metric_structure',
+      'Metric pairwise rows must match comparison candidates',
+      errors
+    )
+    Object.entries(comparison?.pairwiseDifferences || {}).forEach(([label, row]) => {
+      validateLabelSet(
+        Object.keys(row || {}),
+        expectedLabels,
+        `$.metrics.${metricId}.pairwiseDifferences.${label}`,
+        'invalid_metric_structure',
+        'Metric pairwise columns must match comparison candidates',
+        errors
+      )
+    })
+    ;(comparison?.candidateValues || []).forEach((candidateValue, index) => {
+      const summaryMetric = candidatesByLabel.get(candidateValue?.label)?.summary?.metrics?.[metricId]
+      const path = `$.metrics.${metricId}.candidateValues[${index}]`
+      if (!summaryMetric || typeof summaryMetric !== 'object') return
+      if (candidateValue.count !== summaryMetric.count) {
+        errors.push(error('metric_count_mismatch', `${path}.count`, 'Metric candidate value count must match candidate summary', {
+          expected: summaryMetric.count,
+          received: candidateValue.count
+        }))
+      }
+      if (!numbersMatch(summaryMetric.mean, candidateValue.value)) {
+        errors.push(error('metric_mean_mismatch', `${path}.value`, 'Metric candidate value must match candidate summary mean', {
+          expected: summaryMetric.mean,
+          received: candidateValue.value
+        }))
+      }
+    })
+
+    const valuesByLabel = new Map((comparison?.candidateValues || []).map((candidateValue) => [candidateValue?.label, candidateValue?.value]))
+    Object.entries(comparison?.pairwiseDifferences || {}).forEach(([leftLabel, row]) => {
+      Object.entries(row || {}).forEach(([rightLabel, difference]) => {
+        if (leftLabel === rightLabel && !numbersMatch(0, difference)) {
+          errors.push(error('invalid_pairwise_diagonal', `$.metrics.${metricId}.pairwiseDifferences.${leftLabel}.${rightLabel}`, 'Pairwise diagonal difference must be zero', {
+            expected: 0,
+            received: difference
+          }))
+        }
+        const reverse = comparison?.pairwiseDifferences?.[rightLabel]?.[leftLabel]
+        if (typeof reverse === 'number' && !numbersMatch(difference, -reverse)) {
+          errors.push(error('invalid_pairwise_difference', `$.metrics.${metricId}.pairwiseDifferences.${leftLabel}.${rightLabel}`, 'Pairwise differences must be antisymmetric', {
+            expected: -reverse,
+            received: difference
+          }))
+        }
+        const leftValue = valuesByLabel.get(leftLabel)
+        const rightValue = valuesByLabel.get(rightLabel)
+        if (typeof leftValue === 'number' && typeof rightValue === 'number' && !numbersMatch(leftValue - rightValue, difference)) {
+          errors.push(error('invalid_pairwise_difference', `$.metrics.${metricId}.pairwiseDifferences.${leftLabel}.${rightLabel}`, 'Pairwise difference must equal left candidate value minus right candidate value', {
+            expected: leftValue - rightValue,
+            received: difference
+          }))
+        }
+      })
+    })
+  })
+
+  if (Array.isArray(artifact.samples)) artifact.samples.forEach((sample, index) => {
+    validateLabelSet(
+      (sample?.candidateResults || []).map((result) => result?.label).filter((label) => typeof label === 'string'),
+      expectedLabels,
+      `$.samples[${index}].candidateResults`,
+      'invalid_sample_structure',
+      'Sample candidate results must match comparison candidates',
+      errors
+    )
+    ;(sample?.candidateResults || []).forEach((result, resultIndex) => {
+      const resultPath = `$.samples[${index}].candidateResults[${resultIndex}]`
+      if (result?.status !== sample?.status) {
+        errors.push(error('incompatible_sample_status', `${resultPath}.status`, 'Sample candidate result status must match comparison sample status', {
+          expected: sample?.status,
+          received: result?.status
+        }))
+      }
+      if (result?.status === 'recognized') {
+        validateLabelSet(
+          Object.keys(result.metrics || {}),
+          metricIds,
+          `${resultPath}.metrics`,
+          'sample_metric_set_mismatch',
+          'Recognized sample metrics must match comparison artifact metrics',
+          errors
+        )
+        validateSchemaValue(result.metrics, SCORE_METRICS_SCHEMA, `${resultPath}.metrics`, errors)
+      } else if (['failed', 'cancelled', 'skipped'].includes(result?.status) && Object.keys(result?.metrics || {}).length > 0) {
+        errors.push(error('incompatible_status_metrics', `${resultPath}.metrics`, 'Only recognized samples may include metrics'))
+      }
+    })
+  })
+
+  validateLabelSet(
+    Object.keys(matrix),
+    expectedLabels,
+    '$.comparisonMatrix',
+    'invalid_matrix_structure',
+    'Comparison matrix rows must match comparison candidates',
+    errors
+  )
+  Object.entries(matrix).forEach(([label, row]) => {
+    validateLabelSet(
+      Object.keys(row || {}),
+      expectedLabels,
+      `$.comparisonMatrix.${label}`,
+      'invalid_matrix_structure',
+      'Comparison matrix columns must match comparison candidates',
+      errors
+    )
+    Object.entries(row || {}).forEach(([rightLabel, cell]) => {
+      validateLabelSet(
+        Object.keys(cell?.metrics || {}),
+        metricIds,
+        `$.comparisonMatrix.${label}.${rightLabel}.metrics`,
+        'invalid_matrix_structure',
+        'Comparison matrix cell metrics must match artifact metrics',
+        errors
+      )
+      Object.entries(cell?.metrics || {}).forEach(([metricId, value]) => {
+        const expected = metrics?.[metricId]?.pairwiseDifferences?.[label]?.[rightLabel]
+        if (typeof expected === 'number' && !numbersMatch(expected, value)) {
+          errors.push(error('incompatible_matrix_metric', `$.comparisonMatrix.${label}.${rightLabel}.metrics.${metricId}`, 'Comparison matrix metric must match metric pairwise difference', {
+            expected,
+            received: value
+          }))
+        }
+      })
+    })
+  })
+}
+
 function validateReferenceSemantics(artifact, errors) {
   switch (artifact.artifactType) {
     case ARTIFACT_TYPES.CORPUS_MANIFEST:
@@ -97,18 +282,7 @@ function validateReferenceSemantics(artifact, errors) {
       })
       break
     case ARTIFACT_TYPES.COMPARISON_RESULT:
-      validateReferenceType(
-        artifact.leftRef,
-        [ARTIFACT_TYPES.RAW_RUN, ARTIFACT_TYPES.SCORED_RESULT],
-        '$.leftRef',
-        errors
-      )
-      validateReferenceType(
-        artifact.rightRef,
-        [ARTIFACT_TYPES.RAW_RUN, ARTIFACT_TYPES.SCORED_RESULT],
-        '$.rightRef',
-        errors
-      )
+      validateComparisonSemantics(artifact, errors)
       break
   }
 }
@@ -163,7 +337,7 @@ function collectReferences(artifact) {
     case ARTIFACT_TYPES.SCORED_RESULT:
       return [artifact.rawRunRef, artifact.corpusRef, ...(artifact.samples || []).map((sample) => sample.sampleRef)]
     case ARTIFACT_TYPES.COMPARISON_RESULT:
-      return [artifact.leftRef, artifact.rightRef]
+      return (artifact.candidates || []).map((candidate) => candidate.scoredResultRef)
     case ARTIFACT_TYPES.REPORT_MANIFEST:
       return artifact.sourceRefs || []
     default:

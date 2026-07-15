@@ -4,6 +4,7 @@ import {
   ARTIFACT_TYPES,
   BenchmarkArtifactValidationError,
   CONTENT_HASH_CONTRACT,
+  SCORE_METRICS_SCHEMA,
   SCHEMA_VERSIONS,
   finalizeBenchmarkArtifact,
   getBenchmarkArtifactSchema,
@@ -45,6 +46,42 @@ function reference(artifact) {
     schemaVersion: artifact.schemaVersion,
     contentHash: artifact.contentHash
   }
+}
+
+function recognizedMetrics(value = 0) {
+  return { cer: value, wer: 0, deletionRate: 0, rtlOrderCorrect: null }
+}
+
+const COMPARISON_METRIC_IDS = Object.freeze(Object.keys(SCORE_METRICS_SCHEMA.properties))
+
+function comparisonSummary(value = 0) {
+  return {
+    total: 1,
+    recognized: 1,
+    failed: 0,
+    cancelled: 0,
+    skipped: 0,
+    metrics: Object.fromEntries(COMPARISON_METRIC_IDS.map((metricId) => [metricId, { count: 1, mean: value }]))
+  }
+}
+
+function comparisonMetricsForLabels(labels) {
+  return Object.fromEntries(COMPARISON_METRIC_IDS.map((metricId) => [metricId, {
+    candidateValues: labels.map((label, index) => ({ label, count: 1, value: index / 10 })),
+    pairwiseDifferences: Object.fromEntries(labels.map((left, leftIndex) => [
+      left,
+      Object.fromEntries(labels.map((right, rightIndex) => [right, (leftIndex - rightIndex) / 10]))
+    ]))
+  }]))
+}
+
+function comparisonMatrixForLabels(labels) {
+  return Object.fromEntries(labels.map((left, leftIndex) => [
+    left,
+    Object.fromEntries(labels.map((right, rightIndex) => [right, {
+      metrics: Object.fromEntries(COMPARISON_METRIC_IDS.map((metricId) => [metricId, (leftIndex - rightIndex) / 10]))
+    }]))
+  ]))
 }
 
 function createArtifacts() {
@@ -136,19 +173,38 @@ function createArtifacts() {
 
   const comparison = {
     ...artifactBase(ARTIFACT_TYPES.COMPARISON_RESULT, 'comparison-001', HASHES.comparison),
-    comparisonId: 'comparison-001',
-    leftRef: reference(scored),
-    rightRef: reference(scored),
-    comparisonAxes: ['policy'],
-    compatibility: 'compatible',
-    entries: [{
-      caseId: 'vector-en-01/paragraph-01',
-      metricId: 'cer',
-      left: 0,
-      right: 0,
-      absoluteDelta: 0,
-      relativeDelta: null
-    }]
+    comparisonResultId: 'comparison-001',
+    comparisonPolicy: { id: 'comparison-policy', version: '1.0.0', parameters: {} },
+    candidates: [
+      {
+        label: 'candidate-a',
+        scoredResultRef: reference(scored),
+        normalizationPolicy: scored.normalizationPolicy,
+        scorer: scored.scorer,
+        summary: comparisonSummary(0),
+        metadata: { fixture: true }
+      },
+      {
+        label: 'candidate-b',
+        scoredResultRef: reference(scored),
+        normalizationPolicy: scored.normalizationPolicy,
+        scorer: scored.scorer,
+        summary: comparisonSummary(0.1),
+        metadata: { fixture: true }
+      }
+    ],
+    metrics: comparisonMetricsForLabels(['candidate-a', 'candidate-b']),
+    samples: [{
+      documentId: 'vector-en-01',
+      regionId: 'paragraph-01',
+      status: 'recognized',
+      candidateResults: [
+        { label: 'candidate-a', status: 'recognized', metrics: recognizedMetrics(0) },
+        { label: 'candidate-b', status: 'recognized', metrics: recognizedMetrics(0) }
+      ]
+    }],
+    comparisonMatrix: comparisonMatrixForLabels(['candidate-a', 'candidate-b']),
+    diagnostics: { pairwiseDifference: 'leftValue - rightValue' }
   }
 
   const report = {
@@ -164,6 +220,23 @@ function createArtifacts() {
   }
 
   return { corpus, run, sample, scored, comparison, report }
+}
+
+function comparisonWithLabels(labels) {
+  const { comparison } = createArtifacts()
+  comparison.candidates = labels.map((label, index) => ({
+    ...structuredClone(comparison.candidates[0]),
+    label,
+    summary: comparisonSummary(index / 10)
+  }))
+  comparison.metrics = comparisonMetricsForLabels(labels)
+  comparison.samples[0].candidateResults = labels.map((label, index) => ({
+    label,
+    status: 'recognized',
+    metrics: recognizedMetrics(index / 10)
+  }))
+  comparison.comparisonMatrix = comparisonMatrixForLabels(labels)
+  return comparison
 }
 
 describe('Region OCR benchmark artifact schemas', () => {
@@ -219,6 +292,283 @@ describe('Region OCR benchmark artifact schemas', () => {
     for (const artifact of Object.values(createArtifacts())) {
       expect(validateBenchmarkArtifact(artifact)).toMatchObject({ valid: true, errors: [] })
     }
+  })
+
+  it.each([
+    ['two', ['candidate-a', 'candidate-b']],
+    ['three', ['candidate-a', 'candidate-b', 'candidate-c']],
+    ['many', Array.from({ length: 10 }, (_, index) => `candidate-${index}`)]
+  ])('accepts valid N-candidate COMPARISON_RESULT with %s candidates', (_, labels) => {
+    const comparison = comparisonWithLabels(labels)
+
+    expect(validateBenchmarkArtifact(comparison)).toMatchObject({ valid: true, errors: [] })
+    expect(comparison.candidates.map(({ label }) => label)).toEqual(labels)
+    expect(Object.keys(comparison.comparisonMatrix)).toEqual(labels)
+  })
+
+  it('preserves COMPARISON_RESULT matrix, sample ordering, and status data', () => {
+    const comparison = comparisonWithLabels(['candidate-a', 'candidate-b', 'candidate-c'])
+    comparison.samples.push({
+      documentId: 'vector-en-01',
+      regionId: 'paragraph-02',
+      status: 'skipped',
+      candidateResults: [
+        { label: 'candidate-a', status: 'skipped', metrics: {} },
+        { label: 'candidate-b', status: 'skipped', metrics: {} },
+        { label: 'candidate-c', status: 'skipped', metrics: {} }
+      ]
+    })
+
+    expect(validateBenchmarkArtifact(comparison)).toMatchObject({ valid: true, errors: [] })
+    expect(comparison.samples.map(({ regionId }) => regionId)).toEqual(['paragraph-01', 'paragraph-02'])
+    expect(comparison.samples.map(({ status }) => status)).toEqual(['recognized', 'skipped'])
+    expect(comparison.comparisonMatrix['candidate-c']['candidate-a'].metrics.cer).toBe(0.2)
+  })
+
+  it('rejects obsolete pairwise COMPARISON_RESULT contract fields as insufficient', () => {
+    const { scored } = createArtifacts()
+    const obsolete = {
+      ...artifactBase(ARTIFACT_TYPES.COMPARISON_RESULT, 'comparison-001', HASHES.comparison),
+      comparisonId: 'comparison-001',
+      leftRef: reference(scored),
+      rightRef: reference(scored),
+      comparisonAxes: ['policy'],
+      compatibility: 'compatible',
+      entries: []
+    }
+
+    expect(validateBenchmarkArtifact(obsolete).errors).toEqual(expect.arrayContaining([
+      expect.objectContaining({ code: 'missing_required_field', path: '$.comparisonResultId' }),
+      expect.objectContaining({ code: 'missing_required_field', path: '$.candidates' }),
+      expect.objectContaining({ code: 'missing_required_field', path: '$.comparisonMatrix' })
+    ]))
+  })
+
+  it('rejects invalid COMPARISON_RESULT candidate references', () => {
+    const comparison = comparisonWithLabels(['candidate-a', 'candidate-b'])
+    comparison.candidates[0].scoredResultRef.artifactType = ARTIFACT_TYPES.RAW_RUN
+
+    expect(validateBenchmarkArtifact(comparison).errors).toContainEqual(expect.objectContaining({
+      code: 'incompatible_reference_type',
+      path: '$.candidates[0].scoredResultRef.artifactType'
+    }))
+  })
+
+  it('rejects invalid COMPARISON_RESULT matrix structure', () => {
+    const comparison = comparisonWithLabels(['candidate-a', 'candidate-b', 'candidate-c'])
+    delete comparison.comparisonMatrix['candidate-a']['candidate-c']
+
+    expect(validateBenchmarkArtifact(comparison).errors).toContainEqual(expect.objectContaining({
+      code: 'invalid_matrix_structure',
+      path: '$.comparisonMatrix.candidate-a'
+    }))
+  })
+
+  it('rejects invalid COMPARISON_RESULT metric structure', () => {
+    const comparison = comparisonWithLabels(['candidate-a', 'candidate-b'])
+    comparison.metrics.cer.candidateValues.pop()
+
+    expect(validateBenchmarkArtifact(comparison).errors).toContainEqual(expect.objectContaining({
+      code: 'invalid_metric_structure',
+      path: '$.metrics.cer.candidateValues'
+    }))
+  })
+
+  it('rejects invalid COMPARISON_RESULT sample structure', () => {
+    const comparison = comparisonWithLabels(['candidate-a', 'candidate-b'])
+    comparison.samples[0].candidateResults[1].label = 'candidate-c'
+
+    expect(validateBenchmarkArtifact(comparison).errors).toContainEqual(expect.objectContaining({
+      code: 'invalid_sample_structure',
+      path: '$.samples[0].candidateResults'
+    }))
+  })
+
+  it('accepts COMPARISON_RESULT sample metrics with matching keys in different property order', () => {
+    const comparison = comparisonWithLabels(['candidate-a', 'candidate-b'])
+    comparison.samples[0].candidateResults[0].metrics = {
+      rtlOrderCorrect: null,
+      deletionRate: 0,
+      wer: 0,
+      cer: 0
+    }
+
+    expect(validateBenchmarkArtifact(comparison)).toMatchObject({ valid: true, errors: [] })
+  })
+
+  it('rejects COMPARISON_RESULT recognized sample metrics missing artifact metric IDs', () => {
+    const comparison = comparisonWithLabels(['candidate-a', 'candidate-b'])
+    delete comparison.samples[0].candidateResults[0].metrics.wer
+
+    expect(validateBenchmarkArtifact(comparison).errors).toContainEqual(expect.objectContaining({
+      code: 'sample_metric_set_mismatch',
+      path: '$.samples[0].candidateResults[0].metrics'
+    }))
+  })
+
+  it('rejects COMPARISON_RESULT recognized sample metrics with extra metric IDs', () => {
+    const comparison = comparisonWithLabels(['candidate-a', 'candidate-b'])
+    comparison.samples[0].candidateResults[0].metrics.futureMetric = 1
+
+    expect(validateBenchmarkArtifact(comparison).errors).toContainEqual(expect.objectContaining({
+      code: 'sample_metric_set_mismatch',
+      path: '$.samples[0].candidateResults[0].metrics'
+    }))
+  })
+
+  it('accepts COMPARISON_RESULT candidate summary metrics matching artifact metric IDs', () => {
+    const comparison = comparisonWithLabels(['candidate-a', 'candidate-b'])
+    comparison.candidates[0].summary.metrics = {
+      rtlOrderCorrect: { count: 1, mean: 0 },
+      deletionRate: { count: 1, mean: 0 },
+      wer: { count: 1, mean: 0 },
+      cer: { count: 1, mean: 0 }
+    }
+
+    expect(validateBenchmarkArtifact(comparison)).toMatchObject({ valid: true, errors: [] })
+  })
+
+  it('rejects COMPARISON_RESULT candidate summary metrics missing artifact metric IDs', () => {
+    const comparison = comparisonWithLabels(['candidate-a', 'candidate-b'])
+    delete comparison.candidates[1].summary.metrics.wer
+
+    expect(validateBenchmarkArtifact(comparison).errors).toContainEqual(expect.objectContaining({
+      code: 'candidate_summary_metric_set_mismatch',
+      path: '$.candidates[1].summary.metrics'
+    }))
+  })
+
+  it('rejects COMPARISON_RESULT candidate summary metrics with extra metric IDs', () => {
+    const comparison = comparisonWithLabels(['candidate-a', 'candidate-b'])
+    comparison.candidates[1].summary.metrics.futureMetric = { count: 1, mean: 0 }
+
+    expect(validateBenchmarkArtifact(comparison).errors).toContainEqual(expect.objectContaining({
+      code: 'candidate_summary_metric_set_mismatch',
+      path: '$.candidates[1].summary.metrics'
+    }))
+  })
+
+  it('accepts COMPARISON_RESULT sample status and metrics matching persisted scoring contract', () => {
+    const comparison = comparisonWithLabels(['candidate-a', 'candidate-b'])
+    comparison.samples.push({
+      documentId: 'vector-en-01',
+      regionId: 'paragraph-02',
+      status: 'failed',
+      candidateResults: [
+        { label: 'candidate-a', status: 'failed', metrics: {} },
+        { label: 'candidate-b', status: 'failed', metrics: {} }
+      ]
+    }, {
+      documentId: 'vector-en-01',
+      regionId: 'paragraph-03',
+      status: 'cancelled',
+      candidateResults: [
+        { label: 'candidate-a', status: 'cancelled', metrics: {} },
+        { label: 'candidate-b', status: 'cancelled', metrics: {} }
+      ]
+    }, {
+      documentId: 'vector-en-01',
+      regionId: 'paragraph-04',
+      status: 'skipped',
+      candidateResults: [
+        { label: 'candidate-a', status: 'skipped', metrics: {} },
+        { label: 'candidate-b', status: 'skipped', metrics: {} }
+      ]
+    })
+
+    expect(validateBenchmarkArtifact(comparison)).toMatchObject({ valid: true, errors: [] })
+  })
+
+  it('rejects COMPARISON_RESULT sample status mismatch', () => {
+    const comparison = comparisonWithLabels(['candidate-a', 'candidate-b'])
+    comparison.samples[0].candidateResults[1].status = 'skipped'
+    comparison.samples[0].candidateResults[1].metrics = {}
+
+    expect(validateBenchmarkArtifact(comparison).errors).toContainEqual(expect.objectContaining({
+      code: 'incompatible_sample_status',
+      path: '$.samples[0].candidateResults[1].status'
+    }))
+  })
+
+  it.each(['failed', 'cancelled', 'skipped'])('rejects COMPARISON_RESULT %s sample with populated metrics', (status) => {
+    const comparison = comparisonWithLabels(['candidate-a', 'candidate-b'])
+    comparison.samples[0].status = status
+    comparison.samples[0].candidateResults.forEach((result) => {
+      result.status = status
+      result.metrics = { cer: 0 }
+    })
+
+    expect(validateBenchmarkArtifact(comparison).errors).toContainEqual(expect.objectContaining({
+      code: 'incompatible_status_metrics',
+      path: '$.samples[0].candidateResults[0].metrics'
+    }))
+  })
+
+  it('rejects COMPARISON_RESULT candidate summary count mismatch', () => {
+    const comparison = comparisonWithLabels(['candidate-a', 'candidate-b'])
+    comparison.metrics.cer.candidateValues[0].count = 2
+
+    expect(validateBenchmarkArtifact(comparison).errors).toContainEqual(expect.objectContaining({
+      code: 'metric_count_mismatch',
+      path: '$.metrics.cer.candidateValues[0].count'
+    }))
+  })
+
+  it('rejects COMPARISON_RESULT candidate summary mean mismatch', () => {
+    const comparison = comparisonWithLabels(['candidate-a', 'candidate-b'])
+    comparison.metrics.cer.candidateValues[1].value = 0.9
+
+    expect(validateBenchmarkArtifact(comparison).errors).toContainEqual(expect.objectContaining({
+      code: 'metric_mean_mismatch',
+      path: '$.metrics.cer.candidateValues[1].value'
+    }))
+  })
+
+  it('rejects COMPARISON_RESULT matrix values that differ from pairwise differences', () => {
+    const comparison = comparisonWithLabels(['candidate-a', 'candidate-b'])
+    comparison.comparisonMatrix['candidate-a']['candidate-b'].metrics.cer = 1
+
+    expect(validateBenchmarkArtifact(comparison).errors).toContainEqual(expect.objectContaining({
+      code: 'incompatible_matrix_metric',
+      path: '$.comparisonMatrix.candidate-a.candidate-b.metrics.cer'
+    }))
+  })
+
+  it('rejects COMPARISON_RESULT non-zero pairwise diagonal', () => {
+    const comparison = comparisonWithLabels(['candidate-a', 'candidate-b'])
+    comparison.metrics.cer.pairwiseDifferences['candidate-a']['candidate-a'] = 1
+    comparison.comparisonMatrix['candidate-a']['candidate-a'].metrics.cer = 1
+
+    expect(validateBenchmarkArtifact(comparison).errors).toContainEqual(expect.objectContaining({
+      code: 'invalid_pairwise_diagonal',
+      path: '$.metrics.cer.pairwiseDifferences.candidate-a.candidate-a'
+    }))
+  })
+
+  it('rejects COMPARISON_RESULT non-antisymmetric pairwise differences', () => {
+    const comparison = comparisonWithLabels(['candidate-a', 'candidate-b'])
+    comparison.metrics.cer.pairwiseDifferences['candidate-a']['candidate-b'] = 0.2
+    comparison.metrics.cer.pairwiseDifferences['candidate-b']['candidate-a'] = 0.2
+    comparison.comparisonMatrix['candidate-a']['candidate-b'].metrics.cer = 0.2
+    comparison.comparisonMatrix['candidate-b']['candidate-a'].metrics.cer = 0.2
+
+    expect(validateBenchmarkArtifact(comparison).errors).toContainEqual(expect.objectContaining({
+      code: 'invalid_pairwise_difference',
+      path: '$.metrics.cer.pairwiseDifferences.candidate-a.candidate-b'
+    }))
+  })
+
+  it('rejects COMPARISON_RESULT differences inconsistent with candidate values', () => {
+    const comparison = comparisonWithLabels(['candidate-a', 'candidate-b'])
+    comparison.metrics.cer.pairwiseDifferences['candidate-a']['candidate-b'] = -0.5
+    comparison.metrics.cer.pairwiseDifferences['candidate-b']['candidate-a'] = 0.5
+    comparison.comparisonMatrix['candidate-a']['candidate-b'].metrics.cer = -0.5
+    comparison.comparisonMatrix['candidate-b']['candidate-a'].metrics.cer = 0.5
+
+    expect(validateBenchmarkArtifact(comparison).errors).toContainEqual(expect.objectContaining({
+      code: 'invalid_pairwise_difference',
+      path: '$.metrics.cer.pairwiseDifferences.candidate-a.candidate-b'
+    }))
   })
 
   it.each(['recognized', 'failed', 'cancelled', 'skipped'])('accepts RAW_SAMPLE status %s', (status) => {

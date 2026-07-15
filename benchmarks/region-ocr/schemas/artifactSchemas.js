@@ -1,6 +1,5 @@
 import {
   ARTIFACT_TYPES,
-  COMPARISON_COMPATIBILITY,
   DOCUMENT_TYPES,
   IDENTIFIER_PATTERN,
   REPORT_FORMATS,
@@ -298,28 +297,94 @@ export const SCORED_RESULT_SCHEMA = artifactSchema(
   }
 )
 
-const comparisonEntry = object(
-  ['caseId', 'metricId', 'left', 'right', 'absoluteDelta', 'relativeDelta'],
+const metricValues = { type: 'object', additionalProperties: number() }
+const sampleMetricValues = { type: 'object', additionalProperties: true }
+
+const metricCandidateValue = object(
+  ['label', 'count', 'value'],
   {
-    caseId: identifier,
-    metricId: identifier,
-    left: nullableNumber,
-    right: nullableNumber,
-    absoluteDelta: nullableNumber,
-    relativeDelta: nullableNumber
+    label: string({ minLength: 1 }),
+    count: integer({ minimum: 0 }),
+    value: number()
+  }
+)
+
+const metricComparison = object(
+  ['candidateValues', 'pairwiseDifferences'],
+  {
+    candidateValues: array(metricCandidateValue, { minItems: 1, uniqueBy: 'label' }),
+    pairwiseDifferences: {
+      type: 'object',
+      minProperties: 1,
+      additionalProperties: {
+        type: 'object',
+        minProperties: 1,
+        additionalProperties: number()
+      }
+    }
+  }
+)
+
+const sampleCandidateResult = object(
+  ['label', 'status', 'metrics'],
+  {
+    label: string({ minLength: 1 }),
+    status: string({ enum: SAMPLE_STATUSES }),
+    metrics: sampleMetricValues
+  }
+)
+
+const comparisonSample = object(
+  ['documentId', 'regionId', 'status', 'candidateResults'],
+  {
+    documentId: identifier,
+    regionId: identifier,
+    status: string({ enum: SAMPLE_STATUSES }),
+    candidateResults: array(sampleCandidateResult, { minItems: 1, uniqueBy: 'label' })
+  }
+)
+
+const comparisonMatrixCell = object(
+  ['metrics'],
+  {
+    metrics: metricValues
+  }
+)
+
+const comparisonCandidate = object(
+  ['label', 'scoredResultRef', 'normalizationPolicy', 'scorer', 'summary', 'metadata'],
+  {
+    label: string({ minLength: 1 }),
+    scoredResultRef: ARTIFACT_REFERENCE_SCHEMA,
+    normalizationPolicy: versionedDescriptor,
+    scorer: versionedDescriptor,
+    summary: { type: 'object', additionalProperties: true },
+    metadata: { type: 'object', additionalProperties: true }
   }
 )
 
 export const COMPARISON_RESULT_SCHEMA = artifactSchema(
   ARTIFACT_TYPES.COMPARISON_RESULT,
-  ['comparisonId', 'leftRef', 'rightRef', 'comparisonAxes', 'compatibility', 'entries'],
+  ['comparisonResultId', 'comparisonPolicy', 'candidates', 'metrics', 'samples', 'comparisonMatrix', 'diagnostics'],
   {
-    comparisonId: identifier,
-    leftRef: ARTIFACT_REFERENCE_SCHEMA,
-    rightRef: ARTIFACT_REFERENCE_SCHEMA,
-    comparisonAxes: array(identifier, { minItems: 1, uniqueItems: true }),
-    compatibility: string({ enum: COMPARISON_COMPATIBILITY }),
-    entries: array(comparisonEntry, { uniqueBy: ['caseId', 'metricId'] })
+    comparisonResultId: identifier,
+    comparisonPolicy: versionedDescriptor,
+    candidates: array(comparisonCandidate, { minItems: 2, uniqueBy: 'label' }),
+    metrics: {
+      type: 'object',
+      additionalProperties: metricComparison
+    },
+    samples: array(comparisonSample, { uniqueBy: ['documentId', 'regionId'] }),
+    comparisonMatrix: {
+      type: 'object',
+      minProperties: 2,
+      additionalProperties: {
+        type: 'object',
+        minProperties: 2,
+        additionalProperties: comparisonMatrixCell
+      }
+    },
+    diagnostics: { type: 'object', additionalProperties: true }
   }
 )
 
