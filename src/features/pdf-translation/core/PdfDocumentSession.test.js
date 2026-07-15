@@ -299,6 +299,20 @@ describe('PdfDocumentSession', () => {
     expect(pdfDocument.getPage).toHaveBeenCalledTimes(1)
   })
 
+  it('returns loaded visible PageSessions without hydrating', () => {
+    const visibleLoadedPageSession = { loaded: true, pageNumber: 1 }
+    const visibleUnloadedPageSession = { loaded: false, pageNumber: 2 }
+    const hiddenLoadedPageSession = { loaded: true, pageNumber: 3 }
+
+    session.pageSessions.set(1, visibleLoadedPageSession)
+    session.pageSessions.set(2, visibleUnloadedPageSession)
+    session.pageSessions.set(3, hiddenLoadedPageSession)
+    session.visiblePageNumbers = new Set([1, 2])
+
+    expect(session.getLoadedVisiblePageSessions()).toEqual([visibleLoadedPageSession])
+    expect(pdfDocument.getPage).not.toHaveBeenCalled()
+  })
+
   it('traverses committed pages in page order', async () => {
     session.pageSessions.set(3, { getLogicalBlocks: () => [] })
     session.pageSessions.set(1, { getLogicalBlocks: () => [] })

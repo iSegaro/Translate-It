@@ -10,7 +10,7 @@ import { pdfCacheManager } from '@/features/pdf-translation/core/PdfCacheManager
 const logger = getScopedLogger(LOG_COMPONENTS.PDF, 'usePdfOcr')
 
 export function usePdfOcr({ onOcrComplete } = {}) {
-  const recommendationEngine = new PdfOcrRecommendationEngine(pdfDocumentSession)
+  const recommendationEngine = new PdfOcrRecommendationEngine()
   const processor = new PdfOcrProcessor(pdfDocumentSession)
 
   const ocrRecommendationCount = ref(0)
@@ -23,7 +23,8 @@ export function usePdfOcr({ onOcrComplete } = {}) {
   const ocrLanguage = ref('eng')
 
   function refreshOcrRecommendations() {
-    const recommendations = recommendationEngine.getRecommendations()
+    const visiblePageSessions = pdfDocumentSession.getLoadedVisiblePageSessions()
+    const recommendations = recommendationEngine.getRecommendations(visiblePageSessions)
 
     ocrRecommendationCount.value = recommendations.length
     ocrRecommendations.value = recommendations

@@ -1,14 +1,21 @@
 import { PdfOcrDetector } from './PdfOcrDetector.js'
 
 export class PdfOcrRecommendationEngine {
-  constructor(pdfDocumentSession) {
-    this._detector = new PdfOcrDetector(pdfDocumentSession)
+  constructor() {
+    this._detector = new PdfOcrDetector()
   }
 
-  getRecommendations() {
-    return this._detector.detectScannedPages()
-      .filter((p) => !p.alreadyOcrd)
-      .map((p) => p.pageNumber)
-      .sort((a, b) => a - b)
+  getRecommendations(pageSessions = []) {
+    const recommendations = []
+
+    for (const pageSession of pageSessions) {
+      if (!pageSession) continue
+      if (!this._detector.isScannedCandidate(pageSession)) continue
+      if (pageSession?.ocrBlocks?.length > 0) continue
+      recommendations.push(pageSession.pageNumber)
+    }
+
+    recommendations.sort((a, b) => a - b)
+    return recommendations
   }
 }

@@ -516,6 +516,18 @@ export class PdfDocumentSession extends ResourceTracker {
     return this.pageSessions.get(normalizedPageNumber)?.getLogicalBlocks?.() || []
   }
 
+  getLoadedVisiblePageSessions() {
+    const pageSessions = []
+
+    for (const pageNumber of this.visiblePageNumbers) {
+      const pageSession = this.pageSessions.get(pageNumber)
+      if (!pageSession?.loaded) continue
+      pageSessions.push(pageSession)
+    }
+
+    return pageSessions
+  }
+
   setBlockTranslationState(blockId, patch = {}) {
     return this._translationState.setBlockTranslationState(blockId, patch)
   }

@@ -26,6 +26,17 @@ const mockPdfDocumentSession = {
         visibleListener = null
       }
     })
+  }),
+  getLoadedVisiblePageSessions: vi.fn(() => {
+    const pageSessions = []
+
+    for (const pageNumber of mockPdfDocumentSession.visiblePageNumbers) {
+      const pageSession = mockPdfDocumentSession.pageSessions.get(pageNumber)
+      if (!pageSession?.loaded) continue
+      pageSessions.push(pageSession)
+    }
+
+    return pageSessions
   })
 }
 
@@ -90,6 +101,7 @@ describe('usePdfOcr', () => {
     mockPdfDocumentSession.getPageSession.mockClear()
     mockPdfDocumentSession.onPageSessionCommitted.mockClear()
     mockPdfDocumentSession.onVisiblePagesChanged.mockClear()
+    mockPdfDocumentSession.getLoadedVisiblePageSessions.mockClear()
   })
 
   it('refreshes OCR recommendations when a PageSession commit notification arrives', () => {
