@@ -1,4 +1,5 @@
 import { recognizeStructured } from '@/features/screen-capture/services/ocrEngine.js'
+import { toTesseractLanguageCode } from '@/features/screen-capture/utils/ocrLanguageMap.js'
 import { createPdfRegion } from './PdfRegion.js'
 
 const RECOGNIZED_STATUS = 'recognized'
@@ -114,7 +115,7 @@ export class PdfRegionOcrExecutor {
         renderTask = null
         if (cancelled) return createOutcome(CANCELLED_STATUS)
 
-        const data = await this.recognize(canvas, language)
+        const data = await this.recognize(canvas, toTesseractLanguageCode(language))
         if (cancelled) return createOutcome(CANCELLED_STATUS)
 
         return createOutcome(RECOGNIZED_STATUS, { data })

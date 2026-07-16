@@ -2,6 +2,7 @@ import { afterEach, describe, beforeEach, expect, it, vi } from 'vitest'
 import { mount } from '@vue/test-utils'
 import { computed, defineComponent, h, nextTick, ref } from 'vue'
 import PdfApp from './PdfApp.vue'
+import { createPdfRegion } from '@/features/pdf-translation/core/PdfRegion.js'
 
 // jsdom does not implement matchMedia — stub it before component mount
 if (!window.matchMedia) {
@@ -21,8 +22,11 @@ let mockPdfExport
 
 let mockPdfOcr
 let mockPdfOcrOptions
+let mockRegionOcr
+let mockRegionOcrOptions
 let mockLayoutSyncFromPane
 let mockPdfViewport
+const mockRegionExecutionDispatch = vi.fn((request, runner) => runner(request))
 const openTranslationMock = vi.fn()
 
 vi.mock('./composables/usePdfViewerController.js', () => ({
@@ -47,6 +51,25 @@ vi.mock('./composables/usePdfOcr.js', () => ({
   }
 }))
 
+vi.mock('./composables/usePdfRegionOcr.js', () => ({
+  usePdfRegionOcr: (options) => {
+    mockRegionOcrOptions = options
+    return mockRegionOcr
+  }
+}))
+
+vi.mock('./composables/regionExecutionDispatcher.js', () => ({
+  createRegionExecutionDispatcher: (options) => {
+    return {
+      dispatchRegionExecution: (request) => {
+        const runner = options.runners?.[request.target]
+        if (!runner) throw new RangeError('Unsupported region execution target')
+        return mockRegionExecutionDispatch(request, runner)
+      }
+    }
+  }
+}))
+
 vi.mock('@/features/settings/stores/settings.js', () => ({
   useSettingsStore: () => ({
     isDarkTheme: false,
@@ -58,6 +81,10 @@ vi.mock('@/features/settings/stores/settings.js', () => ({
 
 vi.mock('@/utils/ui/theme.js', () => ({
   applyTheme: vi.fn()
+}))
+
+vi.mock('@/shared/config/config.js', () => ({
+  getSourceLanguageAsync: vi.fn().mockResolvedValue('auto')
 }))
 
 vi.mock('./components/PdfToolbar.vue', () => ({
@@ -155,8 +182,18 @@ vi.mock('./components/PdfViewer.vue', () => ({
   default: {
     name: 'PdfViewer',
     props: ['viewerRole', 'showOverlay', 'handleNavigationTarget', 'scrollContainer', 'freezeRenderWindowEviction'],
-    emits: ['layout-change', 'current-page-change', 'visible-pages-change', 'region-ocr-recognized'],
-    template: '<div class="pdf-viewer-stub" />'
+    emits: ['layout-change', 'current-page-change', 'visible-pages-change', 'region-selection-complete'],
+    setup(_, { expose }) {
+      const pageElement = document.createElement('div')
+      const stageElement = document.createElement('div')
+      pageElement.getBoundingClientRect = () => ({ left: 20, top: 30, width: 180, height: 220, right: 200, bottom: 250 })
+      stageElement.getBoundingClientRect = () => ({ left: 48, top: 64, width: 100, height: 100, right: 148, bottom: 164 })
+      expose({
+        getPageElement: vi.fn(() => pageElement),
+        getPageStageElement: vi.fn(() => stageElement)
+      })
+      return () => h('div', { class: 'pdf-viewer-stub' })
+    }
   }
 }))
 
@@ -216,6 +253,7 @@ function createMocks({
     canTranslateVisiblePages: ref(true),
     pageCount: ref(12),
     pageMetrics: ref([]),
+    pageScale: ref(1),
     translationSummary: ref({
       status: 'idle',
       translatedCount: 0,
@@ -290,6 +328,13 @@ function createMocks({
     dismissOcrPrompt: vi.fn()
   }
 
+  mockRegionOcr = {
+    outcome: ref(null),
+    isProcessing: ref(false),
+    executeRegionOcr: vi.fn(),
+    cancelRegionOcr: vi.fn()
+  }
+
   if (bannerState) {
     mockViewerController.isLoading.value = Boolean(bannerState.isLoading)
     mockViewerController.isTranslating.value = Boolean(bannerState.isTranslating)
@@ -304,6 +349,7 @@ describe('PdfApp', () => {
   beforeEach(() => {
     vi.useRealTimers()
     openTranslationMock.mockReset()
+    mockRegionExecutionDispatch.mockClear()
     createMocks()
   })
 
@@ -369,35 +415,55 @@ describe('PdfApp', () => {
     expect(mockViewerController.recomputeLayout).not.toHaveBeenCalled()
   })
 
-  it('forwards only recognized text and position to PdfWindowsHost', async () => {
+  it('builds OCR RegionExecutionRequest and preserves recognized-text handoff', async () => {
+    createMocks({ sessionAsRef: false })
+
+    mockRegionOcr.executeRegionOcr.mockImplementation(async () => {
+      mockRegionOcrOptions.onRecognized?.({ text: ' recognized text ', lines: [], confidence: 99 })
+      return { status: 'recognized', data: { text: 'recognized text', lines: [], confidence: 99 } }
+    })
+
     const wrapper = mount(PdfApp)
     await flushPromises()
-    const payload = {
-      text: 'recognized text',
-      position: { x: 20, y: 30, width: 40, height: 50, _isViewportRelative: true }
-    }
 
-    wrapper.findComponent({ name: 'PdfViewer' }).vm.$emit('region-ocr-recognized', {
-      ...payload,
-      confidence: 99,
-      lines: [{ text: 'ignored' }]
-    })
+    const region = createPdfRegion({ pageNumber: 1, left: 1, top: 4, right: 3, bottom: 2 })
+    wrapper.findComponent({ name: 'PdfViewer' }).vm.$emit('region-selection-complete', region)
+    await flushPromises()
     await flushPromises()
 
-    expect(openTranslationMock).toHaveBeenCalledOnce()
-    expect(openTranslationMock).toHaveBeenCalledWith(payload)
+    expect(mockRegionExecutionDispatch).toHaveBeenCalledOnce()
+    expect(mockRegionExecutionDispatch.mock.calls[0][0]).toEqual({
+      region,
+      target: 'ocr'
+    })
+    expect(mockRegionOcr.executeRegionOcr).toHaveBeenCalledOnce()
+
+    await vi.waitFor(() => {
+      expect(openTranslationMock).toHaveBeenCalledWith({
+        text: 'recognized text',
+        position: {
+          x: 50,
+          y: 68,
+          width: 4,
+          height: 4,
+          _isViewportRelative: true
+        }
+      })
+    })
   })
 
-  it('does not open translation for empty recognized text', async () => {
+  it('does not open translation for failed OCR result', async () => {
+    mockRegionOcr.executeRegionOcr.mockResolvedValue({ status: 'failed', error: new Error('failed') })
+
     const wrapper = mount(PdfApp)
     await flushPromises()
 
-    wrapper.findComponent({ name: 'PdfViewer' }).vm.$emit('region-ocr-recognized', {
-      text: '   ',
-      position: { x: 20, y: 30, width: 40, height: 50, _isViewportRelative: true }
-    })
+    const region = createPdfRegion({ pageNumber: 1, left: 1, top: 4, right: 3, bottom: 2 })
+    wrapper.findComponent({ name: 'PdfViewer' }).vm.$emit('region-selection-complete', region)
+    await flushPromises()
     await flushPromises()
 
+    expect(mockRegionExecutionDispatch).toHaveBeenCalledOnce()
     expect(openTranslationMock).not.toHaveBeenCalled()
   })
 

@@ -2,7 +2,7 @@ import { defineComponent, h, nextTick, onBeforeUnmount, onMounted, ref } from 'v
 import { mount } from '@vue/test-utils'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-const { pageRootEls, pageStageEls, pageRectMap, mapperMock, executeRegionOcrMock, cancelRegionOcrMock, regionOcrState } = vi.hoisted(() => {
+const { pageRootEls, pageStageEls, pageRectMap, mapperMock } = vi.hoisted(() => {
   const pageRootEls = new Map()
   const pageStageEls = new Map()
   const pageRectMap = new Map()
@@ -11,14 +11,6 @@ const { pageRootEls, pageStageEls, pageRectMap, mapperMock, executeRegionOcrMock
     pageStageEls,
     pageRectMap,
     mapperMock: vi.fn(),
-    executeRegionOcrMock: vi.fn(),
-    cancelRegionOcrMock: vi.fn(),
-    regionOcrState: {
-      options: null,
-      deliver(outcome) {
-        if (outcome?.status === 'recognized') this.options?.onRecognized?.(outcome.data)
-      }
-    }
   }
 })
 
@@ -96,18 +88,6 @@ vi.mock('./PdfPageView.vue', () => ({
 
 vi.mock('@/features/pdf-translation/core/PdfRegionMapper.js', () => ({
   mapPageLocalCssRectToPdfRegion: mapperMock
-}))
-
-vi.mock('../composables/usePdfRegionOcr.js', () => ({
-  usePdfRegionOcr: (options) => {
-    regionOcrState.options = options
-    return {
-      outcome: { value: null },
-      isProcessing: { value: false },
-      executeRegionOcr: executeRegionOcrMock,
-      cancelRegionOcr: cancelRegionOcrMock
-    }
-  }
 }))
 
 import PdfViewer from './PdfViewer.vue'
@@ -204,9 +184,6 @@ describe('PdfViewer', () => {
     resizeObserveMock.mockClear()
     resizeDisconnectMock.mockClear()
     mapperMock.mockReset()
-    executeRegionOcrMock.mockReset()
-    cancelRegionOcrMock.mockReset()
-    regionOcrState.options = null
     pageRootEls.clear()
     pageStageEls.clear()
     pageRectMap.clear()
@@ -242,8 +219,10 @@ describe('PdfViewer', () => {
     vi.stubGlobal('ResizeObserver', resizeObserverClass)
   })
 
-  it('keeps one originating page active and emits its completed CSS rectangle', async () => {
-    const { wrapper } = await mountViewerWithPages({ count: 2 })
+  it('keeps one originating page active and emits canonical PdfRegion', async () => {
+    const viewport = { id: 'viewport' }
+    mapperMock.mockReturnValue(createPdfRegion({ pageNumber: 1, left: 1, top: 4, right: 3, bottom: 2 }))
+    const { wrapper } = await mountViewerWithPages({ count: 2, session: { updateVisiblePages: vi.fn(), getPageViewport: vi.fn(() => viewport) } })
     await wrapper.setProps({ regionSelectionActive: true })
     const pageViews = wrapper.findAllComponents({ name: 'PdfPageView' })
     const surface = document.createElement('div')
@@ -272,23 +251,21 @@ describe('PdfViewer', () => {
     await nextTick()
 
     expect(wrapper.emitted('region-selection-complete')).toEqual([[
-      { pageNumber: 1, rect: { x: 20, y: 20, width: 50, height: 50 } }
+      createPdfRegion({ pageNumber: 1, left: 1, top: 4, right: 3, bottom: 2 })
     ]])
     wrapper.unmount()
   })
 
-  it('maps completed selection and hands canonical PdfRegion to Region OCR composable', async () => {
+  it('emits canonical PdfRegion on completed selection', async () => {
     const viewport = { id: 'viewport' }
-    const pdfDocument = { getPage: vi.fn() }
     const session = {
       ...createSession(),
-      pdfDocument,
       getPageViewport: vi.fn(() => viewport)
     }
     const mappedRegion = createPdfRegion({ pageNumber: 1, left: 1, top: 4, right: 3, bottom: 2 })
     mapperMock.mockReturnValue(mappedRegion)
     const { wrapper } = await mountViewerWithPages({ count: 1, session })
-    await wrapper.setProps({ regionSelectionActive: true, regionOcrScale: 2, regionOcrLanguage: 'eng' })
+    await wrapper.setProps({ regionSelectionActive: true })
     const pageView = wrapper.findComponent({ name: 'PdfPageView' })
     const surface = document.createElement('div')
     surface.getBoundingClientRect = () => buildRect(20, 100, 100, 10)
@@ -314,23 +291,18 @@ describe('PdfViewer', () => {
       rect: { x: 20, y: 20, width: 50, height: 50 },
       viewport
     })
-    expect(executeRegionOcrMock).toHaveBeenCalledWith({
-      region: mappedRegion,
-      pdfDocument,
-      scale: 2,
-      language: 'eng'
-    })
+    expect(wrapper.emitted('region-selection-complete')).toEqual([[mappedRegion]])
     wrapper.unmount()
   })
 
-  it('does not execute Region OCR when mapping fails', async () => {
+  it('does not emit selection completion when mapping fails', async () => {
     const session = {
       ...createSession(),
       getPageViewport: vi.fn(() => ({ id: 'viewport' }))
     }
     mapperMock.mockReturnValue(null)
     const { wrapper } = await mountViewerWithPages({ count: 1, session })
-    await wrapper.setProps({ regionSelectionActive: true, regionOcrScale: 2, regionOcrLanguage: 'eng' })
+    await wrapper.setProps({ regionSelectionActive: true })
     const pageView = wrapper.findComponent({ name: 'PdfPageView' })
     const surface = document.createElement('div')
     surface.getBoundingClientRect = () => buildRect(0, 100, 100)
@@ -351,131 +323,22 @@ describe('PdfViewer', () => {
     await nextTick()
 
     expect(mapperMock).toHaveBeenCalledOnce()
-    expect(executeRegionOcrMock).not.toHaveBeenCalled()
-    wrapper.unmount()
-  })
-
-  it('emits recognized OCR text with viewport-relative region position', async () => {
-    const session = {
-      ...createSession(),
-      getPageViewport: vi.fn(() => ({ id: 'viewport' }))
-    }
-    mapperMock.mockReturnValue(createPdfRegion({ pageNumber: 1, left: 1, top: 4, right: 3, bottom: 2 }))
-    const { wrapper } = await mountViewerWithPages({ count: 1, session })
-    await wrapper.setProps({ regionSelectionActive: true, regionOcrScale: 1, regionOcrLanguage: 'eng' })
-    const pageView = wrapper.findComponent({ name: 'PdfPageView' })
-    const surface = document.createElement('div')
-    surface.getBoundingClientRect = () => buildRect(0, 100, 100)
-    surface.setPointerCapture = vi.fn()
-    surface.releasePointerCapture = vi.fn()
-    const event = {
-      button: 0,
-      isPrimary: true,
-      pointerId: 1,
-      clientX: 10,
-      clientY: 20,
-      currentTarget: surface,
-      preventDefault: vi.fn()
-    }
-
-    pageView.vm.$emit('region-selection-pointer-down', 1, event)
-    pageView.vm.$emit('region-selection-pointer-up', 1, { ...event, clientX: 50, clientY: 60 })
-    await nextTick()
-    regionOcrState.options.onRecognized({ text: '  recognized text  ', lines: [], confidence: 92 })
-
-    expect(wrapper.emitted('region-ocr-recognized')).toEqual([[
-      {
-        text: 'recognized text',
-        position: { x: 45, y: 120, width: 40, height: 40, _isViewportRelative: true }
-      }
-    ]])
-    wrapper.unmount()
-  })
-
-  it('cancels previous OCR immediately when new selection mapping fails', async () => {
-    const session = {
-      ...createSession(),
-      getPageViewport: vi.fn(() => ({ id: 'viewport' }))
-    }
-    mapperMock.mockReturnValue(null)
-    const { wrapper } = await mountViewerWithPages({ count: 1, session })
-    await wrapper.setProps({ regionSelectionActive: true, regionOcrScale: 1, regionOcrLanguage: 'eng' })
-    const pageView = wrapper.findComponent({ name: 'PdfPageView' })
-    const surface = document.createElement('div')
-    surface.getBoundingClientRect = () => buildRect(0, 100, 100)
-    surface.setPointerCapture = vi.fn()
-    surface.releasePointerCapture = vi.fn()
-    const event = {
-      button: 0,
-      isPrimary: true,
-      pointerId: 1,
-      clientX: 10,
-      clientY: 20,
-      currentTarget: surface,
-      preventDefault: vi.fn()
-    }
-
-    pageView.vm.$emit('region-selection-pointer-down', 1, event)
-    pageView.vm.$emit('region-selection-pointer-up', 1, { ...event, clientX: 50, clientY: 60 })
-    await nextTick()
-
-    expect(cancelRegionOcrMock).toHaveBeenCalled()
-    expect(executeRegionOcrMock).not.toHaveBeenCalled()
-    wrapper.unmount()
-  })
-
-  it('does not execute OCR when viewport-relative position cannot be resolved', async () => {
-    const session = {
-      ...createSession(),
-      getPageViewport: vi.fn(() => ({ id: 'viewport' }))
-    }
-    mapperMock.mockReturnValue(createPdfRegion({ pageNumber: 1, left: 1, top: 4, right: 3, bottom: 2 }))
-    const { wrapper } = await mountViewerWithPages({ count: 1, session })
-    pageStageEls.get(1).getBoundingClientRect = () => buildRect(NaN, 80, 100, 35)
-    await wrapper.setProps({ regionSelectionActive: true, regionOcrScale: 1, regionOcrLanguage: 'eng' })
-    const pageView = wrapper.findComponent({ name: 'PdfPageView' })
-    const surface = document.createElement('div')
-    surface.getBoundingClientRect = () => buildRect(0, 100, 100)
-    surface.setPointerCapture = vi.fn()
-    surface.releasePointerCapture = vi.fn()
-    const event = {
-      button: 0,
-      isPrimary: true,
-      pointerId: 1,
-      clientX: 10,
-      clientY: 20,
-      currentTarget: surface,
-      preventDefault: vi.fn()
-    }
-
-    pageView.vm.$emit('region-selection-pointer-down', 1, event)
-    pageView.vm.$emit('region-selection-pointer-up', 1, { ...event, clientX: 50, clientY: 60 })
-    await nextTick()
-
-    expect(cancelRegionOcrMock).toHaveBeenCalled()
-    expect(mapperMock).not.toHaveBeenCalled()
-    expect(executeRegionOcrMock).not.toHaveBeenCalled()
-    wrapper.unmount()
-  })
-
-  it('does not emit recognized event for empty, failed, or cancelled OCR', async () => {
-    const { wrapper } = await mountViewerWithPages({ count: 1 })
-
-    regionOcrState.deliver({ status: 'recognized', data: { text: '   ', lines: [], confidence: 0 } })
-    regionOcrState.deliver({ status: 'failed', error: new Error('failed') })
-    regionOcrState.deliver({ status: 'cancelled' })
-
-    expect(wrapper.emitted('region-ocr-recognized')).toBeFalsy()
+    expect(wrapper.emitted('region-selection-complete')).toBeFalsy()
     wrapper.unmount()
   })
 
   it('preserves viewer-role guard for region selection', async () => {
-    const { wrapper } = await mountViewerWithPages({ count: 1, viewerRole: VIEWER_ROLE.OVERLAY })
-    await wrapper.setProps({ regionSelectionActive: true })
+    const session = {
+      ...createSession(),
+      getPageViewport: vi.fn(() => ({ id: 'viewport' }))
+    }
+    mapperMock.mockReturnValue(createPdfRegion({ pageNumber: 1, left: 1, top: 4, right: 3, bottom: 2 }))
+    const { wrapper } = await mountViewerWithPages({ count: 1, session })
+    await wrapper.setProps({ regionSelectionActive: true, viewerRole: VIEWER_ROLE.OVERLAY })
+    await nextTick()
 
     expect(wrapper.findComponent({ name: 'PdfPageView' }).props('regionSelectionActive')).toBe(false)
-    regionOcrState.options.onRecognized({ text: 'ignored', lines: [], confidence: 1 })
-    expect(wrapper.emitted('region-ocr-recognized')).toBeFalsy()
+    expect(wrapper.emitted('region-selection-complete')).toBeFalsy()
     wrapper.unmount()
   })
 
@@ -523,6 +386,29 @@ describe('PdfViewer', () => {
     await nextTick()
 
     expect(observeMock).toHaveBeenCalledWith(pageRootEls.get(1))
+
+    wrapper.unmount()
+  })
+
+  it('exposes rendered stage elements for page-local anchoring', async () => {
+    const wrapper = mount(PdfViewer, {
+      props: {
+        pages: [{ pageNumber: 1, width: 100, height: 100, scale: 1 }],
+        session: {
+          updateVisiblePages: vi.fn(),
+          getPageViewport: vi.fn()
+        }
+      },
+      attachTo: document.body
+    })
+
+    wrapper.find('.pdf-viewer').element.getBoundingClientRect = () => buildRect(0, 500, 300)
+
+    await nextTick()
+    await nextTick()
+
+    expect(wrapper.vm.getPageElement(1)).toBe(pageRootEls.get(1))
+    expect(wrapper.vm.getPageStageElement(1)).toBe(pageStageEls.get(1))
 
     wrapper.unmount()
   })

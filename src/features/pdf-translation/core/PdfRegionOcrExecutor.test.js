@@ -106,6 +106,19 @@ describe('PdfRegionOcrExecutor', () => {
     expect(recognize).toHaveBeenCalledWith(canvases[0], 'eng')
   })
 
+  it.each([
+    { language: 'auto', expected: 'eng' },
+    { language: 'fa', expected: 'fas' },
+    { language: 'eng', expected: 'eng' }
+  ])('normalizes OCR language %s to %s', async ({ language, expected }) => {
+    const recognize = vi.fn().mockResolvedValue({ text: 'ok', lines: [], confidence: 1 })
+    const { executor } = createExecutor({ recognize })
+
+    await executor.execute({ region, scale: 1, language }).promise
+
+    expect(recognize).toHaveBeenCalledWith(expect.any(Object), expected)
+  })
+
   it('rejects invalid region and invalid scale as failed outcomes', async () => {
     const { executor } = createExecutor()
 

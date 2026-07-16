@@ -34,7 +34,7 @@
 </template>
 
 <script setup>
-import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, unref, watch } from 'vue'
 import PdfPageView from './PdfPageView.vue'
 import { getPdfPageRootElement } from '../utils/pageViewInstance.js'
 import { getCanvasScrollTop, getScrollSpaceTop } from '../utils/pdfGeometryModel.js'
@@ -44,7 +44,6 @@ import { usePdfScrollObservation } from '../composables/usePdfScrollObservation.
 import { usePdfLayoutMonitor } from '../composables/usePdfLayoutMonitor.js'
 import { usePdfCurrentPage } from '../composables/usePdfCurrentPage.js'
 import { usePdfRegionSelectionController } from '../composables/usePdfRegionSelectionController.js'
-import { usePdfRegionOcr } from '../composables/usePdfRegionOcr.js'
 import { VIEWER_ROLE } from '../composables/usePdfViewerMode.js'
 import { mapPageLocalCssRectToPdfRegion } from '@/features/pdf-translation/core/PdfRegionMapper.js'
 import './PdfViewer.scss'
@@ -90,14 +89,6 @@ const props = defineProps({
   regionSelectionActive: {
     type: Boolean,
     default: false
-  },
-  regionOcrScale: {
-    type: Number,
-    default: null
-  },
-  regionOcrLanguage: {
-    type: String,
-    default: ''
   }
 })
 
@@ -105,13 +96,11 @@ const emit = defineEmits([
   'layout-change',
   'current-page-change',
   'visible-pages-change',
-  'region-selection-complete',
-  'region-ocr-recognized'
+  'region-selection-complete'
 ])
 const viewerRoot = ref(null)
 const pageViews = new Map()
 let lastEmittedVisiblePages = new Set()
-let activeRegionPosition = null
 
 const isOriginalRole = computed(() => props.viewerRole === VIEWER_ROLE.ORIGINAL)
 const ownsPageRenderLifecycle = computed(() => props.viewerRole === VIEWER_ROLE.ORIGINAL)
@@ -122,50 +111,12 @@ const regionSelection = usePdfRegionSelectionController({
   active: regionSelectionEnabled,
   onComplete: handleRegionSelectionComplete
 })
-const {
-  executeRegionOcr,
-  cancelRegionOcr
-} = usePdfRegionOcr({
-  onRecognized: (data) => {
-    const text = typeof data?.text === 'string' ? data.text.trim() : ''
-    const position = activeRegionPosition
-    activeRegionPosition = null
-    if (!text || !position || !isOriginalRole.value) return
-    emit('region-ocr-recognized', { text, position })
-  }
-})
-
-function resolveRegionViewportPosition(pageNumber, rect) {
-  const stageRect = pageViews.get(pageNumber)?.getStageEl?.()?.getBoundingClientRect?.()
-  if (!stageRect || !rect) return null
-
-  const values = [stageRect.left, stageRect.top, rect.x, rect.y, rect.width, rect.height]
-  if (!values.every(Number.isFinite)) return null
-
-  return {
-    x: stageRect.left + rect.x,
-    y: stageRect.top + rect.y,
-    width: rect.width,
-    height: rect.height,
-    _isViewportRelative: true
-  }
-}
 
 function handleRegionSelectionComplete(payload) {
-  // Interaction event.
-  // Emitted whenever the user completes a region selection,
-  // regardless of whether OCR starts successfully.
-  emit('region-selection-complete', payload)
-  
-  activeRegionPosition = null
-  cancelRegionOcr()
   if (!regionSelectionEnabled.value) return
 
   const viewport = props.session?.getPageViewport?.(payload?.pageNumber)
   if (!viewport) return
-
-  const position = resolveRegionViewportPosition(payload.pageNumber, payload.rect)
-  if (!position) return
 
   const region = mapPageLocalCssRectToPdfRegion({
     pageNumber: payload.pageNumber,
@@ -174,14 +125,7 @@ function handleRegionSelectionComplete(payload) {
   })
   if (!region) return
 
-  activeRegionPosition = position
-
-  executeRegionOcr({
-    region,
-    pdfDocument: props.session?.pdfDocument,
-    scale: props.regionOcrScale,
-    language: props.regionOcrLanguage
-  })
+  emit('region-selection-complete', region)
 }
 
 const {
@@ -309,16 +253,6 @@ watch(
   { flush: 'sync' }
 )
 
-watch(
-  regionSelectionEnabled,
-  (enabled) => {
-    if (!enabled) {
-      activeRegionPosition = null
-      cancelRegionOcr()
-    }
-  }
-)
-
 function setupObservers() {
   disconnectObservers()
   if (!viewerRoot.value) return
@@ -361,8 +295,6 @@ onMounted(() => {
 })
 
 onBeforeUnmount(() => {
-  activeRegionPosition = null
-  cancelRegionOcr()
   disconnectObservers()
   resetRenderPipeline()
 })
@@ -389,6 +321,13 @@ function getScrollContainer() {
 function getPageElement(pageNumber) {
   const instance = pageViews.get(pageNumber)
   return getPdfPageRootElement(instance) || null
+}
+
+function getPageStageElement(pageNumber) {
+  const instance = pageViews.get(pageNumber)
+  if (!instance) return null
+
+  return instance.getStageEl?.() || unref(instance.stageEl) || instance.stageEl || null
 }
 
 function isFiniteCoordinate(v) {
@@ -446,6 +385,7 @@ defineExpose({
   scrollToPage,
   getScrollContainer,
   getPageElement,
+  getPageStageElement,
   refreshRenderWindow: () => applyRenderWindow({ force: true }),
   refreshCurrentPage: () => emitCurrentPageFromResolver(true)
 })

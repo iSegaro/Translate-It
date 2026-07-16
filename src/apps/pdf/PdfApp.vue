@@ -124,7 +124,7 @@
                     @layout-change="handleLayoutChange"
                     @current-page-change="handleCurrentPageChange"
                     @visible-pages-change="handleVisiblePagesChange"
-                    @region-ocr-recognized="handleRegionOcrRecognized"
+                    @region-selection-complete="handleRegionSelectionComplete"
                   />
                 </template>
 
@@ -182,10 +182,14 @@ import { usePdfViewerController } from './composables/usePdfViewerController.js'
 import { usePdfViewerMode, CONTENT_VIEW, VIEWER_ROLE } from './composables/usePdfViewerMode.js'
 import { usePdfExport } from './composables/usePdfExport.js'
 import { usePdfOcr } from './composables/usePdfOcr.js'
+import { usePdfRegionOcr } from './composables/usePdfRegionOcr.js'
+import { createRegionExecutionDispatcher } from './composables/regionExecutionDispatcher.js'
+import { createRegionExecutionRequest, REGION_EXECUTION_TARGET } from './composables/regionExecutionRequest.js'
 import { usePdfNavigation } from './composables/usePdfNavigation.js'
 import { usePdfKeyboard } from './composables/usePdfKeyboard.js'
 import { createPdfTransitionController } from './composables/createPdfTransitionController.js'
 import { createPdfStatusBannerController } from './utils/pdfStatusBanner.js'
+import { getSourceLanguageAsync } from '@/shared/config/config.js'
 import { useSettingsStore } from '@/features/settings/stores/settings.js'
 import { applyTheme } from '@/utils/ui/theme.js'
 import './PdfApp.scss'
@@ -200,6 +204,7 @@ const {
   hasAnyTranslation,
   pageCount,
   pageMetrics,
+  pageScale,
   translationSummary,
   translatedPageData,
   translationTick,
@@ -261,6 +266,7 @@ const exportSuccess = ref(null)
 const exportSuccessTimer = ref(null)
 const EXPORT_SUCCESS_DURATION_MS = 2200
 const dismissedPdfStatusBannerKey = ref('')
+let activeRegionPosition = null
 const pdfStatusBannerController = createPdfStatusBannerController()
 
 const {
@@ -280,6 +286,21 @@ const {
     refreshTranslatedPageBlocks(pageNumbers)
     translationTick.value += 1
     refreshOcrRecommendations()
+  }
+})
+
+const { executeRegionOcr } = usePdfRegionOcr({
+  onRecognized: handleRegionOcrRecognized
+})
+
+const regionExecutionDispatcher = createRegionExecutionDispatcher({
+  runners: {
+    [REGION_EXECUTION_TARGET.OCR]: async (request) => executeRegionOcr({
+      region: request.region,
+      pdfDocument: session.pdfDocument,
+      scale: pageScale.value || 1,
+      language: await getSourceLanguageAsync().catch(() => undefined)
+    })
   }
 })
 
@@ -381,6 +402,7 @@ watch(hasAnyTranslation, (has) => {
 
 function resetPresentationState() {
   currentPage.value = 0
+  activeRegionPosition = null
   resetViewerState()
 }
 
@@ -427,13 +449,47 @@ function handleVisiblePagesChange(pageNumbers) {
   void hydrateVisiblePageBlocks(pages)
 }
 
+function resolveRegionViewportPosition(region) {
+  const pageElement = pdfViewerRef.value?.getPageStageElement?.(region?.pageNumber)
+  const viewport = session?.getPageViewport?.(region?.pageNumber)
+  const bounds = pageElement?.getBoundingClientRect?.()
+
+  if (!pageElement || !viewport || !bounds) return null
+
+  const topLeft = viewport.convertToViewportPoint(region.left, region.top)
+  const bottomRight = viewport.convertToViewportPoint(region.right, region.bottom)
+  if (![...topLeft, ...bottomRight, bounds.left, bounds.top].every(Number.isFinite)) return null
+
+  return {
+    x: bounds.left + Math.min(topLeft[0], bottomRight[0]),
+    y: bounds.top + Math.min(topLeft[1], bottomRight[1]),
+    width: Math.abs(bottomRight[0] - topLeft[0]),
+    height: Math.abs(bottomRight[1] - topLeft[1]),
+    _isViewportRelative: true
+  }
+}
+
+function handleRegionSelectionComplete(region) {
+  activeRegionPosition = resolveRegionViewportPosition(region)
+  const request = createRegionExecutionRequest({
+    region,
+    target: REGION_EXECUTION_TARGET.OCR
+  })
+
+  if (!request) return
+
+  void regionExecutionDispatcher.dispatchRegionExecution(request)
+}
+
 function handleRegionOcrRecognized(payload) {
   const text = typeof payload?.text === 'string' ? payload.text.trim() : ''
-  if (!text || !payload?.position) return
+  const position = activeRegionPosition
+  activeRegionPosition = null
+  if (!text || !position) return
 
   void pdfWindowsHostRef.value?.openTranslation?.({
     text,
-    position: payload.position
+    position
   })
 }
 
@@ -536,6 +592,7 @@ onMounted(() => {
 
 onBeforeUnmount(() => {
   clearExportSuccess()
+  activeRegionPosition = null
   detachDocument()
   void cleanup()
 
