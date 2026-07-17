@@ -294,17 +294,17 @@ const {
   }
 })
 
-const { executeRegionOcr } = usePdfRegionOcr({
+const { startRegionOcr } = usePdfRegionOcr({
   onRecognized: handleRegionOcrRecognized
 })
 
 const regionExecutionDispatcher = createRegionExecutionDispatcher({
   runners: {
-    [REGION_EXECUTION_TARGET.OCR]: async (request) => executeRegionOcr({
+    [REGION_EXECUTION_TARGET.OCR]: (request) => startRegionOcr({
       region: request.region,
       pdfDocument: session.pdfDocument,
       scale: pageScale.value || 1,
-      language: await getSourceLanguageAsync().catch(() => undefined)
+      language: getSourceLanguageAsync().catch(() => undefined)
     })
   }
 })
@@ -488,7 +488,8 @@ function handleRegionSelectionComplete(region) {
 
   if (!request) return
 
-  void regionExecutionDispatcher.dispatchRegionExecution(request)
+  const operation = regionExecutionDispatcher.dispatchRegionExecution(request)
+  void operation.promise
 }
 
 function handleRegionOcrRecognized(payload) {

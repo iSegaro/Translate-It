@@ -30,6 +30,14 @@ let mockPdfSession
 const mockRegionExecutionDispatch = vi.fn((request, runner) => runner(request))
 const openTranslationMock = vi.fn()
 
+function createMockOperation(promise, cancel = vi.fn()) {
+  return Object.freeze({
+    promise,
+    cancel,
+    context: Object.freeze({ target: 'ocr' })
+  })
+}
+
 vi.mock('./composables/usePdfViewerController.js', () => ({
   usePdfViewerController: () => mockViewerController
 }))
@@ -334,6 +342,7 @@ function createMocks({
   mockRegionOcr = {
     outcome: ref(null),
     isProcessing: ref(false),
+    startRegionOcr: vi.fn(),
     executeRegionOcr: vi.fn(),
     cancelRegionOcr: vi.fn()
   }
@@ -421,9 +430,9 @@ describe('PdfApp', () => {
   it('builds OCR RegionExecutionRequest and preserves recognized-text handoff', async () => {
     createMocks({ sessionAsRef: false })
 
-    mockRegionOcr.executeRegionOcr.mockImplementation(async () => {
+    mockRegionOcr.startRegionOcr.mockImplementation(() => {
       mockRegionOcrOptions.onRecognized?.({ text: ' recognized text ', lines: [], confidence: 99 })
-      return { status: 'recognized', data: { text: 'recognized text', lines: [], confidence: 99 } }
+      return createMockOperation(Promise.resolve({ status: 'recognized', data: { text: 'recognized text', lines: [], confidence: 99 } }))
     })
 
     const wrapper = mount(PdfApp)
@@ -437,9 +446,10 @@ describe('PdfApp', () => {
     expect(mockRegionExecutionDispatch).toHaveBeenCalledOnce()
     expect(mockRegionExecutionDispatch.mock.calls[0][0]).toEqual({
       region,
-      target: 'ocr'
+      target: 'ocr',
+      scope: 'live-region'
     })
-    expect(mockRegionOcr.executeRegionOcr).toHaveBeenCalledOnce()
+    expect(mockRegionOcr.startRegionOcr).toHaveBeenCalledOnce()
 
     await vi.waitFor(() => {
       expect(openTranslationMock).toHaveBeenCalledWith({
@@ -472,9 +482,9 @@ describe('PdfApp', () => {
 
   it('keeps dispatched request target immutable after later mode intent', async () => {
     let resolveOcr
-    mockRegionOcr.executeRegionOcr.mockImplementation(() => new Promise((resolve) => {
+    mockRegionOcr.startRegionOcr.mockImplementation(() => createMockOperation(new Promise((resolve) => {
       resolveOcr = resolve
-    }))
+    })))
 
     const wrapper = mount(PdfApp)
     await flushPromises()
@@ -488,7 +498,7 @@ describe('PdfApp', () => {
     await flushPromises()
 
     expect(mockRegionExecutionDispatch).toHaveBeenCalledOnce()
-    expect(request).toEqual({ region, target: 'ocr' })
+    expect(request).toEqual({ region, target: 'ocr', scope: 'live-region' })
     expect(Object.isFrozen(request)).toBe(true)
 
     resolveOcr({ status: 'cancelled' })
@@ -512,7 +522,22 @@ describe('PdfApp', () => {
   })
 
   it('does not open translation for failed OCR result', async () => {
-    mockRegionOcr.executeRegionOcr.mockResolvedValue({ status: 'failed', error: new Error('failed') })
+    mockRegionOcr.startRegionOcr.mockReturnValue(createMockOperation(Promise.resolve({ status: 'failed', error: new Error('failed') })))
+
+    const wrapper = mount(PdfApp)
+    await flushPromises()
+
+    const region = createPdfRegion({ pageNumber: 1, left: 1, top: 4, right: 3, bottom: 2 })
+    wrapper.findComponent({ name: 'PdfViewer' }).vm.$emit('region-selection-complete', region)
+    await flushPromises()
+    await flushPromises()
+
+    expect(mockRegionExecutionDispatch).toHaveBeenCalledOnce()
+    expect(openTranslationMock).not.toHaveBeenCalled()
+  })
+
+  it('does not open translation for cancelled OCR result', async () => {
+    mockRegionOcr.startRegionOcr.mockReturnValue(createMockOperation(Promise.resolve({ status: 'cancelled' })))
 
     const wrapper = mount(PdfApp)
     await flushPromises()

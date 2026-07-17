@@ -34,6 +34,25 @@ afterEach(() => {
 })
 
 describe('usePdfRegionOcr', () => {
+  it('returns an immutable operation handle for a region OCR run', async () => {
+    const cancel = vi.fn()
+    const execute = vi.fn(() => ({
+      promise: Promise.resolve({ status: 'recognized', data: { text: 'ok', lines: [], confidence: 1 } }),
+      cancel
+    }))
+    const api = mountRegionOcr(() => ({ execute }))
+
+    const operation = api.startRegionOcr({ region, pdfDocument: {}, scale: 2, language: 'eng' })
+
+    expect(Object.isFrozen(operation)).toBe(true)
+    expect(Object.isFrozen(operation.context)).toBe(true)
+    expect(operation.context).toEqual({ target: 'ocr', runId: 1, pageNumber: region.pageNumber })
+    expect(operation.context).not.toHaveProperty('region')
+    await expect(operation.promise).resolves.toEqual({ status: 'recognized', data: { text: 'ok', lines: [], confidence: 1 } })
+    expect(api.outcome.value).toEqual({ status: 'recognized', data: { text: 'ok', lines: [], confidence: 1 } })
+    expect(cancel).not.toHaveBeenCalled()
+  })
+
   it('creates an executor operation with canonical PdfRegion input', async () => {
     const execute = vi.fn(() => ({
       promise: Promise.resolve({ status: 'recognized', data: { text: 'ok', lines: [], confidence: 1 } }),
@@ -48,6 +67,28 @@ describe('usePdfRegionOcr', () => {
     expect(createExecutor).toHaveBeenCalledWith({ pdfDocument })
     expect(execute).toHaveBeenCalledWith({ region, scale: 2, language: 'eng' })
     expect(api.outcome.value).toEqual({ status: 'recognized', data: { text: 'ok', lines: [], confidence: 1 } })
+  })
+
+  it('cancels only its own operation handle', async () => {
+    const first = deferredOutcome()
+    const second = deferredOutcome()
+    const firstCancel = vi.fn()
+    const secondCancel = vi.fn()
+    const execute = vi.fn()
+      .mockReturnValueOnce({ promise: first.promise, cancel: firstCancel })
+      .mockReturnValueOnce({ promise: second.promise, cancel: secondCancel })
+    const api = mountRegionOcr(() => ({ execute }))
+
+    const firstOperation = api.startRegionOcr({ region, pdfDocument: {}, scale: 1, language: 'eng' })
+    const secondOperation = api.startRegionOcr({ region, pdfDocument: {}, scale: 1, language: 'eng' })
+    firstOperation.cancel()
+
+    expect(firstCancel).toHaveBeenCalledOnce()
+    expect(secondCancel).not.toHaveBeenCalled()
+
+    first.resolve({ status: 'cancelled' })
+    second.resolve({ status: 'recognized', data: { text: 'current', lines: [], confidence: 1 } })
+    await expect(secondOperation.promise).resolves.toEqual({ status: 'recognized', data: { text: 'current', lines: [], confidence: 1 } })
   })
 
   it('cancels the previous run before starting a new run', async () => {
