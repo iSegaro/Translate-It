@@ -12,6 +12,25 @@ let currentLang = null;
 let lastUsedTime = Date.now();
 const IDLE_TIMEOUT = 5 * 60 * 1000; // 5 minutes
 let idleInterval = null;
+let workerQueue = Promise.resolve();
+
+function enqueueWorkerOperation(operation) {
+  const result = workerQueue.then(operation);
+  workerQueue = result.catch(() => undefined);
+  return result;
+}
+
+async function terminateWorker() {
+  if (!worker) return;
+
+  const activeWorker = worker;
+  try {
+    await activeWorker.terminate();
+  } finally {
+    worker = null;
+    currentLang = null;
+  }
+}
 
 /**
  * Initialize Tesseract Worker
@@ -25,8 +44,7 @@ async function initWorker(lang) {
 
   if (worker) {
     logger.debug("Terminating existing worker");
-    await worker.terminate();
-    worker = null;
+    await terminateWorker();
   }
 
   // Use absolute URLs for all assets
@@ -78,6 +96,7 @@ async function initWorker(lang) {
   } catch (error) {
     logger.error(`Failed to initialize worker for ${lang}:`, error);
     worker = null;
+    currentLang = null;
     throw error;
   }
 
@@ -94,20 +113,26 @@ async function initWorker(lang) {
  */
 export async function recognize(image, lang = 'eng', coordinates = null) {
   try {
-    const worker = await initWorker(lang);
-    
-    const options = {};
-    if (coordinates) {
-      options.rectangle = {
-        top: Math.round(coordinates.y),
-        left: Math.round(coordinates.x),
-        width: Math.round(coordinates.width),
-        height: Math.round(coordinates.height)
-      };
-    }
+    const text = await enqueueWorkerOperation(async () => {
+      const activeWorker = await initWorker(lang);
+      const options = {};
+      if (coordinates) {
+        options.rectangle = {
+          top: Math.round(coordinates.y),
+          left: Math.round(coordinates.x),
+          width: Math.round(coordinates.width),
+          height: Math.round(coordinates.height)
+        };
+      }
 
-    const { data: { text } } = await worker.recognize(image, options);
-    lastUsedTime = Date.now();
+      lastUsedTime = Date.now();
+      try {
+        const { data } = await activeWorker.recognize(image, options);
+        return data.text;
+      } finally {
+        lastUsedTime = Date.now();
+      }
+    });
     return text;
   } catch (error) {
     logger.error('Recognition failed', error);
@@ -124,20 +149,26 @@ export async function recognize(image, lang = 'eng', coordinates = null) {
  */
 export async function recognizeStructured(image, lang = 'eng', coordinates = null) {
   try {
-    const worker = await initWorker(lang);
-    
-    const options = {};
-    if (coordinates) {
-      options.rectangle = {
-        top: Math.round(coordinates.y),
-        left: Math.round(coordinates.x),
-        width: Math.round(coordinates.width),
-        height: Math.round(coordinates.height)
-      };
-    }
+    const data = await enqueueWorkerOperation(async () => {
+      const activeWorker = await initWorker(lang);
+      const options = {};
+      if (coordinates) {
+        options.rectangle = {
+          top: Math.round(coordinates.y),
+          left: Math.round(coordinates.x),
+          width: Math.round(coordinates.width),
+          height: Math.round(coordinates.height)
+        };
+      }
 
-    const { data } = await worker.recognize(image, options);
-    lastUsedTime = Date.now();
+      lastUsedTime = Date.now();
+      try {
+        const result = await activeWorker.recognize(image, options);
+        return result.data;
+      } finally {
+        lastUsedTime = Date.now();
+      }
+    });
     return {
       text: data.text,
       lines: data.lines || [],
@@ -153,17 +184,19 @@ export async function recognizeStructured(image, lang = 'eng', coordinates = nul
  * Terminate worker if idle
  */
 export async function terminateIfIdle() {
-  if (worker && (Date.now() - lastUsedTime > IDLE_TIMEOUT)) {
+  return enqueueWorkerOperation(async () => {
+    if (!worker || Date.now() - lastUsedTime <= IDLE_TIMEOUT) return;
+
     logger.debug('Terminating idle worker');
-    await worker.terminate();
-    worker = null;
-    currentLang = null;
-  }
+    await terminateWorker();
+  });
 }
 
 // Set up periodic idle check
 if (!idleInterval) {
-  idleInterval = setInterval(terminateIfIdle, 60000); // Check every minute
+  idleInterval = setInterval(() => {
+    void terminateIfIdle().catch((error) => logger.warn('Error terminating idle OCR worker:', error));
+  }, 60000); // Check every minute
 }
 
 /**
@@ -171,29 +204,23 @@ if (!idleInterval) {
  * Call this when the feature is deactivated or extension is shutting down
  */
 export async function cleanupOCREngine() {
-  logger.debug('Cleaning up OCR engine resources');
+  return enqueueWorkerOperation(async () => {
+    logger.debug('Cleaning up OCR engine resources');
 
-  // Clear idle check interval
-  if (idleInterval) {
-    clearInterval(idleInterval);
-    idleInterval = null;
-    logger.debug('Cleared idle check interval');
-  }
+    if (idleInterval) {
+      clearInterval(idleInterval);
+      idleInterval = null;
+      logger.debug('Cleared idle check interval');
+    }
 
-  // Terminate worker if active
-  if (worker) {
     try {
-      await worker.terminate();
+      await terminateWorker();
       logger.debug('OCR worker terminated');
     } catch (error) {
       logger.warn('Error terminating OCR worker:', error);
     }
-    worker = null;
-  }
 
-  // Reset state
-  currentLang = null;
-  lastUsedTime = Date.now();
-
-  logger.debug('OCR engine cleanup completed');
+    lastUsedTime = Date.now();
+    logger.debug('OCR engine cleanup completed');
+  });
 }
