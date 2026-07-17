@@ -25,6 +25,14 @@ const ttsStopMock = vi.fn(async () => {
   return true
 })
 
+function deferred() {
+  let resolve
+  const promise = new Promise((resolvePromise) => {
+    resolve = resolvePromise
+  })
+  return { promise, resolve }
+}
+
 vi.mock('@/shared/storage/core/StorageCore.js', () => ({
   storageCore: {
     get: vi.fn(async (keys) => {
@@ -316,8 +324,8 @@ describe('PdfWindowsHost', () => {
     sendRegularMessageMock.mockResolvedValue({ success: true, translatedText: 'Translated text' })
     sendMessageMock.mockReset()
     sendMessageMock.mockResolvedValue({ success: true })
-    getEffectiveProviderAsyncMock.mockClear()
-    getTargetLanguageAsyncMock.mockClear()
+    getEffectiveProviderAsyncMock.mockReset().mockResolvedValue('googlev2')
+    getTargetLanguageAsyncMock.mockReset().mockResolvedValue('fa')
     storageSetMock.mockClear()
 
     Object.keys(eventHandlers).forEach((key) => {
@@ -421,6 +429,86 @@ describe('PdfWindowsHost', () => {
     await flushPromises()
 
     expect(wrapper.get('[data-testid="pdf-windows-host-result"]').text()).toContain('Region translated')
+  })
+
+  it('does not dispatch stale settings resolution after a new selection', async () => {
+    wrapper.unmount()
+    const staleProvider = deferred()
+    getEffectiveProviderAsyncMock
+      .mockResolvedValueOnce('')
+      .mockImplementationOnce(() => staleProvider.promise)
+      .mockResolvedValueOnce('')
+    wrapper = mount(PdfWindowsHost, {
+      props: { pdfFingerprint: 'pdf-doc-1' },
+      attachTo: document.body
+    })
+    await flushPromises()
+
+    const staleOperation = wrapper.vm.openTranslation({
+      text: 'Stale selection',
+      position: { x: 40, y: 60, width: 120, height: 80 }
+    })
+    await flushPromises()
+    const currentOperation = wrapper.vm.openTranslation({
+      text: 'Current selection',
+      position: { x: 80, y: 100, width: 120, height: 80 }
+    })
+    await currentOperation
+    await flushPromises()
+
+    expect(sendRegularMessageMock).toHaveBeenCalledOnce()
+    expect(sendRegularMessageMock).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({ text: 'Current selection' })
+    }))
+
+    staleProvider.resolve('stale-provider')
+    await expect(staleOperation).resolves.toBe(true)
+    await flushPromises()
+
+    expect(sendRegularMessageMock).toHaveBeenCalledOnce()
+    expect(wrapper.findComponent({ name: 'TranslationWindowToolbar' }).props('provider')).toBe('')
+    expect(wrapper.find('[data-testid="pdf-windows-host-loading"]').exists()).toBe(false)
+  })
+
+  it('does not dispatch stale settings resolution after window close', async () => {
+    await wrapper.vm.openTranslation({
+      text: 'Initial selection',
+      position: { x: 40, y: 60, width: 120, height: 80 }
+    })
+    const staleTarget = deferred()
+    getTargetLanguageAsyncMock.mockImplementationOnce(() => staleTarget.promise)
+
+    await wrapper.get('[data-testid="translation-window-toolbar-provider-select"]').setValue('deepl')
+    await flushPromises()
+    await wrapper.get('[data-testid="translation-window-toolbar-close"]').trigger('click')
+
+    staleTarget.resolve('fa')
+    await flushPromises()
+
+    expect(sendRegularMessageMock).toHaveBeenCalledOnce()
+    expect(wrapper.find('[data-testid="pdf-windows-host-loading"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="pdf-windows-host"]').exists()).toBe(false)
+  })
+
+  it('does not dispatch stale settings resolution after PDF replacement', async () => {
+    await wrapper.vm.openTranslation({
+      text: 'Initial selection',
+      position: { x: 40, y: 60, width: 120, height: 80 }
+    })
+    const staleTarget = deferred()
+    getTargetLanguageAsyncMock.mockImplementationOnce(() => staleTarget.promise)
+
+    await wrapper.get('[data-testid="translation-window-toolbar-provider-select"]').setValue('deepl')
+    await flushPromises()
+    await wrapper.setProps({ pdfFingerprint: 'pdf-doc-2' })
+    await flushPromises()
+
+    staleTarget.resolve('fa')
+    await flushPromises()
+
+    expect(sendRegularMessageMock).toHaveBeenCalledOnce()
+    expect(wrapper.find('[data-testid="pdf-windows-host-loading"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="pdf-windows-host"]').exists()).toBe(false)
   })
 
   it('keeps the selection icon transition alive until the icon click opens the window', async () => {

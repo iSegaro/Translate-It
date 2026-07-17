@@ -575,6 +575,7 @@ export function usePdfWindowsHost(options = {}) {
       return false
     }
 
+    const requestSessionId = selectionSessionId.value
     let resolvedTargetLanguage = AUTO_DETECT_VALUE
     const [provider, sourceLanguage, targetLanguage] = await Promise.all([
       selectedProvider.value ? Promise.resolve(selectedProvider.value) : getEffectiveProviderAsync(TranslationMode.Selection),
@@ -582,13 +583,16 @@ export function usePdfWindowsHost(options = {}) {
       getTargetLanguageAsync()
     ])
 
+    if (requestSessionId !== selectionSessionId.value) {
+      return false
+    }
+
     resolvedTargetLanguage = targetLanguage || AUTO_DETECT_VALUE
 
     if (!selectedProvider.value && provider) {
       selectedProvider.value = provider
     }
 
-    const requestSessionId = selectionSessionId.value
     activeRequestSessionId = requestSessionId
 
     isTranslating.value = true
