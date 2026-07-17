@@ -131,6 +131,29 @@ describe('TranslationEngine', () => {
       expect(result.mode).toBe('selection'); // Not upgraded because multi-word
     });
 
+    it('returns cancellation without starting translation when registration was pre-cancelled', async () => {
+      engine.lifecycleRegistry.registerRequest.mockReturnValue(null);
+      const executeTranslation = vi.spyOn(engine, 'executeTranslation');
+      const request = {
+        action: MessageActions.TRANSLATE,
+        messageId: 'pre-cancelled',
+        data: {
+          text: 'Hello world',
+          provider: 'google',
+          sourceLanguage: 'en',
+          targetLanguage: 'fa',
+          mode: 'selection'
+        }
+      };
+
+      const result = await engine.handleMessage(request, {});
+
+      expect(result).toMatchObject({ success: false, error: { type: 'USER_CANCELLED' } });
+      expect(executeTranslation).not.toHaveBeenCalled();
+      expect(engine.jsonHandler.execute).not.toHaveBeenCalled();
+      expect(engine.factory.getProvider).not.toHaveBeenCalled();
+    });
+
     it('should route PDF structured batches through the JSON handler path', async () => {
       const request = {
         action: MessageActions.TRANSLATE,

@@ -3,6 +3,7 @@ import { sendRegularMessage } from '@/shared/messaging/core/UnifiedMessaging.js'
 import { MessageActions } from '@/shared/messaging/core/MessageActions.js'
 import { MessageContexts } from '@/shared/messaging/core/MessagingConstants.js'
 import { MessageFormat } from '@/shared/messaging/core/MessagingCore.js'
+import { generateTranslationMessageId } from '@/utils/messaging/messageId.js'
 import { PdfTranslationAdapter } from './PdfTranslationAdapter.js'
 import { PdfTranslationBatchPlanner } from './PdfTranslationBatchPlanner.js'
 import { enrichBlocksWithTableMetadata } from './TableRegionAnalyzer.js'
@@ -192,7 +193,7 @@ export class PdfTranslationCoordinator {
         this._markBlocksLoading(batch.blocks)
 
         const semanticHint = this.adapter.buildSemanticBatchHint(batch.items)
-        const messageId = this._buildMessageId(runId, batch.batchId)
+        const messageId = this._buildMessageId()
         this.activeRequestIds.add(messageId)
 
         let response
@@ -355,8 +356,8 @@ export class PdfTranslationCoordinator {
     }
   }
 
-  _buildMessageId(runId, batchId) {
-    return `pdf-${runId}-${batchId}-${Date.now()}`
+  _buildMessageId() {
+    return generateTranslationMessageId('pdf')
   }
 
   _isRunCurrent(runId) {

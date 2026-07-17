@@ -170,11 +170,52 @@ describe('PdfTranslationCoordinator', () => {
     }))
     expect(sendRegularMessageMock).toHaveBeenCalledWith(expect.objectContaining({
       context: 'pdf-translation',
+      messageId: expect.stringMatching(/^pdf-translate-/),
       data: expect.objectContaining({
         mode: 'pdf-translation',
         pdfTranslation: true
       })
     }))
+  })
+
+  it('uses distinct globally scoped IDs for matching coordinator runs', () => {
+    const now = vi.spyOn(Date, 'now').mockReturnValue(1_700_000_000_000)
+    const coordinatorA = new PdfTranslationCoordinator(session)
+    const coordinatorB = new PdfTranslationCoordinator(session)
+
+    const messageIdA = coordinatorA._buildMessageId(1, 'pdf-batch-0')
+    const messageIdB = coordinatorB._buildMessageId(1, 'pdf-batch-0')
+
+    expect(messageIdA).toMatch(/^pdf-translate-/)
+    expect(messageIdB).toMatch(/^pdf-translate-/)
+    expect(messageIdA).not.toBe(messageIdB)
+
+    now.mockRestore()
+  })
+
+  it('tracks generated request IDs before sending their batch messages', async () => {
+    const coordinator = new PdfTranslationCoordinator(session)
+    const response = createDeferred()
+    session.getVisibleLogicalBlocks.mockResolvedValue([
+      { id: 'block-a', text: 'Hello', role: 'paragraph', sourceTextHash: 'hash-a' }
+    ])
+    sendRegularMessageMock.mockReturnValue(response.promise)
+
+    const translation = coordinator.translateVisibleBlocks()
+    await vi.waitFor(() => expect(sendRegularMessageMock).toHaveBeenCalledTimes(1))
+
+    const messageId = sendRegularMessageMock.mock.calls[0][0].messageId
+    expect(messageId).toMatch(/^pdf-translate-/)
+    expect(coordinator.activeRequestIds).toEqual(new Set([messageId]))
+
+    response.resolve({
+      success: true,
+      translatedText: JSON.stringify([{ blockId: 'block-a', text: 'Hola' }]),
+      provider: 'google',
+      sourceLanguage: 'en',
+      targetLanguage: 'es'
+    })
+    await translation
   })
 
   it('passes canonical structured regions to the batch planner before legacy regions', async () => {

@@ -10,11 +10,13 @@ import { streamingManager } from "../StreamingManager.js";
 import { getTranslationInputPreview } from "../translationInputHelpers.js";
 
 const logger = getScopedLogger(LOG_COMPONENTS.TRANSLATION, 'TranslationLifecycleRegistry');
+// Retain out-of-order cancellation intent long enough for extension messaging to register its request.
+const CANCELLATION_TOMBSTONE_TTL_MS = 60_000;
 
 export class TranslationLifecycleRegistry {
   constructor() {
     this.activeTranslations = new Map(); // Track active translations: messageId -> { controller: AbortController, context: string }
-    this.cancelledRequests = new Set(); // Track cancelled request messageIds
+    this.cancelledRequests = new Map(); // Track cancellation tombstones: messageId -> timestamp
     this.recentRequests = new Map();     // Track recent requests to prevent duplicates
     this.streamingSenders = new Map();    // Track tab info for streaming: messageId -> sender
   }
@@ -26,9 +28,16 @@ export class TranslationLifecycleRegistry {
    * @param {string} messageId - Unique ID for the message
    * @param {string} text - Content being translated (for duplicate detection)
    * @param {string} context - UI context (popup, sidepanel, etc.)
-   * @returns {AbortController} The controller for this request
+   * @returns {AbortController|null} The controller, or null when cancellation arrived first
    */
   registerRequest(messageId, text, context = 'unknown') {
+    this._pruneCancelledRequests();
+
+    if (this.cancelledRequests.has(messageId)) {
+      logger.debug(`[LifecycleRegistry] Ignoring pre-cancelled request: ${messageId}`);
+      return null;
+    }
+
     // Detect duplicates (brief window of 1 second)
     const requestId = `${messageId}:${getTranslationInputPreview(text)}`;
     if (this.recentRequests.has(requestId)) {
@@ -44,7 +53,6 @@ export class TranslationLifecycleRegistry {
       controller: abortController, 
       context 
     });
-    this.cancelledRequests.delete(messageId);
     
     // Store in recent for duplicate prevention
     this.recentRequests.set(requestId, { time: Date.now(), controller: abortController });
@@ -64,8 +72,8 @@ export class TranslationLifecycleRegistry {
    * @param {string} messageId - The request ID
    */
   unregisterRequest(messageId) {
+    this._pruneCancelledRequests();
     this.activeTranslations.delete(messageId);
-    this.cancelledRequests.delete(messageId);
     this.streamingSenders.delete(messageId);
   }
 
@@ -76,6 +84,7 @@ export class TranslationLifecycleRegistry {
    * @returns {boolean}
    */
   isCancelled(messageId) {
+    this._pruneCancelledRequests();
     return this.cancelledRequests.has(messageId);
   }
 
@@ -88,7 +97,8 @@ export class TranslationLifecycleRegistry {
   async cancelTranslation(messageId) {
     if (!messageId) return false;
 
-    this.cancelledRequests.add(messageId);
+    this._pruneCancelledRequests();
+    this.cancelledRequests.set(messageId, Date.now());
     
     if (this.activeTranslations.has(messageId)) {
       logger.info(`[LifecycleRegistry] Aborting active translation: ${messageId}`);
@@ -110,6 +120,7 @@ export class TranslationLifecycleRegistry {
    * @returns {Promise<number>} Number of cancelled translations
    */
   async cancelAllTranslations(context = null) {
+    this._pruneCancelledRequests();
     let cancelledCount = 0;
     
     for (const [messageId, entry] of this.activeTranslations) {
@@ -119,7 +130,7 @@ export class TranslationLifecycleRegistry {
       }
 
       try {
-        this.cancelledRequests.add(messageId);
+        this.cancelledRequests.set(messageId, Date.now());
         entry.controller.abort();
         cancelledCount++;
       } catch { /* ignore */ }
@@ -171,5 +182,19 @@ export class TranslationLifecycleRegistry {
    */
   getStreamingSender(messageId) {
     return this.streamingSenders.get(messageId) || null;
+  }
+
+  /**
+   * Drop cancellation tombstones for requests that never reached registration.
+   *
+   * @private
+   */
+  _pruneCancelledRequests() {
+    const expiresBefore = Date.now() - CANCELLATION_TOMBSTONE_TTL_MS;
+    for (const [messageId, cancelledAt] of this.cancelledRequests) {
+      if (cancelledAt <= expiresBefore) {
+        this.cancelledRequests.delete(messageId);
+      }
+    }
   }
 }

@@ -77,7 +77,12 @@ export class TranslationEngine {
     data.messageId = messageId;
 
     // Register and detect duplicate with context awareness
-    this.lifecycleRegistry.registerRequest(messageId, data.text, context);
+    const registration = this.lifecycleRegistry.registerRequest(messageId, data.text, context);
+    if (registration === null) {
+      const cancellationError = new Error('Translation cancelled by user');
+      cancellationError.type = ErrorTypes.USER_CANCELLED;
+      return this.formatError(cancellationError, context);
+    }
 
     try {
       const result = await this.executeTranslation(data, sender, context);
