@@ -5,7 +5,8 @@ export const REGION_EXECUTION_TARGET = Object.freeze({
 })
 
 export const EXECUTION_SCOPE = Object.freeze({
-  LIVE_REGION: 'live-region'
+  LIVE_REGION: 'live-region',
+  CORPUS: 'corpus'
 })
 
 function isCanonicalPdfRegion(region) {
