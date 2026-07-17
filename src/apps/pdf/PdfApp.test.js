@@ -505,7 +505,77 @@ describe('PdfApp', () => {
     await flushPromises()
   })
 
-  it('keeps execution mode through document replacement and resets it on remount', async () => {
+  it('cancels active Region OCR before loading a replacement PDF', async () => {
+    const order = []
+    const operationCancel = vi.fn(() => order.push('operation-cancel'))
+    let resolveOcr
+    mockRegionOcr.startRegionOcr.mockImplementation(() => createMockOperation(new Promise((resolve) => {
+      resolveOcr = resolve
+    }), operationCancel))
+    mockRegionOcr.cancelRegionOcr.mockImplementation(() => {
+      order.push('cancel-region-ocr')
+      operationCancel()
+    })
+    mockViewerController.loadPdfFile.mockImplementation(() => {
+      order.push('load-pdf')
+      return Promise.resolve(true)
+    })
+
+    const wrapper = mount(PdfApp)
+    await flushPromises()
+
+    wrapper.findComponent({ name: 'PdfViewer' }).vm.$emit('region-selection-complete', createPdfRegion({ pageNumber: 1, left: 1, top: 4, right: 3, bottom: 2 }))
+    await flushPromises()
+    wrapper.findComponent({ name: 'PdfDropzone' }).vm.$emit('file-selected', { name: 'replacement.pdf' })
+    await flushPromises()
+
+    expect(mockRegionOcr.cancelRegionOcr).toHaveBeenCalledOnce()
+    expect(operationCancel).toHaveBeenCalledOnce()
+    expect(order).toEqual(['cancel-region-ocr', 'operation-cancel', 'load-pdf'])
+
+    resolveOcr({ status: 'cancelled' })
+  })
+
+  it('suppresses late recognized handoff after PDF replacement', async () => {
+    mockRegionOcr.startRegionOcr.mockReturnValue(createMockOperation(new Promise(() => {})))
+
+    const wrapper = mount(PdfApp)
+    await flushPromises()
+
+    wrapper.findComponent({ name: 'PdfViewer' }).vm.$emit('region-selection-complete', createPdfRegion({ pageNumber: 1, left: 1, top: 4, right: 3, bottom: 2 }))
+    await flushPromises()
+    wrapper.findComponent({ name: 'PdfDropzone' }).vm.$emit('file-selected', { name: 'replacement.pdf' })
+    await flushPromises()
+    mockRegionOcrOptions.onRecognized({ text: 'late text', lines: [], confidence: 99 })
+    await flushPromises()
+
+    expect(mockRegionOcr.cancelRegionOcr).toHaveBeenCalledOnce()
+    expect(openTranslationMock).not.toHaveBeenCalled()
+  })
+
+  it('keeps completed Region OCR behavior through document replacement', async () => {
+    createMocks({ sessionAsRef: false })
+    mockRegionOcr.startRegionOcr.mockImplementation(() => {
+      mockRegionOcrOptions.onRecognized({ text: 'recognized text', lines: [], confidence: 99 })
+      return createMockOperation(Promise.resolve({ status: 'recognized', data: { text: 'recognized text', lines: [], confidence: 99 } }))
+    })
+
+    const wrapper = mount(PdfApp)
+    await flushPromises()
+
+    wrapper.findComponent({ name: 'PdfViewer' }).vm.$emit('region-selection-complete', createPdfRegion({ pageNumber: 1, left: 1, top: 4, right: 3, bottom: 2 }))
+    await flushPromises()
+    wrapper.findComponent({ name: 'PdfDropzone' }).vm.$emit('file-selected', { name: 'replacement.pdf' })
+    await flushPromises()
+
+    await vi.waitFor(() => {
+      expect(openTranslationMock).toHaveBeenCalledOnce()
+    })
+    expect(mockRegionOcr.cancelRegionOcr).toHaveBeenCalledOnce()
+    expect(mockViewerController.loadPdfFile).toHaveBeenCalledWith({ name: 'replacement.pdf' }, expect.any(Object))
+  })
+
+  it('keeps execution mode through document replacement and cancels no active Region OCR', async () => {
     const firstWrapper = mount(PdfApp)
     await flushPromises()
 
@@ -513,6 +583,8 @@ describe('PdfApp', () => {
     await flushPromises()
 
     expect(firstWrapper.findComponent({ name: 'PdfToolbar' }).props('executionMode')).toBe('ocr')
+    expect(mockRegionOcr.cancelRegionOcr).toHaveBeenCalledOnce()
+    expect(mockViewerController.loadPdfFile).toHaveBeenCalledWith({ name: 'replacement.pdf' }, expect.any(Object))
     firstWrapper.unmount()
 
     const secondWrapper = mount(PdfApp)

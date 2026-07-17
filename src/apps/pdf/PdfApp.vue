@@ -294,7 +294,7 @@ const {
   }
 })
 
-const { startRegionOcr } = usePdfRegionOcr({
+const { startRegionOcr, cancelRegionOcr } = usePdfRegionOcr({
   onRecognized: handleRegionOcrRecognized
 })
 
@@ -417,6 +417,7 @@ function resetPresentationState() {
 }
 
 async function handleFileSelected(file) {
+  cancelRegionOcr()
   resetPresentationState()
   const loaded = await loadPdfFile(file, buildLayoutRequest())
   if (loaded) {
