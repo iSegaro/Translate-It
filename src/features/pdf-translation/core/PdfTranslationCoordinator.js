@@ -2,6 +2,7 @@ import { TranslationMode, getProviderOptimizationLevelAsync, getSourceLanguageAs
 import { sendRegularMessage } from '@/shared/messaging/core/UnifiedMessaging.js'
 import { MessageActions } from '@/shared/messaging/core/MessageActions.js'
 import { MessageContexts } from '@/shared/messaging/core/MessagingConstants.js'
+import { MessageFormat } from '@/shared/messaging/core/MessagingCore.js'
 import { PdfTranslationAdapter } from './PdfTranslationAdapter.js'
 import { PdfTranslationBatchPlanner } from './PdfTranslationBatchPlanner.js'
 import { enrichBlocksWithTableMetadata } from './TableRegionAnalyzer.js'
@@ -271,18 +272,13 @@ export class PdfTranslationCoordinator {
     this.activeRequestIds.clear()
     this.isTranslating = false
 
-    try {
-      await sendRegularMessage({
-        action: MessageActions.CANCEL_TRANSLATION,
-        context: MessageContexts.PDF_TRANSLATION,
-        data: {
-          cancelAll: true,
-          context: MessageContexts.PDF_TRANSLATION,
-          reason
-        }
-      }, { silent: true })
-    } catch {
-      // Best-effort cancellation only.
+    for (const messageId of messageIds) {
+      const cancelMessage = MessageFormat.create(
+        MessageActions.CANCEL_TRANSLATION,
+        { messageId, reason },
+        MessageContexts.PDF_TRANSLATION
+      )
+      void sendRegularMessage(cancelMessage, { silent: true }).catch(() => {})
     }
 
     return messageIds

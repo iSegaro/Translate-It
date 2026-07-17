@@ -279,6 +279,64 @@ describe('PdfTranslationCoordinator', () => {
     }))
   })
 
+  it('cancels every coordinator-owned request ID without global cancellation', async () => {
+    const coordinator = new PdfTranslationCoordinator(session)
+    coordinator.activeRequestIds.add('pdf-run-a')
+    coordinator.activeRequestIds.add('pdf-run-b')
+    sendRegularMessageMock.mockResolvedValue({ success: true })
+
+    const cancelledIds = await coordinator.cancelActiveTranslation('document-replaced')
+
+    expect(cancelledIds).toEqual(['pdf-run-a', 'pdf-run-b'])
+    expect(coordinator.activeRequestIds.size).toBe(0)
+    expect(sendRegularMessageMock).toHaveBeenCalledTimes(2)
+    for (const [message] of sendRegularMessageMock.mock.calls) {
+      expect(message).toEqual(expect.objectContaining({
+        action: 'CANCEL_TRANSLATION',
+        context: 'pdf-translation',
+        data: expect.objectContaining({ reason: 'document-replaced' })
+      }))
+      expect(message.data).not.toHaveProperty('cancelAll')
+    }
+    expect(sendRegularMessageMock.mock.calls.map(([message]) => message.data.messageId)).toEqual(['pdf-run-a', 'pdf-run-b'])
+  })
+
+  it('does not cancel request IDs owned by another coordinator', async () => {
+    const coordinatorA = new PdfTranslationCoordinator(session)
+    const coordinatorB = new PdfTranslationCoordinator(session)
+    coordinatorA.activeRequestIds.add('pdf-run-a')
+    coordinatorB.activeRequestIds.add('pdf-run-b')
+    sendRegularMessageMock.mockResolvedValue({ success: true })
+
+    await coordinatorA.cancelActiveTranslation('user-cancel')
+
+    expect(sendRegularMessageMock).toHaveBeenCalledOnce()
+    expect(sendRegularMessageMock.mock.calls[0][0].data.messageId).toBe('pdf-run-a')
+    expect(coordinatorB.activeRequestIds).toEqual(new Set(['pdf-run-b']))
+  })
+
+  it('does not send backend cancellation without active request IDs', async () => {
+    const coordinator = new PdfTranslationCoordinator(session)
+
+    await expect(coordinator.cancelActiveTranslation()).resolves.toBeUndefined()
+
+    expect(sendRegularMessageMock).not.toHaveBeenCalled()
+  })
+
+  it('continues scoped cancellation when one cancellation transport rejects', async () => {
+    const coordinator = new PdfTranslationCoordinator(session)
+    coordinator.activeRequestIds.add('pdf-run-a')
+    coordinator.activeRequestIds.add('pdf-run-b')
+    sendRegularMessageMock
+      .mockRejectedValueOnce(new Error('transport failed'))
+      .mockResolvedValueOnce({ success: true })
+
+    await expect(coordinator.cancelActiveTranslation('user-cancel')).resolves.toEqual(['pdf-run-a', 'pdf-run-b'])
+
+    expect(sendRegularMessageMock).toHaveBeenCalledTimes(2)
+    expect(sendRegularMessageMock.mock.calls.map(([message]) => message.data.messageId)).toEqual(['pdf-run-a', 'pdf-run-b'])
+  })
+
   it('calls onStateChange after marking blocks loading and after applying batch results', async () => {
     const onStateChange = vi.fn()
     const coordinator = new PdfTranslationCoordinator(session, { onStateChange })
