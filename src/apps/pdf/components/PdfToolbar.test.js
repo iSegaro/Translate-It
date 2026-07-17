@@ -251,6 +251,22 @@ describe('PdfToolbar', () => {
     expect(wrapper.emitted('request-ocr')).toHaveLength(1)
   })
 
+  it('emits execution-mode-change from current execution mode selection', async () => {
+    const wrapper = mount(PdfToolbar, {
+      props: {
+        executionMode: 'ocr',
+        executionModes: ['ocr', 'benchmark']
+      }
+    })
+
+    const modeSelect = wrapper.find('.pdf-toolbar__execution-mode-select')
+    expect(modeSelect.element.value).toBe('ocr')
+
+    await modeSelect.setValue('benchmark')
+
+    expect(wrapper.emitted('execution-mode-change')).toEqual([['benchmark']])
+  })
+
   it('hides OCR button while processing or without OCR recommendations', async () => {
     const wrapper = mount(PdfToolbar, {
       props: {

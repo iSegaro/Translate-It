@@ -17,6 +17,8 @@
       :show-translation-option="hasAnyTranslation"
       :has-outline="hasOutline"
       :is-outline-visible="isOutlineVisible"
+      :execution-mode="executionMode"
+      :execution-modes="supportedExecutionModes"
       @toggle-outline="toggleOutline"
       @translate-visible="handleTranslateVisiblePages"
       @cancel-translation="handleCancelTranslation"
@@ -30,6 +32,7 @@
       @request-ocr="requestOcr"
       @clear-cache="handleClearCache"
       @request-open-pdf="requestOpenPdf"
+      @execution-mode-change="handleExecutionModeChange"
     />
 
     <input
@@ -267,6 +270,8 @@ const exportSuccessTimer = ref(null)
 const EXPORT_SUCCESS_DURATION_MS = 2200
 const dismissedPdfStatusBannerKey = ref('')
 let activeRegionPosition = null
+const supportedExecutionModes = Object.freeze([REGION_EXECUTION_TARGET.OCR])
+const executionMode = ref(REGION_EXECUTION_TARGET.OCR)
 const pdfStatusBannerController = createPdfStatusBannerController()
 
 const {
@@ -363,6 +368,11 @@ function toggleOutline() {
 
 function handleOutlineNavigate(dest) {
   navigateToDestination(dest)
+}
+
+function handleExecutionModeChange(mode) {
+  if (!supportedExecutionModes.includes(mode)) return
+  executionMode.value = mode
 }
 
 const pdfStatusBanner = computed(() => pdfStatusBannerController.build({
@@ -473,7 +483,7 @@ function handleRegionSelectionComplete(region) {
   activeRegionPosition = resolveRegionViewportPosition(region)
   const request = createRegionExecutionRequest({
     region,
-    target: REGION_EXECUTION_TARGET.OCR
+    target: executionMode.value
   })
 
   if (!request) return

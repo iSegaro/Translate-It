@@ -147,6 +147,22 @@
     </div>
 
     <div class="pdf-toolbar__actions">
+      <select
+        v-if="hasExecutionModeChoice"
+        class="pdf-toolbar__execution-mode-select"
+        :value="executionMode"
+        aria-label="Region execution mode"
+        @change="handleExecutionModeChange"
+      >
+        <option
+          v-for="mode in executionModes"
+          :key="mode"
+          :value="mode"
+        >
+          {{ mode }}
+        </option>
+      </select>
+
       <button
         v-if="ocrRecommendationCount > 0 && !isOcrProcessing"
         class="pdf-toolbar__button pdf-toolbar__button--ocr"
@@ -324,9 +340,11 @@ const props = defineProps({
   showTranslationOption: { type: Boolean, default: false },
   hasOutline: { type: Boolean, default: false },
   isOutlineVisible: { type: Boolean, default: false },
+  executionMode: { type: String, default: '' },
+  executionModes: { type: Array, default: () => [] },
 })
 
-const emit = defineEmits(['request-open-pdf', 'translate-visible', 'cancel-translation', 'content-view-change', 'layout-mode-change', 'toggle-outline', 'export-txt', 'export-markdown', 'export-html', 'request-ocr', 'clear-cache', 'zoom-step', 'zoom-change'])
+const emit = defineEmits(['request-open-pdf', 'translate-visible', 'cancel-translation', 'content-view-change', 'layout-mode-change', 'toggle-outline', 'export-txt', 'export-markdown', 'export-html', 'request-ocr', 'clear-cache', 'zoom-step', 'zoom-change', 'execution-mode-change'])
 
 const logger = getScopedLogger(LOG_COMPONENTS.PDF, 'PdfToolbar')
 const settingsStore = useSettingsStore()
@@ -415,6 +433,7 @@ const contentOptions = computed(() => {
 })
 
 const isSideBySide = computed(() => props.layoutMode === LAYOUT_MODE.SIDE_BY_SIDE)
+const hasExecutionModeChoice = computed(() => props.executionModes.length > 1)
 
 const zoomSelectValue = computed(() => String(props.zoomPercent || 100))
 
@@ -532,6 +551,10 @@ function handleFitToggle() {
 
 function handleLayoutModeToggle() {
   emit('layout-mode-change', isSideBySide.value ? LAYOUT_MODE.SINGLE : LAYOUT_MODE.SIDE_BY_SIDE)
+}
+
+function handleExecutionModeChange(event) {
+  emit('execution-mode-change', event.target.value)
 }
 
 </script>

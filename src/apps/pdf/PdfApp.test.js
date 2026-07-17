@@ -26,6 +26,7 @@ let mockRegionOcr
 let mockRegionOcrOptions
 let mockLayoutSyncFromPane
 let mockPdfViewport
+let mockPdfSession
 const mockRegionExecutionDispatch = vi.fn((request, runner) => runner(request))
 const openTranslationMock = vi.fn()
 
@@ -90,7 +91,8 @@ vi.mock('@/shared/config/config.js', () => ({
 vi.mock('./components/PdfToolbar.vue', () => ({
   default: {
     name: 'PdfToolbar',
-    props: ['fileName', 'pageCount', 'currentPageNumber', 'zoomMode', 'zoomPercent', 'contentView', 'layoutMode', 'ocrRecommendationCount'],
+    props: ['fileName', 'pageCount', 'currentPageNumber', 'zoomMode', 'zoomPercent', 'contentView', 'layoutMode', 'ocrRecommendationCount', 'executionMode', 'executionModes'],
+    emits: ['toggle-outline', 'translate-visible', 'cancel-translation', 'content-view-change', 'layout-mode-change', 'zoom-step', 'zoom-change', 'export-txt', 'export-markdown', 'export-html', 'request-ocr', 'clear-cache', 'request-open-pdf', 'execution-mode-change'],
     template: '<header class="pdf-toolbar-stub" />'
   }
 }))
@@ -242,6 +244,7 @@ function createMocks({
   const sessionMock = {
     getPageViewport: vi.fn(() => mockPdfViewport)
   }
+  mockPdfSession = sessionMock
 
   mockViewerController = {
     error: ref(''),
@@ -450,6 +453,62 @@ describe('PdfApp', () => {
         }
       })
     })
+  })
+
+  it('owns the OCR-only execution mode and rejects unsupported toolbar intent', async () => {
+    const wrapper = mount(PdfApp)
+    await flushPromises()
+
+    const toolbar = wrapper.findComponent({ name: 'PdfToolbar' })
+    expect(toolbar.props('executionMode')).toBe('ocr')
+    expect(toolbar.props('executionModes')).toEqual(['ocr'])
+
+    toolbar.vm.$emit('execution-mode-change', 'benchmark')
+    await flushPromises()
+
+    expect(toolbar.props('executionMode')).toBe('ocr')
+    expect(mockPdfSession).not.toHaveProperty('executionMode')
+  })
+
+  it('keeps dispatched request target immutable after later mode intent', async () => {
+    let resolveOcr
+    mockRegionOcr.executeRegionOcr.mockImplementation(() => new Promise((resolve) => {
+      resolveOcr = resolve
+    }))
+
+    const wrapper = mount(PdfApp)
+    await flushPromises()
+
+    const region = createPdfRegion({ pageNumber: 1, left: 1, top: 4, right: 3, bottom: 2 })
+    wrapper.findComponent({ name: 'PdfViewer' }).vm.$emit('region-selection-complete', region)
+    await flushPromises()
+
+    const request = mockRegionExecutionDispatch.mock.calls[0][0]
+    wrapper.findComponent({ name: 'PdfToolbar' }).vm.$emit('execution-mode-change', 'benchmark')
+    await flushPromises()
+
+    expect(mockRegionExecutionDispatch).toHaveBeenCalledOnce()
+    expect(request).toEqual({ region, target: 'ocr' })
+    expect(Object.isFrozen(request)).toBe(true)
+
+    resolveOcr({ status: 'cancelled' })
+    await flushPromises()
+  })
+
+  it('keeps execution mode through document replacement and resets it on remount', async () => {
+    const firstWrapper = mount(PdfApp)
+    await flushPromises()
+
+    firstWrapper.findComponent({ name: 'PdfDropzone' }).vm.$emit('file-selected', { name: 'replacement.pdf' })
+    await flushPromises()
+
+    expect(firstWrapper.findComponent({ name: 'PdfToolbar' }).props('executionMode')).toBe('ocr')
+    firstWrapper.unmount()
+
+    const secondWrapper = mount(PdfApp)
+    await flushPromises()
+
+    expect(secondWrapper.findComponent({ name: 'PdfToolbar' }).props('executionMode')).toBe('ocr')
   })
 
   it('does not open translation for failed OCR result', async () => {
