@@ -305,6 +305,33 @@ describe('PdfWindowsHost', () => {
   let windowRemoveEventListenerSpy
   let clipboardWriteTextMock
 
+  async function openPendingTranslation(text = 'Pending translation') {
+    let resolveTranslation
+    sendRegularMessageMock.mockImplementationOnce(() => new Promise((resolve) => {
+      resolveTranslation = resolve
+    }))
+
+    const operation = wrapper.vm.openTranslation({
+      text,
+      position: { x: 40, y: 60, width: 120, height: 80 }
+    })
+    await flushPromises()
+
+    return {
+      operation,
+      request: sendRegularMessageMock.mock.calls.at(-1)[0],
+      resolveTranslation
+    }
+  }
+
+  function expectCancellationRequest(request, messageId) {
+    expect(request).toEqual(expect.objectContaining({
+      action: 'CANCEL_TRANSLATION',
+      context: 'pdf-translation',
+      data: expect.objectContaining({ messageId })
+    }))
+  }
+
   beforeEach(async () => {
     windowsManagerImported = false
     ttsStopMock.mockClear()
@@ -509,6 +536,110 @@ describe('PdfWindowsHost', () => {
     expect(sendRegularMessageMock).toHaveBeenCalledOnce()
     expect(wrapper.find('[data-testid="pdf-windows-host-loading"]').exists()).toBe(false)
     expect(wrapper.find('[data-testid="pdf-windows-host"]').exists()).toBe(false)
+  })
+
+  it('cancels the active translation request when the window closes', async () => {
+    await wrapper.vm.openTranslation({
+      text: 'Close replacement',
+      position: { x: 40, y: 60, width: 120, height: 80 }
+    })
+    const pending = deferred()
+    sendRegularMessageMock.mockImplementationOnce(() => pending.promise)
+
+    await wrapper.get('[data-testid="translation-window-toolbar-provider-select"]').setValue('deepl')
+    await flushPromises()
+    const pendingRequest = sendRegularMessageMock.mock.calls[1][0]
+
+    await wrapper.get('[data-testid="translation-window-toolbar-close"]').trigger('click')
+    await flushPromises()
+
+    expectCancellationRequest(sendRegularMessageMock.mock.calls[2][0], pendingRequest.messageId)
+    pending.resolve({ success: true, translatedText: 'Late result' })
+    await flushPromises()
+    expect(wrapper.find('[data-testid="pdf-windows-host"]').exists()).toBe(false)
+  })
+
+  it('cancels the previous request before opening a new Region OCR translation', async () => {
+    const pending = await openPendingTranslation('Old Region OCR text')
+
+    await wrapper.vm.openTranslation({
+      text: 'Current Region OCR text',
+      position: { x: 80, y: 100, width: 120, height: 80 }
+    })
+    await flushPromises()
+
+    expectCancellationRequest(sendRegularMessageMock.mock.calls[1][0], pending.request.messageId)
+    expect(sendRegularMessageMock.mock.calls[2][0]).toEqual(expect.objectContaining({
+      action: 'TRANSLATE',
+      data: expect.objectContaining({ text: 'Current Region OCR text' })
+    }))
+    pending.resolveTranslation({ success: true, translatedText: 'Stale result' })
+    await pending.operation
+    expect(wrapper.text()).not.toContain('Stale result')
+  })
+
+  it('cancels the active translation request before provider replacement', async () => {
+    await wrapper.vm.openTranslation({
+      text: 'Provider replacement',
+      position: { x: 40, y: 60, width: 120, height: 80 }
+    })
+    const pending = deferred()
+    sendRegularMessageMock.mockImplementationOnce(() => pending.promise)
+
+    await wrapper.get('[data-testid="translation-window-toolbar-provider-select"]').setValue('deepl')
+    await flushPromises()
+    const pendingRequest = sendRegularMessageMock.mock.calls[1][0]
+
+    await wrapper.get('[data-testid="translation-window-toolbar-provider-select"]').setValue('openai')
+    await flushPromises()
+
+    expectCancellationRequest(sendRegularMessageMock.mock.calls[2][0], pendingRequest.messageId)
+    pending.resolve({ success: true, translatedText: 'Stale provider result' })
+    await flushPromises()
+  })
+
+  it('cancels the active translation request on PDF fingerprint replacement', async () => {
+    const pending = await openPendingTranslation()
+
+    await wrapper.setProps({ pdfFingerprint: 'pdf-doc-2' })
+    await flushPromises()
+
+    expectCancellationRequest(sendRegularMessageMock.mock.calls[1][0], pending.request.messageId)
+    pending.resolveTranslation({ success: true, translatedText: 'Late result' })
+    await pending.operation
+    expect(wrapper.find('[data-testid="pdf-windows-host"]').exists()).toBe(false)
+  })
+
+  it('cancels the active translation request on host unmount', async () => {
+    const pending = await openPendingTranslation()
+
+    wrapper.unmount()
+    wrapper = null
+    await flushPromises()
+
+    expectCancellationRequest(sendRegularMessageMock.mock.calls[1][0], pending.request.messageId)
+    pending.resolveTranslation({ success: true, translatedText: 'Late result' })
+    await pending.operation
+  })
+
+  it('keeps window invalidation intact when cancellation transport fails', async () => {
+    await wrapper.vm.openTranslation({
+      text: 'Cancellation transport',
+      position: { x: 40, y: 60, width: 120, height: 80 }
+    })
+    const pending = deferred()
+    sendRegularMessageMock.mockImplementationOnce(() => pending.promise)
+
+    await wrapper.get('[data-testid="translation-window-toolbar-provider-select"]').setValue('deepl')
+    await flushPromises()
+    sendRegularMessageMock.mockRejectedValueOnce(new Error('Cancellation transport failed'))
+
+    await wrapper.get('[data-testid="translation-window-toolbar-close"]').trigger('click')
+    await flushPromises()
+
+    expect(wrapper.find('[data-testid="pdf-windows-host"]').exists()).toBe(false)
+    pending.resolve({ success: true, translatedText: 'Late result' })
+    await flushPromises()
   })
 
   it('keeps the selection icon transition alive until the icon click opens the window', async () => {
@@ -1048,6 +1179,7 @@ describe('PdfWindowsHost', () => {
       .mockImplementationOnce(() => new Promise((resolve) => {
         resolvePendingProviderTranslation = resolve
       }))
+      .mockResolvedValueOnce({ success: true })
       .mockResolvedValueOnce({
         success: true,
         translatedText: 'Latest provider result',
@@ -1085,8 +1217,8 @@ describe('PdfWindowsHost', () => {
     await flushPromises()
 
     expect(wrapper.get('[data-testid="translation-window-toolbar-provider-select"]').element.value).toBe('openai')
-    expect(sendRegularMessageMock).toHaveBeenCalledTimes(3)
-    expect(sendRegularMessageMock).toHaveBeenNthCalledWith(3, expect.objectContaining({
+    expect(sendRegularMessageMock).toHaveBeenCalledTimes(4)
+    expect(sendRegularMessageMock).toHaveBeenNthCalledWith(4, expect.objectContaining({
       data: expect.objectContaining({ provider: 'openai' })
     }))
     expect(wrapper.get('[data-testid="pdf-windows-host-result"]').text()).toContain('Latest provider result')

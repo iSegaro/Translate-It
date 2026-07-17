@@ -147,6 +147,7 @@ export function usePdfWindowsHost(options = {}) {
 
   let cleanupRegistered = false
   let activeRequestSessionId = 0
+  let activeMessageId = null
   let listenerId = 0
   let internalHostInteractionResetTimerId = null
 
@@ -305,6 +306,19 @@ export function usePdfWindowsHost(options = {}) {
     clearInternalHostInteraction()
   }
 
+  function cancelActiveTranslationRequest(reason) {
+    const messageId = activeMessageId
+    activeMessageId = null
+    if (!messageId) return
+
+    const cancelMessage = MessageFormat.create(
+      MessageActions.CANCEL_TRANSLATION,
+      { messageId, reason },
+      MessageContexts.PDF_TRANSLATION
+    )
+    void sendRegularMessage(cancelMessage, { silent: true }).catch(() => {})
+  }
+
   function toggleShowOriginal() {
     showOriginal.value = !showOriginal.value
   }
@@ -315,6 +329,7 @@ export function usePdfWindowsHost(options = {}) {
       return
     }
 
+    cancelActiveTranslationRequest('provider-changed')
     markDropdownInteraction()
     selectedProvider.value = normalizedProvider
     selectionSessionId.value += 1
@@ -395,6 +410,7 @@ export function usePdfWindowsHost(options = {}) {
     const positionValues = [position?.x, position?.y, position?.width, position?.height]
     if (!normalizedText || !positionValues.every(Number.isFinite)) return false
 
+    cancelActiveTranslationRequest('selection-replaced')
     selectionSessionId.value += 1
     activeRequestSessionId = 0
     void stopSelectionIconTTS()
@@ -448,6 +464,7 @@ export function usePdfWindowsHost(options = {}) {
   }
 
   function dismissHost() {
+    cancelActiveTranslationRequest('window-dismissed')
     selectionSessionId.value += 1
     activeRequestSessionId = 0
     void stopSelectionIconTTS()
@@ -505,6 +522,7 @@ export function usePdfWindowsHost(options = {}) {
       return
     }
 
+    cancelActiveTranslationRequest('selection-replaced')
     selectionSessionId.value += 1
     activeRequestSessionId = 0
     void stopSelectionIconTTS()
@@ -601,22 +619,24 @@ export function usePdfWindowsHost(options = {}) {
     detectedSourceLanguage.value = ''
     translationTargetLanguage.value = resolvedTargetLanguage
 
+    let requestMessageId = null
     try {
-      const response = await sendRegularMessage(
-        MessageFormat.create(
-          MessageActions.TRANSLATE,
-          {
-            text: normalizedText,
-            provider,
-            sourceLanguage: sourceLanguage || AUTO_DETECT_VALUE,
-            targetLanguage,
-            // PDF selection uses the standard selection route, but provider resolution stays PDF-specific.
-            mode: TranslationMode.Selection,
-            isExplicitProvider: true
-          },
-          MessageContexts.PDF_TRANSLATION
-        )
+      const requestMessage = MessageFormat.create(
+        MessageActions.TRANSLATE,
+        {
+          text: normalizedText,
+          provider,
+          sourceLanguage: sourceLanguage || AUTO_DETECT_VALUE,
+          targetLanguage,
+          // PDF selection uses the standard selection route, but provider resolution stays PDF-specific.
+          mode: TranslationMode.Selection,
+          isExplicitProvider: true
+        },
+        MessageContexts.PDF_TRANSLATION
       )
+      requestMessageId = requestMessage.messageId
+      activeMessageId = requestMessageId
+      const response = await sendRegularMessage(requestMessage)
 
       if (requestSessionId !== selectionSessionId.value || activeRequestSessionId !== requestSessionId) {
         return false
@@ -654,6 +674,9 @@ export function usePdfWindowsHost(options = {}) {
       if (activeRequestSessionId === requestSessionId) {
         isTranslating.value = false
         activeRequestSessionId = 0
+      }
+      if (activeMessageId === requestMessageId) {
+        activeMessageId = null
       }
     }
   }
@@ -855,6 +878,7 @@ export function usePdfWindowsHost(options = {}) {
   })
 
   onUnmounted(() => {
+    cancelActiveTranslationRequest('host-unmounted')
     void stopWindowTTS()
     void stopSelectionIconTTS()
   })
