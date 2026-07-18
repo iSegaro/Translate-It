@@ -251,6 +251,14 @@ describe('PdfToolbar', () => {
     expect(wrapper.emitted('request-ocr')).toHaveLength(1)
   })
 
+  it('emits one region OCR request from the toolbar action', async () => {
+    const wrapper = mount(PdfToolbar)
+
+    await wrapper.find('.pdf-toolbar__button--region-ocr').trigger('click')
+
+    expect(wrapper.emitted('request-region-ocr')).toHaveLength(1)
+  })
+
   it('emits execution-mode-change from current execution mode selection', async () => {
     const wrapper = mount(PdfToolbar, {
       props: {

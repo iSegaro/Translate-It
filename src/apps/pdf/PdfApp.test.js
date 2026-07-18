@@ -100,7 +100,7 @@ vi.mock('./components/PdfToolbar.vue', () => ({
   default: {
     name: 'PdfToolbar',
     props: ['fileName', 'pageCount', 'currentPageNumber', 'zoomMode', 'zoomPercent', 'contentView', 'layoutMode', 'ocrRecommendationCount', 'executionMode', 'executionModes'],
-    emits: ['toggle-outline', 'translate-visible', 'cancel-translation', 'content-view-change', 'layout-mode-change', 'zoom-step', 'zoom-change', 'export-txt', 'export-markdown', 'export-html', 'request-ocr', 'clear-cache', 'request-open-pdf', 'execution-mode-change'],
+    emits: ['toggle-outline', 'translate-visible', 'cancel-translation', 'content-view-change', 'layout-mode-change', 'zoom-step', 'zoom-change', 'export-txt', 'export-markdown', 'export-html', 'request-ocr', 'request-region-ocr', 'clear-cache', 'request-open-pdf', 'execution-mode-change'],
     template: '<header class="pdf-toolbar-stub" />'
   }
 }))
@@ -191,7 +191,7 @@ vi.mock('./components/PdfViewerLayout.vue', () => ({
 vi.mock('./components/PdfViewer.vue', () => ({
   default: {
     name: 'PdfViewer',
-    props: ['viewerRole', 'showOverlay', 'handleNavigationTarget', 'scrollContainer', 'freezeRenderWindowEviction'],
+    props: ['viewerRole', 'showOverlay', 'handleNavigationTarget', 'scrollContainer', 'freezeRenderWindowEviction', 'regionSelectionActive'],
     emits: ['layout-change', 'current-page-change', 'visible-pages-change', 'region-selection-complete'],
     setup(_, { expose }) {
       const pageElement = document.createElement('div')
@@ -463,6 +463,28 @@ describe('PdfApp', () => {
         }
       })
     })
+  })
+
+  it('arms one region selection from the toolbar and dispatches through PdfApp ownership', async () => {
+    mockRegionOcr.startRegionOcr.mockReturnValue(createMockOperation(Promise.resolve({ status: 'cancelled' })))
+    const wrapper = mount(PdfApp)
+    await flushPromises()
+
+    const toolbar = wrapper.findComponent({ name: 'PdfToolbar' })
+    const viewer = wrapper.findComponent({ name: 'PdfViewer' })
+    toolbar.vm.$emit('request-region-ocr')
+    await flushPromises()
+
+    expect(viewer.props('regionSelectionActive')).toBe(true)
+
+    const region = createPdfRegion({ pageNumber: 1, left: 1, top: 4, right: 3, bottom: 2 })
+    viewer.vm.$emit('region-selection-complete', region)
+    await flushPromises()
+
+    expect(viewer.props('regionSelectionActive')).toBe(false)
+    expect(mockRegionExecutionDispatch).toHaveBeenCalledOnce()
+    expect(mockRegionExecutionDispatch.mock.calls[0][0]).toEqual(expect.objectContaining({ region, target: 'ocr' }))
+    expect(mockRegionOcr.startRegionOcr).toHaveBeenCalledOnce()
   })
 
   it('owns the OCR-only execution mode and rejects unsupported toolbar intent', async () => {

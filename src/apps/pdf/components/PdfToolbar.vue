@@ -172,6 +172,14 @@
         OCR Page
       </button>
 
+      <button
+        class="pdf-toolbar__button pdf-toolbar__button--region-ocr"
+        type="button"
+        @click="$emit('request-region-ocr')"
+      >
+        OCR Region
+      </button>
+
       <span
         v-if="isOcrProcessing"
         class="pdf-toolbar__ocr-status"
@@ -344,7 +352,7 @@ const props = defineProps({
   executionModes: { type: Array, default: () => [] },
 })
 
-const emit = defineEmits(['request-open-pdf', 'translate-visible', 'cancel-translation', 'content-view-change', 'layout-mode-change', 'toggle-outline', 'export-txt', 'export-markdown', 'export-html', 'request-ocr', 'clear-cache', 'zoom-step', 'zoom-change', 'execution-mode-change'])
+const emit = defineEmits(['request-open-pdf', 'translate-visible', 'cancel-translation', 'content-view-change', 'layout-mode-change', 'toggle-outline', 'export-txt', 'export-markdown', 'export-html', 'request-ocr', 'request-region-ocr', 'clear-cache', 'zoom-step', 'zoom-change', 'execution-mode-change'])
 
 const logger = getScopedLogger(LOG_COMPONENTS.PDF, 'PdfToolbar')
 const settingsStore = useSettingsStore()

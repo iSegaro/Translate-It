@@ -30,6 +30,7 @@
       @export-markdown="handleExportMarkdown"
       @export-html="handleExportHtml"
       @request-ocr="requestOcr"
+      @request-region-ocr="handleRequestRegionOcr"
       @clear-cache="handleClearCache"
       @request-open-pdf="requestOpenPdf"
       @execution-mode-change="handleExecutionModeChange"
@@ -124,6 +125,7 @@
                     :overlay-page-data="translatedPageData"
                     :handle-navigation-target="handleNavigationTarget"
                     :scroll-container="originalScrollContainer"
+                    :region-selection-active="regionSelectionActive"
                     @layout-change="handleLayoutChange"
                     @current-page-change="handleCurrentPageChange"
                     @visible-pages-change="handleVisiblePagesChange"
@@ -270,6 +272,7 @@ const exportSuccessTimer = ref(null)
 const EXPORT_SUCCESS_DURATION_MS = 2200
 const dismissedPdfStatusBannerKey = ref('')
 let activeRegionPosition = null
+const regionSelectionActive = ref(false)
 const supportedExecutionModes = Object.freeze([REGION_EXECUTION_TARGET.OCR])
 const executionMode = ref(REGION_EXECUTION_TARGET.OCR)
 const pdfStatusBannerController = createPdfStatusBannerController()
@@ -481,6 +484,7 @@ function resolveRegionViewportPosition(region) {
 }
 
 function handleRegionSelectionComplete(region) {
+  regionSelectionActive.value = false
   activeRegionPosition = resolveRegionViewportPosition(region)
   const request = createRegionExecutionRequest({
     region,
@@ -491,6 +495,10 @@ function handleRegionSelectionComplete(region) {
 
   const operation = regionExecutionDispatcher.dispatchRegionExecution(request)
   void operation.promise
+}
+
+function handleRequestRegionOcr() {
+  regionSelectionActive.value = true
 }
 
 function handleRegionOcrRecognized(payload) {
