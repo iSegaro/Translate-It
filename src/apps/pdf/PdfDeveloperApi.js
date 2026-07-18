@@ -1,17 +1,13 @@
+import { BenchmarkCoordinator } from './BenchmarkCoordinator.js'
+
 export const PDF_DEVELOPER_CAPABILITY = Object.freeze({
   REGION_BENCHMARK: 'region-benchmark'
 })
 
-function createNotImplementedError(capability) {
-  return new Error(`Developer capability not implemented: ${capability}`)
-}
-
 export class PdfDeveloperApi {
-  constructor(capabilities = {}) {
+  constructor({ benchmarkCoordinator = new BenchmarkCoordinator(), capabilities = {} } = {}) {
     this.capabilities = new Map([
-      [PDF_DEVELOPER_CAPABILITY.REGION_BENCHMARK, () => {
-        throw createNotImplementedError(PDF_DEVELOPER_CAPABILITY.REGION_BENCHMARK)
-      }],
+      [PDF_DEVELOPER_CAPABILITY.REGION_BENCHMARK, (request) => benchmarkCoordinator.coordinateRegionBenchmark(request)],
       ...Object.entries(capabilities)
     ])
   }

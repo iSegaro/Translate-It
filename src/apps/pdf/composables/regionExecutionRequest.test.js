@@ -20,7 +20,7 @@ describe('RegionExecutionRequest', () => {
 
   it('rejects invalid request inputs', () => {
     expect(createRegionExecutionRequest({ region: Object.freeze({ pageNumber: 1, left: 3, top: 4, right: 3, bottom: 2 }) })).toBeNull()
-    expect(createRegionExecutionRequest({ region: createPdfRegion({ pageNumber: 1, left: 1, top: 4, right: 3, bottom: 2 }), target: 'benchmark' })).toBeNull()
+    expect(createRegionExecutionRequest({ region: createPdfRegion({ pageNumber: 1, left: 1, top: 4, right: 3, bottom: 2 }), target: 'unsupported' })).toBeNull()
     expect(createRegionExecutionRequest({ region: createPdfRegion({ pageNumber: 1, left: 1, top: 4, right: 3, bottom: 2 }), scope: 'corpus' })).toBeNull()
     expect(createRegionExecutionRequest({ region: createPdfRegion({ pageNumber: 1, left: 1, top: 4, right: 3, bottom: 2 }), benchmark: {} })).toBeNull()
   })
