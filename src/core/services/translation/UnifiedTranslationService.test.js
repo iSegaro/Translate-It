@@ -27,11 +27,9 @@ vi.mock('./TranslationRequestTracker.js', () => ({
 
 vi.mock('./UnifiedResultDispatcher.js', () => ({
   UnifiedResultDispatcher: vi.fn().mockImplementation(function() {
-    return {
-      dispatchResult: vi.fn(),
-      dispatchStreamingUpdate: vi.fn(),
-      dispatchCancellation: vi.fn()
-    };
+    this.dispatchResult = vi.fn();
+    this.dispatchStreamingUpdate = vi.fn();
+    this.dispatchCancellation = vi.fn();
   })
 }));
 
@@ -124,6 +122,12 @@ describe('UnifiedTranslationService', () => {
   });
 
   describe('handleTranslationRequest', () => {
+    it('creates isolated result dispatchers for separate services', () => {
+      const secondService = new UnifiedTranslationService();
+
+      expect(service.resultDispatcher).not.toBe(secondService.resultDispatcher);
+    });
+
     it('should block requests exceeding character limits', async () => {
       const message = {
         messageId: 'm1',

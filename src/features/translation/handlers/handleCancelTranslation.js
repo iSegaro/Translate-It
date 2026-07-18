@@ -4,6 +4,7 @@ import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { streamingManager } from "../core/StreamingManager.js";
 import { translationRequestTracker } from '@/core/services/translation/TranslationRequestTracker.js';
+import { dispatchTranslationCancellation } from '@/core/services/translation/UnifiedResultDispatcher.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.TRANSLATION, 'handleCancelTranslation');
 
@@ -71,7 +72,12 @@ export async function handleCancelTranslation(request, sender) {
 
     const results = await Promise.allSettled(messageIdsToCancel.map(async (id) => {
       let cancelled = false;
-      translationRequestTracker.cancelRequest(id, reason || 'Translation cancelled by user');
+      const cancellation = translationRequestTracker.cancelRequest(id, reason || 'Translation cancelled by user');
+      if (cancellation.accepted) {
+        try {
+          await dispatchTranslationCancellation({ messageId: id, request: cancellation.request });
+        } catch { /* continue exact-ID cleanup */ }
+      }
       try {
         cancelled = await translationEngine.cancelTranslation(id);
       } catch { /* continue remaining exact-ID cleanup */ }

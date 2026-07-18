@@ -17,6 +17,11 @@ vi.mock('@/core/services/translation/TranslationRequestTracker.js', () => ({
   translationRequestTracker: { getTabRequests: getTabRequestsMock, cancelRequest: vi.fn() }
 }))
 
+const dispatchCancellationMock = vi.fn()
+vi.mock('@/core/services/translation/UnifiedResultDispatcher.js', () => ({
+  dispatchTranslationCancellation: dispatchCancellationMock
+}))
+
 vi.mock('../core/QueueManager.js', () => ({
   queueManager: { cancelByMessageId: queueCancelMock }
 }))
@@ -35,6 +40,8 @@ describe('handleCancelTranslation', () => {
     cancelStreamMock.mockReset()
     getTabRequestsMock.mockReset()
     translationRequestTracker.cancelRequest.mockReset()
+    translationRequestTracker.cancelRequest.mockReturnValue({ accepted: true, request: { messageId: 'request' } })
+    dispatchCancellationMock.mockReset()
     queueCancelMock.mockReset()
     rateLimitCancelMock.mockReset()
     engine = {
@@ -53,6 +60,7 @@ describe('handleCancelTranslation', () => {
     for (const id of ['one', 'two']) {
       expect(engine.cancelTranslation).toHaveBeenCalledWith(id)
       expect(translationRequestTracker.cancelRequest).toHaveBeenCalledWith(id, 'Translation cancelled by user')
+      expect(dispatchCancellationMock).toHaveBeenCalledWith({ messageId: id, request: { messageId: 'request' } })
       expect(cancelStreamMock).toHaveBeenCalledWith(id, 'Translation cancelled by user')
       expect(rateLimitCancelMock).toHaveBeenCalledWith(id)
       expect(queueCancelMock).toHaveBeenCalledWith(id)
@@ -66,6 +74,28 @@ describe('handleCancelTranslation', () => {
 
     expect(engine.getActiveTranslationIds).toHaveBeenCalledWith('popup')
     expect(engine.cancelTranslation).toHaveBeenCalledWith('popup-id')
+  })
+
+  it('does not notify for a rejected tracker cancellation', async () => {
+    engine.getActiveTranslationIds.mockReturnValue(['terminal'])
+    translationRequestTracker.cancelRequest.mockReturnValue({ accepted: false, status: 'completed' })
+
+    await handleCancelTranslation({ data: { cancelAll: true } }, {})
+
+    expect(dispatchCancellationMock).not.toHaveBeenCalled()
+    expect(engine.cancelTranslation).toHaveBeenCalledWith('terminal')
+  })
+
+  it('continues exact cleanup when cancellation delivery fails', async () => {
+    engine.getActiveTranslationIds.mockReturnValue(['one'])
+    dispatchCancellationMock.mockRejectedValueOnce(new Error('delivery failed'))
+
+    await handleCancelTranslation({ data: { cancelAll: true } }, {})
+
+    expect(engine.cancelTranslation).toHaveBeenCalledWith('one')
+    expect(cancelStreamMock).toHaveBeenCalledWith('one', 'Translation cancelled by user')
+    expect(rateLimitCancelMock).toHaveBeenCalledWith('one')
+    expect(queueCancelMock).toHaveBeenCalledWith('one')
   })
 
   it('continues remaining cleanup when one engine cancellation rejects', async () => {

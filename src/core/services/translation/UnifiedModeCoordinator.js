@@ -205,15 +205,12 @@ export class UnifiedModeCoordinator {
     const sourceLanguage = data.sourceLanguage || data.sourceLang || 'auto';
     const targetLanguage = data.targetLanguage || data.targetLang;
 
-    // Validate that items is an array. Empty arrays are allowed to proceed to provider init for test compatibility.
+    // Validate that items is an array.
     if (!items || !Array.isArray(items)) {
       throw new Error(`No items provided for ${mode} translation`);
     }
 
-    const providerInstance = await translationEngine.getProvider(provider);
-    if (!providerInstance) throw new Error(`Provider '${provider}' initialization failed`);
-
-    // Guard against empty items after provider check to avoid null pointer in sampleText
+    // Empty batches are valid terminal successes and require no runtime resources.
     if (items.length === 0) {
       if (transformOutput) return transformOutput([], 0);
       return { success: true, results: [], actualCharCount: 0, originalCharCount: 0 };
@@ -226,6 +223,16 @@ export class UnifiedModeCoordinator {
 
     const sampleText = (items[0]?.text || items[0] || '').substring(0, 100);
     const abortController = translationEngine.lifecycleRegistry.registerRequest(messageId, sampleText, mode.toLowerCase());
+    if (!abortController) {
+      return {
+        success: false,
+        cancelled: true,
+        error: { type: 'USER_CANCELLED', message: 'Translation cancelled before execution' }
+      };
+    }
+
+    const providerInstance = await translationEngine.getProvider(provider);
+    if (!providerInstance) throw new Error(`Provider '${provider}' initialization failed`);
 
     let timeoutId;
 

@@ -14,6 +14,23 @@ import browser from 'webextension-polyfill';
 
 const logger = getScopedLogger(LOG_COMPONENTS.TRANSLATION, 'UnifiedResultDispatcher');
 
+export async function dispatchTranslationCancellation({ messageId, request }) {
+  if (request?.sender?.tab?.id) {
+    try {
+      await browser.tabs.sendMessage(request.sender.tab.id, {
+        action: MessageActions.TRANSLATION_CANCELLED,
+        messageId
+      });
+    } catch (sendError) {
+      if (ExtensionContextManager.isContextError(sendError)) {
+        ExtensionContextManager.handleContextError(sendError, 'result-dispatcher');
+      } else {
+        logger.warn(`[ResultDispatcher] Failed to send cancellation:`, sendError.message);
+      }
+    }
+  }
+}
+
 export class UnifiedResultDispatcher {
   constructor() {
     this.processedResults = new Set(); // Set of processed messageIds to prevent duplicates
@@ -237,19 +254,6 @@ export class UnifiedResultDispatcher {
    * Notify the original tab that a request has been cancelled.
    */
   async dispatchCancellation({ messageId, request }) {
-    if (request?.sender?.tab?.id) {
-      try {
-        await browser.tabs.sendMessage(request.sender.tab.id, {
-          action: MessageActions.TRANSLATION_CANCELLED,
-          messageId
-        });
-      } catch (sendError) {
-        if (ExtensionContextManager.isContextError(sendError)) {
-          ExtensionContextManager.handleContextError(sendError, 'result-dispatcher');
-        } else {
-          logger.warn(`[ResultDispatcher] Failed to send cancellation:`, sendError.message);
-        }
-      }
-    }
+    return await dispatchTranslationCancellation({ messageId, request });
   }
 }

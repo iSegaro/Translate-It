@@ -64,6 +64,33 @@ The translation system has been completely redesigned with a **Unified Translati
 - **Element data recovery** for resilient field mode translations
 - **Automatic cleanup** of completed requests
 
+### Runtime Ownership And Terminal Rules
+
+Every translation request has one globally unique `messageId`. Exact-ID cancellation, queue removal, rate-limit cleanup, lifecycle aborting, and stream routing use this ID; text, tab, toast, and mode are never cancellation identities.
+
+| Owner | Responsibility |
+|---|---|
+| Workflow/UI | Current intent, run/session identity, and stale presentation suppression. PDF, page, OCR, and window workflows retain their own session ownership. |
+| `TranslationLifecycleRegistry` | `AbortController`, cancellation tombstones, pre-registration cancellation, and execution registration. |
+| `TranslationRequestTracker` | Request status, active tab/toast/retry indexes, immutable terminal transitions, metrics, and retained terminal diagnostics. |
+| `TranslationEngine` | Provider execution entry point and exact-ID cancellation propagation. |
+| `QueueManager` / `RateLimitManager` | Admission and exact-ID pending-work removal. |
+| `StreamingManager` | Sender routing, chunks, local terminal delivery suppression, and delayed stream retention. It does not own workflow lifecycle. |
+| `UnifiedResultDispatcher` | Delivery of accepted results and cancellation notifications. Delivery failure never rewrites tracker state. |
+
+Terminal states are `completed`, `failed`, `cancelled`, and `timeout`. `TranslationRequestTracker` accepts one terminal transition only. Rejected late transitions never dispatch a normal result. Terminal records remain available for five minutes of diagnostics, but leave active tab, toast, and retry indexes immediately.
+
+Cancellation snapshots exact active IDs, marks accepted tracker requests cancelled, notifies their original sender once, then independently attempts lifecycle abort, stream cancellation, rate-limit cleanup, and queue removal. A cancellation tombstone rejects execution when cancellation arrives before lifecycle registration.
+
+Forbidden patterns:
+- Raw terminal status writes outside `TranslationRequestTracker`.
+- Cancellation by text, mode, tab, or toast rather than exact `messageId`.
+- Result delivery before tracker accepts its terminal transition.
+- Treating every rejected transition as cancellation.
+- Keeping retained terminal records in active indexes.
+- Using `StreamingManager` as a workflow lifecycle owner.
+- Broad cancellation where exact-ID ownership exists.
+
 ### Unified Result Dispatcher
 **File**: `src/core/services/translation/UnifiedResultDispatcher.js`
 - **Intelligent result routing** based on translation mode
