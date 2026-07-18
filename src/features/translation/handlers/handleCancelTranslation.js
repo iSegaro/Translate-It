@@ -61,36 +61,32 @@ export async function handleCancelTranslation(request, sender) {
     } else if (messageId) {
       messageIdsToCancel = [messageId];
     } else if (cancelAll) {
-      // Fallback for non-tab contexts (like background cleanup)
-      logger.info(`[CancelTranslation] Falling back to global cancellation for context: ${context || 'all'}`);
-      return await translationEngine.cancelAllTranslations?.(context) || { success: true };
+      // No sender ownership is available; snapshot lifecycle-owned IDs by context.
+      logger.info(`[CancelTranslation] Falling back to lifecycle cancellation for context: ${context || 'all'}`);
+      messageIdsToCancel = translationEngine.getActiveTranslationIds?.(context) || [];
     }
 
-    let totalCancelledCount = 0;
     const { queueManager } = await import("../core/QueueManager.js");
     const { rateLimitManager } = await import("../core/RateLimitManager.js");
 
-    // Process each messageId for cancellation across all systems
-    for (const id of messageIdsToCancel) {
-      // 1. Engine & AbortController
-      const cancelled = await translationEngine.cancelTranslation(id);
-      if (cancelled) totalCancelledCount++;
-
-      // 2. StreamingManager
+    const results = await Promise.allSettled(messageIdsToCancel.map(async (id) => {
+      let cancelled = false;
       try {
-        await streamingManager.cancelStream(id, reason || 'Translation cancelled by user');
-      } catch { /* ignore */ }
+        cancelled = await translationEngine.cancelTranslation(id);
+      } catch { /* continue remaining exact-ID cleanup */ }
 
-      // 3. RateLimitManager
-      try {
-        rateLimitManager.clearPendingRequests(id);
-      } catch { /* ignore */ }
+      await Promise.allSettled([
+        Promise.resolve().then(() => streamingManager.cancelStream(
+          id,
+          reason || 'Translation cancelled by user'
+        )),
+        Promise.resolve().then(() => rateLimitManager.clearPendingRequests(id)),
+        Promise.resolve().then(() => queueManager.cancelByMessageId(id))
+      ]);
 
-      // 4. QueueManager
-      try {
-        queueManager.cancelByMessageId(id);
-      } catch { /* ignore */ }
-    }
+      return cancelled;
+    }));
+    const totalCancelledCount = results.filter((result) => result.status === 'fulfilled' && result.value).length;
 
     // Always return success since the cancellation intent is acknowledged
     return {

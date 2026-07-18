@@ -114,41 +114,30 @@ export class TranslationLifecycleRegistry {
   }
 
   /**
-   * Cancel currently active translations, optionally filtered by context.
+   * Snapshot active translation IDs, optionally filtered by context.
    * 
    * @param {string} [context] - Optional context to filter by (e.g., 'popup')
-   * @returns {Promise<number>} Number of cancelled translations
+   * @returns {string[]} Active request IDs at selection time
+   */
+  getActiveTranslationIds(context = null) {
+    return [...this.activeTranslations]
+      .filter(([, entry]) => !context || entry.context === context)
+      .map(([messageId]) => messageId);
+  }
+
+  /**
+   * Cancel currently active translations, optionally filtered by context.
+   *
+   * @param {string} [context] - Optional context to filter by (e.g., 'popup')
+   * @returns {Promise<number>} Number of selected translations cancelled
    */
   async cancelAllTranslations(context = null) {
-    this._pruneCancelledRequests();
-    let cancelledCount = 0;
-    
-    for (const [messageId, entry] of this.activeTranslations) {
-      // Apply context filter if provided
-      if (context && entry.context !== context) {
-        continue;
-      }
+    const messageIds = this.getActiveTranslationIds(context);
+    const results = await Promise.allSettled(
+      messageIds.map((messageId) => this.cancelTranslation(messageId))
+    );
 
-      try {
-        this.cancelledRequests.set(messageId, Date.now());
-        entry.controller.abort();
-        cancelledCount++;
-      } catch { /* ignore */ }
-    }
-
-    try {
-      // If no context or specifically popup/sidepanel, we might want to be more surgical with streamingManager
-      // for now, cancelAllStreams is safe as it handles all active streams
-      if (!context) {
-        await streamingManager.cancelAllStreams('All translations cancelled by user');
-      } else {
-        // Find streams belonging to this context and cancel them
-        // This is a bit more complex as streamingManager doesn't track context yet
-        // but it will be cleaned up eventually or when the next stream update fails
-      }
-    } catch { /* ignore */ }
-
-    return cancelledCount;
+    return results.filter((result) => result.status === 'fulfilled' && result.value).length;
   }
 
   /**

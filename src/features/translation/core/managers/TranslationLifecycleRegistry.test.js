@@ -57,6 +57,55 @@ describe('TranslationLifecycleRegistry', () => {
     expect(registry.isCancelled('active')).toBe(true)
   })
 
+  it('bulk-cancels every active request through exact stream cancellation', async () => {
+    registry.registerRequest('one', 'Hello', 'popup')
+    registry.registerRequest('two', 'World', 'sidepanel')
+
+    await expect(registry.cancelAllTranslations()).resolves.toBe(2)
+
+    expect(cancelStreamMock).toHaveBeenCalledWith('one', expect.anything())
+    expect(cancelStreamMock).toHaveBeenCalledWith('two', expect.anything())
+  })
+
+  it('bulk-cancels only matching context requests', async () => {
+    const popup = registry.registerRequest('popup-id', 'Hello', 'popup')
+    const sidepanel = registry.registerRequest('sidepanel-id', 'World', 'sidepanel')
+
+    await expect(registry.cancelAllTranslations('popup')).resolves.toBe(1)
+
+    expect(popup.signal.aborted).toBe(true)
+    expect(sidepanel.signal.aborted).toBe(false)
+    expect(cancelStreamMock).toHaveBeenCalledWith('popup-id', expect.anything())
+    expect(cancelStreamMock).not.toHaveBeenCalledWith('sidepanel-id', expect.anything())
+  })
+
+  it('continues bulk cancellation when one exact cancellation rejects', async () => {
+    registry.registerRequest('one', 'Hello')
+    registry.registerRequest('two', 'World')
+    const cancelTranslation = vi.spyOn(registry, 'cancelTranslation')
+      .mockRejectedValueOnce(new Error('stream failed'))
+      .mockResolvedValueOnce(true)
+
+    await expect(registry.cancelAllTranslations()).resolves.toBe(1)
+
+    expect(cancelTranslation).toHaveBeenCalledWith('one')
+    expect(cancelTranslation).toHaveBeenCalledWith('two')
+  })
+
+  it('uses a snapshot so registrations after selection are not cancelled', async () => {
+    registry.registerRequest('one', 'Hello')
+    const cancelTranslation = vi.spyOn(registry, 'cancelTranslation').mockImplementation(async (messageId) => {
+      registry.registerRequest('late', 'Later')
+      return messageId === 'one'
+    })
+
+    await expect(registry.cancelAllTranslations()).resolves.toBe(1)
+
+    expect(cancelTranslation).toHaveBeenCalledTimes(1)
+    expect(cancelTranslation).toHaveBeenCalledWith('one')
+    expect(registry.getAbortController('late')).not.toBeNull()
+  })
+
   it('prunes expired unknown cancellation tombstones', () => {
     registry.cancelledRequests.set('expired', Date.now() - 60_000)
     registry.registerRequest('normal', 'Hello')
