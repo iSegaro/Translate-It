@@ -38,19 +38,23 @@ describe('BenchmarkRunner', () => {
     await expect(operation.promise).resolves.toEqual({ status: BENCHMARK_RUNNER_STATUS.CANCELLED })
   })
 
-  it('delegates provider discovery to its resolver', async () => {
+  it('delegates provider resolution and plan creation', async () => {
     const providers = Object.freeze([{ id: 'provider' }])
+    const plan = Object.freeze({ steps: Object.freeze([{ providerId: 'provider', state: 'pending' }]) })
     const providerResolver = { resolve: vi.fn(() => providers) }
+    const executionPlanner = { create: vi.fn(() => plan) }
     const request = createRegionExecutionRequest({
       region: createPdfRegion({ pageNumber: 1, left: 1, top: 4, right: 3, bottom: 2 }),
       target: REGION_EXECUTION_TARGET.BENCHMARK
     })
 
-    await expect(new BenchmarkSession(request, { providerResolver }).run()).resolves.toEqual({
+    await expect(new BenchmarkSession(request, { providerResolver, executionPlanner }).run()).resolves.toEqual({
       status: BENCHMARK_RUNNER_STATUS.READY,
-      providers
+      providers,
+      plan
     })
     expect(providerResolver.resolve).toHaveBeenCalledOnce()
+    expect(executionPlanner.create).toHaveBeenCalledWith(providers)
   })
 
   it('rejects non-canonical Benchmark requests', () => {

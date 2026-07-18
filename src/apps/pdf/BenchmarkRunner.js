@@ -1,5 +1,6 @@
 import { createExecutionOperation } from './composables/executionOperation.js'
 import { isRegionExecutionRequest, REGION_EXECUTION_TARGET } from './composables/regionExecutionRequest.js'
+import { BenchmarkExecutionPlanner } from './BenchmarkExecutionPlanner.js'
 import { BenchmarkProviderResolver } from './BenchmarkProviderResolver.js'
 
 export const BENCHMARK_RUNNER_STATUS = Object.freeze({
@@ -8,9 +9,13 @@ export const BENCHMARK_RUNNER_STATUS = Object.freeze({
 })
 
 export class BenchmarkSession {
-  constructor(request, { providerResolver = new BenchmarkProviderResolver() } = {}) {
+  constructor(request, {
+    providerResolver = new BenchmarkProviderResolver(),
+    executionPlanner = new BenchmarkExecutionPlanner()
+  } = {}) {
     this.request = request
     this.providerResolver = providerResolver
+    this.executionPlanner = executionPlanner
     this.state = 'created'
     this.cancelled = false
   }
@@ -30,17 +35,23 @@ export class BenchmarkSession {
     if (this.cancelled) return Object.freeze({ status: BENCHMARK_RUNNER_STATUS.CANCELLED })
 
     const providers = this.providerResolver.resolve()
+    const plan = this.executionPlanner.create(providers)
 
     this.state = 'ready'
     return Object.freeze({
       status: BENCHMARK_RUNNER_STATUS.READY,
-      providers
+      providers,
+      plan
     })
   }
 }
 
 export class BenchmarkRunner {
-  constructor({ providerResolver, createSession = (request) => new BenchmarkSession(request, { providerResolver }) } = {}) {
+  constructor({
+    providerResolver,
+    executionPlanner,
+    createSession = (request) => new BenchmarkSession(request, { providerResolver, executionPlanner })
+  } = {}) {
     this.createSession = createSession
   }
 
