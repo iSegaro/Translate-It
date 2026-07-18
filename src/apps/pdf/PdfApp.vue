@@ -213,6 +213,7 @@ import { createPdfTransitionController } from './composables/createPdfTransition
 import { createPdfStatusBannerController } from './utils/pdfStatusBanner.js'
 import { REGION_OCR_STATE } from './constants/regionOcrState.js'
 import { PdfDeveloperApi } from './PdfDeveloperApi.js'
+import { BenchmarkRunner } from './BenchmarkRunner.js'
 import { getSourceLanguageAsync } from '@/shared/config/config.js'
 import { useSettingsStore } from '@/features/settings/stores/settings.js'
 import { applyTheme } from '@/utils/ui/theme.js'
@@ -322,6 +323,7 @@ const {
 const { startRegionOcr, cancelRegionOcr } = usePdfRegionOcr({
   onRecognized: handleRegionOcrRecognized
 })
+const benchmarkRunner = new BenchmarkRunner()
 
 const regionExecutionDispatcher = createRegionExecutionDispatcher({
   runners: {
@@ -330,7 +332,8 @@ const regionExecutionDispatcher = createRegionExecutionDispatcher({
       pdfDocument: session.pdfDocument,
       scale: pageScale.value || 1,
       language: getSourceLanguageAsync().catch(() => undefined)
-    })
+    }),
+    [REGION_EXECUTION_TARGET.BENCHMARK]: (request) => benchmarkRunner.execute(request)
   }
 })
 const pdfDeveloperApi = new PdfDeveloperApi({ regionExecutionDispatcher })

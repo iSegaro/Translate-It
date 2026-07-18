@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { BenchmarkCoordinator } from './BenchmarkCoordinator.js'
 import { EXECUTION_SCOPE, REGION_EXECUTION_TARGET } from './composables/regionExecutionRequest.js'
 import { createRegionExecutionDispatcher } from './composables/regionExecutionDispatcher.js'
+import { BenchmarkRunner, BENCHMARK_RUNNER_STATUS } from './BenchmarkRunner.js'
 import { createPdfRegion } from '@/features/pdf-translation/core/PdfRegion.js'
 
 describe('BenchmarkCoordinator', () => {
@@ -24,13 +25,17 @@ describe('BenchmarkCoordinator', () => {
     expect(Object.isFrozen(regionExecutionDispatcher.dispatchRegionExecution.mock.calls[0][0])).toBe(true)
   })
 
-  it('preserves dispatcher unsupported-target behavior without a Benchmark runner', () => {
+  it('resolves Benchmark through the registered dispatcher target', async () => {
     const coordinator = new BenchmarkCoordinator({
-      regionExecutionDispatcher: createRegionExecutionDispatcher()
+      regionExecutionDispatcher: createRegionExecutionDispatcher({
+        runners: { [REGION_EXECUTION_TARGET.BENCHMARK]: (request) => new BenchmarkRunner().execute(request) }
+      })
     })
     const region = createPdfRegion({ pageNumber: 1, left: 1, top: 4, right: 3, bottom: 2 })
 
-    expect(() => coordinator.coordinateRegionBenchmark({ region })).toThrow('Unsupported region execution target')
+    await expect(coordinator.coordinateRegionBenchmark({ region }).promise).resolves.toEqual({
+      status: BENCHMARK_RUNNER_STATUS.NOT_IMPLEMENTED
+    })
   })
 
   it('rejects requests without a canonical PdfRegion before dispatch', () => {
