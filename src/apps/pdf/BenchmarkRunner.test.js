@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { BenchmarkRunner, BENCHMARK_RUNNER_STATUS } from './BenchmarkRunner.js'
+import { BenchmarkRunner, BenchmarkSession, BENCHMARK_RUNNER_STATUS } from './BenchmarkRunner.js'
 import { createRegionExecutionRequest, REGION_EXECUTION_TARGET } from './composables/regionExecutionRequest.js'
 import { createPdfRegion } from '@/features/pdf-translation/core/PdfRegion.js'
 
@@ -36,6 +36,21 @@ describe('BenchmarkRunner', () => {
     operation.cancel()
 
     await expect(operation.promise).resolves.toEqual({ status: BENCHMARK_RUNNER_STATUS.CANCELLED })
+  })
+
+  it('delegates provider discovery to its resolver', async () => {
+    const providers = Object.freeze([{ id: 'provider' }])
+    const providerResolver = { resolve: vi.fn(() => providers) }
+    const request = createRegionExecutionRequest({
+      region: createPdfRegion({ pageNumber: 1, left: 1, top: 4, right: 3, bottom: 2 }),
+      target: REGION_EXECUTION_TARGET.BENCHMARK
+    })
+
+    await expect(new BenchmarkSession(request, { providerResolver }).run()).resolves.toEqual({
+      status: BENCHMARK_RUNNER_STATUS.READY,
+      providers
+    })
+    expect(providerResolver.resolve).toHaveBeenCalledOnce()
   })
 
   it('rejects non-canonical Benchmark requests', () => {
