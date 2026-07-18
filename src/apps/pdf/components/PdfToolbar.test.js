@@ -236,7 +236,7 @@ describe('PdfToolbar', () => {
     expect(wrapper.emitted('zoom-step')?.at(-1)?.[0]).toBe(1)
   })
 
-  it('shows disabled Region Benchmark placeholder only while Debug Mode is enabled', async () => {
+  it('emits Region Benchmark trigger only while Debug Mode is enabled', async () => {
     const debugDisabled = mount(PdfToolbar)
 
     await debugDisabled.find('.pdf-toolbar__button[aria-label="More actions"]').trigger('click')
@@ -249,11 +249,10 @@ describe('PdfToolbar', () => {
 
     expect(debugEnabled.find('.pdf-toolbar__menu-section').text()).toContain('Developer')
     const regionBenchmark = debugEnabled.findAll('button').find((button) => button.text().includes('Region Benchmark'))
-    expect(regionBenchmark?.attributes('disabled')).toBeDefined()
+    expect(regionBenchmark?.attributes('disabled')).toBeUndefined()
 
     await regionBenchmark?.trigger('click')
-    expect(loggerMock.warn).not.toHaveBeenCalled()
-    expect(debugEnabled.emitted('request-region-ocr')).toBeFalsy()
+    expect(debugEnabled.emitted('request-region-benchmark')).toHaveLength(1)
   })
 
   it('shows OCR button without count when OCR recommendations exist', async () => {

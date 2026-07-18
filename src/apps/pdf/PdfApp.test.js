@@ -3,6 +3,8 @@ import { mount } from '@vue/test-utils'
 import { computed, defineComponent, h, nextTick, ref } from 'vue'
 import PdfApp from './PdfApp.vue'
 import { createPdfRegion } from '@/features/pdf-translation/core/PdfRegion.js'
+import { PdfDeveloperApi } from './PdfDeveloperApi.js'
+import { BenchmarkCoordinator } from './BenchmarkCoordinator.js'
 
 // jsdom does not implement matchMedia — stub it before component mount
 if (!window.matchMedia) {
@@ -100,7 +102,7 @@ vi.mock('./components/PdfToolbar.vue', () => ({
   default: {
     name: 'PdfToolbar',
     props: ['fileName', 'pageCount', 'currentPageNumber', 'zoomMode', 'zoomPercent', 'contentView', 'layoutMode', 'ocrRecommendationCount', 'executionMode', 'executionModes', 'regionOcrState', 'regionOcrAvailable'],
-    emits: ['toggle-outline', 'translate-visible', 'cancel-translation', 'content-view-change', 'layout-mode-change', 'zoom-step', 'zoom-change', 'export-txt', 'export-markdown', 'export-html', 'request-ocr', 'request-region-ocr', 'clear-cache', 'request-open-pdf', 'execution-mode-change'],
+    emits: ['toggle-outline', 'translate-visible', 'cancel-translation', 'content-view-change', 'layout-mode-change', 'zoom-step', 'zoom-change', 'export-txt', 'export-markdown', 'export-html', 'request-ocr', 'request-region-ocr', 'request-region-benchmark', 'clear-cache', 'request-open-pdf', 'execution-mode-change'],
     template: '<header class="pdf-toolbar-stub" />'
   }
 }))
@@ -485,6 +487,32 @@ describe('PdfApp', () => {
     expect(mockRegionExecutionDispatch).toHaveBeenCalledOnce()
     expect(mockRegionExecutionDispatch.mock.calls[0][0]).toEqual(expect.objectContaining({ region, target: 'ocr' }))
     expect(mockRegionOcr.startRegionOcr).toHaveBeenCalledOnce()
+  })
+
+  it('reuses Region selection for Benchmark and stops before dispatch', async () => {
+    const runRegionBenchmark = vi.spyOn(PdfDeveloperApi.prototype, 'runRegionBenchmark')
+    const coordinateRegionBenchmark = vi.spyOn(BenchmarkCoordinator.prototype, 'coordinateRegionBenchmark')
+    const wrapper = mount(PdfApp)
+    await flushPromises()
+
+    const toolbar = wrapper.findComponent({ name: 'PdfToolbar' })
+    const viewer = wrapper.findComponent({ name: 'PdfViewer' })
+    const region = createPdfRegion({ pageNumber: 1, left: 1, top: 4, right: 3, bottom: 2 })
+    toolbar.vm.$emit('request-region-benchmark')
+    await flushPromises()
+
+    expect(viewer.props('regionSelectionActive')).toBe(true)
+
+    viewer.vm.$emit('region-selection-complete', region)
+    await flushPromises()
+
+    expect(viewer.props('regionSelectionActive')).toBe(false)
+    expect(runRegionBenchmark).toHaveBeenCalledWith({ region })
+    expect(coordinateRegionBenchmark).toHaveBeenCalledWith({ region })
+    expect(mockRegionExecutionDispatch).not.toHaveBeenCalled()
+    expect(mockRegionOcr.startRegionOcr).not.toHaveBeenCalled()
+    runRegionBenchmark.mockRestore()
+    coordinateRegionBenchmark.mockRestore()
   })
 
   it('toggles selection off with toolbar cancel and Escape', async () => {

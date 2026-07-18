@@ -33,6 +33,7 @@
       @export-html="handleExportHtml"
       @request-ocr="requestOcr"
       @request-region-ocr="handleRequestRegionOcr"
+      @request-region-benchmark="handleRequestRegionBenchmark"
       @clear-cache="handleClearCache"
       @request-open-pdf="requestOpenPdf"
       @execution-mode-change="handleExecutionModeChange"
@@ -211,6 +212,7 @@ import { usePdfKeyboard } from './composables/usePdfKeyboard.js'
 import { createPdfTransitionController } from './composables/createPdfTransitionController.js'
 import { createPdfStatusBannerController } from './utils/pdfStatusBanner.js'
 import { REGION_OCR_STATE } from './constants/regionOcrState.js'
+import { PdfDeveloperApi } from './PdfDeveloperApi.js'
 import { getSourceLanguageAsync } from '@/shared/config/config.js'
 import { useSettingsStore } from '@/features/settings/stores/settings.js'
 import { applyTheme } from '@/utils/ui/theme.js'
@@ -290,11 +292,13 @@ const EXPORT_SUCCESS_DURATION_MS = 2200
 const dismissedPdfStatusBannerKey = ref('')
 let activeRegionPosition = null
 const regionOcrState = ref(REGION_OCR_STATE.IDLE)
+const regionSelectionTarget = ref(null)
 const regionOcrNotice = ref(null)
 const regionOcrAvailable = computed(() => hasDocument.value && showOriginalPane.value)
 const supportedExecutionModes = Object.freeze([REGION_EXECUTION_TARGET.OCR])
 const executionMode = ref(REGION_EXECUTION_TARGET.OCR)
 const pdfStatusBannerController = createPdfStatusBannerController()
+const pdfDeveloperApi = new PdfDeveloperApi()
 
 const {
   ocrRecommendationCount,
@@ -508,7 +512,14 @@ function resolveRegionViewportPosition(region) {
 }
 
 function handleRegionSelectionComplete(region) {
+  const target = regionSelectionTarget.value
   exitRegionSelection()
+
+  if (target === REGION_EXECUTION_TARGET.BENCHMARK) {
+    pdfDeveloperApi.runRegionBenchmark({ region })
+    return
+  }
+
   activeRegionPosition = resolveRegionViewportPosition(region)
   const request = createRegionExecutionRequest({
     region,
@@ -524,13 +535,24 @@ function handleRegionSelectionComplete(region) {
 }
 
 function handleRequestRegionOcr() {
+  beginRegionSelection(REGION_EXECUTION_TARGET.OCR)
+}
+
+function handleRequestRegionBenchmark() {
+  beginRegionSelection(REGION_EXECUTION_TARGET.BENCHMARK)
+}
+
+function beginRegionSelection(target) {
   if (regionOcrState.value === REGION_OCR_STATE.PROCESSING) return
   if (regionOcrState.value === REGION_OCR_STATE.SELECTING) {
-    exitRegionSelection()
-    return
+    if (regionSelectionTarget.value === target) {
+      exitRegionSelection()
+      return
+    }
   }
   if (!regionOcrAvailable.value) return
   regionOcrNotice.value = null
+  regionSelectionTarget.value = target
   regionOcrState.value = REGION_OCR_STATE.SELECTING
 }
 
@@ -542,6 +564,7 @@ function exitRegionSelection() {
 
 function setRegionOcrIdle() {
   regionOcrState.value = REGION_OCR_STATE.IDLE
+  regionSelectionTarget.value = null
 }
 
 function handleRegionOcrOutcome(result) {

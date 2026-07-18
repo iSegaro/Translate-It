@@ -322,7 +322,7 @@
               class="pdf-toolbar__export-item"
               type="button"
               role="menuitem"
-              disabled
+              @click="$emit('request-region-benchmark')"
             >
               Region Benchmark
             </button>
@@ -380,7 +380,7 @@ const props = defineProps({
   regionOcrAvailable: { type: Boolean, default: false },
 })
 
-const emit = defineEmits(['request-open-pdf', 'translate-visible', 'cancel-translation', 'content-view-change', 'layout-mode-change', 'toggle-outline', 'export-txt', 'export-markdown', 'export-html', 'request-ocr', 'request-region-ocr', 'clear-cache', 'zoom-step', 'zoom-change', 'execution-mode-change'])
+const emit = defineEmits(['request-open-pdf', 'translate-visible', 'cancel-translation', 'content-view-change', 'layout-mode-change', 'toggle-outline', 'export-txt', 'export-markdown', 'export-html', 'request-ocr', 'request-region-ocr', 'request-region-benchmark', 'clear-cache', 'zoom-step', 'zoom-change', 'execution-mode-change'])
 
 const logger = getScopedLogger(LOG_COMPONENTS.PDF, 'PdfToolbar')
 const settingsStore = useSettingsStore()
