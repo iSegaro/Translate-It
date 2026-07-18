@@ -37,6 +37,7 @@ vi.mock('@/shared/logging/logger.js', () => ({
 }))
 
 import PdfToolbar from './PdfToolbar.vue'
+import { PdfDeveloperApi } from '../PdfDeveloperApi.js'
 import { TranslationMode } from '@/shared/config/config.js'
 
 function createDeferred() {
@@ -236,7 +237,7 @@ describe('PdfToolbar', () => {
     expect(wrapper.emitted('zoom-step')?.at(-1)?.[0]).toBe(1)
   })
 
-  it('shows Developer placeholder only while Debug Mode is enabled', async () => {
+  it('shows Developer actions only while Debug Mode is enabled', async () => {
     const debugDisabled = mount(PdfToolbar)
 
     await debugDisabled.find('.pdf-toolbar__button[aria-label="More actions"]').trigger('click')
@@ -249,11 +250,16 @@ describe('PdfToolbar', () => {
 
     expect(debugEnabled.find('.pdf-toolbar__menu-section').text()).toContain('Developer')
     const regionBenchmark = debugEnabled.findAll('button').find((button) => button.text().includes('Region Benchmark'))
-    expect(regionBenchmark?.attributes('disabled')).toBeDefined()
+    expect(regionBenchmark?.attributes('disabled')).toBeUndefined()
+
+    const runRegionBenchmark = vi.spyOn(PdfDeveloperApi.prototype, 'runRegionBenchmark')
 
     await regionBenchmark?.trigger('click')
+    expect(runRegionBenchmark).toHaveBeenCalledTimes(1)
+    expect(loggerMock.warn).toHaveBeenCalledWith('Developer capability not implemented:', expect.any(Error))
+    expect(debugEnabled.find('.pdf-toolbar__export-menu').exists()).toBe(false)
     expect(debugEnabled.emitted('request-region-ocr')).toBeFalsy()
-    expect(debugEnabled.emitted('region-benchmark')).toBeFalsy()
+    runRegionBenchmark.mockRestore()
   })
 
   it('shows OCR button without count when OCR recommendations exist', async () => {

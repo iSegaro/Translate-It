@@ -322,7 +322,7 @@
               class="pdf-toolbar__export-item"
               type="button"
               role="menuitem"
-              disabled
+              @click="handleRegionBenchmarkAction"
             >
               Region Benchmark
             </button>
@@ -348,6 +348,7 @@ import fitPageIcon from '@/icons/ui/fit-page.svg?url'
 import fitWidthIcon from '@/icons/ui/fit-width.svg?url'
 import downloadIcon from '@/icons/ui/download.svg?url'
 import { REGION_OCR_STATE } from '../constants/regionOcrState.js'
+import { PdfDeveloperApi } from '../PdfDeveloperApi.js'
 import './PdfToolbar.scss'
 
 const TOOLTIP_OUTLINE = 'Toggle outline'
@@ -384,6 +385,7 @@ const emit = defineEmits(['request-open-pdf', 'translate-visible', 'cancel-trans
 
 const logger = getScopedLogger(LOG_COMPONENTS.PDF, 'PdfToolbar')
 const settingsStore = useSettingsStore()
+const pdfDeveloperApi = new PdfDeveloperApi()
 
 const pdfProviderValue = computed(() => {
   return settingsStore.settings?.MODE_PROVIDERS?.[TranslationMode.PDF] || 'default'
@@ -519,6 +521,16 @@ function handleOpenPdfAction() {
 function handleClearCacheAction() {
   emit('clear-cache')
   closeMenus()
+}
+
+async function handleRegionBenchmarkAction() {
+  try {
+    await pdfDeveloperApi.runRegionBenchmark()
+  } catch (error) {
+    logger.warn('Developer capability not implemented:', error)
+  } finally {
+    closeMenus()
+  }
 }
 
 function getActiveMenuRefs() {
