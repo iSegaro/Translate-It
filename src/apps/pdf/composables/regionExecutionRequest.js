@@ -14,6 +14,17 @@ function isCanonicalPdfRegion(region) {
   return Object.isFrozen(region) && createPdfRegion(region) !== null
 }
 
+export function isRegionExecutionRequest(request) {
+  if (!request || typeof request !== 'object') return false
+
+  return Object.isFrozen(request) &&
+    Object.keys(request).length === 3 &&
+    typeof request.target === 'string' && request.target.length > 0 &&
+    request.scope === EXECUTION_SCOPE.LIVE_REGION &&
+    Object.hasOwn(request, 'region') &&
+    isCanonicalPdfRegion(request.region)
+}
+
 export function createRegionExecutionRequest({
   region,
   target = REGION_EXECUTION_TARGET.OCR,
@@ -25,9 +36,11 @@ export function createRegionExecutionRequest({
   if (scope !== EXECUTION_SCOPE.LIVE_REGION) return null
   if (Object.keys(metadata).length > 0) return null
 
-  return Object.freeze({
+  const request = Object.freeze({
     target,
     scope,
     region
   })
+
+  return isRegionExecutionRequest(request) ? request : null
 }

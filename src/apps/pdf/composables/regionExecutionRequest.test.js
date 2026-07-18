@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { createRegionExecutionRequest, EXECUTION_SCOPE, REGION_EXECUTION_TARGET } from './regionExecutionRequest.js'
+import { createRegionExecutionRequest, EXECUTION_SCOPE, isRegionExecutionRequest, REGION_EXECUTION_TARGET } from './regionExecutionRequest.js'
 import { createPdfRegion } from '@/features/pdf-translation/core/PdfRegion.js'
 
 describe('RegionExecutionRequest', () => {
@@ -23,6 +23,17 @@ describe('RegionExecutionRequest', () => {
     expect(createRegionExecutionRequest({ region: createPdfRegion({ pageNumber: 1, left: 1, top: 4, right: 3, bottom: 2 }), target: 'unsupported' })).toBeNull()
     expect(createRegionExecutionRequest({ region: createPdfRegion({ pageNumber: 1, left: 1, top: 4, right: 3, bottom: 2 }), scope: 'corpus' })).toBeNull()
     expect(createRegionExecutionRequest({ region: createPdfRegion({ pageNumber: 1, left: 1, top: 4, right: 3, bottom: 2 }), benchmark: {} })).toBeNull()
+  })
+
+  it('validates the shared request shape without target-specific policy', () => {
+    const request = Object.freeze({
+      target: 'future-target',
+      scope: EXECUTION_SCOPE.LIVE_REGION,
+      region: createPdfRegion({ pageNumber: 1, left: 1, top: 4, right: 3, bottom: 2 })
+    })
+
+    expect(isRegionExecutionRequest(request)).toBe(true)
+    expect(isRegionExecutionRequest({ ...request })).toBe(false)
   })
 
   it('remains immutable', () => {

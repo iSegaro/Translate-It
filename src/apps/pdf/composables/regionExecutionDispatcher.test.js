@@ -39,7 +39,7 @@ describe('RegionExecutionDispatcher', () => {
 
     expect(execute).toHaveBeenCalledWith(request)
     expect(operation.context.target).toBe(REGION_EXECUTION_TARGET.BENCHMARK)
-    await expect(operation.promise).resolves.toEqual({ status: BENCHMARK_RUNNER_STATUS.NOT_IMPLEMENTED })
+    await expect(operation.promise).resolves.toEqual({ status: BENCHMARK_RUNNER_STATUS.READY, providers: [] })
   })
 
   it('rejects unsupported target', () => {

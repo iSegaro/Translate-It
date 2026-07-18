@@ -1,21 +1,45 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { BenchmarkRunner, BENCHMARK_RUNNER_STATUS } from './BenchmarkRunner.js'
 import { createRegionExecutionRequest, REGION_EXECUTION_TARGET } from './composables/regionExecutionRequest.js'
 import { createPdfRegion } from '@/features/pdf-translation/core/PdfRegion.js'
 
 describe('BenchmarkRunner', () => {
-  it('returns an immutable placeholder operation without execution side effects', async () => {
+  it('creates a session and resolves the shared operation through its lifecycle', async () => {
     const request = createRegionExecutionRequest({
       region: createPdfRegion({ pageNumber: 1, left: 1, top: 4, right: 3, bottom: 2 }),
       target: REGION_EXECUTION_TARGET.BENCHMARK
     })
 
-    const operation = new BenchmarkRunner().execute(request)
+    const session = {
+      run: vi.fn(() => Promise.resolve({ status: BENCHMARK_RUNNER_STATUS.READY, providers: [] })),
+      cancel: vi.fn()
+    }
+    const createSession = vi.fn(() => session)
+    const operation = new BenchmarkRunner({ createSession }).execute(request)
 
+    expect(createSession).toHaveBeenCalledWith(request)
     expect(Object.isFrozen(operation)).toBe(true)
     expect(Object.isFrozen(operation.context)).toBe(true)
     expect(operation.context).toEqual({ target: REGION_EXECUTION_TARGET.BENCHMARK, request })
     expect(operation.cancel).toBeTypeOf('function')
-    await expect(operation.promise).resolves.toEqual({ status: BENCHMARK_RUNNER_STATUS.NOT_IMPLEMENTED })
+    await expect(operation.promise).resolves.toEqual({ status: BENCHMARK_RUNNER_STATUS.READY, providers: [] })
+    expect(session.run).toHaveBeenCalledOnce()
+  })
+
+  it('cancels the session before provider resolution', async () => {
+    const request = createRegionExecutionRequest({
+      region: createPdfRegion({ pageNumber: 1, left: 1, top: 4, right: 3, bottom: 2 }),
+      target: REGION_EXECUTION_TARGET.BENCHMARK
+    })
+    const operation = new BenchmarkRunner().execute(request)
+
+    operation.cancel()
+
+    await expect(operation.promise).resolves.toEqual({ status: BENCHMARK_RUNNER_STATUS.CANCELLED })
+  })
+
+  it('rejects non-canonical Benchmark requests', () => {
+    expect(() => new BenchmarkRunner().execute()).toThrow('BenchmarkRunner requires a canonical Benchmark RegionExecutionRequest')
+    expect(() => new BenchmarkRunner().execute({ target: REGION_EXECUTION_TARGET.BENCHMARK })).toThrow('BenchmarkRunner requires a canonical Benchmark RegionExecutionRequest')
   })
 })
