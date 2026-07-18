@@ -19,6 +19,8 @@
       :is-outline-visible="isOutlineVisible"
       :execution-mode="executionMode"
       :execution-modes="supportedExecutionModes"
+      :region-ocr-state="regionOcrState"
+      :region-ocr-available="regionOcrAvailable"
       @toggle-outline="toggleOutline"
       @translate-visible="handleTranslateVisiblePages"
       @cancel-translation="handleCancelTranslation"
@@ -67,6 +69,20 @@
           :progress="ocrProgress"
           @cancel="cancelOcr"
         />
+
+        <div
+          v-if="regionOcrNotice"
+          class="pdf-app__status-row"
+        >
+          <PdfStatusBanner
+            :visible="true"
+            :variant="regionOcrNotice.variant"
+            :title="regionOcrNotice.title"
+            :message="regionOcrNotice.message"
+            dismissible
+            @dismiss="regionOcrNotice = null"
+          />
+        </div>
       </div>
 
       <main class="pdf-app__content">
@@ -125,7 +141,7 @@
                     :overlay-page-data="translatedPageData"
                     :handle-navigation-target="handleNavigationTarget"
                     :scroll-container="originalScrollContainer"
-                    :region-selection-active="regionSelectionActive"
+                    :region-selection-active="regionOcrState === REGION_OCR_STATE.SELECTING"
                     @layout-change="handleLayoutChange"
                     @current-page-change="handleCurrentPageChange"
                     @visible-pages-change="handleVisiblePagesChange"
@@ -194,6 +210,7 @@ import { usePdfNavigation } from './composables/usePdfNavigation.js'
 import { usePdfKeyboard } from './composables/usePdfKeyboard.js'
 import { createPdfTransitionController } from './composables/createPdfTransitionController.js'
 import { createPdfStatusBannerController } from './utils/pdfStatusBanner.js'
+import { REGION_OCR_STATE } from './constants/regionOcrState.js'
 import { getSourceLanguageAsync } from '@/shared/config/config.js'
 import { useSettingsStore } from '@/features/settings/stores/settings.js'
 import { applyTheme } from '@/utils/ui/theme.js'
@@ -272,7 +289,9 @@ const exportSuccessTimer = ref(null)
 const EXPORT_SUCCESS_DURATION_MS = 2200
 const dismissedPdfStatusBannerKey = ref('')
 let activeRegionPosition = null
-const regionSelectionActive = ref(false)
+const regionOcrState = ref(REGION_OCR_STATE.IDLE)
+const regionOcrNotice = ref(null)
+const regionOcrAvailable = computed(() => hasDocument.value && showOriginalPane.value)
 const supportedExecutionModes = Object.freeze([REGION_EXECUTION_TARGET.OCR])
 const executionMode = ref(REGION_EXECUTION_TARGET.OCR)
 const pdfStatusBannerController = createPdfStatusBannerController()
@@ -413,9 +432,14 @@ watch(hasAnyTranslation, (has) => {
   }
 })
 
+watch(regionOcrAvailable, (available) => {
+  if (!available) exitRegionSelection()
+})
+
 function resetPresentationState() {
   currentPage.value = 0
   activeRegionPosition = null
+  setRegionOcrIdle()
   resetViewerState()
 }
 
@@ -484,7 +508,7 @@ function resolveRegionViewportPosition(region) {
 }
 
 function handleRegionSelectionComplete(region) {
-  regionSelectionActive.value = false
+  exitRegionSelection()
   activeRegionPosition = resolveRegionViewportPosition(region)
   const request = createRegionExecutionRequest({
     region,
@@ -494,11 +518,53 @@ function handleRegionSelectionComplete(region) {
   if (!request) return
 
   const operation = regionExecutionDispatcher.dispatchRegionExecution(request)
+  regionOcrState.value = REGION_OCR_STATE.PROCESSING
+  void operation.promise.then(handleRegionOcrOutcome, handleRegionOcrFailure)
   void operation.promise
 }
 
 function handleRequestRegionOcr() {
-  regionSelectionActive.value = true
+  if (regionOcrState.value === REGION_OCR_STATE.PROCESSING) return
+  if (regionOcrState.value === REGION_OCR_STATE.SELECTING) {
+    exitRegionSelection()
+    return
+  }
+  if (!regionOcrAvailable.value) return
+  regionOcrNotice.value = null
+  regionOcrState.value = REGION_OCR_STATE.SELECTING
+}
+
+function exitRegionSelection() {
+  if (regionOcrState.value === REGION_OCR_STATE.SELECTING) {
+    setRegionOcrIdle()
+  }
+}
+
+function setRegionOcrIdle() {
+  regionOcrState.value = REGION_OCR_STATE.IDLE
+}
+
+function handleRegionOcrOutcome(result) {
+  if (regionOcrState.value !== REGION_OCR_STATE.PROCESSING) return
+  setRegionOcrIdle()
+
+  if (result?.status === 'recognized' && !String(result?.data?.text || '').trim()) {
+    regionOcrNotice.value = {
+      variant: 'warning',
+      title: 'Region OCR',
+      message: 'No text found in the selected region.'
+    }
+  } else if (result?.status === 'failed') {
+    regionOcrNotice.value = {
+      variant: 'error',
+      title: 'Region OCR',
+      message: 'OCR failed. Please try another region.'
+    }
+  }
+}
+
+function handleRegionOcrFailure() {
+  handleRegionOcrOutcome({ status: 'failed' })
 }
 
 function handleRegionOcrRecognized(payload) {
@@ -608,11 +674,14 @@ onMounted(() => {
   mq.addEventListener('change', mqHandler)
   themeMediaQuery = mq
   themeMqHandler = mqHandler
+
+  document.addEventListener('keydown', handleRegionOcrKeyDown)
 })
 
 onBeforeUnmount(() => {
   clearExportSuccess()
   activeRegionPosition = null
+  setRegionOcrIdle()
   detachDocument()
   void cleanup()
 
@@ -623,5 +692,12 @@ onBeforeUnmount(() => {
   if (themeMediaQuery && themeMqHandler) {
     themeMediaQuery.removeEventListener('change', themeMqHandler)
   }
+  document.removeEventListener('keydown', handleRegionOcrKeyDown)
 })
+
+function handleRegionOcrKeyDown(event) {
+  if (event.key !== 'Escape' || regionOcrState.value !== REGION_OCR_STATE.SELECTING) return
+  event.preventDefault()
+  exitRegionSelection()
+}
 </script>

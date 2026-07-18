@@ -175,9 +175,18 @@
       <button
         class="pdf-toolbar__button pdf-toolbar__button--region-ocr"
         type="button"
+        :class="{ 'pdf-toolbar__button--active': regionOcrState === REGION_OCR_STATE.SELECTING }"
+        :disabled="regionOcrState === REGION_OCR_STATE.PROCESSING || !regionOcrAvailable"
+        :title="regionOcrAvailable ? '' : 'Region OCR is available only in the original PDF view.'"
+        :aria-pressed="regionOcrState === REGION_OCR_STATE.SELECTING"
         @click="$emit('request-region-ocr')"
       >
-        OCR Region
+        <span
+          v-if="regionOcrState === REGION_OCR_STATE.PROCESSING"
+          class="pdf-toolbar__region-ocr-spinner"
+          aria-hidden="true"
+        />
+        {{ regionOcrState === REGION_OCR_STATE.SELECTING ? 'Cancel' : regionOcrState === REGION_OCR_STATE.PROCESSING ? 'Processing...' : 'OCR Region' }}
       </button>
 
       <span
@@ -322,6 +331,7 @@ import splitScreenIcon from '@/icons/ui/split-screen.svg?url'
 import fitPageIcon from '@/icons/ui/fit-page.svg?url'
 import fitWidthIcon from '@/icons/ui/fit-width.svg?url'
 import downloadIcon from '@/icons/ui/download.svg?url'
+import { REGION_OCR_STATE } from '../constants/regionOcrState.js'
 import './PdfToolbar.scss'
 
 const TOOLTIP_OUTLINE = 'Toggle outline'
@@ -350,6 +360,8 @@ const props = defineProps({
   isOutlineVisible: { type: Boolean, default: false },
   executionMode: { type: String, default: '' },
   executionModes: { type: Array, default: () => [] },
+  regionOcrState: { type: String, default: 'idle' },
+  regionOcrAvailable: { type: Boolean, default: false },
 })
 
 const emit = defineEmits(['request-open-pdf', 'translate-visible', 'cancel-translation', 'content-view-change', 'layout-mode-change', 'toggle-outline', 'export-txt', 'export-markdown', 'export-html', 'request-ocr', 'request-region-ocr', 'clear-cache', 'zoom-step', 'zoom-change', 'execution-mode-change'])

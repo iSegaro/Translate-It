@@ -99,7 +99,7 @@ vi.mock('@/shared/config/config.js', () => ({
 vi.mock('./components/PdfToolbar.vue', () => ({
   default: {
     name: 'PdfToolbar',
-    props: ['fileName', 'pageCount', 'currentPageNumber', 'zoomMode', 'zoomPercent', 'contentView', 'layoutMode', 'ocrRecommendationCount', 'executionMode', 'executionModes'],
+    props: ['fileName', 'pageCount', 'currentPageNumber', 'zoomMode', 'zoomPercent', 'contentView', 'layoutMode', 'ocrRecommendationCount', 'executionMode', 'executionModes', 'regionOcrState', 'regionOcrAvailable'],
     emits: ['toggle-outline', 'translate-visible', 'cancel-translation', 'content-view-change', 'layout-mode-change', 'zoom-step', 'zoom-change', 'export-txt', 'export-markdown', 'export-html', 'request-ocr', 'request-region-ocr', 'clear-cache', 'request-open-pdf', 'execution-mode-change'],
     template: '<header class="pdf-toolbar-stub" />'
   }
@@ -485,6 +485,76 @@ describe('PdfApp', () => {
     expect(mockRegionExecutionDispatch).toHaveBeenCalledOnce()
     expect(mockRegionExecutionDispatch.mock.calls[0][0]).toEqual(expect.objectContaining({ region, target: 'ocr' }))
     expect(mockRegionOcr.startRegionOcr).toHaveBeenCalledOnce()
+  })
+
+  it('toggles selection off with toolbar cancel and Escape', async () => {
+    const wrapper = mount(PdfApp)
+    await flushPromises()
+    const toolbar = wrapper.findComponent({ name: 'PdfToolbar' })
+    const viewer = wrapper.findComponent({ name: 'PdfViewer' })
+
+    toolbar.vm.$emit('request-region-ocr')
+    await flushPromises()
+    expect(viewer.props('regionSelectionActive')).toBe(true)
+
+    toolbar.vm.$emit('request-region-ocr')
+    await flushPromises()
+    expect(viewer.props('regionSelectionActive')).toBe(false)
+
+    toolbar.vm.$emit('request-region-ocr')
+    await flushPromises()
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))
+    await flushPromises()
+    expect(viewer.props('regionSelectionActive')).toBe(false)
+  })
+
+  it('returns selection to idle on document replacement', async () => {
+    const wrapper = mount(PdfApp)
+    await flushPromises()
+    wrapper.findComponent({ name: 'PdfToolbar' }).vm.$emit('request-region-ocr')
+    await flushPromises()
+    expect(wrapper.findComponent({ name: 'PdfViewer' }).props('regionSelectionActive')).toBe(true)
+
+    wrapper.findComponent({ name: 'PdfDropzone' }).vm.$emit('file-selected', { name: 'replacement.pdf' })
+    await flushPromises()
+    expect(wrapper.findComponent({ name: 'PdfViewer' }).props('regionSelectionActive')).toBe(false)
+  })
+
+  it('shows processing then returns idle with outcome notifications', async () => {
+    let resolveOcr
+    mockRegionOcr.startRegionOcr.mockReturnValue(createMockOperation(new Promise((resolve) => {
+      resolveOcr = resolve
+    })))
+    const wrapper = mount(PdfApp)
+    await flushPromises()
+    const toolbar = wrapper.findComponent({ name: 'PdfToolbar' })
+    const viewer = wrapper.findComponent({ name: 'PdfViewer' })
+
+    toolbar.vm.$emit('request-region-ocr')
+    viewer.vm.$emit('region-selection-complete', createPdfRegion({ pageNumber: 1, left: 1, top: 4, right: 3, bottom: 2 }))
+    await flushPromises()
+    expect(toolbar.props('regionOcrState')).toBe('processing')
+    expect(toolbar.props('regionOcrAvailable')).toBe(true)
+
+    resolveOcr({ status: 'recognized', data: { text: '' } })
+    await flushPromises()
+    await flushPromises()
+    expect(toolbar.props('regionOcrState')).toBe('idle')
+    expect(wrapper.text()).toContain('No text found in the selected region.')
+  })
+
+  it('returns to idle and notifies on Region OCR failure', async () => {
+    mockRegionOcr.startRegionOcr.mockReturnValue(createMockOperation(Promise.resolve({ status: 'failed', error: new Error('failed') })))
+    const wrapper = mount(PdfApp)
+    await flushPromises()
+    const toolbar = wrapper.findComponent({ name: 'PdfToolbar' })
+    toolbar.vm.$emit('request-region-ocr')
+    wrapper.findComponent({ name: 'PdfViewer' }).vm.$emit('region-selection-complete', createPdfRegion({ pageNumber: 1, left: 1, top: 4, right: 3, bottom: 2 }))
+    await flushPromises()
+    await flushPromises()
+
+    expect(toolbar.props('regionOcrState')).toBe('idle')
+    expect(wrapper.text()).toContain('OCR failed. Please try another region.')
   })
 
   it('owns the OCR-only execution mode and rejects unsupported toolbar intent', async () => {

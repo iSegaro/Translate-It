@@ -252,11 +252,28 @@ describe('PdfToolbar', () => {
   })
 
   it('emits one region OCR request from the toolbar action', async () => {
-    const wrapper = mount(PdfToolbar)
+    const wrapper = mount(PdfToolbar, { props: { regionOcrAvailable: true } })
 
     await wrapper.find('.pdf-toolbar__button--region-ocr').trigger('click')
 
     expect(wrapper.emitted('request-region-ocr')).toHaveLength(1)
+  })
+
+  it('reflects selecting, processing, and unavailable Region OCR states', async () => {
+    const wrapper = mount(PdfToolbar, { props: { regionOcrAvailable: true, regionOcrState: 'selecting' } })
+    const button = wrapper.find('.pdf-toolbar__button--region-ocr')
+
+    expect(button.text()).toBe('Cancel')
+    expect(button.attributes('aria-pressed')).toBe('true')
+
+    await wrapper.setProps({ regionOcrState: 'processing' })
+    expect(button.text()).toContain('Processing...')
+    expect(button.attributes('disabled')).toBeDefined()
+    expect(wrapper.find('.pdf-toolbar__region-ocr-spinner').exists()).toBe(true)
+
+    await wrapper.setProps({ regionOcrState: 'idle', regionOcrAvailable: false })
+    expect(button.attributes('disabled')).toBeDefined()
+    expect(button.attributes('title')).toBe('Region OCR is available only in the original PDF view.')
   })
 
   it('emits execution-mode-change from current execution mode selection', async () => {
