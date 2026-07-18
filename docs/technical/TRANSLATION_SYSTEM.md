@@ -91,6 +91,130 @@ Forbidden patterns:
 - Using `StreamingManager` as a workflow lifecycle owner.
 - Broad cancellation where exact-ID ownership exists.
 
+## Runtime Architecture Freeze
+
+### Request Identity
+
+One logical request owns one stable, globally unique `messageId` from dispatch through terminal retention. Distinct logical requests must never reuse an ID. The tracker rejects both active and retained terminal IDs; callers must generate a new ID instead of replacing a record.
+
+```text
+UI / workflow creates messageId
+  -> request tracker registration
+  -> lifecycle registration
+  -> provider / queue / rate-limit / stream work keyed by messageId
+  -> terminal tracker record retained for diagnostics
+```
+
+### Ownership
+
+| Layer | Owns | Does Not Own |
+|---|---|---|
+| Workflow / UI | Current user intent, run/session identity, stale presentation suppression | Backend lifecycle state |
+| `TranslationRequestTracker` | Request lifecycle, active indexes, terminal transition, metrics, terminal retention | Provider aborting or result transport |
+| `TranslationLifecycleRegistry` | Abort controllers, tombstones, pre-registration cancellation, execution registration | Tracker terminal state |
+| `TranslationEngine` | Provider entry and exact-ID cancellation propagation | UI session ownership |
+| `ProviderCoordinator` | Provider selection and admission | Workflow staleness |
+| `QueueManager` | Queue/retry ownership and exact-ID removal | Tracker terminal transition |
+| `RateLimitManager` | Limiter admission and pending request cleanup | UI delivery |
+| `StreamingManager` | Sender routing, chunk transport, local stream terminal suppression, delayed stream retention | Translation workflow lifecycle |
+| `UnifiedResultDispatcher` | Accepted result and cancellation delivery; per-instance result deduplication | Tracker state mutation |
+
+### Request Lifecycle
+
+```text
+CREATED
+  -> TRACKED
+  -> REGISTERED
+  -> QUEUED / RATE-LIMITED
+  -> DISPATCHED
+  -> STREAMING (when supported)
+  -> COMPLETED | FAILED | CANCELLED | TIMEOUT
+  -> retained diagnostic record
+  -> periodic cleanup
+```
+
+`TranslationRequestTracker` exclusively owns terminal lifecycle transitions. A transition returns an explicit acceptance result. Only an accepted completion may trigger normal result dispatch.
+
+| Current State | Requested Terminal State | Result |
+|---|---|---|
+| `pending`, `processing`, `streaming` | `completed`, `failed`, `cancelled`, `timeout` | Accepted once |
+| Any terminal state | Any terminal state | Rejected without metadata, metric, or timestamp mutation |
+
+Late provider results, errors, timeout callbacks, and duplicate result messages are harmless after a terminal transition because they cannot replace tracker state or trigger normal delivery.
+
+### Exact-ID Cancellation And Timeout
+
+```text
+CANCEL_TRANSLATION { messageId }
+  -> tracker cancel transition
+  -> cancellation delivery for accepted cancellation
+  -> lifecycle abort and tombstone
+  -> stream cancellation
+  -> rate-limit cleanup
+  -> queue/retry cleanup
+
+Timeout for messageId
+  -> CANCEL_TRANSLATION { messageId, timeout: true }
+  -> tracker timeout transition, only while active
+  -> same exact-ID cleanup sequence
+  -> late duplicate timeout skips all cleanup
+```
+
+Timeout callbacks act only for their original request ID. A rejected timeout transition means that completion, failure, cancellation, or an earlier timeout already won; no additional cleanup is attempted.
+
+### Cleanup Matrix
+
+| Terminal Path | Tracker | Lifecycle / Provider | Queue / Rate Limit | Stream / Delivery |
+|---|---|---|---|---|
+| Success | Completed record retained; active indexes removed | Unregister after execution | Provider completion | Accepted result delivery; stream ends if present |
+| Failure | Failed record retained; active indexes removed | Unregister after execution | Retry/reject cleanup | Error terminal delivery if stream exists |
+| Cancellation | Cancelled record retained; active indexes removed | Abort and tombstone | Exact-ID removal | One cancellation/end delivery; late chunks ignored |
+| Timeout | Timed-out record retained; active indexes removed | Exact-ID abort | Exact-ID removal | Timeout prevents later normal delivery |
+| Empty batch | Normal service terminal handling | Batch executor allocates no lifecycle controller or provider work | None | Immediate empty success |
+| Retention expiry | Terminal diagnostic record deleted | None | None | None |
+
+Terminal records remain in tracker storage for diagnostics but leave tab, toast, and retry indexes immediately. They are not eligible for active request selection or bulk cancellation.
+
+### Timeout Ownership Matrix
+
+| Timeout Owner | Request Identity | Terminal Action |
+|---|---|---|
+| Messaging request timeout | Outgoing `messageId` | Sends timeout-marked exact cancellation |
+| Unified streaming coordinator | Active streaming `messageId` | Sends timeout-marked exact cancellation |
+| Translation window timeout | Window request `messageId` | Sends timeout-marked exact cancellation before local rejection |
+| Smart field timeout | Field request `messageId` | Aborts local operation and sends timeout-marked exact cancellation |
+| Generic batch timeout | Batch `messageId` / lifecycle controller | Aborts provider signal; tracker records timeout through service result handling |
+
+### Streaming And Delivery
+
+`StreamingManager` is a transport owner, not a workflow owner. It accepts chunks only while its local stream is active. Its terminal stream states are immutable and its delayed retention exists only for late transport messages.
+
+`UnifiedResultDispatcher` owns delivery after tracker acceptance. Its `processedResults` set is per dispatcher instance, so duplicate-result suppression remains scoped to the owning `UnifiedTranslationService` instance. Delivery failure returns a delivery error and never rewrites accepted tracker state.
+
+### Specialized Workflow Boundaries
+
+| Workflow | Local Owner | Shared Runtime Boundary | Stale Guard |
+|---|---|---|---|
+| PDF visible blocks | `PdfTranslationCoordinator.activeRunId` | Exact active request IDs | Run ID before block update |
+| PDF Region OCR | Region operation and run ID | OCR executor then window translation | Operation/run validation |
+| PDF translation windows | Selection session and active message ID | Standard translation request | Session/message validation |
+| Page translation | Scheduler session context | Unified batch requests | Session-context validation |
+| Hover translation | Current message ID | Standard translation request | Latest-ID check before display |
+| Screen OCR | Capture session ID | Downstream window/selection translation | Capture-session validation |
+| Text replacement | Local field/toast ownership | Exact field request cancellation | Local message/toast guard |
+
+### Frozen Runtime Invariants
+
+- One logical request owns one stable `messageId`.
+- Distinct logical requests never reuse a `messageId`.
+- Tracker exclusively owns immutable terminal lifecycle transitions.
+- Timeout behaves as exact-ID cancellation and only acts while the same request is active.
+- Late callbacks cannot replace terminal state or publish normal stale results.
+- Lifecycle ownership is separate from stream transport and UI presentation ownership.
+- `StreamingManager` owns transport only; workflows own stale presentation rules.
+- Dispatcher owns delivery only; delivery errors never alter tracker terminal state.
+- Empty executable batches allocate no provider, lifecycle, timeout, or execution resources.
+
 ### Unified Result Dispatcher
 **File**: `src/core/services/translation/UnifiedResultDispatcher.js`
 - **Intelligent result routing** based on translation mode
