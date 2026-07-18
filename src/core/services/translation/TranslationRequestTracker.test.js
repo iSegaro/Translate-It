@@ -65,6 +65,21 @@ describe('TranslationRequestTracker', () => {
       expect(request.elementData.selector).toBe('.test');
       expect(request.elementData.recoveryStrategy).toBe('id');
     });
+
+    it.each([
+      ['active', (messageId) => tracker.updateRequest(messageId, { status: RequestStatus.PROCESSING })],
+      ['completed', (messageId) => tracker.completeRequest(messageId, { success: true })],
+      ['failed', (messageId) => tracker.failRequest(messageId, new Error('failed'))],
+      ['cancelled', (messageId) => tracker.cancelRequest(messageId)],
+      ['timed-out', (messageId) => tracker.markTimeout(messageId)]
+    ])('rejects reuse of a %s request ID', (_status, transition) => {
+      const messageId = `duplicate-${_status}`;
+      const original = tracker.createRequest({ messageId, data: { text: 'original' } });
+      transition(messageId);
+
+      expect(tracker.createRequest({ messageId, data: { text: 'replacement' } })).toBeNull();
+      expect(tracker.getRequest(messageId)).toBe(original);
+    });
   });
 
   describe('updateRequest', () => {

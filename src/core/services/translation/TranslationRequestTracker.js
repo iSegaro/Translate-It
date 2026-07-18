@@ -78,6 +78,11 @@ export class TranslationRequestTracker {
    * Create and track a new translation request
    */
   createRequest({ messageId, data, sender, context, sessionId, options = {} }) {
+    if (this.requests.has(messageId)) {
+      logger.warn(`[RequestTracker] Refusing duplicate messageId: ${messageId}`);
+      return null;
+    }
+
     const request = {
       messageId,
       data: { ...data, sessionId: sessionId || data?.sessionId },

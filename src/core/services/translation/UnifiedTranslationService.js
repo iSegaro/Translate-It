@@ -146,8 +146,13 @@ export class UnifiedTranslationService {
       if (!MessageFormat.validate(message)) throw new Error('Invalid message format');
 
       const existingRequest = this.requestTracker.getRequest(messageId);
-      if (existingRequest && this.requestTracker.isRequestActive(messageId)) {
-        return { success: false, error: 'Request already processing' };
+      if (existingRequest) {
+        return {
+          success: false,
+          error: this.requestTracker.isRequestActive(messageId)
+            ? 'Request already processing'
+            : 'Request messageId already exists'
+        };
       }
 
       const request = this.requestTracker.createRequest({

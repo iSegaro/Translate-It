@@ -288,6 +288,17 @@ describe('UnifiedTranslationService', () => {
       expect(result.error).toBe('Request already processing');
     });
 
+    it('should reject reuse of retained terminal request IDs', async () => {
+      const message = { messageId: 'm1', data: { text: 'hi' } };
+      translationRequestTracker.getRequest.mockReturnValue({ messageId: 'm1', status: 'completed' });
+      translationRequestTracker.isRequestActive.mockReturnValue(false);
+
+      const result = await service.handleTranslationRequest(message);
+
+      expect(result).toMatchObject({ success: false, error: 'Request messageId already exists' });
+      expect(translationRequestTracker.createRequest).not.toHaveBeenCalled();
+    });
+
     it('should fallback to globalThis.backgroundService if not initialized', async () => {
       const s2 = new UnifiedTranslationService();
       translationRequestTracker.getRequest.mockReturnValue(null);
