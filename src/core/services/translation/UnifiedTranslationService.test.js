@@ -17,6 +17,7 @@ vi.mock('./TranslationRequestTracker.js', () => ({
     completeRequest: vi.fn(),
     failRequest: vi.fn(),
     cancelRequest: vi.fn(),
+    markTimeout: vi.fn(),
     cleanup: vi.fn()
   },
   RequestStatus: {
@@ -119,6 +120,7 @@ describe('UnifiedTranslationService', () => {
     translationRequestTracker.completeRequest.mockReturnValue({ accepted: true, status: 'completed' });
     translationRequestTracker.failRequest.mockReturnValue({ accepted: true, status: 'failed' });
     translationRequestTracker.cancelRequest.mockReturnValue({ accepted: true, status: 'cancelled' });
+    translationRequestTracker.markTimeout.mockReturnValue({ accepted: true, status: 'timeout' });
   });
 
   describe('handleTranslationRequest', () => {

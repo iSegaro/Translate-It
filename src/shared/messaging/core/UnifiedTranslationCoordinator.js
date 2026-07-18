@@ -244,7 +244,7 @@ export class UnifiedTranslationCoordinator {
    * @param {string} messageId - Message ID
    * @param {string} reason - Cancellation reason
    */
-  cancelTranslation(messageId, reason = 'User cancelled') {
+  cancelTranslation(messageId, reason = 'User cancelled', timeout = false) {
     if (!messageId) return false;
     const translation = this.activeTranslations.get(messageId);
     if (!translation) {
@@ -261,7 +261,7 @@ export class UnifiedTranslationCoordinator {
     // We don't await this as we want the content-side cancellation to be immediate
     sendRegularMessage({
       action: MessageActions.CANCEL_TRANSLATION,
-      data: { messageId, reason }
+      data: { messageId, reason, timeout }
     }).catch(err => {
       // Log at debug level as this is often due to extension context invalidation during cancellation
       logger.debug(`Cancellation message to background failed for ${messageId}:`, err.message);
@@ -384,9 +384,7 @@ export class UnifiedTranslationCoordinator {
 
     const translation = this.activeTranslations.get(messageId);
     if (translation) {
-      // Streaming timeout occurred, but background might still be processing
-      // We keep the operation active but notify user about timeout
-      logger.debug(`Streaming timeout handled, background processing may continue`);
+      this.cancelTranslation(messageId, 'Streaming translation timed out', true);
     }
   }
 

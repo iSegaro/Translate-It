@@ -96,6 +96,11 @@ export async function translateFieldViaSmartHandler({ text, target, selectionRan
         logger.debug('Translation request timeout reached');
         const timeoutError = new Error('Translation request timed out');
         timeoutError.type = ErrorTypes.TRANSLATION_TIMEOUT;
+        abortController.abort();
+        void safeSendMessage({
+          action: MessageActions.CANCEL_TRANSLATION,
+          data: { messageId, reason: 'Translation timed out', timeout: true }
+        }, { forceRegular: true, silent: true }, 'text-field-timeout').catch(() => {});
         reject(timeoutError);
       }, TRANSLATION_TIMEOUT);
     });

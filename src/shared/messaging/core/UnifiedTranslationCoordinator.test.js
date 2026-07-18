@@ -126,5 +126,19 @@ describe('UnifiedTranslationCoordinator', () => {
         action: MessageActions.CANCEL_TRANSLATION
       }));
     });
+
+    it('turns a streaming timeout into exact-ID timeout cancellation', () => {
+      const messageId = 'msg-timeout';
+      coordinator.activeTranslations.set(messageId, { type: 'streaming' });
+
+      coordinator._handleStreamingTimeout(messageId);
+
+      expect(streamingTimeoutManager.cancelStreaming).toHaveBeenCalledWith(messageId, 'Streaming translation timed out');
+      expect(sendRegularMessage).toHaveBeenCalledWith(expect.objectContaining({
+        action: MessageActions.CANCEL_TRANSLATION,
+        data: expect.objectContaining({ messageId, timeout: true })
+      }));
+      expect(coordinator.activeTranslations.has(messageId)).toBe(false);
+    });
   });
 });

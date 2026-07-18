@@ -32,7 +32,7 @@ export async function handleCancelTranslation(request, sender) {
     }
 
     // Cancel operations with proper order: Engine → Streaming → RateLimit
-    const { cancelAll, reason, context, sessionId } = request.data || {};
+    const { cancelAll, reason, context, sessionId, timeout } = request.data || {};
     const tabId = sender?.tab?.id;
     
     // Step 1: Identify messageIds to cancel
@@ -72,8 +72,11 @@ export async function handleCancelTranslation(request, sender) {
 
     const results = await Promise.allSettled(messageIdsToCancel.map(async (id) => {
       let cancelled = false;
-      const cancellation = translationRequestTracker.cancelRequest(id, reason || 'Translation cancelled by user');
-      if (cancellation.accepted) {
+      const cancellation = timeout
+        ? translationRequestTracker.markTimeout(id)
+        : translationRequestTracker.cancelRequest(id, reason || 'Translation cancelled by user');
+      if (timeout && !cancellation.accepted) return false;
+      if (cancellation.accepted && !timeout) {
         try {
           await dispatchTranslationCancellation({ messageId: id, request: cancellation.request });
         } catch { /* continue exact-ID cleanup */ }

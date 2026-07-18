@@ -167,6 +167,9 @@ export class TranslationHandler {
           if (this.activeRequests.has(messageId)) {
             const timeoutError = new Error('Translation timeout');
             timeoutError.type = ErrorTypes.TRANSLATION_TIMEOUT;
+            import("@/shared/messaging/core/ContentScriptIntegration.js").then(m => {
+              m.cancelTranslation(messageId, 'Translation timed out', true);
+            }).catch(() => {});
             this._cleanupRequest(messageId);
             reject(timeoutError);
           }

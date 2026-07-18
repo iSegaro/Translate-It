@@ -242,6 +242,13 @@ export async function sendRegularMessage(message, options = {}) {
   } catch (error) {
     const errorType = matchErrorToType(error);
 
+    if (errorType === ErrorTypes.OPERATION_TIMEOUT && message.messageId && isTranslationAction(message.action)) {
+      void browser.runtime.sendMessage({
+        action: 'CANCEL_TRANSLATION',
+        data: { messageId: message.messageId, reason: 'Translation timed out', timeout: true }
+      }).catch(() => {});
+    }
+
     if (!silent) {
       const errorMsg = (error && typeof error.message === 'string') ? error.message : 'No message';
       logger.debug(`Message error: ${message.action} (${errorType}) - ${errorMsg}`);

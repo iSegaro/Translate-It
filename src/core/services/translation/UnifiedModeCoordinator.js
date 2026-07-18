@@ -250,6 +250,7 @@ export class UnifiedModeCoordinator {
         timeoutId = setTimeout(() => {
           const timeoutError = new Error(`Batch translation timed out after ${BATCH_TIMEOUT_MS}ms`);
           timeoutError.type = 'TIMEOUT';
+          abortController.abort();
           reject(timeoutError);
         }, BATCH_TIMEOUT_MS);
         

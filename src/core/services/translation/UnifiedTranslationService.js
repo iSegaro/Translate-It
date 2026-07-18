@@ -171,7 +171,9 @@ export class UnifiedTranslationService {
         });
       } catch (error) {
         logger.debug('Request failed:', error.message);
-        const transition = this.requestTracker.failRequest(messageId, error);
+        const transition = error.type === 'TIMEOUT'
+          ? this.requestTracker.markTimeout(messageId)
+          : this.requestTracker.failRequest(messageId, error);
         if (!transition.accepted) return this._createSuppressedResponse(messageId, transition);
         return MessageFormat.createErrorResponse(error, messageId);
       }
