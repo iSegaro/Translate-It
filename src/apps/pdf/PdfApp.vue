@@ -298,7 +298,6 @@ const regionOcrAvailable = computed(() => hasDocument.value && showOriginalPane.
 const supportedExecutionModes = Object.freeze([REGION_EXECUTION_TARGET.OCR])
 const executionMode = ref(REGION_EXECUTION_TARGET.OCR)
 const pdfStatusBannerController = createPdfStatusBannerController()
-const pdfDeveloperApi = new PdfDeveloperApi()
 
 const {
   ocrRecommendationCount,
@@ -334,6 +333,7 @@ const regionExecutionDispatcher = createRegionExecutionDispatcher({
     })
   }
 })
+const pdfDeveloperApi = new PdfDeveloperApi({ regionExecutionDispatcher })
 
 usePdfKeyboard({
   currentPage,

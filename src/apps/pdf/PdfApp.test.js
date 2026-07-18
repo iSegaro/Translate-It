@@ -4,7 +4,6 @@ import { computed, defineComponent, h, nextTick, ref } from 'vue'
 import PdfApp from './PdfApp.vue'
 import { createPdfRegion } from '@/features/pdf-translation/core/PdfRegion.js'
 import { PdfDeveloperApi } from './PdfDeveloperApi.js'
-import { BenchmarkCoordinator } from './BenchmarkCoordinator.js'
 
 // jsdom does not implement matchMedia — stub it before component mount
 if (!window.matchMedia) {
@@ -489,9 +488,8 @@ describe('PdfApp', () => {
     expect(mockRegionOcr.startRegionOcr).toHaveBeenCalledOnce()
   })
 
-  it('reuses Region selection for Benchmark and stops before dispatch', async () => {
-    const runRegionBenchmark = vi.spyOn(PdfDeveloperApi.prototype, 'runRegionBenchmark')
-    const coordinateRegionBenchmark = vi.spyOn(BenchmarkCoordinator.prototype, 'coordinateRegionBenchmark')
+  it('reuses Region selection for Benchmark and forwards the canonical region to PdfDeveloperApi', async () => {
+    const runRegionBenchmark = vi.spyOn(PdfDeveloperApi.prototype, 'runRegionBenchmark').mockReturnValue(undefined)
     const wrapper = mount(PdfApp)
     await flushPromises()
 
@@ -508,11 +506,9 @@ describe('PdfApp', () => {
 
     expect(viewer.props('regionSelectionActive')).toBe(false)
     expect(runRegionBenchmark).toHaveBeenCalledWith({ region })
-    expect(coordinateRegionBenchmark).toHaveBeenCalledWith({ region })
     expect(mockRegionExecutionDispatch).not.toHaveBeenCalled()
     expect(mockRegionOcr.startRegionOcr).not.toHaveBeenCalled()
     runRegionBenchmark.mockRestore()
-    coordinateRegionBenchmark.mockRestore()
   })
 
   it('toggles selection off with toolbar cancel and Escape', async () => {

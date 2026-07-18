@@ -5,9 +5,11 @@ export const PDF_DEVELOPER_CAPABILITY = Object.freeze({
 })
 
 export class PdfDeveloperApi {
-  constructor({ benchmarkCoordinator = new BenchmarkCoordinator(), capabilities = {} } = {}) {
+  constructor({ benchmarkCoordinator, regionExecutionDispatcher, capabilities = {} } = {}) {
+    const coordinator = benchmarkCoordinator || new BenchmarkCoordinator({ regionExecutionDispatcher })
+
     this.capabilities = new Map([
-      [PDF_DEVELOPER_CAPABILITY.REGION_BENCHMARK, (request) => benchmarkCoordinator.coordinateRegionBenchmark(request)],
+      [PDF_DEVELOPER_CAPABILITY.REGION_BENCHMARK, (request) => coordinator.coordinateRegionBenchmark(request)],
       ...Object.entries(capabilities)
     ])
   }

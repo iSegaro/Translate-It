@@ -1,10 +1,14 @@
 import { createRegionExecutionRequest, REGION_EXECUTION_TARGET } from './composables/regionExecutionRequest.js'
 
-export const BENCHMARK_COORDINATOR_STATUS = Object.freeze({
-  NOT_IMPLEMENTED: 'not-implemented'
-})
-
 export class BenchmarkCoordinator {
+  constructor({ regionExecutionDispatcher } = {}) {
+    if (typeof regionExecutionDispatcher?.dispatchRegionExecution !== 'function') {
+      throw new TypeError('RegionExecutionDispatcher is required')
+    }
+
+    this.regionExecutionDispatcher = regionExecutionDispatcher
+  }
+
   coordinateRegionBenchmark({ region } = {}) {
     const request = createRegionExecutionRequest({
       region,
@@ -12,9 +16,6 @@ export class BenchmarkCoordinator {
     })
     if (!request) throw new TypeError('Region Benchmark requires a canonical PdfRegion')
 
-    return Object.freeze({
-      status: BENCHMARK_COORDINATOR_STATUS.NOT_IMPLEMENTED,
-      request
-    })
+    return this.regionExecutionDispatcher.dispatchRegionExecution(request)
   }
 }
