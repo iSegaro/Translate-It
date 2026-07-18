@@ -392,6 +392,21 @@
   }
 }
 
+.pdf-toolbar__menu-section {
+  display: grid;
+  gap: 4px;
+  padding-top: 4px;
+  border-top: 1px solid $tb-border;
+}
+
+.pdf-toolbar__menu-section-title {
+  padding: 4px 12px 2px;
+  color: $tb-text-secondary;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
 .pdf-toolbar__button--menu-trigger {
   min-width: 0;
 }

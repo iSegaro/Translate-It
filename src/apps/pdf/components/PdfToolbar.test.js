@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { flushPromises, mount } from '@vue/test-utils'
 
 const settingsStoreMock = vi.hoisted(() => ({
-  settings: { MODE_PROVIDERS: {} },
+  settings: { MODE_PROVIDERS: {}, DEBUG_MODE: false },
   updateSettingAndPersist: vi.fn(() => Promise.resolve(true))
 }))
 
@@ -53,6 +53,7 @@ function createDeferred() {
 describe('PdfToolbar', () => {
   beforeEach(() => {
     settingsStoreMock.settings.MODE_PROVIDERS = {}
+    settingsStoreMock.settings.DEBUG_MODE = false
     settingsStoreMock.updateSettingAndPersist.mockReset()
     settingsStoreMock.updateSettingAndPersist.mockResolvedValue(true)
     loggerMock.debug.mockReset()
@@ -233,6 +234,26 @@ describe('PdfToolbar', () => {
 
     await wrapper.findAll('button').find((button) => button.text().trim() === '+')?.trigger('click')
     expect(wrapper.emitted('zoom-step')?.at(-1)?.[0]).toBe(1)
+  })
+
+  it('shows Developer placeholder only while Debug Mode is enabled', async () => {
+    const debugDisabled = mount(PdfToolbar)
+
+    await debugDisabled.find('.pdf-toolbar__button[aria-label="More actions"]').trigger('click')
+    expect(debugDisabled.find('.pdf-toolbar__menu-section').exists()).toBe(false)
+    expect(debugDisabled.findAll('button').some((button) => button.text().includes('Region Benchmark'))).toBe(false)
+
+    settingsStoreMock.settings.DEBUG_MODE = true
+    const debugEnabled = mount(PdfToolbar)
+    await debugEnabled.find('.pdf-toolbar__button[aria-label="More actions"]').trigger('click')
+
+    expect(debugEnabled.find('.pdf-toolbar__menu-section').text()).toContain('Developer')
+    const regionBenchmark = debugEnabled.findAll('button').find((button) => button.text().includes('Region Benchmark'))
+    expect(regionBenchmark?.attributes('disabled')).toBeDefined()
+
+    await regionBenchmark?.trigger('click')
+    expect(debugEnabled.emitted('request-region-ocr')).toBeFalsy()
+    expect(debugEnabled.emitted('region-benchmark')).toBeFalsy()
   })
 
   it('shows OCR button without count when OCR recommendations exist', async () => {

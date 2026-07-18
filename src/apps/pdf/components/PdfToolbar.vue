@@ -311,6 +311,22 @@
           >
             Clear Cache
           </button>
+          <div
+            v-if="isDebugMode"
+            class="pdf-toolbar__menu-section"
+            role="group"
+            aria-label="Developer"
+          >
+            <span class="pdf-toolbar__menu-section-title">Developer</span>
+            <button
+              class="pdf-toolbar__export-item"
+              type="button"
+              role="menuitem"
+              disabled
+            >
+              Region Benchmark
+            </button>
+          </div>
         </div>
       </div>
     </div>
@@ -372,6 +388,7 @@ const settingsStore = useSettingsStore()
 const pdfProviderValue = computed(() => {
   return settingsStore.settings?.MODE_PROVIDERS?.[TranslationMode.PDF] || 'default'
 })
+const isDebugMode = computed(() => settingsStore.settings?.DEBUG_MODE === true)
 
 const providerPersistenceState = {
   sequence: 0,
