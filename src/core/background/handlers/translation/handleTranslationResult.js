@@ -59,11 +59,10 @@ export async function handleTranslationResult(message) {
     // For regular results, delegate to UnifiedTranslationService's dispatcher
     const request = unifiedTranslationService.requestTracker.getRequest(message.messageId);
     if (request) {
-      // Update request with result
-      unifiedTranslationService.requestTracker.updateRequest(message.messageId, {
-        status: message.data?.success ? 'completed' : 'failed',
-        result: message.data
-      });
+      const transition = unifiedTranslationService.requestTracker.completeRequest(message.messageId, message.data);
+      if (!transition.accepted) {
+        return { success: true, handled: true, suppressed: true, status: transition.status, reason: transition.reason };
+      }
 
       // Dispatch result using ResultDispatcher
       const dispatchResult = await unifiedTranslationService.resultDispatcher.dispatchResult({

@@ -14,7 +14,7 @@ vi.mock('../core/StreamingManager.js', () => ({
 }))
 
 vi.mock('@/core/services/translation/TranslationRequestTracker.js', () => ({
-  translationRequestTracker: { getTabRequests: getTabRequestsMock }
+  translationRequestTracker: { getTabRequests: getTabRequestsMock, cancelRequest: vi.fn() }
 }))
 
 vi.mock('../core/QueueManager.js', () => ({
@@ -26,6 +26,7 @@ vi.mock('../core/RateLimitManager.js', () => ({
 }))
 
 const { handleCancelTranslation } = await import('./handleCancelTranslation.js')
+const { translationRequestTracker } = await import('@/core/services/translation/TranslationRequestTracker.js')
 
 describe('handleCancelTranslation', () => {
   let engine
@@ -33,6 +34,7 @@ describe('handleCancelTranslation', () => {
   beforeEach(() => {
     cancelStreamMock.mockReset()
     getTabRequestsMock.mockReset()
+    translationRequestTracker.cancelRequest.mockReset()
     queueCancelMock.mockReset()
     rateLimitCancelMock.mockReset()
     engine = {
@@ -50,6 +52,7 @@ describe('handleCancelTranslation', () => {
     expect(result).toMatchObject({ success: true, cancelledCount: 2 })
     for (const id of ['one', 'two']) {
       expect(engine.cancelTranslation).toHaveBeenCalledWith(id)
+      expect(translationRequestTracker.cancelRequest).toHaveBeenCalledWith(id, 'Translation cancelled by user')
       expect(cancelStreamMock).toHaveBeenCalledWith(id, 'Translation cancelled by user')
       expect(rateLimitCancelMock).toHaveBeenCalledWith(id)
       expect(queueCancelMock).toHaveBeenCalledWith(id)

@@ -25,6 +25,13 @@ export const RequestStatus = {
   TIMEOUT: 'timeout'
 };
 
+const TERMINAL_STATUSES = new Set([
+  RequestStatus.COMPLETED,
+  RequestStatus.FAILED,
+  RequestStatus.CANCELLED,
+  RequestStatus.TIMEOUT
+]);
+
 /**
  * Request Priority Levels
  */
@@ -156,62 +163,29 @@ export class TranslationRequestTracker {
       return false;
     }
 
-    // Apply updates
+    if (TERMINAL_STATUSES.has(updates.status)) {
+      logger.warn(`[RequestTracker] Terminal status requires an explicit transition: ${messageId}`);
+      return false;
+    }
+
+    // Apply non-terminal updates
     Object.assign(request, updates, { updatedAt: Date.now() });
 
     return true;
   }
 
   /**
-   * Complete a request and immediately remove it from tracking
+   * Complete a request while preserving it for terminal retention cleanup.
    */
   completeRequest(messageId, result) {
-    const request = this.requests.get(messageId);
-    if (!request) {
-      logger.warn(`[RequestTracker] Attempted to complete non-existent request: ${messageId}`);
-      return false;
-    }
-
-    // Update status based on result
     const status = result?.success ? RequestStatus.COMPLETED : RequestStatus.FAILED;
+    return this._transitionToTerminal(messageId, status, { result });
+  }
 
-    // Apply final updates
-    Object.assign(request, {
-      status,
-      result,
-      updatedAt: Date.now(),
-      completedAt: Date.now()
+  failRequest(messageId, error) {
+    return this._transitionToTerminal(messageId, RequestStatus.FAILED, {
+      result: { success: false, error: error?.message || error }
     });
-
-    // Immediately remove from all tracking structures
-    this.requests.delete(messageId);
-    this.requestTimes.delete(messageId);
-    this.retryCounts.delete(messageId);
-
-    // Remove from tab index
-    if (request.sender?.tab?.id) {
-      const tabRequests = this.tabRequests.get(request.sender.tab.id);
-      if (tabRequests) {
-        tabRequests.delete(messageId);
-        if (tabRequests.size === 0) {
-          this.tabRequests.delete(request.sender.tab.id);
-        }
-      }
-    }
-
-    // Remove from toast index
-    if (request.metadata?.toastId) {
-      this.toastRequests.delete(request.metadata.toastId);
-    }
-
-    // Update statistics
-    if (status === RequestStatus.COMPLETED) {
-      this.stats.totalCompleted++;
-    } else {
-      this.stats.totalFailed++;
-    }
-
-    return true;
   }
 
   /**
@@ -246,45 +220,80 @@ export class TranslationRequestTracker {
   cancelRequest(messageId, reason = ActionReasons.USER_CANCELLED) {
     const request = this.requests.get(messageId);
     if (!request) {
-      return { success: false, error: 'Request not found' };
+      return { accepted: false, status: null, request: null, reason: 'not_found' };
+    }
+
+    if (TERMINAL_STATUSES.has(request.status)) {
+      return { accepted: false, status: request.status, request, reason: 'already_terminal' };
     }
 
     if (!this.canCancelRequest(messageId)) {
-      return { success: false, error: 'Request cannot be cancelled' };
+      return { accepted: false, status: request.status, request, reason: 'cancellation_not_allowed' };
     }
 
-    // Update status
-    this.updateRequest(messageId, {
-      status: RequestStatus.CANCELLED,
+    const transition = this._transitionToTerminal(messageId, RequestStatus.CANCELLED, {
       cancelReason: reason,
       cancelledAt: Date.now()
     });
-
-    // Update statistics
-    this.stats.totalCancelled++;
+    if (!transition.accepted) return transition;
 
     logger.info(`[RequestTracker] Cancelled request: ${messageId}`, { reason });
 
-    return { success: true, request };
+    return transition;
   }
 
   /**
    * Mark request as timed out
    */
   markTimeout(messageId) {
-    const request = this.requests.get(messageId);
-    if (!request) return false;
-
-    this.updateRequest(messageId, {
-      status: RequestStatus.TIMEOUT,
+    const transition = this._transitionToTerminal(messageId, RequestStatus.TIMEOUT, {
       timeoutAt: Date.now()
     });
-
-    // Update statistics
-    this.stats.totalTimeouts++;
+    if (!transition.accepted) return transition;
 
     logger.warn(`[RequestTracker] Request timed out: ${messageId}`);
-    return true;
+    return transition;
+  }
+
+  _transitionToTerminal(messageId, status, metadata = {}) {
+    const request = this.requests.get(messageId);
+    if (!request) {
+      return { accepted: false, status: null, request: null, reason: 'not_found' };
+    }
+    if (TERMINAL_STATUSES.has(request.status)) {
+      return { accepted: false, status: request.status, request, reason: 'already_terminal' };
+    }
+
+    const now = Date.now();
+    Object.assign(request, metadata, {
+      status,
+      updatedAt: now,
+      completedAt: now
+    });
+
+    if (status === RequestStatus.COMPLETED) this.stats.totalCompleted++;
+    else if (status === RequestStatus.FAILED) this.stats.totalFailed++;
+    else if (status === RequestStatus.CANCELLED) this.stats.totalCancelled++;
+    else if (status === RequestStatus.TIMEOUT) this.stats.totalTimeouts++;
+
+    this._removeFromActiveIndexes(request);
+    return { accepted: true, status, request, reason: 'accepted' };
+  }
+
+  _removeFromActiveIndexes(request) {
+    this.retryCounts.delete(request.messageId);
+
+    if (request.sender?.tab?.id) {
+      const tabSet = this.tabRequests.get(request.sender.tab.id);
+      if (tabSet) {
+        tabSet.delete(request.messageId);
+        if (tabSet.size === 0) this.tabRequests.delete(request.sender.tab.id);
+      }
+    }
+
+    if (request.metadata?.toastId) {
+      this.toastRequests.delete(request.metadata.toastId);
+    }
   }
 
   /**
@@ -493,26 +502,10 @@ export class TranslationRequestTracker {
       );
 
       if (shouldRemove) {
-        // Remove from indexes
+        // Remove retained terminal or expired active records from all indexes.
         this.requests.delete(messageId);
         this.requestTimes.delete(messageId);
-        this.retryCounts.delete(messageId);
-
-        // Remove from tab index
-        if (request.sender?.tab?.id) {
-          const tabSet = this.tabRequests.get(request.sender.tab.id);
-          if (tabSet) {
-            tabSet.delete(messageId);
-            if (tabSet.size === 0) {
-              this.tabRequests.delete(request.sender.tab.id);
-            }
-          }
-        }
-
-        // Remove from toast index
-        if (request.metadata?.toastId) {
-          this.toastRequests.delete(request.metadata.toastId);
-        }
+        this._removeFromActiveIndexes(request);
 
         cleaned++;
       }

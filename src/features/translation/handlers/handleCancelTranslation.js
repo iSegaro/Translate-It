@@ -71,6 +71,7 @@ export async function handleCancelTranslation(request, sender) {
 
     const results = await Promise.allSettled(messageIdsToCancel.map(async (id) => {
       let cancelled = false;
+      translationRequestTracker.cancelRequest(id, reason || 'Translation cancelled by user');
       try {
         cancelled = await translationEngine.cancelTranslation(id);
       } catch { /* continue remaining exact-ID cleanup */ }

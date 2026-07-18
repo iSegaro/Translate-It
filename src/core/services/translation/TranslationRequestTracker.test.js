@@ -85,14 +85,14 @@ describe('TranslationRequestTracker', () => {
   });
 
   describe('completeRequest', () => {
-    it('should remove request from tracking after completion', () => {
+    it('should retain completed requests for terminal cleanup', () => {
       const messageId = 'msg-1';
       const sender = { tab: { id: 123 } };
       tracker.createRequest({ messageId, data: { text: 'Hello', toastId: 't1' }, sender });
 
       tracker.completeRequest(messageId, { success: true, translatedText: 'Bonjour' });
 
-      expect(tracker.getRequest(messageId)).toBeUndefined();
+      expect(tracker.getRequest(messageId)).toMatchObject({ status: RequestStatus.COMPLETED });
       expect(tracker.getTabRequests(123)).toHaveLength(0);
       expect(tracker.getRequestByToastId('t1')).toBeNull();
     });
@@ -110,7 +110,7 @@ describe('TranslationRequestTracker', () => {
     });
 
     it('should return false for non-existent request', () => {
-      expect(tracker.completeRequest('ghost', { success: true })).toBe(false);
+      expect(tracker.completeRequest('ghost', { success: true })).toMatchObject({ accepted: false, reason: 'not_found' });
     });
   });
 
@@ -125,7 +125,7 @@ describe('TranslationRequestTracker', () => {
       tracker.updateRequest('m1', { status: RequestStatus.STREAMING });
       expect(tracker.isRequestActive('m1')).toBe(true);
 
-      tracker.updateRequest('m1', { status: RequestStatus.COMPLETED });
+      tracker.completeRequest('m1', { success: true });
       expect(tracker.isRequestActive('m1')).toBe(false);
     });
   });
@@ -137,7 +137,7 @@ describe('TranslationRequestTracker', () => {
 
       const result = tracker.cancelRequest(messageId, ActionReasons.USER_CANCELLED);
 
-      expect(result.success).toBe(true);
+      expect(result).toMatchObject({ accepted: true, status: RequestStatus.CANCELLED });
       expect(tracker.getRequest(messageId).status).toBe(RequestStatus.CANCELLED);
       expect(tracker.getStatistics().totalCancelled).toBe(1);
     });
@@ -149,8 +149,7 @@ describe('TranslationRequestTracker', () => {
       request.metadata.preventCancel = true;
 
       const result = tracker.cancelRequest(messageId);
-      expect(result.success).toBe(false);
-      expect(result.error).toBe('Request cannot be cancelled');
+      expect(result).toMatchObject({ accepted: false, status: RequestStatus.PENDING, reason: 'cancellation_not_allowed' });
     });
 
     it('should not cancel non-active requests', () => {
@@ -159,7 +158,71 @@ describe('TranslationRequestTracker', () => {
       tracker.completeRequest(messageId, { success: true });
 
       const result = tracker.cancelRequest(messageId);
-      expect(result.success).toBe(false);
+      expect(result).toMatchObject({ accepted: false, status: RequestStatus.COMPLETED, reason: 'already_terminal' });
+    });
+
+    it('reports a missing request separately from terminal and policy rejection', () => {
+      expect(tracker.cancelRequest('missing')).toMatchObject({ accepted: false, status: null, reason: 'not_found' });
+    });
+  });
+
+  describe('terminal transitions', () => {
+    it('deindexes each retained terminal request immediately', () => {
+      const transitions = [
+        ['completed', (id) => tracker.completeRequest(id, { success: true })],
+        ['failed', (id) => tracker.failRequest(id, new Error('failed'))],
+        ['cancelled', (id) => tracker.cancelRequest(id)],
+        ['timeout', (id) => tracker.markTimeout(id)]
+      ];
+
+      for (const [name, transition] of transitions) {
+        const messageId = `m-${name}`;
+        tracker.createRequest({ messageId, data: { toastId: `toast-${name}` }, sender: { tab: { id: 1 } } });
+        tracker.recordRetry(messageId);
+        expect(transition(messageId)).toMatchObject({ accepted: true });
+        expect(tracker.getRequest(messageId)).toBeDefined();
+        expect(tracker.getTabRequests(1)).not.toContainEqual(expect.objectContaining({ messageId }));
+        expect(tracker.getRequestByToastId(`toast-${name}`)).toBeNull();
+        expect(tracker.retryCounts.has(messageId)).toBe(false);
+      }
+    });
+
+    it('selects only active requests from a shared tab', () => {
+      tracker.createRequest({ messageId: 'completed', data: {}, sender: { tab: { id: 1 } } });
+      tracker.createRequest({ messageId: 'active', data: {}, sender: { tab: { id: 1 } } });
+      tracker.completeRequest('completed', { success: true });
+
+      expect(tracker.getTabRequests(1)).toEqual([expect.objectContaining({ messageId: 'active' })]);
+    });
+
+    it('keeps cancellation immutable against late completion and failure', () => {
+      tracker.createRequest({ messageId: 'm1', data: {} });
+      tracker.cancelRequest('m1');
+      const completedAt = tracker.getRequest('m1').completedAt;
+
+      expect(tracker.completeRequest('m1', { success: true })).toMatchObject({ accepted: false, status: RequestStatus.CANCELLED });
+      expect(tracker.failRequest('m1', new Error('late failure'))).toMatchObject({ accepted: false, status: RequestStatus.CANCELLED });
+      expect(tracker.getRequest('m1')).toMatchObject({ status: RequestStatus.CANCELLED, completedAt });
+      expect(tracker.getStatistics()).toMatchObject({ totalCancelled: 1, totalCompleted: 0, totalFailed: 0 });
+    });
+
+    it('does not update terminal timestamps or metrics for duplicate transitions', () => {
+      tracker.createRequest({ messageId: 'm1', data: {} });
+      expect(tracker.completeRequest('m1', { success: true })).toMatchObject({ accepted: true, status: RequestStatus.COMPLETED });
+      const completedAt = tracker.getRequest('m1').completedAt;
+
+      expect(tracker.completeRequest('m1', { success: true })).toMatchObject({ accepted: false, status: RequestStatus.COMPLETED });
+      expect(tracker.cancelRequest('m1')).toMatchObject({ accepted: false, status: RequestStatus.COMPLETED });
+      expect(tracker.getRequest('m1')).toMatchObject({ status: RequestStatus.COMPLETED, completedAt });
+      expect(tracker.getStatistics()).toMatchObject({ totalCompleted: 1, totalCancelled: 0 });
+    });
+
+    it('keeps failure immutable against late completion', () => {
+      tracker.createRequest({ messageId: 'm1', data: {} });
+
+      expect(tracker.failRequest('m1', new Error('failed'))).toMatchObject({ accepted: true, status: RequestStatus.FAILED });
+      expect(tracker.completeRequest('m1', { success: true })).toMatchObject({ accepted: false, status: RequestStatus.FAILED });
+      expect(tracker.getRequest('m1').status).toBe(RequestStatus.FAILED);
     });
   });
 
@@ -180,7 +243,7 @@ describe('TranslationRequestTracker', () => {
       vi.setSystemTime(2500);
       expect(tracker.getProcessingTime('m1')).toBe(1500);
 
-      tracker.updateRequest('m1', { status: RequestStatus.COMPLETED });
+      tracker.completeRequest('m1', { success: true });
       vi.setSystemTime(5000);
       expect(tracker.getProcessingTime('m1')).toBe(1500); // Should use updatedAt
     });
@@ -200,7 +263,7 @@ describe('TranslationRequestTracker', () => {
       vi.setSystemTime(startTime);
       const messageId = 'msg-old';
       tracker.createRequest({ messageId, data: { text: 'Hello' } });
-      tracker.updateRequest(messageId, { status: RequestStatus.COMPLETED });
+      tracker.completeRequest(messageId, { success: true });
 
       // Move time forward by 6 minutes
       vi.setSystemTime(startTime + 6 * 60 * 1000);

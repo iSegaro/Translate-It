@@ -15,7 +15,7 @@ import {
   getSelectElementMaxCharsAsync
 } from '@/shared/config/config.js';
 import { MessageFormat, MessageContexts } from '@/shared/messaging/core/MessagingCore.js';
-import { translationRequestTracker, RequestStatus } from './TranslationRequestTracker.js';
+import { translationRequestTracker } from './TranslationRequestTracker.js';
 import { UnifiedResultDispatcher } from './UnifiedResultDispatcher.js';
 import { UnifiedModeCoordinator } from './UnifiedModeCoordinator.js';
 import { statsManager } from '@/features/translation/core/TranslationStatsManager.js';
@@ -141,6 +141,7 @@ export class UnifiedTranslationService {
       if (!this.translationEngine || !this.backgroundService) throw new Error('Translation service not initialized');
     }
 
+    let tracked = false;
     try {
       if (!MessageFormat.validate(message)) throw new Error('Invalid message format');
 
@@ -157,23 +158,36 @@ export class UnifiedTranslationService {
         timestamp: Date.now(),
         context
       });
+      tracked = true;
+      if (!request || request.messageId !== messageId) {
+        throw new Error('Translation request registration failed');
+      }
 
-      // Delegate processing to coordinator
-      const result = await this.modeCoordinator.processRequest(request, {
-        translationEngine: this.translationEngine,
-        backgroundService: this.backgroundService
-      });
+      let result;
+      try {
+        result = await this.modeCoordinator.processRequest(request, {
+          translationEngine: this.translationEngine,
+          backgroundService: this.backgroundService
+        });
+      } catch (error) {
+        logger.debug('Request failed:', error.message);
+        const transition = this.requestTracker.failRequest(messageId, error);
+        if (!transition.accepted) return this._createSuppressedResponse(messageId, transition);
+        return MessageFormat.createErrorResponse(error, messageId);
+      }
 
-      this.requestTracker.updateRequest(messageId, {
-        status: result.success ? RequestStatus.COMPLETED : RequestStatus.FAILED,
-        result
-      });
+      const transition = this.requestTracker.completeRequest(messageId, result);
+      if (!transition.accepted) return this._createSuppressedResponse(messageId, transition);
 
       // Special handling for Field mode (direct return)
       if (request.mode === TranslationMode.Field) return result;
 
-      // Delegate result delivery to dispatcher
-      await this.resultDispatcher.dispatchResult({ messageId, result, request, originalMessage: message });
+      try {
+        await this.resultDispatcher.dispatchResult({ messageId, result, request, originalMessage: message });
+      } catch (error) {
+        logger.error('Result dispatch failed:', error.message);
+        return MessageFormat.createErrorResponse(error, messageId);
+      }
 
       // Post-processing stats logging
       this._logSessionStats(request, result, messageId);
@@ -181,11 +195,11 @@ export class UnifiedTranslationService {
       return result;
 
     } catch (error) {
-      logger.debug('Request failed:', error.message);
-      this.requestTracker.updateRequest(messageId, {
-        status: RequestStatus.FAILED,
-        result: { success: false, error: error.message }
-      });
+      logger.debug('Request setup failed:', error.message);
+      if (tracked && this.requestTracker.isRequestActive(messageId)) {
+        const transition = this.requestTracker.failRequest(messageId, error);
+        if (!transition.accepted) return this._createSuppressedResponse(messageId, transition);
+      }
       return MessageFormat.createErrorResponse(error, messageId);
     }
   }
@@ -233,11 +247,43 @@ export class UnifiedTranslationService {
     const request = this.requestTracker.getRequest(messageId);
     if (!request) return { success: false, error: 'Request not found' };
 
-    this.requestTracker.updateRequest(messageId, { status: RequestStatus.CANCELLED });
+    const cancellation = this.requestTracker.cancelRequest(messageId);
+    if (!cancellation.accepted) return { success: false, error: cancellation.reason };
     if (this.translationEngine) this.translationEngine.cancelTranslation(messageId);
     
     await this.resultDispatcher.dispatchCancellation({ messageId, request });
     return { success: true };
+  }
+
+  _createCancelledResponse(messageId) {
+    return {
+      success: false,
+      cancelled: true,
+      messageId,
+      error: {
+        type: ErrorTypes.USER_CANCELLED,
+        message: 'Translation cancelled by user'
+      }
+    };
+  }
+
+  _createSuppressedResponse(messageId, transition) {
+    if (transition.status === 'cancelled') return this._createCancelledResponse(messageId);
+    if (transition.status === 'timeout') {
+      return {
+        success: false,
+        timedOut: true,
+        messageId,
+        error: { type: ErrorTypes.TRANSLATION_TIMEOUT, message: 'Translation timed out' }
+      };
+    }
+    return {
+      success: false,
+      suppressed: true,
+      messageId,
+      reason: transition.reason,
+      status: transition.status
+    };
   }
 
   /**
