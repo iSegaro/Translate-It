@@ -139,6 +139,7 @@ class LifecycleManager {
       
       // Translation handlers
       'TRANSLATE': Handlers.handleTranslateLazy,
+      [MessageActions.TRANSLATE_TEXT]: Handlers.handleTranslateTextLazy,
       'translateText': Handlers.handleTranslateTextLazy,
       'revertTranslation': Handlers.handleRevertTranslationLazy,
       'CANCEL_TRANSLATION': Handlers.handleCancelTranslationLazy,
