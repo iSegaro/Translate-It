@@ -407,7 +407,7 @@
   text-transform: uppercase;
 }
 
-.pdf-toolbar__benchmark {
+.pdf-toolbar__regionComparison {
   display: grid;
   gap: 6px;
   padding: 8px 12px;
@@ -417,20 +417,20 @@
   font-size: 11px;
 }
 
-.pdf-toolbar__benchmark-summary {
+.pdf-toolbar__regionComparison-summary {
   display: flex;
   align-items: center;
   gap: 6px;
 }
 
-.pdf-toolbar__benchmark-summary span:first-child {
+.pdf-toolbar__regionComparison-summary span:first-child {
   margin-right: auto;
   color: $tb-text-primary;
   font-weight: 700;
   text-transform: capitalize;
 }
 
-.pdf-toolbar__benchmark-cancel {
+.pdf-toolbar__regionComparison-cancel {
   border: 0;
   border-radius: 6px;
   padding: 3px 6px;
@@ -440,7 +440,7 @@
   cursor: pointer;
 }
 
-.pdf-toolbar__benchmark-current {
+.pdf-toolbar__regionComparison-current {
   font-variant-numeric: tabular-nums;
 }
 

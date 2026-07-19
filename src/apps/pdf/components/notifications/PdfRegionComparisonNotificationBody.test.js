@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest'
 import { mount } from '@vue/test-utils'
-import PdfBenchmarkNotificationBody from './PdfBenchmarkNotificationBody.vue'
+import PdfRegionComparisonNotificationBody from './PdfRegionComparisonNotificationBody.vue'
 
-describe('PdfBenchmarkNotificationBody', () => {
-  it('renders benchmark comparison details and formatted evaluation metadata', () => {
-    const wrapper = mount(PdfBenchmarkNotificationBody, {
+describe('PdfRegionComparisonNotificationBody', () => {
+  it('renders regionComparison comparison details and formatted evaluation metadata', () => {
+    const wrapper = mount(PdfRegionComparisonNotificationBody, {
       props: {
         payload: {
           analysis: {

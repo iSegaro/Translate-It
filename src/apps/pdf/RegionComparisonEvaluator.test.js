@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
-import { BenchmarkEvaluator } from './BenchmarkEvaluator.js'
+import { RegionComparisonEvaluator } from './RegionComparisonEvaluator.js'
 
-describe('BenchmarkEvaluator', () => {
+describe('RegionComparisonEvaluator', () => {
   const result = Object.freeze({
     candidateId: 'scale-1-eng',
     configuration: Object.freeze({ scale: 1, language: 'eng' }),
@@ -10,7 +10,7 @@ describe('BenchmarkEvaluator', () => {
   })
 
   it('attaches immutable CER evaluation when ground truth is supplied', () => {
-    const evaluator = new BenchmarkEvaluator()
+    const evaluator = new RegionComparisonEvaluator()
     const evaluated = evaluator.evaluate([result], { groundTruth: 'hallo' })
 
     expect(evaluated).toEqual([{
@@ -30,7 +30,7 @@ describe('BenchmarkEvaluator', () => {
 
   it('preserves results without evaluation when ground truth is absent', () => {
     const results = Object.freeze([result])
-    const evaluated = new BenchmarkEvaluator().evaluate(results)
+    const evaluated = new RegionComparisonEvaluator().evaluate(results)
 
     expect(evaluated).toBe(results)
     expect(evaluated[0]).toBe(result)
@@ -41,7 +41,7 @@ describe('BenchmarkEvaluator', () => {
     const outputNormalizer = { normalize: vi.fn(() => ({ text: 'recognized' })) }
     const textNormalizer = { normalize: vi.fn(text => `normalized:${text}`) }
     const cerCalculator = { calculate: vi.fn(() => Object.freeze({ characterErrorRate: 0 })) }
-    const evaluator = new BenchmarkEvaluator({ outputNormalizer, textNormalizer, cerCalculator })
+    const evaluator = new RegionComparisonEvaluator({ outputNormalizer, textNormalizer, cerCalculator })
 
     evaluator.evaluate([result], { groundTruth: 'reference' })
 

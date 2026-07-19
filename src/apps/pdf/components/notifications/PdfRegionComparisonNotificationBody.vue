@@ -1,13 +1,13 @@
 <template>
-  <div class="pdf-benchmark-notification">
-    <div class="pdf-benchmark-notification__analysis">
+  <div class="pdf-region-comparison-notification">
+    <div class="pdf-region-comparison-notification__analysis">
       <span v-if="analysis?.winner">Winner {{ analysis.winner.candidateId }} ({{ winnerReasonLabel(analysis.winner.reason) }})</span>
       <span v-if="analysis?.confidence?.highest !== null && analysis?.confidence?.highest !== undefined">
         Confidence {{ analysis.confidence.highest }}<template v-if="analysis.confidence.comparable && analysis.confidence.delta !== 0"> (+{{ analysis.confidence.delta }})</template>
       </span>
       <span>OCR Output {{ analysis?.output?.comparable ? (analysis.output.identical ? 'Identical' : 'Different') : 'Not comparable' }}</span>
     </div>
-    <table class="pdf-benchmark-notification__results">
+    <table class="pdf-region-comparison-notification__results">
       <thead>
         <tr>
           <th scope="col">
@@ -39,17 +39,17 @@
           :key="result.candidateId"
         >
           <td><code>{{ result.candidateId }}</code></td>
-          <td class="pdf-benchmark-notification__numeric">
+          <td class="pdf-region-comparison-notification__numeric">
             {{ result.configuration?.scale ?? '—' }}
           </td>
           <td>{{ result.configuration?.language || '—' }}</td>
-          <td class="pdf-benchmark-notification__numeric">
+          <td class="pdf-region-comparison-notification__numeric">
             {{ formatRuntime(result.runtime?.latencyMs) }}
           </td>
-          <td class="pdf-benchmark-notification__numeric">
+          <td class="pdf-region-comparison-notification__numeric">
             {{ formatConfidence(result.output?.data?.confidence) }}
           </td>
-          <td class="pdf-benchmark-notification__numeric">
+          <td class="pdf-region-comparison-notification__numeric">
             {{ formatCer(result.evaluation) || '—' }}
           </td>
           <td>{{ resultLabel(result) }}</td>
@@ -58,7 +58,7 @@
     </table>
     <span
       v-if="Number.isFinite(payload?.totalElapsedMs)"
-      class="pdf-benchmark-notification__total"
+      class="pdf-region-comparison-notification__total"
     >
       Total {{ payload.totalElapsedMs }}ms
     </span>
@@ -67,7 +67,7 @@
 
 <script setup>
 import { computed } from 'vue'
-import './PdfBenchmarkNotificationBody.scss'
+import './PdfRegionComparisonNotificationBody.scss'
 
 const props = defineProps({
   payload: {

@@ -1,4 +1,4 @@
-export function createBenchmarkSummary(summary) {
+export function createRegionComparisonSummary(summary) {
   const cloned = {
     winnerCandidateId: summary.winnerCandidateId,
     winner: summary.winner ? Object.freeze({ ...summary.winner }) : null,

@@ -1,6 +1,6 @@
 import { createRegionExecutionRequest, REGION_EXECUTION_TARGET } from './composables/regionExecutionRequest.js'
 
-export class BenchmarkCoordinator {
+export class RegionComparisonCoordinator {
   constructor({ regionExecutionDispatcher } = {}) {
     if (typeof regionExecutionDispatcher?.dispatchRegionExecution !== 'function') {
       throw new TypeError('RegionExecutionDispatcher is required')
@@ -9,12 +9,12 @@ export class BenchmarkCoordinator {
     this.regionExecutionDispatcher = regionExecutionDispatcher
   }
 
-  coordinateRegionBenchmark({ region } = {}) {
+  coordinateRegionComparison({ region } = {}) {
     const request = createRegionExecutionRequest({
       region,
-      target: REGION_EXECUTION_TARGET.BENCHMARK
+      target: REGION_EXECUTION_TARGET.REGION_COMPARISON
     })
-    if (!request) throw new TypeError('Region Benchmark requires a canonical PdfRegion')
+    if (!request) throw new TypeError('RegionComparison requires a canonical PdfRegion')
 
     return this.regionExecutionDispatcher.dispatchRegionExecution(request)
   }

@@ -1,0 +1,49 @@
+.pdf-region-comparison-notification {
+  display: grid;
+  gap: 8px;
+  font-size: 11px;
+}
+
+.pdf-region-comparison-notification__analysis {
+  display: grid;
+  gap: 4px;
+}
+
+.pdf-region-comparison-notification__results {
+  width: 100%;
+  border-collapse: collapse;
+  font-variant-numeric: tabular-nums;
+}
+
+.pdf-region-comparison-notification__results th,
+.pdf-region-comparison-notification__results td {
+  padding: 4px 6px;
+  text-align: left;
+  white-space: nowrap;
+}
+
+.pdf-region-comparison-notification__results th {
+  border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+  color: rgba(230, 237, 247, 0.76);
+  font-weight: 700;
+}
+
+.pdf-region-comparison-notification__results td:first-child {
+  padding-left: 0;
+}
+
+.pdf-region-comparison-notification__results th:first-child {
+  padding-left: 0;
+}
+
+.pdf-region-comparison-notification__results code {
+  color: #ffffff;
+}
+
+.pdf-region-comparison-notification__numeric {
+  text-align: left !important;
+}
+
+.pdf-region-comparison-notification__total {
+  font-variant-numeric: tabular-nums;
+}

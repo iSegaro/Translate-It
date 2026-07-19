@@ -1,42 +1,42 @@
 import { describe, expect, it, vi } from 'vitest'
-import { BenchmarkRunner, BenchmarkSession, BENCHMARK_RUNNER_STATUS } from './BenchmarkRunner.js'
+import { RegionComparisonRunner, RegionComparisonSession, REGION_COMPARISON_RUNNER_STATUS } from './RegionComparisonRunner.js'
 import { createRegionExecutionRequest, REGION_EXECUTION_TARGET } from './composables/regionExecutionRequest.js'
 import { createPdfRegion } from '@/features/pdf-translation/core/PdfRegion.js'
 
-describe('BenchmarkRunner', () => {
+describe('RegionComparisonRunner', () => {
   it('creates a session and resolves the shared operation through its lifecycle', async () => {
     const request = createRegionExecutionRequest({
       region: createPdfRegion({ pageNumber: 1, left: 1, top: 4, right: 3, bottom: 2 }),
-      target: REGION_EXECUTION_TARGET.BENCHMARK
+      target: REGION_EXECUTION_TARGET.REGION_COMPARISON
     })
 
     const session = {
-      run: vi.fn(() => Promise.resolve({ status: BENCHMARK_RUNNER_STATUS.READY, candidates: [], results: [] })),
+      run: vi.fn(() => Promise.resolve({ status: REGION_COMPARISON_RUNNER_STATUS.READY, candidates: [], results: [] })),
       cancel: vi.fn()
     }
     const createSession = vi.fn(() => session)
-    const operation = new BenchmarkRunner({ createSession }).execute(request)
+    const operation = new RegionComparisonRunner({ createSession }).execute(request)
 
     expect(createSession).toHaveBeenCalledWith(request)
     expect(Object.isFrozen(operation)).toBe(true)
     expect(Object.isFrozen(operation.context)).toBe(true)
-    expect(operation.context).toEqual({ target: REGION_EXECUTION_TARGET.BENCHMARK, request })
+    expect(operation.context).toEqual({ target: REGION_EXECUTION_TARGET.REGION_COMPARISON, request })
     expect(operation.cancel).toBeTypeOf('function')
-    await expect(operation.promise).resolves.toEqual({ status: BENCHMARK_RUNNER_STATUS.READY, candidates: [], results: [] })
+    await expect(operation.promise).resolves.toEqual({ status: REGION_COMPARISON_RUNNER_STATUS.READY, candidates: [], results: [] })
     expect(session.run).toHaveBeenCalledOnce()
   })
 
   it('cancels the session before candidate planning', async () => {
     const request = createRegionExecutionRequest({
       region: createPdfRegion({ pageNumber: 1, left: 1, top: 4, right: 3, bottom: 2 }),
-      target: REGION_EXECUTION_TARGET.BENCHMARK
+      target: REGION_EXECUTION_TARGET.REGION_COMPARISON
     })
-    const operation = new BenchmarkRunner().execute(request)
+    const operation = new RegionComparisonRunner().execute(request)
 
     operation.cancel()
 
     await expect(operation.promise).resolves.toMatchObject({
-      status: BENCHMARK_RUNNER_STATUS.CANCELLED,
+      status: REGION_COMPARISON_RUNNER_STATUS.CANCELLED,
       candidates: [],
       results: []
     })
@@ -77,10 +77,10 @@ describe('BenchmarkRunner', () => {
     })
     const request = createRegionExecutionRequest({
       region: createPdfRegion({ pageNumber: 1, left: 1, top: 4, right: 3, bottom: 2 }),
-      target: REGION_EXECUTION_TARGET.BENCHMARK
+      target: REGION_EXECUTION_TARGET.REGION_COMPARISON
     })
 
-    const result = await new BenchmarkSession(request, {
+    const result = await new RegionComparisonSession(request, {
       candidatePlanner,
       configurations,
       createExecutor,
@@ -90,7 +90,7 @@ describe('BenchmarkRunner', () => {
     }).run()
 
     expect(result).toEqual({
-      status: BENCHMARK_RUNNER_STATUS.READY,
+      status: REGION_COMPARISON_RUNNER_STATUS.READY,
       candidates,
       results: [
         {
@@ -146,41 +146,41 @@ describe('BenchmarkRunner', () => {
     const assembledResult = Object.freeze({ candidateId: candidate.candidateId, output: Object.freeze({ status: 'recognized' }) })
     const evaluatedResult = Object.freeze({ ...assembledResult, evaluation: Object.freeze({ cer: Object.freeze({ characterErrorRate: 0 }) }) })
     const resultAssembler = { assemble: vi.fn(() => assembledResult) }
-    const benchmarkEvaluator = { evaluate: vi.fn(() => Object.freeze([evaluatedResult])) }
+    const regionComparisonEvaluator = { evaluate: vi.fn(() => Object.freeze([evaluatedResult])) }
     const request = createRegionExecutionRequest({
       region: createPdfRegion({ pageNumber: 1, left: 1, top: 4, right: 3, bottom: 2 }),
-      target: REGION_EXECUTION_TARGET.BENCHMARK
+      target: REGION_EXECUTION_TARGET.REGION_COMPARISON
     })
 
-    const result = await new BenchmarkSession(request, {
+    const result = await new RegionComparisonSession(request, {
       candidatePlanner: { createCandidates: () => Object.freeze([candidate]) },
       createExecutor: () => ({ prepare: () => Promise.resolve(), execute: () => ({ promise: Promise.resolve({ status: 'recognized' }), cancel: vi.fn() }) }),
       resultAssembler,
-      benchmarkEvaluator,
+      regionComparisonEvaluator,
       groundTruth: 'reference'
     }).run()
 
-    expect(benchmarkEvaluator.evaluate).toHaveBeenCalledWith(Object.freeze([assembledResult]), { groundTruth: 'reference' })
+    expect(regionComparisonEvaluator.evaluate).toHaveBeenCalledWith(Object.freeze([assembledResult]), { groundTruth: 'reference' })
     expect(result.results).toEqual([evaluatedResult])
   })
 
   it('does not evaluate results without ground truth', async () => {
     const candidate = Object.freeze({ candidateId: 'scale-1-eng', configuration: Object.freeze({ scale: 1, language: 'eng' }) })
     const assembledResult = Object.freeze({ candidateId: candidate.candidateId, output: Object.freeze({ status: 'recognized' }) })
-    const benchmarkEvaluator = { evaluate: vi.fn() }
+    const regionComparisonEvaluator = { evaluate: vi.fn() }
     const request = createRegionExecutionRequest({
       region: createPdfRegion({ pageNumber: 1, left: 1, top: 4, right: 3, bottom: 2 }),
-      target: REGION_EXECUTION_TARGET.BENCHMARK
+      target: REGION_EXECUTION_TARGET.REGION_COMPARISON
     })
 
-    const result = await new BenchmarkSession(request, {
+    const result = await new RegionComparisonSession(request, {
       candidatePlanner: { createCandidates: () => Object.freeze([candidate]) },
       createExecutor: () => ({ prepare: () => Promise.resolve(), execute: () => ({ promise: Promise.resolve({ status: 'recognized' }), cancel: vi.fn() }) }),
       resultAssembler: { assemble: () => assembledResult },
-      benchmarkEvaluator
+      regionComparisonEvaluator
     }).run()
 
-    expect(benchmarkEvaluator.evaluate).not.toHaveBeenCalled()
+    expect(regionComparisonEvaluator.evaluate).not.toHaveBeenCalled()
     expect(result.results).toEqual([assembledResult])
   })
 
@@ -198,10 +198,10 @@ describe('BenchmarkRunner', () => {
       .mockReturnValueOnce({ execute: executeSecond })
     const request = createRegionExecutionRequest({
       region: createPdfRegion({ pageNumber: 1, left: 1, top: 4, right: 3, bottom: 2 }),
-      target: REGION_EXECUTION_TARGET.BENCHMARK
+      target: REGION_EXECUTION_TARGET.REGION_COMPARISON
     })
 
-    const run = new BenchmarkSession(request, {
+    const run = new RegionComparisonSession(request, {
       candidatePlanner: { createCandidates: () => candidates },
       createExecutor
     }).run()
@@ -229,9 +229,9 @@ describe('BenchmarkRunner', () => {
     const onProgress = vi.fn()
     const request = createRegionExecutionRequest({
       region: createPdfRegion({ pageNumber: 1, left: 1, top: 4, right: 3, bottom: 2 }),
-      target: REGION_EXECUTION_TARGET.BENCHMARK
+      target: REGION_EXECUTION_TARGET.REGION_COMPARISON
     })
-    const session = new BenchmarkSession(request, {
+    const session = new RegionComparisonSession(request, {
       candidatePlanner: { createCandidates: () => candidates },
       createExecutor,
       onProgress
@@ -244,7 +244,7 @@ describe('BenchmarkRunner', () => {
     resolveSecond({ status: 'cancelled' })
 
     await expect(run).resolves.toMatchObject({
-      status: BENCHMARK_RUNNER_STATUS.CANCELLED,
+      status: REGION_COMPARISON_RUNNER_STATUS.CANCELLED,
       candidates,
       results: [{ candidateId: 'scale-1' }],
       summary: { completedCandidates: 1 }
@@ -272,10 +272,10 @@ describe('BenchmarkRunner', () => {
       .mockReturnValueOnce({ execute: executeSecond })
     const request = createRegionExecutionRequest({
       region: createPdfRegion({ pageNumber: 1, left: 1, top: 4, right: 3, bottom: 2 }),
-      target: REGION_EXECUTION_TARGET.BENCHMARK
+      target: REGION_EXECUTION_TARGET.REGION_COMPARISON
     })
 
-    await expect(new BenchmarkSession(request, {
+    await expect(new RegionComparisonSession(request, {
       candidatePlanner: { createCandidates: () => candidates },
       createExecutor
     }).run()).rejects.toBe(error)
@@ -286,20 +286,20 @@ describe('BenchmarkRunner', () => {
     const candidate = Object.freeze({ candidateId: 'scale-1-eng', configuration: Object.freeze({ scale: 1, language: 'eng' }) })
     const request = createRegionExecutionRequest({
       region: createPdfRegion({ pageNumber: 1, left: 1, top: 4, right: 3, bottom: 2 }),
-      target: REGION_EXECUTION_TARGET.BENCHMARK
+      target: REGION_EXECUTION_TARGET.REGION_COMPARISON
     })
     const prepareError = new Error('worker initialization failed')
     const execute = vi.fn()
 
-    await expect(new BenchmarkSession(request, {
+    await expect(new RegionComparisonSession(request, {
       candidatePlanner: { createCandidates: () => Object.freeze([candidate]) },
       createExecutor: () => ({ prepare: () => Promise.reject(prepareError), execute })
     }).run()).rejects.toBe(prepareError)
     expect(execute).not.toHaveBeenCalled()
   })
 
-  it('rejects non-canonical Benchmark requests', () => {
-    expect(() => new BenchmarkRunner().execute()).toThrow('BenchmarkRunner requires a canonical Benchmark RegionExecutionRequest')
-    expect(() => new BenchmarkRunner().execute({ target: REGION_EXECUTION_TARGET.BENCHMARK })).toThrow('BenchmarkRunner requires a canonical Benchmark RegionExecutionRequest')
+  it('rejects non-canonical RegionComparison requests', () => {
+    expect(() => new RegionComparisonRunner().execute()).toThrow('RegionComparisonRunner requires a canonical RegionComparison RegionExecutionRequest')
+    expect(() => new RegionComparisonRunner().execute({ target: REGION_EXECUTION_TARGET.REGION_COMPARISON })).toThrow('RegionComparisonRunner requires a canonical RegionComparison RegionExecutionRequest')
   })
 })

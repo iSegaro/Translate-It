@@ -21,8 +21,8 @@
       :execution-modes="supportedExecutionModes"
       :region-ocr-state="regionOcrState"
       :region-ocr-available="regionOcrAvailable"
-      :benchmark-state="benchmarkState"
-      :can-export-benchmark-artifact="canExportBenchmarkArtifact"
+      :region-comparison-state="regionComparisonState"
+      :can-export-region-comparison-artifact="canExportRegionComparisonArtifact"
       @toggle-outline="toggleOutline"
       @translate-visible="handleTranslateVisiblePages"
       @cancel-translation="handleCancelTranslation"
@@ -35,9 +35,9 @@
       @export-html="handleExportHtml"
       @request-ocr="requestOcr"
       @request-region-ocr="handleRequestRegionOcr"
-      @request-region-benchmark="handleRequestRegionBenchmark"
-      @cancel-region-benchmark="handleCancelRegionBenchmark"
-      @export-benchmark-artifact="handleExportBenchmarkArtifact"
+      @request-region-comparison="handleRequestRegionComparison"
+      @cancel-region-comparison="handleCancelRegionComparison"
+      @export-region-comparison-artifact="handleExportRegionComparisonArtifact"
       @clear-cache="handleClearCache"
       @request-open-pdf="requestOpenPdf"
       @execution-mode-change="handleExecutionModeChange"
@@ -223,10 +223,10 @@ import { createPdfTransitionController } from './composables/createPdfTransition
 import { createPdfStatusBannerController } from './utils/pdfStatusBanner.js'
 import { REGION_OCR_STATE } from './constants/regionOcrState.js'
 import { PdfDeveloperApi } from './PdfDeveloperApi.js'
-import { BenchmarkRunner } from './BenchmarkRunner.js'
-import { BenchmarkAnalyzer } from './BenchmarkAnalyzer.js'
-import { BenchmarkArtifactWriter } from './BenchmarkArtifactWriter.js'
-import { REGION_BENCHMARK_CONFIGURATIONS } from './regionBenchmarkConfigurations.js'
+import { RegionComparisonRunner } from './RegionComparisonRunner.js'
+import { RegionComparisonAnalyzer } from './RegionComparisonAnalyzer.js'
+import { RegionComparisonArtifactWriter } from './RegionComparisonArtifactWriter.js'
+import { REGION_COMPARISON_CONFIGURATIONS } from './regionComparisonConfigurations.js'
 import { PDF_NOTIFICATION_BODY_TYPE } from './notifications/PdfNotificationBodyType.js'
 import { downloadFile } from '@/features/pdf-translation/core/PdfFileDownloader.js'
 import { PDF_REGION_OCR_RENDER_SCALE } from '@/features/pdf-translation/core/pdfRenderingConstants.js'
@@ -310,10 +310,10 @@ let activeRegionPosition = null
 const regionOcrState = ref(REGION_OCR_STATE.IDLE)
 const regionSelectionTarget = ref(null)
 const regionOcrNotice = ref(null)
-const benchmarkState = ref(null)
+const regionComparisonState = ref(null)
 const developerNotification = ref(null)
 let developerNotificationOccurrenceId = 0
-const canExportBenchmarkArtifact = computed(() => benchmarkState.value?.status === 'completed')
+const canExportRegionComparisonArtifact = computed(() => regionComparisonState.value?.status === 'completed')
 const regionOcrAvailable = computed(() => hasDocument.value && showOriginalPane.value)
 const supportedExecutionModes = Object.freeze([REGION_EXECUTION_TARGET.OCR])
 const executionMode = ref(REGION_EXECUTION_TARGET.OCR)
@@ -342,16 +342,16 @@ const {
 const { startRegionOcr, cancelRegionOcr } = usePdfRegionOcr({
   onRecognized: handleRegionOcrRecognized
 })
-const benchmarkRunner = new BenchmarkRunner({
-  configurations: REGION_BENCHMARK_CONFIGURATIONS,
+const regionComparisonRunner = new RegionComparisonRunner({
+  configurations: REGION_COMPARISON_CONFIGURATIONS,
   getPdfDocument: () => session.pdfDocument,
-  onProgress: handleBenchmarkProgress
+  onProgress: handleRegionComparisonProgress
 })
-const benchmarkArtifactWriter = new BenchmarkArtifactWriter()
-const benchmarkAnalyzer = new BenchmarkAnalyzer()
-let activeBenchmarkOperation = null
-let completedBenchmarkResult = null
-let completedBenchmarkRegion = null
+const regionComparisonArtifactWriter = new RegionComparisonArtifactWriter()
+const regionComparisonAnalyzer = new RegionComparisonAnalyzer()
+let activeRegionComparisonOperation = null
+let completedRegionComparisonResult = null
+let completedRegionComparisonRegion = null
 
 const regionExecutionDispatcher = createRegionExecutionDispatcher({
   runners: {
@@ -361,7 +361,7 @@ const regionExecutionDispatcher = createRegionExecutionDispatcher({
       scale: PDF_REGION_OCR_RENDER_SCALE,
       language: getSourceLanguageAsync().catch(() => undefined)
     }),
-    [REGION_EXECUTION_TARGET.BENCHMARK]: (request) => benchmarkRunner.execute(request)
+    [REGION_EXECUTION_TARGET.REGION_COMPARISON]: (request) => regionComparisonRunner.execute(request)
   }
 })
 const pdfDeveloperApi = new PdfDeveloperApi({ regionExecutionDispatcher })
@@ -548,13 +548,13 @@ function handleRegionSelectionComplete(region) {
   const target = regionSelectionTarget.value
   exitRegionSelection()
 
-  if (target === REGION_EXECUTION_TARGET.BENCHMARK) {
+  if (target === REGION_EXECUTION_TARGET.REGION_COMPARISON) {
     developerNotification.value = null
-    const operation = pdfDeveloperApi.runRegionBenchmark({ region })
-    activeBenchmarkOperation = operation
-    completedBenchmarkResult = null
-    completedBenchmarkRegion = null
-    benchmarkState.value = {
+    const operation = pdfDeveloperApi.runRegionComparison({ region })
+    activeRegionComparisonOperation = operation
+    completedRegionComparisonResult = null
+    completedRegionComparisonRegion = null
+    regionComparisonState.value = {
       status: 'running',
       progress: Object.freeze({
         totalCandidates: 0,
@@ -566,8 +566,8 @@ function handleRegionSelectionComplete(region) {
       summary: null
     }
     void operation.promise.then(
-      result => handleBenchmarkOutcome(operation, result),
-      error => handleBenchmarkFailure(operation, error)
+      result => handleRegionComparisonOutcome(operation, result),
+      error => handleRegionComparisonFailure(operation, error)
     )
     return
   }
@@ -590,47 +590,47 @@ function handleRequestRegionOcr() {
   beginRegionSelection(REGION_EXECUTION_TARGET.OCR)
 }
 
-function handleRequestRegionBenchmark() {
-  beginRegionSelection(REGION_EXECUTION_TARGET.BENCHMARK)
+function handleRequestRegionComparison() {
+  beginRegionSelection(REGION_EXECUTION_TARGET.REGION_COMPARISON)
 }
 
-function handleCancelRegionBenchmark() {
-  if (!activeBenchmarkOperation) return
+function handleCancelRegionComparison() {
+  if (!activeRegionComparisonOperation) return
 
-  benchmarkState.value = {
-    ...benchmarkState.value,
+  regionComparisonState.value = {
+    ...regionComparisonState.value,
     status: 'cancelling'
   }
-  activeBenchmarkOperation.cancel()
+  activeRegionComparisonOperation.cancel()
 }
 
-function handleExportBenchmarkArtifact() {
-  if (!canExportBenchmarkArtifact.value || !completedBenchmarkResult || !completedBenchmarkRegion) return
+function handleExportRegionComparisonArtifact() {
+  if (!canExportRegionComparisonArtifact.value || !completedRegionComparisonResult || !completedRegionComparisonRegion) return
 
-  const artifact = benchmarkArtifactWriter.write(completedBenchmarkResult, {
-    region: completedBenchmarkRegion
+  const artifact = regionComparisonArtifactWriter.write(completedRegionComparisonResult, {
+    region: completedRegionComparisonRegion
   })
-  downloadFile(JSON.stringify(artifact, null, 2), 'region-benchmark-artifact.json', 'application/json')
+  downloadFile(JSON.stringify(artifact, null, 2), 'region-comparison-artifact.json', 'application/json')
 }
 
-function handleBenchmarkProgress(progress) {
-  if (!benchmarkState.value) return
+function handleRegionComparisonProgress(progress) {
+  if (!regionComparisonState.value) return
 
-  benchmarkState.value = {
-    ...benchmarkState.value,
-    status: progress.status === 'cancelled' ? 'cancelled' : benchmarkState.value.status,
+  regionComparisonState.value = {
+    ...regionComparisonState.value,
+    status: progress.status === 'cancelled' ? 'cancelled' : regionComparisonState.value.status,
     progress
   }
 }
 
-function handleBenchmarkOutcome(operation, result) {
-  if (activeBenchmarkOperation !== operation) return
+function handleRegionComparisonOutcome(operation, result) {
+  if (activeRegionComparisonOperation !== operation) return
 
-  activeBenchmarkOperation = null
-  completedBenchmarkResult = result.status === 'ready' ? result : null
-  completedBenchmarkRegion = result.status === 'ready' ? operation.context.request.region : null
-  const analysis = result.status === 'ready' ? benchmarkAnalyzer.analyze(result) : null
-  benchmarkState.value = {
+  activeRegionComparisonOperation = null
+  completedRegionComparisonResult = result.status === 'ready' ? result : null
+  completedRegionComparisonRegion = result.status === 'ready' ? operation.context.request.region : null
+  const analysis = result.status === 'ready' ? regionComparisonAnalyzer.analyze(result) : null
+  regionComparisonState.value = {
     status: result.status === 'cancelled' ? 'cancelled' : 'completed',
     progress: Object.freeze({
       totalCandidates: result.summary.totalCandidates,
@@ -643,22 +643,22 @@ function handleBenchmarkOutcome(operation, result) {
   }
 
   if (result.status === 'ready') {
-    developerNotification.value = createBenchmarkSuccessNotification(analysis, result)
+    developerNotification.value = createRegionComparisonSuccessNotification(analysis, result)
   }
 }
 
-function handleBenchmarkFailure(operation, error) {
-  if (activeBenchmarkOperation !== operation) return
+function handleRegionComparisonFailure(operation, error) {
+  if (activeRegionComparisonOperation !== operation) return
 
-  activeBenchmarkOperation = null
-  benchmarkState.value = {
-    ...benchmarkState.value,
+  activeRegionComparisonOperation = null
+  regionComparisonState.value = {
+    ...regionComparisonState.value,
     status: 'failed'
   }
-  developerNotification.value = createBenchmarkFailureNotification(error)
+  developerNotification.value = createRegionComparisonFailureNotification(error)
 }
 
-function createBenchmarkSuccessNotification(summary, result) {
+function createRegionComparisonSuccessNotification(summary, result) {
   const details = []
   if (summary?.winner?.candidateId) details.push(`Winner: ${summary.winner.candidateId}.`)
   if (Number.isFinite(summary?.latency?.fastestMs)) details.push(`Fastest: ${summary.latency.fastestMs}ms.`)
@@ -666,10 +666,10 @@ function createBenchmarkSuccessNotification(summary, result) {
   return {
     id: `developer-notification:${++developerNotificationOccurrenceId}`,
     variant: 'success',
-    title: 'Region Benchmark complete',
-    message: details.join(' ') || 'Region Benchmark completed.',
+    title: 'Region Comparison complete',
+    message: details.join(' ') || 'Region Comparison completed.',
     body: Object.freeze({
-      type: PDF_NOTIFICATION_BODY_TYPE.BENCHMARK_RESULTS,
+      type: PDF_NOTIFICATION_BODY_TYPE.REGION_COMPARISON_RESULTS,
       payload: Object.freeze({
         analysis: summary,
         results: result.results,
@@ -679,12 +679,12 @@ function createBenchmarkSuccessNotification(summary, result) {
   }
 }
 
-function createBenchmarkFailureNotification(error) {
+function createRegionComparisonFailureNotification(error) {
   return {
     id: `developer-notification:${++developerNotificationOccurrenceId}`,
     variant: 'error',
-    title: 'Region Benchmark failed',
-    message: error?.message || 'Benchmark failed. Please try again.'
+    title: 'Region Comparison failed',
+    message: error?.message || 'Region Comparison failed. Please try again.'
   }
 }
 
@@ -850,8 +850,8 @@ onMounted(() => {
 onBeforeUnmount(() => {
   clearExportSuccess()
   activeRegionPosition = null
-  activeBenchmarkOperation?.cancel()
-  activeBenchmarkOperation = null
+  activeRegionComparisonOperation?.cancel()
+  activeRegionComparisonOperation = null
   setRegionOcrIdle()
   detachDocument()
   void cleanup()

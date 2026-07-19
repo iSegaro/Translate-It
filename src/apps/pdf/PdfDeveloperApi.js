@@ -1,15 +1,15 @@
-import { BenchmarkCoordinator } from './BenchmarkCoordinator.js'
+import { RegionComparisonCoordinator } from './RegionComparisonCoordinator.js'
 
 export const PDF_DEVELOPER_CAPABILITY = Object.freeze({
-  REGION_BENCHMARK: 'region-benchmark'
+  REGION_COMPARISON: 'region-comparison'
 })
 
 export class PdfDeveloperApi {
-  constructor({ benchmarkCoordinator, regionExecutionDispatcher, capabilities = {} } = {}) {
-    const coordinator = benchmarkCoordinator || new BenchmarkCoordinator({ regionExecutionDispatcher })
+  constructor({ regionComparisonCoordinator, regionExecutionDispatcher, capabilities = {} } = {}) {
+    const coordinator = regionComparisonCoordinator || new RegionComparisonCoordinator({ regionExecutionDispatcher })
 
     this.capabilities = new Map([
-      [PDF_DEVELOPER_CAPABILITY.REGION_BENCHMARK, (request) => coordinator.coordinateRegionBenchmark(request)],
+      [PDF_DEVELOPER_CAPABILITY.REGION_COMPARISON, (request) => coordinator.coordinateRegionComparison(request)],
       ...Object.entries(capabilities)
     ])
   }
@@ -28,7 +28,7 @@ export class PdfDeveloperApi {
     return handler(...args)
   }
 
-  runRegionBenchmark(...args) {
-    return this.invokeCapability(PDF_DEVELOPER_CAPABILITY.REGION_BENCHMARK, ...args)
+  runRegionComparison(...args) {
+    return this.invokeCapability(PDF_DEVELOPER_CAPABILITY.REGION_COMPARISON, ...args)
   }
 }

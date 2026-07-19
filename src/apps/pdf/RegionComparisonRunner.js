@@ -1,11 +1,11 @@
 import { createExecutionOperation } from './composables/executionOperation.js'
 import { isRegionExecutionRequest, REGION_EXECUTION_TARGET } from './composables/regionExecutionRequest.js'
-import { BenchmarkCandidatePlanner } from './BenchmarkCandidatePlanner.js'
-import { BenchmarkEvaluator } from './BenchmarkEvaluator.js'
-import { BenchmarkResultAssembler } from './BenchmarkResultAssembler.js'
+import { RegionComparisonCandidatePlanner } from './RegionComparisonCandidatePlanner.js'
+import { RegionComparisonEvaluator } from './RegionComparisonEvaluator.js'
+import { RegionComparisonResultAssembler } from './RegionComparisonResultAssembler.js'
 import { PdfRegionOcrExecutor } from '@/features/pdf-translation/core/PdfRegionOcrExecutor.js'
 
-export const BENCHMARK_RUNNER_STATUS = Object.freeze({
+export const REGION_COMPARISON_RUNNER_STATUS = Object.freeze({
   READY: 'ready',
   CANCELLED: 'cancelled'
 })
@@ -34,15 +34,15 @@ function createSessionResult({ status, candidates, results, startedAt, completed
   })
 }
 
-export class BenchmarkSession {
+export class RegionComparisonSession {
   constructor(request, {
-    candidatePlanner = new BenchmarkCandidatePlanner(),
+    candidatePlanner = new RegionComparisonCandidatePlanner(),
     configurations = Object.freeze([]),
     createExecutor = (options) => new PdfRegionOcrExecutor(options),
     getPdfDocument = () => undefined,
     clock = () => Date.now(),
-    resultAssembler = new BenchmarkResultAssembler(),
-    benchmarkEvaluator = new BenchmarkEvaluator(),
+    resultAssembler = new RegionComparisonResultAssembler(),
+    regionComparisonEvaluator = new RegionComparisonEvaluator(),
     groundTruth,
     onProgress
   } = {}) {
@@ -53,7 +53,7 @@ export class BenchmarkSession {
     this.getPdfDocument = getPdfDocument
     this.clock = clock
     this.resultAssembler = resultAssembler
-    this.benchmarkEvaluator = benchmarkEvaluator
+    this.regionComparisonEvaluator = regionComparisonEvaluator
     this.groundTruth = groundTruth
     this.onProgress = onProgress
     this.state = 'created'
@@ -91,7 +91,7 @@ export class BenchmarkSession {
 
   finish(status, candidates, results, startedAt) {
     const completedAt = this.clock()
-    this.emitProgress(status === BENCHMARK_RUNNER_STATUS.CANCELLED ? 'cancelled' : 'completed', candidates, results)
+    this.emitProgress(status === REGION_COMPARISON_RUNNER_STATUS.CANCELLED ? 'cancelled' : 'completed', candidates, results)
     return createSessionResult({ status, candidates, results, startedAt, completedAt })
   }
 
@@ -100,19 +100,19 @@ export class BenchmarkSession {
     const results = []
     this.state = 'initializing'
     await Promise.resolve()
-    if (this.cancelled) return this.finish(BENCHMARK_RUNNER_STATUS.CANCELLED, emptyCandidates, results, this.clock())
+    if (this.cancelled) return this.finish(REGION_COMPARISON_RUNNER_STATUS.CANCELLED, emptyCandidates, results, this.clock())
 
     this.state = 'planning-candidates'
     await Promise.resolve()
-    if (this.cancelled) return this.finish(BENCHMARK_RUNNER_STATUS.CANCELLED, emptyCandidates, results, this.clock())
+    if (this.cancelled) return this.finish(REGION_COMPARISON_RUNNER_STATUS.CANCELLED, emptyCandidates, results, this.clock())
 
     const candidates = this.candidatePlanner.createCandidates({ configurations: this.configurations })
     await this.prepareCandidates(candidates)
-    if (this.cancelled) return this.finish(BENCHMARK_RUNNER_STATUS.CANCELLED, candidates, results, this.clock())
-    const benchmarkStartedAt = this.clock()
+    if (this.cancelled) return this.finish(REGION_COMPARISON_RUNNER_STATUS.CANCELLED, candidates, results, this.clock())
+    const regionComparisonStartedAt = this.clock()
 
     for (const candidate of candidates) {
-      if (this.cancelled) return this.finish(BENCHMARK_RUNNER_STATUS.CANCELLED, candidates, results, benchmarkStartedAt)
+      if (this.cancelled) return this.finish(REGION_COMPARISON_RUNNER_STATUS.CANCELLED, candidates, results, regionComparisonStartedAt)
 
       this.emitProgress('running', candidates, results, candidate)
       const candidateStartedAt = this.clock()
@@ -123,13 +123,13 @@ export class BenchmarkSession {
       try {
         output = await operation.promise
       } catch (error) {
-        if (this.cancelled) return this.finish(BENCHMARK_RUNNER_STATUS.CANCELLED, candidates, results, benchmarkStartedAt)
+        if (this.cancelled) return this.finish(REGION_COMPARISON_RUNNER_STATUS.CANCELLED, candidates, results, regionComparisonStartedAt)
         throw error
       } finally {
         if (this.activeOperation === operation) this.activeOperation = null
       }
 
-      if (this.cancelled) return this.finish(BENCHMARK_RUNNER_STATUS.CANCELLED, candidates, results, benchmarkStartedAt)
+      if (this.cancelled) return this.finish(REGION_COMPARISON_RUNNER_STATUS.CANCELLED, candidates, results, regionComparisonStartedAt)
 
       results.push(this.resultAssembler.assemble({
         candidate,
@@ -142,15 +142,15 @@ export class BenchmarkSession {
 
     const completedResults = Object.freeze(results)
     const evaluatedResults = typeof this.groundTruth === 'string'
-      ? this.benchmarkEvaluator.evaluate(completedResults, { groundTruth: this.groundTruth })
+      ? this.regionComparisonEvaluator.evaluate(completedResults, { groundTruth: this.groundTruth })
       : completedResults
 
     this.state = 'ready'
-    return this.finish(BENCHMARK_RUNNER_STATUS.READY, candidates, evaluatedResults, benchmarkStartedAt)
+    return this.finish(REGION_COMPARISON_RUNNER_STATUS.READY, candidates, evaluatedResults, regionComparisonStartedAt)
   }
 }
 
-export class BenchmarkRunner {
+export class RegionComparisonRunner {
   constructor({
     candidatePlanner,
     configurations,
@@ -158,17 +158,17 @@ export class BenchmarkRunner {
     getPdfDocument,
     clock,
     resultAssembler,
-    benchmarkEvaluator,
+    regionComparisonEvaluator,
     groundTruth,
     onProgress,
-    createSession = (request) => new BenchmarkSession(request, {
+    createSession = (request) => new RegionComparisonSession(request, {
       candidatePlanner,
       configurations,
       createExecutor,
       getPdfDocument,
       clock,
       resultAssembler,
-      benchmarkEvaluator,
+      regionComparisonEvaluator,
       groundTruth,
       onProgress
     })
@@ -177,8 +177,8 @@ export class BenchmarkRunner {
   }
 
   execute(request) {
-    if (!isRegionExecutionRequest(request) || request.target !== REGION_EXECUTION_TARGET.BENCHMARK) {
-      throw new TypeError('BenchmarkRunner requires a canonical Benchmark RegionExecutionRequest')
+    if (!isRegionExecutionRequest(request) || request.target !== REGION_EXECUTION_TARGET.REGION_COMPARISON) {
+      throw new TypeError('RegionComparisonRunner requires a canonical RegionComparison RegionExecutionRequest')
     }
 
     const session = this.createSession(request)

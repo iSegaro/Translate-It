@@ -8,13 +8,13 @@ describe('PdfNotificationBodyRenderer', () => {
     const wrapper = mount(PdfNotificationBodyRenderer, {
       props: {
         body: {
-          type: PDF_NOTIFICATION_BODY_TYPE.BENCHMARK_RESULTS,
+          type: PDF_NOTIFICATION_BODY_TYPE.REGION_COMPARISON_RESULTS,
           payload: { results: [] }
         }
       }
     })
 
-    expect(wrapper.find('.pdf-benchmark-notification').exists()).toBe(true)
+    expect(wrapper.find('.pdf-region-comparison-notification').exists()).toBe(true)
   })
 
   it('renders nothing for unknown body types', () => {
@@ -24,6 +24,6 @@ describe('PdfNotificationBodyRenderer', () => {
       }
     })
 
-    expect(wrapper.find('.pdf-benchmark-notification').exists()).toBe(false)
+    expect(wrapper.find('.pdf-region-comparison-notification').exists()).toBe(false)
   })
 })

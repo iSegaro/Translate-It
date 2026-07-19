@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { createRegionExecutionDispatcher } from './regionExecutionDispatcher.js'
 import { createRegionExecutionRequest, REGION_EXECUTION_TARGET } from './regionExecutionRequest.js'
 import { createExecutionOperation } from './executionOperation.js'
-import { BenchmarkRunner, BENCHMARK_RUNNER_STATUS } from '../BenchmarkRunner.js'
+import { RegionComparisonRunner, REGION_COMPARISON_RUNNER_STATUS } from '../RegionComparisonRunner.js'
 import { createPdfRegion } from '@/features/pdf-translation/core/PdfRegion.js'
 
 describe('RegionExecutionDispatcher', () => {
@@ -24,23 +24,23 @@ describe('RegionExecutionDispatcher', () => {
     expect(result).toBe(operation)
   })
 
-  it('routes Benchmark requests to BenchmarkRunner', async () => {
+  it('routes RegionComparison requests to RegionComparisonRunner', async () => {
     const request = createRegionExecutionRequest({
       region: createPdfRegion({ pageNumber: 1, left: 1, top: 4, right: 3, bottom: 2 }),
-      target: REGION_EXECUTION_TARGET.BENCHMARK
+      target: REGION_EXECUTION_TARGET.REGION_COMPARISON
     })
-    const runner = new BenchmarkRunner({ configurations: [] })
+    const runner = new RegionComparisonRunner({ configurations: [] })
     const execute = vi.spyOn(runner, 'execute')
     const dispatcher = createRegionExecutionDispatcher({
-      runners: { [REGION_EXECUTION_TARGET.BENCHMARK]: (benchmarkRequest) => runner.execute(benchmarkRequest) }
+      runners: { [REGION_EXECUTION_TARGET.REGION_COMPARISON]: (regionComparisonRequest) => runner.execute(regionComparisonRequest) }
     })
 
     const operation = dispatcher.dispatchRegionExecution(request)
 
     expect(execute).toHaveBeenCalledWith(request)
-    expect(operation.context.target).toBe(REGION_EXECUTION_TARGET.BENCHMARK)
+    expect(operation.context.target).toBe(REGION_EXECUTION_TARGET.REGION_COMPARISON)
     await expect(operation.promise).resolves.toMatchObject({
-      status: BENCHMARK_RUNNER_STATUS.READY,
+      status: REGION_COMPARISON_RUNNER_STATUS.READY,
       candidates: [],
       results: [],
       summary: { totalCandidates: 0, completedCandidates: 0 }

@@ -1,13 +1,13 @@
 import { describe, expect, it } from 'vitest'
-import { BenchmarkCandidatePlanner } from './BenchmarkCandidatePlanner.js'
+import { RegionComparisonCandidatePlanner } from './RegionComparisonCandidatePlanner.js'
 
-describe('BenchmarkCandidatePlanner', () => {
+describe('RegionComparisonCandidatePlanner', () => {
   it('creates immutable candidates in supplied configuration order', () => {
     const configurations = Object.freeze([
       Object.freeze({ scale: 1.5, language: 'eng' }),
       Object.freeze({ scale: 1, language: 'fra' })
     ])
-    const candidates = new BenchmarkCandidatePlanner().createCandidates({ configurations })
+    const candidates = new RegionComparisonCandidatePlanner().createCandidates({ configurations })
 
     expect(candidates).toEqual([
       { candidateId: 'scale-1.5-eng', configuration: { scale: 1.5, language: 'eng' } },
@@ -24,6 +24,6 @@ describe('BenchmarkCandidatePlanner', () => {
   })
 
   it('requires configuration input', () => {
-    expect(() => new BenchmarkCandidatePlanner().createCandidates()).toThrow('BenchmarkCandidatePlanner requires configurations')
+    expect(() => new RegionComparisonCandidatePlanner().createCandidates()).toThrow('RegionComparisonCandidatePlanner requires configurations')
   })
 })

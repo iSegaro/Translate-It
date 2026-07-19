@@ -79,9 +79,9 @@ describe('buildPdfStatusBannerState', () => {
     const notification = {
       id: 'developer-notification:1',
       variant: 'success',
-      title: 'Region Benchmark complete',
+      title: 'Region Comparison completed',
       message: 'Winner: scale-1-eng.',
-      body: { type: PDF_NOTIFICATION_BODY_TYPE.BENCHMARK_RESULTS, payload: { rows: [] } }
+      body: { type: PDF_NOTIFICATION_BODY_TYPE.REGION_COMPARISON_RESULTS, payload: { rows: [] } }
     }
 
     expect(controller.build({ developerNotification: notification })).toEqual({

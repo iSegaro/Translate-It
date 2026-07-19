@@ -236,55 +236,55 @@ describe('PdfToolbar', () => {
     expect(wrapper.emitted('zoom-step')?.at(-1)?.[0]).toBe(1)
   })
 
-  it('emits Region Benchmark trigger only while Debug Mode is enabled', async () => {
+  it('emits region comparison trigger only while Debug Mode is enabled', async () => {
     const debugDisabled = mount(PdfToolbar)
 
     await debugDisabled.find('.pdf-toolbar__button[aria-label="More actions"]').trigger('click')
     expect(debugDisabled.find('.pdf-toolbar__menu-section').exists()).toBe(false)
-    expect(debugDisabled.findAll('button').some((button) => button.text().includes('Region Benchmark'))).toBe(false)
+    expect(debugDisabled.findAll('button').some((button) => button.text().includes('Region Comparison'))).toBe(false)
 
     settingsStoreMock.settings.DEBUG_MODE = true
     const debugEnabled = mount(PdfToolbar)
     await debugEnabled.find('.pdf-toolbar__button[aria-label="More actions"]').trigger('click')
 
     expect(debugEnabled.find('.pdf-toolbar__menu-section').text()).toContain('Developer')
-    const regionBenchmark = debugEnabled.findAll('button').find((button) => button.text().includes('Region Benchmark'))
-    expect(regionBenchmark?.attributes('disabled')).toBeUndefined()
+    const regionComparison = debugEnabled.findAll('button').find((button) => button.text().includes('Region Comparison'))
+    expect(regionComparison?.attributes('disabled')).toBeUndefined()
 
-    await regionBenchmark?.trigger('click')
-    expect(debugEnabled.emitted('request-region-benchmark')).toHaveLength(1)
+    await regionComparison?.trigger('click')
+    expect(debugEnabled.emitted('request-region-comparison')).toHaveLength(1)
   })
 
-  it('shows active benchmark progress only in Developer Mode', async () => {
-    const benchmarkState = {
+  it('shows active regionComparison progress only in Developer Mode', async () => {
+    const regionComparisonState = {
       status: 'running',
       progress: { totalCandidates: 2, completedCandidates: 1, currentCandidate: { candidateId: 'scale-1-eng' } }
     }
-    const normalUser = mount(PdfToolbar, { props: { benchmarkState } })
+    const normalUser = mount(PdfToolbar, { props: { regionComparisonState } })
 
     await normalUser.find('.pdf-toolbar__button[aria-label="More actions"]').trigger('click')
-    expect(normalUser.find('.pdf-toolbar__benchmark').exists()).toBe(false)
+    expect(normalUser.find('.pdf-toolbar__regionComparison').exists()).toBe(false)
 
     settingsStoreMock.settings.DEBUG_MODE = true
-    const developer = mount(PdfToolbar, { props: { benchmarkState } })
+    const developer = mount(PdfToolbar, { props: { regionComparisonState } })
     await developer.find('.pdf-toolbar__button[aria-label="More actions"]').trigger('click')
 
-    expect(developer.find('.pdf-toolbar__benchmark').text()).toContain('1/2')
-    expect(developer.find('.pdf-toolbar__benchmark').text()).toContain('scale-1-eng')
-    expect(developer.findAll('button').some(button => button.text().includes('Export Benchmark Artifact'))).toBe(false)
+    expect(developer.find('.pdf-toolbar__regionComparison').text()).toContain('1/2')
+    expect(developer.find('.pdf-toolbar__regionComparison').text()).toContain('scale-1-eng')
+    expect(developer.findAll('button').some(button => button.text().includes('Export Region Comparison Artifact'))).toBe(false)
 
-    await developer.setProps({ canExportBenchmarkArtifact: true })
-    const exportArtifact = developer.findAll('button').find(button => button.text().includes('Export Benchmark Artifact'))
+    await developer.setProps({ canExportRegionComparisonArtifact: true })
+    const exportArtifact = developer.findAll('button').find(button => button.text().includes('Export Region Comparison Artifact'))
     expect(exportArtifact).toBeTruthy()
     await exportArtifact?.trigger('click')
-    expect(developer.emitted('export-benchmark-artifact')).toHaveLength(1)
+    expect(developer.emitted('export-region-comparison-artifact')).toHaveLength(1)
   })
 
-  it('emits cancellation from active benchmark state', async () => {
+  it('emits cancellation from active regionComparison state', async () => {
     settingsStoreMock.settings.DEBUG_MODE = true
     const wrapper = mount(PdfToolbar, {
       props: {
-        benchmarkState: {
+        regionComparisonState: {
           status: 'running',
           progress: {
             totalCandidates: 2,
@@ -298,16 +298,16 @@ describe('PdfToolbar', () => {
     })
     await wrapper.find('.pdf-toolbar__button[aria-label="More actions"]').trigger('click')
 
-    expect(wrapper.find('.pdf-toolbar__benchmark-current').text()).toBe('scale-1.5-eng')
-    await wrapper.find('.pdf-toolbar__benchmark-cancel').trigger('click')
-    expect(wrapper.emitted('cancel-region-benchmark')).toHaveLength(1)
+    expect(wrapper.find('.pdf-toolbar__regionComparison-current').text()).toBe('scale-1.5-eng')
+    await wrapper.find('.pdf-toolbar__regionComparison-cancel').trigger('click')
+    expect(wrapper.emitted('cancel-region-comparison')).toHaveLength(1)
   })
 
-  it('does not render terminal benchmark results in the toolbar', async () => {
+  it('does not render terminal regionComparison results in the toolbar', async () => {
     settingsStoreMock.settings.DEBUG_MODE = true
     const wrapper = mount(PdfToolbar, {
       props: {
-        benchmarkState: {
+        regionComparisonState: {
           status: 'completed',
           progress: { totalCandidates: 1, completedCandidates: 1, currentCandidate: null },
           results: [],
@@ -318,7 +318,7 @@ describe('PdfToolbar', () => {
     })
     await wrapper.find('.pdf-toolbar__button[aria-label="More actions"]').trigger('click')
 
-    expect(wrapper.find('.pdf-toolbar__benchmark').exists()).toBe(false)
+    expect(wrapper.find('.pdf-toolbar__regionComparison').exists()).toBe(false)
   })
 
   it('shows OCR button without count when OCR recommendations exist', async () => {
@@ -366,16 +366,16 @@ describe('PdfToolbar', () => {
     const wrapper = mount(PdfToolbar, {
       props: {
         executionMode: 'ocr',
-        executionModes: ['ocr', 'benchmark']
+        executionModes: ['ocr', 'region-comparison']
       }
     })
 
     const modeSelect = wrapper.find('.pdf-toolbar__execution-mode-select')
     expect(modeSelect.element.value).toBe('ocr')
 
-    await modeSelect.setValue('benchmark')
+    await modeSelect.setValue('region-comparison')
 
-    expect(wrapper.emitted('execution-mode-change')).toEqual([['benchmark']])
+    expect(wrapper.emitted('execution-mode-change')).toEqual([['region-comparison']])
   })
 
   it('hides OCR button while processing or without OCR recommendations', async () => {

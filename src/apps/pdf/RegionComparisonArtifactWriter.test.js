@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import { createPdfRegion } from '@/features/pdf-translation/core/PdfRegion.js'
-import { BenchmarkArtifactWriter } from './BenchmarkArtifactWriter.js'
+import { RegionComparisonArtifactWriter } from './RegionComparisonArtifactWriter.js'
 
-describe('BenchmarkArtifactWriter', () => {
+describe('RegionComparisonArtifactWriter', () => {
   it('writes an immutable deterministic artifact in execution order', () => {
     const evaluation = Object.freeze({ cer: Object.freeze({ characterErrorRate: 0.2 }) })
     const first = Object.freeze({ candidateId: 'scale-1-eng', evaluation })
@@ -15,7 +15,7 @@ describe('BenchmarkArtifactWriter', () => {
       ]),
       results: Object.freeze([first, second])
     })
-    const writer = new BenchmarkArtifactWriter({ clock: () => '2026-07-19T00:00:00.000Z' })
+    const writer = new RegionComparisonArtifactWriter({ clock: () => '2026-07-19T00:00:00.000Z' })
 
     const region = createPdfRegion({ pageNumber: 1, left: 1, top: 4, right: 3, bottom: 2 })
     const artifact = writer.write(sessionResult, { region })
@@ -23,7 +23,7 @@ describe('BenchmarkArtifactWriter', () => {
 
     expect(artifact).toEqual({
       schemaVersion: '1.0.0',
-      artifactType: 'region-benchmark',
+      artifactType: 'region-comparison',
       generatedAt: '2026-07-19T00:00:00.000Z',
       metadata: { startedAt: 100, completedAt: 120, totalElapsedMs: 20, pageNumber: 1, region },
       summary: sessionResult.summary,

@@ -1,12 +1,12 @@
 import { describe, expect, it } from 'vitest'
-import { createBenchmarkSummary } from './BenchmarkSummary.js'
+import { createRegionComparisonSummary } from './RegionComparisonSummary.js'
 
-describe('BenchmarkSummary', () => {
+describe('RegionComparisonSummary', () => {
   it('clones and freezes derived summary data without freezing caller values', () => {
     const latency = { fastestMs: 10 }
     const confidence = { highest: 90 }
     const output = { identical: false }
-    const summary = createBenchmarkSummary({
+    const summary = createRegionComparisonSummary({
       winnerCandidateId: null,
       fastestCandidateId: null,
       latency,

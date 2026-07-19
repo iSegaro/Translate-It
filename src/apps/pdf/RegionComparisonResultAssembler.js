@@ -1,4 +1,4 @@
-export class BenchmarkResultAssembler {
+export class RegionComparisonResultAssembler {
   assemble({ candidate, startedAt, completedAt, output }) {
     return Object.freeze({
       candidateId: candidate.candidateId,

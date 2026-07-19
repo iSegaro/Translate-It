@@ -2,7 +2,7 @@ import { createPdfRegion } from '@/features/pdf-translation/core/PdfRegion.js'
 
 export const REGION_EXECUTION_TARGET = Object.freeze({
   OCR: 'ocr',
-  BENCHMARK: 'benchmark'
+  REGION_COMPARISON: 'region-comparison'
 })
 
 export const EXECUTION_SCOPE = Object.freeze({

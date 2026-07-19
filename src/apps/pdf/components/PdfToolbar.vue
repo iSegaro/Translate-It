@@ -322,44 +322,44 @@
               class="pdf-toolbar__export-item"
               type="button"
               role="menuitem"
-              :disabled="isBenchmarkActive"
-              @click="$emit('request-region-benchmark')"
+              :disabled="isRegionComparisonActive"
+              @click="$emit('request-region-comparison')"
             >
-              Region Benchmark
+              Region Comparison
             </button>
             <button
-              v-if="canExportBenchmarkArtifact"
+              v-if="canExportRegionComparisonArtifact"
               class="pdf-toolbar__export-item"
               type="button"
               role="menuitem"
-              @click="$emit('export-benchmark-artifact')"
+              @click="$emit('export-region-comparison-artifact')"
             >
-              Export Benchmark Artifact
+              Export Region Comparison Artifact
             </button>
             <div
-              v-if="isBenchmarkActive"
-              class="pdf-toolbar__benchmark"
+              v-if="isRegionComparisonActive"
+              class="pdf-toolbar__regionComparison"
               aria-live="polite"
             >
-              <div class="pdf-toolbar__benchmark-summary">
-                <span>Benchmark {{ benchmarkState.status }}</span>
-                <span v-if="benchmarkState.progress">
-                  {{ benchmarkState.progress.completedCandidates }}/{{ benchmarkState.progress.totalCandidates }}
+              <div class="pdf-toolbar__regionComparison-summary">
+                <span>RegionComparison {{ regionComparisonState.status }}</span>
+                <span v-if="regionComparisonState.progress">
+                  {{ regionComparisonState.progress.completedCandidates }}/{{ regionComparisonState.progress.totalCandidates }}
                 </span>
                 <button
-                  v-if="isBenchmarkActive"
-                  class="pdf-toolbar__benchmark-cancel"
+                  v-if="isRegionComparisonActive"
+                  class="pdf-toolbar__regionComparison-cancel"
                   type="button"
-                  @click="$emit('cancel-region-benchmark')"
+                  @click="$emit('cancel-region-comparison')"
                 >
                   Cancel
                 </button>
               </div>
               <span
-                v-if="benchmarkState.progress?.currentCandidate"
-                class="pdf-toolbar__benchmark-current"
+                v-if="regionComparisonState.progress?.currentCandidate"
+                class="pdf-toolbar__regionComparison-current"
               >
-                {{ benchmarkState.progress.currentCandidate.candidateId }}
+                {{ regionComparisonState.progress.currentCandidate.candidateId }}
               </span>
             </div>
           </div>
@@ -414,11 +414,11 @@ const props = defineProps({
   executionModes: { type: Array, default: () => [] },
   regionOcrState: { type: String, default: 'idle' },
   regionOcrAvailable: { type: Boolean, default: false },
-  benchmarkState: { type: Object, default: null },
-  canExportBenchmarkArtifact: { type: Boolean, default: false },
+  regionComparisonState: { type: Object, default: null },
+  canExportRegionComparisonArtifact: { type: Boolean, default: false },
 })
 
-const emit = defineEmits(['request-open-pdf', 'translate-visible', 'cancel-translation', 'content-view-change', 'layout-mode-change', 'toggle-outline', 'export-txt', 'export-markdown', 'export-html', 'request-ocr', 'request-region-ocr', 'request-region-benchmark', 'cancel-region-benchmark', 'export-benchmark-artifact', 'clear-cache', 'zoom-step', 'zoom-change', 'execution-mode-change'])
+const emit = defineEmits(['request-open-pdf', 'translate-visible', 'cancel-translation', 'content-view-change', 'layout-mode-change', 'toggle-outline', 'export-txt', 'export-markdown', 'export-html', 'request-ocr', 'request-region-ocr', 'request-region-comparison', 'cancel-region-comparison', 'export-region-comparison-artifact', 'clear-cache', 'zoom-step', 'zoom-change', 'execution-mode-change'])
 
 const logger = getScopedLogger(LOG_COMPONENTS.PDF, 'PdfToolbar')
 const settingsStore = useSettingsStore()
@@ -427,7 +427,7 @@ const pdfProviderValue = computed(() => {
   return settingsStore.settings?.MODE_PROVIDERS?.[TranslationMode.PDF] || 'default'
 })
 const isDebugMode = computed(() => settingsStore.settings?.DEBUG_MODE === true)
-const isBenchmarkActive = computed(() => ['running', 'cancelling'].includes(props.benchmarkState?.status))
+const isRegionComparisonActive = computed(() => ['running', 'cancelling'].includes(props.regionComparisonState?.status))
 
 const providerPersistenceState = {
   sequence: 0,

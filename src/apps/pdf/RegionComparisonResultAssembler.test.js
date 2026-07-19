@@ -1,14 +1,14 @@
 import { describe, expect, it } from 'vitest'
-import { BenchmarkResultAssembler } from './BenchmarkResultAssembler.js'
+import { RegionComparisonResultAssembler } from './RegionComparisonResultAssembler.js'
 
-describe('BenchmarkResultAssembler', () => {
+describe('RegionComparisonResultAssembler', () => {
   it('builds an immutable result without transforming candidate output', () => {
     const output = Object.freeze({ text: 'recognized text', confidence: 98 })
     const candidate = Object.freeze({
       candidateId: 'scale-1',
       configuration: Object.freeze({ scale: 1, language: 'eng' })
     })
-    const result = new BenchmarkResultAssembler().assemble({
+    const result = new RegionComparisonResultAssembler().assemble({
       candidate,
       startedAt: 100,
       completedAt: 125,

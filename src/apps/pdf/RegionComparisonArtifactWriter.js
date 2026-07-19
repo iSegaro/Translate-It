@@ -1,17 +1,17 @@
-import { createRegionBenchmarkArtifact, REGION_BENCHMARK_ARTIFACT_TYPE } from './RegionBenchmarkArtifact.js'
+import { createRegionComparisonArtifact, REGION_COMPARISON_ARTIFACT_TYPE } from './RegionComparisonArtifact.js'
 import { createExecutionMetadata } from './ExecutionMetadata.js'
 
 const SCHEMA_VERSION = '1.0.0'
 
-export class BenchmarkArtifactWriter {
+export class RegionComparisonArtifactWriter {
   constructor({ clock = () => new Date().toISOString() } = {}) {
     this.clock = clock
   }
 
   write(sessionResult, { region, generatedAt = this.clock() } = {}) {
-    return createRegionBenchmarkArtifact({
+    return createRegionComparisonArtifact({
       schemaVersion: SCHEMA_VERSION,
-      artifactType: REGION_BENCHMARK_ARTIFACT_TYPE,
+      artifactType: REGION_COMPARISON_ARTIFACT_TYPE,
       generatedAt,
       metadata: createExecutionMetadata({
         startedAt: sessionResult.summary.startedAt,

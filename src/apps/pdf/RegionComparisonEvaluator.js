@@ -2,7 +2,7 @@ import { CERCalculator } from '@/features/pdf-translation/ocr-benchmark/CERCalcu
 import { OCROutputNormalizer } from '@/features/pdf-translation/ocr-benchmark/OCROutputNormalizer.js'
 import { TextNormalizer } from '@/features/pdf-translation/ocr-benchmark/TextNormalizer.js'
 
-export class BenchmarkEvaluator {
+export class RegionComparisonEvaluator {
   constructor({
     outputNormalizer = new OCROutputNormalizer(),
     textNormalizer = new TextNormalizer(),

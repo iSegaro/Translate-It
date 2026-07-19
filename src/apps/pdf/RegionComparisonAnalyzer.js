@@ -1,4 +1,4 @@
-import { createBenchmarkSummary } from './BenchmarkSummary.js'
+import { createRegionComparisonSummary } from './RegionComparisonSummary.js'
 
 function confidenceOf(result) {
   const confidence = result?.output?.data?.confidence
@@ -10,9 +10,9 @@ function cerOf(result) {
   return Number.isFinite(cer) ? cer : null
 }
 
-export class BenchmarkAnalyzer {
-  analyze(benchmarkResult = {}) {
-    const results = Array.isArray(benchmarkResult.results) ? benchmarkResult.results : []
+export class RegionComparisonAnalyzer {
+  analyze(regionComparisonResult = {}) {
+    const results = Array.isArray(regionComparisonResult.results) ? regionComparisonResult.results : []
     const latencyResults = results.filter(result => Number.isFinite(result?.runtime?.latencyMs))
     const confidenceResults = results.map(result => ({ result, confidence: confidenceOf(result) }))
       .filter(({ confidence }) => confidence !== null)
@@ -61,6 +61,6 @@ export class BenchmarkAnalyzer {
       }
     }
 
-    return createBenchmarkSummary(summary)
+    return createRegionComparisonSummary(summary)
   }
 }

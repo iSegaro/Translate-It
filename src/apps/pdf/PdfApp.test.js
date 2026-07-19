@@ -36,7 +36,7 @@ const settingsStoreMock = vi.hoisted(() => ({
   isDarkTheme: false,
   settings: { THEME: 'auto', DEBUG_MODE: false }
 }))
-const benchmarkRunnerMock = vi.hoisted(() => ({
+const regionComparisonRunnerMock = vi.hoisted(() => ({
   execute: vi.fn(),
   options: null
 }))
@@ -103,14 +103,14 @@ vi.mock('@/features/settings/stores/settings.js', () => ({
   useSettingsStore: () => settingsStoreMock
 }))
 
-vi.mock('./BenchmarkRunner.js', () => ({
-  BenchmarkRunner: class {
+vi.mock('./RegionComparisonRunner.js', () => ({
+  RegionComparisonRunner: class {
     constructor(options) {
-      benchmarkRunnerMock.options = options
+      regionComparisonRunnerMock.options = options
     }
 
     execute(request) {
-      return benchmarkRunnerMock.execute(request)
+      return regionComparisonRunnerMock.execute(request)
     }
   }
 }))
@@ -131,8 +131,8 @@ vi.mock('@/shared/config/config.js', () => ({
 vi.mock('./components/PdfToolbar.vue', () => ({
   default: {
     name: 'PdfToolbar',
-    props: ['fileName', 'pageCount', 'currentPageNumber', 'zoomMode', 'zoomPercent', 'contentView', 'layoutMode', 'ocrRecommendationCount', 'executionMode', 'executionModes', 'regionOcrState', 'regionOcrAvailable', 'benchmarkState', 'canExportBenchmarkArtifact'],
-    emits: ['toggle-outline', 'translate-visible', 'cancel-translation', 'content-view-change', 'layout-mode-change', 'zoom-step', 'zoom-change', 'export-txt', 'export-markdown', 'export-html', 'request-ocr', 'request-region-ocr', 'request-region-benchmark', 'cancel-region-benchmark', 'export-benchmark-artifact', 'clear-cache', 'request-open-pdf', 'execution-mode-change'],
+    props: ['fileName', 'pageCount', 'currentPageNumber', 'zoomMode', 'zoomPercent', 'contentView', 'layoutMode', 'ocrRecommendationCount', 'executionMode', 'executionModes', 'regionOcrState', 'regionOcrAvailable', 'regionComparisonState', 'canExportRegionComparisonArtifact'],
+    emits: ['toggle-outline', 'translate-visible', 'cancel-translation', 'content-view-change', 'layout-mode-change', 'zoom-step', 'zoom-change', 'export-txt', 'export-markdown', 'export-html', 'request-ocr', 'request-region-ocr', 'request-region-comparison', 'cancel-region-comparison', 'export-region-comparison-artifact', 'clear-cache', 'request-open-pdf', 'execution-mode-change'],
     template: '<header class="pdf-toolbar-stub" />'
   }
 }))
@@ -393,8 +393,8 @@ describe('PdfApp', () => {
     vi.useRealTimers()
     openTranslationMock.mockReset()
     mockRegionExecutionDispatch.mockClear()
-    benchmarkRunnerMock.execute.mockReset()
-    benchmarkRunnerMock.options = null
+    regionComparisonRunnerMock.execute.mockReset()
+    regionComparisonRunnerMock.options = null
     settingsStoreMock.settings.DEBUG_MODE = false
     createMocks()
   })
@@ -441,15 +441,15 @@ describe('PdfApp', () => {
     expect(wrapper.find('.pdf-viewer-layout-stub').exists()).toBe(true)
   })
 
-  async function startBenchmark(wrapper, region = createPdfRegion({ pageNumber: 1, left: 1, top: 4, right: 3, bottom: 2 })) {
-    wrapper.findComponent({ name: 'PdfToolbar' }).vm.$emit('request-region-benchmark')
+  async function startRegionComparison(wrapper, region = createPdfRegion({ pageNumber: 1, left: 1, top: 4, right: 3, bottom: 2 })) {
+    wrapper.findComponent({ name: 'PdfToolbar' }).vm.$emit('request-region-comparison')
     await flushPromises()
     wrapper.findComponent({ name: 'PdfViewer' }).vm.$emit('region-selection-complete', region)
     await flushPromises()
     return region
   }
 
-  function readyBenchmarkResult(candidateId = 'scale-1-eng') {
+  function readyRegionComparisonResult(candidateId = 'scale-1-eng') {
     return {
       status: 'ready',
       results: [{
@@ -463,45 +463,45 @@ describe('PdfApp', () => {
     }
   }
 
-  it('shows a dismissible developer notification after a successful benchmark', async () => {
+  it('shows a dismissible developer notification after a successful regionComparison', async () => {
     settingsStoreMock.settings.DEBUG_MODE = true
-    benchmarkRunnerMock.execute.mockImplementation(request => createMockOperation(
-      Promise.resolve(readyBenchmarkResult()),
+    regionComparisonRunnerMock.execute.mockImplementation(request => createMockOperation(
+      Promise.resolve(readyRegionComparisonResult()),
       vi.fn(),
-      { target: 'benchmark', request }
+      { target: 'region-comparison', request }
     ))
     const wrapper = mount(PdfApp)
 
-    await startBenchmark(wrapper)
+    await startRegionComparison(wrapper)
     await vi.waitFor(() => expect(wrapper.find('.pdf-status-banner').exists()).toBe(true))
 
-    expect(wrapper.find('.pdf-status-banner__title').text()).toBe('Region Benchmark complete')
+    expect(wrapper.find('.pdf-status-banner__title').text()).toBe('Region Comparison complete')
     expect(wrapper.find('.pdf-status-banner__message').text()).toContain('Winner: scale-1-eng.')
-    expect(wrapper.findAll('.pdf-benchmark-notification__results tbody td').map(cell => cell.text())).toEqual([
+    expect(wrapper.findAll('.pdf-region-comparison-notification__results tbody td').map(cell => cell.text())).toEqual([
       'scale-1-eng', '1.5', 'eng', '42ms', '95', '0.200', 'Winner'
     ])
     await wrapper.find('.pdf-status-banner__dismiss').trigger('click')
     expect(wrapper.find('.pdf-status-banner').exists()).toBe(false)
   })
 
-  it('shows a developer error notification after benchmark failure', async () => {
+  it('shows a developer error notification after regionComparison failure', async () => {
     settingsStoreMock.settings.DEBUG_MODE = true
-    benchmarkRunnerMock.execute.mockImplementation(request => createMockOperation(
+    regionComparisonRunnerMock.execute.mockImplementation(request => createMockOperation(
       Promise.reject(new Error('OCR worker unavailable')),
       vi.fn(),
-      { target: 'benchmark', request }
+      { target: 'region-comparison', request }
     ))
     const wrapper = mount(PdfApp)
 
-    await startBenchmark(wrapper)
+    await startRegionComparison(wrapper)
     await vi.waitFor(() => expect(wrapper.find('.pdf-status-banner').exists()).toBe(true))
 
     expect(wrapper.find('.pdf-status-banner').classes()).toContain('pdf-status-banner--error')
-    expect(wrapper.find('.pdf-status-banner__title').text()).toBe('Region Benchmark failed')
+    expect(wrapper.find('.pdf-status-banner__title').text()).toBe('Region Comparison failed')
     expect(wrapper.find('.pdf-status-banner__message').text()).toBe('OCR worker unavailable')
   })
 
-  it('does not notify after benchmark cancellation', async () => {
+  it('does not notify after regionComparison cancellation', async () => {
     settingsStoreMock.settings.DEBUG_MODE = true
     const deferred = createDeferred()
     const cancel = vi.fn(() => deferred.resolve({
@@ -509,46 +509,46 @@ describe('PdfApp', () => {
       results: [],
       summary: { totalCandidates: 1, completedCandidates: 0, totalElapsedMs: 0 }
     }))
-    benchmarkRunnerMock.execute.mockImplementation(request => createMockOperation(deferred.promise, cancel, { target: 'benchmark', request }))
+    regionComparisonRunnerMock.execute.mockImplementation(request => createMockOperation(deferred.promise, cancel, { target: 'region-comparison', request }))
     const wrapper = mount(PdfApp)
 
-    await startBenchmark(wrapper)
-    wrapper.findComponent({ name: 'PdfToolbar' }).vm.$emit('cancel-region-benchmark')
+    await startRegionComparison(wrapper)
+    wrapper.findComponent({ name: 'PdfToolbar' }).vm.$emit('cancel-region-comparison')
     await vi.waitFor(() => expect(cancel).toHaveBeenCalledOnce())
     await flushPromises()
 
     expect(wrapper.find('.pdf-status-banner').exists()).toBe(false)
   })
 
-  it('replaces a dismissed developer notification on the next benchmark lifecycle', async () => {
+  it('replaces a dismissed developer notification on the next regionComparison lifecycle', async () => {
     settingsStoreMock.settings.DEBUG_MODE = true
-    benchmarkRunnerMock.execute.mockImplementationOnce(request => createMockOperation(
-      Promise.resolve(readyBenchmarkResult('scale-1-eng')),
+    regionComparisonRunnerMock.execute.mockImplementationOnce(request => createMockOperation(
+      Promise.resolve(readyRegionComparisonResult('scale-1-eng')),
       vi.fn(),
-      { target: 'benchmark', request }
+      { target: 'region-comparison', request }
     )).mockImplementationOnce(request => createMockOperation(
-      Promise.resolve(readyBenchmarkResult('scale-1.5-eng')),
+      Promise.resolve(readyRegionComparisonResult('scale-1.5-eng')),
       vi.fn(),
-      { target: 'benchmark', request }
+      { target: 'region-comparison', request }
     ))
     const wrapper = mount(PdfApp)
 
-    await startBenchmark(wrapper)
+    await startRegionComparison(wrapper)
     await vi.waitFor(() => expect(wrapper.find('.pdf-status-banner__dismiss').exists()).toBe(true))
     await wrapper.find('.pdf-status-banner__dismiss').trigger('click')
-    await startBenchmark(wrapper, createPdfRegion({ pageNumber: 2, left: 1, top: 4, right: 3, bottom: 2 }))
+    await startRegionComparison(wrapper, createPdfRegion({ pageNumber: 2, left: 1, top: 4, right: 3, bottom: 2 }))
     await vi.waitFor(() => expect(wrapper.find('.pdf-status-banner__message').text()).toContain('scale-1.5-eng'))
   })
 
   it('keeps developer notifications hidden outside Debug Mode', async () => {
-    benchmarkRunnerMock.execute.mockImplementation(request => createMockOperation(
-      Promise.resolve(readyBenchmarkResult()),
+    regionComparisonRunnerMock.execute.mockImplementation(request => createMockOperation(
+      Promise.resolve(readyRegionComparisonResult()),
       vi.fn(),
-      { target: 'benchmark', request }
+      { target: 'region-comparison', request }
     ))
     const wrapper = mount(PdfApp)
 
-    await startBenchmark(wrapper)
+    await startRegionComparison(wrapper)
     await flushPromises()
 
     expect(wrapper.find('.pdf-status-banner').exists()).toBe(false)
@@ -638,7 +638,7 @@ describe('PdfApp', () => {
     expect(mockRegionOcr.startRegionOcr).toHaveBeenCalledOnce()
   })
 
-  it('completes a benchmark and exports its artifact through PdfApp ownership', async () => {
+  it('completes a regionComparison and exports its artifact through PdfApp ownership', async () => {
     downloadFileMock.mockReset()
     const candidates = Object.freeze([Object.freeze({
       candidateId: 'scale-1-eng',
@@ -651,19 +651,19 @@ describe('PdfApp', () => {
       output: Object.freeze({ status: 'recognized' })
     })])
     const region = createPdfRegion({ pageNumber: 1, left: 1, top: 4, right: 3, bottom: 2 })
-    const runRegionBenchmark = vi.spyOn(PdfDeveloperApi.prototype, 'runRegionBenchmark')
+    const runRegionComparison = vi.spyOn(PdfDeveloperApi.prototype, 'runRegionComparison')
       .mockReturnValue(createMockOperation(Promise.resolve({
         status: 'ready',
         candidates,
         results,
         summary: Object.freeze({ totalCandidates: 1, completedCandidates: 1, startedAt: 0, completedAt: 40, totalElapsedMs: 40 })
-      }), vi.fn(), { target: 'benchmark', request: { region } }))
+      }), vi.fn(), { target: 'region-comparison', request: { region } }))
     const wrapper = mount(PdfApp)
     await flushPromises()
 
     const toolbar = wrapper.findComponent({ name: 'PdfToolbar' })
     const viewer = wrapper.findComponent({ name: 'PdfViewer' })
-    toolbar.vm.$emit('request-region-benchmark')
+    toolbar.vm.$emit('request-region-comparison')
     await flushPromises()
 
     expect(viewer.props('regionSelectionActive')).toBe(true)
@@ -672,26 +672,26 @@ describe('PdfApp', () => {
     await flushPromises()
 
     expect(viewer.props('regionSelectionActive')).toBe(false)
-    expect(runRegionBenchmark).toHaveBeenCalledWith({ region })
+    expect(runRegionComparison).toHaveBeenCalledWith({ region })
     expect(mockRegionOcr.startRegionOcr).not.toHaveBeenCalled()
-    await vi.waitFor(() => expect(toolbar.props('benchmarkState')).toMatchObject({
+    await vi.waitFor(() => expect(toolbar.props('regionComparisonState')).toMatchObject({
       status: 'completed',
       progress: { totalCandidates: 1, completedCandidates: 1 }
     }))
-    expect(toolbar.props('canExportBenchmarkArtifact')).toBe(true)
-    toolbar.vm.$emit('export-benchmark-artifact')
+    expect(toolbar.props('canExportRegionComparisonArtifact')).toBe(true)
+    toolbar.vm.$emit('export-region-comparison-artifact')
     expect(downloadFileMock).toHaveBeenCalledWith(
-      expect.stringContaining('"artifactType": "region-benchmark"'),
-      'region-benchmark-artifact.json',
+      expect.stringContaining('"artifactType": "region-comparison"'),
+      'region-comparison-artifact.json',
       'application/json'
     )
-    runRegionBenchmark.mockRestore()
+    runRegionComparison.mockRestore()
   })
 
-  it('preserves completed benchmark results after cancellation', async () => {
+  it('preserves completed regionComparison results after cancellation', async () => {
     const deferred = createDeferred()
     const cancel = vi.fn()
-    const runRegionBenchmark = vi.spyOn(PdfDeveloperApi.prototype, 'runRegionBenchmark')
+    const runRegionComparison = vi.spyOn(PdfDeveloperApi.prototype, 'runRegionComparison')
       .mockReturnValue(createMockOperation(deferred.promise, cancel))
     const wrapper = mount(PdfApp)
     await flushPromises()
@@ -699,15 +699,15 @@ describe('PdfApp', () => {
     const viewer = wrapper.findComponent({ name: 'PdfViewer' })
     const region = createPdfRegion({ pageNumber: 1, left: 1, top: 4, right: 3, bottom: 2 })
 
-    toolbar.vm.$emit('request-region-benchmark')
+    toolbar.vm.$emit('request-region-comparison')
     await flushPromises()
     viewer.vm.$emit('region-selection-complete', region)
     await flushPromises()
-    expect(toolbar.props('benchmarkState')).toMatchObject({ status: 'running' })
+    expect(toolbar.props('regionComparisonState')).toMatchObject({ status: 'running' })
 
-    toolbar.vm.$emit('cancel-region-benchmark')
+    toolbar.vm.$emit('cancel-region-comparison')
     expect(cancel).toHaveBeenCalledOnce()
-    await vi.waitFor(() => expect(toolbar.props('benchmarkState')).toMatchObject({ status: 'cancelling' }))
+    await vi.waitFor(() => expect(toolbar.props('regionComparisonState')).toMatchObject({ status: 'cancelling' }))
 
     deferred.resolve({
       status: 'cancelled',
@@ -716,12 +716,12 @@ describe('PdfApp', () => {
     })
     await flushPromises()
 
-    await vi.waitFor(() => expect(toolbar.props('benchmarkState')).toMatchObject({
+    await vi.waitFor(() => expect(toolbar.props('regionComparisonState')).toMatchObject({
       status: 'cancelled',
       progress: { totalCandidates: 2, completedCandidates: 1 },
       results: [{ candidateId: 'scale-1-eng' }]
     }))
-    runRegionBenchmark.mockRestore()
+    runRegionComparison.mockRestore()
   })
 
   it('toggles selection off with toolbar cancel and Escape', async () => {
@@ -802,7 +802,7 @@ describe('PdfApp', () => {
     expect(toolbar.props('executionMode')).toBe('ocr')
     expect(toolbar.props('executionModes')).toEqual(['ocr'])
 
-    toolbar.vm.$emit('execution-mode-change', 'benchmark')
+    toolbar.vm.$emit('execution-mode-change', 'region-comparison')
     await flushPromises()
 
     expect(toolbar.props('executionMode')).toBe('ocr')
@@ -823,7 +823,7 @@ describe('PdfApp', () => {
     await flushPromises()
 
     const request = mockRegionExecutionDispatch.mock.calls[0][0]
-    wrapper.findComponent({ name: 'PdfToolbar' }).vm.$emit('execution-mode-change', 'benchmark')
+    wrapper.findComponent({ name: 'PdfToolbar' }).vm.$emit('execution-mode-change', 'region-comparison')
     await flushPromises()
 
     expect(mockRegionExecutionDispatch).toHaveBeenCalledOnce()
