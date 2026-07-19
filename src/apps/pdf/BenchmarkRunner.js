@@ -3,7 +3,7 @@ import { isRegionExecutionRequest, REGION_EXECUTION_TARGET } from './composables
 import { BenchmarkExecutionPlanner } from './BenchmarkExecutionPlanner.js'
 import { BenchmarkProviderExecutor } from './BenchmarkProviderExecutor.js'
 import { BenchmarkProviderResolver } from './BenchmarkProviderResolver.js'
-import { BenchmarkScoringEngine } from './BenchmarkScoringEngine.js'
+import { BenchmarkResultAssembler } from './BenchmarkResultAssembler.js'
 
 export const BENCHMARK_RUNNER_STATUS = Object.freeze({
   READY: 'ready',
@@ -16,14 +16,14 @@ export class BenchmarkSession {
     executionPlanner = new BenchmarkExecutionPlanner(),
     providerExecutor = new BenchmarkProviderExecutor(),
     clock = () => Date.now(),
-    scoringEngine = new BenchmarkScoringEngine()
+    resultAssembler = new BenchmarkResultAssembler()
   } = {}) {
     this.request = request
     this.providerResolver = providerResolver
     this.executionPlanner = executionPlanner
     this.providerExecutor = providerExecutor
     this.clock = clock
-    this.scoringEngine = scoringEngine
+    this.resultAssembler = resultAssembler
     this.state = 'created'
     this.cancelled = false
   }
@@ -58,13 +58,11 @@ export class BenchmarkSession {
           step
         })
         const completedAt = this.clock()
-        results.push(Object.freeze({
+        results.push(this.resultAssembler.assemble({
           providerId: step.providerId,
-          status: 'completed',
-          output,
           startedAt,
           completedAt,
-          durationMs: completedAt - startedAt
+          output
         }))
         plan = this.executionPlanner.markCompleted(plan, step)
       } catch (error) {
@@ -74,15 +72,13 @@ export class BenchmarkSession {
     }
 
     const frozenResults = Object.freeze(results)
-    const scoreReport = this.scoringEngine.score(frozenResults)
 
     this.state = 'ready'
     return Object.freeze({
       status: BENCHMARK_RUNNER_STATUS.READY,
       providers,
       plan,
-      results: frozenResults,
-      scoreReport
+      results: frozenResults
     })
   }
 }
@@ -93,13 +89,13 @@ export class BenchmarkRunner {
     executionPlanner,
     providerExecutor,
     clock,
-    scoringEngine,
+    resultAssembler,
     createSession = (request) => new BenchmarkSession(request, {
       providerResolver,
       executionPlanner,
       providerExecutor,
       clock,
-      scoringEngine
+      resultAssembler
     })
   } = {}) {
     this.createSession = createSession

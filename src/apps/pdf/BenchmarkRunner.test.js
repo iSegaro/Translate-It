@@ -51,32 +51,13 @@ describe('BenchmarkRunner', () => {
       .mockReturnValueOnce(125)
       .mockReturnValueOnce(200)
       .mockReturnValueOnce(260)
-    const scoreReport = Object.freeze({
-      providers: Object.freeze([
-        {
-          providerId: 'first',
-          score: null,
-          metrics: { latencyMs: 25, success: true, completed: true },
-          criteria: {
-            latency: { value: 25, weight: null },
-            quality: { value: null, weight: null },
-            cost: { value: null, weight: null }
-          }
-        },
-        {
-          providerId: 'second',
-          score: null,
-          metrics: { latencyMs: 60, success: true, completed: true },
-          criteria: {
-            latency: { value: 60, weight: null },
-            quality: { value: null, weight: null },
-            cost: { value: null, weight: null }
-          }
-        }
-      ]),
-      winner: null
-    })
-    const scoringEngine = { score: vi.fn(() => scoreReport) }
+    const resultAssembler = {
+      assemble: vi.fn(({ providerId, startedAt, completedAt, output }) => Object.freeze({
+        providerId,
+        runtime: Object.freeze({ startedAt, completedAt, latencyMs: completedAt - startedAt }),
+        output
+      }))
+    }
     const request = createRegionExecutionRequest({
       region: createPdfRegion({ pageNumber: 1, left: 1, top: 4, right: 3, bottom: 2 }),
       target: REGION_EXECUTION_TARGET.BENCHMARK
@@ -87,7 +68,7 @@ describe('BenchmarkRunner', () => {
       executionPlanner,
       providerExecutor,
       clock,
-      scoringEngine
+      resultAssembler
     }).run()
 
     expect(result).toEqual({
@@ -100,15 +81,19 @@ describe('BenchmarkRunner', () => {
         ]
       },
       results: [
-        { providerId: 'first', status: 'completed', output: 'first output', startedAt: 100, completedAt: 125, durationMs: 25 },
-        { providerId: 'second', status: 'completed', output: 'second output', startedAt: 200, completedAt: 260, durationMs: 60 }
-      ],
-      scoreReport
+        { providerId: 'first', runtime: { startedAt: 100, completedAt: 125, latencyMs: 25 }, output: 'first output' },
+        { providerId: 'second', runtime: { startedAt: 200, completedAt: 260, latencyMs: 60 }, output: 'second output' }
+      ]
     })
     expect(clock).toHaveBeenCalledTimes(4)
     expect(Object.isFrozen(result.results)).toBe(true)
     expect(Object.isFrozen(result.results[0])).toBe(true)
-    expect(scoringEngine.score).toHaveBeenCalledWith(result.results)
+    expect(resultAssembler.assemble).toHaveBeenNthCalledWith(1, {
+      providerId: 'first',
+      startedAt: 100,
+      completedAt: 125,
+      output: 'first output'
+    })
     expect(providerResolver.resolve).toHaveBeenCalledOnce()
     expect(createPlan).toHaveBeenCalledWith(providers)
     expect(providerExecutor.execute).toHaveBeenCalledTimes(2)
@@ -137,8 +122,7 @@ describe('BenchmarkRunner', () => {
       status: BENCHMARK_RUNNER_STATUS.READY,
       providers: [],
       plan: { steps: [] },
-      results: [],
-      scoreReport: { providers: [], winner: null }
+      results: []
     })
     expect(providerExecutor.execute).not.toHaveBeenCalled()
   })
