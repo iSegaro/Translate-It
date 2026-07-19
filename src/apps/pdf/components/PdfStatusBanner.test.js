@@ -16,6 +16,39 @@ describe('PdfStatusBanner', () => {
     expect(wrapper.text()).toContain('Partial translation')
     expect(wrapper.text()).toContain('Partial translation available.')
     expect(wrapper.classes()).toContain('pdf-status-banner--warning')
+    expect(wrapper.classes()).not.toContain('pdf-status-banner--expanded')
+    expect(wrapper.find('.pdf-status-banner__body').exists()).toBe(false)
+  })
+
+  it('expands naturally around optional slotted body content', () => {
+    const wrapper = mount(PdfStatusBanner, {
+      props: {
+        visible: true,
+        variant: 'success',
+        title: 'Complete',
+        message: 'Details available.',
+        body: { type: 'detail', payload: { rows: 2 } }
+      },
+      slots: {
+        body: '<div class="notification-detail"><table><tbody><tr><td>Candidate</td><td>39ms</td></tr></tbody></table></div>'
+      }
+    })
+
+    expect(wrapper.find('.pdf-status-banner__body').exists()).toBe(true)
+    expect(wrapper.classes()).toContain('pdf-status-banner--expanded')
+    expect(wrapper.find('.notification-detail').text()).toContain('Candidate')
+    expect(wrapper.find('.pdf-status-banner').attributes('style') || '').not.toContain('height')
+  })
+
+  it('renders no body content for an unknown body type', () => {
+    const wrapper = mount(PdfStatusBanner, {
+      props: {
+        visible: true,
+        body: { type: 'unknown', payload: {} }
+      }
+    })
+
+    expect(wrapper.find('.pdf-status-banner__body').text()).toBe('')
   })
 
   it('shows dismiss button when dismissible', async () => {
@@ -31,6 +64,7 @@ describe('PdfStatusBanner', () => {
 
     await wrapper.find('.pdf-status-banner__dismiss').trigger('click')
     expect(wrapper.emitted('dismiss')).toBeTruthy()
+    expect(wrapper.find('.pdf-status-banner__body').exists()).toBe(false)
   })
 
   it('hides itself when not visible', () => {

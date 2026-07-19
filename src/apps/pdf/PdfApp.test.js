@@ -454,8 +454,10 @@ describe('PdfApp', () => {
       status: 'ready',
       results: [{
         candidateId,
+        configuration: { scale: 1.5, language: 'eng' },
         runtime: { latencyMs: 42 },
-        output: { status: 'recognized', data: { text: 'hello', confidence: 95 } }
+        output: { status: 'recognized', data: { text: 'hello', confidence: 95 } },
+        evaluation: { cer: { characterErrorRate: 0.2 } }
       }],
       summary: { totalCandidates: 1, completedCandidates: 1, totalElapsedMs: 42 }
     }
@@ -475,6 +477,11 @@ describe('PdfApp', () => {
 
     expect(wrapper.find('.pdf-status-banner__title').text()).toBe('Region Benchmark complete')
     expect(wrapper.find('.pdf-status-banner__message').text()).toContain('Winner: scale-1-eng.')
+    expect(wrapper.find('.pdf-benchmark-notification__results').text()).toContain('Scale 1.5')
+    expect(wrapper.find('.pdf-benchmark-notification__results').text()).toContain('Language eng')
+    expect(wrapper.find('.pdf-benchmark-notification__results').text()).toContain('Runtime 42ms')
+    expect(wrapper.find('.pdf-benchmark-notification__results').text()).toContain('CER 0.200')
+    expect(wrapper.find('.pdf-benchmark-notification__results').text()).toContain('Winner')
     await wrapper.find('.pdf-status-banner__dismiss').trigger('click')
     expect(wrapper.find('.pdf-status-banner').exists()).toBe(false)
   })

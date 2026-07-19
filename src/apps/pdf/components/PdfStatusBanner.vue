@@ -30,6 +30,15 @@
         {{ message }}
       </p>
     </div>
+    <div
+      v-if="body"
+      class="pdf-status-banner__body"
+    >
+      <slot
+        name="body"
+        :body="body"
+      />
+    </div>
   </section>
 </template>
 
@@ -54,6 +63,10 @@ const props = defineProps({
     type: String,
     default: ''
   },
+  body: {
+    type: Object,
+    default: null
+  },
   dismissible: {
     type: Boolean,
     default: false
@@ -75,6 +88,7 @@ const bannerClasses = computed(() => ({
   'pdf-status-banner--info': props.variant === 'info',
   'pdf-status-banner--success': props.variant === 'success',
   'pdf-status-banner--warning': props.variant === 'warning',
-  'pdf-status-banner--error': props.variant === 'error'
+  'pdf-status-banner--error': props.variant === 'error',
+  'pdf-status-banner--expanded': Boolean(props.body)
 }))
 </script>

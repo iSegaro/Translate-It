@@ -1,0 +1,33 @@
+.pdf-benchmark-notification {
+  display: grid;
+  gap: 8px;
+  font-size: 11px;
+}
+
+.pdf-benchmark-notification__analysis,
+.pdf-benchmark-notification__results {
+  display: grid;
+  gap: 4px;
+}
+
+.pdf-benchmark-notification__results {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.pdf-benchmark-notification__results li {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
+
+.pdf-benchmark-notification__results code,
+.pdf-benchmark-notification__results strong {
+  color: #ffffff;
+}
+
+.pdf-benchmark-notification__total {
+  font-variant-numeric: tabular-nums;
+}

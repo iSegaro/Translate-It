@@ -77,6 +77,7 @@ export function createPdfStatusBannerController() {
         variant: developerNotification.variant || 'info',
         title: developerNotification.title || 'Developer notification',
         message: developerNotification.message || '',
+        body: developerNotification.body || null,
         dismissible: true
       }
     }

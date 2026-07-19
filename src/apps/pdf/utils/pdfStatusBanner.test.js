@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 import { createPdfStatusBannerController } from './pdfStatusBanner.js'
+import { PDF_NOTIFICATION_BODY_TYPE } from '../notifications/PdfNotificationBodyType.js'
 
 describe('buildPdfStatusBannerState', () => {
   let controller
@@ -79,7 +80,8 @@ describe('buildPdfStatusBannerState', () => {
       id: 'developer-notification:1',
       variant: 'success',
       title: 'Region Benchmark complete',
-      message: 'Winner: scale-1-eng.'
+      message: 'Winner: scale-1-eng.',
+      body: { type: PDF_NOTIFICATION_BODY_TYPE.BENCHMARK_RESULTS, payload: { rows: [] } }
     }
 
     expect(controller.build({ developerNotification: notification })).toEqual({

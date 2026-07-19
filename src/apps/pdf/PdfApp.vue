@@ -64,9 +64,14 @@
             :title="pdfStatusBanner.title || ''"
             :message="pdfStatusBanner.message || ''"
             :detail="pdfStatusBanner.detail || ''"
+            :body="pdfStatusBanner.body || null"
             :dismissible="pdfStatusBanner?.dismissible ?? false"
             @dismiss="dismissPdfStatusBanner"
-          />
+          >
+            <template #body="{ body }">
+              <PdfNotificationBodyRenderer :body="body" />
+            </template>
+          </PdfStatusBanner>
         </div>
 
         <PdfOcrProgress
@@ -202,6 +207,7 @@ import PdfTranslatedPane from './components/PdfTranslatedPane.vue'
 import PdfOcrConsentPrompt from './components/PdfOcrConsentPrompt.vue'
 import PdfOcrProgress from './components/PdfOcrProgress.vue'
 import PdfStatusBanner from './components/PdfStatusBanner.vue'
+import PdfNotificationBodyRenderer from './components/notifications/PdfNotificationBodyRenderer.vue'
 import PdfWindowsHost from './components/PdfWindowsHost.vue'
 import PdfOutline from './components/PdfOutline.vue'
 import { usePdfViewerController } from './composables/usePdfViewerController.js'
@@ -221,6 +227,7 @@ import { BenchmarkRunner } from './BenchmarkRunner.js'
 import { BenchmarkAnalyzer } from './BenchmarkAnalyzer.js'
 import { BenchmarkArtifactWriter } from './BenchmarkArtifactWriter.js'
 import { REGION_BENCHMARK_CONFIGURATIONS } from './regionBenchmarkConfigurations.js'
+import { PDF_NOTIFICATION_BODY_TYPE } from './notifications/PdfNotificationBodyType.js'
 import { downloadFile } from '@/features/pdf-translation/core/PdfFileDownloader.js'
 import { getSourceLanguageAsync } from '@/shared/config/config.js'
 import { useSettingsStore } from '@/features/settings/stores/settings.js'
@@ -636,7 +643,7 @@ function handleBenchmarkOutcome(operation, result) {
   }
 
   if (result.status === 'ready') {
-    developerNotification.value = createBenchmarkSuccessNotification(analysis)
+    developerNotification.value = createBenchmarkSuccessNotification(analysis, result)
   }
 }
 
@@ -651,7 +658,7 @@ function handleBenchmarkFailure(operation, error) {
   developerNotification.value = createBenchmarkFailureNotification(error)
 }
 
-function createBenchmarkSuccessNotification(summary) {
+function createBenchmarkSuccessNotification(summary, result) {
   const details = []
   if (summary?.winner?.candidateId) details.push(`Winner: ${summary.winner.candidateId}.`)
   if (Number.isFinite(summary?.latency?.fastestMs)) details.push(`Fastest: ${summary.latency.fastestMs}ms.`)
@@ -660,7 +667,15 @@ function createBenchmarkSuccessNotification(summary) {
     id: `developer-notification:${++developerNotificationOccurrenceId}`,
     variant: 'success',
     title: 'Region Benchmark complete',
-    message: details.join(' ') || 'Region Benchmark completed.'
+    message: details.join(' ') || 'Region Benchmark completed.',
+    body: Object.freeze({
+      type: PDF_NOTIFICATION_BODY_TYPE.BENCHMARK_RESULTS,
+      payload: Object.freeze({
+        analysis: summary,
+        results: result.results,
+        totalElapsedMs: result.summary?.totalElapsedMs
+      })
+    })
   }
 }
 

@@ -417,8 +417,7 @@
   font-size: 11px;
 }
 
-.pdf-toolbar__benchmark-summary,
-.pdf-toolbar__benchmark-results li {
+.pdf-toolbar__benchmark-summary {
   display: flex;
   align-items: center;
   gap: 6px;
@@ -441,31 +440,8 @@
   cursor: pointer;
 }
 
-.pdf-toolbar__benchmark-current,
-.pdf-toolbar__benchmark-total {
+.pdf-toolbar__benchmark-current {
   font-variant-numeric: tabular-nums;
-}
-
-.pdf-toolbar__benchmark-results {
-  display: grid;
-  gap: 3px;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
-.pdf-toolbar__benchmark-analysis {
-  display: grid;
-  gap: 3px;
-  color: $tb-text-primary;
-}
-
-.pdf-toolbar__benchmark-results li {
-  flex-wrap: wrap;
-}
-
-.pdf-toolbar__benchmark-results code {
-  color: $tb-text-primary;
 }
 
 .pdf-toolbar__button--menu-trigger {

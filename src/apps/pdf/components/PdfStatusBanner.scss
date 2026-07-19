@@ -75,6 +75,17 @@
   gap: 2px;
 }
 
+.pdf-status-banner--expanded {
+  flex-wrap: wrap;
+}
+
+.pdf-status-banner--expanded .pdf-status-banner__body {
+  flex-basis: 100%;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  margin-top: 2px;
+  padding-top: 10px;
+}
+
 .pdf-status-banner__title,
 .pdf-status-banner__message,
 .pdf-status-banner__detail {

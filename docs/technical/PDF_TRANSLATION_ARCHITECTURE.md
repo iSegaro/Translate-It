@@ -1613,7 +1613,7 @@ Reactive via `translationTick`:
 
 ### Overview
 
-The status banner is a single-line notification bar displayed above the viewer content area. It shows the current state of the PDF application: loading progress, translation activity, errors, partial translation warnings, developer notifications, export success confirmations, and cache-restore notifications.
+The status banner is a compact notification bar displayed above the viewer content area. It shows the current state of the PDF application: loading progress, translation activity, errors, partial translation warnings, developer notifications, export success confirmations, and cache-restore notifications. Notifications may provide an optional opaque body (`{ type, payload }`), rendered through the generic `body` slot below the header.
 
 **Ownership:** `PdfApp` owns the banner controller instance (`createPdfStatusBannerController`) and the reactive `pdfStatusBanner` computed that drives it. The banner is rendered by the `PdfStatusBanner` component as a sibling of the viewer layout, outside the scroll pane.
 
