@@ -123,7 +123,6 @@ vi.mock('@/features/pdf-translation/core/PdfHistoryManager.js', () => ({
 }))
 
 const { usePdfViewerController } = await import('./usePdfViewerController.js')
-const { pdfCacheManager } = await import('@/features/pdf-translation/core/PdfCacheManager.js')
 
 function createOpenState() {
   return {
@@ -131,7 +130,6 @@ function createOpenState() {
     displayName: 'doc.pdf',
     totalPages: 1,
     pageMetrics: [{ pageNumber: 1, width: 600, height: 800, scale: 1 }],
-    pageScale: 1,
     workerUrl: 'worker',
     documentIdentity: 'doc-1',
     pdfFingerprint: 'fingerprint-1'

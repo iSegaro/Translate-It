@@ -75,7 +75,6 @@ export class PdfDocumentSession extends ResourceTracker {
     this.fileName = ''
     this.totalPages = 0
     this.pageMetrics = []
-    this.pageScale = 1
     this.visiblePageNumbers = new Set()
     this.pdfFingerprint = ''
     this.documentIdentity = ''
@@ -409,7 +408,6 @@ export class PdfDocumentSession extends ResourceTracker {
     }
 
     this.pageMetrics = metrics
-    this.pageScale = metrics[0]?.scale || 1
   }
 
   async rebuildPageMetrics(layoutRequest) {
@@ -430,7 +428,6 @@ export class PdfDocumentSession extends ResourceTracker {
       displayName: this.displayName,
       totalPages: this.totalPages,
       pageMetrics: this.pageMetrics,
-      pageScale: this.pageScale,
       workerUrl: this.workerUrl,
       documentIdentity: this.documentIdentity,
       pdfFingerprint: this.pdfFingerprint

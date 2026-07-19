@@ -296,7 +296,6 @@ function createMocks({
     canTranslateVisiblePages: ref(true),
     pageCount: ref(12),
     pageMetrics: ref([]),
-    pageScale: ref(1),
     translationSummary: ref({
       status: 'idle',
       translatedCount: 0,
@@ -577,7 +576,6 @@ describe('PdfApp', () => {
 
   it('builds OCR RegionExecutionRequest and preserves recognized-text handoff', async () => {
     createMocks({ sessionAsRef: false })
-    mockViewerController.pageScale.value = 0.4
 
     mockRegionOcr.startRegionOcr.mockImplementation(() => {
       mockRegionOcrOptions.onRecognized?.({ text: ' recognized text ', lines: [], confidence: 99 })
