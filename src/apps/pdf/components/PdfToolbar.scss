@@ -454,6 +454,12 @@
   list-style: none;
 }
 
+.pdf-toolbar__benchmark-analysis {
+  display: grid;
+  gap: 3px;
+  color: $tb-text-primary;
+}
+
 .pdf-toolbar__benchmark-results li {
   flex-wrap: wrap;
 }

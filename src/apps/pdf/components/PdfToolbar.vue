@@ -361,6 +361,17 @@
               >
                 {{ benchmarkState.progress.currentCandidate.candidateId }}
               </span>
+              <div
+                v-if="benchmarkState.analysis"
+                class="pdf-toolbar__benchmark-analysis"
+              >
+                <span v-if="benchmarkState.analysis.winnerCandidateId">Winner {{ benchmarkState.analysis.winnerCandidateId }}</span>
+                <span v-if="benchmarkState.analysis.latency.fastestMs !== null">Fastest {{ benchmarkState.analysis.latency.fastestMs }}ms</span>
+                <span v-if="benchmarkState.analysis.confidence.highest !== null">
+                  Confidence {{ benchmarkState.analysis.confidence.highest }}<template v-if="hasFiniteValue(benchmarkState.analysis.confidence.delta)"> (+{{ benchmarkState.analysis.confidence.delta }})</template>
+                </span>
+                <span>Output {{ benchmarkState.analysis.output.comparable ? (benchmarkState.analysis.output.identical ? 'Identical' : 'Different') : 'Not comparable' }}</span>
+              </div>
               <ul
                 v-if="benchmarkState.results?.length"
                 class="pdf-toolbar__benchmark-results"
@@ -455,6 +466,7 @@ const isBenchmarkActive = computed(() => ['running', 'cancelling'].includes(prop
 
 const formatCer = (evaluation) => evaluation.cer.characterErrorRate.toFixed(3)
 const evaluationStatus = (evaluation) => evaluation.cer.characterErrorRate === 0 ? 'exact' : 'differences'
+const hasFiniteValue = (value) => Number.isFinite(value)
 
 const providerPersistenceState = {
   sequence: 0,

@@ -218,6 +218,7 @@ import { createPdfStatusBannerController } from './utils/pdfStatusBanner.js'
 import { REGION_OCR_STATE } from './constants/regionOcrState.js'
 import { PdfDeveloperApi } from './PdfDeveloperApi.js'
 import { BenchmarkRunner } from './BenchmarkRunner.js'
+import { BenchmarkAnalyzer } from './BenchmarkAnalyzer.js'
 import { BenchmarkArtifactWriter } from './BenchmarkArtifactWriter.js'
 import { REGION_BENCHMARK_CONFIGURATIONS } from './regionBenchmarkConfigurations.js'
 import { downloadFile } from '@/features/pdf-translation/core/PdfFileDownloader.js'
@@ -338,6 +339,7 @@ const benchmarkRunner = new BenchmarkRunner({
   onProgress: handleBenchmarkProgress
 })
 const benchmarkArtifactWriter = new BenchmarkArtifactWriter()
+const benchmarkAnalyzer = new BenchmarkAnalyzer()
 let activeBenchmarkOperation = null
 let completedBenchmarkResult = null
 let completedBenchmarkRegion = null
@@ -548,6 +550,7 @@ function handleRegionSelectionComplete(region) {
         currentCandidate: null
       }),
       results: Object.freeze([]),
+      analysis: null,
       summary: null
     }
     void operation.promise.then(
@@ -622,6 +625,7 @@ function handleBenchmarkOutcome(operation, result) {
       currentCandidate: null
     }),
     results: result.results,
+    analysis: result.status === 'ready' ? benchmarkAnalyzer.analyze(result) : null,
     summary: result.summary
   }
 }
