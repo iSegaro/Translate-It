@@ -38,15 +38,24 @@ export class BenchmarkSession {
     if (this.cancelled) return Object.freeze({ status: BENCHMARK_RUNNER_STATUS.CANCELLED })
 
     const providers = this.providerResolver.resolve()
-    const plan = this.executionPlanner.create(providers)
+    let plan = this.executionPlanner.create(providers)
     const results = []
 
-    for (const [index, step] of plan.steps.entries()) {
-      results.push(await this.providerExecutor.execute({
-        request: this.request,
-        provider: providers[index],
-        step
-      }))
+    for (const [index, pendingStep] of plan.steps.entries()) {
+      plan = this.executionPlanner.markRunning(plan, pendingStep)
+      const step = plan.steps[index]
+
+      try {
+        results.push(await this.providerExecutor.execute({
+          request: this.request,
+          provider: providers[index],
+          step
+        }))
+        plan = this.executionPlanner.markCompleted(plan, step)
+      } catch (error) {
+        plan = this.executionPlanner.markFailed(plan, step)
+        throw error
+      }
     }
 
     this.state = 'ready'

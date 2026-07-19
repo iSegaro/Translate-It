@@ -24,4 +24,18 @@ describe('BenchmarkExecutionPlanner', () => {
     expect(() => plan.steps.push({ providerId: 'another-provider', state: 'pending' })).toThrow()
     expect(() => { plan.steps[0].state = 'running' }).toThrow()
   })
+
+  it('returns immutable state transition snapshots', () => {
+    const planner = new BenchmarkExecutionPlanner()
+    const pending = planner.create([{ id: 'provider' }])
+    const running = planner.markRunning(pending, pending.steps[0])
+    const completed = planner.markCompleted(running, running.steps[0])
+
+    expect(pending.steps[0].state).toBe('pending')
+    expect(running.steps[0].state).toBe('running')
+    expect(completed.steps[0].state).toBe('completed')
+    expect(Object.isFrozen(completed)).toBe(true)
+    expect(Object.isFrozen(completed.steps)).toBe(true)
+    expect(Object.isFrozen(completed.steps[0])).toBe(true)
+  })
 })
