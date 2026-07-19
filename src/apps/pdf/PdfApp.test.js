@@ -4,6 +4,7 @@ import { computed, defineComponent, h, nextTick, ref } from 'vue'
 import PdfApp from './PdfApp.vue'
 import { createPdfRegion } from '@/features/pdf-translation/core/PdfRegion.js'
 import { PdfDeveloperApi } from './PdfDeveloperApi.js'
+import { PDF_REGION_OCR_RENDER_SCALE } from '@/features/pdf-translation/core/pdfRenderingConstants.js'
 
 // jsdom does not implement matchMedia — stub it before component mount
 if (!window.matchMedia) {
@@ -576,6 +577,7 @@ describe('PdfApp', () => {
 
   it('builds OCR RegionExecutionRequest and preserves recognized-text handoff', async () => {
     createMocks({ sessionAsRef: false })
+    mockViewerController.pageScale.value = 0.4
 
     mockRegionOcr.startRegionOcr.mockImplementation(() => {
       mockRegionOcrOptions.onRecognized?.({ text: ' recognized text ', lines: [], confidence: 99 })
@@ -597,6 +599,10 @@ describe('PdfApp', () => {
       scope: 'live-region'
     })
     expect(mockRegionOcr.startRegionOcr).toHaveBeenCalledOnce()
+    expect(mockRegionOcr.startRegionOcr).toHaveBeenCalledWith(expect.objectContaining({
+      region,
+      scale: PDF_REGION_OCR_RENDER_SCALE
+    }))
 
     await vi.waitFor(() => {
       expect(openTranslationMock).toHaveBeenCalledWith({

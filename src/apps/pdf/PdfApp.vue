@@ -229,6 +229,7 @@ import { BenchmarkArtifactWriter } from './BenchmarkArtifactWriter.js'
 import { REGION_BENCHMARK_CONFIGURATIONS } from './regionBenchmarkConfigurations.js'
 import { PDF_NOTIFICATION_BODY_TYPE } from './notifications/PdfNotificationBodyType.js'
 import { downloadFile } from '@/features/pdf-translation/core/PdfFileDownloader.js'
+import { PDF_REGION_OCR_RENDER_SCALE } from '@/features/pdf-translation/core/pdfRenderingConstants.js'
 import { getSourceLanguageAsync } from '@/shared/config/config.js'
 import { useSettingsStore } from '@/features/settings/stores/settings.js'
 import { applyTheme } from '@/utils/ui/theme.js'
@@ -244,7 +245,6 @@ const {
   hasAnyTranslation,
   pageCount,
   pageMetrics,
-  pageScale,
   translationSummary,
   translatedPageData,
   translationTick,
@@ -358,7 +358,7 @@ const regionExecutionDispatcher = createRegionExecutionDispatcher({
     [REGION_EXECUTION_TARGET.OCR]: (request) => startRegionOcr({
       region: request.region,
       pdfDocument: session.pdfDocument,
-      scale: pageScale.value || 1,
+      scale: PDF_REGION_OCR_RENDER_SCALE,
       language: getSourceLanguageAsync().catch(() => undefined)
     }),
     [REGION_EXECUTION_TARGET.BENCHMARK]: (request) => benchmarkRunner.execute(request)
