@@ -30,6 +30,11 @@ export class BenchmarkAnalyzer {
 
     const summary = {
       winnerCandidateId: evaluationWinner?.result.candidateId ?? highestConfidence?.result.candidateId ?? null,
+      winner: evaluationWinner
+        ? { candidateId: evaluationWinner.result.candidateId, reason: 'lowest-cer' }
+        : highestConfidence
+          ? { candidateId: highestConfidence.result.candidateId, reason: 'highest-confidence' }
+          : null,
       fastestCandidateId: fastest?.candidateId ?? null,
       latency: {
         fastestMs: fastest?.runtime.latencyMs ?? null,
@@ -39,7 +44,8 @@ export class BenchmarkAnalyzer {
       confidence: {
         highest: highestConfidence?.confidence ?? null,
         lowest: lowestConfidence?.confidence ?? null,
-        delta: highestConfidence && lowestConfidence ? highestConfidence.confidence - lowestConfidence.confidence : null
+        delta: highestConfidence && lowestConfidence ? highestConfidence.confidence - lowestConfidence.confidence : null,
+        comparable: confidenceResults.length >= 2
       },
       output: {
         identical: successfulTexts.length >= 2 && outputCount === 1,

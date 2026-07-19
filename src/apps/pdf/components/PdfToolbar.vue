@@ -365,12 +365,12 @@
                 v-if="benchmarkState.analysis"
                 class="pdf-toolbar__benchmark-analysis"
               >
-                <span v-if="benchmarkState.analysis.winnerCandidateId">Winner {{ benchmarkState.analysis.winnerCandidateId }}</span>
+                <span v-if="benchmarkState.analysis.winner">Winner {{ benchmarkState.analysis.winner.candidateId }} ({{ winnerReasonLabel(benchmarkState.analysis.winner.reason) }})</span>
                 <span v-if="benchmarkState.analysis.latency.fastestMs !== null">Fastest {{ benchmarkState.analysis.latency.fastestMs }}ms</span>
                 <span v-if="benchmarkState.analysis.confidence.highest !== null">
-                  Confidence {{ benchmarkState.analysis.confidence.highest }}<template v-if="hasFiniteValue(benchmarkState.analysis.confidence.delta)"> (+{{ benchmarkState.analysis.confidence.delta }})</template>
+                  Confidence {{ benchmarkState.analysis.confidence.highest }}<template v-if="benchmarkState.analysis.confidence.comparable && benchmarkState.analysis.confidence.delta !== 0"> (+{{ benchmarkState.analysis.confidence.delta }})</template>
                 </span>
-                <span>Output {{ benchmarkState.analysis.output.comparable ? (benchmarkState.analysis.output.identical ? 'Identical' : 'Different') : 'Not comparable' }}</span>
+                <span>OCR Output {{ benchmarkState.analysis.output.comparable ? (benchmarkState.analysis.output.identical ? 'Identical' : 'Different') : 'Not comparable' }}</span>
               </div>
               <ul
                 v-if="benchmarkState.results?.length"
@@ -466,7 +466,7 @@ const isBenchmarkActive = computed(() => ['running', 'cancelling'].includes(prop
 
 const formatCer = (evaluation) => evaluation.cer.characterErrorRate.toFixed(3)
 const evaluationStatus = (evaluation) => evaluation.cer.characterErrorRate === 0 ? 'exact' : 'differences'
-const hasFiniteValue = (value) => Number.isFinite(value)
+const winnerReasonLabel = (reason) => reason === 'lowest-cer' ? 'Lowest CER' : 'Highest confidence'
 
 const providerPersistenceState = {
   sequence: 0,

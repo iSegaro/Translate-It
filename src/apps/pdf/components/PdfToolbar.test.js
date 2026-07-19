@@ -269,8 +269,9 @@ describe('PdfToolbar', () => {
       results: evaluatedResults,
       analysis: {
         winnerCandidateId: 'scale-1-eng',
+        winner: { candidateId: 'scale-1-eng', reason: 'lowest-cer' },
         latency: { fastestMs: 42 },
-        confidence: { highest: 95, delta: 5 },
+        confidence: { highest: 95, delta: 5, comparable: true },
         output: { identical: true, comparable: true }
       },
       summary: { totalElapsedMs: 84 }
@@ -285,10 +286,10 @@ describe('PdfToolbar', () => {
     await developer.find('.pdf-toolbar__button[aria-label="More actions"]').trigger('click')
 
     expect(developer.find('.pdf-toolbar__benchmark').text()).toContain('2/2')
-    expect(developer.find('.pdf-toolbar__benchmark-analysis').text()).toContain('Winner scale-1-eng')
+    expect(developer.find('.pdf-toolbar__benchmark-analysis').text()).toContain('Winner scale-1-eng (Lowest CER)')
     expect(developer.find('.pdf-toolbar__benchmark-analysis').text()).toContain('Fastest 42ms')
     expect(developer.find('.pdf-toolbar__benchmark-analysis').text()).toContain('Confidence 95 (+5)')
-    expect(developer.find('.pdf-toolbar__benchmark-analysis').text()).toContain('Output Identical')
+    expect(developer.find('.pdf-toolbar__benchmark-analysis').text()).toContain('OCR Output Identical')
     expect(developer.find('.pdf-toolbar__benchmark').text()).toContain('scale-1-eng')
     expect(developer.find('.pdf-toolbar__benchmark').text()).toContain('scale 1')
     expect(developer.find('.pdf-toolbar__benchmark').text()).toContain('eng')
@@ -339,8 +340,9 @@ describe('PdfToolbar', () => {
           results: [],
           analysis: {
             winnerCandidateId: null,
+            winner: null,
             latency: { fastestMs: null },
-            confidence: { highest: 95, delta: null },
+            confidence: { highest: 95, delta: null, comparable: false },
             output: { identical: false, comparable: false }
           },
           summary: null
@@ -352,7 +354,31 @@ describe('PdfToolbar', () => {
     expect(wrapper.find('.pdf-toolbar__benchmark-analysis').text()).toContain('Confidence 95')
     expect(wrapper.find('.pdf-toolbar__benchmark-analysis').text()).not.toContain('null')
     expect(wrapper.find('.pdf-toolbar__benchmark-analysis').text()).not.toContain('undefined')
-    expect(wrapper.find('.pdf-toolbar__benchmark-analysis').text()).toContain('Output Not comparable')
+    expect(wrapper.find('.pdf-toolbar__benchmark-analysis').text()).toContain('OCR Output Not comparable')
+  })
+
+  it('does not render zero confidence delta', async () => {
+    settingsStoreMock.settings.DEBUG_MODE = true
+    const wrapper = mount(PdfToolbar, {
+      props: {
+        benchmarkState: {
+          status: 'completed',
+          progress: { totalCandidates: 2, completedCandidates: 2, currentCandidate: null },
+          results: [],
+          analysis: {
+            winner: null,
+            latency: { fastestMs: null },
+            confidence: { highest: 95, delta: 0, comparable: true },
+            output: { identical: true, comparable: true }
+          },
+          summary: null
+        }
+      }
+    })
+    await wrapper.find('.pdf-toolbar__button[aria-label="More actions"]').trigger('click')
+
+    expect(wrapper.find('.pdf-toolbar__benchmark-analysis').text()).toContain('Confidence 95')
+    expect(wrapper.find('.pdf-toolbar__benchmark-analysis').text()).not.toContain('(+0)')
   })
 
   it('shows OCR button without count when OCR recommendations exist', async () => {

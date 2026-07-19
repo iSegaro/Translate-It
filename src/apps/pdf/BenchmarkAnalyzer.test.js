@@ -25,9 +25,10 @@ describe('BenchmarkAnalyzer', () => {
 
     expect(summary).toEqual({
       winnerCandidateId: 'scale-1.5-eng',
+      winner: { candidateId: 'scale-1.5-eng', reason: 'lowest-cer' },
       fastestCandidateId: 'scale-1.5-eng',
       latency: { fastestMs: 50, slowestMs: 80, deltaMs: 30 },
-      confidence: { highest: 95, lowest: 90, delta: 5 },
+      confidence: { highest: 95, lowest: 90, delta: 5, comparable: true },
       output: { identical: true, comparable: true, uniqueOutputCount: 1 },
       evaluation: { winnerCandidateId: 'scale-1.5-eng', cer: 0.1 }
     })
@@ -35,6 +36,7 @@ describe('BenchmarkAnalyzer', () => {
     expect(Object.isFrozen(summary.latency)).toBe(true)
     expect(Object.isFrozen(summary.confidence)).toBe(true)
     expect(Object.isFrozen(summary.output)).toBe(true)
+    expect(Object.isFrozen(summary.winner)).toBe(true)
     expect(Object.isFrozen(summary.evaluation)).toBe(true)
   })
 
@@ -55,8 +57,9 @@ describe('BenchmarkAnalyzer', () => {
     ]))
 
     expect(summary.winnerCandidateId).toBe('first')
+    expect(summary.winner).toEqual({ candidateId: 'first', reason: 'highest-confidence' })
     expect(summary.fastestCandidateId).toBe('first')
-    expect(summary.confidence).toEqual({ highest: 80, lowest: 80, delta: 0 })
+    expect(summary.confidence).toEqual({ highest: 80, lowest: 80, delta: 0, comparable: true })
     expect(summary.latency).toEqual({ fastestMs: 20, slowestMs: 20, deltaMs: 0 })
     expect(summary).not.toHaveProperty('evaluation')
   })
@@ -68,7 +71,7 @@ describe('BenchmarkAnalyzer', () => {
     ]))
 
     expect(summary.winnerCandidateId).toBe('first')
-    expect(summary.confidence).toEqual({ highest: 95, lowest: 95, delta: 0 })
+    expect(summary.confidence).toEqual({ highest: 95, lowest: 95, delta: 0, comparable: false })
     expect(summary.latency).toEqual({ fastestMs: 10, slowestMs: 10, deltaMs: 0 })
     expect(summary.evaluation).toEqual({ winnerCandidateId: 'first', cer: 0.4 })
     expect(new BenchmarkAnalyzer().analyze(benchmarkResult([recognized('third')])).latency)
