@@ -29,7 +29,7 @@ describe('RegionExecutionDispatcher', () => {
       region: createPdfRegion({ pageNumber: 1, left: 1, top: 4, right: 3, bottom: 2 }),
       target: REGION_EXECUTION_TARGET.BENCHMARK
     })
-    const runner = new BenchmarkRunner({ configurations: [] })
+    const runner = new BenchmarkRunner({ profile: { id: 'empty', name: 'Empty', configurations: [] } })
     const execute = vi.spyOn(runner, 'execute')
     const dispatcher = createRegionExecutionDispatcher({
       runners: { [REGION_EXECUTION_TARGET.BENCHMARK]: (benchmarkRequest) => runner.execute(benchmarkRequest) }

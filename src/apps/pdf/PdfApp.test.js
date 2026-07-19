@@ -115,7 +115,7 @@ vi.mock('@/shared/config/config.js', () => ({
 vi.mock('./components/PdfToolbar.vue', () => ({
   default: {
     name: 'PdfToolbar',
-    props: ['fileName', 'pageCount', 'currentPageNumber', 'zoomMode', 'zoomPercent', 'contentView', 'layoutMode', 'ocrRecommendationCount', 'executionMode', 'executionModes', 'regionOcrState', 'regionOcrAvailable', 'benchmarkState', 'canExportBenchmarkArtifact'],
+    props: ['fileName', 'pageCount', 'currentPageNumber', 'zoomMode', 'zoomPercent', 'contentView', 'layoutMode', 'ocrRecommendationCount', 'executionMode', 'executionModes', 'regionOcrState', 'regionOcrAvailable', 'benchmarkState', 'benchmarkProfileName', 'canExportBenchmarkArtifact'],
     emits: ['toggle-outline', 'translate-visible', 'cancel-translation', 'content-view-change', 'layout-mode-change', 'zoom-step', 'zoom-change', 'export-txt', 'export-markdown', 'export-html', 'request-ocr', 'request-region-ocr', 'request-region-benchmark', 'cancel-region-benchmark', 'export-benchmark-artifact', 'clear-cache', 'request-open-pdf', 'execution-mode-change'],
     template: '<header class="pdf-toolbar-stub" />'
   }

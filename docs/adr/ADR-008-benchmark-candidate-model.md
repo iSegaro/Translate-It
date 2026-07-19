@@ -38,7 +38,7 @@ Evaluation remains independent from execution. `BenchmarkEvaluator` consumes ben
 
 - `PdfRegion` remains canonical geometry under ADR-006.
 - `RegionExecutionDispatcher` remains request routing under ADR-007.
-- Benchmark policy owns the configured OCR configurations.
+- `BenchmarkProfile` owns immutable benchmark policy: id, name, and configured OCR configurations.
 - `BenchmarkCandidatePlanner` owns candidate generation from supplied configurations.
 - Benchmark runner owns benchmark lifecycle only.
 - `PdfRegionOcrExecutor` owns render, OCR, cleanup, and cancellation.
