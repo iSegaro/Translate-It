@@ -43,7 +43,8 @@ describe('RegionExecutionDispatcher', () => {
       status: BENCHMARK_RUNNER_STATUS.READY,
       providers: [],
       plan: { steps: [] },
-      results: []
+      results: [],
+      scoreReport: { providers: [], winner: null }
     })
   })
 

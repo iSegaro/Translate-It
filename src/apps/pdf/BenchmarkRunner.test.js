@@ -51,12 +51,23 @@ describe('BenchmarkRunner', () => {
       .mockReturnValueOnce(125)
       .mockReturnValueOnce(200)
       .mockReturnValueOnce(260)
+    const scoreReport = Object.freeze({
+      providers: Object.freeze([{ providerId: 'first', score: null }, { providerId: 'second', score: null }]),
+      winner: null
+    })
+    const scoringEngine = { score: vi.fn(() => scoreReport) }
     const request = createRegionExecutionRequest({
       region: createPdfRegion({ pageNumber: 1, left: 1, top: 4, right: 3, bottom: 2 }),
       target: REGION_EXECUTION_TARGET.BENCHMARK
     })
 
-    const result = await new BenchmarkSession(request, { providerResolver, executionPlanner, providerExecutor, clock }).run()
+    const result = await new BenchmarkSession(request, {
+      providerResolver,
+      executionPlanner,
+      providerExecutor,
+      clock,
+      scoringEngine
+    }).run()
 
     expect(result).toEqual({
       status: BENCHMARK_RUNNER_STATUS.READY,
@@ -70,11 +81,13 @@ describe('BenchmarkRunner', () => {
       results: [
         { providerId: 'first', status: 'completed', output: 'first output', startedAt: 100, completedAt: 125, durationMs: 25 },
         { providerId: 'second', status: 'completed', output: 'second output', startedAt: 200, completedAt: 260, durationMs: 60 }
-      ]
+      ],
+      scoreReport
     })
     expect(clock).toHaveBeenCalledTimes(4)
     expect(Object.isFrozen(result.results)).toBe(true)
     expect(Object.isFrozen(result.results[0])).toBe(true)
+    expect(scoringEngine.score).toHaveBeenCalledWith(result.results)
     expect(providerResolver.resolve).toHaveBeenCalledOnce()
     expect(createPlan).toHaveBeenCalledWith(providers)
     expect(providerExecutor.execute).toHaveBeenCalledTimes(2)
@@ -103,7 +116,8 @@ describe('BenchmarkRunner', () => {
       status: BENCHMARK_RUNNER_STATUS.READY,
       providers: [],
       plan: { steps: [] },
-      results: []
+      results: [],
+      scoreReport: { providers: [], winner: null }
     })
     expect(providerExecutor.execute).not.toHaveBeenCalled()
   })

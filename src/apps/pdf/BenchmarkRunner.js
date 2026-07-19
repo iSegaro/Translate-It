@@ -3,6 +3,7 @@ import { isRegionExecutionRequest, REGION_EXECUTION_TARGET } from './composables
 import { BenchmarkExecutionPlanner } from './BenchmarkExecutionPlanner.js'
 import { BenchmarkProviderExecutor } from './BenchmarkProviderExecutor.js'
 import { BenchmarkProviderResolver } from './BenchmarkProviderResolver.js'
+import { BenchmarkScoringEngine } from './BenchmarkScoringEngine.js'
 
 export const BENCHMARK_RUNNER_STATUS = Object.freeze({
   READY: 'ready',
@@ -14,13 +15,15 @@ export class BenchmarkSession {
     providerResolver = new BenchmarkProviderResolver(),
     executionPlanner = new BenchmarkExecutionPlanner(),
     providerExecutor = new BenchmarkProviderExecutor(),
-    clock = () => Date.now()
+    clock = () => Date.now(),
+    scoringEngine = new BenchmarkScoringEngine()
   } = {}) {
     this.request = request
     this.providerResolver = providerResolver
     this.executionPlanner = executionPlanner
     this.providerExecutor = providerExecutor
     this.clock = clock
+    this.scoringEngine = scoringEngine
     this.state = 'created'
     this.cancelled = false
   }
@@ -70,12 +73,16 @@ export class BenchmarkSession {
       }
     }
 
+    const frozenResults = Object.freeze(results)
+    const scoreReport = this.scoringEngine.score(frozenResults)
+
     this.state = 'ready'
     return Object.freeze({
       status: BENCHMARK_RUNNER_STATUS.READY,
       providers,
       plan,
-      results: Object.freeze(results)
+      results: frozenResults,
+      scoreReport
     })
   }
 }
@@ -86,7 +93,14 @@ export class BenchmarkRunner {
     executionPlanner,
     providerExecutor,
     clock,
-    createSession = (request) => new BenchmarkSession(request, { providerResolver, executionPlanner, providerExecutor, clock })
+    scoringEngine,
+    createSession = (request) => new BenchmarkSession(request, {
+      providerResolver,
+      executionPlanner,
+      providerExecutor,
+      clock,
+      scoringEngine
+    })
   } = {}) {
     this.createSession = createSession
   }
