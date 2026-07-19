@@ -40,6 +40,9 @@ const regionComparisonRunnerMock = vi.hoisted(() => ({
   execute: vi.fn(),
   options: null
 }))
+const corpusBenchmarkCoordinatorMock = vi.hoisted(() => ({
+  run: vi.fn()
+}))
 
 function createMockOperation(promise, cancel = vi.fn(), context = { target: 'ocr' }) {
   return Object.freeze({
@@ -103,6 +106,15 @@ vi.mock('@/features/settings/stores/settings.js', () => ({
   useSettingsStore: () => settingsStoreMock
 }))
 
+vi.mock('./CorpusBenchmarkCoordinator.js', () => ({
+  CorpusBenchmarkCoordinator: class {
+    constructor() {}
+    run(options) {
+      return corpusBenchmarkCoordinatorMock.run(options)
+    }
+  }
+}))
+
 vi.mock('./RegionComparisonRunner.js', () => ({
   RegionComparisonRunner: class {
     constructor(options) {
@@ -131,8 +143,8 @@ vi.mock('@/shared/config/config.js', () => ({
 vi.mock('./components/PdfToolbar.vue', () => ({
   default: {
     name: 'PdfToolbar',
-    props: ['fileName', 'pageCount', 'currentPageNumber', 'zoomMode', 'zoomPercent', 'contentView', 'layoutMode', 'ocrRecommendationCount', 'executionMode', 'executionModes', 'regionOcrState', 'regionOcrAvailable', 'regionComparisonState', 'canExportRegionComparisonArtifact'],
-    emits: ['toggle-outline', 'translate-visible', 'cancel-translation', 'content-view-change', 'layout-mode-change', 'zoom-step', 'zoom-change', 'export-txt', 'export-markdown', 'export-html', 'request-ocr', 'request-region-ocr', 'request-region-comparison', 'cancel-region-comparison', 'export-region-comparison-artifact', 'clear-cache', 'request-open-pdf', 'execution-mode-change'],
+    props: ['fileName', 'pageCount', 'currentPageNumber', 'zoomMode', 'zoomPercent', 'contentView', 'layoutMode', 'ocrRecommendationCount', 'executionMode', 'executionModes', 'regionOcrState', 'regionOcrAvailable', 'regionComparisonState', 'canExportRegionComparisonArtifact', 'corpusBenchmarkState'],
+    emits: ['toggle-outline', 'translate-visible', 'cancel-translation', 'content-view-change', 'layout-mode-change', 'zoom-step', 'zoom-change', 'export-txt', 'export-markdown', 'export-html', 'request-ocr', 'request-region-ocr', 'request-region-comparison', 'cancel-region-comparison', 'export-region-comparison-artifact', 'clear-cache', 'request-open-pdf', 'execution-mode-change', 'request-corpus-benchmark', 'cancel-corpus-benchmark'],
     template: '<header class="pdf-toolbar-stub" />'
   }
 }))
@@ -395,6 +407,7 @@ describe('PdfApp', () => {
     mockRegionExecutionDispatch.mockClear()
     regionComparisonRunnerMock.execute.mockReset()
     regionComparisonRunnerMock.options = null
+    corpusBenchmarkCoordinatorMock.run.mockReset()
     settingsStoreMock.settings.DEBUG_MODE = false
     createMocks()
   })
@@ -552,6 +565,94 @@ describe('PdfApp', () => {
     await flushPromises()
 
     expect(wrapper.find('.pdf-status-banner').exists()).toBe(false)
+  })
+
+  describe('corpus benchmark flow', () => {
+    function readyCorpusBenchmarkResult() {
+      return {
+        candidateResults: Object.freeze([]),
+        candidateFailures: Object.freeze([]),
+        comparisonRuntimeResult: null,
+        comparisonArtifact: null,
+        cancelled: false
+      }
+    }
+
+    it('shows success developer notification after a corpus benchmark', async () => {
+      settingsStoreMock.settings.DEBUG_MODE = true
+      corpusBenchmarkCoordinatorMock.run.mockReturnValue(createMockOperation(
+        Promise.resolve(readyCorpusBenchmarkResult()),
+        vi.fn()
+      ))
+      const wrapper = mount(PdfApp)
+
+      wrapper.findComponent({ name: 'PdfToolbar' }).vm.$emit('request-corpus-benchmark')
+      await vi.waitFor(() => expect(wrapper.find('.pdf-status-banner').exists()).toBe(true))
+
+      expect(wrapper.find('.pdf-status-banner__title').text()).toBe('Corpus OCR Benchmark complete')
+      expect(wrapper.find('.pdf-status-banner__message').text()).toContain('Corpus benchmark completed.')
+    })
+
+    it('shows error developer notification after corpus benchmark failure', async () => {
+      settingsStoreMock.settings.DEBUG_MODE = true
+      corpusBenchmarkCoordinatorMock.run.mockReturnValue(createMockOperation(
+        Promise.reject(new Error('Corpus assets not packaged')),
+        vi.fn()
+      ))
+      const wrapper = mount(PdfApp)
+
+      wrapper.findComponent({ name: 'PdfToolbar' }).vm.$emit('request-corpus-benchmark')
+      await vi.waitFor(() => expect(wrapper.find('.pdf-status-banner').exists()).toBe(true))
+
+      expect(wrapper.find('.pdf-status-banner').classes()).toContain('pdf-status-banner--error')
+      expect(wrapper.find('.pdf-status-banner__title').text()).toBe('Corpus OCR Benchmark failed')
+      expect(wrapper.find('.pdf-status-banner__message').text()).toBe('Corpus assets not packaged')
+    })
+
+    it('emits corpusBenchmarkState through the toolbar binding', async () => {
+      settingsStoreMock.settings.DEBUG_MODE = true
+      corpusBenchmarkCoordinatorMock.run.mockReturnValue(createMockOperation(
+        new Promise(() => {}),
+        vi.fn()
+      ))
+      const wrapper = mount(PdfApp)
+
+      wrapper.findComponent({ name: 'PdfToolbar' }).vm.$emit('request-corpus-benchmark')
+      await flushPromises()
+
+      expect(wrapper.findComponent({ name: 'PdfToolbar' }).props('corpusBenchmarkState')).toMatchObject({
+        status: 'running'
+      })
+    })
+
+    it('cancels active corpus benchmark', async () => {
+      settingsStoreMock.settings.DEBUG_MODE = true
+      const cancel = vi.fn()
+      corpusBenchmarkCoordinatorMock.run.mockReturnValue(createMockOperation(
+        new Promise(() => {}),
+        cancel
+      ))
+      const wrapper = mount(PdfApp)
+
+      wrapper.findComponent({ name: 'PdfToolbar' }).vm.$emit('request-corpus-benchmark')
+      await flushPromises()
+      wrapper.findComponent({ name: 'PdfToolbar' }).vm.$emit('cancel-corpus-benchmark')
+
+      expect(cancel).toHaveBeenCalledOnce()
+    })
+
+    it('keeps corpus benchmark notification hidden outside Debug Mode', async () => {
+      corpusBenchmarkCoordinatorMock.run.mockReturnValue(createMockOperation(
+        Promise.resolve(readyCorpusBenchmarkResult()),
+        vi.fn()
+      ))
+      const wrapper = mount(PdfApp)
+
+      wrapper.findComponent({ name: 'PdfToolbar' }).vm.$emit('request-corpus-benchmark')
+      await flushPromises()
+
+      expect(wrapper.find('.pdf-status-banner').exists()).toBe(false)
+    })
   })
 
   it('refreshes OCR page wrappers before incrementing translationTick on OCR completion', async () => {

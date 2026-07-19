@@ -38,4 +38,36 @@ describe('PdfDeveloperApi', () => {
     expect(() => api.runRegionComparison(request)).toThrow(error)
     expect(() => api.invokeCapability(PDF_DEVELOPER_CAPABILITY.REGION_COMPARISON, request)).toThrow(error)
   })
+
+  it('exposes corpus benchmark as a developer capability', () => {
+    const api = new PdfDeveloperApi({
+      regionComparisonCoordinator: { coordinateRegionComparison: vi.fn() },
+      corpusBenchmarkCoordinator: { run: vi.fn() }
+    })
+
+    expect(api.getCapabilities()).toContain(PDF_DEVELOPER_CAPABILITY.CORPUS_BENCHMARK)
+    expect(api.hasCapability(PDF_DEVELOPER_CAPABILITY.CORPUS_BENCHMARK)).toBe(true)
+    expect(api.runCorpusBenchmark).toBeTypeOf('function')
+  })
+
+  it('delegates corpus benchmark through its coordinator boundary', () => {
+    const operation = Object.freeze({ promise: Promise.resolve(), cancel: vi.fn() })
+    const corpusBenchmarkCoordinator = { run: vi.fn(() => operation) }
+    const api = new PdfDeveloperApi({
+      regionComparisonCoordinator: { coordinateRegionComparison: vi.fn() },
+      corpusBenchmarkCoordinator
+    })
+    const options = { onProgress: vi.fn() }
+
+    expect(api.runCorpusBenchmark(options)).toBe(operation)
+    expect(corpusBenchmarkCoordinator.run).toHaveBeenCalledWith(options)
+  })
+
+  it('throws when region comparison calls invokeCapability with unknown capability', () => {
+    const api = new PdfDeveloperApi({
+      regionComparisonCoordinator: { coordinateRegionComparison: vi.fn() }
+    })
+
+    expect(() => api.invokeCapability('unknown')).toThrow('Unknown developer capability: unknown')
+  })
 })

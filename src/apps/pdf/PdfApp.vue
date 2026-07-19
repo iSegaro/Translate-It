@@ -23,6 +23,7 @@
       :region-ocr-available="regionOcrAvailable"
       :region-comparison-state="regionComparisonState"
       :can-export-region-comparison-artifact="canExportRegionComparisonArtifact"
+      :corpus-benchmark-state="corpusBenchmarkState"
       @toggle-outline="toggleOutline"
       @translate-visible="handleTranslateVisiblePages"
       @cancel-translation="handleCancelTranslation"
@@ -41,6 +42,8 @@
       @clear-cache="handleClearCache"
       @request-open-pdf="requestOpenPdf"
       @execution-mode-change="handleExecutionModeChange"
+      @request-corpus-benchmark="handleRequestCorpusBenchmark"
+      @cancel-corpus-benchmark="handleCancelCorpusBenchmark"
     />
 
     <input
@@ -223,12 +226,14 @@ import { createPdfTransitionController } from './composables/createPdfTransition
 import { createPdfStatusBannerController } from './utils/pdfStatusBanner.js'
 import { REGION_OCR_STATE } from './constants/regionOcrState.js'
 import { PdfDeveloperApi } from './PdfDeveloperApi.js'
+import { CorpusBenchmarkCoordinator } from './CorpusBenchmarkCoordinator.js'
 import { RegionComparisonRunner } from './RegionComparisonRunner.js'
 import { RegionComparisonAnalyzer } from './RegionComparisonAnalyzer.js'
 import { RegionComparisonArtifactWriter } from './RegionComparisonArtifactWriter.js'
 import { REGION_COMPARISON_CONFIGURATIONS } from './regionComparisonConfigurations.js'
 import { PDF_NOTIFICATION_BODY_TYPE } from './notifications/PdfNotificationBodyType.js'
 import { createRegionComparisonNotificationViewModel } from './components/notifications/RegionComparisonNotificationMapper.js'
+import { createCorpusBenchmarkNotificationViewModel } from './components/notifications/createCorpusBenchmarkNotificationViewModel.js'
 import { downloadFile } from '@/features/pdf-translation/core/PdfFileDownloader.js'
 import { PDF_REGION_OCR_RENDER_SCALE } from '@/features/pdf-translation/core/pdfRenderingConstants.js'
 import { getSourceLanguageAsync } from '@/shared/config/config.js'
@@ -350,6 +355,11 @@ const regionComparisonRunner = new RegionComparisonRunner({
 })
 const regionComparisonArtifactWriter = new RegionComparisonArtifactWriter()
 const regionComparisonAnalyzer = new RegionComparisonAnalyzer()
+
+const corpusBenchmarkCoordinator = new CorpusBenchmarkCoordinator({
+  corpus: null,
+  assets: []
+})
 let activeRegionComparisonOperation = null
 let completedRegionComparisonResult = null
 let completedRegionComparisonRegion = null
@@ -365,7 +375,10 @@ const regionExecutionDispatcher = createRegionExecutionDispatcher({
     [REGION_EXECUTION_TARGET.REGION_COMPARISON]: (request) => regionComparisonRunner.execute(request)
   }
 })
-const pdfDeveloperApi = new PdfDeveloperApi({ regionExecutionDispatcher })
+const corpusBenchmarkState = ref(null)
+let activeCorpusBenchmarkOperation = null
+
+const pdfDeveloperApi = new PdfDeveloperApi({ regionExecutionDispatcher, corpusBenchmarkCoordinator })
 
 usePdfKeyboard({
   currentPage,
@@ -624,6 +637,82 @@ function handleRegionComparisonProgress(progress) {
   }
 }
 
+let corpusBenchmarkStartTime = 0
+
+function handleRequestCorpusBenchmark() {
+  developerNotification.value = null
+  corpusBenchmarkStartTime = performance.now()
+  corpusBenchmarkState.value = {
+    status: 'running',
+    progress: null
+  }
+  const operation = pdfDeveloperApi.runCorpusBenchmark({
+    onProgress: (progress) => {
+      corpusBenchmarkState.value = {
+        status: 'running',
+        progress: Object.freeze({
+          totalCandidates: progress.candidates?.length || 0,
+          completedCandidates: progress.index || 0,
+          currentCandidate: progress.candidate
+            ? { candidateId: progress.candidate.id }
+            : null
+        })
+      }
+    }
+  })
+  activeCorpusBenchmarkOperation = operation
+  void operation.promise.then(
+    result => handleCorpusBenchmarkOutcome(result),
+    error => handleCorpusBenchmarkFailure(error)
+  )
+}
+
+function handleCancelCorpusBenchmark() {
+  if (!activeCorpusBenchmarkOperation) return
+
+  corpusBenchmarkState.value = {
+    ...corpusBenchmarkState.value,
+    status: 'cancelling'
+  }
+  activeCorpusBenchmarkOperation.cancel()
+}
+
+function handleCorpusBenchmarkOutcome(result) {
+  activeCorpusBenchmarkOperation = null
+  corpusBenchmarkState.value = result.cancelled
+    ? { status: 'cancelled', progress: null }
+    : { status: 'completed', progress: null }
+
+  if (!result.cancelled) {
+    const totalElapsedMs = performance.now() - corpusBenchmarkStartTime
+    developerNotification.value = {
+      id: `developer-notification:${++developerNotificationOccurrenceId}`,
+      variant: 'success',
+      title: 'Corpus OCR Benchmark complete',
+      message: 'Corpus benchmark completed.',
+      body: Object.freeze({
+        type: PDF_NOTIFICATION_BODY_TYPE.REGION_COMPARISON_RESULTS,
+        payload: Object.freeze(createCorpusBenchmarkNotificationViewModel({
+          candidateResults: result.candidateResults,
+          comparisonRuntimeResult: result.comparisonRuntimeResult,
+          totalElapsedMs
+        }))
+      })
+    }
+  }
+}
+
+function handleCorpusBenchmarkFailure(error) {
+  activeCorpusBenchmarkOperation = null
+  corpusBenchmarkState.value = { status: 'failed', progress: null }
+  developerNotification.value = {
+    id: `developer-notification:${++developerNotificationOccurrenceId}`,
+    variant: 'error',
+    title: 'Corpus OCR Benchmark failed',
+    message: error?.message || 'Corpus benchmark failed.'
+  }
+}
+
 function handleRegionComparisonOutcome(operation, result) {
   if (activeRegionComparisonOperation !== operation) return
 
@@ -853,6 +942,8 @@ onBeforeUnmount(() => {
   activeRegionPosition = null
   activeRegionComparisonOperation?.cancel()
   activeRegionComparisonOperation = null
+  activeCorpusBenchmarkOperation?.cancel()
+  activeCorpusBenchmarkOperation = null
   setRegionOcrIdle()
   detachDocument()
   void cleanup()

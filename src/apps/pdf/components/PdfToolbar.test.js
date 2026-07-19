@@ -321,6 +321,54 @@ describe('PdfToolbar', () => {
     expect(wrapper.find('.pdf-toolbar__regionComparison').exists()).toBe(false)
   })
 
+  it('emits corpus benchmark trigger only while Debug Mode is enabled', async () => {
+    const debugDisabled = mount(PdfToolbar)
+
+    await debugDisabled.find('.pdf-toolbar__button[aria-label="More actions"]').trigger('click')
+    expect(debugDisabled.findAll('button').some((button) => button.text().includes('Corpus OCR Benchmark'))).toBe(false)
+
+    settingsStoreMock.settings.DEBUG_MODE = true
+    const debugEnabled = mount(PdfToolbar)
+    await debugEnabled.find('.pdf-toolbar__button[aria-label="More actions"]').trigger('click')
+
+    const corpusBenchmark = debugEnabled.findAll('button').find((button) => button.text().includes('Corpus OCR Benchmark'))
+    expect(corpusBenchmark?.attributes('disabled')).toBeUndefined()
+
+    await corpusBenchmark?.trigger('click')
+    expect(debugEnabled.emitted('request-corpus-benchmark')).toHaveLength(1)
+  })
+
+  it('emits cancellation from active corpus benchmark state', async () => {
+    settingsStoreMock.settings.DEBUG_MODE = true
+    const wrapper = mount(PdfToolbar, {
+      props: {
+        corpusBenchmarkState: { status: 'running', progress: null }
+      }
+    })
+    await wrapper.find('.pdf-toolbar__button[aria-label="More actions"]').trigger('click')
+
+    expect(wrapper.find('.pdf-toolbar__regionComparison').text()).toContain('CorpusBenchmark')
+    await wrapper.find('.pdf-toolbar__regionComparison-cancel').trigger('click')
+    expect(wrapper.emitted('cancel-corpus-benchmark')).toHaveLength(1)
+  })
+
+  it('shows corpus benchmark progress only in Developer Mode', async () => {
+    const corpusBenchmarkState = {
+      status: 'running',
+      progress: { totalCandidates: 2, completedCandidates: 1 }
+    }
+    const normalUser = mount(PdfToolbar, { props: { corpusBenchmarkState } })
+
+    await normalUser.find('.pdf-toolbar__button[aria-label="More actions"]').trigger('click')
+    expect(normalUser.find('.pdf-toolbar__menu-section').exists()).toBe(false)
+
+    settingsStoreMock.settings.DEBUG_MODE = true
+    const developer = mount(PdfToolbar, { props: { corpusBenchmarkState } })
+    await developer.find('.pdf-toolbar__button[aria-label="More actions"]').trigger('click')
+
+    expect(developer.find('.pdf-toolbar__regionComparison').text()).toContain('1/2')
+  })
+
   it('shows OCR button without count when OCR recommendations exist', async () => {
     const wrapper = mount(PdfToolbar, {
       props: {
