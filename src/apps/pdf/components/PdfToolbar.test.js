@@ -287,6 +287,13 @@ describe('PdfToolbar', () => {
     expect(developer.find('.pdf-toolbar__benchmark').text()).toContain('CER 0.200')
     expect(developer.find('.pdf-toolbar__benchmark').text()).toContain('differences')
     expect(developer.find('.pdf-toolbar__benchmark').text()).toContain('Total 84ms')
+    expect(developer.findAll('button').some(button => button.text().includes('Export Benchmark Artifact'))).toBe(false)
+
+    await developer.setProps({ canExportBenchmarkArtifact: true })
+    const exportArtifact = developer.findAll('button').find(button => button.text().includes('Export Benchmark Artifact'))
+    expect(exportArtifact).toBeTruthy()
+    await exportArtifact?.trigger('click')
+    expect(developer.emitted('export-benchmark-artifact')).toHaveLength(1)
   })
 
   it('emits cancellation from active benchmark state', async () => {

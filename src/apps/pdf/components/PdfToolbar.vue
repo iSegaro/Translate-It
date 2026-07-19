@@ -327,6 +327,15 @@
             >
               Region Benchmark
             </button>
+            <button
+              v-if="canExportBenchmarkArtifact"
+              class="pdf-toolbar__export-item"
+              type="button"
+              role="menuitem"
+              @click="$emit('export-benchmark-artifact')"
+            >
+              Export Benchmark Artifact
+            </button>
             <div
               v-if="benchmarkState"
               class="pdf-toolbar__benchmark"
@@ -430,9 +439,10 @@ const props = defineProps({
   regionOcrState: { type: String, default: 'idle' },
   regionOcrAvailable: { type: Boolean, default: false },
   benchmarkState: { type: Object, default: null },
+  canExportBenchmarkArtifact: { type: Boolean, default: false },
 })
 
-const emit = defineEmits(['request-open-pdf', 'translate-visible', 'cancel-translation', 'content-view-change', 'layout-mode-change', 'toggle-outline', 'export-txt', 'export-markdown', 'export-html', 'request-ocr', 'request-region-ocr', 'request-region-benchmark', 'cancel-region-benchmark', 'clear-cache', 'zoom-step', 'zoom-change', 'execution-mode-change'])
+const emit = defineEmits(['request-open-pdf', 'translate-visible', 'cancel-translation', 'content-view-change', 'layout-mode-change', 'toggle-outline', 'export-txt', 'export-markdown', 'export-html', 'request-ocr', 'request-region-ocr', 'request-region-benchmark', 'cancel-region-benchmark', 'export-benchmark-artifact', 'clear-cache', 'zoom-step', 'zoom-change', 'execution-mode-change'])
 
 const logger = getScopedLogger(LOG_COMPONENTS.PDF, 'PdfToolbar')
 const settingsStore = useSettingsStore()

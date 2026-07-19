@@ -22,6 +22,7 @@
       :region-ocr-state="regionOcrState"
       :region-ocr-available="regionOcrAvailable"
       :benchmark-state="benchmarkState"
+      :can-export-benchmark-artifact="canExportBenchmarkArtifact"
       @toggle-outline="toggleOutline"
       @translate-visible="handleTranslateVisiblePages"
       @cancel-translation="handleCancelTranslation"
@@ -36,6 +37,7 @@
       @request-region-ocr="handleRequestRegionOcr"
       @request-region-benchmark="handleRequestRegionBenchmark"
       @cancel-region-benchmark="handleCancelRegionBenchmark"
+      @export-benchmark-artifact="handleExportBenchmarkArtifact"
       @clear-cache="handleClearCache"
       @request-open-pdf="requestOpenPdf"
       @execution-mode-change="handleExecutionModeChange"
@@ -216,7 +218,9 @@ import { createPdfStatusBannerController } from './utils/pdfStatusBanner.js'
 import { REGION_OCR_STATE } from './constants/regionOcrState.js'
 import { PdfDeveloperApi } from './PdfDeveloperApi.js'
 import { BenchmarkRunner } from './BenchmarkRunner.js'
+import { BenchmarkArtifactWriter } from './BenchmarkArtifactWriter.js'
 import { REGION_BENCHMARK_CONFIGURATIONS } from './regionBenchmarkConfigurations.js'
+import { downloadFile } from '@/features/pdf-translation/core/PdfFileDownloader.js'
 import { getSourceLanguageAsync } from '@/shared/config/config.js'
 import { useSettingsStore } from '@/features/settings/stores/settings.js'
 import { applyTheme } from '@/utils/ui/theme.js'
@@ -299,6 +303,7 @@ const regionOcrState = ref(REGION_OCR_STATE.IDLE)
 const regionSelectionTarget = ref(null)
 const regionOcrNotice = ref(null)
 const benchmarkState = ref(null)
+const canExportBenchmarkArtifact = computed(() => benchmarkState.value?.status === 'completed')
 const regionOcrAvailable = computed(() => hasDocument.value && showOriginalPane.value)
 const supportedExecutionModes = Object.freeze([REGION_EXECUTION_TARGET.OCR])
 const executionMode = ref(REGION_EXECUTION_TARGET.OCR)
@@ -332,7 +337,9 @@ const benchmarkRunner = new BenchmarkRunner({
   getPdfDocument: () => session.pdfDocument,
   onProgress: handleBenchmarkProgress
 })
+const benchmarkArtifactWriter = new BenchmarkArtifactWriter()
 let activeBenchmarkOperation = null
+let completedBenchmarkResult = null
 
 const regionExecutionDispatcher = createRegionExecutionDispatcher({
   runners: {
@@ -530,6 +537,7 @@ function handleRegionSelectionComplete(region) {
   if (target === REGION_EXECUTION_TARGET.BENCHMARK) {
     const operation = pdfDeveloperApi.runRegionBenchmark({ region })
     activeBenchmarkOperation = operation
+    completedBenchmarkResult = null
     benchmarkState.value = {
       status: 'running',
       progress: Object.freeze({
@@ -579,6 +587,13 @@ function handleCancelRegionBenchmark() {
   activeBenchmarkOperation.cancel()
 }
 
+function handleExportBenchmarkArtifact() {
+  if (!canExportBenchmarkArtifact.value || !completedBenchmarkResult) return
+
+  const artifact = benchmarkArtifactWriter.write(completedBenchmarkResult)
+  downloadFile(JSON.stringify(artifact, null, 2), 'region-benchmark-artifact.json', 'application/json')
+}
+
 function handleBenchmarkProgress(progress) {
   if (!benchmarkState.value) return
 
@@ -593,6 +608,7 @@ function handleBenchmarkOutcome(operation, result) {
   if (activeBenchmarkOperation !== operation) return
 
   activeBenchmarkOperation = null
+  completedBenchmarkResult = result.status === 'ready' ? result : null
   benchmarkState.value = {
     status: result.status === 'cancelled' ? 'cancelled' : 'completed',
     progress: Object.freeze({

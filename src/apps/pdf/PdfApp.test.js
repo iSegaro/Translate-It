@@ -30,6 +30,7 @@ let mockPdfViewport
 let mockPdfSession
 const mockRegionExecutionDispatch = vi.fn((request, runner) => runner(request))
 const openTranslationMock = vi.fn()
+const downloadFileMock = vi.hoisted(() => vi.fn())
 
 function createMockOperation(promise, cancel = vi.fn()) {
   return Object.freeze({
@@ -102,6 +103,10 @@ vi.mock('@/utils/ui/theme.js', () => ({
   applyTheme: vi.fn()
 }))
 
+vi.mock('@/features/pdf-translation/core/PdfFileDownloader.js', () => ({
+  downloadFile: downloadFileMock
+}))
+
 vi.mock('@/shared/config/config.js', () => ({
   CONFIG: { DEBUG_MODE: false },
   getSourceLanguageAsync: vi.fn().mockResolvedValue('auto')
@@ -110,8 +115,8 @@ vi.mock('@/shared/config/config.js', () => ({
 vi.mock('./components/PdfToolbar.vue', () => ({
   default: {
     name: 'PdfToolbar',
-    props: ['fileName', 'pageCount', 'currentPageNumber', 'zoomMode', 'zoomPercent', 'contentView', 'layoutMode', 'ocrRecommendationCount', 'executionMode', 'executionModes', 'regionOcrState', 'regionOcrAvailable', 'benchmarkState'],
-    emits: ['toggle-outline', 'translate-visible', 'cancel-translation', 'content-view-change', 'layout-mode-change', 'zoom-step', 'zoom-change', 'export-txt', 'export-markdown', 'export-html', 'request-ocr', 'request-region-ocr', 'request-region-benchmark', 'cancel-region-benchmark', 'clear-cache', 'request-open-pdf', 'execution-mode-change'],
+    props: ['fileName', 'pageCount', 'currentPageNumber', 'zoomMode', 'zoomPercent', 'contentView', 'layoutMode', 'ocrRecommendationCount', 'executionMode', 'executionModes', 'regionOcrState', 'regionOcrAvailable', 'benchmarkState', 'canExportBenchmarkArtifact'],
+    emits: ['toggle-outline', 'translate-visible', 'cancel-translation', 'content-view-change', 'layout-mode-change', 'zoom-step', 'zoom-change', 'export-txt', 'export-markdown', 'export-html', 'request-ocr', 'request-region-ocr', 'request-region-benchmark', 'cancel-region-benchmark', 'export-benchmark-artifact', 'clear-cache', 'request-open-pdf', 'execution-mode-change'],
     template: '<header class="pdf-toolbar-stub" />'
   }
 }))
@@ -498,12 +503,24 @@ describe('PdfApp', () => {
     expect(mockRegionOcr.startRegionOcr).toHaveBeenCalledOnce()
   })
 
-  it('reuses Region selection for Benchmark and forwards the canonical region to PdfDeveloperApi', async () => {
+  it('completes a benchmark and exports its artifact through PdfApp ownership', async () => {
+    downloadFileMock.mockReset()
+    const candidates = Object.freeze([Object.freeze({
+      candidateId: 'scale-1-eng',
+      configuration: Object.freeze({ scale: 1, language: 'eng' })
+    })])
+    const results = Object.freeze([Object.freeze({
+      candidateId: 'scale-1-eng',
+      configuration: candidates[0].configuration,
+      runtime: Object.freeze({ latencyMs: 40 }),
+      output: Object.freeze({ status: 'recognized' })
+    })])
     const runRegionBenchmark = vi.spyOn(PdfDeveloperApi.prototype, 'runRegionBenchmark')
       .mockReturnValue(createMockOperation(Promise.resolve({
         status: 'ready',
-        results: Object.freeze([]),
-        summary: Object.freeze({ totalCandidates: 2, completedCandidates: 2, totalElapsedMs: 40 })
+        candidates,
+        results,
+        summary: Object.freeze({ totalCandidates: 1, completedCandidates: 1, totalElapsedMs: 40 })
       })))
     const wrapper = mount(PdfApp)
     await flushPromises()
@@ -524,8 +541,15 @@ describe('PdfApp', () => {
     expect(mockRegionOcr.startRegionOcr).not.toHaveBeenCalled()
     await vi.waitFor(() => expect(toolbar.props('benchmarkState')).toMatchObject({
       status: 'completed',
-      progress: { totalCandidates: 2, completedCandidates: 2 }
+      progress: { totalCandidates: 1, completedCandidates: 1 }
     }))
+    expect(toolbar.props('canExportBenchmarkArtifact')).toBe(true)
+    toolbar.vm.$emit('export-benchmark-artifact')
+    expect(downloadFileMock).toHaveBeenCalledWith(
+      expect.stringContaining('"artifactType": "region-benchmark"'),
+      'region-benchmark-artifact.json',
+      'application/json'
+    )
     runRegionBenchmark.mockRestore()
   })
 

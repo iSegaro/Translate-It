@@ -60,4 +60,5 @@ Candidates must not contain translation-provider metadata, OCR executor instance
 - Scale comparisons have direct domain representation.
 - Future OCR parameters extend `configuration` without introducing provider abstractions.
 - Dynamic translation-provider lookup is removed from Region Benchmark.
-- This decision does not add artifacts, reporting, or multi-engine support.
+- `BenchmarkArtifactWriter` produces immutable offline artifacts from completed results without affecting execution or evaluation.
+- This decision does not add reporting or multi-engine support.
