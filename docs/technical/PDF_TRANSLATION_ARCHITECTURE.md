@@ -1613,7 +1613,7 @@ Reactive via `translationTick`:
 
 ### Overview
 
-The status banner is a single-line notification bar displayed above the viewer content area. It shows the current state of the PDF application: loading progress, translation activity, errors, partial translation warnings, export success confirmations, and cache-restore notifications.
+The status banner is a single-line notification bar displayed above the viewer content area. It shows the current state of the PDF application: loading progress, translation activity, errors, partial translation warnings, developer notifications, export success confirmations, and cache-restore notifications.
 
 **Ownership:** `PdfApp` owns the banner controller instance (`createPdfStatusBannerController`) and the reactive `pdfStatusBanner` computed that drives it. The banner is rendered by the `PdfStatusBanner` component as a sibling of the viewer layout, outside the scroll pane.
 
@@ -1648,6 +1648,7 @@ The `pdfStatusBannerController.build()` function accepts these inputs:
 | `ocrError` | `usePdfOcr` | OCR failure message |
 | `isLoading` | `usePdfViewerController` | Document is loading |
 | `isTranslating` | `usePdfViewerController` | Translation in progress |
+| `developerNotification` | `PdfApp` | Debug Mode-gated generic developer notification |
 | `exportSuccess` | `PdfApp` (local ref) | Post-export success notification |
 | `restoredTranslationCount` | `usePdfViewerController` | Number of cached translations restored |
 | `translationStatus` | `usePdfViewerController.translationSummary.status` | Translation run outcome |

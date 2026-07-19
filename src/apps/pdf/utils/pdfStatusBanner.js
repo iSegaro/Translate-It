@@ -33,6 +33,7 @@ export function createPdfStatusBannerController() {
     ocrError = '',
     isLoading = false,
     isTranslating = false,
+    developerNotification = null,
     exportSuccess = null,
     restoredTranslationCount = 0,
     translationStatus = 'idle',
@@ -67,6 +68,17 @@ export function createPdfStatusBannerController() {
 
     if (translationStatus === 'partial') {
       return { id: `partial-export:${translationOccurrenceId}`, visible: true, variant: 'warning', title: 'Partial translation', message: partialMessage, dismissible: true }
+    }
+
+    if (developerNotification?.id) {
+      return {
+        id: developerNotification.id,
+        visible: true,
+        variant: developerNotification.variant || 'info',
+        title: developerNotification.title || 'Developer notification',
+        message: developerNotification.message || '',
+        dismissible: true
+      }
     }
 
     if (exportSuccess) {

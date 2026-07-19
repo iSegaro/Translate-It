@@ -38,7 +38,6 @@ vi.mock('@/shared/logging/logger.js', () => ({
 
 import PdfToolbar from './PdfToolbar.vue'
 import { TranslationMode } from '@/shared/config/config.js'
-import { BenchmarkEvaluator } from '../BenchmarkEvaluator.js'
 
 function createDeferred() {
   let resolve
@@ -256,25 +255,10 @@ describe('PdfToolbar', () => {
     expect(debugEnabled.emitted('request-region-benchmark')).toHaveLength(1)
   })
 
-  it('shows compact benchmark progress and results only in Developer Mode', async () => {
-    const evaluatedResults = new BenchmarkEvaluator().evaluate([{
-      candidateId: 'scale-1-eng',
-      configuration: { scale: 1, language: 'eng' },
-      runtime: { latencyMs: 42 },
-      output: { status: 'recognized', data: { text: 'hello' } }
-    }], { groundTruth: 'hallo' })
+  it('shows active benchmark progress only in Developer Mode', async () => {
     const benchmarkState = {
-      status: 'completed',
-      progress: { totalCandidates: 2, completedCandidates: 2, currentCandidate: null },
-      results: evaluatedResults,
-      analysis: {
-        winnerCandidateId: 'scale-1-eng',
-        winner: { candidateId: 'scale-1-eng', reason: 'lowest-cer' },
-        latency: { fastestMs: 42 },
-        confidence: { highest: 95, delta: 5, comparable: true },
-        output: { identical: true, comparable: true }
-      },
-      summary: { totalElapsedMs: 84 }
+      status: 'running',
+      progress: { totalCandidates: 2, completedCandidates: 1, currentCandidate: { candidateId: 'scale-1-eng' } }
     }
     const normalUser = mount(PdfToolbar, { props: { benchmarkState } })
 
@@ -285,19 +269,8 @@ describe('PdfToolbar', () => {
     const developer = mount(PdfToolbar, { props: { benchmarkState } })
     await developer.find('.pdf-toolbar__button[aria-label="More actions"]').trigger('click')
 
-    expect(developer.find('.pdf-toolbar__benchmark').text()).toContain('2/2')
-    expect(developer.find('.pdf-toolbar__benchmark-analysis').text()).toContain('Winner scale-1-eng (Lowest CER)')
-    expect(developer.find('.pdf-toolbar__benchmark-analysis').text()).toContain('Fastest 42ms')
-    expect(developer.find('.pdf-toolbar__benchmark-analysis').text()).toContain('Confidence 95 (+5)')
-    expect(developer.find('.pdf-toolbar__benchmark-analysis').text()).toContain('OCR Output Identical')
+    expect(developer.find('.pdf-toolbar__benchmark').text()).toContain('1/2')
     expect(developer.find('.pdf-toolbar__benchmark').text()).toContain('scale-1-eng')
-    expect(developer.find('.pdf-toolbar__benchmark').text()).toContain('scale 1')
-    expect(developer.find('.pdf-toolbar__benchmark').text()).toContain('eng')
-    expect(developer.find('.pdf-toolbar__benchmark').text()).toContain('42ms')
-    expect(developer.find('.pdf-toolbar__benchmark').text()).toContain('recognized')
-    expect(developer.find('.pdf-toolbar__benchmark').text()).toContain('CER 0.200')
-    expect(developer.find('.pdf-toolbar__benchmark').text()).toContain('differences')
-    expect(developer.find('.pdf-toolbar__benchmark').text()).toContain('Total 84ms')
     expect(developer.findAll('button').some(button => button.text().includes('Export Benchmark Artifact'))).toBe(false)
 
     await developer.setProps({ canExportBenchmarkArtifact: true })
@@ -330,7 +303,7 @@ describe('PdfToolbar', () => {
     expect(wrapper.emitted('cancel-region-benchmark')).toHaveLength(1)
   })
 
-  it('does not render null confidence delta or incomparable output as different', async () => {
+  it('does not render terminal benchmark results in the toolbar', async () => {
     settingsStoreMock.settings.DEBUG_MODE = true
     const wrapper = mount(PdfToolbar, {
       props: {
@@ -338,47 +311,14 @@ describe('PdfToolbar', () => {
           status: 'completed',
           progress: { totalCandidates: 1, completedCandidates: 1, currentCandidate: null },
           results: [],
-          analysis: {
-            winnerCandidateId: null,
-            winner: null,
-            latency: { fastestMs: null },
-            confidence: { highest: 95, delta: null, comparable: false },
-            output: { identical: false, comparable: false }
-          },
+          analysis: { winner: null },
           summary: null
         }
       }
     })
     await wrapper.find('.pdf-toolbar__button[aria-label="More actions"]').trigger('click')
 
-    expect(wrapper.find('.pdf-toolbar__benchmark-analysis').text()).toContain('Confidence 95')
-    expect(wrapper.find('.pdf-toolbar__benchmark-analysis').text()).not.toContain('null')
-    expect(wrapper.find('.pdf-toolbar__benchmark-analysis').text()).not.toContain('undefined')
-    expect(wrapper.find('.pdf-toolbar__benchmark-analysis').text()).toContain('OCR Output Not comparable')
-  })
-
-  it('does not render zero confidence delta', async () => {
-    settingsStoreMock.settings.DEBUG_MODE = true
-    const wrapper = mount(PdfToolbar, {
-      props: {
-        benchmarkState: {
-          status: 'completed',
-          progress: { totalCandidates: 2, completedCandidates: 2, currentCandidate: null },
-          results: [],
-          analysis: {
-            winner: null,
-            latency: { fastestMs: null },
-            confidence: { highest: 95, delta: 0, comparable: true },
-            output: { identical: true, comparable: true }
-          },
-          summary: null
-        }
-      }
-    })
-    await wrapper.find('.pdf-toolbar__button[aria-label="More actions"]').trigger('click')
-
-    expect(wrapper.find('.pdf-toolbar__benchmark-analysis').text()).toContain('Confidence 95')
-    expect(wrapper.find('.pdf-toolbar__benchmark-analysis').text()).not.toContain('(+0)')
+    expect(wrapper.find('.pdf-toolbar__benchmark').exists()).toBe(false)
   })
 
   it('shows OCR button without count when OCR recommendations exist', async () => {

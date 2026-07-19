@@ -31,6 +31,14 @@ let mockPdfSession
 const mockRegionExecutionDispatch = vi.fn((request, runner) => runner(request))
 const openTranslationMock = vi.fn()
 const downloadFileMock = vi.hoisted(() => vi.fn())
+const settingsStoreMock = vi.hoisted(() => ({
+  isDarkTheme: false,
+  settings: { THEME: 'auto', DEBUG_MODE: false }
+}))
+const benchmarkRunnerMock = vi.hoisted(() => ({
+  execute: vi.fn(),
+  options: null
+}))
 
 function createMockOperation(promise, cancel = vi.fn(), context = { target: 'ocr' }) {
   return Object.freeze({
@@ -91,12 +99,19 @@ vi.mock('./composables/regionExecutionDispatcher.js', () => ({
 }))
 
 vi.mock('@/features/settings/stores/settings.js', () => ({
-  useSettingsStore: () => ({
-    isDarkTheme: false,
-    settings: {
-      THEME: 'auto'
+  useSettingsStore: () => settingsStoreMock
+}))
+
+vi.mock('./BenchmarkRunner.js', () => ({
+  BenchmarkRunner: class {
+    constructor(options) {
+      benchmarkRunnerMock.options = options
     }
-  })
+
+    execute(request) {
+      return benchmarkRunnerMock.execute(request)
+    }
+  }
 }))
 
 vi.mock('@/utils/ui/theme.js', () => ({
@@ -378,6 +393,9 @@ describe('PdfApp', () => {
     vi.useRealTimers()
     openTranslationMock.mockReset()
     mockRegionExecutionDispatch.mockClear()
+    benchmarkRunnerMock.execute.mockReset()
+    benchmarkRunnerMock.options = null
+    settingsStoreMock.settings.DEBUG_MODE = false
     createMocks()
   })
 
@@ -421,6 +439,114 @@ describe('PdfApp', () => {
     expect(wrapper.find('.pdf-status-banner').exists()).toBe(false)
     expect(wrapper.find('.pdf-app__status-row').exists()).toBe(false)
     expect(wrapper.find('.pdf-viewer-layout-stub').exists()).toBe(true)
+  })
+
+  async function startBenchmark(wrapper, region = createPdfRegion({ pageNumber: 1, left: 1, top: 4, right: 3, bottom: 2 })) {
+    wrapper.findComponent({ name: 'PdfToolbar' }).vm.$emit('request-region-benchmark')
+    await flushPromises()
+    wrapper.findComponent({ name: 'PdfViewer' }).vm.$emit('region-selection-complete', region)
+    await flushPromises()
+    return region
+  }
+
+  function readyBenchmarkResult(candidateId = 'scale-1-eng') {
+    return {
+      status: 'ready',
+      results: [{
+        candidateId,
+        runtime: { latencyMs: 42 },
+        output: { status: 'recognized', data: { text: 'hello', confidence: 95 } }
+      }],
+      summary: { totalCandidates: 1, completedCandidates: 1, totalElapsedMs: 42 }
+    }
+  }
+
+  it('shows a dismissible developer notification after a successful benchmark', async () => {
+    settingsStoreMock.settings.DEBUG_MODE = true
+    benchmarkRunnerMock.execute.mockImplementation(request => createMockOperation(
+      Promise.resolve(readyBenchmarkResult()),
+      vi.fn(),
+      { target: 'benchmark', request }
+    ))
+    const wrapper = mount(PdfApp)
+
+    await startBenchmark(wrapper)
+    await vi.waitFor(() => expect(wrapper.find('.pdf-status-banner').exists()).toBe(true))
+
+    expect(wrapper.find('.pdf-status-banner__title').text()).toBe('Region Benchmark complete')
+    expect(wrapper.find('.pdf-status-banner__message').text()).toContain('Winner: scale-1-eng.')
+    await wrapper.find('.pdf-status-banner__dismiss').trigger('click')
+    expect(wrapper.find('.pdf-status-banner').exists()).toBe(false)
+  })
+
+  it('shows a developer error notification after benchmark failure', async () => {
+    settingsStoreMock.settings.DEBUG_MODE = true
+    benchmarkRunnerMock.execute.mockImplementation(request => createMockOperation(
+      Promise.reject(new Error('OCR worker unavailable')),
+      vi.fn(),
+      { target: 'benchmark', request }
+    ))
+    const wrapper = mount(PdfApp)
+
+    await startBenchmark(wrapper)
+    await vi.waitFor(() => expect(wrapper.find('.pdf-status-banner').exists()).toBe(true))
+
+    expect(wrapper.find('.pdf-status-banner').classes()).toContain('pdf-status-banner--error')
+    expect(wrapper.find('.pdf-status-banner__title').text()).toBe('Region Benchmark failed')
+    expect(wrapper.find('.pdf-status-banner__message').text()).toBe('OCR worker unavailable')
+  })
+
+  it('does not notify after benchmark cancellation', async () => {
+    settingsStoreMock.settings.DEBUG_MODE = true
+    const deferred = createDeferred()
+    const cancel = vi.fn(() => deferred.resolve({
+      status: 'cancelled',
+      results: [],
+      summary: { totalCandidates: 1, completedCandidates: 0, totalElapsedMs: 0 }
+    }))
+    benchmarkRunnerMock.execute.mockImplementation(request => createMockOperation(deferred.promise, cancel, { target: 'benchmark', request }))
+    const wrapper = mount(PdfApp)
+
+    await startBenchmark(wrapper)
+    wrapper.findComponent({ name: 'PdfToolbar' }).vm.$emit('cancel-region-benchmark')
+    await vi.waitFor(() => expect(cancel).toHaveBeenCalledOnce())
+    await flushPromises()
+
+    expect(wrapper.find('.pdf-status-banner').exists()).toBe(false)
+  })
+
+  it('replaces a dismissed developer notification on the next benchmark lifecycle', async () => {
+    settingsStoreMock.settings.DEBUG_MODE = true
+    benchmarkRunnerMock.execute.mockImplementationOnce(request => createMockOperation(
+      Promise.resolve(readyBenchmarkResult('scale-1-eng')),
+      vi.fn(),
+      { target: 'benchmark', request }
+    )).mockImplementationOnce(request => createMockOperation(
+      Promise.resolve(readyBenchmarkResult('scale-1.5-eng')),
+      vi.fn(),
+      { target: 'benchmark', request }
+    ))
+    const wrapper = mount(PdfApp)
+
+    await startBenchmark(wrapper)
+    await vi.waitFor(() => expect(wrapper.find('.pdf-status-banner__dismiss').exists()).toBe(true))
+    await wrapper.find('.pdf-status-banner__dismiss').trigger('click')
+    await startBenchmark(wrapper, createPdfRegion({ pageNumber: 2, left: 1, top: 4, right: 3, bottom: 2 }))
+    await vi.waitFor(() => expect(wrapper.find('.pdf-status-banner__message').text()).toContain('scale-1.5-eng'))
+  })
+
+  it('keeps developer notifications hidden outside Debug Mode', async () => {
+    benchmarkRunnerMock.execute.mockImplementation(request => createMockOperation(
+      Promise.resolve(readyBenchmarkResult()),
+      vi.fn(),
+      { target: 'benchmark', request }
+    ))
+    const wrapper = mount(PdfApp)
+
+    await startBenchmark(wrapper)
+    await flushPromises()
+
+    expect(wrapper.find('.pdf-status-banner').exists()).toBe(false)
   })
 
   it('refreshes OCR page wrappers before incrementing translationTick on OCR completion', async () => {

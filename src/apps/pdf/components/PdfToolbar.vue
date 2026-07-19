@@ -337,7 +337,7 @@
               Export Benchmark Artifact
             </button>
             <div
-              v-if="benchmarkState"
+              v-if="isBenchmarkActive"
               class="pdf-toolbar__benchmark"
               aria-live="polite"
             >
@@ -360,41 +360,6 @@
                 class="pdf-toolbar__benchmark-current"
               >
                 {{ benchmarkState.progress.currentCandidate.candidateId }}
-              </span>
-              <div
-                v-if="benchmarkState.analysis"
-                class="pdf-toolbar__benchmark-analysis"
-              >
-                <span v-if="benchmarkState.analysis.winner">Winner {{ benchmarkState.analysis.winner.candidateId }} ({{ winnerReasonLabel(benchmarkState.analysis.winner.reason) }})</span>
-                <span v-if="benchmarkState.analysis.latency.fastestMs !== null">Fastest {{ benchmarkState.analysis.latency.fastestMs }}ms</span>
-                <span v-if="benchmarkState.analysis.confidence.highest !== null">
-                  Confidence {{ benchmarkState.analysis.confidence.highest }}<template v-if="benchmarkState.analysis.confidence.comparable && benchmarkState.analysis.confidence.delta !== 0"> (+{{ benchmarkState.analysis.confidence.delta }})</template>
-                </span>
-                <span>OCR Output {{ benchmarkState.analysis.output.comparable ? (benchmarkState.analysis.output.identical ? 'Identical' : 'Different') : 'Not comparable' }}</span>
-              </div>
-              <ul
-                v-if="benchmarkState.results?.length"
-                class="pdf-toolbar__benchmark-results"
-              >
-                <li
-                  v-for="result in benchmarkState.results"
-                  :key="result.candidateId"
-                >
-                  <code>{{ result.candidateId }}</code>
-                  <span>scale {{ result.configuration.scale }}</span>
-                  <span>{{ result.configuration.language }}</span>
-                  <span>{{ result.runtime.latencyMs }}ms</span>
-                  <span>{{ result.output.status }}</span>
-                  <span v-if="result.evaluation">
-                    CER {{ formatCer(result.evaluation) }} · {{ evaluationStatus(result.evaluation) }}
-                  </span>
-                </li>
-              </ul>
-              <span
-                v-if="benchmarkState.summary"
-                class="pdf-toolbar__benchmark-total"
-              >
-                Total {{ benchmarkState.summary.totalElapsedMs }}ms
               </span>
             </div>
           </div>
@@ -463,10 +428,6 @@ const pdfProviderValue = computed(() => {
 })
 const isDebugMode = computed(() => settingsStore.settings?.DEBUG_MODE === true)
 const isBenchmarkActive = computed(() => ['running', 'cancelling'].includes(props.benchmarkState?.status))
-
-const formatCer = (evaluation) => evaluation.cer.characterErrorRate.toFixed(3)
-const evaluationStatus = (evaluation) => evaluation.cer.characterErrorRate === 0 ? 'exact' : 'differences'
-const winnerReasonLabel = (reason) => reason === 'lowest-cer' ? 'Lowest CER' : 'Highest confidence'
 
 const providerPersistenceState = {
   sequence: 0,

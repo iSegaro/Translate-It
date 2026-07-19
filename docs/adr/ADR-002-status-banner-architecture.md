@@ -93,7 +93,7 @@ Identity change (new error, new translation occurrence) produces a new banner ID
 Banner selection follows a deterministic priority chain:
 
 ```
-Error → Loading → Translating → Partial → Export Success → Cache Restored → None
+Error → Loading → Translating → Partial → Developer Notification → Export Success → Cache Restored → None
 ```
 
 Exactly one banner may exist at any time. The first matching condition wins. Lower-priority states never render while a higher-priority state is active. This is an enforced architectural invariant, not merely current behavior.

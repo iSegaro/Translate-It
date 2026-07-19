@@ -74,6 +74,37 @@ describe('buildPdfStatusBannerState', () => {
     })
   })
 
+  it('builds a generic developer notification below translation outcomes', () => {
+    const notification = {
+      id: 'developer-notification:1',
+      variant: 'success',
+      title: 'Region Benchmark complete',
+      message: 'Winner: scale-1-eng.'
+    }
+
+    expect(controller.build({ developerNotification: notification })).toEqual({
+      ...notification,
+      visible: true,
+      dismissible: true
+    })
+    expect(controller.build({ translationStatus: 'partial', developerNotification: notification })).toMatchObject({
+      id: 'partial-export:0',
+      variant: 'warning'
+    })
+    expect(controller.build({ isLoading: true, developerNotification: notification })).toMatchObject({
+      id: 'opening',
+      variant: 'info'
+    })
+    expect(controller.build({ isTranslating: true, developerNotification: notification })).toMatchObject({
+      id: 'translating',
+      variant: 'info'
+    })
+    expect(controller.build({ error: 'PDF failed', developerNotification: notification })).toMatchObject({
+      id: 'error:1',
+      variant: 'error'
+    })
+  })
+
   it('keeps partial export above success', () => {
     expect(controller.build({
       translationStatus: 'partial',

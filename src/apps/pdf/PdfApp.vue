@@ -304,6 +304,8 @@ const regionOcrState = ref(REGION_OCR_STATE.IDLE)
 const regionSelectionTarget = ref(null)
 const regionOcrNotice = ref(null)
 const benchmarkState = ref(null)
+const developerNotification = ref(null)
+let developerNotificationOccurrenceId = 0
 const canExportBenchmarkArtifact = computed(() => benchmarkState.value?.status === 'completed')
 const regionOcrAvailable = computed(() => hasDocument.value && showOriginalPane.value)
 const supportedExecutionModes = Object.freeze([REGION_EXECUTION_TARGET.OCR])
@@ -401,6 +403,7 @@ const isDragOver = ref(false)
 const isOutlineVisible = ref(false)
 
 const settingsStore = useSettingsStore()
+const isDebugMode = computed(() => settingsStore.settings?.DEBUG_MODE === true)
 
 let removeThemeMessageListener = null
 let themeMediaQuery = null
@@ -429,6 +432,7 @@ const pdfStatusBanner = computed(() => pdfStatusBannerController.build({
   ocrError: ocrError.value,
   isLoading: isLoading.value,
   isTranslating: isTranslating.value,
+  developerNotification: isDebugMode.value ? developerNotification.value : null,
   exportSuccess: exportSuccess.value,
   translationStatus: translationSummary.value?.status ?? 'idle',
   translationOccurrenceId: translationSummary.value?.translationOccurrenceId ?? 0
@@ -538,6 +542,7 @@ function handleRegionSelectionComplete(region) {
   exitRegionSelection()
 
   if (target === REGION_EXECUTION_TARGET.BENCHMARK) {
+    developerNotification.value = null
     const operation = pdfDeveloperApi.runRegionBenchmark({ region })
     activeBenchmarkOperation = operation
     completedBenchmarkResult = null
@@ -617,6 +622,7 @@ function handleBenchmarkOutcome(operation, result) {
   activeBenchmarkOperation = null
   completedBenchmarkResult = result.status === 'ready' ? result : null
   completedBenchmarkRegion = result.status === 'ready' ? operation.context.request.region : null
+  const analysis = result.status === 'ready' ? benchmarkAnalyzer.analyze(result) : null
   benchmarkState.value = {
     status: result.status === 'cancelled' ? 'cancelled' : 'completed',
     progress: Object.freeze({
@@ -625,18 +631,45 @@ function handleBenchmarkOutcome(operation, result) {
       currentCandidate: null
     }),
     results: result.results,
-    analysis: result.status === 'ready' ? benchmarkAnalyzer.analyze(result) : null,
+    analysis,
     summary: result.summary
+  }
+
+  if (result.status === 'ready') {
+    developerNotification.value = createBenchmarkSuccessNotification(analysis)
   }
 }
 
-function handleBenchmarkFailure(operation) {
+function handleBenchmarkFailure(operation, error) {
   if (activeBenchmarkOperation !== operation) return
 
   activeBenchmarkOperation = null
   benchmarkState.value = {
     ...benchmarkState.value,
     status: 'failed'
+  }
+  developerNotification.value = createBenchmarkFailureNotification(error)
+}
+
+function createBenchmarkSuccessNotification(summary) {
+  const details = []
+  if (summary?.winner?.candidateId) details.push(`Winner: ${summary.winner.candidateId}.`)
+  if (Number.isFinite(summary?.latency?.fastestMs)) details.push(`Fastest: ${summary.latency.fastestMs}ms.`)
+
+  return {
+    id: `developer-notification:${++developerNotificationOccurrenceId}`,
+    variant: 'success',
+    title: 'Region Benchmark complete',
+    message: details.join(' ') || 'Region Benchmark completed.'
+  }
+}
+
+function createBenchmarkFailureNotification(error) {
+  return {
+    id: `developer-notification:${++developerNotificationOccurrenceId}`,
+    variant: 'error',
+    title: 'Region Benchmark failed',
+    message: error?.message || 'Benchmark failed. Please try again.'
   }
 }
 
