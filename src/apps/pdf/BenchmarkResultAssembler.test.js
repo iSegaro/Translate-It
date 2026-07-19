@@ -2,17 +2,22 @@ import { describe, expect, it } from 'vitest'
 import { BenchmarkResultAssembler } from './BenchmarkResultAssembler.js'
 
 describe('BenchmarkResultAssembler', () => {
-  it('builds an immutable result without transforming provider output', () => {
+  it('builds an immutable result without transforming candidate output', () => {
     const output = Object.freeze({ text: 'recognized text', confidence: 98 })
+    const candidate = Object.freeze({
+      candidateId: 'scale-1',
+      configuration: Object.freeze({ scale: 1, language: 'eng' })
+    })
     const result = new BenchmarkResultAssembler().assemble({
-      providerId: 'provider',
+      candidate,
       startedAt: 100,
       completedAt: 125,
       output
     })
 
     expect(result).toEqual({
-      providerId: 'provider',
+      candidateId: 'scale-1',
+      configuration: { scale: 1, language: 'eng' },
       runtime: { startedAt: 100, completedAt: 125, latencyMs: 25 },
       output
     })

@@ -1,7 +1,8 @@
 export class BenchmarkResultAssembler {
-  assemble({ providerId, startedAt, completedAt, output }) {
+  assemble({ candidate, startedAt, completedAt, output }) {
     return Object.freeze({
-      providerId,
+      candidateId: candidate.candidateId,
+      configuration: candidate.configuration,
       runtime: Object.freeze({
         startedAt,
         completedAt,

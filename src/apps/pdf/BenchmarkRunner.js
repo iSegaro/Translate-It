@@ -1,9 +1,6 @@
 import { createExecutionOperation } from './composables/executionOperation.js'
 import { isRegionExecutionRequest, REGION_EXECUTION_TARGET } from './composables/regionExecutionRequest.js'
-import { BenchmarkExecutionPlanner } from './BenchmarkExecutionPlanner.js'
-import { BenchmarkProviderExecutor } from './BenchmarkProviderExecutor.js'
-import { BenchmarkProviderResolver } from './BenchmarkProviderResolver.js'
-import { BenchmarkResultAssembler } from './BenchmarkResultAssembler.js'
+import { BenchmarkCandidatePlanner } from './BenchmarkCandidatePlanner.js'
 
 export const BENCHMARK_RUNNER_STATUS = Object.freeze({
   READY: 'ready',
@@ -12,18 +9,12 @@ export const BENCHMARK_RUNNER_STATUS = Object.freeze({
 
 export class BenchmarkSession {
   constructor(request, {
-    providerResolver = new BenchmarkProviderResolver(),
-    executionPlanner = new BenchmarkExecutionPlanner(),
-    providerExecutor = new BenchmarkProviderExecutor(),
-    clock = () => Date.now(),
-    resultAssembler = new BenchmarkResultAssembler()
+    candidatePlanner = new BenchmarkCandidatePlanner(),
+    configurations = Object.freeze([])
   } = {}) {
     this.request = request
-    this.providerResolver = providerResolver
-    this.executionPlanner = executionPlanner
-    this.providerExecutor = providerExecutor
-    this.clock = clock
-    this.resultAssembler = resultAssembler
+    this.candidatePlanner = candidatePlanner
+    this.configurations = configurations
     this.state = 'created'
     this.cancelled = false
   }
@@ -38,64 +29,28 @@ export class BenchmarkSession {
     await Promise.resolve()
     if (this.cancelled) return Object.freeze({ status: BENCHMARK_RUNNER_STATUS.CANCELLED })
 
-    this.state = 'resolving-providers'
+    this.state = 'planning-candidates'
     await Promise.resolve()
     if (this.cancelled) return Object.freeze({ status: BENCHMARK_RUNNER_STATUS.CANCELLED })
 
-    const providers = this.providerResolver.resolve()
-    let plan = this.executionPlanner.create(providers)
-    const results = []
-
-    for (const [index, pendingStep] of plan.steps.entries()) {
-      plan = this.executionPlanner.markRunning(plan, pendingStep)
-      const step = plan.steps[index]
-
-      try {
-        const startedAt = this.clock()
-        const output = await this.providerExecutor.execute({
-          request: this.request,
-          provider: providers[index],
-          step
-        })
-        const completedAt = this.clock()
-        results.push(this.resultAssembler.assemble({
-          providerId: step.providerId,
-          startedAt,
-          completedAt,
-          output
-        }))
-        plan = this.executionPlanner.markCompleted(plan, step)
-      } catch (error) {
-        plan = this.executionPlanner.markFailed(plan, step)
-        throw error
-      }
-    }
-
-    const frozenResults = Object.freeze(results)
+    const candidates = this.candidatePlanner.createCandidates({ configurations: this.configurations })
 
     this.state = 'ready'
     return Object.freeze({
       status: BENCHMARK_RUNNER_STATUS.READY,
-      providers,
-      plan,
-      results: frozenResults
+      candidates,
+      results: Object.freeze([])
     })
   }
 }
 
 export class BenchmarkRunner {
   constructor({
-    providerResolver,
-    executionPlanner,
-    providerExecutor,
-    clock,
-    resultAssembler,
+    candidatePlanner,
+    configurations,
     createSession = (request) => new BenchmarkSession(request, {
-      providerResolver,
-      executionPlanner,
-      providerExecutor,
-      clock,
-      resultAssembler
+      candidatePlanner,
+      configurations
     })
   } = {}) {
     this.createSession = createSession

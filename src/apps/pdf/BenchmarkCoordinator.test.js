@@ -30,7 +30,7 @@ describe('BenchmarkCoordinator', () => {
       regionExecutionDispatcher: createRegionExecutionDispatcher({
         runners: {
           [REGION_EXECUTION_TARGET.BENCHMARK]: (request) => new BenchmarkRunner({
-            providerResolver: { resolve: () => [] }
+            candidatePlanner: { createCandidates: () => [] }
           }).execute(request)
         }
       })
@@ -39,8 +39,7 @@ describe('BenchmarkCoordinator', () => {
 
     await expect(coordinator.coordinateRegionBenchmark({ region }).promise).resolves.toEqual({
       status: BENCHMARK_RUNNER_STATUS.READY,
-      providers: [],
-      plan: { steps: [] },
+      candidates: [],
       results: []
     })
   })

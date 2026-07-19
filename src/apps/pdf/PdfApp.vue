@@ -214,6 +214,7 @@ import { createPdfStatusBannerController } from './utils/pdfStatusBanner.js'
 import { REGION_OCR_STATE } from './constants/regionOcrState.js'
 import { PdfDeveloperApi } from './PdfDeveloperApi.js'
 import { BenchmarkRunner } from './BenchmarkRunner.js'
+import { REGION_BENCHMARK_CONFIGURATIONS } from './regionBenchmarkConfigurations.js'
 import { getSourceLanguageAsync } from '@/shared/config/config.js'
 import { useSettingsStore } from '@/features/settings/stores/settings.js'
 import { applyTheme } from '@/utils/ui/theme.js'
@@ -323,7 +324,7 @@ const {
 const { startRegionOcr, cancelRegionOcr } = usePdfRegionOcr({
   onRecognized: handleRegionOcrRecognized
 })
-const benchmarkRunner = new BenchmarkRunner()
+const benchmarkRunner = new BenchmarkRunner({ configurations: REGION_BENCHMARK_CONFIGURATIONS })
 
 const regionExecutionDispatcher = createRegionExecutionDispatcher({
   runners: {
