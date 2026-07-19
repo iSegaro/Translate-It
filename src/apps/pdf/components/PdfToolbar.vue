@@ -355,7 +355,6 @@
                   Cancel
                 </button>
               </div>
-              <span v-if="benchmarkProfileName">Profile {{ benchmarkProfileName }}</span>
               <span
                 v-if="benchmarkState.progress?.currentCandidate"
                 class="pdf-toolbar__benchmark-current"
@@ -440,7 +439,6 @@ const props = defineProps({
   regionOcrState: { type: String, default: 'idle' },
   regionOcrAvailable: { type: Boolean, default: false },
   benchmarkState: { type: Object, default: null },
-  benchmarkProfileName: { type: String, default: '' },
   canExportBenchmarkArtifact: { type: Boolean, default: false },
 })
 

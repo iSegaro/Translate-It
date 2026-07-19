@@ -17,17 +17,15 @@ describe('BenchmarkArtifactWriter', () => {
     })
     const writer = new BenchmarkArtifactWriter({ clock: () => '2026-07-19T00:00:00.000Z' })
 
-    const profile = Object.freeze({ id: 'default-region-ocr', name: 'Default Region OCR' })
     const region = createPdfRegion({ pageNumber: 1, left: 1, top: 4, right: 3, bottom: 2 })
-    const artifact = writer.write(sessionResult, { profile, region })
-    const repeatedArtifact = writer.write(sessionResult, { profile, region })
+    const artifact = writer.write(sessionResult, { region })
+    const repeatedArtifact = writer.write(sessionResult, { region })
 
     expect(artifact).toEqual({
       schemaVersion: '1.0.0',
       artifactType: 'region-benchmark',
       generatedAt: '2026-07-19T00:00:00.000Z',
-      profile,
-      metadata: { startedAt: 100, completedAt: 120, totalElapsedMs: 20, profileId: 'default-region-ocr', pageNumber: 1, region },
+      metadata: { startedAt: 100, completedAt: 120, totalElapsedMs: 20, pageNumber: 1, region },
       summary: sessionResult.summary,
       configurations: [
         { candidateId: 'scale-1-eng', configuration: { scale: 1, language: 'eng' } },

@@ -1,7 +1,6 @@
 import { createExecutionOperation } from './composables/executionOperation.js'
 import { isRegionExecutionRequest, REGION_EXECUTION_TARGET } from './composables/regionExecutionRequest.js'
 import { BenchmarkCandidatePlanner } from './BenchmarkCandidatePlanner.js'
-import { createBenchmarkProfile } from './BenchmarkProfile.js'
 import { BenchmarkEvaluator } from './BenchmarkEvaluator.js'
 import { BenchmarkResultAssembler } from './BenchmarkResultAssembler.js'
 import { PdfRegionOcrExecutor } from '@/features/pdf-translation/core/PdfRegionOcrExecutor.js'
@@ -10,8 +9,6 @@ export const BENCHMARK_RUNNER_STATUS = Object.freeze({
   READY: 'ready',
   CANCELLED: 'cancelled'
 })
-
-const EMPTY_BENCHMARK_PROFILE = createBenchmarkProfile({ id: 'empty', name: 'Empty', configurations: [] })
 
 function createProgress({ status, candidates, results, currentCandidate = null }) {
   return Object.freeze({
@@ -40,7 +37,7 @@ function createSessionResult({ status, candidates, results, startedAt, completed
 export class BenchmarkSession {
   constructor(request, {
     candidatePlanner = new BenchmarkCandidatePlanner(),
-    profile = EMPTY_BENCHMARK_PROFILE,
+    configurations = Object.freeze([]),
     createExecutor = (options) => new PdfRegionOcrExecutor(options),
     getPdfDocument = () => undefined,
     clock = () => Date.now(),
@@ -51,7 +48,7 @@ export class BenchmarkSession {
   } = {}) {
     this.request = request
     this.candidatePlanner = candidatePlanner
-    this.profile = profile
+    this.configurations = configurations
     this.createExecutor = createExecutor
     this.getPdfDocument = getPdfDocument
     this.clock = clock
@@ -100,7 +97,7 @@ export class BenchmarkSession {
     await Promise.resolve()
     if (this.cancelled) return this.finish(BENCHMARK_RUNNER_STATUS.CANCELLED, emptyCandidates, results, benchmarkStartedAt)
 
-    const candidates = this.candidatePlanner.createCandidates({ configurations: this.profile.configurations })
+    const candidates = this.candidatePlanner.createCandidates({ configurations: this.configurations })
 
     for (const candidate of candidates) {
       if (this.cancelled) return this.finish(BENCHMARK_RUNNER_STATUS.CANCELLED, candidates, results, benchmarkStartedAt)
@@ -144,7 +141,7 @@ export class BenchmarkSession {
 export class BenchmarkRunner {
   constructor({
     candidatePlanner,
-    profile,
+    configurations,
     createExecutor,
     getPdfDocument,
     clock,
@@ -154,7 +151,7 @@ export class BenchmarkRunner {
     onProgress,
     createSession = (request) => new BenchmarkSession(request, {
       candidatePlanner,
-      profile,
+      configurations,
       createExecutor,
       getPdfDocument,
       clock,

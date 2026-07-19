@@ -38,7 +38,7 @@ Evaluation remains independent from execution. `BenchmarkEvaluator` consumes ben
 
 - `PdfRegion` remains canonical geometry under ADR-006.
 - `RegionExecutionDispatcher` remains request routing under ADR-007.
-- `BenchmarkProfile` owns immutable benchmark policy: id, name, and configured OCR configurations.
+- Benchmark policy is represented directly by one immutable OCR configuration collection.
 - `BenchmarkCandidatePlanner` owns candidate generation from supplied configurations.
 - Benchmark runner owns benchmark lifecycle only.
 - `PdfRegionOcrExecutor` owns render, OCR, cleanup, and cancellation.
@@ -60,5 +60,5 @@ Candidates must not contain translation-provider metadata, OCR executor instance
 - Scale comparisons have direct domain representation.
 - Future OCR parameters extend `configuration` without introducing provider abstractions.
 - Dynamic translation-provider lookup is removed from Region Benchmark.
-- `ExecutionMetadata` describes immutable timing, profile, and canonical region context; `RegionBenchmarkArtifact` defines versioned immutable artifact schema validation; `BenchmarkArtifactWriter` produces them from completed results without affecting execution or evaluation.
+- `ExecutionMetadata` describes immutable timing and canonical region context; `RegionBenchmarkArtifact` defines versioned immutable artifact schema validation; `BenchmarkArtifactWriter` produces them from completed results without affecting execution or evaluation.
 - This decision does not add reporting or multi-engine support.

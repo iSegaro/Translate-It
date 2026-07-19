@@ -275,11 +275,10 @@ describe('PdfToolbar', () => {
     expect(normalUser.find('.pdf-toolbar__benchmark').exists()).toBe(false)
 
     settingsStoreMock.settings.DEBUG_MODE = true
-    const developer = mount(PdfToolbar, { props: { benchmarkState, benchmarkProfileName: 'Default Region OCR' } })
+    const developer = mount(PdfToolbar, { props: { benchmarkState } })
     await developer.find('.pdf-toolbar__button[aria-label="More actions"]').trigger('click')
 
     expect(developer.find('.pdf-toolbar__benchmark').text()).toContain('2/2')
-    expect(developer.find('.pdf-toolbar__benchmark').text()).toContain('Profile Default Region OCR')
     expect(developer.find('.pdf-toolbar__benchmark').text()).toContain('scale-1-eng')
     expect(developer.find('.pdf-toolbar__benchmark').text()).toContain('scale 1')
     expect(developer.find('.pdf-toolbar__benchmark').text()).toContain('eng')

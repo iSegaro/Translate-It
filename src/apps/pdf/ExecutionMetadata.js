@@ -12,17 +12,15 @@ export function createExecutionMetadata({
   startedAt,
   completedAt,
   totalElapsedMs,
-  profileId,
   pageNumber,
   region
 } = {}) {
   requireFiniteNumber(startedAt, 'startedAt')
   requireFiniteNumber(completedAt, 'completedAt')
   requireFiniteNumber(totalElapsedMs, 'totalElapsedMs')
-  if (typeof profileId !== 'string' || !profileId) throw new TypeError('ExecutionMetadata requires profileId')
   if (!Number.isInteger(pageNumber) || pageNumber <= 0) throw new TypeError('ExecutionMetadata requires pageNumber')
   if (!isCanonicalPdfRegion(region)) throw new TypeError('ExecutionMetadata requires region')
   if (pageNumber !== region.pageNumber) throw new TypeError('ExecutionMetadata pageNumber must match region')
 
-  return Object.freeze({ startedAt, completedAt, totalElapsedMs, profileId, pageNumber, region })
+  return Object.freeze({ startedAt, completedAt, totalElapsedMs, pageNumber, region })
 }

@@ -8,7 +8,6 @@ function createMetadata(overrides = {}) {
     startedAt: 100,
     completedAt: 140,
     totalElapsedMs: 40,
-    profileId: 'default-region-ocr',
     pageNumber: 2,
     region,
     ...overrides
@@ -24,12 +23,11 @@ describe('ExecutionMetadata', () => {
     expect(Object.isFrozen(metadata)).toBe(true)
   })
 
-  it.each(['startedAt', 'completedAt', 'totalElapsedMs', 'profileId', 'pageNumber', 'region'])('rejects missing %s', field => {
+  it.each(['startedAt', 'completedAt', 'totalElapsedMs', 'pageNumber', 'region'])('rejects missing %s', field => {
     const value = {
       startedAt: 100,
       completedAt: 140,
       totalElapsedMs: 40,
-      profileId: 'default-region-ocr',
       pageNumber: 2,
       region: createPdfRegion({ pageNumber: 2, left: 1, top: 4, right: 3, bottom: 2 })
     }

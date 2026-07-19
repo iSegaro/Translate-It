@@ -22,7 +22,6 @@
       :region-ocr-state="regionOcrState"
       :region-ocr-available="regionOcrAvailable"
       :benchmark-state="benchmarkState"
-      :benchmark-profile-name="DEFAULT_REGION_BENCHMARK_PROFILE.name"
       :can-export-benchmark-artifact="canExportBenchmarkArtifact"
       @toggle-outline="toggleOutline"
       @translate-visible="handleTranslateVisiblePages"
@@ -220,7 +219,7 @@ import { REGION_OCR_STATE } from './constants/regionOcrState.js'
 import { PdfDeveloperApi } from './PdfDeveloperApi.js'
 import { BenchmarkRunner } from './BenchmarkRunner.js'
 import { BenchmarkArtifactWriter } from './BenchmarkArtifactWriter.js'
-import { DEFAULT_REGION_BENCHMARK_PROFILE } from './regionBenchmarkProfile.js'
+import { REGION_BENCHMARK_CONFIGURATIONS } from './regionBenchmarkConfigurations.js'
 import { downloadFile } from '@/features/pdf-translation/core/PdfFileDownloader.js'
 import { getSourceLanguageAsync } from '@/shared/config/config.js'
 import { useSettingsStore } from '@/features/settings/stores/settings.js'
@@ -334,7 +333,7 @@ const { startRegionOcr, cancelRegionOcr } = usePdfRegionOcr({
   onRecognized: handleRegionOcrRecognized
 })
 const benchmarkRunner = new BenchmarkRunner({
-  profile: DEFAULT_REGION_BENCHMARK_PROFILE,
+  configurations: REGION_BENCHMARK_CONFIGURATIONS,
   getPdfDocument: () => session.pdfDocument,
   onProgress: handleBenchmarkProgress
 })
@@ -594,7 +593,6 @@ function handleExportBenchmarkArtifact() {
   if (!canExportBenchmarkArtifact.value || !completedBenchmarkResult || !completedBenchmarkRegion) return
 
   const artifact = benchmarkArtifactWriter.write(completedBenchmarkResult, {
-    profile: DEFAULT_REGION_BENCHMARK_PROFILE,
     region: completedBenchmarkRegion
   })
   downloadFile(JSON.stringify(artifact, null, 2), 'region-benchmark-artifact.json', 'application/json')

@@ -19,10 +19,9 @@ function requireObject(value, field) {
 }
 
 export function createRegionBenchmarkArtifact(value = {}) {
-  for (const field of ['schemaVersion', 'artifactType', 'generatedAt', 'profile', 'metadata', 'summary', 'configurations', 'results']) {
+  for (const field of ['schemaVersion', 'artifactType', 'generatedAt', 'metadata', 'summary', 'configurations', 'results']) {
     requireField(value, field)
   }
-  requireObject(value.profile, 'profile')
   requireObject(value.metadata, 'metadata')
   requireObject(value.summary, 'summary')
   if (!Array.isArray(value.configurations)) throw new TypeError('RegionBenchmarkArtifact requires configurations')
@@ -30,14 +29,11 @@ export function createRegionBenchmarkArtifact(value = {}) {
   if (typeof value.schemaVersion !== 'string' || !value.schemaVersion) throw new TypeError('RegionBenchmarkArtifact requires schemaVersion')
   if (typeof value.artifactType !== 'string' || !value.artifactType) throw new TypeError('RegionBenchmarkArtifact requires artifactType')
   if (typeof value.generatedAt !== 'string' || !value.generatedAt) throw new TypeError('RegionBenchmarkArtifact requires generatedAt')
-  if (typeof value.profile.id !== 'string' || !value.profile.id) throw new TypeError('RegionBenchmarkArtifact profile requires id')
-  if (typeof value.profile.name !== 'string' || !value.profile.name) throw new TypeError('RegionBenchmarkArtifact profile requires name')
 
   return deepFreeze({
     schemaVersion: value.schemaVersion,
     artifactType: value.artifactType,
     generatedAt: value.generatedAt,
-    profile: { id: value.profile.id, name: value.profile.name },
     metadata: value.metadata,
     summary: value.summary,
     configurations: [...value.configurations],

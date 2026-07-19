@@ -8,17 +8,15 @@ export class BenchmarkArtifactWriter {
     this.clock = clock
   }
 
-  write(sessionResult, { profile, region, generatedAt = this.clock() } = {}) {
+  write(sessionResult, { region, generatedAt = this.clock() } = {}) {
     return createRegionBenchmarkArtifact({
       schemaVersion: SCHEMA_VERSION,
       artifactType: REGION_BENCHMARK_ARTIFACT_TYPE,
       generatedAt,
-      profile,
       metadata: createExecutionMetadata({
         startedAt: sessionResult.summary.startedAt,
         completedAt: sessionResult.summary.completedAt,
         totalElapsedMs: sessionResult.summary.totalElapsedMs,
-        profileId: profile?.id,
         pageNumber: region?.pageNumber,
         region
       }),

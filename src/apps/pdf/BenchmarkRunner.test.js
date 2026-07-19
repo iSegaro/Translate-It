@@ -47,11 +47,7 @@ describe('BenchmarkRunner', () => {
       Object.freeze({ candidateId: 'scale-1', configuration: Object.freeze({ scale: 1, language: 'eng' }) }),
       Object.freeze({ candidateId: 'scale-1.5', configuration: Object.freeze({ scale: 1.5, language: 'eng' }) })
     ])
-    const profile = Object.freeze({
-      id: 'test-profile',
-      name: 'Test Profile',
-      configurations: Object.freeze([Object.freeze({ scale: 1, language: 'eng' })])
-    })
+    const configurations = Object.freeze([Object.freeze({ scale: 1, language: 'eng' })])
     const candidatePlanner = { createCandidates: vi.fn(() => candidates) }
     const executeFirst = vi.fn(() => ({
       promise: Promise.resolve({ status: 'recognized', data: { text: 'first' } }),
@@ -79,7 +75,7 @@ describe('BenchmarkRunner', () => {
 
     const result = await new BenchmarkSession(request, {
       candidatePlanner,
-      profile,
+      configurations,
       createExecutor,
       getPdfDocument: () => 'pdf-document',
       clock,
@@ -111,7 +107,7 @@ describe('BenchmarkRunner', () => {
         totalElapsedMs: 250
       }
     })
-    expect(candidatePlanner.createCandidates).toHaveBeenCalledWith({ configurations: profile.configurations })
+    expect(candidatePlanner.createCandidates).toHaveBeenCalledWith({ configurations })
     expect(createExecutor).toHaveBeenCalledTimes(2)
     expect(executeFirst).toHaveBeenCalledOnce()
     expect(executeSecond).toHaveBeenCalledOnce()
