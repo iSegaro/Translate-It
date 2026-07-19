@@ -13,8 +13,12 @@ export class OCRBenchmarkEvaluator {
     this.cerCalculator = cerCalculator
   }
 
-  evaluate(results, { referenceText } = {}) {
-    const normalizedReferenceText = this.textNormalizer.normalize(referenceText)
+  evaluate(results, { groundTruthProvider, context } = {}) {
+    if (typeof groundTruthProvider?.getReferenceText !== 'function') {
+      throw new TypeError('OCRBenchmarkEvaluator requires a GroundTruthProvider')
+    }
+
+    const normalizedReferenceText = this.textNormalizer.normalize(groundTruthProvider.getReferenceText(context))
 
     return Object.freeze(results.map(benchmarkResult => {
       const normalizedOutput = this.outputNormalizer.normalize(benchmarkResult.output)
