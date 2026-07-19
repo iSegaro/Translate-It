@@ -131,6 +131,49 @@ describe('BenchmarkRunner', () => {
     expect(Object.isFrozen(onProgress.mock.calls[0][0])).toBe(true)
   })
 
+  it('evaluates assembled results only when ground truth is injected', async () => {
+    const candidate = Object.freeze({ candidateId: 'scale-1-eng', configuration: Object.freeze({ scale: 1, language: 'eng' }) })
+    const assembledResult = Object.freeze({ candidateId: candidate.candidateId, output: Object.freeze({ status: 'recognized' }) })
+    const evaluatedResult = Object.freeze({ ...assembledResult, evaluation: Object.freeze({ cer: Object.freeze({ characterErrorRate: 0 }) }) })
+    const resultAssembler = { assemble: vi.fn(() => assembledResult) }
+    const benchmarkEvaluator = { evaluate: vi.fn(() => Object.freeze([evaluatedResult])) }
+    const request = createRegionExecutionRequest({
+      region: createPdfRegion({ pageNumber: 1, left: 1, top: 4, right: 3, bottom: 2 }),
+      target: REGION_EXECUTION_TARGET.BENCHMARK
+    })
+
+    const result = await new BenchmarkSession(request, {
+      candidatePlanner: { createCandidates: () => Object.freeze([candidate]) },
+      createExecutor: () => ({ execute: () => ({ promise: Promise.resolve({ status: 'recognized' }), cancel: vi.fn() }) }),
+      resultAssembler,
+      benchmarkEvaluator,
+      groundTruth: 'reference'
+    }).run()
+
+    expect(benchmarkEvaluator.evaluate).toHaveBeenCalledWith(Object.freeze([assembledResult]), { groundTruth: 'reference' })
+    expect(result.results).toEqual([evaluatedResult])
+  })
+
+  it('does not evaluate results without ground truth', async () => {
+    const candidate = Object.freeze({ candidateId: 'scale-1-eng', configuration: Object.freeze({ scale: 1, language: 'eng' }) })
+    const assembledResult = Object.freeze({ candidateId: candidate.candidateId, output: Object.freeze({ status: 'recognized' }) })
+    const benchmarkEvaluator = { evaluate: vi.fn() }
+    const request = createRegionExecutionRequest({
+      region: createPdfRegion({ pageNumber: 1, left: 1, top: 4, right: 3, bottom: 2 }),
+      target: REGION_EXECUTION_TARGET.BENCHMARK
+    })
+
+    const result = await new BenchmarkSession(request, {
+      candidatePlanner: { createCandidates: () => Object.freeze([candidate]) },
+      createExecutor: () => ({ execute: () => ({ promise: Promise.resolve({ status: 'recognized' }), cancel: vi.fn() }) }),
+      resultAssembler: { assemble: () => assembledResult },
+      benchmarkEvaluator
+    }).run()
+
+    expect(benchmarkEvaluator.evaluate).not.toHaveBeenCalled()
+    expect(result.results).toEqual([assembledResult])
+  })
+
   it('executes candidates sequentially', async () => {
     const candidates = Object.freeze([
       Object.freeze({ candidateId: 'scale-1', configuration: Object.freeze({ scale: 1, language: 'eng' }) }),

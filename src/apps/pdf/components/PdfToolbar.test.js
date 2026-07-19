@@ -38,6 +38,7 @@ vi.mock('@/shared/logging/logger.js', () => ({
 
 import PdfToolbar from './PdfToolbar.vue'
 import { TranslationMode } from '@/shared/config/config.js'
+import { BenchmarkEvaluator } from '../BenchmarkEvaluator.js'
 
 function createDeferred() {
   let resolve
@@ -256,15 +257,16 @@ describe('PdfToolbar', () => {
   })
 
   it('shows compact benchmark progress and results only in Developer Mode', async () => {
+    const evaluatedResults = new BenchmarkEvaluator().evaluate([{
+      candidateId: 'scale-1-eng',
+      configuration: { scale: 1, language: 'eng' },
+      runtime: { latencyMs: 42 },
+      output: { status: 'recognized', data: { text: 'hello' } }
+    }], { groundTruth: 'hallo' })
     const benchmarkState = {
       status: 'completed',
       progress: { totalCandidates: 2, completedCandidates: 2, currentCandidate: null },
-      results: [{
-        candidateId: 'scale-1-eng',
-        configuration: { scale: 1, language: 'eng' },
-        runtime: { latencyMs: 42 },
-        output: { status: 'recognized' }
-      }],
+      results: evaluatedResults,
       summary: { totalElapsedMs: 84 }
     }
     const normalUser = mount(PdfToolbar, { props: { benchmarkState } })
@@ -282,6 +284,8 @@ describe('PdfToolbar', () => {
     expect(developer.find('.pdf-toolbar__benchmark').text()).toContain('eng')
     expect(developer.find('.pdf-toolbar__benchmark').text()).toContain('42ms')
     expect(developer.find('.pdf-toolbar__benchmark').text()).toContain('recognized')
+    expect(developer.find('.pdf-toolbar__benchmark').text()).toContain('CER 0.200')
+    expect(developer.find('.pdf-toolbar__benchmark').text()).toContain('differences')
     expect(developer.find('.pdf-toolbar__benchmark').text()).toContain('Total 84ms')
   })
 

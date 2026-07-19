@@ -30,7 +30,7 @@ The benchmark unit is an immutable `BenchmarkCandidate`. A candidate identifies 
 
 Provider terminology is removed from Region Benchmark. Benchmark policy supplies OCR configurations to candidate planning. Candidate planning generates immutable candidates only; it does not choose configurations, resolve runtime dependencies, or execute OCR.
 
-Evaluation remains independent from execution. CER and ground-truth handling consume benchmark outputs only when reference text is available.
+Evaluation remains independent from execution. `BenchmarkEvaluator` consumes benchmark outputs only after execution and only when a caller explicitly supplies ground truth; no automatic reference lookup is allowed.
 
 `PdfRegionOcrExecutor` remains the sole production OCR executor. Benchmark orchestration supplies candidates and sequences their execution; it does not own rendering, OCR, cleanup, or cancellation implementation.
 
@@ -60,4 +60,4 @@ Candidates must not contain translation-provider metadata, OCR executor instance
 - Scale comparisons have direct domain representation.
 - Future OCR parameters extend `configuration` without introducing provider abstractions.
 - Dynamic translation-provider lookup is removed from Region Benchmark.
-- This decision does not add artifacts, evaluation, reporting, or multi-engine support.
+- This decision does not add artifacts, reporting, or multi-engine support.

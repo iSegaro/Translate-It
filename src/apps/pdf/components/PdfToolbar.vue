@@ -365,6 +365,9 @@
                   <span>{{ result.configuration.language }}</span>
                   <span>{{ result.runtime.latencyMs }}ms</span>
                   <span>{{ result.output.status }}</span>
+                  <span v-if="result.evaluation">
+                    CER {{ formatCer(result.evaluation) }} · {{ evaluationStatus(result.evaluation) }}
+                  </span>
                 </li>
               </ul>
               <span
@@ -439,6 +442,9 @@ const pdfProviderValue = computed(() => {
 })
 const isDebugMode = computed(() => settingsStore.settings?.DEBUG_MODE === true)
 const isBenchmarkActive = computed(() => ['running', 'cancelling'].includes(props.benchmarkState?.status))
+
+const formatCer = (evaluation) => evaluation.cer.characterErrorRate.toFixed(3)
+const evaluationStatus = (evaluation) => evaluation.cer.characterErrorRate === 0 ? 'exact' : 'differences'
 
 const providerPersistenceState = {
   sequence: 0,

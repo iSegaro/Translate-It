@@ -1,6 +1,7 @@
 import { createExecutionOperation } from './composables/executionOperation.js'
 import { isRegionExecutionRequest, REGION_EXECUTION_TARGET } from './composables/regionExecutionRequest.js'
 import { BenchmarkCandidatePlanner } from './BenchmarkCandidatePlanner.js'
+import { BenchmarkEvaluator } from './BenchmarkEvaluator.js'
 import { BenchmarkResultAssembler } from './BenchmarkResultAssembler.js'
 import { PdfRegionOcrExecutor } from '@/features/pdf-translation/core/PdfRegionOcrExecutor.js'
 
@@ -41,6 +42,8 @@ export class BenchmarkSession {
     getPdfDocument = () => undefined,
     clock = () => Date.now(),
     resultAssembler = new BenchmarkResultAssembler(),
+    benchmarkEvaluator = new BenchmarkEvaluator(),
+    groundTruth,
     onProgress
   } = {}) {
     this.request = request
@@ -50,6 +53,8 @@ export class BenchmarkSession {
     this.getPdfDocument = getPdfDocument
     this.clock = clock
     this.resultAssembler = resultAssembler
+    this.benchmarkEvaluator = benchmarkEvaluator
+    this.groundTruth = groundTruth
     this.onProgress = onProgress
     this.state = 'created'
     this.cancelled = false
@@ -123,8 +128,13 @@ export class BenchmarkSession {
       this.emitProgress('running', candidates, results)
     }
 
+    const completedResults = Object.freeze(results)
+    const evaluatedResults = typeof this.groundTruth === 'string'
+      ? this.benchmarkEvaluator.evaluate(completedResults, { groundTruth: this.groundTruth })
+      : completedResults
+
     this.state = 'ready'
-    return this.finish(BENCHMARK_RUNNER_STATUS.READY, candidates, results, benchmarkStartedAt)
+    return this.finish(BENCHMARK_RUNNER_STATUS.READY, candidates, evaluatedResults, benchmarkStartedAt)
   }
 }
 
@@ -136,6 +146,8 @@ export class BenchmarkRunner {
     getPdfDocument,
     clock,
     resultAssembler,
+    benchmarkEvaluator,
+    groundTruth,
     onProgress,
     createSession = (request) => new BenchmarkSession(request, {
       candidatePlanner,
@@ -144,6 +156,8 @@ export class BenchmarkRunner {
       getPdfDocument,
       clock,
       resultAssembler,
+      benchmarkEvaluator,
+      groundTruth,
       onProgress
     })
   } = {}) {
