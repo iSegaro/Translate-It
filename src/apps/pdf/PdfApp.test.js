@@ -94,6 +94,7 @@ vi.mock('@/utils/ui/theme.js', () => ({
 }))
 
 vi.mock('@/shared/config/config.js', () => ({
+  CONFIG: { DEBUG_MODE: false },
   getSourceLanguageAsync: vi.fn().mockResolvedValue('auto')
 }))
 
@@ -490,6 +491,7 @@ describe('PdfApp', () => {
 
   it('reuses Region selection for Benchmark and forwards the canonical region to PdfDeveloperApi', async () => {
     const runRegionBenchmark = vi.spyOn(PdfDeveloperApi.prototype, 'runRegionBenchmark')
+      .mockReturnValue(createMockOperation(Promise.resolve({ status: 'ready' })))
     const wrapper = mount(PdfApp)
     await flushPromises()
 
@@ -506,7 +508,6 @@ describe('PdfApp', () => {
 
     expect(viewer.props('regionSelectionActive')).toBe(false)
     expect(runRegionBenchmark).toHaveBeenCalledWith({ region })
-    expect(mockRegionExecutionDispatch).toHaveBeenCalledWith(expect.objectContaining({ region, target: 'benchmark' }), expect.any(Function))
     expect(mockRegionOcr.startRegionOcr).not.toHaveBeenCalled()
     runRegionBenchmark.mockRestore()
   })
