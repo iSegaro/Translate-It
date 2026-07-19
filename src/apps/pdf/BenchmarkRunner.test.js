@@ -52,7 +52,10 @@ describe('BenchmarkRunner', () => {
       .mockReturnValueOnce(200)
       .mockReturnValueOnce(260)
     const scoreReport = Object.freeze({
-      providers: Object.freeze([{ providerId: 'first', score: null }, { providerId: 'second', score: null }]),
+      providers: Object.freeze([
+        { providerId: 'first', score: null, metrics: { latencyMs: 25, success: true, completed: true } },
+        { providerId: 'second', score: null, metrics: { latencyMs: 60, success: true, completed: true } }
+      ]),
       winner: null
     })
     const scoringEngine = { score: vi.fn(() => scoreReport) }
