@@ -16,13 +16,15 @@ describe('BenchmarkArtifactWriter', () => {
     })
     const writer = new BenchmarkArtifactWriter({ clock: () => '2026-07-19T00:00:00.000Z' })
 
-    const artifact = writer.write(sessionResult)
-    const repeatedArtifact = writer.write(sessionResult)
+    const profile = Object.freeze({ id: 'default-region-ocr', name: 'Default Region OCR' })
+    const artifact = writer.write(sessionResult, { profile })
+    const repeatedArtifact = writer.write(sessionResult, { profile })
 
     expect(artifact).toEqual({
       schemaVersion: '1.0.0',
       artifactType: 'region-benchmark',
       generatedAt: '2026-07-19T00:00:00.000Z',
+      profile,
       summary: sessionResult.summary,
       configurations: [
         { candidateId: 'scale-1-eng', configuration: { scale: 1, language: 'eng' } },

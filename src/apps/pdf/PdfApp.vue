@@ -591,7 +591,9 @@ function handleCancelRegionBenchmark() {
 function handleExportBenchmarkArtifact() {
   if (!canExportBenchmarkArtifact.value || !completedBenchmarkResult) return
 
-  const artifact = benchmarkArtifactWriter.write(completedBenchmarkResult)
+  const artifact = benchmarkArtifactWriter.write(completedBenchmarkResult, {
+    profile: DEFAULT_REGION_BENCHMARK_PROFILE
+  })
   downloadFile(JSON.stringify(artifact, null, 2), 'region-benchmark-artifact.json', 'application/json')
 }
 
