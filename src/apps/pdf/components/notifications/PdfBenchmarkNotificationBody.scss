@@ -4,28 +4,44 @@
   font-size: 11px;
 }
 
-.pdf-benchmark-notification__analysis,
-.pdf-benchmark-notification__results {
+.pdf-benchmark-notification__analysis {
   display: grid;
   gap: 4px;
 }
 
 .pdf-benchmark-notification__results {
-  margin: 0;
-  padding: 0;
-  list-style: none;
+  width: 100%;
+  border-collapse: collapse;
+  font-variant-numeric: tabular-nums;
 }
 
-.pdf-benchmark-notification__results li {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  align-items: center;
+.pdf-benchmark-notification__results th,
+.pdf-benchmark-notification__results td {
+  padding: 4px 6px;
+  text-align: left;
+  white-space: nowrap;
 }
 
-.pdf-benchmark-notification__results code,
-.pdf-benchmark-notification__results strong {
+.pdf-benchmark-notification__results th {
+  border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+  color: rgba(230, 237, 247, 0.76);
+  font-weight: 700;
+}
+
+.pdf-benchmark-notification__results td:first-child {
+  padding-left: 0;
+}
+
+.pdf-benchmark-notification__results th:first-child {
+  padding-left: 0;
+}
+
+.pdf-benchmark-notification__results code {
   color: #ffffff;
+}
+
+.pdf-benchmark-notification__numeric {
+  text-align: left !important;
 }
 
 .pdf-benchmark-notification__total {

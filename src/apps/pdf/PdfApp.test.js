@@ -477,11 +477,9 @@ describe('PdfApp', () => {
 
     expect(wrapper.find('.pdf-status-banner__title').text()).toBe('Region Benchmark complete')
     expect(wrapper.find('.pdf-status-banner__message').text()).toContain('Winner: scale-1-eng.')
-    expect(wrapper.find('.pdf-benchmark-notification__results').text()).toContain('Scale 1.5')
-    expect(wrapper.find('.pdf-benchmark-notification__results').text()).toContain('Language eng')
-    expect(wrapper.find('.pdf-benchmark-notification__results').text()).toContain('Runtime 42ms')
-    expect(wrapper.find('.pdf-benchmark-notification__results').text()).toContain('CER 0.200')
-    expect(wrapper.find('.pdf-benchmark-notification__results').text()).toContain('Winner')
+    expect(wrapper.findAll('.pdf-benchmark-notification__results tbody td').map(cell => cell.text())).toEqual([
+      'scale-1-eng', '1.5', 'eng', '42ms', '95', '0.200', 'Winner'
+    ])
     await wrapper.find('.pdf-status-banner__dismiss').trigger('click')
     expect(wrapper.find('.pdf-status-banner').exists()).toBe(false)
   })

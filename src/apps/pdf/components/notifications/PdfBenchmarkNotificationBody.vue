@@ -7,21 +7,55 @@
       </span>
       <span>OCR Output {{ analysis?.output?.comparable ? (analysis.output.identical ? 'Identical' : 'Different') : 'Not comparable' }}</span>
     </div>
-    <ul class="pdf-benchmark-notification__results">
-      <li
-        v-for="result in results"
-        :key="result.candidateId"
-      >
-        <code>{{ result.candidateId }}</code>
-        <span v-if="result.configuration?.scale !== undefined">Scale {{ result.configuration.scale }}</span>
-        <span v-if="result.configuration?.language">Language {{ result.configuration.language }}</span>
-        <span v-if="Number.isFinite(result.runtime?.latencyMs)">Runtime {{ result.runtime.latencyMs }}ms</span>
-        <span>OCR {{ result.output?.status }}</span>
-        <span v-if="Number.isFinite(result.output?.data?.confidence)">Confidence {{ result.output.data.confidence }}</span>
-        <span v-if="Number.isFinite(result.evaluation?.cer?.characterErrorRate)">CER {{ formatCer(result.evaluation) }} · {{ evaluationStatus(result.evaluation) }}</span>
-        <strong v-if="analysis?.winnerCandidateId === result.candidateId">Winner</strong>
-      </li>
-    </ul>
+    <table class="pdf-benchmark-notification__results">
+      <thead>
+        <tr>
+          <th scope="col">
+            Candidate
+          </th>
+          <th scope="col">
+            Scale
+          </th>
+          <th scope="col">
+            Lang
+          </th>
+          <th scope="col">
+            Runtime
+          </th>
+          <th scope="col">
+            Confidence
+          </th>
+          <th scope="col">
+            CER
+          </th>
+          <th scope="col">
+            Result
+          </th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr
+          v-for="result in results"
+          :key="result.candidateId"
+        >
+          <td><code>{{ result.candidateId }}</code></td>
+          <td class="pdf-benchmark-notification__numeric">
+            {{ result.configuration?.scale ?? '—' }}
+          </td>
+          <td>{{ result.configuration?.language || '—' }}</td>
+          <td class="pdf-benchmark-notification__numeric">
+            {{ formatRuntime(result.runtime?.latencyMs) }}
+          </td>
+          <td class="pdf-benchmark-notification__numeric">
+            {{ formatConfidence(result.output?.data?.confidence) }}
+          </td>
+          <td class="pdf-benchmark-notification__numeric">
+            {{ formatCer(result.evaluation) || '—' }}
+          </td>
+          <td>{{ resultLabel(result) }}</td>
+        </tr>
+      </tbody>
+    </table>
     <span
       v-if="Number.isFinite(payload?.totalElapsedMs)"
       class="pdf-benchmark-notification__total"
@@ -50,8 +84,17 @@ function formatCer(evaluation) {
   return Number.isFinite(errorRate) ? errorRate.toFixed(3) : ''
 }
 
-function evaluationStatus(evaluation) {
-  return evaluation?.cer?.characterErrorRate === 0 ? 'exact' : 'differences'
+function formatRuntime(latencyMs) {
+  return Number.isFinite(latencyMs) ? `${latencyMs}ms` : '—'
+}
+
+function formatConfidence(confidence) {
+  return Number.isFinite(confidence) ? confidence : '—'
+}
+
+function resultLabel(result) {
+  if (analysis.value?.winnerCandidateId === result.candidateId) return 'Winner'
+  return result.output?.status === 'recognized' ? '✓' : result.output?.status || '—'
 }
 
 function winnerReasonLabel(reason) {
