@@ -341,6 +341,7 @@ const benchmarkRunner = new BenchmarkRunner({
 const benchmarkArtifactWriter = new BenchmarkArtifactWriter()
 let activeBenchmarkOperation = null
 let completedBenchmarkResult = null
+let completedBenchmarkRegion = null
 
 const regionExecutionDispatcher = createRegionExecutionDispatcher({
   runners: {
@@ -539,6 +540,7 @@ function handleRegionSelectionComplete(region) {
     const operation = pdfDeveloperApi.runRegionBenchmark({ region })
     activeBenchmarkOperation = operation
     completedBenchmarkResult = null
+    completedBenchmarkRegion = null
     benchmarkState.value = {
       status: 'running',
       progress: Object.freeze({
@@ -589,10 +591,11 @@ function handleCancelRegionBenchmark() {
 }
 
 function handleExportBenchmarkArtifact() {
-  if (!canExportBenchmarkArtifact.value || !completedBenchmarkResult) return
+  if (!canExportBenchmarkArtifact.value || !completedBenchmarkResult || !completedBenchmarkRegion) return
 
   const artifact = benchmarkArtifactWriter.write(completedBenchmarkResult, {
-    profile: DEFAULT_REGION_BENCHMARK_PROFILE
+    profile: DEFAULT_REGION_BENCHMARK_PROFILE,
+    region: completedBenchmarkRegion
   })
   downloadFile(JSON.stringify(artifact, null, 2), 'region-benchmark-artifact.json', 'application/json')
 }
@@ -612,6 +615,7 @@ function handleBenchmarkOutcome(operation, result) {
 
   activeBenchmarkOperation = null
   completedBenchmarkResult = result.status === 'ready' ? result : null
+  completedBenchmarkRegion = result.status === 'ready' ? operation.context.request.region : null
   benchmarkState.value = {
     status: result.status === 'cancelled' ? 'cancelled' : 'completed',
     progress: Object.freeze({

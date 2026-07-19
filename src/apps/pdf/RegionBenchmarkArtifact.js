@@ -19,10 +19,11 @@ function requireObject(value, field) {
 }
 
 export function createRegionBenchmarkArtifact(value = {}) {
-  for (const field of ['schemaVersion', 'artifactType', 'generatedAt', 'profile', 'summary', 'configurations', 'results']) {
+  for (const field of ['schemaVersion', 'artifactType', 'generatedAt', 'profile', 'metadata', 'summary', 'configurations', 'results']) {
     requireField(value, field)
   }
   requireObject(value.profile, 'profile')
+  requireObject(value.metadata, 'metadata')
   requireObject(value.summary, 'summary')
   if (!Array.isArray(value.configurations)) throw new TypeError('RegionBenchmarkArtifact requires configurations')
   if (!Array.isArray(value.results)) throw new TypeError('RegionBenchmarkArtifact requires results')
@@ -37,6 +38,7 @@ export function createRegionBenchmarkArtifact(value = {}) {
     artifactType: value.artifactType,
     generatedAt: value.generatedAt,
     profile: { id: value.profile.id, name: value.profile.name },
+    metadata: value.metadata,
     summary: value.summary,
     configurations: [...value.configurations],
     results: [...value.results]

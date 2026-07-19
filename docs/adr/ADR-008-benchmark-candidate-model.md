@@ -60,5 +60,5 @@ Candidates must not contain translation-provider metadata, OCR executor instance
 - Scale comparisons have direct domain representation.
 - Future OCR parameters extend `configuration` without introducing provider abstractions.
 - Dynamic translation-provider lookup is removed from Region Benchmark.
-- `RegionBenchmarkArtifact` defines versioned immutable artifact schema validation; `BenchmarkArtifactWriter` produces it from completed results without affecting execution or evaluation.
+- `ExecutionMetadata` describes immutable timing, profile, and canonical region context; `RegionBenchmarkArtifact` defines versioned immutable artifact schema validation; `BenchmarkArtifactWriter` produces them from completed results without affecting execution or evaluation.
 - This decision does not add reporting or multi-engine support.

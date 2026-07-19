@@ -32,11 +32,11 @@ const mockRegionExecutionDispatch = vi.fn((request, runner) => runner(request))
 const openTranslationMock = vi.fn()
 const downloadFileMock = vi.hoisted(() => vi.fn())
 
-function createMockOperation(promise, cancel = vi.fn()) {
+function createMockOperation(promise, cancel = vi.fn(), context = { target: 'ocr' }) {
   return Object.freeze({
     promise,
     cancel,
-    context: Object.freeze({ target: 'ocr' })
+    context: Object.freeze(context)
   })
 }
 
@@ -515,19 +515,19 @@ describe('PdfApp', () => {
       runtime: Object.freeze({ latencyMs: 40 }),
       output: Object.freeze({ status: 'recognized' })
     })])
+    const region = createPdfRegion({ pageNumber: 1, left: 1, top: 4, right: 3, bottom: 2 })
     const runRegionBenchmark = vi.spyOn(PdfDeveloperApi.prototype, 'runRegionBenchmark')
       .mockReturnValue(createMockOperation(Promise.resolve({
         status: 'ready',
         candidates,
         results,
-        summary: Object.freeze({ totalCandidates: 1, completedCandidates: 1, totalElapsedMs: 40 })
-      })))
+        summary: Object.freeze({ totalCandidates: 1, completedCandidates: 1, startedAt: 0, completedAt: 40, totalElapsedMs: 40 })
+      }), vi.fn(), { target: 'benchmark', request: { region } }))
     const wrapper = mount(PdfApp)
     await flushPromises()
 
     const toolbar = wrapper.findComponent({ name: 'PdfToolbar' })
     const viewer = wrapper.findComponent({ name: 'PdfViewer' })
-    const region = createPdfRegion({ pageNumber: 1, left: 1, top: 4, right: 3, bottom: 2 })
     toolbar.vm.$emit('request-region-benchmark')
     await flushPromises()
 
