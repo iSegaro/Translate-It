@@ -38,13 +38,29 @@ describe('BenchmarkRunner', () => {
     await expect(operation.promise).resolves.toEqual({ status: BENCHMARK_RUNNER_STATUS.CANCELLED })
   })
 
-  it('returns planned candidates without executing OCR', async () => {
+  it('executes every planned candidate and returns immutable results', async () => {
     const candidates = Object.freeze([
       Object.freeze({ candidateId: 'scale-1', configuration: Object.freeze({ scale: 1, language: 'eng' }) }),
       Object.freeze({ candidateId: 'scale-1.5', configuration: Object.freeze({ scale: 1.5, language: 'eng' }) })
     ])
     const configurations = Object.freeze([Object.freeze({ scale: 1, language: 'eng' })])
     const candidatePlanner = { createCandidates: vi.fn(() => candidates) }
+    const executeFirst = vi.fn(() => ({
+      promise: Promise.resolve({ status: 'recognized', data: { text: 'first' } }),
+      cancel: vi.fn()
+    }))
+    const executeSecond = vi.fn(() => ({
+      promise: Promise.resolve({ status: 'recognized', data: { text: 'second' } }),
+      cancel: vi.fn()
+    }))
+    const createExecutor = vi.fn()
+      .mockReturnValueOnce({ execute: executeFirst })
+      .mockReturnValueOnce({ execute: executeSecond })
+    const clock = vi.fn()
+      .mockReturnValueOnce(100)
+      .mockReturnValueOnce(125)
+      .mockReturnValueOnce(200)
+      .mockReturnValueOnce(260)
     const request = createRegionExecutionRequest({
       region: createPdfRegion({ pageNumber: 1, left: 1, top: 4, right: 3, bottom: 2 }),
       target: REGION_EXECUTION_TARGET.BENCHMARK
@@ -52,16 +68,120 @@ describe('BenchmarkRunner', () => {
 
     const result = await new BenchmarkSession(request, {
       candidatePlanner,
-      configurations
+      configurations,
+      createExecutor,
+      getPdfDocument: () => 'pdf-document',
+      clock
     }).run()
 
     expect(result).toEqual({
       status: BENCHMARK_RUNNER_STATUS.READY,
       candidates,
-      results: []
+      results: [
+        {
+          candidateId: 'scale-1',
+          configuration: { scale: 1, language: 'eng' },
+          runtime: { startedAt: 100, completedAt: 125, latencyMs: 25 },
+          output: { status: 'recognized', data: { text: 'first' } }
+        },
+        {
+          candidateId: 'scale-1.5',
+          configuration: { scale: 1.5, language: 'eng' },
+          runtime: { startedAt: 200, completedAt: 260, latencyMs: 60 },
+          output: { status: 'recognized', data: { text: 'second' } }
+        }
+      ]
     })
     expect(candidatePlanner.createCandidates).toHaveBeenCalledWith({ configurations })
+    expect(createExecutor).toHaveBeenCalledTimes(2)
+    expect(executeFirst).toHaveBeenCalledOnce()
+    expect(executeSecond).toHaveBeenCalledOnce()
+    expect(executeFirst).toHaveBeenCalledWith({ region: request.region, scale: 1, language: 'eng' })
+    expect(executeSecond).toHaveBeenCalledWith({ region: request.region, scale: 1.5, language: 'eng' })
     expect(Object.isFrozen(result.results)).toBe(true)
+    expect(Object.isFrozen(result.results[0])).toBe(true)
+    expect(Object.isFrozen(result.results[0].runtime)).toBe(true)
+  })
+
+  it('executes candidates sequentially', async () => {
+    const candidates = Object.freeze([
+      Object.freeze({ candidateId: 'scale-1', configuration: Object.freeze({ scale: 1, language: 'eng' }) }),
+      Object.freeze({ candidateId: 'scale-1.5', configuration: Object.freeze({ scale: 1.5, language: 'eng' }) })
+    ])
+    let resolveFirst
+    const firstOperation = { promise: new Promise(resolve => { resolveFirst = resolve }), cancel: vi.fn() }
+    const executeSecond = vi.fn(() => ({ promise: Promise.resolve({ status: 'recognized' }), cancel: vi.fn() }))
+    const createExecutor = vi.fn()
+      .mockReturnValueOnce({ execute: vi.fn(() => firstOperation) })
+      .mockReturnValueOnce({ execute: executeSecond })
+    const request = createRegionExecutionRequest({
+      region: createPdfRegion({ pageNumber: 1, left: 1, top: 4, right: 3, bottom: 2 }),
+      target: REGION_EXECUTION_TARGET.BENCHMARK
+    })
+
+    const run = new BenchmarkSession(request, {
+      candidatePlanner: { createCandidates: () => candidates },
+      createExecutor
+    }).run()
+
+    await vi.waitFor(() => expect(createExecutor).toHaveBeenCalledOnce())
+    expect(executeSecond).not.toHaveBeenCalled()
+    resolveFirst({ status: 'recognized' })
+    await run
+    expect(executeSecond).toHaveBeenCalledOnce()
+  })
+
+  it('cancels the active candidate and stops remaining candidates', async () => {
+    const candidates = Object.freeze([
+      Object.freeze({ candidateId: 'scale-1', configuration: Object.freeze({ scale: 1, language: 'eng' }) }),
+      Object.freeze({ candidateId: 'scale-1.5', configuration: Object.freeze({ scale: 1.5, language: 'eng' }) })
+    ])
+    let resolveFirst
+    const firstOperation = { promise: new Promise(resolve => { resolveFirst = resolve }), cancel: vi.fn() }
+    const executeSecond = vi.fn()
+    const createExecutor = vi.fn()
+      .mockReturnValueOnce({ execute: vi.fn(() => firstOperation) })
+      .mockReturnValueOnce({ execute: executeSecond })
+    const request = createRegionExecutionRequest({
+      region: createPdfRegion({ pageNumber: 1, left: 1, top: 4, right: 3, bottom: 2 }),
+      target: REGION_EXECUTION_TARGET.BENCHMARK
+    })
+    const session = new BenchmarkSession(request, {
+      candidatePlanner: { createCandidates: () => candidates },
+      createExecutor
+    })
+    const run = session.run()
+
+    await vi.waitFor(() => expect(createExecutor).toHaveBeenCalledOnce())
+    session.cancel()
+    expect(firstOperation.cancel).toHaveBeenCalledOnce()
+    resolveFirst({ status: 'cancelled' })
+
+    await expect(run).resolves.toEqual({ status: BENCHMARK_RUNNER_STATUS.CANCELLED })
+    expect(createExecutor).toHaveBeenCalledOnce()
+    expect(executeSecond).not.toHaveBeenCalled()
+  })
+
+  it('propagates candidate executor failures without scheduling later candidates', async () => {
+    const candidates = Object.freeze([
+      Object.freeze({ candidateId: 'scale-1', configuration: Object.freeze({ scale: 1, language: 'eng' }) }),
+      Object.freeze({ candidateId: 'scale-1.5', configuration: Object.freeze({ scale: 1.5, language: 'eng' }) })
+    ])
+    const error = new Error('OCR executor failed')
+    const executeSecond = vi.fn()
+    const createExecutor = vi.fn()
+      .mockReturnValueOnce({ execute: () => ({ promise: Promise.reject(error), cancel: vi.fn() }) })
+      .mockReturnValueOnce({ execute: executeSecond })
+    const request = createRegionExecutionRequest({
+      region: createPdfRegion({ pageNumber: 1, left: 1, top: 4, right: 3, bottom: 2 }),
+      target: REGION_EXECUTION_TARGET.BENCHMARK
+    })
+
+    await expect(new BenchmarkSession(request, {
+      candidatePlanner: { createCandidates: () => candidates },
+      createExecutor
+    }).run()).rejects.toBe(error)
+    expect(executeSecond).not.toHaveBeenCalled()
   })
 
   it('rejects non-canonical Benchmark requests', () => {

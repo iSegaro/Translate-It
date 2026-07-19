@@ -32,7 +32,7 @@ Provider terminology is removed from Region Benchmark. Benchmark policy supplies
 
 Evaluation remains independent from execution. CER and ground-truth handling consume benchmark outputs only when reference text is available.
 
-`PdfRegionOcrExecutor` remains the sole production OCR executor. Benchmark orchestration supplies candidates and sequences future execution; it does not own rendering, OCR, cleanup, or cancellation implementation.
+`PdfRegionOcrExecutor` remains the sole production OCR executor. Benchmark orchestration supplies candidates and sequences their execution; it does not own rendering, OCR, cleanup, or cancellation implementation.
 
 ## Ownership
 
@@ -60,4 +60,4 @@ Candidates must not contain translation-provider metadata, OCR executor instance
 - Scale comparisons have direct domain representation.
 - Future OCR parameters extend `configuration` without introducing provider abstractions.
 - Dynamic translation-provider lookup is removed from Region Benchmark.
-- This decision does not add OCR execution, progress UI, artifacts, or multi-engine support.
+- This decision does not add progress UI, artifacts, evaluation, reporting, or multi-engine support.

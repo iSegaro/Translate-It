@@ -324,7 +324,10 @@ const {
 const { startRegionOcr, cancelRegionOcr } = usePdfRegionOcr({
   onRecognized: handleRegionOcrRecognized
 })
-const benchmarkRunner = new BenchmarkRunner({ configurations: REGION_BENCHMARK_CONFIGURATIONS })
+const benchmarkRunner = new BenchmarkRunner({
+  configurations: REGION_BENCHMARK_CONFIGURATIONS,
+  getPdfDocument: () => session.pdfDocument
+})
 
 const regionExecutionDispatcher = createRegionExecutionDispatcher({
   runners: {
