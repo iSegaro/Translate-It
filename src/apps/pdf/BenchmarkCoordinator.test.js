@@ -28,14 +28,20 @@ describe('BenchmarkCoordinator', () => {
   it('resolves Benchmark through the registered dispatcher target', async () => {
     const coordinator = new BenchmarkCoordinator({
       regionExecutionDispatcher: createRegionExecutionDispatcher({
-        runners: { [REGION_EXECUTION_TARGET.BENCHMARK]: (request) => new BenchmarkRunner().execute(request) }
+        runners: {
+          [REGION_EXECUTION_TARGET.BENCHMARK]: (request) => new BenchmarkRunner({
+            providerResolver: { resolve: () => [] }
+          }).execute(request)
+        }
       })
     })
     const region = createPdfRegion({ pageNumber: 1, left: 1, top: 4, right: 3, bottom: 2 })
 
     await expect(coordinator.coordinateRegionBenchmark({ region }).promise).resolves.toEqual({
       status: BENCHMARK_RUNNER_STATUS.READY,
-      providers: []
+      providers: [],
+      plan: { steps: [] },
+      results: []
     })
   })
 

@@ -41,20 +41,42 @@ describe('BenchmarkRunner', () => {
   it('delegates provider resolution and plan creation', async () => {
     const providers = Object.freeze([{ id: 'provider' }])
     const plan = Object.freeze({ steps: Object.freeze([{ providerId: 'provider', state: 'pending' }]) })
+    const result = Object.freeze({ providerId: 'provider', status: 'completed', output: 'translated text' })
     const providerResolver = { resolve: vi.fn(() => providers) }
     const executionPlanner = { create: vi.fn(() => plan) }
+    const providerExecutor = { execute: vi.fn(() => result) }
     const request = createRegionExecutionRequest({
       region: createPdfRegion({ pageNumber: 1, left: 1, top: 4, right: 3, bottom: 2 }),
       target: REGION_EXECUTION_TARGET.BENCHMARK
     })
 
-    await expect(new BenchmarkSession(request, { providerResolver, executionPlanner }).run()).resolves.toEqual({
+    await expect(new BenchmarkSession(request, { providerResolver, executionPlanner, providerExecutor }).run()).resolves.toEqual({
       status: BENCHMARK_RUNNER_STATUS.READY,
       providers,
-      plan
+      plan,
+      results: [result]
     })
     expect(providerResolver.resolve).toHaveBeenCalledOnce()
     expect(executionPlanner.create).toHaveBeenCalledWith(providers)
+    expect(providerExecutor.execute).toHaveBeenCalledWith({ request, provider: providers[0], step: plan.steps[0] })
+  })
+
+  it('skips execution for an empty plan', async () => {
+    const providerResolver = { resolve: vi.fn(() => []) }
+    const executionPlanner = { create: vi.fn(() => Object.freeze({ steps: Object.freeze([]) })) }
+    const providerExecutor = { execute: vi.fn() }
+    const request = createRegionExecutionRequest({
+      region: createPdfRegion({ pageNumber: 1, left: 1, top: 4, right: 3, bottom: 2 }),
+      target: REGION_EXECUTION_TARGET.BENCHMARK
+    })
+
+    await expect(new BenchmarkSession(request, { providerResolver, executionPlanner, providerExecutor }).run()).resolves.toMatchObject({
+      status: BENCHMARK_RUNNER_STATUS.READY,
+      providers: [],
+      plan: { steps: [] },
+      results: []
+    })
+    expect(providerExecutor.execute).not.toHaveBeenCalled()
   })
 
   it('rejects non-canonical Benchmark requests', () => {

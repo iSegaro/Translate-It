@@ -1,6 +1,7 @@
 import { createExecutionOperation } from './composables/executionOperation.js'
 import { isRegionExecutionRequest, REGION_EXECUTION_TARGET } from './composables/regionExecutionRequest.js'
 import { BenchmarkExecutionPlanner } from './BenchmarkExecutionPlanner.js'
+import { BenchmarkProviderExecutor } from './BenchmarkProviderExecutor.js'
 import { BenchmarkProviderResolver } from './BenchmarkProviderResolver.js'
 
 export const BENCHMARK_RUNNER_STATUS = Object.freeze({
@@ -11,11 +12,13 @@ export const BENCHMARK_RUNNER_STATUS = Object.freeze({
 export class BenchmarkSession {
   constructor(request, {
     providerResolver = new BenchmarkProviderResolver(),
-    executionPlanner = new BenchmarkExecutionPlanner()
+    executionPlanner = new BenchmarkExecutionPlanner(),
+    providerExecutor = new BenchmarkProviderExecutor()
   } = {}) {
     this.request = request
     this.providerResolver = providerResolver
     this.executionPlanner = executionPlanner
+    this.providerExecutor = providerExecutor
     this.state = 'created'
     this.cancelled = false
   }
@@ -36,12 +39,16 @@ export class BenchmarkSession {
 
     const providers = this.providerResolver.resolve()
     const plan = this.executionPlanner.create(providers)
+    const results = plan.steps.length === 0
+      ? Object.freeze([])
+      : Object.freeze([await this.providerExecutor.execute({ request: this.request, provider: providers[0], step: plan.steps[0] })])
 
     this.state = 'ready'
     return Object.freeze({
       status: BENCHMARK_RUNNER_STATUS.READY,
       providers,
-      plan
+      plan,
+      results
     })
   }
 }
@@ -50,7 +57,8 @@ export class BenchmarkRunner {
   constructor({
     providerResolver,
     executionPlanner,
-    createSession = (request) => new BenchmarkSession(request, { providerResolver, executionPlanner })
+    providerExecutor,
+    createSession = (request) => new BenchmarkSession(request, { providerResolver, executionPlanner, providerExecutor })
   } = {}) {
     this.createSession = createSession
   }

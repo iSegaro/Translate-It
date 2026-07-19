@@ -29,7 +29,7 @@ describe('RegionExecutionDispatcher', () => {
       region: createPdfRegion({ pageNumber: 1, left: 1, top: 4, right: 3, bottom: 2 }),
       target: REGION_EXECUTION_TARGET.BENCHMARK
     })
-    const runner = new BenchmarkRunner()
+    const runner = new BenchmarkRunner({ providerResolver: { resolve: () => [] } })
     const execute = vi.spyOn(runner, 'execute')
     const dispatcher = createRegionExecutionDispatcher({
       runners: { [REGION_EXECUTION_TARGET.BENCHMARK]: (benchmarkRequest) => runner.execute(benchmarkRequest) }
@@ -39,7 +39,12 @@ describe('RegionExecutionDispatcher', () => {
 
     expect(execute).toHaveBeenCalledWith(request)
     expect(operation.context.target).toBe(REGION_EXECUTION_TARGET.BENCHMARK)
-    await expect(operation.promise).resolves.toEqual({ status: BENCHMARK_RUNNER_STATUS.READY, providers: [] })
+    await expect(operation.promise).resolves.toEqual({
+      status: BENCHMARK_RUNNER_STATUS.READY,
+      providers: [],
+      plan: { steps: [] },
+      results: []
+    })
   })
 
   it('rejects unsupported target', () => {
