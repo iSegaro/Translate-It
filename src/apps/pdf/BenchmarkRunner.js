@@ -9,6 +9,30 @@ export const BENCHMARK_RUNNER_STATUS = Object.freeze({
   CANCELLED: 'cancelled'
 })
 
+function createProgress({ status, candidates, results, currentCandidate = null }) {
+  return Object.freeze({
+    status,
+    totalCandidates: candidates.length,
+    completedCandidates: results.length,
+    currentCandidate
+  })
+}
+
+function createSessionResult({ status, candidates, results, startedAt, completedAt }) {
+  return Object.freeze({
+    status,
+    candidates,
+    results: Object.freeze([...results]),
+    summary: Object.freeze({
+      totalCandidates: candidates.length,
+      completedCandidates: results.length,
+      startedAt,
+      completedAt,
+      totalElapsedMs: completedAt - startedAt
+    })
+  })
+}
+
 export class BenchmarkSession {
   constructor(request, {
     candidatePlanner = new BenchmarkCandidatePlanner(),
@@ -16,7 +40,8 @@ export class BenchmarkSession {
     createExecutor = (options) => new PdfRegionOcrExecutor(options),
     getPdfDocument = () => undefined,
     clock = () => Date.now(),
-    resultAssembler = new BenchmarkResultAssembler()
+    resultAssembler = new BenchmarkResultAssembler(),
+    onProgress
   } = {}) {
     this.request = request
     this.candidatePlanner = candidatePlanner
@@ -25,6 +50,7 @@ export class BenchmarkSession {
     this.getPdfDocument = getPdfDocument
     this.clock = clock
     this.resultAssembler = resultAssembler
+    this.onProgress = onProgress
     this.state = 'created'
     this.cancelled = false
     this.activeOperation = null
@@ -44,22 +70,35 @@ export class BenchmarkSession {
     })
   }
 
+  emitProgress(status, candidates, results, currentCandidate) {
+    this.onProgress?.(createProgress({ status, candidates, results, currentCandidate }))
+  }
+
+  finish(status, candidates, results, startedAt) {
+    const completedAt = this.clock()
+    this.emitProgress(status === BENCHMARK_RUNNER_STATUS.CANCELLED ? 'cancelled' : 'completed', candidates, results)
+    return createSessionResult({ status, candidates, results, startedAt, completedAt })
+  }
+
   async run() {
+    const benchmarkStartedAt = this.clock()
+    const emptyCandidates = Object.freeze([])
+    const results = []
     this.state = 'initializing'
     await Promise.resolve()
-    if (this.cancelled) return Object.freeze({ status: BENCHMARK_RUNNER_STATUS.CANCELLED })
+    if (this.cancelled) return this.finish(BENCHMARK_RUNNER_STATUS.CANCELLED, emptyCandidates, results, benchmarkStartedAt)
 
     this.state = 'planning-candidates'
     await Promise.resolve()
-    if (this.cancelled) return Object.freeze({ status: BENCHMARK_RUNNER_STATUS.CANCELLED })
+    if (this.cancelled) return this.finish(BENCHMARK_RUNNER_STATUS.CANCELLED, emptyCandidates, results, benchmarkStartedAt)
 
     const candidates = this.candidatePlanner.createCandidates({ configurations: this.configurations })
-    const results = []
 
     for (const candidate of candidates) {
-      if (this.cancelled) return Object.freeze({ status: BENCHMARK_RUNNER_STATUS.CANCELLED })
+      if (this.cancelled) return this.finish(BENCHMARK_RUNNER_STATUS.CANCELLED, candidates, results, benchmarkStartedAt)
 
-      const startedAt = this.clock()
+      this.emitProgress('running', candidates, results, candidate)
+      const candidateStartedAt = this.clock()
       const operation = this.executeCandidate({ request: this.request, candidate })
       this.activeOperation = operation
 
@@ -67,28 +106,25 @@ export class BenchmarkSession {
       try {
         output = await operation.promise
       } catch (error) {
-        if (this.cancelled) return Object.freeze({ status: BENCHMARK_RUNNER_STATUS.CANCELLED })
+        if (this.cancelled) return this.finish(BENCHMARK_RUNNER_STATUS.CANCELLED, candidates, results, benchmarkStartedAt)
         throw error
       } finally {
         if (this.activeOperation === operation) this.activeOperation = null
       }
 
-      if (this.cancelled) return Object.freeze({ status: BENCHMARK_RUNNER_STATUS.CANCELLED })
+      if (this.cancelled) return this.finish(BENCHMARK_RUNNER_STATUS.CANCELLED, candidates, results, benchmarkStartedAt)
 
       results.push(this.resultAssembler.assemble({
         candidate,
-        startedAt,
+        startedAt: candidateStartedAt,
         completedAt: this.clock(),
         output
       }))
+      this.emitProgress('running', candidates, results)
     }
 
     this.state = 'ready'
-    return Object.freeze({
-      status: BENCHMARK_RUNNER_STATUS.READY,
-      candidates,
-      results: Object.freeze(results)
-    })
+    return this.finish(BENCHMARK_RUNNER_STATUS.READY, candidates, results, benchmarkStartedAt)
   }
 }
 
@@ -100,13 +136,15 @@ export class BenchmarkRunner {
     getPdfDocument,
     clock,
     resultAssembler,
+    onProgress,
     createSession = (request) => new BenchmarkSession(request, {
       candidatePlanner,
       configurations,
       createExecutor,
       getPdfDocument,
       clock,
-      resultAssembler
+      resultAssembler,
+      onProgress
     })
   } = {}) {
     this.createSession = createSession

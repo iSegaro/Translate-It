@@ -39,6 +39,15 @@ function createMockOperation(promise, cancel = vi.fn()) {
   })
 }
 
+function createDeferred() {
+  let resolve
+  const promise = new Promise((resolvePromise) => {
+    resolve = resolvePromise
+  })
+
+  return { promise, resolve }
+}
+
 vi.mock('./composables/usePdfViewerController.js', () => ({
   usePdfViewerController: () => mockViewerController
 }))
@@ -101,8 +110,8 @@ vi.mock('@/shared/config/config.js', () => ({
 vi.mock('./components/PdfToolbar.vue', () => ({
   default: {
     name: 'PdfToolbar',
-    props: ['fileName', 'pageCount', 'currentPageNumber', 'zoomMode', 'zoomPercent', 'contentView', 'layoutMode', 'ocrRecommendationCount', 'executionMode', 'executionModes', 'regionOcrState', 'regionOcrAvailable'],
-    emits: ['toggle-outline', 'translate-visible', 'cancel-translation', 'content-view-change', 'layout-mode-change', 'zoom-step', 'zoom-change', 'export-txt', 'export-markdown', 'export-html', 'request-ocr', 'request-region-ocr', 'request-region-benchmark', 'clear-cache', 'request-open-pdf', 'execution-mode-change'],
+    props: ['fileName', 'pageCount', 'currentPageNumber', 'zoomMode', 'zoomPercent', 'contentView', 'layoutMode', 'ocrRecommendationCount', 'executionMode', 'executionModes', 'regionOcrState', 'regionOcrAvailable', 'benchmarkState'],
+    emits: ['toggle-outline', 'translate-visible', 'cancel-translation', 'content-view-change', 'layout-mode-change', 'zoom-step', 'zoom-change', 'export-txt', 'export-markdown', 'export-html', 'request-ocr', 'request-region-ocr', 'request-region-benchmark', 'cancel-region-benchmark', 'clear-cache', 'request-open-pdf', 'execution-mode-change'],
     template: '<header class="pdf-toolbar-stub" />'
   }
 }))
@@ -491,7 +500,11 @@ describe('PdfApp', () => {
 
   it('reuses Region selection for Benchmark and forwards the canonical region to PdfDeveloperApi', async () => {
     const runRegionBenchmark = vi.spyOn(PdfDeveloperApi.prototype, 'runRegionBenchmark')
-      .mockReturnValue(createMockOperation(Promise.resolve({ status: 'ready' })))
+      .mockReturnValue(createMockOperation(Promise.resolve({
+        status: 'ready',
+        results: Object.freeze([]),
+        summary: Object.freeze({ totalCandidates: 2, completedCandidates: 2, totalElapsedMs: 40 })
+      })))
     const wrapper = mount(PdfApp)
     await flushPromises()
 
@@ -509,6 +522,46 @@ describe('PdfApp', () => {
     expect(viewer.props('regionSelectionActive')).toBe(false)
     expect(runRegionBenchmark).toHaveBeenCalledWith({ region })
     expect(mockRegionOcr.startRegionOcr).not.toHaveBeenCalled()
+    await vi.waitFor(() => expect(toolbar.props('benchmarkState')).toMatchObject({
+      status: 'completed',
+      progress: { totalCandidates: 2, completedCandidates: 2 }
+    }))
+    runRegionBenchmark.mockRestore()
+  })
+
+  it('preserves completed benchmark results after cancellation', async () => {
+    const deferred = createDeferred()
+    const cancel = vi.fn()
+    const runRegionBenchmark = vi.spyOn(PdfDeveloperApi.prototype, 'runRegionBenchmark')
+      .mockReturnValue(createMockOperation(deferred.promise, cancel))
+    const wrapper = mount(PdfApp)
+    await flushPromises()
+    const toolbar = wrapper.findComponent({ name: 'PdfToolbar' })
+    const viewer = wrapper.findComponent({ name: 'PdfViewer' })
+    const region = createPdfRegion({ pageNumber: 1, left: 1, top: 4, right: 3, bottom: 2 })
+
+    toolbar.vm.$emit('request-region-benchmark')
+    await flushPromises()
+    viewer.vm.$emit('region-selection-complete', region)
+    await flushPromises()
+    expect(toolbar.props('benchmarkState')).toMatchObject({ status: 'running' })
+
+    toolbar.vm.$emit('cancel-region-benchmark')
+    expect(cancel).toHaveBeenCalledOnce()
+    await vi.waitFor(() => expect(toolbar.props('benchmarkState')).toMatchObject({ status: 'cancelling' }))
+
+    deferred.resolve({
+      status: 'cancelled',
+      results: Object.freeze([Object.freeze({ candidateId: 'scale-1-eng' })]),
+      summary: Object.freeze({ totalCandidates: 2, completedCandidates: 1, totalElapsedMs: 40 })
+    })
+    await flushPromises()
+
+    await vi.waitFor(() => expect(toolbar.props('benchmarkState')).toMatchObject({
+      status: 'cancelled',
+      progress: { totalCandidates: 2, completedCandidates: 1 },
+      results: [{ candidateId: 'scale-1-eng' }]
+    }))
     runRegionBenchmark.mockRestore()
   })
 

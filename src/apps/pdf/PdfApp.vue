@@ -21,6 +21,7 @@
       :execution-modes="supportedExecutionModes"
       :region-ocr-state="regionOcrState"
       :region-ocr-available="regionOcrAvailable"
+      :benchmark-state="benchmarkState"
       @toggle-outline="toggleOutline"
       @translate-visible="handleTranslateVisiblePages"
       @cancel-translation="handleCancelTranslation"
@@ -34,6 +35,7 @@
       @request-ocr="requestOcr"
       @request-region-ocr="handleRequestRegionOcr"
       @request-region-benchmark="handleRequestRegionBenchmark"
+      @cancel-region-benchmark="handleCancelRegionBenchmark"
       @clear-cache="handleClearCache"
       @request-open-pdf="requestOpenPdf"
       @execution-mode-change="handleExecutionModeChange"
@@ -296,6 +298,7 @@ let activeRegionPosition = null
 const regionOcrState = ref(REGION_OCR_STATE.IDLE)
 const regionSelectionTarget = ref(null)
 const regionOcrNotice = ref(null)
+const benchmarkState = ref(null)
 const regionOcrAvailable = computed(() => hasDocument.value && showOriginalPane.value)
 const supportedExecutionModes = Object.freeze([REGION_EXECUTION_TARGET.OCR])
 const executionMode = ref(REGION_EXECUTION_TARGET.OCR)
@@ -326,8 +329,10 @@ const { startRegionOcr, cancelRegionOcr } = usePdfRegionOcr({
 })
 const benchmarkRunner = new BenchmarkRunner({
   configurations: REGION_BENCHMARK_CONFIGURATIONS,
-  getPdfDocument: () => session.pdfDocument
+  getPdfDocument: () => session.pdfDocument,
+  onProgress: handleBenchmarkProgress
 })
+let activeBenchmarkOperation = null
 
 const regionExecutionDispatcher = createRegionExecutionDispatcher({
   runners: {
@@ -523,7 +528,22 @@ function handleRegionSelectionComplete(region) {
   exitRegionSelection()
 
   if (target === REGION_EXECUTION_TARGET.BENCHMARK) {
-    pdfDeveloperApi.runRegionBenchmark({ region })
+    const operation = pdfDeveloperApi.runRegionBenchmark({ region })
+    activeBenchmarkOperation = operation
+    benchmarkState.value = {
+      status: 'running',
+      progress: Object.freeze({
+        totalCandidates: 0,
+        completedCandidates: 0,
+        currentCandidate: null
+      }),
+      results: Object.freeze([]),
+      summary: null
+    }
+    void operation.promise.then(
+      result => handleBenchmarkOutcome(operation, result),
+      error => handleBenchmarkFailure(operation, error)
+    )
     return
   }
 
@@ -547,6 +567,52 @@ function handleRequestRegionOcr() {
 
 function handleRequestRegionBenchmark() {
   beginRegionSelection(REGION_EXECUTION_TARGET.BENCHMARK)
+}
+
+function handleCancelRegionBenchmark() {
+  if (!activeBenchmarkOperation) return
+
+  benchmarkState.value = {
+    ...benchmarkState.value,
+    status: 'cancelling'
+  }
+  activeBenchmarkOperation.cancel()
+}
+
+function handleBenchmarkProgress(progress) {
+  if (!benchmarkState.value) return
+
+  benchmarkState.value = {
+    ...benchmarkState.value,
+    status: progress.status === 'cancelled' ? 'cancelled' : benchmarkState.value.status,
+    progress
+  }
+}
+
+function handleBenchmarkOutcome(operation, result) {
+  if (activeBenchmarkOperation !== operation) return
+
+  activeBenchmarkOperation = null
+  benchmarkState.value = {
+    status: result.status === 'cancelled' ? 'cancelled' : 'completed',
+    progress: Object.freeze({
+      totalCandidates: result.summary.totalCandidates,
+      completedCandidates: result.summary.completedCandidates,
+      currentCandidate: null
+    }),
+    results: result.results,
+    summary: result.summary
+  }
+}
+
+function handleBenchmarkFailure(operation) {
+  if (activeBenchmarkOperation !== operation) return
+
+  activeBenchmarkOperation = null
+  benchmarkState.value = {
+    ...benchmarkState.value,
+    status: 'failed'
+  }
 }
 
 function beginRegionSelection(target) {
@@ -711,6 +777,8 @@ onMounted(() => {
 onBeforeUnmount(() => {
   clearExportSuccess()
   activeRegionPosition = null
+  activeBenchmarkOperation?.cancel()
+  activeBenchmarkOperation = null
   setRegionOcrIdle()
   detachDocument()
   void cleanup()

@@ -407,6 +407,61 @@
   text-transform: uppercase;
 }
 
+.pdf-toolbar__benchmark {
+  display: grid;
+  gap: 6px;
+  padding: 8px 12px;
+  border-radius: 10px;
+  background: $tb-control-hover;
+  color: $tb-text-secondary;
+  font-size: 11px;
+}
+
+.pdf-toolbar__benchmark-summary,
+.pdf-toolbar__benchmark-results li {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.pdf-toolbar__benchmark-summary span:first-child {
+  margin-right: auto;
+  color: $tb-text-primary;
+  font-weight: 700;
+  text-transform: capitalize;
+}
+
+.pdf-toolbar__benchmark-cancel {
+  border: 0;
+  border-radius: 6px;
+  padding: 3px 6px;
+  background: $tb-border-hover;
+  color: $tb-text-primary;
+  font: inherit;
+  cursor: pointer;
+}
+
+.pdf-toolbar__benchmark-current,
+.pdf-toolbar__benchmark-total {
+  font-variant-numeric: tabular-nums;
+}
+
+.pdf-toolbar__benchmark-results {
+  display: grid;
+  gap: 3px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.pdf-toolbar__benchmark-results li {
+  flex-wrap: wrap;
+}
+
+.pdf-toolbar__benchmark-results code {
+  color: $tb-text-primary;
+}
+
 .pdf-toolbar__button--menu-trigger {
   min-width: 0;
 }

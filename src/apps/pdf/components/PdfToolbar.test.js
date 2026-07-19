@@ -255,6 +255,59 @@ describe('PdfToolbar', () => {
     expect(debugEnabled.emitted('request-region-benchmark')).toHaveLength(1)
   })
 
+  it('shows compact benchmark progress and results only in Developer Mode', async () => {
+    const benchmarkState = {
+      status: 'completed',
+      progress: { totalCandidates: 2, completedCandidates: 2, currentCandidate: null },
+      results: [{
+        candidateId: 'scale-1-eng',
+        configuration: { scale: 1, language: 'eng' },
+        runtime: { latencyMs: 42 },
+        output: { status: 'recognized' }
+      }],
+      summary: { totalElapsedMs: 84 }
+    }
+    const normalUser = mount(PdfToolbar, { props: { benchmarkState } })
+
+    await normalUser.find('.pdf-toolbar__button[aria-label="More actions"]').trigger('click')
+    expect(normalUser.find('.pdf-toolbar__benchmark').exists()).toBe(false)
+
+    settingsStoreMock.settings.DEBUG_MODE = true
+    const developer = mount(PdfToolbar, { props: { benchmarkState } })
+    await developer.find('.pdf-toolbar__button[aria-label="More actions"]').trigger('click')
+
+    expect(developer.find('.pdf-toolbar__benchmark').text()).toContain('2/2')
+    expect(developer.find('.pdf-toolbar__benchmark').text()).toContain('scale-1-eng')
+    expect(developer.find('.pdf-toolbar__benchmark').text()).toContain('scale 1')
+    expect(developer.find('.pdf-toolbar__benchmark').text()).toContain('eng')
+    expect(developer.find('.pdf-toolbar__benchmark').text()).toContain('42ms')
+    expect(developer.find('.pdf-toolbar__benchmark').text()).toContain('recognized')
+    expect(developer.find('.pdf-toolbar__benchmark').text()).toContain('Total 84ms')
+  })
+
+  it('emits cancellation from active benchmark state', async () => {
+    settingsStoreMock.settings.DEBUG_MODE = true
+    const wrapper = mount(PdfToolbar, {
+      props: {
+        benchmarkState: {
+          status: 'running',
+          progress: {
+            totalCandidates: 2,
+            completedCandidates: 1,
+            currentCandidate: { candidateId: 'scale-1.5-eng' }
+          },
+          results: [],
+          summary: null
+        }
+      }
+    })
+    await wrapper.find('.pdf-toolbar__button[aria-label="More actions"]').trigger('click')
+
+    expect(wrapper.find('.pdf-toolbar__benchmark-current').text()).toBe('scale-1.5-eng')
+    await wrapper.find('.pdf-toolbar__benchmark-cancel').trigger('click')
+    expect(wrapper.emitted('cancel-region-benchmark')).toHaveLength(1)
+  })
+
   it('shows OCR button without count when OCR recommendations exist', async () => {
     const wrapper = mount(PdfToolbar, {
       props: {

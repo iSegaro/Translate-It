@@ -37,10 +37,11 @@ describe('BenchmarkCoordinator', () => {
     })
     const region = createPdfRegion({ pageNumber: 1, left: 1, top: 4, right: 3, bottom: 2 })
 
-    await expect(coordinator.coordinateRegionBenchmark({ region }).promise).resolves.toEqual({
+    await expect(coordinator.coordinateRegionBenchmark({ region }).promise).resolves.toMatchObject({
       status: BENCHMARK_RUNNER_STATUS.READY,
       candidates: [],
-      results: []
+      results: [],
+      summary: { totalCandidates: 0, completedCandidates: 0 }
     })
   })
 
