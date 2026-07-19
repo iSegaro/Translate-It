@@ -49,25 +49,32 @@ describe('BenchmarkRunner', () => {
     ])
     const configurations = Object.freeze([Object.freeze({ scale: 1, language: 'eng' })])
     const candidatePlanner = { createCandidates: vi.fn(() => candidates) }
-    const executeFirst = vi.fn(() => ({
-      promise: Promise.resolve({ status: 'recognized', data: { text: 'first' } }),
-      cancel: vi.fn()
-    }))
+    const executionOrder = []
+    const executeFirst = vi.fn(() => {
+      executionOrder.push('first-execute')
+      return {
+        promise: Promise.resolve({ status: 'recognized', data: { text: 'first' } }),
+        cancel: vi.fn()
+      }
+    })
     const executeSecond = vi.fn(() => ({
       promise: Promise.resolve({ status: 'recognized', data: { text: 'second' } }),
       cancel: vi.fn()
     }))
+    const prepare = vi.fn(() => {
+      executionOrder.push('prepare')
+      return Promise.resolve()
+    })
     const createExecutor = vi.fn()
+      .mockReturnValueOnce({ prepare })
       .mockReturnValueOnce({ execute: executeFirst })
       .mockReturnValueOnce({ execute: executeSecond })
     const onProgress = vi.fn()
-    const clock = vi.fn()
-      .mockReturnValueOnce(50)
-      .mockReturnValueOnce(100)
-      .mockReturnValueOnce(125)
-      .mockReturnValueOnce(200)
-      .mockReturnValueOnce(260)
-      .mockReturnValueOnce(300)
+    const timings = [50, 100, 125, 200, 260, 300]
+    const clock = vi.fn(() => {
+      executionOrder.push('clock')
+      return timings.shift()
+    })
     const request = createRegionExecutionRequest({
       region: createPdfRegion({ pageNumber: 1, left: 1, top: 4, right: 3, bottom: 2 }),
       target: REGION_EXECUTION_TARGET.BENCHMARK
@@ -108,7 +115,10 @@ describe('BenchmarkRunner', () => {
       }
     })
     expect(candidatePlanner.createCandidates).toHaveBeenCalledWith({ configurations })
-    expect(createExecutor).toHaveBeenCalledTimes(2)
+    expect(createExecutor).toHaveBeenCalledTimes(3)
+    expect(prepare).toHaveBeenCalledOnce()
+    expect(prepare).toHaveBeenCalledWith({ language: 'eng' })
+    expect(executionOrder.slice(0, 4)).toEqual(['prepare', 'clock', 'clock', 'first-execute'])
     expect(executeFirst).toHaveBeenCalledOnce()
     expect(executeSecond).toHaveBeenCalledOnce()
     expect(executeFirst).toHaveBeenCalledWith({ region: request.region, scale: 1, language: 'eng' })
@@ -144,7 +154,7 @@ describe('BenchmarkRunner', () => {
 
     const result = await new BenchmarkSession(request, {
       candidatePlanner: { createCandidates: () => Object.freeze([candidate]) },
-      createExecutor: () => ({ execute: () => ({ promise: Promise.resolve({ status: 'recognized' }), cancel: vi.fn() }) }),
+      createExecutor: () => ({ prepare: () => Promise.resolve(), execute: () => ({ promise: Promise.resolve({ status: 'recognized' }), cancel: vi.fn() }) }),
       resultAssembler,
       benchmarkEvaluator,
       groundTruth: 'reference'
@@ -165,7 +175,7 @@ describe('BenchmarkRunner', () => {
 
     const result = await new BenchmarkSession(request, {
       candidatePlanner: { createCandidates: () => Object.freeze([candidate]) },
-      createExecutor: () => ({ execute: () => ({ promise: Promise.resolve({ status: 'recognized' }), cancel: vi.fn() }) }),
+      createExecutor: () => ({ prepare: () => Promise.resolve(), execute: () => ({ promise: Promise.resolve({ status: 'recognized' }), cancel: vi.fn() }) }),
       resultAssembler: { assemble: () => assembledResult },
       benchmarkEvaluator
     }).run()
@@ -183,6 +193,7 @@ describe('BenchmarkRunner', () => {
     const firstOperation = { promise: new Promise(resolve => { resolveFirst = resolve }), cancel: vi.fn() }
     const executeSecond = vi.fn(() => ({ promise: Promise.resolve({ status: 'recognized' }), cancel: vi.fn() }))
     const createExecutor = vi.fn()
+      .mockReturnValueOnce({ prepare: () => Promise.resolve() })
       .mockReturnValueOnce({ execute: vi.fn(() => firstOperation) })
       .mockReturnValueOnce({ execute: executeSecond })
     const request = createRegionExecutionRequest({
@@ -195,7 +206,7 @@ describe('BenchmarkRunner', () => {
       createExecutor
     }).run()
 
-    await vi.waitFor(() => expect(createExecutor).toHaveBeenCalledOnce())
+    await vi.waitFor(() => expect(createExecutor).toHaveBeenCalledTimes(2))
     expect(executeSecond).not.toHaveBeenCalled()
     resolveFirst({ status: 'recognized' })
     await run
@@ -212,6 +223,7 @@ describe('BenchmarkRunner', () => {
     const secondOperation = { promise: new Promise(resolve => { resolveSecond = resolve }), cancel: vi.fn() }
     const executeSecond = vi.fn(() => secondOperation)
     const createExecutor = vi.fn()
+      .mockReturnValueOnce({ prepare: () => Promise.resolve() })
       .mockReturnValueOnce({ execute: vi.fn(() => firstOperation) })
       .mockReturnValueOnce({ execute: executeSecond })
     const onProgress = vi.fn()
@@ -226,7 +238,7 @@ describe('BenchmarkRunner', () => {
     })
     const run = session.run()
 
-    await vi.waitFor(() => expect(createExecutor).toHaveBeenCalledTimes(2))
+    await vi.waitFor(() => expect(createExecutor).toHaveBeenCalledTimes(3))
     session.cancel()
     expect(secondOperation.cancel).toHaveBeenCalledOnce()
     resolveSecond({ status: 'cancelled' })
@@ -237,7 +249,7 @@ describe('BenchmarkRunner', () => {
       results: [{ candidateId: 'scale-1' }],
       summary: { completedCandidates: 1 }
     })
-    expect(createExecutor).toHaveBeenCalledTimes(2)
+    expect(createExecutor).toHaveBeenCalledTimes(3)
     expect(executeSecond).toHaveBeenCalledOnce()
     expect(onProgress).toHaveBeenLastCalledWith(expect.objectContaining({
       status: 'cancelled',
@@ -255,6 +267,7 @@ describe('BenchmarkRunner', () => {
     const error = new Error('OCR executor failed')
     const executeSecond = vi.fn()
     const createExecutor = vi.fn()
+      .mockReturnValueOnce({ prepare: () => Promise.resolve() })
       .mockReturnValueOnce({ execute: () => ({ promise: Promise.reject(error), cancel: vi.fn() }) })
       .mockReturnValueOnce({ execute: executeSecond })
     const request = createRegionExecutionRequest({
@@ -267,6 +280,22 @@ describe('BenchmarkRunner', () => {
       createExecutor
     }).run()).rejects.toBe(error)
     expect(executeSecond).not.toHaveBeenCalled()
+  })
+
+  it('prepares once before timing candidates and aborts on preparation failure', async () => {
+    const candidate = Object.freeze({ candidateId: 'scale-1-eng', configuration: Object.freeze({ scale: 1, language: 'eng' }) })
+    const request = createRegionExecutionRequest({
+      region: createPdfRegion({ pageNumber: 1, left: 1, top: 4, right: 3, bottom: 2 }),
+      target: REGION_EXECUTION_TARGET.BENCHMARK
+    })
+    const prepareError = new Error('worker initialization failed')
+    const execute = vi.fn()
+
+    await expect(new BenchmarkSession(request, {
+      candidatePlanner: { createCandidates: () => Object.freeze([candidate]) },
+      createExecutor: () => ({ prepare: () => Promise.reject(prepareError), execute })
+    }).run()).rejects.toBe(prepareError)
+    expect(execute).not.toHaveBeenCalled()
   })
 
   it('rejects non-canonical Benchmark requests', () => {

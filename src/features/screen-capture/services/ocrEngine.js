@@ -104,6 +104,10 @@ async function initWorker(lang) {
   return worker;
 }
 
+export async function prepareOCREngine(lang = 'eng') {
+  return enqueueWorkerOperation(() => initWorker(lang))
+}
+
 /**
  * Perform OCR on an image
  * @param {string|Blob|File} image Image source

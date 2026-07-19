@@ -1,4 +1,4 @@
-import { recognizeStructured } from '@/features/screen-capture/services/ocrEngine.js'
+import { prepareOCREngine, recognizeStructured } from '@/features/screen-capture/services/ocrEngine.js'
 import { toTesseractLanguageCode } from '@/features/screen-capture/utils/ocrLanguageMap.js'
 import { createPdfRegion } from './PdfRegion.js'
 
@@ -54,10 +54,15 @@ function mapRegionToViewportBounds(region, viewport) {
 }
 
 export class PdfRegionOcrExecutor {
-  constructor({ pdfDocument, recognize = recognizeStructured, createCanvas = () => document.createElement('canvas') } = {}) {
+  constructor({ pdfDocument, recognize = recognizeStructured, prepare = prepareOCREngine, createCanvas = () => document.createElement('canvas') } = {}) {
     this.pdfDocument = pdfDocument
     this.recognize = recognize
+    this.prepareEngine = prepare
     this.createCanvas = createCanvas
+  }
+
+  prepare({ language } = {}) {
+    return this.prepareEngine(toTesseractLanguageCode(language))
   }
 
   execute({ region, scale, language } = {}) {

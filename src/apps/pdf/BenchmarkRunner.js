@@ -75,6 +75,16 @@ export class BenchmarkSession {
     })
   }
 
+  async prepareCandidates(candidates) {
+    const candidate = candidates[0]
+    if (!candidate) return
+
+    const executor = this.createExecutor({ pdfDocument: this.getPdfDocument() })
+    if (typeof executor.prepare !== 'function') return
+
+    await executor.prepare({ language: candidate.configuration.language })
+  }
+
   emitProgress(status, candidates, results, currentCandidate) {
     this.onProgress?.(createProgress({ status, candidates, results, currentCandidate }))
   }
@@ -86,18 +96,20 @@ export class BenchmarkSession {
   }
 
   async run() {
-    const benchmarkStartedAt = this.clock()
     const emptyCandidates = Object.freeze([])
     const results = []
     this.state = 'initializing'
     await Promise.resolve()
-    if (this.cancelled) return this.finish(BENCHMARK_RUNNER_STATUS.CANCELLED, emptyCandidates, results, benchmarkStartedAt)
+    if (this.cancelled) return this.finish(BENCHMARK_RUNNER_STATUS.CANCELLED, emptyCandidates, results, this.clock())
 
     this.state = 'planning-candidates'
     await Promise.resolve()
-    if (this.cancelled) return this.finish(BENCHMARK_RUNNER_STATUS.CANCELLED, emptyCandidates, results, benchmarkStartedAt)
+    if (this.cancelled) return this.finish(BENCHMARK_RUNNER_STATUS.CANCELLED, emptyCandidates, results, this.clock())
 
     const candidates = this.candidatePlanner.createCandidates({ configurations: this.configurations })
+    await this.prepareCandidates(candidates)
+    if (this.cancelled) return this.finish(BENCHMARK_RUNNER_STATUS.CANCELLED, candidates, results, this.clock())
+    const benchmarkStartedAt = this.clock()
 
     for (const candidate of candidates) {
       if (this.cancelled) return this.finish(BENCHMARK_RUNNER_STATUS.CANCELLED, candidates, results, benchmarkStartedAt)

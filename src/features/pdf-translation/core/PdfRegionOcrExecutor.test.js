@@ -88,6 +88,15 @@ function createExecutor({ page, recognize = vi.fn().mockResolvedValue({ text: 'h
 const region = createPdfRegion({ pageNumber: 3, left: 10, top: 80, right: 40, bottom: 20 })
 
 describe('PdfRegionOcrExecutor', () => {
+  it('prepares the OCR engine with mapped language before recognition', async () => {
+    const prepare = vi.fn(() => Promise.resolve())
+    const executor = new PdfRegionOcrExecutor({ prepare })
+
+    await executor.prepare({ language: 'en' })
+
+    expect(prepare).toHaveBeenCalledWith('eng')
+  })
+
   it('executes region OCR and returns the existing OCR engine data contract', async () => {
     const viewport = createViewport()
     const renderTask = resolvedRenderTask()
