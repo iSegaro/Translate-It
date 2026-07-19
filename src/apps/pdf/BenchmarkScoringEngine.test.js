@@ -12,8 +12,26 @@ describe('BenchmarkScoringEngine', () => {
 
     expect(report).toEqual({
       providers: [
-        { providerId: 'first', score: null, metrics: { latencyMs: 25, success: true, completed: true } },
-        { providerId: 'second', score: null, metrics: { latencyMs: 50, success: true, completed: true } }
+        {
+          providerId: 'first',
+          score: null,
+          metrics: { latencyMs: 25, success: true, completed: true },
+          criteria: {
+            latency: { value: 25, weight: null },
+            quality: { value: null, weight: null },
+            cost: { value: null, weight: null }
+          }
+        },
+        {
+          providerId: 'second',
+          score: null,
+          metrics: { latencyMs: 50, success: true, completed: true },
+          criteria: {
+            latency: { value: 50, weight: null },
+            quality: { value: null, weight: null },
+            cost: { value: null, weight: null }
+          }
+        }
       ],
       winner: null
     })
@@ -21,6 +39,7 @@ describe('BenchmarkScoringEngine', () => {
     expect(Object.isFrozen(report.providers)).toBe(true)
     expect(Object.isFrozen(report.providers[0])).toBe(true)
     expect(Object.isFrozen(report.providers[0].metrics)).toBe(true)
+    expect(Object.isFrozen(report.providers[0].criteria)).toBe(true)
   })
 
   it('returns an empty report for empty results', () => {

@@ -53,8 +53,26 @@ describe('BenchmarkRunner', () => {
       .mockReturnValueOnce(260)
     const scoreReport = Object.freeze({
       providers: Object.freeze([
-        { providerId: 'first', score: null, metrics: { latencyMs: 25, success: true, completed: true } },
-        { providerId: 'second', score: null, metrics: { latencyMs: 60, success: true, completed: true } }
+        {
+          providerId: 'first',
+          score: null,
+          metrics: { latencyMs: 25, success: true, completed: true },
+          criteria: {
+            latency: { value: 25, weight: null },
+            quality: { value: null, weight: null },
+            cost: { value: null, weight: null }
+          }
+        },
+        {
+          providerId: 'second',
+          score: null,
+          metrics: { latencyMs: 60, success: true, completed: true },
+          criteria: {
+            latency: { value: 60, weight: null },
+            quality: { value: null, weight: null },
+            cost: { value: null, weight: null }
+          }
+        }
       ]),
       winner: null
     })
