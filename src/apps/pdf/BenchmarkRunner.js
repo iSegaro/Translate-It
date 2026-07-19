@@ -13,12 +13,14 @@ export class BenchmarkSession {
   constructor(request, {
     providerResolver = new BenchmarkProviderResolver(),
     executionPlanner = new BenchmarkExecutionPlanner(),
-    providerExecutor = new BenchmarkProviderExecutor()
+    providerExecutor = new BenchmarkProviderExecutor(),
+    clock = () => Date.now()
   } = {}) {
     this.request = request
     this.providerResolver = providerResolver
     this.executionPlanner = executionPlanner
     this.providerExecutor = providerExecutor
+    this.clock = clock
     this.state = 'created'
     this.cancelled = false
   }
@@ -46,10 +48,20 @@ export class BenchmarkSession {
       const step = plan.steps[index]
 
       try {
-        results.push(await this.providerExecutor.execute({
+        const startedAt = this.clock()
+        const output = await this.providerExecutor.execute({
           request: this.request,
           provider: providers[index],
           step
+        })
+        const completedAt = this.clock()
+        results.push(Object.freeze({
+          providerId: step.providerId,
+          status: 'completed',
+          output,
+          startedAt,
+          completedAt,
+          durationMs: completedAt - startedAt
         }))
         plan = this.executionPlanner.markCompleted(plan, step)
       } catch (error) {
@@ -73,7 +85,8 @@ export class BenchmarkRunner {
     providerResolver,
     executionPlanner,
     providerExecutor,
-    createSession = (request) => new BenchmarkSession(request, { providerResolver, executionPlanner, providerExecutor })
+    clock,
+    createSession = (request) => new BenchmarkSession(request, { providerResolver, executionPlanner, providerExecutor, clock })
   } = {}) {
     this.createSession = createSession
   }

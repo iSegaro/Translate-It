@@ -8,7 +8,6 @@ export class BenchmarkProviderExecutor {
       throw new TypeError('BenchmarkProviderExecutor requires an executeProvider callback')
     }
 
-    const output = await this.executeProvider({ request, provider, step })
-    return Object.freeze({ providerId: step.providerId, status: 'completed', output })
+    return this.executeProvider({ request, provider, step })
   }
 }

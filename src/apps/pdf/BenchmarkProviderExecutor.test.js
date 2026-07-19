@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { BenchmarkProviderExecutor } from './BenchmarkProviderExecutor.js'
 
 describe('BenchmarkProviderExecutor', () => {
-  it('executes one provider and returns an immutable completed result', async () => {
+  it('executes one provider and returns its output', async () => {
     const request = Object.freeze({ region: Object.freeze({ id: 'region' }) })
     const provider = Object.freeze({ id: 'provider' })
     const step = Object.freeze({ providerId: 'provider', state: 'pending' })
@@ -11,8 +11,7 @@ describe('BenchmarkProviderExecutor', () => {
     const result = await new BenchmarkProviderExecutor({ executeProvider }).execute({ request, provider, step })
 
     expect(executeProvider).toHaveBeenCalledWith({ request, provider, step })
-    expect(result).toEqual({ providerId: 'provider', status: 'completed', output: 'translated text' })
-    expect(Object.isFrozen(result)).toBe(true)
+    expect(result).toBe('translated text')
   })
 
   it('propagates callback errors', async () => {
