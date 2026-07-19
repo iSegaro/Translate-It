@@ -38,13 +38,19 @@ describe('BenchmarkRunner', () => {
     await expect(operation.promise).resolves.toEqual({ status: BENCHMARK_RUNNER_STATUS.CANCELLED })
   })
 
-  it('delegates provider resolution and plan creation', async () => {
-    const providers = Object.freeze([{ id: 'provider' }])
-    const plan = Object.freeze({ steps: Object.freeze([{ providerId: 'provider', state: 'pending' }]) })
-    const result = Object.freeze({ providerId: 'provider', status: 'completed', output: 'translated text' })
+  it('executes every planned provider in order', async () => {
+    const providers = Object.freeze([{ id: 'first' }, { id: 'second' }])
+    const plan = Object.freeze({ steps: Object.freeze([
+      { providerId: 'first', state: 'pending' },
+      { providerId: 'second', state: 'pending' }
+    ]) })
+    const results = [
+      Object.freeze({ providerId: 'first', status: 'completed', output: 'first output' }),
+      Object.freeze({ providerId: 'second', status: 'completed', output: 'second output' })
+    ]
     const providerResolver = { resolve: vi.fn(() => providers) }
     const executionPlanner = { create: vi.fn(() => plan) }
-    const providerExecutor = { execute: vi.fn(() => result) }
+    const providerExecutor = { execute: vi.fn(({ step }) => results.find(result => result.providerId === step.providerId)) }
     const request = createRegionExecutionRequest({
       region: createPdfRegion({ pageNumber: 1, left: 1, top: 4, right: 3, bottom: 2 }),
       target: REGION_EXECUTION_TARGET.BENCHMARK
@@ -54,11 +60,13 @@ describe('BenchmarkRunner', () => {
       status: BENCHMARK_RUNNER_STATUS.READY,
       providers,
       plan,
-      results: [result]
+      results
     })
     expect(providerResolver.resolve).toHaveBeenCalledOnce()
     expect(executionPlanner.create).toHaveBeenCalledWith(providers)
-    expect(providerExecutor.execute).toHaveBeenCalledWith({ request, provider: providers[0], step: plan.steps[0] })
+    expect(providerExecutor.execute).toHaveBeenCalledTimes(2)
+    expect(providerExecutor.execute).toHaveBeenNthCalledWith(1, { request, provider: providers[0], step: plan.steps[0] })
+    expect(providerExecutor.execute).toHaveBeenNthCalledWith(2, { request, provider: providers[1], step: plan.steps[1] })
   })
 
   it('skips execution for an empty plan', async () => {
@@ -77,6 +85,56 @@ describe('BenchmarkRunner', () => {
       results: []
     })
     expect(providerExecutor.execute).not.toHaveBeenCalled()
+  })
+
+  it('waits for each execution before starting the next', async () => {
+    const providers = Object.freeze([{ id: 'first' }, { id: 'second' }])
+    const plan = Object.freeze({ steps: Object.freeze([
+      { providerId: 'first', state: 'pending' },
+      { providerId: 'second', state: 'pending' }
+    ]) })
+    let completeFirst
+    const firstResult = new Promise(resolve => { completeFirst = resolve })
+    const providerExecutor = {
+      execute: vi.fn(({ step }) => step.providerId === 'first'
+        ? firstResult
+        : Object.freeze({ providerId: 'second', status: 'completed', output: 'second output' }))
+    }
+    const request = createRegionExecutionRequest({
+      region: createPdfRegion({ pageNumber: 1, left: 1, top: 4, right: 3, bottom: 2 }),
+      target: REGION_EXECUTION_TARGET.BENCHMARK
+    })
+    const run = new BenchmarkSession(request, {
+      providerResolver: { resolve: () => providers },
+      executionPlanner: { create: () => plan },
+      providerExecutor
+    }).run()
+
+    await vi.waitFor(() => expect(providerExecutor.execute).toHaveBeenCalledOnce())
+    completeFirst(Object.freeze({ providerId: 'first', status: 'completed', output: 'first output' }))
+    await run
+    expect(providerExecutor.execute).toHaveBeenCalledTimes(2)
+  })
+
+  it('propagates executor errors without starting subsequent steps', async () => {
+    const providers = Object.freeze([{ id: 'first' }, { id: 'second' }])
+    const plan = Object.freeze({ steps: Object.freeze([
+      { providerId: 'first', state: 'pending' },
+      { providerId: 'second', state: 'pending' }
+    ]) })
+    const error = new Error('provider failed')
+    const providerExecutor = { execute: vi.fn(() => { throw error }) }
+    const request = createRegionExecutionRequest({
+      region: createPdfRegion({ pageNumber: 1, left: 1, top: 4, right: 3, bottom: 2 }),
+      target: REGION_EXECUTION_TARGET.BENCHMARK
+    })
+
+    await expect(new BenchmarkSession(request, {
+      providerResolver: { resolve: () => providers },
+      executionPlanner: { create: () => plan },
+      providerExecutor
+    }).run()).rejects.toBe(error)
+    expect(providerExecutor.execute).toHaveBeenCalledOnce()
   })
 
   it('rejects non-canonical Benchmark requests', () => {

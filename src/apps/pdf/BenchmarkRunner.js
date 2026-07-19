@@ -39,16 +39,22 @@ export class BenchmarkSession {
 
     const providers = this.providerResolver.resolve()
     const plan = this.executionPlanner.create(providers)
-    const results = plan.steps.length === 0
-      ? Object.freeze([])
-      : Object.freeze([await this.providerExecutor.execute({ request: this.request, provider: providers[0], step: plan.steps[0] })])
+    const results = []
+
+    for (const [index, step] of plan.steps.entries()) {
+      results.push(await this.providerExecutor.execute({
+        request: this.request,
+        provider: providers[index],
+        step
+      }))
+    }
 
     this.state = 'ready'
     return Object.freeze({
       status: BENCHMARK_RUNNER_STATUS.READY,
       providers,
       plan,
-      results
+      results: Object.freeze(results)
     })
   }
 }
