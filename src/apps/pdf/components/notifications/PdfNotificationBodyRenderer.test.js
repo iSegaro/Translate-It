@@ -9,7 +9,7 @@ describe('PdfNotificationBodyRenderer', () => {
       props: {
         body: {
           type: PDF_NOTIFICATION_BODY_TYPE.REGION_COMPARISON_RESULTS,
-          payload: { results: [] }
+          payload: { title: null, summary: [], columns: [], rows: [], footer: null }
         }
       }
     })

@@ -228,6 +228,7 @@ import { RegionComparisonAnalyzer } from './RegionComparisonAnalyzer.js'
 import { RegionComparisonArtifactWriter } from './RegionComparisonArtifactWriter.js'
 import { REGION_COMPARISON_CONFIGURATIONS } from './regionComparisonConfigurations.js'
 import { PDF_NOTIFICATION_BODY_TYPE } from './notifications/PdfNotificationBodyType.js'
+import { createRegionComparisonNotificationViewModel } from './components/notifications/RegionComparisonNotificationMapper.js'
 import { downloadFile } from '@/features/pdf-translation/core/PdfFileDownloader.js'
 import { PDF_REGION_OCR_RENDER_SCALE } from '@/features/pdf-translation/core/pdfRenderingConstants.js'
 import { getSourceLanguageAsync } from '@/shared/config/config.js'
@@ -670,11 +671,11 @@ function createRegionComparisonSuccessNotification(summary, result) {
     message: details.join(' ') || 'Region Comparison completed.',
     body: Object.freeze({
       type: PDF_NOTIFICATION_BODY_TYPE.REGION_COMPARISON_RESULTS,
-      payload: Object.freeze({
+      payload: Object.freeze(createRegionComparisonNotificationViewModel({
         analysis: summary,
         results: result.results,
         totalElapsedMs: result.summary?.totalElapsedMs
-      })
+      }))
     })
   }
 }
