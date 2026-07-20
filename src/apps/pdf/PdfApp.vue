@@ -14,7 +14,7 @@
       :layout-mode="selectedLayoutMode"
       :zoom-mode="zoomMode"
       :zoom-percent="zoomPercent"
-      :show-translation-option="hasAnyTranslation"
+      :show-translation-option="hasTranslationContent"
       :has-outline="hasOutline"
       :is-outline-visible="isOutlineVisible"
       :execution-mode="executionMode"
@@ -235,7 +235,7 @@ const {
   isLoading,
   isTranslating,
   canTranslateVisiblePages,
-  hasAnyTranslation,
+  hasTranslationContent,
   pageCount,
   pageMetrics,
   translationSummary,
@@ -452,7 +452,7 @@ watch(hasDocument, (has) => {
   }
 })
 
-watch(hasAnyTranslation, (has) => {
+watch(hasTranslationContent, (has) => {
   if (!has && !isTranslating.value && contentView.value !== CONTENT_VIEW.ORIGINAL) {
     setContentView(CONTENT_VIEW.ORIGINAL)
   }

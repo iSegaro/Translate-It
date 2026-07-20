@@ -318,10 +318,13 @@ export function usePdfViewerController() {
 
   const translatedPageData = computed(() => _translatedPageData.value)
 
-  const hasAnyTranslation = computed(() => {
+  const hasTranslationContent = computed(() => {
     translationTick?.value
     for (const state of pdfDocumentSession.translationStates.values()) {
       if (state.status === 'translated') return true
+    }
+    for (const page of _pageDataMap.values()) {
+      if (page.blocks.length > 0) return true
     }
     return false
   })
@@ -528,7 +531,7 @@ export function usePdfViewerController() {
     pageCount,
     pageMetrics,
     isTranslating,
-    hasAnyTranslation,
+    hasTranslationContent,
     canTranslateVisiblePages,
     pdfFingerprint,
     translationSummary,

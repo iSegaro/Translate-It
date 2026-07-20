@@ -888,3 +888,103 @@ describe('usePdfViewerController error lifecycle', () => {
     expect(controller.error.value).toBe('Layout failed')
   })
 })
+
+describe('usePdfViewerController hasTranslationContent', () => {
+  beforeEach(() => {
+    openFileMock.mockReset()
+    rebuildPageMetricsMock.mockReset()
+    cleanupDocumentMock.mockReset().mockResolvedValue()
+    cancelActiveTranslationMock.mockReset().mockResolvedValue()
+    translateVisibleBlocksMock.mockReset()
+    saveTranslationsMock.mockReset().mockResolvedValue()
+    updateAfterOpenMock.mockReset().mockResolvedValue()
+    updateAfterTranslationMock.mockReset().mockResolvedValue()
+    getProviderOptimizationLevelAsyncMock.mockReset().mockResolvedValue(3)
+    getSourceLanguageAsyncMock.mockReset().mockResolvedValue('auto')
+    getTargetLanguageAsyncMock.mockReset().mockResolvedValue('fa')
+    getTranslationApiAsyncMock.mockReset().mockResolvedValue('googlev2')
+
+    session.pageSessions = new Map()
+    session.translationStates = new Map()
+    session.documentIdentity = 'doc-1'
+    session.documentGeneration = 1
+    session.getPageSourceBlocks = vi.fn(() => [])
+    session.setBlockTranslationState.mockClear()
+    session.getBlockTranslationState.mockImplementation((blockId) => session.translationStates.get(blockId) || {
+      blockId,
+      translatedText: '',
+      translatedCells: null,
+      status: 'idle',
+      provider: '',
+      sourceLanguage: '',
+      targetLanguage: '',
+      sourceTextHash: '',
+      translationSettingsHash: '',
+      updatedAt: 0,
+      error: null
+    })
+  })
+
+  async function loadControllerWithBlocks(blocks) {
+    session.pageSessions = new Map([[1, {
+      allBlocks: blocks,
+      getLogicalBlocks: () => blocks
+    }]])
+    openFileMock.mockResolvedValue(createOpenState())
+    const controller = usePdfViewerController()
+    const file = {
+      type: 'application/pdf',
+      name: 'doc.pdf',
+      arrayBuffer: vi.fn().mockResolvedValue(new ArrayBuffer(8))
+    }
+    await controller.loadPdfFile(file, 800)
+    return controller
+  }
+
+  it('returns false when page has no blocks and no translations', async () => {
+    const controller = await loadControllerWithBlocks([])
+    expect(controller.hasTranslationContent.value).toBe(false)
+  })
+
+  it('returns true after OCR populates page blocks', async () => {
+    const controller = await loadControllerWithBlocks([])
+    expect(controller.hasTranslationContent.value).toBe(false)
+
+    const blocks = [createBlock()]
+    session.pageSessions.set(1, {
+      allBlocks: blocks,
+      getLogicalBlocks: () => blocks
+    })
+    session.getPageSourceBlocks = vi.fn(() => blocks)
+    controller.refreshTranslatedPageBlocks([1])
+    controller.translationTick.value += 1
+
+    expect(controller.hasTranslationContent.value).toBe(true)
+  })
+
+  it('returns false when OCR completes without producing blocks', async () => {
+    const controller = await loadControllerWithBlocks([])
+    expect(controller.hasTranslationContent.value).toBe(false)
+
+    session.getPageSourceBlocks = vi.fn(() => [])
+    controller.refreshTranslatedPageBlocks([1])
+    controller.translationTick.value += 1
+
+    expect(controller.hasTranslationContent.value).toBe(false)
+  })
+
+  it('returns true when blocks exist regardless of translation status', async () => {
+    const controller = await loadControllerWithBlocks([createBlock()])
+    expect(controller.hasTranslationContent.value).toBe(true)
+  })
+
+  it('returns true when translationStates has translated entries', async () => {
+    const block = createBlock()
+    const controller = await loadControllerWithBlocks([block])
+
+    session.setBlockTranslationState(block.id, { status: 'translated', translatedText: 'Hola' })
+    controller.translationTick.value += 1
+
+    expect(controller.hasTranslationContent.value).toBe(true)
+  })
+})
