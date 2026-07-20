@@ -146,10 +146,6 @@ export function usePdfRenderPipeline({
     renderCandidatePageNumbers.value = new Set()
     renderAllowedPageNumbers.value = new Set()
     renderPlanByPageNumber.value = new Map()
-
-    if (isOriginalRole.value) {
-      onVisiblePagesChange?.(new Set())
-    }
   }
 
   return {

@@ -187,7 +187,7 @@ describe('usePdfRenderPipeline', () => {
     expect(deps.onVisiblePagesChange).toHaveBeenCalledWith(new Set([2, 3]))
   })
 
-  it('reset clears all state and calls callbacks', () => {
+  it('reset clears render state without clearing session visible pages', () => {
     const deps = createMockDeps()
     const pipeline = usePdfRenderPipeline(deps)
 
@@ -197,7 +197,7 @@ describe('usePdfRenderPipeline', () => {
     expect(toArray(pipeline.renderCandidatePageNumbers.value)).toEqual([])
     expect(toArray(pipeline.renderAllowedPageNumbers.value)).toEqual([])
     expect(pipeline.isRenderAllowed(1)).toBe(false)
-    expect(deps.onVisiblePagesChange).toHaveBeenCalledWith(new Set())
+    expect(deps.onVisiblePagesChange).not.toHaveBeenCalled()
   })
 
   it('cancelRenderWindowFrame is callable without error', () => {

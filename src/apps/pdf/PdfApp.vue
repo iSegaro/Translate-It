@@ -162,6 +162,7 @@
                     :scroll-container="translatedScrollContainer"
                     :suppress-current-page-updates="currentPageUpdatesSuppressed"
                     @current-page-change="handleTranslatedPaneCurrentPageChange"
+                    @visible-pages-change="handleTranslatedPaneVisiblePages"
                   />
                   <PdfViewer
                     v-if="showTranslatedPdfPane"
@@ -511,6 +512,12 @@ function handleVisiblePagesChange(pageNumbers) {
   if (pages.size === 0) return
 
   void hydrateVisiblePageBlocks(pages)
+}
+
+function handleTranslatedPaneVisiblePages(pageNumbers) {
+  if (contentView.value !== CONTENT_VIEW.TRANSLATION) return
+
+  session.updateVisiblePages(new Set(pageNumbers))
 }
 
 function resolveRegionViewportPosition(region) {

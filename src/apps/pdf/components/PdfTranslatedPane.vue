@@ -99,7 +99,7 @@ const props = defineProps({
   }
 })
 
-const emit = defineEmits(['current-page-change'])
+const emit = defineEmits(['current-page-change', 'visible-pages-change'])
 const rootEl = ref(null)
 let pageIntersectionObserver = null
 let scrollRoot = null
@@ -156,18 +156,21 @@ function emitCurrentPage() {
 
   const container = scrollRoot || props.scrollContainer || rootEl.value?.parentElement || null
   const { scrollTop } = getScrollMetrics(container)
-  const currentPage = resolveRenderWindow({
+  const { primaryPage, visiblePages } = resolveRenderWindow({
     scrollTop,
     container,
     pageSelector: '.pdf-translated-page[data-page-number]',
     bufferPages: 1
-  }).primaryPage
-  if (!currentPage) return
+  })
 
-  if (currentPage !== lastCurrentPage) {
-    lastCurrentPage = currentPage
-    logger.debug(`[PDF Primary Page] ${JSON.stringify({ emittedCurrentPage: currentPage, currentPageSource: CURRENT_PAGE_SOURCE, scrollTop, timestamp: new Date().toISOString() })}`)
-    emit('current-page-change', currentPage)
+  emit('visible-pages-change', new Set(visiblePages))
+
+  if (!primaryPage) return
+
+  if (primaryPage !== lastCurrentPage) {
+    lastCurrentPage = primaryPage
+    logger.debug(`[PDF Primary Page] ${JSON.stringify({ emittedCurrentPage: primaryPage, currentPageSource: CURRENT_PAGE_SOURCE, scrollTop, timestamp: new Date().toISOString() })}`)
+    emit('current-page-change', primaryPage)
   }
 }
 
