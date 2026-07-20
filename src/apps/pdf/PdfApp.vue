@@ -226,6 +226,7 @@ import { createPdfTransitionController } from './composables/createPdfTransition
 import { createPdfStatusBannerController } from './utils/pdfStatusBanner.js'
 import { REGION_OCR_STATE } from './constants/regionOcrState.js'
 import { PdfDeveloperApi } from './PdfDeveloperApi.js'
+import { CorpusAssetLoader } from './CorpusAssetLoader.js'
 import { CorpusBenchmarkCoordinator } from './CorpusBenchmarkCoordinator.js'
 import { RegionComparisonRunner } from './RegionComparisonRunner.js'
 import { RegionComparisonAnalyzer } from './RegionComparisonAnalyzer.js'
@@ -356,9 +357,11 @@ const regionComparisonRunner = new RegionComparisonRunner({
 const regionComparisonArtifactWriter = new RegionComparisonArtifactWriter()
 const regionComparisonAnalyzer = new RegionComparisonAnalyzer()
 
+const corpusAssetLoader = new CorpusAssetLoader({
+  manifestUrl: browser.runtime.getURL('corpus/manifest.json')
+})
 const corpusBenchmarkCoordinator = new CorpusBenchmarkCoordinator({
-  corpus: null,
-  assets: []
+  assetLoader: corpusAssetLoader
 })
 let activeRegionComparisonOperation = null
 let completedRegionComparisonResult = null

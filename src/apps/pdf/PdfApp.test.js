@@ -106,6 +106,13 @@ vi.mock('@/features/settings/stores/settings.js', () => ({
   useSettingsStore: () => settingsStoreMock
 }))
 
+vi.mock('./CorpusAssetLoader.js', () => ({
+  CorpusAssetLoader: class {
+    constructor() {}
+    load() { return Promise.resolve({ corpus: {}, assets: [] }) }
+  }
+}))
+
 vi.mock('./CorpusBenchmarkCoordinator.js', () => ({
   CorpusBenchmarkCoordinator: class {
     constructor() {}
@@ -639,6 +646,31 @@ describe('PdfApp', () => {
       wrapper.findComponent({ name: 'PdfToolbar' }).vm.$emit('cancel-corpus-benchmark')
 
       expect(cancel).toHaveBeenCalledOnce()
+    })
+
+    it('does not show error notification after user cancellation', async () => {
+      settingsStoreMock.settings.DEBUG_MODE = true
+      corpusBenchmarkCoordinatorMock.run.mockReturnValue(createMockOperation(
+        Promise.resolve({
+          candidateResults: Object.freeze([]),
+          candidateFailures: Object.freeze([]),
+          comparisonRuntimeResult: null,
+          comparisonArtifact: null,
+          cancelled: true
+        }),
+        vi.fn()
+      ))
+      const wrapper = mount(PdfApp)
+
+      wrapper.findComponent({ name: 'PdfToolbar' }).vm.$emit('request-corpus-benchmark')
+      wrapper.findComponent({ name: 'PdfToolbar' }).vm.$emit('cancel-corpus-benchmark')
+      await flushPromises()
+      await nextTick()
+
+      expect(wrapper.find('.pdf-status-banner').exists()).toBe(false)
+      expect(wrapper.findComponent({ name: 'PdfToolbar' }).props('corpusBenchmarkState')).toMatchObject({
+        status: 'cancelled'
+      })
     })
 
     it('keeps corpus benchmark notification hidden outside Debug Mode', async () => {
