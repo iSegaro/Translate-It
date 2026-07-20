@@ -258,7 +258,7 @@ describe('PdfToolbar', () => {
   it('shows active regionComparison progress only in Developer Mode', async () => {
     const regionComparisonState = {
       status: 'running',
-      progress: { totalCandidates: 2, completedCandidates: 1, currentCandidate: { candidateId: 'scale-1-eng' } }
+      progress: { totalCandidates: 5, completedCandidates: 1, currentCandidate: { candidateId: 'scale-1-eng' } }
     }
     const normalUser = mount(PdfToolbar, { props: { regionComparisonState } })
 
@@ -269,7 +269,7 @@ describe('PdfToolbar', () => {
     const developer = mount(PdfToolbar, { props: { regionComparisonState } })
     await developer.find('.pdf-toolbar__button[aria-label="More actions"]').trigger('click')
 
-    expect(developer.find('.pdf-toolbar__regionComparison').text()).toContain('1/2')
+    expect(developer.find('.pdf-toolbar__regionComparison').text()).toContain('1/5')
     expect(developer.find('.pdf-toolbar__regionComparison').text()).toContain('scale-1-eng')
     expect(developer.findAll('button').some(button => button.text().includes('Export Region Comparison Artifact'))).toBe(false)
 
@@ -287,7 +287,7 @@ describe('PdfToolbar', () => {
         regionComparisonState: {
           status: 'running',
           progress: {
-            totalCandidates: 2,
+            totalCandidates: 5,
             completedCandidates: 1,
             currentCandidate: { candidateId: 'scale-1.5-eng' }
           },
