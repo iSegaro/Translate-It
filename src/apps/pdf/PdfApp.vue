@@ -566,6 +566,7 @@ function handleRegionSelectionComplete(region) {
       analysis: null,
       summary: null
     }
+    regionOcrState.value = REGION_OCR_STATE.PROCESSING
     void operation.promise.then(
       result => handleRegionComparisonOutcome(operation, result),
       error => handleRegionComparisonFailure(operation, error)
@@ -643,6 +644,7 @@ function handleRegionComparisonOutcome(operation, result) {
     summary: result.summary
   }
 
+  setRegionOcrIdle()
   if (result.status === 'ready') {
     developerNotification.value = createRegionComparisonSuccessNotification(analysis, result)
   }
@@ -656,6 +658,7 @@ function handleRegionComparisonFailure(operation, error) {
     ...regionComparisonState.value,
     status: 'failed'
   }
+  setRegionOcrIdle()
   developerNotification.value = createRegionComparisonFailureNotification(error)
 }
 

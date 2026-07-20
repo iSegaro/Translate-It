@@ -492,10 +492,12 @@ describe('PdfApp', () => {
       { target: 'region-comparison', request }
     ))
     const wrapper = mount(PdfApp)
+    const toolbar = wrapper.findComponent({ name: 'PdfToolbar' })
 
     await startRegionComparison(wrapper)
     await vi.waitFor(() => expect(wrapper.find('.pdf-status-banner').exists()).toBe(true))
 
+    expect(toolbar.props('regionOcrState')).toBe('idle')
     expect(wrapper.find('.pdf-status-banner').classes()).toContain('pdf-status-banner--error')
     expect(wrapper.find('.pdf-status-banner__title').text()).toBe('Region Comparison failed')
     expect(wrapper.find('.pdf-status-banner__message').text()).toBe('OCR worker unavailable')
@@ -704,6 +706,7 @@ describe('PdfApp', () => {
     viewer.vm.$emit('region-selection-complete', region)
     await flushPromises()
     expect(toolbar.props('regionComparisonState')).toMatchObject({ status: 'running' })
+    expect(toolbar.props('regionOcrState')).toBe('processing')
 
     toolbar.vm.$emit('cancel-region-comparison')
     expect(cancel).toHaveBeenCalledOnce()
@@ -721,6 +724,7 @@ describe('PdfApp', () => {
       progress: { totalCandidates: 2, completedCandidates: 1 },
       results: [{ candidateId: 'scale-1-eng' }]
     }))
+    expect(toolbar.props('regionOcrState')).toBe('idle')
     runRegionComparison.mockRestore()
   })
 
