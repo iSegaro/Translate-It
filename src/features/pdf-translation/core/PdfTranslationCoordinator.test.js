@@ -154,7 +154,8 @@ describe('PdfTranslationCoordinator', () => {
       translatedCount: 2,
       failedCount: 0,
       totalCount: 2,
-      translationOccurrenceId: 1
+      translationOccurrenceId: 1,
+      error: ''
     })
     expect(session.setBlockTranslationState).toHaveBeenCalledWith('block-a', expect.objectContaining({
       status: 'translated',
@@ -440,7 +441,8 @@ describe('PdfTranslationCoordinator', () => {
       translatedCount: 2,
       failedCount: 0,
       totalCount: 2,
-      translationOccurrenceId: 1
+      translationOccurrenceId: 1,
+      error: ''
     })
     expect(session.setBlockTranslationState).toHaveBeenCalledWith('block-a', expect.objectContaining({
       status: 'translated',
@@ -571,7 +573,8 @@ describe('PdfTranslationCoordinator', () => {
       translatedCount: 3,
       failedCount: 0,
       totalCount: 3,
-      translationOccurrenceId: 1
+      translationOccurrenceId: 1,
+      error: ''
     })
 
     const finalState = translationStateStore.get(block.id)
@@ -620,7 +623,8 @@ describe('PdfTranslationCoordinator', () => {
       translatedCount: 1,
       failedCount: 1,
       totalCount: 2,
-      translationOccurrenceId: 1
+      translationOccurrenceId: 1,
+      error: ''
     })
     expect(session.setBlockTranslationState).toHaveBeenCalledWith('block-a', expect.objectContaining({
       status: 'translated',
@@ -631,6 +635,80 @@ describe('PdfTranslationCoordinator', () => {
       translatedText: '',
       error: 'Empty translation result'
     }))
+  })
+
+  it('captures provider error in summary when batch request fails', async () => {
+    const coordinator = new PdfTranslationCoordinator(session)
+    session.getVisibleLogicalBlocks.mockResolvedValue([
+      { id: 'block-a', text: 'Hello', role: 'paragraph', sourceTextHash: 'hash-a' }
+    ])
+    sendRegularMessageMock.mockRejectedValue(new Error('Provider failed: quota exceeded'))
+
+    const summary = await coordinator.translateVisibleBlocks()
+
+    expect(summary).toEqual({
+      status: 'partial',
+      translatedCount: 0,
+      failedCount: 1,
+      totalCount: 1,
+      translationOccurrenceId: 1,
+      error: 'Provider failed: quota exceeded'
+    })
+  })
+
+  it('preserves first provider error across multiple failed batches', async () => {
+    const batchPlanner = {
+      plan: vi.fn(() => ([
+        {
+          batchId: 'pdf-batch-0',
+          blocks: [{ id: 'block-a', text: 'Hello', role: 'paragraph', sourceTextHash: 'hash-a' }],
+          items: [{ blockId: 'block-a', sourceTextHash: 'hash-a', text: 'Hello', lineIndex: 0 }]
+        },
+        {
+          batchId: 'pdf-batch-1',
+          blocks: [{ id: 'block-b', text: 'World', role: 'paragraph', sourceTextHash: 'hash-b' }],
+          items: [{ blockId: 'block-b', sourceTextHash: 'hash-b', text: 'World', lineIndex: 0 }]
+        }
+      ]))
+    }
+    const coordinator = new PdfTranslationCoordinator(session, { batchPlanner })
+    session.getVisibleLogicalBlocks.mockResolvedValue([
+      { id: 'block-a', text: 'Hello', role: 'paragraph', sourceTextHash: 'hash-a' },
+      { id: 'block-b', text: 'World', role: 'paragraph', sourceTextHash: 'hash-b' }
+    ])
+    sendRegularMessageMock
+      .mockResolvedValueOnce({ success: false, error: 'First provider failed: quota exceeded' })
+      .mockResolvedValueOnce({ success: false, error: 'Second provider failed: timeout' })
+
+    const summary = await coordinator.translateVisibleBlocks()
+
+    expect(summary).toEqual({
+      status: 'partial',
+      translatedCount: 0,
+      failedCount: 2,
+      totalCount: 2,
+      translationOccurrenceId: 1,
+      error: 'First provider failed: quota exceeded'
+    })
+  })
+
+  it('surfaces error from resolved success false response', async () => {
+    const coordinator = new PdfTranslationCoordinator(session)
+    session.getVisibleLogicalBlocks.mockResolvedValue([
+      { id: 'block-a', text: 'Hello', role: 'paragraph', sourceTextHash: 'hash-a' }
+    ])
+    sendRegularMessageMock.mockResolvedValue({ success: false, error: 'Provider X failed: timeout' })
+
+    const summary = await coordinator.translateVisibleBlocks()
+
+    expect(summary).toEqual({
+      status: 'partial',
+      translatedCount: 0,
+      failedCount: 1,
+      totalCount: 1,
+      translationOccurrenceId: 1,
+      error: 'Provider X failed: timeout'
+    })
   })
 
   it('passes pageLayout regions as semanticRegions to batch planner', async () => {

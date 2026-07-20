@@ -795,6 +795,70 @@ describe('usePdfViewerController error lifecycle', () => {
     expect(controller.error.value).toBe('Translation failed')
   })
 
+  it('sets error from partial translation summary', async () => {
+    const block = createBlock()
+    const { controller } = await loadControllerWithCacheEntry(null, block)
+
+    translateVisibleBlocksMock.mockResolvedValue({
+      status: 'partial',
+      translatedCount: 5,
+      failedCount: 3,
+      totalCount: 8,
+      error: 'Provider failed: quota exceeded'
+    })
+
+    session.getVisibleLogicalBlocks.mockResolvedValue([block])
+    session.getPageLayout.mockReturnValue(null)
+
+    await controller.translateVisiblePages()
+
+    expect(controller.error.value).toBe('Provider failed: quota exceeded')
+  })
+
+  it('clears previous error on successful translation run', async () => {
+    const block = createBlock()
+    const { controller } = await loadControllerWithCacheEntry(null, block)
+
+    translateVisibleBlocksMock
+      .mockRejectedValueOnce(new Error('Previous failure'))
+      .mockResolvedValueOnce({
+        status: 'translated',
+        translatedCount: 1,
+        failedCount: 0,
+        totalCount: 1,
+        error: ''
+      })
+
+    session.getVisibleLogicalBlocks.mockResolvedValue([block])
+    session.getPageLayout.mockReturnValue(null)
+
+    await controller.translateVisiblePages()
+    expect(controller.error.value).toBe('Previous failure')
+
+    await controller.translateVisiblePages()
+    expect(controller.error.value).toBe('')
+  })
+
+  it('sets empty error for partial summary without provider error', async () => {
+    const block = createBlock()
+    const { controller } = await loadControllerWithCacheEntry(null, block)
+
+    translateVisibleBlocksMock.mockResolvedValue({
+      status: 'partial',
+      translatedCount: 5,
+      failedCount: 3,
+      totalCount: 8,
+      error: ''
+    })
+
+    session.getVisibleLogicalBlocks.mockResolvedValue([block])
+    session.getPageLayout.mockReturnValue(null)
+
+    await controller.translateVisiblePages()
+
+    expect(controller.error.value).toBe('')
+  })
+
   it('clears stale error before recomputeLayout', async () => {
     const block = createBlock()
     const { controller } = await loadControllerWithCacheEntry(null, block)

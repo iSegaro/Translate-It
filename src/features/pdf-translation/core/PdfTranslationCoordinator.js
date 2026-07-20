@@ -134,7 +134,8 @@ export class PdfTranslationCoordinator {
       translatedCount: 0,
       failedCount: 0,
       totalCount: 0,
-      translationOccurrenceId: 0
+      translationOccurrenceId: 0,
+      error: ''
     }
   }
 
@@ -161,7 +162,8 @@ export class PdfTranslationCoordinator {
           translatedCount,
           failedCount: 0,
           totalCount: translatedCount,
-          translationOccurrenceId: runId
+          translationOccurrenceId: runId,
+          error: ''
         }
         return this.lastSummary
       }
@@ -184,6 +186,7 @@ export class PdfTranslationCoordinator {
 
       let translatedCount = 0
       let failedCount = 0
+      let firstError = ''
 
       for (const batch of batches) {
         if (!this._isRunCurrent(runId)) {
@@ -219,6 +222,10 @@ export class PdfTranslationCoordinator {
           this.activeRequestIds.delete(messageId)
         }
 
+        if (!firstError && response?.success === false && response?.error) {
+          firstError = response.error
+        }
+
         if (!this._isRunCurrent(runId)) {
           break
         }
@@ -240,7 +247,8 @@ export class PdfTranslationCoordinator {
           translatedCount,
           failedCount,
           totalCount: translatedCount + failedCount,
-          translationOccurrenceId: runId
+          translationOccurrenceId: runId,
+          error: firstError
         }
         return this.lastSummary
       }
@@ -250,7 +258,8 @@ export class PdfTranslationCoordinator {
         translatedCount,
         failedCount,
         totalCount: translatedCount + failedCount,
-        translationOccurrenceId: runId
+        translationOccurrenceId: runId,
+        error: failedCount > 0 ? firstError : ''
       }
 
       return this.lastSummary
