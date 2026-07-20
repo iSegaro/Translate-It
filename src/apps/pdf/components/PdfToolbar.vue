@@ -323,7 +323,7 @@
               type="button"
               role="menuitem"
               :disabled="isRegionComparisonActive"
-              @click="$emit('request-region-comparison')"
+              @click="handleRequestRegionComparisonAction"
             >
               Region Comparison
             </button>
@@ -332,7 +332,7 @@
               class="pdf-toolbar__export-item"
               type="button"
               role="menuitem"
-              @click="$emit('export-region-comparison-artifact')"
+              @click="handleExportRegionComparisonArtifactAction"
             >
               Export Region Comparison Artifact
             </button>
@@ -557,6 +557,16 @@ function handleOpenPdfAction() {
 
 function handleClearCacheAction() {
   emit('clear-cache')
+  closeMenus()
+}
+
+function handleRequestRegionComparisonAction() {
+  emit('request-region-comparison')
+  closeMenus()
+}
+
+function handleExportRegionComparisonArtifactAction() {
+  emit('export-region-comparison-artifact')
   closeMenus()
 }
 

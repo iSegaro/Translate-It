@@ -253,6 +253,7 @@ describe('PdfToolbar', () => {
 
     await regionComparison?.trigger('click')
     expect(debugEnabled.emitted('request-region-comparison')).toHaveLength(1)
+    expect(debugEnabled.find('.pdf-toolbar__export-menu').exists()).toBe(false)
   })
 
   it('shows active regionComparison progress only in Developer Mode', async () => {
@@ -278,6 +279,7 @@ describe('PdfToolbar', () => {
     expect(exportArtifact).toBeTruthy()
     await exportArtifact?.trigger('click')
     expect(developer.emitted('export-region-comparison-artifact')).toHaveLength(1)
+    expect(developer.find('.pdf-toolbar__export-menu').exists()).toBe(false)
   })
 
   it('emits cancellation from active regionComparison state', async () => {
