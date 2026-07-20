@@ -1,17 +1,15 @@
 import { RegionComparisonCoordinator } from './RegionComparisonCoordinator.js'
 
 export const PDF_DEVELOPER_CAPABILITY = Object.freeze({
-  REGION_COMPARISON: 'region-comparison',
-  CORPUS_BENCHMARK: 'corpus-benchmark'
+  REGION_COMPARISON: 'region-comparison'
 })
 
 export class PdfDeveloperApi {
-  constructor({ regionComparisonCoordinator, regionExecutionDispatcher, corpusBenchmarkCoordinator, capabilities = {} } = {}) {
+  constructor({ regionComparisonCoordinator, regionExecutionDispatcher, capabilities = {} } = {}) {
     const coordinator = regionComparisonCoordinator || new RegionComparisonCoordinator({ regionExecutionDispatcher })
 
     this.capabilities = new Map([
       [PDF_DEVELOPER_CAPABILITY.REGION_COMPARISON, (request) => coordinator.coordinateRegionComparison(request)],
-      [PDF_DEVELOPER_CAPABILITY.CORPUS_BENCHMARK, (options) => corpusBenchmarkCoordinator?.run(options)],
       ...Object.entries(capabilities)
     ])
   }
@@ -32,9 +30,5 @@ export class PdfDeveloperApi {
 
   runRegionComparison(...args) {
     return this.invokeCapability(PDF_DEVELOPER_CAPABILITY.REGION_COMPARISON, ...args)
-  }
-
-  runCorpusBenchmark(...args) {
-    return this.invokeCapability(PDF_DEVELOPER_CAPABILITY.CORPUS_BENCHMARK, ...args)
   }
 }

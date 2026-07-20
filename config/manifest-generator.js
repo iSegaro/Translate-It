@@ -74,11 +74,6 @@ export function generateManifest(browser = 'chrome') {
         ],
         matches: ['<all_urls>', 'file://*/*'],
         use_dynamic_url: false
-      },
-      {
-        resources: ['corpus/**'],
-        matches: ['<all_urls>', 'file://*/*'],
-        use_dynamic_url: true
       }
     ],
     

@@ -310,15 +310,6 @@ export default defineConfig({
           await fs.copy(tesseractSrc, tesseractDest);
           console.log('✅ Copied Tesseract assets to assets/ocr/');
         }
-
-        // Copy corpus benchmark assets
-        const corpusSrc = resolve(srcDir, 'benchmarks/region-ocr/corpus');
-        const corpusDest = resolve(outDir, 'corpus');
-        if (await fs.pathExists(corpusSrc)) {
-          await fs.ensureDir(resolve(outDir, 'corpus'));
-          await fs.copy(corpusSrc, corpusDest);
-          console.log('✅ Copied corpus benchmark assets to corpus/');
-        }
         
         // HTML files are now handled by the fixExtensionPaths plugin
         

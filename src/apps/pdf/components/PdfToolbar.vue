@@ -362,40 +362,6 @@
                 {{ regionComparisonState.progress.currentCandidate.candidateId }}
               </span>
             </div>
-            <button
-              class="pdf-toolbar__export-item"
-              type="button"
-              role="menuitem"
-              :disabled="isCorpusBenchmarkActive"
-              @click="$emit('request-corpus-benchmark')"
-            >
-              Corpus OCR Benchmark
-            </button>
-            <div
-              v-if="isCorpusBenchmarkActive"
-              class="pdf-toolbar__regionComparison"
-              aria-live="polite"
-            >
-              <div class="pdf-toolbar__regionComparison-summary">
-                <span>CorpusBenchmark {{ corpusBenchmarkState.status }}</span>
-                <span v-if="corpusBenchmarkState.progress">
-                  {{ corpusBenchmarkState.progress.completedCandidates }}/{{ corpusBenchmarkState.progress.totalCandidates }}
-                </span>
-                <button
-                  class="pdf-toolbar__regionComparison-cancel"
-                  type="button"
-                  @click="$emit('cancel-corpus-benchmark')"
-                >
-                  Cancel
-                </button>
-              </div>
-              <span
-                v-if="corpusBenchmarkState.progress?.currentCandidate"
-                class="pdf-toolbar__regionComparison-current"
-              >
-                {{ corpusBenchmarkState.progress.currentCandidate.candidateId }}
-              </span>
-            </div>
           </div>
         </div>
       </div>
@@ -450,10 +416,9 @@ const props = defineProps({
   regionOcrAvailable: { type: Boolean, default: false },
   regionComparisonState: { type: Object, default: null },
   canExportRegionComparisonArtifact: { type: Boolean, default: false },
-  corpusBenchmarkState: { type: Object, default: null },
 })
 
-const emit = defineEmits(['request-open-pdf', 'translate-visible', 'cancel-translation', 'content-view-change', 'layout-mode-change', 'toggle-outline', 'export-txt', 'export-markdown', 'export-html', 'request-ocr', 'request-region-ocr', 'request-region-comparison', 'cancel-region-comparison', 'export-region-comparison-artifact', 'clear-cache', 'zoom-step', 'zoom-change', 'execution-mode-change', 'request-corpus-benchmark', 'cancel-corpus-benchmark'])
+const emit = defineEmits(['request-open-pdf', 'translate-visible', 'cancel-translation', 'content-view-change', 'layout-mode-change', 'toggle-outline', 'export-txt', 'export-markdown', 'export-html', 'request-ocr', 'request-region-ocr', 'request-region-comparison', 'cancel-region-comparison', 'export-region-comparison-artifact', 'clear-cache', 'zoom-step', 'zoom-change', 'execution-mode-change'])
 
 const logger = getScopedLogger(LOG_COMPONENTS.PDF, 'PdfToolbar')
 const settingsStore = useSettingsStore()
@@ -463,7 +428,6 @@ const pdfProviderValue = computed(() => {
 })
 const isDebugMode = computed(() => settingsStore.settings?.DEBUG_MODE === true)
 const isRegionComparisonActive = computed(() => ['running', 'cancelling'].includes(props.regionComparisonState?.status))
-const isCorpusBenchmarkActive = computed(() => ['running', 'cancelling'].includes(props.corpusBenchmarkState?.status))
 
 const providerPersistenceState = {
   sequence: 0,
