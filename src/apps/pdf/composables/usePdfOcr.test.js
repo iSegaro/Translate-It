@@ -160,17 +160,14 @@ describe('usePdfOcr', () => {
     wrapper.unmount()
   })
 
-  it('processes the OCR batch captured when the prompt opened', async () => {
+  it('processes the OCR batch captured when OCR is requested', async () => {
     const { api, wrapper } = mountComposable()
     mockPdfDocumentSession.pageSessions.set(1, createScannedPageSession(1))
     mockPdfDocumentSession.pageSessions.set(2, createScannedPageSession(2))
     mockPdfDocumentSession.visiblePageNumbers = new Set([1, 2])
     api.refreshOcrRecommendations()
-    api.requestOcr()
 
-    mockPdfDocumentSession.visiblePageNumbers = new Set([2])
-    visibleListener?.({ pages: [2] })
-    await api.confirmOcr()
+    await api.requestOcr()
 
     expect(mockProcessPages).toHaveBeenCalledWith([1, 2], expect.any(Object))
     wrapper.unmount()
@@ -183,11 +180,8 @@ describe('usePdfOcr', () => {
     mockPdfDocumentSession.pageSessions.set(2, createScannedPageSession(2))
     mockPdfDocumentSession.visiblePageNumbers = new Set([1, 2])
     api.refreshOcrRecommendations()
-    api.requestOcr()
 
-    mockPdfDocumentSession.visiblePageNumbers = new Set([2])
-    visibleListener?.({ pages: [2] })
-    await api.confirmOcr()
+    await api.requestOcr()
 
     expect(onOcrComplete).toHaveBeenCalledWith({ pageNumbers: [1, 2] })
     wrapper.unmount()

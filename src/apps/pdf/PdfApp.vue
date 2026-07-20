@@ -96,13 +96,6 @@
       </div>
 
       <main class="pdf-app__content">
-        <PdfOcrConsentPrompt
-          :visible="isOcrPromptVisible"
-          :page-count="ocrBatch.pageNumbers.length"
-          @confirm="confirmOcr"
-          @cancel="dismissOcrPrompt"
-        />
-
         <div class="pdf-app__workspace">
           <PdfOutline
             :outline="pdfOutline"
@@ -204,7 +197,6 @@ import PdfDropzone from './components/PdfDropzone.vue'
 import PdfViewer from './components/PdfViewer.vue'
 import PdfViewerLayout from './components/PdfViewerLayout.vue'
 import PdfTranslatedPane from './components/PdfTranslatedPane.vue'
-import PdfOcrConsentPrompt from './components/PdfOcrConsentPrompt.vue'
 import PdfOcrProgress from './components/PdfOcrProgress.vue'
 import PdfStatusBanner from './components/PdfStatusBanner.vue'
 import PdfNotificationBodyRenderer from './components/notifications/PdfNotificationBodyRenderer.vue'
@@ -322,16 +314,12 @@ const pdfStatusBannerController = createPdfStatusBannerController()
 
 const {
   ocrRecommendationCount,
-  ocrBatch,
-  isOcrPromptVisible,
   isOcrProcessing,
   ocrProgress,
   ocrError,
   refreshOcrRecommendations,
   requestOcr,
-  confirmOcr,
-  cancelOcr,
-  dismissOcrPrompt
+  cancelOcr
 } = usePdfOcr({
   onOcrComplete: ({ pageNumbers } = {}) => {
     refreshTranslatedPageBlocks(pageNumbers)

@@ -16,7 +16,6 @@ export function usePdfOcr({ onOcrComplete } = {}) {
   const ocrRecommendationCount = ref(0)
   const ocrRecommendations = ref([])
   const ocrBatch = reactive({ pageNumbers: [] })
-  const isOcrPromptVisible = ref(false)
   const isOcrProcessing = ref(false)
   const ocrProgress = ref({ current: 0, total: 0, pageNumber: 0 })
   const ocrError = ref('')
@@ -35,13 +34,12 @@ export function usePdfOcr({ onOcrComplete } = {}) {
 
     ocrError.value = ''
     ocrBatch.pageNumbers = [...ocrRecommendations.value]
-    isOcrPromptVisible.value = true
+    return confirmOcr()
   }
 
   async function confirmOcr() {
     if (isOcrProcessing.value) return
 
-    isOcrPromptVisible.value = false
     isOcrProcessing.value = true
     ocrError.value = ''
 
@@ -76,12 +74,7 @@ export function usePdfOcr({ onOcrComplete } = {}) {
   function cancelOcr() {
     processor.cancel()
     isOcrProcessing.value = false
-    isOcrPromptVisible.value = false
     ocrProgress.value = { current: 0, total: 0, pageNumber: 0 }
-  }
-
-  function dismissOcrPrompt() {
-    isOcrPromptVisible.value = false
   }
 
   async function saveOcrToCache(pageNumbers) {
@@ -118,7 +111,6 @@ export function usePdfOcr({ onOcrComplete } = {}) {
   return {
     ocrRecommendationCount,
     ocrBatch,
-    isOcrPromptVisible,
     isOcrProcessing,
     ocrProgress,
     ocrError,
@@ -126,7 +118,6 @@ export function usePdfOcr({ onOcrComplete } = {}) {
     refreshOcrRecommendations,
     requestOcr,
     confirmOcr,
-    cancelOcr,
-    dismissOcrPrompt
+    cancelOcr
   }
 }

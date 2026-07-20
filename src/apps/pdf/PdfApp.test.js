@@ -247,13 +247,6 @@ vi.mock('./components/PdfTranslatedPane.vue', () => ({
   }
 }))
 
-vi.mock('./components/PdfOcrConsentPrompt.vue', () => ({
-  default: {
-    name: 'PdfOcrConsentPrompt',
-    template: '<div class="pdf-ocr-consent-stub" />'
-  }
-}))
-
 vi.mock('./components/PdfOcrProgress.vue', () => ({
   default: {
     name: 'PdfOcrProgress',
@@ -359,15 +352,13 @@ function createMocks({
   mockPdfOcr = {
     ocrRecommendationCount: ref(0),
     ocrBatch: { pageNumbers: [] },
-    isOcrPromptVisible: ref(false),
     isOcrProcessing: ref(false),
     ocrProgress: ref(0),
     ocrError: ref(''),
     refreshOcrRecommendations: vi.fn(),
     requestOcr: vi.fn(),
     confirmOcr: vi.fn(),
-    cancelOcr: vi.fn(),
-    dismissOcrPrompt: vi.fn()
+    cancelOcr: vi.fn()
   }
 
   mockRegionOcr = {
