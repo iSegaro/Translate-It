@@ -901,6 +901,8 @@ onMounted(async () => {
   const handler = (message) => {
     if (message.action === 'THEME_CHANGED') {
       applyTheme(message.payload.theme)
+    } else if (message.action === 'OCR_LANGUAGES_UPDATED') {
+      ocrStore.refreshDownloadedLanguages()
     }
   }
   browser.runtime.onMessage.addListener(handler)

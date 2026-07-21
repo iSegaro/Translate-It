@@ -1,8 +1,10 @@
 import { defineStore } from 'pinia';
+import browser from 'webextension-polyfill';
 import { ocrCache } from '../utils/ocrCache.js';
 import { toTesseractLanguageCode, getSupportedOCRCanvasCodes } from '../utils/ocrLanguageMap.js';
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
+import { useSettingsStore } from '@/features/settings/stores/settings.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.SCREEN_CAPTURE, 'OCRStore');
 
@@ -32,9 +34,16 @@ export const useOCRStore = defineStore('ocr', {
   },
 
   actions: {
+    _broadcastLanguageUpdated() {
+      browser.runtime.sendMessage({ action: 'OCR_LANGUAGES_UPDATED' })
+        .catch(err => logger.warn('Failed to broadcast OCR_LANGUAGES_UPDATED', err))
+    },
+
     async init() {
       if (this.initialized) return
+      const settingsStore = useSettingsStore()
       await this.refreshDownloadedLanguages();
+      await settingsStore.reconcileOcrLanguage(this.downloadedLanguages)
       this.initialized = true;
     },
 
@@ -50,6 +59,8 @@ export const useOCRStore = defineStore('ocr', {
       }
 
       this.downloadingProgress[langCode] = 0;
+
+      const settingsStore = useSettingsStore()
 
       try {
         // Tesseract.js language data URL (using the fast/lightweight models)
@@ -84,6 +95,8 @@ export const useOCRStore = defineStore('ocr', {
 
         await ocrCache.saveModel(tesseractCode, uint8Array);
         await this.refreshDownloadedLanguages();
+        await settingsStore.reconcileOcrLanguage(this.downloadedLanguages)
+        this._broadcastLanguageUpdated()
       } catch (error) {
         logger.error(`Error downloading ${tesseractCode}`, error);
         throw error;
@@ -94,13 +107,19 @@ export const useOCRStore = defineStore('ocr', {
 
     async deleteLanguage(langCode) {
       const tesseractCode = toTesseractLanguageCode(langCode);
+      const settingsStore = useSettingsStore()
       await ocrCache.deleteModel(tesseractCode);
       await this.refreshDownloadedLanguages();
+      await settingsStore.reconcileOcrLanguage(this.downloadedLanguages)
+      this._broadcastLanguageUpdated()
     },
 
     async clearAllLanguages() {
+      const settingsStore = useSettingsStore()
       await ocrCache.clear();
       await this.refreshDownloadedLanguages();
+      await settingsStore.reconcileOcrLanguage(this.downloadedLanguages)
+      this._broadcastLanguageUpdated()
     }
   }
 });

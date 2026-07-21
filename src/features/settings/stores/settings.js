@@ -591,6 +591,14 @@ export const useSettingsStore = defineStore('settings', () => {
     return settings.value[key] !== undefined ? settings.value[key] : defaultValue
   }
   
+  const reconcileOcrLanguage = async (downloadedLanguages) => {
+    const current = settings.value['OCR_DEFAULT_LANG'] || 'eng'
+    if (downloadedLanguages.includes(current)) return
+
+    const next = downloadedLanguages.length > 0 ? downloadedLanguages[0] : 'eng'
+    await updateSettingAndPersist('OCR_DEFAULT_LANG', next)
+  }
+
   const validateSettings = () => {
     const errors = []
     
@@ -929,6 +937,7 @@ export const useSettingsStore = defineStore('settings', () => {
     importSettings,
     getSetting,
     validateSettings,
+    reconcileOcrLanguage,
     $reset
   }
 })

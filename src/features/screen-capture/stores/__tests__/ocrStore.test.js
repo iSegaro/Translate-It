@@ -3,6 +3,20 @@ import { setActivePinia, createPinia } from 'pinia';
 import { useOCRStore } from '../ocrStore.js';
 import { ocrCache } from '../../utils/ocrCache.js';
 
+vi.mock('webextension-polyfill', () => ({
+  default: {
+    runtime: {
+      sendMessage: vi.fn().mockResolvedValue()
+    }
+  }
+}))
+
+vi.mock('@/features/settings/stores/settings.js', () => ({
+  useSettingsStore: () => ({
+    reconcileOcrLanguage: vi.fn()
+  })
+}))
+
 // Mock ocrCache
 vi.mock('../../utils/ocrCache.js', () => ({
   ocrCache: {
