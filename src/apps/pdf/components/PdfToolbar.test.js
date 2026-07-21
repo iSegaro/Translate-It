@@ -329,7 +329,6 @@ describe('PdfToolbar', () => {
         ocrViewModel: {
           primaryAction: 'region',
           preferredAction: 'region',
-          disabled: false,
           language: { code: 'eng', name: 'English', compactLabel: 'EN' },
           canCancel: false,
           currentPageContainsOcr: false,
@@ -353,7 +352,6 @@ describe('PdfToolbar', () => {
         ocrViewModel: {
           primaryAction: 'region',
           preferredAction: 'region',
-          disabled: false,
           language: { code: 'eng', name: 'English', compactLabel: 'EN' },
           canCancel: false,
           currentPageContainsOcr: false,
@@ -375,7 +373,6 @@ describe('PdfToolbar', () => {
         ocrViewModel: {
           primaryAction: 'region',
           preferredAction: 'region',
-          disabled: false,
           language: { code: 'eng', name: 'English', compactLabel: 'EN' },
           canCancel: true,
           currentPageContainsOcr: false,
@@ -394,12 +391,11 @@ describe('PdfToolbar', () => {
       ocrViewModel: {
         primaryAction: 'region',
         preferredAction: 'region',
-        disabled: true,
+        regionOcrAvailable: false,
         language: { code: 'eng', name: 'English' },
         canCancel: false,
         currentPageContainsOcr: false,
             hasDocument: true,
-          regionOcrAvailable: true,
             isPageOcrRecommended: false,
         installedLanguages: []
       }
@@ -436,7 +432,6 @@ describe('PdfToolbar', () => {
         ocrViewModel: {
           primaryAction: 'page',
           preferredAction: 'page',
-          disabled: false,
           language: { code: 'eng', name: 'English', compactLabel: 'EN' },
           canCancel: false,
           currentPageContainsOcr: false,
@@ -733,8 +728,7 @@ describe('PdfToolbar', () => {
           ocrViewModel: {
             primaryAction: 'region',
             preferredAction: 'region',
-            disabled: false,
-            language: { code: 'fas', name: 'Persian', compactLabel: 'FA' },
+              language: { code: 'fas', name: 'Persian', compactLabel: 'FA' },
             canCancel: false,
             currentPageContainsOcr: false,
             hasDocument: true,
@@ -754,8 +748,7 @@ describe('PdfToolbar', () => {
           ocrViewModel: {
             primaryAction: 'region',
             preferredAction: 'region',
-            disabled: false,
-            language: { code: 'deu', name: 'German' },
+              language: { code: 'deu', name: 'German' },
             canCancel: false,
             currentPageContainsOcr: false,
             hasDocument: true,
@@ -777,8 +770,7 @@ describe('PdfToolbar', () => {
           ocrViewModel: {
             primaryAction: 'region',
             preferredAction: 'region',
-            disabled: false,
-            language: { code: 'eng', name: 'English', compactLabel: 'EN' },
+              language: { code: 'eng', name: 'English', compactLabel: 'EN' },
             canCancel: false,
             currentPageContainsOcr: false,
             hasDocument: true,
@@ -804,12 +796,11 @@ describe('PdfToolbar', () => {
           ocrViewModel: {
             primaryAction: 'region',
             preferredAction: 'region',
-            disabled: true,
+            regionOcrAvailable: false,
             language: { code: 'eng', name: 'English', compactLabel: 'EN' },
             canCancel: false,
             currentPageContainsOcr: false,
             hasDocument: true,
-          regionOcrAvailable: true,
           isPageOcrRecommended: true,
             installedLanguages: []
           }
@@ -825,11 +816,10 @@ describe('PdfToolbar', () => {
           ocrViewModel: {
             primaryAction: 'page',
             preferredAction: 'page',
-            disabled: true,
+            hasDocument: false,
             language: { code: 'eng', name: 'English', compactLabel: 'EN' },
             canCancel: false,
             currentPageContainsOcr: true,
-            hasDocument: true,
           regionOcrAvailable: true,
           isPageOcrRecommended: false,
             installedLanguages: []
@@ -846,8 +836,7 @@ describe('PdfToolbar', () => {
           ocrViewModel: {
             primaryAction: 'cancel',
             preferredAction: 'region',
-            disabled: false,
-            language: { code: 'eng', name: 'English', compactLabel: 'EN' },
+              language: { code: 'eng', name: 'English', compactLabel: 'EN' },
             canCancel: true,
             currentPageContainsOcr: false,
             hasDocument: true,
@@ -867,8 +856,7 @@ describe('PdfToolbar', () => {
           ocrViewModel: {
             primaryAction: 'region',
             preferredAction: 'region',
-            disabled: false,
-            language: { code: 'eng', name: 'English', compactLabel: 'EN' },
+              language: { code: 'eng', name: 'English', compactLabel: 'EN' },
             canCancel: false,
             currentPageContainsOcr: false,
             hasDocument: false,
@@ -894,8 +882,7 @@ describe('PdfToolbar', () => {
           ocrViewModel: {
             primaryAction: 'region',
             preferredAction: 'region',
-            disabled: false,
-            language: { code: 'eng', name: 'English', compactLabel: 'EN' },
+              language: { code: 'eng', name: 'English', compactLabel: 'EN' },
             canCancel: false,
             currentPageContainsOcr: false,
             hasDocument: true,
@@ -921,8 +908,7 @@ describe('PdfToolbar', () => {
           ocrViewModel: {
             primaryAction: 'region',
             preferredAction: 'region',
-            disabled: false,
-            language: { code: 'eng', name: 'English', compactLabel: 'EN' },
+              language: { code: 'eng', name: 'English', compactLabel: 'EN' },
             canCancel: false,
             currentPageContainsOcr: false,
             hasDocument: true,
@@ -948,8 +934,7 @@ describe('PdfToolbar', () => {
           ocrViewModel: {
             primaryAction: 'cancel',
             preferredAction: 'region',
-            disabled: false,
-            language: { code: 'eng', name: 'English', compactLabel: 'EN' },
+              language: { code: 'eng', name: 'English', compactLabel: 'EN' },
             canCancel: true,
             currentPageContainsOcr: false,
             hasDocument: true,
@@ -977,8 +962,7 @@ describe('PdfToolbar', () => {
           ocrViewModel: {
             primaryAction: 'region',
             preferredAction: 'region',
-            disabled: false,
-            language: { code: 'eng', name: 'English', compactLabel: 'EN' },
+              language: { code: 'eng', name: 'English', compactLabel: 'EN' },
             canCancel: false,
             currentPageContainsOcr: false,
             hasDocument: true,
@@ -1003,8 +987,7 @@ describe('PdfToolbar', () => {
           ocrViewModel: {
             primaryAction: 'region',
             preferredAction: 'region',
-            disabled: false,
-            language: { code: 'eng', name: 'English', compactLabel: 'EN' },
+              language: { code: 'eng', name: 'English', compactLabel: 'EN' },
             canCancel: false,
             currentPageContainsOcr: false,
             hasDocument: true,
@@ -1032,8 +1015,7 @@ describe('PdfToolbar', () => {
           ocrViewModel: {
             primaryAction: 'region',
             preferredAction: 'region',
-            disabled: false,
-            language: { code: 'eng', name: 'English', compactLabel: 'EN' },
+              language: { code: 'eng', name: 'English', compactLabel: 'EN' },
             canCancel: false,
             currentPageContainsOcr: false,
             hasDocument: true,
@@ -1059,8 +1041,7 @@ describe('PdfToolbar', () => {
           ocrViewModel: {
             primaryAction: 'region',
             preferredAction: 'region',
-            disabled: false,
-            language: { code: 'eng', name: 'English', compactLabel: 'EN' },
+              language: { code: 'eng', name: 'English', compactLabel: 'EN' },
             canCancel: false,
             currentPageContainsOcr: false,
             hasDocument: true,
@@ -1090,8 +1071,7 @@ describe('PdfToolbar', () => {
           ocrViewModel: {
             primaryAction: 'region',
             preferredAction: 'region',
-            disabled: false,
-            language: { code: 'eng', name: 'English', compactLabel: 'EN' },
+              language: { code: 'eng', name: 'English', compactLabel: 'EN' },
             canCancel: false,
             currentPageContainsOcr: false,
             hasDocument: true,
@@ -1114,8 +1094,7 @@ describe('PdfToolbar', () => {
           ocrViewModel: {
             primaryAction: 'region',
             preferredAction: 'region',
-            disabled: false,
-            language: { code: 'eng', name: 'English', compactLabel: 'EN' },
+              language: { code: 'eng', name: 'English', compactLabel: 'EN' },
             canCancel: true,
             currentPageContainsOcr: false,
             hasDocument: true,

@@ -175,7 +175,7 @@
               'pdf-toolbar__ocr-primary--cancel': ocrViewModel.canCancel,
               'pdf-toolbar__ocr-primary--highlight': ocrViewModel.isPageOcrRecommended && !ocrViewModel.canCancel
             }"
-            :disabled="ocrViewModel.disabled"
+            :disabled="primaryDisabled"
             type="button"
             :aria-label="primaryAriaLabel"
             @click="$emit('primary-click')"
@@ -207,11 +207,11 @@
               class="pdf-toolbar__ocr-menu-item"
               :class="{
                 'pdf-toolbar__ocr-menu-item--selected': ocrViewModel.preferredAction === 'region',
-                'pdf-toolbar__ocr-menu-item--disabled': ocrViewModel.canCancel || !ocrViewModel.regionOcrAvailable
+                'pdf-toolbar__ocr-menu-item--disabled': regionDisabled
               }"
               role="menuitemradio"
               :aria-checked="ocrViewModel.preferredAction === 'region'"
-              :disabled="ocrViewModel.canCancel || !ocrViewModel.regionOcrAvailable"
+              :disabled="regionDisabled"
               @click="selectAction('region')"
             >
               <span class="pdf-toolbar__ocr-menu-check" aria-hidden="true">✓</span>
@@ -221,11 +221,11 @@
               class="pdf-toolbar__ocr-menu-item"
               :class="{
                 'pdf-toolbar__ocr-menu-item--selected': ocrViewModel.preferredAction === 'page',
-                'pdf-toolbar__ocr-menu-item--disabled': ocrViewModel.canCancel || !ocrViewModel.hasDocument
+                'pdf-toolbar__ocr-menu-item--disabled': pageDisabled
               }"
               role="menuitemradio"
               :aria-checked="ocrViewModel.preferredAction === 'page'"
-              :disabled="ocrViewModel.canCancel || !ocrViewModel.hasDocument"
+              :disabled="pageDisabled"
               title=""
               @click="selectAction('page')"
             >
@@ -607,6 +607,16 @@ const primaryAriaLabel = computed(() => {
   if (m.currentPageContainsOcr && !m.canCancel) label += '. Current page has OCR data.'
   return label
 })
+
+const primaryDisabled = computed(() => {
+  if (ocrModel.value.canCancel) return false
+  if (ocrModel.value.preferredAction === 'region') return !ocrModel.value.regionOcrAvailable
+  return !ocrModel.value.hasDocument
+})
+
+const regionDisabled = computed(() => ocrModel.value.canCancel || !ocrModel.value.regionOcrAvailable)
+
+const pageDisabled = computed(() => ocrModel.value.canCancel || !ocrModel.value.hasDocument)
 
 function toggleOcrMenu() {
   if (activeMenu.value === 'ocr') {
