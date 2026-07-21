@@ -110,6 +110,7 @@ export function usePdfOcr({ onOcrComplete } = {}) {
 
   return {
     ocrRecommendationCount,
+    ocrRecommendations,
     ocrBatch,
     isOcrProcessing,
     ocrProgress,

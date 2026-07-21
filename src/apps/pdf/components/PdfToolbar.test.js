@@ -333,7 +333,8 @@ describe('PdfToolbar', () => {
           language: { code: 'eng', name: 'English', compactLabel: 'EN' },
           canCancel: false,
           currentPageContainsOcr: false,
-          pageOcrAvailable: true,
+          canRunPageOcr: true,
+          isPageOcrRecommended: true,
           installedLanguages: []
         }
       }
@@ -355,7 +356,8 @@ describe('PdfToolbar', () => {
           language: { code: 'eng', name: 'English', compactLabel: 'EN' },
           canCancel: false,
           currentPageContainsOcr: false,
-          pageOcrAvailable: true,
+          canRunPageOcr: true,
+          isPageOcrRecommended: true,
           installedLanguages: []
         }
       }
@@ -375,7 +377,8 @@ describe('PdfToolbar', () => {
           language: { code: 'eng', name: 'English', compactLabel: 'EN' },
           canCancel: true,
           currentPageContainsOcr: false,
-          pageOcrAvailable: true,
+          canRunPageOcr: true,
+          isPageOcrRecommended: true,
           installedLanguages: []
         }
       }
@@ -392,7 +395,8 @@ describe('PdfToolbar', () => {
         language: { code: 'eng', name: 'English' },
         canCancel: false,
         currentPageContainsOcr: false,
-        pageOcrAvailable: false,
+            canRunPageOcr: false,
+            isPageOcrRecommended: false,
         installedLanguages: []
       }
     })
@@ -432,7 +436,8 @@ describe('PdfToolbar', () => {
           language: { code: 'eng', name: 'English', compactLabel: 'EN' },
           canCancel: false,
           currentPageContainsOcr: false,
-          pageOcrAvailable: true,
+          canRunPageOcr: true,
+          isPageOcrRecommended: true,
           installedLanguages: []
         }
       }
@@ -727,7 +732,8 @@ describe('PdfToolbar', () => {
             language: { code: 'fas', name: 'Persian', compactLabel: 'FA' },
             canCancel: false,
             currentPageContainsOcr: false,
-            pageOcrAvailable: true,
+            canRunPageOcr: true,
+          isPageOcrRecommended: true,
             installedLanguages: []
           }
         }
@@ -746,7 +752,8 @@ describe('PdfToolbar', () => {
             language: { code: 'deu', name: 'German' },
             canCancel: false,
             currentPageContainsOcr: false,
-            pageOcrAvailable: true,
+            canRunPageOcr: true,
+          isPageOcrRecommended: true,
             installedLanguages: []
           }
         }
@@ -767,7 +774,8 @@ describe('PdfToolbar', () => {
             language: { code: 'eng', name: 'English', compactLabel: 'EN' },
             canCancel: false,
             currentPageContainsOcr: false,
-            pageOcrAvailable: true,
+            canRunPageOcr: true,
+          isPageOcrRecommended: true,
             installedLanguages: []
           }
         }
@@ -792,7 +800,8 @@ describe('PdfToolbar', () => {
             language: { code: 'eng', name: 'English', compactLabel: 'EN' },
             canCancel: false,
             currentPageContainsOcr: false,
-            pageOcrAvailable: true,
+            canRunPageOcr: true,
+          isPageOcrRecommended: true,
             installedLanguages: []
           }
         }
@@ -811,7 +820,8 @@ describe('PdfToolbar', () => {
             language: { code: 'eng', name: 'English', compactLabel: 'EN' },
             canCancel: false,
             currentPageContainsOcr: true,
-            pageOcrAvailable: false,
+            canRunPageOcr: false,
+          isPageOcrRecommended: false,
             installedLanguages: []
           }
         }
@@ -830,7 +840,8 @@ describe('PdfToolbar', () => {
             language: { code: 'eng', name: 'English', compactLabel: 'EN' },
             canCancel: true,
             currentPageContainsOcr: false,
-            pageOcrAvailable: true,
+            canRunPageOcr: true,
+          isPageOcrRecommended: true,
             installedLanguages: []
           }
         }
@@ -851,7 +862,8 @@ describe('PdfToolbar', () => {
             language: { code: 'eng', name: 'English', compactLabel: 'EN' },
             canCancel: false,
             currentPageContainsOcr: false,
-            pageOcrAvailable: true,
+            canRunPageOcr: true,
+          isPageOcrRecommended: true,
             installedLanguages: []
           }
         }
@@ -875,7 +887,8 @@ describe('PdfToolbar', () => {
             language: { code: 'eng', name: 'English', compactLabel: 'EN' },
             canCancel: false,
             currentPageContainsOcr: false,
-            pageOcrAvailable: true,
+            canRunPageOcr: true,
+          isPageOcrRecommended: true,
             installedLanguages: [{ code: 'eng', name: 'English', selected: true }]
           }
         }
@@ -902,7 +915,8 @@ describe('PdfToolbar', () => {
             language: { code: 'eng', name: 'English', compactLabel: 'EN' },
             canCancel: false,
             currentPageContainsOcr: false,
-            pageOcrAvailable: true,
+            canRunPageOcr: true,
+          isPageOcrRecommended: true,
             installedLanguages: []
           }
         }
@@ -927,7 +941,8 @@ describe('PdfToolbar', () => {
             language: { code: 'eng', name: 'English', compactLabel: 'EN' },
             canCancel: false,
             currentPageContainsOcr: false,
-            pageOcrAvailable: true,
+            canRunPageOcr: true,
+          isPageOcrRecommended: true,
             installedLanguages: [{ code: 'eng', name: 'English', selected: true }]
           }
         }
@@ -956,7 +971,8 @@ describe('PdfToolbar', () => {
             language: { code: 'eng', name: 'English', compactLabel: 'EN' },
             canCancel: false,
             currentPageContainsOcr: false,
-            pageOcrAvailable: true,
+            canRunPageOcr: true,
+          isPageOcrRecommended: true,
             installedLanguages: [{ code: 'eng', name: 'English', selected: true }]
           }
         }
@@ -978,7 +994,8 @@ describe('PdfToolbar', () => {
             language: { code: 'eng', name: 'English', compactLabel: 'EN' },
             canCancel: false,
             currentPageContainsOcr: false,
-            pageOcrAvailable: false,
+            canRunPageOcr: false,
+          isPageOcrRecommended: false,
             installedLanguages: [{ code: 'eng', name: 'English', selected: true }]
           }
         }
