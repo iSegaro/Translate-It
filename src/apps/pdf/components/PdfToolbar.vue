@@ -384,6 +384,14 @@
           >
             Clear Cache
           </button>
+          <button
+            class="pdf-toolbar__export-item"
+            type="button"
+            role="menuitem"
+            @click="handleOpenSettingsAction"
+          >
+            Settings
+          </button>
           <div
             v-if="isDebugMode"
             class="pdf-toolbar__menu-section"
@@ -487,7 +495,7 @@ const props = defineProps({
   canExportRegionComparisonArtifact: { type: Boolean, default: false },
 })
 
-const emit = defineEmits(['request-open-pdf', 'translate-visible', 'cancel-translation', 'content-view-change', 'layout-mode-change', 'toggle-outline', 'export-txt', 'export-markdown', 'export-html', 'request-region-comparison', 'cancel-region-comparison', 'export-region-comparison-artifact', 'clear-cache', 'zoom-step', 'zoom-change', 'execution-mode-change', 'primary-click', 'select-action', 'select-language', 'manage-languages'])
+const emit = defineEmits(['request-open-pdf', 'translate-visible', 'cancel-translation', 'content-view-change', 'layout-mode-change', 'toggle-outline', 'export-txt', 'export-markdown', 'export-html', 'request-region-comparison', 'cancel-region-comparison', 'export-region-comparison-artifact', 'clear-cache', 'zoom-step', 'zoom-change', 'execution-mode-change', 'primary-click', 'select-action', 'select-language', 'manage-languages', 'open-settings'])
 
 const logger = getScopedLogger(LOG_COMPONENTS.PDF, 'PdfToolbar')
 const settingsStore = useSettingsStore()
@@ -697,6 +705,11 @@ function handleOpenPdfAction() {
 
 function handleClearCacheAction() {
   emit('clear-cache')
+  closeMenus()
+}
+
+function handleOpenSettingsAction() {
+  emit('open-settings')
   closeMenus()
 }
 

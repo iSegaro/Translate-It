@@ -40,6 +40,7 @@
       @select-action="handleOcrSelectAction"
       @select-language="handleOcrSelectLanguage"
       @manage-languages="handleOcrManageLanguages"
+      @open-settings="handleOpenSettings"
     />
 
     <input
@@ -492,6 +493,10 @@ function handleOcrSelectLanguage(langCode) {
 
 function handleOcrManageLanguages() {
   openOptionsPage('ocr')
+}
+
+function handleOpenSettings() {
+  openOptionsPage()
 }
 
 const pdfStatusBanner = computed(() => pdfStatusBannerController.build({
