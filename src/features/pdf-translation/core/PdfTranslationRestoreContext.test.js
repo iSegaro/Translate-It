@@ -51,12 +51,16 @@ describe('createTranslationRestoreContext', () => {
     })
 
     expect(context.tryBeginPageRestore(1)).toBe(true)
+    let caughtError
     try {
       throw new Error('restore failed')
-    } catch {}
-    finally {
+    } catch (err) {
+      caughtError = err
+    } finally {
       context.finishPageRestore(1)
     }
+    expect(caughtError).toBeInstanceOf(Error)
+    expect(caughtError.message).toBe('restore failed')
 
     expect(context.pendingPageCount).toBe(0)
     expect(context.tryBeginPageRestore(1)).toBe(true)

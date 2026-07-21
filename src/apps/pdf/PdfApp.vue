@@ -321,7 +321,6 @@ const executionMode = ref(REGION_EXECUTION_TARGET.OCR)
 const pdfStatusBannerController = createPdfStatusBannerController()
 
 const {
-  ocrRecommendationCount,
   ocrRecommendations,
   isOcrProcessing,
   ocrProgress,
