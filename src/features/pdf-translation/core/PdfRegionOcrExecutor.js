@@ -62,7 +62,8 @@ export class PdfRegionOcrExecutor {
   }
 
   prepare({ language } = {}) {
-    return this.prepareEngine(toTesseractLanguageCode(language))
+    this._tesseractLang = toTesseractLanguageCode(language)
+    return this.prepareEngine(this._tesseractLang)
   }
 
   execute({ region, scale, language } = {}) {
@@ -120,7 +121,8 @@ export class PdfRegionOcrExecutor {
         renderTask = null
         if (cancelled) return createOutcome(CANCELLED_STATUS)
 
-        const data = await this.recognize(canvas, toTesseractLanguageCode(language))
+        const normalized = this._tesseractLang ?? toTesseractLanguageCode(language)
+        const data = await this.recognize(canvas, normalized)
         if (cancelled) return createOutcome(CANCELLED_STATUS)
 
         return createOutcome(RECOGNIZED_STATUS, { data })

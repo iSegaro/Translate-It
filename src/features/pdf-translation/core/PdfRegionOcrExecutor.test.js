@@ -115,6 +115,25 @@ describe('PdfRegionOcrExecutor', () => {
     expect(recognize).toHaveBeenCalledWith(canvases[0], 'eng')
   })
 
+  it('reuses cached normalized language from prepare in execute on same instance', async () => {
+    const recognize = vi.fn().mockResolvedValue({ text: 'ok', lines: [], confidence: 1 })
+    const { executor } = createExecutor({ recognize })
+
+    await executor.prepare({ language: 'en' })
+    await executor.execute({ region, scale: 1, language: 'en' }).promise
+
+    expect(recognize).toHaveBeenCalledWith(expect.any(Object), 'eng')
+  })
+
+  it('falls back to conversion when execute called without prepare', async () => {
+    const recognize = vi.fn().mockResolvedValue({ text: 'ok', lines: [], confidence: 1 })
+    const { executor } = createExecutor({ recognize })
+
+    await executor.execute({ region, scale: 1, language: 'fa' }).promise
+
+    expect(recognize).toHaveBeenCalledWith(expect.any(Object), 'fas')
+  })
+
   it.each([
     { language: 'auto', expected: 'eng' },
     { language: 'fa', expected: 'fas' },
