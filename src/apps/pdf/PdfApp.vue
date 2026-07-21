@@ -358,7 +358,7 @@ const regionExecutionDispatcher = createRegionExecutionDispatcher({
       scale: PDF_REGION_OCR_RENDER_SCALE,
       language: settingsStore.settings.OCR_DEFAULT_LANG || 'eng'
     }),
-    [REGION_EXECUTION_TARGET.REGION_COMPARISON]: (request) => regionComparisonRunner.execute(request)
+    [REGION_EXECUTION_TARGET.REGION_COMPARISON]: (request) => regionComparisonRunner.execute(request, settingsStore.settings.OCR_DEFAULT_LANG || 'eng')
   }
 })
 const pdfDeveloperApi = new PdfDeveloperApi({ regionExecutionDispatcher })

@@ -44,7 +44,8 @@ export class RegionComparisonSession {
     resultAssembler = new RegionComparisonResultAssembler(),
     regionComparisonEvaluator = new RegionComparisonEvaluator(),
     groundTruth,
-    onProgress
+    onProgress,
+    language
   } = {}) {
     this.request = request
     this.candidatePlanner = candidatePlanner
@@ -56,6 +57,7 @@ export class RegionComparisonSession {
     this.regionComparisonEvaluator = regionComparisonEvaluator
     this.groundTruth = groundTruth
     this.onProgress = onProgress
+    this.language = language
     this.state = 'created'
     this.cancelled = false
     this.activeOperation = null
@@ -71,7 +73,8 @@ export class RegionComparisonSession {
     const executor = this.createExecutor({ pdfDocument: this.getPdfDocument() })
     return executor.execute({
       region: request.region,
-      ...candidate.configuration
+      scale: candidate.configuration.scale,
+      language: this.language || candidate.configuration.language
     })
   }
 
@@ -82,7 +85,7 @@ export class RegionComparisonSession {
     const executor = this.createExecutor({ pdfDocument: this.getPdfDocument() })
     if (typeof executor.prepare !== 'function') return
 
-    await executor.prepare({ language: candidate.configuration.language })
+    await executor.prepare({ language: this.language || candidate.configuration.language })
   }
 
   emitProgress(status, candidates, results, currentCandidate) {
@@ -161,7 +164,7 @@ export class RegionComparisonRunner {
     regionComparisonEvaluator,
     groundTruth,
     onProgress,
-    createSession = (request) => new RegionComparisonSession(request, {
+    createSession = (request, options) => new RegionComparisonSession(request, {
       candidatePlanner,
       configurations,
       createExecutor,
@@ -170,18 +173,19 @@ export class RegionComparisonRunner {
       resultAssembler,
       regionComparisonEvaluator,
       groundTruth,
-      onProgress
+      onProgress,
+      ...options
     })
   } = {}) {
     this.createSession = createSession
   }
 
-  execute(request) {
+  execute(request, language) {
     if (!isRegionExecutionRequest(request) || request.target !== REGION_EXECUTION_TARGET.REGION_COMPARISON) {
       throw new TypeError('RegionComparisonRunner requires a canonical RegionComparison RegionExecutionRequest')
     }
 
-    const session = this.createSession(request)
+    const session = this.createSession(request, { language })
     return createExecutionOperation({
       promise: Promise.resolve().then(() => session.run()),
       cancel() {

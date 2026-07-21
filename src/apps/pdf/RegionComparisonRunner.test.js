@@ -17,7 +17,7 @@ describe('RegionComparisonRunner', () => {
     const createSession = vi.fn(() => session)
     const operation = new RegionComparisonRunner({ createSession }).execute(request)
 
-    expect(createSession).toHaveBeenCalledWith(request)
+    expect(createSession).toHaveBeenCalledWith(request, { language: undefined })
     expect(Object.isFrozen(operation)).toBe(true)
     expect(Object.isFrozen(operation.context)).toBe(true)
     expect(operation.context).toEqual({ target: REGION_EXECUTION_TARGET.REGION_COMPARISON, request })
