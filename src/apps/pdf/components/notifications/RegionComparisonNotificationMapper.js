@@ -50,7 +50,7 @@ function buildRows(results, winnerCandidateId) {
     cells: [
       { id: 'candidate', value: result.candidateId, code: true },
       { id: 'scale', value: formatScale(result.configuration?.scale), numeric: true },
-      { id: 'language', value: result.configuration?.language || '—' },
+      { id: 'language', value: result.runtimeLanguage || '—' },
       { id: 'runtime', value: formatRuntime(result.runtime?.latencyMs), numeric: true },
       { id: 'confidence', value: formatConfidence(result.output?.data?.confidence), numeric: true },
       { id: 'cer', value: formatCer(result.evaluation) || '—', numeric: true },

@@ -457,15 +457,16 @@ describe('PdfApp', () => {
     return region
   }
 
-  function readyRegionComparisonResult(candidateId = 'scale-1-eng') {
+  function readyRegionComparisonResult(candidateId = 'scale-1') {
     return {
       status: 'ready',
       results: [{
         candidateId,
-        configuration: { scale: 1.5, language: 'eng' },
+        configuration: { scale: 1.5 },
         runtime: { latencyMs: 42 },
         output: { status: 'recognized', data: { text: 'hello', confidence: 95 } },
-        evaluation: { cer: { characterErrorRate: 0.2 } }
+        evaluation: { cer: { characterErrorRate: 0.2 } },
+        runtimeLanguage: 'fas'
       }],
       summary: { totalCandidates: 1, completedCandidates: 1, totalElapsedMs: 42 }
     }
@@ -484,9 +485,9 @@ describe('PdfApp', () => {
     await vi.waitFor(() => expect(wrapper.find('.pdf-status-banner').exists()).toBe(true))
 
     expect(wrapper.find('.pdf-status-banner__title').text()).toBe('Region Comparison complete')
-    expect(wrapper.find('.pdf-status-banner__message').text()).toContain('Winner: scale-1-eng.')
+    expect(wrapper.find('.pdf-status-banner__message').text()).toContain('Winner: scale-1.')
     expect(wrapper.findAll('.pdf-region-comparison-notification__results tbody td').map(cell => cell.text())).toEqual([
-      'scale-1-eng', '1.5', 'eng', '42ms', '95', '0.200', 'Winner'
+      'scale-1', '1.5', 'fas', '42ms', '95', '0.200', 'Winner'
     ])
     await wrapper.find('.pdf-status-banner__dismiss').trigger('click')
     expect(wrapper.find('.pdf-status-banner').exists()).toBe(false)
@@ -531,11 +532,11 @@ describe('PdfApp', () => {
   it('replaces a dismissed developer notification on the next regionComparison lifecycle', async () => {
     settingsStoreMock.settings.DEBUG_MODE = true
     regionComparisonRunnerMock.execute.mockImplementationOnce(request => createMockOperation(
-      Promise.resolve(readyRegionComparisonResult('scale-1-eng')),
+      Promise.resolve(readyRegionComparisonResult('scale-1')),
       vi.fn(),
       { target: 'region-comparison', request }
     )).mockImplementationOnce(request => createMockOperation(
-      Promise.resolve(readyRegionComparisonResult('scale-1.5-eng')),
+      Promise.resolve(readyRegionComparisonResult('scale-1.5')),
       vi.fn(),
       { target: 'region-comparison', request }
     ))
@@ -545,7 +546,7 @@ describe('PdfApp', () => {
     await vi.waitFor(() => expect(wrapper.find('.pdf-status-banner__dismiss').exists()).toBe(true))
     await wrapper.find('.pdf-status-banner__dismiss').trigger('click')
     await startRegionComparison(wrapper, createPdfRegion({ pageNumber: 2, left: 1, top: 4, right: 3, bottom: 2 }))
-    await vi.waitFor(() => expect(wrapper.find('.pdf-status-banner__message').text()).toContain('scale-1.5-eng'))
+    await vi.waitFor(() => expect(wrapper.find('.pdf-status-banner__message').text()).toContain('scale-1.5'))
   })
 
   it('keeps developer notifications hidden outside Debug Mode', async () => {
@@ -649,11 +650,11 @@ describe('PdfApp', () => {
   it('completes a regionComparison and exports its artifact through PdfApp ownership', async () => {
     downloadFileMock.mockReset()
     const candidates = Object.freeze([Object.freeze({
-      candidateId: 'scale-1-eng',
-      configuration: Object.freeze({ scale: 1, language: 'eng' })
+      candidateId: 'scale-1',
+      configuration: Object.freeze({ scale: 1 })
     })])
     const results = Object.freeze([Object.freeze({
-      candidateId: 'scale-1-eng',
+      candidateId: 'scale-1',
       configuration: candidates[0].configuration,
       runtime: Object.freeze({ latencyMs: 40 }),
       output: Object.freeze({ status: 'recognized' })
@@ -719,7 +720,7 @@ describe('PdfApp', () => {
 
     deferred.resolve({
       status: 'cancelled',
-      results: Object.freeze([Object.freeze({ candidateId: 'scale-1-eng' })]),
+      results: Object.freeze([Object.freeze({ candidateId: 'scale-1' })]),
       summary: Object.freeze({ totalCandidates: 2, completedCandidates: 1, totalElapsedMs: 40 })
     })
     await flushPromises()
@@ -727,7 +728,7 @@ describe('PdfApp', () => {
     await vi.waitFor(() => expect(toolbar.props('regionComparisonState')).toMatchObject({
       status: 'cancelled',
       progress: { totalCandidates: 2, completedCandidates: 1 },
-      results: [{ candidateId: 'scale-1-eng' }]
+      results: [{ candidateId: 'scale-1' }]
     }))
     runRegionComparison.mockRestore()
   })

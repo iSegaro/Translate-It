@@ -1,5 +1,5 @@
 export class RegionComparisonResultAssembler {
-  assemble({ candidate, startedAt, completedAt, output }) {
+  assemble({ candidate, startedAt, completedAt, output, runtimeLanguage }) {
     return Object.freeze({
       candidateId: candidate.candidateId,
       configuration: candidate.configuration,
@@ -8,7 +8,8 @@ export class RegionComparisonResultAssembler {
         completedAt,
         latencyMs: completedAt - startedAt
       }),
-      output
+      output,
+      runtimeLanguage
     })
   }
 }

@@ -3,8 +3,8 @@ import { RegionComparisonEvaluator } from './RegionComparisonEvaluator.js'
 
 describe('RegionComparisonEvaluator', () => {
   const result = Object.freeze({
-    candidateId: 'scale-1-eng',
-    configuration: Object.freeze({ scale: 1, language: 'eng' }),
+    candidateId: 'scale-1',
+    configuration: Object.freeze({ scale: 1 }),
     runtime: Object.freeze({ latencyMs: 12 }),
     output: Object.freeze({ status: 'recognized', data: Object.freeze({ text: 'hello' }) })
   })

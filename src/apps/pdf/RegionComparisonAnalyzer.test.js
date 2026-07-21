@@ -19,18 +19,18 @@ function recognized(candidateId, { text = 'same', confidence, latencyMs, cer } =
 describe('RegionComparisonAnalyzer', () => {
   it('accepts a completed RegionComparisonResult and derives immutable insights', () => {
     const summary = new RegionComparisonAnalyzer().analyze(regionComparisonResult([
-      recognized('scale-1-eng', { text: 'same', confidence: 90, latencyMs: 80, cer: 0.2 }),
-      recognized('scale-1.5-eng', { text: 'same', confidence: 95, latencyMs: 50, cer: 0.1 })
+      recognized('scale-1', { text: 'same', confidence: 90, latencyMs: 80, cer: 0.2 }),
+      recognized('scale-1.5', { text: 'same', confidence: 95, latencyMs: 50, cer: 0.1 })
     ]))
 
     expect(summary).toEqual({
-      winnerCandidateId: 'scale-1.5-eng',
-      winner: { candidateId: 'scale-1.5-eng', reason: 'lowest-cer' },
-      fastestCandidateId: 'scale-1.5-eng',
+      winnerCandidateId: 'scale-1.5',
+      winner: { candidateId: 'scale-1.5', reason: 'lowest-cer' },
+      fastestCandidateId: 'scale-1.5',
       latency: { fastestMs: 50, slowestMs: 80, deltaMs: 30 },
       confidence: { highest: 95, lowest: 90, delta: 5, comparable: true },
       output: { identical: true, comparable: true, uniqueOutputCount: 1 },
-      evaluation: { winnerCandidateId: 'scale-1.5-eng', cer: 0.1 }
+      evaluation: { winnerCandidateId: 'scale-1.5', cer: 0.1 }
     })
     expect(Object.isFrozen(summary)).toBe(true)
     expect(Object.isFrozen(summary.latency)).toBe(true)

@@ -44,10 +44,10 @@ describe('RegionComparisonRunner', () => {
 
   it('executes every planned candidate and returns immutable results', async () => {
     const candidates = Object.freeze([
-      Object.freeze({ candidateId: 'scale-1', configuration: Object.freeze({ scale: 1, language: 'eng' }) }),
-      Object.freeze({ candidateId: 'scale-1.5', configuration: Object.freeze({ scale: 1.5, language: 'eng' }) })
+      Object.freeze({ candidateId: 'scale-1', configuration: Object.freeze({ scale: 1 }) }),
+      Object.freeze({ candidateId: 'scale-1.5', configuration: Object.freeze({ scale: 1.5 }) })
     ])
-    const configurations = Object.freeze([Object.freeze({ scale: 1, language: 'eng' })])
+    const configurations = Object.freeze([Object.freeze({ scale: 1 })])
     const candidatePlanner = { createCandidates: vi.fn(() => candidates) }
     const executionOrder = []
     const executeFirst = vi.fn(() => {
@@ -95,15 +95,17 @@ describe('RegionComparisonRunner', () => {
       results: [
         {
           candidateId: 'scale-1',
-          configuration: { scale: 1, language: 'eng' },
+          configuration: { scale: 1 },
           runtime: { startedAt: 100, completedAt: 125, latencyMs: 25 },
-          output: { status: 'recognized', data: { text: 'first' } }
+          output: { status: 'recognized', data: { text: 'first' } },
+          runtimeLanguage: undefined
         },
         {
           candidateId: 'scale-1.5',
-          configuration: { scale: 1.5, language: 'eng' },
+          configuration: { scale: 1.5 },
           runtime: { startedAt: 200, completedAt: 260, latencyMs: 60 },
-          output: { status: 'recognized', data: { text: 'second' } }
+          output: { status: 'recognized', data: { text: 'second' } },
+          runtimeLanguage: undefined
         }
       ],
       summary: {
@@ -117,12 +119,12 @@ describe('RegionComparisonRunner', () => {
     expect(candidatePlanner.createCandidates).toHaveBeenCalledWith({ configurations })
     expect(createExecutor).toHaveBeenCalledTimes(3)
     expect(prepare).toHaveBeenCalledOnce()
-    expect(prepare).toHaveBeenCalledWith({ language: 'eng' })
+    expect(prepare).toHaveBeenCalledWith({ language: undefined })
     expect(executionOrder.slice(0, 4)).toEqual(['prepare', 'clock', 'clock', 'first-execute'])
     expect(executeFirst).toHaveBeenCalledOnce()
     expect(executeSecond).toHaveBeenCalledOnce()
-    expect(executeFirst).toHaveBeenCalledWith({ region: request.region, scale: 1, language: 'eng' })
-    expect(executeSecond).toHaveBeenCalledWith({ region: request.region, scale: 1.5, language: 'eng' })
+    expect(executeFirst).toHaveBeenCalledWith({ region: request.region, scale: 1, language: undefined })
+    expect(executeSecond).toHaveBeenCalledWith({ region: request.region, scale: 1.5, language: undefined })
     expect(Object.isFrozen(result.results)).toBe(true)
     expect(Object.isFrozen(result.results[0])).toBe(true)
     expect(Object.isFrozen(result.results[0].runtime)).toBe(true)
@@ -142,7 +144,7 @@ describe('RegionComparisonRunner', () => {
   })
 
   it('evaluates assembled results only when ground truth is injected', async () => {
-    const candidate = Object.freeze({ candidateId: 'scale-1-eng', configuration: Object.freeze({ scale: 1, language: 'eng' }) })
+    const candidate = Object.freeze({ candidateId: 'scale-1', configuration: Object.freeze({ scale: 1 }) })
     const assembledResult = Object.freeze({ candidateId: candidate.candidateId, output: Object.freeze({ status: 'recognized' }) })
     const evaluatedResult = Object.freeze({ ...assembledResult, evaluation: Object.freeze({ cer: Object.freeze({ characterErrorRate: 0 }) }) })
     const resultAssembler = { assemble: vi.fn(() => assembledResult) }
@@ -165,7 +167,7 @@ describe('RegionComparisonRunner', () => {
   })
 
   it('does not evaluate results without ground truth', async () => {
-    const candidate = Object.freeze({ candidateId: 'scale-1-eng', configuration: Object.freeze({ scale: 1, language: 'eng' }) })
+    const candidate = Object.freeze({ candidateId: 'scale-1', configuration: Object.freeze({ scale: 1 }) })
     const assembledResult = Object.freeze({ candidateId: candidate.candidateId, output: Object.freeze({ status: 'recognized' }) })
     const regionComparisonEvaluator = { evaluate: vi.fn() }
     const request = createRegionExecutionRequest({
@@ -186,8 +188,8 @@ describe('RegionComparisonRunner', () => {
 
   it('executes candidates sequentially', async () => {
     const candidates = Object.freeze([
-      Object.freeze({ candidateId: 'scale-1', configuration: Object.freeze({ scale: 1, language: 'eng' }) }),
-      Object.freeze({ candidateId: 'scale-1.5', configuration: Object.freeze({ scale: 1.5, language: 'eng' }) })
+      Object.freeze({ candidateId: 'scale-1', configuration: Object.freeze({ scale: 1 }) }),
+      Object.freeze({ candidateId: 'scale-1.5', configuration: Object.freeze({ scale: 1.5 }) })
     ])
     let resolveFirst
     const firstOperation = { promise: new Promise(resolve => { resolveFirst = resolve }), cancel: vi.fn() }
@@ -215,8 +217,8 @@ describe('RegionComparisonRunner', () => {
 
   it('cancels the active candidate and stops remaining candidates', async () => {
     const candidates = Object.freeze([
-      Object.freeze({ candidateId: 'scale-1', configuration: Object.freeze({ scale: 1, language: 'eng' }) }),
-      Object.freeze({ candidateId: 'scale-1.5', configuration: Object.freeze({ scale: 1.5, language: 'eng' }) })
+      Object.freeze({ candidateId: 'scale-1', configuration: Object.freeze({ scale: 1 }) }),
+      Object.freeze({ candidateId: 'scale-1.5', configuration: Object.freeze({ scale: 1.5 }) })
     ])
     let resolveSecond
     const firstOperation = { promise: Promise.resolve({ status: 'recognized', data: { text: 'first' } }), cancel: vi.fn() }
@@ -261,8 +263,8 @@ describe('RegionComparisonRunner', () => {
 
   it('propagates candidate executor failures without scheduling later candidates', async () => {
     const candidates = Object.freeze([
-      Object.freeze({ candidateId: 'scale-1', configuration: Object.freeze({ scale: 1, language: 'eng' }) }),
-      Object.freeze({ candidateId: 'scale-1.5', configuration: Object.freeze({ scale: 1.5, language: 'eng' }) })
+      Object.freeze({ candidateId: 'scale-1', configuration: Object.freeze({ scale: 1 }) }),
+      Object.freeze({ candidateId: 'scale-1.5', configuration: Object.freeze({ scale: 1.5 }) })
     ])
     const error = new Error('OCR executor failed')
     const executeSecond = vi.fn()
@@ -283,7 +285,7 @@ describe('RegionComparisonRunner', () => {
   })
 
   it('prepares once before timing candidates and aborts on preparation failure', async () => {
-    const candidate = Object.freeze({ candidateId: 'scale-1-eng', configuration: Object.freeze({ scale: 1, language: 'eng' }) })
+    const candidate = Object.freeze({ candidateId: 'scale-1', configuration: Object.freeze({ scale: 1 }) })
     const request = createRegionExecutionRequest({
       region: createPdfRegion({ pageNumber: 1, left: 1, top: 4, right: 3, bottom: 2 }),
       target: REGION_EXECUTION_TARGET.REGION_COMPARISON

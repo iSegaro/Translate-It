@@ -1,5 +1,5 @@
-function createCandidateId({ scale, language }) {
-  return `scale-${scale}-${language}`
+function createCandidateId({ scale }) {
+  return `scale-${scale}`
 }
 
 export class RegionComparisonCandidatePlanner {

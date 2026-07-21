@@ -5,13 +5,13 @@ import { RegionComparisonArtifactWriter } from './RegionComparisonArtifactWriter
 describe('RegionComparisonArtifactWriter', () => {
   it('writes an immutable deterministic artifact in execution order', () => {
     const evaluation = Object.freeze({ cer: Object.freeze({ characterErrorRate: 0.2 }) })
-    const first = Object.freeze({ candidateId: 'scale-1-eng', evaluation })
-    const second = Object.freeze({ candidateId: 'scale-1.5-eng' })
+    const first = Object.freeze({ candidateId: 'scale-1', evaluation, runtimeLanguage: 'fas' })
+    const second = Object.freeze({ candidateId: 'scale-1.5', runtimeLanguage: 'fas' })
     const sessionResult = Object.freeze({
       summary: Object.freeze({ totalCandidates: 2, completedCandidates: 2, startedAt: 100, completedAt: 120, totalElapsedMs: 20 }),
       candidates: Object.freeze([
-        Object.freeze({ candidateId: 'scale-1-eng', configuration: Object.freeze({ scale: 1, language: 'eng' }) }),
-        Object.freeze({ candidateId: 'scale-1.5-eng', configuration: Object.freeze({ scale: 1.5, language: 'eng' }) })
+        Object.freeze({ candidateId: 'scale-1', configuration: Object.freeze({ scale: 1 }) }),
+        Object.freeze({ candidateId: 'scale-1.5', configuration: Object.freeze({ scale: 1.5 }) })
       ]),
       results: Object.freeze([first, second])
     })
@@ -28,8 +28,8 @@ describe('RegionComparisonArtifactWriter', () => {
       metadata: { startedAt: 100, completedAt: 120, totalElapsedMs: 20, pageNumber: 1, region },
       summary: sessionResult.summary,
       configurations: [
-        { candidateId: 'scale-1-eng', configuration: { scale: 1, language: 'eng' } },
-        { candidateId: 'scale-1.5-eng', configuration: { scale: 1.5, language: 'eng' } }
+        { candidateId: 'scale-1', configuration: { scale: 1 } },
+        { candidateId: 'scale-1.5', configuration: { scale: 1.5 } }
       ],
       results: [first, second]
     })

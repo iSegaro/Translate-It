@@ -74,7 +74,7 @@ export class RegionComparisonSession {
     return executor.execute({
       region: request.region,
       scale: candidate.configuration.scale,
-      language: this.language || candidate.configuration.language
+      language: this.language
     })
   }
 
@@ -85,7 +85,7 @@ export class RegionComparisonSession {
     const executor = this.createExecutor({ pdfDocument: this.getPdfDocument() })
     if (typeof executor.prepare !== 'function') return
 
-    await executor.prepare({ language: this.language || candidate.configuration.language })
+    await executor.prepare({ language: this.language })
   }
 
   emitProgress(status, candidates, results, currentCandidate) {
@@ -138,7 +138,8 @@ export class RegionComparisonSession {
         candidate,
         startedAt: candidateStartedAt,
         completedAt: this.clock(),
-        output
+        output,
+        runtimeLanguage: this.language
       }))
       this.emitProgress('running', candidates, results)
     }

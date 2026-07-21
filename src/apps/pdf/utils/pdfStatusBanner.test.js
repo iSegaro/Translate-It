@@ -80,7 +80,7 @@ describe('buildPdfStatusBannerState', () => {
       id: 'developer-notification:1',
       variant: 'success',
       title: 'Region Comparison completed',
-      message: 'Winner: scale-1-eng.',
+      message: 'Winner: scale-1.',
       body: { type: PDF_NOTIFICATION_BODY_TYPE.REGION_COMPARISON_RESULTS, payload: { rows: [] } }
     }
 

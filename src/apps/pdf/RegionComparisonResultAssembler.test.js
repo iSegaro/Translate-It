@@ -6,20 +6,22 @@ describe('RegionComparisonResultAssembler', () => {
     const output = Object.freeze({ text: 'recognized text', confidence: 98 })
     const candidate = Object.freeze({
       candidateId: 'scale-1',
-      configuration: Object.freeze({ scale: 1, language: 'eng' })
+      configuration: Object.freeze({ scale: 1 })
     })
     const result = new RegionComparisonResultAssembler().assemble({
       candidate,
       startedAt: 100,
       completedAt: 125,
-      output
+      output,
+      runtimeLanguage: 'fas'
     })
 
     expect(result).toEqual({
       candidateId: 'scale-1',
-      configuration: { scale: 1, language: 'eng' },
+      configuration: { scale: 1 },
       runtime: { startedAt: 100, completedAt: 125, latencyMs: 25 },
-      output
+      output,
+      runtimeLanguage: 'fas'
     })
     expect(result.output).toBe(output)
     expect(Object.isFrozen(result)).toBe(true)
