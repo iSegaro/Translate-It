@@ -333,7 +333,8 @@ describe('PdfToolbar', () => {
           language: { code: 'eng', name: 'English', compactLabel: 'EN' },
           canCancel: false,
           currentPageContainsOcr: false,
-          canRunPageOcr: true,
+          hasDocument: true,
+          regionOcrAvailable: true,
           isPageOcrRecommended: true,
           installedLanguages: []
         }
@@ -356,7 +357,8 @@ describe('PdfToolbar', () => {
           language: { code: 'eng', name: 'English', compactLabel: 'EN' },
           canCancel: false,
           currentPageContainsOcr: false,
-          canRunPageOcr: true,
+          hasDocument: true,
+          regionOcrAvailable: true,
           isPageOcrRecommended: true,
           installedLanguages: []
         }
@@ -377,7 +379,8 @@ describe('PdfToolbar', () => {
           language: { code: 'eng', name: 'English', compactLabel: 'EN' },
           canCancel: true,
           currentPageContainsOcr: false,
-          canRunPageOcr: true,
+          hasDocument: true,
+          regionOcrAvailable: true,
           isPageOcrRecommended: true,
           installedLanguages: []
         }
@@ -395,7 +398,8 @@ describe('PdfToolbar', () => {
         language: { code: 'eng', name: 'English' },
         canCancel: false,
         currentPageContainsOcr: false,
-            canRunPageOcr: true,
+            hasDocument: true,
+          regionOcrAvailable: true,
             isPageOcrRecommended: false,
         installedLanguages: []
       }
@@ -436,7 +440,8 @@ describe('PdfToolbar', () => {
           language: { code: 'eng', name: 'English', compactLabel: 'EN' },
           canCancel: false,
           currentPageContainsOcr: false,
-          canRunPageOcr: true,
+          hasDocument: true,
+          regionOcrAvailable: true,
           isPageOcrRecommended: true,
           installedLanguages: []
         }
@@ -732,7 +737,8 @@ describe('PdfToolbar', () => {
             language: { code: 'fas', name: 'Persian', compactLabel: 'FA' },
             canCancel: false,
             currentPageContainsOcr: false,
-            canRunPageOcr: true,
+            hasDocument: true,
+          regionOcrAvailable: true,
           isPageOcrRecommended: true,
             installedLanguages: []
           }
@@ -752,7 +758,8 @@ describe('PdfToolbar', () => {
             language: { code: 'deu', name: 'German' },
             canCancel: false,
             currentPageContainsOcr: false,
-            canRunPageOcr: true,
+            hasDocument: true,
+          regionOcrAvailable: true,
           isPageOcrRecommended: true,
             installedLanguages: []
           }
@@ -774,7 +781,8 @@ describe('PdfToolbar', () => {
             language: { code: 'eng', name: 'English', compactLabel: 'EN' },
             canCancel: false,
             currentPageContainsOcr: false,
-            canRunPageOcr: true,
+            hasDocument: true,
+          regionOcrAvailable: true,
           isPageOcrRecommended: true,
             installedLanguages: []
           }
@@ -800,7 +808,8 @@ describe('PdfToolbar', () => {
             language: { code: 'eng', name: 'English', compactLabel: 'EN' },
             canCancel: false,
             currentPageContainsOcr: false,
-            canRunPageOcr: true,
+            hasDocument: true,
+          regionOcrAvailable: true,
           isPageOcrRecommended: true,
             installedLanguages: []
           }
@@ -820,7 +829,8 @@ describe('PdfToolbar', () => {
             language: { code: 'eng', name: 'English', compactLabel: 'EN' },
             canCancel: false,
             currentPageContainsOcr: true,
-            canRunPageOcr: true,
+            hasDocument: true,
+          regionOcrAvailable: true,
           isPageOcrRecommended: false,
             installedLanguages: []
           }
@@ -840,7 +850,8 @@ describe('PdfToolbar', () => {
             language: { code: 'eng', name: 'English', compactLabel: 'EN' },
             canCancel: true,
             currentPageContainsOcr: false,
-            canRunPageOcr: true,
+            hasDocument: true,
+          regionOcrAvailable: true,
           isPageOcrRecommended: true,
             installedLanguages: []
           }
@@ -848,6 +859,114 @@ describe('PdfToolbar', () => {
       })
 
       expect(wrapper.find('.pdf-toolbar__ocr-primary').attributes('disabled')).toBeUndefined()
+    })
+
+    it('disables OCR Page menu item when hasDocument is false', async () => {
+      const wrapper = mount(PdfToolbar, {
+        props: {
+          ocrViewModel: {
+            primaryAction: 'region',
+            preferredAction: 'region',
+            disabled: false,
+            language: { code: 'eng', name: 'English', compactLabel: 'EN' },
+            canCancel: false,
+            currentPageContainsOcr: false,
+            hasDocument: false,
+            regionOcrAvailable: false,
+            isPageOcrRecommended: false,
+            installedLanguages: []
+          }
+        }
+      })
+
+      await wrapper.find('.pdf-toolbar__ocr-arrow').trigger('click')
+      const items = wrapper.findAll('.pdf-toolbar__ocr-menu-item')
+      const pageItem = items.find(b => b.text().includes('OCR Page'))
+      const regionItem = items.find(b => b.text().includes('OCR Region'))
+
+      expect(pageItem?.attributes('disabled')).toBeDefined()
+      expect(regionItem?.attributes('disabled')).toBeDefined()
+    })
+
+    it('enables both OCR menu items when document is loaded and original pane visible', async () => {
+      const wrapper = mount(PdfToolbar, {
+        props: {
+          ocrViewModel: {
+            primaryAction: 'region',
+            preferredAction: 'region',
+            disabled: false,
+            language: { code: 'eng', name: 'English', compactLabel: 'EN' },
+            canCancel: false,
+            currentPageContainsOcr: false,
+            hasDocument: true,
+            regionOcrAvailable: true,
+            isPageOcrRecommended: false,
+            installedLanguages: []
+          }
+        }
+      })
+
+      await wrapper.find('.pdf-toolbar__ocr-arrow').trigger('click')
+      const items = wrapper.findAll('.pdf-toolbar__ocr-menu-item')
+      const pageItem = items.find(b => b.text().includes('OCR Page'))
+      const regionItem = items.find(b => b.text().includes('OCR Region'))
+
+      expect(pageItem?.attributes('disabled')).toBeUndefined()
+      expect(regionItem?.attributes('disabled')).toBeUndefined()
+    })
+
+    it('disables only OCR Region menu item when original pane is hidden', async () => {
+      const wrapper = mount(PdfToolbar, {
+        props: {
+          ocrViewModel: {
+            primaryAction: 'region',
+            preferredAction: 'region',
+            disabled: false,
+            language: { code: 'eng', name: 'English', compactLabel: 'EN' },
+            canCancel: false,
+            currentPageContainsOcr: false,
+            hasDocument: true,
+            regionOcrAvailable: false,
+            isPageOcrRecommended: false,
+            installedLanguages: []
+          }
+        }
+      })
+
+      await wrapper.find('.pdf-toolbar__ocr-arrow').trigger('click')
+      const items = wrapper.findAll('.pdf-toolbar__ocr-menu-item')
+      const pageItem = items.find(b => b.text().includes('OCR Page'))
+      const regionItem = items.find(b => b.text().includes('OCR Region'))
+
+      expect(pageItem?.attributes('disabled')).toBeUndefined()
+      expect(regionItem?.attributes('disabled')).toBeDefined()
+    })
+
+    it('disables both OCR menu items when processing', async () => {
+      const wrapper = mount(PdfToolbar, {
+        props: {
+          ocrViewModel: {
+            primaryAction: 'cancel',
+            preferredAction: 'region',
+            disabled: false,
+            language: { code: 'eng', name: 'English', compactLabel: 'EN' },
+            canCancel: true,
+            currentPageContainsOcr: false,
+            hasDocument: true,
+            regionOcrAvailable: true,
+            isPageOcrRecommended: false,
+            installedLanguages: []
+          }
+        }
+      })
+
+      await wrapper.find('.pdf-toolbar__ocr-arrow').trigger('click')
+      const items = wrapper.findAll('.pdf-toolbar__ocr-menu-item')
+      const pageItem = items.find(b => b.text().includes('OCR Page'))
+      const regionItem = items.find(b => b.text().includes('OCR Region'))
+
+      expect(pageItem?.attributes('disabled')).toBeDefined()
+      expect(regionItem?.attributes('disabled')).toBeDefined()
     })
   })
 
@@ -862,7 +981,8 @@ describe('PdfToolbar', () => {
             language: { code: 'eng', name: 'English', compactLabel: 'EN' },
             canCancel: false,
             currentPageContainsOcr: false,
-            canRunPageOcr: true,
+            hasDocument: true,
+          regionOcrAvailable: true,
           isPageOcrRecommended: true,
             installedLanguages: []
           }
@@ -887,7 +1007,8 @@ describe('PdfToolbar', () => {
             language: { code: 'eng', name: 'English', compactLabel: 'EN' },
             canCancel: false,
             currentPageContainsOcr: false,
-            canRunPageOcr: true,
+            hasDocument: true,
+          regionOcrAvailable: true,
           isPageOcrRecommended: true,
             installedLanguages: [{ code: 'eng', name: 'English', selected: true }]
           }
@@ -915,7 +1036,8 @@ describe('PdfToolbar', () => {
             language: { code: 'eng', name: 'English', compactLabel: 'EN' },
             canCancel: false,
             currentPageContainsOcr: false,
-            canRunPageOcr: true,
+            hasDocument: true,
+          regionOcrAvailable: true,
           isPageOcrRecommended: true,
             installedLanguages: []
           }
@@ -941,7 +1063,8 @@ describe('PdfToolbar', () => {
             language: { code: 'eng', name: 'English', compactLabel: 'EN' },
             canCancel: false,
             currentPageContainsOcr: false,
-            canRunPageOcr: true,
+            hasDocument: true,
+          regionOcrAvailable: true,
           isPageOcrRecommended: true,
             installedLanguages: [{ code: 'eng', name: 'English', selected: true }]
           }
@@ -971,7 +1094,8 @@ describe('PdfToolbar', () => {
             language: { code: 'eng', name: 'English', compactLabel: 'EN' },
             canCancel: false,
             currentPageContainsOcr: false,
-            canRunPageOcr: true,
+            hasDocument: true,
+          regionOcrAvailable: true,
           isPageOcrRecommended: true,
             installedLanguages: [{ code: 'eng', name: 'English', selected: true }]
           }
@@ -994,7 +1118,8 @@ describe('PdfToolbar', () => {
             language: { code: 'eng', name: 'English', compactLabel: 'EN' },
             canCancel: true,
             currentPageContainsOcr: false,
-            canRunPageOcr: true,
+            hasDocument: true,
+          regionOcrAvailable: true,
           isPageOcrRecommended: false,
             installedLanguages: [{ code: 'eng', name: 'English', selected: true }]
           }

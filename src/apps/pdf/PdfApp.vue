@@ -446,9 +446,13 @@ const toolbarOcrModel = computed(() => {
     language: { code: langCode, name: langName, compactLabel: getTesseractLanguageCodeLabel(langCode) },
     canCancel: processing,
     currentPageContainsOcr: hasOcr,
-    canRunPageOcr: true,
+    hasDocument: hasDocument.value,
+    regionOcrAvailable: regionOcrAvailable.value,
     isPageOcrRecommended: shouldRecommendPageOcr,
-    disabled: !processing && preferredAction === 'region' && !regionOcrAvailable.value,
+    disabled: !processing && (
+      (preferredAction === 'region' && !regionOcrAvailable.value) ||
+      (preferredAction === 'page' && !hasDocument.value)
+    ),
     installedLanguages: SUPPORTED_OCR_LANGUAGES
       .filter(lang => ocrStore.downloadedLanguages.includes(lang.code))
       .map(lang => ({
@@ -460,11 +464,14 @@ const toolbarOcrModel = computed(() => {
 })
 
 function handleOcrPrimaryClick() {
-  if (!toolbarOcrModel.value.canCancel) {
-    const action = toolbarOcrModel.value.preferredAction
+  const model = toolbarOcrModel.value
+  if (!model.canCancel) {
+    const action = model.preferredAction
     if (action === 'region') {
+      if (!model.regionOcrAvailable) return
       beginRegionSelection(REGION_EXECUTION_TARGET.OCR)
     } else {
+      if (!model.hasDocument) return
       requestOcr()
     }
     return

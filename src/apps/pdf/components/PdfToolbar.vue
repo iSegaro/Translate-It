@@ -207,11 +207,11 @@
               class="pdf-toolbar__ocr-menu-item"
               :class="{
                 'pdf-toolbar__ocr-menu-item--selected': ocrViewModel.preferredAction === 'region',
-                'pdf-toolbar__ocr-menu-item--disabled': ocrViewModel.canCancel
+                'pdf-toolbar__ocr-menu-item--disabled': ocrViewModel.canCancel || !ocrViewModel.regionOcrAvailable
               }"
               role="menuitemradio"
               :aria-checked="ocrViewModel.preferredAction === 'region'"
-              :disabled="ocrViewModel.canCancel"
+              :disabled="ocrViewModel.canCancel || !ocrViewModel.regionOcrAvailable"
               @click="selectAction('region')"
             >
               <span class="pdf-toolbar__ocr-menu-check" aria-hidden="true">✓</span>
@@ -221,11 +221,11 @@
               class="pdf-toolbar__ocr-menu-item"
               :class="{
                 'pdf-toolbar__ocr-menu-item--selected': ocrViewModel.preferredAction === 'page',
-                'pdf-toolbar__ocr-menu-item--disabled': ocrViewModel.canCancel
+                'pdf-toolbar__ocr-menu-item--disabled': ocrViewModel.canCancel || !ocrViewModel.hasDocument
               }"
               role="menuitemradio"
               :aria-checked="ocrViewModel.preferredAction === 'page'"
-              :disabled="ocrViewModel.canCancel"
+              :disabled="ocrViewModel.canCancel || !ocrViewModel.hasDocument"
               title=""
               @click="selectAction('page')"
             >
@@ -632,6 +632,8 @@ function handleOcrArrowKeydown(event) {
 
 function selectAction(action) {
   if (ocrModel.value.canCancel) return
+  if (action === 'region' && !ocrModel.value.regionOcrAvailable) return
+  if (action === 'page' && !ocrModel.value.hasDocument) return
   emit('select-action', action)
   closeMenus()
 }
