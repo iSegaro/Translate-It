@@ -34,7 +34,8 @@ const openTranslationMock = vi.fn()
 const downloadFileMock = vi.hoisted(() => vi.fn())
 const settingsStoreMock = vi.hoisted(() => ({
   isDarkTheme: false,
-  settings: { THEME: 'auto', DEBUG_MODE: false }
+  settings: { THEME: 'auto', DEBUG_MODE: false },
+  updateSettingAndPersist: vi.fn().mockResolvedValue(true)
 }))
 const regionComparisonRunnerMock = vi.hoisted(() => ({
   execute: vi.fn(),
@@ -103,6 +104,25 @@ vi.mock('@/features/settings/stores/settings.js', () => ({
   useSettingsStore: () => settingsStoreMock
 }))
 
+vi.mock('@/features/screen-capture/stores/ocrStore.js', () => ({
+  useOCRStore: () => ({
+    downloadedLanguages: []
+  })
+}))
+
+vi.mock('@/features/screen-capture/utils/ocrLanguageMap.js', () => ({
+  SUPPORTED_OCR_LANGUAGES: [
+    { code: 'eng', name: 'English' },
+    { code: 'fas', name: 'Persian' },
+    { code: 'deu', name: 'German' },
+    { code: 'fra', name: 'French' }
+  ],
+  getTesseractLanguageCodeLabel: (code) => {
+    const map = { eng: 'EN', fas: 'FA', deu: 'DE', fra: 'FR' }
+    return map[code] || code?.toUpperCase() || 'EN'
+  }
+}))
+
 vi.mock('./RegionComparisonRunner.js', () => ({
   RegionComparisonRunner: class {
     constructor(options) {
@@ -131,8 +151,8 @@ vi.mock('@/shared/config/config.js', () => ({
 vi.mock('./components/PdfToolbar.vue', () => ({
   default: {
     name: 'PdfToolbar',
-    props: ['fileName', 'pageCount', 'currentPageNumber', 'zoomMode', 'zoomPercent', 'contentView', 'layoutMode', 'ocrRecommendationCount', 'executionMode', 'executionModes', 'regionOcrState', 'regionOcrAvailable', 'regionComparisonState', 'canExportRegionComparisonArtifact'],
-    emits: ['toggle-outline', 'translate-visible', 'cancel-translation', 'content-view-change', 'layout-mode-change', 'zoom-step', 'zoom-change', 'export-txt', 'export-markdown', 'export-html', 'request-ocr', 'request-region-ocr', 'request-region-comparison', 'cancel-region-comparison', 'export-region-comparison-artifact', 'clear-cache', 'request-open-pdf', 'execution-mode-change'],
+    props: ['fileName', 'pageCount', 'currentPageNumber', 'zoomMode', 'zoomPercent', 'contentView', 'layoutMode', 'executionMode', 'executionModes', 'ocrViewModel', 'regionComparisonState', 'canExportRegionComparisonArtifact'],
+    emits: ['toggle-outline', 'translate-visible', 'cancel-translation', 'content-view-change', 'layout-mode-change', 'zoom-step', 'zoom-change', 'export-txt', 'export-markdown', 'export-html', 'request-region-comparison', 'cancel-region-comparison', 'export-region-comparison-artifact', 'clear-cache', 'request-open-pdf', 'execution-mode-change', 'primary-click', 'select-action', 'select-language', 'manage-languages'],
     template: '<header class="pdf-toolbar-stub" />'
   }
 }))
@@ -483,12 +503,10 @@ describe('PdfApp', () => {
       { target: 'region-comparison', request }
     ))
     const wrapper = mount(PdfApp)
-    const toolbar = wrapper.findComponent({ name: 'PdfToolbar' })
 
     await startRegionComparison(wrapper)
     await vi.waitFor(() => expect(wrapper.find('.pdf-status-banner').exists()).toBe(true))
 
-    expect(toolbar.props('regionOcrState')).toBe('idle')
     expect(wrapper.find('.pdf-status-banner').classes()).toContain('pdf-status-banner--error')
     expect(wrapper.find('.pdf-status-banner__title').text()).toBe('Region Comparison failed')
     expect(wrapper.find('.pdf-status-banner__message').text()).toBe('OCR worker unavailable')
@@ -616,7 +634,7 @@ describe('PdfApp', () => {
 
     const toolbar = wrapper.findComponent({ name: 'PdfToolbar' })
     const viewer = wrapper.findComponent({ name: 'PdfViewer' })
-    toolbar.vm.$emit('request-region-ocr')
+    toolbar.vm.$emit('primary-click')
     await flushPromises()
 
     expect(viewer.props('regionSelectionActive')).toBe(true)
@@ -697,7 +715,6 @@ describe('PdfApp', () => {
     viewer.vm.$emit('region-selection-complete', region)
     await flushPromises()
     expect(toolbar.props('regionComparisonState')).toMatchObject({ status: 'running' })
-    expect(toolbar.props('regionOcrState')).toBe('processing')
 
     toolbar.vm.$emit('cancel-region-comparison')
     expect(cancel).toHaveBeenCalledOnce()
@@ -715,7 +732,6 @@ describe('PdfApp', () => {
       progress: { totalCandidates: 2, completedCandidates: 1 },
       results: [{ candidateId: 'scale-1-eng' }]
     }))
-    expect(toolbar.props('regionOcrState')).toBe('idle')
     runRegionComparison.mockRestore()
   })
 
@@ -725,15 +741,15 @@ describe('PdfApp', () => {
     const toolbar = wrapper.findComponent({ name: 'PdfToolbar' })
     const viewer = wrapper.findComponent({ name: 'PdfViewer' })
 
-    toolbar.vm.$emit('request-region-ocr')
+    toolbar.vm.$emit('primary-click')
     await flushPromises()
     expect(viewer.props('regionSelectionActive')).toBe(true)
 
-    toolbar.vm.$emit('request-region-ocr')
+    toolbar.vm.$emit('primary-click')
     await flushPromises()
     expect(viewer.props('regionSelectionActive')).toBe(false)
 
-    toolbar.vm.$emit('request-region-ocr')
+    toolbar.vm.$emit('primary-click')
     await flushPromises()
     document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))
     await flushPromises()
@@ -743,7 +759,7 @@ describe('PdfApp', () => {
   it('returns selection to idle on document replacement', async () => {
     const wrapper = mount(PdfApp)
     await flushPromises()
-    wrapper.findComponent({ name: 'PdfToolbar' }).vm.$emit('request-region-ocr')
+    wrapper.findComponent({ name: 'PdfToolbar' }).vm.$emit('primary-click')
     await flushPromises()
     expect(wrapper.findComponent({ name: 'PdfViewer' }).props('regionSelectionActive')).toBe(true)
 
@@ -762,16 +778,13 @@ describe('PdfApp', () => {
     const toolbar = wrapper.findComponent({ name: 'PdfToolbar' })
     const viewer = wrapper.findComponent({ name: 'PdfViewer' })
 
-    toolbar.vm.$emit('request-region-ocr')
+    toolbar.vm.$emit('primary-click')
     viewer.vm.$emit('region-selection-complete', createPdfRegion({ pageNumber: 1, left: 1, top: 4, right: 3, bottom: 2 }))
     await flushPromises()
-    expect(toolbar.props('regionOcrState')).toBe('processing')
-    expect(toolbar.props('regionOcrAvailable')).toBe(true)
 
     resolveOcr({ status: 'recognized', data: { text: '' } })
     await flushPromises()
     await flushPromises()
-    expect(toolbar.props('regionOcrState')).toBe('idle')
     expect(wrapper.text()).toContain('No text found in the selected region.')
   })
 
@@ -780,12 +793,11 @@ describe('PdfApp', () => {
     const wrapper = mount(PdfApp)
     await flushPromises()
     const toolbar = wrapper.findComponent({ name: 'PdfToolbar' })
-    toolbar.vm.$emit('request-region-ocr')
+    toolbar.vm.$emit('primary-click')
     wrapper.findComponent({ name: 'PdfViewer' }).vm.$emit('region-selection-complete', createPdfRegion({ pageNumber: 1, left: 1, top: 4, right: 3, bottom: 2 }))
     await flushPromises()
     await flushPromises()
 
-    expect(toolbar.props('regionOcrState')).toBe('idle')
     expect(wrapper.text()).toContain('OCR failed. Please try another region.')
   })
 
@@ -1681,6 +1693,138 @@ describe('PdfApp', () => {
       expect(originalPane.scrollTop).toBe(700)
 
       wrapper.unmount()
+    })
+  })
+
+  describe('OCR split button cancel routing', () => {
+    it('routes cancel to region OCR when regionOcrState is processing', async () => {
+      mockRegionOcr.startRegionOcr.mockReturnValue(createMockOperation(new Promise(() => {})))
+      const wrapper = mount(PdfApp)
+      await flushPromises()
+
+      wrapper.findComponent({ name: 'PdfToolbar' }).vm.$emit('primary-click')
+      await flushPromises()
+
+      wrapper.findComponent({ name: 'PdfViewer' }).vm.$emit('region-selection-complete', createPdfRegion({ pageNumber: 1, left: 1, top: 4, right: 3, bottom: 2 }))
+      await flushPromises()
+
+      expect(mockRegionExecutionDispatch).toHaveBeenCalled()
+
+      wrapper.findComponent({ name: 'PdfToolbar' }).vm.$emit('primary-click')
+
+      expect(mockRegionOcr.cancelRegionOcr).toHaveBeenCalledOnce()
+      expect(mockPdfOcr.cancelOcr).not.toHaveBeenCalled()
+    })
+
+    it('routes cancel to page OCR when page OCR is processing', async () => {
+      mockPdfOcr.isOcrProcessing.value = true
+      const wrapper = mount(PdfApp)
+      await flushPromises()
+
+      wrapper.findComponent({ name: 'PdfToolbar' }).vm.$emit('primary-click')
+
+      expect(mockPdfOcr.cancelOcr).toHaveBeenCalledOnce()
+      expect(mockRegionOcr.cancelRegionOcr).not.toHaveBeenCalled()
+    })
+
+    it('routes cancel to region OCR when in selecting state', async () => {
+      const wrapper = mount(PdfApp)
+      await flushPromises()
+
+      wrapper.findComponent({ name: 'PdfToolbar' }).vm.$emit('primary-click')
+      await flushPromises()
+
+      wrapper.findComponent({ name: 'PdfToolbar' }).vm.$emit('primary-click')
+      await flushPromises()
+
+      expect(mockPdfOcr.cancelOcr).not.toHaveBeenCalled()
+      expect(wrapper.findComponent({ name: 'PdfViewer' }).props('regionSelectionActive')).toBe(false)
+    })
+
+    it('does not cancel when nothing is active', async () => {
+      mockPdfOcr.isOcrProcessing.value = false
+      const wrapper = mount(PdfApp)
+      await flushPromises()
+
+      wrapper.findComponent({ name: 'PdfToolbar' }).vm.$emit('primary-click')
+      await flushPromises()
+
+      expect(mockPdfOcr.cancelOcr).not.toHaveBeenCalled()
+      expect(mockRegionOcr.cancelRegionOcr).not.toHaveBeenCalled()
+      expect(wrapper.findComponent({ name: 'PdfViewer' }).props('regionSelectionActive')).toBe(true)
+    })
+  })
+
+  describe('OCR action and language persistence', () => {
+    it('persists preferred action on select-action', async () => {
+      settingsStoreMock.updateSettingAndPersist.mockClear()
+      const wrapper = mount(PdfApp)
+      await flushPromises()
+
+      wrapper.findComponent({ name: 'PdfToolbar' }).vm.$emit('select-action', 'page')
+
+      expect(settingsStoreMock.updateSettingAndPersist).toHaveBeenCalledWith('OCR_PREFERRED_ACTION', 'page')
+    })
+
+    it('persists language on select-language', async () => {
+      settingsStoreMock.updateSettingAndPersist.mockClear()
+      const wrapper = mount(PdfApp)
+      await flushPromises()
+
+      wrapper.findComponent({ name: 'PdfToolbar' }).vm.$emit('select-language', 'fas')
+
+      expect(settingsStoreMock.updateSettingAndPersist).toHaveBeenCalledWith('OCR_DEFAULT_LANG', 'fas')
+    })
+  })
+
+  describe('OCR highlight reactivity', () => {
+    it('updates currentPageContainsOcr after page OCR completes on current page', async () => {
+      createMocks({ sessionAsRef: false })
+      const wrapper = mount(PdfApp)
+      await flushPromises()
+
+      const toolbar = wrapper.findComponent({ name: 'PdfToolbar' })
+      expect(toolbar.props('ocrViewModel').currentPageContainsOcr).toBe(false)
+
+      wrapper.findComponent({ name: 'PdfViewer' }).vm.$emit('current-page-change', 0)
+      await flushPromises()
+
+      mockViewerController.session.pageSessions = new Map([[0, { ocrBlocks: [{ text: 'hello' }], ocrLanguage: 'eng' }]])
+      mockPdfOcr.isOcrProcessing.value = true
+      mockPdfOcrOptions.onOcrComplete({ pageNumbers: [1] })
+      mockPdfOcr.isOcrProcessing.value = false
+      await flushPromises()
+
+      expect(toolbar.props('ocrViewModel').currentPageContainsOcr).toBe(true)
+    })
+  })
+
+  describe('OCR preferred action validation', () => {
+    it('defaults invalid OCR_PREFERRED_ACTION to region', async () => {
+      settingsStoreMock.settings.OCR_PREFERRED_ACTION = 'invalid'
+      const wrapper = mount(PdfApp)
+      await flushPromises()
+
+      const toolbar = wrapper.findComponent({ name: 'PdfToolbar' })
+      expect(toolbar.props('ocrViewModel').preferredAction).toBe('region')
+    })
+
+    it('accepts valid region value', async () => {
+      settingsStoreMock.settings.OCR_PREFERRED_ACTION = 'region'
+      const wrapper = mount(PdfApp)
+      await flushPromises()
+
+      const toolbar = wrapper.findComponent({ name: 'PdfToolbar' })
+      expect(toolbar.props('ocrViewModel').preferredAction).toBe('region')
+    })
+
+    it('accepts valid page value', async () => {
+      settingsStoreMock.settings.OCR_PREFERRED_ACTION = 'page'
+      const wrapper = mount(PdfApp)
+      await flushPromises()
+
+      const toolbar = wrapper.findComponent({ name: 'PdfToolbar' })
+      expect(toolbar.props('ocrViewModel').preferredAction).toBe('page')
     })
   })
 })

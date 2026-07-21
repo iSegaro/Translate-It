@@ -50,6 +50,7 @@ class SettingsManager {
       TRANSLATE_WITH_SELECT_ELEMENT: true,
       ENABLE_SCREEN_CAPTURE: true,
       OCR_DEFAULT_LANG: CONFIG.OCR_DEFAULT_LANG || 'eng',
+      OCR_PREFERRED_ACTION: CONFIG.OCR_PREFERRED_ACTION || 'region',
       REQUIRE_CTRL_FOR_TEXT_SELECTION: false,
       selectionTranslationMode: SelectionTranslationMode.ON_CLICK,
       ENABLE_SHORTCUT_FOR_TEXT_FIELDS: true,

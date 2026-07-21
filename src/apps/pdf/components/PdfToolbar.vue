@@ -163,38 +163,141 @@
         </option>
       </select>
 
-      <button
-        v-if="ocrRecommendationCount > 0 && !isOcrProcessing"
-        class="pdf-toolbar__button pdf-toolbar__button--ocr"
-        type="button"
-        @click="$emit('request-ocr')"
+      <div
+        v-if="ocrViewModel"
+        ref="ocrSplitRef"
+        class="pdf-toolbar__ocr-split"
       >
-        OCR Page
-      </button>
+        <div class="pdf-toolbar__ocr-buttons">
+          <button
+            class="pdf-toolbar__ocr-primary"
+            :class="{
+              'pdf-toolbar__ocr-primary--cancel': ocrViewModel.canCancel,
+              'pdf-toolbar__ocr-primary--highlight': ocrViewModel.currentPageContainsOcr && !ocrViewModel.canCancel
+            }"
+            :disabled="ocrViewModel.disabled"
+            type="button"
+            :aria-label="primaryAriaLabel"
+            @click="$emit('primary-click')"
+          >
+            {{ primaryLabel }}
+          </button>
+          <button
+            ref="ocrMenuTriggerRef"
+            class="pdf-toolbar__ocr-arrow"
+            type="button"
+            aria-haspopup="menu"
+            :aria-expanded="activeMenu === 'ocr'"
+            :aria-label="'More OCR options'"
+            @click="toggleOcrMenu"
+            @keydown="handleOcrArrowKeydown"
+          >
+            ▼
+          </button>
+        </div>
 
-      <button
-        class="pdf-toolbar__button pdf-toolbar__button--region-ocr"
-        type="button"
-        :class="{ 'pdf-toolbar__button--active': regionOcrState === REGION_OCR_STATE.SELECTING }"
-        :disabled="regionOcrState === REGION_OCR_STATE.PROCESSING || !regionOcrAvailable"
-        :title="regionOcrAvailable ? '' : 'Region OCR is available only in the original PDF view.'"
-        :aria-pressed="regionOcrState === REGION_OCR_STATE.SELECTING"
-        @click="$emit('request-region-ocr')"
-      >
-        <span
-          v-if="regionOcrState === REGION_OCR_STATE.PROCESSING"
-          class="pdf-toolbar__region-ocr-spinner"
-          aria-hidden="true"
-        />
-        {{ regionOcrState === REGION_OCR_STATE.SELECTING ? 'Cancel' : regionOcrState === REGION_OCR_STATE.PROCESSING ? 'Processing...' : 'OCR Region' }}
-      </button>
+        <div
+          v-if="activeMenu === 'ocr'"
+          ref="ocrMenuRef"
+          class="pdf-toolbar__ocr-menu"
+          role="menu"
+        >
+          <template v-if="ocrMenuView === 'main'">
+            <button
+              class="pdf-toolbar__ocr-menu-item"
+              :class="{
+                'pdf-toolbar__ocr-menu-item--selected': ocrViewModel.preferredAction === 'region',
+                'pdf-toolbar__ocr-menu-item--disabled': ocrViewModel.canCancel
+              }"
+              role="menuitemradio"
+              :aria-checked="ocrViewModel.preferredAction === 'region'"
+              :disabled="ocrViewModel.canCancel"
+              @click="selectAction('region')"
+            >
+              <span class="pdf-toolbar__ocr-menu-check" aria-hidden="true">✓</span>
+              OCR Region
+            </button>
+            <button
+              class="pdf-toolbar__ocr-menu-item"
+              :class="{
+                'pdf-toolbar__ocr-menu-item--selected': ocrViewModel.preferredAction === 'page',
+                'pdf-toolbar__ocr-menu-item--disabled': !ocrViewModel.pageOcrAvailable || ocrViewModel.canCancel
+              }"
+              role="menuitemradio"
+              :aria-checked="ocrViewModel.preferredAction === 'page'"
+              :disabled="!ocrViewModel.pageOcrAvailable || ocrViewModel.canCancel"
+              :title="!ocrViewModel.pageOcrAvailable && !ocrViewModel.canCancel ? 'Not available for current page' : ''"
+              @click="selectAction('page')"
+            >
+              <span class="pdf-toolbar__ocr-menu-check" aria-hidden="true">✓</span>
+              OCR Page
+            </button>
 
-      <span
-        v-if="isOcrProcessing"
-        class="pdf-toolbar__ocr-status"
-      >
-        OCR processing...
-      </span>
+            <div class="pdf-toolbar__ocr-menu-divider" role="separator" />
+
+            <button
+              class="pdf-toolbar__ocr-menu-item"
+              role="menuitem"
+              @click="ocrMenuView = 'language'"
+            >
+              Language ▶
+            </button>
+
+            <div class="pdf-toolbar__ocr-menu-divider" role="separator" />
+
+            <button
+              class="pdf-toolbar__ocr-menu-item"
+              role="menuitem"
+              @click="handleManageLanguages"
+            >
+              ⚙ Manage Languages...
+            </button>
+          </template>
+
+          <template v-if="ocrMenuView === 'language'">
+            <button
+              class="pdf-toolbar__ocr-menu-item pdf-toolbar__ocr-menu-item--back"
+              role="menuitem"
+              @click="ocrMenuView = 'main'"
+            >
+              ← Back
+            </button>
+
+            <div class="pdf-toolbar__ocr-menu-scroll">
+              <template v-if="ocrViewModel.installedLanguages.length">
+                <button
+                  v-for="lang in ocrViewModel.installedLanguages"
+                  :key="lang.code"
+                  class="pdf-toolbar__ocr-menu-item"
+                  :class="{ 'pdf-toolbar__ocr-menu-item--selected': lang.selected }"
+                  role="menuitemradio"
+                  :aria-checked="lang.selected"
+                  @click="selectLanguage(lang.code)"
+                >
+                  <span class="pdf-toolbar__ocr-menu-check" aria-hidden="true">✓</span>
+                  {{ lang.name }}
+                </button>
+              </template>
+              <div
+                v-else
+                class="pdf-toolbar__ocr-menu-empty"
+              >
+                No languages installed
+              </div>
+            </div>
+
+            <div class="pdf-toolbar__ocr-menu-divider" role="separator" />
+
+            <button
+              class="pdf-toolbar__ocr-menu-item"
+              role="menuitem"
+              @click="handleManageLanguages"
+            >
+              ⚙ Manage Languages...
+            </button>
+          </template>
+        </div>
+      </div>
 
       <ProviderSelector
         :model-value="pdfProviderValue"
@@ -370,7 +473,7 @@
 </template>
 
 <script setup>
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
 import { CONTENT_VIEW, LAYOUT_MODE } from '../composables/usePdfViewerMode.js'
 import { TranslationMode } from '@/shared/config/config.js'
 import { useSettingsStore } from '@/features/settings/stores/settings.js'
@@ -383,7 +486,6 @@ import splitScreenIcon from '@/icons/ui/split-screen.svg?url'
 import fitPageIcon from '@/icons/ui/fit-page.svg?url'
 import fitWidthIcon from '@/icons/ui/fit-width.svg?url'
 import downloadIcon from '@/icons/ui/download.svg?url'
-import { REGION_OCR_STATE } from '../constants/regionOcrState.js'
 import './PdfToolbar.scss'
 
 const TOOLTIP_OUTLINE = 'Toggle outline'
@@ -401,8 +503,7 @@ const props = defineProps({
   isTranslating: { type: Boolean, default: false },
   canTranslateVisiblePages: { type: Boolean, default: false },
   canExport: { type: Boolean, default: false },
-  ocrRecommendationCount: { type: Number, default: 0 },
-  isOcrProcessing: { type: Boolean, default: false },
+  ocrViewModel: { type: Object, default: null },
   contentView: { type: String, default: CONTENT_VIEW.ORIGINAL },
   layoutMode: { type: String, default: LAYOUT_MODE.SINGLE },
   zoomMode: { type: String, default: 'fit-width' },
@@ -412,13 +513,11 @@ const props = defineProps({
   isOutlineVisible: { type: Boolean, default: false },
   executionMode: { type: String, default: '' },
   executionModes: { type: Array, default: () => [] },
-  regionOcrState: { type: String, default: 'idle' },
-  regionOcrAvailable: { type: Boolean, default: false },
   regionComparisonState: { type: Object, default: null },
   canExportRegionComparisonArtifact: { type: Boolean, default: false },
 })
 
-const emit = defineEmits(['request-open-pdf', 'translate-visible', 'cancel-translation', 'content-view-change', 'layout-mode-change', 'toggle-outline', 'export-txt', 'export-markdown', 'export-html', 'request-ocr', 'request-region-ocr', 'request-region-comparison', 'cancel-region-comparison', 'export-region-comparison-artifact', 'clear-cache', 'zoom-step', 'zoom-change', 'execution-mode-change'])
+const emit = defineEmits(['request-open-pdf', 'translate-visible', 'cancel-translation', 'content-view-change', 'layout-mode-change', 'toggle-outline', 'export-txt', 'export-markdown', 'export-html', 'request-region-comparison', 'cancel-region-comparison', 'export-region-comparison-artifact', 'clear-cache', 'zoom-step', 'zoom-change', 'execution-mode-change', 'primary-click', 'select-action', 'select-language', 'manage-languages'])
 
 const logger = getScopedLogger(LOG_COMPONENTS.PDF, 'PdfToolbar')
 const settingsStore = useSettingsStore()
@@ -490,10 +589,72 @@ const handleTranslateRequest = () => {
   emit('translate-visible')
 }
 
+const ocrModel = computed(() => props.ocrViewModel || {})
+
+const primaryLabel = computed(() => {
+  const m = ocrModel.value
+  const lang = m.language?.compactLabel || (m.language?.code || 'EN').toUpperCase()
+  if (m.canCancel) return `Cancel · ${lang}`
+  const action = m.primaryAction === 'page' ? 'OCR Page' : 'OCR Region'
+  return `${action} · ${lang}`
+})
+
+const primaryAriaLabel = computed(() => {
+  const m = ocrModel.value
+  if (m.canCancel) return `Cancel OCR. ${m.language?.name || 'EN'}`
+  const action = m.primaryAction === 'page' ? 'OCR Page' : 'OCR Region'
+  let label = `${action}. ${m.language?.name || 'EN'}`
+  if (m.currentPageContainsOcr && !m.canCancel) label += '. Current page has OCR data.'
+  return label
+})
+
+function toggleOcrMenu() {
+  if (activeMenu.value === 'ocr') {
+    closeMenus()
+    return
+  }
+  closeMenus()
+  activeMenu.value = 'ocr'
+  ocrMenuView.value = 'main'
+}
+
+function handleOcrArrowKeydown(event) {
+  if (event.key === 'ArrowDown' && activeMenu.value !== 'ocr') {
+    event.preventDefault()
+    toggleOcrMenu()
+    nextTick(() => {
+      const items = Array.from(ocrMenuRef.value?.querySelectorAll('[role="menuitem"], [role="menuitemradio"]') || [])
+      const first = items.find(el => !el.disabled)
+      first?.focus()
+    })
+  }
+}
+
+function selectAction(action) {
+  if (ocrModel.value.canCancel) return
+  if (action === 'page' && !ocrModel.value.pageOcrAvailable) return
+  emit('select-action', action)
+  closeMenus()
+}
+
+function selectLanguage(code) {
+  emit('select-language', code)
+  closeMenus()
+}
+
+function handleManageLanguages() {
+  emit('manage-languages')
+  closeMenus()
+}
+
 const exportMenuRef = ref(null)
 const exportMenuTriggerRef = ref(null)
 const moreMenuRef = ref(null)
 const moreMenuTriggerRef = ref(null)
+const ocrSplitRef = ref(null)
+const ocrMenuRef = ref(null)
+const ocrMenuTriggerRef = ref(null)
+const ocrMenuView = ref('main')
 const activeMenu = ref(null)
 const zoomPercentOptions = [50, 75, 100, 125, 150, 200]
 
@@ -585,6 +746,13 @@ function getActiveMenuRefs() {
     }
   }
 
+  if (activeMenu.value === 'ocr') {
+    return {
+      menuRef: ocrMenuRef.value,
+      triggerRef: ocrMenuTriggerRef.value
+    }
+  }
+
   return {
     menuRef: null,
     triggerRef: null
@@ -595,6 +763,12 @@ function handleDocumentPointerDown(event) {
   if (!activeMenu.value) return
 
   const { menuRef, triggerRef } = getActiveMenuRefs()
+  if (activeMenu.value === 'ocr') {
+    const inside = ocrSplitRef.value?.contains(event.target) || menuRef?.contains(event.target)
+    if (inside) return
+    closeMenus()
+    return
+  }
   if (menuRef?.contains(event.target) || triggerRef?.contains(event.target)) return
   closeMenus()
 }
@@ -602,9 +776,37 @@ function handleDocumentPointerDown(event) {
 function handleDocumentKeyDown(event) {
   if (!activeMenu.value) return
 
+  if (activeMenu.value === 'ocr' && (event.key === 'ArrowDown' || event.key === 'ArrowUp')) {
+    event.preventDefault()
+    const items = Array.from(ocrMenuRef.value?.querySelectorAll('[role="menuitem"], [role="menuitemradio"]') || [])
+    const enabled = items.filter(el => !el.disabled)
+    if (!enabled.length) return
+    const currentIndex = enabled.indexOf(document.activeElement)
+    let nextIndex
+    if (event.key === 'ArrowDown') {
+      nextIndex = currentIndex === -1 ? 0 : (currentIndex + 1) % enabled.length
+    } else {
+      nextIndex = currentIndex === -1 ? enabled.length - 1 : (currentIndex - 1 + enabled.length) % enabled.length
+    }
+    enabled[nextIndex]?.focus()
+    return
+  }
+
   if (event.key === 'Escape') {
     event.preventDefault()
     const activeMenuName = activeMenu.value
+    if (activeMenuName === 'ocr') {
+      if (ocrMenuView.value === 'language') {
+        ocrMenuView.value = 'main'
+        nextTick(() => {
+          ocrMenuRef.value?.querySelector('.pdf-toolbar__ocr-menu-item--back')?.focus()
+        })
+        return
+      }
+      closeMenus()
+      ocrMenuTriggerRef.value?.focus?.()
+      return
+    }
     closeMenus()
     if (activeMenuName === 'export') {
       exportMenuTriggerRef.value?.focus?.()

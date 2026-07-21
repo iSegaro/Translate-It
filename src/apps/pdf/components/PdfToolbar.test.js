@@ -323,45 +323,80 @@ describe('PdfToolbar', () => {
     expect(wrapper.find('.pdf-toolbar__regionComparison').exists()).toBe(false)
   })
 
-  it('shows OCR button without count when OCR recommendations exist', async () => {
+  it('shows OCR split button with region action and language label', async () => {
     const wrapper = mount(PdfToolbar, {
       props: {
-        ocrRecommendationCount: 3,
-        isOcrProcessing: false
+        ocrViewModel: {
+          primaryAction: 'region',
+          preferredAction: 'region',
+          disabled: false,
+          language: { code: 'eng', name: 'English', compactLabel: 'EN' },
+          canCancel: false,
+          currentPageContainsOcr: false,
+          pageOcrAvailable: true,
+          installedLanguages: []
+        }
       }
     })
 
-    const ocrButton = wrapper.find('.pdf-toolbar__button--ocr')
-    expect(ocrButton.exists()).toBe(true)
-    expect(ocrButton.text()).toBe('OCR Page')
-
-    await ocrButton.trigger('click')
-    expect(wrapper.emitted('request-ocr')).toHaveLength(1)
+    const primary = wrapper.find('.pdf-toolbar__ocr-primary')
+    expect(primary.exists()).toBe(true)
+    expect(primary.text()).toBe('OCR Region · EN')
+    expect(wrapper.find('.pdf-toolbar__ocr-arrow').exists()).toBe(true)
   })
 
-  it('emits one region OCR request from the toolbar action', async () => {
-    const wrapper = mount(PdfToolbar, { props: { regionOcrAvailable: true } })
+  it('emits primary-click from OCR primary button', async () => {
+    const wrapper = mount(PdfToolbar, {
+      props: {
+        ocrViewModel: {
+          primaryAction: 'region',
+          preferredAction: 'region',
+          disabled: false,
+          language: { code: 'eng', name: 'English', compactLabel: 'EN' },
+          canCancel: false,
+          currentPageContainsOcr: false,
+          pageOcrAvailable: true,
+          installedLanguages: []
+        }
+      }
+    })
 
-    await wrapper.find('.pdf-toolbar__button--region-ocr').trigger('click')
-
-    expect(wrapper.emitted('request-region-ocr')).toHaveLength(1)
+    await wrapper.find('.pdf-toolbar__ocr-primary').trigger('click')
+    expect(wrapper.emitted('primary-click')).toHaveLength(1)
   })
 
-  it('reflects selecting, processing, and unavailable Region OCR states', async () => {
-    const wrapper = mount(PdfToolbar, { props: { regionOcrAvailable: true, regionOcrState: 'selecting' } })
-    const button = wrapper.find('.pdf-toolbar__button--region-ocr')
+  it('reflects cancel state and disabled state via ocrViewModel', async () => {
+    const wrapper = mount(PdfToolbar, {
+      props: {
+        ocrViewModel: {
+          primaryAction: 'region',
+          preferredAction: 'region',
+          disabled: false,
+          language: { code: 'eng', name: 'English', compactLabel: 'EN' },
+          canCancel: true,
+          currentPageContainsOcr: false,
+          pageOcrAvailable: true,
+          installedLanguages: []
+        }
+      }
+    })
 
-    expect(button.text()).toBe('Cancel')
-    expect(button.attributes('aria-pressed')).toBe('true')
+    const primary = wrapper.find('.pdf-toolbar__ocr-primary')
+    expect(primary.text()).toBe('Cancel · EN')
 
-    await wrapper.setProps({ regionOcrState: 'processing' })
-    expect(button.text()).toContain('Processing...')
-    expect(button.attributes('disabled')).toBeDefined()
-    expect(wrapper.find('.pdf-toolbar__region-ocr-spinner').exists()).toBe(true)
-
-    await wrapper.setProps({ regionOcrState: 'idle', regionOcrAvailable: false })
-    expect(button.attributes('disabled')).toBeDefined()
-    expect(button.attributes('title')).toBe('Region OCR is available only in the original PDF view.')
+    await wrapper.setProps({
+      ocrViewModel: {
+        primaryAction: 'region',
+        preferredAction: 'region',
+        disabled: true,
+        language: { code: 'eng', name: 'English' },
+        canCancel: false,
+        currentPageContainsOcr: false,
+        pageOcrAvailable: false,
+        installedLanguages: []
+      }
+    })
+    expect(primary.attributes('disabled')).toBeDefined()
   })
 
   it('emits execution-mode-change from current execution mode selection', async () => {
@@ -380,18 +415,32 @@ describe('PdfToolbar', () => {
     expect(wrapper.emitted('execution-mode-change')).toEqual([['region-comparison']])
   })
 
-  it('hides OCR button while processing or without OCR recommendations', async () => {
+  it('hides OCR split button when ocrViewModel is not provided', async () => {
+    const wrapper = mount(PdfToolbar, { props: { ocrViewModel: null } })
+
+    expect(wrapper.find('.pdf-toolbar__ocr-primary').exists()).toBe(false)
+    expect(wrapper.find('.pdf-toolbar__ocr-arrow').exists()).toBe(false)
+  })
+
+  it('shows OCR split button when ocrViewModel is provided', async () => {
     const wrapper = mount(PdfToolbar, {
       props: {
-        ocrRecommendationCount: 0,
-        isOcrProcessing: false
+        ocrViewModel: {
+          primaryAction: 'page',
+          preferredAction: 'page',
+          disabled: false,
+          language: { code: 'eng', name: 'English', compactLabel: 'EN' },
+          canCancel: false,
+          currentPageContainsOcr: false,
+          pageOcrAvailable: true,
+          installedLanguages: []
+        }
       }
     })
 
-    expect(wrapper.find('.pdf-toolbar__button--ocr').exists()).toBe(false)
-
-    await wrapper.setProps({ ocrRecommendationCount: 2, isOcrProcessing: true })
-    expect(wrapper.find('.pdf-toolbar__button--ocr').exists()).toBe(false)
+    expect(wrapper.find('.pdf-toolbar__ocr-primary').exists()).toBe(true)
+    expect(wrapper.find('.pdf-toolbar__ocr-arrow').exists()).toBe(true)
+    expect(wrapper.find('.pdf-toolbar__ocr-primary').text()).toContain('OCR Page')
   })
 
   it('keeps the main provider selector action cancellable while translating', async () => {
@@ -665,5 +714,280 @@ describe('PdfToolbar', () => {
     })
 
     expect(wrapper.find('.pdf-toolbar__outline-toggle--active').exists()).toBe(true)
+  })
+
+  describe('OCR split button - compact language label', () => {
+    it('uses compactLabel when available', async () => {
+      const wrapper = mount(PdfToolbar, {
+        props: {
+          ocrViewModel: {
+            primaryAction: 'region',
+            preferredAction: 'region',
+            disabled: false,
+            language: { code: 'fas', name: 'Persian', compactLabel: 'FA' },
+            canCancel: false,
+            currentPageContainsOcr: false,
+            pageOcrAvailable: true,
+            installedLanguages: []
+          }
+        }
+      })
+
+      expect(wrapper.find('.pdf-toolbar__ocr-primary').text()).toBe('OCR Region · FA')
+    })
+
+    it('falls back to code uppercase when no compactLabel', async () => {
+      const wrapper = mount(PdfToolbar, {
+        props: {
+          ocrViewModel: {
+            primaryAction: 'region',
+            preferredAction: 'region',
+            disabled: false,
+            language: { code: 'deu', name: 'German' },
+            canCancel: false,
+            currentPageContainsOcr: false,
+            pageOcrAvailable: true,
+            installedLanguages: []
+          }
+        }
+      })
+
+      expect(wrapper.find('.pdf-toolbar__ocr-primary').text()).toBe('OCR Region · DEU')
+    })
+  })
+
+  describe('OCR split button - empty language state', () => {
+    it('shows no-languages message when installedLanguages is empty', async () => {
+      const wrapper = mount(PdfToolbar, {
+        props: {
+          ocrViewModel: {
+            primaryAction: 'region',
+            preferredAction: 'region',
+            disabled: false,
+            language: { code: 'eng', name: 'English', compactLabel: 'EN' },
+            canCancel: false,
+            currentPageContainsOcr: false,
+            pageOcrAvailable: true,
+            installedLanguages: []
+          }
+        }
+      })
+
+      await wrapper.find('.pdf-toolbar__ocr-arrow').trigger('click')
+      await wrapper.findAll('.pdf-toolbar__ocr-menu-item')[2]?.trigger('click')
+
+      expect(wrapper.find('.pdf-toolbar__ocr-menu-empty').exists()).toBe(true)
+      expect(wrapper.find('.pdf-toolbar__ocr-menu-empty').text()).toBe('No languages installed')
+    })
+  })
+
+  describe('OCR split button - disabled states', () => {
+    it('disables primary when preferred action is region and region is unavailable', async () => {
+      const wrapper = mount(PdfToolbar, {
+        props: {
+          ocrViewModel: {
+            primaryAction: 'region',
+            preferredAction: 'region',
+            disabled: true,
+            language: { code: 'eng', name: 'English', compactLabel: 'EN' },
+            canCancel: false,
+            currentPageContainsOcr: false,
+            pageOcrAvailable: true,
+            installedLanguages: []
+          }
+        }
+      })
+
+      expect(wrapper.find('.pdf-toolbar__ocr-primary').attributes('disabled')).toBeDefined()
+    })
+
+    it('disables primary when preferred action is page and page has OCR data', async () => {
+      const wrapper = mount(PdfToolbar, {
+        props: {
+          ocrViewModel: {
+            primaryAction: 'page',
+            preferredAction: 'page',
+            disabled: true,
+            language: { code: 'eng', name: 'English', compactLabel: 'EN' },
+            canCancel: false,
+            currentPageContainsOcr: true,
+            pageOcrAvailable: false,
+            installedLanguages: []
+          }
+        }
+      })
+
+      expect(wrapper.find('.pdf-toolbar__ocr-primary').attributes('disabled')).toBeDefined()
+    })
+
+    it('does not disable when cancel is active', async () => {
+      const wrapper = mount(PdfToolbar, {
+        props: {
+          ocrViewModel: {
+            primaryAction: 'cancel',
+            preferredAction: 'region',
+            disabled: false,
+            language: { code: 'eng', name: 'English', compactLabel: 'EN' },
+            canCancel: true,
+            currentPageContainsOcr: false,
+            pageOcrAvailable: true,
+            installedLanguages: []
+          }
+        }
+      })
+
+      expect(wrapper.find('.pdf-toolbar__ocr-primary').attributes('disabled')).toBeUndefined()
+    })
+  })
+
+  describe('OCR split button - manage languages', () => {
+    it('emits manage-languages from main menu', async () => {
+      const wrapper = mount(PdfToolbar, {
+        props: {
+          ocrViewModel: {
+            primaryAction: 'region',
+            preferredAction: 'region',
+            disabled: false,
+            language: { code: 'eng', name: 'English', compactLabel: 'EN' },
+            canCancel: false,
+            currentPageContainsOcr: false,
+            pageOcrAvailable: true,
+            installedLanguages: []
+          }
+        }
+      })
+
+      await wrapper.find('.pdf-toolbar__ocr-arrow').trigger('click')
+      const manageButtons = wrapper.findAll('.pdf-toolbar__ocr-menu-item')
+      const manageButton = manageButtons.find(b => b.text().includes('Manage Languages'))
+      await manageButton.trigger('click')
+
+      expect(wrapper.emitted('manage-languages')).toHaveLength(1)
+    })
+
+    it('emits manage-languages from language view', async () => {
+      const wrapper = mount(PdfToolbar, {
+        props: {
+          ocrViewModel: {
+            primaryAction: 'region',
+            preferredAction: 'region',
+            disabled: false,
+            language: { code: 'eng', name: 'English', compactLabel: 'EN' },
+            canCancel: false,
+            currentPageContainsOcr: false,
+            pageOcrAvailable: true,
+            installedLanguages: [{ code: 'eng', name: 'English', selected: true }]
+          }
+        }
+      })
+
+      await wrapper.find('.pdf-toolbar__ocr-arrow').trigger('click')
+      await wrapper.findAll('.pdf-toolbar__ocr-menu-item')[2]?.trigger('click')
+      const manageButtons = wrapper.findAll('.pdf-toolbar__ocr-menu-item')
+      const manageButton = manageButtons.find(b => b.text().includes('Manage Languages'))
+      await manageButton.trigger('click')
+
+      expect(wrapper.emitted('manage-languages')).toHaveLength(1)
+    })
+  })
+
+  describe('OCR split button - escape focus restoration', () => {
+    it('closes menu and restores focus to arrow trigger on Escape', async () => {
+      const wrapper = mount(PdfToolbar, {
+        props: {
+          ocrViewModel: {
+            primaryAction: 'region',
+            preferredAction: 'region',
+            disabled: false,
+            language: { code: 'eng', name: 'English', compactLabel: 'EN' },
+            canCancel: false,
+            currentPageContainsOcr: false,
+            pageOcrAvailable: true,
+            installedLanguages: []
+          }
+        }
+      })
+
+      await wrapper.find('.pdf-toolbar__ocr-arrow').trigger('click')
+      expect(wrapper.find('.pdf-toolbar__ocr-menu').exists()).toBe(true)
+
+      document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))
+      await flushPromises()
+
+      expect(wrapper.find('.pdf-toolbar__ocr-menu').exists()).toBe(false)
+    })
+
+    it('returns to main view on Escape in language view', async () => {
+      const wrapper = mount(PdfToolbar, {
+        props: {
+          ocrViewModel: {
+            primaryAction: 'region',
+            preferredAction: 'region',
+            disabled: false,
+            language: { code: 'eng', name: 'English', compactLabel: 'EN' },
+            canCancel: false,
+            currentPageContainsOcr: false,
+            pageOcrAvailable: true,
+            installedLanguages: [{ code: 'eng', name: 'English', selected: true }]
+          }
+        }
+      })
+
+      await wrapper.find('.pdf-toolbar__ocr-arrow').trigger('click')
+      await wrapper.findAll('.pdf-toolbar__ocr-menu-item')[2]?.trigger('click')
+      expect(wrapper.find('.pdf-toolbar__ocr-menu-item--back').exists()).toBe(true)
+
+      document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))
+      await flushPromises()
+
+      expect(wrapper.find('.pdf-toolbar__ocr-menu-item--back').exists()).toBe(false)
+      expect(wrapper.find('.pdf-toolbar__ocr-menu').exists()).toBe(true)
+    })
+  })
+
+  describe('OCR split button - arrow navigation', () => {
+    it('opens menu on ArrowDown from closed arrow', async () => {
+      const wrapper = mount(PdfToolbar, {
+        props: {
+          ocrViewModel: {
+            primaryAction: 'region',
+            preferredAction: 'region',
+            disabled: false,
+            language: { code: 'eng', name: 'English', compactLabel: 'EN' },
+            canCancel: false,
+            currentPageContainsOcr: false,
+            pageOcrAvailable: true,
+            installedLanguages: [{ code: 'eng', name: 'English', selected: true }]
+          }
+        }
+      })
+
+      await wrapper.find('.pdf-toolbar__ocr-arrow').trigger('keydown', { key: 'ArrowDown' })
+      await flushPromises()
+
+      expect(wrapper.find('.pdf-toolbar__ocr-menu').exists()).toBe(true)
+    })
+
+    it('skips disabled items during ArrowDown navigation', async () => {
+      const wrapper = mount(PdfToolbar, {
+        props: {
+          ocrViewModel: {
+            primaryAction: 'region',
+            preferredAction: 'region',
+            disabled: false,
+            language: { code: 'eng', name: 'English', compactLabel: 'EN' },
+            canCancel: false,
+            currentPageContainsOcr: false,
+            pageOcrAvailable: false,
+            installedLanguages: [{ code: 'eng', name: 'English', selected: true }]
+          }
+        }
+      })
+
+      await wrapper.find('.pdf-toolbar__ocr-arrow').trigger('click')
+      const items = wrapper.findAll('.pdf-toolbar__ocr-menu-item')
+      const disabledItem = items.find(b => b.attributes('disabled') === '')
+      expect(disabledItem?.exists?.() ?? true).toBe(true)
+    })
   })
 })

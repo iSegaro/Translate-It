@@ -284,3 +284,11 @@ export function getSupportedOCRCanvasCodes() {
 export function isLanguageSupported(languageCode) {
   return languageCode in OCR_LANGUAGE_MAP || SUPPORTED_OCR_LANGUAGES.some(l => l.code === languageCode);
 }
+
+const TESSERACT_TO_COMPACT_LABEL = Object.fromEntries(
+  Object.entries(OCR_LANGUAGE_MAP).map(([iso, tesseract]) => [tesseract, iso.toUpperCase()])
+);
+
+export function getTesseractLanguageCodeLabel(tesseractCode) {
+  return TESSERACT_TO_COMPACT_LABEL[tesseractCode] || tesseractCode?.toUpperCase() || 'EN';
+}

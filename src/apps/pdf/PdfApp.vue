@@ -8,8 +8,7 @@
       :is-translating="isTranslating"
       :can-translate-visible-pages="canTranslateVisiblePages"
       :can-export="canExport"
-      :ocr-recommendation-count="ocrRecommendationCount"
-      :is-ocr-processing="isOcrProcessing"
+      :ocr-view-model="toolbarOcrModel"
       :content-view="contentView"
       :layout-mode="selectedLayoutMode"
       :zoom-mode="zoomMode"
@@ -19,8 +18,6 @@
       :is-outline-visible="isOutlineVisible"
       :execution-mode="executionMode"
       :execution-modes="supportedExecutionModes"
-      :region-ocr-state="regionOcrState"
-      :region-ocr-available="regionOcrAvailable"
       :region-comparison-state="regionComparisonState"
       :can-export-region-comparison-artifact="canExportRegionComparisonArtifact"
       @toggle-outline="toggleOutline"
@@ -33,14 +30,16 @@
       @export-txt="handleExportTxt"
       @export-markdown="handleExportMarkdown"
       @export-html="handleExportHtml"
-      @request-ocr="requestOcr"
-      @request-region-ocr="handleRequestRegionOcr"
       @request-region-comparison="handleRequestRegionComparison"
       @cancel-region-comparison="handleCancelRegionComparison"
       @export-region-comparison-artifact="handleExportRegionComparisonArtifact"
       @clear-cache="handleClearCache"
       @request-open-pdf="requestOpenPdf"
       @execution-mode-change="handleExecutionModeChange"
+      @primary-click="handleOcrPrimaryClick"
+      @select-action="handleOcrSelectAction"
+      @select-language="handleOcrSelectLanguage"
+      @manage-languages="handleOcrManageLanguages"
     />
 
     <input
@@ -215,6 +214,7 @@ import { usePdfKeyboard } from './composables/usePdfKeyboard.js'
 import { createPdfTransitionController } from './composables/createPdfTransitionController.js'
 import { createPdfStatusBannerController } from './utils/pdfStatusBanner.js'
 import { REGION_OCR_STATE } from './constants/regionOcrState.js'
+import { getTesseractLanguageCodeLabel } from '@/features/screen-capture/utils/ocrLanguageMap.js'
 import { PdfDeveloperApi } from './PdfDeveloperApi.js'
 import { RegionComparisonRunner } from './RegionComparisonRunner.js'
 import { RegionComparisonAnalyzer } from './RegionComparisonAnalyzer.js'
@@ -226,6 +226,9 @@ import { downloadFile } from '@/features/pdf-translation/core/PdfFileDownloader.
 import { PDF_REGION_OCR_RENDER_SCALE } from '@/features/pdf-translation/core/pdfRenderingConstants.js'
 import { getSourceLanguageAsync } from '@/shared/config/config.js'
 import { useSettingsStore } from '@/features/settings/stores/settings.js'
+import { useOCRStore } from '@/features/screen-capture/stores/ocrStore.js'
+import { SUPPORTED_OCR_LANGUAGES } from '@/features/screen-capture/utils/ocrLanguageMap.js'
+import { openOptionsPage } from '@/core/helpers.js'
 import { applyTheme } from '@/utils/ui/theme.js'
 import './PdfApp.scss'
 
@@ -423,6 +426,69 @@ function handleExecutionModeChange(mode) {
   executionMode.value = mode
 }
 
+const toolbarOcrModel = computed(() => {
+  const ocrStore = useOCRStore()
+  const rawAction = settingsStore.settings.OCR_PREFERRED_ACTION
+  const preferredAction = (rawAction === 'page' || rawAction === 'region') ? rawAction : 'region'
+  const langCode = settingsStore.settings.OCR_DEFAULT_LANG || 'eng'
+  const langName = SUPPORTED_OCR_LANGUAGES.find(l => l.code === langCode)?.name || langCode.toUpperCase()
+  const processing = regionOcrState.value !== REGION_OCR_STATE.IDLE || isOcrProcessing.value
+  const pageSession = session?.pageSessions?.get?.(currentPage.value)
+  const hasOcr = (pageSession?.ocrBlocks?.length ?? 0) > 0
+
+  return {
+    primaryAction: processing ? 'cancel' : preferredAction,
+    preferredAction,
+    language: { code: langCode, name: langName, compactLabel: getTesseractLanguageCodeLabel(langCode) },
+    canCancel: processing,
+    currentPageContainsOcr: hasOcr,
+    pageOcrAvailable: !hasOcr,
+    disabled: !processing && (
+      (preferredAction === 'region' && !regionOcrAvailable.value) ||
+      (preferredAction === 'page' && hasOcr)
+    ),
+    installedLanguages: SUPPORTED_OCR_LANGUAGES
+      .filter(lang => ocrStore.downloadedLanguages.includes(lang.code))
+      .map(lang => ({
+        code: lang.code,
+        name: lang.name,
+        selected: lang.code === langCode
+      }))
+  }
+})
+
+function handleOcrPrimaryClick() {
+  if (!toolbarOcrModel.value.canCancel) {
+    const action = toolbarOcrModel.value.preferredAction
+    if (action === 'region') {
+      beginRegionSelection(REGION_EXECUTION_TARGET.OCR)
+    } else {
+      requestOcr()
+    }
+    return
+  }
+
+  if (regionOcrState.value !== REGION_OCR_STATE.IDLE) {
+    cancelRegionOcr()
+    setRegionOcrIdle()
+  }
+  if (isOcrProcessing.value) {
+    cancelOcr()
+  }
+}
+
+function handleOcrSelectAction(action) {
+  settingsStore.updateSettingAndPersist('OCR_PREFERRED_ACTION', action)
+}
+
+function handleOcrSelectLanguage(langCode) {
+  settingsStore.updateSettingAndPersist('OCR_DEFAULT_LANG', langCode)
+}
+
+function handleOcrManageLanguages() {
+  openOptionsPage('ocr')
+}
+
 const pdfStatusBanner = computed(() => pdfStatusBannerController.build({
   error: error.value,
   exportError: exportError.value,
@@ -581,10 +647,6 @@ function handleRegionSelectionComplete(region) {
   regionOcrState.value = REGION_OCR_STATE.PROCESSING
   void operation.promise.then(handleRegionOcrOutcome, handleRegionOcrFailure)
   void operation.promise
-}
-
-function handleRequestRegionOcr() {
-  beginRegionSelection(REGION_EXECUTION_TARGET.OCR)
 }
 
 function handleRequestRegionComparison() {
