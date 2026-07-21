@@ -2,7 +2,10 @@
   <div class="pdf-region-comparison-notification">
     <div class="pdf-region-comparison-notification__analysis">
       <span v-if="viewModel.title">{{ viewModel.title }}</span>
-      <span v-for="item in viewModel.summary" :key="item.label">
+      <span
+        v-for="item in viewModel.summary"
+        :key="item.label"
+      >
         {{ item.label }} {{ item.value }}
       </span>
     </div>
@@ -32,7 +35,9 @@
             :class="{ 'pdf-region-comparison-notification__numeric': cell.numeric }"
           >
             <code v-if="cell.code">{{ cell.value }}</code>
-            <template v-else>{{ cell.value }}</template>
+            <template v-else>
+              {{ cell.value }}
+            </template>
           </td>
         </tr>
       </tbody>

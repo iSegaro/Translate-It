@@ -213,7 +213,10 @@
             :disabled="regionDisabled"
             @click="selectAction('region')"
           >
-            <span class="pdf-toolbar__ocr-menu-check" aria-hidden="true">✓</span>
+            <span
+              class="pdf-toolbar__ocr-menu-check"
+              aria-hidden="true"
+            >✓</span>
             OCR Region
           </button>
           <button
@@ -228,11 +231,17 @@
             title=""
             @click="selectAction('page')"
           >
-            <span class="pdf-toolbar__ocr-menu-check" aria-hidden="true">✓</span>
+            <span
+              class="pdf-toolbar__ocr-menu-check"
+              aria-hidden="true"
+            >✓</span>
             OCR Page
           </button>
 
-          <div class="pdf-toolbar__ocr-menu-divider" role="separator" />
+          <div
+            class="pdf-toolbar__ocr-menu-divider"
+            role="separator"
+          />
 
           <div class="pdf-toolbar__ocr-menu-scroll">
             <template v-if="ocrViewModel.installedLanguages.length">
@@ -245,7 +254,10 @@
                 :aria-checked="lang.selected"
                 @click="selectLanguage(lang.code)"
               >
-                <span class="pdf-toolbar__ocr-menu-check" aria-hidden="true">✓</span>
+                <span
+                  class="pdf-toolbar__ocr-menu-check"
+                  aria-hidden="true"
+                >✓</span>
                 {{ lang.name }}
               </button>
             </template>
@@ -257,7 +269,10 @@
             </div>
           </div>
 
-          <div class="pdf-toolbar__ocr-menu-divider" role="separator" />
+          <div
+            class="pdf-toolbar__ocr-menu-divider"
+            role="separator"
+          />
 
           <button
             class="pdf-toolbar__ocr-menu-item"
