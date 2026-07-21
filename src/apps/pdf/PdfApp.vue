@@ -225,6 +225,8 @@ import { createRegionComparisonNotificationViewModel } from './components/notifi
 import { downloadFile } from '@/features/pdf-translation/core/PdfFileDownloader.js'
 import { PDF_REGION_OCR_RENDER_SCALE } from '@/features/pdf-translation/core/pdfRenderingConstants.js'
 import { getSourceLanguageAsync } from '@/shared/config/config.js'
+import { getScopedLogger } from '@/shared/logging/logger.js'
+import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js'
 import { useSettingsStore } from '@/features/settings/stores/settings.js'
 import { useOCRStore } from '@/features/screen-capture/stores/ocrStore.js'
 import { SUPPORTED_OCR_LANGUAGES } from '@/features/screen-capture/utils/ocrLanguageMap.js'
@@ -303,6 +305,8 @@ const exportSuccess = ref(null)
 const exportSuccessTimer = ref(null)
 const EXPORT_SUCCESS_DURATION_MS = 2200
 const dismissedPdfStatusBannerKey = ref('')
+const logger = getScopedLogger(LOG_COMPONENTS.PDF, 'PdfApp')
+const ocrStore = useOCRStore()
 let activeRegionPosition = null
 const regionOcrState = ref(REGION_OCR_STATE.IDLE)
 const regionSelectionTarget = ref(null)
@@ -428,7 +432,6 @@ function handleExecutionModeChange(mode) {
 }
 
 const toolbarOcrModel = computed(() => {
-  const ocrStore = useOCRStore()
   const rawAction = settingsStore.settings.OCR_PREFERRED_ACTION
   const preferredAction = (rawAction === 'page' || rawAction === 'region') ? rawAction : 'region'
   const langCode = settingsStore.settings.OCR_DEFAULT_LANG || 'eng'
@@ -882,7 +885,13 @@ function showExportSuccess(formatLabel) {
   }, EXPORT_SUCCESS_DURATION_MS)
 }
 
-onMounted(() => {
+onMounted(async () => {
+  try {
+    await ocrStore.init()
+  } catch (error) {
+    logger.error('Failed to initialize OCR store.', error)
+  }
+
   if (import.meta.env.DEV) {
     import('./debug/pdfOverlayDiagnostics.js')
   }

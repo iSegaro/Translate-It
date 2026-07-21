@@ -106,7 +106,8 @@ vi.mock('@/features/settings/stores/settings.js', () => ({
 
 vi.mock('@/features/screen-capture/stores/ocrStore.js', () => ({
   useOCRStore: () => ({
-    downloadedLanguages: []
+    downloadedLanguages: [],
+    init: vi.fn().mockResolvedValue()
   })
 }))
 

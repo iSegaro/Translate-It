@@ -10,6 +10,7 @@ export const useOCRStore = defineStore('ocr', {
   state: () => ({
     downloadedLanguages: [],
     downloadingProgress: {}, // { [langCode]: progress }
+    initialized: false,
     // Settings
     defaultOCRLang: 'eng',
   }),
@@ -32,7 +33,9 @@ export const useOCRStore = defineStore('ocr', {
 
   actions: {
     async init() {
+      if (this.initialized) return
       await this.refreshDownloadedLanguages();
+      this.initialized = true;
     },
 
     async refreshDownloadedLanguages() {
