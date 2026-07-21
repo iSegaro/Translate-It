@@ -1,7 +1,7 @@
 import { onBeforeUnmount, reactive, ref } from 'vue'
 import { getScopedLogger } from '@/shared/logging/logger.js'
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js'
-import { getSourceLanguageAsync } from '@/shared/config/config.js'
+import { useSettingsStore } from '@/features/settings/stores/settings.js'
 import { pdfDocumentSession } from '@/features/pdf-translation/core/PdfDocumentSession.js'
 import { PdfOcrRecommendationEngine } from '@/features/pdf-translation/core/PdfOcrRecommendationEngine.js'
 import { PdfOcrProcessor } from '@/features/pdf-translation/core/PdfOcrProcessor.js'
@@ -12,6 +12,7 @@ const logger = getScopedLogger(LOG_COMPONENTS.PDF, 'usePdfOcr')
 export function usePdfOcr({ onOcrComplete } = {}) {
   const recommendationEngine = new PdfOcrRecommendationEngine()
   const processor = new PdfOcrProcessor(pdfDocumentSession)
+  const settingsStore = useSettingsStore()
 
   const ocrRecommendationCount = ref(0)
   const ocrRecommendations = ref([])
@@ -44,8 +45,7 @@ export function usePdfOcr({ onOcrComplete } = {}) {
     ocrError.value = ''
 
     try {
-      const sourceLang = await getSourceLanguageAsync()
-      ocrLanguage.value = sourceLang || 'eng'
+      ocrLanguage.value = settingsStore.settings.OCR_DEFAULT_LANG || 'eng'
 
       const pageNumbers = [...ocrBatch.pageNumbers]
 

@@ -144,11 +144,6 @@ vi.mock('@/features/pdf-translation/core/PdfFileDownloader.js', () => ({
   downloadFile: downloadFileMock
 }))
 
-vi.mock('@/shared/config/config.js', () => ({
-  CONFIG: { DEBUG_MODE: false },
-  getSourceLanguageAsync: vi.fn().mockResolvedValue('auto')
-}))
-
 vi.mock('./components/PdfToolbar.vue', () => ({
   default: {
     name: 'PdfToolbar',

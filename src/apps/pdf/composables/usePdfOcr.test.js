@@ -54,8 +54,12 @@ vi.mock('@/features/pdf-translation/core/PdfOcrProcessor.js', () => ({
   }
 }))
 
-vi.mock('@/shared/config/config.js', () => ({
-  getSourceLanguageAsync: vi.fn(async () => 'eng')
+vi.mock('@/features/settings/stores/settings.js', () => ({
+  useSettingsStore: () => ({
+    settings: {
+      OCR_DEFAULT_LANG: 'eng'
+    }
+  })
 }))
 
 vi.mock('@/features/pdf-translation/core/PdfCacheManager.js', () => ({

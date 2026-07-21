@@ -224,7 +224,6 @@ import { PDF_NOTIFICATION_BODY_TYPE } from './notifications/PdfNotificationBodyT
 import { createRegionComparisonNotificationViewModel } from './components/notifications/RegionComparisonNotificationMapper.js'
 import { downloadFile } from '@/features/pdf-translation/core/PdfFileDownloader.js'
 import { PDF_REGION_OCR_RENDER_SCALE } from '@/features/pdf-translation/core/pdfRenderingConstants.js'
-import { getSourceLanguageAsync } from '@/shared/config/config.js'
 import { getScopedLogger } from '@/shared/logging/logger.js'
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js'
 import { useSettingsStore } from '@/features/settings/stores/settings.js'
@@ -357,7 +356,7 @@ const regionExecutionDispatcher = createRegionExecutionDispatcher({
       region: request.region,
       pdfDocument: session.pdfDocument,
       scale: PDF_REGION_OCR_RENDER_SCALE,
-      language: getSourceLanguageAsync().catch(() => undefined)
+      language: settingsStore.settings.OCR_DEFAULT_LANG || 'eng'
     }),
     [REGION_EXECUTION_TARGET.REGION_COMPARISON]: (request) => regionComparisonRunner.execute(request)
   }
