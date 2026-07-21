@@ -782,7 +782,6 @@ describe('PdfToolbar', () => {
       })
 
       await wrapper.find('.pdf-toolbar__ocr-arrow').trigger('click')
-      await wrapper.findAll('.pdf-toolbar__ocr-menu-item')[2]?.trigger('click')
 
       expect(wrapper.find('.pdf-toolbar__ocr-menu-empty').exists()).toBe(true)
       expect(wrapper.find('.pdf-toolbar__ocr-menu-empty').text()).toBe('No languages installed')
@@ -981,7 +980,7 @@ describe('PdfToolbar', () => {
       expect(wrapper.emitted('manage-languages')).toHaveLength(1)
     })
 
-    it('emits manage-languages from language view', async () => {
+    it('emits select-language when language is clicked', async () => {
       const wrapper = mount(PdfToolbar, {
         props: {
           ocrViewModel: {
@@ -999,12 +998,39 @@ describe('PdfToolbar', () => {
       })
 
       await wrapper.find('.pdf-toolbar__ocr-arrow').trigger('click')
-      await wrapper.findAll('.pdf-toolbar__ocr-menu-item')[2]?.trigger('click')
-      const manageButtons = wrapper.findAll('.pdf-toolbar__ocr-menu-item')
-      const manageButton = manageButtons.find(b => b.text().includes('Manage Languages'))
-      await manageButton.trigger('click')
+      const langButton = wrapper.findAll('.pdf-toolbar__ocr-menu-item').find(b => b.text().includes('English'))
+      await langButton.trigger('click')
 
-      expect(wrapper.emitted('manage-languages')).toHaveLength(1)
+      expect(wrapper.emitted('select-language')).toEqual([['eng']])
+    })
+
+    it('shows language list with checkmark on selected language', async () => {
+      const wrapper = mount(PdfToolbar, {
+        props: {
+          ocrViewModel: {
+            primaryAction: 'region',
+            preferredAction: 'region',
+              language: { code: 'fas', name: 'Persian', compactLabel: 'FA' },
+            canCancel: false,
+            currentPageContainsOcr: false,
+            hasDocument: true,
+          regionOcrAvailable: true,
+          isPageOcrRecommended: true,
+            installedLanguages: [
+              { code: 'eng', name: 'English', selected: false },
+              { code: 'fas', name: 'Persian', selected: true }
+            ]
+          }
+        }
+      })
+
+      await wrapper.find('.pdf-toolbar__ocr-arrow').trigger('click')
+      const engButton = wrapper.findAll('.pdf-toolbar__ocr-menu-item').find(b => b.text().includes('English'))
+      const fasButton = wrapper.findAll('.pdf-toolbar__ocr-menu-item').find(b => b.text().includes('Persian'))
+
+      expect(engButton?.attributes('aria-checked')).toBe('false')
+      expect(fasButton?.attributes('aria-checked')).toBe('true')
+      expect(fasButton?.classes()).toContain('pdf-toolbar__ocr-menu-item--selected')
     })
   })
 
@@ -1035,33 +1061,6 @@ describe('PdfToolbar', () => {
       expect(wrapper.find('.pdf-toolbar__ocr-menu').exists()).toBe(false)
     })
 
-    it('returns to main view on Escape in language view', async () => {
-      const wrapper = mount(PdfToolbar, {
-        props: {
-          ocrViewModel: {
-            primaryAction: 'region',
-            preferredAction: 'region',
-              language: { code: 'eng', name: 'English', compactLabel: 'EN' },
-            canCancel: false,
-            currentPageContainsOcr: false,
-            hasDocument: true,
-          regionOcrAvailable: true,
-          isPageOcrRecommended: true,
-            installedLanguages: [{ code: 'eng', name: 'English', selected: true }]
-          }
-        }
-      })
-
-      await wrapper.find('.pdf-toolbar__ocr-arrow').trigger('click')
-      await wrapper.findAll('.pdf-toolbar__ocr-menu-item')[2]?.trigger('click')
-      expect(wrapper.find('.pdf-toolbar__ocr-menu-item--back').exists()).toBe(true)
-
-      document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))
-      await flushPromises()
-
-      expect(wrapper.find('.pdf-toolbar__ocr-menu-item--back').exists()).toBe(false)
-      expect(wrapper.find('.pdf-toolbar__ocr-menu').exists()).toBe(true)
-    })
   })
 
   describe('OCR split button - arrow navigation', () => {

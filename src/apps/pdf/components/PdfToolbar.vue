@@ -202,100 +202,70 @@
           class="pdf-toolbar__ocr-menu"
           role="menu"
         >
-          <template v-if="ocrMenuView === 'main'">
-            <button
-              class="pdf-toolbar__ocr-menu-item"
-              :class="{
-                'pdf-toolbar__ocr-menu-item--selected': ocrViewModel.preferredAction === 'region',
-                'pdf-toolbar__ocr-menu-item--disabled': regionDisabled
-              }"
-              role="menuitemradio"
-              :aria-checked="ocrViewModel.preferredAction === 'region'"
-              :disabled="regionDisabled"
-              @click="selectAction('region')"
-            >
-              <span class="pdf-toolbar__ocr-menu-check" aria-hidden="true">✓</span>
-              OCR Region
-            </button>
-            <button
-              class="pdf-toolbar__ocr-menu-item"
-              :class="{
-                'pdf-toolbar__ocr-menu-item--selected': ocrViewModel.preferredAction === 'page',
-                'pdf-toolbar__ocr-menu-item--disabled': pageDisabled
-              }"
-              role="menuitemradio"
-              :aria-checked="ocrViewModel.preferredAction === 'page'"
-              :disabled="pageDisabled"
-              title=""
-              @click="selectAction('page')"
-            >
-              <span class="pdf-toolbar__ocr-menu-check" aria-hidden="true">✓</span>
-              OCR Page
-            </button>
+          <button
+            class="pdf-toolbar__ocr-menu-item"
+            :class="{
+              'pdf-toolbar__ocr-menu-item--selected': ocrViewModel.preferredAction === 'region',
+              'pdf-toolbar__ocr-menu-item--disabled': regionDisabled
+            }"
+            role="menuitemradio"
+            :aria-checked="ocrViewModel.preferredAction === 'region'"
+            :disabled="regionDisabled"
+            @click="selectAction('region')"
+          >
+            <span class="pdf-toolbar__ocr-menu-check" aria-hidden="true">✓</span>
+            OCR Region
+          </button>
+          <button
+            class="pdf-toolbar__ocr-menu-item"
+            :class="{
+              'pdf-toolbar__ocr-menu-item--selected': ocrViewModel.preferredAction === 'page',
+              'pdf-toolbar__ocr-menu-item--disabled': pageDisabled
+            }"
+            role="menuitemradio"
+            :aria-checked="ocrViewModel.preferredAction === 'page'"
+            :disabled="pageDisabled"
+            title=""
+            @click="selectAction('page')"
+          >
+            <span class="pdf-toolbar__ocr-menu-check" aria-hidden="true">✓</span>
+            OCR Page
+          </button>
 
-            <div class="pdf-toolbar__ocr-menu-divider" role="separator" />
+          <div class="pdf-toolbar__ocr-menu-divider" role="separator" />
 
-            <button
-              class="pdf-toolbar__ocr-menu-item"
-              role="menuitem"
-              @click="ocrMenuView = 'language'"
-            >
-              Language ▶
-            </button>
-
-            <div class="pdf-toolbar__ocr-menu-divider" role="separator" />
-
-            <button
-              class="pdf-toolbar__ocr-menu-item"
-              role="menuitem"
-              @click="handleManageLanguages"
-            >
-              ⚙ Manage Languages...
-            </button>
-          </template>
-
-          <template v-if="ocrMenuView === 'language'">
-            <button
-              class="pdf-toolbar__ocr-menu-item pdf-toolbar__ocr-menu-item--back"
-              role="menuitem"
-              @click="ocrMenuView = 'main'"
-            >
-              ← Back
-            </button>
-
-            <div class="pdf-toolbar__ocr-menu-scroll">
-              <template v-if="ocrViewModel.installedLanguages.length">
-                <button
-                  v-for="lang in ocrViewModel.installedLanguages"
-                  :key="lang.code"
-                  class="pdf-toolbar__ocr-menu-item"
-                  :class="{ 'pdf-toolbar__ocr-menu-item--selected': lang.selected }"
-                  role="menuitemradio"
-                  :aria-checked="lang.selected"
-                  @click="selectLanguage(lang.code)"
-                >
-                  <span class="pdf-toolbar__ocr-menu-check" aria-hidden="true">✓</span>
-                  {{ lang.name }}
-                </button>
-              </template>
-              <div
-                v-else
-                class="pdf-toolbar__ocr-menu-empty"
+          <div class="pdf-toolbar__ocr-menu-scroll">
+            <template v-if="ocrViewModel.installedLanguages.length">
+              <button
+                v-for="lang in ocrViewModel.installedLanguages"
+                :key="lang.code"
+                class="pdf-toolbar__ocr-menu-item"
+                :class="{ 'pdf-toolbar__ocr-menu-item--selected': lang.selected }"
+                role="menuitemradio"
+                :aria-checked="lang.selected"
+                @click="selectLanguage(lang.code)"
               >
-                No languages installed
-              </div>
-            </div>
-
-            <div class="pdf-toolbar__ocr-menu-divider" role="separator" />
-
-            <button
-              class="pdf-toolbar__ocr-menu-item"
-              role="menuitem"
-              @click="handleManageLanguages"
+                <span class="pdf-toolbar__ocr-menu-check" aria-hidden="true">✓</span>
+                {{ lang.name }}
+              </button>
+            </template>
+            <div
+              v-else
+              class="pdf-toolbar__ocr-menu-empty"
             >
-              ⚙ Manage Languages...
-            </button>
-          </template>
+              No languages installed
+            </div>
+          </div>
+
+          <div class="pdf-toolbar__ocr-menu-divider" role="separator" />
+
+          <button
+            class="pdf-toolbar__ocr-menu-item"
+            role="menuitem"
+            @click="handleManageLanguages"
+          >
+            ⚙ Manage Languages...
+          </button>
         </div>
       </div>
 
@@ -625,7 +595,6 @@ function toggleOcrMenu() {
   }
   closeMenus()
   activeMenu.value = 'ocr'
-  ocrMenuView.value = 'main'
 }
 
 function handleOcrArrowKeydown(event) {
@@ -665,7 +634,6 @@ const moreMenuTriggerRef = ref(null)
 const ocrSplitRef = ref(null)
 const ocrMenuRef = ref(null)
 const ocrMenuTriggerRef = ref(null)
-const ocrMenuView = ref('main')
 const activeMenu = ref(null)
 const zoomPercentOptions = [50, 75, 100, 125, 150, 200]
 
@@ -807,13 +775,6 @@ function handleDocumentKeyDown(event) {
     event.preventDefault()
     const activeMenuName = activeMenu.value
     if (activeMenuName === 'ocr') {
-      if (ocrMenuView.value === 'language') {
-        ocrMenuView.value = 'main'
-        nextTick(() => {
-          ocrMenuRef.value?.querySelector('.pdf-toolbar__ocr-menu-item--back')?.focus()
-        })
-        return
-      }
       closeMenus()
       ocrMenuTriggerRef.value?.focus?.()
       return
