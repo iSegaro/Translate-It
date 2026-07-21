@@ -221,12 +221,12 @@
               class="pdf-toolbar__ocr-menu-item"
               :class="{
                 'pdf-toolbar__ocr-menu-item--selected': ocrViewModel.preferredAction === 'page',
-                'pdf-toolbar__ocr-menu-item--disabled': !ocrViewModel.canRunPageOcr || ocrViewModel.canCancel
+                'pdf-toolbar__ocr-menu-item--disabled': ocrViewModel.canCancel
               }"
               role="menuitemradio"
               :aria-checked="ocrViewModel.preferredAction === 'page'"
-              :disabled="!ocrViewModel.canRunPageOcr || ocrViewModel.canCancel"
-              :title="!ocrViewModel.canRunPageOcr && !ocrViewModel.canCancel ? 'Not available for current page' : ''"
+              :disabled="ocrViewModel.canCancel"
+              title=""
               @click="selectAction('page')"
             >
               <span class="pdf-toolbar__ocr-menu-check" aria-hidden="true">✓</span>
@@ -632,7 +632,6 @@ function handleOcrArrowKeydown(event) {
 
 function selectAction(action) {
   if (ocrModel.value.canCancel) return
-  if (action === 'page' && !ocrModel.value.canRunPageOcr) return
   emit('select-action', action)
   closeMenus()
 }

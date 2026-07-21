@@ -395,7 +395,7 @@ describe('PdfToolbar', () => {
         language: { code: 'eng', name: 'English' },
         canCancel: false,
         currentPageContainsOcr: false,
-            canRunPageOcr: false,
+            canRunPageOcr: true,
             isPageOcrRecommended: false,
         installedLanguages: []
       }
@@ -810,7 +810,7 @@ describe('PdfToolbar', () => {
       expect(wrapper.find('.pdf-toolbar__ocr-primary').attributes('disabled')).toBeDefined()
     })
 
-    it('disables primary when preferred action is page and page has OCR data', async () => {
+    it('disables primary when disabled prop is true', async () => {
       const wrapper = mount(PdfToolbar, {
         props: {
           ocrViewModel: {
@@ -820,7 +820,7 @@ describe('PdfToolbar', () => {
             language: { code: 'eng', name: 'English', compactLabel: 'EN' },
             canCancel: false,
             currentPageContainsOcr: true,
-            canRunPageOcr: false,
+            canRunPageOcr: true,
           isPageOcrRecommended: false,
             installedLanguages: []
           }
@@ -992,9 +992,9 @@ describe('PdfToolbar', () => {
             preferredAction: 'region',
             disabled: false,
             language: { code: 'eng', name: 'English', compactLabel: 'EN' },
-            canCancel: false,
+            canCancel: true,
             currentPageContainsOcr: false,
-            canRunPageOcr: false,
+            canRunPageOcr: true,
           isPageOcrRecommended: false,
             installedLanguages: [{ code: 'eng', name: 'English', selected: true }]
           }

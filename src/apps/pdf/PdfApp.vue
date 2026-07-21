@@ -436,8 +436,7 @@ const toolbarOcrModel = computed(() => {
   const processing = regionOcrState.value !== REGION_OCR_STATE.IDLE || isOcrProcessing.value
   const pageSession = session?.pageSessions?.get?.(currentPage.value)
   const hasOcr = (pageSession?.ocrBlocks?.length ?? 0) > 0
-  const canRunPageOcr = !hasOcr
-  const shouldRecommendPageOcr = canRunPageOcr && ocrRecommendations.value.includes(currentPage.value)
+  const shouldRecommendPageOcr = ocrRecommendations.value.includes(currentPage.value)
 
   return {
     primaryAction: processing ? 'cancel' : preferredAction,
@@ -445,12 +444,9 @@ const toolbarOcrModel = computed(() => {
     language: { code: langCode, name: langName, compactLabel: getTesseractLanguageCodeLabel(langCode) },
     canCancel: processing,
     currentPageContainsOcr: hasOcr,
-    canRunPageOcr,
+    canRunPageOcr: true,
     isPageOcrRecommended: shouldRecommendPageOcr,
-    disabled: !processing && (
-      (preferredAction === 'region' && !regionOcrAvailable.value) ||
-      (preferredAction === 'page' && hasOcr)
-    ),
+    disabled: !processing && preferredAction === 'region' && !regionOcrAvailable.value,
     installedLanguages: SUPPORTED_OCR_LANGUAGES
       .filter(lang => ocrStore.downloadedLanguages.includes(lang.code))
       .map(lang => ({
