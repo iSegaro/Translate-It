@@ -34,8 +34,8 @@ export function usePdfOcr({ onOcrComplete } = {}) {
   const ocrLanguage = ref('eng')
 
   function refreshOcrRecommendations() {
-    const visiblePageSessions = pdfDocumentSession.getLoadedVisiblePageSessions()
-    const recommendations = recommendationEngine.getRecommendations(visiblePageSessions)
+    const candidates = pdfDocumentSession.getLoadedVisibleOcrCandidates()
+    const recommendations = recommendationEngine.getRecommendations(candidates)
 
     ocrRecommendationCount.value = recommendations.length
     ocrRecommendations.value = recommendations
@@ -97,13 +97,13 @@ export function usePdfOcr({ onOcrComplete } = {}) {
     if (!documentIdentity) return
 
     for (const pageNumber of pageNumbers) {
-      const pageSession = pdfDocumentSession.pageSessions.get(pageNumber)
-      if (pageSession && pageSession.ocrBlocks.length > 0) {
+      const ocrState = pdfDocumentSession.getCommittedOcrState(pageNumber)
+      if (ocrState?.ocrBlocks.length > 0) {
         await pdfCacheManager.saveOcr(documentIdentity, pageNumber, {
           pageNumber,
-          ocrLanguage: pageSession.ocrLanguage || ocrLanguage.value,
-          ocrBlocks: pageSession.ocrBlocks,
-          ocrCompletedAt: pageSession.ocrCompletedAt || Date.now()
+          ocrLanguage: ocrState.ocrLanguage || ocrLanguage.value,
+          ocrBlocks: ocrState.ocrBlocks,
+          ocrCompletedAt: ocrState.ocrCompletedAt || Date.now()
         })
       }
     }

@@ -5,14 +5,14 @@ export class PdfOcrRecommendationEngine {
     this._detector = new PdfOcrDetector()
   }
 
-  getRecommendations(pageSessions = []) {
+  getRecommendations(candidates = []) {
     const recommendations = []
 
-    for (const pageSession of pageSessions) {
-      if (!pageSession) continue
-      if (!this._detector.isScannedCandidate(pageSession)) continue
-      if (pageSession?.ocrBlocks?.length > 0) continue
-      recommendations.push(pageSession.pageNumber)
+    for (const candidate of candidates) {
+      if (!candidate) continue
+      if (!this._detector.isScannedCandidate(candidate)) continue
+      if (candidate.hasOcrBlocks) continue
+      recommendations.push(candidate.pageNumber)
     }
 
     recommendations.sort((a, b) => a - b)

@@ -27,16 +27,34 @@ const mockPdfDocumentSession = {
       }
     })
   }),
-  getLoadedVisiblePageSessions: vi.fn(() => {
-    const pageSessions = []
+  getLoadedVisibleOcrCandidates: vi.fn(() => {
+    const candidates = []
 
     for (const pageNumber of mockPdfDocumentSession.visiblePageNumbers) {
       const pageSession = mockPdfDocumentSession.pageSessions.get(pageNumber)
       if (!pageSession?.loaded) continue
-      pageSessions.push(pageSession)
+      const textItems = pageSession.textContent?.items || []
+      candidates.push({
+        pageNumber,
+        logicalBlockCount: pageSession.logicalBlocks.length,
+        textItemCount: textItems.length,
+        textCharCount: textItems.reduce((count, item) => count + (item?.str || '').replace(/\s/g, '').length, 0),
+        hasOcrBlocks: pageSession.ocrBlocks.length > 0,
+        ocrLanguage: pageSession.ocrLanguage || null
+      })
     }
 
-    return pageSessions
+    return candidates
+  }),
+  getCommittedOcrState: vi.fn((pageNumber) => {
+    const pageSession = mockPdfDocumentSession.pageSessions.get(pageNumber)
+    if (!pageSession?.loaded) return null
+    return {
+      ocrBlocks: pageSession.ocrBlocks,
+      ocrLanguage: pageSession.ocrLanguage,
+      ocrCompletedAt: pageSession.ocrCompletedAt,
+      ocrError: pageSession.ocrError
+    }
   })
 }
 
@@ -119,7 +137,8 @@ describe('usePdfOcr', () => {
     mockPdfDocumentSession.getPageSession.mockClear()
     mockPdfDocumentSession.onPageSessionCommitted.mockClear()
     mockPdfDocumentSession.onVisiblePagesChanged.mockClear()
-    mockPdfDocumentSession.getLoadedVisiblePageSessions.mockClear()
+    mockPdfDocumentSession.getLoadedVisibleOcrCandidates.mockClear()
+    mockPdfDocumentSession.getCommittedOcrState.mockClear()
   })
 
   it('refreshes OCR recommendations when a PageSession commit notification arrives', () => {

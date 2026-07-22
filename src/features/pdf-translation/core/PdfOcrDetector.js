@@ -1,18 +1,6 @@
 const OCR_MIN_TEXT_ITEMS = 5
 const OCR_MIN_TEXT_CHARS = 20
 
-function countTextChars(textContent) {
-  if (!textContent?.items) return 0
-
-  let count = 0
-  for (const item of textContent.items) {
-    const str = item?.str || ''
-    count += str.replace(/\s/g, '').length
-  }
-
-  return count
-}
-
 export class PdfOcrDetector {
   constructor(session, options = {}) {
     this.session = session
@@ -20,15 +8,11 @@ export class PdfOcrDetector {
     this.minTextChars = options.minTextChars ?? OCR_MIN_TEXT_CHARS
   }
 
-  isScannedCandidate(pageSession) {
-    if (!pageSession?.loaded) return false
-    if (pageSession.logicalBlocks.length > 0) return false
-
-    const itemCount = pageSession.textContent?.items?.length ?? 0
-    if (itemCount > this.minTextItems) return false
-
-    const charCount = countTextChars(pageSession.textContent)
-    if (charCount > this.minTextChars) return false
+  isScannedCandidate(candidate) {
+    if (!candidate) return false
+    if (candidate.logicalBlockCount > 0) return false
+    if (candidate.textItemCount > this.minTextItems) return false
+    if (candidate.textCharCount > this.minTextChars) return false
 
     return true
   }
@@ -36,16 +20,13 @@ export class PdfOcrDetector {
   detectScannedPages() {
     const results = []
 
-    for (const [pageNumber, pageSession] of this.session.pageSessions) {
-      if (!this.session.visiblePageNumbers.has(pageNumber)) continue
-
-      if (this.isScannedCandidate(pageSession)) {
-        const alreadyOcrd = pageSession.ocrBlocks.length > 0
+    for (const candidate of this.session?.getLoadedVisibleOcrCandidates?.() || []) {
+      if (this.isScannedCandidate(candidate)) {
         results.push({
-          pageNumber,
+          pageNumber: candidate.pageNumber,
           isScannedCandidate: true,
-          alreadyOcrd,
-          ocrLanguage: pageSession.ocrLanguage || null
+          alreadyOcrd: candidate.hasOcrBlocks,
+          ocrLanguage: candidate.ocrLanguage
         })
       }
     }

@@ -303,7 +303,8 @@ function createMocks({
   sessionAsRef = true
 } = {}) {
   const sessionMock = {
-    getPageViewport: vi.fn(() => mockPdfViewport)
+    getPageViewport: vi.fn(() => mockPdfViewport),
+    getCommittedOcrState: vi.fn(() => null)
   }
   mockPdfSession = sessionMock
 
@@ -1963,7 +1964,7 @@ describe('PdfApp', () => {
       wrapper.findComponent({ name: 'PdfViewer' }).vm.$emit('current-page-change', 0)
       await flushPromises()
 
-      mockViewerController.session.pageSessions = new Map([[0, { ocrBlocks: [{ text: 'hello' }], ocrLanguage: 'eng' }]])
+      mockViewerController.session.getCommittedOcrState.mockReturnValue({ ocrBlocks: [{ text: 'hello' }], ocrLanguage: 'eng' })
       mockPdfOcr.isOcrProcessing.value = true
       mockPdfOcrOptions.onOcrComplete({ pageNumbers: [1] })
       mockPdfOcr.isOcrProcessing.value = false

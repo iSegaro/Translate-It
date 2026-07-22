@@ -19,11 +19,11 @@ export class PdfOcrProcessor {
     }
 
     const tesseractLang = toTesseractLanguageCode(language)
-    const pageSession = this.session.pageSessions.get(pageNumber)
+    const ocrState = this.session.getCommittedOcrState(pageNumber)
 
-    if (pageSession?.hasOcrForLanguage(tesseractLang)) {
+    if (ocrState?.ocrBlocks.length > 0 && ocrState.ocrLanguage === tesseractLang) {
       logger.info('Page already OCR processed for language:', { pageNumber, language: tesseractLang })
-      return pageSession.ocrBlocks
+      return ocrState.ocrBlocks
     }
 
     const page = await this.session.pdfDocument.getPage(pageNumber)
@@ -73,9 +73,7 @@ export class PdfOcrProcessor {
     } catch (error) {
       logger.error('OCR failed for page:', { pageNumber, error })
 
-      if (pageSession) {
-        pageSession.ocrError = error?.message || 'OCR failed'
-      }
+      this.session.recordPageOcrError(pageNumber, error)
 
       throw error
     } finally {

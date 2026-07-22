@@ -438,8 +438,8 @@ const toolbarOcrModel = computed(() => {
   const langCode = settingsStore.settings.OCR_DEFAULT_LANG || 'eng'
   const langName = SUPPORTED_OCR_LANGUAGES.find(l => l.code === langCode)?.name || langCode.toUpperCase()
   const processing = regionOcrState.value !== REGION_OCR_STATE.IDLE || isOcrProcessing.value
-  const pageSession = session?.pageSessions?.get?.(currentPage.value)
-  const hasOcr = (pageSession?.ocrBlocks?.length ?? 0) > 0
+  const ocrState = session?.getCommittedOcrState?.(currentPage.value)
+  const hasOcr = (ocrState?.ocrBlocks?.length ?? 0) > 0
   const shouldRecommendPageOcr = ocrRecommendations.value.includes(currentPage.value)
 
   return {

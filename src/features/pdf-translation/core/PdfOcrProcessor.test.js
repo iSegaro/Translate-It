@@ -14,8 +14,9 @@ const { recognizeStructured } = await import('@/features/screen-capture/services
 function createSession() {
   return {
     documentIdentity: 'doc-1',
-    pageSessions: new Map(),
     setPageOcrBlocks: vi.fn(),
+    getCommittedOcrState: vi.fn(() => null),
+    recordPageOcrError: vi.fn(() => false),
     pdfDocument: {
       getPage: vi.fn(async () => ({
         cleanup: vi.fn(),
@@ -48,6 +49,17 @@ function expectRealBlocks(blocks, expectedTexts) {
 }
 
 describe('PdfOcrProcessor', () => {
+  it('reuses committed OCR blocks for the requested language', async () => {
+    const session = createSession()
+    const blocks = [{ id: 'ocr-1' }]
+    session.getCommittedOcrState.mockReturnValue({ ocrBlocks: blocks, ocrLanguage: 'eng' })
+
+    const result = await new PdfOcrProcessor(session).processPage(1, { language: 'eng' })
+
+    expect(result).toBe(blocks)
+    expect(session.pdfDocument.getPage).not.toHaveBeenCalled()
+  })
+
   it('awaits structured-line OCR logical block creation before storing blocks', async () => {
     mockCanvas()
     recognizeStructured.mockResolvedValue({
@@ -81,5 +93,15 @@ describe('PdfOcrProcessor', () => {
 
     expectRealBlocks(blocks, ['One', 'Two'])
     expect(session.setPageOcrBlocks).toHaveBeenCalledWith(1, blocks, 'eng')
+  })
+
+  it('records OCR errors through the session facade', async () => {
+    mockCanvas()
+    recognizeStructured.mockRejectedValue(new Error('OCR failed'))
+    const session = createSession()
+
+    await expect(new PdfOcrProcessor(session).processPage(1)).rejects.toThrow('OCR failed')
+
+    expect(session.recordPageOcrError).toHaveBeenCalledWith(1, expect.any(Error))
   })
 })

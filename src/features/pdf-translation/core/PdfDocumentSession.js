@@ -520,6 +520,58 @@ export class PdfDocumentSession extends ResourceTracker {
     return pageSession?.loaded ? pageSession.textContent ?? null : null
   }
 
+  getCommittedOcrState(pageNumber) {
+    const normalizedPageNumber = Number(pageNumber)
+    if (!Number.isInteger(normalizedPageNumber) || normalizedPageNumber <= 0) return null
+
+    const pageSession = this.pageSessions.get(normalizedPageNumber)
+    if (!pageSession?.loaded) return null
+
+    return {
+      ocrBlocks: pageSession.ocrBlocks,
+      ocrLanguage: pageSession.ocrLanguage,
+      ocrCompletedAt: pageSession.ocrCompletedAt,
+      ocrError: pageSession.ocrError
+    }
+  }
+
+  getLoadedVisibleOcrCandidates() {
+    const candidates = []
+
+    for (const pageNumber of [...this.visiblePageNumbers].sort((a, b) => a - b)) {
+      const pageSession = this.pageSessions.get(pageNumber)
+      if (!pageSession?.loaded) continue
+
+      const textItems = pageSession.textContent?.items || []
+      let textCharCount = 0
+      for (const item of textItems) {
+        textCharCount += (item?.str || '').replace(/\s/g, '').length
+      }
+
+      candidates.push({
+        pageNumber,
+        logicalBlockCount: pageSession.logicalBlocks.length,
+        textItemCount: textItems.length,
+        textCharCount,
+        hasOcrBlocks: pageSession.ocrBlocks.length > 0,
+        ocrLanguage: pageSession.ocrLanguage || null
+      })
+    }
+
+    return candidates
+  }
+
+  recordPageOcrError(pageNumber, error) {
+    const normalizedPageNumber = Number(pageNumber)
+    if (!Number.isInteger(normalizedPageNumber) || normalizedPageNumber <= 0) return false
+
+    const pageSession = this.pageSessions.get(normalizedPageNumber)
+    if (!pageSession?.loaded) return false
+
+    pageSession.ocrError = error?.message || 'OCR failed'
+    return true
+  }
+
   getLoadedVisiblePageSessions() {
     const pageSessions = []
 

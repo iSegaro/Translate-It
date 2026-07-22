@@ -3,6 +3,18 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 const { PdfOcrDetector } = await import('./PdfOcrDetector.js')
 const { PdfOcrRecommendationEngine } = await import('./PdfOcrRecommendationEngine.js')
 
+function createCandidate(pageNumber, overrides = {}) {
+  return {
+    pageNumber,
+    logicalBlockCount: 0,
+    textItemCount: 0,
+    textCharCount: 0,
+    hasOcrBlocks: false,
+    ocrLanguage: null,
+    ...overrides
+  }
+}
+
 describe('PdfOcrRecommendationEngine', () => {
   let detectorSpy
 
@@ -14,73 +26,24 @@ describe('PdfOcrRecommendationEngine', () => {
     detectorSpy.mockRestore()
   })
 
-  function createPageSession(pageNumber, overrides = {}) {
-    return {
-      pageNumber,
-      loaded: true,
-      logicalBlocks: [],
-      textContent: { items: [] },
-      ocrBlocks: [],
-      ocrLanguage: null,
-      ...overrides
-    }
-  }
+  it('delegates candidate classification and excludes already OCRd pages', () => {
+    const candidates = [createCandidate(1), createCandidate(2, { hasOcrBlocks: true, ocrLanguage: 'eng' })]
 
-  it('delegates structural classification to Detector and excludes already OCRd pages', () => {
-    const pageSessions = [
-      createPageSession(1),
-      createPageSession(2, { ocrBlocks: [{ id: 'ocr-2' }], ocrLanguage: 'eng' })
-    ]
-
-    const engine = new PdfOcrRecommendationEngine()
-    const recommendations = engine.getRecommendations(pageSessions)
+    const recommendations = new PdfOcrRecommendationEngine().getRecommendations(candidates)
 
     expect(recommendations).toEqual([1])
     expect(detectorSpy).toHaveBeenCalledTimes(2)
   })
 
-  it('preserves recommendation behavior for scanned pages with no text blocks', () => {
-    const pageSessions = [
-      createPageSession(3, { textContent: { items: [] } }),
-      createPageSession(1, { textContent: { items: [] } }),
-      createPageSession(2, { textContent: { items: [] } })
-    ]
+  it('sorts scanned candidate recommendations', () => {
+    const candidates = [createCandidate(3), createCandidate(1), createCandidate(2)]
 
-    const engine = new PdfOcrRecommendationEngine()
-    const recommendations = engine.getRecommendations(pageSessions)
-
-    expect(recommendations).toEqual([1, 2, 3])
+    expect(new PdfOcrRecommendationEngine().getRecommendations(candidates)).toEqual([1, 2, 3])
   })
 
-  it('returns empty array when no PageSession qualifies', () => {
-    const pageSessions = [
-      createPageSession(1, {
-        logicalBlocks: [{ id: 'block-1' }],
-        textContent: { items: [{ str: 'hello' }] }
-      })
-    ]
-
-    const engine = new PdfOcrRecommendationEngine()
-    const recommendations = engine.getRecommendations(pageSessions)
-
-    expect(recommendations).toEqual([])
-  })
-
-  it('returns empty array when no PageSessions supplied', () => {
-    const engine = new PdfOcrRecommendationEngine()
-
-    expect(engine.getRecommendations()).toEqual([])
-  })
-
-  it('returns stable recommendation results across repeated calls', () => {
-    const pageSessions = [
-      createPageSession(1, { textContent: { items: [] } }),
-      createPageSession(2, { textContent: { items: [] } })
-    ]
-
-    const engine = new PdfOcrRecommendationEngine()
-
-    expect(engine.getRecommendations(pageSessions)).toEqual([1, 2])
-    expect(engine.getRecommendations(pageSessions)).toEqual([1, 2])
+  it('returns no recommendation for candidate with source blocks', () => {
+    expect(new PdfOcrRecommendationEngine().getRecommendations([
+      createCandidate(1, { logicalBlockCount: 1, textItemCount: 1, textCharCount: 5 })
+    ])).toEqual([])
   })
 })

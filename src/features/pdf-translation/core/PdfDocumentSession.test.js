@@ -323,6 +323,83 @@ describe('PdfDocumentSession', () => {
     expect(session.getCommittedTextContent(3)).toBeNull()
   })
 
+  it('returns committed OCR state without exposing the page session or hydrating', () => {
+    const ocrBlocks = [{ id: 'ocr-1' }]
+    const pageSession = {
+      loaded: true,
+      ocrBlocks,
+      ocrLanguage: 'eng',
+      ocrCompletedAt: 1234,
+      ocrError: 'previous failure'
+    }
+    const hydrateSpy = vi.spyOn(session._pageContentRepository, 'getPageSession')
+    session.pageSessions.set(1, pageSession)
+
+    const state = session.getCommittedOcrState(1)
+
+    expect(state).toEqual({
+      ocrBlocks,
+      ocrLanguage: 'eng',
+      ocrCompletedAt: 1234,
+      ocrError: 'previous failure'
+    })
+    expect(state).not.toBe(pageSession)
+    expect(state.ocrBlocks).toBe(ocrBlocks)
+    expect(hydrateSpy).not.toHaveBeenCalled()
+    expect(pdfDocument.getPage).not.toHaveBeenCalled()
+  })
+
+  it('returns null OCR state for invalid, missing, and unloaded pages', () => {
+    session.pageSessions.set(1, { loaded: false, ocrBlocks: [] })
+
+    expect(session.getCommittedOcrState(0)).toBeNull()
+    expect(session.getCommittedOcrState(1)).toBeNull()
+    expect(session.getCommittedOcrState(2)).toBeNull()
+  })
+
+  it('returns ordered loaded visible OCR candidates without sessions or hydration', () => {
+    const hydrateSpy = vi.spyOn(session._pageContentRepository, 'getPageSession')
+    session.visiblePageNumbers = new Set([2, 1, 3])
+    session.pageSessions.set(1, {
+      loaded: true,
+      logicalBlocks: [],
+      textContent: { items: [{ str: ' A ' }, { str: 'B' }] },
+      ocrBlocks: [],
+      ocrLanguage: null
+    })
+    session.pageSessions.set(2, {
+      loaded: true,
+      logicalBlocks: [{ id: 'text-1' }],
+      textContent: { items: [{ str: 'Text' }] },
+      ocrBlocks: [{ id: 'ocr-1' }],
+      ocrLanguage: 'eng'
+    })
+    session.pageSessions.set(3, { loaded: false })
+
+    expect(session.getLoadedVisibleOcrCandidates()).toEqual([
+      { pageNumber: 1, logicalBlockCount: 0, textItemCount: 2, textCharCount: 2, hasOcrBlocks: false, ocrLanguage: null },
+      { pageNumber: 2, logicalBlockCount: 1, textItemCount: 1, textCharCount: 4, hasOcrBlocks: true, ocrLanguage: 'eng' }
+    ])
+    expect(hydrateSpy).not.toHaveBeenCalled()
+    expect(pdfDocument.getPage).not.toHaveBeenCalled()
+  })
+
+  it('records OCR errors only on existing loaded pages without commit notification', () => {
+    const listener = vi.fn()
+    session.onPageSessionCommitted(listener)
+    const pageSession = { loaded: true, ocrError: null }
+    session.pageSessions.set(1, pageSession)
+    session.pageSessions.set(2, { loaded: false, ocrError: null })
+
+    expect(session.recordPageOcrError(1, new Error('OCR failed'))).toBe(true)
+    expect(pageSession.ocrError).toBe('OCR failed')
+    expect(session.recordPageOcrError(0, 'invalid')).toBe(false)
+    expect(session.recordPageOcrError(2, 'unloaded')).toBe(false)
+    expect(session.recordPageOcrError(3, 'missing')).toBe(false)
+    expect(listener).not.toHaveBeenCalled()
+    expect(pdfDocument.getPage).not.toHaveBeenCalled()
+  })
+
   it('returns loaded visible PageSessions without hydrating', () => {
     const visibleLoadedPageSession = { loaded: true, pageNumber: 1 }
     const visibleUnloadedPageSession = { loaded: false, pageNumber: 2 }

@@ -1,139 +1,77 @@
-import { beforeEach, describe, expect, it } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const { PdfOcrDetector } = await import('./PdfOcrDetector.js')
 
+function createCandidate(pageNumber, overrides = {}) {
+  return {
+    pageNumber,
+    logicalBlockCount: 0,
+    textItemCount: 0,
+    textCharCount: 0,
+    hasOcrBlocks: false,
+    ocrLanguage: null,
+    ...overrides
+  }
+}
+
 describe('PdfOcrDetector', () => {
   let session
+  let candidates
 
   beforeEach(() => {
+    candidates = []
     session = {
-      pageSessions: new Map(),
-      visiblePageNumbers: new Set()
+      getLoadedVisibleOcrCandidates: vi.fn(() => candidates)
     }
   })
 
-  function setupPageSession(pageNumber, { loaded = true, logicalBlocks = [], textContent = null } = {}) {
-    session.pageSessions.set(pageNumber, {
-      loaded,
-      logicalBlocks,
-      textContent,
-      ocrBlocks: [],
+  it('detects scanned candidates from committed candidate summaries', () => {
+    candidates.push(createCandidate(1))
+
+    const results = new PdfOcrDetector(session).detectScannedPages()
+
+    expect(results).toEqual([{
+      pageNumber: 1,
+      isScannedCandidate: true,
+      alreadyOcrd: false,
       ocrLanguage: null
-    })
-    session.visiblePageNumbers.add(pageNumber)
-  }
-
-  it('detects scanned candidate when no text items and no blocks', () => {
-    setupPageSession(1, {
-      loaded: true,
-      logicalBlocks: [],
-      textContent: { items: [] }
-    })
-
-    const detector = new PdfOcrDetector(session)
-    const results = detector.detectScannedPages()
-
-    expect(results).toHaveLength(1)
-    expect(results[0].pageNumber).toBe(1)
-    expect(results[0].isScannedCandidate).toBe(true)
+    }])
   })
 
-  it('does not detect when logical blocks exist', () => {
-    setupPageSession(1, {
-      loaded: true,
-      logicalBlocks: [{ id: 'b1' }],
-      textContent: { items: [] }
-    })
+  it('preserves threshold behavior for blocks, text items, and text characters', () => {
+    const detector = new PdfOcrDetector(session, { minTextItems: 5, minTextChars: 20 })
 
-    const detector = new PdfOcrDetector(session)
-    const results = detector.detectScannedPages()
-
-    expect(results).toHaveLength(0)
+    expect(detector.isScannedCandidate(createCandidate(1, { logicalBlockCount: 1 }))).toBe(false)
+    expect(detector.isScannedCandidate(createCandidate(1, { textItemCount: 6 }))).toBe(false)
+    expect(detector.isScannedCandidate(createCandidate(1, { textCharCount: 21 }))).toBe(false)
+    expect(detector.isScannedCandidate(createCandidate(1))).toBe(true)
   })
 
-  it('does not detect when text items exceed threshold', () => {
-    setupPageSession(1, {
-      loaded: true,
-      logicalBlocks: [],
-      textContent: { items: Array.from({ length: 10 }, (_, i) => ({ str: `item${i}` })) }
-    })
+  it('preserves page ordering and OCR language state', () => {
+    candidates.push(
+      createCandidate(2, { hasOcrBlocks: true, ocrLanguage: 'eng' }),
+      createCandidate(1)
+    )
 
-    const detector = new PdfOcrDetector(session, { minTextItems: 5 })
-    const results = detector.detectScannedPages()
+    const results = new PdfOcrDetector(session).detectScannedPages()
 
-    expect(results).toHaveLength(0)
+    expect(results.map(result => result.pageNumber)).toEqual([1, 2])
+    expect(results[1]).toMatchObject({ alreadyOcrd: true, ocrLanguage: 'eng' })
   })
 
-  it('does not detect when page is not loaded', () => {
-    setupPageSession(1, {
-      loaded: false,
-      logicalBlocks: [],
-      textContent: { items: [] }
-    })
+  it('uses candidate summaries without raw session storage', () => {
+    candidates.push(createCandidate(1))
 
-    const detector = new PdfOcrDetector(session)
-    const results = detector.detectScannedPages()
+    new PdfOcrDetector(session).getScannedPageCount()
 
-    expect(results).toHaveLength(0)
+    expect(session.getLoadedVisibleOcrCandidates).toHaveBeenCalledOnce()
   })
 
-  it('only checks visible pages', () => {
-    setupPageSession(1, {
-      loaded: true,
-      logicalBlocks: [],
-      textContent: { items: [] }
-    })
-    setupPageSession(2, {
-      loaded: true,
-      logicalBlocks: [],
-      textContent: { items: [] }
-    })
-    session.visiblePageNumbers.delete(2)
-
-    const detector = new PdfOcrDetector(session)
-    const results = detector.detectScannedPages()
-
-    expect(results).toHaveLength(1)
-    expect(results[0].pageNumber).toBe(1)
-  })
-
-  it('hasScannedPages returns true when pending OCR pages exist', () => {
-    setupPageSession(1, {
-      loaded: true,
-      logicalBlocks: [],
-      textContent: { items: [] }
-    })
-
-    const detector = new PdfOcrDetector(session)
-    expect(detector.hasScannedPages()).toBe(true)
-  })
-
-  it('hasScannedPages returns false when all scanned pages already OCRd', () => {
-    setupPageSession(1, {
-      loaded: true,
-      logicalBlocks: [],
-      textContent: { items: [] }
-    })
-    session.pageSessions.get(1).ocrBlocks = [{ id: 'ocr-1' }]
-
-    const detector = new PdfOcrDetector(session)
-    expect(detector.hasScannedPages()).toBe(false)
-  })
-
-  it('getScannedPageCount excludes already OCRd pages', () => {
-    setupPageSession(1, {
-      loaded: true,
-      logicalBlocks: [],
-      textContent: { items: [] }
-    })
-    setupPageSession(2, {
-      loaded: true,
-      logicalBlocks: [],
-      textContent: { items: [] }
-    })
-    session.pageSessions.get(1).ocrBlocks = [{ id: 'ocr-1' }]
+  it('excludes already OCRd scanned pages from the recommendation count', () => {
+    candidates.push(createCandidate(1, { hasOcrBlocks: true }), createCandidate(2))
 
     const detector = new PdfOcrDetector(session)
     expect(detector.getScannedPageCount()).toBe(1)
+    expect(detector.hasScannedPages()).toBe(true)
   })
 })
