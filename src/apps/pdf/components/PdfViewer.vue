@@ -101,6 +101,7 @@ const emit = defineEmits([
 const viewerRoot = ref(null)
 const pageViews = new Map()
 let lastEmittedVisiblePages = new Set()
+let unsubscribePageSessionCommitted = null
 
 const isOriginalRole = computed(() => props.viewerRole === VIEWER_ROLE.ORIGINAL)
 const ownsPageRenderLifecycle = computed(() => props.viewerRole === VIEWER_ROLE.ORIGINAL)
@@ -229,6 +230,12 @@ function registerPageView(pageNumber, instance) {
   observePageView(pageNumber, instance)
 }
 
+function handlePageSessionCommitted({ pageNumber } = {}) {
+  if (!renderCandidatePageNumbers.value.has(pageNumber)) return
+
+  pageViews.get(pageNumber)?.renderTextLayerOnly?.()
+}
+
 function disconnectObservers() {
   disconnectScrollObservation()
   disconnectLayoutObservation()
@@ -291,10 +298,13 @@ watch(
 )
 
 onMounted(() => {
+  unsubscribePageSessionCommitted = props.session.onPageSessionCommitted?.(handlePageSessionCommitted) || null
   setupObservers()
 })
 
 onBeforeUnmount(() => {
+  unsubscribePageSessionCommitted?.()
+  unsubscribePageSessionCommitted = null
   disconnectObservers()
   resetRenderPipeline()
 })

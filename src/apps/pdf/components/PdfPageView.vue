@@ -154,7 +154,8 @@ defineExpose({
   stageEl,
   canvasEl,
   textLayerEl,
-  cancelRender
+  cancelRender,
+  renderTextLayerOnly
 })
 
 function ensureTextLayerRenderer() {
@@ -170,14 +171,12 @@ async function renderPage() {
 
   await nextTick()
   if (!props.visible || !props.renderAllowed || !canvasEl.value) return
-  const renderer = ensureTextLayerRenderer()
-  if (!renderer) return
-
   emit('render-started', props.page.pageNumber)
-  const result = await props.session.renderPage(props.page.pageNumber, canvasEl.value, renderer)
+  const result = await props.session.renderPage(props.page.pageNumber, canvasEl.value)
 
   if (props.visible && props.renderAllowed && canvasEl.value) {
     if (result?.status === PDF_RENDER_RESULT_STATUS.SUCCESS) {
+      await renderTextLayerOnly()
       emit('render-committed', props.page.pageNumber)
     } else if (result?.status === PDF_RENDER_RESULT_STATUS.CANCELLED) {
       emit('render-cancelled', props.page.pageNumber)
@@ -186,6 +185,27 @@ async function renderPage() {
     }
   }
 
+}
+
+async function renderTextLayerOnly() {
+  if (!props.visible || !props.renderAllowed || !textLayerEl.value) return
+
+  const pageSession = props.session.pageSessions?.get(props.page.pageNumber)
+  if (!pageSession?.textContent) {
+    textLayerRenderer?.clear()
+    return
+  }
+
+  const renderer = ensureTextLayerRenderer()
+  const viewport = props.session.getPageViewport?.(props.page.pageNumber)
+  if (!renderer || !viewport) return
+
+  await renderer.render({
+    viewport,
+    containerWidth: Math.floor(props.page.width),
+    containerHeight: Math.floor(props.page.height),
+    textContent: pageSession.textContent
+  })
 }
 
 function clearPage() {

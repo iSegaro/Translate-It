@@ -2,14 +2,16 @@ import { defineComponent, h, nextTick, onBeforeUnmount, onMounted, ref } from 'v
 import { mount } from '@vue/test-utils'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-const { pageRootEls, pageStageEls, pageRectMap, mapperMock } = vi.hoisted(() => {
+const { pageRootEls, pageStageEls, pageRectMap, pageTextLayerRenderers, mapperMock } = vi.hoisted(() => {
   const pageRootEls = new Map()
   const pageStageEls = new Map()
   const pageRectMap = new Map()
+  const pageTextLayerRenderers = new Map()
   return {
     pageRootEls,
     pageStageEls,
     pageRectMap,
+    pageTextLayerRenderers,
     mapperMock: vi.fn(),
   }
 })
@@ -57,6 +59,7 @@ vi.mock('./PdfPageView.vue', () => ({
       const rootEl = ref(null)
       const canvasEl = document.createElement('canvas')
       const stageEl = document.createElement('div')
+      const renderTextLayerOnly = vi.fn()
       canvasEl.getBoundingClientRect = () => buildRect(40, 80, 100, 15)
       stageEl.getBoundingClientRect = () => buildRect(100, 80, 100, 35)
 
@@ -67,9 +70,11 @@ vi.mock('./PdfPageView.vue', () => ({
         rootEl.value.getBoundingClientRect = () => pageRectMap.get(props.page.pageNumber) || buildRect(0)
         pageRootEls.set(props.page.pageNumber, rootEl.value)
         pageStageEls.set(props.page.pageNumber, stageEl)
+        pageTextLayerRenderers.set(props.page.pageNumber, renderTextLayerOnly)
       })
 
       onBeforeUnmount(() => {
+        pageTextLayerRenderers.delete(props.page.pageNumber)
         if (props.clearOnUnmount) {
           props.session.clearPage?.(props.page.pageNumber)
         }
@@ -79,7 +84,8 @@ vi.mock('./PdfPageView.vue', () => ({
         getRootEl: () => rootEl.value,
         getStageEl: () => stageEl,
         getCanvasEl: () => canvasEl,
-        rootEl
+        rootEl,
+        renderTextLayerOnly
       })
       return () => h('article', { ref: rootEl, class: 'pdf-page' })
     }
@@ -107,6 +113,7 @@ function createSession() {
   return {
     updateVisiblePages: vi.fn(),
     getPageViewport: vi.fn(),
+    onPageSessionCommitted: vi.fn(() => () => {}),
     pdfDocument: { getPage: vi.fn() }
   }
 }
@@ -178,6 +185,67 @@ async function applyWindow(wrapper, tops) {
 }
 
 describe('PdfViewer', () => {
+  it('renders committed text only for a current render candidate', async () => {
+    let notifyCommitted
+    const session = {
+      ...createSession(),
+      onPageSessionCommitted: vi.fn((listener) => {
+        notifyCommitted = listener
+        return vi.fn()
+      })
+    }
+    const { wrapper } = await mountViewerWithPages({ count: 2, session })
+    await applyWindow(wrapper, { 1: 0, 2: 10000 })
+
+    notifyCommitted({ pageNumber: 1 })
+
+    expect(pageTextLayerRenderers.get(1)).toHaveBeenCalledOnce()
+    expect(pageTextLayerRenderers.get(2)).not.toHaveBeenCalled()
+    wrapper.unmount()
+  })
+
+  it('renders committed text for a buffer candidate', async () => {
+    let notifyCommitted
+    const session = {
+      ...createSession(),
+      onPageSessionCommitted: vi.fn((listener) => {
+        notifyCommitted = listener
+        return vi.fn()
+      })
+    }
+    const { wrapper } = await mountViewerWithPages({ count: 6, session })
+    await applyWindow(wrapper, {
+      ...createFarPageTops(6),
+      1: -100,
+      2: 0,
+      3: 100
+    })
+
+    notifyCommitted({ pageNumber: 1 })
+
+    expect(pageTextLayerRenderers.get(1)).toHaveBeenCalledOnce()
+    wrapper.unmount()
+  })
+
+  it('ignores a late commit after teardown', async () => {
+    let notifyCommitted
+    const unsubscribe = vi.fn()
+    const session = {
+      ...createSession(),
+      onPageSessionCommitted: vi.fn((listener) => {
+        notifyCommitted = listener
+        return unsubscribe
+      })
+    }
+    const { wrapper } = await mountViewerWithPages({ count: 2, session })
+    await applyWindow(wrapper, { 1: 0, 2: 10000 })
+
+    wrapper.unmount()
+    notifyCommitted({ pageNumber: 1 })
+
+    expect(unsubscribe).toHaveBeenCalledOnce()
+  })
+
   beforeEach(() => {
     observeMock.mockClear()
     disconnectMock.mockClear()
@@ -187,6 +255,7 @@ describe('PdfViewer', () => {
     pageRootEls.clear()
     pageStageEls.clear()
     pageRectMap.clear()
+    pageTextLayerRenderers.clear()
     visibilityCallback = null
     let instanceCount = 0
 

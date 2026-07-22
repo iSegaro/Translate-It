@@ -36,6 +36,11 @@ describe('PdfPageSession', () => {
     })
 
     expect(page.getTextContent).toHaveBeenCalledOnce()
+    expect(page.getTextContent).toHaveBeenCalledWith({
+      includeMarkedContent: true,
+      disableCombineTextItems: false,
+      disableNormalization: true
+    })
     expect(session.getTextLines()).toHaveLength(1)
     expect(session.getLogicalBlocks()).toHaveLength(1)
     expect(session.getLogicalBlocks()[0].text).toBe('Hello world')

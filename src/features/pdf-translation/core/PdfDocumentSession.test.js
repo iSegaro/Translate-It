@@ -254,7 +254,7 @@ describe('PdfDocumentSession', () => {
     expect(session.pageSessions.get(1)?.loaded).toBe(true)
   })
 
-  it('starts background hydration for visible pages', async () => {
+  it('keeps visibility changes separate from page hydration', async () => {
     session.pageMetrics = [
       { pageNumber: 1, width: 100, height: 200, naturalWidth: 100, naturalHeight: 200, scale: 1 }
     ]
@@ -265,8 +265,8 @@ describe('PdfDocumentSession', () => {
     session.updateVisiblePages([1])
     await Promise.resolve()
 
-    expect(hydrateSpy).toHaveBeenCalledWith(expect.objectContaining({ pageNumber: 1 }))
-    expect(pdfDocument.getPage).toHaveBeenCalledWith(1)
+    expect(hydrateSpy).not.toHaveBeenCalled()
+    expect(pdfDocument.getPage).not.toHaveBeenCalled()
   })
 
   it('notifies consumers after PageSession commits', async () => {
@@ -399,7 +399,7 @@ describe('PdfDocumentSession', () => {
     expect(listener).toHaveBeenCalledTimes(1)
   })
 
-  it('no-ops when visible page set is unchanged', async () => {
+  it('does not hydrate pages from visible-set updates', async () => {
     session.pageMetrics = [
       { pageNumber: 1, width: 100, height: 200, naturalWidth: 100, naturalHeight: 200, scale: 1 },
       { pageNumber: 2, width: 100, height: 200, naturalWidth: 100, naturalHeight: 200, scale: 1 }
@@ -409,22 +409,41 @@ describe('PdfDocumentSession', () => {
     session.updateVisiblePages([1, 2])
     session.updateVisiblePages([2, 1])
 
-    expect(hydrateSpy).toHaveBeenCalledTimes(2)
+    expect(hydrateSpy).not.toHaveBeenCalled()
   })
 
-  it('hydrates only newly visible pages for overlapping updates', async () => {
+  it('starts canonical hydration without waiting for canvas rendering', async () => {
+    let resolveTextContent
     session.pageMetrics = [
-      { pageNumber: 1, width: 100, height: 200, naturalWidth: 100, naturalHeight: 200, scale: 1 },
-      { pageNumber: 2, width: 100, height: 200, naturalWidth: 100, naturalHeight: 200, scale: 1 },
-      { pageNumber: 3, width: 100, height: 200, naturalWidth: 100, naturalHeight: 200, scale: 1 }
+      { pageNumber: 1, width: 100, height: 200, naturalWidth: 100, naturalHeight: 200, scale: 1 }
     ]
-    const hydrateSpy = vi.spyOn(session._pageContentRepository, 'getPageSession')
+    session.pdfDocument = {
+      getPage: vi.fn().mockResolvedValue({
+        pageNumber: 1,
+        cleanup: vi.fn(),
+        getTextContent: vi.fn(() => new Promise((resolve) => {
+          resolveTextContent = () => resolve({ items: [], styles: null })
+        }))
+      })
+    }
+    session._renderer = {
+      renderPage: vi.fn().mockResolvedValue({ status: 'success' }),
+      cancelRender: vi.fn(),
+      clearPage: vi.fn(),
+      cancelAll: vi.fn()
+    }
 
-    session.updateVisiblePages([1, 2])
-    session.updateVisiblePages([2, 3])
+    await session.renderPage(1, {})
+    await Promise.resolve()
 
-    const hydratedPages = hydrateSpy.mock.calls.map(([args]) => args.pageNumber)
-    expect(hydratedPages).toEqual([1, 2, 3])
+    expect(session._renderer.renderPage).toHaveBeenCalledOnce()
+    expect(resolveTextContent).toBeTypeOf('function')
+
+    resolveTextContent()
+    await session.getPageSession(1)
+    await session.renderPage(1, {})
+
+    expect(session.pdfDocument.getPage).toHaveBeenCalledOnce()
   })
 
   it('keeps lazy getPageSession hydration working without visibility', async () => {
@@ -463,7 +482,13 @@ describe('PdfDocumentSession', () => {
       }))
     }
 
-    session.updateVisiblePages([1])
+    session._renderer = {
+      renderPage: vi.fn().mockResolvedValue({ status: 'success' }),
+      cancelRender: vi.fn(),
+      clearPage: vi.fn(),
+      cancelAll: vi.fn()
+    }
+    await session.renderPage(1, {})
     await Promise.resolve()
     await session.cleanupDocument()
     session.documentIdentity = 'doc-b'
@@ -500,7 +525,13 @@ describe('PdfDocumentSession', () => {
       }))
     }
 
-    session.updateVisiblePages([1])
+    session._renderer = {
+      renderPage: vi.fn().mockResolvedValue({ status: 'success' }),
+      cancelRender: vi.fn(),
+      clearPage: vi.fn(),
+      cancelAll: vi.fn()
+    }
+    await session.renderPage(1, {})
     await Promise.resolve()
     await session.cleanupDocument()
     session.documentIdentity = 'same-doc'
@@ -952,34 +983,22 @@ describe('PdfDocumentSession', () => {
      expect(cacheSession._bitmapCache.size).toBe(0)
    })
 
-   it('cache hit still renders text layer when textLayerRenderer provided', async () => {
-     const mockTextLayer = { render: vi.fn().mockResolvedValue(undefined) }
-     const canvas = { width: 0, height: 0, style: {}, getContext: vi.fn(() => ({ drawImage: vi.fn(), fillRect: vi.fn() })) }
+    it('requests canonical hydration on a bitmap cache hit', async () => {
+      const canvas = { width: 0, height: 0, style: {}, getContext: vi.fn(() => ({ drawImage: vi.fn(), fillRect: vi.fn() })) }
+      const hydrateSpy = vi.spyOn(cacheSession._pageContentRepository, 'getPageSession')
 
-     // First render — cache miss
-     await cacheSession.renderPage(1, canvas, mockTextLayer)
-     mockRenderer.renderPage.mockClear()
-     mockTextLayer.render.mockClear()
-     mockPdfDocument.getPage.mockClear()
+      // First render — cache miss
+      await cacheSession.renderPage(1, canvas)
+      mockRenderer.renderPage.mockClear()
+      mockPdfDocument.getPage.mockClear()
 
-     // Second render — cache hit
-     const canvas2 = { width: 0, height: 0, style: {}, getContext: vi.fn(() => ({ drawImage: vi.fn(), fillRect: vi.fn() })) }
-     await cacheSession.renderPage(1, canvas2, mockTextLayer)
+      // Second render — cache hit
+      const canvas2 = { width: 0, height: 0, style: {}, getContext: vi.fn(() => ({ drawImage: vi.fn(), fillRect: vi.fn() })) }
+      await cacheSession.renderPage(1, canvas2)
 
-     // Renderer not called (cache hit)
-     expect(mockRenderer.renderPage).not.toHaveBeenCalled()
-     // pdfDocument.getPage not called (cache hit bypasses pdf.js)
-     expect(mockPdfDocument.getPage).not.toHaveBeenCalled()
-     // Text layer still rendered
-     expect(mockTextLayer.render).toHaveBeenCalled()
-     // Text layer called with options object (no page)
-     expect(mockTextLayer.render).toHaveBeenCalledWith(
-       expect.objectContaining({
-         pageNumber: 1,
-         viewport: expect.any(Object),
-         textContent: expect.any(Object)
-       })
-     )
+      // Renderer not called (cache hit)
+      expect(mockRenderer.renderPage).not.toHaveBeenCalled()
+      expect(hydrateSpy).toHaveBeenCalledTimes(2)
    })
 
    it('destroy clears cache', async () => {

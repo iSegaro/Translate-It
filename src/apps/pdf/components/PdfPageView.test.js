@@ -4,9 +4,15 @@ import { describe, expect, it, vi } from 'vitest'
 import { PDF_RENDER_RESULT_STATUS } from '@/features/pdf-translation/core/PdfRenderer.js'
 import PdfPageView from './PdfPageView.vue'
 
+const { textLayerRenderMock } = vi.hoisted(() => ({
+  textLayerRenderMock: vi.fn().mockResolvedValue(undefined)
+}))
+
 vi.mock('@/features/pdf-translation/core/PdfTextLayerRenderer.js', () => ({
   PdfTextLayerRenderer: class PdfTextLayerRenderer {
+    render = textLayerRenderMock
     clear() {}
+    destroy() {}
   }
 }))
 
@@ -28,7 +34,9 @@ function createSession() {
   return {
     renderPage: vi.fn().mockResolvedValue({ status: PDF_RENDER_RESULT_STATUS.SUCCESS }),
     clearPage: vi.fn(),
-    getPageMaskModel: vi.fn(() => null)
+    getPageMaskModel: vi.fn(() => null),
+    getPageViewport: vi.fn(() => ({ scale: 1 })),
+    pageSessions: new Map()
   }
 }
 
@@ -50,6 +58,52 @@ async function settleWatchers() {
 }
 
 describe('PdfPageView', () => {
+  it('renders committed text during normal page render', async () => {
+    const session = createSession()
+    session.pageSessions.set(3, {
+      textContent: {
+        items: [{ str: 'Already committed', transform: [1, 0, 0, 1, 10, 20], width: 50, height: 12 }]
+      }
+    })
+    textLayerRenderMock.mockClear()
+    const wrapper = mount(PdfPageView, {
+      props: { page: createPage(), session, visible: true, renderAllowed: false }
+    })
+
+    await settleWatchers()
+    await wrapper.setProps({ renderAllowed: true })
+    await settleWatchers()
+
+    expect(session.renderPage).toHaveBeenCalledOnce()
+    expect(textLayerRenderMock).toHaveBeenCalledWith(expect.objectContaining({
+      textContent: session.pageSessions.get(3).textContent
+    }))
+    wrapper.unmount()
+  })
+
+  it('renders committed text without rerendering the canvas', async () => {
+    const session = createSession()
+    session.pageSessions.set(3, {
+      textContent: {
+        items: [{ str: 'Committed', transform: [1, 0, 0, 1, 10, 20], width: 50, height: 12 }]
+      }
+    })
+    const wrapper = mount(PdfPageView, {
+      props: { page: createPage(), session, visible: true }
+    })
+
+    await settleWatchers()
+    session.renderPage.mockClear()
+    textLayerRenderMock.mockClear()
+
+    await wrapper.vm.renderTextLayerOnly()
+
+    expect(session.renderPage).not.toHaveBeenCalled()
+    expect(textLayerRenderMock).toHaveBeenCalledWith(expect.objectContaining({
+      textContent: session.pageSessions.get(3).textContent
+    }))
+  })
+
   it('reserves the PDF canvas slot before the page renders', () => {
     const wrapper = mount(PdfPageView, {
       props: {

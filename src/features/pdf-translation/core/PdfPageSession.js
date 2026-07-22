@@ -53,7 +53,8 @@ export class PdfPageSession {
 
     this.textContent = await page.getTextContent({
       includeMarkedContent: true,
-      disableCombineTextItems: false
+      disableCombineTextItems: false,
+      disableNormalization: true
     })
 
     this.lines = buildPdfTextLinesFromItems(this.textContent?.items || [], this.pageSize, this.textContent?.styles || null)

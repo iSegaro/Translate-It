@@ -224,7 +224,7 @@ describe('PdfRenderer', () => {
       expect(r2.status).toBe(PDF_RENDER_RESULT_STATUS.SUCCESS)
     })
 
-    it('renders text layer when PdfTextLayerRenderer is provided and render succeeds', async () => {
+    it('does not render the text layer during canvas rendering', async () => {
       const { PdfTextLayerRenderer } = await import('./PdfTextLayerRenderer.js')
       const canvas = createMockCanvas()
       const metric = { scale: 1 }
@@ -236,7 +236,7 @@ describe('PdfRenderer', () => {
       const result = await promise
 
       expect(result.status).toBe(PDF_RENDER_RESULT_STATUS.SUCCESS)
-      expect(textLayer.render).toHaveBeenCalled()
+      expect(textLayer.render).not.toHaveBeenCalled()
     })
 
     it('renders directly to visible canvas when canvas has no existing content', async () => {

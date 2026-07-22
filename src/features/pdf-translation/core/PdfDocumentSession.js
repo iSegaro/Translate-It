@@ -444,13 +444,8 @@ export class PdfDocumentSession extends ResourceTracker {
     const nextVisible = normalizePageNumberSet(pageNumbers)
     if (arePageSetsEqual(this.visiblePageNumbers, nextVisible)) return
 
-    const newlyVisible = [...nextVisible].filter((pageNumber) => !this.visiblePageNumbers.has(pageNumber))
     this.visiblePageNumbers = nextVisible
     this._notifyVisiblePagesChanged()
-
-    if (newlyVisible.length > 0) {
-      this._hydrateVisiblePagesInBackground(newlyVisible)
-    }
   }
 
   _createHydrationContext() {
@@ -463,19 +458,17 @@ export class PdfDocumentSession extends ResourceTracker {
     }
   }
 
-  _hydrateVisiblePagesInBackground(pageNumbers) {
+  _hydrateRenderedPageInBackground(pageNumber) {
     const context = this._createHydrationContext()
 
-    for (const pageNumber of pageNumbers) {
-      this._pageContentRepository.getPageSession({
-        ...context,
-        pageNumber
-      }).catch((error) => {
-        if (this._isDocumentGenerationCurrent(context.documentGeneration)) {
-          logger.warn('Failed to hydrate visible page session:', { pageNumber, error })
-        }
-      })
-    }
+    this._pageContentRepository.getPageSession({
+      ...context,
+      pageNumber
+    }).catch((error) => {
+      if (this._isDocumentGenerationCurrent(context.documentGeneration)) {
+        logger.warn('Failed to hydrate rendered page session:', { pageNumber, error })
+      }
+    })
   }
 
   async getPageSession(pageNumber) {
@@ -663,9 +656,11 @@ export class PdfDocumentSession extends ResourceTracker {
     })
   }
 
-  async renderPage(pageNumber, canvasEl, textLayerRenderer) {
+  async renderPage(pageNumber, canvasEl) {
     const metric = this.pageMetrics[pageNumber - 1]
     if (!metric) return createPdfRenderResult(PDF_RENDER_RESULT_STATUS.FAILED)
+
+    this._hydrateRenderedPageInBackground(pageNumber)
 
     const cacheKey = PdfBitmapCache.buildKey(this.documentIdentity, pageNumber, metric.scale)
 
@@ -681,37 +676,15 @@ export class PdfDocumentSession extends ResourceTracker {
       ctx.fillRect(0, 0, cachedBitmap.width, cachedBitmap.height)
       ctx.drawImage(cachedBitmap, 0, 0)
 
-      // Render text layer without pdf.js page retrieval
-      if (textLayerRenderer) {
-        try {
-          const pageSession = this.pageSessions.get(pageNumber) || null
-          const cw = Math.floor(cachedBitmap.width)
-          const ch = Math.floor(cachedBitmap.height)
-          const textContent = pageSession?.textContent ?? null
-          await textLayerRenderer.render({
-            pageNumber,
-            viewport: metric.viewport,
-            containerWidth: cw,
-            containerHeight: ch,
-            textContent
-          })
-        } catch {
-          // Text layer render failed — canvas is still valid
-        }
-      }
-
       return createPdfRenderResult(PDF_RENDER_RESULT_STATUS.SUCCESS)
     }
 
     // Cache miss: render via PdfRenderer
-    const pageSession = this.pageSessions.get(pageNumber) || null
     const result = await this._renderer.renderPage({
       pdfDocument: this.pdfDocument,
       metric,
       pageNumber,
-      canvas: canvasEl,
-      textLayerRenderer,
-      pageSession
+      canvas: canvasEl
     })
 
     // Cache bitmap only on successful render

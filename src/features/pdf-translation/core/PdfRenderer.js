@@ -1,6 +1,5 @@
 import { getScopedLogger } from '@/shared/logging/logger.js'
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js'
-import { PdfTextLayerRenderer } from './PdfTextLayerRenderer.js'
 import { PDF_PAGE_BACKGROUND } from './pdfRenderingConstants.js'
 
 const logger = getScopedLogger(LOG_COMPONENTS.PDF, 'PdfRenderer')
@@ -46,9 +45,7 @@ export class PdfRenderer {
     pdfDocument,
     metric,
     pageNumber,
-    canvas: canvasEl,
-    textLayerRenderer,
-    pageSession
+    canvas: canvasEl
   }) {
     if (!pdfDocument || !canvasEl || !metric) {
       return createPdfRenderResult(PDF_RENDER_RESULT_STATUS.FAILED)
@@ -104,19 +101,6 @@ export class PdfRenderer {
       } catch {
         // Bitmap creation failed — continue without cache entry
       }
-      if (textLayerRenderer instanceof PdfTextLayerRenderer) {
-        const cw = Math.floor(viewport.width)
-        const ch = Math.floor(viewport.height)
-        const textContent = pageSession?.textContent ?? null
-        await textLayerRenderer.render({
-          pageNumber,
-          viewport,
-          containerWidth: cw,
-          containerHeight: ch,
-          textContent,
-          page
-        })
-      }
       return createPdfRenderResult(PDF_RENDER_RESULT_STATUS.SUCCESS, null, bitmap)
     } catch (error) {
       if (error?.name !== 'RenderingCancelledException') {
@@ -148,9 +132,7 @@ export class PdfRenderer {
       canvasEl.height = 0
     }
 
-    if (textLayerRenderer instanceof PdfTextLayerRenderer) {
-      textLayerRenderer.clear()
-    }
+    textLayerRenderer?.clear?.()
   }
 
   cancelRender(pageNumber, canvasEl) {
