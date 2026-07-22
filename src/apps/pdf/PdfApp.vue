@@ -413,6 +413,7 @@ const isDebugMode = computed(() => settingsStore.settings?.DEBUG_MODE === true)
 let removeThemeMessageListener = null
 let themeMediaQuery = null
 let themeMqHandler = null
+let isAlive = true
 
 watch(() => settingsStore.settings.THEME, (theme) => {
   applyTheme(theme || 'auto')
@@ -937,6 +938,8 @@ onMounted(async () => {
     logger.error('Failed to initialize OCR store.', error)
   }
 
+  if (!isAlive) return
+
   if (import.meta.env.DEV) {
     import('./debug/pdfOverlayDiagnostics.js')
   }
@@ -965,6 +968,7 @@ onMounted(async () => {
 })
 
 onBeforeUnmount(() => {
+  isAlive = false
   clearExportSuccess()
   activeRegionPosition = null
   activeRegionComparisonOperation?.cancel()

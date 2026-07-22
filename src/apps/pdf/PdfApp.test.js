@@ -33,6 +33,7 @@ const mockRegionExecutionDispatch = vi.fn((request, runner) => runner(request))
 const openTranslationMock = vi.fn()
 const downloadFileMock = vi.hoisted(() => vi.fn())
 const openOptionsPageMock = vi.hoisted(() => vi.fn())
+const pdfDiagnosticsImportMock = vi.hoisted(() => vi.fn())
 const settingsStoreMock = vi.hoisted(() => ({
   isDarkTheme: false,
   settings: { THEME: 'auto', DEBUG_MODE: false },
@@ -57,11 +58,13 @@ function createMockOperation(promise, cancel = vi.fn(), context = { target: 'ocr
 
 function createDeferred() {
   let resolve
-  const promise = new Promise((resolvePromise) => {
+  let reject
+  const promise = new Promise((resolvePromise, rejectPromise) => {
     resolve = resolvePromise
+    reject = rejectPromise
   })
 
-  return { promise, resolve }
+  return { promise, resolve, reject }
 }
 
 vi.mock('./composables/usePdfViewerController.js', () => ({
@@ -286,7 +289,10 @@ vi.mock('./components/PdfWindowsHost.vue', () => ({
   })
 }))
 
-vi.mock('./debug/pdfOverlayDiagnostics.js', () => ({}))
+vi.mock('./debug/pdfOverlayDiagnostics.js', () => {
+  pdfDiagnosticsImportMock()
+  return {}
+})
 
 const flushPromises = () => nextTick()
 const waitAnimationFrame = () => new Promise(resolve => requestAnimationFrame(resolve))
@@ -407,6 +413,7 @@ describe('PdfApp', () => {
     vi.useRealTimers()
     openTranslationMock.mockReset()
     openOptionsPageMock.mockReset()
+    pdfDiagnosticsImportMock.mockReset()
     mockRegionExecutionDispatch.mockClear()
     regionComparisonRunnerMock.execute.mockReset()
     regionComparisonRunnerMock.options = null
@@ -414,12 +421,102 @@ describe('PdfApp', () => {
     settingsStoreMock.settings.OCR_DEFAULT_LANG = 'eng'
     settingsStoreMock.settings.OCR_PREFERRED_ACTION = 'region'
     ocrStoreMock.downloadedLanguages = ['eng']
+    ocrStoreMock.init.mockReset()
+    ocrStoreMock.init.mockResolvedValue()
+    browser.runtime.onMessage.addListener.mockClear()
+    browser.runtime.onMessage.removeListener.mockClear()
+    window.matchMedia.mockReset()
+    window.matchMedia.mockImplementation((query) => ({
+      matches: false,
+      media: query,
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+      dispatchEvent: vi.fn()
+    }))
     createMocks()
   })
 
   afterEach(() => {
     vi.useRealTimers()
+    vi.unstubAllEnvs()
     vi.clearAllTimers()
+  })
+
+  it('does not continue bootstrap after unmount while OCR initialization is pending', async () => {
+    const init = createDeferred()
+    const mediaQuery = { addEventListener: vi.fn(), removeEventListener: vi.fn() }
+    const documentAddListenerSpy = vi.spyOn(document, 'addEventListener')
+    vi.stubEnv('DEV', true)
+    window.matchMedia.mockImplementation(() => mediaQuery)
+    ocrStoreMock.init.mockReturnValue(init.promise)
+
+    const wrapper = mount(PdfApp)
+    await nextTick()
+    documentAddListenerSpy.mockClear()
+    browser.runtime.onMessage.addListener.mockClear()
+    wrapper.unmount()
+
+    init.resolve()
+    await Promise.resolve()
+    await nextTick()
+
+    expect(pdfDiagnosticsImportMock).not.toHaveBeenCalled()
+    expect(browser.runtime.onMessage.addListener).not.toHaveBeenCalled()
+    expect(mediaQuery.addEventListener).not.toHaveBeenCalled()
+    expect(documentAddListenerSpy.mock.calls.some(([eventName]) => eventName === 'keydown')).toBe(false)
+
+    documentAddListenerSpy.mockRestore()
+  })
+
+  it('registers bootstrap side effects after OCR initialization while mounted', async () => {
+    const init = createDeferred()
+    const mediaQuery = { addEventListener: vi.fn(), removeEventListener: vi.fn() }
+    const documentAddListenerSpy = vi.spyOn(document, 'addEventListener')
+    vi.stubEnv('DEV', true)
+    window.matchMedia.mockImplementation(() => mediaQuery)
+    ocrStoreMock.init.mockReturnValue(init.promise)
+
+    const wrapper = mount(PdfApp)
+    await nextTick()
+    documentAddListenerSpy.mockClear()
+    browser.runtime.onMessage.addListener.mockClear()
+
+    init.resolve()
+    await Promise.resolve()
+    await nextTick()
+
+    expect(browser.runtime.onMessage.addListener).toHaveBeenCalledOnce()
+    expect(mediaQuery.addEventListener).toHaveBeenCalledWith('change', expect.any(Function))
+    expect(documentAddListenerSpy).toHaveBeenCalledWith('keydown', expect.any(Function))
+
+    wrapper.unmount()
+    documentAddListenerSpy.mockRestore()
+  })
+
+  it('does not continue bootstrap when OCR initialization rejects after unmount', async () => {
+    const init = createDeferred()
+    const mediaQuery = { addEventListener: vi.fn(), removeEventListener: vi.fn() }
+    const documentAddListenerSpy = vi.spyOn(document, 'addEventListener')
+    vi.stubEnv('DEV', true)
+    window.matchMedia.mockImplementation(() => mediaQuery)
+    ocrStoreMock.init.mockReturnValue(init.promise)
+
+    const wrapper = mount(PdfApp)
+    await nextTick()
+    documentAddListenerSpy.mockClear()
+    browser.runtime.onMessage.addListener.mockClear()
+    wrapper.unmount()
+
+    init.reject(new Error('OCR cache unavailable'))
+    await Promise.resolve()
+    await nextTick()
+
+    expect(pdfDiagnosticsImportMock).not.toHaveBeenCalled()
+    expect(browser.runtime.onMessage.addListener).not.toHaveBeenCalled()
+    expect(mediaQuery.addEventListener).not.toHaveBeenCalled()
+    expect(documentAddListenerSpy.mock.calls.some(([eventName]) => eventName === 'keydown')).toBe(false)
+
+    documentAddListenerSpy.mockRestore()
   })
 
   it('renders the status banner outside the viewer content flow when active', async () => {
