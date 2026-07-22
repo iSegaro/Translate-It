@@ -4,7 +4,7 @@
 .pdf-toolbar {
   position: sticky;
   top: 0;
-  z-index: 30;
+  z-index: var(--pdf-layer-toolbar);
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
   gap: 8px 12px;
@@ -344,7 +344,7 @@
   position: absolute;
   top: calc(100% + 8px);
   right: 0;
-  z-index: 40;
+  z-index: var(--pdf-layer-toolbar-menu);
   display: grid;
   gap: 4px;
   min-width: 190px;
@@ -565,7 +565,7 @@
   position: absolute;
   top: calc(100% + 8px);
   right: 0;
-  z-index: 40;
+  z-index: var(--pdf-layer-toolbar-menu);
   min-width: 220px;
   padding: 8px;
   border: 1px solid $tb-border-hover;
