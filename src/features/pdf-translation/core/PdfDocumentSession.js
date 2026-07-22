@@ -289,7 +289,13 @@ export class PdfDocumentSession extends ResourceTracker {
     this.objectUrl = objectUrl
     this.totalPages = document.numPages
     this.pdfFingerprint = document.fingerprint || ''
-    this.displayName = this.fileName
+    try {
+      const { info } = await this.pdfDocument.getMetadata()
+      this.displayName = (info?.Title || '').trim() || this.fileName
+    } catch (error) {
+      logger.debug('Failed to read PDF metadata', error)
+      this.displayName = this.fileName
+    }
     this.documentIdentity = await this._resolveDocumentIdentity(file, document)
     this._startDocumentCacheLoad(this.documentIdentity, this._documentGeneration)
     this._pageContentRepository.reset()

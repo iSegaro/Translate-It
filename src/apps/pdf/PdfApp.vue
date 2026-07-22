@@ -545,6 +545,10 @@ function resetPresentationState() {
   resetViewerState()
 }
 
+function updateDocumentTitle() {
+  document.title = session.displayName || 'Translate It - PDF Viewer'
+}
+
 async function handleFileSelected(file) {
   cancelRegionOcr()
   resetPresentationState()
@@ -553,6 +557,7 @@ async function handleFileSelected(file) {
     isDragOver.value = false
     void attachDocument(session)
   }
+  updateDocumentTitle()
 }
 
 function requestOpenPdf() {
@@ -890,6 +895,8 @@ function showExportSuccess(formatLabel) {
     exportSuccessTimer.value = null
   }, EXPORT_SUCCESS_DURATION_MS)
 }
+
+updateDocumentTitle()
 
 onMounted(async () => {
   try {
