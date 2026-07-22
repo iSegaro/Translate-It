@@ -512,6 +512,14 @@ export class PdfDocumentSession extends ResourceTracker {
     return this.pageSessions.get(normalizedPageNumber)?.getLogicalBlocks?.() || []
   }
 
+  getCommittedTextContent(pageNumber) {
+    const normalizedPageNumber = Number(pageNumber)
+    if (!Number.isInteger(normalizedPageNumber) || normalizedPageNumber <= 0) return null
+
+    const pageSession = this.pageSessions.get(normalizedPageNumber)
+    return pageSession?.loaded ? pageSession.textContent ?? null : null
+  }
+
   getLoadedVisiblePageSessions() {
     const pageSessions = []
 

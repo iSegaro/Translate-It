@@ -190,8 +190,8 @@ async function renderPage() {
 async function renderTextLayerOnly() {
   if (!props.visible || !props.renderAllowed || !textLayerEl.value) return
 
-  const pageSession = props.session.pageSessions?.get(props.page.pageNumber)
-  if (!pageSession?.textContent) {
+  const textContent = props.session.getCommittedTextContent?.(props.page.pageNumber)
+  if (!textContent) {
     textLayerRenderer?.clear()
     return
   }
@@ -204,7 +204,7 @@ async function renderTextLayerOnly() {
     viewport,
     containerWidth: Math.floor(props.page.width),
     containerHeight: Math.floor(props.page.height),
-    textContent: pageSession.textContent
+    textContent
   })
 }
 

@@ -299,6 +299,30 @@ describe('PdfDocumentSession', () => {
     expect(pdfDocument.getPage).toHaveBeenCalledTimes(1)
   })
 
+  it('returns committed text content by reference without hydrating', () => {
+    const textContent = { items: [{ str: 'Committed text' }] }
+    const pageSession = { loaded: true, textContent }
+    const hydrateSpy = vi.spyOn(session._pageContentRepository, 'getPageSession')
+    session.pageSessions.set(1, pageSession)
+
+    const first = session.getCommittedTextContent(1)
+    const second = session.getCommittedTextContent(1)
+
+    expect(first).toBe(textContent)
+    expect(second).toBe(textContent)
+    expect(hydrateSpy).not.toHaveBeenCalled()
+    expect(pdfDocument.getPage).not.toHaveBeenCalled()
+  })
+
+  it('returns null when committed text content is missing or not loaded', () => {
+    session.pageSessions.set(1, { loaded: false, textContent: { items: [] } })
+    session.pageSessions.set(2, { loaded: true, textContent: null })
+
+    expect(session.getCommittedTextContent(1)).toBeNull()
+    expect(session.getCommittedTextContent(2)).toBeNull()
+    expect(session.getCommittedTextContent(3)).toBeNull()
+  })
+
   it('returns loaded visible PageSessions without hydrating', () => {
     const visibleLoadedPageSession = { loaded: true, pageNumber: 1 }
     const visibleUnloadedPageSession = { loaded: false, pageNumber: 2 }

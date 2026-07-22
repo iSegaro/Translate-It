@@ -4,14 +4,15 @@ import { describe, expect, it, vi } from 'vitest'
 import { PDF_RENDER_RESULT_STATUS } from '@/features/pdf-translation/core/PdfRenderer.js'
 import PdfPageView from './PdfPageView.vue'
 
-const { textLayerRenderMock } = vi.hoisted(() => ({
-  textLayerRenderMock: vi.fn().mockResolvedValue(undefined)
+const { textLayerRenderMock, textLayerClearMock } = vi.hoisted(() => ({
+  textLayerRenderMock: vi.fn().mockResolvedValue(undefined),
+  textLayerClearMock: vi.fn()
 }))
 
 vi.mock('@/features/pdf-translation/core/PdfTextLayerRenderer.js', () => ({
   PdfTextLayerRenderer: class PdfTextLayerRenderer {
     render = textLayerRenderMock
-    clear() {}
+    clear = textLayerClearMock
     destroy() {}
   }
 }))
@@ -36,7 +37,7 @@ function createSession() {
     clearPage: vi.fn(),
     getPageMaskModel: vi.fn(() => null),
     getPageViewport: vi.fn(() => ({ scale: 1 })),
-    pageSessions: new Map()
+    getCommittedTextContent: vi.fn(() => null)
   }
 }
 
@@ -60,11 +61,10 @@ async function settleWatchers() {
 describe('PdfPageView', () => {
   it('renders committed text during normal page render', async () => {
     const session = createSession()
-    session.pageSessions.set(3, {
-      textContent: {
-        items: [{ str: 'Already committed', transform: [1, 0, 0, 1, 10, 20], width: 50, height: 12 }]
-      }
-    })
+    const textContent = {
+      items: [{ str: 'Already committed', transform: [1, 0, 0, 1, 10, 20], width: 50, height: 12 }]
+    }
+    session.getCommittedTextContent.mockReturnValue(textContent)
     textLayerRenderMock.mockClear()
     const wrapper = mount(PdfPageView, {
       props: { page: createPage(), session, visible: true, renderAllowed: false }
@@ -76,18 +76,17 @@ describe('PdfPageView', () => {
 
     expect(session.renderPage).toHaveBeenCalledOnce()
     expect(textLayerRenderMock).toHaveBeenCalledWith(expect.objectContaining({
-      textContent: session.pageSessions.get(3).textContent
+      textContent
     }))
     wrapper.unmount()
   })
 
   it('renders committed text without rerendering the canvas', async () => {
     const session = createSession()
-    session.pageSessions.set(3, {
-      textContent: {
-        items: [{ str: 'Committed', transform: [1, 0, 0, 1, 10, 20], width: 50, height: 12 }]
-      }
-    })
+    const textContent = {
+      items: [{ str: 'Committed', transform: [1, 0, 0, 1, 10, 20], width: 50, height: 12 }]
+    }
+    session.getCommittedTextContent.mockReturnValue(textContent)
     const wrapper = mount(PdfPageView, {
       props: { page: createPage(), session, visible: true }
     })
@@ -99,9 +98,29 @@ describe('PdfPageView', () => {
     await wrapper.vm.renderTextLayerOnly()
 
     expect(session.renderPage).not.toHaveBeenCalled()
+    expect(session.getCommittedTextContent).toHaveBeenCalledWith(3)
     expect(textLayerRenderMock).toHaveBeenCalledWith(expect.objectContaining({
-      textContent: session.pageSessions.get(3).textContent
+      textContent
     }))
+  })
+
+  it('clears existing text when committed text becomes unavailable', async () => {
+    const session = createSession()
+    session.getCommittedTextContent.mockReturnValue({
+      items: [{ str: 'Committed', transform: [1, 0, 0, 1, 10, 20], width: 50, height: 12 }]
+    })
+    const wrapper = mount(PdfPageView, {
+      props: { page: createPage(), session, visible: true }
+    })
+
+    await wrapper.vm.renderTextLayerOnly()
+    textLayerClearMock.mockClear()
+    session.getCommittedTextContent.mockReturnValue(null)
+
+    await wrapper.vm.renderTextLayerOnly()
+
+    expect(textLayerClearMock).toHaveBeenCalledOnce()
+    wrapper.unmount()
   })
 
   it('reserves the PDF canvas slot before the page renders', () => {
