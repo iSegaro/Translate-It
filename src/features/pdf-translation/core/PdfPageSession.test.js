@@ -42,6 +42,22 @@ describe('PdfPageSession', () => {
     expect(session.getLogicalBlocks()[0].documentIdentity).toBe('fingerprint-1')
   })
 
+  it('does not extract again after an empty page has loaded', async () => {
+    const page = {
+      pageNumber: 1,
+      getTextContent: vi.fn().mockResolvedValue({ items: [], styles: null })
+    }
+    const session = new PdfPageSession({ documentIdentity: 'fingerprint-1', pageNumber: 1 })
+
+    await session.hydrate(page, { naturalWidth: 500, naturalHeight: 700 })
+    await session.hydrate(page, { naturalWidth: 500, naturalHeight: 700, scale: 1.5 })
+
+    expect(session.loaded).toBe(true)
+    expect(session.getLogicalBlocks()).toHaveLength(0)
+    expect(session.displayScale).toBe(1.5)
+    expect(page.getTextContent).toHaveBeenCalledOnce()
+  })
+
   it('keeps logical block identity stable across different page display scales', async () => {
     const page = {
       pageNumber: 1,

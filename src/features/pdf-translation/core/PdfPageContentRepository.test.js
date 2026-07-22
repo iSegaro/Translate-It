@@ -59,6 +59,37 @@ describe('PdfPageContentRepository', () => {
     expect(repository.pageSessions.get(1)).toBe(pageSession)
   })
 
+  it('reuses a loaded page session with zero logical blocks', async () => {
+    const page = {
+      pageNumber: 1,
+      getTextContent: vi.fn().mockResolvedValue({ items: [], styles: null })
+    }
+    context.pdfDocument.getPage = vi.fn().mockResolvedValue(page)
+
+    const first = await repository.getPageSession({ ...context, pageNumber: 1 })
+    const second = await repository.getPageSession({ ...context, pageNumber: 1 })
+    const [visibleSession] = await repository.getVisiblePageSessions({
+      ...context,
+      visiblePageNumbers: new Set([1])
+    })
+
+    expect(first.loaded).toBe(true)
+    expect(first.getLogicalBlocks()).toHaveLength(0)
+    expect(second).toBe(first)
+    expect(visibleSession).toBe(first)
+    expect(context.pdfDocument.getPage).toHaveBeenCalledOnce()
+    expect(page.getTextContent).toHaveBeenCalledOnce()
+  })
+
+  it('reuses a loaded page session with logical blocks', async () => {
+    const first = await repository.getPageSession({ ...context, pageNumber: 1 })
+    const second = await repository.getPageSession({ ...context, pageNumber: 1 })
+
+    expect(first.getLogicalBlocks()).not.toHaveLength(0)
+    expect(second).toBe(first)
+    expect(context.pdfDocument.getPage).toHaveBeenCalledOnce()
+  })
+
   it('dedupes pending hydration for the same page', async () => {
     let resolveTextContent
     const page = createPage(1)

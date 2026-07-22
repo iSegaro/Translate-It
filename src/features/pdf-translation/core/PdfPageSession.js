@@ -46,7 +46,8 @@ export class PdfPageSession {
     this.pageSize = normalizePageSize(pageMetric)
     this.displayScale = Number(pageMetric?.scale) || this.displayScale || 1
 
-    if (this.loaded && this.textContent && this.logicalBlocks.length) {
+    // `loaded` marks completed extraction, including image-only pages with no blocks.
+    if (this.loaded) {
       return this
     }
 

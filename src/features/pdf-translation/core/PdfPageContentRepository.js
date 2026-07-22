@@ -50,7 +50,7 @@ export class PdfPageContentRepository {
     if (existingSession) {
       if (!this._isHydrationCurrent(lifecycle)) return null
       existingSession.updateDocumentIdentity(documentIdentity)
-      if (existingSession.loaded && existingSession.getLogicalBlocks().length > 0) {
+      if (existingSession.loaded) {
         return existingSession
       }
     }
@@ -99,7 +99,7 @@ export class PdfPageContentRepository {
     if (!this._isHydrationCurrent(lifecycle)) return null
 
     // Re-check: a previous call may have completed while this one waited
-    if (existingSession?.loaded && existingSession.getLogicalBlocks().length > 0) {
+    if (existingSession?.loaded) {
       if (!this._isHydrationCurrent(lifecycle)) return null
       existingSession.updateDocumentIdentity(documentIdentity)
       this.pageSessions.set(pageNumber, existingSession)
