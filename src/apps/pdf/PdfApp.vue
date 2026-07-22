@@ -460,9 +460,22 @@ const toolbarOcrModel = computed(() => {
   }
 })
 
+function showOcrLanguageRequiredMessage() {
+  ocrError.value = 'No OCR language is installed. Open Manage Languages from the OCR menu to download one.'
+}
+
+function ensureOcrLanguageInstalled() {
+  if (toolbarOcrModel.value.hasInstalledLanguages) return true
+
+  showOcrLanguageRequiredMessage()
+  return false
+}
+
 function handleOcrPrimaryClick() {
   const model = toolbarOcrModel.value
   if (!model.canCancel) {
+    if (!ensureOcrLanguageInstalled()) return
+
     const action = model.preferredAction
     if (action === 'region') {
       if (!model.regionOcrAvailable) return
@@ -766,6 +779,7 @@ function createRegionComparisonFailureNotification(error) {
 
 function beginRegionSelection(target) {
   if (regionOcrState.value === REGION_OCR_STATE.PROCESSING) return
+  if (target === REGION_EXECUTION_TARGET.OCR && !ensureOcrLanguageInstalled()) return
   if (regionOcrState.value === REGION_OCR_STATE.SELECTING) {
     if (regionSelectionTarget.value === target) {
       exitRegionSelection()

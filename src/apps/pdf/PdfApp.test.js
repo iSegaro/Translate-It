@@ -32,10 +32,15 @@ let mockPdfSession
 const mockRegionExecutionDispatch = vi.fn((request, runner) => runner(request))
 const openTranslationMock = vi.fn()
 const downloadFileMock = vi.hoisted(() => vi.fn())
+const openOptionsPageMock = vi.hoisted(() => vi.fn())
 const settingsStoreMock = vi.hoisted(() => ({
   isDarkTheme: false,
   settings: { THEME: 'auto', DEBUG_MODE: false },
   updateSettingAndPersist: vi.fn().mockResolvedValue(true)
+}))
+const ocrStoreMock = vi.hoisted(() => ({
+  downloadedLanguages: ['eng'],
+  init: vi.fn().mockResolvedValue()
 }))
 const regionComparisonRunnerMock = vi.hoisted(() => ({
   execute: vi.fn(),
@@ -105,10 +110,7 @@ vi.mock('@/features/settings/stores/settings.js', () => ({
 }))
 
 vi.mock('@/features/screen-capture/stores/ocrStore.js', () => ({
-  useOCRStore: () => ({
-    downloadedLanguages: [],
-    init: vi.fn().mockResolvedValue()
-  })
+  useOCRStore: () => ocrStoreMock
 }))
 
 vi.mock('@/features/screen-capture/utils/ocrLanguageMap.js', () => ({
@@ -138,6 +140,10 @@ vi.mock('./RegionComparisonRunner.js', () => ({
 
 vi.mock('@/utils/ui/theme.js', () => ({
   applyTheme: vi.fn()
+}))
+
+vi.mock('@/core/helpers.js', () => ({
+  openOptionsPage: openOptionsPageMock
 }))
 
 vi.mock('@/features/pdf-translation/core/PdfFileDownloader.js', () => ({
@@ -400,10 +406,14 @@ describe('PdfApp', () => {
   beforeEach(() => {
     vi.useRealTimers()
     openTranslationMock.mockReset()
+    openOptionsPageMock.mockReset()
     mockRegionExecutionDispatch.mockClear()
     regionComparisonRunnerMock.execute.mockReset()
     regionComparisonRunnerMock.options = null
     settingsStoreMock.settings.DEBUG_MODE = false
+    settingsStoreMock.settings.OCR_DEFAULT_LANG = 'eng'
+    settingsStoreMock.settings.OCR_PREFERRED_ACTION = 'region'
+    ocrStoreMock.downloadedLanguages = ['eng']
     createMocks()
   })
 
@@ -645,6 +655,42 @@ describe('PdfApp', () => {
     expect(mockRegionExecutionDispatch).toHaveBeenCalledOnce()
     expect(mockRegionExecutionDispatch.mock.calls[0][0]).toEqual(expect.objectContaining({ region, target: 'ocr' }))
     expect(mockRegionOcr.startRegionOcr).toHaveBeenCalledOnce()
+  })
+
+  it('prevents region selection and shows guidance when no OCR language is installed', async () => {
+    ocrStoreMock.downloadedLanguages = []
+    const wrapper = mount(PdfApp)
+    await flushPromises()
+
+    wrapper.findComponent({ name: 'PdfToolbar' }).vm.$emit('primary-click')
+    await flushPromises()
+
+    expect(wrapper.findComponent({ name: 'PdfViewer' }).props('regionSelectionActive')).toBe(false)
+    expect(mockRegionExecutionDispatch).not.toHaveBeenCalled()
+    expect(wrapper.text()).toContain('No OCR language is installed. Open Manage Languages from the OCR menu to download one.')
+  })
+
+  it('prevents page OCR and shows guidance when no OCR language is installed', async () => {
+    settingsStoreMock.settings.OCR_PREFERRED_ACTION = 'page'
+    ocrStoreMock.downloadedLanguages = []
+    const wrapper = mount(PdfApp)
+    await flushPromises()
+
+    wrapper.findComponent({ name: 'PdfToolbar' }).vm.$emit('primary-click')
+    await flushPromises()
+
+    expect(mockPdfOcr.requestOcr).not.toHaveBeenCalled()
+    expect(wrapper.findComponent({ name: 'PdfViewer' }).props('regionSelectionActive')).toBe(false)
+    expect(wrapper.text()).toContain('No OCR language is installed. Open Manage Languages from the OCR menu to download one.')
+  })
+
+  it('keeps the OCR Manage Languages entry point routed to options', async () => {
+    const wrapper = mount(PdfApp)
+    await flushPromises()
+
+    wrapper.findComponent({ name: 'PdfToolbar' }).vm.$emit('manage-languages')
+
+    expect(openOptionsPageMock).toHaveBeenCalledWith('ocr')
   })
 
   it('completes a regionComparison and exports its artifact through PdfApp ownership', async () => {
@@ -1778,6 +1824,7 @@ describe('PdfApp', () => {
   describe('OCR highlight reactivity', () => {
     it('updates currentPageContainsOcr after page OCR completes on current page', async () => {
       createMocks({ sessionAsRef: false })
+      ocrStoreMock.downloadedLanguages = []
       const wrapper = mount(PdfApp)
       await flushPromises()
 
