@@ -586,9 +586,11 @@ const ocrModel = computed(() => props.ocrViewModel || {})
 
 const primaryLabel = computed(() => {
   const m = ocrModel.value
+  const action = m.primaryAction === 'page' ? 'OCR Page' : 'OCR Region'
+  if (!m.hasInstalledLanguages) return m.canCancel ? 'Cancel' : action
+
   const lang = m.language?.compactLabel || (m.language?.code || 'EN').toUpperCase()
   if (m.canCancel) return `Cancel · ${lang}`
-  const action = m.primaryAction === 'page' ? 'OCR Page' : 'OCR Region'
   return `${action} · ${lang}`
 })
 

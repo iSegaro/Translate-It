@@ -335,6 +335,7 @@ describe('PdfToolbar', () => {
           hasDocument: true,
           regionOcrAvailable: true,
           isPageOcrRecommended: true,
+          hasInstalledLanguages: true,
           installedLanguages: []
         }
       }
@@ -344,6 +345,36 @@ describe('PdfToolbar', () => {
     expect(primary.exists()).toBe(true)
     expect(primary.text()).toBe('OCR Region · EN')
     expect(wrapper.find('.pdf-toolbar__ocr-arrow').exists()).toBe(true)
+  })
+
+  it('hides the language suffix when no OCR language is installed', async () => {
+    const wrapper = mount(PdfToolbar, {
+      props: {
+        ocrViewModel: {
+          primaryAction: 'region',
+          preferredAction: 'region',
+          language: { code: 'eng', name: 'English', compactLabel: 'EN' },
+          canCancel: false,
+          currentPageContainsOcr: false,
+          hasDocument: true,
+          regionOcrAvailable: true,
+          isPageOcrRecommended: false,
+          hasInstalledLanguages: false,
+          installedLanguages: []
+        }
+      }
+    })
+
+    expect(wrapper.find('.pdf-toolbar__ocr-primary').text()).toBe('OCR Region')
+
+    await wrapper.setProps({
+      ocrViewModel: {
+        ...wrapper.props('ocrViewModel'),
+        primaryAction: 'page'
+      }
+    })
+
+    expect(wrapper.find('.pdf-toolbar__ocr-primary').text()).toBe('OCR Page')
   })
 
   it('emits primary-click from OCR primary button', async () => {
@@ -358,6 +389,7 @@ describe('PdfToolbar', () => {
           hasDocument: true,
           regionOcrAvailable: true,
           isPageOcrRecommended: true,
+          hasInstalledLanguages: true,
           installedLanguages: []
         }
       }
@@ -379,6 +411,7 @@ describe('PdfToolbar', () => {
           hasDocument: true,
           regionOcrAvailable: true,
           isPageOcrRecommended: true,
+          hasInstalledLanguages: true,
           installedLanguages: []
         }
       }
@@ -395,8 +428,9 @@ describe('PdfToolbar', () => {
         language: { code: 'eng', name: 'English' },
         canCancel: false,
         currentPageContainsOcr: false,
-            hasDocument: true,
-            isPageOcrRecommended: false,
+        hasDocument: true,
+        isPageOcrRecommended: false,
+        hasInstalledLanguages: true,
         installedLanguages: []
       }
     })
@@ -734,6 +768,7 @@ describe('PdfToolbar', () => {
             hasDocument: true,
           regionOcrAvailable: true,
           isPageOcrRecommended: true,
+            hasInstalledLanguages: true,
             installedLanguages: []
           }
         }
@@ -754,6 +789,7 @@ describe('PdfToolbar', () => {
             hasDocument: true,
           regionOcrAvailable: true,
           isPageOcrRecommended: true,
+            hasInstalledLanguages: true,
             installedLanguages: []
           }
         }

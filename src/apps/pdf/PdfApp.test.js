@@ -1783,6 +1783,7 @@ describe('PdfApp', () => {
 
       const toolbar = wrapper.findComponent({ name: 'PdfToolbar' })
       expect(toolbar.props('ocrViewModel').currentPageContainsOcr).toBe(false)
+      expect(toolbar.props('ocrViewModel').hasInstalledLanguages).toBe(false)
 
       wrapper.findComponent({ name: 'PdfViewer' }).vm.$emit('current-page-change', 0)
       await flushPromises()

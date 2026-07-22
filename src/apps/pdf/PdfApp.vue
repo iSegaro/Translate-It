@@ -449,6 +449,7 @@ const toolbarOcrModel = computed(() => {
     hasDocument: hasDocument.value,
     regionOcrAvailable: regionOcrAvailable.value,
     isPageOcrRecommended: shouldRecommendPageOcr,
+    hasInstalledLanguages: ocrStore.downloadedLanguages.length > 0,
     installedLanguages: SUPPORTED_OCR_LANGUAGES
       .filter(lang => ocrStore.downloadedLanguages.includes(lang.code))
       .map(lang => ({
