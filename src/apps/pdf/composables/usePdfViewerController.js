@@ -135,8 +135,6 @@ export function usePdfViewerController() {
     const logicalBlocks = pdfDocumentSession.getPageSourceBlocks(metric.pageNumber)
     return reactive({
       pageNumber: metric.pageNumber,
-      width: metric.width,
-      height: metric.height,
       blocks: _resolveBlocksForPageSession(logicalBlocks, existingPage)
     })
   }
@@ -159,11 +157,8 @@ export function usePdfViewerController() {
     pdfDocumentSession.forEachCommittedPage((pageNumber) => {
       const logicalBlocks = pdfDocumentSession.getPageSourceBlocks(pageNumber)
       if (!_pageDataMap.has(pageNumber)) {
-        const metric = _pageMetricIndex.get(pageNumber)
         _pageDataMap.set(pageNumber, reactive({
           pageNumber,
-          width: metric?.width ?? 0,
-          height: metric?.height ?? 0,
           blocks: _buildBlocksForLogicalBlocks(logicalBlocks)
         }))
         changed = true

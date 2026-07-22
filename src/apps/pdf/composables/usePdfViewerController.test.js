@@ -599,8 +599,6 @@ describe('usePdfViewerController cache persistence', () => {
     await controller.recomputeLayout({ width: 900, height: 700 })
 
     const [page] = controller.translatedPageData.value
-    expect(page.width).toBe(720)
-    expect(page.height).toBe(900)
     expect(page.blocks).toHaveLength(1)
     expect(page.blocks[0].id).toBe(block.id)
   })
