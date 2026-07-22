@@ -6,6 +6,7 @@ import { pdfDocumentSession } from '@/features/pdf-translation/core/PdfDocumentS
 import { PdfOcrRecommendationEngine } from '@/features/pdf-translation/core/PdfOcrRecommendationEngine.js'
 import { PdfOcrProcessor } from '@/features/pdf-translation/core/PdfOcrProcessor.js'
 import { pdfCacheManager } from '@/features/pdf-translation/core/PdfCacheManager.js'
+import { mapOcrError } from '@/features/ocr/errors/ocrErrorMapper.js'
 
 const logger = getScopedLogger(LOG_COMPONENTS.PDF, 'usePdfOcr')
 
@@ -49,12 +50,19 @@ export function usePdfOcr({ onOcrComplete } = {}) {
 
       const pageNumbers = [...ocrBatch.pageNumbers]
 
-      await processor.processPages(pageNumbers, {
+      const results = await processor.processPages(pageNumbers, {
         language: ocrLanguage.value,
         onProgress: ({ current, total, pageNumber }) => {
           ocrProgress.value = { current, total, pageNumber }
         }
       })
+
+      const failedPage = results.find(result => !result.success)
+      if (failedPage) {
+        const error = failedPage.error instanceof Error ? failedPage.error : new Error(failedPage.error)
+        const errorCode = mapOcrError(error)
+        if (errorCode !== 'cancelled') ocrError.value = errorCode
+      }
 
       await saveOcrToCache(pageNumbers)
 
@@ -64,7 +72,8 @@ export function usePdfOcr({ onOcrComplete } = {}) {
       logger.info('OCR completed for pages:', { pageNumbers, language: ocrLanguage.value })
     } catch (error) {
       logger.error('OCR process failed:', error)
-      ocrError.value = error?.message || 'OCR failed'
+      const errorCode = mapOcrError(error)
+      if (errorCode !== 'cancelled') ocrError.value = errorCode
     } finally {
       isOcrProcessing.value = false
       ocrProgress.value = { current: 0, total: 0, pageNumber: 0 }

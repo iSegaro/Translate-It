@@ -216,6 +216,7 @@ import { createPdfTransitionController } from './composables/createPdfTransition
 import { createPdfStatusBannerController } from './utils/pdfStatusBanner.js'
 import { REGION_OCR_STATE } from './constants/regionOcrState.js'
 import { getTesseractLanguageCodeLabel } from '@/features/screen-capture/utils/ocrLanguageMap.js'
+import { mapOcrError } from '@/features/ocr/errors/ocrErrorMapper.js'
 import { PdfDeveloperApi } from './PdfDeveloperApi.js'
 import { RegionComparisonRunner } from './RegionComparisonRunner.js'
 import { RegionComparisonAnalyzer } from './RegionComparisonAnalyzer.js'
@@ -461,7 +462,7 @@ const toolbarOcrModel = computed(() => {
 })
 
 function showOcrLanguageRequiredMessage() {
-  ocrError.value = 'No OCR language is installed. Open Manage Languages from the OCR menu to download one.'
+  ocrError.value = 'model-not-installed'
 }
 
 function ensureOcrLanguageInstalled() {
@@ -469,6 +470,15 @@ function ensureOcrLanguageInstalled() {
 
   showOcrLanguageRequiredMessage()
   return false
+}
+
+function getPdfOcrBannerMessage(errorCode) {
+  if (errorCode === 'model-not-installed') {
+    return 'No OCR language is installed. Open Manage Languages from the OCR menu to download one.'
+  }
+
+  if (errorCode === 'ocr-failed') return 'OCR failed. Please try again.'
+  return ''
 }
 
 function handleOcrPrimaryClick() {
@@ -515,7 +525,7 @@ function handleOpenSettings() {
 const pdfStatusBanner = computed(() => pdfStatusBannerController.build({
   error: error.value,
   exportError: exportError.value,
-  ocrError: ocrError.value,
+  ocrError: getPdfOcrBannerMessage(ocrError.value),
   isLoading: isLoading.value,
   isTranslating: isTranslating.value,
   developerNotification: isDebugMode.value ? developerNotification.value : null,
@@ -814,6 +824,13 @@ function handleRegionOcrOutcome(result) {
       message: 'No text found in the selected region.'
     }
   } else if (result?.status === 'failed') {
+    const errorCode = mapOcrError(result.error)
+    if (errorCode === 'cancelled') return
+    if (errorCode === 'model-not-installed') {
+      showOcrLanguageRequiredMessage()
+      return
+    }
+
     regionOcrNotice.value = {
       variant: 'error',
       title: 'Region OCR',
@@ -822,8 +839,8 @@ function handleRegionOcrOutcome(result) {
   }
 }
 
-function handleRegionOcrFailure() {
-  handleRegionOcrOutcome({ status: 'failed' })
+function handleRegionOcrFailure(error) {
+  handleRegionOcrOutcome({ status: 'failed', error })
 }
 
 function handleRegionOcrRecognized(payload) {

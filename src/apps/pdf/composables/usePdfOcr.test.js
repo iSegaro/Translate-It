@@ -233,6 +233,33 @@ describe('usePdfOcr', () => {
     wrapper.unmount()
   })
 
+  it('maps a missing language model failure to a stable OCR error code', async () => {
+    const { api, wrapper } = mountComposable()
+    mockPdfDocumentSession.pageSessions.set(1, createScannedPageSession(1))
+    mockPdfDocumentSession.visiblePageNumbers.add(1)
+    mockProcessPages = vi.fn(async () => [{ pageNumber: 1, blocks: [], success: false, error: 'model-not-installed' }])
+    api.refreshOcrRecommendations()
+
+    await api.requestOcr()
+
+    expect(api.ocrError.value).toBe('model-not-installed')
+    wrapper.unmount()
+  })
+
+  it('maps generic page failures without exposing their raw messages', async () => {
+    const { api, wrapper } = mountComposable()
+    mockPdfDocumentSession.pageSessions.set(1, createScannedPageSession(1))
+    mockPdfDocumentSession.visiblePageNumbers.add(1)
+    mockProcessPages = vi.fn(async () => [{ pageNumber: 1, blocks: [], success: false, error: 'Tesseract worker crashed' }])
+    api.refreshOcrRecommendations()
+
+    await api.requestOcr()
+
+    expect(api.ocrError.value).toBe('ocr-failed')
+    expect(api.ocrError.value).not.toContain('Tesseract')
+    wrapper.unmount()
+  })
+
   it('removes lifecycle listeners on unmount', () => {
     const { wrapper } = mountComposable()
 

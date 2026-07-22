@@ -832,8 +832,8 @@ describe('PdfApp', () => {
     expect(wrapper.text()).toContain('No text found in the selected region.')
   })
 
-  it('returns to idle and notifies on Region OCR failure', async () => {
-    mockRegionOcr.startRegionOcr.mockReturnValue(createMockOperation(Promise.resolve({ status: 'failed', error: new Error('failed') })))
+  it('returns to idle and shows a generic message for Region OCR failure', async () => {
+    mockRegionOcr.startRegionOcr.mockReturnValue(createMockOperation(Promise.resolve({ status: 'failed', error: new Error('Tesseract worker crashed') })))
     const wrapper = mount(PdfApp)
     await flushPromises()
     const toolbar = wrapper.findComponent({ name: 'PdfToolbar' })
@@ -843,6 +843,36 @@ describe('PdfApp', () => {
     await flushPromises()
 
     expect(wrapper.text()).toContain('OCR failed. Please try another region.')
+    expect(wrapper.text()).not.toContain('Tesseract worker crashed')
+  })
+
+  it('shows missing-language guidance for Region OCR failures', async () => {
+    mockRegionOcr.startRegionOcr.mockReturnValue(createMockOperation(Promise.resolve({ status: 'failed', error: new Error('model-not-installed') })))
+    const wrapper = mount(PdfApp)
+    await flushPromises()
+
+    const toolbar = wrapper.findComponent({ name: 'PdfToolbar' })
+    toolbar.vm.$emit('primary-click')
+    wrapper.findComponent({ name: 'PdfViewer' }).vm.$emit('region-selection-complete', createPdfRegion({ pageNumber: 1, left: 1, top: 4, right: 3, bottom: 2 }))
+    await flushPromises()
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('No OCR language is installed. Open Manage Languages from the OCR menu to download one.')
+    expect(wrapper.text()).not.toContain('OCR failed. Please try another region.')
+  })
+
+  it('keeps cancelled Region OCR silent', async () => {
+    mockRegionOcr.startRegionOcr.mockReturnValue(createMockOperation(Promise.resolve({ status: 'failed', error: new Error('cancelled') })))
+    const wrapper = mount(PdfApp)
+    await flushPromises()
+
+    const toolbar = wrapper.findComponent({ name: 'PdfToolbar' })
+    toolbar.vm.$emit('primary-click')
+    wrapper.findComponent({ name: 'PdfViewer' }).vm.$emit('region-selection-complete', createPdfRegion({ pageNumber: 1, left: 1, top: 4, right: 3, bottom: 2 }))
+    await flushPromises()
+    await flushPromises()
+
+    expect(wrapper.text()).not.toContain('OCR failed. Please try another region.')
   })
 
   it('owns the OCR-only execution mode and rejects unsupported toolbar intent', async () => {
@@ -1104,10 +1134,11 @@ describe('PdfApp', () => {
   })
 
   it.each([
-    ['PDF load', { error: 'Failed to open the PDF file.' }],
-    ['export', { exportError: 'Failed to export as TXT.' }],
-    ['OCR', { ocrError: 'OCR failed.' }]
-  ])('shows only the banner for %s errors', async (_label, bannerState) => {
+    ['PDF load', { error: 'Failed to open the PDF file.' }, 'Failed to open the PDF file.'],
+    ['export', { exportError: 'Failed to export as TXT.' }, 'Failed to export as TXT.'],
+    ['OCR', { ocrError: 'ocr-failed' }, 'OCR failed. Please try again.'],
+    ['OCR missing model', { ocrError: 'model-not-installed' }, 'No OCR language is installed. Open Manage Languages from the OCR menu to download one.']
+  ])('shows only the banner for %s errors', async (_label, bannerState, expectedMessage) => {
     createMocks({ bannerState })
 
     const wrapper = mount(PdfApp)
@@ -1116,7 +1147,7 @@ describe('PdfApp', () => {
 
     expect(wrapper.find('.pdf-status-banner').exists()).toBe(true)
     expect(wrapper.find('.pdf-app__error').exists()).toBe(false)
-    expect(wrapper.text()).toContain(bannerState.error || bannerState.exportError || bannerState.ocrError)
+    expect(wrapper.text()).toContain(expectedMessage)
   })
 
   it('dismisses persistent error banner without mutating app state', async () => {
