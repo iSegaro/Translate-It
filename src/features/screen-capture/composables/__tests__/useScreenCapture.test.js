@@ -3,14 +3,13 @@ import { defineComponent, h } from 'vue';
 import { mount } from '@vue/test-utils';
 import { useScreenCapture } from '../useScreenCapture.js';
 
+const captureScreenAreaMock = vi.hoisted(() => vi.fn());
+
 // Mock useExtensionAPI
 vi.mock('@/composables/core/useExtensionAPI.js', () => ({
   useExtensionAPI: () => ({
     startScreenCapture: vi.fn().mockResolvedValue(true),
-    captureScreenArea: vi.fn().mockResolvedValue({ 
-      success: true, 
-      data: { imageData: 'data:image/png;base64,test', text: 'extracted' } 
-    })
+    captureScreenArea: captureScreenAreaMock
   })
 }));
 
@@ -27,6 +26,10 @@ describe('useScreenCapture', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    captureScreenAreaMock.mockResolvedValue({
+      success: true,
+      data: { imageData: 'data:image/png;base64,test', text: 'extracted' }
+    });
     wrapper = mount(TestComponent, {
       attachTo: document.body
     });
@@ -112,6 +115,21 @@ describe('useScreenCapture', () => {
     
     expect(result.text).toBe('extracted');
     expect(composable.isCapturing.value).toBe(false);
+  });
+
+  it.each([
+    ['model-not-installed', { success: false, error: 'model-not-installed' }, 'model-not-installed'],
+    ['generic OCR failure', { success: false, error: 'Tesseract worker crashed' }, 'ocr-failed'],
+    ['cancelled OCR', { success: false, error: 'cancelled' }, 'cancelled'],
+    ['no text', { success: true, data: { imageData: 'data:image/png;base64,test', text: '' } }, 'no-text']
+  ])('stores %s as a stable error code', async (_label, response, expectedCode) => {
+    composable.selectionRect.value = { x: 10, y: 10, width: 100, height: 100 };
+    captureScreenAreaMock.mockResolvedValue(response);
+
+    await expect(composable.confirmSelection()).rejects.toThrow(expectedCode);
+
+    expect(composable.error.value).toBe(expectedCode);
+    expect(composable.error.value).not.toContain('Tesseract');
   });
 
   it('should cleanup on unmount', () => {

@@ -2,6 +2,7 @@ import { ref, computed, onMounted, onUnmounted } from "vue";
 import { useExtensionAPI } from "@/composables/core/useExtensionAPI.js";
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
+import { mapOcrError } from '@/features/ocr/errors/ocrErrorMapper.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.SCREEN_CAPTURE, 'useScreenCapture');
 
@@ -48,6 +49,17 @@ export function useScreenCapture() {
       bottom: Math.max(0, y + height),
     };
   });
+
+  const normalizeScreenOcrError = (captureError) => {
+    if (captureError?.message === 'no-text') return 'no-text';
+    return mapOcrError(captureError);
+  };
+
+  const handleScreenOcrError = (captureError) => {
+    const errorCode = normalizeScreenOcrError(captureError);
+    error.value = errorCode;
+    throw new Error(errorCode);
+  };
 
   // Methods
   const startSelection = (event) => {
@@ -157,17 +169,11 @@ export function useScreenCapture() {
           text: response.data.text,
         };
       } else {
-        // Map background error strings to internal error keys
-        const errorMsg = response.error || "";
-        if (errorMsg.includes("OCR engine failed") || errorMsg.includes("model")) {
-          throw new Error("model-error");
-        }
-        throw new Error(errorMsg || "capture-failed");
+        throw new Error(response.error || 'ocr-failed');
       }
       } catch (err) {
       logger.error("Capture area error:", err);
-      error.value = err.message;
-      throw err;
+      handleScreenOcrError(err);
 
     } finally {
       isCapturing.value = false;
@@ -281,17 +287,11 @@ export function useScreenCapture() {
           text: response.data.text,
         };
       } else {
-        // Map background error strings to internal error keys
-        const errorMsg = response.error || "";
-        if (errorMsg.includes("OCR engine failed") || errorMsg.includes("model")) {
-          throw new Error("model-error");
-        }
-        throw new Error(errorMsg || "capture-failed");
+        throw new Error(response.error || 'ocr-failed');
       }
     } catch (err) {
       logger.error("Full screen capture error:", err);
-      error.value = err.message;
-      throw err;
+      handleScreenOcrError(err);
     } finally {
       isCapturing.value = false;
     }
