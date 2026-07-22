@@ -10,6 +10,16 @@ import { mapOcrError } from '@/features/ocr/errors/ocrErrorMapper.js'
 
 const logger = getScopedLogger(LOG_COMPONENTS.PDF, 'usePdfOcr')
 
+function getBatchOcrError(results) {
+  const failedPages = results.filter(result => !result.success)
+  if (!failedPages.length) return null
+
+  const errorCodes = failedPages.map(({ error }) => mapOcrError(error instanceof Error ? error : { message: error }))
+  if (errorCodes.every(errorCode => errorCode === 'cancelled')) return 'cancelled'
+  if (errorCodes.includes('model-not-installed')) return 'model-not-installed'
+  return 'ocr-failed'
+}
+
 export function usePdfOcr({ onOcrComplete } = {}) {
   const recommendationEngine = new PdfOcrRecommendationEngine()
   const processor = new PdfOcrProcessor(pdfDocumentSession)
@@ -57,12 +67,8 @@ export function usePdfOcr({ onOcrComplete } = {}) {
         }
       })
 
-      const failedPage = results.find(result => !result.success)
-      if (failedPage) {
-        const error = failedPage.error instanceof Error ? failedPage.error : new Error(failedPage.error)
-        const errorCode = mapOcrError(error)
-        if (errorCode !== 'cancelled') ocrError.value = errorCode
-      }
+      const errorCode = getBatchOcrError(results)
+      if (errorCode && errorCode !== 'cancelled') ocrError.value = errorCode
 
       await saveOcrToCache(pageNumbers)
 

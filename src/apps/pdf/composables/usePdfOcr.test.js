@@ -94,6 +94,20 @@ function mountComposable(options = {}) {
   return { api, wrapper }
 }
 
+async function getBatchOcrError(results) {
+  const { api, wrapper } = mountComposable()
+  mockPdfDocumentSession.pageSessions.set(1, createScannedPageSession(1))
+  mockPdfDocumentSession.visiblePageNumbers.add(1)
+  mockProcessPages = vi.fn(async () => results)
+  api.refreshOcrRecommendations()
+
+  await api.requestOcr()
+
+  const errorCode = api.ocrError.value
+  wrapper.unmount()
+  return errorCode
+}
+
 describe('usePdfOcr', () => {
   beforeEach(() => {
     commitListener = null
@@ -233,31 +247,35 @@ describe('usePdfOcr', () => {
     wrapper.unmount()
   })
 
-  it('maps a missing language model failure to a stable OCR error code', async () => {
-    const { api, wrapper } = mountComposable()
-    mockPdfDocumentSession.pageSessions.set(1, createScannedPageSession(1))
-    mockPdfDocumentSession.visiblePageNumbers.add(1)
-    mockProcessPages = vi.fn(async () => [{ pageNumber: 1, blocks: [], success: false, error: 'model-not-installed' }])
-    api.refreshOcrRecommendations()
+  it.each([
+    ['all successful pages', [{ pageNumber: 1, blocks: [], success: true }], ''],
+    ['one generic failure', [{ pageNumber: 1, blocks: [], success: false, error: 'Tesseract worker crashed' }], 'ocr-failed'],
+    ['multiple generic failures', [
+      { pageNumber: 1, blocks: [], success: false, error: 'Tesseract worker crashed' },
+      { pageNumber: 2, blocks: [], success: false, error: 'PDF render failed' }
+    ], 'ocr-failed'],
+    ['only cancelled failures', [{ pageNumber: 1, blocks: [], success: false, error: 'cancelled' }], ''],
+    ['cancelled and generic failures', [
+      { pageNumber: 1, blocks: [], success: false, error: 'cancelled' },
+      { pageNumber: 2, blocks: [], success: false, error: 'Tesseract worker crashed' }
+    ], 'ocr-failed'],
+    ['cancelled and missing model failures', [
+      { pageNumber: 1, blocks: [], success: false, error: 'cancelled' },
+      { pageNumber: 2, blocks: [], success: false, error: 'model-not-installed' }
+    ], 'model-not-installed']
+  ])('derives %s as the stable batch error', async (_label, results, expectedError) => {
+    const errorCode = await getBatchOcrError(results)
 
-    await api.requestOcr()
-
-    expect(api.ocrError.value).toBe('model-not-installed')
-    wrapper.unmount()
+    expect(errorCode).toBe(expectedError)
+    expect(errorCode).not.toContain('Tesseract')
   })
 
-  it('maps generic page failures without exposing their raw messages', async () => {
-    const { api, wrapper } = mountComposable()
-    mockPdfDocumentSession.pageSessions.set(1, createScannedPageSession(1))
-    mockPdfDocumentSession.visiblePageNumbers.add(1)
-    mockProcessPages = vi.fn(async () => [{ pageNumber: 1, blocks: [], success: false, error: 'Tesseract worker crashed' }])
-    api.refreshOcrRecommendations()
+  it('prioritizes missing models regardless of page result order', async () => {
+    const genericFailure = { pageNumber: 1, blocks: [], success: false, error: 'Tesseract worker crashed' }
+    const missingModelFailure = { pageNumber: 2, blocks: [], success: false, error: 'model-not-installed' }
 
-    await api.requestOcr()
-
-    expect(api.ocrError.value).toBe('ocr-failed')
-    expect(api.ocrError.value).not.toContain('Tesseract')
-    wrapper.unmount()
+    expect(await getBatchOcrError([genericFailure, missingModelFailure])).toBe('model-not-installed')
+    expect(await getBatchOcrError([missingModelFailure, genericFailure])).toBe('model-not-installed')
   })
 
   it('removes lifecycle listeners on unmount', () => {
