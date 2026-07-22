@@ -634,9 +634,13 @@ describe('usePdfViewerController cache persistence', () => {
     session.getDocumentCacheSnapshot.mockResolvedValue({ translations: {}, ocr: {} })
     openFileMock.mockResolvedValue(createOpenState())
     session.pageSessions = new Map()
-    session.getPageSession.mockResolvedValue({
+    const hydratedSession = {
       allBlocks: [block],
       getLogicalBlocks: () => [block]
+    }
+    session.getPageSession.mockImplementation(async () => {
+      session.pageSessions.set(1, hydratedSession)
+      return hydratedSession
     })
 
     const controller = usePdfViewerController()
@@ -930,6 +934,7 @@ describe('usePdfViewerController hasTranslationContent', () => {
       allBlocks: blocks,
       getLogicalBlocks: () => blocks
     }]])
+    session.getPageSourceBlocks = vi.fn((pageNumber) => session.pageSessions.get(pageNumber)?.getLogicalBlocks?.() || [])
     openFileMock.mockResolvedValue(createOpenState())
     const controller = usePdfViewerController()
     const file = {

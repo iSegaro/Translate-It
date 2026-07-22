@@ -93,10 +93,6 @@ export function usePdfViewerController() {
     unsubscribePageSessionCommitted = pdfDocumentSession.onPageSessionCommitted(({ pageNumber }) => restoreCachedTranslationsForPage(pageNumber, translationRestoreContext))
   }
 
-  function _buildBlocksForPage(pageSession) {
-    return _buildBlocksForLogicalBlocks(pageSession.getLogicalBlocks())
-  }
-
   function _buildBlocksForLogicalBlocks(logicalBlocks = []) {
     const blocks = []
 
@@ -122,9 +118,9 @@ export function usePdfViewerController() {
     return blocks
   }
 
-  function _resolveBlocksForPageSession(pageSession, existingPage = null) {
-    if (pageSession) {
-      const blocks = _buildBlocksForPage(pageSession)
+  function _resolveBlocksForPageSession(logicalBlocks = [], existingPage = null) {
+    if (logicalBlocks.length > 0) {
+      const blocks = _buildBlocksForLogicalBlocks(logicalBlocks)
       if (blocks.length > 0) return blocks
     }
 
@@ -136,54 +132,48 @@ export function usePdfViewerController() {
   }
 
   function _buildPageDataForMetric(metric, existingPage = null) {
-    const pageSession = pdfDocumentSession.pageSessions.get(metric.pageNumber)
+    const logicalBlocks = pdfDocumentSession.getPageSourceBlocks(metric.pageNumber)
     return reactive({
       pageNumber: metric.pageNumber,
       width: metric.width,
       height: metric.height,
-      blocks: _resolveBlocksForPageSession(pageSession, existingPage)
+      blocks: _resolveBlocksForPageSession(logicalBlocks, existingPage)
     })
   }
 
-  function _hydratePageBlocks(page, pageSession) {
+  function _hydratePageBlocks(page, logicalBlocks) {
     if (page.blocks.length > 0) {
       return false
     }
 
-    const logicalBlocks = pageSession.getLogicalBlocks()
     if (logicalBlocks.length === 0) {
       return false
     }
 
-    page.blocks = _buildBlocksForPage(pageSession)
+    page.blocks = _buildBlocksForLogicalBlocks(logicalBlocks)
     return true
   }
 
   function _syncMissingPageSessions() {
     let changed = false
-    const pageSessionCount = pdfDocumentSession.pageSessions.size
-
-    if (pageSessionCount === 0) {
-      return false
-    }
-
-    for (const [pageNumber, pageSession] of pdfDocumentSession.pageSessions) {
+    pdfDocumentSession.forEachCommittedPage((pageNumber) => {
+      const logicalBlocks = pdfDocumentSession.getPageSourceBlocks(pageNumber)
       if (!_pageDataMap.has(pageNumber)) {
         const metric = _pageMetricIndex.get(pageNumber)
         _pageDataMap.set(pageNumber, reactive({
           pageNumber,
           width: metric?.width ?? 0,
           height: metric?.height ?? 0,
-          blocks: _buildBlocksForPage(pageSession)
+          blocks: _buildBlocksForLogicalBlocks(logicalBlocks)
         }))
         changed = true
-        continue
+        return
       }
 
-      if (_hydratePageBlocks(_pageDataMap.get(pageNumber), pageSession)) {
+      if (_hydratePageBlocks(_pageDataMap.get(pageNumber), logicalBlocks)) {
         changed = true
       }
-    }
+    })
 
     if (changed) {
       _translatedPageData.value = [..._pageDataMap.values()]
@@ -229,7 +219,8 @@ export function usePdfViewerController() {
       if (!page || page.blocks.length > 0) continue
 
       const pageSession = await pdfDocumentSession.getPageSession?.(pageNumber)
-      if (pageSession && _hydratePageBlocks(page, pageSession)) {
+      const logicalBlocks = pageSession ? pdfDocumentSession.getPageSourceBlocks(pageNumber) : []
+      if (_hydratePageBlocks(page, logicalBlocks)) {
         changed = true
       }
     }
