@@ -1,5 +1,6 @@
-import { describe, expect, it, vi, beforeEach } from 'vitest'
-import { ref } from 'vue'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { defineComponent, h, ref } from 'vue'
+import { mount } from '@vue/test-utils'
 
 vi.mock('../utils/pdfScrollAnchor.js', () => ({
   captureScrollAnchor: vi.fn(),
@@ -46,6 +47,8 @@ const scrollAnchor = await import('../utils/pdfScrollAnchor.js')
 const pdfTransitionAnchor = await import('./createPdfTransitionAnchor.js')
 const { PDF_SCROLL_OWNER } = pdfTransitionAnchor
 
+const mountedHosts = []
+
 function createController(options = {}) {
   const contentView = ref(options.contentView ?? CONTENT_VIEW.ORIGINAL)
   const isSideBySide = ref(options.isSideBySide ?? false)
@@ -69,24 +72,32 @@ function createController(options = {}) {
     syncFromPane: vi.fn()
   })
 
-  const ctrl = createPdfTransitionController({
-    contentView,
-    selectedLayoutMode,
-    isSideBySide,
-    showTranslatedTextPane,
-    showTranslatedPdfPane,
-    setContentView,
-    setLayoutMode,
-    session,
-    hasDocument,
-    recomputeLayout,
-    currentPage,
-    originalScrollContainer,
-    translatedScrollContainer,
-    pdfViewerRef,
-    pdfTranslatedPaneRef,
-    pdfViewerLayoutRef
+  let ctrl
+  const TestHost = defineComponent({
+    setup() {
+      ctrl = createPdfTransitionController({
+        contentView,
+        selectedLayoutMode,
+        isSideBySide,
+        showTranslatedTextPane,
+        showTranslatedPdfPane,
+        setContentView,
+        setLayoutMode,
+        session,
+        hasDocument,
+        recomputeLayout,
+        currentPage,
+        originalScrollContainer,
+        translatedScrollContainer,
+        pdfViewerRef,
+        pdfTranslatedPaneRef,
+        pdfViewerLayoutRef
+      })
+
+      return () => h('div')
+    }
   })
+  mountedHosts.push(mount(TestHost))
 
   return { ctrl, contentView, isSideBySide, selectedLayoutMode, currentPage, setContentView, setLayoutMode, recomputeLayout, pdfViewerLayoutRef, pdfViewerRef, pdfTranslatedPaneRef }
 }
@@ -135,6 +146,10 @@ beforeEach(() => {
   }
 
   pdfTransitionAnchor.createPdfTransitionAnchor.mockReturnValue(anchorFns)
+})
+
+afterEach(() => {
+  mountedHosts.splice(0).forEach(wrapper => wrapper.unmount())
 })
 
 describe('createPdfTransitionController', () => {
