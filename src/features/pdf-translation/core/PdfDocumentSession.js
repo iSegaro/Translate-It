@@ -212,10 +212,12 @@ export class PdfDocumentSession extends ResourceTracker {
 
       if (pageSession.hasOcrForLanguage(ocrEntry.ocrLanguage)) return
 
-      pageSession.setOcrBlocks(ocrEntry.ocrBlocks, ocrEntry.ocrLanguage)
-      if (Number.isFinite(Number(ocrEntry.ocrCompletedAt))) {
-        pageSession.ocrCompletedAt = Number(ocrEntry.ocrCompletedAt)
-      }
+      const ocrCompletedAt = Number(ocrEntry.ocrCompletedAt)
+      pageSession.setOcrBlocks(
+        ocrEntry.ocrBlocks,
+        ocrEntry.ocrLanguage,
+        Number.isFinite(ocrCompletedAt) ? ocrCompletedAt : undefined
+      )
     } catch (error) {
       if (this._isDocumentGenerationCurrent(generation)) {
         logger.warn('Failed to restore persisted page data:', { pageNumber: pageSession.pageNumber, error })
@@ -527,12 +529,7 @@ export class PdfDocumentSession extends ResourceTracker {
     const pageSession = this.pageSessions.get(normalizedPageNumber)
     if (!pageSession?.loaded) return null
 
-    return {
-      ocrBlocks: pageSession.ocrBlocks,
-      ocrLanguage: pageSession.ocrLanguage,
-      ocrCompletedAt: pageSession.ocrCompletedAt,
-      ocrError: pageSession.ocrError
-    }
+    return pageSession.getCommittedOcrState()
   }
 
   getLoadedVisibleOcrCandidates() {
@@ -568,7 +565,7 @@ export class PdfDocumentSession extends ResourceTracker {
     const pageSession = this.pageSessions.get(normalizedPageNumber)
     if (!pageSession?.loaded) return false
 
-    pageSession.ocrError = error?.message || 'OCR failed'
+    pageSession.setOcrError(error?.message || 'OCR failed')
     return true
   }
 

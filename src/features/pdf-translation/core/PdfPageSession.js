@@ -11,6 +11,15 @@ function normalizePageSize(pageMetric = null) {
   }
 }
 
+function createCommittedOcrState({
+  ocrBlocks = [],
+  ocrLanguage = null,
+  ocrCompletedAt = 0,
+  ocrError = null
+} = {}) {
+  return { ocrBlocks, ocrLanguage, ocrCompletedAt, ocrError }
+}
+
 export class PdfPageSession {
   constructor({
     documentIdentity = '',
@@ -27,10 +36,7 @@ export class PdfPageSession {
     this.loaded = false
     this.displayScale = 1
     this.logicalBlockBuilder = new PdfLogicalBlockBuilder()
-    this.ocrBlocks = []
-    this.ocrLanguage = null
-    this.ocrCompletedAt = 0
-    this.ocrError = null
+    this.committedOcrState = createCommittedOcrState()
   }
 
   updateDocumentIdentity(documentIdentity) {
@@ -95,18 +101,44 @@ export class PdfPageSession {
     return [...this.logicalBlocks, ...this.ocrBlocks]
   }
 
-  setOcrBlocks(blocks, language) {
-    this.ocrBlocks = blocks || []
-    this.ocrLanguage = language || null
-    this.ocrCompletedAt = Date.now()
-    this.ocrError = null
+  get ocrBlocks() {
+    return this.committedOcrState.ocrBlocks
+  }
+
+  get ocrLanguage() {
+    return this.committedOcrState.ocrLanguage
+  }
+
+  get ocrCompletedAt() {
+    return this.committedOcrState.ocrCompletedAt
+  }
+
+  get ocrError() {
+    return this.committedOcrState.ocrError
+  }
+
+  getCommittedOcrState() {
+    return this.committedOcrState
+  }
+
+  setOcrBlocks(blocks, language, ocrCompletedAt = Date.now()) {
+    this.committedOcrState = createCommittedOcrState({
+      ocrBlocks: blocks || [],
+      ocrLanguage: language || null,
+      ocrCompletedAt,
+      ocrError: null
+    })
   }
 
   clearOcrBlocks() {
-    this.ocrBlocks = []
-    this.ocrLanguage = null
-    this.ocrCompletedAt = 0
-    this.ocrError = null
+    this.committedOcrState = createCommittedOcrState()
+  }
+
+  setOcrError(error) {
+    this.committedOcrState = createCommittedOcrState({
+      ...this.committedOcrState,
+      ocrError: error || 'OCR failed'
+    })
   }
 
   hasOcrForLanguage(language) {

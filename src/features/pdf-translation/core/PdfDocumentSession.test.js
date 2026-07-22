@@ -325,13 +325,8 @@ describe('PdfDocumentSession', () => {
 
   it('returns committed OCR state without exposing the page session or hydrating', () => {
     const ocrBlocks = [{ id: 'ocr-1' }]
-    const pageSession = {
-      loaded: true,
-      ocrBlocks,
-      ocrLanguage: 'eng',
-      ocrCompletedAt: 1234,
-      ocrError: 'previous failure'
-    }
+    const committedState = { ocrBlocks, ocrLanguage: 'eng', ocrCompletedAt: 1234, ocrError: 'previous failure' }
+    const pageSession = { loaded: true, getCommittedOcrState: vi.fn(() => committedState) }
     const hydrateSpy = vi.spyOn(session._pageContentRepository, 'getPageSession')
     session.pageSessions.set(1, pageSession)
 
@@ -345,6 +340,7 @@ describe('PdfDocumentSession', () => {
     })
     expect(state).not.toBe(pageSession)
     expect(state.ocrBlocks).toBe(ocrBlocks)
+    expect(session.getCommittedOcrState(1)).toBe(state)
     expect(hydrateSpy).not.toHaveBeenCalled()
     expect(pdfDocument.getPage).not.toHaveBeenCalled()
   })
@@ -387,12 +383,12 @@ describe('PdfDocumentSession', () => {
   it('records OCR errors only on existing loaded pages without commit notification', () => {
     const listener = vi.fn()
     session.onPageSessionCommitted(listener)
-    const pageSession = { loaded: true, ocrError: null }
+    const pageSession = { loaded: true, setOcrError: vi.fn() }
     session.pageSessions.set(1, pageSession)
     session.pageSessions.set(2, { loaded: false, ocrError: null })
 
     expect(session.recordPageOcrError(1, new Error('OCR failed'))).toBe(true)
-    expect(pageSession.ocrError).toBe('OCR failed')
+    expect(pageSession.setOcrError).toHaveBeenCalledWith('OCR failed')
     expect(session.recordPageOcrError(0, 'invalid')).toBe(false)
     expect(session.recordPageOcrError(2, 'unloaded')).toBe(false)
     expect(session.recordPageOcrError(3, 'missing')).toBe(false)

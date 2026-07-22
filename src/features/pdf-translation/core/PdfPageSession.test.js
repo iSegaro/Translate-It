@@ -132,6 +132,37 @@ describe('PdfPageSession OCR state', () => {
     expect(session.ocrError).toBeNull()
   })
 
+  it('replaces the committed OCR state for success, errors, and clear', () => {
+    const session = new PdfPageSession({ documentIdentity: 'doc-1', pageNumber: 1 })
+    const initialState = session.getCommittedOcrState()
+    const blocks = [{ id: 'ocr-1' }]
+
+    session.setOcrBlocks(blocks, 'eng', 1234)
+    const completedState = session.getCommittedOcrState()
+    session.setOcrError('OCR failed')
+    const errorState = session.getCommittedOcrState()
+    session.clearOcrBlocks()
+    const clearedState = session.getCommittedOcrState()
+
+    expect(completedState).not.toBe(initialState)
+    expect(completedState).toMatchObject({ ocrBlocks: blocks, ocrLanguage: 'eng', ocrCompletedAt: 1234, ocrError: null })
+    expect(errorState).not.toBe(completedState)
+    expect(errorState).toMatchObject({ ocrBlocks: blocks, ocrLanguage: 'eng', ocrCompletedAt: 1234, ocrError: 'OCR failed' })
+    expect(clearedState).not.toBe(errorState)
+    expect(clearedState).toMatchObject({ ocrBlocks: [], ocrLanguage: null, ocrCompletedAt: 0, ocrError: null })
+  })
+
+  it('replaces committed OCR state when restoring a persisted timestamp', () => {
+    const session = new PdfPageSession({ documentIdentity: 'doc-1', pageNumber: 1 })
+    const initialState = session.getCommittedOcrState()
+
+    session.setOcrBlocks([{ id: 'ocr-1' }], 'eng', 1234)
+
+    const restoredState = session.getCommittedOcrState()
+    expect(restoredState).not.toBe(initialState)
+    expect(restoredState.ocrCompletedAt).toBe(1234)
+  })
+
   it('clearOcrBlocks resets OCR state', () => {
     const session = new PdfPageSession({ documentIdentity: 'doc-1', pageNumber: 1 })
     session.setOcrBlocks([{ id: 'ocr-1' }], 'eng')
