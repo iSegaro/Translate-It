@@ -612,6 +612,12 @@ describe('usePdfViewerController cache persistence', () => {
       translatedText: 'ترجمه',
       sourceTextHash: block.sourceTextHash
     })
+    // Simulate normal state-propagation (_updateBlockStates refreshes
+    // block.translationState from session after translation completes).
+    // Block retains this state across zoom since _rebuildPageData is
+    // no longer called during geometry-only updates.
+    const preZoomBlocks = controller.translatedPageData.value[0].blocks
+    preZoomBlocks[0].translationState = session.getBlockTranslationState(block.id)
 
     session.pageSessions.set(1, {
       allBlocks: [],

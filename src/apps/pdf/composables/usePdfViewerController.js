@@ -72,7 +72,6 @@ export function usePdfViewerController() {
 
   const _blockIndex = new Map()
 
-  const _pageMetricIndex = new Map()
   let translationRestoreContext = null
   let unsubscribePageSessionCommitted = null
   let disposed = false
@@ -192,10 +191,8 @@ export function usePdfViewerController() {
     const previousPageData = new Map(_pageDataMap)
     _pageDataMap.clear()
     _blockIndex.clear()
-    _pageMetricIndex.clear()
 
     for (const metric of pageMetrics.value) {
-      _pageMetricIndex.set(metric.pageNumber, metric)
       _pageDataMap.set(metric.pageNumber, _buildPageDataForMetric(metric, previousPageData.get(metric.pageNumber)))
     }
 
@@ -315,13 +312,15 @@ export function usePdfViewerController() {
     return false
   })
 
-  function applySessionState(state) {
+  function applySessionState(state, rebuildContent = true) {
     fileName.value = state.fileName
     pageCount.value = state.totalPages
     pageMetrics.value = state.pageMetrics
     pdfFingerprint.value = state.pdfFingerprint || ''
     workerLabel.value = state.workerUrl ? 'configured' : 'pending'
-    _rebuildPageData()
+    if (rebuildContent) {
+      _rebuildPageData()
+    }
   }
 
   function resetLoadedDocument() {
@@ -344,7 +343,6 @@ export function usePdfViewerController() {
     restoredOcrPageCount.value = 0
     _pageDataMap.clear()
     _blockIndex.clear()
-    _pageMetricIndex.clear()
     _translatedPageData.value = []
   }
 
@@ -397,7 +395,7 @@ export function usePdfViewerController() {
     error.value = ''
     try {
       const nextState = await pdfDocumentSession.rebuildPageMetrics(layoutRequest)
-      applySessionState(nextState)
+      applySessionState(nextState, false)
 
       return true
     } catch (layoutError) {
