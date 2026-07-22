@@ -25,8 +25,14 @@ describe('PdfExportCollector', () => {
           error: null
         }
       }),
-      getPageSession: vi.fn(async (pageNumber) => {
-        return session.pageSessions.get(pageNumber) || null
+      forEachCommittedPage: vi.fn((callback) => {
+        const pageNumbers = [...session.pageSessions.keys()].sort((a, b) => a - b)
+        for (const pageNumber of pageNumbers) {
+          callback(pageNumber)
+        }
+      }),
+      getPageSourceBlocks: vi.fn((pageNumber) => {
+        return session.pageSessions.get(pageNumber)?.getLogicalBlocks?.() || []
       })
     }
   })

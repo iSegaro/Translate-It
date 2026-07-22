@@ -5,13 +5,9 @@ export class PdfExportCollector {
 
   async collectTranslatedBlocks() {
     const allBlocks = []
-    const sortedPageNumbers = [...this.session.pageSessions.keys()].sort((a, b) => a - b)
 
-    for (const pageNumber of sortedPageNumbers) {
-      const pageSession = await this.session.getPageSession(pageNumber)
-      if (!pageSession) continue
-
-      const blocks = pageSession.getLogicalBlocks()
+    this.session.forEachCommittedPage((pageNumber) => {
+      const blocks = this.session.getPageSourceBlocks(pageNumber)
       for (const block of blocks) {
         const state = this.session.getBlockTranslationState(block.id)
 
@@ -27,7 +23,7 @@ export class PdfExportCollector {
           })
         }
       }
-    }
+    })
 
     allBlocks.sort((a, b) => {
       if (a.pageNumber !== b.pageNumber) return a.pageNumber - b.pageNumber
@@ -39,13 +35,9 @@ export class PdfExportCollector {
 
   async collectAllBlocks() {
     const allBlocks = []
-    const sortedPageNumbers = [...this.session.pageSessions.keys()].sort((a, b) => a - b)
 
-    for (const pageNumber of sortedPageNumbers) {
-      const pageSession = await this.session.getPageSession(pageNumber)
-      if (!pageSession) continue
-
-      const blocks = pageSession.getLogicalBlocks()
+    this.session.forEachCommittedPage((pageNumber) => {
+      const blocks = this.session.getPageSourceBlocks(pageNumber)
       for (const block of blocks) {
         const state = this.session.getBlockTranslationState(block.id)
 
@@ -59,7 +51,7 @@ export class PdfExportCollector {
           status: state.status || 'idle'
         })
       }
-    }
+    })
 
     allBlocks.sort((a, b) => {
       if (a.pageNumber !== b.pageNumber) return a.pageNumber - b.pageNumber
@@ -92,15 +84,11 @@ export class PdfExportCollector {
 
   async collectSpatialBlocks(canvasDataUrls = new Map()) {
     const pages = []
-    const sortedPageNumbers = [...this.session.pageSessions.keys()].sort((a, b) => a - b)
 
-    for (const pageNumber of sortedPageNumbers) {
-      const pageSession = await this.session.getPageSession(pageNumber)
-      if (!pageSession) continue
-
+    this.session.forEachCommittedPage((pageNumber) => {
       const metric = this.session.pageMetrics?.find((m) => m.pageNumber === pageNumber)
       const blocks = []
-      const logicalBlocks = pageSession.getLogicalBlocks()
+      const logicalBlocks = this.session.getPageSourceBlocks(pageNumber)
 
       for (const block of logicalBlocks) {
         const state = this.session.getBlockTranslationState(block.id)
@@ -120,7 +108,7 @@ export class PdfExportCollector {
 
       blocks.sort((a, b) => a.readingOrderIndex - b.readingOrderIndex)
 
-      if (blocks.length === 0) continue
+      if (blocks.length === 0) return
 
       pages.push({
         pageNumber,
@@ -132,7 +120,7 @@ export class PdfExportCollector {
         canvasDataUrl: canvasDataUrls.get(pageNumber) || null,
         blocks
       })
-    }
+    })
 
     return pages
   }
