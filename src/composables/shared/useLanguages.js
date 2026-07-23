@@ -215,3 +215,14 @@ export function useLanguages() {
     interfaceLanguages,
   };
 }
+
+/**
+ * Preload language data for LanguageSelector on startup.
+ * Module-level function; callable via dynamic import from app entry points.
+ * Uses sharedState cache — first call loads, subsequent calls resolve immediately.
+ * @returns {Promise<void>}
+ */
+export async function preloadLanguages() {
+  const { loadLanguages } = useLanguages()
+  return loadLanguages()
+}

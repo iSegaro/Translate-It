@@ -141,13 +141,12 @@ const tracker = useResourceTracker('popup-app')
 const { applyGlobalCSSVariables } = useGlobalFont()
 
 /**
- * Preload languages in parallel with other initialization tasks
+ * Preload languages on startup in parallel with other initialization tasks
  * to ensure LanguageSelector has cached values immediately
  */
 const usePreloadLanguages = async () => {
-  const { useLanguages } = await import('@/composables/shared/useLanguages.js')
-  const { loadLanguages } = useLanguages()
-  return loadLanguages()
+  const { preloadLanguages } = await import('@/composables/shared/useLanguages.js')
+  return preloadLanguages()
 }
 
 // Stores & Composables
