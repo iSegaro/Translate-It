@@ -28,6 +28,15 @@ vi.mock('@/components/shared/ProviderSelector.vue', () => ({
   }
 }))
 
+vi.mock('@/components/shared/LanguageSelector.vue', () => ({
+  default: {
+    name: 'LanguageSelector',
+    template: '<div class="mock-language-selector"><select class="mock-source-lang" :value="sourceLanguage" @change="$emit(\'update:sourceLanguage\', $event.target.value)"><option value="auto">Auto</option><option value="en">English</option><option value="fr">French</option></select><select class="mock-target-lang" :value="targetLanguage" @change="$emit(\'update:targetLanguage\', $event.target.value)"><option value="fa">Persian</option><option value="en">English</option><option value="de">German</option></select></div>',
+    props: ['sourceLanguage', 'targetLanguage', 'compact', 'showDefaultActions', 'enableSelectElementIntegration', 'disabled', 'allowAuto'],
+    emits: ['update:sourceLanguage', 'update:targetLanguage', 'swap-languages']
+  }
+}))
+
 vi.mock('@/features/settings/stores/settings.js', () => ({
   useSettingsStore: () => settingsStoreMock
 }))
@@ -1145,5 +1154,80 @@ describe('PdfToolbar', () => {
       const disabledItem = items.find(b => b.attributes('disabled') === '')
       expect(disabledItem?.exists?.() ?? true).toBe(true)
     })
+  })
+
+  describe('language controls', () => {
+    it('renders LanguageSelector when fileName is set', () => {
+      const wrapper = mount(PdfToolbar, {
+        props: {
+          fileName: 'doc.pdf',
+          sourceLanguage: 'auto',
+          targetLanguage: 'fa'
+        }
+      })
+      expect(wrapper.find('.mock-language-selector').exists()).toBe(true)
+    })
+
+    it('does not render LanguageSelector when fileName is empty', () => {
+      const wrapper = mount(PdfToolbar, {
+        props: {
+          fileName: '',
+          sourceLanguage: 'auto',
+          targetLanguage: 'fa'
+        }
+      })
+      expect(wrapper.find('.mock-language-selector').exists()).toBe(false)
+    })
+
+    it('passes sourceLanguage prop to LanguageSelector', () => {
+      const wrapper = mount(PdfToolbar, {
+        props: {
+          fileName: 'doc.pdf',
+          sourceLanguage: 'en',
+          targetLanguage: 'fa'
+        }
+      })
+      const sourceSelect = wrapper.find('.mock-source-lang')
+      expect(sourceSelect.element.value).toBe('en')
+    })
+
+    it('passes targetLanguage prop to LanguageSelector', () => {
+      const wrapper = mount(PdfToolbar, {
+        props: {
+          fileName: 'doc.pdf',
+          sourceLanguage: 'auto',
+          targetLanguage: 'en'
+        }
+      })
+      const targetSelect = wrapper.find('.mock-target-lang')
+      expect(targetSelect.element.value).toBe('en')
+    })
+
+    it('emits update:sourceLanguage when source dropdown changes', async () => {
+      const wrapper = mount(PdfToolbar, {
+        props: {
+          fileName: 'doc.pdf',
+          sourceLanguage: 'auto',
+          targetLanguage: 'fa'
+        }
+      })
+      await wrapper.find('.mock-source-lang').setValue('en')
+      expect(wrapper.emitted('update:sourceLanguage')).toBeTruthy()
+      expect(wrapper.emitted('update:sourceLanguage')[0]).toEqual(['en'])
+    })
+
+    it('emits update:targetLanguage when target dropdown changes', async () => {
+      const wrapper = mount(PdfToolbar, {
+        props: {
+          fileName: 'doc.pdf',
+          sourceLanguage: 'auto',
+          targetLanguage: 'fa'
+        }
+      })
+      await wrapper.find('.mock-target-lang').setValue('de')
+      expect(wrapper.emitted('update:targetLanguage')).toBeTruthy()
+      expect(wrapper.emitted('update:targetLanguage')[0]).toEqual(['de'])
+    })
+
   })
 })

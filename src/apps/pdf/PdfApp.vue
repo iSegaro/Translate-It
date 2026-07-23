@@ -20,6 +20,10 @@
       :execution-modes="supportedExecutionModes"
       :region-comparison-state="regionComparisonState"
       :can-export-region-comparison-artifact="canExportRegionComparisonArtifact"
+      :source-language="pdfSourceLanguage"
+      :target-language="pdfTargetLanguage"
+      @update:source-language="pdfSourceLanguage = $event"
+      @update:target-language="pdfTargetLanguage = $event"
       @toggle-outline="toggleOutline"
       @translate-visible="handleTranslateVisiblePages"
       @cancel-translation="handleCancelTranslation"
@@ -250,6 +254,8 @@ const {
   translationTick,
   pdfFingerprint,
   session,
+  pdfSourceLanguage,
+  pdfTargetLanguage,
   loadPdfFile,
   recomputeLayout,
   translateVisiblePages,

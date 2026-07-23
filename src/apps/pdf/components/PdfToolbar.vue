@@ -284,6 +284,16 @@
         </div>
       </div>
 
+      <LanguageSelector
+        v-if="fileName"
+        :source-language="sourceLanguage"
+        :target-language="targetLanguage"
+        :show-default-actions="false"
+        :enable-select-element-integration="false"
+        @update:source-language="emit('update:sourceLanguage', $event)"
+        @update:target-language="emit('update:targetLanguage', $event)"
+      />
+
       <ProviderSelector
         :model-value="pdfProviderValue"
         mode="split"
@@ -473,6 +483,7 @@ import { useSettingsStore } from '@/features/settings/stores/settings.js'
 import { getScopedLogger } from '@/shared/logging/logger.js'
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js'
 import SvgIcon from '@/components/shared/SvgIcon.vue'
+import LanguageSelector from '@/components/shared/LanguageSelector.vue'
 import ProviderSelector from '@/components/shared/ProviderSelector.vue'
 import outlineIcon from '@/icons/ui/outline.svg?url'
 import splitScreenIcon from '@/icons/ui/split-screen.svg?url'
@@ -508,9 +519,11 @@ const props = defineProps({
   executionModes: { type: Array, default: () => [] },
   regionComparisonState: { type: Object, default: null },
   canExportRegionComparisonArtifact: { type: Boolean, default: false },
+  sourceLanguage: { type: String, default: 'auto' },
+  targetLanguage: { type: String, default: 'fa' },
 })
 
-const emit = defineEmits(['request-open-pdf', 'translate-visible', 'cancel-translation', 'content-view-change', 'layout-mode-change', 'toggle-outline', 'export-txt', 'export-markdown', 'export-html', 'request-region-comparison', 'cancel-region-comparison', 'export-region-comparison-artifact', 'clear-cache', 'zoom-step', 'zoom-change', 'execution-mode-change', 'primary-click', 'select-action', 'select-language', 'manage-languages', 'open-settings'])
+const emit = defineEmits(['request-open-pdf', 'translate-visible', 'cancel-translation', 'content-view-change', 'layout-mode-change', 'toggle-outline', 'export-txt', 'export-markdown', 'export-html', 'request-region-comparison', 'cancel-region-comparison', 'export-region-comparison-artifact', 'clear-cache', 'zoom-step', 'zoom-change', 'execution-mode-change', 'primary-click', 'select-action', 'select-language', 'manage-languages', 'open-settings', 'update:sourceLanguage', 'update:targetLanguage'])
 
 const logger = getScopedLogger(LOG_COMPONENTS.PDF, 'PdfToolbar')
 const settingsStore = useSettingsStore()

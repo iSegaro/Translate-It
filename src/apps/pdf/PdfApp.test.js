@@ -312,6 +312,8 @@ function createMocks({
     error: ref(''),
     fileName: ref('demo.pdf'),
     hasDocument: ref(hasDocument),
+    pdfSourceLanguage: ref('auto'),
+    pdfTargetLanguage: ref('fa'),
     isLoading: ref(false),
     isTranslating: ref(false),
     hasTranslationContent: ref(false),
