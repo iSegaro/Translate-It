@@ -36,7 +36,10 @@
       v-if="fileName"
       class="pdf-toolbar__center-group"
     >
-      <template v-if="showTranslationOption">
+      <div
+        class="pdf-toolbar__mode-section"
+        :class="{ 'pdf-toolbar__mode-section--hidden': !showTranslationOption }"
+      >
         <div class="pdf-toolbar__mode-group pdf-toolbar__mode-group--content">
           <button
             v-for="opt in contentOptions"
@@ -71,7 +74,7 @@
           class="pdf-toolbar__separator"
           aria-hidden="true"
         />
-      </template>
+      </div>
 
       <div class="pdf-toolbar__page-group">
         <input
@@ -717,10 +720,7 @@ const allContentOptions = [
   { value: CONTENT_VIEW.TRANSLATED_PDF, label: 'Translated PDF' }
 ]
 
-const contentOptions = computed(() => {
-  if (props.showTranslationOption) return allContentOptions
-  return allContentOptions.filter(opt => opt.value !== CONTENT_VIEW.TRANSLATION)
-})
+const contentOptions = computed(() => allContentOptions)
 
 const isSideBySide = computed(() => props.layoutMode === LAYOUT_MODE.SIDE_BY_SIDE)
 const hasExecutionModeChoice = computed(() => props.executionModes.length > 1)

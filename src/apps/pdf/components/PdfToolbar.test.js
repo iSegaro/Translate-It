@@ -134,7 +134,7 @@ describe('PdfToolbar', () => {
     expect(wrapper.emitted('content-view-change')?.[1]?.[0]).toBe('translation')
   })
 
-  it('hides the entire mode section when showTranslationOption is false', async () => {
+  it('hides the mode section when showTranslationOption is false', async () => {
     const wrapper = mount(PdfToolbar, {
       props: {
         fileName: 'demo.pdf',
@@ -145,9 +145,9 @@ describe('PdfToolbar', () => {
       }
     })
 
-    expect(wrapper.find('.pdf-toolbar__mode-group--content').exists()).toBe(false)
-    expect(wrapper.find('.pdf-toolbar__mode-group--layout').exists()).toBe(false)
-    expect(wrapper.find('.pdf-toolbar__mode-button').exists()).toBe(false)
+    const section = wrapper.find('.pdf-toolbar__mode-section')
+    expect(section.exists()).toBe(true)
+    expect(section.classes()).toContain('pdf-toolbar__mode-section--hidden')
   })
 
   it('shows Translation option when showTranslationOption is true', async () => {

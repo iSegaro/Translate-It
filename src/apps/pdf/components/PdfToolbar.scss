@@ -131,6 +131,19 @@
   }
 }
 
+.pdf-toolbar__mode-section {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+
+  &--hidden {
+    visibility: hidden;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 150ms ease, visibility 150ms ease;
+  }
+}
+
 .pdf-toolbar__mode-button {
   appearance: none;
   border: 0;
