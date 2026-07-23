@@ -360,6 +360,15 @@ const {
       cancellable: true,
       onCancel: () => cancelOcr()
     })
+  },
+  onOcrError: (errorCode) => {
+    if (errorCode === 'model-not-installed') {
+      toast.error('No OCR language is installed. Open Manage Languages from the OCR menu to download one.')
+    } else if (errorCode === 'ocr-failed') {
+      toast.error('OCR failed. Please try again.')
+    } else {
+      toast.error(errorCode)
+    }
   }
 })
 
@@ -496,6 +505,7 @@ const toolbarOcrModel = computed(() => {
 
 function showOcrLanguageRequiredMessage() {
   ocrError.value = 'model-not-installed'
+  toast.error('No OCR language is installed. Open Manage Languages from the OCR menu to download one.')
 }
 
 function ensureOcrLanguageInstalled() {
@@ -564,20 +574,6 @@ const isPdfStatusBannerVisible = computed(() => {
     return false
   }
   return true
-})
-
-watch(exportError, (val) => {
-  if (val) toast.error(val)
-})
-
-watch(ocrError, (val) => {
-  if (val === 'model-not-installed') {
-    toast.error('No OCR language is installed. Open Manage Languages from the OCR menu to download one.')
-  } else if (val === 'ocr-failed') {
-    toast.error('OCR failed. Please try again.')
-  } else if (val) {
-    toast.error(val)
-  }
 })
 
 watch(hasDocument, (has) => {
@@ -916,20 +912,26 @@ function handleCancelTranslation() {
 
 async function handleExportTxt() {
   if (await exportTxt()) {
-    toast.success('TXT export ready')
+    toast.success('TXT exported successfully')
+  } else if (exportError.value) {
+    toast.error(exportError.value)
   }
 }
 
 async function handleExportMarkdown() {
   if (await exportMarkdown()) {
-    toast.success('Markdown export ready')
+    toast.success('Markdown exported successfully')
+  } else if (exportError.value) {
+    toast.error(exportError.value)
   }
 }
 
 async function handleExportHtml() {
   const canvasDataUrls = pdfViewerRef.value?.collectCanvasDataUrls?.() || new Map()
   if (await exportHtml(canvasDataUrls)) {
-    toast.success('HTML export ready')
+    toast.success('HTML exported successfully')
+  } else if (exportError.value) {
+    toast.error(exportError.value)
   }
 }
 

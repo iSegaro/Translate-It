@@ -20,7 +20,7 @@ function getBatchOcrError(results) {
   return 'ocr-failed'
 }
 
-export function usePdfOcr({ onOcrComplete, onOcrStart } = {}) {
+export function usePdfOcr({ onOcrComplete, onOcrStart, onOcrError } = {}) {
   const recommendationEngine = new PdfOcrRecommendationEngine()
   const processor = new PdfOcrProcessor(pdfDocumentSession)
   const settingsStore = useSettingsStore()
@@ -73,7 +73,10 @@ export function usePdfOcr({ onOcrComplete, onOcrStart } = {}) {
       })
 
       const errorCode = getBatchOcrError(results)
-      if (errorCode && errorCode !== 'cancelled') ocrError.value = errorCode
+      if (errorCode && errorCode !== 'cancelled') {
+        ocrError.value = errorCode
+        onOcrError?.(errorCode)
+      }
 
       await saveOcrToCache(pageNumbers)
 
@@ -84,7 +87,10 @@ export function usePdfOcr({ onOcrComplete, onOcrStart } = {}) {
     } catch (error) {
       logger.error('OCR process failed:', error)
       const errorCode = mapOcrError(error)
-      if (errorCode !== 'cancelled') ocrError.value = errorCode
+      if (errorCode !== 'cancelled') {
+        ocrError.value = errorCode
+        onOcrError?.(errorCode)
+      }
     } finally {
       handle?.finish()
       isOcrProcessing.value = false

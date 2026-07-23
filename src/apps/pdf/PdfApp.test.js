@@ -420,8 +420,13 @@ function createMocks({
 }
 
 describe('PdfApp', () => {
-  beforeEach(() => {
+  beforeEach(async () => {
     vi.useRealTimers()
+    const { toast } = await import('vue-sonner')
+    toast.success.mockClear()
+    toast.error.mockClear()
+    toast.warning.mockClear()
+    toast.info.mockClear()
     openTranslationMock.mockReset()
     openOptionsPageMock.mockReset()
     pdfDiagnosticsImportMock.mockReset()
