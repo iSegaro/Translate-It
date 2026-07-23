@@ -649,6 +649,60 @@
   text-align: center;
 }
 
+.pdf-toolbar__language-trigger {
+  position: relative;
+}
+
+.pdf-toolbar__language-summary-button {
+  appearance: none;
+  border: 0;
+  border-radius: 6px;
+  padding: 5px 8px;
+  background: $tb-control-hover;
+  color: $tb-text-primary;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+  outline: none;
+  white-space: nowrap;
+
+  &:hover {
+    background: $tb-control-strong;
+  }
+
+  &:active {
+    background: $tb-control-active;
+  }
+
+  &:focus-visible {
+    outline: 2px solid $tb-focus;
+    outline-offset: 2px;
+  }
+}
+
+.pdf-toolbar__language-popover {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  z-index: var(--pdf-layer-toolbar-menu);
+  min-width: 280px;
+  padding: 12px;
+  border: 1px solid $tb-border-hover;
+  border-radius: 14px;
+  background: $tb-surface;
+  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.28);
+}
+
+.pdf-toolbar__language-popover-header {
+  padding: 0 4px 10px;
+  color: $tb-text-primary;
+  font-size: 13px;
+  font-weight: 700;
+  border-bottom: 1px solid $tb-border;
+  margin-bottom: 10px;
+}
+
 .pdf-toolbar__button--clear {
   background: rgba(239, 68, 68, 0.1);
   color: rgba(254, 202, 202, 0.8);

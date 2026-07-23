@@ -1164,13 +1164,8 @@ describe('PdfToolbar', () => {
     })
   })
 
-  describe('language controls', () => {
-    beforeEach(() => {
-      settingsStoreMock.settings.MODE_PROVIDERS = {}
-      settingsStoreMock.settings.TRANSLATION_API = 'googlev2'
-    })
-
-    it('renders LanguageSelector when fileName is set', () => {
+  describe('language summary button', () => {
+    it('renders language summary button when fileName is set', () => {
       const wrapper = mount(PdfToolbar, {
         props: {
           fileName: 'doc.pdf',
@@ -1178,10 +1173,10 @@ describe('PdfToolbar', () => {
           targetLanguage: 'fa'
         }
       })
-      expect(wrapper.find('.mock-language-selector').exists()).toBe(true)
+      expect(wrapper.find('.pdf-toolbar__language-summary-button').exists()).toBe(true)
     })
 
-    it('does not render LanguageSelector when fileName is empty', () => {
+    it('does not render language trigger when fileName is empty', () => {
       const wrapper = mount(PdfToolbar, {
         props: {
           fileName: '',
@@ -1189,10 +1184,22 @@ describe('PdfToolbar', () => {
           targetLanguage: 'fa'
         }
       })
-      expect(wrapper.find('.mock-language-selector').exists()).toBe(false)
+      expect(wrapper.find('.pdf-toolbar__language-summary-button').exists()).toBe(false)
     })
 
-    it('passes sourceLanguage prop to LanguageSelector', () => {
+    it('shows Auto label when source is auto-detect', () => {
+      const wrapper = mount(PdfToolbar, {
+        props: {
+          fileName: 'doc.pdf',
+          sourceLanguage: 'auto',
+          targetLanguage: 'fa'
+        }
+      })
+      expect(wrapper.find('.pdf-toolbar__language-summary-button').text()).toContain('Auto')
+      expect(wrapper.find('.pdf-toolbar__language-summary-button').text()).toContain('FA')
+    })
+
+    it('shows uppercase source code when source is specific', () => {
       const wrapper = mount(PdfToolbar, {
         props: {
           fileName: 'doc.pdf',
@@ -1200,11 +1207,167 @@ describe('PdfToolbar', () => {
           targetLanguage: 'fa'
         }
       })
+      expect(wrapper.find('.pdf-toolbar__language-summary-button').text()).toContain('EN')
+      expect(wrapper.find('.pdf-toolbar__language-summary-button').text()).toContain('FA')
+    })
+
+    it('has accessible label with source and target language', () => {
+      const wrapper = mount(PdfToolbar, {
+        props: {
+          fileName: 'doc.pdf',
+          sourceLanguage: 'en',
+          targetLanguage: 'fa'
+        }
+      })
+      expect(wrapper.find('.pdf-toolbar__language-summary-button').attributes('aria-label')).toBe('Translation settings. Source: en, Target: fa')
+    })
+
+    it('has aria-haspopup and aria-expanded attributes', () => {
+      const wrapper = mount(PdfToolbar, {
+        props: {
+          fileName: 'doc.pdf',
+          sourceLanguage: 'auto',
+          targetLanguage: 'fa'
+        }
+      })
+      const btn = wrapper.find('.pdf-toolbar__language-summary-button')
+      expect(btn.attributes('aria-haspopup')).toBe('true')
+      expect(btn.attributes('aria-expanded')).toBe('false')
+    })
+  })
+
+  describe('language popover', () => {
+    beforeEach(() => {
+      settingsStoreMock.settings.MODE_PROVIDERS = {}
+      settingsStoreMock.settings.TRANSLATION_API = 'googlev2'
+    })
+
+    it('opens popover on trigger click', async () => {
+      const wrapper = mount(PdfToolbar, {
+        props: {
+          fileName: 'doc.pdf',
+          sourceLanguage: 'auto',
+          targetLanguage: 'fa'
+        }
+      })
+      expect(wrapper.find('.pdf-toolbar__language-popover').exists()).toBe(false)
+      await wrapper.find('.pdf-toolbar__language-summary-button').trigger('click')
+      expect(wrapper.find('.pdf-toolbar__language-popover').exists()).toBe(true)
+    })
+
+    it('shows LanguageSelector inside popover when open', async () => {
+      const wrapper = mount(PdfToolbar, {
+        props: {
+          fileName: 'doc.pdf',
+          sourceLanguage: 'auto',
+          targetLanguage: 'fa'
+        }
+      })
+      await wrapper.find('.pdf-toolbar__language-summary-button').trigger('click')
+      expect(wrapper.find('.mock-language-selector').exists()).toBe(true)
+    })
+
+    it('does not render LanguageSelector in toolbar when popover is closed', () => {
+      const wrapper = mount(PdfToolbar, {
+        props: {
+          fileName: 'doc.pdf',
+          sourceLanguage: 'auto',
+          targetLanguage: 'fa'
+        }
+      })
+      expect(wrapper.find('.mock-language-selector').exists()).toBe(false)
+    })
+
+    it('closes popover on second trigger click', async () => {
+      const wrapper = mount(PdfToolbar, {
+        props: {
+          fileName: 'doc.pdf',
+          sourceLanguage: 'auto',
+          targetLanguage: 'fa'
+        }
+      })
+      await wrapper.find('.pdf-toolbar__language-summary-button').trigger('click')
+      expect(wrapper.find('.pdf-toolbar__language-popover').exists()).toBe(true)
+      await wrapper.find('.pdf-toolbar__language-summary-button').trigger('click')
+      expect(wrapper.find('.pdf-toolbar__language-popover').exists()).toBe(false)
+    })
+
+    it('closes popover on Escape', async () => {
+      const wrapper = mount(PdfToolbar, {
+        props: {
+          fileName: 'doc.pdf',
+          sourceLanguage: 'auto',
+          targetLanguage: 'fa'
+        }
+      })
+      await wrapper.find('.pdf-toolbar__language-summary-button').trigger('click')
+      expect(wrapper.find('.pdf-toolbar__language-popover').exists()).toBe(true)
+      document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))
+      await flushPromises()
+      expect(wrapper.find('.pdf-toolbar__language-popover').exists()).toBe(false)
+    })
+
+    it('closes popover on outside click', async () => {
+      const wrapper = mount(PdfToolbar, {
+        props: {
+          fileName: 'doc.pdf',
+          sourceLanguage: 'auto',
+          targetLanguage: 'fa'
+        }
+      })
+      await wrapper.find('.pdf-toolbar__language-summary-button').trigger('click')
+      expect(wrapper.find('.pdf-toolbar__language-popover').exists()).toBe(true)
+      document.dispatchEvent(new PointerEvent('pointerdown'))
+      await flushPromises()
+      expect(wrapper.find('.pdf-toolbar__language-popover').exists()).toBe(false)
+    })
+
+    it('returns focus to trigger button on Escape close', async () => {
+      const wrapper = mount(PdfToolbar, {
+        props: {
+          fileName: 'doc.pdf',
+          sourceLanguage: 'auto',
+          targetLanguage: 'fa'
+        }
+      })
+      const trigger = wrapper.find('.pdf-toolbar__language-summary-button')
+      trigger.element.focus()
+      await trigger.trigger('click')
+      expect(wrapper.find('.pdf-toolbar__language-popover').exists()).toBe(true)
+      document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))
+      await flushPromises()
+      expect(wrapper.find('.pdf-toolbar__language-popover').exists()).toBe(false)
+    })
+
+    it('does not close popover on language change', async () => {
+      const wrapper = mount(PdfToolbar, {
+        props: {
+          fileName: 'doc.pdf',
+          sourceLanguage: 'auto',
+          targetLanguage: 'fa'
+        }
+      })
+      await wrapper.find('.pdf-toolbar__language-summary-button').trigger('click')
+      expect(wrapper.find('.pdf-toolbar__language-popover').exists()).toBe(true)
+      await wrapper.find('.mock-source-lang').setValue('en')
+      expect(wrapper.find('.pdf-toolbar__language-popover').exists()).toBe(true)
+      expect(wrapper.emitted('update:sourceLanguage')).toBeTruthy()
+    })
+
+    it('passes sourceLanguage prop to LanguageSelector inside popover', async () => {
+      const wrapper = mount(PdfToolbar, {
+        props: {
+          fileName: 'doc.pdf',
+          sourceLanguage: 'en',
+          targetLanguage: 'fa'
+        }
+      })
+      await wrapper.find('.pdf-toolbar__language-summary-button').trigger('click')
       const sourceSelect = wrapper.find('.mock-source-lang')
       expect(sourceSelect.element.value).toBe('en')
     })
 
-    it('passes targetLanguage prop to LanguageSelector', () => {
+    it('passes targetLanguage prop to LanguageSelector inside popover', async () => {
       const wrapper = mount(PdfToolbar, {
         props: {
           fileName: 'doc.pdf',
@@ -1212,11 +1375,12 @@ describe('PdfToolbar', () => {
           targetLanguage: 'en'
         }
       })
+      await wrapper.find('.pdf-toolbar__language-summary-button').trigger('click')
       const targetSelect = wrapper.find('.mock-target-lang')
       expect(targetSelect.element.value).toBe('en')
     })
 
-    it('passes effective provider to LanguageSelector when mode-specific provider is set', () => {
+    it('passes effective provider to LanguageSelector inside popover when mode-specific provider is set', async () => {
       settingsStoreMock.settings.MODE_PROVIDERS[TranslationMode.PDF] = 'deepl'
       const wrapper = mount(PdfToolbar, {
         props: {
@@ -1225,10 +1389,11 @@ describe('PdfToolbar', () => {
           targetLanguage: 'fa'
         }
       })
+      await wrapper.find('.pdf-toolbar__language-summary-button').trigger('click')
       expect(wrapper.find('.mock-language-selector').attributes('data-provider')).toBe('deepl')
     })
 
-    it('passes effective provider to LanguageSelector when mode-specific provider is default', () => {
+    it('passes effective provider to LanguageSelector inside popover when mode-specific provider is default', async () => {
       settingsStoreMock.settings.MODE_PROVIDERS[TranslationMode.PDF] = 'default'
       settingsStoreMock.settings.TRANSLATION_API = 'openai'
       const wrapper = mount(PdfToolbar, {
@@ -1238,10 +1403,11 @@ describe('PdfToolbar', () => {
           targetLanguage: 'fa'
         }
       })
+      await wrapper.find('.pdf-toolbar__language-summary-button').trigger('click')
       expect(wrapper.find('.mock-language-selector').attributes('data-provider')).toBe('openai')
     })
 
-    it('passes effective provider to LanguageSelector when no mode-specific override exists', () => {
+    it('passes effective provider to LanguageSelector inside popover when no mode-specific override exists', async () => {
       settingsStoreMock.settings.TRANSLATION_API = 'gemini'
       const wrapper = mount(PdfToolbar, {
         props: {
@@ -1250,10 +1416,11 @@ describe('PdfToolbar', () => {
           targetLanguage: 'fa'
         }
       })
+      await wrapper.find('.pdf-toolbar__language-summary-button').trigger('click')
       expect(wrapper.find('.mock-language-selector').attributes('data-provider')).toBe('gemini')
     })
 
-    it('falls back to googlev2 when no provider is configured', () => {
+    it('falls back to googlev2 when no provider is configured', async () => {
       settingsStoreMock.settings.MODE_PROVIDERS = {}
       settingsStoreMock.settings.TRANSLATION_API = ''
       const wrapper = mount(PdfToolbar, {
@@ -1263,10 +1430,11 @@ describe('PdfToolbar', () => {
           targetLanguage: 'fa'
         }
       })
+      await wrapper.find('.pdf-toolbar__language-summary-button').trigger('click')
       expect(wrapper.find('.mock-language-selector').attributes('data-provider')).toBe('googlev2')
     })
 
-    it('passes localized auto-detect label to LanguageSelector', () => {
+    it('passes localized auto-detect label to LanguageSelector inside popover', async () => {
       tMock.mockReturnValueOnce('Auto-Detect')
       const wrapper = mount(PdfToolbar, {
         props: {
@@ -1275,10 +1443,11 @@ describe('PdfToolbar', () => {
           targetLanguage: 'fa'
         }
       })
+      await wrapper.find('.pdf-toolbar__language-summary-button').trigger('click')
       expect(wrapper.find('.mock-language-selector').attributes('data-auto-detect-label')).toBe('Auto-Detect')
     })
 
-    it('emits update:sourceLanguage when source dropdown changes', async () => {
+    it('emits update:sourceLanguage when source dropdown changes inside popover', async () => {
       const wrapper = mount(PdfToolbar, {
         props: {
           fileName: 'doc.pdf',
@@ -1286,12 +1455,13 @@ describe('PdfToolbar', () => {
           targetLanguage: 'fa'
         }
       })
+      await wrapper.find('.pdf-toolbar__language-summary-button').trigger('click')
       await wrapper.find('.mock-source-lang').setValue('en')
       expect(wrapper.emitted('update:sourceLanguage')).toBeTruthy()
       expect(wrapper.emitted('update:sourceLanguage')[0]).toEqual(['en'])
     })
 
-    it('emits update:targetLanguage when target dropdown changes', async () => {
+    it('emits update:targetLanguage when target dropdown changes inside popover', async () => {
       const wrapper = mount(PdfToolbar, {
         props: {
           fileName: 'doc.pdf',
@@ -1299,10 +1469,30 @@ describe('PdfToolbar', () => {
           targetLanguage: 'fa'
         }
       })
+      await wrapper.find('.pdf-toolbar__language-summary-button').trigger('click')
       await wrapper.find('.mock-target-lang').setValue('de')
       expect(wrapper.emitted('update:targetLanguage')).toBeTruthy()
       expect(wrapper.emitted('update:targetLanguage')[0]).toEqual(['de'])
     })
 
+    it('does not interfere with other toolbar menus', async () => {
+      const wrapper = mount(PdfToolbar, {
+        props: {
+          fileName: 'doc.pdf',
+          pageCount: 12,
+          currentPageNumber: 1,
+          sourceLanguage: 'auto',
+          targetLanguage: 'fa',
+          canExport: true
+        }
+      })
+      // Open language popover
+      await wrapper.find('.pdf-toolbar__language-summary-button').trigger('click')
+      expect(wrapper.find('.pdf-toolbar__language-popover').exists()).toBe(true)
+      // Open export menu — language popover closes
+      await wrapper.find('.pdf-toolbar__button[aria-label="Export options"]').trigger('click')
+      expect(wrapper.find('.pdf-toolbar__language-popover').exists()).toBe(false)
+      expect(wrapper.find('.pdf-toolbar__export-menu').exists()).toBe(true)
+    })
   })
 })

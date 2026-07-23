@@ -284,17 +284,35 @@
         </div>
       </div>
 
-      <LanguageSelector
+      <div
         v-if="fileName"
-        :source-language="sourceLanguage"
-        :target-language="targetLanguage"
-        :provider="effectivePdfProvider"
-        :auto-detect-label="t('auto_detect', 'Auto-Detect')"
-        :show-default-actions="false"
-        :enable-select-element-integration="false"
-        @update:source-language="emit('update:sourceLanguage', $event)"
-        @update:target-language="emit('update:targetLanguage', $event)"
-      />
+        ref="languageMenuRef"
+        class="pdf-toolbar__language-trigger"
+      >
+        <button
+          ref="languageTriggerRef"
+          class="pdf-toolbar__language-summary-button"
+          type="button"
+          aria-haspopup="true"
+          :aria-expanded="activeMenu === 'language'"
+          :aria-label="languageSummaryAriaLabel"
+          :title="languageSummaryTitle"
+          @click="toggleLanguageSettings"
+        >
+          {{ languageSummary }}
+        </button>
+        <PdfTranslationSettingsPopover
+          v-if="activeMenu === 'language'"
+          ref="languagePopoverRef"
+          :source-language="sourceLanguage"
+          :target-language="targetLanguage"
+          :provider="effectivePdfProvider"
+          :auto-detect-label="t('auto_detect', 'Auto-Detect')"
+          :disabled="isTranslating"
+          @update:source-language="emit('update:sourceLanguage', $event)"
+          @update:target-language="emit('update:targetLanguage', $event)"
+        />
+      </div>
 
       <ProviderSelector
         :model-value="pdfProviderValue"
@@ -486,8 +504,8 @@ import { useUnifiedI18n } from '@/composables/shared/useUnifiedI18n.js'
 import { getScopedLogger } from '@/shared/logging/logger.js'
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js'
 import SvgIcon from '@/components/shared/SvgIcon.vue'
-import LanguageSelector from '@/components/shared/LanguageSelector.vue'
 import ProviderSelector from '@/components/shared/ProviderSelector.vue'
+import PdfTranslationSettingsPopover from './PdfTranslationSettingsPopover.vue'
 import outlineIcon from '@/icons/ui/outline.svg?url'
 import splitScreenIcon from '@/icons/ui/split-screen.svg?url'
 import fitPageIcon from '@/icons/ui/fit-page.svg?url'
@@ -682,6 +700,9 @@ const moreMenuTriggerRef = ref(null)
 const ocrSplitRef = ref(null)
 const ocrMenuRef = ref(null)
 const ocrMenuTriggerRef = ref(null)
+const languageMenuRef = ref(null)
+const languageTriggerRef = ref(null)
+const languagePopoverRef = ref(null)
 const activeMenu = ref(null)
 const zoomPercentOptions = [50, 75, 100, 125, 150, 200]
 
@@ -724,6 +745,29 @@ const currentPageDisplayValue = computed(() => {
 
 const hasZoomOut = computed(() => props.zoomMode !== 'fit-width' || props.zoomPercent > zoomPercentOptions[0])
 const hasZoomIn = computed(() => props.zoomMode !== 'fit-width' || props.zoomPercent < zoomPercentOptions[zoomPercentOptions.length - 1])
+
+const languageSummary = computed(() => {
+  const src = props.sourceLanguage === 'auto' ? 'Auto' : props.sourceLanguage.toUpperCase()
+  const tgt = props.targetLanguage.toUpperCase()
+  return `\u{1F310} ${src} \u2192 ${tgt}`
+})
+
+const languageSummaryAriaLabel = computed(() => {
+  const src = props.sourceLanguage === 'auto' ? 'Auto-Detect' : props.sourceLanguage
+  return `Translation settings. Source: ${src}, Target: ${props.targetLanguage}`
+})
+
+const languageSummaryTitle = computed(() => languageSummaryAriaLabel.value)
+
+function toggleLanguageSettings() {
+  if (activeMenu.value === 'language') {
+    closeMenus()
+    languageTriggerRef.value?.focus()
+    return
+  }
+  closeMenus()
+  activeMenu.value = 'language'
+}
 
 function toggleMenu(menuName) {
   activeMenu.value = activeMenu.value === menuName ? null : menuName
@@ -785,6 +829,13 @@ function getActiveMenuRefs() {
     }
   }
 
+  if (activeMenu.value === 'language') {
+    return {
+      menuRef: languageMenuRef.value,
+      triggerRef: languageTriggerRef.value
+    }
+  }
+
   return {
     menuRef: null,
     triggerRef: null
@@ -837,6 +888,8 @@ function handleDocumentKeyDown(event) {
       exportMenuTriggerRef.value?.focus?.()
     } else if (activeMenuName === 'more') {
       moreMenuTriggerRef.value?.focus?.()
+    } else if (activeMenuName === 'language') {
+      languageTriggerRef.value?.focus?.()
     }
   }
 }
