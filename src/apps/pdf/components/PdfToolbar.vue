@@ -330,59 +330,6 @@
         @cancel="$emit('cancel-translation')"
       />
       <div
-        v-if="fileName && canExport"
-        ref="exportMenuRef"
-        class="pdf-toolbar__export-dropdown"
-      >
-        <button
-          ref="exportMenuTriggerRef"
-          class="pdf-toolbar__button pdf-toolbar__button--menu-trigger pdf-toolbar__button--icon-trigger"
-          type="button"
-          :aria-label="TOOLTIP_EXPORT"
-          :title="TOOLTIP_EXPORT"
-          aria-haspopup="menu"
-          :aria-expanded="activeMenu === 'export'"
-          @click="toggleMenu('export')"
-        >
-          <SvgIcon
-            :src="downloadIcon"
-            :size="18"
-          />
-        </button>
-
-        <div
-          v-if="activeMenu === 'export'"
-          class="pdf-toolbar__export-menu"
-          role="menu"
-        >
-          <button
-            class="pdf-toolbar__export-item"
-            type="button"
-            role="menuitem"
-            @click="handleExportAction('export-txt')"
-          >
-            Export TXT
-          </button>
-          <button
-            class="pdf-toolbar__export-item"
-            type="button"
-            role="menuitem"
-            @click="handleExportAction('export-markdown')"
-          >
-            Export Markdown
-          </button>
-          <button
-            class="pdf-toolbar__export-item"
-            type="button"
-            role="menuitem"
-            @click="handleExportAction('export-html')"
-          >
-            Export HTML
-          </button>
-        </div>
-      </div>
-
-      <div
         ref="moreMenuRef"
         class="pdf-toolbar__export-dropdown"
       >
@@ -438,6 +385,38 @@
           >
             Settings
           </button>
+          <div
+            v-if="canExport"
+            class="pdf-toolbar__menu-section"
+            role="group"
+            aria-label="Export"
+          >
+            <span class="pdf-toolbar__menu-section-title">Export</span>
+            <button
+              class="pdf-toolbar__export-item"
+              type="button"
+              role="menuitem"
+              @click="handleExportAction('export-txt')"
+            >
+              Export TXT
+            </button>
+            <button
+              class="pdf-toolbar__export-item"
+              type="button"
+              role="menuitem"
+              @click="handleExportAction('export-markdown')"
+            >
+              Export Markdown
+            </button>
+            <button
+              class="pdf-toolbar__export-item"
+              type="button"
+              role="menuitem"
+              @click="handleExportAction('export-html')"
+            >
+              Export HTML
+            </button>
+          </div>
           <div
             v-if="isDebugMode"
             class="pdf-toolbar__menu-section"
@@ -511,14 +490,12 @@ import outlineIcon from '@/icons/ui/outline.svg?url'
 import splitScreenIcon from '@/icons/ui/split-screen.svg?url'
 import fitPageIcon from '@/icons/ui/fit-page.svg?url'
 import fitWidthIcon from '@/icons/ui/fit-width.svg?url'
-import downloadIcon from '@/icons/ui/download.svg?url'
 import './PdfToolbar.scss'
 
 const TOOLTIP_OUTLINE = 'Toggle outline'
 const TOOLTIP_SIDE_BY_SIDE = 'Side by Side'
 const TOOLTIP_ZOOM_OUT = 'Zoom out'
 const TOOLTIP_ZOOM_IN = 'Zoom in'
-const TOOLTIP_EXPORT = 'Export options'
 const TOOLTIP_MORE = 'More actions'
 
 const props = defineProps({
@@ -694,8 +671,6 @@ function handleManageLanguages() {
   closeMenus()
 }
 
-const exportMenuRef = ref(null)
-const exportMenuTriggerRef = ref(null)
 const moreMenuRef = ref(null)
 const moreMenuTriggerRef = ref(null)
 const ocrSplitRef = ref(null)
@@ -809,13 +784,6 @@ function handleExportRegionComparisonArtifactAction() {
 }
 
 function getActiveMenuRefs() {
-  if (activeMenu.value === 'export') {
-    return {
-      menuRef: exportMenuRef.value,
-      triggerRef: exportMenuTriggerRef.value
-    }
-  }
-
   if (activeMenu.value === 'more') {
     return {
       menuRef: moreMenuRef.value,
@@ -885,9 +853,7 @@ function handleDocumentKeyDown(event) {
       return
     }
     closeMenus()
-    if (activeMenuName === 'export') {
-      exportMenuTriggerRef.value?.focus?.()
-    } else if (activeMenuName === 'more') {
+    if (activeMenuName === 'more') {
       moreMenuTriggerRef.value?.focus?.()
     } else if (activeMenuName === 'language') {
       languageTriggerRef.value?.focus?.()

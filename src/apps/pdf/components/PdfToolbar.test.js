@@ -106,7 +106,6 @@ describe('PdfToolbar', () => {
     expect(wrapper.find('.pdf-toolbar__page-total').text()).toBe('12')
     expect(wrapper.find('.pdf-toolbar__zoom-select').exists()).toBe(true)
     expect(wrapper.find('.pdf-toolbar__button[aria-label="More actions"]').exists()).toBe(true)
-    expect(wrapper.find('.pdf-toolbar__button[aria-label="Export options"]').exists()).toBe(true)
 
     expect(wrapper.find('.pdf-toolbar__mode-button--active').exists()).toBe(true)
   })
@@ -191,7 +190,7 @@ describe('PdfToolbar', () => {
     expect(wrapper.emitted('layout-mode-change')?.[0]?.[0]).toBe('side-by-side')
   })
 
-  it('keeps Open PDF and Clear Cache in the hamburger menu and export in the export menu', async () => {
+  it('keeps Open PDF, Clear Cache, and Export inside the hamburger menu', async () => {
     const wrapper = mount(PdfToolbar, {
       props: {
         fileName: 'demo.pdf',
@@ -221,6 +220,9 @@ describe('PdfToolbar', () => {
     expect(wrapper.find('.pdf-toolbar__export-menu').exists()).toBe(true)
     expect(wrapper.find('.pdf-toolbar__export-menu').text()).toContain('Open PDF')
     expect(wrapper.find('.pdf-toolbar__export-menu').text()).toContain('Clear Cache')
+    expect(wrapper.find('.pdf-toolbar__export-menu').text()).toContain('Export TXT')
+    expect(wrapper.find('.pdf-toolbar__export-menu').text()).toContain('Export Markdown')
+    expect(wrapper.find('.pdf-toolbar__export-menu').text()).toContain('Export HTML')
 
     await wrapper.find('.pdf-toolbar__export-menu button').trigger('click')
     expect(wrapper.emitted('request-open-pdf')).toHaveLength(1)
@@ -229,17 +231,16 @@ describe('PdfToolbar', () => {
     await wrapper.find('.pdf-toolbar__export-menu button:nth-child(2)').trigger('click')
     expect(wrapper.emitted('clear-cache')).toBeTruthy()
 
-    await wrapper.find('.pdf-toolbar__button[aria-label="Export options"]').trigger('click')
-    expect(wrapper.find('.pdf-toolbar__export-menu').exists()).toBe(true)
-
+    // Export items inside hamburger menu — no standalone export button
+    await wrapper.find('.pdf-toolbar__button[aria-label="More actions"]').trigger('click')
     await wrapper.findAll('button').find((button) => button.text().includes('Export TXT'))?.trigger('click')
     expect(wrapper.emitted('export-txt')).toBeTruthy()
 
-    await wrapper.find('.pdf-toolbar__button[aria-label="Export options"]').trigger('click')
+    await wrapper.find('.pdf-toolbar__button[aria-label="More actions"]').trigger('click')
     await wrapper.findAll('button').find((button) => button.text().includes('Export Markdown'))?.trigger('click')
     expect(wrapper.emitted('export-markdown')).toBeTruthy()
 
-    await wrapper.find('.pdf-toolbar__button[aria-label="Export options"]').trigger('click')
+    await wrapper.find('.pdf-toolbar__button[aria-label="More actions"]').trigger('click')
     await wrapper.findAll('button').find((button) => button.text().includes('Export HTML'))?.trigger('click')
     expect(wrapper.emitted('export-html')).toBeTruthy()
 
@@ -1505,8 +1506,8 @@ describe('PdfToolbar', () => {
       // Open language popover
       await wrapper.find('.pdf-toolbar__language-summary-button').trigger('click')
       expect(wrapper.find('.pdf-toolbar__language-popover').exists()).toBe(true)
-      // Open export menu — language popover closes
-      await wrapper.find('.pdf-toolbar__button[aria-label="Export options"]').trigger('click')
+      // Open hamburger menu — language popover closes
+      await wrapper.find('.pdf-toolbar__button[aria-label="More actions"]').trigger('click')
       expect(wrapper.find('.pdf-toolbar__language-popover').exists()).toBe(false)
       expect(wrapper.find('.pdf-toolbar__export-menu').exists()).toBe(true)
     })
