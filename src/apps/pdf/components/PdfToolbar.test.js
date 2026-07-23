@@ -79,7 +79,7 @@ describe('PdfToolbar', () => {
     tMock.mockReset()
   })
 
-  it('renders the file name and keeps core actions available', async () => {
+  it('renders the info button and keeps core actions available', async () => {
     const wrapper = mount(PdfToolbar, {
       props: {
         fileName: 'very-long-document-name.pdf',
@@ -99,8 +99,7 @@ describe('PdfToolbar', () => {
     })
 
     expect(wrapper.find('.pdf-toolbar__file-row').exists()).toBe(true)
-    expect(wrapper.find('.pdf-toolbar__file-name').text()).toBe('very-long-document-name.pdf')
-    expect(wrapper.find('.pdf-toolbar__file-name').attributes('title')).toBe('very-long-document-name.pdf')
+    expect(wrapper.find('.pdf-toolbar__info-toggle').exists()).toBe(true)
     expect(wrapper.find('.pdf-toolbar__page-input').exists()).toBe(true)
     expect(wrapper.find('.pdf-toolbar__page-input').element.value).toBe('5')
     expect(wrapper.find('.pdf-toolbar__page-total').text()).toBe('12')
@@ -710,7 +709,7 @@ describe('PdfToolbar', () => {
       }
     })
 
-    expect(wrapper.text()).toContain('demo.pdf')
+    expect(wrapper.find('.pdf-toolbar__info-toggle').exists()).toBe(true)
 
     await wrapper.find('.pdf-toolbar__button[aria-label="More actions"]').trigger('click')
     expect(wrapper.find('.pdf-toolbar__export-menu').text()).toContain('Loading...')
@@ -1216,6 +1215,26 @@ describe('PdfToolbar', () => {
         .find(item => item.text().includes('Language:'))
       expect(languageItem.text()).toContain('EN')
       expect(languageItem.text()).toContain('FA')
+    })
+  })
+
+  describe('PDF Information menu item', () => {
+    it('emits request-document-info and closes menu', async () => {
+      const wrapper = mount(PdfToolbar, {
+        props: {
+          fileName: 'doc.pdf',
+          pageCount: 12,
+          currentPageNumber: 1,
+          canExport: true,
+        }
+      })
+      await wrapper.find('.pdf-toolbar__button--menu-trigger').trigger('click')
+      const pdfInfoItem = wrapper.findAll('.pdf-toolbar__export-item')
+        .find(item => item.text().includes('PDF Information'))
+      expect(pdfInfoItem.exists()).toBe(true)
+      await pdfInfoItem.trigger('click')
+      expect(wrapper.emitted('request-document-info')).toHaveLength(1)
+      expect(wrapper.find('.pdf-toolbar__export-menu').exists()).toBe(false)
     })
   })
 

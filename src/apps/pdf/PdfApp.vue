@@ -45,6 +45,7 @@
       @select-language="handleOcrSelectLanguage"
       @manage-languages="handleOcrManageLanguages"
       @open-settings="handleOpenSettings"
+      @request-document-info="showPdfInfo = true"
     />
 
     <input
@@ -188,6 +189,11 @@
       </main>
     </div>
 
+    <PdfDocumentInfoDialog
+      v-model="showPdfInfo"
+      :rows="pdfInfoRows"
+    />
+
     <PdfWindowsHost
       ref="pdfWindowsHostRef"
       :pdf-fingerprint="pdfFingerprint"
@@ -209,8 +215,10 @@ import PdfStatusBanner from './components/PdfStatusBanner.vue'
 import PdfNotificationBodyRenderer from './components/notifications/PdfNotificationBodyRenderer.vue'
 import PdfWindowsHost from './components/PdfWindowsHost.vue'
 import PdfOutline from './components/PdfOutline.vue'
+import PdfDocumentInfoDialog from './components/PdfDocumentInfoDialog.vue'
 import { usePdfViewerController } from './composables/usePdfViewerController.js'
 import { usePdfViewerMode, CONTENT_VIEW, VIEWER_ROLE } from './composables/usePdfViewerMode.js'
+import { usePdfDocumentInfo } from './composables/usePdfDocumentInfo.js'
 import { usePdfExport } from './composables/usePdfExport.js'
 import { usePdfOcr } from './composables/usePdfOcr.js'
 import { usePdfRegionOcr } from './composables/usePdfRegionOcr.js'
@@ -255,6 +263,7 @@ const {
   translatedPageData,
   translationTick,
   pdfFingerprint,
+  currentFile,
   session,
   pdfSourceLanguage,
   pdfTargetLanguage,
@@ -267,6 +276,16 @@ const {
   clearDocumentCache,
   cleanup
 } = usePdfViewerController()
+
+const showPdfInfo = ref(false)
+
+const { rows: pdfInfoRows } = usePdfDocumentInfo(computed(() => ({
+  fileName: fileName.value,
+  pageCount: pageCount.value,
+  fileSize: currentFile.value?.size ?? 0,
+  pdfFingerprint: session.pdfFingerprint,
+  documentMetadata: session.documentMetadata,
+})))
 
 const {
   contentView,

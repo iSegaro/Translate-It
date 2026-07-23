@@ -157,7 +157,7 @@ vi.mock('./components/PdfToolbar.vue', () => ({
   default: {
     name: 'PdfToolbar',
     props: ['fileName', 'pageCount', 'currentPageNumber', 'zoomMode', 'zoomPercent', 'contentView', 'layoutMode', 'executionMode', 'executionModes', 'ocrViewModel', 'regionComparisonState', 'canExportRegionComparisonArtifact'],
-    emits: ['toggle-outline', 'translate-visible', 'cancel-translation', 'content-view-change', 'layout-mode-change', 'zoom-step', 'zoom-change', 'export-txt', 'export-markdown', 'export-html', 'request-region-comparison', 'cancel-region-comparison', 'export-region-comparison-artifact', 'clear-cache', 'request-open-pdf', 'execution-mode-change', 'primary-click', 'select-action', 'select-language', 'manage-languages', 'open-settings'],
+    emits: ['toggle-outline', 'translate-visible', 'cancel-translation', 'content-view-change', 'layout-mode-change', 'zoom-step', 'zoom-change', 'export-txt', 'export-markdown', 'export-html', 'request-region-comparison', 'cancel-region-comparison', 'export-region-comparison-artifact', 'clear-cache', 'request-open-pdf', 'execution-mode-change', 'primary-click', 'select-action', 'select-language', 'manage-languages', 'open-settings', 'request-document-info'],
     template: '<header class="pdf-toolbar-stub" />'
   }
 }))
@@ -304,7 +304,8 @@ function createMocks({
 } = {}) {
   const sessionMock = {
     getPageViewport: vi.fn(() => mockPdfViewport),
-    getCommittedOcrState: vi.fn(() => null)
+    getCommittedOcrState: vi.fn(() => null),
+    documentMetadata: {},
   }
   mockPdfSession = sessionMock
 
@@ -331,6 +332,7 @@ function createMocks({
     restoredTranslationCount: ref(0),
     pdfFingerprint: ref('fingerprint'),
     workerLabel: ref('worker'),
+    currentFile: ref(null),
     session: sessionAsRef ? ref(sessionMock) : sessionMock,
     loadPdfFile: vi.fn().mockResolvedValue(true),
     recomputeLayout: vi.fn().mockResolvedValue(undefined),
@@ -2002,6 +2004,21 @@ describe('PdfApp', () => {
 
       const toolbar = wrapper.findComponent({ name: 'PdfToolbar' })
       expect(toolbar.props('ocrViewModel').preferredAction).toBe('page')
+    })
+  })
+
+  describe('PDF Information dialog', () => {
+    it('opens dialog on request-document-info from toolbar', async () => {
+      const wrapper = mount(PdfApp)
+      await flushPromises()
+
+      expect(wrapper.findComponent({ name: 'PdfDocumentInfoDialog' }).props('modelValue')).toBe(false)
+
+      const toolbar = wrapper.findComponent({ name: 'PdfToolbar' })
+      toolbar.vm.$emit('request-document-info')
+      await flushPromises()
+
+      expect(wrapper.findComponent({ name: 'PdfDocumentInfoDialog' }).props('modelValue')).toBe(true)
     })
   })
 })

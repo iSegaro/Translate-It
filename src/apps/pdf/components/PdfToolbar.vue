@@ -16,12 +16,19 @@
             :size="16"
           />
         </button>
-        <span
-          class="pdf-toolbar__file-name"
-          :title="fileName || 'PDF Viewer'"
+        <button
+          v-if="fileName"
+          class="pdf-toolbar__info-toggle"
+          type="button"
+          aria-label="PDF Information"
+          title="PDF Information"
+          @click="$emit('request-document-info')"
         >
-          {{ fileName || 'PDF Viewer' }}
-        </span>
+          <SvgIcon
+            :src="infoIcon"
+            :size="16"
+          />
+        </button>
       </div>
     </div>
 
@@ -359,6 +366,14 @@
             class="pdf-toolbar__export-item"
             type="button"
             role="menuitem"
+            @click="handleRequestPdfInfo"
+          >
+            PDF Information
+          </button>
+          <button
+            class="pdf-toolbar__export-item"
+            type="button"
+            role="menuitem"
             @click="handleOpenLanguageSettings"
           >
             Language: {{ languageSummarySource }} → {{ languageSummaryTarget }}
@@ -479,6 +494,7 @@ import outlineIcon from '@/icons/ui/outline.svg?url'
 import splitScreenIcon from '@/icons/ui/split-screen.svg?url'
 import fitPageIcon from '@/icons/ui/fit-page.svg?url'
 import fitWidthIcon from '@/icons/ui/fit-width.svg?url'
+import infoIcon from '@/icons/ui/info.svg?url'
 import './PdfToolbar.scss'
 
 const TOOLTIP_OUTLINE = 'Toggle outline'
@@ -511,7 +527,7 @@ const props = defineProps({
   targetLanguage: { type: String, default: 'fa' },
 })
 
-const emit = defineEmits(['request-open-pdf', 'translate-visible', 'cancel-translation', 'content-view-change', 'layout-mode-change', 'toggle-outline', 'export-txt', 'export-markdown', 'export-html', 'request-region-comparison', 'cancel-region-comparison', 'export-region-comparison-artifact', 'clear-cache', 'zoom-step', 'zoom-change', 'execution-mode-change', 'primary-click', 'select-action', 'select-language', 'manage-languages', 'open-settings', 'update:sourceLanguage', 'update:targetLanguage'])
+const emit = defineEmits(['request-open-pdf', 'translate-visible', 'cancel-translation', 'content-view-change', 'layout-mode-change', 'toggle-outline', 'export-txt', 'export-markdown', 'export-html', 'request-region-comparison', 'cancel-region-comparison', 'export-region-comparison-artifact', 'clear-cache', 'zoom-step', 'zoom-change', 'execution-mode-change', 'primary-click', 'select-action', 'select-language', 'manage-languages', 'open-settings', 'request-document-info', 'update:sourceLanguage', 'update:targetLanguage'])
 
 const logger = getScopedLogger(LOG_COMPONENTS.PDF, 'PdfToolbar')
 const settingsStore = useSettingsStore()
@@ -772,6 +788,11 @@ function handleClearCacheAction() {
 function handleOpenSettingsAction() {
   emit('open-settings')
   closeMenus()
+}
+
+function handleRequestPdfInfo() {
+  closeMenus()
+  emit('request-document-info')
 }
 
 function handleRequestRegionComparisonAction() {

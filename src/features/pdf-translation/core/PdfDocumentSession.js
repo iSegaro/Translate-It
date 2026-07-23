@@ -18,6 +18,20 @@ const PAGE_MARGIN = 24
 const MIN_SCALE = 0.4
 const MAX_SCALE = 2.0
 
+function createEmptyDocumentMetadata() {
+  return {
+    title: '',
+    author: '',
+    subject: '',
+    keywords: '',
+    creator: '',
+    producer: '',
+    creationDate: '',
+    modificationDate: '',
+    pdfVersion: '',
+  }
+}
+
 function normalizePageNumberSet(pageNumbers = []) {
   const normalized = new Set()
 
@@ -79,6 +93,7 @@ export class PdfDocumentSession extends ResourceTracker {
     this.pdfFingerprint = ''
     this.documentIdentity = ''
     this.displayName = ''
+    this.documentMetadata = createEmptyDocumentMetadata()
     this._renderer = new PdfRenderer()
     this._bitmapCache = new PdfBitmapCache()
     this._resolver = new PdfDestinationResolver()
@@ -294,6 +309,17 @@ export class PdfDocumentSession extends ResourceTracker {
     try {
       const { info } = await this.pdfDocument.getMetadata()
       this.displayName = (info?.Title || '').trim() || this.fileName
+      this.documentMetadata = {
+        title: info?.Title || '',
+        author: info?.Author || '',
+        subject: info?.Subject || '',
+        keywords: info?.Keywords || '',
+        creator: info?.Creator || '',
+        producer: info?.Producer || '',
+        creationDate: info?.CreationDate || '',
+        modificationDate: info?.ModDate || '',
+        pdfVersion: info?.PDFFormatVersion || '',
+      }
     } catch (error) {
       logger.debug('Failed to read PDF metadata', error)
       this.displayName = this.fileName
@@ -807,6 +833,7 @@ export class PdfDocumentSession extends ResourceTracker {
     this.totalPages = 0
     this.pageMetrics = []
     this.fileName = ''
+    this.documentMetadata = createEmptyDocumentMetadata()
   }
 
   async destroy() {
