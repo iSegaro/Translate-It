@@ -194,7 +194,10 @@
             :aria-label="primaryAriaLabel"
             @click="$emit('primary-click')"
           >
-            <span class="pdf-toolbar__ocr-primary-size" aria-hidden="true">{{ widestPrimaryLabel }}</span>
+            <span
+              class="pdf-toolbar__ocr-primary-size"
+              aria-hidden="true"
+            >{{ widestPrimaryLabel }}</span>
             <span class="pdf-toolbar__ocr-primary-text">{{ primaryLabel }}</span>
           </button>
           <button
@@ -755,10 +758,12 @@ const currentPageDisplayValue = computed(() => {
 
 const isEditingPage = ref(false)
 const editPageValue = ref('')
+const originalPageNumber = ref(0)
 
 function startEditingPage(e) {
   isEditingPage.value = true
   editPageValue.value = currentPageDisplayValue.value
+  originalPageNumber.value = Number(currentPageDisplayValue.value)
   nextTick(() => e.target.select())
 }
 
@@ -769,17 +774,23 @@ function handlePageInput(e) {
 function commitPageEdit() {
   if (!isEditingPage.value) return
   isEditingPage.value = false
+
   const num = Number(editPageValue.value)
-  if (Number.isInteger(num) && num >= 1) {
-    emit('go-to-page', num)
-  } else {
+  const isValidPage = Number.isInteger(num) && num >= 1
+
+  if (!isValidPage) {
     editPageValue.value = currentPageDisplayValue.value
+  } else if (num !== originalPageNumber.value) {
+    emit('go-to-page', num)
   }
+
+  originalPageNumber.value = 0
 }
 
 function cancelPageEdit(e) {
   isEditingPage.value = false
   editPageValue.value = currentPageDisplayValue.value
+  originalPageNumber.value = 0
   e.target.value = editPageValue.value
   e.target.blur()
 }

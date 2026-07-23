@@ -1709,5 +1709,38 @@ describe('PdfToolbar', () => {
 
       wrapper.unmount()
     })
+
+    it('does not emit go-to-page on blur when value is unchanged', async () => {
+      const wrapper = mount(PdfToolbar, {
+        props: baseProps(),
+        global: { stubs: { SvgIcon: true } },
+        attachTo: document.body
+      })
+      const input = wrapper.find('.pdf-toolbar__page-input')
+      await input.trigger('focus')
+      await input.trigger('blur')
+
+      expect(wrapper.emitted('go-to-page')).toBeFalsy()
+      expect(input.element.value).toBe('5')
+
+      wrapper.unmount()
+    })
+
+    it('does not emit go-to-page on Enter when value is unchanged', async () => {
+      const wrapper = mount(PdfToolbar, {
+        props: baseProps(),
+        global: { stubs: { SvgIcon: true } },
+        attachTo: document.body
+      })
+      const input = wrapper.find('.pdf-toolbar__page-input')
+      await input.trigger('focus')
+      await input.trigger('keydown', { key: 'Enter' })
+      await input.trigger('blur')
+
+      expect(wrapper.emitted('go-to-page')).toBeFalsy()
+      expect(input.element.value).toBe('5')
+
+      wrapper.unmount()
+    })
   })
 })
