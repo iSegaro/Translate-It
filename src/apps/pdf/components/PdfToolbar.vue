@@ -285,39 +285,6 @@
         </div>
       </div>
 
-      <div
-        v-if="fileName"
-        ref="languageMenuRef"
-        class="pdf-toolbar__language-trigger"
-      >
-        <button
-          ref="languageTriggerRef"
-          class="pdf-toolbar__language-summary-button"
-          :class="{ 'pdf-toolbar__language-summary-button--active': activeMenu === 'language' }"
-          type="button"
-          aria-haspopup="true"
-          :aria-expanded="activeMenu === 'language'"
-          :aria-label="languageSummaryAriaLabel"
-          :title="languageSummaryTitle"
-          @click="toggleLanguageSettings"
-        >
-          <span class="pdf-toolbar__language-summary-source">{{ languageSummarySource }}</span>
-          <span class="pdf-toolbar__language-summary-arrow" aria-hidden="true">→</span>
-          <span class="pdf-toolbar__language-summary-target">{{ languageSummaryTarget }}</span>
-        </button>
-        <PdfTranslationSettingsPopover
-          v-if="activeMenu === 'language'"
-          ref="languagePopoverRef"
-          :source-language="sourceLanguage"
-          :target-language="targetLanguage"
-          :provider="effectivePdfProvider"
-          :auto-detect-label="t('auto_detect', 'Auto-Detect')"
-          :disabled="isTranslating"
-          @update:source-language="emit('update:sourceLanguage', $event)"
-          @update:target-language="emit('update:targetLanguage', $event)"
-        />
-      </div>
-
       <ProviderSelector
         :model-value="pdfProviderValue"
         mode="split"
@@ -387,6 +354,14 @@
             @click="handleOpenSettingsAction"
           >
             Settings
+          </button>
+          <button
+            class="pdf-toolbar__export-item"
+            type="button"
+            role="menuitem"
+            @click="handleOpenLanguageSettings"
+          >
+            Language: {{ languageSummarySource }} → {{ languageSummaryTarget }}
           </button>
           <div
             v-if="canExport"
@@ -474,6 +449,17 @@
           </div>
         </div>
       </div>
+      <PdfTranslationSettingsPopover
+        v-if="activeMenu === 'language'"
+        ref="languagePopoverRef"
+        :source-language="sourceLanguage"
+        :target-language="targetLanguage"
+        :provider="effectivePdfProvider"
+        :auto-detect-label="t('auto_detect', 'Auto-Detect')"
+        :disabled="isTranslating"
+        @update:source-language="emit('update:sourceLanguage', $event)"
+        @update:target-language="emit('update:targetLanguage', $event)"
+      />
     </div>
   </header>
 </template>
@@ -705,8 +691,6 @@ const moreMenuTriggerRef = ref(null)
 const ocrSplitRef = ref(null)
 const ocrMenuRef = ref(null)
 const ocrMenuTriggerRef = ref(null)
-const languageMenuRef = ref(null)
-const languageTriggerRef = ref(null)
 const languagePopoverRef = ref(null)
 const activeMenu = ref(null)
 const zoomPercentOptions = [50, 75, 100, 125, 150, 200]
@@ -757,19 +741,7 @@ const languageSummarySource = computed(() =>
 
 const languageSummaryTarget = computed(() => props.targetLanguage.toUpperCase())
 
-const languageSummaryAriaLabel = computed(() => {
-  const src = props.sourceLanguage === 'auto' ? 'Auto-Detect' : props.sourceLanguage
-  return `Translation settings. Source: ${src}, Target: ${props.targetLanguage}`
-})
-
-const languageSummaryTitle = computed(() => languageSummaryAriaLabel.value)
-
-function toggleLanguageSettings() {
-  if (activeMenu.value === 'language') {
-    closeMenus()
-    languageTriggerRef.value?.focus()
-    return
-  }
+function handleOpenLanguageSettings() {
   closeMenus()
   activeMenu.value = 'language'
 }
@@ -829,8 +801,8 @@ function getActiveMenuRefs() {
 
   if (activeMenu.value === 'language') {
     return {
-      menuRef: languageMenuRef.value,
-      triggerRef: languageTriggerRef.value
+      menuRef: languagePopoverRef.value?.$el || null,
+      triggerRef: moreMenuTriggerRef.value
     }
   }
 
@@ -885,7 +857,7 @@ function handleDocumentKeyDown(event) {
     if (activeMenuName === 'more') {
       moreMenuTriggerRef.value?.focus?.()
     } else if (activeMenuName === 'language') {
-      languageTriggerRef.value?.focus?.()
+      moreMenuTriggerRef.value?.focus?.()
     }
   }
 }

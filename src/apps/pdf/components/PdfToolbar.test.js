@@ -1166,7 +1166,7 @@ describe('PdfToolbar', () => {
   })
 
   describe('language summary button', () => {
-    it('renders language summary button when fileName is set', () => {
+    it('language info lives in More menu, not as inline button', () => {
       const wrapper = mount(PdfToolbar, {
         props: {
           fileName: 'doc.pdf',
@@ -1174,10 +1174,10 @@ describe('PdfToolbar', () => {
           targetLanguage: 'fa'
         }
       })
-      expect(wrapper.find('.pdf-toolbar__language-summary-button').exists()).toBe(true)
+      expect(wrapper.find('.pdf-toolbar__language-summary-button').exists()).toBe(false)
     })
 
-    it('does not render language trigger when fileName is empty', () => {
+    it('does not render inline language button when fileName is empty', () => {
       const wrapper = mount(PdfToolbar, {
         props: {
           fileName: '',
@@ -1188,7 +1188,7 @@ describe('PdfToolbar', () => {
       expect(wrapper.find('.pdf-toolbar__language-summary-button').exists()).toBe(false)
     })
 
-    it('shows Auto label when source is auto-detect', () => {
+    it('shows Auto and language codes in More menu', async () => {
       const wrapper = mount(PdfToolbar, {
         props: {
           fileName: 'doc.pdf',
@@ -1196,11 +1196,14 @@ describe('PdfToolbar', () => {
           targetLanguage: 'fa'
         }
       })
-      expect(wrapper.find('.pdf-toolbar__language-summary-button').text()).toContain('Auto')
-      expect(wrapper.find('.pdf-toolbar__language-summary-button').text()).toContain('FA')
+      await wrapper.find('.pdf-toolbar__button--menu-trigger').trigger('click')
+      const languageItem = wrapper.findAll('.pdf-toolbar__export-item')
+        .find(item => item.text().includes('Language:'))
+      expect(languageItem.text()).toContain('Auto')
+      expect(languageItem.text()).toContain('FA')
     })
 
-    it('shows uppercase source code when source is specific', () => {
+    it('shows uppercase source code in More menu', async () => {
       const wrapper = mount(PdfToolbar, {
         props: {
           fileName: 'doc.pdf',
@@ -1208,32 +1211,11 @@ describe('PdfToolbar', () => {
           targetLanguage: 'fa'
         }
       })
-      expect(wrapper.find('.pdf-toolbar__language-summary-button').text()).toContain('EN')
-      expect(wrapper.find('.pdf-toolbar__language-summary-button').text()).toContain('FA')
-    })
-
-    it('has accessible label with source and target language', () => {
-      const wrapper = mount(PdfToolbar, {
-        props: {
-          fileName: 'doc.pdf',
-          sourceLanguage: 'en',
-          targetLanguage: 'fa'
-        }
-      })
-      expect(wrapper.find('.pdf-toolbar__language-summary-button').attributes('aria-label')).toBe('Translation settings. Source: en, Target: fa')
-    })
-
-    it('has aria-haspopup and aria-expanded attributes', () => {
-      const wrapper = mount(PdfToolbar, {
-        props: {
-          fileName: 'doc.pdf',
-          sourceLanguage: 'auto',
-          targetLanguage: 'fa'
-        }
-      })
-      const btn = wrapper.find('.pdf-toolbar__language-summary-button')
-      expect(btn.attributes('aria-haspopup')).toBe('true')
-      expect(btn.attributes('aria-expanded')).toBe('false')
+      await wrapper.find('.pdf-toolbar__button--menu-trigger').trigger('click')
+      const languageItem = wrapper.findAll('.pdf-toolbar__export-item')
+        .find(item => item.text().includes('Language:'))
+      expect(languageItem.text()).toContain('EN')
+      expect(languageItem.text()).toContain('FA')
     })
   })
 
@@ -1252,7 +1234,10 @@ describe('PdfToolbar', () => {
         }
       })
       expect(wrapper.find('.pdf-toolbar__language-popover').exists()).toBe(false)
-      await wrapper.find('.pdf-toolbar__language-summary-button').trigger('click')
+      await wrapper.find('.pdf-toolbar__button--menu-trigger').trigger('click')
+      const langItem = wrapper.findAll('.pdf-toolbar__export-item')
+        .find(item => item.text().includes('Language:'))
+      await langItem.trigger('click')
       expect(wrapper.find('.pdf-toolbar__language-popover').exists()).toBe(true)
     })
 
@@ -1264,24 +1249,11 @@ describe('PdfToolbar', () => {
           targetLanguage: 'fa'
         }
       })
-      await wrapper.find('.pdf-toolbar__language-summary-button').trigger('click')
+      await wrapper.find('.pdf-toolbar__button--menu-trigger').trigger('click')
+      const langItem = wrapper.findAll('.pdf-toolbar__export-item')
+        .find(item => item.text().includes('Language:'))
+      await langItem.trigger('click')
       expect(wrapper.find('.mock-language-selector').exists()).toBe(true)
-    })
-
-    it('applies active class to trigger button when popover is open', async () => {
-      const wrapper = mount(PdfToolbar, {
-        props: {
-          fileName: 'doc.pdf',
-          sourceLanguage: 'auto',
-          targetLanguage: 'fa'
-        }
-      })
-      const btn = wrapper.find('.pdf-toolbar__language-summary-button')
-      expect(btn.classes()).not.toContain('pdf-toolbar__language-summary-button--active')
-      await btn.trigger('click')
-      expect(btn.classes()).toContain('pdf-toolbar__language-summary-button--active')
-      await btn.trigger('click')
-      expect(btn.classes()).not.toContain('pdf-toolbar__language-summary-button--active')
     })
 
     it('does not render LanguageSelector in toolbar when popover is closed', () => {
@@ -1303,9 +1275,12 @@ describe('PdfToolbar', () => {
           targetLanguage: 'fa'
         }
       })
-      await wrapper.find('.pdf-toolbar__language-summary-button').trigger('click')
+      await wrapper.find('.pdf-toolbar__button--menu-trigger').trigger('click')
+      const langItem = wrapper.findAll('.pdf-toolbar__export-item')
+        .find(item => item.text().includes('Language:'))
+      await langItem.trigger('click')
       expect(wrapper.find('.pdf-toolbar__language-popover').exists()).toBe(true)
-      await wrapper.find('.pdf-toolbar__language-summary-button').trigger('click')
+      await wrapper.find('.pdf-toolbar__button--menu-trigger').trigger('click')
       expect(wrapper.find('.pdf-toolbar__language-popover').exists()).toBe(false)
     })
 
@@ -1317,7 +1292,10 @@ describe('PdfToolbar', () => {
           targetLanguage: 'fa'
         }
       })
-      await wrapper.find('.pdf-toolbar__language-summary-button').trigger('click')
+      await wrapper.find('.pdf-toolbar__button--menu-trigger').trigger('click')
+      const langItem = wrapper.findAll('.pdf-toolbar__export-item')
+        .find(item => item.text().includes('Language:'))
+      await langItem.trigger('click')
       expect(wrapper.find('.pdf-toolbar__language-popover').exists()).toBe(true)
       document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))
       await flushPromises()
@@ -1332,14 +1310,17 @@ describe('PdfToolbar', () => {
           targetLanguage: 'fa'
         }
       })
-      await wrapper.find('.pdf-toolbar__language-summary-button').trigger('click')
+      await wrapper.find('.pdf-toolbar__button--menu-trigger').trigger('click')
+      const langItem = wrapper.findAll('.pdf-toolbar__export-item')
+        .find(item => item.text().includes('Language:'))
+      await langItem.trigger('click')
       expect(wrapper.find('.pdf-toolbar__language-popover').exists()).toBe(true)
       document.dispatchEvent(new PointerEvent('pointerdown'))
       await flushPromises()
       expect(wrapper.find('.pdf-toolbar__language-popover').exists()).toBe(false)
     })
 
-    it('returns focus to trigger button on Escape close', async () => {
+    it('returns focus to More button on Escape close', async () => {
       const wrapper = mount(PdfToolbar, {
         props: {
           fileName: 'doc.pdf',
@@ -1347,9 +1328,11 @@ describe('PdfToolbar', () => {
           targetLanguage: 'fa'
         }
       })
-      const trigger = wrapper.find('.pdf-toolbar__language-summary-button')
-      trigger.element.focus()
-      await trigger.trigger('click')
+      wrapper.find('.pdf-toolbar__button--menu-trigger').element.focus()
+      await wrapper.find('.pdf-toolbar__button--menu-trigger').trigger('click')
+      const langItem = wrapper.findAll('.pdf-toolbar__export-item')
+        .find(item => item.text().includes('Language:'))
+      await langItem.trigger('click')
       expect(wrapper.find('.pdf-toolbar__language-popover').exists()).toBe(true)
       document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))
       await flushPromises()
@@ -1364,7 +1347,10 @@ describe('PdfToolbar', () => {
           targetLanguage: 'fa'
         }
       })
-      await wrapper.find('.pdf-toolbar__language-summary-button').trigger('click')
+      await wrapper.find('.pdf-toolbar__button--menu-trigger').trigger('click')
+      const langItem = wrapper.findAll('.pdf-toolbar__export-item')
+        .find(item => item.text().includes('Language:'))
+      await langItem.trigger('click')
       expect(wrapper.find('.pdf-toolbar__language-popover').exists()).toBe(true)
       await wrapper.find('.mock-source-lang').setValue('en')
       expect(wrapper.find('.pdf-toolbar__language-popover').exists()).toBe(true)
@@ -1379,7 +1365,10 @@ describe('PdfToolbar', () => {
           targetLanguage: 'fa'
         }
       })
-      await wrapper.find('.pdf-toolbar__language-summary-button').trigger('click')
+      await wrapper.find('.pdf-toolbar__button--menu-trigger').trigger('click')
+      const langItem = wrapper.findAll('.pdf-toolbar__export-item')
+        .find(item => item.text().includes('Language:'))
+      await langItem.trigger('click')
       const sourceSelect = wrapper.find('.mock-source-lang')
       expect(sourceSelect.element.value).toBe('en')
     })
@@ -1392,7 +1381,10 @@ describe('PdfToolbar', () => {
           targetLanguage: 'en'
         }
       })
-      await wrapper.find('.pdf-toolbar__language-summary-button').trigger('click')
+      await wrapper.find('.pdf-toolbar__button--menu-trigger').trigger('click')
+      const langItem = wrapper.findAll('.pdf-toolbar__export-item')
+        .find(item => item.text().includes('Language:'))
+      await langItem.trigger('click')
       const targetSelect = wrapper.find('.mock-target-lang')
       expect(targetSelect.element.value).toBe('en')
     })
@@ -1406,7 +1398,10 @@ describe('PdfToolbar', () => {
           targetLanguage: 'fa'
         }
       })
-      await wrapper.find('.pdf-toolbar__language-summary-button').trigger('click')
+      await wrapper.find('.pdf-toolbar__button--menu-trigger').trigger('click')
+      const langItem = wrapper.findAll('.pdf-toolbar__export-item')
+        .find(item => item.text().includes('Language:'))
+      await langItem.trigger('click')
       expect(wrapper.find('.mock-language-selector').attributes('data-provider')).toBe('deepl')
     })
 
@@ -1420,7 +1415,10 @@ describe('PdfToolbar', () => {
           targetLanguage: 'fa'
         }
       })
-      await wrapper.find('.pdf-toolbar__language-summary-button').trigger('click')
+      await wrapper.find('.pdf-toolbar__button--menu-trigger').trigger('click')
+      const langItem = wrapper.findAll('.pdf-toolbar__export-item')
+        .find(item => item.text().includes('Language:'))
+      await langItem.trigger('click')
       expect(wrapper.find('.mock-language-selector').attributes('data-provider')).toBe('openai')
     })
 
@@ -1433,7 +1431,10 @@ describe('PdfToolbar', () => {
           targetLanguage: 'fa'
         }
       })
-      await wrapper.find('.pdf-toolbar__language-summary-button').trigger('click')
+      await wrapper.find('.pdf-toolbar__button--menu-trigger').trigger('click')
+      const langItem = wrapper.findAll('.pdf-toolbar__export-item')
+        .find(item => item.text().includes('Language:'))
+      await langItem.trigger('click')
       expect(wrapper.find('.mock-language-selector').attributes('data-provider')).toBe('gemini')
     })
 
@@ -1447,7 +1448,10 @@ describe('PdfToolbar', () => {
           targetLanguage: 'fa'
         }
       })
-      await wrapper.find('.pdf-toolbar__language-summary-button').trigger('click')
+      await wrapper.find('.pdf-toolbar__button--menu-trigger').trigger('click')
+      const langItem = wrapper.findAll('.pdf-toolbar__export-item')
+        .find(item => item.text().includes('Language:'))
+      await langItem.trigger('click')
       expect(wrapper.find('.mock-language-selector').attributes('data-provider')).toBe('googlev2')
     })
 
@@ -1460,7 +1464,10 @@ describe('PdfToolbar', () => {
           targetLanguage: 'fa'
         }
       })
-      await wrapper.find('.pdf-toolbar__language-summary-button').trigger('click')
+      await wrapper.find('.pdf-toolbar__button--menu-trigger').trigger('click')
+      const langItem = wrapper.findAll('.pdf-toolbar__export-item')
+        .find(item => item.text().includes('Language:'))
+      await langItem.trigger('click')
       expect(wrapper.find('.mock-language-selector').attributes('data-auto-detect-label')).toBe('Auto-Detect')
     })
 
@@ -1472,7 +1479,10 @@ describe('PdfToolbar', () => {
           targetLanguage: 'fa'
         }
       })
-      await wrapper.find('.pdf-toolbar__language-summary-button').trigger('click')
+      await wrapper.find('.pdf-toolbar__button--menu-trigger').trigger('click')
+      const langItem = wrapper.findAll('.pdf-toolbar__export-item')
+        .find(item => item.text().includes('Language:'))
+      await langItem.trigger('click')
       await wrapper.find('.mock-source-lang').setValue('en')
       expect(wrapper.emitted('update:sourceLanguage')).toBeTruthy()
       expect(wrapper.emitted('update:sourceLanguage')[0]).toEqual(['en'])
@@ -1486,7 +1496,10 @@ describe('PdfToolbar', () => {
           targetLanguage: 'fa'
         }
       })
-      await wrapper.find('.pdf-toolbar__language-summary-button').trigger('click')
+      await wrapper.find('.pdf-toolbar__button--menu-trigger').trigger('click')
+      const langItem = wrapper.findAll('.pdf-toolbar__export-item')
+        .find(item => item.text().includes('Language:'))
+      await langItem.trigger('click')
       await wrapper.find('.mock-target-lang').setValue('de')
       expect(wrapper.emitted('update:targetLanguage')).toBeTruthy()
       expect(wrapper.emitted('update:targetLanguage')[0]).toEqual(['de'])
@@ -1504,7 +1517,10 @@ describe('PdfToolbar', () => {
         }
       })
       // Open language popover
-      await wrapper.find('.pdf-toolbar__language-summary-button').trigger('click')
+      await wrapper.find('.pdf-toolbar__button--menu-trigger').trigger('click')
+      const langItem = wrapper.findAll('.pdf-toolbar__export-item')
+        .find(item => item.text().includes('Language:'))
+      await langItem.trigger('click')
       expect(wrapper.find('.pdf-toolbar__language-popover').exists()).toBe(true)
       // Open hamburger menu — language popover closes
       await wrapper.find('.pdf-toolbar__button[aria-label="More actions"]').trigger('click')

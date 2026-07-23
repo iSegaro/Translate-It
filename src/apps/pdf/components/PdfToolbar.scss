@@ -210,6 +210,7 @@ $pdf-toolbar-file-name-inline-limit: clamp(120px, 25vw, 350px);
 
 .pdf-toolbar__actions {
   grid-column: 3;
+  position: relative;
   display: flex;
   align-items: center;
   justify-content: flex-end;
