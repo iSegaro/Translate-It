@@ -147,7 +147,7 @@ describe('PdfTranslationCoordinator', () => {
       targetLanguage: 'es'
     })
 
-    const summary = await coordinator.translateVisibleBlocks()
+    const summary = await coordinator.translateVisibleBlocks({ sourceLanguage: 'en', targetLanguage: 'es' })
 
     expect(summary).toEqual({
       status: 'translated',
@@ -202,7 +202,7 @@ describe('PdfTranslationCoordinator', () => {
     ])
     sendRegularMessageMock.mockReturnValue(response.promise)
 
-    const translation = coordinator.translateVisibleBlocks()
+    const translation = coordinator.translateVisibleBlocks({ sourceLanguage: 'en', targetLanguage: 'es' })
     await vi.waitFor(() => expect(sendRegularMessageMock).toHaveBeenCalledTimes(1))
 
     const messageId = sendRegularMessageMock.mock.calls[0][0].messageId
@@ -270,7 +270,7 @@ describe('PdfTranslationCoordinator', () => {
       }
     })
 
-    await coordinator.translateVisibleBlocks()
+    await coordinator.translateVisibleBlocks({ sourceLanguage: 'en', targetLanguage: 'es' })
 
     expect(batchPlanner.plan).toHaveBeenCalledTimes(1)
     expect(batchPlanner.plan).toHaveBeenCalledWith(
@@ -297,7 +297,7 @@ describe('PdfTranslationCoordinator', () => {
       return deferred.promise
     })
 
-    const translatePromise = coordinator.translateVisibleBlocks()
+    const translatePromise = coordinator.translateVisibleBlocks({ sourceLanguage: 'en', targetLanguage: 'es' })
     await vi.waitFor(() => {
       expect(session.setBlockTranslationState).toHaveBeenCalledWith('block-a', expect.objectContaining({
         status: 'loading'
@@ -393,7 +393,7 @@ describe('PdfTranslationCoordinator', () => {
       targetLanguage: 'es'
     })
 
-    await coordinator.translateVisibleBlocks()
+    await coordinator.translateVisibleBlocks({ sourceLanguage: 'en', targetLanguage: 'es' })
 
     expect(onStateChange).toHaveBeenCalledTimes(2)
     expect(onStateChange).toHaveBeenNthCalledWith(1, ['block-a'])
@@ -413,7 +413,7 @@ describe('PdfTranslationCoordinator', () => {
       targetLanguage: 'es'
     })
 
-    const summary = await coordinator.translateVisibleBlocks()
+    const summary = await coordinator.translateVisibleBlocks({ sourceLanguage: 'en', targetLanguage: 'es' })
     expect(summary.status).toBe('translated')
   })
 
@@ -434,7 +434,7 @@ describe('PdfTranslationCoordinator', () => {
       metadata: { batchCount: 1 }
     })
 
-    const summary = await coordinator.translateVisibleBlocks()
+    const summary = await coordinator.translateVisibleBlocks({ sourceLanguage: 'en', targetLanguage: 'es' })
 
     expect(summary).toEqual({
       status: 'translated',
@@ -566,7 +566,7 @@ describe('PdfTranslationCoordinator', () => {
         targetLanguage: 'fa'
       })
 
-    const summary = await coordinator.translateVisibleBlocks()
+    const summary = await coordinator.translateVisibleBlocks({ sourceLanguage: 'en', targetLanguage: 'es' })
 
     expect(summary).toEqual({
       status: 'translated',
@@ -616,7 +616,7 @@ describe('PdfTranslationCoordinator', () => {
       metadata: { batchCount: 1 }
     })
 
-    const summary = await coordinator.translateVisibleBlocks()
+    const summary = await coordinator.translateVisibleBlocks({ sourceLanguage: 'en', targetLanguage: 'es' })
 
     expect(summary).toEqual({
       status: 'partial',
@@ -644,7 +644,7 @@ describe('PdfTranslationCoordinator', () => {
     ])
     sendRegularMessageMock.mockRejectedValue(new Error('Provider failed: quota exceeded'))
 
-    const summary = await coordinator.translateVisibleBlocks()
+    const summary = await coordinator.translateVisibleBlocks({ sourceLanguage: 'en', targetLanguage: 'es' })
 
     expect(summary).toEqual({
       status: 'partial',
@@ -680,7 +680,7 @@ describe('PdfTranslationCoordinator', () => {
       .mockResolvedValueOnce({ success: false, error: 'First provider failed: quota exceeded' })
       .mockResolvedValueOnce({ success: false, error: 'Second provider failed: timeout' })
 
-    const summary = await coordinator.translateVisibleBlocks()
+    const summary = await coordinator.translateVisibleBlocks({ sourceLanguage: 'en', targetLanguage: 'es' })
 
     expect(summary).toEqual({
       status: 'partial',
@@ -699,7 +699,7 @@ describe('PdfTranslationCoordinator', () => {
     ])
     sendRegularMessageMock.mockResolvedValue({ success: false, error: 'Provider X failed: timeout' })
 
-    const summary = await coordinator.translateVisibleBlocks()
+    const summary = await coordinator.translateVisibleBlocks({ sourceLanguage: 'en', targetLanguage: 'es' })
 
     expect(summary).toEqual({
       status: 'partial',
@@ -740,7 +740,7 @@ describe('PdfTranslationCoordinator', () => {
       targetLanguage: 'es'
     })
 
-    const summary = await coordinator.translateVisibleBlocks()
+    const summary = await coordinator.translateVisibleBlocks({ sourceLanguage: 'en', targetLanguage: 'es' })
 
     expect(summary.status).toBe('translated')
 
@@ -772,7 +772,7 @@ describe('PdfTranslationCoordinator', () => {
       targetLanguage: 'es'
     })
 
-    const summary = await coordinator.translateVisibleBlocks()
+    const summary = await coordinator.translateVisibleBlocks({ sourceLanguage: 'en', targetLanguage: 'es' })
 
     expect(summary.status).toBe('translated')
 
@@ -794,7 +794,7 @@ describe('PdfTranslationCoordinator', () => {
       targetLanguage: 'es'
     })
 
-    const summary = await coordinator.translateVisibleBlocks()
+    const summary = await coordinator.translateVisibleBlocks({ sourceLanguage: 'en', targetLanguage: 'es' })
 
     expect(summary.status).toBe('translated')
   })
