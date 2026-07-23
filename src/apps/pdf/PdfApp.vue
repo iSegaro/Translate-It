@@ -84,20 +84,6 @@
             </template>
           </PdfStatusBanner>
         </div>
-
-        <div
-          v-if="regionOcrNotice"
-          class="pdf-app__status-row"
-        >
-          <PdfStatusBanner
-            :visible="true"
-            :variant="regionOcrNotice.variant"
-            :title="regionOcrNotice.title"
-            :message="regionOcrNotice.message"
-            dismissible
-            @dismiss="regionOcrNotice = null"
-          />
-        </div>
       </div>
 
       <main class="pdf-app__content">
@@ -200,11 +186,17 @@
       :pdf-source-language="pdfSourceLanguage"
       :pdf-target-language="pdfTargetLanguage"
     />
+
+    <Toaster
+      rich-colors
+      position="bottom-right"
+    />
   </div>
 </template>
 
 <script setup>
-import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { toast, Toaster } from 'vue-sonner'
 import PdfToolbar from './components/PdfToolbar.vue'
 import PdfDropzone from './components/PdfDropzone.vue'
 import PdfViewer from './components/PdfViewer.vue'
@@ -330,16 +322,12 @@ const {
   attachDocument,
   detachDocument
 } = usePdfNavigation(pdfViewerRef)
-const exportSuccess = ref(null)
-const exportSuccessTimer = ref(null)
-const EXPORT_SUCCESS_DURATION_MS = 2200
 const dismissedPdfStatusBannerKey = ref('')
 const logger = getScopedLogger(LOG_COMPONENTS.PDF, 'PdfApp')
 const ocrStore = useOCRStore()
 let activeRegionPosition = null
 const regionOcrState = ref(REGION_OCR_STATE.IDLE)
 const regionSelectionTarget = ref(null)
-const regionOcrNotice = ref(null)
 const regionComparisonState = ref(null)
 const developerNotification = ref(null)
 let developerNotificationOccurrenceId = 0
@@ -517,15 +505,6 @@ function ensureOcrLanguageInstalled() {
   return false
 }
 
-function getPdfOcrBannerMessage(errorCode) {
-  if (errorCode === 'model-not-installed') {
-    return 'No OCR language is installed. Open Manage Languages from the OCR menu to download one.'
-  }
-
-  if (errorCode === 'ocr-failed') return 'OCR failed. Please try again.'
-  return ''
-}
-
 function handleOcrPrimaryClick() {
   const model = toolbarOcrModel.value
   if (!model.canCancel) {
@@ -569,11 +548,8 @@ function handleOpenSettings() {
 
 const pdfStatusBanner = computed(() => pdfStatusBannerController.build({
   error: error.value,
-  exportError: exportError.value,
-  ocrError: getPdfOcrBannerMessage(ocrError.value),
   isLoading: isLoading.value,
   developerNotification: isDebugMode.value ? developerNotification.value : null,
-  exportSuccess: exportSuccess.value,
   translationStatus: translationSummary.value?.status ?? 'idle',
   translationOccurrenceId: translationSummary.value?.translationOccurrenceId ?? 0
 }))
@@ -588,6 +564,20 @@ const isPdfStatusBannerVisible = computed(() => {
     return false
   }
   return true
+})
+
+watch(exportError, (val) => {
+  if (val) toast.error(val)
+})
+
+watch(ocrError, (val) => {
+  if (val === 'model-not-installed') {
+    toast.error('No OCR language is installed. Open Manage Languages from the OCR menu to download one.')
+  } else if (val === 'ocr-failed') {
+    toast.error('OCR failed. Please try again.')
+  } else if (val) {
+    toast.error(val)
+  }
 })
 
 watch(hasDocument, (has) => {
@@ -856,7 +846,6 @@ function beginRegionSelection(target) {
     }
   }
   if (!regionOcrAvailable.value) return
-  regionOcrNotice.value = null
   regionSelectionTarget.value = target
   regionOcrState.value = REGION_OCR_STATE.SELECTING
 }
@@ -877,11 +866,7 @@ function handleRegionOcrOutcome(result) {
   setRegionOcrIdle()
 
   if (result?.status === 'recognized' && !String(result?.data?.text || '').trim()) {
-    regionOcrNotice.value = {
-      variant: 'warning',
-      title: 'Region OCR',
-      message: 'No text found in the selected region.'
-    }
+    toast.warning('No text found in the selected region.')
   } else if (result?.status === 'failed') {
     const errorCode = mapOcrError(result.error)
     if (errorCode === 'cancelled') return
@@ -890,11 +875,7 @@ function handleRegionOcrOutcome(result) {
       return
     }
 
-    regionOcrNotice.value = {
-      variant: 'error',
-      title: 'Region OCR',
-      message: 'OCR failed. Please try another region.'
-    }
+    toast.error('Region OCR failed. Please try another region.')
   }
 }
 
@@ -934,27 +915,21 @@ function handleCancelTranslation() {
 }
 
 async function handleExportTxt() {
-  clearExportSuccess()
-  clearExportError()
   if (await exportTxt()) {
-    showExportSuccess('TXT')
+    toast.success('TXT export ready')
   }
 }
 
 async function handleExportMarkdown() {
-  clearExportSuccess()
-  clearExportError()
   if (await exportMarkdown()) {
-    showExportSuccess('Markdown')
+    toast.success('Markdown export ready')
   }
 }
 
 async function handleExportHtml() {
-  clearExportSuccess()
-  clearExportError()
   const canvasDataUrls = pdfViewerRef.value?.collectCanvasDataUrls?.() || new Map()
   if (await exportHtml(canvasDataUrls)) {
-    showExportSuccess('HTML')
+    toast.success('HTML export ready')
   }
 }
 
@@ -967,30 +942,6 @@ function dismissPdfStatusBanner() {
     return
   }
   dismissedPdfStatusBannerKey.value = pdfStatusBanner.value.id
-}
-
-function clearExportSuccess() {
-  if (exportSuccessTimer.value) {
-    clearTimeout(exportSuccessTimer.value)
-    exportSuccessTimer.value = null
-  }
-
-  exportSuccess.value = null
-}
-
-function showExportSuccess(formatLabel) {
-  clearExportSuccess()
-  exportSuccess.value = {
-    variant: 'success',
-    title: `${formatLabel} export ready`,
-    message: `${formatLabel} export downloaded successfully.`,
-    detail: ''
-  }
-
-  exportSuccessTimer.value = setTimeout(() => {
-    exportSuccess.value = null
-    exportSuccessTimer.value = null
-  }, EXPORT_SUCCESS_DURATION_MS)
 }
 
 updateDocumentTitle()
@@ -1036,7 +987,6 @@ onMounted(async () => {
 
 onBeforeUnmount(() => {
   isAlive = false
-  clearExportSuccess()
   activeRegionPosition = null
   activeRegionComparisonOperation?.cancel()
   activeRegionComparisonOperation = null

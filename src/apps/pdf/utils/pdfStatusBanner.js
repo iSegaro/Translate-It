@@ -29,23 +29,16 @@ export function createPdfStatusBannerController() {
   const errorIdFactory = createErrorBannerIdFactory()
   function build({
     error = '',
-    exportError = '',
-    ocrError = '',
     isLoading = false,
     developerNotification = null,
-    exportSuccess = null,
-    restoredTranslationCount = 0,
     translationStatus = 'idle',
     translationOccurrenceId = 0
   } = {}) {
     const loadingMessage = 'Loading PDF and rebuilding visible pages.'
-    const restoredMessage = restoredTranslationCount > 0
-      ? `Restored ${restoredTranslationCount} cached translation(s).`
-      : ''
     const partialMessage = 'Partial translation available. Not all blocks are translated yet.'
 
-    const errorMessage = buildMessageFromError(error) || buildMessageFromError(exportError) || buildMessageFromError(ocrError)
-    const errorKind = errorMessage ? (error ? 'error' : exportError ? 'export-error' : 'ocr-error') : ''
+    const errorMessage = buildMessageFromError(error)
+    const errorKind = errorMessage ? 'error' : ''
     const errorSource = errorMessage || ''
     const errorId = errorIdFactory.next(errorKind, errorSource)
 
@@ -71,14 +64,6 @@ export function createPdfStatusBannerController() {
         body: developerNotification.body || null,
         dismissible: true
       }
-    }
-
-    if (exportSuccess) {
-      return { id: 'export-success', visible: true, variant: exportSuccess.variant || 'success', title: exportSuccess.title || 'Export ready', message: exportSuccess.message || '', dismissible: true }
-    }
-
-    if (restoredTranslationCount > 0) {
-      return { id: 'cache-restored', visible: true, variant: 'success', title: 'Restored from cache', message: restoredMessage, dismissible: true }
     }
 
     return null

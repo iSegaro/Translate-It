@@ -24,17 +24,6 @@ describe('buildPdfStatusBannerState', () => {
     })
   })
 
-  it('builds a cache-restore banner', () => {
-    expect(controller.build({ restoredTranslationCount: 2 })).toEqual({
-      id: 'cache-restored',
-      visible: true,
-      variant: 'success',
-      title: 'Restored from cache',
-      message: 'Restored 2 cached translation(s).',
-      dismissible: true
-    })
-  })
-
   it('builds a partial export warning banner', () => {
     expect(controller.build({ translationStatus: 'partial' })).toEqual({
       id: 'partial-export:0',
@@ -42,24 +31,6 @@ describe('buildPdfStatusBannerState', () => {
       variant: 'warning',
       title: 'Partial translation',
       message: 'Partial translation available. Not all blocks are translated yet.',
-      dismissible: true
-    })
-  })
-
-  it('builds an export success banner', () => {
-    expect(controller.build({
-      exportSuccess: {
-        variant: 'success',
-        title: 'TXT export ready',
-        message: 'TXT export downloaded successfully.',
-        detail: ''
-      }
-    })).toEqual({
-      id: 'export-success',
-      visible: true,
-      variant: 'success',
-      title: 'TXT export ready',
-      message: 'TXT export downloaded successfully.',
       dismissible: true
     })
   })
@@ -92,36 +63,10 @@ describe('buildPdfStatusBannerState', () => {
     })
   })
 
-  it('keeps partial export above success', () => {
-    expect(controller.build({
-      translationStatus: 'partial',
-      exportSuccess: {
-        variant: 'success',
-        title: 'HTML export ready',
-        message: 'HTML export downloaded successfully.',
-        detail: ''
-      }
-    })).toEqual({
-      id: 'partial-export:0',
-      visible: true,
-      variant: 'warning',
-      title: 'Partial translation',
-      message: 'Partial translation available. Not all blocks are translated yet.',
-      dismissible: true
-    })
-  })
-
   it('prefers error state over other states', () => {
     expect(controller.build({
       error: 'Failed to open the PDF file.',
-      isLoading: true,
-      restoredTranslationCount: 3,
-      exportSuccess: {
-        variant: 'success',
-        title: 'Markdown export ready',
-        message: 'Markdown export downloaded successfully.',
-        detail: ''
-      }
+      isLoading: true
     })).toEqual({
       id: 'error:1',
       visible: true,
