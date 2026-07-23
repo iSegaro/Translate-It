@@ -1267,6 +1267,22 @@ describe('PdfToolbar', () => {
       expect(wrapper.find('.mock-language-selector').exists()).toBe(true)
     })
 
+    it('applies active class to trigger button when popover is open', async () => {
+      const wrapper = mount(PdfToolbar, {
+        props: {
+          fileName: 'doc.pdf',
+          sourceLanguage: 'auto',
+          targetLanguage: 'fa'
+        }
+      })
+      const btn = wrapper.find('.pdf-toolbar__language-summary-button')
+      expect(btn.classes()).not.toContain('pdf-toolbar__language-summary-button--active')
+      await btn.trigger('click')
+      expect(btn.classes()).toContain('pdf-toolbar__language-summary-button--active')
+      await btn.trigger('click')
+      expect(btn.classes()).not.toContain('pdf-toolbar__language-summary-button--active')
+    })
+
     it('does not render LanguageSelector in toolbar when popover is closed', () => {
       const wrapper = mount(PdfToolbar, {
         props: {

@@ -679,6 +679,10 @@
     outline: 2px solid $tb-focus;
     outline-offset: 2px;
   }
+
+  &--active {
+    background: $tb-control-selected;
+  }
 }
 
 .pdf-toolbar__language-popover {
@@ -687,6 +691,7 @@
   right: 0;
   z-index: var(--pdf-layer-toolbar-menu);
   min-width: 280px;
+  max-width: calc(100vw - 32px);
   padding: 12px;
   border: 1px solid $tb-border-hover;
   border-radius: 14px;

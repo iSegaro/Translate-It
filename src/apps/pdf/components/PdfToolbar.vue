@@ -292,6 +292,7 @@
         <button
           ref="languageTriggerRef"
           class="pdf-toolbar__language-summary-button"
+          :class="{ 'pdf-toolbar__language-summary-button--active': activeMenu === 'language' }"
           type="button"
           aria-haspopup="true"
           :aria-expanded="activeMenu === 'language'"
@@ -749,7 +750,7 @@ const hasZoomIn = computed(() => props.zoomMode !== 'fit-width' || props.zoomPer
 const languageSummary = computed(() => {
   const src = props.sourceLanguage === 'auto' ? 'Auto' : props.sourceLanguage.toUpperCase()
   const tgt = props.targetLanguage.toUpperCase()
-  return `\u{1F310} ${src} \u2192 ${tgt}`
+  return `${src} \u2192 ${tgt}`
 })
 
 const languageSummaryAriaLabel = computed(() => {
