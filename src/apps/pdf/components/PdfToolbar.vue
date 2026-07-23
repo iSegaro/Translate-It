@@ -180,7 +180,8 @@
             :aria-label="primaryAriaLabel"
             @click="$emit('primary-click')"
           >
-            {{ primaryLabel }}
+            <span class="pdf-toolbar__ocr-primary-size" aria-hidden="true">{{ widestPrimaryLabel }}</span>
+            <span class="pdf-toolbar__ocr-primary-text">{{ primaryLabel }}</span>
           </button>
           <button
             ref="ocrMenuTriggerRef"
@@ -603,15 +604,41 @@ const handleTranslateRequest = () => {
 
 const ocrModel = computed(() => props.ocrViewModel || {})
 
-const primaryLabel = computed(() => {
-  const m = ocrModel.value
-  const action = m.primaryAction === 'page' ? 'OCR Page' : 'OCR Region'
-  if (!m.hasInstalledLanguages) return m.canCancel ? 'Cancel' : action
+function buildPrimaryLabel(state) {
+  const actionText = state.action === 'cancel'
+    ? t('ocr.cancel', 'Cancel')
+    : (state.action === 'page'
+      ? t('ocr.page', 'OCR Page')
+      : t('ocr.region', 'OCR Region'))
+  if (state.language === null) return actionText
+  const languageLabel = state.language.compactLabel || state.language.code?.toUpperCase() || 'EN'
+  return `${actionText} · ${languageLabel}`
+}
 
-  const lang = m.language?.compactLabel || (m.language?.code || 'EN').toUpperCase()
-  if (m.canCancel) return `Cancel · ${lang}`
-  return `${action} · ${lang}`
+const currentOcrState = computed(() => {
+  const m = ocrModel.value
+  return {
+    action: m.canCancel ? 'cancel' : m.primaryAction,
+    language: m.hasInstalledLanguages ? (m.language ?? null) : null,
+  }
 })
+
+const primaryLabel = computed(() => buildPrimaryLabel(currentOcrState.value))
+
+const widestOcrState = computed(() => {
+  const m = ocrModel.value
+  const longestInstalledLanguage = (m.installedLanguages || [])
+    .reduce((longest, candidate) => (
+      (candidate.code?.length || 0) > (longest?.code?.length || 0) ? candidate : longest
+    ), null)
+  const language = longestInstalledLanguage ?? m.language ?? null
+  return {
+    action: 'region',
+    language,
+  }
+})
+
+const widestPrimaryLabel = computed(() => buildPrimaryLabel(widestOcrState.value))
 
 const primaryAriaLabel = computed(() => {
   const m = ocrModel.value

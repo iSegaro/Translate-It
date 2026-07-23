@@ -486,6 +486,7 @@
   border: 0;
   border-radius: 6px 0 0 6px;
   padding: 5px 10px;
+  display: inline-grid;
   background: $tb-control-hover;
   color: $tb-text-primary;
   font-size: 12px;
@@ -530,6 +531,16 @@
       background: rgba(244, 184, 96, 0.2);
     }
   }
+}
+
+.pdf-toolbar__ocr-primary-size {
+  grid-area: 1/1;
+  visibility: hidden;
+  white-space: nowrap;
+}
+
+.pdf-toolbar__ocr-primary-text {
+  grid-area: 1/1;
 }
 
 .pdf-toolbar__ocr-arrow {

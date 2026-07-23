@@ -361,7 +361,7 @@ describe('PdfToolbar', () => {
 
     const primary = wrapper.find('.pdf-toolbar__ocr-primary')
     expect(primary.exists()).toBe(true)
-    expect(primary.text()).toBe('OCR Region · EN')
+    expect(primary.find('.pdf-toolbar__ocr-primary-text').text()).toBe('OCR Region · EN')
     expect(wrapper.find('.pdf-toolbar__ocr-arrow').exists()).toBe(true)
   })
 
@@ -383,7 +383,7 @@ describe('PdfToolbar', () => {
       }
     })
 
-    expect(wrapper.find('.pdf-toolbar__ocr-primary').text()).toBe('OCR Region')
+    expect(wrapper.find('.pdf-toolbar__ocr-primary-text').text()).toBe('OCR Region')
 
     await wrapper.setProps({
       ocrViewModel: {
@@ -392,7 +392,7 @@ describe('PdfToolbar', () => {
       }
     })
 
-    expect(wrapper.find('.pdf-toolbar__ocr-primary').text()).toBe('OCR Page')
+    expect(wrapper.find('.pdf-toolbar__ocr-primary-text').text()).toBe('OCR Page')
   })
 
   it('emits primary-click from OCR primary button', async () => {
@@ -436,7 +436,7 @@ describe('PdfToolbar', () => {
     })
 
     const primary = wrapper.find('.pdf-toolbar__ocr-primary')
-    expect(primary.text()).toBe('Cancel · EN')
+    expect(primary.find('.pdf-toolbar__ocr-primary-text').text()).toBe('Cancel · EN')
 
     await wrapper.setProps({
       ocrViewModel: {
@@ -497,7 +497,7 @@ describe('PdfToolbar', () => {
 
     expect(wrapper.find('.pdf-toolbar__ocr-primary').exists()).toBe(true)
     expect(wrapper.find('.pdf-toolbar__ocr-arrow').exists()).toBe(true)
-    expect(wrapper.find('.pdf-toolbar__ocr-primary').text()).toContain('OCR Page')
+    expect(wrapper.find('.pdf-toolbar__ocr-primary-text').text()).toContain('OCR Page')
   })
 
   it('keeps the main provider selector action cancellable while translating', async () => {
@@ -792,7 +792,7 @@ describe('PdfToolbar', () => {
         }
       })
 
-      expect(wrapper.find('.pdf-toolbar__ocr-primary').text()).toBe('OCR Region · FA')
+      expect(wrapper.find('.pdf-toolbar__ocr-primary-text').text()).toBe('OCR Region · FA')
     })
 
     it('falls back to code uppercase when no compactLabel', async () => {
@@ -813,7 +813,7 @@ describe('PdfToolbar', () => {
         }
       })
 
-      expect(wrapper.find('.pdf-toolbar__ocr-primary').text()).toBe('OCR Region · DEU')
+      expect(wrapper.find('.pdf-toolbar__ocr-primary-text').text()).toBe('OCR Region · DEU')
     })
   })
 
