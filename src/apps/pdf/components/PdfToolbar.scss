@@ -664,11 +664,20 @@
   position: relative;
 }
 
+// Reserve stable width for currently supported translation language codes.
+// Unknown future codes expand naturally.
+$translation-language-code-width: 5ch;
+
 .pdf-toolbar__language-summary-button {
   appearance: none;
   border: 0;
   border-radius: 6px;
   padding: 5px 8px;
+  display: grid;
+  grid-template-columns:
+    minmax($translation-language-code-width, max-content)
+    max-content
+    minmax($translation-language-code-width, max-content);
   background: $tb-control-hover;
   color: $tb-text-primary;
   font-size: 12px;
