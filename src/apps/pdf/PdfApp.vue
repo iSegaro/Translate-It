@@ -427,6 +427,13 @@ watch(() => settingsStore.settings.THEME, (theme) => {
   applyTheme(theme || 'auto')
 }, { immediate: true })
 
+// Language preloading utility — matches PopupApp/SidepanelApp pattern
+const usePreloadLanguages = async () => {
+  const { useLanguages } = await import('@/composables/shared/useLanguages.js')
+  const { loadLanguages } = useLanguages()
+  return loadLanguages()
+}
+
 function toggleOutline() {
   isOutlineVisible.value = !isOutlineVisible.value
 }
@@ -940,6 +947,9 @@ function showExportSuccess(formatLabel) {
 updateDocumentTitle()
 
 onMounted(async () => {
+  // Preload languages asynchronously — LanguageSelector expects cached values
+  usePreloadLanguages().catch(() => {})
+
   try {
     await ocrStore.init()
   } catch (error) {
