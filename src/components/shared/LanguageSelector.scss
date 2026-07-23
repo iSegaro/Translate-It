@@ -296,6 +296,9 @@
     filter: var(--icon-filter, none) !important;
     transition: opacity 0.2s ease-in-out !important;
     object-fit: contain !important;
+  }
+
+  &--mirrored img {
     transform: scaleX(-1) !important;
   }
 

@@ -65,7 +65,7 @@
       <!-- Swap Button -->
       <button
         type="button"
-        class="ti-swap-button"
+        class="ti-swap-button ti-swap-button--mirrored"
         :title="swapTitle"
         :disabled="disabled || !isSwapPossible"
         :class="{ 'ti-swap-button--disabled': !isSwapPossible }"
