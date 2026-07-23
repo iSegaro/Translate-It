@@ -1,8 +1,5 @@
 <template>
   <div class="pdf-toolbar__language-popover">
-    <div class="pdf-toolbar__language-popover-header">
-      Translation Settings
-    </div>
     <LanguageSelector
       dark
       :source-language="sourceLanguage"
