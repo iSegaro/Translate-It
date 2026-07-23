@@ -2,6 +2,7 @@ import { computed, reactive, ref, shallowRef } from 'vue'
 import { getScopedLogger } from '@/shared/logging/logger.js'
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js'
 import { getProviderOptimizationLevelAsync, getSourceLanguageAsync, getTargetLanguageAsync, getTranslationApiAsync } from '@/shared/config/config.js'
+import { AUTO_DETECT_VALUE, DEFAULT_TARGET_LANGUAGE } from '@/shared/constants/core.js'
 import { pdfDocumentSession } from '@/features/pdf-translation/core/PdfDocumentSession.js'
 import { PdfTranslationCoordinator } from '@/features/pdf-translation/core/PdfTranslationCoordinator.js'
 import { pdfCacheManager } from '@/features/pdf-translation/core/PdfCacheManager.js'
@@ -65,6 +66,8 @@ export function usePdfViewerController() {
   const translationTick = ref(0)
   const restoredTranslationCount = ref(0)
   const restoredOcrPageCount = ref(0)
+  const pdfSourceLanguage = ref(AUTO_DETECT_VALUE)
+  const pdfTargetLanguage = ref(DEFAULT_TARGET_LANGUAGE)
 
   const _pageDataMap = reactive(new Map())
 
@@ -523,6 +526,8 @@ export function usePdfViewerController() {
     translatedPageData,
     restoredTranslationCount,
     restoredOcrPageCount,
+    pdfSourceLanguage,
+    pdfTargetLanguage,
     workerLabel,
     workerUrl,
     session: pdfDocumentSession,

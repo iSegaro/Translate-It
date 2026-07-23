@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { sha256HexFromText } from '@/features/pdf-translation/core/PdfBlockIdentity.js'
+import { AUTO_DETECT_VALUE, DEFAULT_TARGET_LANGUAGE } from '@/shared/constants/core.js'
 
 const openFileMock = vi.fn()
 const rebuildPageMetricsMock = vi.fn()
@@ -206,6 +207,59 @@ async function loadControllerWithCacheEntry(cacheEntry, block = createBlock()) {
   await controller.loadPdfFile(file, 800)
   return { controller, block }
 }
+
+describe('usePdfViewerController pdf translation preferences', () => {
+  beforeEach(() => {
+    pageSessionCommittedListener = null
+    openFileMock.mockReset()
+    rebuildPageMetricsMock.mockReset()
+    cleanupDocumentMock.mockReset().mockResolvedValue()
+    cancelActiveTranslationMock.mockReset().mockResolvedValue()
+    translateVisibleBlocksMock.mockReset()
+    saveTranslationsMock.mockReset().mockResolvedValue()
+    updateAfterOpenMock.mockReset().mockResolvedValue()
+    updateAfterTranslationMock.mockReset().mockResolvedValue()
+    getProviderOptimizationLevelAsyncMock.mockReset().mockResolvedValue(3)
+    getSourceLanguageAsyncMock.mockReset().mockResolvedValue('auto')
+    getTargetLanguageAsyncMock.mockReset().mockResolvedValue('fa')
+    getTranslationApiAsyncMock.mockReset().mockResolvedValue('googlev2')
+
+    session.pageSessions = new Map()
+    session.translationStates = new Map()
+    session.documentIdentity = 'doc-1'
+    session.documentGeneration = 1
+    session.visiblePageNumbers = new Set()
+    session.getPageSession.mockReset()
+    session.getPageSourceBlocks.mockClear()
+    session.forEachCommittedPage.mockClear()
+    session.onPageSessionCommitted.mockClear()
+    session.getDocumentCacheSnapshot.mockReset().mockResolvedValue({ translations: {}, ocr: {} })
+    session.setBlockTranslationState.mockClear()
+    session.getBlockTranslationState.mockClear()
+    session.setPageOcrBlocks.mockClear()
+  })
+
+  it('initializes pdfSourceLanguage to AUTO_DETECT_VALUE', () => {
+    const controller = usePdfViewerController()
+    expect(controller.pdfSourceLanguage.value).toBe(AUTO_DETECT_VALUE)
+  })
+
+  it('initializes pdfTargetLanguage to DEFAULT_TARGET_LANGUAGE', () => {
+    const controller = usePdfViewerController()
+    expect(controller.pdfTargetLanguage.value).toBe(DEFAULT_TARGET_LANGUAGE)
+  })
+
+  it('allows independent language values per controller instance', () => {
+    const controller1 = usePdfViewerController()
+    const controller2 = usePdfViewerController()
+
+    controller1.pdfSourceLanguage.value = 'en'
+    controller1.pdfTargetLanguage.value = 'de'
+
+    expect(controller2.pdfSourceLanguage.value).toBe(AUTO_DETECT_VALUE)
+    expect(controller2.pdfTargetLanguage.value).toBe(DEFAULT_TARGET_LANGUAGE)
+  })
+})
 
 describe('usePdfViewerController cache persistence', () => {
   beforeEach(() => {
