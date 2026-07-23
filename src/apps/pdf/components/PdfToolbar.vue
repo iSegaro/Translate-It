@@ -301,7 +301,9 @@
           :title="languageSummaryTitle"
           @click="toggleLanguageSettings"
         >
-          {{ languageSummary }}
+          <span class="pdf-toolbar__language-summary-source">{{ languageSummarySource }}</span>
+          <span class="pdf-toolbar__language-summary-arrow" aria-hidden="true">→</span>
+          <span class="pdf-toolbar__language-summary-target">{{ languageSummaryTarget }}</span>
         </button>
         <PdfTranslationSettingsPopover
           v-if="activeMenu === 'language'"
@@ -749,11 +751,11 @@ const currentPageDisplayValue = computed(() => {
 const hasZoomOut = computed(() => props.zoomMode !== 'fit-width' || props.zoomPercent > zoomPercentOptions[0])
 const hasZoomIn = computed(() => props.zoomMode !== 'fit-width' || props.zoomPercent < zoomPercentOptions[zoomPercentOptions.length - 1])
 
-const languageSummary = computed(() => {
-  const src = props.sourceLanguage === 'auto' ? 'Auto' : props.sourceLanguage.toUpperCase()
-  const tgt = props.targetLanguage.toUpperCase()
-  return `${src} \u2192 ${tgt}`
-})
+const languageSummarySource = computed(() =>
+  props.sourceLanguage === 'auto' ? 'Auto' : props.sourceLanguage.toUpperCase()
+)
+
+const languageSummaryTarget = computed(() => props.targetLanguage.toUpperCase())
 
 const languageSummaryAriaLabel = computed(() => {
   const src = props.sourceLanguage === 'auto' ? 'Auto-Detect' : props.sourceLanguage
