@@ -8,6 +8,7 @@
     <div
       v-if="modelValue"
       class="modal-overlay"
+      :class="[`mobile-${mobileBehavior}`]"
       @click="handleOverlayClick"
     >
       <div
@@ -87,6 +88,11 @@ const props = defineProps({
   scrollLock: {
     type: Boolean,
     default: true
+  },
+  mobileBehavior: {
+    type: String,
+    default: 'sheet',
+    validator: (value) => ['sheet', 'dialog'].includes(value)
   }
 })
 
@@ -146,3 +152,7 @@ onUnmounted(() => {
   unlockScroll()
 })
 </script>
+
+<style lang="scss">
+@use './BaseModal.scss';
+</style>

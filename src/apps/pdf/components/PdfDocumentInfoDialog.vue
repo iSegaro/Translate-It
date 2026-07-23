@@ -3,6 +3,7 @@
     v-model="open"
     title="PDF Information"
     size="sm"
+    mobile-behavior="dialog"
   >
     <dl class="pdf-info-rows">
       <div

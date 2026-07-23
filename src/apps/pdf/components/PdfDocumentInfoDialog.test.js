@@ -12,7 +12,7 @@ vi.mock('@/components/base/BaseModal.vue', () => ({
         <slot />
       </div>
     `,
-    props: ['modelValue', 'title', 'size', 'closable', 'closeOnOverlay', 'closeOnEscape', 'fullscreen', 'scrollLock'],
+    props: ['modelValue', 'title', 'size', 'closable', 'closeOnOverlay', 'closeOnEscape', 'fullscreen', 'scrollLock', 'mobileBehavior'],
     emits: ['update:modelValue', 'close', 'open'],
   },
 }))

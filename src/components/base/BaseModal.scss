@@ -146,16 +146,31 @@
   .modal-overlay {
     align-items: flex-end;
     padding: 0;
-  }
-  
-  .modal-container {
-    border-radius: var(--border-radius-lg) var(--border-radius-lg) 0 0;
-    max-height: 90vh;
-    width: 100%;
-  }
-  
-  .modal-enter-from .modal-container,
-  .modal-leave-to .modal-container {
-    transform: translateY(100%);
+
+    .modal-container {
+      border-radius: var(--border-radius-lg) var(--border-radius-lg) 0 0;
+      max-height: 90vh;
+      width: 100%;
+    }
+
+    .modal-enter-from .modal-container,
+    .modal-leave-to .modal-container {
+      transform: translateY(100%);
+    }
+
+    &.mobile-dialog {
+      align-items: center;
+      padding: 8px;
+
+      .modal-container {
+        border-radius: var(--border-radius-lg);
+        max-height: calc(100vh - 16px);
+      }
+
+      .modal-enter-from .modal-container,
+      .modal-leave-to .modal-container {
+        transform: scale(0.9) translateY(-20px);
+      }
+    }
   }
 }
