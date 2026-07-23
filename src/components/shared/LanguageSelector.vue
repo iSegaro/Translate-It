@@ -10,60 +10,6 @@
   >
     <!-- Regular Language Selection -->
     <template v-if="!isAutoLanguageProvider">
-      <!-- Target Language Dropdown -->
-      <div
-        class="ti-language-control-group ti-language-control-group--target"
-        :class="{ 'ti-language-control-group--with-default-action': showDefaultActions }"
-      >
-        <div class="ti-language-control-shell">
-          <select
-            v-model="targetLanguage"
-            class="ti-language-select"
-            :title="targetTitle"
-            :disabled="disabled"
-            @click="handleDropdownClick"
-          >
-            <option
-              v-for="language in targetLanguages"
-              :key="language.code"
-              :value="language.code"
-            >
-              {{ language.name }}
-            </option>
-          </select>
-          <button
-            v-if="showDefaultActions"
-            type="button"
-            class="ti-default-action-button"
-            :class="{ 'is-active': targetIsSavedDefault }"
-            :title="targetDefaultTitle || 'Set target as default'"
-            :aria-label="targetDefaultTitle || 'Set target as default'"
-            :disabled="disabled || !defaultActionsEnabled"
-            @click="emit('set-default-target')"
-          >
-            <span
-              aria-hidden="true"
-              class="ti-default-action-icon"
-            >{{ targetIsSavedDefault ? '★' : '☆' }}</span>
-          </button>
-        </div>
-      </div>
-
-      <!-- Swap Button -->
-      <button
-        type="button"
-        class="ti-swap-button"
-        :title="swapTitle"
-        :disabled="disabled || !isSwapPossible"
-        :class="{ 'ti-swap-button--disabled': !isSwapPossible }"
-        @click="handleSwapLanguages"
-      >
-        <img
-          :src="swapIcon"
-          :alt="swapAlt"
-        >
-      </button>
-
       <!-- Source Language Dropdown -->
       <div
         class="ti-language-control-group ti-language-control-group--source"
@@ -112,6 +58,60 @@
               aria-hidden="true"
               class="ti-default-action-icon"
             >{{ sourceIsSavedDefault ? '★' : '☆' }}</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Swap Button -->
+      <button
+        type="button"
+        class="ti-swap-button"
+        :title="swapTitle"
+        :disabled="disabled || !isSwapPossible"
+        :class="{ 'ti-swap-button--disabled': !isSwapPossible }"
+        @click="handleSwapLanguages"
+      >
+        <img
+          :src="swapIcon"
+          :alt="swapAlt"
+        >
+      </button>
+
+      <!-- Target Language Dropdown -->
+      <div
+        class="ti-language-control-group ti-language-control-group--target"
+        :class="{ 'ti-language-control-group--with-default-action': showDefaultActions }"
+      >
+        <div class="ti-language-control-shell">
+          <select
+            v-model="targetLanguage"
+            class="ti-language-select"
+            :title="targetTitle"
+            :disabled="disabled"
+            @click="handleDropdownClick"
+          >
+            <option
+              v-for="language in targetLanguages"
+              :key="language.code"
+              :value="language.code"
+            >
+              {{ language.name }}
+            </option>
+          </select>
+          <button
+            v-if="showDefaultActions"
+            type="button"
+            class="ti-default-action-button"
+            :class="{ 'is-active': targetIsSavedDefault }"
+            :title="targetDefaultTitle || 'Set target as default'"
+            :aria-label="targetDefaultTitle || 'Set target as default'"
+            :disabled="disabled || !defaultActionsEnabled"
+            @click="emit('set-default-target')"
+          >
+            <span
+              aria-hidden="true"
+              class="ti-default-action-icon"
+            >{{ targetIsSavedDefault ? '★' : '☆' }}</span>
           </button>
         </div>
       </div>
