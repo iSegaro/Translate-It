@@ -68,11 +68,15 @@
   }
 }
 
+// Prevent long PDF filenames from dominating the toolbar.
+// The center controls own the remaining horizontal space.
+$pdf-toolbar-file-name-inline-limit: clamp(120px, 25vw, 350px);
+
 .pdf-toolbar__file-name {
   display: block;
   flex: 1 1 auto;
   min-width: 0;
-  max-inline-size: clamp(120px, 25vw, 350px);
+  max-inline-size: $pdf-toolbar-file-name-inline-limit;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
