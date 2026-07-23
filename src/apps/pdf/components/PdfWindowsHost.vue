@@ -235,11 +235,21 @@ const props = defineProps({
   pdfFingerprint: {
     type: String,
     default: ''
+  },
+  pdfSourceLanguage: {
+    type: String,
+    required: true
+  },
+  pdfTargetLanguage: {
+    type: String,
+    required: true
   }
 })
 
 const { t } = useUnifiedI18n()
 const pdfFingerprint = toRef(props, 'pdfFingerprint')
+const pdfSourceLanguage = toRef(props, 'pdfSourceLanguage')
+const pdfTargetLanguage = toRef(props, 'pdfTargetLanguage')
 
 const settingsStore = useSettingsStore()
 const isDarkTheme = computed(() => settingsStore.isDarkTheme)
@@ -291,7 +301,9 @@ const {
   handleDockResize,
   startDrag
 } = usePdfWindowsHost({
-  pdfFingerprint
+  pdfFingerprint,
+  pdfSourceLanguage,
+  pdfTargetLanguage
 })
 
 defineExpose({ openTranslation })

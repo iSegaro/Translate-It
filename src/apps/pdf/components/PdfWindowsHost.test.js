@@ -375,7 +375,9 @@ describe('PdfWindowsHost', () => {
 
     wrapper = mount(PdfWindowsHost, {
       props: {
-        pdfFingerprint: 'pdf-doc-1'
+        pdfFingerprint: 'pdf-doc-1',
+        pdfSourceLanguage: 'auto',
+        pdfTargetLanguage: 'fa'
       },
       attachTo: document.body
     })
@@ -466,7 +468,11 @@ describe('PdfWindowsHost', () => {
       .mockImplementationOnce(() => staleProvider.promise)
       .mockResolvedValueOnce('')
     wrapper = mount(PdfWindowsHost, {
-      props: { pdfFingerprint: 'pdf-doc-1' },
+      props: {
+        pdfFingerprint: 'pdf-doc-1',
+        pdfSourceLanguage: 'auto',
+        pdfTargetLanguage: 'fa'
+      },
       attachTo: document.body
     })
     await flushPromises()
@@ -497,44 +503,63 @@ describe('PdfWindowsHost', () => {
     expect(wrapper.find('[data-testid="pdf-windows-host-loading"]').exists()).toBe(false)
   })
 
-  it('does not dispatch stale settings resolution after window close', async () => {
-    await wrapper.vm.openTranslation({
-      text: 'Initial selection',
+  it('does not dispatch stale provider resolution after window close', async () => {
+    wrapper.unmount()
+    const staleProvider = deferred()
+    getEffectiveProviderAsyncMock
+      .mockResolvedValueOnce('')
+      .mockImplementationOnce(() => staleProvider.promise)
+      .mockResolvedValueOnce('')
+    wrapper = mount(PdfWindowsHost, {
+      props: {
+        pdfFingerprint: 'pdf-doc-1',
+        pdfSourceLanguage: 'auto',
+        pdfTargetLanguage: 'fa'
+      },
+      attachTo: document.body
+    })
+    await flushPromises()
+
+    wrapper.vm.openTranslation({
+      text: 'Stale provider close',
       position: { x: 40, y: 60, width: 120, height: 80 }
     })
-    const staleTarget = deferred()
-    getTargetLanguageAsyncMock.mockImplementationOnce(() => staleTarget.promise)
+    wrapper.vm.dismissHost()
 
-    await wrapper.get('[data-testid="translation-window-toolbar-provider-select"]').setValue('deepl')
-    await flushPromises()
-    await wrapper.get('[data-testid="translation-window-toolbar-close"]').trigger('click')
-
-    staleTarget.resolve('fa')
+    staleProvider.resolve('stale-provider')
     await flushPromises()
 
-    expect(sendRegularMessageMock).toHaveBeenCalledOnce()
-    expect(wrapper.find('[data-testid="pdf-windows-host-loading"]').exists()).toBe(false)
+    expect(sendRegularMessageMock).not.toHaveBeenCalled()
     expect(wrapper.find('[data-testid="pdf-windows-host"]').exists()).toBe(false)
   })
 
-  it('does not dispatch stale settings resolution after PDF replacement', async () => {
-    await wrapper.vm.openTranslation({
-      text: 'Initial selection',
+  it('does not dispatch stale provider resolution after PDF replacement', async () => {
+    wrapper.unmount()
+    const staleProvider = deferred()
+    getEffectiveProviderAsyncMock
+      .mockResolvedValueOnce('')
+      .mockImplementationOnce(() => staleProvider.promise)
+      .mockResolvedValueOnce('')
+    wrapper = mount(PdfWindowsHost, {
+      props: {
+        pdfFingerprint: 'pdf-doc-1',
+        pdfSourceLanguage: 'auto',
+        pdfTargetLanguage: 'fa'
+      },
+      attachTo: document.body
+    })
+    await flushPromises()
+
+    wrapper.vm.openTranslation({
+      text: 'Stale provider replace',
       position: { x: 40, y: 60, width: 120, height: 80 }
     })
-    const staleTarget = deferred()
-    getTargetLanguageAsyncMock.mockImplementationOnce(() => staleTarget.promise)
-
-    await wrapper.get('[data-testid="translation-window-toolbar-provider-select"]').setValue('deepl')
-    await flushPromises()
     await wrapper.setProps({ pdfFingerprint: 'pdf-doc-2' })
+
+    staleProvider.resolve('stale-provider')
     await flushPromises()
 
-    staleTarget.resolve('fa')
-    await flushPromises()
-
-    expect(sendRegularMessageMock).toHaveBeenCalledOnce()
-    expect(wrapper.find('[data-testid="pdf-windows-host-loading"]').exists()).toBe(false)
+    expect(sendRegularMessageMock).not.toHaveBeenCalled()
     expect(wrapper.find('[data-testid="pdf-windows-host"]').exists()).toBe(false)
   })
 
@@ -919,7 +944,7 @@ describe('PdfWindowsHost', () => {
     expect(targetBadge.exists()).toBe(true)
     expect(targetBadge.text()).toBe('Persian (Farsi)')
 
-    getTargetLanguageAsyncMock.mockResolvedValueOnce('ja')
+    await wrapper.setProps({ pdfTargetLanguage: 'ja' })
     sendRegularMessageMock.mockResolvedValueOnce({
       success: true,
       translatedText: 'Updated target result',
@@ -935,7 +960,17 @@ describe('PdfWindowsHost', () => {
   })
 
   it('hides the target language badge for auto or unknown target language values', async () => {
-    getTargetLanguageAsyncMock.mockResolvedValueOnce('auto')
+    wrapper.unmount()
+    wrapper = mount(PdfWindowsHost, {
+      props: {
+        pdfFingerprint: 'pdf-doc-1',
+        pdfSourceLanguage: 'auto',
+        pdfTargetLanguage: 'auto'
+      },
+      attachTo: document.body
+    })
+    await flushPromises()
+
     sendRegularMessageMock.mockResolvedValueOnce({
       success: true,
       translatedText: 'Auto target result',
@@ -952,13 +987,14 @@ describe('PdfWindowsHost', () => {
     wrapper.unmount()
     wrapper = mount(PdfWindowsHost, {
       props: {
-        pdfFingerprint: 'pdf-doc-1'
+        pdfFingerprint: 'pdf-doc-1',
+        pdfSourceLanguage: 'auto',
+        pdfTargetLanguage: 'xx-unknown'
       },
       attachTo: document.body
     })
     await flushPromises()
 
-    getTargetLanguageAsyncMock.mockResolvedValueOnce('xx-unknown')
     sendRegularMessageMock.mockResolvedValueOnce({
       success: true,
       translatedText: 'Unknown target result',
@@ -1051,7 +1087,9 @@ describe('PdfWindowsHost', () => {
 
     wrapper = mount(PdfWindowsHost, {
       props: {
-        pdfFingerprint: 'pdf-doc-1'
+        pdfFingerprint: 'pdf-doc-1',
+        pdfSourceLanguage: 'auto',
+        pdfTargetLanguage: 'fa'
       },
       attachTo: document.body
     })
@@ -1273,7 +1311,6 @@ describe('PdfWindowsHost', () => {
     }))
     expect(sendRegularMessageMock.mock.calls[0][0].data.enableDictionary).toBeUndefined()
     expect(getEffectiveProviderAsyncMock).toHaveBeenCalledWith('selection-manager')
-    expect(getTargetLanguageAsyncMock).toHaveBeenCalled()
     expect(wrapper.find('[data-testid="pdf-windows-host-loading"]').exists()).toBe(false)
     const result = wrapper.get('[data-testid="pdf-windows-host-result"]')
     expect(result.find('.simple-markdown').exists()).toBe(true)
@@ -1890,7 +1927,9 @@ describe('PdfWindowsHost', () => {
     globalThis.__pdfWindowsHostStorageState.pdfWindowsHostLayout.global.defaultPosition = { x: 88, y: 96 }
     const fingerprintRestored = mount(PdfWindowsHost, {
       props: {
-        pdfFingerprint: 'pdf-doc-1'
+        pdfFingerprint: 'pdf-doc-1',
+        pdfSourceLanguage: 'auto',
+        pdfTargetLanguage: 'fa'
       },
       attachTo: document.body
     })
@@ -1906,6 +1945,10 @@ describe('PdfWindowsHost', () => {
     fingerprintRestored.unmount()
 
     const globalFallback = mount(PdfWindowsHost, {
+      props: {
+        pdfSourceLanguage: 'auto',
+        pdfTargetLanguage: 'fa'
+      },
       attachTo: document.body
     })
     await flushPromises()

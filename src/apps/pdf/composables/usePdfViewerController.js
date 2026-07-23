@@ -1,7 +1,7 @@
 import { computed, reactive, ref, shallowRef } from 'vue'
 import { getScopedLogger } from '@/shared/logging/logger.js'
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js'
-import { getProviderOptimizationLevelAsync, getSourceLanguageAsync, getTargetLanguageAsync, getTranslationApiAsync } from '@/shared/config/config.js'
+import { getProviderOptimizationLevelAsync, getTranslationApiAsync } from '@/shared/config/config.js'
 import { AUTO_DETECT_VALUE, DEFAULT_TARGET_LANGUAGE } from '@/shared/constants/core.js'
 import { pdfDocumentSession } from '@/features/pdf-translation/core/PdfDocumentSession.js'
 import { PdfTranslationCoordinator } from '@/features/pdf-translation/core/PdfTranslationCoordinator.js'
@@ -14,36 +14,15 @@ import { createTranslationRestoreContext } from '@/features/pdf-translation/core
 const logger = getScopedLogger(LOG_COMPONENTS.PDF, 'usePdfViewerController')
 const pdfTranslationCoordinator = new PdfTranslationCoordinator(pdfDocumentSession)
 
-async function resolveTranslationSettings() {
-  const [provider, sourceLanguage, targetLanguage] = await Promise.all([
-    getTranslationApiAsync(),
-    getSourceLanguageAsync(),
-    getTargetLanguageAsync()
-  ])
-
-  const optimizationLevel = await getProviderOptimizationLevelAsync(provider)
-
-  return {
-    provider,
-    sourceLanguage,
-    targetLanguage,
-    optimizationLevel
-  }
-}
-
-async function buildTranslationSettings() {
-  const settings = await resolveTranslationSettings()
+async function buildTranslationSettings({ provider, sourceLanguage, targetLanguage, optimizationLevel }) {
   const translationSettingsHash = await sha256HexFromText(JSON.stringify({
-    provider: settings.provider || '',
-    sourceLanguage: settings.sourceLanguage || '',
-    targetLanguage: settings.targetLanguage || '',
-    optimizationLevel: settings.optimizationLevel ?? null
+    provider: provider || '',
+    sourceLanguage: sourceLanguage || '',
+    targetLanguage: targetLanguage || '',
+    optimizationLevel: optimizationLevel ?? null
   }))
 
-  return {
-    ...settings,
-    translationSettingsHash
-  }
+  return { provider, sourceLanguage, targetLanguage, optimizationLevel, translationSettingsHash }
 }
 
 export function usePdfViewerController() {
@@ -81,10 +60,20 @@ export function usePdfViewerController() {
 
   function createRestoreContext() {
     translationRestoreContext?.dispose?.()
+    const resolveSettings = async () => {
+      const provider = await getTranslationApiAsync()
+      const optimizationLevel = await getProviderOptimizationLevelAsync(provider)
+      return buildTranslationSettings({
+        provider,
+        sourceLanguage: pdfSourceLanguage.value,
+        targetLanguage: pdfTargetLanguage.value,
+        optimizationLevel
+      })
+    }
     translationRestoreContext = createTranslationRestoreContext({
       documentGeneration: pdfDocumentSession.documentGeneration,
       getDocumentGeneration: () => pdfDocumentSession.documentGeneration,
-      resolveSettings: buildTranslationSettings
+      resolveSettings
     })
     return translationRestoreContext
   }
@@ -450,26 +439,42 @@ export function usePdfViewerController() {
     const documentIdentity = pdfDocumentSession.documentIdentity
     if (!documentIdentity) return
 
-    const { translationSettingsHash } = await buildTranslationSettings()
-
+    const hashCache = new Map()
     const entries = {}
     for (const [blockId, state] of pdfDocumentSession.translationStates) {
-      if (state.status === 'translated') {
-        const translatedCells = normalizeStructuredCells(state.translatedCells)
-        entries[blockId] = {
-          blockId,
-          documentIdentity,
-          pageNumber: state.pageNumber || 0,
-          sourceTextHash: state.sourceTextHash || '',
-          translatedText: state.translatedText || '',
-          ...(translatedCells && { translatedCells }),
-          status: state.status,
-          provider: state.provider || '',
-          sourceLanguage: state.sourceLanguage || '',
-          targetLanguage: state.targetLanguage || '',
-          translationSettingsHash,
-          updatedAt: state.updatedAt || Date.now()
-        }
+      if (state.status !== 'translated') continue
+
+      const entrySourceLanguage = state.sourceLanguage || ''
+      const entryTargetLanguage = state.targetLanguage || ''
+      const entryProvider = state.provider || ''
+      const cacheKey = `${entryProvider}|${entrySourceLanguage}|${entryTargetLanguage}`
+      let translationSettingsHash = hashCache.get(cacheKey)
+      if (!translationSettingsHash) {
+        const optimizationLevel = await getProviderOptimizationLevelAsync(entryProvider)
+        const result = await buildTranslationSettings({
+          provider: entryProvider,
+          sourceLanguage: entrySourceLanguage,
+          targetLanguage: entryTargetLanguage,
+          optimizationLevel
+        })
+        translationSettingsHash = result.translationSettingsHash
+        hashCache.set(cacheKey, translationSettingsHash)
+      }
+
+      const translatedCells = normalizeStructuredCells(state.translatedCells)
+      entries[blockId] = {
+        blockId,
+        documentIdentity,
+        pageNumber: state.pageNumber || 0,
+        sourceTextHash: state.sourceTextHash || '',
+        translatedText: state.translatedText || '',
+        ...(translatedCells && { translatedCells }),
+        status: state.status,
+        provider: entryProvider,
+        sourceLanguage: entrySourceLanguage,
+        targetLanguage: entryTargetLanguage,
+        translationSettingsHash,
+        updatedAt: state.updatedAt || Date.now()
       }
     }
 

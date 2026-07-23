@@ -191,6 +191,8 @@
     <PdfWindowsHost
       ref="pdfWindowsHostRef"
       :pdf-fingerprint="pdfFingerprint"
+      :pdf-source-language="pdfSourceLanguage"
+      :pdf-target-language="pdfTargetLanguage"
     />
   </div>
 </template>

@@ -6,9 +6,7 @@ import { MessageActions } from '@/shared/messaging/core/MessageActions.js'
 import { MessageContexts, MessageFormat } from '@/shared/messaging/core/MessagingCore.js'
 import {
   TranslationMode,
-  getEffectiveProviderAsync,
-  getSourceLanguageAsync,
-  getTargetLanguageAsync
+  getEffectiveProviderAsync
 } from '@/shared/config/config.js'
 import { sendRegularMessage } from '@/shared/messaging/core/UnifiedMessaging.js'
 import { getScopedLogger } from '@/shared/logging/logger.js'
@@ -100,6 +98,8 @@ async function copyTextToClipboard(text) {
 export function usePdfWindowsHost(options = {}) {
   const tracker = useResourceTracker('pdf-windows-host')
   const pdfFingerprintSource = options.pdfFingerprint ?? ref('')
+  const pdfSourceLanguageRef = options.pdfSourceLanguage ?? ref(AUTO_DETECT_VALUE)
+  const pdfTargetLanguageRef = options.pdfTargetLanguage ?? ref(AUTO_DETECT_VALUE)
 
   const hostRef = ref(null)
   const toolbarRef = ref(null)
@@ -594,12 +594,10 @@ export function usePdfWindowsHost(options = {}) {
     }
 
     const requestSessionId = selectionSessionId.value
+    const sourceLanguage = unref(pdfSourceLanguageRef)
+    const targetLanguage = unref(pdfTargetLanguageRef)
     let resolvedTargetLanguage = AUTO_DETECT_VALUE
-    const [provider, sourceLanguage, targetLanguage] = await Promise.all([
-      selectedProvider.value ? Promise.resolve(selectedProvider.value) : getEffectiveProviderAsync(TranslationMode.Selection),
-      getSourceLanguageAsync(),
-      getTargetLanguageAsync()
-    ])
+    const provider = selectedProvider.value ? selectedProvider.value : await getEffectiveProviderAsync(TranslationMode.Selection)
 
     if (requestSessionId !== selectionSessionId.value) {
       return false
