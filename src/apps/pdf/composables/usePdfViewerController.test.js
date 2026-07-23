@@ -14,6 +14,7 @@ const getProviderOptimizationLevelAsyncMock = vi.fn()
 const getSourceLanguageAsyncMock = vi.fn()
 const getTargetLanguageAsyncMock = vi.fn()
 const getTranslationApiAsyncMock = vi.fn()
+const getEffectiveProviderAsyncMock = vi.fn()
 let pageSessionCommittedListener = null
 
 const session = {
@@ -77,10 +78,19 @@ const session = {
 }
 
 vi.mock('@/shared/config/config.js', () => ({
+  TranslationMode: {
+    PDF: 'pdf-translation',
+    Selection: 'selection-manager',
+    Select_Element: 'select-element',
+    Field: 'field',
+    Page: 'page-translation-batch',
+    Dictionary_Translation: 'dictionary'
+  },
   getProviderOptimizationLevelAsync: getProviderOptimizationLevelAsyncMock,
   getSourceLanguageAsync: getSourceLanguageAsyncMock,
   getTargetLanguageAsync: getTargetLanguageAsyncMock,
-  getTranslationApiAsync: getTranslationApiAsyncMock
+  getTranslationApiAsync: getTranslationApiAsyncMock,
+  getEffectiveProviderAsync: getEffectiveProviderAsyncMock
 }))
 
 vi.mock('@/features/pdf-translation/core/PdfDocumentSession.js', () => ({
@@ -223,6 +233,7 @@ describe('usePdfViewerController pdf translation preferences', () => {
     getSourceLanguageAsyncMock.mockReset().mockResolvedValue('auto')
     getTargetLanguageAsyncMock.mockReset().mockResolvedValue('fa')
     getTranslationApiAsyncMock.mockReset().mockResolvedValue('googlev2')
+    getEffectiveProviderAsyncMock.mockReset().mockResolvedValue('googlev2')
 
     session.pageSessions = new Map()
     session.translationStates = new Map()
@@ -276,6 +287,7 @@ describe('usePdfViewerController cache persistence', () => {
     getSourceLanguageAsyncMock.mockReset().mockResolvedValue('auto')
     getTargetLanguageAsyncMock.mockReset().mockResolvedValue('fa')
     getTranslationApiAsyncMock.mockReset().mockResolvedValue('googlev2')
+    getEffectiveProviderAsyncMock.mockReset().mockResolvedValue('googlev2')
 
     session.pageSessions = new Map()
     session.translationStates = new Map()
@@ -312,6 +324,57 @@ describe('usePdfViewerController cache persistence', () => {
     expect(restoreCall[1].sourceLanguage).toBe('auto')
     expect(restoreCall[1].targetLanguage).toBe('fa')
     expect(restoreCall[1].sourceTextHash).toBe(block.sourceTextHash)
+    expect(controller.restoredTranslationCount.value).toBe(1)
+  })
+
+  it('resolves restore provider via getEffectiveProviderAsync(PDF)', async () => {
+    const block = createBlock()
+    await loadControllerWithCacheEntry(null, block)
+    expect(getEffectiveProviderAsyncMock).toHaveBeenCalledWith('pdf-translation')
+  })
+
+  it('restores cache with global provider when no mode-specific override exists', async () => {
+    getEffectiveProviderAsyncMock.mockReset().mockResolvedValue('googlev2')
+    const block = createBlock()
+    const { controller } = await loadControllerWithCacheEntry({
+      blockId: block.id,
+      translatedText: 'سلام',
+      sourceTextHash: block.sourceTextHash,
+      translationSettingsHash: await createSettingsHash({ provider: 'googlev2' }),
+      provider: 'googlev2',
+      sourceLanguage: 'auto',
+      targetLanguage: 'fa'
+    }, block)
+    expect(controller.restoredTranslationCount.value).toBe(1)
+  })
+
+  it('restores cache with mode-specific PDF provider override', async () => {
+    getEffectiveProviderAsyncMock.mockReset().mockResolvedValue('deepl')
+    const block = createBlock()
+    const { controller } = await loadControllerWithCacheEntry({
+      blockId: block.id,
+      translatedText: 'Hallo',
+      sourceTextHash: block.sourceTextHash,
+      translationSettingsHash: await createSettingsHash({ provider: 'deepl' }),
+      provider: 'deepl',
+      sourceLanguage: 'auto',
+      targetLanguage: 'fa'
+    }, block)
+    expect(controller.restoredTranslationCount.value).toBe(1)
+  })
+
+  it('restores cache when mode-specific provider is default (falls back to global)', async () => {
+    getEffectiveProviderAsyncMock.mockReset().mockResolvedValue('openai')
+    const block = createBlock()
+    const { controller } = await loadControllerWithCacheEntry({
+      blockId: block.id,
+      translatedText: 'Bonjour',
+      sourceTextHash: block.sourceTextHash,
+      translationSettingsHash: await createSettingsHash({ provider: 'openai' }),
+      provider: 'openai',
+      sourceLanguage: 'auto',
+      targetLanguage: 'fa'
+    }, block)
     expect(controller.restoredTranslationCount.value).toBe(1)
   })
 
@@ -774,6 +837,7 @@ describe('usePdfViewerController error lifecycle', () => {
     getSourceLanguageAsyncMock.mockReset().mockResolvedValue('auto')
     getTargetLanguageAsyncMock.mockReset().mockResolvedValue('fa')
     getTranslationApiAsyncMock.mockReset().mockResolvedValue('googlev2')
+    getEffectiveProviderAsyncMock.mockReset().mockResolvedValue('googlev2')
 
     session.pageSessions = new Map()
     session.translationStates = new Map()

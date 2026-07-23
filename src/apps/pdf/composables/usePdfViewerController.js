@@ -1,7 +1,7 @@
 import { computed, reactive, ref, shallowRef } from 'vue'
 import { getScopedLogger } from '@/shared/logging/logger.js'
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js'
-import { getProviderOptimizationLevelAsync, getTranslationApiAsync } from '@/shared/config/config.js'
+import { TranslationMode, getProviderOptimizationLevelAsync, getEffectiveProviderAsync } from '@/shared/config/config.js'
 import { AUTO_DETECT_VALUE, DEFAULT_TARGET_LANGUAGE } from '@/shared/constants/core.js'
 import { pdfDocumentSession } from '@/features/pdf-translation/core/PdfDocumentSession.js'
 import { PdfTranslationCoordinator } from '@/features/pdf-translation/core/PdfTranslationCoordinator.js'
@@ -61,7 +61,7 @@ export function usePdfViewerController() {
   function createRestoreContext() {
     translationRestoreContext?.dispose?.()
     const resolveSettings = async () => {
-      const provider = await getTranslationApiAsync()
+      const provider = await getEffectiveProviderAsync(TranslationMode.PDF)
       const optimizationLevel = await getProviderOptimizationLevelAsync(provider)
       return buildTranslationSettings({
         provider,
