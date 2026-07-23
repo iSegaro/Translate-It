@@ -1547,4 +1547,167 @@ describe('PdfToolbar', () => {
       expect(wrapper.find('.pdf-toolbar__export-menu').exists()).toBe(true)
     })
   })
+
+  describe('page input editing', () => {
+    const baseProps = () => ({
+      fileName: 'doc.pdf',
+      pageCount: 12,
+      currentPageNumber: 5,
+      sourceLanguage: 'en',
+      targetLanguage: 'fa'
+    })
+
+    it('emits go-to-page on Enter', async () => {
+      const wrapper = mount(PdfToolbar, {
+        props: baseProps(),
+        global: { stubs: { SvgIcon: true } },
+        attachTo: document.body
+      })
+      const input = wrapper.find('.pdf-toolbar__page-input')
+      await input.trigger('focus')
+      await input.setValue('8')
+      await input.trigger('keydown', { key: 'Enter' })
+      await input.trigger('blur')
+
+      expect(wrapper.emitted('go-to-page')).toBeTruthy()
+      expect(wrapper.emitted('go-to-page')[0]).toEqual([8])
+
+      wrapper.unmount()
+    })
+
+    it('emits go-to-page on blur', async () => {
+      const wrapper = mount(PdfToolbar, {
+        props: baseProps(),
+        global: { stubs: { SvgIcon: true } },
+        attachTo: document.body
+      })
+      const input = wrapper.find('.pdf-toolbar__page-input')
+      await input.trigger('focus')
+      await input.setValue('3')
+      await input.trigger('blur')
+
+      expect(wrapper.emitted('go-to-page')).toBeTruthy()
+      expect(wrapper.emitted('go-to-page')[0]).toEqual([3])
+
+      wrapper.unmount()
+    })
+
+    it('does not emit go-to-page on invalid input blur and restores value', async () => {
+      const wrapper = mount(PdfToolbar, {
+        props: baseProps(),
+        global: { stubs: { SvgIcon: true } },
+        attachTo: document.body
+      })
+      const input = wrapper.find('.pdf-toolbar__page-input')
+      await input.trigger('focus')
+      await input.setValue('')
+      await input.trigger('blur')
+
+      expect(wrapper.emitted('go-to-page')).toBeFalsy()
+      expect(input.element.value).toBe('5')
+
+      wrapper.unmount()
+    })
+
+    it('restores current page immediately on invalid non-numeric blur', async () => {
+      const wrapper = mount(PdfToolbar, {
+        props: baseProps(),
+        global: { stubs: { SvgIcon: true } },
+        attachTo: document.body
+      })
+      const input = wrapper.find('.pdf-toolbar__page-input')
+      await input.trigger('focus')
+      await input.setValue('abc')
+      await input.trigger('blur')
+
+      expect(wrapper.emitted('go-to-page')).toBeFalsy()
+      expect(input.element.value).toBe('5')
+
+      wrapper.unmount()
+    })
+
+    it('Enter emits go-to-page only once', async () => {
+      const wrapper = mount(PdfToolbar, {
+        props: baseProps(),
+        global: { stubs: { SvgIcon: true } },
+        attachTo: document.body
+      })
+      const input = wrapper.find('.pdf-toolbar__page-input')
+      await input.trigger('focus')
+      await input.setValue('8')
+      await input.trigger('keydown', { key: 'Enter' })
+      await input.trigger('blur')
+
+      expect(wrapper.emitted('go-to-page')).toBeTruthy()
+      expect(wrapper.emitted('go-to-page')).toHaveLength(1)
+      expect(wrapper.emitted('go-to-page')[0]).toEqual([8])
+
+      wrapper.unmount()
+    })
+
+    it('cancels edit on Escape and restores value', async () => {
+      const wrapper = mount(PdfToolbar, {
+        props: baseProps(),
+        global: { stubs: { SvgIcon: true } },
+        attachTo: document.body
+      })
+      const input = wrapper.find('.pdf-toolbar__page-input')
+      await input.trigger('focus')
+      await input.setValue('99')
+      await input.trigger('keydown', { key: 'Escape' })
+
+      expect(wrapper.emitted('go-to-page')).toBeFalsy()
+      expect(input.element.value).toBe('5')
+
+      wrapper.unmount()
+    })
+
+    it('syncs value when currentPageNumber prop changes while not editing', async () => {
+      const wrapper = mount(PdfToolbar, {
+        props: baseProps(),
+        global: { stubs: { SvgIcon: true } },
+        attachTo: document.body
+      })
+      const input = wrapper.find('.pdf-toolbar__page-input')
+      expect(input.element.value).toBe('5')
+
+      await wrapper.setProps({ currentPageNumber: 7 })
+      expect(input.element.value).toBe('7')
+
+      wrapper.unmount()
+    })
+
+    it('does not overwrite input while editing when prop changes', async () => {
+      const wrapper = mount(PdfToolbar, {
+        props: baseProps(),
+        global: { stubs: { SvgIcon: true } },
+        attachTo: document.body
+      })
+      const input = wrapper.find('.pdf-toolbar__page-input')
+      await input.trigger('focus')
+      await input.setValue('1')
+
+      await wrapper.setProps({ currentPageNumber: 9 })
+      expect(input.element.value).toBe('1')
+
+      wrapper.unmount()
+    })
+
+    it('strips non-numeric characters from input', async () => {
+      const wrapper = mount(PdfToolbar, {
+        props: baseProps(),
+        global: { stubs: { SvgIcon: true } },
+        attachTo: document.body
+      })
+      const input = wrapper.find('.pdf-toolbar__page-input')
+      await input.trigger('focus')
+      await input.setValue('4abc2')
+      await input.trigger('blur')
+
+      expect(wrapper.emitted('go-to-page')).toBeTruthy()
+      expect(wrapper.emitted('go-to-page')[0]).toEqual([42])
+
+      wrapper.unmount()
+    })
+  })
 })

@@ -187,7 +187,8 @@
 }
 
 .pdf-toolbar__page-input {
-  width: 28px;
+  min-width: 28px;
+  width: 5ch;
   padding: 3px 2px;
   border: 1px solid $tb-border;
   border-radius: 4px;
@@ -816,7 +817,8 @@ $translation-language-code-width: 5ch;
   }
 
   .pdf-toolbar__page-input {
-    width: 28px;
+    min-width: 28px;
+    width: 5ch;
   }
 
   .pdf-toolbar__actions {

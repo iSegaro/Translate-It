@@ -79,10 +79,14 @@
       <div class="pdf-toolbar__page-group">
         <input
           class="pdf-toolbar__page-input"
-          type="number"
-          min="1"
-          :value="currentPageDisplayValue"
-          readonly
+          type="text"
+          inputmode="numeric"
+          pattern="[0-9]*"
+          :value="isEditingPage ? editPageValue : currentPageDisplayValue"
+          @focus="startEditingPage"
+          @input="handlePageInput"
+          @keydown="handlePageKeydown"
+          @blur="commitPageEdit"
         >
         <span class="pdf-toolbar__page-separator">/</span>
         <span class="pdf-toolbar__page-total">{{ pageCount || 0 }}</span>
@@ -483,7 +487,7 @@
 </template>
 
 <script setup>
-import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { CONTENT_VIEW, LAYOUT_MODE } from '../composables/usePdfViewerMode.js'
 import { TranslationMode } from '@/shared/config/config.js'
 import { useSettingsStore } from '@/features/settings/stores/settings.js'
@@ -530,7 +534,8 @@ const props = defineProps({
   targetLanguage: { type: String, default: 'fa' },
 })
 
-const emit = defineEmits(['request-open-pdf', 'translate-visible', 'cancel-translation', 'content-view-change', 'layout-mode-change', 'toggle-outline', 'export-txt', 'export-markdown', 'export-html', 'request-region-comparison', 'cancel-region-comparison', 'export-region-comparison-artifact', 'clear-cache', 'zoom-step', 'zoom-change', 'execution-mode-change', 'primary-click', 'select-action', 'select-language', 'manage-languages', 'open-settings', 'request-document-info', 'update:sourceLanguage', 'update:targetLanguage'])
+const emit = defineEmits(['request-open-pdf', 'translate-visible', 'cancel-translation', 'content-view-change', 'layout-mode-change', 'toggle-outline', 'export-txt', 'export-markdown', 'export-html', 'request-region-comparison', 'cancel-region-comparison', 'export-region-comparison-artifact', 'clear-cache', 'zoom-step', 'zoom-change', 'execution-mode-change', 'primary-click', 'select-action', 'select-language',   'manage-languages', 'open-settings', 'request-document-info',
+  'go-to-page', 'update:sourceLanguage', 'update:targetLanguage'])
 
 const logger = getScopedLogger(LOG_COMPONENTS.PDF, 'PdfToolbar')
 const settingsStore = useSettingsStore()
@@ -746,6 +751,52 @@ const currentPageDisplayValue = computed(() => {
   }
 
   return String(current || 1)
+})
+
+const isEditingPage = ref(false)
+const editPageValue = ref('')
+
+function startEditingPage(e) {
+  isEditingPage.value = true
+  editPageValue.value = currentPageDisplayValue.value
+  nextTick(() => e.target.select())
+}
+
+function handlePageInput(e) {
+  editPageValue.value = e.target.value.replace(/\D/g, '')
+}
+
+function commitPageEdit() {
+  if (!isEditingPage.value) return
+  isEditingPage.value = false
+  const num = Number(editPageValue.value)
+  if (Number.isInteger(num) && num >= 1) {
+    emit('go-to-page', num)
+  } else {
+    editPageValue.value = currentPageDisplayValue.value
+  }
+}
+
+function cancelPageEdit(e) {
+  isEditingPage.value = false
+  editPageValue.value = currentPageDisplayValue.value
+  e.target.value = editPageValue.value
+  e.target.blur()
+}
+
+function handlePageKeydown(e) {
+  if (e.key === 'Enter') {
+    e.preventDefault()
+    e.target.blur()
+  } else if (e.key === 'Escape') {
+    cancelPageEdit(e)
+  }
+}
+
+watch(() => props.currentPageNumber, (val) => {
+  if (!isEditingPage.value) {
+    editPageValue.value = String(val || 1)
+  }
 })
 
 const hasZoomOut = computed(() => props.zoomMode !== 'fit-width' || props.zoomPercent > zoomPercentOptions[0])
