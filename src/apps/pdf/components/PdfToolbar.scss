@@ -6,7 +6,7 @@
   top: 0;
   z-index: var(--pdf-layer-toolbar);
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  grid-template-columns: auto minmax(0, 1fr) auto;
   gap: 8px 12px;
   align-items: center;
   padding: $tb-padding-y 16px;
