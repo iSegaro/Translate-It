@@ -49,6 +49,11 @@
       @go-to-page="navigateToPage($event)"
     />
 
+    <PdfProgressBar
+      :operation="operationController.operation"
+      @cancel="operationController.cancelOperation"
+    />
+
     <input
       ref="fileInput"
       class="pdf-app__file-input"
@@ -217,6 +222,7 @@ import PdfNotificationBodyRenderer from './components/notifications/PdfNotificat
 import PdfWindowsHost from './components/PdfWindowsHost.vue'
 import PdfOutline from './components/PdfOutline.vue'
 import PdfDocumentInfoDialog from './components/PdfDocumentInfoDialog.vue'
+import PdfProgressBar from './components/PdfProgressBar.vue'
 import { usePdfViewerController } from './composables/usePdfViewerController.js'
 import { usePdfViewerMode, CONTENT_VIEW, VIEWER_ROLE } from './composables/usePdfViewerMode.js'
 import { usePdfDocumentInfo } from './composables/usePdfDocumentInfo.js'
@@ -229,6 +235,7 @@ import { usePdfNavigation } from './composables/usePdfNavigation.js'
 import { usePdfKeyboard } from './composables/usePdfKeyboard.js'
 import { createPdfTransitionController } from './composables/createPdfTransitionController.js'
 import { createPdfStatusBannerController } from './utils/pdfStatusBanner.js'
+import { usePdfOperationController } from './composables/usePdfOperationController.js'
 import { REGION_OCR_STATE } from './constants/regionOcrState.js'
 import { getTesseractLanguageCodeLabel } from '@/features/screen-capture/utils/ocrLanguageMap.js'
 import { mapOcrError } from '@/features/ocr/errors/ocrErrorMapper.js'
@@ -348,6 +355,7 @@ const regionOcrAvailable = computed(() => hasDocument.value && showOriginalPane.
 const supportedExecutionModes = Object.freeze([REGION_EXECUTION_TARGET.OCR])
 const executionMode = ref(REGION_EXECUTION_TARGET.OCR)
 const pdfStatusBannerController = createPdfStatusBannerController()
+const operationController = usePdfOperationController()
 
 const {
   ocrRecommendations,
