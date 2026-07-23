@@ -951,6 +951,128 @@ describe('usePdfViewerController error lifecycle', () => {
   })
 })
 
+describe('usePdfViewerController translation language resolution', () => {
+  beforeEach(() => {
+    pageSessionCommittedListener = null
+    openFileMock.mockReset()
+    rebuildPageMetricsMock.mockReset()
+    cleanupDocumentMock.mockReset().mockResolvedValue()
+    cancelActiveTranslationMock.mockReset().mockResolvedValue()
+    translateVisibleBlocksMock.mockReset()
+    saveTranslationsMock.mockReset().mockResolvedValue()
+    updateAfterOpenMock.mockReset().mockResolvedValue()
+    updateAfterTranslationMock.mockReset().mockResolvedValue()
+    getProviderOptimizationLevelAsyncMock.mockReset().mockResolvedValue(3)
+    getSourceLanguageAsyncMock.mockReset().mockResolvedValue('auto')
+    getTargetLanguageAsyncMock.mockReset().mockResolvedValue('fa')
+    getTranslationApiAsyncMock.mockReset().mockResolvedValue('googlev2')
+
+    session.pageSessions = new Map()
+    session.translationStates = new Map()
+    session.documentIdentity = 'doc-1'
+    session.documentGeneration = 1
+    session.visiblePageNumbers = new Set()
+    session.getPageSession.mockReset()
+    session.getPageSourceBlocks.mockClear()
+    session.forEachCommittedPage.mockClear()
+    session.onPageSessionCommitted.mockClear()
+    session.getDocumentCacheSnapshot.mockReset().mockResolvedValue({ translations: {}, ocr: {} })
+    session.setBlockTranslationState.mockClear()
+    session.getBlockTranslationState.mockClear()
+    session.setPageOcrBlocks.mockClear()
+    session.getPageLayout = vi.fn().mockReturnValue(null)
+    session.getVisibleLogicalBlocks = vi.fn().mockResolvedValue([])
+  })
+
+  it('passes pdfSourceLanguage to translateVisibleBlocks', async () => {
+    const block = createBlock()
+    const { controller } = await loadControllerWithCacheEntry(null, block)
+
+    controller.pdfSourceLanguage.value = 'de'
+    controller.pdfTargetLanguage.value = 'fa'
+
+    translateVisibleBlocksMock.mockResolvedValue({
+      status: 'translated',
+      translatedCount: 1,
+      failedCount: 0,
+      totalCount: 1
+    })
+
+    session.getVisibleLogicalBlocks.mockResolvedValue([block])
+
+    await controller.translateVisiblePages()
+
+    expect(translateVisibleBlocksMock).toHaveBeenCalledWith('de', 'fa')
+  })
+
+  it('passes pdfTargetLanguage to translateVisibleBlocks', async () => {
+    const block = createBlock()
+    const { controller } = await loadControllerWithCacheEntry(null, block)
+
+    controller.pdfSourceLanguage.value = 'auto'
+    controller.pdfTargetLanguage.value = 'fr'
+
+    translateVisibleBlocksMock.mockResolvedValue({
+      status: 'translated',
+      translatedCount: 1,
+      failedCount: 0,
+      totalCount: 1
+    })
+
+    session.getVisibleLogicalBlocks.mockResolvedValue([block])
+
+    await controller.translateVisiblePages()
+
+    expect(translateVisibleBlocksMock).toHaveBeenCalledWith('auto', 'fr')
+  })
+
+  it('uses pdf-local languages different from global settings', async () => {
+    const block = createBlock()
+    const { controller } = await loadControllerWithCacheEntry(null, block)
+
+    controller.pdfSourceLanguage.value = 'en'
+    controller.pdfTargetLanguage.value = 'de'
+
+    translateVisibleBlocksMock.mockResolvedValue({
+      status: 'translated',
+      translatedCount: 1,
+      failedCount: 0,
+      totalCount: 1
+    })
+
+    session.getVisibleLogicalBlocks.mockResolvedValue([block])
+
+    await controller.translateVisiblePages()
+
+    expect(translateVisibleBlocksMock).toHaveBeenCalledWith('en', 'de')
+    expect(translateVisibleBlocksMock.mock.calls[0][0]).not.toBe('auto')
+  })
+
+  it('uses unique values per language slot in translation request', async () => {
+    const block = createBlock()
+    const { controller } = await loadControllerWithCacheEntry(null, block)
+
+    controller.pdfSourceLanguage.value = 'en'
+    controller.pdfTargetLanguage.value = 'de'
+
+    translateVisibleBlocksMock.mockResolvedValue({
+      status: 'translated',
+      translatedCount: 1,
+      failedCount: 0,
+      totalCount: 1
+    })
+
+    session.getVisibleLogicalBlocks.mockResolvedValue([block])
+
+    await controller.translateVisiblePages()
+
+    const [passedSource, passedTarget] = translateVisibleBlocksMock.mock.calls[0]
+    expect(passedSource).toBe('en')
+    expect(passedTarget).toBe('de')
+    expect(passedSource).not.toBe(passedTarget)
+  })
+})
+
 describe('usePdfViewerController hasTranslationContent', () => {
   beforeEach(() => {
     openFileMock.mockReset()

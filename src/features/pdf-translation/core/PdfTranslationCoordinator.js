@@ -1,4 +1,4 @@
-import { TranslationMode, getProviderOptimizationLevelAsync, getSourceLanguageAsync, getTargetLanguageAsync, getEffectiveProviderAsync } from '@/shared/config/config.js'
+import { TranslationMode, getProviderOptimizationLevelAsync, getEffectiveProviderAsync } from '@/shared/config/config.js'
 import { sendRegularMessage } from '@/shared/messaging/core/UnifiedMessaging.js'
 import { MessageActions } from '@/shared/messaging/core/MessageActions.js'
 import { MessageContexts } from '@/shared/messaging/core/MessagingConstants.js'
@@ -139,7 +139,7 @@ export class PdfTranslationCoordinator {
     }
   }
 
-  async translateVisibleBlocks() {
+  async translateVisibleBlocks(sourceLanguage, targetLanguage) {
     if (this.isTranslating) {
       return this.lastSummary
     }
@@ -174,8 +174,6 @@ export class PdfTranslationCoordinator {
       const structuredRegions = pageLayout?.metadata?.structured?.regions || []
 
       const provider = await getEffectiveProviderAsync(TranslationMode.PDF)
-      const sourceLanguage = await getSourceLanguageAsync()
-      const targetLanguage = await getTargetLanguageAsync()
       const optimizationLevel = await getProviderOptimizationLevelAsync(provider)
       const batches = this.batchPlanner.plan(enrichedBlocks, {
         providerName: provider,

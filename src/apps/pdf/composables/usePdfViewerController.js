@@ -421,7 +421,10 @@ export function usePdfViewerController() {
 
     try {
       isTranslating.value = true
-      translationSummary.value = await pdfTranslationCoordinator.translateVisibleBlocks()
+      translationSummary.value = await pdfTranslationCoordinator.translateVisibleBlocks(
+        pdfSourceLanguage.value,
+        pdfTargetLanguage.value
+      )
       error.value = translationSummary.value?.error || ''
       await saveTranslationsToCache()
       pdfHistoryManager.updateAfterTranslation(pdfDocumentSession).catch(() => {})
