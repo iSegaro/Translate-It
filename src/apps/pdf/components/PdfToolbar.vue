@@ -288,6 +288,8 @@
         v-if="fileName"
         :source-language="sourceLanguage"
         :target-language="targetLanguage"
+        :provider="effectivePdfProvider"
+        :auto-detect-label="t('auto_detect', 'Auto-Detect')"
         :show-default-actions="false"
         :enable-select-element-integration="false"
         @update:source-language="emit('update:sourceLanguage', $event)"
@@ -480,6 +482,7 @@ import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
 import { CONTENT_VIEW, LAYOUT_MODE } from '../composables/usePdfViewerMode.js'
 import { TranslationMode } from '@/shared/config/config.js'
 import { useSettingsStore } from '@/features/settings/stores/settings.js'
+import { useUnifiedI18n } from '@/composables/shared/useUnifiedI18n.js'
 import { getScopedLogger } from '@/shared/logging/logger.js'
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js'
 import SvgIcon from '@/components/shared/SvgIcon.vue'
@@ -527,9 +530,16 @@ const emit = defineEmits(['request-open-pdf', 'translate-visible', 'cancel-trans
 
 const logger = getScopedLogger(LOG_COMPONENTS.PDF, 'PdfToolbar')
 const settingsStore = useSettingsStore()
+const { t } = useUnifiedI18n()
 
 const pdfProviderValue = computed(() => {
   return settingsStore.settings?.MODE_PROVIDERS?.[TranslationMode.PDF] || 'default'
+})
+
+const effectivePdfProvider = computed(() => {
+  const modeProvider = settingsStore.settings?.MODE_PROVIDERS?.[TranslationMode.PDF]
+  if (modeProvider && modeProvider !== 'default') return modeProvider
+  return settingsStore.settings?.TRANSLATION_API || 'googlev2'
 })
 const isDebugMode = computed(() => settingsStore.settings?.DEBUG_MODE === true)
 const isRegionComparisonActive = computed(() => ['running', 'cancelling'].includes(props.regionComparisonState?.status))

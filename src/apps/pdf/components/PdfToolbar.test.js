@@ -2,9 +2,11 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { flushPromises, mount } from '@vue/test-utils'
 
 const settingsStoreMock = vi.hoisted(() => ({
-  settings: { MODE_PROVIDERS: {}, DEBUG_MODE: false },
+  settings: { MODE_PROVIDERS: {}, TRANSLATION_API: 'googlev2', DEBUG_MODE: false },
   updateSettingAndPersist: vi.fn(() => Promise.resolve(true))
 }))
+
+const tMock = vi.hoisted(() => vi.fn((key, fallback) => fallback || key))
 
 const loggerMock = vi.hoisted(() => ({
   debug: vi.fn(),
@@ -31,14 +33,18 @@ vi.mock('@/components/shared/ProviderSelector.vue', () => ({
 vi.mock('@/components/shared/LanguageSelector.vue', () => ({
   default: {
     name: 'LanguageSelector',
-    template: '<div class="mock-language-selector"><select class="mock-source-lang" :value="sourceLanguage" @change="$emit(\'update:sourceLanguage\', $event.target.value)"><option value="auto">Auto</option><option value="en">English</option><option value="fr">French</option></select><select class="mock-target-lang" :value="targetLanguage" @change="$emit(\'update:targetLanguage\', $event.target.value)"><option value="fa">Persian</option><option value="en">English</option><option value="de">German</option></select></div>',
-    props: ['sourceLanguage', 'targetLanguage', 'compact', 'showDefaultActions', 'enableSelectElementIntegration', 'disabled', 'allowAuto'],
+    template: '<div class="mock-language-selector" :data-provider="provider" :data-auto-detect-label="autoDetectLabel"><select class="mock-source-lang" :value="sourceLanguage" @change="$emit(\'update:sourceLanguage\', $event.target.value)"><option value="auto">Auto</option><option value="en">English</option><option value="fr">French</option></select><select class="mock-target-lang" :value="targetLanguage" @change="$emit(\'update:targetLanguage\', $event.target.value)"><option value="fa">Persian</option><option value="en">English</option><option value="de">German</option></select></div>',
+    props: ['sourceLanguage', 'targetLanguage', 'provider', 'autoDetectLabel', 'compact', 'showDefaultActions', 'enableSelectElementIntegration', 'disabled', 'allowAuto'],
     emits: ['update:sourceLanguage', 'update:targetLanguage', 'swap-languages']
   }
 }))
 
 vi.mock('@/features/settings/stores/settings.js', () => ({
   useSettingsStore: () => settingsStoreMock
+}))
+
+vi.mock('@/composables/shared/useUnifiedI18n.js', () => ({
+  useUnifiedI18n: () => ({ t: tMock })
 }))
 
 vi.mock('@/shared/logging/logger.js', () => ({
@@ -62,6 +68,7 @@ function createDeferred() {
 describe('PdfToolbar', () => {
   beforeEach(() => {
     settingsStoreMock.settings.MODE_PROVIDERS = {}
+    settingsStoreMock.settings.TRANSLATION_API = 'googlev2'
     settingsStoreMock.settings.DEBUG_MODE = false
     settingsStoreMock.updateSettingAndPersist.mockReset()
     settingsStoreMock.updateSettingAndPersist.mockResolvedValue(true)
@@ -69,6 +76,7 @@ describe('PdfToolbar', () => {
     loggerMock.info.mockReset()
     loggerMock.warn.mockReset()
     loggerMock.error.mockReset()
+    tMock.mockReset()
   })
 
   it('renders the file name and keeps core actions available', async () => {
@@ -1157,6 +1165,11 @@ describe('PdfToolbar', () => {
   })
 
   describe('language controls', () => {
+    beforeEach(() => {
+      settingsStoreMock.settings.MODE_PROVIDERS = {}
+      settingsStoreMock.settings.TRANSLATION_API = 'googlev2'
+    })
+
     it('renders LanguageSelector when fileName is set', () => {
       const wrapper = mount(PdfToolbar, {
         props: {
@@ -1201,6 +1214,68 @@ describe('PdfToolbar', () => {
       })
       const targetSelect = wrapper.find('.mock-target-lang')
       expect(targetSelect.element.value).toBe('en')
+    })
+
+    it('passes effective provider to LanguageSelector when mode-specific provider is set', () => {
+      settingsStoreMock.settings.MODE_PROVIDERS[TranslationMode.PDF] = 'deepl'
+      const wrapper = mount(PdfToolbar, {
+        props: {
+          fileName: 'doc.pdf',
+          sourceLanguage: 'auto',
+          targetLanguage: 'fa'
+        }
+      })
+      expect(wrapper.find('.mock-language-selector').attributes('data-provider')).toBe('deepl')
+    })
+
+    it('passes effective provider to LanguageSelector when mode-specific provider is default', () => {
+      settingsStoreMock.settings.MODE_PROVIDERS[TranslationMode.PDF] = 'default'
+      settingsStoreMock.settings.TRANSLATION_API = 'openai'
+      const wrapper = mount(PdfToolbar, {
+        props: {
+          fileName: 'doc.pdf',
+          sourceLanguage: 'auto',
+          targetLanguage: 'fa'
+        }
+      })
+      expect(wrapper.find('.mock-language-selector').attributes('data-provider')).toBe('openai')
+    })
+
+    it('passes effective provider to LanguageSelector when no mode-specific override exists', () => {
+      settingsStoreMock.settings.TRANSLATION_API = 'gemini'
+      const wrapper = mount(PdfToolbar, {
+        props: {
+          fileName: 'doc.pdf',
+          sourceLanguage: 'auto',
+          targetLanguage: 'fa'
+        }
+      })
+      expect(wrapper.find('.mock-language-selector').attributes('data-provider')).toBe('gemini')
+    })
+
+    it('falls back to googlev2 when no provider is configured', () => {
+      settingsStoreMock.settings.MODE_PROVIDERS = {}
+      settingsStoreMock.settings.TRANSLATION_API = ''
+      const wrapper = mount(PdfToolbar, {
+        props: {
+          fileName: 'doc.pdf',
+          sourceLanguage: 'auto',
+          targetLanguage: 'fa'
+        }
+      })
+      expect(wrapper.find('.mock-language-selector').attributes('data-provider')).toBe('googlev2')
+    })
+
+    it('passes localized auto-detect label to LanguageSelector', () => {
+      tMock.mockReturnValueOnce('Auto-Detect')
+      const wrapper = mount(PdfToolbar, {
+        props: {
+          fileName: 'doc.pdf',
+          sourceLanguage: 'auto',
+          targetLanguage: 'fa'
+        }
+      })
+      expect(wrapper.find('.mock-language-selector').attributes('data-auto-detect-label')).toBe('Auto-Detect')
     })
 
     it('emits update:sourceLanguage when source dropdown changes', async () => {
