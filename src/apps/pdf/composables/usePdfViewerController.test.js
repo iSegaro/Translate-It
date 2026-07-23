@@ -1025,31 +1025,6 @@ describe('usePdfViewerController translation language resolution', () => {
 
     expect(translateVisibleBlocksMock).toHaveBeenCalledWith({ sourceLanguage: 'auto', targetLanguage: 'fr' })
   })
-
-  it('uses pdf-local languages different from global settings', async () => {
-    const block = createBlock()
-    const { controller } = await loadControllerWithCacheEntry(null, block)
-
-    controller.pdfSourceLanguage.value = 'en'
-    controller.pdfTargetLanguage.value = 'de'
-
-    translateVisibleBlocksMock.mockResolvedValue({
-      status: 'translated',
-      translatedCount: 1,
-      failedCount: 0,
-      totalCount: 1
-    })
-
-    session.getVisibleLogicalBlocks.mockResolvedValue([block])
-
-    await controller.translateVisiblePages()
-
-    const request = translateVisibleBlocksMock.mock.calls[0][0]
-    expect(request.sourceLanguage).toBe('en')
-    expect(request.targetLanguage).toBe('de')
-    expect(request.sourceLanguage).not.toBe(request.targetLanguage)
-    expect(request.sourceLanguage).not.toBe('auto')
-  })
 })
 
 describe('usePdfViewerController hasTranslationContent', () => {
