@@ -46,7 +46,7 @@
       @manage-languages="handleOcrManageLanguages"
       @open-settings="handleOpenSettings"
       @request-document-info="showPdfInfo = true"
-      @go-to-page="navigateToPage($event, { behavior: 'smooth' })"
+      @go-to-page="navigateToPage($event)"
     />
 
     <input

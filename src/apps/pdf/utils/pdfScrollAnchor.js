@@ -59,7 +59,7 @@ function restoreScrollAnchor(anchor, container, pageSelector) {
 
   container.scrollTo({
     top: targetScrollTop,
-    behavior: 'instant'
+    behavior: 'auto'
   })
 
   return true
@@ -117,7 +117,7 @@ function restorePdfBackedScrollAnchor(anchor, container, pageSelector, pdfSessio
     if (!Number.isFinite(targetScrollTop)) return false
     container.scrollTo({
       top: targetScrollTop,
-      behavior: 'instant'
+      behavior: 'auto'
     })
     return true
   }
@@ -139,7 +139,7 @@ function restorePdfBackedScrollAnchor(anchor, container, pageSelector, pdfSessio
 
   container.scrollTo({
     top: targetScrollTop,
-    behavior: 'instant'
+    behavior: 'auto'
   })
 
   return true

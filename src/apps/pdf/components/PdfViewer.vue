@@ -365,7 +365,7 @@ function scrollToPage(pageNumber, options = {}) {
 
     container.scrollTo({
       top: targetScrollTop,
-      behavior: options.behavior === 'instant' ? 'auto' : 'smooth'
+      behavior: options.behavior ?? 'auto'
     })
     return
   }
@@ -386,7 +386,7 @@ function scrollToPage(pageNumber, options = {}) {
 
   container.scrollTo({
     top: targetScrollTop,
-    behavior: options.behavior === 'instant' ? 'auto' : 'smooth'
+    behavior: options.behavior ?? 'auto'
   })
 }
 
