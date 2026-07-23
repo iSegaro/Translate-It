@@ -445,32 +445,6 @@
             >
               Export Region Comparison Artifact
             </button>
-            <div
-              v-if="isRegionComparisonActive"
-              class="pdf-toolbar__regionComparison"
-              aria-live="polite"
-            >
-              <div class="pdf-toolbar__regionComparison-summary">
-                <span>RegionComparison {{ regionComparisonState.status }}</span>
-                <span v-if="regionComparisonState.progress">
-                  {{ regionComparisonState.progress.completedCandidates }}/{{ regionComparisonState.progress.totalCandidates }}
-                </span>
-                <button
-                  v-if="isRegionComparisonActive"
-                  class="pdf-toolbar__regionComparison-cancel"
-                  type="button"
-                  @click="$emit('cancel-region-comparison')"
-                >
-                  Cancel
-                </button>
-              </div>
-              <span
-                v-if="regionComparisonState.progress?.currentCandidate"
-                class="pdf-toolbar__regionComparison-current"
-              >
-                {{ regionComparisonState.progress.currentCandidate.candidateId }}
-              </span>
-            </div>
           </div>
         </div>
       </div>

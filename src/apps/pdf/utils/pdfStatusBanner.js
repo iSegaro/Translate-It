@@ -32,18 +32,13 @@ export function createPdfStatusBannerController() {
     exportError = '',
     ocrError = '',
     isLoading = false,
-    isTranslating = false,
     developerNotification = null,
     exportSuccess = null,
     restoredTranslationCount = 0,
     translationStatus = 'idle',
-    // Domain-level identity for one completed translation occurrence.
-    // Stable across reactive recomputations of the same occurrence.
-    // UI dismiss key uses this to distinguish independent translation outcomes.
     translationOccurrenceId = 0
   } = {}) {
     const loadingMessage = 'Loading PDF and rebuilding visible pages.'
-    const translatingMessage = 'Translating visible pages.'
     const restoredMessage = restoredTranslationCount > 0
       ? `Restored ${restoredTranslationCount} cached translation(s).`
       : ''
@@ -60,10 +55,6 @@ export function createPdfStatusBannerController() {
 
     if (isLoading) {
       return { id: 'opening', visible: true, variant: 'info', title: 'Opening PDF', message: loadingMessage, dismissible: false }
-    }
-
-    if (isTranslating) {
-      return { id: 'translating', visible: true, variant: 'info', title: 'Translating visible pages', message: translatingMessage, dismissible: false }
     }
 
     if (translationStatus === 'partial') {

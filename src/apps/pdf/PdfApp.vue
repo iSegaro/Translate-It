@@ -85,12 +85,6 @@
           </PdfStatusBanner>
         </div>
 
-        <PdfOcrProgress
-          :processing="isOcrProcessing"
-          :progress="ocrProgress"
-          @cancel="cancelOcr"
-        />
-
         <div
           v-if="regionOcrNotice"
           class="pdf-app__status-row"
@@ -216,9 +210,8 @@ import PdfDropzone from './components/PdfDropzone.vue'
 import PdfViewer from './components/PdfViewer.vue'
 import PdfViewerLayout from './components/PdfViewerLayout.vue'
 import PdfTranslatedPane from './components/PdfTranslatedPane.vue'
-import PdfOcrProgress from './components/PdfOcrProgress.vue'
-import PdfStatusBanner from './components/PdfStatusBanner.vue'
 import PdfNotificationBodyRenderer from './components/notifications/PdfNotificationBodyRenderer.vue'
+import PdfStatusBanner from './components/PdfStatusBanner.vue'
 import PdfWindowsHost from './components/PdfWindowsHost.vue'
 import PdfOutline from './components/PdfOutline.vue'
 import PdfDocumentInfoDialog from './components/PdfDocumentInfoDialog.vue'
@@ -370,6 +363,15 @@ const {
     refreshTranslatedPageBlocks(pageNumbers)
     translationTick.value += 1
     refreshOcrRecommendations()
+  },
+  onOcrStart: () => {
+    return operationController.startOperation({
+      title: 'OCR: Processing pages',
+      indeterminate: false,
+      progress: 0,
+      cancellable: true,
+      onCancel: () => cancelOcr()
+    })
   }
 })
 
@@ -570,7 +572,6 @@ const pdfStatusBanner = computed(() => pdfStatusBannerController.build({
   exportError: exportError.value,
   ocrError: getPdfOcrBannerMessage(ocrError.value),
   isLoading: isLoading.value,
-  isTranslating: isTranslating.value,
   developerNotification: isDebugMode.value ? developerNotification.value : null,
   exportSuccess: exportSuccess.value,
   translationStatus: translationSummary.value?.status ?? 'idle',
@@ -693,6 +694,12 @@ function handleRegionSelectionComplete(region) {
 
   if (target === REGION_EXECUTION_TARGET.REGION_COMPARISON) {
     developerNotification.value = null
+    const handle = operationController.startOperation({
+      title: 'Region Comparison',
+      indeterminate: true,
+      cancellable: true,
+      onCancel: () => handleCancelRegionComparison()
+    })
     const operation = pdfDeveloperApi.runRegionComparison({ region })
     activeRegionComparisonOperation = operation
     completedRegionComparisonResult = null
@@ -712,7 +719,9 @@ function handleRegionSelectionComplete(region) {
     void operation.promise.then(
       result => handleRegionComparisonOutcome(operation, result),
       error => handleRegionComparisonFailure(operation, error)
-    )
+    ).finally(() => {
+      handle.finish()
+    })
     return
   }
 
@@ -724,10 +733,17 @@ function handleRegionSelectionComplete(region) {
 
   if (!request) return
 
+  const ocrHandle = operationController.startOperation({
+    title: 'Scanning region...',
+    indeterminate: true,
+    cancellable: true,
+    onCancel: () => cancelRegionOcr()
+  })
   const operation = regionExecutionDispatcher.dispatchRegionExecution(request)
   regionOcrState.value = REGION_OCR_STATE.PROCESSING
-  void operation.promise.then(handleRegionOcrOutcome, handleRegionOcrFailure)
-  void operation.promise
+  void operation.promise.then(handleRegionOcrOutcome, handleRegionOcrFailure).finally(() => {
+    ocrHandle.finish()
+  })
 }
 
 function handleRequestRegionComparison() {
@@ -904,7 +920,13 @@ function handleTranslatedPaneCurrentPageChange(pageNumber) {
 }
 
 function handleTranslateVisiblePages() {
-  void translateVisiblePages()
+  const handle = operationController.startOperation({
+    title: 'Translating visible pages',
+    indeterminate: true,
+    cancellable: true,
+    onCancel: () => handleCancelTranslation()
+  })
+  translateVisiblePages().finally(() => handle.finish())
 }
 
 function handleCancelTranslation() {

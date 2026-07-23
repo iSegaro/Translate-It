@@ -24,17 +24,6 @@ describe('buildPdfStatusBannerState', () => {
     })
   })
 
-  it('builds a translating banner', () => {
-    expect(controller.build({ isTranslating: true })).toEqual({
-      id: 'translating',
-      visible: true,
-      variant: 'info',
-      title: 'Translating visible pages',
-      message: 'Translating visible pages.',
-      dismissible: false
-    })
-  })
-
   it('builds a cache-restore banner', () => {
     expect(controller.build({ restoredTranslationCount: 2 })).toEqual({
       id: 'cache-restored',
@@ -95,10 +84,6 @@ describe('buildPdfStatusBannerState', () => {
     })
     expect(controller.build({ isLoading: true, developerNotification: notification })).toMatchObject({
       id: 'opening',
-      variant: 'info'
-    })
-    expect(controller.build({ isTranslating: true, developerNotification: notification })).toMatchObject({
-      id: 'translating',
       variant: 'info'
     })
     expect(controller.build({ error: 'PDF failed', developerNotification: notification })).toMatchObject({
@@ -249,13 +234,4 @@ describe('buildPdfStatusBannerState', () => {
     })
   })
 
-  it('prefers translating over partial status', () => {
-    expect(controller.build({
-      isTranslating: true,
-      translationStatus: 'partial'
-    })).toMatchObject({
-      id: 'translating',
-      variant: 'info'
-    })
-  })
 })

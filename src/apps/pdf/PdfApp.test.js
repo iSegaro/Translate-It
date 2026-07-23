@@ -527,7 +527,7 @@ describe('PdfApp', () => {
   it('renders the status banner outside the viewer content flow when active', async () => {
     createMocks({
       bannerState: {
-        isTranslating: true
+        isLoading: true
       }
     })
 
