@@ -1002,7 +1002,7 @@ describe('usePdfViewerController translation language resolution', () => {
 
     await controller.translateVisiblePages()
 
-    expect(translateVisibleBlocksMock).toHaveBeenCalledWith('de', 'fa')
+    expect(translateVisibleBlocksMock).toHaveBeenCalledWith({ sourceLanguage: 'de', targetLanguage: 'fa' })
   })
 
   it('passes pdfTargetLanguage to translateVisibleBlocks', async () => {
@@ -1023,7 +1023,7 @@ describe('usePdfViewerController translation language resolution', () => {
 
     await controller.translateVisiblePages()
 
-    expect(translateVisibleBlocksMock).toHaveBeenCalledWith('auto', 'fr')
+    expect(translateVisibleBlocksMock).toHaveBeenCalledWith({ sourceLanguage: 'auto', targetLanguage: 'fr' })
   })
 
   it('uses pdf-local languages different from global settings', async () => {
@@ -1044,32 +1044,11 @@ describe('usePdfViewerController translation language resolution', () => {
 
     await controller.translateVisiblePages()
 
-    expect(translateVisibleBlocksMock).toHaveBeenCalledWith('en', 'de')
-    expect(translateVisibleBlocksMock.mock.calls[0][0]).not.toBe('auto')
-  })
-
-  it('uses unique values per language slot in translation request', async () => {
-    const block = createBlock()
-    const { controller } = await loadControllerWithCacheEntry(null, block)
-
-    controller.pdfSourceLanguage.value = 'en'
-    controller.pdfTargetLanguage.value = 'de'
-
-    translateVisibleBlocksMock.mockResolvedValue({
-      status: 'translated',
-      translatedCount: 1,
-      failedCount: 0,
-      totalCount: 1
-    })
-
-    session.getVisibleLogicalBlocks.mockResolvedValue([block])
-
-    await controller.translateVisiblePages()
-
-    const [passedSource, passedTarget] = translateVisibleBlocksMock.mock.calls[0]
-    expect(passedSource).toBe('en')
-    expect(passedTarget).toBe('de')
-    expect(passedSource).not.toBe(passedTarget)
+    const request = translateVisibleBlocksMock.mock.calls[0][0]
+    expect(request.sourceLanguage).toBe('en')
+    expect(request.targetLanguage).toBe('de')
+    expect(request.sourceLanguage).not.toBe(request.targetLanguage)
+    expect(request.sourceLanguage).not.toBe('auto')
   })
 })
 

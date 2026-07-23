@@ -139,7 +139,8 @@ export class PdfTranslationCoordinator {
     }
   }
 
-  async translateVisibleBlocks(sourceLanguage, targetLanguage) {
+  async translateVisibleBlocks(request) {
+    const { sourceLanguage, targetLanguage } = request || {}
     if (this.isTranslating) {
       return this.lastSummary
     }
