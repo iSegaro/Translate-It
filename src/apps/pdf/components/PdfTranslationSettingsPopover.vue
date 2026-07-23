@@ -4,6 +4,7 @@
       Translation Settings
     </div>
     <LanguageSelector
+      dark
       :source-language="sourceLanguage"
       :target-language="targetLanguage"
       :provider="provider"

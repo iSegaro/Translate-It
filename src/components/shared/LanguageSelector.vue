@@ -4,6 +4,7 @@
     class="ti-language-controls"
     :class="{ 
       'ti-language-controls--vertical': isVerticalLayout && isSidepanelContext,
+      'ti-language-controls--dark': dark,
       'ti-compact-mode': compact 
     }"
   >
@@ -247,6 +248,10 @@ const props = defineProps({
   allowAuto: {
     type: Boolean,
     default: true
+  },
+  dark: {
+    type: Boolean,
+    default: false
   },
   // Enable select element mode integration (deactivates select mode on dropdown click)
   // Should be disabled for standalone pages like Subtitle that don't have element selection
