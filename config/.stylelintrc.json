@@ -7,9 +7,9 @@
     "at-rule-no-unknown": null,
     "scss/at-rule-no-unknown": true,
     "selector-class-pattern": [
-      "^(ti-[a-z][a-z0-9]*([_-][a-z0-9]+)*|ti-u-[a-z-]+)$",
+      "^(ti-[a-z][a-z0-9]*([_-][a-z0-9]+)*|ti-u-[a-z-]+|popup-context|options-context|sidepanel-context)$",
       {
-        "message": "Class names must use ti- prefix (ti-component or ti-u-utility)"
+        "message": "Class names must use ti- prefix; body application context markers are exempt"
       }
     ],
     "selector-id-pattern": null,
@@ -80,9 +80,9 @@
       "customSyntax": "postcss-html",
       "rules": {
         "selector-class-pattern": [
-          "^(ti-[a-z][a-z0-9]*([_-][a-z0-9]+)*|ti-u-[a-z-]+)$",
+          "^(ti-[a-z][a-z0-9]*([_-][a-z0-9]+)*|ti-u-[a-z-]+|popup-context|options-context|sidepanel-context)$",
           {
-            "message": "Vue component classes must use ti- prefix"
+            "message": "Vue component classes must use ti- prefix; body application context markers are exempt"
           }
         ],
         "vue-scoped-css/no-parsing-error": true,
