@@ -561,6 +561,10 @@ class SettingsManager {
       return
     }
 
+    // Fallback-only storage listener.
+    // Registered only when _fallbackMode is true (Vue/Pinia unavailable).
+    // StorageCore is the sole browser.storage.onChanged owner during normal runtime.
+    // The two listeners are never active simultaneously.
     browserAPI.storage.onChanged.addListener((changes, areaName) => {
       logger.debug(`Storage onChanged triggered for area: ${areaName}`, Object.keys(changes))
 
