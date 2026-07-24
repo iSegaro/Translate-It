@@ -197,6 +197,17 @@ describe('usePdfOcr', () => {
     wrapper.unmount()
   })
 
+  it('does not emit start when no pages need OCR', () => {
+    const onOcrStart = vi.fn()
+    const { api, wrapper } = mountComposable({ onOcrStart })
+
+    api.requestOcr()
+
+    expect(onOcrStart).not.toHaveBeenCalled()
+    expect(mockProcessPages).not.toHaveBeenCalled()
+    wrapper.unmount()
+  })
+
   it('processes the OCR batch captured when OCR is requested', async () => {
     const { api, wrapper } = mountComposable()
     mockPdfDocumentSession.pageSessions.set(1, createScannedPageSession(1))

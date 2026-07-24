@@ -811,6 +811,23 @@ describe('PdfApp', () => {
     expect(toast.error).toHaveBeenCalledWith(expect.stringContaining('No OCR language is installed'))
   })
 
+  it('starts page OCR progress only after the composable confirms work', async () => {
+    settingsStoreMock.settings.OCR_PREFERRED_ACTION = 'page'
+    const wrapper = mount(PdfApp)
+    await flushPromises()
+
+    wrapper.findComponent({ name: 'PdfToolbar' }).vm.$emit('primary-click')
+    await flushPromises()
+
+    expect(mockPdfOcr.requestOcr).toHaveBeenCalledOnce()
+    expect(wrapper.find('.pdf-progress-bar').exists()).toBe(false)
+
+    mockPdfOcrOptions.onOcrStart()
+    await flushPromises()
+
+    expect(wrapper.find('.pdf-progress-bar').exists()).toBe(true)
+  })
+
   it('keeps the OCR Manage Languages entry point routed to options', async () => {
     const wrapper = mount(PdfApp)
     await flushPromises()

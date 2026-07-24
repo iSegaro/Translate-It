@@ -361,6 +361,10 @@ const {
   requestOcr,
   cancelOcr
 } = usePdfOcr({
+  onOcrStart: () => {
+    presentation.present(DomainEvents.ocrStarted())
+    activeProgressCancel = cancelOcr
+  },
   onOcrComplete: ({ pageNumbers } = {}) => {
     presentation.present(DomainEvents.activityCompleted())
     activeProgressCancel = null
@@ -548,8 +552,6 @@ function handleOcrPrimaryClick() {
 }
 
 function startPageOcr() {
-  presentation.present(DomainEvents.ocrStarted())
-  activeProgressCancel = cancelOcr
   requestOcr()
 }
 
