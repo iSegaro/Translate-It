@@ -785,11 +785,80 @@ $translation-language-code-width: 5ch;
   }
 }
 
-@media (max-width: 1100px) {
+// ── Layout B + C (≤ 1099 px) ──────────────────────────────────────
+// Shared compact styles. Active for all widths ≤ 1099px.
+//   • Switches segmented View Mode buttons to compact dropdown.
+//   • Hides separator bars.
+//   • Reduces padding and font sizes.
+// Layout C (≤ 749px) inherits these rules and adds a second row.
+@media (max-width: 1099px) {
   .pdf-toolbar {
     padding: 8px 16px;
     gap: 8px 12px;
     min-height: 44px;
+  }
+
+  .pdf-toolbar__view-mode--desktop {
+    display: none;
+  }
+
+  .pdf-toolbar__view-mode--mobile {
+    display: inline-block;
+  }
+
+  .pdf-toolbar__separator {
+    display: none;
+  }
+
+  .pdf-toolbar__file-row {
+    gap: 6px;
+  }
+
+  .pdf-toolbar__outline-toggle {
+    width: 28px;
+    height: 28px;
+  }
+
+  .pdf-toolbar__file-name {
+    font-size: 13px;
+  }
+
+  .pdf-toolbar__progress {
+    padding: 3px 8px;
+    font-size: 12px;
+  }
+
+  .pdf-toolbar__mode-button {
+    padding: 4px 6px;
+    font-size: 11px;
+  }
+
+  .pdf-toolbar__page-group .pdf-toolbar__page-input {
+    width: 28px;
+  }
+
+  .pdf-toolbar__button {
+    padding: 5px 8px;
+    font-size: 11px;
+  }
+
+  .pdf-toolbar__button--menu-trigger {
+    min-width: 0;
+  }
+
+  .pdf-toolbar__button--icon-trigger {
+    width: $tb-icon-trigger-size;
+    height: $tb-icon-trigger-size;
+  }
+}
+
+// ── Layout C Overrides (≤ 749 px) ────────────────────────────────
+// Additional two-row grid overrides. Applied on top of Layout B + C
+// shared styles. Switches from single-row 3-column grid to:
+//   Row 1: title-block (left) + actions (right)
+//   Row 2: center-group (full width)
+@media (max-width: 749px) {
+  .pdf-toolbar {
     grid-template-columns: 1fr auto;
     justify-items: stretch;
   }
@@ -814,58 +883,5 @@ $translation-language-code-width: 5ch;
     justify-self: stretch;
     justify-content: flex-start;
     gap: 8px;
-  }
-
-  .pdf-toolbar__file-row {
-    gap: 6px;
-  }
-
-  .pdf-toolbar__outline-toggle {
-    width: 28px;
-    height: 28px;
-  }
-
-  .pdf-toolbar__separator {
-    display: none;
-  }
-
-  .pdf-toolbar__file-name {
-    font-size: 13px;
-  }
-
-  .pdf-toolbar__progress {
-    padding: 3px 8px;
-    font-size: 12px;
-  }
-
-  .pdf-toolbar__view-mode--desktop {
-    display: none;
-  }
-
-  .pdf-toolbar__view-mode--mobile {
-    display: inline-block;
-  }
-
-  .pdf-toolbar__mode-button {
-    padding: 4px 6px;
-    font-size: 11px;
-  }
-
-  .pdf-toolbar__page-group .pdf-toolbar__page-input {
-    width: 28px;
-  }
-
-  .pdf-toolbar__button {
-    padding: 5px 8px;
-    font-size: 11px;
-  }
-
-  .pdf-toolbar__button--menu-trigger {
-    min-width: 0;
-  }
-
-  .pdf-toolbar__button--icon-trigger {
-    width: $tb-icon-trigger-size;
-    height: $tb-icon-trigger-size;
   }
 }
