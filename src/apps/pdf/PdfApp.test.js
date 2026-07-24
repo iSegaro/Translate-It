@@ -85,6 +85,10 @@ vi.mock('./composables/usePdfExport.js', () => ({
   usePdfExport: () => mockPdfExport
 }))
 
+vi.mock('@/features/pdf-translation/core/PdfDocumentSession.js', () => ({
+  pdfDocumentSession: {}
+}))
+
 vi.mock('./presentation/domainEvents.js', async (importOriginal) => {
   const actual = await importOriginal()
   return {
