@@ -224,8 +224,7 @@ import { createProgressAdapter } from './presentation/adapters/progressAdapter.j
 import { createToastAdapter } from './presentation/adapters/toastAdapter.js'
 import { createBannerAdapter } from './presentation/adapters/bannerAdapter.js'
 import { DomainEvents } from './presentation/domainEvents.js'
-import { createPresentationDispatcher } from './presentation/presentationDispatcher.js'
-import { present } from './presentation/presentationPresenter.js'
+import { createPresentationFacade } from './presentation/presentationFacade.js'
 import { REGION_OCR_STATE } from './constants/regionOcrState.js'
 import { getTesseractLanguageCodeLabel } from '@/features/screen-capture/utils/ocrLanguageMap.js'
 import { mapOcrError } from '@/features/ocr/errors/ocrErrorMapper.js'
@@ -342,14 +341,6 @@ const pdfStatusBannerController = createPdfStatusBannerController()
 const progressAdapter = createProgressAdapter()
 const bannerAdapter = createBannerAdapter()
 
-const presentationDispatcher = createPresentationDispatcher({
-  adapters: {
-    toast: createToastAdapter({ toast }),
-    banner: bannerAdapter,
-    'progress-bar': progressAdapter
-  }
-})
-
 const progressTick = ref(0)
 let progressLastVersion = 0
 
@@ -358,16 +349,7 @@ const progressOperation = computed(() => {
   return progressAdapter.getState().operation
 })
 
-function dispatchIntent(domainResult) {
-  const intent = present(domainResult)
-  if (intent) presentationDispatcher.dispatch(intent)
-  afterBannerDispatch()
-}
-
-function dispatchProgress(domainResult) {
-  const intent = present(domainResult)
-  if (!intent) return
-  presentationDispatcher.dispatch(intent)
+function afterProgressPresentation() {
   const { version } = progressAdapter.getState()
   if (version !== progressLastVersion) {
     progressLastVersion = version
@@ -383,7 +365,7 @@ const bannerState = computed(() => {
   return bannerAdapter.getState()
 })
 
-function afterBannerDispatch() {
+function afterBannerPresentation() {
   const { version } = bannerAdapter.getState()
   if (version !== bannerLastVersion) {
     bannerLastVersion = version
@@ -391,11 +373,26 @@ function afterBannerDispatch() {
   }
 }
 
+const presentation = createPresentationFacade({
+  adapters: {
+    toast: createToastAdapter({ toast }),
+    banner: bannerAdapter,
+    'progress-bar': progressAdapter
+  },
+  onPresented: (intent) => {
+    if (intent.intent === 'activity') {
+      afterProgressPresentation()
+    } else {
+      afterBannerPresentation()
+    }
+  }
+})
+
 let activeProgressCancel = null
 
 function handleProgressCancel() {
   if (activeProgressCancel) activeProgressCancel()
-  dispatchProgress(DomainEvents.activityCompleted())
+  presentation.present(DomainEvents.activityCompleted())
   activeProgressCancel = null
 }
 
@@ -409,19 +406,19 @@ const {
   cancelOcr
 } = usePdfOcr({
   onOcrComplete: ({ pageNumbers } = {}) => {
-    dispatchProgress(DomainEvents.activityCompleted())
+    presentation.present(DomainEvents.activityCompleted())
     activeProgressCancel = null
     refreshTranslatedPageBlocks(pageNumbers)
     translationTick.value += 1
     refreshOcrRecommendations()
   },
   onOcrProgress: ({ current, total }) => {
-    dispatchProgress(DomainEvents.ocrProgressUpdated({ current, total }))
+    presentation.present(DomainEvents.ocrProgressUpdated({ current, total }))
   },
   onOcrError: (errorCode) => {
-    dispatchProgress(DomainEvents.activityCompleted())
+    presentation.present(DomainEvents.activityCompleted())
     activeProgressCancel = null
-    dispatchIntent(errorCode === 'model-not-installed'
+    presentation.present(errorCode === 'model-not-installed'
       ? DomainEvents.ocrLanguageMissing()
       : DomainEvents.ocrFailed())
   }
@@ -560,7 +557,7 @@ const toolbarOcrModel = computed(() => {
 
 function showOcrLanguageRequiredMessage() {
   ocrError.value = 'model-not-installed'
-  dispatchIntent(DomainEvents.ocrLanguageMissing())
+  presentation.present(DomainEvents.ocrLanguageMissing())
 }
 
 function ensureOcrLanguageInstalled() {
@@ -596,7 +593,7 @@ function handleOcrPrimaryClick() {
 }
 
 function startPageOcr() {
-  dispatchProgress(DomainEvents.ocrStarted())
+  presentation.present(DomainEvents.ocrStarted())
   activeProgressCancel = cancelOcr
   requestOcr()
 }
@@ -741,7 +738,7 @@ function handleRegionSelectionComplete(region) {
 
   if (target === REGION_EXECUTION_TARGET.REGION_COMPARISON) {
     activeProgressCancel = handleCancelRegionComparison
-    dispatchProgress(DomainEvents.comparisonStarted())
+    presentation.present(DomainEvents.comparisonStarted())
     const operation = pdfDeveloperApi.runRegionComparison({ region })
     activeRegionComparisonOperation = operation
     completedRegionComparisonResult = null
@@ -762,7 +759,7 @@ function handleRegionSelectionComplete(region) {
       result => handleRegionComparisonOutcome(operation, result),
       error => handleRegionComparisonFailure(operation, error)
     ).finally(() => {
-      dispatchProgress(DomainEvents.activityCompleted())
+      presentation.present(DomainEvents.activityCompleted())
       activeProgressCancel = null
     })
     return
@@ -777,11 +774,11 @@ function handleRegionSelectionComplete(region) {
   if (!request) return
 
   activeProgressCancel = cancelRegionOcr
-  dispatchProgress(DomainEvents.regionOcrStarted())
+  presentation.present(DomainEvents.regionOcrStarted())
   const operation = regionExecutionDispatcher.dispatchRegionExecution(request)
   regionOcrState.value = REGION_OCR_STATE.PROCESSING
   void operation.promise.then(handleRegionOcrOutcome, handleRegionOcrFailure).finally(() => {
-    dispatchProgress(DomainEvents.activityCompleted())
+    presentation.present(DomainEvents.activityCompleted())
     activeProgressCancel = null
   })
 }
@@ -841,7 +838,7 @@ function handleRegionComparisonOutcome(operation, result) {
   setRegionOcrIdle()
   if (result.status === 'ready') {
     const id = `developer-notification:${++developerNotificationOccurrenceId}`
-    dispatchIntent(DomainEvents.comparisonCompleted({ id, summary: analysis, result }))
+    presentation.present(DomainEvents.comparisonCompleted({ id, summary: analysis, result }))
   }
 }
 
@@ -855,7 +852,7 @@ function handleRegionComparisonFailure(operation, error) {
   }
   setRegionOcrIdle()
   const id = `developer-notification:${++developerNotificationOccurrenceId}`
-  dispatchIntent(DomainEvents.comparisonFailed({ id, error: error?.message }))
+  presentation.present(DomainEvents.comparisonFailed({ id, error: error?.message }))
 }
 
 function beginRegionSelection(target) {
@@ -888,7 +885,7 @@ function handleRegionOcrOutcome(result) {
   setRegionOcrIdle()
 
   if (result?.status === 'recognized' && !String(result?.data?.text || '').trim()) {
-    dispatchIntent(DomainEvents.regionOcrNoText())
+    presentation.present(DomainEvents.regionOcrNoText())
   } else if (result?.status === 'failed') {
     const errorCode = mapOcrError(result.error)
     if (errorCode === 'cancelled') return
@@ -897,7 +894,7 @@ function handleRegionOcrOutcome(result) {
       return
     }
 
-    dispatchIntent(DomainEvents.regionOcrFailed())
+    presentation.present(DomainEvents.regionOcrFailed())
   }
 }
 
@@ -924,9 +921,9 @@ function handleTranslatedPaneCurrentPageChange(pageNumber) {
 
 function handleTranslateVisiblePages() {
   activeProgressCancel = handleCancelTranslation
-  dispatchProgress(DomainEvents.translationStarted())
+  presentation.present(DomainEvents.translationStarted())
   translateVisiblePages().finally(() => {
-    dispatchProgress(DomainEvents.activityCompleted())
+    presentation.present(DomainEvents.activityCompleted())
     activeProgressCancel = null
   })
 }
@@ -937,26 +934,26 @@ function handleCancelTranslation() {
 
 async function handleExportTxt() {
   if (await exportTxt()) {
-    dispatchIntent(DomainEvents.exportCompleted({ format: 'txt' }))
+    presentation.present(DomainEvents.exportCompleted({ format: 'txt' }))
   } else if (exportError.value) {
-    dispatchIntent(DomainEvents.exportFailed({ error: exportError.value }))
+    presentation.present(DomainEvents.exportFailed({ error: exportError.value }))
   }
 }
 
 async function handleExportMarkdown() {
   if (await exportMarkdown()) {
-    dispatchIntent(DomainEvents.exportCompleted({ format: 'markdown' }))
+    presentation.present(DomainEvents.exportCompleted({ format: 'markdown' }))
   } else if (exportError.value) {
-    dispatchIntent(DomainEvents.exportFailed({ error: exportError.value }))
+    presentation.present(DomainEvents.exportFailed({ error: exportError.value }))
   }
 }
 
 async function handleExportHtml() {
   const canvasDataUrls = pdfViewerRef.value?.collectCanvasDataUrls?.() || new Map()
   if (await exportHtml(canvasDataUrls)) {
-    dispatchIntent(DomainEvents.exportCompleted({ format: 'html' }))
+    presentation.present(DomainEvents.exportCompleted({ format: 'html' }))
   } else if (exportError.value) {
-    dispatchIntent(DomainEvents.exportFailed({ error: exportError.value }))
+    presentation.present(DomainEvents.exportFailed({ error: exportError.value }))
   }
 }
 
