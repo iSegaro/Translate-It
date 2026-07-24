@@ -2,10 +2,15 @@ import { describe, expect, it } from 'vitest'
 
 import { DomainEvents } from './domainEvents.js'
 import { createPresentationHost } from './presentationHost.js'
+import { createPresentationSurfaces } from './presentationSurfaces.js'
+
+function createHost() {
+  return createPresentationHost({ surfaces: createPresentationSurfaces() })
+}
 
 describe('Presentation Host', () => {
   it('exposes frozen presentation entry point and state snapshots', () => {
-    const presentation = createPresentationHost()
+    const presentation = createHost()
 
     expect(Object.isFrozen(presentation)).toBe(true)
     expect(presentation.progressState.value.operation.running).toBe(false)
@@ -13,7 +18,7 @@ describe('Presentation Host', () => {
   })
 
   it('synchronizes progress state only when adapter version changes', () => {
-    const presentation = createPresentationHost()
+    const presentation = createHost()
     const initial = presentation.progressState.value
 
     presentation.present(DomainEvents.translationStarted())
@@ -26,7 +31,7 @@ describe('Presentation Host', () => {
   })
 
   it('synchronizes banner state for outcome results', () => {
-    const presentation = createPresentationHost()
+    const presentation = createHost()
 
     presentation.present(DomainEvents.comparisonFailed({ id: 'comparison:1', error: 'Failed' }))
 

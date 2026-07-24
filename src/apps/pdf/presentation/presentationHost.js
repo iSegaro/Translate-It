@@ -1,30 +1,24 @@
 import { shallowRef } from 'vue'
-import { toast } from 'vue-sonner'
 
-import { createBannerAdapter } from './adapters/bannerAdapter.js'
-import { createProgressAdapter } from './adapters/progressAdapter.js'
-import { createToastAdapter } from './adapters/toastAdapter.js'
 import { createPresentationFacade } from './presentationFacade.js'
 
 /**
  * Presentation Host — PDF presentation subsystem bootstrap.
  *
- * Owns surface adapters, facade wiring, and reactive adapter snapshots. PDF
- * features only emit Domain Results through `present` and read exposed state.
+ * Owns facade wiring and reactive surface snapshots. PDF features only emit
+ * Domain Results through `present` and read exposed state.
  *
  * @returns {{ present: (domainResult: object) => any, bannerState: import('vue').ShallowRef, progressState: import('vue').ShallowRef }}
  */
-export function createPresentationHost() {
-  const progressAdapter = createProgressAdapter()
-  const bannerAdapter = createBannerAdapter()
-  const progressState = shallowRef(progressAdapter.getState())
-  const bannerState = shallowRef(bannerAdapter.getState())
+export function createPresentationHost({ surfaces } = {}) {
+  const progressState = shallowRef(surfaces.progress.getState())
+  const bannerState = shallowRef(surfaces.banner.getState())
   let progressVersion = progressState.value.version
   let bannerVersion = bannerState.value.version
 
   function synchronize(intent) {
     if (intent.intent === 'activity') {
-      const state = progressAdapter.getState()
+      const state = surfaces.progress.getState()
       if (state.version === progressVersion) return
       progressVersion = state.version
       progressState.value = state
@@ -32,7 +26,7 @@ export function createPresentationHost() {
     }
 
     if (intent.intent === 'outcome') {
-      const state = bannerAdapter.getState()
+      const state = surfaces.banner.getState()
       if (state.version === bannerVersion) return
       bannerVersion = state.version
       bannerState.value = state
@@ -40,11 +34,7 @@ export function createPresentationHost() {
   }
 
   const facade = createPresentationFacade({
-    adapters: {
-      toast: createToastAdapter({ toast }),
-      banner: bannerAdapter,
-      'progress-bar': progressAdapter
-    },
+    adapters: surfaces.adapters,
     onPresented: synchronize
   })
 

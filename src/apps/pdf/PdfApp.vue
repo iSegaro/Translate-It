@@ -222,6 +222,7 @@ import { createPdfTransitionController } from './composables/createPdfTransition
 import { createPdfStatusBannerController } from './utils/pdfStatusBanner.js'
 import { DomainEvents } from './presentation/domainEvents.js'
 import { createPresentationHost } from './presentation/presentationHost.js'
+import { createPresentationSurfaces } from './presentation/presentationSurfaces.js'
 import { REGION_OCR_STATE } from './constants/regionOcrState.js'
 import { getTesseractLanguageCodeLabel } from '@/features/screen-capture/utils/ocrLanguageMap.js'
 import { mapOcrError } from '@/features/ocr/errors/ocrErrorMapper.js'
@@ -335,7 +336,9 @@ const regionOcrAvailable = computed(() => hasDocument.value && showOriginalPane.
 const supportedExecutionModes = Object.freeze([REGION_EXECUTION_TARGET.OCR])
 const executionMode = ref(REGION_EXECUTION_TARGET.OCR)
 const pdfStatusBannerController = createPdfStatusBannerController()
-const presentation = createPresentationHost()
+const presentation = createPresentationHost({
+  surfaces: createPresentationSurfaces()
+})
 
 const progressOperation = computed(() => {
   return presentation.progressState.value.operation
