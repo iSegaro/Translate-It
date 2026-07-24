@@ -570,10 +570,6 @@ export const useSettingsStore = defineStore('settings', () => {
 
       logger.info('[Import] Completed');
 
-      // Reload page to apply new settings
-      if (typeof window !== 'undefined') {
-        window.location.reload();
-      }
       return true;
     } catch (error) {
       if (ExtensionContextManager.isContextError(error)) {
