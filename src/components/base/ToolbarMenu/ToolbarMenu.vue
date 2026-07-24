@@ -15,25 +15,30 @@
       :close="close"
     />
 
-    <div
-      v-if="isOpen"
-      class="toolbar-menu__backdrop"
-      aria-hidden="true"
-      @click="close"
-    />
-
-    <div
-      v-if="isOpen"
-      ref="menuRef"
-      class="toolbar-menu__panel"
-      role="menu"
-      @keydown.escape="close"
+    <Teleport
+      :disabled="!isMobile"
+      to="body"
     >
-      <slot
-        :close="close"
-        :is-open="isOpen"
+      <div
+        v-if="isOpen"
+        class="toolbar-menu__backdrop"
+        aria-hidden="true"
+        @click="close"
       />
-    </div>
+
+      <div
+        v-if="isOpen"
+        ref="menuRef"
+        class="toolbar-menu__panel"
+        role="menu"
+        @keydown.escape="close"
+      >
+        <slot
+          :close="close"
+          :is-open="isOpen"
+        />
+      </div>
+    </Teleport>
   </div>
 </template>
 
@@ -74,7 +79,10 @@ const tracker = useResourceTracker('toolbar-menu')
 const rootRef = ref(null)
 const menuRef = ref(null)
 const isOpen = ref(false)
+const isMobile = ref(false)
 const triggerEl = ref(null)
+
+let mediaQuery = null
 
 const triggerAttrs = computed(() => ({
   'aria-expanded': isOpen.value,
@@ -112,9 +120,9 @@ function toggle() {
 
 function handleOutsidePointer(event) {
   if (!isOpen.value) return
-  if (rootRef.value && !rootRef.value.contains(event.target)) {
-    close()
-  }
+  if (rootRef.value?.contains(event.target)) return
+  if (menuRef.value?.contains(event.target)) return
+  close()
 }
 
 function handleEscKey(event) {
@@ -125,20 +133,30 @@ function handleEscKey(event) {
 
 function handleFocusOutside(event) {
   if (!isOpen.value) return
-  if (rootRef.value && !rootRef.value.contains(event.target)) {
-    close()
-  }
+  if (rootRef.value?.contains(event.target)) return
+  if (menuRef.value?.contains(event.target)) return
+  close()
 }
 
 defineExpose({ open, close, toggle, isOpen })
 
 onMounted(() => {
+  if (typeof window.matchMedia === 'function') {
+    mediaQuery = window.matchMedia('(max-width: 749px)')
+    isMobile.value = mediaQuery.matches
+    mediaQuery.addEventListener('change', (e) => { isMobile.value = e.matches })
+  }
+
   tracker.addEventListener(document, 'pointerdown', handleOutsidePointer, true)
   tracker.addEventListener(document, 'keydown', handleEscKey)
   tracker.addEventListener(document, 'focusin', handleFocusOutside)
 })
 
 onBeforeUnmount(() => {
+  if (mediaQuery) {
+    mediaQuery.removeEventListener('change', () => {})
+    mediaQuery = null
+  }
   if (isOpen.value) {
     isOpen.value = false
   }
