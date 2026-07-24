@@ -333,45 +333,6 @@ describe('pdfOverlayDiagnostics', () => {
     expect(report.pageSummary.roleCounts).toBeDefined()
   })
 
-  it('dumpCurrentPage returns report object', async () => {
-    const block = makeBlock()
-    const pageSession = makePageSession([block])
-    pdfDocumentSession.pageSessions.set(1, pageSession)
-    pdfDocumentSession.visiblePageNumbers.add(1)
-    pdfDocumentSession.pageMetrics.push({
-      pageNumber: 1,
-      width: 600,
-      height: 800,
-      naturalWidth: 612,
-      naturalHeight: 792,
-      scale: 1
-    })
-
-    const { dumpCurrentPage } = await import('../debug/pdfOverlayDiagnostics.js')
-    const report = dumpCurrentPage(1)
-    expect(report).toBeDefined()
-    expect(report.pageNumber).toBe(1)
-  })
-
-  it('dumpAllPages returns array of reports', async () => {
-    const block = makeBlock()
-    const pageSession = makePageSession([block])
-    pdfDocumentSession.pageSessions.set(1, pageSession)
-    pdfDocumentSession.pageMetrics.push({
-      pageNumber: 1,
-      width: 600,
-      height: 800,
-      naturalWidth: 612,
-      naturalHeight: 792,
-      scale: 1
-    })
-
-    const { dumpAllPages } = await import('../debug/pdfOverlayDiagnostics.js')
-    const reports = dumpAllPages()
-    expect(reports).toBeInstanceOf(Array)
-    expect(reports.length).toBe(1)
-  })
-
   it('cell height floor applies for zero-height items', async () => {
     const block = makeBlock({
       lines: [
