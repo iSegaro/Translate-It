@@ -1,7 +1,8 @@
 const FORMAT_LABELS = Object.freeze({
   txt: 'TXT',
   markdown: 'Markdown',
-  html: 'HTML'
+  html: 'HTML',
+  json: 'JSON'
 })
 
 function formatLabel(format) {

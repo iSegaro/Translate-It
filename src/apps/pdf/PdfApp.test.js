@@ -441,6 +441,7 @@ describe('PdfApp', () => {
     toast.info.mockClear()
     openTranslationMock.mockReset()
     openOptionsPageMock.mockReset()
+    downloadFileMock.mockReset()
     pdfDiagnosticsImportMock.mockReset()
     mockRegionExecutionDispatch.mockClear()
     regionComparisonRunnerMock.execute.mockReset()
@@ -671,6 +672,55 @@ describe('PdfApp', () => {
     await flushPromises()
 
     expect(wrapper.find('.pdf-status-banner').exists()).toBe(false)
+  })
+
+  it('completes progress once when cancelling regionComparison from the progress bar', async () => {
+    settingsStoreMock.settings.DEBUG_MODE = true
+    const deferred = createDeferred()
+    const cancel = vi.fn()
+    const { toast } = await import('vue-sonner')
+    regionComparisonRunnerMock.execute.mockImplementation(request => createMockOperation(deferred.promise, cancel, { target: 'region-comparison', request }))
+    const wrapper = mount(PdfApp)
+
+    await startRegionComparison(wrapper)
+    await wrapper.find('.pdf-progress-bar__cancel').trigger('click')
+    await flushPromises()
+
+    expect(cancel).toHaveBeenCalledOnce()
+    expect(activityCompletedMock).toHaveBeenCalledTimes(1)
+    expect(wrapper.findComponent({ name: 'PdfToolbar' }).props('regionComparisonState')).toMatchObject({ status: 'cancelled' })
+
+    deferred.resolve({
+      status: 'cancelled',
+      results: [],
+      summary: { totalCandidates: 1, completedCandidates: 0, totalElapsedMs: 0 }
+    })
+    await flushPromises()
+    await flushPromises()
+
+    expect(activityCompletedMock).toHaveBeenCalledTimes(1)
+    expect(wrapper.find('.pdf-status-banner').exists()).toBe(false)
+    expect(toast.success).not.toHaveBeenCalled()
+    expect(toast.error).not.toHaveBeenCalled()
+    expect(toast.warning).not.toHaveBeenCalled()
+  })
+
+  it('handles synchronous regionComparison startup failure as one terminal lifecycle', async () => {
+    vi.useFakeTimers()
+    settingsStoreMock.settings.DEBUG_MODE = true
+    regionComparisonRunnerMock.execute.mockImplementation(() => {
+      throw new Error('OCR worker unavailable')
+    })
+    const wrapper = mount(PdfApp)
+
+    await startRegionComparison(wrapper)
+    await vi.advanceTimersByTimeAsync(200)
+
+    expect(wrapper.findComponent({ name: 'PdfToolbar' }).props('regionComparisonState')).toMatchObject({ status: 'failed' })
+    expect(wrapper.find('.pdf-status-banner__title').text()).toBe('Region Comparison failed')
+    expect(wrapper.find('.pdf-status-banner__message').text()).toBe('OCR worker unavailable')
+    expect(wrapper.find('.pdf-progress-bar').exists()).toBe(false)
+    expect(activityCompletedMock).toHaveBeenCalledTimes(1)
   })
 
   it('replaces a dismissed developer notification on the next regionComparison lifecycle', async () => {
@@ -905,10 +955,35 @@ describe('PdfApp', () => {
       'region-comparison-artifact.json',
       'application/json'
     )
+    const { toast } = await import('vue-sonner')
+    expect(toast.success).toHaveBeenCalledWith('JSON exported successfully')
     runRegionComparison.mockRestore()
   })
 
-  it('preserves completed regionComparison results after cancellation', async () => {
+  it('reports regionComparison artifact download failure through the export contract', async () => {
+    downloadFileMock.mockImplementation(() => {
+      throw new Error('Disk full')
+    })
+    const region = createPdfRegion({ pageNumber: 1, left: 1, top: 4, right: 3, bottom: 2 })
+    const runRegionComparison = vi.spyOn(PdfDeveloperApi.prototype, 'runRegionComparison')
+      .mockReturnValue(createMockOperation(Promise.resolve({
+        status: 'ready',
+        candidates: Object.freeze([]),
+        results: Object.freeze([]),
+        summary: Object.freeze({ totalCandidates: 0, completedCandidates: 0, startedAt: 0, completedAt: 0, totalElapsedMs: 0 })
+      }), vi.fn(), { target: 'region-comparison', request: { region } }))
+    const wrapper = mount(PdfApp)
+    await startRegionComparison(wrapper, region)
+    await vi.waitFor(() => expect(wrapper.findComponent({ name: 'PdfToolbar' }).props('canExportRegionComparisonArtifact')).toBe(true))
+
+    wrapper.findComponent({ name: 'PdfToolbar' }).vm.$emit('export-region-comparison-artifact')
+
+    const { toast } = await import('vue-sonner')
+    expect(toast.error).toHaveBeenCalledWith('Disk full')
+    runRegionComparison.mockRestore()
+  })
+
+  it('ignores a late regionComparison cancellation result', async () => {
     const deferred = createDeferred()
     const cancel = vi.fn()
     const runRegionComparison = vi.spyOn(PdfDeveloperApi.prototype, 'runRegionComparison')
@@ -927,7 +1002,7 @@ describe('PdfApp', () => {
 
     toolbar.vm.$emit('cancel-region-comparison')
     expect(cancel).toHaveBeenCalledOnce()
-    await vi.waitFor(() => expect(toolbar.props('regionComparisonState')).toMatchObject({ status: 'cancelling' }))
+    await vi.waitFor(() => expect(toolbar.props('regionComparisonState')).toMatchObject({ status: 'cancelled' }))
 
     deferred.resolve({
       status: 'cancelled',
@@ -938,8 +1013,8 @@ describe('PdfApp', () => {
 
     await vi.waitFor(() => expect(toolbar.props('regionComparisonState')).toMatchObject({
       status: 'cancelled',
-      progress: { totalCandidates: 2, completedCandidates: 1 },
-      results: [{ candidateId: 'scale-1' }]
+      progress: { totalCandidates: 0, completedCandidates: 0 },
+      results: []
     }))
     runRegionComparison.mockRestore()
   })

@@ -18,6 +18,12 @@ describe('Presentation Presenter', () => {
       expect(intent.message).toBe('Markdown exported successfully')
     })
 
+    it('presents JSON artifact export acknowledgement centrally', () => {
+      const intent = present({ name: 'export-completed', format: 'json' })
+
+      expect(intent.message).toBe('JSON exported successfully')
+    })
+
     it('presents export-failed as error', () => {
       const intent = present({ name: 'export-failed', error: 'Disk full' })
 

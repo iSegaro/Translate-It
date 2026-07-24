@@ -346,6 +346,7 @@ const progressOperation = computed(() => {
 
 let activeProgressCancel = null
 let cancelActiveRegionOcr = null
+let cancelActiveRegionComparison = null
 
 function handleProgressCancel() {
   const completionHandled = activeProgressCancel?.() === true
@@ -703,10 +704,7 @@ function handleRegionSelectionComplete(region) {
   exitRegionSelection()
 
   if (target === REGION_EXECUTION_TARGET.REGION_COMPARISON) {
-    activeProgressCancel = handleCancelRegionComparison
     presentation.present(DomainEvents.comparisonStarted())
-    const operation = pdfDeveloperApi.runRegionComparison({ region })
-    activeRegionComparisonOperation = operation
     completedRegionComparisonResult = null
     completedRegionComparisonRegion = null
     regionComparisonState.value = {
@@ -721,12 +719,55 @@ function handleRegionSelectionComplete(region) {
       summary: null
     }
     regionOcrState.value = REGION_OCR_STATE.PROCESSING
+    let operation
+    try {
+      operation = pdfDeveloperApi.runRegionComparison({ region })
+    } catch (error) {
+      regionComparisonState.value = {
+        ...regionComparisonState.value,
+        status: 'failed'
+      }
+      setRegionOcrIdle()
+      activeRegionComparisonOperation = null
+      cancelActiveRegionComparison = null
+      activeProgressCancel = null
+      const id = `developer-notification:${++developerNotificationOccurrenceId}`
+      presentation.present(DomainEvents.comparisonFailed({ id, error: error?.message }))
+      presentation.present(DomainEvents.activityCompleted())
+      return
+    }
+
+    let completionHandled = false
+    const cancelOperation = () => {
+      if (completionHandled || activeRegionComparisonOperation !== operation) return true
+
+      completionHandled = true
+      activeRegionComparisonOperation = null
+      regionComparisonState.value = {
+        ...regionComparisonState.value,
+        status: 'cancelled'
+      }
+      operation.cancel()
+      setRegionOcrIdle()
+      presentation.present(DomainEvents.activityCompleted())
+      if (cancelActiveRegionComparison === cancelOperation) cancelActiveRegionComparison = null
+      if (activeProgressCancel === cancelOperation) activeProgressCancel = null
+      return true
+    }
+
+    activeRegionComparisonOperation = operation
+    cancelActiveRegionComparison = cancelOperation
+    activeProgressCancel = cancelOperation
     void operation.promise.then(
       result => handleRegionComparisonOutcome(operation, result),
       error => handleRegionComparisonFailure(operation, error)
     ).finally(() => {
-      presentation.present(DomainEvents.activityCompleted())
-      activeProgressCancel = null
+      if (!completionHandled && activeProgressCancel === cancelOperation) {
+        completionHandled = true
+        presentation.present(DomainEvents.activityCompleted())
+      }
+      if (cancelActiveRegionComparison === cancelOperation) cancelActiveRegionComparison = null
+      if (activeProgressCancel === cancelOperation) activeProgressCancel = null
     })
     return
   }
@@ -766,22 +807,21 @@ function handleRequestRegionComparison() {
 }
 
 function handleCancelRegionComparison() {
-  if (!activeRegionComparisonOperation) return
-
-  regionComparisonState.value = {
-    ...regionComparisonState.value,
-    status: 'cancelling'
-  }
-  activeRegionComparisonOperation.cancel()
+  return cancelActiveRegionComparison?.() === true
 }
 
 function handleExportRegionComparisonArtifact() {
   if (!canExportRegionComparisonArtifact.value || !completedRegionComparisonResult || !completedRegionComparisonRegion) return
 
-  const artifact = regionComparisonArtifactWriter.write(completedRegionComparisonResult, {
-    region: completedRegionComparisonRegion
-  })
-  downloadFile(JSON.stringify(artifact, null, 2), 'region-comparison-artifact.json', 'application/json')
+  try {
+    const artifact = regionComparisonArtifactWriter.write(completedRegionComparisonResult, {
+      region: completedRegionComparisonRegion
+    })
+    downloadFile(JSON.stringify(artifact, null, 2), 'region-comparison-artifact.json', 'application/json')
+    presentation.present(DomainEvents.exportCompleted({ format: 'json' }))
+  } catch (error) {
+    presentation.present(DomainEvents.exportFailed({ error: error?.message }))
+  }
 }
 
 function handleRegionComparisonProgress(progress) {
