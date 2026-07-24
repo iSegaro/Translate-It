@@ -69,6 +69,7 @@ export function usePdfOcr({ onOcrComplete, onOcrStart, onOcrProgress, onOcrError
       const results = await processor.processPages(pageNumbers, {
         language: ocrLanguage.value,
         onProgress: ({ current, total, pageNumber }) => {
+          if (runId !== activeRunId) return
           onOcrProgress?.({ current, total, pageNumber })
         }
       })

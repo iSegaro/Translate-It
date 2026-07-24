@@ -1391,19 +1391,15 @@ describe('PdfApp', () => {
     expect(openTranslationMock).not.toHaveBeenCalled()
   })
 
-  it('suppresses late Page OCR callbacks after PDF replacement', async () => {
+  it('cancels Page OCR before loading a replacement PDF', async () => {
     const wrapper = mount(PdfApp)
     await flushPromises()
 
     mockPdfOcrOptions.onOcrStart()
     wrapper.findComponent({ name: 'PdfDropzone' }).vm.$emit('file-selected', { name: 'replacement.pdf' })
     await flushPromises()
-    mockPdfOcrOptions.onOcrComplete({ pageNumbers: [2] })
-    mockPdfOcrOptions.onOcrError('ocr-failed', { pageNumbers: [2] })
 
     expect(mockPdfOcr.cancelOcr).toHaveBeenCalledOnce()
-    expect(mockViewerController.refreshTranslatedPageBlocks).not.toHaveBeenCalled()
-    expect(mockPdfOcr.refreshOcrRecommendations).not.toHaveBeenCalled()
   })
 
   it('cancels Region Comparison and discards its artifact on PDF replacement', async () => {
@@ -1429,7 +1425,7 @@ describe('PdfApp', () => {
     expect(downloadFileMock).not.toHaveBeenCalled()
   })
 
-  it('invalidates stale Page OCR callbacks across rapid PDF replacements', async () => {
+  it('cancels Page OCR across rapid PDF replacements', async () => {
     const wrapper = mount(PdfApp)
     await flushPromises()
 
@@ -1438,11 +1434,9 @@ describe('PdfApp', () => {
     dropzone.vm.$emit('file-selected', { name: 'replacement-a.pdf' })
     dropzone.vm.$emit('file-selected', { name: 'replacement-b.pdf' })
     await flushPromises()
-    mockPdfOcrOptions.onOcrComplete({ pageNumbers: [1] })
 
     expect(mockPdfOcr.cancelOcr).toHaveBeenCalledTimes(2)
     expect(mockViewerController.loadPdfFile).toHaveBeenCalledTimes(2)
-    expect(mockViewerController.refreshTranslatedPageBlocks).not.toHaveBeenCalled()
   })
 
   it('keeps completed Region OCR behavior through document replacement', async () => {

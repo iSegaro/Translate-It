@@ -346,7 +346,6 @@ let activeProgressCancel = null
 let cancelActiveRegionOcr = null
 let cancelActiveRegionComparison = null
 let cancelActivePageTranslation = null
-let pageOcrCallbacksInvalidated = false
 
 function handleProgressCancel() {
   const completionHandled = activeProgressCancel?.() === true
@@ -363,22 +362,18 @@ const {
   cancelOcr
 } = usePdfOcr({
   onOcrStart: () => {
-    pageOcrCallbacksInvalidated = false
     presentation.present(DomainEvents.ocrStarted())
     activeProgressCancel = cancelOcr
   },
   onOcrComplete: ({ pageNumbers } = {}) => {
-    if (pageOcrCallbacksInvalidated) return
     presentation.present(DomainEvents.activityCompleted())
     activeProgressCancel = null
     refreshOcrPageData(pageNumbers)
   },
   onOcrProgress: ({ current, total } = {}) => {
-    if (pageOcrCallbacksInvalidated) return
     presentation.present(DomainEvents.ocrProgressUpdated({ current, total }))
   },
   onOcrError: (errorCode, { pageNumbers } = {}) => {
-    if (pageOcrCallbacksInvalidated) return
     presentation.present(DomainEvents.activityCompleted())
     activeProgressCancel = null
     presentation.present(errorCode === 'model-not-installed'
@@ -627,7 +622,6 @@ function resetPresentationState() {
 }
 
 function invalidateDocumentOperations() {
-  pageOcrCallbacksInvalidated = true
   cancelOcr()
   cancelRegionOcr()
   cancelActiveRegionComparison?.()

@@ -235,6 +235,85 @@ describe('usePdfOcr', () => {
     wrapper.unmount()
   })
 
+  it('ignores stale progress after cancellation', async () => {
+    const onOcrProgress = vi.fn()
+    const { api, wrapper } = mountComposable({ onOcrProgress })
+    let resolve
+    let emitProgress
+    mockProcessPages = vi.fn((_, options) => new Promise(resolvePromise => {
+      resolve = resolvePromise
+      emitProgress = options.onProgress
+    }))
+    mockPdfDocumentSession.pageSessions.set(1, createScannedPageSession(1))
+    mockPdfDocumentSession.visiblePageNumbers.add(1)
+    api.refreshOcrRecommendations()
+
+    const run = api.requestOcr()
+    api.cancelOcr()
+    emitProgress({ current: 1, total: 1, pageNumber: 1 })
+    resolve([])
+    await run
+
+    expect(onOcrProgress).not.toHaveBeenCalled()
+    wrapper.unmount()
+  })
+
+  it('ignores stale completion after cancellation', async () => {
+    const onOcrComplete = vi.fn()
+    const { api, wrapper } = mountComposable({ onOcrComplete })
+    let resolve
+    mockProcessPages = vi.fn(() => new Promise(resolvePromise => { resolve = resolvePromise }))
+    mockPdfDocumentSession.pageSessions.set(1, createScannedPageSession(1))
+    mockPdfDocumentSession.visiblePageNumbers.add(1)
+    api.refreshOcrRecommendations()
+
+    const run = api.requestOcr()
+    api.cancelOcr()
+    resolve([])
+    await run
+
+    expect(onOcrComplete).not.toHaveBeenCalled()
+    wrapper.unmount()
+  })
+
+  it('ignores stale errors after cancellation', async () => {
+    const onOcrError = vi.fn()
+    const { api, wrapper } = mountComposable({ onOcrError })
+    let reject
+    mockProcessPages = vi.fn(() => new Promise((_, rejectPromise) => { reject = rejectPromise }))
+    mockPdfDocumentSession.pageSessions.set(1, createScannedPageSession(1))
+    mockPdfDocumentSession.visiblePageNumbers.add(1)
+    api.refreshOcrRecommendations()
+
+    const run = api.requestOcr()
+    api.cancelOcr()
+    reject(new Error('late OCR failure'))
+    await run
+
+    expect(onOcrError).not.toHaveBeenCalled()
+    wrapper.unmount()
+  })
+
+  it('prevents an old run from emitting after a new run starts', async () => {
+    const onOcrComplete = vi.fn()
+    const { api, wrapper } = mountComposable({ onOcrComplete })
+    const deferredRuns = []
+    mockProcessPages = vi.fn(() => new Promise(resolve => { deferredRuns.push(resolve) }))
+    mockPdfDocumentSession.pageSessions.set(1, createScannedPageSession(1))
+    mockPdfDocumentSession.visiblePageNumbers.add(1)
+    api.refreshOcrRecommendations()
+
+    const firstRun = api.requestOcr()
+    api.cancelOcr()
+    const secondRun = api.requestOcr()
+    deferredRuns[0]([])
+    deferredRuns[1]([])
+    await Promise.all([firstRun, secondRun])
+
+    expect(onOcrComplete).toHaveBeenCalledTimes(1)
+    wrapper.unmount()
+  })
+
   it('emits only the error terminal callback for failed batches', async () => {
     const onOcrComplete = vi.fn()
     const onOcrError = vi.fn()
