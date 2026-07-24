@@ -110,9 +110,31 @@ export function present(domainResult) {
     case 'translation-partial':
       return {
         intent: 'outcome',
-        partialTranslation: {
+        translationOutcome: {
+          id: `translation-partial:${domainResult.occurrenceId || 0}`,
+          variant: 'warning',
+          title: 'Partial translation',
+          message: domainResult.error || 'Some pages could not be translated.',
           occurrenceId: domainResult.occurrenceId
         }
+      }
+
+    case 'translation-failed':
+      return {
+        intent: 'outcome',
+        translationOutcome: {
+          id: `translation-failed:${domainResult.occurrenceId || 0}`,
+          variant: 'error',
+          title: 'Translation failed',
+          message: domainResult.error || 'Translation failed. Please try again.',
+          occurrenceId: domainResult.occurrenceId
+        }
+      }
+
+    case 'translation-outcome-cleared':
+      return {
+        intent: 'outcome',
+        clearTranslationOutcome: true
       }
 
     // ── Activity ──

@@ -414,19 +414,18 @@ export function usePdfViewerController() {
         sourceLanguage: pdfSourceLanguage.value,
         targetLanguage: pdfTargetLanguage.value
       })
-      error.value = translationSummary.value?.error || ''
       await saveTranslationsToCache()
       pdfHistoryManager.updateAfterTranslation(pdfDocumentSession).catch(() => {})
       return true
     } catch (translateError) {
       logger.error('Failed to translate visible PDF blocks:', translateError)
-      error.value = translateError?.message || 'Failed to translate visible PDF blocks.'
       translationSummary.value = {
         status: 'error',
         translatedCount: 0,
         failedCount: 0,
         totalCount: 0,
-        translationOccurrenceId: 0
+        translationOccurrenceId: 0,
+        error: translateError?.message || 'Failed to translate visible PDF blocks.'
       }
       return false
     } finally {

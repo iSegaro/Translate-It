@@ -905,7 +905,7 @@ describe('usePdfViewerController error lifecycle', () => {
     expect(controller.isTranslating.value).toBe(false)
   })
 
-  it('sets error when translation fails after clearing stale error', async () => {
+  it('keeps translation failure on translationSummary after clearing stale error', async () => {
     const block = createBlock()
     const { controller } = await loadControllerWithCacheEntry(null, block)
 
@@ -918,10 +918,14 @@ describe('usePdfViewerController error lifecycle', () => {
 
     await controller.translateVisiblePages()
 
-    expect(controller.error.value).toBe('Translation failed')
+    expect(controller.error.value).toBe('')
+    expect(controller.translationSummary.value).toMatchObject({
+      status: 'error',
+      error: 'Translation failed'
+    })
   })
 
-  it('sets error from partial translation summary', async () => {
+  it('keeps partial translation error on translationSummary', async () => {
     const block = createBlock()
     const { controller } = await loadControllerWithCacheEntry(null, block)
 
@@ -938,7 +942,8 @@ describe('usePdfViewerController error lifecycle', () => {
 
     await controller.translateVisiblePages()
 
-    expect(controller.error.value).toBe('Provider failed: quota exceeded')
+    expect(controller.error.value).toBe('')
+    expect(controller.translationSummary.value.error).toBe('Provider failed: quota exceeded')
   })
 
   it('clears previous error on successful translation run', async () => {
@@ -959,7 +964,8 @@ describe('usePdfViewerController error lifecycle', () => {
     session.getPageLayout.mockReturnValue(null)
 
     await controller.translateVisiblePages()
-    expect(controller.error.value).toBe('Previous failure')
+    expect(controller.error.value).toBe('')
+    expect(controller.translationSummary.value.error).toBe('Previous failure')
 
     await controller.translateVisiblePages()
     expect(controller.error.value).toBe('')

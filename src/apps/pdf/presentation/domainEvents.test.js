@@ -23,9 +23,13 @@ describe('DomainEvents', () => {
     expect(DomainEvents.comparisonFailed({ id: '2', error: 'Failed' })).toEqual({
       name: 'comparison-failed', id: '2', error: 'Failed'
     })
-    expect(DomainEvents.translationPartial({ occurrenceId: 3 })).toEqual({
-      name: 'translation-partial', occurrenceId: 3
+    expect(DomainEvents.translationPartial({ occurrenceId: 3, error: 'Partial failure' })).toEqual({
+      name: 'translation-partial', occurrenceId: 3, error: 'Partial failure'
     })
+    expect(DomainEvents.translationFailed({ occurrenceId: 4, error: 'Failed' })).toEqual({
+      name: 'translation-failed', occurrenceId: 4, error: 'Failed'
+    })
+    expect(DomainEvents.translationOutcomeCleared()).toEqual({ name: 'translation-outcome-cleared' })
   })
 
   it('creates activity results', () => {

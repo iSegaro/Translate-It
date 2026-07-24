@@ -347,6 +347,7 @@ const progressOperation = computed(() => {
 let activeProgressCancel = null
 let cancelActiveRegionOcr = null
 let cancelActiveRegionComparison = null
+let cancelActivePageTranslation = null
 
 function handleProgressCancel() {
   const completionHandled = activeProgressCancel?.() === true
@@ -585,8 +586,7 @@ const pdfStatusBanner = computed(() => pdfStatusBannerController.build({
   error: error.value,
   isLoading: isLoading.value,
   developerNotification: isDebugMode.value ? presentation.bannerState.value.developerNotification : null,
-  translationStatus: translationSummary.value?.status ?? 'idle',
-  translationOccurrenceId: translationSummary.value?.translationOccurrenceId ?? 0
+  translationNotification: presentation.bannerState.value.translationNotification
 }))
 
 const isPdfStatusBannerVisible = computed(() => {
@@ -938,16 +938,49 @@ function handleTranslatedPaneCurrentPageChange(pageNumber) {
 }
 
 function handleTranslateVisiblePages() {
-  activeProgressCancel = handleCancelTranslation
+  presentation.present(DomainEvents.translationOutcomeCleared())
   presentation.present(DomainEvents.translationStarted())
-  translateVisiblePages().finally(() => {
+  let completionHandled = false
+  const cancelOperation = () => {
+    if (completionHandled || activeProgressCancel !== cancelOperation) return true
+
+    completionHandled = true
+    void cancelTranslation()
     presentation.present(DomainEvents.activityCompleted())
-    activeProgressCancel = null
+    if (cancelActivePageTranslation === cancelOperation) cancelActivePageTranslation = null
+    if (activeProgressCancel === cancelOperation) activeProgressCancel = null
+    return true
+  }
+
+  cancelActivePageTranslation = cancelOperation
+  activeProgressCancel = cancelOperation
+  void translateVisiblePages().then(() => {
+    if (completionHandled || activeProgressCancel !== cancelOperation) return
+
+    const summary = translationSummary.value
+    if (summary?.status === 'partial') {
+      presentation.present(DomainEvents.translationPartial({
+        occurrenceId: summary.translationOccurrenceId,
+        error: summary.error
+      }))
+    } else if (summary?.status === 'error') {
+      presentation.present(DomainEvents.translationFailed({
+        occurrenceId: summary.translationOccurrenceId,
+        error: summary.error
+      }))
+    }
+  }).finally(() => {
+    if (!completionHandled && activeProgressCancel === cancelOperation) {
+      completionHandled = true
+      presentation.present(DomainEvents.activityCompleted())
+    }
+    if (cancelActivePageTranslation === cancelOperation) cancelActivePageTranslation = null
+    if (activeProgressCancel === cancelOperation) activeProgressCancel = null
   })
 }
 
 function handleCancelTranslation() {
-  void cancelTranslation()
+  return cancelActivePageTranslation?.() === true
 }
 
 async function handleExportTxt() {

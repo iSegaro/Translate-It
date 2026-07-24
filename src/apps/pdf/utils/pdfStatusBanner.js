@@ -31,11 +31,9 @@ export function createPdfStatusBannerController() {
     error = '',
     isLoading = false,
     developerNotification = null,
-    translationStatus = 'idle',
-    translationOccurrenceId = 0
+    translationNotification = null
   } = {}) {
     const loadingMessage = 'Loading PDF and rebuilding visible pages.'
-    const partialMessage = 'Partial translation available. Not all blocks are translated yet.'
 
     const errorMessage = buildMessageFromError(error)
     const errorKind = errorMessage ? 'error' : ''
@@ -50,8 +48,12 @@ export function createPdfStatusBannerController() {
       return { id: 'opening', visible: true, variant: 'info', title: 'Opening PDF', message: loadingMessage, dismissible: false }
     }
 
-    if (translationStatus === 'partial') {
-      return { id: `partial-export:${translationOccurrenceId}`, visible: true, variant: 'warning', title: 'Partial translation', message: partialMessage, dismissible: true }
+    if (translationNotification?.id) {
+      return {
+        ...translationNotification,
+        visible: true,
+        dismissible: true
+      }
     }
 
     if (developerNotification?.id) {

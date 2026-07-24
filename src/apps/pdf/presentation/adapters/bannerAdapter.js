@@ -19,7 +19,7 @@ function buildNotification(notification, comparison) {
 /**
  * Banner Adapter — stores outcome presentation state.
  *
- * Receives { intent: 'outcome', notification?, comparison?, partialTranslation? }
+ * Receives { intent: 'outcome', notification?, comparison?, translationOutcome? }
  * from Presentation Dispatcher. Builds Banner-specific comparison bodies and
  * stores latest outcome state for each field.
  *
@@ -33,8 +33,7 @@ export function createBannerAdapter() {
   const state = {
     version: 0,
     developerNotification: null,
-    translationStatus: 'idle',
-    translationOccurrenceId: 0
+    translationNotification: null
   }
 
   function notificationChanged(a, b) {
@@ -57,15 +56,19 @@ export function createBannerAdapter() {
       return
     }
 
-    if (intent.partialTranslation) {
-      if (
-        state.translationStatus === 'partial' &&
-        state.translationOccurrenceId === intent.partialTranslation.occurrenceId
-      ) return
-      state.translationStatus = 'partial'
-      state.translationOccurrenceId = intent.partialTranslation.occurrenceId
+    if (intent.translationOutcome) {
+      if (notificationChanged(state.translationNotification, intent.translationOutcome)) {
+        state.translationNotification = intent.translationOutcome
+      } else {
+        return
+      }
       state.version++
       return
+    }
+
+    if (intent.clearTranslationOutcome && state.translationNotification !== null) {
+      state.translationNotification = null
+      state.version++
     }
   }
 
@@ -76,12 +79,10 @@ export function createBannerAdapter() {
   function reset() {
     if (
       state.developerNotification === null &&
-      state.translationStatus === 'idle' &&
-      state.translationOccurrenceId === 0
+      state.translationNotification === null
     ) return
     state.developerNotification = null
-    state.translationStatus = 'idle'
-    state.translationOccurrenceId = 0
+    state.translationNotification = null
     state.version++
   }
 

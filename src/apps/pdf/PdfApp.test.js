@@ -48,6 +48,8 @@ const regionComparisonRunnerMock = vi.hoisted(() => ({
   options: null
 }))
 const activityCompletedMock = vi.hoisted(() => vi.fn(() => ({ name: 'activity-completed' })))
+const translationPartialMock = vi.hoisted(() => vi.fn())
+const translationFailedMock = vi.hoisted(() => vi.fn())
 
 function createMockOperation(promise, cancel = vi.fn(), context = { target: 'ocr' }) {
   return Object.freeze({
@@ -89,7 +91,15 @@ vi.mock('./presentation/domainEvents.js', async (importOriginal) => {
     ...actual,
     DomainEvents: Object.freeze({
       ...actual.DomainEvents,
-      activityCompleted: activityCompletedMock
+      activityCompleted: activityCompletedMock,
+      translationPartial: (payload) => {
+        translationPartialMock(payload)
+        return actual.DomainEvents.translationPartial(payload)
+      },
+      translationFailed: (payload) => {
+        translationFailedMock(payload)
+        return actual.DomainEvents.translationFailed(payload)
+      }
     })
   }
 })
@@ -358,7 +368,7 @@ function createMocks({
     session: sessionAsRef ? ref(sessionMock) : sessionMock,
     loadPdfFile: vi.fn().mockResolvedValue(true),
     recomputeLayout: vi.fn().mockResolvedValue(undefined),
-    translateVisiblePages: vi.fn(),
+    translateVisiblePages: vi.fn().mockResolvedValue(false),
     hydrateVisiblePageBlocks: vi.fn().mockResolvedValue(false),
     refreshTranslatedPageBlocks: vi.fn(),
     cancelTranslation: vi.fn(),
@@ -447,6 +457,8 @@ describe('PdfApp', () => {
     regionComparisonRunnerMock.execute.mockReset()
     regionComparisonRunnerMock.options = null
     activityCompletedMock.mockClear()
+    translationPartialMock.mockClear()
+    translationFailedMock.mockClear()
     settingsStoreMock.settings.DEBUG_MODE = false
     settingsStoreMock.settings.OCR_DEFAULT_LANG = 'eng'
     settingsStoreMock.settings.OCR_PREFERRED_ACTION = 'region'
@@ -584,6 +596,167 @@ describe('PdfApp', () => {
     expect(wrapper.find('.pdf-status-banner').exists()).toBe(false)
     expect(wrapper.find('.pdf-app__status-row').exists()).toBe(false)
     expect(wrapper.find('.pdf-viewer-layout-stub').exists()).toBe(true)
+  })
+
+  it('completes successful page translation activity once', async () => {
+    const deferred = createDeferred()
+    createMocks()
+    mockViewerController.translateVisiblePages.mockImplementation(() => deferred.promise)
+    const wrapper = mount(PdfApp)
+
+    wrapper.findComponent({ name: 'PdfToolbar' }).vm.$emit('translate-visible')
+    deferred.resolve(true)
+    await flushPromises()
+    await flushPromises()
+
+    expect(activityCompletedMock).toHaveBeenCalledTimes(1)
+    expect(translationPartialMock).not.toHaveBeenCalled()
+    expect(translationFailedMock).not.toHaveBeenCalled()
+  })
+
+  it('presents partial page translation through its canonical event', async () => {
+    createMocks()
+    mockViewerController.translationSummary.value = {
+      status: 'partial',
+      translatedCount: 1,
+      failedCount: 1,
+      totalCount: 2,
+      translationOccurrenceId: 7,
+      error: 'Provider failed'
+    }
+    const wrapper = mount(PdfApp)
+
+    wrapper.findComponent({ name: 'PdfToolbar' }).vm.$emit('translate-visible')
+    await flushPromises()
+    await flushPromises()
+
+    expect(translationPartialMock).toHaveBeenCalledWith(expect.objectContaining({ occurrenceId: 7, error: 'Provider failed' }))
+    expect(wrapper.find('.pdf-status-banner__title').text()).toBe('Partial translation')
+    expect(wrapper.find('.pdf-status-banner__message').text()).toBe('Provider failed')
+  })
+
+  it('presents failed page translation through its canonical event', async () => {
+    createMocks()
+    mockViewerController.translationSummary.value = {
+      status: 'error',
+      translatedCount: 0,
+      failedCount: 0,
+      totalCount: 0,
+      translationOccurrenceId: 8,
+      error: 'Translation request failed'
+    }
+    const wrapper = mount(PdfApp)
+
+    wrapper.findComponent({ name: 'PdfToolbar' }).vm.$emit('translate-visible')
+    await flushPromises()
+    await flushPromises()
+
+    expect(translationFailedMock).toHaveBeenCalledWith(expect.objectContaining({ occurrenceId: 8, error: 'Translation request failed' }))
+    expect(wrapper.find('.pdf-status-banner__title').text()).toBe('Translation failed')
+    expect(wrapper.find('.pdf-status-banner__message').text()).toBe('Translation request failed')
+  })
+
+  it('clears a partial page translation banner on the next successful run', async () => {
+    createMocks()
+    mockViewerController.translationSummary.value = {
+      status: 'partial', translationOccurrenceId: 11, error: 'Provider failed'
+    }
+    const wrapper = mount(PdfApp)
+
+    wrapper.findComponent({ name: 'PdfToolbar' }).vm.$emit('translate-visible')
+    await flushPromises()
+    await flushPromises()
+    expect(wrapper.find('.pdf-status-banner').exists()).toBe(true)
+
+    mockViewerController.translationSummary.value = {
+      status: 'translated', translationOccurrenceId: 12, error: ''
+    }
+    wrapper.findComponent({ name: 'PdfToolbar' }).vm.$emit('translate-visible')
+    await flushPromises()
+    await flushPromises()
+
+    expect(wrapper.find('.pdf-status-banner').exists()).toBe(false)
+  })
+
+  it('clears a failed page translation banner on a no-work run', async () => {
+    createMocks()
+    mockViewerController.translationSummary.value = {
+      status: 'error', translationOccurrenceId: 13, error: 'Request failed'
+    }
+    const wrapper = mount(PdfApp)
+
+    wrapper.findComponent({ name: 'PdfToolbar' }).vm.$emit('translate-visible')
+    await flushPromises()
+    await flushPromises()
+    expect(wrapper.find('.pdf-status-banner').exists()).toBe(true)
+
+    mockViewerController.translationSummary.value = {
+      status: 'idle', translationOccurrenceId: 14, error: ''
+    }
+    wrapper.findComponent({ name: 'PdfToolbar' }).vm.$emit('translate-visible')
+    await flushPromises()
+    await flushPromises()
+
+    expect(wrapper.find('.pdf-status-banner').exists()).toBe(false)
+  })
+
+  it('ignores stale cancelled page translation completion after a newer outcome', async () => {
+    const first = createDeferred()
+    const second = createDeferred()
+    createMocks()
+    mockViewerController.translateVisiblePages
+      .mockImplementationOnce(() => first.promise)
+      .mockImplementationOnce(() => second.promise)
+    const wrapper = mount(PdfApp)
+
+    wrapper.findComponent({ name: 'PdfToolbar' }).vm.$emit('translate-visible')
+    await flushPromises()
+    wrapper.findComponent({ name: 'PdfToolbar' }).vm.$emit('translate-visible')
+    mockViewerController.translationSummary.value = {
+      status: 'partial', translationOccurrenceId: 15, error: 'Newer failure'
+    }
+    second.resolve(true)
+    await flushPromises()
+    await flushPromises()
+    expect(wrapper.find('.pdf-status-banner__message').text()).toBe('Newer failure')
+
+    mockViewerController.translationSummary.value = {
+      status: 'cancelled', translationOccurrenceId: 16, error: ''
+    }
+    first.resolve(true)
+    await flushPromises()
+    await flushPromises()
+
+    expect(wrapper.find('.pdf-status-banner__message').text()).toBe('Newer failure')
+  })
+
+  it('completes page translation once when cancelled from the progress bar', async () => {
+    const deferred = createDeferred()
+    createMocks()
+    mockViewerController.translateVisiblePages.mockImplementation(() => deferred.promise)
+    const wrapper = mount(PdfApp)
+
+    wrapper.findComponent({ name: 'PdfToolbar' }).vm.$emit('translate-visible')
+    await flushPromises()
+    await wrapper.find('.pdf-progress-bar__cancel').trigger('click')
+    mockViewerController.translationSummary.value = { status: 'partial', translationOccurrenceId: 9, error: 'late failure' }
+    deferred.resolve(true)
+    await flushPromises()
+    await flushPromises()
+
+    expect(mockViewerController.cancelTranslation).toHaveBeenCalledOnce()
+    expect(activityCompletedMock).toHaveBeenCalledTimes(1)
+    expect(translationPartialMock).not.toHaveBeenCalled()
+  })
+
+  it('does not build page banners from initial translationSummary or error state', async () => {
+    createMocks()
+    mockViewerController.translationSummary.value = { status: 'partial', translationOccurrenceId: 10, error: 'stale summary' }
+    mockViewerController.error.value = ''
+    const wrapper = mount(PdfApp)
+    await flushPromises()
+
+    expect(wrapper.find('.pdf-status-banner').exists()).toBe(false)
   })
 
   async function startRegionComparison(wrapper, region = createPdfRegion({ pageNumber: 1, left: 1, top: 4, right: 3, bottom: 2 })) {

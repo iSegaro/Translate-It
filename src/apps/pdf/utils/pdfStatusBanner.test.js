@@ -24,13 +24,18 @@ describe('buildPdfStatusBannerState', () => {
     })
   })
 
-  it('builds a partial export warning banner', () => {
-    expect(controller.build({ translationStatus: 'partial' })).toEqual({
-      id: 'partial-export:0',
+  it('builds a translation outcome banner from presentation state', () => {
+    expect(controller.build({ translationNotification: {
+      id: 'translation-partial:1',
+      variant: 'warning',
+      title: 'Partial translation',
+      message: 'Provider failed'
+    } })).toEqual({
+      id: 'translation-partial:1',
       visible: true,
       variant: 'warning',
       title: 'Partial translation',
-      message: 'Partial translation available. Not all blocks are translated yet.',
+      message: 'Provider failed',
       dismissible: true
     })
   })
@@ -49,8 +54,10 @@ describe('buildPdfStatusBannerState', () => {
       visible: true,
       dismissible: true
     })
-    expect(controller.build({ translationStatus: 'partial', developerNotification: notification })).toMatchObject({
-      id: 'partial-export:0',
+    expect(controller.build({ translationNotification: {
+      id: 'translation-partial:1', variant: 'warning', title: 'Partial translation', message: 'Partial failure'
+    }, developerNotification: notification })).toMatchObject({
+      id: 'translation-partial:1',
       variant: 'warning'
     })
     expect(controller.build({ isLoading: true, developerNotification: notification })).toMatchObject({
@@ -113,69 +120,14 @@ describe('buildPdfStatusBannerState', () => {
     expect(second.id).toBe('error:1')
   })
 
-  it('uses translationOccurrenceId in partial banner id', () => {
-    expect(controller.build({ translationStatus: 'partial', translationOccurrenceId: 1 })).toMatchObject({
-      id: 'partial-export:1',
-      variant: 'warning'
-    })
-  })
-
-  it('generates different partial ids for different occurrences', () => {
-    const first = controller.build({ translationStatus: 'partial', translationOccurrenceId: 1 })
-    const second = controller.build({ translationStatus: 'partial', translationOccurrenceId: 2 })
-    expect(first.id).toBe('partial-export:1')
-    expect(second.id).toBe('partial-export:2')
-    expect(first.id).not.toBe(second.id)
-  })
-
-  it('keeps same partial id across same-occurrence recomputations', () => {
-    const first = controller.build({ translationStatus: 'partial', translationOccurrenceId: 5 })
-    const second = controller.build({ translationStatus: 'partial', translationOccurrenceId: 5 })
-    expect(first.id).toBe('partial-export:5')
-    expect(second.id).toBe(first.id)
-  })
-
-  it('uses new partial id after successful translation between partials', () => {
-    const first = controller.build({ translationStatus: 'partial', translationOccurrenceId: 1 })
-    expect(first.id).toBe('partial-export:1')
-
-    controller.build({ translationStatus: 'translated', translationOccurrenceId: 2 })
-
-    const third = controller.build({ translationStatus: 'partial', translationOccurrenceId: 3 })
-    expect(third.id).toBe('partial-export:3')
-  })
-
-  it('returns null when translationStatus is idle', () => {
-    expect(controller.build({ translationStatus: 'idle' })).toBeNull()
-  })
-
-  it('returns null when translationStatus is translated', () => {
-    expect(controller.build({ translationStatus: 'translated' })).toBeNull()
-  })
-
-  it('returns null when translationStatus is cancelled', () => {
-    expect(controller.build({ translationStatus: 'cancelled' })).toBeNull()
-  })
-
-  it('prefers error over partial status', () => {
+  it('keeps document errors above translation outcomes', () => {
     expect(controller.build({
       error: 'Failed.',
-      translationStatus: 'partial'
+      translationNotification: { id: 'translation-failed:1', variant: 'error', title: 'Translation failed', message: 'Failed.' }
     })).toMatchObject({
       id: 'error:1',
       variant: 'error',
-      title: 'PDF error',
-      message: 'Failed.'
-    })
-  })
-
-  it('prefers loading over partial status', () => {
-    expect(controller.build({
-      isLoading: true,
-      translationStatus: 'partial'
-    })).toMatchObject({
-      id: 'opening',
-      variant: 'info'
+      title: 'PDF error'
     })
   })
 

@@ -132,10 +132,33 @@ describe('Presentation Presenter', () => {
     })
 
     it('presents translation-partial as outcome with partialTranslation', () => {
-      const intent = present({ name: 'translation-partial', occurrenceId: 42 })
+      const intent = present({ name: 'translation-partial', occurrenceId: 42, error: 'Provider failed' })
 
       expect(intent.intent).toBe('outcome')
-      expect(intent.partialTranslation.occurrenceId).toBe(42)
+      expect(intent.translationOutcome).toMatchObject({
+        id: 'translation-partial:42',
+        variant: 'warning',
+        title: 'Partial translation',
+        message: 'Provider failed'
+      })
+    })
+
+    it('presents translation-failed as an error outcome', () => {
+      const intent = present({ name: 'translation-failed', occurrenceId: 43, error: 'Request failed' })
+
+      expect(intent.translationOutcome).toMatchObject({
+        id: 'translation-failed:43',
+        variant: 'error',
+        title: 'Translation failed',
+        message: 'Request failed'
+      })
+    })
+
+    it('presents translation outcome clearing as an outcome intent', () => {
+      expect(present({ name: 'translation-outcome-cleared' })).toEqual({
+        intent: 'outcome',
+        clearTranslationOutcome: true
+      })
     })
   })
 
