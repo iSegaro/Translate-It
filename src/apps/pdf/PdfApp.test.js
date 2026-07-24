@@ -1,6 +1,6 @@
 import { afterEach, describe, beforeEach, expect, it, vi } from 'vitest'
 import { mount } from '@vue/test-utils'
-import { computed, defineComponent, h, nextTick, ref } from 'vue'
+import { computed, defineComponent, h, nextTick, reactive, ref } from 'vue'
 import PdfApp from './PdfApp.vue'
 import { createPdfRegion } from '@/features/pdf-translation/core/PdfRegion.js'
 import { PdfDeveloperApi } from './PdfDeveloperApi.js'
@@ -454,6 +454,7 @@ describe('PdfApp', () => {
     activityCompletedMock.mockClear()
     translationPartialMock.mockClear()
     translationFailedMock.mockClear()
+    settingsStoreMock.settings = reactive({ THEME: 'auto', DEBUG_MODE: false })
     settingsStoreMock.settings.DEBUG_MODE = false
     settingsStoreMock.settings.OCR_DEFAULT_LANG = 'eng'
     settingsStoreMock.settings.OCR_PREFERRED_ACTION = 'region'
@@ -929,7 +930,24 @@ describe('PdfApp', () => {
     await vi.waitFor(() => expect(wrapper.find('.pdf-status-banner__message').text()).toContain('scale-1.5'))
   })
 
-  it('keeps developer notifications hidden outside Debug Mode', async () => {
+  it('blocks direct Region Comparison requests outside Debug Mode', async () => {
+    regionComparisonRunnerMock.execute.mockImplementation(request => createMockOperation(
+      Promise.resolve(readyRegionComparisonResult()),
+      vi.fn(),
+      { target: 'region-comparison', request }
+    ))
+    const wrapper = mount(PdfApp)
+
+    wrapper.findComponent({ name: 'PdfToolbar' }).vm.$emit('request-region-comparison')
+    await flushPromises()
+
+    expect(regionComparisonRunnerMock.execute).not.toHaveBeenCalled()
+    expect(wrapper.findComponent({ name: 'PdfViewer' }).props('regionSelectionActive')).toBe(false)
+    expect(wrapper.find('.pdf-status-banner').exists()).toBe(false)
+  })
+
+  it('blocks direct Region Comparison artifact export outside Debug Mode', async () => {
+    settingsStoreMock.settings.DEBUG_MODE = true
     regionComparisonRunnerMock.execute.mockImplementation(request => createMockOperation(
       Promise.resolve(readyRegionComparisonResult()),
       vi.fn(),
@@ -938,9 +956,11 @@ describe('PdfApp', () => {
     const wrapper = mount(PdfApp)
 
     await startRegionComparison(wrapper)
-    await flushPromises()
+    await vi.waitFor(() => expect(wrapper.findComponent({ name: 'PdfToolbar' }).props('canExportRegionComparisonArtifact')).toBe(true))
+    settingsStoreMock.settings.DEBUG_MODE = false
+    wrapper.findComponent({ name: 'PdfToolbar' }).vm.$emit('export-region-comparison-artifact')
 
-    expect(wrapper.find('.pdf-status-banner').exists()).toBe(false)
+    expect(downloadFileMock).not.toHaveBeenCalled()
   })
 
   it('refreshes OCR page wrappers before incrementing translationTick on OCR completion', async () => {
@@ -1095,6 +1115,7 @@ describe('PdfApp', () => {
   })
 
   it('completes a regionComparison and exports its artifact through PdfApp ownership', async () => {
+    settingsStoreMock.settings.DEBUG_MODE = true
     downloadFileMock.mockReset()
     const candidates = Object.freeze([Object.freeze({
       candidateId: 'scale-1',
@@ -1147,6 +1168,7 @@ describe('PdfApp', () => {
   })
 
   it('reports regionComparison artifact download failure through the export contract', async () => {
+    settingsStoreMock.settings.DEBUG_MODE = true
     downloadFileMock.mockImplementation(() => {
       throw new Error('Disk full')
     })
@@ -1170,6 +1192,7 @@ describe('PdfApp', () => {
   })
 
   it('ignores a late regionComparison cancellation result', async () => {
+    settingsStoreMock.settings.DEBUG_MODE = true
     const deferred = createDeferred()
     const cancel = vi.fn()
     const runRegionComparison = vi.spyOn(PdfDeveloperApi.prototype, 'runRegionComparison')

@@ -816,6 +816,7 @@ function handleRegionSelectionComplete(region) {
 }
 
 function handleRequestRegionComparison() {
+  if (!isDebugMode.value) return
   beginRegionSelection(REGION_EXECUTION_TARGET.REGION_COMPARISON)
 }
 
@@ -824,6 +825,7 @@ function handleCancelRegionComparison() {
 }
 
 function handleExportRegionComparisonArtifact() {
+  if (!isDebugMode.value) return
   if (!canExportRegionComparisonArtifact.value || !completedRegionComparisonResult || !completedRegionComparisonRegion) return
 
   try {
