@@ -345,12 +345,17 @@
         ref="moreMenuRef"
         @open="closeMenus"
       >
-        <template #trigger>
+        <template #trigger="{ triggerAttrs, triggerRef, onToggle }">
           <button
+            v-bind="triggerAttrs"
+            :ref="triggerRef"
             class="pdf-toolbar__button pdf-toolbar__button--menu-trigger pdf-toolbar__button--icon-trigger"
             type="button"
             :aria-label="TOOLTIP_MORE"
             :title="TOOLTIP_MORE"
+            @click="onToggle"
+            @keydown.enter.prevent="onToggle"
+            @keydown.space.prevent="onToggle"
           >
             <span
               class="pdf-toolbar__menu-trigger-icon"

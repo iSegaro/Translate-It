@@ -2,23 +2,26 @@
 // Application-agnostic toolbar-attached menu primitive.
 // Desktop: anchored popover. Mobile: full-height right drawer.
 
+$tm-mobile-breakpoint: 749px;
+
 .toolbar-menu {
   position: relative;
-}
 
-.toolbar-menu__trigger {
-  cursor: pointer;
+  // Layer tokens — defaults use the project's shared z-index system.
+  // Consumers may override per application.
+  --tm-layer-backdrop: var(--ti-z-dropdown);
+  --tm-layer-panel: calc(var(--ti-z-dropdown) + 1);
 }
 
 // Backdrop — only visible on mobile when drawer is open
 .toolbar-menu__backdrop {
   display: none;
 
-  @media (max-width: 749px) {
+  @media (max-width: $tm-mobile-breakpoint) {
     display: block;
     position: fixed;
     inset: 0;
-    z-index: 100;
+    z-index: var(--tm-layer-backdrop);
     background: rgba(0, 0, 0, 0.4);
   }
 }
@@ -29,7 +32,7 @@
   position: absolute;
   top: calc(100% + 8px);
   right: 0;
-  z-index: 110;
+  z-index: var(--tm-layer-panel);
   min-width: 190px;
   max-height: calc(100vh - 120px);
   overflow-y: auto;
@@ -38,7 +41,7 @@
   box-shadow: 0 18px 40px rgba(0, 0, 0, 0.28);
 
   // Mobile: full-height right drawer
-  @media (max-width: 749px) {
+  @media (max-width: $tm-mobile-breakpoint) {
     position: fixed;
     top: 0;
     right: 0;

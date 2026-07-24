@@ -3,20 +3,15 @@
     ref="rootRef"
     class="toolbar-menu"
   >
-    <div
-      class="toolbar-menu__trigger"
-      :class="{ 'toolbar-menu__trigger--active': isOpen }"
-      @click="toggle"
-      @keydown.enter.prevent="toggle"
-      @keydown.space.prevent="toggle"
-    >
-      <slot
-        name="trigger"
-        :open="isOpen"
-        :toggle="toggle"
-        :close="close"
-      />
-    </div>
+    <slot
+      name="trigger"
+      :trigger-attrs="triggerAttrs"
+      :trigger-ref="setTriggerRef"
+      :on-toggle="toggle"
+      :open="isOpen"
+      :toggle="toggle"
+      :close="close"
+    />
 
     <div
       v-if="isOpen"
@@ -41,19 +36,8 @@
 </template>
 
 <script setup>
-import { onMounted, onBeforeUnmount, ref, nextTick } from 'vue'
+import { computed, onMounted, onBeforeUnmount, ref, nextTick } from 'vue'
 import { useResourceTracker } from '@/composables/core/useResourceTracker.js'
-
-defineProps({
-  mobileBreakpoint: {
-    type: Number,
-    default: 749
-  },
-  closeOnSelect: {
-    type: Boolean,
-    default: false
-  }
-})
 
 const emit = defineEmits(['open', 'close'])
 
@@ -61,6 +45,16 @@ const tracker = useResourceTracker('toolbar-menu')
 const rootRef = ref(null)
 const menuRef = ref(null)
 const isOpen = ref(false)
+const triggerEl = ref(null)
+
+const triggerAttrs = computed(() => ({
+  'aria-expanded': isOpen.value,
+  'aria-haspopup': 'menu'
+}))
+
+function setTriggerRef(el) {
+  triggerEl.value = el instanceof HTMLElement ? el : null
+}
 
 function open() {
   isOpen.value = true
@@ -76,10 +70,7 @@ function open() {
 function close() {
   isOpen.value = false
   emit('close')
-  const trigger = rootRef.value?.querySelector('.toolbar-menu__trigger')
-  if (trigger instanceof HTMLElement) {
-    trigger.focus()
-  }
+  triggerEl.value?.focus()
 }
 
 function toggle() {
