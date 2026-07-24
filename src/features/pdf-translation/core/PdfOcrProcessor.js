@@ -71,6 +71,7 @@ export class PdfOcrProcessor {
 
       return blocks
     } catch (error) {
+      if (this._cancelled) return []
       logger.error('OCR failed for page:', { pageNumber, error })
 
       this.session.recordPageOcrError(pageNumber, error)

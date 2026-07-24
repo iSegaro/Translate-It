@@ -346,6 +346,7 @@ let activeProgressCancel = null
 let cancelActiveRegionOcr = null
 let cancelActiveRegionComparison = null
 let cancelActivePageTranslation = null
+let pageOcrCallbacksInvalidated = false
 
 function handleProgressCancel() {
   const completionHandled = activeProgressCancel?.() === true
@@ -362,18 +363,22 @@ const {
   cancelOcr
 } = usePdfOcr({
   onOcrStart: () => {
+    pageOcrCallbacksInvalidated = false
     presentation.present(DomainEvents.ocrStarted())
     activeProgressCancel = cancelOcr
   },
   onOcrComplete: ({ pageNumbers } = {}) => {
+    if (pageOcrCallbacksInvalidated) return
     presentation.present(DomainEvents.activityCompleted())
     activeProgressCancel = null
     refreshOcrPageData(pageNumbers)
   },
-  onOcrProgress: ({ current, total }) => {
+  onOcrProgress: ({ current, total } = {}) => {
+    if (pageOcrCallbacksInvalidated) return
     presentation.present(DomainEvents.ocrProgressUpdated({ current, total }))
   },
   onOcrError: (errorCode, { pageNumbers } = {}) => {
+    if (pageOcrCallbacksInvalidated) return
     presentation.present(DomainEvents.activityCompleted())
     activeProgressCancel = null
     presentation.present(errorCode === 'model-not-installed'
@@ -621,12 +626,29 @@ function resetPresentationState() {
   resetViewerState()
 }
 
+function invalidateDocumentOperations() {
+  pageOcrCallbacksInvalidated = true
+  cancelOcr()
+  cancelRegionOcr()
+  cancelActiveRegionComparison?.()
+  void cancelTranslation()
+  activeProgressCancel = null
+  cancelActiveRegionOcr = null
+  cancelActiveRegionComparison = null
+  cancelActivePageTranslation = null
+  activeRegionComparisonOperation = null
+  completedRegionComparisonResult = null
+  completedRegionComparisonRegion = null
+  regionComparisonState.value = null
+  presentation.reset()
+}
+
 function updateDocumentTitle() {
   document.title = session.displayName || 'Translate It - PDF Viewer'
 }
 
 async function handleFileSelected(file) {
-  cancelRegionOcr()
+  invalidateDocumentOperations()
   resetPresentationState()
   const loaded = await loadPdfFile(file, buildLayoutRequest())
   if (loaded) {
@@ -822,7 +844,7 @@ function handleExportRegionComparisonArtifact() {
 }
 
 function handleRegionComparisonProgress(progress) {
-  if (!regionComparisonState.value) return
+  if (!activeRegionComparisonOperation || !regionComparisonState.value) return
 
   regionComparisonState.value = {
     ...regionComparisonState.value,

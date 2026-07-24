@@ -1391,6 +1391,60 @@ describe('PdfApp', () => {
     expect(openTranslationMock).not.toHaveBeenCalled()
   })
 
+  it('suppresses late Page OCR callbacks after PDF replacement', async () => {
+    const wrapper = mount(PdfApp)
+    await flushPromises()
+
+    mockPdfOcrOptions.onOcrStart()
+    wrapper.findComponent({ name: 'PdfDropzone' }).vm.$emit('file-selected', { name: 'replacement.pdf' })
+    await flushPromises()
+    mockPdfOcrOptions.onOcrComplete({ pageNumbers: [2] })
+    mockPdfOcrOptions.onOcrError('ocr-failed', { pageNumbers: [2] })
+
+    expect(mockPdfOcr.cancelOcr).toHaveBeenCalledOnce()
+    expect(mockViewerController.refreshTranslatedPageBlocks).not.toHaveBeenCalled()
+    expect(mockPdfOcr.refreshOcrRecommendations).not.toHaveBeenCalled()
+  })
+
+  it('cancels Region Comparison and discards its artifact on PDF replacement', async () => {
+    settingsStoreMock.settings.DEBUG_MODE = true
+    const deferred = createDeferred()
+    const cancel = vi.fn()
+    regionComparisonRunnerMock.execute.mockImplementation(request => createMockOperation(
+      deferred.promise,
+      cancel,
+      { target: 'region-comparison', request }
+    ))
+    const wrapper = mount(PdfApp)
+
+    await startRegionComparison(wrapper)
+    wrapper.findComponent({ name: 'PdfDropzone' }).vm.$emit('file-selected', { name: 'replacement.pdf' })
+    await flushPromises()
+    deferred.resolve(readyRegionComparisonResult())
+    await flushPromises()
+    wrapper.findComponent({ name: 'PdfToolbar' }).vm.$emit('export-region-comparison-artifact')
+
+    expect(cancel).toHaveBeenCalledOnce()
+    expect(wrapper.find('.pdf-status-banner').exists()).toBe(false)
+    expect(downloadFileMock).not.toHaveBeenCalled()
+  })
+
+  it('invalidates stale Page OCR callbacks across rapid PDF replacements', async () => {
+    const wrapper = mount(PdfApp)
+    await flushPromises()
+
+    mockPdfOcrOptions.onOcrStart()
+    const dropzone = wrapper.findComponent({ name: 'PdfDropzone' })
+    dropzone.vm.$emit('file-selected', { name: 'replacement-a.pdf' })
+    dropzone.vm.$emit('file-selected', { name: 'replacement-b.pdf' })
+    await flushPromises()
+    mockPdfOcrOptions.onOcrComplete({ pageNumbers: [1] })
+
+    expect(mockPdfOcr.cancelOcr).toHaveBeenCalledTimes(2)
+    expect(mockViewerController.loadPdfFile).toHaveBeenCalledTimes(2)
+    expect(mockViewerController.refreshTranslatedPageBlocks).not.toHaveBeenCalled()
+  })
+
   it('keeps completed Region OCR behavior through document replacement', async () => {
     createMocks({ sessionAsRef: false })
     mockRegionOcr.startRegionOcr.mockImplementation(() => {

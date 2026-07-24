@@ -8,7 +8,7 @@ import { createPresentationFacade } from './presentationFacade.js'
  * Owns facade wiring and reactive surface snapshots. PDF features only emit
  * Domain Results through `present` and read exposed state.
  *
- * @returns {{ present: (domainResult: object) => any, bannerState: import('vue').ShallowRef, progressState: import('vue').ShallowRef }}
+ * @returns {{ present: (domainResult: object) => any, reset: () => void, bannerState: import('vue').ShallowRef, progressState: import('vue').ShallowRef }}
  */
 export function createPresentationHost({ surfaces } = {}) {
   const progressState = shallowRef(surfaces.progress.getState())
@@ -38,8 +38,18 @@ export function createPresentationHost({ surfaces } = {}) {
     onPresented: synchronize
   })
 
+  function reset() {
+    surfaces.progress.reset()
+    surfaces.banner.reset()
+    progressVersion = surfaces.progress.getState().version
+    bannerVersion = surfaces.banner.getState().version
+    progressState.value = surfaces.progress.getState()
+    bannerState.value = surfaces.banner.getState()
+  }
+
   return Object.freeze({
     present: facade.present,
+    reset,
     bannerState,
     progressState
   })

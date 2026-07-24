@@ -31,6 +31,7 @@ export function usePdfOcr({ onOcrComplete, onOcrStart, onOcrProgress, onOcrError
   const isOcrProcessing = ref(false)
   const ocrError = ref('')
   const ocrLanguage = ref('eng')
+  let activeRunId = 0
 
   function refreshOcrRecommendations() {
     const candidates = pdfDocumentSession.getLoadedVisibleOcrCandidates()
@@ -51,6 +52,7 @@ export function usePdfOcr({ onOcrComplete, onOcrStart, onOcrProgress, onOcrError
   async function confirmOcr() {
     if (isOcrProcessing.value) return
 
+    const runId = ++activeRunId
     isOcrProcessing.value = true
     ocrError.value = ''
     let pageNumbers = []
@@ -70,6 +72,8 @@ export function usePdfOcr({ onOcrComplete, onOcrStart, onOcrProgress, onOcrError
           onOcrProgress?.({ current, total, pageNumber })
         }
       })
+
+      if (runId !== activeRunId) return
 
       batchErrorCode = getBatchOcrError(results)
       if (batchErrorCode && batchErrorCode !== 'cancelled') {
@@ -98,11 +102,13 @@ export function usePdfOcr({ onOcrComplete, onOcrStart, onOcrProgress, onOcrError
         }
       }
     } finally {
-      isOcrProcessing.value = false
+      if (runId === activeRunId) isOcrProcessing.value = false
     }
 
+    if (runId !== activeRunId) return
+
     if (terminalResult?.type === 'error') {
-      onOcrError?.(terminalResult.errorCode, terminalResult.pageNumbers && { pageNumbers: terminalResult.pageNumbers })
+      onOcrError?.(terminalResult.errorCode, { pageNumbers: terminalResult.pageNumbers })
       return
     }
 
@@ -112,6 +118,7 @@ export function usePdfOcr({ onOcrComplete, onOcrStart, onOcrProgress, onOcrError
   }
 
   function cancelOcr() {
+    activeRunId++
     processor.cancel()
     isOcrProcessing.value = false
   }
