@@ -38,8 +38,8 @@
       class="pdf-toolbar__center-group"
     >
       <div
-        class="pdf-toolbar__mode-section"
-        :class="{ 'pdf-toolbar__mode-section--hidden': !showTranslationOption }"
+        class="pdf-toolbar__view-mode pdf-toolbar__view-mode--desktop"
+        :class="{ 'pdf-toolbar__view-mode--hidden': !showTranslationOption }"
       >
         <div class="pdf-toolbar__mode-group pdf-toolbar__mode-group--content">
           <button
@@ -53,29 +53,53 @@
             {{ opt.label }}
           </button>
         </div>
-
-        <div class="pdf-toolbar__mode-group pdf-toolbar__mode-group--layout">
-          <button
-            class="pdf-toolbar__mode-button"
-            :class="{ 'pdf-toolbar__mode-button--active': isSideBySide }"
-            type="button"
-            :aria-label="TOOLTIP_SIDE_BY_SIDE"
-            :title="TOOLTIP_SIDE_BY_SIDE"
-            :aria-pressed="isSideBySide"
-            @click="handleLayoutModeToggle"
-          >
-            <SvgIcon
-              :src="splitScreenIcon"
-              :size="14"
-            />
-          </button>
-        </div>
-
-        <span
-          class="pdf-toolbar__separator"
-          aria-hidden="true"
-        />
       </div>
+
+      <div
+        v-if="showTranslationOption"
+        class="pdf-toolbar__view-mode pdf-toolbar__view-mode--mobile"
+      >
+        <select
+          class="pdf-toolbar__view-mode-select"
+          :value="contentView"
+          aria-label="View mode"
+          @change="$emit('content-view-change', $event.target.value)"
+        >
+          <option
+            v-for="opt in contentOptions"
+            :key="opt.value"
+            :value="opt.value"
+          >
+            {{ opt.label }}
+          </option>
+        </select>
+      </div>
+
+      <div
+        v-show="showTranslationOption"
+        class="pdf-toolbar__mode-group pdf-toolbar__mode-group--layout"
+      >
+        <button
+          class="pdf-toolbar__mode-button"
+          :class="{ 'pdf-toolbar__mode-button--active': isSideBySide }"
+          type="button"
+          :aria-label="TOOLTIP_SIDE_BY_SIDE"
+          :title="TOOLTIP_SIDE_BY_SIDE"
+          :aria-pressed="isSideBySide"
+          @click="handleLayoutModeToggle"
+        >
+          <SvgIcon
+            :src="splitScreenIcon"
+            :size="14"
+          />
+        </button>
+      </div>
+
+      <span
+        v-show="showTranslationOption"
+        class="pdf-toolbar__separator"
+        aria-hidden="true"
+      />
 
       <div class="pdf-toolbar__page-group">
         <input

@@ -145,9 +145,9 @@ describe('PdfToolbar', () => {
       }
     })
 
-    const section = wrapper.find('.pdf-toolbar__mode-section')
+    const section = wrapper.find('.pdf-toolbar__view-mode--desktop')
     expect(section.exists()).toBe(true)
-    expect(section.classes()).toContain('pdf-toolbar__mode-section--hidden')
+    expect(section.classes()).toContain('pdf-toolbar__view-mode--hidden')
   })
 
   it('shows Translation option when showTranslationOption is true', async () => {

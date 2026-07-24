@@ -131,16 +131,45 @@
   }
 }
 
-.pdf-toolbar__mode-section {
+.pdf-toolbar__view-mode {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+
+  &--desktop {
+    gap: 6px;
+  }
+
+  &--mobile {
+    display: none;
+  }
 
   &--hidden {
     visibility: hidden;
     opacity: 0;
     pointer-events: none;
     transition: opacity 150ms ease, visibility 150ms ease;
+  }
+}
+
+.pdf-toolbar__view-mode-select {
+  display: inline-block;
+  appearance: none;
+  border: 1px solid $tb-border;
+  border-radius: 6px;
+  padding: 4px 24px 4px 7px;
+  background: $tb-control-hover;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='rgba(255,255,255,0.65)'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 6px center;
+  color: $tb-text-primary;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  outline: none;
+
+  &:focus-visible {
+    outline: 2px solid $tb-focus;
+    outline-offset: 2px;
   }
 }
 
@@ -761,12 +790,30 @@ $translation-language-code-width: 5ch;
     padding: 8px 16px;
     gap: 8px 12px;
     min-height: 44px;
-    grid-template-columns: minmax(0, 1fr);
+    grid-template-columns: 1fr auto;
     justify-items: stretch;
   }
 
   .pdf-toolbar__title-block {
+    grid-row: 1;
+    grid-column: 1;
     gap: 2px;
+  }
+
+  .pdf-toolbar__actions {
+    grid-row: 1;
+    grid-column: 2;
+    justify-self: end;
+    justify-content: flex-end;
+    gap: 6px;
+  }
+
+  .pdf-toolbar__center-group {
+    grid-row: 2;
+    grid-column: 1 / -1;
+    justify-self: stretch;
+    justify-content: flex-start;
+    gap: 8px;
   }
 
   .pdf-toolbar__file-row {
@@ -791,23 +838,12 @@ $translation-language-code-width: 5ch;
     font-size: 12px;
   }
 
-  .pdf-toolbar__title-block,
-  .pdf-toolbar__center-group,
-  .pdf-toolbar__actions {
-    grid-column: 1;
-    justify-self: stretch;
+  .pdf-toolbar__view-mode--desktop {
+    display: none;
   }
 
-  .pdf-toolbar__center-group {
-    justify-content: flex-start;
-    gap: 8px;
-  }
-
-  .pdf-toolbar__mode-group,
-  .pdf-toolbar__page-group,
-  .pdf-toolbar__zoom-group {
-    flex-wrap: wrap;
-    justify-content: flex-start;
+  .pdf-toolbar__view-mode--mobile {
+    display: inline-block;
   }
 
   .pdf-toolbar__mode-button {
@@ -817,11 +853,6 @@ $translation-language-code-width: 5ch;
 
   .pdf-toolbar__page-group .pdf-toolbar__page-input {
     width: 28px;
-  }
-
-  .pdf-toolbar__actions {
-    justify-content: flex-start;
-    gap: 6px;
   }
 
   .pdf-toolbar__button {
