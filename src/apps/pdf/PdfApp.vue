@@ -614,6 +614,12 @@ watch(regionOcrAvailable, (available) => {
   if (!available) exitRegionSelection()
 })
 
+watch(isDebugMode, (enabled) => {
+  if (!enabled && regionSelectionTarget.value === REGION_EXECUTION_TARGET.REGION_COMPARISON) {
+    exitRegionSelection()
+  }
+})
+
 function resetPresentationState() {
   currentPage.value = 0
   activeRegionPosition = null
@@ -717,6 +723,7 @@ function handleRegionSelectionComplete(region) {
   exitRegionSelection()
 
   if (target === REGION_EXECUTION_TARGET.REGION_COMPARISON) {
+    if (!isDebugMode.value) return
     presentation.present(DomainEvents.comparisonStarted())
     completedRegionComparisonResult = null
     completedRegionComparisonRegion = null

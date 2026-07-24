@@ -963,6 +963,60 @@ describe('PdfApp', () => {
     expect(downloadFileMock).not.toHaveBeenCalled()
   })
 
+  it('cancels comparison selection when Debug Mode is disabled before selection completes', async () => {
+    settingsStoreMock.settings.DEBUG_MODE = true
+    mockRegionOcr.startRegionOcr.mockReturnValue(createMockOperation(Promise.resolve({ status: 'cancelled' })))
+    const wrapper = mount(PdfApp)
+    const toolbar = wrapper.findComponent({ name: 'PdfToolbar' })
+    const viewer = wrapper.findComponent({ name: 'PdfViewer' })
+
+    toolbar.vm.$emit('request-region-comparison')
+    await flushPromises()
+    expect(viewer.props('regionSelectionActive')).toBe(true)
+
+    settingsStoreMock.settings.DEBUG_MODE = false
+    await nextTick()
+    viewer.vm.$emit('region-selection-complete', createPdfRegion({ pageNumber: 1, left: 1, top: 4, right: 3, bottom: 2 }))
+    await flushPromises()
+
+    expect(viewer.props('regionSelectionActive')).toBe(false)
+    expect(regionComparisonRunnerMock.execute).not.toHaveBeenCalled()
+  })
+
+  it('keeps a running comparison active when Debug Mode is disabled', async () => {
+    settingsStoreMock.settings.DEBUG_MODE = true
+    const deferred = createDeferred()
+    const cancel = vi.fn()
+    regionComparisonRunnerMock.execute.mockImplementation(request => createMockOperation(
+      deferred.promise,
+      cancel,
+      { target: 'region-comparison', request }
+    ))
+    const wrapper = mount(PdfApp)
+
+    await startRegionComparison(wrapper)
+    settingsStoreMock.settings.DEBUG_MODE = false
+    await nextTick()
+    deferred.resolve(readyRegionComparisonResult())
+    await vi.waitFor(() => expect(wrapper.findComponent({ name: 'PdfToolbar' }).props('regionComparisonState')).toMatchObject({ status: 'completed' }))
+
+    expect(cancel).not.toHaveBeenCalled()
+  })
+
+  it('keeps OCR selection active when Debug Mode is disabled', async () => {
+    settingsStoreMock.settings.DEBUG_MODE = true
+    const wrapper = mount(PdfApp)
+    const toolbar = wrapper.findComponent({ name: 'PdfToolbar' })
+    const viewer = wrapper.findComponent({ name: 'PdfViewer' })
+
+    toolbar.vm.$emit('primary-click')
+    await flushPromises()
+    settingsStoreMock.settings.DEBUG_MODE = false
+    await nextTick()
+
+    expect(viewer.props('regionSelectionActive')).toBe(true)
+  })
+
   it('refreshes OCR page wrappers before incrementing translationTick on OCR completion', async () => {
     createMocks()
     const order = []
