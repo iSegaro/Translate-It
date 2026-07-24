@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia'
-import { ref, computed, watch, onUnmounted, getCurrentInstance } from 'vue'
+import { ref, computed, watch } from 'vue'
 import browser from 'webextension-polyfill'
 import { CONFIG, TranslationMode, SelectionTranslationMode } from '@/shared/config/config.js'
 import { MOBILE_CONSTANTS } from '@/shared/constants/mobile.js'
@@ -889,19 +889,14 @@ export const useSettingsStore = defineStore('settings', () => {
     logger.error('Failed to initialize settings store:', error)
   })
 
-  // Cleanup listener on store destruction - only if we're in a component context
-  const instance = getCurrentInstance()
-  if (instance) {
-    onUnmounted(() => {
-      cleanupStorageListener()
-      if (removeSystemThemeListener) {
-        removeSystemThemeListener();
-        removeSystemThemeListener = null;
-        systemThemeMediaQuery = null;
-      }
-    })
+  const cleanupStoreResources = () => {
+    cleanupStorageListener()
+    if (removeSystemThemeListener) {
+      removeSystemThemeListener();
+      removeSystemThemeListener = null;
+      systemThemeMediaQuery = null;
+    }
   }
-  // Note: If not in component context, cleanup will happen when browser extension unloads
   
   return {
     // State
@@ -934,6 +929,7 @@ export const useSettingsStore = defineStore('settings', () => {
     getSetting,
     validateSettings,
     reconcileOcrLanguage,
+    cleanupStoreResources,
     $reset
   }
 })

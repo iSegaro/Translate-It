@@ -12,6 +12,7 @@ import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { configureVueForCSP } from '@/shared/vue/vue-utils.js';
 import { UI_LOCALE_TO_CODE_MAP } from '@/shared/config/languageConstants.js';
+import useSettingsStore from '@/features/settings/stores/settings.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.UI, 'options');
 
@@ -248,6 +249,11 @@ async function initializeApp() {
 
 // Initialize the app
 initializeApp()
+
+window.addEventListener('beforeunload', () => {
+  const store = useSettingsStore()
+  store.cleanupStoreResources()
+})
 
 // Fallback mechanism for debugging
 setTimeout(() => {

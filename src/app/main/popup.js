@@ -8,6 +8,7 @@ import ExtensionContextManager from '@/core/extensionContext.js'
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { configureVueForCSP } from '@/shared/vue/vue-utils.js';
+import useSettingsStore from '@/features/settings/stores/settings.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.POPUP, 'popup');
 
@@ -67,6 +68,11 @@ const appElement = document.getElementById('app')
 if (appElement && !appElement.__vue_app__) {
   initializeApp()
 }
+
+window.addEventListener('beforeunload', () => {
+  const store = useSettingsStore()
+  store.cleanupStoreResources()
+})
 
 // Lazy loading functions for heavy features (only load when needed)
 export const loadTranslationFeatures = async () => {
