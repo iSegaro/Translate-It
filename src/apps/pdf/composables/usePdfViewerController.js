@@ -5,6 +5,7 @@ import { TranslationMode, getProviderOptimizationLevelAsync, getEffectiveProvide
 import { AUTO_DETECT_VALUE, DEFAULT_TARGET_LANGUAGE } from '@/shared/constants/core.js'
 import { pdfDocumentSession } from '@/features/pdf-translation/core/PdfDocumentSession.js'
 import { PdfTranslationCoordinator } from '@/features/pdf-translation/core/PdfTranslationCoordinator.js'
+import { getPdfTranslationFailureReason } from '@/features/pdf-translation/core/PdfTranslationAdapter.js'
 import { pdfCacheManager } from '@/features/pdf-translation/core/PdfCacheManager.js'
 import { pdfHistoryManager } from '@/features/pdf-translation/core/PdfHistoryManager.js'
 import { sha256HexFromText } from '@/features/pdf-translation/core/PdfBlockIdentity.js'
@@ -425,7 +426,8 @@ export function usePdfViewerController() {
         failedCount: 0,
         totalCount: 0,
         translationOccurrenceId: 0,
-        error: translateError?.message || 'Failed to translate visible PDF blocks.'
+        error: translateError?.message || 'Failed to translate visible PDF blocks.',
+        failureReason: getPdfTranslationFailureReason(translateError)
       }
       return false
     } finally {

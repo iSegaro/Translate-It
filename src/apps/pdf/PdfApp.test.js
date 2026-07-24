@@ -622,7 +622,8 @@ describe('PdfApp', () => {
       failedCount: 1,
       totalCount: 2,
       translationOccurrenceId: 7,
-      error: 'Provider failed'
+      error: 'Provider failed',
+      failureReason: 'provider-error'
     }
     const wrapper = mount(PdfApp)
 
@@ -643,7 +644,8 @@ describe('PdfApp', () => {
       failedCount: 0,
       totalCount: 0,
       translationOccurrenceId: 8,
-      error: 'Translation request failed'
+      error: 'Translation request failed',
+      failureReason: 'provider-error'
     }
     const wrapper = mount(PdfApp)
 
@@ -713,7 +715,7 @@ describe('PdfApp', () => {
     await flushPromises()
     wrapper.findComponent({ name: 'PdfToolbar' }).vm.$emit('translate-visible')
     mockViewerController.translationSummary.value = {
-      status: 'partial', translationOccurrenceId: 15, error: 'Newer failure'
+      status: 'partial', translationOccurrenceId: 15, error: 'Newer failure', failureReason: 'provider-error'
     }
     second.resolve(true)
     await flushPromises()
@@ -747,6 +749,22 @@ describe('PdfApp', () => {
     expect(mockViewerController.cancelTranslation).toHaveBeenCalledOnce()
     expect(activityCompletedMock).toHaveBeenCalledTimes(1)
     expect(translationPartialMock).not.toHaveBeenCalled()
+  })
+
+  it('keeps provider-cancelled page translation silent', async () => {
+    createMocks()
+    mockViewerController.translationSummary.value = {
+      status: 'partial', translationOccurrenceId: 10, error: 'Cancelled', failureReason: 'cancelled'
+    }
+    const wrapper = mount(PdfApp)
+
+    wrapper.findComponent({ name: 'PdfToolbar' }).vm.$emit('translate-visible')
+    await flushPromises()
+    await flushPromises()
+
+    expect(translationPartialMock).not.toHaveBeenCalled()
+    expect(translationFailedMock).not.toHaveBeenCalled()
+    expect(wrapper.find('.pdf-status-banner').exists()).toBe(false)
   })
 
   it('does not build page banners from initial translationSummary or error state', async () => {

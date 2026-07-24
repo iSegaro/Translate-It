@@ -1,6 +1,7 @@
 import { MessageActions } from '@/shared/messaging/core/MessageActions.js'
 import { TranslationMode } from '@/shared/config/config.js'
 import { MessageContexts } from '@/shared/messaging/core/MessagingConstants.js'
+import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js'
 import { normalizePdfText } from './PdfBlockIdentity.js'
 
 const STRUCTURED_MAX_CELLS_PER_LINE = 10
@@ -10,6 +11,40 @@ const READING_ROLE_KV = 'summary'
 const RELATIONSHIP_ROLE_PARENT = 'parent'
 const RELATIONSHIP_ROLE_CHILD = 'child'
 const RELATIONSHIP_ROLE_STANDALONE = 'standalone'
+
+export const PDF_TRANSLATION_FAILURE_REASON = Object.freeze({
+  TIMEOUT: 'timeout',
+  PROVIDER_UNAVAILABLE: 'provider-unavailable',
+  EMPTY_RESPONSE: 'empty-response',
+  PROVIDER_ERROR: 'provider-error',
+  UNKNOWN: 'unknown',
+  CANCELLED: 'cancelled'
+})
+
+const TIMEOUT_ERROR_TYPES = new Set([
+  ErrorTypes.TRANSLATION_TIMEOUT,
+  ErrorTypes.OPERATION_TIMEOUT,
+  'TIMEOUT',
+  'PROGRESS_TIMEOUT',
+  'FINAL_TIMEOUT'
+])
+const PROVIDER_UNAVAILABLE_ERROR_TYPES = new Set([
+  ErrorTypes.BROWSER_API_UNAVAILABLE,
+  ErrorTypes.CIRCUIT_BREAKER_OPEN
+])
+const CANCELLATION_ERROR_TYPES = new Set([
+  ErrorTypes.USER_CANCELLED,
+  ErrorTypes.TRANSLATION_CANCELLED
+])
+
+export function getPdfTranslationFailureReason(error) {
+  const type = error?.type || error?.reason || ''
+  if (CANCELLATION_ERROR_TYPES.has(type)) return PDF_TRANSLATION_FAILURE_REASON.CANCELLED
+  if (TIMEOUT_ERROR_TYPES.has(type)) return PDF_TRANSLATION_FAILURE_REASON.TIMEOUT
+  if (PROVIDER_UNAVAILABLE_ERROR_TYPES.has(type)) return PDF_TRANSLATION_FAILURE_REASON.PROVIDER_UNAVAILABLE
+  if (type) return PDF_TRANSLATION_FAILURE_REASON.PROVIDER_ERROR
+  return PDF_TRANSLATION_FAILURE_REASON.UNKNOWN
+}
 
 function isStructuredBlock(block) {
   if (block?.roleMetadata?.isStructured !== true) return false
@@ -440,6 +475,7 @@ export class PdfTranslationAdapter {
 
     if (!response || response.success === false) {
       const errorMessage = response?.error?.message || response?.error || 'PDF translation failed'
+      const failureReason = getPdfTranslationFailureReason(response?.error)
       return batchItems.map((item) => ({
         blockId: item.blockId,
         status: 'error',
@@ -448,7 +484,8 @@ export class PdfTranslationAdapter {
         sourceLanguage: sourceLanguage || response?.sourceLanguage || '',
         targetLanguage: targetLanguage || response?.targetLanguage || '',
         sourceTextHash: item.sourceTextHash || '',
-        error: errorMessage
+        error: errorMessage,
+        failureReason
       }))
     }
 
@@ -638,7 +675,8 @@ export class PdfTranslationAdapter {
           sourceLanguage: direct.sourceLanguage || sourceLanguage || '',
           targetLanguage: direct.targetLanguage || targetLanguage || '',
           sourceTextHash: representativeItem?.sourceTextHash || '',
-          error: translatedText ? null : 'Empty translation result'
+          error: translatedText ? null : 'Empty translation result',
+          failureReason: translatedText ? null : PDF_TRANSLATION_FAILURE_REASON.EMPTY_RESPONSE
         }
       }
 
@@ -661,6 +699,7 @@ export class PdfTranslationAdapter {
         targetLanguage: lastResult.targetLanguage || targetLanguage || '',
         sourceTextHash: representativeItem?.sourceTextHash || '',
         error: translatedText ? null : 'Empty translation result',
+        failureReason: translatedText ? null : PDF_TRANSLATION_FAILURE_REASON.EMPTY_RESPONSE,
         ...(blockItems.some((item) => hasStructuredCellMetadata(item)) && {
           translatedCells: [{
             lineIndex: 0,
@@ -769,7 +808,8 @@ export class PdfTranslationAdapter {
       sourceLanguage: lastResult.sourceLanguage || sourceLanguage || '',
       targetLanguage: lastResult.targetLanguage || targetLanguage || '',
       sourceTextHash: blockItems[0]?.sourceTextHash || '',
-      error: translatedText ? null : 'Empty translation result'
+      error: translatedText ? null : 'Empty translation result',
+      failureReason: translatedText ? null : PDF_TRANSLATION_FAILURE_REASON.EMPTY_RESPONSE
     }
   }
 

@@ -281,6 +281,27 @@ describe('PdfTranslationAdapter', () => {
     ])
   })
 
+  it.each([
+    ['TIMEOUT', 'timeout'],
+    ['BROWSER_API_UNAVAILABLE', 'provider-unavailable'],
+    ['API_ERROR', 'provider-error'],
+    [undefined, 'unknown'],
+    ['USER_CANCELLED', 'cancelled']
+  ])('preserves %s failure type as %s', (type, failureReason) => {
+    const adapter = new PdfTranslationAdapter()
+    const batchItems = adapter.toProviderItems([{ id: 'block-a', text: 'Hello', sourceTextHash: 'hash-a' }])
+    const mapped = adapter.mapBatchResponse(batchItems, {
+      success: false,
+      error: { message: 'Provider failed', type }
+    })
+
+    expect(mapped[0]).toMatchObject({
+      status: 'error',
+      error: 'Provider failed',
+      failureReason
+    })
+  })
+
   describe('structured block cell-aware translation', () => {
     it('emits per-cell items for multi-item structured lines', () => {
       const adapter = new PdfTranslationAdapter()

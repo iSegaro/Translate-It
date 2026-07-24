@@ -624,7 +624,8 @@ describe('PdfTranslationCoordinator', () => {
       failedCount: 1,
       totalCount: 2,
       translationOccurrenceId: 1,
-      error: ''
+      error: '',
+      failureReason: 'empty-response'
     })
     expect(session.setBlockTranslationState).toHaveBeenCalledWith('block-a', expect.objectContaining({
       status: 'translated',
@@ -652,7 +653,8 @@ describe('PdfTranslationCoordinator', () => {
       failedCount: 1,
       totalCount: 1,
       translationOccurrenceId: 1,
-      error: 'Provider failed: quota exceeded'
+      error: 'Provider failed: quota exceeded',
+      failureReason: 'unknown'
     })
   })
 
@@ -688,7 +690,8 @@ describe('PdfTranslationCoordinator', () => {
       failedCount: 2,
       totalCount: 2,
       translationOccurrenceId: 1,
-      error: 'First provider failed: quota exceeded'
+      error: 'First provider failed: quota exceeded',
+      failureReason: 'unknown'
     })
   })
 
@@ -707,7 +710,32 @@ describe('PdfTranslationCoordinator', () => {
       failedCount: 1,
       totalCount: 1,
       translationOccurrenceId: 1,
-      error: 'Provider X failed: timeout'
+      error: 'Provider X failed: timeout',
+      failureReason: 'unknown'
+    })
+  })
+
+  it.each([
+    ['TIMEOUT', 'timeout'],
+    ['BROWSER_API_UNAVAILABLE', 'provider-unavailable'],
+    ['API_ERROR', 'provider-error'],
+    [undefined, 'unknown']
+  ])('preserves %s response type as %s summary reason', async (type, failureReason) => {
+    const coordinator = new PdfTranslationCoordinator(session)
+    session.getVisibleLogicalBlocks.mockResolvedValue([
+      { id: 'block-a', text: 'Hello', role: 'paragraph', sourceTextHash: 'hash-a' }
+    ])
+    sendRegularMessageMock.mockResolvedValue({
+      success: false,
+      error: { message: 'Provider failed', type }
+    })
+
+    const summary = await coordinator.translateVisibleBlocks({ sourceLanguage: 'en', targetLanguage: 'es' })
+
+    expect(summary).toMatchObject({
+      status: 'partial',
+      error: 'Provider failed',
+      failureReason
     })
   })
 

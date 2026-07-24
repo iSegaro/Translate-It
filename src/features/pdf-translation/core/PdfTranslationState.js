@@ -10,7 +10,8 @@ export function createDefaultPdfTranslationState(blockId) {
     sourceTextHash: '',
     translationSettingsHash: '',
     updatedAt: 0,
-    error: null
+    error: null,
+    failureReason: null
   }
 }
 

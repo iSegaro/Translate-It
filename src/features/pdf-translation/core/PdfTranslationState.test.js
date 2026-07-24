@@ -14,7 +14,8 @@ describe('PdfTranslationState', () => {
       sourceTextHash: '',
       translationSettingsHash: '',
       updatedAt: 0,
-      error: null
+      error: null,
+      failureReason: null
     })
   })
 

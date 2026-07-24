@@ -132,7 +132,7 @@ describe('Presentation Presenter', () => {
     })
 
     it('presents translation-partial as outcome with partialTranslation', () => {
-      const intent = present({ name: 'translation-partial', occurrenceId: 42, error: 'Provider failed' })
+      const intent = present({ name: 'translation-partial', occurrenceId: 42, reason: 'provider-error', error: 'Provider failed' })
 
       expect(intent.intent).toBe('outcome')
       expect(intent.translationOutcome).toMatchObject({
@@ -144,7 +144,7 @@ describe('Presentation Presenter', () => {
     })
 
     it('presents translation-failed as an error outcome', () => {
-      const intent = present({ name: 'translation-failed', occurrenceId: 43, error: 'Request failed' })
+      const intent = present({ name: 'translation-failed', occurrenceId: 43, reason: 'provider-error', error: 'Request failed' })
 
       expect(intent.translationOutcome).toMatchObject({
         id: 'translation-failed:43',
@@ -152,6 +152,18 @@ describe('Presentation Presenter', () => {
         title: 'Translation failed',
         message: 'Request failed'
       })
+    })
+
+    it.each([
+      ['timeout', 'Translation timed out.'],
+      ['provider-unavailable', 'Translation provider unavailable.'],
+      ['empty-response', 'Translation returned no content.'],
+      ['provider-error', 'Provider failed'],
+      ['unknown', 'Translation failed. Please try again.']
+    ])('presents %s translation failure wording', (reason, message) => {
+      const intent = present({ name: 'translation-failed', occurrenceId: 44, reason, error: 'Provider failed' })
+
+      expect(intent.translationOutcome.message).toBe(message)
     })
 
     it('presents translation outcome clearing as an outcome intent', () => {

@@ -958,15 +958,18 @@ function handleTranslateVisiblePages() {
     if (completionHandled || activeProgressCancel !== cancelOperation) return
 
     const summary = translationSummary.value
+    if (summary?.failureReason === 'cancelled') return
     if (summary?.status === 'partial') {
       presentation.present(DomainEvents.translationPartial({
         occurrenceId: summary.translationOccurrenceId,
-        error: summary.error
+        error: summary.error,
+        reason: summary.failureReason
       }))
     } else if (summary?.status === 'error') {
       presentation.present(DomainEvents.translationFailed({
         occurrenceId: summary.translationOccurrenceId,
-        error: summary.error
+        error: summary.error,
+        reason: summary.failureReason
       }))
     }
   }).finally(() => {

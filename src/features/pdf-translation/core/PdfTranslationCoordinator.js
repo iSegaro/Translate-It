@@ -4,7 +4,7 @@ import { MessageActions } from '@/shared/messaging/core/MessageActions.js'
 import { MessageContexts } from '@/shared/messaging/core/MessagingConstants.js'
 import { MessageFormat } from '@/shared/messaging/core/MessagingCore.js'
 import { generateTranslationMessageId } from '@/utils/messaging/messageId.js'
-import { PdfTranslationAdapter } from './PdfTranslationAdapter.js'
+import { PDF_TRANSLATION_FAILURE_REASON, PdfTranslationAdapter } from './PdfTranslationAdapter.js'
 import { PdfTranslationBatchPlanner } from './PdfTranslationBatchPlanner.js'
 import { enrichBlocksWithTableMetadata } from './TableRegionAnalyzer.js'
 
@@ -186,6 +186,7 @@ export class PdfTranslationCoordinator {
       let translatedCount = 0
       let failedCount = 0
       let firstError = ''
+      let firstFailureReason = ''
 
       for (const batch of batches) {
         if (!this._isRunCurrent(runId)) {
@@ -215,14 +216,13 @@ export class PdfTranslationCoordinator {
         } catch (error) {
           response = {
             success: false,
-            error: error?.message || 'PDF translation failed'
+            error: {
+              message: error?.message || 'PDF translation failed',
+              type: error?.type
+            }
           }
         } finally {
           this.activeRequestIds.delete(messageId)
-        }
-
-        if (!firstError && response?.success === false && response?.error) {
-          firstError = response.error
         }
 
         if (!this._isRunCurrent(runId)) {
@@ -234,6 +234,13 @@ export class PdfTranslationCoordinator {
           sourceLanguage,
           targetLanguage
         })
+        const batchFailure = mappedResults.find((result) => result?.status === 'error' || !result?.translatedText)
+        if (batchFailure && !firstFailureReason) {
+          firstFailureReason = batchFailure.failureReason || PDF_TRANSLATION_FAILURE_REASON.UNKNOWN
+        }
+        if (!firstError && response?.success === false && batchFailure) {
+          firstError = batchFailure.error || 'PDF translation failed'
+        }
 
         const batchCounts = this._applyBatchResults(mappedResults)
         translatedCount += batchCounts.translatedCount
@@ -247,7 +254,8 @@ export class PdfTranslationCoordinator {
           failedCount,
           totalCount: translatedCount + failedCount,
           translationOccurrenceId: runId,
-          error: firstError
+          error: firstError,
+          ...(firstFailureReason && { failureReason: firstFailureReason })
         }
         return this.lastSummary
       }
@@ -256,9 +264,10 @@ export class PdfTranslationCoordinator {
         status: failedCount > 0 ? 'partial' : 'translated',
         translatedCount,
         failedCount,
-        totalCount: translatedCount + failedCount,
-        translationOccurrenceId: runId,
-        error: failedCount > 0 ? firstError : ''
+          totalCount: translatedCount + failedCount,
+          translationOccurrenceId: runId,
+          error: failedCount > 0 ? firstError : '',
+          ...(failedCount > 0 && { failureReason: firstFailureReason || PDF_TRANSLATION_FAILURE_REASON.UNKNOWN })
       }
 
       return this.lastSummary
@@ -302,7 +311,8 @@ export class PdfTranslationCoordinator {
         sourceLanguage: '',
         targetLanguage: '',
         sourceTextHash: block.sourceTextHash || '',
-        error: null
+        error: null,
+        failureReason: null
       })
     }
 
@@ -326,7 +336,8 @@ export class PdfTranslationCoordinator {
           sourceLanguage: result.sourceLanguage || '',
           targetLanguage: result.targetLanguage || '',
           sourceTextHash: result.sourceTextHash || '',
-          error: result.error || 'PDF translation failed'
+          error: result.error || 'PDF translation failed',
+          failureReason: result.failureReason || PDF_TRANSLATION_FAILURE_REASON.UNKNOWN
         })
         continue
       }
@@ -348,8 +359,9 @@ export class PdfTranslationCoordinator {
         provider: result.provider || '',
         sourceLanguage: result.sourceLanguage || '',
         targetLanguage: result.targetLanguage || '',
-        sourceTextHash: result.sourceTextHash || '',
-        error: null
+          sourceTextHash: result.sourceTextHash || '',
+          error: null,
+          failureReason: null
       })
     }
 

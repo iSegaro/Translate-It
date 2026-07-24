@@ -20,6 +20,21 @@ function buildComparisonMessage(summary) {
   return parts.join(' ') || 'Region Comparison completed.'
 }
 
+function buildTranslationFailureMessage(reason, error) {
+  switch (reason) {
+    case 'timeout':
+      return 'Translation timed out.'
+    case 'provider-unavailable':
+      return 'Translation provider unavailable.'
+    case 'empty-response':
+      return 'Translation returned no content.'
+    case 'provider-error':
+      return error || 'Translation failed. Please try again.'
+    default:
+      return 'Translation failed. Please try again.'
+  }
+}
+
 /**
  * Presentation Presenter — converts Domain Results to Presentation Intents.
  *
@@ -114,7 +129,7 @@ export function present(domainResult) {
           id: `translation-partial:${domainResult.occurrenceId || 0}`,
           variant: 'warning',
           title: 'Partial translation',
-          message: domainResult.error || 'Some pages could not be translated.',
+          message: buildTranslationFailureMessage(domainResult.reason, domainResult.error),
           occurrenceId: domainResult.occurrenceId
         }
       }
@@ -126,7 +141,7 @@ export function present(domainResult) {
           id: `translation-failed:${domainResult.occurrenceId || 0}`,
           variant: 'error',
           title: 'Translation failed',
-          message: domainResult.error || 'Translation failed. Please try again.',
+          message: buildTranslationFailureMessage(domainResult.reason, domainResult.error),
           occurrenceId: domainResult.occurrenceId
         }
       }
