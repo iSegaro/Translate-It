@@ -2,7 +2,7 @@
 
 ## Status
 
-Proposed
+Accepted
 
 ---
 
@@ -10,22 +10,7 @@ Proposed
 
 ADR-006 establishes `PdfRegion` as canonical geometry. ASR-002 defines Region OCR execution ownership after that mapping boundary. `PDF_TRANSLATION_ARCHITECTURE.md` keeps translation window ownership separate from selection and execution.
 
-Current production already has:
-
-- Region Selection
-- `PdfRegionMapper`
-- `PdfRegion`
-- Region OCR execution pipeline
-- Translation window pipeline
-
-Benchmark infrastructure is also complete:
-
-- Runner
-- RAW artifacts
-- `SCORED_RESULT`
-- `COMPARISON_RESULT`
-
-Next step is exposing execution through UX without coupling selection to any concrete execution path.
+The runtime uses this boundary for Region OCR and Region Comparison. Selection emits canonical geometry; `PdfApp` constructs the fully decided request; the dispatcher routes it without mutation.
 
 ---
 
@@ -212,18 +197,6 @@ This preserves clean architecture because execution policy belongs to the caller
 ### Trade-offs
 
 The architecture favors explicit routing over direct calls. A direct selection-to-feature path would be shorter, but it would couple interaction code to concrete execution behavior and make future extension expensive.
-
----
-
-## Migration Plan
-
-1. Selection creates canonical `PdfRegion`.
-2. UI or caller creates `RegionExecutionRequest`.
-3. Dispatcher routes request.
-4. Runner executes request.
-5. Add future execution targets only behind dispatcher routing.
-
-Migration should be incremental. Existing selection and execution ownership should remain intact during the transition.
 
 ---
 

@@ -1,4 +1,4 @@
-# ADR-010: Defer Per-Application Stylesheet Architecture
+# ADR-012: Defer Per-Application Stylesheet Architecture
 
 - **Status:** Accepted
 - **Date:** 2026-07-23

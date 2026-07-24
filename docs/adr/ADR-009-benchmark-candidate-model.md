@@ -1,4 +1,4 @@
-# ADR-008: Benchmark Candidate Model
+# ADR-009: Benchmark Candidate Model
 
 ## Status
 
@@ -8,7 +8,7 @@ Accepted
 
 ## Context
 
-Region Benchmark compares repeated executions of production Region OCR under defined OCR configurations. Current benchmark configurations include render scale and OCR language; future configurations may vary additional OCR parameters.
+Region Benchmark compares repeated executions of production Region OCR under defined OCR configurations. Current immutable candidate configurations include render scale; OCR language is runtime input supplied when a comparison run starts.
 
 ## Problem
 
@@ -20,10 +20,9 @@ The benchmark unit is an immutable `BenchmarkCandidate`. A candidate identifies 
 
 ```js
 {
-  candidateId: 'scale-1.5-eng',
+  candidateId: 'scale-1.5',
   configuration: {
-    scale: 1.5,
-    language: 'eng'
+    scale: 1.5
   }
 }
 ```
@@ -46,7 +45,7 @@ Evaluation remains independent from execution. `BenchmarkEvaluator` consumes ben
 
 ## Candidate Model
 
-`OCRConfiguration` is an immutable domain value containing OCR parameters, initially `scale` and `language`. It is not an OCR executor, runtime state, or provider metadata. Future OCR parameters extend `OCRConfiguration`.
+`OCRConfiguration` is an immutable domain value containing candidate parameters, currently `scale`. It is not an OCR executor, runtime state, or provider metadata. OCR language is runtime input supplied to `RegionComparisonRunner.execute(request, language)` and recorded with each result, not part of candidate identity. Future candidate parameters extend `OCRConfiguration`.
 
 `BenchmarkCandidate` owns one `OCRConfiguration` and contains:
 

@@ -2,7 +2,7 @@
 
 ## Status
 
-Proposed
+Accepted
 
 ---
 
@@ -10,7 +10,7 @@ Proposed
 
 ADR-007 introduced `RegionExecutionRequest` and request-based dispatch for execution selected from a PDF page. That contract correctly models one canonical `PdfRegion` after the ADR-006 geometry boundary.
 
-The PDF runtime needs one immutable request contract for Region OCR while preserving existing ownership:
+The PDF runtime needs one immutable request contract for live PDF region execution while preserving existing ownership:
 
 - ADR-006 retains canonical `PdfRegion` geometry.
 - ASR-002 retains Region OCR interaction, execution, workflow, and presentation boundaries.
@@ -20,11 +20,11 @@ The PDF runtime needs one immutable request contract for Region OCR while preser
 
 ## Decision
 
-Use `RegionExecutionRequest` as the dispatcher contract for Region OCR.
+Use `RegionExecutionRequest` as the dispatcher contract for live PDF region execution.
 
 The contract is not a required runtime inheritance hierarchy. The architecture does not require a base class, inheritance, or a runtime-polymorphic object.
 
-Every Region OCR request contains:
+Every request contains:
 
 - `target`: requested execution target.
 - `scope`: input-domain discriminator.
@@ -39,7 +39,7 @@ Every Region OCR request contains:
 - `scope` is `live-region`.
 - Requires one canonical immutable `PdfRegion`.
 - Is constructed from user selection after ADR-006 mapping.
-- Is used by OCR.
+- Supports `OCR` and `REGION_COMPARISON` targets.
 
 ---
 
@@ -48,14 +48,15 @@ Every Region OCR request contains:
 | Target | Scope | Required Payload | Invalid Payload | Valid |
 |---|---|---|---|---|
 | OCR | `live-region` | Canonical `PdfRegion` | Unsupported target or metadata | Yes |
+| REGION_COMPARISON | `live-region` | Canonical `PdfRegion` | Unsupported target or metadata | Yes |
 
-Request construction validates target, scope, and payload compatibility. The OCR runner defensively validates its required inputs. The dispatcher does not own this policy.
+Request construction validates target, scope, and payload compatibility. Each runner defensively validates its required inputs. The dispatcher does not own this policy.
 
 ---
 
 ## Dispatcher Contract
 
-The dispatcher depends only on the `RegionExecutionRequest` contract and routes Region OCR requests without mutating them.
+The dispatcher depends only on the `RegionExecutionRequest` contract and routes live-region requests without mutating them.
 
 The dispatcher owns only:
 
@@ -80,7 +81,7 @@ The dispatcher returns the selected runner operation unchanged.
 
 ## Operation Contract
 
-The OCR runner returns one immutable operation handle containing:
+Each runner returns one immutable operation handle containing:
 
 | Field | Meaning |
 |---|---|
@@ -102,9 +103,10 @@ Workflow adapters own active-operation retention, user cancellation commands, st
 |---|---|---|
 | Selection | Pointer interaction and page-local CSS rectangle | Execution routing |
 | PdfRegionMapper | CSS-to-canonical `PdfRegion` conversion | Execution lifecycle |
-| PdfApp | Current execution mode, request construction, command/workflow start decision | OCR runner internals |
+| PdfApp | Request construction, command/workflow start decision | Runner internals |
 | Dispatcher | Target routing, runner lookup, operation delegation | Scope policy, cancellation, progress |
 | OCR runner | Live-region OCR execution and delegated OCR cancellation | Selection, translation-window lifecycle |
+| Region Comparison runner | Candidate execution and delegated cancellation | Selection, presentation, artifact writing |
 | Workflow adapter | Active operation identity, reactive progress bridge, stale-result suppression, app teardown cancellation | OCR execution semantics |
 | Toolbar | Presentation and user intent emission | Request construction, runner invocation, dispatch, progress ownership |
 
@@ -112,7 +114,7 @@ Workflow adapters own active-operation retention, user cancellation commands, st
 
 ## Execution Flows
 
-Live OCR begins with selection, crosses the ADR-006 mapping boundary, then creates a `RegionExecutionRequest`. The dispatcher routes the immutable live-region request to an OCR operation. The existing OCR workflow and PDF translation-window pipeline retain their lifecycle and presentation responsibilities.
+Live region execution begins with selection, crosses the ADR-006 mapping boundary, then creates a `RegionExecutionRequest`. The dispatcher routes the immutable request to its OCR or Region Comparison operation. Each workflow retains its lifecycle and presentation responsibilities.
 
 ---
 
@@ -120,7 +122,7 @@ Live OCR begins with selection, crosses the ADR-006 mapping boundary, then creat
 
 1. Existing callers using `RegionExecutionRequest` remain unaffected. It remains valid as the live-region request contract.
 2. Dispatcher routing remains limited to `RegionExecutionRequest`.
-3. OCR uses the immutable operation handle without moving lifecycle ownership from the OCR workflow.
+3. Each runner uses the immutable operation handle without moving lifecycle ownership from its workflow.
 
 ---
 

@@ -2,7 +2,7 @@
 
 ## Status
 
-Proposed
+Accepted
 
 ---
 
@@ -24,15 +24,7 @@ This pipeline is functionally correct and stable.
 
 ### Current Product Semantics
 
-The current product language is built on **"Scanned Page Detection."**
-
-The detector answers: *"Is this page scanned?"*
-
-The composable exposes this classification directly as public state. The toolbar renders an OCR button when scanned pages are detected. The consent prompt tells the user that "scanned pages are currently visible."
-
-The product question the user actually encounters is: *"Should I run OCR on this page?"*
-
-Today, these two questions are answered by the same mechanism. The detector classifies page structure, and the composable forwards that classification as product-facing state. The policy that converts "scanned candidate" to "OCR should be recommended" (excluding already-OCR'd pages) is embedded inline in the composable.
+The detector answers: *"Is this page structurally scanned?"* The Recommendation Engine answers: *"Should OCR be recommended for this page?"* `usePdfOcr` exposes recommendation results to the toolbar and excludes pages that already contain committed OCR blocks.
 
 ### Why Recommendation Differs From Detection
 
@@ -44,21 +36,9 @@ Today, these two questions are answered by the same mechanism. The detector clas
 
 Detection changes when heuristics evolve. Recommendation changes when product policy evolves. These are independent forces. Merging them means every product-policy change touches the detector, and every heuristic change risks altering product behavior. This independent-change-driver principle is the central architectural motivation for the separation established by this ADR.
 
-### Current Limitations
+### Region OCR Independence
 
-1. **Semantic leak.** The composable exposes detection terminology as public state. UI components bind to detection-derived concepts rather than recommendation semantics. If recommendation logic evolves to consider factors beyond scanned-page classification, the public contract becomes misleading.
-
-2. **Recommendation policy embedded in composable.** The filtering that converts detection results to recommendation results lives inline in the composable. This is recommendation policy disguised as workflow logic. It cannot be tested independently, and it couples the composable to detection internals.
-
-3. **No separation between "classify page" and "decide to recommend."** The detector returns structured classification results. The composable interprets these to produce a recommendation. There is no architectural boundary between structural classification and product decision.
-
-4. **Dead detector methods.** The detector exposes methods that are never called in production. The composable calls the detector directly and performs its own interpretation. The detector's public surface is larger than its actual usage.
-
-5. **Dead UI status path.** UI components bind detection-derived fields that the viewer controller never populates. The status indicator is effectively non-functional. This is a symptom of the semantic leak: detection concepts were threaded through the viewer layer without a clear ownership boundary.
-
-### Future Region OCR
-
-The long-term roadmap includes **Region OCR**: the user draws a rectangle in the PDF viewport, OCR runs inside that region, and the extracted text is translated.
+Region OCR is implemented: the user draws a rectangle in the PDF viewport, OCR runs inside that region, and recognized text opens a translation window.
 
 Region OCR is a fundamentally different interaction model from OCR recommendation:
 
@@ -211,7 +191,7 @@ The recommendation path and the execution path are separate. Recommendation neve
 
 - **No UI coupling to detection.** UI components bind to recommendation results, not classification results. Changing the detection heuristic does not require UI changes. Changing recommendation rules does not require detector changes.
 
-- **Region OCR compatibility.** OCR recommendation and region-level OCR are independent. Adding Region OCR does not require changes to the Recommendation Engine. Region OCR can use its own execution path without conflicting with the recommendation contract.
+- **Region OCR independence.** OCR recommendation and implemented region-level OCR are independent. Region OCR uses its own execution path without conflicting with the recommendation contract.
 
 - **Aligned with ADR-004.** The Recommendation Engine is a pure consumer of page content. It does not own PageSession lifecycle, does not trigger hydration, and does not mutate PageSession. It follows the consumer contract established by ADR-004.
 

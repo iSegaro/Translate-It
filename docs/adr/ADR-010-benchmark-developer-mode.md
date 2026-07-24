@@ -1,8 +1,8 @@
-# ADR-009: Benchmark Developer Mode
+# ADR-010: Benchmark Developer Mode
 
 ## Status
 
-Proposed
+Accepted
 
 ---
 
