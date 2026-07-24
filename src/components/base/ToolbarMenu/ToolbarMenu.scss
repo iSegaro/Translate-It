@@ -1,6 +1,6 @@
 // ── ToolbarMenu ──────────────────────────────────────────────
 // Application-agnostic toolbar-attached menu primitive.
-// Desktop: anchored popover. Mobile: full-height right drawer.
+// Desktop: anchored popover. Mobile: full-height drawer.
 
 $tm-mobile-breakpoint: 749px;
 
@@ -8,12 +8,32 @@ $tm-mobile-breakpoint: 749px;
   position: relative;
 
   // Layer tokens — defaults use the project's shared z-index system.
-  // Consumers may override per application.
   --tm-layer-backdrop: var(--ti-z-dropdown);
   --tm-layer-panel: calc(var(--ti-z-dropdown) + 1);
+
+  // Semantic panel tokens — overridable per variant or consumer.
+  --tm-panel-background: transparent;
+  --tm-panel-border: none;
+  --tm-panel-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  --tm-panel-radius: 14px;
 }
 
-// Backdrop — only visible on mobile when drawer is open
+// ── Placement ────────────────────────────────────────────────
+
+.toolbar-menu--placement-end {
+  .toolbar-menu__panel {
+    right: 0;
+  }
+}
+
+.toolbar-menu--placement-start {
+  .toolbar-menu__panel {
+    left: 0;
+  }
+}
+
+// ── Backdrop ──────────────────────────────────────────────────
+
 .toolbar-menu__backdrop {
   display: none;
 
@@ -26,29 +46,42 @@ $tm-mobile-breakpoint: 749px;
   }
 }
 
-// Panel — popover at desktop, drawer at mobile
+// ── Panel ─────────────────────────────────────────────────────
+
 .toolbar-menu__panel {
-  // Desktop: anchored popover
   position: absolute;
-  top: calc(100% + 8px);
-  right: 0;
+  top: calc(100% + var(--tm-offset, 8px));
   z-index: var(--tm-layer-panel);
   min-width: 190px;
   max-height: calc(100vh - 120px);
   overflow-y: auto;
   overscroll-behavior: contain;
-  border-radius: 14px;
-  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.28);
+  background: var(--tm-panel-background);
+  border: var(--tm-panel-border);
+  border-radius: var(--tm-panel-radius);
+  box-shadow: var(--tm-panel-shadow);
 
-  // Mobile: full-height right drawer
+  // Mobile: full-height drawer
   @media (max-width: $tm-mobile-breakpoint) {
     position: fixed;
     top: 0;
-    right: 0;
     bottom: 0;
     width: 80vw;
     max-width: 360px;
     max-height: none;
-    border-radius: 14px 0 0 14px;
+  }
+}
+
+.toolbar-menu--placement-end .toolbar-menu__panel {
+  @media (max-width: $tm-mobile-breakpoint) {
+    right: 0;
+    border-radius: var(--tm-panel-radius) 0 0 var(--tm-panel-radius);
+  }
+}
+
+.toolbar-menu--placement-start .toolbar-menu__panel {
+  @media (max-width: $tm-mobile-breakpoint) {
+    left: 0;
+    border-radius: 0 var(--tm-panel-radius) var(--tm-panel-radius) 0;
   }
 }

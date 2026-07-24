@@ -2,6 +2,8 @@
   <div
     ref="rootRef"
     class="toolbar-menu"
+    :class="rootClasses"
+    :style="rootStyle"
   >
     <slot
       name="trigger"
@@ -39,7 +41,34 @@
 import { computed, onMounted, onBeforeUnmount, ref, nextTick } from 'vue'
 import { useResourceTracker } from '@/composables/core/useResourceTracker.js'
 
+const props = defineProps({
+  variant: {
+    type: String,
+    default: null
+  },
+  placement: {
+    type: String,
+    default: 'end',
+    validator: (v) => ['start', 'end'].includes(v)
+  },
+  offset: {
+    type: Number,
+    default: 8
+  }
+})
+
 const emit = defineEmits(['open', 'close'])
+
+const rootClasses = computed(() => {
+  const classes = []
+  if (props.variant) classes.push(`toolbar-menu--${props.variant}`)
+  classes.push(`toolbar-menu--placement-${props.placement}`)
+  return classes
+})
+
+const rootStyle = computed(() => ({
+  '--tm-offset': `${props.offset}px`
+}))
 
 const tracker = useResourceTracker('toolbar-menu')
 const rootRef = ref(null)

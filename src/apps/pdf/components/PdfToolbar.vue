@@ -343,6 +343,7 @@
       />
       <ToolbarMenu
         ref="moreMenuRef"
+        variant="dark"
         @open="closeMenus"
       >
         <template #trigger="{ triggerAttrs, triggerRef, onToggle }">
