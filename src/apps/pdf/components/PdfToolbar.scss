@@ -390,23 +390,10 @@
   }
 }
 
-.pdf-toolbar__export-dropdown {
-  position: relative;
-}
-
 .pdf-toolbar__export-menu {
-  position: absolute;
-  top: calc(100% + 8px);
-  right: 0;
-  z-index: var(--pdf-layer-toolbar-menu);
   display: grid;
   gap: 4px;
-  min-width: 190px;
   padding: 8px;
-  border: 1px solid $tb-border-hover;
-  border-radius: 14px;
-  background: $tb-surface;
-  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.28);
 }
 
 .pdf-toolbar__export-item {

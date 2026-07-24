@@ -1,0 +1,51 @@
+// ── ToolbarMenu ──────────────────────────────────────────────
+// Application-agnostic toolbar-attached menu primitive.
+// Desktop: anchored popover. Mobile: full-height right drawer.
+
+.toolbar-menu {
+  position: relative;
+}
+
+.toolbar-menu__trigger {
+  cursor: pointer;
+}
+
+// Backdrop — only visible on mobile when drawer is open
+.toolbar-menu__backdrop {
+  display: none;
+
+  @media (max-width: 749px) {
+    display: block;
+    position: fixed;
+    inset: 0;
+    z-index: 100;
+    background: rgba(0, 0, 0, 0.4);
+  }
+}
+
+// Panel — popover at desktop, drawer at mobile
+.toolbar-menu__panel {
+  // Desktop: anchored popover
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  z-index: 110;
+  min-width: 190px;
+  max-height: calc(100vh - 120px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  border-radius: 14px;
+  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.28);
+
+  // Mobile: full-height right drawer
+  @media (max-width: 749px) {
+    position: fixed;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    width: 80vw;
+    max-width: 360px;
+    max-height: none;
+    border-radius: 14px 0 0 14px;
+  }
+}

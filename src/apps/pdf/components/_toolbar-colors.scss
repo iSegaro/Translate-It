@@ -31,6 +31,12 @@ $tb-focus-soft:         rgba(106, 165, 255, 0.90);
 .pdf-toolbar {
   // ProviderSelector text contrast on the always-dark PDF toolbar.
   --color-text: #{$tb-text-primary};
+
+  // ToolbarMenu dark theme overrides
+  .toolbar-menu__panel {
+    background: $tb-surface;
+    border: 1px solid $tb-border-hover;
+  }
 }
 
 .pdf-toolbar .ti-dropdown-arrow {
