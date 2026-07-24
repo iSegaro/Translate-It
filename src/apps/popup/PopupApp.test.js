@@ -66,9 +66,7 @@ vi.mock('@/utils/UtilsFactory.js', () => ({
 }))
 
 vi.mock('@/composables/shared/useLanguages.js', () => ({
-  useLanguages: () => ({
-    loadLanguages: vi.fn().mockResolvedValue(undefined)
-  })
+  preloadLanguages: vi.fn().mockResolvedValue(undefined)
 }))
 
 vi.mock('@/components/base/LoadingSpinner.vue', () => ({
