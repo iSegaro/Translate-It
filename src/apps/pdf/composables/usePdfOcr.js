@@ -54,13 +54,16 @@ export function usePdfOcr({ onOcrComplete, onOcrStart, onOcrProgress, onOcrError
 
     isOcrProcessing.value = true
     ocrError.value = ''
+    let pageNumbers = []
+    let batchErrorCode = null
+    let terminalResult = null
 
     onOcrStart?.()
 
     try {
       ocrLanguage.value = settingsStore.settings.OCR_DEFAULT_LANG || 'eng'
 
-      const pageNumbers = [...ocrBatch.pageNumbers]
+      pageNumbers = [...ocrBatch.pageNumbers]
 
       const results = await processor.processPages(pageNumbers, {
         language: ocrLanguage.value,
@@ -70,28 +73,44 @@ export function usePdfOcr({ onOcrComplete, onOcrStart, onOcrProgress, onOcrError
         }
       })
 
-      const errorCode = getBatchOcrError(results)
-      if (errorCode && errorCode !== 'cancelled') {
-        ocrError.value = errorCode
-        onOcrError?.(errorCode)
+      batchErrorCode = getBatchOcrError(results)
+      if (batchErrorCode && batchErrorCode !== 'cancelled') {
+        ocrError.value = batchErrorCode
       }
 
       await saveOcrToCache(pageNumbers)
 
       refreshOcrRecommendations()
-      onOcrComplete?.({ pageNumbers })
+      if (batchErrorCode && batchErrorCode !== 'cancelled') {
+        terminalResult = { type: 'error', errorCode: batchErrorCode, pageNumbers }
+      } else {
+        terminalResult = { type: 'complete', pageNumbers }
+      }
 
       logger.info('OCR completed for pages:', { pageNumbers, language: ocrLanguage.value })
     } catch (error) {
       logger.error('OCR process failed:', error)
-      const errorCode = mapOcrError(error)
+      const errorCode = batchErrorCode || mapOcrError(error)
       if (errorCode !== 'cancelled') {
         ocrError.value = errorCode
-        onOcrError?.(errorCode)
+        terminalResult = {
+          type: 'error',
+          errorCode,
+          pageNumbers: batchErrorCode ? pageNumbers : undefined
+        }
       }
     } finally {
       isOcrProcessing.value = false
       ocrProgress.value = { current: 0, total: 0, pageNumber: 0 }
+    }
+
+    if (terminalResult?.type === 'error') {
+      onOcrError?.(terminalResult.errorCode, terminalResult.pageNumbers && { pageNumbers: terminalResult.pageNumbers })
+      return
+    }
+
+    if (terminalResult?.type === 'complete') {
+      onOcrComplete?.({ pageNumbers: terminalResult.pageNumbers })
     }
   }
 

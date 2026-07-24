@@ -364,19 +364,18 @@ const {
   onOcrComplete: ({ pageNumbers } = {}) => {
     presentation.present(DomainEvents.activityCompleted())
     activeProgressCancel = null
-    refreshTranslatedPageBlocks(pageNumbers)
-    translationTick.value += 1
-    refreshOcrRecommendations()
+    refreshOcrPageData(pageNumbers)
   },
   onOcrProgress: ({ current, total }) => {
     presentation.present(DomainEvents.ocrProgressUpdated({ current, total }))
   },
-  onOcrError: (errorCode) => {
+  onOcrError: (errorCode, { pageNumbers } = {}) => {
     presentation.present(DomainEvents.activityCompleted())
     activeProgressCancel = null
     presentation.present(errorCode === 'model-not-installed'
       ? DomainEvents.ocrLanguageMissing()
       : DomainEvents.ocrFailed())
+    refreshOcrPageData(pageNumbers)
   }
 })
 
@@ -552,6 +551,13 @@ function startPageOcr() {
   presentation.present(DomainEvents.ocrStarted())
   activeProgressCancel = cancelOcr
   requestOcr()
+}
+
+function refreshOcrPageData(pageNumbers) {
+  if (!pageNumbers?.length) return
+  refreshTranslatedPageBlocks(pageNumbers)
+  translationTick.value += 1
+  refreshOcrRecommendations()
 }
 
 function handleOcrSelectAction(action) {

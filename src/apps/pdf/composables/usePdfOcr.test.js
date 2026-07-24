@@ -224,6 +224,87 @@ describe('usePdfOcr', () => {
     wrapper.unmount()
   })
 
+  it('emits only the error terminal callback for failed batches', async () => {
+    const onOcrComplete = vi.fn()
+    const onOcrError = vi.fn()
+    const { api, wrapper } = mountComposable({ onOcrComplete, onOcrError })
+    mockPdfDocumentSession.pageSessions.set(1, createScannedPageSession(1))
+    mockPdfDocumentSession.pageSessions.set(2, createScannedPageSession(2))
+    mockPdfDocumentSession.visiblePageNumbers = new Set([1, 2])
+    mockProcessPages = vi.fn(async () => [
+      { pageNumber: 1, blocks: [{ id: 'ocr-1' }], success: true },
+      { pageNumber: 2, blocks: [], success: false, error: 'Tesseract worker crashed' }
+    ])
+    api.refreshOcrRecommendations()
+
+    await api.requestOcr()
+
+    expect(onOcrError).toHaveBeenCalledWith('ocr-failed', { pageNumbers: [1, 2] })
+    expect(onOcrComplete).not.toHaveBeenCalled()
+    wrapper.unmount()
+  })
+
+  it('emits one batch error callback when saving partial results fails', async () => {
+    const onOcrComplete = vi.fn()
+    const onOcrError = vi.fn()
+    const { api, wrapper } = mountComposable({ onOcrComplete, onOcrError })
+    const { pdfCacheManager } = await import('@/features/pdf-translation/core/PdfCacheManager.js')
+    mockPdfDocumentSession.pageSessions.set(1, createScannedPageSession(1))
+    mockPdfDocumentSession.visiblePageNumbers.add(1)
+    mockPdfDocumentSession.getCommittedOcrState.mockReturnValue({
+      ocrBlocks: [{ id: 'ocr-1' }],
+      ocrLanguage: 'eng',
+      ocrCompletedAt: 0
+    })
+    mockProcessPages = vi.fn(async () => [
+      { pageNumber: 1, blocks: [], success: false, error: 'Tesseract worker crashed' }
+    ])
+    pdfCacheManager.saveOcr.mockRejectedValueOnce(new Error('Cache unavailable'))
+    api.refreshOcrRecommendations()
+
+    await api.requestOcr()
+
+    expect(onOcrError).toHaveBeenCalledTimes(1)
+    expect(onOcrError).toHaveBeenCalledWith('ocr-failed', { pageNumbers: [1] })
+    expect(onOcrComplete).not.toHaveBeenCalled()
+    wrapper.unmount()
+  })
+
+  it('does not emit a second terminal error when the error callback throws', async () => {
+    const callbackError = new Error('Error callback failed')
+    const onOcrComplete = vi.fn()
+    const onOcrError = vi.fn(() => { throw callbackError })
+    const { api, wrapper } = mountComposable({ onOcrComplete, onOcrError })
+    mockPdfDocumentSession.pageSessions.set(1, createScannedPageSession(1))
+    mockPdfDocumentSession.visiblePageNumbers.add(1)
+    mockProcessPages = vi.fn(async () => [
+      { pageNumber: 1, blocks: [], success: false, error: 'Tesseract worker crashed' }
+    ])
+    api.refreshOcrRecommendations()
+
+    await expect(api.requestOcr()).rejects.toThrow(callbackError)
+
+    expect(onOcrError).toHaveBeenCalledTimes(1)
+    expect(onOcrComplete).not.toHaveBeenCalled()
+    wrapper.unmount()
+  })
+
+  it('does not convert a throwing completion callback into an error terminal event', async () => {
+    const callbackError = new Error('Completion callback failed')
+    const onOcrComplete = vi.fn(() => { throw callbackError })
+    const onOcrError = vi.fn()
+    const { api, wrapper } = mountComposable({ onOcrComplete, onOcrError })
+    mockPdfDocumentSession.pageSessions.set(1, createScannedPageSession(1))
+    mockPdfDocumentSession.visiblePageNumbers.add(1)
+    api.refreshOcrRecommendations()
+
+    await expect(api.requestOcr()).rejects.toThrow(callbackError)
+
+    expect(onOcrComplete).toHaveBeenCalledTimes(1)
+    expect(onOcrError).not.toHaveBeenCalled()
+    wrapper.unmount()
+  })
+
   it('updates recommendations while scrolling down and up across hydrated pages', () => {
     const { api, wrapper } = mountComposable()
     mockPdfDocumentSession.pageSessions.set(1, createScannedPageSession(1, { logicalBlocks: [{ id: 'text-1' }] }))

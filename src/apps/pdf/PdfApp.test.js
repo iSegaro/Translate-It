@@ -706,6 +706,18 @@ describe('PdfApp', () => {
     expect(mockViewerController.recomputeLayout).not.toHaveBeenCalled()
   })
 
+  it('refreshes partial OCR page wrappers from the terminal error callback', async () => {
+    createMocks()
+    mount(PdfApp)
+    await flushPromises()
+
+    mockPdfOcrOptions.onOcrError('ocr-failed', { pageNumbers: [2, 1] })
+
+    expect(mockViewerController.refreshTranslatedPageBlocks).toHaveBeenCalledWith([2, 1])
+    expect(mockViewerController.translationTick.value).toBe(1)
+    expect(mockPdfOcr.refreshOcrRecommendations).toHaveBeenCalled()
+  })
+
   it('builds OCR RegionExecutionRequest and preserves recognized-text handoff', async () => {
     createMocks({ sessionAsRef: false })
 
