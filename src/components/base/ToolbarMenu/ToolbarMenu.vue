@@ -19,25 +19,53 @@
       :disabled="!isMobile"
       to="body"
     >
-      <div
-        v-if="isOpen"
-        class="toolbar-menu__backdrop"
-        aria-hidden="true"
-        @click="close"
-      />
+      <template v-if="isMobile">
+        <Transition name="toolbar-menu-backdrop">
+          <div
+            v-if="isOpen"
+            class="toolbar-menu__backdrop"
+            aria-hidden="true"
+            @click="close"
+          />
+        </Transition>
 
-      <div
-        v-if="isOpen"
-        ref="menuRef"
-        class="toolbar-menu__panel"
-        role="menu"
-        @keydown.escape="close"
-      >
-        <slot
-          :close="close"
-          :is-open="isOpen"
+        <Transition name="toolbar-menu-drawer">
+          <div
+            v-if="isOpen"
+            ref="menuRef"
+            class="toolbar-menu__panel"
+            role="menu"
+            @keydown.escape="close"
+          >
+            <slot
+              :close="close"
+              :is-open="isOpen"
+            />
+          </div>
+        </Transition>
+      </template>
+
+      <template v-else>
+        <div
+          v-if="isOpen"
+          class="toolbar-menu__backdrop"
+          aria-hidden="true"
+          @click="close"
         />
-      </div>
+
+        <div
+          v-if="isOpen"
+          ref="menuRef"
+          class="toolbar-menu__panel"
+          role="menu"
+          @keydown.escape="close"
+        >
+          <slot
+            :close="close"
+            :is-open="isOpen"
+          />
+        </div>
+      </template>
     </Teleport>
   </div>
 </template>

@@ -85,3 +85,36 @@ $tm-mobile-breakpoint: 749px;
     border-radius: 0 var(--tm-panel-radius) var(--tm-panel-radius) 0;
   }
 }
+
+// ── Drawer Animation (mobile only) ────────────────────────────
+
+.toolbar-menu-backdrop-enter-from,
+.toolbar-menu-backdrop-leave-to {
+  opacity: 0;
+}
+
+.toolbar-menu-backdrop-enter-to,
+.toolbar-menu-backdrop-leave-from {
+  opacity: 1;
+}
+
+.toolbar-menu-backdrop-enter-active,
+.toolbar-menu-backdrop-leave-active {
+  transition: opacity 220ms ease;
+}
+
+.toolbar-menu-drawer-enter-from,
+.toolbar-menu-drawer-leave-to {
+  transform: translateX(100%);
+}
+
+.toolbar-menu-drawer-enter-to,
+.toolbar-menu-drawer-leave-from {
+  transform: translateX(0);
+}
+
+.toolbar-menu-drawer-enter-active,
+.toolbar-menu-drawer-leave-active {
+  transition: transform 220ms cubic-bezier(0.2, 0, 0, 1);
+  will-change: transform;
+}
