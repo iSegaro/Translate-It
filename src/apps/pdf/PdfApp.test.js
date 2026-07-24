@@ -47,6 +47,7 @@ const regionComparisonRunnerMock = vi.hoisted(() => ({
   execute: vi.fn(),
   options: null
 }))
+const activityCompletedMock = vi.hoisted(() => vi.fn(() => ({ name: 'activity-completed' })))
 
 function createMockOperation(promise, cancel = vi.fn(), context = { target: 'ocr' }) {
   return Object.freeze({
@@ -81,6 +82,17 @@ vi.mock('./composables/usePdfViewerMode.js', () => ({
 vi.mock('./composables/usePdfExport.js', () => ({
   usePdfExport: () => mockPdfExport
 }))
+
+vi.mock('./presentation/domainEvents.js', async (importOriginal) => {
+  const actual = await importOriginal()
+  return {
+    ...actual,
+    DomainEvents: Object.freeze({
+      ...actual.DomainEvents,
+      activityCompleted: activityCompletedMock
+    })
+  }
+})
 
 vi.mock('./composables/usePdfOcr.js', () => ({
   usePdfOcr: (options) => {
@@ -433,6 +445,7 @@ describe('PdfApp', () => {
     mockRegionExecutionDispatch.mockClear()
     regionComparisonRunnerMock.execute.mockReset()
     regionComparisonRunnerMock.options = null
+    activityCompletedMock.mockClear()
     settingsStoreMock.settings.DEBUG_MODE = false
     settingsStoreMock.settings.OCR_DEFAULT_LANG = 'eng'
     settingsStoreMock.settings.OCR_PREFERRED_ACTION = 'region'
@@ -574,6 +587,14 @@ describe('PdfApp', () => {
 
   async function startRegionComparison(wrapper, region = createPdfRegion({ pageNumber: 1, left: 1, top: 4, right: 3, bottom: 2 })) {
     wrapper.findComponent({ name: 'PdfToolbar' }).vm.$emit('request-region-comparison')
+    await flushPromises()
+    wrapper.findComponent({ name: 'PdfViewer' }).vm.$emit('region-selection-complete', region)
+    await flushPromises()
+    return region
+  }
+
+  async function startRegionOcr(wrapper, region = createPdfRegion({ pageNumber: 1, left: 1, top: 4, right: 3, bottom: 2 })) {
+    wrapper.findComponent({ name: 'PdfToolbar' }).vm.$emit('primary-click')
     await flushPromises()
     wrapper.findComponent({ name: 'PdfViewer' }).vm.$emit('region-selection-complete', region)
     await flushPromises()
@@ -820,7 +841,7 @@ describe('PdfApp', () => {
     await flushPromises()
 
     expect(mockPdfOcr.requestOcr).toHaveBeenCalledOnce()
-    expect(wrapper.find('.pdf-progress-bar').exists()).toBe(false)
+    expect(wrapper.find('.pdf-progress-bar__cancel').exists()).toBe(false)
 
     mockPdfOcrOptions.onOcrStart()
     await flushPromises()
@@ -968,6 +989,57 @@ describe('PdfApp', () => {
     await flushPromises()
 
     expect(wrapper.text()).not.toContain('OCR failed. Please try another region.')
+  })
+
+  it('emits one completion on progress-bar Region OCR cancel and ignores late outcome', async () => {
+    const deferred = createDeferred()
+    const cancel = vi.fn()
+    mockRegionOcr.startRegionOcr.mockReturnValue(createMockOperation(deferred.promise, cancel))
+    mockRegionOcr.cancelRegionOcr.mockImplementation(cancel)
+    const { toast } = await import('vue-sonner')
+    const wrapper = mount(PdfApp)
+    await flushPromises()
+
+    await startRegionOcr(wrapper)
+    await wrapper.find('.pdf-progress-bar__cancel').trigger('click')
+    await flushPromises()
+
+    expect(cancel).toHaveBeenCalledOnce()
+    expect(activityCompletedMock).toHaveBeenCalledTimes(1)
+
+    deferred.resolve({ status: 'recognized', data: { text: 'late text', lines: [], confidence: 1 } })
+    await flushPromises()
+    await flushPromises()
+
+    expect(activityCompletedMock).toHaveBeenCalledTimes(1)
+    expect(openTranslationMock).not.toHaveBeenCalled()
+    expect(toast.success).not.toHaveBeenCalled()
+    expect(toast.error).not.toHaveBeenCalled()
+    expect(toast.warning).not.toHaveBeenCalled()
+    expect(wrapper.find('.pdf-status-banner').exists()).toBe(false)
+  })
+
+  it('presents Region OCR no-text, missing-language, and failure outcomes', async () => {
+    const { toast } = await import('vue-sonner')
+    const outcomes = [
+      [{ status: 'recognized', data: { text: '   ' } }, 'warning', 'No text found in the selected region.'],
+      [{ status: 'failed', error: new Error('model-not-installed') }, 'error', 'No OCR language is installed.'],
+      [{ status: 'failed', error: new Error('worker failed') }, 'error', 'Region OCR failed. Please try another region.']
+    ]
+
+    for (const [result, severity, message] of outcomes) {
+      mockRegionOcr.startRegionOcr.mockReturnValueOnce(createMockOperation(Promise.resolve(result)))
+      const wrapper = mount(PdfApp)
+      await flushPromises()
+
+      await startRegionOcr(wrapper)
+      await flushPromises()
+
+      expect(toast[severity]).toHaveBeenCalledWith(expect.stringContaining(message))
+      wrapper.unmount()
+      toast.error.mockClear()
+      toast.warning.mockClear()
+    }
   })
 
   it('owns the OCR-only execution mode and rejects unsupported toolbar intent', async () => {

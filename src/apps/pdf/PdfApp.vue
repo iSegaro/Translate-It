@@ -345,10 +345,11 @@ const progressOperation = computed(() => {
 })
 
 let activeProgressCancel = null
+let cancelActiveRegionOcr = null
 
 function handleProgressCancel() {
-  if (activeProgressCancel) activeProgressCancel()
-  presentation.present(DomainEvents.activityCompleted())
+  const completionHandled = activeProgressCancel?.() === true
+  if (!completionHandled) presentation.present(DomainEvents.activityCompleted())
   activeProgressCancel = null
 }
 
@@ -542,8 +543,9 @@ function handleOcrPrimaryClick() {
     return
   }
 
-  if (regionOcrState.value !== REGION_OCR_STATE.IDLE) {
-    cancelRegionOcr()
+  if (regionOcrState.value === REGION_OCR_STATE.PROCESSING) {
+    cancelActiveRegionOcr?.()
+  } else if (regionOcrState.value !== REGION_OCR_STATE.IDLE) {
     setRegionOcrIdle()
   }
   if (isOcrProcessing.value) {
@@ -737,13 +739,25 @@ function handleRegionSelectionComplete(region) {
 
   if (!request) return
 
-  activeProgressCancel = cancelRegionOcr
   presentation.present(DomainEvents.regionOcrStarted())
   const operation = regionExecutionDispatcher.dispatchRegionExecution(request)
+  let completionHandled = false
+  const cancelOperation = () => {
+    if (completionHandled) return true
+    completionHandled = true
+    cancelRegionOcr()
+    setRegionOcrIdle()
+    presentation.present(DomainEvents.activityCompleted())
+    if (activeProgressCancel === cancelOperation) activeProgressCancel = null
+    return true
+  }
+  cancelActiveRegionOcr = cancelOperation
+  activeProgressCancel = cancelOperation
   regionOcrState.value = REGION_OCR_STATE.PROCESSING
   void operation.promise.then(handleRegionOcrOutcome, handleRegionOcrFailure).finally(() => {
-    presentation.present(DomainEvents.activityCompleted())
-    activeProgressCancel = null
+    if (!completionHandled) presentation.present(DomainEvents.activityCompleted())
+    if (cancelActiveRegionOcr === cancelOperation) cancelActiveRegionOcr = null
+    if (activeProgressCancel === cancelOperation) activeProgressCancel = null
   })
 }
 
