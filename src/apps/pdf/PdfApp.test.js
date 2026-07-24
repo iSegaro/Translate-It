@@ -294,13 +294,6 @@ vi.mock('./components/PdfTranslatedPane.vue', () => ({
   }
 }))
 
-vi.mock('./components/PdfOcrProgress.vue', () => ({
-  default: {
-    name: 'PdfOcrProgress',
-    template: '<div class="pdf-ocr-progress-stub" />'
-  }
-}))
-
 vi.mock('./components/PdfWindowsHost.vue', () => ({
   default: defineComponent({
     name: 'PdfWindowsHost',
@@ -411,7 +404,6 @@ function createMocks({
     exportTxt: vi.fn().mockResolvedValue(false),
     exportMarkdown: vi.fn().mockResolvedValue(false),
     exportHtml: vi.fn().mockResolvedValue(false),
-    clearExportError: vi.fn()
   }
 
   mockPdfOcr = {
@@ -419,7 +411,6 @@ function createMocks({
     ocrRecommendations: ref([]),
     ocrBatch: { pageNumbers: [] },
     isOcrProcessing: ref(false),
-    ocrProgress: ref(0),
     ocrError: ref(''),
     refreshOcrRecommendations: vi.fn(),
     requestOcr: vi.fn(),

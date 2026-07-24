@@ -29,7 +29,6 @@ export function usePdfOcr({ onOcrComplete, onOcrStart, onOcrProgress, onOcrError
   const ocrRecommendations = ref([])
   const ocrBatch = reactive({ pageNumbers: [] })
   const isOcrProcessing = ref(false)
-  const ocrProgress = ref({ current: 0, total: 0, pageNumber: 0 })
   const ocrError = ref('')
   const ocrLanguage = ref('eng')
 
@@ -68,7 +67,6 @@ export function usePdfOcr({ onOcrComplete, onOcrStart, onOcrProgress, onOcrError
       const results = await processor.processPages(pageNumbers, {
         language: ocrLanguage.value,
         onProgress: ({ current, total, pageNumber }) => {
-          ocrProgress.value = { current, total, pageNumber }
           onOcrProgress?.({ current, total, pageNumber })
         }
       })
@@ -101,7 +99,6 @@ export function usePdfOcr({ onOcrComplete, onOcrStart, onOcrProgress, onOcrError
       }
     } finally {
       isOcrProcessing.value = false
-      ocrProgress.value = { current: 0, total: 0, pageNumber: 0 }
     }
 
     if (terminalResult?.type === 'error') {
@@ -117,7 +114,6 @@ export function usePdfOcr({ onOcrComplete, onOcrStart, onOcrProgress, onOcrError
   function cancelOcr() {
     processor.cancel()
     isOcrProcessing.value = false
-    ocrProgress.value = { current: 0, total: 0, pageNumber: 0 }
   }
 
   async function saveOcrToCache(pageNumbers) {
@@ -156,7 +152,6 @@ export function usePdfOcr({ onOcrComplete, onOcrStart, onOcrProgress, onOcrError
     ocrRecommendations,
     ocrBatch,
     isOcrProcessing,
-    ocrProgress,
     ocrError,
     ocrLanguage,
     refreshOcrRecommendations,

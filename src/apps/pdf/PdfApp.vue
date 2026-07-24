@@ -195,7 +195,7 @@
 </template>
 
 <script setup>
-import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { Toaster } from 'vue-sonner'
 import PdfToolbar from './components/PdfToolbar.vue'
 import PdfDropzone from './components/PdfDropzone.vue'
@@ -298,8 +298,7 @@ const {
   exportError,
   exportTxt,
   exportMarkdown,
-  exportHtml,
-  clearExportError
+  exportHtml
 } = usePdfExport(translationTick)
 
 const pdfViewerRef = ref(null)
@@ -329,7 +328,6 @@ let activeRegionPosition = null
 const regionOcrState = ref(REGION_OCR_STATE.IDLE)
 const regionSelectionTarget = ref(null)
 const regionComparisonState = ref(null)
-const developerNotification = ref(null)
 let developerNotificationOccurrenceId = 0
 const canExportRegionComparisonArtifact = computed(() => regionComparisonState.value?.status === 'completed')
 const regionOcrAvailable = computed(() => hasDocument.value && showOriginalPane.value)
@@ -358,7 +356,6 @@ function handleProgressCancel() {
 const {
   ocrRecommendations,
   isOcrProcessing,
-  ocrProgress,
   ocrError,
   refreshOcrRecommendations,
   requestOcr,

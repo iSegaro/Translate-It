@@ -67,10 +67,6 @@ export function usePdfExport(translationTick) {
     }
   }
 
-  function clearExportError() {
-    exportError.value = ''
-  }
-
   async function exportHtml(canvasDataUrls = new Map()) {
     try {
       exportError.value = ''
@@ -101,7 +97,6 @@ export function usePdfExport(translationTick) {
     exportError,
     exportTxt,
     exportMarkdown,
-    exportHtml,
-    clearExportError
+    exportHtml
   }
 }
