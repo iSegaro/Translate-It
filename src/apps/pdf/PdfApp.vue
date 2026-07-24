@@ -196,7 +196,7 @@
 
 <script setup>
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
-import { toast, Toaster } from 'vue-sonner'
+import { Toaster } from 'vue-sonner'
 import PdfToolbar from './components/PdfToolbar.vue'
 import PdfDropzone from './components/PdfDropzone.vue'
 import PdfViewer from './components/PdfViewer.vue'
@@ -220,11 +220,8 @@ import { usePdfNavigation } from './composables/usePdfNavigation.js'
 import { usePdfKeyboard } from './composables/usePdfKeyboard.js'
 import { createPdfTransitionController } from './composables/createPdfTransitionController.js'
 import { createPdfStatusBannerController } from './utils/pdfStatusBanner.js'
-import { createProgressAdapter } from './presentation/adapters/progressAdapter.js'
-import { createToastAdapter } from './presentation/adapters/toastAdapter.js'
-import { createBannerAdapter } from './presentation/adapters/bannerAdapter.js'
 import { DomainEvents } from './presentation/domainEvents.js'
-import { createPresentationFacade } from './presentation/presentationFacade.js'
+import { createPresentationHost } from './presentation/presentationHost.js'
 import { REGION_OCR_STATE } from './constants/regionOcrState.js'
 import { getTesseractLanguageCodeLabel } from '@/features/screen-capture/utils/ocrLanguageMap.js'
 import { mapOcrError } from '@/features/ocr/errors/ocrErrorMapper.js'
@@ -338,54 +335,10 @@ const regionOcrAvailable = computed(() => hasDocument.value && showOriginalPane.
 const supportedExecutionModes = Object.freeze([REGION_EXECUTION_TARGET.OCR])
 const executionMode = ref(REGION_EXECUTION_TARGET.OCR)
 const pdfStatusBannerController = createPdfStatusBannerController()
-const progressAdapter = createProgressAdapter()
-const bannerAdapter = createBannerAdapter()
-
-const progressTick = ref(0)
-let progressLastVersion = 0
+const presentation = createPresentationHost()
 
 const progressOperation = computed(() => {
-  progressTick.value
-  return progressAdapter.getState().operation
-})
-
-function afterProgressPresentation() {
-  const { version } = progressAdapter.getState()
-  if (version !== progressLastVersion) {
-    progressLastVersion = version
-    progressTick.value++
-  }
-}
-
-const bannerTick = ref(0)
-let bannerLastVersion = 0
-
-const bannerState = computed(() => {
-  bannerTick.value
-  return bannerAdapter.getState()
-})
-
-function afterBannerPresentation() {
-  const { version } = bannerAdapter.getState()
-  if (version !== bannerLastVersion) {
-    bannerLastVersion = version
-    bannerTick.value++
-  }
-}
-
-const presentation = createPresentationFacade({
-  adapters: {
-    toast: createToastAdapter({ toast }),
-    banner: bannerAdapter,
-    'progress-bar': progressAdapter
-  },
-  onPresented: (intent) => {
-    if (intent.intent === 'activity') {
-      afterProgressPresentation()
-    } else {
-      afterBannerPresentation()
-    }
-  }
+  return presentation.progressState.value.operation
 })
 
 let activeProgressCancel = null
@@ -617,7 +570,7 @@ function handleOpenSettings() {
 const pdfStatusBanner = computed(() => pdfStatusBannerController.build({
   error: error.value,
   isLoading: isLoading.value,
-  developerNotification: isDebugMode.value ? bannerState.value.developerNotification : null,
+  developerNotification: isDebugMode.value ? presentation.bannerState.value.developerNotification : null,
   translationStatus: translationSummary.value?.status ?? 'idle',
   translationOccurrenceId: translationSummary.value?.translationOccurrenceId ?? 0
 }))
