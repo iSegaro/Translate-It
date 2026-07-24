@@ -1,7 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import { mount } from '@vue/test-utils'
 import PdfDocumentInfoDialog from './PdfDocumentInfoDialog.vue'
-import BaseModal from '@/components/base/BaseModal.vue'
 
 vi.mock('@/components/base/BaseModal.vue', () => ({
   default: {
