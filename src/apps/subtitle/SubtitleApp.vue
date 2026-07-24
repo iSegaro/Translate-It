@@ -388,6 +388,7 @@ onUnmounted(() => {
 
 <style lang="scss">
 @use '../../assets/styles/base/brand-tokens' as *;
+@use '../../assets/styles/base/mixins' as *;
 
 :root {
   --primary-color: #6366f1;
@@ -402,7 +403,10 @@ onUnmounted(() => {
   --text-primary: #0f172a;
   --text-secondary: #64748b;
   --bg-header: rgba(248, 250, 252, 0.8);
-  --brand-title-gradient: $brand-title-gradient-light;
+  @include css-properties('logo-text-gradient', (
+    'start': $brand-title-gradient-light-start,
+    'end': $brand-title-gradient-light-end
+  ));
   --btn-secondary-bg: rgba(0, 0, 0, 0.03);
   --btn-secondary-bg-hover: rgba(0, 0, 0, 0.06);
   --bg-glass: rgba(0, 0, 0, 0.02);
@@ -418,7 +422,10 @@ onUnmounted(() => {
   --text-primary: #f8fafc;
   --text-secondary: #94a3b8;
   --bg-header: rgba(15, 23, 42, 0.8);
-  --brand-title-gradient: $brand-title-gradient-dark;
+  @include css-properties('logo-text-gradient', (
+    'start': $brand-title-gradient-dark-start,
+    'end': $brand-title-gradient-dark-end
+  ));
   --btn-secondary-bg: rgba(255, 255, 255, 0.05);
   --btn-secondary-bg-hover: rgba(255, 255, 255, 0.1);
   --bg-glass: rgba(255, 255, 255, 0.03);
@@ -479,7 +486,7 @@ onUnmounted(() => {
           font-size: 1.25rem;
           margin: 0;
           font-weight: 700;
-          background: var(--brand-title-gradient);
+          background: linear-gradient(90deg, var(--logo-text-gradient-start), var(--logo-text-gradient-end));
           -webkit-background-clip: text;
           -webkit-text-fill-color: transparent;
         }

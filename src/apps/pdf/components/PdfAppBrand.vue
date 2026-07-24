@@ -67,7 +67,7 @@ defineProps({
   font-weight: 600;
   line-height: 1.15;
   color: $tb-text-primary;
-  background: $brand-title-gradient-dark;
+  background: linear-gradient(90deg, $brand-title-gradient-dark-start, $brand-title-gradient-dark-end);
   -webkit-background-clip: text;
   background-clip: text;
   -webkit-text-fill-color: transparent;
