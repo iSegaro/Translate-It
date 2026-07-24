@@ -7,64 +7,54 @@ function createMockAdapter(overrides = {}) {
 }
 
 describe('Presentation Dispatcher', () => {
-  it('routes global acknowledgement result to toast adapter', () => {
+  it('routes acknowledgement intent to toast adapter', () => {
     const toast = createMockAdapter()
     const dispatcher = createPresentationDispatcher({
       adapters: { toast, banner: createMockAdapter(), 'progress-bar': createMockAdapter() }
     })
 
-    dispatcher.dispatch({ type: 'export-completed' })
+    dispatcher.dispatch({ intent: 'acknowledgement', severity: 'success', message: 'Hello' })
 
-    expect(toast.dispatch).toHaveBeenCalledWith({ type: 'export-completed' })
+    expect(toast.dispatch).toHaveBeenCalledWith({ intent: 'acknowledgement', severity: 'success', message: 'Hello' })
   })
 
-  it('routes global persistent-information result to banner adapter', () => {
+  it('routes outcome intent to banner adapter', () => {
     const banner = createMockAdapter()
     const dispatcher = createPresentationDispatcher({
       adapters: { toast: createMockAdapter(), banner, 'progress-bar': createMockAdapter() }
     })
 
-    dispatcher.dispatch({ type: 'comparison-completed' })
+    dispatcher.dispatch({ intent: 'outcome', notification: { id: '1', variant: 'success', title: 'T', message: 'M' } })
 
-    expect(banner.dispatch).toHaveBeenCalledWith({ type: 'comparison-completed' })
+    expect(banner.dispatch).toHaveBeenCalledWith({ intent: 'outcome', notification: { id: '1', variant: 'success', title: 'T', message: 'M' } })
   })
 
-  it('routes global progress result to progress adapter', () => {
+  it('routes activity intent to progress adapter', () => {
     const progress = createMockAdapter()
     const dispatcher = createPresentationDispatcher({
       adapters: { toast: createMockAdapter(), banner: createMockAdapter(), 'progress-bar': progress }
     })
 
-    dispatcher.dispatch({ type: 'translation-progress' })
+    dispatcher.dispatch({ intent: 'activity', running: true, title: 'Running' })
 
-    expect(progress.dispatch).toHaveBeenCalledWith({ type: 'translation-progress' })
-  })
-
-  it('returns early for component-scoped result', () => {
-    const toast = createMockAdapter()
-    const dispatcher = createPresentationDispatcher({ adapters: { toast } })
-
-    const result = dispatcher.dispatch({ type: 'pane-empty', pane: 'translated' })
-
-    expect(result).toBeUndefined()
-    expect(toast.dispatch).not.toHaveBeenCalled()
+    expect(progress.dispatch).toHaveBeenCalledWith({ intent: 'activity', running: true, title: 'Running' })
   })
 
   it('returns early for element-scoped result', () => {
     const toast = createMockAdapter()
     const dispatcher = createPresentationDispatcher({ adapters: { toast } })
 
-    const result = dispatcher.dispatch({ type: 'block-translation-loading', blockId: 'b12', pageNumber: 3 })
+    const result = dispatcher.dispatch({ intent: 'progress', type: 'block-translation-loading', blockId: 'b12', pageNumber: 3 })
 
     expect(result).toBeUndefined()
     expect(toast.dispatch).not.toHaveBeenCalled()
   })
 
-  it('returns early for element-scoped result with pageNumber', () => {
+  it('returns early for component-scoped result', () => {
     const toast = createMockAdapter()
     const dispatcher = createPresentationDispatcher({ adapters: { toast } })
 
-    const result = dispatcher.dispatch({ type: 'page-ocr-complete', pageNumber: 5 })
+    const result = dispatcher.dispatch({ intent: 'acknowledgement', type: 'pane-empty', pane: 'translated' })
 
     expect(result).toBeUndefined()
     expect(toast.dispatch).not.toHaveBeenCalled()
@@ -73,7 +63,7 @@ describe('Presentation Dispatcher', () => {
   it('returns undefined when surface has no registered adapter', () => {
     const dispatcher = createPresentationDispatcher({ adapters: {} })
 
-    const result = dispatcher.dispatch({ type: 'export-completed' })
+    const result = dispatcher.dispatch({ intent: 'acknowledgement' })
 
     expect(result).toBeUndefined()
   })
@@ -83,7 +73,7 @@ describe('Presentation Dispatcher', () => {
       adapters: { toast: {} }
     })
 
-    const result = dispatcher.dispatch({ type: 'export-completed' })
+    const result = dispatcher.dispatch({ intent: 'acknowledgement' })
 
     expect(result).toBeUndefined()
   })
@@ -93,47 +83,35 @@ describe('Presentation Dispatcher', () => {
     const toast = { dispatch: () => { throw error } }
     const dispatcher = createPresentationDispatcher({ adapters: { toast } })
 
-    expect(() => dispatcher.dispatch({ type: 'export-completed' })).toThrow(error)
+    expect(() => dispatcher.dispatch({ intent: 'acknowledgement' })).toThrow(error)
   })
 
-  it('falls through to toast for unknown result type', () => {
-    const toast = createMockAdapter()
-    const dispatcher = createPresentationDispatcher({ adapters: { toast } })
-
-    dispatcher.dispatch({ type: 'nonexistent-type' })
-
-    expect(toast.dispatch).toHaveBeenCalledWith({ type: 'nonexistent-type' })
-  })
-
-  it('falls through to toast for null result', () => {
+  it('is safe with null input', () => {
     const toast = createMockAdapter()
     const dispatcher = createPresentationDispatcher({ adapters: { toast } })
 
     dispatcher.dispatch(null)
 
-    expect(toast.dispatch).toHaveBeenCalledWith(null)
+    expect(toast.dispatch).not.toHaveBeenCalled()
   })
 
   it('is safe with empty adapter registry', () => {
     const dispatcher = createPresentationDispatcher()
 
-    expect(() => dispatcher.dispatch({ type: 'export-completed' })).not.toThrow()
-    expect(() => dispatcher.dispatch({ type: 'pane-empty', pane: 'translated' })).not.toThrow()
-    expect(() => dispatcher.dispatch(null)).not.toThrow()
+    expect(() => dispatcher.dispatch({ intent: 'acknowledgement' })).not.toThrow()
   })
 
   it('returns frozen dispatcher', () => {
-    const dispatcher = createPresentationDispatcher()
-    expect(Object.isFrozen(dispatcher)).toBe(true)
+    expect(Object.isFrozen(createPresentationDispatcher())).toBe(true)
   })
 
   it('has no state leakage across multiple dispatches', () => {
     const toast = createMockAdapter()
     const dispatcher = createPresentationDispatcher({ adapters: { toast } })
 
-    dispatcher.dispatch({ type: 'export-completed' })
-    dispatcher.dispatch({ type: 'export-failed' })
-    dispatcher.dispatch({ type: 'pane-empty', pane: 'translated' })
+    dispatcher.dispatch({ intent: 'acknowledgement' })
+    dispatcher.dispatch({ intent: 'acknowledgement' })
+    dispatcher.dispatch({ intent: 'activity', type: 'block-translation-loading', blockId: 'b12', pageNumber: 3 })
 
     expect(toast.dispatch).toHaveBeenCalledTimes(2)
   })
@@ -142,7 +120,7 @@ describe('Presentation Dispatcher', () => {
     const toast = createMockAdapter({ dispatch: () => undefined })
     const dispatcher = createPresentationDispatcher({ adapters: { toast } })
 
-    const result = dispatcher.dispatch({ type: 'export-completed' })
+    const result = dispatcher.dispatch({ intent: 'acknowledgement' })
 
     expect(result).toBeUndefined()
   })
@@ -152,7 +130,7 @@ describe('Presentation Dispatcher', () => {
     const progress = createMockAdapter({ dispatch: () => handle })
     const dispatcher = createPresentationDispatcher({ adapters: { 'progress-bar': progress } })
 
-    const result = dispatcher.dispatch({ type: 'translation-progress' })
+    const result = dispatcher.dispatch({ intent: 'activity' })
 
     expect(result).toBe(handle)
   })
@@ -161,7 +139,7 @@ describe('Presentation Dispatcher', () => {
     const progress = createMockAdapter({ dispatch: () => 42 })
     const dispatcher = createPresentationDispatcher({ adapters: { 'progress-bar': progress } })
 
-    const result = dispatcher.dispatch({ type: 'translation-progress' })
+    const result = dispatcher.dispatch({ intent: 'activity' })
 
     expect(result).toBe(42)
   })
@@ -175,22 +153,22 @@ describe('Presentation Dispatcher', () => {
       adapters: { toast, banner, 'progress-bar': progress }
     })
 
-    dispatcher.dispatch({ type: 'export-completed' })
-    dispatcher.dispatch({ type: 'comparison-completed' })
-    dispatcher.dispatch({ type: 'translation-progress' })
+    dispatcher.dispatch({ intent: 'acknowledgement' })
+    dispatcher.dispatch({ intent: 'outcome' })
+    dispatcher.dispatch({ intent: 'activity' })
 
     expect(toast.dispatch).toHaveBeenCalledTimes(1)
     expect(banner.dispatch).toHaveBeenCalledTimes(1)
     expect(progress.dispatch).toHaveBeenCalledTimes(1)
   })
 
-  it('never invokes adapters for non-Global results — registry lookup not reached', () => {
+  it('never invokes adapters for non-Global results', () => {
     const toast = createMockAdapter()
     const dispatcher = createPresentationDispatcher({ adapters: { toast } })
 
-    dispatcher.dispatch({ type: 'block-translation-loading', blockId: 'b12', pageNumber: 3 })
-    dispatcher.dispatch({ type: 'pane-empty', pane: 'translated' })
-    dispatcher.dispatch({ type: 'page-ocr-complete', pageNumber: 5 })
+    dispatcher.dispatch({ intent: 'acknowledgement', type: 'block-translation-loading', blockId: 'b12', pageNumber: 3 })
+    dispatcher.dispatch({ intent: 'outcome', type: 'pane-empty', pane: 'translated' })
+    dispatcher.dispatch({ intent: 'activity', type: 'page-ocr-complete', pageNumber: 5 })
 
     expect(toast.dispatch).not.toHaveBeenCalled()
   })

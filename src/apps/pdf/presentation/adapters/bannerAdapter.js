@@ -1,69 +1,33 @@
-import { COMPARISON_RESULTS, TRANSLATION_RESULTS } from '../operationResults.js'
 import { createRegionComparisonNotificationViewModel } from '../../components/notifications/RegionComparisonNotificationMapper.js'
 import { PDF_NOTIFICATION_BODY_TYPE } from '../../notifications/PdfNotificationBodyType.js'
 
-function buildSuccessNotification(result) {
-  const summary = result.summary
-  const details = []
-
-  if (summary?.winner?.candidateId) {
-    details.push(`Winner: ${summary.winner.candidateId}.`)
-  }
-  if (Number.isFinite(summary?.latency?.fastestMs)) {
-    details.push(`Fastest: ${summary.latency.fastestMs}ms.`)
-  }
-
-  const body = result.result
-    ? Object.freeze({
-      type: PDF_NOTIFICATION_BODY_TYPE.REGION_COMPARISON_RESULTS,
-      payload: Object.freeze(createRegionComparisonNotificationViewModel({
-        analysis: summary,
-        results: result.result.results,
-        totalElapsedMs: result.result.summary?.totalElapsedMs
-      }))
-    })
-    : undefined
-
-  return {
-    id: result.id,
-    variant: 'success',
-    title: 'Region Comparison complete',
-    message: details.join(' ') || 'Region Comparison completed.',
-    body
-  }
+function buildComparisonBody(comparison) {
+  if (!comparison) return undefined
+  return Object.freeze({
+    type: PDF_NOTIFICATION_BODY_TYPE.REGION_COMPARISON_RESULTS,
+    payload: Object.freeze(createRegionComparisonNotificationViewModel(comparison))
+  })
 }
 
-function buildFailureNotification(result) {
+function buildNotification(notification, comparison) {
   return {
-    id: result.id,
-    variant: 'error',
-    title: 'Region Comparison failed',
-    message: result.error || 'Region Comparison failed. Please try again.'
+    ...notification,
+    body: buildComparisonBody(comparison)
   }
-}
-
-function notificationChanged(a, b) {
-  if (!a || !b) return a !== b
-  return a.id !== b.id
-    || a.variant !== b.variant
-    || a.title !== b.title
-    || a.message !== b.message
-    || a.body !== b.body
 }
 
 /**
- * Banner Adapter — converts Operation Results to banner presentation state.
+ * Banner Adapter — stores outcome presentation state.
  *
- * Stateful by nature: the banner accumulates results over time
- * (unlike Toast, which is fire-and-forget per dispatch).
+ * Receives { intent: 'outcome', notification?, comparison?, partialTranslation? }
+ * from Presentation Dispatcher. Builds Banner-specific comparison bodies and
+ * stores latest outcome state for each field.
  *
- * The adapter is framework-agnostic. The `version` field in state
- * is an opaque invalidation token — consumers use it to detect
- * state changes without callbacks or framework coupling.
+ * Framework-agnostic. Pure JavaScript. No Vue, no composables.
  *
  * version changes if and only if observable adapter state changes.
  *
- * @returns {{ dispatch: (result: object) => void, getState: () => object, reset: () => void }}
+ * @returns {{ dispatch: (intent: object) => void, getState: () => object, reset: () => void }}
  */
 export function createBannerAdapter() {
   const state = {
@@ -73,32 +37,33 @@ export function createBannerAdapter() {
     translationOccurrenceId: 0
   }
 
-  function dispatch(result) {
-    const type = result?.type
+  function notificationChanged(a, b) {
+    if (!a || !b) return a !== b
+    return a.id !== b.id
+      || a.variant !== b.variant
+      || a.title !== b.title
+      || a.message !== b.message
+      || a.body !== b.body
+  }
 
-    if (type === COMPARISON_RESULTS.COMPLETED) {
-      const notification = buildSuccessNotification(result)
+  function dispatch(intent) {
+    if (!intent || intent.intent !== 'outcome') return
+
+    if (intent.notification) {
+      const notification = buildNotification(intent.notification, intent.comparison)
       if (!notificationChanged(state.developerNotification, notification)) return
       state.developerNotification = notification
       state.version++
       return
     }
 
-    if (type === COMPARISON_RESULTS.FAILED) {
-      const notification = buildFailureNotification(result)
-      if (!notificationChanged(state.developerNotification, notification)) return
-      state.developerNotification = notification
-      state.version++
-      return
-    }
-
-    if (type === TRANSLATION_RESULTS.PARTIAL) {
+    if (intent.partialTranslation) {
       if (
         state.translationStatus === 'partial' &&
-        state.translationOccurrenceId === result.occurrenceId
+        state.translationOccurrenceId === intent.partialTranslation.occurrenceId
       ) return
       state.translationStatus = 'partial'
-      state.translationOccurrenceId = result.occurrenceId
+      state.translationOccurrenceId = intent.partialTranslation.occurrenceId
       state.version++
       return
     }

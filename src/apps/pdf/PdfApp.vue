@@ -50,8 +50,8 @@
     />
 
     <PdfProgressBar
-      :operation="operationController.operation"
-      @cancel="operationController.cancelOperation"
+      :operation="progressOperation"
+      @cancel="handleProgressCancel"
     />
 
     <input
@@ -220,7 +220,11 @@ import { usePdfNavigation } from './composables/usePdfNavigation.js'
 import { usePdfKeyboard } from './composables/usePdfKeyboard.js'
 import { createPdfTransitionController } from './composables/createPdfTransitionController.js'
 import { createPdfStatusBannerController } from './utils/pdfStatusBanner.js'
-import { usePdfOperationController } from './composables/usePdfOperationController.js'
+import { createProgressAdapter } from './presentation/adapters/progressAdapter.js'
+import { createToastAdapter } from './presentation/adapters/toastAdapter.js'
+import { createBannerAdapter } from './presentation/adapters/bannerAdapter.js'
+import { createPresentationDispatcher } from './presentation/presentationDispatcher.js'
+import { present } from './presentation/presentationPresenter.js'
 import { REGION_OCR_STATE } from './constants/regionOcrState.js'
 import { getTesseractLanguageCodeLabel } from '@/features/screen-capture/utils/ocrLanguageMap.js'
 import { mapOcrError } from '@/features/ocr/errors/ocrErrorMapper.js'
@@ -229,8 +233,6 @@ import { RegionComparisonRunner } from './RegionComparisonRunner.js'
 import { RegionComparisonAnalyzer } from './RegionComparisonAnalyzer.js'
 import { RegionComparisonArtifactWriter } from './RegionComparisonArtifactWriter.js'
 import { REGION_COMPARISON_CONFIGURATIONS } from './regionComparisonConfigurations.js'
-import { PDF_NOTIFICATION_BODY_TYPE } from './notifications/PdfNotificationBodyType.js'
-import { createRegionComparisonNotificationViewModel } from './components/notifications/RegionComparisonNotificationMapper.js'
 import { downloadFile } from '@/features/pdf-translation/core/PdfFileDownloader.js'
 import { PDF_REGION_OCR_RENDER_SCALE } from '@/features/pdf-translation/core/pdfRenderingConstants.js'
 import { getScopedLogger } from '@/shared/logging/logger.js'
@@ -336,7 +338,65 @@ const regionOcrAvailable = computed(() => hasDocument.value && showOriginalPane.
 const supportedExecutionModes = Object.freeze([REGION_EXECUTION_TARGET.OCR])
 const executionMode = ref(REGION_EXECUTION_TARGET.OCR)
 const pdfStatusBannerController = createPdfStatusBannerController()
-const operationController = usePdfOperationController()
+const progressAdapter = createProgressAdapter()
+const bannerAdapter = createBannerAdapter()
+
+const presentationDispatcher = createPresentationDispatcher({
+  adapters: {
+    toast: createToastAdapter({ toast }),
+    banner: bannerAdapter,
+    'progress-bar': progressAdapter
+  }
+})
+
+const progressTick = ref(0)
+let progressLastVersion = 0
+
+const progressOperation = computed(() => {
+  progressTick.value
+  return progressAdapter.getState().operation
+})
+
+function dispatchIntent(domainResult) {
+  const intent = present(domainResult)
+  if (intent) presentationDispatcher.dispatch(intent)
+  afterBannerDispatch()
+}
+
+function dispatchProgress(domainResult) {
+  const intent = present(domainResult)
+  if (!intent) return
+  presentationDispatcher.dispatch(intent)
+  const { version } = progressAdapter.getState()
+  if (version !== progressLastVersion) {
+    progressLastVersion = version
+    progressTick.value++
+  }
+}
+
+const bannerTick = ref(0)
+let bannerLastVersion = 0
+
+const bannerState = computed(() => {
+  bannerTick.value
+  return bannerAdapter.getState()
+})
+
+function afterBannerDispatch() {
+  const { version } = bannerAdapter.getState()
+  if (version !== bannerLastVersion) {
+    bannerLastVersion = version
+    bannerTick.value++
+  }
+}
+
+let activeProgressCancel = null
+
+function handleProgressCancel() {
+  if (activeProgressCancel) activeProgressCancel()
+  dispatchProgress({ name: 'activity-completed' })
+  activeProgressCancel = null
+}
 
 const {
   ocrRecommendations,
@@ -348,27 +408,20 @@ const {
   cancelOcr
 } = usePdfOcr({
   onOcrComplete: ({ pageNumbers } = {}) => {
+    dispatchProgress({ name: 'activity-completed' })
+    activeProgressCancel = null
     refreshTranslatedPageBlocks(pageNumbers)
     translationTick.value += 1
     refreshOcrRecommendations()
   },
-  onOcrStart: () => {
-    return operationController.startOperation({
-      title: 'OCR: Processing pages',
-      indeterminate: false,
-      progress: 0,
-      cancellable: true,
-      onCancel: () => cancelOcr()
-    })
+  onOcrProgress: ({ current, total }) => {
+    dispatchProgress({ name: 'ocr-progress-update', current, total })
   },
   onOcrError: (errorCode) => {
-    if (errorCode === 'model-not-installed') {
-      toast.error('No OCR language is installed. Open Manage Languages from the OCR menu to download one.')
-    } else if (errorCode === 'ocr-failed') {
-      toast.error('OCR failed. Please try again.')
-    } else {
-      toast.error(errorCode)
-    }
+    dispatchProgress({ name: 'activity-completed' })
+    activeProgressCancel = null
+    const name = errorCode === 'model-not-installed' ? 'ocr-language-missing' : 'ocr-failed'
+    dispatchIntent({ name })
   }
 })
 
@@ -505,7 +558,7 @@ const toolbarOcrModel = computed(() => {
 
 function showOcrLanguageRequiredMessage() {
   ocrError.value = 'model-not-installed'
-  toast.error('No OCR language is installed. Open Manage Languages from the OCR menu to download one.')
+  dispatchIntent({ name: 'ocr-language-missing' })
 }
 
 function ensureOcrLanguageInstalled() {
@@ -526,7 +579,7 @@ function handleOcrPrimaryClick() {
       beginRegionSelection(REGION_EXECUTION_TARGET.OCR)
     } else {
       if (!model.hasDocument) return
-      requestOcr()
+      startPageOcr()
     }
     return
   }
@@ -538,6 +591,12 @@ function handleOcrPrimaryClick() {
   if (isOcrProcessing.value) {
     cancelOcr()
   }
+}
+
+function startPageOcr() {
+  dispatchProgress({ name: 'ocr-started' })
+  activeProgressCancel = cancelOcr
+  requestOcr()
 }
 
 function handleOcrSelectAction(action) {
@@ -559,7 +618,7 @@ function handleOpenSettings() {
 const pdfStatusBanner = computed(() => pdfStatusBannerController.build({
   error: error.value,
   isLoading: isLoading.value,
-  developerNotification: isDebugMode.value ? developerNotification.value : null,
+  developerNotification: isDebugMode.value ? bannerState.value.developerNotification : null,
   translationStatus: translationSummary.value?.status ?? 'idle',
   translationOccurrenceId: translationSummary.value?.translationOccurrenceId ?? 0
 }))
@@ -679,13 +738,8 @@ function handleRegionSelectionComplete(region) {
   exitRegionSelection()
 
   if (target === REGION_EXECUTION_TARGET.REGION_COMPARISON) {
-    developerNotification.value = null
-    const handle = operationController.startOperation({
-      title: 'Region Comparison',
-      indeterminate: true,
-      cancellable: true,
-      onCancel: () => handleCancelRegionComparison()
-    })
+    activeProgressCancel = handleCancelRegionComparison
+    dispatchProgress({ name: 'comparison-started' })
     const operation = pdfDeveloperApi.runRegionComparison({ region })
     activeRegionComparisonOperation = operation
     completedRegionComparisonResult = null
@@ -706,7 +760,8 @@ function handleRegionSelectionComplete(region) {
       result => handleRegionComparisonOutcome(operation, result),
       error => handleRegionComparisonFailure(operation, error)
     ).finally(() => {
-      handle.finish()
+      dispatchProgress({ name: 'activity-completed' })
+      activeProgressCancel = null
     })
     return
   }
@@ -719,16 +774,13 @@ function handleRegionSelectionComplete(region) {
 
   if (!request) return
 
-  const ocrHandle = operationController.startOperation({
-    title: 'Scanning region...',
-    indeterminate: true,
-    cancellable: true,
-    onCancel: () => cancelRegionOcr()
-  })
+  activeProgressCancel = cancelRegionOcr
+  dispatchProgress({ name: 'region-ocr-started' })
   const operation = regionExecutionDispatcher.dispatchRegionExecution(request)
   regionOcrState.value = REGION_OCR_STATE.PROCESSING
   void operation.promise.then(handleRegionOcrOutcome, handleRegionOcrFailure).finally(() => {
-    ocrHandle.finish()
+    dispatchProgress({ name: 'activity-completed' })
+    activeProgressCancel = null
   })
 }
 
@@ -786,7 +838,8 @@ function handleRegionComparisonOutcome(operation, result) {
 
   setRegionOcrIdle()
   if (result.status === 'ready') {
-    developerNotification.value = createRegionComparisonSuccessNotification(analysis, result)
+    const id = `developer-notification:${++developerNotificationOccurrenceId}`
+    dispatchIntent({ name: 'comparison-completed', id, summary: analysis, result })
   }
 }
 
@@ -799,37 +852,8 @@ function handleRegionComparisonFailure(operation, error) {
     status: 'failed'
   }
   setRegionOcrIdle()
-  developerNotification.value = createRegionComparisonFailureNotification(error)
-}
-
-function createRegionComparisonSuccessNotification(summary, result) {
-  const details = []
-  if (summary?.winner?.candidateId) details.push(`Winner: ${summary.winner.candidateId}.`)
-  if (Number.isFinite(summary?.latency?.fastestMs)) details.push(`Fastest: ${summary.latency.fastestMs}ms.`)
-
-  return {
-    id: `developer-notification:${++developerNotificationOccurrenceId}`,
-    variant: 'success',
-    title: 'Region Comparison complete',
-    message: details.join(' ') || 'Region Comparison completed.',
-    body: Object.freeze({
-      type: PDF_NOTIFICATION_BODY_TYPE.REGION_COMPARISON_RESULTS,
-      payload: Object.freeze(createRegionComparisonNotificationViewModel({
-        analysis: summary,
-        results: result.results,
-        totalElapsedMs: result.summary?.totalElapsedMs
-      }))
-    })
-  }
-}
-
-function createRegionComparisonFailureNotification(error) {
-  return {
-    id: `developer-notification:${++developerNotificationOccurrenceId}`,
-    variant: 'error',
-    title: 'Region Comparison failed',
-    message: error?.message || 'Region Comparison failed. Please try again.'
-  }
+  const id = `developer-notification:${++developerNotificationOccurrenceId}`
+  dispatchIntent({ name: 'comparison-failed', id, error: error?.message })
 }
 
 function beginRegionSelection(target) {
@@ -862,7 +886,7 @@ function handleRegionOcrOutcome(result) {
   setRegionOcrIdle()
 
   if (result?.status === 'recognized' && !String(result?.data?.text || '').trim()) {
-    toast.warning('No text found in the selected region.')
+    dispatchIntent({ name: 'region-ocr-no-text' })
   } else if (result?.status === 'failed') {
     const errorCode = mapOcrError(result.error)
     if (errorCode === 'cancelled') return
@@ -871,7 +895,7 @@ function handleRegionOcrOutcome(result) {
       return
     }
 
-    toast.error('Region OCR failed. Please try another region.')
+    dispatchIntent({ name: 'region-ocr-failed' })
   }
 }
 
@@ -897,13 +921,12 @@ function handleTranslatedPaneCurrentPageChange(pageNumber) {
 }
 
 function handleTranslateVisiblePages() {
-  const handle = operationController.startOperation({
-    title: 'Translating visible pages',
-    indeterminate: true,
-    cancellable: true,
-    onCancel: () => handleCancelTranslation()
+  activeProgressCancel = handleCancelTranslation
+  dispatchProgress({ name: 'translation-started' })
+  translateVisiblePages().finally(() => {
+    dispatchProgress({ name: 'activity-completed' })
+    activeProgressCancel = null
   })
-  translateVisiblePages().finally(() => handle.finish())
 }
 
 function handleCancelTranslation() {
@@ -912,26 +935,26 @@ function handleCancelTranslation() {
 
 async function handleExportTxt() {
   if (await exportTxt()) {
-    toast.success('TXT exported successfully')
+    dispatchIntent({ name: 'export-completed', format: 'txt' })
   } else if (exportError.value) {
-    toast.error(exportError.value)
+    dispatchIntent({ name: 'export-failed', error: exportError.value })
   }
 }
 
 async function handleExportMarkdown() {
   if (await exportMarkdown()) {
-    toast.success('Markdown exported successfully')
+    dispatchIntent({ name: 'export-completed', format: 'markdown' })
   } else if (exportError.value) {
-    toast.error(exportError.value)
+    dispatchIntent({ name: 'export-failed', error: exportError.value })
   }
 }
 
 async function handleExportHtml() {
   const canvasDataUrls = pdfViewerRef.value?.collectCanvasDataUrls?.() || new Map()
   if (await exportHtml(canvasDataUrls)) {
-    toast.success('HTML exported successfully')
+    dispatchIntent({ name: 'export-completed', format: 'html' })
   } else if (exportError.value) {
-    toast.error(exportError.value)
+    dispatchIntent({ name: 'export-failed', error: exportError.value })
   }
 }
 

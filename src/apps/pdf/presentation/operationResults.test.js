@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import {
+  ACTIVITY_RESULTS,
   COMPARISON_RESULTS,
   LOCAL_RESULTS,
   EXPORT_RESULTS,
@@ -12,6 +13,7 @@ import {
 describe('operationResults', () => {
   it('exports all result type groups as frozen objects', () => {
     expect(Object.isFrozen(EXPORT_RESULTS)).toBe(true)
+    expect(Object.isFrozen(ACTIVITY_RESULTS)).toBe(true)
     expect(Object.isFrozen(COMPARISON_RESULTS)).toBe(true)
     expect(Object.isFrozen(OCR_RESULTS)).toBe(true)
     expect(Object.isFrozen(REGION_OCR_RESULTS)).toBe(true)
@@ -30,18 +32,20 @@ describe('operationResults', () => {
     expect(COMPARISON_RESULTS.PROGRESS).toBe('comparison-progress')
   })
 
-  it('ocr results include completed, failed, language-missing, and progress', () => {
-    expect(OCR_RESULTS.COMPLETED).toBe('ocr-completed')
+  it('ocr results include failed, language-missing, and progress', () => {
     expect(OCR_RESULTS.FAILED).toBe('ocr-failed')
     expect(OCR_RESULTS.LANGUAGE_MISSING).toBe('ocr-language-missing')
     expect(OCR_RESULTS.PROGRESS).toBe('ocr-progress')
   })
 
-  it('region ocr results include completed, failed, no-text, and progress', () => {
-    expect(REGION_OCR_RESULTS.COMPLETED).toBe('region-ocr-completed')
+  it('region ocr results include failed, no-text, and progress', () => {
     expect(REGION_OCR_RESULTS.FAILED).toBe('region-ocr-failed')
     expect(REGION_OCR_RESULTS.NO_TEXT).toBe('region-ocr-no-text')
     expect(REGION_OCR_RESULTS.PROGRESS).toBe('region-ocr-progress')
+  })
+
+  it('activity results include canonical completion', () => {
+    expect(ACTIVITY_RESULTS.COMPLETED).toBe('activity-completed')
   })
 
   it('translation results include progress and partial', () => {

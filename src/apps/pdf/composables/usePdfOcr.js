@@ -20,7 +20,7 @@ function getBatchOcrError(results) {
   return 'ocr-failed'
 }
 
-export function usePdfOcr({ onOcrComplete, onOcrStart, onOcrError } = {}) {
+export function usePdfOcr({ onOcrComplete, onOcrStart, onOcrProgress, onOcrError } = {}) {
   const recommendationEngine = new PdfOcrRecommendationEngine()
   const processor = new PdfOcrProcessor(pdfDocumentSession)
   const settingsStore = useSettingsStore()
@@ -55,7 +55,7 @@ export function usePdfOcr({ onOcrComplete, onOcrStart, onOcrError } = {}) {
     isOcrProcessing.value = true
     ocrError.value = ''
 
-    const handle = onOcrStart?.() ?? null
+    onOcrStart?.()
 
     try {
       ocrLanguage.value = settingsStore.settings.OCR_DEFAULT_LANG || 'eng'
@@ -66,9 +66,7 @@ export function usePdfOcr({ onOcrComplete, onOcrStart, onOcrError } = {}) {
         language: ocrLanguage.value,
         onProgress: ({ current, total, pageNumber }) => {
           ocrProgress.value = { current, total, pageNumber }
-          if (handle && total > 0) {
-            handle.updateProgress({ progress: Math.round((current / total) * 100) })
-          }
+          onOcrProgress?.({ current, total, pageNumber })
         }
       })
 
@@ -92,7 +90,6 @@ export function usePdfOcr({ onOcrComplete, onOcrStart, onOcrError } = {}) {
         onOcrError?.(errorCode)
       }
     } finally {
-      handle?.finish()
       isOcrProcessing.value = false
       ocrProgress.value = { current: 0, total: 0, pageNumber: 0 }
     }

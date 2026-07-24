@@ -47,7 +47,7 @@ An **Operation Result** is the architectural boundary between Feature and Presen
 { type: 'export-completed', format: 'txt' }
 { type: 'comparison-completed', winner: 'scale-1', timingMs: 1234, cer: {...} }
 { type: 'translation-partial', pageCount: 42, translatedCount: 38 }
-{ type: 'ocr-completed', pageNumbers: [1, 2, 3] }
+{ type: 'activity-completed', pageNumbers: [1, 2, 3] }
 { type: 'ocr-failed', reason: 'model-not-installed' }
 { type: 'region-ocr-no-text' }
 { type: 'block-translation-loading', blockId: 'b12', pageNumber: 3 }

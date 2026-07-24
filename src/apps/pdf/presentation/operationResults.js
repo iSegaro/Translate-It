@@ -10,17 +10,19 @@ export const COMPARISON_RESULTS = Object.freeze({
 })
 
 export const OCR_RESULTS = Object.freeze({
-  COMPLETED: 'ocr-completed',
   FAILED: 'ocr-failed',
   LANGUAGE_MISSING: 'ocr-language-missing',
   PROGRESS: 'ocr-progress'
 })
 
 export const REGION_OCR_RESULTS = Object.freeze({
-  COMPLETED: 'region-ocr-completed',
   FAILED: 'region-ocr-failed',
   NO_TEXT: 'region-ocr-no-text',
   PROGRESS: 'region-ocr-progress'
+})
+
+export const ACTIVITY_RESULTS = Object.freeze({
+  COMPLETED: 'activity-completed'
 })
 
 export const TRANSLATION_RESULTS = Object.freeze({
