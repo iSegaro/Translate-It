@@ -223,6 +223,7 @@ import { createPdfStatusBannerController } from './utils/pdfStatusBanner.js'
 import { createProgressAdapter } from './presentation/adapters/progressAdapter.js'
 import { createToastAdapter } from './presentation/adapters/toastAdapter.js'
 import { createBannerAdapter } from './presentation/adapters/bannerAdapter.js'
+import { DomainEvents } from './presentation/domainEvents.js'
 import { createPresentationDispatcher } from './presentation/presentationDispatcher.js'
 import { present } from './presentation/presentationPresenter.js'
 import { REGION_OCR_STATE } from './constants/regionOcrState.js'
@@ -394,7 +395,7 @@ let activeProgressCancel = null
 
 function handleProgressCancel() {
   if (activeProgressCancel) activeProgressCancel()
-  dispatchProgress({ name: 'activity-completed' })
+  dispatchProgress(DomainEvents.activityCompleted())
   activeProgressCancel = null
 }
 
@@ -408,20 +409,21 @@ const {
   cancelOcr
 } = usePdfOcr({
   onOcrComplete: ({ pageNumbers } = {}) => {
-    dispatchProgress({ name: 'activity-completed' })
+    dispatchProgress(DomainEvents.activityCompleted())
     activeProgressCancel = null
     refreshTranslatedPageBlocks(pageNumbers)
     translationTick.value += 1
     refreshOcrRecommendations()
   },
   onOcrProgress: ({ current, total }) => {
-    dispatchProgress({ name: 'ocr-progress-update', current, total })
+    dispatchProgress(DomainEvents.ocrProgressUpdated({ current, total }))
   },
   onOcrError: (errorCode) => {
-    dispatchProgress({ name: 'activity-completed' })
+    dispatchProgress(DomainEvents.activityCompleted())
     activeProgressCancel = null
-    const name = errorCode === 'model-not-installed' ? 'ocr-language-missing' : 'ocr-failed'
-    dispatchIntent({ name })
+    dispatchIntent(errorCode === 'model-not-installed'
+      ? DomainEvents.ocrLanguageMissing()
+      : DomainEvents.ocrFailed())
   }
 })
 
@@ -558,7 +560,7 @@ const toolbarOcrModel = computed(() => {
 
 function showOcrLanguageRequiredMessage() {
   ocrError.value = 'model-not-installed'
-  dispatchIntent({ name: 'ocr-language-missing' })
+  dispatchIntent(DomainEvents.ocrLanguageMissing())
 }
 
 function ensureOcrLanguageInstalled() {
@@ -594,7 +596,7 @@ function handleOcrPrimaryClick() {
 }
 
 function startPageOcr() {
-  dispatchProgress({ name: 'ocr-started' })
+  dispatchProgress(DomainEvents.ocrStarted())
   activeProgressCancel = cancelOcr
   requestOcr()
 }
@@ -739,7 +741,7 @@ function handleRegionSelectionComplete(region) {
 
   if (target === REGION_EXECUTION_TARGET.REGION_COMPARISON) {
     activeProgressCancel = handleCancelRegionComparison
-    dispatchProgress({ name: 'comparison-started' })
+    dispatchProgress(DomainEvents.comparisonStarted())
     const operation = pdfDeveloperApi.runRegionComparison({ region })
     activeRegionComparisonOperation = operation
     completedRegionComparisonResult = null
@@ -760,7 +762,7 @@ function handleRegionSelectionComplete(region) {
       result => handleRegionComparisonOutcome(operation, result),
       error => handleRegionComparisonFailure(operation, error)
     ).finally(() => {
-      dispatchProgress({ name: 'activity-completed' })
+      dispatchProgress(DomainEvents.activityCompleted())
       activeProgressCancel = null
     })
     return
@@ -775,11 +777,11 @@ function handleRegionSelectionComplete(region) {
   if (!request) return
 
   activeProgressCancel = cancelRegionOcr
-  dispatchProgress({ name: 'region-ocr-started' })
+  dispatchProgress(DomainEvents.regionOcrStarted())
   const operation = regionExecutionDispatcher.dispatchRegionExecution(request)
   regionOcrState.value = REGION_OCR_STATE.PROCESSING
   void operation.promise.then(handleRegionOcrOutcome, handleRegionOcrFailure).finally(() => {
-    dispatchProgress({ name: 'activity-completed' })
+    dispatchProgress(DomainEvents.activityCompleted())
     activeProgressCancel = null
   })
 }
@@ -839,7 +841,7 @@ function handleRegionComparisonOutcome(operation, result) {
   setRegionOcrIdle()
   if (result.status === 'ready') {
     const id = `developer-notification:${++developerNotificationOccurrenceId}`
-    dispatchIntent({ name: 'comparison-completed', id, summary: analysis, result })
+    dispatchIntent(DomainEvents.comparisonCompleted({ id, summary: analysis, result }))
   }
 }
 
@@ -853,7 +855,7 @@ function handleRegionComparisonFailure(operation, error) {
   }
   setRegionOcrIdle()
   const id = `developer-notification:${++developerNotificationOccurrenceId}`
-  dispatchIntent({ name: 'comparison-failed', id, error: error?.message })
+  dispatchIntent(DomainEvents.comparisonFailed({ id, error: error?.message }))
 }
 
 function beginRegionSelection(target) {
@@ -886,7 +888,7 @@ function handleRegionOcrOutcome(result) {
   setRegionOcrIdle()
 
   if (result?.status === 'recognized' && !String(result?.data?.text || '').trim()) {
-    dispatchIntent({ name: 'region-ocr-no-text' })
+    dispatchIntent(DomainEvents.regionOcrNoText())
   } else if (result?.status === 'failed') {
     const errorCode = mapOcrError(result.error)
     if (errorCode === 'cancelled') return
@@ -895,7 +897,7 @@ function handleRegionOcrOutcome(result) {
       return
     }
 
-    dispatchIntent({ name: 'region-ocr-failed' })
+    dispatchIntent(DomainEvents.regionOcrFailed())
   }
 }
 
@@ -922,9 +924,9 @@ function handleTranslatedPaneCurrentPageChange(pageNumber) {
 
 function handleTranslateVisiblePages() {
   activeProgressCancel = handleCancelTranslation
-  dispatchProgress({ name: 'translation-started' })
+  dispatchProgress(DomainEvents.translationStarted())
   translateVisiblePages().finally(() => {
-    dispatchProgress({ name: 'activity-completed' })
+    dispatchProgress(DomainEvents.activityCompleted())
     activeProgressCancel = null
   })
 }
@@ -935,26 +937,26 @@ function handleCancelTranslation() {
 
 async function handleExportTxt() {
   if (await exportTxt()) {
-    dispatchIntent({ name: 'export-completed', format: 'txt' })
+    dispatchIntent(DomainEvents.exportCompleted({ format: 'txt' }))
   } else if (exportError.value) {
-    dispatchIntent({ name: 'export-failed', error: exportError.value })
+    dispatchIntent(DomainEvents.exportFailed({ error: exportError.value }))
   }
 }
 
 async function handleExportMarkdown() {
   if (await exportMarkdown()) {
-    dispatchIntent({ name: 'export-completed', format: 'markdown' })
+    dispatchIntent(DomainEvents.exportCompleted({ format: 'markdown' }))
   } else if (exportError.value) {
-    dispatchIntent({ name: 'export-failed', error: exportError.value })
+    dispatchIntent(DomainEvents.exportFailed({ error: exportError.value }))
   }
 }
 
 async function handleExportHtml() {
   const canvasDataUrls = pdfViewerRef.value?.collectCanvasDataUrls?.() || new Map()
   if (await exportHtml(canvasDataUrls)) {
-    dispatchIntent({ name: 'export-completed', format: 'html' })
+    dispatchIntent(DomainEvents.exportCompleted({ format: 'html' }))
   } else if (exportError.value) {
-    dispatchIntent({ name: 'export-failed', error: exportError.value })
+    dispatchIntent(DomainEvents.exportFailed({ error: exportError.value }))
   }
 }
 
