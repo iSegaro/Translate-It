@@ -39,6 +39,7 @@ defineProps({
 
 <style lang="scss" scoped>
 @use 'toolbar-colors' as *;
+@use '../../../assets/styles/base/brand-tokens' as *;
 
 .pdf-app-brand {
   display: flex;
@@ -66,6 +67,10 @@ defineProps({
   font-weight: 600;
   line-height: 1.15;
   color: $tb-text-primary;
+  background: $brand-title-gradient-dark;
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;

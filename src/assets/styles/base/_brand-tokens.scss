@@ -1,0 +1,10 @@
+// ── Brand Design Tokens ──────────────────────────────────────────
+// Single source of truth for Translate It visual brand identity.
+// Consumed by application title headers (Subtitle, PDF, etc.).
+// Does NOT include layout, spacing, typography, or component styles.
+
+// Title gradient — light theme
+$brand-title-gradient-light: linear-gradient(90deg, #0f172a, #475569);
+
+// Title gradient — dark theme
+$brand-title-gradient-dark: linear-gradient(90deg, #ffffff, #94a3b8);
