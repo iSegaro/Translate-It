@@ -15,57 +15,59 @@
       :close="close"
     />
 
+    <!-- Desktop: inline anchored popover -->
+    <template v-if="!isMobile">
+      <div
+        v-if="isOpen"
+        class="toolbar-menu__backdrop"
+        aria-hidden="true"
+        @click="close"
+      />
+
+      <div
+        v-if="isOpen"
+        ref="menuRef"
+        class="toolbar-menu__panel"
+        role="menu"
+        @keydown.escape="close"
+      >
+        <slot
+          :close="close"
+          :is-open="isOpen"
+        />
+      </div>
+    </template>
+
+    <!-- Mobile: teleported full-height drawer -->
     <Teleport
-      :disabled="!isMobile"
+      v-else
       to="body"
     >
-      <template v-if="isMobile">
-        <Transition name="toolbar-menu-backdrop">
-          <div
-            v-if="isOpen"
-            class="toolbar-menu__backdrop"
-            aria-hidden="true"
-            @click="close"
-          />
-        </Transition>
-
-        <Transition name="toolbar-menu-drawer">
-          <div
-            v-if="isOpen"
-            ref="menuRef"
-            class="toolbar-menu__panel"
-            role="menu"
-            @keydown.escape="close"
-          >
-            <slot
-              :close="close"
-              :is-open="isOpen"
-            />
-          </div>
-        </Transition>
-      </template>
-
-      <template v-else>
+      <Transition name="toolbar-menu-backdrop">
         <div
           v-if="isOpen"
           class="toolbar-menu__backdrop"
           aria-hidden="true"
           @click="close"
         />
+      </Transition>
 
+      <Transition name="toolbar-menu--drawer">
         <div
           v-if="isOpen"
           ref="menuRef"
-          class="toolbar-menu__panel"
+          class="toolbar-menu__drawer"
           role="menu"
           @keydown.escape="close"
         >
-          <slot
-            :close="close"
-            :is-open="isOpen"
-          />
+          <div class="toolbar-menu__drawer-body">
+            <slot
+              :close="close"
+              :is-open="isOpen"
+            />
+          </div>
         </div>
-      </template>
+      </Transition>
     </Teleport>
   </div>
 </template>

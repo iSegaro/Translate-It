@@ -1,6 +1,5 @@
 // ── ToolbarMenu ──────────────────────────────────────────────
-// Application-agnostic toolbar-attached menu primitive.
-// Desktop: anchored popover. Mobile: full-height drawer.
+// Desktop: inline anchored popover. Mobile: teleported full-height drawer.
 
 $tm-mobile-breakpoint: 749px;
 
@@ -32,21 +31,15 @@ $tm-mobile-breakpoint: 749px;
   }
 }
 
-// ── Backdrop ──────────────────────────────────────────────────
+// ── Desktop Popover ──────────────────────────────────────────
 
 .toolbar-menu__backdrop {
   display: none;
 
   @media (max-width: $tm-mobile-breakpoint) {
     display: block;
-    position: fixed;
-    inset: 0;
-    z-index: var(--tm-layer-backdrop);
-    background: rgba(0, 0, 0, 0.4);
   }
 }
-
-// ── Panel ─────────────────────────────────────────────────────
 
 .toolbar-menu__panel {
   position: absolute;
@@ -60,33 +53,63 @@ $tm-mobile-breakpoint: 749px;
   border: var(--tm-panel-border);
   border-radius: var(--tm-panel-radius);
   box-shadow: var(--tm-panel-shadow);
+}
 
-  // Mobile: full-height drawer
+// ── Mobile Drawer ────────────────────────────────────────────
+
+.toolbar-menu__drawer {
+  position: fixed;
+  inset: 0;
+  z-index: var(--tm-layer-panel);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: var(--tm-panel-background);
+  box-shadow: var(--tm-panel-shadow);
+
+  @media (min-width: ($tm-mobile-breakpoint + 1)) {
+    display: none;
+  }
+}
+
+.toolbar-menu--placement-end .toolbar-menu__drawer {
+  right: 0;
+  left: auto;
+  width: 80vw;
+  max-width: 360px;
+  border-radius: var(--tm-panel-radius) 0 0 var(--tm-panel-radius);
+  padding-right: env(safe-area-inset-right, 0);
+}
+
+.toolbar-menu--placement-start .toolbar-menu__drawer {
+  left: 0;
+  right: auto;
+  width: 80vw;
+  max-width: 360px;
+  border-radius: 0 var(--tm-panel-radius) var(--tm-panel-radius) 0;
+  padding-left: env(safe-area-inset-left, 0);
+}
+
+.toolbar-menu__drawer-body {
+  flex: 1;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  padding-bottom: env(safe-area-inset-bottom, 0);
+}
+
+// ── Backdrop (mobile) ────────────────────────────────────────
+
+.toolbar-menu__backdrop {
   @media (max-width: $tm-mobile-breakpoint) {
     position: fixed;
-    top: 0;
-    bottom: 0;
-    width: 80vw;
-    max-width: 360px;
-    max-height: none;
+    inset: 0;
+    z-index: var(--tm-layer-backdrop);
+    background: rgba(0, 0, 0, 0.4);
   }
 }
 
-.toolbar-menu--placement-end .toolbar-menu__panel {
-  @media (max-width: $tm-mobile-breakpoint) {
-    right: 0;
-    border-radius: var(--tm-panel-radius) 0 0 var(--tm-panel-radius);
-  }
-}
-
-.toolbar-menu--placement-start .toolbar-menu__panel {
-  @media (max-width: $tm-mobile-breakpoint) {
-    left: 0;
-    border-radius: 0 var(--tm-panel-radius) var(--tm-panel-radius) 0;
-  }
-}
-
-// ── Drawer Animation (mobile only) ────────────────────────────
+// ── Drawer Animation ─────────────────────────────────────────
 
 .toolbar-menu-backdrop-enter-from,
 .toolbar-menu-backdrop-leave-to {
@@ -103,18 +126,23 @@ $tm-mobile-breakpoint: 749px;
   transition: opacity 220ms ease;
 }
 
-.toolbar-menu-drawer-enter-from,
-.toolbar-menu-drawer-leave-to {
+.toolbar-menu--drawer-enter-from,
+.toolbar-menu--drawer-leave-to {
   transform: translateX(100%);
 }
 
-.toolbar-menu-drawer-enter-to,
-.toolbar-menu-drawer-leave-from {
+.toolbar-menu--placement-start .toolbar-menu--drawer-enter-from,
+.toolbar-menu--placement-start .toolbar-menu--drawer-leave-to {
+  transform: translateX(-100%);
+}
+
+.toolbar-menu--drawer-enter-to,
+.toolbar-menu--drawer-leave-from {
   transform: translateX(0);
 }
 
-.toolbar-menu-drawer-enter-active,
-.toolbar-menu-drawer-leave-active {
+.toolbar-menu--drawer-enter-active,
+.toolbar-menu--drawer-leave-active {
   transition: transform 220ms cubic-bezier(0.2, 0, 0, 1);
   will-change: transform;
 }
