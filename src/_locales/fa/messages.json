@@ -2708,6 +2708,9 @@
   "subtitle_app_title": {
     "message": "مترجم زیرنویس"
   },
+  "pdf_app_title": {
+    "message": "مترجم PDF"
+  },
   "subtitle_app_powered_by": {
     "message": "قدرت گرفته از Translate It"
   },

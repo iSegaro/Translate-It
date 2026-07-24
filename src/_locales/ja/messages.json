@@ -2708,6 +2708,9 @@
   "subtitle_app_title": {
     "message": "字幕翻訳"
   },
+  "pdf_app_title": {
+    "message": "PDF翻訳"
+  },
   "subtitle_app_powered_by": {
     "message": "Translate It 提供"
   },

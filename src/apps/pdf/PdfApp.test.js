@@ -175,6 +175,12 @@ vi.mock('@/core/helpers.js', () => ({
   openOptionsPage: openOptionsPageMock
 }))
 
+const tMock = vi.fn((key, fallback) => fallback ?? key)
+
+vi.mock('@/composables/shared/useUnifiedI18n.js', () => ({
+  useUnifiedI18n: () => ({ t: tMock })
+}))
+
 vi.mock('@/features/pdf-translation/core/PdfFileDownloader.js', () => ({
   downloadFile: downloadFileMock
 }))

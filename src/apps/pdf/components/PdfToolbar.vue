@@ -1,6 +1,7 @@
 <template>
   <header class="pdf-toolbar">
     <div class="pdf-toolbar__title-block">
+      <slot name="leading" />
       <div class="pdf-toolbar__file-row">
         <button
           v-if="hasOutline"

@@ -47,7 +47,16 @@
       @open-settings="handleOpenSettings"
       @request-document-info="showPdfInfo = true"
       @go-to-page="navigateToPage($event)"
-    />
+    >
+      <template #leading>
+        <PdfAppBrand
+          v-if="!hasDocument"
+          :icon-src="pdfBrandIcon"
+          :title="t('pdf_app_title', 'PDF Translator')"
+          :subtitle="t('subtitle_app_powered_by', 'Powered by Translate It')"
+        />
+      </template>
+    </PdfToolbar>
 
     <PdfProgressBar
       :operation="progressOperation"
@@ -208,6 +217,8 @@ import PdfWindowsHost from './components/PdfWindowsHost.vue'
 import PdfOutline from './components/PdfOutline.vue'
 import PdfDocumentInfoDialog from './components/PdfDocumentInfoDialog.vue'
 import PdfProgressBar from './components/PdfProgressBar.vue'
+import PdfAppBrand from './components/PdfAppBrand.vue'
+import pdfBrandIcon from '@/icons/ui/pdf_viewer/pdf.svg?url'
 import { usePdfViewerController } from './composables/usePdfViewerController.js'
 import { usePdfViewerMode, CONTENT_VIEW, VIEWER_ROLE } from './composables/usePdfViewerMode.js'
 import { usePdfDocumentInfo } from './composables/usePdfDocumentInfo.js'
@@ -240,7 +251,10 @@ import { useOCRStore } from '@/features/screen-capture/stores/ocrStore.js'
 import { SUPPORTED_OCR_LANGUAGES } from '@/features/screen-capture/utils/ocrLanguageMap.js'
 import { openOptionsPage } from '@/core/helpers.js'
 import { applyTheme } from '@/utils/ui/theme.js'
+import { useUnifiedI18n } from '@/composables/shared/useUnifiedI18n.js'
 import './PdfApp.scss'
+
+const { t } = useUnifiedI18n()
 
 const {
   error,

@@ -2708,6 +2708,9 @@
   "subtitle_app_title": {
     "message": "Subtitle Translator"
   },
+  "pdf_app_title": {
+    "message": "PDF Translator"
+  },
   "subtitle_app_powered_by": {
     "message": "Powered by Translate It"
   },
