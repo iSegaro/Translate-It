@@ -200,11 +200,13 @@
       rich-colors
       position="bottom-right"
     />
+
+    <PdfOverlayRoot :set-root="setOverlayRoot" />
   </div>
 </template>
 
 <script setup>
-import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, onMounted, provide, ref, watch } from 'vue'
 import { Toaster } from 'vue-sonner'
 import PdfToolbar from './components/PdfToolbar.vue'
 import PdfDropzone from './components/PdfDropzone.vue'
@@ -218,6 +220,7 @@ import PdfOutline from './components/PdfOutline.vue'
 import PdfDocumentInfoDialog from './components/PdfDocumentInfoDialog.vue'
 import PdfProgressBar from './components/PdfProgressBar.vue'
 import PdfAppBrand from './components/PdfAppBrand.vue'
+import PdfOverlayRoot from './components/PdfOverlayRoot.vue'
 import pdfBrandIcon from '@/icons/ui/pdf_viewer/pdf.svg?url'
 import { usePdfViewerController } from './composables/usePdfViewerController.js'
 import { usePdfViewerMode, CONTENT_VIEW, VIEWER_ROLE } from './composables/usePdfViewerMode.js'
@@ -252,9 +255,17 @@ import { SUPPORTED_OCR_LANGUAGES } from '@/features/screen-capture/utils/ocrLang
 import { openOptionsPage } from '@/core/helpers.js'
 import { applyTheme } from '@/utils/ui/theme.js'
 import { useUnifiedI18n } from '@/composables/shared/useUnifiedI18n.js'
+import { OVERLAY_ROOT_KEY } from '@/components/base/ToolbarMenu/keys.js'
 import './PdfApp.scss'
 
 const { t } = useUnifiedI18n()
+
+const overlayRootRef = ref(null)
+provide(OVERLAY_ROOT_KEY, overlayRootRef)
+
+function setOverlayRoot(el) {
+  overlayRootRef.value = el ?? null
+}
 
 const {
   error,

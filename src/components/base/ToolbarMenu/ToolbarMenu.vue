@@ -41,7 +41,8 @@
     <!-- Mobile: teleported full-height drawer -->
     <Teleport
       v-else
-      to="body"
+      :disabled="!isMobile"
+      :to="teleportTarget"
     >
       <Transition name="toolbar-menu-backdrop">
         <div
@@ -84,8 +85,9 @@
 </template>
 
 <script setup>
-import { computed, onMounted, onBeforeUnmount, ref, nextTick } from 'vue'
+import { computed, inject, onMounted, onBeforeUnmount, ref, nextTick } from 'vue'
 import { useResourceTracker } from '@/composables/core/useResourceTracker.js'
+import { OVERLAY_ROOT_KEY } from './keys.js'
 
 const props = defineProps({
   variant: {
@@ -104,6 +106,13 @@ const props = defineProps({
 })
 
 const emit = defineEmits(['open', 'close'])
+
+const overlayRoot = inject(OVERLAY_ROOT_KEY, null)
+
+const teleportTarget = computed(() => {
+  if (overlayRoot?.value instanceof HTMLElement) return overlayRoot.value
+  return 'body'
+})
 
 const rootClasses = computed(() => {
   const classes = []
