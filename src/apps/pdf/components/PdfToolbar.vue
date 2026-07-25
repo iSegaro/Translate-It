@@ -78,6 +78,7 @@
       </div>
 
       <div
+        v-if="!overflowDecisions['layout-toggle']"
         class="pdf-toolbar__mode-group pdf-toolbar__mode-group--layout"
         :class="{ 'pdf-toolbar__mode-group--hidden': !showTranslationOption }"
       >
@@ -373,6 +374,15 @@
 
         <template #default="{ close }">
           <div class="pdf-toolbar__export-menu">
+            <template v-if="overflowDecisions['layout-toggle'] === 'menu' && showTranslationOption">
+              <button
+                class="pdf-toolbar__export-item"
+                type="button"
+                @click="close(); handleLayoutModeToggle()"
+              >
+                {{ isSideBySide ? 'Single Page' : 'Side by Side' }}
+              </button>
+            </template>
             <button
               class="pdf-toolbar__export-item"
               type="button"
@@ -493,6 +503,7 @@ import SvgIcon from '@/components/shared/SvgIcon.vue'
 import ProviderSelector from '@/components/shared/ProviderSelector.vue'
 import PdfTranslationSettingsPopover from './PdfTranslationSettingsPopover.vue'
 import ToolbarMenu from '@/components/base/ToolbarMenu/ToolbarMenu.vue'
+import { resolveOverflow } from './toolbarOverflowPolicy.js'
 import outlineIcon from '@/icons/ui/outline.svg?url'
 import splitScreenIcon from '@/icons/ui/split-screen.svg?url'
 import fitPageIcon from '@/icons/ui/fit-page.svg?url'
@@ -536,6 +547,14 @@ const emit = defineEmits(['request-open-pdf', 'translate-visible', 'cancel-trans
 const logger = getScopedLogger(LOG_COMPONENTS.PDF, 'PdfToolbar')
 const settingsStore = useSettingsStore()
 const { t } = useUnifiedI18n()
+
+// ── Responsive Context ───────────────────────────────────────
+
+const isTablet = ref(false)
+
+const overflowDecisions = computed(() =>
+  resolveOverflow(isTablet.value)
+)
 
 const pdfProviderValue = computed(() => {
   return settingsStore.settings?.MODE_PROVIDERS?.[TranslationMode.PDF] || 'default'
@@ -924,6 +943,16 @@ function handleDocumentKeyDown(event) {
 onMounted(() => {
   document.addEventListener('pointerdown', handleDocumentPointerDown, true)
   document.addEventListener('keydown', handleDocumentKeyDown)
+
+  if (typeof window !== 'undefined' && window.matchMedia) {
+    const mq = matchMedia('(max-width: 1099px)')
+    const syncState = () => {
+      isTablet.value = mq.matches
+    }
+    syncState()
+    mq.addEventListener('change', syncState)
+    onBeforeUnmount(() => mq.removeEventListener('change', syncState))
+  }
 })
 
 onBeforeUnmount(() => {
