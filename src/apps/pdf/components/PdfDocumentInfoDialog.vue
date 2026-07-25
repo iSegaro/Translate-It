@@ -5,6 +5,19 @@
     size="sm"
     mobile-behavior="dialog"
   >
+    <template #header>
+      <h3 class="modal-title pdf-document-info-dialog__title">
+        <img
+          class="pdf-document-info-dialog__icon"
+          :src="pdfBrandIcon"
+          alt=""
+          width="28"
+          height="28"
+        >
+        <span>PDF Information</span>
+      </h3>
+    </template>
+
     <dl class="pdf-info-rows">
       <div
         v-for="row in rows"
@@ -21,6 +34,7 @@
 <script setup>
 import { computed } from 'vue'
 import BaseModal from '@/components/base/BaseModal.vue'
+import pdfBrandIcon from '@/icons/ui/pdf_viewer/pdf.svg?url'
 
 const props = defineProps({
   modelValue: { type: Boolean, default: false },
@@ -41,6 +55,19 @@ const open = computed({
   gap: 12px;
   margin: 0;
   padding: 0;
+}
+
+.pdf-document-info-dialog__title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.pdf-document-info-dialog__icon {
+  display: block;
+  width: 28px;
+  height: 28px;
+  flex-shrink: 0;
 }
 
 .pdf-info-row {

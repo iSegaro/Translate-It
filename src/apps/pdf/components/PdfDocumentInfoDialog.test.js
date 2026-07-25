@@ -7,7 +7,9 @@ vi.mock('@/components/base/BaseModal.vue', () => ({
     name: 'BaseModal',
     template: `
       <div v-if="modelValue" class="mock-base-modal">
-        <div class="mock-modal-title">{{ title }}</div>
+        <slot name="header">
+          <div class="mock-modal-title">{{ title }}</div>
+        </slot>
         <slot />
       </div>
     `,
@@ -28,7 +30,8 @@ describe('PdfDocumentInfoDialog', () => {
       },
     })
 
-    expect(wrapper.find('.mock-modal-title').text()).toBe('PDF Information')
+    expect(wrapper.find('.pdf-document-info-dialog__title').text()).toBe('PDF Information')
+    expect(wrapper.find('.pdf-document-info-dialog__icon').attributes('src')).toBeTruthy()
     expect(wrapper.findAll('.pdf-info-row')).toHaveLength(2)
     expect(wrapper.text()).toContain('test.pdf')
     expect(wrapper.text()).toContain('42')
