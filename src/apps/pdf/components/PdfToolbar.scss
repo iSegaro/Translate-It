@@ -155,6 +155,11 @@
     display: none;
   }
 
+  /*
+  * Toolbar controls that become available later must preserve their layout
+  * footprint. Visibility changes must not change the toolbar's intrinsic
+  * width; otherwise responsive wrapping becomes unstable.
+  */
   &--hidden {
     visibility: hidden;
     opacity: 0;

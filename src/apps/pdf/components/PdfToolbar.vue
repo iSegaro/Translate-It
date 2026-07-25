@@ -56,12 +56,14 @@
       </div>
 
       <div
-        v-if="showTranslationOption"
         class="pdf-toolbar__view-mode pdf-toolbar__view-mode--mobile"
+        :class="{ 'pdf-toolbar__view-mode--hidden': !showTranslationOption }"
       >
         <select
           class="pdf-toolbar__view-mode-select"
           :value="contentView"
+          :tabindex="showTranslationOption ? 0 : -1"
+          :aria-hidden="!showTranslationOption"
           aria-label="View mode"
           @change="$emit('content-view-change', $event.target.value)"
         >
