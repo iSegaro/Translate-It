@@ -10,11 +10,22 @@ $tm-mobile-breakpoint: 749px;
   --tm-layer-backdrop: var(--ti-z-dropdown);
   --tm-layer-panel: calc(var(--ti-z-dropdown) + 1);
 
-  // Semantic panel tokens — overridable per variant or consumer.
+  // Panel (desktop popover) tokens
   --tm-panel-background: transparent;
   --tm-panel-border: none;
   --tm-panel-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
   --tm-panel-radius: 14px;
+
+  // Drawer (mobile) tokens
+  --tm-drawer-background: transparent;
+  --tm-drawer-border-color: transparent;
+  --tm-drawer-shadow: 0 0 0 1px rgba(0, 0, 0, 0.05), 0 8px 40px rgba(0, 0, 0, 0.32);
+  --tm-drawer-radius: 10px;
+  --tm-drawer-width: 320px;
+  --tm-drawer-header-color: inherit;
+  --tm-drawer-header-border: 1px solid rgba(0, 0, 0, 0.08);
+  --tm-drawer-close-color: inherit;
+  --tm-drawer-close-hover-bg: rgba(0, 0, 0, 0.06);
 }
 
 // ── Placement ────────────────────────────────────────────────
@@ -35,10 +46,6 @@ $tm-mobile-breakpoint: 749px;
 
 .toolbar-menu__backdrop {
   display: none;
-
-  @media (max-width: $tm-mobile-breakpoint) {
-    display: block;
-  }
 }
 
 .toolbar-menu__panel {
@@ -58,50 +65,92 @@ $tm-mobile-breakpoint: 749px;
 // ── Mobile Drawer ────────────────────────────────────────────
 
 .toolbar-menu__drawer {
-  position: fixed;
-  inset: 0;
-  z-index: var(--tm-layer-panel);
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-  background: var(--tm-panel-background);
-  box-shadow: var(--tm-panel-shadow);
+  display: none;
 
-  @media (min-width: ($tm-mobile-breakpoint + 1)) {
-    display: none;
+  @media (max-width: $tm-mobile-breakpoint) {
+    position: fixed;
+    top: 0;
+    bottom: 0;
+    z-index: var(--tm-layer-panel);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    background: var(--tm-drawer-background);
+    box-shadow: var(--tm-drawer-shadow);
+    width: var(--tm-drawer-width);
+    max-width: 85vw;
   }
 }
 
 .toolbar-menu--placement-end .toolbar-menu__drawer {
   right: 0;
-  left: auto;
-  width: 80vw;
-  max-width: 360px;
-  border-radius: var(--tm-panel-radius) 0 0 var(--tm-panel-radius);
+  border-left: 1px solid var(--tm-drawer-border-color);
+  border-radius: var(--tm-drawer-radius) 0 0 var(--tm-drawer-radius);
   padding-right: env(safe-area-inset-right, 0);
 }
 
 .toolbar-menu--placement-start .toolbar-menu__drawer {
   left: 0;
-  right: auto;
-  width: 80vw;
-  max-width: 360px;
-  border-radius: 0 var(--tm-panel-radius) var(--tm-panel-radius) 0;
+  border-right: 1px solid var(--tm-drawer-border-color);
+  border-radius: 0 var(--tm-drawer-radius) var(--tm-drawer-radius) 0;
   padding-left: env(safe-area-inset-left, 0);
 }
+
+// ── Drawer Header ────────────────────────────────────────────
+
+.toolbar-menu__drawer-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 16px;
+  padding-top: max(12px, env(safe-area-inset-top, 0));
+  flex-shrink: 0;
+  border-bottom: var(--tm-drawer-header-border);
+  color: var(--tm-drawer-header-color);
+}
+
+.toolbar-menu__drawer-title {
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.toolbar-menu__drawer-close {
+  display: inline-grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--tm-drawer-close-color);
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+  flex-shrink: 0;
+
+  &:hover {
+    background: var(--tm-drawer-close-hover-bg);
+  }
+}
+
+// ── Drawer Body ──────────────────────────────────────────────
 
 .toolbar-menu__drawer-body {
   flex: 1;
   overflow-y: auto;
   overscroll-behavior: contain;
   -webkit-overflow-scrolling: touch;
-  padding-bottom: env(safe-area-inset-bottom, 0);
+  padding: 8px 12px;
+  padding-bottom: max(8px, env(safe-area-inset-bottom, 0));
 }
 
-// ── Backdrop (mobile) ────────────────────────────────────────
+// ── Mobile Backdrop ──────────────────────────────────────────
 
 .toolbar-menu__backdrop {
   @media (max-width: $tm-mobile-breakpoint) {
+    display: block;
     position: fixed;
     inset: 0;
     z-index: var(--tm-layer-backdrop);

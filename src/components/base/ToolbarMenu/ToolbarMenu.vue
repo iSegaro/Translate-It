@@ -60,6 +60,17 @@
           role="menu"
           @keydown.escape="close"
         >
+          <div class="toolbar-menu__drawer-header">
+            <span class="toolbar-menu__drawer-title">More</span>
+            <button
+              class="toolbar-menu__drawer-close"
+              type="button"
+              aria-label="Close menu"
+              @click="close"
+            >
+              <span aria-hidden="true">×</span>
+            </button>
+          </div>
           <div class="toolbar-menu__drawer-body">
             <slot
               :close="close"
