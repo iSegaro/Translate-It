@@ -21,6 +21,7 @@ if (!window.matchMedia) {
 let mockViewerController
 let mockViewerMode
 let mockPdfExport
+let mockPdfNavigation
 
 let mockPdfOcr
 let mockPdfOcrOptions
@@ -89,6 +90,10 @@ vi.mock('./composables/usePdfViewerMode.js', () => ({
 
 vi.mock('./composables/usePdfExport.js', () => ({
   usePdfExport: () => mockPdfExport
+}))
+
+vi.mock('./composables/usePdfNavigation.js', () => ({
+  usePdfNavigation: () => mockPdfNavigation
 }))
 
 vi.mock('@/features/pdf-translation/core/PdfDocumentSession.js', () => ({
@@ -196,7 +201,7 @@ vi.mock('./components/PdfToolbar.vue', () => ({
   default: {
     name: 'PdfToolbar',
     props: ['fileName', 'pageCount', 'currentPageNumber', 'zoomMode', 'zoomPercent', 'contentView', 'layoutMode', 'executionMode', 'executionModes', 'ocrViewModel', 'regionComparisonState', 'canExportRegionComparisonArtifact'],
-    emits: ['toggle-outline', 'translate-visible', 'cancel-translation', 'content-view-change', 'layout-mode-change', 'zoom-step', 'zoom-change', 'export-txt', 'export-markdown', 'export-html', 'request-region-comparison', 'cancel-region-comparison', 'export-region-comparison-artifact', 'clear-cache', 'request-open-pdf', 'execution-mode-change', 'primary-click', 'select-action', 'select-language', 'manage-languages', 'open-settings', 'request-document-info'],
+    emits: ['toggle-outline', 'translate-visible', 'cancel-translation', 'content-view-change', 'layout-mode-change', 'zoom-step', 'zoom-change', 'export-txt', 'export-markdown', 'export-html', 'request-region-comparison', 'cancel-region-comparison', 'export-region-comparison-artifact', 'clear-cache', 'request-open-pdf', 'execution-mode-change', 'primary-click', 'select-action', 'select-language', 'manage-languages', 'open-settings', 'request-document-info', 'previous-page', 'next-page'],
     template: '<header class="pdf-toolbar-stub" />'
   }
 }))
@@ -425,6 +430,20 @@ function createMocks({
     exportHtml: vi.fn().mockResolvedValue(false),
   }
 
+  mockPdfNavigation = {
+    currentPage: ref(5),
+    isNavigating: ref(false),
+    outline: ref(null),
+    hasOutline: computed(() => false),
+    activeOutlineDest: ref(null),
+    expandedDests: ref(new Set()),
+    navigateToPage: vi.fn(),
+    navigateToDestination: vi.fn(),
+    handleNavigationTarget: vi.fn(),
+    attachDocument: vi.fn(),
+    detachDocument: vi.fn()
+  }
+
   mockPdfOcr = {
     ocrRecommendationCount: ref(0),
     ocrRecommendations: ref([]),
@@ -493,6 +512,22 @@ describe('PdfApp', () => {
     vi.useRealTimers()
     vi.unstubAllEnvs()
     vi.clearAllTimers()
+  })
+
+  it('delegates previous-page toolbar intent through navigation', () => {
+    const wrapper = mount(PdfApp)
+
+    wrapper.findComponent({ name: 'PdfToolbar' }).vm.$emit('previous-page')
+
+    expect(mockPdfNavigation.navigateToPage).toHaveBeenCalledWith(4)
+  })
+
+  it('delegates next-page toolbar intent through navigation', () => {
+    const wrapper = mount(PdfApp)
+
+    wrapper.findComponent({ name: 'PdfToolbar' }).vm.$emit('next-page')
+
+    expect(mockPdfNavigation.navigateToPage).toHaveBeenCalledWith(6)
   })
 
   it('does not continue bootstrap after unmount while OCR initialization is pending', async () => {

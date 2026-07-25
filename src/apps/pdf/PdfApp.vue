@@ -3,7 +3,7 @@
     <PdfToolbar
       :file-name="fileName"
       :page-count="pageCount"
-      :current-page-number="currentPage"
+      :current-page-number="currentPageNumber"
       :is-loading="isLoading"
       :is-translating="isTranslating"
       :can-translate-visible-pages="canTranslateVisiblePages"
@@ -46,6 +46,8 @@
       @manage-languages="handleOcrManageLanguages"
       @open-settings="handleOpenSettings"
       @request-document-info="showPdfInfo = true"
+      @previous-page="navigateToPage(currentPageNumber - 1)"
+      @next-page="navigateToPage(currentPageNumber + 1)"
       @go-to-page="navigateToPage($event)"
     >
       <template #leading>
@@ -359,6 +361,7 @@ const {
   attachDocument,
   detachDocument
 } = usePdfNavigation(pdfViewerRef)
+const currentPageNumber = computed(() => Number(currentPage.value) || 0)
 const dismissedPdfStatusBannerKey = ref('')
 const logger = getScopedLogger(LOG_COMPONENTS.PDF, 'PdfApp')
 const ocrStore = useOCRStore()

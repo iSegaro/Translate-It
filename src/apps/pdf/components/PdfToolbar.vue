@@ -105,6 +105,33 @@
       />
 
       <div class="pdf-toolbar__page-group">
+        <button
+          class="pdf-toolbar__button pdf-toolbar__button--icon-trigger"
+          type="button"
+          :disabled="!canGoPrevious"
+          :aria-label="TOOLTIP_PREVIOUS_PAGE"
+          :title="TOOLTIP_PREVIOUS_PAGE"
+          @click="$emit('previous-page')"
+        >
+          <SvgIcon
+            class="pdf-toolbar__icon--rotated"
+            :src="dropdownArrowIcon"
+            :size="14"
+          />
+        </button>
+        <button
+          class="pdf-toolbar__button pdf-toolbar__button--icon-trigger"
+          type="button"
+          :disabled="!canGoNext"
+          :aria-label="TOOLTIP_NEXT_PAGE"
+          :title="TOOLTIP_NEXT_PAGE"
+          @click="$emit('next-page')"
+        >
+          <SvgIcon
+            :src="dropdownArrowIcon"
+            :size="14"
+          />
+        </button>
         <input
           class="pdf-toolbar__page-input"
           type="text"
@@ -523,6 +550,7 @@ import splitScreenIcon from '@/icons/ui/split-screen.svg?url'
 import fitPageIcon from '@/icons/ui/fit-page.svg?url'
 import fitWidthIcon from '@/icons/ui/fit-width.svg?url'
 import infoIcon from '@/icons/ui/info.svg?url'
+import dropdownArrowIcon from '@/icons/ui/dropdown-arrow.svg?url'
 import './PdfToolbar.scss'
 
 const TOOLTIP_OUTLINE = 'Toggle outline'
@@ -530,6 +558,8 @@ const TOOLTIP_SIDE_BY_SIDE = 'Side by Side'
 const TOOLTIP_ZOOM_OUT = 'Zoom out'
 const TOOLTIP_ZOOM_IN = 'Zoom in'
 const TOOLTIP_MORE = 'More actions'
+const TOOLTIP_PREVIOUS_PAGE = 'Previous page'
+const TOOLTIP_NEXT_PAGE = 'Next page'
 
 const props = defineProps({
   fileName: { type: String, default: '' },
@@ -555,7 +585,7 @@ const props = defineProps({
   targetLanguage: { type: String, default: 'fa' },
 })
 
-const emit = defineEmits(['request-open-pdf', 'translate-visible', 'cancel-translation', 'content-view-change', 'layout-mode-change', 'toggle-outline', 'export-txt', 'export-markdown', 'export-html', 'request-region-comparison', 'cancel-region-comparison', 'export-region-comparison-artifact', 'clear-cache', 'zoom-step', 'zoom-change', 'execution-mode-change', 'primary-click', 'select-action', 'select-language',   'manage-languages', 'open-settings', 'request-document-info',
+const emit = defineEmits(['request-open-pdf', 'translate-visible', 'cancel-translation', 'content-view-change', 'layout-mode-change', 'toggle-outline', 'export-txt', 'export-markdown', 'export-html', 'request-region-comparison', 'cancel-region-comparison', 'export-region-comparison-artifact', 'clear-cache', 'zoom-step', 'zoom-change', 'execution-mode-change', 'primary-click', 'select-action', 'select-language',   'manage-languages', 'open-settings', 'request-document-info', 'previous-page', 'next-page',
   'go-to-page', 'update:sourceLanguage', 'update:targetLanguage'])
 
 const logger = getScopedLogger(LOG_COMPONENTS.PDF, 'PdfToolbar')
@@ -775,6 +805,9 @@ const currentPageDisplayValue = computed(() => {
 
   return String(current || 1)
 })
+
+const canGoPrevious = computed(() => Number(props.currentPageNumber) > 1)
+const canGoNext = computed(() => Number(props.currentPageNumber) < Number(props.pageCount))
 
 const isEditingPage = ref(false)
 const editPageValue = ref('')

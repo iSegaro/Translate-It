@@ -1696,6 +1696,50 @@ describe('PdfToolbar', () => {
     })
   })
 
+  describe('page navigation buttons', () => {
+    const baseProps = () => ({
+      fileName: 'doc.pdf',
+      pageCount: 12,
+      currentPageNumber: 5
+    })
+
+    it('disables Previous on the first page', () => {
+      const wrapper = mount(PdfToolbar, { props: { ...baseProps(), currentPageNumber: 1 } })
+
+      expect(wrapper.find('button[aria-label="Previous page"]').attributes('disabled')).toBeDefined()
+    })
+
+    it('disables Next on the last page', () => {
+      const wrapper = mount(PdfToolbar, { props: { ...baseProps(), currentPageNumber: 12 } })
+
+      expect(wrapper.find('button[aria-label="Next page"]').attributes('disabled')).toBeDefined()
+    })
+
+    it('enables Previous and Next between page boundaries', () => {
+      const wrapper = mount(PdfToolbar, { props: baseProps() })
+
+      expect(wrapper.find('button[aria-label="Previous page"]').attributes('disabled')).toBeUndefined()
+      expect(wrapper.find('button[aria-label="Next page"]').attributes('disabled')).toBeUndefined()
+    })
+
+    it('emits previous-page and next-page from their buttons', async () => {
+      const wrapper = mount(PdfToolbar, { props: baseProps() })
+
+      await wrapper.find('button[aria-label="Previous page"]').trigger('click')
+      await wrapper.find('button[aria-label="Next page"]').trigger('click')
+
+      expect(wrapper.emitted('previous-page')).toHaveLength(1)
+      expect(wrapper.emitted('next-page')).toHaveLength(1)
+    })
+
+    it('labels page navigation buttons for assistive technology and tooltips', () => {
+      const wrapper = mount(PdfToolbar, { props: baseProps() })
+
+      expect(wrapper.find('button[aria-label="Previous page"]').attributes('title')).toBe('Previous page')
+      expect(wrapper.find('button[aria-label="Next page"]').attributes('title')).toBe('Next page')
+    })
+  })
+
   describe('overflow routing', () => {
     it('keeps all controls in toolbar at desktop', () => {
       const decisions = resolveOverflow(false)

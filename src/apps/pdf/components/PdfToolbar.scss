@@ -233,6 +233,10 @@
   font-weight: 600;
 }
 
+.pdf-toolbar__icon--rotated {
+  transform: rotate(180deg);
+}
+
 .pdf-toolbar__page-group .pdf-toolbar__page-input {
   width: 28px;
   padding: 3px 2px;
