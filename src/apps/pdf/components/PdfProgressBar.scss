@@ -1,3 +1,5 @@
+@use '../../../assets/styles/base/brand-tokens' as *;
+
 @keyframes pdf-progress-bar-indeterminate {
   0% { transform: translateX(-100%); }
   100% { transform: translateX(400%); }
@@ -27,7 +29,7 @@
 .pdf-progress-bar__fill {
   height: 100%;
   border-radius: 1.5px;
-  background: linear-gradient(90deg, #6366f1, #8b5cf6);
+  background: linear-gradient(90deg, $brand-green-gradient-start, $brand-green-gradient-end);
   transition: width 200ms ease;
 
   &--indeterminate {

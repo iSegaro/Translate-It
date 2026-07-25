@@ -3,6 +3,13 @@
 // Canonical color stops only. Each application owns gradient construction.
 // Does NOT include layout, spacing, typography, or component styles.
 
+// Brand green — primary (from extension icon)
+$brand-green: #52dd85;
+
+// Brand green gradient stops (computed from primary)
+$brand-green-gradient-start: $brand-green;
+$brand-green-gradient-end: lighten($brand-green, 15%);
+
 // Title gradient — light theme
 $brand-title-gradient-light-start: #0f172a;
 $brand-title-gradient-light-end: #475569;
