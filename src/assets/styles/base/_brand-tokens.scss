@@ -1,3 +1,5 @@
+@use 'sass:color';
+
 // ── Brand Design Tokens ──────────────────────────────────────────
 // Single source of truth for Translate It visual brand identity.
 // Canonical color stops only. Each application owns gradient construction.
@@ -8,12 +10,12 @@ $brand-green: #52dd85;
 
 // Brand green gradient stops (computed from primary)
 $brand-green-gradient-start: $brand-green;
-$brand-green-gradient-end: lighten($brand-green, 15%);
+$brand-green-gradient-end: color.adjust($brand-green, $lightness: 15%);
 
 // Title gradient — light theme
 $brand-title-gradient-light-start: #0f172a;
 $brand-title-gradient-light-end: #475569;
 
 // Title gradient — dark theme
-$brand-title-gradient-dark-start: #ffffff;
+$brand-title-gradient-dark-start: #fff;
 $brand-title-gradient-dark-end: #94a3b8;
