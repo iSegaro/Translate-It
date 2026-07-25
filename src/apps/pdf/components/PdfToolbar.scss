@@ -453,6 +453,90 @@
   text-transform: uppercase;
 }
 
+// ── Submenu Trigger ──────────────────────────────────────────
+
+.pdf-toolbar__menu-section--has-flyout {
+  position: relative;
+}
+
+.pdf-toolbar__export-item--submenu-trigger {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+}
+
+.pdf-toolbar__submenu-chevron {
+  display: block;
+  width: 0;
+  height: 0;
+  border-style: solid;
+  border-width: 4px 5px 4px 0;
+  border-color: transparent currentColor transparent transparent;
+  transition: transform 0.15s ease;
+
+  .pdf-toolbar__export-item--submenu-trigger[aria-expanded='true'] & {
+    transform: rotate(90deg);
+  }
+}
+
+// ── Flyout Panel ─────────────────────────────────────────────
+
+.pdf-toolbar__flyout {
+  z-index: calc(var(--ti-z-dropdown) + 10);
+  min-width: 180px;
+  padding: 4px;
+  background: #1e1e1e;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 10px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.28);
+}
+
+.pdf-toolbar__flyout-item {
+  appearance: none;
+  border: 0;
+  border-radius: 6px;
+  width: 100%;
+  padding: 8px 12px;
+  background: transparent;
+  color: $tb-text-primary;
+  font-size: 13px;
+  font-weight: 500;
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.12s ease;
+  outline: none;
+
+  &:hover,
+  &:focus-visible {
+    background: $tb-control-hover;
+  }
+
+  &:focus-visible {
+    outline: 2px solid $tb-focus-soft;
+    outline-offset: -2px;
+  }
+}
+
+// ── Flyout Transition ────────────────────────────────────────
+
+.pdf-toolbar-flyout-enter-active,
+.pdf-toolbar-flyout-leave-active {
+  transition: opacity 0.12s ease, transform 0.12s ease;
+}
+
+.pdf-toolbar-flyout-enter-from,
+.pdf-toolbar-flyout-leave-to {
+  opacity: 0;
+  transform: translateX(4px);
+}
+
+.pdf-toolbar-flyout-enter-to,
+.pdf-toolbar-flyout-leave-from {
+  opacity: 1;
+  transform: translateX(0);
+}
+
 .pdf-toolbar__regionComparison {
   display: grid;
   gap: 6px;

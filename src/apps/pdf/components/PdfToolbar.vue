@@ -412,32 +412,55 @@
             </button>
             <div
               v-if="canExport"
-              class="pdf-toolbar__menu-section"
+              class="pdf-toolbar__menu-section pdf-toolbar__menu-section--has-flyout"
               role="group"
               aria-label="Export"
             >
-              <span class="pdf-toolbar__menu-section-title">Export</span>
               <button
-                class="pdf-toolbar__export-item"
+                ref="exportTriggerRef"
+                class="pdf-toolbar__export-item pdf-toolbar__export-item--submenu-trigger"
                 type="button"
-                @click="close(); handleExportAction('export-txt')"
+                :aria-haspopup="true"
+                :aria-expanded="isExportSubmenuOpen"
+                @click="isExportSubmenuOpen = !isExportSubmenuOpen"
               >
-                Export TXT
+                <span>Export</span>
+                <span class="pdf-toolbar__submenu-chevron" />
               </button>
-              <button
-                class="pdf-toolbar__export-item"
-                type="button"
-                @click="close(); handleExportAction('export-markdown')"
-              >
-                Export Markdown
-              </button>
-              <button
-                class="pdf-toolbar__export-item"
-                type="button"
-                @click="close(); handleExportAction('export-html')"
-              >
-                Export HTML
-              </button>
+              <Transition name="pdf-toolbar-flyout">
+                <div
+                  v-if="isExportSubmenuOpen"
+                  ref="exportFlyoutRef"
+                  class="pdf-toolbar__flyout"
+                  role="menu"
+                  :style="flyoutStyle"
+                >
+                  <button
+                    class="pdf-toolbar__flyout-item"
+                    type="button"
+                    role="menuitem"
+                    @click="close(); handleExportAction('export-txt')"
+                  >
+                    Export TXT
+                  </button>
+                  <button
+                    class="pdf-toolbar__flyout-item"
+                    type="button"
+                    role="menuitem"
+                    @click="close(); handleExportAction('export-markdown')"
+                  >
+                    Export Markdown
+                  </button>
+                  <button
+                    class="pdf-toolbar__flyout-item"
+                    type="button"
+                    role="menuitem"
+                    @click="close(); handleExportAction('export-html')"
+                  >
+                    Export HTML
+                  </button>
+                </div>
+              </Transition>
             </div>
             <div
               v-if="isDebugMode"
@@ -712,6 +735,9 @@ const ocrMenuRef = ref(null)
 const ocrMenuTriggerRef = ref(null)
 const languagePopoverRef = ref(null)
 const activeMenu = ref(null)
+const isExportSubmenuOpen = ref(false)
+const exportTriggerRef = ref(null)
+const exportFlyoutRef = ref(null)
 const zoomPercentOptions = [50, 75, 100, 125, 150, 200]
 
 const allContentOptions = [
@@ -811,6 +837,16 @@ const languageSummarySource = computed(() =>
 
 const languageSummaryTarget = computed(() => props.targetLanguage.toUpperCase())
 
+const flyoutStyle = computed(() => {
+  if (!exportTriggerRef.value) return {}
+  const rect = exportTriggerRef.value.getBoundingClientRect()
+  return {
+    position: 'fixed',
+    top: `${rect.top}px`,
+    right: `${window.innerWidth - rect.left + 4}px`
+  }
+})
+
 function handleOpenLanguageSettings() {
   closeMenus()
   activeMenu.value = 'language'
@@ -818,6 +854,7 @@ function handleOpenLanguageSettings() {
 
 function closeMenus() {
   activeMenu.value = null
+  isExportSubmenuOpen.value = false
 }
 
 function handleExportAction(eventName) {
