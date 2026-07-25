@@ -1107,8 +1107,9 @@ async function handleExportHtml() {
   }
 }
 
-function handleClearCache() {
-  void clearDocumentCache()
+async function handleClearCache() {
+  await clearDocumentCache()
+  presentation.present(DomainEvents.cacheCleared())
 }
 
 function dismissPdfStatusBanner() {

@@ -486,10 +486,21 @@ export function usePdfViewerController() {
 
   async function clearDocumentCache() {
     const documentIdentity = pdfDocumentSession.documentIdentity
-    if (documentIdentity) {
-      await pdfCacheManager.clearDocument(documentIdentity)
-      logger.info('Cleared document cache:', { documentIdentity })
-    }
+    if (!documentIdentity) return
+
+    // 1. Persistent storage
+    await pdfCacheManager.clearDocument(documentIdentity)
+
+    // 2. In-memory bitmap cache
+    pdfDocumentSession._bitmapCache?.clear()
+
+    // 3. Translation state + UI overlay
+    pdfDocumentSession.resetTranslationStates()
+    _pageDataMap.clear()
+    _blockIndex.clear()
+    _translatedPageData.value = []
+
+    logger.info('Cleared document cache:', { documentIdentity })
   }
 
   async function clearAllPdfCache() {

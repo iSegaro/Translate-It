@@ -198,6 +198,13 @@ export function present(domainResult) {
         cancellable: false
       }
 
+    case 'cache-cleared':
+      return {
+        intent: 'acknowledgement',
+        severity: 'success',
+        message: 'Document cache cleared'
+      }
+
     default:
       return null
   }

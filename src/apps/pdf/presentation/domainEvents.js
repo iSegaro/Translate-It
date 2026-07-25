@@ -21,5 +21,6 @@ export const DomainEvents = Object.freeze({
   ocrProgressUpdated: ({ current, total } = {}) => ({ name: 'ocr-progress-update', current, total }),
   regionOcrStarted: () => ({ name: 'region-ocr-started' }),
   comparisonStarted: () => ({ name: 'comparison-started' }),
-  activityCompleted: () => ({ name: 'activity-completed' })
+  activityCompleted: () => ({ name: 'activity-completed' }),
+  cacheCleared: () => ({ name: 'cache-cleared' })
 })
