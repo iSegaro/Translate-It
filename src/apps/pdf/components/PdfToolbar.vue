@@ -76,8 +76,8 @@
       </div>
 
       <div
-        v-show="showTranslationOption"
         class="pdf-toolbar__mode-group pdf-toolbar__mode-group--layout"
+        :class="{ 'pdf-toolbar__mode-group--hidden': !showTranslationOption }"
       >
         <button
           class="pdf-toolbar__mode-button"
@@ -96,8 +96,8 @@
       </div>
 
       <span
-        v-show="showTranslationOption"
         class="pdf-toolbar__separator"
+        :class="{ 'pdf-toolbar__separator--hidden': !showTranslationOption }"
         aria-hidden="true"
       />
 

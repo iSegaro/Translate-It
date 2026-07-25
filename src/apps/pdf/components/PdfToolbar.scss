@@ -99,6 +99,12 @@
   flex-shrink: 0;
   margin: 0 16px;
   border-left: 1px solid $tb-text-tertiary;
+
+  &--hidden {
+    visibility: hidden;
+    opacity: 0;
+    pointer-events: none;
+  }
 }
 
 .pdf-toolbar__center-group {
@@ -128,6 +134,12 @@
       align-items: center;
       gap: 4px;
     }
+  }
+
+  &--hidden {
+    visibility: hidden;
+    opacity: 0;
+    pointer-events: none;
   }
 }
 
