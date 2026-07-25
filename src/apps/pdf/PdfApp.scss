@@ -2,10 +2,11 @@
 @use '../../assets/styles/base/variables' as *;
 
 .pdf-app {
-  // PDF chrome stacking contract: content < status < toolbar < toolbar menus.
+  // PDF chrome stacking contract: status < toolbar < popup < overlay.
   --pdf-layer-status: 20;
   --pdf-layer-toolbar: 30;
-  --pdf-layer-toolbar-menu: 40;
+  --pdf-layer-popup: 40;
+  --pdf-layer-overlay: 50;
 
   position: relative;
   height: 100vh;
