@@ -14,6 +14,7 @@ describe('DomainEvents', () => {
     expect(DomainEvents.ocrLanguageMissing()).toEqual({ name: 'ocr-language-missing' })
     expect(DomainEvents.regionOcrNoText()).toEqual({ name: 'region-ocr-no-text' })
     expect(DomainEvents.regionOcrFailed()).toEqual({ name: 'region-ocr-failed' })
+    expect(DomainEvents.cacheCleared()).toEqual({ name: 'cache-cleared' })
   })
 
   it('creates outcome results', () => {

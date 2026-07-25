@@ -8,6 +8,7 @@ const cleanupDocumentMock = vi.fn().mockResolvedValue()
 const cancelActiveTranslationMock = vi.fn().mockResolvedValue()
 const translateVisibleBlocksMock = vi.fn()
 const saveTranslationsMock = vi.fn().mockResolvedValue()
+const clearDocumentCacheMock = vi.fn().mockResolvedValue()
 const updateAfterOpenMock = vi.fn().mockResolvedValue()
 const updateAfterTranslationMock = vi.fn().mockResolvedValue()
 const getProviderOptimizationLevelAsyncMock = vi.fn()
@@ -17,6 +18,9 @@ const getTranslationApiAsyncMock = vi.fn()
 const getEffectiveProviderAsyncMock = vi.fn()
 let pageSessionCommittedListener = null
 
+const resetTranslationStatesMock = vi.fn()
+const bitmapCacheClearMock = vi.fn()
+
 const session = {
   openFile: openFileMock,
   rebuildPageMetrics: rebuildPageMetricsMock,
@@ -25,6 +29,8 @@ const session = {
   pdfFingerprint: 'fingerprint-1',
   pageSessions: new Map(),
   translationStates: new Map(),
+  resetTranslationStates: resetTranslationStatesMock,
+  _bitmapCache: { clear: bitmapCacheClearMock },
   setBlockTranslationState: vi.fn((blockId, patch) => {
     const current = session.translationStates.get(blockId) || { blockId }
     const next = {
@@ -118,7 +124,7 @@ vi.mock('@/features/pdf-translation/core/PdfCacheManager.js', () => ({
     loadDocument: vi.fn(),
     saveTranslations: saveTranslationsMock,
     saveOcr: vi.fn(),
-    clearDocument: vi.fn(),
+    clearDocument: clearDocumentCacheMock,
     clearAll: vi.fn(),
     getStats: vi.fn()
   }
@@ -1195,5 +1201,33 @@ describe('usePdfViewerController hasTranslationContent', () => {
     controller.translationTick.value += 1
 
     expect(controller.hasTranslationContent.value).toBe(true)
+  })
+})
+
+describe('clearDocumentCache', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    session.documentIdentity = 'doc-1'
+  })
+
+  it('clears persistent storage, bitmap cache, translation state, and UI overlay', async () => {
+    const controller = usePdfViewerController()
+
+    await controller.clearDocumentCache()
+
+    expect(clearDocumentCacheMock).toHaveBeenCalledWith('doc-1')
+    expect(bitmapCacheClearMock).toHaveBeenCalled()
+    expect(resetTranslationStatesMock).toHaveBeenCalled()
+  })
+
+  it('early exits when documentIdentity is falsy', async () => {
+    session.documentIdentity = ''
+    const controller = usePdfViewerController()
+
+    await controller.clearDocumentCache()
+
+    expect(clearDocumentCacheMock).not.toHaveBeenCalled()
+    expect(bitmapCacheClearMock).not.toHaveBeenCalled()
+    expect(resetTranslationStatesMock).not.toHaveBeenCalled()
   })
 })

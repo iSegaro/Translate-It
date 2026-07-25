@@ -65,6 +65,14 @@ describe('Presentation Presenter', () => {
       expect(intent.severity).toBe('error')
       expect(intent.message).toBe('Region OCR failed. Try another region.')
     })
+
+    it('presents cache-cleared as success', () => {
+      const intent = present({ name: 'cache-cleared' })
+
+      expect(intent.intent).toBe('acknowledgement')
+      expect(intent.severity).toBe('success')
+      expect(intent.message).toBe('Document cache cleared')
+    })
   })
 
   describe('outcome intents', () => {
