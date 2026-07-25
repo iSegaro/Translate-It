@@ -23,15 +23,15 @@ function buildComparisonMessage(summary) {
 function buildTranslationFailureMessage(reason, error) {
   switch (reason) {
     case 'timeout':
-      return 'Translation timed out.'
+      return 'Translation timed out. Try again.'
     case 'provider-unavailable':
-      return 'Translation provider unavailable.'
+      return 'Translation provider unavailable. Try again.'
     case 'empty-response':
-      return 'Translation returned no content.'
+      return 'Translation returned no content. Try again.'
     case 'provider-error':
-      return error || 'Translation failed. Please try again.'
+      return error || 'Translation failed. Try again.'
     default:
-      return 'Translation failed. Please try again.'
+      return 'Translation failed. Try again.'
   }
 }
 
@@ -69,14 +69,14 @@ export function present(domainResult) {
       return {
         intent: 'acknowledgement',
         severity: 'error',
-        message: 'OCR failed. Please try again.'
+        message: 'OCR failed. Try again.'
       }
 
     case 'ocr-language-missing':
       return {
         intent: 'acknowledgement',
         severity: 'error',
-        message: 'No OCR language is installed. Open Manage Languages from the OCR menu to download one.'
+        message: 'No OCR language installed. Download one from the OCR menu.'
       }
 
     case 'region-ocr-no-text':
@@ -90,7 +90,7 @@ export function present(domainResult) {
       return {
         intent: 'acknowledgement',
         severity: 'error',
-        message: 'Region OCR failed. Please try another region.'
+        message: 'Region OCR failed. Try another region.'
       }
 
     // ── Outcome ──

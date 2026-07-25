@@ -1130,7 +1130,7 @@ describe('PdfApp', () => {
 
     expect(wrapper.findComponent({ name: 'PdfViewer' }).props('regionSelectionActive')).toBe(false)
     expect(mockRegionExecutionDispatch).not.toHaveBeenCalled()
-    expect(toast.error).toHaveBeenCalledWith(expect.stringContaining('No OCR language is installed'))
+    expect(toast.error).toHaveBeenCalledWith(expect.stringContaining('No OCR language installed'))
   })
 
   it('prevents page OCR and shows guidance when no OCR language is installed', async () => {
@@ -1145,7 +1145,7 @@ describe('PdfApp', () => {
 
     expect(mockPdfOcr.requestOcr).not.toHaveBeenCalled()
     expect(wrapper.findComponent({ name: 'PdfViewer' }).props('regionSelectionActive')).toBe(false)
-    expect(toast.error).toHaveBeenCalledWith(expect.stringContaining('No OCR language is installed'))
+    expect(toast.error).toHaveBeenCalledWith(expect.stringContaining('No OCR language installed'))
   })
 
   it('starts page OCR progress only after the composable confirms work', async () => {
@@ -1367,8 +1367,8 @@ describe('PdfApp', () => {
     const { toast } = await import('vue-sonner')
     const outcomes = [
       [{ status: 'recognized', data: { text: '   ' } }, 'warning', 'No text found in the selected region.'],
-      [{ status: 'failed', error: new Error('model-not-installed') }, 'error', 'No OCR language is installed.'],
-      [{ status: 'failed', error: new Error('worker failed') }, 'error', 'Region OCR failed. Please try another region.']
+      [{ status: 'failed', error: new Error('model-not-installed') }, 'error', 'No OCR language installed.'],
+      [{ status: 'failed', error: new Error('worker failed') }, 'error', 'Region OCR failed. Try another region.']
     ]
 
     for (const [result, severity, message] of outcomes) {

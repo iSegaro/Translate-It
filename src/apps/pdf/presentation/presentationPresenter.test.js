@@ -42,14 +42,14 @@ describe('Presentation Presenter', () => {
       const intent = present({ name: 'ocr-failed' })
 
       expect(intent.severity).toBe('error')
-      expect(intent.message).toBe('OCR failed. Please try again.')
+      expect(intent.message).toBe('OCR failed. Try again.')
     })
 
     it('presents ocr-language-missing as error', () => {
       const intent = present({ name: 'ocr-language-missing' })
 
       expect(intent.severity).toBe('error')
-      expect(intent.message).toContain('No OCR language is installed')
+      expect(intent.message).toContain('No OCR language installed')
     })
 
     it('presents region-ocr-no-text as warning', () => {
@@ -63,7 +63,7 @@ describe('Presentation Presenter', () => {
       const intent = present({ name: 'region-ocr-failed' })
 
       expect(intent.severity).toBe('error')
-      expect(intent.message).toBe('Region OCR failed. Please try another region.')
+      expect(intent.message).toBe('Region OCR failed. Try another region.')
     })
   })
 
@@ -155,11 +155,11 @@ describe('Presentation Presenter', () => {
     })
 
     it.each([
-      ['timeout', 'Translation timed out.'],
-      ['provider-unavailable', 'Translation provider unavailable.'],
-      ['empty-response', 'Translation returned no content.'],
+      ['timeout', 'Translation timed out. Try again.'],
+      ['provider-unavailable', 'Translation provider unavailable. Try again.'],
+      ['empty-response', 'Translation returned no content. Try again.'],
       ['provider-error', 'Provider failed'],
-      ['unknown', 'Translation failed. Please try again.']
+      ['unknown', 'Translation failed. Try again.']
     ])('presents %s translation failure wording', (reason, message) => {
       const intent = present({ name: 'translation-failed', occurrenceId: 44, reason, error: 'Provider failed' })
 
