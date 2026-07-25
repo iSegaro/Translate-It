@@ -21,7 +21,7 @@ describe('usePdfDocumentInfo', () => {
     })
 
     expect(rows.value.map(row => row.label)).toEqual([
-      'File Name', 'File Size', 'Pages',
+      'File Name', 'File Size', 'Pages', 'Page Size',
       'Title', 'Author', 'Subject', 'Keywords',
       'Creation Date', 'Modification Date',
       'Creator', 'Producer', 'PDF Version'
@@ -46,7 +46,7 @@ describe('usePdfDocumentInfo', () => {
     }))
 
     const { rows } = usePdfDocumentInfo(source)
-    expect(rows.value).toHaveLength(12)
+    expect(rows.value).toHaveLength(13)
 
     fileName.value = 'new.pdf'
     pageCount.value = 20
@@ -98,7 +98,7 @@ describe('usePdfDocumentInfo', () => {
       documentMetadata: {},
     })
 
-    expect(rows.value).toHaveLength(12)
+    expect(rows.value).toHaveLength(13)
     expect(rows.value.every(row => row.value === '—')).toBe(true)
   })
 
@@ -150,5 +150,74 @@ describe('usePdfDocumentInfo', () => {
     })
 
     expect(rows.value.find(row => row.label === 'File Size').value).toBe(`3.0 MB (${(3 * 1024 * 1024).toLocaleString()} bytes)`)
+  })
+
+  it.each([
+    ['A4 Portrait — 210 × 297 mm (8.27 × 11.69 in)', 595.28, 841.89],
+    ['A4 Landscape — 297 × 210 mm (11.69 × 8.27 in)', 841.89, 595.28],
+    ['Letter Portrait — 215.9 × 279.4 mm (8.5 × 11 in)', 612, 792],
+    ['Legal Portrait — 215.9 × 355.6 mm (8.5 × 14 in)', 612, 1008],
+    ['Tabloid Portrait — 279.4 × 431.8 mm (11 × 17 in)', 792, 1224]
+  ])('formats standard page size %s', (expected, naturalWidth, naturalHeight) => {
+    const { rows } = usePdfDocumentInfo({
+      pageMetrics: [{ naturalWidth, naturalHeight }]
+    })
+
+    expect(rows.value.find(row => row.label === 'Page Size').value).toBe(expected)
+  })
+
+  it('formats custom page sizes with raw dimensions', () => {
+    const { rows } = usePdfDocumentInfo({
+      pageMetrics: [{ naturalWidth: 500, naturalHeight: 700 }]
+    })
+
+    expect(rows.value.find(row => row.label === 'Page Size').value)
+      .toBe('176.4 × 246.9 mm (6.94 × 9.72 in)')
+  })
+
+  it('labels square custom page sizes', () => {
+    const { rows } = usePdfDocumentInfo({
+      pageMetrics: [{ naturalWidth: 500, naturalHeight: 500 }]
+    })
+
+    expect(rows.value.find(row => row.label === 'Page Size').value)
+      .toBe('Square — 176.4 × 176.4 mm (6.94 × 6.94 in)')
+  })
+
+  it('shows Varies for different page dimensions', () => {
+    const { rows } = usePdfDocumentInfo({
+      pageMetrics: [
+        { naturalWidth: 595.28, naturalHeight: 841.89 },
+        { naturalWidth: 612, naturalHeight: 792 }
+      ]
+    })
+
+    expect(rows.value.find(row => row.label === 'Page Size').value).toBe('Varies')
+  })
+
+  it('recognizes whole-point A4 dimensions', () => {
+    const { rows } = usePdfDocumentInfo({
+      pageMetrics: [{ naturalWidth: 595, naturalHeight: 842 }]
+    })
+
+    expect(rows.value.find(row => row.label === 'Page Size').value)
+      .toBe('A4 Portrait — 210 × 297 mm (8.27 × 11.69 in)')
+  })
+
+  it('recognizes dimensions at the one-point tolerance boundary', () => {
+    const { rows } = usePdfDocumentInfo({
+      pageMetrics: [{ naturalWidth: 596.28, naturalHeight: 840.89 }]
+    })
+
+    expect(rows.value.find(row => row.label === 'Page Size').value)
+      .toBe('A4 Portrait — 210 × 297 mm (8.27 × 11.69 in)')
+  })
+
+  it('uses the metadata placeholder when page dimensions are invalid or unavailable', () => {
+    const { rows } = usePdfDocumentInfo({
+      pageMetrics: [{ naturalWidth: 0, naturalHeight: Number.NaN }]
+    })
+
+    expect(rows.value.find(row => row.label === 'Page Size').value).toBe('—')
   })
 })

@@ -313,6 +313,7 @@ const { rows: pdfInfoRows } = usePdfDocumentInfo(computed(() => ({
   fileName: fileName.value,
   pageCount: pageCount.value,
   fileSize: currentFile.value?.size ?? 0,
+  pageMetrics: pageMetrics.value,
   pdfFingerprint: session.pdfFingerprint,
   documentMetadata: session.documentMetadata,
 })))
