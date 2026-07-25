@@ -14,7 +14,7 @@ describe('Presentation Host', () => {
 
     expect(Object.isFrozen(presentation)).toBe(true)
     expect(presentation.progressState.value.operation.running).toBe(false)
-    expect(presentation.bannerState.value.developerNotification).toBeNull()
+    expect(presentation.bannerState.value.notification).toBeNull()
   })
 
   it('synchronizes progress state only when adapter version changes', () => {
@@ -35,7 +35,7 @@ describe('Presentation Host', () => {
 
     presentation.present(DomainEvents.comparisonFailed({ id: 'comparison:1', error: 'Failed' }))
 
-    expect(presentation.bannerState.value.developerNotification).toMatchObject({
+    expect(presentation.bannerState.value.notification).toMatchObject({
       id: 'comparison:1', variant: 'error', message: 'Failed'
     })
   })

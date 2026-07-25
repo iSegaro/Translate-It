@@ -25,18 +25,18 @@ describe('Banner Adapter', () => {
 
       const state = adapter.getState()
 
-      expect(state.developerNotification).toBeTruthy()
-      expect(state.developerNotification.id).toBe('dev-notif:1')
-      expect(state.developerNotification.variant).toBe('success')
-      expect(state.developerNotification.title).toBe('Region Comparison complete')
-      expect(state.developerNotification.message).toBe('Winner: scale-1.5. Fastest: 342ms.')
-      expect(state.developerNotification.body).toMatchObject({
+      expect(state.notification).toBeTruthy()
+      expect(state.notification.id).toBe('dev-notif:1')
+      expect(state.notification.variant).toBe('success')
+      expect(state.notification.title).toBe('Region Comparison complete')
+      expect(state.notification.message).toBe('Winner: scale-1.5. Fastest: 342ms.')
+      expect(state.notification.body).toMatchObject({
         type: PDF_NOTIFICATION_BODY_TYPE.REGION_COMPARISON_RESULTS,
         payload: { footer: 'Total 100ms' }
       })
     })
 
-    it('sets developerNotification with error variant', () => {
+    it('sets notification with error variant', () => {
       const adapter = createBannerAdapter()
 
       adapter.dispatch({
@@ -51,26 +51,8 @@ describe('Banner Adapter', () => {
 
       const state = adapter.getState()
 
-      expect(state.developerNotification.variant).toBe('error')
-      expect(state.developerNotification.message).toBe('All candidates rejected')
-    })
-  })
-
-  describe('outcome intent with translationOutcome', () => {
-    it('sets translation notification', () => {
-      const adapter = createBannerAdapter()
-
-      adapter.dispatch({
-        intent: 'outcome',
-        translationOutcome: { id: 'translation-partial:42', variant: 'warning', title: 'Partial translation', message: 'Partial failure' }
-      })
-
-      const state = adapter.getState()
-
-      expect(state.translationNotification).toMatchObject({
-        id: 'translation-partial:42',
-        variant: 'warning'
-      })
+      expect(state.notification.variant).toBe('error')
+      expect(state.notification.message).toBe('All candidates rejected')
     })
   })
 
@@ -97,39 +79,13 @@ describe('Banner Adapter', () => {
     })
   })
 
-  describe('accumulated state', () => {
-    it('preserves both translation outcome and notification state', () => {
-      const adapter = createBannerAdapter()
-
-      adapter.dispatch({
-        intent: 'outcome',
-        translationOutcome: { id: 'translation-partial:1', variant: 'warning', title: 'Partial translation', message: 'Partial failure' }
-      })
-      adapter.dispatch({
-        intent: 'outcome',
-        notification: {
-          id: 'dev-notif:3',
-          variant: 'success',
-          title: 'Region Comparison complete',
-          message: 'Region Comparison completed.'
-        }
-      })
-
-      const state = adapter.getState()
-
-      expect(state.translationNotification.id).toBe('translation-partial:1')
-      expect(state.developerNotification).toBeTruthy()
-      expect(state.developerNotification.id).toBe('dev-notif:3')
-    })
-  })
-
   describe('reset', () => {
     it('restores initial state and increments version', () => {
       const adapter = createBannerAdapter()
 
       adapter.dispatch({
         intent: 'outcome',
-        translationOutcome: { id: 'translation-partial:1', variant: 'warning', title: 'Partial translation', message: 'Partial failure' }
+        notification: { id: 'dev-notif:3', variant: 'success', title: 'Comparison complete', message: 'Done' }
       })
       const versionBefore = adapter.getState().version
 
@@ -137,8 +93,7 @@ describe('Banner Adapter', () => {
 
       const state = adapter.getState()
 
-      expect(state.developerNotification).toBeNull()
-      expect(state.translationNotification).toBeNull()
+      expect(state.notification).toBeNull()
       expect(state.version).toBeGreaterThan(versionBefore)
     })
 
@@ -152,39 +107,20 @@ describe('Banner Adapter', () => {
     })
   })
 
-  describe('translation outcome clearing', () => {
-    it('clears translation notification without clearing developer notification', () => {
-      const adapter = createBannerAdapter()
-      adapter.dispatch({
-        intent: 'outcome',
-        notification: { id: 'dev-notif:4', variant: 'success', title: 'Comparison complete', message: 'Done' }
-      })
-      adapter.dispatch({
-        intent: 'outcome',
-        translationOutcome: { id: 'translation-partial:1', variant: 'warning', title: 'Partial translation', message: 'Partial failure' }
-      })
-
-      adapter.dispatch({ intent: 'outcome', clearTranslationOutcome: true })
-
-      expect(adapter.getState().translationNotification).toBeNull()
-      expect(adapter.getState().developerNotification).toMatchObject({ id: 'dev-notif:4' })
-    })
-  })
-
   describe('version', () => {
     it('increments on successful mutation', () => {
       const adapter = createBannerAdapter()
 
       adapter.dispatch({
         intent: 'outcome',
-        translationOutcome: { id: 'translation-partial:1', variant: 'warning', title: 'Partial translation', message: 'Partial failure' }
+        notification: { id: '1', variant: 'success', title: 'T', message: 'M' }
       })
       const v1 = adapter.getState().version
       expect(v1).toBeGreaterThan(0)
 
       adapter.dispatch({
         intent: 'outcome',
-        notification: { id: '1', variant: 'success', title: 'T', message: 'M' }
+        notification: { id: '2', variant: 'error', title: 'T2', message: 'M2' }
       })
       expect(adapter.getState().version).toBeGreaterThan(v1)
     })
@@ -197,23 +133,6 @@ describe('Banner Adapter', () => {
       const v1 = adapter.getState().version
 
       adapter.dispatch({ intent: 'outcome', notification: notif })
-
-      expect(adapter.getState().version).toBe(v1)
-    })
-
-    it('does not increment on equivalent translation outcome dispatch', () => {
-      const adapter = createBannerAdapter()
-
-      adapter.dispatch({
-        intent: 'outcome',
-        translationOutcome: { id: 'translation-partial:42', variant: 'warning', title: 'Partial translation', message: 'Partial failure' }
-      })
-      const v1 = adapter.getState().version
-
-      adapter.dispatch({
-        intent: 'outcome',
-        translationOutcome: { id: 'translation-partial:42', variant: 'warning', title: 'Partial translation', message: 'Partial failure' }
-      })
 
       expect(adapter.getState().version).toBe(v1)
     })
@@ -237,8 +156,7 @@ describe('Banner Adapter', () => {
       const state = adapter.getState()
 
       expect(state.version).toBe(0)
-      expect(state.developerNotification).toBeNull()
-      expect(state.translationNotification).toBeNull()
+      expect(state.notification).toBeNull()
     })
   })
 

@@ -82,19 +82,17 @@
 
     <div class="pdf-app__viewport">
       <div class="pdf-app__status-layer">
-        <Transition name="pdf-banner">
+        <Transition
+          name="pdf-banner"
+          mode="out-in"
+        >
           <div
             v-if="isPdfStatusBannerVisible"
             class="pdf-app__status-row"
           >
             <PdfStatusBanner
-              :visible="isPdfStatusBannerVisible"
-              :variant="pdfStatusBanner.variant || 'info'"
-              :title="pdfStatusBanner.title || ''"
-              :message="pdfStatusBanner.message || ''"
-              :detail="pdfStatusBanner.detail || ''"
               :body="pdfStatusBanner.body || null"
-              :dismissible="pdfStatusBanner?.dismissible ?? false"
+              :dismissible="pdfStatusBanner.dismissible"
               @dismiss="dismissPdfStatusBanner"
             >
               <template #body="{ body }">
@@ -659,10 +657,7 @@ function handleOpenSettings() {
 }
 
 const pdfStatusBanner = computed(() => pdfStatusBannerController.build({
-  error: error.value,
-  isLoading: isLoading.value,
-  developerNotification: isDebugMode.value ? presentation.bannerState.value.developerNotification : null,
-  translationNotification: presentation.bannerState.value.translationNotification
+  notification: isDebugMode.value ? presentation.bannerState.value.notification : null
 }))
 
 const isPdfStatusBannerVisible = computed(() => {

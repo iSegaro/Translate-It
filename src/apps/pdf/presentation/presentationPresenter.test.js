@@ -131,27 +131,20 @@ describe('Presentation Presenter', () => {
       expect(intent.notification.message).toBe('Region Comparison failed. Please try again.')
     })
 
-    it('presents translation-partial as outcome with partialTranslation', () => {
+    it('presents translation-partial as acknowledgement warning', () => {
       const intent = present({ name: 'translation-partial', occurrenceId: 42, reason: 'provider-error', error: 'Provider failed' })
 
-      expect(intent.intent).toBe('outcome')
-      expect(intent.translationOutcome).toMatchObject({
-        id: 'translation-partial:42',
-        variant: 'warning',
-        title: 'Partial translation',
-        message: 'Provider failed'
-      })
+      expect(intent.intent).toBe('acknowledgement')
+      expect(intent.severity).toBe('warning')
+      expect(intent.message).toBe('Provider failed')
     })
 
-    it('presents translation-failed as an error outcome', () => {
+    it('presents translation-failed as acknowledgement error', () => {
       const intent = present({ name: 'translation-failed', occurrenceId: 43, reason: 'provider-error', error: 'Request failed' })
 
-      expect(intent.translationOutcome).toMatchObject({
-        id: 'translation-failed:43',
-        variant: 'error',
-        title: 'Translation failed',
-        message: 'Request failed'
-      })
+      expect(intent.intent).toBe('acknowledgement')
+      expect(intent.severity).toBe('error')
+      expect(intent.message).toBe('Request failed')
     })
 
     it.each([
@@ -163,14 +156,7 @@ describe('Presentation Presenter', () => {
     ])('presents %s translation failure wording', (reason, message) => {
       const intent = present({ name: 'translation-failed', occurrenceId: 44, reason, error: 'Provider failed' })
 
-      expect(intent.translationOutcome.message).toBe(message)
-    })
-
-    it('presents translation outcome clearing as an outcome intent', () => {
-      expect(present({ name: 'translation-outcome-cleared' })).toEqual({
-        intent: 'outcome',
-        clearTranslationOutcome: true
-      })
+      expect(intent.message).toBe(message)
     })
   })
 

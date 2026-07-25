@@ -17,11 +17,11 @@ function buildNotification(notification, comparison) {
 }
 
 /**
- * Banner Adapter — stores outcome presentation state.
+ * Banner Adapter — stores benchmark/comparison presentation state.
  *
- * Receives { intent: 'outcome', notification?, comparison?, translationOutcome? }
+ * Receives { intent: 'outcome', notification?, comparison? }
  * from Presentation Dispatcher. Builds Banner-specific comparison bodies and
- * stores latest outcome state for each field.
+ * stores latest outcome state.
  *
  * Framework-agnostic. Pure JavaScript. No Vue, no composables.
  *
@@ -32,8 +32,7 @@ function buildNotification(notification, comparison) {
 export function createBannerAdapter() {
   const state = {
     version: 0,
-    developerNotification: null,
-    translationNotification: null
+    notification: null
   }
 
   function notificationChanged(a, b) {
@@ -49,25 +48,9 @@ export function createBannerAdapter() {
     if (!intent || intent.intent !== 'outcome') return
 
     if (intent.notification) {
-      const notification = buildNotification(intent.notification, intent.comparison)
-      if (!notificationChanged(state.developerNotification, notification)) return
-      state.developerNotification = notification
-      state.version++
-      return
-    }
-
-    if (intent.translationOutcome) {
-      if (notificationChanged(state.translationNotification, intent.translationOutcome)) {
-        state.translationNotification = intent.translationOutcome
-      } else {
-        return
-      }
-      state.version++
-      return
-    }
-
-    if (intent.clearTranslationOutcome && state.translationNotification !== null) {
-      state.translationNotification = null
+      const built = buildNotification(intent.notification, intent.comparison)
+      if (!notificationChanged(state.notification, built)) return
+      state.notification = built
       state.version++
     }
   }
@@ -77,12 +60,8 @@ export function createBannerAdapter() {
   }
 
   function reset() {
-    if (
-      state.developerNotification === null &&
-      state.translationNotification === null
-    ) return
-    state.developerNotification = null
-    state.translationNotification = null
+    if (state.notification === null) return
+    state.notification = null
     state.version++
   }
 

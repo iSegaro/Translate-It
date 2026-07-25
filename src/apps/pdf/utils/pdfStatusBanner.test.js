@@ -9,126 +9,58 @@ describe('buildPdfStatusBannerState', () => {
     controller = createPdfStatusBannerController()
   })
 
-  it('returns null when idle', () => {
+  it('returns null when no notification', () => {
     expect(controller.build()).toBeNull()
   })
 
-  it('builds a loading banner', () => {
-    expect(controller.build({ isLoading: true })).toEqual({
-      id: 'opening',
-      visible: true,
-      variant: 'info',
-      title: 'Opening PDF',
-      message: 'Loading PDF and rebuilding visible pages.',
-      dismissible: false
-    })
+  it('returns null when notification has no id', () => {
+    expect(controller.build({ notification: { variant: 'success', message: 'Done' } })).toBeNull()
   })
 
-  it('builds a translation outcome banner from presentation state', () => {
-    expect(controller.build({ translationNotification: {
-      id: 'translation-partial:1',
-      variant: 'warning',
-      title: 'Partial translation',
-      message: 'Provider failed'
-    } })).toEqual({
-      id: 'translation-partial:1',
-      visible: true,
-      variant: 'warning',
-      title: 'Partial translation',
-      message: 'Provider failed',
-      dismissible: true
-    })
-  })
-
-  it('builds a generic developer notification below translation outcomes', () => {
-    const notification = {
-      id: 'developer-notification:1',
-      variant: 'success',
-      title: 'Region Comparison completed',
-      message: 'Winner: scale-1.',
-      body: { type: PDF_NOTIFICATION_BODY_TYPE.REGION_COMPARISON_RESULTS, payload: { rows: [] } }
-    }
-
-    expect(controller.build({ developerNotification: notification })).toEqual({
-      ...notification,
-      visible: true,
-      dismissible: true
-    })
-    expect(controller.build({ translationNotification: {
-      id: 'translation-partial:1', variant: 'warning', title: 'Partial translation', message: 'Partial failure'
-    }, developerNotification: notification })).toMatchObject({
-      id: 'translation-partial:1',
-      variant: 'warning'
-    })
-    expect(controller.build({ isLoading: true, developerNotification: notification })).toMatchObject({
-      id: 'opening',
-      variant: 'info'
-    })
-    expect(controller.build({ error: 'PDF failed', developerNotification: notification })).toMatchObject({
-      id: 'error:1',
-      variant: 'error'
-    })
-  })
-
-  it('prefers error state over other states', () => {
+  it('builds a banner from notification', () => {
     expect(controller.build({
-      error: 'Failed to open the PDF file.',
-      isLoading: true
+      notification: {
+        id: 'dev-notif:1',
+        variant: 'success',
+        title: 'Region Comparison complete',
+        message: 'Winner: scale-1.5.',
+        body: { type: PDF_NOTIFICATION_BODY_TYPE.REGION_COMPARISON_RESULTS, payload: { rows: [] } }
+      }
     })).toEqual({
-      id: 'error:1',
-      visible: true,
-      variant: 'error',
-      title: 'PDF error',
-      message: 'Failed to open the PDF file.',
+      id: 'dev-notif:1',
+      variant: 'success',
+      title: 'Region Comparison complete',
+      message: 'Winner: scale-1.5.',
+      body: { type: PDF_NOTIFICATION_BODY_TYPE.REGION_COMPARISON_RESULTS, payload: { rows: [] } },
       dismissible: true
     })
   })
 
-  it('keeps same error id until source changes or clears', () => {
-    const first = controller.build({ error: 'Failed again.' })
-    const second = controller.build({ error: 'Failed again.' })
-    const third = controller.build({ error: 'Different error.' })
-
-    expect(first).toMatchObject({
-      id: 'error:1',
-      variant: 'error',
-      title: 'PDF error',
-      message: 'Failed again.'
-    })
-
-    expect(second.id).toBe(first.id)
-    expect(third.id).toBe('error:2')
-  })
-
-  it('generates new id after error clears and returns', () => {
-    const first = controller.build({ error: 'Same error.' })
-    expect(first.id).toBe('error:1')
-
-    controller.build({})
-    const second = controller.build({ error: 'Same error.' })
-    expect(second.id).toBe('error:2')
-  })
-
-  it('keeps controllers independent', () => {
-    const firstController = createPdfStatusBannerController()
-    const secondController = createPdfStatusBannerController()
-
-    const first = firstController.build({ error: 'Boom' })
-    const second = secondController.build({ error: 'Boom' })
-
-    expect(first.id).toBe('error:1')
-    expect(second.id).toBe('error:1')
-  })
-
-  it('keeps document errors above translation outcomes', () => {
+  it('defaults variant to info when missing', () => {
     expect(controller.build({
-      error: 'Failed.',
-      translationNotification: { id: 'translation-failed:1', variant: 'error', title: 'Translation failed', message: 'Failed.' }
+      notification: { id: 'n1', title: 'T', message: 'M' }
     })).toMatchObject({
-      id: 'error:1',
-      variant: 'error',
-      title: 'PDF error'
+      id: 'n1',
+      variant: 'info',
+      title: 'T',
+      message: 'M'
     })
   })
 
+  it('defaults body to null when missing', () => {
+    expect(controller.build({
+      notification: { id: 'n2', variant: 'error', title: 'T', message: 'M' }
+    })).toMatchObject({
+      id: 'n2',
+      body: null
+    })
+  })
+
+  it('returns plain object result', () => {
+    const result = controller.build({
+      notification: { id: 'n3', variant: 'success', title: 'T', message: 'M' }
+    })
+    expect(result).toBeTruthy()
+    expect(result.id).toBe('n3')
+  })
 })

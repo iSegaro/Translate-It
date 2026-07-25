@@ -1,9 +1,8 @@
 <template>
   <section
-    v-if="visible"
     class="pdf-status-banner"
-    :class="bannerClasses"
-    :role="variant === 'error' ? 'alert' : 'status'"
+    :class="{ 'pdf-status-banner--expanded': Boolean(body) }"
+    role="status"
     aria-live="polite"
   >
     <button
@@ -17,20 +16,6 @@
       <span aria-hidden="true">×</span>
     </button>
     <div
-      class="pdf-status-banner__icon"
-      aria-hidden="true"
-    >
-      {{ iconLabel }}
-    </div>
-    <div class="pdf-status-banner__content">
-      <p class="pdf-status-banner__title">
-        {{ title }}
-      </p>
-      <p class="pdf-status-banner__message">
-        {{ message }}
-      </p>
-    </div>
-    <div
       v-if="body"
       class="pdf-status-banner__body"
     >
@@ -43,26 +28,9 @@
 </template>
 
 <script setup>
-import { computed } from 'vue'
 import './PdfStatusBanner.scss'
 
-const props = defineProps({
-  visible: {
-    type: Boolean,
-    default: false
-  },
-  variant: {
-    type: String,
-    default: 'info'
-  },
-  title: {
-    type: String,
-    default: ''
-  },
-  message: {
-    type: String,
-    default: ''
-  },
+defineProps({
   body: {
     type: Object,
     default: null
@@ -74,21 +42,4 @@ const props = defineProps({
 })
 
 defineEmits(['dismiss'])
-
-const iconLabels = {
-  info: 'i',
-  success: '✓',
-  warning: '!',
-  error: '!'
-}
-
-const iconLabel = computed(() => iconLabels[props.variant] || 'i')
-
-const bannerClasses = computed(() => ({
-  'pdf-status-banner--info': props.variant === 'info',
-  'pdf-status-banner--success': props.variant === 'success',
-  'pdf-status-banner--warning': props.variant === 'warning',
-  'pdf-status-banner--error': props.variant === 'error',
-  'pdf-status-banner--expanded': Boolean(props.body)
-}))
 </script>

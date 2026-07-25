@@ -124,32 +124,16 @@ export function present(domainResult) {
 
     case 'translation-partial':
       return {
-        intent: 'outcome',
-        translationOutcome: {
-          id: `translation-partial:${domainResult.occurrenceId || 0}`,
-          variant: 'warning',
-          title: 'Partial translation',
-          message: buildTranslationFailureMessage(domainResult.reason, domainResult.error),
-          occurrenceId: domainResult.occurrenceId
-        }
+        intent: 'acknowledgement',
+        severity: 'warning',
+        message: buildTranslationFailureMessage(domainResult.reason, domainResult.error)
       }
 
     case 'translation-failed':
       return {
-        intent: 'outcome',
-        translationOutcome: {
-          id: `translation-failed:${domainResult.occurrenceId || 0}`,
-          variant: 'error',
-          title: 'Translation failed',
-          message: buildTranslationFailureMessage(domainResult.reason, domainResult.error),
-          occurrenceId: domainResult.occurrenceId
-        }
-      }
-
-    case 'translation-outcome-cleared':
-      return {
-        intent: 'outcome',
-        clearTranslationOutcome: true
+        intent: 'acknowledgement',
+        severity: 'error',
+        message: buildTranslationFailureMessage(domainResult.reason, domainResult.error)
       }
 
     // ── Activity ──
