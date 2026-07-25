@@ -12,6 +12,7 @@ import { PdfPageContentRepository } from './PdfPageContentRepository.js'
 import { PdfTranslationState } from './PdfTranslationState.js'
 import { pdfCacheManager } from './PdfCacheManager.js'
 import { PDF_PAGE_BACKGROUND } from './pdfRenderingConstants.js'
+import { PAGE_CONTENT_SOURCE } from './PdfPageSession.js'
 
 const logger = getScopedLogger(LOG_COMPONENTS.PDF, 'PdfDocumentSession')
 const PAGE_MARGIN = 24
@@ -540,6 +541,13 @@ export class PdfDocumentSession extends ResourceTracker {
     return this.pageSessions.get(normalizedPageNumber)?.getLogicalBlocks?.() || []
   }
 
+  getPageContentSource(pageNumber) {
+    const normalizedPageNumber = Number(pageNumber)
+    if (!Number.isInteger(normalizedPageNumber) || normalizedPageNumber <= 0) return PAGE_CONTENT_SOURCE.NONE
+
+    return this.pageSessions.get(normalizedPageNumber)?.getPageContentSource?.() || PAGE_CONTENT_SOURCE.NONE
+  }
+
   getCommittedTextContent(pageNumber) {
     const normalizedPageNumber = Number(pageNumber)
     if (!Number.isInteger(normalizedPageNumber) || normalizedPageNumber <= 0) return null
@@ -846,4 +854,5 @@ export class PdfDocumentSession extends ResourceTracker {
   }
 }
 
+export { PAGE_CONTENT_SOURCE }
 export const pdfDocumentSession = new PdfDocumentSession()

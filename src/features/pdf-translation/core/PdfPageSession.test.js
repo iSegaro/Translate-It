@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { PdfPageSession } from './PdfPageSession.js'
+import { PAGE_CONTENT_SOURCE, PdfPageSession } from './PdfPageSession.js'
 
 describe('PdfPageSession', () => {
   it('hydrates from a PDF page and exposes logical blocks for the page', async () => {
@@ -200,6 +200,13 @@ describe('PdfPageSession OCR state', () => {
     expect(blocks[0].id).toBe('ocr-1')
   })
 
+  it('reports OCR as page content source when OCR blocks are selected', () => {
+    const session = new PdfPageSession({ documentIdentity: 'doc-1', pageNumber: 1 })
+    session.setOcrBlocks([{ id: 'ocr-1' }], 'eng')
+
+    expect(session.getPageContentSource()).toBe(PAGE_CONTENT_SOURCE.OCR)
+  })
+
   it('getLogicalBlocks returns text-layer blocks when they exist', () => {
     const session = new PdfPageSession({ documentIdentity: 'doc-1', pageNumber: 1 })
     session.logicalBlocks = [{ id: 'text-1', text: 'Text layer' }]
@@ -209,6 +216,24 @@ describe('PdfPageSession OCR state', () => {
 
     expect(blocks).toHaveLength(1)
     expect(blocks[0].id).toBe('text-1')
+  })
+
+  it('reports PDF text as page content source when text-layer blocks are selected', () => {
+    const session = new PdfPageSession({ documentIdentity: 'doc-1', pageNumber: 1 })
+    session.logicalBlocks = [{ id: 'text-1' }]
+    session.setOcrBlocks([{ id: 'ocr-1' }], 'eng')
+
+    expect(session.getPageContentSource()).toBe(PAGE_CONTENT_SOURCE.PDF_TEXT)
+  })
+
+  it('reports no page content source when no blocks are selected', () => {
+    const session = new PdfPageSession({ documentIdentity: 'doc-1', pageNumber: 1 })
+
+    expect(session.getPageContentSource()).toBe(PAGE_CONTENT_SOURCE.NONE)
+  })
+
+  it('exports MIXED for future source selection', () => {
+    expect(PAGE_CONTENT_SOURCE.MIXED).toBe('mixed')
   })
 
   it('allBlocks returns both text-layer and OCR blocks', () => {

@@ -4,6 +4,13 @@ import { detectLayoutRegions } from './LayoutRegionDetector.js'
 import { buildPageLayoutModel, createEmptyPageLayoutModel } from './PageLayoutModel.js'
 import { buildPageMaskModel } from './PageMaskModelBuilder.js'
 
+export const PAGE_CONTENT_SOURCE = Object.freeze({
+  PDF_TEXT: 'pdf-text',
+  OCR: 'ocr',
+  NONE: 'none',
+  MIXED: 'mixed'
+})
+
 function normalizePageSize(pageMetric = null) {
   return {
     width: Number(pageMetric?.naturalWidth || pageMetric?.width) || 0,
@@ -95,6 +102,12 @@ export class PdfPageSession {
     }
 
     return []
+  }
+
+  getPageContentSource() {
+    if (this.logicalBlocks.length > 0) return PAGE_CONTENT_SOURCE.PDF_TEXT
+    if (this.ocrBlocks.length > 0) return PAGE_CONTENT_SOURCE.OCR
+    return PAGE_CONTENT_SOURCE.NONE
   }
 
   get allBlocks() {

@@ -16,7 +16,7 @@ vi.mock('./PdfCacheManager.js', () => ({
   }
 }))
 
-const { PdfDocumentSession } = await import('./PdfDocumentSession.js')
+const { PdfDocumentSession, PAGE_CONTENT_SOURCE } = await import('./PdfDocumentSession.js')
 const { loadPdfDocumentFromFile } = await import('./pdfjs.js')
 const { pdfCacheManager } = await import('./PdfCacheManager.js')
 
@@ -297,6 +297,15 @@ describe('PdfDocumentSession', () => {
     expect(blocks).toEqual(pageSession.getLogicalBlocks())
     expect(session.getPageSourceBlocks(2)).toEqual([])
     expect(pdfDocument.getPage).toHaveBeenCalledTimes(1)
+  })
+
+  it('forwards committed page content source unchanged', async () => {
+    const pageSession = { getPageContentSource: vi.fn(() => PAGE_CONTENT_SOURCE.OCR) }
+    session.pageSessions.set(1, pageSession)
+
+    expect(session.getPageContentSource(1)).toBe(PAGE_CONTENT_SOURCE.OCR)
+    expect(pageSession.getPageContentSource).toHaveBeenCalledOnce()
+    expect(session.getPageContentSource(2)).toBe(PAGE_CONTENT_SOURCE.NONE)
   })
 
   it('returns committed text content by reference without hydrating', () => {

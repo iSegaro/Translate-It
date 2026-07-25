@@ -233,6 +233,7 @@ import PdfOverlayRoot from './components/PdfOverlayRoot.vue'
 import pdfBrandIcon from '@/icons/ui/pdf_viewer/pdf.svg?url'
 import { usePdfViewerController } from './composables/usePdfViewerController.js'
 import { usePdfViewerMode, CONTENT_VIEW, LAYOUT_MODE, VIEWER_ROLE } from './composables/usePdfViewerMode.js'
+import { PAGE_CONTENT_SOURCE } from '@/features/pdf-translation/core/PdfDocumentSession.js'
 import { usePdfDocumentInfo } from './composables/usePdfDocumentInfo.js'
 import { usePdfExport } from './composables/usePdfExport.js'
 import { usePdfOcr } from './composables/usePdfOcr.js'
@@ -1066,13 +1067,18 @@ function handleTranslateVisiblePages() {
 
     const summary = translationSummary.value
     if (summary?.failureReason === 'cancelled') return
+    const shouldRevealTranslatedContent = hasTranslationContent.value && (
+      contentView.value === CONTENT_VIEW.ORIGINAL ||
+      (contentView.value === CONTENT_VIEW.TRANSLATED_PDF &&
+        session.getPageContentSource(currentPage.value) === PAGE_CONTENT_SOURCE.OCR)
+    )
     if (summary?.status === 'partial') {
       presentation.present(DomainEvents.translationPartial({
         occurrenceId: summary.translationOccurrenceId,
         error: summary.error,
         reason: summary.failureReason
       }))
-      if (hasTranslationContent.value && contentView.value === CONTENT_VIEW.ORIGINAL) await revealTranslation()
+      if (shouldRevealTranslatedContent) await revealTranslation()
     } else if (summary?.status === 'error') {
       presentation.present(DomainEvents.translationFailed({
         occurrenceId: summary.translationOccurrenceId,
@@ -1080,7 +1086,7 @@ function handleTranslateVisiblePages() {
         reason: summary.failureReason
       }))
     } else if (summary?.status === 'translated') {
-      if (hasTranslationContent.value && contentView.value === CONTENT_VIEW.ORIGINAL) await revealTranslation()
+      if (shouldRevealTranslatedContent) await revealTranslation()
     }
   }).finally(() => {
     if (!completionHandled && activeProgressCancel === cancelOperation) {

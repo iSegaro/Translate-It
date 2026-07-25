@@ -50,6 +50,12 @@ const regionComparisonRunnerMock = vi.hoisted(() => ({
 const activityCompletedMock = vi.hoisted(() => vi.fn(() => ({ name: 'activity-completed' })))
 const translationPartialMock = vi.hoisted(() => vi.fn())
 const translationFailedMock = vi.hoisted(() => vi.fn())
+const pageContentSourceMock = vi.hoisted(() => Object.freeze({
+  PDF_TEXT: 'pdf-text',
+  OCR: 'ocr',
+  NONE: 'none',
+  MIXED: 'mixed'
+}))
 
 function createMockOperation(promise, cancel = vi.fn(), context = { target: 'ocr' }) {
   return Object.freeze({
@@ -86,7 +92,8 @@ vi.mock('./composables/usePdfExport.js', () => ({
 }))
 
 vi.mock('@/features/pdf-translation/core/PdfDocumentSession.js', () => ({
-  pdfDocumentSession: {}
+  pdfDocumentSession: {},
+  PAGE_CONTENT_SOURCE: pageContentSourceMock
 }))
 
 vi.mock('./presentation/domainEvents.js', async (importOriginal) => {
@@ -339,6 +346,7 @@ function createMocks({
 } = {}) {
   const sessionMock = {
     getPageViewport: vi.fn(() => mockPdfViewport),
+    getPageContentSource: vi.fn(() => pageContentSourceMock.PDF_TEXT),
     getCommittedOcrState: vi.fn(() => null),
     documentMetadata: {},
   }
@@ -813,6 +821,45 @@ describe('PdfApp', () => {
 
     expect(mockViewerMode.setContentView).toHaveBeenCalledWith('translation')
     expect(mockViewerMode.setLayoutMode).toHaveBeenCalledWith('side-by-side')
+  })
+
+  it('reveals OCR-backed page translations from the translated PDF view', async () => {
+    createMocks({ sessionAsRef: false })
+    mockPdfSession.getPageContentSource.mockReturnValue(pageContentSourceMock.OCR)
+    mockViewerController.hasTranslationContent.value = true
+    mockViewerController.translationSummary.value = { status: 'translated' }
+    const wrapper = mount(PdfApp)
+
+    wrapper.findComponent({ name: 'PdfViewer' }).vm.$emit('current-page-change', 1)
+    wrapper.findComponent({ name: 'PdfToolbar' }).vm.$emit('translate-visible')
+    await flushPromises()
+    await flushPromises()
+    await flushPromises()
+
+    expect(mockPdfSession.getPageContentSource).toHaveBeenCalledWith(1)
+    expect(mockViewerMode.setContentView).toHaveBeenCalledWith('translation')
+    expect(mockViewerMode.setLayoutMode).toHaveBeenCalledWith('side-by-side')
+  })
+
+  it.each([
+    pageContentSourceMock.PDF_TEXT,
+    pageContentSourceMock.NONE,
+    pageContentSourceMock.MIXED
+  ])('keeps translated PDF view for %s page content', async (pageContentSource) => {
+    createMocks({ sessionAsRef: false })
+    mockPdfSession.getPageContentSource.mockReturnValue(pageContentSource)
+    mockViewerController.hasTranslationContent.value = true
+    mockViewerController.translationSummary.value = { status: 'translated' }
+    const wrapper = mount(PdfApp)
+
+    wrapper.findComponent({ name: 'PdfViewer' }).vm.$emit('current-page-change', 1)
+    wrapper.findComponent({ name: 'PdfToolbar' }).vm.$emit('translate-visible')
+    await flushPromises()
+    await flushPromises()
+
+    expect(mockPdfSession.getPageContentSource).toHaveBeenCalledWith(1)
+    expect(mockViewerMode.setContentView).not.toHaveBeenCalled()
+    expect(mockViewerMode.setLayoutMode).not.toHaveBeenCalled()
   })
 
   it('does not override a viewer mode selected while page translation is running', async () => {
