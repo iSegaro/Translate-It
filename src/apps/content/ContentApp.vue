@@ -107,8 +107,6 @@
           unicodeBidi: 'plaintext',
           wordWrap: 'break-word',
           overflowWrap: 'break-word',
-          maxWidth: '320px',
-          minWidth: '280px',
           whiteSpace: 'pre-wrap',
           overflow: 'hidden',
           boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)'
