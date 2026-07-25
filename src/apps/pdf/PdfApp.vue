@@ -82,25 +82,27 @@
 
     <div class="pdf-app__viewport">
       <div class="pdf-app__status-layer">
-        <div
-          v-if="isPdfStatusBannerVisible"
-          class="pdf-app__status-row"
-        >
-          <PdfStatusBanner
-            :visible="isPdfStatusBannerVisible"
-            :variant="pdfStatusBanner.variant || 'info'"
-            :title="pdfStatusBanner.title || ''"
-            :message="pdfStatusBanner.message || ''"
-            :detail="pdfStatusBanner.detail || ''"
-            :body="pdfStatusBanner.body || null"
-            :dismissible="pdfStatusBanner?.dismissible ?? false"
-            @dismiss="dismissPdfStatusBanner"
+        <Transition name="pdf-banner">
+          <div
+            v-if="isPdfStatusBannerVisible"
+            class="pdf-app__status-row"
           >
-            <template #body="{ body }">
-              <PdfNotificationBodyRenderer :body="body" />
-            </template>
-          </PdfStatusBanner>
-        </div>
+            <PdfStatusBanner
+              :visible="isPdfStatusBannerVisible"
+              :variant="pdfStatusBanner.variant || 'info'"
+              :title="pdfStatusBanner.title || ''"
+              :message="pdfStatusBanner.message || ''"
+              :detail="pdfStatusBanner.detail || ''"
+              :body="pdfStatusBanner.body || null"
+              :dismissible="pdfStatusBanner?.dismissible ?? false"
+              @dismiss="dismissPdfStatusBanner"
+            >
+              <template #body="{ body }">
+                <PdfNotificationBodyRenderer :body="body" />
+              </template>
+            </PdfStatusBanner>
+          </div>
+        </Transition>
       </div>
 
       <main class="pdf-app__content">

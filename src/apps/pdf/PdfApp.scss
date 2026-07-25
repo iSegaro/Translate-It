@@ -13,6 +13,7 @@
   min-height: 100vh;
   display: flex;
   flex-direction: column;
+  overflow: hidden;
   --pdf-toolbar-sticky-height: #{$tb-toolbar-height};
   background:
     radial-gradient(circle at top left, rgba(90, 92, 255, 0.18), transparent 35%),
@@ -94,6 +95,23 @@
   display: flex;
   min-height: 0;
   flex: 1;
+}
+
+/* ── Banner Transition ────────────────────── */
+
+.pdf-banner-enter-active,
+.pdf-banner-leave-active {
+  transition: transform 0.2s ease, opacity 0.2s ease;
+}
+
+.pdf-banner-enter-from {
+  transform: translateY(-8px);
+  opacity: 0;
+}
+
+.pdf-banner-leave-to {
+  transform: translateY(-8px);
+  opacity: 0;
 }
 
 @media (max-width: 749px) {
