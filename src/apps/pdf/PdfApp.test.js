@@ -742,7 +742,7 @@ describe('PdfApp', () => {
 
     wrapper.findComponent({ name: 'PdfToolbar' }).vm.$emit('translate-visible')
     await flushPromises()
-    await wrapper.find('.pdf-progress-bar__cancel').trigger('click')
+    await wrapper.find('.operation-status__cancel').trigger('click')
     mockViewerController.translationSummary.value = { status: 'partial', translationOccurrenceId: 9, error: 'late failure' }
     deferred.resolve(true)
     await flushPromises()
@@ -876,7 +876,7 @@ describe('PdfApp', () => {
     const wrapper = mount(PdfApp)
 
     await startRegionComparison(wrapper)
-    await wrapper.find('.pdf-progress-bar__cancel').trigger('click')
+    await wrapper.find('.operation-status__cancel').trigger('click')
     await flushPromises()
 
     expect(cancel).toHaveBeenCalledOnce()
@@ -912,7 +912,7 @@ describe('PdfApp', () => {
     expect(wrapper.findComponent({ name: 'PdfToolbar' }).props('regionComparisonState')).toMatchObject({ status: 'failed' })
     expect(wrapper.find('.pdf-status-banner__title').text()).toBe('Region Comparison failed')
     expect(wrapper.find('.pdf-status-banner__message').text()).toBe('OCR worker unavailable')
-    expect(wrapper.find('.pdf-progress-bar').exists()).toBe(false)
+    expect(wrapper.find('.operation-status').exists()).toBe(false)
     expect(activityCompletedMock).toHaveBeenCalledTimes(1)
   })
 
@@ -1157,12 +1157,12 @@ describe('PdfApp', () => {
     await flushPromises()
 
     expect(mockPdfOcr.requestOcr).toHaveBeenCalledOnce()
-    expect(wrapper.find('.pdf-progress-bar__cancel').exists()).toBe(false)
+    expect(wrapper.find('.operation-status__cancel').exists()).toBe(false)
 
     mockPdfOcrOptions.onOcrStart()
     await flushPromises()
 
-    expect(wrapper.find('.pdf-progress-bar').exists()).toBe(true)
+    expect(wrapper.find('.progress-indicator').exists()).toBe(true)
   })
 
   it('keeps the OCR Manage Languages entry point routed to options', async () => {
@@ -1345,7 +1345,7 @@ describe('PdfApp', () => {
     await flushPromises()
 
     await startRegionOcr(wrapper)
-    await wrapper.find('.pdf-progress-bar__cancel').trigger('click')
+    await wrapper.find('.operation-status__cancel').trigger('click')
     await flushPromises()
 
     expect(cancel).toHaveBeenCalledOnce()

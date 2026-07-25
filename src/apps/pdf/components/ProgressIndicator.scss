@@ -1,0 +1,35 @@
+@use '../../../assets/styles/base/brand-tokens' as *;
+
+@keyframes progress-indicator-shimmer {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(400%); }
+}
+
+.progress-indicator {
+  position: absolute;
+  top: var(--pdf-toolbar-sticky-height);
+  inset-inline: 0;
+  z-index: calc(var(--pdf-layer-toolbar) - 1);
+  height: 4px;
+  pointer-events: none;
+  border-radius: 2px;
+  background: linear-gradient(90deg, $brand-green-gradient-start, $brand-green-gradient-end);
+  transition: width 200ms ease;
+
+  &[aria-busy='true'] {
+    width: 25%;
+    animation: progress-indicator-shimmer 1.2s ease-in-out infinite;
+  }
+}
+
+/* ── Accessibility ────────── */
+
+@media (prefers-reduced-motion: reduce) {
+  .progress-indicator {
+    transition: none;
+
+    &[aria-busy='true'] {
+      animation: none;
+    }
+  }
+}

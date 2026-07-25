@@ -58,8 +58,16 @@
       </template>
     </PdfToolbar>
 
-    <PdfProgressBar
-      :operation="progressOperation"
+    <ProgressIndicator
+      v-if="showProgressIndicator"
+      :progress="progressOperation.progress"
+      :indeterminate="progressOperation.indeterminate"
+    />
+
+    <OperationStatus
+      v-if="showOperationStatus"
+      :title="progressOperation.title"
+      :cancellable="progressOperation.cancellable"
       @cancel="handleProgressCancel"
     />
 
@@ -218,7 +226,8 @@ import PdfStatusBanner from './components/PdfStatusBanner.vue'
 import PdfWindowsHost from './components/PdfWindowsHost.vue'
 import PdfOutline from './components/PdfOutline.vue'
 import PdfDocumentInfoDialog from './components/PdfDocumentInfoDialog.vue'
-import PdfProgressBar from './components/PdfProgressBar.vue'
+import ProgressIndicator from './components/ProgressIndicator.vue'
+import OperationStatus from './components/OperationStatus.vue'
 import PdfAppBrand from './components/PdfAppBrand.vue'
 import PdfOverlayRoot from './components/PdfOverlayRoot.vue'
 import pdfBrandIcon from '@/icons/ui/pdf_viewer/pdf.svg?url'
@@ -366,6 +375,47 @@ const presentation = createPresentationHost({
 const progressOperation = computed(() => {
   return presentation.progressState.value.operation
 })
+
+// ── Lifecycle Controller ──────────
+// PdfApp owns all lifecycle state and timers.
+// Computed properties derive from state — never own timers.
+const lifecycleProgressVisible = ref(false)
+const lifecycleStatusVisible = ref(false)
+let lingerTimer = null
+
+function clearLingerTimer() {
+  if (lingerTimer !== null) {
+    clearTimeout(lingerTimer)
+    lingerTimer = null
+  }
+}
+
+// Lifecycle controller: reacts to progress state changes
+// and transitions lifecycle state. Timers update state.
+// Computed properties read state.
+watch(
+  () => progressOperation.value.running,
+  (running) => {
+    if (running) {
+      clearLingerTimer()
+      lifecycleProgressVisible.value = true
+      lifecycleStatusVisible.value = true
+    } else {
+      clearLingerTimer()
+      lifecycleStatusVisible.value = false
+      lingerTimer = setTimeout(() => {
+        lifecycleProgressVisible.value = false
+        lingerTimer = null
+      }, 200)
+    }
+  },
+  { immediate: true }
+)
+
+// Pure computed visibility — derives from lifecycle state only.
+// Never owns timers, never performs side effects.
+const showProgressIndicator = computed(() => lifecycleProgressVisible.value)
+const showOperationStatus = computed(() => lifecycleStatusVisible.value)
 
 let activeProgressCancel = null
 let cancelActiveRegionOcr = null
@@ -1112,6 +1162,7 @@ onMounted(async () => {
 
 onBeforeUnmount(() => {
   isAlive = false
+  clearLingerTimer()
   activeRegionPosition = null
   activeRegionComparisonOperation?.cancel()
   activeRegionComparisonOperation = null
