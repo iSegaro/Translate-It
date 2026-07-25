@@ -32,13 +32,13 @@ $tm-mobile-breakpoint: 749px;
 
 .toolbar-menu--placement-end {
   .toolbar-menu__panel {
-    right: 0;
+    inset-inline-end: 0;
   }
 }
 
 .toolbar-menu--placement-start {
   .toolbar-menu__panel {
-    left: 0;
+    inset-inline-start: 0;
   }
 }
 
@@ -70,6 +70,7 @@ $tm-mobile-breakpoint: 749px;
   @media (max-width: $tm-mobile-breakpoint) {
     position: fixed;
     top: 0;
+    inset-inline-end: 0;
     bottom: 0;
     z-index: var(--tm-layer-panel);
     display: flex;
@@ -79,22 +80,21 @@ $tm-mobile-breakpoint: 749px;
     box-shadow: var(--tm-drawer-shadow);
     width: var(--tm-drawer-width);
     max-width: 85vw;
+    border-inline-start: 1px solid var(--tm-drawer-border-color);
+    border-radius: var(--tm-drawer-radius) 0 0 var(--tm-drawer-radius);
+    padding-inline-end: env(safe-area-inset-right, 0);
   }
 }
 
-.toolbar-menu--placement-end .toolbar-menu__drawer {
-  right: 0;
-  border-left: 1px solid var(--tm-drawer-border-color);
-  border-radius: var(--tm-drawer-radius) 0 0 var(--tm-drawer-radius);
-  padding-right: env(safe-area-inset-right, 0);
-}
-
-.toolbar-menu--placement-start .toolbar-menu__drawer {
-  left: 0;
-  border-right: 1px solid var(--tm-drawer-border-color);
-  border-radius: 0 var(--tm-drawer-radius) var(--tm-drawer-radius) 0;
-  padding-left: env(safe-area-inset-left, 0);
-}
+/*
+ * Placement modifiers only affect the desktop popover.
+ *
+ * The mobile drawer owns its own positioning rules and must remain
+ * independent from popover placement.
+ *
+ * Drawer positioning should be driven by layout direction (LTR/RTL),
+ * not by popover placement.
+ */
 
 // ── Drawer Header ────────────────────────────────────────────
 
@@ -178,11 +178,6 @@ $tm-mobile-breakpoint: 749px;
 .toolbar-menu--drawer-enter-from,
 .toolbar-menu--drawer-leave-to {
   transform: translateX(100%);
-}
-
-.toolbar-menu--placement-start .toolbar-menu--drawer-enter-from,
-.toolbar-menu--placement-start .toolbar-menu--drawer-leave-to {
-  transform: translateX(-100%);
 }
 
 .toolbar-menu--drawer-enter-to,
