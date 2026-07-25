@@ -843,7 +843,8 @@ const flyoutStyle = computed(() => {
   return {
     position: 'fixed',
     top: `${rect.top}px`,
-    right: `${window.innerWidth - rect.left + 4}px`
+    right: `${window.innerWidth - rect.left + 4}px`,
+    left: 'auto'
   }
 })
 

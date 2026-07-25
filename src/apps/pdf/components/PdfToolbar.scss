@@ -483,13 +483,18 @@
 // ── Flyout Panel ─────────────────────────────────────────────
 
 .pdf-toolbar__flyout {
+  display: flex;
+  flex-direction: column;
   z-index: calc(var(--ti-z-dropdown) + 10);
-  min-width: 180px;
+  left: auto !important;
+  width: fit-content !important;
+  max-width: fit-content !important;
+  min-width: unset !important;
   padding: 4px;
   background: #1e1e1e;
   border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 10px;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.28);
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
 }
 
 .pdf-toolbar__flyout-item {
@@ -497,12 +502,13 @@
   border: 0;
   border-radius: 6px;
   width: 100%;
-  padding: 8px 12px;
+  padding: 7px 12px;
   background: transparent;
   color: $tb-text-primary;
   font-size: 13px;
   font-weight: 500;
   text-align: left;
+  white-space: nowrap;
   cursor: pointer;
   transition: background 0.12s ease;
   outline: none;
