@@ -376,25 +376,17 @@
             <button
               class="pdf-toolbar__export-item"
               type="button"
+              @click="close(); handleOpenLanguageSettings()"
+            >
+              Language: {{ languageSummarySource }} → {{ languageSummaryTarget }}
+            </button>
+            <button
+              class="pdf-toolbar__export-item"
+              type="button"
               :disabled="isLoading"
               @click="close(); handleOpenPdfAction()"
             >
               {{ isLoading ? 'Loading...' : 'Open PDF' }}
-            </button>
-            <button
-              v-if="fileName"
-              class="pdf-toolbar__export-item"
-              type="button"
-              @click="close(); handleClearCacheAction()"
-            >
-              Clear Cache
-            </button>
-            <button
-              class="pdf-toolbar__export-item"
-              type="button"
-              @click="close(); handleOpenSettingsAction()"
-            >
-              Settings
             </button>
             <button
               class="pdf-toolbar__export-item"
@@ -402,13 +394,6 @@
               @click="close(); handleRequestPdfInfo()"
             >
               PDF Information
-            </button>
-            <button
-              class="pdf-toolbar__export-item"
-              type="button"
-              @click="close(); handleOpenLanguageSettings()"
-            >
-              Language: {{ languageSummarySource }} → {{ languageSummaryTarget }}
             </button>
             <div
               v-if="canExport"
@@ -462,6 +447,21 @@
                 </div>
               </Transition>
             </div>
+            <button
+              class="pdf-toolbar__export-item"
+              type="button"
+              @click="close(); handleOpenSettingsAction()"
+            >
+              Settings
+            </button>
+            <button
+              v-if="fileName"
+              class="pdf-toolbar__export-item"
+              type="button"
+              @click="close(); handleClearCacheAction()"
+            >
+              Clear Cache
+            </button>
             <div
               v-if="isDebugMode"
               class="pdf-toolbar__menu-section"
