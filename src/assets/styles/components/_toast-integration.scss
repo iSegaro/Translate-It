@@ -24,6 +24,12 @@
   --font-mono: monospace;
 }
 
+// Adaptive toast width.
+[data-sonner-toast][data-styled='true'] {
+  width: fit-content;
+  max-width: 320px;
+}
+
 // Scoped toast styles for better layout control
 [data-sonner-toast] {
   // Use extension typography
