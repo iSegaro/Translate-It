@@ -266,6 +266,8 @@ import { applyTheme } from '@/utils/ui/theme.js'
 import { useUnifiedI18n } from '@/composables/shared/useUnifiedI18n.js'
 import { OVERLAY_ROOT_KEY } from '@/components/base/ToolbarMenu/keys.js'
 import './PdfApp.scss'
+import 'vue-sonner/style.css'
+import '@/assets/styles/components/_toast.scss'
 
 const { t } = useUnifiedI18n()
 
