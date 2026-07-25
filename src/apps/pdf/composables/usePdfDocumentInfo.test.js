@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { computed, ref } from 'vue'
 import { usePdfDocumentInfo } from './usePdfDocumentInfo.js'
 
@@ -7,21 +7,31 @@ describe('usePdfDocumentInfo', () => {
     const { rows } = usePdfDocumentInfo({
       fileName: 'doc.pdf',
       pageCount: 42,
-      fileSize: 2048,
+      fileSize: 657704,
       pdfFingerprint: 'abc123',
       documentMetadata: {
         title: 'My Doc',
-        author: '',
+        author: 'Author',
+        subject: 'Subject',
+        keywords: 'one, two',
+        creator: 'Creator',
+        producer: 'Producer',
+        pdfVersion: '1.7',
       },
     })
 
-    expect(rows.value).toEqual([
-      { label: 'File Name', value: 'doc.pdf' },
-      { label: 'Pages', value: '42' },
-      { label: 'File Size', value: '2.0 KB' },
-      { label: 'Fingerprint', value: 'abc123' },
-      { label: 'Title', value: 'My Doc' },
+    expect(rows.value.map(row => row.label)).toEqual([
+      'File Name', 'File Size', 'Pages',
+      'Title', 'Author', 'Subject', 'Keywords',
+      'Creation Date', 'Modification Date',
+      'Creator', 'Producer', 'PDF Version'
     ])
+    expect(rows.value).toEqual(expect.arrayContaining([
+      { label: 'File Size', value: `642.3 KB (${(657704).toLocaleString()} bytes)` },
+      { label: 'Title', value: 'My Doc' },
+      { label: 'Subject', value: 'Subject' },
+      { label: 'Keywords', value: 'one, two' },
+    ]))
   })
 
   it('reacts to computed input changes', () => {
@@ -36,17 +46,16 @@ describe('usePdfDocumentInfo', () => {
     }))
 
     const { rows } = usePdfDocumentInfo(source)
-    expect(rows.value).toHaveLength(2)
+    expect(rows.value).toHaveLength(12)
 
     fileName.value = 'new.pdf'
     pageCount.value = 20
-    expect(rows.value).toEqual([
-      { label: 'File Name', value: 'new.pdf' },
-      { label: 'Pages', value: '20' },
-    ])
+    expect(rows.value.find(row => row.label === 'File Name')).toEqual({ label: 'File Name', value: 'new.pdf' })
+    expect(rows.value.find(row => row.label === 'Pages')).toEqual({ label: 'Pages', value: '20' })
   })
 
   it('formats PDF date strings correctly', () => {
+    const localeSpy = vi.spyOn(Date.prototype, 'toLocaleString').mockReturnValue('January 15, 2024, 12:30:00 PM')
     const { rows } = usePdfDocumentInfo({
       fileName: '',
       pageCount: 0,
@@ -58,9 +67,11 @@ describe('usePdfDocumentInfo', () => {
     })
 
     const dateRow = rows.value.find(r => r.label === 'Creation Date')
-    expect(dateRow).toBeTruthy()
-    // "January 15, 2024" in any locale
-    expect(dateRow.value).toMatch(/2024/)
+    expect(dateRow.value).toBe('January 15, 2024, 12:30:00 PM')
+    expect(localeSpy).toHaveBeenCalledWith(undefined, expect.objectContaining({
+      hour: 'numeric', minute: 'numeric', second: 'numeric'
+    }))
+    localeSpy.mockRestore()
   })
 
   it('falls back to raw value for unparseable dates', () => {
@@ -78,7 +89,7 @@ describe('usePdfDocumentInfo', () => {
     expect(dateRow.value).toBe('garbage')
   })
 
-  it('filters empty fields', () => {
+  it('uses placeholders for missing metadata', () => {
     const { rows } = usePdfDocumentInfo({
       fileName: '',
       pageCount: 0,
@@ -87,7 +98,34 @@ describe('usePdfDocumentInfo', () => {
       documentMetadata: {},
     })
 
-    expect(rows.value).toHaveLength(0)
+    expect(rows.value).toHaveLength(12)
+    expect(rows.value.every(row => row.value === '—')).toBe(true)
+  })
+
+  it('uses placeholders for each missing metadata field independently', () => {
+    const { rows } = usePdfDocumentInfo({
+      fileName: 'doc.pdf',
+      pageCount: 1,
+      fileSize: 1024,
+      documentMetadata: {
+        title: '',
+        author: '',
+        subject: '',
+        keywords: '',
+        creator: 'Creator',
+        producer: 'Producer',
+        pdfVersion: '1.7'
+      },
+    })
+
+    expect(rows.value.filter(row => ['Title', 'Author', 'Subject', 'Keywords'].includes(row.label)))
+      .toEqual([
+        { label: 'Title', value: '—' },
+        { label: 'Author', value: '—' },
+        { label: 'Subject', value: '—' },
+        { label: 'Keywords', value: '—' }
+      ])
+    expect(rows.value.find(row => row.label === 'Creator').value).toBe('Creator')
   })
 
   it('formats file sizes correctly', () => {
@@ -99,7 +137,7 @@ describe('usePdfDocumentInfo', () => {
       documentMetadata: {},
     })
 
-    expect(rows.value[0].value).toBe('500 B')
+    expect(rows.value.find(row => row.label === 'File Size').value).toBe('500 B (500 bytes)')
   })
 
   it('shows MB for large files', () => {
@@ -111,6 +149,6 @@ describe('usePdfDocumentInfo', () => {
       documentMetadata: {},
     })
 
-    expect(rows.value[0].value).toBe('3.0 MB')
+    expect(rows.value.find(row => row.label === 'File Size').value).toBe(`3.0 MB (${(3 * 1024 * 1024).toLocaleString()} bytes)`)
   })
 })

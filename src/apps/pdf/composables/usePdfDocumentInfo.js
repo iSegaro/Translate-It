@@ -1,10 +1,15 @@
 import { computed, unref } from 'vue'
 
+const PDF_METADATA_PLACEHOLDER = '—'
+
 function formatFileSize(bytes) {
-  if (!bytes || bytes === 0) return ''
-  if (bytes < 1024) return `${bytes} B`
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
+  if (!bytes || bytes === 0) return PDF_METADATA_PLACEHOLDER
+  const readableSize = bytes < 1024
+    ? `${bytes} B`
+    : bytes < 1024 * 1024
+      ? `${(bytes / 1024).toFixed(1)} KB`
+      : `${(bytes / (1024 * 1024)).toFixed(1)} MB`
+  return `${readableSize} (${bytes.toLocaleString()} bytes)`
 }
 
 /**
@@ -13,14 +18,21 @@ function formatFileSize(bytes) {
  * Falls back to the raw value if parsing fails.
  */
 function formatDate(value) {
-  if (!value) return ''
+  if (!value) return PDF_METADATA_PLACEHOLDER
   const date = parsePdfDate(value)
   if (!date) return String(value)
-  return date.toLocaleDateString(undefined, {
+  return date.toLocaleString(undefined, {
     year: 'numeric',
     month: 'long',
     day: 'numeric',
+    hour: 'numeric',
+    minute: 'numeric',
+    second: 'numeric',
   })
+}
+
+function formatValue(value) {
+  return value ? String(value) : PDF_METADATA_PLACEHOLDER
 }
 
 function parsePdfDate(value) {
@@ -47,20 +59,19 @@ export function usePdfDocumentInfo(raw) {
     const m = source.documentMetadata || {}
 
     return [
-      { label: 'File Name', value: source.fileName || '' },
-      { label: 'Pages', value: source.pageCount > 0 ? String(source.pageCount) : '' },
+      { label: 'File Name', value: formatValue(source.fileName) },
       { label: 'File Size', value: formatFileSize(source.fileSize) },
-      { label: 'Fingerprint', value: source.pdfFingerprint || '' },
-      { label: 'Title', value: m.title || '' },
-      { label: 'Author', value: m.author || '' },
-      { label: 'Subject', value: m.subject || '' },
-      { label: 'Keywords', value: m.keywords || '' },
-      { label: 'Creator', value: m.creator || '' },
-      { label: 'Producer', value: m.producer || '' },
+      { label: 'Pages', value: source.pageCount > 0 ? String(source.pageCount) : PDF_METADATA_PLACEHOLDER },
+      { label: 'Title', value: formatValue(m.title) },
+      { label: 'Author', value: formatValue(m.author) },
+      { label: 'Subject', value: formatValue(m.subject) },
+      { label: 'Keywords', value: formatValue(m.keywords) },
       { label: 'Creation Date', value: formatDate(m.creationDate) },
       { label: 'Modification Date', value: formatDate(m.modificationDate) },
-      { label: 'PDF Version', value: m.pdfVersion || '' },
-    ].filter(r => r.value)
+      { label: 'Creator', value: formatValue(m.creator) },
+      { label: 'Producer', value: formatValue(m.producer) },
+      { label: 'PDF Version', value: formatValue(m.pdfVersion) },
+    ]
   })
 
   return { rows }
