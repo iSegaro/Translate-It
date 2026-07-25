@@ -30,11 +30,10 @@
   font-family: var(--font-sans);
   font-size: $font-size-base;
   
-  // Custom shadow and rounded corners
-  box-shadow: $shadow-md;
-  border-radius: $border-radius-base;
-  border-width: $border-width;
-  border-style: $border-style;
+  // Custom toast surface styling
+  box-shadow: 0 4px 12px rgb(0 0 0 / 10%);
+  border: none;
+  border-radius: 8px;
   
   // Responsive padding
   padding: $spacing-sm $spacing-base;
