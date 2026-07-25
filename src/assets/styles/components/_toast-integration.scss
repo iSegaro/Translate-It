@@ -18,7 +18,10 @@
   --error-bg: var(--color-error-bg);
   --error-border: var(--color-error);
   --error-text: var(--color-error-text);
-  
+  --warning-bg: var(--color-warning-bg);
+  --warning-border: var(--color-warning);
+  --warning-text: var(--color-warning-text);
+
   // Custom font from extension variables
   --font-sans: #{$font-family-base};
   --font-mono: monospace;
