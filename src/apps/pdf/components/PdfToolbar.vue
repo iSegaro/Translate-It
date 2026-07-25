@@ -18,6 +18,7 @@
           />
         </button>
         <button
+          :disabled="!fileName"
           v-if="fileName"
           class="pdf-toolbar__info-toggle"
           type="button"
@@ -391,6 +392,7 @@
             <button
               class="pdf-toolbar__export-item"
               type="button"
+              :disabled="!fileName"
               @click="close(); handleRequestPdfInfo()"
             >
               PDF Information
@@ -879,6 +881,7 @@ function handleOpenSettingsAction() {
 }
 
 function handleRequestPdfInfo() {
+  if (!props.fileName) return
   closeMenus()
   emit('request-document-info')
 }
