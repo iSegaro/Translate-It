@@ -610,6 +610,7 @@ describe('PdfApp', () => {
     deferred.resolve(true)
     await flushPromises()
     await flushPromises()
+    await vi.waitFor(() => expect(activityCompletedMock).toHaveBeenCalledOnce())
 
     expect(activityCompletedMock).toHaveBeenCalledTimes(1)
     expect(translationPartialMock).not.toHaveBeenCalled()
@@ -777,6 +778,90 @@ describe('PdfApp', () => {
     await flushPromises()
 
     expect(wrapper.find('.pdf-status-banner').exists()).toBe(false)
+  })
+
+  it('reveals translated pages side by side after a successful page translation', async () => {
+    createMocks()
+    mockViewerMode.contentView.value = 'original'
+    mockViewerController.hasTranslationContent.value = true
+    mockViewerController.translationSummary.value = { status: 'translated' }
+    const wrapper = mount(PdfApp)
+
+    wrapper.findComponent({ name: 'PdfToolbar' }).vm.$emit('translate-visible')
+    await flushPromises()
+    await flushPromises()
+    await flushPromises()
+    await vi.waitFor(() => expect(activityCompletedMock).toHaveBeenCalledOnce())
+
+    expect(mockViewerMode.setContentView).toHaveBeenCalledWith('translation')
+    expect(mockViewerMode.setLayoutMode).toHaveBeenCalledWith('side-by-side')
+    expect(mockViewerMode.setLayoutMode.mock.invocationCallOrder[0])
+      .toBeLessThan(activityCompletedMock.mock.invocationCallOrder[0])
+  })
+
+  it('reveals partial page translations side by side', async () => {
+    createMocks()
+    mockViewerMode.contentView.value = 'original'
+    mockViewerController.hasTranslationContent.value = true
+    mockViewerController.translationSummary.value = { status: 'partial', translationOccurrenceId: 17 }
+    const wrapper = mount(PdfApp)
+
+    wrapper.findComponent({ name: 'PdfToolbar' }).vm.$emit('translate-visible')
+    await flushPromises()
+    await flushPromises()
+    await flushPromises()
+
+    expect(mockViewerMode.setContentView).toHaveBeenCalledWith('translation')
+    expect(mockViewerMode.setLayoutMode).toHaveBeenCalledWith('side-by-side')
+  })
+
+  it('does not override a viewer mode selected while page translation is running', async () => {
+    const deferred = createDeferred()
+    createMocks()
+    mockViewerMode.contentView.value = 'original'
+    mockViewerController.hasTranslationContent.value = true
+    mockViewerController.translateVisiblePages.mockImplementation(() => deferred.promise)
+    const wrapper = mount(PdfApp)
+
+    wrapper.findComponent({ name: 'PdfToolbar' }).vm.$emit('translate-visible')
+    await flushPromises()
+    mockViewerMode.contentView.value = 'translated-pdf'
+    mockViewerController.translationSummary.value = { status: 'translated' }
+    deferred.resolve(true)
+    await flushPromises()
+    await flushPromises()
+
+    expect(mockViewerMode.setContentView).not.toHaveBeenCalled()
+    expect(mockViewerMode.setLayoutMode).not.toHaveBeenCalled()
+  })
+
+  it('keeps original view when a completed translation has no displayable content', async () => {
+    createMocks()
+    mockViewerMode.contentView.value = 'original'
+    mockViewerController.translationSummary.value = { status: 'translated' }
+    const wrapper = mount(PdfApp)
+
+    wrapper.findComponent({ name: 'PdfToolbar' }).vm.$emit('translate-visible')
+    await flushPromises()
+    await flushPromises()
+
+    expect(mockViewerMode.setContentView).not.toHaveBeenCalled()
+    expect(mockViewerMode.setLayoutMode).not.toHaveBeenCalled()
+  })
+
+  it('does not reveal after a failed page translation', async () => {
+    createMocks()
+    mockViewerMode.contentView.value = 'original'
+    mockViewerController.hasTranslationContent.value = true
+    mockViewerController.translationSummary.value = { status: 'error' }
+    const wrapper = mount(PdfApp)
+
+    wrapper.findComponent({ name: 'PdfToolbar' }).vm.$emit('translate-visible')
+    await flushPromises()
+    await flushPromises()
+
+    expect(mockViewerMode.setContentView).not.toHaveBeenCalled()
+    expect(mockViewerMode.setLayoutMode).not.toHaveBeenCalled()
   })
 
   async function startRegionComparison(wrapper, region = createPdfRegion({ pageNumber: 1, left: 1, top: 4, right: 3, bottom: 2 })) {
@@ -1034,13 +1119,55 @@ describe('PdfApp', () => {
     mount(PdfApp)
     await flushPromises()
 
-    mockPdfOcrOptions.onOcrComplete({ pageNumbers: [2, 1] })
+    await mockPdfOcrOptions.onOcrComplete({ pageNumbers: [2, 1] })
 
     expect(mockViewerController.refreshTranslatedPageBlocks).toHaveBeenCalledWith([2, 1])
     expect(mockViewerController.translationTick.value).toBe(1)
     expect(order).toEqual(['refresh:0'])
     expect(mockPdfOcr.refreshOcrRecommendations).toHaveBeenCalled()
     expect(mockViewerController.recomputeLayout).not.toHaveBeenCalled()
+  })
+
+  it('reveals OCR results side by side from the original view', async () => {
+    createMocks()
+    mockViewerMode.contentView.value = 'original'
+    mockViewerController.hasTranslationContent.value = true
+    mount(PdfApp)
+    await flushPromises()
+
+    await mockPdfOcrOptions.onOcrComplete({ pageNumbers: [1] })
+
+    expect(mockViewerMode.setContentView).toHaveBeenCalledWith('translation')
+    expect(mockViewerMode.setLayoutMode).toHaveBeenCalledWith('side-by-side')
+    expect(mockViewerController.refreshTranslatedPageBlocks.mock.invocationCallOrder[0])
+      .toBeLessThan(mockViewerMode.setContentView.mock.invocationCallOrder[0])
+    expect(mockViewerMode.setLayoutMode.mock.invocationCallOrder[0])
+      .toBeLessThan(activityCompletedMock.mock.invocationCallOrder[0])
+  })
+
+  it('reveals OCR results side by side from the translated PDF view', async () => {
+    createMocks()
+    mockViewerController.hasTranslationContent.value = true
+    mount(PdfApp)
+    await flushPromises()
+
+    await mockPdfOcrOptions.onOcrComplete({ pageNumbers: [1] })
+
+    expect(mockViewerMode.setContentView).toHaveBeenCalledWith('translation')
+    expect(mockViewerMode.setLayoutMode).toHaveBeenCalledWith('side-by-side')
+  })
+
+  it('preserves Translation view after successful OCR', async () => {
+    createMocks()
+    mockViewerMode.contentView.value = 'translation'
+    mockViewerController.hasTranslationContent.value = true
+    mount(PdfApp)
+    await flushPromises()
+
+    await mockPdfOcrOptions.onOcrComplete({ pageNumbers: [1] })
+
+    expect(mockViewerMode.setContentView).not.toHaveBeenCalled()
+    expect(mockViewerMode.setLayoutMode).not.toHaveBeenCalled()
   })
 
   it('refreshes partial OCR page wrappers from the terminal error callback', async () => {
@@ -1053,6 +1180,31 @@ describe('PdfApp', () => {
     expect(mockViewerController.refreshTranslatedPageBlocks).toHaveBeenCalledWith([2, 1])
     expect(mockViewerController.translationTick.value).toBe(1)
     expect(mockPdfOcr.refreshOcrRecommendations).toHaveBeenCalled()
+  })
+
+  it('does not reveal after an OCR error', async () => {
+    createMocks()
+    mockViewerMode.contentView.value = 'original'
+    mockViewerController.hasTranslationContent.value = true
+    mount(PdfApp)
+    await flushPromises()
+
+    mockPdfOcrOptions.onOcrError('ocr-failed', { pageNumbers: [1] })
+
+    expect(mockViewerMode.setContentView).not.toHaveBeenCalled()
+    expect(mockViewerMode.setLayoutMode).not.toHaveBeenCalled()
+  })
+
+  it('does not reveal OCR results without translated content', async () => {
+    createMocks()
+    mockViewerMode.contentView.value = 'original'
+    mount(PdfApp)
+    await flushPromises()
+
+    await mockPdfOcrOptions.onOcrComplete({ pageNumbers: [1] })
+
+    expect(mockViewerMode.setContentView).not.toHaveBeenCalled()
+    expect(mockViewerMode.setLayoutMode).not.toHaveBeenCalled()
   })
 
   it('builds OCR RegionExecutionRequest and preserves recognized-text handoff', async () => {

@@ -232,7 +232,7 @@ import PdfAppBrand from './components/PdfAppBrand.vue'
 import PdfOverlayRoot from './components/PdfOverlayRoot.vue'
 import pdfBrandIcon from '@/icons/ui/pdf_viewer/pdf.svg?url'
 import { usePdfViewerController } from './composables/usePdfViewerController.js'
-import { usePdfViewerMode, CONTENT_VIEW, VIEWER_ROLE } from './composables/usePdfViewerMode.js'
+import { usePdfViewerMode, CONTENT_VIEW, LAYOUT_MODE, VIEWER_ROLE } from './composables/usePdfViewerMode.js'
 import { usePdfDocumentInfo } from './composables/usePdfDocumentInfo.js'
 import { usePdfExport } from './composables/usePdfExport.js'
 import { usePdfOcr } from './composables/usePdfOcr.js'
@@ -442,10 +442,14 @@ const {
     presentation.present(DomainEvents.ocrStarted())
     activeProgressCancel = cancelOcr
   },
-  onOcrComplete: ({ pageNumbers } = {}) => {
-    presentation.present(DomainEvents.activityCompleted())
+  onOcrComplete: async ({ pageNumbers } = {}) => {
     activeProgressCancel = null
     refreshOcrPageData(pageNumbers)
+    if (hasTranslationContent.value && (
+      contentView.value === CONTENT_VIEW.ORIGINAL ||
+      contentView.value === CONTENT_VIEW.TRANSLATED_PDF
+    )) await revealTranslation()
+    presentation.present(DomainEvents.activityCompleted())
   },
   onOcrProgress: ({ current, total } = {}) => {
     presentation.present(DomainEvents.ocrProgressUpdated({ current, total }))
@@ -1033,6 +1037,13 @@ function handleTranslatedPaneCurrentPageChange(pageNumber) {
   handleCurrentPageChange(pageNumber)
 }
 
+async function revealTranslation() {
+  await handleContentViewChange(CONTENT_VIEW.TRANSLATION)
+  if (!isSideBySide.value) {
+    await handleLayoutModeChange(LAYOUT_MODE.SIDE_BY_SIDE)
+  }
+}
+
 function handleTranslateVisiblePages() {
   presentation.present(DomainEvents.translationOutcomeCleared())
   presentation.present(DomainEvents.translationStarted())
@@ -1050,7 +1061,7 @@ function handleTranslateVisiblePages() {
 
   cancelActivePageTranslation = cancelOperation
   activeProgressCancel = cancelOperation
-  void translateVisiblePages().then(() => {
+  void translateVisiblePages().then(async () => {
     if (completionHandled || activeProgressCancel !== cancelOperation) return
 
     const summary = translationSummary.value
@@ -1061,12 +1072,15 @@ function handleTranslateVisiblePages() {
         error: summary.error,
         reason: summary.failureReason
       }))
+      if (hasTranslationContent.value && contentView.value === CONTENT_VIEW.ORIGINAL) await revealTranslation()
     } else if (summary?.status === 'error') {
       presentation.present(DomainEvents.translationFailed({
         occurrenceId: summary.translationOccurrenceId,
         error: summary.error,
         reason: summary.failureReason
       }))
+    } else if (summary?.status === 'translated') {
+      if (hasTranslationContent.value && contentView.value === CONTENT_VIEW.ORIGINAL) await revealTranslation()
     }
   }).finally(() => {
     if (!completionHandled && activeProgressCancel === cancelOperation) {
