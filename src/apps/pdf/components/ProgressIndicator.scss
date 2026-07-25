@@ -2,6 +2,7 @@
 
 @keyframes progress-indicator-shimmer {
   0% { transform: translateX(-100%); }
+
   100% { transform: translateX(400%); }
 }
 
@@ -14,6 +15,10 @@
   pointer-events: none;
   border-radius: 2px;
   background: linear-gradient(90deg, $brand-green-gradient-start, $brand-green-gradient-end);
+  filter:
+  drop-shadow(0 1px 2px rgb(0 0 0 / 35%))
+  drop-shadow(0 2px 5px rgb(0 0 0 / 20%))
+  drop-shadow(0 0 4px rgb(82 221 133 / 25%));
   transition: width 200ms ease;
 
   &[aria-busy='true'] {
