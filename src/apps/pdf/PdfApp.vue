@@ -723,7 +723,7 @@ function invalidateDocumentOperations() {
 }
 
 function updateDocumentTitle() {
-  document.title = session.displayName || 'Translate It - PDF Viewer'
+  document.title = session.displayName || 'PDF Translator'
 }
 
 async function handleFileSelected(file) {
