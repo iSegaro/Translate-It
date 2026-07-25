@@ -724,7 +724,16 @@ function invalidateDocumentOperations() {
 }
 
 function updateDocumentTitle() {
-  document.title = session.displayName || 'PDF Translator'
+  const metadataTitle = session.documentMetadata?.title?.trim()
+  const fileName = session.fileName
+  const normalizedFileName = fileName?.trim()
+  if (metadataTitle) {
+    document.title = normalizedFileName && metadataTitle !== normalizedFileName
+      ? `${metadataTitle} - ${fileName}`
+      : metadataTitle
+    return
+  }
+  document.title = normalizedFileName ? fileName : 'PDF Translator'
 }
 
 async function handleFileSelected(file) {

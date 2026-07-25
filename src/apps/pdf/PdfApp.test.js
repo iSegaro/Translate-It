@@ -348,6 +348,7 @@ function createMocks({
     getPageViewport: vi.fn(() => mockPdfViewport),
     getPageContentSource: vi.fn(() => pageContentSourceMock.PDF_TEXT),
     getCommittedOcrState: vi.fn(() => null),
+    fileName: '',
     documentMetadata: {},
   }
   mockPdfSession = sessionMock
@@ -786,6 +787,69 @@ describe('PdfApp', () => {
     await flushPromises()
 
     expect(wrapper.find('.pdf-status-banner').exists()).toBe(false)
+  })
+
+  it.each([
+    ['combines metadata title and file name', 'Annual Report', 'annual-report.pdf', 'Annual Report - annual-report.pdf'],
+    ['uses metadata title without a file name', 'Annual Report', '', 'Annual Report'],
+    ['uses file name without metadata title', '', 'annual-report.pdf', 'annual-report.pdf'],
+    ['uses fallback title without document values', '', '', 'PDF Translator'],
+    ['uses fallback title for whitespace-only file name', '', '   ', 'PDF Translator'],
+    ['suppresses duplicate metadata title and file name', 'annual-report.pdf', 'annual-report.pdf', 'annual-report.pdf'],
+    ['ignores whitespace-only metadata title', '   ', 'annual-report.pdf', 'annual-report.pdf']
+  ])('sets browser title: %s', (_, metadataTitle, fileName, expectedTitle) => {
+    createMocks({ sessionAsRef: false })
+    mockPdfSession.documentMetadata.title = metadataTitle
+    mockPdfSession.fileName = fileName
+
+    mount(PdfApp)
+
+    expect(document.title).toBe(expectedTitle)
+  })
+
+  it('updates browser title when replacing a document', async () => {
+    createMocks({ sessionAsRef: false })
+    mockViewerController.loadPdfFile
+      .mockImplementationOnce(async () => {
+        mockPdfSession.documentMetadata.title = 'First Report'
+        mockPdfSession.fileName = 'first.pdf'
+        return true
+      })
+      .mockImplementationOnce(async () => {
+        mockPdfSession.documentMetadata.title = 'Second Report'
+        mockPdfSession.fileName = 'second.pdf'
+        return true
+      })
+    const wrapper = mount(PdfApp)
+
+    const dropzone = wrapper.findComponent({ name: 'PdfDropzone' })
+    dropzone.vm.$emit('file-selected', { name: 'first.pdf' })
+    await flushPromises()
+    await flushPromises()
+    expect(document.title).toBe('First Report - first.pdf')
+
+    dropzone.vm.$emit('file-selected', { name: 'second.pdf' })
+    await flushPromises()
+    await flushPromises()
+    expect(document.title).toBe('Second Report - second.pdf')
+  })
+
+  it('resets browser title after a failed document load', async () => {
+    createMocks({ sessionAsRef: false })
+    mockPdfSession.documentMetadata.title = 'Previous Report'
+    mockPdfSession.fileName = 'previous.pdf'
+    mockViewerController.loadPdfFile.mockImplementation(async () => {
+      mockPdfSession.documentMetadata.title = ''
+      mockPdfSession.fileName = ''
+      return false
+    })
+    const wrapper = mount(PdfApp)
+
+    wrapper.findComponent({ name: 'PdfDropzone' }).vm.$emit('file-selected', { name: 'failed.pdf' })
+    await flushPromises()
+    await flushPromises()
+
+    expect(document.title).toBe('PDF Translator')
   })
 
   it('reveals translated pages side by side after a successful page translation', async () => {
