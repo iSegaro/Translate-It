@@ -53,6 +53,10 @@ vi.mock('@/shared/logging/logger.js', () => ({
 }))
 
 import PdfToolbar from './PdfToolbar.vue'
+import ToolbarActionDock from './ToolbarActionDock.vue'
+import ToolbarCenterRegion from './ToolbarCenterRegion.vue'
+import ToolbarNavigationGroup from './ToolbarNavigationGroup.vue'
+import ToolbarPresentationGroup from './ToolbarPresentationGroup.vue'
 import { TranslationMode } from '@/shared/config/config.js'
 
 function createDeferred() {
@@ -155,6 +159,22 @@ describe('PdfToolbar', () => {
     expect(wrapper.find('.pdf-toolbar__actions').find('.pdf-toolbar__group--primary-operation').exists()).toBe(true)
     expect(wrapper.find('.pdf-toolbar__actions').find('.pdf-toolbar__group--secondary-actions').exists()).toBe(true)
     expect(wrapper.findAll('[class*="pdf-toolbar__group--"]')).toHaveLength(5)
+  })
+
+  it('composes logical groups through stateless layout components', () => {
+    const wrapper = mount(PdfToolbar, {
+      props: {
+        fileName: 'doc.pdf',
+        pageCount: 12,
+        currentPageNumber: 5,
+        hasOutline: true
+      }
+    })
+
+    expect(wrapper.findComponent(ToolbarCenterRegion).exists()).toBe(true)
+    expect(wrapper.findComponent(ToolbarPresentationGroup).find('.pdf-toolbar__group--view').exists()).toBe(true)
+    expect(wrapper.findComponent(ToolbarNavigationGroup).find('.pdf-toolbar__group--navigation').exists()).toBe(true)
+    expect(wrapper.findComponent(ToolbarActionDock).find('.pdf-toolbar__actions').exists()).toBe(true)
   })
 
   it('keeps logical groups in stable semantic source order', () => {

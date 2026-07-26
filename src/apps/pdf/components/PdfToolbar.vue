@@ -39,11 +39,8 @@
       </div>
     </div>
 
-    <div
-      v-if="fileName"
-      class="pdf-toolbar__center-group"
-    >
-      <div class="pdf-toolbar__group pdf-toolbar__group--view">
+    <ToolbarCenterRegion v-if="fileName">
+      <ToolbarPresentationGroup>
         <div
           class="pdf-toolbar__view-mode pdf-toolbar__view-mode--desktop"
           :class="{ 'pdf-toolbar__view-mode--hidden': !showTranslationOption }"
@@ -171,9 +168,9 @@
             :size="18"
           />
         </button>
-      </div>
+      </ToolbarPresentationGroup>
 
-      <div class="pdf-toolbar__page-group pdf-toolbar__group pdf-toolbar__group--navigation">
+      <ToolbarNavigationGroup>
         <button
           class="pdf-toolbar__button pdf-toolbar__button--icon-trigger"
           type="button"
@@ -214,10 +211,10 @@
         >
         <span class="pdf-toolbar__page-separator">/</span>
         <span class="pdf-toolbar__page-total">{{ pageCount || 0 }}</span>
-      </div>
-    </div>
+      </ToolbarNavigationGroup>
+    </ToolbarCenterRegion>
 
-    <div class="pdf-toolbar__actions">
+    <ToolbarActionDock>
       <div class="pdf-toolbar__group pdf-toolbar__group--primary-operation">
         <div
           v-if="ocrViewModel"
@@ -541,7 +538,7 @@
           />
         </div>
       </div>
-    </div>
+    </ToolbarActionDock>
   </header>
 </template>
 
@@ -557,6 +554,10 @@ import SvgIcon from '@/components/shared/SvgIcon.vue'
 import ProviderSelector from '@/components/shared/ProviderSelector.vue'
 import PdfTranslationSettingsPopover from './PdfTranslationSettingsPopover.vue'
 import ToolbarMenu from '@/components/base/ToolbarMenu/ToolbarMenu.vue'
+import ToolbarActionDock from './ToolbarActionDock.vue'
+import ToolbarCenterRegion from './ToolbarCenterRegion.vue'
+import ToolbarNavigationGroup from './ToolbarNavigationGroup.vue'
+import ToolbarPresentationGroup from './ToolbarPresentationGroup.vue'
 import outlineIcon from '@/icons/ui/outline.svg?url'
 import splitScreenIcon from '@/icons/ui/split-screen.svg?url'
 import fitPageIcon from '@/icons/ui/fit-page.svg?url'
