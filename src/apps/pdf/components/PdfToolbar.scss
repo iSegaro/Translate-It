@@ -1017,6 +1017,10 @@ $translation-language-code-width: 5ch;
     display: contents;
   }
 
+  .pdf-toolbar__group--primary-operation {
+    justify-self: end;
+  }
+
   .pdf-toolbar--empty .pdf-toolbar__actions {
     display: flex;
   }
