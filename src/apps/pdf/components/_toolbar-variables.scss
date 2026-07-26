@@ -2,3 +2,12 @@ $tb-icon-trigger-size: 34px;
 $tb-padding-y:         6px;
 $tb-border-width:      1px;
 $tb-toolbar-height:    $tb-icon-trigger-size + $tb-padding-y * 2 + $tb-border-width;
+
+// Progressive toolbar compaction stages. All Layout B stages currently retain
+// the existing activation width; later tuning can adjust each independently.
+$tb-stage-view-compact-max-width: 1099px;
+$tb-stage-ocr-label-compact-max-width: 1099px;
+$tb-stage-ocr-chrome-compact-max-width: 1099px;
+$tb-stage-pdf-info-hidden-max-width: 1099px;
+$tb-stage-side-by-side-hidden-max-width: 1099px;
+$tb-layout-c-max-width: 749px;

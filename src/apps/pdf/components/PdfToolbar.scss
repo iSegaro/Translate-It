@@ -937,13 +937,10 @@ $translation-language-code-width: 5ch;
   }
 }
 
-// ── Layout B + C (≤ 1099 px) ──────────────────────────────────────
-// Shared compact styles. Active for all widths ≤ 1099px.
-//   • Switches segmented View Mode buttons to compact dropdown.
-//   • Hides separator bars.
-//   • Reduces padding and font sizes.
-// Layout C (≤ 749px) inherits these rules and adds a second row.
-@media (max-width: 1099px) {
+// ── Stage 1: Compact View ──────────────────────────────────────────
+// Layout B entry stage. Establishes compact toolbar chrome and replaces the
+// segmented View Mode control with its compact selector.
+@media (max-width: $tb-stage-view-compact-max-width) {
   .pdf-toolbar {
     padding: 8px 16px;
     gap: 8px 12px;
@@ -965,10 +962,6 @@ $translation-language-code-width: 5ch;
   .pdf-toolbar__outline-toggle {
     width: 28px;
     height: 28px;
-  }
-
-  .pdf-toolbar__info-toggle {
-    display: none;
   }
 
   .pdf-toolbar__file-name {
@@ -1003,14 +996,10 @@ $translation-language-code-width: 5ch;
     height: $tb-icon-trigger-size;
   }
 
-  .pdf-toolbar__ocr-primary {
-    padding-inline: 4px;
-  }
+}
 
-  .pdf-toolbar__ocr-arrow {
-    padding-inline: 4px;
-  }
-
+// ── Stage 2: Compact OCR Labels ────────────────────────────────────
+@media (max-width: $tb-stage-ocr-label-compact-max-width) {
   .pdf-toolbar__ocr-primary-size--full,
   .pdf-toolbar__ocr-primary-text--full {
     display: none;
@@ -1022,12 +1011,35 @@ $translation-language-code-width: 5ch;
   }
 }
 
-// ── Layout C Overrides (≤ 749 px) ────────────────────────────────
-// Additional two-row grid overrides. Applied on top of Layout B + C
-// shared styles. Switches from single-row 3-column grid to:
-//   Row 1: title-block (left) + actions (right)
-//   Row 2: center-group (full width)
-@media (max-width: 749px) {
+// ── Stage 3: Compact OCR Chrome ────────────────────────────────────
+@media (max-width: $tb-stage-ocr-chrome-compact-max-width) {
+  .pdf-toolbar__ocr-primary {
+    padding-inline: 4px;
+  }
+
+  .pdf-toolbar__ocr-arrow {
+    padding-inline: 4px;
+  }
+}
+
+// ── Stage 4: Hide PDF Info ─────────────────────────────────────────
+@media (max-width: $tb-stage-pdf-info-hidden-max-width) {
+  .pdf-toolbar__info-toggle {
+    display: none;
+  }
+}
+
+// ── Stage 5: Hide Side-by-Side ─────────────────────────────────────
+@media (max-width: $tb-stage-side-by-side-hidden-max-width) {
+  .pdf-toolbar__mode-group--layout {
+    display: none;
+  }
+}
+
+// ── Layout C Overrides ─────────────────────────────────────────────
+// Restores controls compacted by Layout B stages, then applies its two-row
+// Grid presentation.
+@media (max-width: $tb-layout-c-max-width) {
   .pdf-toolbar {
     grid-template-areas:
       'outline navigation primary'
@@ -1038,6 +1050,10 @@ $translation-language-code-width: 5ch;
 
   .pdf-toolbar__info-toggle {
     display: none;
+  }
+
+  .pdf-toolbar__mode-group--layout {
+    display: inline-flex;
   }
 
   .pdf-toolbar__actions {
