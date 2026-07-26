@@ -967,6 +967,10 @@ $translation-language-code-width: 5ch;
     height: 28px;
   }
 
+  .pdf-toolbar__info-toggle {
+    display: none;
+  }
+
   .pdf-toolbar__file-name {
     font-size: 13px;
   }
@@ -1000,11 +1004,11 @@ $translation-language-code-width: 5ch;
   }
 
   .pdf-toolbar__ocr-primary {
-    padding-inline: 6px;
+    padding-inline: 4px;
   }
 
   .pdf-toolbar__ocr-arrow {
-    padding-inline: 5px;
+    padding-inline: 4px;
   }
 
   .pdf-toolbar__ocr-primary-size--full,
