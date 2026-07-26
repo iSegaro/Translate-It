@@ -6,9 +6,11 @@
   top: 0;
   z-index: var(--pdf-layer-toolbar);
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto;
+  grid-template-areas: 'outline info view navigation primary secondary';
+  grid-template-columns: auto auto max-content max-content max-content max-content;
   gap: 8px 12px;
   align-items: center;
+  justify-content: space-between;
   padding: $tb-padding-y 16px;
   min-height: $tb-toolbar-height;
   box-sizing: border-box;
@@ -19,19 +21,20 @@
 }
 
 .pdf-toolbar__title-block {
-  grid-column: 1;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  overflow: hidden;
+  display: contents;
 }
 
 .pdf-toolbar__file-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  min-width: 0;
+  display: contents;
+}
+
+.pdf-toolbar__title-block > .pdf-app-brand {
+  grid-area: brand;
+}
+
+.pdf-toolbar--empty {
+  grid-template-areas: 'brand brand brand primary secondary';
+  grid-template-columns: minmax(0, 1fr) auto auto auto auto;
 }
 
 .pdf-toolbar__group--outline-access,
@@ -42,14 +45,44 @@
   align-items: center;
 }
 
-// Preserve pre-group sibling spacing. Patch 2 owns final group spacing.
 .pdf-toolbar__group--view {
+  grid-area: view;
   gap: 6px;
+}
+
+.pdf-toolbar__group--outline-access {
+  grid-area: outline;
+}
+
+.pdf-toolbar__group--outline-access:empty {
+  display: none;
+}
+
+.pdf-toolbar__info-toggle {
+  grid-area: info;
+}
+
+.pdf-toolbar__group--navigation {
+  grid-area: navigation;
 }
 
 .pdf-toolbar__group--primary-operation,
 .pdf-toolbar__group--secondary-actions {
   gap: 8px;
+}
+
+.pdf-toolbar__group--primary-operation {
+  grid-area: primary;
+}
+
+.pdf-toolbar__group--secondary-actions {
+  grid-area: secondary;
+}
+
+.pdf-toolbar__language-settings {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
 }
 
 .pdf-toolbar__outline-toggle {
@@ -126,13 +159,7 @@
 }
 
 .pdf-toolbar__center-group {
-  grid-column: 2;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  min-width: 0;
-  justify-self: center;
-  flex-wrap: wrap;
+  display: contents;
 }
 
 .pdf-toolbar__mode-group {
@@ -297,15 +324,7 @@
 }
 
 .pdf-toolbar__actions {
-  grid-column: 3;
-  position: relative;
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  flex-wrap: wrap;
-  gap: 8px;
-  min-width: 0;
-  justify-self: end;
+  display: contents;
 }
 
 .pdf-toolbar__button {
@@ -934,10 +953,6 @@ $translation-language-code-width: 5ch;
     display: none;
   }
 
-  .pdf-toolbar__file-row {
-    gap: 6px;
-  }
-
   .pdf-toolbar__outline-toggle {
     width: 28px;
     height: 28px;
@@ -983,29 +998,19 @@ $translation-language-code-width: 5ch;
 //   Row 2: center-group (full width)
 @media (max-width: 749px) {
   .pdf-toolbar {
-    grid-template-columns: 1fr auto;
-    justify-items: stretch;
+    grid-template-areas:
+      'outline navigation primary'
+      'view view secondary';
+    grid-template-columns: auto auto minmax(0, 1fr);
+    justify-content: stretch;
   }
 
-  .pdf-toolbar__title-block {
-    grid-row: 1;
-    grid-column: 1;
-    gap: 2px;
+  .pdf-toolbar__info-toggle {
+    display: none;
   }
 
-  .pdf-toolbar__actions {
-    grid-row: 1;
-    grid-column: 2;
-    justify-self: end;
-    justify-content: flex-end;
-    gap: 6px;
-  }
-
-  .pdf-toolbar__center-group {
-    grid-row: 2;
-    grid-column: 1 / -1;
-    justify-self: stretch;
-    justify-content: flex-start;
-    gap: 8px;
+  .pdf-toolbar--empty {
+    grid-template-areas: 'brand primary secondary';
+    grid-template-columns: minmax(0, 1fr) auto auto;
   }
 }

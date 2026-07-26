@@ -155,6 +155,30 @@ describe('PdfToolbar', () => {
     expect(wrapper.findAll('[class*="pdf-toolbar__group--"]')).toHaveLength(5)
   })
 
+  it('keeps logical groups in stable semantic source order', () => {
+    const wrapper = mount(PdfToolbar, {
+      props: {
+        fileName: 'doc.pdf',
+        pageCount: 12,
+        currentPageNumber: 5,
+        hasOutline: true
+      }
+    })
+
+    const sourceOrder = Array.from(wrapper.find('.pdf-toolbar').element.querySelectorAll(
+      '.pdf-toolbar__group--outline-access, .pdf-toolbar__info-toggle, .pdf-toolbar__group--view, .pdf-toolbar__group--navigation, .pdf-toolbar__group--primary-operation, .pdf-toolbar__group--secondary-actions'
+    )).map((element) => {
+      if (element.classList.contains('pdf-toolbar__group--outline-access')) return 'outline'
+      if (element.classList.contains('pdf-toolbar__info-toggle')) return 'info'
+      if (element.classList.contains('pdf-toolbar__group--view')) return 'view'
+      if (element.classList.contains('pdf-toolbar__group--navigation')) return 'navigation'
+      if (element.classList.contains('pdf-toolbar__group--primary-operation')) return 'primary'
+      return 'secondary'
+    })
+
+    expect(sourceOrder).toEqual(['outline', 'info', 'view', 'navigation', 'primary', 'secondary'])
+  })
+
   it('keeps full and compact View representations on the same event contract', async () => {
     const wrapper = mount(PdfToolbar, {
       props: {
