@@ -999,6 +999,14 @@ $translation-language-code-width: 5ch;
     height: $tb-icon-trigger-size;
   }
 
+  .pdf-toolbar__ocr-primary {
+    padding-inline: 6px;
+  }
+
+  .pdf-toolbar__ocr-arrow {
+    padding-inline: 5px;
+  }
+
   .pdf-toolbar__ocr-primary-size--full,
   .pdf-toolbar__ocr-primary-text--full {
     display: none;
@@ -1040,6 +1048,14 @@ $translation-language-code-width: 5ch;
   .pdf-toolbar__ocr-primary-size--compact,
   .pdf-toolbar__ocr-primary-text--compact {
     display: none;
+  }
+
+  .pdf-toolbar__ocr-primary {
+    padding-inline: 10px;
+  }
+
+  .pdf-toolbar__ocr-arrow {
+    padding-inline: 6px;
   }
 
   .pdf-toolbar__group--primary-operation {
