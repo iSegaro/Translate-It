@@ -1039,12 +1039,16 @@ $translation-language-code-width: 5ch;
 // ── Layout C Overrides ─────────────────────────────────────────────
 // Restores controls compacted by Layout B stages, then applies its two-row
 // Grid presentation.
+//
+// `gutter` is a layout-only Grid area representing flexible separation between
+// the Reading region and Primary actions. It intentionally has no Grid item so
+// Presentation can use flexible space without sizing the Outline track.
 @media (max-width: $tb-layout-c-max-width) {
   .pdf-toolbar {
     grid-template-areas:
-      'outline navigation primary'
-      'view view secondary';
-    grid-template-columns: auto auto minmax(0, 1fr);
+      'outline navigation gutter primary'
+      '. view view secondary';
+    grid-template-columns: max-content max-content minmax(0, 1fr) max-content;
     justify-content: start;
   }
 
