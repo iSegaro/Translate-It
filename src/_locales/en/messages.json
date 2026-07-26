@@ -284,6 +284,18 @@
   "ocr_tab_title": {
     "message": "Screen OCR"
   },
+  "ocr.page": {
+    "message": "OCR Page"
+  },
+  "ocr.pageCompact": {
+    "message": "Page"
+  },
+  "ocr.region": {
+    "message": "OCR Region"
+  },
+  "ocr.regionCompact": {
+    "message": "Region"
+  },
   "ocr_toggle_section_title": {
     "message": "Screen OCR Settings"
   },

@@ -237,10 +237,15 @@
               @click="$emit('primary-click')"
             >
               <span
-                class="pdf-toolbar__ocr-primary-size"
+                class="pdf-toolbar__ocr-primary-size pdf-toolbar__ocr-primary-size--full"
                 aria-hidden="true"
               >{{ widestPrimaryLabel }}</span>
-              <span class="pdf-toolbar__ocr-primary-text">{{ primaryLabel }}</span>
+              <span
+                class="pdf-toolbar__ocr-primary-size pdf-toolbar__ocr-primary-size--compact"
+                aria-hidden="true"
+              >{{ widestCompactPrimaryLabel }}</span>
+              <span class="pdf-toolbar__ocr-primary-text pdf-toolbar__ocr-primary-text--full">{{ primaryLabel }}</span>
+              <span class="pdf-toolbar__ocr-primary-text pdf-toolbar__ocr-primary-text--compact">{{ compactPrimaryLabel }}</span>
             </button>
             <button
               ref="ocrMenuTriggerRef"
@@ -674,12 +679,12 @@ const handleTranslateRequest = () => {
 
 const ocrModel = computed(() => props.ocrViewModel || {})
 
-function buildPrimaryLabel(state) {
+function buildPrimaryLabel(state, compact = false) {
   const actionText = state.action === 'cancel'
     ? t('ocr.cancel', 'Cancel')
     : (state.action === 'page'
-      ? t('ocr.page', 'OCR Page')
-      : t('ocr.region', 'OCR Region'))
+      ? t(compact ? 'ocr.pageCompact' : 'ocr.page', compact ? 'Page' : 'OCR Page')
+      : t(compact ? 'ocr.regionCompact' : 'ocr.region', compact ? 'Region' : 'OCR Region'))
   if (state.language === null) return actionText
   const languageLabel = state.language.compactLabel || state.language.code?.toUpperCase() || 'EN'
   return `${actionText} · ${languageLabel}`
@@ -694,6 +699,7 @@ const currentOcrState = computed(() => {
 })
 
 const primaryLabel = computed(() => buildPrimaryLabel(currentOcrState.value))
+const compactPrimaryLabel = computed(() => buildPrimaryLabel(currentOcrState.value, true))
 
 const widestOcrState = computed(() => {
   const m = ocrModel.value
@@ -709,6 +715,7 @@ const widestOcrState = computed(() => {
 })
 
 const widestPrimaryLabel = computed(() => buildPrimaryLabel(widestOcrState.value))
+const widestCompactPrimaryLabel = computed(() => buildPrimaryLabel(widestOcrState.value, true))
 
 const primaryAriaLabel = computed(() => {
   const m = ocrModel.value

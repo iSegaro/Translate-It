@@ -739,6 +739,11 @@
   white-space: nowrap;
 }
 
+.pdf-toolbar__ocr-primary-size--compact,
+.pdf-toolbar__ocr-primary-text--compact {
+  display: none;
+}
+
 .pdf-toolbar__ocr-primary-text {
   grid-area: 1/1;
 }
@@ -993,6 +998,16 @@ $translation-language-code-width: 5ch;
     width: $tb-icon-trigger-size;
     height: $tb-icon-trigger-size;
   }
+
+  .pdf-toolbar__ocr-primary-size--full,
+  .pdf-toolbar__ocr-primary-text--full {
+    display: none;
+  }
+
+  .pdf-toolbar__ocr-primary-size--compact,
+  .pdf-toolbar__ocr-primary-text--compact {
+    display: block;
+  }
 }
 
 // ── Layout C Overrides (≤ 749 px) ────────────────────────────────
@@ -1015,6 +1030,16 @@ $translation-language-code-width: 5ch;
 
   .pdf-toolbar__actions {
     display: contents;
+  }
+
+  .pdf-toolbar__ocr-primary-size--full,
+  .pdf-toolbar__ocr-primary-text--full {
+    display: block;
+  }
+
+  .pdf-toolbar__ocr-primary-size--compact,
+  .pdf-toolbar__ocr-primary-text--compact {
+    display: none;
   }
 
   .pdf-toolbar__group--primary-operation {

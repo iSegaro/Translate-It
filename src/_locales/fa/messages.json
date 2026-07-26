@@ -284,6 +284,18 @@
   "ocr_tab_title": {
     "message": "تشخیص متن (OCR)"
   },
+  "ocr.page": {
+    "message": "OCR صفحه"
+  },
+  "ocr.pageCompact": {
+    "message": "صفحه"
+  },
+  "ocr.region": {
+    "message": "OCR ناحیه"
+  },
+  "ocr.regionCompact": {
+    "message": "ناحیه"
+  },
   "ocr_toggle_section_title": {
     "message": "تنظیمات تشخیص متن"
   },

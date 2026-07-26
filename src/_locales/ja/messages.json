@@ -284,6 +284,18 @@
   "ocr_tab_title": {
     "message": "スクリーンOCR"
   },
+  "ocr.page": {
+    "message": "OCRページ"
+  },
+  "ocr.pageCompact": {
+    "message": "ページ"
+  },
+  "ocr.region": {
+    "message": "OCR領域"
+  },
+  "ocr.regionCompact": {
+    "message": "領域"
+  },
   "ocr_toggle_section_title": {
     "message": "OCR設定"
   },

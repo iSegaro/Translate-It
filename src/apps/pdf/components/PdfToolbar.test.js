@@ -421,7 +421,10 @@ describe('PdfToolbar', () => {
 
     const primary = wrapper.find('.pdf-toolbar__ocr-primary')
     expect(primary.exists()).toBe(true)
-    expect(primary.find('.pdf-toolbar__ocr-primary-text').text()).toBe('OCR Region · EN')
+    expect(primary.find('.pdf-toolbar__ocr-primary-text--full').text()).toBe('OCR Region · EN')
+    expect(primary.find('.pdf-toolbar__ocr-primary-text--compact').text()).toBe('Region · EN')
+    expect(primary.find('.pdf-toolbar__ocr-primary-size--full').text()).toBe('OCR Region · EN')
+    expect(primary.find('.pdf-toolbar__ocr-primary-size--compact').text()).toBe('Region · EN')
     expect(wrapper.find('.pdf-toolbar__ocr-arrow').exists()).toBe(true)
   })
 
