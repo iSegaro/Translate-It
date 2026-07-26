@@ -152,6 +152,8 @@ describe('PdfToolbar', () => {
     expect(primary.find('.pdf-toolbar__ocr-primary').exists()).toBe(true)
     expect(primary.findComponent({ name: 'ProviderSelector' }).exists()).toBe(true)
     expect(secondary.find('.pdf-toolbar__button--menu-trigger').exists()).toBe(true)
+    expect(wrapper.find('.pdf-toolbar__actions').find('.pdf-toolbar__group--primary-operation').exists()).toBe(true)
+    expect(wrapper.find('.pdf-toolbar__actions').find('.pdf-toolbar__group--secondary-actions').exists()).toBe(true)
     expect(wrapper.findAll('[class*="pdf-toolbar__group--"]')).toHaveLength(5)
   })
 

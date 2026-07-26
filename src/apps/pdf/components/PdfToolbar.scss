@@ -6,8 +6,8 @@
   top: 0;
   z-index: var(--pdf-layer-toolbar);
   display: grid;
-  grid-template-areas: 'outline info view navigation primary secondary';
-  grid-template-columns: auto auto max-content max-content max-content max-content;
+  grid-template-areas: 'outline info view navigation . actions';
+  grid-template-columns: auto auto max-content max-content 1fr auto;
   gap: 8px 12px;
   align-items: center;
   justify-content: start;
@@ -33,7 +33,7 @@
 }
 
 .pdf-toolbar--empty {
-  grid-template-areas: 'brand brand brand primary secondary';
+  grid-template-areas: 'brand brand brand actions actions';
   grid-template-columns: minmax(0, 1fr) auto auto auto auto;
 }
 
@@ -324,7 +324,11 @@
 }
 
 .pdf-toolbar__actions {
-  display: contents;
+  grid-area: actions;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
 }
 
 .pdf-toolbar__button {
@@ -1009,8 +1013,16 @@ $translation-language-code-width: 5ch;
     display: none;
   }
 
+  .pdf-toolbar__actions {
+    display: contents;
+  }
+
+  .pdf-toolbar--empty .pdf-toolbar__actions {
+    display: flex;
+  }
+
   .pdf-toolbar--empty {
-    grid-template-areas: 'brand primary secondary';
+    grid-template-areas: 'brand brand actions';
     grid-template-columns: minmax(0, 1fr) auto auto;
   }
 }
