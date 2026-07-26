@@ -10,7 +10,7 @@
   grid-template-columns: auto auto max-content max-content max-content max-content;
   gap: 8px 12px;
   align-items: center;
-  justify-content: space-between;
+  justify-content: start;
   padding: $tb-padding-y 16px;
   min-height: $tb-toolbar-height;
   box-sizing: border-box;
@@ -1002,7 +1002,7 @@ $translation-language-code-width: 5ch;
       'outline navigation primary'
       'view view secondary';
     grid-template-columns: auto auto minmax(0, 1fr);
-    justify-content: stretch;
+    justify-content: start;
   }
 
   .pdf-toolbar__info-toggle {
