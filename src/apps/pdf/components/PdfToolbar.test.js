@@ -110,6 +110,88 @@ describe('PdfToolbar', () => {
     expect(wrapper.find('.pdf-toolbar__mode-button--active').exists()).toBe(true)
   })
 
+  it('renders each logical group once with its assigned controls', () => {
+    const wrapper = mount(PdfToolbar, {
+      props: {
+        fileName: 'doc.pdf',
+        pageCount: 12,
+        currentPageNumber: 5,
+        showTranslationOption: true,
+        hasOutline: true,
+        ocrViewModel: {
+          primaryAction: 'region',
+          preferredAction: 'region',
+          language: { code: 'eng', name: 'English', compactLabel: 'EN' },
+          canCancel: false,
+          currentPageContainsOcr: false,
+          hasDocument: true,
+          regionOcrAvailable: true,
+          isPageOcrRecommended: false,
+          hasInstalledLanguages: true,
+          installedLanguages: []
+        }
+      }
+    })
+
+    const outline = wrapper.find('.pdf-toolbar__group--outline-access')
+    const view = wrapper.find('.pdf-toolbar__group--view')
+    const navigation = wrapper.find('.pdf-toolbar__group--navigation')
+    const primary = wrapper.find('.pdf-toolbar__group--primary-operation')
+    const secondary = wrapper.find('.pdf-toolbar__group--secondary-actions')
+
+    expect(wrapper.findAll('.pdf-toolbar__group--outline-access')).toHaveLength(1)
+    expect(wrapper.findAll('.pdf-toolbar__group--view')).toHaveLength(1)
+    expect(wrapper.findAll('.pdf-toolbar__group--navigation')).toHaveLength(1)
+    expect(wrapper.findAll('.pdf-toolbar__group--primary-operation')).toHaveLength(1)
+    expect(wrapper.findAll('.pdf-toolbar__group--secondary-actions')).toHaveLength(1)
+    expect(outline.find('.pdf-toolbar__outline-toggle').exists()).toBe(true)
+    expect(view.find('.pdf-toolbar__view-mode--desktop').exists()).toBe(true)
+    expect(view.find('.pdf-toolbar__view-mode--mobile').exists()).toBe(true)
+    expect(view.find('.pdf-toolbar__zoom-group').exists()).toBe(true)
+    expect(navigation.find('.pdf-toolbar__page-input').exists()).toBe(true)
+    expect(primary.find('.pdf-toolbar__ocr-primary').exists()).toBe(true)
+    expect(primary.findComponent({ name: 'ProviderSelector' }).exists()).toBe(true)
+    expect(secondary.find('.pdf-toolbar__button--menu-trigger').exists()).toBe(true)
+    expect(wrapper.findAll('[class*="pdf-toolbar__group--"]')).toHaveLength(5)
+  })
+
+  it('keeps full and compact View representations on the same event contract', async () => {
+    const wrapper = mount(PdfToolbar, {
+      props: {
+        fileName: 'doc.pdf',
+        pageCount: 12,
+        currentPageNumber: 1,
+        contentView: 'original',
+        showTranslationOption: true
+      }
+    })
+
+    const translationButton = wrapper.findAll('.pdf-toolbar__view-mode--desktop .pdf-toolbar__mode-button')
+      .find(button => button.text() === 'Translation')
+    await translationButton.trigger('click')
+    await wrapper.find('.pdf-toolbar__view-mode--mobile select').setValue('translated-pdf')
+
+    expect(wrapper.emitted('content-view-change')).toEqual([['translation'], ['translated-pdf']])
+  })
+
+  it('keeps PDF Information toolbar and Overflow projections on one event contract', async () => {
+    const wrapper = mount(PdfToolbar, {
+      props: {
+        fileName: 'doc.pdf',
+        pageCount: 12,
+        currentPageNumber: 1
+      }
+    })
+
+    await wrapper.find('.pdf-toolbar__info-toggle').trigger('click')
+    await wrapper.find('.pdf-toolbar__button--menu-trigger').trigger('click')
+    const pdfInfoItem = wrapper.findAll('.pdf-toolbar__export-item')
+      .find(item => item.text().includes('PDF Information'))
+    await pdfInfoItem.trigger('click')
+
+    expect(wrapper.emitted('request-document-info')).toHaveLength(2)
+  })
+
   it('emits content-view-change when a content view button is clicked', async () => {
     const wrapper = mount(PdfToolbar, {
       props: {
@@ -149,6 +231,7 @@ describe('PdfToolbar', () => {
     const section = wrapper.find('.pdf-toolbar__view-mode--desktop')
     expect(section.exists()).toBe(true)
     expect(section.classes()).toContain('pdf-toolbar__view-mode--hidden')
+    expect(wrapper.find('.pdf-toolbar__view-mode--mobile select').attributes('tabindex')).toBe('-1')
   })
 
   it('shows Translation option when showTranslationOption is true', async () => {

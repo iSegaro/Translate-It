@@ -34,6 +34,24 @@
   min-width: 0;
 }
 
+.pdf-toolbar__group--outline-access,
+.pdf-toolbar__group--view,
+.pdf-toolbar__group--primary-operation,
+.pdf-toolbar__group--secondary-actions {
+  display: inline-flex;
+  align-items: center;
+}
+
+// Preserve pre-group sibling spacing. Patch 2 owns final group spacing.
+.pdf-toolbar__group--view {
+  gap: 6px;
+}
+
+.pdf-toolbar__group--primary-operation,
+.pdf-toolbar__group--secondary-actions {
+  gap: 8px;
+}
+
 .pdf-toolbar__outline-toggle {
   display: inline-grid;
   place-items: center;

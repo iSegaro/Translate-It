@@ -3,23 +3,25 @@
     <div class="pdf-toolbar__title-block">
       <slot name="leading" />
       <div class="pdf-toolbar__file-row">
+        <div class="pdf-toolbar__group pdf-toolbar__group--outline-access">
+          <button
+            v-if="hasOutline"
+            class="pdf-toolbar__outline-toggle"
+            :class="{ 'pdf-toolbar__outline-toggle--active': isOutlineVisible }"
+            type="button"
+            :aria-label="TOOLTIP_OUTLINE"
+            :title="TOOLTIP_OUTLINE"
+            @click="$emit('toggle-outline')"
+          >
+            <SvgIcon
+              :src="outlineIcon"
+              :size="16"
+            />
+          </button>
+        </div>
         <button
-          v-if="hasOutline"
-          class="pdf-toolbar__outline-toggle"
-          :class="{ 'pdf-toolbar__outline-toggle--active': isOutlineVisible }"
-          type="button"
-          :aria-label="TOOLTIP_OUTLINE"
-          :title="TOOLTIP_OUTLINE"
-          @click="$emit('toggle-outline')"
-        >
-          <SvgIcon
-            :src="outlineIcon"
-            :size="16"
-          />
-        </button>
-        <button
-          :disabled="!fileName"
           v-if="fileName"
+          :disabled="!fileName"
           class="pdf-toolbar__info-toggle"
           type="button"
           aria-label="PDF Information"
@@ -38,73 +40,142 @@
       v-if="fileName"
       class="pdf-toolbar__center-group"
     >
-      <div
-        class="pdf-toolbar__view-mode pdf-toolbar__view-mode--desktop"
-        :class="{ 'pdf-toolbar__view-mode--hidden': !showTranslationOption }"
-      >
-        <div class="pdf-toolbar__mode-group pdf-toolbar__mode-group--content">
-          <button
-            v-for="opt in contentOptions"
-            :key="opt.value"
-            class="pdf-toolbar__mode-button"
-            :class="{ 'pdf-toolbar__mode-button--active': contentView === opt.value }"
-            type="button"
-            @click="$emit('content-view-change', opt.value)"
+      <div class="pdf-toolbar__group pdf-toolbar__group--view">
+        <div
+          class="pdf-toolbar__view-mode pdf-toolbar__view-mode--desktop"
+          :class="{ 'pdf-toolbar__view-mode--hidden': !showTranslationOption }"
+        >
+          <div class="pdf-toolbar__mode-group pdf-toolbar__mode-group--content">
+            <button
+              v-for="opt in contentOptions"
+              :key="opt.value"
+              class="pdf-toolbar__mode-button"
+              :class="{ 'pdf-toolbar__mode-button--active': contentView === opt.value }"
+              type="button"
+              @click="$emit('content-view-change', opt.value)"
+            >
+              {{ opt.label }}
+            </button>
+          </div>
+        </div>
+
+        <div
+          class="pdf-toolbar__view-mode pdf-toolbar__view-mode--mobile"
+          :class="{ 'pdf-toolbar__view-mode--hidden': !showTranslationOption }"
+        >
+          <select
+            class="pdf-toolbar__view-mode-select"
+            :value="contentView"
+            :tabindex="showTranslationOption ? 0 : -1"
+            :aria-hidden="!showTranslationOption"
+            aria-label="View mode"
+            @change="$emit('content-view-change', $event.target.value)"
           >
-            {{ opt.label }}
+            <option
+              v-for="opt in contentOptions"
+              :key="opt.value"
+              :value="opt.value"
+            >
+              {{ opt.label }}
+            </option>
+          </select>
+        </div>
+
+        <div
+          class="pdf-toolbar__mode-group pdf-toolbar__mode-group--layout"
+          :class="{ 'pdf-toolbar__mode-group--hidden': !showTranslationOption }"
+        >
+          <button
+            class="pdf-toolbar__mode-button"
+            :class="{ 'pdf-toolbar__mode-button--active': isSideBySide }"
+            type="button"
+            :aria-label="TOOLTIP_SIDE_BY_SIDE"
+            :title="TOOLTIP_SIDE_BY_SIDE"
+            :aria-pressed="isSideBySide"
+            @click="handleLayoutModeToggle"
+          >
+            <SvgIcon
+              :src="splitScreenIcon"
+              :size="14"
+            />
           </button>
         </div>
-      </div>
 
-      <div
-        class="pdf-toolbar__view-mode pdf-toolbar__view-mode--mobile"
-        :class="{ 'pdf-toolbar__view-mode--hidden': !showTranslationOption }"
-      >
-        <select
-          class="pdf-toolbar__view-mode-select"
-          :value="contentView"
-          :tabindex="showTranslationOption ? 0 : -1"
-          :aria-hidden="!showTranslationOption"
-          aria-label="View mode"
-          @change="$emit('content-view-change', $event.target.value)"
-        >
-          <option
-            v-for="opt in contentOptions"
-            :key="opt.value"
-            :value="opt.value"
+        <span
+          class="pdf-toolbar__separator"
+          :class="{ 'pdf-toolbar__separator--hidden': !showTranslationOption }"
+          aria-hidden="true"
+        />
+
+        <div class="pdf-toolbar__zoom-group">
+          <button
+            class="pdf-toolbar__zoom-button pdf-toolbar__zoom-button--out"
+            type="button"
+            :disabled="!hasZoomOut"
+            :aria-label="TOOLTIP_ZOOM_OUT"
+            :title="TOOLTIP_ZOOM_OUT"
+            @click="$emit('zoom-step', -1)"
           >
-            {{ opt.label }}
-          </option>
-        </select>
-      </div>
+            −
+          </button>
 
-      <div
-        class="pdf-toolbar__mode-group pdf-toolbar__mode-group--layout"
-        :class="{ 'pdf-toolbar__mode-group--hidden': !showTranslationOption }"
-      >
+          <select
+            class="pdf-toolbar__zoom-select"
+            :value="zoomSelectValue"
+            @change="handleZoomSelectChange"
+          >
+            <option
+              v-for="option in zoomPercentOptions"
+              :key="option"
+              :value="String(option)"
+            >
+              {{ option }}%
+            </option>
+          </select>
+
+          <button
+            class="pdf-toolbar__zoom-button pdf-toolbar__zoom-button--in"
+            type="button"
+            :disabled="!hasZoomIn"
+            :aria-label="TOOLTIP_ZOOM_IN"
+            :title="TOOLTIP_ZOOM_IN"
+            @click="$emit('zoom-step', 1)"
+          >
+            +
+          </button>
+        </div>
+
+        <span
+          class="pdf-toolbar__separator"
+          aria-hidden="true"
+        />
+
         <button
-          class="pdf-toolbar__mode-button"
-          :class="{ 'pdf-toolbar__mode-button--active': isSideBySide }"
+          class="pdf-toolbar__button pdf-toolbar__button--icon-trigger"
           type="button"
-          :aria-label="TOOLTIP_SIDE_BY_SIDE"
-          :title="TOOLTIP_SIDE_BY_SIDE"
-          :aria-pressed="isSideBySide"
-          @click="handleLayoutModeToggle"
+          :aria-label="fitToggleTooltip"
+          :title="fitToggleTooltip"
+          @click="handleFitToggle"
         >
           <SvgIcon
-            :src="splitScreenIcon"
-            :size="14"
+            v-if="fitToggleIcon === 'fit-page'"
+            :src="fitPageIcon"
+            :size="18"
+          />
+          <SvgIcon
+            v-else
+            :src="fitWidthIcon"
+            :size="18"
           />
         </button>
       </div>
 
       <span
         class="pdf-toolbar__separator"
-        :class="{ 'pdf-toolbar__separator--hidden': !showTranslationOption }"
         aria-hidden="true"
       />
 
-      <div class="pdf-toolbar__page-group">
+      <div class="pdf-toolbar__page-group pdf-toolbar__group pdf-toolbar__group--navigation">
         <button
           class="pdf-toolbar__button pdf-toolbar__button--icon-trigger"
           type="button"
@@ -146,389 +217,325 @@
         <span class="pdf-toolbar__page-separator">/</span>
         <span class="pdf-toolbar__page-total">{{ pageCount || 0 }}</span>
       </div>
-
-      <span
-        class="pdf-toolbar__separator"
-        aria-hidden="true"
-      />
-
-      <div class="pdf-toolbar__zoom-group">
-        <button
-          class="pdf-toolbar__zoom-button pdf-toolbar__zoom-button--out"
-          type="button"
-          :disabled="!hasZoomOut"
-          :aria-label="TOOLTIP_ZOOM_OUT"
-          :title="TOOLTIP_ZOOM_OUT"
-          @click="$emit('zoom-step', -1)"
-        >
-          −
-        </button>
-
-        <select
-          class="pdf-toolbar__zoom-select"
-          :value="zoomSelectValue"
-          @change="handleZoomSelectChange"
-        >
-          <option
-            v-for="option in zoomPercentOptions"
-            :key="option"
-            :value="String(option)"
-          >
-            {{ option }}%
-          </option>
-        </select>
-
-        <button
-          class="pdf-toolbar__zoom-button pdf-toolbar__zoom-button--in"
-          type="button"
-          :disabled="!hasZoomIn"
-          :aria-label="TOOLTIP_ZOOM_IN"
-          :title="TOOLTIP_ZOOM_IN"
-          @click="$emit('zoom-step', 1)"
-        >
-          +
-        </button>
-      </div>
-
-      <span
-        class="pdf-toolbar__separator"
-        aria-hidden="true"
-      />
-
-      <button
-        class="pdf-toolbar__button pdf-toolbar__button--icon-trigger"
-        type="button"
-        :aria-label="fitToggleTooltip"
-        :title="fitToggleTooltip"
-        @click="handleFitToggle"
-      >
-        <SvgIcon
-          v-if="fitToggleIcon === 'fit-page'"
-          :src="fitPageIcon"
-          :size="18"
-        />
-        <SvgIcon
-          v-else
-          :src="fitWidthIcon"
-          :size="18"
-        />
-      </button>
     </div>
 
     <div class="pdf-toolbar__actions">
-      <select
-        v-if="hasExecutionModeChoice"
-        class="pdf-toolbar__execution-mode-select"
-        :value="executionMode"
-        aria-label="Region execution mode"
-        @change="handleExecutionModeChange"
-      >
-        <option
-          v-for="mode in executionModes"
-          :key="mode"
-          :value="mode"
-        >
-          {{ mode }}
-        </option>
-      </select>
-
-      <div
-        v-if="ocrViewModel"
-        ref="ocrSplitRef"
-        class="pdf-toolbar__ocr-split"
-      >
-        <div class="pdf-toolbar__ocr-buttons">
-          <button
-            class="pdf-toolbar__ocr-primary"
-            :class="{
-              'pdf-toolbar__ocr-primary--cancel': ocrViewModel.canCancel,
-              'pdf-toolbar__ocr-primary--highlight': ocrViewModel.isPageOcrRecommended && !ocrViewModel.canCancel
-            }"
-            :disabled="primaryDisabled"
-            type="button"
-            :aria-label="primaryAriaLabel"
-            @click="$emit('primary-click')"
-          >
-            <span
-              class="pdf-toolbar__ocr-primary-size"
-              aria-hidden="true"
-            >{{ widestPrimaryLabel }}</span>
-            <span class="pdf-toolbar__ocr-primary-text">{{ primaryLabel }}</span>
-          </button>
-          <button
-            ref="ocrMenuTriggerRef"
-            class="pdf-toolbar__ocr-arrow"
-            type="button"
-            aria-haspopup="menu"
-            :aria-expanded="activeMenu === 'ocr'"
-            :aria-label="'More OCR options'"
-            @click="toggleOcrMenu"
-            @keydown="handleOcrArrowKeydown"
-          >
-            ▼
-          </button>
-        </div>
-
+      <div class="pdf-toolbar__group pdf-toolbar__group--primary-operation">
         <div
-          v-if="activeMenu === 'ocr'"
-          ref="ocrMenuRef"
-          class="pdf-toolbar__ocr-menu"
-          role="menu"
+          v-if="ocrViewModel"
+          ref="ocrSplitRef"
+          class="pdf-toolbar__ocr-split"
         >
-          <button
-            class="pdf-toolbar__ocr-menu-item"
-            :class="{
-              'pdf-toolbar__ocr-menu-item--selected': ocrViewModel.preferredAction === 'region',
-              'pdf-toolbar__ocr-menu-item--disabled': regionDisabled
-            }"
-            role="menuitemradio"
-            :aria-checked="ocrViewModel.preferredAction === 'region'"
-            :disabled="regionDisabled"
-            @click="selectAction('region')"
-          >
-            <span
-              class="pdf-toolbar__ocr-menu-check"
-              aria-hidden="true"
-            >✓</span>
-            OCR Region
-          </button>
-          <button
-            class="pdf-toolbar__ocr-menu-item"
-            :class="{
-              'pdf-toolbar__ocr-menu-item--selected': ocrViewModel.preferredAction === 'page',
-              'pdf-toolbar__ocr-menu-item--disabled': pageDisabled
-            }"
-            role="menuitemradio"
-            :aria-checked="ocrViewModel.preferredAction === 'page'"
-            :disabled="pageDisabled"
-            title=""
-            @click="selectAction('page')"
-          >
-            <span
-              class="pdf-toolbar__ocr-menu-check"
-              aria-hidden="true"
-            >✓</span>
-            OCR Page
-          </button>
-
-          <div
-            class="pdf-toolbar__ocr-menu-divider"
-            role="separator"
-          />
-
-          <div class="pdf-toolbar__ocr-menu-scroll">
-            <template v-if="ocrViewModel.installedLanguages.length">
-              <button
-                v-for="lang in ocrViewModel.installedLanguages"
-                :key="lang.code"
-                class="pdf-toolbar__ocr-menu-item"
-                :class="{ 'pdf-toolbar__ocr-menu-item--selected': lang.selected }"
-                role="menuitemradio"
-                :aria-checked="lang.selected"
-                @click="selectLanguage(lang.code)"
-              >
-                <span
-                  class="pdf-toolbar__ocr-menu-check"
-                  aria-hidden="true"
-                >✓</span>
-                {{ lang.name }}
-              </button>
-            </template>
-            <div
-              v-else
-              class="pdf-toolbar__ocr-menu-empty"
+          <div class="pdf-toolbar__ocr-buttons">
+            <button
+              class="pdf-toolbar__ocr-primary"
+              :class="{
+                'pdf-toolbar__ocr-primary--cancel': ocrViewModel.canCancel,
+                'pdf-toolbar__ocr-primary--highlight': ocrViewModel.isPageOcrRecommended && !ocrViewModel.canCancel
+              }"
+              :disabled="primaryDisabled"
+              type="button"
+              :aria-label="primaryAriaLabel"
+              @click="$emit('primary-click')"
             >
-              No languages installed
-            </div>
+              <span
+                class="pdf-toolbar__ocr-primary-size"
+                aria-hidden="true"
+              >{{ widestPrimaryLabel }}</span>
+              <span class="pdf-toolbar__ocr-primary-text">{{ primaryLabel }}</span>
+            </button>
+            <button
+              ref="ocrMenuTriggerRef"
+              class="pdf-toolbar__ocr-arrow"
+              type="button"
+              aria-haspopup="menu"
+              :aria-expanded="activeMenu === 'ocr'"
+              :aria-label="'More OCR options'"
+              @click="toggleOcrMenu"
+              @keydown="handleOcrArrowKeydown"
+            >
+              ▼
+            </button>
           </div>
 
           <div
-            class="pdf-toolbar__ocr-menu-divider"
-            role="separator"
-          />
-
-          <button
-            class="pdf-toolbar__ocr-menu-item"
-            role="menuitem"
-            @click="handleManageLanguages"
+            v-if="activeMenu === 'ocr'"
+            ref="ocrMenuRef"
+            class="pdf-toolbar__ocr-menu"
+            role="menu"
           >
-            ⚙ Manage Languages...
-          </button>
-        </div>
-      </div>
+            <button
+              class="pdf-toolbar__ocr-menu-item"
+              :class="{
+                'pdf-toolbar__ocr-menu-item--selected': ocrViewModel.preferredAction === 'region',
+                'pdf-toolbar__ocr-menu-item--disabled': regionDisabled
+              }"
+              role="menuitemradio"
+              :aria-checked="ocrViewModel.preferredAction === 'region'"
+              :disabled="regionDisabled"
+              @click="selectAction('region')"
+            >
+              <span
+                class="pdf-toolbar__ocr-menu-check"
+                aria-hidden="true"
+              >✓</span>
+              OCR Region
+            </button>
+            <button
+              class="pdf-toolbar__ocr-menu-item"
+              :class="{
+                'pdf-toolbar__ocr-menu-item--selected': ocrViewModel.preferredAction === 'page',
+                'pdf-toolbar__ocr-menu-item--disabled': pageDisabled
+              }"
+              role="menuitemradio"
+              :aria-checked="ocrViewModel.preferredAction === 'page'"
+              :disabled="pageDisabled"
+              title=""
+              @click="selectAction('page')"
+            >
+              <span
+                class="pdf-toolbar__ocr-menu-check"
+                aria-hidden="true"
+              >✓</span>
+              OCR Page
+            </button>
 
-      <ProviderSelector
-        :model-value="pdfProviderValue"
-        mode="split"
-        :is-global="false"
-        allow-default
-        only-configured
-        required-feature="bulk"
-        :loading="isTranslating"
-        :disabled="!canTranslateVisiblePages && !isTranslating"
-        :dropdown-disabled="isTranslating"
-        @provider-change="handleProviderChange"
-        @translate="handleTranslateRequest"
-        @cancel="$emit('cancel-translation')"
-      />
-      <ToolbarMenu
-        ref="moreMenuRef"
-        variant="dark"
-        @open="closeMenus"
-      >
-        <template #trigger="{ triggerAttrs, triggerRef, onToggle }">
-          <button
-            v-bind="triggerAttrs"
-            :ref="triggerRef"
-            class="pdf-toolbar__button pdf-toolbar__button--menu-trigger pdf-toolbar__button--icon-trigger"
-            type="button"
-            :aria-label="TOOLTIP_MORE"
-            :title="TOOLTIP_MORE"
-            @click="onToggle"
-            @keydown.enter.prevent="onToggle"
-            @keydown.space.prevent="onToggle"
-          >
-            <span
-              class="pdf-toolbar__menu-trigger-icon"
-              aria-hidden="true"
-            >
-              <span />
-              <span />
-              <span />
-            </span>
-          </button>
-        </template>
-
-        <template #default="{ close }">
-          <div class="pdf-toolbar__export-menu">
-            <button
-              class="pdf-toolbar__export-item"
-              type="button"
-              @click="close(); handleOpenLanguageSettings()"
-            >
-              Language: {{ languageSummarySource }} → {{ languageSummaryTarget }}
-            </button>
-            <button
-              class="pdf-toolbar__export-item"
-              type="button"
-              :disabled="isLoading"
-              @click="close(); handleOpenPdfAction()"
-            >
-              {{ isLoading ? 'Loading...' : 'Open PDF' }}
-            </button>
-            <button
-              class="pdf-toolbar__export-item"
-              type="button"
-              :disabled="!fileName"
-              @click="close(); handleRequestPdfInfo()"
-            >
-              PDF Information
-            </button>
             <div
-              v-if="canExport"
-              class="pdf-toolbar__menu-section pdf-toolbar__menu-section--has-flyout"
-              role="group"
-              aria-label="Export"
-            >
-              <button
-                ref="exportTriggerRef"
-                class="pdf-toolbar__export-item pdf-toolbar__export-item--submenu-trigger"
-                type="button"
-                :aria-haspopup="true"
-                :aria-expanded="isExportSubmenuOpen"
-                @click="isExportSubmenuOpen = !isExportSubmenuOpen"
-              >
-                <span>Export</span>
-                <span class="pdf-toolbar__submenu-chevron" />
-              </button>
-              <Transition name="pdf-toolbar-flyout">
-                <div
-                  v-if="isExportSubmenuOpen"
-                  ref="exportFlyoutRef"
-                  class="pdf-toolbar__flyout"
-                  role="menu"
-                  :style="flyoutStyle"
+              class="pdf-toolbar__ocr-menu-divider"
+              role="separator"
+            />
+
+            <div class="pdf-toolbar__ocr-menu-scroll">
+              <template v-if="ocrViewModel.installedLanguages.length">
+                <button
+                  v-for="lang in ocrViewModel.installedLanguages"
+                  :key="lang.code"
+                  class="pdf-toolbar__ocr-menu-item"
+                  :class="{ 'pdf-toolbar__ocr-menu-item--selected': lang.selected }"
+                  role="menuitemradio"
+                  :aria-checked="lang.selected"
+                  @click="selectLanguage(lang.code)"
                 >
-                  <button
-                    class="pdf-toolbar__flyout-item"
-                    type="button"
-                    role="menuitem"
-                    @click="close(); handleExportAction('export-txt')"
-                  >
-                    Export TXT
-                  </button>
-                  <button
-                    class="pdf-toolbar__flyout-item"
-                    type="button"
-                    role="menuitem"
-                    @click="close(); handleExportAction('export-markdown')"
-                  >
-                    Export Markdown
-                  </button>
-                  <button
-                    class="pdf-toolbar__flyout-item"
-                    type="button"
-                    role="menuitem"
-                    @click="close(); handleExportAction('export-html')"
-                  >
-                    Export HTML
-                  </button>
-                </div>
-              </Transition>
+                  <span
+                    class="pdf-toolbar__ocr-menu-check"
+                    aria-hidden="true"
+                  >✓</span>
+                  {{ lang.name }}
+                </button>
+              </template>
+              <div
+                v-else
+                class="pdf-toolbar__ocr-menu-empty"
+              >
+                No languages installed
+              </div>
             </div>
-            <button
-              class="pdf-toolbar__export-item"
-              type="button"
-              @click="close(); handleOpenSettingsAction()"
-            >
-              Settings
-            </button>
-            <button
-              v-if="fileName"
-              class="pdf-toolbar__export-item"
-              type="button"
-              @click="close(); handleClearCacheAction()"
-            >
-              Clear Cache
-            </button>
+
             <div
-              v-if="isDebugMode"
-              class="pdf-toolbar__menu-section"
-              role="group"
-              aria-label="Developer"
+              class="pdf-toolbar__ocr-menu-divider"
+              role="separator"
+            />
+
+            <button
+              class="pdf-toolbar__ocr-menu-item"
+              role="menuitem"
+              @click="handleManageLanguages"
             >
-              <span class="pdf-toolbar__menu-section-title">Developer</span>
-              <button
-                class="pdf-toolbar__export-item"
-                type="button"
-                :disabled="isRegionComparisonActive"
-                @click="close(); handleRequestRegionComparisonAction()"
-              >
-                Region Comparison
-              </button>
-              <button
-                v-if="canExportRegionComparisonArtifact"
-                class="pdf-toolbar__export-item"
-                type="button"
-                @click="close(); handleExportRegionComparisonArtifactAction()"
-              >
-                Export Region Comparison Artifact
-              </button>
-            </div>
+              ⚙ Manage Languages...
+            </button>
           </div>
-        </template>
-      </ToolbarMenu>
-      <PdfTranslationSettingsPopover
-        v-if="activeMenu === 'language'"
-        ref="languagePopoverRef"
-        :source-language="sourceLanguage"
-        :target-language="targetLanguage"
-        :provider="effectivePdfProvider"
-        :auto-detect-label="t('auto_detect', 'Auto-Detect')"
-        :disabled="isTranslating"
-        @update:source-language="emit('update:sourceLanguage', $event)"
-        @update:target-language="emit('update:targetLanguage', $event)"
-      />
+        </div>
+
+        <ProviderSelector
+          :model-value="pdfProviderValue"
+          mode="split"
+          :is-global="false"
+          allow-default
+          only-configured
+          required-feature="bulk"
+          :loading="isTranslating"
+          :disabled="!canTranslateVisiblePages && !isTranslating"
+          :dropdown-disabled="isTranslating"
+          @provider-change="handleProviderChange"
+          @translate="handleTranslateRequest"
+          @cancel="$emit('cancel-translation')"
+        />
+      </div>
+      <div class="pdf-toolbar__group pdf-toolbar__group--secondary-actions">
+        <select
+          v-if="hasExecutionModeChoice"
+          class="pdf-toolbar__execution-mode-select"
+          :value="executionMode"
+          aria-label="Region execution mode"
+          @change="handleExecutionModeChange"
+        >
+          <option
+            v-for="mode in executionModes"
+            :key="mode"
+            :value="mode"
+          >
+            {{ mode }}
+          </option>
+        </select>
+        <ToolbarMenu
+          ref="moreMenuRef"
+          variant="dark"
+          @open="closeMenus"
+        >
+          <template #trigger="{ triggerAttrs, triggerRef, onToggle }">
+            <button
+              v-bind="triggerAttrs"
+              :ref="triggerRef"
+              class="pdf-toolbar__button pdf-toolbar__button--menu-trigger pdf-toolbar__button--icon-trigger"
+              type="button"
+              :aria-label="TOOLTIP_MORE"
+              :title="TOOLTIP_MORE"
+              @click="onToggle"
+              @keydown.enter.prevent="onToggle"
+              @keydown.space.prevent="onToggle"
+            >
+              <span
+                class="pdf-toolbar__menu-trigger-icon"
+                aria-hidden="true"
+              >
+                <span />
+                <span />
+                <span />
+              </span>
+            </button>
+          </template>
+
+          <template #default="{ close }">
+            <div class="pdf-toolbar__export-menu">
+              <button
+                class="pdf-toolbar__export-item"
+                type="button"
+                @click="close(); handleOpenLanguageSettings()"
+              >
+                Language: {{ languageSummarySource }} → {{ languageSummaryTarget }}
+              </button>
+              <button
+                class="pdf-toolbar__export-item"
+                type="button"
+                :disabled="isLoading"
+                @click="close(); handleOpenPdfAction()"
+              >
+                {{ isLoading ? 'Loading...' : 'Open PDF' }}
+              </button>
+              <button
+                class="pdf-toolbar__export-item"
+                type="button"
+                :disabled="!fileName"
+                @click="close(); handleRequestPdfInfo()"
+              >
+                PDF Information
+              </button>
+              <div
+                v-if="canExport"
+                class="pdf-toolbar__menu-section pdf-toolbar__menu-section--has-flyout"
+                role="group"
+                aria-label="Export"
+              >
+                <button
+                  ref="exportTriggerRef"
+                  class="pdf-toolbar__export-item pdf-toolbar__export-item--submenu-trigger"
+                  type="button"
+                  :aria-haspopup="true"
+                  :aria-expanded="isExportSubmenuOpen"
+                  @click="isExportSubmenuOpen = !isExportSubmenuOpen"
+                >
+                  <span>Export</span>
+                  <span class="pdf-toolbar__submenu-chevron" />
+                </button>
+                <Transition name="pdf-toolbar-flyout">
+                  <div
+                    v-if="isExportSubmenuOpen"
+                    ref="exportFlyoutRef"
+                    class="pdf-toolbar__flyout"
+                    role="menu"
+                    :style="flyoutStyle"
+                  >
+                    <button
+                      class="pdf-toolbar__flyout-item"
+                      type="button"
+                      role="menuitem"
+                      @click="close(); handleExportAction('export-txt')"
+                    >
+                      Export TXT
+                    </button>
+                    <button
+                      class="pdf-toolbar__flyout-item"
+                      type="button"
+                      role="menuitem"
+                      @click="close(); handleExportAction('export-markdown')"
+                    >
+                      Export Markdown
+                    </button>
+                    <button
+                      class="pdf-toolbar__flyout-item"
+                      type="button"
+                      role="menuitem"
+                      @click="close(); handleExportAction('export-html')"
+                    >
+                      Export HTML
+                    </button>
+                  </div>
+                </Transition>
+              </div>
+              <button
+                class="pdf-toolbar__export-item"
+                type="button"
+                @click="close(); handleOpenSettingsAction()"
+              >
+                Settings
+              </button>
+              <button
+                v-if="fileName"
+                class="pdf-toolbar__export-item"
+                type="button"
+                @click="close(); handleClearCacheAction()"
+              >
+                Clear Cache
+              </button>
+              <div
+                v-if="isDebugMode"
+                class="pdf-toolbar__menu-section"
+                role="group"
+                aria-label="Developer"
+              >
+                <span class="pdf-toolbar__menu-section-title">Developer</span>
+                <button
+                  class="pdf-toolbar__export-item"
+                  type="button"
+                  :disabled="isRegionComparisonActive"
+                  @click="close(); handleRequestRegionComparisonAction()"
+                >
+                  Region Comparison
+                </button>
+                <button
+                  v-if="canExportRegionComparisonArtifact"
+                  class="pdf-toolbar__export-item"
+                  type="button"
+                  @click="close(); handleExportRegionComparisonArtifactAction()"
+                >
+                  Export Region Comparison Artifact
+                </button>
+              </div>
+            </div>
+          </template>
+        </ToolbarMenu>
+        <PdfTranslationSettingsPopover
+          v-if="activeMenu === 'language'"
+          ref="languagePopoverRef"
+          :source-language="sourceLanguage"
+          :target-language="targetLanguage"
+          :provider="effectivePdfProvider"
+          :auto-detect-label="t('auto_detect', 'Auto-Detect')"
+          :disabled="isTranslating"
+          @update:source-language="emit('update:sourceLanguage', $event)"
+          @update:target-language="emit('update:targetLanguage', $event)"
+        />
+      </div>
     </div>
   </header>
 </template>
