@@ -319,6 +319,33 @@ describe('PdfToolbar', () => {
     expect(wrapper.emitted('layout-mode-change')?.[0]?.[0]).toBe('side-by-side')
   })
 
+  it('applies the shared right-anchored presentation contract to More menu rows', async () => {
+    const wrapper = mount(PdfToolbar, {
+      props: {
+        fileName: 'demo.pdf',
+        pageCount: 12,
+        currentPageNumber: 1,
+        canExport: true,
+        zoomMode: 'fit-width',
+        zoomPercent: 100
+      }
+    })
+
+    await wrapper.find('.pdf-toolbar__button[aria-label="More actions"]').trigger('click')
+
+    const mainRows = wrapper.findAll('.pdf-toolbar__export-menu .pdf-toolbar__menu-row')
+    expect(mainRows.length).toBeGreaterThan(0)
+    expect(mainRows.every((row) => row.find('.pdf-toolbar__menu-row-label').exists())).toBe(true)
+
+    const exportTrigger = wrapper.find('.pdf-toolbar__export-item--submenu-trigger')
+    expect(exportTrigger.classes()).toContain('pdf-toolbar__menu-row')
+    expect(exportTrigger.find('.pdf-toolbar__menu-row-label').text()).toBe('Export')
+    expect(exportTrigger.find('.pdf-toolbar__submenu-chevron').exists()).toBe(true)
+
+    await exportTrigger.trigger('click')
+    expect(wrapper.findAll('.pdf-toolbar__flyout .pdf-toolbar__menu-row')).toHaveLength(3)
+  })
+
   it('keeps Open PDF, Clear Cache, and Export inside the hamburger menu', async () => {
     const wrapper = mount(PdfToolbar, {
       props: {

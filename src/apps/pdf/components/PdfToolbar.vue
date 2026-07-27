@@ -410,27 +410,27 @@
             <template #default="{ close }">
               <div class="pdf-toolbar__export-menu">
                 <button
-                  class="pdf-toolbar__export-item"
+                  class="pdf-toolbar__export-item pdf-toolbar__menu-row"
                   type="button"
                   @click="close(); handleOpenLanguageSettings()"
                 >
-                  Language: {{ languageSummarySource }} → {{ languageSummaryTarget }}
+                  <span class="pdf-toolbar__menu-row-label">Language: {{ languageSummarySource }} → {{ languageSummaryTarget }}</span>
                 </button>
                 <button
-                  class="pdf-toolbar__export-item"
+                  class="pdf-toolbar__export-item pdf-toolbar__menu-row"
                   type="button"
                   :disabled="isLoading"
                   @click="close(); handleOpenPdfAction()"
                 >
-                  {{ isLoading ? 'Loading...' : 'Open PDF' }}
+                  <span class="pdf-toolbar__menu-row-label">{{ isLoading ? 'Loading...' : 'Open PDF' }}</span>
                 </button>
                 <button
-                  class="pdf-toolbar__export-item"
+                  class="pdf-toolbar__export-item pdf-toolbar__menu-row"
                   type="button"
                   :disabled="!fileName"
                   @click="close(); handleRequestPdfInfo()"
                 >
-                  PDF Information
+                  <span class="pdf-toolbar__menu-row-label">PDF Information</span>
                 </button>
                 <div
                   v-if="canExport"
@@ -440,13 +440,13 @@
                 >
                   <button
                     ref="exportTriggerRef"
-                    class="pdf-toolbar__export-item pdf-toolbar__export-item--submenu-trigger"
+                    class="pdf-toolbar__export-item pdf-toolbar__export-item--submenu-trigger pdf-toolbar__menu-row"
                     type="button"
                     :aria-haspopup="true"
                     :aria-expanded="isExportSubmenuOpen"
                     @click="isExportSubmenuOpen = !isExportSubmenuOpen"
                   >
-                    <span>Export</span>
+                    <span class="pdf-toolbar__menu-row-label">Export</span>
                     <span class="pdf-toolbar__submenu-chevron" />
                   </button>
                   <Transition name="pdf-toolbar-flyout">
@@ -458,46 +458,46 @@
                       :style="flyoutStyle"
                     >
                       <button
-                        class="pdf-toolbar__flyout-item"
+                        class="pdf-toolbar__flyout-item pdf-toolbar__menu-row"
                         type="button"
                         role="menuitem"
                         @click="close(); handleExportAction('export-txt')"
                       >
-                        Export TXT
+                        <span class="pdf-toolbar__menu-row-label">Export TXT</span>
                       </button>
                       <button
-                        class="pdf-toolbar__flyout-item"
+                        class="pdf-toolbar__flyout-item pdf-toolbar__menu-row"
                         type="button"
                         role="menuitem"
                         @click="close(); handleExportAction('export-markdown')"
                       >
-                        Export Markdown
+                        <span class="pdf-toolbar__menu-row-label">Export Markdown</span>
                       </button>
                       <button
-                        class="pdf-toolbar__flyout-item"
+                        class="pdf-toolbar__flyout-item pdf-toolbar__menu-row"
                         type="button"
                         role="menuitem"
                         @click="close(); handleExportAction('export-html')"
                       >
-                        Export HTML
+                        <span class="pdf-toolbar__menu-row-label">Export HTML</span>
                       </button>
                     </div>
                   </Transition>
                 </div>
                 <button
-                  class="pdf-toolbar__export-item"
+                  class="pdf-toolbar__export-item pdf-toolbar__menu-row"
                   type="button"
                   @click="close(); handleOpenSettingsAction()"
                 >
-                  Settings
+                  <span class="pdf-toolbar__menu-row-label">Settings</span>
                 </button>
                 <button
                   v-if="fileName"
-                  class="pdf-toolbar__export-item"
+                  class="pdf-toolbar__export-item pdf-toolbar__menu-row"
                   type="button"
                   @click="close(); handleClearCacheAction()"
                 >
-                  Clear Cache
+                  <span class="pdf-toolbar__menu-row-label">Clear Cache</span>
                 </button>
                 <div
                   v-if="isDebugMode"
@@ -507,20 +507,20 @@
                 >
                   <span class="pdf-toolbar__menu-section-title">Developer</span>
                   <button
-                    class="pdf-toolbar__export-item"
+                    class="pdf-toolbar__export-item pdf-toolbar__menu-row"
                     type="button"
                     :disabled="isRegionComparisonActive"
                     @click="close(); handleRequestRegionComparisonAction()"
                   >
-                    Region Comparison
+                    <span class="pdf-toolbar__menu-row-label">Region Comparison</span>
                   </button>
                   <button
                     v-if="canExportRegionComparisonArtifact"
-                    class="pdf-toolbar__export-item"
+                    class="pdf-toolbar__export-item pdf-toolbar__menu-row"
                     type="button"
                     @click="close(); handleExportRegionComparisonArtifactAction()"
                   >
-                    Export Region Comparison Artifact
+                    <span class="pdf-toolbar__menu-row-label">Export Region Comparison Artifact</span>
                   </button>
                 </div>
               </div>

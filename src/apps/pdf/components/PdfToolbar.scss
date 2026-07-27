@@ -485,6 +485,23 @@
   }
 }
 
+// PDF More-menu rows mirror its right-anchored navigation surface without
+// changing DOM order or document direction.
+.pdf-toolbar__menu-row {
+  display: grid;
+  grid-template-columns: 16px minmax(0, 1fr);
+  align-items: center;
+  column-gap: 8px;
+  width: 100%;
+  min-width: 0;
+}
+
+.pdf-toolbar__menu-row-label {
+  grid-column: 2;
+  min-width: 0;
+  text-align: left;
+}
+
 .pdf-toolbar__menu-section {
   display: grid;
   gap: 4px;
@@ -506,17 +523,13 @@
   position: relative;
 }
 
-.pdf-toolbar__export-item--submenu-trigger {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  width: 100%;
-}
-
 .pdf-toolbar__submenu-chevron {
+  grid-column: 1;
+  grid-row: 1;
   display: block;
   width: 0;
   height: 0;
+  margin-inline-start: 2px;
   border-style: solid;
   border-width: 4px 5px 4px 0;
   border-color: transparent currentColor transparent transparent;
