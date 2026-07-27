@@ -37,13 +37,17 @@ $tb-focus-soft:         rgba(106, 165, 255, 0.90);
     --tm-panel-background: #{$tb-surface};
     --tm-panel-border: 1px solid #{$tb-border-hover};
     --tm-panel-shadow: 0 18px 40px rgba(0, 0, 0, 0.28);
-    --tm-drawer-background: #{$tb-surface};
-    --tm-drawer-border-color: #{$tb-border};
-    --tm-drawer-header-color: #{$tb-text-primary};
-    --tm-drawer-header-border: 1px solid #{$tb-border};
-    --tm-drawer-close-color: #{$tb-text-secondary};
-    --tm-drawer-close-hover-bg: #{$tb-control-hover};
   }
+}
+
+.pdf-toolbar .toolbar-menu--dark,
+.pdf-overlay-root {
+  --tm-drawer-background: #{$tb-surface};
+  --tm-drawer-border-color: #{$tb-border};
+  --tm-drawer-header-color: #{$tb-text-primary};
+  --tm-drawer-header-border: 1px solid #{$tb-border};
+  --tm-drawer-close-color: #{$tb-text-secondary};
+  --tm-drawer-close-hover-bg: #{$tb-control-hover};
 }
 
 .pdf-toolbar .ti-dropdown-arrow {
