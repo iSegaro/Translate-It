@@ -690,6 +690,16 @@
   --tm-panel-inline-size: max-content;
 }
 
+.pdf-toolbar__more-menu .toolbar-menu__panel .pdf-toolbar__export-menu {
+  width: max-content;
+  max-width: 100%;
+}
+
+.pdf-toolbar__more-menu .toolbar-menu__panel .pdf-toolbar__menu-row {
+  width: auto;
+  grid-template-columns: 16px minmax(0, max-content);
+}
+
 .pdf-toolbar__ocr-split {
   position: relative;
 }
