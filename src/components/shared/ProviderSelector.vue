@@ -4,7 +4,11 @@
     v-if="mode === 'split'"
     ref="selectorRef"
     class="ti-split-translate-button-container"
-    :class="{ 'ti-dropdown-open': isDropdownOpen, 'is-disabled': disabled }"
+    :class="{
+      'ti-dropdown-open': isDropdownOpen,
+      'is-disabled': disabled,
+      'ti-split-translate-button-container--compact-label': presentation === 'compact-label'
+    }"
     v-bind="$attrs"
   >
     <div
@@ -14,7 +18,8 @@
       <button
         type="submit"
         class="ti-translate-main-area"
-        :title="loading ? (t('popup_stop_button_title') || 'توقف') : (t('popup_translate_button_title') || 'ترجمه')"
+        :title="mainActionLabel"
+        :aria-label="mainActionLabel"
         :disabled="disabled"
         @click="handleTranslate"
         @keydown="handleKeydown"
@@ -31,7 +36,7 @@
           class="ti-api-provider-icon"
           :class="{ 'ti-invert-dark': isProviderInverted(currentProvider) }"
         >
-        <span>{{ t('popup_translate_button_text') || 'ترجمه' }}</span>
+        <span class="ti-translate-main-label">{{ mainActionLabel }}</span>
       </button>
       <button 
         ref="triggerBtnRef"
@@ -352,6 +357,11 @@ const props = defineProps({
     type: Boolean,
     default: false
   },
+  presentation: {
+    type: String,
+    default: 'default',
+    validator: (value) => ['default', 'compact-label'].includes(value)
+  },
   onlyConfigured: {
     type: Boolean,
     default: false
@@ -369,6 +379,11 @@ const props = defineProps({
     default: 'auto', // auto, up, down
     validator: (value) => ['auto', 'up', 'down'].includes(value)
   }
+})
+
+const mainActionLabel = computed(() => {
+  if (props.loading) return t('popup_stop_button_title') || 'Cancel'
+  return t('popup_translate_button_text') || 'Translate'
 })
 
 // Emits

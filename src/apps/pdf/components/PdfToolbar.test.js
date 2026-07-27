@@ -26,7 +26,7 @@ vi.mock('@/components/shared/ProviderSelector.vue', () => ({
         <button class="mock-provider-change-b" :disabled="disabled || dropdownDisabled" @click="$emit('provider-change', 'openai'); $emit('translate', { provider: 'openai' })" />
       </div>
     `,
-    props: ['disabled', 'dropdownDisabled', 'loading'],
+    props: ['disabled', 'dropdownDisabled', 'loading', 'presentation'],
     emits: ['translate', 'cancel', 'provider-change', 'update:modelValue']
   }
 }))

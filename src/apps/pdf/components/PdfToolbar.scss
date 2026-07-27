@@ -165,6 +165,7 @@
 .pdf-toolbar__mode-group {
   display: inline-flex;
   align-items: center;
+  flex-shrink: 0;
   border-radius: 6px;
   border: 1px solid $tb-border-group;
   overflow: hidden;
@@ -388,6 +389,7 @@
 .pdf-toolbar__zoom-group {
   display: inline-flex;
   align-items: center;
+  flex-shrink: 0;
   border-radius: 6px;
   border: 1px solid $tb-border;
   overflow: hidden;
@@ -1008,6 +1010,14 @@ $translation-language-code-width: 5ch;
   .pdf-toolbar__ocr-primary-size--compact,
   .pdf-toolbar__ocr-primary-text--compact {
     display: block;
+  }
+
+}
+
+@media (min-width: ($tb-layout-c-max-width + 1px)) and (max-width: $tb-stage-ocr-label-compact-max-width) {
+  .pdf-toolbar__group--primary-operation {
+    --ti-provider-main-gap: 0;
+    --ti-provider-label-display: none;
   }
 }
 

@@ -60,6 +60,16 @@
   span { font-size: 13px !important; font-weight: 500 !important; }
 }
 
+.ti-split-translate-button-container--compact-label {
+  .ti-translate-main-area {
+    gap: var(--ti-provider-main-gap, 6px) !important;
+  }
+
+  .ti-translate-main-label {
+    display: var(--ti-provider-label-display, inline) !important;
+  }
+}
+
 .ti-provider-dropdown-area {
   display: flex !important;
   align-items: center !important;

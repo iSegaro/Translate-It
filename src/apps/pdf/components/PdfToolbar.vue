@@ -349,6 +349,7 @@
         <ProviderSelector
           :model-value="pdfProviderValue"
           mode="split"
+          presentation="compact-label"
           :is-global="false"
           allow-default
           only-configured
