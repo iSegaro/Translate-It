@@ -87,12 +87,12 @@ $tm-mobile-breakpoint: 749px;
     display: flex;
     flex-direction: column;
     overflow: hidden;
-    background: var(--tm-drawer-background);
-    box-shadow: var(--tm-drawer-shadow);
+    background: var(--tm-drawer-background, transparent);
+    box-shadow: var(--tm-drawer-shadow, 0 0 0 1px rgba(0, 0, 0, 0.05), 0 8px 40px rgba(0, 0, 0, 0.32));
     width: var(--tm-drawer-width);
     max-width: 85vw;
-    border-inline-start: 1px solid var(--tm-drawer-border-color);
-    border-radius: var(--tm-drawer-radius) 0 0 var(--tm-drawer-radius);
+    border-inline-start: 1px solid var(--tm-drawer-border-color, transparent);
+    border-radius: var(--tm-drawer-radius, 10px) 0 0 var(--tm-drawer-radius, 10px);
     padding-inline-end: env(safe-area-inset-right, 0);
   }
 }
@@ -117,8 +117,8 @@ $tm-mobile-breakpoint: 749px;
   padding: 12px 16px;
   padding-top: max(12px, env(safe-area-inset-top, 0));
   flex-shrink: 0;
-  border-bottom: var(--tm-drawer-header-border);
-  color: var(--tm-drawer-header-color);
+  border-bottom: var(--tm-drawer-header-border, 1px solid rgba(0, 0, 0, 0.08));
+  color: var(--tm-drawer-header-color, inherit);
 }
 
 .toolbar-menu__drawer-title {
@@ -135,14 +135,14 @@ $tm-mobile-breakpoint: 749px;
   border: none;
   border-radius: 6px;
   background: transparent;
-  color: var(--tm-drawer-close-color);
+  color: var(--tm-drawer-close-color, inherit);
   font-size: 18px;
   line-height: 1;
   cursor: pointer;
   flex-shrink: 0;
 
   &:hover {
-    background: var(--tm-drawer-close-hover-bg);
+    background: var(--tm-drawer-close-hover-bg, rgba(0, 0, 0, 0.06));
   }
 }
 
