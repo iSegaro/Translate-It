@@ -172,14 +172,40 @@ describe('PdfDocumentSession', () => {
     expect(state.pageMetrics[0].scale).toBeCloseTo(footprint.availableCanvasWidth / 500, 6)
   })
 
+  it('allows fit-width to exceed the user zoom maximum', async () => {
+    session.totalPages = 1
+    session.pdfDocument = {
+      numPages: 1,
+      getPage: vi.fn(async () => ({
+        pageNumber: 1,
+        cleanup: vi.fn(),
+        getTextContent: vi.fn().mockResolvedValue({ items: [] }),
+        getViewport: ({ scale }) => ({ width: 500 * scale, height: 600 * scale })
+      }))
+    }
+
+    const state = await session.rebuildPageMetrics({
+      width: 1500,
+      height: 800,
+      availableCanvasWidth: 1500,
+      availableCanvasHeight: 700,
+      zoomMode: 'fit-width',
+      zoomPercent: 100
+    })
+
+    expect(state.pageMetrics[0].scale).toBe(3)
+    expect(state.pageMetrics[0].width).toBe(1500)
+  })
+
   it.each([
     [50, 0.5],
     [75, 0.75],
     [100, 1],
     [125, 1.25],
     [150, 1.5],
-    [200, 2]
-  ])('rebuildPageMetrics applies %s percent as absolute scale %s', async (zoomPercent, expectedScale) => {
+    [200, 2],
+    [250, 2]
+  ])('rebuildPageMetrics applies percent zoom within the user scale policy', async (zoomPercent, expectedScale) => {
     session.totalPages = 1
     session.pdfDocument = {
       numPages: 1,

@@ -18,6 +18,10 @@ import { resolvePdfCanvasSlot } from '@/apps/pdf/utils/pdfFitPageFootprint.js'
 const logger = getScopedLogger(LOG_COMPONENTS.PDF, 'PdfDocumentSession')
 const MIN_SCALE = 0.4
 const MAX_SCALE = 2.0
+// Fit Width is a layout policy, not a user zoom policy.
+// It intentionally remains uncapped so the page can fill the available pane.
+// Resource limits (bitmap size, memory, cache) are not enforced by this policy.
+const FIT_WIDTH_MAX_SCALE = Number.POSITIVE_INFINITY
 
 function createEmptyDocumentMetadata() {
   return {
@@ -428,7 +432,8 @@ export class PdfDocumentSession extends ResourceTracker {
         scale = percentScale
       }
 
-      scale = Math.min(MAX_SCALE, Math.max(MIN_SCALE, scale))
+      const maxScale = zoomMode === 'fit-width' ? FIT_WIDTH_MAX_SCALE : MAX_SCALE
+      scale = Math.min(maxScale, Math.max(MIN_SCALE, scale))
 
       const displayViewport = await this._resolveDisplayViewport(naturalViewport, pageNumber, scale)
 
