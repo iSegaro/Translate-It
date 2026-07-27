@@ -1041,7 +1041,7 @@ $translation-language-code-width: 5ch;
 
 }
 
-@media (min-width: ($tb-layout-c-max-width + 1px)) and (max-width: $tb-stage-ocr-label-compact-max-width) {
+@media (min-width: ($tb-layout-c-max-width + 0.01px)) and (max-width: $tb-stage-ocr-label-compact-max-width) {
   .pdf-toolbar__group--primary-operation {
     --ti-provider-main-gap: 0;
     --ti-provider-label-display: none;
