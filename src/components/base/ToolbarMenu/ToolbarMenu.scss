@@ -15,6 +15,12 @@ $tm-mobile-breakpoint: 749px;
   --tm-panel-border: none;
   --tm-panel-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
   --tm-panel-radius: 14px;
+  --tm-panel-inline-size: auto;
+  --tm-panel-min-inline-size: 190px;
+  --tm-panel-viewport-gutter: 0px;
+  --tm-panel-viewport-inline-size: calc(
+    100vw - (var(--tm-panel-viewport-gutter) * 2)
+  );
 
   // Drawer (mobile) tokens
   --tm-drawer-background: transparent;
@@ -52,7 +58,12 @@ $tm-mobile-breakpoint: 749px;
   position: absolute;
   top: calc(100% + var(--tm-offset, 8px));
   z-index: var(--tm-layer-panel);
-  min-width: 190px;
+  inline-size: var(--tm-panel-inline-size);
+  min-inline-size: var(--tm-panel-min-inline-size);
+  max-inline-size: min(
+    var(--tm-panel-max-inline-size, var(--tm-panel-viewport-inline-size)),
+    var(--tm-panel-viewport-inline-size)
+  );
   max-height: calc(100vh - 120px);
   overflow-y: auto;
   overscroll-behavior: contain;
