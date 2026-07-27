@@ -1076,12 +1076,12 @@ $translation-language-code-width: 5ch;
 
   .pdf-toolbar__ocr-primary-size--full,
   .pdf-toolbar__ocr-primary-text--full {
-    display: block;
+    display: none;
   }
 
   .pdf-toolbar__ocr-primary-size--compact,
   .pdf-toolbar__ocr-primary-text--compact {
-    display: none;
+    display: block;
   }
 
   .pdf-toolbar__ocr-primary {
@@ -1093,6 +1093,8 @@ $translation-language-code-width: 5ch;
   }
 
   .pdf-toolbar__group--primary-operation {
+    --ti-provider-main-gap: 0;
+    --ti-provider-label-display: none;
     justify-self: end;
   }
 
