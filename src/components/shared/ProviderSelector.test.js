@@ -24,7 +24,7 @@ vi.mock('@/composables/shared/useUnifiedI18n.js', () => ({
   useUnifiedI18n: () => ({
     t: (key) => ({
       popup_translate_button_text: 'Translate',
-      popup_stop_button_title: 'Cancel',
+      popup_stop_button_title: 'Stop',
     })[key] || key,
   }),
 }))
@@ -79,22 +79,26 @@ describe('ProviderSelector split mode', () => {
     settingsStore.updateSettingAndPersist.mockReset()
   })
 
-  it('keeps accessible Translate and Cancel labels while emitting existing actions', async () => {
+  it('keeps accessible Translate and Stop labels while reserving localized label width', async () => {
     const wrapper = mount(ProviderSelector, {
       props: { mode: 'split', modelValue: 'googlev2' },
       global: { stubs: { Teleport: true } },
     })
 
     const mainAction = wrapper.find('.ti-translate-main-area')
+    const labels = wrapper.find('.ti-translate-main-labels')
     expect(mainAction.attributes('aria-label')).toBe('Translate')
     expect(wrapper.find('.ti-translate-main-label').text()).toBe('Translate')
+    expect(labels.findAll('.ti-translate-main-label-reserve')).toHaveLength(2)
+    expect(labels.findAll('.ti-translate-main-label-reserve').map((label) => label.text())).toEqual(['Translate', 'Stop'])
+    expect(labels.findAll('.ti-translate-main-label-reserve').every((label) => label.attributes('aria-hidden') === 'true')).toBe(true)
 
     await mainAction.trigger('click')
     expect(wrapper.emitted('translate')).toEqual([[{ provider: 'googlev2' }]])
 
     await wrapper.setProps({ loading: true })
-    expect(mainAction.attributes('aria-label')).toBe('Cancel')
-    expect(wrapper.find('.ti-translate-main-label').text()).toBe('Cancel')
+    expect(mainAction.attributes('aria-label')).toBe('Stop')
+    expect(wrapper.find('.ti-translate-main-label').text()).toBe('Stop')
 
     await mainAction.trigger('click')
     expect(wrapper.emitted('cancel')).toHaveLength(1)

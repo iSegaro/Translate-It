@@ -36,7 +36,17 @@
           class="ti-api-provider-icon"
           :class="{ 'ti-invert-dark': isProviderInverted(currentProvider) }"
         >
-        <span class="ti-translate-main-label">{{ mainActionLabel }}</span>
+        <span class="ti-translate-main-labels">
+          <span class="ti-translate-main-label">{{ mainActionLabel }}</span>
+          <span
+            class="ti-translate-main-label-reserve"
+            aria-hidden="true"
+          >{{ translateActionLabel }}</span>
+          <span
+            class="ti-translate-main-label-reserve"
+            aria-hidden="true"
+          >{{ stopActionLabel }}</span>
+        </span>
       </button>
       <button 
         ref="triggerBtnRef"
@@ -381,10 +391,9 @@ const props = defineProps({
   }
 })
 
-const mainActionLabel = computed(() => {
-  if (props.loading) return t('popup_stop_button_title') || 'Cancel'
-  return t('popup_translate_button_text') || 'Translate'
-})
+const translateActionLabel = computed(() => t('popup_translate_button_text') || 'Translate')
+const stopActionLabel = computed(() => t('popup_stop_button_title') || 'Stop')
+const mainActionLabel = computed(() => (props.loading ? stopActionLabel.value : translateActionLabel.value))
 
 // Emits
 const emit = defineEmits(['translate', 'cancel', 'provider-change', 'update:modelValue'])
