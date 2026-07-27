@@ -1,5 +1,6 @@
 import {
-  PDF_PAGE_MARGIN,
+  PDF_PANE_EDGE_SAFETY_CLEARANCE,
+  PDF_PAGE_INLINE_CHROME,
   PDF_VIEWER_PADDING_TOP,
   PDF_VIEWER_PADDING_BOTTOM,
   PDF_PAGE_PADDING_TOP,
@@ -24,7 +25,8 @@ function getViewerVerticalChromeHeight() {
 function resolvePdfCanvasSlot(layout = {}) {
   const width = toFiniteDimension(layout.width)
   const height = toFiniteDimension(layout.height)
-  const availableCanvasWidth = Math.max(320, width - PDF_PAGE_MARGIN * 2)
+  const horizontalFootprintInset = PDF_PANE_EDGE_SAFETY_CLEARANCE + PDF_PAGE_INLINE_CHROME
+  const availableCanvasWidth = Math.max(320, width - horizontalFootprintInset * 2)
   const availableCanvasHeight = Math.max(
     0,
     height - getViewerVerticalChromeHeight() - getPageChromeHeight()

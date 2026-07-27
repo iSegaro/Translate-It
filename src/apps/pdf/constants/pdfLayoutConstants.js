@@ -9,7 +9,8 @@
  * PdfPageView.scss, or PdfViewerLayout.scss should be kept in sync.
  */
 
-export const PDF_PAGE_MARGIN = 24
+export const PDF_PANE_EDGE_SAFETY_CLEARANCE = 8
+export const PDF_PAGE_INLINE_CHROME = 16
 export const PDF_VIEWER_PADDING_TOP = 16
 export const PDF_VIEWER_PADDING_BOTTOM = 24
 export const PDF_PAGE_PADDING_TOP = 16

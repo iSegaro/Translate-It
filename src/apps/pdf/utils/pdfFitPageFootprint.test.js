@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { getPageChromeHeight, getViewerVerticalChromeHeight, resolvePdfCanvasSlot } from './pdfFitPageFootprint.js'
 
 describe('pdfFitPageFootprint', () => {
-  it('keeps the width slot compatible with existing page margin behavior', () => {
+  it('subtracts structural chrome and pane safety clearance from each width edge', () => {
     expect(resolvePdfCanvasSlot({ width: 400, height: 600 }).availableCanvasWidth).toBe(352)
   })
 
