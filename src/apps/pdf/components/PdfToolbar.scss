@@ -1039,13 +1039,6 @@ $translation-language-code-width: 5ch;
   }
 }
 
-// ── Stage 5: Hide Side-by-Side ─────────────────────────────────────
-@media (max-width: $tb-stage-side-by-side-hidden-max-width) {
-  .pdf-toolbar__mode-group--layout {
-    display: none;
-  }
-}
-
 // ── Layout C Overrides ─────────────────────────────────────────────
 // Restores controls compacted by Layout B stages, then applies its two-row
 // Grid presentation.
