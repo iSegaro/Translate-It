@@ -686,6 +686,10 @@
   box-shadow: 0 0 0 2px $tb-focus;
 }
 
+.pdf-toolbar__more-menu {
+  --tm-panel-inline-size: max-content;
+}
+
 .pdf-toolbar__ocr-split {
   position: relative;
 }

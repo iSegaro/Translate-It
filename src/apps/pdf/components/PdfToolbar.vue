@@ -381,6 +381,7 @@
         <div class="pdf-toolbar__language-settings">
           <ToolbarMenu
             ref="moreMenuRef"
+            class="pdf-toolbar__more-menu"
             variant="dark"
             @open="closeMenus"
           >
