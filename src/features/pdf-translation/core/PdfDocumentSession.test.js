@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { resolvePdfCanvasSlot } from '@/apps/pdf/utils/pdfFitPageFootprint.js'
 
 vi.mock('./pdfjs.js', () => ({
   ensurePdfJsConfigured: vi.fn(() => ({})),
@@ -125,21 +126,22 @@ describe('PdfDocumentSession', () => {
       }))
     }
 
+    const footprint = resolvePdfCanvasSlot({ width: 400, height: 400 })
     const state = await session.rebuildPageMetrics({
       width: 400,
       height: 400,
-      availableCanvasWidth: 352,
-      availableCanvasHeight: 300,
+      availableCanvasWidth: footprint.availableCanvasWidth,
+      availableCanvasHeight: footprint.availableCanvasHeight,
       zoomMode: 'fit-page',
       zoomPercent: 100
     })
 
     expect(state.pageMetrics).toHaveLength(1)
-    expect(state.pageMetrics[0].scale).toBeCloseTo(300 / 600, 6)
-    expect(state.pageMetrics[0].height).toBeCloseTo(300, 6)
+    expect(state.pageMetrics[0].scale).toBeCloseTo(footprint.availableCanvasHeight / 600, 6)
+    expect(state.pageMetrics[0].height).toBeCloseTo(footprint.availableCanvasHeight, 6)
   })
 
-  it('keeps fit-width scale compatible when an explicit canvas slot is provided', async () => {
+  it('keeps fit-width scale compatible when a canonical footprint is provided', async () => {
     session.totalPages = 1
     session.pdfDocument = {
       numPages: 1,
@@ -156,17 +158,18 @@ describe('PdfDocumentSession', () => {
       }))
     }
 
+    const footprint = resolvePdfCanvasSlot({ width: 400, height: 400 })
     const state = await session.rebuildPageMetrics({
       width: 400,
       height: 400,
-      availableCanvasWidth: 352,
-      availableCanvasHeight: 300,
+      availableCanvasWidth: footprint.availableCanvasWidth,
+      availableCanvasHeight: footprint.availableCanvasHeight,
       zoomMode: 'fit-width',
       zoomPercent: 100
     })
 
     expect(state.pageMetrics).toHaveLength(1)
-    expect(state.pageMetrics[0].scale).toBeCloseTo(352 / 500, 6)
+    expect(state.pageMetrics[0].scale).toBeCloseTo(footprint.availableCanvasWidth / 500, 6)
   })
 
   it.each([

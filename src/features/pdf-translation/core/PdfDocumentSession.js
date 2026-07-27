@@ -13,9 +13,9 @@ import { PdfTranslationState } from './PdfTranslationState.js'
 import { pdfCacheManager } from './PdfCacheManager.js'
 import { PDF_PAGE_BACKGROUND } from './pdfRenderingConstants.js'
 import { PAGE_CONTENT_SOURCE } from './PdfPageSession.js'
+import { resolvePdfCanvasSlot } from '@/apps/pdf/utils/pdfFitPageFootprint.js'
 
 const logger = getScopedLogger(LOG_COMPONENTS.PDF, 'PdfDocumentSession')
-const PAGE_MARGIN = 24
 const MIN_SCALE = 0.4
 const MAX_SCALE = 2.0
 
@@ -382,12 +382,13 @@ export class PdfDocumentSession extends ResourceTracker {
       zoomPercent
     } = normalizeLayoutRequest(layoutRequest)
 
-    const usableWidth = availableCanvasWidth > 0
-      ? availableCanvasWidth
-      : Math.max(320, viewerWidth - PAGE_MARGIN * 2)
+    const fallbackFootprint = availableCanvasWidth > 0 && availableCanvasHeight > 0
+      ? null
+      : resolvePdfCanvasSlot({ width: viewerWidth, height: viewerHeight })
+    const usableWidth = availableCanvasWidth > 0 ? availableCanvasWidth : fallbackFootprint.availableCanvasWidth
     const usableHeight = availableCanvasHeight > 0
       ? availableCanvasHeight
-      : Math.max(0, viewerHeight - PAGE_MARGIN * 2)
+      : fallbackFootprint.availableCanvasHeight
     const BATCH_SIZE = 8
     const metrics = []
 
