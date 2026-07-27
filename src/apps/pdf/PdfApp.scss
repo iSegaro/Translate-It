@@ -114,7 +114,7 @@
   opacity: 0;
 }
 
-@media (max-width: 749px) {
+@media (max-width: $tb-layout-c-max-width) {
   .pdf-app {
     --pdf-toolbar-sticky-height: 96px;
   }
