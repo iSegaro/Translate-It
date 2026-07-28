@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { resolvePdfCanvasSlot } from '@/apps/pdf/utils/pdfFitPageFootprint.js'
+import { OCR_ENGINE_VERSION, isCompatibleCachedOcrEntry } from './PdfOcrCompatibility.js'
 
 vi.mock('./pdfjs.js', () => ({
   ensurePdfJsConfigured: vi.fn(() => ({})),
@@ -181,6 +182,7 @@ describe('PdfDocumentSession', () => {
       pageNumber,
       ocrLanguage: 'eng',
       ocrCompletedAt: 1234,
+      ocrEngineVersion: OCR_ENGINE_VERSION,
       ocrBlocks: [{
         id: `ocr-${pageNumber}`,
         text: 'Cached OCR text',
@@ -189,6 +191,19 @@ describe('PdfDocumentSession', () => {
       }]
     }
   }
+
+  it('derives cached OCR compatibility expectations from the predicate', () => {
+    const validEntry = createOcrEntry(1)
+
+    expect(isCompatibleCachedOcrEntry(validEntry)).toBe(true)
+    expect(isCompatibleCachedOcrEntry()).toBe(false)
+    expect(isCompatibleCachedOcrEntry({})).toBe(false)
+    expect(isCompatibleCachedOcrEntry({ ...validEntry, ocrBlocks: undefined })).toBe(false)
+    expect(isCompatibleCachedOcrEntry({ ...validEntry, ocrBlocks: null })).toBe(false)
+    expect(isCompatibleCachedOcrEntry({ ...validEntry, ocrLanguage: undefined })).toBe(false)
+    expect(isCompatibleCachedOcrEntry({ ...validEntry, ocrLanguage: '' })).toBe(false)
+    expect(isCompatibleCachedOcrEntry({ ...validEntry, ocrEngineVersion: 'old-version' })).toBe(false)
+  })
 
   it('rebuildPageMetrics recomputes layout without reopening or destroying the document', async () => {
     const state = await session.rebuildPageMetrics(640)
@@ -798,6 +813,7 @@ describe('PdfDocumentSession', () => {
 
   it('restores cached OCR before PageSession commit notification and indexing', async () => {
     const ocrEntry = createOcrEntry(1)
+    expect(isCompatibleCachedOcrEntry(ocrEntry)).toBe(true)
     pdfCacheManager.loadDocument.mockResolvedValue({ translations: {}, ocr: { 1: ocrEntry } })
     session.pageMetrics = [
       { pageNumber: 1, width: 100, height: 200, naturalWidth: 100, naturalHeight: 200, scale: 1 }
@@ -896,9 +912,11 @@ describe('PdfDocumentSession', () => {
   })
 
   it('skips corrupt cached OCR entries safely', async () => {
+    const invalidOcrEntry = { ocrLanguage: 'eng', ocrBlocks: null }
+    expect(isCompatibleCachedOcrEntry(invalidOcrEntry)).toBe(false)
     pdfCacheManager.loadDocument.mockResolvedValue({
       translations: {},
-      ocr: { 1: { ocrLanguage: 'eng', ocrBlocks: null } }
+      ocr: { 1: invalidOcrEntry }
     })
     session.pageMetrics = [
       { pageNumber: 1, width: 100, height: 200, naturalWidth: 100, naturalHeight: 200, scale: 1 }
