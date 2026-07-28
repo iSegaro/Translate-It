@@ -1,8 +1,6 @@
 import { isCompatibleEntry } from './PdfTranslationCompatibility.js'
 import { normalizeStructuredCells } from './PdfStructuredCells.js'
 
-export { normalizeStructuredCells } from './PdfStructuredCells.js'
-
 function deriveTranslatedTextFromStructuredCells(translatedCells = []) {
   if (!Array.isArray(translatedCells) || translatedCells.length === 0) return ''
 

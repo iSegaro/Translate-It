@@ -9,7 +9,7 @@ import { getPdfTranslationFailureReason } from '@/features/pdf-translation/core/
 import { pdfCacheManager } from '@/features/pdf-translation/core/PdfCacheManager.js'
 import { pdfHistoryManager } from '@/features/pdf-translation/core/PdfHistoryManager.js'
 import { sha256HexFromText } from '@/features/pdf-translation/core/PdfBlockIdentity.js'
-import { normalizeStructuredCells } from '@/features/pdf-translation/core/PdfTranslationCacheRestore.js'
+import { normalizeStructuredCells } from '@/features/pdf-translation/core/PdfStructuredCells.js'
 
 const logger = getScopedLogger(LOG_COMPONENTS.PDF, 'usePdfViewerController')
 const pdfTranslationCoordinator = new PdfTranslationCoordinator(pdfDocumentSession)
