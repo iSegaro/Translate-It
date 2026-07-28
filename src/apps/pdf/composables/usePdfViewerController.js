@@ -232,9 +232,7 @@ export function usePdfViewerController() {
 
   const hasTranslationContent = computed(() => {
     translationTick?.value
-    for (const state of pdfDocumentSession.translationStates.values()) {
-      if (state.status === 'translated') return true
-    }
+    if (pdfDocumentSession.hasAnyTranslatedBlocks()) return true
     for (const page of _pageDataMap.values()) {
       if (page.blocks.length > 0) return true
     }
