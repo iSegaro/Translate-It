@@ -126,6 +126,7 @@ export class PdfDocumentSession extends ResourceTracker {
     this._naturalPageViewports = new Map()
     this._documentGeneration = 0
     this._documentCacheGeneration = 0
+    this._documentCacheSnapshotEpoch = 0
     this._documentCachePromise = Promise.resolve({ ocr: {} })
     this._documentCacheSnapshot = { ocr: {} }
   }
@@ -171,6 +172,7 @@ export class PdfDocumentSession extends ResourceTracker {
 
   invalidateDocumentCacheSnapshot(generation = this._documentGeneration) {
     const emptyCache = this._emptyDocumentCache()
+    this._documentCacheSnapshotEpoch += 1
     this._documentCacheGeneration = generation
     this._documentCacheSnapshot = emptyCache
     this._documentCachePromise = Promise.resolve(emptyCache)
@@ -179,6 +181,7 @@ export class PdfDocumentSession extends ResourceTracker {
 
   _startDocumentCacheLoad(documentIdentity, generation = this._documentGeneration) {
     const emptyCache = this.invalidateDocumentCacheSnapshot(generation)
+    const snapshotEpoch = this._documentCacheSnapshotEpoch
 
     if (!documentIdentity) {
       return this._documentCachePromise
@@ -186,7 +189,7 @@ export class PdfDocumentSession extends ResourceTracker {
 
     this._documentCachePromise = pdfCacheManager.loadDocument(documentIdentity)
       .then((cache) => {
-        if (!this._isDocumentGenerationCurrent(generation)) {
+        if (!this._isDocumentGenerationCurrent(generation) || snapshotEpoch !== this._documentCacheSnapshotEpoch) {
           return emptyCache
         }
 
@@ -207,12 +210,13 @@ export class PdfDocumentSession extends ResourceTracker {
   }
 
   async _getDocumentCacheSnapshot(generation) {
+    const snapshotEpoch = this._documentCacheSnapshotEpoch
     if (generation !== this._documentCacheGeneration) {
       return this._emptyDocumentCache()
     }
 
     const cache = await this._documentCachePromise
-    if (!this._isDocumentGenerationCurrent(generation)) {
+    if (!this._isDocumentGenerationCurrent(generation) || snapshotEpoch !== this._documentCacheSnapshotEpoch) {
       return this._emptyDocumentCache()
     }
 

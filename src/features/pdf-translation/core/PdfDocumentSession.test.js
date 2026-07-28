@@ -936,6 +936,68 @@ describe('PdfDocumentSession', () => {
     expect(session.pageSessions.get(1)).toBe(pageSession)
   })
 
+  it('ignores an in-flight cache load after snapshot invalidation', async () => {
+    let resolveCache
+    pdfCacheManager.loadDocument.mockReturnValue(new Promise((resolve) => {
+      resolveCache = resolve
+    }))
+    session.documentIdentity = 'doc-cache-clear'
+
+    const cacheLoad = session._startDocumentCacheLoad(session.documentIdentity, session.documentGeneration)
+    session.invalidateDocumentCacheSnapshot()
+    resolveCache({ translations: {}, ocr: { 1: createOcrEntry(1) } })
+    await cacheLoad
+
+    expect(session._documentCacheSnapshot).toEqual({ ocr: {} })
+    await expect(session.getDocumentCacheSnapshot()).resolves.toEqual({ ocr: {} })
+  })
+
+  it('does not restore stale OCR after snapshot invalidation', async () => {
+    let resolveCache
+    pdfCacheManager.loadDocument.mockReturnValue(new Promise((resolve) => {
+      resolveCache = resolve
+    }))
+    session.pageMetrics = [
+      { pageNumber: 1, width: 100, height: 200, naturalWidth: 100, naturalHeight: 200, scale: 1 }
+    ]
+    session.documentIdentity = 'doc-cache-clear'
+    session.pdfDocument = {
+      numPages: 1,
+      getPage: vi.fn(async () => createScannedPage(1))
+    }
+    session._startDocumentCacheLoad(session.documentIdentity, session.documentGeneration)
+    const hydration = session.getPageSession(1)
+    await Promise.resolve()
+
+    session.invalidateDocumentCacheSnapshot()
+    resolveCache({ translations: {}, ocr: { 1: createOcrEntry(1) } })
+
+    expect((await hydration).ocrBlocks).toEqual([])
+  })
+
+  it('restores OCR from a cache load started after snapshot invalidation', async () => {
+    let resolveStaleCache
+    pdfCacheManager.loadDocument
+      .mockReturnValueOnce(new Promise((resolve) => {
+        resolveStaleCache = resolve
+      }))
+      .mockResolvedValueOnce({ translations: {}, ocr: { 1: createOcrEntry(1) } })
+    session.pageMetrics = [
+      { pageNumber: 1, width: 100, height: 200, naturalWidth: 100, naturalHeight: 200, scale: 1 }
+    ]
+    session.documentIdentity = 'doc-cache-clear'
+    session.pdfDocument = {
+      numPages: 1,
+      getPage: vi.fn(async () => createScannedPage(1))
+    }
+    session._startDocumentCacheLoad(session.documentIdentity, session.documentGeneration)
+    session.invalidateDocumentCacheSnapshot()
+    await session._startDocumentCacheLoad(session.documentIdentity, session.documentGeneration)
+    resolveStaleCache({ translations: {}, ocr: {} })
+
+    expect((await session.getPageSession(1)).ocrBlocks).toEqual(createOcrEntry(1).ocrBlocks)
+  })
+
   it('does not apply stale cache result after different document opens', async () => {
     let resolveCache
     pdfCacheManager.loadDocument.mockReturnValue(new Promise((resolve) => {
