@@ -9,7 +9,6 @@ import { getPdfTranslationFailureReason } from '@/features/pdf-translation/core/
 import { pdfCacheManager } from '@/features/pdf-translation/core/PdfCacheManager.js'
 import { pdfHistoryManager } from '@/features/pdf-translation/core/PdfHistoryManager.js'
 import { sha256HexFromText } from '@/features/pdf-translation/core/PdfBlockIdentity.js'
-import { normalizeStructuredCells } from '@/features/pdf-translation/core/PdfStructuredCells.js'
 
 const logger = getScopedLogger(LOG_COMPONENTS.PDF, 'usePdfViewerController')
 const pdfTranslationCoordinator = new PdfTranslationCoordinator(pdfDocumentSession)
@@ -346,7 +345,6 @@ export function usePdfViewerController() {
         targetLanguage: pdfTargetLanguage.value,
         translationIntent
       })
-      await saveTranslationsToCache()
       pdfHistoryManager.updateAfterTranslation(pdfDocumentSession).catch(() => {})
       return true
     } catch (translateError) {
@@ -364,54 +362,6 @@ export function usePdfViewerController() {
     } finally {
       translationTick.value += 1
       isTranslating.value = false
-    }
-  }
-
-  async function saveTranslationsToCache() {
-    const documentIdentity = pdfDocumentSession.documentIdentity
-    if (!documentIdentity) return
-
-    const hashCache = new Map()
-    const entries = {}
-    for (const state of pdfDocumentSession.getTranslatedBlockPersistenceRecords()) {
-      const blockId = state.blockId
-
-      const entrySourceLanguage = state.sourceLanguage || ''
-      const entryTargetLanguage = state.targetLanguage || ''
-      const entryProvider = state.provider || ''
-      const cacheKey = `${entryProvider}|${entrySourceLanguage}|${entryTargetLanguage}`
-      let translationSettingsHash = hashCache.get(cacheKey)
-      if (!translationSettingsHash) {
-        const optimizationLevel = await getProviderOptimizationLevelAsync(entryProvider)
-        const result = await buildTranslationSettings({
-          provider: entryProvider,
-          sourceLanguage: entrySourceLanguage,
-          targetLanguage: entryTargetLanguage,
-          optimizationLevel
-        })
-        translationSettingsHash = result.translationSettingsHash
-        hashCache.set(cacheKey, translationSettingsHash)
-      }
-
-      const translatedCells = normalizeStructuredCells(state.translatedCells)
-      entries[blockId] = {
-        blockId,
-        documentIdentity,
-        pageNumber: state.pageNumber || 0,
-        sourceTextHash: state.sourceTextHash || '',
-        translatedText: state.translatedText || '',
-        ...(translatedCells && { translatedCells }),
-        status: state.status,
-        provider: entryProvider,
-        sourceLanguage: entrySourceLanguage,
-        targetLanguage: entryTargetLanguage,
-        translationSettingsHash,
-        updatedAt: state.updatedAt || Date.now()
-      }
-    }
-
-    if (Object.keys(entries).length > 0) {
-      await pdfCacheManager.saveTranslations(documentIdentity, entries)
     }
   }
 

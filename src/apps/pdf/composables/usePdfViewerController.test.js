@@ -375,56 +375,9 @@ describe('usePdfViewerController cache persistence', () => {
     expect(session.setBlockTranslationState).not.toHaveBeenCalled()
   })
 
-  it('saves translatedCells and translationSettingsHash to cache', async () => {
+  it('keeps completed translations in memory without persistence', async () => {
     const block = createBlock()
     const { controller } = await loadControllerWithCacheEntry(null, block)
-
-    session.translationStates.set(block.id, {
-      blockId: block.id,
-      pageNumber: 1,
-      translatedText: 'درآمد',
-      translatedCells: [
-        {
-          lineIndex: 0,
-          cells: ['درآمد'],
-          structuredCells: [
-            {
-              id: 'cell-2',
-              regionId: 'region-2',
-              rowIndex: 0,
-              columnIndex: 0,
-              rowSpan: 1,
-              colSpan: 1,
-              spanType: 'none',
-              role: 'value',
-              text: 'Revenue',
-              boundingBox: { x: 60, y: 120, width: 120, height: 18 },
-              sourceReferences: {
-                blockIds: ['block-a'],
-                lineIds: [],
-                sourceLineIndices: [0],
-                sourceItemIndices: [0],
-                groupRegionIds: []
-              },
-              blockIds: ['block-a'],
-              lineIds: [],
-              sourceLineIndex: 0,
-              sourceItemIndex: 0,
-              spanCandidate: false,
-              estimatedRowSpan: 1,
-              estimatedColSpan: 1,
-              confidence: 0.9
-            }
-          ]
-        }
-      ],
-      status: 'translated',
-      provider: 'googlev2',
-      sourceLanguage: 'auto',
-      targetLanguage: 'fa',
-      sourceTextHash: block.sourceTextHash,
-      updatedAt: 123
-    })
 
     translateVisibleBlocksMock.mockResolvedValue({
       status: 'translated',
@@ -438,12 +391,9 @@ describe('usePdfViewerController cache persistence', () => {
 
     await controller.translateVisiblePages()
 
-    expect(saveTranslationsMock).toHaveBeenCalledTimes(1)
-    const [documentIdentity, entries] = saveTranslationsMock.mock.calls[0]
-    expect(documentIdentity).toBe('doc-1')
-    expect(entries[block.id].translatedCells).toHaveLength(1)
-    expect(entries[block.id].translatedCells[0].structuredCells[0].id).toBe('cell-2')
-    expect(entries[block.id].translationSettingsHash).toHaveLength(64)
+    expect(controller.translationSummary.value).toMatchObject({ status: 'translated', translatedCount: 1 })
+    expect(updateAfterTranslationMock).toHaveBeenCalledWith(session)
+    expect(saveTranslationsMock).not.toHaveBeenCalled()
   })
 
   it('forwards the layout object to openFile and recomputeLayout', async () => {
