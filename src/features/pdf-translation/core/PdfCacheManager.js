@@ -58,15 +58,6 @@ export class PdfCacheManager {
     }
   }
 
-  async clearAll() {
-    try {
-      await storageCore.set({ [STORAGE_KEY]: {} })
-      logger.info('Cleared all PDF document cache')
-    } catch (error) {
-      logger.warn('Failed to clear all PDF cache:', error)
-    }
-  }
-
   async getStats() {
     try {
       const cache = await storageCore.get(STORAGE_KEY) || {}

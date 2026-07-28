@@ -387,11 +387,6 @@ export function usePdfViewerController() {
     logger.info('Cleared document cache:', { documentIdentity })
   }
 
-  async function clearAllPdfCache() {
-    await pdfCacheManager.clearAll()
-    logger.info('Cleared all PDF cache')
-  }
-
   function clearError() {
     error.value = ''
   }
@@ -436,7 +431,6 @@ export function usePdfViewerController() {
     refreshTranslatedPageBlocks,
     cancelTranslation,
     clearDocumentCache,
-    clearAllPdfCache,
     clearError,
     cleanup,
     resetLoadedDocument

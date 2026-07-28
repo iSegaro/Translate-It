@@ -65,13 +65,6 @@ describe('PdfCacheManager', () => {
     expect(saved['doc-2']).toBeDefined()
   })
 
-  it('clearAll empties the entire cache', async () => {
-    mockStorage.pdfDocumentCache = { 'doc-1': { ocr: { '1': {} } } }
-
-    await manager.clearAll()
-    expect(mockStorage.pdfDocumentCache).toEqual({})
-  })
-
   it('getStats returns document and OCR page counts', async () => {
     mockStorage.pdfDocumentCache = {
       'doc-1': {
