@@ -432,7 +432,7 @@ export function usePdfViewerController() {
     pdfDocumentSession._bitmapCache?.clear()
 
     // 3. In-memory document cache snapshot (prevents stale restores)
-    pdfDocumentSession._documentCacheSnapshot = pdfDocumentSession._emptyDocumentCache()
+    pdfDocumentSession.invalidateDocumentCacheSnapshot()
 
     // 4. Translation state + UI overlay
     pdfDocumentSession.resetTranslationStates()
