@@ -460,4 +460,60 @@ describe('pdfCanvasSampler', () => {
     const lum = 0.299 * Number(match[1]) + 0.587 * Number(match[2]) + 0.114 * Number(match[3])
     expect(lum).toBeGreaterThanOrEqual(200)
   })
+
+  it('maintains backward compatibility without raster options', () => {
+    const canvas = createUniformMockCanvas(200, 200, 200)
+    const bbox = { x: 10, y: 10, width: 100, height: 100 }
+    const color = sampleCanvasBackgroundColor(canvas, bbox, 1, 'block-backward')
+    expect(color).toBe('rgb(200, 200, 200)')
+  })
+
+  it('maps logical coordinates through raster scaling', () => {
+    const getImageData = vi.fn(() => ({ data: [200, 200, 200, 255] }))
+    const canvas = {
+      width: 400,
+      height: 300,
+      getContext: vi.fn(() => ({ getImageData }))
+    }
+    const bbox = { x: 100, y: 200, width: 200, height: 100 }
+
+    sampleCanvasBackgroundColor(canvas, bbox, 1, 'block-raster', { rasterScaleX: 0.5, rasterScaleY: 0.5 })
+
+    const calls = getImageData.mock.calls
+    expect(calls.length).toBeGreaterThan(0)
+    const centerCall = calls[0]
+    expect(centerCall[0]).toBe(Math.round(100 * 1 * 0.5 + 200 * 1 * 0.5 / 2))
+    expect(centerCall[1]).toBe(Math.round(200 * 1 * 0.5 + 100 * 1 * 0.5 / 2))
+  })
+
+  it('separates cache entries for different raster densities', () => {
+    const mockCtx = { getImageData: vi.fn(() => ({ data: [200, 200, 200, 255] })) }
+    const canvas = { width: 200, height: 200, getContext: vi.fn(() => mockCtx) }
+    const bbox = { x: 10, y: 20, width: 100, height: 30 }
+
+    sampleCanvasBackgroundColor(canvas, bbox, 1, 'block-raster-cache', { rasterScaleX: 1, rasterScaleY: 1 })
+    expect(mockCtx.getImageData).toHaveBeenCalledTimes(14)
+
+    sampleCanvasBackgroundColor(canvas, bbox, 1, 'block-raster-cache', { rasterScaleX: 0.5, rasterScaleY: 0.5 })
+    expect(mockCtx.getImageData).toHaveBeenCalledTimes(28)
+  })
+
+  it('clamps coordinates after raster scaling', () => {
+    const getImageData = vi.fn(() => ({ data: [200, 200, 200, 255] }))
+    const canvas = {
+      width: 100,
+      height: 100,
+      getContext: vi.fn(() => ({ getImageData }))
+    }
+    const bbox = { x: -10, y: -10, width: 300, height: 300 }
+
+    sampleCanvasBackgroundColor(canvas, bbox, 1, 'block-raster-clamp', { rasterScaleX: 0.5, rasterScaleY: 0.5 })
+
+    for (const call of getImageData.mock.calls) {
+      expect(call[0]).toBeGreaterThanOrEqual(0)
+      expect(call[0]).toBeLessThanOrEqual(99)
+      expect(call[1]).toBeGreaterThanOrEqual(0)
+      expect(call[1]).toBeLessThanOrEqual(99)
+    }
+  })
 })

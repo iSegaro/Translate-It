@@ -1,6 +1,13 @@
 import { mount } from '@vue/test-utils'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import PdfBlockOverlayItem from './PdfBlockOverlayItem.vue'
+
+vi.mock('../utils/pdfCanvasSampler.js', () => ({
+  sampleCanvasBackgroundColor: vi.fn(() => 'rgb(255, 255, 255)'),
+  clearColorCache: vi.fn()
+}))
+
+const { sampleCanvasBackgroundColor } = await import('../utils/pdfCanvasSampler.js')
 
 describe('PdfBlockOverlayItem', () => {
   it('renders translated text', () => {
@@ -1566,5 +1573,57 @@ describe('PdfBlockOverlayItem', () => {
       const mode = wrapper.find('.pdf-block-overlay-item')
       expect(mode.attributes('data-pdf-overlay-mode')).toBe('cell')
     })
+  })
+
+  it('passes raster scale ratios derived from canvas and page metric', () => {
+    sampleCanvasBackgroundColor.mockClear()
+
+    const canvas = { width: 400, height: 300, getContext: vi.fn() }
+    mount(PdfBlockOverlayItem, {
+      props: {
+        block: {
+          id: 'block-raster',
+          boundingBox: { x: 10, y: 20, width: 200, height: 40 },
+          roleMetadata: { fontSize: 12 },
+          translationState: { status: 'translated', translatedText: 'Raster Test' }
+        },
+        pageMetric: { scale: 1, width: 800, height: 600 },
+        canvas
+      }
+    })
+
+    expect(sampleCanvasBackgroundColor).toHaveBeenCalledWith(
+      canvas,
+      expect.any(Object),
+      1,
+      'block-raster',
+      { rasterScaleX: 0.5, rasterScaleY: 0.5 }
+    )
+  })
+
+  it('falls back to identity raster ratio when canvas or page metric is unavailable', () => {
+    sampleCanvasBackgroundColor.mockClear()
+
+    const canvas = { width: 0, height: 0, getContext: vi.fn() }
+    mount(PdfBlockOverlayItem, {
+      props: {
+        block: {
+          id: 'block-fallback',
+          boundingBox: { x: 10, y: 20, width: 200, height: 40 },
+          roleMetadata: { fontSize: 12 },
+          translationState: { status: 'translated', translatedText: 'Fallback' }
+        },
+        pageMetric: { scale: 1 },
+        canvas
+      }
+    })
+
+    expect(sampleCanvasBackgroundColor).toHaveBeenCalledWith(
+      canvas,
+      expect.any(Object),
+      1,
+      'block-fallback',
+      { rasterScaleX: 1, rasterScaleY: 1 }
+    )
   })
 })

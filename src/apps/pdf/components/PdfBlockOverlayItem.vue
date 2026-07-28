@@ -99,6 +99,18 @@ const CELL_GAP_EXPANSION_RATIO = 0.4
 
 const scale = computed(() => props.pageMetric?.scale || 1)
 
+const rasterScaleX = computed(() => {
+  if (!props.canvas || !props.pageMetric?.width) return 1
+  const ratio = props.canvas.width / props.pageMetric.width
+  return Number.isFinite(ratio) && ratio > 0 ? ratio : 1
+})
+
+const rasterScaleY = computed(() => {
+  if (!props.canvas || !props.pageMetric?.height) return 1
+  const ratio = props.canvas.height / props.pageMetric.height
+  return Number.isFinite(ratio) && ratio > 0 ? ratio : 1
+})
+
 const backgroundColor = computed(() => {
   if (!props.canvas || !props.block.boundingBox) return OVERLAY_BACKGROUND
 
@@ -106,7 +118,11 @@ const backgroundColor = computed(() => {
     props.canvas,
     props.block.boundingBox,
     scale.value,
-    props.block.id
+    props.block.id,
+    {
+      rasterScaleX: rasterScaleX.value,
+      rasterScaleY: rasterScaleY.value
+    }
   )
 })
 

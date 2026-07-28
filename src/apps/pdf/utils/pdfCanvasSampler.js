@@ -4,8 +4,8 @@ const NEAR_WHITE_LUMINANCE = 245
 
 const colorCache = new Map()
 
-function cacheKey(blockId, scale) {
-  return `${blockId}:${scale}`
+function cacheKey(blockId, scale, rasterScaleX, rasterScaleY) {
+  return `${blockId}:${scale}:${rasterScaleX}:${rasterScaleY}`
 }
 
 function rgbaToRgb(r, g, b) {
@@ -132,10 +132,10 @@ function buildSamplePoints(bboxX, bboxY, bboxW, bboxH, canvasW, canvasH) {
   }))
 }
 
-export function sampleCanvasBackgroundColor(canvas, boundingBox, scale, blockId) {
+export function sampleCanvasBackgroundColor(canvas, boundingBox, scale, blockId, { rasterScaleX = 1, rasterScaleY = 1 } = {}) {
   if (!canvas || !boundingBox) return FALLBACK_COLOR
 
-  const key = cacheKey(blockId, scale)
+  const key = cacheKey(blockId, scale, rasterScaleX, rasterScaleY)
   const cached = colorCache.get(key)
   if (cached !== undefined) return cached
 
@@ -159,10 +159,10 @@ export function sampleCanvasBackgroundColor(canvas, boundingBox, scale, blockId)
     return FALLBACK_COLOR
   }
 
-  const bboxX = clamp(Math.round(boundingBox.x * scale), 0, canvasW - 1)
-  const bboxY = clamp(Math.round(boundingBox.y * scale), 0, canvasH - 1)
-  const bboxW = Math.round(boundingBox.width * scale)
-  const bboxH = Math.round(boundingBox.height * scale)
+  const bboxX = clamp(Math.round(boundingBox.x * scale * rasterScaleX), 0, canvasW - 1)
+  const bboxY = clamp(Math.round(boundingBox.y * scale * rasterScaleY), 0, canvasH - 1)
+  const bboxW = Math.round(boundingBox.width * scale * rasterScaleX)
+  const bboxH = Math.round(boundingBox.height * scale * rasterScaleY)
 
   if (bboxW <= 0 || bboxH <= 0) {
     colorCache.set(key, FALLBACK_COLOR)
