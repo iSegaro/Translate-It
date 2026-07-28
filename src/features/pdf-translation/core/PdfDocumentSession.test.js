@@ -85,6 +85,41 @@ describe('PdfDocumentSession', () => {
     expect(session.hasAnyTranslatedBlocks()).toBe(false)
   })
 
+  it('returns immutable translated block persistence records', () => {
+    session.setBlockTranslationState('block-1', {
+      status: 'translated',
+      pageNumber: 2,
+      translatedText: 'Hola',
+      translatedCells: [{ lineIndex: 0, cells: ['Hola'] }],
+      provider: 'googlev2',
+      sourceLanguage: 'en',
+      targetLanguage: 'es',
+      sourceTextHash: 'source-hash',
+      updatedAt: 123
+    })
+
+    const records = session.getTranslatedBlockPersistenceRecords()
+
+    expect(records).toEqual([{
+      blockId: 'block-1',
+      pageNumber: 2,
+      translatedText: 'Hola',
+      translatedCells: [{ lineIndex: 0, cells: ['Hola'] }],
+      status: 'translated',
+      provider: 'googlev2',
+      sourceLanguage: 'en',
+      targetLanguage: 'es',
+      sourceTextHash: 'source-hash',
+      updatedAt: 123
+    }])
+    expect(Object.isFrozen(records)).toBe(true)
+    expect(Object.isFrozen(records[0])).toBe(true)
+
+    records[0].translatedCells[0].cells[0] = 'Changed'
+
+    expect(session.getBlockTranslationState('block-1').translatedCells[0].cells[0]).toBe('Hola')
+  })
+
   function createScannedPage(pageNumber = 1) {
     return {
       pageNumber,

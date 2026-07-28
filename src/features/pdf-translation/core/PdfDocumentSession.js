@@ -64,6 +64,16 @@ function arePageSetsEqual(first, second) {
   return true
 }
 
+function cloneTranslationPersistenceValue(value) {
+  if (value == null) return value
+
+  if (typeof globalThis.structuredClone === 'function') {
+    return globalThis.structuredClone(value)
+  }
+
+  return JSON.parse(JSON.stringify(value))
+}
+
 function normalizeLayoutRequest(layoutRequest = null) {
   if (typeof layoutRequest === 'number') {
     return {
@@ -647,6 +657,28 @@ export class PdfDocumentSession extends ResourceTracker {
 
   resetTranslationStates() {
     this._translationState.resetTranslationStates()
+  }
+
+  getTranslatedBlockPersistenceRecords() {
+    const records = []
+    for (const state of this._translationState.values()) {
+      if (state.status !== 'translated') continue
+
+      records.push(Object.freeze({
+        blockId: state.blockId,
+        pageNumber: state.pageNumber || 0,
+        translatedText: state.translatedText || '',
+        translatedCells: cloneTranslationPersistenceValue(state.translatedCells),
+        status: 'translated',
+        provider: state.provider || '',
+        sourceLanguage: state.sourceLanguage || '',
+        targetLanguage: state.targetLanguage || '',
+        sourceTextHash: state.sourceTextHash || '',
+        updatedAt: state.updatedAt || 0
+      }))
+    }
+
+    return Object.freeze(records)
   }
 
   getVisibleTranslationStates() {
