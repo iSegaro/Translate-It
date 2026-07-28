@@ -345,7 +345,7 @@ describe('PdfToolbar', () => {
     expect(wrapper.findAll('.pdf-toolbar__flyout .pdf-toolbar__menu-row')).toHaveLength(3)
   })
 
-  it('keeps Open PDF, Clear Cache, and Export inside the hamburger menu', async () => {
+  it('keeps Open PDF and Export inside the hamburger menu', async () => {
     const wrapper = mount(PdfToolbar, {
       props: {
         fileName: 'demo.pdf',
@@ -374,17 +374,13 @@ describe('PdfToolbar', () => {
     await wrapper.find('.pdf-toolbar__button[aria-label="More actions"]').trigger('click')
     expect(wrapper.find('.pdf-toolbar__export-menu').exists()).toBe(true)
     expect(wrapper.find('.pdf-toolbar__export-menu').text()).toContain('Open PDF')
-    expect(wrapper.find('.pdf-toolbar__export-menu').text()).toContain('Clear Cache')
+    expect(wrapper.find('.pdf-toolbar__export-menu').text()).not.toContain('Clear Cache')
     expect(wrapper.find('.pdf-toolbar__export-menu').text()).toContain('Export TXT')
     expect(wrapper.find('.pdf-toolbar__export-menu').text()).toContain('Export Markdown')
     expect(wrapper.find('.pdf-toolbar__export-menu').text()).toContain('Export HTML')
 
     await wrapper.find('.pdf-toolbar__export-menu button').trigger('click')
     expect(wrapper.emitted('request-open-pdf')).toHaveLength(1)
-
-    await wrapper.find('.pdf-toolbar__button[aria-label="More actions"]').trigger('click')
-    await wrapper.find('.pdf-toolbar__export-menu button:nth-child(2)').trigger('click')
-    expect(wrapper.emitted('clear-cache')).toBeTruthy()
 
     // Export items inside hamburger menu — no standalone export button
     await wrapper.find('.pdf-toolbar__button[aria-label="More actions"]').trigger('click')

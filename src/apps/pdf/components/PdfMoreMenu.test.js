@@ -18,13 +18,25 @@ describe('PdfMoreMenu', () => {
     expect(menu.text()).toContain('PDF Information')
     expect(menu.text()).toContain('Export')
     expect(menu.text()).toContain('Settings')
-    expect(menu.text()).toContain('Clear Cache')
+    expect(menu.text()).not.toContain('Clear Cache')
     expect(menu.text()).toContain('Language: EN → FA')
   })
 
-  it('hides Clear Cache when fileName is empty', () => {
+  it('shows Clear Cache inside the Developer section when debug mode is enabled', () => {
     const wrapper = mount(PdfMoreMenu, {
-      props: { fileName: '', canExport: true }
+      props: {
+        fileName: 'test.pdf',
+        canExport: true,
+        isDebugMode: true
+      }
+    })
+
+    expect(wrapper.find('.pdf-toolbar__export-menu').text()).toContain('Clear Cache')
+  })
+
+  it('hides Clear Cache when isDebugMode is false', () => {
+    const wrapper = mount(PdfMoreMenu, {
+      props: { fileName: 'test.pdf', canExport: true, isDebugMode: false }
     })
 
     expect(wrapper.find('.pdf-toolbar__export-menu').text()).not.toContain('Clear Cache')

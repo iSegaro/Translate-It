@@ -112,14 +112,6 @@
         >
           <span class="pdf-toolbar__menu-row-label">Settings</span>
         </button>
-        <button
-          v-if="fileName"
-          class="pdf-toolbar__export-item pdf-toolbar__menu-row"
-          type="button"
-          @click="close(); handleClearCacheAction()"
-        >
-          <span class="pdf-toolbar__menu-row-label">Clear Cache</span>
-        </button>
         <div
           v-if="isDebugMode"
           class="pdf-toolbar__menu-section"
@@ -142,6 +134,14 @@
             @click="close(); handleExportRegionComparisonArtifactAction()"
           >
             <span class="pdf-toolbar__menu-row-label">Export Region Comparison Artifact</span>
+          </button>
+          <button
+            v-if="fileName"
+            class="pdf-toolbar__export-item pdf-toolbar__menu-row"
+            type="button"
+            @click="close(); handleClearCacheAction()"
+          >
+            <span class="pdf-toolbar__menu-row-label">Clear Cache</span>
           </button>
         </div>
       </div>
