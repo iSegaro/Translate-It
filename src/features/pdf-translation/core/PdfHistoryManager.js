@@ -68,20 +68,13 @@ export class PdfHistoryManager {
   async updateAfterTranslation(session) {
     if (!session?.documentIdentity) return
 
-    const translatedStates = [...session.translationStates.values()]
-      .filter((s) => s.status === 'translated')
-
-    const translatedBlockCount = translatedStates.length
-
-    const translatedPageCount = new Set(
-      translatedStates
-        .map((s) => s.pageNumber || 0)
-        .filter((p) => p > 0)
-    ).size
-
-    const provider = translatedStates.find((s) => s.provider)?.provider || ''
-    const sourceLanguage = translatedStates.find((s) => s.sourceLanguage)?.sourceLanguage || ''
-    const targetLanguage = translatedStates.find((s) => s.targetLanguage)?.targetLanguage || ''
+    const {
+      translatedBlockCount,
+      translatedPageCount,
+      provider,
+      sourceLanguage,
+      targetLanguage
+    } = session.getTranslationHistoryMetadata()
 
     await this.upsert({
       documentIdentity: session.documentIdentity,
