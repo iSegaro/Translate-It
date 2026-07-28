@@ -10,7 +10,6 @@ import { pdfCacheManager } from '@/features/pdf-translation/core/PdfCacheManager
 import { pdfHistoryManager } from '@/features/pdf-translation/core/PdfHistoryManager.js'
 import { sha256HexFromText } from '@/features/pdf-translation/core/PdfBlockIdentity.js'
 import { restoreCachedPdfTranslations, normalizeStructuredCells } from '@/features/pdf-translation/core/PdfTranslationCacheRestore.js'
-import { createTranslationRestoreContext } from '@/features/pdf-translation/core/PdfTranslationRestoreContext.js'
 
 const logger = getScopedLogger(LOG_COMPONENTS.PDF, 'usePdfViewerController')
 const pdfTranslationCoordinator = new PdfTranslationCoordinator(pdfDocumentSession)
@@ -55,28 +54,7 @@ export function usePdfViewerController() {
 
   const _blockIndex = new Map()
 
-  let translationRestoreContext = null
   let disposed = false
-
-  function createRestoreContext() {
-    translationRestoreContext?.dispose?.()
-    const resolveSettings = async () => {
-      const provider = await getEffectiveProviderAsync(TranslationMode.PDF)
-      const optimizationLevel = await getProviderOptimizationLevelAsync(provider)
-      return buildTranslationSettings({
-        provider,
-        sourceLanguage: pdfSourceLanguage.value,
-        targetLanguage: pdfTargetLanguage.value,
-        optimizationLevel
-      })
-    }
-    translationRestoreContext = createTranslationRestoreContext({
-      documentGeneration: pdfDocumentSession.documentGeneration,
-      getDocumentGeneration: () => pdfDocumentSession.documentGeneration,
-      resolveSettings
-    })
-    return translationRestoreContext
-  }
 
   function _buildBlocksForLogicalBlocks(logicalBlocks = []) {
     const blocks = []
@@ -349,7 +327,6 @@ export function usePdfViewerController() {
       currentFile.value = file
 
       const nextState = await pdfDocumentSession.openFile(file, layoutRequest)
-      createRestoreContext()
       applySessionState(nextState)
 
       pdfHistoryManager.updateAfterOpen(pdfDocumentSession).catch(() => {})
@@ -518,8 +495,6 @@ export function usePdfViewerController() {
 
   async function cleanup() {
     disposed = true
-    translationRestoreContext?.dispose?.()
-    translationRestoreContext = null
     await pdfTranslationCoordinator.cancelActiveTranslation('viewer-cleanup')
     await pdfDocumentSession.destroy()
     resetLoadedDocument()

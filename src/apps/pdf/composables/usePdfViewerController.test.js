@@ -319,12 +319,6 @@ describe('usePdfViewerController cache persistence', () => {
     expect(controller.restoredTranslationCount.value).toBe(0)
   })
 
-  it('resolves restore provider via getEffectiveProviderAsync(PDF)', async () => {
-    const block = createBlock()
-    await loadControllerWithCacheEntry(null, block)
-    expect(getEffectiveProviderAsyncMock).toHaveBeenCalledWith('pdf-translation')
-  })
-
   it('does not restore OCR from the controller cache path', async () => {
     session.getDocumentCacheSnapshot.mockResolvedValue({
       translations: {},
