@@ -566,6 +566,7 @@ import fitPageIcon from '@/icons/ui/fit-page.svg?url'
 import fitWidthIcon from '@/icons/ui/fit-width.svg?url'
 import infoIcon from '@/icons/ui/info.svg?url'
 import dropdownArrowIcon from '@/icons/ui/dropdown-arrow.svg?url'
+import { PDF_ZOOM_PERCENT_OPTIONS } from '../constants/pdfZoomConstants.js'
 import './PdfToolbar.scss'
 
 const TOOLTIP_OUTLINE = 'Toggle outline'
@@ -787,7 +788,7 @@ const activeMenu = ref(null)
 const isExportSubmenuOpen = ref(false)
 const exportTriggerRef = ref(null)
 const exportFlyoutRef = ref(null)
-const zoomPercentOptions = [50, 75, 100, 125, 150, 200, 250, 300, 400]
+const zoomPercentOptions = PDF_ZOOM_PERCENT_OPTIONS
 
 const allContentOptions = [
   { value: CONTENT_VIEW.ORIGINAL, label: 'Original' },
