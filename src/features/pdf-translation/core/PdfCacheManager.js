@@ -7,48 +7,20 @@ const STORAGE_KEY = 'pdfDocumentCache'
 
 export class PdfCacheManager {
   async loadDocument(documentIdentity) {
-    if (!documentIdentity) return { translations: {}, ocr: {} }
+    if (!documentIdentity) return { ocr: {} }
 
     try {
       const cache = await storageCore.get(STORAGE_KEY) || {}
       const docCache = cache[documentIdentity]
 
       if (!docCache) {
-        return { translations: {}, ocr: {} }
+        return { ocr: {} }
       }
 
-      return {
-        translations: docCache.translations || {},
-        ocr: docCache.ocr || {}
-      }
+      return { ocr: docCache.ocr || {} }
     } catch (error) {
       logger.warn('Failed to load document cache:', error)
-      return { translations: {}, ocr: {} }
-    }
-  }
-
-  async saveTranslations(documentIdentity, entries) {
-    if (!documentIdentity || !entries || Object.keys(entries).length === 0) return
-
-    try {
-      const cache = await storageCore.get(STORAGE_KEY) || {}
-
-      if (!cache[documentIdentity]) {
-        cache[documentIdentity] = { translations: {}, ocr: {}, updatedAt: Date.now() }
-      }
-
-      for (const [blockId, entry] of Object.entries(entries)) {
-        if (entry.status === 'translated') {
-          cache[documentIdentity].translations[blockId] = entry
-        }
-      }
-
-      cache[documentIdentity].updatedAt = Date.now()
-      await storageCore.set({ [STORAGE_KEY]: cache })
-
-      logger.debug('Saved translations for document:', { documentIdentity, count: Object.keys(entries).length })
-    } catch (error) {
-      logger.warn('Failed to save translations:', error)
+      return { ocr: {} }
     }
   }
 
@@ -59,7 +31,7 @@ export class PdfCacheManager {
       const cache = await storageCore.get(STORAGE_KEY) || {}
 
       if (!cache[documentIdentity]) {
-        cache[documentIdentity] = { translations: {}, ocr: {}, updatedAt: Date.now() }
+        cache[documentIdentity] = { ocr: {}, updatedAt: Date.now() }
       }
 
       cache[documentIdentity].ocr[pageNumber] = ocrEntry
@@ -99,17 +71,15 @@ export class PdfCacheManager {
     try {
       const cache = await storageCore.get(STORAGE_KEY) || {}
       const documentCount = Object.keys(cache).length
-      let blockCount = 0
       let ocrPageCount = 0
 
       for (const doc of Object.values(cache)) {
-        blockCount += Object.keys(doc.translations || {}).length
         ocrPageCount += Object.keys(doc.ocr || {}).length
       }
 
-      return { documentCount, blockCount, ocrPageCount }
+      return { documentCount, ocrPageCount }
     } catch {
-      return { documentCount: 0, blockCount: 0, ocrPageCount: 0 }
+      return { documentCount: 0, ocrPageCount: 0 }
     }
   }
 }
