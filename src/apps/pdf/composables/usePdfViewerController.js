@@ -9,7 +9,7 @@ import { getPdfTranslationFailureReason } from '@/features/pdf-translation/core/
 import { pdfCacheManager } from '@/features/pdf-translation/core/PdfCacheManager.js'
 import { pdfHistoryManager } from '@/features/pdf-translation/core/PdfHistoryManager.js'
 import { sha256HexFromText } from '@/features/pdf-translation/core/PdfBlockIdentity.js'
-import { restoreCachedPdfTranslations, normalizeStructuredCells } from '@/features/pdf-translation/core/PdfTranslationCacheRestore.js'
+import { normalizeStructuredCells } from '@/features/pdf-translation/core/PdfTranslationCacheRestore.js'
 
 const logger = getScopedLogger(LOG_COMPONENTS.PDF, 'usePdfViewerController')
 const pdfTranslationCoordinator = new PdfTranslationCoordinator(pdfDocumentSession)
@@ -217,41 +217,6 @@ export function usePdfViewerController() {
     }
 
     return changed
-  }
-
-  async function restoreCachedTranslationsForPage(pageNumber, context) {
-    if (!context?.isCurrent?.() || !context.tryBeginPageRestore(pageNumber)) return
-
-    try {
-      const sourceBlocks = pdfDocumentSession.getPageSourceBlocks?.(pageNumber) || []
-      if (sourceBlocks.length === 0) return
-
-      const [cache, settings] = await Promise.all([
-        pdfDocumentSession.getDocumentCacheSnapshot(),
-        context.settingsHashPromise
-      ])
-
-      if (!context.isCurrent()) return
-
-      const { restoredBlockIds } = restoreCachedPdfTranslations({
-        session: pdfDocumentSession,
-        cacheTranslations: cache.translations,
-        sourceBlocks,
-        settings
-      })
-
-      if (!context.isCurrent() || disposed || restoredBlockIds.length === 0) return
-
-      restoredTranslationCount.value += restoredBlockIds.length
-      _syncMissingPageSessions()
-      _updateBlockStates(restoredBlockIds)
-      translationTick.value += 1
-      logger.info('Restored PDF translations from cache:', { pageNumber, count: restoredBlockIds.length })
-    } catch (cacheError) {
-      logger.warn('Failed to restore PDF translations from cache:', { pageNumber, error: cacheError })
-    } finally {
-      context.finishPageRestore(pageNumber)
-    }
   }
 
   pdfTranslationCoordinator.onStateChange = (updatedBlockIds) => {
