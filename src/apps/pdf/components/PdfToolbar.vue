@@ -379,154 +379,26 @@
           </option>
         </select>
         <div class="pdf-toolbar__language-settings">
-          <ToolbarMenu
-            ref="moreMenuRef"
-            class="pdf-toolbar__more-menu"
-            variant="dark"
-            @open="closeMenus"
-          >
-            <template #trigger="{ triggerAttrs, triggerRef, onToggle }">
-              <button
-                v-bind="triggerAttrs"
-                :ref="triggerRef"
-                class="pdf-toolbar__button pdf-toolbar__button--menu-trigger pdf-toolbar__button--icon-trigger"
-                type="button"
-                :aria-label="TOOLTIP_MORE"
-                :title="TOOLTIP_MORE"
-                @click="onToggle"
-                @keydown.enter.prevent="onToggle"
-                @keydown.space.prevent="onToggle"
-              >
-                <span
-                  class="pdf-toolbar__menu-trigger-icon"
-                  aria-hidden="true"
-                >
-                  <span />
-                  <span />
-                  <span />
-                </span>
-              </button>
-            </template>
-
-            <template #default="{ close }">
-              <div class="pdf-toolbar__export-menu">
-                <button
-                  class="pdf-toolbar__export-item pdf-toolbar__menu-row"
-                  type="button"
-                  @click="close(); handleOpenLanguageSettings()"
-                >
-                  <span class="pdf-toolbar__menu-row-label">Language: {{ languageSummarySource }} → {{ languageSummaryTarget }}</span>
-                </button>
-                <button
-                  class="pdf-toolbar__export-item pdf-toolbar__menu-row"
-                  type="button"
-                  :disabled="isLoading"
-                  @click="close(); handleOpenPdfAction()"
-                >
-                  <span class="pdf-toolbar__menu-row-label">{{ isLoading ? 'Loading...' : 'Open PDF' }}</span>
-                </button>
-                <button
-                  class="pdf-toolbar__export-item pdf-toolbar__menu-row"
-                  type="button"
-                  :disabled="!fileName"
-                  @click="close(); handleRequestPdfInfo()"
-                >
-                  <span class="pdf-toolbar__menu-row-label">PDF Information</span>
-                </button>
-                <div
-                  v-if="canExport"
-                  class="pdf-toolbar__menu-section pdf-toolbar__menu-section--has-flyout"
-                  role="group"
-                  aria-label="Export"
-                >
-                  <button
-                    ref="exportTriggerRef"
-                    class="pdf-toolbar__export-item pdf-toolbar__export-item--submenu-trigger pdf-toolbar__menu-row"
-                    type="button"
-                    :aria-haspopup="true"
-                    :aria-expanded="isExportSubmenuOpen"
-                    @click="isExportSubmenuOpen = !isExportSubmenuOpen"
-                  >
-                    <span class="pdf-toolbar__menu-row-label">Export</span>
-                    <span class="pdf-toolbar__submenu-chevron" />
-                  </button>
-                  <Transition name="pdf-toolbar-flyout">
-                    <div
-                      v-if="isExportSubmenuOpen"
-                      ref="exportFlyoutRef"
-                      class="pdf-toolbar__flyout"
-                      role="menu"
-                      :style="flyoutStyle"
-                    >
-                      <button
-                        class="pdf-toolbar__flyout-item pdf-toolbar__menu-row"
-                        type="button"
-                        role="menuitem"
-                        @click="close(); handleExportAction('export-txt')"
-                      >
-                        <span class="pdf-toolbar__menu-row-label">Export TXT</span>
-                      </button>
-                      <button
-                        class="pdf-toolbar__flyout-item pdf-toolbar__menu-row"
-                        type="button"
-                        role="menuitem"
-                        @click="close(); handleExportAction('export-markdown')"
-                      >
-                        <span class="pdf-toolbar__menu-row-label">Export Markdown</span>
-                      </button>
-                      <button
-                        class="pdf-toolbar__flyout-item pdf-toolbar__menu-row"
-                        type="button"
-                        role="menuitem"
-                        @click="close(); handleExportAction('export-html')"
-                      >
-                        <span class="pdf-toolbar__menu-row-label">Export HTML</span>
-                      </button>
-                    </div>
-                  </Transition>
-                </div>
-                <button
-                  class="pdf-toolbar__export-item pdf-toolbar__menu-row"
-                  type="button"
-                  @click="close(); handleOpenSettingsAction()"
-                >
-                  <span class="pdf-toolbar__menu-row-label">Settings</span>
-                </button>
-                <button
-                  v-if="fileName"
-                  class="pdf-toolbar__export-item pdf-toolbar__menu-row"
-                  type="button"
-                  @click="close(); handleClearCacheAction()"
-                >
-                  <span class="pdf-toolbar__menu-row-label">Clear Cache</span>
-                </button>
-                <div
-                  v-if="isDebugMode"
-                  class="pdf-toolbar__menu-section"
-                  role="group"
-                  aria-label="Developer"
-                >
-                  <span class="pdf-toolbar__menu-section-title">Developer</span>
-                  <button
-                    class="pdf-toolbar__export-item pdf-toolbar__menu-row"
-                    type="button"
-                    :disabled="isRegionComparisonActive"
-                    @click="close(); handleRequestRegionComparisonAction()"
-                  >
-                    <span class="pdf-toolbar__menu-row-label">Region Comparison</span>
-                  </button>
-                  <button
-                    v-if="canExportRegionComparisonArtifact"
-                    class="pdf-toolbar__export-item pdf-toolbar__menu-row"
-                    type="button"
-                    @click="close(); handleExportRegionComparisonArtifactAction()"
-                  >
-                    <span class="pdf-toolbar__menu-row-label">Export Region Comparison Artifact</span>
-                  </button>
-                </div>
-              </div>
-            </template>
-          </ToolbarMenu>
+          <PdfMoreMenu
+            :file-name="fileName"
+            :is-loading="isLoading"
+            :can-export="canExport"
+            :source-language="sourceLanguage"
+            :target-language="targetLanguage"
+            :region-comparison-state="regionComparisonState"
+            :can-export-region-comparison-artifact="canExportRegionComparisonArtifact"
+            :is-debug-mode="isDebugMode"
+            @request-open-pdf="emit('request-open-pdf')"
+            @export-txt="emit('export-txt')"
+            @export-markdown="emit('export-markdown')"
+            @export-html="emit('export-html')"
+            @request-region-comparison="emit('request-region-comparison')"
+            @export-region-comparison-artifact="emit('export-region-comparison-artifact')"
+            @clear-cache="emit('clear-cache')"
+            @open-settings="emit('open-settings')"
+            @request-document-info="emit('request-document-info')"
+            @open-language-settings="handleOpenLanguageSettings"
+          />
           <PdfTranslationSettingsPopover
             v-if="activeMenu === 'language'"
             ref="languagePopoverRef"
@@ -558,6 +430,7 @@ import PdfTranslationSettingsPopover from './PdfTranslationSettingsPopover.vue'
 import ToolbarMenu from '@/components/base/ToolbarMenu/ToolbarMenu.vue'
 import ToolbarActionDock from './ToolbarActionDock.vue'
 import ToolbarCenterRegion from './ToolbarCenterRegion.vue'
+import PdfMoreMenu from './PdfMoreMenu.vue'
 import ToolbarNavigationGroup from './ToolbarNavigationGroup.vue'
 import ToolbarPresentationGroup from './ToolbarPresentationGroup.vue'
 import outlineIcon from '@/icons/ui/outline.svg?url'
@@ -573,7 +446,6 @@ const TOOLTIP_OUTLINE = 'Toggle outline'
 const TOOLTIP_SIDE_BY_SIDE = 'Side by Side'
 const TOOLTIP_ZOOM_OUT = 'Zoom out'
 const TOOLTIP_ZOOM_IN = 'Zoom in'
-const TOOLTIP_MORE = 'More actions'
 const TOOLTIP_PREVIOUS_PAGE = 'Previous page'
 const TOOLTIP_NEXT_PAGE = 'Next page'
 
@@ -617,8 +489,8 @@ const effectivePdfProvider = computed(() => {
   if (modeProvider && modeProvider !== 'default') return modeProvider
   return settingsStore.settings?.TRANSLATION_API || 'googlev2'
 })
+
 const isDebugMode = computed(() => settingsStore.settings?.DEBUG_MODE === true)
-const isRegionComparisonActive = computed(() => ['running', 'cancelling'].includes(props.regionComparisonState?.status))
 
 const providerPersistenceState = {
   sequence: 0,
@@ -779,15 +651,11 @@ function handleManageLanguages() {
   closeMenus()
 }
 
-const moreMenuRef = ref(null)
 const ocrSplitRef = ref(null)
 const ocrMenuRef = ref(null)
 const ocrMenuTriggerRef = ref(null)
 const languagePopoverRef = ref(null)
 const activeMenu = ref(null)
-const isExportSubmenuOpen = ref(false)
-const exportTriggerRef = ref(null)
-const exportFlyoutRef = ref(null)
 const zoomPercentOptions = PDF_ZOOM_PERCENT_OPTIONS
 
 const allContentOptions = [
@@ -884,67 +752,12 @@ watch(() => props.currentPageNumber, (val) => {
 const hasZoomOut = computed(() => props.zoomMode !== 'fit-width' || props.zoomPercent > zoomPercentOptions[0])
 const hasZoomIn = computed(() => props.zoomMode !== 'fit-width' || props.zoomPercent < zoomPercentOptions[zoomPercentOptions.length - 1])
 
-const languageSummarySource = computed(() =>
-  props.sourceLanguage === 'auto' ? 'Auto' : props.sourceLanguage.toUpperCase()
-)
-
-const languageSummaryTarget = computed(() => props.targetLanguage.toUpperCase())
-
-const flyoutStyle = computed(() => {
-  if (!exportTriggerRef.value) return {}
-  const rect = exportTriggerRef.value.getBoundingClientRect()
-  return {
-    position: 'fixed',
-    top: `${rect.top}px`,
-    right: `${window.innerWidth - rect.left + 4}px`,
-    left: 'auto'
-  }
-})
-
 function handleOpenLanguageSettings() {
-  closeMenus()
   activeMenu.value = 'language'
 }
 
 function closeMenus() {
   activeMenu.value = null
-  isExportSubmenuOpen.value = false
-}
-
-function handleExportAction(eventName) {
-  emit(eventName)
-  closeMenus()
-}
-
-function handleOpenPdfAction() {
-  emit('request-open-pdf')
-  closeMenus()
-}
-
-function handleClearCacheAction() {
-  emit('clear-cache')
-  closeMenus()
-}
-
-function handleOpenSettingsAction() {
-  emit('open-settings')
-  closeMenus()
-}
-
-function handleRequestPdfInfo() {
-  if (!props.fileName) return
-  closeMenus()
-  emit('request-document-info')
-}
-
-function handleRequestRegionComparisonAction() {
-  emit('request-region-comparison')
-  closeMenus()
-}
-
-function handleExportRegionComparisonArtifactAction() {
-  emit('export-region-comparison-artifact')
-  closeMenus()
 }
 
 function getActiveMenuRefs() {
