@@ -6,17 +6,6 @@ const logger = getScopedLogger(LOG_COMPONENTS.PDF, 'PdfBitmapCache')
 const DEFAULT_MAX_SIZE_BYTES = 64 * 1024 * 1024 // 64 MB
 
 /**
- * Estimate memory usage for a bitmap entry.
- *
- * @param {number} width - Bitmap width in pixels
- * @param {number} height - Bitmap height in pixels
- * @returns {number} Estimated bytes (4 bytes per pixel)
- */
-function estimateEntrySize(width, height) {
-  return width * height * 4
-}
-
-/**
  * LRU bitmap cache for rendered PDF pages.
  *
  * Stores ImageBitmap entries keyed by document identity, page number, and scale.
@@ -96,22 +85,6 @@ export class PdfBitmapCache {
     this._currentSizeBytes += estimatedBytes
     this._evict()
     return true
-  }
-
-  /**
-   * @deprecated Temporary compatibility wrapper.
-   * Use tryAdmit() directly.
-   */
-  set(key, bitmap, metadata = {}) {
-    const width = metadata.width || bitmap?.width || 0
-    const height = metadata.height || bitmap?.height || 0
-    const estimatedBytes = estimateEntrySize(width, height)
-    return this.tryAdmit(key, bitmap, estimatedBytes, {
-      logicalWidth: width,
-      logicalHeight: height,
-      backingWidth: width,
-      backingHeight: height
-    })
   }
 
   /**

@@ -81,16 +81,6 @@ describe('PdfBitmapCache', () => {
     expect(cache.size).toBe(0)
   })
 
-  it('forwards set admission without taking rejected bitmap ownership', () => {
-    const bitmap = createMockBitmap(20, 20)
-    const admitSpy = vi.spyOn(cache, 'tryAdmit')
-
-    expect(cache.set('oversized', bitmap)).toBe(false)
-    expect(admitSpy).toHaveBeenCalledWith('oversized', bitmap, 1_600, { logicalWidth: 20, logicalHeight: 20, backingWidth: 20, backingHeight: 20 })
-    expect(bitmap.close).not.toHaveBeenCalled()
-    expect(cache.size).toBe(0)
-  })
-
   it('evicts the least recently used owned bitmap', () => {
     const b1 = createMockBitmap()
     const b2 = createMockBitmap()
