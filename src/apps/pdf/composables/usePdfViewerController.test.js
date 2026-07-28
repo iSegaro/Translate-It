@@ -333,7 +333,6 @@ describe('usePdfViewerController cache persistence', () => {
 
     const restoreCall = session.setBlockTranslationState.mock.calls.find((call) => call[0] === block.id)
     expect(restoreCall).toBeUndefined()
-    expect(controller.restoredTranslationCount.value).toBe(0)
   })
 
   it('does not restore OCR from the controller cache path', async () => {
@@ -360,7 +359,6 @@ describe('usePdfViewerController cache persistence', () => {
     await controller.loadPdfFile({ type: 'application/pdf', name: 'doc.pdf' }, 800)
 
     expect(session.setPageOcrBlocks).not.toHaveBeenCalled()
-    expect(controller.restoredOcrPageCount.value).toBe(0)
   })
 
   it('does not register deferred translation restoration', async () => {
@@ -375,7 +373,6 @@ describe('usePdfViewerController cache persistence', () => {
 
     expect(session.onPageSessionCommitted).not.toHaveBeenCalled()
     expect(session.setBlockTranslationState).not.toHaveBeenCalled()
-    expect(controller.restoredTranslationCount.value).toBe(0)
   })
 
   it('saves translatedCells and translationSettingsHash to cache', async () => {

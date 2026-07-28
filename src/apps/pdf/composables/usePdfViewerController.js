@@ -41,11 +41,9 @@ export function usePdfViewerController() {
     failedCount: 0,
     totalCount: 0,
     translationOccurrenceId: 0
-  })
-  const translationTick = ref(0)
-  const restoredTranslationCount = ref(0)
-  const restoredOcrPageCount = ref(0)
-  const pdfSourceLanguage = ref(AUTO_DETECT_VALUE)
+    })
+    const translationTick = ref(0)
+    const pdfSourceLanguage = ref(AUTO_DETECT_VALUE)
   const pdfTargetLanguage = ref(DEFAULT_TARGET_LANGUAGE)
 
   const _pageDataMap = reactive(new Map())
@@ -266,8 +264,6 @@ export function usePdfViewerController() {
     }
     isTranslating.value = false
     translationTick.value = 0
-    restoredTranslationCount.value = 0
-    restoredOcrPageCount.value = 0
     _pageDataMap.clear()
     _blockIndex.clear()
     _translatedPageData.value = []
@@ -478,8 +474,6 @@ export function usePdfViewerController() {
     translationSummary,
     translationTick,
     translatedPageData,
-    restoredTranslationCount,
-    restoredOcrPageCount,
     pdfSourceLanguage,
     pdfTargetLanguage,
     workerLabel,
