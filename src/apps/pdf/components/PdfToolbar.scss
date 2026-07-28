@@ -373,6 +373,23 @@
   }
 }
 
+.pdf-toolbar__button--icon-trigger {
+  display: inline-grid;
+  place-items: center;
+  width: $tb-icon-trigger-size;
+  height: $tb-icon-trigger-size;
+  padding: 0;
+  background: transparent;
+
+  &:hover {
+    background: $tb-control-hover;
+  }
+}
+
+.pdf-toolbar__button--icon-trigger:focus-visible {
+  box-shadow: 0 0 0 2px $tb-focus;
+}
+
 .pdf-toolbar__file-input {
   display: none;
 }
