@@ -56,7 +56,6 @@ export function usePdfViewerController() {
   const _blockIndex = new Map()
 
   let translationRestoreContext = null
-  let unsubscribePageSessionCommitted = null
   let disposed = false
 
   function createRestoreContext() {
@@ -77,12 +76,6 @@ export function usePdfViewerController() {
       resolveSettings
     })
     return translationRestoreContext
-  }
-
-  function ensurePageSessionCommitSubscription() {
-    if (unsubscribePageSessionCommitted || typeof pdfDocumentSession.onPageSessionCommitted !== 'function') return
-
-    unsubscribePageSessionCommitted = pdfDocumentSession.onPageSessionCommitted(({ pageNumber }) => restoreCachedTranslationsForPage(pageNumber, translationRestoreContext))
   }
 
   function _buildBlocksForLogicalBlocks(logicalBlocks = []) {
@@ -356,8 +349,7 @@ export function usePdfViewerController() {
       currentFile.value = file
 
       const nextState = await pdfDocumentSession.openFile(file, layoutRequest)
-      const restoreContext = createRestoreContext()
-      ensurePageSessionCommitSubscription()
+      createRestoreContext()
       applySessionState(nextState)
 
       pdfHistoryManager.updateAfterOpen(pdfDocumentSession).catch(() => {})
@@ -526,8 +518,6 @@ export function usePdfViewerController() {
 
   async function cleanup() {
     disposed = true
-    unsubscribePageSessionCommitted?.()
-    unsubscribePageSessionCommitted = null
     translationRestoreContext?.dispose?.()
     translationRestoreContext = null
     await pdfTranslationCoordinator.cancelActiveTranslation('viewer-cleanup')

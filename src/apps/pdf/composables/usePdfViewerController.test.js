@@ -16,7 +16,6 @@ const getSourceLanguageAsyncMock = vi.fn()
 const getTargetLanguageAsyncMock = vi.fn()
 const getTranslationApiAsyncMock = vi.fn()
 const getEffectiveProviderAsyncMock = vi.fn()
-let pageSessionCommittedListener = null
 
 const resetTranslationStatesMock = vi.fn()
 const bitmapCacheClearMock = vi.fn()
@@ -62,12 +61,7 @@ const session = {
       callback(pageNumber)
     }
   }),
-  onPageSessionCommitted: vi.fn((listener) => {
-    pageSessionCommittedListener = listener
-    return vi.fn(() => {
-      if (pageSessionCommittedListener === listener) pageSessionCommittedListener = null
-    })
-  }),
+  onPageSessionCommitted: vi.fn(),
   documentGeneration: 1,
   visiblePageNumbers: new Set(),
   getVisibleLogicalBlocks: vi.fn().mockResolvedValue([]),
@@ -226,7 +220,6 @@ async function loadControllerWithCacheEntry(cacheEntry, block = createBlock()) {
 
 describe('usePdfViewerController pdf translation preferences', () => {
   beforeEach(() => {
-    pageSessionCommittedListener = null
     openFileMock.mockReset()
     rebuildPageMetricsMock.mockReset()
     cleanupDocumentMock.mockReset().mockResolvedValue()
@@ -280,7 +273,6 @@ describe('usePdfViewerController pdf translation preferences', () => {
 
 describe('usePdfViewerController cache persistence', () => {
   beforeEach(() => {
-    pageSessionCommittedListener = null
     openFileMock.mockReset()
     rebuildPageMetricsMock.mockReset()
     cleanupDocumentMock.mockReset().mockResolvedValue()
@@ -333,59 +325,6 @@ describe('usePdfViewerController cache persistence', () => {
     expect(getEffectiveProviderAsyncMock).toHaveBeenCalledWith('pdf-translation')
   })
 
-  it('restores cache with global provider when a page commits', async () => {
-    const block = createBlock()
-    const { controller } = await loadControllerWithCacheEntry({
-      blockId: block.id,
-      translatedText: 'سلام',
-      sourceTextHash: block.sourceTextHash,
-      translationSettingsHash: await createSettingsHash(),
-      provider: 'googlev2',
-      sourceLanguage: 'auto',
-      targetLanguage: 'fa'
-    }, block)
-
-    await pageSessionCommittedListener?.({ pageNumber: 1 })
-
-    expect(controller.restoredTranslationCount.value).toBe(1)
-  })
-
-  it('restores cache with mode-specific PDF provider override when a page commits', async () => {
-    getEffectiveProviderAsyncMock.mockReset().mockResolvedValue('deepl')
-    const block = createBlock()
-    const { controller } = await loadControllerWithCacheEntry({
-      blockId: block.id,
-      translatedText: 'Hallo',
-      sourceTextHash: block.sourceTextHash,
-      translationSettingsHash: await createSettingsHash({ provider: 'deepl' }),
-      provider: 'deepl',
-      sourceLanguage: 'auto',
-      targetLanguage: 'fa'
-    }, block)
-
-    await pageSessionCommittedListener?.({ pageNumber: 1 })
-
-    expect(controller.restoredTranslationCount.value).toBe(1)
-  })
-
-  it('restores cache with default mode-specific provider when a page commits', async () => {
-    getEffectiveProviderAsyncMock.mockReset().mockResolvedValue('openai')
-    const block = createBlock()
-    const { controller } = await loadControllerWithCacheEntry({
-      blockId: block.id,
-      translatedText: 'Bonjour',
-      sourceTextHash: block.sourceTextHash,
-      translationSettingsHash: await createSettingsHash({ provider: 'openai' }),
-      provider: 'openai',
-      sourceLanguage: 'auto',
-      targetLanguage: 'fa'
-    }, block)
-
-    await pageSessionCommittedListener?.({ pageNumber: 1 })
-
-    expect(controller.restoredTranslationCount.value).toBe(1)
-  })
-
   it('does not restore OCR from the controller cache path', async () => {
     session.getDocumentCacheSnapshot.mockResolvedValue({
       translations: {},
@@ -413,147 +352,19 @@ describe('usePdfViewerController cache persistence', () => {
     expect(controller.restoredOcrPageCount.value).toBe(0)
   })
 
-  it('restores structured translatedCells cache entries when a page commits', async () => {
+  it('does not register deferred translation restoration', async () => {
     const block = createBlock()
-    const structuredCell = {
-      id: 'cell-1', regionId: 'region-1', rowIndex: 0, columnIndex: 0, rowSpan: 1, colSpan: 1,
-      spanType: 'none', role: 'value', text: 'Revenue', boundingBox: { x: 60, y: 120, width: 120, height: 18 },
-      sourceReferences: { blockIds: ['block-a'], lineIds: [], sourceLineIndices: [0], sourceItemIndices: [0], groupRegionIds: [] },
-      blockIds: ['block-a'], lineIds: [], sourceLineIndex: 0, sourceItemIndex: 0,
-      spanCandidate: false, estimatedRowSpan: 1, estimatedColSpan: 1, confidence: 0.9
-    }
-    await loadControllerWithCacheEntry({
+    const { controller } = await loadControllerWithCacheEntry({
       blockId: block.id,
       translatedText: 'درآمد',
-      translatedCells: [{ lineIndex: 0, cells: ['درآمد'], structuredCells: [structuredCell] }],
       sourceTextHash: block.sourceTextHash,
       translationSettingsHash: await createSettingsHash(),
       provider: 'googlev2', sourceLanguage: 'auto', targetLanguage: 'fa'
     }, block)
 
-    await pageSessionCommittedListener?.({ pageNumber: 1 })
-
-    const restoreCall = session.setBlockTranslationState.mock.calls.find((call) => call[0] === block.id)
-    expect(restoreCall).toBeDefined()
-    expect(restoreCall[1].translatedCells).toHaveLength(1)
-    expect(restoreCall[1].translatedCells[0].structuredCells[0]).toEqual(structuredCell)
-  })
-
-  it('ignores invalid structuredCells but restores translatedText when a page commits', async () => {
-    const block = createBlock()
-    await loadControllerWithCacheEntry({
-      blockId: block.id,
-      translatedText: 'درآمد',
-      translatedCells: [{ lineIndex: 0, cells: ['درآمد'], structuredCells: [{ id: 'broken-cell', boundingBox: null }] }],
-      sourceTextHash: block.sourceTextHash,
-      translationSettingsHash: await createSettingsHash(),
-      provider: 'googlev2', sourceLanguage: 'auto', targetLanguage: 'fa'
-    }, block)
-
-    await pageSessionCommittedListener?.({ pageNumber: 1 })
-
-    const restoreCall = session.setBlockTranslationState.mock.calls.find((call) => call[0] === block.id)
-    expect(restoreCall).toBeDefined()
-    expect(restoreCall[1].translatedText).toBe('درآمد')
-    expect(restoreCall[1].translatedCells).toBeUndefined()
-  })
-
-  it('skips stale source-hash cache entries when a page commits', async () => {
-    const block = createBlock()
-    await loadControllerWithCacheEntry({
-      blockId: block.id,
-      translatedText: 'درآمد',
-      sourceTextHash: 'wrong-hash',
-      provider: 'googlev2', sourceLanguage: 'auto', targetLanguage: 'fa'
-    }, block)
-
-    await pageSessionCommittedListener?.({ pageNumber: 1 })
-
+    expect(session.onPageSessionCommitted).not.toHaveBeenCalled()
     expect(session.setBlockTranslationState).not.toHaveBeenCalled()
-  })
-
-  it('skips stale settings-hash cache entries when a page commits', async () => {
-    const block = createBlock()
-    await loadControllerWithCacheEntry({
-      blockId: block.id,
-      translatedText: 'درآمد',
-      sourceTextHash: block.sourceTextHash,
-      translationSettingsHash: 'old-settings-hash',
-      provider: 'googlev2', sourceLanguage: 'auto', targetLanguage: 'fa'
-    }, block)
-
-    await pageSessionCommittedListener?.({ pageNumber: 1 })
-
-    expect(session.setBlockTranslationState).not.toHaveBeenCalled()
-  })
-
-  it('restores cached translations only after pages commit through the shared page pipeline', async () => {
-    const openBlock = createBlock({ id: 'open-block', sourceTextHash: 'hash-open' })
-    const lateBlock = createBlock({ id: 'late-block', sourceTextHash: 'hash-late' })
-    const translationSettingsHash = await createSettingsHash()
-
-    session.getDocumentCacheSnapshot.mockResolvedValue({
-      translations: {
-        [openBlock.id]: {
-          blockId: openBlock.id,
-          translatedText: 'باز',
-          sourceTextHash: openBlock.sourceTextHash,
-          translationSettingsHash,
-          provider: 'googlev2',
-          sourceLanguage: 'auto',
-          targetLanguage: 'fa'
-        },
-        [lateBlock.id]: {
-          blockId: lateBlock.id,
-          translatedText: 'دیر',
-          sourceTextHash: lateBlock.sourceTextHash,
-          translationSettingsHash,
-          provider: 'googlev2',
-          sourceLanguage: 'auto',
-          targetLanguage: 'fa'
-        }
-      },
-      ocr: {}
-    })
-    session.pageSessions = new Map([
-      [1, { allBlocks: [openBlock], getLogicalBlocks: () => [openBlock] }]
-    ])
-    openFileMock.mockResolvedValue(createOpenState())
-
-    const controller = usePdfViewerController()
-    await controller.loadPdfFile({ type: 'application/pdf', name: 'doc.pdf' }, 800)
-
-    expect(session.setBlockTranslationState).not.toHaveBeenCalledWith(openBlock.id, expect.anything())
-    expect(session.setBlockTranslationState).not.toHaveBeenCalledWith(lateBlock.id, expect.anything())
-
-    await pageSessionCommittedListener?.({ pageNumber: 1 })
-
-    expect(session.setBlockTranslationState).toHaveBeenCalledWith(openBlock.id, expect.objectContaining({ translatedText: 'باز' }))
-
-    session.pageSessions.set(2, { allBlocks: [lateBlock], getLogicalBlocks: () => [lateBlock] })
-    await pageSessionCommittedListener?.({ pageNumber: 2 })
-
-    expect(session.setBlockTranslationState).toHaveBeenCalledWith(lateBlock.id, expect.objectContaining({ translatedText: 'دیر' }))
-    expect(controller.restoredTranslationCount.value).toBe(2)
-    expect(controller.translationTick.value).toBe(2)
-  })
-
-  it('does not finish page restore when duplicate begin returns false', async () => {
-    const block = createBlock()
-    const cache = createDeferred()
-    session.getDocumentCacheSnapshot.mockReturnValue(cache.promise)
-    session.pageSessions = new Map([[1, { allBlocks: [block], getLogicalBlocks: () => [block] }]])
-    openFileMock.mockResolvedValue(createOpenState())
-
-    const controller = usePdfViewerController()
-    const load = controller.loadPdfFile({ type: 'application/pdf', name: 'doc.pdf' }, 800)
-    await Promise.resolve()
-
-    await pageSessionCommittedListener?.({ pageNumber: 1 })
-    cache.resolve({ translations: {}, ocr: {} })
-    await load
-
-    expect(session.getDocumentCacheSnapshot).toHaveBeenCalledTimes(1)
+    expect(controller.restoredTranslationCount.value).toBe(0)
   })
 
   it('saves translatedCells and translationSettingsHash to cache', async () => {
@@ -996,7 +807,6 @@ describe('usePdfViewerController error lifecycle', () => {
 
 describe('usePdfViewerController translation language resolution', () => {
   beforeEach(() => {
-    pageSessionCommittedListener = null
     openFileMock.mockReset()
     rebuildPageMetricsMock.mockReset()
     cleanupDocumentMock.mockReset().mockResolvedValue()
