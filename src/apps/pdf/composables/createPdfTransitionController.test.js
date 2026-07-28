@@ -2480,15 +2480,15 @@ describe('createPdfTransitionController', () => {
       expect(recomputeLayout).not.toHaveBeenCalled()
     })
 
-    it('clamps at max bound', async () => {
+    it('clamps at max bound 400%', async () => {
       const { ctrl, recomputeLayout } = createController()
 
       ctrl.zoomMode.value = 'percent'
-      ctrl.zoomPercent.value = 200
+      ctrl.zoomPercent.value = 400
 
       await ctrl.handleZoomStep(1)
 
-      expect(ctrl.zoomPercent.value).toBe(200)
+      expect(ctrl.zoomPercent.value).toBe(400)
       expect(recomputeLayout).not.toHaveBeenCalled()
     })
   })

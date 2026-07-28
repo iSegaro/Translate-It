@@ -205,7 +205,10 @@ describe('PdfDocumentSession', () => {
     [125, 1.25],
     [150, 1.5],
     [200, 2],
-    [250, 2]
+    [250, 2.5],
+    [300, 3],
+    [400, 4],
+    [500, 4]
   ])('rebuildPageMetrics applies percent zoom within the user scale policy', async (zoomPercent, expectedScale) => {
     session.totalPages = 1
     session.pdfDocument = {

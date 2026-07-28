@@ -787,7 +787,7 @@ const activeMenu = ref(null)
 const isExportSubmenuOpen = ref(false)
 const exportTriggerRef = ref(null)
 const exportFlyoutRef = ref(null)
-const zoomPercentOptions = [50, 75, 100, 125, 150, 200]
+const zoomPercentOptions = [50, 75, 100, 125, 150, 200, 250, 300, 400]
 
 const allContentOptions = [
   { value: CONTENT_VIEW.ORIGINAL, label: 'Original' },

@@ -4,7 +4,7 @@ import { captureScrollAnchor, capturePdfBackedScrollAnchor, isPdfAnchor } from '
 import { resolvePdfCanvasSlot } from '../utils/pdfFitPageFootprint.js'
 import { createPdfTransitionAnchor, PDF_SCROLL_OWNER, isPdfBackedContentView } from './createPdfTransitionAnchor.js'
 import { resolveEffectivePaneTopology, doesOriginalPaneLayoutChange } from '../utils/pdfViewerTopology.js'
-const ZOOM_PERCENT_OPTIONS = [50, 75, 100, 125, 150, 200]
+const ZOOM_PERCENT_OPTIONS = [50, 75, 100, 125, 150, 200, 250, 300, 400]
 
 const DEFAULT_VIEWER_WIDTH = 960
 
