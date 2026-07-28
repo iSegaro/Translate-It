@@ -7,6 +7,14 @@ vi.mock('./PdfTextLayerRenderer.js', () => ({
   }
 }))
 
+const { resolvePdfRasterPlanMock } = vi.hoisted(() => ({
+  resolvePdfRasterPlanMock: vi.fn()
+}))
+
+vi.mock('./PdfRasterPlan.js', () => ({
+  resolvePdfRasterPlan: resolvePdfRasterPlanMock
+}))
+
 // Mock createImageBitmap globally
 const mockCreateImageBitmap = vi.fn().mockResolvedValue({
   width: 100,
@@ -16,7 +24,6 @@ const mockCreateImageBitmap = vi.fn().mockResolvedValue({
 vi.stubGlobal('createImageBitmap', mockCreateImageBitmap)
 
 const { PdfRenderer, PDF_RENDER_RESULT_STATUS } = await import('./PdfRenderer.js')
-const { createIdentityPdfRasterPlan } = await import('./PdfRasterPlan.js')
 
 function createMockPage(pageNumber, deferredStore) {
   const state = { cancelled: false }
@@ -108,6 +115,26 @@ afterEach(() => {
   vi.restoreAllMocks()
 })
 
+function createMockPlan(overrides = {}) {
+  const logicalWidth = overrides.logicalWidth ?? 900
+  const logicalHeight = overrides.logicalHeight ?? 1200
+  const backingWidth = overrides.backingWidth ?? logicalWidth
+  const backingHeight = overrides.backingHeight ?? logicalHeight
+  return Object.freeze({
+    logicalWidth,
+    logicalHeight,
+    rasterOutputScale: overrides.rasterOutputScale ?? 1,
+    backingWidth,
+    backingHeight,
+    rasterScaleX: overrides.rasterScaleX ?? (backingWidth / logicalWidth),
+    rasterScaleY: overrides.rasterScaleY ?? (backingHeight / logicalHeight),
+    rasterPixels: backingWidth * backingHeight,
+    estimatedBytes: backingWidth * backingHeight * 4,
+    degraded: overrides.degraded ?? false,
+    renderable: overrides.renderable ?? true
+  })
+}
+
 describe('PdfRenderer', () => {
   let renderer
   let pdfDocument
@@ -115,6 +142,10 @@ describe('PdfRenderer', () => {
 
   beforeEach(() => {
     deferredRenders = []
+    resolvePdfRasterPlanMock.mockReset()
+    resolvePdfRasterPlanMock.mockImplementation(
+      ({ logicalWidth, logicalHeight }) => createMockPlan({ logicalWidth, logicalHeight })
+    )
     renderer = new PdfRenderer()
     pdfDocument = {
       getPage: vi.fn(async (pageNumber) => createMockPage(pageNumber, deferredRenders))
@@ -365,6 +396,67 @@ describe('PdfRenderer', () => {
 
       expect(result.status).toBe(PDF_RENDER_RESULT_STATUS.FAILED)
       expect(result.bitmap).toBeUndefined()
+    })
+
+    it('omits transform for identity raster plan', async () => {
+      const canvas = createMockCanvas()
+      const metric = { scale: 1.5 }
+
+      const promise = renderer.renderPage({ pdfDocument, metric, pageNumber: 1, canvas, textLayerRenderer: null })
+      await flushMicrotasks()
+      deferredRenders[0].resolve()
+      await promise
+
+      const page = await pdfDocument.getPage.mock.results[0].value
+      expect(page.render).toHaveBeenCalled()
+      const renderCall = page.render.mock.calls[0][0]
+      expect(renderCall.transform).toBeUndefined()
+    })
+
+    it('supplies exact transform for degraded raster plan', async () => {
+      resolvePdfRasterPlanMock.mockReturnValueOnce(createMockPlan({
+        logicalWidth: 600,
+        logicalHeight: 800,
+        backingWidth: 300,
+        backingHeight: 400,
+        rasterScaleX: 0.5,
+        rasterScaleY: 0.5,
+        degraded: true
+      }))
+
+      const canvas = createMockCanvas()
+      const metric = { scale: 1 }
+
+      const promise = renderer.renderPage({ pdfDocument, metric, pageNumber: 1, canvas, textLayerRenderer: null })
+      await flushMicrotasks()
+      deferredRenders[0].resolve()
+      await promise
+
+      const page = await pdfDocument.getPage.mock.results[0].value
+      const renderCall = page.render.mock.calls[0][0]
+      expect(renderCall.canvasContext).toBeDefined()
+      expect(renderCall.viewport).toBeDefined()
+      expect(renderCall.intent).toBe('display')
+      expect(renderCall.transform).toEqual([0.5, 0, 0, 0.5, 0, 0])
+    })
+
+    it('returns FAILED with raster plan and skips render when plan is unrenderable', async () => {
+      resolvePdfRasterPlanMock.mockReturnValueOnce(createMockPlan({ renderable: false }))
+
+      const canvas = createMockCanvas()
+      const metric = { scale: 1 }
+
+      const result = await renderer.renderPage({ pdfDocument, metric, pageNumber: 1, canvas, textLayerRenderer: null })
+
+      expect(resolvePdfRasterPlanMock).toHaveBeenCalled()
+      expect(result.status).toBe(PDF_RENDER_RESULT_STATUS.FAILED)
+      expect(result.raster).toBeDefined()
+      expect(result.raster.renderable).toBe(false)
+      expect(result.bitmap).toBeNull()
+      expect(mockCreateImageBitmap).not.toHaveBeenCalled()
+      expect(pdfDocument.getPage).toHaveBeenCalled()
+      const page = await pdfDocument.getPage.mock.results[0].value
+      expect(page.render).not.toHaveBeenCalled()
     })
   })
 

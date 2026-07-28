@@ -1,7 +1,7 @@
 import { getScopedLogger } from '@/shared/logging/logger.js'
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js'
-import { PDF_PAGE_BACKGROUND } from './pdfRenderingConstants.js'
-import { createIdentityPdfRasterPlan } from './PdfRasterPlan.js'
+import { PDF_PAGE_BACKGROUND, PDF_MAX_PAGE_RASTER_PIXELS, PDF_MAX_CANVAS_DIMENSION, PDF_MAX_PAGE_RASTER_BYTES, PDF_MIN_RASTER_OUTPUT_SCALE } from './pdfRenderingConstants.js'
+import { resolvePdfRasterPlan } from './PdfRasterPlan.js'
 
 const logger = getScopedLogger(LOG_COMPONENTS.PDF, 'PdfRenderer')
 
@@ -60,10 +60,18 @@ export class PdfRenderer {
     const page = await pdfDocument.getPage(pageNumber)
     const viewport = page.getViewport({ scale: metric.scale })
 
-    const plan = createIdentityPdfRasterPlan(
-      Math.floor(viewport.width),
-      Math.floor(viewport.height)
-    )
+    const plan = resolvePdfRasterPlan({
+      logicalWidth: Math.floor(viewport.width),
+      logicalHeight: Math.floor(viewport.height),
+      maxRasterPixels: PDF_MAX_PAGE_RASTER_PIXELS,
+      maxCanvasDimension: PDF_MAX_CANVAS_DIMENSION,
+      maxEstimatedBytes: PDF_MAX_PAGE_RASTER_BYTES,
+      minRasterOutputScale: PDF_MIN_RASTER_OUTPUT_SCALE
+    })
+
+    if (!plan.renderable) {
+      return createPdfRenderResult(PDF_RENDER_RESULT_STATUS.FAILED, null, null, plan)
+    }
 
     const hasReusableCanvas = canvasEl.width > 0 && canvasEl.height > 0
     const renderCanvas = hasReusableCanvas ? document.createElement('canvas') : canvasEl
@@ -81,11 +89,17 @@ export class PdfRenderer {
     context.fillStyle = PDF_PAGE_BACKGROUND
     context.fillRect(0, 0, plan.backingWidth, plan.backingHeight)
 
-    const renderTask = page.render({
+    const renderParams = {
       canvasContext: context,
       viewport,
       intent: 'display'
-    })
+    }
+
+    if (plan.degraded) {
+      renderParams.transform = [plan.rasterScaleX, 0, 0, plan.rasterScaleY, 0, 0]
+    }
+
+    const renderTask = page.render(renderParams)
 
     this.renderTasks.set(key, renderTask)
 

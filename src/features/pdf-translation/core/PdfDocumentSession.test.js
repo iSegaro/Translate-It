@@ -1165,6 +1165,19 @@ describe('PdfDocumentSession', () => {
       expect(result.raster).toBeNull()
     })
 
+    it('strips raster metadata on failed render results too', async () => {
+      mockRenderer.renderPage.mockResolvedValueOnce({
+        status: 'failed',
+        raster: { logicalWidth: 600, logicalHeight: 800, backingWidth: 600, backingHeight: 800, renderable: false }
+      })
+      const canvas = { width: 0, height: 0, style: {}, getContext: vi.fn(() => ({ drawImage: vi.fn(), fillRect: vi.fn() })) }
+
+      const result = await cacheSession.renderPage(1, canvas, null)
+
+      expect(cacheSession._bitmapCache.size).toBe(0)
+      expect(result.raster).toBeNull()
+    })
+
    it('clearPage preserves cache', async () => {
      const canvas = { width: 0, height: 0, style: {}, getContext: vi.fn(() => ({ drawImage: vi.fn(), fillRect: vi.fn() })) }
      await cacheSession.renderPage(1, canvas, null)

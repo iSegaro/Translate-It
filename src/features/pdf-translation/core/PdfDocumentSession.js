@@ -801,9 +801,10 @@ export class PdfDocumentSession extends ResourceTracker {
         }
         result.bitmap = null
       }
-
-      result.raster = null
     }
+
+    // RasterPlan must never leak past the renderer boundary
+    result.raster = null
 
     return result
   }
