@@ -14,7 +14,7 @@ import { pdfCacheManager } from './PdfCacheManager.js'
 import { PDF_PAGE_BACKGROUND } from './pdfRenderingConstants.js'
 import { PAGE_CONTENT_SOURCE } from './PdfPageSession.js'
 import { resolvePdfCanvasSlot } from '@/apps/pdf/utils/pdfFitPageFootprint.js'
-import { OCR_ENGINE_VERSION } from './PdfOcrCompatibility.js'
+import { isCompatibleCachedOcrEntry } from './PdfOcrCompatibility.js'
 
 const logger = getScopedLogger(LOG_COMPONENTS.PDF, 'PdfDocumentSession')
 const MIN_SCALE = 0.4
@@ -223,15 +223,6 @@ export class PdfDocumentSession extends ResourceTracker {
     return this._getDocumentCacheSnapshot(this._documentGeneration)
   }
 
-  _isCachedOcrEntryValid(entry) {
-    return !!entry &&
-      typeof entry === 'object' &&
-      Array.isArray(entry.ocrBlocks) &&
-      typeof entry.ocrLanguage === 'string' &&
-      entry.ocrLanguage.length > 0 &&
-      entry.ocrEngineVersion === OCR_ENGINE_VERSION
-  }
-
   async _restorePersistedPageData(pageSession, generation) {
     if (!pageSession || !this._isDocumentGenerationCurrent(generation)) return
 
@@ -242,7 +233,7 @@ export class PdfDocumentSession extends ResourceTracker {
       const ocrEntry = cache.ocr?.[pageSession.pageNumber]
       if (!ocrEntry) return
 
-      if (!this._isCachedOcrEntryValid(ocrEntry)) {
+      if (!isCompatibleCachedOcrEntry(ocrEntry)) {
         logger.warn('Skipped invalid cached OCR entry:', { pageNumber: pageSession.pageNumber })
         return
       }
