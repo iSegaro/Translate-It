@@ -10,8 +10,14 @@ function estimateBytes(bitmap) {
   return bitmap.width * bitmap.height * 4
 }
 
-function admit(cache, key, bitmap) {
-  return cache.tryAdmit(key, bitmap, estimateBytes(bitmap))
+function admit(cache, key, bitmap, presentation = {}) {
+  const pres = {
+    logicalWidth: presentation.logicalWidth ?? bitmap.width,
+    logicalHeight: presentation.logicalHeight ?? bitmap.height,
+    backingWidth: presentation.backingWidth ?? bitmap.width,
+    backingHeight: presentation.backingHeight ?? bitmap.height
+  }
+  return cache.tryAdmit(key, bitmap, estimateBytes(bitmap), pres)
 }
 
 describe('PdfBitmapCache', () => {
@@ -29,7 +35,7 @@ describe('PdfBitmapCache', () => {
     const bitmap = createMockBitmap()
 
     expect(admit(cache, 'key', bitmap)).toBe(true)
-    expect(cache.get('key')).toBe(bitmap)
+    expect(cache.get('key').bitmap).toBe(bitmap)
     expect(cache.currentSizeBytes).toBe(400)
     expect(bitmap.close).not.toHaveBeenCalled()
   })
@@ -41,7 +47,7 @@ describe('PdfBitmapCache', () => {
 
     expect(admit(cache, 'oversized', oversized)).toBe(false)
     expect(cache.size).toBe(1)
-    expect(cache.get('retained')).toBe(retained)
+    expect(cache.get('retained').bitmap).toBe(retained)
     expect(cache.currentSizeBytes).toBe(400)
     expect(retained.close).not.toHaveBeenCalled()
     expect(oversized.close).not.toHaveBeenCalled()
@@ -80,7 +86,7 @@ describe('PdfBitmapCache', () => {
     const admitSpy = vi.spyOn(cache, 'tryAdmit')
 
     expect(cache.set('oversized', bitmap)).toBe(false)
-    expect(admitSpy).toHaveBeenCalledWith('oversized', bitmap, 1_600)
+    expect(admitSpy).toHaveBeenCalledWith('oversized', bitmap, 1_600, { logicalWidth: 20, logicalHeight: 20, backingWidth: 20, backingHeight: 20 })
     expect(bitmap.close).not.toHaveBeenCalled()
     expect(cache.size).toBe(0)
   })
@@ -95,8 +101,8 @@ describe('PdfBitmapCache', () => {
     admit(cache, 'k3', b3)
 
     expect(cache.get('k2')).toBeNull()
-    expect(cache.get('k1')).toBe(b1)
-    expect(cache.get('k3')).toBe(b3)
+    expect(cache.get('k1').bitmap).toBe(b1)
+    expect(cache.get('k3').bitmap).toBe(b3)
     expect(b2.close).toHaveBeenCalledTimes(1)
   })
 
@@ -106,7 +112,7 @@ describe('PdfBitmapCache', () => {
     admit(cache, 'key', oldBitmap)
 
     expect(admit(cache, 'key', newBitmap)).toBe(true)
-    expect(cache.get('key')).toBe(newBitmap)
+    expect(cache.get('key').bitmap).toBe(newBitmap)
     expect(cache.currentSizeBytes).toBe(400)
     expect(oldBitmap.close).toHaveBeenCalledTimes(1)
     expect(newBitmap.close).not.toHaveBeenCalled()
@@ -140,7 +146,7 @@ describe('PdfBitmapCache', () => {
     cache.invalidatePage(1)
 
     expect(cache.size).toBe(1)
-    expect(cache.get('doc:2:1')).toBe(b3)
+    expect(cache.get('doc:2:1').bitmap).toBe(b3)
     expect(b1.close).toHaveBeenCalledTimes(1)
     expect(b2.close).toHaveBeenCalledTimes(1)
   })
@@ -173,5 +179,38 @@ describe('PdfBitmapCache', () => {
 
     expect(smallCache.currentSizeBytes).toBe(0)
     expect(b2.close).toHaveBeenCalledTimes(1)
+  })
+
+  it('stores and returns presentation dimensions separate from the bitmap', () => {
+    const bitmap = createMockBitmap(10, 10)
+    admit(cache, 'key', bitmap, { logicalWidth: 800, logicalHeight: 600, backingWidth: 400, backingHeight: 300 })
+
+    const entry = cache.get('key')
+    expect(entry.bitmap).toBe(bitmap)
+    expect(entry.logicalWidth).toBe(800)
+    expect(entry.logicalHeight).toBe(600)
+    expect(entry.backingWidth).toBe(400)
+    expect(entry.backingHeight).toBe(300)
+  })
+
+  it('rejects admission when presentation dimensions are invalid', () => {
+    const bitmap = createMockBitmap()
+    expect(cache.tryAdmit('k', bitmap, 400, { logicalWidth: 0, logicalHeight: 10, backingWidth: 10, backingHeight: 10 })).toBe(false)
+    expect(cache.size).toBe(0)
+    expect(bitmap.close).not.toHaveBeenCalled()
+  })
+
+  it('round-trips presentation metadata through admission and retrieval', () => {
+    const bitmap = createMockBitmap(30, 20)
+    const pres = { logicalWidth: 900, logicalHeight: 600, backingWidth: 450, backingHeight: 300 }
+
+    expect(cache.tryAdmit('rt', bitmap, estimateBytes(bitmap), pres)).toBe(true)
+
+    const entry = cache.get('rt')
+    expect(entry.logicalWidth).toBe(900)
+    expect(entry.logicalHeight).toBe(600)
+    expect(entry.backingWidth).toBe(450)
+    expect(entry.backingHeight).toBe(300)
+    expect(entry.bitmap).toBe(bitmap)
   })
 })

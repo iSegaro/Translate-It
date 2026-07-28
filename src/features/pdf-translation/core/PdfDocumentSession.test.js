@@ -1001,11 +1001,21 @@ describe('PdfDocumentSession', () => {
    beforeEach(() => {
      cacheSession = new PdfDocumentSession()
      mockBitmap = { width: 600, height: 800, close: vi.fn() }
-     mockRenderer = {
-       renderPage: vi.fn().mockResolvedValue({
-         status: 'success',
-         bitmap: mockBitmap
-       }),
+      mockRenderer = {
+        renderPage: vi.fn().mockResolvedValue({
+          status: 'success',
+          bitmap: mockBitmap,
+          raster: {
+            logicalWidth: 600,
+            logicalHeight: 800,
+            backingWidth: 600,
+            backingHeight: 800,
+            rasterScaleX: 1,
+            rasterScaleY: 1,
+            degraded: false,
+            renderable: true
+          }
+        }),
         cancelRender: vi.fn().mockReturnValue(false),
         clearPage: vi.fn(),
         cancelAll: vi.fn(),
@@ -1036,6 +1046,7 @@ describe('PdfDocumentSession', () => {
       expect(mockRenderer.renderPage).toHaveBeenCalledTimes(1)
       expect(mockBitmap.close).not.toHaveBeenCalled()
       expect(result.bitmap).toBeNull()
+      expect(result.raster).toBeNull()
     })
 
     it('derives cache admission bytes from the candidate bitmap dimensions', async () => {
@@ -1044,7 +1055,12 @@ describe('PdfDocumentSession', () => {
 
       await cacheSession.renderPage(1, canvas, null)
 
-      expect(admitSpy).toHaveBeenCalledWith('test-doc:1:1.5', mockBitmap, 600 * 800 * 4)
+      expect(admitSpy).toHaveBeenCalledWith(
+        'test-doc:1:1.5',
+        mockBitmap,
+        600 * 800 * 4,
+        { logicalWidth: 600, logicalHeight: 800, backingWidth: 600, backingHeight: 800 }
+      )
     })
 
     it('closes rejected candidates exactly once without retaining them', async () => {
@@ -1056,24 +1072,47 @@ describe('PdfDocumentSession', () => {
       expect(cacheSession._bitmapCache.size).toBe(0)
       expect(mockBitmap.close).toHaveBeenCalledTimes(1)
       expect(result.bitmap).toBeNull()
+      expect(result.raster).toBeNull()
     })
 
-   it('uses cache on second render for same page/scale', async () => {
-     const canvas = { width: 0, height: 0, style: {}, getContext: vi.fn(() => ({ drawImage: vi.fn(), fillRect: vi.fn() })) }
+    it('uses cache on second render for same page/scale', async () => {
+      const canvas = { width: 0, height: 0, style: {}, getContext: vi.fn(() => ({ drawImage: vi.fn(), fillRect: vi.fn() })) }
 
-     await cacheSession.renderPage(1, canvas, null)
-     mockRenderer.renderPage.mockClear()
-     mockPdfDocument.getPage.mockClear()
+      await cacheSession.renderPage(1, canvas, null)
+      mockRenderer.renderPage.mockClear()
+      mockPdfDocument.getPage.mockClear()
 
-     const canvas2 = { width: 0, height: 0, style: {}, getContext: vi.fn(() => ({ drawImage: vi.fn(), fillRect: vi.fn() })) }
-     await cacheSession.renderPage(1, canvas2, null)
+      const canvas2 = { width: 0, height: 0, style: {}, getContext: vi.fn(() => ({ drawImage: vi.fn(), fillRect: vi.fn() })) }
+      await cacheSession.renderPage(1, canvas2, null)
 
-     // Cache hit — renderer should not be called
-     expect(mockRenderer.renderPage).not.toHaveBeenCalled()
-     // Cache hit — pdfDocument.getPage should not be called
-     expect(mockPdfDocument.getPage).not.toHaveBeenCalled()
-     expect(canvas2.width).toBe(mockBitmap.width)
+      // Cache hit — renderer should not be called
+      expect(mockRenderer.renderPage).not.toHaveBeenCalled()
+      // Cache hit — pdfDocument.getPage should not be called
+      expect(mockPdfDocument.getPage).not.toHaveBeenCalled()
+      expect(canvas2.width).toBe(mockBitmap.width)
       expect(canvas2.height).toBe(mockBitmap.height)
+      expect(canvas2.style.width).toBe(`${mockBitmap.width}px`)
+      expect(canvas2.style.height).toBe(`${mockBitmap.height}px`)
+    })
+
+    it('restores logical CSS and backing dimensions from stored cache metadata', async () => {
+      const cacheKey = 'test-doc:1:1.5'
+      const presBitmap = { width: 400, height: 300, close: vi.fn() }
+      cacheSession._bitmapCache.tryAdmit(cacheKey, presBitmap, 400 * 300 * 4, {
+        logicalWidth: 800,
+        logicalHeight: 600,
+        backingWidth: 400,
+        backingHeight: 300
+      })
+
+      const canvas = { width: 0, height: 0, style: {}, getContext: vi.fn(() => ({ drawImage: vi.fn(), fillRect: vi.fn() })) }
+      await cacheSession.renderPage(1, canvas, null)
+
+      expect(mockRenderer.renderPage).not.toHaveBeenCalled()
+      expect(canvas.width).toBe(400)
+      expect(canvas.height).toBe(300)
+      expect(canvas.style.width).toBe('800px')
+      expect(canvas.style.height).toBe('600px')
     })
 
     it('uses scale in bitmap cache keys', async () => {
@@ -1102,14 +1141,29 @@ describe('PdfDocumentSession', () => {
      expect(cacheSession._bitmapCache.size).toBe(0)
    })
 
-   it('does not cache on cancelled render', async () => {
-     mockRenderer.renderPage.mockResolvedValueOnce({ status: 'cancelled' })
-     const canvas = { width: 0, height: 0, style: {}, getContext: vi.fn(() => ({ drawImage: vi.fn(), fillRect: vi.fn() })) }
+    it('does not cache on cancelled render', async () => {
+      mockRenderer.renderPage.mockResolvedValueOnce({ status: 'cancelled' })
+      const canvas = { width: 0, height: 0, style: {}, getContext: vi.fn(() => ({ drawImage: vi.fn(), fillRect: vi.fn() })) }
 
-     await cacheSession.renderPage(1, canvas, null)
+      await cacheSession.renderPage(1, canvas, null)
 
-     expect(cacheSession._bitmapCache.size).toBe(0)
-   })
+      expect(cacheSession._bitmapCache.size).toBe(0)
+    })
+
+    it('strips raster metadata on successful render even without a bitmap', async () => {
+      mockRenderer.renderPage.mockResolvedValueOnce({
+        status: 'success',
+        bitmap: null,
+        raster: { logicalWidth: 600, logicalHeight: 800, backingWidth: 600, backingHeight: 800 }
+      })
+      const canvas = { width: 0, height: 0, style: {}, getContext: vi.fn(() => ({ drawImage: vi.fn(), fillRect: vi.fn() })) }
+
+      const result = await cacheSession.renderPage(1, canvas, null)
+
+      expect(cacheSession._bitmapCache.size).toBe(0)
+      expect(result.bitmap).toBeNull()
+      expect(result.raster).toBeNull()
+    })
 
    it('clearPage preserves cache', async () => {
      const canvas = { width: 0, height: 0, style: {}, getContext: vi.fn(() => ({ drawImage: vi.fn(), fillRect: vi.fn() })) }

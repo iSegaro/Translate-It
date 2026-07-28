@@ -762,16 +762,16 @@ export class PdfDocumentSession extends ResourceTracker {
     const cacheKey = PdfBitmapCache.buildKey(this.documentIdentity, pageNumber, metric.scale)
 
     // Cache hit: draw bitmap and render text layer without pdf.js render
-    const cachedBitmap = this._bitmapCache.get(cacheKey)
-    if (cachedBitmap) {
-      canvasEl.width = cachedBitmap.width
-      canvasEl.height = cachedBitmap.height
-      canvasEl.style.width = `${cachedBitmap.width}px`
-      canvasEl.style.height = `${cachedBitmap.height}px`
+    const cachedEntry = this._bitmapCache.get(cacheKey)
+    if (cachedEntry) {
+      canvasEl.width = cachedEntry.backingWidth
+      canvasEl.height = cachedEntry.backingHeight
+      canvasEl.style.width = `${cachedEntry.logicalWidth}px`
+      canvasEl.style.height = `${cachedEntry.logicalHeight}px`
       const ctx = canvasEl.getContext('2d', { alpha: false })
       ctx.fillStyle = PDF_PAGE_BACKGROUND
-      ctx.fillRect(0, 0, cachedBitmap.width, cachedBitmap.height)
-      ctx.drawImage(cachedBitmap, 0, 0)
+      ctx.fillRect(0, 0, cachedEntry.backingWidth, cachedEntry.backingHeight)
+      ctx.drawImage(cachedEntry.bitmap, 0, 0)
 
       return createPdfRenderResult(PDF_RENDER_RESULT_STATUS.SUCCESS)
     }
@@ -785,14 +785,24 @@ export class PdfDocumentSession extends ResourceTracker {
     })
 
     // Cache bitmap only on successful render
-    if (result.status === PDF_RENDER_RESULT_STATUS.SUCCESS && result.bitmap) {
-      const candidateBitmap = result.bitmap
-      const estimatedBytes = candidateBitmap.width * candidateBitmap.height * 4
-      const admitted = this._bitmapCache.tryAdmit(cacheKey, candidateBitmap, estimatedBytes)
-      if (!admitted) {
-        candidateBitmap.close?.()
+    if (result.status === PDF_RENDER_RESULT_STATUS.SUCCESS) {
+      if (result.bitmap) {
+        const candidateBitmap = result.bitmap
+        const estimatedBytes = candidateBitmap.width * candidateBitmap.height * 4
+        const presentation = result.raster ? {
+          logicalWidth: result.raster.logicalWidth,
+          logicalHeight: result.raster.logicalHeight,
+          backingWidth: result.raster.backingWidth,
+          backingHeight: result.raster.backingHeight
+        } : null
+        const admitted = this._bitmapCache.tryAdmit(cacheKey, candidateBitmap, estimatedBytes, presentation)
+        if (!admitted) {
+          candidateBitmap.close?.()
+        }
+        result.bitmap = null
       }
-      result.bitmap = null
+
+      result.raster = null
     }
 
     return result

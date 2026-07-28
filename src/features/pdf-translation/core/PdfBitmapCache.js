@@ -49,10 +49,11 @@ export class PdfBitmapCache {
   }
 
   /**
-   * Retrieve a cached bitmap. Moves entry to most-recently-used position.
+   * Retrieve a cached entry: bitmap plus presentation dimensions.
+   * Moves entry to most-recently-used position.
    *
    * @param {string} key
-   * @returns {ImageBitmap | null}
+   * @returns {{ bitmap: ImageBitmap, logicalWidth: number, logicalHeight: number, backingWidth: number, backingHeight: number } | null}
    */
   get(key) {
     const entry = this._entries.get(key)
@@ -62,11 +63,21 @@ export class PdfBitmapCache {
     this._entries.delete(key)
     this._entries.set(key, entry)
 
-    return entry.bitmap
+    return {
+      bitmap: entry.bitmap,
+      logicalWidth: entry.logicalWidth,
+      logicalHeight: entry.logicalHeight,
+      backingWidth: entry.backingWidth,
+      backingHeight: entry.backingHeight
+    }
   }
 
-  tryAdmit(key, bitmap, estimatedBytes) {
+  tryAdmit(key, bitmap, estimatedBytes, presentation = {}) {
     if (!this._isAdmissible(key, bitmap, estimatedBytes)) {
+      return false
+    }
+
+    if (!this._isValidPresentation(presentation)) {
       return false
     }
 
@@ -74,7 +85,14 @@ export class PdfBitmapCache {
       this._removeEntry(key)
     }
 
-    this._entries.set(key, { bitmap, size: estimatedBytes })
+    this._entries.set(key, {
+      bitmap,
+      size: estimatedBytes,
+      logicalWidth: presentation.logicalWidth,
+      logicalHeight: presentation.logicalHeight,
+      backingWidth: presentation.backingWidth,
+      backingHeight: presentation.backingHeight
+    })
     this._currentSizeBytes += estimatedBytes
     this._evict()
     return true
@@ -88,7 +106,12 @@ export class PdfBitmapCache {
     const width = metadata.width || bitmap?.width || 0
     const height = metadata.height || bitmap?.height || 0
     const estimatedBytes = estimateEntrySize(width, height)
-    return this.tryAdmit(key, bitmap, estimatedBytes)
+    return this.tryAdmit(key, bitmap, estimatedBytes, {
+      logicalWidth: width,
+      logicalHeight: height,
+      backingWidth: width,
+      backingHeight: height
+    })
   }
 
   /**
@@ -150,6 +173,15 @@ export class PdfBitmapCache {
     this._currentSizeBytes -= entry.size
     this._entries.delete(key)
     this._closeBitmap(entry.bitmap)
+  }
+
+  _isValidPresentation(presentation) {
+    if (!presentation || typeof presentation !== 'object') return false
+    const { logicalWidth, logicalHeight, backingWidth, backingHeight } = presentation
+    return Number.isFinite(logicalWidth) && logicalWidth > 0
+      && Number.isFinite(logicalHeight) && logicalHeight > 0
+      && Number.isFinite(backingWidth) && backingWidth > 0
+      && Number.isFinite(backingHeight) && backingHeight > 0
   }
 
   _isAdmissible(key, bitmap, estimatedBytes) {
