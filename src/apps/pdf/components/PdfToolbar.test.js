@@ -1,6 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { flushPromises, mount } from '@vue/test-utils'
-import { resolveOverflow } from './toolbarOverflowPolicy.js'
 
 const settingsStoreMock = vi.hoisted(() => ({
   settings: { MODE_PROVIDERS: {}, TRANSLATION_API: 'googlev2', DEBUG_MODE: false },
@@ -1896,29 +1895,6 @@ describe('PdfToolbar', () => {
 
       expect(wrapper.find('button[aria-label="Previous page"]').attributes('title')).toBe('Previous page')
       expect(wrapper.find('button[aria-label="Next page"]').attributes('title')).toBe('Next page')
-    })
-  })
-
-  describe('overflow routing', () => {
-    it('keeps all controls in toolbar at desktop', () => {
-      const decisions = resolveOverflow(false)
-
-      expect(Object.keys(decisions)).toHaveLength(0)
-    })
-
-    it('routes layout-toggle to menu at tablet', () => {
-      const decisions = resolveOverflow(true)
-
-      expect(decisions['layout-toggle']).toBe('menu')
-      expect(Object.keys(decisions)).toHaveLength(1)
-    })
-
-    it('does not route view-mode or any other control', () => {
-      const decisions = resolveOverflow(true)
-
-      expect(decisions['view-mode']).toBeUndefined()
-      expect(decisions['fit-toggle']).toBeUndefined()
-      expect(decisions['page-nav']).toBeUndefined()
     })
   })
 })

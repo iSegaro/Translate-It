@@ -460,43 +460,6 @@
   pointer-events: none;
 }
 
-.pdf-toolbar__regionComparison {
-  display: grid;
-  gap: 6px;
-  padding: 8px 12px;
-  border-radius: 10px;
-  background: $tb-control-hover;
-  color: $tb-text-secondary;
-  font-size: 11px;
-}
-
-.pdf-toolbar__regionComparison-summary {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.pdf-toolbar__regionComparison-summary span:first-child {
-  margin-right: auto;
-  color: $tb-text-primary;
-  font-weight: 700;
-  text-transform: capitalize;
-}
-
-.pdf-toolbar__regionComparison-cancel {
-  border: 0;
-  border-radius: 6px;
-  padding: 3px 6px;
-  background: $tb-border-hover;
-  color: $tb-text-primary;
-  font: inherit;
-  cursor: pointer;
-}
-
-.pdf-toolbar__regionComparison-current {
-  font-variant-numeric: tabular-nums;
-}
-
 .pdf-toolbar__ocr-split {
   position: relative;
 }
@@ -695,47 +658,6 @@
   position: relative;
 }
 
-// Reserve stable width for currently supported translation language codes.
-// Unknown future codes expand naturally.
-$translation-language-code-width: 5ch;
-
-.pdf-toolbar__language-summary-button {
-  appearance: none;
-  border: 0;
-  border-radius: 6px;
-  padding: 5px 8px;
-  display: grid;
-  grid-template-columns:
-    minmax($translation-language-code-width, max-content)
-    max-content
-    minmax($translation-language-code-width, max-content);
-  background: $tb-control-hover;
-  color: $tb-text-primary;
-  font-size: 12px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: background 0.15s ease, color 0.15s ease;
-  outline: none;
-  white-space: nowrap;
-
-  &:hover {
-    background: $tb-control-strong;
-  }
-
-  &:active {
-    background: $tb-control-active;
-  }
-
-  &:focus-visible {
-    outline: 2px solid $tb-focus;
-    outline-offset: 2px;
-  }
-
-  &--active {
-    background: $tb-control-selected;
-  }
-}
-
 .pdf-toolbar__language-popover {
   position: absolute;
   top: calc(100% + 8px);
@@ -750,18 +672,6 @@ $translation-language-code-width: 5ch;
   box-shadow: 0 18px 40px rgba(0, 0, 0, 0.28);
 }
 
-
-.pdf-toolbar__button--clear {
-  background: rgba(239, 68, 68, 0.1);
-  color: rgba(254, 202, 202, 0.8);
-  font-size: 13px;
-  padding: 8px 12px;
-
-  &:hover {
-    background: rgba(239, 68, 68, 0.2);
-    color: #fecaca;
-  }
-}
 
 // ── Stage 1: Compact View ──────────────────────────────────────────
 // Layout B entry stage. Establishes compact toolbar chrome and replaces the
