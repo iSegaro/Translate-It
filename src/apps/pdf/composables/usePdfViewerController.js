@@ -418,7 +418,6 @@ export function usePdfViewerController() {
 
     if (Object.keys(entries).length > 0) {
       await pdfCacheManager.saveTranslations(documentIdentity, entries)
-      pdfDocumentSession.mergeDocumentCacheSnapshot(entries)
     }
   }
 

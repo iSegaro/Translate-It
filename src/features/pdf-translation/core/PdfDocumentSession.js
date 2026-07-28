@@ -116,8 +116,8 @@ export class PdfDocumentSession extends ResourceTracker {
     this._naturalPageViewports = new Map()
     this._documentGeneration = 0
     this._documentCacheGeneration = 0
-    this._documentCachePromise = Promise.resolve({ translations: {}, ocr: {} })
-    this._documentCacheSnapshot = { translations: {}, ocr: {} }
+    this._documentCachePromise = Promise.resolve({ ocr: {} })
+    this._documentCacheSnapshot = { ocr: {} }
   }
 
   get pageSessions() {
@@ -156,16 +156,7 @@ export class PdfDocumentSession extends ResourceTracker {
   _isDocumentGenerationCurrent = (generation) => generation === this._documentGeneration
 
   _emptyDocumentCache() {
-    return { translations: {}, ocr: {} }
-  }
-
-  mergeDocumentCacheSnapshot(entries) {
-    if (!entries || typeof entries !== 'object') return
-    for (const [blockId, entry] of Object.entries(entries)) {
-      if (entry?.status === 'translated') {
-        this._documentCacheSnapshot.translations[blockId] = entry
-      }
-    }
+    return { ocr: {} }
   }
 
   _startDocumentCacheLoad(documentIdentity, generation = this._documentGeneration) {
@@ -185,7 +176,6 @@ export class PdfDocumentSession extends ResourceTracker {
         }
 
         const snapshot = {
-          translations: cache?.translations || {},
           ocr: cache?.ocr || {}
         }
         this._documentCacheSnapshot = snapshot
