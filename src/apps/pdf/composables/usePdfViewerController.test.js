@@ -19,6 +19,7 @@ const getEffectiveProviderAsyncMock = vi.fn()
 
 const resetTranslationStatesMock = vi.fn()
 const bitmapCacheClearMock = vi.fn()
+const invalidateDocumentCacheSnapshotMock = vi.fn()
 
 const session = {
   openFile: openFileMock,
@@ -29,6 +30,7 @@ const session = {
   pageSessions: new Map(),
   translationStates: new Map(),
   resetTranslationStates: resetTranslationStatesMock,
+  invalidateDocumentCacheSnapshot: invalidateDocumentCacheSnapshotMock,
   _bitmapCache: { clear: bitmapCacheClearMock },
   setBlockTranslationState: vi.fn((blockId, patch) => {
     const current = session.translationStates.get(blockId) || { blockId }
@@ -1004,6 +1006,7 @@ describe('clearDocumentCache', () => {
 
     expect(clearDocumentCacheMock).toHaveBeenCalledWith('doc-1')
     expect(bitmapCacheClearMock).toHaveBeenCalled()
+    expect(invalidateDocumentCacheSnapshotMock).toHaveBeenCalled()
     expect(resetTranslationStatesMock).toHaveBeenCalled()
   })
 
