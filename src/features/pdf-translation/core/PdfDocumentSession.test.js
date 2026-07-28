@@ -149,6 +149,24 @@ describe('PdfDocumentSession', () => {
     expect(Object.isFrozen(metadata)).toBe(true)
   })
 
+  it('returns immutable translation export statistics', () => {
+    session.totalPages = 3
+    session.setBlockTranslationState('block-1', { status: 'translated' })
+    session.setBlockTranslationState('block-2', { status: 'error' })
+
+    const stats = session.getTranslationExportStats()
+
+    expect(stats).toEqual({
+      totalBlocks: 2,
+      translatedCount: 1,
+      failedCount: 1,
+      totalPages: 3,
+      isPartial: true,
+      hasTranslatedBlocks: true
+    })
+    expect(Object.isFrozen(stats)).toBe(true)
+  })
+
   function createScannedPage(pageNumber = 1) {
     return {
       pageNumber,

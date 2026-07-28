@@ -707,6 +707,24 @@ export class PdfDocumentSession extends ResourceTracker {
     })
   }
 
+  getTranslationExportStats() {
+    const {
+      totalCount,
+      translatedCount,
+      failedCount,
+      hasTranslatedBlocks
+    } = this._translationState.getStats()
+
+    return Object.freeze({
+      totalBlocks: totalCount,
+      translatedCount,
+      failedCount,
+      totalPages: this.totalPages,
+      isPartial: translatedCount < totalCount && totalCount > 0,
+      hasTranslatedBlocks
+    })
+  }
+
   getVisibleTranslationStates() {
     const visibleBlocks = []
     for (const pageNumber of this.visiblePageNumbers) {
