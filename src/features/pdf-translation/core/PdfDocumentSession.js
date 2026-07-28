@@ -469,7 +469,7 @@ export class PdfDocumentSession extends ResourceTracker {
     }
 
     this._renderer.cancelAll()
-    this._bitmapCache.clear()
+    this.clearRenderedPageCache()
     await this._buildPageMetrics(layoutRequest)
 
     return this.getState()
@@ -829,6 +829,10 @@ export class PdfDocumentSession extends ResourceTracker {
     this._renderer.clearPage(pageNumber, canvasEl, textLayerRenderer)
   }
 
+  clearRenderedPageCache() {
+    this._bitmapCache.clear()
+  }
+
   _cancelAllRenders() {
     this._renderer.cancelAll()
   }
@@ -843,7 +847,7 @@ export class PdfDocumentSession extends ResourceTracker {
     this._outlineRepository.clear()
     this._linkAnnotationRepository.clear()
     this._naturalPageViewports.clear()
-    this._bitmapCache.clear()
+    this.clearRenderedPageCache()
     this.pdfFingerprint = ''
     this.documentIdentity = ''
     this.displayName = ''
@@ -878,7 +882,7 @@ export class PdfDocumentSession extends ResourceTracker {
     await this.cleanupDocument()
     this._pageSessionCommittedListeners.clear()
     this._visiblePagesChangedListeners.clear()
-    this._bitmapCache.clear()
+    this.clearRenderedPageCache()
     this._renderer.destroy()
     super.destroy()
   }

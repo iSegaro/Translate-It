@@ -1052,6 +1052,16 @@ describe('PdfDocumentSession', () => {
       expect(result.raster).toBeNull()
     })
 
+    it('clearRenderedPageCache clears cached bitmap resources', async () => {
+      const canvas = { width: 0, height: 0, style: {}, getContext: vi.fn(() => ({ drawImage: vi.fn(), fillRect: vi.fn() })) }
+      await cacheSession.renderPage(1, canvas, null)
+
+      cacheSession.clearRenderedPageCache()
+
+      expect(cacheSession._bitmapCache.size).toBe(0)
+      expect(mockBitmap.close).toHaveBeenCalledTimes(1)
+    })
+
     it('derives cache admission bytes from the candidate bitmap dimensions', async () => {
       const canvas = { width: 0, height: 0, style: {}, getContext: vi.fn(() => ({ drawImage: vi.fn(), fillRect: vi.fn() })) }
       const admitSpy = vi.spyOn(cacheSession._bitmapCache, 'tryAdmit')
