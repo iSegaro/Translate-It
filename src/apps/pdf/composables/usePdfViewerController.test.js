@@ -56,6 +56,20 @@ const session = {
     error: null
   }),
   hasAnyTranslatedBlocks: vi.fn(() => [...session.translationStates.values()].some((state) => state.status === 'translated')),
+  getTranslatedBlockPersistenceRecords: vi.fn(() => [...session.translationStates]
+    .filter(([, state]) => state.status === 'translated')
+    .map(([blockId, state]) => ({
+      blockId,
+      pageNumber: state.pageNumber || 0,
+      translatedText: state.translatedText || '',
+      translatedCells: state.translatedCells || null,
+      status: 'translated',
+      provider: state.provider || '',
+      sourceLanguage: state.sourceLanguage || '',
+      targetLanguage: state.targetLanguage || '',
+      sourceTextHash: state.sourceTextHash || '',
+      updatedAt: state.updatedAt || 0
+    }))),
   getPageLayout: vi.fn().mockReturnValue(null),
   getPageSession: vi.fn(),
   getPageSourceBlocks: vi.fn((pageNumber) => session.pageSessions.get(pageNumber)?.getLogicalBlocks?.() || []),
