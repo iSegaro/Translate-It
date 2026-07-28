@@ -120,6 +120,35 @@ describe('PdfDocumentSession', () => {
     expect(session.getBlockTranslationState('block-1').translatedCells[0].cells[0]).toBe('Hola')
   })
 
+  it('returns immutable translation history metadata', () => {
+    session.setBlockTranslationState('block-1', {
+      status: 'translated',
+      pageNumber: 1,
+      provider: 'googlev2',
+      sourceLanguage: 'en',
+      targetLanguage: 'es'
+    })
+    session.setBlockTranslationState('block-2', {
+      status: 'translated',
+      pageNumber: 1,
+      provider: 'deepl',
+      sourceLanguage: 'de',
+      targetLanguage: 'fr'
+    })
+    session.setBlockTranslationState('block-3', { status: 'error', pageNumber: 2 })
+
+    const metadata = session.getTranslationHistoryMetadata()
+
+    expect(metadata).toEqual({
+      translatedBlockCount: 2,
+      translatedPageCount: 1,
+      provider: 'googlev2',
+      sourceLanguage: 'en',
+      targetLanguage: 'es'
+    })
+    expect(Object.isFrozen(metadata)).toBe(true)
+  })
+
   function createScannedPage(pageNumber = 1) {
     return {
       pageNumber,

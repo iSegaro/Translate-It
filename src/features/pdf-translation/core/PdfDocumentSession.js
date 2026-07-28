@@ -681,6 +681,32 @@ export class PdfDocumentSession extends ResourceTracker {
     return Object.freeze(records)
   }
 
+  getTranslationHistoryMetadata() {
+    let translatedBlockCount = 0
+    const translatedPages = new Set()
+    let provider = ''
+    let sourceLanguage = ''
+    let targetLanguage = ''
+
+    for (const state of this._translationState.values()) {
+      if (state.status !== 'translated') continue
+
+      translatedBlockCount += 1
+      if (state.pageNumber > 0) translatedPages.add(state.pageNumber)
+      if (!provider && state.provider) provider = state.provider
+      if (!sourceLanguage && state.sourceLanguage) sourceLanguage = state.sourceLanguage
+      if (!targetLanguage && state.targetLanguage) targetLanguage = state.targetLanguage
+    }
+
+    return Object.freeze({
+      translatedBlockCount,
+      translatedPageCount: translatedPages.size,
+      provider,
+      sourceLanguage,
+      targetLanguage
+    })
+  }
+
   getVisibleTranslationStates() {
     const visibleBlocks = []
     for (const pageNumber of this.visiblePageNumbers) {
