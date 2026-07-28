@@ -6,6 +6,7 @@ import { pdfDocumentSession } from '@/features/pdf-translation/core/PdfDocumentS
 import { PdfOcrRecommendationEngine } from '@/features/pdf-translation/core/PdfOcrRecommendationEngine.js'
 import { PdfOcrProcessor } from '@/features/pdf-translation/core/PdfOcrProcessor.js'
 import { pdfCacheManager } from '@/features/pdf-translation/core/PdfCacheManager.js'
+import { OCR_ENGINE_VERSION } from '@/features/pdf-translation/core/PdfOcrCompatibility.js'
 import { mapOcrError } from '@/features/ocr/errors/ocrErrorMapper.js'
 
 const logger = getScopedLogger(LOG_COMPONENTS.PDF, 'usePdfOcr')
@@ -135,7 +136,8 @@ export function usePdfOcr({ onOcrComplete, onOcrStart, onOcrProgress, onOcrError
           pageNumber,
           ocrLanguage: ocrState.ocrLanguage || ocrLanguage.value,
           ocrBlocks: ocrState.ocrBlocks,
-          ocrCompletedAt: ocrState.ocrCompletedAt || Date.now()
+          ocrCompletedAt: ocrState.ocrCompletedAt || Date.now(),
+          ocrEngineVersion: OCR_ENGINE_VERSION
         })
       }
     }

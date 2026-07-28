@@ -14,6 +14,7 @@ import { pdfCacheManager } from './PdfCacheManager.js'
 import { PDF_PAGE_BACKGROUND } from './pdfRenderingConstants.js'
 import { PAGE_CONTENT_SOURCE } from './PdfPageSession.js'
 import { resolvePdfCanvasSlot } from '@/apps/pdf/utils/pdfFitPageFootprint.js'
+import { OCR_ENGINE_VERSION } from './PdfOcrCompatibility.js'
 
 const logger = getScopedLogger(LOG_COMPONENTS.PDF, 'PdfDocumentSession')
 const MIN_SCALE = 0.4
@@ -222,7 +223,8 @@ export class PdfDocumentSession extends ResourceTracker {
       typeof entry === 'object' &&
       Array.isArray(entry.ocrBlocks) &&
       typeof entry.ocrLanguage === 'string' &&
-      entry.ocrLanguage.length > 0
+      entry.ocrLanguage.length > 0 &&
+      entry.ocrEngineVersion === OCR_ENGINE_VERSION
   }
 
   async _restorePersistedPageData(pageSession, generation) {
