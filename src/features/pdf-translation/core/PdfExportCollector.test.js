@@ -25,6 +25,24 @@ describe('PdfExportCollector', () => {
           error: null
         }
       }),
+      getTranslationExportStats: vi.fn(() => {
+        let translatedCount = 0
+        let failedCount = 0
+        let totalBlocks = 0
+        for (const state of session.translationStates.values()) {
+          totalBlocks += 1
+          if (state.status === 'translated') translatedCount += 1
+          if (state.status === 'error') failedCount += 1
+        }
+        return {
+          totalBlocks,
+          translatedCount,
+          failedCount,
+          totalPages: session.totalPages,
+          isPartial: translatedCount < totalBlocks && totalBlocks > 0,
+          hasTranslatedBlocks: translatedCount > 0
+        }
+      }),
       forEachCommittedPage: vi.fn((callback) => {
         const pageNumbers = [...session.pageSessions.keys()].sort((a, b) => a - b)
         for (const pageNumber of pageNumbers) {
