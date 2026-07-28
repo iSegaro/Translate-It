@@ -1,6 +1,7 @@
 import { getScopedLogger } from '@/shared/logging/logger.js'
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js'
 import { PDF_PAGE_BACKGROUND } from './pdfRenderingConstants.js'
+import { createIdentityPdfRasterPlan } from './PdfRasterPlan.js'
 
 const logger = getScopedLogger(LOG_COMPONENTS.PDF, 'PdfRenderer')
 
@@ -12,9 +13,10 @@ export const PDF_RENDER_RESULT_STATUS = Object.freeze({
   FAILED: 'failed'
 })
 
-export function createPdfRenderResult(status, error = null, bitmap = null) {
+export function createPdfRenderResult(status, error = null, bitmap = null, raster = null) {
   const result = error ? { status, error } : { status }
   if (bitmap) result.bitmap = bitmap
+  if (raster) result.raster = raster
   return result
 }
 
@@ -58,16 +60,18 @@ export class PdfRenderer {
     const page = await pdfDocument.getPage(pageNumber)
     const viewport = page.getViewport({ scale: metric.scale })
 
-    const newWidth = Math.floor(viewport.width)
-    const newHeight = Math.floor(viewport.height)
+    const plan = createIdentityPdfRasterPlan(
+      Math.floor(viewport.width),
+      Math.floor(viewport.height)
+    )
 
     const hasReusableCanvas = canvasEl.width > 0 && canvasEl.height > 0
     const renderCanvas = hasReusableCanvas ? document.createElement('canvas') : canvasEl
-    renderCanvas.width = newWidth
-    renderCanvas.height = newHeight
+    renderCanvas.width = plan.backingWidth
+    renderCanvas.height = plan.backingHeight
 
-    canvasEl.style.width = `${newWidth}px`
-    canvasEl.style.height = `${newHeight}px`
+    canvasEl.style.width = `${plan.logicalWidth}px`
+    canvasEl.style.height = `${plan.logicalHeight}px`
 
     const context = renderCanvas.getContext('2d', { alpha: false, willReadFrequently: true })
     if (!context) {
@@ -75,7 +79,7 @@ export class PdfRenderer {
     }
 
     context.fillStyle = PDF_PAGE_BACKGROUND
-    context.fillRect(0, 0, newWidth, newHeight)
+    context.fillRect(0, 0, plan.backingWidth, plan.backingHeight)
 
     const renderTask = page.render({
       canvasContext: context,
@@ -89,8 +93,8 @@ export class PdfRenderer {
       await renderTask.promise
 
       if (hasReusableCanvas) {
-        canvasEl.width = newWidth
-        canvasEl.height = newHeight
+        canvasEl.width = plan.backingWidth
+        canvasEl.height = plan.backingHeight
         const visibleCtx = canvasEl.getContext('2d', { alpha: false })
         visibleCtx.drawImage(renderCanvas, 0, 0)
       }
@@ -101,7 +105,7 @@ export class PdfRenderer {
       } catch {
         // Bitmap creation failed — continue without cache entry
       }
-      return createPdfRenderResult(PDF_RENDER_RESULT_STATUS.SUCCESS, null, bitmap)
+      return createPdfRenderResult(PDF_RENDER_RESULT_STATUS.SUCCESS, null, bitmap, plan)
     } catch (error) {
       if (error?.name !== 'RenderingCancelledException') {
         logger.warn(`Failed to render page ${pageNumber}:`, error)

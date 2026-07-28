@@ -14,6 +14,27 @@ function resolveBackingDimension(logicalDimension, rasterOutputScale) {
   return Math.max(1, Math.floor(logicalDimension * rasterOutputScale))
 }
 
+export function createIdentityPdfRasterPlan(logicalWidth, logicalHeight) {
+  requirePositiveFinite('logicalWidth', logicalWidth)
+  requirePositiveFinite('logicalHeight', logicalHeight)
+
+  const rasterPixels = logicalWidth * logicalHeight
+
+  return Object.freeze({
+    logicalWidth,
+    logicalHeight,
+    rasterOutputScale: 1,
+    backingWidth: logicalWidth,
+    backingHeight: logicalHeight,
+    rasterScaleX: 1,
+    rasterScaleY: 1,
+    rasterPixels,
+    estimatedBytes: rasterPixels * 4,
+    degraded: false,
+    renderable: true
+  })
+}
+
 export function resolvePdfRasterPlan({
   logicalWidth,
   logicalHeight,

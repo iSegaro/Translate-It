@@ -16,6 +16,7 @@ const mockCreateImageBitmap = vi.fn().mockResolvedValue({
 vi.stubGlobal('createImageBitmap', mockCreateImageBitmap)
 
 const { PdfRenderer, PDF_RENDER_RESULT_STATUS } = await import('./PdfRenderer.js')
+const { createIdentityPdfRasterPlan } = await import('./PdfRasterPlan.js')
 
 function createMockPage(pageNumber, deferredStore) {
   const state = { cancelled: false }
@@ -299,7 +300,7 @@ describe('PdfRenderer', () => {
       expect(result.status).toBe(PDF_RENDER_RESULT_STATUS.CANCELLED)
     })
 
-    it('returns bitmap on successful render', async () => {
+    it('returns bitmap and identity raster plan on successful render', async () => {
       const mockBitmap = { width: 900, height: 1200, close: vi.fn() }
       mockCreateImageBitmap.mockResolvedValueOnce(mockBitmap)
 
@@ -314,6 +315,16 @@ describe('PdfRenderer', () => {
       expect(result.status).toBe(PDF_RENDER_RESULT_STATUS.SUCCESS)
       expect(result.bitmap).toBe(mockBitmap)
       expect(mockCreateImageBitmap).toHaveBeenCalled()
+      expect(result.raster).toBeDefined()
+      expect(Object.isFrozen(result.raster)).toBe(true)
+      expect(result.raster.logicalWidth).toBe(900)
+      expect(result.raster.logicalHeight).toBe(1200)
+      expect(result.raster.backingWidth).toBe(900)
+      expect(result.raster.backingHeight).toBe(1200)
+      expect(result.raster.rasterScaleX).toBe(1)
+      expect(result.raster.rasterScaleY).toBe(1)
+      expect(result.raster.degraded).toBe(false)
+      expect(result.raster.renderable).toBe(true)
     })
 
     it('returns no bitmap when createImageBitmap fails', async () => {
