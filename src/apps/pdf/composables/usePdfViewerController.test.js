@@ -18,7 +18,7 @@ const getTranslationApiAsyncMock = vi.fn()
 const getEffectiveProviderAsyncMock = vi.fn()
 
 const resetTranslationStatesMock = vi.fn()
-const bitmapCacheClearMock = vi.fn()
+const clearRenderedPageCacheMock = vi.fn()
 const invalidateDocumentCacheSnapshotMock = vi.fn()
 
 const session = {
@@ -30,8 +30,8 @@ const session = {
   pageSessions: new Map(),
   translationStates: new Map(),
   resetTranslationStates: resetTranslationStatesMock,
+  clearRenderedPageCache: clearRenderedPageCacheMock,
   invalidateDocumentCacheSnapshot: invalidateDocumentCacheSnapshotMock,
-  _bitmapCache: { clear: bitmapCacheClearMock },
   setBlockTranslationState: vi.fn((blockId, patch) => {
     const current = session.translationStates.get(blockId) || { blockId }
     const next = {
@@ -1005,7 +1005,7 @@ describe('clearDocumentCache', () => {
     await controller.clearDocumentCache()
 
     expect(clearDocumentCacheMock).toHaveBeenCalledWith('doc-1')
-    expect(bitmapCacheClearMock).toHaveBeenCalled()
+    expect(clearRenderedPageCacheMock).toHaveBeenCalled()
     expect(invalidateDocumentCacheSnapshotMock).toHaveBeenCalled()
     expect(resetTranslationStatesMock).toHaveBeenCalled()
   })
@@ -1017,7 +1017,7 @@ describe('clearDocumentCache', () => {
     await controller.clearDocumentCache()
 
     expect(clearDocumentCacheMock).not.toHaveBeenCalled()
-    expect(bitmapCacheClearMock).not.toHaveBeenCalled()
+    expect(clearRenderedPageCacheMock).not.toHaveBeenCalled()
     expect(resetTranslationStatesMock).not.toHaveBeenCalled()
   })
 })

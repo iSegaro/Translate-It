@@ -429,7 +429,7 @@ export function usePdfViewerController() {
     await pdfCacheManager.clearDocument(documentIdentity)
 
     // 2. In-memory bitmap cache
-    pdfDocumentSession._bitmapCache?.clear()
+    pdfDocumentSession.clearRenderedPageCache()
 
     // 3. In-memory document cache snapshot (prevents stale restores)
     pdfDocumentSession.invalidateDocumentCacheSnapshot()
