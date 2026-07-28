@@ -411,9 +411,18 @@ export function usePdfViewerController() {
 
     try {
       isTranslating.value = true
+      const provider = await getEffectiveProviderAsync(TranslationMode.PDF)
+      const optimizationLevel = await getProviderOptimizationLevelAsync(provider)
+      const translationIntent = await buildTranslationSettings({
+        provider,
+        sourceLanguage: pdfSourceLanguage.value,
+        targetLanguage: pdfTargetLanguage.value,
+        optimizationLevel
+      })
       translationSummary.value = await pdfTranslationCoordinator.translateVisibleBlocks({
         sourceLanguage: pdfSourceLanguage.value,
-        targetLanguage: pdfTargetLanguage.value
+        targetLanguage: pdfTargetLanguage.value,
+        translationIntent
       })
       await saveTranslationsToCache()
       pdfHistoryManager.updateAfterTranslation(pdfDocumentSession).catch(() => {})

@@ -1,4 +1,3 @@
-import { TranslationMode, getProviderOptimizationLevelAsync, getEffectiveProviderAsync } from '@/shared/config/config.js'
 import { sendRegularMessage } from '@/shared/messaging/core/UnifiedMessaging.js'
 import { MessageActions } from '@/shared/messaging/core/MessageActions.js'
 import { MessageContexts } from '@/shared/messaging/core/MessagingConstants.js'
@@ -7,6 +6,7 @@ import { generateTranslationMessageId } from '@/utils/messaging/messageId.js'
 import { PDF_TRANSLATION_FAILURE_REASON, PdfTranslationAdapter } from './PdfTranslationAdapter.js'
 import { PdfTranslationBatchPlanner } from './PdfTranslationBatchPlanner.js'
 import { enrichBlocksWithTableMetadata } from './TableRegionAnalyzer.js'
+import { isCompatibleEntry } from './PdfTranslationCompatibility.js'
 
 function isFiniteNumber(value) {
   return typeof value === 'number' && Number.isFinite(value)
@@ -140,7 +140,7 @@ export class PdfTranslationCoordinator {
   }
 
   async translateVisibleBlocks(request) {
-    const { sourceLanguage, targetLanguage } = request
+    const { sourceLanguage, targetLanguage, translationIntent } = request
     if (this.isTranslating) {
       return this.lastSummary
     }
@@ -153,7 +153,12 @@ export class PdfTranslationCoordinator {
       const allVisibleBlocks = await this.session.getVisibleLogicalBlocks()
       const visibleBlocks = allVisibleBlocks.filter((block) => {
         const state = this.session.getBlockTranslationState(block.id)
-        return state.status !== 'translated'
+        if (state.status !== 'translated') return true
+        return !isCompatibleEntry(
+          state,
+          block,
+          translationIntent
+        )
       })
 
       if (visibleBlocks.length === 0) {
@@ -174,11 +179,9 @@ export class PdfTranslationCoordinator {
       const semanticRegions = pageLayout?.regions || []
       const structuredRegions = pageLayout?.metadata?.structured?.regions || []
 
-      const provider = await getEffectiveProviderAsync(TranslationMode.PDF)
-      const optimizationLevel = await getProviderOptimizationLevelAsync(provider)
       const batches = this.batchPlanner.plan(enrichedBlocks, {
-        providerName: provider,
-        optimizationLevel,
+        providerName: translationIntent.provider,
+        optimizationLevel: translationIntent.optimizationLevel,
         semanticRegions,
         structuredRegions
       })
@@ -203,7 +206,7 @@ export class PdfTranslationCoordinator {
         try {
           response = await sendRegularMessage(
             this.adapter.buildTranslationRequest(batch.items, {
-              provider,
+              provider: translationIntent.provider,
               sourceLanguage,
               targetLanguage,
               messageId,
@@ -230,7 +233,7 @@ export class PdfTranslationCoordinator {
         }
 
         const mappedResults = this.adapter.mapBatchResponse(batch.items, response, {
-          provider,
+          provider: translationIntent.provider,
           sourceLanguage,
           targetLanguage
         })
@@ -242,7 +245,7 @@ export class PdfTranslationCoordinator {
           firstError = batchFailure.error || 'PDF translation failed'
         }
 
-        const batchCounts = this._applyBatchResults(mappedResults)
+        const batchCounts = this._applyBatchResults(mappedResults, translationIntent)
         translatedCount += batchCounts.translatedCount
         failedCount += batchCounts.failedCount
       }
@@ -320,7 +323,7 @@ export class PdfTranslationCoordinator {
     this._notifyStateChange(blockIds)
   }
 
-  _applyBatchResults(batchResults = []) {
+  _applyBatchResults(batchResults = [], translationIntent = {}) {
     let translatedCount = 0
     let failedCount = 0
 
@@ -335,34 +338,35 @@ export class PdfTranslationCoordinator {
           provider: result.provider || '',
           sourceLanguage: result.sourceLanguage || '',
           targetLanguage: result.targetLanguage || '',
-          sourceTextHash: result.sourceTextHash || '',
-          error: result.error || 'PDF translation failed',
-          failureReason: result.failureReason || PDF_TRANSLATION_FAILURE_REASON.UNKNOWN
-        })
-        continue
-      }
-
-      translatedCount += 1
-      const currentState = this.session.getBlockTranslationState(result.blockId)
-      const mergedTranslatedCells = mergeStructuredTranslatedCells(
-        currentState?.translatedCells || null,
-        result.translatedCells || null
-      )
-      const nextTranslatedText = mergedTranslatedCells
-        ? deriveStructuredTranslatedText(mergedTranslatedCells)
-        : result.translatedText
-
-      this.session.setBlockTranslationState(result.blockId, {
-        translatedText: nextTranslatedText,
-        translatedCells: mergedTranslatedCells,
-        status: 'translated',
-        provider: result.provider || '',
-        sourceLanguage: result.sourceLanguage || '',
-        targetLanguage: result.targetLanguage || '',
-          sourceTextHash: result.sourceTextHash || '',
-          error: null,
-          failureReason: null
+        sourceTextHash: result.sourceTextHash || '',
+        error: result.error || 'PDF translation failed',
+        failureReason: result.failureReason || PDF_TRANSLATION_FAILURE_REASON.UNKNOWN
       })
+      continue
+    }
+
+    translatedCount += 1
+    const currentState = this.session.getBlockTranslationState(result.blockId)
+    const mergedTranslatedCells = mergeStructuredTranslatedCells(
+      currentState?.translatedCells || null,
+      result.translatedCells || null
+    )
+    const nextTranslatedText = mergedTranslatedCells
+      ? deriveStructuredTranslatedText(mergedTranslatedCells)
+      : result.translatedText
+
+    this.session.setBlockTranslationState(result.blockId, {
+      translatedText: nextTranslatedText,
+      translatedCells: mergedTranslatedCells,
+      status: 'translated',
+      provider: result.provider || '',
+      sourceLanguage: result.sourceLanguage || '',
+      targetLanguage: result.targetLanguage || '',
+      sourceTextHash: result.sourceTextHash || '',
+      translationSettingsHash: translationIntent.translationSettingsHash || '',
+      error: null,
+      failureReason: null
+    })
     }
 
     const blockIds = batchResults.map((result) => result?.blockId).filter(Boolean)

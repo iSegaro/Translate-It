@@ -1078,7 +1078,15 @@ describe('usePdfViewerController translation language resolution', () => {
 
     await controller.translateVisiblePages()
 
-    expect(translateVisibleBlocksMock).toHaveBeenCalledWith({ sourceLanguage: 'de', targetLanguage: 'fa' })
+    expect(translateVisibleBlocksMock).toHaveBeenCalledWith(expect.objectContaining({
+      sourceLanguage: 'de',
+      targetLanguage: 'fa',
+      translationIntent: expect.objectContaining({
+        provider: 'googlev2',
+        optimizationLevel: 3,
+        translationSettingsHash: expect.any(String)
+      })
+    }))
   })
 
   it('passes pdfTargetLanguage to translateVisibleBlocks', async () => {
@@ -1099,7 +1107,15 @@ describe('usePdfViewerController translation language resolution', () => {
 
     await controller.translateVisiblePages()
 
-    expect(translateVisibleBlocksMock).toHaveBeenCalledWith({ sourceLanguage: 'auto', targetLanguage: 'fr' })
+    expect(translateVisibleBlocksMock).toHaveBeenCalledWith(expect.objectContaining({
+      sourceLanguage: 'auto',
+      targetLanguage: 'fr',
+      translationIntent: expect.objectContaining({
+        provider: 'googlev2',
+        optimizationLevel: 3,
+        translationSettingsHash: expect.any(String)
+      })
+    }))
   })
 })
 
