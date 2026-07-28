@@ -139,6 +139,7 @@
             v-if="fileName"
             class="pdf-toolbar__export-item pdf-toolbar__menu-row"
             type="button"
+            :disabled="isClearCacheDisabled"
             @click="close(); handleClearCacheAction()"
           >
             <span class="pdf-toolbar__menu-row-label">Clear Cache</span>
@@ -164,7 +165,8 @@ const props = defineProps({
   targetLanguage: { type: String, default: 'fa' },
   isDebugMode: { type: Boolean, default: false },
   regionComparisonState: { type: Object, default: null },
-  canExportRegionComparisonArtifact: { type: Boolean, default: false }
+  canExportRegionComparisonArtifact: { type: Boolean, default: false },
+  isClearCacheDisabled: { type: Boolean, default: false }
 })
 
 const emit = defineEmits([

@@ -387,6 +387,7 @@
             :target-language="targetLanguage"
             :region-comparison-state="regionComparisonState"
             :can-export-region-comparison-artifact="canExportRegionComparisonArtifact"
+            :is-clear-cache-disabled="isClearCacheDisabled"
             :is-debug-mode="isDebugMode"
             @request-open-pdf="emit('request-open-pdf')"
             @export-txt="emit('export-txt')"
@@ -468,6 +469,7 @@ const props = defineProps({
   executionModes: { type: Array, default: () => [] },
   regionComparisonState: { type: Object, default: null },
   canExportRegionComparisonArtifact: { type: Boolean, default: false },
+  isClearCacheDisabled: { type: Boolean, default: false },
   sourceLanguage: { type: String, default: 'auto' },
   targetLanguage: { type: String, default: 'fa' },
 })

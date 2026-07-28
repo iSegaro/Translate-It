@@ -20,6 +20,7 @@
       :execution-modes="supportedExecutionModes"
       :region-comparison-state="regionComparisonState"
       :can-export-region-comparison-artifact="canExportRegionComparisonArtifact"
+      :is-clear-cache-disabled="isClearCacheDisabled"
       :source-language="pdfSourceLanguage"
       :target-language="pdfTargetLanguage"
       @update:source-language="pdfSourceLanguage = $event"
@@ -371,6 +372,13 @@ const regionSelectionTarget = ref(null)
 const regionComparisonState = ref(null)
 let developerNotificationOccurrenceId = 0
 const canExportRegionComparisonArtifact = computed(() => regionComparisonState.value?.status === 'completed')
+const isClearCacheDisabled = computed(() =>
+  isLoading.value ||
+  isTranslating.value ||
+  isOcrProcessing.value ||
+  regionOcrState.value !== REGION_OCR_STATE.IDLE ||
+  ['running', 'cancelling'].includes(regionComparisonState.value?.status)
+)
 const regionOcrAvailable = computed(() => hasDocument.value && showOriginalPane.value)
 const supportedExecutionModes = Object.freeze([REGION_EXECUTION_TARGET.OCR])
 const executionMode = ref(REGION_EXECUTION_TARGET.OCR)
