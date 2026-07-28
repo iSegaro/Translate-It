@@ -62,24 +62,7 @@ export class PdfExportCollector {
   }
 
   getExportStats() {
-    let translatedCount = 0
-    let failedCount = 0
-    let totalCount = 0
-
-    for (const state of this.session.translationStates.values()) {
-      totalCount++
-      if (state.status === 'translated') translatedCount++
-      if (state.status === 'error') failedCount++
-    }
-
-    return {
-      totalBlocks: totalCount,
-      translatedCount,
-      failedCount,
-      totalPages: this.session.totalPages,
-      isPartial: translatedCount < totalCount && totalCount > 0,
-      hasTranslatedBlocks: translatedCount > 0
-    }
+    return this.session.getTranslationExportStats()
   }
 
   async collectSpatialBlocks(canvasDataUrls = new Map()) {
