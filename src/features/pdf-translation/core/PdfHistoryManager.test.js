@@ -89,15 +89,26 @@ describe('PdfHistoryManager', () => {
   })
 
   it('updateAfterTranslation updates translated counts and derives provider/language', async () => {
+    const translationStates = new Map([
+      ['b1', { status: 'translated', pageNumber: 1, provider: 'google', sourceLanguage: 'en', targetLanguage: 'es' }],
+      ['b2', { status: 'translated', pageNumber: 1, provider: 'google', sourceLanguage: 'en', targetLanguage: 'es' }],
+      ['b3', { status: 'idle', pageNumber: 2 }]
+    ])
     await manager.updateAfterTranslation({
       documentIdentity: 'doc-1',
       fileName: 'test.pdf',
       totalPages: 5,
-      translationStates: new Map([
-        ['b1', { status: 'translated', pageNumber: 1, provider: 'google', sourceLanguage: 'en', targetLanguage: 'es' }],
-        ['b2', { status: 'translated', pageNumber: 1, provider: 'google', sourceLanguage: 'en', targetLanguage: 'es' }],
-        ['b3', { status: 'idle', pageNumber: 2 }]
-      ])
+      translationStates,
+      getTranslationHistoryMetadata: () => {
+        const translated = [...translationStates.values()].filter((state) => state.status === 'translated')
+        return {
+          translatedBlockCount: translated.length,
+          translatedPageCount: new Set(translated.map((state) => state.pageNumber).filter((pageNumber) => pageNumber > 0)).size,
+          provider: translated.find((state) => state.provider)?.provider || '',
+          sourceLanguage: translated.find((state) => state.sourceLanguage)?.sourceLanguage || '',
+          targetLanguage: translated.find((state) => state.targetLanguage)?.targetLanguage || ''
+        }
+      }
     })
 
     const saved = mockStorage.pdfTranslationHistory
