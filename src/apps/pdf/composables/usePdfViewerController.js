@@ -377,8 +377,8 @@ export function usePdfViewerController() {
 
     const hashCache = new Map()
     const entries = {}
-    for (const [blockId, state] of pdfDocumentSession.translationStates) {
-      if (state.status !== 'translated') continue
+    for (const state of pdfDocumentSession.getTranslatedBlockPersistenceRecords()) {
+      const blockId = state.blockId
 
       const entrySourceLanguage = state.sourceLanguage || ''
       const entryTargetLanguage = state.targetLanguage || ''
