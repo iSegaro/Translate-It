@@ -152,6 +152,7 @@
 <script setup>
 import { computed, ref } from 'vue'
 import ToolbarMenu from '@/components/base/ToolbarMenu/ToolbarMenu.vue'
+import './PdfMoreMenu.scss'
 
 const TOOLTIP_MORE = 'More actions'
 
