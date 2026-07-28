@@ -543,6 +543,10 @@ export class PdfDocumentSession extends ResourceTracker {
     return this._translationState.getBlockTranslationState(blockId)
   }
 
+  hasAnyTranslatedBlocks() {
+    return this._translationState.hasAnyTranslated()
+  }
+
   forEachCommittedPage(callback) {
     if (typeof callback !== 'function') return
 

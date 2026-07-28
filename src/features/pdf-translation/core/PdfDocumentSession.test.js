@@ -73,6 +73,18 @@ describe('PdfDocumentSession', () => {
     session.totalPages = 2
   })
 
+  it('reports whether translated blocks exist', () => {
+    expect(session.hasAnyTranslatedBlocks()).toBe(false)
+
+    session.setBlockTranslationState('block-1', { status: 'translated' })
+
+    expect(session.hasAnyTranslatedBlocks()).toBe(true)
+
+    session.resetTranslationStates()
+
+    expect(session.hasAnyTranslatedBlocks()).toBe(false)
+  })
+
   function createScannedPage(pageNumber = 1) {
     return {
       pageNumber,
