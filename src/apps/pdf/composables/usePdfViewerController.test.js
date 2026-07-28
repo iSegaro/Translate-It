@@ -310,7 +310,7 @@ describe('usePdfViewerController cache persistence', () => {
     session.setPageOcrBlocks.mockClear()
   })
 
-  it('restores plain translatedText cache entries', async () => {
+  it('does not restore cached translations during document load', async () => {
     const block = createBlock()
     const { controller } = await loadControllerWithCacheEntry({
       blockId: block.id,
@@ -323,14 +323,8 @@ describe('usePdfViewerController cache persistence', () => {
     }, block)
 
     const restoreCall = session.setBlockTranslationState.mock.calls.find((call) => call[0] === block.id)
-    expect(restoreCall).toBeDefined()
-    expect(restoreCall[1].translatedText).toBe('درآمد ۱۲٫۵ میلیارد')
-    expect(restoreCall[1].translatedCells).toBeUndefined()
-    expect(restoreCall[1].provider).toBe('googlev2')
-    expect(restoreCall[1].sourceLanguage).toBe('auto')
-    expect(restoreCall[1].targetLanguage).toBe('fa')
-    expect(restoreCall[1].sourceTextHash).toBe(block.sourceTextHash)
-    expect(controller.restoredTranslationCount.value).toBe(1)
+    expect(restoreCall).toBeUndefined()
+    expect(controller.restoredTranslationCount.value).toBe(0)
   })
 
   it('resolves restore provider via getEffectiveProviderAsync(PDF)', async () => {
@@ -339,22 +333,24 @@ describe('usePdfViewerController cache persistence', () => {
     expect(getEffectiveProviderAsyncMock).toHaveBeenCalledWith('pdf-translation')
   })
 
-  it('restores cache with global provider when no mode-specific override exists', async () => {
-    getEffectiveProviderAsyncMock.mockReset().mockResolvedValue('googlev2')
+  it('restores cache with global provider when a page commits', async () => {
     const block = createBlock()
     const { controller } = await loadControllerWithCacheEntry({
       blockId: block.id,
       translatedText: 'سلام',
       sourceTextHash: block.sourceTextHash,
-      translationSettingsHash: await createSettingsHash({ provider: 'googlev2' }),
+      translationSettingsHash: await createSettingsHash(),
       provider: 'googlev2',
       sourceLanguage: 'auto',
       targetLanguage: 'fa'
     }, block)
+
+    await pageSessionCommittedListener?.({ pageNumber: 1 })
+
     expect(controller.restoredTranslationCount.value).toBe(1)
   })
 
-  it('restores cache with mode-specific PDF provider override', async () => {
+  it('restores cache with mode-specific PDF provider override when a page commits', async () => {
     getEffectiveProviderAsyncMock.mockReset().mockResolvedValue('deepl')
     const block = createBlock()
     const { controller } = await loadControllerWithCacheEntry({
@@ -366,10 +362,13 @@ describe('usePdfViewerController cache persistence', () => {
       sourceLanguage: 'auto',
       targetLanguage: 'fa'
     }, block)
+
+    await pageSessionCommittedListener?.({ pageNumber: 1 })
+
     expect(controller.restoredTranslationCount.value).toBe(1)
   })
 
-  it('restores cache when mode-specific provider is default (falls back to global)', async () => {
+  it('restores cache with default mode-specific provider when a page commits', async () => {
     getEffectiveProviderAsyncMock.mockReset().mockResolvedValue('openai')
     const block = createBlock()
     const { controller } = await loadControllerWithCacheEntry({
@@ -381,6 +380,9 @@ describe('usePdfViewerController cache persistence', () => {
       sourceLanguage: 'auto',
       targetLanguage: 'fa'
     }, block)
+
+    await pageSessionCommittedListener?.({ pageNumber: 1 })
+
     expect(controller.restoredTranslationCount.value).toBe(1)
   })
 
@@ -411,81 +413,44 @@ describe('usePdfViewerController cache persistence', () => {
     expect(controller.restoredOcrPageCount.value).toBe(0)
   })
 
-  it('restores structured translatedCells cache entries', async () => {
+  it('restores structured translatedCells cache entries when a page commits', async () => {
     const block = createBlock()
     const structuredCell = {
-      id: 'cell-1',
-      regionId: 'region-1',
-      rowIndex: 0,
-      columnIndex: 0,
-      rowSpan: 1,
-      colSpan: 1,
-      spanType: 'none',
-      role: 'value',
-      text: 'Revenue',
-      boundingBox: { x: 60, y: 120, width: 120, height: 18 },
-      sourceReferences: {
-        blockIds: ['block-a'],
-        lineIds: [],
-        sourceLineIndices: [0],
-        sourceItemIndices: [0],
-        groupRegionIds: []
-      },
-      blockIds: ['block-a'],
-      lineIds: [],
-      sourceLineIndex: 0,
-      sourceItemIndex: 0,
-      spanCandidate: false,
-      estimatedRowSpan: 1,
-      estimatedColSpan: 1,
-      confidence: 0.9
+      id: 'cell-1', regionId: 'region-1', rowIndex: 0, columnIndex: 0, rowSpan: 1, colSpan: 1,
+      spanType: 'none', role: 'value', text: 'Revenue', boundingBox: { x: 60, y: 120, width: 120, height: 18 },
+      sourceReferences: { blockIds: ['block-a'], lineIds: [], sourceLineIndices: [0], sourceItemIndices: [0], groupRegionIds: [] },
+      blockIds: ['block-a'], lineIds: [], sourceLineIndex: 0, sourceItemIndex: 0,
+      spanCandidate: false, estimatedRowSpan: 1, estimatedColSpan: 1, confidence: 0.9
     }
-
     await loadControllerWithCacheEntry({
       blockId: block.id,
       translatedText: 'درآمد',
-      translatedCells: [
-        {
-          lineIndex: 0,
-          cells: ['درآمد'],
-          structuredCells: [structuredCell]
-        }
-      ],
+      translatedCells: [{ lineIndex: 0, cells: ['درآمد'], structuredCells: [structuredCell] }],
       sourceTextHash: block.sourceTextHash,
       translationSettingsHash: await createSettingsHash(),
-      provider: 'googlev2',
-      sourceLanguage: 'auto',
-      targetLanguage: 'fa'
+      provider: 'googlev2', sourceLanguage: 'auto', targetLanguage: 'fa'
     }, block)
+
+    await pageSessionCommittedListener?.({ pageNumber: 1 })
 
     const restoreCall = session.setBlockTranslationState.mock.calls.find((call) => call[0] === block.id)
     expect(restoreCall).toBeDefined()
     expect(restoreCall[1].translatedCells).toHaveLength(1)
     expect(restoreCall[1].translatedCells[0].structuredCells[0]).toEqual(structuredCell)
-    expect(restoreCall[1].translatedText).toBe('درآمد')
   })
 
-  it('ignores invalid structuredCells but still restores translatedText when safe', async () => {
+  it('ignores invalid structuredCells but restores translatedText when a page commits', async () => {
     const block = createBlock()
-
     await loadControllerWithCacheEntry({
       blockId: block.id,
       translatedText: 'درآمد',
-      translatedCells: [
-        {
-          lineIndex: 0,
-          cells: ['درآمد'],
-          structuredCells: [
-            { id: 'broken-cell', boundingBox: null }
-          ]
-        }
-      ],
+      translatedCells: [{ lineIndex: 0, cells: ['درآمد'], structuredCells: [{ id: 'broken-cell', boundingBox: null }] }],
       sourceTextHash: block.sourceTextHash,
       translationSettingsHash: await createSettingsHash(),
-      provider: 'googlev2',
-      sourceLanguage: 'auto',
-      targetLanguage: 'fa'
+      provider: 'googlev2', sourceLanguage: 'auto', targetLanguage: 'fa'
     }, block)
+
+    await pageSessionCommittedListener?.({ pageNumber: 1 })
 
     const restoreCall = session.setBlockTranslationState.mock.calls.find((call) => call[0] === block.id)
     expect(restoreCall).toBeDefined()
@@ -493,38 +458,36 @@ describe('usePdfViewerController cache persistence', () => {
     expect(restoreCall[1].translatedCells).toBeUndefined()
   })
 
-  it('skips stale restores when sourceTextHash does not match', async () => {
+  it('skips stale source-hash cache entries when a page commits', async () => {
     const block = createBlock()
-
     await loadControllerWithCacheEntry({
       blockId: block.id,
       translatedText: 'درآمد',
       sourceTextHash: 'wrong-hash',
-      provider: 'googlev2',
-      sourceLanguage: 'auto',
-      targetLanguage: 'fa'
+      provider: 'googlev2', sourceLanguage: 'auto', targetLanguage: 'fa'
     }, block)
+
+    await pageSessionCommittedListener?.({ pageNumber: 1 })
 
     expect(session.setBlockTranslationState).not.toHaveBeenCalled()
   })
 
-  it('skips stale restores when translationSettingsHash does not match', async () => {
+  it('skips stale settings-hash cache entries when a page commits', async () => {
     const block = createBlock()
-
     await loadControllerWithCacheEntry({
       blockId: block.id,
       translatedText: 'درآمد',
       sourceTextHash: block.sourceTextHash,
       translationSettingsHash: 'old-settings-hash',
-      provider: 'googlev2',
-      sourceLanguage: 'auto',
-      targetLanguage: 'fa'
+      provider: 'googlev2', sourceLanguage: 'auto', targetLanguage: 'fa'
     }, block)
+
+    await pageSessionCommittedListener?.({ pageNumber: 1 })
 
     expect(session.setBlockTranslationState).not.toHaveBeenCalled()
   })
 
-  it('restores cached translations for late committed pages through the shared page pipeline', async () => {
+  it('restores cached translations only after pages commit through the shared page pipeline', async () => {
     const openBlock = createBlock({ id: 'open-block', sourceTextHash: 'hash-open' })
     const lateBlock = createBlock({ id: 'late-block', sourceTextHash: 'hash-late' })
     const translationSettingsHash = await createSettingsHash()
@@ -560,8 +523,12 @@ describe('usePdfViewerController cache persistence', () => {
     const controller = usePdfViewerController()
     await controller.loadPdfFile({ type: 'application/pdf', name: 'doc.pdf' }, 800)
 
-    expect(session.setBlockTranslationState).toHaveBeenCalledWith(openBlock.id, expect.objectContaining({ translatedText: 'باز' }))
+    expect(session.setBlockTranslationState).not.toHaveBeenCalledWith(openBlock.id, expect.anything())
     expect(session.setBlockTranslationState).not.toHaveBeenCalledWith(lateBlock.id, expect.anything())
+
+    await pageSessionCommittedListener?.({ pageNumber: 1 })
+
+    expect(session.setBlockTranslationState).toHaveBeenCalledWith(openBlock.id, expect.objectContaining({ translatedText: 'باز' }))
 
     session.pageSessions.set(2, { allBlocks: [lateBlock], getLogicalBlocks: () => [lateBlock] })
     await pageSessionCommittedListener?.({ pageNumber: 2 })

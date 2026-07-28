@@ -360,12 +360,6 @@ export function usePdfViewerController() {
       ensurePageSessionCommitSubscription()
       applySessionState(nextState)
 
-      const restoreTasks = []
-      pdfDocumentSession.forEachCommittedPage?.((pageNumber) => {
-        restoreTasks.push(restoreCachedTranslationsForPage(pageNumber, restoreContext))
-      })
-      await Promise.all(restoreTasks)
-
       pdfHistoryManager.updateAfterOpen(pdfDocumentSession).catch(() => {})
 
       return true
