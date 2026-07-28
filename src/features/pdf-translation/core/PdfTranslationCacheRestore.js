@@ -1,3 +1,5 @@
+import { isCompatibleEntry } from './PdfTranslationCompatibility.js'
+
 function isFiniteNumber(value) {
   return typeof value === 'number' && Number.isFinite(value)
 }
@@ -94,15 +96,6 @@ function deriveTranslatedTextFromStructuredCells(translatedCells = []) {
   }
 
   return lines.join('\n').trim()
-}
-
-function isCompatibleEntry(entry, block, settings) {
-  return !!entry &&
-    entry.sourceTextHash === block.sourceTextHash &&
-    entry.translationSettingsHash === settings.translationSettingsHash &&
-    entry.provider === settings.provider &&
-    entry.sourceLanguage === settings.sourceLanguage &&
-    entry.targetLanguage === settings.targetLanguage
 }
 
 export function restoreCachedPdfTranslations({
