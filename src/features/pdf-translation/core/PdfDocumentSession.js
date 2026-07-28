@@ -159,13 +159,18 @@ export class PdfDocumentSession extends ResourceTracker {
     return { ocr: {} }
   }
 
-  _startDocumentCacheLoad(documentIdentity, generation = this._documentGeneration) {
+  invalidateDocumentCacheSnapshot(generation = this._documentGeneration) {
     const emptyCache = this._emptyDocumentCache()
     this._documentCacheGeneration = generation
     this._documentCacheSnapshot = emptyCache
+    this._documentCachePromise = Promise.resolve(emptyCache)
+    return emptyCache
+  }
+
+  _startDocumentCacheLoad(documentIdentity, generation = this._documentGeneration) {
+    const emptyCache = this.invalidateDocumentCacheSnapshot(generation)
 
     if (!documentIdentity) {
-      this._documentCachePromise = Promise.resolve(emptyCache)
       return this._documentCachePromise
     }
 
@@ -842,9 +847,7 @@ export class PdfDocumentSession extends ResourceTracker {
     this.pdfFingerprint = ''
     this.documentIdentity = ''
     this.displayName = ''
-    this._documentCacheGeneration = this._documentGeneration
-    this._documentCacheSnapshot = this._emptyDocumentCache()
-    this._documentCachePromise = Promise.resolve(this._documentCacheSnapshot)
+    this.invalidateDocumentCacheSnapshot()
 
     try {
       await this.loadingTask?.destroy?.()
