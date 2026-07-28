@@ -158,6 +158,15 @@ export class PdfDocumentSession extends ResourceTracker {
     return { translations: {}, ocr: {} }
   }
 
+  mergeDocumentCacheSnapshot(entries) {
+    if (!entries || typeof entries !== 'object') return
+    for (const [blockId, entry] of Object.entries(entries)) {
+      if (entry?.status === 'translated') {
+        this._documentCacheSnapshot.translations[blockId] = entry
+      }
+    }
+  }
+
   _startDocumentCacheLoad(documentIdentity, generation = this._documentGeneration) {
     const emptyCache = this._emptyDocumentCache()
     this._documentCacheGeneration = generation

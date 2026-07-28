@@ -490,6 +490,7 @@ export function usePdfViewerController() {
 
     if (Object.keys(entries).length > 0) {
       await pdfCacheManager.saveTranslations(documentIdentity, entries)
+      pdfDocumentSession.mergeDocumentCacheSnapshot(entries)
     }
   }
 
@@ -503,7 +504,10 @@ export function usePdfViewerController() {
     // 2. In-memory bitmap cache
     pdfDocumentSession._bitmapCache?.clear()
 
-    // 3. Translation state + UI overlay
+    // 3. In-memory document cache snapshot (prevents stale restores)
+    pdfDocumentSession._documentCacheSnapshot = pdfDocumentSession._emptyDocumentCache()
+
+    // 4. Translation state + UI overlay
     pdfDocumentSession.resetTranslationStates()
     _pageDataMap.clear()
     _blockIndex.clear()
