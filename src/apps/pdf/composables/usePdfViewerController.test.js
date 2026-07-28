@@ -55,6 +55,7 @@ const session = {
     updatedAt: 0,
     error: null
   }),
+  hasAnyTranslatedBlocks: vi.fn(() => [...session.translationStates.values()].some((state) => state.status === 'translated')),
   getPageLayout: vi.fn().mockReturnValue(null),
   getPageSession: vi.fn(),
   getPageSourceBlocks: vi.fn((pageNumber) => session.pageSessions.get(pageNumber)?.getLogicalBlocks?.() || []),
