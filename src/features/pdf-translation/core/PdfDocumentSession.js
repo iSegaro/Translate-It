@@ -786,10 +786,13 @@ export class PdfDocumentSession extends ResourceTracker {
 
     // Cache bitmap only on successful render
     if (result.status === PDF_RENDER_RESULT_STATUS.SUCCESS && result.bitmap) {
-      this._bitmapCache.set(cacheKey, result.bitmap, {
-        width: result.bitmap.width,
-        height: result.bitmap.height
-      })
+      const candidateBitmap = result.bitmap
+      const estimatedBytes = candidateBitmap.width * candidateBitmap.height * 4
+      const admitted = this._bitmapCache.tryAdmit(cacheKey, candidateBitmap, estimatedBytes)
+      if (!admitted) {
+        candidateBitmap.close?.()
+      }
+      result.bitmap = null
     }
 
     return result

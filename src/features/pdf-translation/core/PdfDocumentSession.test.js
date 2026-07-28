@@ -18,6 +18,7 @@ vi.mock('./PdfCacheManager.js', () => ({
 }))
 
 const { PdfDocumentSession, PAGE_CONTENT_SOURCE } = await import('./PdfDocumentSession.js')
+const { PdfBitmapCache } = await import('./PdfBitmapCache.js')
 const { loadPdfDocumentFromFile } = await import('./pdfjs.js')
 const { pdfCacheManager } = await import('./PdfCacheManager.js')
 
@@ -1026,14 +1027,36 @@ describe('PdfDocumentSession', () => {
      ]
    })
 
-   it('caches bitmap on successful render', async () => {
-     const canvas = { width: 0, height: 0, style: {}, getContext: vi.fn(() => ({ drawImage: vi.fn(), fillRect: vi.fn() })) }
+    it('caches bitmap on successful render', async () => {
+      const canvas = { width: 0, height: 0, style: {}, getContext: vi.fn(() => ({ drawImage: vi.fn(), fillRect: vi.fn() })) }
 
-     await cacheSession.renderPage(1, canvas, null)
+      const result = await cacheSession.renderPage(1, canvas, null)
 
-     expect(cacheSession._bitmapCache.size).toBe(1)
-     expect(mockRenderer.renderPage).toHaveBeenCalledTimes(1)
-   })
+      expect(cacheSession._bitmapCache.size).toBe(1)
+      expect(mockRenderer.renderPage).toHaveBeenCalledTimes(1)
+      expect(mockBitmap.close).not.toHaveBeenCalled()
+      expect(result.bitmap).toBeNull()
+    })
+
+    it('derives cache admission bytes from the candidate bitmap dimensions', async () => {
+      const canvas = { width: 0, height: 0, style: {}, getContext: vi.fn(() => ({ drawImage: vi.fn(), fillRect: vi.fn() })) }
+      const admitSpy = vi.spyOn(cacheSession._bitmapCache, 'tryAdmit')
+
+      await cacheSession.renderPage(1, canvas, null)
+
+      expect(admitSpy).toHaveBeenCalledWith('test-doc:1:1.5', mockBitmap, 600 * 800 * 4)
+    })
+
+    it('closes rejected candidates exactly once without retaining them', async () => {
+      cacheSession._bitmapCache = new PdfBitmapCache({ maxSizeBytes: 1 })
+      const canvas = { width: 0, height: 0, style: {}, getContext: vi.fn(() => ({ drawImage: vi.fn(), fillRect: vi.fn() })) }
+
+      const result = await cacheSession.renderPage(1, canvas, null)
+
+      expect(cacheSession._bitmapCache.size).toBe(0)
+      expect(mockBitmap.close).toHaveBeenCalledTimes(1)
+      expect(result.bitmap).toBeNull()
+    })
 
    it('uses cache on second render for same page/scale', async () => {
      const canvas = { width: 0, height: 0, style: {}, getContext: vi.fn(() => ({ drawImage: vi.fn(), fillRect: vi.fn() })) }

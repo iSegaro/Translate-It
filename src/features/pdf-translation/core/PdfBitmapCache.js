@@ -65,29 +65,30 @@ export class PdfBitmapCache {
     return entry.bitmap
   }
 
-  /**
-   * Store a bitmap in the cache. Evicts LRU entries if over limit.
-   *
-   * @param {string} key
-   * @param {ImageBitmap} bitmap
-   * @param {object} [metadata]
-   * @param {number} [metadata.width] - Bitmap width (for size estimation)
-   * @param {number} [metadata.height] - Bitmap height (for size estimation)
-   */
-  set(key, bitmap, metadata = {}) {
-    // Remove existing entry under same key if present
+  tryAdmit(key, bitmap, estimatedBytes) {
+    if (!this._isAdmissible(key, bitmap, estimatedBytes)) {
+      return false
+    }
+
     if (this._entries.has(key)) {
       this._removeEntry(key)
     }
 
-    const width = metadata.width || bitmap.width || 0
-    const height = metadata.height || bitmap.height || 0
-    const size = estimateEntrySize(width, height)
-
-    this._entries.set(key, { bitmap, size })
-    this._currentSizeBytes += size
-
+    this._entries.set(key, { bitmap, size: estimatedBytes })
+    this._currentSizeBytes += estimatedBytes
     this._evict()
+    return true
+  }
+
+  /**
+   * @deprecated Temporary compatibility wrapper.
+   * Use tryAdmit() directly.
+   */
+  set(key, bitmap, metadata = {}) {
+    const width = metadata.width || bitmap?.width || 0
+    const height = metadata.height || bitmap?.height || 0
+    const estimatedBytes = estimateEntrySize(width, height)
+    return this.tryAdmit(key, bitmap, estimatedBytes)
   }
 
   /**
@@ -113,11 +114,9 @@ export class PdfBitmapCache {
    * Clear all entries and close their bitmaps.
    */
   clear() {
-    for (const [, entry] of this._entries) {
-      entry.bitmap.close?.()
+    for (const key of [...this._entries.keys()]) {
+      this._removeEntry(key)
     }
-    this._entries.clear()
-    this._currentSizeBytes = 0
   }
 
   /**
@@ -148,9 +147,29 @@ export class PdfBitmapCache {
     const entry = this._entries.get(key)
     if (!entry) return
 
-    entry.bitmap.close?.()
     this._currentSizeBytes -= entry.size
     this._entries.delete(key)
+    this._closeBitmap(entry.bitmap)
+  }
+
+  _isAdmissible(key, bitmap, estimatedBytes) {
+    if (typeof key !== 'string' || !key || !bitmap || typeof bitmap.close !== 'function') {
+      return false
+    }
+
+    if (!Number.isSafeInteger(estimatedBytes) || estimatedBytes <= 0 || estimatedBytes > this._maxSizeBytes) {
+      return false
+    }
+
+    return ![...this._entries.values()].some((entry) => entry.bitmap === bitmap)
+  }
+
+  _closeBitmap(bitmap) {
+    try {
+      bitmap.close?.()
+    } catch (error) {
+      logger.warn('[BitmapCache] failed to close bitmap', { error })
+    }
   }
 
   /**
