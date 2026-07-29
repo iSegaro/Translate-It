@@ -36,6 +36,36 @@ export function createPdfTransitionController({
   let deferredZoomLayout = null
   let renderWindowFreezeDepth = 0
   let currentPageSuppressionDepth = 0
+  let pendingLayoutCommit = null
+  let firstRealLayoutCommitted = false
+  let firstRealLayoutWaiter = createFirstRealLayoutWaiter()
+
+  function createFirstRealLayoutWaiter() {
+    let resolve
+    const promise = new Promise((resolvePromise) => {
+      resolve = resolvePromise
+    })
+    return { promise, resolve }
+  }
+
+  function clearPendingLayoutCommit(commit) {
+    if (pendingLayoutCommit === commit) {
+      pendingLayoutCommit = null
+    }
+  }
+
+  function waitForInitialLayoutCommit() {
+    if (pendingLayoutCommit) return pendingLayoutCommit
+    if (firstRealLayoutCommitted) return Promise.resolve()
+    return firstRealLayoutWaiter.promise
+  }
+
+  function resetInitialLayoutCommit() {
+    pendingLayoutCommit = null
+    firstRealLayoutCommitted = false
+    firstRealLayoutWaiter.resolve({ cancelled: true })
+    firstRealLayoutWaiter = createFirstRealLayoutWaiter()
+  }
 
   function _getSuppressionDebugState() {
     return {
@@ -131,6 +161,7 @@ export function createPdfTransitionController({
   onBeforeUnmount(() => {
     clearScrollSyncSuppressionTimer()
     clearPendingTransitionRestore()
+    resetInitialLayoutCommit()
     deferredZoomLayout = null
   })
 
@@ -422,7 +453,7 @@ export function createPdfTransitionController({
     }
   }
 
-  async function handleLayoutChange(layout = null) {
+  async function runLayoutChange(layout = null) {
     const nextLayout = normalizeLayout(layout)
     const currentLayout = viewerLayout.value
     const contentSeqAtStart = contentTransitionSeq
@@ -433,7 +464,7 @@ export function createPdfTransitionController({
       nextLayout.height === currentLayout.height
     ) {
       completePendingTransition(contentSeqAtStart)
-      return
+      return false
     }
 
     // During active controlled zoom, defer layout changes to avoid
@@ -442,7 +473,7 @@ export function createPdfTransitionController({
     if (controlledZoomSeq > 0) {
       deferredZoomLayout = nextLayout
       viewerLayout.value = nextLayout
-      return
+      return false
     }
 
     layoutChangeSeq += 1
@@ -487,10 +518,10 @@ export function createPdfTransitionController({
         await nextTick()
 
         if (contentSeqAtStart !== contentTransitionSeq) {
-          return
+          return false
         }
         if (layoutSeq !== layoutChangeSeq) {
-          return
+          return false
         }
         if (pendingPdfAnchor) {
           try {
@@ -501,14 +532,16 @@ export function createPdfTransitionController({
           } finally {
             completePendingTransition(contentSeqAtStart)
           }
-          return
+          return true
         }
         try {
           restoreControlledTransitionAnchors(capturedAnchors)
         } finally {
           completePendingTransition(contentSeqAtStart)
         }
+        return true
       }
+      return false
     } catch (error) {
       completePendingTransition(contentSeqAtStart, true)
       throw error
@@ -518,6 +551,23 @@ export function createPdfTransitionController({
       }
       scheduleScrollSyncSuppressionClear()
     }
+  }
+
+  function handleLayoutChange(layout = null) {
+    const commit = runLayoutChange(layout)
+    const initialWaiter = firstRealLayoutWaiter
+    pendingLayoutCommit = commit
+    commit.then(
+      (committed) => {
+        clearPendingLayoutCommit(commit)
+        if (committed && !firstRealLayoutCommitted && firstRealLayoutWaiter === initialWaiter) {
+          firstRealLayoutCommitted = true
+          initialWaiter.resolve()
+        }
+      },
+      () => clearPendingLayoutCommit(commit)
+    )
+    return commit
   }
 
   async function runControlledZoomTransition(resolvedOriginalAnchor, finalTranslatedAnchor) {
@@ -656,6 +706,7 @@ export function createPdfTransitionController({
   }
 
   function resetViewerState() {
+    resetInitialLayoutCommit()
     zoomMode.value = 'fit-width'
     zoomPercent.value = 100
     viewerLayout.value = { width: 0, height: 0 }
@@ -665,6 +716,7 @@ export function createPdfTransitionController({
     handleContentViewChange,
     handleLayoutModeChange,
     handleLayoutChange,
+    waitForInitialLayoutCommit,
     handleZoomChange,
     handleZoomStep,
     currentPageUpdatesSuppressed,

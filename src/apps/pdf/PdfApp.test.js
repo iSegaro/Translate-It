@@ -342,6 +342,7 @@ vi.mock('vue-sonner', () => ({
 }))
 
 const mockHandleZoomChange = vi.fn()
+const mockWaitForInitialLayoutCommit = vi.fn()
 vi.mock('./composables/createPdfTransitionController.js', () => ({
   createPdfTransitionController: () => ({
     handleContentViewChange: vi.fn((value) => {
@@ -349,6 +350,7 @@ vi.mock('./composables/createPdfTransitionController.js', () => ({
     }),
     handleLayoutModeChange: vi.fn(),
     handleLayoutChange: vi.fn(),
+    waitForInitialLayoutCommit: mockWaitForInitialLayoutCommit,
     handleZoomChange: mockHandleZoomChange,
     handleZoomStep: vi.fn(),
     buildLayoutRequest: vi.fn(() => ({ width: 960, height: 600 })),
@@ -395,6 +397,7 @@ function createMocks({
     fileName: '',
     documentMetadata: {},
     documentIdentity: 'loaded-doc-id',
+    documentGeneration: 1,
   }
   mockPdfSession = sessionMock
 
@@ -537,6 +540,8 @@ describe('PdfApp', () => {
     ocrStoreMock.init.mockResolvedValue()
     mockHandleZoomChange.mockReset()
     mockHandleZoomChange.mockResolvedValue(undefined)
+    mockWaitForInitialLayoutCommit.mockReset()
+    mockWaitForInitialLayoutCommit.mockResolvedValue(undefined)
     mockGetPending.mockReset()
     mockClearPending.mockReset()
     mockSetPending.mockReset()
@@ -2779,6 +2784,62 @@ describe('PdfApp', () => {
       const cp = mockClearPending.mock.invocationCallOrder[0]
       expect(cv).toBeLessThan(np)
       expect(np).toBeLessThan(cp)
+    })
+
+    it('waits for pending initial layout commit before navigating once', async () => {
+      let resolveLayoutCommit
+      mockWaitForInitialLayoutCommit.mockImplementationOnce(() => new Promise(resolve => {
+        resolveLayoutCommit = resolve
+      }))
+      const wrapper = mount(PdfApp)
+      await flushPromises()
+      mockPendingState = pendingState()
+
+      await simulateFileOpen(wrapper)
+      await flushPromises()
+
+      expect(mockWaitForInitialLayoutCommit).toHaveBeenCalledOnce()
+      expect(mockPdfNavigation.navigateToPage).not.toHaveBeenCalled()
+      expect(mockClearPending).not.toHaveBeenCalled()
+
+      resolveLayoutCommit()
+      await flushPromises()
+
+      expect(mockPdfNavigation.navigateToPage).toHaveBeenCalledTimes(1)
+      expect(mockPdfNavigation.navigateToPage).toHaveBeenCalledWith(8)
+      expect(mockClearPending).toHaveBeenCalledOnce()
+    })
+
+    it('does not navigate a replacement document after pending layout commit', async () => {
+      let resolveLayoutCommit
+      mockWaitForInitialLayoutCommit.mockImplementationOnce(() => new Promise(resolve => {
+        resolveLayoutCommit = resolve
+      }))
+      const wrapper = mount(PdfApp)
+      await flushPromises()
+      mockPendingState = pendingState()
+
+      await simulateFileOpen(wrapper)
+      await flushPromises()
+      mockPdfSession.documentGeneration += 1
+      resolveLayoutCommit()
+      await flushPromises()
+
+      expect(mockPdfNavigation.navigateToPage).not.toHaveBeenCalled()
+      expect(mockClearPending).not.toHaveBeenCalled()
+    })
+
+    it('does not navigate when initial layout wait is cancelled', async () => {
+      mockWaitForInitialLayoutCommit.mockResolvedValueOnce({ cancelled: true })
+      const wrapper = mount(PdfApp)
+      await flushPromises()
+      mockPendingState = pendingState()
+
+      await simulateFileOpen(wrapper)
+      await flushPromises()
+
+      expect(mockPdfNavigation.navigateToPage).not.toHaveBeenCalled()
+      expect(mockClearPending).not.toHaveBeenCalled()
     })
 
     it('does not restore on identity mismatch', async () => {

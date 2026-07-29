@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { defineComponent, h, ref } from 'vue'
+import { defineComponent, h, ref, watch } from 'vue'
 import { mount } from '@vue/test-utils'
 
 vi.mock('../utils/pdfScrollAnchor.js', () => ({
@@ -153,6 +153,97 @@ afterEach(() => {
 })
 
 describe('createPdfTransitionController', () => {
+  describe('initial layout commit', () => {
+    it('waits before any layout change until first real layout commit completes', async () => {
+      const recompute = createDeferred()
+      const reactiveMetric = ref('provisional')
+      let metricPropagated = false
+      watch(reactiveMetric, () => {
+        metricPropagated = true
+      }, { flush: 'post' })
+      const { ctrl } = createController({ recomputeLayout: vi.fn(async () => {
+        await recompute.promise
+        reactiveMetric.value = 'final'
+      }) })
+
+      const firstLayout = ctrl.waitForInitialLayoutCommit()
+      let settled = false
+      firstLayout.then(() => { settled = true })
+      await Promise.resolve()
+      expect(settled).toBe(false)
+
+      const commit = ctrl.handleLayoutChange({ width: 800, height: 600 })
+      expect(ctrl.waitForInitialLayoutCommit()).toBe(commit)
+
+      recompute.resolve()
+      await commit
+
+      expect(reactiveMetric.value).toBe('final')
+      expect(metricPropagated).toBe(true)
+      await expect(firstLayout).resolves.toBeUndefined()
+      await expect(ctrl.waitForInitialLayoutCommit()).resolves.toBeUndefined()
+    })
+
+    it('does not clear newer pending layout commit when older commit completes', async () => {
+      const first = createDeferred()
+      const second = createDeferred()
+      const recomputeLayout = vi.fn()
+        .mockReturnValueOnce(first.promise)
+        .mockReturnValueOnce(second.promise)
+      const { ctrl } = createController({ recomputeLayout })
+
+      const firstCommit = ctrl.handleLayoutChange({ width: 800, height: 600 })
+      const secondCommit = ctrl.handleLayoutChange({ width: 900, height: 600 })
+      expect(ctrl.waitForInitialLayoutCommit()).toBe(secondCommit)
+
+      first.resolve()
+      await firstCommit
+      expect(ctrl.waitForInitialLayoutCommit()).toBe(secondCommit)
+
+      second.resolve()
+      await secondCommit
+      await expect(ctrl.waitForInitialLayoutCommit()).resolves.toBeUndefined()
+    })
+
+    it('keeps first layout pending after failure until later successful commit', async () => {
+      const recompute = createDeferred()
+      const recomputeLayout = vi.fn()
+        .mockReturnValueOnce(recompute.promise)
+        .mockResolvedValueOnce()
+      const { ctrl } = createController({ recomputeLayout })
+      const firstLayout = ctrl.waitForInitialLayoutCommit()
+
+      const commit = ctrl.handleLayoutChange({ width: 800, height: 600 })
+      recompute.reject(new Error('layout failed'))
+      await expect(commit).rejects.toThrow('layout failed')
+
+      let settled = false
+      firstLayout.then(() => { settled = true })
+      await Promise.resolve()
+      expect(settled).toBe(false)
+
+      await ctrl.handleLayoutChange({ width: 900, height: 600 })
+      await expect(firstLayout).resolves.toBeUndefined()
+    })
+
+    it('cancels old first-layout waiter when viewer state resets', async () => {
+      const { ctrl } = createController()
+      const oldWaiter = ctrl.waitForInitialLayoutCommit()
+
+      ctrl.resetViewerState()
+
+      await expect(oldWaiter).resolves.toEqual({ cancelled: true })
+      const newWaiter = ctrl.waitForInitialLayoutCommit()
+      let settled = false
+      newWaiter.then(() => { settled = true })
+      await Promise.resolve()
+      expect(settled).toBe(false)
+
+      await ctrl.handleLayoutChange({ width: 800, height: 600 })
+      await expect(newWaiter).resolves.toBeUndefined()
+    })
+  })
+
   describe('currentPage suppression depth', () => {
     it('increments and decrements depth safely', () => {
       const { ctrl } = createController()

@@ -557,6 +557,7 @@ usePdfKeyboard({
     handleContentViewChange,
     handleLayoutModeChange,
     handleLayoutChange,
+    waitForInitialLayoutCommit,
     handleZoomChange,
     handleZoomStep,
     buildLayoutRequest,
@@ -801,6 +802,7 @@ async function handleFileSelected(file) {
   if (loaded) {
     const pending = getPendingViewerState()
     const isMatch = pending && pending.documentIdentity === session.documentIdentity
+    const restoredDocumentGeneration = session.documentGeneration
 
     if (!isMatch) {
       clearPendingViewerState()
@@ -812,6 +814,9 @@ async function handleFileSelected(file) {
     if (isMatch) {
       setContentView(pending.contentView)
       await nextTick()
+      const layoutCommit = await waitForInitialLayoutCommit()
+      if (layoutCommit?.cancelled) return
+      if (session.documentGeneration !== restoredDocumentGeneration) return
       navigateToPage(pending.currentPage)
       clearPendingViewerState()
     }
