@@ -452,7 +452,7 @@ describe('PdfRenderer', () => {
       expect(result.status).toBe(PDF_RENDER_RESULT_STATUS.FAILED)
       expect(result.raster).toBeDefined()
       expect(result.raster.renderable).toBe(false)
-      expect(result.bitmap).toBeNull()
+      expect(result.bitmap).toBeUndefined()
       expect(mockCreateImageBitmap).not.toHaveBeenCalled()
       expect(pdfDocument.getPage).toHaveBeenCalled()
       const page = await pdfDocument.getPage.mock.results[0].value
