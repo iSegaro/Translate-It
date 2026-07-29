@@ -848,7 +848,7 @@ const toggleDropdown = () => {
         const maxLimit = isFloatingWindow ? 650 : (props.mode === 'mobile' ? 350 : (props.isGlobal ? 400 : 550));
 
         // Final height calculation
-        dropdownMaxHeight.value = `${Math.min(maxLimit, Math.max(250, availableHeight))}px`;
+        dropdownMaxHeight.value = `${Math.max(0, Math.min(maxLimit, availableHeight))}px`;
 
         // Calculate fixed positioning for teleported dropdown
         if (isTeleport && selectorRef.value) {
