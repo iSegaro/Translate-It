@@ -12,16 +12,10 @@ export function createViewerState({
   documentIdentity,
   currentPage,
   contentView,
-  layoutMode,
-  zoomMode,
-  zoomPercent,
 }) {
   return Object.freeze({
     documentIdentity,
     currentPage,
     contentView,
-    layoutMode,
-    zoomMode,
-    zoomPercent,
   })
 }

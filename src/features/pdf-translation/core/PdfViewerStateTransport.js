@@ -1,12 +1,11 @@
 import { createViewerState } from './PdfViewerState.js'
 
 /**
- * Serialized format: `doc=...&p=...&v=...&l=...&z=...` with optional `&zz=...`
+ * Serialized format: `doc=...&p=...&v=...`
  *
  * - Key order is fixed and deterministic.
  * - Single-character keys; single-character enum values.
- * - `zz` (zoomPercent) is written only when `zoomMode === 'percent'`.
- * - Current Viewer State values are transport-safe and require no escaping.
+ * - Transport delegates value encoding to URLSearchParams/history APIs.
  * - ADR-014: Viewer State Architecture.
  */
 
@@ -16,35 +15,13 @@ const CONTENT_VIEW_TO_KEY = Object.freeze({
   'translated-pdf': 'p',
 })
 
-const LAYOUT_MODE_TO_KEY = Object.freeze({
-  single: 's',
-  'side-by-side': 'b',
-})
-
-const ZOOM_MODE_TO_KEY = Object.freeze({
-  'fit-width': 'w',
-  'fit-page': 'f',
-  percent: 'p',
-})
-
 const KEY_TO_CONTENT_VIEW = Object.freeze({
   o: 'original',
   t: 'translation',
   p: 'translated-pdf',
 })
 
-const KEY_TO_LAYOUT_MODE = Object.freeze({
-  s: 'single',
-  b: 'side-by-side',
-})
-
-const KEY_TO_ZOOM_MODE = Object.freeze({
-  w: 'fit-width',
-  f: 'fit-page',
-  p: 'percent',
-})
-
-const REQUIRED_KEYS = ['doc', 'p', 'v', 'l', 'z']
+const REQUIRED_KEYS = ['doc', 'p', 'v']
 
 /**
  * Serializes Viewer State to a deterministic transport string.
@@ -58,12 +35,6 @@ export function serializeViewerState(state) {
   pairs.push(`doc=${state.documentIdentity}`)
   pairs.push(`p=${state.currentPage}`)
   pairs.push(`v=${CONTENT_VIEW_TO_KEY[state.contentView]}`)
-  pairs.push(`l=${LAYOUT_MODE_TO_KEY[state.layoutMode]}`)
-  pairs.push(`z=${ZOOM_MODE_TO_KEY[state.zoomMode]}`)
-
-  if (state.zoomMode === 'percent') {
-    pairs.push(`zz=${state.zoomPercent}`)
-  }
 
   return pairs.join('&')
 }
@@ -72,8 +43,8 @@ export function serializeViewerState(state) {
  * Deserializes a transport string into Viewer State.
  *
  * Returns null for any structurally malformed or incomplete transport.
- * Performs no domain validation — page range, zoom limits, and enum
- * membership are the responsibility of architectural owners.
+ * Performs no domain validation — page range and enum membership
+ * are the responsibility of architectural owners.
  *
  * @param {string|null|undefined} raw — serialized transport string
  * @returns {object|null} frozen Viewer State, or null
@@ -109,24 +80,9 @@ export function deserializeViewerState(raw) {
   const contentView = KEY_TO_CONTENT_VIEW[values.v]
   if (contentView === undefined) return null
 
-  const layoutMode = KEY_TO_LAYOUT_MODE[values.l]
-  if (layoutMode === undefined) return null
-
-  const zoomMode = KEY_TO_ZOOM_MODE[values.z]
-  if (zoomMode === undefined) return null
-
-  let zoomPercent = 100
-  if ('zz' in values && zoomMode === 'percent') {
-    zoomPercent = Number(values.zz)
-    if (!Number.isFinite(zoomPercent)) return null
-  }
-
   return createViewerState({
     documentIdentity: doc,
     currentPage: page,
     contentView,
-    layoutMode,
-    zoomMode,
-    zoomPercent,
   })
 }

@@ -2744,9 +2744,6 @@ describe('PdfApp', () => {
         documentIdentity: 'loaded-doc-id',
         currentPage: 8,
         contentView: 'translation',
-        layoutMode: 'side-by-side',
-        zoomMode: 'fit-page',
-        zoomPercent: 100,
         ...overrides,
       })
     }
@@ -2771,23 +2768,14 @@ describe('PdfApp', () => {
       await flushPromises()
 
       expect(mockViewerMode.setContentView).toHaveBeenCalledWith('translation')
-      expect(mockViewerMode.setLayoutMode).toHaveBeenCalledWith('side-by-side')
-      expect(mockHandleZoomChange).toHaveBeenCalledWith({
-        mode: 'fit-page',
-        value: 100,
-      })
       expect(mockPdfNavigation.navigateToPage).toHaveBeenCalledWith(8)
       expect(mockClearPending).toHaveBeenCalled()
 
-      // ordering: contentView → layoutMode → handleZoomChange → navigateToPage → clearPending
+      // ordering: contentView → navigateToPage → clearPending
       const cv = mockViewerMode.setContentView.mock.invocationCallOrder[0]
-      const lm = mockViewerMode.setLayoutMode.mock.invocationCallOrder[0]
-      const hz = mockHandleZoomChange.mock.invocationCallOrder[0]
       const np = mockPdfNavigation.navigateToPage.mock.invocationCallOrder[0]
       const cp = mockClearPending.mock.invocationCallOrder[0]
-      expect(cv).toBeLessThan(lm)
-      expect(lm).toBeLessThan(hz)
-      expect(hz).toBeLessThan(np)
+      expect(cv).toBeLessThan(np)
       expect(np).toBeLessThan(cp)
     })
 
@@ -2817,71 +2805,6 @@ describe('PdfApp', () => {
 
       expect(mockClearPending).not.toHaveBeenCalled()
       expect(mockViewerMode.setContentView).not.toHaveBeenCalled()
-    })
-
-    it('clears pending only after restore completes', async () => {
-      let zoomResolve
-      const zoomDeferred = new Promise((resolve) => { zoomResolve = resolve })
-      mockHandleZoomChange.mockReturnValueOnce(zoomDeferred)
-
-      const wrapper = mount(PdfApp)
-      await flushPromises()
-      mockPendingState = pendingState()
-
-      await simulateFileOpen(wrapper)
-      await flushPromises()
-
-      // zoom is unresolved — clearPending and navigateToPage must not have been called
-      expect(mockViewerMode.setContentView).toHaveBeenCalledWith('translation')
-      expect(mockViewerMode.setLayoutMode).toHaveBeenCalledWith('side-by-side')
-      expect(mockClearPending).not.toHaveBeenCalled()
-      expect(mockPdfNavigation.navigateToPage).not.toHaveBeenCalled()
-
-      zoomResolve()
-      await flushPromises()
-      await flushPromises()
-
-      expect(mockPdfNavigation.navigateToPage).toHaveBeenCalledWith(8)
-      expect(mockClearPending).toHaveBeenCalled()
-
-      // clearPending must follow navigateToPage
-      const np = mockPdfNavigation.navigateToPage.mock.invocationCallOrder[0]
-      const cp = mockClearPending.mock.invocationCallOrder[0]
-      expect(np).toBeLessThan(cp)
-    })
-
-    it('waits for zoom before page navigation', async () => {
-      let zoomResolve
-      const zoomDeferred = new Promise((resolve) => { zoomResolve = resolve })
-      mockHandleZoomChange.mockReturnValueOnce(zoomDeferred)
-
-      const wrapper = mount(PdfApp)
-      await flushPromises()
-      mockPendingState = pendingState()
-
-      await simulateFileOpen(wrapper)
-      await flushPromises()
-
-      expect(mockPdfNavigation.navigateToPage).not.toHaveBeenCalled()
-
-      // contentView and layoutMode must be set before zoom starts
-      expect(mockViewerMode.setContentView).toHaveBeenCalledWith('translation')
-      expect(mockViewerMode.setLayoutMode).toHaveBeenCalledWith('side-by-side')
-      const cv = mockViewerMode.setContentView.mock.invocationCallOrder[0]
-      const lm = mockViewerMode.setLayoutMode.mock.invocationCallOrder[0]
-      const hz = mockHandleZoomChange.mock.invocationCallOrder[0]
-      expect(cv).toBeLessThan(lm)
-      expect(lm).toBeLessThan(hz)
-
-      zoomResolve()
-      await flushPromises()
-      await flushPromises()
-
-      expect(mockPdfNavigation.navigateToPage).toHaveBeenCalledWith(8)
-
-      // navigateToPage must follow zoom resolution
-      const np = mockPdfNavigation.navigateToPage.mock.invocationCallOrder[0]
-      expect(hz).toBeLessThan(np)
     })
   })
 

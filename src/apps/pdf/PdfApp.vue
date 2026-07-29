@@ -795,12 +795,7 @@ async function handleFileSelected(file) {
 
     if (isMatch) {
       setContentView(pending.contentView)
-      setLayoutMode(pending.layoutMode)
       await nextTick()
-      await handleZoomChange({
-        mode: pending.zoomMode,
-        value: pending.zoomPercent,
-      })
       navigateToPage(pending.currentPage)
       clearPendingViewerState()
     }

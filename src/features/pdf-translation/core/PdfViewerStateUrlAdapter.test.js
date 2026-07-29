@@ -56,9 +56,6 @@ function state(overrides = {}) {
     documentIdentity: 'abc123',
     currentPage: 5,
     contentView: 'translation',
-    layoutMode: 'side-by-side',
-    zoomMode: 'fit-width',
-    zoomPercent: 100,
     ...overrides,
   })
 }
@@ -93,7 +90,7 @@ describe('readViewerStateFromUrl', () => {
   })
 
   it('returns null when deserialize rejects', () => {
-    setHash('#doc=abc&p=5&v=t&l=b')
+    setHash('#doc=abc&p=5')
     expect(readViewerStateFromUrl()).toBeNull()
   })
 
@@ -104,7 +101,7 @@ describe('readViewerStateFromUrl', () => {
       '',
       '#',
       '#garbage',
-      '#doc=valid&p=1&v=t&l=s&z=w',
+      '#doc=valid&p=1&v=t',
     ]
     for (const input of inputs) {
       setHash(input)
@@ -119,7 +116,7 @@ describe('readViewerStateFromUrl', () => {
   })
 
   it('round-trips: serialize → write → read → same state', () => {
-    const original = state({ zoomMode: 'percent', zoomPercent: 150 })
+    const original = state({ currentPage: 42 })
     setHash('#' + serializeViewerState(original))
     const result = readViewerStateFromUrl()
     expect(result).toEqual(original)

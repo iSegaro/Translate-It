@@ -1,87 +1,65 @@
 import { describe, expect, it } from 'vitest'
 import { createViewerState } from './PdfViewerState.js'
 
-function minimalArgs(overrides = {}) {
-  return {
+function state(overrides = {}) {
+  return createViewerState({
     documentIdentity: 'abc123',
     currentPage: 5,
     contentView: 'translation',
-    layoutMode: 'side-by-side',
-    zoomMode: 'fit-width',
-    zoomPercent: 100,
     ...overrides,
-  }
+  })
 }
 
 describe('createViewerState', () => {
   it('returns a frozen object', () => {
-    const state = createViewerState(minimalArgs())
-    expect(Object.isFrozen(state)).toBe(true)
+    const s = state()
+    expect(Object.isFrozen(s)).toBe(true)
   })
 
-  it('contains exactly six fields', () => {
-    const state = createViewerState(minimalArgs())
-    expect(Object.keys(state)).toEqual([
-      'documentIdentity',
-      'currentPage',
+  it('contains exactly three fields', () => {
+    const s = state()
+    expect(Object.keys(s).sort()).toEqual([
       'contentView',
-      'layoutMode',
-      'zoomMode',
-      'zoomPercent',
+      'currentPage',
+      'documentIdentity',
     ])
   })
 
   it('preserves input values exactly', () => {
-    const state = createViewerState(
-      minimalArgs({ currentPage: 42, zoomMode: 'fit-page' }),
-    )
-    expect(state.currentPage).toBe(42)
-    expect(state.zoomMode).toBe('fit-page')
+    const s = state({ currentPage: 42, contentView: 'original' })
+    expect(s.currentPage).toBe(42)
+    expect(s.contentView).toBe('original')
   })
 
   it('preserves all fields from standard input', () => {
-    const state = createViewerState(minimalArgs())
-    expect(state.documentIdentity).toBe('abc123')
-    expect(state.currentPage).toBe(5)
-    expect(state.contentView).toBe('translation')
-    expect(state.layoutMode).toBe('side-by-side')
-    expect(state.zoomMode).toBe('fit-width')
-    expect(state.zoomPercent).toBe(100)
+    const s = state()
+    expect(s.documentIdentity).toBe('abc123')
+    expect(s.currentPage).toBe(5)
+    expect(s.contentView).toBe('translation')
   })
 
   it('does not mutate input object', () => {
-    const input = minimalArgs()
+    const input = { documentIdentity: 'abc', currentPage: 1, contentView: 'original' }
     const frozen = Object.freeze({ ...input })
     createViewerState(input)
     expect(input).toEqual(frozen)
   })
 
   it('returns object that shares no mutable references with input', () => {
-    const input = minimalArgs()
-    const state = createViewerState(input)
-    // Viewer State must not retain references to mutable input.
+    const input = { documentIdentity: 'abc', currentPage: 1, contentView: 'original' }
+    const s = createViewerState(input)
     input.currentPage = 999
-    expect(state.currentPage).toBe(5)
+    expect(s.currentPage).toBe(1)
   })
 
   it('preserves zero and empty values as passed', () => {
-    const state = createViewerState(
-      minimalArgs({
-        documentIdentity: '',
-        currentPage: 0,
-        zoomPercent: 0,
-      }),
-    )
-    expect(state.documentIdentity).toBe('')
-    expect(state.currentPage).toBe(0)
-    expect(state.zoomPercent).toBe(0)
+    const s = state({ documentIdentity: '', currentPage: 0 })
+    expect(s.documentIdentity).toBe('')
+    expect(s.currentPage).toBe(0)
   })
 
-  it('preserves negative and large values as passed', () => {
-    const state = createViewerState(
-      minimalArgs({ currentPage: -1, zoomPercent: 9999 }),
-    )
-    expect(state.currentPage).toBe(-1)
-    expect(state.zoomPercent).toBe(9999)
+  it('preserves negative page as passed', () => {
+    const s = state({ currentPage: -1 })
+    expect(s.currentPage).toBe(-1)
   })
 })
