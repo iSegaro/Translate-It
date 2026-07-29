@@ -782,13 +782,18 @@ export class PdfDocumentSession extends ResourceTracker {
    * Load the PDF outline (bookmarks) tree.
    *
    * Uses pdfDocument.getOutline() and normalizes the result
-   * via createOutlineNode(). The outline is cached — subsequent
-   * calls return the cached value without re-fetching.
+   * via createOutlineNode(). Results are cached only while their
+   * document generation remains current.
    *
    * @returns {Promise<Array<object>|null>} Normalized outline tree, or null if none
    */
   async loadOutline() {
-    return this._outlineRepository.load({ pdfDocument: this.pdfDocument })
+    const documentGeneration = this.documentGeneration
+    return this._outlineRepository.load({
+      pdfDocument: this.pdfDocument,
+      documentGeneration,
+      isDocumentGenerationCurrent: generation => this._isDocumentGenerationCurrent(generation)
+    })
   }
 
   /**

@@ -304,6 +304,7 @@ export function usePdfNavigation(viewerRef, translatedPaneRef, contentView) {
   // ── Lifecycle ────────────────────────────────────────────
 
   async function attachDocument(documentSession) {
+    const documentGeneration = documentSession.documentGeneration
     _session = documentSession
     _pageCache.clear()
     _flatNodes = []
@@ -313,7 +314,7 @@ export function usePdfNavigation(viewerRef, translatedPaneRef, contentView) {
     try {
       const loadedOutline = await documentSession.loadOutline()
 
-      if (_session !== documentSession) {
+      if (_session !== documentSession || documentSession.documentGeneration !== documentGeneration) {
         return
       }
 
@@ -321,7 +322,7 @@ export function usePdfNavigation(viewerRef, translatedPaneRef, contentView) {
       rebuildFlatNodes()
       void updateActiveOutline()
     } catch (error) {
-      if (_session !== documentSession) {
+      if (_session !== documentSession || documentSession.documentGeneration !== documentGeneration) {
         return
       }
 

@@ -216,9 +216,9 @@ vi.mock('@/features/pdf-translation/core/PdfFileDownloader.js', () => ({
 vi.mock('./components/PdfToolbar.vue', () => ({
   default: {
     name: 'PdfToolbar',
-    props: ['fileName', 'pageCount', 'currentPageNumber', 'zoomMode', 'zoomPercent', 'contentView', 'layoutMode', 'executionMode', 'executionModes', 'ocrViewModel', 'regionComparisonState', 'canExportRegionComparisonArtifact'],
+    props: ['fileName', 'pageCount', 'currentPageNumber', 'zoomMode', 'zoomPercent', 'contentView', 'layoutMode', 'executionMode', 'executionModes', 'ocrViewModel', 'regionComparisonState', 'canExportRegionComparisonArtifact', 'hasOutline'],
     emits: ['toggle-outline', 'translate-visible', 'cancel-translation', 'content-view-change', 'layout-mode-change', 'zoom-step', 'zoom-change', 'export-txt', 'export-markdown', 'export-html', 'request-region-comparison', 'cancel-region-comparison', 'export-region-comparison-artifact', 'clear-cache', 'request-open-pdf', 'execution-mode-change', 'primary-click', 'select-action', 'select-language', 'manage-languages', 'open-settings', 'request-document-info', 'previous-page', 'next-page'],
-    template: '<header class="pdf-toolbar-stub" />'
+    template: '<header class="pdf-toolbar-stub"><button v-if="hasOutline" class="pdf-toolbar__outline-toggle" /></header>'
   }
 }))
 
@@ -489,18 +489,19 @@ function createMocks({
     exportHtml: vi.fn().mockResolvedValue(false),
   }
 
+  const outline = ref(null)
   mockPdfNavigation = {
     currentPage: ref(5),
     isNavigating: ref(false),
-    outline: ref(null),
-    hasOutline: computed(() => false),
+    outline,
+    hasOutline: computed(() => Array.isArray(outline.value) && outline.value.length > 0),
     activeOutlineDest: ref(null),
     expandedDests: ref(new Set()),
     navigateToPage: vi.fn(),
     navigateToDestination: vi.fn(),
     handleNavigationTarget: vi.fn(),
     attachDocument: vi.fn(),
-    detachDocument: vi.fn()
+    detachDocument: vi.fn(() => { outline.value = null })
   }
 
   mockPdfOcr = {
@@ -1715,6 +1716,39 @@ describe('PdfApp', () => {
     wrapper.findComponent({ name: 'PdfDropzone' }).vm.$emit('file-selected', { name: 'replacement.pdf' })
     await flushPromises()
     expect(wrapper.findComponent({ name: 'PdfViewer' }).props('regionSelectionActive')).toBe(false)
+  })
+
+  it('detaches navigation before loading a replacement PDF', async () => {
+    const wrapper = mount(PdfApp)
+    await flushPromises()
+
+    wrapper.findComponent({ name: 'PdfDropzone' }).vm.$emit('file-selected', { name: 'replacement.pdf' })
+    await flushPromises()
+
+    expect(mockPdfNavigation.detachDocument).toHaveBeenCalled()
+    expect(mockPdfNavigation.detachDocument.mock.invocationCallOrder[0])
+      .toBeLessThan(mockViewerController.loadPdfFile.mock.invocationCallOrder[0])
+  })
+
+  it('hides the previous outline action until replacement outline is available', async () => {
+    const loading = createDeferred()
+    mockViewerController.loadPdfFile.mockReturnValueOnce(loading.promise)
+    mockPdfNavigation.outline.value = [{ title: 'Document A', dest: [1] }]
+    const wrapper = mount(PdfApp)
+    await flushPromises()
+
+    expect(wrapper.find('.pdf-toolbar__outline-toggle').exists()).toBe(true)
+
+    wrapper.findComponent({ name: 'PdfDropzone' }).vm.$emit('file-selected', { name: 'replacement.pdf' })
+    await flushPromises()
+
+    expect(wrapper.find('.pdf-toolbar__outline-toggle').exists()).toBe(false)
+
+    mockPdfNavigation.outline.value = [{ title: 'Document B', dest: [2] }]
+    loading.resolve(true)
+    await flushPromises()
+
+    expect(wrapper.find('.pdf-toolbar__outline-toggle').exists()).toBe(true)
   })
 
   it('keeps cancelled Region OCR silent', async () => {

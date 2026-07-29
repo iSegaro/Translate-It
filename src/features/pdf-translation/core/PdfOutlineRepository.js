@@ -7,22 +7,31 @@ const logger = getScopedLogger(LOG_COMPONENTS.PDF, 'PdfOutlineRepository')
 export class PdfOutlineRepository {
   constructor() {
     this._outline = null
+    this._outlineGeneration = null
   }
 
-  async load({ pdfDocument }) {
+  async load({ pdfDocument, documentGeneration, isDocumentGenerationCurrent } = {}) {
     if (!pdfDocument) {
       return null
     }
 
     if (this._outline !== null) {
-      return this._outline
+      if (documentGeneration === undefined || this._outlineGeneration === documentGeneration) {
+        return this._outline
+      }
+      this.clear()
     }
 
     try {
       const rawOutline = await pdfDocument.getOutline()
 
+      if (isDocumentGenerationCurrent && !isDocumentGenerationCurrent(documentGeneration)) {
+        return null
+      }
+
       if (!rawOutline || !Array.isArray(rawOutline) || rawOutline.length === 0) {
         this._outline = null
+        this._outlineGeneration = documentGeneration ?? null
         return null
       }
 
@@ -31,10 +40,15 @@ export class PdfOutlineRepository {
         .filter(Boolean)
 
       this._outline = outline.length > 0 ? outline : null
+      this._outlineGeneration = documentGeneration ?? null
       return this._outline
     } catch (error) {
+      if (isDocumentGenerationCurrent && !isDocumentGenerationCurrent(documentGeneration)) {
+        return null
+      }
       logger.warn('Failed to load PDF outline:', error)
       this._outline = null
+      this._outlineGeneration = documentGeneration ?? null
       return null
     }
   }
@@ -45,5 +59,6 @@ export class PdfOutlineRepository {
 
   clear() {
     this._outline = null
+    this._outlineGeneration = null
   }
 }

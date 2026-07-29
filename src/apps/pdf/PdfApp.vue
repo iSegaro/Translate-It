@@ -773,6 +773,7 @@ function updateDocumentTitle() {
 }
 
 async function handleFileSelected(file) {
+  detachDocument()
   invalidateDocumentOperations()
   documentLoadId.value += 1
   resetPresentationState()
