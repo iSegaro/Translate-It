@@ -191,7 +191,7 @@ describe('PdfBitmapCache', () => {
   })
 
   it('round-trips presentation metadata through admission and retrieval', () => {
-    const bitmap = createMockBitmap(30, 20)
+    const bitmap = createMockBitmap(10, 10)
     const pres = { logicalWidth: 900, logicalHeight: 600, backingWidth: 450, backingHeight: 300 }
 
     expect(cache.tryAdmit('rt', bitmap, estimateBytes(bitmap), pres)).toBe(true)
