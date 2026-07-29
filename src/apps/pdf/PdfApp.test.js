@@ -370,8 +370,10 @@ vi.mock('@/features/pdf-translation/core/PendingViewerState.js', () => ({
 }))
 
 const mockReadUrl = vi.fn(() => null)
+const mockWriteUrl = vi.fn()
 vi.mock('@/features/pdf-translation/core/PdfViewerStateUrlAdapter.js', () => ({
   readViewerStateFromUrl: () => mockReadUrl(),
+  writeViewerStateToUrl: (state) => mockWriteUrl(state),
 }))
 
 import { createViewerState } from '@/features/pdf-translation/core/PdfViewerState.js'
@@ -538,6 +540,7 @@ describe('PdfApp', () => {
     mockSetPending.mockReset()
     mockReadUrl.mockReset()
     mockReadUrl.mockReturnValue(null)
+    mockWriteUrl.mockReset()
     mockPendingState = null
     browser.runtime.onMessage.addListener.mockClear()
     browser.runtime.onMessage.removeListener.mockClear()
@@ -2879,6 +2882,26 @@ describe('PdfApp', () => {
       // navigateToPage must follow zoom resolution
       const np = mockPdfNavigation.navigateToPage.mock.invocationCallOrder[0]
       expect(hz).toBeLessThan(np)
+    })
+  })
+
+  describe('Viewer State URL write', () => {
+    it('does not write on failed document load', async () => {
+      mockViewerController.loadPdfFile.mockResolvedValueOnce(false)
+
+      const wrapper = mount(PdfApp)
+      await flushPromises()
+
+      const file = new File([''], 'test.pdf', { type: 'application/pdf' })
+      const fileInput = wrapper.find('input[type="file"]')
+      Object.defineProperty(fileInput.element, 'files', {
+        value: [file],
+        writable: false,
+      })
+      await fileInput.trigger('change')
+      await flushPromises()
+
+      expect(mockWriteUrl).not.toHaveBeenCalled()
     })
   })
 })
