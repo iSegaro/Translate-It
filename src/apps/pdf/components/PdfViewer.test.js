@@ -683,6 +683,51 @@ describe('PdfViewer', () => {
     wrapper.unmount()
   })
 
+  it('resets scroll before observing a replacement document', async () => {
+    const scrollContainer = document.createElement('div')
+    let scrollTop = 0
+    Object.defineProperty(scrollContainer, 'scrollTop', {
+      configurable: true,
+      get: () => scrollTop,
+      set: (value) => { scrollTop = value }
+    })
+    scrollContainer.scrollTo = vi.fn(({ top }) => { scrollTop = top })
+
+    const wrapper = mount(PdfViewer, {
+      props: {
+        pages: [{ pageNumber: 1, width: 100, height: 100, scale: 1 }],
+        session: createSession(),
+        scrollContainer,
+        documentLoadId: 1
+      },
+      attachTo: document.body
+    })
+
+    await nextTick()
+    await nextTick()
+
+    scrollContainer.scrollTop = 8000
+    await wrapper.setProps({
+      documentLoadId: 2,
+      pages: [{ pageNumber: 1, width: 100, height: 100, scale: 1 }]
+    })
+    await nextTick()
+    await nextTick()
+
+    expect(scrollContainer.scrollTop).toBe(0)
+
+    scrollContainer.scrollTop = 5000
+    await wrapper.setProps({
+      documentLoadId: 3,
+      pages: [{ pageNumber: 1, width: 100, height: 100, scale: 1 }]
+    })
+    await nextTick()
+    await nextTick()
+
+    expect(scrollContainer.scrollTop).toBe(0)
+    wrapper.unmount()
+  })
+
   it('keeps existing render candidates unchanged while eviction is frozen', async () => {
     const session = createSession()
     setPageTops({ 1: -100, 2: 0, 3: 100, 4: 200 })

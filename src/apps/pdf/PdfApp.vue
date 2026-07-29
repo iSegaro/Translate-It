@@ -149,6 +149,7 @@
                     :viewer-role="VIEWER_ROLE.ORIGINAL"
                     :pages="pageMetrics"
                     :session="session"
+                    :document-load-id="documentLoadId"
                     :suppress-current-page-updates="currentPageUpdatesSuppressed"
                     :freeze-render-window-eviction="renderWindowEvictionFrozen"
                     :show-overlay="showOverlayLayer"
@@ -180,6 +181,7 @@
                     :viewer-role="VIEWER_ROLE.OVERLAY"
                     :pages="pageMetrics"
                     :session="session"
+                    :document-load-id="documentLoadId"
                     :suppress-current-page-updates="currentPageUpdatesSuppressed"
                     :freeze-render-window-eviction="renderWindowEvictionFrozen"
                     :show-overlay="true"
@@ -351,6 +353,7 @@ const pdfWindowsHostRef = ref(null)
 const pdfTranslatedPaneRef = ref(null)
 const pdfViewerLayoutRef = ref(null)
 const fileInput = ref(null)
+const documentLoadId = ref(0)
 const originalScrollContainer = computed(() => pdfViewerLayoutRef.value?.scrollContainer ?? null)
 const translatedScrollContainer = computed(() => pdfViewerLayoutRef.value?.translatedPaneRef ?? null)
 const {
@@ -504,6 +507,8 @@ const regionComparisonAnalyzer = new RegionComparisonAnalyzer()
 let activeRegionComparisonOperation = null
 let completedRegionComparisonResult = null
 let completedRegionComparisonRegion = null
+let previousScrollRestoration = null
+let managesScrollRestoration = false
 
 const regionExecutionDispatcher = createRegionExecutionDispatcher({
   runners: {
@@ -769,6 +774,7 @@ function updateDocumentTitle() {
 
 async function handleFileSelected(file) {
   invalidateDocumentOperations()
+  documentLoadId.value += 1
   resetPresentationState()
   const loaded = await loadPdfFile(file, buildLayoutRequest())
   if (loaded) {
@@ -1265,6 +1271,12 @@ function dismissPdfStatusBanner() {
 updateDocumentTitle()
 
 onMounted(async () => {
+  if (typeof history !== 'undefined' && 'scrollRestoration' in history) {
+    previousScrollRestoration = history.scrollRestoration
+    history.scrollRestoration = 'manual'
+    managesScrollRestoration = true
+  }
+
   // Preload languages asynchronously — LanguageSelector expects cached values
   usePreloadLanguages().catch(() => {})
 
@@ -1314,6 +1326,12 @@ onBeforeUnmount(() => {
   setRegionOcrIdle()
   detachDocument()
   void cleanup()
+
+  if (managesScrollRestoration) {
+    history.scrollRestoration = previousScrollRestoration
+    previousScrollRestoration = null
+    managesScrollRestoration = false
+  }
 
   if (removeThemeMessageListener) {
     removeThemeMessageListener()

@@ -597,6 +597,32 @@ describe('PdfApp', () => {
     expect(mockPdfNavigation.navigateToPage).toHaveBeenCalledWith(4)
   })
 
+  it('uses manual browser scroll restoration only while mounted', async () => {
+    const hadOwnProperty = Object.hasOwn(history, 'scrollRestoration')
+    const originalDescriptor = Object.getOwnPropertyDescriptor(history, 'scrollRestoration')
+    let value = 'auto'
+    Object.defineProperty(history, 'scrollRestoration', {
+      configurable: true,
+      get: () => value,
+      set: (nextValue) => { value = nextValue }
+    })
+
+    try {
+      const wrapper = mount(PdfApp)
+      await flushPromises()
+
+      expect(value).toBe('manual')
+      wrapper.unmount()
+      expect(value).toBe('auto')
+    } finally {
+      if (hadOwnProperty && originalDescriptor) {
+        Object.defineProperty(history, 'scrollRestoration', originalDescriptor)
+      } else {
+        delete history.scrollRestoration
+      }
+    }
+  })
+
   it('delegates next-page toolbar intent through navigation', () => {
     const wrapper = mount(PdfApp)
 

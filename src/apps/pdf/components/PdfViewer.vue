@@ -86,6 +86,10 @@ const props = defineProps({
     type: HTMLElement,
     default: null
   },
+  documentLoadId: {
+    type: Number,
+    default: 0
+  },
   regionSelectionActive: {
     type: Boolean,
     default: false
@@ -102,6 +106,7 @@ const viewerRoot = ref(null)
 const pageViews = new Map()
 let lastEmittedVisiblePages = new Set()
 let unsubscribePageSessionCommitted = null
+let needsDocumentScrollReset = true
 
 const isOriginalRole = computed(() => props.viewerRole === VIEWER_ROLE.ORIGINAL)
 const ownsPageRenderLifecycle = computed(() => props.viewerRole === VIEWER_ROLE.ORIGINAL)
@@ -267,6 +272,10 @@ function setupObservers() {
   setupScrollObservation()
 
   if (scrollRoot.value) {
+    if (needsDocumentScrollReset) {
+      resetScroll()
+      needsDocumentScrollReset = false
+    }
     setupLayoutObservation()
   }
 
@@ -278,6 +287,10 @@ watch(
   () => props.pages,
   async () => {
     await nextTick()
+    if (needsDocumentScrollReset && props.pages.length > 0) {
+      resetScroll()
+      needsDocumentScrollReset = false
+    }
     refreshObservationTargets()
     applyRenderWindow()
 
@@ -286,6 +299,14 @@ watch(
       currentPageIfVisible()
     }
   }
+)
+
+watch(
+  () => props.documentLoadId,
+  () => {
+    needsDocumentScrollReset = true
+  },
+  { flush: 'sync' }
 )
 
 watch(
@@ -326,6 +347,19 @@ function collectCanvasDataUrls() {
 
 function getScrollContainer() {
   return props.scrollContainer || null
+}
+
+function resetScroll() {
+  const container = getScrollContainer()
+  if (!container) return
+
+  if (typeof container.scrollTo === 'function') {
+    container.scrollTo({ top: 0, left: 0, behavior: 'auto' })
+    return
+  }
+
+  container.scrollTop = 0
+  container.scrollLeft = 0
 }
 
 function getPageElement(pageNumber) {
