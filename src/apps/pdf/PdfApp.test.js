@@ -341,13 +341,48 @@ vi.mock('vue-sonner', () => ({
   Toaster: { name: 'Toaster', template: '<div />' }
 }))
 
+const mockHandleZoomChange = vi.fn()
+vi.mock('./composables/createPdfTransitionController.js', () => ({
+  createPdfTransitionController: () => ({
+    handleContentViewChange: vi.fn(),
+    handleLayoutModeChange: vi.fn(),
+    handleLayoutChange: vi.fn(),
+    handleZoomChange: mockHandleZoomChange,
+    handleZoomStep: vi.fn(),
+    buildLayoutRequest: vi.fn(() => ({ width: 960, height: 600 })),
+    resetViewerState: vi.fn(),
+    currentPageUpdatesSuppressed: ref(false),
+    renderWindowEvictionFrozen: ref(false),
+    suppressScrollSync: ref(false),
+    zoomMode: ref('fit-width'),
+    zoomPercent: ref(100),
+  })
+}))
+
+let mockPendingState
+const mockGetPending = vi.fn(() => mockPendingState)
+const mockClearPending = vi.fn(() => { mockPendingState = null })
+const mockSetPending = vi.fn((state) => { mockPendingState = state })
+vi.mock('@/features/pdf-translation/core/PendingViewerState.js', () => ({
+  getPendingViewerState: () => mockGetPending(),
+  setPendingViewerState: (state) => mockSetPending(state),
+  clearPendingViewerState: () => mockClearPending(),
+}))
+
+const mockReadUrl = vi.fn(() => null)
+vi.mock('@/features/pdf-translation/core/PdfViewerStateUrlAdapter.js', () => ({
+  readViewerStateFromUrl: () => mockReadUrl(),
+}))
+
+import { createViewerState } from '@/features/pdf-translation/core/PdfViewerState.js'
+
 const flushPromises = () => nextTick()
 const waitAnimationFrame = () => new Promise(resolve => requestAnimationFrame(resolve))
 
 function createMocks({
   bannerState = null,
   hasDocument = true,
-  sessionAsRef = true
+  sessionAsRef = false
 } = {}) {
   const sessionMock = {
     getPageViewport: vi.fn(() => mockPdfViewport),
@@ -355,6 +390,7 @@ function createMocks({
     getCommittedOcrState: vi.fn(() => null),
     fileName: '',
     documentMetadata: {},
+    documentIdentity: 'loaded-doc-id',
   }
   mockPdfSession = sessionMock
 
@@ -495,6 +531,14 @@ describe('PdfApp', () => {
     ocrStoreMock.downloadedLanguages = ['eng']
     ocrStoreMock.init.mockReset()
     ocrStoreMock.init.mockResolvedValue()
+    mockHandleZoomChange.mockReset()
+    mockHandleZoomChange.mockResolvedValue(undefined)
+    mockGetPending.mockReset()
+    mockClearPending.mockReset()
+    mockSetPending.mockReset()
+    mockReadUrl.mockReset()
+    mockReadUrl.mockReturnValue(null)
+    mockPendingState = null
     browser.runtime.onMessage.addListener.mockClear()
     browser.runtime.onMessage.removeListener.mockClear()
     window.matchMedia.mockReset()
@@ -2688,6 +2732,121 @@ describe('PdfApp', () => {
       await flushPromises()
 
       expect(wrapper.findComponent({ name: 'PdfDocumentInfoDialog' }).props('modelValue')).toBe(true)
+    })
+  })
+
+  describe('Restore pipeline', () => {
+    function pendingState(overrides = {}) {
+      return createViewerState({
+        documentIdentity: 'loaded-doc-id',
+        currentPage: 8,
+        contentView: 'translation',
+        layoutMode: 'side-by-side',
+        zoomMode: 'fit-page',
+        zoomPercent: 100,
+        ...overrides,
+      })
+    }
+
+    async function simulateFileOpen(wrapper) {
+      const file = new File([''], 'test.pdf', { type: 'application/pdf' })
+      const fileInput = wrapper.find('input[type="file"]')
+      Object.defineProperty(fileInput.element, 'files', {
+        value: [file],
+        writable: false,
+      })
+      await fileInput.trigger('change')
+      await flushPromises()
+    }
+
+    it('restores full viewer state on identity match', async () => {
+      const wrapper = mount(PdfApp)
+      await flushPromises()
+      mockPendingState = pendingState()
+
+      await simulateFileOpen(wrapper)
+      await flushPromises()
+
+      expect(mockViewerMode.setContentView).toHaveBeenCalledWith('translation')
+      expect(mockViewerMode.setLayoutMode).toHaveBeenCalledWith('side-by-side')
+      expect(mockHandleZoomChange).toHaveBeenCalledWith({
+        mode: 'fit-page',
+        value: 100,
+      })
+      expect(mockPdfNavigation.navigateToPage).toHaveBeenCalledWith(8)
+      expect(mockClearPending).toHaveBeenCalled()
+    })
+
+    it('does not restore on identity mismatch', async () => {
+      const wrapper = mount(PdfApp)
+      await flushPromises()
+      mockPendingState = pendingState({ documentIdentity: 'different-id' })
+
+      await simulateFileOpen(wrapper)
+      await flushPromises()
+
+      expect(mockViewerMode.setContentView).not.toHaveBeenCalled()
+      expect(mockHandleZoomChange).not.toHaveBeenCalled()
+      expect(mockPdfNavigation.navigateToPage).not.toHaveBeenCalled()
+      expect(mockClearPending).toHaveBeenCalled()
+    })
+
+    it('keeps pending state on load failure', async () => {
+      mockViewerController.loadPdfFile.mockResolvedValueOnce(false)
+
+      const wrapper = mount(PdfApp)
+      await flushPromises()
+      mockPendingState = pendingState()
+
+      await simulateFileOpen(wrapper)
+      await flushPromises()
+
+      expect(mockClearPending).not.toHaveBeenCalled()
+      expect(mockViewerMode.setContentView).not.toHaveBeenCalled()
+    })
+
+    it('clears pending only after restore completes', async () => {
+      let zoomResolve
+      const zoomDeferred = new Promise((resolve) => { zoomResolve = resolve })
+      mockHandleZoomChange.mockReturnValueOnce(zoomDeferred)
+
+      const wrapper = mount(PdfApp)
+      await flushPromises()
+      mockPendingState = pendingState()
+
+      await simulateFileOpen(wrapper)
+      await flushPromises()
+
+      expect(mockClearPending).not.toHaveBeenCalled()
+      expect(mockPdfNavigation.navigateToPage).not.toHaveBeenCalled()
+
+      zoomResolve()
+      await flushPromises()
+      await flushPromises()
+
+      expect(mockPdfNavigation.navigateToPage).toHaveBeenCalledWith(8)
+      expect(mockClearPending).toHaveBeenCalled()
+    })
+
+    it('waits for zoom before page navigation', async () => {
+      let zoomResolve
+      const zoomDeferred = new Promise((resolve) => { zoomResolve = resolve })
+      mockHandleZoomChange.mockReturnValueOnce(zoomDeferred)
+
+      const wrapper = mount(PdfApp)
+      await flushPromises()
+      mockPendingState = pendingState()
+
+      await simulateFileOpen(wrapper)
+      await flushPromises()
+
+      expect(mockPdfNavigation.navigateToPage).not.toHaveBeenCalled()
+
+      zoomResolve()
+      await flushPromises()
+      await flushPromises()
+
+      expect(mockPdfNavigation.navigateToPage).toHaveBeenCalledWith(8)
     })
   })
 })
