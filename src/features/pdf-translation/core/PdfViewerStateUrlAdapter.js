@@ -43,6 +43,17 @@ export function writeViewerStateToUrl(state) {
   if (typeof globalThis.history.replaceState !== 'function') return
   if (typeof globalThis.location === 'undefined') return
 
+  const current = readViewerStateFromUrl()
+  if (current !== null) {
+    if (
+      current.documentIdentity === state.documentIdentity &&
+      current.currentPage === state.currentPage &&
+      current.contentView === state.contentView
+    ) {
+      return
+    }
+  }
+
   const serialized = serializeViewerState(state)
   const url = globalThis.location.pathname
     + globalThis.location.search

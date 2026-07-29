@@ -168,4 +168,36 @@ describe('writeViewerStateToUrl', () => {
     expect(writtenUrl).toContain('#doc=')
     expect(writtenUrl).toContain('?debug=1')
   })
+
+  it('skips write when state is identical to current URL state', () => {
+    writeViewerStateToUrl(state())
+    const callCount = globalThis.history.replaceState.mock.calls.length
+
+    writeViewerStateToUrl(state())
+    expect(globalThis.history.replaceState).toHaveBeenCalledTimes(callCount)
+  })
+
+  it('writes when documentIdentity changes', () => {
+    writeViewerStateToUrl(state())
+    const callCount = globalThis.history.replaceState.mock.calls.length
+
+    writeViewerStateToUrl(state({ documentIdentity: 'different-id' }))
+    expect(globalThis.history.replaceState).toHaveBeenCalledTimes(callCount + 1)
+  })
+
+  it('writes when currentPage changes', () => {
+    writeViewerStateToUrl(state())
+    const callCount = globalThis.history.replaceState.mock.calls.length
+
+    writeViewerStateToUrl(state({ currentPage: 99 }))
+    expect(globalThis.history.replaceState).toHaveBeenCalledTimes(callCount + 1)
+  })
+
+  it('writes when contentView changes', () => {
+    writeViewerStateToUrl(state())
+    const callCount = globalThis.history.replaceState.mock.calls.length
+
+    writeViewerStateToUrl(state({ contentView: 'original' }))
+    expect(globalThis.history.replaceState).toHaveBeenCalledTimes(callCount + 1)
+  })
 })
