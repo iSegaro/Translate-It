@@ -344,7 +344,9 @@ vi.mock('vue-sonner', () => ({
 const mockHandleZoomChange = vi.fn()
 vi.mock('./composables/createPdfTransitionController.js', () => ({
   createPdfTransitionController: () => ({
-    handleContentViewChange: vi.fn(),
+    handleContentViewChange: vi.fn((value) => {
+      mockViewerMode.setContentView(value)
+    }),
     handleLayoutModeChange: vi.fn(),
     handleLayoutChange: vi.fn(),
     handleZoomChange: mockHandleZoomChange,
@@ -2809,6 +2811,25 @@ describe('PdfApp', () => {
   })
 
   describe('Viewer State URL write', () => {
+    it('writes Viewer State on successful document open', async () => {
+      const wrapper = mount(PdfApp)
+      await flushPromises()
+
+      const file = new File([''], 'test.pdf', { type: 'application/pdf' })
+      const fileInput = wrapper.find('input[type="file"]')
+      Object.defineProperty(fileInput.element, 'files', {
+        value: [file],
+        writable: false,
+      })
+      await fileInput.trigger('change')
+      await flushPromises()
+
+      expect(mockWriteUrl).toHaveBeenCalled()
+      const state = mockWriteUrl.mock.calls[0][0]
+      expect(state.documentIdentity).toBe('loaded-doc-id')
+      expect(state.contentView).toBe('translated-pdf')
+    })
+
     it('does not write on failed document load', async () => {
       mockViewerController.loadPdfFile.mockResolvedValueOnce(false)
 
@@ -2825,6 +2846,35 @@ describe('PdfApp', () => {
       await flushPromises()
 
       expect(mockWriteUrl).not.toHaveBeenCalled()
+    })
+
+    it('writes updated page on currentPage change', async () => {
+      const wrapper = mount(PdfApp)
+      await flushPromises()
+
+      wrapper.findComponent({ name: 'PdfViewer' }).vm.$emit('current-page-change', 12)
+      await flushPromises()
+
+      expect(mockWriteUrl).toHaveBeenCalled()
+      const state = mockWriteUrl.mock.calls[0][0]
+      expect(state.documentIdentity).toBe('loaded-doc-id')
+      expect(state.currentPage).toBe(12)
+      expect(state.contentView).toBe('translated-pdf')
+    })
+
+    it('writes updated contentView on view change', async () => {
+      const wrapper = mount(PdfApp)
+      await flushPromises()
+
+      const toolbar = wrapper.findComponent({ name: 'PdfToolbar' })
+      await toolbar.vm.$emit('content-view-change', 'translation')
+      await flushPromises()
+
+      expect(mockWriteUrl).toHaveBeenCalled()
+      const state = mockWriteUrl.mock.calls[0][0]
+      expect(state.documentIdentity).toBe('loaded-doc-id')
+      expect(state.currentPage).toBe(5)
+      expect(state.contentView).toBe('translation')
     })
   })
 })

@@ -28,7 +28,7 @@
       @toggle-outline="toggleOutline"
       @translate-visible="handleTranslateVisiblePages"
       @cancel-translation="handleCancelTranslation"
-      @content-view-change="handleContentViewChange"
+      @content-view-change="onContentViewChange"
       @layout-mode-change="handleLayoutModeChange"
       @zoom-step="handleZoomStep"
       @zoom-change="handleZoomChange"
@@ -278,8 +278,9 @@ import { openOptionsPage } from '@/core/helpers.js'
 import { applyTheme } from '@/utils/ui/theme.js'
 import { useUnifiedI18n } from '@/composables/shared/useUnifiedI18n.js'
 import { OVERLAY_ROOT_KEY } from '@/components/base/ToolbarMenu/keys.js'
-import { readViewerStateFromUrl } from '@/features/pdf-translation/core/PdfViewerStateUrlAdapter.js'
+import { readViewerStateFromUrl, writeViewerStateToUrl } from '@/features/pdf-translation/core/PdfViewerStateUrlAdapter.js'
 import { setPendingViewerState, getPendingViewerState, clearPendingViewerState } from '@/features/pdf-translation/core/PendingViewerState.js'
+import { createViewerState } from '@/features/pdf-translation/core/PdfViewerState.js'
 import './PdfApp.scss'
 import 'vue-sonner/style.css'
 import '@/assets/styles/components/_toast.scss'
@@ -421,6 +422,16 @@ const resumeDescriptor = computed(() => {
     viewLabel,
   }
 })
+
+function writeCurrentViewerState() {
+  if (!hasDocument.value) return
+  if (!session.documentIdentity) return
+  writeViewerStateToUrl(createViewerState({
+    documentIdentity: session.documentIdentity,
+    currentPage: currentPageNumber.value,
+    contentView: contentView.value,
+  }))
+}
 
 // ── Lifecycle Controller ──────────
 // PdfApp owns all lifecycle state and timers.
@@ -574,6 +585,11 @@ usePdfKeyboard({
     pdfTranslatedPaneRef,
     pdfViewerLayoutRef
   })
+
+function onContentViewChange(value) {
+  handleContentViewChange(value)
+  writeCurrentViewerState()
+}
 
 const isDragOver = ref(false)
 const isOutlineVisible = ref(false)
@@ -799,6 +815,10 @@ async function handleFileSelected(file) {
       navigateToPage(pending.currentPage)
       clearPendingViewerState()
     }
+
+    if (!isMatch) {
+      writeCurrentViewerState()
+    }
   }
   updateDocumentTitle()
 }
@@ -831,6 +851,7 @@ function handleCurrentPageChange(pageNumber) {
   if (isNavigating.value) return
   if (!Number.isFinite(Number(pageNumber))) return
   currentPage.value = Number(pageNumber) || 0
+  writeCurrentViewerState()
 }
 
 function handleVisiblePagesChange(pageNumbers) {
