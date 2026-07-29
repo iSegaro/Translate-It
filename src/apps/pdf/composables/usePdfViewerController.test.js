@@ -321,7 +321,7 @@ describe('usePdfViewerController cache persistence', () => {
 
   it('does not restore cached translations during document load', async () => {
     const block = createBlock()
-    const { controller } = await loadControllerWithCacheEntry({
+    await loadControllerWithCacheEntry({
       blockId: block.id,
       translatedText: 'درآمد ۱۲٫۵ میلیارد',
       sourceTextHash: block.sourceTextHash,
@@ -363,7 +363,7 @@ describe('usePdfViewerController cache persistence', () => {
 
   it('does not register deferred translation restoration', async () => {
     const block = createBlock()
-    const { controller } = await loadControllerWithCacheEntry({
+    await loadControllerWithCacheEntry({
       blockId: block.id,
       translatedText: 'درآمد',
       sourceTextHash: block.sourceTextHash,

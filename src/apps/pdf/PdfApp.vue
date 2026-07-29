@@ -289,7 +289,6 @@ function setOverlayRoot(el) {
 }
 
 const {
-  error,
   fileName,
   hasDocument,
   isLoading,

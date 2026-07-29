@@ -51,8 +51,6 @@ export function usePdfViewerController() {
 
   const _blockIndex = new Map()
 
-  let disposed = false
-
   function _buildBlocksForLogicalBlocks(logicalBlocks = []) {
     const blocks = []
 
@@ -277,7 +275,6 @@ export function usePdfViewerController() {
     }
 
     try {
-      disposed = false
       isLoading.value = true
       error.value = ''
       await pdfTranslationCoordinator.cancelActiveTranslation('document-replaced')
@@ -397,7 +394,6 @@ export function usePdfViewerController() {
   }
 
   async function cleanup() {
-    disposed = true
     await pdfTranslationCoordinator.cancelActiveTranslation('viewer-cleanup')
     await pdfDocumentSession.destroy()
     resetLoadedDocument()
