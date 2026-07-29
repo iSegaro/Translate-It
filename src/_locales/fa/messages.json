@@ -284,16 +284,16 @@
   "ocr_tab_title": {
     "message": "تشخیص متن (OCR)"
   },
-  "ocr.page": {
+  "ocr_page": {
     "message": "OCR صفحه"
   },
-  "ocr.pageCompact": {
+  "ocr_page_compact": {
     "message": "صفحه"
   },
-  "ocr.region": {
+  "ocr_region": {
     "message": "OCR ناحیه"
   },
-  "ocr.regionCompact": {
+  "ocr_region_compact": {
     "message": "ناحیه"
   },
   "ocr_toggle_section_title": {

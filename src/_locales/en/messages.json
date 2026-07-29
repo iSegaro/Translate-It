@@ -284,16 +284,16 @@
   "ocr_tab_title": {
     "message": "Screen OCR"
   },
-  "ocr.page": {
+  "ocr_page": {
     "message": "OCR Page"
   },
-  "ocr.pageCompact": {
+  "ocr_page_compact": {
     "message": "Page"
   },
-  "ocr.region": {
+  "ocr_region": {
     "message": "OCR Region"
   },
-  "ocr.regionCompact": {
+  "ocr_region_compact": {
     "message": "Region"
   },
   "ocr_toggle_section_title": {

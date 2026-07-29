@@ -560,8 +560,8 @@ function buildPrimaryLabel(state, compact = false) {
   const actionText = state.action === 'cancel'
     ? t('ocr.cancel', 'Cancel')
     : (state.action === 'page'
-      ? t(compact ? 'ocr.pageCompact' : 'ocr.page', compact ? 'Page' : 'OCR Page')
-      : t(compact ? 'ocr.regionCompact' : 'ocr.region', compact ? 'Region' : 'OCR Region'))
+      ? t(compact ? 'ocr_page_compact' : 'ocr_page', compact ? 'Page' : 'OCR Page')
+      : t(compact ? 'ocr_region_compact' : 'ocr_region', compact ? 'Region' : 'OCR Region'))
   if (state.language === null) return actionText
   const languageLabel = state.language.compactLabel || state.language.code?.toUpperCase() || 'EN'
   return `${actionText} · ${languageLabel}`

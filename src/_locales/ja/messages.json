@@ -284,16 +284,16 @@
   "ocr_tab_title": {
     "message": "スクリーンOCR"
   },
-  "ocr.page": {
+  "ocr_page": {
     "message": "OCRページ"
   },
-  "ocr.pageCompact": {
+  "ocr_page_compact": {
     "message": "ページ"
   },
-  "ocr.region": {
+  "ocr_region": {
     "message": "OCR領域"
   },
-  "ocr.regionCompact": {
+  "ocr_region_compact": {
     "message": "領域"
   },
   "ocr_toggle_section_title": {
