@@ -10,10 +10,10 @@ export class PdfDestinationResolver {
     this._pageIndexCache = new Map()
   }
 
-  resolveDestination({ pdfDocument, totalPages, destination }) {
+  resolveDestination({ pdfDocument, totalPages, destination, documentGeneration, isDocumentGenerationCurrent }) {
     if (!pdfDocument) return null
 
-    const ctx = Object.freeze({ pdfDocument, totalPages })
+    const ctx = Object.freeze({ pdfDocument, totalPages, documentGeneration, isDocumentGenerationCurrent })
 
     try {
       if (typeof destination === 'number') {
@@ -40,6 +40,10 @@ export class PdfDestinationResolver {
     this._pageIndexCache.clear()
   }
 
+  _canCommitCache(ctx) {
+    return !ctx.isDocumentGenerationCurrent || ctx.isDocumentGenerationCurrent(ctx.documentGeneration)
+  }
+
   _resolvePageNumber(ctx, pageNumber) {
     if (!Number.isInteger(pageNumber)) {
       return null
@@ -62,15 +66,19 @@ export class PdfDestinationResolver {
       return this._destinationCache.get(cacheKey)
     }
 
-    const explicitDest = await ctx.pdfDocument.getDestination(name)
-    if (!explicitDest) {
-      this._destinationCache.set(cacheKey, null)
-      return null
-    }
+      const explicitDest = await ctx.pdfDocument.getDestination(name)
+      if (!explicitDest) {
+        if (this._canCommitCache(ctx)) {
+          this._destinationCache.set(cacheKey, null)
+        }
+        return null
+      }
 
-    const target = await this._resolveExplicitDestination(ctx, explicitDest)
-    this._destinationCache.set(cacheKey, target)
-    return target
+      const target = await this._resolveExplicitDestination(ctx, explicitDest)
+      if (this._canCommitCache(ctx)) {
+        this._destinationCache.set(cacheKey, target)
+      }
+      return target
   }
 
   async _resolveExplicitDestination(ctx, destArray) {
@@ -104,15 +112,21 @@ export class PdfDestinationResolver {
       const pageNumber = pageIndex + 1
 
       if (pageNumber < 1 || pageNumber > ctx.totalPages) {
-        this._pageIndexCache.set(cacheKey, null)
+        if (this._canCommitCache(ctx)) {
+          this._pageIndexCache.set(cacheKey, null)
+        }
         return null
       }
 
-      this._pageIndexCache.set(cacheKey, pageNumber)
+      if (this._canCommitCache(ctx)) {
+        this._pageIndexCache.set(cacheKey, pageNumber)
+      }
       return pageNumber
     } catch (error) {
       logger.warn('Failed to resolve page index from ref:', error)
-      this._pageIndexCache.set(cacheKey, null)
+      if (this._canCommitCache(ctx)) {
+        this._pageIndexCache.set(cacheKey, null)
+      }
       return null
     }
   }

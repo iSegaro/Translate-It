@@ -769,10 +769,13 @@ export class PdfDocumentSession extends ResourceTracker {
    * @returns {Promise<object|null>} NavigationTarget or null when resolution fails
    */
   resolveDestination(dest) {
+    const documentGeneration = this.documentGeneration
     return this._resolver.resolveDestination({
       pdfDocument: this.pdfDocument,
       totalPages: this.totalPages,
-      destination: dest
+      destination: dest,
+      documentGeneration,
+      isDocumentGenerationCurrent: generation => this._isDocumentGenerationCurrent(generation)
     })
   }
 
