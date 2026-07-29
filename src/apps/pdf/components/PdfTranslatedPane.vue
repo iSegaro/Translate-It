@@ -68,6 +68,7 @@ import { getScopedLogger } from '@/shared/logging/logger.js'
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js'
 import { LAYOUT_MODE } from '../composables/usePdfViewerMode.js'
 import { getScrollMetrics } from '../utils/pdfGeometryModel.js'
+import { getScrollSpaceTop } from '../utils/pdfGeometryModel.js'
 import { CURRENT_PAGE_SOURCE } from '../utils/pdfCurrentPageResolver.js'
 import { resolveRenderWindow } from '../utils/pdfRenderWindowResolver.js'
 import PdfTranslatedBlock from './PdfTranslatedBlock.vue'
@@ -250,7 +251,29 @@ onBeforeUnmount(() => {
   lastCurrentPage = 0
 })
 
+function scrollToPage(pageNumber) {
+  const num = Number(pageNumber)
+  if (!Number.isInteger(num) || num < 1) return
+
+  if (!rootEl.value) return
+
+  const pageEl = rootEl.value.querySelector(`.pdf-translated-page[data-page-number="${num}"]`)
+  if (!pageEl) return
+
+  const container = scrollRoot || props.scrollContainer
+  if (!container) return
+
+  const targetScrollTop = getScrollSpaceTop(pageEl, container)
+  if (!Number.isFinite(targetScrollTop)) return
+
+  container.scrollTo({
+    top: targetScrollTop,
+    behavior: 'auto',
+  })
+}
+
 defineExpose({
-  refreshCurrentPage: () => emitCurrentPage(true)
+  refreshCurrentPage: () => emitCurrentPage(true),
+  scrollToPage,
 })
 </script>
