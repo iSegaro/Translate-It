@@ -2,10 +2,12 @@ import { ref, computed, nextTick, watch } from 'vue'
 import { getScopedLogger } from '@/shared/logging/logger.js'
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js'
 import { NavigationTargetType, destKey } from '@/features/pdf-translation/core/NavigationModels.js'
+import { resolveNavigationOwner } from '../utils/resolveNavigationOwner.js'
+import { PANE_OWNER } from '../utils/paneOwner.js'
 
 const logger = getScopedLogger(LOG_COMPONENTS.PDF, 'usePdfNavigation')
 
-export function usePdfNavigation(viewerRef) {
+export function usePdfNavigation(viewerRef, translatedPaneRef, contentView) {
   const currentPage = ref(0)
   const isNavigating = ref(false)
   const outline = ref(null)
@@ -214,16 +216,18 @@ export function usePdfNavigation(viewerRef) {
     isNavigating.value = true
     currentPage.value = num
 
-    const viewer = viewerRef?.value
-    if (viewer?.scrollToPage) {
-      viewer.scrollToPage(num, options)
+    const owner = resolveNavigationOwner(contentView.value)
+    if (owner === PANE_OWNER.TRANSLATED) {
+      translatedPaneRef?.value?.scrollToPage?.(num)
+    } else {
+      viewerRef?.value?.scrollToPage?.(num, options)
     }
 
     void nextTick(() => {
       isNavigating.value = false
     })
 
-    logger.info('Navigation executed:', { pageNumber: num })
+    logger.info('Navigation executed:', { pageNumber: num, owner })
   }
 
   async function navigateToDestination(dest) {

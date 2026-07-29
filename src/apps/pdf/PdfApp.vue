@@ -373,7 +373,7 @@ const {
   handleNavigationTarget,
   attachDocument,
   detachDocument
-} = usePdfNavigation(pdfViewerRef)
+} = usePdfNavigation(pdfViewerRef, pdfTranslatedPaneRef, contentView)
 const currentPageNumber = computed(() => Number(currentPage.value) || 0)
 const dismissedPdfStatusBannerKey = ref('')
 const logger = getScopedLogger(LOG_COMPONENTS.PDF, 'PdfApp')
