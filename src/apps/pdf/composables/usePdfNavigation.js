@@ -19,6 +19,7 @@ export function usePdfNavigation(viewerRef, translatedPaneRef, contentView) {
   let _session = null
   let _flatNodes = []
   const _pageCache = new Map()
+  let _navigationRevision = 0
 
   // ── Flatten ──────────────────────────────────────────────
 
@@ -87,7 +88,9 @@ export function usePdfNavigation(viewerRef, translatedPaneRef, contentView) {
   // ── Lazy Resolution ──────────────────────────────────────
 
   async function resolvePageNumber(dest) {
-    if (!dest || !_session) return null
+    const session = _session
+    const documentGeneration = session?.documentGeneration
+    if (!dest || !session) return null
 
     const key = destKey(dest)
     if (_pageCache.has(key)) {
@@ -95,7 +98,10 @@ export function usePdfNavigation(viewerRef, translatedPaneRef, contentView) {
     }
 
     try {
-      const target = await _session.resolveDestination(dest)
+      const target = await session.resolveDestination(dest)
+      if (session !== _session || session.documentGeneration !== documentGeneration) {
+        return null
+      }
       if (target?.type === NavigationTargetType.PAGE) {
         _pageCache.set(key, target.pageNumber)
         return target.pageNumber
@@ -113,6 +119,8 @@ export function usePdfNavigation(viewerRef, translatedPaneRef, contentView) {
 
   async function updateActiveOutline() {
     const generation = ++_activeGeneration
+    const session = _session
+    const documentGeneration = session?.documentGeneration
     const page = currentPage.value
 
     if (page < 1 || _flatNodes.length === 0) {
@@ -153,7 +161,11 @@ export function usePdfNavigation(viewerRef, translatedPaneRef, contentView) {
     if (unresolvedDests.length > 0) {
       await Promise.all(unresolvedDests.map((d) => resolvePageNumber(d)))
 
-      if (generation !== _activeGeneration) return
+      if (
+        generation !== _activeGeneration ||
+        session !== _session ||
+        session?.documentGeneration !== documentGeneration
+      ) return
 
       for (let i = 0; i < _flatNodes.length; i++) {
         const entry = _flatNodes[i]
@@ -201,14 +213,18 @@ export function usePdfNavigation(viewerRef, translatedPaneRef, contentView) {
 
   // ── Navigation ───────────────────────────────────────────
 
-  function navigateToPage(pageNumber, options = {}) {
-    if (!_session) {
-      logger.warn('navigateToPage called without attached document')
-      return
-    }
+  function isCurrentCommandContext({ session, documentGeneration, navigationRevision }) {
+    return session === _session &&
+      session.documentGeneration === documentGeneration &&
+      navigationRevision === _navigationRevision
+  }
+
+  function executePageNavigation(pageNumber, options, commandContext) {
+    const { session } = commandContext
+    if (!isCurrentCommandContext(commandContext)) return
 
     const num = Number(pageNumber)
-    if (!Number.isInteger(num) || num < 1 || num > _session.totalPages) {
+    if (!Number.isInteger(num) || num < 1 || num > session.totalPages) {
       logger.warn('Invalid page number for navigation:', pageNumber)
       return
     }
@@ -224,20 +240,46 @@ export function usePdfNavigation(viewerRef, translatedPaneRef, contentView) {
     }
 
     void nextTick(() => {
+      if (!isCurrentCommandContext(commandContext)) return
       isNavigating.value = false
     })
 
     logger.info('Navigation executed:', { pageNumber: num, owner })
   }
 
+  function navigateToPage(pageNumber, options = {}) {
+    const session = _session
+    const documentGeneration = session?.documentGeneration
+    if (!session) {
+      logger.warn('navigateToPage called without attached document')
+      return
+    }
+
+    executePageNavigation(pageNumber, options, {
+      session,
+      documentGeneration,
+      navigationRevision: ++_navigationRevision
+    })
+  }
+
   async function navigateToDestination(dest) {
-    if (!_session) {
+    const session = _session
+    const documentGeneration = session?.documentGeneration
+    if (!session) {
       logger.warn('navigateToDestination called without attached document')
       return
     }
 
+    const commandContext = {
+      session,
+      documentGeneration,
+      navigationRevision: ++_navigationRevision
+    }
+
     try {
-      const target = await _session.resolveDestination(dest)
+      const target = await session.resolveDestination(dest)
+
+      if (!isCurrentCommandContext(commandContext)) return
 
       if (!target) {
         logger.warn('Destination could not be resolved:', dest)
@@ -245,11 +287,11 @@ export function usePdfNavigation(viewerRef, translatedPaneRef, contentView) {
       }
 
       if (target.type === NavigationTargetType.PAGE) {
-        navigateToPage(target.pageNumber, {
+        executePageNavigation(target.pageNumber, {
           left: target.left,
           top: target.top,
           zoom: target.zoom
-        })
+        }, commandContext)
         return
       }
 
