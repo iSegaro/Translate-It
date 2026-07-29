@@ -627,7 +627,7 @@ describe('usePdfViewerController error lifecycle', () => {
     const firstRequest = controller.translateVisiblePages()
 
     expect(controller.isTranslating.value).toBe(true)
-    expect(translateVisibleBlocksMock).toHaveBeenCalledTimes(1)
+    await vi.waitFor(() => expect(translateVisibleBlocksMock).toHaveBeenCalledTimes(1))
 
     const duplicateResult = await controller.translateVisiblePages()
 
