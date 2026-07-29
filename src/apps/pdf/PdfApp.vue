@@ -270,6 +270,7 @@ import { applyTheme } from '@/utils/ui/theme.js'
 import { useUnifiedI18n } from '@/composables/shared/useUnifiedI18n.js'
 import { OVERLAY_ROOT_KEY } from '@/components/base/ToolbarMenu/keys.js'
 import { readViewerStateFromUrl } from '@/features/pdf-translation/core/PdfViewerStateUrlAdapter.js'
+import { setPendingViewerState } from '@/features/pdf-translation/core/PendingViewerState.js'
 import './PdfApp.scss'
 import 'vue-sonner/style.css'
 import '@/assets/styles/components/_toast.scss'
@@ -1175,7 +1176,7 @@ onMounted(async () => {
 
   if (!isAlive) return
 
-  readViewerStateFromUrl()
+  setPendingViewerState(readViewerStateFromUrl())
 
   if (import.meta.env.DEV) {
     import('./debug/pdfOverlayDiagnostics.js')
