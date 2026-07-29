@@ -35,6 +35,12 @@ const openTranslationMock = vi.fn()
 const downloadFileMock = vi.hoisted(() => vi.fn())
 const openOptionsPageMock = vi.hoisted(() => vi.fn())
 const pdfDiagnosticsImportMock = vi.hoisted(() => vi.fn())
+const pdfAppLoggerMock = vi.hoisted(() => ({
+  debug: vi.fn(),
+  info: vi.fn(),
+  warn: vi.fn(),
+  error: vi.fn(),
+}))
 const settingsStoreMock = vi.hoisted(() => ({
   isDarkTheme: false,
   settings: { THEME: 'auto', DEBUG_MODE: false },
@@ -79,6 +85,10 @@ function createDeferred() {
 
 vi.mock('./composables/usePdfViewerController.js', () => ({
   usePdfViewerController: () => mockViewerController
+}))
+
+vi.mock('@/shared/logging/logger.js', () => ({
+  getScopedLogger: () => pdfAppLoggerMock,
 }))
 
 vi.mock('./composables/usePdfViewerMode.js', () => ({
@@ -525,6 +535,7 @@ describe('PdfApp', () => {
     openOptionsPageMock.mockReset()
     downloadFileMock.mockReset()
     pdfDiagnosticsImportMock.mockReset()
+    pdfAppLoggerMock.warn.mockReset()
     mockRegionExecutionDispatch.mockClear()
     regionComparisonRunnerMock.execute.mockReset()
     regionComparisonRunnerMock.options = null
@@ -565,6 +576,7 @@ describe('PdfApp', () => {
   afterEach(() => {
     vi.useRealTimers()
     vi.unstubAllEnvs()
+    vi.unstubAllGlobals()
     vi.clearAllTimers()
   })
 
@@ -1944,7 +1956,7 @@ describe('PdfApp', () => {
     expect(openTranslationMock).not.toHaveBeenCalled()
   })
 
-  it('clicks hidden file input when open pdf is requested', async () => {
+  it('falls back to hidden file input when the Chromium picker is unavailable', async () => {
     createMocks()
 
     const wrapper = mount(PdfApp)
@@ -1968,6 +1980,52 @@ describe('PdfApp', () => {
 
     expect(clickSpy).toHaveBeenCalledTimes(1)
     clickSpy.mockRestore()
+  })
+
+  it('uses Chromium picker and forwards selected file to the loading pipeline', async () => {
+    const file = new File(['pdf'], 'chromium.pdf', { type: 'application/pdf' })
+    const getFile = vi.fn().mockResolvedValue(file)
+    const showOpenFilePicker = vi.fn().mockResolvedValue([{ getFile }])
+    vi.stubGlobal('showOpenFilePicker', showOpenFilePicker)
+    const wrapper = mount(PdfApp)
+    await flushPromises()
+    const inputClick = vi.spyOn(wrapper.find('input[type="file"]').element, 'click')
+
+    wrapper.findComponent({ name: 'PdfToolbar' }).vm.$emit('request-open-pdf')
+    await flushPromises()
+    await flushPromises()
+
+    expect(showOpenFilePicker).toHaveBeenCalledWith(expect.objectContaining({ multiple: false }))
+    expect(getFile).toHaveBeenCalledOnce()
+    expect(mockViewerController.loadPdfFile).toHaveBeenCalledWith(file, expect.any(Object))
+    expect(inputClick).not.toHaveBeenCalled()
+  })
+
+  it('silently ignores Chromium picker cancellation', async () => {
+    const showOpenFilePicker = vi.fn().mockRejectedValue(new DOMException('cancelled', 'AbortError'))
+    vi.stubGlobal('showOpenFilePicker', showOpenFilePicker)
+    const wrapper = mount(PdfApp)
+    await flushPromises()
+
+    wrapper.findComponent({ name: 'PdfToolbar' }).vm.$emit('request-open-pdf')
+    await flushPromises()
+
+    expect(mockViewerController.loadPdfFile).not.toHaveBeenCalled()
+  })
+
+  it('falls back to hidden input when Chromium picker fails', async () => {
+    const error = new DOMException('blocked', 'SecurityError')
+    vi.stubGlobal('showOpenFilePicker', vi.fn().mockRejectedValue(error))
+    const wrapper = mount(PdfApp)
+    await flushPromises()
+    const inputClick = vi.spyOn(wrapper.find('input[type="file"]').element, 'click')
+
+    wrapper.findComponent({ name: 'PdfToolbar' }).vm.$emit('request-open-pdf')
+    await flushPromises()
+
+    expect(pdfAppLoggerMock.warn).toHaveBeenCalledWith('Failed to open PDF picker.', error)
+    expect(inputClick).toHaveBeenCalledOnce()
+    expect(mockViewerController.loadPdfFile).not.toHaveBeenCalled()
   })
 
   it('loads selected pdf and resets hidden input value', async () => {

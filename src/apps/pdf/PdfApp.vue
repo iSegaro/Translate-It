@@ -799,7 +799,30 @@ async function handleFileSelected(file) {
   updateDocumentTitle()
 }
 
-function requestOpenPdf() {
+async function requestOpenPdf() {
+  if (typeof globalThis.showOpenFilePicker === 'function') {
+    try {
+      const [fileHandle] = await globalThis.showOpenFilePicker({
+        multiple: false,
+        types: [{
+          description: 'PDF files',
+          accept: { 'application/pdf': ['.pdf'] },
+        }],
+      })
+      const file = await fileHandle?.getFile?.()
+      if (file) {
+        await handleFileSelected(file)
+      }
+    } catch (error) {
+      if (error?.name === 'AbortError') return
+      logger.warn('Failed to open PDF picker.', error)
+    }
+  }
+
+  openFileInput()
+}
+
+function openFileInput() {
   const input = fileInput.value
   if (!input) return
 
