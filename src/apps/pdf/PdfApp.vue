@@ -272,6 +272,7 @@ import { OVERLAY_ROOT_KEY } from '@/components/base/ToolbarMenu/keys.js'
 import { readViewerStateFromUrl, writeViewerStateToUrl } from '@/features/pdf-translation/core/PdfViewerStateUrlAdapter.js'
 import { setPendingViewerState, getPendingViewerState, clearPendingViewerState } from '@/features/pdf-translation/core/PendingViewerState.js'
 import { createViewerState } from '@/features/pdf-translation/core/PdfViewerState.js'
+import { read as readBrowserTabState, write as writeBrowserTabState } from './utils/PdfBrowserTabState.js'
 import './PdfApp.scss'
 import 'vue-sonner/style.css'
 import '@/assets/styles/components/_toast.scss'
@@ -786,8 +787,8 @@ async function handleFileSelected(file) {
       setContentView(pending.contentView)
       await nextTick()
       const layoutCommit = await waitForInitialLayoutCommit()
-      if (layoutCommit?.cancelled) return
-      if (session.documentGeneration !== restoredDocumentGeneration) return
+      if (layoutCommit?.cancelled) return false
+      if (session.documentGeneration !== restoredDocumentGeneration) return false
       navigateToPage(pending.currentPage)
       clearPendingViewerState()
     }
@@ -797,29 +798,65 @@ async function handleFileSelected(file) {
     }
   }
   updateDocumentTitle()
+  return loaded
 }
 
 async function requestOpenPdf() {
   if (typeof globalThis.showOpenFilePicker === 'function') {
+    const storedHandle = readBrowserTabState()?.fileHandle
+    let fileHandle
+
     try {
-      const [fileHandle] = await globalThis.showOpenFilePicker({
-        multiple: false,
-        types: [{
-          description: 'PDF files',
-          accept: { 'application/pdf': ['.pdf'] },
-        }],
-      })
-      const file = await fileHandle?.getFile?.()
-      if (file) {
-        await handleFileSelected(file)
-      }
+      fileHandle = await pickPdfFile(storedHandle)
     } catch (error) {
       if (error?.name === 'AbortError') return
-      logger.warn('Failed to open PDF picker.', error)
+
+      if (storedHandle) {
+        logger.warn('Failed to open PDF picker with stored location.', error)
+        try {
+          fileHandle = await pickPdfFile()
+        } catch (retryError) {
+          if (retryError?.name === 'AbortError') return
+          logger.warn('Failed to open PDF picker.', retryError)
+          openFileInput()
+          return
+        }
+      } else {
+        logger.warn('Failed to open PDF picker.', error)
+        openFileInput()
+        return
+      }
     }
+
+    try {
+      const file = await fileHandle?.getFile?.()
+      if (file) {
+        const loaded = await handleFileSelected(file)
+        if (loaded) {
+          writeBrowserTabState({ fileHandle })
+        }
+      }
+    } catch (error) {
+      logger.warn('Failed to open PDF picker.', error)
+      openFileInput()
+    }
+    return
   }
 
   openFileInput()
+}
+
+function pickPdfFile(startIn = null) {
+  const options = {
+    multiple: false,
+    types: [{
+      description: 'PDF files',
+      accept: { 'application/pdf': ['.pdf'] },
+    }],
+  }
+  if (startIn) options.startIn = startIn
+
+  return globalThis.showOpenFilePicker(options).then(([fileHandle]) => fileHandle)
 }
 
 function openFileInput() {

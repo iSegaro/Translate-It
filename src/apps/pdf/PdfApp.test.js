@@ -41,6 +41,10 @@ const pdfAppLoggerMock = vi.hoisted(() => ({
   warn: vi.fn(),
   error: vi.fn(),
 }))
+const browserTabStateMock = vi.hoisted(() => ({
+  read: vi.fn(),
+  write: vi.fn(),
+}))
 const settingsStoreMock = vi.hoisted(() => ({
   isDarkTheme: false,
   settings: { THEME: 'auto', DEBUG_MODE: false },
@@ -90,6 +94,8 @@ vi.mock('./composables/usePdfViewerController.js', () => ({
 vi.mock('@/shared/logging/logger.js', () => ({
   getScopedLogger: () => pdfAppLoggerMock,
 }))
+
+vi.mock('./utils/PdfBrowserTabState.js', () => browserTabStateMock)
 
 vi.mock('./composables/usePdfViewerMode.js', () => ({
   usePdfViewerMode: () => mockViewerMode,
@@ -536,6 +542,9 @@ describe('PdfApp', () => {
     downloadFileMock.mockReset()
     pdfDiagnosticsImportMock.mockReset()
     pdfAppLoggerMock.warn.mockReset()
+    browserTabStateMock.read.mockReset()
+    browserTabStateMock.read.mockReturnValue(null)
+    browserTabStateMock.write.mockReset()
     mockRegionExecutionDispatch.mockClear()
     regionComparisonRunnerMock.execute.mockReset()
     regionComparisonRunnerMock.options = null
@@ -681,8 +690,7 @@ describe('PdfApp', () => {
     })
 
     const wrapper = mount(PdfApp)
-    await flushPromises()
-    await flushPromises()
+    await vi.waitFor(() => expect(browserTabStateMock.write).toHaveBeenCalledOnce())
 
     const banner = wrapper.find('.pdf-status-banner')
     const content = wrapper.find('.pdf-app__content')
@@ -702,8 +710,7 @@ describe('PdfApp', () => {
     })
 
     const wrapper = mount(PdfApp)
-    await flushPromises()
-    await flushPromises()
+    await vi.waitFor(() => expect(globalThis.showOpenFilePicker).toHaveBeenCalledOnce())
 
     expect(wrapper.find('.pdf-status-banner').exists()).toBe(false)
     expect(wrapper.find('.pdf-app__status-row').exists()).toBe(false)
@@ -718,8 +725,7 @@ describe('PdfApp', () => {
 
     wrapper.findComponent({ name: 'PdfToolbar' }).vm.$emit('translate-visible')
     deferred.resolve(true)
-    await flushPromises()
-    await flushPromises()
+    await vi.waitFor(() => expect(showOpenFilePicker).toHaveBeenCalledTimes(2))
     await vi.waitFor(() => expect(activityCompletedMock).toHaveBeenCalledOnce())
 
     expect(activityCompletedMock).toHaveBeenCalledTimes(1)
@@ -741,7 +747,7 @@ describe('PdfApp', () => {
     const wrapper = mount(PdfApp)
 
     wrapper.findComponent({ name: 'PdfToolbar' }).vm.$emit('translate-visible')
-    await flushPromises()
+    await vi.waitFor(() => expect(pdfAppLoggerMock.warn).toHaveBeenCalledOnce())
     await flushPromises()
 
     expect(translationPartialMock).toHaveBeenCalledWith(expect.objectContaining({ occurrenceId: 7, error: 'Provider failed' }))
@@ -1979,6 +1985,7 @@ describe('PdfApp', () => {
     await flushPromises()
 
     expect(clickSpy).toHaveBeenCalledTimes(1)
+    expect(browserTabStateMock.write).not.toHaveBeenCalled()
     clickSpy.mockRestore()
   })
 
@@ -1992,11 +1999,11 @@ describe('PdfApp', () => {
     const inputClick = vi.spyOn(wrapper.find('input[type="file"]').element, 'click')
 
     wrapper.findComponent({ name: 'PdfToolbar' }).vm.$emit('request-open-pdf')
-    await flushPromises()
-    await flushPromises()
+    await vi.waitFor(() => expect(browserTabStateMock.write).toHaveBeenCalledOnce())
 
     expect(showOpenFilePicker).toHaveBeenCalledWith(expect.objectContaining({ multiple: false }))
     expect(getFile).toHaveBeenCalledOnce()
+    expect(browserTabStateMock.write).toHaveBeenCalledWith({ fileHandle: expect.objectContaining({ getFile }) })
     expect(mockViewerController.loadPdfFile).toHaveBeenCalledWith(file, expect.any(Object))
     expect(inputClick).not.toHaveBeenCalled()
   })
@@ -2011,6 +2018,55 @@ describe('PdfApp', () => {
     await flushPromises()
 
     expect(mockViewerController.loadPdfFile).not.toHaveBeenCalled()
+    expect(browserTabStateMock.write).not.toHaveBeenCalled()
+  })
+
+  it('uses stored picker handle as startIn', async () => {
+    const storedHandle = { getFile: vi.fn() }
+    const file = new File(['pdf'], 'stored.pdf', { type: 'application/pdf' })
+    browserTabStateMock.read.mockReturnValue({ fileHandle: storedHandle })
+    vi.stubGlobal('showOpenFilePicker', vi.fn().mockResolvedValue([{ getFile: vi.fn().mockResolvedValue(file) }]))
+    const wrapper = mount(PdfApp)
+    await flushPromises()
+
+    wrapper.findComponent({ name: 'PdfToolbar' }).vm.$emit('request-open-pdf')
+    await vi.waitFor(() => expect(globalThis.showOpenFilePicker).toHaveBeenCalledOnce())
+
+    expect(globalThis.showOpenFilePicker).toHaveBeenCalledWith(expect.objectContaining({ startIn: storedHandle }))
+  })
+
+  it('does not persist picker handle when PDF loading rejects', async () => {
+    const file = new File(['pdf'], 'failed.pdf', { type: 'application/pdf' })
+    const error = new Error('load failed')
+    mockViewerController.loadPdfFile.mockRejectedValueOnce(error)
+    vi.stubGlobal('showOpenFilePicker', vi.fn().mockResolvedValue([{ getFile: vi.fn().mockResolvedValue(file) }]))
+    const wrapper = mount(PdfApp)
+    await flushPromises()
+
+    wrapper.findComponent({ name: 'PdfToolbar' }).vm.$emit('request-open-pdf')
+    await vi.waitFor(() => expect(pdfAppLoggerMock.warn).toHaveBeenCalledWith('Failed to open PDF picker.', error))
+
+    expect(browserTabStateMock.write).not.toHaveBeenCalled()
+  })
+
+  it('retries without startIn when stored picker handle is rejected', async () => {
+    const storedHandle = { getFile: vi.fn() }
+    const file = new File(['pdf'], 'retry.pdf', { type: 'application/pdf' })
+    browserTabStateMock.read.mockReturnValue({ fileHandle: storedHandle })
+    const showOpenFilePicker = vi.fn()
+      .mockRejectedValueOnce(new DOMException('invalid handle', 'SecurityError'))
+      .mockResolvedValueOnce([{ getFile: vi.fn().mockResolvedValue(file) }])
+    vi.stubGlobal('showOpenFilePicker', showOpenFilePicker)
+    const wrapper = mount(PdfApp)
+    await flushPromises()
+
+    wrapper.findComponent({ name: 'PdfToolbar' }).vm.$emit('request-open-pdf')
+    await vi.waitFor(() => expect(showOpenFilePicker).toHaveBeenCalledTimes(2))
+
+    expect(showOpenFilePicker).toHaveBeenNthCalledWith(1, expect.objectContaining({ startIn: storedHandle }))
+    expect(showOpenFilePicker).toHaveBeenNthCalledWith(2, expect.not.objectContaining({ startIn: expect.anything() }))
+    expect(pdfAppLoggerMock.warn).toHaveBeenCalledWith('Failed to open PDF picker with stored location.', expect.any(DOMException))
+    expect(mockViewerController.loadPdfFile).toHaveBeenCalledWith(file, expect.any(Object))
   })
 
   it('falls back to hidden input when Chromium picker fails', async () => {
@@ -2021,11 +2077,12 @@ describe('PdfApp', () => {
     const inputClick = vi.spyOn(wrapper.find('input[type="file"]').element, 'click')
 
     wrapper.findComponent({ name: 'PdfToolbar' }).vm.$emit('request-open-pdf')
-    await flushPromises()
+    await vi.waitFor(() => expect(pdfAppLoggerMock.warn).toHaveBeenCalledOnce())
 
     expect(pdfAppLoggerMock.warn).toHaveBeenCalledWith('Failed to open PDF picker.', error)
     expect(inputClick).toHaveBeenCalledOnce()
     expect(mockViewerController.loadPdfFile).not.toHaveBeenCalled()
+    expect(browserTabStateMock.write).not.toHaveBeenCalled()
   })
 
   it('loads selected pdf and resets hidden input value', async () => {
