@@ -88,8 +88,8 @@
 .pdf-toolbar__outline-toggle {
   display: inline-grid;
   place-items: center;
-  width: 28px;
-  height: 28px;
+  width: $tb-standalone-icon-control-size;
+  height: $tb-standalone-icon-control-size;
   padding: 0;
   border: none;
   border-radius: 4px;
@@ -122,8 +122,8 @@
 .pdf-toolbar__info-toggle {
   display: inline-grid;
   place-items: center;
-  width: 28px;
-  height: 28px;
+  width: $tb-standalone-icon-control-size;
+  height: $tb-standalone-icon-control-size;
   padding: 0;
   border: none;
   border-radius: 4px;
@@ -376,8 +376,8 @@
 .pdf-toolbar__button--icon-trigger {
   display: inline-grid;
   place-items: center;
-  width: $tb-icon-trigger-size;
-  height: $tb-icon-trigger-size;
+  width: $tb-standalone-icon-control-size;
+  height: $tb-standalone-icon-control-size;
   padding: 0;
   background: transparent;
 
