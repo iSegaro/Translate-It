@@ -59,5 +59,5 @@ export function writeViewerStateToUrl(state) {
     + globalThis.location.search
     + '#' + serialized
 
-  globalThis.history.replaceState(null, '', url)
+  globalThis.history.replaceState(globalThis.history.state, '', url)
 }

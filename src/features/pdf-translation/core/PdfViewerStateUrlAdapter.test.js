@@ -9,12 +9,14 @@ let _hash = ''
 let _replaceStateCalls = []
 let _pathname = '/src/html/pdf.html'
 let _search = ''
+let _historyState = null
 
 beforeEach(() => {
   _hash = ''
   _replaceStateCalls = []
   _pathname = '/src/html/pdf.html'
   _search = ''
+  _historyState = null
   globalThis.location = {
     get hash() {
       return _hash
@@ -31,7 +33,11 @@ beforeEach(() => {
     href: 'chrome-extension://test/src/html/pdf.html',
   }
   globalThis.history = {
+    get state() {
+      return _historyState
+    },
     replaceState: vi.fn((_state, _title, url) => {
+      _historyState = _state
       _replaceStateCalls.push(url)
       const hashIndex = url.indexOf('#')
       if (hashIndex !== -1) {
@@ -199,5 +205,21 @@ describe('writeViewerStateToUrl', () => {
 
     writeViewerStateToUrl(state({ contentView: 'original' }))
     expect(globalThis.history.replaceState).toHaveBeenCalledTimes(callCount + 1)
+  })
+
+  it('preserves unrelated History state', () => {
+    _historyState = { unrelated: { value: true } }
+
+    writeViewerStateToUrl(state())
+
+    expect(_historyState).toEqual({ unrelated: { value: true } })
+  })
+
+  it('preserves the BrowserTabState namespace', () => {
+    _historyState = { pdfBrowserTabState: { value: 'tab-state' } }
+
+    writeViewerStateToUrl(state())
+
+    expect(_historyState).toEqual({ pdfBrowserTabState: { value: 'tab-state' } })
   })
 })
