@@ -125,7 +125,15 @@
             @request-open-pdf="requestOpenPdf"
           >
             <template #empty>
-              <div class="pdf-app__empty">
+              <ResumePrompt
+                v-if="resumeDescriptor"
+                :descriptor="resumeDescriptor"
+                @resume="handleResume"
+              />
+              <div
+                v-else
+                class="pdf-app__empty"
+              >
                 <p class="pdf-app__empty-title">
                   Drop a PDF here or choose one from disk.
                 </p>
@@ -232,6 +240,7 @@ import PdfDocumentInfoDialog from './components/PdfDocumentInfoDialog.vue'
 import ProgressIndicator from './components/ProgressIndicator.vue'
 import OperationStatus from './components/OperationStatus.vue'
 import PdfAppBrand from './components/PdfAppBrand.vue'
+import ResumePrompt from './components/ResumePrompt.vue'
 import PdfOverlayRoot from './components/PdfOverlayRoot.vue'
 import pdfBrandIcon from '@/icons/ui/pdf_viewer/pdf.svg?url'
 import { usePdfViewerController } from './composables/usePdfViewerController.js'
@@ -270,7 +279,7 @@ import { applyTheme } from '@/utils/ui/theme.js'
 import { useUnifiedI18n } from '@/composables/shared/useUnifiedI18n.js'
 import { OVERLAY_ROOT_KEY } from '@/components/base/ToolbarMenu/keys.js'
 import { readViewerStateFromUrl } from '@/features/pdf-translation/core/PdfViewerStateUrlAdapter.js'
-import { setPendingViewerState } from '@/features/pdf-translation/core/PendingViewerState.js'
+import { setPendingViewerState, getPendingViewerState } from '@/features/pdf-translation/core/PendingViewerState.js'
 import './PdfApp.scss'
 import 'vue-sonner/style.css'
 import '@/assets/styles/components/_toast.scss'
@@ -391,6 +400,26 @@ const presentation = createPresentationHost({
 
 const progressOperation = computed(() => {
   return presentation.progressState.value.operation
+})
+
+const CONTENT_VIEW_LABEL = {
+  original: 'Original',
+  translation: 'Translation',
+  'translated-pdf': 'Translated PDF',
+}
+
+const resumeDescriptor = computed(() => {
+  const pending = getPendingViewerState()
+  if (!pending) return null
+
+  const pageLabel = `Page ${pending.currentPage || 1}`
+  const viewLabel = CONTENT_VIEW_LABEL[pending.contentView] || pending.contentView
+
+  return {
+    title: 'Previous PDF',
+    pageLabel,
+    viewLabel,
+  }
 })
 
 // ── Lifecycle Controller ──────────
@@ -766,6 +795,10 @@ function requestOpenPdf() {
 
   input.value = ''
   input.click()
+}
+
+function handleResume() {
+  requestOpenPdf()
 }
 
 async function handleFileInputChange(event) {
