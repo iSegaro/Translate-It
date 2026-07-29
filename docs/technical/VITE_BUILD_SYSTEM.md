@@ -29,6 +29,36 @@ The project maintains three core configurations under `config/vite/`:
 
 ---
 
+## 1.1. Content Script CSS Ownership
+
+The content UI is rendered entirely inside a Shadow DOM.
+
+To preserve Shadow DOM isolation, Content UI styles are injected manually
+into the ShadowRoot at runtime.
+
+Although Vite extracts component SCSS into CSS assets, the auto-generated
+CSS for the main content script is intentionally removed from the final
+manifest during `transformManifest()`. Otherwise, the browser would inject
+those styles into the host page through `manifest.content_scripts[].css`,
+bypassing Shadow DOM isolation.
+
+This results in a clear ownership model:
+
+- **Content UI styles** → ShadowRoot only.
+- **Page-facing styles** (Element Selection, Mouse Hover, Page Translation
+  layout fixes, iframe highlights, etc.) → Explicit page-style injection.
+
+### Design Rule
+
+Never rely on `manifest.content_scripts[].css` for Content UI styling.
+
+Any style that must affect the host page should be injected explicitly
+through its own page-style injection mechanism.
+
+> This behavior is intentional and should not be reverted unless the Content UI architecture changes.
+
+---
+
 ## 2. Manual Chunking Strategy (`manualChunks`)
 
 In a multi-page browser extension, letting the bundler split code dynamically without guidance results in fragmented, duplicated code across chunks, causing critical circular dependencies and runtime crashes (Temporal Dead Zone errors). 

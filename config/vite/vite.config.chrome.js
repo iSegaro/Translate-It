@@ -269,6 +269,14 @@ export default defineConfig({
         }
       },
       transformManifest: async (manifest) => {
+        // Prevent Vite from injecting extracted content UI CSS into page scope.
+        // Content UI styles are loaded manually into the ShadowRoot.        
+        for (const contentScript of manifest.content_scripts || []) {
+          if (contentScript.js?.includes('src/core/content-scripts/index-main.js')) {
+            delete contentScript.css;
+          }
+        }
+
         const outDir = baseOutDir;
         await fs.ensureDir(outDir);
         await fs.ensureDir(resolve(outDir, 'src/html'));
