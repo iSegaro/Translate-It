@@ -154,6 +154,15 @@ afterEach(() => {
 
 describe('createPdfTransitionController', () => {
   describe('initial layout commit', () => {
+    it('does not retain identical layout as a pending commit', async () => {
+      const { ctrl } = createController()
+      const firstLayout = ctrl.waitForInitialLayoutCommit()
+
+      await expect(ctrl.handleLayoutChange({ width: 0, height: 0 })).resolves.toBe(false)
+
+      expect(ctrl.waitForInitialLayoutCommit()).toBe(firstLayout)
+    })
+
     it('waits before any layout change until first real layout commit completes', async () => {
       const recompute = createDeferred()
       const reactiveMetric = ref('provisional')
@@ -1427,6 +1436,7 @@ describe('createPdfTransitionController', () => {
 
     it('defers layout change during controlled zoom and applies after zoom', async () => {
       const { ctrl, recomputeLayout } = createController()
+      const firstLayout = ctrl.waitForInitialLayoutCommit()
 
       anchorFns.captureControlledTransitionAnchors.mockReturnValue({
         originalAnchor: { pageNumber: 1, offsetRatio: 0.5, owner: PANE_OWNER.ORIGINAL },
@@ -1439,6 +1449,8 @@ describe('createPdfTransitionController', () => {
       const zoomPromise = ctrl.handleZoomChange({ mode: 'fit-page' })
 
       await ctrl.handleLayoutChange({ width: 500, height: 400 })
+
+      expect(ctrl.waitForInitialLayoutCommit()).toBe(firstLayout)
 
       await zoomPromise
 

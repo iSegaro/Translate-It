@@ -453,7 +453,7 @@ export function createPdfTransitionController({
     }
   }
 
-  async function runLayoutChange(layout = null) {
+  function runLayoutChange(layout = null) {
     const nextLayout = normalizeLayout(layout)
     const currentLayout = viewerLayout.value
     const contentSeqAtStart = contentTransitionSeq
@@ -464,7 +464,7 @@ export function createPdfTransitionController({
       nextLayout.height === currentLayout.height
     ) {
       completePendingTransition(contentSeqAtStart)
-      return false
+      return null
     }
 
     // During active controlled zoom, defer layout changes to avoid
@@ -473,7 +473,7 @@ export function createPdfTransitionController({
     if (controlledZoomSeq > 0) {
       deferredZoomLayout = nextLayout
       viewerLayout.value = nextLayout
-      return false
+      return null
     }
 
     layoutChangeSeq += 1
@@ -484,77 +484,81 @@ export function createPdfTransitionController({
     const shouldFreezeRenderWindow =
       contentSeqAtStart > 0 && pendingTransitionRestoreForTransition != null
 
-    try {
-      const pendingPdfAnchor = pdfAnchorFromToken
-      let capturedAnchors = pendingTransitionRestoreForTransition?.pdfAnchor
-        ? null
-        : ownerAnchorFromToken
+    return (async () => {
+      try {
+        const pendingPdfAnchor = pdfAnchorFromToken
+        let capturedAnchors = pendingTransitionRestoreForTransition?.pdfAnchor
           ? null
-          : (captureControlledTransitionAnchors() || { originalAnchor: null, translatedAnchor: null })
-      const translatedAnchor = pendingTransitionRestoreForTransition?.pdfAnchor
-        ? deriveTranslatedAnchorFromOriginal?.(pendingTransitionRestoreForTransition.pdfAnchor) || null
-        : capturedAnchors?.translatedAnchor ?? null
+          : ownerAnchorFromToken
+            ? null
+            : (captureControlledTransitionAnchors() || { originalAnchor: null, translatedAnchor: null })
+        const translatedAnchor = pendingTransitionRestoreForTransition?.pdfAnchor
+          ? deriveTranslatedAnchorFromOriginal?.(pendingTransitionRestoreForTransition.pdfAnchor) || null
+          : capturedAnchors?.translatedAnchor ?? null
 
-      if (ownerAnchorFromToken && !pendingTransitionRestoreForTransition?.pdfAnchor) {
-        if (ownerAnchorFromToken.owner === PANE_OWNER.ORIGINAL) {
-          capturedAnchors = {
-            originalAnchor: ownerAnchorFromToken,
-            translatedAnchor: deriveTranslatedAnchorFromOriginal?.(ownerAnchorFromToken) || null
-          }
-        } else {
-          capturedAnchors = {
-            originalAnchor: deriveOriginalAnchorFromTranslated(ownerAnchorFromToken),
-            translatedAnchor: ownerAnchorFromToken
+        if (ownerAnchorFromToken && !pendingTransitionRestoreForTransition?.pdfAnchor) {
+          if (ownerAnchorFromToken.owner === PANE_OWNER.ORIGINAL) {
+            capturedAnchors = {
+              originalAnchor: ownerAnchorFromToken,
+              translatedAnchor: deriveTranslatedAnchorFromOriginal?.(ownerAnchorFromToken) || null
+            }
+          } else {
+            capturedAnchors = {
+              originalAnchor: deriveOriginalAnchorFromTranslated(ownerAnchorFromToken),
+              translatedAnchor: ownerAnchorFromToken
+            }
           }
         }
-      }
-      beginScrollSyncSuppression()
-      if (shouldFreezeRenderWindow) {
-        acquireRenderWindowFreeze()
-      }
-      viewerLayout.value = nextLayout
-      if (hasDocument.value) {
-        await recomputeLayout(buildLayoutRequest(nextLayout))
-        await nextTick()
+        beginScrollSyncSuppression()
+        if (shouldFreezeRenderWindow) {
+          acquireRenderWindowFreeze()
+        }
+        viewerLayout.value = nextLayout
+        if (hasDocument.value) {
+          await recomputeLayout(buildLayoutRequest(nextLayout))
+          await nextTick()
 
-        if (contentSeqAtStart !== contentTransitionSeq) {
-          return false
-        }
-        if (layoutSeq !== layoutChangeSeq) {
-          return false
-        }
-        if (pendingPdfAnchor) {
+          if (contentSeqAtStart !== contentTransitionSeq) {
+            return false
+          }
+          if (layoutSeq !== layoutChangeSeq) {
+            return false
+          }
+          if (pendingPdfAnchor) {
+            try {
+              restoreControlledTransitionAnchors({
+                originalAnchor: pendingPdfAnchor,
+                translatedAnchor
+              })
+            } finally {
+              completePendingTransition(contentSeqAtStart)
+            }
+            return true
+          }
           try {
-            restoreControlledTransitionAnchors({
-              originalAnchor: pendingPdfAnchor,
-              translatedAnchor
-            })
+            restoreControlledTransitionAnchors(capturedAnchors)
           } finally {
             completePendingTransition(contentSeqAtStart)
           }
           return true
         }
-        try {
-          restoreControlledTransitionAnchors(capturedAnchors)
-        } finally {
-          completePendingTransition(contentSeqAtStart)
+        return false
+      } catch (error) {
+        completePendingTransition(contentSeqAtStart, true)
+        throw error
+      } finally {
+        if (shouldFreezeRenderWindow) {
+          releaseRenderWindowFreeze()
         }
-        return true
+        scheduleScrollSyncSuppressionClear()
       }
-      return false
-    } catch (error) {
-      completePendingTransition(contentSeqAtStart, true)
-      throw error
-    } finally {
-      if (shouldFreezeRenderWindow) {
-        releaseRenderWindowFreeze()
-      }
-      scheduleScrollSyncSuppressionClear()
-    }
+    })()
   }
 
   function handleLayoutChange(layout = null) {
     const commit = runLayoutChange(layout)
+    if (!commit) return Promise.resolve(false)
+
     const initialWaiter = firstRealLayoutWaiter
     pendingLayoutCommit = commit
     commit.then(
