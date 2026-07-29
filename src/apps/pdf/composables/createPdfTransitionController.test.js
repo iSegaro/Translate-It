@@ -33,9 +33,9 @@ vi.mock('../utils/pdfViewerTopology.js', async () => {
 })
 
 vi.mock('./createPdfTransitionAnchor.js', () => {
-  const PDF_SCROLL_OWNER = Object.freeze({ ORIGINAL: 'original', TRANSLATED: 'translated' })
+  const PANE_OWNER = Object.freeze({ ORIGINAL: 'original', TRANSLATED: 'translated' })
   return {
-    PDF_SCROLL_OWNER,
+    PANE_OWNER,
     isPdfBackedContentView: vi.fn((view) => view === 'original' || view === 'translated-pdf'),
     createPdfTransitionAnchor: vi.fn()
   }
@@ -45,7 +45,7 @@ const { CONTENT_VIEW, LAYOUT_MODE } = await import('./usePdfViewerMode.js')
 const { createPdfTransitionController } = await import('./createPdfTransitionController.js')
 const scrollAnchor = await import('../utils/pdfScrollAnchor.js')
 const pdfTransitionAnchor = await import('./createPdfTransitionAnchor.js')
-const { PDF_SCROLL_OWNER } = pdfTransitionAnchor
+const { PANE_OWNER } = pdfTransitionAnchor
 
 const mountedHosts = []
 
@@ -183,12 +183,12 @@ describe('createPdfTransitionController', () => {
 
       ctrl.__debugCurrentPageSuppression.begin({ owner: 'layout-mode', reason: 'outer' })
       anchorFns.captureControlledTransitionAnchors.mockReturnValue({
-        originalAnchor: { pageNumber: 1, offsetRatio: 0.5, owner: PDF_SCROLL_OWNER.ORIGINAL },
+        originalAnchor: { pageNumber: 1, offsetRatio: 0.5, owner: PANE_OWNER.ORIGINAL },
         translatedAnchor: null
       })
       anchorFns.resolveTranslatedZoomAnchor.mockImplementation((a) => a)
       anchorFns.normalizeFitPagePdfAnchor.mockImplementation((a) => a)
-      anchorFns.restoreControlledTransitionAnchors.mockReturnValue(PDF_SCROLL_OWNER.ORIGINAL)
+      anchorFns.restoreControlledTransitionAnchors.mockReturnValue(PANE_OWNER.ORIGINAL)
 
       const zoomPromise = ctrl.handleZoomChange({ mode: 'fit-page' })
       expect(ctrl.currentPageUpdatesSuppressed.value).toBe(true)
@@ -210,9 +210,9 @@ describe('createPdfTransitionController', () => {
     it('preserves PDF-backed anchor when switching between PDF-backed views', async () => {
       const { ctrl, setContentView } = createController()
 
-      anchorFns.resolveAnchorOwner.mockReturnValue(PDF_SCROLL_OWNER.ORIGINAL)
+      anchorFns.resolveAnchorOwner.mockReturnValue(PANE_OWNER.ORIGINAL)
       anchorFns.resolveOwnerScrollTarget.mockReturnValue({
-        owner: PDF_SCROLL_OWNER.ORIGINAL,
+        owner: PANE_OWNER.ORIGINAL,
         container: document.createElement('div'),
         selector: '.pdf-page[data-page-number]'
       })
@@ -220,14 +220,14 @@ describe('createPdfTransitionController', () => {
       const pdfAnchor = { pageNumber: 1, offsetRatio: 0, pdfPoint: { x: 0, y: 0 } }
       scrollAnchor.capturePdfBackedScrollAnchor.mockReturnValue(pdfAnchor)
       scrollAnchor.isPdfAnchor.mockReturnValue(true)
-      anchorFns.restoreOwnedScrollAnchor.mockReturnValue(PDF_SCROLL_OWNER.ORIGINAL)
+      anchorFns.restoreOwnedScrollAnchor.mockReturnValue(PANE_OWNER.ORIGINAL)
 
       await ctrl.handleContentViewChange(CONTENT_VIEW.TRANSLATED_PDF)
 
       expect(scrollAnchor.capturePdfBackedScrollAnchor).toHaveBeenCalled()
       expect(setContentView).toHaveBeenCalledWith(CONTENT_VIEW.TRANSLATED_PDF)
       expect(anchorFns.restoreOwnedScrollAnchor).toHaveBeenCalledWith(
-        expect.objectContaining({ owner: PDF_SCROLL_OWNER.ORIGINAL, pdfPoint: { x: 0, y: 0 } })
+        expect.objectContaining({ owner: PANE_OWNER.ORIGINAL, pdfPoint: { x: 0, y: 0 } })
       )
     })
 
@@ -240,18 +240,18 @@ describe('createPdfTransitionController', () => {
       const { ctrl } = createController({ recomputeLayout, isSideBySide: true, showTranslatedPdfPane: true })
 
       const page35Anchor = { pageNumber: 35, offsetRatio: 0.25, pdfPoint: { x: 10, y: 20 } }
-      const wrongOriginalAnchor = { owner: PDF_SCROLL_OWNER.ORIGINAL, pageNumber: 48, offsetRatio: 0.4 }
-      anchorFns.resolveAnchorOwner.mockReturnValue(PDF_SCROLL_OWNER.ORIGINAL)
+      const wrongOriginalAnchor = { owner: PANE_OWNER.ORIGINAL, pageNumber: 48, offsetRatio: 0.4 }
+      anchorFns.resolveAnchorOwner.mockReturnValue(PANE_OWNER.ORIGINAL)
       anchorFns.resolveOwnerScrollTarget.mockReturnValue({
-        owner: PDF_SCROLL_OWNER.ORIGINAL,
+        owner: PANE_OWNER.ORIGINAL,
         container: document.createElement('div'),
         selector: '.pdf-page[data-page-number]'
       })
       scrollAnchor.capturePdfBackedScrollAnchor.mockReturnValue(page35Anchor)
       scrollAnchor.isPdfAnchor.mockImplementation((anchor) => !!anchor?.pdfPoint)
-      anchorFns.restoreOwnedScrollAnchor.mockReturnValue(PDF_SCROLL_OWNER.ORIGINAL)
+      anchorFns.restoreOwnedScrollAnchor.mockReturnValue(PANE_OWNER.ORIGINAL)
       anchorFns.deriveTranslatedAnchorFromOriginal.mockReturnValue({
-        owner: PDF_SCROLL_OWNER.TRANSLATED,
+        owner: PANE_OWNER.TRANSLATED,
         pageNumber: 35,
         offsetRatio: 0.25
       })
@@ -285,7 +285,7 @@ describe('createPdfTransitionController', () => {
       expect(anchorFns.restoreControlledTransitionAnchors).toHaveBeenCalledTimes(1)
       expect(anchorFns.restoreControlledTransitionAnchors).toHaveBeenCalledWith({
         originalAnchor: expect.objectContaining({ pageNumber: 35, pdfPoint: { x: 10, y: 20 } }),
-        translatedAnchor: expect.objectContaining({ pageNumber: 35, offsetRatio: 0.25, owner: PDF_SCROLL_OWNER.TRANSLATED })
+        translatedAnchor: expect.objectContaining({ pageNumber: 35, offsetRatio: 0.25, owner: PANE_OWNER.TRANSLATED })
       })
       expect(anchorFns.restoreControlledTransitionAnchors).not.toHaveBeenCalledWith({
         originalAnchor: expect.objectContaining({ pageNumber: 48 }),
@@ -301,16 +301,16 @@ describe('createPdfTransitionController', () => {
       const { ctrl } = createController({ recomputeLayout, isSideBySide: true, showTranslatedPdfPane: true })
 
       const page35Anchor = { pageNumber: 35, pdfPoint: { x: 0, y: 0 } }
-      anchorFns.resolveAnchorOwner.mockReturnValue(PDF_SCROLL_OWNER.ORIGINAL)
+      anchorFns.resolveAnchorOwner.mockReturnValue(PANE_OWNER.ORIGINAL)
       anchorFns.resolveOwnerScrollTarget.mockReturnValue({
-        owner: PDF_SCROLL_OWNER.ORIGINAL,
+        owner: PANE_OWNER.ORIGINAL,
         container: document.createElement('div'),
         selector: '.pdf-page[data-page-number]'
       })
       scrollAnchor.capturePdfBackedScrollAnchor.mockReturnValue(page35Anchor)
       scrollAnchor.isPdfAnchor.mockReturnValue(true)
       anchorFns.deriveTranslatedAnchorFromOriginal.mockReturnValue(null)
-      anchorFns.restoreOwnedScrollAnchor.mockReturnValue(PDF_SCROLL_OWNER.ORIGINAL)
+      anchorFns.restoreOwnedScrollAnchor.mockReturnValue(PANE_OWNER.ORIGINAL)
 
       await ctrl.handleContentViewChange(CONTENT_VIEW.TRANSLATED_PDF)
       await ctrl.handleLayoutChange({ width: 800, height: 600 })
@@ -335,22 +335,22 @@ describe('createPdfTransitionController', () => {
       const { ctrl } = createController({ recomputeLayout, isSideBySide: true, showTranslatedPdfPane: true })
 
       const page35Anchor = { pageNumber: 35, offsetRatio: 0.25, pdfPoint: { x: 10, y: 20 } }
-      anchorFns.resolveAnchorOwner.mockReturnValue(PDF_SCROLL_OWNER.ORIGINAL)
+      anchorFns.resolveAnchorOwner.mockReturnValue(PANE_OWNER.ORIGINAL)
       anchorFns.resolveOwnerScrollTarget.mockReturnValue({
-        owner: PDF_SCROLL_OWNER.ORIGINAL,
+        owner: PANE_OWNER.ORIGINAL,
         container: document.createElement('div'),
         selector: '.pdf-page[data-page-number]'
       })
       scrollAnchor.capturePdfBackedScrollAnchor.mockReturnValue(page35Anchor)
       scrollAnchor.isPdfAnchor.mockImplementation((anchor) => !!anchor?.pdfPoint)
-      anchorFns.restoreOwnedScrollAnchor.mockReturnValue(PDF_SCROLL_OWNER.ORIGINAL)
+      anchorFns.restoreOwnedScrollAnchor.mockReturnValue(PANE_OWNER.ORIGINAL)
       anchorFns.deriveTranslatedAnchorFromOriginal.mockReturnValue({
-        owner: PDF_SCROLL_OWNER.TRANSLATED,
+        owner: PANE_OWNER.TRANSLATED,
         pageNumber: 35,
         offsetRatio: 0.25
       })
       anchorFns.captureControlledTransitionAnchors.mockReturnValue({
-        originalAnchor: { owner: PDF_SCROLL_OWNER.ORIGINAL, pageNumber: 43, offsetRatio: 0.4 },
+        originalAnchor: { owner: PANE_OWNER.ORIGINAL, pageNumber: 43, offsetRatio: 0.4 },
         translatedAnchor: null
       })
 
@@ -365,7 +365,7 @@ describe('createPdfTransitionController', () => {
       expect(anchorFns.restoreControlledTransitionAnchors).toHaveBeenCalledTimes(1)
       expect(anchorFns.restoreControlledTransitionAnchors).toHaveBeenCalledWith({
         originalAnchor: expect.objectContaining({ pageNumber: 35 }),
-        translatedAnchor: expect.objectContaining({ pageNumber: 35, offsetRatio: 0.25, owner: PDF_SCROLL_OWNER.TRANSLATED })
+        translatedAnchor: expect.objectContaining({ pageNumber: 35, offsetRatio: 0.25, owner: PANE_OWNER.TRANSLATED })
       })
       expect(ctrl.renderWindowEvictionFrozen.value).toBe(true)
 
@@ -380,23 +380,23 @@ describe('createPdfTransitionController', () => {
       const { ctrl } = createController({ isSideBySide: true, showTranslatedPdfPane: true })
 
       const page35Anchor = { pageNumber: 35, offsetRatio: 0.25, pdfPoint: { x: 10, y: 20 } }
-      anchorFns.resolveAnchorOwner.mockReturnValue(PDF_SCROLL_OWNER.ORIGINAL)
+      anchorFns.resolveAnchorOwner.mockReturnValue(PANE_OWNER.ORIGINAL)
       anchorFns.resolveOwnerScrollTarget.mockReturnValue({
-        owner: PDF_SCROLL_OWNER.ORIGINAL,
+        owner: PANE_OWNER.ORIGINAL,
         container: document.createElement('div'),
         selector: '.pdf-page[data-page-number]'
       })
       scrollAnchor.capturePdfBackedScrollAnchor.mockReturnValue(page35Anchor)
       scrollAnchor.isPdfAnchor.mockImplementation((anchor) => !!anchor?.pdfPoint)
-      anchorFns.restoreOwnedScrollAnchor.mockReturnValue(PDF_SCROLL_OWNER.ORIGINAL)
+      anchorFns.restoreOwnedScrollAnchor.mockReturnValue(PANE_OWNER.ORIGINAL)
       anchorFns.deriveTranslatedAnchorFromOriginal.mockReturnValue({
-        owner: PDF_SCROLL_OWNER.TRANSLATED,
+        owner: PANE_OWNER.TRANSLATED,
         pageNumber: 35,
         offsetRatio: 0.25
       })
       anchorFns.captureControlledTransitionAnchors
-        .mockReturnValueOnce({ originalAnchor: { owner: PDF_SCROLL_OWNER.ORIGINAL, pageNumber: 48, offsetRatio: 0.4 }, translatedAnchor: null })
-        .mockReturnValueOnce({ originalAnchor: { owner: PDF_SCROLL_OWNER.ORIGINAL, pageNumber: 49, offsetRatio: 0.4 }, translatedAnchor: null })
+        .mockReturnValueOnce({ originalAnchor: { owner: PANE_OWNER.ORIGINAL, pageNumber: 48, offsetRatio: 0.4 }, translatedAnchor: null })
+        .mockReturnValueOnce({ originalAnchor: { owner: PANE_OWNER.ORIGINAL, pageNumber: 49, offsetRatio: 0.4 }, translatedAnchor: null })
 
       await ctrl.handleContentViewChange(CONTENT_VIEW.TRANSLATED_PDF)
       await ctrl.handleLayoutChange({ width: 800, height: 600 })
@@ -406,7 +406,7 @@ describe('createPdfTransitionController', () => {
       expect(anchorFns.deriveTranslatedAnchorFromOriginal).toHaveBeenCalledTimes(1)
       expect(anchorFns.restoreControlledTransitionAnchors).toHaveBeenNthCalledWith(1, {
         originalAnchor: expect.objectContaining({ pageNumber: 35 }),
-        translatedAnchor: expect.objectContaining({ pageNumber: 35, offsetRatio: 0.25, owner: PDF_SCROLL_OWNER.TRANSLATED })
+        translatedAnchor: expect.objectContaining({ pageNumber: 35, offsetRatio: 0.25, owner: PANE_OWNER.TRANSLATED })
       })
     })
 
@@ -415,22 +415,22 @@ describe('createPdfTransitionController', () => {
 
       const page35Anchor = { pageNumber: 35, offsetRatio: 0.25, pdfPoint: { x: 10, y: 20 } }
       const domAnchor = { pageNumber: 48, offsetRatio: 0.4 }
-      anchorFns.resolveAnchorOwner.mockReturnValue(PDF_SCROLL_OWNER.ORIGINAL)
+      anchorFns.resolveAnchorOwner.mockReturnValue(PANE_OWNER.ORIGINAL)
       anchorFns.resolveOwnerScrollTarget.mockReturnValue({
-        owner: PDF_SCROLL_OWNER.ORIGINAL,
+        owner: PANE_OWNER.ORIGINAL,
         container: document.createElement('div'),
         selector: '.pdf-page[data-page-number]'
       })
       scrollAnchor.capturePdfBackedScrollAnchor.mockReturnValue(page35Anchor)
       scrollAnchor.captureScrollAnchor.mockReturnValue(domAnchor)
       scrollAnchor.isPdfAnchor.mockImplementation((anchor) => !!anchor?.pdfPoint)
-      anchorFns.restoreOwnedScrollAnchor.mockReturnValue(PDF_SCROLL_OWNER.ORIGINAL)
+      anchorFns.restoreOwnedScrollAnchor.mockReturnValue(PANE_OWNER.ORIGINAL)
 
       await ctrl.handleContentViewChange(CONTENT_VIEW.TRANSLATED_PDF)
 
       scrollAnchor.capturePdfBackedScrollAnchor.mockReturnValue(null)
       anchorFns.captureControlledTransitionAnchors.mockReturnValue({
-        originalAnchor: { owner: PDF_SCROLL_OWNER.ORIGINAL, pageNumber: 48, offsetRatio: 0.4 },
+        originalAnchor: { owner: PANE_OWNER.ORIGINAL, pageNumber: 48, offsetRatio: 0.4 },
         translatedAnchor: null
       })
 
@@ -455,18 +455,18 @@ describe('createPdfTransitionController', () => {
 
       const page35Anchor = { pageNumber: 35, offsetRatio: 0.25, pdfPoint: { x: 10, y: 20 } }
       const domAnchor = { pageNumber: 5, offsetRatio: 0.4 }
-      anchorFns.resolveAnchorOwner.mockReturnValue(PDF_SCROLL_OWNER.ORIGINAL)
+      anchorFns.resolveAnchorOwner.mockReturnValue(PANE_OWNER.ORIGINAL)
       anchorFns.resolveOwnerScrollTarget.mockReturnValue({
-        owner: PDF_SCROLL_OWNER.ORIGINAL,
+        owner: PANE_OWNER.ORIGINAL,
         container: document.createElement('div'),
         selector: '.pdf-page[data-page-number]'
       })
       scrollAnchor.capturePdfBackedScrollAnchor.mockReturnValue(page35Anchor)
       scrollAnchor.captureScrollAnchor.mockReturnValue(domAnchor)
       scrollAnchor.isPdfAnchor.mockImplementation((anchor) => !!anchor?.pdfPoint)
-      anchorFns.restoreOwnedScrollAnchor.mockReturnValue(PDF_SCROLL_OWNER.ORIGINAL)
+      anchorFns.restoreOwnedScrollAnchor.mockReturnValue(PANE_OWNER.ORIGINAL)
       anchorFns.captureControlledTransitionAnchors.mockReturnValue({
-        originalAnchor: { owner: PDF_SCROLL_OWNER.ORIGINAL, pageNumber: 48, offsetRatio: 0.4 },
+        originalAnchor: { owner: PANE_OWNER.ORIGINAL, pageNumber: 48, offsetRatio: 0.4 },
         translatedAnchor: null
       })
 
@@ -487,22 +487,22 @@ describe('createPdfTransitionController', () => {
       const { ctrl, currentPage } = createController({ currentPage: 35, isSideBySide: true, showTranslatedPdfPane: true })
 
       const page35Anchor = { pageNumber: 35, offsetRatio: 0.25, pdfPoint: { x: 10, y: 20 } }
-      anchorFns.resolveAnchorOwner.mockReturnValue(PDF_SCROLL_OWNER.ORIGINAL)
+      anchorFns.resolveAnchorOwner.mockReturnValue(PANE_OWNER.ORIGINAL)
       anchorFns.resolveOwnerScrollTarget.mockReturnValue({
-        owner: PDF_SCROLL_OWNER.ORIGINAL,
+        owner: PANE_OWNER.ORIGINAL,
         container: document.createElement('div'),
         selector: '.pdf-page[data-page-number]'
       })
       scrollAnchor.capturePdfBackedScrollAnchor.mockReturnValue(page35Anchor)
       scrollAnchor.isPdfAnchor.mockImplementation((anchor) => !!anchor?.pdfPoint)
-      anchorFns.restoreOwnedScrollAnchor.mockReturnValue(PDF_SCROLL_OWNER.ORIGINAL)
+      anchorFns.restoreOwnedScrollAnchor.mockReturnValue(PANE_OWNER.ORIGINAL)
       anchorFns.deriveTranslatedAnchorFromOriginal.mockReturnValue({
-        owner: PDF_SCROLL_OWNER.TRANSLATED,
+        owner: PANE_OWNER.TRANSLATED,
         pageNumber: 35,
         offsetRatio: 0.25
       })
       anchorFns.captureControlledTransitionAnchors.mockReturnValue({
-        originalAnchor: { owner: PDF_SCROLL_OWNER.ORIGINAL, pageNumber: 48, offsetRatio: 0.4 },
+        originalAnchor: { owner: PANE_OWNER.ORIGINAL, pageNumber: 48, offsetRatio: 0.4 },
         translatedAnchor: null
       })
 
@@ -531,17 +531,17 @@ describe('createPdfTransitionController', () => {
       })
 
       const page13Anchor = { pageNumber: 13, offsetRatio: 0.25, pdfPoint: { x: 10, y: 20 } }
-      anchorFns.resolveAnchorOwner.mockReturnValue(PDF_SCROLL_OWNER.ORIGINAL)
+      anchorFns.resolveAnchorOwner.mockReturnValue(PANE_OWNER.ORIGINAL)
       anchorFns.resolveOwnerScrollTarget.mockReturnValue({
-        owner: PDF_SCROLL_OWNER.ORIGINAL,
+        owner: PANE_OWNER.ORIGINAL,
         container: document.createElement('div'),
         selector: '.pdf-page[data-page-number]'
       })
       scrollAnchor.capturePdfBackedScrollAnchor.mockReturnValue(page13Anchor)
       scrollAnchor.isPdfAnchor.mockImplementation((anchor) => !!anchor?.pdfPoint)
-      anchorFns.restoreOwnedScrollAnchor.mockReturnValue(PDF_SCROLL_OWNER.ORIGINAL)
+      anchorFns.restoreOwnedScrollAnchor.mockReturnValue(PANE_OWNER.ORIGINAL)
       anchorFns.deriveTranslatedAnchorFromOriginal.mockReturnValue({
-        owner: PDF_SCROLL_OWNER.TRANSLATED,
+        owner: PANE_OWNER.TRANSLATED,
         pageNumber: 13,
         offsetRatio: 0.25
       })
@@ -567,17 +567,17 @@ describe('createPdfTransitionController', () => {
       })
 
       const page13Anchor = { pageNumber: 13, offsetRatio: 0.25, pdfPoint: { x: 10, y: 20 } }
-      anchorFns.resolveAnchorOwner.mockReturnValue(PDF_SCROLL_OWNER.ORIGINAL)
+      anchorFns.resolveAnchorOwner.mockReturnValue(PANE_OWNER.ORIGINAL)
       anchorFns.resolveOwnerScrollTarget.mockReturnValue({
-        owner: PDF_SCROLL_OWNER.ORIGINAL,
+        owner: PANE_OWNER.ORIGINAL,
         container: document.createElement('div'),
         selector: '.pdf-page[data-page-number]'
       })
       scrollAnchor.capturePdfBackedScrollAnchor.mockReturnValue(page13Anchor)
       scrollAnchor.isPdfAnchor.mockImplementation((anchor) => !!anchor?.pdfPoint)
-      anchorFns.restoreOwnedScrollAnchor.mockReturnValue(PDF_SCROLL_OWNER.ORIGINAL)
+      anchorFns.restoreOwnedScrollAnchor.mockReturnValue(PANE_OWNER.ORIGINAL)
       anchorFns.deriveTranslatedAnchorFromOriginal.mockReturnValue({
-        owner: PDF_SCROLL_OWNER.TRANSLATED,
+        owner: PANE_OWNER.TRANSLATED,
         pageNumber: 13,
         offsetRatio: 0.25
       })
@@ -605,17 +605,17 @@ describe('createPdfTransitionController', () => {
       })
 
       const page13Anchor = { pageNumber: 13, offsetRatio: 0.25, pdfPoint: { x: 10, y: 20 } }
-      anchorFns.resolveAnchorOwner.mockReturnValue(PDF_SCROLL_OWNER.ORIGINAL)
+      anchorFns.resolveAnchorOwner.mockReturnValue(PANE_OWNER.ORIGINAL)
       anchorFns.resolveOwnerScrollTarget.mockReturnValue({
-        owner: PDF_SCROLL_OWNER.ORIGINAL,
+        owner: PANE_OWNER.ORIGINAL,
         container: document.createElement('div'),
         selector: '.pdf-page[data-page-number]'
       })
       scrollAnchor.capturePdfBackedScrollAnchor.mockReturnValue(page13Anchor)
       scrollAnchor.isPdfAnchor.mockImplementation((anchor) => !!anchor?.pdfPoint)
-      anchorFns.restoreOwnedScrollAnchor.mockReturnValue(PDF_SCROLL_OWNER.ORIGINAL)
+      anchorFns.restoreOwnedScrollAnchor.mockReturnValue(PANE_OWNER.ORIGINAL)
       anchorFns.deriveTranslatedAnchorFromOriginal.mockReturnValue({
-        owner: PDF_SCROLL_OWNER.TRANSLATED,
+        owner: PANE_OWNER.TRANSLATED,
         pageNumber: 13,
         offsetRatio: 0.25
       })
@@ -636,17 +636,17 @@ describe('createPdfTransitionController', () => {
       })
 
       const page13Anchor = { pageNumber: 13, offsetRatio: 0.25, pdfPoint: { x: 10, y: 20 } }
-      anchorFns.resolveAnchorOwner.mockReturnValue(PDF_SCROLL_OWNER.ORIGINAL)
+      anchorFns.resolveAnchorOwner.mockReturnValue(PANE_OWNER.ORIGINAL)
       anchorFns.resolveOwnerScrollTarget.mockReturnValue({
-        owner: PDF_SCROLL_OWNER.ORIGINAL,
+        owner: PANE_OWNER.ORIGINAL,
         container: document.createElement('div'),
         selector: '.pdf-page[data-page-number]'
       })
       scrollAnchor.capturePdfBackedScrollAnchor.mockReturnValue(page13Anchor)
       scrollAnchor.isPdfAnchor.mockImplementation((anchor) => !!anchor?.pdfPoint)
-      anchorFns.restoreOwnedScrollAnchor.mockReturnValue(PDF_SCROLL_OWNER.ORIGINAL)
+      anchorFns.restoreOwnedScrollAnchor.mockReturnValue(PANE_OWNER.ORIGINAL)
       anchorFns.deriveTranslatedAnchorFromOriginal.mockReturnValue({
-        owner: PDF_SCROLL_OWNER.TRANSLATED,
+        owner: PANE_OWNER.TRANSLATED,
         pageNumber: 13,
         offsetRatio: 0.25
       })
@@ -662,15 +662,15 @@ describe('createPdfTransitionController', () => {
       const { ctrl, setContentView, currentPage } = createController({ contentView: CONTENT_VIEW.TRANSLATION })
 
       currentPage.value = 5
-      anchorFns.resolveAnchorOwner.mockReturnValue(PDF_SCROLL_OWNER.TRANSLATED)
+      anchorFns.resolveAnchorOwner.mockReturnValue(PANE_OWNER.TRANSLATED)
       anchorFns.resolveOwnerScrollTarget.mockReturnValue({
-        owner: PDF_SCROLL_OWNER.TRANSLATED,
+        owner: PANE_OWNER.TRANSLATED,
         container: document.createElement('div'),
         selector: '.pdf-translated-page[data-page-number]'
       })
 
       scrollAnchor.captureScrollAnchor.mockReturnValue({ pageNumber: 2, offsetRatio: 0.5 })
-      anchorFns.restoreOwnedScrollAnchor.mockReturnValue(PDF_SCROLL_OWNER.ORIGINAL)
+      anchorFns.restoreOwnedScrollAnchor.mockReturnValue(PANE_OWNER.ORIGINAL)
 
       await ctrl.handleContentViewChange(CONTENT_VIEW.ORIGINAL)
 
@@ -685,16 +685,16 @@ describe('createPdfTransitionController', () => {
     it('uses DOM capture when switching from PDF-backed view to TRANSLATION', async () => {
       const { ctrl, setContentView } = createController()
 
-      anchorFns.resolveAnchorOwner.mockReturnValue(PDF_SCROLL_OWNER.ORIGINAL)
+      anchorFns.resolveAnchorOwner.mockReturnValue(PANE_OWNER.ORIGINAL)
       anchorFns.resolveOwnerScrollTarget.mockReturnValue({
-        owner: PDF_SCROLL_OWNER.ORIGINAL,
+        owner: PANE_OWNER.ORIGINAL,
         container: document.createElement('div'),
         selector: '.pdf-page[data-page-number]'
       })
 
       scrollAnchor.captureScrollAnchor.mockReturnValue({ pageNumber: 3, offsetRatio: 0.3 })
       scrollAnchor.isPdfAnchor.mockReturnValue(false)
-      anchorFns.restoreOwnedScrollAnchor.mockReturnValue(PDF_SCROLL_OWNER.ORIGINAL)
+      anchorFns.restoreOwnedScrollAnchor.mockReturnValue(PANE_OWNER.ORIGINAL)
 
       await ctrl.handleContentViewChange(CONTENT_VIEW.TRANSLATION)
 
@@ -706,16 +706,16 @@ describe('createPdfTransitionController', () => {
     it('triggers side-by-side sync after restore when isSideBySide is true', async () => {
       const { ctrl, pdfViewerLayoutRef } = createController({ isSideBySide: true })
 
-      anchorFns.resolveAnchorOwner.mockReturnValue(PDF_SCROLL_OWNER.ORIGINAL)
+      anchorFns.resolveAnchorOwner.mockReturnValue(PANE_OWNER.ORIGINAL)
       anchorFns.resolveOwnerScrollTarget.mockReturnValue({
-        owner: PDF_SCROLL_OWNER.ORIGINAL,
+        owner: PANE_OWNER.ORIGINAL,
         container: document.createElement('div'),
         selector: '.pdf-page[data-page-number]'
       })
 
       scrollAnchor.captureScrollAnchor.mockReturnValue({ pageNumber: 1, offsetRatio: 0 })
       scrollAnchor.isPdfAnchor.mockReturnValue(false)
-      anchorFns.restoreOwnedScrollAnchor.mockReturnValue(PDF_SCROLL_OWNER.ORIGINAL)
+      anchorFns.restoreOwnedScrollAnchor.mockReturnValue(PANE_OWNER.ORIGINAL)
 
       await ctrl.handleContentViewChange(CONTENT_VIEW.TRANSLATION)
 
@@ -728,15 +728,15 @@ describe('createPdfTransitionController', () => {
 
       mockTopologyRef.doesTopologyChange.mockReturnValue(false)
 
-      anchorFns.resolveAnchorOwner.mockReturnValue(PDF_SCROLL_OWNER.ORIGINAL)
+      anchorFns.resolveAnchorOwner.mockReturnValue(PANE_OWNER.ORIGINAL)
       anchorFns.resolveOwnerScrollTarget.mockReturnValue({
-        owner: PDF_SCROLL_OWNER.ORIGINAL,
+        owner: PANE_OWNER.ORIGINAL,
         container: document.createElement('div'),
         selector: '.pdf-page[data-page-number]'
       })
       scrollAnchor.captureScrollAnchor.mockReturnValue({ pageNumber: 13, offsetRatio: 0.25 })
       scrollAnchor.isPdfAnchor.mockReturnValue(false)
-      anchorFns.restoreOwnedScrollAnchor.mockReturnValue(PDF_SCROLL_OWNER.ORIGINAL)
+      anchorFns.restoreOwnedScrollAnchor.mockReturnValue(PANE_OWNER.ORIGINAL)
 
       await ctrl.handleContentViewChange(CONTENT_VIEW.TRANSLATION)
 
@@ -750,15 +750,15 @@ describe('createPdfTransitionController', () => {
       const refreshCurrentPage = vi.fn()
       const { ctrl } = createController({ pdfViewerRef: { refreshCurrentPage } })
 
-      anchorFns.resolveAnchorOwner.mockReturnValue(PDF_SCROLL_OWNER.ORIGINAL)
+      anchorFns.resolveAnchorOwner.mockReturnValue(PANE_OWNER.ORIGINAL)
       anchorFns.resolveOwnerScrollTarget.mockReturnValue({
-        owner: PDF_SCROLL_OWNER.ORIGINAL,
+        owner: PANE_OWNER.ORIGINAL,
         container: document.createElement('div'),
         selector: '.pdf-page[data-page-number]'
       })
       scrollAnchor.captureScrollAnchor.mockReturnValue({ pageNumber: 13, offsetRatio: 0.25 })
       scrollAnchor.isPdfAnchor.mockReturnValue(false)
-      anchorFns.restoreOwnedScrollAnchor.mockReturnValue(PDF_SCROLL_OWNER.ORIGINAL)
+      anchorFns.restoreOwnedScrollAnchor.mockReturnValue(PANE_OWNER.ORIGINAL)
 
       await ctrl.handleContentViewChange(CONTENT_VIEW.TRANSLATION)
 
@@ -775,15 +775,15 @@ describe('createPdfTransitionController', () => {
         pdfViewerRef: { refreshCurrentPage }
       })
 
-      anchorFns.resolveAnchorOwner.mockReturnValue(PDF_SCROLL_OWNER.ORIGINAL)
+      anchorFns.resolveAnchorOwner.mockReturnValue(PANE_OWNER.ORIGINAL)
       anchorFns.resolveOwnerScrollTarget.mockReturnValue({
-        owner: PDF_SCROLL_OWNER.ORIGINAL,
+        owner: PANE_OWNER.ORIGINAL,
         container: document.createElement('div'),
         selector: '.pdf-page[data-page-number]'
       })
       scrollAnchor.captureScrollAnchor.mockReturnValue({ pageNumber: 5, offsetRatio: 0.3 })
       scrollAnchor.isPdfAnchor.mockReturnValue(false)
-      anchorFns.restoreOwnedScrollAnchor.mockReturnValue(PDF_SCROLL_OWNER.ORIGINAL)
+      anchorFns.restoreOwnedScrollAnchor.mockReturnValue(PANE_OWNER.ORIGINAL)
 
       await ctrl.handleContentViewChange(CONTENT_VIEW.TRANSLATION)
 
@@ -801,15 +801,15 @@ describe('createPdfTransitionController', () => {
         pdfViewerRef: { refreshCurrentPage }
       })
 
-      anchorFns.resolveAnchorOwner.mockReturnValue(PDF_SCROLL_OWNER.ORIGINAL)
+      anchorFns.resolveAnchorOwner.mockReturnValue(PANE_OWNER.ORIGINAL)
       anchorFns.resolveOwnerScrollTarget.mockReturnValue({
-        owner: PDF_SCROLL_OWNER.ORIGINAL,
+        owner: PANE_OWNER.ORIGINAL,
         container: document.createElement('div'),
         selector: '.pdf-page[data-page-number]'
       })
       scrollAnchor.captureScrollAnchor.mockReturnValue({ pageNumber: 10, offsetRatio: 0.5 })
       scrollAnchor.isPdfAnchor.mockReturnValue(false)
-      anchorFns.restoreOwnedScrollAnchor.mockReturnValue(PDF_SCROLL_OWNER.ORIGINAL)
+      anchorFns.restoreOwnedScrollAnchor.mockReturnValue(PANE_OWNER.ORIGINAL)
 
       await ctrl.handleContentViewChange(CONTENT_VIEW.TRANSLATION)
 
@@ -824,10 +824,10 @@ describe('createPdfTransitionController', () => {
         pdfViewerRef: { refreshCurrentPage }
       })
 
-      const domAnchor = { pageNumber: 1, offsetRatio: 0, owner: PDF_SCROLL_OWNER.ORIGINAL }
-      anchorFns.resolveAnchorOwner.mockReturnValue(PDF_SCROLL_OWNER.ORIGINAL)
+      const domAnchor = { pageNumber: 1, offsetRatio: 0, owner: PANE_OWNER.ORIGINAL }
+      anchorFns.resolveAnchorOwner.mockReturnValue(PANE_OWNER.ORIGINAL)
       anchorFns.resolveOwnerScrollTarget.mockReturnValue({
-        owner: PDF_SCROLL_OWNER.ORIGINAL,
+        owner: PANE_OWNER.ORIGINAL,
         container: document.createElement('div'),
         selector: '.pdf-page[data-page-number]'
       })
@@ -855,13 +855,13 @@ describe('createPdfTransitionController', () => {
         pdfViewerRef: { refreshCurrentPage }
       })
 
-      anchorFns.resolveAnchorOwner.mockReturnValue(PDF_SCROLL_OWNER.ORIGINAL)
+      anchorFns.resolveAnchorOwner.mockReturnValue(PANE_OWNER.ORIGINAL)
       anchorFns.capturePdfAwareOwnedScrollAnchor.mockReturnValue({
         pageNumber: 7,
         offsetRatio: 0.4
       })
       scrollAnchor.isPdfAnchor.mockReturnValue(false)
-      anchorFns.restoreOwnedScrollAnchor.mockReturnValue(PDF_SCROLL_OWNER.ORIGINAL)
+      anchorFns.restoreOwnedScrollAnchor.mockReturnValue(PANE_OWNER.ORIGINAL)
 
       await ctrl.handleLayoutModeChange(LAYOUT_MODE.SINGLE)
 
@@ -873,14 +873,14 @@ describe('createPdfTransitionController', () => {
       const { ctrl, setLayoutMode } = createController()
 
       const domAnchor = { pageNumber: 2, offsetRatio: 0.5 }
-      anchorFns.resolveAnchorOwner.mockReturnValue(PDF_SCROLL_OWNER.ORIGINAL)
+      anchorFns.resolveAnchorOwner.mockReturnValue(PANE_OWNER.ORIGINAL)
       anchorFns.capturePdfAwareOwnedScrollAnchor.mockReturnValue(domAnchor)
       scrollAnchor.isPdfAnchor.mockReturnValue(false)
-      anchorFns.restoreOwnedScrollAnchor.mockReturnValue(PDF_SCROLL_OWNER.ORIGINAL)
+      anchorFns.restoreOwnedScrollAnchor.mockReturnValue(PANE_OWNER.ORIGINAL)
 
       await ctrl.handleLayoutModeChange('side-by-side')
 
-      expect(anchorFns.capturePdfAwareOwnedScrollAnchor).toHaveBeenCalledWith(PDF_SCROLL_OWNER.ORIGINAL)
+      expect(anchorFns.capturePdfAwareOwnedScrollAnchor).toHaveBeenCalledWith(PANE_OWNER.ORIGINAL)
       expect(setLayoutMode).toHaveBeenCalledWith('side-by-side')
       expect(anchorFns.restoreOwnedScrollAnchor).toHaveBeenCalledWith(domAnchor)
     })
@@ -889,10 +889,10 @@ describe('createPdfTransitionController', () => {
       const { ctrl, setLayoutMode } = createController()
 
       const domAnchor = { pageNumber: 2, offsetRatio: 0.5 }
-      anchorFns.resolveAnchorOwner.mockReturnValue(PDF_SCROLL_OWNER.ORIGINAL)
+      anchorFns.resolveAnchorOwner.mockReturnValue(PANE_OWNER.ORIGINAL)
       anchorFns.capturePdfAwareOwnedScrollAnchor.mockReturnValue(domAnchor)
       scrollAnchor.isPdfAnchor.mockReturnValue(false)
-      anchorFns.restoreOwnedScrollAnchor.mockReturnValue(PDF_SCROLL_OWNER.ORIGINAL)
+      anchorFns.restoreOwnedScrollAnchor.mockReturnValue(PANE_OWNER.ORIGINAL)
       setLayoutMode.mockImplementation(() => {
         expect(ctrl.renderWindowEvictionFrozen.value).toBe(true)
       })
@@ -907,12 +907,12 @@ describe('createPdfTransitionController', () => {
       const { ctrl } = createController()
 
       const domAnchor = { pageNumber: 2, offsetRatio: 0.5 }
-      anchorFns.resolveAnchorOwner.mockReturnValue(PDF_SCROLL_OWNER.ORIGINAL)
+      anchorFns.resolveAnchorOwner.mockReturnValue(PANE_OWNER.ORIGINAL)
       anchorFns.capturePdfAwareOwnedScrollAnchor.mockReturnValue(domAnchor)
       scrollAnchor.isPdfAnchor.mockReturnValue(false)
       anchorFns.restoreOwnedScrollAnchor.mockImplementation(() => {
         expect(ctrl.renderWindowEvictionFrozen.value).toBe(true)
-        return PDF_SCROLL_OWNER.ORIGINAL
+        return PANE_OWNER.ORIGINAL
       })
 
       await ctrl.handleLayoutModeChange('side-by-side')
@@ -934,7 +934,7 @@ describe('createPdfTransitionController', () => {
       })
 
       const domAnchor = { pageNumber: 36, offsetRatio: 0.5 }
-      anchorFns.resolveAnchorOwner.mockReturnValue(PDF_SCROLL_OWNER.ORIGINAL)
+      anchorFns.resolveAnchorOwner.mockReturnValue(PANE_OWNER.ORIGINAL)
       anchorFns.capturePdfAwareOwnedScrollAnchor.mockReturnValue(domAnchor)
       scrollAnchor.isPdfAnchor.mockReturnValue(false)
       setLayoutMode.mockImplementation(() => {
@@ -942,7 +942,7 @@ describe('createPdfTransitionController', () => {
       })
       anchorFns.restoreOwnedScrollAnchor.mockImplementation(() => {
         expect(ctrl.currentPageUpdatesSuppressed.value).toBe(true)
-        return PDF_SCROLL_OWNER.ORIGINAL
+        return PANE_OWNER.ORIGINAL
       })
 
       await ctrl.handleLayoutModeChange('side-by-side')
@@ -961,7 +961,7 @@ describe('createPdfTransitionController', () => {
       })
 
       const anchor = { pageNumber: 36, offsetRatio: 0.5 }
-      anchorFns.resolveAnchorOwner.mockReturnValue(PDF_SCROLL_OWNER.ORIGINAL)
+      anchorFns.resolveAnchorOwner.mockReturnValue(PANE_OWNER.ORIGINAL)
       anchorFns.capturePdfAwareOwnedScrollAnchor.mockImplementation(() => {
         expect(ctrl.currentPageUpdatesSuppressed.value).toBe(false)
         return anchor
@@ -969,7 +969,7 @@ describe('createPdfTransitionController', () => {
       scrollAnchor.isPdfAnchor.mockReturnValue(false)
       anchorFns.restoreOwnedScrollAnchor.mockImplementation(() => {
         expect(ctrl.currentPageUpdatesSuppressed.value).toBe(true)
-        return PDF_SCROLL_OWNER.ORIGINAL
+        return PANE_OWNER.ORIGINAL
       })
 
       await ctrl.handleLayoutModeChange('side-by-side')
@@ -986,7 +986,7 @@ describe('createPdfTransitionController', () => {
       const { ctrl, setLayoutMode } = createController()
 
       const domAnchor = { pageNumber: 2, offsetRatio: 0.5 }
-      anchorFns.resolveAnchorOwner.mockReturnValue(PDF_SCROLL_OWNER.ORIGINAL)
+      anchorFns.resolveAnchorOwner.mockReturnValue(PANE_OWNER.ORIGINAL)
       anchorFns.capturePdfAwareOwnedScrollAnchor.mockReturnValue(domAnchor)
       scrollAnchor.isPdfAnchor.mockReturnValue(false)
       setLayoutMode.mockImplementation(() => {
@@ -1008,7 +1008,7 @@ describe('createPdfTransitionController', () => {
       })
 
       const domAnchor = { pageNumber: 36, offsetRatio: 0.5 }
-      anchorFns.resolveAnchorOwner.mockReturnValue(PDF_SCROLL_OWNER.ORIGINAL)
+      anchorFns.resolveAnchorOwner.mockReturnValue(PANE_OWNER.ORIGINAL)
       anchorFns.capturePdfAwareOwnedScrollAnchor.mockReturnValue(domAnchor)
       scrollAnchor.isPdfAnchor.mockReturnValue(false)
       setLayoutMode.mockImplementation(() => {
@@ -1031,7 +1031,7 @@ describe('createPdfTransitionController', () => {
       })
 
       const pdfAnchor = { pageNumber: 1, offsetRatio: 0, pdfPoint: { x: 0, y: 0 } }
-      anchorFns.resolveAnchorOwner.mockReturnValue(PDF_SCROLL_OWNER.ORIGINAL)
+      anchorFns.resolveAnchorOwner.mockReturnValue(PANE_OWNER.ORIGINAL)
       anchorFns.capturePdfAwareOwnedScrollAnchor.mockReturnValue(pdfAnchor)
       scrollAnchor.isPdfAnchor.mockReturnValue(true)
       setLayoutMode.mockImplementation(() => {
@@ -1055,7 +1055,7 @@ describe('createPdfTransitionController', () => {
       })
 
       const pdfAnchor = { pageNumber: 1, offsetRatio: 0, pdfPoint: { x: 0, y: 0 } }
-      anchorFns.resolveAnchorOwner.mockReturnValue(PDF_SCROLL_OWNER.ORIGINAL)
+      anchorFns.resolveAnchorOwner.mockReturnValue(PANE_OWNER.ORIGINAL)
       anchorFns.capturePdfAwareOwnedScrollAnchor.mockReturnValue(pdfAnchor)
       scrollAnchor.isPdfAnchor.mockReturnValue(true)
       setLayoutMode.mockImplementation(() => {
@@ -1077,7 +1077,7 @@ describe('createPdfTransitionController', () => {
       })
 
       const domAnchor = { pageNumber: 2, offsetRatio: 0.5 }
-      anchorFns.resolveAnchorOwner.mockReturnValue(PDF_SCROLL_OWNER.ORIGINAL)
+      anchorFns.resolveAnchorOwner.mockReturnValue(PANE_OWNER.ORIGINAL)
       anchorFns.capturePdfAwareOwnedScrollAnchor.mockReturnValue(domAnchor)
       scrollAnchor.isPdfAnchor.mockReturnValue(false)
       anchorFns.restoreOwnedScrollAnchor.mockImplementation(() => {
@@ -1096,7 +1096,7 @@ describe('createPdfTransitionController', () => {
       const { ctrl, setLayoutMode } = createController()
 
       const domAnchor = { pageNumber: 2, offsetRatio: 0.5 }
-      anchorFns.resolveAnchorOwner.mockReturnValue(PDF_SCROLL_OWNER.ORIGINAL)
+      anchorFns.resolveAnchorOwner.mockReturnValue(PANE_OWNER.ORIGINAL)
       anchorFns.capturePdfAwareOwnedScrollAnchor.mockReturnValue(domAnchor)
       scrollAnchor.isPdfAnchor.mockReturnValue(false)
       setLayoutMode.mockImplementation(() => {
@@ -1117,7 +1117,7 @@ describe('createPdfTransitionController', () => {
       vi.spyOn(console, 'warn').mockImplementation(() => {})
 
       const domAnchor = { pageNumber: 2, offsetRatio: 0.5 }
-      anchorFns.resolveAnchorOwner.mockReturnValue(PDF_SCROLL_OWNER.ORIGINAL)
+      anchorFns.resolveAnchorOwner.mockReturnValue(PANE_OWNER.ORIGINAL)
       anchorFns.capturePdfAwareOwnedScrollAnchor.mockReturnValue(domAnchor)
       scrollAnchor.isPdfAnchor.mockReturnValue(false)
       setLayoutMode.mockImplementation(() => {
@@ -1142,7 +1142,7 @@ describe('createPdfTransitionController', () => {
       })
 
       const domAnchor = { pageNumber: 2, offsetRatio: 0.5 }
-      anchorFns.resolveAnchorOwner.mockReturnValue(PDF_SCROLL_OWNER.ORIGINAL)
+      anchorFns.resolveAnchorOwner.mockReturnValue(PANE_OWNER.ORIGINAL)
       anchorFns.capturePdfAwareOwnedScrollAnchor.mockReturnValue(domAnchor)
       scrollAnchor.isPdfAnchor.mockReturnValue(false)
       setLayoutMode.mockImplementation(() => {
@@ -1169,10 +1169,10 @@ describe('createPdfTransitionController', () => {
       })
 
       const domAnchor = { pageNumber: 2, offsetRatio: 0.5 }
-      anchorFns.resolveAnchorOwner.mockReturnValue(PDF_SCROLL_OWNER.ORIGINAL)
+      anchorFns.resolveAnchorOwner.mockReturnValue(PANE_OWNER.ORIGINAL)
       anchorFns.capturePdfAwareOwnedScrollAnchor.mockReturnValue(domAnchor)
       scrollAnchor.isPdfAnchor.mockReturnValue(false)
-      anchorFns.restoreOwnedScrollAnchor.mockReturnValue(PDF_SCROLL_OWNER.ORIGINAL)
+      anchorFns.restoreOwnedScrollAnchor.mockReturnValue(PANE_OWNER.ORIGINAL)
 
       await expect(ctrl.handleLayoutModeChange('side-by-side')).rejects.toThrow('cleanup failed')
 
@@ -1189,7 +1189,7 @@ describe('createPdfTransitionController', () => {
       })
 
       const domAnchor = { pageNumber: 2, offsetRatio: 0.5 }
-      anchorFns.resolveAnchorOwner.mockReturnValue(PDF_SCROLL_OWNER.ORIGINAL)
+      anchorFns.resolveAnchorOwner.mockReturnValue(PANE_OWNER.ORIGINAL)
       anchorFns.capturePdfAwareOwnedScrollAnchor.mockReturnValue(domAnchor)
       scrollAnchor.isPdfAnchor.mockReturnValue(false)
 
@@ -1207,7 +1207,7 @@ describe('createPdfTransitionController', () => {
       })
 
       const pdfAnchor = { pageNumber: 2, offsetRatio: 0, pdfPoint: { x: 0, y: 0 } }
-      anchorFns.resolveAnchorOwner.mockReturnValue(PDF_SCROLL_OWNER.ORIGINAL)
+      anchorFns.resolveAnchorOwner.mockReturnValue(PANE_OWNER.ORIGINAL)
       anchorFns.capturePdfAwareOwnedScrollAnchor.mockReturnValue(pdfAnchor)
       scrollAnchor.isPdfAnchor.mockReturnValue(true)
 
@@ -1222,7 +1222,7 @@ describe('createPdfTransitionController', () => {
       const { ctrl, setLayoutMode } = createController()
 
       const pdfAnchor = { pageNumber: 1, offsetRatio: 0, pdfPoint: { x: 0, y: 0 } }
-      anchorFns.resolveAnchorOwner.mockReturnValue(PDF_SCROLL_OWNER.ORIGINAL)
+      anchorFns.resolveAnchorOwner.mockReturnValue(PANE_OWNER.ORIGINAL)
       anchorFns.capturePdfAwareOwnedScrollAnchor.mockReturnValue(pdfAnchor)
       scrollAnchor.isPdfAnchor.mockReturnValue(true)
 
@@ -1251,21 +1251,21 @@ describe('createPdfTransitionController', () => {
         pdfViewerRef
       })
 
-      const domAnchor = { pageNumber: 33, offsetRatio: 0.25, owner: PDF_SCROLL_OWNER.ORIGINAL }
-      anchorFns.resolveAnchorOwner.mockReturnValue(PDF_SCROLL_OWNER.ORIGINAL)
+      const domAnchor = { pageNumber: 33, offsetRatio: 0.25, owner: PANE_OWNER.ORIGINAL }
+      anchorFns.resolveAnchorOwner.mockReturnValue(PANE_OWNER.ORIGINAL)
       anchorFns.resolveOwnerScrollTarget.mockReturnValue({
-        owner: PDF_SCROLL_OWNER.ORIGINAL,
+        owner: PANE_OWNER.ORIGINAL,
         container: document.createElement('div'),
         selector: '.pdf-page[data-page-number]'
       })
       scrollAnchor.captureScrollAnchor.mockReturnValue(domAnchor)
       scrollAnchor.isPdfAnchor.mockReturnValue(false)
-      anchorFns.restoreOwnedScrollAnchor.mockReturnValue(PDF_SCROLL_OWNER.ORIGINAL)
+      anchorFns.restoreOwnedScrollAnchor.mockReturnValue(PANE_OWNER.ORIGINAL)
       anchorFns.captureControlledTransitionAnchors.mockReturnValue({
         originalAnchor: domAnchor,
         translatedAnchor: null
       })
-      anchorFns.restoreControlledTransitionAnchors.mockReturnValue(PDF_SCROLL_OWNER.ORIGINAL)
+      anchorFns.restoreControlledTransitionAnchors.mockReturnValue(PANE_OWNER.ORIGINAL)
 
       await ctrl.handleContentViewChange(CONTENT_VIEW.ORIGINAL)
 
@@ -1301,21 +1301,21 @@ describe('createPdfTransitionController', () => {
         pdfViewerRef
       })
 
-      const domAnchor = { pageNumber: 33, offsetRatio: 0.25, owner: PDF_SCROLL_OWNER.ORIGINAL }
-      anchorFns.resolveAnchorOwner.mockReturnValue(PDF_SCROLL_OWNER.ORIGINAL)
+      const domAnchor = { pageNumber: 33, offsetRatio: 0.25, owner: PANE_OWNER.ORIGINAL }
+      anchorFns.resolveAnchorOwner.mockReturnValue(PANE_OWNER.ORIGINAL)
       anchorFns.resolveOwnerScrollTarget.mockReturnValue({
-        owner: PDF_SCROLL_OWNER.ORIGINAL,
+        owner: PANE_OWNER.ORIGINAL,
         container: document.createElement('div'),
         selector: '.pdf-page[data-page-number]'
       })
       scrollAnchor.captureScrollAnchor.mockReturnValue(domAnchor)
       scrollAnchor.isPdfAnchor.mockReturnValue(false)
-      anchorFns.restoreOwnedScrollAnchor.mockReturnValue(PDF_SCROLL_OWNER.ORIGINAL)
+      anchorFns.restoreOwnedScrollAnchor.mockReturnValue(PANE_OWNER.ORIGINAL)
       anchorFns.captureControlledTransitionAnchors.mockReturnValue({
         originalAnchor: domAnchor,
         translatedAnchor: null
       })
-      anchorFns.restoreControlledTransitionAnchors.mockReturnValue(PDF_SCROLL_OWNER.ORIGINAL)
+      anchorFns.restoreControlledTransitionAnchors.mockReturnValue(PANE_OWNER.ORIGINAL)
 
       await ctrl.handleContentViewChange(CONTENT_VIEW.ORIGINAL)
 
@@ -1338,10 +1338,10 @@ describe('createPdfTransitionController', () => {
       const { ctrl, recomputeLayout } = createController()
 
       anchorFns.captureControlledTransitionAnchors.mockReturnValue({
-        originalAnchor: { pageNumber: 1, offsetRatio: 0.5, owner: PDF_SCROLL_OWNER.ORIGINAL },
+        originalAnchor: { pageNumber: 1, offsetRatio: 0.5, owner: PANE_OWNER.ORIGINAL },
         translatedAnchor: null
       })
-      anchorFns.restoreControlledTransitionAnchors.mockReturnValue(PDF_SCROLL_OWNER.ORIGINAL)
+      anchorFns.restoreControlledTransitionAnchors.mockReturnValue(PANE_OWNER.ORIGINAL)
       anchorFns.resolveTranslatedZoomAnchor.mockImplementation((a) => a)
       anchorFns.normalizeFitPagePdfAnchor.mockImplementation((a) => a)
 
@@ -1361,9 +1361,9 @@ describe('createPdfTransitionController', () => {
       const recomputeLayout = vi.fn().mockResolvedValue(true)
       const { ctrl } = createController({ recomputeLayout, isSideBySide: true, showTranslatedPdfPane: true })
 
-      anchorFns.resolveAnchorOwner.mockReturnValue(PDF_SCROLL_OWNER.ORIGINAL)
+      anchorFns.resolveAnchorOwner.mockReturnValue(PANE_OWNER.ORIGINAL)
       anchorFns.resolveOwnerScrollTarget.mockReturnValue({
-        owner: PDF_SCROLL_OWNER.ORIGINAL,
+        owner: PANE_OWNER.ORIGINAL,
         container: document.createElement('div'),
         selector: '.pdf-page[data-page-number]'
       })
@@ -1371,9 +1371,9 @@ describe('createPdfTransitionController', () => {
       const pendingAnchor = { pageNumber: 35, pdfPoint: { x: 0, y: 0 } }
       scrollAnchor.capturePdfBackedScrollAnchor.mockReturnValue(pendingAnchor)
       scrollAnchor.isPdfAnchor.mockReturnValue(true)
-      anchorFns.restoreOwnedScrollAnchor.mockReturnValue(PDF_SCROLL_OWNER.ORIGINAL)
+      anchorFns.restoreOwnedScrollAnchor.mockReturnValue(PANE_OWNER.ORIGINAL)
       anchorFns.captureControlledTransitionAnchors.mockReturnValue({
-        originalAnchor: { owner: PDF_SCROLL_OWNER.ORIGINAL, pageNumber: 48, offsetRatio: 0.4 },
+        originalAnchor: { owner: PANE_OWNER.ORIGINAL, pageNumber: 48, offsetRatio: 0.4 },
         translatedAnchor: null
       })
       anchorFns.restoreControlledTransitionAnchors.mockImplementation(() => {
@@ -1390,9 +1390,9 @@ describe('createPdfTransitionController', () => {
     it('restores retained PDF-backed content anchor during first width-changing resize after content view restore', async () => {
       const { ctrl, recomputeLayout } = createController({ isSideBySide: true, showTranslatedPdfPane: true })
 
-      anchorFns.resolveAnchorOwner.mockReturnValue(PDF_SCROLL_OWNER.ORIGINAL)
+      anchorFns.resolveAnchorOwner.mockReturnValue(PANE_OWNER.ORIGINAL)
       anchorFns.resolveOwnerScrollTarget.mockReturnValue({
-        owner: PDF_SCROLL_OWNER.ORIGINAL,
+        owner: PANE_OWNER.ORIGINAL,
         container: document.createElement('div'),
         selector: '.pdf-page[data-page-number]'
       })
@@ -1400,13 +1400,13 @@ describe('createPdfTransitionController', () => {
       const pendingAnchor = { pageNumber: 1, pdfPoint: { x: 0, y: 0 } }
       scrollAnchor.capturePdfBackedScrollAnchor.mockReturnValue(pendingAnchor)
       scrollAnchor.isPdfAnchor.mockReturnValue(true)
-      anchorFns.restoreOwnedScrollAnchor.mockReturnValue(PDF_SCROLL_OWNER.ORIGINAL)
+      anchorFns.restoreOwnedScrollAnchor.mockReturnValue(PANE_OWNER.ORIGINAL)
 
       await ctrl.handleContentViewChange(CONTENT_VIEW.TRANSLATED_PDF)
       await new Promise(resolve => requestAnimationFrame(resolve))
 
       const freshAnchors = {
-        originalAnchor: { pageNumber: 40, offsetRatio: 0.25, owner: PDF_SCROLL_OWNER.ORIGINAL },
+        originalAnchor: { pageNumber: 40, offsetRatio: 0.25, owner: PANE_OWNER.ORIGINAL },
         translatedAnchor: null
       }
       anchorFns.captureControlledTransitionAnchors.mockReturnValue({
@@ -1431,10 +1431,10 @@ describe('createPdfTransitionController', () => {
       const { ctrl, recomputeLayout } = createController()
 
       const domAnchor = { pageNumber: 2, offsetRatio: 0.5 }
-      anchorFns.resolveAnchorOwner.mockReturnValue(PDF_SCROLL_OWNER.ORIGINAL)
+      anchorFns.resolveAnchorOwner.mockReturnValue(PANE_OWNER.ORIGINAL)
       anchorFns.capturePdfAwareOwnedScrollAnchor.mockReturnValue(domAnchor)
       scrollAnchor.isPdfAnchor.mockReturnValue(false)
-      anchorFns.restoreOwnedScrollAnchor.mockReturnValue(PDF_SCROLL_OWNER.ORIGINAL)
+      anchorFns.restoreOwnedScrollAnchor.mockReturnValue(PANE_OWNER.ORIGINAL)
 
       const layoutModeTransition = ctrl.handleLayoutModeChange('side-by-side')
 
@@ -1458,10 +1458,10 @@ describe('createPdfTransitionController', () => {
       const { ctrl, recomputeLayout } = createController()
 
       const domAnchor = { pageNumber: 2, offsetRatio: 0.5 }
-      anchorFns.resolveAnchorOwner.mockReturnValue(PDF_SCROLL_OWNER.ORIGINAL)
+      anchorFns.resolveAnchorOwner.mockReturnValue(PANE_OWNER.ORIGINAL)
       anchorFns.capturePdfAwareOwnedScrollAnchor.mockReturnValue(domAnchor)
       scrollAnchor.isPdfAnchor.mockReturnValue(false)
-      anchorFns.restoreOwnedScrollAnchor.mockReturnValue(PDF_SCROLL_OWNER.ORIGINAL)
+      anchorFns.restoreOwnedScrollAnchor.mockReturnValue(PANE_OWNER.ORIGINAL)
 
       await ctrl.handleLayoutModeChange('side-by-side')
 
@@ -1475,24 +1475,24 @@ describe('createPdfTransitionController', () => {
     it('captures, recomputes, and restores for transition-backed layout change', async () => {
       const { ctrl, recomputeLayout } = createController()
 
-      anchorFns.resolveAnchorOwner.mockReturnValue(PDF_SCROLL_OWNER.ORIGINAL)
+      anchorFns.resolveAnchorOwner.mockReturnValue(PANE_OWNER.ORIGINAL)
       anchorFns.resolveOwnerScrollTarget.mockReturnValue({
-        owner: PDF_SCROLL_OWNER.ORIGINAL,
+        owner: PANE_OWNER.ORIGINAL,
         container: document.createElement('div'),
         selector: '.pdf-page[data-page-number]'
       })
       scrollAnchor.captureScrollAnchor.mockReturnValue({ pageNumber: 1, offsetRatio: 0 })
       scrollAnchor.isPdfAnchor.mockReturnValue(false)
-      anchorFns.restoreOwnedScrollAnchor.mockReturnValue(PDF_SCROLL_OWNER.ORIGINAL)
+      anchorFns.restoreOwnedScrollAnchor.mockReturnValue(PANE_OWNER.ORIGINAL)
 
       await ctrl.handleContentViewChange(CONTENT_VIEW.TRANSLATION)
 
       const anchors = {
-        originalAnchor: { pageNumber: 2, offsetRatio: 0.5, owner: PDF_SCROLL_OWNER.ORIGINAL },
+        originalAnchor: { pageNumber: 2, offsetRatio: 0.5, owner: PANE_OWNER.ORIGINAL },
         translatedAnchor: null
       }
       anchorFns.captureControlledTransitionAnchors.mockReturnValue(anchors)
-      anchorFns.restoreControlledTransitionAnchors.mockReturnValue(PDF_SCROLL_OWNER.ORIGINAL)
+      anchorFns.restoreControlledTransitionAnchors.mockReturnValue(PANE_OWNER.ORIGINAL)
 
       await ctrl.handleLayoutChange({ width: 800, height: 600 })
 
@@ -1506,21 +1506,21 @@ describe('createPdfTransitionController', () => {
       const recomputeLayout = vi.fn().mockReturnValue(deferredRecompute.promise)
       const { ctrl } = createController({ recomputeLayout })
 
-      const domAnchor = { pageNumber: 3, offsetRatio: 0.5, owner: PDF_SCROLL_OWNER.ORIGINAL }
-      anchorFns.resolveAnchorOwner.mockReturnValue(PDF_SCROLL_OWNER.ORIGINAL)
+      const domAnchor = { pageNumber: 3, offsetRatio: 0.5, owner: PANE_OWNER.ORIGINAL }
+      anchorFns.resolveAnchorOwner.mockReturnValue(PANE_OWNER.ORIGINAL)
       anchorFns.resolveOwnerScrollTarget.mockReturnValue({
-        owner: PDF_SCROLL_OWNER.ORIGINAL,
+        owner: PANE_OWNER.ORIGINAL,
         container: document.createElement('div'),
         selector: '.pdf-page[data-page-number]'
       })
       scrollAnchor.captureScrollAnchor.mockReturnValue(domAnchor)
       scrollAnchor.isPdfAnchor.mockReturnValue(false)
-      anchorFns.restoreOwnedScrollAnchor.mockReturnValue(PDF_SCROLL_OWNER.ORIGINAL)
+      anchorFns.restoreOwnedScrollAnchor.mockReturnValue(PANE_OWNER.ORIGINAL)
       anchorFns.captureControlledTransitionAnchors.mockReturnValue({
         originalAnchor: domAnchor,
         translatedAnchor: null
       })
-      anchorFns.restoreControlledTransitionAnchors.mockReturnValue(PDF_SCROLL_OWNER.ORIGINAL)
+      anchorFns.restoreControlledTransitionAnchors.mockReturnValue(PANE_OWNER.ORIGINAL)
 
       await ctrl.handleContentViewChange(CONTENT_VIEW.TRANSLATION)
 
@@ -1542,16 +1542,16 @@ describe('createPdfTransitionController', () => {
       const recomputeLayout = vi.fn().mockResolvedValue(true)
       const { ctrl } = createController({ recomputeLayout })
 
-      const domAnchor = { pageNumber: 33, offsetRatio: 0.25, owner: PDF_SCROLL_OWNER.ORIGINAL }
-      anchorFns.resolveAnchorOwner.mockReturnValue(PDF_SCROLL_OWNER.ORIGINAL)
+      const domAnchor = { pageNumber: 33, offsetRatio: 0.25, owner: PANE_OWNER.ORIGINAL }
+      anchorFns.resolveAnchorOwner.mockReturnValue(PANE_OWNER.ORIGINAL)
       anchorFns.resolveOwnerScrollTarget.mockReturnValue({
-        owner: PDF_SCROLL_OWNER.ORIGINAL,
+        owner: PANE_OWNER.ORIGINAL,
         container: document.createElement('div'),
         selector: '.pdf-page[data-page-number]'
       })
       scrollAnchor.captureScrollAnchor.mockReturnValue(domAnchor)
       scrollAnchor.isPdfAnchor.mockReturnValue(false)
-      anchorFns.restoreOwnedScrollAnchor.mockReturnValue(PDF_SCROLL_OWNER.ORIGINAL)
+      anchorFns.restoreOwnedScrollAnchor.mockReturnValue(PANE_OWNER.ORIGINAL)
       anchorFns.captureControlledTransitionAnchors.mockReturnValue({
         originalAnchor: domAnchor,
         translatedAnchor: null
@@ -1573,23 +1573,23 @@ describe('createPdfTransitionController', () => {
       const recomputeLayout = vi.fn().mockResolvedValue(true)
       const { ctrl } = createController({ recomputeLayout })
 
-      const domAnchor = { pageNumber: 31, offsetRatio: 0.25, owner: PDF_SCROLL_OWNER.ORIGINAL }
-      anchorFns.resolveAnchorOwner.mockReturnValue(PDF_SCROLL_OWNER.ORIGINAL)
+      const domAnchor = { pageNumber: 31, offsetRatio: 0.25, owner: PANE_OWNER.ORIGINAL }
+      anchorFns.resolveAnchorOwner.mockReturnValue(PANE_OWNER.ORIGINAL)
       anchorFns.resolveOwnerScrollTarget.mockReturnValue({
-        owner: PDF_SCROLL_OWNER.ORIGINAL,
+        owner: PANE_OWNER.ORIGINAL,
         container: document.createElement('div'),
         selector: '.pdf-page[data-page-number]'
       })
       scrollAnchor.captureScrollAnchor.mockReturnValue(domAnchor)
       scrollAnchor.isPdfAnchor.mockReturnValue(false)
-      anchorFns.restoreOwnedScrollAnchor.mockReturnValue(PDF_SCROLL_OWNER.ORIGINAL)
+      anchorFns.restoreOwnedScrollAnchor.mockReturnValue(PANE_OWNER.ORIGINAL)
 
       const capturedAnchors = {
         originalAnchor: domAnchor,
         translatedAnchor: null
       }
       anchorFns.captureControlledTransitionAnchors.mockReturnValue(capturedAnchors)
-      anchorFns.restoreControlledTransitionAnchors.mockReturnValue(PDF_SCROLL_OWNER.ORIGINAL)
+      anchorFns.restoreControlledTransitionAnchors.mockReturnValue(PANE_OWNER.ORIGINAL)
 
       await ctrl.handleContentViewChange(CONTENT_VIEW.TRANSLATION)
 
@@ -1603,16 +1603,16 @@ describe('createPdfTransitionController', () => {
       const recomputeLayout = vi.fn().mockReturnValue(deferredRecompute.promise)
       const { ctrl } = createController({ recomputeLayout })
 
-      const domAnchor = { pageNumber: 31, offsetRatio: 0.25, owner: PDF_SCROLL_OWNER.ORIGINAL }
-      anchorFns.resolveAnchorOwner.mockReturnValue(PDF_SCROLL_OWNER.ORIGINAL)
+      const domAnchor = { pageNumber: 31, offsetRatio: 0.25, owner: PANE_OWNER.ORIGINAL }
+      anchorFns.resolveAnchorOwner.mockReturnValue(PANE_OWNER.ORIGINAL)
       anchorFns.resolveOwnerScrollTarget.mockReturnValue({
-        owner: PDF_SCROLL_OWNER.ORIGINAL,
+        owner: PANE_OWNER.ORIGINAL,
         container: document.createElement('div'),
         selector: '.pdf-page[data-page-number]'
       })
       scrollAnchor.captureScrollAnchor.mockReturnValue(domAnchor)
       scrollAnchor.isPdfAnchor.mockReturnValue(false)
-      anchorFns.restoreOwnedScrollAnchor.mockReturnValue(PDF_SCROLL_OWNER.ORIGINAL)
+      anchorFns.restoreOwnedScrollAnchor.mockReturnValue(PANE_OWNER.ORIGINAL)
       anchorFns.captureControlledTransitionAnchors.mockReturnValue({
         originalAnchor: domAnchor,
         translatedAnchor: null
@@ -1640,21 +1640,21 @@ describe('createPdfTransitionController', () => {
         .mockReturnValueOnce(secondRecompute.promise)
       const { ctrl } = createController({ recomputeLayout })
 
-      const domAnchor = { pageNumber: 31, offsetRatio: 0.25, owner: PDF_SCROLL_OWNER.ORIGINAL }
-      anchorFns.resolveAnchorOwner.mockReturnValue(PDF_SCROLL_OWNER.ORIGINAL)
+      const domAnchor = { pageNumber: 31, offsetRatio: 0.25, owner: PANE_OWNER.ORIGINAL }
+      anchorFns.resolveAnchorOwner.mockReturnValue(PANE_OWNER.ORIGINAL)
       anchorFns.resolveOwnerScrollTarget.mockReturnValue({
-        owner: PDF_SCROLL_OWNER.ORIGINAL,
+        owner: PANE_OWNER.ORIGINAL,
         container: document.createElement('div'),
         selector: '.pdf-page[data-page-number]'
       })
       scrollAnchor.captureScrollAnchor.mockReturnValue(domAnchor)
       scrollAnchor.isPdfAnchor.mockReturnValue(false)
-      anchorFns.restoreOwnedScrollAnchor.mockReturnValue(PDF_SCROLL_OWNER.ORIGINAL)
+      anchorFns.restoreOwnedScrollAnchor.mockReturnValue(PANE_OWNER.ORIGINAL)
       anchorFns.captureControlledTransitionAnchors.mockReturnValue({
         originalAnchor: domAnchor,
         translatedAnchor: null
       })
-      anchorFns.restoreControlledTransitionAnchors.mockReturnValue(PDF_SCROLL_OWNER.ORIGINAL)
+      anchorFns.restoreControlledTransitionAnchors.mockReturnValue(PANE_OWNER.ORIGINAL)
       scrollAnchor.capturePdfBackedScrollAnchor.mockReturnValue(null)
 
       await ctrl.handleContentViewChange(CONTENT_VIEW.TRANSLATION)
@@ -1678,19 +1678,19 @@ describe('createPdfTransitionController', () => {
       const { ctrl } = createController({ recomputeLayout, isSideBySide: true, showTranslatedPdfPane: true })
 
       const pendingAnchor = { pageNumber: 35, offsetRatio: 0.25, pdfPoint: { x: 10, y: 20 } }
-      const capturedAnchor = { owner: PDF_SCROLL_OWNER.ORIGINAL, pageNumber: 48, offsetRatio: 0.4 }
+      const capturedAnchor = { owner: PANE_OWNER.ORIGINAL, pageNumber: 48, offsetRatio: 0.4 }
 
-      anchorFns.resolveAnchorOwner.mockReturnValue(PDF_SCROLL_OWNER.ORIGINAL)
+      anchorFns.resolveAnchorOwner.mockReturnValue(PANE_OWNER.ORIGINAL)
       anchorFns.resolveOwnerScrollTarget.mockReturnValue({
-        owner: PDF_SCROLL_OWNER.ORIGINAL,
+        owner: PANE_OWNER.ORIGINAL,
         container: document.createElement('div'),
         selector: '.pdf-page[data-page-number]'
       })
       scrollAnchor.capturePdfBackedScrollAnchor.mockReturnValue(pendingAnchor)
       scrollAnchor.isPdfAnchor.mockImplementation((anchor) => !!anchor?.pdfPoint)
-      anchorFns.restoreOwnedScrollAnchor.mockReturnValue(PDF_SCROLL_OWNER.ORIGINAL)
+      anchorFns.restoreOwnedScrollAnchor.mockReturnValue(PANE_OWNER.ORIGINAL)
       anchorFns.deriveTranslatedAnchorFromOriginal.mockReturnValue({
-        owner: PDF_SCROLL_OWNER.TRANSLATED,
+        owner: PANE_OWNER.TRANSLATED,
         pageNumber: 35,
         offsetRatio: 0.25
       })
@@ -1698,7 +1698,7 @@ describe('createPdfTransitionController', () => {
         originalAnchor: capturedAnchor,
         translatedAnchor: null
       })
-      anchorFns.restoreControlledTransitionAnchors.mockReturnValue(PDF_SCROLL_OWNER.ORIGINAL)
+      anchorFns.restoreControlledTransitionAnchors.mockReturnValue(PANE_OWNER.ORIGINAL)
 
       await ctrl.handleContentViewChange(CONTENT_VIEW.TRANSLATED_PDF)
 
@@ -1719,21 +1719,21 @@ describe('createPdfTransitionController', () => {
       const recomputeLayout = vi.fn().mockResolvedValue(true)
       const { ctrl } = createController({ recomputeLayout })
 
-      const domAnchor = { pageNumber: 33, offsetRatio: 0.25, owner: PDF_SCROLL_OWNER.ORIGINAL }
-      anchorFns.resolveAnchorOwner.mockReturnValue(PDF_SCROLL_OWNER.ORIGINAL)
+      const domAnchor = { pageNumber: 33, offsetRatio: 0.25, owner: PANE_OWNER.ORIGINAL }
+      anchorFns.resolveAnchorOwner.mockReturnValue(PANE_OWNER.ORIGINAL)
       anchorFns.resolveOwnerScrollTarget.mockReturnValue({
-        owner: PDF_SCROLL_OWNER.ORIGINAL,
+        owner: PANE_OWNER.ORIGINAL,
         container: document.createElement('div'),
         selector: '.pdf-page[data-page-number]'
       })
       scrollAnchor.captureScrollAnchor.mockReturnValue(domAnchor)
       scrollAnchor.isPdfAnchor.mockReturnValue(false)
-      anchorFns.restoreOwnedScrollAnchor.mockReturnValue(PDF_SCROLL_OWNER.ORIGINAL)
+      anchorFns.restoreOwnedScrollAnchor.mockReturnValue(PANE_OWNER.ORIGINAL)
       anchorFns.captureControlledTransitionAnchors.mockReturnValue({
         originalAnchor: domAnchor,
         translatedAnchor: null
       })
-      anchorFns.restoreControlledTransitionAnchors.mockReturnValue(PDF_SCROLL_OWNER.ORIGINAL)
+      anchorFns.restoreControlledTransitionAnchors.mockReturnValue(PANE_OWNER.ORIGINAL)
 
       await ctrl.handleContentViewChange(CONTENT_VIEW.TRANSLATION)
 
@@ -1752,20 +1752,20 @@ describe('createPdfTransitionController', () => {
       const { ctrl } = createController({ recomputeLayout, contentView: CONTENT_VIEW.TRANSLATION })
 
       // Capture from translated pane
-      anchorFns.resolveAnchorOwner.mockReturnValue(PDF_SCROLL_OWNER.TRANSLATED)
+      anchorFns.resolveAnchorOwner.mockReturnValue(PANE_OWNER.TRANSLATED)
       anchorFns.resolveOwnerScrollTarget.mockReturnValue({
-        owner: PDF_SCROLL_OWNER.TRANSLATED,
+        owner: PANE_OWNER.TRANSLATED,
         container: document.createElement('div'),
         selector: '.pdf-translated-page[data-page-number]'
       })
       scrollAnchor.captureScrollAnchor.mockReturnValue({ pageNumber: 45, offsetRatio: 0.3 })
       scrollAnchor.isPdfAnchor.mockReturnValue(false)
-      anchorFns.restoreOwnedScrollAnchor.mockReturnValue(PDF_SCROLL_OWNER.TRANSLATED)
+      anchorFns.restoreOwnedScrollAnchor.mockReturnValue(PANE_OWNER.TRANSLATED)
       anchorFns.captureControlledTransitionAnchors.mockReturnValue({
         originalAnchor: null,
-        translatedAnchor: { pageNumber: 45, offsetRatio: 0.3, owner: PDF_SCROLL_OWNER.TRANSLATED }
+        translatedAnchor: { pageNumber: 45, offsetRatio: 0.3, owner: PANE_OWNER.TRANSLATED }
       })
-      anchorFns.restoreControlledTransitionAnchors.mockReturnValue(PDF_SCROLL_OWNER.TRANSLATED)
+      anchorFns.restoreControlledTransitionAnchors.mockReturnValue(PANE_OWNER.TRANSLATED)
 
       await ctrl.handleContentViewChange(CONTENT_VIEW.ORIGINAL)
 
@@ -1780,21 +1780,21 @@ describe('createPdfTransitionController', () => {
       const recomputeLayout = vi.fn().mockResolvedValue(true)
       const { ctrl } = createController({ recomputeLayout })
 
-      const domAnchor = { pageNumber: 33, offsetRatio: 0.25, owner: PDF_SCROLL_OWNER.ORIGINAL }
-      anchorFns.resolveAnchorOwner.mockReturnValue(PDF_SCROLL_OWNER.ORIGINAL)
+      const domAnchor = { pageNumber: 33, offsetRatio: 0.25, owner: PANE_OWNER.ORIGINAL }
+      anchorFns.resolveAnchorOwner.mockReturnValue(PANE_OWNER.ORIGINAL)
       anchorFns.resolveOwnerScrollTarget.mockReturnValue({
-        owner: PDF_SCROLL_OWNER.ORIGINAL,
+        owner: PANE_OWNER.ORIGINAL,
         container: document.createElement('div'),
         selector: '.pdf-page[data-page-number]'
       })
       scrollAnchor.captureScrollAnchor.mockReturnValue(domAnchor)
       scrollAnchor.isPdfAnchor.mockReturnValue(false)
-      anchorFns.restoreOwnedScrollAnchor.mockReturnValue(PDF_SCROLL_OWNER.ORIGINAL)
+      anchorFns.restoreOwnedScrollAnchor.mockReturnValue(PANE_OWNER.ORIGINAL)
       anchorFns.captureControlledTransitionAnchors.mockReturnValue({
         originalAnchor: domAnchor,
         translatedAnchor: null
       })
-      anchorFns.restoreControlledTransitionAnchors.mockReturnValue(PDF_SCROLL_OWNER.ORIGINAL)
+      anchorFns.restoreControlledTransitionAnchors.mockReturnValue(PANE_OWNER.ORIGINAL)
 
       await ctrl.handleContentViewChange(CONTENT_VIEW.TRANSLATION)
 
@@ -1812,25 +1812,25 @@ describe('createPdfTransitionController', () => {
       const { ctrl } = createController({ recomputeLayout, isSideBySide: true, showTranslatedPdfPane: true })
 
       const pendingAnchor = { pageNumber: 35, offsetRatio: 0.25, pdfPoint: { x: 10, y: 20 } }
-      anchorFns.resolveAnchorOwner.mockReturnValue(PDF_SCROLL_OWNER.ORIGINAL)
+      anchorFns.resolveAnchorOwner.mockReturnValue(PANE_OWNER.ORIGINAL)
       anchorFns.resolveOwnerScrollTarget.mockReturnValue({
-        owner: PDF_SCROLL_OWNER.ORIGINAL,
+        owner: PANE_OWNER.ORIGINAL,
         container: document.createElement('div'),
         selector: '.pdf-page[data-page-number]'
       })
       scrollAnchor.capturePdfBackedScrollAnchor.mockReturnValue(pendingAnchor)
       scrollAnchor.isPdfAnchor.mockImplementation((anchor) => !!anchor?.pdfPoint)
-      anchorFns.restoreOwnedScrollAnchor.mockReturnValue(PDF_SCROLL_OWNER.ORIGINAL)
+      anchorFns.restoreOwnedScrollAnchor.mockReturnValue(PANE_OWNER.ORIGINAL)
       anchorFns.deriveTranslatedAnchorFromOriginal.mockReturnValue({
-        owner: PDF_SCROLL_OWNER.TRANSLATED,
+        owner: PANE_OWNER.TRANSLATED,
         pageNumber: 35,
         offsetRatio: 0.25
       })
       anchorFns.captureControlledTransitionAnchors.mockReturnValue({
-        originalAnchor: { owner: PDF_SCROLL_OWNER.ORIGINAL, pageNumber: 48, offsetRatio: 0.4 },
+        originalAnchor: { owner: PANE_OWNER.ORIGINAL, pageNumber: 48, offsetRatio: 0.4 },
         translatedAnchor: null
       })
-      anchorFns.restoreControlledTransitionAnchors.mockReturnValue(PDF_SCROLL_OWNER.ORIGINAL)
+      anchorFns.restoreControlledTransitionAnchors.mockReturnValue(PANE_OWNER.ORIGINAL)
 
       await ctrl.handleContentViewChange(CONTENT_VIEW.TRANSLATED_PDF)
 
@@ -1849,21 +1849,21 @@ describe('createPdfTransitionController', () => {
       const recomputeLayout = vi.fn().mockReturnValue(deferredRecompute.promise)
       const { ctrl } = createController({ recomputeLayout })
 
-      const domAnchor = { pageNumber: 33, offsetRatio: 0.25, owner: PDF_SCROLL_OWNER.ORIGINAL }
-      anchorFns.resolveAnchorOwner.mockReturnValue(PDF_SCROLL_OWNER.ORIGINAL)
+      const domAnchor = { pageNumber: 33, offsetRatio: 0.25, owner: PANE_OWNER.ORIGINAL }
+      anchorFns.resolveAnchorOwner.mockReturnValue(PANE_OWNER.ORIGINAL)
       anchorFns.resolveOwnerScrollTarget.mockReturnValue({
-        owner: PDF_SCROLL_OWNER.ORIGINAL,
+        owner: PANE_OWNER.ORIGINAL,
         container: document.createElement('div'),
         selector: '.pdf-page[data-page-number]'
       })
       scrollAnchor.captureScrollAnchor.mockReturnValue(domAnchor)
       scrollAnchor.isPdfAnchor.mockReturnValue(false)
-      anchorFns.restoreOwnedScrollAnchor.mockReturnValue(PDF_SCROLL_OWNER.ORIGINAL)
+      anchorFns.restoreOwnedScrollAnchor.mockReturnValue(PANE_OWNER.ORIGINAL)
       anchorFns.captureControlledTransitionAnchors.mockReturnValue({
         originalAnchor: domAnchor,
         translatedAnchor: null
       })
-      anchorFns.restoreControlledTransitionAnchors.mockReturnValue(PDF_SCROLL_OWNER.ORIGINAL)
+      anchorFns.restoreControlledTransitionAnchors.mockReturnValue(PANE_OWNER.ORIGINAL)
       scrollAnchor.capturePdfBackedScrollAnchor.mockReturnValue(null)
 
       await ctrl.handleContentViewChange(CONTENT_VIEW.TRANSLATION)
@@ -1889,16 +1889,16 @@ describe('createPdfTransitionController', () => {
       const recomputeLayout = vi.fn().mockResolvedValue(true)
       const { ctrl } = createController({ recomputeLayout })
 
-      const domAnchor = { pageNumber: 33, offsetRatio: 0.25, owner: PDF_SCROLL_OWNER.ORIGINAL }
-      anchorFns.resolveAnchorOwner.mockReturnValue(PDF_SCROLL_OWNER.ORIGINAL)
+      const domAnchor = { pageNumber: 33, offsetRatio: 0.25, owner: PANE_OWNER.ORIGINAL }
+      anchorFns.resolveAnchorOwner.mockReturnValue(PANE_OWNER.ORIGINAL)
       anchorFns.resolveOwnerScrollTarget.mockReturnValue({
-        owner: PDF_SCROLL_OWNER.ORIGINAL,
+        owner: PANE_OWNER.ORIGINAL,
         container: document.createElement('div'),
         selector: '.pdf-page[data-page-number]'
       })
       scrollAnchor.captureScrollAnchor.mockReturnValue(domAnchor)
       scrollAnchor.isPdfAnchor.mockReturnValue(false)
-      anchorFns.restoreOwnedScrollAnchor.mockReturnValue(PDF_SCROLL_OWNER.ORIGINAL)
+      anchorFns.restoreOwnedScrollAnchor.mockReturnValue(PANE_OWNER.ORIGINAL)
       anchorFns.captureControlledTransitionAnchors.mockReturnValue({
         originalAnchor: domAnchor,
         translatedAnchor: null
@@ -1922,17 +1922,17 @@ describe('createPdfTransitionController', () => {
     it('restores both panes from ownerAnchor after Translation single switches to side-by-side', async () => {
       const { ctrl, recomputeLayout } = createController({ contentView: CONTENT_VIEW.TRANSLATION })
 
-      const translatedAnchor = { owner: PDF_SCROLL_OWNER.TRANSLATED, pageNumber: 28, offsetRatio: 0.3 }
-      anchorFns.resolveAnchorOwner.mockReturnValue(PDF_SCROLL_OWNER.TRANSLATED)
+      const translatedAnchor = { owner: PANE_OWNER.TRANSLATED, pageNumber: 28, offsetRatio: 0.3 }
+      anchorFns.resolveAnchorOwner.mockReturnValue(PANE_OWNER.TRANSLATED)
       anchorFns.capturePdfAwareOwnedScrollAnchor.mockReturnValue(translatedAnchor)
       scrollAnchor.isPdfAnchor.mockReturnValue(false)
-      anchorFns.restoreOwnedScrollAnchor.mockReturnValue(PDF_SCROLL_OWNER.TRANSLATED)
-      anchorFns.deriveOriginalAnchorFromTranslated.mockReturnValue({ owner: PDF_SCROLL_OWNER.ORIGINAL, pageNumber: 28, offsetRatio: 0 })
+      anchorFns.restoreOwnedScrollAnchor.mockReturnValue(PANE_OWNER.TRANSLATED)
+      anchorFns.deriveOriginalAnchorFromTranslated.mockReturnValue({ owner: PANE_OWNER.ORIGINAL, pageNumber: 28, offsetRatio: 0 })
 
       await ctrl.handleLayoutModeChange('side-by-side')
 
       anchorFns.captureControlledTransitionAnchors.mockReturnValue({
-        originalAnchor: { owner: PDF_SCROLL_OWNER.ORIGINAL, pageNumber: 1, offsetRatio: 0 },
+        originalAnchor: { owner: PANE_OWNER.ORIGINAL, pageNumber: 1, offsetRatio: 0 },
         translatedAnchor
       })
       recomputeLayout.mockResolvedValue()
@@ -1949,18 +1949,18 @@ describe('createPdfTransitionController', () => {
     it('restores both panes from ownerAnchor after Original single switches to side-by-side', async () => {
       const { ctrl, recomputeLayout } = createController()
 
-      const originalAnchor = { owner: PDF_SCROLL_OWNER.ORIGINAL, pageNumber: 14, offsetRatio: 0.5 }
-      anchorFns.resolveAnchorOwner.mockReturnValue(PDF_SCROLL_OWNER.ORIGINAL)
+      const originalAnchor = { owner: PANE_OWNER.ORIGINAL, pageNumber: 14, offsetRatio: 0.5 }
+      anchorFns.resolveAnchorOwner.mockReturnValue(PANE_OWNER.ORIGINAL)
       anchorFns.capturePdfAwareOwnedScrollAnchor.mockReturnValue(originalAnchor)
       scrollAnchor.isPdfAnchor.mockReturnValue(false)
-      anchorFns.restoreOwnedScrollAnchor.mockReturnValue(PDF_SCROLL_OWNER.ORIGINAL)
-      anchorFns.deriveTranslatedAnchorFromOriginal.mockReturnValue({ owner: PDF_SCROLL_OWNER.TRANSLATED, pageNumber: 14, offsetRatio: 0.5 })
+      anchorFns.restoreOwnedScrollAnchor.mockReturnValue(PANE_OWNER.ORIGINAL)
+      anchorFns.deriveTranslatedAnchorFromOriginal.mockReturnValue({ owner: PANE_OWNER.TRANSLATED, pageNumber: 14, offsetRatio: 0.5 })
 
       await ctrl.handleLayoutModeChange('side-by-side')
 
       anchorFns.captureControlledTransitionAnchors.mockReturnValue({
         originalAnchor,
-        translatedAnchor: { owner: PDF_SCROLL_OWNER.TRANSLATED, pageNumber: 1, offsetRatio: 0 }
+        translatedAnchor: { owner: PANE_OWNER.TRANSLATED, pageNumber: 1, offsetRatio: 0 }
       })
       recomputeLayout.mockResolvedValue()
 
@@ -1976,20 +1976,20 @@ describe('createPdfTransitionController', () => {
     it('does not use ownerAnchor when pdfAnchor is present and authoritative', async () => {
       const { ctrl, recomputeLayout } = createController({ isSideBySide: true, showTranslatedPdfPane: true })
 
-      const pdfAnchor = { owner: PDF_SCROLL_OWNER.ORIGINAL, pageNumber: 5, pdfPoint: { x: 0, y: 0 } }
-      anchorFns.resolveAnchorOwner.mockReturnValue(PDF_SCROLL_OWNER.ORIGINAL)
+      const pdfAnchor = { owner: PANE_OWNER.ORIGINAL, pageNumber: 5, pdfPoint: { x: 0, y: 0 } }
+      anchorFns.resolveAnchorOwner.mockReturnValue(PANE_OWNER.ORIGINAL)
       anchorFns.capturePdfAwareOwnedScrollAnchor.mockReturnValue(pdfAnchor)
       scrollAnchor.isPdfAnchor.mockReturnValue(true)
-      anchorFns.restoreOwnedScrollAnchor.mockReturnValue(PDF_SCROLL_OWNER.ORIGINAL)
+      anchorFns.restoreOwnedScrollAnchor.mockReturnValue(PANE_OWNER.ORIGINAL)
 
       await ctrl.handleLayoutModeChange('side-by-side')
 
       const freshAnchors = {
-        originalAnchor: { owner: PDF_SCROLL_OWNER.ORIGINAL, pageNumber: 40, offsetRatio: 0.25 },
+        originalAnchor: { owner: PANE_OWNER.ORIGINAL, pageNumber: 40, offsetRatio: 0.25 },
         translatedAnchor: null
       }
       anchorFns.captureControlledTransitionAnchors.mockReturnValue(freshAnchors)
-      anchorFns.deriveTranslatedAnchorFromOriginal.mockReturnValue({ owner: PDF_SCROLL_OWNER.TRANSLATED, pageNumber: 5, offsetRatio: 0 })
+      anchorFns.deriveTranslatedAnchorFromOriginal.mockReturnValue({ owner: PANE_OWNER.TRANSLATED, pageNumber: 5, offsetRatio: 0 })
       recomputeLayout.mockResolvedValue()
 
       await ctrl.handleLayoutChange({ width: 800, height: 600 })
@@ -2005,21 +2005,21 @@ describe('createPdfTransitionController', () => {
     it('falls back to captureControlledTransitionAnchors when token has no ownerAnchor or pdfAnchor', async () => {
       const { ctrl, recomputeLayout } = createController()
 
-      anchorFns.resolveAnchorOwner.mockReturnValue(PDF_SCROLL_OWNER.ORIGINAL)
+      anchorFns.resolveAnchorOwner.mockReturnValue(PANE_OWNER.ORIGINAL)
       anchorFns.resolveOwnerScrollTarget.mockReturnValue({
-        owner: PDF_SCROLL_OWNER.ORIGINAL,
+        owner: PANE_OWNER.ORIGINAL,
         container: document.createElement('div'),
         selector: '.pdf-page[data-page-number]'
       })
       scrollAnchor.captureScrollAnchor.mockReturnValue({ pageNumber: 3, offsetRatio: 0.5 })
       scrollAnchor.isPdfAnchor.mockReturnValue(false)
-      anchorFns.restoreOwnedScrollAnchor.mockReturnValue(PDF_SCROLL_OWNER.ORIGINAL)
+      anchorFns.restoreOwnedScrollAnchor.mockReturnValue(PANE_OWNER.ORIGINAL)
 
       await ctrl.handleContentViewChange(CONTENT_VIEW.TRANSLATED_PDF)
       await new Promise(resolve => requestAnimationFrame(resolve))
 
       const freshAnchors = {
-        originalAnchor: { owner: PDF_SCROLL_OWNER.ORIGINAL, pageNumber: 10, offsetRatio: 0.5 },
+        originalAnchor: { owner: PANE_OWNER.ORIGINAL, pageNumber: 10, offsetRatio: 0.5 },
         translatedAnchor: null
       }
       anchorFns.captureControlledTransitionAnchors.mockReturnValue(freshAnchors)
@@ -2040,16 +2040,16 @@ describe('createPdfTransitionController', () => {
         pdfViewerRef
       })
 
-      const domAnchor = { pageNumber: 33, offsetRatio: 0.25, owner: PDF_SCROLL_OWNER.ORIGINAL }
-      anchorFns.resolveAnchorOwner.mockReturnValue(PDF_SCROLL_OWNER.ORIGINAL)
+      const domAnchor = { pageNumber: 33, offsetRatio: 0.25, owner: PANE_OWNER.ORIGINAL }
+      anchorFns.resolveAnchorOwner.mockReturnValue(PANE_OWNER.ORIGINAL)
       anchorFns.resolveOwnerScrollTarget.mockReturnValue({
-        owner: PDF_SCROLL_OWNER.ORIGINAL,
+        owner: PANE_OWNER.ORIGINAL,
         container: document.createElement('div'),
         selector: '.pdf-page[data-page-number]'
       })
       scrollAnchor.captureScrollAnchor.mockReturnValue(domAnchor)
       scrollAnchor.isPdfAnchor.mockReturnValue(false)
-      anchorFns.restoreOwnedScrollAnchor.mockReturnValue(PDF_SCROLL_OWNER.ORIGINAL)
+      anchorFns.restoreOwnedScrollAnchor.mockReturnValue(PANE_OWNER.ORIGINAL)
       anchorFns.captureControlledTransitionAnchors.mockImplementation(() => {
         throw new Error('capture failed')
       })
@@ -2078,15 +2078,15 @@ describe('createPdfTransitionController', () => {
       })
 
       const pendingAnchor = { pageNumber: 35, pdfPoint: { x: 0, y: 0 } }
-      anchorFns.resolveAnchorOwner.mockReturnValue(PDF_SCROLL_OWNER.ORIGINAL)
+      anchorFns.resolveAnchorOwner.mockReturnValue(PANE_OWNER.ORIGINAL)
       anchorFns.resolveOwnerScrollTarget.mockReturnValue({
-        owner: PDF_SCROLL_OWNER.ORIGINAL,
+        owner: PANE_OWNER.ORIGINAL,
         container: document.createElement('div'),
         selector: '.pdf-page[data-page-number]'
       })
       scrollAnchor.capturePdfBackedScrollAnchor.mockReturnValue(pendingAnchor)
       scrollAnchor.isPdfAnchor.mockImplementation((a) => !!a?.pdfPoint)
-      anchorFns.restoreOwnedScrollAnchor.mockReturnValue(PDF_SCROLL_OWNER.ORIGINAL)
+      anchorFns.restoreOwnedScrollAnchor.mockReturnValue(PANE_OWNER.ORIGINAL)
       anchorFns.deriveTranslatedAnchorFromOriginal.mockImplementation(() => {
         throw new Error('derive failed')
       })
@@ -2110,21 +2110,21 @@ describe('createPdfTransitionController', () => {
         pdfViewerRef
       })
 
-      const domAnchor = { pageNumber: 33, offsetRatio: 0.25, owner: PDF_SCROLL_OWNER.ORIGINAL }
-      anchorFns.resolveAnchorOwner.mockReturnValue(PDF_SCROLL_OWNER.ORIGINAL)
+      const domAnchor = { pageNumber: 33, offsetRatio: 0.25, owner: PANE_OWNER.ORIGINAL }
+      anchorFns.resolveAnchorOwner.mockReturnValue(PANE_OWNER.ORIGINAL)
       anchorFns.resolveOwnerScrollTarget.mockReturnValue({
-        owner: PDF_SCROLL_OWNER.ORIGINAL,
+        owner: PANE_OWNER.ORIGINAL,
         container: document.createElement('div'),
         selector: '.pdf-page[data-page-number]'
       })
       scrollAnchor.captureScrollAnchor.mockReturnValue(domAnchor)
       scrollAnchor.isPdfAnchor.mockReturnValue(false)
-      anchorFns.restoreOwnedScrollAnchor.mockReturnValue(PDF_SCROLL_OWNER.ORIGINAL)
+      anchorFns.restoreOwnedScrollAnchor.mockReturnValue(PANE_OWNER.ORIGINAL)
       anchorFns.captureControlledTransitionAnchors.mockReturnValue({
         originalAnchor: domAnchor,
         translatedAnchor: null
       })
-      anchorFns.restoreControlledTransitionAnchors.mockReturnValue(PDF_SCROLL_OWNER.ORIGINAL)
+      anchorFns.restoreControlledTransitionAnchors.mockReturnValue(PANE_OWNER.ORIGINAL)
 
       const recomputeLayout = vi.fn().mockRejectedValue(new Error('layout failed'))
       const { ctrl: ctrl2 } = createController({
@@ -2135,20 +2135,20 @@ describe('createPdfTransitionController', () => {
         showTranslatedPdfPane: true
       })
 
-      anchorFns.resolveAnchorOwner.mockReturnValue(PDF_SCROLL_OWNER.ORIGINAL)
+      anchorFns.resolveAnchorOwner.mockReturnValue(PANE_OWNER.ORIGINAL)
       anchorFns.resolveOwnerScrollTarget.mockReturnValue({
-        owner: PDF_SCROLL_OWNER.ORIGINAL,
+        owner: PANE_OWNER.ORIGINAL,
         container: document.createElement('div'),
         selector: '.pdf-page[data-page-number]'
       })
       scrollAnchor.captureScrollAnchor.mockReturnValue(domAnchor)
       scrollAnchor.isPdfAnchor.mockReturnValue(false)
-      anchorFns.restoreOwnedScrollAnchor.mockReturnValue(PDF_SCROLL_OWNER.ORIGINAL)
+      anchorFns.restoreOwnedScrollAnchor.mockReturnValue(PANE_OWNER.ORIGINAL)
       anchorFns.captureControlledTransitionAnchors.mockReturnValue({
         originalAnchor: domAnchor,
         translatedAnchor: null
       })
-      anchorFns.restoreControlledTransitionAnchors.mockReturnValue(PDF_SCROLL_OWNER.ORIGINAL)
+      anchorFns.restoreControlledTransitionAnchors.mockReturnValue(PANE_OWNER.ORIGINAL)
 
       await ctrl2.handleContentViewChange(CONTENT_VIEW.ORIGINAL)
 
@@ -2173,21 +2173,21 @@ describe('createPdfTransitionController', () => {
         showTranslatedPdfPane: true
       })
 
-      const domAnchor = { pageNumber: 33, offsetRatio: 0.25, owner: PDF_SCROLL_OWNER.ORIGINAL }
-      anchorFns.resolveAnchorOwner.mockReturnValue(PDF_SCROLL_OWNER.ORIGINAL)
+      const domAnchor = { pageNumber: 33, offsetRatio: 0.25, owner: PANE_OWNER.ORIGINAL }
+      anchorFns.resolveAnchorOwner.mockReturnValue(PANE_OWNER.ORIGINAL)
       anchorFns.resolveOwnerScrollTarget.mockReturnValue({
-        owner: PDF_SCROLL_OWNER.ORIGINAL,
+        owner: PANE_OWNER.ORIGINAL,
         container: document.createElement('div'),
         selector: '.pdf-page[data-page-number]'
       })
       scrollAnchor.captureScrollAnchor.mockReturnValue(domAnchor)
       scrollAnchor.isPdfAnchor.mockReturnValue(false)
-      anchorFns.restoreOwnedScrollAnchor.mockReturnValue(PDF_SCROLL_OWNER.ORIGINAL)
+      anchorFns.restoreOwnedScrollAnchor.mockReturnValue(PANE_OWNER.ORIGINAL)
       anchorFns.captureControlledTransitionAnchors.mockReturnValue({
         originalAnchor: domAnchor,
         translatedAnchor: null
       })
-      anchorFns.restoreControlledTransitionAnchors.mockReturnValue(PDF_SCROLL_OWNER.ORIGINAL)
+      anchorFns.restoreControlledTransitionAnchors.mockReturnValue(PANE_OWNER.ORIGINAL)
 
       await ctrl.handleContentViewChange(CONTENT_VIEW.ORIGINAL)
 
@@ -2205,16 +2205,16 @@ describe('createPdfTransitionController', () => {
         contentView: CONTENT_VIEW.TRANSLATION
       })
 
-      const domAnchor = { pageNumber: 33, offsetRatio: 0.25, owner: PDF_SCROLL_OWNER.ORIGINAL }
-      anchorFns.resolveAnchorOwner.mockReturnValue(PDF_SCROLL_OWNER.ORIGINAL)
+      const domAnchor = { pageNumber: 33, offsetRatio: 0.25, owner: PANE_OWNER.ORIGINAL }
+      anchorFns.resolveAnchorOwner.mockReturnValue(PANE_OWNER.ORIGINAL)
       anchorFns.resolveOwnerScrollTarget.mockReturnValue({
-        owner: PDF_SCROLL_OWNER.ORIGINAL,
+        owner: PANE_OWNER.ORIGINAL,
         container: document.createElement('div'),
         selector: '.pdf-page[data-page-number]'
       })
       scrollAnchor.captureScrollAnchor.mockReturnValue(domAnchor)
       scrollAnchor.isPdfAnchor.mockReturnValue(false)
-      anchorFns.restoreOwnedScrollAnchor.mockReturnValue(PDF_SCROLL_OWNER.ORIGINAL)
+      anchorFns.restoreOwnedScrollAnchor.mockReturnValue(PANE_OWNER.ORIGINAL)
       anchorFns.captureControlledTransitionAnchors.mockReturnValue({
         originalAnchor: domAnchor,
         translatedAnchor: null
@@ -2231,15 +2231,15 @@ describe('createPdfTransitionController', () => {
         recomputeLayout: secondRecomputeLayout,
         contentView: CONTENT_VIEW.TRANSLATION
       })
-      anchorFns.resolveAnchorOwner.mockReturnValue(PDF_SCROLL_OWNER.ORIGINAL)
+      anchorFns.resolveAnchorOwner.mockReturnValue(PANE_OWNER.ORIGINAL)
       anchorFns.resolveOwnerScrollTarget.mockReturnValue({
-        owner: PDF_SCROLL_OWNER.ORIGINAL,
+        owner: PANE_OWNER.ORIGINAL,
         container: document.createElement('div'),
         selector: '.pdf-page[data-page-number]'
       })
       scrollAnchor.captureScrollAnchor.mockReturnValue(domAnchor)
       scrollAnchor.isPdfAnchor.mockReturnValue(false)
-      anchorFns.restoreOwnedScrollAnchor.mockReturnValue(PDF_SCROLL_OWNER.ORIGINAL)
+      anchorFns.restoreOwnedScrollAnchor.mockReturnValue(PANE_OWNER.ORIGINAL)
       anchorFns.captureControlledTransitionAnchors.mockReturnValue({
         originalAnchor: domAnchor,
         translatedAnchor: null
@@ -2259,10 +2259,10 @@ describe('createPdfTransitionController', () => {
       const { ctrl } = createController()
 
       const domAnchor = { pageNumber: 2, offsetRatio: 0.5 }
-      anchorFns.resolveAnchorOwner.mockReturnValue(PDF_SCROLL_OWNER.ORIGINAL)
+      anchorFns.resolveAnchorOwner.mockReturnValue(PANE_OWNER.ORIGINAL)
       anchorFns.capturePdfAwareOwnedScrollAnchor.mockReturnValue(domAnchor)
       scrollAnchor.isPdfAnchor.mockReturnValue(false)
-      anchorFns.restoreOwnedScrollAnchor.mockReturnValue(PDF_SCROLL_OWNER.ORIGINAL)
+      anchorFns.restoreOwnedScrollAnchor.mockReturnValue(PANE_OWNER.ORIGINAL)
 
       await ctrl.handleLayoutModeChange('side-by-side')
 
@@ -2285,8 +2285,8 @@ describe('createPdfTransitionController', () => {
     it('applies fit-page entry normalization and restores', async () => {
       const { ctrl, recomputeLayout } = createController()
 
-      const domAnchor = { pageNumber: 2, offsetRatio: 0, owner: PDF_SCROLL_OWNER.ORIGINAL }
-      const normalizedAnchor = { pageNumber: 2, offsetRatio: 0, owner: PDF_SCROLL_OWNER.ORIGINAL, pdfPoint: { x: 0, y: 0 } }
+      const domAnchor = { pageNumber: 2, offsetRatio: 0, owner: PANE_OWNER.ORIGINAL }
+      const normalizedAnchor = { pageNumber: 2, offsetRatio: 0, owner: PANE_OWNER.ORIGINAL, pdfPoint: { x: 0, y: 0 } }
 
       anchorFns.captureControlledTransitionAnchors.mockReturnValue({
         originalAnchor: domAnchor,
@@ -2294,7 +2294,7 @@ describe('createPdfTransitionController', () => {
       })
       anchorFns.normalizeFitPagePdfAnchor.mockReturnValue(normalizedAnchor)
       anchorFns.resolveTranslatedZoomAnchor.mockReturnValue(null)
-      anchorFns.restoreControlledTransitionAnchors.mockReturnValue(PDF_SCROLL_OWNER.ORIGINAL)
+      anchorFns.restoreControlledTransitionAnchors.mockReturnValue(PANE_OWNER.ORIGINAL)
 
       await ctrl.handleZoomChange({ mode: 'fit-page' })
 
@@ -2309,8 +2309,8 @@ describe('createPdfTransitionController', () => {
 
       ctrl.zoomMode.value = 'fit-page'
 
-      const nearTopAnchor = { pageNumber: 2, offsetRatio: 0.005, owner: PDF_SCROLL_OWNER.ORIGINAL }
-      const rootAnchor = { owner: PDF_SCROLL_OWNER.ORIGINAL, pageNumber: 2, offsetRatio: 0 }
+      const nearTopAnchor = { pageNumber: 2, offsetRatio: 0.005, owner: PANE_OWNER.ORIGINAL }
+      const rootAnchor = { owner: PANE_OWNER.ORIGINAL, pageNumber: 2, offsetRatio: 0 }
 
       anchorFns.captureControlledTransitionAnchors.mockReturnValue({
         originalAnchor: nearTopAnchor,
@@ -2318,7 +2318,7 @@ describe('createPdfTransitionController', () => {
       })
       anchorFns.normalizeFitPageDomRootAnchor.mockReturnValue(rootAnchor)
       anchorFns.resolveTranslatedZoomAnchor.mockReturnValue(null)
-      anchorFns.restoreControlledTransitionAnchors.mockReturnValue(PDF_SCROLL_OWNER.ORIGINAL)
+      anchorFns.restoreControlledTransitionAnchors.mockReturnValue(PANE_OWNER.ORIGINAL)
 
       await ctrl.handleZoomChange({ mode: 'fit-width' })
 
@@ -2329,13 +2329,13 @@ describe('createPdfTransitionController', () => {
     it('captures and restores for percent zoom change', async () => {
       const { ctrl, recomputeLayout } = createController()
 
-      const originalAnchor = { pageNumber: 1, offsetRatio: 0.5, owner: PDF_SCROLL_OWNER.ORIGINAL }
+      const originalAnchor = { pageNumber: 1, offsetRatio: 0.5, owner: PANE_OWNER.ORIGINAL }
       anchorFns.captureControlledTransitionAnchors.mockReturnValue({
         originalAnchor,
         translatedAnchor: null
       })
       anchorFns.resolveTranslatedZoomAnchor.mockReturnValue(null)
-      anchorFns.restoreControlledTransitionAnchors.mockReturnValue(PDF_SCROLL_OWNER.ORIGINAL)
+      anchorFns.restoreControlledTransitionAnchors.mockReturnValue(PANE_OWNER.ORIGINAL)
 
       await ctrl.handleZoomChange({ mode: 'percent', value: 150 })
 
@@ -2349,13 +2349,13 @@ describe('createPdfTransitionController', () => {
       const { ctrl, recomputeLayout } = createController()
 
       anchorFns.captureControlledTransitionAnchors.mockReturnValue({
-        originalAnchor: { pageNumber: 1, offsetRatio: 0.5, owner: PDF_SCROLL_OWNER.ORIGINAL },
+        originalAnchor: { pageNumber: 1, offsetRatio: 0.5, owner: PANE_OWNER.ORIGINAL },
         translatedAnchor: null
       })
       anchorFns.resolveTranslatedZoomAnchor.mockReturnValue(null)
       anchorFns.restoreControlledTransitionAnchors.mockImplementation(() => {
         expect(ctrl.renderWindowEvictionFrozen.value).toBe(true)
-        return PDF_SCROLL_OWNER.ORIGINAL
+        return PANE_OWNER.ORIGINAL
       })
       anchorFns.normalizeFitPagePdfAnchor.mockImplementation((a) => a)
       recomputeLayout.mockImplementationOnce(() => {
@@ -2376,11 +2376,11 @@ describe('createPdfTransitionController', () => {
       const { ctrl, recomputeLayout } = createController()
 
       anchorFns.captureControlledTransitionAnchors.mockReturnValue({
-        originalAnchor: { pageNumber: 1, offsetRatio: 0.5, owner: PDF_SCROLL_OWNER.ORIGINAL },
+        originalAnchor: { pageNumber: 1, offsetRatio: 0.5, owner: PANE_OWNER.ORIGINAL },
         translatedAnchor: null
       })
       anchorFns.resolveTranslatedZoomAnchor.mockReturnValue(null)
-      anchorFns.restoreControlledTransitionAnchors.mockReturnValue(PDF_SCROLL_OWNER.ORIGINAL)
+      anchorFns.restoreControlledTransitionAnchors.mockReturnValue(PANE_OWNER.ORIGINAL)
       anchorFns.normalizeFitPagePdfAnchor.mockImplementation((a) => a)
       recomputeLayout
         .mockImplementationOnce(async () => {
@@ -2401,7 +2401,7 @@ describe('createPdfTransitionController', () => {
       const { ctrl, recomputeLayout } = createController()
 
       const domAnchor = { pageNumber: 2, offsetRatio: 0.5 }
-      anchorFns.resolveAnchorOwner.mockReturnValue(PDF_SCROLL_OWNER.ORIGINAL)
+      anchorFns.resolveAnchorOwner.mockReturnValue(PANE_OWNER.ORIGINAL)
       anchorFns.capturePdfAwareOwnedScrollAnchor.mockReturnValue(domAnchor)
       scrollAnchor.isPdfAnchor.mockReturnValue(false)
 
@@ -2436,11 +2436,11 @@ describe('createPdfTransitionController', () => {
       const { ctrl, recomputeLayout } = createController()
 
       anchorFns.captureControlledTransitionAnchors.mockReturnValue({
-        originalAnchor: { pageNumber: 1, offsetRatio: 0.5, owner: PDF_SCROLL_OWNER.ORIGINAL },
+        originalAnchor: { pageNumber: 1, offsetRatio: 0.5, owner: PANE_OWNER.ORIGINAL },
         translatedAnchor: null
       })
       anchorFns.resolveTranslatedZoomAnchor.mockReturnValue(null)
-      anchorFns.restoreControlledTransitionAnchors.mockReturnValue(PDF_SCROLL_OWNER.ORIGINAL)
+      anchorFns.restoreControlledTransitionAnchors.mockReturnValue(PANE_OWNER.ORIGINAL)
 
       await ctrl.handleZoomStep(1)
 
@@ -2456,11 +2456,11 @@ describe('createPdfTransitionController', () => {
       ctrl.zoomPercent.value = 125
 
       anchorFns.captureControlledTransitionAnchors.mockReturnValue({
-        originalAnchor: { pageNumber: 1, offsetRatio: 0.5, owner: PDF_SCROLL_OWNER.ORIGINAL },
+        originalAnchor: { pageNumber: 1, offsetRatio: 0.5, owner: PANE_OWNER.ORIGINAL },
         translatedAnchor: null
       })
       anchorFns.resolveTranslatedZoomAnchor.mockReturnValue(null)
-      anchorFns.restoreControlledTransitionAnchors.mockReturnValue(PDF_SCROLL_OWNER.ORIGINAL)
+      anchorFns.restoreControlledTransitionAnchors.mockReturnValue(PANE_OWNER.ORIGINAL)
 
       await ctrl.handleZoomStep(-1)
 
@@ -2498,10 +2498,10 @@ describe('createPdfTransitionController', () => {
       const { ctrl, setLayoutMode } = createController()
 
       const domAnchor = { pageNumber: 3, offsetRatio: 0.25 }
-      anchorFns.resolveAnchorOwner.mockReturnValue(PDF_SCROLL_OWNER.ORIGINAL)
+      anchorFns.resolveAnchorOwner.mockReturnValue(PANE_OWNER.ORIGINAL)
       anchorFns.capturePdfAwareOwnedScrollAnchor.mockReturnValue(domAnchor)
       scrollAnchor.isPdfAnchor.mockReturnValue(false)
-      anchorFns.restoreOwnedScrollAnchor.mockReturnValue(PDF_SCROLL_OWNER.ORIGINAL)
+      anchorFns.restoreOwnedScrollAnchor.mockReturnValue(PANE_OWNER.ORIGINAL)
 
       await ctrl.handleLayoutModeChange('side-by-side')
 
@@ -2516,10 +2516,10 @@ describe('createPdfTransitionController', () => {
       })
 
       const domAnchor = { pageNumber: 3, offsetRatio: 0.25 }
-      anchorFns.resolveAnchorOwner.mockReturnValue(PDF_SCROLL_OWNER.ORIGINAL)
+      anchorFns.resolveAnchorOwner.mockReturnValue(PANE_OWNER.ORIGINAL)
       anchorFns.capturePdfAwareOwnedScrollAnchor.mockReturnValue(domAnchor)
       scrollAnchor.isPdfAnchor.mockReturnValue(false)
-      anchorFns.restoreOwnedScrollAnchor.mockReturnValue(PDF_SCROLL_OWNER.ORIGINAL)
+      anchorFns.restoreOwnedScrollAnchor.mockReturnValue(PANE_OWNER.ORIGINAL)
 
       await ctrl.handleLayoutModeChange('single')
 
@@ -2530,13 +2530,13 @@ describe('createPdfTransitionController', () => {
     it('captures, zooms, and restores in correct order for zoom transition', async () => {
       const { ctrl, recomputeLayout, pdfViewerLayoutRef } = createController()
 
-      const originalAnchor = { pageNumber: 1, offsetRatio: 0.5, owner: PDF_SCROLL_OWNER.ORIGINAL }
+      const originalAnchor = { pageNumber: 1, offsetRatio: 0.5, owner: PANE_OWNER.ORIGINAL }
       anchorFns.captureControlledTransitionAnchors.mockReturnValue({
         originalAnchor,
         translatedAnchor: null
       })
       anchorFns.resolveTranslatedZoomAnchor.mockReturnValue(null)
-      anchorFns.restoreControlledTransitionAnchors.mockReturnValue(PDF_SCROLL_OWNER.ORIGINAL)
+      anchorFns.restoreControlledTransitionAnchors.mockReturnValue(PANE_OWNER.ORIGINAL)
       anchorFns.normalizeFitPagePdfAnchor.mockImplementation((a) => a)
 
       await ctrl.handleZoomChange({ mode: 'fit-page' })
@@ -2555,12 +2555,12 @@ describe('createPdfTransitionController', () => {
       const container = { scrollTop: 0, scrollLeft: 0 }
       const domAnchor = { pageNumber: 3, offsetRatio: 0.5 }
 
-      anchorFns.resolveAnchorOwner.mockReturnValue(PDF_SCROLL_OWNER.ORIGINAL)
+      anchorFns.resolveAnchorOwner.mockReturnValue(PANE_OWNER.ORIGINAL)
       anchorFns.capturePdfAwareOwnedScrollAnchor.mockReturnValue(domAnchor)
       scrollAnchor.isPdfAnchor.mockReturnValue(false)
       anchorFns.restoreOwnedScrollAnchor.mockImplementation((anchor) => {
         container.scrollTop = anchor.pageNumber * 200 + anchor.offsetRatio * 100
-        return PDF_SCROLL_OWNER.ORIGINAL
+        return PANE_OWNER.ORIGINAL
       })
 
       await ctrl.handleLayoutModeChange('side-by-side')
@@ -2573,12 +2573,12 @@ describe('createPdfTransitionController', () => {
       const { ctrl, recomputeLayout } = createController()
 
       anchorFns.captureControlledTransitionAnchors.mockReturnValue({
-        originalAnchor: { pageNumber: 1, offsetRatio: 0.5, owner: PDF_SCROLL_OWNER.ORIGINAL },
+        originalAnchor: { pageNumber: 1, offsetRatio: 0.5, owner: PANE_OWNER.ORIGINAL },
         translatedAnchor: null
       })
       anchorFns.resolveTranslatedZoomAnchor.mockReturnValue(null)
       anchorFns.normalizeFitPagePdfAnchor.mockImplementation((a) => a)
-      anchorFns.restoreControlledTransitionAnchors.mockReturnValue(PDF_SCROLL_OWNER.ORIGINAL)
+      anchorFns.restoreControlledTransitionAnchors.mockReturnValue(PANE_OWNER.ORIGINAL)
 
       recomputeLayout.mockRejectedValueOnce(new Error('layout failed'))
 
@@ -2588,7 +2588,7 @@ describe('createPdfTransitionController', () => {
       expect(ctrl.renderWindowEvictionFrozen.value).toBe(false)
 
       anchorFns.captureControlledTransitionAnchors.mockReturnValue({
-        originalAnchor: { pageNumber: 1, offsetRatio: 0.5, owner: PDF_SCROLL_OWNER.ORIGINAL },
+        originalAnchor: { pageNumber: 1, offsetRatio: 0.5, owner: PANE_OWNER.ORIGINAL },
         translatedAnchor: null
       })
       recomputeLayout.mockResolvedValue()

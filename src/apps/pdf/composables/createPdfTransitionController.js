@@ -2,7 +2,8 @@ import { nextTick, onBeforeUnmount, ref, unref } from 'vue'
 import { CONTENT_VIEW } from './usePdfViewerMode.js'
 import { captureScrollAnchor, capturePdfBackedScrollAnchor, isPdfAnchor } from '../utils/pdfScrollAnchor.js'
 import { resolvePdfCanvasSlot } from '../utils/pdfFitPageFootprint.js'
-import { createPdfTransitionAnchor, PDF_SCROLL_OWNER, isPdfBackedContentView } from './createPdfTransitionAnchor.js'
+import { createPdfTransitionAnchor, isPdfBackedContentView } from './createPdfTransitionAnchor.js'
+import { PANE_OWNER } from '../utils/paneOwner.js'
 import { resolveEffectivePaneTopology, doesOriginalPaneLayoutChange } from '../utils/pdfViewerTopology.js'
 import { PDF_ZOOM_PERCENT_OPTIONS } from '../constants/pdfZoomConstants.js'
 const ZOOM_PERCENT_OPTIONS = PDF_ZOOM_PERCENT_OPTIONS
@@ -233,7 +234,7 @@ export function createPdfTransitionController({
 
   function normalizeTranslatedAnchor(anchor, owner, previousView, nextView) {
     if (!isTranslatedTextPdfBackedTransition(previousView, nextView)) return anchor
-    if (owner !== PDF_SCROLL_OWNER.TRANSLATED) return anchor
+    if (owner !== PANE_OWNER.TRANSLATED) return anchor
 
     const pageNumber = Number(currentPage.value)
     const resolvedPage = Number.isInteger(pageNumber) && pageNumber > 0 ? pageNumber : null
@@ -464,7 +465,7 @@ export function createPdfTransitionController({
         : capturedAnchors?.translatedAnchor ?? null
 
       if (ownerAnchorFromToken && !pendingTransitionRestoreForTransition?.pdfAnchor) {
-        if (ownerAnchorFromToken.owner === PDF_SCROLL_OWNER.ORIGINAL) {
+        if (ownerAnchorFromToken.owner === PANE_OWNER.ORIGINAL) {
           capturedAnchors = {
             originalAnchor: ownerAnchorFromToken,
             translatedAnchor: deriveTranslatedAnchorFromOriginal?.(ownerAnchorFromToken) || null

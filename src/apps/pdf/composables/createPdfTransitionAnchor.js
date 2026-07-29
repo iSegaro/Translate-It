@@ -7,17 +7,14 @@ import {
   restorePdfBackedScrollAnchor,
   isPdfAnchor
 } from '../utils/pdfScrollAnchor.js'
-
-const PDF_SCROLL_OWNER = Object.freeze({
-  ORIGINAL: 'original',
-  TRANSLATED: 'translated'
-})
+import { PANE_OWNER } from '../utils/paneOwner.js'
+import { resolveNavigationOwner } from '../utils/resolveNavigationOwner.js'
 
 function isPdfBackedContentView(view) {
   return view === CONTENT_VIEW.ORIGINAL || view === CONTENT_VIEW.TRANSLATED_PDF
 }
 
-export { PDF_SCROLL_OWNER, isPdfBackedContentView }
+export { isPdfBackedContentView }
 
 export function createPdfTransitionAnchor({
   contentView,
@@ -30,17 +27,11 @@ export function createPdfTransitionAnchor({
   zoomMode
 }) {
   function resolveAnchorOwner(explicitOwner) {
-    if (explicitOwner === PDF_SCROLL_OWNER.ORIGINAL || explicitOwner === PDF_SCROLL_OWNER.TRANSLATED) {
-      return explicitOwner
-    }
-
-    return contentView.value === CONTENT_VIEW.TRANSLATION
-      ? PDF_SCROLL_OWNER.TRANSLATED
-      : PDF_SCROLL_OWNER.ORIGINAL
+    return resolveNavigationOwner(contentView.value, explicitOwner)
   }
 
   function resolveOwnerScrollTarget(owner) {
-    if (owner === PDF_SCROLL_OWNER.TRANSLATED) {
+    if (owner === PANE_OWNER.TRANSLATED) {
       if (showTranslatedTextPane.value && translatedScrollContainer.value) {
         return { owner, container: translatedScrollContainer.value, selector: '.pdf-translated-page[data-page-number]' }
       }
@@ -51,21 +42,21 @@ export function createPdfTransitionAnchor({
     }
 
     if (originalScrollContainer.value) {
-      return { owner: PDF_SCROLL_OWNER.ORIGINAL, container: originalScrollContainer.value, selector: '.pdf-page[data-page-number]' }
+      return { owner: PANE_OWNER.ORIGINAL, container: originalScrollContainer.value, selector: '.pdf-page[data-page-number]' }
     }
 
     if (translatedScrollContainer.value) {
       const selector = showTranslatedTextPane.value
         ? '.pdf-translated-page[data-page-number]'
         : '.pdf-page[data-page-number]'
-      return { owner: PDF_SCROLL_OWNER.TRANSLATED, container: translatedScrollContainer.value, selector }
+      return { owner: PANE_OWNER.TRANSLATED, container: translatedScrollContainer.value, selector }
     }
 
     return { owner, container: null, selector: '.pdf-page[data-page-number]' }
   }
 
   function resolveLayoutTransitionTarget(owner) {
-    if (owner === PDF_SCROLL_OWNER.ORIGINAL) {
+    if (owner === PANE_OWNER.ORIGINAL) {
       return {
         owner,
         container: originalScrollContainer.value,
@@ -74,7 +65,7 @@ export function createPdfTransitionAnchor({
     }
 
     return {
-      owner: PDF_SCROLL_OWNER.TRANSLATED,
+      owner: PANE_OWNER.TRANSLATED,
       container: translatedScrollContainer.value,
       selector: showTranslatedTextPane.value
         ? '.pdf-translated-page[data-page-number]'
@@ -103,7 +94,7 @@ export function createPdfTransitionAnchor({
     const target = resolveLayoutTransitionTarget(owner)
     if (!target.container) return null
 
-    if (owner === PDF_SCROLL_OWNER.ORIGINAL) {
+    if (owner === PANE_OWNER.ORIGINAL) {
       const pdfSession = unref(session) ?? null
       const pdfAnchor = capturePdfBackedScrollAnchor(target.container, target.selector, pdfSession)
       if (pdfAnchor) {
@@ -117,8 +108,8 @@ export function createPdfTransitionAnchor({
 
   function captureControlledTransitionAnchors() {
     return {
-      originalAnchor: captureLayoutTransitionAnchor(PDF_SCROLL_OWNER.ORIGINAL),
-      translatedAnchor: captureLayoutTransitionAnchor(PDF_SCROLL_OWNER.TRANSLATED)
+      originalAnchor: captureLayoutTransitionAnchor(PANE_OWNER.ORIGINAL),
+      translatedAnchor: captureLayoutTransitionAnchor(PANE_OWNER.TRANSLATED)
     }
   }
 
@@ -126,7 +117,7 @@ export function createPdfTransitionAnchor({
     if (!originalAnchor?.pageNumber) return null
 
     return {
-      owner: PDF_SCROLL_OWNER.TRANSLATED,
+      owner: PANE_OWNER.TRANSLATED,
       pageNumber: originalAnchor.pageNumber,
       offsetRatio: originalAnchor.offsetRatio ?? 0
     }
@@ -136,7 +127,7 @@ export function createPdfTransitionAnchor({
     if (!translatedAnchor?.pageNumber) return null
 
     return {
-      owner: PDF_SCROLL_OWNER.ORIGINAL,
+      owner: PANE_OWNER.ORIGINAL,
       pageNumber: translatedAnchor.pageNumber,
       offsetRatio: 0
     }
@@ -169,9 +160,9 @@ export function createPdfTransitionAnchor({
       return restoredOwner
     }
 
-    const fallbackOwner = anchor.owner === PDF_SCROLL_OWNER.TRANSLATED
-      ? PDF_SCROLL_OWNER.ORIGINAL
-      : PDF_SCROLL_OWNER.TRANSLATED
+    const fallbackOwner = anchor.owner === PANE_OWNER.TRANSLATED
+      ? PANE_OWNER.ORIGINAL
+      : PANE_OWNER.TRANSLATED
     const fallbackTarget = resolveOwnerScrollTarget(fallbackOwner)
     const fallbackAnchor = fallbackTarget.owner === anchor.owner
       ? anchor
@@ -188,7 +179,7 @@ export function createPdfTransitionAnchor({
     const restoredOriginalOwner = restoreOwnedScrollAnchor(originalAnchor)
 
     if (translatedAnchor) {
-      const translatedTarget = resolveLayoutTransitionTarget(PDF_SCROLL_OWNER.TRANSLATED)
+      const translatedTarget = resolveLayoutTransitionTarget(PANE_OWNER.TRANSLATED)
       restoreScrollAnchor(translatedAnchor, translatedTarget.container, translatedTarget.selector)
     }
 

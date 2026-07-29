@@ -1,13 +1,8 @@
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { syncScroll as syncScrollViaGeometry } from '../utils/pdfGeometrySyncEngine.js'
+import { PANE_OWNER } from '../utils/paneOwner.js'
 
 const SCROLL_POSITION_EPSILON = 1
-const SCROLL_SYNC_PANE = Object.freeze({
-  ORIGINAL: 'original',
-  TRANSLATED: 'translated'
-})
-
-export { SCROLL_SYNC_PANE }
 
 const PAGE_SELECTOR = '[data-page-number]'
 
@@ -195,7 +190,7 @@ export function usePdfScrollSync(originalPaneRef, translatedPaneRef, enabledRef)
     if (!original || !translated) return
 
     suppressSource = null
-    if (owner === SCROLL_SYNC_PANE.TRANSLATED) {
+    if (owner === PANE_OWNER.TRANSLATED) {
       runSync(translated, original)
       return
     }
@@ -204,7 +199,7 @@ export function usePdfScrollSync(originalPaneRef, translatedPaneRef, enabledRef)
   }
 
   function syncNow() {
-    syncFromPane(SCROLL_SYNC_PANE.ORIGINAL)
+    syncFromPane(PANE_OWNER.ORIGINAL)
   }
 
   return { syncFromPane, syncNow, setScrollSyncSuppressed }

@@ -1,7 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { mount } from '@vue/test-utils'
 import { defineComponent, nextTick, ref } from 'vue'
-import { SCROLL_SYNC_PANE, usePdfScrollSync } from './usePdfScrollSync.js'
+import { PANE_OWNER } from '../utils/paneOwner.js'
+import { usePdfScrollSync } from './usePdfScrollSync.js'
 
 function createHostComponent({ enabled = true } = {}) {
   return defineComponent({
@@ -329,7 +330,7 @@ describe('usePdfScrollSync', () => {
       })
     })
 
-    wrapper.vm.syncFromPane(SCROLL_SYNC_PANE.TRANSLATED)
+    wrapper.vm.syncFromPane(PANE_OWNER.TRANSLATED)
 
     expect(originalPane.scrollTop).toBe(1182)
 

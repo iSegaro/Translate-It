@@ -10,7 +10,8 @@ vi.mock('../utils/pdfScrollAnchor.js', () => ({
   isPdfAnchor: vi.fn()
 }))
 
-const { createPdfTransitionAnchor, PDF_SCROLL_OWNER, isPdfBackedContentView } = await import('./createPdfTransitionAnchor.js')
+const { createPdfTransitionAnchor, isPdfBackedContentView } = await import('./createPdfTransitionAnchor.js')
+const { PANE_OWNER } = await import('../utils/paneOwner.js')
 const scrollAnchor = await import('../utils/pdfScrollAnchor.js')
 
 function createAnchor(options = {}) {
@@ -43,8 +44,8 @@ beforeEach(() => {
 
 describe('createPdfTransitionAnchor', () => {
   describe('exports', () => {
-    it('defines PDF_SCROLL_OWNER', () => {
-      expect(PDF_SCROLL_OWNER).toEqual({ ORIGINAL: 'original', TRANSLATED: 'translated' })
+    it('defines PANE_OWNER', () => {
+      expect(PANE_OWNER).toEqual({ ORIGINAL: 'original', TRANSLATED: 'translated' })
     })
 
     it('isPdfBackedContentView returns true for ORIGINAL and TRANSLATED_PDF', () => {
@@ -60,27 +61,27 @@ describe('createPdfTransitionAnchor', () => {
   describe('resolveAnchorOwner', () => {
     it('returns explicit ORIGINAL owner', () => {
       const anchor = createAnchor()
-      expect(anchor.resolveAnchorOwner(PDF_SCROLL_OWNER.ORIGINAL)).toBe(PDF_SCROLL_OWNER.ORIGINAL)
+      expect(anchor.resolveAnchorOwner(PANE_OWNER.ORIGINAL)).toBe(PANE_OWNER.ORIGINAL)
     })
 
     it('returns explicit TRANSLATED owner', () => {
       const anchor = createAnchor()
-      expect(anchor.resolveAnchorOwner(PDF_SCROLL_OWNER.TRANSLATED)).toBe(PDF_SCROLL_OWNER.TRANSLATED)
+      expect(anchor.resolveAnchorOwner(PANE_OWNER.TRANSLATED)).toBe(PANE_OWNER.TRANSLATED)
     })
 
     it('returns TRANSLATED when contentView is TRANSLATION and no explicit owner', () => {
       const anchor = createAnchor({ contentView: CONTENT_VIEW.TRANSLATION })
-      expect(anchor.resolveAnchorOwner()).toBe(PDF_SCROLL_OWNER.TRANSLATED)
+      expect(anchor.resolveAnchorOwner()).toBe(PANE_OWNER.TRANSLATED)
     })
 
     it('returns ORIGINAL when contentView is ORIGINAL and no explicit owner', () => {
       const anchor = createAnchor({ contentView: CONTENT_VIEW.ORIGINAL })
-      expect(anchor.resolveAnchorOwner()).toBe(PDF_SCROLL_OWNER.ORIGINAL)
+      expect(anchor.resolveAnchorOwner()).toBe(PANE_OWNER.ORIGINAL)
     })
 
     it('returns ORIGINAL when contentView is TRANSLATED_PDF and no explicit owner', () => {
       const anchor = createAnchor({ contentView: CONTENT_VIEW.TRANSLATED_PDF })
-      expect(anchor.resolveAnchorOwner()).toBe(PDF_SCROLL_OWNER.ORIGINAL)
+      expect(anchor.resolveAnchorOwner()).toBe(PANE_OWNER.ORIGINAL)
     })
   })
 
@@ -91,8 +92,8 @@ describe('createPdfTransitionAnchor', () => {
         showTranslatedTextPane: true,
         translatedScrollContainer: container
       })
-      const target = anchor.resolveOwnerScrollTarget(PDF_SCROLL_OWNER.TRANSLATED)
-      expect(target.owner).toBe(PDF_SCROLL_OWNER.TRANSLATED)
+      const target = anchor.resolveOwnerScrollTarget(PANE_OWNER.TRANSLATED)
+      expect(target.owner).toBe(PANE_OWNER.TRANSLATED)
       expect(target.container).toBe(container)
       expect(target.selector).toBe('.pdf-translated-page[data-page-number]')
     })
@@ -103,8 +104,8 @@ describe('createPdfTransitionAnchor', () => {
         showTranslatedPdfPane: true,
         translatedScrollContainer: container
       })
-      const target = anchor.resolveOwnerScrollTarget(PDF_SCROLL_OWNER.TRANSLATED)
-      expect(target.owner).toBe(PDF_SCROLL_OWNER.TRANSLATED)
+      const target = anchor.resolveOwnerScrollTarget(PANE_OWNER.TRANSLATED)
+      expect(target.owner).toBe(PANE_OWNER.TRANSLATED)
       expect(target.container).toBe(container)
       expect(target.selector).toBe('.pdf-page[data-page-number]')
     })
@@ -112,22 +113,22 @@ describe('createPdfTransitionAnchor', () => {
     it('falls back to original container when owner is not TRANSLATED', () => {
       const container = document.createElement('div')
       const anchor = createAnchor({ originalScrollContainer: container })
-      const target = anchor.resolveOwnerScrollTarget(PDF_SCROLL_OWNER.ORIGINAL)
-      expect(target.owner).toBe(PDF_SCROLL_OWNER.ORIGINAL)
+      const target = anchor.resolveOwnerScrollTarget(PANE_OWNER.ORIGINAL)
+      expect(target.owner).toBe(PANE_OWNER.ORIGINAL)
       expect(target.container).toBe(container)
     })
 
     it('falls back to original container when TRANSLATED has no translated container', () => {
       const container = document.createElement('div')
       const anchor = createAnchor({ originalScrollContainer: container, translatedScrollContainer: null })
-      const target = anchor.resolveOwnerScrollTarget(PDF_SCROLL_OWNER.TRANSLATED)
-      expect(target.owner).toBe(PDF_SCROLL_OWNER.ORIGINAL)
+      const target = anchor.resolveOwnerScrollTarget(PANE_OWNER.TRANSLATED)
+      expect(target.owner).toBe(PANE_OWNER.ORIGINAL)
       expect(target.container).toBe(container)
     })
 
     it('returns container null when no containers exist', () => {
       const anchor = createAnchor({ originalScrollContainer: null, translatedScrollContainer: null })
-      const target = anchor.resolveOwnerScrollTarget(PDF_SCROLL_OWNER.ORIGINAL)
+      const target = anchor.resolveOwnerScrollTarget(PANE_OWNER.ORIGINAL)
       expect(target.container).toBeNull()
     })
   })
@@ -136,8 +137,8 @@ describe('createPdfTransitionAnchor', () => {
     it('returns original target for ORIGINAL owner', () => {
       const container = document.createElement('div')
       const anchor = createAnchor({ originalScrollContainer: container })
-      const target = anchor.resolveLayoutTransitionTarget(PDF_SCROLL_OWNER.ORIGINAL)
-      expect(target.owner).toBe(PDF_SCROLL_OWNER.ORIGINAL)
+      const target = anchor.resolveLayoutTransitionTarget(PANE_OWNER.ORIGINAL)
+      expect(target.owner).toBe(PANE_OWNER.ORIGINAL)
       expect(target.container).toBe(container)
       expect(target.selector).toBe('.pdf-page[data-page-number]')
     })
@@ -145,8 +146,8 @@ describe('createPdfTransitionAnchor', () => {
     it('returns translated target with translated-page selector when showTranslatedTextPane', () => {
       const container = document.createElement('div')
       const anchor = createAnchor({ showTranslatedTextPane: true, translatedScrollContainer: container })
-      const target = anchor.resolveLayoutTransitionTarget(PDF_SCROLL_OWNER.TRANSLATED)
-      expect(target.owner).toBe(PDF_SCROLL_OWNER.TRANSLATED)
+      const target = anchor.resolveLayoutTransitionTarget(PANE_OWNER.TRANSLATED)
+      expect(target.owner).toBe(PANE_OWNER.TRANSLATED)
       expect(target.container).toBe(container)
       expect(target.selector).toBe('.pdf-translated-page[data-page-number]')
     })
@@ -154,8 +155,8 @@ describe('createPdfTransitionAnchor', () => {
     it('returns translated target with pdf-page selector when not showTranslatedTextPane', () => {
       const container = document.createElement('div')
       const anchor = createAnchor({ translatedScrollContainer: container })
-      const target = anchor.resolveLayoutTransitionTarget(PDF_SCROLL_OWNER.TRANSLATED)
-      expect(target.owner).toBe(PDF_SCROLL_OWNER.TRANSLATED)
+      const target = anchor.resolveLayoutTransitionTarget(PANE_OWNER.TRANSLATED)
+      expect(target.owner).toBe(PANE_OWNER.TRANSLATED)
       expect(target.container).toBe(container)
       expect(target.selector).toBe('.pdf-page[data-page-number]')
     })
@@ -167,10 +168,10 @@ describe('createPdfTransitionAnchor', () => {
       const anchor = createAnchor({ originalScrollContainer: container })
       scrollAnchor.captureScrollAnchor.mockReturnValue({ pageNumber: 1, offsetRatio: 0.5 })
 
-      const result = anchor.captureOwnedScrollAnchor(PDF_SCROLL_OWNER.ORIGINAL)
+      const result = anchor.captureOwnedScrollAnchor(PANE_OWNER.ORIGINAL)
 
       expect(scrollAnchor.captureScrollAnchor).toHaveBeenCalledWith(container, '.pdf-page[data-page-number]')
-      expect(result).toEqual({ pageNumber: 1, offsetRatio: 0.5, owner: PDF_SCROLL_OWNER.ORIGINAL })
+      expect(result).toEqual({ pageNumber: 1, offsetRatio: 0.5, owner: PANE_OWNER.ORIGINAL })
     })
 
     it('returns null when captureScrollAnchor returns null', () => {
@@ -178,7 +179,7 @@ describe('createPdfTransitionAnchor', () => {
       const anchor = createAnchor({ originalScrollContainer: container })
       scrollAnchor.captureScrollAnchor.mockReturnValue(null)
 
-      const result = anchor.captureOwnedScrollAnchor(PDF_SCROLL_OWNER.ORIGINAL)
+      const result = anchor.captureOwnedScrollAnchor(PANE_OWNER.ORIGINAL)
 
       expect(result).toBeNull()
     })
@@ -196,10 +197,10 @@ describe('createPdfTransitionAnchor', () => {
       const pdfAnchor = { pageNumber: 1, offsetRatio: 0.5, pdfPoint: { x: 10, y: 20 } }
       scrollAnchor.capturePdfBackedScrollAnchor.mockReturnValue(pdfAnchor)
 
-      const result = anchor.capturePdfAwareOwnedScrollAnchor(PDF_SCROLL_OWNER.ORIGINAL)
+      const result = anchor.capturePdfAwareOwnedScrollAnchor(PANE_OWNER.ORIGINAL)
 
       expect(scrollAnchor.capturePdfBackedScrollAnchor).toHaveBeenCalled()
-      expect(result).toEqual({ owner: PDF_SCROLL_OWNER.ORIGINAL, ...pdfAnchor })
+      expect(result).toEqual({ owner: PANE_OWNER.ORIGINAL, ...pdfAnchor })
     })
 
     it('falls back to DOM capture when PDF-backed capture fails', () => {
@@ -211,9 +212,9 @@ describe('createPdfTransitionAnchor', () => {
       scrollAnchor.capturePdfBackedScrollAnchor.mockReturnValue(null)
       scrollAnchor.captureScrollAnchor.mockReturnValue({ pageNumber: 2, offsetRatio: 0.3 })
 
-      const result = anchor.capturePdfAwareOwnedScrollAnchor(PDF_SCROLL_OWNER.ORIGINAL)
+      const result = anchor.capturePdfAwareOwnedScrollAnchor(PANE_OWNER.ORIGINAL)
 
-      expect(result).toEqual({ pageNumber: 2, offsetRatio: 0.3, owner: PDF_SCROLL_OWNER.ORIGINAL })
+      expect(result).toEqual({ pageNumber: 2, offsetRatio: 0.3, owner: PANE_OWNER.ORIGINAL })
     })
 
     it('uses DOM capture directly for TRANSLATION content view', () => {
@@ -225,10 +226,10 @@ describe('createPdfTransitionAnchor', () => {
       })
       scrollAnchor.captureScrollAnchor.mockReturnValue({ pageNumber: 3, offsetRatio: 0.7 })
 
-      const result = anchor.capturePdfAwareOwnedScrollAnchor(PDF_SCROLL_OWNER.TRANSLATED)
+      const result = anchor.capturePdfAwareOwnedScrollAnchor(PANE_OWNER.TRANSLATED)
 
       expect(scrollAnchor.capturePdfBackedScrollAnchor).not.toHaveBeenCalled()
-      expect(result).toEqual({ pageNumber: 3, offsetRatio: 0.7, owner: PDF_SCROLL_OWNER.TRANSLATED })
+      expect(result).toEqual({ pageNumber: 3, offsetRatio: 0.7, owner: PANE_OWNER.TRANSLATED })
     })
   })
 
@@ -240,10 +241,10 @@ describe('createPdfTransitionAnchor', () => {
       const pdfAnchor = { pageNumber: 1, offsetRatio: 0, pdfPoint: { x: 0, y: 0 } }
       scrollAnchor.capturePdfBackedScrollAnchor.mockReturnValue(pdfAnchor)
 
-      const result = anchor.captureLayoutTransitionAnchor(PDF_SCROLL_OWNER.ORIGINAL)
+      const result = anchor.captureLayoutTransitionAnchor(PANE_OWNER.ORIGINAL)
 
       expect(scrollAnchor.captureScrollAnchor).not.toHaveBeenCalled()
-      expect(result).toEqual({ owner: PDF_SCROLL_OWNER.ORIGINAL, ...pdfAnchor })
+      expect(result).toEqual({ owner: PANE_OWNER.ORIGINAL, ...pdfAnchor })
     })
 
     it('falls back to DOM capture for ORIGINAL when PDF-backed fails', () => {
@@ -252,9 +253,9 @@ describe('createPdfTransitionAnchor', () => {
       scrollAnchor.capturePdfBackedScrollAnchor.mockReturnValue(null)
       scrollAnchor.captureScrollAnchor.mockReturnValue({ pageNumber: 2, offsetRatio: 0.4 })
 
-      const result = anchor.captureLayoutTransitionAnchor(PDF_SCROLL_OWNER.ORIGINAL)
+      const result = anchor.captureLayoutTransitionAnchor(PANE_OWNER.ORIGINAL)
 
-      expect(result).toEqual({ owner: PDF_SCROLL_OWNER.ORIGINAL, pageNumber: 2, offsetRatio: 0.4 })
+      expect(result).toEqual({ owner: PANE_OWNER.ORIGINAL, pageNumber: 2, offsetRatio: 0.4 })
     })
 
     it('uses DOM capture for TRANSLATED owner', () => {
@@ -262,15 +263,15 @@ describe('createPdfTransitionAnchor', () => {
       const anchor = createAnchor({ showTranslatedTextPane: true, translatedScrollContainer: container })
       scrollAnchor.captureScrollAnchor.mockReturnValue({ pageNumber: 5, offsetRatio: 0.1 })
 
-      const result = anchor.captureLayoutTransitionAnchor(PDF_SCROLL_OWNER.TRANSLATED)
+      const result = anchor.captureLayoutTransitionAnchor(PANE_OWNER.TRANSLATED)
 
       expect(scrollAnchor.capturePdfBackedScrollAnchor).not.toHaveBeenCalled()
-      expect(result).toEqual({ owner: PDF_SCROLL_OWNER.TRANSLATED, pageNumber: 5, offsetRatio: 0.1 })
+      expect(result).toEqual({ owner: PANE_OWNER.TRANSLATED, pageNumber: 5, offsetRatio: 0.1 })
     })
 
     it('returns null when no container', () => {
       const anchor = createAnchor({ originalScrollContainer: null })
-      const result = anchor.captureLayoutTransitionAnchor(PDF_SCROLL_OWNER.ORIGINAL)
+      const result = anchor.captureLayoutTransitionAnchor(PANE_OWNER.ORIGINAL)
       expect(result).toBeNull()
     })
   })
@@ -286,7 +287,7 @@ describe('createPdfTransitionAnchor', () => {
 
       const result = anchor.captureControlledTransitionAnchors()
 
-      expect(result.originalAnchor).toEqual({ owner: PDF_SCROLL_OWNER.ORIGINAL, pageNumber: 1, offsetRatio: 0 })
+      expect(result.originalAnchor).toEqual({ owner: PANE_OWNER.ORIGINAL, pageNumber: 1, offsetRatio: 0 })
       expect(result.translatedAnchor).toBeNull()
     })
   })
@@ -294,8 +295,8 @@ describe('createPdfTransitionAnchor', () => {
   describe('deriveTranslatedAnchorFromOriginal', () => {
     it('derives translated anchor from original', () => {
       const anchor = createAnchor()
-      const result = anchor.deriveTranslatedAnchorFromOriginal({ pageNumber: 3, offsetRatio: 0.75, owner: PDF_SCROLL_OWNER.ORIGINAL })
-      expect(result).toEqual({ owner: PDF_SCROLL_OWNER.TRANSLATED, pageNumber: 3, offsetRatio: 0.75 })
+      const result = anchor.deriveTranslatedAnchorFromOriginal({ pageNumber: 3, offsetRatio: 0.75, owner: PANE_OWNER.ORIGINAL })
+      expect(result).toEqual({ owner: PANE_OWNER.TRANSLATED, pageNumber: 3, offsetRatio: 0.75 })
     })
 
     it('uses 0 for missing offsetRatio', () => {
@@ -318,19 +319,19 @@ describe('createPdfTransitionAnchor', () => {
   describe('deriveOriginalAnchorFromTranslated', () => {
     it('derives original anchor from translated', () => {
       const anchor = createAnchor()
-      const result = anchor.deriveOriginalAnchorFromTranslated({ pageNumber: 28, offsetRatio: 0.75, owner: PDF_SCROLL_OWNER.TRANSLATED })
-      expect(result).toEqual({ owner: PDF_SCROLL_OWNER.ORIGINAL, pageNumber: 28, offsetRatio: 0 })
+      const result = anchor.deriveOriginalAnchorFromTranslated({ pageNumber: 28, offsetRatio: 0.75, owner: PANE_OWNER.TRANSLATED })
+      expect(result).toEqual({ owner: PANE_OWNER.ORIGINAL, pageNumber: 28, offsetRatio: 0 })
     })
 
     it('resets offsetRatio to 0', () => {
       const anchor = createAnchor()
-      const result = anchor.deriveOriginalAnchorFromTranslated({ pageNumber: 5, offsetRatio: 0.5, owner: PDF_SCROLL_OWNER.TRANSLATED })
+      const result = anchor.deriveOriginalAnchorFromTranslated({ pageNumber: 5, offsetRatio: 0.5, owner: PANE_OWNER.TRANSLATED })
       expect(result.offsetRatio).toBe(0)
     })
 
     it('preserves pageNumber from source', () => {
       const anchor = createAnchor()
-      const result = anchor.deriveOriginalAnchorFromTranslated({ pageNumber: 28, offsetRatio: 0.3, owner: PDF_SCROLL_OWNER.TRANSLATED })
+      const result = anchor.deriveOriginalAnchorFromTranslated({ pageNumber: 28, offsetRatio: 0.3, owner: PANE_OWNER.TRANSLATED })
       expect(result.pageNumber).toBe(28)
     })
 
@@ -339,10 +340,10 @@ describe('createPdfTransitionAnchor', () => {
       const result = anchor.deriveOriginalAnchorFromTranslated({
         pageNumber: 28,
         offsetRatio: 0.5,
-        owner: PDF_SCROLL_OWNER.TRANSLATED,
+        owner: PANE_OWNER.TRANSLATED,
         pdfPoint: { x: 100, y: 200 }
       })
-      expect(result).toEqual({ owner: PDF_SCROLL_OWNER.ORIGINAL, pageNumber: 28, offsetRatio: 0 })
+      expect(result).toEqual({ owner: PANE_OWNER.ORIGINAL, pageNumber: 28, offsetRatio: 0 })
       expect(result.pdfPoint).toBeUndefined()
     })
 
@@ -353,29 +354,29 @@ describe('createPdfTransitionAnchor', () => {
 
     it('returns null for anchor without pageNumber', () => {
       const anchor = createAnchor()
-      expect(anchor.deriveOriginalAnchorFromTranslated({ offsetRatio: 0.5, owner: PDF_SCROLL_OWNER.TRANSLATED })).toBeNull()
+      expect(anchor.deriveOriginalAnchorFromTranslated({ offsetRatio: 0.5, owner: PANE_OWNER.TRANSLATED })).toBeNull()
     })
   })
 
   describe('resolveTranslatedZoomAnchor', () => {
     it('returns capturedTranslatedAnchor when not side-by-side', () => {
       const anchor = createAnchor({ isSideBySide: false })
-      const captured = { owner: PDF_SCROLL_OWNER.TRANSLATED, pageNumber: 2, offsetRatio: 0.5 }
+      const captured = { owner: PANE_OWNER.TRANSLATED, pageNumber: 2, offsetRatio: 0.5 }
       const result = anchor.resolveTranslatedZoomAnchor({ pageNumber: 1, offsetRatio: 0 }, captured)
       expect(result).toBe(captured)
     })
 
     it('derives from original when side-by-side', () => {
       const anchor = createAnchor({ isSideBySide: true })
-      const captured = { owner: PDF_SCROLL_OWNER.TRANSLATED, pageNumber: 2, offsetRatio: 0.5 }
-      const original = { pageNumber: 1, offsetRatio: 0.3, owner: PDF_SCROLL_OWNER.ORIGINAL }
+      const captured = { owner: PANE_OWNER.TRANSLATED, pageNumber: 2, offsetRatio: 0.5 }
+      const original = { pageNumber: 1, offsetRatio: 0.3, owner: PANE_OWNER.ORIGINAL }
       const result = anchor.resolveTranslatedZoomAnchor(original, captured)
-      expect(result).toEqual({ owner: PDF_SCROLL_OWNER.TRANSLATED, pageNumber: 1, offsetRatio: 0.3 })
+      expect(result).toEqual({ owner: PANE_OWNER.TRANSLATED, pageNumber: 1, offsetRatio: 0.3 })
     })
 
     it('falls back to capturedTranslatedAnchor when original is null', () => {
       const anchor = createAnchor({ isSideBySide: true })
-      const captured = { owner: PDF_SCROLL_OWNER.TRANSLATED, pageNumber: 2, offsetRatio: 0.5 }
+      const captured = { owner: PANE_OWNER.TRANSLATED, pageNumber: 2, offsetRatio: 0.5 }
       const result = anchor.resolveTranslatedZoomAnchor(null, captured)
       expect(result).toBe(captured)
     })
@@ -394,10 +395,10 @@ describe('createPdfTransitionAnchor', () => {
       scrollAnchor.isPdfAnchor.mockReturnValue(true)
       scrollAnchor.restorePdfBackedScrollAnchor.mockReturnValue(true)
 
-      const result = anchor.restoreOwnedScrollAnchor({ owner: PDF_SCROLL_OWNER.ORIGINAL, pageNumber: 1, pdfPoint: { x: 0, y: 0 } })
+      const result = anchor.restoreOwnedScrollAnchor({ owner: PANE_OWNER.ORIGINAL, pageNumber: 1, pdfPoint: { x: 0, y: 0 } })
 
       expect(scrollAnchor.restorePdfBackedScrollAnchor).toHaveBeenCalled()
-      expect(result).toBe(PDF_SCROLL_OWNER.ORIGINAL)
+      expect(result).toBe(PANE_OWNER.ORIGINAL)
     })
 
     it('falls back to DOM restore when PDF-backed restore fails', () => {
@@ -407,10 +408,10 @@ describe('createPdfTransitionAnchor', () => {
       scrollAnchor.restorePdfBackedScrollAnchor.mockReturnValue(false)
       scrollAnchor.restoreScrollAnchor.mockReturnValue(true)
 
-      const result = anchor.restoreOwnedScrollAnchor({ owner: PDF_SCROLL_OWNER.ORIGINAL, pageNumber: 1, pdfPoint: { x: 0, y: 0 } })
+      const result = anchor.restoreOwnedScrollAnchor({ owner: PANE_OWNER.ORIGINAL, pageNumber: 1, pdfPoint: { x: 0, y: 0 } })
 
       expect(scrollAnchor.restoreScrollAnchor).toHaveBeenCalled()
-      expect(result).toBe(PDF_SCROLL_OWNER.ORIGINAL)
+      expect(result).toBe(PANE_OWNER.ORIGINAL)
     })
 
     it('tries fallback owner when primary DOM restore fails', () => {
@@ -424,10 +425,10 @@ describe('createPdfTransitionAnchor', () => {
       scrollAnchor.isPdfAnchor.mockReturnValue(false)
       scrollAnchor.restoreScrollAnchor.mockReturnValueOnce(false).mockReturnValueOnce(true)
 
-      const result = anchor.restoreOwnedScrollAnchor({ owner: PDF_SCROLL_OWNER.ORIGINAL, pageNumber: 1, offsetRatio: 0.5 })
+      const result = anchor.restoreOwnedScrollAnchor({ owner: PANE_OWNER.ORIGINAL, pageNumber: 1, offsetRatio: 0.5 })
 
       expect(scrollAnchor.restoreScrollAnchor).toHaveBeenCalledTimes(2)
-      expect(result).toBe(PDF_SCROLL_OWNER.TRANSLATED)
+      expect(result).toBe(PANE_OWNER.TRANSLATED)
     })
 
     it('returns null when all restore attempts fail', () => {
@@ -436,7 +437,7 @@ describe('createPdfTransitionAnchor', () => {
       scrollAnchor.isPdfAnchor.mockReturnValue(false)
       scrollAnchor.restoreScrollAnchor.mockReturnValue(false)
 
-      const result = anchor.restoreOwnedScrollAnchor({ owner: PDF_SCROLL_OWNER.ORIGINAL, pageNumber: 1, offsetRatio: 0.5 })
+      const result = anchor.restoreOwnedScrollAnchor({ owner: PANE_OWNER.ORIGINAL, pageNumber: 1, offsetRatio: 0.5 })
 
       expect(scrollAnchor.restoreScrollAnchor).toHaveBeenCalledTimes(2)
       expect(result).toBeNull()
@@ -451,12 +452,12 @@ describe('createPdfTransitionAnchor', () => {
       scrollAnchor.restoreScrollAnchor.mockReturnValue(true)
 
       const result = anchor.restoreControlledTransitionAnchors({
-        originalAnchor: { owner: PDF_SCROLL_OWNER.ORIGINAL, pageNumber: 1, offsetRatio: 0.5 },
-        translatedAnchor: { owner: PDF_SCROLL_OWNER.TRANSLATED, pageNumber: 1, offsetRatio: 0.5 }
+        originalAnchor: { owner: PANE_OWNER.ORIGINAL, pageNumber: 1, offsetRatio: 0.5 },
+        translatedAnchor: { owner: PANE_OWNER.TRANSLATED, pageNumber: 1, offsetRatio: 0.5 }
       })
 
       expect(scrollAnchor.restoreScrollAnchor).toHaveBeenCalledTimes(2)
-      expect(result).toBe(PDF_SCROLL_OWNER.ORIGINAL)
+      expect(result).toBe(PANE_OWNER.ORIGINAL)
     })
 
     it('skips translated restore when translatedAnchor is null', () => {
@@ -466,7 +467,7 @@ describe('createPdfTransitionAnchor', () => {
       scrollAnchor.restoreScrollAnchor.mockReturnValue(true)
 
       anchor.restoreControlledTransitionAnchors({
-        originalAnchor: { owner: PDF_SCROLL_OWNER.ORIGINAL, pageNumber: 1, offsetRatio: 0.5 },
+        originalAnchor: { owner: PANE_OWNER.ORIGINAL, pageNumber: 1, offsetRatio: 0.5 },
         translatedAnchor: null
       })
 
@@ -528,14 +529,14 @@ describe('createPdfTransitionAnchor', () => {
 
     it('returns unmodified anchor for anchor without pageNumber', () => {
       const anchor = createAnchor()
-      const input = { owner: PDF_SCROLL_OWNER.ORIGINAL }
+      const input = { owner: PANE_OWNER.ORIGINAL }
       expect(anchor.normalizeFitPageDomRootAnchor(input)).toBe(input)
     })
 
     it('zeroes offsetRatio while preserving owner and pageNumber', () => {
       const anchor = createAnchor()
-      const result = anchor.normalizeFitPageDomRootAnchor({ owner: PDF_SCROLL_OWNER.TRANSLATED, pageNumber: 3, offsetRatio: 0.8 })
-      expect(result).toEqual({ owner: PDF_SCROLL_OWNER.TRANSLATED, pageNumber: 3, offsetRatio: 0 })
+      const result = anchor.normalizeFitPageDomRootAnchor({ owner: PANE_OWNER.TRANSLATED, pageNumber: 3, offsetRatio: 0.8 })
+      expect(result).toEqual({ owner: PANE_OWNER.TRANSLATED, pageNumber: 3, offsetRatio: 0 })
     })
   })
 })
