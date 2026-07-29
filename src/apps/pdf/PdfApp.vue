@@ -225,7 +225,7 @@
 </template>
 
 <script setup>
-import { computed, onBeforeUnmount, onMounted, provide, ref, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, provide, ref, watch } from 'vue'
 import { Toaster } from 'vue-sonner'
 import PdfToolbar from './components/PdfToolbar.vue'
 import PdfDropzone from './components/PdfDropzone.vue'
@@ -279,7 +279,7 @@ import { applyTheme } from '@/utils/ui/theme.js'
 import { useUnifiedI18n } from '@/composables/shared/useUnifiedI18n.js'
 import { OVERLAY_ROOT_KEY } from '@/components/base/ToolbarMenu/keys.js'
 import { readViewerStateFromUrl } from '@/features/pdf-translation/core/PdfViewerStateUrlAdapter.js'
-import { setPendingViewerState, getPendingViewerState } from '@/features/pdf-translation/core/PendingViewerState.js'
+import { setPendingViewerState, getPendingViewerState, clearPendingViewerState } from '@/features/pdf-translation/core/PendingViewerState.js'
 import './PdfApp.scss'
 import 'vue-sonner/style.css'
 import '@/assets/styles/components/_toast.scss'
@@ -783,8 +783,27 @@ async function handleFileSelected(file) {
   resetPresentationState()
   const loaded = await loadPdfFile(file, buildLayoutRequest())
   if (loaded) {
+    const pending = getPendingViewerState()
+    const isMatch = pending && pending.documentIdentity === session.documentIdentity
+
+    if (!isMatch) {
+      clearPendingViewerState()
+    }
+
     isDragOver.value = false
     void attachDocument(session)
+
+    if (isMatch) {
+      setContentView(pending.contentView)
+      setLayoutMode(pending.layoutMode)
+      await nextTick()
+      await handleZoomChange({
+        mode: pending.zoomMode,
+        value: pending.zoomPercent,
+      })
+      navigateToPage(pending.currentPage)
+      clearPendingViewerState()
+    }
   }
   updateDocumentTitle()
 }
