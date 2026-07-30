@@ -33,6 +33,7 @@ const PAGE_CONTEXT_MENU_ID = "translate-with-select-element";
 const ACTION_TRANSLATE_ELEMENT_ID = "action-translate-element";
 const SCREEN_CAPTURE_MENU_ID = "screen-capture";
 const ACTION_CONTEXT_MENU_OPTIONS_ID = "open-options-page";
+const ACTION_CONTEXT_MENU_PDF_ID = "open-pdf-page";
 const ACTION_CONTEXT_MENU_SUBTITLE_ID = "open-subtitle-page";
 const ACTION_CONTEXT_MENU_SHORTCUTS_ID = "open-shortcuts-page";
 const HELP_MENU_ID = "open-help-page";
@@ -535,6 +536,13 @@ export class ContextMenuManager extends ResourceTracker {
           }
         }
 
+        // --- 2.3.4 PDF Menu (Before Subtitle) ---
+        await this.createMenu({
+          id: ACTION_CONTEXT_MENU_PDF_ID,
+          title: (await getTranslationString("pdf_app_title", locale)) || "PDF Translator",
+          contexts: ["action"],
+        });
+
         // --- 2.3.5 Subtitle Menu (Before Options) ---
         await this.createMenu({
           id: ACTION_CONTEXT_MENU_SUBTITLE_ID,
@@ -766,6 +774,7 @@ export class ContextMenuManager extends ResourceTracker {
         API_PROVIDER_ITEM_ID_PREFIX
       );
       const isStaticActionClick = [
+        ACTION_CONTEXT_MENU_PDF_ID,
         ACTION_CONTEXT_MENU_SUBTITLE_ID,
         ACTION_CONTEXT_MENU_OPTIONS_ID,
         ACTION_CONTEXT_MENU_SHORTCUTS_ID,
@@ -832,6 +841,10 @@ export class ContextMenuManager extends ResourceTracker {
           await this._activateSelectElement(activeTab);
           break;
         }
+
+        case ACTION_CONTEXT_MENU_PDF_ID:
+          await openExtensionApp('pdf');
+          break;
 
         case ACTION_CONTEXT_MENU_SUBTITLE_ID:
           await openExtensionApp('subtitle');
