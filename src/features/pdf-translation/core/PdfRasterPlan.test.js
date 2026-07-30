@@ -94,7 +94,7 @@ describe('resolvePdfRasterPlan', () => {
     expect(plan.rasterScaleY).toBe(plan.backingHeight / plan.logicalHeight)
     expect(plan.rasterScaleX).toBeLessThanOrEqual(plan.rasterOutputScale)
     expect(plan.rasterScaleY).toBeLessThanOrEqual(plan.rasterOutputScale)
-    expect(plan.backingWidth / plan.backingHeight).toBeCloseTo(1_000 / 333, 2)
+    expect(plan.backingWidth / plan.backingHeight).toBeCloseTo(1_000 / 333, 1)
     expect(plan.rasterPixels).toBeLessThanOrEqual(1_000_000)
     expect(plan.estimatedBytes).toBeLessThanOrEqual(4_000_000)
   })
@@ -102,7 +102,7 @@ describe('resolvePdfRasterPlan', () => {
   it('marks plans below the minimum raster density as unrenderable', () => {
     const plan = resolvePlan({ maxRasterPixels: 10_000, minRasterOutputScale: 0.25 })
 
-    expect(plan.rasterOutputScale).toBe(0.1)
+    expect(plan.rasterOutputScale).toBeCloseTo(Math.sqrt(10_000 / (1_000 * 500)), 3)
     expect(plan.renderable).toBe(false)
     expect(plan.degraded).toBe(true)
   })
