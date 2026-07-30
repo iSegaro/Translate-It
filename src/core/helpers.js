@@ -5,6 +5,7 @@ import { ErrorHandler } from "@/shared/error-management/ErrorHandler.js";
 import { ErrorTypes } from "@/shared/error-management/ErrorTypes.js";
 import { getScopedLogger } from "@/shared/logging/logger.js";
 import { LOG_COMPONENTS } from "@/shared/logging/logConstants.js";
+import { EXTENSION_APPS } from '@/shared/constants';
 const logger = getScopedLogger(LOG_COMPONENTS.CORE, "helpers");
 
 // Lazy loader for ErrorHandler to break circular dependency
@@ -93,6 +94,17 @@ export const openOptionsPage = (anchor = null) => {
     .catch((err) => {
       logger.error("Error sending openOptionsPage message:", err);
     });
+};
+
+export const openExtensionApp = (appName) => {
+  const app = EXTENSION_APPS[appName];
+  if (!app) {
+    throw new Error(`Unknown extension app: ${appName}`);
+  }
+  return browser.runtime.sendMessage({
+    action: MessageActions.FOCUS_OR_CREATE_TAB,
+    data: { urlPath: app.urlPath },
+  });
 };
 
 export const openOptionsPage_from_Background = (message) => {

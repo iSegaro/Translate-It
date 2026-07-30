@@ -9,3 +9,4 @@ export * from './detection.js';
 export * from './translation.js';
 export * from './tts.js';
 export * from './mobile.js';
+export * from './extensionApps.js';

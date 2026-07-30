@@ -152,7 +152,7 @@ import { TranslationMode } from '@/shared/config/config.js';
 import { findProviderById } from '@/features/translation/providers/ProviderManifest.js';
 import { MessageActions } from '@/shared/messaging/core/MessageActions.js';
 import { sendMessage } from '@/shared/messaging/core/UnifiedMessaging.js';
-import { useExtensionAPI } from '@/composables/core/useExtensionAPI.js';
+import { openExtensionApp } from '@/core/helpers.js';
 import browser from 'webextension-polyfill';
 
 // Icon URLs will be loaded at runtime
@@ -204,7 +204,6 @@ const { isSelectModeActive, activateSelectMode, deactivateSelectMode, isActivati
 const { isMouseHoverEnabled, toggleMouseHover } = useMouseHoverToggle()
 const { revertTranslation } = useSidepanelActions()
 const { handleError } = useErrorHandler()
-const { focusOrCreateTab } = useExtensionAPI()
 
 // Computed
 const isExtensionEnabledGlobal = computed(() => {
@@ -373,7 +372,7 @@ const handleSettingsClick = async () => {
 const handleSubtitleClick = async () => {
   getLogger().debug('Subtitle Translator button clicked!')
   try {
-    await focusOrCreateTab('src/html/subtitle.html')
+    await openExtensionApp('subtitle')
     showVisualFeedback(document.getElementById('subtitleBtn'), 'success')
   } catch (error) {
     getLogger().error('Failed to open subtitle page:', error)

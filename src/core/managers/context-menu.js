@@ -24,6 +24,7 @@ import ResourceTracker from '@/core/memory/ResourceTracker.js';
 import { storageManager } from '@/shared/storage/core/StorageCore.js';
 import ExtensionContextManager from '@/core/extensionContext.js';
 import { tabPermissionChecker } from '@/core/tabPermissions.js';
+import { openExtensionApp } from '@/core/helpers.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.CORE, 'context-menu');
 
@@ -833,7 +834,7 @@ export class ContextMenuManager extends ResourceTracker {
         }
 
         case ACTION_CONTEXT_MENU_SUBTITLE_ID:
-          await focusOrCreateTab(browser.runtime.getURL("src/html/subtitle.html"));
+          await openExtensionApp('subtitle');
           break;
 
         case ACTION_CONTEXT_MENU_OPTIONS_ID:

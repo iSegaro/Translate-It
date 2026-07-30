@@ -100,7 +100,7 @@ import { useUnifiedI18n } from '@/composables/shared/useUnifiedI18n.js'
 import { getScopedLogger } from '@/shared/logging/logger.js'
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js'
 import { REPO_URLS } from '@/shared/constants/core.js'
-import { useExtensionAPI } from '@/composables/core/useExtensionAPI.js'
+import { openExtensionApp } from '@/core/helpers.js'
 import ThemeSelector from './components/ThemeSelector.vue'
 import InterfaceLocaleSelector from './components/InterfaceLocaleSelector.vue'
 
@@ -109,7 +109,6 @@ const logger = getScopedLogger(LOG_COMPONENTS.UI, 'OptionsSidebar')
 
 // Composables
 const { t } = useUnifiedI18n()
-const { focusOrCreateTab } = useExtensionAPI()
 
 // State
 const sidebarError = ref('')
@@ -138,7 +137,7 @@ onMounted(async () => {
 
 const openSubtitlePage = async () => {
   try {
-    await focusOrCreateTab('src/html/subtitle.html')
+    await openExtensionApp('subtitle')
   } catch (error) {
     logger.error('Failed to open subtitle page:', error)
   }
