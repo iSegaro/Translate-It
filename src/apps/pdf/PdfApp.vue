@@ -783,49 +783,68 @@ function updateDocumentTitle() {
   document.title = normalizedFileName ? fileName : 'PDF Translator'
 }
 
-async function handleFileSelected(file) {
+function prepareDocumentReplacement() {
   detachDocument()
   invalidateDocumentOperations()
   documentLoadId.value += 1
   resetPresentationState()
+}
+
+function finalizeDocumentOpen() {
+  void attachDocument(session)
+}
+
+async function restoreViewerState() {
+  const pending = getPendingViewerState()
+  const isMatch = pending && pending.documentIdentity === session.documentIdentity
+  const restoredDocumentGeneration = session.documentGeneration
+
+  if (!isMatch) {
+    clearPendingViewerState()
+  }
+
+  if (isMatch) {
+    setContentView(pending.contentView)
+    await nextTick()
+    const layoutCommit = await waitForInitialLayoutCommit()
+    if (layoutCommit?.cancelled) return
+    if (session.documentGeneration !== restoredDocumentGeneration) return
+    navigateToPage(pending.currentPage)
+    clearPendingViewerState()
+  } else {
+    writeCurrentViewerState()
+  }
+}
+
+function updateBrowserState() {
+  updateDocumentTitle()
+}
+
+async function handleFileSelected(file) {
+  prepareDocumentReplacement()
   const loaded = await loadPdfFile(file, buildLayoutRequest())
   if (loaded) {
-    const pending = getPendingViewerState()
-    const isMatch = pending && pending.documentIdentity === session.documentIdentity
-    const restoredDocumentGeneration = session.documentGeneration
-
-    if (!isMatch) {
-      clearPendingViewerState()
-    }
-
     isDragOver.value = false
-    void attachDocument(session)
-
-    if (isMatch) {
-      setContentView(pending.contentView)
-      await nextTick()
-      const layoutCommit = await waitForInitialLayoutCommit()
-      if (layoutCommit?.cancelled) return false
-      if (session.documentGeneration !== restoredDocumentGeneration) return false
-      navigateToPage(pending.currentPage)
-      clearPendingViewerState()
-    }
-
-    if (!isMatch) {
-      writeCurrentViewerState()
-    }
+    finalizeDocumentOpen()
+    await restoreViewerState()
   }
-  updateDocumentTitle()
+  updateBrowserState()
   return loaded
 }
 
 async function handleOpenRemoteUrl(url) {
   isRemoteUrlLoading.value = true
   try {
+    if (hasDocument.value) {
+      prepareDocumentReplacement()
+    }
     const loaded = await openPdfUrl(url, buildLayoutRequest())
     if (loaded) {
       showRemoteUrlDialog.value = false
+      finalizeDocumentOpen()
+      await restoreViewerState()
     }
+    updateBrowserState()
   } finally {
     isRemoteUrlLoading.value = false
   }
@@ -1333,11 +1352,14 @@ onMounted(async () => {
   if (remoteUrl) {
     const loaded = await openPdfUrl(remoteUrl, buildLayoutRequest())
     if (loaded) {
+      finalizeDocumentOpen()
+      await restoreViewerState()
       const url = new URL(location.href)
       params.delete('remote')
       url.search = params.toString()
       history.replaceState(history.state, '', url.toString())
     }
+    updateBrowserState()
   }
 
   const mq = window.matchMedia('(prefers-color-scheme: dark)')
