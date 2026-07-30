@@ -681,40 +681,8 @@ describe('PdfToolbar', () => {
       return persistence.promise.then(() => {
         settingsStoreMock.settings[key] = value
         return true
-    })
-
-    it('closes language popover when More menu opens and does not reopen when More closes', async () => {
-      const wrapper = mount(PdfToolbar, {
-        props: {
-          fileName: 'doc.pdf',
-          pageCount: 12,
-          currentPageNumber: 1,
-          sourceLanguage: 'auto',
-          targetLanguage: 'fa',
-          canExport: true
-        }
       })
-      // Open language popover
-      await wrapper.find('.pdf-toolbar__button--menu-trigger').trigger('click')
-      const langItem = wrapper.findAll('.pdf-toolbar__export-item')
-        .find(item => item.text().includes('Language:'))
-      await langItem.trigger('click')
-      expect(wrapper.find('.pdf-toolbar__language-popover').exists()).toBe(true)
-
-      // Open More menu — language popover closes
-      await wrapper.find('.pdf-toolbar__button[aria-label="More actions"]').trigger('click')
-      expect(wrapper.find('.pdf-toolbar__language-popover').exists()).toBe(false)
-      expect(wrapper.find('.pdf-toolbar__export-menu').exists()).toBe(true)
-
-      // Close More menu by clicking outside
-      document.dispatchEvent(new PointerEvent('pointerdown'))
-      await flushPromises()
-      expect(wrapper.find('.pdf-toolbar__export-menu').exists()).toBe(false)
-
-      // Language popover stays closed
-      expect(wrapper.find('.pdf-toolbar__language-popover').exists()).toBe(false)
     })
-  })
 
     const wrapper = mount(PdfToolbar, {
       props: {
@@ -738,6 +706,38 @@ describe('PdfToolbar', () => {
 
     expect(settingsStoreMock.settings.MODE_PROVIDERS[TranslationMode.PDF]).toBe('deepl')
     expect(wrapper.emitted('translate-visible')).toHaveLength(1)
+  })
+
+  it('closes language popover when More menu opens and does not reopen when More closes', async () => {
+    const wrapper = mount(PdfToolbar, {
+      props: {
+        fileName: 'doc.pdf',
+        pageCount: 12,
+        currentPageNumber: 1,
+        sourceLanguage: 'auto',
+        targetLanguage: 'fa',
+        canExport: true
+      }
+    })
+    // Open language popover
+    await wrapper.find('.pdf-toolbar__button--menu-trigger').trigger('click')
+    const langItem = wrapper.findAll('.pdf-toolbar__export-item')
+      .find(item => item.text().includes('Language:'))
+    await langItem.trigger('click')
+    expect(wrapper.find('.pdf-toolbar__language-popover').exists()).toBe(true)
+
+    // Open More menu — language popover closes
+    await wrapper.find('.pdf-toolbar__button[aria-label="More actions"]').trigger('click')
+    expect(wrapper.find('.pdf-toolbar__language-popover').exists()).toBe(false)
+    expect(wrapper.find('.pdf-toolbar__export-menu').exists()).toBe(true)
+
+    // Close More menu by clicking outside
+    document.dispatchEvent(new PointerEvent('pointerdown'))
+    await flushPromises()
+    expect(wrapper.find('.pdf-toolbar__export-menu').exists()).toBe(false)
+
+    // Language popover stays closed
+    expect(wrapper.find('.pdf-toolbar__language-popover').exists()).toBe(false)
   })
 
   it('serializes rapid PDF provider changes so the latest selection persists and translates once', async () => {

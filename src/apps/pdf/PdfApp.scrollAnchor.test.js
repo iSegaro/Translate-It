@@ -21,12 +21,9 @@ let mockPdfExport
 let mockPdfNavigation
 
 let mockPdfOcr
-let mockPdfOcrOptions
 let mockRegionOcr
-let mockRegionOcrOptions
 let mockLayoutSyncFromPane
 let mockPdfViewport
-let mockPdfSession
 const mockRegionExecutionDispatch = vi.fn((request, runner) => runner(request))
 const openTranslationMock = vi.fn()
 const downloadFileMock = vi.hoisted(() => vi.fn())
@@ -64,25 +61,6 @@ const pageContentSourceMock = vi.hoisted(() => Object.freeze({
   NONE: 'none',
   MIXED: 'mixed'
 }))
-
-function createMockOperation(promise, cancel = vi.fn(), context = { target: 'ocr' }) {
-  return Object.freeze({
-    promise,
-    cancel,
-    context: Object.freeze(context)
-  })
-}
-
-function createDeferred() {
-  let resolve
-  let reject
-  const promise = new Promise((resolvePromise, rejectPromise) => {
-    resolve = resolvePromise
-    reject = rejectPromise
-  })
-
-  return { promise, resolve, reject }
-}
 
 vi.mock('./composables/usePdfViewerController.js', () => ({
   usePdfViewerController: () => mockViewerController
@@ -134,15 +112,13 @@ vi.mock('./presentation/domainEvents.js', async (importOriginal) => {
 })
 
 vi.mock('./composables/usePdfOcr.js', () => ({
-  usePdfOcr: (options) => {
-    mockPdfOcrOptions = options
+  usePdfOcr: () => {
     return mockPdfOcr
   }
 }))
 
 vi.mock('./composables/usePdfRegionOcr.js', () => ({
-  usePdfRegionOcr: (options) => {
-    mockRegionOcrOptions = options
+  usePdfRegionOcr: () => {
     return mockRegionOcr
   }
 }))
@@ -371,8 +347,6 @@ vi.mock('@/features/pdf-translation/core/PdfViewerStateUrlAdapter.js', () => ({
   writeViewerStateToUrl: (state) => mockWriteUrl(state),
 }))
 
-import { createViewerState } from '@/features/pdf-translation/core/PdfViewerState.js'
-
 const flushPromises = () => nextTick()
 const waitAnimationFrame = () => new Promise(resolve => requestAnimationFrame(resolve))
 
@@ -390,7 +364,6 @@ function createMocks({
     documentIdentity: 'loaded-doc-id',
     documentGeneration: 1,
   }
-  mockPdfSession = sessionMock
 
   mockViewerController = {
     error: ref(''),
@@ -511,7 +484,6 @@ function createMocks({
       mockViewerMode.selectedLayoutMode.value = selectedLayoutMode
       return mount(PdfApp)
     }
-    mockPdfOcrOptions = null
 
     async function emitToolbar(wrapper, eventName, value) {
       wrapper.findComponent({ name: 'PdfToolbar' }).vm.$emit(eventName, value)
