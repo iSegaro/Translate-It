@@ -1,3 +1,25 @@
+/**
+ * Builds a render-ready viewModel for the Region Comparison results body.
+ *
+ * @param {object} input
+ * @param {object} input.analysis - Comparison analysis from the presenter
+ * @param {Array} input.results - Per-candidate result objects
+ * @param {number} [input.totalElapsedMs] - Total elapsed time in ms
+ * @returns {RegionComparisonNotificationPayload}
+ *
+ * @typedef {object} RegionComparisonNotificationPayload
+ * @property {string|null} title - Winner description e.g. "Winner scale-1 (Lowest CER)"
+ * @property {Array<{label: string, value: string}>} summary - OCR output and confidence items
+ * @property {Array<{id: string, label: string}>} columns - Table column definitions
+ * @property {Array<{cells: Array<RowCell>}>} rows - Result rows
+ * @property {string|null} footer - Total runtime e.g. "Total 42ms"
+ *
+ * @typedef {object} RowCell
+ * @property {string} id - Column identifier
+ * @property {string} value - Cell display value
+ * @property {boolean} [code] - Render value in monospace
+ * @property {boolean} [numeric] - Align value numerically
+ */
 export function createRegionComparisonNotificationViewModel({ analysis, results, totalElapsedMs }) {
   const winnerCandidateId = analysis?.winnerCandidateId ?? null
 
