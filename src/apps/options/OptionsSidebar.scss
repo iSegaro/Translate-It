@@ -285,11 +285,14 @@
   }
 }
 
+$app-launcher-icon-size: 24px;
+$app-launcher-icon-column: 32px;
+
 a.app-link-section {
-  display: flex;
+  display: grid;
+  grid-template-columns: $app-launcher-icon-column 1fr;
   align-items: center;
-  justify-content: center;
-  gap: 8px;
+  column-gap: var(--spacing-sm);
   text-decoration: none;
   color: var(--color-text);
   font-weight: var(--font-weight-medium);
@@ -297,8 +300,9 @@ a.app-link-section {
   cursor: pointer;
   
   .app-link-icon {
-    width: 24px;
-    height: 24px;
+    justify-self: center;
+    width: $app-launcher-icon-size;
+    height: $app-launcher-icon-size;
     object-fit: contain;
     transition: transform var(--transition-base);
   }
