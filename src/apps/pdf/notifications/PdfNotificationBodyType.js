@@ -1,3 +1,4 @@
 export const PDF_NOTIFICATION_BODY_TYPE = Object.freeze({
-  REGION_COMPARISON_RESULTS: 'region-comparison-results'
+  REGION_COMPARISON_RESULTS: 'region-comparison-results',
+  MESSAGE: 'message'
 })

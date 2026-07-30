@@ -1,18 +1,28 @@
 import { createRegionComparisonNotificationViewModel } from '../../components/notifications/RegionComparisonNotificationMapper.js'
 import { PDF_NOTIFICATION_BODY_TYPE } from '../../notifications/PdfNotificationBodyType.js'
 
-function buildComparisonBody(comparison) {
-  if (!comparison) return undefined
-  return Object.freeze({
-    type: PDF_NOTIFICATION_BODY_TYPE.REGION_COMPARISON_RESULTS,
-    payload: Object.freeze(createRegionComparisonNotificationViewModel(comparison))
-  })
+function buildComparisonNotificationBody(notification, comparison) {
+  if (comparison) {
+    return Object.freeze({
+      type: PDF_NOTIFICATION_BODY_TYPE.REGION_COMPARISON_RESULTS,
+      payload: Object.freeze(createRegionComparisonNotificationViewModel(comparison))
+    })
+  }
+
+  if (notification?.message) {
+    return Object.freeze({
+      type: PDF_NOTIFICATION_BODY_TYPE.MESSAGE,
+      payload: Object.freeze({ message: notification.message })
+    })
+  }
+
+  return undefined
 }
 
 function buildNotification(notification, comparison) {
   return {
     ...notification,
-    body: buildComparisonBody(comparison)
+    body: buildComparisonNotificationBody(notification, comparison)
   }
 }
 
