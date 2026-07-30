@@ -282,14 +282,20 @@ vi.mock('./components/PdfViewerLayout.vue', () => ({
       }
 
       const exposed = {
-        syncFromPane: mockLayoutSyncFromPane
+        setScrollSyncSuppressed: vi.fn()
       }
       Object.defineProperties(exposed, {
+        syncFromPane: {
+          get: () => mockLayoutSyncFromPane,
+          configurable: true
+        },
         scrollContainer: {
-          get: () => props.showOriginalPane ? original : null
+          get: () => props.showOriginalPane ? original : null,
+          configurable: true
         },
         translatedPaneRef: {
-          get: () => props.showTranslatedPane ? translated : null
+          get: () => props.showTranslatedPane ? translated : null,
+          configurable: true
         }
       })
       expose(exposed)
