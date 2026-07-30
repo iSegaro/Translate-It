@@ -389,6 +389,7 @@ function createMocks({
     pdfFingerprint: ref('fingerprint'),
     workerLabel: ref('worker'),
     currentFile: ref(null),
+    fileSize: ref(0),
     session: sessionAsRef ? ref(sessionMock) : sessionMock,
     loadPdfFile: vi.fn().mockResolvedValue(true),
     recomputeLayout: vi.fn().mockResolvedValue(undefined),

@@ -3,6 +3,8 @@ import { getScopedLogger } from '@/shared/logging/logger.js'
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js'
 import { TranslationMode, getProviderOptimizationLevelAsync, getEffectiveProviderAsync } from '@/shared/config/config.js'
 import { AUTO_DETECT_VALUE, DEFAULT_TARGET_LANGUAGE } from '@/shared/constants/core.js'
+import { pdfSourceFromFile } from '@/apps/pdf/core/PdfSource.js'
+import { PdfLoader } from '@/apps/pdf/core/PdfLoader.js'
 import { pdfDocumentSession } from '@/features/pdf-translation/core/PdfDocumentSession.js'
 import { PdfTranslationCoordinator } from '@/features/pdf-translation/core/PdfTranslationCoordinator.js'
 import { getPdfTranslationFailureReason } from '@/features/pdf-translation/core/PdfTranslationAdapter.js'
@@ -26,6 +28,7 @@ async function buildTranslationSettings({ provider, sourceLanguage, targetLangua
 
 export function usePdfViewerController() {
   const currentFile = ref(null)
+  const fileSize = ref(0)
   const isLoading = ref(false)
   const error = ref('')
   const fileName = ref('')
@@ -247,6 +250,7 @@ export function usePdfViewerController() {
 
   function resetLoadedDocument() {
     currentFile.value = null
+    fileSize.value = 0
     fileName.value = ''
     pageCount.value = 0
     workerLabel.value = ''
@@ -269,7 +273,7 @@ export function usePdfViewerController() {
   async function loadPdfFile(file, layoutRequest) {
     if (!file) return false
 
-    if (file.type !== 'application/pdf' && !file.name?.toLowerCase().endsWith('.pdf')) {
+    if (!file.name?.toLowerCase().endsWith('.pdf') && file.type !== 'application/pdf') {
       error.value = 'Please choose a valid PDF file.'
       return false
     }
@@ -279,9 +283,14 @@ export function usePdfViewerController() {
       error.value = ''
       await pdfTranslationCoordinator.cancelActiveTranslation('document-replaced')
       resetLoadedDocument()
-      currentFile.value = file
 
-      const nextState = await pdfDocumentSession.openFile(file, layoutRequest)
+      const source = pdfSourceFromFile(file)
+      const { name, buffer } = await PdfLoader.load(source)
+      const size = file.size ?? 0
+      currentFile.value = { name, size }
+      fileSize.value = size
+
+      const nextState = await pdfDocumentSession.openFile({ name, buffer }, layoutRequest)
       applySessionState(nextState)
 
       pdfHistoryManager.updateAfterOpen(pdfDocumentSession).catch(() => {})
@@ -290,6 +299,7 @@ export function usePdfViewerController() {
     } catch (loadError) {
       logger.error('Failed to open PDF file:', loadError)
       currentFile.value = null
+      fileSize.value = 0
       error.value = loadError?.message || 'Failed to open the PDF file.'
       await pdfDocumentSession.cleanupDocument()
       return false
@@ -402,6 +412,7 @@ export function usePdfViewerController() {
 
   return {
     currentFile,
+    fileSize,
     error,
     fileName,
     hasDocument,

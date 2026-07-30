@@ -301,7 +301,7 @@ const {
   translatedPageData,
   translationTick,
   pdfFingerprint,
-  currentFile,
+  fileSize,
   session,
   pdfSourceLanguage,
   pdfTargetLanguage,
@@ -320,7 +320,7 @@ const showPdfInfo = ref(false)
 const { rows: pdfInfoRows } = usePdfDocumentInfo(computed(() => ({
   fileName: fileName.value,
   pageCount: pageCount.value,
-  fileSize: currentFile.value?.size ?? 0,
+  fileSize: fileSize.value,
   pageMetrics: pageMetrics.value,
   pdfFingerprint: session.pdfFingerprint,
   documentMetadata: session.documentMetadata,

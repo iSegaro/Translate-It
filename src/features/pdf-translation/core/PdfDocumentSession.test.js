@@ -5,7 +5,7 @@ import { OCR_ENGINE_VERSION, isCompatibleCachedOcrEntry } from './PdfOcrCompatib
 vi.mock('./pdfjs.js', () => ({
   ensurePdfJsConfigured: vi.fn(() => ({})),
   getPdfWorkerUrl: vi.fn(() => 'blob:worker-url'),
-  loadPdfDocumentFromFile: vi.fn()
+  loadPdfDocumentFromBuffer: vi.fn()
 }))
 
 vi.mock('./PdfTextLayerRenderer.js', () => ({
@@ -20,7 +20,7 @@ vi.mock('./PdfCacheManager.js', () => ({
 
 const { PdfDocumentSession, PAGE_CONTENT_SOURCE } = await import('./PdfDocumentSession.js')
 const { PdfBitmapCache } = await import('./PdfBitmapCache.js')
-const { loadPdfDocumentFromFile } = await import('./pdfjs.js')
+const { loadPdfDocumentFromBuffer } = await import('./pdfjs.js')
 const { pdfCacheManager } = await import('./PdfCacheManager.js')
 
 describe('PdfDocumentSession', () => {
@@ -30,7 +30,7 @@ describe('PdfDocumentSession', () => {
 
   beforeEach(() => {
     pdfCacheManager.loadDocument.mockReset().mockResolvedValue({ translations: {}, ocr: {} })
-    loadPdfDocumentFromFile.mockReset()
+    loadPdfDocumentFromBuffer.mockReset()
     session = new PdfDocumentSession()
     loadingTask = {
       destroy: vi.fn().mockResolvedValue(undefined)
@@ -842,14 +842,14 @@ describe('PdfDocumentSession', () => {
 
   it('starts one cache load when a document lifecycle opens', async () => {
     pdfDocument.fingerprint = 'doc-fingerprint'
-    loadPdfDocumentFromFile.mockResolvedValue({
+    loadPdfDocumentFromBuffer.mockResolvedValue({
       document: pdfDocument,
       loadingTask,
       objectUrl: 'blob:next-pdf'
     })
     pdfCacheManager.loadDocument.mockResolvedValue({ translations: {}, ocr: {} })
 
-    await session.openFile({ type: 'application/pdf', name: 'doc.pdf' }, 800)
+    await session.openFile({ name: 'doc.pdf', buffer: new ArrayBuffer(8) }, 800)
 
     expect(pdfCacheManager.loadDocument).toHaveBeenCalledTimes(1)
     expect(pdfCacheManager.loadDocument).toHaveBeenCalledWith(session.documentIdentity)

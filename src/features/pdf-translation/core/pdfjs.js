@@ -34,9 +34,10 @@ export function getPdfWorkerUrl() {
   return pdfWorkerUrl
 }
 
-export async function loadPdfDocumentFromFile(file) {
+export async function loadPdfDocumentFromBuffer({ buffer }) {
   const pdfjs = ensurePdfJsConfigured()
-  const objectUrl = URL.createObjectURL(file)
+  const blob = new Blob([buffer], { type: 'application/pdf' })
+  const objectUrl = URL.createObjectURL(blob)
 
   try {
     const pdfVerbosity = isGlobalDebugModeEnabled()

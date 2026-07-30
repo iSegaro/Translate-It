@@ -356,7 +356,7 @@ describe('usePdfViewerController cache persistence', () => {
     openFileMock.mockResolvedValue(createOpenState())
 
     const controller = usePdfViewerController()
-    await controller.loadPdfFile({ type: 'application/pdf', name: 'doc.pdf' }, 800)
+    await controller.loadPdfFile({ type: 'application/pdf', name: 'doc.pdf', arrayBuffer: vi.fn().mockResolvedValue(new ArrayBuffer(8)) }, 800)
 
     expect(session.setPageOcrBlocks).not.toHaveBeenCalled()
   })
@@ -418,7 +418,7 @@ describe('usePdfViewerController cache persistence', () => {
       zoomPercent: 100
     })
 
-    expect(openFileMock).toHaveBeenCalledWith(file, {
+    expect(openFileMock).toHaveBeenCalledWith({ name: 'doc.pdf', buffer: expect.any(ArrayBuffer) }, {
       width: 800,
       height: 600,
       zoomMode: 'fit-page',
@@ -507,7 +507,7 @@ describe('usePdfViewerController cache persistence', () => {
     })
 
     const controller = usePdfViewerController()
-    await controller.loadPdfFile({ type: 'application/pdf', name: 'doc.pdf' }, 800)
+    await controller.loadPdfFile({ type: 'application/pdf', name: 'doc.pdf', arrayBuffer: vi.fn().mockResolvedValue(new ArrayBuffer(8)) }, 800)
 
     expect(controller.translatedPageData.value[0].blocks).toHaveLength(0)
 
@@ -535,7 +535,7 @@ describe('usePdfViewerController cache persistence', () => {
     })
 
     const controller = usePdfViewerController()
-    await controller.loadPdfFile({ type: 'application/pdf', name: 'doc.pdf' }, 800)
+    await controller.loadPdfFile({ type: 'application/pdf', name: 'doc.pdf', arrayBuffer: vi.fn().mockResolvedValue(new ArrayBuffer(8)) }, 800)
     const originalPageData = controller.translatedPageData.value
     const unaffectedPage = originalPageData.find((page) => page.pageNumber === 2)
 

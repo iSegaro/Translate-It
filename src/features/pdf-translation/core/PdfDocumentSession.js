@@ -1,7 +1,7 @@
 import ResourceTracker from '@/core/memory/ResourceTracker.js'
 import { getScopedLogger } from '@/shared/logging/logger.js'
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js'
-import { ensurePdfJsConfigured, getPdfWorkerUrl, loadPdfDocumentFromFile } from './pdfjs.js'
+import { ensurePdfJsConfigured, getPdfWorkerUrl, loadPdfDocumentFromBuffer } from './pdfjs.js'
 import { PdfRenderer, PDF_RENDER_RESULT_STATUS, createPdfRenderResult } from './PdfRenderer.js'
 import { PdfBitmapCache } from './PdfBitmapCache.js'
 import { sha256HexFromArrayBuffer } from './PdfBlockIdentity.js'
@@ -309,14 +309,14 @@ export class PdfDocumentSession extends ResourceTracker {
     }
   }
 
-  async openFile(file, layoutRequest) {
-    if (!file) throw new Error('No PDF file provided')
+  async openFile({ name, buffer }, layoutRequest) {
+    if (!buffer) throw new Error('No PDF buffer provided')
 
     await this.cleanupDocument()
     ensurePdfJsConfigured()
 
-    this.fileName = file.name || 'document.pdf'
-    const { document, loadingTask, objectUrl } = await loadPdfDocumentFromFile(file)
+    this.fileName = name || 'document.pdf'
+    const { document, loadingTask, objectUrl } = await loadPdfDocumentFromBuffer({ buffer })
 
     this.loadingTask = loadingTask
     this.pdfDocument = document
@@ -341,7 +341,7 @@ export class PdfDocumentSession extends ResourceTracker {
       logger.debug('Failed to read PDF metadata', error)
       this.displayName = this.fileName
     }
-    this.documentIdentity = await this._resolveDocumentIdentity(file, document)
+    this.documentIdentity = await this._resolveDocumentIdentity(buffer, document)
     this._startDocumentCacheLoad(this.documentIdentity, this._documentGeneration)
     this._pageContentRepository.reset()
     this.resetTranslationStates()
@@ -359,14 +359,13 @@ export class PdfDocumentSession extends ResourceTracker {
     return this.getState()
   }
 
-  async _resolveDocumentIdentity(file, document) {
+  async _resolveDocumentIdentity(buffer, document) {
     if (document?.fingerprint) {
       return document.fingerprint
     }
 
     try {
-      const fileBytes = await file.arrayBuffer()
-      const fileHash = await sha256HexFromArrayBuffer(fileBytes)
+      const fileHash = await sha256HexFromArrayBuffer(buffer)
       if (fileHash) {
         return fileHash
       }

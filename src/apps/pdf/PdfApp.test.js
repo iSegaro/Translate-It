@@ -441,6 +441,7 @@ function createMocks({
     pdfFingerprint: ref('fingerprint'),
     workerLabel: ref('worker'),
     currentFile: ref(null),
+    fileSize: ref(0),
     session: sessionAsRef ? ref(sessionMock) : sessionMock,
     loadPdfFile: vi.fn().mockResolvedValue(true),
     recomputeLayout: vi.fn().mockResolvedValue(undefined),
@@ -1981,7 +1982,7 @@ describe('PdfApp', () => {
     expect(showOpenFilePicker).toHaveBeenCalledWith(expect.objectContaining({ multiple: false }))
     expect(getFile).toHaveBeenCalledOnce()
     expect(browserTabStateMock.write).toHaveBeenCalledWith({ fileHandle: expect.objectContaining({ getFile }) })
-    expect(mockViewerController.loadPdfFile).toHaveBeenCalledWith(file, expect.any(Object))
+    expect(mockViewerController.loadPdfFile).toHaveBeenCalledWith(expect.objectContaining({ name: 'chromium.pdf' }), expect.any(Object))
     expect(inputClick).not.toHaveBeenCalled()
   })
 
@@ -2043,7 +2044,7 @@ describe('PdfApp', () => {
     expect(showOpenFilePicker).toHaveBeenNthCalledWith(1, expect.objectContaining({ startIn: storedHandle }))
     expect(showOpenFilePicker).toHaveBeenNthCalledWith(2, expect.not.objectContaining({ startIn: expect.anything() }))
     expect(pdfAppLoggerMock.warn).toHaveBeenCalledWith('Failed to open PDF picker with stored location.', expect.any(DOMException))
-    expect(mockViewerController.loadPdfFile).toHaveBeenCalledWith(file, expect.any(Object))
+    expect(mockViewerController.loadPdfFile).toHaveBeenCalledWith(expect.objectContaining({ name: 'retry.pdf' }), expect.any(Object))
   })
 
   it('falls back to hidden input when Chromium picker fails', async () => {
@@ -2080,7 +2081,7 @@ describe('PdfApp', () => {
     await flushPromises()
     await flushPromises()
 
-    expect(mockViewerController.loadPdfFile).toHaveBeenCalledWith(file, expect.any(Object))
+    expect(mockViewerController.loadPdfFile).toHaveBeenCalledWith(expect.objectContaining({ name: 'sample.pdf' }), expect.any(Object))
     expect(fileInput.element.value).toBe('')
   })
 
