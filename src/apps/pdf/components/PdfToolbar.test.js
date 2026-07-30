@@ -363,6 +363,9 @@ describe('PdfToolbar', () => {
       }
     })
 
+    const toggleExportSubmenu = () =>
+      wrapper.find('.pdf-toolbar__export-item--submenu-trigger').trigger('click')
+
     const toolbarButtons = () => wrapper.findAll('.pdf-toolbar__actions button')
 
     expect(toolbarButtons().some((button) => button.text().includes('Open PDF'))).toBe(false)
@@ -375,23 +378,29 @@ describe('PdfToolbar', () => {
     expect(wrapper.find('.pdf-toolbar__export-menu').exists()).toBe(true)
     expect(wrapper.find('.pdf-toolbar__export-menu').text()).toContain('Open PDF')
     expect(wrapper.find('.pdf-toolbar__export-menu').text()).not.toContain('Clear Cache')
-    expect(wrapper.find('.pdf-toolbar__export-menu').text()).toContain('Export TXT')
-    expect(wrapper.find('.pdf-toolbar__export-menu').text()).toContain('Export Markdown')
-    expect(wrapper.find('.pdf-toolbar__export-menu').text()).toContain('Export HTML')
+    await toggleExportSubmenu()
+    const menu = wrapper.find('.pdf-toolbar__export-menu')
+    expect(menu.text()).toContain('Export TXT')
+    expect(menu.text()).toContain('Export Markdown')
+    expect(menu.text()).toContain('Export HTML')
 
-    await wrapper.find('.pdf-toolbar__export-menu button').trigger('click')
+    await toggleExportSubmenu()
+    await wrapper.findAll('.pdf-toolbar__export-menu .pdf-toolbar__export-item').find(b => b.text().includes('Open PDF')).trigger('click')
     expect(wrapper.emitted('request-open-pdf')).toHaveLength(1)
 
     // Export items inside hamburger menu — no standalone export button
     await wrapper.find('.pdf-toolbar__button[aria-label="More actions"]').trigger('click')
+    await toggleExportSubmenu()
     await wrapper.findAll('button').find((button) => button.text().includes('Export TXT'))?.trigger('click')
     expect(wrapper.emitted('export-txt')).toBeTruthy()
 
     await wrapper.find('.pdf-toolbar__button[aria-label="More actions"]').trigger('click')
+    await toggleExportSubmenu()
     await wrapper.findAll('button').find((button) => button.text().includes('Export Markdown'))?.trigger('click')
     expect(wrapper.emitted('export-markdown')).toBeTruthy()
 
     await wrapper.find('.pdf-toolbar__button[aria-label="More actions"]').trigger('click')
+    await toggleExportSubmenu()
     await wrapper.findAll('button').find((button) => button.text().includes('Export HTML'))?.trigger('click')
     expect(wrapper.emitted('export-html')).toBeTruthy()
 
@@ -672,8 +681,40 @@ describe('PdfToolbar', () => {
       return persistence.promise.then(() => {
         settingsStoreMock.settings[key] = value
         return true
-      })
     })
+
+    it('closes language popover when More menu opens and does not reopen when More closes', async () => {
+      const wrapper = mount(PdfToolbar, {
+        props: {
+          fileName: 'doc.pdf',
+          pageCount: 12,
+          currentPageNumber: 1,
+          sourceLanguage: 'auto',
+          targetLanguage: 'fa',
+          canExport: true
+        }
+      })
+      // Open language popover
+      await wrapper.find('.pdf-toolbar__button--menu-trigger').trigger('click')
+      const langItem = wrapper.findAll('.pdf-toolbar__export-item')
+        .find(item => item.text().includes('Language:'))
+      await langItem.trigger('click')
+      expect(wrapper.find('.pdf-toolbar__language-popover').exists()).toBe(true)
+
+      // Open More menu — language popover closes
+      await wrapper.find('.pdf-toolbar__button[aria-label="More actions"]').trigger('click')
+      expect(wrapper.find('.pdf-toolbar__language-popover').exists()).toBe(false)
+      expect(wrapper.find('.pdf-toolbar__export-menu').exists()).toBe(true)
+
+      // Close More menu by clicking outside
+      document.dispatchEvent(new PointerEvent('pointerdown'))
+      await flushPromises()
+      expect(wrapper.find('.pdf-toolbar__export-menu').exists()).toBe(false)
+
+      // Language popover stays closed
+      expect(wrapper.find('.pdf-toolbar__language-popover').exists()).toBe(false)
+    })
+  })
 
     const wrapper = mount(PdfToolbar, {
       props: {

@@ -399,6 +399,7 @@
             @open-settings="emit('open-settings')"
             @request-document-info="emit('request-document-info')"
             @open-language-settings="handleOpenLanguageSettings"
+            @open="closeMenus"
           />
           <PdfTranslationSettingsPopover
             v-if="activeMenu === 'language'"

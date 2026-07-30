@@ -3,7 +3,7 @@
     ref="moreMenuRef"
     class="pdf-toolbar__more-menu"
     variant="dark"
-    @open="closeMenus"
+    @open="onToolbarMenuOpen"
   >
     <template #trigger="{ triggerAttrs, triggerRef, onToggle }">
       <button
@@ -179,7 +179,8 @@ const emit = defineEmits([
   'clear-cache',
   'open-settings',
   'request-document-info',
-  'open-language-settings'
+  'open-language-settings',
+  'open'
 ])
 
 const moreMenuRef = ref(null)
@@ -208,6 +209,11 @@ const flyoutStyle = computed(() => {
 
 function closeMenus() {
   isExportSubmenuOpen.value = false
+}
+
+function onToolbarMenuOpen() {
+  closeMenus()
+  emit('open')
 }
 
 function handleOpenLanguageSettings() {
