@@ -152,7 +152,7 @@ export function useExtensionAPI() {
 
   const focusOrCreateTab = async (urlPath) => {
     try {
-      return await sendMessage(MessageActions.FOCUS_OR_CREATE_TAB, { urlPath });
+      return await sendMessage(MessageActions.LAUNCH_EXTENSION_APP, { urlPath });
     } catch (error) {
       logger.error(`Failed to focus or create tab for ${urlPath}:`, error);
       throw error;

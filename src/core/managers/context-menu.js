@@ -230,7 +230,7 @@ async function focusOrCreateTab(url) {
   try {
     const backgroundService = globalThis.backgroundService;
     if (backgroundService && backgroundService.messageHandler) {
-      const handler = backgroundService.messageHandler.getHandlerForMessage(MessageActions.FOCUS_OR_CREATE_TAB);
+      const handler = backgroundService.messageHandler.getHandlerForMessage(MessageActions.LAUNCH_EXTENSION_APP);
       if (handler) {
         // Extract just the relative path (e.g. "src/html/subtitle.html")
         let urlPath = "";
@@ -241,7 +241,7 @@ async function focusOrCreateTab(url) {
         }
         
         await handler({
-          action: MessageActions.FOCUS_OR_CREATE_TAB,
+          action: MessageActions.LAUNCH_EXTENSION_APP,
           data: { urlPath }
         }, { tab: null }, () => {});
         return;
@@ -258,7 +258,7 @@ async function focusOrCreateTab(url) {
     }
     
     await browser.runtime.sendMessage({
-      action: MessageActions.FOCUS_OR_CREATE_TAB,
+      action: MessageActions.LAUNCH_EXTENSION_APP,
       data: { urlPath }
     });
   } catch (error) {

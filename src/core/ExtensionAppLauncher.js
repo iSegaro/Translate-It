@@ -19,22 +19,25 @@ export function openExtensionApp(appName) {
   const backgroundService = globalThis.backgroundService;
   if (backgroundService?.messageHandler) {
     const handler = backgroundService.messageHandler.getHandlerForMessage(
-      MessageActions.FOCUS_OR_CREATE_TAB,
+      MessageActions.LAUNCH_EXTENSION_APP,
     );
     if (!handler) {
       throw new Error(
-        `Background handler not found for action: ${MessageActions.FOCUS_OR_CREATE_TAB}`,
+        `Background handler not found for action: ${MessageActions.LAUNCH_EXTENSION_APP}`,
       );
     }
     return handler(
-      { action: MessageActions.FOCUS_OR_CREATE_TAB, data: { urlPath: app.urlPath } },
+      {
+        action: MessageActions.LAUNCH_EXTENSION_APP,
+        data: { urlPath: app.urlPath, launchPolicy: app.launchPolicy },
+      },
       { tab: null },
       () => {},
     );
   }
 
   return browser.runtime.sendMessage({
-    action: MessageActions.FOCUS_OR_CREATE_TAB,
-    data: { urlPath: app.urlPath },
+    action: MessageActions.LAUNCH_EXTENSION_APP,
+    data: { urlPath: app.urlPath, launchPolicy: app.launchPolicy },
   });
 }
