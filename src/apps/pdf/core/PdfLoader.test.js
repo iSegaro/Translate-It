@@ -35,6 +35,7 @@ describe('PdfLoader', () => {
     it('fetches a URL and returns { name, buffer }', async () => {
       const buffer = new Uint8Array([1, 2, 3]).buffer;
       vi.spyOn(globalThis, 'fetch').mockResolvedValue({
+        ok: true,
         arrayBuffer: () => Promise.resolve(buffer),
       });
 
@@ -49,12 +50,52 @@ describe('PdfLoader', () => {
       vi.useFakeTimers();
       const clearTimeoutSpy = vi.spyOn(globalThis, 'clearTimeout');
       vi.spyOn(globalThis, 'fetch').mockResolvedValue({
+        ok: true,
         arrayBuffer: () => Promise.resolve(new ArrayBuffer(3)),
       });
 
       await PdfLoader.load(pdfSourceFromUrl('https://example.com/doc.pdf'));
 
       expect(clearTimeoutSpy).toHaveBeenCalledOnce();
+    });
+
+    it('rejects a 404 response without reading its body', async () => {
+      const arrayBuffer = vi.fn();
+      vi.spyOn(globalThis, 'fetch').mockResolvedValue({
+        ok: false,
+        status: 404,
+        statusText: 'Not Found',
+        url: 'https://example.com/missing.pdf',
+        arrayBuffer,
+      });
+
+      await expect(PdfLoader.load(pdfSourceFromUrl('https://example.com/doc.pdf')))
+        .rejects.toMatchObject({
+          name: 'PdfHttpError',
+          status: 404,
+          statusText: 'Not Found',
+          url: 'https://example.com/missing.pdf',
+        });
+      expect(arrayBuffer).not.toHaveBeenCalled();
+    });
+
+    it('rejects a 500 response without reading its body', async () => {
+      const arrayBuffer = vi.fn();
+      vi.spyOn(globalThis, 'fetch').mockResolvedValue({
+        ok: false,
+        status: 500,
+        statusText: 'Internal Server Error',
+        url: 'https://example.com/doc.pdf',
+        arrayBuffer,
+      });
+
+      await expect(PdfLoader.load(pdfSourceFromUrl('https://example.com/doc.pdf')))
+        .rejects.toMatchObject({
+          name: 'PdfHttpError',
+          status: 500,
+          statusText: 'Internal Server Error',
+        });
+      expect(arrayBuffer).not.toHaveBeenCalled();
     });
 
     it('propagates fetch errors', async () => {

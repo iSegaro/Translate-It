@@ -23,6 +23,14 @@ export const PdfLoader = {
 
       try {
         const response = await fetch(source.url, { signal: controller.signal })
+        if (response.ok === false) {
+          const error = new Error(`Failed to fetch PDF: ${response.status} ${response.statusText}`)
+          error.name = 'PdfHttpError'
+          error.status = response.status
+          error.statusText = response.statusText
+          error.url = response.url || source.url
+          throw error
+        }
         const buffer = await response.arrayBuffer()
         return { name: 'document.pdf', buffer }
       } finally {
