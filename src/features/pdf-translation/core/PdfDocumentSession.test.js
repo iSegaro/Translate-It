@@ -1308,6 +1308,23 @@ describe('PdfDocumentSession', () => {
       expect(cacheSession._bitmapCache.size).toBe(1)
 
       mockRenderer.renderPage.mockClear()
+      const secondBitmap = { width: 800, height: 1000, close: vi.fn() }
+      mockRenderer.renderPage.mockImplementationOnce(() =>
+        Promise.resolve({
+          status: 'success',
+          bitmap: secondBitmap,
+          raster: {
+            logicalWidth: 800,
+            logicalHeight: 1000,
+            backingWidth: 800,
+            backingHeight: 1000,
+            rasterScaleX: 1,
+            rasterScaleY: 1,
+            degraded: false,
+            renderable: true
+          }
+        })
+      )
       cacheSession.pageMetrics = [
         { pageNumber: 1, width: 800, height: 1000, scale: 2, viewport: { width: 800, height: 1000 } }
       ]
