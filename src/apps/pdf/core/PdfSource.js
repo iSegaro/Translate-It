@@ -5,3 +5,7 @@
 export function pdfSourceFromFile(file) {
   return { type: 'file', file };
 }
+
+export function pdfSourceFromUrl(url) {
+  return { type: 'url', url };
+}
