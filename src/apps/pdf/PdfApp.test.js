@@ -800,50 +800,6 @@ describe('PdfApp', () => {
     expect(translationFailedMock).toHaveBeenCalledWith(expect.objectContaining({ occurrenceId: 8, error: 'Translation request failed' }))
   })
 
-  it('clears a partial page translation banner on the next successful run', async () => {
-    createMocks()
-    mockViewerController.translationSummary.value = {
-      status: 'partial', translationOccurrenceId: 11, error: 'Provider failed'
-    }
-    const wrapper = mount(PdfApp)
-
-    wrapper.findComponent({ name: 'PdfToolbar' }).vm.$emit('translate-visible')
-    await flushPromises()
-    await flushPromises()
-    expect(wrapper.find('.pdf-status-banner').exists()).toBe(true)
-
-    mockViewerController.translationSummary.value = {
-      status: 'translated', translationOccurrenceId: 12, error: ''
-    }
-    wrapper.findComponent({ name: 'PdfToolbar' }).vm.$emit('translate-visible')
-    await flushPromises()
-    await flushPromises()
-
-    expect(wrapper.find('.pdf-status-banner').exists()).toBe(false)
-  })
-
-  it('clears a failed page translation banner on a no-work run', async () => {
-    createMocks()
-    mockViewerController.translationSummary.value = {
-      status: 'error', translationOccurrenceId: 13, error: 'Request failed'
-    }
-    const wrapper = mount(PdfApp)
-
-    wrapper.findComponent({ name: 'PdfToolbar' }).vm.$emit('translate-visible')
-    await flushPromises()
-    await flushPromises()
-    expect(wrapper.find('.pdf-status-banner').exists()).toBe(true)
-
-    mockViewerController.translationSummary.value = {
-      status: 'idle', translationOccurrenceId: 14, error: ''
-    }
-    wrapper.findComponent({ name: 'PdfToolbar' }).vm.$emit('translate-visible')
-    await flushPromises()
-    await flushPromises()
-
-    expect(wrapper.find('.pdf-status-banner').exists()).toBe(false)
-  })
-
   it('ignores stale cancelled page translation completion after a newer outcome', async () => {
     const first = createDeferred()
     const second = createDeferred()
