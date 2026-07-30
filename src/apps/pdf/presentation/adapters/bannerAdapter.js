@@ -51,7 +51,6 @@ export function createBannerAdapter() {
       || a.variant !== b.variant
       || a.title !== b.title
       || a.message !== b.message
-      || a.body !== b.body
   }
 
   function dispatch(intent) {
