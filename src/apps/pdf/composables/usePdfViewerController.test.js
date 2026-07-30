@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { sha256HexFromText } from '@/features/pdf-translation/core/PdfBlockIdentity.js'
 import { AUTO_DETECT_VALUE, DEFAULT_TARGET_LANGUAGE } from '@/shared/constants/core.js'
 
@@ -985,6 +985,11 @@ describe('clearDocumentCache', () => {
 })
 
 describe('openPdfUrl', () => {
+  afterEach(() => {
+    vi.useRealTimers()
+    vi.restoreAllMocks()
+  })
+
   it('fetches a URL and opens the document in the session', async () => {
     const buffer = new ArrayBuffer(8)
     vi.spyOn(globalThis, 'fetch').mockResolvedValue({
@@ -1020,5 +1025,57 @@ describe('openPdfUrl', () => {
     const result = await controller.openPdfUrl('', 800)
 
     expect(result).toBe(false)
+  })
+
+  it('returns false, sets error, resets loading, and cleans up after timeout', async () => {
+    vi.useFakeTimers()
+    cleanupDocumentMock.mockReset().mockResolvedValue()
+    vi.spyOn(globalThis, 'fetch').mockImplementation((_url, { signal }) => new Promise((_, reject) => {
+      signal.addEventListener('abort', () => reject(signal.reason))
+    }))
+    const controller = usePdfViewerController()
+
+    const load = controller.openPdfUrl('https://example.com/doc.pdf', 800)
+    await vi.advanceTimersByTimeAsync(30_000)
+
+    await expect(load).resolves.toBe(false)
+    expect(controller.error.value).toBe('Remote PDF load timed out.')
+    expect(controller.isLoading.value).toBe(false)
+    expect(cleanupDocumentMock).toHaveBeenCalledOnce()
+  })
+
+  it('returns false when timeout cleanup fails', async () => {
+    vi.useFakeTimers()
+    cleanupDocumentMock.mockReset().mockRejectedValueOnce(new Error('Cleanup failed'))
+    vi.spyOn(globalThis, 'fetch').mockImplementation((_url, { signal }) => new Promise((_, reject) => {
+      signal.addEventListener('abort', () => reject(signal.reason))
+    }))
+    const controller = usePdfViewerController()
+
+    const load = controller.openPdfUrl('https://example.com/doc.pdf', 800)
+    await vi.advanceTimersByTimeAsync(30_000)
+
+    await expect(load).resolves.toBe(false)
+    expect(cleanupDocumentMock).toHaveBeenCalledOnce()
+  })
+
+  it('opens successfully after a timeout', async () => {
+    vi.useFakeTimers()
+    cleanupDocumentMock.mockReset().mockResolvedValue()
+    vi.spyOn(globalThis, 'fetch')
+      .mockImplementationOnce((_url, { signal }) => new Promise((_, reject) => {
+        signal.addEventListener('abort', () => reject(signal.reason))
+      }))
+      .mockResolvedValueOnce({ arrayBuffer: () => Promise.resolve(new ArrayBuffer(8)) })
+    openFileMock.mockReset().mockResolvedValue(createOpenState())
+    const controller = usePdfViewerController()
+
+    const timedOutLoad = controller.openPdfUrl('https://example.com/timeout.pdf', 800)
+    await vi.advanceTimersByTimeAsync(30_000)
+
+    await expect(timedOutLoad).resolves.toBe(false)
+    await expect(controller.openPdfUrl('https://example.com/retry.pdf', 800)).resolves.toBe(true)
+    expect(controller.error.value).toBe('')
+    expect(controller.isLoading.value).toBe(false)
   })
 })

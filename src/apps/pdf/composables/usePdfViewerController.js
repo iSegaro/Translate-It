@@ -292,7 +292,11 @@ export function usePdfViewerController() {
       currentFile.value = null
       fileSize.value = 0
       error.value = loadError?.message || `Failed to open the PDF ${context}.`
-      await pdfDocumentSession.cleanupDocument()
+      try {
+        await pdfDocumentSession.cleanupDocument()
+      } catch (cleanupError) {
+        logger.error(`Failed to clean up PDF ${context}:`, cleanupError)
+      }
       return false
     } finally {
       isLoading.value = false

@@ -4,7 +4,9 @@ import { pdfSourceFromFile, pdfSourceFromUrl } from './PdfSource.js';
 
 describe('PdfLoader', () => {
   afterEach(() => {
+    vi.useRealTimers();
     vi.restoreAllMocks();
+    vi.unstubAllGlobals();
   });
 
   describe('file source', () => {
@@ -26,6 +28,7 @@ describe('PdfLoader', () => {
 
       expect(result.name).toBe('document.pdf');
     });
+
   });
 
   describe('url source', () => {
@@ -42,11 +45,46 @@ describe('PdfLoader', () => {
       expect(result.buffer.byteLength).toBe(3);
     });
 
+    it('clears the timeout after a successful fetch', async () => {
+      vi.useFakeTimers();
+      const clearTimeoutSpy = vi.spyOn(globalThis, 'clearTimeout');
+      vi.spyOn(globalThis, 'fetch').mockResolvedValue({
+        arrayBuffer: () => Promise.resolve(new ArrayBuffer(3)),
+      });
+
+      await PdfLoader.load(pdfSourceFromUrl('https://example.com/doc.pdf'));
+
+      expect(clearTimeoutSpy).toHaveBeenCalledOnce();
+    });
+
     it('propagates fetch errors', async () => {
+      vi.useFakeTimers();
+      const clearTimeoutSpy = vi.spyOn(globalThis, 'clearTimeout');
       vi.spyOn(globalThis, 'fetch').mockRejectedValue(new TypeError('NetworkError'));
 
       await expect(PdfLoader.load(pdfSourceFromUrl('https://example.com/doc.pdf')))
         .rejects.toThrow('NetworkError');
+      expect(clearTimeoutSpy).toHaveBeenCalledOnce();
+    });
+
+    it('aborts timed-out requests with a TimeoutError and clears the timer', async () => {
+      vi.useFakeTimers();
+      const clearTimeoutSpy = vi.spyOn(globalThis, 'clearTimeout');
+      let signal;
+      vi.spyOn(globalThis, 'fetch').mockImplementation((_url, options) => {
+        signal = options.signal;
+        return new Promise((resolve, reject) => {
+          signal.addEventListener('abort', () => reject(signal.reason));
+        });
+      });
+
+      const load = PdfLoader.load(pdfSourceFromUrl('https://example.com/doc.pdf'));
+      await vi.advanceTimersByTimeAsync(30_000);
+
+      await expect(load).rejects.toMatchObject({ name: 'TimeoutError' });
+      expect(signal.aborted).toBe(true);
+      expect(signal.reason.name).toBe('TimeoutError');
+      expect(clearTimeoutSpy).toHaveBeenCalledOnce();
     });
   });
 
