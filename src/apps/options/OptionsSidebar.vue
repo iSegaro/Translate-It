@@ -43,17 +43,31 @@
       </div>
 
       <a 
+        id="PDF_TRANSLATOR"
+        href="#"
+        class="sidebar-section app-link-section"
+        @click.prevent="openPdfPage"
+      >
+        <img
+          src="@/icons/ui/pdf_viewer/pdf.png"
+          class="app-link-icon"
+          alt="PDF"
+        >
+        <span class="app-link-label">{{ t('pdf_app_title', 'PDF Translator') }}</span>
+      </a>
+
+      <a 
         id="SUBTITLE_TRANSLATOR"
         href="#"
-        class="sidebar-section subtitle-link-section"
+        class="sidebar-section app-link-section"
         @click.prevent="openSubtitlePage"
       >
         <img
           src="@/icons/ui/subtitle.png"
-          class="subtitle-icon"
+          class="app-link-icon"
           alt="Subtitle"
         >
-        <span class="subtitle-label">{{ t('open_subtitle_translator', 'Subtitle Translator') }}</span>
+        <span class="app-link-label">{{ t('open_subtitle_translator', 'Subtitle Translator') }}</span>
       </a>
 
       <div class="sidebar-footer">
@@ -135,11 +149,14 @@ onMounted(async () => {
   }
 })
 
-const openSubtitlePage = async () => {
+const openApp = async (appName) => {
   try {
-    await openExtensionApp('subtitle')
+    await openExtensionApp(appName)
   } catch (error) {
-    logger.error('Failed to open subtitle page:', error)
+    logger.error(`Failed to open ${appName} page:`, error)
   }
 }
+
+const openPdfPage = () => openApp('pdf')
+const openSubtitlePage = () => openApp('subtitle')
 </script>
