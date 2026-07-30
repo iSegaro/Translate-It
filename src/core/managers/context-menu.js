@@ -30,6 +30,7 @@ const logger = getScopedLogger(LOG_COMPONENTS.CORE, 'context-menu');
 
 // --- Constants for Menu Item IDs ---
 const PAGE_CONTEXT_MENU_ID = "translate-with-select-element";
+const PAGE_CONTEXT_PDF_ID = "open-pdf-with-link";
 const ACTION_TRANSLATE_ELEMENT_ID = "action-translate-element";
 const SCREEN_CAPTURE_MENU_ID = "screen-capture";
 const ACTION_CONTEXT_MENU_OPTIONS_ID = "open-options-page";
@@ -439,6 +440,13 @@ export class ContextMenuManager extends ResourceTracker {
         }
       }
 
+      // --- 1.5. Create Page Context Menu (Open in PDF Translator) ---
+      await this.createMenu({
+        id: PAGE_CONTEXT_PDF_ID,
+        title: (await getTranslationString("pdf_app_title", locale)) || "PDF Translator",
+        contexts: ["link"],
+      });
+
       // --- 2. Create Action (Browser Action) Context Menus ---
       try {
         logger.debug("[ContextMenuManager] Creating Action (Browser Action) menus...");
@@ -805,6 +813,14 @@ export class ContextMenuManager extends ResourceTracker {
         case PAGE_CONTEXT_MENU_ID:
           await this._activateSelectElement(tab);
           break;
+
+        case PAGE_CONTEXT_PDF_ID: {
+          const linkUrl = info.linkUrl;
+          if (linkUrl) {
+            await openExtensionApp('pdf', { remoteUrl: linkUrl });
+          }
+          break;
+        }
 
         case `${SCREEN_CAPTURE_MENU_ID}-page`:
         case `${SCREEN_CAPTURE_MENU_ID}-action`:

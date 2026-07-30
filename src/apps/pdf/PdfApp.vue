@@ -307,6 +307,7 @@ const {
   pdfTargetLanguage,
   loadPdfFile,
   recomputeLayout,
+  openPdfUrl,
   translateVisiblePages,
   hydrateVisiblePageBlocks,
   refreshTranslatedPageBlocks,
@@ -1303,6 +1304,18 @@ onMounted(async () => {
   }
   browser.runtime.onMessage.addListener(handler)
   removeThemeMessageListener = () => browser.runtime.onMessage.removeListener(handler)
+
+  const params = new URLSearchParams(location.search)
+  const remoteUrl = params.get('remote')
+  if (remoteUrl) {
+    const loaded = await openPdfUrl(remoteUrl, buildLayoutRequest())
+    if (loaded) {
+      const url = new URL(location.href)
+      params.delete('remote')
+      url.search = params.toString()
+      history.replaceState(history.state, '', url.toString())
+    }
+  }
 
   const mq = window.matchMedia('(prefers-color-scheme: dark)')
   const mqHandler = () => {

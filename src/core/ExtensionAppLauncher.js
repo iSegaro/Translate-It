@@ -8,12 +8,18 @@ import { EXTENSION_APPS } from '@/shared/constants';
  * using direct invocation (in-process) or runtime.sendMessage (cross-process).
  *
  * @param {string} appName — key from EXTENSION_APPS
+ * @param {{ remoteUrl?: string }} [options]
  * @throws {Error} if appName is not registered
  */
-export function openExtensionApp(appName) {
+export function openExtensionApp(appName, options = {}) {
   const app = EXTENSION_APPS[appName];
   if (!app) {
     throw new Error(`Unknown extension app: ${appName}`);
+  }
+
+  const messageData = { urlPath: app.urlPath, launchPolicy: app.launchPolicy };
+  if (options.remoteUrl) {
+    messageData.remoteUrl = options.remoteUrl;
   }
 
   const backgroundService = globalThis.backgroundService;
@@ -27,10 +33,7 @@ export function openExtensionApp(appName) {
       );
     }
     return handler(
-      {
-        action: MessageActions.LAUNCH_EXTENSION_APP,
-        data: { urlPath: app.urlPath, launchPolicy: app.launchPolicy },
-      },
+      { action: MessageActions.LAUNCH_EXTENSION_APP, data: messageData },
       { tab: null },
       () => {},
     );
@@ -38,6 +41,6 @@ export function openExtensionApp(appName) {
 
   return browser.runtime.sendMessage({
     action: MessageActions.LAUNCH_EXTENSION_APP,
-    data: { urlPath: app.urlPath, launchPolicy: app.launchPolicy },
+    data: messageData,
   });
 }

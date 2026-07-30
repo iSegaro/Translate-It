@@ -7,13 +7,19 @@ const logger = getScopedLogger(LOG_COMPONENTS.BACKGROUND, 'handleLaunchExtension
 
 export async function handleLaunchExtensionApp(message) {
   try {
-    const { urlPath, launchPolicy } = message?.data || {};
+    const { urlPath, launchPolicy, remoteUrl } = message?.data || {};
 
     if (!urlPath) {
       throw new Error('urlPath is required');
     }
 
-    const targetUrl = browser.runtime.getURL(urlPath);
+    let targetUrl = browser.runtime.getURL(urlPath);
+
+    if (remoteUrl) {
+      const params = new URLSearchParams();
+      params.set('remote', remoteUrl);
+      targetUrl += '?' + params.toString();
+    }
 
     if (launchPolicy === EXTENSION_APP_LAUNCH_POLICY.ALWAYS_CREATE) {
       logger.debug(`Creating new tab for: ${targetUrl}`);

@@ -444,6 +444,7 @@ function createMocks({
     fileSize: ref(0),
     session: sessionAsRef ? ref(sessionMock) : sessionMock,
     loadPdfFile: vi.fn().mockResolvedValue(true),
+    openPdfUrl: vi.fn().mockResolvedValue(true),
     recomputeLayout: vi.fn().mockResolvedValue(undefined),
     translateVisiblePages: vi.fn().mockResolvedValue(false),
     hydrateVisiblePageBlocks: vi.fn().mockResolvedValue(false),
