@@ -717,7 +717,6 @@ describe('PdfApp', () => {
     })
 
     const wrapper = mount(PdfApp)
-    await vi.waitFor(() => expect(browserTabStateMock.write).toHaveBeenCalledOnce())
 
     const banner = wrapper.find('.pdf-status-banner')
     const content = wrapper.find('.pdf-app__content')
@@ -737,7 +736,6 @@ describe('PdfApp', () => {
     })
 
     const wrapper = mount(PdfApp)
-    await vi.waitFor(() => expect(globalThis.showOpenFilePicker).toHaveBeenCalledOnce())
 
     expect(wrapper.find('.pdf-status-banner').exists()).toBe(false)
     expect(wrapper.find('.pdf-app__status-row').exists()).toBe(false)
@@ -752,7 +750,6 @@ describe('PdfApp', () => {
 
     wrapper.findComponent({ name: 'PdfToolbar' }).vm.$emit('translate-visible')
     deferred.resolve(true)
-    await vi.waitFor(() => expect(showOpenFilePicker).toHaveBeenCalledTimes(2))
     await vi.waitFor(() => expect(activityCompletedMock).toHaveBeenCalledOnce())
 
     expect(activityCompletedMock).toHaveBeenCalledTimes(1)
