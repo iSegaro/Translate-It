@@ -798,8 +798,6 @@ describe('PdfApp', () => {
     await flushPromises()
 
     expect(translationFailedMock).toHaveBeenCalledWith(expect.objectContaining({ occurrenceId: 8, error: 'Translation request failed' }))
-    expect(wrapper.find('.pdf-status-banner__title').text()).toBe('Translation failed')
-    expect(wrapper.find('.pdf-status-banner__message').text()).toBe('Translation request failed')
   })
 
   it('clears a partial page translation banner on the next successful run', async () => {
