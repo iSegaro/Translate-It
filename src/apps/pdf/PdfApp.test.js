@@ -364,7 +364,9 @@ vi.mock('./composables/createPdfTransitionController.js', () => ({
     handleContentViewChange: vi.fn((value) => {
       mockViewerMode.setContentView(value)
     }),
-    handleLayoutModeChange: vi.fn(),
+    handleLayoutModeChange: vi.fn((value) => {
+      mockViewerMode.setLayoutMode(value)
+    }),
     handleLayoutChange: vi.fn(),
     waitForInitialLayoutCommit: mockWaitForInitialLayoutCommit,
     handleZoomChange: mockHandleZoomChange,
