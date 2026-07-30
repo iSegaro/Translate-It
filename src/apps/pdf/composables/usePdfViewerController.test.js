@@ -983,3 +983,42 @@ describe('clearDocumentCache', () => {
     expect(resetTranslationStatesMock).not.toHaveBeenCalled()
   })
 })
+
+describe('openPdfUrl', () => {
+  it('fetches a URL and opens the document in the session', async () => {
+    const buffer = new ArrayBuffer(8)
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue({
+      arrayBuffer: () => Promise.resolve(buffer),
+    })
+
+    openFileMock.mockResolvedValue(createOpenState())
+    const controller = usePdfViewerController()
+
+    const result = await controller.openPdfUrl('https://example.com/doc.pdf', 800)
+
+    expect(result).toBe(true)
+    expect(openFileMock).toHaveBeenCalledWith(
+      { name: 'document.pdf', buffer: expect.any(ArrayBuffer) },
+      800,
+    )
+  })
+
+  it('returns false and resets state on fetch failure', async () => {
+    vi.spyOn(globalThis, 'fetch').mockRejectedValue(new TypeError('NetworkError'))
+
+    const controller = usePdfViewerController()
+
+    const result = await controller.openPdfUrl('https://example.com/doc.pdf', 800)
+
+    expect(result).toBe(false)
+    expect(controller.error.value).toBe('NetworkError')
+  })
+
+  it('returns false for empty URL', async () => {
+    const controller = usePdfViewerController()
+
+    const result = await controller.openPdfUrl('', 800)
+
+    expect(result).toBe(false)
+  })
+})

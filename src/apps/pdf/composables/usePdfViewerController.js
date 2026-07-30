@@ -3,7 +3,7 @@ import { getScopedLogger } from '@/shared/logging/logger.js'
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js'
 import { TranslationMode, getProviderOptimizationLevelAsync, getEffectiveProviderAsync } from '@/shared/config/config.js'
 import { AUTO_DETECT_VALUE, DEFAULT_TARGET_LANGUAGE } from '@/shared/constants/core.js'
-import { pdfSourceFromFile } from '@/apps/pdf/core/PdfSource.js'
+import { pdfSourceFromFile, pdfSourceFromUrl } from '@/apps/pdf/core/PdfSource.js'
 import { PdfLoader } from '@/apps/pdf/core/PdfLoader.js'
 import { pdfDocumentSession } from '@/features/pdf-translation/core/PdfDocumentSession.js'
 import { PdfTranslationCoordinator } from '@/features/pdf-translation/core/PdfTranslationCoordinator.js'
@@ -270,25 +270,16 @@ export function usePdfViewerController() {
     _translatedPageData.value = []
   }
 
-  async function loadPdfFile(file, layoutRequest) {
-    if (!file) return false
-
-    if (!file.name?.toLowerCase().endsWith('.pdf') && file.type !== 'application/pdf') {
-      error.value = 'Please choose a valid PDF file.'
-      return false
-    }
-
+  async function loadPdfSource(source, { size, context }, layoutRequest) {
     try {
       isLoading.value = true
       error.value = ''
       await pdfTranslationCoordinator.cancelActiveTranslation('document-replaced')
       resetLoadedDocument()
 
-      const source = pdfSourceFromFile(file)
       const { name, buffer } = await PdfLoader.load(source)
-      const size = file.size ?? 0
-      currentFile.value = { name, size }
-      fileSize.value = size
+      currentFile.value = { name, size: size ?? 0 }
+      fileSize.value = size ?? 0
 
       const nextState = await pdfDocumentSession.openFile({ name, buffer }, layoutRequest)
       applySessionState(nextState)
@@ -297,15 +288,35 @@ export function usePdfViewerController() {
 
       return true
     } catch (loadError) {
-      logger.error('Failed to open PDF file:', loadError)
+      logger.error(`Failed to open PDF ${context}:`, loadError)
       currentFile.value = null
       fileSize.value = 0
-      error.value = loadError?.message || 'Failed to open the PDF file.'
+      error.value = loadError?.message || `Failed to open the PDF ${context}.`
       await pdfDocumentSession.cleanupDocument()
       return false
     } finally {
       isLoading.value = false
     }
+  }
+
+  async function loadPdfFile(file, layoutRequest) {
+    if (!file) return false
+
+    if (!file.name?.toLowerCase().endsWith('.pdf') && file.type !== 'application/pdf') {
+      error.value = 'Please choose a valid PDF file.'
+      return false
+    }
+
+    return loadPdfSource(
+      pdfSourceFromFile(file),
+      { size: file.size ?? 0, context: 'file' },
+      layoutRequest,
+    )
+  }
+
+  async function openPdfUrl(url, layoutRequest) {
+    if (!url) return false
+    return loadPdfSource(pdfSourceFromUrl(url), { size: 0, context: 'URL' }, layoutRequest)
   }
 
   async function recomputeLayout(layoutRequest) {
@@ -432,6 +443,7 @@ export function usePdfViewerController() {
     workerUrl,
     session: pdfDocumentSession,
     loadPdfFile,
+    openPdfUrl,
     recomputeLayout,
     translateVisiblePages,
     hydrateVisiblePageBlocks,
@@ -441,5 +453,5 @@ export function usePdfViewerController() {
     clearError,
     cleanup,
     resetLoadedDocument
+    }
   }
-}
