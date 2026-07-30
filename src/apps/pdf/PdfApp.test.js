@@ -710,13 +710,17 @@ describe('PdfApp', () => {
   })
 
   it('renders the status banner outside the viewer content flow when active', async () => {
-    createMocks({
-      bannerState: {
-        isLoading: true
-      }
-    })
+    settingsStoreMock.settings.DEBUG_MODE = true
+    regionComparisonRunnerMock.execute.mockImplementation(request => createMockOperation(
+      Promise.resolve(readyRegionComparisonResult()),
+      vi.fn(),
+      { target: 'region-comparison', request }
+    ))
+    createMocks()
 
     const wrapper = mount(PdfApp)
+    await startRegionComparison(wrapper)
+    await vi.waitFor(() => expect(wrapper.find('.pdf-status-banner').exists()).toBe(true))
 
     const banner = wrapper.find('.pdf-status-banner')
     const content = wrapper.find('.pdf-app__content')
