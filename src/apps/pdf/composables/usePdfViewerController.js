@@ -11,6 +11,7 @@ import { getPdfTranslationFailureReason } from '@/features/pdf-translation/core/
 import { pdfCacheManager } from '@/features/pdf-translation/core/PdfCacheManager.js'
 import { pdfHistoryManager } from '@/features/pdf-translation/core/PdfHistoryManager.js'
 import { sha256HexFromText } from '@/features/pdf-translation/core/PdfBlockIdentity.js'
+import { classifyPdfLoadFailure } from '@/features/pdf-translation/failures/PdfLoadFailure.js'
 
 const logger = getScopedLogger(LOG_COMPONENTS.PDF, 'usePdfViewerController')
 const pdfTranslationCoordinator = new PdfTranslationCoordinator(pdfDocumentSession)
@@ -31,6 +32,7 @@ export function usePdfViewerController() {
   const fileSize = ref(0)
   const isLoading = ref(false)
   const error = ref('')
+  const loadFailure = ref(null)
   const fileName = ref('')
   const pageCount = ref(0)
   const workerLabel = ref('')
@@ -274,6 +276,7 @@ export function usePdfViewerController() {
     try {
       isLoading.value = true
       error.value = ''
+      loadFailure.value = null
       await pdfTranslationCoordinator.cancelActiveTranslation('document-replaced')
       resetLoadedDocument()
 
@@ -292,6 +295,7 @@ export function usePdfViewerController() {
       currentFile.value = null
       fileSize.value = 0
       error.value = loadError?.message || `Failed to open the PDF ${context}.`
+      loadFailure.value = classifyPdfLoadFailure(loadError)
       try {
         await pdfDocumentSession.cleanupDocument()
       } catch (cleanupError) {
@@ -429,6 +433,7 @@ export function usePdfViewerController() {
     currentFile,
     fileSize,
     error,
+    loadFailure,
     fileName,
     hasDocument,
     isLoading,

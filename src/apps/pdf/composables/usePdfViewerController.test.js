@@ -1002,6 +1002,7 @@ describe('openPdfUrl', () => {
     const result = await controller.openPdfUrl('https://example.com/doc.pdf', 800)
 
     expect(result).toBe(true)
+    expect(controller.loadFailure.value).toBeNull()
     expect(openFileMock).toHaveBeenCalledWith(
       { name: 'document.pdf', buffer: expect.any(ArrayBuffer) },
       800,
@@ -1009,14 +1010,20 @@ describe('openPdfUrl', () => {
   })
 
   it('returns false and resets state on fetch failure', async () => {
-    vi.spyOn(globalThis, 'fetch').mockRejectedValue(new TypeError('NetworkError'))
+    let controller
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async () => {
+      expect(controller.loadFailure.value).toBeNull()
+      throw new TypeError('NetworkError')
+    })
 
-    const controller = usePdfViewerController()
+    controller = usePdfViewerController()
+    controller.loadFailure.value = Object.freeze({ kind: 'TIMEOUT', details: Object.freeze({}) })
 
     const result = await controller.openPdfUrl('https://example.com/doc.pdf', 800)
 
     expect(result).toBe(false)
     expect(controller.error.value).toBe('NetworkError')
+    expect(controller.loadFailure.value).toEqual({ kind: 'UNEXPECTED', details: {} })
   })
 
   it('returns false for empty URL', async () => {
@@ -1040,6 +1047,7 @@ describe('openPdfUrl', () => {
 
     await expect(load).resolves.toBe(false)
     expect(controller.error.value).toBe('Remote PDF load timed out.')
+    expect(controller.loadFailure.value).toEqual({ kind: 'TIMEOUT', details: {} })
     expect(controller.isLoading.value).toBe(false)
     expect(cleanupDocumentMock).toHaveBeenCalledOnce()
   })
