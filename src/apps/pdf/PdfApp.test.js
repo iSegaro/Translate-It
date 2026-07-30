@@ -1095,7 +1095,7 @@ describe('PdfApp', () => {
     await startRegionComparison(wrapper)
     await vi.waitFor(() => expect(wrapper.find('.pdf-status-banner').exists()).toBe(true))
 
-    expect(wrapper.find('.pdf-error-notification').text()).toBe('OCR worker unavailable')
+    expect(wrapper.find('.pdf-message-notification').text()).toBe('OCR worker unavailable')
   })
 
   it('does not notify after regionComparison cancellation', async () => {
@@ -1160,7 +1160,7 @@ describe('PdfApp', () => {
     await vi.advanceTimersByTimeAsync(200)
 
     expect(wrapper.findComponent({ name: 'PdfToolbar' }).props('regionComparisonState')).toMatchObject({ status: 'failed' })
-    expect(wrapper.find('.pdf-error-notification').text()).toBe('OCR worker unavailable')
+    expect(wrapper.find('.pdf-message-notification').text()).toBe('OCR worker unavailable')
     expect(wrapper.find('.operation-status').exists()).toBe(false)
     expect(activityCompletedMock).toHaveBeenCalledTimes(1)
   })

@@ -1,5 +1,5 @@
 <template>
-  <div class="pdf-error-notification">
+  <div class="pdf-message-notification">
     <p>{{ payload.message }}</p>
   </div>
 </template>
