@@ -11,7 +11,7 @@
       type="button"
       aria-label="Dismiss status banner"
       title="Dismiss"
-      @click="$emit('dismiss')"
+      @click="emit('dismiss')"
     >
       <span aria-hidden="true">×</span>
     </button>
@@ -30,6 +30,8 @@
 <script setup>
 import './PdfStatusBanner.scss'
 
+const emit = defineEmits(['dismiss'])
+
 defineProps({
   body: {
     type: Object,
@@ -40,6 +42,4 @@ defineProps({
     default: false
   }
 })
-
-defineEmits(['dismiss'])
 </script>
