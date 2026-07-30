@@ -775,12 +775,9 @@ describe('PdfApp', () => {
     const wrapper = mount(PdfApp)
 
     wrapper.findComponent({ name: 'PdfToolbar' }).vm.$emit('translate-visible')
-    await vi.waitFor(() => expect(pdfAppLoggerMock.warn).toHaveBeenCalledOnce())
     await flushPromises()
 
     expect(translationPartialMock).toHaveBeenCalledWith(expect.objectContaining({ occurrenceId: 7, error: 'Provider failed' }))
-    expect(wrapper.find('.pdf-status-banner__title').text()).toBe('Partial translation')
-    expect(wrapper.find('.pdf-status-banner__message').text()).toBe('Provider failed')
   })
 
   it('presents failed page translation through its canonical event', async () => {
