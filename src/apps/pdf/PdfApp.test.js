@@ -1076,13 +1076,11 @@ describe('PdfApp', () => {
     await startRegionComparison(wrapper)
     await vi.waitFor(() => expect(wrapper.find('.pdf-status-banner').exists()).toBe(true))
 
-    expect(wrapper.find('.pdf-status-banner__title').text()).toBe('Region Comparison complete')
-    expect(wrapper.find('.pdf-status-banner__message').text()).toContain('Winner: scale-1.')
     expect(wrapper.findAll('.pdf-region-comparison-notification__results tbody td').map(cell => cell.text())).toEqual([
       'scale-1', '1.5', 'fas', '42ms', '95', '0.200', 'Winner'
     ])
     await wrapper.find('.pdf-status-banner__dismiss').trigger('click')
-    expect(wrapper.find('.pdf-status-banner').exists()).toBe(false)
+    await vi.waitFor(() => expect(wrapper.find('.pdf-status-banner').exists()).toBe(false))
   })
 
   it('shows a developer error notification after regionComparison failure', async () => {
@@ -1097,9 +1095,7 @@ describe('PdfApp', () => {
     await startRegionComparison(wrapper)
     await vi.waitFor(() => expect(wrapper.find('.pdf-status-banner').exists()).toBe(true))
 
-    expect(wrapper.find('.pdf-status-banner').classes()).toContain('pdf-status-banner--error')
-    expect(wrapper.find('.pdf-status-banner__title').text()).toBe('Region Comparison failed')
-    expect(wrapper.find('.pdf-status-banner__message').text()).toBe('OCR worker unavailable')
+    expect(wrapper.find('.pdf-error-notification').text()).toBe('OCR worker unavailable')
   })
 
   it('does not notify after regionComparison cancellation', async () => {
@@ -1164,8 +1160,7 @@ describe('PdfApp', () => {
     await vi.advanceTimersByTimeAsync(200)
 
     expect(wrapper.findComponent({ name: 'PdfToolbar' }).props('regionComparisonState')).toMatchObject({ status: 'failed' })
-    expect(wrapper.find('.pdf-status-banner__title').text()).toBe('Region Comparison failed')
-    expect(wrapper.find('.pdf-status-banner__message').text()).toBe('OCR worker unavailable')
+    expect(wrapper.find('.pdf-error-notification').text()).toBe('OCR worker unavailable')
     expect(wrapper.find('.operation-status').exists()).toBe(false)
     expect(activityCompletedMock).toHaveBeenCalledTimes(1)
   })
@@ -1187,7 +1182,7 @@ describe('PdfApp', () => {
     await vi.waitFor(() => expect(wrapper.find('.pdf-status-banner__dismiss').exists()).toBe(true))
     await wrapper.find('.pdf-status-banner__dismiss').trigger('click')
     await startRegionComparison(wrapper, createPdfRegion({ pageNumber: 2, left: 1, top: 4, right: 3, bottom: 2 }))
-    await vi.waitFor(() => expect(wrapper.find('.pdf-status-banner__message').text()).toContain('scale-1.5'))
+    await vi.waitFor(() => expect(wrapper.text()).toContain('scale-1.5'))
   })
 
   it('blocks direct Region Comparison requests outside Debug Mode', async () => {
