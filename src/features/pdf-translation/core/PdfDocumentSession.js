@@ -39,6 +39,17 @@ function createEmptyDocumentMetadata() {
   }
 }
 
+function createPdfDocumentError(error, stage, fileName) {
+  if (error?.name === 'PdfDocumentError') return error
+
+  const documentError = new Error(error?.message || 'Failed to open PDF document')
+  documentError.name = 'PdfDocumentError'
+  documentError.cause = error
+  documentError.stage = stage
+  documentError.fileName = fileName
+  return documentError
+}
+
 function normalizePageNumberSet(pageNumbers = []) {
   const normalized = new Set()
 
@@ -310,45 +321,67 @@ export class PdfDocumentSession extends ResourceTracker {
   }
 
   async openFile({ name, buffer }, layoutRequest) {
-    if (!buffer) throw new Error('No PDF buffer provided')
-
-    await this.cleanupDocument()
-    ensurePdfJsConfigured()
-
-    this.fileName = name || 'document.pdf'
-    const { document, loadingTask, objectUrl } = await loadPdfDocumentFromBuffer({ buffer })
-
-    this.loadingTask = loadingTask
-    this.pdfDocument = document
-    this.objectUrl = objectUrl
-    this.totalPages = document.numPages
-    this.pdfFingerprint = document.fingerprint || ''
-    try {
-      const { info } = await this.pdfDocument.getMetadata()
-      this.displayName = (info?.Title || '').trim() || this.fileName
-      this.documentMetadata = {
-        title: info?.Title || '',
-        author: info?.Author || '',
-        subject: info?.Subject || '',
-        keywords: info?.Keywords || '',
-        creator: info?.Creator || '',
-        producer: info?.Producer || '',
-        creationDate: info?.CreationDate || '',
-        modificationDate: info?.ModDate || '',
-        pdfVersion: info?.PDFFormatVersion || '',
-      }
-    } catch (error) {
-      logger.debug('Failed to read PDF metadata', error)
-      this.displayName = this.fileName
+    const fileName = name || 'document.pdf'
+    if (!buffer) {
+      throw createPdfDocumentError(new Error('No PDF buffer provided'), 'INITIALIZE', fileName)
     }
-    this.documentIdentity = await this._resolveDocumentIdentity(buffer, document)
-    this._startDocumentCacheLoad(this.documentIdentity, this._documentGeneration)
-    this._pageContentRepository.reset()
-    this.resetTranslationStates()
-    this._resolver.clearCaches()
-    this._outlineRepository.clear()
-    this._linkAnnotationRepository.clear()
-    await this._buildPageMetrics(layoutRequest)
+
+    try {
+      await this.cleanupDocument()
+    } catch (error) {
+      throw createPdfDocumentError(error, 'CLEANUP', fileName)
+    }
+
+    let openedDocument
+    try {
+      ensurePdfJsConfigured()
+      this.fileName = fileName
+      openedDocument = await loadPdfDocumentFromBuffer({ buffer })
+    } catch (error) {
+      throw createPdfDocumentError(error, 'LOAD', fileName)
+    }
+
+    const { document, loadingTask, objectUrl } = openedDocument
+    try {
+      this.loadingTask = loadingTask
+      this.pdfDocument = document
+      this.objectUrl = objectUrl
+      this.totalPages = document.numPages
+      this.pdfFingerprint = document.fingerprint || ''
+      try {
+        const { info } = await this.pdfDocument.getMetadata()
+        this.displayName = (info?.Title || '').trim() || this.fileName
+        this.documentMetadata = {
+          title: info?.Title || '',
+          author: info?.Author || '',
+          subject: info?.Subject || '',
+          keywords: info?.Keywords || '',
+          creator: info?.Creator || '',
+          producer: info?.Producer || '',
+          creationDate: info?.CreationDate || '',
+          modificationDate: info?.ModDate || '',
+          pdfVersion: info?.PDFFormatVersion || '',
+        }
+      } catch (error) {
+        logger.debug('Failed to read PDF metadata', error)
+        this.displayName = this.fileName
+      }
+      this.documentIdentity = await this._resolveDocumentIdentity(buffer, document)
+      this._startDocumentCacheLoad(this.documentIdentity, this._documentGeneration)
+      this._pageContentRepository.reset()
+      this.resetTranslationStates()
+      this._resolver.clearCaches()
+      this._outlineRepository.clear()
+      this._linkAnnotationRepository.clear()
+    } catch (error) {
+      throw createPdfDocumentError(error, 'INITIALIZE', fileName)
+    }
+
+    try {
+      await this._buildPageMetrics(layoutRequest)
+    } catch (error) {
+      throw createPdfDocumentError(error, 'PAGE_METRICS', fileName)
+    }
 
     logger.info('PDF document opened:', {
       fileName: this.fileName,

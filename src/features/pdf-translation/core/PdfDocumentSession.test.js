@@ -855,6 +855,99 @@ describe('PdfDocumentSession', () => {
     expect(pdfCacheManager.loadDocument).toHaveBeenCalledWith(session.documentIdentity)
   })
 
+  describe('openFile document errors', () => {
+    it('wraps document loading failures with provenance', async () => {
+      const cause = new Error('Invalid PDF')
+      loadPdfDocumentFromBuffer.mockRejectedValue(cause)
+
+      await expect(session.openFile({ name: 'invalid.pdf', buffer: new ArrayBuffer(8) }, 800))
+        .rejects.toMatchObject({
+          name: 'PdfDocumentError',
+          message: 'Invalid PDF',
+          cause,
+          stage: 'LOAD',
+          fileName: 'invalid.pdf',
+        })
+    })
+
+    it('wraps document replacement cleanup failures', async () => {
+      const cause = new Error('Cleanup failed')
+      session.cleanupDocument = vi.fn().mockRejectedValue(cause)
+
+      await expect(session.openFile({ name: 'replacement.pdf', buffer: new ArrayBuffer(8) }, 800))
+        .rejects.toMatchObject({
+          name: 'PdfDocumentError',
+          cause,
+          stage: 'CLEANUP',
+          fileName: 'replacement.pdf',
+        })
+    })
+
+    it('wraps session initialization failures', async () => {
+      const cause = new Error('Repository initialization failed')
+      pdfDocument.fingerprint = 'doc-fingerprint'
+      pdfDocument.getMetadata = vi.fn().mockResolvedValue({ info: {} })
+      session._pageContentRepository.reset = vi.fn(() => { throw cause })
+      loadPdfDocumentFromBuffer.mockResolvedValue({ document: pdfDocument, loadingTask, objectUrl: 'blob:next-pdf' })
+
+      await expect(session.openFile({ name: 'initialization.pdf', buffer: new ArrayBuffer(8) }, 800))
+        .rejects.toMatchObject({
+          name: 'PdfDocumentError',
+          cause,
+          stage: 'INITIALIZE',
+          fileName: 'initialization.pdf',
+        })
+    })
+
+    it('wraps page metrics failures', async () => {
+      const cause = new Error('Page metrics failed')
+      pdfDocument.fingerprint = 'doc-fingerprint'
+      pdfDocument.getMetadata = vi.fn().mockResolvedValue({ info: {} })
+      pdfDocument.getPage.mockRejectedValue(cause)
+      loadPdfDocumentFromBuffer.mockResolvedValue({ document: pdfDocument, loadingTask, objectUrl: 'blob:next-pdf' })
+
+      await expect(session.openFile({ name: 'metrics.pdf', buffer: new ArrayBuffer(8) }, 800))
+        .rejects.toMatchObject({
+          name: 'PdfDocumentError',
+          cause,
+          stage: 'PAGE_METRICS',
+          fileName: 'metrics.pdf',
+        })
+    })
+
+    it('does not wrap an existing PdfDocumentError', async () => {
+      const cause = new Error('Already typed')
+      cause.name = 'PdfDocumentError'
+      loadPdfDocumentFromBuffer.mockRejectedValue(cause)
+
+      await expect(session.openFile({ name: 'typed.pdf', buffer: new ArrayBuffer(8) }, 800))
+        .rejects.toBe(cause)
+    })
+
+    it('keeps metadata failures non-fatal', async () => {
+      pdfDocument.fingerprint = 'doc-fingerprint'
+      pdfDocument.getMetadata = vi.fn().mockRejectedValue(new Error('Metadata failed'))
+      loadPdfDocumentFromBuffer.mockResolvedValue({ document: pdfDocument, loadingTask, objectUrl: 'blob:next-pdf' })
+
+      await expect(session.openFile({ name: 'metadata.pdf', buffer: new ArrayBuffer(8) }, 800))
+        .resolves.toMatchObject({ fileName: 'metadata.pdf' })
+    })
+
+    it('keeps identity hash failures non-fatal', async () => {
+      pdfDocument.fingerprint = ''
+      pdfDocument.getMetadata = vi.fn().mockResolvedValue({ info: {} })
+      loadPdfDocumentFromBuffer.mockResolvedValue({ document: pdfDocument, loadingTask, objectUrl: 'blob:next-pdf' })
+      vi.stubGlobal('crypto', { subtle: { digest: vi.fn().mockRejectedValue(new Error('Hash failed')) } })
+
+      try {
+        await expect(session.openFile({ name: 'identity.pdf', buffer: new ArrayBuffer(8) }, 800))
+          .resolves.toMatchObject({ fileName: 'identity.pdf', documentIdentity: '' })
+      } finally {
+        vi.unstubAllGlobals()
+      }
+    })
+  })
+
   it('loads document cache once and shares readiness across PageSessions', async () => {
     let resolveCache
     pdfCacheManager.loadDocument.mockReturnValue(new Promise((resolve) => {
