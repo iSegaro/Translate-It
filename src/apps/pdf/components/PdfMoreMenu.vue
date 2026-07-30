@@ -48,6 +48,14 @@
         <button
           class="pdf-toolbar__export-item pdf-toolbar__menu-row"
           type="button"
+          :disabled="isLoading"
+          @click="close(); emit('open-remote-pdf')"
+        >
+          <span class="pdf-toolbar__menu-row-label">{{ isLoading ? 'Loading...' : 'Open Remote PDF...' }}</span>
+        </button>
+        <button
+          class="pdf-toolbar__export-item pdf-toolbar__menu-row"
+          type="button"
           :disabled="!fileName"
           @click="close(); handleRequestPdfInfo()"
         >
@@ -171,6 +179,7 @@ const props = defineProps({
 
 const emit = defineEmits([
   'request-open-pdf',
+  'open-remote-pdf',
   'export-txt',
   'export-markdown',
   'export-html',

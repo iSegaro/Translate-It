@@ -123,6 +123,7 @@
             @file-selected="handleFileSelected"
             @drag-state-change="isDragOver = $event"
             @request-open-pdf="requestOpenPdf"
+            @open-remote-pdf="showRemoteUrlDialog = true"
           >
             <template #empty>
               <div class="pdf-app__empty">
@@ -215,6 +216,13 @@
     />
 
     <PdfOverlayRoot :set-root="setOverlayRoot" />
+
+    <PdfRemoteUrlDialog
+      :visible="showRemoteUrlDialog"
+      :loading="isRemoteUrlLoading"
+      @close="showRemoteUrlDialog = false"
+      @submit="handleOpenRemoteUrl"
+    />
   </div>
 </template>
 
@@ -231,6 +239,7 @@ import PdfStatusBanner from './components/PdfStatusBanner.vue'
 import PdfWindowsHost from './components/PdfWindowsHost.vue'
 import PdfOutline from './components/PdfOutline.vue'
 import PdfDocumentInfoDialog from './components/PdfDocumentInfoDialog.vue'
+import PdfRemoteUrlDialog from './components/PdfRemoteUrlDialog.vue'
 import ProgressIndicator from './components/ProgressIndicator.vue'
 import OperationStatus from './components/OperationStatus.vue'
 import PdfAppBrand from './components/PdfAppBrand.vue'
@@ -317,6 +326,8 @@ const {
 } = usePdfViewerController()
 
 const showPdfInfo = ref(false)
+const showRemoteUrlDialog = ref(false)
+const isRemoteUrlLoading = ref(false)
 
 const { rows: pdfInfoRows } = usePdfDocumentInfo(computed(() => ({
   fileName: fileName.value,
@@ -806,6 +817,18 @@ async function handleFileSelected(file) {
   }
   updateDocumentTitle()
   return loaded
+}
+
+async function handleOpenRemoteUrl(url) {
+  isRemoteUrlLoading.value = true
+  try {
+    const loaded = await openPdfUrl(url, buildLayoutRequest())
+    if (loaded) {
+      showRemoteUrlDialog.value = false
+    }
+  } finally {
+    isRemoteUrlLoading.value = false
+  }
 }
 
 async function requestOpenPdf() {

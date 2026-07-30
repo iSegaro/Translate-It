@@ -390,6 +390,7 @@
             :is-clear-cache-disabled="isClearCacheDisabled"
             :is-debug-mode="isDebugMode"
             @request-open-pdf="emit('request-open-pdf')"
+            @open-remote-pdf="emit('open-remote-pdf')"
             @export-txt="emit('export-txt')"
             @export-markdown="emit('export-markdown')"
             @export-html="emit('export-html')"
@@ -475,7 +476,7 @@ const props = defineProps({
   targetLanguage: { type: String, default: 'fa' },
 })
 
-const emit = defineEmits(['request-open-pdf', 'translate-visible', 'cancel-translation', 'content-view-change', 'layout-mode-change', 'toggle-outline', 'export-txt', 'export-markdown', 'export-html', 'request-region-comparison', 'cancel-region-comparison', 'export-region-comparison-artifact', 'clear-cache', 'zoom-step', 'zoom-change', 'execution-mode-change', 'primary-click', 'select-action', 'select-language',   'manage-languages', 'open-settings', 'request-document-info', 'previous-page', 'next-page',
+const emit = defineEmits(['request-open-pdf', 'open-remote-pdf', 'translate-visible', 'cancel-translation', 'content-view-change', 'layout-mode-change', 'toggle-outline', 'export-txt', 'export-markdown', 'export-html', 'request-region-comparison', 'cancel-region-comparison', 'export-region-comparison-artifact', 'clear-cache', 'zoom-step', 'zoom-change', 'execution-mode-change', 'primary-click', 'select-action', 'select-language',   'manage-languages', 'open-settings', 'request-document-info', 'previous-page', 'next-page',
   'go-to-page', 'update:sourceLanguage', 'update:targetLanguage'])
 
 const logger = getScopedLogger(LOG_COMPONENTS.PDF, 'PdfToolbar')
