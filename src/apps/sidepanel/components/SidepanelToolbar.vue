@@ -152,7 +152,7 @@ import { TranslationMode } from '@/shared/config/config.js';
 import { findProviderById } from '@/features/translation/providers/ProviderManifest.js';
 import { MessageActions } from '@/shared/messaging/core/MessageActions.js';
 import { sendMessage } from '@/shared/messaging/core/UnifiedMessaging.js';
-import { openExtensionApp } from '@/core/helpers.js';
+import { openExtensionApp } from '@/core/ExtensionAppLauncher.js';
 import browser from 'webextension-polyfill';
 
 // Icon URLs will be loaded at runtime

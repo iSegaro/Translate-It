@@ -24,7 +24,7 @@ import ResourceTracker from '@/core/memory/ResourceTracker.js';
 import { storageManager } from '@/shared/storage/core/StorageCore.js';
 import ExtensionContextManager from '@/core/extensionContext.js';
 import { tabPermissionChecker } from '@/core/tabPermissions.js';
-import { openExtensionApp } from '@/core/helpers.js';
+import { openExtensionApp } from '@/core/ExtensionAppLauncher.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.CORE, 'context-menu');
 
