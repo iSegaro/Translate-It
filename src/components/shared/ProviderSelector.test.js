@@ -116,12 +116,28 @@ describe('ProviderSelector split mode', () => {
   })
 
   it('keeps provider dropdown trigger available in split mode', async () => {
-    const wrapper = mount(ProviderSelector, {
-      props: { mode: 'split', modelValue: 'googlev2' },
-      global: { stubs: { Teleport: true } },
-    })
+    const container = document.createElement('div')
+    document.body.appendChild(container)
 
-    await wrapper.find('.ti-provider-dropdown-area').trigger('click')
-    expect(wrapper.find('.ti-provider-dropdown-menu').exists()).toBe(true)
+    let wrapper
+    try {
+      wrapper = mount(ProviderSelector, {
+        props: { mode: 'split', modelValue: 'googlev2' },
+        global: { stubs: { Teleport: true } },
+        attachTo: container,
+      })
+
+      const rootEl = wrapper.find('.ti-split-translate-button-container').element
+      vi.spyOn(rootEl, 'getBoundingClientRect').mockReturnValue({
+        top: 10, left: 10, right: 300, bottom: 50,
+        width: 290, height: 40, x: 10, y: 10
+      })
+
+      await wrapper.find('.ti-provider-dropdown-area').trigger('click')
+      expect(wrapper.find('.ti-provider-dropdown-menu').exists()).toBe(true)
+    } finally {
+      wrapper?.unmount()
+      container.remove()
+    }
   })
 })
