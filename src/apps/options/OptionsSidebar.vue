@@ -43,20 +43,6 @@
       </div>
 
       <a 
-        id="PDF_TRANSLATOR"
-        href="#"
-        class="sidebar-section app-link-section"
-        @click.prevent="openPdfPage"
-      >
-        <img
-          src="@/icons/ui/pdf_viewer/pdf.png"
-          class="app-link-icon"
-          alt="PDF"
-        >
-        <span class="app-link-label">{{ t('pdf_app_title', 'PDF Translator') }}</span>
-      </a>
-
-      <a 
         id="SUBTITLE_TRANSLATOR"
         href="#"
         class="sidebar-section app-link-section"
@@ -68,6 +54,20 @@
           alt="Subtitle"
         >
         <span class="app-link-label">{{ t('open_subtitle_translator', 'Subtitle Translator') }}</span>
+      </a>
+
+      <a 
+        id="PDF_TRANSLATOR"
+        href="#"
+        class="sidebar-section app-link-section"
+        @click.prevent="openPdfPage"
+      >
+        <img
+          src="@/icons/ui/pdf_viewer/pdf.png"
+          class="app-link-icon"
+          alt="PDF"
+        >
+        <span class="app-link-label">{{ t('pdf_app_title', 'PDF Translator') }}</span>
       </a>
 
       <div class="sidebar-footer">
