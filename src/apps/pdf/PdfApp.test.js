@@ -401,8 +401,6 @@ vi.mock('@/features/pdf-translation/core/PdfViewerStateUrlAdapter.js', () => ({
 import { createViewerState } from '@/features/pdf-translation/core/PdfViewerState.js'
 
 const flushPromises = () => nextTick()
-const waitAnimationFrame = () => new Promise(resolve => requestAnimationFrame(resolve))
-
 function createMocks({
   bannerState = null,
   hasDocument = true,

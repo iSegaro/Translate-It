@@ -1,10 +1,7 @@
-import { afterEach, describe, beforeEach, expect, it, vi } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { mount } from '@vue/test-utils'
-import { computed, defineComponent, h, nextTick, reactive, ref } from 'vue'
+import { computed, defineComponent, h, nextTick, ref } from 'vue'
 import PdfApp from './PdfApp.vue'
-import { createPdfRegion } from '@/features/pdf-translation/core/PdfRegion.js'
-import { PdfDeveloperApi } from './PdfDeveloperApi.js'
-import { PDF_REGION_OCR_RENDER_SCALE } from '@/features/pdf-translation/core/pdfRenderingConstants.js'
 
 // jsdom does not implement matchMedia — stub it before component mount
 if (!window.matchMedia) {
