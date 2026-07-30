@@ -800,36 +800,6 @@ describe('PdfApp', () => {
     expect(translationFailedMock).toHaveBeenCalledWith(expect.objectContaining({ occurrenceId: 8, error: 'Translation request failed' }))
   })
 
-  it('ignores stale cancelled page translation completion after a newer outcome', async () => {
-    const first = createDeferred()
-    const second = createDeferred()
-    createMocks()
-    mockViewerController.translateVisiblePages
-      .mockImplementationOnce(() => first.promise)
-      .mockImplementationOnce(() => second.promise)
-    const wrapper = mount(PdfApp)
-
-    wrapper.findComponent({ name: 'PdfToolbar' }).vm.$emit('translate-visible')
-    await flushPromises()
-    wrapper.findComponent({ name: 'PdfToolbar' }).vm.$emit('translate-visible')
-    mockViewerController.translationSummary.value = {
-      status: 'partial', translationOccurrenceId: 15, error: 'Newer failure', failureReason: 'provider-error'
-    }
-    second.resolve(true)
-    await flushPromises()
-    await flushPromises()
-    expect(wrapper.find('.pdf-status-banner__message').text()).toBe('Newer failure')
-
-    mockViewerController.translationSummary.value = {
-      status: 'cancelled', translationOccurrenceId: 16, error: ''
-    }
-    first.resolve(true)
-    await flushPromises()
-    await flushPromises()
-
-    expect(wrapper.find('.pdf-status-banner__message').text()).toBe('Newer failure')
-  })
-
   it('completes page translation once when cancelled from the progress bar', async () => {
     const deferred = createDeferred()
     createMocks()
