@@ -2325,16 +2325,16 @@ describe('PdfApp', () => {
     })
   })
 
-  describe('Restore pipeline', () => {
-    function pendingState(overrides = {}) {
-      return createViewerState({
-        documentIdentity: 'loaded-doc-id',
-        currentPage: 8,
-        contentView: 'translation',
-        ...overrides,
-      })
-    }
+  function pendingState(overrides = {}) {
+    return createViewerState({
+      documentIdentity: 'loaded-doc-id',
+      currentPage: 8,
+      contentView: 'translation',
+      ...overrides,
+    })
+  }
 
+  describe('Restore pipeline', () => {
     async function simulateFileOpen(wrapper) {
       const file = new File([''], 'test.pdf', { type: 'application/pdf' })
       const fileInput = wrapper.find('input[type="file"]')
@@ -2449,6 +2449,30 @@ describe('PdfApp', () => {
       expect(mockClearPending).not.toHaveBeenCalled()
       expect(mockViewerMode.setContentView).not.toHaveBeenCalled()
     })
+
+    it('restores viewer state after a retried load succeeds', async () => {
+      mockViewerController.hasDocument.value = false
+      mockViewerController.loadFailure.value = { kind: 'TIMEOUT', details: {} }
+      mockViewerController.loadPdfFile.mockResolvedValueOnce(false)
+
+      const wrapper = mount(PdfApp)
+      await flushPromises()
+      mockPendingState = pendingState()
+
+      await simulateFileOpen(wrapper)
+      await flushPromises()
+
+      expect(mockClearPending).not.toHaveBeenCalled()
+
+      const retryButton = wrapper.find('.pdf-load-failure-banner__retry')
+      expect(retryButton.exists()).toBe(true)
+      await retryButton.trigger('click')
+      await flushPromises()
+
+      expect(mockViewerMode.setContentView).toHaveBeenCalledWith('translation')
+      expect(mockPdfNavigation.navigateToPage).toHaveBeenCalledWith(8)
+      expect(mockClearPending).toHaveBeenCalled()
+    })
   })
 
   describe('Startup restore', () => {
@@ -2532,6 +2556,54 @@ describe('PdfApp', () => {
 
       expect(mockViewerController.loadPdfFile).not.toHaveBeenCalled()
       expect(mockViewerController.openPdfUrl).not.toHaveBeenCalled()
+    })
+
+    it('restores viewer state for a stored local file on identity match', async () => {
+      const file = new File([''], 'restored.pdf', { type: 'application/pdf' })
+      browserTabStateMock.read.mockReturnValue({
+        fileHandle: { getFile: vi.fn().mockResolvedValue(file) }
+      })
+      mockReadUrl.mockReturnValue(pendingState())
+
+      mount(PdfApp)
+      await flushPromises()
+
+      await vi.waitFor(() => {
+        expect(mockViewerMode.setContentView).toHaveBeenCalledWith('translation')
+      })
+      expect(mockPdfNavigation.navigateToPage).toHaveBeenCalledWith(8)
+      expect(mockClearPending).toHaveBeenCalled()
+    })
+
+    it('restores viewer state for a remote URL on identity match', async () => {
+      window.history.pushState({}, '', `/?remote=${remoteUrl}`)
+      mockReadUrl.mockReturnValue(pendingState())
+
+      mount(PdfApp)
+      await flushPromises()
+
+      await vi.waitFor(() => {
+        expect(mockViewerMode.setContentView).toHaveBeenCalledWith('translation')
+      })
+      expect(mockPdfNavigation.navigateToPage).toHaveBeenCalledWith(8)
+      expect(mockClearPending).toHaveBeenCalled()
+    })
+
+    it('preserves pending viewer state when remote startup load fails', async () => {
+      window.history.pushState({}, '', `/?remote=${remoteUrl}`)
+      mockReadUrl.mockReturnValue(pendingState())
+      mockViewerController.openPdfUrl.mockResolvedValueOnce(false)
+
+      mount(PdfApp)
+      await flushPromises()
+
+      await vi.waitFor(() => {
+        expect(mockViewerController.openPdfUrl).toHaveBeenCalled()
+      })
+
+      expect(mockViewerMode.setContentView).not.toHaveBeenCalled()
+      expect(mockPdfNavigation.navigateToPage).not.toHaveBeenCalled()
+      expect(mockClearPending).not.toHaveBeenCalled()
     })
   })
 
