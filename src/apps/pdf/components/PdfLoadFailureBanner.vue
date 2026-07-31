@@ -8,17 +8,29 @@
     <div class="pdf-load-failure-banner__content">
       <p class="pdf-load-failure-banner__title">{{ title }}</p>
       <p class="pdf-load-failure-banner__description">{{ description }}</p>
+      <button
+        v-if="retryable"
+        class="pdf-load-failure-banner__retry"
+        type="button"
+        :disabled="isLoading"
+        @click="emit('retry')"
+      >
+        Retry
+      </button>
     </div>
   </div>
 </template>
 
 <script setup>
+const emit = defineEmits(['retry'])
+
 defineProps({
   title: { type: String, required: true },
   description: { type: String, required: true },
   severity: { type: String, required: true },
   retryable: { type: Boolean, required: true },
   icon: { type: String, required: true },
+  isLoading: { type: Boolean, default: false },
 })
 </script>
 
@@ -69,5 +81,21 @@ defineProps({
   font-size: 13px;
   color: rgba(230, 237, 247, 0.7);
   line-height: 1.4;
+}
+
+.pdf-load-failure-banner__retry {
+  align-self: flex-start;
+  margin-top: 10px;
+  padding: 6px 16px;
+  border: 1px solid rgba(230, 237, 247, 0.25);
+  border-radius: 6px;
+  background: transparent;
+  color: rgb(230, 237, 247);
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.pdf-load-failure-banner__retry:hover {
+  background: rgba(230, 237, 247, 0.08);
 }
 </style>

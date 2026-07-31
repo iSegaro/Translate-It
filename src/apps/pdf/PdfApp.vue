@@ -129,6 +129,8 @@
               <PdfLoadFailureBanner
                 v-if="loadFailurePresentation"
                 v-bind="loadFailurePresentation"
+                :is-loading="isLoading"
+                @retry="handleRetry"
               />
               <div
                 v-else
@@ -338,6 +340,7 @@ const {
 const showPdfInfo = ref(false)
 const showRemoteUrlDialog = ref(false)
 const isRemoteUrlLoading = ref(false)
+const lastRetryAction = ref(null)
 const loadFailurePresentation = computed(() => {
   if (!loadFailure.value) return null
   return mapPdfLoadFailurePresentation(loadFailure.value)
@@ -835,6 +838,7 @@ function updateBrowserState() {
 }
 
 async function handleFileSelected(file) {
+  lastRetryAction.value = () => handleFileSelected(file)
   prepareDocumentReplacement()
   const loaded = await loadPdfFile(file, buildLayoutRequest())
   if (loaded) {
@@ -847,6 +851,7 @@ async function handleFileSelected(file) {
 }
 
 async function handleOpenRemoteUrl(url) {
+  lastRetryAction.value = () => handleOpenRemoteUrl(url)
   isRemoteUrlLoading.value = true
   try {
     if (hasDocument.value) {
@@ -859,9 +864,15 @@ async function handleOpenRemoteUrl(url) {
       await restoreViewerState()
     }
     updateBrowserState()
+    return loaded
   } finally {
     isRemoteUrlLoading.value = false
   }
+}
+
+async function handleRetry() {
+  if (!lastRetryAction.value || isLoading.value) return false
+  return lastRetryAction.value()
 }
 
 async function requestOpenPdf() {
@@ -1364,16 +1375,13 @@ onMounted(async () => {
   const params = new URLSearchParams(location.search)
   const remoteUrl = params.get('remote')
   if (remoteUrl) {
-    const loaded = await openPdfUrl(remoteUrl, buildLayoutRequest())
+    const loaded = await handleOpenRemoteUrl(remoteUrl)
     if (loaded) {
-      finalizeDocumentOpen()
-      await restoreViewerState()
-      const url = new URL(location.href)
       params.delete('remote')
+      const url = new URL(location.href)
       url.search = params.toString()
       history.replaceState(history.state, '', url.toString())
     }
-    updateBrowserState()
   }
 
   const mq = window.matchMedia('(prefers-color-scheme: dark)')
