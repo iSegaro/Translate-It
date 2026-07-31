@@ -445,6 +445,7 @@ export class ContextMenuManager extends ResourceTracker {
         id: PAGE_CONTEXT_PDF_ID,
         title: (await getTranslationString("pdf_app_title", locale)) || "PDF Translator",
         contexts: ["link"],
+        targetUrlPatterns: ["*://*/*.pdf", "*://*/*.PDF"],
       });
 
       // --- 2. Create Action (Browser Action) Context Menus ---
