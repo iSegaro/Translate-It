@@ -388,6 +388,10 @@ const props = defineProps({
     type: String,
     default: 'auto', // auto, up, down
     validator: (value) => ['auto', 'up', 'down'].includes(value)
+  },
+  translateOnProviderChange: {
+    type: Boolean,
+    default: true
   }
 })
 
@@ -980,7 +984,7 @@ const selectProvider = async (provider) => {
     closeDropdown()
 
     // Auto-trigger translation in split mode after selecting a provider
-    if (props.mode === 'split' && !props.disabled) {
+    if (props.mode === 'split' && !props.disabled && props.translateOnProviderChange) {
       emit('translate', { provider: provider.id })
     }
   } catch (error) {

@@ -358,6 +358,7 @@
           :loading="isTranslating"
           :disabled="!canTranslateVisiblePages && !isTranslating"
           :dropdown-disabled="isTranslating"
+          :translate-on-provider-change="false"
           @provider-change="handleProviderChange"
           @translate="handleTranslateRequest"
           @cancel="$emit('cancel-translation')"
@@ -539,7 +540,6 @@ const runProviderPersistenceQueue = async () => {
       }
 
       if (ownership.sequence === providerPersistenceState.sequence && !providerPersistenceState.latest) {
-        emit('translate-visible')
         return
       }
     }

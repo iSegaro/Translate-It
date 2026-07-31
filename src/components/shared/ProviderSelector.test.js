@@ -140,4 +140,64 @@ describe('ProviderSelector split mode', () => {
       container.remove()
     }
   })
+
+  it('auto-triggers translate after provider selection by default', async () => {
+    const container = document.createElement('div')
+    document.body.appendChild(container)
+
+    let wrapper
+    try {
+      wrapper = mount(ProviderSelector, {
+        props: { mode: 'split', modelValue: 'googlev2' },
+        global: { stubs: { Teleport: true } },
+        attachTo: container,
+      })
+
+      const rootEl = wrapper.find('.ti-split-translate-button-container').element
+      vi.spyOn(rootEl, 'getBoundingClientRect').mockReturnValue({
+        top: 10, left: 10, right: 300, bottom: 50,
+        width: 290, height: 40, x: 10, y: 10
+      })
+
+      await wrapper.find('.ti-provider-dropdown-area').trigger('click')
+      await wrapper.find('.ti-dropdown-item').trigger('click')
+
+      expect(wrapper.emitted('provider-change')).toEqual([['googlev2']])
+      expect(wrapper.emitted('update:modelValue')).toEqual([['googlev2']])
+      expect(wrapper.emitted('translate')).toEqual([[{ provider: 'googlev2' }]])
+    } finally {
+      wrapper?.unmount()
+      container.remove()
+    }
+  })
+
+  it('skips the automatic translate emit when translateOnProviderChange is false', async () => {
+    const container = document.createElement('div')
+    document.body.appendChild(container)
+
+    let wrapper
+    try {
+      wrapper = mount(ProviderSelector, {
+        props: { mode: 'split', modelValue: 'googlev2', translateOnProviderChange: false },
+        global: { stubs: { Teleport: true } },
+        attachTo: container,
+      })
+
+      const rootEl = wrapper.find('.ti-split-translate-button-container').element
+      vi.spyOn(rootEl, 'getBoundingClientRect').mockReturnValue({
+        top: 10, left: 10, right: 300, bottom: 50,
+        width: 290, height: 40, x: 10, y: 10
+      })
+
+      await wrapper.find('.ti-provider-dropdown-area').trigger('click')
+      await wrapper.find('.ti-dropdown-item').trigger('click')
+
+      expect(wrapper.emitted('provider-change')).toEqual([['googlev2']])
+      expect(wrapper.emitted('update:modelValue')).toEqual([['googlev2']])
+      expect(wrapper.emitted('translate')).toBeUndefined()
+    } finally {
+      wrapper?.unmount()
+      container.remove()
+    }
+  })
 })

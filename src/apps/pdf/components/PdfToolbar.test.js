@@ -21,11 +21,11 @@ vi.mock('@/components/shared/ProviderSelector.vue', () => ({
     template: `
       <div>
         <button class="mock-provider-selector" :disabled="disabled" @click="$emit(loading ? 'cancel' : 'translate', { provider: 'googlev2' })" />
-        <button class="mock-provider-change-a" :disabled="disabled || dropdownDisabled" @click="$emit('provider-change', 'deepl'); $emit('translate', { provider: 'deepl' })" />
-        <button class="mock-provider-change-b" :disabled="disabled || dropdownDisabled" @click="$emit('provider-change', 'openai'); $emit('translate', { provider: 'openai' })" />
+        <button class="mock-provider-change-a" :disabled="disabled || dropdownDisabled" @click="$emit('provider-change', 'deepl'); if (translateOnProviderChange) $emit('translate', { provider: 'deepl' })" />
+        <button class="mock-provider-change-b" :disabled="disabled || dropdownDisabled" @click="$emit('provider-change', 'openai'); if (translateOnProviderChange) $emit('translate', { provider: 'openai' })" />
       </div>
     `,
-    props: ['disabled', 'dropdownDisabled', 'loading', 'presentation'],
+    props: ['disabled', 'dropdownDisabled', 'loading', 'presentation', 'translateOnProviderChange'],
     emits: ['translate', 'cancel', 'provider-change', 'update:modelValue']
   }
 }))
@@ -675,7 +675,7 @@ describe('PdfToolbar', () => {
     expect(wrapper.emitted('translate-visible')).toHaveLength(1)
   })
 
-  it('waits for PDF provider persistence before translating after provider change', async () => {
+  it('persists PDF provider changes without translating', async () => {
     const persistence = createDeferred()
     settingsStoreMock.updateSettingAndPersist.mockImplementationOnce((key, value) => {
       return persistence.promise.then(() => {
@@ -705,6 +705,32 @@ describe('PdfToolbar', () => {
     await flushPromises()
 
     expect(settingsStoreMock.settings.MODE_PROVIDERS[TranslationMode.PDF]).toBe('deepl')
+    expect(wrapper.emitted('translate-visible')).toBeFalsy()
+  })
+
+  it('translates when the user clicks Translate after a provider change', async () => {
+    settingsStoreMock.updateSettingAndPersist.mockImplementationOnce((key, value) => {
+      settingsStoreMock.settings[key] = value
+      return Promise.resolve(true)
+    })
+
+    const wrapper = mount(PdfToolbar, {
+      props: {
+        fileName: 'demo.pdf',
+        pageCount: 12,
+        currentPageNumber: 1,
+        canTranslateVisiblePages: true
+      }
+    })
+
+    await wrapper.find('.mock-provider-change-a').trigger('click')
+    await flushPromises()
+
+    expect(settingsStoreMock.settings.MODE_PROVIDERS[TranslationMode.PDF]).toBe('deepl')
+    expect(wrapper.emitted('translate-visible')).toBeFalsy()
+
+    await wrapper.find('.mock-provider-selector').trigger('click')
+
     expect(wrapper.emitted('translate-visible')).toHaveLength(1)
   })
 
@@ -740,7 +766,7 @@ describe('PdfToolbar', () => {
     expect(wrapper.find('.pdf-toolbar__language-popover').exists()).toBe(false)
   })
 
-  it('serializes rapid PDF provider changes so the latest selection persists and translates once', async () => {
+  it('serializes rapid PDF provider changes so the latest selection persists without translating', async () => {
     const firstPersistence = createDeferred()
     const secondPersistence = createDeferred()
     settingsStoreMock.updateSettingAndPersist
@@ -780,7 +806,7 @@ describe('PdfToolbar', () => {
     await flushPromises()
 
     expect(settingsStoreMock.settings.MODE_PROVIDERS[TranslationMode.PDF]).toBe('openai')
-    expect(wrapper.emitted('translate-visible')).toHaveLength(1)
+    expect(wrapper.emitted('translate-visible')).toBeFalsy()
   })
 
   it('does not log stale PDF provider persistence failures when the latest selection succeeds', async () => {
@@ -818,7 +844,7 @@ describe('PdfToolbar', () => {
 
     expect(settingsStoreMock.settings.MODE_PROVIDERS[TranslationMode.PDF]).toBe('openai')
     expect(loggerMock.error).not.toHaveBeenCalled()
-    expect(wrapper.emitted('translate-visible')).toHaveLength(1)
+    expect(wrapper.emitted('translate-visible')).toBeFalsy()
   })
 
   it('logs latest PDF provider persistence failures without translating', async () => {
