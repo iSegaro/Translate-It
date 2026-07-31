@@ -217,7 +217,7 @@ vi.mock('./components/PdfToolbar.vue', () => ({
   default: {
     name: 'PdfToolbar',
     props: ['fileName', 'pageCount', 'currentPageNumber', 'zoomMode', 'zoomPercent', 'contentView', 'layoutMode', 'executionMode', 'executionModes', 'ocrViewModel', 'regionComparisonState', 'canExportRegionComparisonArtifact', 'hasOutline'],
-    emits: ['toggle-outline', 'translate-visible', 'cancel-translation', 'content-view-change', 'layout-mode-change', 'zoom-step', 'zoom-change', 'export-txt', 'export-markdown', 'export-html', 'request-region-comparison', 'cancel-region-comparison', 'export-region-comparison-artifact', 'clear-cache', 'request-open-pdf', 'execution-mode-change', 'primary-click', 'select-action', 'select-language', 'manage-languages', 'open-settings', 'request-document-info', 'previous-page', 'next-page'],
+    emits: ['toggle-outline', 'translate-visible', 'cancel-translation', 'content-view-change', 'layout-mode-change', 'zoom-step', 'zoom-change', 'export-txt', 'export-markdown', 'export-html', 'request-region-comparison', 'cancel-region-comparison', 'export-region-comparison-artifact', 'clear-cache', 'request-open-pdf', 'open-remote-pdf', 'execution-mode-change', 'primary-click', 'select-action', 'select-language', 'manage-languages', 'open-settings', 'request-document-info', 'previous-page', 'next-page'],
     template: '<header class="pdf-toolbar-stub"><button v-if="hasOutline" class="pdf-toolbar__outline-toggle" /></header>'
   }
 }))
@@ -2322,6 +2322,56 @@ describe('PdfApp', () => {
       await flushPromises()
 
       expect(wrapper.findComponent({ name: 'PdfDocumentInfoDialog' }).props('modelValue')).toBe(true)
+    })
+  })
+
+  describe('Remote URL dialog', () => {
+    it('opens the dialog from the Open Remote PDF toolbar action', async () => {
+      const wrapper = mount(PdfApp)
+      await flushPromises()
+
+      const dialog = wrapper.findComponent({ name: 'PdfRemoteUrlDialog' })
+      expect(dialog.props('visible')).toBe(false)
+      expect(wrapper.find('.pdf-remote-url-overlay').exists()).toBe(false)
+
+      wrapper.findComponent({ name: 'PdfToolbar' }).vm.$emit('open-remote-pdf')
+      await flushPromises()
+
+      expect(dialog.props('visible')).toBe(true)
+      expect(wrapper.find('.pdf-remote-url-overlay').exists()).toBe(true)
+    })
+
+    it('closes the dialog and hides its overlay on close', async () => {
+      const wrapper = mount(PdfApp)
+      await flushPromises()
+
+      wrapper.findComponent({ name: 'PdfToolbar' }).vm.$emit('open-remote-pdf')
+      await flushPromises()
+      expect(wrapper.find('.pdf-remote-url-overlay').exists()).toBe(true)
+
+      wrapper.findComponent({ name: 'PdfRemoteUrlDialog' }).vm.$emit('close')
+      await flushPromises()
+
+      expect(wrapper.findComponent({ name: 'PdfRemoteUrlDialog' }).props('visible')).toBe(false)
+      await vi.waitFor(() => expect(wrapper.find('.pdf-remote-url-overlay').exists()).toBe(false))
+    })
+
+    it('submits a valid URL through the existing remote loading flow', async () => {
+      const wrapper = mount(PdfApp)
+      await flushPromises()
+
+      wrapper.findComponent({ name: 'PdfToolbar' }).vm.$emit('open-remote-pdf')
+      await flushPromises()
+
+      const url = 'https://example.com/document.pdf'
+      await wrapper.find('.pdf-remote-url-dialog__input').setValue(url)
+      await wrapper.find('.pdf-remote-url-dialog form').trigger('submit')
+      await flushPromises()
+
+      expect(mockViewerController.openPdfUrl).toHaveBeenCalledWith(url, expect.anything())
+      expect(browserTabStateMock.write).toHaveBeenCalledWith({ remoteUrl: url })
+      expect(wrapper.findComponent({ name: 'PdfRemoteUrlDialog' }).props('visible')).toBe(false)
+      await vi.waitFor(() => expect(wrapper.find('.pdf-remote-url-overlay').exists()).toBe(false))
     })
   })
 

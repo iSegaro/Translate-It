@@ -40,6 +40,7 @@
       @export-region-comparison-artifact="handleExportRegionComparisonArtifact"
       @clear-cache="handleClearCache"
       @request-open-pdf="requestOpenPdf"
+      @open-remote-pdf="showRemoteUrlDialog = true"
       @execution-mode-change="handleExecutionModeChange"
       @primary-click="handleOcrPrimaryClick"
       @select-action="handleOcrSelectAction"
@@ -123,7 +124,6 @@
             @file-selected="handleFileSelected"
             @drag-state-change="isDragOver = $event"
             @request-open-pdf="requestOpenPdf"
-            @open-remote-pdf="showRemoteUrlDialog = true"
           >
             <template #empty>
               <PdfLoadFailureBanner
