@@ -8,7 +8,8 @@
 
   &.light {
     .ti-action-btn,
-    .ti-smart-tts-btn {
+    .ti-smart-tts-btn,
+    &.pdf-windows-host__toolbar .ti-window-provider-selector .ti-provider-icon-button {
       background-color: #f0f0f0 !important;
       color: #555 !important;
     }
@@ -22,7 +23,8 @@
 
   &.dark {
     .ti-action-btn,
-    .ti-smart-tts-btn {
+    .ti-smart-tts-btn,
+    &.pdf-windows-host__toolbar .ti-window-provider-selector .ti-provider-icon-button {
       background-color: #424242 !important;
       color: #e0e0e0 !important;
     }
@@ -92,7 +94,8 @@
   }
 
   .ti-action-btn,
-  .ti-smart-tts-btn {
+  .ti-smart-tts-btn,
+  &.pdf-windows-host__toolbar .ti-window-provider-selector .ti-provider-icon-button {
     display: flex !important;
     align-items: center !important;
     justify-content: center !important;
@@ -116,7 +119,8 @@
     }
   }
 
-  .ti-action-btn {
+  .ti-action-btn,
+  &.pdf-windows-host__toolbar .ti-window-provider-selector .ti-provider-icon-button {
     &.ti-original-visible,
     &.ti-active {
       background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%) !important;
