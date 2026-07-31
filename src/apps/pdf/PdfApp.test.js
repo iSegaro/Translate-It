@@ -2451,6 +2451,90 @@ describe('PdfApp', () => {
     })
   })
 
+  describe('Startup restore', () => {
+    const remoteUrl = 'https://example.com/remote.pdf'
+
+    afterEach(() => {
+      window.history.pushState({}, '', window.location.pathname)
+    })
+
+    it('restores a stored local file handle through the load pipeline', async () => {
+      const file = new File([''], 'restored.pdf', { type: 'application/pdf' })
+      browserTabStateMock.read.mockReturnValue({
+        fileHandle: { getFile: vi.fn().mockResolvedValue(file) }
+      })
+
+      mount(PdfApp)
+      await flushPromises()
+
+      await vi.waitFor(() => {
+        expect(mockViewerController.loadPdfFile).toHaveBeenCalledWith(file, expect.anything())
+        expect(mockViewerController.openPdfUrl).not.toHaveBeenCalled()
+      })
+    })
+
+    it('does not auto-load anything when no restore source exists', async () => {
+      browserTabStateMock.read.mockReturnValue(null)
+
+      mount(PdfApp)
+      await flushPromises()
+
+      await vi.waitFor(() => {
+        expect(browserTabStateMock.read).toHaveBeenCalled()
+      })
+
+      expect(mockViewerController.loadPdfFile).not.toHaveBeenCalled()
+      expect(mockViewerController.openPdfUrl).not.toHaveBeenCalled()
+    })
+
+    it('loads a remote URL from the ?remote= startup param', async () => {
+      window.history.pushState({}, '', `/?remote=${remoteUrl}`)
+
+      mount(PdfApp)
+      await flushPromises()
+
+      await vi.waitFor(() => {
+        expect(mockViewerController.openPdfUrl).toHaveBeenCalledWith(remoteUrl, expect.anything())
+        expect(mockViewerController.loadPdfFile).not.toHaveBeenCalled()
+        expect(window.location.search).toBe('')
+      })
+    })
+
+    it('skips restore when multiple sources exist', async () => {
+      const file = new File([''], 'restored.pdf', { type: 'application/pdf' })
+      browserTabStateMock.read.mockReturnValue({
+        fileHandle: { getFile: vi.fn().mockResolvedValue(file) }
+      })
+      window.history.pushState({}, '', `/?remote=${remoteUrl}`)
+
+      mount(PdfApp)
+      await flushPromises()
+
+      await vi.waitFor(() => {
+        expect(pdfAppLoggerMock.warn).toHaveBeenCalledWith('Ambiguous PDF restore sources detected. Skipping restore.')
+      })
+
+      expect(mockViewerController.loadPdfFile).not.toHaveBeenCalled()
+      expect(mockViewerController.openPdfUrl).not.toHaveBeenCalled()
+    })
+
+    it('does not auto-restore when the file handle getFile fails', async () => {
+      browserTabStateMock.read.mockReturnValue({
+        fileHandle: { getFile: vi.fn().mockRejectedValue(new Error('handle revoked')) }
+      })
+
+      mount(PdfApp)
+      await flushPromises()
+
+      await vi.waitFor(() => {
+        expect(pdfAppLoggerMock.warn).toHaveBeenCalledWith('Failed to restore local PDF file handle.', expect.any(Error))
+      })
+
+      expect(mockViewerController.loadPdfFile).not.toHaveBeenCalled()
+      expect(mockViewerController.openPdfUrl).not.toHaveBeenCalled()
+    })
+  })
+
   describe('Viewer State URL write', () => {
     it('writes Viewer State on successful document open', async () => {
       const wrapper = mount(PdfApp)

@@ -875,6 +875,41 @@ async function handleRetry() {
   return lastRetryAction.value()
 }
 
+async function tryAutoRestore() {
+  const params = new URLSearchParams(location.search)
+  const remoteUrl = params.get('remote')
+  const fileHandle = readBrowserTabState()?.fileHandle
+
+  const sourceCount = Number(Boolean(remoteUrl)) + Number(Boolean(fileHandle))
+
+  if (sourceCount > 1) {
+    logger.warn('Ambiguous PDF restore sources detected. Skipping restore.')
+    return
+  }
+
+  if (remoteUrl) {
+    const loaded = await handleOpenRemoteUrl(remoteUrl)
+    if (loaded) {
+      params.delete('remote')
+      const url = new URL(location.href)
+      url.search = params.toString()
+      history.replaceState(history.state, '', url.toString())
+    }
+    return
+  }
+
+  if (fileHandle) {
+    try {
+      const file = await fileHandle.getFile()
+      if (file) {
+        await handleFileSelected(file)
+      }
+    } catch (error) {
+      logger.warn('Failed to restore local PDF file handle.', error)
+    }
+  }
+}
+
 async function requestOpenPdf() {
   if (typeof globalThis.showOpenFilePicker === 'function') {
     const storedHandle = readBrowserTabState()?.fileHandle
@@ -1372,17 +1407,7 @@ onMounted(async () => {
   browser.runtime.onMessage.addListener(handler)
   removeThemeMessageListener = () => browser.runtime.onMessage.removeListener(handler)
 
-  const params = new URLSearchParams(location.search)
-  const remoteUrl = params.get('remote')
-  if (remoteUrl) {
-    const loaded = await handleOpenRemoteUrl(remoteUrl)
-    if (loaded) {
-      params.delete('remote')
-      const url = new URL(location.href)
-      url.search = params.toString()
-      history.replaceState(history.state, '', url.toString())
-    }
-  }
+  await tryAutoRestore()
 
   const mq = window.matchMedia('(prefers-color-scheme: dark)')
   const mqHandler = () => {
