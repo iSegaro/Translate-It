@@ -69,6 +69,14 @@ describe('Settings Store', () => {
       .toBe(CONFIG.CONTEXT_MENU_VISIBILITY.PAGE_CONTEXT_PDF_TRANSLATOR);
   });
 
+  it('should include the launcher ACTION_CONTEXT flags with the CONFIG defaults', () => {
+    const store = useSettingsStore();
+    expect(store.settings.CONTEXT_MENU_VISIBILITY.ACTION_CONTEXT_PDF_TRANSLATOR)
+      .toBe(CONFIG.CONTEXT_MENU_VISIBILITY.ACTION_CONTEXT_PDF_TRANSLATOR);
+    expect(store.settings.CONTEXT_MENU_VISIBILITY.ACTION_CONTEXT_SUBTITLE_TRANSLATOR)
+      .toBe(CONFIG.CONTEXT_MENU_VISIBILITY.ACTION_CONTEXT_SUBTITLE_TRANSLATOR);
+  });
+
   it('should keep fixed-schema nested defaults in sync with CONFIG', () => {
     const store = useSettingsStore();
 

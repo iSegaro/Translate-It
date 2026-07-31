@@ -548,18 +548,22 @@ export class ContextMenuManager extends ResourceTracker {
         }
 
         // --- 2.3.4 PDF Menu (Before Subtitle) ---
-        await this.createMenu({
-          id: ACTION_CONTEXT_MENU_PDF_ID,
-          title: (await getTranslationString("pdf_app_title", locale)) || "PDF Translator",
-          contexts: ["action"],
-        });
+        if (visibility.ACTION_CONTEXT_PDF_TRANSLATOR !== false) {
+          await this.createMenu({
+            id: ACTION_CONTEXT_MENU_PDF_ID,
+            title: (await getTranslationString("pdf_app_title", locale)) || "PDF Translator",
+            contexts: ["action"],
+          });
+        }
 
         // --- 2.3.5 Subtitle Menu (Before Options) ---
-        await this.createMenu({
-          id: ACTION_CONTEXT_MENU_SUBTITLE_ID,
-          title: (await getTranslationString("subtitle_app_title", locale)) || "Subtitle Translator",
-          contexts: ["action"],
-        });
+        if (visibility.ACTION_CONTEXT_SUBTITLE_TRANSLATOR !== false) {
+          await this.createMenu({
+            id: ACTION_CONTEXT_MENU_SUBTITLE_ID,
+            title: (await getTranslationString("subtitle_app_title", locale)) || "Subtitle Translator",
+            contexts: ["action"],
+          });
+        }
 
         // --- 2.4. Options Menu (Fourth option in Action menu) ---
         if (visibility.ACTION_CONTEXT_OPTIONS) {

@@ -2738,6 +2738,18 @@
   "pdf_context_menu_desc": {
     "message": "نمایش گزینه «مترجم PDF» در منوی کلیک‌راست مرورگر برای لینک‌های PDF."
   },
+  "pdf_action_context_menu_label": {
+    "message": "نمایش «مترجم PDF» در منوی آیکون افزونه"
+  },
+  "pdf_action_context_menu_desc": {
+    "message": "نمایش میانبر «مترجم PDF» در منوی نوار ابزار افزونه."
+  },
+  "subtitle_action_context_menu_label": {
+    "message": "نمایش «مترجم زیرنویس» در منوی آیکون افزونه"
+  },
+  "subtitle_action_context_menu_desc": {
+    "message": "نمایش میانبر «مترجم زیرنویس» در منوی نوار ابزار افزونه."
+  },
   "subtitle_app_powered_by": {
     "message": "قدرت گرفته از Translate It"
   },

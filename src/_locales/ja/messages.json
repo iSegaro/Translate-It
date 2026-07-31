@@ -2738,6 +2738,18 @@
   "pdf_context_menu_desc": {
     "message": "PDFリンクの右クリックメニューに「PDF翻訳」オプションを表示します。"
   },
+  "pdf_action_context_menu_label": {
+    "message": "ブラウザアクションメニューに「PDF翻訳」を表示"
+  },
+  "pdf_action_context_menu_desc": {
+    "message": "拡張機能のツールバーメニューに「PDF翻訳」ランチャーを表示します。"
+  },
+  "subtitle_action_context_menu_label": {
+    "message": "ブラウザアクションメニューに「字幕翻訳」を表示"
+  },
+  "subtitle_action_context_menu_desc": {
+    "message": "拡張機能のツールバーメニューに「字幕翻訳」ランチャーを表示します。"
+  },
   "subtitle_app_powered_by": {
     "message": "Translate It 提供"
   },

@@ -352,6 +352,8 @@ export const CONFIG = {
     PAGE_CONTEXT_PDF_TRANSLATOR: true,    // نمایش مترجم PDF در کلیک‌راست لینک‌های PDF
     ACTION_CONTEXT_SELECT_ELEMENT: true,  // نمایش در منوی آیکون افزونه (Action)
     ACTION_CONTEXT_SCREEN_CAPTURE: true,  // نمایش تصویربرداری در منوی آیکون
+    ACTION_CONTEXT_PDF_TRANSLATOR: true,  // نمایش مترجم PDF در منوی آیکون
+    ACTION_CONTEXT_SUBTITLE_TRANSLATOR: true, // نمایش مترجم زیرنویس در منوی آیکون
     ACTION_CONTEXT_OPTIONS: true,         // نمایش گزینه تنظیمات در منوی آیکون
     ACTION_CONTEXT_SHORTCUTS: true,       // نمایش میانبرهای کیبورد در منوی آیکون
     ACTION_CONTEXT_HELP: true             // نمایش راهنما در منوی آیکون
