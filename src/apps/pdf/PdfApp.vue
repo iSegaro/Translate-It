@@ -126,7 +126,14 @@
             @open-remote-pdf="showRemoteUrlDialog = true"
           >
             <template #empty>
-              <div class="pdf-app__empty">
+              <PdfLoadFailureBanner
+                v-if="loadFailurePresentation"
+                v-bind="loadFailurePresentation"
+              />
+              <div
+                v-else
+                class="pdf-app__empty"
+              >
                 <p class="pdf-app__empty-title">
                   Drop a PDF here or choose one from disk.
                 </p>
@@ -240,6 +247,7 @@ import PdfWindowsHost from './components/PdfWindowsHost.vue'
 import PdfOutline from './components/PdfOutline.vue'
 import PdfDocumentInfoDialog from './components/PdfDocumentInfoDialog.vue'
 import PdfRemoteUrlDialog from './components/PdfRemoteUrlDialog.vue'
+import PdfLoadFailureBanner from './components/PdfLoadFailureBanner.vue'
 import ProgressIndicator from './components/ProgressIndicator.vue'
 import OperationStatus from './components/OperationStatus.vue'
 import PdfAppBrand from './components/PdfAppBrand.vue'
@@ -248,6 +256,7 @@ import pdfBrandIcon from '@/icons/ui/pdf_viewer/pdf.svg?url'
 import { usePdfViewerController } from './composables/usePdfViewerController.js'
 import { usePdfViewerMode, CONTENT_VIEW, LAYOUT_MODE, VIEWER_ROLE } from './composables/usePdfViewerMode.js'
 import { PAGE_CONTENT_SOURCE } from '@/features/pdf-translation/core/PdfDocumentSession.js'
+import { mapPdfLoadFailurePresentation } from '@/features/pdf-translation/failures/mapPdfLoadFailurePresentation.js'
 import { usePdfDocumentInfo } from './composables/usePdfDocumentInfo.js'
 import { usePdfExport } from './composables/usePdfExport.js'
 import { usePdfOcr } from './composables/usePdfOcr.js'
@@ -315,6 +324,7 @@ const {
   pdfSourceLanguage,
   pdfTargetLanguage,
   loadPdfFile,
+  loadFailure,
   recomputeLayout,
   openPdfUrl,
   translateVisiblePages,
@@ -328,6 +338,10 @@ const {
 const showPdfInfo = ref(false)
 const showRemoteUrlDialog = ref(false)
 const isRemoteUrlLoading = ref(false)
+const loadFailurePresentation = computed(() => {
+  if (!loadFailure.value) return null
+  return mapPdfLoadFailurePresentation(loadFailure.value)
+})
 
 const { rows: pdfInfoRows } = usePdfDocumentInfo(computed(() => ({
   fileName: fileName.value,

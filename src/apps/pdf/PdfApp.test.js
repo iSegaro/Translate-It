@@ -226,7 +226,7 @@ vi.mock('./components/PdfDropzone.vue', () => ({
   default: {
     name: 'PdfDropzone',
     props: ['hasDocument'],
-    template: '<section class="pdf-dropzone-stub"><slot name="document" /></section>'
+    template: '<section class="pdf-dropzone-stub"><slot v-if="!hasDocument" name="empty" /><slot v-else name="document" /></section>'
   }
 }))
 
@@ -441,6 +441,7 @@ function createMocks({
     pdfFingerprint: ref('fingerprint'),
     workerLabel: ref('worker'),
     currentFile: ref(null),
+    loadFailure: ref(null),
     fileSize: ref(0),
     session: sessionAsRef ? ref(sessionMock) : sessionMock,
     loadPdfFile: vi.fn().mockResolvedValue(true),
@@ -2515,6 +2516,43 @@ describe('PdfApp', () => {
       expect(state.documentIdentity).toBe('loaded-doc-id')
       expect(state.currentPage).toBe(5)
       expect(state.contentView).toBe('translation')
+    })
+  })
+
+  describe('Failure presentation', () => {
+    it('renders PdfLoadFailureBanner when loadFailure exists', () => {
+      mockViewerController.hasDocument.value = false
+      mockViewerController.loadFailure.value = { kind: 'TIMEOUT', details: {} }
+      const wrapper = mount(PdfApp)
+
+      const banner = wrapper.find('.pdf-load-failure-banner')
+      expect(banner.exists()).toBe(true)
+      expect(banner.find('.pdf-load-failure-banner__title').text()).toBe('Connection timed out')
+      expect(banner.find('.pdf-load-failure-banner__description').text()).toBe('The server did not respond in time. Please check your connection and try again.')
+
+      expect(wrapper.find('.pdf-app__empty').exists()).toBe(false)
+    })
+
+    it('renders original empty state when loadFailure is null', () => {
+      mockViewerController.hasDocument.value = false
+      mockViewerController.loadFailure.value = null
+      const wrapper = mount(PdfApp)
+
+      expect(wrapper.find('.pdf-load-failure-banner').exists()).toBe(false)
+      expect(wrapper.find('.pdf-app__empty').exists()).toBe(true)
+    })
+
+    it('passes only presentation model to banner, never raw producer data', () => {
+      mockViewerController.hasDocument.value = false
+      mockViewerController.loadFailure.value = { kind: 'TIMEOUT', details: {} }
+      const wrapper = mount(PdfApp)
+
+      const banner = wrapper.find('.pdf-load-failure-banner')
+      expect(banner.exists()).toBe(true)
+
+      const props = wrapper.find('.pdf-load-failure-banner').attributes()
+      expect(props).not.toHaveProperty('kind')
+      expect(props).not.toHaveProperty('error')
     })
   })
 })
