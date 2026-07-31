@@ -1,8 +1,14 @@
 <template>
   <Transition name="dialog-fade">
-    <div v-if="visible" class="pdf-remote-url-overlay" @click.self="handleClose">
+    <div
+      v-if="visible"
+      class="pdf-remote-url-overlay"
+      @click.self="handleClose"
+    >
       <div class="pdf-remote-url-dialog">
-        <h2 class="pdf-remote-url-dialog__title">Open Remote PDF</h2>
+        <h2 class="pdf-remote-url-dialog__title">
+          Open Remote PDF
+        </h2>
 
         <form @submit.prevent="handleSubmit">
           <input
@@ -13,7 +19,12 @@
             placeholder="https://example.com/document.pdf"
             autofocus
           >
-          <p v-if="validationError" class="pdf-remote-url-dialog__error">{{ validationError }}</p>
+          <p
+            v-if="validationError"
+            class="pdf-remote-url-dialog__error"
+          >
+            {{ validationError }}
+          </p>
 
           <div class="pdf-remote-url-dialog__actions">
             <button

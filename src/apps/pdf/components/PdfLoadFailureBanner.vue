@@ -6,8 +6,12 @@
       aria-hidden="true"
     />
     <div class="pdf-load-failure-banner__content">
-      <p class="pdf-load-failure-banner__title">{{ title }}</p>
-      <p class="pdf-load-failure-banner__description">{{ description }}</p>
+      <p class="pdf-load-failure-banner__title">
+        {{ title }}
+      </p>
+      <p class="pdf-load-failure-banner__description">
+        {{ description }}
+      </p>
       <button
         v-if="retryable"
         class="pdf-load-failure-banner__retry"
