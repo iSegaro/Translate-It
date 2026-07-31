@@ -887,6 +887,7 @@ describe('PdfDocumentSession', () => {
       const cause = new Error('Repository initialization failed')
       pdfDocument.fingerprint = 'doc-fingerprint'
       pdfDocument.getMetadata = vi.fn().mockResolvedValue({ info: {} })
+      session.cleanupDocument = vi.fn().mockResolvedValue()
       session._pageContentRepository.reset = vi.fn(() => { throw cause })
       loadPdfDocumentFromBuffer.mockResolvedValue({ document: pdfDocument, loadingTask, objectUrl: 'blob:next-pdf' })
 
