@@ -121,6 +121,7 @@ export function usePdfWindowsHost(options = {}) {
   const translationTargetLanguage = ref(AUTO_DETECT_VALUE)
   const selectionSessionId = ref(0)
   const hostStyle = ref({})
+  const pinnedLoadingMinHeight = ref(0)
   const viewportTick = ref(0)
   const isInternalHostInteraction = ref(false)
 
@@ -203,10 +204,14 @@ export function usePdfWindowsHost(options = {}) {
     }
 
     placement.measureHostSize(hostRef.value)
-    hostStyle.value = placement.buildCurrentStyle({
+    const nextStyle = placement.buildCurrentStyle({
       dockMode: docking.dockMode.value,
       dockedWidth: docking.dockedWidth.value
     })
+    if (pinnedLoadingMinHeight.value > 0) {
+      nextStyle.minHeight = `${pinnedLoadingMinHeight.value}px`
+    }
+    hostStyle.value = nextStyle
   }
 
   async function scheduleHostStyleRefresh() {
@@ -276,6 +281,24 @@ export function usePdfWindowsHost(options = {}) {
     return toolbarRef.value?.stopTTS?.()
   }
 
+  function capturePinnedHostHeight() {
+    if (!isVisible.value || !docking.isPinned.value) return
+
+    const height = Math.round(hostRef.value?.getBoundingClientRect?.().height || 0)
+    if (height <= 0) return
+
+    pinnedLoadingMinHeight.value = height
+  }
+
+  function clearPinnedLoadingMinHeight() {
+    if (pinnedLoadingMinHeight.value <= 0) return
+
+    pinnedLoadingMinHeight.value = 0
+    if (isVisible.value) {
+      void scheduleHostStyleRefresh()
+    }
+  }
+
   function clearWindowContent() {
     translatedText.value = ''
     translationError.value = ''
@@ -293,6 +316,7 @@ export function usePdfWindowsHost(options = {}) {
       void stopWindowTTS()
     }
     isVisible.value = false
+    clearPinnedLoadingMinHeight()
     clearWindowContent()
     hostStyle.value = {}
   }
@@ -307,6 +331,7 @@ export function usePdfWindowsHost(options = {}) {
   }
 
   function cancelActiveTranslationRequest(reason) {
+    clearPinnedLoadingMinHeight()
     const messageId = activeMessageId
     activeMessageId = null
     if (!messageId) return
@@ -356,9 +381,17 @@ export function usePdfWindowsHost(options = {}) {
     placement.setSelectionPosition(position, { followSelection: true })
   }
 
-  async function showWindowForSelection(position, { translateImmediately = false, anchorToSelection = false } = {}) {
+  async function showWindowForSelection(position, {
+    translateImmediately = false,
+    anchorToSelection = false,
+    preservePinnedHeight = false
+  } = {}) {
     const wasAlreadyVisible = isVisible.value
     hideIconStage()
+    if (preservePinnedHeight && wasAlreadyVisible && docking.isPinned.value) {
+      capturePinnedHostHeight()
+      refreshHostStyle()
+    }
     clearWindowContent()
     isVisible.value = true
 
@@ -533,7 +566,10 @@ export function usePdfWindowsHost(options = {}) {
     hideIconStage()
 
     if (shouldTranslateDirectlyOnSelection()) {
-      void showWindowForSelection(position, { translateImmediately: true })
+      void showWindowForSelection(position, {
+        translateImmediately: true,
+        preservePinnedHeight: true
+      })
       return
     }
 
@@ -597,7 +633,13 @@ export function usePdfWindowsHost(options = {}) {
     const sourceLanguage = unref(pdfSourceLanguageRef)
     const targetLanguage = unref(pdfTargetLanguageRef)
     let resolvedTargetLanguage = AUTO_DETECT_VALUE
-    const provider = selectedProvider.value ? selectedProvider.value : await getEffectiveProviderAsync(TranslationMode.Selection)
+    let provider
+    try {
+      provider = selectedProvider.value ? selectedProvider.value : await getEffectiveProviderAsync(TranslationMode.Selection)
+    } catch (error) {
+      clearPinnedLoadingMinHeight()
+      throw error
+    }
 
     if (requestSessionId !== selectionSessionId.value) {
       return false
@@ -672,6 +714,7 @@ export function usePdfWindowsHost(options = {}) {
       if (activeRequestSessionId === requestSessionId) {
         isTranslating.value = false
         activeRequestSessionId = 0
+        clearPinnedLoadingMinHeight()
       }
       if (activeMessageId === requestMessageId) {
         activeMessageId = null

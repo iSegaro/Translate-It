@@ -252,6 +252,28 @@ async function openWindowFromSelectionIcon(wrapper) {
   await flushPromises()
 }
 
+async function openAndPinWindow(wrapper, text = 'Pinned result') {
+  await showSelectionIcon(text)
+  await openWindowFromSelectionIcon(wrapper)
+  await wrapper.get('[data-testid="translation-window-toolbar-pin"]').trigger('click')
+  await flushPromises()
+}
+
+function mockVisibleHostHeight(wrapper, height) {
+  const host = wrapper.get('[data-testid="pdf-windows-host"]')
+  vi.spyOn(host.element, 'getBoundingClientRect').mockReturnValue({
+    width: 320,
+    height,
+    top: 60,
+    right: 360,
+    bottom: 60 + height,
+    left: 40,
+    x: 40,
+    y: 60
+  })
+  return host
+}
+
 async function clickSelectionTtsButton(wrapper) {
   const icon = wrapper.get('[data-testid="pdf-translation-icon"]')
   const buttons = icon.findAll('button')
@@ -415,6 +437,7 @@ describe('PdfWindowsHost', () => {
     await openWindowFromSelectionIcon(wrapper)
 
     expect(wrapper.find('.pdf-windows-host--loading').exists()).toBe(true)
+    expect(wrapper.find('.pdf-windows-host--loading').element.style.minHeight).toBe('')
     expect(wrapper.find('[data-testid="pdf-windows-host"]').exists()).toBe(false)
     expect(wrapper.find('[data-testid="translation-window-toolbar"]').exists()).toBe(false)
 
@@ -1726,6 +1749,98 @@ describe('PdfWindowsHost', () => {
     expect(wrapper.find('[data-testid="pdf-windows-host"]').exists()).toBe(false)
   })
 
+  it('preserves visible pinned host height while a replacement selection loads', async () => {
+    await openAndPinWindow(wrapper, 'Pinned original')
+    const host = mockVisibleHostHeight(wrapper, 260)
+    const pending = deferred()
+    sendRegularMessageMock.mockImplementationOnce(() => pending.promise)
+
+    emitSelection({
+      text: 'Pinned replacement',
+      position: { x: 140, y: 200, width: 90, height: 18 },
+      context: { source: 'pdf-viewer', isPdf: true }
+    })
+    await flushPromises()
+
+    expect(host.element.style.minHeight).toBe('260px')
+    expect(wrapper.get('[data-testid="pdf-windows-host-loading"]').exists()).toBe(true)
+    expect(wrapper.text()).not.toContain('Pinned original')
+
+    pending.resolve({ success: true, translatedText: 'Pinned replacement result' })
+    await flushPromises()
+
+    expect(host.element.style.minHeight).toBe('')
+    expect(wrapper.get('[data-testid="pdf-windows-host-result"]').text()).toContain('Pinned replacement result')
+  })
+
+  it('clears pinned loading height after a replacement selection fails', async () => {
+    await openAndPinWindow(wrapper, 'Pinned original')
+    const host = mockVisibleHostHeight(wrapper, 240)
+    const pending = deferred()
+    sendRegularMessageMock.mockImplementationOnce(() => pending.promise)
+
+    emitSelection({
+      text: 'Pinned failing replacement',
+      position: { x: 140, y: 200, width: 90, height: 18 },
+      context: { source: 'pdf-viewer', isPdf: true }
+    })
+    await flushPromises()
+    expect(host.element.style.minHeight).toBe('240px')
+
+    pending.resolve({ success: false, error: { message: 'Provider unavailable' } })
+    await flushPromises()
+
+    expect(host.element.style.minHeight).toBe('')
+    expect(wrapper.get('[data-testid="pdf-windows-host-error"]').text()).toContain('Provider unavailable')
+  })
+
+  it('clears pinned loading height when a pending replacement is dismissed', async () => {
+    await openAndPinWindow(wrapper, 'Pinned original')
+    mockVisibleHostHeight(wrapper, 220)
+    const pending = deferred()
+    sendRegularMessageMock.mockImplementationOnce(() => pending.promise)
+
+    emitSelection({
+      text: 'Pinned dismissed replacement',
+      position: { x: 140, y: 200, width: 90, height: 18 },
+      context: { source: 'pdf-viewer', isPdf: true }
+    })
+    await flushPromises()
+    expect(wrapper.get('[data-testid="pdf-windows-host"]').element.style.minHeight).toBe('220px')
+
+    await wrapper.get('[data-testid="translation-window-toolbar-close"]').trigger('click')
+    await flushPromises()
+
+    sendRegularMessageMock.mockClear()
+    sendRegularMessageMock.mockResolvedValue({ success: true, translatedText: 'Reopened result' })
+    await showSelectionIcon('Pinned reopened')
+    await openWindowFromSelectionIcon(wrapper)
+
+    expect(wrapper.get('[data-testid="pdf-windows-host"]').element.style.minHeight).toBe('')
+
+    pending.resolve({ success: true, translatedText: 'Late result' })
+    await flushPromises()
+  })
+
+  it('does not preserve height for visible non-pinned direct translations', async () => {
+    await showSelectionIcon('Floating original')
+    await openWindowFromSelectionIcon(wrapper)
+    const host = mockVisibleHostHeight(wrapper, 240)
+    const pending = deferred()
+    sendRegularMessageMock.mockImplementationOnce(() => pending.promise)
+
+    wrapper.vm.openTranslation({
+      text: 'Region OCR replacement',
+      position: { x: 140, y: 200, width: 90, height: 18 }
+    })
+    await flushPromises()
+
+    expect(host.element.style.minHeight).toBe('')
+
+    pending.resolve({ success: true, translatedText: 'Region OCR result' })
+    await flushPromises()
+  })
+
   it('shows the icon first when the window is pinned but currently closed', async () => {
     await showSelectionIcon('Pinned closed')
     await openWindowFromSelectionIcon(wrapper)
@@ -1761,6 +1876,7 @@ describe('PdfWindowsHost', () => {
     dispatchPointerEvent(document, 'pointerup', { clientX: 4, clientY: 210 })
     await flushPromises()
     expect(wrapper.get('[data-testid="pdf-windows-host"]').classes()).toContain('pdf-windows-host--dock-left')
+    expect(wrapper.get('[data-testid="pdf-windows-host"]').element.style.minHeight).toBe('')
     expect(wrapper.get('[data-testid="pdf-windows-host"]').element.style.left).toBe('0px')
     expect(wrapper.get('[data-testid="pdf-windows-host"]').element.style.top).toBe('0px')
     expect(wrapper.find('[data-testid="pdf-windows-host-resize-handle"]').exists()).toBe(true)
