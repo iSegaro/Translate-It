@@ -263,9 +263,10 @@ describe('PdfLoader', () => {
       });
 
       const load = PdfLoader.load(pdfSourceFromUrl('https://example.com/doc.pdf'));
+      const assertion = expect(load).rejects.toMatchObject({ name: 'TimeoutError' });
       await vi.advanceTimersByTimeAsync(30_000);
 
-      await expect(load).rejects.toMatchObject({ name: 'TimeoutError' });
+      await assertion;
       expect(signal.aborted).toBe(true);
       expect(signal.reason.name).toBe('TimeoutError');
       expect(clearTimeoutSpy).toHaveBeenCalledOnce();
