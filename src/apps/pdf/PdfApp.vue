@@ -860,6 +860,7 @@ async function handleOpenRemoteUrl(url) {
     const loaded = await openPdfUrl(url, buildLayoutRequest())
     if (loaded) {
       showRemoteUrlDialog.value = false
+      writeBrowserTabState({ remoteUrl: url })
       finalizeDocumentOpen()
       await restoreViewerState()
     }
@@ -878,9 +879,15 @@ async function handleRetry() {
 async function tryAutoRestore() {
   const params = new URLSearchParams(location.search)
   const remoteUrl = params.get('remote')
-  const fileHandle = readBrowserTabState()?.fileHandle
+  const browserTabState = readBrowserTabState()
+  const storedRemoteUrl = browserTabState?.remoteUrl
+  const fileHandle = browserTabState?.fileHandle
 
-  const sourceCount = Number(Boolean(remoteUrl)) + Number(Boolean(fileHandle))
+  const sourceCount = (
+    Number(Boolean(remoteUrl))
+    + Number(Boolean(storedRemoteUrl))
+    + Number(Boolean(fileHandle))
+  )
 
   if (sourceCount > 1) {
     logger.warn('Ambiguous PDF restore sources detected. Skipping restore.')
@@ -895,6 +902,11 @@ async function tryAutoRestore() {
       url.search = params.toString()
       history.replaceState(history.state, '', url.toString())
     }
+    return
+  }
+
+  if (storedRemoteUrl) {
+    await handleOpenRemoteUrl(storedRemoteUrl)
     return
   }
 

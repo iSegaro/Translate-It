@@ -2524,6 +2524,65 @@ describe('PdfApp', () => {
       })
     })
 
+    it('loads a stored remote URL from BrowserTabState on startup', async () => {
+      browserTabStateMock.read.mockReturnValue({ remoteUrl })
+
+      mount(PdfApp)
+      await flushPromises()
+
+      await vi.waitFor(() => {
+        expect(mockViewerController.openPdfUrl).toHaveBeenCalledWith(remoteUrl, expect.anything())
+        expect(mockViewerController.loadPdfFile).not.toHaveBeenCalled()
+      })
+    })
+
+    it('restores a remote PDF after a successful load and remount', async () => {
+      window.history.pushState({}, '', `/?remote=${remoteUrl}`)
+      mockReadUrl.mockReturnValue(pendingState())
+
+      const wrapper = mount(PdfApp)
+      await flushPromises()
+
+      await vi.waitFor(() => {
+        expect(mockViewerController.openPdfUrl).toHaveBeenCalledWith(remoteUrl, expect.anything())
+      })
+      await vi.waitFor(() => expect(mockClearPending).toHaveBeenCalled())
+
+      expect(browserTabStateMock.write).toHaveBeenCalledWith({ remoteUrl })
+      expect(window.location.search).toBe('')
+
+      wrapper.unmount()
+
+      browserTabStateMock.read.mockReturnValue({ remoteUrl })
+      mockReadUrl.mockReturnValue(pendingState())
+      mount(PdfApp)
+      await flushPromises()
+
+      await vi.waitFor(() => {
+        expect(mockViewerController.openPdfUrl).toHaveBeenCalledWith(remoteUrl, expect.anything())
+      })
+      await vi.waitFor(() => {
+        expect(mockViewerMode.setContentView).toHaveBeenCalledWith('translation')
+      })
+      expect(mockPdfNavigation.navigateToPage).toHaveBeenCalledWith(8)
+      expect(mockClearPending).toHaveBeenCalled()
+    })
+
+    it('skips restore when ?remote= and a stored remote URL both exist', async () => {
+      browserTabStateMock.read.mockReturnValue({ remoteUrl })
+      window.history.pushState({}, '', `/?remote=${remoteUrl}`)
+
+      mount(PdfApp)
+      await flushPromises()
+
+      await vi.waitFor(() => {
+        expect(pdfAppLoggerMock.warn).toHaveBeenCalledWith('Ambiguous PDF restore sources detected. Skipping restore.')
+      })
+
+      expect(mockViewerController.loadPdfFile).not.toHaveBeenCalled()
+      expect(mockViewerController.openPdfUrl).not.toHaveBeenCalled()
+    })
+
     it('skips restore when multiple sources exist', async () => {
       const file = new File([''], 'restored.pdf', { type: 'application/pdf' })
       browserTabStateMock.read.mockReturnValue({
