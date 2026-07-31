@@ -441,12 +441,14 @@ export class ContextMenuManager extends ResourceTracker {
       }
 
       // --- 1.5. Create Page Context Menu (Open in PDF Translator) ---
-      await this.createMenu({
-        id: PAGE_CONTEXT_PDF_ID,
-        title: (await getTranslationString("pdf_app_title", locale)) || "PDF Translator",
-        contexts: ["link"],
-        targetUrlPatterns: ["*://*/*.pdf", "*://*/*.PDF"],
-      });
+      if (visibility.PAGE_CONTEXT_PDF_TRANSLATOR !== false) {
+        await this.createMenu({
+          id: PAGE_CONTEXT_PDF_ID,
+          title: (await getTranslationString("pdf_app_title", locale)) || "PDF Translator",
+          contexts: ["link"],
+          targetUrlPatterns: ["*://*/*.pdf", "*://*/*.PDF"],
+        });
+      }
 
       // --- 2. Create Action (Browser Action) Context Menus ---
       try {

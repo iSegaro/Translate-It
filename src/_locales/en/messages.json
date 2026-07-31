@@ -2723,6 +2723,21 @@
   "pdf_app_title": {
     "message": "PDF Translator"
   },
+  "pdf_tab_title": {
+    "message": "PDF"
+  },
+  "pdf_tab_desc": {
+    "message": "Manage PDF-related settings."
+  },
+  "pdf_context_menu_section_title": {
+    "message": "Context Menu"
+  },
+  "pdf_context_menu_label": {
+    "message": "Show PDF Translator in the browser context menu"
+  },
+  "pdf_context_menu_desc": {
+    "message": "Display the PDF Translator option in the browser's right-click menu for PDF links."
+  },
   "subtitle_app_powered_by": {
     "message": "Powered by Translate It"
   },

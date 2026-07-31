@@ -207,6 +207,26 @@ describe('Settings Migrations', () => {
     expect(updates.CONTEXT_MENU_VISIBILITY).toBeUndefined();
   });
 
+  it('should backfill a newly added nested flag into an older persisted object', async () => {
+    const currentSettings = {
+      CONTEXT_MENU_VISIBILITY: {
+        PAGE_CONTEXT_SELECT_ELEMENT: true,
+        PAGE_CONTEXT_SCREEN_CAPTURE: true,
+        PAGE_CONTEXT_PDF_TRANSLATOR: true,
+        ACTION_CONTEXT_SELECT_ELEMENT: true,
+        ACTION_CONTEXT_SCREEN_CAPTURE: true,
+        ACTION_CONTEXT_OPTIONS: true,
+        ACTION_CONTEXT_SHORTCUTS: true,
+        ACTION_CONTEXT_HELP: true
+      }
+    };
+
+    const { updates } = await runSettingsMigrations(currentSettings);
+
+    expect(updates.CONTEXT_MENU_VISIBILITY.PAGE_CONTEXT_PDF_TRANSLATOR).toBe(true);
+    expect(updates.CONTEXT_MENU_VISIBILITY.PAGE_CONTEXT_SELECT_ELEMENT).toBe(true);
+  });
+
   it('should preserve existing nested user values and backfill missing MODE_PROVIDERS members', async () => {
     const currentSettings = {
       MODE_PROVIDERS: {

@@ -2723,6 +2723,21 @@
   "pdf_app_title": {
     "message": "PDF翻訳"
   },
+  "pdf_tab_title": {
+    "message": "PDF"
+  },
+  "pdf_tab_desc": {
+    "message": "PDF関連の設定を管理します。"
+  },
+  "pdf_context_menu_section_title": {
+    "message": "コンテキストメニュー"
+  },
+  "pdf_context_menu_label": {
+    "message": "ブラウザのコンテキストメニューに「PDF翻訳」を表示"
+  },
+  "pdf_context_menu_desc": {
+    "message": "PDFリンクの右クリックメニューに「PDF翻訳」オプションを表示します。"
+  },
   "subtitle_app_powered_by": {
     "message": "Translate It 提供"
   },

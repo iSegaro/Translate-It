@@ -2723,6 +2723,21 @@
   "pdf_app_title": {
     "message": "مترجم PDF"
   },
+  "pdf_tab_title": {
+    "message": "PDF"
+  },
+  "pdf_tab_desc": {
+    "message": "مدیریت تنظیمات مربوط به PDF."
+  },
+  "pdf_context_menu_section_title": {
+    "message": "منوی زمینه"
+  },
+  "pdf_context_menu_label": {
+    "message": "نمایش «مترجم PDF» در منوی زمینه مرورگر"
+  },
+  "pdf_context_menu_desc": {
+    "message": "نمایش گزینه «مترجم PDF» در منوی کلیک‌راست مرورگر برای لینک‌های PDF."
+  },
   "subtitle_app_powered_by": {
     "message": "قدرت گرفته از Translate It"
   },

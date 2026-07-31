@@ -63,6 +63,12 @@ describe('Settings Store', () => {
       .toBe(CONFIG.BILINGUAL_TRANSLATION_MODES[TranslationMode.PDF]);
   });
 
+  it('should include CONTEXT_MENU_VISIBILITY.PAGE_CONTEXT_PDF_TRANSLATOR with the CONFIG default', () => {
+    const store = useSettingsStore();
+    expect(store.settings.CONTEXT_MENU_VISIBILITY.PAGE_CONTEXT_PDF_TRANSLATOR)
+      .toBe(CONFIG.CONTEXT_MENU_VISIBILITY.PAGE_CONTEXT_PDF_TRANSLATOR);
+  });
+
   it('should keep fixed-schema nested defaults in sync with CONFIG', () => {
     const store = useSettingsStore();
 
