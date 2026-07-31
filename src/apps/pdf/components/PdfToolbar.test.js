@@ -1201,6 +1201,10 @@ describe('PdfToolbar', () => {
       await wrapper.find('.pdf-toolbar__ocr-arrow').trigger('click')
       const manageButtons = wrapper.findAll('.pdf-toolbar__ocr-menu-item')
       const manageButton = manageButtons.find(b => b.text().includes('Manage Languages'))
+
+      expect(manageButton.find('.svg-icon').exists()).toBe(true)
+      expect(manageButton.text()).toBe('Manage Languages...')
+
       await manageButton.trigger('click')
 
       expect(wrapper.emitted('manage-languages')).toHaveLength(1)

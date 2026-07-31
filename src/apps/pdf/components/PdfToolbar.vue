@@ -342,7 +342,11 @@
               role="menuitem"
               @click="handleManageLanguages"
             >
-              ⚙ Manage Languages...
+              <SvgIcon
+                :src="settingsIcon"
+                :size="16"
+              />
+              Manage Languages...
             </button>
           </div>
         </div>
@@ -443,6 +447,7 @@ import fitPageIcon from '@/icons/ui/fit-page.svg?url'
 import fitWidthIcon from '@/icons/ui/fit-width.svg?url'
 import infoIcon from '@/icons/ui/info.svg?url'
 import dropdownArrowIcon from '@/icons/ui/dropdown-arrow.svg?url'
+import settingsIcon from '@/icons/ui/settings.svg?url'
 import { PDF_ZOOM_PERCENT_OPTIONS } from '../constants/pdfZoomConstants.js'
 import './PdfToolbar.scss'
 
