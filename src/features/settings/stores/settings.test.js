@@ -4,7 +4,7 @@ import { nextTick } from 'vue';
 import useSettingsStore from './settings.js';
 import { storageManager } from '@/shared/storage/core/StorageCore.js';
 import secureStorage from '@/shared/storage/core/SecureStorage.js';
-import { SelectionTranslationMode } from '@/shared/config/config.js';
+import { SelectionTranslationMode, CONFIG, TranslationMode } from '@/shared/config/config.js';
 
 // Mock Dependencies
 vi.mock('@/shared/storage/core/StorageCore.js', () => ({
@@ -55,6 +55,26 @@ describe('Settings Store', () => {
   it('should initialize with default settings', () => {
     const store = useSettingsStore();
     expect(store.settings.THEME).toBe('auto');
+  });
+
+  it('should include BILINGUAL_TRANSLATION_MODES.PDF with the CONFIG default', () => {
+    const store = useSettingsStore();
+    expect(store.settings.BILINGUAL_TRANSLATION_MODES[TranslationMode.PDF])
+      .toBe(CONFIG.BILINGUAL_TRANSLATION_MODES[TranslationMode.PDF]);
+  });
+
+  it('should keep fixed-schema nested defaults in sync with CONFIG', () => {
+    const store = useSettingsStore();
+
+    const storeBilingual = store.settings.BILINGUAL_TRANSLATION_MODES;
+    Object.keys(CONFIG.BILINGUAL_TRANSLATION_MODES).forEach(mode => {
+      expect(storeBilingual[mode]).toBe(CONFIG.BILINGUAL_TRANSLATION_MODES[mode]);
+    });
+
+    const storeContextMenu = store.settings.CONTEXT_MENU_VISIBILITY;
+    Object.keys(CONFIG.CONTEXT_MENU_VISIBILITY).forEach(flag => {
+      expect(storeContextMenu[flag]).toBe(CONFIG.CONTEXT_MENU_VISIBILITY[flag]);
+    });
   });
 
   it('should load settings from storage', async () => {

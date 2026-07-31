@@ -175,6 +175,7 @@ function getDefaultSettings() {
       [TranslationMode.Field]: true,
       [TranslationMode.Selection]: true,
       [TranslationMode.Page]: false,
+      [TranslationMode.PDF]: false,
       [TranslationMode.Dictionary_Translation]: true,
       [TranslationMode.ScreenCapture]: true,
       [TranslationMode.MouseHover]: true
