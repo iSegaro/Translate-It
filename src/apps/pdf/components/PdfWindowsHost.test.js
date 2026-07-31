@@ -1749,6 +1749,85 @@ describe('PdfWindowsHost', () => {
     expect(wrapper.find('[data-testid="pdf-windows-host"]').exists()).toBe(false)
   })
 
+  it('keeps pinned window position when a new PDF selection updates its translation', async () => {
+    await showSelectionIcon('Pinned first selection', { x: 120, y: 180, width: 90, height: 18 })
+    await openWindowFromSelectionIcon(wrapper)
+    await wrapper.get('[data-testid="translation-window-toolbar-pin"]').trigger('click')
+    await flushPromises()
+
+    const host = wrapper.get('[data-testid="pdf-windows-host"]')
+    const initialPosition = {
+      left: host.element.style.left,
+      top: host.element.style.top
+    }
+    sendRegularMessageMock.mockResolvedValueOnce({ success: true, translatedText: 'Pinned second result' })
+
+    emitSelection({
+      text: 'Pinned second selection',
+      position: { x: 760, y: 520, width: 90, height: 18 },
+      context: { source: 'pdf-viewer', isPdf: true }
+    })
+    await flushPromises()
+
+    expect(host.element.style.left).toBe(initialPosition.left)
+    expect(host.element.style.top).toBe(initialPosition.top)
+    expect(wrapper.get('[data-testid="pdf-windows-host-result"]').text()).toContain('Pinned second result')
+  })
+
+  it('reanchors floating window to the latest selection', async () => {
+    await showSelectionIcon('Floating first selection', { x: 120, y: 180, width: 90, height: 18 })
+    await openWindowFromSelectionIcon(wrapper)
+
+    const firstHost = wrapper.get('[data-testid="pdf-windows-host"]')
+    const initialPosition = {
+      left: firstHost.element.style.left,
+      top: firstHost.element.style.top
+    }
+    sendRegularMessageMock.mockResolvedValueOnce({ success: true, translatedText: 'Floating second result' })
+
+    await showSelectionIcon('Floating second selection', { x: 760, y: 520, width: 90, height: 18 })
+    await openWindowFromSelectionIcon(wrapper)
+
+    const secondHost = wrapper.get('[data-testid="pdf-windows-host"]')
+    expect({
+      left: secondHost.element.style.left,
+      top: secondHost.element.style.top
+    }).not.toEqual(initialPosition)
+    expect(wrapper.get('[data-testid="pdf-windows-host-result"]').text()).toContain('Floating second result')
+  })
+
+  it('keeps manually dragged pinned window position when a new PDF selection arrives', async () => {
+    await showSelectionIcon('Dragged first selection', { x: 120, y: 180, width: 90, height: 18 })
+    await openWindowFromSelectionIcon(wrapper)
+
+    const header = wrapper.get('.pdf-windows-host__header')
+    dispatchPointerEvent(header.element, 'pointerdown', { clientX: 180, clientY: 210 })
+    dispatchPointerEvent(document, 'pointermove', { clientX: 340, clientY: 280 })
+    dispatchPointerEvent(document, 'pointerup', { clientX: 340, clientY: 280 })
+    await flushPromises()
+
+    await wrapper.get('[data-testid="translation-window-toolbar-pin"]').trigger('click')
+    await flushPromises()
+
+    const host = wrapper.get('[data-testid="pdf-windows-host"]')
+    const draggedPosition = {
+      left: host.element.style.left,
+      top: host.element.style.top
+    }
+    sendRegularMessageMock.mockResolvedValueOnce({ success: true, translatedText: 'Dragged second result' })
+
+    emitSelection({
+      text: 'Dragged second selection',
+      position: { x: 760, y: 520, width: 90, height: 18 },
+      context: { source: 'pdf-viewer', isPdf: true }
+    })
+    await flushPromises()
+
+    expect(host.element.style.left).toBe(draggedPosition.left)
+    expect(host.element.style.top).toBe(draggedPosition.top)
+    expect(wrapper.get('[data-testid="pdf-windows-host-result"]').text()).toContain('Dragged second result')
+  })
+
   it('preserves visible pinned host height while a replacement selection loads', async () => {
     await openAndPinWindow(wrapper, 'Pinned original')
     const host = mockVisibleHostHeight(wrapper, 260)
