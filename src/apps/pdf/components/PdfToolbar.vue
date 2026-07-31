@@ -52,6 +52,7 @@
               class="pdf-toolbar__mode-button"
               :class="{ 'pdf-toolbar__mode-button--active': contentView === opt.value }"
               type="button"
+              :aria-label="opt.ariaLabel ?? opt.label"
               @click="$emit('content-view-change', opt.value)"
             >
               {{ opt.label }}
@@ -662,9 +663,9 @@ const activeMenu = ref(null)
 const zoomPercentOptions = PDF_ZOOM_PERCENT_OPTIONS
 
 const allContentOptions = [
-  { value: CONTENT_VIEW.ORIGINAL, label: 'Original' },
-  { value: CONTENT_VIEW.TRANSLATION, label: 'Translation' },
-  { value: CONTENT_VIEW.TRANSLATED_PDF, label: 'Translated PDF' }
+  { value: CONTENT_VIEW.ORIGINAL, label: 'Original', ariaLabel: 'Original' },
+  { value: CONTENT_VIEW.TRANSLATION, label: 'Text', ariaLabel: 'Translation' },
+  { value: CONTENT_VIEW.TRANSLATED_PDF, label: 'PDF', ariaLabel: 'Translated PDF' }
 ]
 
 const contentOptions = computed(() => allContentOptions)

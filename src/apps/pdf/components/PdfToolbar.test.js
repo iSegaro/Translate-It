@@ -212,7 +212,7 @@ describe('PdfToolbar', () => {
     })
 
     const translationButton = wrapper.findAll('.pdf-toolbar__view-mode--desktop .pdf-toolbar__mode-button')
-      .find(button => button.text() === 'Translation')
+      .find(button => button.text() === 'Text')
     await translationButton.trigger('click')
     await wrapper.find('.pdf-toolbar__view-mode--mobile select').setValue('translated-pdf')
 
@@ -256,7 +256,7 @@ describe('PdfToolbar', () => {
     expect(wrapper.emitted('content-view-change')?.[0]?.[0]).toBe('original')
 
     const translationButton = wrapper.findAll('.pdf-toolbar__mode-button').find(
-      (btn) => btn.text().includes('Translation')
+      (btn) => btn.text().includes('Text')
     )
     await translationButton?.trigger('click')
     expect(wrapper.emitted('content-view-change')?.[1]?.[0]).toBe('translation')
@@ -292,10 +292,10 @@ describe('PdfToolbar', () => {
 
     const allButtons = wrapper.findAll('.pdf-toolbar__mode-button')
     const contentButtons = allButtons.filter(
-      btn => ['Original', 'Translation', 'Translated PDF'].some(label => btn.text().includes(label))
+      btn => ['Original', 'Text', 'PDF'].some(label => btn.text().includes(label))
     )
     expect(contentButtons).toHaveLength(3)
-    expect(contentButtons.some(btn => btn.text().includes('Translation'))).toBe(true)
+    expect(contentButtons.some(btn => btn.text().includes('Text'))).toBe(true)
   })
 
   it('emits layout-mode-change when a layout mode button is clicked', async () => {
