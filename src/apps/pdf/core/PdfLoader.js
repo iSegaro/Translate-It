@@ -93,7 +93,7 @@ export const PdfLoader = {
     if (source.type === 'url') {
       const controller = new AbortController()
       const timeoutId = setTimeout(
-        () => controller.abort(new DOMException('Remote PDF load timed out.', 'TimeoutError')),
+        () => controller.abort(new DOMException('Opening the PDF link timed out.', 'TimeoutError')),
         REMOTE_PDF_LOAD_TIMEOUT_MS,
       )
 

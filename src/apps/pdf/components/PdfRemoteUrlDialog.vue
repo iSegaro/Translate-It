@@ -7,7 +7,7 @@
     >
       <div class="pdf-remote-url-dialog">
         <h2 class="pdf-remote-url-dialog__title">
-          Open Remote PDF
+          Open PDF Link
         </h2>
 
         <form @submit.prevent="handleSubmit">

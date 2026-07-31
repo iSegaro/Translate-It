@@ -51,7 +51,7 @@
           :disabled="isLoading"
           @click="close(); emit('open-remote-pdf')"
         >
-          <span class="pdf-toolbar__menu-row-label">{{ isLoading ? 'Loading...' : 'Open Remote PDF...' }}</span>
+          <span class="pdf-toolbar__menu-row-label">{{ isLoading ? 'Loading...' : 'Open PDF Link...' }}</span>
         </button>
         <button
           class="pdf-toolbar__export-item pdf-toolbar__menu-row"

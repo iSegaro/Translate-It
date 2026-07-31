@@ -2326,7 +2326,7 @@ describe('PdfApp', () => {
   })
 
   describe('Remote URL dialog', () => {
-    it('opens the dialog from the Open Remote PDF toolbar action', async () => {
+    it('opens the dialog from the Open PDF Link toolbar action', async () => {
       const wrapper = mount(PdfApp)
       await flushPromises()
 

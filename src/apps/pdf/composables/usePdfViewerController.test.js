@@ -1046,7 +1046,7 @@ describe('openPdfUrl', () => {
     await vi.advanceTimersByTimeAsync(30_000)
 
     await expect(load).resolves.toBe(false)
-    expect(controller.error.value).toBe('Remote PDF load timed out.')
+    expect(controller.error.value).toBe('Opening the PDF link timed out.')
     expect(controller.loadFailure.value).toEqual({ kind: 'TIMEOUT', details: {} })
     expect(controller.isLoading.value).toBe(false)
     expect(cleanupDocumentMock).toHaveBeenCalledOnce()
