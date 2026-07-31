@@ -32,7 +32,7 @@ describe('PdfLoader', () => {
   });
 
   describe('url source', () => {
-    it('fetches a URL and returns { name, buffer }', async () => {
+    it('fetches a URL and returns { name, buffer } with the URL basename', async () => {
       const buffer = new Uint8Array([1, 2, 3]).buffer;
       vi.spyOn(globalThis, 'fetch').mockResolvedValue({
         ok: true,
@@ -41,9 +41,152 @@ describe('PdfLoader', () => {
 
       const result = await PdfLoader.load(pdfSourceFromUrl('https://example.com/doc.pdf'));
 
-      expect(result.name).toBe('document.pdf');
+      expect(result.name).toBe('doc.pdf');
       expect(result.buffer).toBeInstanceOf(ArrayBuffer);
       expect(result.buffer.byteLength).toBe(3);
+    });
+
+    it('uses the Content-Disposition filename when present', async () => {
+      vi.spyOn(globalThis, 'fetch').mockResolvedValue({
+        ok: true,
+        headers: { get: () => 'attachment; filename="annual-report.pdf"' },
+        arrayBuffer: () => Promise.resolve(new ArrayBuffer(1)),
+      });
+
+      const result = await PdfLoader.load(pdfSourceFromUrl('https://example.com/download?id=7'));
+
+      expect(result.name).toBe('annual-report.pdf');
+    });
+
+    it('decodes an RFC 5987 filename* header value', async () => {
+      vi.spyOn(globalThis, 'fetch').mockResolvedValue({
+        ok: true,
+        headers: { get: () => "attachment; filename*=UTF-8''%E2%82%AC%20rate.pdf" },
+        arrayBuffer: () => Promise.resolve(new ArrayBuffer(1)),
+      });
+
+      const result = await PdfLoader.load(pdfSourceFromUrl('https://example.com/doc.pdf'));
+
+      expect(result.name).toBe('€ rate.pdf');
+    });
+
+    it('prefers filename* over filename when both are present', async () => {
+      vi.spyOn(globalThis, 'fetch').mockResolvedValue({
+        ok: true,
+        headers: { get: () => 'attachment; filename="fallback.pdf"; filename*=UTF-8\'\'final.pdf' },
+        arrayBuffer: () => Promise.resolve(new ArrayBuffer(1)),
+      });
+
+      const result = await PdfLoader.load(pdfSourceFromUrl('https://example.com/doc.pdf'));
+
+      expect(result.name).toBe('final.pdf');
+    });
+
+    it('uses response.url basename after a redirect', async () => {
+      vi.spyOn(globalThis, 'fetch').mockResolvedValue({
+        ok: true,
+        url: 'https://cdn.example.com/final-report.pdf',
+        arrayBuffer: () => Promise.resolve(new ArrayBuffer(1)),
+      });
+
+      const result = await PdfLoader.load(pdfSourceFromUrl('https://example.com/redirect'));
+
+      expect(result.name).toBe('final-report.pdf');
+    });
+
+    it('falls back to source.url basename when the response exposes no filename', async () => {
+      vi.spyOn(globalThis, 'fetch').mockResolvedValue({
+        ok: true,
+        arrayBuffer: () => Promise.resolve(new ArrayBuffer(1)),
+      });
+
+      const result = await PdfLoader.load(pdfSourceFromUrl('https://example.com/report-2024.pdf'));
+
+      expect(result.name).toBe('report-2024.pdf');
+    });
+
+    it('decodes percent-encoded URL basenames', async () => {
+      vi.spyOn(globalThis, 'fetch').mockResolvedValue({
+        ok: true,
+        arrayBuffer: () => Promise.resolve(new ArrayBuffer(1)),
+      });
+
+      const result = await PdfLoader.load(pdfSourceFromUrl('https://example.com/q1%20report.pdf'));
+
+      expect(result.name).toBe('q1 report.pdf');
+    });
+
+    it('falls back to document.pdf when both URL paths end with a slash', async () => {
+      vi.spyOn(globalThis, 'fetch').mockResolvedValue({
+        ok: true,
+        url: 'https://example.com/pdfs/',
+        arrayBuffer: () => Promise.resolve(new ArrayBuffer(1)),
+      });
+
+      const result = await PdfLoader.load(pdfSourceFromUrl('https://example.com/docs/'));
+
+      expect(result.name).toBe('document.pdf');
+    });
+
+    it('falls back to the URL basename when the header filename is empty', async () => {
+      vi.spyOn(globalThis, 'fetch').mockResolvedValue({
+        ok: true,
+        headers: { get: () => 'attachment; filename=""' },
+        arrayBuffer: () => Promise.resolve(new ArrayBuffer(1)),
+      });
+
+      const result = await PdfLoader.load(pdfSourceFromUrl('https://example.com/doc.pdf'));
+
+      expect(result.name).toBe('doc.pdf');
+    });
+
+    it('sanitizes path traversal and leading slashes in header filenames', async () => {
+      vi.spyOn(globalThis, 'fetch').mockResolvedValue({
+        ok: true,
+        headers: { get: () => 'attachment; filename="../../evil.pdf"' },
+        arrayBuffer: () => Promise.resolve(new ArrayBuffer(1)),
+      });
+
+      const result = await PdfLoader.load(pdfSourceFromUrl('https://example.com/doc.pdf'));
+
+      expect(result.name).toBe('evil.pdf');
+    });
+
+    it('rejects a ".." header filename and falls back to the URL basename', async () => {
+      vi.spyOn(globalThis, 'fetch').mockResolvedValue({
+        ok: true,
+        headers: { get: () => 'attachment; filename=".."' },
+        arrayBuffer: () => Promise.resolve(new ArrayBuffer(1)),
+      });
+
+      const result = await PdfLoader.load(pdfSourceFromUrl('https://example.com/doc.pdf'));
+
+      expect(result.name).toBe('doc.pdf');
+    });
+
+    it('rejects a "." header filename and falls back to the URL basename', async () => {
+      vi.spyOn(globalThis, 'fetch').mockResolvedValue({
+        ok: true,
+        headers: { get: () => 'attachment; filename="."' },
+        arrayBuffer: () => Promise.resolve(new ArrayBuffer(1)),
+      });
+
+      const result = await PdfLoader.load(pdfSourceFromUrl('https://example.com/doc.pdf'));
+
+      expect(result.name).toBe('doc.pdf');
+    });
+
+    it('returns document.pdf when a ".." header filename and no URL filename exist', async () => {
+      vi.spyOn(globalThis, 'fetch').mockResolvedValue({
+        ok: true,
+        headers: { get: () => 'attachment; filename=".."' },
+        url: 'https://example.com/pdfs/',
+        arrayBuffer: () => Promise.resolve(new ArrayBuffer(1)),
+      });
+
+      const result = await PdfLoader.load(pdfSourceFromUrl('https://example.com/docs/'));
+
+      expect(result.name).toBe('document.pdf');
     });
 
     it('clears the timeout after a successful fetch', async () => {

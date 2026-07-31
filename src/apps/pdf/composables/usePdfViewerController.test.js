@@ -1004,7 +1004,7 @@ describe('openPdfUrl', () => {
     expect(result).toBe(true)
     expect(controller.loadFailure.value).toBeNull()
     expect(openFileMock).toHaveBeenCalledWith(
-      { name: 'document.pdf', buffer: expect.any(ArrayBuffer) },
+      { name: 'doc.pdf', buffer: expect.any(ArrayBuffer) },
       800,
     )
   })
