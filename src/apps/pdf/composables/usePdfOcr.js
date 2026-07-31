@@ -1,4 +1,4 @@
-import { onBeforeUnmount, reactive, ref } from 'vue'
+import { onBeforeUnmount, reactive, ref, watch } from 'vue'
 import { getScopedLogger } from '@/shared/logging/logger.js'
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js'
 import { useSettingsStore } from '@/features/settings/stores/settings.js'
@@ -34,9 +34,13 @@ export function usePdfOcr({ onOcrComplete, onOcrStart, onOcrProgress, onOcrError
   const ocrLanguage = ref('eng')
   let activeRunId = 0
 
+  function getCurrentOcrLanguage() {
+    return settingsStore.settings.OCR_DEFAULT_LANG || 'eng'
+  }
+
   function refreshOcrRecommendations() {
     const candidates = pdfDocumentSession.getLoadedVisibleOcrCandidates()
-    const recommendations = recommendationEngine.getRecommendations(candidates)
+    const recommendations = recommendationEngine.getRecommendations(candidates, getCurrentOcrLanguage())
 
     ocrRecommendationCount.value = recommendations.length
     ocrRecommendations.value = recommendations
@@ -63,7 +67,7 @@ export function usePdfOcr({ onOcrComplete, onOcrStart, onOcrProgress, onOcrError
     onOcrStart?.()
 
     try {
-      ocrLanguage.value = settingsStore.settings.OCR_DEFAULT_LANG || 'eng'
+      ocrLanguage.value = getCurrentOcrLanguage()
 
       pageNumbers = [...ocrBatch.pageNumbers]
 
@@ -148,6 +152,10 @@ export function usePdfOcr({ onOcrComplete, onOcrStart, onOcrProgress, onOcrError
   })
 
   const unsubscribeVisiblePagesChanged = pdfDocumentSession.onVisiblePagesChanged?.(() => {
+    refreshOcrRecommendations()
+  })
+
+  watch(() => settingsStore.settings.OCR_DEFAULT_LANG, () => {
     refreshOcrRecommendations()
   })
 

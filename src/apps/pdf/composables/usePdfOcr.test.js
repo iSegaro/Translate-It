@@ -1,10 +1,11 @@
 import { mount } from '@vue/test-utils'
-import { defineComponent } from 'vue'
+import { defineComponent, nextTick, reactive } from 'vue'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 let commitListener = null
 let visibleListener = null
 let mockProcessPages = vi.fn()
+let ocrSettings = reactive({ OCR_DEFAULT_LANG: 'eng' })
 
 const mockPdfDocumentSession = {
   pageSessions: new Map(),
@@ -74,9 +75,7 @@ vi.mock('@/features/pdf-translation/core/PdfOcrProcessor.js', () => ({
 
 vi.mock('@/features/settings/stores/settings.js', () => ({
   useSettingsStore: () => ({
-    settings: {
-      OCR_DEFAULT_LANG: 'eng'
-    }
+    settings: ocrSettings
   })
 }))
 
@@ -131,6 +130,7 @@ describe('usePdfOcr', () => {
     commitListener = null
     visibleListener = null
     mockProcessPages = vi.fn(async () => [])
+    ocrSettings.OCR_DEFAULT_LANG = 'eng'
     mockPdfDocumentSession.pageSessions = new Map()
     mockPdfDocumentSession.visiblePageNumbers = new Set()
     mockPdfDocumentSession.documentIdentity = 'doc-1'
@@ -176,6 +176,29 @@ describe('usePdfOcr', () => {
     expect(api.ocrRecommendationCount.value).toBe(1)
     api.requestOcr()
     expect(api.ocrBatch.pageNumbers).toEqual([1])
+    wrapper.unmount()
+  })
+
+  it('recommends OCR pages again when the configured language changes', async () => {
+    const { api, wrapper } = mountComposable()
+    mockPdfDocumentSession.pageSessions.set(1, createScannedPageSession(1, {
+      ocrBlocks: [{ id: 'ocr-1' }],
+      ocrLanguage: 'eng'
+    }))
+    mockPdfDocumentSession.visiblePageNumbers.add(1)
+
+    api.refreshOcrRecommendations()
+    expect(api.ocrRecommendations.value).toEqual([])
+
+    ocrSettings.OCR_DEFAULT_LANG = 'fra'
+    await nextTick()
+
+    expect(api.ocrRecommendations.value).toEqual([1])
+
+    ocrSettings.OCR_DEFAULT_LANG = 'eng'
+    await nextTick()
+
+    expect(api.ocrRecommendations.value).toEqual([])
     wrapper.unmount()
   })
 
@@ -428,6 +451,7 @@ describe('usePdfOcr', () => {
 
     mockProcessPages = vi.fn(async () => {
       pageSession.ocrBlocks = [{ id: 'ocr-1' }]
+      pageSession.ocrLanguage = 'eng'
       return [{ pageNumber: 1, blocks: pageSession.ocrBlocks, success: true }]
     })
 

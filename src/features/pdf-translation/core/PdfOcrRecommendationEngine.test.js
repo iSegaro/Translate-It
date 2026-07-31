@@ -29,10 +29,40 @@ describe('PdfOcrRecommendationEngine', () => {
   it('delegates candidate classification and excludes already OCRd pages', () => {
     const candidates = [createCandidate(1), createCandidate(2, { hasOcrBlocks: true, ocrLanguage: 'eng' })]
 
-    const recommendations = new PdfOcrRecommendationEngine().getRecommendations(candidates)
+    const recommendations = new PdfOcrRecommendationEngine().getRecommendations(candidates, 'eng')
 
     expect(recommendations).toEqual([1])
     expect(detectorSpy).toHaveBeenCalledTimes(2)
+  })
+
+  it('recommends a page whose existing OCR uses a different language', () => {
+    const candidates = [createCandidate(1, { hasOcrBlocks: true, ocrLanguage: 'eng' })]
+
+    const recommendations = new PdfOcrRecommendationEngine().getRecommendations(candidates, 'fra')
+
+    expect(recommendations).toEqual([1])
+  })
+
+  it('keeps pages without OCR blocks eligible for recommendation', () => {
+    const candidates = [createCandidate(1, { hasOcrBlocks: false, ocrLanguage: null })]
+
+    const recommendations = new PdfOcrRecommendationEngine().getRecommendations(candidates, 'fra')
+
+    expect(recommendations).toEqual([1])
+  })
+
+  it('keeps scanned-page rejection unchanged across language changes', () => {
+    const candidates = [createCandidate(1, {
+      hasOcrBlocks: true,
+      ocrLanguage: 'eng',
+      logicalBlockCount: 2,
+      textItemCount: 10,
+      textCharCount: 40
+    })]
+
+    const recommendations = new PdfOcrRecommendationEngine().getRecommendations(candidates, 'fra')
+
+    expect(recommendations).toEqual([])
   })
 
   it('sorts scanned candidate recommendations', () => {

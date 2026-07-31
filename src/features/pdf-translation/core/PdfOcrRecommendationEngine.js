@@ -5,13 +5,13 @@ export class PdfOcrRecommendationEngine {
     this._detector = new PdfOcrDetector()
   }
 
-  getRecommendations(candidates = []) {
+  getRecommendations(candidates = [], currentLanguage = null) {
     const recommendations = []
 
     for (const candidate of candidates) {
       if (!candidate) continue
       if (!this._detector.isScannedCandidate(candidate)) continue
-      if (candidate.hasOcrBlocks) continue
+      if (candidate.hasOcrBlocks && candidate.ocrLanguage === currentLanguage) continue
       recommendations.push(candidate.pageNumber)
     }
 
