@@ -1283,10 +1283,22 @@ function handleTranslatedPaneCurrentPageChange(pageNumber) {
 }
 
 async function revealTranslation() {
+  const targetPage = currentPageNumber.value
+  const transitionDocumentGeneration = session.documentGeneration
   await handleContentViewChange(CONTENT_VIEW.TRANSLATION)
   if (!isSideBySide.value) {
     await handleLayoutModeChange(LAYOUT_MODE.SIDE_BY_SIDE)
   }
+  await commitTransitionPage(targetPage, transitionDocumentGeneration)
+}
+
+async function commitTransitionPage(targetPage, transitionDocumentGeneration) {
+  if (!Number.isInteger(targetPage) || targetPage < 1) return
+
+  const layoutCommit = await waitForInitialLayoutCommit()
+  if (layoutCommit?.cancelled) return
+  if (session.documentGeneration !== transitionDocumentGeneration) return
+  navigateToPage(targetPage)
 }
 
 function handleTranslateVisiblePages() {

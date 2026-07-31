@@ -1372,6 +1372,85 @@ describe('PdfApp', () => {
     expect(mockViewerMode.setLayoutMode).not.toHaveBeenCalled()
   })
 
+  it('commits the OCR page once after the automatic reveal layout commit', async () => {
+    createMocks()
+    mockViewerMode.contentView.value = 'original'
+    mockViewerController.hasTranslationContent.value = true
+    mockPdfNavigation.currentPage.value = 7
+    mount(PdfApp)
+    await flushPromises()
+
+    await mockPdfOcrOptions.onOcrComplete({ pageNumbers: [7] })
+
+    expect(mockViewerMode.setContentView).toHaveBeenCalledWith('translation')
+    expect(mockViewerMode.setLayoutMode).toHaveBeenCalledWith('side-by-side')
+    expect(mockPdfNavigation.navigateToPage).toHaveBeenCalledTimes(1)
+    expect(mockPdfNavigation.navigateToPage).toHaveBeenCalledWith(7)
+  })
+
+  it('waits for the layout commit before committing the OCR page', async () => {
+    createMocks()
+    mockViewerMode.contentView.value = 'original'
+    mockViewerController.hasTranslationContent.value = true
+    mockPdfNavigation.currentPage.value = 7
+    let resolveLayoutCommit
+    mockWaitForInitialLayoutCommit.mockImplementationOnce(() => new Promise((resolve) => {
+      resolveLayoutCommit = resolve
+    }))
+    mount(PdfApp)
+    await flushPromises()
+
+    const completion = mockPdfOcrOptions.onOcrComplete({ pageNumbers: [7] })
+    await vi.waitFor(() => expect(typeof resolveLayoutCommit).toBe('function'))
+
+    expect(mockPdfNavigation.navigateToPage).not.toHaveBeenCalled()
+
+    resolveLayoutCommit()
+    await completion
+    await flushPromises()
+
+    expect(mockPdfNavigation.navigateToPage).toHaveBeenCalledTimes(1)
+    expect(mockPdfNavigation.navigateToPage).toHaveBeenCalledWith(7)
+  })
+
+  it('does not commit the OCR page when the layout commit is cancelled', async () => {
+    createMocks()
+    mockViewerMode.contentView.value = 'original'
+    mockViewerController.hasTranslationContent.value = true
+    mockPdfNavigation.currentPage.value = 7
+    mockWaitForInitialLayoutCommit.mockResolvedValueOnce({ cancelled: true })
+    mount(PdfApp)
+    await flushPromises()
+
+    await mockPdfOcrOptions.onOcrComplete({ pageNumbers: [7] })
+
+    expect(mockViewerMode.setContentView).toHaveBeenCalledWith('translation')
+    expect(mockViewerMode.setLayoutMode).toHaveBeenCalledWith('side-by-side')
+    expect(mockPdfNavigation.navigateToPage).not.toHaveBeenCalled()
+  })
+
+  it('does not commit a stale OCR page to a replaced document', async () => {
+    createMocks()
+    mockViewerMode.contentView.value = 'original'
+    mockViewerController.hasTranslationContent.value = true
+    mockPdfNavigation.currentPage.value = 7
+    let resolveLayoutCommit
+    mockWaitForInitialLayoutCommit.mockImplementationOnce(() => new Promise((resolve) => {
+      resolveLayoutCommit = resolve
+    }))
+    mount(PdfApp)
+    await flushPromises()
+
+    const completion = mockPdfOcrOptions.onOcrComplete({ pageNumbers: [7] })
+    await vi.waitFor(() => expect(typeof resolveLayoutCommit).toBe('function'))
+    mockPdfSession.documentGeneration += 1
+    resolveLayoutCommit()
+    await completion
+    await flushPromises()
+
+    expect(mockPdfNavigation.navigateToPage).not.toHaveBeenCalled()
+  })
+
   it('builds OCR RegionExecutionRequest and preserves recognized-text handoff', async () => {
     createMocks({ sessionAsRef: false })
 
