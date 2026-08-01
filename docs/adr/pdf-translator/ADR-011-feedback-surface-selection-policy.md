@@ -1,135 +1,108 @@
-# ADR: Feedback Surface Selection Policy
+# ADR-011: PDF Presentation Architecture
 
 **Status:** Accepted
+
+**Scope:** PDF workflow feedback, presentation state, adapters, and surface boundaries.
 
 ---
 
 ## Context
 
-PDF workflows originally selected feedback surfaces directly. This coupled workflow code to toast, banner, and progress components and made surface changes cross-cutting.
-
-The PDF Viewer now has a presentation subsystem. `PdfApp` remains its composition root: it owns feature callbacks and active cancellation commands, while presentation layers own communication and surface state.
-
----
+PDF workflows must expose progress and outcomes without making presentation a source of business state or workflow ownership. Presentation therefore requires a boundary that converts workflow outcomes into replaceable UI surfaces.
 
 ## Decision
 
-PDF workflows emit canonical `DomainEvents` through the Presentation Host. A Domain Event contains domain data and a `name`; it contains no surface, rendered wording, or adapter payload.
+PDF workflows emit `DomainEvents` through the Presentation Pipeline. The pipeline derives disposable presentation state and routes it to adapters and surfaces without owning workflow state, execution, or cancellation.
+
+## Ownership Domains
+
+Ownership domains define architectural responsibility only. They do not describe runtime execution order. Execution flow is documented separately.
+
+### Workflow Domain
+
+- `PdfApp` composes feature workflows, owns active cancellation commands, and emits Domain Events.
+- Translation, OCR, and export own their business state and completion outcomes.
+
+### Presentation Domain
+
+- Presentation Pipeline owns domain-event presentation, intent creation, surface selection, and disposable banner/progress state.
+- Presenter owns wording, severity, and presentation intent.
+- Presentation adapters own surface-specific delivery and retained presentation state.
+
+### Surface Domain
+
+- `ProgressIndicator` visualizes activity only.
+- Banner displays persistent contextual notifications only.
+- Toast displays acknowledgement notifications only.
+
+## Presentation Lifecycle
 
 ```text
-PDF workflow callback
-    ↓
-PdfApp → DomainEvents
-    ↓
-Presentation Host / Facade
-    ↓
-Presenter
-    ↓ Presentation Intent
-Dispatcher
-    ↓
-Policy
-    ↓
-Toast / Banner / Progress adapter
-    ↓
-vue-sonner / PdfStatusBanner / PdfProgressBar
+Workflow → Domain Event → Presentation Pipeline → Presentation Intent → Presentation Adapter → Presentation Surface
 ```
 
-### Runtime Layers
+Domain Events contain workflow data without surface or rendered wording. Presentation converts those events into surface-specific state; surfaces do not call workflows directly.
 
-| Layer | Responsibility | Does Not Own |
-|---|---|---|
-| `PdfApp` | Feature composition, Domain Event emission, active cancellation command | Surface wording, adapter payloads, surface routing |
-| `DomainEvents` | Canonical domain payload creators | Wording, severity, surface selection |
-| Presentation Host | Facade wiring and reactive banner/progress snapshots | Feature lifecycle or domain state |
-| Presentation Facade | Presenter-to-Dispatcher pipeline | Vue state or concrete surfaces |
-| Presenter | Domain Event to Presentation Intent; wording and severity | Adapters, components, routing |
-| Dispatcher | Routes global Presentation Intents to an adapter | Wording, domain logic, component rendering |
-| Policy | Maps intent to surface | Scope or input data |
-| Adapter | Toast delivery or banner/progress surface state | Domain workflow |
+## Presentation Model
 
-### Intent-to-Surface Mapping
+- Presentation derives from Domain Events and owns no business state.
+- Presentation MUST remain read-only with respect to workflow state.
+- Presentation MUST NOT mutate workflow state, execution state, or cancellation state.
+- Presentation state is disposable and may be reset when its workflow context ends.
+- Presentation adapters MUST remain replaceable without changing workflow contracts.
 
-| Presentation Intent | Surface | Runtime behavior |
-|---|---|---|
-| `acknowledgement` | Toast | Toast adapter calls `vue-sonner` |
-| `outcome` | Banner | Banner adapter retains translation or developer outcome snapshot |
-| `activity` | Progress bar | Progress adapter retains current operation snapshot |
+## Surface Responsibilities
 
-The current dispatcher only routes global intents. Inline component and element states remain owned by their rendering components; they are not emitted through the global presentation pipeline.
+- `ProgressIndicator` renders workflow activity supplied through the Presentation Pipeline and does not own operation lifecycle.
+- Banner renders retained contextual outcome notifications and does not own domain outcomes.
+- Toast renders acknowledgement notifications and does not own workflow completion state.
 
----
+## Translation Outcome Boundary
 
-## Event Examples
+`translationSummary` remains workflow-owned and is defined in `PDF_TRANSLATION_ARCHITECTURE.md`. When a completed translation outcome requires acknowledgement, `PdfApp` emits a Domain Event; Presentation Pipeline maps the event to an acknowledgement toast. Presentation does not read or define the `translationSummary` contract.
 
-### Export
+## Export Boundary
 
-```text
-exportTxt / exportMarkdown / exportHtml
-    ↓
-DomainEvents.exportCompleted or exportFailed
-    ↓
-acknowledgement → toast
-```
+Presentation acknowledges completed or failed export operations. It MUST NOT derive export readiness, export completeness, or export policy; those remain workflow-owned.
 
-### Page OCR
+## Invariants
 
-```text
-usePdfOcr callback
-    ↓
-ocrStarted → activity → progress bar
-ocrProgressUpdated → activity → progress bar
-activityCompleted → clear progress bar
-ocrLanguageMissing / ocrFailed → acknowledgement → toast
-```
+- Presentation MUST remain read-only.
+- Presentation MUST NOT own workflow state.
+- Presentation MUST derive surface state from Domain Events.
+- Presentation adapters MUST remain replaceable.
+- Surfaces MUST NOT communicate directly with workflows.
+- Presentation dismissal MUST NOT mutate business state.
+- Workflow completion MUST precede presentation acknowledgement.
+- `PdfApp` MUST retain workflow cancellation ownership; presentation layers MUST NOT cancel work directly.
+- Inline component and element states MUST remain owned by their rendering components, not the global Presentation Pipeline.
 
-### Translation
+## Rejected Alternatives
 
-```text
-translationStarted → activity → progress bar
-translationPartial / translationFailed → outcome → banner
-translationOutcomeCleared → clears retained translation banner outcome
-activityCompleted → clear progress bar
-```
+### Ownership
 
-### Region OCR
+- Presentation components own workflow lifecycle, business state, or cancellation commands.
+- Separate presentation-specific workflow state that duplicates feature state.
 
-```text
-regionOcrStarted → activity → progress bar
-recognized text → PdfWindowsHost.openTranslation()
-no text / failure → acknowledgement → toast
-activityCompleted → clear progress bar
-```
+### Presentation
 
-### Region Comparison
+- Workflows select concrete toast, banner, or progress surfaces directly.
+- Surfaces derive presentation from unrelated infrastructure or query workflow internals.
 
-```text
-comparisonStarted → activity → progress bar
-comparisonCompleted / comparisonFailed → outcome → banner
-completed artifact export → acknowledgement → toast
-```
+### State
 
----
+- Banner dismissal mutates domain state.
+- Retained presentation state survives beyond its workflow context as product state.
 
-## Ownership and Cancellation
+## Consequences
 
-The progress adapter only represents activity. `PdfApp` owns `activeProgressCancel`, which identifies the current page translation, page OCR, region OCR, or region comparison cancellation command. `PdfProgressBar` requests cancellation through `PdfApp`; cancellation remains owned by the feature operation that delegated work.
+### Positive
 
-Banner state is separate from domain state. The banner adapter retains translation outcomes and developer comparison notifications. `PdfApp` combines those snapshots with PDF error and loading state through `createPdfStatusBannerController`.
+- Presentation remains independent from workflow implementation.
+- UI surfaces can change through adapters without changing feature contracts.
+- Workflow business state and cancellation remain isolated from UI feedback.
 
-Banner priority is deterministic:
+### Negative
 
-```text
-PDF error → loading → translation outcome → debug developer outcome → none
-```
-
----
-
-## Architectural Invariants
-
-1. PDF workflows emit `DomainEvents`; they do not call toast, banner, or progress adapters directly.
-2. Domain Events contain domain data only; Presenter owns wording, severity, and presentation intent.
-3. Dispatcher routes only global intents and has no domain workflow responsibility.
-4. Policy maps Presentation Intent to surface and never receives scope or domain data.
-5. Adapters own concrete surface behavior only.
-6. `PdfApp` owns feature lifecycle and cancellation commands; presentation layers never cancel work directly.
-7. Inline component and element states remain local to their rendering owners.
+- Presentation state is transient and cannot replace workflow state.
+- Workflows remain responsible for producing complete outcomes before feedback is emitted.
