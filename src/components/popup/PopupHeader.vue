@@ -10,88 +10,87 @@
       class="ti-page-translate-btn"
     />
 
-    <!-- Spacer to push remaining items to the right -->
-    <div class="ti-header-spacer" />
-
-    <!-- 2. Exclude (Switch) -->
-    <label
-      class="ti-switch"
-      :title="t('popup_exclude_toggle_title') || 'فعال/غیرفعال در این صفحه'"
-    >
-      <input 
-        v-model="isExtensionEnabled" 
-        type="checkbox"
-        @change="handleExcludeToggle"
+    <HorizontalActionScroller :aria-label="t('popup_action_scroller_label')">
+      <!-- 2. Exclude (Switch) -->
+      <label
+        class="ti-switch"
+        :title="t('popup_exclude_toggle_title') || 'فعال/غیرفعال در این صفحه'"
       >
-      <span class="ti-slider" />
-    </label>
+        <input 
+          v-model="isExtensionEnabled" 
+          type="checkbox"
+          @change="handleExcludeToggle"
+        >
+        <span class="ti-slider" />
+      </label>
 
-    <!-- 3. Settings -->
-    <IconButton
-      icon="settings.png"
-      :alt="t('popup_settings_alt_icon') || 'Settings'"
-      :title="t('popup_settings_title_icon') || 'تنظیمات'"
-      type="toolbar"
-      class="ti-btn-settings"
-      @click="handleOpenSettings"
-    />
+      <!-- 3. Settings -->
+      <IconButton
+        icon="settings.png"
+        :alt="t('popup_settings_alt_icon') || 'Settings'"
+        :title="t('popup_settings_title_icon') || 'تنظیمات'"
+        type="toolbar"
+        class="ti-btn-settings"
+        @click="handleOpenSettings"
+      />
 
-    <!-- 5. Revert -->
-    <IconButton
-      v-if="isSelectElementEnabled"
-      icon="revert.png"
-      :alt="t('popup_revert_alt_icon') || 'Revert'"
-      :title="t('popup_revert_title_icon') || 'بازگرداندن به حالت قبلی'"
-      type="toolbar"
-      variant="revert"
-      class="ti-btn-revert"
-      @click="handleRevert"
-    />
+      <!-- 5. Revert -->
+      <IconButton
+        v-if="isSelectElementEnabled"
+        icon="revert.png"
+        :alt="t('popup_revert_alt_icon') || 'Revert'"
+        :title="t('popup_revert_title_icon') || 'بازگرداندن به حالت قبلی'"
+        type="toolbar"
+        variant="revert"
+        class="ti-btn-revert"
+        @click="handleRevert"
+      />
 
-    <!-- 6. Screen Capture -->
-    <IconButton
-      v-if="isScreenCaptureEnabled"
-      icon="capture.svg"
-      :alt="t('popup_screen_capture_alt_icon') || 'Screen Capture'"
-      :title="t('popup_screen_capture_title_icon') || 'تصویربرداری از صفحه'"
-      type="toolbar"
-      class="ti-btn-capture"
-      @click="handleScreenCapture"
-    />
+      <!-- 6. Screen Capture -->
+      <IconButton
+        v-if="isScreenCaptureEnabled"
+        icon="capture.svg"
+        :alt="t('popup_screen_capture_alt_icon') || 'Screen Capture'"
+        :title="t('popup_screen_capture_title_icon') || 'تصویربرداری از صفحه'"
+        type="toolbar"
+        class="ti-btn-capture"
+        @click="handleScreenCapture"
+      />
 
-    <!-- 7. Select Element -->
-    <IconButton
-      v-if="isSelectElementEnabled"
-      icon="select.png"
-      :alt="t('popup_select_element_alt_icon') || 'Select Element'"
-      :title="!isSelectElementSupported ? (t('provider_does_not_support_bulk') || 'این سرویس از حالت انتخاب پشتیبانی نمی‌کند') : (t('popup_select_element_title_icon') || 'حالت انتخاب با موس')"
-      type="toolbar"
-      :active="isSelectModeActive"
-      :disabled="!isSelectElementSupported"
-      class="ti-btn-select"
-      @click="handleSelectElement"
-    />
+      <!-- 7. Select Element -->
+      <IconButton
+        v-if="isSelectElementEnabled"
+        icon="select.png"
+        :alt="t('popup_select_element_alt_icon') || 'Select Element'"
+        :title="!isSelectElementSupported ? (t('provider_does_not_support_bulk') || 'این سرویس از حالت انتخاب پشتیبانی نمی‌کند') : (t('popup_select_element_title_icon') || 'حالت انتخاب با موس')"
+        type="toolbar"
+        :active="isSelectModeActive"
+        :disabled="!isSelectElementSupported"
+        class="ti-btn-select"
+        @click="handleSelectElement"
+      />
 
-    <!-- 8. Mouse Hover Toggle -->
-    <IconButton
-      icon="mouse-hover.png"
-      :alt="isMouseHoverEnabled ? (t('mouse_hover_disable_label') || 'غیرفعال‌سازی ترجمه با ماوس') : (t('mouse_hover_enable_label') || 'فعال‌سازی ترجمه با ماوس')"
-      :title="isMouseHoverEnabled ? (t('mouse_hover_disable_label') || 'غیرفعال‌سازی ترجمه با ماوس') : (t('mouse_hover_enable_label') || 'فعال‌سازی ترجمه با ماوس')"
-      type="toolbar"
-      :active="isMouseHoverEnabled"
-      class="ti-btn-mouse-hover"
-      @click="toggleMouseHover"
-    />
+      <!-- 8. Mouse Hover Toggle -->
+      <IconButton
+        icon="mouse-hover.png"
+        :alt="isMouseHoverEnabled ? (t('mouse_hover_disable_label') || 'غیرفعال‌سازی ترجمه با ماوس') : (t('mouse_hover_enable_label') || 'فعال‌سازی ترجمه با ماوس')"
+        :title="isMouseHoverEnabled ? (t('mouse_hover_disable_label') || 'غیرفعال‌سازی ترجمه با ماوس') : (t('mouse_hover_enable_label') || 'فعال‌سازی ترجمه با ماوس')"
+        type="toolbar"
+        :active="isMouseHoverEnabled"
+        class="ti-btn-mouse-hover"
+        @click="toggleMouseHover"
+      />
 
-    <!-- 7. Open Sidepanel (Rightmost) -->
-    <IconButton
-      v-if="!IsMobile"
-      ref="sidePanelButton"
-      icon="side-panel.png"
-      :title="t('popup_open_side_panel_title') || 'باز کردن در پنل کناری'"
-      type="toolbar"
-      class="ti-btn-sidepanel"
-    />
+      <!-- 7. Open Sidepanel (Rightmost) -->
+      <IconButton
+        v-if="!IsMobile"
+        ref="sidePanelButton"
+        icon="side-panel.png"
+        :title="t('popup_open_side_panel_title') || 'باز کردن در پنل کناری'"
+        type="toolbar"
+        class="ti-btn-sidepanel"
+      />
+    </HorizontalActionScroller>
   </div>
 </template>
 
@@ -108,6 +107,7 @@ import { TranslationMode } from '@/shared/config/config.js'
 import { findProviderById } from '@/features/translation/providers/ProviderManifest.js'
 import browser from 'webextension-polyfill'
 import IconButton from '@/components/shared/IconButton.vue'
+import HorizontalActionScroller from '@/components/shared/HorizontalActionScroller.vue'
 import PageTranslationButton from '@/features/page-translation/components/PageTranslationButton.vue'
 import { MessageActions } from '@/shared/messaging/core/MessageActions.js'
 import { MessageContexts } from '@/shared/messaging/core/MessagingCore.js'

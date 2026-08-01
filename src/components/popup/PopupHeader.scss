@@ -19,21 +19,19 @@
   direction: ltr !important;
   flex-direction: row !important;
 
-  /* Explicit Ordering to keep Translate Page left and others right */
-  .ti-page-translate-btn { order: 1 !important; }
-  .ti-header-spacer { order: 2 !important; flex: 1 1 auto !important; }
-  .ti-switch { order: 3 !important; }
-  .ti-btn-settings { order: 4 !important; }
-  .ti-btn-mouse-hover { order: 5 !important; }
-  .ti-btn-capture { order: 6 !important; }
-  .ti-btn-revert { order: 7 !important; }
-  .ti-btn-select { order: 8 !important; }
-  .ti-btn-sidepanel { order: 9 !important; }
+  .ti-horizontal-action-scroller__track {
+    .ti-switch { order: 1 !important; }
+    .ti-btn-settings { order: 2 !important; }
+    .ti-btn-mouse-hover { order: 3 !important; }
+    .ti-btn-capture { order: 4 !important; }
+    .ti-btn-revert { order: 5 !important; }
+    .ti-btn-select { order: 6 !important; }
+    .ti-btn-sidepanel { order: 7 !important; }
+  }
 
   /* Toolbar Buttons Base Style */
-  .ti-toolbar-button {
-    width: 36px !important;
-    height: 36px !important;
+  .ti-toolbar-button,
+  .ti-horizontal-action-scroller__control {
     display: flex !important;
     align-items: center !important;
     justify-content: center !important;
@@ -78,13 +76,22 @@
     }
   }
 
+  .ti-horizontal-action-scroller__control {
+    color: var(--color-text-secondary) !important;
+
+    &:hover {
+      color: var(--color-text) !important;
+    }
+  }
+
   /* Specific Dark Mode overrides */
   @at-root :global(.ti-dark-mode) &, 
            :global(.theme-dark) & {
     background-color: #2d2d2d !important;
     border-bottom-color: #404040 !important;
 
-    .ti-toolbar-button:hover {
+    .ti-toolbar-button:hover,
+    .ti-horizontal-action-scroller__control:hover {
       background-color: #424242 !important;
     }
 
