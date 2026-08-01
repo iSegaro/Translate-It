@@ -20,6 +20,8 @@
   flex-direction: row !important;
 
   .ti-horizontal-action-scroller__track {
+    justify-content: flex-end;
+
     .ti-switch { order: 1 !important; }
     .ti-btn-settings { order: 2 !important; }
     .ti-btn-mouse-hover { order: 3 !important; }
