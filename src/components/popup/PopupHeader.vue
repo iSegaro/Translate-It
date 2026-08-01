@@ -34,17 +34,17 @@
         :title="t('popup_subtitle_title_icon')"
         type="toolbar"
         class="ti-btn-subtitle"
-        @click="openExtensionApp('subtitle')"
+        @click="handleOpenExtensionApp('subtitle')"
       />
 
       <!-- 4. PDF Translator -->
       <IconButton
-        icon="pdf_viewer/pdf.png"
+        icon="@/icons/ui/pdf_viewer/pdf.png"
         :alt="t('pdf_app_title')"
         :title="t('pdf_app_title')"
         type="toolbar"
         class="ti-btn-pdf"
-        @click="openExtensionApp('pdf')"
+        @click="handleOpenExtensionApp('pdf')"
       />
 
       <!-- 5. Settings -->
@@ -230,6 +230,14 @@ const isWholePageEnabled = computed(() => {
 })
 
 // Methods
+const handleOpenExtensionApp = async (appName) => {
+  const result = await openExtensionApp(appName)
+
+  if (result?.success) {
+    window.close()
+  }
+}
+
 const handleSelectElement = async () => {
   if (!isSelectElementSupported.value) return
 

@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { mount } from '@vue/test-utils'
 import { ref } from 'vue'
 import PopupHeader from './PopupHeader.vue'
@@ -6,6 +6,7 @@ import { openExtensionApp } from '@/core/ExtensionAppLauncher.js'
 
 let settings
 let scrollToEnd
+let closePopup
 
 vi.mock('@/features/settings/stores/settings.js', () => ({
   useSettingsStore: () => ({ settings })
@@ -90,6 +91,8 @@ describe('PopupHeader', () => {
   beforeEach(() => {
     scrollToEnd = vi.fn()
     vi.mocked(openExtensionApp).mockClear()
+    vi.mocked(openExtensionApp).mockResolvedValue({ success: true })
+    closePopup = vi.spyOn(window, 'close').mockImplementation(() => {})
     settings = {
       EXTENSION_ENABLED: true,
       TRANSLATE_WITH_SELECT_ELEMENT: true,
@@ -98,6 +101,10 @@ describe('PopupHeader', () => {
       MODE_PROVIDERS: {},
       TRANSLATION_API: 'google'
     }
+  })
+
+  afterEach(() => {
+    closePopup.mockRestore()
   })
 
   it('keeps Page Translation fixed while utility controls render inside scroller', async () => {
@@ -136,7 +143,7 @@ describe('PopupHeader', () => {
     ])
   })
 
-  it('launches Subtitle and PDF translators through shared launcher', async () => {
+  it('launches Subtitle and PDF translators before closing Popup', async () => {
     const wrapper = mount(PopupHeader)
     await wrapper.vm.$nextTick()
 
@@ -145,6 +152,20 @@ describe('PopupHeader', () => {
 
     expect(openExtensionApp).toHaveBeenNthCalledWith(1, 'subtitle')
     expect(openExtensionApp).toHaveBeenNthCalledWith(2, 'pdf')
+    expect(closePopup).toHaveBeenCalledTimes(2)
+    expect(openExtensionApp.mock.invocationCallOrder[0]).toBeLessThan(closePopup.mock.invocationCallOrder[0])
+    expect(openExtensionApp.mock.invocationCallOrder[1]).toBeLessThan(closePopup.mock.invocationCallOrder[1])
+  })
+
+  it('keeps Popup open when an extension app launch fails', async () => {
+    vi.mocked(openExtensionApp).mockResolvedValueOnce({ success: false })
+    const wrapper = mount(PopupHeader)
+    await wrapper.vm.$nextTick()
+
+    await wrapper.find('.ti-btn-subtitle').trigger('click')
+
+    expect(openExtensionApp).toHaveBeenCalledWith('subtitle')
+    expect(closePopup).not.toHaveBeenCalled()
   })
 
   it('preserves conditional utility action rendering', async () => {
