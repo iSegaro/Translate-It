@@ -49,6 +49,7 @@
 ## Why Translate It?
 
 - **Privacy First:** OCR and core processes happen locally. Your data stays in your browser.
+- **PDF Translator:** Open local or online PDF documents with intelligent page translation, bilingual reading, OCR for scanned PDFs, and TXT/Markdown/HTML export.
 - **AI-Powered:** Support for Gemini, OpenAI, DeepSeek and more.
 - **Cost-Efficient:** Save up to **70% on AI tokens** with the unique Economy Mode.
 - **Zero-Pressure Engineering:** Optimized for low-footprint operation. Keep dozens of tabs open without worrying about RAM bloat or system slowdowns.
@@ -88,7 +89,16 @@
 
 <br>
 
-### 5. Subtitle Translation (SRT)
+### 5. PDF Translator
+- **Local & Online Documents:** Open PDF files from your device or a URL.
+- **Bilingual & Translated Views:** Translate pages on demand and switch between bilingual and translated views.
+- **Navigate & Select:** Move between pages and select PDF text naturally.
+- **Scanned PDF OCR & Export:** Extract text from scanned PDFs with OCR, then export translations to TXT, Markdown, or HTML.
+<!-- PDF_TRANSLATOR_SCREENSHOT_PLACEHOLDER -->
+
+<br>
+
+### 6. Subtitle Translation (SRT)
 - **Easy File Translation:** Upload your movie or course subtitles (`.srt`) and translate them to any language in seconds.
 - **Perfect Timing & Style:** Your video timestamps, italics, and bold text stay exactly as they are. No broken files.
 - **Live Preview:** Watch the translation happen line-by-line with a clear progress bar and estimated time remaining.
@@ -96,7 +106,7 @@
 
 <br>
 
-### 6. Smart Optimization Slider (Economy vs. Turbo)
+### 7. Smart Optimization Slider (Economy vs. Turbo)
 Take full control over your API costs and UI speed with **Optimization Levels (1-5)**:
 - **Economy Mode (Level 1):** Packs 70% more text per request. Perfect for saving AI tokens and preventing IP bans on traditional providers.
 - **Turbo Mode (Level 5):** Maximizes concurrency for the fastest possible UI response.
@@ -104,13 +114,13 @@ Take full control over your API costs and UI speed with **Optimization Levels (1
 
 <br>
 
-### 6. Cross-Platform Ergonomics
+### 8. Cross-Platform Ergonomics
 - **Mobile Bottom Sheet:** A native-like, thumb-friendly interface for mobile browsers (Firefox Android, Kiwi, Lemur) with gesture support.
 - **Desktop/Mobile FAB Menu:** A draggable, persistent floating action button for instant access to OCR, Page Translation, Element Mode, and rapid feature toggles (like instant TTS or direct-translation mode).
 
 <br>
 
-### 7. Mouse on Hover (Instant Glance)
+### 9. Mouse on Hover (Instant Glance)
 - **Glance-to-Translate:** Move your mouse over any text while holding a modifier key (like Ctrl) to see an instant translation in a non-intrusive tooltip.
 - **Smart Scoping:** Choose your focus: translate a single **Word**, a full **Sentence**, or the entire **Container** block automatically.
 
@@ -123,6 +133,7 @@ Take full control over your API costs and UI speed with **Optimization Levels (1
 | **Text Selection** | Instant translation icon/box right where you select text. |
 | **Element Mode** | Click any UI element to translate it inline while keeping the layout. |
 | **Whole Page** | Auto-translate entire pages with lazy-loading and smart memory management. |
+| **PDF Translator** | Translate local and online PDF documents with bilingual reading, OCR support for scanned PDFs, and TXT/Markdown/HTML export. |
 | **Mouse Hover** | Instant translation tooltip triggered by moving mouse over text (supports Word/Sentence/Container scopes). |
 | **Desktop/Mobile FAB** | Multipurpose draggable hub for instant OCR, Page Translation, Element Mode, and rapid feature toggles. |
 | **In-Field (Ctrl+/)** | Translate your input inside text fields before sending. |
