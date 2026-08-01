@@ -13,6 +13,7 @@ Translate It! is engineered with a "zero-pressure" philosophy, optimized to run 
 - 70% Token Savings: Use our unique Economy Mode to pack more text into every request, slashing your AI API costs.
 - Zero-Pressure Engineering: Optimized for low-footprint operation. Keep dozens of tabs open without worrying about RAM bloat or system slowdowns.
 - Privacy First OCR: Translate text from images, videos, and PDFs using our Offline OCR engine. Your visual data never leaves your browser.
+- PDF Translator: Open local or online PDF documents with intelligent page translation, bilingual reading, OCR for scanned PDFs, and TXT/Markdown/HTML export.
 - Progressive Streaming: Don't wait! Large paragraphs are rendered in real-time as they arrive, providing a fluid, zero lag experience.
 
 ---
@@ -23,6 +24,7 @@ Translate It! is engineered with a "zero-pressure" philosophy, optimized to run 
 - Screen Capture (Visual Translation): Highlight any area on your screen—even inside videos or images to extract and translate text instantly.
 - Element Mode: Click any UI element to translate it inline while keeping the layout intact.
 - Whole Page Translation: Auto-translate entire web-pages with smart lazy-loading and infinite scroll support. Perfect for long articles or social media feeds.
+- PDF Translator: Translate local and online PDF documents with page navigation, text selection, bilingual and translated views, OCR for scanned PDFs, and export to TXT, Markdown, or HTML.
 - Mouse Hover (Instant Glance): Hover over any text while holding a modifier key (like Ctrl) to see an instant translation in a sleek tooltip. Supports Word, Sentence, and Container scopes.
 - Desktop/Mobile FAB: A multipurpose, drag-gable floating hub that gives you instant access to OCR, Page Translation, and Element Mode.
 - Translate While Typing (Ctrl + /): Type in any field and translate your message before hitting send. Perfect for international messaging.
