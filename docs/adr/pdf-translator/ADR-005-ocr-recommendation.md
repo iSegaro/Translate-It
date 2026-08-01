@@ -1,8 +1,8 @@
 # ADR-005: OCR Recommendation
 
-## Status
+**Status:** Accepted
 
-Accepted
+**Scope:** Separation of OCR structural detection from recommendation policy.
 
 ---
 
@@ -195,31 +195,13 @@ The recommendation path and the execution path are separate. Recommendation neve
 
 - **Aligned with ADR-003.** The Recommendation Engine is a pure consumer of page content. It does not own PageSession lifecycle, does not trigger hydration, and does not mutate PageSession. It follows the consumer contract established by ADR-003.
 
-### Negative
-
-- **Additional component.** The Recommendation Engine is a new module between the composable and the detector. It adds one level of indirection. In the current system, where recommendation logic is trivially "detect scanned → exclude already-OCR'd," this component may feel like over-engineering.
-
-- **Migration cost.** The composable's public state must shift from detection semantics to recommendation semantics. All consumers — UI components, tests, and documentation — must update their bindings. This is a mechanical but wide-reaching change.
-
-### Trade-offs
-
-The core trade-off is **indirection vs. semantic clarity**. The current system has fewer modules but leaks detection terminology into the product contract. The proposed system has one more module but establishes a clean boundary between structural classification and product policy.
-
-This trade-off favors the separation because:
-- The recommendation policy will evolve with additional signals and heuristics. The detection heuristic may also evolve independently. These are independent change drivers that should not be coupled.
-- The cost of the additional component is low (a thin, stateless query module). The cost of the semantic leak compounds over time as more UI components and tests bind to detection terminology.
-
----
-
 ## Alternatives Considered
 
-### Alternative A — Keep Detector Public (Status Quo)
+### Alternative A — Keep Detector Public
 
 The composable continues to query the detector directly. Detection results are exposed as public state. No Recommendation Engine is introduced.
 
-**Accepted as:** The current stable state. This ADR does not deny that the current system works.
-
-**Rejected as:** The target architecture. Detection terminology leaks into the product contract. Recommendation policy is embedded in the composable. Future recommendation rule changes require composable modifications. UI is coupled to "scanned" semantics.
+**Rejected because:** Detection terminology leaks into the product contract. Recommendation policy remains embedded in the composable, coupling policy changes to structural classification.
 
 ### Alternative B — Pure Rename
 
@@ -262,37 +244,10 @@ Introduce a Recommendation Engine that wraps the detector. The detector remains 
 
 ---
 
-## Future Compatibility
-
-### Smarter Recommendation Rules
-
-The Recommendation Engine can incorporate additional recommendation signals without changing its public contract. Additional heuristics — such as text coverage analysis, image coverage, damaged text-layer detection, OCR confidence from prior runs, or user preferences — are internal to the Recommendation Engine.
-
-All of these are internal to the Recommendation Engine. The composable continues to ask for recommendation results and receives them. No UI changes, no composable changes, no detector changes.
-
-### Mixed-Content PDFs
-
-A page may contain mixed native text and raster content. The current detector classifies such pages based on overall text extraction. The Recommendation Engine can apply additional rules that consider partial-page content quality, independently of the detector's structural classification.
-
-This requires the Recommendation Engine to understand evolving product policy, but it does not require the detector to change. The detector continues to answer structural questions. The Recommendation Engine adds product-level rules as separate policy.
-
-The separation between detection and recommendation is what makes this possible. If they were merged, evolving product policy would require changing the public contract.
-
-### Region OCR
-
-Region OCR is a viewer-layer action. The user explicitly selects a region and requests OCR. This path does not involve the Recommendation Engine. The Recommendation Engine answers product questions about page content; region-level OCR is a separate concern with its own explicit trigger.
-
-The two paths share the OCR execution engine but nothing else. Region OCR can define its own execution contract without conflicting with the recommendation contract.
-
-No names, boundaries, or ownership decisions in this ADR block Region OCR. The Recommendation Engine does not assume OCR is always full-page. It simply does not concern itself with how OCR is executed — only whether it should be recommended.
-
----
-
 ## Relationship to Existing ADRs
 
 | ADR | Relationship |
 |-----|--------------|
-| **ADR-003** | Accepts document-lifetime PageSession model. This ADR adds a Recommendation Engine that is a consumer of PageSession content, consistent with the consumer model. No PageSession lifecycle changes. |
 | **ADR-003** | Establishes that consumers do not own PageSession lifecycle. The Recommendation Engine is a pure consumer: it reads page state, applies policy, returns results. It does not hydrate, create, or destroy sessions. It does not trigger hydration. It follows the consumer contract. |
 
 ---

@@ -1,4 +1,4 @@
-# ADR-0001: Status Banner Architecture
+# ADR-002: Status Banner Architecture
 
 **Status:** Superseded
 

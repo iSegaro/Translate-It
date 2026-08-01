@@ -191,4 +191,4 @@ Do not use `transform` on the root `<svg>` element. Browsers may not apply it re
 | SVGRepo metadata in several SVGs | Low |
 | `Firefox_Browser_Add-ons_logo.svg` naming inconsistency | Low |
 
-Refer to the ADR in `docs/adr/ADR-SVG-ICON-SYSTEM.md` for the architectural rationale behind these decisions.
+Refer to [ADR-001: SVG Icon System](../adr/ADR-001-svg-icon-system.md) for the architectural rationale behind these decisions.
