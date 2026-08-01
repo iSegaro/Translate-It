@@ -59,4 +59,4 @@ Once you are happy with your translations:
 
 ---
 
-**Detailed Technical Guide**: If you are a developer and want to know how the localization system works behind the scenes, see the [Localization Architecture Guide](../LOCALIZATION.md).
+**Detailed Technical Guide**: If you are a developer and want to know how the localization system works behind the scenes, see the [Localization Architecture Guide](../technical/LOCALIZATION.md).

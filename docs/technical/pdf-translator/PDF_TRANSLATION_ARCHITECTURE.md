@@ -1,12 +1,18 @@
 # PDF Translation Architecture
 
+> **Scope:** PDF Translator runtime pipeline, module ownership, lifecycle, translation contracts, export-readiness contracts, and feature integration.
+> **Canonical responsibility:** Define current PDF Translator implementation boundaries without owning toolbar behavior or detailed table metadata schemas.
+> **Intended audience:** PDF Translator maintainers, contributors, and reviewers.
+> **Related ADRs:** [ADR-003: Document Lifecycle](../../adr/pdf-translator/ADR-003-document-lifecycle.md), [ADR-005: OCR Recommendation](../../adr/pdf-translator/ADR-005-ocr-recommendation.md), [ADR-006: Canonical Region Geometry](../../adr/pdf-translator/ADR-006-canonical-region-geometry.md), [ADR-007: Region OCR Execution Lifecycle](../../adr/pdf-translator/ADR-007-region-ocr-execution-lifecycle.md), [ADR-011: Presentation Architecture](../../adr/pdf-translator/ADR-011-presentation-architecture.md), [ADR-014: Viewer State Restoration](../../adr/pdf-translator/ADR-014-viewer-state-restoration.md)
+> **Related technical references:** [PDF Viewer Toolbar](./PDF_VIEWER_TOOLBAR.md), [PDF Table Reconstruction](./PDF_TABLE_RECONSTRUCTION.md)
+
 ## Overview
 
 The PDF Translation feature is a **self-contained, dedicated PDF viewer and translation system**. It runs as a standalone Vue 3 application backed by a rich core library. The system uses **pdfjs-dist** for rendering, a custom text layer renderer for selection, a layout analysis engine for logical block extraction, a batch translation pipeline, page and region OCR, persistent caching, document history, TXT/Markdown/HTML export, and global feedback presentation.
 
 **Architecture Status**: Production Ready (MVP Complete)
 
-**Key Metrics**: custom text layer with sub-pixel accuracy, per-block deterministic identity, local Tesseract.js OCR, three-format export, and presentation routing through Host, Facade, Presenter, Dispatcher, Policy, and adapters.
+**Key Metrics**: custom text layer with sub-pixel accuracy, per-block deterministic identity, local Tesseract.js OCR, three-format export, and event-driven workflow presentation.
 
 ---
 
@@ -22,7 +28,7 @@ The PDF Translation feature is a **self-contained, dedicated PDF viewer and tran
   - [Key Application Constants](#key-application-constants-srcappspdfconstants)
   - [Composable Responsibilities](#composable-responsibilities)
   - [Workspace Visual Presentation](#workspace-visual-presentation)
-  - [Feedback Presentation Architecture](#feedback-presentation-architecture)
+   - [Presentation Reference](#presentation-reference)
 - [PDF Viewer Lifecycle](#pdf-viewer-lifecycle)
   - [File Loading Sequence](#file-loading-sequence)
   - [Page Rendering Sequence](#page-rendering-sequence)
@@ -75,7 +81,6 @@ The PDF Translation feature is a **self-contained, dedicated PDF viewer and tran
 - [Translation State (`PdfTranslationState`)](#translation-state-pdftranslationstate)
 - [History Architecture](#history-architecture)
 - [Export Architecture](#export-architecture)
-- [Status Banner Architecture](#status-banner-architecture)
 - [Storage Model](#storage-model)
 - [Event Flow](#event-flow)
 - [Cross-Feature Dependencies](#cross-feature-dependencies)
@@ -105,7 +110,7 @@ The PDF Translation feature is a **self-contained, dedicated PDF viewer and tran
 1. **No browser-native PDF interception** — Users open PDFs inside the dedicated viewer only.
 2. **No auto-translate on open** — Translation is manually triggered per visible pages.
 3. **No translated PDF regeneration** — Output is text-based export, not a translated PDF file.
-4. **No advanced table reconstruction** — Tables are translated as flat text blocks.
+4. **Limited document-level table reconstruction** — The viewer does not reconstruct table layout as a complete document representation. Production table metadata, span handling, and overlay integration are defined in [PDF Table Reconstruction](./PDF_TABLE_RECONSTRUCTION.md).
 5. **No translated search** — Search operates on the original text only.
 
 ---
@@ -125,11 +130,6 @@ The PDF Translation feature is a **self-contained, dedicated PDF viewer and tran
 | PdfRenderScheduler | Render policy — candidates, eligibility, priority, cancellation targets |
 | PdfRenderWindowState | Render window — committed vs. pending candidate sets |
 | PdfRenderJobState | Render lifecycle — per-page state machine (idle → rendering → committed/failed/cancelled) |
-| Presentation Host | Presentation bootstrap — exposes reactive banner and progress snapshots |
-| Presentation Facade | Sends Domain Events through Presenter and Dispatcher |
-| Presentation Presenter | Converts Domain Events into surface-independent Presentation Intents |
-| Presentation Dispatcher | Resolves global intent surface and delegates to an adapter |
-| Presentation Adapters | Own toast delivery and banner/progress surface state |
 
 ---
 
@@ -183,12 +183,10 @@ PdfApp.vue
 ├── usePdfRegionOcr               (region OCR operation lifecycle)
 ├── usePdfExport                  (TXT/Markdown/HTML export)
 ├── usePdfSelectionBridge         (text selection bridge)
-├── createPresentationHost         (global feedback pipeline and surface snapshots)
-│   ├── Presentation Facade → Presenter → Dispatcher → Policy → adapters
-│   └── pdfStatusBannerController (selects PDF error/loading/banner-adapter outcome)
+├── Presentation Pipeline          (see ADR-011)
 ├── PdfToolbar
 ├── PdfDropzone
-├── PdfStatusBanner                 (rendered status banner)
+├── Presentation surfaces           (see ADR-011)
 └── PdfViewerLayout
     ├── PdfViewer (original pane)
     │   └── PdfPageView × N
@@ -261,7 +259,7 @@ Standard Vue 3 bootstrap: `createApp`, Pinia install, error handlers, mount to `
 PdfApp
 ├── PdfToolbar (file info, mode selector, action buttons)
 ├── PdfOcrConsentPrompt (user consent before OCR)
-├── PdfProgressBar (shared translation, page OCR, region OCR, and comparison activity)
+├── ProgressIndicator (shared translation, page OCR, region OCR, and comparison activity)
 ├── PdfOutlinePanel (outline/bookmarks sidebar)
 ├── PdfDropzone (drag-and-drop or empty state)
 │   └── PdfViewerLayout (CSS Grid: single/dual pane, owns scroll containers)
@@ -272,7 +270,7 @@ PdfApp
 │       └── PdfTranslatedPane (translated blocks per page, own scroll container)
 │           ├── PdfTranslatedBlock × M
 │           └── PdfOcrStatus × N
-├── PdfStatusBanner (PDF error/loading, translation outcome, debug region-comparison outcome)
+├── PdfStatusBanner (persistent contextual notification surface)
 └── PdfWindowsHost (floating translation icon + draggable/resizable result window)
 ```
 
@@ -340,28 +338,9 @@ The page list within the scroll pane uses `padding: 16px 0 24px` to provide vert
 
 ---
 
-### Feedback Presentation Architecture
+### Presentation Reference
 
-```text
-PDF workflow callback
-    ↓
-PdfApp emits DomainEvents
-    ↓
-Presentation Host / Facade
-    ↓
-Presenter (Domain Event → Presentation Intent)
-    ↓
-Dispatcher (global scope only)
-    ↓
-Policy (acknowledgement → toast, outcome → banner, activity → progress bar)
-    ↓
-Toast / Banner / Progress adapter
-    ├── Toast adapter → vue-sonner
-    └── Banner / Progress adapters → Presentation Host reactive snapshot
-                                      → PdfApp → PdfStatusBanner / PdfProgressBar
-```
-
-`PdfApp` owns feature callbacks and active cancellation commands. `DomainEvents` carry domain data; Presenter owns wording, severity, and intent; Dispatcher owns global adapter routing. Banner and progress adapters retain state snapshots; toast adapter delivers directly to `vue-sonner`. Inline block, page, and pane states remain owned by their rendering components.
+PDF workflow presentation architecture is defined by [ADR-011: Presentation Architecture](../../adr/pdf-translator/ADR-011-presentation-architecture.md).
 
 ---
 
@@ -649,7 +628,11 @@ The toolbar page indicator reads `currentPage` directly. There is no intermediat
 
 A page-change observer in `usePdfNavigation` triggers `updateActiveOutline()` on every page change. This recomputes `activeOutlineDest` (the active outline node) and `expandedDests` (the ancestor path for auto-expansion). The outline and toolbar always reflect the same page state because they share the same source.
 
-This ownership may move to a future Viewer State layer, but the consumer contract — all navigation sources update one value, all consumers observe it — will remain unchanged.
+### Viewer State Restoration
+
+[ADR-014: Viewer State Restoration](../../adr/pdf-translator/ADR-014-viewer-state-restoration.md) defines Viewer State as an immutable snapshot, not a new authoritative owner. `PdfViewerState` captures `documentIdentity`, `currentPage`, and `contentView`; existing document, navigation, and view owners retain validation and restoration responsibility.
+
+`PdfApp` writes the current snapshot through `PdfViewerStateUrlAdapter`, stores a parsed snapshot in `PendingViewerState`, and restores it only after the matching document loads. Restoration applies `contentView`, waits for the initial layout commit, then navigates through the existing navigation owner to `currentPage`. A non-matching or absent snapshot is cleared and the current state is written instead.
 
 ### Scroll Container Ownership
 
@@ -1254,7 +1237,9 @@ translateVisibleBlocks()
     translatedCount: number,
     failedCount: number,
     totalCount: number,
-    translationOccurrenceId: number
+    translationOccurrenceId: number,
+    error: string,
+    failureReason?: string
 }
 ```
 
@@ -1267,24 +1252,26 @@ translateVisibleBlocks()
 | `failedCount` | Number of blocks that failed |
 | `totalCount` | Total visible blocks processed |
 | `translationOccurrenceId` | Monotonic identity for this translation occurrence |
+| `error` | First failure message, if available |
+| `failureReason` | Failure classification for partial, error, or cancelled outcomes when available |
 
 **Status semantics:**
 
-| Status | Meaning | Banner Display |
-|--------|---------|----------------|
-| `idle` | No translation has run | No banner |
-| `translated` | All visible blocks translated | No banner |
-| `partial` | Some blocks failed or were skipped | `PdfApp` emits `translation-partial`; banner adapter retains warning outcome |
-| `cancelled` | Translation was cancelled by user | No banner |
-| `error` | Fatal translation error | `PdfApp` emits `translation-failed`; banner adapter retains error outcome |
+| Status | Meaning |
+|--------|---------|
+| `idle` | No translation has run |
+| `translated` | All visible blocks translated |
+| `partial` | Some blocks failed or were skipped |
+| `cancelled` | Translation was cancelled by user |
+| `error` | Fatal translation error |
 
-`translationSummary` remains the per-run domain outcome. `PdfApp` reads it after terminal completion and emits the matching Domain Event. The Presentation Presenter maps failure reasons to user-facing wording, then the banner adapter stores the resulting translation outcome.
+`translationSummary` remains the per-run domain outcome. `PdfApp` reads it after terminal completion and emits matching Domain Events. Presentation behavior is defined by ADR-011.
 
 **Producer:** `PdfTranslationCoordinator.translateVisibleBlocks()` creates the summary at the end of each translation run.
 
 **State owner:** `usePdfViewerController` receives the summary and stores it in the reactive `translationSummary` ref.
 
-**Consumer:** `PdfApp` reads `translationSummary` to emit terminal presentation events. See [Status Banner Architecture](#status-banner-architecture).
+**Consumer:** `PdfApp` reads `translationSummary` to emit terminal Domain Events.
 
 The ownership chain is: `PdfTranslationCoordinator` (produces) → `usePdfViewerController` (owns reactive state) → `PdfApp` (emits Domain Event) → Presentation pipeline (communicates outcome).
 
@@ -1400,16 +1387,16 @@ requestOcr()
     ↓
 usePdfOcr.confirmOcr()
     ↓ onOcrStart
-PdfApp → DomainEvents.ocrStarted → PdfProgressBar
+PdfApp → DomainEvents.ocrStarted → Presentation Pipeline → ProgressIndicator
     ↓ onOcrProgress({ current, total })
-PdfApp → DomainEvents.ocrProgressUpdated → PdfProgressBar
+PdfApp → DomainEvents.ocrProgressUpdated → Presentation Pipeline → ProgressIndicator
     ↓ complete / failure
 PdfApp → DomainEvents.activityCompleted
        → refresh page data and recommendations
        → failure acknowledgement toast when applicable
 ```
 
-The shared progress bar cancels through `PdfApp.activeProgressCancel`. Page OCR cancellation calls `PdfOcrProcessor.cancel()` and is cooperative: the processor checks cancellation between pages and after render/recognition work.
+`ProgressIndicator` requests cancellation through `PdfApp.activeProgressCancel`. Page OCR cancellation calls `PdfOcrProcessor.cancel()` and is cooperative: the processor checks cancellation between pages and after render/recognition work. Presentation behavior is defined by ADR-011.
 
 ### OCR Block Integration
 
@@ -1582,7 +1569,6 @@ A pure state container for per-block translation tracking. No external dependenc
 ```javascript
 {
     translatedText: string,
-    translatedCells: Map | null,
     status: 'idle' | 'translated' | 'error',
     provider: string,
     sourceLanguage: string,
@@ -1593,6 +1579,8 @@ A pure state container for per-block translation tracking. No external dependenc
     error: Error | null
 }
 ```
+
+Table-specific translation metadata is defined by [PDF Table Reconstruction](./PDF_TABLE_RECONSTRUCTION.md).
 
 ---
 
@@ -1657,59 +1645,10 @@ Reactive via `translationTick`:
 | `translatedCount` | Blocks with status `translated` |
 | `failedCount` | Blocks with status `error` |
 | `totalPages` | Total pages in the document |
-| `isPartial` | `translatedCount < totalCount && totalCount > 0` |
+| `isPartial` | `translatedCount < totalBlocks && totalBlocks > 0` |
 | `hasTranslatedBlocks` | `translatedCount > 0` |
 
-**Architectural note:** The status banner does NOT read from `getExportStats()`. Partial-translation display is driven entirely by `translationSummary.status === 'partial'`, not by `isPartial`. These metrics model intentionally different concerns: export metrics represent cumulative document export readiness, while `translationSummary` represents only the latest translation occurrence. They must remain independent. See [Status Banner Architecture](#status-banner-architecture).
-
----
-
-## Status Banner Architecture
-
-The status banner is a compact notification bar above viewer content. `PdfApp` owns `createPdfStatusBannerController`, its dismissal key, and the computed banner input. `PdfStatusBanner` renders the selected banner as a sibling of the viewer layout.
-
-The Presentation Banner Adapter owns separate retained snapshots for translation outcomes and developer comparison notifications. Export and OCR acknowledgements use toast; operation activity uses `PdfProgressBar`.
-
-```text
-DomainEvents.translationPartial / translationFailed
-    ↓
-Presentation Banner Adapter → translationNotification
-
-DomainEvents.comparisonCompleted / comparisonFailed
-    ↓
-Presentation Banner Adapter → developerNotification
-
-PdfApp error/loading + adapter snapshots
-    ↓
-pdfStatusBannerController.build()
-    ↓
-PdfStatusBanner
-```
-
-| Input | Source | Purpose |
-|-------|--------|---------|
-| `error` | `usePdfViewerController` | PDF load or render error message |
-| `isLoading` | `usePdfViewerController` | Document is loading |
-| `translationNotification` | Presentation Banner Adapter | Partial or failed translation outcome |
-| `developerNotification` | Presentation Banner Adapter | Debug Mode-gated region-comparison outcome |
-
-The controller retains only error identity. The Presenter derives translation IDs from `translationOccurrenceId`; `PdfApp` assigns monotonic IDs to developer comparison outcomes. Banner dismissal records an ID only and never mutates domain state.
-
-Exactly one banner is visible:
-
-```text
-PDF error → loading → translation outcome → debug developer outcome → none
-```
-
-| Priority | Condition | Banner Variant | Dismissible |
-|----------|-----------|----------------|-------------|
-| 1 (highest) | `error` | Error | Yes |
-| 2 | `isLoading` | Info | No |
-| 3 | `translationNotification` | Warning or error | Yes |
-| 4 | Debug Mode + `developerNotification` | Success or error | Yes |
-| 5 | None | No banner | — |
-
----
+**Architectural note:** Export metrics represent cumulative document export readiness, while `translationSummary` represents only the latest translation occurrence. These contracts remain independent: export readiness does not determine translation outcome.
 
 ---
 
@@ -1789,7 +1728,7 @@ User selects a region
     → usePdfRegionOcr → PdfRegionOcrExecutor
     → recognized text: PdfApp → PdfWindowsHost.openTranslation()
     → no text / failure: acknowledgement toast
-    → cancellation: PdfProgressBar → PdfApp active command → operation.cancel()
+    → cancellation: ProgressIndicator → PdfApp active command → operation.cancel()
 ```
 
 ### Region Comparison Event Flow
@@ -1801,7 +1740,7 @@ Debug toolbar action
     → RegionExecutionDispatcher → RegionComparisonRunner
     → RegionComparisonAnalyzer
     → DomainEvents.comparisonCompleted / comparisonFailed
-    → Presentation Banner Adapter → PdfStatusBanner
+    → presentation behavior: see ADR-011
     → completed result: RegionComparisonArtifactWriter → JSON download → export toast
 ```
 

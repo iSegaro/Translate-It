@@ -1,10 +1,16 @@
 # PDF Table Reconstruction
 
+> **Scope:** PDF Translator table metadata, reconstruction rules, span handling, overlay consumers, limitations, and diagnostic boundary.
+> **Canonical responsibility:** Define current table metadata and reconstruction integration without owning viewer lifecycle, toolbar behavior, or general translation pipeline.
+> **Intended audience:** PDF Translator maintainers, rendering contributors, and reviewers.
+> **Related ADRs:** [ADR-006: Canonical Region Geometry](../../adr/pdf-translator/ADR-006-canonical-region-geometry.md)
+> **Related technical references:** [PDF Translation Architecture](./PDF_TRANSLATION_ARCHITECTURE.md)
+
 ## Overview
 
-The PDF Table Reconstruction system provides diagnostic table metadata for improved table translation and rendering. It detects table structure (columns, rows, cells) and identifies span candidates for merged cells.
+The PDF Table Reconstruction system provides production table metadata, span handling, and overlay integration for translated table content. It detects table structure (columns, rows, cells) and identifies span candidates for merged cells.
 
-**Architecture Status**: Diagnostic-only (L5a-L5i complete)
+**Architecture Status**: Production metadata and overlay integration; diagnostic table analysis tooling.
 
 **Key Metrics**: ~450 lines of core logic, 70+ tests, pure functions with no side effects.
 
@@ -22,6 +28,18 @@ The PDF Table Reconstruction system provides diagnostic table metadata for impro
 - [Known Limitations](#known-limitations)
 - [Validation Checklist](#validation-checklist)
 - [Pass/Fail Criteria](#passfail-criteria)
+
+---
+
+## Implementation Boundary
+
+### Production Implementation
+
+The runtime pipeline extracts and carries table metadata through `PageLayoutModel`, `PdfTranslationCoordinator`, and `PdfTranslationAdapter`. `PdfBlockOverlayItem` consumes translated cell metadata and `PdfCellSpanLayout` resolves span-aware overlay widths. This metadata is additive: document-level table layout is not reconstructed as a complete document representation.
+
+### Diagnostic-only Tooling
+
+`TableRegionAnalyzer` performs diagnostic structural analysis for columns, rows, cells, and span candidates. Its output is additive metadata; it does not own a production document-reconstruction model. Development-only overlay diagnostics expose span analysis without changing production rendering behavior.
 
 ---
 

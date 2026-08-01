@@ -1,7 +1,11 @@
 # ADR-012: Defer Per-Application Stylesheet Architecture
 
-- **Status:** Accepted
+- **Status:** Historical
 - **Date:** 2026-07-23
+
+> Historical record.
+>
+> Documents completed Options CSS containment work and deferral of broader stylesheet restructuring. This document is no longer an active architectural authority.
 
 ## Context
 
