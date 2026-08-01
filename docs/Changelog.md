@@ -1,4 +1,8 @@
-#### v1.17.2 – Released on X XX, 2026
+#### v1.18.0 – Released on X XX, 2026
+
+##### Added
+
+- Introduced [PDF Translator](#/about?highlight=PDF_TRANSLATOR) for translating PDF documents.
 
 ##### Fixed
 
