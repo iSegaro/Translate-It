@@ -1,5 +1,11 @@
 # PDF Viewer Toolbar Technical Reference
 
+> **Scope:** PDF Viewer toolbar controls, responsive behavior, component integration, accessibility, and toolbar event flow.
+> **Canonical responsibility:** Define current toolbar behavior and implementation ownership without owning translation pipeline, Viewer State Restoration, or table metadata contracts.
+> **Intended audience:** PDF Viewer maintainers, UI contributors, and reviewers.
+> **Related ADRs:** [ADR-013: Viewer Toolbar Architecture](../../adr/pdf-translator/ADR-013-viewer-toolbar-architecture.md)
+> **Related technical references:** [PDF Translation Architecture](./pdf-translation-architecture.md)
+
 **Status:** Current implementation reference  
 **Architecture rationale:** [ADR-013: Viewer Toolbar Architecture](../../adr/pdf-translator/ADR-013-viewer-toolbar-architecture.md)
 

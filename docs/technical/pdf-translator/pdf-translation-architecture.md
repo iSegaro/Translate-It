@@ -1,5 +1,11 @@
 # PDF Translation Architecture
 
+> **Scope:** PDF Translator runtime pipeline, module ownership, lifecycle, translation contracts, export-readiness contracts, and feature integration.
+> **Canonical responsibility:** Define current PDF Translator implementation boundaries without owning toolbar behavior or detailed table metadata schemas.
+> **Intended audience:** PDF Translator maintainers, contributors, and reviewers.
+> **Related ADRs:** [ADR-003: Document Lifecycle](../../adr/pdf-translator/ADR-003-document-lifecycle.md), [ADR-005: OCR Recommendation](../../adr/pdf-translator/ADR-005-ocr-recommendation.md), [ADR-006: Canonical Region Geometry](../../adr/pdf-translator/ADR-006-canonical-region-geometry.md), [ADR-007: Region OCR Execution Lifecycle](../../adr/pdf-translator/ADR-007-region-ocr-execution-lifecycle.md), [ADR-011: Presentation Architecture](../../adr/pdf-translator/ADR-011-presentation-architecture.md), [ADR-014: Viewer State Restoration](../../adr/pdf-translator/ADR-014-viewer-state-restoration.md)
+> **Related technical references:** [PDF Viewer Toolbar](./pdf-viewer-toolbar.md), [PDF Table Reconstruction](./pdf-table-reconstruction.md)
+
 ## Overview
 
 The PDF Translation feature is a **self-contained, dedicated PDF viewer and translation system**. It runs as a standalone Vue 3 application backed by a rich core library. The system uses **pdfjs-dist** for rendering, a custom text layer renderer for selection, a layout analysis engine for logical block extraction, a batch translation pipeline, page and region OCR, persistent caching, document history, TXT/Markdown/HTML export, and global feedback presentation.
@@ -104,7 +110,7 @@ The PDF Translation feature is a **self-contained, dedicated PDF viewer and tran
 1. **No browser-native PDF interception** — Users open PDFs inside the dedicated viewer only.
 2. **No auto-translate on open** — Translation is manually triggered per visible pages.
 3. **No translated PDF regeneration** — Output is text-based export, not a translated PDF file.
-4. **No advanced table reconstruction** — Tables are translated as flat text blocks.
+4. **Limited document-level table reconstruction** — The viewer does not reconstruct table layout as a complete document representation. Production table metadata, span handling, and overlay integration are defined in [PDF Table Reconstruction](./pdf-table-reconstruction.md).
 5. **No translated search** — Search operates on the original text only.
 
 ---
@@ -622,7 +628,11 @@ The toolbar page indicator reads `currentPage` directly. There is no intermediat
 
 A page-change observer in `usePdfNavigation` triggers `updateActiveOutline()` on every page change. This recomputes `activeOutlineDest` (the active outline node) and `expandedDests` (the ancestor path for auto-expansion). The outline and toolbar always reflect the same page state because they share the same source.
 
-This ownership may move to a future Viewer State layer, but the consumer contract — all navigation sources update one value, all consumers observe it — will remain unchanged.
+### Viewer State Restoration
+
+[ADR-014: Viewer State Restoration](../../adr/pdf-translator/ADR-014-viewer-state-restoration.md) defines Viewer State as an immutable snapshot, not a new authoritative owner. `PdfViewerState` captures `documentIdentity`, `currentPage`, and `contentView`; existing document, navigation, and view owners retain validation and restoration responsibility.
+
+`PdfApp` writes the current snapshot through `PdfViewerStateUrlAdapter`, stores a parsed snapshot in `PendingViewerState`, and restores it only after the matching document loads. Restoration applies `contentView`, waits for the initial layout commit, then navigates through the existing navigation owner to `currentPage`. A non-matching or absent snapshot is cleared and the current state is written instead.
 
 ### Scroll Container Ownership
 
@@ -1559,7 +1569,6 @@ A pure state container for per-block translation tracking. No external dependenc
 ```javascript
 {
     translatedText: string,
-    translatedCells: Map | null,
     status: 'idle' | 'translated' | 'error',
     provider: string,
     sourceLanguage: string,
@@ -1570,6 +1579,8 @@ A pure state container for per-block translation tracking. No external dependenc
     error: Error | null
 }
 ```
+
+Table-specific translation metadata is defined by [PDF Table Reconstruction](./pdf-table-reconstruction.md).
 
 ---
 
