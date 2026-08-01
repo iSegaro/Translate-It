@@ -1,4 +1,4 @@
-# ADR-006: Canonical PDF Region Geometry
+# ADR-006: Canonical Region Geometry
 
 ## Status
 

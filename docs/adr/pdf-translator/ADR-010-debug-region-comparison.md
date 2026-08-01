@@ -1,4 +1,4 @@
-# ADR-010: Debug Region Comparison Architecture
+# ADR-010: Debug Region Comparison
 
 **Status:** Accepted
 

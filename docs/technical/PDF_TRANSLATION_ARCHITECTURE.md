@@ -334,7 +334,7 @@ The page list within the scroll pane uses `padding: 16px 0 24px` to provide vert
 
 ### Presentation Reference
 
-PDF workflow presentation architecture is defined by [ADR-011: PDF Presentation Architecture](../adr/pdf-translator/ADR-011-feedback-surface-selection-policy.md).
+PDF workflow presentation architecture is defined by [ADR-011: Presentation Architecture](../adr/pdf-translator/ADR-011-presentation-architecture.md).
 
 ---
 

@@ -1,4 +1,4 @@
-# ADR-005: OCR Recommendation Architecture
+# ADR-005: OCR Recommendation
 
 ## Status
 
@@ -15,7 +15,7 @@ The PDF Viewer has a stable OCR pipeline. The current ownership is:
 - **Detector** — a feature-layer class that classifies visible pages as "scanned candidates" based on text-extraction heuristics (no logical blocks, minimal text items, minimal character count).
 - **OCR Processor** — owns OCR execution: renders pages to canvas, runs Tesseract.js, creates logical blocks, stores them on PageSession via the repository.
 - **OCR workflow composable** — owns the OCR workflow: candidate discovery, consent prompt, execution delegation, cache persistence, progress/error state, and reactive invalidation.
-- **PageSession** — owns OCR blocks and OCR metadata as a feature-owned domain inside the session (per ADR-004 mutation contract).
+- **PageSession** — owns OCR blocks and OCR metadata as a feature-owned domain inside the session (per ADR-003 mutation contract).
 - **Repository** — owns PageSession lifecycle, hydration, block indexing, and OCR block mutation routing.
 - **Cache Manager** — owns OCR cache I/O.
 - **Translation Coordinator** — consumes logical blocks transparently, falling back to OCR blocks when no text-layer blocks exist. The coordinator is OCR-agnostic.
@@ -99,7 +99,7 @@ The Recommendation Engine:
 
 It is a stateless query over already-hydrated page content. It reads page state and exposes recommendation results. It has no side effects.
 
-This aligns with ADR-004's consumer model: the Recommendation Engine is a consumer of page content, not an owner of page lifecycle.
+This aligns with ADR-003's consumer model: the Recommendation Engine is a consumer of page content, not an owner of page lifecycle.
 
 ### Decision 5 — The detector remains as an internal heuristic
 
@@ -174,7 +174,7 @@ The recommendation path and the execution path are separate. Recommendation neve
 | **Recommendation Engine** | Owns the product decision: which pages should have OCR recommended. Reads page state, applies product policy, exposes recommendation results. Stateless. No side effects. Does not execute OCR. Does not mutate PageSession. Does not own UI state. The concrete result contract is intentionally left to implementation. |
 | **Detector** | Owns structural page classification heuristic. Pure query over hydrated page content. Returns structural classification. Does not apply product policy. Does not filter by OCR state. Not part of the public recommendation contract. The Recommendation Engine is its primary consumer. |
 | **OCR Processor** | Owns OCR execution: rendering, recognition, block creation, storage via repository. Does not decide when to run. Does not own recommendation. |
-| **PageSession** | Owns page source content and OCR content as a feature-owned domain (per ADR-004). Provides transparent fallback from text-layer blocks to OCR blocks. Does not own recommendation state. |
+| **PageSession** | Owns page source content and OCR content as a feature-owned domain (per ADR-003). Provides transparent fallback from text-layer blocks to OCR blocks. Does not own recommendation state. |
 | **Repository** | Owns PageSession lifecycle, hydration, block indexing, and OCR block mutation routing. Does not own recommendation. |
 
 ---
@@ -193,7 +193,7 @@ The recommendation path and the execution path are separate. Recommendation neve
 
 - **Region OCR independence.** OCR recommendation and implemented region-level OCR are independent. Region OCR uses its own execution path without conflicting with the recommendation contract.
 
-- **Aligned with ADR-004.** The Recommendation Engine is a pure consumer of page content. It does not own PageSession lifecycle, does not trigger hydration, and does not mutate PageSession. It follows the consumer contract established by ADR-004.
+- **Aligned with ADR-003.** The Recommendation Engine is a pure consumer of page content. It does not own PageSession lifecycle, does not trigger hydration, and does not mutate PageSession. It follows the consumer contract established by ADR-003.
 
 ### Negative
 
@@ -257,7 +257,7 @@ Introduce a Recommendation Engine that wraps the detector. The detector remains 
 - Composable contract uses recommendation semantics.
 - Product policy is testable independently.
 - Future recommendation rules can be added to the Recommendation Engine without touching the detector, composable, or UI.
-- Aligned with ADR-004 consumer model.
+- Aligned with ADR-003 consumer model.
 - Region OCR compatible.
 
 ---
@@ -293,7 +293,7 @@ No names, boundaries, or ownership decisions in this ADR block Region OCR. The R
 | ADR | Relationship |
 |-----|--------------|
 | **ADR-003** | Accepts document-lifetime PageSession model. This ADR adds a Recommendation Engine that is a consumer of PageSession content, consistent with the consumer model. No PageSession lifecycle changes. |
-| **ADR-004** | Establishes that consumers do not own PageSession lifecycle. The Recommendation Engine is a pure consumer: it reads page state, applies policy, returns results. It does not hydrate, create, or destroy sessions. It does not trigger hydration. It follows the consumer contract. |
+| **ADR-003** | Establishes that consumers do not own PageSession lifecycle. The Recommendation Engine is a pure consumer: it reads page state, applies policy, returns results. It does not hydrate, create, or destroy sessions. It does not trigger hydration. It follows the consumer contract. |
 
 ---
 
@@ -311,7 +311,7 @@ The Recommendation Engine is a pure query. It does not call the OCR Processor. I
 
 ### Invariant 3 — The Recommendation Engine never mutates PageSession
 
-The Recommendation Engine evaluates already-available page content. It does not write to PageSession, does not modify OCR blocks, and does not alter page metadata. It is a read-only consumer per ADR-004.
+The Recommendation Engine evaluates already-available page content. It does not write to PageSession, does not modify OCR blocks, and does not alter page metadata. It is a read-only consumer per ADR-003.
 
 ### Invariant 4 — Recommendation results are not persisted
 

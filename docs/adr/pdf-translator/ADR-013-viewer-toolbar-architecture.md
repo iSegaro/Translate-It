@@ -1,10 +1,10 @@
-# ADR-013: PDF Viewer Toolbar Architecture
+# ADR-013: Viewer Toolbar Architecture
 
 - **Status:** Accepted
 - **Date:** 2026-07-26
 - **Scope:** PDF Viewer toolbar product architecture
 - **Decision Type:** Architectural
-- **Implementation reference:** [PDF Viewer Toolbar Technical Reference](../technical/PDF_VIEWER_TOOLBAR_TECHNICAL.md)
+- **Implementation reference:** [PDF Viewer Toolbar Technical Reference](../../technical/PDF_VIEWER_TOOLBAR_TECHNICAL.md)
 
 ## 1. Status and Problem
 

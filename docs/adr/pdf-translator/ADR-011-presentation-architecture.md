@@ -1,4 +1,4 @@
-# ADR-011: PDF Presentation Architecture
+# ADR-011: Presentation Architecture
 
 **Status:** Accepted
 

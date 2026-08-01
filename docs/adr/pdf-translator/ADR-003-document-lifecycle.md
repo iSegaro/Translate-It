@@ -1,4 +1,4 @@
-# ADR-003: PDF Document Session and Viewer Lifecycle
+# ADR-003: Document Lifecycle
 
 **Status:** Accepted
 

@@ -1,4 +1,4 @@
-# ADR: SVG Icon System
+# ADR-001: SVG Icon System
 
 **Status:** Accepted
 
