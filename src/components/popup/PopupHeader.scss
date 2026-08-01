@@ -7,7 +7,9 @@
   flex-wrap: nowrap !important;
   justify-content: flex-start !important;
   align-items: center !important;
-  padding: 8px 12px !important;
+  padding-block: 8px !important;
+  padding-inline-start: 12px !important;
+  padding-inline-end: 0 !important;
   background-color: var(--header-bg-color, #f8f9fa) !important;
   border-bottom: 1px solid var(--header-border-color, #dee2e6) !important;
   width: 100% !important;
