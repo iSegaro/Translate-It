@@ -1,15 +1,18 @@
 .ti-horizontal-action-scroller {
   --ti-horizontal-action-scroller-control-size: 24px;
   --ti-horizontal-action-scroller-icon-size: 16px;
-  --ti-horizontal-action-scroller-edge-padding: 32px;
-  --ti-horizontal-action-scroller-control-inset: 2px;
+  --ti-horizontal-action-scroller-control-gap: 2px;
 
-  position: relative;
+  display: flex;
+  align-items: center;
+  gap: var(--ti-horizontal-action-scroller-control-gap);
   flex: 1 1 0;
   min-width: 0;
 
   &__viewport {
     display: block;
+    flex: 1 1 auto;
+    min-width: 0;
     overflow-x: auto;
     overflow-y: hidden;
     scrollbar-width: none;
@@ -29,25 +32,13 @@
     min-width: 100%;
     align-items: center;
     gap: 8px;
-    padding-inline: var(--ti-horizontal-action-scroller-edge-padding);
     box-sizing: border-box;
   }
 
   &__control {
-    position: absolute;
-    top: 50%;
-    z-index: 1;
+    flex: 0 0 var(--ti-horizontal-action-scroller-control-size);
     width: var(--ti-horizontal-action-scroller-control-size);
     height: var(--ti-horizontal-action-scroller-control-size);
-    transform: translateY(-50%);
-
-    &--previous {
-      inset-inline-start: var(--ti-horizontal-action-scroller-control-inset);
-    }
-
-    &--next {
-      inset-inline-end: var(--ti-horizontal-action-scroller-control-inset);
-    }
   }
 
   &__icon {

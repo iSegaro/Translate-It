@@ -88,6 +88,11 @@ describe('HorizontalActionScroller', () => {
 
     expect(wrapper.find('.ti-horizontal-action-scroller__control--previous').exists()).toBe(true)
     expect(wrapper.find('.ti-horizontal-action-scroller__control--next').exists()).toBe(true)
+    expect([...wrapper.element.children].map((element) => element.className)).toEqual([
+      'ti-horizontal-action-scroller__control ti-horizontal-action-scroller__control--previous',
+      'ti-horizontal-action-scroller__viewport',
+      'ti-horizontal-action-scroller__control ti-horizontal-action-scroller__control--next'
+    ])
 
     viewport.scrollLeft = 34
     viewport.dispatchEvent(new Event('scroll'))
