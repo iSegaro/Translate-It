@@ -1147,7 +1147,7 @@ For detailed information on the radial badge system, gesture logic, and state-aw
 <summary>View IFrame Support details</summary>
 
 ### Overview
-Streamlined iframe support system that provides essential iframe functionality while maintaining compatibility with existing Vue.js, ResourceTracker, Error Management, and Smart Messaging systems. The system has been simplified to include only actively used components. See [IFrame Support Documentation](../features/iframe-support/README.md) for complete details.
+Streamlined iframe support system that provides essential iframe functionality while maintaining compatibility with existing Vue.js, ResourceTracker, Error Management, and Smart Messaging systems. The system has been simplified to include only actively used components. See [IFrame Support Documentation](../../src/features/iframe-support/README.md) for complete details.
 
 **Key Features:**
 - **Essential Frame Management**: IFrameManager for frame registration and tracking

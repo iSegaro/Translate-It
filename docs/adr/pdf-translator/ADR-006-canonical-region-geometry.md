@@ -1,8 +1,8 @@
-# ADR-006: Canonical PDF Region Geometry
+# ADR-006: Canonical Region Geometry
 
-## Status
+**Status:** Accepted
 
-Accepted
+**Scope:** Canonical PDF-user-space geometry for regions selected from rendered pages.
 
 ---
 
@@ -200,14 +200,6 @@ The contract intentionally stores physical edges rather than origin plus dimensi
 ### Name the Concept PdfOcrRegion
 
 **Rejected.** The geometry is not owned by one feature. Feature-specific naming would create false ownership and discourage reuse by other legitimate PDF-domain consumers.
-
----
-
-## Future Compatibility
-
-The canonical contract can be consumed by future PDF features that need stable rectangular regions, including annotations, highlights, comments, redactions, search regions, and contextual analysis.
-
-If a future requirement needs non-axis-aligned polygons, that requirement should introduce a distinct geometry contract. `PdfRegion` should not grow speculative point arrays or presentation metadata.
 
 ---
 

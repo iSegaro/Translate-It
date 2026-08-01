@@ -1,7 +1,13 @@
 # PDF Viewer Toolbar Technical Reference
 
+> **Scope:** PDF Viewer toolbar controls, responsive behavior, component integration, accessibility, and toolbar event flow.
+> **Canonical responsibility:** Define current toolbar behavior and implementation ownership without owning translation pipeline, Viewer State Restoration, or table metadata contracts.
+> **Intended audience:** PDF Viewer maintainers, UI contributors, and reviewers.
+> **Related ADRs:** [ADR-013: Viewer Toolbar Architecture](../../adr/pdf-translator/ADR-013-viewer-toolbar-architecture.md)
+> **Related technical references:** [PDF Translation Architecture](./PDF_TRANSLATION_ARCHITECTURE.md)
+
 **Status:** Current implementation reference  
-**Architecture rationale:** [ADR-013: PDF Viewer Toolbar Architecture](../adr/ADR-013-pdf-viewer-toolbar-architecture.md)
+**Architecture rationale:** [ADR-013: Viewer Toolbar Architecture](../../adr/pdf-translator/ADR-013-viewer-toolbar-architecture.md)
 
 ## 1. Purpose
 
@@ -210,7 +216,7 @@ Current extension mapping:
 
 ## 10. References
 
-- [ADR-013: PDF Viewer Toolbar Architecture](../adr/ADR-013-pdf-viewer-toolbar-architecture.md)
+- [ADR-013: Viewer Toolbar Architecture](../../adr/pdf-translator/ADR-013-viewer-toolbar-architecture.md)
 - `src/apps/pdf/PdfApp.vue`
 - `src/apps/pdf/components/PdfToolbar.vue`
 - `src/apps/pdf/components/PdfToolbar.scss`

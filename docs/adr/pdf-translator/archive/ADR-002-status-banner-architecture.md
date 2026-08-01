@@ -1,6 +1,12 @@
-# ADR-0001: Status Banner Architecture
+# ADR-002: Status Banner Architecture
 
-**Status:** Accepted
+**Status:** Superseded
+
+> Superseded by:
+>
+> - [ADR-011: Presentation Architecture](../ADR-011-presentation-architecture.md)
+>
+> Translation outcome and export-readiness technical contracts now live in [PDF Translation Architecture](../../../technical/pdf-translator/PDF_TRANSLATION_ARCHITECTURE.md).
 
 ---
 

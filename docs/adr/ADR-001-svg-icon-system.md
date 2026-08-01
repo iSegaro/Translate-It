@@ -1,6 +1,8 @@
-# ADR: SVG Icon System
+# ADR-001: SVG Icon System
 
 **Status:** Accepted
+
+**Scope:** Monochrome UI icon assets and rendering conventions.
 
 ---
 
@@ -73,19 +75,3 @@ Standardize on **CSS Mask** as the rendering technique for all monochrome UI ico
 - **Root-`<svg>` transforms unreliable.** `transform` on the root `<svg>` element has undefined behavior in CSS Mask context in some browsers. SVGs relying on this (like the original `fit-page.svg`) must be fixed.
 
 ---
-
-## Migration Strategy
-
-The migration is phased to allow incremental adoption with zero regressions:
-
-- **Phase A** — Create `SvgIcon` shared component and its SCSS. No consumers yet.
-- **Phase B** — Migrate one real consumer (PdfToolbar) to validate the API and fix any issues.
-- **Phase C** — Documentation (this ADR, technical guide, AGENTS.md pointer).
-- **Phase D+** — Per-feature migration PRs, prioritized by duplication and impact:
-  1. TTS system (icons duplicated in 3+ components)
-  2. TranslationWindowToolbar (4 icons, one file)
-  3. Mobile views (duplicated back chevrons, star)
-  4. DesktopFabMenu
-  5. Remaining singletons
-
-No feature should block on migration. Working code stays working.
