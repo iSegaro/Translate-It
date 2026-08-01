@@ -27,7 +27,6 @@
 
     <!-- Translation Display -->
     <TranslationDisplay
-      ref="translationResultRef"
       :content="translatedText"
       :language="actualTargetLanguage"
       :target-language="actualTargetLanguage"
@@ -49,9 +48,8 @@
 </template>
 
 <script setup>
-import { ref, onMounted, nextTick, watch } from 'vue'
+import { ref, onMounted, watch } from 'vue'
 import { useUnifiedTranslation } from '@/features/translation/composables/useUnifiedTranslation.js'
-import { usePopupResize } from '@/composables/ui/usePopupResize.js'
 import { useSettingsStore } from '@/features/settings/stores/settings.js'
 import { useErrorHandler } from '@/composables/shared/useErrorHandler.js'
 import { useUnifiedI18n } from '@/composables/shared/useUnifiedI18n.js'
@@ -94,14 +92,12 @@ const emit = defineEmits(['can-translate-change'])
 
 // Composables (lightweight popup version)
 const translation = useUnifiedTranslation('popup')
-const popupResize = usePopupResize()
 const { handleError } = useErrorHandler()
 const { t } = useUnifiedI18n()
 
 
 // Refs
 const sourceInputRef = ref(null)
-const translationResultRef = ref(null)
 
 // State from composables
 const {
@@ -217,61 +213,6 @@ onMounted(async () => {
   
   // Initialize translation data
   await loadLastTranslation()
-})
-
-// Helper function to get the translation content element
-const getTranslationContentElement = () => {
-  const component = translationResultRef.value
-  let outputElement = null
-  
-  // In Vue 3, component refs work differently - try to get the element directly
-  if (component && typeof component === 'object') {
-    // If it's a component instance, try to access its root element
-    if (component.$el) {
-      outputElement = component.$el.querySelector('.result-content') || 
-                     component.$el.querySelector('.translation-content')
-    } else if (component.querySelector) {
-      // If it's a DOM element directly
-      outputElement = component.querySelector('.result-content') || 
-                     component.querySelector('.translation-content')
-    }
-  }
-  
-  // Fallback to document query
-  if (!outputElement) {
-    outputElement = document.querySelector('.result-content') || 
-                   document.querySelector('.translation-content')
-  }
-  
-  return outputElement
-}
-
-// Watch for translation changes and adjust popup size
-watch(translatedText, (newText, oldText) => {
-  if (newText && newText !== oldText) {
-    // Wait for DOM update and handle resize immediately with fade-in
-    nextTick(() => {
-      const outputElement = getTranslationContentElement()
-      if (outputElement) {
-        // Start resize immediately to synchronize with fade-in animation (600ms)
-        popupResize.handleTranslationResult(outputElement)
-      }
-    })
-  } else if (!newText && oldText) {
-    // Reset output field when translation is cleared
-    const outputElement = getTranslationContentElement()
-    if (outputElement) {
-      popupResize.resetOutputField(outputElement)
-    }
-  }
-})
-
-// Watch for loading state to reset layout when new translation starts
-watch(isTranslating, (newLoading, oldLoading) => {
-  if (newLoading && !oldLoading) {
-    // Reset layout when starting new translation
-    popupResize.resetLayout()
-  }
 })
 
 // Expose methods and state to parent

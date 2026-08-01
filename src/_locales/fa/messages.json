@@ -1502,6 +1502,15 @@
   "popup_open_side_panel_title": {
     "message": "پنل کناری"
   },
+  "popup_action_scroller_label": {
+    "message": "عملیات پنجره بازشو"
+  },
+  "horizontal_action_scroller_previous": {
+    "message": "پیمایش عملیات به چپ"
+  },
+  "horizontal_action_scroller_next": {
+    "message": "پیمایش عملیات به راست"
+  },
   "page_translation_btn_translate": {
     "message": "ترجمه صفحه"
   },

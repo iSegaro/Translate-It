@@ -1502,6 +1502,15 @@
   "popup_open_side_panel_title": {
     "message": "サイドパネル"
   },
+  "popup_action_scroller_label": {
+    "message": "ポップアップ操作"
+  },
+  "horizontal_action_scroller_previous": {
+    "message": "操作を左にスクロール"
+  },
+  "horizontal_action_scroller_next": {
+    "message": "操作を右にスクロール"
+  },
   "page_translation_btn_translate": {
     "message": "ページ翻訳"
   },

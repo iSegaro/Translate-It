@@ -72,7 +72,7 @@ To implement a new provider, refer to the `docs/technical/PROVIDERS.md` document
 - **`src/components/`**: Reusable components (structure preserved).
 - **`src/composables/`**: Business logic organized by category:
   - `core/` - useExtensionAPI, useBrowserAPI.
-  - `ui/` - useUI, usePopupResize, useMobileGestures.
+  - `ui/` - useUI, useMobileGestures.
   - `shared/` - useClipboard, useErrorHandler, useLanguages.
 
 ### Store Modules
