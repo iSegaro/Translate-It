@@ -1,4 +1,4 @@
-#### v1.18.0 – Released on X XX, 2026
+#### v1.18.0 – Released on August 01, 2026
 
 ##### Added
 
