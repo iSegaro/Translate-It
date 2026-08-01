@@ -1,0 +1,65 @@
+.ti-horizontal-action-scroller {
+  --ti-horizontal-action-scroller-control-size: 24px;
+  --ti-horizontal-action-scroller-icon-size: 16px;
+  --ti-horizontal-action-scroller-control-gap: 2px;
+
+  display: flex;
+  align-items: center;
+  gap: var(--ti-horizontal-action-scroller-control-gap);
+  flex: 1 1 0;
+  min-width: 0;
+
+  &__viewport {
+    display: block;
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow-x: auto;
+    overflow-y: hidden;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+    -webkit-overflow-scrolling: touch;
+    touch-action: pan-x;
+
+    &::-webkit-scrollbar {
+      display: none;
+    }
+  }
+
+  &__track {
+    display: flex;
+    flex-wrap: nowrap;
+    width: max-content;
+    min-width: 100%;
+    align-items: center;
+    gap: 8px;
+    box-sizing: border-box;
+  }
+
+  &__control {
+    flex: 0 0 var(--ti-horizontal-action-scroller-control-size);
+    width: var(--ti-horizontal-action-scroller-control-size);
+    height: var(--ti-horizontal-action-scroller-control-size);
+    transition: opacity 120ms ease;
+
+    &--inactive {
+      opacity: 0;
+      pointer-events: none;
+    }
+  }
+
+  &__icon {
+    display: block;
+    width: var(--ti-horizontal-action-scroller-icon-size);
+    height: var(--ti-horizontal-action-scroller-icon-size);
+    background-color: currentColor;
+    mask: center / contain no-repeat;
+
+    &--previous {
+      mask-image: url('@/icons/ui/arrow-prev.svg');
+    }
+
+    &--next {
+      mask-image: url('@/icons/ui/arrow-next.svg');
+    }
+  }
+}

@@ -8,23 +8,15 @@
 body.popup-context {
   margin: 0;
   padding: 0;
-  width: $popup-width;
-  min-height: 350px;
-  max-height: $popup-max-height;
-  height: auto;
   font-family: $font-family-base;
   background-color: var(--bg-color);
   color: var(--text-color);
   font-size: $font-size-md;
-  overflow: hidden;
-  transition: height 0.6s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 // Popup container
 .ti-popup-container {
   width: 100%;
-  min-height: 350px;
-  height: auto;
   background: var(--bg-color);
 
   @include ti-shadow-md;

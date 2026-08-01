@@ -4,7 +4,6 @@
 .ti-textarea-container {
   position: relative !important;
   margin: 8px 12px !important;
-  width: calc(100% - 24px) !important; // عرض کامل منهای حاشیه
   display: block !important;
   border: 1px solid var(--color-border, #dee2e6) !important;
   border-radius: 8px !important;
@@ -109,7 +108,6 @@
 .sidepanel-wrapper {
   .ti-textarea-container {
     margin: 12px !important;
-    width: calc(100% - 24px) !important;
   }
 
   .ti-input-toolbar {

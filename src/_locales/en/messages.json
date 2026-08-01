@@ -1490,6 +1490,15 @@
   "popup_open_side_panel_title": {
     "message": "Sidepanel"
   },
+  "popup_action_scroller_label": {
+    "message": "Popup actions"
+  },
+  "horizontal_action_scroller_previous": {
+    "message": "Scroll actions left"
+  },
+  "horizontal_action_scroller_next": {
+    "message": "Scroll actions right"
+  },
   "page_translation_btn_translate": {
     "message": "Translate Page"
   },
