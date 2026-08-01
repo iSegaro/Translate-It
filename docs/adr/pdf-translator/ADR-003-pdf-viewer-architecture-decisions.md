@@ -1,335 +1,114 @@
-# ADR-003: Core PDF Viewer Ownership and Lifecycle Decisions
+# ADR-003: PDF Document Session and Viewer Lifecycle
 
 **Status:** Accepted
 
-> **Note**
->
-> This ADR is **Accepted**.
-> Implementation is complete. All cleanup scheduling, release lifecycle, and render-candidate reporting have been removed. PageSession lifetime follows document lifetime with no intermediate destruction paths. Tests were aligned with the current architecture. An independent architecture audit confirmed the result matches the documented decisions.
-
-**Scope:** Core PDF Viewer Architecture
-
-**Decision Type:** Architectural
+**Scope:** PDF document, viewer, rendering, cache, and page-session lifecycle ownership.
 
 ---
 
-# Purpose
+## Context
 
-This document records the architectural decisions reached after multiple independent architecture audits.
-
-These decisions are considered the baseline architecture for future development.
-
-Future changes should challenge these decisions only with new evidence, not preference.
-
----
-
-# Decision Process
-
-This ADR was produced after multiple independent architecture audits rather than a single design discussion.
-
-The following areas were audited independently before reaching the final conclusions:
-
-- Render Scheduler
-- Bitmap Cache
-- PageSession ownership
-- Cleanup architecture
-- Memory trade-offs
-
-Multiple alternative architectures were evaluated before reaching the recorded decisions.
-
-These decisions are evidence-driven, not opinion-driven.
-
----
-
-# Decision 1 — Render Scheduler
+PDF document content is shared by rendering, translation, OCR, selection, export, and other feature consumers. These concerns require clear ownership boundaries so viewer presentation does not control document state and feature consumers do not manage shared page content.
 
 ## Decision
 
-Keep independent `PdfRenderScheduler` instances.
+The PDF viewer uses document-owned page sessions and caches with viewer-local render scheduling. Page sessions hydrate on render or through document APIs, remain available for the active document lifetime, and are released only when that document is replaced or closed.
 
-## Rationale
+## Ownership Domains
 
-Scheduling is inherently viewer-local.
+Ownership domains define long-term responsibility boundaries between architectural layers. They do not describe runtime execution order or a call hierarchy. A component may collaborate across domains without acquiring another domain's ownership.
 
-Each viewer owns:
+### Document Domain
 
-* render window
-* primary page
-* render priority
-* eligibility
-* queue ordering
-* cancellation
-* presentation timing
+- `PdfDocumentSession` owns active-document lifecycle, document generation, `PdfRenderer`, document cache restoration, and cleanup.
+- `PdfPageContentRepository` is the sole production creator of `PdfPageSession` instances. It owns hydration and in-flight hydration deduplication.
+- `PdfPageSession` holds hydrated page content, including text, layout, logical blocks, and feature-owned page data.
+- `PdfBitmapCache` owns document-scoped rendered bitmap storage and its bounded-memory eviction policy.
 
-A shared scheduler would need to own multiple viewer states simultaneously, introducing arbitration and violating single responsibility.
+### Viewer Domain
+
+- `PdfViewer` owns viewer presentation, viewport observation, canvas and text-layer DOM, and visible-page reporting.
+- Each viewer owns one `PdfRenderScheduler`, render window, priority policy, eligibility, and render cancellation decisions.
+- The scheduler is pure: it has no DOM, Vue, document-lifetime, page-content, or bitmap-cache ownership.
+- Rendering presentation is viewer-owned. `PdfDocumentSession` performs PDF.js rendering through `PdfRenderer` and caches successful bitmap output; the viewer supplies canvas targets and commits visual output.
+
+### Feature Domain
+
+- Translation, OCR, selection, and search consume document content through document APIs.
+- Features may own and update only their feature-specific data within a page session.
+- Features do not create, destroy, replace, or define the lifecycle of page sessions.
+
+## Page Session Lifecycle
+
+- A page session represents hydrated content for one page of the active document.
+- The repository creates at most one committed page session for an active document page.
+- Once hydrated, a page session remains available until document replacement, document close, or session destruction.
+- There is no intermediate release, eviction, cleanup timer, consumer lease, reference count, or rehydration lifecycle.
+- `PdfDocumentSession.cleanupDocument()` resets page sessions, document-scoped caches, document metadata, PDF.js resources, and the object URL.
+
+## Hydration
+
+- Viewer visibility is a viewer signal only; it does not grant the viewer ownership of page-session lifecycle.
+- Rendered-page hydration follows this path: viewer visibility → viewer-local scheduler → rendering → `PdfDocumentSession` background hydration.
+- `PdfDocumentSession.getPageSession()` and visible-page document APIs provide lazy hydration for non-render-driven access.
+- All hydration paths converge in `PdfPageContentRepository`.
+- The repository deduplicates concurrent hydration requests for the same page through its pending-hydration registry.
+- Consumers may request page content through document APIs, but do not construct page sessions or implement hydration policy.
+
+## Rendering
+
+- Scheduling is viewer-local; shared schedulers and global render queues are not used.
+- `PdfRenderer` owns PDF.js render-task tracking and cancellation for supplied page/canvas targets.
+- Render scheduling does not own document lifetime, page content, bitmap cache, or cross-viewer coordination.
+- In-flight raster deduplication is not introduced. Avoiding narrow cold-cache races would require shared promise, cancellation, error, and synchronization ownership that exceeds its benefit.
+
+## Cache
+
+### Bitmap Cache
+
+- `PdfBitmapCache` stores rendered `ImageBitmap` output by document identity, page number, and scale.
+- The cache is document-scoped, bounded by memory, independent of viewer DOM, and cleared during document cleanup or page-metric rebuild.
+- Viewer-local bitmap caches and bitmap-cache redesign are not used.
+
+### Persistent OCR Cache
+
+- Persistent OCR data is separate from bitmap storage.
+- `PdfDocumentSession` loads a document cache snapshot for the active document and restores compatible OCR data while a page session hydrates.
+- Persistent OCR cache data does not own rendering, viewer state, or page-session lifecycle.
+
+## Invariants
+
+- Document domain is sole owner of page-session creation and lifecycle.
+- Viewer visibility reports presentation state; it does not define hydration ownership.
+- A feature request for page content cannot create a competing page-session model or lifecycle.
+- Concurrent hydration requests for one active document page converge on one repository-managed hydration operation.
+- Page-session lifetime is independent of viewer mount state and feature ordering.
+- Features own only their feature-specific page data; lifecycle ownership remains with the document domain.
+- Bitmap storage, persistent OCR data, scheduler state, and viewer DOM MUST remain separate ownership domains.
+
+## Rejected Alternatives
+
+- Shared render scheduler or global render queue.
+- Viewer-owned or consumer-owned page-session lifetime.
+- Translation-driven or OCR-driven page-session ownership.
+- Reference-counted page sessions, consumer leases, cleanup timers, and intermediate release paths.
+- Full document hydration on open.
+- Per-consumer hydration registries or duplicated hydration strategies.
+- Viewer-local bitmap caches or bitmap-cache redesign.
+- In-flight raster deduplication.
 
 ## Consequences
 
-Accepted:
-
-* one scheduler per viewer
-* viewer-local scheduling policy
-* scheduler remains pure
-* scheduler remains DOM-free
-* scheduler remains Vue-free
-
-Rejected:
-
-* shared scheduler
-* global render queue
-* scheduler-level viewer coordination
-
-Cross-viewer coordination belongs at the document layer, never inside the scheduler.
-
----
-
-# Decision 2 — Bitmap Cache
-
-## Decision
-
-Keep the current document-scoped shared `PdfBitmapCache`.
-
-## Rationale
-
-The cache already has:
-
-* explicit ownership
-* deterministic lifecycle
-* clear invalidation
-* bounded memory
-* correct separation from presentation
-
-The architecture is already well isolated.
-
-## Consequences
-
-Accepted:
-
-* shared bitmap cache
-* viewer-independent bitmap reuse
-
-Rejected:
-
-* bitmap-cache redesign
-* viewer-local bitmap caches
-
----
-
-# Decision 3 — In-flight Raster Deduplication
-
-## Decision
-
-Do not introduce in-flight raster deduplication.
-
-## Rationale
-
-Duplicate rasterization occurs only during narrow cold-cache races.
-
-Avoiding that work would require introducing:
-
-* shared promises
-* ownership rules
-* cancellation propagation
-* error propagation
-* synchronization
-
-The architectural complexity outweighs the temporary performance benefit.
-
----
-
-# Decision 4 — PageSession Ownership
-
-## Decision
-
-`PdfPageSession` is document-owned state.
-
-It is not:
-
-* viewer state
-* scheduler state
-* render state
-
-It represents hydrated document content.
-
-Examples include:
-
-* text content
-* text lines
-* logical blocks
-* page layout
-* OCR data
-* derived page models
-
-Its natural lifetime is the document.
-
----
-
-# Decision 5 — PageSession Cleanup
-
-## Decision
-
-Adopt a document-lifetime PageSession model by removing the PageSession cleanup subsystem.
-
-## Rationale
-
-Architecture audits showed that cleanup exists solely to reclaim modest JavaScript heap while introducing significant architectural complexity.
-
-Cleanup introduces:
-
-* timers
-* debounce
-* keep-set logic
-* release lifecycle
-* rehydration lifecycle
-* viewer lifetime coupling
-* loaded-state transitions
-* cleanup-specific tests
-
-Cleanup does not improve:
-
-* rendering
-* rasterization
-* GPU memory
-* bitmap cache
-* RenderTask count
-* pdf.js worker memory
-
-Its benefit is limited to modest retained JS heap reduction.
-
-The complexity cost exceeds the architectural value.
-
----
-
-# Decision 6 — Lifetime Model
-
-## Decision
-
-PageSession lifetime becomes:
-
-```text
-Document opened
-        ↓
-Hydrate once on demand
-        ↓
-Remain hydrated
-        ↓
-Document closes
-        ↓
-Destroy
-```
-
-No intermediate release.
-
-No rehydration.
-
-No cleanup timer.
-
-No viewer-driven lifetime.
-
----
-
-# Architectural Principles
-
-Future work should preserve these principles.
-
-## Ownership
-
-Document owns:
-
-* PdfDocumentSession
-* PdfPageContentRepository
-* PdfPageSession
-* PdfBitmapCache
-
-Viewer owns:
-
-* PdfRenderScheduler
-* render window
-* canvases
-* text-layer DOM
-* presentation
-
-## Scheduler
-
-Scheduler never owns:
-
-* document lifetime
-* bitmap cache
-* page content
-* cross-viewer coordination
-
-## Bitmap Cache
-
-Bitmap cache never owns:
-
-* DOM
-* viewers
-* scheduling
-* text layers
-
-## PageSession
-
-PageSession never owns:
-
-* viewer lifetime
-* rendering lifecycle
-* scheduler state
-
----
-
-# Rejected Architectures
-
-The following were audited and rejected.
-
-* Shared Render Scheduler
-* Viewer-owned PageSession lifetime
-* Reference-counted PageSessions
-* Consumer leases
-* In-flight raster deduplication
-* Bitmap-cache redesign
-* Cleanup expansion through additional viewer coordination
-* Shared cleanup ownership
-
----
-
-# Future Guidance
-
-Future architectural work should continue following the principles established during these audits.
-
-- **Prefer removing mechanisms before introducing new coordination.** Deletion is simpler than coordination. When a mechanism no longer earns its keep, remove it rather than adding more code to work around it.
-
-- **New ownership relationships require explicit architectural justification.** Every new owner relationship adds coupling. Do not introduce one without documenting why existing ownership models are insufficient.
-
-- **Avoid adding lifecycle states unless correctness requires them.** Each additional state doubles the transition matrix. Prefer simpler lifecycles with fewer states and no intermediate transitions.
-
-- **Prefer deterministic document ownership over viewer coordination.** Document-owned state is simpler to reason about than viewer-coordinated state. When a choice exists between document ownership and viewer coordination, prefer document ownership.
-
-- **Preserve explicit ownership boundaries.** Each subsystem should have a clear, documented set of owned responsibilities. Ownership crossing is a design smell that should be explicitly justified.
-
-- **Base architecture decisions on evidence, not hypothetical optimization.** Avoid introducing coordination, synchronization, caching, lifecycle mechanisms, or ownership relationships unless profiling, measurements, or architectural analysis demonstrate that they are actually required. Speculative mechanism design is a common source of unnecessary complexity.
-
-This section is guidance only. It does not introduce new architectural decisions.
-
----
-
-# Long-Term Direction
-
-Future architecture should continue to favor:
-
-* explicit ownership
-* deterministic lifetime
-* document-centric state
-* viewer-local presentation
-* deletion instead of coordination
-* fewer lifecycle states
-* lower maintenance cost
-
-When faced with a design choice, prefer removing mechanisms over coordinating them unless correctness requires otherwise.
-
----
-
-# Baseline
-
-This ADR becomes the architectural baseline for future PDF Viewer work.
-
-Future proposals should assume these decisions are accepted unless new evidence demonstrates that one of them is incorrect.
+### Positive
+
+- Shared document content has one lifecycle owner.
+- Viewer scheduling remains isolated from document and feature state.
+- Rendered and non-rendered page access use the same repository hydration boundary.
+- Page-session lifetime has few states and no cleanup/recovery coordination.
+- Bitmap and persistent OCR caches remain independently understandable and releasable.
+
+### Negative
+
+- Hydrated page-session data remains in memory for the active document lifetime.
+- A page requested outside rendering may incur first-access hydration cost.
+- New feature consumers must use document APIs and preserve feature-data ownership boundaries.
