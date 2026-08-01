@@ -1,81 +1,125 @@
-# ADR-010: Benchmark Developer Mode
+# ADR-010: Debug Region Comparison Architecture
 
-## Status
+**Status:** Accepted
 
-Accepted
+**Scope:** Debug-only Region OCR comparison, analysis, artifact export, and feedback boundaries.
 
 ---
 
 ## Context
 
-Region comparison is a Debug Mode-only PDF developer capability. It reuses canonical region selection, immutable execution requests, and `RegionExecutionDispatcher`; it does not add a parallel OCR path.
-
-It has limited in-product feedback: shared operation progress, a persistent debug-only comparison outcome banner, and explicit JSON artifact export after completion. It has no benchmark page, dashboard, history, settings, or normal-user entry point.
-
----
+Region Comparison evaluates repeated Region OCR executions using defined OCR configurations. It must reuse the production Region OCR path while remaining isolated from normal-user workflows, persistent product state, and execution ownership.
 
 ## Decision
 
-The Debug toolbar emits developer intent. `PdfApp` owns selection start, comparison operation lifecycle, cancellation command, completed-result retention, and presentation event emission. `PdfDeveloperApi` is the public component-facing boundary to `RegionComparisonCoordinator`.
+Region Comparison is a Debug Mode-only capability that reuses canonical region selection, immutable region execution requests, shared dispatch, and the production `PdfRegionOcrExecutor`. It produces immutable candidate results for analysis and explicit artifact export without creating a parallel OCR pipeline.
+
+## Ownership Domains
+
+Ownership domains define architectural responsibility only. They do not describe runtime execution order. Execution flow is documented separately.
+
+### Application Domain
+
+- `PdfApp` owns Debug Mode-gated workflow start, active comparison retention, cancellation bridging, completed-result retention, artifact-export initiation, and presentation event emission.
+- `PdfDeveloperApi` owns the application-facing developer command boundary.
+
+### Execution Domain
+
+- `RegionComparisonCoordinator` owns Region Comparison request construction and delegation to shared dispatch.
+- `RegionExecutionDispatcher` owns shared target routing and immediate operation delegation.
+- `RegionComparisonRunner` owns candidate sequencing, progress callbacks, and delegated cancellation.
+- `PdfRegionOcrExecutor` owns production region rasterization, OCR execution, render-task cancellation, and temporary canvas cleanup.
+
+### Analysis Domain
+
+- `RegionComparisonEvaluator` owns optional ground-truth normalization and metrics after execution.
+- `RegionComparisonAnalyzer` owns read-only summary and winner analysis from completed results.
+- `RegionComparisonArtifactWriter` owns immutable versioned artifact construction.
+
+### Presentation Domain
+
+- Presentation Pipeline owns activity, outcome, and acknowledgement feedback; `PdfApp` exposes comparison outcomes only while Debug Mode is enabled.
+- Presentation Pipeline does not own comparison execution, cancellation, analysis, result retention, or artifact generation.
+
+## Candidate Model
+
+- A Region Comparison candidate is an immutable `candidateId` and immutable OCR configuration.
+- Candidate configuration identifies one comparison input, currently render scale; it is not an OCR executor, provider, or mutable runtime state.
+- Runtime OCR language MUST NOT participate in candidate identity. It is supplied when the comparison operation starts and recorded with each result.
+- `RegionComparisonCandidatePlanner` generates immutable candidates from supplied configurations only.
+- Candidate planner MUST NOT select runtime workflow, resolve runtime dependencies, execute OCR, or own comparison lifecycle.
+
+## Execution Lifecycle
 
 ```text
-Debug toolbar
-    ↓
-PdfApp begins REGION_COMPARISON selection
-    ↓
-PdfDeveloperApi
-    ↓
-RegionComparisonCoordinator
-    ↓
-RegionExecutionDispatcher
-    ↓
-RegionComparisonRunner
-    ↓
-RegionComparisonAnalyzer
-    ↓
-PdfApp
-    ├── DomainEvents.comparisonCompleted / comparisonFailed
-    │   └── Presentation banner adapter → debug-only PdfStatusBanner outcome
-    └── completed result → RegionComparisonArtifactWriter → JSON download
+Debug Intent → PdfApp → Developer API → Coordinator → Dispatcher → Runner → Production Executor → Evaluation → Analyzer → Completed Result → Artifact Export
 ```
 
-### Ownership
+The evaluator runs after candidate execution and only computes metrics when ground truth is explicitly supplied. The analyzer reads the completed result without changing execution output. Artifact export is available only after a completed comparison result exists.
 
-| Component | Owns | Does Not Own |
-|---|---|---|
-| Debug toolbar | Debug Mode-gated comparison intent | Request construction, execution, result analysis |
-| `PdfApp` | Selection target, comparison operation lifecycle, cancellation bridge, completion state, presentation events | Runner internals, artifact serialization |
-| `PdfDeveloperApi` | Public developer command boundary | UI policy or runner implementation |
-| `RegionComparisonCoordinator` | Creates comparison execution request and delegates it | UI state, routing, candidate execution |
-| `RegionExecutionDispatcher` | Target routing and operation delegation | Comparison policy, progress, presentation |
-| `RegionComparisonRunner` | Candidate execution, progress callbacks, cancellation | UI, result presentation, artifact writing |
-| `RegionComparisonAnalyzer` | Winner and metrics analysis | Execution or UI state |
-| `RegionComparisonArtifactWriter` | JSON artifact construction | Execution or component presentation |
-| Presentation pipeline | Shared activity feedback and debug outcome communication | Comparison lifecycle or cancellation |
+## Results and Artifacts
 
-### Presentation Boundary
+- `RegionComparisonRunner` returns an immutable completed-result container containing candidate, result, and summary data.
+- `PdfApp` retains a ready result and its canonical region for explicit export.
+- `RegionComparisonAnalyzer` reads completed results only and MUST NOT modify execution results.
+- `RegionComparisonArtifactWriter` produces an immutable, versioned artifact containing execution metadata, canonical region context, configurations, summary, and results.
+- Artifact generation MUST NOT modify comparison execution or completed results.
+- `PdfApp` owns explicit JSON download after artifact construction.
 
-`PdfProgressBar` displays comparison activity and delegates cancellation to `PdfApp.activeProgressCancel`. On a ready result, `PdfApp` emits `comparison-completed`; the Presenter and Banner Adapter build a region-comparison result body. The banner is visible only while Debug Mode is enabled. Failures use the same outcome path. Cancelled comparison does not emit a terminal banner outcome.
+## Debug Boundaries
 
-The completed result remains in `PdfApp` only long enough to enable `RegionComparisonArtifactWriter` JSON export. Export success or failure is an acknowledgement toast through the presentation pipeline.
+- Region Comparison is available only while Debug Mode is enabled.
+- It has no normal-user product surface, comparison history, dashboard, or persistent comparison store.
+- It reuses the existing Region OCR selection and execution boundaries.
+- It does not create a second OCR pipeline or parallel execution architecture.
 
----
+## Invariants
 
-## Non-goals
+- Candidate configuration MUST remain immutable.
+- Runtime OCR language MUST NOT participate in candidate identity.
+- Region Comparison MUST reuse the production `PdfRegionOcrExecutor`.
+- `RegionExecutionDispatcher` MUST remain the shared dispatch boundary.
+- Evaluation MUST occur only after candidate execution.
+- Ground truth MUST be explicitly supplied for evaluation metrics.
+- `RegionComparisonAnalyzer` MUST remain read-only.
+- Artifact generation MUST NOT modify execution results.
+- Presentation Pipeline MUST NEVER own comparison execution.
+- Artifact export MUST require a completed comparison result.
 
-- A second region selection or execution pipeline.
-- Normal-user comparison access.
-- Comparison history, dashboard, page, settings, or window.
-- Direct component-to-coordinator calls.
-- Moving comparison business logic into the toolbar or presentation layers.
+## Rejected Alternatives
 
----
+### Candidate Model
 
-## Architectural Invariants
+- Provider metadata or OCR executor instances as candidate identity.
+- Mutable candidate configuration or runtime OCR language as candidate identity.
+- Candidate planner ownership of execution or workflow selection.
 
-1. Region comparison uses canonical `PdfRegion`, `RegionExecutionRequest`, and `RegionExecutionDispatcher`.
-2. `PdfDeveloperApi` is the component-facing developer boundary; components do not call `RegionComparisonCoordinator` directly.
-3. Debug toolbar emits intent only.
-4. `PdfApp` owns comparison operation retention and cancellation bridging.
-5. Presentation communicates comparison progress and outcomes but does not own execution.
-6. Artifact writing is explicit and only available for a completed comparison result.
+### Execution
+
+- A separate Region OCR executor or second Region OCR pipeline for comparison.
+- Direct component-to-coordinator execution that bypasses `PdfApp` and `PdfDeveloperApi`.
+- Dispatcher ownership of candidate policy, progress, or runner lifecycle.
+
+### Persistence
+
+- Automatic comparison history or persistent result storage.
+- Artifact generation that changes execution or analysis state.
+
+### Product Boundary
+
+- Normal-user Region Comparison access.
+- Dashboard, dedicated comparison page, or persistent product settings.
+
+## Consequences
+
+### Positive
+
+- Comparison behavior reuses the production OCR path.
+- Immutable candidates and explicit ground truth keep comparison results deterministic.
+- Developer tooling remains isolated from normal PDF workflows and persistent product state.
+
+### Negative
+
+- Evaluation metrics require explicitly supplied ground truth.
+- Comparison history is not retained by the application.
+- Region Comparison is unavailable outside Debug Mode.
