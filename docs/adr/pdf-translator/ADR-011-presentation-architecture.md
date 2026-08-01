@@ -59,7 +59,7 @@ Domain Events contain workflow data without surface or rendered wording. Present
 
 ## Translation Outcome Boundary
 
-`translationSummary` remains workflow-owned and is defined in `docs/technical/pdf-translator/pdf-translation-architecture.md`. When a completed translation outcome requires acknowledgement, `PdfApp` emits a Domain Event; Presentation Pipeline maps the event to an acknowledgement toast. Presentation does not read or define the `translationSummary` contract.
+`translationSummary` remains workflow-owned and is defined in `docs/technical/pdf-translator/PDF_TRANSLATION_ARCHITECTURE.md`. When a completed translation outcome requires acknowledgement, `PdfApp` emits a Domain Event; Presentation Pipeline maps the event to an acknowledgement toast. Presentation does not read or define the `translationSummary` contract.
 
 ## Export Boundary
 

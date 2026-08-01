@@ -4,7 +4,7 @@
 > **Canonical responsibility:** Define current PDF Translator implementation boundaries without owning toolbar behavior or detailed table metadata schemas.
 > **Intended audience:** PDF Translator maintainers, contributors, and reviewers.
 > **Related ADRs:** [ADR-003: Document Lifecycle](../../adr/pdf-translator/ADR-003-document-lifecycle.md), [ADR-005: OCR Recommendation](../../adr/pdf-translator/ADR-005-ocr-recommendation.md), [ADR-006: Canonical Region Geometry](../../adr/pdf-translator/ADR-006-canonical-region-geometry.md), [ADR-007: Region OCR Execution Lifecycle](../../adr/pdf-translator/ADR-007-region-ocr-execution-lifecycle.md), [ADR-011: Presentation Architecture](../../adr/pdf-translator/ADR-011-presentation-architecture.md), [ADR-014: Viewer State Restoration](../../adr/pdf-translator/ADR-014-viewer-state-restoration.md)
-> **Related technical references:** [PDF Viewer Toolbar](./pdf-viewer-toolbar.md), [PDF Table Reconstruction](./pdf-table-reconstruction.md)
+> **Related technical references:** [PDF Viewer Toolbar](./PDF_VIEWER_TOOLBAR.md), [PDF Table Reconstruction](./PDF_TABLE_RECONSTRUCTION.md)
 
 ## Overview
 
@@ -110,7 +110,7 @@ The PDF Translation feature is a **self-contained, dedicated PDF viewer and tran
 1. **No browser-native PDF interception** — Users open PDFs inside the dedicated viewer only.
 2. **No auto-translate on open** — Translation is manually triggered per visible pages.
 3. **No translated PDF regeneration** — Output is text-based export, not a translated PDF file.
-4. **Limited document-level table reconstruction** — The viewer does not reconstruct table layout as a complete document representation. Production table metadata, span handling, and overlay integration are defined in [PDF Table Reconstruction](./pdf-table-reconstruction.md).
+4. **Limited document-level table reconstruction** — The viewer does not reconstruct table layout as a complete document representation. Production table metadata, span handling, and overlay integration are defined in [PDF Table Reconstruction](./PDF_TABLE_RECONSTRUCTION.md).
 5. **No translated search** — Search operates on the original text only.
 
 ---
@@ -1580,7 +1580,7 @@ A pure state container for per-block translation tracking. No external dependenc
 }
 ```
 
-Table-specific translation metadata is defined by [PDF Table Reconstruction](./pdf-table-reconstruction.md).
+Table-specific translation metadata is defined by [PDF Table Reconstruction](./PDF_TABLE_RECONSTRUCTION.md).
 
 ---
 

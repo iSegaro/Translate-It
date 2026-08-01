@@ -4,7 +4,7 @@
 > **Canonical responsibility:** Define current table metadata and reconstruction integration without owning viewer lifecycle, toolbar behavior, or general translation pipeline.
 > **Intended audience:** PDF Translator maintainers, rendering contributors, and reviewers.
 > **Related ADRs:** [ADR-006: Canonical Region Geometry](../../adr/pdf-translator/ADR-006-canonical-region-geometry.md)
-> **Related technical references:** [PDF Translation Architecture](./pdf-translation-architecture.md)
+> **Related technical references:** [PDF Translation Architecture](./PDF_TRANSLATION_ARCHITECTURE.md)
 
 ## Overview
 

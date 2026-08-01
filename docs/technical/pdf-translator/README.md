@@ -8,9 +8,9 @@ These documents describe the current runtime implementation and ownership bounda
 
 ## Documents
 
-- [PDF Translation Architecture](./pdf-translation-architecture.md)
-- [PDF Viewer Toolbar](./pdf-viewer-toolbar.md)
-- [PDF Table Reconstruction](./pdf-table-reconstruction.md)
+- [PDF Translation Architecture](./PDF_TRANSLATION_ARCHITECTURE.md)
+- [PDF Viewer Toolbar](./PDF_VIEWER_TOOLBAR.md)
+- [PDF Table Reconstruction](./PDF_TABLE_RECONSTRUCTION.md)
 
 ## Related ADRs
 
