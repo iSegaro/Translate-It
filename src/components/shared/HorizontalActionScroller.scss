@@ -39,6 +39,12 @@
     flex: 0 0 var(--ti-horizontal-action-scroller-control-size);
     width: var(--ti-horizontal-action-scroller-control-size);
     height: var(--ti-horizontal-action-scroller-control-size);
+    transition: opacity 120ms ease;
+
+    &--inactive {
+      opacity: 0;
+      pointer-events: none;
+    }
   }
 
   &__icon {
