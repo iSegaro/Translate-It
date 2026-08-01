@@ -23,12 +23,14 @@
     justify-content: flex-end;
 
     .ti-switch { order: 1 !important; }
-    .ti-btn-settings { order: 2 !important; }
-    .ti-btn-mouse-hover { order: 3 !important; }
-    .ti-btn-capture { order: 4 !important; }
-    .ti-btn-revert { order: 5 !important; }
-    .ti-btn-select { order: 6 !important; }
-    .ti-btn-sidepanel { order: 7 !important; }
+    .ti-btn-subtitle { order: 2 !important; }
+    .ti-btn-pdf { order: 3 !important; }
+    .ti-btn-settings { order: 4 !important; }
+    .ti-btn-mouse-hover { order: 5 !important; }
+    .ti-btn-capture { order: 6 !important; }
+    .ti-btn-revert { order: 7 !important; }
+    .ti-btn-select { order: 8 !important; }
+    .ti-btn-sidepanel { order: 9 !important; }
   }
 
   /* Toolbar Buttons Base Style */

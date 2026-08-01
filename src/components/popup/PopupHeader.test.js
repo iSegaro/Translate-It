@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { mount } from '@vue/test-utils'
 import { ref } from 'vue'
 import PopupHeader from './PopupHeader.vue'
+import { openExtensionApp } from '@/core/ExtensionAppLauncher.js'
 
 let settings
 let scrollToEnd
@@ -55,6 +56,10 @@ vi.mock('@/shared/logging/logger.js', () => ({
   })
 }))
 
+vi.mock('@/core/ExtensionAppLauncher.js', () => ({
+  openExtensionApp: vi.fn()
+}))
+
 vi.mock('@/components/shared/IconButton.vue', () => ({
   default: {
     name: 'IconButton',
@@ -84,6 +89,7 @@ vi.mock('@/features/page-translation/components/PageTranslationButton.vue', () =
 describe('PopupHeader', () => {
   beforeEach(() => {
     scrollToEnd = vi.fn()
+    vi.mocked(openExtensionApp).mockClear()
     settings = {
       EXTENSION_ENABLED: true,
       TRANSLATE_WITH_SELECT_ELEMENT: true,
@@ -109,6 +115,8 @@ describe('PopupHeader', () => {
     expect(toolbarChildren[1]).toBe(scroller.element)
     expect(scrollToEnd).toHaveBeenCalledOnce()
     expect(scroller.find('.ti-switch').exists()).toBe(true)
+    expect(scroller.find('.ti-btn-subtitle').exists()).toBe(true)
+    expect(scroller.find('.ti-btn-pdf').exists()).toBe(true)
     expect(scroller.find('.ti-btn-settings').exists()).toBe(true)
     expect(scroller.find('.ti-btn-revert').exists()).toBe(true)
     expect(scroller.find('.ti-btn-capture').exists()).toBe(true)
@@ -117,6 +125,8 @@ describe('PopupHeader', () => {
     expect(scroller.find('.ti-btn-sidepanel').exists()).toBe(true)
     expect([...scroller.element.children].map((element) => element.className)).toEqual([
       'ti-switch',
+      'ti-toolbar-button ti-btn-subtitle',
+      'ti-toolbar-button ti-btn-pdf',
       'ti-toolbar-button ti-btn-settings',
       'ti-toolbar-button ti-btn-mouse-hover',
       'ti-toolbar-button ti-btn-capture',
@@ -124,6 +134,17 @@ describe('PopupHeader', () => {
       'ti-toolbar-button ti-btn-select',
       'ti-toolbar-button ti-btn-sidepanel'
     ])
+  })
+
+  it('launches Subtitle and PDF translators through shared launcher', async () => {
+    const wrapper = mount(PopupHeader)
+    await wrapper.vm.$nextTick()
+
+    await wrapper.find('.ti-btn-subtitle').trigger('click')
+    await wrapper.find('.ti-btn-pdf').trigger('click')
+
+    expect(openExtensionApp).toHaveBeenNthCalledWith(1, 'subtitle')
+    expect(openExtensionApp).toHaveBeenNthCalledWith(2, 'pdf')
   })
 
   it('preserves conditional utility action rendering', async () => {

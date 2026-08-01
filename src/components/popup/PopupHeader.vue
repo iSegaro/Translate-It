@@ -27,7 +27,27 @@
         <span class="ti-slider" />
       </label>
 
-      <!-- 3. Settings -->
+      <!-- 3. Subtitle Translator -->
+      <IconButton
+        icon="subtitle.png"
+        :alt="t('popup_subtitle_alt_icon')"
+        :title="t('popup_subtitle_title_icon')"
+        type="toolbar"
+        class="ti-btn-subtitle"
+        @click="openExtensionApp('subtitle')"
+      />
+
+      <!-- 4. PDF Translator -->
+      <IconButton
+        icon="pdf_viewer/pdf.png"
+        :alt="t('pdf_app_title')"
+        :title="t('pdf_app_title')"
+        type="toolbar"
+        class="ti-btn-pdf"
+        @click="openExtensionApp('pdf')"
+      />
+
+      <!-- 5. Settings -->
       <IconButton
         icon="settings.png"
         :alt="t('popup_settings_alt_icon') || 'Settings'"
@@ -37,7 +57,7 @@
         @click="handleOpenSettings"
       />
 
-      <!-- 4. Mouse Hover Toggle -->
+      <!-- 6. Mouse Hover Toggle -->
       <IconButton
         icon="mouse-hover.png"
         :alt="isMouseHoverEnabled ? (t('mouse_hover_disable_label') || 'غیرفعال‌سازی ترجمه با ماوس') : (t('mouse_hover_enable_label') || 'فعال‌سازی ترجمه با ماوس')"
@@ -48,7 +68,7 @@
         @click="toggleMouseHover"
       />
 
-      <!-- 5. Screen Capture -->
+      <!-- 7. Screen Capture -->
       <IconButton
         v-if="isScreenCaptureEnabled"
         icon="capture.svg"
@@ -59,7 +79,7 @@
         @click="handleScreenCapture"
       />
 
-      <!-- 6. Revert -->
+      <!-- 8. Revert -->
       <IconButton
         v-if="isSelectElementEnabled"
         icon="revert.png"
@@ -71,7 +91,7 @@
         @click="handleRevert"
       />
 
-      <!-- 7. Select Element -->
+      <!-- 9. Select Element -->
       <IconButton
         v-if="isSelectElementEnabled"
         icon="select.png"
@@ -84,7 +104,7 @@
         @click="handleSelectElement"
       />
 
-      <!-- 8. Open Sidepanel (Rightmost) -->
+      <!-- 10. Open Sidepanel (Rightmost) -->
       <IconButton
         v-if="!IsMobile"
         ref="sidePanelButton"
@@ -118,6 +138,7 @@ import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { useResourceTracker } from '@/composables/core/useResourceTracker.js';
 import { getBrowserInfoSync } from '@/utils/browser/compatibility.js'
+import { openExtensionApp } from '@/core/ExtensionAppLauncher.js'
 
 // Import adjacent SCSS
 import './PopupHeader.scss';
