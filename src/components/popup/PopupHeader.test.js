@@ -97,12 +97,25 @@ describe('PopupHeader', () => {
     expect(toolbarChildren[0]).toBe(pageTranslationButton.element)
     expect(toolbarChildren[1]).toBe(scroller.element)
     expect(scroller.find('.ti-switch').exists()).toBe(true)
+    expect(scroller.find('.ti-btn-pdf').exists()).toBe(true)
+    expect(scroller.find('.ti-btn-subtitle').exists()).toBe(true)
     expect(scroller.find('.ti-btn-settings').exists()).toBe(true)
     expect(scroller.find('.ti-btn-revert').exists()).toBe(true)
     expect(scroller.find('.ti-btn-capture').exists()).toBe(true)
     expect(scroller.find('.ti-btn-select').exists()).toBe(true)
     expect(scroller.find('.ti-btn-mouse-hover').exists()).toBe(true)
     expect(scroller.find('.ti-btn-sidepanel').exists()).toBe(true)
+    expect([...scroller.element.children].map((element) => element.className)).toEqual([
+      'ti-switch',
+      'ti-toolbar-button ti-btn-pdf',
+      'ti-toolbar-button ti-btn-subtitle',
+      'ti-toolbar-button ti-btn-settings',
+      'ti-toolbar-button ti-btn-mouse-hover',
+      'ti-toolbar-button ti-btn-capture',
+      'ti-toolbar-button ti-btn-revert',
+      'ti-toolbar-button ti-btn-select',
+      'ti-toolbar-button ti-btn-sidepanel'
+    ])
   })
 
   it('preserves conditional utility action rendering', async () => {

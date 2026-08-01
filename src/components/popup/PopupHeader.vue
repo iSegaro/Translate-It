@@ -24,7 +24,27 @@
         <span class="ti-slider" />
       </label>
 
-      <!-- 3. Settings -->
+      <!-- 3. PDF Translator -->
+      <IconButton
+        icon="page.png"
+        alt="PDF Translator"
+        title="PDF Translator"
+        type="toolbar"
+        class="ti-btn-pdf"
+        @click="onOpenPdf"
+      />
+
+      <!-- 4. Subtitle Translator -->
+      <IconButton
+        icon="subtitle.png"
+        :alt="t('popup_subtitle_alt_icon')"
+        :title="t('popup_subtitle_title_icon')"
+        type="toolbar"
+        class="ti-btn-subtitle"
+        @click="onOpenSubtitle"
+      />
+
+      <!-- 5. Settings -->
       <IconButton
         icon="settings.png"
         :alt="t('popup_settings_alt_icon') || 'Settings'"
@@ -34,7 +54,29 @@
         @click="handleOpenSettings"
       />
 
-      <!-- 5. Revert -->
+      <!-- 6. Mouse Hover Toggle -->
+      <IconButton
+        icon="mouse-hover.png"
+        :alt="isMouseHoverEnabled ? (t('mouse_hover_disable_label') || 'غیرفعال‌سازی ترجمه با ماوس') : (t('mouse_hover_enable_label') || 'فعال‌سازی ترجمه با ماوس')"
+        :title="isMouseHoverEnabled ? (t('mouse_hover_disable_label') || 'غیرفعال‌سازی ترجمه با ماوس') : (t('mouse_hover_enable_label') || 'فعال‌سازی ترجمه با ماوس')"
+        type="toolbar"
+        :active="isMouseHoverEnabled"
+        class="ti-btn-mouse-hover"
+        @click="toggleMouseHover"
+      />
+
+      <!-- 7. Screen Capture -->
+      <IconButton
+        v-if="isScreenCaptureEnabled"
+        icon="capture.svg"
+        :alt="t('popup_screen_capture_alt_icon') || 'Screen Capture'"
+        :title="t('popup_screen_capture_title_icon') || 'تصویربرداری از صفحه'"
+        type="toolbar"
+        class="ti-btn-capture"
+        @click="handleScreenCapture"
+      />
+
+      <!-- 8. Revert -->
       <IconButton
         v-if="isSelectElementEnabled"
         icon="revert.png"
@@ -46,18 +88,7 @@
         @click="handleRevert"
       />
 
-      <!-- 6. Screen Capture -->
-      <IconButton
-        v-if="isScreenCaptureEnabled"
-        icon="capture.svg"
-        :alt="t('popup_screen_capture_alt_icon') || 'Screen Capture'"
-        :title="t('popup_screen_capture_title_icon') || 'تصویربرداری از صفحه'"
-        type="toolbar"
-        class="ti-btn-capture"
-        @click="handleScreenCapture"
-      />
-
-      <!-- 7. Select Element -->
+      <!-- 9. Select Element -->
       <IconButton
         v-if="isSelectElementEnabled"
         icon="select.png"
@@ -70,18 +101,7 @@
         @click="handleSelectElement"
       />
 
-      <!-- 8. Mouse Hover Toggle -->
-      <IconButton
-        icon="mouse-hover.png"
-        :alt="isMouseHoverEnabled ? (t('mouse_hover_disable_label') || 'غیرفعال‌سازی ترجمه با ماوس') : (t('mouse_hover_enable_label') || 'فعال‌سازی ترجمه با ماوس')"
-        :title="isMouseHoverEnabled ? (t('mouse_hover_disable_label') || 'غیرفعال‌سازی ترجمه با ماوس') : (t('mouse_hover_enable_label') || 'فعال‌سازی ترجمه با ماوس')"
-        type="toolbar"
-        :active="isMouseHoverEnabled"
-        class="ti-btn-mouse-hover"
-        @click="toggleMouseHover"
-      />
-
-      <!-- 7. Open Sidepanel (Rightmost) -->
+      <!-- 10. Open Sidepanel (Rightmost) -->
       <IconButton
         v-if="!IsMobile"
         ref="sidePanelButton"
@@ -203,6 +223,14 @@ const isScreenCaptureEnabled = computed(() => {
 const isWholePageEnabled = computed(() => {
   return isExtensionEnabledGlobal.value && (settingsStore.settings?.WHOLE_PAGE_TRANSLATION_ENABLED ?? true)
 })
+
+const onOpenPdf = () => {
+  console.log('PDF Translator')
+}
+
+const onOpenSubtitle = () => {
+  console.log('Subtitle Translator')
+}
 
 // Methods
 const handleSelectElement = async () => {
