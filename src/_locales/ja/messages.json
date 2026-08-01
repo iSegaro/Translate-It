@@ -284,6 +284,18 @@
   "ocr_tab_title": {
     "message": "スクリーンOCR"
   },
+  "ocr_page": {
+    "message": "OCRページ"
+  },
+  "ocr_page_compact": {
+    "message": "ページ"
+  },
+  "ocr_region": {
+    "message": "OCR領域"
+  },
+  "ocr_region_compact": {
+    "message": "領域"
+  },
   "ocr_toggle_section_title": {
     "message": "OCR設定"
   },
@@ -1431,7 +1443,7 @@
     "message": "翻訳"
   },
   "popup_stop_button_title": {
-    "message": "翻訳を停止"
+    "message": "停止"
   },
   "popup_exclude_toggle_title": {
     "message": "このサイトで有効/無効を切り替え"
@@ -2228,6 +2240,21 @@
   "window_close": {
     "message": "閉じる"
   },
+  "pdf_windows_host_aria_label": {
+    "message": "PDF翻訳ウィンドウ"
+  },
+  "pdf_windows_host_selected_text": {
+    "message": "選択されたテキスト"
+  },
+  "pdf_windows_host_detected_language": {
+    "message": "検出された言語"
+  },
+  "pdf_windows_host_copied": {
+    "message": "コピーしました"
+  },
+  "pdf_windows_host_copy_failed": {
+    "message": "コピーに失敗しました"
+  },
   "window_tts_no_text": {
     "message": "読み上げるテキストがありません"
   },
@@ -2701,6 +2728,36 @@
   },
   "subtitle_app_title": {
     "message": "字幕翻訳"
+  },
+  "pdf_app_title": {
+    "message": "PDF翻訳"
+  },
+  "pdf_tab_title": {
+    "message": "PDF"
+  },
+  "pdf_tab_desc": {
+    "message": "PDF関連の設定を管理します。"
+  },
+  "pdf_context_menu_section_title": {
+    "message": "コンテキストメニュー"
+  },
+  "pdf_context_menu_label": {
+    "message": "ブラウザのコンテキストメニューに「PDF翻訳」を表示"
+  },
+  "pdf_context_menu_desc": {
+    "message": "PDFリンクの右クリックメニューに「PDF翻訳」オプションを表示します。"
+  },
+  "pdf_action_context_menu_label": {
+    "message": "ブラウザアクションメニューに「PDF翻訳」を表示"
+  },
+  "pdf_action_context_menu_desc": {
+    "message": "拡張機能のツールバーメニューに「PDF翻訳」ランチャーを表示します。"
+  },
+  "subtitle_action_context_menu_label": {
+    "message": "ブラウザアクションメニューに「字幕翻訳」を表示"
+  },
+  "subtitle_action_context_menu_desc": {
+    "message": "拡張機能のツールバーメニューに「字幕翻訳」ランチャーを表示します。"
   },
   "subtitle_app_powered_by": {
     "message": "Translate It 提供"

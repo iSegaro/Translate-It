@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { runSettingsMigrations } from './settingsMigrations.js';
+import { runSettingsMigrations, mergeMissingNestedMembers } from './settingsMigrations.js';
 import { HISTORICAL_PROMPT_DEFAULTS } from './promptHistoricalDefaults.js';
 import { CONFIG, TranslationMode } from './config.js';
 
@@ -169,5 +169,178 @@ describe('Settings Migrations', () => {
     const { updates } = await runSettingsMigrations(currentSettings);
     // Custom template must be preserved (not overwritten/reverted)
     expect(updates.PROMPT_TEMPLATE).toBeUndefined();
+  });
+
+  // --- Nested Object Migration Tests ---
+
+  it('should add a missing top-level nested object with its complete default', async () => {
+    const currentSettings = { THEME: 'dark' }; // CONTEXT_MENU_VISIBILITY absent
+    const { updates, logs } = await runSettingsMigrations(currentSettings);
+
+    expect(updates.CONTEXT_MENU_VISIBILITY).toEqual(CONFIG.CONTEXT_MENU_VISIBILITY);
+    expect(logs).toContain('Added missing setting: CONTEXT_MENU_VISIBILITY');
+  });
+
+  it('should backfill a missing nested member while preserving existing members', async () => {
+    const currentSettings = {
+      CONTEXT_MENU_VISIBILITY: {
+        PAGE_CONTEXT_SELECT_ELEMENT: false
+      }
+    };
+
+    const { updates } = await runSettingsMigrations(currentSettings);
+
+    expect(updates.CONTEXT_MENU_VISIBILITY).toEqual({
+      ...CONFIG.CONTEXT_MENU_VISIBILITY,
+      PAGE_CONTEXT_SELECT_ELEMENT: false
+    });
+    expect(updates.CONTEXT_MENU_VISIBILITY.PAGE_CONTEXT_SELECT_ELEMENT).toBe(false);
+    expect(updates.CONTEXT_MENU_VISIBILITY.PAGE_CONTEXT_SCREEN_CAPTURE).toBe(true);
+  });
+
+  it('should not emit an update when all nested members are already present', async () => {
+    const currentSettings = {
+      CONTEXT_MENU_VISIBILITY: { ...CONFIG.CONTEXT_MENU_VISIBILITY }
+    };
+
+    const { updates } = await runSettingsMigrations(currentSettings);
+    expect(updates.CONTEXT_MENU_VISIBILITY).toBeUndefined();
+  });
+
+  it('should backfill a newly added nested flag into an older persisted object', async () => {
+    const currentSettings = {
+      CONTEXT_MENU_VISIBILITY: {
+        PAGE_CONTEXT_SELECT_ELEMENT: true,
+        PAGE_CONTEXT_SCREEN_CAPTURE: true,
+        PAGE_CONTEXT_PDF_TRANSLATOR: true,
+        ACTION_CONTEXT_SELECT_ELEMENT: true,
+        ACTION_CONTEXT_SCREEN_CAPTURE: true,
+        ACTION_CONTEXT_OPTIONS: true,
+        ACTION_CONTEXT_SHORTCUTS: true,
+        ACTION_CONTEXT_HELP: true
+      }
+    };
+
+    const { updates } = await runSettingsMigrations(currentSettings);
+
+    expect(updates.CONTEXT_MENU_VISIBILITY.PAGE_CONTEXT_PDF_TRANSLATOR).toBe(true);
+    expect(updates.CONTEXT_MENU_VISIBILITY.PAGE_CONTEXT_SELECT_ELEMENT).toBe(true);
+    expect(updates.CONTEXT_MENU_VISIBILITY.ACTION_CONTEXT_PDF_TRANSLATOR).toBe(true);
+    expect(updates.CONTEXT_MENU_VISIBILITY.ACTION_CONTEXT_SUBTITLE_TRANSLATOR).toBe(true);
+  });
+
+  it('should preserve existing nested user values and backfill missing MODE_PROVIDERS members', async () => {
+    const currentSettings = {
+      MODE_PROVIDERS: {
+        [TranslationMode.Select_Element]: 'google'
+      }
+    };
+
+    const { updates } = await runSettingsMigrations(currentSettings);
+
+    expect(updates.MODE_PROVIDERS[TranslationMode.Select_Element]).toBe('google');
+    expect(updates.MODE_PROVIDERS[TranslationMode.Popup_Translate]).toBe(null);
+    expect(updates.MODE_PROVIDERS[TranslationMode.Page]).toBe(null);
+  });
+
+  it('should not clobber a remap result from an earlier migration pass', async () => {
+    const currentSettings = {
+      MODE_PROVIDERS: {
+        'select_element': 'google'
+      }
+    };
+
+    const { updates } = await runSettingsMigrations(currentSettings);
+
+    // Remap renamed the legacy key BEFORE nested backfill; the legacy key must not return
+    expect(updates.MODE_PROVIDERS[TranslationMode.Select_Element]).toBe('google');
+    expect(updates.MODE_PROVIDERS['select_element']).toBeUndefined();
+  });
+
+  it('should preserve an existing empty-string nested member', async () => {
+    const stored = { text: '' };
+    const defaults = { text: 'default', extra: 'added' };
+    expect(mergeMissingNestedMembers(stored, defaults)).toEqual({ text: '', extra: 'added' });
+  });
+
+  it('should preserve existing false and zero nested members', async () => {
+    const stored = { enabled: false, level: 0 };
+    const defaults = { enabled: true, level: 1, extra: true };
+    expect(mergeMissingNestedMembers(stored, defaults)).toEqual({
+      enabled: false,
+      level: 0,
+      extra: true
+    });
+  });
+
+  it('should recursively backfill deeply missing nested members', async () => {
+    const stored = { a: { b: {} } };
+    const defaults = { a: { b: { c: 1 }, d: 2 }, e: 3 };
+    expect(mergeMissingNestedMembers(stored, defaults)).toEqual({
+      a: { b: { c: 1 }, d: 2 },
+      e: 3
+    });
+  });
+
+  it('should not overwrite a cross-type stored primitive (default is object)', async () => {
+    const stored = { edge: 'legacy-voice-id' };
+    const defaults = { edge: null, google: null };
+    expect(mergeMissingNestedMembers(stored, defaults)).toEqual({
+      edge: 'legacy-voice-id',
+      google: null
+    });
+  });
+
+  it('should not recurse into a cross-type stored object (default is primitive)', async () => {
+    const stored = { x: { a: 1 } };
+    const defaults = { x: 1 };
+    expect(mergeMissingNestedMembers(stored, defaults)).toBeNull();
+  });
+
+  it('should treat arrays as leaves and never element-merge', async () => {
+    const stored = { models: [{ value: 'old', thinking: { enabled: true } }] };
+    const defaults = { models: [{ value: 'new', thinking: { enabled: false } }], extra: 1 };
+    expect(mergeMissingNestedMembers(stored, defaults)).toEqual({
+      models: [{ value: 'old', thinking: { enabled: true } }],
+      extra: 1
+    });
+  });
+
+  it('should add a missing array member as a complete leaf', async () => {
+    expect(mergeMissingNestedMembers({}, { models: [1, 2] })).toEqual({ models: [1, 2] });
+  });
+
+  it('should not recursively process RegExp values', async () => {
+    const regex = /[a-z]/;
+    expect(mergeMissingNestedMembers({}, { re: regex })).toEqual({ re: regex });
+    expect(mergeMissingNestedMembers({ re: /[0-9]/ }, { re: regex })).toBeNull();
+  });
+
+  it('should be a no-op for empty dictionary defaults', async () => {
+    expect(mergeMissingNestedMembers({}, {})).toBeNull();
+    expect(mergeMissingNestedMembers({ custom: 'value' }, {})).toBeNull();
+  });
+
+  it('should not mutate either input object', async () => {
+    const stored = { a: { keep: 'v' } };
+    const defaults = { a: { keep: 'v', add: 2 }, top: 3 };
+    const storedSnapshot = JSON.stringify(stored);
+    const defaultsSnapshot = JSON.stringify(defaults);
+
+    mergeMissingNestedMembers(stored, defaults);
+
+    expect(JSON.stringify(stored)).toBe(storedSnapshot);
+    expect(JSON.stringify(defaults)).toBe(defaultsSnapshot);
+  });
+
+  it('should skip DO_NOT_MIGRATE settings entirely', async () => {
+    const currentSettings = {
+      EXCLUDED_SITES: ['example.com'],
+      OPENAI_API_KEY: 'secret'
+    };
+
+    const { updates } = await runSettingsMigrations(currentSettings);
+    expect(updates.EXCLUDED_SITES).toBeUndefined();
+    expect(updates.OPENAI_API_KEY).toBeUndefined();
   });
 });

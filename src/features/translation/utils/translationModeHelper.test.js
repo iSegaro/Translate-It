@@ -19,6 +19,7 @@ vi.mock("@/shared/config/config.js", () => ({
     Dictionary_Translation: 'dictionary',
     Select_Element: 'select_element',
     Page: 'page',
+    PDF: 'pdf-translation',
     Field: 'field'
   },
   getEnableDictionaryAsync: vi.fn()
@@ -85,6 +86,7 @@ describe('translationModeHelper', () => {
     it('should return false if translation mode is structural/bulk', async () => {
       expect(await isEligibleForDictionaryUpgrade('apple', TranslationMode.Select_Element)).toBe(false);
       expect(await isEligibleForDictionaryUpgrade('apple', TranslationMode.Page)).toBe(false);
+      expect(await isEligibleForDictionaryUpgrade('apple', TranslationMode.PDF)).toBe(false);
       expect(await isEligibleForDictionaryUpgrade('apple', TranslationMode.Field)).toBe(false);
     });
 

@@ -24,6 +24,7 @@ Your mission is to evolve this codebase while rigorously maintaining its structu
 - **IFrame Support**: Simple and effective iframe support system with ResourceTracker integration and unified memory management.
 - **Toast Integration System**: A unified notification system with ToastEventHandler, ToastElementDetector, and support for interactive action buttons.
 - **Modern CSS Architecture**: Principled CSS architecture featuring CSS Grid, containment, safe variable functions, forward-looking SCSS patterns, and Shadow DOM isolation using strategic `!important` declarations.
+- **Icon System**: Standardized monochrome UI icons via CSS Mask (`SvgIcon`) with `currentColor` theming, SVG assets as single source of truth, and clear conventions for brand/multicolor `<img>` assets. See [docs/technical/ICON_SYSTEM.md](docs/technical/ICON_SYSTEM.md) and [docs/adr/ADR-SVG-ICON-SYSTEM.md](docs/adr/ADR-SVG-ICON-SYSTEM.md).
 - **Provider System**: 10+ translation services with a hierarchical architecture (BaseProvider, BaseTranslateProvider, BaseAIProvider) including Rate Limiting and Circuit Breaker management.
 - **Error Management**: Centralized error management system.
 - **Storage Manager**: Smart storage with built-in caching.
@@ -122,6 +123,7 @@ Comprehensive documentation is available in the `docs/` folder:
 - [**PROXY_SYSTEM.md**](docs/technical/PROXY_SYSTEM.md): Extension-only proxy system using Strategy Pattern.
 - [**TOAST_INTEGRATION_SYSTEM.md**](docs/technical/TOAST_INTEGRATION_SYSTEM.md): **Toast System** – Event-driven notifications and actions.
 - [**VITE_BUILD_SYSTEM.md**](docs/technical/VITE_BUILD_SYSTEM.md): **Vite Build System** – Modular bundling, manual chunking, and warning suppression filters.
+- [**ICON_SYSTEM.md**](docs/technical/ICON_SYSTEM.md): Monochrome icon standards, SvgIcon usage, SVG asset conventions, and accessibility rules.
 - [**CSS_ARCHITECTURE.md**](docs/technical/CSS_ARCHITECTURE.md): Modern principled CSS and Shadow DOM isolation.
 - [**CSS_VARIABLES_GUIDE.md**](docs/technical/CSS_VARIABLES_GUIDE.md): Design tokens and safe SCSS variable functions.
 - [**COMPONENT_ADJACENT_SCSS.md**](docs/technical/COMPONENT_ADJACENT_SCSS.md): Rules for component-specific style management.

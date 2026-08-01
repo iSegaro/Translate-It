@@ -8,6 +8,7 @@ import { ProviderFactory } from "@/features/translation/providers/ProviderFactor
 import { MessageActions } from "@/shared/messaging/core/MessageActions.js";
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
+import { isEmptyTranslationInput, isStructuredBatchInput } from "./translationInputHelpers.js";
 import { 
   getSourceLanguageAsync, 
   getTargetLanguageAsync, 
@@ -76,7 +77,12 @@ export class TranslationEngine {
     data.messageId = messageId;
 
     // Register and detect duplicate with context awareness
-    this.lifecycleRegistry.registerRequest(messageId, data.text, context);
+    const registration = this.lifecycleRegistry.registerRequest(messageId, data.text, context);
+    if (registration === null) {
+      const cancellationError = new Error('Translation cancelled by user');
+      cancellationError.type = ErrorTypes.USER_CANCELLED;
+      return this.formatError(cancellationError, context);
+    }
 
     try {
       const result = await this.executeTranslation(data, sender, context);
@@ -104,7 +110,7 @@ export class TranslationEngine {
     const { text, provider, sourceLanguage, targetLanguage } = data;
     let { mode } = data;
 
-    if (!text || text.trim().length === 0) {
+    if (isEmptyTranslationInput(text)) {
       throw new Error("Text to translate is required");
     }
 
@@ -131,10 +137,11 @@ export class TranslationEngine {
       getTargetLanguageAsync()
     ]);
 
-    // 4. Handle Optimized JSON strategy (Select Element)
+    // 4. Handle Optimized JSON strategy (structured batch modes)
     const isSelectJson = mode === TranslationMode.Select_Element && data.options?.rawJsonPayload;
-    if (isSelectJson) {
-      logger.debug('[TranslationEngine] Using optimized SelectElement strategy for provider:', provider);
+    const isPdfJson = mode === TranslationMode.PDF && data.options?.rawJsonPayload;
+    if (isSelectJson || isPdfJson) {
+      logger.debug('[TranslationEngine] Using optimized structured batch strategy for provider:', provider);
       return await this.jsonHandler.execute(this, data, providerInstance, originalSourceLang, originalTargetLang, data.messageId, sender, uiContext);
     }
 
@@ -187,7 +194,9 @@ export class TranslationEngine {
    * @private
    */
   async _validateTextLength(text, mode, provider) {
-    const isSelectElementMode = mode === TranslationMode.Select_Element;
+    if (isStructuredBatchInput(text)) return null
+
+    const isSelectElementMode = mode === TranslationMode.Select_Element || mode === TranslationMode.PDF;
     const isSelectionMode = mode === TranslationMode.Selection;
     const isPopupMode = mode === TranslationMode.Popup_Translate;
     const isSidepanelMode = mode === TranslationMode.Sidepanel_Translate;
@@ -260,6 +269,7 @@ export class TranslationEngine {
   
   async cancelTranslation(messageId) { return await this.lifecycleRegistry.cancelTranslation(messageId); }
   async cancelAllTranslations(context = null) { return await this.lifecycleRegistry.cancelAllTranslations(context); }
+  getActiveTranslationIds(context = null) { return this.lifecycleRegistry.getActiveTranslationIds(context); }
   getAbortController(messageId) { return this.lifecycleRegistry.getAbortController(messageId); }
   registerStreamingSender(messageId, sender) { return this.lifecycleRegistry.registerStreamingSender(messageId, sender); }
   getStreamingSender(messageId) { return this.lifecycleRegistry.getStreamingSender(messageId); }

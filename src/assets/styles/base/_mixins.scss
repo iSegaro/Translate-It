@@ -5,6 +5,23 @@
 @use "sass:math";
 @use "./variables" as *;
 
+// ── Safe CSS Variable Generation ──────────────────────────────────
+// Canonical pattern. See docs/technical/CSS_VARIABLES_GUIDE.md
+
+@mixin css-properties($prefix: 'ti', $properties: ()) {
+  @each $name, $value in $properties {
+    --#{$prefix}-#{$name}: #{$value};
+  }
+}
+
+@function css-var($name, $fallback: null) {
+  @if $fallback {
+    @return var(--ti-#{$name}, #{$fallback});
+  } @else {
+    @return var(--ti-#{$name});
+  }
+}
+
 // Transitions
 @mixin ti-transition-fast($properties...) {
   transition: $properties $transition-fast;

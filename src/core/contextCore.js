@@ -68,6 +68,7 @@ export const ENVIRONMENTS = {
   POPUP: "popup",
   SIDEPANEL: "sidepanel",
   OPTIONS: "options",
+  PDF: "pdf",
   OFFSCREEN: "offscreen",
 };
 
@@ -87,6 +88,7 @@ export function getActiveEnvironment() {
     if (url.includes("popup.html")) return ENVIRONMENTS.POPUP;
     if (url.includes("sidepanel.html")) return ENVIRONMENTS.SIDEPANEL;
     if (url.includes("options.html")) return ENVIRONMENTS.OPTIONS;
+    if (url.includes("pdf.html")) return ENVIRONMENTS.PDF;
     if (url.includes("offscreen.html")) return ENVIRONMENTS.OFFSCREEN;
     return ENVIRONMENTS.BACKGROUND;
   }

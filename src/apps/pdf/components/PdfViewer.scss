@@ -1,0 +1,9 @@
+@use '../../../assets/styles/base/variables' as *;
+
+.pdf-viewer {
+  display: flex;
+  flex-direction: column;
+  gap: $spacing-md;
+  position: relative;
+  padding: $spacing-md 0 $spacing-xl;
+}

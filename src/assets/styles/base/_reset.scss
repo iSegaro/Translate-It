@@ -17,21 +17,29 @@ input, button, textarea, select {
   line-height: inherit;
 }
 
-// Scrollbar styling
-::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
-}
+// App-context scrollbar styling. PDF intentionally opts out so browser-native
+// scrollbars remain visible in the document viewer.
+body.popup-context,
+body.options-context,
+body.sidepanel-context {
+  &::-webkit-scrollbar,
+  & ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
 
-::-webkit-scrollbar-track {
-  background: var(--color-surface, #f5f5f5);
-}
+  &::-webkit-scrollbar-track,
+  & ::-webkit-scrollbar-track {
+    background: var(--color-surface, #f5f5f5);
+  }
 
-::-webkit-scrollbar-thumb {
-  background: var(--color-border, #ddd);
-  border-radius: 3px;
+  &::-webkit-scrollbar-thumb,
+  & ::-webkit-scrollbar-thumb {
+    background: var(--color-border, #ddd);
+    border-radius: 3px;
 
-  &:hover {
-    background: var(--color-text-disabled, #bbb);
+    &:hover {
+      background: var(--color-text-disabled, #bbb);
+    }
   }
 }

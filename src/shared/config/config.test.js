@@ -52,6 +52,7 @@ describe('Config Module', () => {
     it('should have correct TranslationMode values', () => {
       expect(TranslationMode.Select_Element).toBe('select-element');
       expect(TranslationMode.Page).toBe('page-translation-batch');
+      expect(TranslationMode.PDF).toBe('pdf-translation');
     });
 
     it('should have basic app info in CONFIG', () => {

@@ -217,7 +217,7 @@ describe('StreamingManager', () => {
       await streamingManager.completeStream(messageId, true);
 
       const info = streamingManager.getStreamInfo(messageId);
-      expect(info.status).toBe('reported');
+      expect(info.status).toBe('completed');
       expect(streamingManager.stats.completedSessions).toBe(1);
       expect(streamingManager.stats.activeSessions).toBe(0);
 
@@ -272,12 +272,72 @@ describe('StreamingManager', () => {
       await streamingManager.cancelStream(messageId, 'User clicked stop');
       
       const info = streamingManager.getStreamInfo(messageId);
-      expect(info.status).toBe('reported'); // completeStream changes it to reported
+      expect(info.status).toBe('cancelled');
       expect(info.cancellationReason).toBe('User clicked stop');
       expect(completeSpy).toHaveBeenCalledWith(messageId, false, expect.objectContaining({
-        cancelled: true,
-        reason: 'User clicked stop'
+         cancelled: true,
+         reason: 'User clicked stop'
+       }), true);
+     });
+
+    it('preserves cancellation when a late provider completion arrives', async () => {
+      const messageId = 'msg-cancel-late-complete';
+      streamingManager.initializeStream(messageId, { tab: { id: 1 } }, { providerName: 'P' }, ['s1']);
+
+      await streamingManager.cancelStream(messageId);
+      await streamingManager.completeStream(messageId, true);
+
+      expect(streamingManager.getStreamInfo(messageId).status).toBe('cancelled');
+    });
+
+    it('does not deliver late stream chunks after cancellation', async () => {
+      const { default: browser } = await import('webextension-polyfill');
+      const messageId = 'msg-cancel-late-chunk';
+      streamingManager.initializeStream(messageId, { tab: { id: 1 } }, { providerName: 'P' }, ['s1']);
+
+      await streamingManager.cancelStream(messageId);
+      await streamingManager.streamBatchResults(messageId, ['late'], ['s1'], 0);
+
+      const messages = browser.tabs.sendMessage.mock.calls.map(([, message]) => message);
+      expect(messages).toEqual([expect.objectContaining({
+        action: MessageActions.TRANSLATION_STREAM_END,
+        data: expect.objectContaining({ cancelled: true })
+      })]);
+      expect(messages).not.toContainEqual(expect.objectContaining({
+        action: MessageActions.TRANSLATION_STREAM_UPDATE
       }));
+      expect(streamingManager.getStreamResults(messageId)).toEqual([]);
+    });
+
+    it('preserves error when a late provider completion arrives', async () => {
+      const messageId = 'msg-error-late-complete';
+      streamingManager.initializeStream(messageId, { tab: { id: 1 } }, { providerName: 'P' }, ['s1']);
+
+      await streamingManager.completeStream(messageId, false);
+      await streamingManager.completeStream(messageId, true);
+
+      expect(streamingManager.getStreamInfo(messageId).status).toBe('error');
+    });
+
+    it('keeps cancellation idempotent and schedules delayed cleanup', async () => {
+      const { default: browser } = await import('webextension-polyfill');
+      const messageId = 'msg-cancel-cleanup';
+      streamingManager.initializeStream(messageId, { tab: { id: 1 } }, { providerName: 'P' }, ['s1']);
+
+      await streamingManager.cancelStream(messageId);
+      await streamingManager.cancelStream(messageId);
+
+      expect(browser.tabs.sendMessage).toHaveBeenCalledTimes(1);
+      expect(browser.tabs.sendMessage).toHaveBeenCalledWith(1, expect.objectContaining({
+        action: MessageActions.TRANSLATION_STREAM_END,
+        data: expect.objectContaining({ cancelled: true })
+      }));
+      expect(streamingManager.stats).toMatchObject({ activeSessions: 0, errorSessions: 1 });
+      expect(vi.getTimerCount()).toBe(1);
+
+      vi.advanceTimersByTime(30000);
+
+      expect(streamingManager.activeStreams.has(messageId)).toBe(false);
     });
   });
 

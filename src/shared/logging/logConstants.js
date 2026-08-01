@@ -33,6 +33,7 @@ export const LOG_COMPONENTS = {
   SHORTCUTS: 'Shortcuts',         // src/features/shortcuts/
   EXCLUSION: 'Exclusion',         // src/features/exclusion/
   SUBTITLE: 'Subtitle',           // src/features/subtitle/
+  PDF: 'PDF',                     // src/apps/pdf/ and src/features/pdf-translation/
   HISTORY: 'History',             // src/features/history/
   SETTINGS: 'Settings',           // src/features/settings/
   WINDOWS: 'Windows',             // src/features/windows/
@@ -83,6 +84,7 @@ export const LOG_CATEGORIES = {
       LOG_COMPONENTS.WINDOWS, LOG_COMPONENTS.ELEMENT_SELECTION, LOG_COMPONENTS.TEXT_FIELD_INTERACTION,
       LOG_COMPONENTS.TEXT_ACTIONS, LOG_COMPONENTS.TEXT_SELECTION, LOG_COMPONENTS.TRANSLATION,
       LOG_COMPONENTS.PAGE_TRANSLATION, LOG_COMPONENTS.SHORTCUTS, LOG_COMPONENTS.EXCLUSION,
+      LOG_COMPONENTS.PDF,
       LOG_COMPONENTS.SCREEN_CAPTURE, LOG_COMPONENTS.SUBTITLE, LOG_COMPONENTS.TTS,
       LOG_COMPONENTS.MOBILE, LOG_COMPONENTS.DESKTOP_FAB, LOG_COMPONENTS.ON_HOVER
     ]

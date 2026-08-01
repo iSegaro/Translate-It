@@ -243,15 +243,8 @@ const importSettings = async () => {
     const fileContent = await selectedFile.value.text()
     const importedSettings = JSON.parse(fileContent)
     await settingsStore.importSettings(importedSettings, importPassword.value.trim() || null)
-    
-    if (importFileInput.value) importFileInput.value.value = ''
-    importPassword.value = ''
-    showPasswordField.value = false
-    selectedFile.value = null
-    
-    statusType.value = 'success'
-    statusMessage.value = t('import_success') || 'Settings imported successfully!'
-    
+
+    window.location.reload()
   } catch (error) {
     statusType.value = 'error'
     

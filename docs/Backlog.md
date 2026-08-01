@@ -4,7 +4,6 @@ List of features, enhancements, and ideas planned for future development.
 
 ## Features and Enhancements
 
-- **PDF Support**: Enable direct translation of text within PDF files.
 - **ESC Key Flexibility**: Add option to revert and cancel `Select Element` via `ESC`.
 - **Code Cleanup**: Remove unused `compact` mode from `ProviderSelector.vue` to improve maintainability.
 - **Error Handling Refactoring**: The error handling logic is still inherited from a legacy version. Although the system currently functions correctly, it is architecturally unsound as both lower and upper layers are redundantly handling errors. Detailed information can be found in `ERROR_MANAGMENT_ISSUE.md`.

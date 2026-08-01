@@ -139,11 +139,11 @@ export class ContentScriptIntegration {
    * @param {string} messageId - Message ID
    * @param {string} reason - Cancellation reason
    */
-  cancelTranslationRequest(messageId, reason = 'User cancelled') {
+  cancelTranslationRequest(messageId, reason = 'User cancelled', timeout = false) {
     logger.debug(`Cancelling translation request: ${messageId}`);
 
     // Cancel in coordinator
-    unifiedTranslationCoordinator.cancelTranslation(messageId, reason);
+    unifiedTranslationCoordinator.cancelTranslation(messageId, reason, timeout);
 
     // Cancel streaming handler
     this.streamingHandler.cancelHandler(messageId);
@@ -282,8 +282,8 @@ export function sendUnifiedTranslation(message, options) {
  * @param {string} messageId - Message ID
  * @param {string} reason - Cancellation reason
  */
-export function cancelTranslation(messageId, reason) {
-  return contentScriptIntegration.cancelTranslationRequest(messageId, reason);
+export function cancelTranslation(messageId, reason, timeout) {
+  return contentScriptIntegration.cancelTranslationRequest(messageId, reason, timeout);
 }
 
 /**

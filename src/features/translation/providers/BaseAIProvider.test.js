@@ -115,6 +115,13 @@ describe('BaseAIProvider', () => {
     });
   });
 
+  describe('_shouldUseStreaming', () => {
+    it('should not use streaming for PDF mode', async () => {
+      const shouldStream = await provider._shouldUseStreaming(['a', 'b'], 'msg-1', { name: 'engine' }, 'pdf-translation');
+      expect(shouldStream).toBe(false);
+    });
+  });
+
   describe('_traditionalBatchTranslate', () => {
     it('should process segments sequentially', async () => {
       const texts = ['seg1', 'seg2'];

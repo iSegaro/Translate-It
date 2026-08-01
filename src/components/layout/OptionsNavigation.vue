@@ -57,6 +57,7 @@ const navigationItems = ref([
   { name: 'activation', labelKey: 'activation_tab_title' },
   { name: 'tts', labelKey: 'tts_tab_title' },
   { name: 'ocr', labelKey: 'ocr_tab_title' },
+  { name: 'pdf', labelKey: 'pdf_tab_title' },
   { name: 'prompt', labelKey: 'prompt_tab_title' },
   { name: 'appearance', labelKey: 'appearance_tab_title' },
   { name: 'advance', labelKey: 'advance_tab_title' },

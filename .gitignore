@@ -15,4 +15,5 @@ tests/coverage/
 .codex/
 .agent/
 .gemini/
-openspec/
+.mimocode/
+#openspec/

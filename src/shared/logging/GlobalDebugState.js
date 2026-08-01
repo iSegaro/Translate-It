@@ -54,6 +54,10 @@ export function setGlobalDebugOverride(value) {
   globalState.sharedLogLevelCache.clear();
 }
 
+export function isGlobalDebugModeEnabled() {
+  return globalState.debugOverride;
+}
+
 export function getGlobalLogLevel() {
   return globalState.globalLogLevel;
 }

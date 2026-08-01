@@ -1,0 +1,180 @@
+import { onBeforeUnmount, reactive, ref, watch } from 'vue'
+import { getScopedLogger } from '@/shared/logging/logger.js'
+import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js'
+import { useSettingsStore } from '@/features/settings/stores/settings.js'
+import { pdfDocumentSession } from '@/features/pdf-translation/core/PdfDocumentSession.js'
+import { PdfOcrRecommendationEngine } from '@/features/pdf-translation/core/PdfOcrRecommendationEngine.js'
+import { PdfOcrProcessor } from '@/features/pdf-translation/core/PdfOcrProcessor.js'
+import { pdfCacheManager } from '@/features/pdf-translation/core/PdfCacheManager.js'
+import { OCR_ENGINE_VERSION } from '@/features/pdf-translation/core/PdfOcrCompatibility.js'
+import { mapOcrError } from '@/features/ocr/errors/ocrErrorMapper.js'
+
+const logger = getScopedLogger(LOG_COMPONENTS.PDF, 'usePdfOcr')
+
+function getBatchOcrError(results) {
+  const failedPages = results.filter(result => !result.success)
+  if (!failedPages.length) return null
+
+  const errorCodes = failedPages.map(({ error }) => mapOcrError(error instanceof Error ? error : { message: error }))
+  if (errorCodes.every(errorCode => errorCode === 'cancelled')) return 'cancelled'
+  if (errorCodes.includes('model-not-installed')) return 'model-not-installed'
+  return 'ocr-failed'
+}
+
+export function usePdfOcr({ onOcrComplete, onOcrStart, onOcrProgress, onOcrError } = {}) {
+  const recommendationEngine = new PdfOcrRecommendationEngine()
+  const processor = new PdfOcrProcessor(pdfDocumentSession)
+  const settingsStore = useSettingsStore()
+
+  const ocrRecommendationCount = ref(0)
+  const ocrRecommendations = ref([])
+  const ocrBatch = reactive({ pageNumbers: [] })
+  const isOcrProcessing = ref(false)
+  const ocrError = ref('')
+  const ocrLanguage = ref('eng')
+  let activeRunId = 0
+
+  function getCurrentOcrLanguage() {
+    return settingsStore.settings.OCR_DEFAULT_LANG || 'eng'
+  }
+
+  function refreshOcrRecommendations() {
+    const candidates = pdfDocumentSession.getLoadedVisibleOcrCandidates()
+    const recommendations = recommendationEngine.getRecommendations(candidates, getCurrentOcrLanguage())
+
+    ocrRecommendationCount.value = recommendations.length
+    ocrRecommendations.value = recommendations
+  }
+
+  function requestOcr() {
+    if (ocrRecommendationCount.value === 0) return
+
+    ocrError.value = ''
+    ocrBatch.pageNumbers = [...ocrRecommendations.value]
+    return confirmOcr()
+  }
+
+  async function confirmOcr() {
+    if (isOcrProcessing.value) return
+
+    const runId = ++activeRunId
+    isOcrProcessing.value = true
+    ocrError.value = ''
+    let pageNumbers = []
+    let batchErrorCode = null
+    let terminalResult = null
+
+    onOcrStart?.()
+
+    try {
+      ocrLanguage.value = getCurrentOcrLanguage()
+
+      pageNumbers = [...ocrBatch.pageNumbers]
+
+      const results = await processor.processPages(pageNumbers, {
+        language: ocrLanguage.value,
+        onProgress: ({ current, total, pageNumber }) => {
+          if (runId !== activeRunId) return
+          onOcrProgress?.({ current, total, pageNumber })
+        }
+      })
+
+      if (runId !== activeRunId) return
+
+      batchErrorCode = getBatchOcrError(results)
+      if (batchErrorCode && batchErrorCode !== 'cancelled') {
+        ocrError.value = batchErrorCode
+      }
+
+      await saveOcrToCache(pageNumbers)
+
+      refreshOcrRecommendations()
+      if (batchErrorCode && batchErrorCode !== 'cancelled') {
+        terminalResult = { type: 'error', errorCode: batchErrorCode, pageNumbers }
+      } else {
+        terminalResult = { type: 'complete', pageNumbers }
+      }
+
+      logger.info('OCR completed for pages:', { pageNumbers, language: ocrLanguage.value })
+    } catch (error) {
+      logger.error('OCR process failed:', error)
+      const errorCode = batchErrorCode || mapOcrError(error)
+      if (errorCode !== 'cancelled') {
+        ocrError.value = errorCode
+        terminalResult = {
+          type: 'error',
+          errorCode,
+          pageNumbers: batchErrorCode ? pageNumbers : undefined
+        }
+      }
+    } finally {
+      if (runId === activeRunId) isOcrProcessing.value = false
+    }
+
+    if (runId !== activeRunId) return
+
+    if (terminalResult?.type === 'error') {
+      onOcrError?.(terminalResult.errorCode, { pageNumbers: terminalResult.pageNumbers })
+      return
+    }
+
+    if (terminalResult?.type === 'complete') {
+      onOcrComplete?.({ pageNumbers: terminalResult.pageNumbers })
+    }
+  }
+
+  function cancelOcr() {
+    activeRunId++
+    processor.cancel()
+    isOcrProcessing.value = false
+  }
+
+  async function saveOcrToCache(pageNumbers) {
+    const documentIdentity = pdfDocumentSession.documentIdentity
+    if (!documentIdentity) return
+
+    for (const pageNumber of pageNumbers) {
+      const ocrState = pdfDocumentSession.getCommittedOcrState(pageNumber)
+      if (ocrState?.ocrBlocks.length > 0) {
+        await pdfCacheManager.saveOcr(documentIdentity, pageNumber, {
+          pageNumber,
+          ocrLanguage: ocrState.ocrLanguage || ocrLanguage.value,
+          ocrBlocks: ocrState.ocrBlocks,
+          ocrCompletedAt: ocrState.ocrCompletedAt || Date.now(),
+          ocrEngineVersion: OCR_ENGINE_VERSION
+        })
+      }
+    }
+  }
+
+  const unsubscribePageSessionCommitted = pdfDocumentSession.onPageSessionCommitted?.(() => {
+    refreshOcrRecommendations()
+  })
+
+  const unsubscribeVisiblePagesChanged = pdfDocumentSession.onVisiblePagesChanged?.(() => {
+    refreshOcrRecommendations()
+  })
+
+  watch(() => settingsStore.settings.OCR_DEFAULT_LANG, () => {
+    refreshOcrRecommendations()
+  })
+
+  onBeforeUnmount(() => {
+    unsubscribePageSessionCommitted?.()
+    unsubscribeVisiblePagesChanged?.()
+    processor.cancel()
+  })
+
+  return {
+    ocrRecommendationCount,
+    ocrRecommendations,
+    ocrBatch,
+    isOcrProcessing,
+    ocrError,
+    ocrLanguage,
+    refreshOcrRecommendations,
+    requestOcr,
+    confirmOcr,
+    cancelOcr
+  }
+}

@@ -18,10 +18,20 @@
   --error-bg: var(--color-error-bg);
   --error-border: var(--color-error);
   --error-text: var(--color-error-text);
-  
+  --warning-bg: var(--color-warning-bg);
+  --warning-border: var(--color-warning);
+  --warning-text: var(--color-warning-text);
+
   // Custom font from extension variables
   --font-sans: #{$font-family-base};
   --font-mono: monospace;
+}
+
+// Adaptive toast width.
+[data-sonner-toast][data-styled='true'] {
+  width: fit-content;
+  min-width: 280px;
+  max-width: 320px;
 }
 
 // Scoped toast styles for better layout control
@@ -30,11 +40,10 @@
   font-family: var(--font-sans);
   font-size: $font-size-base;
   
-  // Custom shadow and rounded corners
-  box-shadow: $shadow-md;
-  border-radius: $border-radius-base;
-  border-width: $border-width;
-  border-style: $border-style;
+  // Custom toast surface styling
+  box-shadow: 0 4px 12px rgb(0 0 0 / 10%);
+  border: none;
+  border-radius: 8px;
   
   // Responsive padding
   padding: $spacing-sm $spacing-base;

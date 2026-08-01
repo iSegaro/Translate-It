@@ -387,6 +387,9 @@ onUnmounted(() => {
 </script>
 
 <style lang="scss">
+@use '../../assets/styles/base/brand-tokens' as *;
+@use '../../assets/styles/base/mixins' as *;
+
 :root {
   --primary-color: #6366f1;
   --primary-glow: rgba(99, 102, 241, 0.15);
@@ -400,8 +403,10 @@ onUnmounted(() => {
   --text-primary: #0f172a;
   --text-secondary: #64748b;
   --bg-header: rgba(248, 250, 252, 0.8);
-  --logo-text-gradient-start: #0f172a;
-  --logo-text-gradient-end: #475569;
+  @include css-properties('logo-text-gradient', (
+    'start': $brand-title-gradient-light-start,
+    'end': $brand-title-gradient-light-end
+  ));
   --btn-secondary-bg: rgba(0, 0, 0, 0.03);
   --btn-secondary-bg-hover: rgba(0, 0, 0, 0.06);
   --bg-glass: rgba(0, 0, 0, 0.02);
@@ -417,8 +422,10 @@ onUnmounted(() => {
   --text-primary: #f8fafc;
   --text-secondary: #94a3b8;
   --bg-header: rgba(15, 23, 42, 0.8);
-  --logo-text-gradient-start: #ffffff;
-  --logo-text-gradient-end: #94a3b8;
+  @include css-properties('logo-text-gradient', (
+    'start': $brand-title-gradient-dark-start,
+    'end': $brand-title-gradient-dark-end
+  ));
   --btn-secondary-bg: rgba(255, 255, 255, 0.05);
   --btn-secondary-bg-hover: rgba(255, 255, 255, 0.1);
   --bg-glass: rgba(255, 255, 255, 0.03);

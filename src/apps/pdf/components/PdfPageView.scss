@@ -1,0 +1,113 @@
+/* PdfPageView.scss */
+/* stylelint-disable selector-class-pattern, property-no-vendor-prefix -- PDF.js text-layer classes and browser properties must match the upstream selection contract. */
+
+.pdf-page {
+  position: relative;
+  margin: 0 auto;
+  border-radius: 2px;
+  padding: 16px;
+  box-sizing: content-box;
+  background: #ffffff;
+  box-shadow: 0 1px 6px rgba(0, 0, 0, 0.35);
+  color: #11161d;
+}
+
+.pdf-page__label {
+  margin-bottom: 12px;
+  font-size: 13px;
+  line-height: 16px;
+  font-weight: 700;
+  color: rgba(60, 64, 67, 0.82);
+}
+
+.pdf-page__stage {
+  position: relative;
+  display: grid;
+  overflow: hidden;
+}
+
+.pdf-page__stage canvas,
+.pdf-page__text-layer {
+  grid-area: 1 / 1;
+}
+
+.pdf-region-selection-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 10;
+  cursor: crosshair;
+  touch-action: none;
+  user-select: none;
+}
+
+.pdf-region-selection-overlay__rect {
+  position: absolute;
+  box-sizing: border-box;
+  border: 1px solid #1a73e8;
+  background: rgba(26, 115, 232, 0.16);
+  pointer-events: none;
+}
+
+.pdf-page__stage canvas {
+  display: block;
+}
+
+.pdf-page__text-layer {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  transform-origin: 0 0;
+}
+
+.pdf-page__text-layer .textLayer {
+  position: absolute;
+  text-align: initial;
+  inset: 0;
+  overflow: clip;
+  line-height: 1;
+  letter-spacing: normal;
+  word-spacing: normal;
+  -webkit-text-size-adjust: none;
+  text-size-adjust: none;
+  transform-origin: 0 0;
+  caret-color: CanvasText;
+  z-index: 0;
+
+  span {
+    color: transparent;
+    position: absolute;
+    white-space: pre;
+    cursor: text;
+    transform-origin: 0% 0%;
+    -webkit-user-select: text;
+    user-select: text;
+
+    --font-height: 0;
+
+    font-size: calc(var(--total-scale-factor, 1) * var(--font-height));
+
+    --rotate: 0deg;
+
+    transform: rotate(var(--rotate));
+
+    &::selection {
+      background: rgba(51, 144, 255, 0.30);
+      color: transparent;
+    }
+  }
+
+  .endOfContent {
+    display: block;
+    position: absolute;
+    inset: 100% 0 0;
+    z-index: 0;
+    cursor: default;
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    user-select: none;
+  }
+
+  &.selecting .endOfContent {
+    top: 0;
+  }
+}

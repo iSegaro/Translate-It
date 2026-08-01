@@ -61,10 +61,8 @@ const { applyGlobalCSSVariables } = useGlobalFont()
 
 // Language preloading utility
 const usePreloadLanguages = async () => {
-  const { useLanguages } = await import('@/composables/shared/useLanguages.js')
-  const { loadLanguages } = useLanguages()
-  // Preload languages in parallel with other initialization tasks
-  return loadLanguages()
+  const { preloadLanguages } = await import('@/composables/shared/useLanguages.js')
+  return preloadLanguages()
 }
 
 

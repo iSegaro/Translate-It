@@ -1,0 +1,43 @@
+import { describe, expect, it } from 'vitest'
+import { createPdfRegion } from '@/features/pdf-translation/core/PdfRegion.js'
+import { RegionComparisonArtifactWriter } from './RegionComparisonArtifactWriter.js'
+
+describe('RegionComparisonArtifactWriter', () => {
+  it('writes an immutable deterministic artifact in execution order', () => {
+    const evaluation = Object.freeze({ cer: Object.freeze({ characterErrorRate: 0.2 }) })
+    const first = Object.freeze({ candidateId: 'scale-1', evaluation, runtimeLanguage: 'fas' })
+    const second = Object.freeze({ candidateId: 'scale-1.5', runtimeLanguage: 'fas' })
+    const sessionResult = Object.freeze({
+      summary: Object.freeze({ totalCandidates: 2, completedCandidates: 2, startedAt: 100, completedAt: 120, totalElapsedMs: 20 }),
+      candidates: Object.freeze([
+        Object.freeze({ candidateId: 'scale-1', configuration: Object.freeze({ scale: 1 }) }),
+        Object.freeze({ candidateId: 'scale-1.5', configuration: Object.freeze({ scale: 1.5 }) })
+      ]),
+      results: Object.freeze([first, second])
+    })
+    const writer = new RegionComparisonArtifactWriter({ clock: () => '2026-07-19T00:00:00.000Z' })
+
+    const region = createPdfRegion({ pageNumber: 1, left: 1, top: 4, right: 3, bottom: 2 })
+    const artifact = writer.write(sessionResult, { region })
+    const repeatedArtifact = writer.write(sessionResult, { region })
+
+    expect(artifact).toEqual({
+      schemaVersion: '1.0.0',
+      artifactType: 'region-comparison',
+      generatedAt: '2026-07-19T00:00:00.000Z',
+      metadata: { startedAt: 100, completedAt: 120, totalElapsedMs: 20, pageNumber: 1, region },
+      summary: sessionResult.summary,
+      configurations: [
+        { candidateId: 'scale-1', configuration: { scale: 1 } },
+        { candidateId: 'scale-1.5', configuration: { scale: 1.5 } }
+      ],
+      results: [first, second]
+    })
+    expect(artifact.results[0].evaluation).toBe(evaluation)
+    expect(repeatedArtifact).toEqual(artifact)
+    expect(Object.isFrozen(artifact)).toBe(true)
+    expect(Object.isFrozen(artifact.configurations)).toBe(true)
+    expect(Object.isFrozen(artifact.configurations[0])).toBe(true)
+    expect(Object.isFrozen(artifact.results)).toBe(true)
+  })
+})

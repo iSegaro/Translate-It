@@ -24,14 +24,17 @@ import ResourceTracker from '@/core/memory/ResourceTracker.js';
 import { storageManager } from '@/shared/storage/core/StorageCore.js';
 import ExtensionContextManager from '@/core/extensionContext.js';
 import { tabPermissionChecker } from '@/core/tabPermissions.js';
+import { openExtensionApp } from '@/core/ExtensionAppLauncher.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.CORE, 'context-menu');
 
 // --- Constants for Menu Item IDs ---
 const PAGE_CONTEXT_MENU_ID = "translate-with-select-element";
+const PAGE_CONTEXT_PDF_ID = "open-pdf-with-link";
 const ACTION_TRANSLATE_ELEMENT_ID = "action-translate-element";
 const SCREEN_CAPTURE_MENU_ID = "screen-capture";
 const ACTION_CONTEXT_MENU_OPTIONS_ID = "open-options-page";
+const ACTION_CONTEXT_MENU_PDF_ID = "open-pdf-page";
 const ACTION_CONTEXT_MENU_SUBTITLE_ID = "open-subtitle-page";
 const ACTION_CONTEXT_MENU_SHORTCUTS_ID = "open-shortcuts-page";
 const HELP_MENU_ID = "open-help-page";
@@ -228,7 +231,7 @@ async function focusOrCreateTab(url) {
   try {
     const backgroundService = globalThis.backgroundService;
     if (backgroundService && backgroundService.messageHandler) {
-      const handler = backgroundService.messageHandler.getHandlerForMessage(MessageActions.FOCUS_OR_CREATE_TAB);
+      const handler = backgroundService.messageHandler.getHandlerForMessage(MessageActions.LAUNCH_EXTENSION_APP);
       if (handler) {
         // Extract just the relative path (e.g. "src/html/subtitle.html")
         let urlPath = "";
@@ -239,7 +242,7 @@ async function focusOrCreateTab(url) {
         }
         
         await handler({
-          action: MessageActions.FOCUS_OR_CREATE_TAB,
+          action: MessageActions.LAUNCH_EXTENSION_APP,
           data: { urlPath }
         }, { tab: null }, () => {});
         return;
@@ -256,7 +259,7 @@ async function focusOrCreateTab(url) {
     }
     
     await browser.runtime.sendMessage({
-      action: MessageActions.FOCUS_OR_CREATE_TAB,
+      action: MessageActions.LAUNCH_EXTENSION_APP,
       data: { urlPath }
     });
   } catch (error) {
@@ -437,6 +440,16 @@ export class ContextMenuManager extends ResourceTracker {
         }
       }
 
+      // --- 1.5. Create Page Context Menu (Open in PDF Translator) ---
+      if (visibility.PAGE_CONTEXT_PDF_TRANSLATOR !== false) {
+        await this.createMenu({
+          id: PAGE_CONTEXT_PDF_ID,
+          title: (await getTranslationString("pdf_app_title", locale)) || "PDF Translator",
+          contexts: ["link"],
+          targetUrlPatterns: ["*://*/*.pdf", "*://*/*.PDF"],
+        });
+      }
+
       // --- 2. Create Action (Browser Action) Context Menus ---
       try {
         logger.debug("[ContextMenuManager] Creating Action (Browser Action) menus...");
@@ -534,12 +547,23 @@ export class ContextMenuManager extends ResourceTracker {
           }
         }
 
+        // --- 2.3.4 PDF Menu (Before Subtitle) ---
+        if (visibility.ACTION_CONTEXT_PDF_TRANSLATOR !== false) {
+          await this.createMenu({
+            id: ACTION_CONTEXT_MENU_PDF_ID,
+            title: (await getTranslationString("pdf_app_title", locale)) || "PDF Translator",
+            contexts: ["action"],
+          });
+        }
+
         // --- 2.3.5 Subtitle Menu (Before Options) ---
-        await this.createMenu({
-          id: ACTION_CONTEXT_MENU_SUBTITLE_ID,
-          title: (await getTranslationString("subtitle_app_title", locale)) || "Subtitle Translator",
-          contexts: ["action"],
-        });
+        if (visibility.ACTION_CONTEXT_SUBTITLE_TRANSLATOR !== false) {
+          await this.createMenu({
+            id: ACTION_CONTEXT_MENU_SUBTITLE_ID,
+            title: (await getTranslationString("subtitle_app_title", locale)) || "Subtitle Translator",
+            contexts: ["action"],
+          });
+        }
 
         // --- 2.4. Options Menu (Fourth option in Action menu) ---
         if (visibility.ACTION_CONTEXT_OPTIONS) {
@@ -765,6 +789,7 @@ export class ContextMenuManager extends ResourceTracker {
         API_PROVIDER_ITEM_ID_PREFIX
       );
       const isStaticActionClick = [
+        ACTION_CONTEXT_MENU_PDF_ID,
         ACTION_CONTEXT_MENU_SUBTITLE_ID,
         ACTION_CONTEXT_MENU_OPTIONS_ID,
         ACTION_CONTEXT_MENU_SHORTCUTS_ID,
@@ -795,6 +820,14 @@ export class ContextMenuManager extends ResourceTracker {
         case PAGE_CONTEXT_MENU_ID:
           await this._activateSelectElement(tab);
           break;
+
+        case PAGE_CONTEXT_PDF_ID: {
+          const linkUrl = info.linkUrl;
+          if (linkUrl) {
+            await openExtensionApp('pdf', { remoteUrl: linkUrl });
+          }
+          break;
+        }
 
         case `${SCREEN_CAPTURE_MENU_ID}-page`:
         case `${SCREEN_CAPTURE_MENU_ID}-action`:
@@ -832,8 +865,12 @@ export class ContextMenuManager extends ResourceTracker {
           break;
         }
 
+        case ACTION_CONTEXT_MENU_PDF_ID:
+          await openExtensionApp('pdf');
+          break;
+
         case ACTION_CONTEXT_MENU_SUBTITLE_ID:
-          await focusOrCreateTab(browser.runtime.getURL("src/html/subtitle.html"));
+          await openExtensionApp('subtitle');
           break;
 
         case ACTION_CONTEXT_MENU_OPTIONS_ID:

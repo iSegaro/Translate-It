@@ -12,6 +12,7 @@ import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { configureVueForCSP } from '@/shared/vue/vue-utils.js';
 import { UI_LOCALE_TO_CODE_MAP } from '@/shared/config/languageConstants.js';
+import useSettingsStore from '@/features/settings/stores/settings.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.UI, 'options');
 
@@ -22,6 +23,7 @@ const AppearanceTab = () => import('@/apps/options/tabs/AppearanceTab.vue')
 const ActivationTab = () => import('@/apps/options/tabs/ActivationTab.vue')
 const TTSTab = () => import('@/apps/options/tabs/TTSTab.vue')
 const OCRTab = () => import('@/apps/options/tabs/OCRTab.vue')
+const PdfTab = () => import('@/apps/options/tabs/PdfTab.vue')
 const PromptTab = () => import('@/apps/options/tabs/PromptTab.vue')
 const ImportExportTab = () => import('@/apps/options/tabs/ImportExportTab.vue')
 const AdvanceTab = () => import('@/apps/options/tabs/AdvanceTab.vue')
@@ -91,7 +93,7 @@ async function initializeApp() {
           logger.debug(`Detected hash #${hash}, redirecting to help tab`);
         } else if (hash && hash !== '') {
           // Use the hash path if it's valid
-          const validRoutes = ['languages', 'providers', 'appearance', 'activation', 'tts', 'ocr', 'prompt', 'import-export', 'advance', 'about', 'help'];
+          const validRoutes = ['languages', 'providers', 'appearance', 'activation', 'tts', 'ocr', 'pdf', 'prompt', 'import-export', 'advance', 'about', 'help'];
           if (validRoutes.includes(hash)) {
             initialRoute = `/${hash}`;
             logger.debug(`Detected hash #${hash}, redirecting to ${initialRoute} tab`);
@@ -116,7 +118,7 @@ async function initializeApp() {
             return initialRoute;
           }
           // If current hash matches a valid route, use it instead
-          const validRoutes = ['languages', 'providers', 'appearance', 'activation', 'tts', 'ocr', 'prompt', 'import-export', 'advance', 'about', 'help'];
+          const validRoutes = ['languages', 'providers', 'appearance', 'activation', 'tts', 'ocr', 'pdf', 'prompt', 'import-export', 'advance', 'about', 'help'];
           if (validRoutes.includes(currentHash)) {
             logger.debug(`Root redirect: current hash #${currentHash} is valid, using it`);
             return `/${currentHash}`;
@@ -129,6 +131,7 @@ async function initializeApp() {
         { path: '/activation', component: ActivationTab, name: 'activation' },
         { path: '/tts', component: TTSTab, name: 'tts' },
         { path: '/ocr', component: OCRTab, name: 'ocr' },
+        { path: '/pdf', component: PdfTab, name: 'pdf' },
         { path: '/prompt', component: PromptTab, name: 'prompt' },
         { path: '/appearance', component: AppearanceTab, name: 'appearance' },
         { path: '/advance', component: AdvanceTab, name: 'advance' },
@@ -248,6 +251,11 @@ async function initializeApp() {
 
 // Initialize the app
 initializeApp()
+
+window.addEventListener('beforeunload', () => {
+  const store = useSettingsStore()
+  store.cleanupStoreResources()
+})
 
 // Fallback mechanism for debugging
 setTimeout(() => {

@@ -25,6 +25,59 @@ import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 const logger = getScopedLogger(LOG_COMPONENTS.CONFIG, 'SettingsMigrations');
 
 /**
+ * Determine whether a value is a plain object.
+ *
+ * Only plain objects are candidates for recursive nested migration. Arrays,
+ * RegExp, Date, Map, Set, functions, null and primitives are treated as
+ * leaves and are never merged into.
+ */
+function isPlainObject(value) {
+  if (value === null || typeof value !== 'object') return false;
+  const prototype = Object.getPrototypeOf(value);
+  return prototype === Object.prototype || prototype === null;
+}
+
+/**
+ * Add-only deep merge of nested default members into a persisted object.
+ *
+ * Returns a complete merged object when at least one member of `defaultValue`
+ * is missing from `storedValue`, otherwise `null`.
+ *
+ * Semantics:
+ * - Existing persisted members are never overwritten (add-only).
+ * - Recursion descends only when BOTH values are plain objects.
+ * - Cross-type values are never replaced or recursed into.
+ * - Arrays, RegExp and other non-plain values are leaves.
+ * - `false`, `0`, empty strings and null-like user values are preserved.
+ * - Neither input is mutated.
+ */
+export function mergeMissingNestedMembers(storedValue, defaultValue) {
+  if (!isPlainObject(storedValue) || !isPlainObject(defaultValue)) return null;
+
+  const merged = {};
+  let changed = false;
+
+  Object.keys(storedValue).forEach(key => {
+    merged[key] = storedValue[key];
+  });
+
+  Object.keys(defaultValue).forEach(key => {
+    if (!Object.prototype.hasOwnProperty.call(storedValue, key)) {
+      merged[key] = defaultValue[key];
+      changed = true;
+    } else {
+      const nested = mergeMissingNestedMembers(storedValue[key], defaultValue[key]);
+      if (nested !== null) {
+        merged[key] = nested;
+        changed = true;
+      }
+    }
+  });
+
+  return changed ? merged : null;
+}
+
+/**
  * Migrate MODE_PROVIDERS keys from old format (underscore) to new format (hyphenated/MessageContexts)
  */
 function migrateModeProviderKeys(currentSettings, updates, migrationLog) {
@@ -171,6 +224,16 @@ function runMainMigration(currentSettings) {
     if (!(key in currentSettings)) {
       updates[key] = CONFIG[key];
       migrationLog.push(`Added missing setting: ${key}`);
+    } else if (!(key in updates)) {
+      // Backfill missing nested members for existing settings. The merge
+      // helper is the single owner of mergeability validation (plain object,
+      // cross-type, leaf values) and returns null when not applicable.
+      // Skips keys already updated by earlier passes (e.g. MODE_PROVIDERS/BILINGUAL remaps).
+      const merged = mergeMissingNestedMembers(currentSettings[key], CONFIG[key]);
+      if (merged !== null) {
+        updates[key] = merged;
+        migrationLog.push(`Added missing nested members for ${key}`);
+      }
     }
   });
 

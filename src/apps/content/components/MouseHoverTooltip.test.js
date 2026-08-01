@@ -88,18 +88,9 @@ describe('MouseHoverTooltip', () => {
     const wrapper = mount(MouseHoverTooltip);
     wrapper.vm.isVisible = true;
     
-    // Mock getBoundingClientRect for tooltipRef
-    // We need to wait for it to exist
     await wrapper.vm.$nextTick();
-    
-    Object.defineProperty(wrapper.vm, 'tooltipRef', {
-      value: {
-        getBoundingClientRect: () => ({
-          width: 200,
-          height: 100
-        })
-      }
-    });
+    const tooltip = wrapper.find('.ti-mouse-hover-tooltip');
+    vi.spyOn(tooltip.element, 'getBoundingClientRect').mockReturnValue({ width: 200, height: 100 });
 
     window.innerHeight = 1000;
     wrapper.vm.calculatePosition({ x: 500, y: 500 });
@@ -112,15 +103,8 @@ describe('MouseHoverTooltip', () => {
     wrapper.vm.isVisible = true;
     
     await wrapper.vm.$nextTick();
-    
-    Object.defineProperty(wrapper.vm, 'tooltipRef', {
-      value: {
-        getBoundingClientRect: () => ({
-          width: 200,
-          height: 100
-        })
-      }
-    });
+    const tooltip = wrapper.find('.ti-mouse-hover-tooltip');
+    vi.spyOn(tooltip.element, 'getBoundingClientRect').mockReturnValue({ width: 200, height: 100 });
 
     window.innerHeight = 1000;
     wrapper.vm.calculatePosition({ x: 500, y: 5 }); // Very close to top

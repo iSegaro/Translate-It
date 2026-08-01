@@ -284,6 +284,18 @@
   "ocr_tab_title": {
     "message": "تشخیص متن (OCR)"
   },
+  "ocr_page": {
+    "message": "OCR صفحه"
+  },
+  "ocr_page_compact": {
+    "message": "صفحه"
+  },
+  "ocr_region": {
+    "message": "OCR ناحیه"
+  },
+  "ocr_region_compact": {
+    "message": "ناحیه"
+  },
   "ocr_toggle_section_title": {
     "message": "تنظیمات تشخیص متن"
   },
@@ -1431,7 +1443,7 @@
     "message": "ترجمه"
   },
   "popup_stop_button_title": {
-    "message": "توقف ترجمه"
+    "message": "توقف"
   },
   "popup_exclude_toggle_title": {
     "message": "فعال/غیرفعال کردن در این سایت"
@@ -2228,6 +2240,21 @@
   "window_close": {
     "message": "بستن"
   },
+  "pdf_windows_host_aria_label": {
+    "message": "پنجره ترجمه PDF"
+  },
+  "pdf_windows_host_selected_text": {
+    "message": "متن انتخاب‌شده"
+  },
+  "pdf_windows_host_detected_language": {
+    "message": "زبان تشخیص‌داده‌شده"
+  },
+  "pdf_windows_host_copied": {
+    "message": "کپی شد"
+  },
+  "pdf_windows_host_copy_failed": {
+    "message": "کپی ناموفق بود"
+  },
   "window_tts_no_text": {
     "message": "متنی برای خواندن موجود نیست"
   },
@@ -2701,6 +2728,36 @@
   },
   "subtitle_app_title": {
     "message": "مترجم زیرنویس"
+  },
+  "pdf_app_title": {
+    "message": "مترجم PDF"
+  },
+  "pdf_tab_title": {
+    "message": "PDF"
+  },
+  "pdf_tab_desc": {
+    "message": "مدیریت تنظیمات مربوط به PDF."
+  },
+  "pdf_context_menu_section_title": {
+    "message": "منوی زمینه"
+  },
+  "pdf_context_menu_label": {
+    "message": "نمایش «مترجم PDF» در منوی زمینه مرورگر"
+  },
+  "pdf_context_menu_desc": {
+    "message": "نمایش گزینه «مترجم PDF» در منوی کلیک‌راست مرورگر برای لینک‌های PDF."
+  },
+  "pdf_action_context_menu_label": {
+    "message": "نمایش «مترجم PDF» در منوی آیکون افزونه"
+  },
+  "pdf_action_context_menu_desc": {
+    "message": "نمایش میانبر «مترجم PDF» در منوی نوار ابزار افزونه."
+  },
+  "subtitle_action_context_menu_label": {
+    "message": "نمایش «مترجم زیرنویس» در منوی آیکون افزونه"
+  },
+  "subtitle_action_context_menu_desc": {
+    "message": "نمایش میانبر «مترجم زیرنویس» در منوی نوار ابزار افزونه."
   },
   "subtitle_app_powered_by": {
     "message": "قدرت گرفته از Translate It"

@@ -66,7 +66,7 @@ const OPERATION_TIMEOUTS = {
 };
 
 function getTimeoutForAction(action, context = null) {
-  if (action === 'TRANSLATE' && (context === 'select-element' || (typeof context === 'object' && context !== null && context.mode === 'select_element'))) {
+  if (action === 'TRANSLATE' && (context === 'select-element' || context === 'pdf-translation' || context === 'pdf-viewer' || (typeof context === 'object' && context !== null && (context.mode === 'select_element' || context.mode === 'pdf-translation')))) {
     return 300000; 
   }
   
@@ -241,6 +241,13 @@ export async function sendRegularMessage(message, options = {}) {
     return response;
   } catch (error) {
     const errorType = matchErrorToType(error);
+
+    if (errorType === ErrorTypes.OPERATION_TIMEOUT && message.messageId && isTranslationAction(message.action)) {
+      void browser.runtime.sendMessage({
+        action: 'CANCEL_TRANSLATION',
+        data: { messageId: message.messageId, reason: 'Translation timed out', timeout: true }
+      }).catch(() => {});
+    }
 
     if (!silent) {
       const errorMsg = (error && typeof error.message === 'string') ? error.message : 'No message';

@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia'
-import { ref, computed, watch, onUnmounted, getCurrentInstance } from 'vue'
+import { ref, computed, watch } from 'vue'
 import browser from 'webextension-polyfill'
 import { CONFIG, TranslationMode, SelectionTranslationMode } from '@/shared/config/config.js'
 import { MOBILE_CONSTANTS } from '@/shared/constants/mobile.js'
@@ -24,17 +24,7 @@ function getDefaultSettings() {
     EXTENSION_ENABLED: CONFIG.EXTENSION_ENABLED ?? true,
     ENABLE_TRANSLATION_HISTORY: CONFIG.ENABLE_TRANSLATION_HISTORY ?? true,
     TRANSLATION_API: CONFIG.TRANSLATION_API || ProviderRegistryIds.GOOGLE_V2,
-    MODE_PROVIDERS: CONFIG.MODE_PROVIDERS || {
-      [TranslationMode.Field]: null,
-      [TranslationMode.Select_Element]: null,
-      [TranslationMode.Selection]: null,
-      [TranslationMode.Page]: null,
-      [TranslationMode.Dictionary_Translation]: null,
-      [TranslationMode.Popup_Translate]: null,
-      [TranslationMode.Sidepanel_Translate]: null,
-      [TranslationMode.ScreenCapture]: null,
-      [TranslationMode.MouseHover]: null
-    },
+    MODE_PROVIDERS: CONFIG.MODE_PROVIDERS,
     SOURCE_LANGUAGE: CONFIG.SOURCE_LANGUAGE || 'auto',
     TARGET_LANGUAGE: CONFIG.TARGET_LANGUAGE || 'en',
     LANGUAGE_DETECTION_PREFERENCES: CONFIG.LANGUAGE_DETECTION_PREFERENCES || {
@@ -124,6 +114,7 @@ function getDefaultSettings() {
     ENABLE_DICTIONARY: CONFIG.ENABLE_DICTIONARY ?? true,
     ENABLE_SCREEN_CAPTURE: CONFIG.ENABLE_SCREEN_CAPTURE ?? true,
     OCR_DEFAULT_LANG: CONFIG.OCR_DEFAULT_LANG || 'eng',
+    OCR_PREFERRED_ACTION: CONFIG.OCR_PREFERRED_ACTION || 'region',
     ACTIVE_SELECTION_ICON_ON_TEXTFIELDS: CONFIG.ACTIVE_SELECTION_ICON_ON_TEXTFIELDS ?? true,
     ENHANCED_TRIPLE_CLICK_DRAG: CONFIG.ENHANCED_TRIPLE_CLICK_DRAG ?? false,
     // Dictionary Display Settings
@@ -184,6 +175,7 @@ function getDefaultSettings() {
       [TranslationMode.Field]: true,
       [TranslationMode.Selection]: true,
       [TranslationMode.Page]: false,
+      [TranslationMode.PDF]: false,
       [TranslationMode.Dictionary_Translation]: true,
       [TranslationMode.ScreenCapture]: true,
       [TranslationMode.MouseHover]: true
@@ -191,8 +183,11 @@ function getDefaultSettings() {
     CONTEXT_MENU_VISIBILITY: CONFIG.CONTEXT_MENU_VISIBILITY || {
       PAGE_CONTEXT_SELECT_ELEMENT: true,
       PAGE_CONTEXT_SCREEN_CAPTURE: true,
+      PAGE_CONTEXT_PDF_TRANSLATOR: true,
       ACTION_CONTEXT_SELECT_ELEMENT: true,
       ACTION_CONTEXT_SCREEN_CAPTURE: true,
+      ACTION_CONTEXT_PDF_TRANSLATOR: true,
+      ACTION_CONTEXT_SUBTITLE_TRANSLATOR: true,
       ACTION_CONTEXT_OPTIONS: true,
       ACTION_CONTEXT_SHORTCUTS: true,
       ACTION_CONTEXT_HELP: true
@@ -266,10 +261,10 @@ export const useSettingsStore = defineStore('settings', () => {
     // 3. Validation
     const provider = findProviderById(resolvedId);
     const needsBulk = [
-      TranslationMode.Page, 
-      TranslationMode.Select_Element, 
-      TranslationMode.Field,
-      TranslationMode.MouseHover
+      TranslationMode.Page,
+      TranslationMode.PDF,
+      TranslationMode.Select_Element,
+      TranslationMode.Field
     ].includes(mode);
 
     if (needsBulk && provider && !provider.features?.includes('bulk')) {
@@ -579,10 +574,6 @@ export const useSettingsStore = defineStore('settings', () => {
 
       logger.info('[Import] Completed');
 
-      // Reload page to apply new settings
-      if (typeof window !== 'undefined') {
-        window.location.reload();
-      }
       return true;
     } catch (error) {
       if (ExtensionContextManager.isContextError(error)) {
@@ -600,6 +591,14 @@ export const useSettingsStore = defineStore('settings', () => {
     return settings.value[key] !== undefined ? settings.value[key] : defaultValue
   }
   
+  const reconcileOcrLanguage = async (downloadedLanguages) => {
+    const current = settings.value['OCR_DEFAULT_LANG'] || 'eng'
+    if (downloadedLanguages.includes(current)) return
+
+    const next = downloadedLanguages.length > 0 ? downloadedLanguages[0] : 'eng'
+    await updateSettingAndPersist('OCR_DEFAULT_LANG', next)
+  }
+
   const validateSettings = () => {
     const errors = []
     
@@ -894,19 +893,14 @@ export const useSettingsStore = defineStore('settings', () => {
     logger.error('Failed to initialize settings store:', error)
   })
 
-  // Cleanup listener on store destruction - only if we're in a component context
-  const instance = getCurrentInstance()
-  if (instance) {
-    onUnmounted(() => {
-      cleanupStorageListener()
-      if (removeSystemThemeListener) {
-        removeSystemThemeListener();
-        removeSystemThemeListener = null;
-        systemThemeMediaQuery = null;
-      }
-    })
+  const cleanupStoreResources = () => {
+    cleanupStorageListener()
+    if (removeSystemThemeListener) {
+      removeSystemThemeListener();
+      removeSystemThemeListener = null;
+      systemThemeMediaQuery = null;
+    }
   }
-  // Note: If not in component context, cleanup will happen when browser extension unloads
   
   return {
     // State
@@ -938,6 +932,8 @@ export const useSettingsStore = defineStore('settings', () => {
     importSettings,
     getSetting,
     validateSettings,
+    reconcileOcrLanguage,
+    cleanupStoreResources,
     $reset
   }
 })

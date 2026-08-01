@@ -7,13 +7,16 @@ import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
 import { streamingManager } from "../StreamingManager.js";
+import { getTranslationInputPreview } from "../translationInputHelpers.js";
 
 const logger = getScopedLogger(LOG_COMPONENTS.TRANSLATION, 'TranslationLifecycleRegistry');
+// Retain out-of-order cancellation intent long enough for extension messaging to register its request.
+const CANCELLATION_TOMBSTONE_TTL_MS = 60_000;
 
 export class TranslationLifecycleRegistry {
   constructor() {
     this.activeTranslations = new Map(); // Track active translations: messageId -> { controller: AbortController, context: string }
-    this.cancelledRequests = new Set(); // Track cancelled request messageIds
+    this.cancelledRequests = new Map(); // Track cancellation tombstones: messageId -> timestamp
     this.recentRequests = new Map();     // Track recent requests to prevent duplicates
     this.streamingSenders = new Map();    // Track tab info for streaming: messageId -> sender
   }
@@ -25,11 +28,18 @@ export class TranslationLifecycleRegistry {
    * @param {string} messageId - Unique ID for the message
    * @param {string} text - Content being translated (for duplicate detection)
    * @param {string} context - UI context (popup, sidepanel, etc.)
-   * @returns {AbortController} The controller for this request
+   * @returns {AbortController|null} The controller, or null when cancellation arrived first
    */
   registerRequest(messageId, text, context = 'unknown') {
+    this._pruneCancelledRequests();
+
+    if (this.cancelledRequests.has(messageId)) {
+      logger.debug(`[LifecycleRegistry] Ignoring pre-cancelled request: ${messageId}`);
+      return null;
+    }
+
     // Detect duplicates (brief window of 1 second)
-    const requestId = `${messageId}:${text?.substring(0, 50)}`;
+    const requestId = `${messageId}:${getTranslationInputPreview(text)}`;
     if (this.recentRequests.has(requestId)) {
       const existing = this.recentRequests.get(requestId);
       if (Date.now() - existing.time < 1000) {
@@ -43,7 +53,6 @@ export class TranslationLifecycleRegistry {
       controller: abortController, 
       context 
     });
-    this.cancelledRequests.delete(messageId);
     
     // Store in recent for duplicate prevention
     this.recentRequests.set(requestId, { time: Date.now(), controller: abortController });
@@ -63,8 +72,8 @@ export class TranslationLifecycleRegistry {
    * @param {string} messageId - The request ID
    */
   unregisterRequest(messageId) {
+    this._pruneCancelledRequests();
     this.activeTranslations.delete(messageId);
-    this.cancelledRequests.delete(messageId);
     this.streamingSenders.delete(messageId);
   }
 
@@ -75,6 +84,7 @@ export class TranslationLifecycleRegistry {
    * @returns {boolean}
    */
   isCancelled(messageId) {
+    this._pruneCancelledRequests();
     return this.cancelledRequests.has(messageId);
   }
 
@@ -87,7 +97,8 @@ export class TranslationLifecycleRegistry {
   async cancelTranslation(messageId) {
     if (!messageId) return false;
 
-    this.cancelledRequests.add(messageId);
+    this._pruneCancelledRequests();
+    this.cancelledRequests.set(messageId, Date.now());
     
     if (this.activeTranslations.has(messageId)) {
       logger.info(`[LifecycleRegistry] Aborting active translation: ${messageId}`);
@@ -103,40 +114,30 @@ export class TranslationLifecycleRegistry {
   }
 
   /**
-   * Cancel currently active translations, optionally filtered by context.
+   * Snapshot active translation IDs, optionally filtered by context.
    * 
    * @param {string} [context] - Optional context to filter by (e.g., 'popup')
-   * @returns {Promise<number>} Number of cancelled translations
+   * @returns {string[]} Active request IDs at selection time
+   */
+  getActiveTranslationIds(context = null) {
+    return [...this.activeTranslations]
+      .filter(([, entry]) => !context || entry.context === context)
+      .map(([messageId]) => messageId);
+  }
+
+  /**
+   * Cancel currently active translations, optionally filtered by context.
+   *
+   * @param {string} [context] - Optional context to filter by (e.g., 'popup')
+   * @returns {Promise<number>} Number of selected translations cancelled
    */
   async cancelAllTranslations(context = null) {
-    let cancelledCount = 0;
-    
-    for (const [messageId, entry] of this.activeTranslations) {
-      // Apply context filter if provided
-      if (context && entry.context !== context) {
-        continue;
-      }
+    const messageIds = this.getActiveTranslationIds(context);
+    const results = await Promise.allSettled(
+      messageIds.map((messageId) => this.cancelTranslation(messageId))
+    );
 
-      try {
-        this.cancelledRequests.add(messageId);
-        entry.controller.abort();
-        cancelledCount++;
-      } catch { /* ignore */ }
-    }
-
-    try {
-      // If no context or specifically popup/sidepanel, we might want to be more surgical with streamingManager
-      // for now, cancelAllStreams is safe as it handles all active streams
-      if (!context) {
-        await streamingManager.cancelAllStreams('All translations cancelled by user');
-      } else {
-        // Find streams belonging to this context and cancel them
-        // This is a bit more complex as streamingManager doesn't track context yet
-        // but it will be cleaned up eventually or when the next stream update fails
-      }
-    } catch { /* ignore */ }
-
-    return cancelledCount;
+    return results.filter((result) => result.status === 'fulfilled' && result.value).length;
   }
 
   /**
@@ -170,5 +171,19 @@ export class TranslationLifecycleRegistry {
    */
   getStreamingSender(messageId) {
     return this.streamingSenders.get(messageId) || null;
+  }
+
+  /**
+   * Drop cancellation tombstones for requests that never reached registration.
+   *
+   * @private
+   */
+  _pruneCancelledRequests() {
+    const expiresBefore = Date.now() - CANCELLATION_TOMBSTONE_TTL_MS;
+    for (const [messageId, cancelledAt] of this.cancelledRequests) {
+      if (cancelledAt <= expiresBefore) {
+        this.cancelledRequests.delete(messageId);
+      }
+    }
   }
 }

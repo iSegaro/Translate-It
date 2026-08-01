@@ -13,9 +13,10 @@
   flex-direction: column;
   justify-content: stretch !important;
   align-items: flex-start !important;
-  height: 100vh; /* Ensure the parent container has a fixed height */
+  height: 100vh;
 }
 
+:where(body.options-context) {
 section {
   margin-bottom: $spacing-xxl;
 
@@ -120,6 +121,8 @@ input[type="radio"] {
   accent-color: var(--color-primary);
   vertical-align: middle;
 }
+
+} // end :where(body.options-context)
 
 .github-icon {
   width: 22px;

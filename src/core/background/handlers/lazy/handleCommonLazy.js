@@ -27,15 +27,15 @@ export async function handleOpenOptionsPageLazy(message, sender, sendResponse) {
     }
 }
 
-export async function handleFocusOrCreateTabLazy(message, sender, sendResponse) {
+export async function handleLaunchExtensionAppLazy(message, sender, sendResponse) {
     try {
-        logger.debug('Loading FocusOrCreateTab handler');
-        const { handleFocusOrCreateTab } = await import('../common/handleFocusOrCreateTab.js');
-        logger.debug('FocusOrCreateTab handler loaded successfully');
-        return handleFocusOrCreateTab(message, sender, sendResponse);
+        logger.debug('Loading LaunchExtensionApp handler');
+        const { handleLaunchExtensionApp } = await import('../common/handleLaunchExtensionApp.js');
+        logger.debug('LaunchExtensionApp handler loaded successfully');
+        return handleLaunchExtensionApp(message, sender, sendResponse);
     } catch (error) {
-        logger.error('Failed to load FocusOrCreateTab handler:', error);
-        return { success: false, error: 'Failed to load focus or create tab functionality' };
+        logger.error('Failed to load LaunchExtensionApp handler:', error);
+        return { success: false, error: 'Failed to load extension app launcher functionality' };
     }
 }
 

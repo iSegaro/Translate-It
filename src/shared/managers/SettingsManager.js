@@ -50,6 +50,7 @@ class SettingsManager {
       TRANSLATE_WITH_SELECT_ELEMENT: true,
       ENABLE_SCREEN_CAPTURE: true,
       OCR_DEFAULT_LANG: CONFIG.OCR_DEFAULT_LANG || 'eng',
+      OCR_PREFERRED_ACTION: CONFIG.OCR_PREFERRED_ACTION || 'region',
       REQUIRE_CTRL_FOR_TEXT_SELECTION: false,
       selectionTranslationMode: SelectionTranslationMode.ON_CLICK,
       ENABLE_SHORTCUT_FOR_TEXT_FIELDS: true,
@@ -97,8 +98,11 @@ class SettingsManager {
       CONTEXT_MENU_VISIBILITY: {
         PAGE_CONTEXT_SELECT_ELEMENT: true,
         PAGE_CONTEXT_SCREEN_CAPTURE: true,
+        PAGE_CONTEXT_PDF_TRANSLATOR: true,
         ACTION_CONTEXT_SELECT_ELEMENT: true,
         ACTION_CONTEXT_SCREEN_CAPTURE: true,
+        ACTION_CONTEXT_PDF_TRANSLATOR: true,
+        ACTION_CONTEXT_SUBTITLE_TRANSLATOR: true,
         ACTION_CONTEXT_OPTIONS: true,
         ACTION_CONTEXT_SHORTCUTS: true,
         ACTION_CONTEXT_HELP: true
@@ -560,6 +564,10 @@ class SettingsManager {
       return
     }
 
+    // Fallback-only storage listener.
+    // Registered only when _fallbackMode is true (Vue/Pinia unavailable).
+    // StorageCore is the sole browser.storage.onChanged owner during normal runtime.
+    // The two listeners are never active simultaneously.
     browserAPI.storage.onChanged.addListener((changes, areaName) => {
       logger.debug(`Storage onChanged triggered for area: ${areaName}`, Object.keys(changes))
 

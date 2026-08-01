@@ -40,10 +40,15 @@ export class OptimizedJsonHandler {
       const level = await getProviderOptimizationLevelAsync(providerInstance.providerName);
       const providerConfig = getProviderConfiguration(providerInstance.providerName, level);
       
-      // Mode-specific overrides (Select Element)
-      const selectElementOverride = providerConfig?.batching?.modeOverrides?.select_element || {};
-      const optimalSize = selectElementOverride.optimalSize || providerConfig?.batching?.optimalSize || 25;
-      const characterLimit = selectElementOverride.characterLimit || providerConfig?.batching?.characterLimit || providerConfig?.batching?.maxChars || 5000;
+      // Mode-specific overrides for structured batch translation
+      const modeOverrides = providerConfig?.batching?.modeOverrides || {};
+      const structuredOverride = mode === TranslationMode.Select_Element
+        ? (modeOverrides.select_element || modeOverrides[TranslationMode.Select_Element] || {})
+        : mode === TranslationMode.PDF
+          ? (modeOverrides.pdf_translation || modeOverrides.pdf || modeOverrides[TranslationMode.PDF] || {})
+          : {};
+      const optimalSize = structuredOverride.optimalSize || providerConfig?.batching?.optimalSize || 25;
+      const characterLimit = structuredOverride.characterLimit || providerConfig?.batching?.characterLimit || providerConfig?.batching?.maxChars || 5000;
 
       const batches = engine.createIntelligentBatches(
         segments, 
@@ -52,10 +57,12 @@ export class OptimizedJsonHandler {
       );
 
       logger.debug(`[JsonHandler] Executing ${batches.length} batches for ${segments.length} segments (Concurrency: ${providerConfig.rateLimit.maxConcurrent})`);
-      logger.debug(`[JsonHandler] Select Element ${laneLabel}`);
+      logger.debug(`[JsonHandler] Structured batch ${laneLabel} (${mode})`);
 
       const self = this;
       let completedBatchCount = 0;
+      const accumulatedResults = [];
+      const skipStreaming = mode === TranslationMode.PDF;
       
       // Preserve the ordered lane when conversation continuity is enabled.
       if (historyEnabled) {
@@ -85,7 +92,8 @@ export class OptimizedJsonHandler {
                 message: lastError.message || String(lastError),
                 type: lastError.type || matchErrorToType(lastError),
                 statusCode: lastError.statusCode
-              } 
+              },
+              results: accumulatedResults
             };
           }
           startIndex = 1;
@@ -161,19 +169,23 @@ export class OptimizedJsonHandler {
 
           const mappedResults = self._mapResults(batch, translatedBatch);
           checkCancellation();
+          accumulatedResults.push(...mappedResults);
           completedBatchCount++;
-          await self._streamResults(
-            tabId,
-            messageId,
-            mappedResults,
-            i,
-            batches.length,
-            targetLanguage,
-            detectedSourceLanguage,
-            completedBatchCount,
-            abortController,
-            engine
-          );
+          if (!skipStreaming) {
+            await self._streamResults(
+              tabId,
+              messageId,
+              mappedResults,
+              i,
+              batches.length,
+              targetLanguage,
+              detectedSourceLanguage,
+              mode,
+              completedBatchCount,
+              abortController,
+              engine
+            );
+          }
           
           const statsAfter = statsManager.getSessionSummary(sessionId);
           if (statsAfter) {
@@ -220,18 +232,21 @@ export class OptimizedJsonHandler {
           
           // Stream empty/original results on failure to keep progress moving
           completedBatchCount++;
-          await self._streamResults(
-            tabId,
-            messageId,
-            batch,
-            i,
-            batches.length,
-            targetLanguage,
-            undefined,
-            completedBatchCount,
-            abortController,
-            engine
-          );
+          if (!skipStreaming) {
+            await self._streamResults(
+              tabId,
+              messageId,
+              batch,
+              i,
+              batches.length,
+              targetLanguage,
+              undefined,
+              mode,
+              completedBatchCount,
+              abortController,
+              engine
+            );
+          }
           
           // Stop all other batches if error is fatal (429, etc.)
           if (isFatalError(batchError)) {
@@ -248,10 +263,12 @@ export class OptimizedJsonHandler {
         return { success: false, streaming: true, error: { type: ErrorTypes.USER_CANCELLED, message: 'Cancelled' } };
       }
 
-      if (hasErrors) {
-        await this._sendStreamError(tabId, messageId, lastError, targetLanguage, detectedSourceLanguage);
-      } else {
-        await this._sendStreamEnd(tabId, messageId, providerInstance.providerName, targetLanguage, detectedSourceLanguage);
+      if (!skipStreaming) {
+        if (hasErrors) {
+          await this._sendStreamError(tabId, messageId, lastError, targetLanguage, detectedSourceLanguage, mode);
+        } else {
+          await this._sendStreamEnd(tabId, messageId, providerInstance.providerName, targetLanguage, detectedSourceLanguage, mode);
+        }
       }
 
       statsManager.printSummary(sessionId, { status: 'Streaming', success: !hasErrors, clear: true });
@@ -266,6 +283,7 @@ export class OptimizedJsonHandler {
         success: !hasErrors,
         streaming: true,
         error: formattedError,
+        results: accumulatedResults,
         metadata: {
           batchCount: batches.length
         }
@@ -367,7 +385,7 @@ export class OptimizedJsonHandler {
     });
   }
 
-  async _streamResults(tabId, messageId, translatedData, batchIndex, totalBatches, targetLanguage, sourceLanguage, completedCount = null, abortController = null, engine = null) {
+  async _streamResults(tabId, messageId, translatedData, batchIndex, totalBatches, targetLanguage, sourceLanguage, translationMode, completedCount = null, abortController = null, engine = null) {
     if (!tabId) return;
     const isCancelled = () => {
       if (abortController?.signal?.aborted) return true;
@@ -391,7 +409,7 @@ export class OptimizedJsonHandler {
         isComplete: typeof completedCount === 'number' ? completedCount === totalBatches : batchIndex === totalBatches - 1,
         sourceLanguage,
         targetLanguage,
-        translationMode: TranslationMode.Select_Element,
+        translationMode,
         timestamp: Date.now()
       }
     };
@@ -404,7 +422,7 @@ export class OptimizedJsonHandler {
     }
   }
 
-  async _sendStreamEnd(tabId, messageId, providerName, targetLanguage, sourceLanguage) {
+  async _sendStreamEnd(tabId, messageId, providerName, targetLanguage, sourceLanguage, translationMode) {
     if (!tabId) return;
     const endMessage = {
       action: MessageActions.TRANSLATION_STREAM_END,
@@ -415,7 +433,7 @@ export class OptimizedJsonHandler {
         provider: providerName,
         sourceLanguage,
         targetLanguage,
-        translationMode: TranslationMode.Select_Element,
+        translationMode,
         timestamp: Date.now()
       }
     };
@@ -424,7 +442,7 @@ export class OptimizedJsonHandler {
     } catch { /* ignore */ }
   }
 
-  async _sendStreamError(tabId, messageId, lastError, targetLanguage, sourceLanguage) {
+  async _sendStreamError(tabId, messageId, lastError, targetLanguage, sourceLanguage, translationMode) {
     if (!tabId) return;
     const endMessage = {
       action: MessageActions.TRANSLATION_STREAM_END,
@@ -438,7 +456,7 @@ export class OptimizedJsonHandler {
         } : null,
         sourceLanguage,
         targetLanguage,
-        translationMode: TranslationMode.Select_Element,
+        translationMode,
         timestamp: Date.now()
       }
     };

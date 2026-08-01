@@ -43,112 +43,28 @@
       @mousedown="handleStartDrag"
       @touchstart="handleStartDrag"
     >
-      <div class="ti-header-actions">
-        <ProviderSelector
-          v-if="props.provider"
-          :model-value="props.provider"
-          mode="icon-only"
-          :is-global="false"
-          allow-set-default
-          only-configured
-          class="ti-window-provider-selector"
-          @update:model-value="handleProviderChange"
-          @mousedown.stop
-          @touchstart.stop
-        />
-        <button
-          class="ti-action-btn"
-          :class="{ 'ti-active': isPinned }"
-          :title="isPinned ? t('window_unpin') : t('window_pin')"
-          @click.stop="togglePin"
-          @mousedown.stop
-          @touchstart.stop
-        >
-          <svg
-            width="16"
-            height="16"
-            viewBox="0 0 24 24"
-          >
-            <path
-              fill="currentColor"
-              d="M16 9V4l1 0V2H7v2l1 0v5c0 1.66-1.34 3-3 3v2h5.97v7l1 1 1-1v-7H19v-2c-1.66 0-3-1.34-3-3z"
-            />
-          </svg>
-        </button>
-        <button
-          class="ti-action-btn"
-          :title="t('window_copy_translation')"
-          @click.stop="handleCopy"
-          @mousedown.stop
-          @touchstart.stop
-        >
-          <svg
-            width="16"
-            height="16"
-            viewBox="0 0 24 24"
-          >
-            <path
-              fill="currentColor"
-              d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"
-            />
-          </svg>
-        </button>
-        <TTSButton
-          :text="currentTTSText"
-          :language="currentTTSLang"
-          :is-dictionary="isDictionary"
-          size="sm"
-          variant="secondary"
-          class="ti-smart-tts-btn"
-          @mousedown.stop
-          @touchstart.stop
-        />
-        <button
-          class="ti-action-btn"
-          :class="{ 'ti-original-visible': showOriginal }"
-          :title="getOriginalButtonTitle"
-          @click.stop="toggleShowOriginal"
-          @mousedown.stop
-          @touchstart.stop
-        >
-          <svg
-            width="16"
-            height="16"
-            viewBox="0 0 24 24"
-          >
-            <path
-              fill="currentColor"
-              d="M11.99 2C6.47 2 2 6.48 2 12s4.47 10 9.99 10C17.52 22 22 17.52 22 12S17.52 2 11.99 2zM12 20c-4.42 0-8-3.58-8-8s3.58-8 8-8s8 3.58 8 8s-3.58 8-8 8zm-2-9.41V12h2.59L15 14.41V16h-4v-1.59L8.59 12H7v-2h3.59L13 7.59V6h4v1.59L14.41 10H12v.59z"
-            />
-          </svg>
-        </button>
-      </div>
-      <div class="ti-header-close">
-        <span
-          v-if="detectedLanguageName"
-          class="ti-detected-language-label"
-        >
-          {{ detectedLanguageName }}
-        </span>
-        <button
-          class="ti-action-btn"
-          :title="t('window_close')"
-          @click.stop="handleClose"
-          @mousedown.stop
-          @touchstart.stop
-        >
-          <svg
-            width="16"
-            height="16"
-            viewBox="0 0 24 24"
-          >
-            <path
-              fill="currentColor"
-              d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"
-            />
-          </svg>
-        </button>
-      </div>
+      <TranslationWindowToolbar
+        :provider="props.provider"
+        :theme="shellTheme"
+        :is-pinned="isPinned"
+        :show-original="showOriginal"
+        :is-dictionary="isDictionary"
+        :tts-text="currentTTSText"
+        :tts-language="currentTTSLang"
+        :detected-language-label="detectedLanguageName"
+        :pin-title="isPinned ? t('window_unpin') : t('window_pin')"
+        :copy-title="t('window_copy_translation')"
+        :original-title="getOriginalButtonTitle"
+        :close-title="t('window_close')"
+        :provider-selector-is-global="false"
+        :provider-selector-allow-set-default="true"
+        :provider-selector-only-configured="true"
+        @provider-change="handleProviderChange"
+        @toggle-pin="togglePin"
+        @copy="handleCopy"
+        @toggle-original="toggleShowOriginal"
+        @close="handleClose"
+      />
     </div>
 
     <div class="ti-window-body">
@@ -193,9 +109,8 @@ import { useUnifiedI18n } from '@/composables/shared/useUnifiedI18n.js';
 import { usePositioning } from '@/composables/ui/usePositioning.js';
 import { WindowsConfig } from '@/features/windows/managers/core/WindowsConfig.js';
 import { useTTSSmart } from '@/features/tts/composables/useTTSSmart.js';
-import TTSButton from '@/components/shared/TTSButton.vue';
+import TranslationWindowToolbar from '@/components/shared/TranslationWindowToolbar.vue';
 import TranslationDisplay from '@/components/shared/TranslationDisplay.vue';
-import ProviderSelector from '@/components/shared/ProviderSelector.vue';
 import LoadingSpinner from '@/components/base/LoadingSpinner.vue';
 import { useMessaging } from '@/shared/messaging/composables/useMessaging.js';
 import { getScopedLogger } from '@/shared/logging/logger.js';

@@ -1,0 +1,853 @@
+@use 'toolbar-variables' as *;
+@use 'toolbar-colors' as *;
+
+.pdf-toolbar {
+  position: sticky;
+  top: 0;
+  z-index: var(--pdf-layer-toolbar);
+  display: grid;
+  grid-template-areas: 'outline info view navigation . actions';
+  grid-template-columns: auto auto max-content max-content 1fr auto;
+  gap: 8px 12px;
+  align-items: center;
+  justify-content: start;
+  padding: $tb-padding-y 16px;
+  min-height: $tb-toolbar-height;
+  box-sizing: border-box;
+  border-bottom: $tb-border-width solid $tb-border;
+  background: $tb-surface;
+  backdrop-filter: blur(14px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
+}
+
+.pdf-toolbar__title-block {
+  display: contents;
+}
+
+.pdf-toolbar__file-row {
+  display: contents;
+}
+
+.pdf-toolbar__title-block > .pdf-app-brand {
+  grid-area: brand;
+}
+
+.pdf-toolbar--empty {
+  grid-template-areas: 'brand brand brand actions actions';
+  grid-template-columns: minmax(0, 1fr) auto auto auto auto;
+}
+
+.pdf-toolbar__group--outline-access,
+.pdf-toolbar__group--view,
+.pdf-toolbar__group--primary-operation,
+.pdf-toolbar__group--secondary-actions {
+  display: inline-flex;
+  align-items: center;
+}
+
+.pdf-toolbar__group--view {
+  grid-area: view;
+  gap: 6px;
+}
+
+.pdf-toolbar__group--outline-access {
+  grid-area: outline;
+}
+
+.pdf-toolbar__group--outline-access:empty {
+  display: none;
+}
+
+.pdf-toolbar__info-toggle {
+  grid-area: info;
+}
+
+.pdf-toolbar__group--navigation {
+  grid-area: navigation;
+}
+
+.pdf-toolbar__group--primary-operation,
+.pdf-toolbar__group--secondary-actions {
+  gap: 8px;
+}
+
+.pdf-toolbar__group--primary-operation {
+  grid-area: primary;
+}
+
+.pdf-toolbar__group--secondary-actions {
+  grid-area: secondary;
+}
+
+.pdf-toolbar__language-settings {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+
+.pdf-toolbar__outline-toggle {
+  display: inline-grid;
+  place-items: center;
+  width: $tb-standalone-icon-control-size;
+  height: $tb-standalone-icon-control-size;
+  padding: 0;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: $tb-text-secondary;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+  flex-shrink: 0;
+
+  &:hover {
+    background: $tb-control-hover;
+    color: $tb-text-primary;
+  }
+
+  &:active {
+    background: $tb-control-active;
+  }
+
+  &:focus-visible {
+    outline: 2px solid $tb-focus;
+    outline-offset: 2px;
+  }
+
+  &--active {
+    background: $tb-control-selected;
+    color: $tb-text-primary;
+  }
+}
+
+.pdf-toolbar__info-toggle {
+  display: inline-grid;
+  place-items: center;
+  width: $tb-standalone-icon-control-size;
+  height: $tb-standalone-icon-control-size;
+  padding: 0;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: $tb-text-secondary;
+  cursor: pointer;
+  flex-shrink: 0;
+
+  &:hover {
+    background: $tb-control-hover;
+    color: $tb-text-primary;
+  }
+
+  &:focus-visible {
+    outline: 2px solid $tb-focus;
+    outline-offset: 2px;
+  }
+}
+
+.pdf-toolbar__separator {
+  width: 0;
+  height: 24px;
+  display: block;
+  flex-shrink: 0;
+  margin: 0 16px;
+  border-left: 1px solid $tb-text-tertiary;
+
+  &--hidden {
+    visibility: hidden;
+    opacity: 0;
+    pointer-events: none;
+  }
+}
+
+.pdf-toolbar__center-group {
+  display: contents;
+}
+
+.pdf-toolbar__mode-group {
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+  border-radius: 6px;
+  border: 1px solid $tb-border-group;
+  overflow: hidden;
+
+  &--content {
+    gap: 0;
+  }
+
+  &--layout {
+    .pdf-toolbar__mode-button {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+    }
+  }
+
+  &--hidden {
+    visibility: hidden;
+    opacity: 0;
+    pointer-events: none;
+  }
+}
+
+.pdf-toolbar__view-mode {
+  display: inline-flex;
+  align-items: center;
+
+  &--desktop {
+    gap: 6px;
+  }
+
+  &--mobile {
+    display: none;
+  }
+
+  /*
+  * Toolbar controls that become available later must preserve their layout
+  * footprint. Visibility changes must not change the toolbar's intrinsic
+  * width; otherwise responsive wrapping becomes unstable.
+  */
+  &--hidden {
+    visibility: hidden;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 150ms ease, visibility 150ms ease;
+  }
+}
+
+.pdf-toolbar__view-mode-select {
+  display: inline-block;
+  appearance: none;
+  color-scheme: dark;
+  border: 1px solid $tb-border;
+  border-radius: 6px;
+  padding: 4px 24px 4px 7px;
+  background-color: $tb-surface;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='rgba(255,255,255,0.65)'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 6px center;
+  color: $tb-text-primary;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  outline: none;
+
+  &:focus-visible {
+    outline: 2px solid $tb-focus;
+    outline-offset: 2px;
+  }
+}
+
+.pdf-toolbar__mode-button {
+  appearance: none;
+  border: 0;
+  padding: 4px 7px;
+  background: transparent;
+  color: $tb-text-secondary;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+  white-space: nowrap;
+
+  &:hover {
+    background: $tb-control-hover;
+    color: $tb-text-primary;
+  }
+
+  &:active {
+    background: $tb-control-active;
+  }
+
+  &:focus-visible {
+    outline: none;
+    box-shadow: inset 0 0 0 2px $tb-focus;
+  }
+
+  &--active {
+    background: $tb-control-selected;
+    color: $tb-text-primary;
+  }
+}
+
+
+.pdf-toolbar__page-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  color: $tb-text-secondary;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.pdf-toolbar__icon--rotated {
+  transform: rotate(180deg);
+}
+
+.pdf-toolbar__page-group .pdf-toolbar__page-input {
+  width: 28px;
+  padding: 3px 2px;
+  border: 1px solid $tb-border;
+  border-radius: 4px;
+  background: $tb-control-hover;
+  color: $tb-text-primary;
+  font-size: 13px;
+  font-weight: 500;
+  text-align: center;
+  outline: none;
+  appearance: textfield;
+
+  &::-webkit-inner-spin-button,
+  &::-webkit-outer-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+  }
+
+  &:hover {
+    border-color: $tb-border-hover;
+  }
+
+  &:focus-visible {
+    border-color: $tb-border-focus;
+    outline: 2px solid $tb-focus;
+    outline-offset: 1px;
+  }
+}
+
+.pdf-toolbar__page-separator {
+  margin: 0 2px;
+  color: $tb-text-tertiary;
+}
+
+.pdf-toolbar__page-total {
+  color: $tb-text-secondary;
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.pdf-toolbar__actions {
+  grid-area: actions;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.pdf-toolbar__button {
+  appearance: none;
+  border: 0;
+  border-radius: 6px;
+  padding: 5px 8px;
+  background: $tb-control-hover;
+  color: $tb-text-primary;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+  outline: none;
+
+  &:hover {
+    background: $tb-control-strong;
+  }
+
+  &:active {
+    background: $tb-control-active;
+  }
+
+  &:focus-visible {
+    outline: 2px solid $tb-focus;
+    outline-offset: 2px;
+  }
+
+  &:disabled {
+    opacity: 0.7;
+    cursor: progress;
+  }
+
+  &--active {
+    background: $tb-control-selected;
+  }
+
+  &:disabled {
+    cursor: not-allowed;
+    opacity: 0.6;
+  }
+}
+
+.pdf-toolbar__button--icon-trigger {
+  display: inline-grid;
+  place-items: center;
+  width: $tb-standalone-icon-control-size;
+  height: $tb-standalone-icon-control-size;
+  padding: 0;
+  background: transparent;
+
+  &:hover {
+    background: $tb-control-hover;
+  }
+}
+
+.pdf-toolbar__button--icon-trigger:focus-visible {
+  box-shadow: 0 0 0 2px $tb-focus;
+}
+
+.pdf-toolbar__file-input {
+  display: none;
+}
+
+.pdf-toolbar__button--cancel {
+  background: rgba(239, 68, 68, 0.15);
+  color: #fecaca;
+
+  &:hover {
+    background: rgba(239, 68, 68, 0.25);
+  }
+}
+
+.pdf-toolbar__zoom-group {
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+  border-radius: 6px;
+  border: 1px solid $tb-border;
+  overflow: hidden;
+}
+
+.pdf-toolbar__zoom-button {
+  appearance: none;
+  border: 0;
+  min-width: 24px;
+  height: 24px;
+  padding: 0 5px;
+  background: transparent;
+  color: $tb-text-secondary;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+
+  &:hover {
+    background: $tb-control-hover;
+    color: $tb-text-primary;
+  }
+
+  &:active {
+    background: $tb-control-active;
+  }
+
+  &:focus-visible {
+    outline: none;
+    box-shadow: inset 0 0 0 2px $tb-focus;
+  }
+
+  &:disabled {
+    opacity: 0.4;
+    cursor: default;
+    pointer-events: none;
+  }
+}
+
+.pdf-toolbar__zoom-select {
+  appearance: none;
+  border: 0;
+  border-left: 1px solid $tb-border;
+  border-right: 1px solid $tb-border;
+  padding: 3px 6px;
+  background: #474747;
+  color: $tb-text-primary;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  width: auto;
+  min-width: 40px;
+  text-align: center;
+  outline: none;
+
+  &:focus-visible {
+    outline: none;
+    box-shadow: inset 0 0 0 2px $tb-focus;
+  }
+}
+
+.pdf-toolbar__info-toggle[disabled] {
+  opacity: 0.5;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+.pdf-toolbar__ocr-split {
+  position: relative;
+}
+
+.pdf-toolbar__ocr-buttons {
+  display: inline-flex;
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.pdf-toolbar__ocr-primary {
+  appearance: none;
+  border: 0;
+  border-radius: 6px 0 0 6px;
+  padding: 5px 10px;
+  display: inline-grid;
+  background: $tb-control-hover;
+  color: $tb-text-primary;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+  outline: none;
+  white-space: nowrap;
+
+  &:hover {
+    background: $tb-control-strong;
+  }
+
+  &:active {
+    background: $tb-control-active;
+  }
+
+  &:focus-visible {
+    outline: 2px solid $tb-focus;
+    outline-offset: -2px;
+  }
+
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+
+  &--cancel {
+    background: rgba(239, 68, 68, 0.15);
+    color: #fecaca;
+
+    &:hover {
+      background: rgba(239, 68, 68, 0.25);
+    }
+  }
+
+  &--highlight {
+    background: rgba(244, 184, 96, 0.12);
+    color: #f4b860;
+
+    &:hover {
+      background: rgba(244, 184, 96, 0.2);
+    }
+  }
+}
+
+.pdf-toolbar__ocr-primary-size {
+  grid-area: 1/1;
+  visibility: hidden;
+  white-space: nowrap;
+}
+
+.pdf-toolbar__ocr-primary-size--compact,
+.pdf-toolbar__ocr-primary-text--compact {
+  display: none;
+}
+
+.pdf-toolbar__ocr-primary-text {
+  grid-area: 1/1;
+}
+
+.pdf-toolbar__ocr-arrow {
+  appearance: none;
+  border: 0;
+  border-left: 1px solid $tb-border;
+  border-radius: 0 6px 6px 0;
+  padding: 5px 6px;
+  background: $tb-control-hover;
+  color: $tb-text-secondary;
+  font-size: 10px;
+  line-height: 1;
+  cursor: pointer;
+  transition: background 0.15s ease;
+  outline: none;
+
+  &:hover {
+    background: $tb-control-strong;
+  }
+
+  &:focus-visible {
+    outline: 2px solid $tb-focus;
+    outline-offset: -2px;
+  }
+
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+}
+
+.pdf-toolbar__ocr-menu {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  z-index: var(--pdf-layer-popup);
+  min-width: 220px;
+  padding: 8px;
+  border: 1px solid $tb-border-hover;
+  border-radius: 14px;
+  background: $tb-surface;
+  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.28);
+}
+
+.pdf-toolbar__ocr-menu-item {
+  appearance: none;
+  border: 0;
+  border-radius: 10px;
+  padding: 10px 12px;
+  background: transparent;
+  color: $tb-text-primary;
+  font-size: 13px;
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.15s ease;
+  outline: none;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+
+  &:hover,
+  &:focus-visible {
+    background: $tb-control-hover;
+  }
+
+  &:focus-visible {
+    outline: 2px solid $tb-focus-soft;
+    outline-offset: 2px;
+  }
+
+  &--disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+
+    &:hover {
+      background: transparent;
+    }
+  }
+
+  &--back {
+    font-weight: 500;
+  }
+
+  &--submenu {
+    justify-content: space-between;
+  }
+}
+
+.pdf-toolbar__ocr-menu-check {
+  width: 16px;
+  text-align: center;
+  flex-shrink: 0;
+  visibility: hidden;
+
+  .pdf-toolbar__ocr-menu-item--selected & {
+    visibility: visible;
+  }
+}
+
+.pdf-toolbar__ocr-menu-divider {
+  height: 1px;
+  background: $tb-border;
+  margin: 6px 0;
+}
+
+.pdf-toolbar__ocr-menu-scroll {
+  max-height: 250px;
+  overflow-y: auto;
+}
+
+.pdf-toolbar__ocr-menu-empty {
+  padding: 12px 16px;
+  color: $tb-text-tertiary;
+  font-size: 13px;
+  text-align: center;
+}
+
+.pdf-toolbar__language-trigger {
+  position: relative;
+}
+
+.pdf-toolbar__language-popover {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  z-index: var(--pdf-layer-popup);
+  min-width: 280px;
+  max-width: calc(100vw - 32px);
+  padding: 12px;
+  border: 1px solid $tb-border-hover;
+  border-radius: 14px;
+  background: $tb-surface;
+  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.28);
+}
+
+
+// ── Stage 1: Compact View ──────────────────────────────────────────
+// Layout B entry stage. Establishes compact toolbar chrome and replaces the
+// segmented View Mode control with its compact selector.
+@media (max-width: $tb-stage-view-compact-max-width) {
+  .pdf-toolbar {
+    padding: 8px 16px;
+    gap: 8px 12px;
+    min-height: 44px;
+  }
+
+  .pdf-toolbar__view-mode--desktop {
+    display: none;
+  }
+
+  .pdf-toolbar__view-mode--mobile {
+    display: inline-block;
+  }
+
+  .pdf-toolbar__separator {
+    display: none;
+  }
+
+  .pdf-toolbar__outline-toggle {
+    width: 28px;
+    height: 28px;
+  }
+
+  .pdf-toolbar__file-name {
+    font-size: 13px;
+  }
+
+  .pdf-toolbar__progress {
+    padding: 3px 8px;
+    font-size: 12px;
+  }
+
+  .pdf-toolbar__mode-button {
+    padding: 4px 6px;
+    font-size: 11px;
+  }
+
+  .pdf-toolbar__page-group .pdf-toolbar__page-input {
+    width: 28px;
+  }
+
+  .pdf-toolbar__button {
+    padding: 5px 8px;
+    font-size: 11px;
+  }
+
+  .pdf-toolbar__button--menu-trigger {
+    min-width: 0;
+  }
+
+  .pdf-toolbar__button--icon-trigger {
+    width: $tb-icon-trigger-size;
+    height: $tb-icon-trigger-size;
+  }
+
+}
+
+// ── Stage 2: Compact OCR Labels ────────────────────────────────────
+@media (max-width: $tb-stage-ocr-label-compact-max-width) {
+  .pdf-toolbar__ocr-primary-size--full,
+  .pdf-toolbar__ocr-primary-text--full {
+    display: none;
+  }
+
+  .pdf-toolbar__ocr-primary-size--compact,
+  .pdf-toolbar__ocr-primary-text--compact {
+    display: block;
+  }
+
+}
+
+@media (min-width: ($tb-layout-c-max-width + 0.01px)) and (max-width: $tb-stage-ocr-label-compact-max-width) {
+  .pdf-toolbar__group--primary-operation {
+    --ti-provider-main-gap: 0;
+    --ti-provider-label-display: none;
+  }
+}
+
+// ── Stage 3: Compact OCR Chrome ────────────────────────────────────
+@media (max-width: $tb-stage-ocr-chrome-compact-max-width) {
+  .pdf-toolbar__ocr-primary {
+    padding-inline: 4px;
+  }
+
+  .pdf-toolbar__ocr-arrow {
+    padding-inline: 4px;
+  }
+}
+
+// ── Stage 4: Hide PDF Info ─────────────────────────────────────────
+@media (max-width: $tb-stage-pdf-info-hidden-max-width) {
+  .pdf-toolbar__info-toggle {
+    display: none;
+  }
+}
+
+// ── Layout C Overrides ─────────────────────────────────────────────
+// Restores controls compacted by Layout B stages, then applies its two-row
+// Grid presentation.
+//
+// `gutter` is a layout-only Grid area representing flexible separation between
+// the Reading region and Primary actions. It intentionally has no Grid item so
+// Presentation can use flexible space without sizing the Outline track.
+@media (max-width: $tb-layout-c-max-width) {
+  .pdf-toolbar {
+    grid-template-areas:
+      'outline navigation gutter primary'
+      '. view view secondary';
+    grid-template-columns: max-content max-content minmax(0, 1fr) max-content;
+    justify-content: start;
+  }
+
+  .pdf-toolbar__info-toggle {
+    display: none;
+  }
+
+  .pdf-toolbar__actions {
+    display: contents;
+  }
+
+  .pdf-toolbar__ocr-primary-size--full,
+  .pdf-toolbar__ocr-primary-text--full {
+    display: none;
+  }
+
+  .pdf-toolbar__ocr-primary-size--compact,
+  .pdf-toolbar__ocr-primary-text--compact {
+    display: block;
+  }
+
+  .pdf-toolbar__ocr-primary {
+    padding-inline: 10px;
+  }
+
+  .pdf-toolbar__ocr-arrow {
+    padding-inline: 6px;
+  }
+
+  .pdf-toolbar__group--primary-operation {
+    --ti-provider-main-gap: 0;
+    --ti-provider-label-display: none;
+    justify-self: end;
+  }
+
+  .pdf-toolbar__group--secondary-actions {
+    justify-self: end;
+  }
+
+  .pdf-toolbar--empty .pdf-toolbar__actions {
+    display: flex;
+  }
+
+  .pdf-toolbar--empty {
+    grid-template-areas: 'brand brand actions';
+    grid-template-columns: minmax(0, 1fr) auto auto;
+  }
+}

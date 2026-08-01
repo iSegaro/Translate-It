@@ -1,0 +1,131 @@
+@use 'components/toolbar-variables' as *;
+@use '../../assets/styles/base/variables' as *;
+
+.pdf-app {
+  // PDF chrome stacking contract: status < toolbar < popup < overlay.
+  --pdf-layer-status: 20;
+  --pdf-layer-toolbar: 30;
+  --pdf-layer-popup: 40;
+  --pdf-layer-overlay: 50;
+
+  position: relative;
+  height: 100vh;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  --pdf-toolbar-sticky-height: #{$tb-toolbar-height};
+  background:
+    radial-gradient(circle at top left, rgba(90, 92, 255, 0.18), transparent 35%),
+    linear-gradient(180deg, #10131a 0%, #0b0e13 100%);
+  color: #e6edf7;
+  font-family: Inter, "Segoe UI", system-ui, sans-serif;
+}
+
+.pdf-app__file-input {
+  display: none !important;
+}
+
+.pdf-app__viewport {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.pdf-app__content {
+  flex: 1;
+  padding: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: #2c2c2c;
+}
+
+.pdf-app__status-layer {
+  position: absolute;
+  top: 12px;
+  left: 28px;
+  right: 28px;
+  z-index: var(--pdf-layer-status);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  pointer-events: none;
+}
+
+.pdf-app__status-row {
+  width: 100%;
+  display: flex;
+  pointer-events: auto;
+}
+
+.pdf-app__status-row .pdf-status-banner {
+  pointer-events: auto;
+}
+
+.pdf-app__status-layer .pdf-ocr-progress {
+  pointer-events: auto;
+}
+
+.pdf-app__empty {
+  min-height: 480px;
+  display: grid;
+  place-items: center;
+  text-align: center;
+  padding: 32px;
+}
+
+.pdf-app__empty-title {
+  font-size: 20px;
+  font-weight: 700;
+  margin: 0 0 8px;
+}
+
+.pdf-app__empty-text {
+  margin: 0;
+  color: rgba(230, 237, 247, 0.7);
+}
+
+/* ── Workspace (Outline + Viewer) ────────── */
+
+.pdf-app__workspace {
+  display: flex;
+  min-height: 0;
+  flex: 1;
+}
+
+/* ── Banner Transition ────────────────────── */
+
+.pdf-banner-enter-active,
+.pdf-banner-leave-active {
+  transition: transform 0.2s ease, opacity 0.2s ease;
+}
+
+.pdf-banner-enter-from {
+  transform: translateY(-8px);
+  opacity: 0;
+}
+
+.pdf-banner-leave-to {
+  transform: translateY(-8px);
+  opacity: 0;
+}
+
+@media (max-width: $tb-layout-c-max-width) {
+  .pdf-app {
+    --pdf-toolbar-sticky-height: 96px;
+  }
+
+  .pdf-app__status-layer {
+    top: 8px;
+    left: $spacing-md;
+    right: $spacing-md;
+  }
+
+  .pdf-app__status-row {
+    width: 100%;
+  }
+}

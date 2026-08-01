@@ -47,6 +47,18 @@ describe('UnifiedResultDispatcher', () => {
       expect(browser.tabs.sendMessage).toHaveBeenCalledTimes(1);
     });
 
+    it('keeps duplicate-result tracking isolated per dispatcher instance', async () => {
+      const secondDispatcher = new UnifiedResultDispatcher();
+      const request = { mode: TranslationMode.Selection, sender: { tab: { id: 123 } } };
+      const result = { success: true, translatedText: 'hi' };
+
+      await dispatcher.dispatchResult({ messageId: 'shared-id', result, request });
+      await secondDispatcher.dispatchResult({ messageId: 'shared-id', result, request });
+
+      expect(browser.tabs.sendMessage).toHaveBeenCalledTimes(2);
+      expect(dispatcher.processedResults).not.toBe(secondDispatcher.processedResults);
+    });
+
     it('should record history if enabled and successful', async () => {
       const messageId = 'm1';
       const request = { 

@@ -94,7 +94,7 @@ export class ProviderCoordinator {
           // we force it back to 'auto' for traditional providers.
           // This allows Google/Bing to handle per-item detection within the batch,
           // preventing the skipping of English items in a "mostly Farsi" batch.
-          if ((translateMode === TranslationMode.Page || translateMode === TranslationMode.Select_Element) && detectedLanguage === processedTargetLang) {
+          if ((translateMode === TranslationMode.Page || translateMode === TranslationMode.Select_Element || translateMode === TranslationMode.PDF) && detectedLanguage === processedTargetLang) {
             logger.debug(`[Coordinator] Source matches target in ${translateMode} mode (${detectedLanguage}). Forcing auto to prevent skipping.`);
             processedSourceLang = AUTO_DETECT_VALUE;
           } else {
@@ -320,11 +320,12 @@ export class ProviderCoordinator {
     const supportsStreaming = providerClass.supportsStreaming !== false;
     const isSelectElement = mode === TranslationMode.Select_Element;
     const isPageBatch = mode === TranslationMode.Page;
+    const isPdfBatch = mode === TranslationMode.PDF;
     const expectedFormat = options.expectedFormat;
     
     let useStreaming = false;
     // Don't use coordinator streaming for modes that have their own streaming orchestration (Select Element, Page)
-    if (messageId && engine && supportsStreaming && !isSelectElement && !isPageBatch && expectedFormat !== ResponseFormat.JSON_OBJECT) {
+    if (messageId && engine && supportsStreaming && !isSelectElement && !isPageBatch && !isPdfBatch && expectedFormat !== ResponseFormat.JSON_OBJECT) {
       if (providerType === ProviderTypes.AI) {
         useStreaming = (options.textLength > TRANSLATION_CONSTANTS.STREAMING_THRESHOLDS.AI);
       } else {

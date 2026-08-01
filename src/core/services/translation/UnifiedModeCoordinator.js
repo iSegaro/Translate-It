@@ -28,6 +28,8 @@ export class UnifiedModeCoordinator {
         return await this.processFieldTranslation(request, { translationEngine });
       case TranslationMode.Page:
         return await this.processPageTranslation(request, { translationEngine });
+      case TranslationMode.PDF:
+        return await this.processPdfTranslation(request, { translationEngine });
       case TranslationMode.Subtitle:
         return await this.processSubtitleTranslation(request, { translationEngine });
       case TranslationMode.Select_Element:
@@ -54,7 +56,7 @@ export class UnifiedModeCoordinator {
       return TranslationPriority.HIGH;
     }
     
-    if ([TranslationMode.Page, TranslationMode.Select_Element].includes(mode)) {
+    if ([TranslationMode.Page, TranslationMode.Select_Element, TranslationMode.PDF].includes(mode)) {
       return TranslationPriority.LOW;
     }
 
@@ -136,6 +138,30 @@ export class UnifiedModeCoordinator {
   }
 
   /**
+   * Handler for PDF translation batches.
+   */
+  async processPdfTranslation(request, { translationEngine }) {
+    const enhancedData = {
+      ...request.data,
+      mode: TranslationMode.PDF,
+      enableDictionary: false,
+      options: {
+        ...request.data.options,
+        rawJsonPayload: true,
+        pdfTranslation: true,
+        enableDictionary: false
+      }
+    };
+
+    return await translationEngine.handleTranslateMessage({
+      action: MessageActions.TRANSLATE,
+      messageId: request.messageId,
+      context: request.context || 'pdf-translation',
+      data: enhancedData
+    }, request.sender);
+  }
+
+  /**
    * Default handler for standard translations (Selection, Popup, etc.).
    */
   async processStandardTranslation(request, { translationEngine }) {
@@ -179,15 +205,12 @@ export class UnifiedModeCoordinator {
     const sourceLanguage = data.sourceLanguage || data.sourceLang || 'auto';
     const targetLanguage = data.targetLanguage || data.targetLang;
 
-    // Validate that items is an array. Empty arrays are allowed to proceed to provider init for test compatibility.
+    // Validate that items is an array.
     if (!items || !Array.isArray(items)) {
       throw new Error(`No items provided for ${mode} translation`);
     }
 
-    const providerInstance = await translationEngine.getProvider(provider);
-    if (!providerInstance) throw new Error(`Provider '${provider}' initialization failed`);
-
-    // Guard against empty items after provider check to avoid null pointer in sampleText
+    // Empty batches are valid terminal successes and require no runtime resources.
     if (items.length === 0) {
       if (transformOutput) return transformOutput([], 0);
       return { success: true, results: [], actualCharCount: 0, originalCharCount: 0 };
@@ -200,6 +223,16 @@ export class UnifiedModeCoordinator {
 
     const sampleText = (items[0]?.text || items[0] || '').substring(0, 100);
     const abortController = translationEngine.lifecycleRegistry.registerRequest(messageId, sampleText, mode.toLowerCase());
+    if (!abortController) {
+      return {
+        success: false,
+        cancelled: true,
+        error: { type: 'USER_CANCELLED', message: 'Translation cancelled before execution' }
+      };
+    }
+
+    const providerInstance = await translationEngine.getProvider(provider);
+    if (!providerInstance) throw new Error(`Provider '${provider}' initialization failed`);
 
     let timeoutId;
 
@@ -217,6 +250,7 @@ export class UnifiedModeCoordinator {
         timeoutId = setTimeout(() => {
           const timeoutError = new Error(`Batch translation timed out after ${BATCH_TIMEOUT_MS}ms`);
           timeoutError.type = 'TIMEOUT';
+          abortController.abort();
           reject(timeoutError);
         }, BATCH_TIMEOUT_MS);
         

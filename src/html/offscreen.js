@@ -938,14 +938,10 @@ async function handleOCRProcess(data, sendResponse) {
       console.log("[Offscreen] OCR engine module loaded");
     }
 
-    // Import language mapping utility
-    const { toTesseractLanguageCode } = await import('../features/screen-capture/utils/ocrLanguageMap.js');
-
     const { image, lang, coordinates } = data;
-    const tesseractLang = toTesseractLanguageCode(lang); // Convert to valid Tesseract language code
 
-    console.log("[Offscreen] Starting recognition with language:", tesseractLang);
-    const text = await ocrEngine.recognize(image, tesseractLang, coordinates);
+    console.log("[Offscreen] Starting recognition with language:", lang);
+    const text = await ocrEngine.recognize(image, lang, coordinates);
     console.log("[Offscreen] Recognition successful, extracted text length:", text?.length);
     sendResponse({ success: true, text });
   } catch (error) {

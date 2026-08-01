@@ -1,0 +1,505 @@
+import { mount } from '@vue/test-utils'
+import { defineComponent, nextTick, reactive } from 'vue'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+
+let commitListener = null
+let visibleListener = null
+let mockProcessPages = vi.fn()
+let ocrSettings = reactive({ OCR_DEFAULT_LANG: 'eng' })
+
+const mockPdfDocumentSession = {
+  pageSessions: new Map(),
+  visiblePageNumbers: new Set(),
+  documentIdentity: 'doc-1',
+  getPageSession: vi.fn(),
+  onPageSessionCommitted: vi.fn((listener) => {
+    commitListener = listener
+    return vi.fn(() => {
+      if (commitListener === listener) {
+        commitListener = null
+      }
+    })
+  }),
+  onVisiblePagesChanged: vi.fn((listener) => {
+    visibleListener = listener
+    return vi.fn(() => {
+      if (visibleListener === listener) {
+        visibleListener = null
+      }
+    })
+  }),
+  getLoadedVisibleOcrCandidates: vi.fn(() => {
+    const candidates = []
+
+    for (const pageNumber of mockPdfDocumentSession.visiblePageNumbers) {
+      const pageSession = mockPdfDocumentSession.pageSessions.get(pageNumber)
+      if (!pageSession?.loaded) continue
+      const textItems = pageSession.textContent?.items || []
+      candidates.push({
+        pageNumber,
+        logicalBlockCount: pageSession.logicalBlocks.length,
+        textItemCount: textItems.length,
+        textCharCount: textItems.reduce((count, item) => count + (item?.str || '').replace(/\s/g, '').length, 0),
+        hasOcrBlocks: pageSession.ocrBlocks.length > 0,
+        ocrLanguage: pageSession.ocrLanguage || null
+      })
+    }
+
+    return candidates
+  }),
+  getCommittedOcrState: vi.fn((pageNumber) => {
+    const pageSession = mockPdfDocumentSession.pageSessions.get(pageNumber)
+    if (!pageSession?.loaded) return null
+    return {
+      ocrBlocks: pageSession.ocrBlocks,
+      ocrLanguage: pageSession.ocrLanguage,
+      ocrCompletedAt: pageSession.ocrCompletedAt,
+      ocrError: pageSession.ocrError
+    }
+  })
+}
+
+vi.mock('@/features/pdf-translation/core/PdfDocumentSession.js', () => ({
+  pdfDocumentSession: mockPdfDocumentSession
+}))
+
+vi.mock('@/features/pdf-translation/core/PdfOcrProcessor.js', () => ({
+  PdfOcrProcessor: class PdfOcrProcessor {
+    processPages(...args) {
+      return mockProcessPages(...args)
+    }
+
+    cancel() {}
+  }
+}))
+
+vi.mock('@/features/settings/stores/settings.js', () => ({
+  useSettingsStore: () => ({
+    settings: ocrSettings
+  })
+}))
+
+vi.mock('@/features/pdf-translation/core/PdfCacheManager.js', () => ({
+  pdfCacheManager: {
+    saveOcr: vi.fn(async () => {})
+  }
+}))
+
+const { usePdfOcr } = await import('./usePdfOcr.js')
+
+function createScannedPageSession(pageNumber, overrides = {}) {
+  return {
+    pageNumber,
+    loaded: true,
+    logicalBlocks: [],
+    textContent: { items: [] },
+    ocrBlocks: [],
+    ocrLanguage: null,
+    hasOcrForLanguage: vi.fn(() => false),
+    ...overrides
+  }
+}
+
+function mountComposable(options = {}) {
+  let api
+  const wrapper = mount(defineComponent({
+    setup() {
+      api = usePdfOcr(options)
+      return () => null
+    }
+  }))
+  return { api, wrapper }
+}
+
+async function getBatchOcrError(results) {
+  const { api, wrapper } = mountComposable()
+  mockPdfDocumentSession.pageSessions.set(1, createScannedPageSession(1))
+  mockPdfDocumentSession.visiblePageNumbers.add(1)
+  mockProcessPages = vi.fn(async () => results)
+  api.refreshOcrRecommendations()
+
+  await api.requestOcr()
+
+  const errorCode = api.ocrError.value
+  wrapper.unmount()
+  return errorCode
+}
+
+describe('usePdfOcr', () => {
+  beforeEach(() => {
+    commitListener = null
+    visibleListener = null
+    mockProcessPages = vi.fn(async () => [])
+    ocrSettings.OCR_DEFAULT_LANG = 'eng'
+    mockPdfDocumentSession.pageSessions = new Map()
+    mockPdfDocumentSession.visiblePageNumbers = new Set()
+    mockPdfDocumentSession.documentIdentity = 'doc-1'
+    mockPdfDocumentSession.getPageSession.mockClear()
+    mockPdfDocumentSession.onPageSessionCommitted.mockClear()
+    mockPdfDocumentSession.onVisiblePagesChanged.mockClear()
+    mockPdfDocumentSession.getLoadedVisibleOcrCandidates.mockClear()
+    mockPdfDocumentSession.getCommittedOcrState.mockClear()
+  })
+
+  it('refreshes OCR recommendations when a PageSession commit notification arrives', () => {
+    const { api, wrapper } = mountComposable()
+    mockPdfDocumentSession.pageSessions.set(1, createScannedPageSession(1))
+    mockPdfDocumentSession.visiblePageNumbers.add(1)
+
+    commitListener?.({ pageNumber: 1 })
+
+    expect(api.ocrRecommendationCount.value).toBe(1)
+    api.requestOcr()
+    expect(api.ocrBatch.pageNumbers).toEqual([1])
+    wrapper.unmount()
+  })
+
+  it('does not hydrate while refreshing OCR recommendations', () => {
+    const { api, wrapper } = mountComposable()
+    mockPdfDocumentSession.pageSessions.set(1, createScannedPageSession(1))
+    mockPdfDocumentSession.visiblePageNumbers.add(1)
+
+    api.refreshOcrRecommendations()
+
+    expect(api.ocrRecommendationCount.value).toBe(1)
+    expect(mockPdfDocumentSession.getPageSession).not.toHaveBeenCalled()
+    wrapper.unmount()
+  })
+
+  it('refreshes OCR recommendations when visible pages change', () => {
+    const { api, wrapper } = mountComposable()
+    mockPdfDocumentSession.pageSessions.set(1, createScannedPageSession(1))
+    mockPdfDocumentSession.visiblePageNumbers = new Set([1])
+
+    visibleListener?.({ pages: [1] })
+
+    expect(api.ocrRecommendationCount.value).toBe(1)
+    api.requestOcr()
+    expect(api.ocrBatch.pageNumbers).toEqual([1])
+    wrapper.unmount()
+  })
+
+  it('recommends OCR pages again when the configured language changes', async () => {
+    const { api, wrapper } = mountComposable()
+    mockPdfDocumentSession.pageSessions.set(1, createScannedPageSession(1, {
+      ocrBlocks: [{ id: 'ocr-1' }],
+      ocrLanguage: 'eng'
+    }))
+    mockPdfDocumentSession.visiblePageNumbers.add(1)
+
+    api.refreshOcrRecommendations()
+    expect(api.ocrRecommendations.value).toEqual([])
+
+    ocrSettings.OCR_DEFAULT_LANG = 'fra'
+    await nextTick()
+
+    expect(api.ocrRecommendations.value).toEqual([1])
+
+    ocrSettings.OCR_DEFAULT_LANG = 'eng'
+    await nextTick()
+
+    expect(api.ocrRecommendations.value).toEqual([])
+    wrapper.unmount()
+  })
+
+  it('captures prompt batch when OCR is requested', () => {
+    const { api, wrapper } = mountComposable()
+    mockPdfDocumentSession.pageSessions.set(1, createScannedPageSession(1))
+    mockPdfDocumentSession.pageSessions.set(2, createScannedPageSession(2))
+    mockPdfDocumentSession.visiblePageNumbers = new Set([1, 2])
+    api.refreshOcrRecommendations()
+
+    api.requestOcr()
+    expect(api.ocrBatch.pageNumbers).toEqual([1, 2])
+    expect(api.ocrBatch.pageNumbers.length).toBe(2)
+
+    mockPdfDocumentSession.visiblePageNumbers = new Set([2])
+    visibleListener?.({ pages: [2] })
+    expect(api.ocrRecommendationCount.value).toBe(1)
+    expect(api.ocrBatch.pageNumbers.length).toBe(2)
+    wrapper.unmount()
+  })
+
+  it('does not emit start when no pages need OCR', () => {
+    const onOcrStart = vi.fn()
+    const { api, wrapper } = mountComposable({ onOcrStart })
+
+    api.requestOcr()
+
+    expect(onOcrStart).not.toHaveBeenCalled()
+    expect(mockProcessPages).not.toHaveBeenCalled()
+    wrapper.unmount()
+  })
+
+  it('processes the OCR batch captured when OCR is requested', async () => {
+    const { api, wrapper } = mountComposable()
+    mockPdfDocumentSession.pageSessions.set(1, createScannedPageSession(1))
+    mockPdfDocumentSession.pageSessions.set(2, createScannedPageSession(2))
+    mockPdfDocumentSession.visiblePageNumbers = new Set([1, 2])
+    api.refreshOcrRecommendations()
+
+    await api.requestOcr()
+
+    expect(mockProcessPages).toHaveBeenCalledWith([1, 2], expect.any(Object))
+    wrapper.unmount()
+  })
+
+  it('emits captured OCR batch page numbers on completion', async () => {
+    const onOcrComplete = vi.fn()
+    const { api, wrapper } = mountComposable({ onOcrComplete })
+    mockPdfDocumentSession.pageSessions.set(1, createScannedPageSession(1))
+    mockPdfDocumentSession.pageSessions.set(2, createScannedPageSession(2))
+    mockPdfDocumentSession.visiblePageNumbers = new Set([1, 2])
+    api.refreshOcrRecommendations()
+
+    await api.requestOcr()
+
+    expect(onOcrComplete).toHaveBeenCalledWith({ pageNumbers: [1, 2] })
+    wrapper.unmount()
+  })
+
+  it('ignores stale progress after cancellation', async () => {
+    const onOcrProgress = vi.fn()
+    const { api, wrapper } = mountComposable({ onOcrProgress })
+    let resolve
+    let emitProgress
+    mockProcessPages = vi.fn((_, options) => new Promise(resolvePromise => {
+      resolve = resolvePromise
+      emitProgress = options.onProgress
+    }))
+    mockPdfDocumentSession.pageSessions.set(1, createScannedPageSession(1))
+    mockPdfDocumentSession.visiblePageNumbers.add(1)
+    api.refreshOcrRecommendations()
+
+    const run = api.requestOcr()
+    api.cancelOcr()
+    emitProgress({ current: 1, total: 1, pageNumber: 1 })
+    resolve([])
+    await run
+
+    expect(onOcrProgress).not.toHaveBeenCalled()
+    wrapper.unmount()
+  })
+
+  it('ignores stale completion after cancellation', async () => {
+    const onOcrComplete = vi.fn()
+    const { api, wrapper } = mountComposable({ onOcrComplete })
+    let resolve
+    mockProcessPages = vi.fn(() => new Promise(resolvePromise => { resolve = resolvePromise }))
+    mockPdfDocumentSession.pageSessions.set(1, createScannedPageSession(1))
+    mockPdfDocumentSession.visiblePageNumbers.add(1)
+    api.refreshOcrRecommendations()
+
+    const run = api.requestOcr()
+    api.cancelOcr()
+    resolve([])
+    await run
+
+    expect(onOcrComplete).not.toHaveBeenCalled()
+    wrapper.unmount()
+  })
+
+  it('ignores stale errors after cancellation', async () => {
+    const onOcrError = vi.fn()
+    const { api, wrapper } = mountComposable({ onOcrError })
+    let reject
+    mockProcessPages = vi.fn(() => new Promise((_, rejectPromise) => { reject = rejectPromise }))
+    mockPdfDocumentSession.pageSessions.set(1, createScannedPageSession(1))
+    mockPdfDocumentSession.visiblePageNumbers.add(1)
+    api.refreshOcrRecommendations()
+
+    const run = api.requestOcr()
+    api.cancelOcr()
+    reject(new Error('late OCR failure'))
+    await run
+
+    expect(onOcrError).not.toHaveBeenCalled()
+    wrapper.unmount()
+  })
+
+  it('prevents an old run from emitting after a new run starts', async () => {
+    const onOcrComplete = vi.fn()
+    const { api, wrapper } = mountComposable({ onOcrComplete })
+    const deferredRuns = []
+    mockProcessPages = vi.fn(() => new Promise(resolve => { deferredRuns.push(resolve) }))
+    mockPdfDocumentSession.pageSessions.set(1, createScannedPageSession(1))
+    mockPdfDocumentSession.visiblePageNumbers.add(1)
+    api.refreshOcrRecommendations()
+
+    const firstRun = api.requestOcr()
+    api.cancelOcr()
+    const secondRun = api.requestOcr()
+    deferredRuns[0]([])
+    deferredRuns[1]([])
+    await Promise.all([firstRun, secondRun])
+
+    expect(onOcrComplete).toHaveBeenCalledTimes(1)
+    wrapper.unmount()
+  })
+
+  it('emits only the error terminal callback for failed batches', async () => {
+    const onOcrComplete = vi.fn()
+    const onOcrError = vi.fn()
+    const { api, wrapper } = mountComposable({ onOcrComplete, onOcrError })
+    mockPdfDocumentSession.pageSessions.set(1, createScannedPageSession(1))
+    mockPdfDocumentSession.pageSessions.set(2, createScannedPageSession(2))
+    mockPdfDocumentSession.visiblePageNumbers = new Set([1, 2])
+    mockProcessPages = vi.fn(async () => [
+      { pageNumber: 1, blocks: [{ id: 'ocr-1' }], success: true },
+      { pageNumber: 2, blocks: [], success: false, error: 'Tesseract worker crashed' }
+    ])
+    api.refreshOcrRecommendations()
+
+    await api.requestOcr()
+
+    expect(onOcrError).toHaveBeenCalledWith('ocr-failed', { pageNumbers: [1, 2] })
+    expect(onOcrComplete).not.toHaveBeenCalled()
+    wrapper.unmount()
+  })
+
+  it('emits one batch error callback when saving partial results fails', async () => {
+    const onOcrComplete = vi.fn()
+    const onOcrError = vi.fn()
+    const { api, wrapper } = mountComposable({ onOcrComplete, onOcrError })
+    const { pdfCacheManager } = await import('@/features/pdf-translation/core/PdfCacheManager.js')
+    mockPdfDocumentSession.pageSessions.set(1, createScannedPageSession(1))
+    mockPdfDocumentSession.visiblePageNumbers.add(1)
+    mockPdfDocumentSession.getCommittedOcrState.mockReturnValue({
+      ocrBlocks: [{ id: 'ocr-1' }],
+      ocrLanguage: 'eng',
+      ocrCompletedAt: 0
+    })
+    mockProcessPages = vi.fn(async () => [
+      { pageNumber: 1, blocks: [], success: false, error: 'Tesseract worker crashed' }
+    ])
+    pdfCacheManager.saveOcr.mockRejectedValueOnce(new Error('Cache unavailable'))
+    api.refreshOcrRecommendations()
+
+    await api.requestOcr()
+
+    expect(onOcrError).toHaveBeenCalledTimes(1)
+    expect(onOcrError).toHaveBeenCalledWith('ocr-failed', { pageNumbers: [1] })
+    expect(onOcrComplete).not.toHaveBeenCalled()
+    wrapper.unmount()
+  })
+
+  it('does not emit a second terminal error when the error callback throws', async () => {
+    const callbackError = new Error('Error callback failed')
+    const onOcrComplete = vi.fn()
+    const onOcrError = vi.fn(() => { throw callbackError })
+    const { api, wrapper } = mountComposable({ onOcrComplete, onOcrError })
+    mockPdfDocumentSession.pageSessions.set(1, createScannedPageSession(1))
+    mockPdfDocumentSession.visiblePageNumbers.add(1)
+    mockProcessPages = vi.fn(async () => [
+      { pageNumber: 1, blocks: [], success: false, error: 'Tesseract worker crashed' }
+    ])
+    api.refreshOcrRecommendations()
+
+    await expect(api.requestOcr()).rejects.toThrow(callbackError)
+
+    expect(onOcrError).toHaveBeenCalledTimes(1)
+    expect(onOcrComplete).not.toHaveBeenCalled()
+    wrapper.unmount()
+  })
+
+  it('does not convert a throwing completion callback into an error terminal event', async () => {
+    const callbackError = new Error('Completion callback failed')
+    const onOcrComplete = vi.fn(() => { throw callbackError })
+    const onOcrError = vi.fn()
+    const { api, wrapper } = mountComposable({ onOcrComplete, onOcrError })
+    mockPdfDocumentSession.pageSessions.set(1, createScannedPageSession(1))
+    mockPdfDocumentSession.visiblePageNumbers.add(1)
+    api.refreshOcrRecommendations()
+
+    await expect(api.requestOcr()).rejects.toThrow(callbackError)
+
+    expect(onOcrComplete).toHaveBeenCalledTimes(1)
+    expect(onOcrError).not.toHaveBeenCalled()
+    wrapper.unmount()
+  })
+
+  it('updates recommendations while scrolling down and up across hydrated pages', () => {
+    const { api, wrapper } = mountComposable()
+    mockPdfDocumentSession.pageSessions.set(1, createScannedPageSession(1, { logicalBlocks: [{ id: 'text-1' }] }))
+    mockPdfDocumentSession.pageSessions.set(2, createScannedPageSession(2))
+    mockPdfDocumentSession.pageSessions.set(3, createScannedPageSession(3))
+
+    mockPdfDocumentSession.visiblePageNumbers = new Set([2, 3])
+    visibleListener?.({ pages: [2, 3] })
+    api.requestOcr()
+    expect(api.ocrBatch.pageNumbers).toEqual([2, 3])
+
+    mockPdfDocumentSession.visiblePageNumbers = new Set([1, 2])
+    visibleListener?.({ pages: [1, 2] })
+    api.requestOcr()
+    expect(api.ocrBatch.pageNumbers).toEqual([2])
+
+    mockPdfDocumentSession.visiblePageNumbers = new Set([3])
+    visibleListener?.({ pages: [3] })
+    api.requestOcr()
+    expect(api.ocrBatch.pageNumbers).toEqual([3])
+    wrapper.unmount()
+  })
+
+  it('keeps OCR completion refresh behavior', async () => {
+    const { api, wrapper } = mountComposable()
+    const pageSession = createScannedPageSession(1)
+    mockPdfDocumentSession.pageSessions.set(1, pageSession)
+    mockPdfDocumentSession.visiblePageNumbers.add(1)
+    api.refreshOcrRecommendations()
+    expect(api.ocrRecommendationCount.value).toBe(1)
+
+    mockProcessPages = vi.fn(async () => {
+      pageSession.ocrBlocks = [{ id: 'ocr-1' }]
+      pageSession.ocrLanguage = 'eng'
+      return [{ pageNumber: 1, blocks: pageSession.ocrBlocks, success: true }]
+    })
+
+    await api.confirmOcr()
+
+    expect(api.ocrRecommendationCount.value).toBe(0)
+    wrapper.unmount()
+  })
+
+  it.each([
+    ['all successful pages', [{ pageNumber: 1, blocks: [], success: true }], ''],
+    ['one generic failure', [{ pageNumber: 1, blocks: [], success: false, error: 'Tesseract worker crashed' }], 'ocr-failed'],
+    ['multiple generic failures', [
+      { pageNumber: 1, blocks: [], success: false, error: 'Tesseract worker crashed' },
+      { pageNumber: 2, blocks: [], success: false, error: 'PDF render failed' }
+    ], 'ocr-failed'],
+    ['only cancelled failures', [{ pageNumber: 1, blocks: [], success: false, error: 'cancelled' }], ''],
+    ['cancelled and generic failures', [
+      { pageNumber: 1, blocks: [], success: false, error: 'cancelled' },
+      { pageNumber: 2, blocks: [], success: false, error: 'Tesseract worker crashed' }
+    ], 'ocr-failed'],
+    ['cancelled and missing model failures', [
+      { pageNumber: 1, blocks: [], success: false, error: 'cancelled' },
+      { pageNumber: 2, blocks: [], success: false, error: 'model-not-installed' }
+    ], 'model-not-installed']
+  ])('derives %s as the stable batch error', async (_label, results, expectedError) => {
+    const errorCode = await getBatchOcrError(results)
+
+    expect(errorCode).toBe(expectedError)
+    expect(errorCode).not.toContain('Tesseract')
+  })
+
+  it('prioritizes missing models regardless of page result order', async () => {
+    const genericFailure = { pageNumber: 1, blocks: [], success: false, error: 'Tesseract worker crashed' }
+    const missingModelFailure = { pageNumber: 2, blocks: [], success: false, error: 'model-not-installed' }
+
+    expect(await getBatchOcrError([genericFailure, missingModelFailure])).toBe('model-not-installed')
+    expect(await getBatchOcrError([missingModelFailure, genericFailure])).toBe('model-not-installed')
+  })
+
+  it('removes lifecycle listeners on unmount', () => {
+    const { wrapper } = mountComposable()
+
+    expect(commitListener).toEqual(expect.any(Function))
+    expect(visibleListener).toEqual(expect.any(Function))
+    wrapper.unmount()
+
+    expect(commitListener).toBeNull()
+    expect(visibleListener).toBeNull()
+  })
+})

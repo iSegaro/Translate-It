@@ -1,0 +1,203 @@
+// ── ToolbarMenu ──────────────────────────────────────────────
+// Desktop: inline anchored popover. Mobile: teleported full-height drawer.
+
+$tm-mobile-breakpoint: 749px;
+
+.toolbar-menu {
+  position: relative;
+
+  // Layer tokens — defaults use the project's shared z-index system.
+  --tm-layer-backdrop: var(--ti-z-dropdown);
+  --tm-layer-panel: calc(var(--ti-z-dropdown) + 1);
+
+  // Panel (desktop popover) tokens
+  --tm-panel-background: transparent;
+  --tm-panel-border: none;
+  --tm-panel-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  --tm-panel-radius: 14px;
+  --tm-panel-inline-size: auto;
+  --tm-panel-min-inline-size: 190px;
+  --tm-panel-viewport-gutter: 0px;
+  --tm-panel-viewport-inline-size: calc(
+    100vw - (var(--tm-panel-viewport-gutter) * 2)
+  );
+
+  // Drawer (mobile) tokens
+  --tm-drawer-background: transparent;
+  --tm-drawer-border-color: transparent;
+  --tm-drawer-shadow: 0 0 0 1px rgba(0, 0, 0, 0.05), 0 8px 40px rgba(0, 0, 0, 0.32);
+  --tm-drawer-radius: 10px;
+  --tm-drawer-width: 320px;
+  --tm-drawer-header-color: inherit;
+  --tm-drawer-header-border: 1px solid rgba(0, 0, 0, 0.08);
+  --tm-drawer-close-color: inherit;
+  --tm-drawer-close-hover-bg: rgba(0, 0, 0, 0.06);
+}
+
+// ── Placement ────────────────────────────────────────────────
+
+.toolbar-menu--placement-end {
+  .toolbar-menu__panel {
+    inset-inline-end: 0;
+  }
+}
+
+.toolbar-menu--placement-start {
+  .toolbar-menu__panel {
+    inset-inline-start: 0;
+  }
+}
+
+// ── Desktop Popover ──────────────────────────────────────────
+
+.toolbar-menu__backdrop {
+  display: none;
+}
+
+.toolbar-menu__panel {
+  position: absolute;
+  top: calc(100% + var(--tm-offset, 8px));
+  z-index: var(--tm-layer-panel);
+  inline-size: var(--tm-panel-inline-size);
+  min-inline-size: var(--tm-panel-min-inline-size);
+  max-inline-size: min(
+    var(--tm-panel-max-inline-size, var(--tm-panel-viewport-inline-size)),
+    var(--tm-panel-viewport-inline-size)
+  );
+  max-height: calc(100vh - 120px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  background: var(--tm-panel-background);
+  border: var(--tm-panel-border);
+  border-radius: var(--tm-panel-radius);
+  box-shadow: var(--tm-panel-shadow);
+}
+
+// ── Mobile Drawer ────────────────────────────────────────────
+
+.toolbar-menu__drawer {
+  display: none;
+
+  @media (max-width: $tm-mobile-breakpoint) {
+    position: fixed;
+    top: 0;
+    inset-inline-end: 0;
+    bottom: 0;
+    z-index: var(--tm-layer-panel);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    background: var(--tm-drawer-background, transparent);
+    box-shadow: var(--tm-drawer-shadow, 0 0 0 1px rgba(0, 0, 0, 0.05), 0 8px 40px rgba(0, 0, 0, 0.32));
+    width: var(--tm-drawer-width);
+    max-width: 85vw;
+    border-inline-start: 1px solid var(--tm-drawer-border-color, transparent);
+    border-radius: var(--tm-drawer-radius, 10px) 0 0 var(--tm-drawer-radius, 10px);
+    padding-inline-end: env(safe-area-inset-right, 0);
+  }
+}
+
+/*
+ * Placement modifiers only affect the desktop popover.
+ *
+ * The mobile drawer owns its own positioning rules and must remain
+ * independent from popover placement.
+ *
+ * Drawer positioning should be driven by layout direction (LTR/RTL),
+ * not by popover placement.
+ */
+
+// ── Drawer Header ────────────────────────────────────────────
+
+.toolbar-menu__drawer-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 16px;
+  padding-top: max(12px, env(safe-area-inset-top, 0));
+  flex-shrink: 0;
+  border-bottom: var(--tm-drawer-header-border, 1px solid rgba(0, 0, 0, 0.08));
+  color: var(--tm-drawer-header-color, inherit);
+}
+
+.toolbar-menu__drawer-title {
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.toolbar-menu__drawer-close {
+  display: inline-grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--tm-drawer-close-color, inherit);
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+  flex-shrink: 0;
+
+  &:hover {
+    background: var(--tm-drawer-close-hover-bg, rgba(0, 0, 0, 0.06));
+  }
+}
+
+// ── Drawer Body ──────────────────────────────────────────────
+
+.toolbar-menu__drawer-body {
+  flex: 1;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  padding: 8px 12px;
+  padding-bottom: max(8px, env(safe-area-inset-bottom, 0));
+}
+
+// ── Mobile Backdrop ──────────────────────────────────────────
+
+.toolbar-menu__backdrop {
+  @media (max-width: $tm-mobile-breakpoint) {
+    display: block;
+    position: fixed;
+    inset: 0;
+    z-index: var(--tm-layer-backdrop);
+    background: rgba(0, 0, 0, 0.4);
+  }
+}
+
+// ── Drawer Animation ─────────────────────────────────────────
+
+.toolbar-menu-backdrop-enter-from,
+.toolbar-menu-backdrop-leave-to {
+  opacity: 0;
+}
+
+.toolbar-menu-backdrop-enter-to,
+.toolbar-menu-backdrop-leave-from {
+  opacity: 1;
+}
+
+.toolbar-menu-backdrop-enter-active,
+.toolbar-menu-backdrop-leave-active {
+  transition: opacity 220ms ease;
+}
+
+.toolbar-menu--drawer-enter-from,
+.toolbar-menu--drawer-leave-to {
+  transform: translateX(100%);
+}
+
+.toolbar-menu--drawer-enter-to,
+.toolbar-menu--drawer-leave-from {
+  transform: translateX(0);
+}
+
+.toolbar-menu--drawer-enter-active,
+.toolbar-menu--drawer-leave-active {
+  transition: transform 220ms cubic-bezier(0.2, 0, 0, 1);
+  will-change: transform;
+}

@@ -4,7 +4,11 @@
     v-if="mode === 'split'"
     ref="selectorRef"
     class="ti-split-translate-button-container"
-    :class="{ 'ti-dropdown-open': isDropdownOpen, 'is-disabled': disabled }"
+    :class="{
+      'ti-dropdown-open': isDropdownOpen,
+      'is-disabled': disabled,
+      'ti-split-translate-button-container--compact-label': presentation === 'compact-label'
+    }"
     v-bind="$attrs"
   >
     <div
@@ -14,7 +18,8 @@
       <button
         type="submit"
         class="ti-translate-main-area"
-        :title="loading ? (t('popup_stop_button_title') || 'توقف') : (t('popup_translate_button_title') || 'ترجمه')"
+        :title="mainActionLabel"
+        :aria-label="mainActionLabel"
         :disabled="disabled"
         @click="handleTranslate"
         @keydown="handleKeydown"
@@ -31,14 +36,24 @@
           class="ti-api-provider-icon"
           :class="{ 'ti-invert-dark': isProviderInverted(currentProvider) }"
         >
-        <span>{{ t('popup_translate_button_text') || 'ترجمه' }}</span>
+        <span class="ti-translate-main-labels">
+          <span class="ti-translate-main-label">{{ mainActionLabel }}</span>
+          <span
+            class="ti-translate-main-label-reserve"
+            aria-hidden="true"
+          >{{ translateActionLabel }}</span>
+          <span
+            class="ti-translate-main-label-reserve"
+            aria-hidden="true"
+          >{{ stopActionLabel }}</span>
+        </span>
       </button>
       <button 
         ref="triggerBtnRef"
         type="button"
         class="ti-provider-dropdown-area"
         :class="{ 'ti-active': isDropdownOpen }"
-        :disabled="disabled"
+        :disabled="isProviderSelectionDisabled"
         @click.stop="toggleDropdown"
         @keydown="handleKeydown"
       >
@@ -47,7 +62,7 @@
           alt="Dropdown"
           type="inline"
           class="ti-dropdown-arrow"
-          :disabled="disabled"
+          :disabled="isProviderSelectionDisabled"
         />
       </button>
     </div>
@@ -58,14 +73,14 @@
     v-else-if="mode === 'button'"
     ref="selectorRef"
     class="ti-provider-button-container"
-    :class="{ 'ti-dropdown-open': isDropdownOpen, 'is-disabled': disabled }"
+    :class="{ 'ti-dropdown-open': isDropdownOpen, 'is-disabled': isProviderSelectionDisabled }"
     v-bind="$attrs"
   >
     <button
       ref="triggerBtnRef"
       class="ti-provider-button"
       :class="{ 'ti-active': isDropdownOpen }"
-      :disabled="disabled"
+      :disabled="isProviderSelectionDisabled"
       @click="toggleDropdown"
       @keydown="handleKeydown"
     >
@@ -82,7 +97,7 @@
         type="inline"
         class="dropdown-arrow"
         :class="{ rotated: isDropdownOpen }"
-        :disabled="disabled"
+        :disabled="isProviderSelectionDisabled"
       />
     </button>
   </div>
@@ -92,7 +107,7 @@
     v-else-if="mode === 'icon-only'"
     ref="selectorRef"
     class="ti-provider-icon-only-container"
-    :class="{ 'ti-dropdown-open': isDropdownOpen, 'is-disabled': disabled }"
+    :class="{ 'ti-dropdown-open': isDropdownOpen, 'is-disabled': isProviderSelectionDisabled }"
     v-bind="$attrs"
   >
     <button
@@ -100,7 +115,7 @@
       class="ti-provider-icon-button"
       :class="{ 'ti-active': isDropdownOpen }"
       :title="currentProviderName"
-      :disabled="disabled"
+      :disabled="isProviderSelectionDisabled"
       @click="toggleDropdown"
       @keydown="handleKeydown"
     >
@@ -118,14 +133,14 @@
     v-else-if="mode === 'mobile'"
     ref="selectorRef"
     class="ti-provider-mobile-container"
-    :class="{ 'ti-dropdown-open': isDropdownOpen, 'is-disabled': disabled }"
+    :class="{ 'ti-dropdown-open': isDropdownOpen, 'is-disabled': isProviderSelectionDisabled }"
     v-bind="$attrs"
   >
     <button
       ref="triggerBtnRef"
       class="ti-provider-mobile-button"
       :class="{ 'ti-active': isDropdownOpen }"
-      :disabled="disabled"
+      :disabled="isProviderSelectionDisabled"
       @click="toggleDropdown"
       @keydown="handleKeydown"
     >
@@ -142,7 +157,7 @@
         type="inline"
         class="dropdown-arrow"
         :class="{ rotated: isDropdownOpen }"
-        :disabled="disabled"
+        :disabled="isProviderSelectionDisabled"
       />
     </button>
   </div>
@@ -151,14 +166,14 @@
   <div
     v-else
     class="ti-provider-compact-container"
-    :class="{ 'is-disabled': disabled }"
+    :class="{ 'is-disabled': isProviderSelectionDisabled }"
     v-bind="$attrs"
   >
     <select
       :value="currentProvider"
       class="ti-provider-select"
       :class="{ 'is-dark': settingsStore.isDarkTheme }"
-      :disabled="disabled"
+      :disabled="isProviderSelectionDisabled"
       @change="handleProviderChange"
     >
       <option
@@ -328,6 +343,10 @@ const props = defineProps({
     type: Boolean,
     default: false
   },
+  dropdownDisabled: {
+    type: Boolean,
+    default: false
+  },
   isGlobal: {
     type: Boolean,
     default: true
@@ -348,6 +367,11 @@ const props = defineProps({
     type: Boolean,
     default: false
   },
+  presentation: {
+    type: String,
+    default: 'default',
+    validator: (value) => ['default', 'compact-label'].includes(value)
+  },
   onlyConfigured: {
     type: Boolean,
     default: false
@@ -364,8 +388,16 @@ const props = defineProps({
     type: String,
     default: 'auto', // auto, up, down
     validator: (value) => ['auto', 'up', 'down'].includes(value)
+  },
+  translateOnProviderChange: {
+    type: Boolean,
+    default: true
   }
 })
+
+const translateActionLabel = computed(() => t('popup_translate_button_text') || 'Translate')
+const stopActionLabel = computed(() => t('popup_stop_button_title') || 'Stop')
+const mainActionLabel = computed(() => (props.loading ? stopActionLabel.value : translateActionLabel.value))
 
 // Emits
 const emit = defineEmits(['translate', 'cancel', 'provider-change', 'update:modelValue'])
@@ -400,6 +432,8 @@ const isRTL = computed(() => {
     return false;
   }
 })
+
+const isProviderSelectionDisabled = computed(() => props.disabled || props.dropdownDisabled)
 
 /**
  * Computed property to identify the current global default provider
@@ -786,7 +820,7 @@ const handleTranslate = () => {
  * Toggles the provider selection dropdown
  */
 const toggleDropdown = () => {
-  if (props.disabled) return
+  if (isProviderSelectionDisabled.value) return;
 
   // Deactivate select element mode if it's active when user interacts with this control
   if (isSelectModeActive.value) {
@@ -950,7 +984,7 @@ const selectProvider = async (provider) => {
     closeDropdown()
 
     // Auto-trigger translation in split mode after selecting a provider
-    if (props.mode === 'split' && !props.disabled) {
+    if (props.mode === 'split' && !props.disabled && props.translateOnProviderChange) {
       emit('translate', { provider: provider.id })
     }
   } catch (error) {

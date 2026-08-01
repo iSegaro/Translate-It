@@ -124,7 +124,7 @@ class LifecycleManager {
       'ping': Handlers.handlePingLazy,
       [MessageActions.OPEN_OPTIONS_PAGE]: Handlers.handleOpenOptionsPageLazy,
       'openURL': Handlers.handleOpenURLLazy,
-      [MessageActions.FOCUS_OR_CREATE_TAB]: Handlers.handleFocusOrCreateTabLazy,
+      [MessageActions.LAUNCH_EXTENSION_APP]: Handlers.handleLaunchExtensionAppLazy,
       [MessageActions.UPDATE_CONTEXT_MENU]: Handlers.handleRefreshContextMenusLazy,
       'showOSNotification': Handlers.handleShowOSNotification,
       'REFRESH_CONTEXT_MENUS': Handlers.handleRefreshContextMenusLazy,
@@ -139,6 +139,7 @@ class LifecycleManager {
       
       // Translation handlers
       'TRANSLATE': Handlers.handleTranslateLazy,
+      [MessageActions.TRANSLATE_TEXT]: Handlers.handleTranslateTextLazy,
       'translateText': Handlers.handleTranslateTextLazy,
       'revertTranslation': Handlers.handleRevertTranslationLazy,
       'CANCEL_TRANSLATION': Handlers.handleCancelTranslationLazy,

@@ -25,6 +25,7 @@ export const TranslationMode = {
   Mobile_Translate: MessageContexts.MOBILE_TRANSLATE,
   ScreenCapture: MessageContexts.CAPTURE_MANAGER,
   Page: MessageContexts.PAGE_TRANSLATION_BATCH, // Whole page translation
+  PDF: MessageContexts.PDF_TRANSLATION, // Dedicated PDF translation
   MouseHover: 'mouse_hover', // Mouse on hover translation
   Subtitle: MessageContexts.SUBTITLE_TRANSLATION,
   
@@ -263,6 +264,7 @@ export const CONFIG = {
   ENABLE_DICTIONARY: true, // با مکانیزم تشخیص کلمه، بعنوان دیکشنری پاسخ را نمایش میدهد
   ENABLE_SCREEN_CAPTURE: true, // فعال کردن قابلیت Screen Capture Translator
   OCR_DEFAULT_LANG: 'eng', // زبان پیش‌فرض OCR
+  OCR_PREFERRED_ACTION: 'region', // اقدام ترجیحی PDF OCR: 'region' | 'page'
   ACTIVE_SELECTION_ICON_ON_TEXTFIELDS: true, // فعال کردن دوبار کلیک روی متن در فیلدهای متنی
   EXCLUDED_SITES: [], // وب‌سایت‌هایی که افزونه در آن‌ها غیرفعال باشد
   MOBILE_UI_MODE: MOBILE_CONSTANTS.UI_MODE.AUTO, // حالت رابط کاربری موبایل: auto, mobile, desktop
@@ -297,10 +299,11 @@ export const CONFIG = {
     [TranslationMode.Field]: true,
     [TranslationMode.Selection]: true, // WindowsManager
     [TranslationMode.Page]: false,     // Default disabled for whole page to prevent checkerboarding
+    [TranslationMode.PDF]: false,
     [TranslationMode.Dictionary_Translation]: true,
     [TranslationMode.ScreenCapture]: true,
     [TranslationMode.MouseHover]: true
-    },
+  },
   // --- Whole Page Translation Settings Getters ---
   SMART_CONTEXT_TRANSLATION_ENABLED: true, // Enable/disable smart context and logical batching
   WHOLE_PAGE_TRANSLATION_ENABLED: true, // فعال بودن ترجمه کل صفحه
@@ -346,8 +349,11 @@ export const CONFIG = {
   CONTEXT_MENU_VISIBILITY: {
     PAGE_CONTEXT_SELECT_ELEMENT: true,    // نمایش در کلیک‌راست صفحات
     PAGE_CONTEXT_SCREEN_CAPTURE: true,    // نمایش تصویربرداری در کلیک‌راست صفحات
+    PAGE_CONTEXT_PDF_TRANSLATOR: true,    // نمایش مترجم PDF در کلیک‌راست لینک‌های PDF
     ACTION_CONTEXT_SELECT_ELEMENT: true,  // نمایش در منوی آیکون افزونه (Action)
     ACTION_CONTEXT_SCREEN_CAPTURE: true,  // نمایش تصویربرداری در منوی آیکون
+    ACTION_CONTEXT_PDF_TRANSLATOR: true,  // نمایش مترجم PDF در منوی آیکون
+    ACTION_CONTEXT_SUBTITLE_TRANSLATOR: true, // نمایش مترجم زیرنویس در منوی آیکون
     ACTION_CONTEXT_OPTIONS: true,         // نمایش گزینه تنظیمات در منوی آیکون
     ACTION_CONTEXT_SHORTCUTS: true,       // نمایش میانبرهای کیبورد در منوی آیکون
     ACTION_CONTEXT_HELP: true             // نمایش راهنما در منوی آیکون
@@ -1012,6 +1018,7 @@ export const getEffectiveProviderAsync = async (mode) => {
     // Mode-specific requirements
     const needsBulk = [
       TranslationMode.Page, 
+      TranslationMode.PDF,
       TranslationMode.Select_Element, 
       TranslationMode.Field
     ].includes(mode);

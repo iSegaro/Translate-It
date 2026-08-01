@@ -284,6 +284,18 @@
   "ocr_tab_title": {
     "message": "Screen OCR"
   },
+  "ocr_page": {
+    "message": "OCR Page"
+  },
+  "ocr_page_compact": {
+    "message": "Page"
+  },
+  "ocr_region": {
+    "message": "OCR Region"
+  },
+  "ocr_region_compact": {
+    "message": "Region"
+  },
   "ocr_toggle_section_title": {
     "message": "Screen OCR Settings"
   },
@@ -1431,7 +1443,7 @@
     "message": "Translate"
   },
   "popup_stop_button_title": {
-    "message": "Stop translation"
+    "message": "Stop"
   },
   "popup_exclude_toggle_title": {
     "message": "Enable/Disable on this site"
@@ -2228,6 +2240,21 @@
   "window_close": {
     "message": "Close"
   },
+  "pdf_windows_host_aria_label": {
+    "message": "PDF translation window"
+  },
+  "pdf_windows_host_selected_text": {
+    "message": "Selected text"
+  },
+  "pdf_windows_host_detected_language": {
+    "message": "Detected language"
+  },
+  "pdf_windows_host_copied": {
+    "message": "Copied"
+  },
+  "pdf_windows_host_copy_failed": {
+    "message": "Copy failed"
+  },
   "window_tts_no_text": {
     "message": "No text available for speech"
   },
@@ -2701,6 +2728,36 @@
   },
   "subtitle_app_title": {
     "message": "Subtitle Translator"
+  },
+  "pdf_app_title": {
+    "message": "PDF Translator"
+  },
+  "pdf_tab_title": {
+    "message": "PDF"
+  },
+  "pdf_tab_desc": {
+    "message": "Manage PDF-related settings."
+  },
+  "pdf_context_menu_section_title": {
+    "message": "Context Menu"
+  },
+  "pdf_context_menu_label": {
+    "message": "Show PDF Translator in the browser context menu"
+  },
+  "pdf_context_menu_desc": {
+    "message": "Display the \"PDF Translator\" option in the browser's right-click menu for PDF links."
+  },
+  "pdf_action_context_menu_label": {
+    "message": "Show PDF Translator in the extension action menu"
+  },
+  "pdf_action_context_menu_desc": {
+    "message": "Display the PDF Translator launcher in the extension's toolbar menu."
+  },
+  "subtitle_action_context_menu_label": {
+    "message": "Show Subtitle Translator in the extension action menu"
+  },
+  "subtitle_action_context_menu_desc": {
+    "message": "Display the Subtitle Translator launcher in the extension's toolbar menu."
   },
   "subtitle_app_powered_by": {
     "message": "Powered by Translate It"

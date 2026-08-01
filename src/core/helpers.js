@@ -95,53 +95,6 @@ export const openOptionsPage = (anchor = null) => {
     });
 };
 
-export const openOptionsPage_from_Background = (message) => {
-  const anchor = message.data?.anchor;
-  const optionsPath = "src/html/options.html";
-  const baseUrl = browser.runtime.getURL(optionsPath);
-  const finalUrl = anchor ? `${baseUrl}#${anchor}` : baseUrl;
-  focusOrCreateTab(finalUrl);
-};
-
-export function focusOrCreateTab(url) {
-  const baseUrl = url.split("#")[0];
-  browser.tabs
-    .query({})
-    .then((tabs) => {
-      const targetPath = baseUrl.replace(/^chrome-extension:\/\/[^/]+/, "");
-      const existingTabs = tabs.filter((tab) => {
-        if (!tab.url) return false;
-        const tabPath = tab.url
-          .split("#")[0]
-          .replace(/^chrome-extension:\/\/[^/]+/, "");
-        return tabPath === targetPath;
-      });
-
-      if (existingTabs.length > 0) {
-        const firstTab = existingTabs[0];
-        const duplicateTabIds = existingTabs.slice(1).map((tab) => tab.id);
-        if (duplicateTabIds.length > 0) {
-          browser.tabs
-            .remove(duplicateTabIds)
-            .catch((err) => logger.error("Error closing duplicate tabs:", err));
-        }
-        browser.tabs
-          .update(firstTab.id, { active: true, url: url })
-          .then((updatedTab) => {
-            if (updatedTab)
-              browser.windows.update(updatedTab.windowId, { focused: true });
-          })
-          .catch(() => browser.tabs.create({ url: url }));
-      } else {
-        browser.tabs.create({ url: url });
-      }
-    })
-    .catch((err) => {
-      logger.error("Error in focusOrCreateTab:", err);
-      browser.tabs.create({ url: url });
-    });
-}
-
 export function taggleLinks(enable = true) {
   try {
     if (!document?.body) return;

@@ -1,0 +1,40 @@
+.operation-status {
+  position: absolute;
+  top: calc(var(--pdf-toolbar-sticky-height) + 8px);
+  right: 16px;
+  z-index: calc(var(--pdf-layer-popup) + 5);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 12px;
+  background: rgb(21 24 30 / 92%);
+  border-radius: 4px;
+  box-shadow: 0 2px 8px rgb(0 0 0 / 30%);
+  pointer-events: auto;
+}
+
+.operation-status__title {
+  font-size: 11px;
+  font-weight: 500;
+  color: rgb(255 255 255 / 50%);
+  white-space: nowrap;
+}
+
+.operation-status__cancel {
+  appearance: none;
+  border: 1px solid rgb(255 255 255 / 10%);
+  border-radius: 3px;
+  padding: 1px 6px;
+  background: transparent;
+  color: rgb(255 255 255 / 40%);
+  font-size: 10px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+
+  &:hover {
+    background: rgb(239 68 68 / 18%);
+    color: #fecaca;
+    border-color: rgb(239 68 68 / 35%);
+  }
+}

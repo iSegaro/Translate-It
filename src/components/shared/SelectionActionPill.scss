@@ -1,0 +1,211 @@
+/* SelectionActionPill.scss - shared selection toolbar pill & buttons */
+
+.ti-translation-icon {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 2px !important;
+  padding: 2px !important;
+  border-radius: 20px !important;
+  background-color: #ffffff !important;
+  border: 1px solid #e0e0e0 !important;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1), 0 1px 3px rgba(0, 0, 0, 0.08) !important;
+  z-index: 2147483645 !important;
+  direction: ltr !important;
+  user-select: none !important;
+  box-sizing: border-box !important;
+  animation: ti-slide-in-up 0.3s cubic-bezier(0.4, 0, 0.2, 1) forwards !important;
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1) !important;
+
+  &.dark {
+    background-color: #2d2d2d !important;
+    border-color: #424242 !important;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3), 0 2px 4px rgba(0, 0, 0, 0.2) !important;
+
+    .ti-icon-btn {
+      color: #b0b0b0 !important;
+
+      &:hover {
+        background-color: #424242 !important;
+        color: #64b5f6 !important;
+      }
+
+      &:active {
+        background-color: #1e3a8a !important;
+      }
+    }
+
+    .ti-icon-btn--translate {
+      &:hover {
+        color: #81c784 !important;
+        background-color: #1b5e20 !important;
+      }
+    }
+
+    .ti-icon-btn--playing {
+      color: #81c784 !important;
+      background-color: #1b5e20 !important;
+
+      &:hover {
+        background-color: #2e7d32 !important;
+      }
+    }
+
+    .ti-icon-btn--loading {
+      color: #64b5f6 !important;
+    }
+
+    .ti-icon-btn--error {
+      color: #e57373 !important;
+      background-color: #b71c1c !important;
+
+      &:hover {
+        background-color: #d32f2f !important;
+      }
+    }
+  }
+}
+
+.ti-icon-btn {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  width: 28px !important;
+  height: 28px !important;
+  border-radius: 50% !important;
+  background-color: transparent !important;
+  border: none !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  cursor: pointer !important;
+  outline: none !important;
+  color: #5f6368 !important;
+  box-sizing: border-box !important;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1) !important;
+
+  &:hover {
+    background-color: #f1f3f4 !important;
+    color: #1a73e8 !important;
+    transform: scale(1.1) !important;
+  }
+
+  &:active {
+    transform: scale(0.95) !important;
+    background-color: #e8f0fe !important;
+  }
+
+  &:disabled {
+    opacity: 0.5 !important;
+    cursor: not-allowed !important;
+    pointer-events: none !important;
+  }
+}
+
+.ti-icon-btn__svg {
+  display: block !important;
+  pointer-events: none !important;
+  transition: transform 0.2s ease !important;
+  width: 16px !important;
+  height: 16px !important;
+  fill: currentColor !important;
+}
+
+.ti-icon-btn--translate {
+  &:hover {
+    color: #0fa438 !important;
+    background-color: #e6f4ea !important;
+  }
+}
+
+.ti-icon-btn--playing {
+  color: #0fa438 !important;
+  background-color: #e6f4ea !important;
+
+  &:hover {
+    background-color: #d2e9d6 !important;
+  }
+}
+
+.ti-icon-btn--loading {
+  color: #1a73e8 !important;
+
+  .ti-icon-btn__svg {
+    animation: ti-spin 1s linear infinite !important;
+  }
+}
+
+.ti-icon-btn--error {
+  color: #d93025 !important;
+  background-color: #fce8e6 !important;
+
+  &:hover {
+    background-color: #f9d2cd !important;
+  }
+}
+
+@keyframes ti-slide-in-up {
+  from {
+    opacity: 0;
+    transform: scale(0.9);
+  }
+
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes ti-spin {
+  from {
+    transform: rotate(0deg);
+  }
+
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-contrast: high) {
+  .ti-translation-icon {
+    border-width: 2px !important;
+    border-color: #000000 !important;
+  }
+
+  .ti-icon-btn:hover {
+    background-color: #000000 !important;
+    color: #ffffff !important;
+  }
+
+  .ti-icon-btn__svg {
+    filter: invert(1) !important;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ti-translation-icon {
+    animation: none !important;
+    transition: none !important;
+  }
+
+  .ti-icon-btn {
+    transition: none !important;
+
+    &:hover {
+      transform: none !important;
+    }
+
+    &:active {
+      transform: none !important;
+    }
+  }
+
+  .ti-icon-btn--loading .ti-icon-btn__svg {
+    animation: none !important;
+  }
+}
+
+@media print {
+  .ti-translation-icon {
+    display: none !important;
+  }
+}

@@ -1,0 +1,16 @@
+/* PdfLinkOverlay.scss */
+.pdf-link-overlay {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 3;
+}
+
+.pdf-link-overlay__hit {
+  position: absolute;
+  pointer-events: auto;
+  cursor: pointer;
+  background: transparent;
+  border: none;
+  padding: 0;
+}

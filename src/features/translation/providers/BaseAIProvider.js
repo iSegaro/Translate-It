@@ -105,7 +105,7 @@ export class BaseAIProvider extends BaseProvider {
    */
   async _shouldUseStreaming(texts, messageId, engine, translateMode) {
     // Disable internal AI streaming for Select Element or Page modes 
-    if (translateMode === TranslationMode.Select_Element || translateMode === TranslationMode.Page) {
+    if (translateMode === TranslationMode.Select_Element || translateMode === TranslationMode.Page || translateMode === TranslationMode.PDF) {
       return false;
     }
 

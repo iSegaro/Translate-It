@@ -1,0 +1,43 @@
+@use "@/assets/styles/base/variables" as *;
+
+.pdf-tab {
+  padding: 1rem;
+
+  .tab-header {
+    margin-bottom: 2rem;
+
+    h2 {
+      font-size: 1.5rem;
+      font-weight: 600;
+      margin-bottom: 0.5rem;
+      color: var(--text-primary);
+    }
+
+    .tab-description {
+      color: var(--text-secondary);
+      font-size: 0.9rem;
+    }
+  }
+
+  .setting-group {
+    transition: all 0.3s ease;
+    margin-bottom: 1.5rem;
+
+    &:first-child {
+      margin-top: 0.5rem; /* Add space for header actions */
+    }
+
+    &:last-child {
+      margin-bottom: 0;
+    }
+
+    .setting-description {
+      display: block;
+      margin-top: 0.5rem;
+      color: var(--text-secondary);
+      font-size: 0.85rem;
+      margin-bottom: 0;
+      padding-inline-start: 32px;
+    }
+  }
+}

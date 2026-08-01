@@ -1,0 +1,65 @@
+# ADR-009: Benchmark Candidate Model
+
+## Status
+
+Accepted
+
+---
+
+## Context
+
+Region Benchmark compares repeated executions of production Region OCR under defined OCR configurations. Current immutable candidate configurations include render scale; OCR language is runtime input supplied when a comparison run starts.
+
+## Problem
+
+Region Benchmark previously used provider terminology and resolved translation-provider metadata. Translation providers are neither OCR implementations nor benchmark configurations, so this model cannot describe scale comparisons or execute the intended OCR path.
+
+## Decision
+
+The benchmark unit is an immutable `BenchmarkCandidate`. A candidate identifies one OCR configuration, not an OCR engine.
+
+```js
+{
+  candidateId: 'scale-1.5',
+  configuration: {
+    scale: 1.5
+  }
+}
+```
+
+Provider terminology is removed from Region Benchmark. Benchmark policy supplies OCR configurations to candidate planning. Candidate planning generates immutable candidates only; it does not choose configurations, resolve runtime dependencies, or execute OCR.
+
+Evaluation remains independent from execution. `BenchmarkEvaluator` consumes benchmark outputs only after execution and only when a caller explicitly supplies ground truth; no automatic reference lookup is allowed.
+
+`PdfRegionOcrExecutor` remains the sole production OCR executor. Benchmark orchestration supplies candidates and sequences their execution; it does not own rendering, OCR, cleanup, or cancellation implementation.
+
+## Ownership
+
+- `PdfRegion` remains canonical geometry under ADR-006.
+- `RegionExecutionDispatcher` remains request routing under ADR-007.
+- Benchmark policy is represented directly by one immutable OCR configuration collection.
+- `BenchmarkCandidatePlanner` owns candidate generation from supplied configurations.
+- Benchmark runner owns benchmark lifecycle only.
+- `PdfRegionOcrExecutor` owns render, OCR, cleanup, and cancellation.
+- OCR evaluation owns normalization and metrics independently from execution.
+
+## Candidate Model
+
+`OCRConfiguration` is an immutable domain value containing candidate parameters, currently `scale`. It is not an OCR executor, runtime state, or provider metadata. OCR language is runtime input supplied to `RegionComparisonRunner.execute(request, language)` and recorded with each result, not part of candidate identity. Future candidate parameters extend `OCRConfiguration`.
+
+`BenchmarkCandidate` owns one `OCRConfiguration` and contains:
+
+- `candidateId`: stable identifier for one configuration.
+- `configuration`: immutable `OCRConfiguration`.
+
+Candidates must not contain translation-provider metadata, OCR executor instances, or mutable runtime state.
+
+## Consequences
+
+- Scale comparisons have direct domain representation.
+- Future OCR parameters extend `configuration` without introducing provider abstractions.
+- Dynamic translation-provider lookup is removed from Region Benchmark.
+- `ExecutionMetadata` describes immutable timing and canonical region context; `RegionBenchmarkArtifact` defines versioned immutable artifact schema validation; `BenchmarkArtifactWriter` produces them from completed results without affecting execution or evaluation.
+- `BenchmarkAnalyzer` derives non-persisted developer insights from completed results without affecting execution, evaluation, or artifacts.
+- `BenchmarkAnalyzer.analyze(BenchmarkResult)` consumes the completed result object and derives its summary from `BenchmarkResult.results`.
+- This decision does not add reporting or multi-engine support.

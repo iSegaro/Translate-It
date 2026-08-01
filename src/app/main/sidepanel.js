@@ -10,6 +10,7 @@ import ExtensionContextManager from '@/core/extensionContext.js'
 import { getScopedLogger } from '@/shared/logging/logger.js'
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js'
 import { configureVueForCSP } from '@/shared/vue/vue-utils.js'
+import useSettingsStore from '@/features/settings/stores/settings.js'
 
 const logger = getScopedLogger(LOG_COMPONENTS.UI, 'sidepanel-main')
 
@@ -33,7 +34,7 @@ async function initializeApp() {
     // Setup browser API globals for compatibility
     setupBrowserAPIGlobals()
     
-    logger.debug('ðŸŒ Browser API globals configured')
+    logger.debug('ï¿½ Browser API globals configured')
 
     // Debug browser API availability for i18n
     logger.debugLazy(() => [
@@ -117,3 +118,8 @@ async function initializeApp() {
 
 // Initialize the app
 initializeApp()
+
+window.addEventListener('beforeunload', () => {
+  const store = useSettingsStore()
+  store.cleanupStoreResources()
+})

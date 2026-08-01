@@ -126,7 +126,7 @@ export class StreamingManager extends ResourceTracker {
     const streamInfo = this.activeStreams.get(messageId);
     const senderInfo = this.senderInfo.get(messageId);
 
-    if (!streamInfo || !senderInfo) {
+    if (!streamInfo || streamInfo.status !== 'active' || !senderInfo) {
       logger.warn(`[StreamingManager] Cannot stream - missing info for messageId: ${messageId}`);
       return;
     }
@@ -194,7 +194,7 @@ export class StreamingManager extends ResourceTracker {
     const streamInfo = this.activeStreams.get(messageId);
     const senderInfo = this.senderInfo.get(messageId);
 
-    if (!streamInfo || !senderInfo) {
+    if (!streamInfo || streamInfo.status !== 'active' || !senderInfo) {
       logger.warn(`[StreamingManager] Cannot stream error - missing info for messageId: ${messageId}`);
       return;
     }
@@ -236,19 +236,21 @@ export class StreamingManager extends ResourceTracker {
    * @param {boolean} success - Whether translation was successful
    * @param {object} additionalData - Additional completion data
    */
-  async completeStream(messageId, success = true, additionalData = {}) {
+  async completeStream(messageId, success = true, additionalData = {}, finalizeCancelled = false) {
     const streamInfo = this.activeStreams.get(messageId);
     const senderInfo = this.senderInfo.get(messageId);
 
-    // CRITICAL: Ensure this only runs once
-    if (!streamInfo || streamInfo.status === 'completed' || streamInfo.status === 'error' || streamInfo.status === 'reported') {
+    const isCancelled = streamInfo?.status === 'cancelled';
+    if (!streamInfo || streamInfo.status === 'completed' || streamInfo.status === 'error' || (isCancelled && !finalizeCancelled)) {
       return;
     }
 
-    const wasActive = streamInfo.status === 'active';
+    const wasActive = streamInfo.status === 'active' || isCancelled;
     
-    // Update stream info state immediately to prevent re-entry
-    streamInfo.status = success ? 'completed' : 'error';
+    // Cancellation owns its terminal state; completion only publishes its final event and cleanup.
+    if (!isCancelled) {
+      streamInfo.status = success ? 'completed' : 'error';
+    }
     streamInfo.endTime = Date.now();
     streamInfo.duration = streamInfo.endTime - streamInfo.startTime;
 
@@ -304,9 +306,6 @@ export class StreamingManager extends ResourceTracker {
       logger.debug(`[StreamingManager] Failed to send stream end for ${messageId}:`, error.message);
     }
 
-    // Mark as reported so even if streamInfo stays in Map for 30s, we don't log again
-    streamInfo.status = 'reported';
-
     // Cleanup after delay
     this._cleanupStream(messageId);
   }
@@ -359,7 +358,7 @@ export class StreamingManager extends ResourceTracker {
     await this.completeStream(messageId, false, {
       cancelled: true,
       reason: reason
-    });
+    }, true);
   }
 
   /**
@@ -413,12 +412,12 @@ export class StreamingManager extends ResourceTracker {
     const results = this.streamingResults.get(messageId) || [];
     
     return {
-      status: streamInfo.status === 'reported' ? 'completed' : streamInfo.status,
+      status: streamInfo.status,
       hasResults: results.length > 0,
       results: results,
       processedSegments: streamInfo.processedSegments,
       totalSegments: streamInfo.totalSegments,
-      isComplete: streamInfo.status === 'completed' || streamInfo.status === 'reported'
+      isComplete: streamInfo.status === 'completed'
     };
   }
 

@@ -1,0 +1,290 @@
+.pdf-windows-host__icon-stage {
+  position: fixed;
+  z-index: 2147483646;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: auto;
+}
+
+.pdf-windows-host {
+  position: fixed;
+  z-index: 2147483647;
+  animation: ti-fade-in 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px 12px 10px;
+  border: 1px solid #424242;
+  border-radius: 14px;
+  background: #2d2d2d;
+  color: #e0e0e0;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+  transform: none;
+  max-width: min(350px, 85vw);
+  max-height: min(400px, 80vh);
+  pointer-events: auto;
+  box-sizing: border-box;
+  overflow: hidden;
+}
+
+// Light theme override — uses global :root.theme-light contract.
+// Keep in sync with TranslationWindow light theme colors.
+:root.theme-light .pdf-windows-host {
+  background: #ffffff;
+  color: #2c3e50;
+  border-color: #e8e8e8;
+
+  .pdf-windows-host__header {
+    background: #f7f7f7;
+    border-bottom-color: #e8e8e8;
+  }
+
+  .pdf-windows-host__label {
+    color: #5f6368;
+  }
+
+  .pdf-windows-host__text--source {
+    color: inherit;
+  }
+
+  .pdf-windows-host__state--loading {
+    color: #5f6368;
+  }
+
+  .pdf-windows-host__body::-webkit-scrollbar-thumb {
+    background: rgba(0, 0, 0, 0.16);
+  }
+}
+
+.pdf-windows-host--loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border-radius: 50%;
+  border-color: #555;
+  max-width: none;
+  max-height: none;
+  overflow: visible;
+}
+
+.pdf-windows-host--docked {
+  border-radius: 0;
+  max-width: calc(100vw - 24px);
+  max-height: none;
+  height: 100vh;
+  overflow: hidden;
+}
+
+.pdf-windows-host--dock-left {
+  left: 12px;
+  right: auto;
+}
+
+.pdf-windows-host--dock-right {
+  right: 12px;
+  left: auto;
+}
+
+.pdf-windows-host--dragging,
+.pdf-windows-host--resizing {
+  user-select: none;
+}
+
+.pdf-windows-host__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  cursor: grab;
+  padding: 8px 10px;
+  margin: -12px -12px 0;
+  border-bottom: 1px solid #424242;
+  background: #333333;
+  border-radius: 14px 14px 0 0;
+}
+
+.pdf-windows-host--dragging .pdf-windows-host__header {
+  cursor: grabbing;
+}
+
+.pdf-windows-host__title-group {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.pdf-windows-host__toolbar {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.pdf-windows-host__body {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+  padding-right: 6px;
+  padding-bottom: 2px;
+  box-sizing: border-box;
+}
+
+.pdf-windows-host__source {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.pdf-windows-host__label {
+  font-size: 10px;
+  font-weight: 700;
+  color: rgba(230, 237, 247, 0.58);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.pdf-windows-host__text,
+.pdf-windows-host__translation,
+.pdf-windows-host__state {
+  font-size: 13px;
+  line-height: 1.45;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.pdf-windows-host__text--source {
+  color: rgba(230, 237, 247, 0.86);
+  max-height: 90px;
+  overflow: auto;
+  padding-right: 4px;
+}
+
+.pdf-windows-host__source {
+  animation: pdf-windows-host-fade-in 0.18s ease;
+}
+
+.pdf-windows-host__state--loading {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: rgba(230, 237, 247, 0.84);
+}
+
+.pdf-windows-host__state--error {
+  color: #fda4af;
+  background: rgba(239, 68, 68, 0.08);
+  border: 1px solid rgba(239, 68, 68, 0.14);
+  border-radius: 10px;
+  padding: 9px 10px;
+}
+
+.pdf-windows-host__translation {
+  color: inherit;
+  background: transparent;
+  border: none;
+  border-radius: 0;
+  padding: 0;
+  max-height: none;
+  overflow: visible;
+}
+
+.pdf-windows-host__translation.ti-translation-display.theme-dark,
+.pdf-windows-host__translation.ti-translation-display.is-dark {
+  background-color: transparent !important;
+  border-color: transparent !important;
+}
+
+.pdf-windows-host__translation.ti-translation-display .ti-translation-content {
+  background: transparent !important;
+}
+
+.pdf-windows-host__translation--markdown,
+.pdf-windows-host__translation--dictionary {
+  white-space: normal;
+}
+
+.pdf-windows-host__body::-webkit-scrollbar {
+  width: 8px;
+}
+
+.pdf-windows-host__body::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.16);
+  border-radius: 999px;
+}
+
+.pdf-windows-host__body::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.pdf-windows-host__translation.ti-translation-display {
+  color: inherit;
+}
+
+.pdf-windows-host__translation--markdown .simple-markdown > :last-child,
+.pdf-windows-host__translation--dictionary .simple-markdown > :last-child {
+  margin-bottom: 0;
+}
+
+.pdf-windows-host__translation--markdown .simple-markdown p,
+.pdf-windows-host__translation--markdown .simple-markdown ul,
+.pdf-windows-host__translation--markdown .simple-markdown ol,
+.pdf-windows-host__translation--markdown .simple-markdown h1,
+.pdf-windows-host__translation--markdown .simple-markdown h2,
+.pdf-windows-host__translation--markdown .simple-markdown h3,
+.pdf-windows-host__translation--markdown .simple-markdown h4,
+.pdf-windows-host__translation--markdown .simple-markdown h5,
+.pdf-windows-host__translation--markdown .simple-markdown h6,
+.pdf-windows-host__translation--dictionary .simple-markdown p,
+.pdf-windows-host__translation--dictionary .simple-markdown ul,
+.pdf-windows-host__translation--dictionary .simple-markdown ol,
+.pdf-windows-host__translation--dictionary .simple-markdown h1,
+.pdf-windows-host__translation--dictionary .simple-markdown h2,
+.pdf-windows-host__translation--dictionary .simple-markdown h3,
+.pdf-windows-host__translation--dictionary .simple-markdown h4,
+.pdf-windows-host__translation--dictionary .simple-markdown h5,
+.pdf-windows-host__translation--dictionary .simple-markdown h6 {
+  margin-top: 0;
+}
+
+@keyframes pdf-windows-host-fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(-2px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.pdf-windows-host__footer {
+  margin-top: -2px;
+  flex-shrink: 0;
+}
+
+.pdf-windows-host__dock-resize-handle {
+  position: absolute;
+  top: 10px;
+  bottom: 10px;
+  width: 8px;
+  border-radius: 999px;
+  background: linear-gradient(180deg, rgba(107, 124, 255, 0.18), rgba(107, 124, 255, 0.34));
+  cursor: ew-resize;
+  opacity: 0.85;
+}
+
+.pdf-windows-host--dock-left .pdf-windows-host__dock-resize-handle {
+  right: -4px;
+}
+
+.pdf-windows-host--dock-right .pdf-windows-host__dock-resize-handle {
+  left: -4px;
+}

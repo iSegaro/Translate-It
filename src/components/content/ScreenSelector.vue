@@ -269,20 +269,17 @@ const notificationManager = new NotificationManager()
 
 /**
  * Shows a localized toast error message
- * @param {string} errorKey - Internal error key (no-text, model-error, etc.)
+ * @param {string} errorKey - Stable OCR error code (no-text, model-not-installed, ocr-failed, cancelled)
  */
 const showToastError = (errorKey) => {
+  if (errorKey === 'cancelled') return
+
   let message = t('screen_capture_error_failed')
   
   if (errorKey === 'no-text') {
     message = t('screen_capture_error_no_text')
-  } else if (errorKey === 'model-error') {
-    message = t('screen_capture_error_model')
   } else if (errorKey === 'model-not-installed') {
     message = t('screen_capture_error_model_missing')
-  } else if (errorKey && errorKey.length > 5) {
-    // If it's a direct message from elsewhere, use it
-    message = errorKey
   }
 
   notificationManager.show(message, 'error', 4000, {

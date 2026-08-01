@@ -60,6 +60,30 @@
   span { font-size: 13px !important; font-weight: 500 !important; }
 }
 
+.ti-translate-main-labels {
+  display: grid !important;
+}
+
+.ti-translate-main-label,
+.ti-translate-main-label-reserve {
+  grid-area: 1 / 1 !important;
+  white-space: nowrap !important;
+}
+
+.ti-translate-main-label-reserve {
+  visibility: hidden !important;
+}
+
+.ti-split-translate-button-container--compact-label {
+  .ti-translate-main-area {
+    gap: var(--ti-provider-main-gap, 6px) !important;
+  }
+
+  .ti-translate-main-labels {
+    display: var(--ti-provider-label-display, grid) !important;
+  }
+}
+
 .ti-provider-dropdown-area {
   display: flex !important;
   align-items: center !important;

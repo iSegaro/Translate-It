@@ -1,0 +1,150 @@
+import { computed, ref } from 'vue'
+import { getScopedLogger } from '@/shared/logging/logger.js'
+import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js'
+import { CONTENT_VIEW, LAYOUT_MODE } from '../constants/pdfViewerConstants.js'
+import { resolveEffectivePaneTopology } from '../utils/pdfViewerTopology.js'
+
+const logger = getScopedLogger(LOG_COMPONENTS.PDF, 'usePdfViewerMode')
+
+// ───────────────────────────────────────────────────────────
+// Domain model — architectural contract
+// ───────────────────────────────────────────────────────────
+
+/**
+ * @readonly
+ * @enum {string}
+ *
+ * contentView — WHAT content to display in the viewer.
+ *
+ * | Value            | Meaning                                  |
+ * |------------------|------------------------------------------|
+ * | 'original'       | Show the original PDF document           |
+ * | 'translation'    | Show the translated text content         |
+ * | 'translated-pdf' | Show the translated PDF overlay          |
+ */
+export { CONTENT_VIEW }
+
+/**
+ * @readonly
+ * @enum {string}
+ *
+ * layoutMode — HOW to arrange the visible panes.
+ *
+ * | Value           | Meaning                                    |
+ * |-----------------|--------------------------------------------|
+ * | 'single'        | Single-pane layout (one column)            |
+ * | 'side-by-side'  | Two-pane layout (side-by-side columns)     |
+ */
+export { LAYOUT_MODE }
+
+const VALID_CONTENT_VIEWS = new Set(Object.values(CONTENT_VIEW))
+const VALID_LAYOUT_MODES = new Set(Object.values(LAYOUT_MODE))
+
+/**
+ * @readonly
+ * @enum {string}
+ *
+ * viewerRole — the role of a PdfViewer instance in the layout.
+ *
+ * | Value       | Meaning                                              |
+ * |-------------|------------------------------------------------------|
+ * | 'original'  | Primary viewer — owns layout, pagination, interaction |
+ * | 'overlay'   | Secondary viewer — read-only canvas + overlay only    |
+ */
+const VIEWER_ROLE = Object.freeze({
+  ORIGINAL: 'original',
+  OVERLAY: 'overlay'
+})
+export { VIEWER_ROLE }
+
+/**
+ * Viewing modes terminology:
+ *
+ *   selectedLayoutMode — the user's persistent preference (never auto-corrected)
+ *   layoutMode         — the effective value used for rendering
+ *                        (follows selectedLayoutMode, but is always SINGLE
+ *                         when contentView is ORIGINAL)
+ *
+ * Valid combinations of (contentView, layoutMode).
+ *
+ * ┌──────────────────┬──────────────┬───────┬───────────────────────────────┐
+ * │ contentView      │ layoutMode   │ valid │ note                          │
+ * ├──────────────────┼──────────────┼───────┼───────────────────────────────┤
+ * │ original         │ single       │ ✅    │ Original PDF only             │
+ * │ translation      │ single       │ ✅    │ Translation text only         │
+ * │ translation      │ side-by-side │ ✅    │ Original + translation text   │
+ * │ translated-pdf   │ single       │ ✅    │ Original PDF + overlay         │
+ * │ translated-pdf   │ side-by-side │ ✅    │ Original PDF + Translated PDF │
+ * │ original         │ side-by-side │ ❌    │ Not meaningful                │
+ * └──────────────────┴──────────────┴───────┴───────────────────────────────┘
+ */
+
+export function usePdfViewerMode() {
+  const contentView = ref(CONTENT_VIEW.ORIGINAL)
+  const selectedLayoutMode = ref(LAYOUT_MODE.SINGLE)
+
+  const layoutMode = computed(() => {
+    if (contentView.value === CONTENT_VIEW.ORIGINAL) {
+      return LAYOUT_MODE.SINGLE
+    }
+
+    return selectedLayoutMode.value
+  })
+
+  const effectivePaneTopology = computed(() => resolveEffectivePaneTopology({
+    contentView: contentView.value,
+    selectedLayoutMode: selectedLayoutMode.value
+  }))
+
+  const showOriginalPane = computed(() => {
+    return effectivePaneTopology.value.showOriginalPane
+  })
+  const showTranslatedTextPane = computed(() => effectivePaneTopology.value.showTranslatedTextPane)
+  const showTranslatedPdfPane = computed(() => {
+    return effectivePaneTopology.value.showTranslatedPdfPane
+  })
+  const showOverlayLayer = computed(() => {
+    return contentView.value === CONTENT_VIEW.TRANSLATED_PDF && layoutMode.value === LAYOUT_MODE.SINGLE
+  })
+
+  const isSideBySide = computed(() => layoutMode.value === LAYOUT_MODE.SIDE_BY_SIDE)
+
+  function setContentView(val) {
+    if (!VALID_CONTENT_VIEWS.has(val)) {
+      logger.warn('Invalid content view:', val)
+      return
+    }
+
+    contentView.value = val
+    logger.info('Content view changed:', { contentView: val })
+  }
+
+  function setLayoutMode(val) {
+    if (!VALID_LAYOUT_MODES.has(val)) {
+      logger.warn('Invalid layout mode:', val)
+      return
+    }
+
+    selectedLayoutMode.value = val
+    logger.info('Layout mode preference changed:', { selectedLayoutMode: val })
+  }
+
+  function reset() {
+    contentView.value = CONTENT_VIEW.ORIGINAL
+    selectedLayoutMode.value = LAYOUT_MODE.SINGLE
+  }
+
+  return {
+    contentView,
+    layoutMode,
+    selectedLayoutMode,
+    setContentView,
+    setLayoutMode,
+    isSideBySide,
+    showOriginalPane,
+    showTranslatedTextPane,
+    showTranslatedPdfPane,
+    showOverlayLayer,
+    reset
+  }
+}

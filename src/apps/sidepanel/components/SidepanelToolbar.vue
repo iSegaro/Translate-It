@@ -106,6 +106,21 @@
     </div>
     <div class="toolbar-group-bottom">
       <button
+        id="pdfBtn"
+        class="toolbar-button"
+        :title="t('pdf_app_title') || 'PDF Translator'"
+        @click="handlePdfClick"
+        @keydown.enter.prevent="handlePdfClick"
+        @keydown.space.prevent="handlePdfClick"
+      >
+        <img
+          :src="pdfIcon"
+          alt="PDF Translator"
+          class="toolbar-icon"
+        >
+      </button>
+
+      <button
         id="subtitleBtn"
         class="toolbar-button"
         :title="t('popup_subtitle_title_icon') || 'ترجمه زیرنویس'"
@@ -152,7 +167,7 @@ import { TranslationMode } from '@/shared/config/config.js';
 import { findProviderById } from '@/features/translation/providers/ProviderManifest.js';
 import { MessageActions } from '@/shared/messaging/core/MessageActions.js';
 import { sendMessage } from '@/shared/messaging/core/UnifiedMessaging.js';
-import { useExtensionAPI } from '@/composables/core/useExtensionAPI.js';
+import { openExtensionApp } from '@/core/ExtensionAppLauncher.js';
 import browser from 'webextension-polyfill';
 
 // Icon URLs will be loaded at runtime
@@ -204,7 +219,6 @@ const { isSelectModeActive, activateSelectMode, deactivateSelectMode, isActivati
 const { isMouseHoverEnabled, toggleMouseHover } = useMouseHoverToggle()
 const { revertTranslation } = useSidepanelActions()
 const { handleError } = useErrorHandler()
-const { focusOrCreateTab } = useExtensionAPI()
 
 // Computed
 const isExtensionEnabledGlobal = computed(() => {
@@ -258,6 +272,7 @@ const mouseHoverIcon = browser.runtime.getURL('icons/ui/mouse-hover.png')
 const settingsIcon = browser.runtime.getURL('icons/ui/settings.png')
 const captureIcon = browser.runtime.getURL('icons/ui/capture.svg')
 const subtitleIcon = browser.runtime.getURL('icons/ui/subtitle.png')
+const pdfIcon = browser.runtime.getURL('icons/ui/pdf_viewer/pdf.png')
 
 const handleSelectElement = async () => {
   if (!isSelectElementSupported.value) return
@@ -370,15 +385,25 @@ const handleSettingsClick = async () => {
   }
 };
 
+const launchAppWithFeedback = async (appName, buttonId, errorContext) => {
+  const button = document.getElementById(buttonId);
+  try {
+    await openExtensionApp(appName);
+    showVisualFeedback(button, 'success');
+  } catch (error) {
+    getLogger().error(`Failed to launch ${appName} app:`, error);
+    await handleError(error, errorContext);
+    showVisualFeedback(button, 'error');
+  }
+};
+
 const handleSubtitleClick = async () => {
   getLogger().debug('Subtitle Translator button clicked!')
-  try {
-    await focusOrCreateTab('src/html/subtitle.html')
-    showVisualFeedback(document.getElementById('subtitleBtn'), 'success')
-  } catch (error) {
-    getLogger().error('Failed to open subtitle page:', error)
-    await handleError(error, 'SidepanelToolbar-openSubtitle')
-    showVisualFeedback(document.getElementById('subtitleBtn'), 'error')
-  }
+  await launchAppWithFeedback('subtitle', 'subtitleBtn', 'SidepanelToolbar-openSubtitle')
+};
+
+const handlePdfClick = async () => {
+  getLogger().debug('PDF Translator button clicked!')
+  await launchAppWithFeedback('pdf', 'pdfBtn', 'SidepanelToolbar-openPdf')
 };
 </script>

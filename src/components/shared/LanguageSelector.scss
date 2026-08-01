@@ -17,6 +17,18 @@
   --ti-language-select-default-action-gap: 2px;
   --ti-language-select-default-action-inline-end: 18px;
 
+  &.ti-language-controls--dark {
+    --color-border: rgba(255, 255, 255, 0.12);
+    --color-background: #2d2d2d;
+    --color-text: rgba(255, 255, 255, 0.90);
+    --bg-disabled: rgba(255, 255, 255, 0.04);
+    --text-disabled: rgba(255, 255, 255, 0.48);
+    --toolbar-link-hover-bg-color: rgba(255, 255, 255, 0.08);
+    --icon-opacity: 0.9;
+    --icon-filter: brightness(0) invert(1);
+    --language-controls-bg-color: transparent;
+  }
+
   .ti-language-control-group {
     display: flex !important;
     align-items: center !important;
@@ -175,7 +187,8 @@
   // Default Arrow (Light)
   background-image: url('data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2210%22%20height%3D%225%22%20viewBox%3D%220%200%2010%205%22%3E%3Cpath%20fill%3D%22%236c757d%22%20d%3D%22M0%200l5%205%205-5z%22%2F%3E%3C%2Fsvg%3E') !important;
 
-  :is(.theme-dark, .is-dark) & {
+  :is(.theme-dark, .is-dark) &,
+  .ti-language-controls--dark & {
     background-image: url('data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2210%22%20height%3D%225%22%20viewBox%3D%220%200%2010%205%22%3E%3Cpath%20fill%3D%22%23adb5bd%22%20d%3D%22M0%200l5%205%205-5z%22%2F%3E%3C%2Fsvg%3E') !important;
     color-scheme: dark !important;
   }
@@ -283,6 +296,10 @@
     filter: var(--icon-filter, none) !important;
     transition: opacity 0.2s ease-in-out !important;
     object-fit: contain !important;
+  }
+
+  &--mirrored img {
+    transform: scaleX(-1) !important;
   }
 
   &:hover:not(:disabled) img {

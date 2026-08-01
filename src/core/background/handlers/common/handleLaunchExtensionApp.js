@@ -1,26 +1,39 @@
 import browser from 'webextension-polyfill';
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
+import { EXTENSION_APP_LAUNCH_POLICY } from '@/shared/constants/extensionApps.js';
 
-const logger = getScopedLogger(LOG_COMPONENTS.BACKGROUND, 'handleFocusOrCreateTab');
+const logger = getScopedLogger(LOG_COMPONENTS.BACKGROUND, 'handleLaunchExtensionApp');
 
-export async function handleFocusOrCreateTab(message) {
+export async function handleLaunchExtensionApp(message) {
   try {
-    const urlPath = message?.data?.urlPath;
-    
+    const { urlPath, launchPolicy, remoteUrl } = message?.data || {};
+
     if (!urlPath) {
       throw new Error('urlPath is required');
     }
-    
-    const targetUrl = browser.runtime.getURL(urlPath);
+
+    let targetUrl = browser.runtime.getURL(urlPath);
+
+    if (remoteUrl) {
+      const params = new URLSearchParams();
+      params.set('remote', remoteUrl);
+      targetUrl += '?' + params.toString();
+    }
+
+    if (launchPolicy === EXTENSION_APP_LAUNCH_POLICY.ALWAYS_CREATE) {
+      logger.debug(`Creating new tab for: ${targetUrl}`);
+      await browser.tabs.create({ url: targetUrl });
+      return { success: true };
+    }
+
     logger.debug(`Target URL for focusing: ${targetUrl}`);
-    
-    // Query all tabs to manually check URLs and bypass any match pattern bugs
+
     const allTabs = await browser.tabs.query({});
     const matchingTabs = allTabs.filter(tab => tab.url && tab.url.includes(urlPath));
-    
+
     logger.debug(`Found ${matchingTabs.length} matching tabs out of ${allTabs.length} total tabs`);
-    
+
     if (matchingTabs.length > 0) {
       const targetTab = matchingTabs[0];
       logger.debug(`Focusing tab ${targetTab.id} in window ${targetTab.windowId}`);
@@ -32,10 +45,10 @@ export async function handleFocusOrCreateTab(message) {
       logger.debug(`No matching tabs found, creating new one for ${targetUrl}`);
       await browser.tabs.create({ url: targetUrl });
     }
-    
+
     return { success: true };
   } catch (error) {
-    logger.error('Failed to focus or create tab:', error);
+    logger.error('Failed to launch extension app:', error);
     return { success: false, error: error.message };
   }
 }

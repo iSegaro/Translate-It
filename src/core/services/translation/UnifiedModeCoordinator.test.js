@@ -54,6 +54,21 @@ describe('UnifiedModeCoordinator', () => {
       expect(request.data.priority).toBe(1); // LOW
     });
 
+    it('should assign LOW priority to PDF mode and dispatch through the PDF path', async () => {
+      const request = {
+        mode: TranslationMode.PDF,
+        data: { text: JSON.stringify([{ text: 'hello' }]), provider: 'google' },
+        messageId: 'm-pdf',
+        context: 'pdf-translation'
+      };
+
+      coordinator.processPdfTranslation = vi.fn().mockResolvedValue({ success: true });
+      await coordinator.processRequest(request, { translationEngine: mockEngine });
+
+      expect(request.data.priority).toBe(1);
+      expect(coordinator.processPdfTranslation).toHaveBeenCalledWith(request, { translationEngine: mockEngine });
+    });
+
     it('should delegate to processFieldTranslation for Field mode', async () => {
       const request = {
         mode: TranslationMode.Field,
@@ -97,6 +112,38 @@ describe('UnifiedModeCoordinator', () => {
   });
 
   describe('processPageTranslation', () => {
+    it('returns empty batches without provider or lifecycle work', async () => {
+      const request = {
+        mode: TranslationMode.Page,
+        messageId: 'empty-batch',
+        data: { text: JSON.stringify([]), provider: 'google' }
+      };
+
+      const result = await coordinator.processRequest(request, { translationEngine: mockEngine });
+
+      expect(result).toMatchObject({ success: true, translatedText: '[]' });
+      expect(mockEngine.getProvider).not.toHaveBeenCalled();
+      expect(mockEngine.lifecycleRegistry.registerRequest).not.toHaveBeenCalled();
+      expect(mockEngine.lifecycleRegistry.unregisterRequest).not.toHaveBeenCalled();
+    });
+
+    it('does not dispatch provider work when lifecycle registration was pre-cancelled', async () => {
+      const request = {
+        mode: TranslationMode.Page,
+        messageId: 'pre-cancelled',
+        data: { text: JSON.stringify([{ text: 'hello' }]), provider: 'google' }
+      };
+      const provider = { translate: vi.fn() };
+      mockEngine.getProvider.mockResolvedValue(provider);
+      mockEngine.lifecycleRegistry.registerRequest.mockReturnValue(null);
+
+      const result = await coordinator.processRequest(request, { translationEngine: mockEngine });
+
+      expect(result).toMatchObject({ success: false, cancelled: true });
+      expect(mockEngine.getProvider).not.toHaveBeenCalled();
+      expect(provider.translate).not.toHaveBeenCalled();
+    });
+
     it('should handle array of segments correctly', async () => {
       const request = {
         mode: TranslationMode.Page,
@@ -162,7 +209,7 @@ describe('UnifiedModeCoordinator', () => {
     });
 
     it('should handle provider initialization failure', async () => {
-      const request = { mode: TranslationMode.Page, data: { text: '[]', provider: 'invalid' }, messageId: 'm1' };
+      const request = { mode: TranslationMode.Page, data: { text: '["text"]', provider: 'invalid' }, messageId: 'm1' };
       mockEngine.getProvider.mockResolvedValue(null);
       await expect(coordinator.processPageTranslation(request, { translationEngine: mockEngine }))
         .rejects.toThrow("Provider 'invalid' initialization failed");

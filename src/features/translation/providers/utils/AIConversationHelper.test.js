@@ -15,6 +15,7 @@ vi.mock('@/shared/config/config.js', () => ({
     Dictionary_Translation: 'dictionary',
     Field: 'content',
     Page: 'page',
+    PDF: 'pdf-translation',
     Subtitle: 'subtitle',
   }
 }));
@@ -68,6 +69,28 @@ describe('AIConversationHelper', () => {
     expect(getPromptBASEAIBatchAutoAsync).not.toHaveBeenCalled();
     expect(systemPrompt).toContain('BATCH: translate from English to Persian');
     expect(systemPrompt).not.toContain('BATCH_AUTO');
+    expect(userText).toContain('"translations"');
+  });
+
+  it('uses the batch prompt for PDF structured translation without select-element coupling', async () => {
+    const { getPromptAsync, getPromptAutoAsync, getPromptBASEAIBatchAsync, getPromptBASEAIBatchAutoAsync } = await import('@/shared/config/config.js');
+
+    getPromptAsync.mockResolvedValue('INSTRUCTIONS: translate from $_{SOURCE} to $_{TARGET}');
+    getPromptAutoAsync.mockResolvedValue('INSTRUCTIONS_AUTO: translate into $_{TARGET}');
+    getPromptBASEAIBatchAsync.mockResolvedValue('PDF_BATCH: translate from _{SOURCE} to _{TARGET}\n$_{PROMPT_INSTRUCTIONS}\n$_{TEXT}');
+    getPromptBASEAIBatchAutoAsync.mockResolvedValue('PDF_BATCH_AUTO: translate into _{TARGET}\n$_{PROMPT_INSTRUCTIONS}\n$_{TEXT}');
+
+    const { systemPrompt, userText } = await AIConversationHelper.preparePromptAndText(
+      [{ i: 'b1', t: 'Hello', blockId: 'b1' }],
+      'auto',
+      'fa',
+      'pdf-translation',
+      'ai'
+    );
+
+    expect(getPromptBASEAIBatchAsync).toHaveBeenCalled();
+    expect(systemPrompt).toContain('PDF_BATCH: translate from English to Persian');
+    expect(systemPrompt).not.toContain('select');
     expect(userText).toContain('"translations"');
   });
 
@@ -177,5 +200,158 @@ describe('AIConversationHelper', () => {
     await expect(
       AIConversationHelper.formatCompactHistoryContext('session-id', TranslationMode.Field)
     ).resolves.toBe('');
+  });
+
+  describe('semantic prompt injection', () => {
+    it('does not modify prompt when semanticHint is absent', async () => {
+      const { getPromptBASEAIBatchAsync } = await import('@/shared/config/config.js');
+      getPromptBASEAIBatchAsync.mockResolvedValue(
+        'BATCH: translate from _{SOURCE} to _{TARGET}\n$_{PROMPT_INSTRUCTIONS}\n$_{TEXT}'
+      );
+
+      const { systemPrompt } = await AIConversationHelper.preparePromptAndText(
+        ['Hello'],
+        'en',
+        'fa',
+        'pdf-translation',
+        'ai'
+      );
+
+      expect(systemPrompt).not.toContain('Additional translation context');
+    });
+
+    it('appends semantic instructions when semanticHint is present in PDF mode', async () => {
+      const { getPromptBASEAIBatchAsync } = await import('@/shared/config/config.js');
+      getPromptBASEAIBatchAsync.mockResolvedValue(
+        'BATCH: translate from _{SOURCE} to _{TARGET}\n$_{PROMPT_INSTRUCTIONS}\n$_{TEXT}'
+      );
+
+      const metadata = {
+        semanticHint: {
+          hasSemanticContext: true,
+          financialSubtypes: ['metric-with-delta'],
+          hasStatementFragment: false,
+          hasDashboardGroup: true
+        }
+      };
+
+      const { systemPrompt } = await AIConversationHelper.preparePromptAndText(
+        ['Hello'],
+        'en',
+        'fa',
+        'pdf-translation',
+        'ai',
+        null,
+        metadata
+      );
+
+      expect(systemPrompt).toContain('Additional translation context');
+      expect(systemPrompt).toContain('Preserve all numeric values exactly');
+      expect(systemPrompt).toContain('Maintain concise and parallel wording');
+    });
+
+    it('preserves user custom instructions before semantic instructions', async () => {
+      const { getPromptAsync, getPromptBASEAIBatchAsync } = await import('@/shared/config/config.js');
+      getPromptAsync.mockResolvedValue('Custom user rule: translate formally');
+      getPromptBASEAIBatchAsync.mockResolvedValue(
+        'BATCH: translate from _{SOURCE} to _{TARGET}\n$_{PROMPT_INSTRUCTIONS}\n$_{TEXT}'
+      );
+
+      const metadata = {
+        semanticHint: {
+          hasSemanticContext: true,
+          hasDashboardGroup: true
+        }
+      };
+
+      const { systemPrompt } = await AIConversationHelper.preparePromptAndText(
+        ['Hello'],
+        'en',
+        'fa',
+        'pdf-translation',
+        'ai',
+        null,
+        metadata
+      );
+
+      const customIdx = systemPrompt.indexOf('Custom user rule');
+      const semanticIdx = systemPrompt.indexOf('Additional translation context');
+      expect(customIdx).toBeGreaterThan(-1);
+      expect(semanticIdx).toBeGreaterThan(-1);
+      expect(customIdx).toBeLessThan(semanticIdx);
+    });
+
+    it('does not inject semantic instructions for non-PDF mode', async () => {
+      const { getPromptBASEAIBatchAsync } = await import('@/shared/config/config.js');
+      getPromptBASEAIBatchAsync.mockResolvedValue(
+        'BATCH: translate from _{SOURCE} to _{TARGET}\n$_{PROMPT_INSTRUCTIONS}\n$_{TEXT}'
+      );
+
+      const metadata = {
+        semanticHint: {
+          hasSemanticContext: true,
+          financialSubtypes: ['metric-with-delta']
+        }
+      };
+
+      const { systemPrompt } = await AIConversationHelper.preparePromptAndText(
+        ['Hello'],
+        'en',
+        'fa',
+        'select-element',
+        'ai',
+        null,
+        metadata
+      );
+
+      expect(systemPrompt).not.toContain('Additional translation context');
+    });
+
+    it('ignores malformed semanticHint without crash', async () => {
+      const { getPromptBASEAIBatchAsync } = await import('@/shared/config/config.js');
+      getPromptBASEAIBatchAsync.mockResolvedValue(
+        'BATCH: translate from _{SOURCE} to _{TARGET}\n$_{PROMPT_INSTRUCTIONS}\n$_{TEXT}'
+      );
+
+      const metadata = { semanticHint: 'invalid' };
+
+      const { systemPrompt } = await AIConversationHelper.preparePromptAndText(
+        ['Hello'],
+        'en',
+        'fa',
+        'pdf-translation',
+        'ai',
+        null,
+        metadata
+      );
+
+      expect(systemPrompt).not.toContain('Additional translation context');
+    });
+
+    it('ignores hint with hasSemanticContext false', async () => {
+      const { getPromptBASEAIBatchAsync } = await import('@/shared/config/config.js');
+      getPromptBASEAIBatchAsync.mockResolvedValue(
+        'BATCH: translate from _{SOURCE} to _{TARGET}\n$_{PROMPT_INSTRUCTIONS}\n$_{TEXT}'
+      );
+
+      const metadata = {
+        semanticHint: {
+          hasSemanticContext: false,
+          financialSubtypes: ['metric-with-delta']
+        }
+      };
+
+      const { systemPrompt } = await AIConversationHelper.preparePromptAndText(
+        ['Hello'],
+        'en',
+        'fa',
+        'pdf-translation',
+        'ai',
+        null,
+        metadata
+      );
+
+      expect(systemPrompt).not.toContain('Additional translation context');
+    });
   });
 });
