@@ -6,7 +6,7 @@
 >
 > - [ADR-011: Presentation Architecture](../ADR-011-presentation-architecture.md)
 >
-> Translation outcome and export-readiness technical contracts now live in [PDF Translation Architecture](../../../technical/PDF_TRANSLATION_ARCHITECTURE.md).
+> Translation outcome and export-readiness technical contracts now live in [PDF Translation Architecture](../../../technical/pdf-translator/pdf-translation-architecture.md).
 
 ---
 

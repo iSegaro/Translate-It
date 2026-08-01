@@ -2,7 +2,7 @@
 
 Translate It currently exposes popup, sidepanel, options, subtitle, offscreen, and content-script surfaces. It already has an established translation pipeline, storage core, logging system, resource tracking, and history persistence. The PDF feature must fit into those systems without being treated as Whole Page Translation or as generic DOM translation.
 
-The runtime architecture source of truth is `docs/technical/PDF_TRANSLATION_ARCHITECTURE.md`. PDF is an independent feature with its own session model, dedicated viewer, logical block pipeline, and adaptive bilingual rendering.
+The runtime architecture source of truth is `docs/technical/pdf-translator/pdf-translation-architecture.md`. PDF is an independent feature with its own session model, dedicated viewer, logical block pipeline, and adaptive bilingual rendering.
 
 ## Goals / Non-Goals
 

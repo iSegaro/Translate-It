@@ -1,7 +1,7 @@
 # PDF Viewer Toolbar Technical Reference
 
 **Status:** Current implementation reference  
-**Architecture rationale:** [ADR-013: Viewer Toolbar Architecture](../adr/pdf-translator/ADR-013-viewer-toolbar-architecture.md)
+**Architecture rationale:** [ADR-013: Viewer Toolbar Architecture](../../adr/pdf-translator/ADR-013-viewer-toolbar-architecture.md)
 
 ## 1. Purpose
 
@@ -210,7 +210,7 @@ Current extension mapping:
 
 ## 10. References
 
-- [ADR-013: Viewer Toolbar Architecture](../adr/pdf-translator/ADR-013-viewer-toolbar-architecture.md)
+- [ADR-013: Viewer Toolbar Architecture](../../adr/pdf-translator/ADR-013-viewer-toolbar-architecture.md)
 - `src/apps/pdf/PdfApp.vue`
 - `src/apps/pdf/components/PdfToolbar.vue`
 - `src/apps/pdf/components/PdfToolbar.scss`

@@ -4,7 +4,7 @@
 - **Date:** 2026-07-26
 - **Scope:** PDF Viewer toolbar product architecture
 - **Decision Type:** Architectural
-- **Implementation reference:** [PDF Viewer Toolbar Technical Reference](../../technical/PDF_VIEWER_TOOLBAR_TECHNICAL.md)
+- **Implementation reference:** [PDF Viewer Toolbar Technical Reference](../../technical/pdf-translator/pdf-viewer-toolbar.md)
 
 ## 1. Status and Problem
 
@@ -74,4 +74,4 @@ Related controls extend an existing group before a new group is proposed. A new 
 
 New controls enter secondary presentation unless workflow evidence requires protected direct access. Feature growth does not justify runtime overflow behavior, incidental wrapping, or an independent layout policy.
 
-Implementation details, current state flows, concrete responsive stages, control inventory, tests, and extension mappings belong in the [PDF Viewer Toolbar Technical Reference](../../technical/PDF_VIEWER_TOOLBAR_TECHNICAL.md).
+Implementation details, current state flows, concrete responsive stages, control inventory, tests, and extension mappings belong in the [PDF Viewer Toolbar Technical Reference](../../technical/pdf-translator/pdf-viewer-toolbar.md).
