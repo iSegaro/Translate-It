@@ -10,7 +10,10 @@
       class="ti-page-translate-btn"
     />
 
-    <HorizontalActionScroller :aria-label="t('popup_action_scroller_label')">
+    <HorizontalActionScroller
+      ref="scrollerRef"
+      :aria-label="t('popup_action_scroller_label')"
+    >
       <!-- 2. Exclude (Switch) -->
       <label
         class="ti-switch"
@@ -115,7 +118,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { ref, computed, nextTick, onMounted, onUnmounted } from 'vue'
 import { useSelectElementTranslation } from '@/features/translation/composables/useTranslationModes.js'
 import { useMouseHoverToggle } from '@/features/mouse-hover/composables/useMouseHoverToggle.js'
 import { useMessaging } from '@/shared/messaging/composables/useMessaging.js'
@@ -158,6 +161,7 @@ const props = defineProps({
 
 // Refs
 const sidePanelButton = ref(null)
+const scrollerRef = ref(null)
 
 // Stores
 const settingsStore = useSettingsStore()
@@ -313,6 +317,9 @@ const handleExcludeToggle = async () => {
 
 // Initialize exclude status
 onMounted(async () => {
+  await nextTick()
+  scrollerRef.value?.scrollToEnd()
+
   try {
     const [activeTab] = await browser.tabs.query({ active: true, currentWindow: true })
     if (activeTab) {

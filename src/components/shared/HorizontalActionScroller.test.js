@@ -4,6 +4,7 @@ import HorizontalActionScroller from './HorizontalActionScroller.vue'
 
 let resizeObserver
 let animationFrameCallbacks
+let cancelledAnimationFrameIds
 
 vi.mock('@/composables/shared/useUnifiedI18n.js', () => ({
   useUnifiedI18n: () => ({ t: (key) => key })
@@ -29,19 +30,24 @@ function setViewportMetrics(viewport, { clientWidth, scrollWidth, scrollLeft = 0
 
 function flushAnimationFrame() {
   const callbacks = animationFrameCallbacks.splice(0)
-  callbacks.forEach((callback) => callback())
+  callbacks.forEach(({ callback }) => callback())
 }
 
 describe('HorizontalActionScroller', () => {
   beforeEach(() => {
     resizeObserver = null
     animationFrameCallbacks = []
+    cancelledAnimationFrameIds = []
     vi.stubGlobal('ResizeObserver', ResizeObserverMock)
     vi.stubGlobal('requestAnimationFrame', (callback) => {
-      animationFrameCallbacks.push(callback)
-      return animationFrameCallbacks.length
+      const id = animationFrameCallbacks.length + 1
+      animationFrameCallbacks.push({ id, callback })
+      return id
     })
-    vi.stubGlobal('cancelAnimationFrame', vi.fn())
+    vi.stubGlobal('cancelAnimationFrame', (id) => {
+      cancelledAnimationFrameIds.push(id)
+      animationFrameCallbacks = animationFrameCallbacks.filter((entry) => entry.id !== id)
+    })
   })
 
   afterEach(() => {
@@ -63,6 +69,9 @@ describe('HorizontalActionScroller', () => {
     setViewportMetrics(viewport, { clientWidth: 200, scrollWidth: 200 })
     await wrapper.vm.$nextTick()
     resizeObserver.callback()
+    flushAnimationFrame()
+    await wrapper.vm.$nextTick()
+    await wrapper.vm.scrollToEnd()
     flushAnimationFrame()
     await wrapper.vm.$nextTick()
 
@@ -116,6 +125,25 @@ describe('HorizontalActionScroller', () => {
     await wrapper.find('.ti-horizontal-action-scroller__control--next').trigger('click')
 
     expect(viewport.scrollBy).toHaveBeenCalledWith({ left: 80, behavior: 'smooth' })
+  })
+
+  it('stabilizes the first end anchor and keeps later calls immediate', async () => {
+    const wrapper = mountScroller()
+    const viewport = wrapper.find('.ti-horizontal-action-scroller__viewport').element
+    setViewportMetrics(viewport, { clientWidth: 302, scrollWidth: 336 })
+    await wrapper.vm.$nextTick()
+
+    await wrapper.vm.scrollToEnd()
+    flushAnimationFrame()
+    await wrapper.vm.$nextTick()
+
+    expect(cancelledAnimationFrameIds).toEqual([1])
+    expect(wrapper.find('.ti-horizontal-action-scroller__control--previous').exists()).toBe(true)
+    expect(wrapper.find('.ti-horizontal-action-scroller__control--next').exists()).toBe(false)
+
+    await wrapper.vm.scrollToEnd()
+
+    expect(cancelledAnimationFrameIds).toEqual([1])
   })
 
   it('updates after resize and disconnects its observer on unmount', async () => {

@@ -4,6 +4,7 @@ import { ref } from 'vue'
 import PopupHeader from './PopupHeader.vue'
 
 let settings
+let scrollToEnd
 
 vi.mock('@/features/settings/stores/settings.js', () => ({
   useSettingsStore: () => ({ settings })
@@ -61,6 +62,9 @@ vi.mock('@/components/shared/HorizontalActionScroller.vue', () => ({
   default: {
     name: 'HorizontalActionScroller',
     props: ['ariaLabel'],
+    setup(_, { expose }) {
+      expose({ scrollToEnd })
+    },
     template: '<div class="horizontal-action-scroller-stub"><slot /></div>'
   }
 }))
@@ -74,6 +78,7 @@ vi.mock('@/features/page-translation/components/PageTranslationButton.vue', () =
 
 describe('PopupHeader', () => {
   beforeEach(() => {
+    scrollToEnd = vi.fn()
     settings = {
       EXTENSION_ENABLED: true,
       TRANSLATE_WITH_SELECT_ELEMENT: true,
@@ -87,6 +92,7 @@ describe('PopupHeader', () => {
   it('keeps Page Translation fixed while utility controls render inside scroller', async () => {
     const wrapper = mount(PopupHeader)
     await wrapper.vm.$nextTick()
+    await wrapper.vm.$nextTick()
 
     const pageTranslationButton = wrapper.find('.ti-header-toolbar > .page-translation-button-stub')
     expect(pageTranslationButton.exists()).toBe(true)
@@ -96,6 +102,7 @@ describe('PopupHeader', () => {
     const toolbarChildren = wrapper.find('.ti-header-toolbar').element.children
     expect(toolbarChildren[0]).toBe(pageTranslationButton.element)
     expect(toolbarChildren[1]).toBe(scroller.element)
+    expect(scrollToEnd).toHaveBeenCalledOnce()
     expect(scroller.find('.ti-switch').exists()).toBe(true)
     expect(scroller.find('.ti-btn-pdf').exists()).toBe(true)
     expect(scroller.find('.ti-btn-subtitle').exists()).toBe(true)

@@ -66,6 +66,7 @@ const nextLabel = computed(() => t('horizontal_action_scroller_next'))
 const EPSILON = 1
 let resizeObserver = null
 let animationFrameId = null
+let hasInitializedEndPosition = false
 
 const updateScrollState = () => {
   const element = viewport.value
@@ -96,6 +97,31 @@ const scroll = (direction) => {
     behavior: 'smooth'
   })
 }
+
+const scrollToEnd = async () => {
+  const element = viewport.value
+  if (!element) return
+
+  if (!hasInitializedEndPosition) {
+    hasInitializedEndPosition = true
+
+    if (animationFrameId !== null) {
+      cancelAnimationFrame(animationFrameId)
+      animationFrameId = null
+    }
+
+    element.scrollLeft = element.scrollWidth
+    updateScrollState()
+    await nextTick()
+    element.scrollLeft = element.scrollWidth
+  } else {
+    element.scrollLeft = element.scrollWidth
+  }
+
+  scheduleScrollStateUpdate()
+}
+
+defineExpose({ scrollToEnd })
 
 onMounted(async () => {
   await nextTick()
