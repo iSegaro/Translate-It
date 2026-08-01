@@ -1,303 +1,120 @@
-# ADR-014: Viewer State Architecture
+# ADR-014: Viewer State Restoration
 
 **Status:** Accepted
-**Supersedes:** None
+
+**Scope:** Tab-local viewer-state snapshot, transport, validation, and restoration boundaries.
 
 ---
 
 ## Context
 
-The PDF Viewer manages viewing position across several components: current page, zoom mode, content view, and layout mode. Each is owned by a different architectural component. When the browser tab is closed and restored (Ctrl+Shift+T or session restore), all in-memory state is lost. The user must manually re-open the document and re-configure their viewing position.
+The PDF viewer must restore a limited reading context after a document source becomes available again. This requires a durable snapshot without making restored state a new source of truth or coupling viewing context to document-source recovery.
 
-This ADR defines Viewer State — a read-only aggregate of viewing position — and how it is preserved, restored, and managed across tab lifecycle boundaries. Browser Session Restore is the feature that consumes Viewer State to resume the previous viewing context after tab restoration.
+## Decision
 
----
-
-## Goals
-
-- Preserve Viewer State across tab close and browser restart so the user can resume reading where they left off.
-- Keep each browser tab independent — no shared session manager, no cross-tab synchronization.
-- Integrate restore UI into the existing PdfEmptyState rather than introducing new modal or dialog patterns.
-- Remain within the browser security model — automatic local file reopening is impossible and not attempted.
-- Persist Viewer State through the browser tab transport. No new storage keys, no new permissions.
-
----
-
-## Non-Goals
-
-This ADR explicitly does **not** solve:
-
-- **Automatic local file reopening** — Browsers block file access without user interaction. The user must re-select the file.
-- **Recent documents** — No document history browser or launcher.
-- **Session history** — No multi-session timeline or undo/redo across tab closures.
-- **Multi-tab coordination** — Tabs are independent. Restoring Tab A has no effect on Tab B.
-- **Cloud synchronization** — No cross-device or cross-browser restore.
-- **Document persistence** — No caching of file content in extension storage.
-- **Extension update recovery** — Extension reload invalidates all active extension pages. Out of scope.
-
----
-
-## Architecture
-
-### Viewer State Lifecycle
-
-Viewer State has two lifecycle states. Both are the same Viewer State — same contract, same ownership, same invariants:
-
-```
-Viewer State
-    ├── Attached   — document is loaded; state reflects active viewing position
-    └── Pending    — no document loaded; state awaits attachment to a matching document
-```
-
-**Attached Viewer State** is the normal state when a document is open. A snapshot is created from current owners and persisted through the browser tab transport.
-
-**Pending Viewer State** is simply Viewer State whose corresponding document has not yet been attached. It occurs when:
-
-- The browser restores a tab that previously had a document loaded.
-- A Viewer State snapshot from the previous session is available.
-- No document is currently loaded in the tab.
-
-Pending Viewer State is **not** a separate model, a new ownership boundary, or a different source of truth. It carries no runtime objects, no file references, and no cache data. The same ownership rules, contract, and invariants apply to both lifecycle states.
-
-### Browser Session Restore
-
-**Browser Session Restore** is the feature that consumes Viewer State to resume the previous viewing context after tab restoration.
-
-### One-Shot Behavior
-
-Pending Viewer State is one-shot. If the user opens any PDF — matching or not — the Pending Viewer State is discarded. No stale pending state may survive after any document load.
-
-### Lifecycle
-
-```
-┌──────────────────────────────────────────────────────────┐
-│                   Tab open (fresh)                       │
-│                      │                                   │
-│              No Pending Viewer State                     │
-│              PdfEmptyState: default                      │
-└──────────────────────┬───────────────────────────────────┘
-                       │
-                       │ User opens PDF
-                       ▼
-┌──────────────────────────────────────────────────────────┐
-│                   Document loaded                        │
-│                      │                                   │
-│              Viewer State snapshot created               │
-│              Transport updated with Viewer State         │
-└──────────────────────┬───────────────────────────────────┘
-                       │
-                       │ Tab closed (user or browser)
-                       ▼
-┌──────────────────────────────────────────────────────────┐
-│                   Tab closed                             │
-│                      │                                   │
-│              File/Blob destroyed                         │
-│              Viewer State survives across boundary       │
-└──────────────────────┬───────────────────────────────────┘
-                       │
-                       │ Browser restores tab (Ctrl+Shift+T or session restore)
-                       ▼
-┌──────────────────────────────────────────────────────────┐
-│                   Tab restored                           │
-│                      │                                   │
-│              Pending Viewer State detected               │
-│              PdfEmptyState: resume context               │
-└──────────────────────┬───────────────────────────────────┘
-                       │
-                       │ User selects PDF file
-                       ▼
-┌──────────────────────────────────────────────────────────┐
-│                   Document loading                       │
-│                      │                                   │
-│              ┌───────┴────────┐                          │
-│              │                │                          │
-│         Identity         Identity                        │
-│         MATCH            MISMATCH                        │
-│              │                │                          │
-│              ▼                ▼                          │
-│     Restore Viewer      Discard Pending                  │
-│     State applied       Viewer State                     │
-│              │                │                          │
-│              └───────┬────────┘                          │
-│                      │                                   │
-│                      ▼                                   │
-│              Pending Viewer State consumed (one-shot)    │
-│              Normal viewer                               │
-└──────────────────────────────────────────────────────────┘
-```
-
-### Resume UI
-
-When a Pending Viewer State exists and no document is loaded, PdfEmptyState presents actions allowing the user to either resume the previous document or begin a new session:
-
-- Displays the previous document name (from `pdfTranslationHistory`, matched by `documentIdentity`).
-- Displays the previous viewing position.
-
-If the user chooses to resume, the OS file picker opens. After file selection and document load, identity is verified. If identity matches, Viewer State is restored. If not, the document opens as new.
-
-If the user chooses to begin a new session or drags a file onto the dropzone, the Pending Viewer State is discarded and the viewer behaves as a fresh session.
-
-No modal, dialog, or banner is introduced for this flow.
-
----
-
-## Viewer State Contract
-
-### Required State
-
-| State | Architectural Owner | Why Required |
-|-------|-------------------|-------------|
-| **Document Identity** | Document Identity Owner | Required to identify which document the Viewer State belongs to. |
-| **Current Page** | Navigation Owner | Reading position. The most important piece of navigation state. |
-| **Content View** | Viewer Mode Owner | Which view was visible: Original, Translation, or Translated PDF. |
-| **Layout Mode** | Viewer Mode Owner | Pane arrangement: Single or Side-by-Side. |
-| **Zoom State** | Zoom Owner | Page display mode: Fit-Width, Fit-Page, or specific percentage. |
-
-### Optional State (Future)
-
-| State | Status | Reason |
-|-------|--------|--------|
-| **Scroll Offset** | Future | Exact scroll restoration depends on window size and zoom. Page number alone provides 80% of UX value. |
-| **Outline State** | Future | Outline panel visibility and expanded nodes. Convenience, not necessity. |
-| **Search Query** | Future | If search capability is added to the PDF Viewer. |
-
-### Must NOT Belong
-
-These states must **never** be part of Viewer State:
-
-| State | Reason |
-|-------|--------|
-| **OCR State** | Operation, not viewing position. OCR cache is automatically restored on document load. |
-| **Translation Jobs** | In-progress operations. Expire when the tab closes. |
-| **Translation Progress** | Belongs to the Presentation layer, not Viewer State. |
-| **Toasts / Banner State** | Transient UI. Meaningless after tab close. |
-| **Region Selection** | Debug/transient state. Not part of the reading experience. |
-| **Presentation State** (Progress Bar) | Momentary feedback. Belongs to Operation Lifecycle. |
-| **Runtime Objects** | File, Blob, PDF.js Document. Destroyed on tab close. |
-| **Cache** (Bitmap Cache, Page Sessions) | In-memory. Rebuilt on document load. |
-| **File Objects** | JavaScript heap objects. Lost on tab close. |
-
-### Viewer State May Exist Without a Document
-
-Viewer State is not coupled to a loaded document. It is valid for a Pending Viewer State to exist while no document is open. This is the normal state after tab restoration and before the user re-selects the file.
-
----
+Viewer State is an immutable, tab-local aggregate transported in the current tab URL hash. It contains exactly `documentIdentity`, `currentPage`, and `contentView`. Existing owners remain authoritative; restoration returns snapshot values to those owners only after the loaded document identity matches.
 
 ## Ownership
 
-### Architectural Owner
+- Viewer State owns no runtime behavior. It is an immutable aggregate of document identity, navigation, and viewer-mode values.
+- Browser Tab State owns source-restoration data for the tab, including remote URL and File System Access `fileHandle` values.
+- `PdfDocumentSession` owns loaded-document identity and produces the identity used for post-load validation.
+- `PdfApp` coordinates tab restoration by reading pending Viewer State, opening an available document source, validating identity, and returning restored values to their owners.
 
-An **Architectural Owner** is the single authoritative component responsible for producing and validating one piece of Viewer State. There is exactly one Architectural Owner for each state field. Viewer State never replaces or duplicates an Architectural Owner — it only aggregates values from them into a snapshot. Restoration returns values to the Architectural Owner; the owner remains the sole source of truth.
+These components collaborate through explicit state boundaries. Viewer State MUST NOT own document-source restoration, and Browser Tab State MUST NOT become Viewer State.
 
-Viewer State is a **read-only aggregate**. It does not produce new data; it collects existing state.
+## Related State
 
-### Ownership Does Not Change
+| State | Responsibility | Does Not Own |
+|---|---|---|
+| Viewer State | Immutable reading-context snapshot | Document source, runtime objects, cache, or restoration authority |
+| Browser Tab State | Tab-local remote URL and file-handle source restoration data | Viewer position or viewer-mode snapshot |
+| Document Session | Active PDF lifecycle and loaded-document identity | Pending Viewer State or Browser Tab State |
 
-| State | Architectural Owner | Changed? |
-|-------|-------------------|:---:|
-| Document Identity | Document Identity Owner | No |
-| Current Page | Navigation Owner | No |
-| Content View | Viewer Mode Owner | No |
-| Layout Mode | Viewer Mode Owner | No |
-| Zoom Mode / Percent | Zoom Owner | No |
+## Persisted Viewer State
 
-No new owner is created. No existing owner's responsibility is moved.
+Viewer State contains exactly:
 
-### Scope
+- `documentIdentity`: identity of the document the snapshot belongs to.
+- `currentPage`: reading position represented as a page number.
+- `contentView`: active original, translation, or translated-PDF view.
 
-Browser Session Restore is scoped to a **single browser tab**. Each tab is a completely independent Viewer Application. There is no shared Session Manager, no cross-tab communication, and no global ownership. Closing Tab A has no effect on Tab B. Restoring Tab A restores only Tab A's Viewer State.
+Viewer State excludes layout mode, zoom state, scroll offsets, OCR state, translation operations, presentation state, region selection, runtime objects, caches, files, and document-source data.
 
----
+## URL Transport
 
-## Design Decisions
+- The current Viewer State transport is the PDF tab URL hash.
+- Serialization is deterministic and contains document identity, page, and content-view values only.
+- URL writes use replacement semantics and do not create browser history entries.
+- Browser storage and IndexedDB are not used for Viewer State.
+- Browser Tab State is separate from Viewer State transport and preserves its own tab-local source-restoration data.
 
-### Decision 1: The Browser Tab Is the Persistence Boundary
+## Restore Lifecycle
 
-Viewer State is persisted through the browser tab — the only data the browser guarantees to preserve across session restore. The current implementation encodes state in the tab URL. No `browser.storage`, IndexedDB, or other persistence mechanism is used.
+```text
+URL snapshot → Pending Viewer State → Document source restoration → PDF load → Identity validation → Restore or discard
+```
 
-**Rationale:** The browser tab is the natural, scoped persistence boundary for tab-local state. It requires zero additional permissions. It ensures each tab carries only its own state. The transport mechanism (URL, in the current implementation) may change without affecting the architectural contract: the tab carries the state.
+A valid URL snapshot becomes Pending Viewer State while no document is attached. Browser Tab State may provide a source for restoration. After a document loads, its identity determines whether the pending snapshot is restored or discarded.
 
-### Decision 2: No Automatic File Reopen
+## Restore Order
 
-The browser security model prevents web pages from reading local files without explicit user interaction. The File object and Blob URL from the original session are destroyed when the tab closes. No extension API can re-acquire them.
+For a matching pending snapshot, restoration occurs in this order:
 
-**Rationale:** This is a platform constraint, not a design choice. Attempting to work around it (File System Access API, IndexedDB caching) introduces browser compatibility issues, storage quota problems, and privacy concerns disproportionate to the feature's value.
+```text
+Content View → Layout Commit → Page Navigation
+```
 
-### Decision 3: Identity Check Is Post-Load
+Restore order coordinates existing viewer owners. It does not imply that layout or zoom state is persisted in Viewer State.
 
-Document identity is verified after the user selects a file and the PDF is parsed — not before. If the identity does not match, the document opens as new and Pending Viewer State is discarded.
+## Identity Validation
 
-**Rationale:** Document identity depends on PDF content (fingerprint or SHA-256). It cannot be computed before the PDF is loaded and parsed. Pre-load identity checks are impossible.
+- Identity validation occurs after PDF load, when `PdfDocumentSession` has resolved the document fingerprint or content-derived identity.
+- Matching identity restores `contentView`, waits for initial layout commit, then navigates to `currentPage`.
+- Mismatching identity discards Pending Viewer State and treats the loaded document as a new viewing context.
 
-### Decision 4: One-Shot Pending State
+## Failure Policy
 
-Pending Viewer State is consumed exactly once — on any document load. It is never reused, never persists across multiple document loads, and never survives after a different PDF is opened.
+- Invalid or incomplete URL snapshots do not create Pending Viewer State.
+- When no document source is available, Pending Viewer State remains available for a later source-open attempt.
+- Failed document loading or source restoration leaves Pending Viewer State available because restoration has not completed.
+- Identity mismatch discards Pending Viewer State.
+- Successful matching restoration consumes Pending Viewer State.
+- A cancelled layout commit or replaced document generation retains Pending Viewer State until a later restore attempt can complete.
 
-**Rationale:** Pending Viewer State is specific to one document. Opening a different PDF invalidates it. Allowing it to persist would create ambiguity (which document's state applies to which tab?).
+## Invariants
 
-### Decision 5: Empty State Integration
-
-The Resume UI is part of PdfEmptyState, not a separate modal, dialog, or banner. When Pending Viewer State exists, PdfEmptyState renders a different context.
-
-**Rationale:** The empty state is already the correct architectural surface for "no document loaded" scenarios. Adding a separate component would duplicate the empty-state concept and create ownership ambiguity.
-
----
+- Viewer State MUST be an immutable aggregate, never a source of truth.
+- Viewer State MUST contain exactly `documentIdentity`, `currentPage`, and `contentView`.
+- Viewer State MUST NOT contain runtime objects, cache data, file objects, document-source data, or transient operation state.
+- Viewer State serialization MUST be deterministic and serializable.
+- Viewer State MUST remain tab-local; tabs do not share Viewer State or coordinate restoration.
+- Document identity MUST be validated after PDF load.
+- Viewer State MUST NOT own document-source restoration.
+- Browser Tab State MUST remain separate from Viewer State.
+- Pending Viewer State is consumed after successful identity-matched restoration or identity mismatch, and remains pending when restoration cannot yet complete.
 
 ## Rejected Alternatives
 
-### Alternative: Persistent Storage (`browser.storage.local`)
+### Transport
 
-**Rejected because:** Storage persists across all tabs and sessions, breaking tab isolation. Requires coordination to determine which stored state belongs to which tab. Introduces cleanup complexity (stale entries, storage quota). Adds permission dependency. Tab URL is the natural, scoped persistence mechanism.
+- `browser.storage.local` for Viewer State. Tab-local URL transport avoids shared-state coordination and stale storage cleanup.
+- IndexedDB for Viewer State or PDF file content. Viewer State needs only a small snapshot; storing document content adds quota, privacy, and invalidation concerns.
 
-### Alternative: File Content Caching (IndexedDB)
+### Ownership
 
-**Rejected because:** Storing arbitrary PDF content in IndexedDB consumes quota proportional to file size. A 50MB PDF would consume significant storage. Introduces privacy concerns (file content in extension storage). Requires cache invalidation, quota management, and TTL policies — complexity disproportionate to restore value.
-
-### Alternative: Separate Restore Manager
-
-**Rejected because:** Violates ownership invariants. Viewer State is an aggregate over existing owners, not a new authority. A Restore Manager would create a second source of truth for viewing position and duplicate existing owner logic.
-
-### Alternative: Automatic Document Reopen via File System Access API
-
-**Rejected because:** File System Access API is Chromium-only. Its support in MV3 extension pages is undocumented and unstable. Requires user permission grant on first use. Firefox has no equivalent. Browser compatibility risk unacceptable.
-
-**Note:** This alternative was rejected for the current architecture revision. If cross-browser support for persistent file handles becomes available in the future, automatic file reopen may be reconsidered.
-
----
-
-## Architectural Invariants
-
-Every implementation of this ADR **must** preserve:
-
-| # | Invariant |
-|---|-----------|
-| 1 | **One tab = one Viewer State** — Each browser tab has exactly one Viewer State. |
-| 2 | **Tabs are independent** — No state sharing, no cross-tab communication, no global session manager. |
-| 3 | **State is read from existing owners only** — Viewer State is an aggregate, not a source of truth. |
-| 4 | **No new owners are created** — Page, Zoom, and View each retain their existing owners. |
-| 5 | **No runtime objects in Viewer State** — File, Blob, PDF.js Document, and Cache are excluded. |
-| 6 | **Persistence mechanism is independent of contract** — Changing how state is encoded must not change what state is preserved. |
-| 7 | **Viewer State is immutable** — A snapshot, once created, is never mutated. Restoration reads from it, never writes to it. |
-| 8 | **Viewer State is fully serializable** — Every field must be deterministic, serializable, and platform-independent. |
-| 9 | **Pending Viewer State is one-shot** — Consumed on first document load. No stale pending state may survive. |
-| 10 | **Identity check is post-load** — Document identity is verified after document load, not before. |
-| 11 | **No automatic file reopen** — The architecture never attempts to reopen a local file without user interaction. |
-| 12 | **Viewer State may exist without a document** — Pending Viewer State is valid even when no document is loaded. |
-
----
+- Dedicated restore manager. A separate authority would duplicate Viewer State ownership and compete with document, navigation, and viewer-mode owners.
 
 ## Consequences
 
 ### Positive
 
-- Each tab is independently restorable. No cross-tab coordination bugs.
-- Zero new permissions. Zero new storage keys. Pure browser platform mechanism.
-- Pending Viewer State is naturally scoped — destroyed when the tab URL changes or the user opens a different document.
-- Clear ownership boundaries. No new managers, stores, or controllers.
+- Viewer restoration is deterministic, immutable, and tab-local.
+- Existing document, navigation, and viewer-mode ownership remains unchanged.
+- Viewer context and document-source restoration remain independently understandable.
 
 ### Negative
 
-- User must manually re-select the file after tab restore. This is inherent to browser security and cannot be avoided.
-- If the user selects a different file (identity mismatch), Viewer State is silently discarded. The user must re-navigate to their previous page manually.
-- If the tab transport is cleared (user manually opens pdf.html without state), session restore is unavailable. This is expected behavior — the user explicitly chose a clean session.
-- The browser tab transport carries additional Viewer State metadata alongside the page URL.
+- Restoration is intentionally limited to document identity, page, and content view.
+- Viewer State cannot restore a document source by itself.
+- Source restoration remains a separate Browser Tab State concern.
