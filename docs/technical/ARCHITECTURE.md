@@ -162,8 +162,7 @@ src/
 │   ├── core/                       # useExtensionAPI, useBrowserAPI
 │   │   ├── useDirectMessage.js     # Direct messaging
 │   │   └── useExtensionAPI.js      # Extension API wrapper
-│   ├── ui/                         # useUI, usePopupResize  
-│   │   ├── usePopupResize.js       # Popup resizing
+│   ├── ui/                         # UI composables
 │   │   └── useUI.js                # UI state management
 │   └── shared/                     # Other shared composables
 │       ├── useClipboard.js         # Clipboard operations

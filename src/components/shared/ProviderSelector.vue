@@ -388,6 +388,7 @@ const dropdownStyles = ref({})
 
 const teleportTarget = ref('body')
 const isTeleportEnabled = ref(false)
+let resizeAnimationFrameId = null
 
 /**
  * Detects RTL direction for correct alignment of teleported dropdowns.
@@ -526,10 +527,10 @@ const scrollToFocused = () => {
  * Handle click outside to close dropdown (Shadow DOM compatible)
  */
 const handleClickOutside = (event) => {
-  if (!isDropdownOpen.value || !selectorRef.value) return
-
   // Use composedPath to support Shadow DOM and handle retargeting
   const path = event.composedPath()
+
+  if (!isDropdownOpen.value || !selectorRef.value) return
   
   // If the component container is NOT in the event path, the click was outside
   if (!path.includes(selectorRef.value)) {
@@ -785,7 +786,7 @@ const handleTranslate = () => {
  * Toggles the provider selection dropdown
  */
 const toggleDropdown = () => {
-  if (props.disabled) return;
+  if (props.disabled) return
 
   // Deactivate select element mode if it's active when user interacts with this control
   if (isSelectModeActive.value) {
@@ -799,111 +800,6 @@ const toggleDropdown = () => {
     const items = availableProviders.value;
     const currentIndex = items.findIndex(p => p.id === currentProvider.value);
     focusedIndex.value = currentIndex !== -1 ? currentIndex : 0;
-    
-    // Calculate dynamic max-height and direction based on available space
-    const isTeleport = isTeleportEnabled.value;
-
-    nextTick(() => {
-      if (selectorRef.value) {
-        const rect = selectorRef.value.getBoundingClientRect();
-        const isFloatingWindow = selectorRef.value.closest('.ti-window');
-
-        // Mobile-specific sheet container detection
-        const mobileContainer = selectorRef.value.closest('.ti-m-sheet-content');
-        const sidepanelContainer = selectorRef.value.closest('.ti-sidepanel-container');
-        const tabContainer = selectorRef.value.closest('.tab-content-container');
-        const windowBody = selectorRef.value.closest('.ti-window-body');
-
-        const container = mobileContainer || sidepanelContainer || tabContainer || windowBody;
-
-        // If teleported, always use viewport for calculations to avoid clipping by parents
-        const useViewport = isTeleport || !container || isFloatingWindow;
-        const containerRect = useViewport 
-          ? { top: 0, bottom: window.innerHeight } 
-          : container.getBoundingClientRect();
-
-        const spaceBelow = containerRect.bottom - rect.bottom;
-        const spaceAbove = rect.top - containerRect.top;
-
-        const isOptionsPage = window.location.href.includes('options.html');
-
-        if (props.placement !== 'auto') {
-          isUpward.value = props.placement === 'up';
-        } else if (props.mode === 'mobile') {
-          // On mobile, downward is almost always preferred to avoid sheet header clipping
-          isUpward.value = spaceBelow < 220 && spaceAbove > spaceBelow;
-        } else if (isOptionsPage || !props.isGlobal || isFloatingWindow) {
-          // For floating windows or options page, prioritize downward unless space is tight
-          const flipThreshold = isFloatingWindow ? 180 : 250;
-          isUpward.value = spaceBelow < flipThreshold && spaceAbove > spaceBelow;
-        } else {
-          isUpward.value = spaceBelow < 100 && spaceAbove > spaceBelow;
-        }
-
-        const availableHeight = isUpward.value 
-          ? spaceAbove - 20
-          : spaceBelow - 20;
-
-        // Large limit for desktop floating windows, smaller for mobile
-        const maxLimit = isFloatingWindow ? 650 : (props.mode === 'mobile' ? 350 : (props.isGlobal ? 400 : 550));
-
-        // Final height calculation
-        dropdownMaxHeight.value = `${Math.min(maxLimit, Math.max(250, availableHeight))}px`;
-
-        // Calculate fixed positioning for teleported dropdown
-        if (isTeleport && selectorRef.value) {
-          const styles = {
-            position: 'fixed !important',
-            zIndex: '2147483647 !important',
-            maxHeight: `${dropdownMaxHeight.value} !important`
-          };
-
-          if (isUpward.value) {
-            styles.bottom = `${window.innerHeight - rect.top + 4}px !important`;
-            styles.top = 'auto !important';
-          } else {
-            styles.top = `${rect.bottom + 4}px !important`;
-            styles.bottom = 'auto !important';
-          }
-
-          // Alignment logic based on mode and RTL
-          if (props.mode === 'icon-only') {
-            styles.insetInlineStart = `${rect.right + 10}px !important`;
-            styles.top = `${rect.top}px !important`;
-            styles.bottom = 'auto !important';
-          } else {
-            if (props.mode === 'button' || props.mode === 'mobile') {
-              styles.width = `${rect.width}px !important`;
-              styles.minWidth = '220px !important';
-            }
-            
-            const expectedWidth = Math.max(rect.width, 220); // 220px is typical min-width
-            
-            if (isRTL.value) {
-              const rightDist = window.innerWidth - rect.right;
-              if (rightDist + expectedWidth > window.innerWidth) {
-                styles.left = `${rect.left}px !important`;
-                styles.right = 'auto !important';
-              } else {
-                styles.right = `${rightDist}px !important`;
-                styles.left = 'auto !important';
-              }
-            } else {
-              if (rect.left + expectedWidth > window.innerWidth) {
-                styles.right = `${window.innerWidth - rect.right}px !important`;
-                styles.left = 'auto !important';
-              } else {
-                styles.left = `${rect.left}px !important`;
-                styles.right = 'auto !important';
-              }
-            }
-          }
-
-          dropdownStyles.value = styles;
-        }
-      }
-      scrollToFocused();
-    });
   }
 
   logger.debug('Provider selector dropdown toggled!', {
@@ -913,6 +809,107 @@ const toggleDropdown = () => {
   })
   
   isDropdownOpen.value = newState;
+  if (newState) {
+    nextTick(() => {
+      if (!updateDropdownPosition()) {
+        closeDropdown()
+        return
+      }
+      scrollToFocused()
+    })
+  }
+}
+
+const updateDropdownPosition = () => {
+  const selector = selectorRef.value
+  const trigger = triggerBtnRef.value
+
+  if (!selector?.isConnected || !trigger?.isConnected) return false
+
+  const rect = selector.getBoundingClientRect()
+  const dimensions = [rect.width, rect.height]
+
+  if (dimensions.some(dimension => !Number.isFinite(dimension) || dimension <= 0)) return false
+
+  const isFloatingWindow = selector.closest('.ti-window');
+  const mobileContainer = selector.closest('.ti-m-sheet-content');
+  const sidepanelContainer = selector.closest('.ti-sidepanel-container');
+  const tabContainer = selector.closest('.tab-content-container');
+  const windowBody = selector.closest('.ti-window-body');
+  const container = mobileContainer || sidepanelContainer || tabContainer || windowBody;
+  const isTeleport = isTeleportEnabled.value;
+  const useViewport = isTeleport || !container || isFloatingWindow;
+  const containerRect = useViewport
+    ? { top: 0, bottom: window.innerHeight }
+    : container.getBoundingClientRect();
+  const spaceBelow = containerRect.bottom - rect.bottom;
+  const spaceAbove = rect.top - containerRect.top;
+  const isOptionsPage = window.location.href.includes('options.html');
+
+  if (props.placement !== 'auto') {
+    isUpward.value = props.placement === 'up';
+  } else if (props.mode === 'mobile') {
+    isUpward.value = spaceBelow < 220 && spaceAbove > spaceBelow;
+  } else if (isOptionsPage || !props.isGlobal || isFloatingWindow) {
+    const flipThreshold = isFloatingWindow ? 180 : 250;
+    isUpward.value = spaceBelow < flipThreshold && spaceAbove > spaceBelow;
+  } else {
+    isUpward.value = spaceBelow < 100 && spaceAbove > spaceBelow;
+  }
+
+  const availableHeight = isUpward.value ? spaceAbove - 20 : spaceBelow - 20;
+  const maxLimit = isFloatingWindow ? 650 : (props.mode === 'mobile' ? 350 : (props.isGlobal ? 400 : 550));
+  dropdownMaxHeight.value = `${Math.max(0, Math.min(maxLimit, availableHeight))}px`;
+
+  if (isTeleport) {
+    const styles = {
+      position: 'fixed !important',
+      zIndex: '2147483647 !important',
+      maxHeight: `${dropdownMaxHeight.value} !important`
+    };
+
+    if (isUpward.value) {
+      styles.bottom = `${window.innerHeight - rect.top + 4}px !important`;
+      styles.top = 'auto !important';
+    } else {
+      styles.top = `${rect.bottom + 4}px !important`;
+      styles.bottom = 'auto !important';
+    }
+
+    if (props.mode === 'icon-only') {
+      styles.insetInlineStart = `${rect.right + 10}px !important`;
+      styles.top = `${rect.top}px !important`;
+      styles.bottom = 'auto !important';
+    } else {
+      if (props.mode === 'button' || props.mode === 'mobile') {
+        styles.width = `${rect.width}px !important`;
+        styles.minWidth = '220px !important';
+      }
+
+      const expectedWidth = Math.max(rect.width, 220);
+
+      if (isRTL.value) {
+        const rightDist = window.innerWidth - rect.right;
+        if (rightDist + expectedWidth > window.innerWidth) {
+          styles.left = `${rect.left}px !important`;
+          styles.right = 'auto !important';
+        } else {
+          styles.right = `${rightDist}px !important`;
+          styles.left = 'auto !important';
+        }
+      } else if (rect.left + expectedWidth > window.innerWidth) {
+        styles.right = `${window.innerWidth - rect.right}px !important`;
+        styles.left = 'auto !important';
+      } else {
+        styles.left = `${rect.left}px !important`;
+        styles.right = 'auto !important';
+      }
+    }
+
+    dropdownStyles.value = styles;
+  }
+
+  return true
 }
 
 /**
@@ -1017,7 +1014,7 @@ onMounted(() => {
    */
   tracker.addEventListener(document, 'click', handleClickOutside, { capture: true })
   
-  // Close dropdown on scroll or resize when teleported to prevent misalignment
+  // Close dropdown on scroll; reposition on resize when teleported
   if (isTeleportEnabled.value) {
     tracker.addEventListener(window, 'scroll', (event) => {
       if (!isDropdownOpen.value) return;
@@ -1035,7 +1032,11 @@ onMounted(() => {
     }, { capture: true, passive: true });
 
     tracker.addEventListener(window, 'resize', () => {
-      if (isDropdownOpen.value) closeDropdown();
+      if (!isDropdownOpen.value || resizeAnimationFrameId !== null) return
+      resizeAnimationFrameId = requestAnimationFrame(() => {
+        resizeAnimationFrameId = null
+        if (isDropdownOpen.value && !updateDropdownPosition()) closeDropdown()
+      })
     }, { passive: true });
   }
   
@@ -1046,6 +1047,7 @@ onMounted(() => {
 })
 
 onUnmounted(() => {
+  if (resizeAnimationFrameId !== null) cancelAnimationFrame(resizeAnimationFrameId)
   // Event listener cleanup is now handled automatically by useResourceTracker
 })
 </script>
