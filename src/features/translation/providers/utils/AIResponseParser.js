@@ -10,8 +10,23 @@ import { NewlineManager } from '@/features/translation/utils/NewlineManager.js';
 import { appendTranslationDiagnostic } from '@/features/translation/ir/TranslationOperation.js';
 import { createParserSnapshot } from '@/features/translation/providers/utils/ParserSnapshot.js';
 import { TranslationContractValidator } from '@/features/translation/core/TranslationContractValidator.js';
+import { MappingStrategy } from '@/features/translation/ir/RequestUnitManifest.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.TRANSLATION, 'AIResponseParser');
+const VALID_MAPPING_STRATEGIES = new Set(Object.values(MappingStrategy));
+
+function hasValidManifestView(manifestView, expectedCount) {
+  if (!manifestView || !Array.isArray(manifestView.units) || manifestView.units.length !== expectedCount) return false;
+  if (!VALID_MAPPING_STRATEGIES.has(manifestView.declaredMappingStrategy)) return false;
+
+  const requestIndexes = new Set();
+  return manifestView.units.every((unit) => {
+    if (!unit || !Object.isFrozen(unit) || !Number.isInteger(unit.requestIndex)) return false;
+    if (requestIndexes.has(unit.requestIndex)) return false;
+    requestIndexes.add(unit.requestIndex);
+    return true;
+  });
+}
 
 /**
  * Pipeline-based AI Response Healers.
@@ -207,7 +222,7 @@ export const AIResponseParser = {
   /**
    * Parse batch translation results from JSON response.
    */
-  parseBatchResult(result, expectedCount, originalBatch, providerName = 'Unknown', expectedFormat = ResponseFormat.JSON_ARRAY, executionContext = null) {
+  parseBatchResult(result, expectedCount, originalBatch, providerName = 'Unknown', expectedFormat = ResponseFormat.JSON_ARRAY, executionContext = null, manifestView = null) {
     try {
       const parserEvidence = { repaired: false };
       const parsed = this.cleanAIResponse(result, expectedFormat, executionContext, parserEvidence);
@@ -216,7 +231,9 @@ export const AIResponseParser = {
 
       let rawItems = this._normalizeToItems(parsed);
       const snapshot = createParserSnapshot(rawItems, parserEvidence);
-      TranslationContractValidator.validate(snapshot, originalBatch, { expectedCount });
+      if (hasValidManifestView(manifestView, expectedCount)) {
+        TranslationContractValidator.validate(manifestView, snapshot, parserEvidence);
+      }
       const results = new Array(expectedCount).fill(null);
       const unmappedTexts = [];
       const mappedIndexes = new Set();

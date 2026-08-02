@@ -13,6 +13,7 @@ import { statsManager } from '@/features/translation/core/TranslationStatsManage
 import { isFatalError, matchErrorToType } from '@/shared/error-management/ErrorMatcher.js';
 import { ErrorTypes } from "@/shared/error-management/ErrorTypes.js";
 import { appendTranslationDiagnostic } from '@/features/translation/ir/TranslationOperation.js';
+import { createManifestView } from '@/features/translation/ir/RequestUnitManifest.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.TRANSLATION, 'OptimizedJsonHandler');
 
@@ -159,7 +160,7 @@ export class OptimizedJsonHandler {
                originalSourceLang,
                originalTargetLang,
                parallelExecution,
-               executionContext
+                self._createBatchExecutionContext(executionContext, segments, batch)
             ),
             timeoutPromise
           ]);
@@ -332,6 +333,18 @@ export class OptimizedJsonHandler {
          executionContext
       }
     );
+  }
+
+  _createBatchExecutionContext(executionContext, segments, batch) {
+    if (!executionContext?.manifestView || !Array.isArray(batch)) return executionContext
+
+    const requestIndexes = batch.map((item) => segments.indexOf(item))
+    if (requestIndexes.some((requestIndex) => requestIndex < 0)) return executionContext
+
+    return {
+      ...executionContext,
+      manifestView: createManifestView(executionContext.manifestView, requestIndexes),
+    }
   }
 
   _mapResults(originalBatch, translatedResults, executionContext = null) {

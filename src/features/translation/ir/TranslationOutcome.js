@@ -47,7 +47,7 @@ export const UnitDisposition = Object.freeze({
 /**
  * @typedef {object} ValidationResult
  * @property {boolean|null} isValid
- * @property {ReadonlyArray<object>} validatedUnits
+ * @property {ReadonlyArray<{requestIndex: number, unitId: string, translatedText?: string, violationCodes: ReadonlyArray<string>}>} validatedUnits
  * @property {ReadonlyArray<object>} invalidUnits
  * @property {ReadonlyArray<string>} missingUnitIds
  * @property {ReadonlyArray<string>} duplicateUnitIds
@@ -125,6 +125,14 @@ function copyRecordArray(value) {
   return Object.freeze(Array.isArray(value) ? value.map(copyRecord) : [])
 }
 
+function copyValidatedUnit(value) {
+  const unit = copyRecord(value) || {}
+  return createValueObject({
+    ...unit,
+    violationCodes: copyArray(unit.violationCodes),
+  })
+}
+
 function copyUnitResult(value) {
   if (valueObjects.has(value)) return value
   const unit = copyRecord(value) || {}
@@ -181,7 +189,7 @@ export function createValidationResult({
 } = {}) {
   return createValueObject({
     isValid,
-    validatedUnits: copyRecordArray(validatedUnits),
+    validatedUnits: Object.freeze(Array.isArray(validatedUnits) ? validatedUnits.map(copyValidatedUnit) : []),
     invalidUnits: copyRecordArray(invalidUnits),
     missingUnitIds: copyArray(missingUnitIds),
     duplicateUnitIds: copyArray(duplicateUnitIds),

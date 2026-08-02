@@ -26,6 +26,7 @@ import {
   createTranslationOperation,
   finalizeTranslationOperation,
 } from '@/features/translation/ir/TranslationOperation.js';
+import { createManifestView, createRequestUnitManifest } from '@/features/translation/ir/RequestUnitManifest.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.TRANSLATION, 'UnifiedTranslationService');
 
@@ -175,7 +176,11 @@ export class UnifiedTranslationService {
         throw new Error('Translation request registration failed');
       }
 
-      const executionContext = { operation: createTranslationOperation(messageId) };
+      const requestUnitManifest = createRequestUnitManifest(data?.text);
+      const executionContext = {
+        operation: createTranslationOperation(messageId),
+        manifestView: createManifestView(requestUnitManifest),
+      };
       this._setOperation(request, executionContext.operation);
 
       let result;

@@ -47,6 +47,7 @@ describe('TranslationOutcome contracts', () => {
     expect(Object.isFrozen(validation)).toBe(true)
     expect(Object.isFrozen(validation.validatedUnits)).toBe(true)
     expect(Object.isFrozen(validation.validatedUnits[0])).toBe(true)
+    expect(Object.isFrozen(validation.validatedUnits[0].violationCodes)).toBe(true)
     expect(Object.isFrozen(validation.orderingFacts)).toBe(true)
     expect(Object.isFrozen(validation.orderingFacts.nested)).toBe(false)
   })

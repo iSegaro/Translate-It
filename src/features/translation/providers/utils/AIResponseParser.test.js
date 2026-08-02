@@ -1,6 +1,8 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { AIResponseParser } from './AIResponseParser.js';
 import { ResponseFormat } from '@/shared/config/translationConstants.js';
+import { TranslationContractValidator } from '@/features/translation/core/TranslationContractValidator.js';
+import { MappingStrategy } from '@/features/translation/ir/RequestUnitManifest.js';
 
 describe('AIResponseParser', () => {
   describe('cleanAIResponse - String Format', () => {
@@ -98,6 +100,29 @@ describe('AIResponseParser', () => {
       const input = 'undefined';
       const result = AIResponseParser.cleanAIResponse(input, ResponseFormat.STRING);
       expect(result).toBe('undefined');
+    });
+  });
+
+  describe('parseBatchResult manifest validation', () => {
+    it('skips observation for an inconsistent manifest view without changing parser output', () => {
+      const validate = vi.spyOn(TranslationContractValidator, 'validate');
+
+      const result = AIResponseParser.parseBatchResult(
+        '["translated"]',
+        1,
+        ['source'],
+        'Custom',
+        ResponseFormat.JSON_ARRAY,
+        null,
+        {
+          units: [{ unitId: 'unit-0', requestIndex: 0 }],
+          declaredMappingStrategy: MappingStrategy.POSITIONAL_ONLY,
+        },
+      );
+
+      expect(result).toEqual(['translated']);
+      expect(validate).not.toHaveBeenCalled();
+      validate.mockRestore();
     });
   });
 });

@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { createTranslationOperation } from './TranslationOperation.js'
 import { AIResponseParser } from '../providers/utils/AIResponseParser.js'
 import { ResponseFormat } from '@/shared/config/translationConstants.js'
+import { createManifestView, createRequestUnitManifest } from './RequestUnitManifest.js'
 
 describe('TranslationOperation', () => {
   it('keeps bounded sanitized diagnostics and creates one immutable report', () => {
@@ -80,13 +81,16 @@ describe('TranslationOperation', () => {
 
   it('keeps legacy mapped output unchanged after validation', () => {
     const operation = createTranslationOperation('message-validation-output')
+    const originalBatch = [{ i: 'first', t: 'source one' }, { i: 'second', t: 'source two' }]
+    const manifestView = createManifestView(createRequestUnitManifest(originalBatch))
     const result = AIResponseParser.parseBatchResult(
       '[{"i":"second","t":"translated"},{"i":"second","t":""}]',
       2,
-      [{ i: 'first', t: 'source one' }, { i: 'second', t: 'source two' }],
+      originalBatch,
       'Custom',
       ResponseFormat.JSON_ARRAY,
       { operation },
+      manifestView,
     )
 
     expect(result).toEqual(['source one', 'second'])

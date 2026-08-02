@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { createParserSnapshot } from '../providers/utils/ParserSnapshot.js'
+import { createManifestView, createRequestUnitManifest } from '../ir/RequestUnitManifest.js'
 import { TranslationContractValidator } from './TranslationContractValidator.js'
 
 describe('TranslationContractValidator', () => {
@@ -10,10 +11,15 @@ describe('TranslationContractValidator', () => {
       { i: 'second', t: '' },
       { i: 'unknown', t: nestedText },
     ], { repaired: true })
-    const result = TranslationContractValidator.validate(snapshot, [
+    const requestedUnits = [
       { i: 'first', t: 'source one' },
       { i: 'second', t: 'source two' },
-    ])
+    ]
+    const result = TranslationContractValidator.validate(
+      createManifestView(createRequestUnitManifest(requestedUnits)),
+      snapshot,
+      snapshot.parserEvidence,
+    )
 
     expect(result).toMatchObject({
       isValid: false,
@@ -37,17 +43,27 @@ describe('TranslationContractValidator', () => {
     expect(snapshot.units[2].translatedText).toBe(nestedText)
     expect(Object.isFrozen(nestedText)).toBe(false)
     expect(Object.isFrozen(result)).toBe(true)
+    expect(result.validatedUnits).toEqual([
+      { requestIndex: 0, unitId: 'first', violationCodes: ['MISSING_REQUESTED_UNIT'] },
+      { requestIndex: 1, unitId: 'second', violationCodes: ['DUPLICATE_RESPONSE_ID', 'EMPTY_TRANSLATED_TEXT'] },
+    ])
   })
 
   it('validates string arrays positionally', () => {
+    const requestedUnits = ['source one', 'source two']
     const result = TranslationContractValidator.validate(
+      createManifestView(createRequestUnitManifest(requestedUnits)),
       createParserSnapshot(['one', 'two']),
-      ['source one', 'source two'],
+      undefined,
     )
 
     expect(result).toMatchObject({
       isValid: true,
       orderingFacts: { mode: 'POSITIONAL', isInRequestOrder: true },
     })
+    expect(result.validatedUnits).toEqual([
+      { requestIndex: 0, unitId: 'unit-0', translatedText: 'one', violationCodes: [] },
+      { requestIndex: 1, unitId: 'unit-1', translatedText: 'two', violationCodes: [] },
+    ])
   })
 })

@@ -1,16 +1,9 @@
 import { createValidationResult } from '../ir/TranslationOutcome.js'
+import { MappingStrategy } from '../ir/RequestUnitManifest.js'
 
-function getRequestedId(unit, index) {
-  if (!unit || typeof unit !== 'object') return String(index)
-  return String(unit.i || unit.uid || unit.id || index)
-}
-
-function findRequestedIndex(responseId, requestedUnits, expectedCount) {
+function findRequestedIndex(responseId, manifestUnits, expectedCount) {
   if (typeof responseId === 'string') {
-    return requestedUnits.findIndex((unit) => {
-      if (!unit || typeof unit !== 'object') return false
-      return (unit.i || unit.uid || unit.id) === responseId
-    })
+    return manifestUnits.findIndex((unit) => unit.unitId === responseId)
   }
 
   const index = Number.parseInt(responseId, 10)
@@ -26,17 +19,24 @@ function createViolation(code, index) {
  * legacy parser mapping behavior.
  */
 export const TranslationContractValidator = {
-  validate(snapshot, requestedUnits = [], { expectedCount = requestedUnits.length } = {}) {
+  validate(manifestView, snapshot, parserEvidence = snapshot?.parserEvidence) {
     const units = Array.isArray(snapshot?.units) ? snapshot.units : []
-    const requestedIds = requestedUnits.map(getRequestedId)
-    const hasResponseIds = units.some((unit) => unit.hasResponseId)
+    const manifestUnits = Array.isArray(manifestView?.units)
+      ? manifestView.units
+      : []
+    const expectedCount = manifestUnits.length
+    const requestedIds = manifestUnits.map(({ unitId, requestIndex }) => (
+      manifestView?.declaredMappingStrategy === MappingStrategy.IDENTITY_REQUIRED ? unitId : String(requestIndex)
+    ))
+    const hasResponseIds = manifestView?.declaredMappingStrategy === MappingStrategy.IDENTITY_REQUIRED
+      && units.some((unit) => unit.hasResponseId)
     const seenIndexes = new Set()
     const missingUnitIds = []
     const duplicateUnitIds = []
     const unknownUnitIds = []
-    const validatedUnits = []
     const invalidUnits = []
     const violations = []
+    const requestFacts = Array.from({ length: expectedCount }, () => ({ unit: null, violationCodes: [] }))
     let isInRequestOrder = true
 
     units.forEach((unit, index) => {
@@ -47,7 +47,7 @@ export const TranslationContractValidator = {
         if (!unit.hasResponseId) {
           unitViolations.push('MISSING_RESPONSE_ID')
         } else {
-          requestedIndex = findRequestedIndex(unit.responseId, requestedUnits, expectedCount)
+          requestedIndex = findRequestedIndex(unit.responseId, manifestUnits, expectedCount)
           if (requestedIndex === -1) {
             unknownUnitIds.push(String(unit.responseId))
             unitViolations.push('UNKNOWN_RESPONSE_ID')
@@ -74,7 +74,11 @@ export const TranslationContractValidator = {
         requestedIndex: requestedIndex >= 0 ? requestedIndex : null,
         responseId: unit.hasResponseId ? String(unit.responseId) : null,
       })
-      validatedUnits.push(fact)
+      if (requestedIndex >= 0 && requestedIndex < expectedCount) {
+        const requestFact = requestFacts[requestedIndex]
+        if (requestFact.unit === null) requestFact.unit = unit
+        requestFact.violationCodes.push(...unitViolations)
+      }
       if (unitViolations.length > 0) {
         invalidUnits.push(fact)
         unitViolations.forEach((code) => violations.push(createViolation(code, index)))
@@ -93,6 +97,22 @@ export const TranslationContractValidator = {
     if (units.length !== expectedCount) violations.push(createViolation('CARDINALITY_MISMATCH', null))
     if (missingUnitIds.length > 0) violations.push(createViolation('MISSING_REQUESTED_UNITS', null))
 
+    const validatedUnits = manifestUnits.map((manifestUnit, requestIndex) => {
+      const requestFact = requestFacts[requestIndex]
+      const violationCodes = requestFact.violationCodes.length > 0
+        ? requestFact.violationCodes
+        : (requestFact.unit ? [] : ['MISSING_REQUESTED_UNIT'])
+      const translatedText = violationCodes.length === 0 && typeof requestFact.unit?.translatedText === 'string'
+        ? requestFact.unit.translatedText
+        : undefined
+      return Object.freeze({
+        requestIndex: manifestUnit.requestIndex,
+        unitId: manifestUnit.unitId,
+        ...(translatedText !== undefined && { translatedText }),
+        violationCodes: Object.freeze([...violationCodes]),
+      })
+    })
+
     return createValidationResult({
       isValid: violations.length === 0,
       validatedUnits,
@@ -103,7 +123,7 @@ export const TranslationContractValidator = {
       orderingFacts: { mode: hasResponseIds ? 'IDENTITY' : 'POSITIONAL', isInRequestOrder },
       cardinality,
       violations,
-      parserEvidence: snapshot?.parserEvidence || null,
+      parserEvidence: parserEvidence || null,
     })
   },
 }
