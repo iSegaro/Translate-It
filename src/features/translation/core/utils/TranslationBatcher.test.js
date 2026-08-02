@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { TranslationBatcher } from './TranslationBatcher.js';
 import { ComplexityAnalyzer } from './ComplexityAnalyzer.js';
+import { createRequestUnitManifest } from '../../ir/RequestUnitManifest.js';
 
 // Mock ComplexityAnalyzer
 vi.mock('./ComplexityAnalyzer.js', () => ({
@@ -131,6 +132,33 @@ describe('TranslationBatcher', () => {
       
       expect(batches.length).toBe(1);
       expect(batches[0].length).toBe(2);
+    });
+  });
+
+  describe('createIntelligentMembershipBatches', () => {
+    it('preserves distinct manifest references for duplicate values and references', () => {
+      const repeated = { t: 'same' };
+      const segments = ['same', 'same', repeated, repeated, { t: 'same' }];
+      const manifest = createRequestUnitManifest(segments);
+      const batches = TranslationBatcher.createIntelligentMembershipBatches(segments, manifest.units, 10, 1000);
+      const members = batches.flat();
+
+      expect(members.map(({ payload }) => payload)).toEqual(segments);
+      expect(members.map(({ manifestUnit }) => manifestUnit)).toEqual(manifest.units);
+      expect(members.every(({ isSplitFragment }) => isSplitFragment === false)).toBe(true);
+      expect(members[0].manifestUnit).not.toBe(members[1].manifestUnit);
+      expect(members[2].manifestUnit).not.toBe(members[3].manifestUnit);
+      expect(members[2].payload).toBe(members[3].payload);
+    });
+
+    it('marks split fragments as ineligible for manifest observation', () => {
+      const segments = ['First sentence. Second sentence.'];
+      const manifest = createRequestUnitManifest(segments);
+      const members = TranslationBatcher.createIntelligentMembershipBatches(segments, manifest.units, 10, 15).flat();
+
+      expect(members.length).toBeGreaterThan(1);
+      expect(members.every(({ manifestUnit }) => manifestUnit === null)).toBe(true);
+      expect(members.every(({ isSplitFragment }) => isSplitFragment === true)).toBe(true);
     });
   });
 

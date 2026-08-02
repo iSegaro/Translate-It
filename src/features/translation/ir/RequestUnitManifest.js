@@ -7,6 +7,11 @@ export const MappingStrategy = Object.freeze({
   IDENTITY_REQUIRED: 'IDENTITY_REQUIRED',
   POSITIONAL_ONLY: 'POSITIONAL_ONLY',
 })
+const VALID_MAPPING_STRATEGIES = new Set(Object.values(MappingStrategy))
+
+function hasValidMappingStrategy(manifestView) {
+  return Boolean(manifestView) && VALID_MAPPING_STRATEGIES.has(manifestView.declaredMappingStrategy)
+}
 
 function getInputUnits(input) {
   if (Array.isArray(input)) return input
@@ -53,6 +58,8 @@ export function createRequestUnitManifest(input) {
  * Creates an immutable batch view from manifest-owned unit records.
  */
 export function createManifestView(manifest, requestIndexes = manifest?.units.map(({ requestIndex }) => requestIndex)) {
+  if (!hasValidMappingStrategy(manifest)) return null
+
   const sourceUnits = Array.isArray(manifest?.units) ? manifest.units : []
   const unitsByRequestIndex = new Map(sourceUnits.map((unit) => [unit.requestIndex, unit]))
   const units = Array.isArray(requestIndexes)
@@ -61,6 +68,26 @@ export function createManifestView(manifest, requestIndexes = manifest?.units.ma
 
   return Object.freeze({
     units: Object.freeze(units),
-    declaredMappingStrategy: manifest?.declaredMappingStrategy ?? MappingStrategy.POSITIONAL_ONLY,
+    declaredMappingStrategy: manifest.declaredMappingStrategy,
+  })
+}
+
+/**
+ * Creates an immutable view from execution-carried manifest unit references.
+ */
+export function createManifestViewFromUnits(manifestView, units) {
+  if (!hasValidMappingStrategy(manifestView) || !Array.isArray(units)) return null
+
+  const requestIndexes = new Set()
+  if (!units.every((unit) => {
+    if (!unit || !Object.isFrozen(unit) || !Number.isInteger(unit.requestIndex)) return false
+    if (requestIndexes.has(unit.requestIndex)) return false
+    requestIndexes.add(unit.requestIndex)
+    return true
+  })) return null
+
+  return Object.freeze({
+    units: Object.freeze([...units]),
+    declaredMappingStrategy: manifestView.declaredMappingStrategy,
   })
 }

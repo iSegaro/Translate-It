@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { createManifestView, createRequestUnitManifest, MappingStrategy } from './RequestUnitManifest.js'
+import { createManifestView, createManifestViewFromUnits, createRequestUnitManifest, MappingStrategy } from './RequestUnitManifest.js'
 
 describe('RequestUnitManifest', () => {
   it('creates a frozen execution-owned identity manifest', () => {
@@ -28,5 +28,19 @@ describe('RequestUnitManifest', () => {
     expect(secondBatch.units[0]).toEqual({ unitId: 'third', requestIndex: 2 })
     expect(Object.isFrozen(firstBatch)).toBe(true)
     expect(Object.isFrozen(firstBatch.units)).toBe(true)
+  })
+
+  it('rejects invalid direct views without cloning manifest units', () => {
+    const manifest = createRequestUnitManifest(['one', 'two'])
+
+    expect(createManifestView(null)).toBeNull()
+    expect(createManifestView({ units: manifest.units, declaredMappingStrategy: 'invalid' })).toBeNull()
+    expect(createManifestViewFromUnits(null, manifest.units)).toBeNull()
+    expect(createManifestViewFromUnits({ declaredMappingStrategy: 'invalid' }, manifest.units)).toBeNull()
+    expect(createManifestViewFromUnits(manifest, [manifest.units[0], manifest.units[0]])).toBeNull()
+    expect(createManifestViewFromUnits(manifest, [{ unitId: 'invalid', requestIndex: 2 }])).toBeNull()
+    const view = createManifestViewFromUnits(manifest, [manifest.units[1]])
+    expect(view?.units[0]).toBe(manifest.units[1])
+    expect(view?.declaredMappingStrategy).toBe(manifest.declaredMappingStrategy)
   })
 })

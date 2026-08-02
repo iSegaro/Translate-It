@@ -24,6 +24,7 @@ import { OptimizedJsonHandler } from './OptimizedJsonHandler.js';
 import { isFatalError, matchErrorToType } from '@/shared/error-management/ErrorMatcher.js';
 import { getProviderConfiguration } from '@/features/translation/core/ProviderConfigurations.js';
 import { TranslationBatcher } from '@/features/translation/core/utils/TranslationBatcher.js';
+import { createManifestView, createRequestUnitManifest } from '@/features/translation/ir/RequestUnitManifest.js';
 
 // Mock dependencies
 vi.mock('@/shared/logging/logger.js', () => ({
@@ -143,6 +144,52 @@ describe('OptimizedJsonHandler', () => {
       const original = ['s1', 's2'];
       const translated = ['t1'];
       expect(() => handler._mapResults(original, translated)).toThrow(/Segment count mismatch/);
+    });
+  });
+
+  describe('manifest membership', () => {
+    it('constructs views from carried manifest records and keeps provider payload unchanged', async () => {
+      const segments = ['same', 'same'];
+      const manifest = createRequestUnitManifest(segments);
+      const executionContext = { manifestView: createManifestView(manifest) };
+      mockEngine.createIntelligentMembershipBatches = vi.fn((items, manifestUnits) => (
+        items.map((payload, index) => [{ payload, manifestUnit: manifestUnits[index] }])
+      ));
+      mockProvider.translate
+        .mockResolvedValueOnce({ translatedText: ['first'] })
+        .mockResolvedValueOnce({ translatedText: ['second'] });
+
+      await handler.execute(
+        mockEngine,
+        { text: JSON.stringify(segments), sourceLanguage: 'en', targetLanguage: 'fa', mode: 'select_element', messageId: 'manifest-1' },
+        mockProvider,
+        'en',
+        'fa',
+        'manifest-1',
+        { tab: { id: 123 } },
+        'unknown',
+        executionContext,
+      );
+
+      expect(mockProvider.translate.mock.calls.map(([payload]) => payload)).toEqual([['same'], ['same']]);
+      const batchView = handler._createBatchExecutionContext(executionContext, [{ payload: 'same', manifestUnit: manifest.units[1] }]).manifestView;
+      expect(batchView.units[0]).toBe(manifest.units[1]);
+    });
+
+    it('skips manifest observation for split batch members', () => {
+      const manifest = createRequestUnitManifest(['source']);
+      const executionContext = { manifestView: createManifestView(manifest) };
+      const batchContext = handler._createBatchExecutionContext(executionContext, [{ payload: 'fragment', manifestUnit: null, isSplitFragment: true }]);
+
+      expect(batchContext.manifestView).toBeNull();
+    });
+
+    it('rejects missing non-split membership as an invalid view', () => {
+      const manifest = createRequestUnitManifest(['source']);
+      const executionContext = { manifestView: createManifestView(manifest) };
+      const batchContext = handler._createBatchExecutionContext(executionContext, [{ payload: 'source', manifestUnit: null, isSplitFragment: false }]);
+
+      expect(batchContext.manifestView).toBeNull();
     });
   });
 

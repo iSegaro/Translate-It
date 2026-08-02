@@ -299,4 +299,8 @@ export class TranslationEngine {
   createIntelligentBatches(segments, baseBatchSize, maxCharsPerBatch) {
     return TranslationBatcher.createIntelligentBatches(segments, baseBatchSize, maxCharsPerBatch);
   }
+
+  createIntelligentMembershipBatches(segments, manifestUnits, baseBatchSize, maxCharsPerBatch) {
+    return TranslationBatcher.createIntelligentMembershipBatches(segments, manifestUnits, baseBatchSize, maxCharsPerBatch);
+  }
 }

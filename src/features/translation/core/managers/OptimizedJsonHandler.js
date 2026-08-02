@@ -13,7 +13,7 @@ import { statsManager } from '@/features/translation/core/TranslationStatsManage
 import { isFatalError, matchErrorToType } from '@/shared/error-management/ErrorMatcher.js';
 import { ErrorTypes } from "@/shared/error-management/ErrorTypes.js";
 import { appendTranslationDiagnostic } from '@/features/translation/ir/TranslationOperation.js';
-import { createManifestView } from '@/features/translation/ir/RequestUnitManifest.js';
+import { createManifestViewFromUnits } from '@/features/translation/ir/RequestUnitManifest.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.TRANSLATION, 'OptimizedJsonHandler');
 
@@ -52,11 +52,12 @@ export class OptimizedJsonHandler {
       const optimalSize = structuredOverride.optimalSize || providerConfig?.batching?.optimalSize || 25;
       const characterLimit = structuredOverride.characterLimit || providerConfig?.batching?.characterLimit || providerConfig?.batching?.maxChars || 5000;
 
-      const batches = engine.createIntelligentBatches(
-        segments, 
-        optimalSize, 
-        characterLimit
-      );
+      const manifestUnits = executionContext?.manifestView?.units;
+      const hasManifestMembership = Array.isArray(manifestUnits) && manifestUnits.length === segments.length
+        && typeof engine.createIntelligentMembershipBatches === 'function';
+      const batches = hasManifestMembership
+        ? engine.createIntelligentMembershipBatches(segments, manifestUnits, optimalSize, characterLimit)
+        : engine.createIntelligentBatches(segments, optimalSize, characterLimit);
 
       logger.debug(`[JsonHandler] Executing ${batches.length} batches for ${segments.length} segments (Concurrency: ${providerConfig.rateLimit.maxConcurrent})`);
       logger.debug(`[JsonHandler] Structured batch ${laneLabel} (${mode})`);
@@ -143,10 +144,14 @@ export class OptimizedJsonHandler {
             abortController.signal.addEventListener('abort', () => clearTimeout(timeoutId));
           });
 
+          const batchPayload = hasManifestMembership ? batch.map(({ payload }) => payload) : batch;
+          const batchExecutionContext = hasManifestMembership
+            ? self._createBatchExecutionContext(executionContext, batch)
+            : executionContext;
           const translatedBatchResponse = await Promise.race([
             self._performBatchCall(
               providerInstance, 
-              batch, 
+              batchPayload, 
               detectedSourceLanguage, 
               targetLanguage, 
               mode, 
@@ -160,7 +165,7 @@ export class OptimizedJsonHandler {
                originalSourceLang,
                originalTargetLang,
                parallelExecution,
-                self._createBatchExecutionContext(executionContext, segments, batch)
+                batchExecutionContext
             ),
             timeoutPromise
           ]);
@@ -177,7 +182,7 @@ export class OptimizedJsonHandler {
             ? translatedBatchResponse.translatedText
             : translatedBatchResponse;
 
-          const mappedResults = self._mapResults(batch, translatedBatch, executionContext);
+          const mappedResults = self._mapResults(batchPayload, translatedBatch, executionContext);
           checkCancellation();
           accumulatedResults.push(...mappedResults);
           completedBatchCount++;
@@ -335,15 +340,18 @@ export class OptimizedJsonHandler {
     );
   }
 
-  _createBatchExecutionContext(executionContext, segments, batch) {
+  _createBatchExecutionContext(executionContext, batch) {
     if (!executionContext?.manifestView || !Array.isArray(batch)) return executionContext
 
-    const requestIndexes = batch.map((item) => segments.indexOf(item))
-    if (requestIndexes.some((requestIndex) => requestIndex < 0)) return executionContext
+    if (batch.some(({ isSplitFragment }) => isSplitFragment)) {
+      return { ...executionContext, manifestView: null }
+    }
+
+    const manifestUnits = batch.map(({ manifestUnit }) => manifestUnit)
 
     return {
       ...executionContext,
-      manifestView: createManifestView(executionContext.manifestView, requestIndexes),
+      manifestView: createManifestViewFromUnits(executionContext.manifestView, manifestUnits),
     }
   }
 
