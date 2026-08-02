@@ -152,7 +152,26 @@ export class BaseAIProvider extends BaseProvider {
 
       // Stats recording is handled by ProviderRequestEngine. 
       // Orchestrators (like OptimizedJsonHandler or UnifiedService) handle the reporting.
-      return AIResponseParser.parseBatchResult(response, texts.length, texts, this.providerName, expectedFormat || ResponseFormat.JSON_ARRAY);
+      const parsed = AIResponseParser.parseBatchResult(response, texts.length, texts, this.providerName, expectedFormat || ResponseFormat.JSON_ARRAY);
+
+      if (parsed.contractViolation) {
+        logger.warn(`[${this.providerName}] Batch JSON response violated the structured response contract; falling back to sequential translation`);
+        return this._traditionalBatchTranslate(
+          texts,
+          sourceLang,
+          targetLang,
+          translateMode,
+          engine,
+          messageId,
+          abortController,
+          priority,
+          sessionId,
+          ResponseFormat.STRING,
+          contextMetadata || {}
+        );
+      }
+
+      return parsed.results;
     } catch (error) {
       if (sessionId) {
         import('../core/TranslationStatsManager.js').then(m => {

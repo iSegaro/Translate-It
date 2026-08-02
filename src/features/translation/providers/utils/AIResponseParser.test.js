@@ -100,4 +100,48 @@ describe('AIResponseParser', () => {
       expect(result).toBe('undefined');
     });
   });
+
+  describe('parseBatchResult - Recovery Verdict', () => {
+    it('should return contractViolation false for a complete id-mapped JSON response', () => {
+      const result = AIResponseParser.parseBatchResult(
+        '[{"id": 0, "text": "Hola"}, {"id": 1, "text": "Adiós"}]',
+        2,
+        ['Hello', 'World']
+      );
+
+      expect(result).toEqual({
+        results: ['Hola', 'Adiós'],
+        contractViolation: false
+      });
+    });
+
+    it('should return contractViolation true when slots are gap-filled', () => {
+      const result = AIResponseParser.parseBatchResult(
+        '[{"id": 0, "text": "Hola"}]',
+        2,
+        ['Hello', 'World']
+      );
+
+      expect(result).toEqual({
+        results: ['Hola', 'World'],
+        contractViolation: true
+      });
+    });
+
+    it('should return contractViolation true for malformed JSON', () => {
+      const original = ['Hello', 'World', 'Foo'];
+      const result = AIResponseParser.parseBatchResult(
+        'null',
+        3,
+        original,
+        'MockAI',
+        ResponseFormat.JSON_ARRAY
+      );
+
+      expect(result).toEqual({
+        results: original,
+        contractViolation: true
+      });
+    });
+  });
 });

@@ -195,6 +195,8 @@ export const AIResponseParser = {
 
   /**
    * Parse batch translation results from JSON response.
+   * @returns {{ results: Array<string>, contractViolation: boolean }} Parsed results plus whether
+   * the response violated the structured contract (slots gap-filled or unparseable).
    */
   parseBatchResult(result, expectedCount, originalBatch, providerName = 'Unknown', expectedFormat = ResponseFormat.JSON_ARRAY) {
     try {
@@ -220,10 +222,20 @@ export const AIResponseParser = {
         }
       });
 
-      return this._fillResultsGaps(results, unmappedTexts, originalBatch, expectedCount);
+      // Contract violation: any slot that could not be mapped by id and will be gap-filled below
+      // means the AI violated the structured response contract.
+      const contractViolation = results.some(text => text === null);
+
+      return {
+        results: this._fillResultsGaps(results, unmappedTexts, originalBatch, expectedCount),
+        contractViolation
+      };
     } catch (error) {
       logger.error(`[${providerName}] Strict parse failed: ${error.message}`);
-      return originalBatch.map(item => typeof item === 'object' ? (item.t || item.text) : item);
+      return {
+        results: originalBatch.map(item => typeof item === 'object' ? (item.t || item.text) : item),
+        contractViolation: true
+      };
     }
   },
 

@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { ResponseFormat } from '@/shared/config/translationConstants.js';
 
 // 1. Mock minimal dependencies
 vi.mock('webextension-polyfill', () => ({
@@ -35,6 +36,7 @@ vi.mock('@/shared/error-management/ErrorMatcher.js', () => ({
 
 import { BaseAIProvider } from './BaseAIProvider.js';
 import { isFatalError, isTransientError, matchErrorToType } from '@/shared/error-management/ErrorMatcher.js';
+import { AIResponseParser } from './utils/AIResponseParser.js';
 
 // Mock AIResponseParser
 vi.mock("./utils/AIResponseParser.js", () => ({
@@ -112,6 +114,44 @@ describe('BaseAIProvider', () => {
       expect(spy).toHaveBeenCalled();
       const userText = spy.mock.calls[0][1];
       expect(userText).toContain('Hello');
+    });
+  });
+
+  describe('parseBatchResult recovery verdict', () => {
+    it('should return parsed.results when contractViolation is false', async () => {
+      vi.mocked(AIResponseParser.parseBatchResult).mockReturnValue({ results: ['R1', 'R2'], contractViolation: false });
+
+      const result = await provider._translateBatch(['Hello', 'World'], 'en', 'fa', 'selection', null, null, null, 'session-1');
+
+      expect(result).toEqual(['R1', 'R2']);
+    });
+
+    it('should call _traditionalBatchTranslate exactly once when contractViolation is true', async () => {
+      vi.mocked(AIResponseParser.parseBatchResult).mockReturnValue({ results: ['R1'], contractViolation: true });
+      const fallbackSpy = vi.spyOn(provider, '_traditionalBatchTranslate').mockResolvedValue(['F1', 'F2']);
+      const texts = ['Hello', 'World'];
+
+      const result = await provider._translateBatch(texts, 'en', 'fa', 'selection', null, null, null, 'session-1');
+
+      expect(fallbackSpy).toHaveBeenCalledTimes(1);
+      expect(fallbackSpy).toHaveBeenCalledWith(
+        texts, 'en', 'fa', 'selection',
+        null, null, null, null, 'session-1',
+        ResponseFormat.STRING,
+        {}
+      );
+      expect(result).toEqual(['F1', 'F2']);
+    });
+
+    it('should NOT trigger fallback on non-fatal transport errors', async () => {
+      provider._callAI = vi.fn().mockRejectedValue(new Error('Non-Fatal-Non-Transient'));
+      const fallbackSpy = vi.spyOn(provider, '_traditionalBatchTranslate').mockResolvedValue([]);
+      const texts = ['Original 1', 'Original 2'];
+
+      const result = await provider._translateBatch(texts, 'en', 'fa', 'selection', null, null, null, 'session-1');
+
+      expect(result).toEqual(['Original 1', 'Original 2']);
+      expect(fallbackSpy).not.toHaveBeenCalled();
     });
   });
 
