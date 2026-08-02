@@ -184,9 +184,12 @@ export class OptimizedJsonHandler {
 
           const mappedResults = self._mapResults(batchPayload, translatedBatch, executionContext);
           checkCancellation();
-          // Forward terminally accepted manifest unit references only; execution
-          // identity extraction is the router's responsibility, never this handler's.
-          if (batchExecutionContext?.manifestView?.units) {
+          // Terminal observation is restricted to the approved execution scope:
+          // structured Select Element + AI provider + unsplit ManifestView.
+          // Execution identity extraction is the router's responsibility, never this handler's.
+          if (mode === TranslationMode.Select_Element
+              && providerInstance.constructor.isAI
+              && batchExecutionContext?.manifestView?.units) {
             executionContext?.onTerminalUnitsAccepted?.(batchExecutionContext.manifestView.units);
           }
           accumulatedResults.push(...mappedResults);

@@ -227,6 +227,101 @@ describe('OptimizedJsonHandler', () => {
       expect(secondBatchUnits[0]).toBe(manifest.units[1]);
       expect(typeof firstBatchUnits[0]).toBe('object');
     });
+
+    it('never invokes terminal observation for structured PDF', async () => {
+      const segments = ['same', 'same'];
+      const manifest = createRequestUnitManifest(segments);
+      const onTerminalUnitsAccepted = vi.fn();
+      const executionContext = {
+        manifestView: createManifestView(manifest),
+        onTerminalUnitsAccepted,
+      };
+      mockEngine.createIntelligentMembershipBatches = vi.fn((items, manifestUnits) => (
+        items.map((payload, index) => [{ payload, manifestUnit: manifestUnits[index] }])
+      ));
+      mockProvider.translate
+        .mockResolvedValueOnce({ translatedText: ['first'] })
+        .mockResolvedValueOnce({ translatedText: ['second'] });
+
+      await handler.execute(
+        mockEngine,
+        { text: JSON.stringify(segments), sourceLanguage: 'en', targetLanguage: 'fa', mode: 'pdf-translation', messageId: 'pdf-observe-1' },
+        mockProvider,
+        'en',
+        'fa',
+        'pdf-observe-1',
+        { tab: { id: 123 } },
+        'unknown',
+        executionContext,
+      );
+
+      expect(onTerminalUnitsAccepted).not.toHaveBeenCalled();
+    });
+
+    it('never invokes terminal observation for traditional Select providers', async () => {
+      const segments = ['same', 'same'];
+      const manifest = createRequestUnitManifest(segments);
+      const onTerminalUnitsAccepted = vi.fn();
+      const executionContext = {
+        manifestView: createManifestView(manifest),
+        onTerminalUnitsAccepted,
+      };
+      mockEngine.createIntelligentMembershipBatches = vi.fn((items, manifestUnits) => (
+        items.map((payload, index) => [{ payload, manifestUnit: manifestUnits[index] }])
+      ));
+      const traditionalProvider = {
+        ...mockProvider,
+        constructor: { batchStrategy: 'string', isAI: false },
+      };
+      traditionalProvider.translate
+        .mockResolvedValueOnce({ translatedText: ['first'] })
+        .mockResolvedValueOnce({ translatedText: ['second'] });
+
+      await handler.execute(
+        mockEngine,
+        { text: JSON.stringify(segments), sourceLanguage: 'en', targetLanguage: 'fa', mode: 'select_element', messageId: 'traditional-observe-1' },
+        traditionalProvider,
+        'en',
+        'fa',
+        'traditional-observe-1',
+        { tab: { id: 123 } },
+        'unknown',
+        executionContext,
+      );
+
+      expect(onTerminalUnitsAccepted).not.toHaveBeenCalled();
+    });
+
+    it('never invokes terminal observation for split batch members', async () => {
+      const segments = ['same', 'same'];
+      const manifest = createRequestUnitManifest(segments);
+      const onTerminalUnitsAccepted = vi.fn();
+      const executionContext = {
+        manifestView: createManifestView(manifest),
+        onTerminalUnitsAccepted,
+      };
+      mockEngine.createIntelligentMembershipBatches = vi.fn(() => ([
+        [{ payload: 'frag-a', manifestUnit: null, isSplitFragment: true }],
+        [{ payload: 'frag-b', manifestUnit: null, isSplitFragment: true }],
+      ]));
+      mockProvider.translate
+        .mockResolvedValueOnce({ translatedText: ['first'] })
+        .mockResolvedValueOnce({ translatedText: ['second'] });
+
+      await handler.execute(
+        mockEngine,
+        { text: JSON.stringify(segments), sourceLanguage: 'en', targetLanguage: 'fa', mode: 'select_element', messageId: 'split-observe-1' },
+        mockProvider,
+        'en',
+        'fa',
+        'split-observe-1',
+        { tab: { id: 123 } },
+        'unknown',
+        executionContext,
+      );
+
+      expect(onTerminalUnitsAccepted).not.toHaveBeenCalled();
+    });
   });
 
   describe('execute', () => {
