@@ -66,7 +66,7 @@ New provider dictionary shapes must be covered by:
 ### 2. AI & Context Logic
 - **AIConversationHelper**: Manages session history and context-enriched prompt preparation (Injecting Page Title/Headings).
 - **AITextProcessor**: Handles complexity analysis and smart segment splitting.
-- **AIResponseParser**: Robustly parses results from AI artifacts (Markdown, JSON blocks) and cleans "AI Chatter."
+- **AIResponseParser**: Robustly parses results from AI artifacts (Markdown, JSON blocks) and cleans "AI Chatter." It also reports to the provider layer whether structured-response recovery is required.
 
 ### 3. Traditional Provider Helpers
 - **TraditionalTextProcessor**: Handles character-limit chunking and network weight calculation.
@@ -139,8 +139,20 @@ Implement `convertLanguage(code)` in your provider class to map standard ISO cod
 
 ### 4. Segment Mapping (The "Split" Safety)
 If your provider merges multiple text segments into a single request, you **MUST** ensure they are split back correctly.
-- AI: Use `AIResponseParser.parseBatchResult`.
+- AI: Use `AIResponseParser.parseBatchResult`. `parseBatchResult(...)` also reports whether structured-response recovery is required, while the provider decides whether recovery is performed.
 - Traditional: Use `TranslationSegmentMapper.mapTranslationToOriginalSegments`.
+
+### 5. Structured Response Handling
+
+Structured (JSON) responses can violate their response contract — for example through unmapped or gap-filled slots, or an unparseable response. The system recovers explicitly instead of silently corrupting results.
+
+- **`AIResponseParser`** parses structured responses and reports whether structured-response recovery is required. It never decides semantic success and never owns the recovery strategy.
+- **`BaseAIProvider`** owns the recovery strategy. The current strategy is a sequential re-request of the affected batch through `_traditionalBatchTranslate`.
+- A format-level re-request is execution strategy within a single execution attempt.
+- Multi-API key failover and provider/key failover remain operation-lifecycle responsibilities and are unrelated to this recovery.
+- Provider implementations must not duplicate or override this decision logic; they consume the provider-owned recovery decision.
+
+This is the only observable production behavior introduced by the Translation Pipeline Foundation.
 
 ---
 
@@ -174,4 +186,4 @@ If all available keys fail or the provider is consistently unstable, the **RateL
 
 ---
 
-**Last Updated**: May 2026
+**Last Updated**: August 2026
