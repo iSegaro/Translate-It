@@ -363,18 +363,50 @@ UI must never infer semantic outcome from source/translated equality, empty text
 
 ## Migration Roadmap
 
-| Phase | Scope | Expected Improvement | Compatibility Risk |
-|---|---|---|---|
-| 1. ADR only | Accept this decision; no runtime behavior changes | Shared architectural boundary | None |
-| 2. Domain contracts | Introduce contracts without behavior change | Shared vocabulary | Parallel semantic representations |
-| 3. Diagnostics preservation | Preserve parser/provider facts through boundaries without behavior change | Observable provenance | Messaging payload compatibility |
-| 4. Validator and assembler | Introduce `TranslationContractValidator` and `TranslationOutcomeAssembler` without changing observable behavior | Separate validation from aggregation without changing behavior | Parallel contract interpretation |
-| 5. Whole Page adoption | Consume outcome in Page workflow | Explicit partial-page behavior | Existing soft-failure UX |
-| 6. Select Element adoption | Consume outcome in Select workflow | Explicit subtree application and revert policy | Partial DOM behavior |
-| 7. PDF adoption | Consume outcome in PDF workflow | Explicit block/cell partial state | Session and renderer state |
-| 8. Popup and Sidepanel adoption | Consume outcome in view workflows | Consistent direct-translation state | Existing success/error assumptions |
-| 9. Legacy fallback removal | Remove hidden source substitution | One recovery boundary | Provider and batch compatibility paths |
-| 10. Transport reassessment | Reassess OpenAI-Compatible and LM Studio behavior using preserved diagnostics | Transport policy separated from semantics | Provider-specific compatibility matrix |
+| Phase | Scope | Expected Improvement | Compatibility Risk | Status |
+|---|---|---|---|---|
+| 1. ADR only | Accept this decision; no runtime behavior changes | Shared architectural boundary | None | Completed |
+| 2. Domain contracts | Introduce contracts without behavior change | Shared vocabulary | Parallel semantic representations | Partially Completed |
+| 3. Diagnostics preservation | Preserve parser/provider facts through boundaries without behavior change | Observable provenance | Messaging payload compatibility | Completed |
+| 4. Validator and assembler | Introduce `TranslationContractValidator` and `TranslationOutcomeAssembler` without changing observable behavior | Separate validation from aggregation without changing behavior | Parallel contract interpretation | Partially Completed |
+| 5. Whole Page adoption | Consume outcome in Page workflow | Explicit partial-page behavior | Existing soft-failure UX | Deferred |
+| 6. Select Element adoption | Consume outcome in Select workflow | Explicit subtree application and revert policy | Partial DOM behavior | Deferred |
+| 7. PDF adoption | Consume outcome in PDF workflow | Explicit block/cell partial state | Session and renderer state | Deferred |
+| 8. Popup and Sidepanel adoption | Consume outcome in view workflows | Consistent direct-translation state | Existing success/error assumptions | Deferred |
+| 9. Legacy fallback removal | Remove hidden source substitution | One recovery boundary | Provider and batch compatibility paths | Deferred |
+| 10. Transport reassessment | Reassess OpenAI-Compatible and LM Studio behavior using preserved diagnostics | Transport policy separated from semantics | Provider-specific compatibility matrix | Deferred |
+
+---
+
+## Implementation Status
+
+A foundational implementation phase delivered the observational and structural groundwork described below. This section records what is implemented versus what is intentionally deferred. The ADR remains the canonical specification for the target architecture.
+
+### Implemented Foundation
+
+- **Domain contracts**: Immutable domain contracts (`TranslationOutcome`, `ExecutionResult`, `TranslationUnit` disposition) have been established as structural contracts; their runtime production remains deferred.
+- **Diagnostics preservation**: Parser and execution facts are retained through the pipeline, feeding `TranslationDiagnosticReport` evidence without crossing presentation boundaries.
+- **Observational validation foundation**: An internal observation pipeline and a request unit manifest provide deterministic, observation-only validation of request structure without changing observable behavior.
+- **Terminal execution routing**: Completed and cancelled execution states currently route through the terminal execution router.
+- **Ownership clarification**: Execution strategy is separated from provider/key failover. A format-level re-request within a single execution attempt is execution strategy; provider/key failover remains owned by the operation lifecycle.
+- **Cancellation architecture**: Cancellation and timeout flow through exact request identity with a single accepted terminal transition per request.
+
+### Production Improvements
+
+The structured-response recovery path is the only production behavior change delivered by this phase. When a structured batch response violates its contract (unmapped or gap-filled slots, or an unparseable response), the parser reports that structured-response recovery is required, and the provider owns and executes the recovery strategy — re-requesting sequentially. This replaces silent result corruption with an explicit, provider-owned recovery decision. The parser only signals whether recovery is required; it never decides semantic success. This is an interim production improvement, not a phase of the migration roadmap.
+
+### Deferred Scope
+
+The remaining phases are intentionally deferred to a future initiative named **Translation Outcome Adoption**:
+
+- Runtime production and adoption of `TranslationOutcome` (`ValidationResult` runtime integration and `TranslationOutcomeAssembler`).
+- `TranslationOutcomeAssembler` and runtime consumers of assembled outcomes.
+- Feature adoption across Whole Page, Select Element, PDF, Popup, and Sidepanel workflows.
+- Legacy fallback removal (including parser gap-fill source substitution).
+
+This is a deliberate scope decision, not unfinished work. The canonical pipeline described in this ADR remains the target; the deferred initiative will carry these phases forward as a separate effort without altering this document's architecture.
+
+Runtime adoption should begin only after a concrete `TranslationOutcome` consumer has been defined.
 
 ---
 
@@ -394,3 +426,5 @@ UI must never infer semantic outcome from source/translated equality, empty text
 - Define unit-level error taxonomy and validation reason codes.
 - Define feature-specific application policies for partial and cancelled outcomes.
 - Define sanitized presentation projections for direct and streamed workflows.
+
+> **Status**: A request unit manifest now provides the foundation for canonical unit identity. Complete adoption of identity and mapping strategies remains deferred to the Translation Outcome Adoption initiative.
