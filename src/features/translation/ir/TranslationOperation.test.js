@@ -5,6 +5,23 @@ import { ResponseFormat } from '@/shared/config/translationConstants.js'
 import { createManifestView, createRequestUnitManifest } from './RequestUnitManifest.js'
 
 describe('TranslationOperation', () => {
+  it('keeps private settlement state in manifest order', () => {
+    const manifest = createRequestUnitManifest([{ i: 'first' }, { i: 'second' }, { i: 'third' }])
+    const operation = createTranslationOperation('message-settlement', manifest)
+
+    expect(operation.snapshotCancelled()).toEqual([])
+    expect(Object.isFrozen(operation.snapshotCancelled())).toBe(true)
+    expect(operation.settleUnits(['second', 'second', 'unknown'])).toEqual(['second'])
+    expect(operation.settleUnits(['second'])).toEqual([])
+
+    const cancelled = operation.cancelRemaining()
+    expect(cancelled).toEqual(['first', 'third'])
+    expect(Object.isFrozen(cancelled)).toBe(true)
+    expect(operation.cancelRemaining()).toBe(cancelled)
+    expect(operation.snapshotCancelled()).toBe(cancelled)
+    expect(operation.settleUnits(['first', 'third'])).toEqual([])
+  })
+
   it('keeps bounded sanitized diagnostics and creates one immutable report', () => {
     const operation = createTranslationOperation('message-1')
 

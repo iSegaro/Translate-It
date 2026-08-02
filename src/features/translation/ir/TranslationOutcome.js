@@ -42,6 +42,7 @@ export const UnitDisposition = Object.freeze({
  * @property {number} retryCount
  * @property {boolean} providerFailoverUsed
  * @property {ReadonlyArray<object>} attempts
+ * @property {ReadonlyArray<string>} cancelledUnitIds
  */
 
 /**
@@ -158,6 +159,7 @@ export function createExecutionResult({
   retryCount = 0,
   providerFailoverUsed = false,
   attempts = [],
+  cancelledUnitIds = [],
 } = {}) {
   return createValueObject({
     status,
@@ -166,6 +168,7 @@ export function createExecutionResult({
     retryCount,
     providerFailoverUsed,
     attempts: copyRecordArray(attempts),
+    cancelledUnitIds: copyArray(cancelledUnitIds),
   })
 }
 

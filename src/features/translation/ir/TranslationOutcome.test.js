@@ -33,9 +33,11 @@ describe('TranslationOutcome contracts', () => {
       cardinality: { requested: 2, received: 1 },
       violations: [{ code: 'CARDINALITY' }],
     })
-    const execution = createExecutionResult({ status: ExecutionStatus.FAILED, attempts })
+    const cancelledUnitIds = ['unit-1']
+    const execution = createExecutionResult({ status: ExecutionStatus.FAILED, attempts, cancelledUnitIds })
 
     attempts.push({ provider: 'Other' })
+    cancelledUnitIds.push('unit-2')
     attempt.provider = 'Changed'
     orderingFacts.strategy = 'changed'
 
@@ -44,12 +46,21 @@ describe('TranslationOutcome contracts', () => {
     expect(Object.isFrozen(execution)).toBe(true)
     expect(Object.isFrozen(execution.attempts)).toBe(true)
     expect(Object.isFrozen(execution.attempts[0])).toBe(true)
+    expect(execution.cancelledUnitIds).toEqual(['unit-1'])
+    expect(Object.isFrozen(execution.cancelledUnitIds)).toBe(true)
     expect(Object.isFrozen(validation)).toBe(true)
     expect(Object.isFrozen(validation.validatedUnits)).toBe(true)
     expect(Object.isFrozen(validation.validatedUnits[0])).toBe(true)
     expect(Object.isFrozen(validation.validatedUnits[0].violationCodes)).toBe(true)
     expect(Object.isFrozen(validation.orderingFacts)).toBe(true)
     expect(Object.isFrozen(validation.orderingFacts.nested)).toBe(false)
+  })
+
+  it('defaults execution cancellation IDs to an immutable empty array', () => {
+    const execution = createExecutionResult()
+
+    expect(execution.cancelledUnitIds).toEqual([])
+    expect(Object.isFrozen(execution.cancelledUnitIds)).toBe(true)
   })
 
   it('preserves caller-supplied translation semantics without deriving quality or source fallback', () => {
