@@ -25,7 +25,7 @@ UI Component → useMessaging → browser.runtime.sendMessage
      ↓
 Background: UnifiedTranslationService → handleTranslate.js
      ↓
-TranslationEngine → Provider → Result Dispatcher → Target Context
+TranslationEngine → Provider → Terminal Execution Router → Result Dispatcher → Target Context
 ```
 
 ### Unified Translation Service Architecture (2025)
@@ -118,6 +118,8 @@ UI / workflow creates messageId
 | `RateLimitManager` | Limiter admission and pending request cleanup | UI delivery |
 | `StreamingManager` | Sender routing, chunk transport, local stream terminal suppression, delayed stream retention | Translation workflow lifecycle |
 | `UnifiedResultDispatcher` | Accepted result and cancellation delivery; per-instance result deduplication | Tracker state mutation |
+| Terminal execution router | Completed and cancelled terminal routing; one stable terminal outcome per request | Semantic success, recovery strategy, tracker state mutation |
+| Execution foundation | Request unit manifest, observation-only validation facts, preserved diagnostics | Semantic success, recovery strategy, tracker terminal transition |
 
 ### Request Lifecycle
 
@@ -215,6 +217,30 @@ Terminal records remain in tracker storage for diagnostics but leave tab, toast,
 - Dispatcher owns delivery only; delivery errors never alter tracker terminal state.
 - Empty executable batches allocate no provider, lifecycle, timeout, or execution resources.
 
+### Execution Routing
+
+**File**: `src/features/translation/ir/TerminalExecutionRouter.js`
+
+Execution routing is applied after the tracker accepts a terminal transition. The tracker owns the terminal *transition*; the terminal execution router owns terminal *routing*.
+
+Currently adopted terminal paths:
+- **Completed**: accepted completion routes through the terminal execution router before normal result delivery.
+- **Cancelled**: accepted cancellation routes through the terminal execution router before cancellation delivery.
+
+Failed and timed-out states do not yet route through the terminal execution router; their lifecycle handling is unchanged. Terminal routing is structural foundation, not provider/key failover, which remains owned by the operation lifecycle.
+
+### Execution Foundation and Diagnostics
+
+**Files**: `src/features/translation/ir/` (request unit manifest, operation, outcome and unit contracts, terminal execution router)
+
+The foundation layer is structural and observation-only: it establishes contracts and observational validation without changing observable translation behavior.
+
+- **Request Unit Manifest**: A deterministic manifest of a request's translation units (`RequestUnitManifest`). It is the structural reference for observation-only validation.
+- **Observational Validation Foundation**: Request structure is validated observationally against the manifest without altering execution or observable behavior. This validation never performs recovery and never decides semantic success.
+- **TranslationDiagnosticReport Preservation**: Parser and execution facts are retained across execution boundaries and feed diagnostic report evidence. This is distinct from the tracker's retained terminal records, which are lifecycle diagnostics only.
+
+> **Deferred**: Runtime production and adoption of `TranslationOutcome` is intentionally deferred to a future initiative. See the [ADR-015 Implementation Status](../adr/ADR-015-translation-outcome-semantics.md). Runtime adoption should begin only after a concrete `TranslationOutcome` consumer has been defined.
+
 ### Unified Result Dispatcher
 **File**: `src/core/services/translation/UnifiedResultDispatcher.js`
 - **Intelligent result routing** based on translation mode
@@ -310,6 +336,16 @@ class BaseProvider {
 const provider = this.factory.getProvider(data.provider || 'google-translate')
 const result = await provider.translate(text, sourceLang, targetLang, mode)
 ```
+
+### Structured-Response Recovery
+
+When a structured batch response violates its contract (unmapped or gap-filled slots, or an unparseable response), the system recovers explicitly instead of silently corrupting results.
+
+- **`AIResponseParser`** only reports whether structured-response recovery is required. It never decides semantic success.
+- **`BaseAIProvider`** owns the recovery strategy. The current implementation re-requests the affected batch sequentially via `_traditionalBatchTranslate`.
+- **Recovery is a sequential re-request**, not a silent result rewrite.
+
+This is the only production behavior change introduced by the Translation Pipeline Foundation.
 
 ## Context Separation
 
@@ -430,6 +466,13 @@ if (!result.success && data.provider !== 'google-translate') {
 - `src/features/translation/handlers/handleTranslate.js` - Translation request handler
 - `src/core/background/handlers/translation/handleTranslationResult.js` - Translation result processor
 - `src/features/translation/core/translation-engine.js` - Provider coordination
+
+### Execution Foundation (Translation Pipeline Foundation)
+- `src/features/translation/ir/RequestUnitManifest.js` - Deterministic request unit manifest
+- `src/features/translation/ir/TerminalExecutionRouter.js` - Completed and cancelled terminal routing
+- `src/features/translation/ir/TranslationOperation.js` - Execution lifecycle and diagnostics collection
+- `src/features/translation/ir/TranslationOutcome.js` - Immutable outcome contract
+- `src/features/translation/ir/TranslationUnit.js` - Unit disposition contract
 
 ### Integration Files
 - `src/handlers/smartTranslationIntegration.js` - Field mode integration with element recovery
