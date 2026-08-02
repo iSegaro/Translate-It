@@ -154,14 +154,16 @@ export class BaseAIProvider extends BaseProvider {
 
       // Stats recording is handled by ProviderRequestEngine. 
       // Orchestrators (like OptimizedJsonHandler or UnifiedService) handle the reporting.
+      const executionContext = contextMetadata?.executionContext;
+
       return AIResponseParser.parseBatchResult(
         response,
         texts.length,
         texts,
         this.providerName,
         expectedFormat || ResponseFormat.JSON_ARRAY,
-        contextMetadata?.executionContext,
-        contextMetadata?.executionContext?.manifestView,
+        executionContext,
+        executionContext?.manifestView,
       );
     } catch (error) {
       if (sessionId) {
@@ -326,7 +328,7 @@ export class BaseAIProvider extends BaseProvider {
           sessionId,
           options,
           expectedFormat,
-          priority
+          priority,
         );
 
         const batchResults = Array.isArray(batchResponse) ? batchResponse : [batchResponse];

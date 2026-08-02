@@ -28,6 +28,14 @@ function hasValidManifestView(manifestView, expectedCount) {
   });
 }
 
+function observeValidationResult(executionContext, validationResult) {
+  try {
+    executionContext?.observeValidationResult?.(validationResult);
+  } catch (error) {
+    logger.debug('[AIResponseParser] Validation observation failed:', error?.message);
+  }
+}
+
 /**
  * Pipeline-based AI Response Healers.
  * Each healer is a focused function that fixes a specific AI output issue.
@@ -232,7 +240,8 @@ export const AIResponseParser = {
       let rawItems = this._normalizeToItems(parsed);
       const snapshot = createParserSnapshot(rawItems, parserEvidence);
       if (hasValidManifestView(manifestView, expectedCount)) {
-        TranslationContractValidator.validate(manifestView, snapshot, parserEvidence);
+        const validationResult = TranslationContractValidator.validate(manifestView, snapshot, parserEvidence);
+        observeValidationResult(executionContext, validationResult);
       }
       const results = new Array(expectedCount).fill(null);
       const unmappedTexts = [];
