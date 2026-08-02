@@ -64,7 +64,17 @@ export function createTranslationOperation(messageId, manifest = null) {
   let droppedDiagnostics = 0
   let report = null
   let cancelledUnitIds = null
+  let pendingAcceptedUnitIds = null
+  let pendingAcceptedUnitIdSet = null
   let finalized = false
+
+  function getPendingAcceptedStorage() {
+    if (pendingAcceptedUnitIds) return { list: pendingAcceptedUnitIds, set: pendingAcceptedUnitIdSet }
+
+    pendingAcceptedUnitIds = []
+    pendingAcceptedUnitIdSet = new Set()
+    return { list: pendingAcceptedUnitIds, set: pendingAcceptedUnitIdSet }
+  }
 
   return {
     messageId,
@@ -106,6 +116,28 @@ export function createTranslationOperation(messageId, manifest = null) {
     },
     snapshotCancelled() {
       return cancelledUnitIds || EMPTY_CANCELLED_UNIT_IDS
+    },
+    acceptTerminalUnits(unitIds) {
+      const values = typeof unitIds === 'string'
+        ? [unitIds]
+        : (unitIds && typeof unitIds[Symbol.iterator] === 'function' ? unitIds : [])
+
+      const states = getUnitStates()
+      const { list, set } = getPendingAcceptedStorage()
+
+      for (const unitId of values) {
+        if (typeof unitId !== 'string' || !states.has(unitId) || set.has(unitId)) continue
+        set.add(unitId)
+        list.push(unitId)
+      }
+    },
+    drainAcceptedUnitIds() {
+      if (!pendingAcceptedUnitIds) return EMPTY_CANCELLED_UNIT_IDS
+
+      const snapshot = Object.freeze([...pendingAcceptedUnitIds])
+      pendingAcceptedUnitIds = null
+      pendingAcceptedUnitIdSet = null
+      return snapshot
     },
     finalize() {
       if (report) return report

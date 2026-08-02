@@ -117,3 +117,57 @@ describe('TranslationOperation', () => {
     }))
   })
 })
+
+describe('TranslationOperation pending accepted units', () => {
+  const manifest = createRequestUnitManifest([{ i: 'first' }, { i: 'second' }, { i: 'third' }])
+
+  it('accepts canonical manifest unitIds preserving first-accepted order', () => {
+    const operation = createTranslationOperation('accept-order', manifest)
+
+    operation.acceptTerminalUnits(['second', 'first'])
+    operation.acceptTerminalUnits(['third'])
+
+    expect(operation.drainAcceptedUnitIds()).toEqual(['second', 'first', 'third'])
+  })
+
+  it('ignores duplicate and unknown unitIds', () => {
+    const operation = createTranslationOperation('accept-dedup', manifest)
+
+    operation.acceptTerminalUnits(['second', 'second', 'unknown', 'second'])
+
+    expect(operation.drainAcceptedUnitIds()).toEqual(['second'])
+  })
+
+  it('returns one frozen snapshot and clears the pending collection', () => {
+    const operation = createTranslationOperation('accept-drain', manifest)
+
+    operation.acceptTerminalUnits(['third'])
+
+    const snapshot = operation.drainAcceptedUnitIds()
+    expect(snapshot).toEqual(['third'])
+    expect(Object.isFrozen(snapshot)).toBe(true)
+    expect(operation.drainAcceptedUnitIds()).toEqual([])
+    expect(Object.isFrozen(operation.drainAcceptedUnitIds())).toBe(true)
+  })
+
+  it('starts a new pending collection after drain', () => {
+    const operation = createTranslationOperation('accept-reopen', manifest)
+
+    operation.acceptTerminalUnits(['first'])
+    operation.drainAcceptedUnitIds()
+    operation.acceptTerminalUnits(['second', 'third'])
+
+    expect(operation.drainAcceptedUnitIds()).toEqual(['second', 'third'])
+  })
+
+  it('does not interact with the settlement ledger', () => {
+    const operation = createTranslationOperation('accept-no-ledger', manifest)
+
+    operation.acceptTerminalUnits(['first', 'second'])
+    const drained = operation.drainAcceptedUnitIds()
+
+    expect(operation.snapshotCancelled()).toEqual([])
+    expect(operation.settleUnits(drained)).toEqual(['first', 'second'])
+    expect(operation.cancelRemaining()).toEqual(['third'])
+  })
+})
