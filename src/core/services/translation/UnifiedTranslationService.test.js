@@ -76,6 +76,9 @@ vi.mock('../../../shared/messaging/core/MessagingCore.js', () => ({
     CONTENT: 'content',
     MOBILE_TRANSLATE: 'mobile-translate',
     SELECTION_MANAGER: 'selection-manager'
+  },
+  ActionReasons: {
+    USER_CANCELLED: 'user_cancelled'
   }
 }));
 
@@ -104,7 +107,8 @@ vi.mock('../../../features/translation/ir/TranslationOperation.js', async (impor
   const actual = await importOriginal();
   return {
     ...actual,
-    createTranslationOperation: vi.fn(actual.createTranslationOperation)
+    createTranslationOperation: vi.fn(actual.createTranslationOperation),
+    finalizeTranslationOperation: vi.fn(actual.finalizeTranslationOperation)
   };
 });
 
@@ -132,9 +136,10 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { UnifiedTranslationService } from './UnifiedTranslationService.js';
 import { ErrorTypes } from '../../../shared/error-management/ErrorTypes.js';
 import { translationRequestTracker } from './TranslationRequestTracker.js';
-import { createTranslationOperation } from '../../../features/translation/ir/TranslationOperation.js';
+import { createTranslationOperation, finalizeTranslationOperation } from '../../../features/translation/ir/TranslationOperation.js';
 import { createRequestUnitManifest } from '../../../features/translation/ir/RequestUnitManifest.js';
 import { TerminalExecutionRouter } from '../../../features/translation/ir/TerminalExecutionRouter.js';
+import { ActionReasons } from '../../../shared/messaging/core/MessagingCore.js';
 
 describe('UnifiedTranslationService', () => {
   let service;
@@ -443,19 +448,47 @@ describe('UnifiedTranslationService', () => {
 
       const result = await service.cancelRequest('m1');
 
-      expect(result.success).toBe(true);
+      expect(result).toEqual({ handled: true, success: true });
+      expect(translationRequestTracker.cancelRequest).toHaveBeenCalledWith('m1', ActionReasons.USER_CANCELLED);
       expect(mockEngine.cancelTranslation).toHaveBeenCalledWith('m1');
-      expect(translationRequestTracker.cancelRequest).toHaveBeenCalledWith('m1');
       expect(service.resultDispatcher.dispatchCancellation).toHaveBeenCalled();
     });
 
-    it('should return error if request not found', async () => {
+    it('should return unhandled when request not found', async () => {
       translationRequestTracker.getRequest.mockReturnValue(null);
 
       const result = await service.cancelRequest('unknown');
 
-      expect(result.success).toBe(false);
-      expect(result.error).toBe('Request not found');
+      expect(result).toEqual({ handled: false, success: false, error: 'Request not found' });
+    });
+
+    it('reports handled-but-rejected cancellation without finalizing or dispatching', async () => {
+      translationRequestTracker.getRequest.mockReturnValue({ messageId: 'm-rejected' });
+      translationRequestTracker.cancelRequest.mockReturnValue({ accepted: false, status: 'completed', reason: 'already_terminal' });
+
+      const result = await service.cancelRequest('m-rejected');
+
+      expect(result).toEqual({ handled: true, success: false, error: 'already_terminal' });
+      expect(finalizeTranslationOperation).not.toHaveBeenCalled();
+      expect(service.resultDispatcher.dispatchCancellation).not.toHaveBeenCalled();
+    });
+
+    it('threads the supplied reason unchanged to the tracker', async () => {
+      translationRequestTracker.getRequest.mockReturnValue({ messageId: 'm-reason' });
+
+      await service.cancelRequest('m-reason', 'user-typed');
+
+      expect(translationRequestTracker.cancelRequest).toHaveBeenCalledWith('m-reason', 'user-typed');
+    });
+
+    it('finalizes, aborts and dispatches exactly once on accepted cancellation', async () => {
+      translationRequestTracker.getRequest.mockReturnValue({ messageId: 'm-finalize' });
+
+      await service.cancelRequest('m-finalize');
+
+      expect(finalizeTranslationOperation).toHaveBeenCalledTimes(1);
+      expect(mockEngine.cancelTranslation).toHaveBeenCalledTimes(1);
+      expect(service.resultDispatcher.dispatchCancellation).toHaveBeenCalledTimes(1);
     });
   });
 

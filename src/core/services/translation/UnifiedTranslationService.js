@@ -14,7 +14,7 @@ import {
   getSelectionMaxCharsAsync,
   getSelectElementMaxCharsAsync
 } from '@/shared/config/config.js';
-import { MessageFormat, MessageContexts } from '@/shared/messaging/core/MessagingCore.js';
+import { MessageFormat, MessageContexts, ActionReasons } from '@/shared/messaging/core/MessagingCore.js';
 import { translationRequestTracker } from './TranslationRequestTracker.js';
 import { UnifiedResultDispatcher } from './UnifiedResultDispatcher.js';
 import { UnifiedModeCoordinator } from './UnifiedModeCoordinator.js';
@@ -285,15 +285,18 @@ export class UnifiedTranslationService {
   }
 
   /**
-   * Cancel an active request through the engine and notify UI.
+   * Cancel an active service-owned request.
+   * User-cancellation entry point only; timeout stays outside this API.
+   * Returns { handled } so callers can fall back for non-service requests.
    */
-  async cancelRequest(messageId) {
+  async cancelRequest(messageId, reason = ActionReasons.USER_CANCELLED) {
     logger.info(`Cancelling request: ${messageId}`);
     const request = this.requestTracker.getRequest(messageId);
-    if (!request) return { success: false, error: 'Request not found' };
+    if (!request) return { handled: false, success: false, error: 'Request not found' };
 
-    const cancellation = this.requestTracker.cancelRequest(messageId);
-    if (!cancellation.accepted) return { success: false, error: cancellation.reason };
+    const cancellation = this.requestTracker.cancelRequest(messageId, reason);
+    if (!cancellation.accepted) return { handled: true, success: false, error: cancellation.reason };
+
     const operation = this._getOperation(request);
     this._finalizeDiagnostics(request, { operation }, {
       type: 'OPERATION_CANCELLED',
@@ -304,7 +307,7 @@ export class UnifiedTranslationService {
     if (this.translationEngine) this.translationEngine.cancelTranslation(messageId);
     
     await this.resultDispatcher.dispatchCancellation({ messageId, request });
-    return { success: true };
+    return { handled: true, success: true };
   }
 
   _createCancelledResponse(messageId) {
