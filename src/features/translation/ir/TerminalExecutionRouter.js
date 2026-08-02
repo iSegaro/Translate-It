@@ -3,7 +3,7 @@
  *
  * Decides how accepted terminal units map to future ledger settlement.
  * Stateless: owns no execution state; TranslationOperation remembers.
- * PR4B.3: architecture-only. No ledger wiring.
+ * PR4B.5: COMPLETED settlement active. CANCELLED/FAILED/TIMEOUT unwired.
  */
 
 const EMPTY_ACCEPTED_UNIT_IDS = Object.freeze([])
@@ -48,12 +48,21 @@ export const TerminalExecutionRouter = Object.freeze({
   },
 
   /**
-   * Consumes pending accepted units exactly once at terminal execution.
-   * Decides policy only; never touches the ledger (architecture-only).
+   * Routes a terminal transition. Settles drained accepted units for
+   * COMPLETED only; NONE actions never drain operation state (critical
+   * invariant, keeps FAILED/TIMEOUT/CANCELLED ledgers untouched).
    */
   routeTerminalExecution(operation, { status }) {
     const action = policyForStatus(status)
+
+    if (action !== TerminalAction.SETTLE) {
+      return Object.freeze({ action, acceptedUnitIds: EMPTY_ACCEPTED_UNIT_IDS })
+    }
+
     const acceptedUnitIds = operation?.drainAcceptedUnitIds?.() || EMPTY_ACCEPTED_UNIT_IDS
+    if (acceptedUnitIds.length > 0) {
+      operation?.settleUnits?.(acceptedUnitIds)
+    }
 
     return Object.freeze({ action, acceptedUnitIds })
   },

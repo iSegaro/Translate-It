@@ -178,7 +178,7 @@ export class UnifiedTranslationService {
       }
 
       const requestUnitManifest = createRequestUnitManifest(data?.text);
-      const operation = createTranslationOperation(messageId);
+      const operation = createTranslationOperation(messageId, requestUnitManifest);
       const executionContext = {
         operation,
         manifestView: createManifestView(requestUnitManifest),
@@ -210,6 +210,7 @@ export class UnifiedTranslationService {
 
       const transition = this.requestTracker.completeRequest(messageId, result);
       if (!transition.accepted) return this._createSuppressedResponse(messageId, transition);
+      TerminalExecutionRouter.routeTerminalExecution(executionContext.operation, { status: transition.status });
       this._finalizeDiagnostics(request, executionContext, {
         type: 'OPERATION_COMPLETED',
         stage: 'service',

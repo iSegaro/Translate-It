@@ -100,11 +100,41 @@ vi.mock('../../../shared/logging/logConstants.js', () => ({
   }
 }));
 
+vi.mock('../../../features/translation/ir/TranslationOperation.js', async (importOriginal) => {
+  const actual = await importOriginal();
+  return {
+    ...actual,
+    createTranslationOperation: vi.fn(actual.createTranslationOperation)
+  };
+});
+
+vi.mock('../../../features/translation/ir/RequestUnitManifest.js', async (importOriginal) => {
+  const actual = await importOriginal();
+  return {
+    ...actual,
+    createRequestUnitManifest: vi.fn(actual.createRequestUnitManifest)
+  };
+});
+
+vi.mock('../../../features/translation/ir/TerminalExecutionRouter.js', async (importOriginal) => {
+  const actual = await importOriginal();
+  return {
+    ...actual,
+    TerminalExecutionRouter: {
+      ...actual.TerminalExecutionRouter,
+      routeTerminalExecution: vi.fn(actual.TerminalExecutionRouter.routeTerminalExecution)
+    }
+  };
+});
+
 // 2. Imports second
 import { describe, it, expect, beforeEach } from 'vitest';
 import { UnifiedTranslationService } from './UnifiedTranslationService.js';
 import { ErrorTypes } from '../../../shared/error-management/ErrorTypes.js';
 import { translationRequestTracker } from './TranslationRequestTracker.js';
+import { createTranslationOperation } from '../../../features/translation/ir/TranslationOperation.js';
+import { createRequestUnitManifest } from '../../../features/translation/ir/RequestUnitManifest.js';
+import { TerminalExecutionRouter } from '../../../features/translation/ir/TerminalExecutionRouter.js';
 
 describe('UnifiedTranslationService', () => {
   let service;
@@ -344,6 +374,41 @@ describe('UnifiedTranslationService', () => {
 
       expect(result.success).toBe(true);
       expect(service.modeCoordinator.processRequest).toHaveBeenCalledWith(mockRequest, expect.any(Object));
+    });
+
+    it('passes the exact manifest instance to TranslationOperation', async () => {
+      const message = { messageId: 'm-manifest', data: { text: 'hello', mode: 'selection' }, context: 'content' };
+      translationRequestTracker.createRequest.mockReturnValue({ messageId: 'm-manifest', data: message.data, mode: 'selection' });
+      service.modeCoordinator.processRequest.mockResolvedValue({ success: true, translatedText: 'bonjour' });
+
+      await service.handleTranslationRequest(message);
+
+      const manifest = createRequestUnitManifest.mock.results[0].value;
+      expect(createTranslationOperation).toHaveBeenCalledWith('m-manifest', manifest);
+    });
+
+    it('invokes the router once for an accepted completion', async () => {
+      const message = { messageId: 'm-route', data: { text: 'hello', mode: 'selection' }, context: 'content' };
+      translationRequestTracker.createRequest.mockReturnValue({ messageId: 'm-route', data: message.data, mode: 'selection' });
+      translationRequestTracker.completeRequest.mockReturnValue({ accepted: true, status: 'completed' });
+      service.modeCoordinator.processRequest.mockResolvedValue({ success: true, translatedText: 'bonjour' });
+
+      await service.handleTranslationRequest(message);
+
+      expect(TerminalExecutionRouter.routeTerminalExecution).toHaveBeenCalledTimes(1);
+      expect(TerminalExecutionRouter.routeTerminalExecution).toHaveBeenCalledWith(expect.any(Object), { status: 'completed' });
+    });
+
+    it('never invokes the router when completion is rejected', async () => {
+      const message = { messageId: 'm-rejected', data: { text: 'hello', mode: 'selection' }, context: 'content' };
+      translationRequestTracker.createRequest.mockReturnValue({ messageId: 'm-rejected', data: message.data, mode: 'selection' });
+      translationRequestTracker.completeRequest.mockReturnValue({ accepted: false, status: 'cancelled', reason: 'already_terminal' });
+      service.modeCoordinator.processRequest.mockResolvedValue({ success: true, translatedText: 'bonjour' });
+
+      const result = await service.handleTranslationRequest(message);
+
+      expect(result).toMatchObject({ success: false, cancelled: true });
+      expect(TerminalExecutionRouter.routeTerminalExecution).not.toHaveBeenCalled();
     });
   });
 

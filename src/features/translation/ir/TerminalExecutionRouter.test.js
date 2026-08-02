@@ -47,16 +47,70 @@ describe('TerminalExecutionRouter', () => {
     expect(() => observe(manifestUnits)).not.toThrow()
   })
 
-  it('consumes drainAcceptedUnitIds at terminal routing', () => {
+  it('drains once and settles once when COMPLETED', () => {
     const operation = {
       acceptTerminalUnits: vi.fn(),
       drainAcceptedUnitIds: vi.fn(() => Object.freeze(['unit-0'])),
+      settleUnits: vi.fn(),
     }
 
     const outcome = TerminalExecutionRouter.routeTerminalExecution(operation, { status: TerminalStatus.COMPLETED })
 
     expect(operation.drainAcceptedUnitIds).toHaveBeenCalledTimes(1)
+    expect(operation.settleUnits).toHaveBeenCalledTimes(1)
+    expect(operation.settleUnits).toHaveBeenCalledWith(['unit-0'])
     expect(outcome).toEqual({ action: TerminalAction.SETTLE, acceptedUnitIds: ['unit-0'] })
+    expect(Object.isFrozen(outcome.acceptedUnitIds)).toBe(true)
+  })
+
+  it('settles nothing new when COMPLETED routing is repeated', () => {
+    let pending = ['unit-0']
+    const operation = {
+      acceptTerminalUnits: vi.fn(),
+      drainAcceptedUnitIds: vi.fn(() => {
+        const next = Object.freeze([...pending])
+        pending = []
+        return next
+      }),
+      settleUnits: vi.fn(),
+    }
+
+    TerminalExecutionRouter.routeTerminalExecution(operation, { status: TerminalStatus.COMPLETED })
+    const second = TerminalExecutionRouter.routeTerminalExecution(operation, { status: TerminalStatus.COMPLETED })
+
+    expect(operation.drainAcceptedUnitIds).toHaveBeenCalledTimes(2)
+    expect(operation.settleUnits).toHaveBeenCalledTimes(1)
+    expect(operation.settleUnits).toHaveBeenCalledWith(['unit-0'])
+    expect(second).toEqual({ action: TerminalAction.SETTLE, acceptedUnitIds: [] })
+  })
+
+  it('never drains or settles when FAILED', () => {
+    const operation = {
+      acceptTerminalUnits: vi.fn(),
+      drainAcceptedUnitIds: vi.fn(),
+      settleUnits: vi.fn(),
+    }
+
+    const outcome = TerminalExecutionRouter.routeTerminalExecution(operation, { status: TerminalStatus.FAILED })
+
+    expect(operation.drainAcceptedUnitIds).not.toHaveBeenCalled()
+    expect(operation.settleUnits).not.toHaveBeenCalled()
+    expect(outcome).toEqual({ action: TerminalAction.NONE, acceptedUnitIds: [] })
+    expect(Object.isFrozen(outcome.acceptedUnitIds)).toBe(true)
+  })
+
+  it('never drains or settles when TIMEOUT', () => {
+    const operation = {
+      acceptTerminalUnits: vi.fn(),
+      drainAcceptedUnitIds: vi.fn(),
+      settleUnits: vi.fn(),
+    }
+
+    const outcome = TerminalExecutionRouter.routeTerminalExecution(operation, { status: TerminalStatus.TIMEOUT })
+
+    expect(operation.drainAcceptedUnitIds).not.toHaveBeenCalled()
+    expect(operation.settleUnits).not.toHaveBeenCalled()
+    expect(outcome).toEqual({ action: TerminalAction.NONE, acceptedUnitIds: [] })
     expect(Object.isFrozen(outcome.acceptedUnitIds)).toBe(true)
   })
 
