@@ -28,7 +28,7 @@ export class OpenRouterProvider extends BaseAIProvider {
    * @protected
    */
   async _callAI(systemPrompt, userText, options = {}) {
-    const { abortController, sessionId, expectedFormat, isBatch } = options;
+    const { abortController, sessionId, expectedFormat, isBatch, executionContext } = options;
 
     const [apiKeys, model] = await Promise.all([
       getOpenRouterApiKeysAsync(),
@@ -89,6 +89,7 @@ export class OpenRouterProvider extends BaseAIProvider {
       context: `${this.providerName.toLowerCase()}-translation`,
       abortController,
       sessionId,
+      executionContext,
       updateApiKey: (newKey, options) => {
         if (options && options.headers) {
           options.headers.Authorization = `Bearer ${newKey}`;

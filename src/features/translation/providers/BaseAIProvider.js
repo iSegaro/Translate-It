@@ -17,6 +17,7 @@ import { AIResponseParser } from "./utils/AIResponseParser.js";
 import { AITextProcessor } from "./utils/AITextProcessor.js";
 import { TranslationMode, getProviderOptimizationLevelAsync } from "@/shared/config/config.js";
 import { AIStreamManager } from "./utils/AIStreamManager.js";
+import { appendTranslationDiagnostic } from '@/features/translation/ir/TranslationOperation.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.TRANSLATION, 'BaseAIProvider');
 
@@ -142,17 +143,18 @@ export class BaseAIProvider extends BaseProvider {
           mode: translateMode,
           sourceLang,
           targetLang,
-          isBatch: true,
-          expectedFormat: expectedFormat || ResponseFormat.JSON_ARRAY
+           isBatch: true,
+           expectedFormat: expectedFormat || ResponseFormat.JSON_ARRAY,
+           executionContext: contextMetadata?.executionContext,
         }),
         context,
         priority,
-        { sessionId, abortController, messageId }
+        { sessionId, abortController, messageId, executionContext: contextMetadata?.executionContext }
       );
 
       // Stats recording is handled by ProviderRequestEngine. 
       // Orchestrators (like OptimizedJsonHandler or UnifiedService) handle the reporting.
-      return AIResponseParser.parseBatchResult(response, texts.length, texts, this.providerName, expectedFormat || ResponseFormat.JSON_ARRAY);
+      return AIResponseParser.parseBatchResult(response, texts.length, texts, this.providerName, expectedFormat || ResponseFormat.JSON_ARRAY, contextMetadata?.executionContext);
     } catch (error) {
       if (sessionId) {
         import('../core/TranslationStatsManager.js').then(m => {
@@ -172,6 +174,14 @@ export class BaseAIProvider extends BaseProvider {
       // For fatal errors (401, 403), we MUST throw to inform the UI and stop the process.
       if (!isFatal && !isTransient && Array.isArray(texts)) {
         logger.warn(`[${this.providerName}] Non-fatal error, falling back to original text for mapping safety`);
+        appendTranslationDiagnostic(contextMetadata?.executionContext, {
+          type: 'PROVIDER_FALLBACK',
+          stage: 'base-ai-provider',
+          provider: this.providerName,
+          reason: error.message,
+          code: errorType,
+          fallback: true,
+        });
         return texts.map(t => typeof t === 'object' ? (t.t || t.text || "") : (t || ""));
       }
       
@@ -205,7 +215,8 @@ export class BaseAIProvider extends BaseProvider {
             mode: translateMode,
             sourceLang,
             targetLang,
-            expectedFormat: expectedFormat || ResponseFormat.STRING
+            expectedFormat: expectedFormat || ResponseFormat.STRING,
+            executionContext: options.executionContext,
           }),
           chunkContext,
           priority,
@@ -215,6 +226,14 @@ export class BaseAIProvider extends BaseProvider {
         results.push(AIResponseParser.cleanAIResponse(response, expectedFormat || ResponseFormat.STRING));
       } catch (error) {
         logger.error(`[${this.providerName}] Traditional segment translation failed:`, error.message);
+        appendTranslationDiagnostic(options.executionContext, {
+          type: 'PROVIDER_FALLBACK',
+          stage: 'base-ai-provider',
+          provider: this.providerName,
+          reason: error.message,
+          code: error.type,
+          fallback: true,
+        });
         // Return clean original text as fallback for this segment
         results.push(typeof text === 'object' ? (text.t || text.text || "") : (text || ""));
       }

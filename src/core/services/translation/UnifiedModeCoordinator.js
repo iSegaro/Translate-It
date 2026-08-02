@@ -8,6 +8,7 @@ import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { TranslationMode } from '@/shared/config/config.js';
 import { MessageActions } from '@/shared/messaging/core/MessageActions.js';
 import { RequestStatus } from './TranslationRequestTracker.js';
+import { appendTranslationDiagnostic } from '@/features/translation/ir/TranslationOperation.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.TRANSLATION, 'UnifiedModeCoordinator');
 
@@ -18,24 +19,24 @@ export class UnifiedModeCoordinator {
    * @param {object} request - The request record from Tracker
    * @param {object} deps - { translationEngine, backgroundService }
    */
-  async processRequest(request, { translationEngine }) {
+  async processRequest(request, { translationEngine, executionContext }) {
     const { mode } = request;
     request.status = RequestStatus.PROCESSING;
     request.data.priority = await this._resolvePriority(mode);
 
     switch (mode) {
       case TranslationMode.Field:
-        return await this.processFieldTranslation(request, { translationEngine });
+        return await this.processFieldTranslation(request, { translationEngine, executionContext });
       case TranslationMode.Page:
-        return await this.processPageTranslation(request, { translationEngine });
+        return await this.processPageTranslation(request, { translationEngine, executionContext });
       case TranslationMode.PDF:
-        return await this.processPdfTranslation(request, { translationEngine });
+        return await this.processPdfTranslation(request, { translationEngine, executionContext });
       case TranslationMode.Subtitle:
-        return await this.processSubtitleTranslation(request, { translationEngine });
+        return await this.processSubtitleTranslation(request, { translationEngine, executionContext });
       case TranslationMode.Select_Element:
-        return await this.processSelectElementTranslation(request, { translationEngine });
+        return await this.processSelectElementTranslation(request, { translationEngine, executionContext });
       default:
-        return await this.processStandardTranslation(request, { translationEngine });
+        return await this.processStandardTranslation(request, { translationEngine, executionContext });
     }
   }
 
@@ -110,37 +111,42 @@ export class UnifiedModeCoordinator {
   /**
    * Handler for Text Field (Input) translations.
    */
-  async processFieldTranslation(request, { translationEngine }) {
+  async processFieldTranslation(request, { translationEngine, executionContext }) {
     const messageForEngine = {
       action: MessageActions.TRANSLATE,
       messageId: request.messageId,
       context: request.context || 'content', 
       data: { ...request.data, mode: TranslationMode.Field, enableDictionary: false }
     };
-    return await translationEngine.handleTranslateMessage(messageForEngine, request.sender);
+    return executionContext
+      ? await translationEngine.handleTranslateMessage(messageForEngine, request.sender, executionContext)
+      : await translationEngine.handleTranslateMessage(messageForEngine, request.sender);
   }
 
   /**
    * Handler for Select Element translations.
    */
-  async processSelectElementTranslation(request, { translationEngine }) {
+  async processSelectElementTranslation(request, { translationEngine, executionContext }) {
     const enhancedData = {
       ...request.data,
       enableDictionary: false,
       options: { ...request.data.options, forceStreaming: true, enableDictionary: false }
     };
-    return await translationEngine.handleTranslateMessage({
+    const message = {
       action: MessageActions.TRANSLATE,
       messageId: request.messageId,
       context: request.context || 'content', 
       data: enhancedData
-    }, request.sender);
+    };
+    return executionContext
+      ? await translationEngine.handleTranslateMessage(message, request.sender, executionContext)
+      : await translationEngine.handleTranslateMessage(message, request.sender);
   }
 
   /**
    * Handler for PDF translation batches.
    */
-  async processPdfTranslation(request, { translationEngine }) {
+  async processPdfTranslation(request, { translationEngine, executionContext }) {
     const enhancedData = {
       ...request.data,
       mode: TranslationMode.PDF,
@@ -153,24 +159,30 @@ export class UnifiedModeCoordinator {
       }
     };
 
-    return await translationEngine.handleTranslateMessage({
+    const message = {
       action: MessageActions.TRANSLATE,
       messageId: request.messageId,
       context: request.context || 'pdf-translation',
       data: enhancedData
-    }, request.sender);
+    };
+    return executionContext
+      ? await translationEngine.handleTranslateMessage(message, request.sender, executionContext)
+      : await translationEngine.handleTranslateMessage(message, request.sender);
   }
 
   /**
    * Default handler for standard translations (Selection, Popup, etc.).
    */
-  async processStandardTranslation(request, { translationEngine }) {
-    return await translationEngine.handleTranslateMessage({
+  async processStandardTranslation(request, { translationEngine, executionContext }) {
+    const message = {
       action: MessageActions.TRANSLATE,
       messageId: request.messageId,
       context: request.context || 'content',
       data: request.data
-    }, request.sender);
+    };
+    return executionContext
+      ? await translationEngine.handleTranslateMessage(message, request.sender, executionContext)
+      : await translationEngine.handleTranslateMessage(message, request.sender);
   }
 
   /**
@@ -197,7 +209,7 @@ export class UnifiedModeCoordinator {
    * 
    * @private
    */
-  async _processGenericBatch(request, { translationEngine }, options) {
+  async _processGenericBatch(request, { translationEngine, executionContext }, options) {
     const { messageId, data } = request;
     const { provider, priority, promptTemplate, instruction } = data;
     const { mode, items, transformOutput, handleError, useRawItems = false } = options;
@@ -250,6 +262,12 @@ export class UnifiedModeCoordinator {
         timeoutId = setTimeout(() => {
           const timeoutError = new Error(`Batch translation timed out after ${BATCH_TIMEOUT_MS}ms`);
           timeoutError.type = 'TIMEOUT';
+          appendTranslationDiagnostic(executionContext, {
+            type: 'BATCH_TIMEOUT',
+            stage: 'mode-coordinator',
+            reason: timeoutError.message,
+            code: timeoutError.type,
+          });
           abortController.abort();
           reject(timeoutError);
         }, BATCH_TIMEOUT_MS);
@@ -268,8 +286,9 @@ export class UnifiedModeCoordinator {
           sessionId,
           priority,
           promptTemplate,
-          instruction,
-          rawJsonPayload: true 
+            instruction,
+            rawJsonPayload: true,
+            executionContext,
         }),
         timeoutPromise
       ]);

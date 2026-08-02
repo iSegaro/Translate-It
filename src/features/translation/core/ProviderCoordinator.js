@@ -18,6 +18,9 @@ import { AUTO_DETECT_VALUE } from "@/shared/constants/core.js";
 import { queueManager } from "./QueueManager.js";
 import { TranslationPriority } from "./RateLimitManager.js";
 import { streamingManager } from "./StreamingManager.js";
+import {
+  appendTranslationDiagnostic,
+} from '@/features/translation/ir/TranslationOperation.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.TRANSLATION, 'ProviderCoordinator');
 
@@ -177,7 +180,8 @@ export class ProviderCoordinator {
       const result = await queueManager.enqueue(queueProviderName, executeTask, numericPriority, translateMode, {
         messageId: options.messageId,
         uiContext: options.uiContext,
-        parallelExecution: !!options.parallelExecution
+        parallelExecution: !!options.parallelExecution,
+        executionContext: options.executionContext,
       });
 
       // 7. Post-processing & Normalization
@@ -260,6 +264,15 @@ export class ProviderCoordinator {
 
       // Throw if it's a recognized fatal/transient error or a generic system Error
       if (isFatalError(error) || isTransient) throw error;
+
+      appendTranslationDiagnostic(options.executionContext, {
+        type: 'COORDINATOR_FALLBACK',
+        stage: 'provider-coordinator',
+        provider: providerName,
+        reason: error.message,
+        code: errorType,
+        fallback: true,
+      });
       
       // Wrap fallback in a standard result object to avoid destructuring errors in the engine
       const fallbackResult = Array.isArray(text) ? text.map(t => typeof t === 'object' ? (t.t || t.text) : t) : text;

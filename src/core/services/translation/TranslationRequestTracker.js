@@ -52,6 +52,7 @@ export class TranslationRequestTracker {
     this.tabRequests = new Map(); // tabId -> Set<messageId>
     this.toastRequests = new Map(); // toastId -> messageId
     this.elementRequests = new WeakMap(); // DOM element -> messageId
+    this._diagnosticReports = new WeakMap(); // request -> immutable terminal report
 
     // Performance monitoring
     this.requestTimes = new Map(); // messageId -> timestamp
@@ -138,6 +139,14 @@ export class TranslationRequestTracker {
    */
   getRequest(messageId) {
     return this.requests.get(messageId);
+  }
+
+  _setDiagnosticReport(request, report) {
+    if (request && report) this._diagnosticReports.set(request, report);
+  }
+
+  _getDiagnosticReport(request) {
+    return request ? this._diagnosticReports.get(request) || null : null;
   }
 
   /**
