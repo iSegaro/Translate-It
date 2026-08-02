@@ -77,4 +77,22 @@ describe('TranslationOperation', () => {
       messageId: 'message-4',
     }))
   })
+
+  it('keeps legacy mapped output unchanged after validation', () => {
+    const operation = createTranslationOperation('message-validation-output')
+    const result = AIResponseParser.parseBatchResult(
+      '[{"i":"second","t":"translated"},{"i":"second","t":""}]',
+      2,
+      [{ i: 'first', t: 'source one' }, { i: 'second', t: 'source two' }],
+      'Custom',
+      ResponseFormat.JSON_ARRAY,
+      { operation },
+    )
+
+    expect(result).toEqual(['source one', 'second'])
+    expect(operation.finalize().entries).toContainEqual(expect.objectContaining({
+      type: 'PARSER_DUPLICATE_ID',
+      stage: 'parser',
+    }))
+  })
 })

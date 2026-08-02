@@ -8,6 +8,8 @@ import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { ResponseFormat } from '@/shared/config/translationConstants.js';
 import { NewlineManager } from '@/features/translation/utils/NewlineManager.js';
 import { appendTranslationDiagnostic } from '@/features/translation/ir/TranslationOperation.js';
+import { createParserSnapshot } from '@/features/translation/providers/utils/ParserSnapshot.js';
+import { TranslationContractValidator } from '@/features/translation/core/TranslationContractValidator.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.TRANSLATION, 'AIResponseParser');
 
@@ -111,7 +113,7 @@ export const AIResponseParser = {
   /**
    * Cleans AI responses based on the expected contract.
    */
-  cleanAIResponse(result, expectedFormat = ResponseFormat.STRING, executionContext = null) {
+  cleanAIResponse(result, expectedFormat = ResponseFormat.STRING, executionContext = null, parserEvidence = null) {
     if (!result || typeof result !== 'string') return result;
 
     // Strategy 1: RAW STRING (Popup, Sidepanel, Field)
@@ -158,6 +160,7 @@ export const AIResponseParser = {
             stage: 'parser',
             repaired: true,
           });
+          if (parserEvidence) parserEvidence.repaired = true;
         }
       } else if (!parsed) {
         // If no healing was possible and we still don't have a result, re-run to throw original error
@@ -206,11 +209,14 @@ export const AIResponseParser = {
    */
   parseBatchResult(result, expectedCount, originalBatch, providerName = 'Unknown', expectedFormat = ResponseFormat.JSON_ARRAY, executionContext = null) {
     try {
-      const parsed = this.cleanAIResponse(result, expectedFormat, executionContext);
+      const parserEvidence = { repaired: false };
+      const parsed = this.cleanAIResponse(result, expectedFormat, executionContext, parserEvidence);
       
       if (!parsed) throw new Error('Empty or invalid response');
 
       let rawItems = this._normalizeToItems(parsed);
+      const snapshot = createParserSnapshot(rawItems, parserEvidence);
+      TranslationContractValidator.validate(snapshot, originalBatch, { expectedCount });
       const results = new Array(expectedCount).fill(null);
       const unmappedTexts = [];
       const mappedIndexes = new Set();
