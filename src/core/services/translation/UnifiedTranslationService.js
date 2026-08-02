@@ -27,6 +27,7 @@ import {
   finalizeTranslationOperation,
 } from '@/features/translation/ir/TranslationOperation.js';
 import { createManifestView, createRequestUnitManifest } from '@/features/translation/ir/RequestUnitManifest.js';
+import { TerminalExecutionRouter } from '@/features/translation/ir/TerminalExecutionRouter.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.TRANSLATION, 'UnifiedTranslationService');
 
@@ -177,9 +178,11 @@ export class UnifiedTranslationService {
       }
 
       const requestUnitManifest = createRequestUnitManifest(data?.text);
+      const operation = createTranslationOperation(messageId);
       const executionContext = {
-        operation: createTranslationOperation(messageId),
+        operation,
         manifestView: createManifestView(requestUnitManifest),
+        onTerminalUnitsAccepted: TerminalExecutionRouter.createTerminalUnitsObserver(operation),
       };
       this._setOperation(request, executionContext.operation);
 

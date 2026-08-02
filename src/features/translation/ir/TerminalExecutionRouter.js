@@ -27,15 +27,20 @@ function policyForStatus(status) {
   return TerminalAction.NONE
 }
 
+function extractUnitIds(manifestUnits) {
+  return Array.isArray(manifestUnits) ? manifestUnits.map((unit) => unit?.unitId) : []
+}
+
 export const TerminalExecutionRouter = Object.freeze({
   /**
-   * Returns the synchronous, optional, fail-open unit acceptance handoff.
-   * The executor invokes it with canonical manifest unitIds only.
+   * Returns the synchronous, optional, fail-open terminal acceptance handoff.
+   * The executor forwards canonical manifest unit references; only the router
+   * extracts execution identity (unitId) from them.
    */
   createTerminalUnitsObserver(operation) {
-    return (unitIds) => {
+    return (manifestUnits) => {
       try {
-        operation?.acceptTerminalUnits?.(unitIds)
+        operation?.acceptTerminalUnits?.(extractUnitIds(manifestUnits))
       } catch {
         /* fail-open */
       }

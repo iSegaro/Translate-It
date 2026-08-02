@@ -184,6 +184,11 @@ export class OptimizedJsonHandler {
 
           const mappedResults = self._mapResults(batchPayload, translatedBatch, executionContext);
           checkCancellation();
+          // Forward terminally accepted manifest unit references only; execution
+          // identity extraction is the router's responsibility, never this handler's.
+          if (batchExecutionContext?.manifestView?.units) {
+            executionContext?.onTerminalUnitsAccepted?.(batchExecutionContext.manifestView.units);
+          }
           accumulatedResults.push(...mappedResults);
           completedBatchCount++;
           if (!skipStreaming) {

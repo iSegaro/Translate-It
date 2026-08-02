@@ -1,25 +1,40 @@
 import { describe, expect, it, vi } from 'vitest'
 import { TerminalAction, TerminalExecutionRouter, TerminalStatus } from './TerminalExecutionRouter.js'
 
+const manifestUnits = Object.freeze([
+  Object.freeze({ unitId: 'unit-0', requestIndex: 0 }),
+  Object.freeze({ unitId: 'unit-1', requestIndex: 1 }),
+])
+
 describe('TerminalExecutionRouter', () => {
-  it('forwards canonical unitIds synchronously to the operation', () => {
+  it('accepts ManifestUnit references and extracts canonical unitIds for the operation', () => {
     const operation = { acceptTerminalUnits: vi.fn(), drainAcceptedUnitIds: vi.fn() }
     const observe = TerminalExecutionRouter.createTerminalUnitsObserver(operation)
 
     expect(typeof observe).toBe('function')
 
-    observe(['first', 'unknown'])
-    observe(['first'])
+    observe([manifestUnits[0], manifestUnits[1]])
+    observe([manifestUnits[0]])
 
     expect(operation.acceptTerminalUnits).toHaveBeenCalledTimes(2)
-    expect(operation.acceptTerminalUnits).toHaveBeenCalledWith(['first', 'unknown'])
-    expect(operation.acceptTerminalUnits).toHaveBeenCalledWith(['first'])
+    expect(operation.acceptTerminalUnits).toHaveBeenCalledWith(['unit-0', 'unit-1'])
+    expect(operation.acceptTerminalUnits).toHaveBeenCalledWith(['unit-0'])
+  })
+
+  it('never forwards ManifestUnit references to the operation', () => {
+    const operation = { acceptTerminalUnits: vi.fn(), drainAcceptedUnitIds: vi.fn() }
+    const observe = TerminalExecutionRouter.createTerminalUnitsObserver(operation)
+
+    observe(manifestUnits)
+
+    expect(operation.acceptTerminalUnits).not.toHaveBeenCalledWith(manifestUnits)
+    expect(operation.acceptTerminalUnits).toHaveBeenCalledWith(['unit-0', 'unit-1'])
   })
 
   it('is optional and fail-open when the operation is absent', () => {
     const observe = TerminalExecutionRouter.createTerminalUnitsObserver(null)
 
-    expect(() => observe(['first'])).not.toThrow()
+    expect(() => observe(manifestUnits)).not.toThrow()
   })
 
   it('is fail-open when the operation rejects an observation', () => {
@@ -29,19 +44,19 @@ describe('TerminalExecutionRouter', () => {
     }
     const observe = TerminalExecutionRouter.createTerminalUnitsObserver(operation)
 
-    expect(() => observe(['first'])).not.toThrow()
+    expect(() => observe(manifestUnits)).not.toThrow()
   })
 
   it('consumes drainAcceptedUnitIds at terminal routing', () => {
     const operation = {
       acceptTerminalUnits: vi.fn(),
-      drainAcceptedUnitIds: vi.fn(() => Object.freeze(['first'])),
+      drainAcceptedUnitIds: vi.fn(() => Object.freeze(['unit-0'])),
     }
 
     const outcome = TerminalExecutionRouter.routeTerminalExecution(operation, { status: TerminalStatus.COMPLETED })
 
     expect(operation.drainAcceptedUnitIds).toHaveBeenCalledTimes(1)
-    expect(outcome).toEqual({ action: TerminalAction.SETTLE, acceptedUnitIds: ['first'] })
+    expect(outcome).toEqual({ action: TerminalAction.SETTLE, acceptedUnitIds: ['unit-0'] })
     expect(Object.isFrozen(outcome.acceptedUnitIds)).toBe(true)
   })
 

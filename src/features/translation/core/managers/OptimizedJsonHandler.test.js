@@ -191,6 +191,42 @@ describe('OptimizedJsonHandler', () => {
 
       expect(batchContext.manifestView).toBeNull();
     });
+
+    it('forwards terminally accepted manifest unit references without mapping unitIds', async () => {
+      const segments = ['same', 'same'];
+      const manifest = createRequestUnitManifest(segments);
+      const onTerminalUnitsAccepted = vi.fn();
+      const executionContext = {
+        manifestView: createManifestView(manifest),
+        onTerminalUnitsAccepted,
+      };
+      mockEngine.createIntelligentMembershipBatches = vi.fn((items, manifestUnits) => (
+        items.map((payload, index) => [{ payload, manifestUnit: manifestUnits[index] }])
+      ));
+      mockProvider.translate
+        .mockResolvedValueOnce({ translatedText: ['first'] })
+        .mockResolvedValueOnce({ translatedText: ['second'] });
+
+      await handler.execute(
+        mockEngine,
+        { text: JSON.stringify(segments), sourceLanguage: 'en', targetLanguage: 'fa', mode: 'select_element', messageId: 'manifest-units-1' },
+        mockProvider,
+        'en',
+        'fa',
+        'manifest-units-1',
+        { tab: { id: 123 } },
+        'unknown',
+        executionContext,
+      );
+
+      expect(onTerminalUnitsAccepted).toHaveBeenCalledTimes(2);
+      const firstBatchUnits = onTerminalUnitsAccepted.mock.calls[0][0];
+      const secondBatchUnits = onTerminalUnitsAccepted.mock.calls[1][0];
+      expect(firstBatchUnits).toHaveLength(1);
+      expect(firstBatchUnits[0]).toBe(manifest.units[0]);
+      expect(secondBatchUnits[0]).toBe(manifest.units[1]);
+      expect(typeof firstBatchUnits[0]).toBe('object');
+    });
   });
 
   describe('execute', () => {
