@@ -59,7 +59,7 @@ describe('TerminalExecutionRouter', () => {
     expect(operation.drainAcceptedUnitIds).toHaveBeenCalledTimes(1)
     expect(operation.settleUnits).toHaveBeenCalledTimes(1)
     expect(operation.settleUnits).toHaveBeenCalledWith(['unit-0'])
-    expect(outcome).toEqual({ action: TerminalAction.SETTLE, acceptedUnitIds: ['unit-0'] })
+    expect(outcome).toEqual({ action: TerminalAction.SETTLE, acceptedUnitIds: ['unit-0'], cancelledUnitIds: [] })
     expect(Object.isFrozen(outcome.acceptedUnitIds)).toBe(true)
   })
 
@@ -81,7 +81,7 @@ describe('TerminalExecutionRouter', () => {
     expect(operation.drainAcceptedUnitIds).toHaveBeenCalledTimes(2)
     expect(operation.settleUnits).toHaveBeenCalledTimes(1)
     expect(operation.settleUnits).toHaveBeenCalledWith(['unit-0'])
-    expect(second).toEqual({ action: TerminalAction.SETTLE, acceptedUnitIds: [] })
+    expect(second).toEqual({ action: TerminalAction.SETTLE, acceptedUnitIds: [], cancelledUnitIds: [] })
   })
 
   it('never drains or settles when FAILED', () => {
@@ -95,7 +95,7 @@ describe('TerminalExecutionRouter', () => {
 
     expect(operation.drainAcceptedUnitIds).not.toHaveBeenCalled()
     expect(operation.settleUnits).not.toHaveBeenCalled()
-    expect(outcome).toEqual({ action: TerminalAction.NONE, acceptedUnitIds: [] })
+    expect(outcome).toEqual({ action: TerminalAction.NONE, acceptedUnitIds: [], cancelledUnitIds: [] })
     expect(Object.isFrozen(outcome.acceptedUnitIds)).toBe(true)
   })
 
@@ -110,7 +110,7 @@ describe('TerminalExecutionRouter', () => {
 
     expect(operation.drainAcceptedUnitIds).not.toHaveBeenCalled()
     expect(operation.settleUnits).not.toHaveBeenCalled()
-    expect(outcome).toEqual({ action: TerminalAction.NONE, acceptedUnitIds: [] })
+    expect(outcome).toEqual({ action: TerminalAction.NONE, acceptedUnitIds: [], cancelledUnitIds: [] })
     expect(Object.isFrozen(outcome.acceptedUnitIds)).toBe(true)
   })
 
@@ -128,5 +128,55 @@ describe('TerminalExecutionRouter', () => {
       .toBe(TerminalAction.NONE)
     expect(TerminalExecutionRouter.routeTerminalExecution(operation(), { status: TerminalStatus.TIMEOUT }).action)
       .toBe(TerminalAction.NONE)
+  })
+
+  it('cancels remaining units exactly once on CANCELLED without draining or settling', () => {
+    const operation = {
+      acceptTerminalUnits: vi.fn(),
+      drainAcceptedUnitIds: vi.fn(),
+      settleUnits: vi.fn(),
+      cancelRemaining: vi.fn(() => Object.freeze(['unit-1'])),
+    }
+
+    const outcome = TerminalExecutionRouter.routeTerminalExecution(operation, { status: TerminalStatus.CANCELLED })
+
+    expect(operation.cancelRemaining).toHaveBeenCalledTimes(1)
+    expect(operation.drainAcceptedUnitIds).not.toHaveBeenCalled()
+    expect(operation.settleUnits).not.toHaveBeenCalled()
+    expect(outcome).toEqual({
+      action: TerminalAction.CANCEL_REMAINING,
+      acceptedUnitIds: [],
+      cancelledUnitIds: ['unit-1'],
+    })
+    expect(Object.isFrozen(outcome.cancelledUnitIds)).toBe(true)
+  })
+
+  it('passes through the stable frozen cancelled snapshot on repeated CANCELLED routing', () => {
+    const snapshot = Object.freeze(['unit-0'])
+    const operation = {
+      acceptTerminalUnits: vi.fn(),
+      drainAcceptedUnitIds: vi.fn(),
+      settleUnits: vi.fn(),
+      cancelRemaining: vi.fn(() => snapshot),
+    }
+
+    const first = TerminalExecutionRouter.routeTerminalExecution(operation, { status: TerminalStatus.CANCELLED })
+    const second = TerminalExecutionRouter.routeTerminalExecution(operation, { status: TerminalStatus.CANCELLED })
+
+    expect(first.cancelledUnitIds).toBe(snapshot)
+    expect(second.cancelledUnitIds).toBe(snapshot)
+    expect(first.action).toBe(TerminalAction.CANCEL_REMAINING)
+    expect(second.action).toBe(TerminalAction.CANCEL_REMAINING)
+    expect(Object.isFrozen(second.cancelledUnitIds)).toBe(true)
+  })
+
+  it('is fail-open when the operation is absent on CANCELLED', () => {
+    const outcome = TerminalExecutionRouter.routeTerminalExecution(null, { status: TerminalStatus.CANCELLED })
+
+    expect(outcome).toEqual({
+      action: TerminalAction.CANCEL_REMAINING,
+      acceptedUnitIds: [],
+      cancelledUnitIds: [],
+    })
   })
 })

@@ -298,6 +298,7 @@ export class UnifiedTranslationService {
     if (!cancellation.accepted) return { handled: true, success: false, error: cancellation.reason };
 
     const operation = this._getOperation(request);
+    TerminalExecutionRouter.routeTerminalExecution(operation, { status: cancellation.status });
     this._finalizeDiagnostics(request, { operation }, {
       type: 'OPERATION_CANCELLED',
       stage: 'service',

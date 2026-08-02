@@ -3,10 +3,12 @@
  *
  * Decides how accepted terminal units map to future ledger settlement.
  * Stateless: owns no execution state; TranslationOperation remembers.
- * PR4B.5: COMPLETED settlement active. CANCELLED/FAILED/TIMEOUT unwired.
+ * PR4B.5: COMPLETED settlement active.
+ * PR4B.6B: CANCELLED cancelRemaining active. FAILED/TIMEOUT unwired.
  */
 
 const EMPTY_ACCEPTED_UNIT_IDS = Object.freeze([])
+const EMPTY_CANCELLED_UNIT_IDS = Object.freeze([])
 
 export const TerminalAction = Object.freeze({
   SETTLE: 'settle',
@@ -55,8 +57,21 @@ export const TerminalExecutionRouter = Object.freeze({
   routeTerminalExecution(operation, { status }) {
     const action = policyForStatus(status)
 
+    if (action === TerminalAction.CANCEL_REMAINING) {
+      const cancelledUnitIds = operation?.cancelRemaining?.() || EMPTY_CANCELLED_UNIT_IDS
+      return Object.freeze({
+        action,
+        acceptedUnitIds: EMPTY_ACCEPTED_UNIT_IDS,
+        cancelledUnitIds,
+      })
+    }
+
     if (action !== TerminalAction.SETTLE) {
-      return Object.freeze({ action, acceptedUnitIds: EMPTY_ACCEPTED_UNIT_IDS })
+      return Object.freeze({
+        action,
+        acceptedUnitIds: EMPTY_ACCEPTED_UNIT_IDS,
+        cancelledUnitIds: EMPTY_CANCELLED_UNIT_IDS,
+      })
     }
 
     const acceptedUnitIds = operation?.drainAcceptedUnitIds?.() || EMPTY_ACCEPTED_UNIT_IDS
@@ -64,6 +79,10 @@ export const TerminalExecutionRouter = Object.freeze({
       operation?.settleUnits?.(acceptedUnitIds)
     }
 
-    return Object.freeze({ action, acceptedUnitIds })
+    return Object.freeze({
+      action,
+      acceptedUnitIds,
+      cancelledUnitIds: EMPTY_CANCELLED_UNIT_IDS,
+    })
   },
 })

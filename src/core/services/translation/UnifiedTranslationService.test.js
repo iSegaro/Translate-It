@@ -490,6 +490,24 @@ describe('UnifiedTranslationService', () => {
       expect(mockEngine.cancelTranslation).toHaveBeenCalledTimes(1);
       expect(service.resultDispatcher.dispatchCancellation).toHaveBeenCalledTimes(1);
     });
+
+    it('routes the accepted cancellation to the router exactly once', async () => {
+      translationRequestTracker.getRequest.mockReturnValue({ messageId: 'm-route-cancel' });
+
+      await service.cancelRequest('m-route-cancel');
+
+      expect(TerminalExecutionRouter.routeTerminalExecution).toHaveBeenCalledTimes(1);
+      expect(TerminalExecutionRouter.routeTerminalExecution).toHaveBeenCalledWith(expect.any(Object), { status: 'cancelled' });
+    });
+
+    it('never routes when cancellation is rejected', async () => {
+      translationRequestTracker.getRequest.mockReturnValue({ messageId: 'm-reject-cancel' });
+      translationRequestTracker.cancelRequest.mockReturnValue({ accepted: false, status: 'completed', reason: 'already_terminal' });
+
+      await service.cancelRequest('m-reject-cancel');
+
+      expect(TerminalExecutionRouter.routeTerminalExecution).not.toHaveBeenCalled();
+    });
   });
 
   describe('handleStreamingUpdate', () => {
