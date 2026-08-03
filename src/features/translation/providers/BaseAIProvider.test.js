@@ -34,12 +34,13 @@ vi.mock('@/shared/error-management/ErrorMatcher.js', () => ({
 }));
 
 import { BaseAIProvider } from './BaseAIProvider.js';
+import { ResponseFormat } from '@/shared/config/translationConstants.js';
 import { isFatalError, isTransientError, matchErrorToType } from '@/shared/error-management/ErrorMatcher.js';
 
 // Mock AIResponseParser
 vi.mock("./utils/AIResponseParser.js", () => ({
   AIResponseParser: {
-    parseBatchResult: vi.fn((res) => res),
+    parseBatchResult: vi.fn((res) => ({ results: res, contractViolation: false })),
     cleanAIResponse: vi.fn((res) => res)
   }
 }));
@@ -112,6 +113,35 @@ describe('BaseAIProvider', () => {
       expect(spy).toHaveBeenCalled();
       const userText = spy.mock.calls[0][1];
       expect(userText).toContain('Hello');
+    });
+
+    it('should return parsed results without recovery when contract is honored', async () => {
+      const { AIResponseParser } = await import("./utils/AIResponseParser.js");
+      AIResponseParser.parseBatchResult.mockReturnValue({ results: ['R1', 'R2'], contractViolation: false });
+      const fallbackSpy = vi.spyOn(provider, '_traditionalBatchTranslate').mockResolvedValue(['F1', 'F2']);
+
+      const texts = ['seg1', 'seg2'];
+      const result = await provider._translateBatch(texts, 'en', 'fa', 'selection', null, null, null, 'session-1');
+
+      expect(result).toEqual(['R1', 'R2']);
+      expect(fallbackSpy).not.toHaveBeenCalled();
+    });
+
+    it('should perform exactly one sequential recovery when the contract is violated', async () => {
+      const { AIResponseParser } = await import("./utils/AIResponseParser.js");
+      AIResponseParser.parseBatchResult.mockReturnValue({ results: ['seg1'], contractViolation: true });
+      const fallbackSpy = vi.spyOn(provider, '_traditionalBatchTranslate').mockResolvedValue(['F1']);
+
+      const result = await provider._translateBatch(
+        ['seg1', 'seg2'], 'en', 'fa', 'selection', null, null, null, 'session-1', { metadata: true }
+      );
+
+      expect(fallbackSpy).toHaveBeenCalledTimes(1);
+      expect(fallbackSpy).toHaveBeenCalledWith(
+        ['seg1', 'seg2'], 'en', 'fa', 'selection', null, null, null, null,
+        'session-1', ResponseFormat.STRING, { metadata: true }
+      );
+      expect(result).toEqual(['F1']);
     });
   });
 

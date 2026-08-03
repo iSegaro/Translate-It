@@ -229,6 +229,9 @@ export const AIResponseParser = {
 
   /**
    * Parse batch translation results from JSON response.
+   *
+   * @returns {{ results: Array<string>, contractViolation: boolean }} Parsed results plus whether
+   * the response violated the structured contract (slots gap-filled or unparseable).
    */
   parseBatchResult(result, expectedCount, originalBatch, providerName = 'Unknown', expectedFormat = ResponseFormat.JSON_ARRAY, executionContext = null, manifestView = null) {
     try {
@@ -282,7 +285,16 @@ export const AIResponseParser = {
           count: unknownIdCount,
         });
       }
-      return this._fillResultsGaps(results, unmappedTexts, originalBatch, expectedCount);
+
+      // A null slot means this response violated the structured contract: it will
+      // be gap-filled with unmapped translations or original text below. The parser
+      // reports this fact only; recovery is owned by the provider.
+      const contractViolation = results.some(item => item === null);
+
+      return {
+        results: this._fillResultsGaps(results, unmappedTexts, originalBatch, expectedCount),
+        contractViolation,
+      };
     } catch (error) {
       logger.error(`[${providerName}] Strict parse failed: ${error.message}`);
       appendTranslationDiagnostic(executionContext, {
@@ -293,7 +305,10 @@ export const AIResponseParser = {
         code: 'PARSE_FAILED',
         fallback: true,
       });
-      return originalBatch.map(item => typeof item === 'object' ? (item.t || item.text) : item);
+      return {
+        results: originalBatch.map(item => typeof item === 'object' ? (item.t || item.text) : item),
+        contractViolation: true,
+      };
     }
   },
 

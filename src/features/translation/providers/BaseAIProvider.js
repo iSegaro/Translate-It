@@ -156,7 +156,7 @@ export class BaseAIProvider extends BaseProvider {
       // Orchestrators (like OptimizedJsonHandler or UnifiedService) handle the reporting.
       const executionContext = contextMetadata?.executionContext;
 
-      return AIResponseParser.parseBatchResult(
+      const parsed = AIResponseParser.parseBatchResult(
         response,
         texts.length,
         texts,
@@ -165,6 +165,27 @@ export class BaseAIProvider extends BaseProvider {
         executionContext,
         executionContext?.manifestView,
       );
+
+      // Structured recovery: the parser reports facts only; recovery ownership stays
+      // here. A contract violation triggers exactly one sequential re-request.
+      if (parsed.contractViolation) {
+        logger.warn(`[${this.providerName}] Structured response violated its contract; sequential recovery started`);
+        return this._traditionalBatchTranslate(
+          texts,
+          sourceLang,
+          targetLang,
+          translateMode,
+          engine,
+          messageId,
+          abortController,
+          priority,
+          sessionId,
+          ResponseFormat.STRING,
+          contextMetadata || {}
+        );
+      }
+
+      return parsed.results;
     } catch (error) {
       if (sessionId) {
         import('../core/TranslationStatsManager.js').then(m => {

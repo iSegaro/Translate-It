@@ -88,7 +88,8 @@ describe('TranslationOperation', () => {
       { operation },
     )
 
-    expect(result).toEqual(originalBatch)
+    expect(result.results).toEqual(originalBatch)
+    expect(result.contractViolation).toBe(true)
     expect(operation.finalize().entries).toContainEqual(expect.objectContaining({
       type: 'PARSER_MALFORMED_RESPONSE',
       stage: 'parser',
@@ -110,7 +111,8 @@ describe('TranslationOperation', () => {
       manifestView,
     )
 
-    expect(result).toEqual(['source one', 'second'])
+    expect(result.results).toEqual(['source one', 'second'])
+    expect(result.contractViolation).toBe(true)
     expect(operation.finalize().entries).toContainEqual(expect.objectContaining({
       type: 'PARSER_DUPLICATE_ID',
       stage: 'parser',

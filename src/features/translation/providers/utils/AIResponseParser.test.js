@@ -117,7 +117,8 @@ describe('AIResponseParser', () => {
         createManifestView(createRequestUnitManifest(originalBatch)),
       );
 
-      expect(result).toEqual(['translated']);
+      expect(result.results).toEqual(['translated']);
+      expect(result.contractViolation).toBe(false);
       expect(observeValidationResult).toHaveBeenCalledTimes(1);
       expect(observeValidationResult).toHaveBeenCalledWith(expect.objectContaining({
         isValid: true,
@@ -139,7 +140,8 @@ describe('AIResponseParser', () => {
         createManifestView(createRequestUnitManifest(originalBatch)),
       );
 
-      expect(result).toEqual(['source one', 'second']);
+      expect(result.results).toEqual(['source one', 'second']);
+      expect(result.contractViolation).toBe(true);
       expect(observeValidationResult).toHaveBeenCalledWith(expect.objectContaining({ isValid: false }));
     });
 
@@ -155,7 +157,8 @@ describe('AIResponseParser', () => {
         createManifestView(createRequestUnitManifest(originalBatch)),
       );
 
-      expect(result).toEqual(['translated']);
+      expect(result.results).toEqual(['translated']);
+      expect(result.contractViolation).toBe(true);
     });
 
     it('does not observe malformed parser fallback', () => {
@@ -170,7 +173,8 @@ describe('AIResponseParser', () => {
         createManifestView(createRequestUnitManifest(['source'])),
       );
 
-      expect(result).toEqual(['source']);
+      expect(result.results).toEqual(['source']);
+      expect(result.contractViolation).toBe(true);
       expect(observeValidationResult).not.toHaveBeenCalled();
     });
 
@@ -186,7 +190,8 @@ describe('AIResponseParser', () => {
         null,
       );
 
-      expect(result).toEqual(['translated']);
+      expect(result.results).toEqual(['translated']);
+      expect(result.contractViolation).toBe(true);
       expect(observeValidationResult).not.toHaveBeenCalled();
     });
 
@@ -206,7 +211,8 @@ describe('AIResponseParser', () => {
         },
       );
 
-      expect(result).toEqual(['translated']);
+      expect(result.results).toEqual(['translated']);
+      expect(result.contractViolation).toBe(true);
       expect(validate).not.toHaveBeenCalled();
       validate.mockRestore();
     });
