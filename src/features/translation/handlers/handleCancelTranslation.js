@@ -78,11 +78,10 @@ export async function handleCancelTranslation(request, sender) {
       let cancelled = false;
 
       if (timeout) {
-        // Timeout stays outside the service cancellation API.
-        const cancellation = translationRequestTracker.markTimeout(id);
-        if (!cancellation.accepted) return false;
         try {
-          cancelled = await translationEngine.cancelTranslation(id);
+          const timeoutResult = await unifiedTranslationService.handleTimeout(id);
+          cancelled = timeoutResult.success;
+          if (timeoutResult.handled && !timeoutResult.success) return false;
         } catch { /* continue remaining exact-ID cleanup */ }
       } else {
         // Delegate service ownership first; fall back only when unhandled.

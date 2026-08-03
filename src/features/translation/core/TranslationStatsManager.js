@@ -8,6 +8,7 @@ import { safeConsole } from '@/shared/logging/SafeConsole.js';
 import { CONFIG } from '@/shared/config/config.js';
 import { storageManager } from '@/shared/storage/core/StorageCore.js';
 import { TranslationCallPurpose } from '../providers/ProviderConstants.js';
+import { RecoveryFinalOutcome } from '../ir/TranslationOperation.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.TRANSLATION, 'StatsManager');
 
@@ -15,6 +16,17 @@ function createPurposeCounters() {
   return {
     [TranslationCallPurpose.PRIMARY_TRANSLATION]: 0,
     [TranslationCallPurpose.STRUCTURED_RECOVERY]: 0
+  };
+}
+
+function createQualityCounters() {
+  return { structuredResponseViolations: 0, recoveryPasses: 0, operationsWithRecovery: 0, operationsRecovered: 0, operationsRecoveryFailed: 0, operationsRecoveryIncomplete: 0, operationsRecoverySuperseded: 0 };
+}
+
+function createProviderStats() {
+  return {
+    calls: 0, chars: 0, errors: 0, originalChars: 0,
+    callsByPurpose: createPurposeCounters(), charsByPurpose: createPurposeCounters(), errorsByPurpose: createPurposeCounters(), quality: createQualityCounters()
   };
 }
 
@@ -32,6 +44,7 @@ class TranslationStatsManager {
       callsByPurpose: createPurposeCounters(),
       charsByPurpose: createPurposeCounters(),
       errorsByPurpose: createPurposeCounters(),
+      quality: createQualityCounters(),
       startTime: Date.now()
     };
     
@@ -51,10 +64,7 @@ class TranslationStatsManager {
 
     // Update provider stats
     if (!this.providers.has(providerName)) {
-      this.providers.set(providerName, {
-        calls: 0, chars: 0, errors: 0, originalChars: 0,
-        callsByPurpose: createPurposeCounters(), charsByPurpose: createPurposeCounters(), errorsByPurpose: createPurposeCounters()
-      });
+      this.providers.set(providerName, createProviderStats());
     }
     const pStats = this.providers.get(providerName);
     pStats.calls++;
@@ -113,6 +123,29 @@ class TranslationStatsManager {
     if (sessionId && this.sessions.has(sessionId)) {
       this.sessions.get(sessionId).errors++;
       this.sessions.get(sessionId).errorsByPurpose[callPurpose]++;
+    }
+  }
+
+  recordOperationQuality(summary) {
+    if (!summary?.hadRecovery) return;
+    const apply = (quality, source, operation) => {
+      quality.structuredResponseViolations += source.structuredResponseViolations || 0;
+      quality.recoveryPasses += source.recoveryPasses || 0;
+      if (operation) {
+        quality.operationsWithRecovery++;
+        const key = {
+          [RecoveryFinalOutcome.SUCCEEDED]: 'operationsRecovered',
+          [RecoveryFinalOutcome.FAILED]: 'operationsRecoveryFailed',
+          [RecoveryFinalOutcome.INCOMPLETE]: 'operationsRecoveryIncomplete',
+          [RecoveryFinalOutcome.SUPERSEDED]: 'operationsRecoverySuperseded'
+        }[summary.finalRecoveryOutcome];
+        if (key) quality[key]++;
+      }
+    };
+    apply(this.global.quality, summary, true);
+    for (const fact of summary.providerFacts || []) {
+      if (!this.providers.has(fact.provider)) this.providers.set(fact.provider, createProviderStats());
+      apply(this.providers.get(fact.provider).quality, fact, fact.provider === summary.finalRecoveryProvider);
     }
   }
 

@@ -24,6 +24,7 @@ import { isEligibleForDictionaryUpgrade } from '@/features/translation/utils/tra
 import {
   appendTranslationDiagnostic,
   createTranslationOperation,
+  deriveRecoverySummary,
   finalizeTranslationOperation,
 } from '@/features/translation/ir/TranslationOperation.js';
 import { createManifestView, createRequestUnitManifest } from '@/features/translation/ir/RequestUnitManifest.js';
@@ -199,12 +200,16 @@ export class UnifiedTranslationService {
           ? this.requestTracker.markTimeout(messageId)
           : this.requestTracker.failRequest(messageId, error);
         if (!transition.accepted) return this._createSuppressedResponse(messageId, transition);
-        this._finalizeDiagnostics(request, executionContext, {
-          type: error.type === 'TIMEOUT' ? 'OPERATION_TIMEOUT' : 'OPERATION_FAILED',
-          stage: 'service',
-          reason: error.message,
-          code: error.type,
-        });
+        if (error.type === 'TIMEOUT') {
+          await this._finalizeAcceptedTimeout(request, messageId, error.message);
+        } else {
+          this._finalizeDiagnostics(request, executionContext, {
+            type: 'OPERATION_FAILED',
+            stage: 'service',
+            reason: error.message,
+            code: error.type,
+          });
+        }
         return MessageFormat.createErrorResponse(error, messageId);
       }
 
@@ -315,6 +320,30 @@ export class UnifiedTranslationService {
     return { handled: true, success: true };
   }
 
+  async handleTimeout(messageId, reason = 'Translation timed out') {
+    const request = this.requestTracker.getRequest(messageId);
+    if (!request) return { handled: false, success: false, error: 'Request not found' };
+    const timeout = this.requestTracker.markTimeout(messageId);
+    if (!timeout.accepted) return { handled: true, success: false, error: timeout.reason };
+    await this._finalizeAcceptedTimeout(request, messageId, reason);
+    return { handled: true, success: true };
+  }
+
+  async _finalizeAcceptedTimeout(request, messageId, reason) {
+    const operation = this._getOperation(request);
+    this._finalizeDiagnostics(request, { operation }, {
+      type: 'OPERATION_TIMEOUT',
+      stage: 'service',
+      reason,
+      code: 'TIMEOUT',
+    });
+    try {
+      await this.translationEngine?.cancelTranslation(messageId);
+    } catch (error) {
+      logger.debug('Timeout cancellation failed:', error.message);
+    }
+  }
+
   _createCancelledResponse(messageId) {
     return {
       success: false,
@@ -349,7 +378,21 @@ export class UnifiedTranslationService {
   _finalizeDiagnostics(request, executionContext, terminalFact) {
     appendTranslationDiagnostic(executionContext, terminalFact);
     const report = finalizeTranslationOperation(executionContext);
-    if (report) this._setDiagnosticReport(request, report);
+    if (report) {
+      this._setDiagnosticReport(request, report);
+      const terminalStatus = {
+        OPERATION_COMPLETED: 'completed',
+        OPERATION_FAILED: 'failed',
+        OPERATION_CANCELLED: 'cancelled',
+        OPERATION_TIMEOUT: 'timeout',
+      }[terminalFact.type];
+      if (terminalStatus) {
+        statsManager.recordOperationQuality(deriveRecoverySummary(report, {
+          terminalStatus,
+          operationSucceeded: terminalStatus === 'completed',
+        }));
+      }
+    }
     this._clearOperation(request);
   }
 

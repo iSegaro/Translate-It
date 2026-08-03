@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { TranslationCallPurpose } from '../providers/ProviderConstants.js';
+import { RecoveryFinalOutcome } from '../ir/TranslationOperation.js';
 
 // Mock extension polyfill
 vi.mock('webextension-polyfill', () => ({
@@ -48,6 +49,24 @@ describe('TranslationStatsManager', () => {
   });
 
   describe('Recording Requests', () => {
+    it('aggregates logical recovery quality globally and by final provider without session quality', () => {
+      statsManager.recordOperationQuality({
+        structuredResponseViolations: 2,
+        recoveryPasses: 2,
+        hadRecovery: true,
+        finalRecoveryOutcome: RecoveryFinalOutcome.SUCCEEDED,
+        finalRecoveryProvider: 'ProviderB',
+        providerFacts: [
+          { provider: 'ProviderA', structuredResponseViolations: 1, recoveryPasses: 1 },
+          { provider: 'ProviderB', structuredResponseViolations: 1, recoveryPasses: 1 }
+        ]
+      });
+      expect(statsManager.global.quality).toMatchObject({ structuredResponseViolations: 2, recoveryPasses: 2, operationsWithRecovery: 1, operationsRecovered: 1 });
+      expect(statsManager.providers.get('ProviderA').quality).toMatchObject({ recoveryPasses: 1, operationsWithRecovery: 0 });
+      expect(statsManager.providers.get('ProviderB').quality).toMatchObject({ recoveryPasses: 1, operationsWithRecovery: 1, operationsRecovered: 1 });
+      statsManager.recordRequest('ProviderB', 'session', 1, 1, TranslationCallPurpose.PRIMARY_TRANSLATION);
+      expect(statsManager.sessions.get('session')).not.toHaveProperty('quality');
+    });
     it('should break physical calls, characters, and errors down by purpose', () => {
       statsManager.recordRequest('Google', 'session-1', 100, 90, TranslationCallPurpose.PRIMARY_TRANSLATION);
       statsManager.recordRequest('Google', 'session-1', 25, 20, TranslationCallPurpose.STRUCTURED_RECOVERY);

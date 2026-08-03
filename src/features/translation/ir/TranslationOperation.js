@@ -32,6 +32,7 @@ export function deriveRecoverySummary(report, terminalContext = {}) {
       const pass = [...passes].reverse().find(item => item.terminal === null)
       if (pass) {
         pass.terminal = entry.type
+        pass.terminalProvider = entry.provider || null
         const provider = entry.provider || pass.provider
         const fact = providers.get(provider) || { provider, structuredResponseViolations: 0, recoveryPasses: 0, recoverySuccesses: 0, recoveryFailures: 0, incompleteRecoveries: 0 }
         if (entry.type === 'RECOVERY_SUCCEEDED') fact.recoverySuccesses++
@@ -40,7 +41,10 @@ export function deriveRecoverySummary(report, terminalContext = {}) {
       }
     }
   }
-  for (const pass of passes.filter(item => item.terminal === null)) providers.get(pass.provider)?.incompleteRecoveries++
+  for (const pass of passes.filter(item => item.terminal === null)) {
+    const providerFact = providers.get(pass.provider)
+    if (providerFact) providerFact.incompleteRecoveries++
+  }
   const last = passes.at(-1)
   const success = passes.some(item => item.terminal === 'RECOVERY_SUCCEEDED')
   const failure = passes.some(item => item.terminal === 'RECOVERY_FAILED')
@@ -52,7 +56,8 @@ export function deriveRecoverySummary(report, terminalContext = {}) {
     else finalRecoveryOutcome = RecoveryFinalOutcome.INCOMPLETE
   }
   const providerFacts = Object.freeze([...providers.values()].map(fact => Object.freeze(fact)))
-  return Object.freeze({ structuredResponseViolations: passes.length, recoveryPasses: passes.length, hadRecovery: passes.length > 0, hadRecoverySuccess: success, hadRecoveryFailure: failure, recoveryIncomplete: passes.some(item => item.terminal === null), finalRecoveryOutcome, providerFacts })
+  const finalRecoveryProvider = last ? (last.terminalProvider || last.provider || null) : null
+  return Object.freeze({ structuredResponseViolations: passes.length, recoveryPasses: passes.length, hadRecovery: passes.length > 0, hadRecoverySuccess: success, hadRecoveryFailure: failure, recoveryIncomplete: passes.some(item => item.terminal === null), finalRecoveryOutcome, finalRecoveryProvider, providerFacts })
 }
 
 function safeString(value) {
