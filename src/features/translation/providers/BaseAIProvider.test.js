@@ -80,6 +80,43 @@ describe('BaseAIProvider', () => {
     translationSessionManager.sessions.clear();
   });
 
+  describe('explicit batch execution APIs', () => {
+    it('executeStructuredBatch returns raw primary response unchanged', async () => {
+      provider._callAI = vi.fn().mockResolvedValue('raw structured response');
+
+      const result = await provider.executeStructuredBatch(['source'], 'en', 'fa', {
+        translateMode: 'selection',
+        expectedFormat: ResponseFormat.JSON_ARRAY,
+      });
+
+      expect(result).toBe('raw structured response');
+      expect(provider._callAI).toHaveBeenCalledWith('Sys', expect.any(String), expect.objectContaining({
+        callPurpose: TranslationCallPurpose.PRIMARY_TRANSLATION,
+      }));
+    });
+
+    it('executeSequentialBatch preserves scalar and array transport results with supplied purpose', async () => {
+      provider._callAI = vi.fn()
+        .mockResolvedValueOnce('one')
+        .mockResolvedValueOnce('two')
+        .mockResolvedValueOnce('three');
+
+      await expect(provider.executeSequentialBatch(['one'], 'en', 'fa', {
+        translateMode: 'selection',
+        callPurpose: TranslationCallPurpose.STRUCTURED_RECOVERY,
+      })).resolves.toBe('one');
+      await expect(provider.executeSequentialBatch(['two', 'three'], 'en', 'fa', {
+        translateMode: 'selection',
+        callPurpose: TranslationCallPurpose.STRUCTURED_RECOVERY,
+      })).resolves.toEqual(['two', 'three']);
+      expect(provider._callAI.mock.calls.map(([, , options]) => options.callPurpose)).toEqual([
+        TranslationCallPurpose.STRUCTURED_RECOVERY,
+        TranslationCallPurpose.STRUCTURED_RECOVERY,
+        TranslationCallPurpose.STRUCTURED_RECOVERY,
+      ]);
+    });
+  });
+
   describe('_translateBatch', () => {
     it('should throw on non-fatal AND non-transient error instead of returning original text', async () => {
       provider._callAI = vi.fn().mockRejectedValue(new Error('Non-Fatal-Non-Transient'));
@@ -247,6 +284,8 @@ describe('BaseAIProvider', () => {
     it('should perform exactly one sequential recovery when the contract is violated', async () => {
       const { AIResponseParser } = await import("./utils/AIResponseParser.js");
       AIResponseParser.parseBatchResult.mockReturnValue({ results: ['seg1'], contractViolation: true });
+      const structuredSpy = vi.spyOn(provider, 'executeStructuredBatch');
+      const sequentialSpy = vi.spyOn(provider, 'executeSequentialBatch');
       const fallbackSpy = vi.spyOn(provider, '_traditionalBatchTranslate').mockResolvedValue(['F1']);
 
       const result = await provider._translateBatch(
@@ -254,6 +293,8 @@ describe('BaseAIProvider', () => {
       );
 
       expect(fallbackSpy).toHaveBeenCalledTimes(1);
+      expect(structuredSpy).toHaveBeenCalledTimes(1);
+      expect(sequentialSpy).toHaveBeenCalledTimes(1);
       expect(fallbackSpy).toHaveBeenCalledWith(
         ['seg1', 'seg2'], 'en', 'fa', 'selection', null, null, null, null,
         'session-1', ResponseFormat.STRING, expect.objectContaining({

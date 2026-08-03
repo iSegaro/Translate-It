@@ -103,7 +103,16 @@ export class BaseAIProvider extends BaseProvider {
     }
 
     // 3. Fallback to traditional sequential batching for single segments or non-JSON providers
-    return this._traditionalBatchTranslate(texts, sourceLang, targetLang, translateMode, engine, messageId, abortController, priority, sessionId, expectedFormat, options);
+    return this.executeSequentialBatch(texts, sourceLang, targetLang, {
+      translateMode,
+      engine,
+      messageId,
+      abortController,
+      priority,
+      sessionId,
+      expectedFormat,
+      contextMetadata: options,
+    });
   }
 
   /**
@@ -155,36 +164,16 @@ export class BaseAIProvider extends BaseProvider {
       structuredFormat === ResponseFormat.JSON_ARRAY || structuredFormat === ResponseFormat.JSON_OBJECT
     ) ? createConversationCommitCandidate() : null;
     try {
-      const { systemPrompt, userText } = await this._preparePromptAndText(texts, sourceLang, targetLang, translateMode, contextMetadata, sessionId);
-      
-      logger.debugLazy(() => [`[${this.providerName}] Batch Prompt preparation complete`, { 
-        systemPrompt, 
-        userText: typeof userText === 'string' ? userText : JSON.parse(userText) 
-      }]);
-
-      // Ensure promptText is a string for the AI API
-      const finalUserText = typeof userText === 'string' ? userText : JSON.stringify(userText);
-      const context = `${this.providerName.toLowerCase()}-batch-translation`;
-
-      const response = await this._executeWithRateLimit(
-        (opts) => this._callAI(systemPrompt, finalUserText, {
-          ...opts,
-          abortController,
-          messageId,
-          sessionId,
-          mode: translateMode,
-          sourceLang,
-          targetLang,
-          isBatch: true,
-          expectedFormat: expectedFormat || ResponseFormat.JSON_ARRAY,
-          executionContext: contextMetadata?.executionContext,
-          callPurpose: TranslationCallPurpose.PRIMARY_TRANSLATION,
-          conversationCommitCandidate,
-        }),
-        context,
+      const response = await this.executeStructuredBatch(texts, sourceLang, targetLang, {
+        translateMode,
+        abortController,
+        messageId,
+        sessionId,
+        contextMetadata,
+        expectedFormat,
         priority,
-        { sessionId, abortController, messageId, executionContext: contextMetadata?.executionContext }
-      );
+        conversationCommitCandidate,
+      });
 
       // Stats recording is handled by ProviderRequestEngine. 
       // Orchestrators (like OptimizedJsonHandler or UnifiedService) handle the reporting.
@@ -218,23 +207,17 @@ export class BaseAIProvider extends BaseProvider {
 
         let recoveryResult;
         try {
-          const recoveryMetadata = {
-            ...contextMetadata,
-            callPurpose: TranslationCallPurpose.STRUCTURED_RECOVERY,
-          };
-          recoveryResult = await this._traditionalBatchTranslate(
-            texts,
-            sourceLang,
-            targetLang,
+          recoveryResult = await this.executeSequentialBatch(texts, sourceLang, targetLang, {
             translateMode,
             engine,
             messageId,
             abortController,
             priority,
             sessionId,
-            ResponseFormat.STRING,
-            recoveryMetadata
-          );
+            expectedFormat: ResponseFormat.STRING,
+            contextMetadata,
+            callPurpose: TranslationCallPurpose.STRUCTURED_RECOVERY,
+          });
         } catch (error) {
           if (!abortController?.signal?.aborted && !isCancellationError(error)) {
             appendTranslationDiagnostic(executionContext, {
@@ -273,6 +256,61 @@ export class BaseAIProvider extends BaseProvider {
       //   silently reporting the untranslated original as a success.
       throw error;
     }
+  }
+
+  async executeStructuredBatch(texts, sourceLang, targetLang, {
+    translateMode,
+    abortController,
+    messageId,
+    sessionId,
+    contextMetadata = null,
+    expectedFormat = null,
+    priority = null,
+    conversationCommitCandidate = null,
+  } = {}) {
+    const { systemPrompt, userText } = await this._preparePromptAndText(texts, sourceLang, targetLang, translateMode, contextMetadata, sessionId);
+    logger.debugLazy(() => [`[${this.providerName}] Batch Prompt preparation complete`, {
+      systemPrompt,
+      userText: typeof userText === 'string' ? userText : JSON.parse(userText)
+    }]);
+    const finalUserText = typeof userText === 'string' ? userText : JSON.stringify(userText);
+    const context = `${this.providerName.toLowerCase()}-batch-translation`;
+    return this._executeWithRateLimit(
+      (opts) => this._callAI(systemPrompt, finalUserText, {
+        ...opts,
+        abortController,
+        messageId,
+        sessionId,
+        mode: translateMode,
+        sourceLang,
+        targetLang,
+        isBatch: true,
+        expectedFormat: expectedFormat || ResponseFormat.JSON_ARRAY,
+        executionContext: contextMetadata?.executionContext,
+        callPurpose: TranslationCallPurpose.PRIMARY_TRANSLATION,
+        conversationCommitCandidate,
+      }),
+      context,
+      priority,
+      { sessionId, abortController, messageId, executionContext: contextMetadata?.executionContext }
+    );
+  }
+
+  async executeSequentialBatch(texts, sourceLang, targetLang, {
+    translateMode,
+    engine,
+    messageId,
+    abortController,
+    priority,
+    sessionId,
+    expectedFormat,
+    contextMetadata = {},
+    callPurpose,
+  } = {}) {
+    return this._traditionalBatchTranslate(
+      texts, sourceLang, targetLang, translateMode, engine, messageId, abortController,
+      priority, sessionId, expectedFormat, { ...contextMetadata, ...(callPurpose && { callPurpose }) }
+    );
   }
 
   /**
