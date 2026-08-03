@@ -29,7 +29,7 @@ export class WebAIProvider extends BaseAIProvider {
    * @protected
    */
   async _callAI(systemPrompt, userText, options = {}) {
-    const { abortController, sessionId, expectedFormat, isBatch, executionContext } = options;
+    const { abortController, sessionId, expectedFormat, isBatch, executionContext, callPurpose } = options;
 
     const [apiUrl, apiModel] = await Promise.all([
       getWebAIApiUrlAsync(),
@@ -84,7 +84,8 @@ export class WebAIProvider extends BaseAIProvider {
       context: `${this.providerName.toLowerCase()}-translation`,
       abortController,
       sessionId,
-      executionContext
+      executionContext,
+      callPurpose
     });
 
     if (shouldUseConversationHistory && sessionId && result) {

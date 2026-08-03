@@ -30,7 +30,7 @@ export class CustomProvider extends BaseAIProvider {
    * @protected
    */
   async _callAI(systemPrompt, userText, options = {}) {
-    const { abortController, sessionId, expectedFormat, isBatch, executionContext } = options;
+    const { abortController, sessionId, expectedFormat, isBatch, executionContext, callPurpose } = options;
 
     const [apiUrl, apiKeys, model] = await Promise.all([
       getCustomApiUrlAsync(),
@@ -82,6 +82,7 @@ export class CustomProvider extends BaseAIProvider {
       abortController,
       sessionId,
       executionContext,
+      callPurpose,
       updateApiKey: (newKey, options) => {
         if (options && options.headers) {
           options.headers.Authorization = `Bearer ${newKey}`;

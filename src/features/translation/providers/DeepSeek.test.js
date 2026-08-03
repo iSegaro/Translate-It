@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { DeepSeekProvider } from './DeepSeek.js';
 import { proxyManager } from '@/shared/proxy/ProxyManager.js';
 import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
+import { TranslationCallPurpose } from './ProviderConstants.js';
 
 // Mock Dependencies
 vi.mock('@/shared/proxy/ProxyManager.js', () => ({
@@ -44,6 +45,15 @@ describe('DeepSeekProvider Error Handling', () => {
 
     const result = await provider._callAI('system', 'Hello World');
     expect(result).toBe('DeepSeek Result');
+  });
+
+  it('forwards call purpose outside the provider payload', async () => {
+    const executeRequest = vi.spyOn(provider, '_executeRequest').mockResolvedValue('translated');
+    await provider._callAI('system', 'text', { callPurpose: TranslationCallPurpose.STRUCTURED_RECOVERY });
+    const request = executeRequest.mock.calls[0][0];
+    expect(request).toMatchObject({ callPurpose: TranslationCallPurpose.STRUCTURED_RECOVERY });
+    expect(request.fetchOptions.headers).not.toHaveProperty('callPurpose');
+    expect(JSON.parse(request.fetchOptions.body)).not.toHaveProperty('callPurpose');
   });
 
   it('should detect API_ERROR wrapped in 200 OK response', async () => {

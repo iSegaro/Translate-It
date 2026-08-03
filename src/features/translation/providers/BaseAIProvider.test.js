@@ -38,6 +38,7 @@ import { BaseAIProvider } from './BaseAIProvider.js';
 import { ResponseFormat } from '@/shared/config/translationConstants.js';
 import { isCancellationError, isFatalError, isTransientError, matchErrorToType } from '@/shared/error-management/ErrorMatcher.js';
 import { createTranslationOperation } from '../ir/TranslationOperation.js';
+import { TranslationCallPurpose } from './ProviderConstants.js';
 
 // Mock AIResponseParser
 vi.mock("./utils/AIResponseParser.js", () => ({
@@ -140,6 +141,16 @@ describe('BaseAIProvider', () => {
       expect(fallbackSpy).not.toHaveBeenCalled();
     });
 
+    it('should mark structured calls as primary translation', async () => {
+      const { AIResponseParser } = await import("./utils/AIResponseParser.js");
+      AIResponseParser.parseBatchResult.mockReturnValue({ results: ['R1'], contractViolation: false });
+      const callSpy = vi.spyOn(provider, '_callAI');
+
+      await provider._translateBatch(['seg1'], 'en', 'fa', 'selection');
+
+      expect(callSpy.mock.calls[0][2].callPurpose).toBe(TranslationCallPurpose.PRIMARY_TRANSLATION);
+    });
+
     it('should perform exactly one sequential recovery when the contract is violated', async () => {
       const { AIResponseParser } = await import("./utils/AIResponseParser.js");
       AIResponseParser.parseBatchResult.mockReturnValue({ results: ['seg1'], contractViolation: true });
@@ -152,7 +163,10 @@ describe('BaseAIProvider', () => {
       expect(fallbackSpy).toHaveBeenCalledTimes(1);
       expect(fallbackSpy).toHaveBeenCalledWith(
         ['seg1', 'seg2'], 'en', 'fa', 'selection', null, null, null, null,
-        'session-1', ResponseFormat.STRING, { metadata: true }
+        'session-1', ResponseFormat.STRING, expect.objectContaining({
+          metadata: true,
+          callPurpose: TranslationCallPurpose.STRUCTURED_RECOVERY
+        })
       );
       expect(result).toEqual(['F1']);
     });
@@ -251,6 +265,35 @@ describe('BaseAIProvider', () => {
       expect(recoveryFacts).toHaveLength(2);
     });
 
+    it('should use recovery purpose without mutating the original metadata', async () => {
+      const { AIResponseParser } = await import("./utils/AIResponseParser.js");
+      const operation = createTranslationOperation('recovery-purpose');
+      const executionContext = { operation };
+      const originalMetadata = { executionContext, marker: 'unchanged' };
+      const beforeMetadata = { ...originalMetadata };
+      AIResponseParser.parseBatchResult.mockReturnValue({ results: ['seg1', 'seg2'], contractViolation: true });
+      const callSpy = vi.spyOn(provider, '_callAI').mockResolvedValueOnce('structured').mockResolvedValueOnce('F1').mockResolvedValueOnce('F2');
+
+      const result = await provider._translateBatch(
+        ['seg1', 'seg2'], 'en', 'fa', 'selection', null, null, 'recovery-purpose', 'session-1',
+        originalMetadata, ResponseFormat.JSON_OBJECT
+      );
+
+      expect(result).toEqual(['F1', 'F2']);
+      expect(callSpy.mock.calls.map(([, , options]) => options.callPurpose)).toEqual([
+        TranslationCallPurpose.PRIMARY_TRANSLATION,
+        TranslationCallPurpose.STRUCTURED_RECOVERY,
+        TranslationCallPurpose.STRUCTURED_RECOVERY
+      ]);
+      expect(originalMetadata).toEqual(beforeMetadata);
+      expect(originalMetadata.callPurpose).toBeUndefined();
+      expect(originalMetadata.executionContext).toBe(executionContext);
+      expect(operation.finalize().entries).toEqual(expect.arrayContaining([
+        expect.objectContaining({ type: 'RECOVERY_TRIGGERED' }),
+        expect.objectContaining({ type: 'RECOVERY_SUCCEEDED' })
+      ]));
+    });
+
     it('should normalize single-segment sequential recovery output to the structured-batch array shape (JSON_OBJECT)', async () => {
       const { AIResponseParser } = await import("./utils/AIResponseParser.js");
       AIResponseParser.parseBatchResult.mockReturnValue({ results: ['Bonjour'], contractViolation: true });
@@ -302,6 +345,7 @@ describe('BaseAIProvider', () => {
       await provider._traditionalBatchTranslate(texts, 'en', 'fa', 'selection');
 
       expect(spy).toHaveBeenCalledTimes(2);
+      expect(spy.mock.calls.every(([, , options]) => options.callPurpose === TranslationCallPurpose.PRIMARY_TRANSLATION)).toBe(true);
     });
   });
 });

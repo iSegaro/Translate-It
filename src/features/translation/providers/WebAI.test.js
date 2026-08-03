@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { ResponseFormat } from '@/shared/config/translationConstants.js';
+import { TranslationCallPurpose } from './ProviderConstants.js';
 
 vi.mock('webextension-polyfill', () => ({
   default: {
@@ -64,6 +65,15 @@ describe('WebAIProvider history support', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     provider = new WebAIProvider();
+  });
+
+  it('forwards call purpose outside the provider payload', async () => {
+    const executeRequest = vi.spyOn(provider, '_executeRequest').mockResolvedValue('translated');
+    await provider._callAI('system', 'text', { callPurpose: TranslationCallPurpose.STRUCTURED_RECOVERY });
+    const request = executeRequest.mock.calls[0][0];
+    expect(request).toMatchObject({ callPurpose: TranslationCallPurpose.STRUCTURED_RECOVERY });
+    expect(request.fetchOptions.headers).not.toHaveProperty('callPurpose');
+    expect(JSON.parse(request.fetchOptions.body)).not.toHaveProperty('callPurpose');
   });
 
   it('injects compact Select Element history and keeps a single message payload when history is enabled', async () => {

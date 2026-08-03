@@ -78,6 +78,11 @@ export const ProviderTypes = {
   MOCK: 'mock',
 };
 
+export const TranslationCallPurpose = Object.freeze({
+  PRIMARY_TRANSLATION: 'PRIMARY_TRANSLATION',
+  STRUCTURED_RECOVERY: 'STRUCTURED_RECOVERY',
+});
+
 /**
  * Helper function to check if provider name matches
  * @param {string} providerName - The provider name to check

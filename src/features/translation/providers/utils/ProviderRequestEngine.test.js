@@ -42,6 +42,7 @@ vi.mock('@/utils/browser/compatibility.js', () => ({
 }));
 
 import { ProviderRequestEngine } from './ProviderRequestEngine.js';
+import { TranslationCallPurpose } from '../ProviderConstants.js';
 import { ApiKeyManager } from '../ApiKeyManager.js';
 import { proxyManager } from '@/shared/proxy/ProxyManager.js';
 import { getBrowserInfoSync } from '@/utils/browser/compatibility.js';
@@ -129,6 +130,44 @@ describe('ProviderRequestEngine', () => {
       })).rejects.toThrow('Bad Request');
 
       expect(proxyManager.fetch).toHaveBeenCalledTimes(1);
+    });
+
+    it.each([
+      ['missing purpose', undefined, TranslationCallPurpose.PRIMARY_TRANSLATION],
+      ['invalid purpose', 'OTHER', TranslationCallPurpose.PRIMARY_TRANSLATION],
+      ['recovery purpose', TranslationCallPurpose.STRUCTURED_RECOVERY, TranslationCallPurpose.STRUCTURED_RECOVERY],
+    ])('should forward normalized %s to every physical call', async (_label, callPurpose, expectedPurpose) => {
+      const apiCallSpy = vi.spyOn(ProviderRequestEngine, 'executeApiCall').mockResolvedValue('translated');
+
+      await ProviderRequestEngine.executeRequest(mockProvider, {
+        url: 'https://api.test.com',
+        fetchOptions: { headers: {} },
+        extractResponse: mockExtractResponse,
+        callPurpose,
+      });
+
+      expect(apiCallSpy).toHaveBeenCalledWith(mockProvider, expect.objectContaining({ callPurpose: expectedPurpose }));
+      apiCallSpy.mockRestore();
+    });
+
+    it('should preserve recovery purpose across key failover', async () => {
+      ApiKeyManager.getKeys.mockResolvedValue(['bad-key', 'good-key']);
+      ApiKeyManager.shouldFailover.mockReturnValue(true);
+      const apiCallSpy = vi.spyOn(ProviderRequestEngine, 'executeApiCall')
+        .mockRejectedValueOnce(Object.assign(new Error('bad key'), { type: 'API_ERROR' }))
+        .mockResolvedValueOnce('translated');
+
+      await ProviderRequestEngine.executeRequest(mockProvider, {
+        url: 'https://api.test.com',
+        fetchOptions: { headers: {} },
+        extractResponse: mockExtractResponse,
+        updateApiKey: vi.fn(),
+        callPurpose: TranslationCallPurpose.STRUCTURED_RECOVERY,
+      });
+
+      expect(apiCallSpy).toHaveBeenCalledTimes(2);
+      expect(apiCallSpy.mock.calls.every(([, params]) => params.callPurpose === TranslationCallPurpose.STRUCTURED_RECOVERY)).toBe(true);
+      apiCallSpy.mockRestore();
     });
   });
 

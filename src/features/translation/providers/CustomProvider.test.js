@@ -3,6 +3,7 @@ import { CustomProvider } from './CustomProvider.js';
 import { proxyManager } from '@/shared/proxy/ProxyManager.js';
 import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
 import { getCustomApiKeysAsync } from '@/shared/config/config.js';
+import { TranslationCallPurpose } from './ProviderConstants.js';
 
 // Mock Dependencies
 vi.mock('@/shared/proxy/ProxyManager.js', () => ({
@@ -45,6 +46,15 @@ describe('CustomProvider Error Handling', () => {
 
     const result = await provider._callAI('system', 'Hello World');
     expect(result).toBe('Custom AI Result');
+  });
+
+  it('forwards call purpose outside the provider payload', async () => {
+    const executeRequest = vi.spyOn(provider, '_executeRequest').mockResolvedValue('translated');
+    await provider._callAI('system', 'text', { callPurpose: TranslationCallPurpose.STRUCTURED_RECOVERY });
+    const request = executeRequest.mock.calls[0][0];
+    expect(request).toMatchObject({ callPurpose: TranslationCallPurpose.STRUCTURED_RECOVERY });
+    expect(request.fetchOptions.headers).not.toHaveProperty('callPurpose');
+    expect(JSON.parse(request.fetchOptions.body)).not.toHaveProperty('callPurpose');
   });
 
   it('should allow anonymous OpenAI-compatible requests without an API key', async () => {

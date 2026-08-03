@@ -31,7 +31,7 @@ export class GeminiProvider extends BaseAIProvider {
    * @protected
    */
   async _callAI(systemPrompt, userText, options = {}) {
-    const { abortController, sessionId, expectedFormat, isBatch, executionContext } = options;
+    const { abortController, sessionId, expectedFormat, isBatch, executionContext, callPurpose } = options;
 
     const [apiKeys, model, thinkingEnabled, rawApiUrl] = await Promise.all([
       getGeminiApiKeysAsync(),
@@ -130,6 +130,7 @@ export class GeminiProvider extends BaseAIProvider {
         abortController,
         sessionId,
         executionContext,
+        callPurpose,
         updateApiKey: (newKey, options) => {
           if (options.url) {
             const urlObj = new URL(options.url);
@@ -169,6 +170,7 @@ export class GeminiProvider extends BaseAIProvider {
           context: `${this.providerName.toLowerCase()}-translation-fallback`,
           abortController,
           sessionId,
+          callPurpose,
           updateApiKey: (newKey, options) => {
             if (options.url) {
               const urlObj = new URL(options.url);

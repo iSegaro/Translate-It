@@ -19,6 +19,7 @@ import { TranslationMode, getProviderOptimizationLevelAsync } from "@/shared/con
 import { AIStreamManager } from "./utils/AIStreamManager.js";
 import { isCancellationError } from "@/shared/error-management/ErrorMatcher.js";
 import { appendTranslationDiagnostic } from "@/features/translation/ir/TranslationOperation.js";
+import { TranslationCallPurpose } from "@/features/translation/providers/ProviderConstants.js";
 
 const logger = getScopedLogger(LOG_COMPONENTS.TRANSLATION, 'BaseAIProvider');
 
@@ -144,9 +145,10 @@ export class BaseAIProvider extends BaseProvider {
           mode: translateMode,
           sourceLang,
           targetLang,
-           isBatch: true,
-           expectedFormat: expectedFormat || ResponseFormat.JSON_ARRAY,
-           executionContext: contextMetadata?.executionContext,
+          isBatch: true,
+          expectedFormat: expectedFormat || ResponseFormat.JSON_ARRAY,
+          executionContext: contextMetadata?.executionContext,
+          callPurpose: TranslationCallPurpose.PRIMARY_TRANSLATION,
         }),
         context,
         priority,
@@ -184,6 +186,10 @@ export class BaseAIProvider extends BaseProvider {
 
         let recoveryResult;
         try {
+          const recoveryMetadata = {
+            ...contextMetadata,
+            callPurpose: TranslationCallPurpose.STRUCTURED_RECOVERY,
+          };
           recoveryResult = await this._traditionalBatchTranslate(
             texts,
             sourceLang,
@@ -195,7 +201,7 @@ export class BaseAIProvider extends BaseProvider {
             priority,
             sessionId,
             ResponseFormat.STRING,
-            contextMetadata || {}
+            recoveryMetadata
           );
         } catch (error) {
           if (!abortController?.signal?.aborted && !isCancellationError(error)) {
@@ -241,6 +247,9 @@ export class BaseAIProvider extends BaseProvider {
   async _traditionalBatchTranslate(texts, sourceLang, targetLang, translateMode, engine, messageId, abortController, priority, sessionId, expectedFormat, options = {}) {
     const results = [];
     const context = `${this.providerName.toLowerCase()}-traditional-sequential`;
+    const callPurpose = options.callPurpose === TranslationCallPurpose.STRUCTURED_RECOVERY
+      ? TranslationCallPurpose.STRUCTURED_RECOVERY
+      : TranslationCallPurpose.PRIMARY_TRANSLATION;
 
     for (let i = 0; i < texts.length; i++) {
       if (abortController?.signal?.aborted) throw new Error('Cancelled');
@@ -263,6 +272,7 @@ export class BaseAIProvider extends BaseProvider {
             targetLang,
             expectedFormat: expectedFormat || ResponseFormat.STRING,
             executionContext: options.executionContext,
+            callPurpose,
           }),
           chunkContext,
           priority,

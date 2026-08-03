@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { GeminiProvider } from './GoogleGemini.js';
 import { proxyManager } from '@/shared/proxy/ProxyManager.js';
 import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
+import { TranslationCallPurpose } from './ProviderConstants.js';
 
 // Mock Dependencies
 vi.mock('@/shared/proxy/ProxyManager.js', () => ({
@@ -126,8 +127,20 @@ describe('GeminiProvider Error Handling', () => {
     getGeminiThinkingEnabledAsync.mockResolvedValue(true);
     getGeminiModelAsync.mockResolvedValue('gemini-2.0-flash-thinking-exp');
 
-    const result = await provider._callAI('system', 'text');
+    const executeRequest = vi.spyOn(provider, '_executeRequest');
+    const executionContext = { operation: { appendDiagnostic: vi.fn() } };
+    const result = await provider._callAI('system', 'text', {
+      callPurpose: TranslationCallPurpose.STRUCTURED_RECOVERY,
+      executionContext
+    });
     expect(result).toBe('fallback result');
+    expect(executeRequest).toHaveBeenCalledTimes(2);
+    expect(executeRequest.mock.calls.map(([request]) => request.callPurpose)).toEqual([
+      TranslationCallPurpose.STRUCTURED_RECOVERY,
+      TranslationCallPurpose.STRUCTURED_RECOVERY
+    ]);
+    expect(executeRequest.mock.calls[0][0].executionContext).toBe(executionContext);
+    expect(executeRequest.mock.calls[1][0].executionContext).toBeUndefined();
     expect(proxyManager.fetch).toHaveBeenCalledTimes(2);
   });
 });
