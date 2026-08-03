@@ -187,6 +187,17 @@ describe('ProviderCoordinator', () => {
 
       expect(result.translatedText).toBe('Part 1\nPart 2');
     });
+
+    it('should pass recovery-shaped array through JSON_OBJECT cleaning without collapsing to empty string', async () => {
+      mockProvider.translate.mockResolvedValue(['Bonjour']);
+
+      const result = await providerCoordinator.execute(
+        mockProvider, 'Input', 'en', 'fa', { expectedFormat: ResponseFormat.JSON_OBJECT }
+      );
+
+      expect(result.translatedText).toEqual(['Bonjour']);
+      expect(result.translatedText).not.toBe('');
+    });
   });
 
   describe('Error Resilience', () => {

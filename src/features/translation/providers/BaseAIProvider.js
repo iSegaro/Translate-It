@@ -167,9 +167,12 @@ export class BaseAIProvider extends BaseProvider {
 
       // Structured recovery: the parser reports facts only; recovery ownership stays
       // here. A contract violation triggers exactly one sequential re-request.
+      // The sequential pass returns a scalar for a single segment; normalize it to
+      // the canonical structured-batch array shape so downstream contract cleaning
+      // (ProviderCoordinator._cleanResult) receives the same shape as the normal path.
       if (parsed.contractViolation) {
         logger.warn(`[${this.providerName}] Structured response violated its contract; sequential recovery started`);
-        return this._traditionalBatchTranslate(
+        const recoveryResult = await this._traditionalBatchTranslate(
           texts,
           sourceLang,
           targetLang,
@@ -182,6 +185,7 @@ export class BaseAIProvider extends BaseProvider {
           ResponseFormat.STRING,
           contextMetadata || {}
         );
+        return Array.isArray(recoveryResult) ? recoveryResult : [recoveryResult];
       }
 
       return parsed.results;

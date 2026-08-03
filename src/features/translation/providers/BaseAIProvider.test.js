@@ -142,6 +142,41 @@ describe('BaseAIProvider', () => {
       );
       expect(result).toEqual(['F1']);
     });
+
+    it('should normalize single-segment sequential recovery output to the structured-batch array shape (JSON_OBJECT)', async () => {
+      const { AIResponseParser } = await import("./utils/AIResponseParser.js");
+      AIResponseParser.parseBatchResult.mockReturnValue({ results: ['Bonjour'], contractViolation: true });
+      provider._callAI = vi.fn()
+        .mockResolvedValueOnce('structured-response')
+        .mockResolvedValueOnce('Bonjour');
+      const recoverySpy = vi.spyOn(provider, '_traditionalBatchTranslate');
+
+      const result = await provider._translateBatch(
+        ['Bonjour'], 'en', 'fa', 'selection', null, null, null, 'session-1', null, ResponseFormat.JSON_OBJECT
+      );
+
+      expect(recoverySpy).toHaveBeenCalledTimes(1);
+      expect(Array.isArray(result)).toBe(true);
+      expect(result).toEqual(['Bonjour']);
+    });
+
+    it('should keep multi-segment sequential recovery output as a flat array (no nesting)', async () => {
+      const { AIResponseParser } = await import("./utils/AIResponseParser.js");
+      AIResponseParser.parseBatchResult.mockReturnValue({ results: ['F1', 'F2'], contractViolation: true });
+      provider._callAI = vi.fn()
+        .mockResolvedValueOnce('structured-response')
+        .mockResolvedValueOnce('F1')
+        .mockResolvedValueOnce('F2');
+      const recoverySpy = vi.spyOn(provider, '_traditionalBatchTranslate');
+
+      const result = await provider._translateBatch(
+        ['seg1', 'seg2'], 'en', 'fa', 'selection', null, null, null, 'session-1', null, ResponseFormat.JSON_OBJECT
+      );
+
+      expect(recoverySpy).toHaveBeenCalledTimes(1);
+      expect(result).toEqual(['F1', 'F2']);
+      expect(result[0]).not.toBeInstanceOf(Array);
+    });
   });
 
   describe('_shouldUseStreaming', () => {
