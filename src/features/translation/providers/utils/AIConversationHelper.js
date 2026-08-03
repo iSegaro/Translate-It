@@ -187,7 +187,8 @@ export const AIConversationHelper = {
   async formatCompactHistoryContext(sessionId, translateMode = '', options = {}) {
     const turns = await this.getConversationHistory(sessionId, translateMode, {
       maxTurns: 1,
-      maxChars: options.maxChars ?? TRANSLATION_CONSTANTS.HISTORY_CHARACTER_LIMITS.AI
+      maxChars: options.maxChars ?? TRANSLATION_CONSTANTS.HISTORY_CHARACTER_LIMITS.AI,
+      callPurpose: options.callPurpose,
     });
 
     if (!turns.length) return '';

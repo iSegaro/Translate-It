@@ -109,6 +109,25 @@ describe('AIConversationHelper', () => {
     });
   });
 
+  it('keeps compact history empty for recovery with a populated session', async () => {
+    const { getAIConversationHistoryEnabledAsync, TranslationMode } = await import('@/shared/config/config.js');
+    getAIConversationHistoryEnabledAsync.mockResolvedValue(true);
+    const session = translationSessionManager.getOrCreateSession('compact-recovery', 'WebAI');
+    session.turnCounter = 7;
+    session.batchCount = 2;
+    session.history.push({ role: 'user', content: 'previous source' }, { role: 'assistant', content: 'previous result' });
+    const before = structuredClone(session);
+
+    await expect(AIConversationHelper.formatCompactHistoryContext(
+      session.id,
+      TranslationMode.Select_Element,
+      { callPurpose: TranslationCallPurpose.STRUCTURED_RECOVERY },
+    )).resolves.toBe('');
+
+    expect(session).toEqual(before);
+    getAIConversationHistoryEnabledAsync.mockResolvedValue(false);
+  });
+
   it('keeps recovery calls outside conversation state', async () => {
     const session = translationSessionManager.getOrCreateSession('recovery-session', 'OpenAI');
     session.turnCounter = 4;
