@@ -261,23 +261,9 @@ export class OptimizedJsonHandler {
           hasErrors = true;
           lastError = batchError;
           
-          // Stream empty/original results on failure to keep progress moving
+          // Count the attempted batch to keep progress accounting stable.
+          // Never stream the original batch as translated output on failure.
           completedBatchCount++;
-          if (!skipStreaming) {
-            await self._streamResults(
-              tabId,
-              messageId,
-              batch,
-              i,
-              batches.length,
-              targetLanguage,
-              undefined,
-              mode,
-              completedBatchCount,
-              abortController,
-              engine
-            );
-          }
           
           // Stop all other batches if error is fatal (429, etc.)
           if (isFatalError(batchError)) {

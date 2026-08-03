@@ -498,6 +498,30 @@ describe('DomTranslatorAdapter', () => {
       expect(applyElementDirection).toHaveBeenCalledWith(testElement, 'ja');
     });
 
+    it('should retain successful batches and report failure when the stream ends with an error', async () => {
+      let streamCallbacks;
+      registerTranslation.mockImplementation((id, callbacks) => {
+        streamCallbacks = callbacks;
+      });
+
+      contentScriptIntegration.sendTranslationRequest.mockImplementation(async () => {
+        setTimeout(() => {
+          streamCallbacks.onStreamUpdate({
+            success: true,
+            data: [{ t: 'سلام', i: 'n1' }]
+          });
+          streamCallbacks.onStreamEnd({
+            success: false,
+            error: { message: 'Batch failed', type: 'TRANSLATION_FAILED' }
+          });
+        }, 10);
+        return { success: true, streaming: true };
+      });
+
+      await expect(adapter.translateElement(testElement)).rejects.toThrow('Batch failed');
+      expect(testElement.textContent).toContain('سلام');
+    });
+
     it('should fallback to sequential mapping if UID is missing in stream', async () => {
       let streamCallbacks;
       registerTranslation.mockImplementation((id, callbacks) => {

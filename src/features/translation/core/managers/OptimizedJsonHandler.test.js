@@ -22,6 +22,7 @@ vi.mock('@/shared/error-management/ErrorMatcher.js');
 
 import { OptimizedJsonHandler } from './OptimizedJsonHandler.js';
 import { isFatalError, matchErrorToType } from '@/shared/error-management/ErrorMatcher.js';
+import { MessageActions } from '@/shared/messaging/core/MessageActions.js';
 import { getProviderConfiguration } from '@/features/translation/core/ProviderConfigurations.js';
 import { TranslationBatcher } from '@/features/translation/core/utils/TranslationBatcher.js';
 import { createManifestView, createRequestUnitManifest } from '@/features/translation/ir/RequestUnitManifest.js';
@@ -464,6 +465,97 @@ describe('OptimizedJsonHandler', () => {
       await handler.execute(mockEngine, mockData, mockProvider, 'en', 'fa', 'msg-1', mockSender);
 
       expect(mockAbortController.abort).toHaveBeenCalled();
+    });
+
+    it('should never stream original content for a failed batch', async () => {
+      const browser = (await import('webextension-polyfill')).default;
+      browser.tabs.sendMessage.mockClear();
+
+      const failure = new Error('Non-fatal batch failure');
+      failure.type = 'TRANSLATION_FAILED';
+
+      mockProvider.translate
+        .mockRejectedValueOnce(failure)
+        .mockResolvedValueOnce({ translatedText: ['t2'] });
+
+      const result = await handler.execute(mockEngine, mockData, mockProvider, 'auto', 'fa', 'msg-fail-1', mockSender);
+
+      expect(result.success).toBe(false);
+      expect(result.error).toBeDefined();
+
+      const messages = browser.tabs.sendMessage.mock.calls.map(c => c[1]);
+      const updates = messages.filter(m => m.action === MessageActions.TRANSLATION_STREAM_UPDATE);
+      expect(updates).toHaveLength(1);
+      updates.forEach((update) => {
+        expect(JSON.stringify(update.data.data)).not.toContain('s1');
+      });
+    });
+
+    it('should emit a failing stream end when a batch fails', async () => {
+      const browser = (await import('webextension-polyfill')).default;
+      browser.tabs.sendMessage.mockClear();
+
+      const failure = new Error('Non-fatal batch failure');
+      failure.type = 'TRANSLATION_FAILED';
+
+      mockProvider.translate
+        .mockRejectedValueOnce(failure)
+        .mockResolvedValueOnce({ translatedText: ['t2'] });
+
+      const result = await handler.execute(mockEngine, mockData, mockProvider, 'auto', 'fa', 'msg-fail-2', mockSender);
+
+      expect(result.success).toBe(false);
+
+      const messages = browser.tabs.sendMessage.mock.calls.map(c => c[1]);
+      const ends = messages.filter(m => m.action === MessageActions.TRANSLATION_STREAM_END);
+      expect(ends).toHaveLength(1);
+      expect(ends[0].data.success).toBe(false);
+      expect(ends[0].data.error).toBeDefined();
+    });
+
+    it('should keep streaming successful batches unchanged', async () => {
+      const browser = (await import('webextension-polyfill')).default;
+      browser.tabs.sendMessage.mockClear();
+
+      mockProvider.translate
+        .mockResolvedValueOnce({ translatedText: ['t1'] })
+        .mockResolvedValueOnce({ translatedText: ['t2'] });
+
+      const result = await handler.execute(mockEngine, mockData, mockProvider, 'auto', 'fa', 'msg-ok', mockSender);
+
+      expect(result.success).toBe(true);
+
+      const messages = browser.tabs.sendMessage.mock.calls.map(c => c[1]);
+      const updates = messages.filter(m => m.action === MessageActions.TRANSLATION_STREAM_UPDATE);
+      expect(updates).toHaveLength(2);
+      expect(updates.map(u => u.data.data)).toEqual([['t1'], ['t2']]);
+
+      const ends = messages.filter(m => m.action === MessageActions.TRANSLATION_STREAM_END);
+      expect(ends).toHaveLength(1);
+      expect(ends[0].data.success).toBe(true);
+    });
+
+    it('should abort other batches on fatal error without streaming original content', async () => {
+      const browser = (await import('webextension-polyfill')).default;
+      browser.tabs.sendMessage.mockClear();
+
+      const fatalError = new Error('429 Too Many Requests');
+      fatalError.isFatal = true;
+
+      mockProvider.translate
+        .mockRejectedValueOnce(fatalError)
+        .mockResolvedValueOnce({ translatedText: ['t2'] });
+
+      const result = await handler.execute(mockEngine, mockData, mockProvider, 'auto', 'fa', 'msg-fatal', mockSender);
+
+      expect(mockAbortController.abort).toHaveBeenCalled();
+      expect(result.success).toBe(false);
+
+      const messages = browser.tabs.sendMessage.mock.calls.map(c => c[1]);
+      const updates = messages.filter(m => m.action === MessageActions.TRANSLATION_STREAM_UPDATE);
+      updates.forEach((update) => {
+        expect(JSON.stringify(update.data.data)).not.toContain('s1');
+      });
     });
 
     it('should abort execution and bubble validation error on count mismatch', async () => {
