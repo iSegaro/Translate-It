@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { TranslationCallPurpose } from '../providers/ProviderConstants.js';
 
 // Mock extension polyfill
 vi.mock('webextension-polyfill', () => ({
@@ -47,8 +48,42 @@ describe('TranslationStatsManager', () => {
   });
 
   describe('Recording Requests', () => {
+    it('should break physical calls, characters, and errors down by purpose', () => {
+      statsManager.recordRequest('Google', 'session-1', 100, 90, TranslationCallPurpose.PRIMARY_TRANSLATION);
+      statsManager.recordRequest('Google', 'session-1', 25, 20, TranslationCallPurpose.STRUCTURED_RECOVERY);
+      statsManager.recordError('Google', 'session-1', TranslationCallPurpose.STRUCTURED_RECOVERY);
+
+      expect(statsManager.global.callsByPurpose).toEqual({
+        PRIMARY_TRANSLATION: 1,
+        STRUCTURED_RECOVERY: 1
+      });
+      expect(statsManager.global.charsByPurpose).toEqual({
+        PRIMARY_TRANSLATION: 100,
+        STRUCTURED_RECOVERY: 25
+      });
+      expect(statsManager.global.errorsByPurpose).toEqual({
+        PRIMARY_TRANSLATION: 0,
+        STRUCTURED_RECOVERY: 1
+      });
+      expect(statsManager.providers.get('Google').callsByPurpose).not.toBe(statsManager.global.callsByPurpose);
+      expect(statsManager.sessions.get('session-1').callsByPurpose).toEqual(statsManager.global.callsByPurpose);
+    });
+
+    it('should reset independent purpose maps with existing totals', () => {
+      statsManager.recordRequest('P1', 's1', 10, 8, TranslationCallPurpose.STRUCTURED_RECOVERY);
+      statsManager.recordError('P1', 's1', TranslationCallPurpose.STRUCTURED_RECOVERY);
+      expect(statsManager.global.totalCalls).toBe(1);
+      expect(statsManager.global.totalErrors).toBe(1);
+      expect(statsManager.providers.get('P1').callsByPurpose).not.toBe(statsManager.sessions.get('s1').callsByPurpose);
+      statsManager.reset();
+      expect(statsManager.global.callsByPurpose).toEqual({ PRIMARY_TRANSLATION: 0, STRUCTURED_RECOVERY: 0 });
+      expect(statsManager.global.charsByPurpose).toEqual({ PRIMARY_TRANSLATION: 0, STRUCTURED_RECOVERY: 0 });
+      expect(statsManager.global.errorsByPurpose).toEqual({ PRIMARY_TRANSLATION: 0, STRUCTURED_RECOVERY: 0 });
+      expect(statsManager.global.totalCalls).toBe(0);
+      expect(statsManager.global.totalErrors).toBe(0);
+    });
     it('should correctly record global and provider stats', () => {
-      statsManager.recordRequest('Google', 'session-1', 100, 90);
+      statsManager.recordRequest('Google', 'session-1', 100, 90, TranslationCallPurpose.PRIMARY_TRANSLATION);
       
       expect(statsManager.global.totalCalls).toBe(1);
       expect(statsManager.global.totalChars).toBe(100);
@@ -60,7 +95,7 @@ describe('TranslationStatsManager', () => {
     });
 
     it('should correctly record session stats', () => {
-      const ids = statsManager.recordRequest('DeepL', 's-123', 50, 40);
+      const ids = statsManager.recordRequest('DeepL', 's-123', 50, 40, TranslationCallPurpose.PRIMARY_TRANSLATION);
       
       expect(ids.globalCallId).toBe(1);
       expect(ids.sessionCallId).toBe(1);
@@ -73,8 +108,8 @@ describe('TranslationStatsManager', () => {
 
   describe('Recording Errors', () => {
     it('should increment error counters across all levels', () => {
-      statsManager.recordRequest('P1', 's1', 10, 10);
-      statsManager.recordError('P1', 's1');
+      statsManager.recordRequest('P1', 's1', 10, 10, TranslationCallPurpose.PRIMARY_TRANSLATION);
+      statsManager.recordError('P1', 's1', TranslationCallPurpose.PRIMARY_TRANSLATION);
       
       expect(statsManager.global.totalErrors).toBe(1);
       expect(statsManager.providers.get('P1').errors).toBe(1);
@@ -84,7 +119,7 @@ describe('TranslationStatsManager', () => {
 
   describe('Session Summaries', () => {
     it('getSessionSummary should return duration and stats', () => {
-      statsManager.recordRequest('P1', 's1', 10, 10);
+      statsManager.recordRequest('P1', 's1', 10, 10, TranslationCallPurpose.PRIMARY_TRANSLATION);
       
       const summary = statsManager.getSessionSummary('s1');
       expect(summary.calls).toBe(1);
@@ -92,7 +127,7 @@ describe('TranslationStatsManager', () => {
     });
 
     it('clearSession should remove session data', () => {
-      statsManager.recordRequest('P1', 's1', 10, 10);
+      statsManager.recordRequest('P1', 's1', 10, 10, TranslationCallPurpose.PRIMARY_TRANSLATION);
       statsManager.clearSession('s1');
       expect(statsManager.sessions.has('s1')).toBe(false);
     });
@@ -102,7 +137,7 @@ describe('TranslationStatsManager', () => {
     it('printSummary should call safeConsole.info when debug is on', async () => {
       const { safeConsole } = await import('@/shared/logging/SafeConsole.js');
       
-      statsManager.recordRequest('P1', 's1', 100, 100);
+      statsManager.recordRequest('P1', 's1', 100, 100, TranslationCallPurpose.PRIMARY_TRANSLATION);
       statsManager.printSummary('s1', { status: 'Complete' });
       
       expect(safeConsole.info).toHaveBeenCalledWith(expect.stringContaining('[Complete Summary: s1]'));
@@ -111,7 +146,7 @@ describe('TranslationStatsManager', () => {
     it('showStats should print a table of statistics', async () => {
       const { safeConsole } = await import('@/shared/logging/SafeConsole.js');
       
-      statsManager.recordRequest('Google', null, 50, 50);
+      statsManager.recordRequest('Google', null, 50, 50, TranslationCallPurpose.PRIMARY_TRANSLATION);
       statsManager.showStats();
       
       expect(safeConsole.group).toHaveBeenCalled();

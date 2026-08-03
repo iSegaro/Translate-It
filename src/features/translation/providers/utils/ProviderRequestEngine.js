@@ -167,7 +167,7 @@ export const ProviderRequestEngine = {
     const finalCharCount = charCount || 0;
     const finalOriginalCharCount = originalCharCount || 0;
 
-    const { globalCallId, sessionCallId } = statsManager.recordRequest(provider.providerName, finalSessionId, finalCharCount, finalOriginalCharCount);
+    const { globalCallId, sessionCallId } = statsManager.recordRequest(provider.providerName, finalSessionId, finalCharCount, finalOriginalCharCount, callPurpose);
 
     // MOCK BYPASS: If URL is a mock protocol, skip actual fetch but keep stats and logs
     if (url.startsWith('mock://')) {
@@ -371,7 +371,7 @@ export const ProviderRequestEngine = {
                              err.name === 'AbortError';
       
       if (!isCancellation) {
-        statsManager.recordError(provider.providerName, finalSessionId);
+        statsManager.recordError(provider.providerName, finalSessionId, callPurpose);
       }
 
       if (err.name === 'AbortError') {

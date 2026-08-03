@@ -7,8 +7,16 @@ import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { safeConsole } from '@/shared/logging/SafeConsole.js';
 import { CONFIG } from '@/shared/config/config.js';
 import { storageManager } from '@/shared/storage/core/StorageCore.js';
+import { TranslationCallPurpose } from '../providers/ProviderConstants.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.TRANSLATION, 'StatsManager');
+
+function createPurposeCounters() {
+  return {
+    [TranslationCallPurpose.PRIMARY_TRANSLATION]: 0,
+    [TranslationCallPurpose.STRUCTURED_RECOVERY]: 0
+  };
+}
 
 class TranslationStatsManager {
   constructor() {
@@ -21,6 +29,9 @@ class TranslationStatsManager {
       totalChars: 0,
       totalOriginalChars: 0,
       totalErrors: 0,
+      callsByPurpose: createPurposeCounters(),
+      charsByPurpose: createPurposeCounters(),
+      errorsByPurpose: createPurposeCounters(),
       startTime: Date.now()
     };
     
@@ -31,19 +42,26 @@ class TranslationStatsManager {
   /**
    * Record an API request start
    */
-  recordRequest(providerName, sessionId, networkChars, originalChars = 0) {
+  recordRequest(providerName, sessionId, networkChars, originalChars = 0, callPurpose) {
     this.global.totalCalls++;
     this.global.totalChars += networkChars;
     this.global.totalOriginalChars += originalChars;
+    this.global.callsByPurpose[callPurpose]++;
+    this.global.charsByPurpose[callPurpose] += networkChars;
 
     // Update provider stats
     if (!this.providers.has(providerName)) {
-      this.providers.set(providerName, { calls: 0, chars: 0, errors: 0, originalChars: 0 });
+      this.providers.set(providerName, {
+        calls: 0, chars: 0, errors: 0, originalChars: 0,
+        callsByPurpose: createPurposeCounters(), charsByPurpose: createPurposeCounters(), errorsByPurpose: createPurposeCounters()
+      });
     }
     const pStats = this.providers.get(providerName);
     pStats.calls++;
     pStats.chars += networkChars;
     pStats.originalChars += originalChars;
+    pStats.callsByPurpose[callPurpose]++;
+    pStats.charsByPurpose[callPurpose] += networkChars;
 
     // Use sessionId if provided, otherwise stats are just global
     if (sessionId) {
@@ -55,13 +73,18 @@ class TranslationStatsManager {
           errors: 0, 
           originalChars: 0,
           startTime: Date.now(),
-          provider: providerName 
+          provider: providerName,
+          callsByPurpose: createPurposeCounters(),
+          charsByPurpose: createPurposeCounters(),
+          errorsByPurpose: createPurposeCounters()
         });
       }
       const sStats = this.sessions.get(sessionId);
       sStats.calls++;
       sStats.chars += networkChars;
       sStats.originalChars += originalChars;
+      sStats.callsByPurpose[callPurpose]++;
+      sStats.charsByPurpose[callPurpose] += networkChars;
       
       return {
         globalCallId: this.global.totalCalls,
@@ -78,15 +101,18 @@ class TranslationStatsManager {
   /**
    * Record an API error
    */
-  recordError(providerName, sessionId) {
+  recordError(providerName, sessionId, callPurpose) {
     this.global.totalErrors++;
+    this.global.errorsByPurpose[callPurpose]++;
     
     if (this.providers.has(providerName)) {
       this.providers.get(providerName).errors++;
+      this.providers.get(providerName).errorsByPurpose[callPurpose]++;
     }
     
     if (sessionId && this.sessions.has(sessionId)) {
       this.sessions.get(sessionId).errors++;
+      this.sessions.get(sessionId).errorsByPurpose[callPurpose]++;
     }
   }
 
