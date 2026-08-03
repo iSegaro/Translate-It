@@ -178,7 +178,10 @@ export class TranslationEngine {
     // Extract values from the unified coordinator response
     const { translatedText, detectedLanguage, targetLanguage: finalTargetLanguage, sourceLanguage: finalSourceLanguage } = result;
 
-    if (translatedText === null || translatedText === undefined) {
+    // An empty string also represents "no translation". Earlier normalization
+    // layers may convert missing provider output into "", so treat it the same
+    // as null/undefined to avoid classifying an empty translation as success.
+    if (translatedText === null || translatedText === undefined || translatedText === '') {
       const emptyResult = new Error('Translation returned no text');
       emptyResult.type = ErrorTypes.TRANSLATION_FAILED;
       throw emptyResult;

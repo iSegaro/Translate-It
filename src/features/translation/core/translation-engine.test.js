@@ -219,6 +219,21 @@ describe('TranslationEngine', () => {
       expect(result.success).toBe(false);
       expect(result.error.message).toContain('Text too long');
     });
+
+    it('should reject an empty string translation as "no text" through the failure path', async () => {
+      const mockProvider = await engine.getProvider('google');
+      mockProvider.translate.mockResolvedValue({ translatedText: '' });
+
+      const request = {
+        action: MessageActions.TRANSLATE,
+        data: { text: 'Hello world', provider: 'google', mode: 'selection' }
+      };
+
+      const result = await engine.handleMessage(request, {});
+
+      expect(result.success).toBe(false);
+      expect(result.error.message).toBe('Translation returned no text');
+    });
   });
 
   describe('Mode Resolution & Dictionary Upgrade', () => {
