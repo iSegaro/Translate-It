@@ -340,7 +340,8 @@ export class QueueManager {
     try {
       const result = await item.requestFunction();
       
-      // Success
+      // Execution success (the callback resolved); this is NOT a claim about
+      // translation validity - semantic success is decided by downstream layers.
       item.status = QueueStatus.COMPLETED;
       item.result = result;
       
@@ -348,7 +349,7 @@ export class QueueManager {
         item.callbacks.resolve(result);
       }
       
-      logger.debug(`Item ${item.id} completed successfully`);
+      logger.debug(`Item ${item.id} execution completed`);
       
     } catch (error) {
       // Re-check status: it might have been changed to FAILED by an external cancellation during the request
