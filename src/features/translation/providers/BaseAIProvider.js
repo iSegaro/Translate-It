@@ -17,6 +17,8 @@ import { AIResponseParser } from "./utils/AIResponseParser.js";
 import { AITextProcessor } from "./utils/AITextProcessor.js";
 import { TranslationMode, getProviderOptimizationLevelAsync } from "@/shared/config/config.js";
 import { AIStreamManager } from "./utils/AIStreamManager.js";
+import { isCancellationError } from "@/shared/error-management/ErrorMatcher.js";
+import { appendTranslationDiagnostic } from "@/features/translation/ir/TranslationOperation.js";
 
 const logger = getScopedLogger(LOG_COMPONENTS.TRANSLATION, 'BaseAIProvider');
 
@@ -172,19 +174,47 @@ export class BaseAIProvider extends BaseProvider {
       // (ProviderCoordinator._cleanResult) receives the same shape as the normal path.
       if (parsed.contractViolation) {
         logger.warn(`[${this.providerName}] Structured response violated its contract; sequential recovery started`);
-        const recoveryResult = await this._traditionalBatchTranslate(
-          texts,
-          sourceLang,
-          targetLang,
-          translateMode,
-          engine,
-          messageId,
-          abortController,
-          priority,
-          sessionId,
-          ResponseFormat.STRING,
-          contextMetadata || {}
-        );
+        appendTranslationDiagnostic(executionContext, {
+          type: 'RECOVERY_TRIGGERED',
+          stage: 'recovery',
+          provider: this.providerName,
+          code: 'CONTRACT_VIOLATION',
+          count: texts.length,
+        });
+
+        let recoveryResult;
+        try {
+          recoveryResult = await this._traditionalBatchTranslate(
+            texts,
+            sourceLang,
+            targetLang,
+            translateMode,
+            engine,
+            messageId,
+            abortController,
+            priority,
+            sessionId,
+            ResponseFormat.STRING,
+            contextMetadata || {}
+          );
+        } catch (error) {
+          if (!abortController?.signal?.aborted && !isCancellationError(error)) {
+            appendTranslationDiagnostic(executionContext, {
+              type: 'RECOVERY_FAILED',
+              stage: 'recovery',
+              provider: this.providerName,
+              reason: error.message,
+              ...(typeof error.type === 'string' && { code: error.type }),
+            });
+          }
+          throw error;
+        }
+
+        appendTranslationDiagnostic(executionContext, {
+          type: 'RECOVERY_SUCCEEDED',
+          stage: 'recovery',
+          provider: this.providerName,
+        });
         return Array.isArray(recoveryResult) ? recoveryResult : [recoveryResult];
       }
 

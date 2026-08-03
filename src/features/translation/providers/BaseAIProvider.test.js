@@ -30,12 +30,14 @@ vi.mock('../core/TranslationStatsManager.js', () => ({
 vi.mock('@/shared/error-management/ErrorMatcher.js', () => ({
   matchErrorToType: vi.fn(),
   isFatalError: vi.fn(),
-  isTransientError: vi.fn()
+  isTransientError: vi.fn(),
+  isCancellationError: vi.fn()
 }));
 
 import { BaseAIProvider } from './BaseAIProvider.js';
 import { ResponseFormat } from '@/shared/config/translationConstants.js';
-import { isFatalError, isTransientError, matchErrorToType } from '@/shared/error-management/ErrorMatcher.js';
+import { isCancellationError, isFatalError, isTransientError, matchErrorToType } from '@/shared/error-management/ErrorMatcher.js';
+import { createTranslationOperation } from '../ir/TranslationOperation.js';
 
 // Mock AIResponseParser
 vi.mock("./utils/AIResponseParser.js", () => ({
@@ -72,6 +74,7 @@ describe('BaseAIProvider', () => {
     vi.mocked(isFatalError).mockReturnValue(false);
     vi.mocked(isTransientError).mockReturnValue(false);
     vi.mocked(matchErrorToType).mockReturnValue('UNKNOWN');
+    vi.mocked(isCancellationError).mockReturnValue(false);
   });
 
   describe('_translateBatch', () => {
@@ -152,6 +155,100 @@ describe('BaseAIProvider', () => {
         'session-1', ResponseFormat.STRING, { metadata: true }
       );
       expect(result).toEqual(['F1']);
+    });
+
+    it('should retain triggered and successful recovery facts without changing the result', async () => {
+      const { AIResponseParser } = await import("./utils/AIResponseParser.js");
+      const operation = createTranslationOperation('recovery-success');
+      AIResponseParser.parseBatchResult.mockReturnValue({ results: ['seg1', 'seg2'], contractViolation: true });
+      vi.spyOn(provider, '_traditionalBatchTranslate').mockResolvedValue(['F1', 'F2']);
+
+      const result = await provider._translateBatch(
+        ['seg1', 'seg2'], 'en', 'fa', 'selection', null, null, 'recovery-success', 'session-1',
+        { executionContext: { operation } }
+      );
+      const report = operation.finalize();
+      const recoveryFacts = report.entries.filter(({ type }) => type.startsWith('RECOVERY_'));
+
+      expect(result).toEqual(['F1', 'F2']);
+      expect(recoveryFacts).toEqual([
+        expect.objectContaining({
+          type: 'RECOVERY_TRIGGERED',
+          stage: 'recovery',
+          provider: 'MockAI',
+          code: 'CONTRACT_VIOLATION',
+          count: 2,
+          messageId: 'recovery-success'
+        }),
+        expect.objectContaining({
+          type: 'RECOVERY_SUCCEEDED',
+          stage: 'recovery',
+          provider: 'MockAI',
+          messageId: 'recovery-success'
+        })
+      ]);
+      expect(Object.isFrozen(report)).toBe(true);
+      expect(Object.isFrozen(report.entries)).toBe(true);
+      expect(Object.isFrozen(recoveryFacts[0])).toBe(true);
+    });
+
+    it('should retain recovery failure facts and rethrow the original error', async () => {
+      const { AIResponseParser } = await import("./utils/AIResponseParser.js");
+      const operation = createTranslationOperation('recovery-failure');
+      const error = Object.assign(new Error('Recovery network failure'), { type: 'NETWORK_ERROR' });
+      AIResponseParser.parseBatchResult.mockReturnValue({ results: ['seg1'], contractViolation: true });
+      vi.spyOn(provider, '_traditionalBatchTranslate').mockRejectedValue(error);
+
+      await expect(provider._translateBatch(
+        ['seg1'], 'en', 'fa', 'selection', null, null, 'recovery-failure', 'session-1',
+        { executionContext: { operation } }
+      )).rejects.toBe(error);
+
+      const recoveryFacts = operation.finalize().entries.filter(({ type }) => type.startsWith('RECOVERY_'));
+      expect(recoveryFacts).toEqual([
+        expect.objectContaining({ type: 'RECOVERY_TRIGGERED' }),
+        expect.objectContaining({
+          type: 'RECOVERY_FAILED',
+          stage: 'recovery',
+          provider: 'MockAI',
+          reason: 'Recovery network failure',
+          code: 'NETWORK_ERROR'
+        })
+      ]);
+    });
+
+    it('should not record recovery failure for cancellation and rethrow the original error', async () => {
+      const { AIResponseParser } = await import("./utils/AIResponseParser.js");
+      const operation = createTranslationOperation('recovery-cancelled');
+      const error = Object.assign(new Error('Translation cancelled by user'), { type: 'USER_CANCELLED' });
+      AIResponseParser.parseBatchResult.mockReturnValue({ results: ['seg1'], contractViolation: true });
+      vi.mocked(isCancellationError).mockReturnValue(true);
+      vi.spyOn(provider, '_traditionalBatchTranslate').mockRejectedValue(error);
+
+      await expect(provider._translateBatch(
+        ['seg1'], 'en', 'fa', 'selection', null, null, 'recovery-cancelled', 'session-1',
+        { executionContext: { operation } }
+      )).rejects.toBe(error);
+
+      const recoveryFacts = operation.finalize().entries.filter(({ type }) => type.startsWith('RECOVERY_'));
+      expect(recoveryFacts).toHaveLength(1);
+      expect(recoveryFacts[0]).toMatchObject({ type: 'RECOVERY_TRIGGERED' });
+    });
+
+    it('should emit no per-segment recovery facts for multi-segment recovery', async () => {
+      const { AIResponseParser } = await import("./utils/AIResponseParser.js");
+      const operation = createTranslationOperation('recovery-multi-segment');
+      AIResponseParser.parseBatchResult.mockReturnValue({ results: ['seg1', 'seg2', 'seg3'], contractViolation: true });
+      vi.spyOn(provider, '_traditionalBatchTranslate').mockResolvedValue(['F1', 'F2', 'F3']);
+
+      const result = await provider._translateBatch(
+        ['seg1', 'seg2', 'seg3'], 'en', 'fa', 'selection', null, null, 'recovery-multi-segment', 'session-1',
+        { executionContext: { operation } }
+      );
+      const recoveryFacts = operation.finalize().entries.filter(({ type }) => type.startsWith('RECOVERY_'));
+
+      expect(result).toEqual(['F1', 'F2', 'F3']);
+      expect(recoveryFacts).toHaveLength(2);
     });
 
     it('should normalize single-segment sequential recovery output to the structured-batch array shape (JSON_OBJECT)', async () => {
