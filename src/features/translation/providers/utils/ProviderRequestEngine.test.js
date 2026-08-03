@@ -150,4 +150,38 @@ describe('ProviderRequestEngine', () => {
       expect(result['Referer']).toBeUndefined();
     });
   });
+
+  describe('Error Accounting', () => {
+    const baseParams = () => ({
+      url: 'https://api.test.com',
+      fetchOptions: { headers: {} },
+      extractResponse: mockExtractResponse,
+      context: 'test',
+      sessionId: 's1',
+      charCount: 10,
+      originalCharCount: 5
+    });
+
+    it('should record exactly one error for a non-cancellation transport failure and rethrow', async () => {
+      proxyManager.fetch.mockRejectedValue(new TypeError('NetworkError: Failed to fetch'));
+      const { statsManager } = await import('../../core/TranslationStatsManager.js');
+
+      await expect(ProviderRequestEngine.executeApiCall(mockProvider, baseParams()))
+        .rejects.toThrow('NetworkError');
+
+      expect(statsManager.recordRequest).toHaveBeenCalledTimes(1);
+      expect(statsManager.recordError).toHaveBeenCalledTimes(1);
+    });
+
+    it('should not record an error for an aborted transport call', async () => {
+      proxyManager.fetch.mockRejectedValue(new DOMException('Aborted', 'AbortError'));
+      const { statsManager } = await import('../../core/TranslationStatsManager.js');
+
+      await expect(ProviderRequestEngine.executeApiCall(mockProvider, baseParams()))
+        .rejects.toThrow('Translation cancelled by user');
+
+      expect(statsManager.recordRequest).toHaveBeenCalledTimes(1);
+      expect(statsManager.recordError).not.toHaveBeenCalled();
+    });
+  });
 });

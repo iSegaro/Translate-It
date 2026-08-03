@@ -103,6 +103,17 @@ describe('BaseAIProvider', () => {
         .rejects.toThrow('FATAL 401');
     });
 
+    it('should not record a TranslationStatsManager error from the batch boundary (ownership: transport only)', async () => {
+      const { statsManager } = await import('../core/TranslationStatsManager.js');
+      provider._callAI = vi.fn().mockRejectedValue(new Error('Transport Failure'));
+
+      await expect(provider._translateBatch(['seg1'], 'en', 'fa', 'selection', null, null, null, 'session-1'))
+        .rejects.toThrow('Transport Failure');
+
+      await new Promise(resolve => setTimeout(resolve, 0));
+      expect(statsManager.recordError).not.toHaveBeenCalled();
+    });
+
     it('should call _callAI with correct parameters', async () => {
       const spy = vi.spyOn(provider, '_callAI');
       const texts = ['Hello'];

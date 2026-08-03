@@ -190,12 +190,10 @@ export class BaseAIProvider extends BaseProvider {
 
       return parsed.results;
     } catch (error) {
-      if (sessionId) {
-        import('../core/TranslationStatsManager.js').then(m => {
-          m.statsManager.recordError(this.providerName, sessionId);
-        }).catch(() => { /* ignore */ });
-      }
-
+      // Error accounting is owned exclusively by ProviderRequestEngine.executeApiCall:
+      // TranslationStatsManager.errors counts failed physical HTTP calls only.
+      // This batch boundary only logs and rethrows; it must not double-record transport
+      // failures or classify cancellation, timeout, or pre-transport rejection as one.
       logger.debug(`[${this.providerName}] Batch translation failed:`, error.message);
 
       // EVERY error is thrown - never return original text as a "successful" translation.
