@@ -76,6 +76,23 @@ describe('WebAIProvider history support', () => {
     expect(JSON.parse(request.fetchOptions.body)).not.toHaveProperty('callPurpose');
   });
 
+  it('threads recovery purpose through every conversation helper under active history gates', async () => {
+    getAIConversationHistoryEnabledAsync.mockResolvedValue(true);
+    vi.spyOn(provider, '_executeRequest').mockResolvedValue('translated');
+    await provider._callAI('system', 'current segment', {
+      sessionId: 'session-1',
+      mode: 'select-element',
+      callPurpose: TranslationCallPurpose.STRUCTURED_RECOVERY
+    });
+
+    expect(AIConversationHelper.claimNextTurn).toHaveBeenCalledWith('session-1', 'WebAI', { callPurpose: TranslationCallPurpose.STRUCTURED_RECOVERY });
+    expect(AIConversationHelper.formatCompactHistoryContext).toHaveBeenCalledWith('session-1', 'select-element', {
+      maxChars: 300,
+      callPurpose: TranslationCallPurpose.STRUCTURED_RECOVERY
+    });
+    expect(AIConversationHelper.updateSessionHistory).toHaveBeenCalledWith('session-1', 'current segment', 'translated', { callPurpose: TranslationCallPurpose.STRUCTURED_RECOVERY });
+  });
+
   it('injects compact Select Element history and keeps a single message payload when history is enabled', async () => {
     getAIConversationHistoryEnabledAsync.mockResolvedValue(true);
 
@@ -97,9 +114,9 @@ describe('WebAIProvider history support', () => {
     );
 
     expect(result).toBe('translated');
-    expect(AIConversationHelper.claimNextTurn).toHaveBeenCalledWith('session-1', 'WebAI');
-    expect(AIConversationHelper.formatCompactHistoryContext).toHaveBeenCalledWith('session-1', 'select-element', { maxChars: 300 });
-    expect(AIConversationHelper.updateSessionHistory).toHaveBeenCalledWith('session-1', 'Current text', 'translated');
+    expect(AIConversationHelper.claimNextTurn).toHaveBeenCalledWith('session-1', 'WebAI', { callPurpose: undefined });
+    expect(AIConversationHelper.formatCompactHistoryContext).toHaveBeenCalledWith('session-1', 'select-element', { maxChars: 300, callPurpose: undefined });
+    expect(AIConversationHelper.updateSessionHistory).toHaveBeenCalledWith('session-1', 'Current text', 'translated', { callPurpose: undefined });
 
     const body = JSON.parse(capturedRequest.fetchOptions.body);
     expect(body).toEqual(expect.objectContaining({

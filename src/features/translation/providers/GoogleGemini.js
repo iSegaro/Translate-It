@@ -44,7 +44,7 @@ export class GeminiProvider extends BaseAIProvider {
 
     this._validateConfig({ apiKey }, ["apiKey"], `${this.providerName.toLowerCase()}-translation`);
 
-    const turnNumber = await AIConversationHelper.claimNextTurn(sessionId, this.providerName);
+    const turnNumber = await AIConversationHelper.claimNextTurn(sessionId, this.providerName, { callPurpose });
     logger.info(`[Gemini] Model: ${model || 'gemini-1.5-flash'}${sessionId ? ` (Session: ${sessionId.substring(0, 15)}..., Turn: ${turnNumber})` : ''}`);
 
     const requestBody = {
@@ -66,7 +66,8 @@ export class GeminiProvider extends BaseAIProvider {
       // Limit history to last 2 turns with character capping to optimize tokens
       const history = await AIConversationHelper.getConversationHistory(sessionId, options.mode, { 
         maxTurns: 2,
-        maxChars: TRANSLATION_CONSTANTS.HISTORY_CHARACTER_LIMITS.AI 
+        maxChars: TRANSLATION_CONSTANTS.HISTORY_CHARACTER_LIMITS.AI,
+        callPurpose
       });
       
       if (history.length > 0) {
@@ -141,7 +142,7 @@ export class GeminiProvider extends BaseAIProvider {
       });
 
       if (sessionId && result) {
-        await AIConversationHelper.updateSessionHistory(sessionId, userText, result);
+        await AIConversationHelper.updateSessionHistory(sessionId, userText, result, { callPurpose });
       }
 
       return result;

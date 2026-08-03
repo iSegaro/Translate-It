@@ -3,6 +3,7 @@ import { GeminiProvider } from './GoogleGemini.js';
 import { proxyManager } from '@/shared/proxy/ProxyManager.js';
 import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
 import { TranslationCallPurpose } from './ProviderConstants.js';
+import { AIConversationHelper } from './utils/AIConversationHelper.js';
 
 // Mock Dependencies
 vi.mock('@/shared/proxy/ProxyManager.js', () => ({
@@ -47,6 +48,22 @@ describe('GeminiProvider Error Handling', () => {
 
     const result = await provider._callAI('system', 'Hello World');
     expect(result).toBe('سلام دنیا');
+  });
+
+  it('threads recovery purpose through Gemini conversation helpers', async () => {
+    const claim = vi.spyOn(AIConversationHelper, 'claimNextTurn').mockResolvedValue(1);
+    const history = vi.spyOn(AIConversationHelper, 'getConversationHistory').mockResolvedValue([]);
+    const update = vi.spyOn(AIConversationHelper, 'updateSessionHistory').mockResolvedValue();
+    vi.spyOn(provider, '_executeRequest').mockResolvedValue('translated');
+    await provider._callAI('system', 'current segment', {
+      sessionId: 'session-1',
+      mode: 'select-element',
+      callPurpose: TranslationCallPurpose.STRUCTURED_RECOVERY
+    });
+    expect(claim).toHaveBeenCalledWith('session-1', 'Gemini', { callPurpose: TranslationCallPurpose.STRUCTURED_RECOVERY });
+    expect(history).toHaveBeenCalledWith('session-1', 'select-element', expect.objectContaining({ maxTurns: 2, callPurpose: TranslationCallPurpose.STRUCTURED_RECOVERY }));
+    expect(update).toHaveBeenCalledWith('session-1', 'current segment', 'translated', { callPurpose: TranslationCallPurpose.STRUCTURED_RECOVERY });
+    claim.mockRestore(); history.mockRestore(); update.mockRestore();
   });
 
   it('should detect API_ERROR wrapped in 200 OK response', async () => {

@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { OpenRouterProvider } from './OpenRouter.js';
 import { proxyManager } from '@/shared/proxy/ProxyManager.js';
 import { TranslationCallPurpose } from './ProviderConstants.js';
+import { AIConversationHelper } from './utils/AIConversationHelper.js';
 
 // Mock Dependencies
 vi.mock('@/shared/proxy/ProxyManager.js', () => ({
@@ -52,6 +53,26 @@ describe('OpenRouterProvider Error Handling', () => {
     expect(request).toMatchObject({ callPurpose: TranslationCallPurpose.STRUCTURED_RECOVERY });
     expect(request.fetchOptions.headers).not.toHaveProperty('callPurpose');
     expect(JSON.parse(request.fetchOptions.body)).not.toHaveProperty('callPurpose');
+  });
+
+  it('threads recovery purpose through all conversation helpers', async () => {
+    const claim = vi.spyOn(AIConversationHelper, 'claimNextTurn').mockResolvedValue(1);
+    const messages = vi.spyOn(AIConversationHelper, 'getConversationMessages').mockResolvedValue({ messages: [{ role: 'system', content: 'system prompt' }, { role: 'user', content: 'current recovery segment' }], session: null });
+    const update = vi.spyOn(AIConversationHelper, 'updateSessionHistory').mockResolvedValue();
+    const execute = vi.spyOn(provider, '_executeRequest').mockResolvedValue('translated');
+    try {
+      const result = await provider._callAI('system prompt', 'current recovery segment', { sessionId: 'session-1', mode: 'select-element', callPurpose: TranslationCallPurpose.STRUCTURED_RECOVERY });
+      expect(claim).toHaveBeenCalledWith('session-1', provider.providerName, { callPurpose: TranslationCallPurpose.STRUCTURED_RECOVERY });
+      expect(messages).toHaveBeenCalledWith('session-1', provider.providerName, 'current recovery segment', 'system prompt', 'select-element', { callPurpose: TranslationCallPurpose.STRUCTURED_RECOVERY });
+      expect(update).toHaveBeenCalledWith('session-1', 'current recovery segment', 'translated', { callPurpose: TranslationCallPurpose.STRUCTURED_RECOVERY });
+      const request = execute.mock.calls[0][0];
+      expect(request).toMatchObject({ callPurpose: TranslationCallPurpose.STRUCTURED_RECOVERY });
+      expect(request.fetchOptions.headers).not.toHaveProperty('callPurpose');
+      expect(JSON.parse(request.fetchOptions.body)).not.toHaveProperty('callPurpose');
+      expect(result).toBe('translated');
+    } finally {
+      claim.mockRestore(); messages.mockRestore(); update.mockRestore(); execute.mockRestore();
+    }
   });
 
   it('should detect API_ERROR wrapped in 200 OK response (OpenRouter style)', async () => {

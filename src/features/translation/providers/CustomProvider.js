@@ -42,10 +42,10 @@ export class CustomProvider extends BaseAIProvider {
 
     this._validateConfig({ apiUrl, model }, ["apiUrl", "model"], `${this.providerName.toLowerCase()}-translation`);
 
-    const turnNumber = await AIConversationHelper.claimNextTurn(sessionId, this.providerName);
+    const turnNumber = await AIConversationHelper.claimNextTurn(sessionId, this.providerName, { callPurpose });
     logger.info(`[Custom] Model: ${model || 'default'}${sessionId ? ` (Session: ${sessionId.substring(0, 15)}..., Turn: ${turnNumber})` : ''}`);
 
-    const { messages } = await AIConversationHelper.getConversationMessages(sessionId, this.providerName, userText, systemPrompt, options.mode);
+    const { messages } = await AIConversationHelper.getConversationMessages(sessionId, this.providerName, userText, systemPrompt, options.mode, { callPurpose });
 
     const headers = {
       "Content-Type": "application/json",
@@ -91,7 +91,7 @@ export class CustomProvider extends BaseAIProvider {
     });
 
     if (sessionId && result) {
-      await AIConversationHelper.updateSessionHistory(sessionId, userText, result);
+      await AIConversationHelper.updateSessionHistory(sessionId, userText, result, { callPurpose });
     }
 
     return result;

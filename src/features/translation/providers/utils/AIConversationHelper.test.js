@@ -40,11 +40,51 @@ vi.mock('@/features/translation/utils/bilingualPromptHelper.js', () => ({
 
 import { AIConversationHelper } from './AIConversationHelper.js';
 import { translationSessionManager } from '@/features/translation/core/TranslationSessionManager.js';
+import { TranslationCallPurpose } from '../ProviderConstants.js';
 
 describe('AIConversationHelper', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     translationSessionManager.sessions.clear();
+  });
+
+  it('keeps recovery calls outside conversation state', async () => {
+    const session = translationSessionManager.getOrCreateSession('recovery-session', 'OpenAI');
+    session.turnCounter = 4;
+    session.batchCount = 2;
+    session.history.push({ role: 'user', content: 'old' }, { role: 'assistant', content: 'translated' });
+    const before = structuredClone(session);
+    const options = { callPurpose: TranslationCallPurpose.STRUCTURED_RECOVERY };
+
+    expect(await AIConversationHelper.claimNextTurn('recovery-session', 'OpenAI', options)).toBe(1);
+    expect(await AIConversationHelper.getConversationMessages('recovery-session', 'OpenAI', 'current', 'system', 'select-element', options))
+      .toEqual({ messages: [{ role: 'system', content: 'system' }, { role: 'user', content: 'current' }], session: null });
+    expect(await AIConversationHelper.getConversationHistory('recovery-session', 'select-element', options)).toEqual([]);
+    expect(await AIConversationHelper.formatCompactHistoryContext('recovery-session', 'select-element', options)).toBe('');
+    await AIConversationHelper.updateSessionHistory('recovery-session', 'current', 'result', options);
+
+    expect(translationSessionManager.sessions.get('recovery-session')).toEqual(before);
+  });
+
+  it.each([
+    ['primary', TranslationCallPurpose.PRIMARY_TRANSLATION],
+    ['missing', undefined],
+    ['invalid', 'INVALID_PURPOSE'],
+  ])('keeps %s purpose in normal conversation lifecycle', async (_label, callPurpose) => {
+    const { getAIConversationHistoryEnabledAsync } = await import('@/shared/config/config.js');
+    getAIConversationHistoryEnabledAsync.mockResolvedValue(true);
+    const session = translationSessionManager.getOrCreateSession(`compat-${_label}`, 'OpenAI');
+    session.history.push({ role: 'user', content: 'old' }, { role: 'assistant', content: 'translated' });
+    const options = callPurpose === undefined ? {} : { callPurpose };
+
+    expect(await AIConversationHelper.claimNextTurn(session.id, 'OpenAI', options)).toBe(1);
+    expect(await AIConversationHelper.getConversationHistory(session.id, 'select-element', { ...options, maxTurns: 1, maxChars: 100 }))
+      .toEqual([{ user: 'old', assistant: 'translated' }]);
+    await AIConversationHelper.updateSessionHistory(session.id, 'new', 'new translated', options);
+
+    expect(session.turnCounter).toBe(1);
+    expect(session.batchCount).toBe(1);
+    expect(session.history).toHaveLength(4);
   });
 
   it('uses the non-auto batch prompt when bilingual auto prompts are disabled', async () => {
