@@ -9,6 +9,52 @@ const SettlementState = Object.freeze({
 })
 const EMPTY_CANCELLED_UNIT_IDS = Object.freeze([])
 
+export const RecoveryFinalOutcome = Object.freeze({
+  NONE: 'NONE',
+  SUCCEEDED: 'SUCCEEDED',
+  FAILED: 'FAILED',
+  INCOMPLETE: 'INCOMPLETE',
+  SUPERSEDED: 'SUPERSEDED',
+})
+
+export function deriveRecoverySummary(report, terminalContext = {}) {
+  const passes = []
+  const providers = new Map()
+  for (const entry of Array.isArray(report?.entries) ? report.entries : []) {
+    if (entry?.type === 'RECOVERY_TRIGGERED') {
+      const pass = { provider: entry.provider, terminal: null }
+      passes.push(pass)
+      const fact = providers.get(pass.provider) || { provider: pass.provider, structuredResponseViolations: 0, recoveryPasses: 0, recoverySuccesses: 0, recoveryFailures: 0, incompleteRecoveries: 0 }
+      fact.structuredResponseViolations++
+      fact.recoveryPasses++
+      providers.set(pass.provider, fact)
+    } else if ((entry?.type === 'RECOVERY_SUCCEEDED' || entry?.type === 'RECOVERY_FAILED')) {
+      const pass = [...passes].reverse().find(item => item.terminal === null)
+      if (pass) {
+        pass.terminal = entry.type
+        const provider = entry.provider || pass.provider
+        const fact = providers.get(provider) || { provider, structuredResponseViolations: 0, recoveryPasses: 0, recoverySuccesses: 0, recoveryFailures: 0, incompleteRecoveries: 0 }
+        if (entry.type === 'RECOVERY_SUCCEEDED') fact.recoverySuccesses++
+        else fact.recoveryFailures++
+        providers.set(provider, fact)
+      }
+    }
+  }
+  for (const pass of passes.filter(item => item.terminal === null)) providers.get(pass.provider)?.incompleteRecoveries++
+  const last = passes.at(-1)
+  const success = passes.some(item => item.terminal === 'RECOVERY_SUCCEEDED')
+  const failure = passes.some(item => item.terminal === 'RECOVERY_FAILED')
+  let finalRecoveryOutcome = RecoveryFinalOutcome.NONE
+  if (last) {
+    if (last.terminal === 'RECOVERY_SUCCEEDED' && terminalContext.operationSucceeded) finalRecoveryOutcome = RecoveryFinalOutcome.SUCCEEDED
+    else if (last.terminal === 'RECOVERY_FAILED' && terminalContext.operationSucceeded) finalRecoveryOutcome = RecoveryFinalOutcome.SUPERSEDED
+    else if (last.terminal === 'RECOVERY_FAILED' && terminalContext.terminalStatus === 'failed') finalRecoveryOutcome = RecoveryFinalOutcome.FAILED
+    else finalRecoveryOutcome = RecoveryFinalOutcome.INCOMPLETE
+  }
+  const providerFacts = Object.freeze([...providers.values()].map(fact => Object.freeze(fact)))
+  return Object.freeze({ structuredResponseViolations: passes.length, recoveryPasses: passes.length, hadRecovery: passes.length > 0, hadRecoverySuccess: success, hadRecoveryFailure: failure, recoveryIncomplete: passes.some(item => item.terminal === null), finalRecoveryOutcome, providerFacts })
+}
+
 function safeString(value) {
   return typeof value === 'string' ? value.slice(0, MAX_STRING_LENGTH) : undefined
 }
