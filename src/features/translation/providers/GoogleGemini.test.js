@@ -166,7 +166,10 @@ describe('GeminiProvider Error Handling', () => {
 
     const executeRequest = vi.spyOn(provider, '_executeRequest');
     const executionContext = { operation: { appendDiagnostic: vi.fn() } };
+    const abortController = new AbortController();
     const result = await provider._callAI('system', 'text', {
+      sessionId: 'session-1',
+      abortController,
       callPurpose: TranslationCallPurpose.STRUCTURED_RECOVERY,
       executionContext
     });
@@ -177,7 +180,15 @@ describe('GeminiProvider Error Handling', () => {
       TranslationCallPurpose.STRUCTURED_RECOVERY
     ]);
     expect(executeRequest.mock.calls[0][0].executionContext).toBe(executionContext);
-    expect(executeRequest.mock.calls[1][0].executionContext).toBeUndefined();
+    expect(executeRequest.mock.calls[1][0].executionContext).toBe(executionContext);
+    expect(executeRequest.mock.calls[1][0]).toMatchObject({ sessionId: 'session-1', abortController });
+    const [initialRequest, fallbackRequest] = executeRequest.mock.calls.map(([request]) => request);
+    expect(JSON.parse(initialRequest.fetchOptions.body).generationConfig.thinking_config).toEqual({ include_thoughts: false });
+    expect(JSON.parse(fallbackRequest.fetchOptions.body).generationConfig.thinking_config).toBeUndefined();
+    expect(JSON.parse(fallbackRequest.fetchOptions.body)).not.toHaveProperty('executionContext');
+    expect(JSON.parse(fallbackRequest.fetchOptions.body)).not.toHaveProperty('callPurpose');
+    expect(fallbackRequest.fetchOptions.headers).not.toHaveProperty('executionContext');
+    expect(fallbackRequest.fetchOptions.headers).not.toHaveProperty('callPurpose');
     expect(proxyManager.fetch).toHaveBeenCalledTimes(2);
   });
 

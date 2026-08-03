@@ -172,6 +172,7 @@ export class GeminiProvider extends BaseAIProvider {
           context: `${this.providerName.toLowerCase()}-translation-fallback`,
           abortController,
           sessionId,
+          executionContext,
           callPurpose,
           updateApiKey: (newKey, options) => {
             if (options.url) {
