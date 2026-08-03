@@ -48,6 +48,67 @@ describe('AIConversationHelper', () => {
     translationSessionManager.sessions.clear();
   });
 
+  describe('committed-history eligibility', () => {
+    it('keeps failed-attempt-only sessions first-turn eligible', async () => {
+      const { getAIConversationHistoryEnabledAsync } = await import('@/shared/config/config.js');
+      getAIConversationHistoryEnabledAsync.mockResolvedValue(true);
+      const session = translationSessionManager.getOrCreateSession('failed-attempts', 'OpenAI');
+      session.turnCounter = 3;
+
+      expect(await AIConversationHelper.isFirstTurn(session.id)).toBe(true);
+      await expect(AIConversationHelper.getConversationMessages(
+        session.id, 'OpenAI', 'current', 'system', 'select-element'
+      )).resolves.toMatchObject({
+        messages: [{ role: 'system', content: 'system' }, { role: 'user', content: 'current' }],
+      });
+      const { getPromptAsync, getPromptBASEAIBatchAsync, getPromptBASEAIFollowupAsync } = await import('@/shared/config/config.js');
+      getPromptAsync.mockResolvedValue('instructions $_{SOURCE} $_{TARGET}');
+      getPromptBASEAIBatchAsync.mockResolvedValue('base $_{PROMPT_INSTRUCTIONS} $_{TEXT}');
+      getPromptBASEAIFollowupAsync.mockResolvedValue('follow-up $_{PROMPT_INSTRUCTIONS} $_{TEXT}');
+      await expect(AIConversationHelper.preparePromptAndText(
+        ['current'], 'en', 'fa', 'select-element', 'ai', session.id
+      )).resolves.toMatchObject({ systemPrompt: expect.stringContaining('base') });
+      expect(getPromptBASEAIFollowupAsync).not.toHaveBeenCalled();
+      getAIConversationHistoryEnabledAsync.mockResolvedValue(false);
+    });
+
+    it('recognizes only ordered user-assistant history pairs', async () => {
+      const invalidHistories = [
+        [{ role: 'assistant', content: 'result' }],
+        [{ role: 'user', content: 'source' }],
+        [{ role: 'assistant', content: 'result' }, { role: 'user', content: 'source' }],
+        [{ role: 'user', content: 'one' }, { role: 'user', content: 'two' }],
+        [{ role: 'assistant', content: 'one' }, { role: 'assistant', content: 'two' }],
+        [null, { role: 'user', content: 'source' }],
+        [{ role: 'user' }, { type: 'assistant' }],
+      ];
+
+      for (const [index, history] of invalidHistories.entries()) {
+        const session = translationSessionManager.getOrCreateSession(`invalid-${index}`, 'OpenAI');
+        session.turnCounter = 10;
+        session.history = history;
+        await expect(AIConversationHelper.isFirstTurn(session.id)).resolves.toBe(true);
+      }
+
+      const valid = translationSessionManager.getOrCreateSession('valid-pair', 'OpenAI');
+      valid.turnCounter = 1;
+      valid.history = [{ role: 'system', content: 'ignored' }, { role: 'user', content: 'source' }, { role: 'assistant', content: 'result' }];
+      await expect(AIConversationHelper.isFirstTurn(valid.id)).resolves.toBe(false);
+    });
+
+    it('becomes follow-up eligible only after a committed history write', async () => {
+      const session = translationSessionManager.getOrCreateSession('commit-transition', 'OpenAI');
+      session.turnCounter = 10;
+
+      await expect(AIConversationHelper.isFirstTurn(session.id)).resolves.toBe(true);
+      await AIConversationHelper.updateSessionHistory(session.id, 'source', 'result');
+
+      await expect(AIConversationHelper.isFirstTurn(session.id)).resolves.toBe(false);
+      expect(session.batchCount).toBe(1);
+      expect(session.history).toHaveLength(2);
+    });
+  });
+
   it('keeps recovery calls outside conversation state', async () => {
     const session = translationSessionManager.getOrCreateSession('recovery-session', 'OpenAI');
     session.turnCounter = 4;

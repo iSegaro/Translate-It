@@ -29,6 +29,14 @@ function shouldParticipateInConversation(callPurpose) {
   return callPurpose !== TranslationCallPurpose.STRUCTURED_RECOVERY;
 }
 
+function hasCommittedConversationPair(session) {
+  const history = session?.history;
+  if (!Array.isArray(history)) return false;
+  return history.some((message, index) => (
+    message?.role === 'user' && history[index + 1]?.role === 'assistant'
+  ));
+}
+
 /**
  * Checks if the parsed JSON object matches the specific format
  * (array of objects where each object has a 'text' property as string)
@@ -93,7 +101,7 @@ export const AIConversationHelper = {
     try {
       const { translationSessionManager } = await import('@/features/translation/core/TranslationSessionManager.js');
       const session = translationSessionManager.sessions.get(sessionId);
-      return !session || session.turnCounter <= 1;
+      return !hasCommittedConversationPair(session);
     } catch {
       return true;
     }
@@ -482,7 +490,7 @@ export const AIConversationHelper = {
     const session = translationSessionManager.getOrCreateSession(sessionId, providerName);
     const historyEnabled = await getAIConversationHistoryEnabledAsync();
 
-    if (session.turnCounter <= 1) {
+    if (!hasCommittedConversationPair(session)) {
       session.systemPrompt = systemPrompt;
       return {
         messages: [{ role: 'system', content: systemPrompt }, { role: 'user', content: currentText }],
