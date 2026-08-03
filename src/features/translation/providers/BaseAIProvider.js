@@ -23,6 +23,32 @@ import { TranslationCallPurpose } from "@/features/translation/providers/Provide
 
 const logger = getScopedLogger(LOG_COMPONENTS.TRANSLATION, 'BaseAIProvider');
 
+function createConversationCommitCandidate() {
+  let staged = null;
+  let settled = false;
+  return {
+    stage(payload) {
+      if (!settled && !staged) staged = payload;
+    },
+    async commit() {
+      if (settled || !staged) return;
+      settled = true;
+      await AIConversationHelper.updateSessionHistory(
+        staged.sessionId,
+        staged.userContent,
+        staged.assistantContent,
+        { callPurpose: TranslationCallPurpose.PRIMARY_TRANSLATION }
+      );
+    },
+    discard() {
+      if (!settled) {
+        settled = true;
+        staged = null;
+      }
+    }
+  };
+}
+
 export class BaseAIProvider extends BaseProvider {
   // AI-specific capabilities - to be overridden by subclasses
   static isAI = true;
@@ -124,6 +150,10 @@ export class BaseAIProvider extends BaseProvider {
    * @protected
    */
   async _translateBatch(texts, sourceLang, targetLang, translateMode, abortController, engine, messageId, sessionId, contextMetadata = null, expectedFormat = null, priority = null) {
+    const structuredFormat = expectedFormat || ResponseFormat.JSON_ARRAY;
+    const conversationCommitCandidate = (
+      structuredFormat === ResponseFormat.JSON_ARRAY || structuredFormat === ResponseFormat.JSON_OBJECT
+    ) ? createConversationCommitCandidate() : null;
     try {
       const { systemPrompt, userText } = await this._preparePromptAndText(texts, sourceLang, targetLang, translateMode, contextMetadata, sessionId);
       
@@ -149,6 +179,7 @@ export class BaseAIProvider extends BaseProvider {
           expectedFormat: expectedFormat || ResponseFormat.JSON_ARRAY,
           executionContext: contextMetadata?.executionContext,
           callPurpose: TranslationCallPurpose.PRIMARY_TRANSLATION,
+          conversationCommitCandidate,
         }),
         context,
         priority,
@@ -175,6 +206,7 @@ export class BaseAIProvider extends BaseProvider {
       // the canonical structured-batch array shape so downstream contract cleaning
       // (ProviderCoordinator._cleanResult) receives the same shape as the normal path.
       if (parsed.contractViolation) {
+        conversationCommitCandidate?.discard();
         logger.warn(`[${this.providerName}] Structured response violated its contract; sequential recovery started`);
         appendTranslationDiagnostic(executionContext, {
           type: 'RECOVERY_TRIGGERED',
@@ -224,8 +256,10 @@ export class BaseAIProvider extends BaseProvider {
         return Array.isArray(recoveryResult) ? recoveryResult : [recoveryResult];
       }
 
+      await conversationCommitCandidate?.commit();
       return parsed.results;
     } catch (error) {
+      conversationCommitCandidate?.discard();
       // Error accounting is owned exclusively by ProviderRequestEngine.executeApiCall:
       // TranslationStatsManager.errors counts failed physical HTTP calls only.
       // This batch boundary only logs and rethrows; it must not double-record transport

@@ -30,7 +30,7 @@ export class CustomProvider extends BaseAIProvider {
    * @protected
    */
   async _callAI(systemPrompt, userText, options = {}) {
-    const { abortController, sessionId, expectedFormat, isBatch, executionContext, callPurpose } = options;
+    const { abortController, sessionId, expectedFormat, isBatch, executionContext, callPurpose, conversationCommitCandidate } = options;
 
     const [apiUrl, apiKeys, model] = await Promise.all([
       getCustomApiUrlAsync(),
@@ -91,7 +91,8 @@ export class CustomProvider extends BaseAIProvider {
     });
 
     if (sessionId && result) {
-      await AIConversationHelper.updateSessionHistory(sessionId, userText, result, { callPurpose });
+      if (conversationCommitCandidate) conversationCommitCandidate.stage({ sessionId, userContent: userText, assistantContent: result });
+      else await AIConversationHelper.updateSessionHistory(sessionId, userText, result, { callPurpose });
     }
 
     return result;

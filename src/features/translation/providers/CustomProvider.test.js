@@ -140,6 +140,26 @@ describe('CustomProvider Error Handling', () => {
     }
   });
 
+  it('stages a primary candidate instead of writing history directly', async () => {
+    const candidate = { stage: vi.fn() };
+    const update = vi.spyOn(AIConversationHelper, 'updateSessionHistory').mockResolvedValue();
+    vi.spyOn(provider, '_executeRequest').mockResolvedValue('translated');
+    try {
+      await provider._callAI('system', 'source', { sessionId: 'session-1', callPurpose: TranslationCallPurpose.PRIMARY_TRANSLATION, conversationCommitCandidate: candidate });
+      expect(candidate.stage).toHaveBeenCalledWith({ sessionId: 'session-1', userContent: 'source', assistantContent: 'translated' });
+      expect(update).not.toHaveBeenCalled();
+    } finally { update.mockRestore(); }
+  });
+
+  it('keeps direct history writes for primary calls without a candidate', async () => {
+    const update = vi.spyOn(AIConversationHelper, 'updateSessionHistory').mockResolvedValue();
+    vi.spyOn(provider, '_executeRequest').mockResolvedValue('translated');
+    try {
+      await provider._callAI('system', 'source', { sessionId: 'session-1', callPurpose: TranslationCallPurpose.PRIMARY_TRANSLATION });
+      expect(update).toHaveBeenCalledWith('session-1', 'source', 'translated', { callPurpose: TranslationCallPurpose.PRIMARY_TRANSLATION });
+    } finally { update.mockRestore(); }
+  });
+
   it('should allow anonymous OpenAI-compatible requests without an API key', async () => {
     vi.mocked(getCustomApiKeysAsync).mockResolvedValueOnce([]);
 

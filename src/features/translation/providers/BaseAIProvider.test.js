@@ -39,6 +39,7 @@ import { ResponseFormat } from '@/shared/config/translationConstants.js';
 import { isCancellationError, isFatalError, isTransientError, matchErrorToType } from '@/shared/error-management/ErrorMatcher.js';
 import { createTranslationOperation } from '../ir/TranslationOperation.js';
 import { TranslationCallPurpose } from './ProviderConstants.js';
+import { translationSessionManager } from '../core/TranslationSessionManager.js';
 
 // Mock AIResponseParser
 vi.mock("./utils/AIResponseParser.js", () => ({
@@ -76,6 +77,7 @@ describe('BaseAIProvider', () => {
     vi.mocked(isTransientError).mockReturnValue(false);
     vi.mocked(matchErrorToType).mockReturnValue('UNKNOWN');
     vi.mocked(isCancellationError).mockReturnValue(false);
+    translationSessionManager.sessions.clear();
   });
 
   describe('_translateBatch', () => {
@@ -149,6 +151,97 @@ describe('BaseAIProvider', () => {
       await provider._translateBatch(['seg1'], 'en', 'fa', 'selection');
 
       expect(callSpy.mock.calls[0][2].callPurpose).toBe(TranslationCallPurpose.PRIMARY_TRANSLATION);
+    });
+
+    it('commits one staged valid structured primary response after parser acceptance', async () => {
+      const { AIResponseParser } = await import("./utils/AIResponseParser.js");
+      const response = '{"translations":["translated"]}';
+      const session = translationSessionManager.getOrCreateSession('accepted-session', 'MockAI');
+      const writeSpy = vi.spyOn((await import('./utils/AIConversationHelper.js')).AIConversationHelper, 'updateSessionHistory');
+      provider._callAI = vi.fn(async (_system, userText, options) => {
+        options.conversationCommitCandidate.stage({ sessionId: options.sessionId, userContent: userText, assistantContent: response });
+        return response;
+      });
+      AIResponseParser.parseBatchResult.mockReturnValue({ results: ['translated'], contractViolation: false });
+
+      try {
+        await expect(provider._translateBatch(['source'], 'en', 'fa', 'select-element', null, null, 'm', 'accepted-session', null, ResponseFormat.JSON_ARRAY))
+          .resolves.toEqual(['translated']);
+        expect(writeSpy).toHaveBeenCalledTimes(1);
+        expect(session.batchCount).toBe(1);
+        expect(session.history).toHaveLength(2);
+      } finally {
+        writeSpy.mockRestore();
+      }
+    });
+
+    it('discards a staged malformed structured primary response before recovery', async () => {
+      const { AIResponseParser } = await import("./utils/AIResponseParser.js");
+      const session = translationSessionManager.getOrCreateSession('rejected-session', 'MockAI');
+      const before = structuredClone(session);
+      const writeSpy = vi.spyOn((await import('./utils/AIConversationHelper.js')).AIConversationHelper, 'updateSessionHistory');
+      provider._callAI = vi.fn(async (_system, userText, options) => {
+        options.conversationCommitCandidate.stage({ sessionId: options.sessionId, userContent: userText, assistantContent: 'malformed' });
+        return 'malformed';
+      });
+      const recoverySpy = vi.spyOn(provider, '_traditionalBatchTranslate').mockResolvedValue(['translated']);
+      AIResponseParser.parseBatchResult.mockReturnValue({ results: ['source'], contractViolation: true });
+
+      try {
+        await expect(provider._translateBatch(['source'], 'en', 'fa', 'select-element', null, null, 'm', 'rejected-session', null, ResponseFormat.JSON_ARRAY))
+          .resolves.toEqual(['translated']);
+        expect(recoverySpy).toHaveBeenCalledTimes(1);
+        expect(writeSpy).not.toHaveBeenCalled();
+        expect(session).toEqual(before);
+      } finally {
+        writeSpy.mockRestore();
+      }
+    });
+
+    it.each([
+      ['transport failure', Object.assign(new Error('network'), { type: 'NETWORK_ERROR' })],
+      ['cancellation', Object.assign(new Error('cancelled'), { type: 'USER_CANCELLED' })],
+    ])('discards a staged structured primary response after %s', async (_label, error) => {
+      const session = translationSessionManager.getOrCreateSession(`failed-${_label}`, 'MockAI');
+      const before = structuredClone(session);
+      const writeSpy = vi.spyOn((await import('./utils/AIConversationHelper.js')).AIConversationHelper, 'updateSessionHistory');
+      provider._callAI = vi.fn(async (_system, userText, options) => {
+        options.conversationCommitCandidate.stage({ sessionId: options.sessionId, userContent: userText, assistantContent: 'raw' });
+        throw error;
+      });
+
+      try {
+        await expect(provider._translateBatch(['source'], 'en', 'fa', 'select-element', null, null, 'm', session.id, null, ResponseFormat.JSON_ARRAY))
+          .rejects.toBe(error);
+        expect(writeSpy).not.toHaveBeenCalled();
+        expect(session).toEqual(before);
+      } finally {
+        writeSpy.mockRestore();
+      }
+    });
+
+    it('keeps staged candidate state local to each structured batch execution', async () => {
+      const { AIResponseParser } = await import("./utils/AIResponseParser.js");
+      const session = translationSessionManager.getOrCreateSession('local-candidates', 'MockAI');
+      const writeSpy = vi.spyOn((await import('./utils/AIConversationHelper.js')).AIConversationHelper, 'updateSessionHistory');
+      provider._callAI = vi.fn(async (_system, userText, options) => {
+        options.conversationCommitCandidate.stage({ sessionId: options.sessionId, userContent: userText, assistantContent: userText });
+        return userText;
+      });
+      const recoverySpy = vi.spyOn(provider, '_traditionalBatchTranslate').mockResolvedValue(['recovered']);
+      AIResponseParser.parseBatchResult
+        .mockReturnValueOnce({ results: ['source'], contractViolation: true })
+        .mockReturnValueOnce({ results: ['accepted'], contractViolation: false });
+
+      try {
+        await provider._translateBatch(['discarded'], 'en', 'fa', 'select-element', null, null, 'm1', session.id, null, ResponseFormat.JSON_ARRAY);
+        await provider._translateBatch(['accepted'], 'en', 'fa', 'select-element', null, null, 'm2', session.id, null, ResponseFormat.JSON_ARRAY);
+        expect(recoverySpy).toHaveBeenCalledTimes(1);
+        expect(writeSpy).toHaveBeenCalledTimes(1);
+        expect(session.history).toHaveLength(2);
+      } finally {
+        writeSpy.mockRestore();
+      }
     });
 
     it('should perform exactly one sequential recovery when the contract is violated', async () => {

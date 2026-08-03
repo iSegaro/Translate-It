@@ -31,7 +31,7 @@ export class GeminiProvider extends BaseAIProvider {
    * @protected
    */
   async _callAI(systemPrompt, userText, options = {}) {
-    const { abortController, sessionId, expectedFormat, isBatch, executionContext, callPurpose } = options;
+    const { abortController, sessionId, expectedFormat, isBatch, executionContext, callPurpose, conversationCommitCandidate } = options;
 
     const [apiKeys, model, thinkingEnabled, rawApiUrl] = await Promise.all([
       getGeminiApiKeysAsync(),
@@ -142,7 +142,8 @@ export class GeminiProvider extends BaseAIProvider {
       });
 
       if (sessionId && result) {
-        await AIConversationHelper.updateSessionHistory(sessionId, userText, result, { callPurpose });
+        if (conversationCommitCandidate) conversationCommitCandidate.stage({ sessionId, userContent: userText, assistantContent: result });
+        else await AIConversationHelper.updateSessionHistory(sessionId, userText, result, { callPurpose });
       }
 
       return result;
@@ -152,7 +153,7 @@ export class GeminiProvider extends BaseAIProvider {
         const retryBody = { ...requestBody };
         delete retryBody.generationConfig.thinking_config;
         const retryBodyJson = JSON.stringify(retryBody);
-        return await this._executeRequest({
+        const fallbackResult = await this._executeRequest({
           url,
           fetchOptions: { ...fetchOptions, body: retryBodyJson },
           charCount: retryBodyJson.length,
@@ -178,7 +179,15 @@ export class GeminiProvider extends BaseAIProvider {
               urlObj.searchParams.set('key', newKey);
               options.url = urlObj.toString();
             }
-          }        });
+          }
+        });
+
+        if (sessionId && fallbackResult) {
+          if (conversationCommitCandidate) conversationCommitCandidate.stage({ sessionId, userContent: userText, assistantContent: fallbackResult });
+          else await AIConversationHelper.updateSessionHistory(sessionId, userText, fallbackResult, { callPurpose });
+        }
+
+        return fallbackResult;
       }
       throw error;
     }

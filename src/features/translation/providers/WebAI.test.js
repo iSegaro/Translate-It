@@ -93,6 +93,28 @@ describe('WebAIProvider history support', () => {
     expect(AIConversationHelper.updateSessionHistory).toHaveBeenCalledWith('session-1', 'current segment', 'translated', { callPurpose: TranslationCallPurpose.STRUCTURED_RECOVERY });
   });
 
+  it('stages a primary candidate under active history gates', async () => {
+    getAIConversationHistoryEnabledAsync.mockResolvedValue(true);
+    const candidate = { stage: vi.fn() };
+    const update = vi.spyOn(AIConversationHelper, 'updateSessionHistory').mockResolvedValue();
+    vi.spyOn(provider, '_executeRequest').mockResolvedValue('translated');
+    try {
+      await provider._callAI('system', 'source', { sessionId: 'session-1', mode: 'select-element', callPurpose: TranslationCallPurpose.PRIMARY_TRANSLATION, conversationCommitCandidate: candidate });
+      expect(candidate.stage).toHaveBeenCalledWith({ sessionId: 'session-1', userContent: 'source', assistantContent: 'translated' });
+      expect(update).not.toHaveBeenCalled();
+    } finally { update.mockRestore(); }
+  });
+
+  it('keeps direct history writes for primary calls without a candidate', async () => {
+    getAIConversationHistoryEnabledAsync.mockResolvedValue(true);
+    const update = vi.spyOn(AIConversationHelper, 'updateSessionHistory').mockResolvedValue();
+    vi.spyOn(provider, '_executeRequest').mockResolvedValue('translated');
+    try {
+      await provider._callAI('system', 'source', { sessionId: 'session-1', mode: 'select-element', callPurpose: TranslationCallPurpose.PRIMARY_TRANSLATION });
+      expect(update).toHaveBeenCalledWith('session-1', 'source', 'translated', { callPurpose: TranslationCallPurpose.PRIMARY_TRANSLATION });
+    } finally { update.mockRestore(); }
+  });
+
   it('injects compact Select Element history and keeps a single message payload when history is enabled', async () => {
     getAIConversationHistoryEnabledAsync.mockResolvedValue(true);
 

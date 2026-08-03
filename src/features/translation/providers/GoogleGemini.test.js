@@ -66,6 +66,26 @@ describe('GeminiProvider Error Handling', () => {
     claim.mockRestore(); history.mockRestore(); update.mockRestore();
   });
 
+  it('stages a normal primary candidate instead of writing history directly', async () => {
+    const candidate = { stage: vi.fn() };
+    const update = vi.spyOn(AIConversationHelper, 'updateSessionHistory').mockResolvedValue();
+    vi.spyOn(provider, '_executeRequest').mockResolvedValue('translated');
+    try {
+      await provider._callAI('system', 'source', { sessionId: 'session-1', callPurpose: TranslationCallPurpose.PRIMARY_TRANSLATION, conversationCommitCandidate: candidate });
+      expect(candidate.stage).toHaveBeenCalledWith({ sessionId: 'session-1', userContent: 'source', assistantContent: 'translated' });
+      expect(update).not.toHaveBeenCalled();
+    } finally { update.mockRestore(); }
+  });
+
+  it('keeps direct history writes for primary calls without a candidate', async () => {
+    const update = vi.spyOn(AIConversationHelper, 'updateSessionHistory').mockResolvedValue();
+    vi.spyOn(provider, '_executeRequest').mockResolvedValue('translated');
+    try {
+      await provider._callAI('system', 'source', { sessionId: 'session-1', callPurpose: TranslationCallPurpose.PRIMARY_TRANSLATION });
+      expect(update).toHaveBeenCalledWith('session-1', 'source', 'translated', { callPurpose: TranslationCallPurpose.PRIMARY_TRANSLATION });
+    } finally { update.mockRestore(); }
+  });
+
   it('should detect API_ERROR wrapped in 200 OK response', async () => {
     proxyManager.fetch.mockResolvedValue({
       ok: true,
@@ -159,5 +179,41 @@ describe('GeminiProvider Error Handling', () => {
     expect(executeRequest.mock.calls[0][0].executionContext).toBe(executionContext);
     expect(executeRequest.mock.calls[1][0].executionContext).toBeUndefined();
     expect(proxyManager.fetch).toHaveBeenCalledTimes(2);
+  });
+
+  it('stages a successful thinking fallback for structured primary validation', async () => {
+    proxyManager.fetch
+      .mockResolvedValueOnce({
+        ok: false,
+        status: 400,
+        headers: new Map([['content-type', 'application/json']]),
+        json: () => Promise.resolve({ error: { message: 'Invalid field: thinking_config' } }),
+        clone: function() { return this; }
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        headers: new Map([['content-type', 'application/json']]),
+        json: () => Promise.resolve({ candidates: [{ content: { parts: [{ text: 'fallback result' }] } }] }),
+        clone: function() { return this; }
+      });
+    const { getGeminiThinkingEnabledAsync, getGeminiModelAsync } = await import('@/shared/config/config.js');
+    getGeminiThinkingEnabledAsync.mockResolvedValue(true);
+    getGeminiModelAsync.mockResolvedValue('gemini-2.0-flash-thinking-exp');
+    const conversationCommitCandidate = { stage: vi.fn() };
+
+    const result = await provider._callAI('system', 'text', {
+      sessionId: 'session-1',
+      callPurpose: TranslationCallPurpose.PRIMARY_TRANSLATION,
+      conversationCommitCandidate
+    });
+
+    expect(result).toBe('fallback result');
+    expect(conversationCommitCandidate.stage).toHaveBeenCalledTimes(1);
+    expect(conversationCommitCandidate.stage).toHaveBeenCalledWith({
+      sessionId: 'session-1',
+      userContent: 'text',
+      assistantContent: 'fallback result'
+    });
   });
 });

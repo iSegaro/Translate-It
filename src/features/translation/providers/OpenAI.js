@@ -30,7 +30,7 @@ export class OpenAIProvider extends BaseAIProvider {
    * @protected
    */
   async _callAI(systemPrompt, userText, options = {}) {
-    const { abortController, sessionId, expectedFormat, isBatch, executionContext, callPurpose } = options;
+    const { abortController, sessionId, expectedFormat, isBatch, executionContext, callPurpose, conversationCommitCandidate } = options;
 
     const [apiKeys, apiUrl, model] = await Promise.all([
       getOpenAIApiKeysAsync(),
@@ -90,7 +90,8 @@ export class OpenAIProvider extends BaseAIProvider {
     });
 
     if (sessionId && result) {
-      await AIConversationHelper.updateSessionHistory(sessionId, userText, result, { callPurpose });
+      if (conversationCommitCandidate) conversationCommitCandidate.stage({ sessionId, userContent: userText, assistantContent: result });
+      else await AIConversationHelper.updateSessionHistory(sessionId, userText, result, { callPurpose });
     }
 
     return result;
