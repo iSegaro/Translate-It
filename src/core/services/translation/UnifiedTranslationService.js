@@ -15,7 +15,7 @@ import {
   getSelectElementMaxCharsAsync
 } from '@/shared/config/config.js';
 import { MessageFormat, MessageContexts, ActionReasons } from '@/shared/messaging/core/MessagingCore.js';
-import { translationRequestTracker } from './TranslationRequestTracker.js';
+import { RequestStatus, translationRequestTracker } from './TranslationRequestTracker.js';
 import { UnifiedResultDispatcher } from './UnifiedResultDispatcher.js';
 import { UnifiedModeCoordinator } from './UnifiedModeCoordinator.js';
 import { statsManager } from '@/features/translation/core/TranslationStatsManager.js';
@@ -212,8 +212,12 @@ export class UnifiedTranslationService {
       if (!transition.accepted) return this._createSuppressedResponse(messageId, transition);
       TerminalExecutionRouter.routeTerminalExecution(executionContext.operation, { status: transition.status });
       this._finalizeDiagnostics(request, executionContext, {
-        type: 'OPERATION_COMPLETED',
+        type: transition.status === RequestStatus.FAILED ? 'OPERATION_FAILED' : 'OPERATION_COMPLETED',
         stage: 'service',
+        ...(transition.status === RequestStatus.FAILED && {
+          reason: typeof result.error === 'object' ? result.error?.message : result.error,
+          code: typeof result.error === 'object' ? result.error?.type : undefined,
+        }),
       });
 
       // Special handling for Field mode (direct return)

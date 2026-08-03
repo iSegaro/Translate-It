@@ -207,6 +207,54 @@ describe('UnifiedTranslationService', () => {
       expect(service.resultDispatcher.dispatchResult).toHaveBeenCalled();
     });
 
+    it('records OPERATION_FAILED with reason and code when the tracker transition is FAILED', async () => {
+      const message = {
+        messageId: 'm-fail',
+        data: { text: 'hello', mode: 'selection' },
+        context: 'content'
+      };
+
+      const mockRequest = { messageId: 'm-fail', data: message.data };
+      translationRequestTracker.createRequest.mockReturnValue(mockRequest);
+      translationRequestTracker.completeRequest.mockReturnValue({ accepted: true, status: 'failed' });
+
+      service.modeCoordinator.processRequest.mockResolvedValue({
+        success: false,
+        error: { type: 'API_ERROR', message: 'Provider rejected request' }
+      });
+
+      await service.handleTranslationRequest(message);
+
+      const calls = finalizeTranslationOperation.mock.results;
+      const report = calls[calls.length - 1].value;
+      expect(report).toBeTruthy();
+      const terminal = report.entries[report.entries.length - 1];
+      expect(terminal.type).toBe('OPERATION_FAILED');
+      expect(terminal.reason).toBe('Provider rejected request');
+      expect(terminal.code).toBe('API_ERROR');
+    });
+
+    it('records OPERATION_COMPLETED when the tracker transition is COMPLETED', async () => {
+      const message = {
+        messageId: 'm-ok',
+        data: { text: 'hello', mode: 'selection' },
+        context: 'content'
+      };
+
+      const mockRequest = { messageId: 'm-ok', data: message.data };
+      translationRequestTracker.createRequest.mockReturnValue(mockRequest);
+
+      service.modeCoordinator.processRequest.mockResolvedValue({ success: true, translatedText: 'bonjour' });
+
+      await service.handleTranslationRequest(message);
+
+      const calls = finalizeTranslationOperation.mock.results;
+      const report = calls[calls.length - 1].value;
+      expect(report).toBeTruthy();
+      const terminal = report.entries[report.entries.length - 1];
+      expect(terminal.type).toBe('OPERATION_COMPLETED');
+    });
+
     it('suppresses a late success result when cancellation already won', async () => {
       const message = { messageId: 'm-cancelled', data: { text: 'hello', mode: 'selection' }, context: 'content' };
       const request = { messageId: 'm-cancelled', data: message.data, mode: 'selection' };
