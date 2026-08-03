@@ -75,15 +75,14 @@ describe('BaseAIProvider', () => {
   });
 
   describe('_translateBatch', () => {
-    it('should return original text on non-fatal AND non-transient error', async () => {
+    it('should throw on non-fatal AND non-transient error instead of returning original text', async () => {
       provider._callAI = vi.fn().mockRejectedValue(new Error('Non-Fatal-Non-Transient'));
       vi.mocked(isFatalError).mockReturnValue(false);
       vi.mocked(isTransientError).mockReturnValue(false);
 
       const texts = ['Original 1', 'Original 2'];
-      const result = await provider._translateBatch(texts, 'en', 'fa', 'selection', null, null, null, 'session-123');
-
-      expect(result).toEqual(['Original 1', 'Original 2']);
+      await expect(provider._translateBatch(texts, 'en', 'fa', 'selection', null, null, null, 'session-123'))
+        .rejects.toThrow('Non-Fatal-Non-Transient');
     });
 
     it('should throw and NOT fallback if error is transient', async () => {

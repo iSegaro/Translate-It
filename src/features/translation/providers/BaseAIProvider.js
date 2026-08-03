@@ -17,7 +17,6 @@ import { AIResponseParser } from "./utils/AIResponseParser.js";
 import { AITextProcessor } from "./utils/AITextProcessor.js";
 import { TranslationMode, getProviderOptimizationLevelAsync } from "@/shared/config/config.js";
 import { AIStreamManager } from "./utils/AIStreamManager.js";
-import { appendTranslationDiagnostic } from '@/features/translation/ir/TranslationOperation.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.TRANSLATION, 'BaseAIProvider');
 
@@ -192,30 +191,14 @@ export class BaseAIProvider extends BaseProvider {
           m.statsManager.recordError(this.providerName, sessionId);
         }).catch(() => { /* ignore */ });
       }
-      
-      const { matchErrorToType, isFatalError, isTransientError } = await import('@/shared/error-management/ErrorMatcher.js');
-      const errorType = error.type || matchErrorToType(error);
-      const isFatal = isFatalError(error) || isFatalError(errorType);
-      const isTransient = isTransientError(error) || isTransientError(errorType);
 
       logger.debug(`[${this.providerName}] Batch translation failed:`, error.message);
-      
-      // CRITICAL FALLBACK: ONLY return clean original text if the error is non-fatal AND non-transient.
-      // If it is transient (Network, 429, 5xx), we MUST throw so QueueManager can retry.
-      // For fatal errors (401, 403), we MUST throw to inform the UI and stop the process.
-      if (!isFatal && !isTransient && Array.isArray(texts)) {
-        logger.warn(`[${this.providerName}] Non-fatal error, falling back to original text for mapping safety`);
-        appendTranslationDiagnostic(contextMetadata?.executionContext, {
-          type: 'PROVIDER_FALLBACK',
-          stage: 'base-ai-provider',
-          provider: this.providerName,
-          reason: error.message,
-          code: errorType,
-          fallback: true,
-        });
-        return texts.map(t => typeof t === 'object' ? (t.t || t.text || "") : (t || ""));
-      }
-      
+
+      // EVERY error is thrown - never return original text as a "successful" translation.
+      // - Transient (Network, 429, 5xx): thrown so QueueManager can retry.
+      // - Fatal (401, 403): thrown to inform the UI and stop the process.
+      // - Non-fatal, non-transient: thrown so the failure surfaces loudly instead of
+      //   silently reporting the untranslated original as a success.
       throw error;
     }
   }
@@ -257,16 +240,9 @@ export class BaseAIProvider extends BaseProvider {
         results.push(AIResponseParser.cleanAIResponse(response, expectedFormat || ResponseFormat.STRING));
       } catch (error) {
         logger.error(`[${this.providerName}] Traditional segment translation failed:`, error.message);
-        appendTranslationDiagnostic(options.executionContext, {
-          type: 'PROVIDER_FALLBACK',
-          stage: 'base-ai-provider',
-          provider: this.providerName,
-          reason: error.message,
-          code: error.type,
-          fallback: true,
-        });
-        // Return clean original text as fallback for this segment
-        results.push(typeof text === 'object' ? (text.t || text.text || "") : (text || ""));
+        // No silent success: a failed segment fails the batch loudly. The error
+        // propagates for retry (transient) or explicit failure reporting (fatal/permanent).
+        throw error;
       }
     }
     return results.length === 1 && texts.length === 1 ? results[0] : results;

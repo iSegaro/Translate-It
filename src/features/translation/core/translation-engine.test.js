@@ -190,6 +190,20 @@ describe('TranslationEngine', () => {
       expect(result.success).toBe(false);
       expect(result.error.message).toBe('API Down');
     });
+
+    it('should not stamp success on a raw-string result from the provider', async () => {
+      const mockProvider = await engine.getProvider('google');
+      mockProvider.translate.mockResolvedValue('Plain String Result');
+
+      const request = {
+        action: MessageActions.TRANSLATE,
+        data: { text: 'Test', provider: 'google', mode: 'selection' }
+      };
+
+      const result = await engine.handleMessage(request, {});
+
+      expect(result.success).toBe(false);
+    });
   });
 
   describe('Validation Logic', () => {
