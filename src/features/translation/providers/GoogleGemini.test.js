@@ -183,8 +183,15 @@ describe('GeminiProvider Error Handling', () => {
     expect(executeRequest.mock.calls[1][0].executionContext).toBe(executionContext);
     expect(executeRequest.mock.calls[1][0]).toMatchObject({ sessionId: 'session-1', abortController });
     const [initialRequest, fallbackRequest] = executeRequest.mock.calls.map(([request]) => request);
+    expect(initialRequest.originalCharCount).toBe('text'.length);
+    expect(fallbackRequest.originalCharCount).toBe('text'.length);
+    expect(initialRequest.charCount).toBe(initialRequest.fetchOptions.body.length);
+    expect(fallbackRequest.charCount).toBe(fallbackRequest.fetchOptions.body.length);
     expect(JSON.parse(initialRequest.fetchOptions.body).generationConfig.thinking_config).toEqual({ include_thoughts: false });
     expect(JSON.parse(fallbackRequest.fetchOptions.body).generationConfig.thinking_config).toBeUndefined();
+    expect(fallbackRequest.charCount).toBeLessThan(initialRequest.charCount);
+    expect(JSON.parse(fallbackRequest.fetchOptions.body)).not.toHaveProperty('originalCharCount');
+    expect(JSON.parse(fallbackRequest.fetchOptions.body)).not.toHaveProperty('charCount');
     expect(JSON.parse(fallbackRequest.fetchOptions.body)).not.toHaveProperty('executionContext');
     expect(JSON.parse(fallbackRequest.fetchOptions.body)).not.toHaveProperty('callPurpose');
     expect(fallbackRequest.fetchOptions.headers).not.toHaveProperty('executionContext');

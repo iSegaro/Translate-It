@@ -108,13 +108,14 @@ export class GeminiProvider extends BaseAIProvider {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(requestBody),
     };
+    const originalCharCount = isBatch ? AITextProcessor.estimateOriginalChars(userText) : userText.length;
 
     try {
       const result = await this._executeRequest({
         url,
         fetchOptions,
         charCount: fetchOptions.body.length,
-        originalCharCount: isBatch ? AITextProcessor.estimateOriginalChars(userText) : userText.length,
+        originalCharCount,
         extractResponse: (data) => {
         if (data?.error) {
           throw new Error(`API_ERROR: ${data.error.message || 'Unknown Gemini Error'}`);
@@ -157,6 +158,7 @@ export class GeminiProvider extends BaseAIProvider {
           url,
           fetchOptions: { ...fetchOptions, body: retryBodyJson },
           charCount: retryBodyJson.length,
+          originalCharCount,
           extractResponse: (data) => {
         if (data?.error) {
           throw new Error(`API_ERROR: ${data.error.message || 'Unknown Gemini Error'}`);
