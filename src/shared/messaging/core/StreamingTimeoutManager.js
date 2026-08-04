@@ -135,10 +135,10 @@ export class StreamingTimeoutManager {
     // Call completion callback
     try {
       streamState.onComplete(result);
-      streamState.resolve(result);
     } catch (error) {
       logger.warn(`Error in completion callback for ${messageId}:`, error);
     }
+    streamState.resolve(result);
 
     // Cleanup
     this._cleanup(messageId);
@@ -173,36 +173,36 @@ export class StreamingTimeoutManager {
     // Call error callback
     try {
       streamState.onError(error);
-
-      // For user cancellations, resolve with a cancelled result instead of rejecting
-      if (error.isCancellation || error.type === ErrorTypes.USER_CANCELLED) {
-        // Resolve with a cancellation result instead of rejecting to avoid uncaught promise
-        streamState.resolve({
-          success: false,
-          cancelled: true,
-          reason: error.message || error.reason,
-          messageId
-        });
-      } else {
-        // Use centralized error handling and resolve instead of reject to avoid uncaught promise
-        ErrorHandler.getInstance().handle(error, {
-          context: 'streaming-timeout-manager',
-          messageId: messageId,
-          showToast: false // Streaming errors are handled by the streaming system
-        }).catch(handlerError => {
-          logger.warn(`ErrorHandler failed to handle streaming timeout error:`, handlerError);
-        });
-
-        // Resolve with error result instead of rejecting to prevent uncaught promise errors
-        streamState.resolve({
-          success: false,
-          error: error,
-          messageId: messageId,
-          timedOut: true
-        });
-      }
     } catch (callbackError) {
       logger.warn(`Error in error callback for ${messageId}:`, callbackError);
+    }
+
+    // For user cancellations, resolve with a cancelled result instead of rejecting
+    if (error.isCancellation || error.type === ErrorTypes.USER_CANCELLED) {
+      // Resolve with a cancellation result instead of rejecting to avoid uncaught promise
+      streamState.resolve({
+        success: false,
+        cancelled: true,
+        reason: error.message || error.reason,
+        messageId
+      });
+    } else {
+      // Use centralized error handling and resolve instead of reject to avoid uncaught promise
+      ErrorHandler.getInstance().handle(error, {
+        context: 'streaming-timeout-manager',
+        messageId: messageId,
+        showToast: false // Streaming errors are handled by the streaming system
+      }).catch(handlerError => {
+        logger.warn(`ErrorHandler failed to handle streaming timeout error:`, handlerError);
+      });
+
+      // Resolve with error result instead of rejecting to prevent uncaught promise errors
+      streamState.resolve({
+        success: false,
+        error: error,
+        messageId: messageId,
+        timedOut: true
+      });
     }
 
     // Cleanup

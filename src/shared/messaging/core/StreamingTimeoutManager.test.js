@@ -1,9 +1,14 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { StreamingTimeoutManager } from './StreamingTimeoutManager.js';
 
+const { loggerMock } = vi.hoisted(() => ({
+  loggerMock: { debug: vi.fn(), warn: vi.fn(), error: vi.fn() },
+}));
+
 // Mock ErrorHandler and ErrorMatcher using central mocks
 vi.mock('@/shared/error-management/ErrorHandler.js');
 vi.mock('@/shared/error-management/ErrorMatcher.js');
+vi.mock('@/shared/logging/logger.js', () => ({ getScopedLogger: () => loggerMock }));
 
 describe('StreamingTimeoutManager', () => {
   let manager;
@@ -35,6 +40,83 @@ describe('StreamingTimeoutManager', () => {
     
     await expect(promise).resolves.toEqual(result);
     expect(manager.isStreaming(messageId)).toBe(false);
+  });
+
+  it('settles completion when its observer throws', async () => {
+    const onComplete = vi.fn(() => { throw new Error('completion observer failed'); });
+    const onTimeout = vi.fn();
+    const promise = manager.registerStreamingOperation('complete-observer-error', 5000, { onComplete, onTimeout });
+    const result = { success: true, text: 'completed' };
+
+    manager.completeStreaming('complete-observer-error', result);
+
+    await expect(promise).resolves.toEqual(result);
+    expect(onComplete).toHaveBeenCalledTimes(1);
+    expect(manager.isStreaming('complete-observer-error')).toBe(false);
+    expect(loggerMock.warn).toHaveBeenCalled();
+    vi.advanceTimersByTime(6000);
+    expect(onTimeout).not.toHaveBeenCalled();
+  });
+
+  it('settles error and cancellation results when onError throws', async () => {
+    const onError = vi.fn(() => { throw new Error('error observer failed'); });
+    const error = new Error('stream failed');
+    const failed = manager.registerStreamingOperation('error-observer-error', 5000, { onError });
+
+    manager.errorStreaming('error-observer-error', error);
+    await expect(failed).resolves.toMatchObject({ success: false, error });
+    expect(manager.isStreaming('error-observer-error')).toBe(false);
+
+    const cancelled = manager.registerStreamingOperation('cancel-observer-error', 5000, { onError });
+    manager.cancelStreaming('cancel-observer-error', 'cancelled by test');
+    await expect(cancelled).resolves.toMatchObject({ success: false, cancelled: true, reason: 'cancelled by test' });
+    expect(loggerMock.warn).toHaveBeenCalled();
+  });
+
+  it('settles timeout when timeout and error observers throw', async () => {
+    const onTimeout = vi.fn(() => { throw new Error('timeout observer failed'); });
+    const onError = vi.fn(() => { throw new Error('error observer failed'); });
+    const promise = manager.registerStreamingOperation('timeout-observer-error', 5000, { onTimeout, onError });
+
+    vi.advanceTimersByTime(5000);
+
+    await expect(promise).resolves.toMatchObject({ success: false, timedOut: true });
+    expect(onTimeout).toHaveBeenCalledTimes(1);
+    expect(onError).toHaveBeenCalledTimes(1);
+    expect(manager.isStreaming('timeout-observer-error')).toBe(false);
+  });
+
+  it('keeps progress reset and terminal callback order when observers throw', async () => {
+    const onProgress = vi.fn(() => { throw new Error('progress observer failed'); });
+    const order = [];
+    const promise = manager.registerStreamingOperation('progress-observer-error', 300000, {
+      maxProgressTimeout: 5000,
+      onProgress,
+      onComplete: () => order.push('callback'),
+    });
+    promise.then(() => order.push('settled'));
+
+    manager.reportProgress('progress-observer-error');
+    vi.advanceTimersByTime(4999);
+    expect(manager.isStreaming('progress-observer-error')).toBe(true);
+    manager.completeStreaming('progress-observer-error', { success: true });
+    await promise;
+
+    expect(order).toEqual(['callback', 'settled']);
+    expect(loggerMock.warn).toHaveBeenCalled();
+  });
+
+  it('isolates a throwing terminal observer from concurrent streams', async () => {
+    const failing = manager.registerStreamingOperation('observer-fails', 5000, {
+      onComplete: () => { throw new Error('observer failed'); },
+    });
+    const normal = manager.registerStreamingOperation('observer-normal', 5000);
+
+    manager.completeStreaming('observer-fails', { success: true });
+    manager.completeStreaming('observer-normal', { success: true, text: 'normal' });
+
+    await expect(failing).resolves.toMatchObject({ success: true });
+    await expect(normal).resolves.toEqual({ success: true, text: 'normal' });
   });
 
   it('should reject (via resolve with error) when streaming fails', async () => {
