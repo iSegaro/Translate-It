@@ -146,6 +146,72 @@ describe('QueueManager', () => {
   });
 
   describe('Cancellation', () => {
+    it('does not retry a cancellation-shaped rejection', async () => {
+      const cancellation = Object.assign(new Error('Request cancelled'), {
+        type: ErrorTypes.USER_CANCELLED,
+        isCancelled: true,
+      });
+      const request = vi.fn().mockRejectedValue(cancellation);
+      const executionContext = { operation: { appendDiagnostic: vi.fn() } };
+      const promise = queueManager.enqueue('cancel-error-provider', request, 0, 'context', { executionContext });
+
+      await expect(promise).rejects.toBe(cancellation);
+      await vi.advanceTimersByTimeAsync(10000);
+
+      expect(request).toHaveBeenCalledTimes(1);
+      expect(queueManager.retryTimeouts.size).toBe(0);
+      expect(queueManager.getQueueStatus('cancel-error-provider').total).toBe(0);
+      expect(executionContext.operation.appendDiagnostic).not.toHaveBeenCalledWith(expect.objectContaining({ type: 'QUEUE_RETRY' }));
+    });
+
+    it('keeps a cancelled running item terminal after late resolution', async () => {
+      const deferred = createDeferred();
+      const promise = queueManager.enqueue('late-resolve-provider', () => deferred.promise, 0, 'context', { messageId: 'late-resolve' });
+      await Promise.resolve();
+      const item = queueManager.queues.get('late-resolve-provider')[0];
+
+      queueManager.cancelByMessageId('late-resolve');
+      await expect(promise).rejects.toMatchObject({ type: ErrorTypes.USER_CANCELLED });
+      deferred.resolve('late result');
+      await Promise.resolve();
+
+      expect(item.status).toBe('failed');
+      expect(queueManager.retryTimeouts.size).toBe(0);
+      expect(queueManager.getQueueStatus('late-resolve-provider').total).toBe(0);
+    });
+
+    it('does not retry a cancelled running item after late rejection', async () => {
+      const deferred = createDeferred();
+      const promise = queueManager.enqueue('late-reject-provider', () => deferred.promise, 0, 'context', { messageId: 'late-reject' });
+      await Promise.resolve();
+
+      queueManager.cancelByMessageId('late-reject');
+      await expect(promise).rejects.toMatchObject({ type: ErrorTypes.USER_CANCELLED });
+      const error = Object.assign(new Error('network failed'), { type: ErrorTypes.NETWORK_ERROR });
+      deferred.reject(error);
+      await Promise.resolve();
+      await vi.advanceTimersByTimeAsync(10000);
+
+      expect(queueManager.retryTimeouts.size).toBe(0);
+      expect(queueManager.getQueueStatus('late-reject-provider').total).toBe(0);
+    });
+
+    it('clears retry delay when the message is cancelled', async () => {
+      const retryable = Object.assign(new Error('network failed'), { type: ErrorTypes.NETWORK_ERROR });
+      const request = vi.fn().mockRejectedValue(retryable);
+      const promise = queueManager.enqueue('retry-cancel-provider', request, 0, 'context', { messageId: 'retry-cancel' });
+      promise.catch(() => {});
+      await vi.advanceTimersByTimeAsync(100);
+
+      expect(queueManager.retryTimeouts.size).toBe(1);
+      queueManager.cancelByMessageId('retry-cancel');
+      await expect(promise).rejects.toMatchObject({ type: ErrorTypes.USER_CANCELLED });
+      await vi.advanceTimersByTimeAsync(10000);
+
+      expect(request).toHaveBeenCalledTimes(1);
+      expect(queueManager.retryTimeouts.size).toBe(0);
+    });
+
     it('should cancel all items (including processing) for a provider', async () => {
       const mockRequest1 = vi.fn().mockImplementation(() => new Promise(resolve => setTimeout(() => resolve('R1'), 1000)));
       const mockRequest2 = vi.fn().mockResolvedValue('R2');

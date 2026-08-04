@@ -129,6 +129,8 @@ class QueueItem {
    * Check if item should be retried
    */
   shouldRetry() {
+    if (isCancellationError(this.lastError)) return false;
+
     // 1. If we have a fatal error (like invalid API key), do NOT retry
     if (this.lastError && isFatalError(this.lastError)) {
       // CIRCUIT_BREAKER_OPEN is considered fatal in ErrorMatcher.
@@ -339,6 +341,7 @@ export class QueueManager {
     
     try {
       const result = await item.requestFunction();
+      if (item.status !== QueueStatus.PROCESSING) return;
       
       // Execution success (the callback resolved); this is NOT a claim about
       // translation validity - semantic success is decided by downstream layers.
