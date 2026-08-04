@@ -249,12 +249,17 @@ export const AIResponseParser = {
       const results = new Array(expectedCount).fill(null);
       const unmappedTexts = [];
       const mappedIndexes = new Set();
+      const plainStringBatch = originalBatch.every((item) => typeof item === 'string');
+      const responseIds = [];
+      const unresolvedIds = [];
+      const resolvedIndexes = [];
       let unknownIdCount = 0;
 
       rawItems.forEach((item) => {
         const { text, id } = this._extractItemData(item);
+        responseIds.push(id === null || id === undefined ? '<missing>' : String(id));
         if (id !== null && id !== undefined) {
-          const idx = this._findOriginalIndex(id, originalBatch, expectedCount);
+          const idx = this._findOriginalIndex(id, originalBatch, expectedCount, plainStringBatch);
           if (idx !== -1) {
             if (mappedIndexes.has(idx)) {
               appendTranslationDiagnostic(executionContext, {
@@ -265,11 +270,14 @@ export const AIResponseParser = {
             }
             mappedIndexes.add(idx);
             results[idx] = text;
+            resolvedIndexes.push(idx);
           } else {
             unknownIdCount++;
+            unresolvedIds.push(String(id));
             unmappedTexts.push(text);
           }
         } else {
+          unresolvedIds.push('<missing>');
           unmappedTexts.push(text);
         }
       });
@@ -290,6 +298,17 @@ export const AIResponseParser = {
       // be gap-filled with unmapped translations or original text below. The parser
       // reports this fact only; recovery is owned by the provider.
       const contractViolation = results.some(item => item === null);
+      if (contractViolation) {
+        appendTranslationDiagnostic(executionContext, {
+          type: 'PARSER_MAPPING_FAILURE',
+          stage: 'parser',
+          expectedCount,
+          receivedCount: rawItems.length,
+          missingCount,
+          code: 'UNRESOLVED_MAPPING',
+          reason: `sourceBatch=${plainStringBatch ? 'plain-string' : 'object-or-mixed'}; mappingMode=${plainStringBatch ? 'POSITIONAL_NUMERIC' : 'IDENTITY'}; responseIds=${responseIds.join(',')}; unresolvedIds=${unresolvedIds.join(',')}; resolvedIndexes=${resolvedIndexes.join(',')}`,
+        });
+      }
 
       return {
         results: this._fillResultsGaps(results, unmappedTexts, originalBatch, expectedCount),
@@ -397,7 +416,14 @@ export const AIResponseParser = {
    * Finds the index of the original segment matching the AI's ID.
    * @private
    */
-  _findOriginalIndex(id, originalBatch, expectedCount) {
+  _findOriginalIndex(id, originalBatch, expectedCount, plainStringBatch = false) {
+    if (plainStringBatch) {
+      const index = typeof id === 'number'
+        ? id
+        : (/^(0|[1-9]\d*)$/.test(id) ? Number(id) : -1);
+      return Number.isInteger(index) && index >= 0 && index < expectedCount ? index : -1;
+    }
+
     const idx = typeof id === 'string' 
       ? originalBatch.findIndex(ob => (typeof ob === 'object' ? (ob.i || ob.uid || ob.id) : null) === id)
       : parseInt(id, 10);

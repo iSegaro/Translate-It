@@ -40,6 +40,7 @@ import { isCancellationError, isFatalError, isTransientError, matchErrorToType }
 import { createTranslationOperation } from '../ir/TranslationOperation.js';
 import { TranslationCallPurpose } from './ProviderConstants.js';
 import { translationSessionManager } from '../core/TranslationSessionManager.js';
+import { AIResponseParser } from './utils/AIResponseParser.js';
 
 // Mock AIResponseParser
 vi.mock("./utils/AIResponseParser.js", () => ({
@@ -118,6 +119,22 @@ describe('BaseAIProvider', () => {
   });
 
   describe('_translateBatch', () => {
+    it('accepts the normalized WebAI structured response without recovery', async () => {
+      const { AIResponseParser: realParser } = await vi.importActual('./utils/AIResponseParser.js');
+      AIResponseParser.parseBatchResult.mockImplementation(realParser.parseBatchResult.bind(realParser));
+      provider._callAI = vi.fn().mockResolvedValue(
+        JSON.parse('{"response":"{\\"translations\\":[{\\"id\\":\\"0\\",\\"text\\":\\"AA\\"},{\\"id\\":\\"1\\",\\"text\\":\\"BB\\"}]}"}').response
+      );
+      const recovery = vi.spyOn(provider, 'executeSequentialBatch');
+
+      const result = await provider._translateBatch(
+        ['A', 'B'], 'en', 'fa', 'select-element', null, null, null, null, null, ResponseFormat.JSON_OBJECT
+      );
+
+      expect(result).toEqual(['AA', 'BB']);
+      expect(recovery).not.toHaveBeenCalled();
+    });
+
     it('should throw on non-fatal AND non-transient error instead of returning original text', async () => {
       provider._callAI = vi.fn().mockRejectedValue(new Error('Non-Fatal-Non-Transient'));
       vi.mocked(isFatalError).mockReturnValue(false);

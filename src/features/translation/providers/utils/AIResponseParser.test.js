@@ -104,6 +104,51 @@ describe('AIResponseParser', () => {
   });
 
   describe('parseBatchResult manifest validation', () => {
+    it('maps string numeric response IDs positionally for plain-string batches', () => {
+      const result = AIResponseParser.parseBatchResult(
+        '{"translations":[{"id":"0","text":"AA"},{"id":"1","text":"BB"},{"id":"2","text":"CC"}]}',
+        3,
+        ['A', 'B', 'C'],
+        'WebAI',
+        ResponseFormat.JSON_OBJECT,
+      );
+
+      expect(result).toEqual({
+        results: ['AA', 'BB', 'CC'],
+        contractViolation: false,
+      });
+    });
+
+    it('maps numeric response IDs positionally for plain-string batches', () => {
+      const result = AIResponseParser.parseBatchResult(
+        '[{"id":0,"text":"AA"},{"id":1,"text":"BB"},{"id":2,"text":"CC"}]',
+        3,
+        ['A', 'B', 'C'],
+      );
+
+      expect(result).toEqual({ results: ['AA', 'BB', 'CC'], contractViolation: false });
+    });
+
+    it('keeps object batch mapping identity-based', () => {
+      const result = AIResponseParser.parseBatchResult(
+        '[{"id":"y","text":"BB"},{"id":"x","text":"AA"}]',
+        2,
+        [{ id: 'x', text: 'A' }, { id: 'y', text: 'B' }],
+      );
+
+      expect(result).toEqual({ results: ['AA', 'BB'], contractViolation: false });
+    });
+
+    it.each([
+      ['unknown ID', '[{"id":"9","text":"AA"},{"id":"1","text":"BB"}]'],
+      ['duplicate ID', '[{"id":"0","text":"AA"},{"id":"0","text":"BB"}]'],
+      ['missing ID', '[{"id":"0","text":"AA"}]'],
+    ])('keeps %s as a contract violation', (_label, response) => {
+      const result = AIResponseParser.parseBatchResult(response, 2, ['A', 'B']);
+
+      expect(result.contractViolation).toBe(true);
+    });
+
     it('observes immutable validation without changing legacy output', () => {
       const originalBatch = [{ i: 'first', t: 'source' }];
       const observeValidationResult = vi.fn();
