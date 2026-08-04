@@ -128,6 +128,19 @@ describe('BlockGroupReconstructor', () => {
       expect(() => BlockGroupReconstructor.splitTranslatedBlock(mismatched, units, 's123', 'xyz')).toThrow(/Segment count mismatch/);
     });
 
+    it('rejects localized digits inside a segment marker', () => {
+      const translated = 'A @@TI_SEG_xyz_s123_n۲@@ B @@TI_SEG_xyz_s123_n3@@ C';
+
+      expect(() => BlockGroupReconstructor.splitTranslatedBlock(translated, units, 's123', 'xyz')).toThrow(/Segment count mismatch/);
+    });
+
+    it('allows localized digits after a completed segment marker', () => {
+      const translated = 'A @@TI_SEG_xyz_s123_n2@@۲۴۳@@TI_SEG_xyz_s123_n3@@ C';
+      const segments = BlockGroupReconstructor.splitTranslatedBlock(translated, units, 's123', 'xyz');
+
+      expect(segments[1].text).toBe('۲۴۳');
+    });
+
     it('should reject foreign session IDs', () => {
       const translated = 'مرحبا @@TI_SEG_abc_n2@@بالعالم@@TI_SEG_abc_n3@@.';
       expect(() => BlockGroupReconstructor.splitTranslatedBlock(translated, units, 'def')).toThrow();

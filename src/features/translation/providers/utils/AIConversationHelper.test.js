@@ -192,6 +192,23 @@ describe('AIConversationHelper', () => {
     expect(userText).toContain('"translations"');
   });
 
+  it('uses the segment-marker rule for primary and one-item recovery preparation', async () => {
+    const { getPromptAsync, getPromptBASEAIBatchAsync } = await import('@/shared/config/config.js');
+    const markerRule = 'Preserve every segment marker that begins with @@TI_SEG_ and ends with @@ exactly as it appears. Example: @@TI_SEG_xxx_session_n5@@.';
+    getPromptAsync.mockResolvedValue('INSTRUCTIONS: $_{SOURCE} $_{TARGET}');
+    getPromptBASEAIBatchAsync.mockResolvedValue(`BATCH: ${markerRule}\n$_{PROMPT_INSTRUCTIONS}\n$_{TEXT}`);
+
+    const primary = await AIConversationHelper.preparePromptAndText(
+      ['Commons@@TI_SEG_ab12_session_n8@@Free media collection'], 'en', 'fa', 'select-element', 'ai'
+    );
+    const recovery = await AIConversationHelper.preparePromptAndText(
+      'Commons@@TI_SEG_ab12_session_n8@@Free media collection', 'en', 'fa', 'select-element', 'ai'
+    );
+
+    expect(primary.systemPrompt).toContain(markerRule);
+    expect(recovery.systemPrompt).toContain(markerRule);
+  });
+
   it('uses the batch prompt for PDF structured translation without select-element coupling', async () => {
     const { getPromptAsync, getPromptAutoAsync, getPromptBASEAIBatchAsync, getPromptBASEAIBatchAutoAsync } = await import('@/shared/config/config.js');
 

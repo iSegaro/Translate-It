@@ -120,6 +120,19 @@ describe('AIResponseParser', () => {
       });
     });
 
+    it('accepts a structured response preserving a runtime segment marker', () => {
+      const text = 'Commons@@TI_SEG_ab12_session_n8@@Free media collection';
+      const result = AIResponseParser.parseBatchResult(
+        `{"translations":[{"id":"0","text":"${text}"}]}`,
+        1,
+        [text],
+        'WebAI',
+        ResponseFormat.JSON_OBJECT,
+      );
+
+      expect(result).toEqual({ results: [text], contractViolation: false });
+    });
+
     it('maps numeric response IDs positionally for plain-string batches', () => {
       const result = AIResponseParser.parseBatchResult(
         '[{"id":0,"text":"AA"},{"id":1,"text":"BB"},{"id":2,"text":"CC"}]',
