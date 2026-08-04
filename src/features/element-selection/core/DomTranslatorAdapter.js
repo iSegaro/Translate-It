@@ -244,7 +244,8 @@ export class DomTranslatorAdapter extends ResourceTracker {
           t: data.text || '',
           i: data.uid,
           b: data.blockId,
-          r: data.role
+          r: data.role,
+          isV2Unit: true
         }));
       }
 
@@ -312,6 +313,10 @@ export class DomTranslatorAdapter extends ResourceTracker {
 
               if (data.data && Array.isArray(data.data)) {
                 data.data.forEach((translatedItem, index) => {
+                  if (translatedItem?.isSplitFragment === true) {
+                    this.logger.warn('[DomTranslatorAdapter] Suppressed incomplete V2 fragment event');
+                    return;
+                  }
                   // Handle both abbreviated and full keys for backward compatibility
                   const uid = translatedItem?.i || translatedItem?.uid || (data.originalData && (data.originalData[index]?.i || data.originalData[index]?.uid));
                   const text = translatedItem?.t || translatedItem?.text || translatedItem;
@@ -651,6 +656,10 @@ export class DomTranslatorAdapter extends ResourceTracker {
       const isBlockGroupingEnabled = this.sessionContext !== undefined;
 
       results.forEach((item, i) => {
+        if (item?.isSplitFragment === true) {
+          this.logger.warn('[DomTranslatorAdapter] Suppressed incomplete V2 fragment result');
+          return;
+        }
         // Handle abbreviated key 'i' for UID
         const uid = item?.i || item?.uid || item?.id;
         const text = item?.t || item?.text || item;
