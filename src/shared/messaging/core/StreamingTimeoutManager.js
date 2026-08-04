@@ -56,6 +56,7 @@ export class StreamingTimeoutManager {
       isCompleted: false,
       isCancelled: false,
       progressCount: 0,
+      maxProgressTimeout,
       hasTimedOut: false,
       lastError: null, // Store last error for cancellation detection
       onProgress,
@@ -438,10 +439,10 @@ export class StreamingTimeoutManager {
       clearTimeout(timeouts.progress);
     }
 
-    // Set new progress timeout (60 seconds between progress updates)
+    // Reuse the operation's configured maximum interval between progress updates.
     timeouts.progress = setTimeout(() => {
       this._handleProgressTimeout(messageId);
-    }, 60000);
+    }, this.activeStreams.get(messageId)?.maxProgressTimeout ?? 60000);
   }
 
   /**
