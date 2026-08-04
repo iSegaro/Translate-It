@@ -196,11 +196,12 @@ export class UnifiedTranslationService {
         });
       } catch (error) {
         logger.debug('Request failed:', error.message);
-        const transition = error.type === 'TIMEOUT'
+        const isTimeout = error.type === ErrorTypes.TRANSLATION_TIMEOUT || error.type === 'TIMEOUT';
+        const transition = isTimeout
           ? this.requestTracker.markTimeout(messageId)
           : this.requestTracker.failRequest(messageId, error);
         if (!transition.accepted) return this._createSuppressedResponse(messageId, transition);
-        if (error.type === 'TIMEOUT') {
+        if (isTimeout) {
           await this._finalizeAcceptedTimeout(request, messageId, error.message);
         } else {
           this._finalizeDiagnostics(request, executionContext, {

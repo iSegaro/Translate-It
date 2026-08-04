@@ -108,6 +108,11 @@ export class OptimizedJsonHandler {
       }
 
       async function processBatch(batch, i, { parallelExecution = false } = {}) {
+        let timeoutId = null;
+        let onAbort = null;
+        let timeoutError = null;
+        let didTimeout = false;
+
         const checkCancellation = () => {
           if (engine.isCancelled(messageId) || abortController.signal.aborted) {
             const abortError = new Error('Translation task cancelled');
@@ -127,21 +132,24 @@ export class OptimizedJsonHandler {
           // Timeout Protection (5 minutes) for each batch call
           const BATCH_TIMEOUT_MS = 300000;
           const timeoutPromise = new Promise((_, reject) => {
-            const timeoutId = setTimeout(() => {
-            const timeoutError = new Error(`Batch translation timed out after ${BATCH_TIMEOUT_MS}ms`);
-            timeoutError.type = 'TIMEOUT';
-            appendTranslationDiagnostic(executionContext, {
-              type: 'BATCH_TIMEOUT',
-              stage: 'optimized-json-handler',
-              batchIndex: i,
-              reason: timeoutError.message,
-              code: timeoutError.type,
-            });
+            timeoutId = setTimeout(() => {
+              didTimeout = true;
+              timeoutError = new Error(`Batch translation timed out after ${BATCH_TIMEOUT_MS}ms`);
+              timeoutError.type = ErrorTypes.TRANSLATION_TIMEOUT;
+              appendTranslationDiagnostic(executionContext, {
+                type: 'BATCH_TIMEOUT',
+                stage: 'optimized-json-handler',
+                batchIndex: i,
+                reason: timeoutError.message,
+                code: timeoutError.type,
+              });
               reject(timeoutError);
+              abortController.abort();
             }, BATCH_TIMEOUT_MS);
             
             // Link timeout cleanup to abort signal
-            abortController.signal.addEventListener('abort', () => clearTimeout(timeoutId));
+            onAbort = () => clearTimeout(timeoutId);
+            abortController.signal.addEventListener('abort', onAbort);
           });
 
           const batchPayload = hasManifestMembership ? batch.map(({ payload }) => payload) : batch;
@@ -220,6 +228,8 @@ export class OptimizedJsonHandler {
           }
           
         } catch (batchError) {
+          if (didTimeout) throw timeoutError;
+
           const errorType = matchErrorToType(batchError);
           const isCancellation = batchError.name === 'AbortError' || 
                                batchError.isCancelled || 
@@ -269,6 +279,9 @@ export class OptimizedJsonHandler {
           if (isFatalError(batchError)) {
             abortController.abort();
           }
+        } finally {
+          clearTimeout(timeoutId);
+          abortController.signal.removeEventListener('abort', onAbort);
         }
       }
 

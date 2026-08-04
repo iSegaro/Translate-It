@@ -23,6 +23,7 @@ vi.mock('@/shared/error-management/ErrorMatcher.js');
 import { OptimizedJsonHandler } from './OptimizedJsonHandler.js';
 import { isFatalError, matchErrorToType } from '@/shared/error-management/ErrorMatcher.js';
 import { MessageActions } from '@/shared/messaging/core/MessageActions.js';
+import { appendTranslationDiagnostic } from '@/features/translation/ir/TranslationOperation.js';
 import { getProviderConfiguration } from '@/features/translation/core/ProviderConfigurations.js';
 import { TranslationBatcher } from '@/features/translation/core/utils/TranslationBatcher.js';
 import { createManifestView, createRequestUnitManifest } from '@/features/translation/ir/RequestUnitManifest.js';
@@ -42,6 +43,10 @@ vi.mock('@/features/translation/core/TranslationStatsManager.js', () => ({
     getSessionSummary: vi.fn(() => ({ chars: 100, originalChars: 80 })),
     printSummary: vi.fn()
   }
+}));
+
+vi.mock('@/features/translation/ir/TranslationOperation.js', () => ({
+  appendTranslationDiagnostic: vi.fn()
 }));
 
 // Partial mocks for dynamic imports
@@ -556,6 +561,86 @@ describe('OptimizedJsonHandler', () => {
       updates.forEach((update) => {
         expect(JSON.stringify(update.data.data)).not.toContain('s1');
       });
+    });
+
+    it('should abort and propagate a canonical timeout without starting the next sequential batch', async () => {
+      vi.useFakeTimers();
+      const { getAIConversationHistoryEnabledAsync } = await import('@/shared/config/config.js');
+      const firstBatch = createDeferred();
+      let execution;
+
+      try {
+        getAIConversationHistoryEnabledAsync.mockResolvedValue(true);
+        mockProvider.translate
+          .mockImplementationOnce(() => firstBatch.promise)
+          .mockResolvedValue({ translatedText: ['t2'] });
+
+        execution = handler.execute(mockEngine, mockData, mockProvider, 'en', 'fa', 'msg-timeout', mockSender);
+        await vi.waitFor(() => expect(mockProvider.translate).toHaveBeenCalledTimes(1));
+        await vi.advanceTimersByTimeAsync(300000);
+
+        expect(mockAbortController.abort).toHaveBeenCalledTimes(1);
+        await expect(execution).rejects.toMatchObject({ type: 'TRANSLATION_TIMEOUT' });
+        expect(mockProvider.translate).toHaveBeenCalledTimes(1);
+
+      } finally {
+        firstBatch.resolve({ translatedText: ['late'] });
+        await execution?.catch(() => {});
+        getAIConversationHistoryEnabledAsync.mockResolvedValue(false);
+        vi.useRealTimers();
+      }
+    });
+
+    it('should clear successful batch deadlines without appending a late timeout diagnostic', async () => {
+      vi.useFakeTimers();
+      try {
+        mockProvider.translate
+          .mockResolvedValueOnce({ translatedText: ['t1'] })
+          .mockResolvedValueOnce({ translatedText: ['t2'] });
+
+        const execution = handler.execute(mockEngine, mockData, mockProvider, 'en', 'fa', 'msg-cleanup', mockSender);
+        await vi.waitFor(() => expect(mockProvider.translate).toHaveBeenCalledTimes(2));
+        await vi.advanceTimersByTimeAsync(50);
+        await expect(execution).resolves.toMatchObject({ success: true });
+        await vi.advanceTimersByTimeAsync(300000);
+
+        expect(mockAbortController.abort).not.toHaveBeenCalled();
+        expect(appendTranslationDiagnostic).not.toHaveBeenCalledWith(
+          expect.anything(),
+          expect.objectContaining({ type: 'BATCH_TIMEOUT' })
+        );
+        expect(mockAbortController.signal.removeEventListener).toHaveBeenCalledTimes(2);
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it('should suppress late provider settlement after a timeout', async () => {
+      vi.useFakeTimers();
+      const { getAIConversationHistoryEnabledAsync } = await import('@/shared/config/config.js');
+      const browser = (await import('webextension-polyfill')).default;
+      const firstBatch = createDeferred();
+
+      try {
+        getAIConversationHistoryEnabledAsync.mockResolvedValue(true);
+        mockProvider.translate.mockImplementationOnce(() => firstBatch.promise);
+        browser.tabs.sendMessage.mockClear();
+
+        const execution = handler.execute(mockEngine, mockData, mockProvider, 'en', 'fa', 'msg-late', mockSender);
+        await vi.waitFor(() => expect(mockProvider.translate).toHaveBeenCalledTimes(1));
+        await vi.advanceTimersByTimeAsync(300000);
+        await expect(execution).rejects.toMatchObject({ type: 'TRANSLATION_TIMEOUT' });
+
+        firstBatch.resolve({ translatedText: ['late'] });
+        await Promise.resolve();
+
+        expect(mockProvider.translate).toHaveBeenCalledTimes(1);
+        expect(browser.tabs.sendMessage).not.toHaveBeenCalled();
+      } finally {
+        firstBatch.resolve({ translatedText: ['late'] });
+        getAIConversationHistoryEnabledAsync.mockResolvedValue(false);
+        vi.useRealTimers();
+      }
     });
 
     it('should abort execution and bubble validation error on count mismatch', async () => {

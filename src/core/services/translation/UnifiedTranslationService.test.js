@@ -319,6 +319,22 @@ describe('UnifiedTranslationService', () => {
       expect(service.resultDispatcher.dispatchResult).not.toHaveBeenCalled();
     });
 
+    it('marks a canonical provider timeout as TIMEOUT and records OPERATION_TIMEOUT', async () => {
+      const message = { messageId: 'm-provider-timeout', data: { text: 'hello', mode: 'selection' }, context: 'content' };
+      translationRequestTracker.createRequest.mockReturnValue({ messageId: message.messageId, data: message.data, mode: 'selection' });
+      const timeout = Object.assign(new Error('Batch translation timed out'), {
+        type: ErrorTypes.TRANSLATION_TIMEOUT
+      });
+      service.modeCoordinator.processRequest.mockRejectedValue(timeout);
+
+      await service.handleTranslationRequest(message);
+
+      expect(translationRequestTracker.markTimeout).toHaveBeenCalledWith(message.messageId);
+      expect(translationRequestTracker.failRequest).not.toHaveBeenCalled();
+      const report = finalizeTranslationOperation.mock.results.at(-1).value;
+      expect(report.entries.at(-1).type).toBe('OPERATION_TIMEOUT');
+    });
+
     it('preserves timeout when late completion is rejected', async () => {
       const message = { messageId: 'm-timeout', data: { text: 'hello', mode: 'selection' }, context: 'content' };
       translationRequestTracker.createRequest.mockReturnValue({ messageId: 'm-timeout', data: message.data, mode: 'selection' });
