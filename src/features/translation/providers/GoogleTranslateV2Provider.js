@@ -1,5 +1,6 @@
 import { BaseTranslateProvider } from "@/features/translation/providers/BaseTranslateProvider.js";
 import { getScopedLogger } from '@/shared/logging/logger.js';
+import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { ProviderNames } from "@/features/translation/providers/ProviderConstants.js";
 import { TraditionalTextProcessor, getTextInfo } from "./utils/TraditionalTextProcessor.js";
@@ -162,8 +163,9 @@ export class GoogleTranslateV2Provider extends BaseTranslateProvider {
       },
       extractResponse: (data) => {
         if (!data || (!data[0] && !data.sentences)) {
-          logger.warn('[GoogleV2] Empty or invalid response data');
-          return { translatedText: "", candidateText: "" };
+          const error = new Error('Google V2 response has invalid format');
+          error.type = ErrorTypes.API_RESPONSE_INVALID;
+          throw error;
         }
 
         // Capture detected source language if available
@@ -190,6 +192,11 @@ export class GoogleTranslateV2Provider extends BaseTranslateProvider {
           }
 
           // Fallback to legacy array format
+          if (!Array.isArray(data[0])) {
+            const error = new Error('Google V2 response has invalid segment data');
+            error.type = ErrorTypes.API_RESPONSE_INVALID;
+            throw error;
+          }
           const translatedText = normalizeGoogleSlashDashArtifact(
             data[0].map(segment => segment[0] || "").join(''),
             sourceText
@@ -209,6 +216,11 @@ export class GoogleTranslateV2Provider extends BaseTranslateProvider {
         // For multiple segments, reconstruct the array to prevent delimiter leakage.
         // Multiple segments NEVER use dj=1 in our implementation, so we keep the legacy logic.
         const segments = data[0];
+        if (!Array.isArray(segments)) {
+          const error = new Error('Google V2 response has invalid segment data');
+          error.type = ErrorTypes.API_RESPONSE_INVALID;
+          throw error;
+        }
         const results = new Array(chunkTexts.length).fill("");
         let currentIdx = 0;
         let inDelimiterZone = false;
@@ -240,8 +252,9 @@ export class GoogleTranslateV2Provider extends BaseTranslateProvider {
 
         const hasEmpty = results.some((r, i) => !r.trim() && chunkTexts[i] && getTextInfo(chunkTexts[i]).text.trim());
         if (hasEmpty) {
-          const joinedResult = data[0].map(segment => segment[0] || "").join('');
-          return { translatedText: joinedResult, candidateText: "" };
+          const error = new Error('Google V2 response omitted a translated segment');
+          error.type = ErrorTypes.API_RESPONSE_INVALID;
+          throw error;
         }
 
         return { translatedText: results, candidateText: "" };
@@ -263,9 +276,14 @@ export class GoogleTranslateV2Provider extends BaseTranslateProvider {
     }
 
     // Return translated text. Coordinator will handle robust splitting for multiple segments.
-    const finalResult = responseObj?.translatedText || chunkTexts
-      .map(item => getTextInfo(item).text)
-      .join(TRANSLATION_CONSTANTS.TEXT_DELIMITER);
+    const finalResult = responseObj?.translatedText;
+    if ((typeof finalResult !== 'string' && !Array.isArray(finalResult)) ||
+        (typeof finalResult === 'string' && !finalResult.trim()) ||
+        (Array.isArray(finalResult) && (finalResult.length === 0 || finalResult.some(item => typeof item !== 'string' || !item.trim())))) {
+      const error = new Error('Google V2 response has no translation text');
+      error.type = ErrorTypes.API_RESPONSE_INVALID;
+      throw error;
+    }
 
     if (finalResult) {
       logger.info(`[GoogleV2] Translation completed successfully`);

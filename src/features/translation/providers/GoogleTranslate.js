@@ -4,6 +4,7 @@ import {
   getGoogleTranslateUrlAsync,
 } from "@/shared/config/config.js";
 import { getScopedLogger } from '@/shared/logging/logger.js';
+import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { TranslationMode } from "@/shared/config/config.js";
 import { TRANSLATION_CONSTANTS } from "@/shared/config/translationConstants.js";
@@ -113,8 +114,9 @@ export class GoogleTranslateProvider extends BaseTranslateProvider {
       },
       extractResponse: (data) => {
         if (!data || (!data[0] && !data.sentences)) {
-          logger.warn('[Google] Empty or invalid response data');
-          return { translatedText: "", candidateText: "" };
+          const error = new Error('Google response has invalid format');
+          error.type = ErrorTypes.API_RESPONSE_INVALID;
+          throw error;
         }
 
         // Capture detected source language from metadata
@@ -191,14 +193,17 @@ export class GoogleTranslateProvider extends BaseTranslateProvider {
 
           const hasEmpty = results.some((r, i) => !r.trim() && chunkTexts[i] && getTextInfo(chunkTexts[i]).text.trim());
           if (hasEmpty) {
-            const joinedResult = data[0].map(segment => segment[0]).join('');
-            return { translatedText: joinedResult, candidateText: "" };
+            const error = new Error('Google response omitted a translated segment');
+            error.type = ErrorTypes.API_RESPONSE_INVALID;
+            throw error;
           }
 
           return { translatedText: results, candidateText: "" };
         }
 
-        return { translatedText: "", candidateText: "" };
+        const error = new Error('Google response has no translation data');
+        error.type = ErrorTypes.API_RESPONSE_INVALID;
+        throw error;
       },
       context,
       abortController,
@@ -218,9 +223,14 @@ export class GoogleTranslateProvider extends BaseTranslateProvider {
     }
 
     // Return translated text. Coordinator will handle robust splitting for multiple segments.
-    const finalResult = result?.translatedText || chunkTexts
-      .map(item => getTextInfo(item).text)
-      .join(TRANSLATION_CONSTANTS.TEXT_DELIMITER);
+    const finalResult = result?.translatedText;
+    if ((typeof finalResult !== 'string' && !Array.isArray(finalResult)) ||
+        (typeof finalResult === 'string' && !finalResult.trim()) ||
+        (Array.isArray(finalResult) && (finalResult.length === 0 || finalResult.some(item => typeof item !== 'string' || !item.trim())))) {
+      const error = new Error('Google response has no translation text');
+      error.type = ErrorTypes.API_RESPONSE_INVALID;
+      throw error;
+    }
 
     // Add completion log for successful translation
     if (finalResult) {

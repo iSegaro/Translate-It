@@ -260,6 +260,31 @@ describe('GoogleTranslateProvider newline chunk isolation', () => {
       expect(result).toBe('translated text');
     });
 
+    it.each([
+      ['invalid response shape', {}],
+      ['empty modern sentences', { sentences: [] }],
+      ['invalid legacy array', { 0: {} }],
+      ['blank modern item', { sentences: [{ trans: '   ' }] }],
+    ])('throws API_RESPONSE_INVALID for %s', async (_label, response) => {
+      vi.spyOn(provider, '_executeRequest').mockImplementation(async (opts) => opts.extractResponse(response));
+
+      await expect(provider._translateChunk(['source'], 'en', 'fa', 'page', null, 0, 1, 0, 1, {}))
+        .rejects.toMatchObject({ type: 'API_RESPONSE_INVALID' });
+    });
+
+    it('accepts valid legacy and source-equal responses', async () => {
+      vi.spyOn(provider, '_executeRequest').mockImplementation(async (opts) => opts.extractResponse([[['URL', 'URL']]]));
+
+      await expect(provider._translateChunk(['URL'], 'en', 'fa', 'page', null, 0, 1, 0, 1, {})).resolves.toBe('URL');
+    });
+
+    it('rejects a missing required segment in a multi-item legacy response', async () => {
+      vi.spyOn(provider, '_executeRequest').mockImplementation(async (opts) => opts.extractResponse([[['only first', 'first']]]));
+
+      await expect(provider._translateChunk(['first', 'second'], 'en', 'fa', 'page', null, 0, 2, 0, 1, {}))
+        .rejects.toMatchObject({ type: 'API_RESPONSE_INVALID' });
+    });
+
     it('appends single-segment dictionary output using the current Markdown contract', async () => {
       vi.spyOn(provider, '_executeRequest').mockImplementation(async (opts) =>
         opts.extractResponse({
