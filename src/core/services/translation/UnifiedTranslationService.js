@@ -320,16 +320,16 @@ export class UnifiedTranslationService {
     return { handled: true, success: true };
   }
 
-  async handleTimeout(messageId, reason = 'Translation timed out') {
+  async handleTimeout(messageId, reason = 'Translation timed out', timeoutType) {
     const request = this.requestTracker.getRequest(messageId);
     if (!request) return { handled: false, success: false, error: 'Request not found' };
     const timeout = this.requestTracker.markTimeout(messageId);
     if (!timeout.accepted) return { handled: true, success: false, error: timeout.reason };
-    await this._finalizeAcceptedTimeout(request, messageId, reason);
+    await this._finalizeAcceptedTimeout(request, messageId, reason, timeoutType);
     return { handled: true, success: true };
   }
 
-  async _finalizeAcceptedTimeout(request, messageId, reason) {
+  async _finalizeAcceptedTimeout(request, messageId, reason, timeoutType) {
     const operation = this._getOperation(request);
     this._finalizeDiagnostics(request, { operation }, {
       type: 'OPERATION_TIMEOUT',
@@ -338,7 +338,7 @@ export class UnifiedTranslationService {
       code: 'TIMEOUT',
     });
     try {
-      await this.translationEngine?.cancelTranslation(messageId);
+      await this.translationEngine?.cancelTranslation(messageId, true, timeoutType, reason);
     } catch (error) {
       logger.debug('Timeout cancellation failed:', error.message);
     }

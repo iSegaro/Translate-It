@@ -140,8 +140,13 @@ describe('StreamingTimeoutManager', () => {
     vi.advanceTimersByTime(6000);
     
     const result = await promise;
-    expect(result.success).toBe(false);
-    expect(result.timedOut).toBe(true);
+    expect(result).toMatchObject({
+      success: false,
+      timedOut: true,
+      cancelled: false,
+      type: 'TRANSLATION_TIMEOUT',
+      timeoutType: 'FINAL_TIMEOUT'
+    });
     expect(onTimeout).toHaveBeenCalled();
   });
 
@@ -179,7 +184,14 @@ describe('StreamingTimeoutManager', () => {
     
     const result = await promise;
     expect(result.success).toBe(false);
-    expect(result.error.type).toBe('PROGRESS_TIMEOUT');
+    expect(result.error.type).toBe('TRANSLATION_TIMEOUT');
+    expect(result.error.timeoutType).toBe('PROGRESS_TIMEOUT');
+    expect(result).toMatchObject({
+      timedOut: true,
+      cancelled: false,
+      type: 'TRANSLATION_TIMEOUT',
+      timeoutType: 'PROGRESS_TIMEOUT'
+    });
   });
 
   it('resets progress timeout with the configured long duration', async () => {
@@ -280,9 +292,13 @@ describe('StreamingTimeoutManager', () => {
     manager.cancelStreaming(messageId, 'Cancelled by test');
     
     const result = await promise;
-    expect(result.success).toBe(false);
-    expect(result.cancelled).toBe(true);
-    expect(result.reason).toBe('Cancelled by test');
+    expect(result).toMatchObject({
+      success: false,
+      cancelled: true,
+      timedOut: false,
+      type: 'USER_CANCELLED',
+      reason: 'Cancelled by test'
+    });
   });
 
   it('should return true for shouldContinue when messageId is unknown', () => {

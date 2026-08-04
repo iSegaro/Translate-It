@@ -110,6 +110,24 @@ describe('TranslationEngine', () => {
     getEnableDictionaryAsync.mockResolvedValue(true);
   });
 
+  it('forwards timeout classification and reason to lifecycle', async () => {
+    engine.lifecycleRegistry.cancelTranslation = vi.fn().mockResolvedValue(true);
+
+    await engine.cancelTranslation(
+      'message-id',
+      true,
+      'PROGRESS_TIMEOUT',
+      'Streaming translation timed out'
+    );
+
+    expect(engine.lifecycleRegistry.cancelTranslation).toHaveBeenCalledWith(
+      'message-id',
+      true,
+      'PROGRESS_TIMEOUT',
+      'Streaming translation timed out'
+    );
+  });
+
   describe('handleMessage', () => {
     it('should process TRANSLATE message successfully', async () => {
       const request = {

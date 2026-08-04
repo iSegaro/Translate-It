@@ -177,12 +177,16 @@ export class StreamingTimeoutManager {
       logger.warn(`Error in error callback for ${messageId}:`, callbackError);
     }
 
+    const isTimeout = error.type === ErrorTypes.TRANSLATION_TIMEOUT;
+
     // For user cancellations, resolve with a cancelled result instead of rejecting
     if (error.isCancellation || error.type === ErrorTypes.USER_CANCELLED) {
       // Resolve with a cancellation result instead of rejecting to avoid uncaught promise
       streamState.resolve({
         success: false,
         cancelled: true,
+        timedOut: false,
+        type: ErrorTypes.USER_CANCELLED,
         reason: error.message || error.reason,
         messageId
       });
@@ -201,7 +205,10 @@ export class StreamingTimeoutManager {
         success: false,
         error: error,
         messageId: messageId,
-        timedOut: true
+        timedOut: isTimeout,
+        cancelled: false,
+        type: error.type,
+        ...(isTimeout && { timeoutType: error.timeoutType })
       });
     }
 
@@ -213,8 +220,9 @@ export class StreamingTimeoutManager {
    * Cancel a streaming operation
    * @param {string} messageId - Message ID
    * @param {string} reason - Cancellation reason
+   * @param {boolean} timeout - Whether cancellation follows a timeout
    */
-  cancelStreaming(messageId, reason = 'User cancelled') {
+  cancelStreaming(messageId, reason = 'User cancelled', timeout = false, timeoutType) {
     const streamState = this.activeStreams.get(messageId);
     if (!streamState) {
       return;
@@ -222,14 +230,24 @@ export class StreamingTimeoutManager {
 
     logger.debug(`Cancelling streaming for ${messageId}: ${reason}`);
 
-    // Mark as cancelled for timeout detection
-    streamState.isCancelled = true;
-
     // Abort the operation
     const abortController = this.abortControllers.get(messageId);
     if (abortController) {
       abortController.abort();
     }
+
+    if (timeout) {
+      const timeoutError = new Error(reason);
+      timeoutError.type = ErrorTypes.TRANSLATION_TIMEOUT;
+      timeoutError.timeoutType = timeoutType || (streamState.hasTimedOut
+        ? ErrorTypes.PROGRESS_TIMEOUT
+        : ErrorTypes.FINAL_TIMEOUT);
+      this.errorStreaming(messageId, timeoutError);
+      return;
+    }
+
+    // Mark as cancelled for timeout detection
+    streamState.isCancelled = true;
 
     // Create cancellation object for logging purposes (not for throwing)
     const cancellationInfo = {
@@ -374,12 +392,13 @@ export class StreamingTimeoutManager {
     logger.warn(`Progress timeout for streaming operation ${messageId}`);
 
     const timeoutError = new Error(`Streaming operation timed out - no progress for too long`);
-    timeoutError.type = 'PROGRESS_TIMEOUT';
+    timeoutError.type = ErrorTypes.TRANSLATION_TIMEOUT;
+    timeoutError.timeoutType = ErrorTypes.PROGRESS_TIMEOUT;
 
     streamState.hasTimedOut = true;
 
     try {
-      streamState.onTimeout();
+      streamState.onTimeout(timeoutError);
     } catch (error) {
       logger.warn(`Error in timeout callback for ${messageId}:`, error);
     }
@@ -413,12 +432,13 @@ export class StreamingTimeoutManager {
     logger.warn(`Final timeout for streaming operation ${messageId}`);
 
     const timeoutError = new Error(`Streaming operation timed out completely`);
-    timeoutError.type = 'FINAL_TIMEOUT';
+    timeoutError.type = ErrorTypes.TRANSLATION_TIMEOUT;
+    timeoutError.timeoutType = ErrorTypes.FINAL_TIMEOUT;
 
     streamState.hasTimedOut = true;
 
     try {
-      streamState.onTimeout();
+      streamState.onTimeout(timeoutError);
     } catch (error) {
       logger.warn(`Error in timeout callback for ${messageId}:`, error);
     }

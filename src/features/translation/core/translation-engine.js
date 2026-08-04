@@ -287,7 +287,9 @@ export class TranslationEngine {
 
   // --- Delegation Methods ---
   
-  async cancelTranslation(messageId) { return await this.lifecycleRegistry.cancelTranslation(messageId); }
+  async cancelTranslation(messageId, timeout = false, timeoutType, reason) {
+    return await this.lifecycleRegistry.cancelTranslation(messageId, timeout, timeoutType, reason);
+  }
   async cancelAllTranslations(context = null) { return await this.lifecycleRegistry.cancelAllTranslations(context); }
   getActiveTranslationIds(context = null) { return this.lifecycleRegistry.getActiveTranslationIds(context); }
   getAbortController(messageId) { return this.lifecycleRegistry.getAbortController(messageId); }

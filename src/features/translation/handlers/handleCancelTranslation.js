@@ -34,7 +34,7 @@ export async function handleCancelTranslation(request, sender) {
     }
 
     // Cancel operations with proper order: Engine → Streaming → RateLimit
-    const { cancelAll, reason, context, sessionId, timeout } = request.data || {};
+    const { cancelAll, reason, context, sessionId, timeout, timeoutType } = request.data || {};
     const tabId = sender?.tab?.id;
     
     // Step 1: Identify messageIds to cancel
@@ -72,14 +72,18 @@ export async function handleCancelTranslation(request, sender) {
     const { queueManager } = await import("../core/QueueManager.js");
     const { rateLimitManager } = await import("../core/RateLimitManager.js");
 
-    const resolvedReason = reason ?? ActionReasons.USER_CANCELLED;
+    const resolvedReason = reason ?? (timeout ? 'Translation timed out' : ActionReasons.USER_CANCELLED);
 
     const results = await Promise.allSettled(messageIdsToCancel.map(async (id) => {
       let cancelled = false;
 
       if (timeout) {
         try {
-          const timeoutResult = await unifiedTranslationService.handleTimeout(id);
+          const timeoutResult = await unifiedTranslationService.handleTimeout(
+            id,
+            resolvedReason,
+            timeoutType
+          );
           cancelled = timeoutResult.success;
           if (timeoutResult.handled && !timeoutResult.success) return false;
         } catch { /* continue remaining exact-ID cleanup */ }

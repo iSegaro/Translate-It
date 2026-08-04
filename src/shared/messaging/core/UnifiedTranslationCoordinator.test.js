@@ -121,7 +121,7 @@ describe('UnifiedTranslationCoordinator', () => {
       
       coordinator.cancelTranslation(messageId, 'Test cancel');
       
-      expect(streamingTimeoutManager.cancelStreaming).toHaveBeenCalledWith(messageId, 'Test cancel');
+      expect(streamingTimeoutManager.cancelStreaming).toHaveBeenCalledWith(messageId, 'Test cancel', false);
       expect(sendRegularMessage).toHaveBeenCalledWith(expect.objectContaining({
         action: MessageActions.CANCEL_TRANSLATION
       }));
@@ -131,12 +131,12 @@ describe('UnifiedTranslationCoordinator', () => {
       const messageId = 'msg-timeout';
       coordinator.activeTranslations.set(messageId, { type: 'streaming' });
 
-      coordinator._handleStreamingTimeout(messageId);
+      coordinator._handleStreamingTimeout(messageId, { timeoutType: 'PROGRESS_TIMEOUT' });
 
-      expect(streamingTimeoutManager.cancelStreaming).toHaveBeenCalledWith(messageId, 'Streaming translation timed out');
+      expect(streamingTimeoutManager.cancelStreaming).toHaveBeenCalledWith(messageId, 'Streaming translation timed out', true, 'PROGRESS_TIMEOUT');
       expect(sendRegularMessage).toHaveBeenCalledWith(expect.objectContaining({
         action: MessageActions.CANCEL_TRANSLATION,
-        data: expect.objectContaining({ messageId, timeout: true })
+        data: expect.objectContaining({ messageId, timeout: true, timeoutType: 'PROGRESS_TIMEOUT' })
       }));
       expect(coordinator.activeTranslations.has(messageId)).toBe(false);
     });

@@ -590,14 +590,23 @@ describe('UnifiedTranslationService', () => {
       translationRequestTracker.getRequest.mockReturnValue(request);
       service._setOperation(request, createTranslationOperation('m-timeout'));
 
-      const result = await service.handleTimeout('m-timeout');
+      const result = await service.handleTimeout(
+        'm-timeout',
+        'Streaming translation timed out',
+        'PROGRESS_TIMEOUT'
+      );
 
       expect(result).toEqual({ handled: true, success: true });
       expect(translationRequestTracker.markTimeout).toHaveBeenCalledTimes(1);
       expect(finalizeTranslationOperation).toHaveBeenCalledTimes(1);
       expect(statsManager.recordOperationQuality).toHaveBeenCalledTimes(1);
       expect(service._getOperation(request)).toBeNull();
-      expect(mockEngine.cancelTranslation).toHaveBeenCalledWith('m-timeout');
+      expect(mockEngine.cancelTranslation).toHaveBeenCalledWith(
+        'm-timeout',
+        true,
+        'PROGRESS_TIMEOUT',
+        'Streaming translation timed out'
+      );
     });
 
     it('does no terminal work when timeout transition is rejected', async () => {
