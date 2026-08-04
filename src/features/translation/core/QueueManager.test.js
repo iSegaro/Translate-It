@@ -259,6 +259,138 @@ describe('QueueManager', () => {
     });
   });
 
+  describe('TEXT_TOO_LONG deterministic validation', () => {
+    it('does not retry explicit TEXT_TOO_LONG errors', async () => {
+      const textTooLongError = { type: ErrorTypes.TEXT_TOO_LONG, message: 'text is too long' };
+      const mockRequest = vi.fn().mockRejectedValue(textTooLongError);
+
+      const promise = queueManager.enqueue('text-long-provider', mockRequest);
+      promise.catch(() => {});
+
+      await vi.advanceTimersByTimeAsync(10000);
+
+      expect(mockRequest).toHaveBeenCalledTimes(1);
+      await expect(promise).rejects.toBe(textTooLongError);
+      expect(queueManager.retryTimeouts.size).toBe(0);
+    });
+
+    it('does not append QUEUE_RETRY diagnostic for TEXT_TOO_LONG', async () => {
+      const textTooLongError = { type: ErrorTypes.TEXT_TOO_LONG, message: 'text is too long' };
+      const mockRequest = vi.fn().mockRejectedValue(textTooLongError);
+      const executionContext = { operation: { appendDiagnostic: vi.fn() } };
+
+      const promise = queueManager.enqueue('text-long-diag', mockRequest, 0, 'context', { executionContext });
+      promise.catch(() => {});
+
+      await vi.advanceTimersByTimeAsync(10000);
+
+      expect(executionContext.operation.appendDiagnostic).not.toHaveBeenCalledWith(
+        expect.objectContaining({ type: 'QUEUE_RETRY' })
+      );
+    });
+
+    it('settles and removes TEXT_TOO_LONG item from queue', async () => {
+      const textTooLongError = { type: ErrorTypes.TEXT_TOO_LONG, message: 'text is too long' };
+      const mockRequest = vi.fn().mockRejectedValue(textTooLongError);
+
+      await queueManager.enqueue('text-long-settle', mockRequest).catch(() => {});
+      await vi.advanceTimersByTimeAsync(100);
+
+      expect(queueManager.getQueueStatus('text-long-settle').total).toBe(0);
+    });
+
+    it('does not treat message-only "text is too long" as local validation', async () => {
+      const messageError = { message: 'text is too long' };
+      const mockRequest = vi.fn()
+        .mockRejectedValueOnce(messageError)
+        .mockResolvedValue('Success');
+
+      const promise = queueManager.enqueue('msg-long', mockRequest);
+
+      await vi.advanceTimersByTimeAsync(150);
+      expect(mockRequest).toHaveBeenCalledTimes(1);
+
+      await vi.advanceTimersByTimeAsync(3000);
+      expect(mockRequest).toHaveBeenCalledTimes(2);
+
+      const result = await promise;
+      expect(result).toBe('Success');
+    });
+
+    it('does not treat HTTP 413 shaped error as local validation', async () => {
+      const httpError = { statusCode: 413, message: 'payload too large' };
+      const mockRequest = vi.fn()
+        .mockRejectedValueOnce(httpError)
+        .mockResolvedValue('Success');
+
+      const promise = queueManager.enqueue('http-long', mockRequest);
+
+      await vi.advanceTimersByTimeAsync(150);
+      expect(mockRequest).toHaveBeenCalledTimes(1);
+
+      await vi.advanceTimersByTimeAsync(3000);
+      expect(mockRequest).toHaveBeenCalledTimes(2);
+
+      const result = await promise;
+      expect(result).toBe('Success');
+    });
+
+    it('still retries NETWORK_ERROR', async () => {
+      const networkError = { type: ErrorTypes.NETWORK_ERROR, message: 'failed to fetch' };
+      const mockRequest = vi.fn()
+        .mockRejectedValueOnce(networkError)
+        .mockResolvedValue('Success');
+
+      const promise = queueManager.enqueue('net-retry', mockRequest);
+
+      await vi.advanceTimersByTimeAsync(150);
+      expect(mockRequest).toHaveBeenCalledTimes(1);
+
+      await vi.advanceTimersByTimeAsync(3000);
+      expect(mockRequest).toHaveBeenCalledTimes(2);
+
+      const result = await promise;
+      expect(result).toBe('Success');
+    });
+
+    it('still retries API_RESPONSE_INVALID', async () => {
+      const apiError = { type: ErrorTypes.API_RESPONSE_INVALID, message: 'invalid response' };
+      const mockRequest = vi.fn()
+        .mockRejectedValueOnce(apiError)
+        .mockResolvedValue('Success');
+
+      const promise = queueManager.enqueue('api-retry', mockRequest);
+
+      await vi.advanceTimersByTimeAsync(150);
+      expect(mockRequest).toHaveBeenCalledTimes(1);
+
+      await vi.advanceTimersByTimeAsync(3000);
+      expect(mockRequest).toHaveBeenCalledTimes(2);
+
+      const result = await promise;
+      expect(result).toBe('Success');
+    });
+
+    it('processes subsequent tasks after TEXT_TOO_LONG rejection', async () => {
+      const textTooLongError = { type: ErrorTypes.TEXT_TOO_LONG, message: 'text is too long' };
+      let callCount = 0;
+      const mockRequest = vi.fn().mockImplementation(() => {
+        callCount++;
+        if (callCount === 1) return Promise.reject(textTooLongError);
+        return Promise.resolve('task2-ok');
+      });
+
+      const p1 = queueManager.enqueue('progress-provider', mockRequest).catch(error => error);
+      const p2 = queueManager.enqueue('progress-provider', mockRequest);
+
+      await vi.advanceTimersByTimeAsync(200);
+
+      await expect(p1).resolves.toBe(textTooLongError);
+      await expect(p2).resolves.toBe('task2-ok');
+      expect(queueManager.getQueueStatus('progress-provider').total).toBe(0);
+    });
+  });
+
   describe('Parallel queue lane', () => {
     it('should dispatch all pending parallel-queue requests without serializing them', async () => {
       const first = createDeferred();

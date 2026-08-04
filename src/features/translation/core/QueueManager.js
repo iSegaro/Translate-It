@@ -7,6 +7,7 @@ import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { ErrorTypes } from "@/shared/error-management/ErrorTypes.js";
 import { isFatalError, isCancellationError } from "@/shared/error-management/ErrorMatcher.js";
+import { isLocalDeterministicValidationError } from "@/shared/error-management/ValidationPolicy.js";
 import { appendTranslationDiagnostic } from '@/features/translation/ir/TranslationOperation.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.TRANSLATION, 'QueueManager');
@@ -130,6 +131,9 @@ class QueueItem {
    */
   shouldRetry() {
     if (isCancellationError(this.lastError)) return false;
+
+    // Local deterministic validation errors (e.g., TEXT_TOO_LONG) must never be retried
+    if (isLocalDeterministicValidationError(this.lastError)) return false;
 
     // 1. If we have a fatal error (like invalid API key), do NOT retry
     if (this.lastError && isFatalError(this.lastError)) {

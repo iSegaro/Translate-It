@@ -8,6 +8,7 @@ import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { registryIdToName } from '@/features/translation/providers/ProviderConstants.js';
 import { isFatalError, isConfigError, matchErrorToType } from '@/shared/error-management/ErrorMatcher.js';
+import { isLocalDeterministicValidationError } from '@/shared/error-management/ValidationPolicy.js';
 import { PROVIDER_CONFIGURATIONS, getProviderConfiguration } from '@/features/translation/core/ProviderConfigurations.js';
 import { getProviderOptimizationLevelAsync } from '@/shared/config/config.js';
 
@@ -333,7 +334,7 @@ export class RateLimitManager {
                            error.message?.includes('cancelled') ||
                            error.message?.includes('aborted');
       
-      if (!isCancellation) {
+      if (!isCancellation && !isLocalDeterministicValidationError(error)) {
         this._recordFailure(state, error, providerName);
       }
       

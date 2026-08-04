@@ -15,8 +15,14 @@ vi.mock('webextension-polyfill', () => ({
 // Mock ErrorMatcher
 vi.mock('@/shared/error-management/ErrorMatcher.js');
 
+// Mock ValidationPolicy
+vi.mock('@/shared/error-management/ValidationPolicy.js', () => ({
+  isLocalDeterministicValidationError: vi.fn(() => false)
+}));
+
 import { RateLimitManager, TranslationPriority } from './RateLimitManager.js';
 import { isFatalError } from '@/shared/error-management/ErrorMatcher.js';
+import { isLocalDeterministicValidationError } from '@/shared/error-management/ValidationPolicy.js';
 
 // Mock dependencies
 vi.mock('@/shared/config/config.js', () => ({
@@ -254,6 +260,155 @@ describe('RateLimitManager', () => {
       }
 
       expect(state.currentBackoffMultiplier).toBe(2);
+    });
+  });
+
+  describe('TEXT_TOO_LONG deterministic validation', () => {
+    beforeEach(() => {
+      isLocalDeterministicValidationError.mockImplementation(
+        (err) => err?.type === 'TEXT_TOO_LONG'
+      );
+    });
+
+    it('rejects TEXT_TOO_LONG to caller', async () => {
+      const textTooLongError = Object.assign(new Error('text is too long'), { type: 'TEXT_TOO_LONG' });
+      const failingTask = () => Promise.reject(textTooLongError);
+
+      await expect(manager.executeWithRateLimit('TestProvider', failingTask))
+        .rejects.toBe(textTooLongError);
+    });
+
+    it('does not increment failedRequests for TEXT_TOO_LONG', async () => {
+      const state = manager.providerStates.get('TestProvider');
+      const textTooLongError = Object.assign(new Error('text is too long'), { type: 'TEXT_TOO_LONG' });
+
+      try {
+        await manager.executeWithRateLimit('TestProvider', () => Promise.reject(textTooLongError));
+      } catch { /* ignore */ }
+
+      expect(state.performanceStats.failedRequests).toBe(0);
+    });
+
+    it('does not increment consecutiveFailures for TEXT_TOO_LONG', async () => {
+      const state = manager.providerStates.get('TestProvider');
+      const textTooLongError = Object.assign(new Error('text is too long'), { type: 'TEXT_TOO_LONG' });
+
+      try {
+        await manager.executeWithRateLimit('TestProvider', () => Promise.reject(textTooLongError));
+      } catch { /* ignore */ }
+
+      expect(state.consecutiveFailures).toBe(0);
+    });
+
+    it('does not change circuit state for TEXT_TOO_LONG', async () => {
+      const state = manager.providerStates.get('TestProvider');
+      const textTooLongError = Object.assign(new Error('text is too long'), { type: 'TEXT_TOO_LONG' });
+
+      try {
+        await manager.executeWithRateLimit('TestProvider', () => Promise.reject(textTooLongError));
+      } catch { /* ignore */ }
+
+      expect(state.isCircuitOpen).toBe(false);
+    });
+
+    it('releases active request count after TEXT_TOO_LONG', async () => {
+      const state = manager.providerStates.get('TestProvider');
+      const textTooLongError = Object.assign(new Error('text is too long'), { type: 'TEXT_TOO_LONG' });
+
+      try {
+        await manager.executeWithRateLimit('TestProvider', () => Promise.reject(textTooLongError));
+      } catch { /* ignore */ }
+
+      expect(state.activeRequests).toBe(0);
+    });
+
+    it('repeated TEXT_TOO_LONG never opens circuit', async () => {
+      const state = manager.providerStates.get('TestProvider');
+      const textTooLongError = Object.assign(new Error('text is too long'), { type: 'TEXT_TOO_LONG' });
+
+      for (let i = 0; i < 10; i++) {
+        try {
+          await manager.executeWithRateLimit('TestProvider', () => Promise.reject(textTooLongError));
+        } catch { /* ignore */ }
+      }
+
+      expect(state.isCircuitOpen).toBe(false);
+      expect(state.consecutiveFailures).toBe(0);
+      expect(state.performanceStats.failedRequests).toBe(0);
+    });
+
+    it('processes queued tasks after TEXT_TOO_LONG rejection', async () => {
+      const state = manager.providerStates.get('TestProvider');
+      const textTooLongError = Object.assign(new Error('text is too long'), { type: 'TEXT_TOO_LONG' });
+      let callCount = 0;
+
+      const task = () => {
+        callCount++;
+        if (callCount === 1) return Promise.reject(textTooLongError);
+        return Promise.resolve('task2-ok');
+      };
+
+      const p1 = manager.executeWithRateLimit('TestProvider', task).catch(() => {});
+      const p2 = manager.executeWithRateLimit('TestProvider', task);
+
+      await Promise.all([p1, p2]);
+
+      expect(state.activeRequests).toBe(0);
+      expect(state.isCircuitOpen).toBe(false);
+      expect(state.performanceStats.failedRequests).toBe(0);
+      await expect(p2).resolves.toBe('task2-ok');
+    });
+
+    it('still increments health counters for NETWORK_ERROR', async () => {
+      isLocalDeterministicValidationError.mockReturnValue(false);
+      const state = manager.providerStates.get('TestProvider');
+      const networkError = Object.assign(new Error('failed to fetch'), { type: 'NETWORK_ERROR' });
+
+      try {
+        await manager.executeWithRateLimit('TestProvider', () => Promise.reject(networkError));
+      } catch { /* ignore */ }
+
+      expect(state.performanceStats.failedRequests).toBe(1);
+      expect(state.consecutiveFailures).toBe(1);
+    });
+
+    it('retains existing behavior for SERVER_ERROR', async () => {
+      isLocalDeterministicValidationError.mockReturnValue(false);
+      const state = manager.providerStates.get('TestProvider');
+      const serverError = Object.assign(new Error('internal server error'), { type: 'SERVER_ERROR' });
+
+      try {
+        await manager.executeWithRateLimit('TestProvider', () => Promise.reject(serverError));
+      } catch { /* ignore */ }
+
+      expect(state.performanceStats.failedRequests).toBe(1);
+      expect(state.consecutiveFailures).toBe(1);
+    });
+
+    it('retains existing behavior for RATE_LIMIT_REACHED', async () => {
+      isLocalDeterministicValidationError.mockReturnValue(false);
+      const state = manager.providerStates.get('TestProvider');
+      const rateLimitError = Object.assign(new Error('rate limit'), { type: 'RATE_LIMIT_REACHED' });
+
+      try {
+        await manager.executeWithRateLimit('TestProvider', () => Promise.reject(rateLimitError));
+      } catch { /* ignore */ }
+
+      expect(state.performanceStats.failedRequests).toBe(1);
+      expect(state.consecutiveFailures).toBe(1);
+    });
+
+    it('retains existing behavior for API_RESPONSE_INVALID', async () => {
+      isLocalDeterministicValidationError.mockReturnValue(false);
+      const state = manager.providerStates.get('TestProvider');
+      const apiError = Object.assign(new Error('invalid response'), { type: 'API_RESPONSE_INVALID' });
+
+      try {
+        await manager.executeWithRateLimit('TestProvider', () => Promise.reject(apiError));
+      } catch { /* ignore */ }
+
+      expect(state.performanceStats.failedRequests).toBe(1);
+      expect(state.consecutiveFailures).toBe(1);
     });
   });
 });

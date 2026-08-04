@@ -7,6 +7,7 @@ import { AUTO_DETECT_VALUE } from "@/shared/constants/core.js";
 import { getLingvaApiUrlAsync } from "@/shared/config/config.js";
 import { TRANSLATION_CONSTANTS } from "@/shared/config/translationConstants.js";
 import { getProviderLanguageCode } from "@/shared/config/languageConstants.js";
+import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.TRANSLATION, 'LingvaProvider');
 
@@ -65,13 +66,11 @@ export class LingvaProvider extends BaseTranslateProvider {
     });
     const joinedText = validTexts.join(LingvaProvider.TEXT_DELIMITER);
 
-    // If joined text is too long for a GET request (Lingva limit),
-    // we take as many as we can from the start. 
-    // The central engine will handle the rest in subsequent chunks.
     let textToTranslate = joinedText;
     if (textToTranslate.length > 1200) {
-      logger.debug(`[Lingva] Chunk too long (${textToTranslate.length}), limiting to first segment for safety.`);
-      textToTranslate = validTexts[0];
+      const error = new Error('Lingva request exceeds its URL length limit');
+      error.type = ErrorTypes.API_RESPONSE_INVALID;
+      throw error;
     }
 
     const url = `${apiPath}/api/v1/${sl}/${tl}/${encodeURIComponent(textToTranslate)}`;
@@ -86,20 +85,19 @@ export class LingvaProvider extends BaseTranslateProvider {
         credentials: 'omit',
         headers: { "Accept": "application/json" }
       },
-      extractResponse: (data) => data?.translation,
+      extractResponse: (data) => {
+        if (typeof data?.translation !== 'string' || !data.translation.trim()) {
+          const error = new Error('Lingva response contained no translation text');
+          error.type = ErrorTypes.API_RESPONSE_INVALID;
+          throw error;
+        }
+        return data.translation;
+      },
       context: 'lingva-standard-chunk',
       abortController,
       charCount: textToTranslate.length, // Explicitly pass the actual count sent to the network
       originalCharCount
     });
-
-    if (!result) return chunkTexts.join(TRANSLATION_CONSTANTS.TEXT_DELIMITER);
-
-    // If we only translated the first one because of length
-    if (textToTranslate === validTexts[0] && chunkTexts.length > 1) {
-      // Return partial array, Coordinator handles this correctly
-      return [result, ...chunkTexts.slice(1)];
-    }
 
     // Return raw translated text. Coordinator will handle robust splitting for multiple segments.
     if (result) {
