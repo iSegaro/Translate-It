@@ -30,6 +30,16 @@ describe('RequestUnitManifest', () => {
     expect(Object.isFrozen(firstBatch.units)).toBe(true)
   })
 
+  it('preserves numeric object identities as canonical strings', () => {
+    const manifest = createRequestUnitManifest([{ i: 0 }, { i: 1 }, { uid: 2 }])
+
+    expect(manifest.units).toEqual([
+      { unitId: '0', requestIndex: 0 },
+      { unitId: '1', requestIndex: 1 },
+      { unitId: '2', requestIndex: 2 },
+    ])
+  })
+
   it('rejects invalid direct views without cloning manifest units', () => {
     const manifest = createRequestUnitManifest(['one', 'two'])
 

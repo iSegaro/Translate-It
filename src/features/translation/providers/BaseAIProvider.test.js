@@ -135,6 +135,22 @@ describe('BaseAIProvider', () => {
       expect(recovery).not.toHaveBeenCalled();
     });
 
+    it('does not recover for harmless complete surplus output', async () => {
+      const { AIResponseParser: realParser } = await vi.importActual('./utils/AIResponseParser.js');
+      AIResponseParser.parseBatchResult.mockImplementation(realParser.parseBatchResult.bind(realParser));
+      provider._callAI = vi.fn().mockResolvedValue(
+        '[{"id":"0","text":"AA"},{"id":"1","text":"BB"},{"id":"99","text":"unused"}]'
+      );
+      const recovery = vi.spyOn(provider, 'executeSequentialBatch');
+
+      const result = await provider._translateBatch(
+        ['A', 'B'], 'en', 'fa', 'select-element', null, null, null, null, null, ResponseFormat.JSON_OBJECT
+      );
+
+      expect(result).toEqual(['AA', 'BB']);
+      expect(recovery).not.toHaveBeenCalled();
+    });
+
     it('should throw on non-fatal AND non-transient error instead of returning original text', async () => {
       provider._callAI = vi.fn().mockRejectedValue(new Error('Non-Fatal-Non-Transient'));
       vi.mocked(isFatalError).mockReturnValue(false);

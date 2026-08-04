@@ -66,4 +66,24 @@ describe('TranslationContractValidator', () => {
       { requestIndex: 1, unitId: 'unit-1', translatedText: 'two', violationCodes: [] },
     ])
   })
+
+  it('reports observational facts for mixed identity, surplus, and invalid text candidates', () => {
+    const requestedUnits = [{ id: 'x', text: 'A' }, { id: 'y', text: 'B' }]
+    const result = TranslationContractValidator.validate(
+      createManifestView(createRequestUnitManifest(requestedUnits)),
+      createParserSnapshot([
+        { id: 0, text: 'AA' },
+        { id: 'y', text: null },
+        { id: 'extra', text: [] },
+        { text: 'missing-id' },
+      ]),
+    )
+
+    expect(result.violations.map(({ code }) => code)).toEqual(expect.arrayContaining([
+      'UNKNOWN_RESPONSE_ID',
+      'INVALID_TRANSLATED_TEXT',
+      'MISSING_RESPONSE_ID',
+      'CARDINALITY_MISMATCH',
+    ]))
+  })
 })

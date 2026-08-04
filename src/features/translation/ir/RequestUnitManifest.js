@@ -9,6 +9,10 @@ export const MappingStrategy = Object.freeze({
 })
 const VALID_MAPPING_STRATEGIES = new Set(Object.values(MappingStrategy))
 
+function getLegacyId(unit) {
+  return unit?.i ?? unit?.uid ?? unit?.id ?? null
+}
+
 function hasValidMappingStrategy(manifestView) {
   return Boolean(manifestView) && VALID_MAPPING_STRATEGIES.has(manifestView.declaredMappingStrategy)
 }
@@ -42,7 +46,7 @@ export function createRequestUnitManifest(input) {
 
   return Object.freeze({
     units: Object.freeze(inputUnits.map((unit, requestIndex) => {
-      const legacyId = unit && typeof unit === 'object' ? (unit.i || unit.uid || unit.id) : null
+      const legacyId = unit && typeof unit === 'object' ? getLegacyId(unit) : null
       const preferredUnitId = declaredMappingStrategy === MappingStrategy.IDENTITY_REQUIRED && legacyId !== null && legacyId !== undefined
         ? String(legacyId)
         : `unit-${requestIndex}`

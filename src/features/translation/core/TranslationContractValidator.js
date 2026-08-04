@@ -2,12 +2,8 @@ import { createValidationResult } from '../ir/TranslationOutcome.js'
 import { MappingStrategy } from '../ir/RequestUnitManifest.js'
 
 function findRequestedIndex(responseId, manifestUnits, expectedCount) {
-  if (typeof responseId === 'string') {
-    return manifestUnits.findIndex((unit) => unit.unitId === responseId)
-  }
-
-  const index = Number.parseInt(responseId, 10)
-  return index >= 0 && index < expectedCount ? index : -1
+  const identityIndex = manifestUnits.findIndex((unit) => unit.unitId === String(responseId))
+  return identityIndex >= 0 && identityIndex < expectedCount ? identityIndex : -1
 }
 
 function createViolation(code, index) {
