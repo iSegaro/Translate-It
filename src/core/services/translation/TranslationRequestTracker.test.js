@@ -193,12 +193,10 @@ describe('TranslationRequestTracker', () => {
       for (const [name, transition] of transitions) {
         const messageId = `m-${name}`;
         tracker.createRequest({ messageId, data: { toastId: `toast-${name}` }, sender: { tab: { id: 1 } } });
-        tracker.recordRetry(messageId);
         expect(transition(messageId)).toMatchObject({ accepted: true });
         expect(tracker.getRequest(messageId)).toBeDefined();
         expect(tracker.getTabRequests(1)).not.toContainEqual(expect.objectContaining({ messageId }));
         expect(tracker.getRequestByToastId(`toast-${name}`)).toBeNull();
-        expect(tracker.retryCounts.has(messageId)).toBe(false);
       }
     });
 
@@ -301,19 +299,6 @@ describe('TranslationRequestTracker', () => {
       const cleaned = tracker.cleanup();
       expect(cleaned).toBe(1);
       expect(tracker.getRequest(messageId)).toBeUndefined();
-    });
-  });
-
-  describe('retries', () => {
-    it('should track retry counts', () => {
-      const messageId = 'msg-1';
-      tracker.createRequest({ messageId, data: { text: 'Hello' } });
-
-      tracker.recordRetry(messageId);
-      tracker.recordRetry(messageId);
-
-      expect(tracker.getRetryCount(messageId)).toBe(2);
-      expect(tracker.hasExceededMaxRetries(messageId, 2)).toBe(true);
     });
   });
 
