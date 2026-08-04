@@ -610,22 +610,6 @@ export class QueueManager {
     return cleanedCount;
   }
   
-  /**
-   * Clear all queues (for testing)
-   */
-  clearAll() {
-    // Cancel all retry timeouts
-    for (const [, timeout] of this.retryTimeouts) {
-      clearTimeout(timeout);
-    }
-    
-    this.queues.clear();
-    this.processing.clear();
-    this.retryTimeouts.clear();
-    this.itemCounter = 0;
-    
-    logger.debug('Cleared all queues');
-  }
 }
 
 // Export singleton instance

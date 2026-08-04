@@ -45,7 +45,6 @@ describe('QueueManager', () => {
     const errMod = await import('@/shared/error-management/ErrorTypes.js');
     ErrorTypes = errMod.ErrorTypes;
     
-    queueManager.clearAll();
     vi.spyOn(Math, 'random').mockReturnValue(0.5); // Predictable jitter (0.75x)
   });
 
