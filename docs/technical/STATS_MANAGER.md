@@ -5,7 +5,7 @@ The **Translation Stats Manager** is a centralized, high-precision system design
 
 ## Core Mandates
 1.  **Golden Chain Compliance**: All logs follow the project's standard: Providers (technical detail), Managers (lifecycle/progress), StatsManager (final unified reporting).
-2.  **Explicit Self-Reporting**: Unlike old systems that "guess" payload sizes, each provider is responsible for calculating and reporting its exact network weight.
+2.  **Explicit Self-Reporting**: Unlike old systems that "guess" payload sizes, providers supply network payload values and `ProviderRequestEngine` records each physical request.
 3.  **Dual-Metric Tracking**: Every request records two distinct values:
     -   **Original Chars**: The raw length of the text the user intended to translate.
     -   **Network Chars**: The actual payload size (including system prompts, history, JSON formatting, and delimiters).
@@ -23,11 +23,58 @@ The system automatically determines how to display characters in logs based on t
 - **Low Overhead**: If the difference between Original and Network is negligible (e.g., `< 5` chars), it shows a single number: `Chars: 31`.
 - **Significant Overhead**: For AI or batched requests, it shows both: `Chars: 100 (Network: 1,291)`.
 
-### 3. Explicit Reporting Flow
+### 3. Physical Reporting Flow
 1.  **Provider Calculation**: The concrete provider calculates `charCount` (Network) and `originalCharCount` (Original).
 2.  **Explicit Passing**: These values are passed through `_executeRequest` to `_executeApiCall`.
-3.  **Central Recording**: `BaseProvider` calls `statsManager.recordRequest()` at the exact moment of the network call.
+3.  **Central Recording**: `ProviderRequestEngine` calls `statsManager.recordRequest()` at the exact moment of the physical network call.
 4.  **Delta Extraction**: Orchestrators (Engine/Service) calculate the "Delta" (difference in stats before/after a call) to log 100% accurate per-batch progress.
+
+### 4. Purpose-Attributed Physical Counters
+
+Each physical request is normalized to one purpose before recording:
+
+- `PRIMARY_TRANSLATION`: Normal provider execution.
+- `STRUCTURED_RECOVERY`: Sequential recovery after a structured response contract violation.
+
+Calls, network characters, original characters, and non-cancellation physical failures are counted once per physical request. Missing or invalid purposes are normalized to `PRIMARY_TRANSLATION` before recording.
+
+```js
+global: {
+  totalCalls, totalChars, totalOriginalChars, totalErrors,
+  callsByPurpose, charsByPurpose, errorsByPurpose,
+}
+
+provider: {
+  calls, chars, originalChars, errors,
+  callsByPurpose, charsByPurpose, errorsByPurpose,
+  quality,
+}
+
+session: {
+  calls, chars, originalChars, errors,
+  callsByPurpose, charsByPurpose, errorsByPurpose,
+}
+```
+
+### 5. Recovery Quality Counters
+
+Quality counters exist globally and per provider only:
+
+```js
+quality: {
+  structuredResponseViolations,
+  recoveryPasses,
+  operationsWithRecovery,
+  operationsRecovered,
+  operationsRecoveryFailed,
+  operationsRecoveryIncomplete,
+  operationsRecoverySuperseded,
+}
+```
+
+Physical counters measure HTTP/provider execution cost. Quality counters measure logical recovery behavior from finalized `TranslationOperation` reports. There are no session-scoped quality counters, stored rates, persistence, or schema migration. In-memory reset initializes both physical and quality counters.
+
+Quality counters are observational: they do not alter `RateLimitManager`, provider selection, retry policy, or routing.
 
 ## Logging Strategy
 

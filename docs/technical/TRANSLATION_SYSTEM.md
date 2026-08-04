@@ -72,13 +72,14 @@ Every translation request has one globally unique `messageId`. Exact-ID cancella
 |---|---|
 | Workflow/UI | Current intent, run/session identity, and stale presentation suppression. PDF, page, OCR, and window workflows retain their own session ownership. |
 | `TranslationLifecycleRegistry` | `AbortController`, cancellation tombstones, pre-registration cancellation, and execution registration. |
-| `TranslationRequestTracker` | Request status, active tab/toast/retry indexes, immutable terminal transitions, metrics, and retained terminal diagnostics. |
+| `TranslationRequestTracker` | Request status, active tab/toast indexes, immutable terminal transitions, and lifecycle metrics. |
 | `TranslationEngine` | Provider execution entry point and exact-ID cancellation propagation. |
-| `QueueManager` / `RateLimitManager` | Admission and exact-ID pending-work removal. |
+| `QueueManager` | Provider-execution retry/backoff and exact-ID queue removal. |
+| `RateLimitManager` | Admission, concurrency, circuit state, and exact-ID pending-work removal. |
 | `StreamingManager` | Sender routing, chunks, local terminal delivery suppression, and delayed stream retention. It does not own workflow lifecycle. |
 | `UnifiedResultDispatcher` | Delivery of accepted results and cancellation notifications. Delivery failure never rewrites tracker state. |
 
-Terminal states are `completed`, `failed`, `cancelled`, and `timeout`. `TranslationRequestTracker` accepts one terminal transition only. Rejected late transitions never dispatch a normal result. Terminal records remain available for five minutes of diagnostics, but leave active tab, toast, and retry indexes immediately.
+Terminal states are `completed`, `failed`, `cancelled`, and `timeout`. `TranslationRequestTracker` accepts one terminal transition only. Rejected late transitions never dispatch a normal result. Tracker records leave active tab and toast indexes immediately; `QueueManager` owns retry/backoff execution.
 
 Cancellation snapshots exact active IDs, marks accepted tracker requests cancelled, notifies their original sender once, then independently attempts lifecycle abort, stream cancellation, rate-limit cleanup, and queue removal. A cancellation tombstone rejects execution when cancellation arrives before lifecycle registration.
 
@@ -102,7 +103,7 @@ UI / workflow creates messageId
   -> request tracker registration
   -> lifecycle registration
   -> provider / queue / rate-limit / stream work keyed by messageId
-  -> terminal tracker record retained for diagnostics
+  -> terminal tracker record retained for lifecycle cleanup
 ```
 
 ### Ownership
@@ -110,11 +111,11 @@ UI / workflow creates messageId
 | Layer | Owns | Does Not Own |
 |---|---|---|
 | Workflow / UI | Current user intent, run/session identity, stale presentation suppression | Backend lifecycle state |
-| `TranslationRequestTracker` | Request lifecycle, active indexes, terminal transition, metrics, terminal retention | Provider aborting or result transport |
+| `TranslationRequestTracker` | Request lifecycle, active indexes, terminal transition, metrics, terminal retention | Provider aborting, retry execution, or result transport |
 | `TranslationLifecycleRegistry` | Abort controllers, tombstones, pre-registration cancellation, execution registration | Tracker terminal state |
 | `TranslationEngine` | Provider entry and exact-ID cancellation propagation | UI session ownership |
 | `ProviderCoordinator` | Provider selection and admission | Workflow staleness |
-| `QueueManager` | Queue/retry ownership and exact-ID removal | Tracker terminal transition |
+| `QueueManager` | Provider-execution retry/backoff and exact-ID removal | Tracker terminal transition |
 | `RateLimitManager` | Limiter admission and pending request cleanup | UI delivery |
 | `StreamingManager` | Sender routing, chunk transport, local stream terminal suppression, delayed stream retention | Translation workflow lifecycle |
 | `UnifiedResultDispatcher` | Accepted result and cancellation delivery; per-instance result deduplication | Tracker state mutation |
@@ -173,9 +174,9 @@ Timeout callbacks act only for their original request ID. A rejected timeout tra
 | Cancellation | Cancelled record retained; active indexes removed | Abort and tombstone | Exact-ID removal | One cancellation/end delivery; late chunks ignored |
 | Timeout | Timed-out record retained; active indexes removed | Exact-ID abort | Exact-ID removal | Timeout prevents later normal delivery |
 | Empty batch | Normal service terminal handling | Batch executor allocates no lifecycle controller or provider work | None | Immediate empty success |
-| Retention expiry | Terminal diagnostic record deleted | None | None | None |
+| Retention cleanup | Terminal lifecycle record deleted | None | None | None |
 
-Terminal records remain in tracker storage for diagnostics but leave tab, toast, and retry indexes immediately. They are not eligible for active request selection or bulk cancellation.
+Tracker terminal records leave active tab and toast indexes immediately. They are not eligible for active request selection or bulk cancellation.
 
 ### Timeout Ownership Matrix
 
@@ -237,7 +238,7 @@ The foundation layer is structural and observation-only: it establishes contract
 
 - **Request Unit Manifest**: A deterministic manifest of a request's translation units (`RequestUnitManifest`). It is the structural reference for observation-only validation.
 - **Observational Validation Foundation**: Request structure is validated observationally against the manifest without altering execution or observable behavior. This validation never performs recovery and never decides semantic success.
-- **TranslationDiagnosticReport Preservation**: Parser and execution facts are retained across execution boundaries and feed diagnostic report evidence. This is distinct from the tracker's retained terminal records, which are lifecycle diagnostics only.
+- **TranslationDiagnosticReport Preservation**: Parser and execution facts feed an immutable terminal diagnostic report. `UnifiedTranslationService` retains that report privately in service-owned `WeakMap` storage for internal lifecycle/debugging use; it has no public retrieval, export, persistence, or time-based retention guarantee. This is distinct from tracker lifecycle records.
 
 > **Deferred**: Runtime production and adoption of `TranslationOutcome` is intentionally deferred to a future initiative. See the [ADR-015 Implementation Status](../adr/ADR-015-translation-outcome-semantics.md). Runtime adoption should begin only after a concrete `TranslationOutcome` consumer has been defined.
 
