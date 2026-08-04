@@ -16,6 +16,12 @@ import { appendTranslationDiagnostic } from '@/features/translation/ir/Translati
 
 const logger = getScopedLogger(LOG_COMPONENTS.TRANSLATION, 'ProviderRequestEngine');
 
+function normalizeCallPurpose(callPurpose) {
+  return Object.values(TranslationCallPurpose).includes(callPurpose)
+    ? callPurpose
+    : TranslationCallPurpose.PRIMARY_TRANSLATION;
+}
+
 export const ProviderRequestEngine = {
   /**
    * Internal helper to adapt request headers based on the environment (Browser/Platform)
@@ -49,9 +55,7 @@ export const ProviderRequestEngine = {
    * UNIFIED API REQUEST HANDLER
    */
   async executeRequest(provider, { url, fetchOptions, extractResponse, context, abortController, updateApiKey, charCount, originalCharCount, sessionId, executionContext, callPurpose }) {
-    const normalizedCallPurpose = Object.values(TranslationCallPurpose).includes(callPurpose)
-      ? callPurpose
-      : TranslationCallPurpose.PRIMARY_TRANSLATION;
+    const normalizedCallPurpose = normalizeCallPurpose(callPurpose);
     // 1. Determine how many attempts we should make based on available keys
     let availableKeysCount = 1;
     if (provider.providerSettingKey && updateApiKey) {
@@ -162,12 +166,12 @@ export const ProviderRequestEngine = {
    * Executes a fetch call and normalizes errors
    */
   async executeApiCall(provider, { url, fetchOptions, extractResponse = (data) => data, context, abortController, sessionId, charCount, originalCharCount, callPurpose }) {
-    void callPurpose; // Reserved physical-call identity for later attribution phases.
+    const normalizedCallPurpose = normalizeCallPurpose(callPurpose);
     const finalSessionId = sessionId || abortController?.sessionId || null;
     const finalCharCount = charCount || 0;
     const finalOriginalCharCount = originalCharCount || 0;
 
-    const { globalCallId, sessionCallId } = statsManager.recordRequest(provider.providerName, finalSessionId, finalCharCount, finalOriginalCharCount, callPurpose);
+    const { globalCallId, sessionCallId } = statsManager.recordRequest(provider.providerName, finalSessionId, finalCharCount, finalOriginalCharCount, normalizedCallPurpose);
 
     // MOCK BYPASS: If URL is a mock protocol, skip actual fetch but keep stats and logs
     if (url.startsWith('mock://')) {
@@ -371,7 +375,7 @@ export const ProviderRequestEngine = {
                              err.name === 'AbortError';
       
       if (!isCancellation) {
-        statsManager.recordError(provider.providerName, finalSessionId, callPurpose);
+        statsManager.recordError(provider.providerName, finalSessionId, normalizedCallPurpose);
       }
 
       if (err.name === 'AbortError') {

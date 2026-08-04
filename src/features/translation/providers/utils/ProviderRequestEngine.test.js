@@ -218,6 +218,34 @@ describe('ProviderRequestEngine', () => {
       originalCharCount: 5
     });
 
+    it.each([
+      [undefined, TranslationCallPurpose.PRIMARY_TRANSLATION],
+      [null, TranslationCallPurpose.PRIMARY_TRANSLATION],
+      ['', TranslationCallPurpose.PRIMARY_TRANSLATION],
+      ['UNKNOWN', TranslationCallPurpose.PRIMARY_TRANSLATION],
+      [TranslationCallPurpose.PRIMARY_TRANSLATION, TranslationCallPurpose.PRIMARY_TRANSLATION],
+      [TranslationCallPurpose.STRUCTURED_RECOVERY, TranslationCallPurpose.STRUCTURED_RECOVERY],
+    ])('attributes direct physical %p purpose as %s', async (callPurpose, expectedPurpose) => {
+      proxyManager.fetch.mockResolvedValue({
+        ok: true,
+        status: 200,
+        headers: new Map([['content-type', 'application/json']]),
+        clone() { return this; },
+        json: async () => ({ translated: 'translated' })
+      });
+      const { statsManager } = await import('../../core/TranslationStatsManager.js');
+
+      await ProviderRequestEngine.executeApiCall(mockProvider, { ...baseParams(), callPurpose });
+
+      expect(statsManager.recordRequest).toHaveBeenCalledWith(
+        'TestProvider',
+        's1',
+        10,
+        5,
+        expectedPurpose
+      );
+    });
+
     it('should record exactly one error for a non-cancellation transport failure and rethrow', async () => {
       proxyManager.fetch.mockRejectedValue(new TypeError('NetworkError: Failed to fetch'));
       const { statsManager } = await import('../../core/TranslationStatsManager.js');
@@ -227,6 +255,8 @@ describe('ProviderRequestEngine', () => {
 
       expect(statsManager.recordRequest).toHaveBeenCalledTimes(1);
       expect(statsManager.recordError).toHaveBeenCalledTimes(1);
+      expect(statsManager.recordRequest).toHaveBeenCalledWith('TestProvider', 's1', 10, 5, TranslationCallPurpose.PRIMARY_TRANSLATION);
+      expect(statsManager.recordError).toHaveBeenCalledWith('TestProvider', 's1', TranslationCallPurpose.PRIMARY_TRANSLATION);
     });
 
     it('should not record an error for an aborted transport call', async () => {
