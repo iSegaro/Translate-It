@@ -201,12 +201,21 @@ export class BaseTranslateProvider extends BaseProvider {
           })
           .join(TRANSLATION_CONSTANTS.TEXT_DELIMITER);
 
-        chunkResults = TranslationSegmentMapper.mapTranslationToOriginalSegments(
-          joinedResult,
-          chunk.texts,
-          TRANSLATION_CONSTANTS.TEXT_DELIMITER,
-          this.providerName
-        ).map(text => TraditionalTextProcessor.scrubBidiArtifacts(text));
+        try {
+          chunkResults = TranslationSegmentMapper.mapTranslationToOriginalSegments(
+            joinedResult,
+            chunk.texts,
+            TRANSLATION_CONSTANTS.TEXT_DELIMITER,
+            this.providerName
+          ).map(text => TraditionalTextProcessor.scrubBidiArtifacts(text));
+        } catch (mapperError) {
+          if (mapperError.type === TranslationSegmentMapper.INCOMPLETE_CARDINALITY) {
+            const err = new Error(`[${this.providerName}] Incomplete translation: ${mapperError.message}`);
+            err.type = ErrorTypes.API_RESPONSE_INVALID;
+            throw err;
+          }
+          throw mapperError;
+        }
       }
 
       allResults.push(...chunkResults);

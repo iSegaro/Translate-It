@@ -10,12 +10,38 @@ import { DEFAULT_TEXT_DELIMITER, ALTERNATIVE_DELIMITERS } from '@/features/trans
 
 const logger = getScopedLogger(LOG_COMPONENTS.TRANSLATION, 'SegmentMapper');
 
+/**
+ * Delimiters that unambiguously mark structured segment output (bracket/dash
+ * markers). Only these may trigger hard INCOMPLETE_CARDINALITY rejection.
+ * Generic formatting separators (plain '\n', '\n\n') are deliberately excluded
+ * so ordinary multiline translations never hard-fail on line-break formatting.
+ */
+const STRUCTURAL_SEGMENT_DELIMITERS = new Set([
+  DEFAULT_TEXT_DELIMITER,   // '\n[[---]]\n'
+  '[[---]]',
+  '\n\n---\n\n',            // Lingva subgroup delimiter
+  '\n---\n',
+]);
+
+/**
+ * Generic formatting delimiters. Used for splitting/mapping only; they can
+ * never trigger INCOMPLETE_CARDINALITY.
+ */
+const GENERIC_FORMATTING_DELIMITERS = ALTERNATIVE_DELIMITERS.filter(
+  (delimiter) => !STRUCTURAL_SEGMENT_DELIMITERS.has(delimiter)
+);
+
 export class TranslationSegmentMapper {
   /**
    * Standard delimiter for separating text segments.
    * Using a more resilient pattern that traditional providers are less likely to merge.
    */
   static STANDARD_DELIMITER = DEFAULT_TEXT_DELIMITER;
+
+  /**
+   * Error type for incomplete cardinality: delimiter present but split count wrong.
+   */
+  static INCOMPLETE_CARDINALITY = 'INCOMPLETE_CARDINALITY';
 
   /**
    * Enhanced mapping: attempt to reconstruct original segments from translated text
@@ -61,12 +87,33 @@ export class TranslationSegmentMapper {
       return segments.map(s => scrub(s).trim());
     }
 
-    // 2. Try alternative common delimiters
-    for (const altDelim of ALTERNATIVE_DELIMITERS) {
+    // 2. Try alternative common delimiters.
+    // Structural delimiters prove segmented output; only they may trigger hard
+    // cardinality rejection. Generic formatting separators ('\n', '\n\n') are
+    // consulted only when no structural delimiter is present, so ordinary
+    // multiline translations never hard-fail.
+    const structuralDelims = [...STRUCTURAL_SEGMENT_DELIMITERS];
+    const genericDelims = GENERIC_FORMATTING_DELIMITERS;
+    let delimiterFound = false;
+
+    for (const altDelim of structuralDelims) {
       const testSegments = translatedText.split(altDelim);
       if (testSegments.length === originalSegments.length) {
         logger.info(`[${providerName}] Found working alternative delimiter: "${altDelim}"`);
         return testSegments.map(s => scrub(s).trim());
+      }
+      if (testSegments.length > 1) {
+        delimiterFound = true;
+      }
+    }
+
+    if (!delimiterFound) {
+      for (const altDelim of genericDelims) {
+        const testSegments = translatedText.split(altDelim);
+        if (testSegments.length === originalSegments.length) {
+          logger.info(`[${providerName}] Found working alternative delimiter: "${altDelim}"`);
+          return testSegments.map(s => scrub(s).trim());
+        }
       }
     }
 
@@ -80,6 +127,45 @@ export class TranslationSegmentMapper {
       result[nonEmptyOriginals[0].id] = translatedText.trim();
       return result;
     }
+
+    // 3.5. Source-aware blank reconstruction: translated parts match nonblank count.
+    // Structural delimiters take precedence; generic newlines are only consulted
+    // when no structural delimiter was found in the text.
+    if (nonEmptyOriginals.length > 1 && typeof translatedText === 'string') {
+      const reconstruct = (delims) => {
+        for (const altDelim of delims) {
+          const translatedParts = translatedText.split(altDelim);
+          if (translatedParts.length === nonEmptyOriginals.length) {
+            const result = new Array(originalSegments.length).fill('');
+            nonEmptyOriginals.forEach((entry, i) => {
+              result[entry.id] = scrub(translatedParts[i]).trim();
+            });
+            logger.info(`[${providerName}] Used source-aware blank reconstruction (${translatedParts.length} translated, ${nonEmptyOriginals.length} nonblank)`);
+            return result;
+          }
+        }
+        return null;
+      };
+
+      const structuralResult = reconstruct(structuralDelims);
+      if (structuralResult) return structuralResult;
+
+      if (!delimiterFound) {
+        const genericResult = reconstruct(genericDelims);
+        if (genericResult) return genericResult;
+      }
+    }
+
+    // 3.6. Incomplete cardinality: delimiter present but no split matched total or nonblank
+    if (delimiterFound) {
+      const error = new Error(
+        `[${providerName}] Incomplete translation: delimiter found but split produced wrong segment count ` +
+        `(expected ${originalSegments.length} total / ${nonEmptyOriginals.length} nonblank)`
+      );
+      error.type = TranslationSegmentMapper.INCOMPLETE_CARDINALITY;
+      throw error;
+    }
+
     // 4. Last Resort: Smart Word-Based Distribution (Replacing the broken character-ratio split)
     try {
       // CRITICAL: Before word-ratio splitting, remove ALL possible delimiters from the text
