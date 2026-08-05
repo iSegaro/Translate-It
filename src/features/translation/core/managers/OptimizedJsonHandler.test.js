@@ -22,6 +22,7 @@ vi.mock('@/shared/error-management/ErrorMatcher.js');
 
 import { OptimizedJsonHandler } from './OptimizedJsonHandler.js';
 import { isFatalError, matchErrorToType } from '@/shared/error-management/ErrorMatcher.js';
+import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
 import { MessageActions } from '@/shared/messaging/core/MessageActions.js';
 import { appendTranslationDiagnostic } from '@/features/translation/ir/TranslationOperation.js';
 import { getProviderConfiguration } from '@/features/translation/core/ProviderConfigurations.js';
@@ -133,7 +134,7 @@ describe('OptimizedJsonHandler', () => {
       expect(result).toEqual(['t1', 't2']);
     });
 
-    it('should reject malformed JSON-like strings to prevent UI corruption', () => {
+    it('should reject malformed JSON-like strings as a typed failure with a preserved diagnostic', () => {
       const original = ['s1'];
       // A string that:
       // 1. Starts with {" or ["
@@ -142,14 +143,76 @@ describe('OptimizedJsonHandler', () => {
       // 4. Is longer than 20 chars
       const malformedJson = '{"this is malformed": and fails parse ", but has markers and is long enough }';
       
-      const result = handler._mapResults(original, malformedJson);
-      expect(result).toEqual(['s1']);
+      expect(() => handler._mapResults(original, malformedJson)).toThrow(/RAW_JSON_RESULT/);
+      const rawJsonDiagnostic = appendTranslationDiagnostic.mock.calls.find(call => call[1]?.code === 'RAW_JSON_RESULT');
+      expect(rawJsonDiagnostic).toBeDefined();
+      expect(rawJsonDiagnostic[1]).toMatchObject({ type: 'STRUCTURED_RESULT_REJECTED', code: 'RAW_JSON_RESULT' });
     });
 
     it('should throw a fatal validation error on segment count mismatch', () => {
       const original = ['s1', 's2'];
       const translated = ['t1'];
-      expect(() => handler._mapResults(original, translated)).toThrow(/Segment count mismatch/);
+      try {
+        handler._mapResults(original, translated);
+        throw new Error('Expected mapping to fail');
+      } catch (error) {
+        expect(error).toMatchObject({ type: ErrorTypes.VALIDATION_ERROR, isFatal: true });
+        expect(error.message).toMatch(/Segment count mismatch/);
+      }
+    });
+
+    it('should throw a typed failure when a mapped item is null', () => {
+      expect(() => handler._mapResults(['s1'], [null])).toThrow(/NULL_TRANSLATION_RESULT/);
+    });
+
+    it('should throw a typed failure when a mapped item is undefined', () => {
+      expect(() => handler._mapResults(['s1'], [undefined])).toThrow(/NULL_TRANSLATION_RESULT/);
+    });
+
+    it('should throw a typed failure when translated text is missing from an object item', () => {
+      expect(() => handler._mapResults(['s1'], [{}])).toThrow(/MISSING_TRANSLATION_TEXT/);
+      expect(() => handler._mapResults(['s1'], [{ t: undefined }])).toThrow(/MISSING_TRANSLATION_TEXT/);
+      expect(() => handler._mapResults(['s1'], [{ text: undefined }])).toThrow(/MISSING_TRANSLATION_TEXT/);
+    });
+
+    it('should throw a typed failure for blank translated text with a nonblank source', () => {
+      expect(() => handler._mapResults(['s1'], [''])).toThrow(/EMPTY_TRANSLATION_RESULT/);
+      expect(() => handler._mapResults(['s1'], [{ t: '' }])).toThrow(/EMPTY_TRANSLATION_RESULT/);
+      expect(() => handler._mapResults(['s1'], [{ text: '' }])).toThrow(/EMPTY_TRANSLATION_RESULT/);
+    });
+
+    it('should throw a typed failure for whitespace translated text with a nonblank source', () => {
+      expect(() => handler._mapResults(['s1'], ['   '])).toThrow(/EMPTY_TRANSLATION_RESULT/);
+      expect(() => handler._mapResults(['s1'], [{ t: '   ' }])).toThrow(/EMPTY_TRANSLATION_RESULT/);
+    });
+
+    it('should surface every invalid result family as a typed fatal validation error', () => {
+      const expectTypedFailure = (attempt) => {
+        try {
+          attempt();
+          throw new Error('Expected mapping to fail');
+        } catch (error) {
+          expect(error).toMatchObject({ type: ErrorTypes.VALIDATION_ERROR, isFatal: true });
+        }
+      };
+
+      expectTypedFailure(() => handler._mapResults(['s1'], [null]));
+      expectTypedFailure(() => handler._mapResults(['s1'], [undefined]));
+      expectTypedFailure(() => handler._mapResults(['s1'], [{}]));
+      expectTypedFailure(() => handler._mapResults(['s1'], [{ t: undefined }]));
+      expectTypedFailure(() => handler._mapResults(['s1'], ['']));
+      expectTypedFailure(() => handler._mapResults(['s1'], ['   ']));
+      expectTypedFailure(() => handler._mapResults(['s1'], ['{"this is malformed": and fails parse ", but has markers and is long enough }']));
+    });
+
+    it('should accept blank translated text for a blank source position', () => {
+      expect(handler._mapResults([''], [''])).toEqual(['']);
+      expect(handler._mapResults([{ t: '', i: 'blank' }], [{ t: '' }])).toEqual([{ t: '', text: '', i: 'blank' }]);
+    });
+
+    it('should keep an explicit source-equal translation as a valid result', () => {
+      expect(handler._mapResults(['URL'], ['URL'])).toEqual(['URL']);
+      expect(handler._mapResults(['URL'], [{ t: 'URL' }])).toEqual(['URL']);
     });
   });
 
@@ -516,6 +579,51 @@ describe('OptimizedJsonHandler', () => {
       expect(ends).toHaveLength(1);
       expect(ends[0].data.success).toBe(false);
       expect(ends[0].data.error).toBeDefined();
+    });
+
+    it('should fail the batch and emit no stream update when a mapped item is null', async () => {
+      const browser = (await import('webextension-polyfill')).default;
+      browser.tabs.sendMessage.mockClear();
+
+      mockProvider.translate.mockResolvedValueOnce({ translatedText: [null] });
+
+      const result = await handler.execute(mockEngine, mockData, mockProvider, 'auto', 'fa', 'msg-null', mockSender);
+
+      expect(result.success).toBe(false);
+      expect(result.error).toBeDefined();
+      const messages = browser.tabs.sendMessage.mock.calls.map(c => c[1]);
+      expect(messages.filter(m => m.action === MessageActions.TRANSLATION_STREAM_UPDATE)).toHaveLength(0);
+    });
+
+    it('should fail the batch and emit no stream update when a mapped item is undefined', async () => {
+      const browser = (await import('webextension-polyfill')).default;
+      browser.tabs.sendMessage.mockClear();
+
+      mockProvider.translate.mockResolvedValueOnce({ translatedText: [undefined] });
+
+      const result = await handler.execute(mockEngine, mockData, mockProvider, 'auto', 'fa', 'msg-undef', mockSender);
+
+      expect(result.success).toBe(false);
+      const messages = browser.tabs.sendMessage.mock.calls.map(c => c[1]);
+      expect(messages.filter(m => m.action === MessageActions.TRANSLATION_STREAM_UPDATE)).toHaveLength(0);
+    });
+
+    it('should reject RAW_JSON_RESULT with a preserved diagnostic and no stream update', async () => {
+      const browser = (await import('webextension-polyfill')).default;
+      browser.tabs.sendMessage.mockClear();
+      appendTranslationDiagnostic.mockClear();
+
+      const malformedJson = '{"this is malformed": and fails parse ", but has markers and is long enough }';
+      mockProvider.translate.mockResolvedValueOnce({ translatedText: [malformedJson] });
+
+      const result = await handler.execute(mockEngine, mockData, mockProvider, 'auto', 'fa', 'msg-rawjson', mockSender);
+
+      expect(result.success).toBe(false);
+      const rawJsonDiagnostic = appendTranslationDiagnostic.mock.calls.find(call => call[1]?.code === 'RAW_JSON_RESULT');
+      expect(rawJsonDiagnostic).toBeDefined();
+      expect(rawJsonDiagnostic[1]).toMatchObject({ type: 'STRUCTURED_RESULT_REJECTED', code: 'RAW_JSON_RESULT' });
+      const messages = browser.tabs.sendMessage.mock.calls.map(c => c[1]);
+      expect(messages.filter(m => m.action === MessageActions.TRANSLATION_STREAM_UPDATE)).toHaveLength(0);
     });
 
     it('should keep streaming successful batches unchanged', async () => {

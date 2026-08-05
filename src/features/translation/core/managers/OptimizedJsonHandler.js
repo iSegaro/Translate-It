@@ -477,11 +477,32 @@ export class OptimizedJsonHandler {
       rawItems = [currentResults];
     }
     
-    // Ensure rawItems is always an array of text strings
-    const results = rawItems.map(item => {
-      if (item === null || item === undefined) return '';
-      let text = (typeof item === 'object') ? (item.t || item.text || item.translation || JSON.stringify(item)) : String(item);
-      
+    // Shared pipeline contract: every nonblank source segment must receive valid
+    // nonblank translated text. Missing, blank, or raw-JSON output is a typed
+    // failure — never a silent source-fill into the success path.
+    const rejectInvalidResult = (index, code) => {
+      const errorMsg = `Invalid translation result at segment index ${index} (code: ${code})`;
+      logger.error(`[JsonHandler] ${errorMsg}`);
+      const err = new Error(errorMsg);
+      err.isFatal = true;
+      err.type = ErrorTypes.VALIDATION_ERROR;
+      throw err;
+    };
+
+    const results = rawItems.map((item, index) => {
+      if (item === null || item === undefined) {
+        rejectInvalidResult(index, 'NULL_TRANSLATION_RESULT');
+      }
+      let text;
+      if (typeof item === 'object') {
+        text = item.t ?? item.text ?? item.translation;
+        if (text === undefined || text === null) {
+          rejectInvalidResult(index, 'MISSING_TRANSLATION_TEXT');
+        }
+      } else {
+        text = String(item);
+      }
+
       // FINAL SAFETY: If the extracted text still looks like JSON (e.g. contains {"translations":),
       // it means parsing failed completely. We should NOT show this to the user.
         if (typeof text === 'string' && text.length > 20 && 
@@ -492,9 +513,8 @@ export class OptimizedJsonHandler {
             type: 'STRUCTURED_RESULT_REJECTED',
             stage: 'optimized-json-handler',
             code: 'RAW_JSON_RESULT',
-            fallback: true,
           });
-          return null; // Force fallback to original text below
+          rejectInvalidResult(index, 'RAW_JSON_RESULT');
       }
       
       return text;
@@ -510,11 +530,15 @@ export class OptimizedJsonHandler {
     }
 
     return originalBatch.map((item, idx) => {
-      // Use result if it exists and is not null (null means it was rejected by safety check)
-      const translatedContent = (results[idx] !== undefined && results[idx] !== null) 
-        ? results[idx] 
-        : (typeof item === 'object' ? (item.t || item.text) : item);
-        
+      const translatedContent = results[idx];
+      const sourceText = typeof item === 'object' ? (item.t ?? item.text) : item;
+      const sourceIsBlank = typeof sourceText === 'string' && sourceText.trim() === '';
+
+      // Blank output stays acceptable only for blank source positions.
+      if (typeof translatedContent !== 'string' || (translatedContent.trim() === '' && !sourceIsBlank)) {
+        rejectInvalidResult(idx, 'EMPTY_TRANSLATION_RESULT');
+      }
+
       if (typeof item === 'object') {
         return { ...item, t: translatedContent, text: translatedContent };
       }
