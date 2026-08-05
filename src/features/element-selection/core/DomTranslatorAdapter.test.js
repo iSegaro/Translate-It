@@ -1231,5 +1231,18 @@ describe('DomTranslatorAdapter', () => {
         window.getComputedStyle = originalGetComputedStyle;
       }
     });
+
+    it('suppresses raw V3 fragment events without DOM mutation', async () => {
+      contentScriptIntegration.sendTranslationRequest.mockResolvedValue({
+        success: true,
+        streaming: false,
+        translatedText: JSON.stringify([{ t: 'Translated fragment', i: 'n1', blockId: 'g1', isV3Fragment: true, parentId: 'g1', fragmentIndex: 0, fragmentCount: 2 }])
+      });
+
+      await adapter.translateElement(testElement);
+
+      expect(testElement.textContent).toContain('Hello');
+      expect(testElement.textContent).not.toContain('Translated fragment');
+    });
   });
 });

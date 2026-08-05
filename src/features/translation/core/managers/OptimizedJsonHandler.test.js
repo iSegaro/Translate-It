@@ -1234,5 +1234,564 @@ describe('OptimizedJsonHandler', () => {
 
       expect(browser.tabs.sendMessage).toHaveBeenCalled();
     });
+
+    describe('V3 BlockGroup fragment aggregation', () => {
+      const makeV3Fragments = (blockId, unitId, texts, joiners) => texts.map((t, i) => ({
+        t,
+        blockId,
+        i: unitId,
+        role: 'paragraph',
+        isV3Fragment: true,
+        parentId: blockId,
+        fragmentIndex: i,
+        fragmentCount: texts.length,
+        fragmentJoinerBefore: joiners[i] ?? '',
+      }));
+
+      it('reassembles in-order V3 fragments into one logical unit', async () => {
+        const browser = (await import('webextension-polyfill')).default;
+        browser.tabs.sendMessage.mockClear();
+
+        const fragments = makeV3Fragments('g1', 'n1', ['Translated one.', 'Translated two.'], ['', ' ']);
+        mockEngine.createIntelligentBatches = vi.fn(() => [fragments]);
+        mockProvider.translate.mockResolvedValueOnce({ translatedText: ['Translated one.', 'Translated two.'] });
+
+        const result = await handler.execute(
+          mockEngine,
+          { ...mockData, text: JSON.stringify([{ t: 'Hello world.', blockId: 'g1', i: 'n1' }]) },
+          mockProvider, 'auto', 'fa', 'msg-v3-inorder', mockSender
+        );
+
+        expect(result.success).toBe(true);
+        const updates = browser.tabs.sendMessage.mock.calls
+          .map(([, m]) => m)
+          .filter(m => m.action === MessageActions.TRANSLATION_STREAM_UPDATE);
+        expect(updates).toHaveLength(1);
+        expect(updates[0].data.data).toEqual([{ t: 'Translated one. Translated two.', text: 'Translated one. Translated two.', blockId: 'g1', i: 'g1', role: 'paragraph' }]);
+      });
+
+      it('reassembles V3 fragments by fragmentIndex regardless of batch completion order', async () => {
+        const browser = (await import('webextension-polyfill')).default;
+        browser.tabs.sendMessage.mockClear();
+
+        const fragments = makeV3Fragments('g1', 'n1', ['Translated one.', 'Translated two.'], ['', ' ']);
+        const fragment0 = fragments[0];
+        const fragment1 = fragments[1];
+        const deferred0 = createDeferred();
+        const deferred1 = createDeferred();
+
+        // Batch 0 contains fragment1 (index 1), batch 1 contains fragment0 (index 0)
+        // Completion order: batch 1 (fragment0) first, then batch 0 (fragment1)
+        mockEngine.createIntelligentBatches = vi.fn(() => [[fragment1], [fragment0]]);
+        mockProvider.translate
+          .mockImplementationOnce(() => deferred1.promise) // batch 0 → fragment1
+          .mockImplementationOnce(() => deferred0.promise); // batch 1 → fragment0
+
+        const execution = handler.execute(
+          mockEngine,
+          { ...mockData, sourceLanguage: 'en', text: JSON.stringify([{ t: 'Hello world.', blockId: 'g1', i: 'n1' }]) },
+          mockProvider, 'en', 'fa', 'msg-v3-outoforder', mockSender
+        );
+
+        await vi.waitFor(() => expect(mockProvider.translate).toHaveBeenCalledTimes(2));
+
+        // Resolve the batch containing fragment0 (index 0) first
+        deferred0.resolve({ translatedText: ['Translated one.'] });
+        await Promise.resolve();
+
+        // Parent incomplete — no stream update yet
+        let updates = browser.tabs.sendMessage.mock.calls
+          .map(([, m]) => m)
+          .filter(m => m.action === MessageActions.TRANSLATION_STREAM_UPDATE);
+        expect(updates).toHaveLength(0);
+
+        // Now resolve the batch containing fragment1 (index 1)
+        deferred1.resolve({ translatedText: ['Translated two.'] });
+        await execution;
+
+        // Parent fully assembled — one stream update with correct order
+        updates = browser.tabs.sendMessage.mock.calls
+          .map(([, m]) => m)
+          .filter(m => m.action === MessageActions.TRANSLATION_STREAM_UPDATE);
+        expect(updates).toHaveLength(1);
+        expect(updates[0].data.data[0].t).toBe('Translated one. Translated two.');
+      });
+
+      it('reassembles three or more V3 fragments correctly', async () => {
+        const browser = (await import('webextension-polyfill')).default;
+        browser.tabs.sendMessage.mockClear();
+
+        const fragments = makeV3Fragments('g1', 'n1', ['Alpha.', 'Beta.', 'Gamma.'], ['', ' ', ' ']);
+        mockEngine.createIntelligentBatches = vi.fn(() => [fragments]);
+        mockProvider.translate.mockResolvedValueOnce({ translatedText: ['Alpha.', 'Beta.', 'Gamma.'] });
+
+        const result = await handler.execute(
+          mockEngine,
+          { ...mockData, text: JSON.stringify([{ t: 'Hello world here.', blockId: 'g1', i: 'n1' }]) },
+          mockProvider, 'auto', 'fa', 'msg-v3-three', mockSender
+        );
+
+        expect(result.success).toBe(true);
+        const updates = browser.tabs.sendMessage.mock.calls
+          .map(([, m]) => m)
+          .filter(m => m.action === MessageActions.TRANSLATION_STREAM_UPDATE);
+        expect(updates[0].data.data[0].t).toBe('Alpha. Beta. Gamma.');
+      });
+
+      it('preserves boundary whitespace between V3 fragments', async () => {
+        const browser = (await import('webextension-polyfill')).default;
+        browser.tabs.sendMessage.mockClear();
+
+        const fragments = makeV3Fragments('g1', 'n1', ['Line one.', 'Line two.'], ['', '\n']);
+        mockEngine.createIntelligentBatches = vi.fn(() => [fragments]);
+        mockProvider.translate.mockResolvedValueOnce({ translatedText: ['Line one.', 'Line two.'] });
+
+        const result = await handler.execute(
+          mockEngine,
+          { ...mockData, text: JSON.stringify([{ t: 'First line.\nSecond line.', blockId: 'g1', i: 'n1' }]) },
+          mockProvider, 'auto', 'fa', 'msg-v3-ws', mockSender
+        );
+
+        expect(result.success).toBe(true);
+        const updates = browser.tabs.sendMessage.mock.calls
+          .map(([, m]) => m)
+          .filter(m => m.action === MessageActions.TRANSLATION_STREAM_UPDATE);
+        expect(updates[0].data.data[0].t).toBe('Line one.\nLine two.');
+      });
+
+      it('preserves marker text byte-for-byte after V3 reassembly', async () => {
+        const browser = (await import('webextension-polyfill')).default;
+        browser.tabs.sendMessage.mockClear();
+
+        const marker = '@@TI_SEG_s1_e1_n1@@';
+        const fragments = makeV3Fragments('g1', 'n1', [`${marker}Hello`, 'World'], ['', ' ']);
+        mockEngine.createIntelligentBatches = vi.fn(() => [fragments]);
+        mockProvider.translate.mockResolvedValueOnce({ translatedText: [`${marker}Hello`, 'World'] });
+
+        const result = await handler.execute(
+          mockEngine,
+          { ...mockData, text: JSON.stringify([{ t: `Hello${marker}World`, blockId: 'g1', i: 'n1' }]) },
+          mockProvider, 'auto', 'fa', 'msg-v3-marker', mockSender
+        );
+
+        expect(result.success).toBe(true);
+        const updates = browser.tabs.sendMessage.mock.calls
+          .map(([, m]) => m)
+          .filter(m => m.action === MessageActions.TRANSLATION_STREAM_UPDATE);
+        expect(updates[0].data.data[0].t).toBe(`${marker}Hello World`);
+      });
+
+      it('preserves parent blockId identity in assembled V3 result', async () => {
+        const browser = (await import('webextension-polyfill')).default;
+        browser.tabs.sendMessage.mockClear();
+
+        const fragments = makeV3Fragments('g1', 'n1', ['Translated one.', 'Translated two.'], ['', ' ']);
+        mockEngine.createIntelligentBatches = vi.fn(() => [fragments]);
+        mockProvider.translate.mockResolvedValueOnce({ translatedText: ['Translated one.', 'Translated two.'] });
+
+        const result = await handler.execute(
+          mockEngine,
+          { ...mockData, text: JSON.stringify([{ t: 'Hello world.', blockId: 'g1', i: 'n1' }]) },
+          mockProvider, 'auto', 'fa', 'msg-v3-identity', mockSender
+        );
+
+        expect(result.success).toBe(true);
+        const updates = browser.tabs.sendMessage.mock.calls
+          .map(([, m]) => m)
+          .filter(m => m.action === MessageActions.TRANSLATION_STREAM_UPDATE);
+        expect(updates[0].data.data[0].i).toBe('g1');
+        expect(updates[0].data.data[0].blockId).toBe('g1');
+      });
+
+      it('never includes raw V3 fragments in final results', async () => {
+        const browser = (await import('webextension-polyfill')).default;
+        browser.tabs.sendMessage.mockClear();
+
+        const fragments = makeV3Fragments('g1', 'n1', ['Translated one.', 'Translated two.'], ['', ' ']);
+        mockEngine.createIntelligentBatches = vi.fn(() => [fragments]);
+        mockProvider.translate.mockResolvedValueOnce({ translatedText: ['Translated one.', 'Translated two.'] });
+
+        const result = await handler.execute(
+          mockEngine,
+          { ...mockData, text: JSON.stringify([{ t: 'Hello world.', blockId: 'g1', i: 'n1' }]) },
+          mockProvider, 'auto', 'fa', 'msg-v3-no-raw', mockSender
+        );
+
+        expect(result.success).toBe(true);
+        expect(result.results).toBeDefined();
+        result.results.forEach((item) => {
+          expect(item.isV3Fragment).toBeUndefined();
+          expect(item.fragmentIndex).toBeUndefined();
+          expect(item.fragmentCount).toBeUndefined();
+          expect(item.fragmentJoinerBefore).toBeUndefined();
+          expect(item.isSplit).toBeUndefined();
+          expect(item.partIndex).toBeUndefined();
+        });
+      });
+
+      describe('failure matrix (first/middle/last)', () => {
+        it('suppresses V3 parent when first fragment fails', async () => {
+          const browser = (await import('webextension-polyfill')).default;
+
+          const fragments = makeV3Fragments('g1', 'n1', ['A.', 'B.', 'C.'], ['', ' ', ' ']);
+          const d0 = createDeferred();
+          const d1 = createDeferred();
+          const d2 = createDeferred();
+
+          mockEngine.createIntelligentBatches = vi.fn(() => [[fragments[0]], [fragments[1]], [fragments[2]]]);
+          mockProvider.translate
+            .mockImplementationOnce(() => d0.promise)
+            .mockImplementationOnce(() => d1.promise)
+            .mockImplementationOnce(() => d2.promise);
+
+          const execution = handler.execute(
+            mockEngine,
+            { ...mockData, sourceLanguage: 'en', text: JSON.stringify([{ t: 'A B C.', blockId: 'g1', i: 'n1' }]) },
+            mockProvider, 'en', 'fa', 'msg-v3-fail-first', mockSender
+          );
+
+          await vi.waitFor(() => expect(mockProvider.translate).toHaveBeenCalledTimes(3));
+
+          d0.reject(Object.assign(new Error('first failed'), { type: 'TRANSLATION_FAILED' }));
+          d1.resolve({ translatedText: ['B.'] });
+          d2.resolve({ translatedText: ['C.'] });
+
+          const result = await execution;
+
+          expect(result.success).toBe(false);
+          const updates = browser.tabs.sendMessage.mock.calls
+            .map(([, m]) => m)
+            .filter(m => m.action === MessageActions.TRANSLATION_STREAM_UPDATE);
+          expect(updates).toHaveLength(0);
+        });
+
+        it('suppresses V3 parent when middle fragment fails', async () => {
+          const browser = (await import('webextension-polyfill')).default;
+
+          const fragments = makeV3Fragments('g1', 'n1', ['A.', 'B.', 'C.'], ['', ' ', ' ']);
+          const d0 = createDeferred();
+          const d1 = createDeferred();
+          const d2 = createDeferred();
+
+          mockEngine.createIntelligentBatches = vi.fn(() => [[fragments[0]], [fragments[1]], [fragments[2]]]);
+          mockProvider.translate
+            .mockImplementationOnce(() => d0.promise)
+            .mockImplementationOnce(() => d1.promise)
+            .mockImplementationOnce(() => d2.promise);
+
+          const execution = handler.execute(
+            mockEngine,
+            { ...mockData, sourceLanguage: 'en', text: JSON.stringify([{ t: 'A B C.', blockId: 'g1', i: 'n1' }]) },
+            mockProvider, 'en', 'fa', 'msg-v3-fail-middle', mockSender
+          );
+
+          await vi.waitFor(() => expect(mockProvider.translate).toHaveBeenCalledTimes(3));
+
+          d0.resolve({ translatedText: ['A.'] });
+          d1.reject(Object.assign(new Error('middle failed'), { type: 'TRANSLATION_FAILED' }));
+          d2.resolve({ translatedText: ['C.'] });
+
+          const result = await execution;
+
+          expect(result.success).toBe(false);
+          const updates = browser.tabs.sendMessage.mock.calls
+            .map(([, m]) => m)
+            .filter(m => m.action === MessageActions.TRANSLATION_STREAM_UPDATE);
+          expect(updates).toHaveLength(0);
+        });
+
+        it('suppresses V3 parent when last fragment fails', async () => {
+          const browser = (await import('webextension-polyfill')).default;
+
+          const fragments = makeV3Fragments('g1', 'n1', ['A.', 'B.', 'C.'], ['', ' ', ' ']);
+          const d0 = createDeferred();
+          const d1 = createDeferred();
+          const d2 = createDeferred();
+
+          mockEngine.createIntelligentBatches = vi.fn(() => [[fragments[0]], [fragments[1]], [fragments[2]]]);
+          mockProvider.translate
+            .mockImplementationOnce(() => d0.promise)
+            .mockImplementationOnce(() => d1.promise)
+            .mockImplementationOnce(() => d2.promise);
+
+          const execution = handler.execute(
+            mockEngine,
+            { ...mockData, sourceLanguage: 'en', text: JSON.stringify([{ t: 'A B C.', blockId: 'g1', i: 'n1' }]) },
+            mockProvider, 'en', 'fa', 'msg-v3-fail-last', mockSender
+          );
+
+          await vi.waitFor(() => expect(mockProvider.translate).toHaveBeenCalledTimes(3));
+
+          d0.resolve({ translatedText: ['A.'] });
+          d1.resolve({ translatedText: ['B.'] });
+          d2.reject(Object.assign(new Error('last failed'), { type: 'TRANSLATION_FAILED' }));
+
+          const result = await execution;
+
+          expect(result.success).toBe(false);
+          const updates = browser.tabs.sendMessage.mock.calls
+            .map(([, m]) => m)
+            .filter(m => m.action === MessageActions.TRANSLATION_STREAM_UPDATE);
+          expect(updates).toHaveLength(0);
+        });
+      });
+
+      it('keeps independent units flowing when V3 parent fails', async () => {
+        const browser = (await import('webextension-polyfill')).default;
+        browser.tabs.sendMessage.mockClear();
+
+        const normalA = { t: 'Hello.', i: 'na' };
+        const fragments = makeV3Fragments('g1', 'n1', ['World.', '!'], ['', ' ']);
+        const normalC = { t: 'Done.', i: 'nc' };
+        mockEngine.createIntelligentBatches = vi.fn(() => [[normalA], fragments, [normalC]]);
+        mockProvider.translate
+          .mockResolvedValueOnce({ translatedText: ['Hola.'] })
+          .mockRejectedValueOnce(Object.assign(new Error('V3 failed'), { type: 'TRANSLATION_FAILED' }))
+          .mockResolvedValueOnce({ translatedText: ['Listo.'] });
+
+        const result = await handler.execute(
+          mockEngine,
+          { ...mockData, text: JSON.stringify([normalA, { t: 'Hello world!', blockId: 'g1', i: 'n1' }, normalC]) },
+          mockProvider, 'auto', 'fa', 'msg-v3-mixed', mockSender
+        );
+
+        expect(result.success).toBe(false);
+        const updates = browser.tabs.sendMessage.mock.calls
+          .map(([, m]) => m)
+          .filter(m => m.action === MessageActions.TRANSLATION_STREAM_UPDATE);
+        expect(updates).toHaveLength(2);
+        expect(updates[0].data.data[0].t).toBe('Hola.');
+        expect(updates[1].data.data[0].t).toBe('Listo.');
+      });
+
+      it('keeps first value on duplicate V3 fragment index before completion', async () => {
+        const browser = (await import('webextension-polyfill')).default;
+        browser.tabs.sendMessage.mockClear();
+
+        const fragment0 = makeV3Fragments('g1', 'n1', ['A.', 'B.'], ['', ' '])[0];
+        const fragment1 = makeV3Fragments('g1', 'n1', ['A.', 'B.'], ['', ' '])[1];
+        const duplicate0 = { ...fragment0, t: 'DUPLICATE.' };
+
+        const d0 = createDeferred();
+        const d1 = createDeferred();
+        const d2 = createDeferred();
+
+        mockEngine.createIntelligentBatches = vi.fn(() => [[fragment0], [duplicate0], [fragment1]]);
+        mockProvider.translate
+          .mockImplementationOnce(() => d0.promise)
+          .mockImplementationOnce(() => d1.promise)
+          .mockImplementationOnce(() => d2.promise);
+
+        const execution = handler.execute(
+          mockEngine,
+          { ...mockData, sourceLanguage: 'en', text: JSON.stringify([{ t: 'A B.', blockId: 'g1', i: 'n1' }]) },
+          mockProvider, 'en', 'fa', 'msg-v3-dup', mockSender
+        );
+
+        await vi.waitFor(() => expect(mockProvider.translate).toHaveBeenCalledTimes(3));
+
+        // fragment0 succeeds first
+        d0.resolve({ translatedText: ['A.'] });
+        await Promise.resolve();
+
+        // duplicate fragment0 arrives — first value must survive
+        d1.resolve({ translatedText: ['DUPLICATE.'] });
+        await Promise.resolve();
+
+        // fragment1 succeeds — parent should now complete
+        d2.resolve({ translatedText: ['B.'] });
+        const result = await execution;
+
+        expect(result.success).toBe(true);
+        const updates = browser.tabs.sendMessage.mock.calls
+          .map(([, m]) => m)
+          .filter(m => m.action === MessageActions.TRANSLATION_STREAM_UPDATE);
+        expect(updates).toHaveLength(1);
+        expect(updates[0].data.data[0].t).toBe('A. B.');
+      });
+
+      it('does not emit V3 parent twice on duplicate after completion', async () => {
+        const browser = (await import('webextension-polyfill')).default;
+        browser.tabs.sendMessage.mockClear();
+
+        const fragments = makeV3Fragments('g1', 'n1', ['A.', 'B.'], ['', ' ']);
+        const fragment0 = fragments[0];
+        const fragment1 = fragments[1];
+        const duplicate0 = { ...fragment0, t: 'Duplicate.' };
+
+        const d0 = createDeferred();
+        const d1 = createDeferred();
+        const d2 = createDeferred();
+
+        mockEngine.createIntelligentBatches = vi.fn(() => [[fragment0], [fragment1], [duplicate0]]);
+        mockProvider.translate
+          .mockImplementationOnce(() => d0.promise)
+          .mockImplementationOnce(() => d1.promise)
+          .mockImplementationOnce(() => d2.promise);
+
+        const execution = handler.execute(
+          mockEngine,
+          { ...mockData, sourceLanguage: 'en', text: JSON.stringify([{ t: 'A B.', blockId: 'g1', i: 'n1' }]) },
+          mockProvider, 'en', 'fa', 'msg-v3-late-dup', mockSender
+        );
+
+        await vi.waitFor(() => expect(mockProvider.translate).toHaveBeenCalledTimes(3));
+
+        // Fragments 0 and 1 succeed — parent should complete and emit
+        d0.resolve({ translatedText: ['A.'] });
+        d1.resolve({ translatedText: ['B.'] });
+
+        // Wait for parent to complete and stream update emitted
+        await vi.waitFor(() => {
+          const updates = browser.tabs.sendMessage.mock.calls
+            .map(([, m]) => m)
+            .filter(m => m.action === MessageActions.TRANSLATION_STREAM_UPDATE);
+          expect(updates).toHaveLength(1);
+        });
+
+        const updates = browser.tabs.sendMessage.mock.calls
+          .map(([, m]) => m)
+          .filter(m => m.action === MessageActions.TRANSLATION_STREAM_UPDATE);
+        expect(updates[0].data.data[0].t).toBe('A. B.');
+
+        // Late duplicate fragment — should be ignored
+        d2.resolve({ translatedText: ['Duplicate.'] });
+        await execution;
+
+        const updatesAfter = browser.tabs.sendMessage.mock.calls
+          .map(([, m]) => m)
+          .filter(m => m.action === MessageActions.TRANSLATION_STREAM_UPDATE);
+        expect(updatesAfter).toHaveLength(1);
+      });
+
+      it('ignores late V3 success after parent failure', async () => {
+        const browser = (await import('webextension-polyfill')).default;
+        browser.tabs.sendMessage.mockClear();
+
+        const fragment0 = makeV3Fragments('g1', 'n1', ['A.', 'B.'], ['', ' '])[0];
+        const fragment1 = makeV3Fragments('g1', 'n1', ['A.', 'B.'], ['', ' '])[1];
+        const late0 = { ...fragment0, t: 'Late.' };
+
+        const d0 = createDeferred();
+        const d1 = createDeferred();
+
+        mockEngine.createIntelligentBatches = vi.fn(() => [[fragment0], [late0]]);
+        mockProvider.translate
+          .mockImplementationOnce(() => d0.promise)
+          .mockImplementationOnce(() => d1.promise);
+
+        const execution = handler.execute(
+          mockEngine,
+          { ...mockData, sourceLanguage: 'en', text: JSON.stringify([{ t: 'A B.', blockId: 'g1', i: 'n1' }]) },
+          mockProvider, 'en', 'fa', 'msg-v3-late-fail', mockSender
+        );
+
+        await vi.waitFor(() => expect(mockProvider.translate).toHaveBeenCalledTimes(2));
+
+        d0.reject(Object.assign(new Error('failed'), { type: 'TRANSLATION_FAILED' }));
+        d1.resolve({ translatedText: ['Late B.'] });
+        const result = await execution;
+
+        expect(result.success).toBe(false);
+        const updates = browser.tabs.sendMessage.mock.calls
+          .map(([, m]) => m)
+          .filter(m => m.action === MessageActions.TRANSLATION_STREAM_UPDATE);
+        expect(updates).toHaveLength(0);
+      });
+
+      it('request-local isolation for reused parent ID across execute() calls', async () => {
+        const browser = (await import('webextension-polyfill')).default;
+        browser.tabs.sendMessage.mockClear();
+
+        // First request: g1 with 2 fragments → success
+        const fragments1 = makeV3Fragments('g1', 'n1', ['A.', 'B.'], ['', ' ']);
+        mockEngine.createIntelligentBatches = vi.fn(() => [fragments1]);
+        mockProvider.translate.mockResolvedValueOnce({ translatedText: ['A.', 'B.'] });
+
+        const result1 = await handler.execute(
+          mockEngine,
+          { ...mockData, sourceLanguage: 'en', messageId: 'req-1', text: JSON.stringify([{ t: 'A B.', blockId: 'g1', i: 'n1' }]) },
+          mockProvider, 'en', 'fa', 'req-1', mockSender
+        );
+
+        // Second request: g1 (reused id) with 3 fragments → success
+        const fragments2 = makeV3Fragments('g1', 'n1', ['C.', 'D.', 'E.'], ['', ' ', ' ']);
+        mockEngine.createIntelligentBatches = vi.fn(() => [fragments2]);
+        mockProvider.translate.mockResolvedValueOnce({ translatedText: ['C.', 'D.', 'E.'] });
+
+        const result2 = await handler.execute(
+          mockEngine,
+          { ...mockData, sourceLanguage: 'en', messageId: 'req-2', text: JSON.stringify([{ t: 'C D E.', blockId: 'g1', i: 'n1' }]) },
+          mockProvider, 'en', 'fa', 'req-2', mockSender
+        );
+
+        expect(result1.success).toBe(true);
+        expect(result2.success).toBe(true);
+
+        const updates = browser.tabs.sendMessage.mock.calls
+          .map(([, m]) => m)
+          .filter(m => m.action === MessageActions.TRANSLATION_STREAM_UPDATE);
+        expect(updates).toHaveLength(2);
+        expect(updates[0].data.data[0].t).toBe('A. B.');
+        expect(updates[1].data.data[0].t).toBe('C. D. E.');
+      });
+
+      it('stream integration: complete + V3 fragmented + complete emits assembled result', async () => {
+        const browser = (await import('webextension-polyfill')).default;
+        browser.tabs.sendMessage.mockClear();
+
+        const normalA = { t: 'Hello.', i: 'na' };
+        const v3Fragments = makeV3Fragments('g1', 'n1', ['World.', '!'], ['', ' ']);
+        const normalC = { t: 'Done.', i: 'nc' };
+        mockEngine.createIntelligentBatches = vi.fn(() => [[normalA], v3Fragments, [normalC]]);
+        mockProvider.translate
+          .mockResolvedValueOnce({ translatedText: ['Hola.'] })
+          .mockResolvedValueOnce({ translatedText: ['Mundo.', '!'] })
+          .mockResolvedValueOnce({ translatedText: ['Listo.'] });
+
+        const result = await handler.execute(
+          mockEngine,
+          { ...mockData, text: JSON.stringify([normalA, { t: 'Hello world!', blockId: 'g1', i: 'n1' }, normalC]) },
+          mockProvider, 'auto', 'fa', 'msg-v3-stream', mockSender
+        );
+
+        expect(result.success).toBe(true);
+        const updates = browser.tabs.sendMessage.mock.calls
+          .map(([, m]) => m)
+          .filter(m => m.action === MessageActions.TRANSLATION_STREAM_UPDATE);
+        expect(updates).toHaveLength(3);
+        expect(updates[0].data.data[0].t).toBe('Hola.');
+        expect(updates[1].data.data[0].t).toBe('Mundo. !');
+        expect(updates[2].data.data[0].t).toBe('Listo.');
+      });
+
+      it('stream integration: V3 fragment failure leaves independent units translated', async () => {
+        const browser = (await import('webextension-polyfill')).default;
+        browser.tabs.sendMessage.mockClear();
+
+        const normalA = { t: 'Hello.', i: 'na' };
+        const v3Fragments = makeV3Fragments('g1', 'n1', ['World.', '!'], ['', ' ']);
+        const normalC = { t: 'Done.', i: 'nc' };
+        mockEngine.createIntelligentBatches = vi.fn(() => [[normalA], v3Fragments, [normalC]]);
+        mockProvider.translate
+          .mockResolvedValueOnce({ translatedText: ['Hola.'] })
+          .mockRejectedValueOnce(Object.assign(new Error('V3 fragment failed'), { type: 'TRANSLATION_FAILED' }))
+          .mockResolvedValueOnce({ translatedText: ['Listo.'] });
+
+        const result = await handler.execute(
+          mockEngine,
+          { ...mockData, text: JSON.stringify([normalA, { t: 'Hello world!', blockId: 'g1', i: 'n1' }, normalC]) },
+          mockProvider, 'auto', 'fa', 'msg-v3-stream-fail', mockSender
+        );
+
+        expect(result.success).toBe(false);
+        const updates = browser.tabs.sendMessage.mock.calls
+          .map(([, m]) => m)
+          .filter(m => m.action === MessageActions.TRANSLATION_STREAM_UPDATE);
+        expect(updates).toHaveLength(2);
+        expect(updates[0].data.data[0].t).toBe('Hola.');
+        expect(updates[1].data.data[0].t).toBe('Listo.');
+      });
+    });
   });
 });

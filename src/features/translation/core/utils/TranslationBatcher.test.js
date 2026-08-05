@@ -208,4 +208,87 @@ describe('TranslationBatcher', () => {
       expect(batches).toEqual([[1, 2], [3, 4], [5]]);
     });
   });
+
+  describe('V3 BlockGroup fragment metadata', () => {
+    it('adds V3 fragment metadata when a V3 block group exceeds maxChars', () => {
+      const segment = { t: 'A very long text that exceeds the maximum character limit for a single batch request.', blockId: 'g1', i: 'n1' };
+      const parts = TranslationBatcher.splitOversizedSegment(segment, 30);
+
+      expect(parts.length).toBeGreaterThan(1);
+      parts.forEach((part, index) => {
+        expect(part.isV3Fragment).toBe(true);
+        expect(part.parentId).toBe('g1');
+        expect(part.fragmentIndex).toBe(index);
+        expect(part.fragmentCount).toBe(parts.length);
+        expect(part.isSplit).toBe(true);
+        expect(part.partIndex).toBe(index);
+      });
+    });
+
+    it('preserves source identity fields with nullish semantics for falsy numeric IDs', () => {
+      const segment = { t: 'Long text here.', blockId: 'g1', i: 0 };
+      const parts = TranslationBatcher.splitOversizedSegment(segment, 5);
+
+      expect(parts.length).toBeGreaterThan(1);
+      parts.forEach((part) => {
+        expect(part.i).toBe(0);
+        expect(part.blockId).toBe('g1');
+      });
+    });
+
+    it('does not add V3 fragment metadata to non-split V3 units', () => {
+      const segment = { t: 'Short text.', blockId: 'g1', i: 'n1' };
+      const parts = TranslationBatcher.splitOversizedSegment(segment, 1000);
+
+      expect(parts.length).toBe(1);
+      expect(parts[0].isV3Fragment).toBeUndefined();
+      expect(parts[0].isSplit).toBeUndefined();
+      expect(parts[0].parentId).toBeUndefined();
+    });
+
+    it('does not add V3 fragment metadata to plain non-V3 objects', () => {
+      const segment = { t: 'A very long text that exceeds the maximum character limit for a single batch request.', role: 'paragraph' };
+      const parts = TranslationBatcher.splitOversizedSegment(segment, 30);
+
+      expect(parts.length).toBeGreaterThan(1);
+      parts.forEach((part) => {
+        expect(part.isV3Fragment).toBeUndefined();
+        expect(part.isSplit).toBe(true);
+        expect(part.partIndex).toBeDefined();
+      });
+    });
+
+    it('does not add V3 fragment metadata to V2 units', () => {
+      const segment = { t: 'A very long text that exceeds the maximum character limit for a single batch request.', isV2Unit: true, i: 'n7' };
+      const parts = TranslationBatcher.splitOversizedSegment(segment, 30);
+
+      expect(parts.length).toBeGreaterThan(1);
+      parts.forEach((part) => {
+        expect(part.isV2Unit).toBe(true);
+        expect(part.isSplitFragment).toBe(true);
+        expect(part.isV3Fragment).toBeUndefined();
+      });
+    });
+
+    it('preserves V2 metadata unchanged when V3 metadata is also present', () => {
+      const segment = { t: 'A very long text that exceeds the maximum character limit for a single batch request.', isV2Unit: true, i: 'n7', blockId: 'g1' };
+      const parts = TranslationBatcher.splitOversizedSegment(segment, 30);
+
+      expect(parts.length).toBeGreaterThan(1);
+      parts.forEach((part) => {
+        expect(part.isV2Unit).toBe(true);
+        expect(part.isSplitFragment).toBe(true);
+        expect(part.isV3Fragment).toBeUndefined();
+      });
+    });
+
+    it('includes fragmentJoinerBefore for V3 fragments', () => {
+      const segment = { t: 'First part.  Second part.', blockId: 'g1', i: 'n1' };
+      const parts = TranslationBatcher.splitOversizedSegment(segment, 12);
+
+      expect(parts.length).toBeGreaterThan(1);
+      expect(parts[0].fragmentJoinerBefore).toBeDefined();
+      expect(parts[1].fragmentJoinerBefore).toBeDefined();
+    });
+  });
 });

@@ -29,6 +29,7 @@ export const TranslationBatcher = {
     let partIndex = 0;
     let fragmentJoinerBefore = '';
     const isV2Unit = isObject && segment.isV2Unit === true;
+    const isV3Block = isObject && !isV2Unit && !!(segment.blockId);
 
     const createObjectPart = (partText, index) => ({
       ...segment,
@@ -36,7 +37,7 @@ export const TranslationBatcher = {
       text: partText,
       isSplit: true,
       partIndex: index,
-      ...(isV2Unit && { fragmentJoinerBefore })
+      ...(isV2Unit || isV3Block ? { fragmentJoinerBefore } : {}),
     });
     
     while (remaining.length > maxChars) {
@@ -76,16 +77,29 @@ export const TranslationBatcher = {
       }
     }
     
-    if (!isV2Unit) return chunks;
+    if (isV2Unit) {
+      const parentId = segment.i ?? segment.uid ?? segment.id;
+      return chunks.map((chunk, fragmentIndex) => ({
+        ...chunk,
+        parentId,
+        fragmentIndex,
+        fragmentCount: chunks.length,
+        isSplitFragment: true
+      }));
+    }
 
-    const parentId = segment.i ?? segment.uid ?? segment.id;
-    return chunks.map((chunk, fragmentIndex) => ({
-      ...chunk,
-      parentId,
-      fragmentIndex,
-      fragmentCount: chunks.length,
-      isSplitFragment: true
-    }));
+    if (isV3Block) {
+      const parentId = segment.blockId;
+      return chunks.map((chunk, fragmentIndex) => ({
+        ...chunk,
+        isV3Fragment: true,
+        parentId,
+        fragmentIndex,
+        fragmentCount: chunks.length,
+      }));
+    }
+    
+    return chunks;
   },
 
   /**

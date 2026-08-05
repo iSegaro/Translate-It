@@ -75,74 +75,120 @@ export class OptimizedJsonHandler {
         parentId,
       });
 
-      const collectCompleteFragments = (mappedResults) => {
-        const completeResults = [];
+       const collectCompleteFragments = (mappedResults) => {
+         const completeResults = [];
 
-        for (const result of mappedResults) {
-          if (result?.isV2Unit !== true || result?.isSplitFragment !== true) {
-            completeResults.push(result);
-            continue;
-          }
+         for (const result of mappedResults) {
+           if (result?.isV2Unit === true && result?.isSplitFragment === true) {
+             const { parentId, fragmentIndex, fragmentCount } = result;
+             if (!parentId || !Number.isInteger(fragmentIndex) || !Number.isInteger(fragmentCount) || fragmentIndex < 0 || fragmentIndex >= fragmentCount) {
+               appendFragmentDiagnostic('INCOMPLETE_FRAGMENT_EVENT_SUPPRESSED', parentId);
+               continue;
+             }
 
-          const { parentId, fragmentIndex, fragmentCount } = result;
-          if (!parentId || !Number.isInteger(fragmentIndex) || !Number.isInteger(fragmentCount) || fragmentIndex < 0 || fragmentIndex >= fragmentCount) {
-            appendFragmentDiagnostic('INCOMPLETE_FRAGMENT_EVENT_SUPPRESSED', parentId);
-            continue;
-          }
+             let parent = fragmentedUnits.get(parentId);
+             if (!parent) {
+               parent = { expectedCount: fragmentCount, fragments: new Map(), failed: false, emitted: false };
+               fragmentedUnits.set(parentId, parent);
+             }
 
-          let parent = fragmentedUnits.get(parentId);
-          if (!parent) {
-            parent = { expectedCount: fragmentCount, fragments: new Map(), failed: false, emitted: false };
-            fragmentedUnits.set(parentId, parent);
-          }
+             if (parent.failed || parent.emitted || parent.expectedCount !== fragmentCount || parent.fragments.has(fragmentIndex)) continue;
+             parent.fragments.set(fragmentIndex, result);
 
-          if (parent.failed || parent.emitted || parent.expectedCount !== fragmentCount || parent.fragments.has(fragmentIndex)) continue;
-          parent.fragments.set(fragmentIndex, result);
+             if (parent.fragments.size !== parent.expectedCount) continue;
 
-          if (parent.fragments.size !== parent.expectedCount) continue;
+             const orderedFragments = Array.from({ length: parent.expectedCount }, (_, index) => parent.fragments.get(index));
+             if (orderedFragments.some(fragment => !fragment)) {
+               parent.failed = true;
+               parent.fragments.clear();
+               appendFragmentDiagnostic('INCOMPLETE_FRAGMENT_EVENT_SUPPRESSED', parentId);
+               continue;
+             }
 
-          const orderedFragments = Array.from({ length: parent.expectedCount }, (_, index) => parent.fragments.get(index));
-          if (orderedFragments.some(fragment => !fragment)) {
-            parent.failed = true;
-            parent.fragments.clear();
-            appendFragmentDiagnostic('INCOMPLETE_FRAGMENT_EVENT_SUPPRESSED', parentId);
-            continue;
-          }
+             const translatedText = orderedFragments
+               .map((fragment, index) => `${index === 0 ? '' : (fragment.fragmentJoinerBefore || '')}${fragment.t || fragment.text || ''}`)
+               .join('');
+             const logicalItem = { ...orderedFragments[0] };
+             delete logicalItem.isSplit;
+             delete logicalItem.isSplitFragment;
+             delete logicalItem.partIndex;
+             delete logicalItem.parentId;
+             delete logicalItem.fragmentIndex;
+             delete logicalItem.fragmentCount;
+             delete logicalItem.fragmentJoinerBefore;
+             delete logicalItem.isV2Unit;
+             completeResults.push({ ...logicalItem, i: parentId, t: translatedText, text: translatedText });
+             parent.emitted = true;
+             parent.fragments.clear();
+             appendFragmentDiagnostic('FRAGMENTED_UNIT_COMPLETED', parentId);
+             continue;
+           }
 
-          const translatedText = orderedFragments
-            .map((fragment, index) => `${index === 0 ? '' : (fragment.fragmentJoinerBefore || '')}${fragment.t || fragment.text || ''}`)
-            .join('');
-          const logicalItem = { ...orderedFragments[0] };
-          delete logicalItem.isSplit;
-          delete logicalItem.isSplitFragment;
-          delete logicalItem.partIndex;
-          delete logicalItem.parentId;
-          delete logicalItem.fragmentIndex;
-          delete logicalItem.fragmentCount;
-          delete logicalItem.fragmentJoinerBefore;
-          delete logicalItem.isV2Unit;
-          completeResults.push({ ...logicalItem, i: parentId, t: translatedText, text: translatedText });
-          parent.emitted = true;
-          parent.fragments.clear();
-          appendFragmentDiagnostic('FRAGMENTED_UNIT_COMPLETED', parentId);
-        }
+           if (result?.isV3Fragment === true) {
+             const { parentId, fragmentIndex, fragmentCount } = result;
+             if (!parentId || !Number.isInteger(fragmentIndex) || !Number.isInteger(fragmentCount) || fragmentIndex < 0 || fragmentIndex >= fragmentCount) {
+               appendFragmentDiagnostic('INCOMPLETE_FRAGMENT_EVENT_SUPPRESSED', parentId);
+               continue;
+             }
 
-        return completeResults;
-      };
+             let parent = fragmentedUnits.get(parentId);
+             if (!parent) {
+               parent = { expectedCount: fragmentCount, fragments: new Map(), failed: false, emitted: false };
+               fragmentedUnits.set(parentId, parent);
+             }
 
-      const discardFailedFragments = (batchPayload) => {
-        for (const payload of batchPayload) {
-          if (payload?.isV2Unit !== true || payload?.isSplitFragment !== true) continue;
-          const parentId = payload.parentId;
-          if (!parentId) continue;
-          const parent = fragmentedUnits.get(parentId) || { expectedCount: payload.fragmentCount, fragments: new Map(), failed: false, emitted: false };
-          if (parent.emitted || parent.failed) continue;
-          parent.failed = true;
-          parent.fragments.clear();
-          fragmentedUnits.set(parentId, parent);
-          appendFragmentDiagnostic('FRAGMENTED_UNIT_FAILED', parentId);
-        }
-      };
+             if (parent.failed || parent.emitted || parent.expectedCount !== fragmentCount || parent.fragments.has(fragmentIndex)) continue;
+             parent.fragments.set(fragmentIndex, result);
+
+             if (parent.fragments.size !== parent.expectedCount) continue;
+
+             const orderedFragments = Array.from({ length: parent.expectedCount }, (_, index) => parent.fragments.get(index));
+             if (orderedFragments.some(fragment => !fragment)) {
+               parent.failed = true;
+               parent.fragments.clear();
+               appendFragmentDiagnostic('INCOMPLETE_FRAGMENT_EVENT_SUPPRESSED', parentId);
+               continue;
+             }
+
+             const translatedText = orderedFragments
+               .map((fragment, index) => `${index === 0 ? '' : (fragment.fragmentJoinerBefore || '')}${fragment.t || fragment.text || ''}`)
+               .join('');
+             const logicalItem = { ...orderedFragments[0] };
+             delete logicalItem.isSplit;
+             delete logicalItem.partIndex;
+             delete logicalItem.isV3Fragment;
+             delete logicalItem.parentId;
+             delete logicalItem.fragmentIndex;
+             delete logicalItem.fragmentCount;
+             delete logicalItem.fragmentJoinerBefore;
+             completeResults.push({ ...logicalItem, i: parentId, t: translatedText, text: translatedText });
+             parent.emitted = true;
+             parent.fragments.clear();
+             appendFragmentDiagnostic('FRAGMENTED_UNIT_COMPLETED', parentId);
+             continue;
+           }
+
+           completeResults.push(result);
+         }
+
+         return completeResults;
+       };
+
+       const discardFailedFragments = (batchPayload) => {
+         for (const payload of batchPayload) {
+           const isV2Fragment = payload?.isV2Unit === true && payload?.isSplitFragment === true;
+           const isV3Fragment = payload?.isV3Fragment === true;
+           if (!isV2Fragment && !isV3Fragment) continue;
+           const parentId = payload.parentId;
+           if (!parentId) continue;
+           const parent = fragmentedUnits.get(parentId) || { expectedCount: payload.fragmentCount, fragments: new Map(), failed: false, emitted: false };
+           if (parent.emitted || parent.failed) continue;
+           parent.failed = true;
+           parent.fragments.clear();
+           fragmentedUnits.set(parentId, parent);
+           appendFragmentDiagnostic('FRAGMENTED_UNIT_FAILED', parentId);
+         }
+       };
       
       // Preserve the ordered lane when conversation continuity is enabled.
       if (historyEnabled) {
@@ -435,8 +481,8 @@ export class OptimizedJsonHandler {
   _createBatchExecutionContext(executionContext, batch) {
     if (!executionContext?.manifestView || !Array.isArray(batch)) return executionContext
 
-    if (batch.some(({ isSplitFragment }) => isSplitFragment)) {
-      return { ...executionContext, manifestView: null }
+    if (batch.some(({ isSplitFragment, isV3Fragment }) => isSplitFragment || isV3Fragment)) {
+      return { ...executionContext, manifestView: null };
     }
 
     const manifestUnits = batch.map(({ manifestUnit }) => manifestUnit)

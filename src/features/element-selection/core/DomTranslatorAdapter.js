@@ -313,10 +313,10 @@ export class DomTranslatorAdapter extends ResourceTracker {
 
               if (data.data && Array.isArray(data.data)) {
                 data.data.forEach((translatedItem, index) => {
-                  if (translatedItem?.isSplitFragment === true) {
-                    this.logger.warn('[DomTranslatorAdapter] Suppressed incomplete V2 fragment event');
-                    return;
-                  }
+               if (translatedItem?.isSplitFragment === true || translatedItem?.isV3Fragment === true) {
+                     this.logger.warn('[DomTranslatorAdapter] Suppressed incomplete fragment event');
+                     return;
+                   }
                   // Handle both abbreviated and full keys for backward compatibility
                   const uid = translatedItem?.i || translatedItem?.uid || (data.originalData && (data.originalData[index]?.i || data.originalData[index]?.uid));
                   const text = translatedItem?.t || translatedItem?.text || translatedItem;
