@@ -173,12 +173,12 @@ describe('TranslationSegmentMapper', () => {
   // ── Unsafe mismatch cases ──────────────────────────────────────────────
 
   describe('unsafe mismatch — cardinality too far off', () => {
-    it('["A", "", "B"] response "TA" (no delimiter, 1 segment vs 3 originals) → word-ratio fallback', () => {
-      // No delimiter found → delimiterFound=false → word-ratio, not a clean positional map
-      const result = mapAsLingvaWould('TA', ['A', '', 'B']);
-      expect(result.length).toBe(3);
-      expect(result[1]).toBe('');
-      // TA is distributed to non-blank positions; behavior is existing fallback
+    it('["A", "", "B"] response "TA" (1 word vs 2 nonblanks) → throws INCOMPLETE_CARDINALITY', () => {
+      // No delimiter found → word-ratio distribution. Nonblank source "B" receives no
+      // translated content → partial coverage must fail loudly, never return silent gaps.
+      expect(() => mapAsLingvaWould('TA', ['A', '', 'B'])).toThrow(
+        expect.objectContaining({ type: TranslationSegmentMapper.INCOMPLETE_CARDINALITY })
+      );
     });
 
     it('["A", "", "B", "", "C"] response "TA" + LingvaDelim + "TB" (2 parts vs 3 nonblanks) → throws INCOMPLETE_CARDINALITY', () => {
@@ -200,6 +200,58 @@ describe('TranslationSegmentMapper', () => {
       // This IS a cardinality defect: 1 element returned for 3 originals
       const result = mapAsLingvaWould('', ['A', '', 'B']);
       expect(result).toEqual(['']);
+    });
+  });
+
+  // ── Word-ratio coverage policy ─────────────────────────────────────────
+
+  describe('word-ratio coverage — full coverage passes', () => {
+    it('["A","B"] "one two three four five" → all nonblank receive text', () => {
+      expect(mapAsLingvaWould('one two three four five', ['A', 'B']))
+        .toEqual(['one two three', 'four five']);
+    });
+
+    it('["A","B","C"] "TA TB TC" → full coverage', () => {
+      expect(mapAsLingvaWould('TA TB TC', ['A', 'B', 'C']))
+        .toEqual(['TA', 'TB', 'TC']);
+    });
+
+    it('source-equal output remains valid', () => {
+      expect(mapAsLingvaWould('A B', ['A', 'B'])).toEqual(['A', 'B']);
+    });
+
+    it('blank originals preserved alongside full coverage', () => {
+      expect(mapAsLingvaWould('TA TB', ['A', '', 'B'])).toEqual(['TA', '', 'TB']);
+    });
+
+    it('all-blank sources remain fully valid', () => {
+      expect(mapAsLingvaWould('anything', ['', '', ''])).toEqual(['', '', '']);
+    });
+  });
+
+  describe('word-ratio coverage — partial coverage throws', () => {
+    it('1 translated word for 3 nonblank originals → throws', () => {
+      expect(() => mapAsLingvaWould('TA', ['A', 'B', 'C'])).toThrow(
+        expect.objectContaining({ type: TranslationSegmentMapper.INCOMPLETE_CARDINALITY })
+      );
+    });
+
+    it('2 translated words for 3 nonblank originals → throws', () => {
+      expect(() => mapAsLingvaWould('TA TB', ['A', 'B', 'C'])).toThrow(
+        expect.objectContaining({ type: TranslationSegmentMapper.INCOMPLETE_CARDINALITY })
+      );
+    });
+
+    it('RTL short translation → throws', () => {
+      expect(() => mapAsLingvaWould('Hello', ['سلام', 'دنیا'])).toThrow(
+        expect.objectContaining({ type: TranslationSegmentMapper.INCOMPLETE_CARDINALITY })
+      );
+    });
+
+    it('CJK one-token translation → throws', () => {
+      expect(() => mapAsLingvaWould('Hello', ['你好', '世界'])).toThrow(
+        expect.objectContaining({ type: TranslationSegmentMapper.INCOMPLETE_CARDINALITY })
+      );
     });
   });
 

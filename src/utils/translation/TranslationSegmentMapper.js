@@ -167,16 +167,17 @@ export class TranslationSegmentMapper {
     }
 
     // 4. Last Resort: Smart Word-Based Distribution (Replacing the broken character-ratio split)
-    try {
-      // CRITICAL: Before word-ratio splitting, remove ALL possible delimiters from the text
-      // to avoid them appearing as "words" in the output segments.
-      const cleanedText = this.removeAllDelimiters(translatedText, delimiter);
-      return this.splitByWordRatio(cleanedText, originalSegments, providerName);
-    } catch (error) {
-      logger.warn(`[${providerName}] Smart splitting failed:`, error);
-      // Absolute fallback: first segment gets everything, others get original
-      return originalSegments.map((s, i) => i === 0 ? translatedText : s);
-    }
+    // CRITICAL: Before word-ratio splitting, remove ALL possible delimiters from the text
+    // to avoid them appearing as "words" in the output segments.
+    const cleanedText = this.removeAllDelimiters(translatedText, delimiter);
+    // splitByWordRatio validates translation coverage and throws INCOMPLETE_CARDINALITY
+    // when any nonblank source segment would receive no translated content.
+    // The old greedy source-fallback (`i === 0 ? translatedText : source`) was REMOVED:
+    // it silently inserted original source as "translated" output and, once coverage
+    // rejection was added, would have converted the new typed failure back into silent
+    // success. Partial heuristic coverage must surface as an explicit failure, not a
+    // success (shared contract: valid deterministic reconstruction OR typed failure).
+    return this.splitByWordRatio(cleanedText, originalSegments, providerName);
   }
 
   /**
@@ -260,6 +261,25 @@ export class TranslationSegmentMapper {
 
       result[i] = segmentWords.join(" ");
       currentWordIdx += targetWordCount;
+    }
+
+    // Coverage invariant: the heuristic distribution must give every nonblank original
+    // segment nonblank translated content. A partial array with correct cardinality must
+    // not masquerade as a successful translation (silent gaps in nonblank positions).
+    // Reject loudly instead — the shared contract requires valid reconstruction OR an
+    // explicit typed failure. Blank original segments legitimately stay blank (`result[i]`
+    // may be "" only where the source position is itself blank).
+    for (let i = 0; i < originalSegments.length; i++) {
+      const segText = typeof originalSegments[i] === 'object'
+        ? (originalSegments[i].t || originalSegments[i].text || "")
+        : String(originalSegments[i] || "");
+      if (segText.trim() !== "" && String(result[i] || "").trim() === "") {
+        const error = new Error(
+          `[${providerName}] Incomplete translation: nonblank segment ${i} received no translated content`
+        );
+        error.type = TranslationSegmentMapper.INCOMPLETE_CARDINALITY;
+        throw error;
+      }
     }
 
     logger.info(`[${providerName}] Used Word-Ratio splitting to preserve word integrity`);
