@@ -701,16 +701,17 @@ export class DomTranslatorAdapter extends ResourceTracker {
               }
             }
           }
-        } else {
-          let nodeData = uid ? nodeMap.get(uid) : null;
-          if (!nodeData) {
-            nodeData = textNodesData[i];
-          }
+         } else {
+           let nodeData = uid ? nodeMap.get(uid) : null;
+           if (!nodeData) {
+             nodeData = textNodesData[i];
+           }
 
-          if (nodeData) {
-            this._applyTranslationToNode(nodeData.node, text, finalTargetLanguage, element);
-          }
-        }
+           if (nodeData && !processedUids.has(nodeData.uid)) {
+             this._applyTranslationToNode(nodeData.node, text, finalTargetLanguage, element);
+             processedUids.add(nodeData.uid);
+           }
+         }
       });
 
       // Emit final progress for non-streaming mode
