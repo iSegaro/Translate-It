@@ -4,7 +4,7 @@ import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
 
 vi.mock('webextension-polyfill', () => ({ default: { i18n: { detectLanguage: vi.fn() } } }));
 vi.mock('@/shared/logging/logger.js', () => ({
-  getScopedLogger: () => ({ debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() })
+  getScopedLogger: () => ({ debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn(), init: vi.fn() })
 }));
 
 describe('browserTranslateProvider', () => {
