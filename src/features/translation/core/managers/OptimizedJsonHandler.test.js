@@ -762,6 +762,7 @@ describe('OptimizedJsonHandler', () => {
           .mockResolvedValue({ translatedText: ['t2'] });
 
         execution = handler.execute(mockEngine, mockData, mockProvider, 'en', 'fa', 'msg-timeout', mockSender);
+        execution.catch(() => {});
         await vi.waitFor(() => expect(mockProvider.translate).toHaveBeenCalledTimes(1));
         await vi.advanceTimersByTimeAsync(300000);
 
@@ -813,6 +814,7 @@ describe('OptimizedJsonHandler', () => {
         browser.tabs.sendMessage.mockClear();
 
         const execution = handler.execute(mockEngine, mockData, mockProvider, 'en', 'fa', 'msg-late', mockSender);
+        execution.catch(() => {});
         await vi.waitFor(() => expect(mockProvider.translate).toHaveBeenCalledTimes(1));
         await vi.advanceTimersByTimeAsync(300000);
         await expect(execution).rejects.toMatchObject({ type: 'TRANSLATION_TIMEOUT' });
@@ -1022,6 +1024,7 @@ describe('OptimizedJsonHandler', () => {
           'fragment-timeout',
           mockSender
         );
+        execution.catch(() => {});
         await vi.waitFor(() => expect(mockProvider.translate).toHaveBeenCalledTimes(2));
         await vi.advanceTimersByTimeAsync(300000);
 
@@ -1059,6 +1062,7 @@ describe('OptimizedJsonHandler', () => {
           'fragment-late-failure',
           mockSender
         );
+        execution.catch(() => {});
         await vi.waitFor(() => expect(mockProvider.translate).toHaveBeenCalledTimes(2));
         await vi.advanceTimersByTimeAsync(300000);
         await expect(execution).rejects.toMatchObject({ type: 'TRANSLATION_TIMEOUT' });

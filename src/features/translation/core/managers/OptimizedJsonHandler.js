@@ -283,7 +283,7 @@ export class OptimizedJsonHandler {
 
           // Timeout Protection (5 minutes) for each batch call
           const BATCH_TIMEOUT_MS = 300000;
-          const timeoutPromise = new Promise((_, reject) => {
+          const timeoutPromise = new Promise((resolve) => {
             timeoutId = setTimeout(() => {
               didTimeout = true;
               timeoutError = new Error(`Batch translation timed out after ${BATCH_TIMEOUT_MS}ms`);
@@ -295,7 +295,7 @@ export class OptimizedJsonHandler {
                 reason: timeoutError.message,
                 code: timeoutError.type,
               });
-              reject(timeoutError);
+              resolve({ __kind: 'timeout', error: timeoutError });
               abortController.abort();
             }, BATCH_TIMEOUT_MS);
             
@@ -308,8 +308,7 @@ export class OptimizedJsonHandler {
           const batchExecutionContext = hasManifestMembership
             ? self._createBatchExecutionContext(executionContext, batch)
             : executionContext;
-          const translatedBatchResponse = await Promise.race([
-            self._performBatchCall(
+          const providerPromise = self._performBatchCall(
               providerInstance, 
               batchPayload, 
               detectedSourceLanguage, 
@@ -326,9 +325,30 @@ export class OptimizedJsonHandler {
                originalTargetLang,
                parallelExecution,
                 batchExecutionContext
-            ),
+            );
+
+          // Guard provider promise so late rejection after timeout cannot become
+          // an unhandled rejection. The outcome object normalizes resolution/rejection
+          // into a value the race can consume without leaking.
+          const guardedProviderPromise = providerPromise.then(
+            (value) => ({ __kind: 'provider-success', value }),
+            (error) => ({ __kind: 'provider-error', error })
+          );
+
+          // timeoutPromise resolves (not rejects) with an outcome object
+          let translatedBatchResponse = await Promise.race([
+            guardedProviderPromise,
             timeoutPromise
           ]);
+
+          // Unwrap guarded provider outcome
+          if (translatedBatchResponse && typeof translatedBatchResponse === 'object' && translatedBatchResponse.__kind === 'provider-error') {
+            throw translatedBatchResponse.error;
+          } else if (translatedBatchResponse && typeof translatedBatchResponse === 'object' && translatedBatchResponse.__kind === 'timeout') {
+            throw translatedBatchResponse.error;
+          } else if (translatedBatchResponse && typeof translatedBatchResponse === 'object' && translatedBatchResponse.__kind === 'provider-success') {
+            translatedBatchResponse = translatedBatchResponse.value;
+          }
 
           checkCancellation();
 
