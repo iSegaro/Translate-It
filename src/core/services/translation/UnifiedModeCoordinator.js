@@ -301,11 +301,18 @@ export class UnifiedModeCoordinator {
       
       const finalResults = items.map((item, idx) => {
         const translated = resultsArray[idx];
-        const translatedText = translated !== undefined 
-          ? (typeof translated === 'object' ? translated.text : translated) 
+        const isMissingResult = translated === undefined;
+        const translatedText = !isMissingResult
+          ? (typeof translated === 'object' ? translated.text : translated)
           : (typeof item === 'string' ? item : item.text);
-          
-        return typeof item === 'string' ? { text: translatedText } : { ...item, text: translatedText };
+
+        if (typeof item === 'string') {
+          return { text: translatedText };
+        }
+
+        // Object results (e.g. subtitle) carry an explicit unresolved marker so
+        // downstream consumers never mistake the source fallback for real output.
+        return { ...item, text: translatedText, ...(isMissingResult ? { isSkipped: true } : {}) };
       });
 
       if (transformOutput) {

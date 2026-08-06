@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { subtitleTranslationCoordinator } from './SubtitleTranslationCoordinator.js';
+import { SubtitleProgressTracker } from './SubtitleProgressTracker.js';
 import { unifiedTranslationService } from '@/core/services/translation/UnifiedTranslationService.js';
 
 vi.mock('@/core/services/translation/UnifiedTranslationService.js', () => ({
@@ -55,5 +56,138 @@ describe('SubtitleTranslationCoordinator Stability', () => {
     unifiedTranslationService.handleTranslationRequest.mockImplementation(() => new Promise(() => {}));
 
     // Verification of the code path is enough
+  });
+});
+
+describe('SubtitleTranslationCoordinator Source-Preservation Contract', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    subtitleTranslationCoordinator.activeJobs.clear();
+  });
+
+  function cue(id, text, index) {
+    return { id, text, index, warnings: [] };
+  }
+
+  function makeJob(cues) {
+    const tracker = new SubtitleProgressTracker(cues.length);
+    subtitleTranslationCoordinator.activeJobs.set('job', { cues, status: 'running', progressTracker: tracker });
+    return tracker;
+  }
+
+  it('preserves the original cue and counts a failure for an under-returned cue (pipeline isSkipped marker)', async () => {
+    const batch = [cue('1', 'Hello', 1)];
+    const tracker = makeJob(batch);
+    // The pipeline attaches isSkipped to a result it could not resolve.
+    unifiedTranslationService.handleTranslationRequest.mockResolvedValue({
+      success: true,
+      results: [{ id: '1', text: 'Hello', isSkipped: true }]
+    });
+
+    await subtitleTranslationCoordinator._processBatch('job', batch, 'en', 'fa', 'google', {});
+
+    expect(batch[0].translatedText).toBeUndefined();
+    expect(batch[0].text).toBe('Hello');
+    expect(batch[0].status).toBe('failed');
+    const progress = tracker.getProgress();
+    expect(progress.translated).toBe(0);
+    expect(progress.failed).toBe(1);
+  });
+
+  it('keeps the original cue and fails when a blank translation is returned', async () => {
+    const batch = [cue('b1', 'Hello', 1)];
+    const tracker = makeJob(batch);
+    unifiedTranslationService.handleTranslationRequest.mockResolvedValue({
+      success: true,
+      results: [{ id: 'b1', text: '' }]
+    });
+
+    await subtitleTranslationCoordinator._processBatch('job', batch, 'en', 'fa', 'google', {});
+
+    expect(batch[0].translatedText).toBeUndefined();
+    expect(batch[0].status).toBe('failed');
+    const progress = tracker.getProgress();
+    expect(progress.translated).toBe(0);
+    expect(progress.failed).toBe(1);
+  });
+
+  it('treats a source-equal translation (URL -> URL) as valid, not failed', async () => {
+    const batch = [cue('u1', 'URL', 1)];
+    const tracker = makeJob(batch);
+    unifiedTranslationService.handleTranslationRequest.mockResolvedValue({
+      success: true,
+      results: [{ id: 'u1', text: 'URL' }]
+    });
+
+    await subtitleTranslationCoordinator._processBatch('job', batch, 'en', 'fa', 'google', {});
+
+    expect(batch[0].status).toBe('translated');
+    expect(batch[0].translatedText).toBe('URL');
+    const progress = tracker.getProgress();
+    expect(progress.translated).toBe(1);
+    expect(progress.failed).toBe(0);
+  });
+
+  it('counts a mixed batch correctly without reporting the missing cue as translated', async () => {
+    const batch = [cue('m1', 'Hello', 1), cue('m2', 'World', 2), cue('m3', 'Again', 3)];
+    const tracker = makeJob(batch);
+    unifiedTranslationService.handleTranslationRequest.mockResolvedValue({
+      success: true,
+      results: [
+        { id: 'm1', text: 'سلام' },
+        { id: 'm2', text: 'World', isSkipped: true },
+        { id: 'm3', text: 'دوباره' }
+      ]
+    });
+
+    await subtitleTranslationCoordinator._processBatch('job', batch, 'en', 'fa', 'google', {});
+
+    expect(batch[0].status).toBe('translated');
+    expect(batch[0].translatedText).toBe('سلام');
+    expect(batch[1].status).toBe('failed');
+    expect(batch[1].translatedText).toBeUndefined();
+    expect(batch[1].text).toBe('World');
+    expect(batch[2].status).toBe('translated');
+    const progress = tracker.getProgress();
+    expect(progress.translated).toBe(2);
+    expect(progress.failed).toBe(1);
+  });
+
+  it('keeps all cues original and fails every cue when the entire batch is unresolved', async () => {
+    const batch = [cue('e1', 'One'), cue('e2', 'Two')];
+    const tracker = makeJob(batch);
+    unifiedTranslationService.handleTranslationRequest.mockResolvedValue({
+      success: true,
+      results: [
+        { id: 'e1', text: 'One', isSkipped: true },
+        { id: 'e2', text: 'Two', isSkipped: true }
+      ]
+    });
+
+    await subtitleTranslationCoordinator._processBatch('job', batch, 'en', 'fa', 'google', {});
+
+    batch.forEach(c => {
+      expect(c.status).toBe('failed');
+      expect(c.translatedText).toBeUndefined();
+    });
+    const progress = tracker.getProgress();
+    expect(progress.translated).toBe(0);
+    expect(progress.failed).toBe(2);
+  });
+
+  it('does not turn original cues into translated cues on a late timeout', async () => {
+    const batch = [cue('t1', 'Hello')];
+    const tracker = makeJob(batch);
+    const timeoutError = new Error('Batch translation timed out');
+    timeoutError.type = 'TIMEOUT';
+    unifiedTranslationService.handleTranslationRequest.mockRejectedValue(timeoutError);
+
+    await subtitleTranslationCoordinator._processBatch('job', batch, 'en', 'fa', 'google', {});
+
+    expect(batch[0].translatedText).toBeUndefined();
+    expect(batch[0].status).toBe('failed');
+    const progress = tracker.getProgress();
+    expect(progress.translated).toBe(0);
+    expect(progress.failed).toBe(1);
   });
 });

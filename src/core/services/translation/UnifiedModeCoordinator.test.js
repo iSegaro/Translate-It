@@ -268,4 +268,58 @@ describe('UnifiedModeCoordinator', () => {
       );
     });
   });
+
+  describe('_processGenericBatch unresolved-result marker', () => {
+    function batchOptions(items) {
+      return {
+        mode: TranslationMode.Subtitle,
+        items,
+        useRawItems: true,
+        transformOutput: (results) => results
+      };
+    }
+
+    function batchRequest() {
+      return {
+        mode: TranslationMode.Subtitle,
+        messageId: 'm-sub',
+        data: { provider: 'google', sourceLanguage: 'en', targetLanguage: 'fa' }
+      };
+    }
+
+    it('tags only under-returned items with isSkipped', async () => {
+      mockEngine.getProvider.mockResolvedValue({
+        translate: vi.fn().mockResolvedValue(['ترجمهٔ A'])
+      });
+
+      const items = [{ id: 'A', text: 'A' }, { id: 'B', text: 'B' }];
+      const result = await coordinator._processGenericBatch(
+        batchRequest(),
+        { translationEngine: mockEngine },
+        batchOptions(items)
+      );
+
+      expect(result[0]).toEqual({ id: 'A', text: 'ترجمهٔ A' });
+      expect(result[1]).toEqual({ id: 'B', text: 'B', isSkipped: true });
+      expect(result[0].isSkipped).toBeUndefined();
+    });
+
+    it('never adds isSkipped when every item resolves', async () => {
+      mockEngine.getProvider.mockResolvedValue({
+        translate: vi.fn().mockResolvedValue(['ترجمهٔ A', 'ترجمهٔ B'])
+      });
+
+      const items = [{ id: 'A', text: 'A' }, { id: 'B', text: 'B' }];
+      const result = await coordinator._processGenericBatch(
+        batchRequest(),
+        { translationEngine: mockEngine },
+        batchOptions(items)
+      );
+
+      expect(result).toHaveLength(2);
+      result.forEach(item => expect(item.isSkipped).toBeUndefined());
+      expect(result[0].text).toBe('ترجمهٔ A');
+      expect(result[1].text).toBe('ترجمهٔ B');
+    });
+  });
 });
