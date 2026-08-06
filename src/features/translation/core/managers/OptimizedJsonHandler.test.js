@@ -1893,7 +1893,7 @@ describe('OptimizedJsonHandler', () => {
         );
 
         expect(result.success).toBe(false);
-        expect(result.error.type).not.toBe(ErrorTypes.USER_CANCELLED);
+        expect(result.error.type).toBe(ErrorTypes.VALIDATION);
         const updates = browser.tabs.sendMessage.mock.calls
           .map(([, m]) => m)
           .filter(m => m.action === MessageActions.TRANSLATION_STREAM_UPDATE);
@@ -1915,7 +1915,7 @@ describe('OptimizedJsonHandler', () => {
         );
 
         expect(result.success).toBe(false);
-        expect(result.error.type).not.toBe(ErrorTypes.USER_CANCELLED);
+        expect(result.error.type).toBe(ErrorTypes.VALIDATION);
         const updates = browser.tabs.sendMessage.mock.calls
           .map(([, m]) => m)
           .filter(m => m.action === MessageActions.TRANSLATION_STREAM_UPDATE);
@@ -1937,7 +1937,7 @@ describe('OptimizedJsonHandler', () => {
         );
 
         expect(result.success).toBe(false);
-        expect(result.error.type).not.toBe(ErrorTypes.USER_CANCELLED);
+        expect(result.error.type).toBe(ErrorTypes.VALIDATION);
         const updates = browser.tabs.sendMessage.mock.calls
           .map(([, m]) => m)
           .filter(m => m.action === MessageActions.TRANSLATION_STREAM_UPDATE);
@@ -2097,6 +2097,104 @@ describe('OptimizedJsonHandler', () => {
         expect(onTerminalUnitsAccepted).toHaveBeenCalledTimes(1);
         expect(onTerminalUnitsAccepted.mock.calls[0][0]).toHaveLength(1);
       });
+
+      it('structured PDF cells with same blockId but different cellId are NOT duplicates', async () => {
+        const browser = (await import('webextension-polyfill')).default;
+        browser.tabs.sendMessage.mockClear();
+
+        const cellA = { i: 'sched-1', b: 'sched-1', blockId: 'sched-1', cellId: 'c-a', lineIndex: 0, cellIndex: 0, t: 'Mon' };
+        const cellB = { i: 'sched-1', b: 'sched-1', blockId: 'sched-1', cellId: 'c-b', lineIndex: 0, cellIndex: 1, t: 'Tue' };
+        mockEngine.createIntelligentBatches = vi.fn(() => [[cellA, cellB]]);
+        mockProvider.translate.mockResolvedValueOnce({ translatedText: ['دوشنبه', 'سه‌شنبه'] });
+
+        const result = await handler.execute(
+          mockEngine,
+          { ...mockData, sourceLanguage: 'en', mode: 'pdf-translation', text: JSON.stringify([cellA, cellB]) },
+          mockProvider, 'en', 'fa', 'msg-pdf-diff-cellid', mockSender
+        );
+
+        expect(result.success).toBe(true);
+        expect(result.results).toHaveLength(2);
+        expect(result.results.map((r) => r.cellId)).toEqual(['c-a', 'c-b']);
+      });
+
+      it('structured PDF duplicate cellId still fails with typed error', async () => {
+        const browser = (await import('webextension-polyfill')).default;
+        browser.tabs.sendMessage.mockClear();
+
+        const cellA = { i: 'sched-1', b: 'sched-1', blockId: 'sched-1', cellId: 'c-x', lineIndex: 0, cellIndex: 0, t: 'Mon' };
+        const cellB = { i: 'sched-1', b: 'sched-1', blockId: 'sched-1', cellId: 'c-x', lineIndex: 0, cellIndex: 1, t: 'Tue' };
+        mockEngine.createIntelligentBatches = vi.fn(() => [[cellA, cellB]]);
+        mockProvider.translate.mockResolvedValueOnce({ translatedText: ['دوشن', 'سه‌شنبه'] });
+
+        const result = await handler.execute(
+          mockEngine,
+          { ...mockData, sourceLanguage: 'en', mode: 'pdf-translation', text: JSON.stringify([cellA, cellB]) },
+          mockProvider, 'en', 'fa', 'msg-pdf-dup-cellid', mockSender
+        );
+
+        expect(result.success).toBe(false);
+        expect(result.error.type).toBe(ErrorTypes.VALIDATION);
+        const updates = browser.tabs.sendMessage.mock.calls
+          .map(([, m]) => m)
+          .filter(m => m.action === MessageActions.TRANSLATION_STREAM_UPDATE);
+        expect(updates).toHaveLength(0);
+      });
+
+      it('structured PDF numeric cellId 0 is valid (nullish, not falsy fallback)', async () => {
+        const browser = (await import('webextension-polyfill')).default;
+        browser.tabs.sendMessage.mockClear();
+
+        const cellA = { i: 'sched-2', b: 'sched-2', blockId: 'sched-2', cellId: 0, lineIndex: 0, cellIndex: 0, t: 'Mon' };
+        const cellB = { i: 'sched-2', b: 'sched-2', blockId: 'sched-2', cellId: 1, lineIndex: 0, cellIndex: 1, t: 'Tue' };
+        mockEngine.createIntelligentBatches = vi.fn(() => [[cellA, cellB]]);
+        mockProvider.translate.mockResolvedValueOnce({ translatedText: ['دوشنبه', 'سه‌شنبه'] });
+
+        const result = await handler.execute(
+          mockEngine,
+          { ...mockData, sourceLanguage: 'en', mode: 'pdf-translation', text: JSON.stringify([cellA, cellB]) },
+          mockProvider, 'en', 'fa', 'msg-pdf-zero-cellid', mockSender
+        );
+
+        expect(result.success).toBe(true);
+        expect(result.results).toHaveLength(2);
+      });
+
+      it('non-PDF items without cellId keep prior identity policy (i-based dedup)', async () => {
+        const browser = (await import('webextension-polyfill')).default;
+        browser.tabs.sendMessage.mockClear();
+
+        const payload = [{ i: 'n1', t: 'A.', blockId: 'b1' }, { i: 'n2', t: 'B.', blockId: 'b2' }];
+        mockEngine.createIntelligentBatches = vi.fn(() => [payload]);
+        mockProvider.translate.mockResolvedValueOnce({ translatedText: ['TA.', 'TB.'] });
+
+        const result = await handler.execute(
+          mockEngine,
+          { ...mockData, sourceLanguage: 'en', mode: 'select_element', text: JSON.stringify(payload) },
+          mockProvider, 'en', 'fa', 'msg-nonpdf-no-cellid', mockSender
+        );
+
+        expect(result.success).toBe(true);
+        expect(result.results).toHaveLength(2);
+      });
+
+      it('non-PDF duplicate uid (no cellId) still fails with typed error', async () => {
+        const browser = (await import('webextension-polyfill')).default;
+        browser.tabs.sendMessage.mockClear();
+
+        const payload = [{ i: 'n1', t: 'A.', blockId: 'b1' }, { i: 'n1', t: 'C.', blockId: 'b1' }];
+        mockEngine.createIntelligentBatches = vi.fn(() => [payload]);
+        mockProvider.translate.mockResolvedValueOnce({ translatedText: ['TA.', 'TC.'] });
+
+        const result = await handler.execute(
+          mockEngine,
+          { ...mockData, sourceLanguage: 'en', text: JSON.stringify(payload) },
+          mockProvider, 'en', 'fa', 'msg-nonpdf-dup-uid', mockSender
+        );
+
+        expect(result.success).toBe(false);
+        expect(result.error.type).toBe(ErrorTypes.VALIDATION);
+      });
     });
 
     describe('missing and unknown identity edge cases', () => {
@@ -2148,7 +2246,7 @@ describe('OptimizedJsonHandler', () => {
         );
 
         expect(result.success).toBe(false);
-        expect(result.error.type).not.toBe(ErrorTypes.USER_CANCELLED);
+        expect(result.error.type).toBe(ErrorTypes.VALIDATION);
         const updates = browser.tabs.sendMessage.mock.calls
           .map(([, m]) => m)
           .filter(m => m.action === MessageActions.TRANSLATION_STREAM_UPDATE);

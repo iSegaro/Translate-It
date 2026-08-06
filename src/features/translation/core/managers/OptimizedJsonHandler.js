@@ -79,7 +79,13 @@ export class OptimizedJsonHandler {
 
         const extractLogicalId = (item) => {
           if (typeof item !== 'object' || item === null) return undefined;
-          return item.i ?? item.uid ?? item.id ?? item.blockId;
+          // Structured PDF cells carry i/b/blockId (all = block.id); per-cell
+          // identity (cellId) takes precedence so distinct cells of one block are
+          // not treated as duplicates. Nullish semantics keep valid falsy IDs
+          // (e.g. numeric cellId 0) intact and skip fallback only for null/
+          // undefined. Non-PDF items without cellId fall through to the prior
+          // identity policy.
+          return item.uid ?? item.cellId ?? item.i ?? item.id ?? item.blockId;
         };
 
         const collectCompleteFragments = (mappedResults) => {
