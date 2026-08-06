@@ -396,7 +396,7 @@ export const AIResponseParser = {
       }
 
       return {
-        results: this._fillResultsGaps(results, unmappedTexts, originalBatch, expectedCount),
+        results: this._fillResultsGaps(results, unmappedTexts, expectedCount),
         contractViolation,
       };
     } catch (error) {
@@ -410,7 +410,7 @@ export const AIResponseParser = {
         fallback: true,
       });
       return {
-        results: originalBatch.map(item => typeof item === 'object' ? (item.t || item.text) : item),
+        results: Array(originalBatch.length).fill(''),
         contractViolation: true,
       };
     }
@@ -522,21 +522,22 @@ export const AIResponseParser = {
     ));
   },
 
-  /**
-   * Fills gaps in results with sequential unmapped translations.
-   * @private
-   */
-  _fillResultsGaps(results, unmappedTexts, originalBatch, expectedCount) {
-    let unmappedIdx = 0;
-    for (let i = 0; i < expectedCount; i++) {
-      if (results[i] === null) {
-        results[i] = unmappedTexts[unmappedIdx] || 
-                    (typeof originalBatch[i] === 'object' ? (originalBatch[i].t || originalBatch[i].text) : originalBatch[i]) || '';
-        unmappedIdx++;
-      }
-    }
-    return results;
-  },
+   /**
+    * Fills gaps in results with sequential unmapped translations. Remaining
+    * slots receive an empty string so original source text never escapes on a
+    * contract violation. Recovery (owned by the provider) replaces these gaps.
+    * @private
+    */
+   _fillResultsGaps(results, unmappedTexts, expectedCount) {
+     let unmappedIdx = 0;
+     for (let i = 0; i < expectedCount; i++) {
+       if (results[i] === null) {
+         results[i] = unmappedTexts?.[unmappedIdx] ?? '';
+         unmappedIdx++;
+       }
+     }
+     return results;
+   },
 
   /**
    * Strips markdown code blocks if present.

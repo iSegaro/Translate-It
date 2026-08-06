@@ -495,6 +495,39 @@ describe('BaseAIProvider', () => {
       expect(result).toEqual(['F1', 'F2']);
       expect(result[0]).not.toBeInstanceOf(Array);
     });
+
+    it('rejects duplicate primary candidate, runs sequential recovery, returns ordered results without parser source-fill escaping', async () => {
+      const { AIResponseParser: realParser } = await vi.importActual("./utils/AIResponseParser.js");
+      AIResponseParser.parseBatchResult.mockImplementation(realParser.parseBatchResult.bind(realParser));
+
+      provider._callAI = vi.fn().mockResolvedValue('[{"i":"n1","t":"TA"},{"i":"n1","t":"TB"}]');
+      const recoverySpy = vi.spyOn(provider, '_traditionalBatchTranslate').mockResolvedValue(['recovered-A', 'recovered-B']);
+
+      const result = await provider._translateBatch(
+        [{ i: 'n1', t: 'A' }, { i: 'n2', t: 'B' }], 'en', 'fa', 'select-element', null, null, 'rec-real', 'session-1', null, ResponseFormat.JSON_ARRAY
+      );
+
+      expect(AIResponseParser.parseBatchResult).toHaveBeenCalledTimes(1);
+      expect(AIResponseParser.parseBatchResult.mock.results[0].value.contractViolation).toBe(true);
+      expect(recoverySpy).toHaveBeenCalledTimes(1);
+      expect(result).toEqual(['recovered-A', 'recovered-B']);
+      expect(result).not.toContain('A');
+      expect(result).not.toContain('B');
+    });
+
+    it('propagates recovery failure error without returning source-filled parser results', async () => {
+      const { AIResponseParser: realParser } = await vi.importActual("./utils/AIResponseParser.js");
+      AIResponseParser.parseBatchResult.mockImplementation(realParser.parseBatchResult.bind(realParser));
+
+      const error = Object.assign(new Error('Recovery network failure'), { type: 'NETWORK_ERROR' });
+      provider._callAI = vi.fn().mockResolvedValue('[{"i":"n1","t":"TA"},{"i":"n1","t":"TB"}]');
+      const recoverySpy = vi.spyOn(provider, '_traditionalBatchTranslate').mockRejectedValue(error);
+
+      await expect(provider._translateBatch(
+        [{ i: 'n1', t: 'A' }, { i: 'n2', t: 'B' }], 'en', 'fa', 'select-element', null, null, 'rec-fail', 'session-1', null, ResponseFormat.JSON_ARRAY
+      )).rejects.toBe(error);
+      expect(recoverySpy).toHaveBeenCalledTimes(1);
+    });
   });
 
   describe('_shouldUseStreaming', () => {

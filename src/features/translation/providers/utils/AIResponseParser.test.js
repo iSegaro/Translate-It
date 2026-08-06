@@ -293,7 +293,7 @@ describe('AIResponseParser', () => {
       expect(Object.isFrozen(observeValidationResult.mock.calls[0][0])).toBe(true);
     });
 
-    it('observes invalid validation while preserving legacy fallback mapping', () => {
+    it('observes invalid validation while filling resolved slots with empty string', () => {
       const originalBatch = [{ i: 'first', t: 'source one' }, { i: 'second', t: 'source two' }];
       const observeValidationResult = vi.fn();
       const result = AIResponseParser.parseBatchResult(
@@ -306,7 +306,9 @@ describe('AIResponseParser', () => {
         createManifestView(createRequestUnitManifest(originalBatch)),
       );
 
-      expect(result.results).toEqual(['source one', 'second']);
+      expect(result.results).toEqual(['', 'second']);
+      expect(result.results).not.toContain('source one');
+      expect(result.results).not.toContain('source two');
       expect(result.contractViolation).toBe(true);
       expect(observeValidationResult).toHaveBeenCalledWith(expect.objectContaining({ isValid: false }));
     });
@@ -339,9 +341,25 @@ describe('AIResponseParser', () => {
         createManifestView(createRequestUnitManifest(['source'])),
       );
 
-      expect(result.results).toEqual(['source']);
+      expect(result.results).toEqual(['']);
       expect(result.contractViolation).toBe(true);
       expect(observeValidationResult).not.toHaveBeenCalled();
+    });
+
+    it('total JSON parse failure fills all slots with empty string, not source', () => {
+      const result = AIResponseParser.parseBatchResult(
+        '{"translations":',
+        3,
+        ['A', 'B', 'C'],
+        'Custom',
+        ResponseFormat.JSON_OBJECT,
+      );
+
+      expect(result.results).toEqual(['', '', '']);
+      expect(result.results).not.toContain('A');
+      expect(result.results).not.toContain('B');
+      expect(result.results).not.toContain('C');
+      expect(result.contractViolation).toBe(true);
     });
 
     it('does not observe split batches without a manifest view', () => {
@@ -381,6 +399,67 @@ describe('AIResponseParser', () => {
       expect(result.contractViolation).toBe(false);
       expect(validate).not.toHaveBeenCalled();
       validate.mockRestore();
+    });
+
+    it('fills an unresolved slot with empty string when a duplicate response ID masks a missing slot', () => {
+      const response = '[{"i":"n1","t":"TA"},{"i":"n1","t":"TB"}]';
+      const result = AIResponseParser.parseBatchResult(
+        response,
+        2,
+        [{ i: 'n1', t: 'A' }, { i: 'n2', t: 'B' }],
+        'TestProvider',
+        ResponseFormat.JSON_ARRAY,
+      );
+
+      expect(result.results[1]).toBe('');
+      expect(result.results).not.toContain('A');
+      expect(result.results).not.toContain('B');
+      expect(result.contractViolation).toBe(true);
+    });
+
+    it('fills unresolved slots with empty string when response items are missing', () => {
+      const response = '[{"i":"n1","t":"TA"}]';
+      const result = AIResponseParser.parseBatchResult(
+        response,
+        3,
+        [{ i: 'n1', t: 'A' }, { i: 'n2', t: 'B' }, { i: 'n3', t: 'C' }],
+        'TestProvider',
+        ResponseFormat.JSON_ARRAY,
+      );
+
+      expect(result.results).toEqual(['TA', '', '']);
+      expect(result.results).not.toContain('A');
+      expect(result.results).not.toContain('B');
+      expect(result.results).not.toContain('C');
+      expect(result.contractViolation).toBe(true);
+    });
+
+    it('preserves valid mapped translations unchanged', () => {
+      const response = '[{"i":"n1","t":"TA"},{"i":"n2","t":"TB"}]';
+      const result = AIResponseParser.parseBatchResult(
+        response,
+        2,
+        [{ i: 'n1', t: 'A' }, { i: 'n2', t: 'B' }],
+        'TestProvider',
+        ResponseFormat.JSON_ARRAY,
+      );
+
+      expect(result.results).toEqual(['TA', 'TB']);
+      expect(result.contractViolation).toBe(false);
+    });
+
+    it('accepts source-equal translation as valid', () => {
+      const response = '[{"i":"n1","t":"A"},{"i":"n2","t":"B"}]';
+      const result = AIResponseParser.parseBatchResult(
+        response,
+        2,
+        [{ i: 'n1', t: 'A' }, { i: 'n2', t: 'B' }],
+        'TestProvider',
+        ResponseFormat.JSON_ARRAY,
+      );
+
+      expect(result.results).toEqual(['A', 'B']);
+      expect(result.contractViolation).toBe(false);
     });
   });
 });
