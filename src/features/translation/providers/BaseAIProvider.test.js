@@ -39,6 +39,7 @@ import { ResponseFormat } from '@/shared/config/translationConstants.js';
 import { isCancellationError, isFatalError, isTransientError, matchErrorToType } from '@/shared/error-management/ErrorMatcher.js';
 import { createTranslationOperation } from '../ir/TranslationOperation.js';
 import { TranslationCallPurpose } from './ProviderConstants.js';
+import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
 import { translationSessionManager } from '../core/TranslationSessionManager.js';
 import { AIResponseParser } from './utils/AIResponseParser.js';
 
@@ -312,6 +313,112 @@ describe('BaseAIProvider', () => {
       } finally {
         writeSpy.mockRestore();
       }
+    });
+
+    it('discards the staged candidate and rejects with USER_CANCELLED when the signal aborts immediately before commit', async () => {
+      const { AIResponseParser } = await import("./utils/AIResponseParser.js");
+      const abortController = new AbortController();
+      const session = translationSessionManager.getOrCreateSession('late-abort-session', 'MockAI');
+      const writeSpy = vi.spyOn((await import('./utils/AIConversationHelper.js')).AIConversationHelper, 'updateSessionHistory');
+      let commitSpy;
+      let discardSpy;
+      provider._callAI = vi.fn(async (_system, userText, options) => {
+        const candidate = options.conversationCommitCandidate;
+        commitSpy = vi.spyOn(candidate, 'commit');
+        discardSpy = vi.spyOn(candidate, 'discard');
+        candidate.stage({ sessionId: options.sessionId, userContent: userText, assistantContent: 'raw' });
+        abortController.abort();
+        return 'raw';
+      });
+      AIResponseParser.parseBatchResult.mockReturnValue({ results: ['translated'], contractViolation: false });
+
+      try {
+        await expect(
+          provider._translateBatch(['source'], 'en', 'fa', 'select-element', abortController, null, 'm', 'late-abort-session', null, ResponseFormat.JSON_ARRAY)
+        ).rejects.toMatchObject({ type: ErrorTypes.USER_CANCELLED });
+        expect(commitSpy).not.toHaveBeenCalled();
+        expect(discardSpy).toHaveBeenCalledTimes(1);
+        expect(writeSpy).not.toHaveBeenCalled();
+        expect(session.history).toHaveLength(0);
+      } finally {
+        writeSpy.mockRestore();
+      }
+    });
+
+    it('commits once without discard when the signal is not aborted and the result is accepted', async () => {
+      const { AIResponseParser } = await import("./utils/AIResponseParser.js");
+      const abortController = new AbortController();
+      const session = translationSessionManager.getOrCreateSession('normal-accept-session', 'MockAI');
+      const writeSpy = vi.spyOn((await import('./utils/AIConversationHelper.js')).AIConversationHelper, 'updateSessionHistory');
+      let commitSpy;
+      let discardSpy;
+      AIResponseParser.parseBatchResult.mockReturnValue({ results: ['translated'], contractViolation: false });
+      provider._callAI = vi.fn(async (_system, userText, options) => {
+        const candidate = options.conversationCommitCandidate;
+        commitSpy = vi.spyOn(candidate, 'commit');
+        discardSpy = vi.spyOn(candidate, 'discard');
+        candidate.stage({ sessionId: options.sessionId, userContent: userText, assistantContent: 'raw' });
+        return 'raw';
+      });
+
+      try {
+        const result = await provider._translateBatch(['source'], 'en', 'fa', 'select-element', abortController, null, 'm', 'normal-accept-session', null, ResponseFormat.JSON_ARRAY);
+        expect(result).toEqual(['translated']);
+        expect(commitSpy).toHaveBeenCalledTimes(1);
+        expect(discardSpy).not.toHaveBeenCalled();
+        expect(writeSpy).toHaveBeenCalledTimes(1);
+        expect(session.history).toHaveLength(2);
+      } finally {
+        writeSpy.mockRestore();
+      }
+    });
+
+    it('throws a typed USER_CANCELLED error when the signal aborts in the sequential pass', async () => {
+      const abortController = new AbortController();
+      abortController.abort();
+
+      await expect(
+        provider._traditionalBatchTranslate(['seg'], 'en', 'fa', 'selection', null, null, abortController, null, 'recovery-session', null, {})
+      ).rejects.toMatchObject({ type: ErrorTypes.USER_CANCELLED });
+    });
+
+    it('aborting during sequential recovery retains no conversation write and rejects with typed USER_CANCELLED', async () => {
+      const { AIResponseParser } = await import("./utils/AIResponseParser.js");
+      const abortController = new AbortController();
+      const session = translationSessionManager.getOrCreateSession('recovery-abort-session', 'MockAI');
+      const writeSpy = vi.spyOn((await import('./utils/AIConversationHelper.js')).AIConversationHelper, 'updateSessionHistory');
+      let commitSpy;
+      provider._callAI = vi.fn(async (_system, userText, options) => {
+        if (options.conversationCommitCandidate) {
+          commitSpy = vi.spyOn(options.conversationCommitCandidate, 'commit');
+        }
+        abortController.abort();
+        return 'raw';
+      });
+      AIResponseParser.parseBatchResult.mockReturnValue({ results: ['source'], contractViolation: true });
+
+      try {
+        await expect(
+          provider._translateBatch(['source'], 'en', 'fa', 'selection', abortController, null, 'm', 'recovery-abort-session', null, ResponseFormat.JSON_ARRAY)
+        ).rejects.toMatchObject({ type: ErrorTypes.USER_CANCELLED });
+        expect(commitSpy).toBeDefined();
+        expect(commitSpy).not.toHaveBeenCalled();
+        expect(writeSpy).not.toHaveBeenCalled();
+        expect(session.history).toHaveLength(0);
+      } finally {
+        writeSpy.mockRestore();
+      }
+    });
+
+    it('rethrows a network recovery failure with its original error type', async () => {
+      const { AIResponseParser } = await import("./utils/AIResponseParser.js");
+      AIResponseParser.parseBatchResult.mockReturnValue({ results: ['source'], contractViolation: true });
+      const networkError = Object.assign(new Error('network down'), { type: ErrorTypes.NETWORK_ERROR });
+      vi.spyOn(provider, '_traditionalBatchTranslate').mockRejectedValue(networkError);
+
+      await expect(
+        provider._translateBatch(['source'], 'en', 'fa', 'selection', null, null, null, 'recovery-fail-session', null, ResponseFormat.JSON_ARRAY)
+      ).rejects.toBe(networkError);
     });
 
     it('should perform exactly one sequential recovery when the contract is violated', async () => {

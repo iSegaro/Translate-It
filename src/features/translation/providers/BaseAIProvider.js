@@ -18,6 +18,7 @@ import { AITextProcessor } from "./utils/AITextProcessor.js";
 import { TranslationMode, getProviderOptimizationLevelAsync } from "@/shared/config/config.js";
 import { AIStreamManager } from "./utils/AIStreamManager.js";
 import { isCancellationError } from "@/shared/error-management/ErrorMatcher.js";
+import { ErrorTypes } from "@/shared/error-management/ErrorTypes.js";
 import { appendTranslationDiagnostic } from "@/features/translation/ir/TranslationOperation.js";
 import { TranslationCallPurpose } from "@/features/translation/providers/ProviderConstants.js";
 
@@ -163,6 +164,7 @@ export class BaseAIProvider extends BaseProvider {
     const conversationCommitCandidate = (
       structuredFormat === ResponseFormat.JSON_ARRAY || structuredFormat === ResponseFormat.JSON_OBJECT
     ) ? createConversationCommitCandidate() : null;
+    let acceptedResults;
     try {
       const response = await this.executeStructuredBatch(texts, sourceLang, targetLang, {
         translateMode,
@@ -239,8 +241,7 @@ export class BaseAIProvider extends BaseProvider {
         return Array.isArray(recoveryResult) ? recoveryResult : [recoveryResult];
       }
 
-      await conversationCommitCandidate?.commit();
-      return parsed.results;
+      acceptedResults = parsed.results;
     } catch (error) {
       conversationCommitCandidate?.discard();
       // Error accounting is owned exclusively by ProviderRequestEngine.executeApiCall:
@@ -256,6 +257,22 @@ export class BaseAIProvider extends BaseProvider {
       //   silently reporting the untranslated original as a success.
       throw error;
     }
+
+    // Late-settlement guard: the outer handler (e.g. OptimizedJsonHandler) may
+    // abort the signal immediately after the provider response resolved but
+    // before this commit point. Once aborted, the user never receives the
+    // result, so the conversation must not be written. Discard the staged
+    // candidate and fail loudly as USER_CANCELLED.
+    if (abortController?.signal?.aborted) {
+      conversationCommitCandidate?.discard();
+      const cancelError = new Error('Translation cancelled by user');
+      cancelError.name = 'AbortError';
+      cancelError.type = ErrorTypes.USER_CANCELLED;
+      throw cancelError;
+    }
+
+    await conversationCommitCandidate?.commit();
+    return acceptedResults;
   }
 
   async executeStructuredBatch(texts, sourceLang, targetLang, {
@@ -324,7 +341,12 @@ export class BaseAIProvider extends BaseProvider {
       : TranslationCallPurpose.PRIMARY_TRANSLATION;
 
     for (let i = 0; i < texts.length; i++) {
-      if (abortController?.signal?.aborted) throw new Error('Cancelled');
+      if (abortController?.signal?.aborted) {
+        const cancelError = new Error('Translation cancelled by user');
+        cancelError.name = 'AbortError';
+        cancelError.type = ErrorTypes.USER_CANCELLED;
+        throw cancelError;
+      }
       
       const text = texts[i];
       const { systemPrompt, userText } = await this._preparePromptAndText(text, sourceLang, targetLang, translateMode, options, sessionId);
