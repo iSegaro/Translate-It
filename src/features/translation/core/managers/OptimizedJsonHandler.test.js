@@ -156,7 +156,7 @@ describe('OptimizedJsonHandler', () => {
         handler._mapResults(original, translated);
         throw new Error('Expected mapping to fail');
       } catch (error) {
-        expect(error).toMatchObject({ type: ErrorTypes.VALIDATION_ERROR, isFatal: true });
+        expect(error).toMatchObject({ type: ErrorTypes.VALIDATION, isFatal: true });
         expect(error.message).toMatch(/Segment count mismatch/);
       }
     });
@@ -192,7 +192,7 @@ describe('OptimizedJsonHandler', () => {
           attempt();
           throw new Error('Expected mapping to fail');
         } catch (error) {
-          expect(error).toMatchObject({ type: ErrorTypes.VALIDATION_ERROR, isFatal: true });
+          expect(error).toMatchObject({ type: ErrorTypes.VALIDATION, isFatal: true });
         }
       };
 
@@ -533,6 +533,84 @@ describe('OptimizedJsonHandler', () => {
       await handler.execute(mockEngine, mockData, mockProvider, 'en', 'fa', 'msg-1', mockSender);
 
       expect(mockAbortController.abort).toHaveBeenCalled();
+    });
+
+    it('genuine cancellation after a non-fatal error returns USER_CANCELLED (not lastError)', async () => {
+      vi.useRealTimers();
+      const { getAIConversationHistoryEnabledAsync } = await import('@/shared/config/config.js');
+      getAIConversationHistoryEnabledAsync.mockResolvedValue(false);
+
+      const firstBatch = createDeferred();
+      const secondBatch = createDeferred();
+      const data = { ...mockData, sourceLanguage: 'en' };
+
+      mockProvider.translate
+        .mockImplementationOnce(() => firstBatch.promise)
+        .mockImplementationOnce(() => secondBatch.promise);
+
+      const execution = handler.execute(mockEngine, data, mockProvider, 'en', 'fa', 'msg-cancel-after-err', mockSender);
+
+      await vi.waitFor(() => expect(mockProvider.translate).toHaveBeenCalledTimes(2));
+
+      // First batch fails with non-fatal error
+      firstBatch.reject(Object.assign(new Error('Non-fatal'), { type: 'TRANSLATION_FAILED' }));
+      await Promise.resolve();
+
+      // User cancels after error
+      mockAbortController.signal.aborted = true;
+      secondBatch.resolve({ translatedText: ['t2'] });
+
+      const result = await execution;
+
+      expect(result.success).toBe(false);
+      expect(result.error.type).toBe(ErrorTypes.USER_CANCELLED);
+    });
+
+    it('genuine cancellation with no earlier error returns USER_CANCELLED', async () => {
+      vi.useRealTimers();
+      const { getAIConversationHistoryEnabledAsync } = await import('@/shared/config/config.js');
+      getAIConversationHistoryEnabledAsync.mockResolvedValue(false);
+
+      const firstBatch = createDeferred();
+      const secondBatch = createDeferred();
+      const data = { ...mockData, sourceLanguage: 'en' };
+
+      mockProvider.translate
+        .mockImplementationOnce(() => firstBatch.promise)
+        .mockImplementationOnce(() => secondBatch.promise);
+
+      const execution = handler.execute(mockEngine, data, mockProvider, 'en', 'fa', 'msg-cancel-no-err', mockSender);
+
+      await vi.waitFor(() => expect(mockProvider.translate).toHaveBeenCalledTimes(2));
+
+      firstBatch.resolve({ translatedText: ['t1'] });
+
+      // User cancels before second batch settles
+      mockAbortController.signal.aborted = true;
+      secondBatch.resolve({ translatedText: ['t2'] });
+
+      const result = await execution;
+
+      expect(result.success).toBe(false);
+      expect(result.error.type).toBe(ErrorTypes.USER_CANCELLED);
+    });
+
+    it('fatal validation error preserves original error type through abort', async () => {
+      const browser = (await import('webextension-polyfill')).default;
+      browser.tabs.sendMessage.mockClear();
+
+      const payload = [{ i: 'n1', t: 'A.' }, { i: 'n1', t: 'B.' }];
+      mockEngine.createIntelligentBatches = vi.fn(() => [payload]);
+      mockProvider.translate.mockResolvedValueOnce({ translatedText: ['TA.', 'TB.'] });
+
+      const result = await handler.execute(
+        mockEngine,
+        { ...mockData, sourceLanguage: 'en', text: JSON.stringify(payload) },
+        mockProvider, 'en', 'fa', 'msg-validation-abort', mockSender
+      );
+
+      expect(result.success).toBe(false);
+      expect(result.error.type).toBe(ErrorTypes.VALIDATION);
     });
 
     it('should never stream original content for a failed batch', async () => {
@@ -1669,7 +1747,6 @@ describe('OptimizedJsonHandler', () => {
         browser.tabs.sendMessage.mockClear();
 
         const fragment0 = makeV3Fragments('g1', 'n1', ['A.', 'B.'], ['', ' '])[0];
-        const fragment1 = makeV3Fragments('g1', 'n1', ['A.', 'B.'], ['', ' '])[1];
         const late0 = { ...fragment0, t: 'Late.' };
 
         const d0 = createDeferred();
@@ -1791,6 +1868,314 @@ describe('OptimizedJsonHandler', () => {
         expect(updates).toHaveLength(2);
         expect(updates[0].data.data[0].t).toBe('Hola.');
         expect(updates[1].data.data[0].t).toBe('Listo.');
+      });
+    });
+
+    describe('non-fragment duplicate identity', () => {
+      const mockSender = { tab: { id: 123 } };
+
+      it('same-batch duplicate uid fails with typed error (not USER_CANCELLED)', async () => {
+        const browser = (await import('webextension-polyfill')).default;
+        browser.tabs.sendMessage.mockClear();
+
+        const payload = [{ i: 'n1', t: 'A.' }, { i: 'n1', t: 'B.' }];
+        mockEngine.createIntelligentBatches = vi.fn(() => [payload]);
+        mockProvider.translate.mockResolvedValueOnce({ translatedText: ['TA.', 'TB.'] });
+
+        const result = await handler.execute(
+          mockEngine,
+          { ...mockData, sourceLanguage: 'en', text: JSON.stringify(payload) },
+          mockProvider, 'en', 'fa', 'msg-dup-same-batch', mockSender
+        );
+
+        expect(result.success).toBe(false);
+        expect(result.error.type).not.toBe(ErrorTypes.USER_CANCELLED);
+        const updates = browser.tabs.sendMessage.mock.calls
+          .map(([, m]) => m)
+          .filter(m => m.action === MessageActions.TRANSLATION_STREAM_UPDATE);
+        expect(updates).toHaveLength(0);
+      });
+
+      it('same-batch duplicate uid with different text still fails (typed error)', async () => {
+        const browser = (await import('webextension-polyfill')).default;
+        browser.tabs.sendMessage.mockClear();
+
+        const payload = [{ i: 'n1', t: 'A.' }, { i: 'n1', t: 'C.' }];
+        mockEngine.createIntelligentBatches = vi.fn(() => [payload]);
+        mockProvider.translate.mockResolvedValueOnce({ translatedText: ['TA.', 'TC.'] });
+
+        const result = await handler.execute(
+          mockEngine,
+          { ...mockData, sourceLanguage: 'en', text: JSON.stringify(payload) },
+          mockProvider, 'en', 'fa', 'msg-dup-different-text', mockSender
+        );
+
+        expect(result.success).toBe(false);
+        expect(result.error.type).not.toBe(ErrorTypes.USER_CANCELLED);
+        const updates = browser.tabs.sendMessage.mock.calls
+          .map(([, m]) => m)
+          .filter(m => m.action === MessageActions.TRANSLATION_STREAM_UPDATE);
+        expect(updates).toHaveLength(0);
+      });
+
+      it('same-batch duplicate numeric ID 0 fails (typed error)', async () => {
+        const browser = (await import('webextension-polyfill')).default;
+        browser.tabs.sendMessage.mockClear();
+
+        const payload = [{ i: 0, t: 'A.' }, { i: 0, t: 'B.' }];
+        mockEngine.createIntelligentBatches = vi.fn(() => [payload]);
+        mockProvider.translate.mockResolvedValueOnce({ translatedText: ['TA.', 'TB.'] });
+
+        const result = await handler.execute(
+          mockEngine,
+          { ...mockData, sourceLanguage: 'en', text: JSON.stringify(payload) },
+          mockProvider, 'en', 'fa', 'msg-dup-numeric-zero', mockSender
+        );
+
+        expect(result.success).toBe(false);
+        expect(result.error.type).not.toBe(ErrorTypes.USER_CANCELLED);
+        const updates = browser.tabs.sendMessage.mock.calls
+          .map(([, m]) => m)
+          .filter(m => m.action === MessageActions.TRANSLATION_STREAM_UPDATE);
+        expect(updates).toHaveLength(0);
+      });
+
+      it('different IDs both stream and return successfully', async () => {
+        const browser = (await import('webextension-polyfill')).default;
+        browser.tabs.sendMessage.mockClear();
+
+        const payload = [{ i: 'n1', t: 'A.' }, { i: 'n2', t: 'B.' }];
+        mockEngine.createIntelligentBatches = vi.fn(() => [payload]);
+        mockProvider.translate.mockResolvedValueOnce({ translatedText: ['TA.', 'TB.'] });
+
+        const result = await handler.execute(
+          mockEngine,
+          { ...mockData, sourceLanguage: 'en', text: JSON.stringify(payload) },
+          mockProvider, 'en', 'fa', 'msg-diff-ids', mockSender
+        );
+
+        expect(result.success).toBe(true);
+        expect(result.results).toHaveLength(2);
+        const updates = browser.tabs.sendMessage.mock.calls
+          .map(([, m]) => m)
+          .filter(m => m.action === MessageActions.TRANSLATION_STREAM_UPDATE);
+        expect(updates).toHaveLength(1);
+        expect(updates[0].data.data).toHaveLength(2);
+      });
+
+      it('cross-batch duplicate suppresses second and final results contain one item', async () => {
+        const browser = (await import('webextension-polyfill')).default;
+        browser.tabs.sendMessage.mockClear();
+
+        mockEngine.createIntelligentBatches = vi.fn(() => [[{ i: 'n1', t: 'A.' }], [{ i: 'n1', t: 'A.' }]]);
+        mockProvider.translate
+          .mockResolvedValueOnce({ translatedText: ['TA.'] })
+          .mockResolvedValueOnce({ translatedText: ['TA2.'] });
+
+        const result = await handler.execute(
+          mockEngine,
+          { ...mockData, sourceLanguage: 'en', text: JSON.stringify([{ i: 'n1', t: 'A.' }, { i: 'n1', t: 'A.' }]) },
+          mockProvider, 'en', 'fa', 'msg-cross-batch-dup', mockSender
+        );
+
+        expect(result.success).toBe(true);
+        expect(result.results).toHaveLength(1);
+        expect(result.results[0].t).toBe('TA.');
+        const updates = browser.tabs.sendMessage.mock.calls
+          .map(([, m]) => m)
+          .filter(m => m.action === MessageActions.TRANSLATION_STREAM_UPDATE);
+        expect(updates).toHaveLength(1);
+        expect(updates[0].data.data).toHaveLength(1);
+      });
+
+      it('cross-batch duplicate with different text: first-wins', async () => {
+        const browser = (await import('webextension-polyfill')).default;
+        browser.tabs.sendMessage.mockClear();
+
+        mockEngine.createIntelligentBatches = vi.fn(() => [[{ i: 'n1', t: 'A.' }], [{ i: 'n1', t: 'A.' }]]);
+        mockProvider.translate
+          .mockResolvedValueOnce({ translatedText: ['First.'] })
+          .mockResolvedValueOnce({ translatedText: ['Second.'] });
+
+        const result = await handler.execute(
+          mockEngine,
+          { ...mockData, sourceLanguage: 'en', text: JSON.stringify([{ i: 'n1', t: 'A.' }, { i: 'n1', t: 'A.' }]) },
+          mockProvider, 'en', 'fa', 'msg-cross-batch-text', mockSender
+        );
+
+        expect(result.success).toBe(true);
+        expect(result.results).toHaveLength(1);
+        expect(result.results[0].t).toBe('First.');
+      });
+
+      it('same identity in separate execute() calls: both requests succeed independently', async () => {
+        const browser = (await import('webextension-polyfill')).default;
+        browser.tabs.sendMessage.mockClear();
+
+        mockEngine.createIntelligentBatches = vi.fn(() => [[{ i: 'n1', t: 'A.' }]]);
+        mockProvider.translate.mockResolvedValue({ translatedText: ['TA.'] });
+
+        const payload = [{ i: 'n1', t: 'A.' }];
+
+        const result1 = await handler.execute(
+          mockEngine,
+          { ...mockData, sourceLanguage: 'en', text: JSON.stringify(payload) },
+          mockProvider, 'en', 'fa', 'msg-indep-1', mockSender
+        );
+
+        const result2 = await handler.execute(
+          mockEngine,
+          { ...mockData, sourceLanguage: 'en', text: JSON.stringify(payload) },
+          mockProvider, 'en', 'fa', 'msg-indep-2', mockSender
+        );
+
+        expect(result1.success).toBe(true);
+        expect(result1.results[0].t).toBe('TA.');
+        expect(result2.success).toBe(true);
+        expect(result2.results[0].t).toBe('TA.');
+      });
+
+      it('V3 parent identity and plain item identity do not collide (separate namespaces)', async () => {
+        const browser = (await import('webextension-polyfill')).default;
+        browser.tabs.sendMessage.mockClear();
+
+        const v3Fragment = { i: 'n1', t: 'A.', blockId: 'g1', isV3Fragment: true, parentId: 'g1', fragmentIndex: 0, fragmentCount: 1, fragmentJoinerBefore: '' };
+        const plainItem = { i: 'n1', t: 'B.' };
+        mockEngine.createIntelligentBatches = vi.fn(() => [[plainItem], [v3Fragment]]);
+        mockProvider.translate
+          .mockResolvedValueOnce({ translatedText: ['TB.'] })
+          .mockResolvedValueOnce({ translatedText: ['TA.'] });
+
+        const result = await handler.execute(
+          mockEngine,
+          { ...mockData, sourceLanguage: 'en', text: JSON.stringify(plainItem) },
+          mockProvider, 'en', 'fa', 'msg-collision', mockSender
+        );
+
+        expect(result.success).toBe(true);
+        const updates = browser.tabs.sendMessage.mock.calls
+          .map(([, m]) => m)
+          .filter(m => m.action === MessageActions.TRANSLATION_STREAM_UPDATE);
+        expect(updates).toHaveLength(2);
+        expect(updates[0].data.data[0].t).toBe('TB.');
+        expect(updates[1].data.data[0].t).toBe('TA.');
+        expect(updates[0].data.data[0].i).toBe('n1');
+        expect(updates[1].data.data[0].i).toBe('g1');
+      });
+
+      it('cross-batch duplicate: onTerminalUnitsAccepted only called for first occurrence', async () => {
+        const { getAIConversationHistoryEnabledAsync } = await import('@/shared/config/config.js');
+        getAIConversationHistoryEnabledAsync.mockResolvedValue(false);
+
+        const segments = [{ i: 'same', t: 'A.' }, { i: 'same', t: 'B.' }];
+        const manifest = createRequestUnitManifest(segments);
+        const onTerminalUnitsAccepted = vi.fn();
+        const executionContext = {
+          manifestView: createManifestView(manifest),
+          onTerminalUnitsAccepted,
+        };
+        mockEngine.createIntelligentMembershipBatches = vi.fn((items, manifestUnits) =>
+          items.map((payload, index) => [{ payload, manifestUnit: manifestUnits[index] }])
+        );
+        mockProvider.translate
+          .mockResolvedValueOnce({ translatedText: ['first A.'] })
+          .mockResolvedValueOnce({ translatedText: ['first B.'] });
+
+        const result = await handler.execute(
+          mockEngine,
+          { text: JSON.stringify(segments), sourceLanguage: 'en', targetLanguage: 'fa', mode: 'select_element', messageId: 'terminal-accounting' },
+          mockProvider, 'en', 'fa', 'terminal-accounting', { tab: { id: 123 } }, 'unknown', executionContext
+        );
+
+        expect(result.success).toBe(true);
+        expect(result.results).toHaveLength(1);
+        expect(result.results[0].t).toBe('first A.');
+        expect(onTerminalUnitsAccepted).toHaveBeenCalledTimes(1);
+        expect(onTerminalUnitsAccepted.mock.calls[0][0]).toHaveLength(1);
+      });
+    });
+
+    describe('missing and unknown identity edge cases', () => {
+      const mockSender = { tab: { id: 123 } };
+
+      it('item with missing identity falls back to positional mapping (no dedup conflict)', async () => {
+        const browser = (await import('webextension-polyfill')).default;
+        browser.tabs.sendMessage.mockClear();
+
+        mockEngine.createIntelligentBatches = vi.fn(() => [[{ t: 'A.' }, { t: 'B.' }]]);
+        mockProvider.translate.mockResolvedValueOnce({ translatedText: ['TA.', 'TB.'] });
+
+        const result = await handler.execute(
+          mockEngine,
+          { ...mockData, text: JSON.stringify([{ t: 'A.' }, { t: 'B.' }]) },
+          mockProvider, 'en', 'fa', 'msg-no-id', mockSender
+        );
+
+        expect(result.success).toBe(true);
+        expect(result.results).toHaveLength(2);
+      });
+
+      it('item with numeric ID 0 is handled correctly (not falsy fallback)', async () => {
+        mockEngine.createIntelligentBatches = vi.fn(() => [[{ i: 0, t: 'A.' }]]);
+        mockProvider.translate.mockResolvedValueOnce({ translatedText: ['TA.'] });
+
+        const result = await handler.execute(
+          mockEngine,
+          { ...mockData, text: JSON.stringify([{ i: 0, t: 'A.' }]) },
+          mockProvider, 'en', 'fa', 'msg-id-zero', mockSender
+        );
+
+        expect(result.success).toBe(true);
+        expect(result.results).toHaveLength(1);
+      });
+
+      it('same-batch duplicate uid 0 with nullish semantics still detected', async () => {
+        const browser = (await import('webextension-polyfill')).default;
+        browser.tabs.sendMessage.mockClear();
+
+        const payload = [{ i: 0, t: 'A.' }, { i: 0, t: 'B.' }];
+        mockEngine.createIntelligentBatches = vi.fn(() => [payload]);
+        mockProvider.translate.mockResolvedValueOnce({ translatedText: ['TA.', 'TB.'] });
+
+        const result = await handler.execute(
+          mockEngine,
+          { ...mockData, sourceLanguage: 'en', text: JSON.stringify(payload) },
+          mockProvider, 'en', 'fa', 'msg-zero-dup', mockSender
+        );
+
+        expect(result.success).toBe(false);
+        expect(result.error.type).not.toBe(ErrorTypes.USER_CANCELLED);
+        const updates = browser.tabs.sendMessage.mock.calls
+          .map(([, m]) => m)
+          .filter(m => m.action === MessageActions.TRANSLATION_STREAM_UPDATE);
+        expect(updates).toHaveLength(0);
+      });
+
+      it('genuine cancellation returns USER_CANCELLED (not masked by validation error)', async () => {
+        vi.useRealTimers();
+        const { getAIConversationHistoryEnabledAsync } = await import('@/shared/config/config.js');
+        const browser = (await import('webextension-polyfill')).default;
+        browser.tabs.sendMessage.mockClear();
+        getAIConversationHistoryEnabledAsync.mockResolvedValue(false);
+
+        const firstBatch = createDeferred();
+        mockEngine.createIntelligentBatches = vi.fn(() => [[{ i: 'n1', t: 'Hello.' }]]);
+        mockProvider.translate.mockImplementationOnce(() => firstBatch.promise);
+
+        const execution = handler.execute(
+          mockEngine,
+          { ...mockData, sourceLanguage: 'en', text: JSON.stringify([{ i: 'n1', t: 'Hello.' }]) },
+          mockProvider, 'en', 'fa', 'msg-cancel-validation', mockSender
+        );
+
+        await vi.waitFor(() => expect(mockProvider.translate).toHaveBeenCalledTimes(1));
+
+        mockAbortController.signal.aborted = true;
+        firstBatch.resolve({ translatedText: ['Hello.'] });
+
+        const result = await execution;
+        expect(result.success).toBe(false);
+        expect(result.error.type).toBe(ErrorTypes.USER_CANCELLED);
       });
     });
   });

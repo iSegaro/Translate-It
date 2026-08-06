@@ -68,6 +68,8 @@ export class OptimizedJsonHandler {
       const accumulatedResults = [];
       fragmentedUnits = new Map();
       const skipStreaming = mode === TranslationMode.PDF;
+      const emittedLogicalIds = new Set();
+      let abortInitiator = null;
 
       const appendFragmentDiagnostic = (type, parentId) => appendTranslationDiagnostic(executionContext, {
         type,
@@ -75,10 +77,28 @@ export class OptimizedJsonHandler {
         parentId,
       });
 
-       const collectCompleteFragments = (mappedResults) => {
-         const completeResults = [];
+        const extractLogicalId = (item) => {
+          if (typeof item !== 'object' || item === null) return undefined;
+          return item.i ?? item.uid ?? item.id ?? item.blockId;
+        };
 
-         for (const result of mappedResults) {
+        const collectCompleteFragments = (mappedResults) => {
+          const completeResults = [];
+          const sameBatchIds = new Set();
+
+          const validateAndAdd = (item) => {
+            const logicalId = extractLogicalId(item);
+            if (logicalId !== undefined && sameBatchIds.has(logicalId)) {
+              const err = new Error(`Duplicate identity in batch: ${String(logicalId)}`);
+              err.isFatal = true;
+              err.type = ErrorTypes.VALIDATION;
+              throw err;
+            }
+            if (logicalId !== undefined) sameBatchIds.add(logicalId);
+            completeResults.push(item);
+          };
+
+          for (const result of mappedResults) {
            if (result?.isV2Unit === true && result?.isSplitFragment === true) {
              const { parentId, fragmentIndex, fragmentCount } = result;
              if (!parentId || !Number.isInteger(fragmentIndex) || !Number.isInteger(fragmentCount) || fragmentIndex < 0 || fragmentIndex >= fragmentCount) {
@@ -117,14 +137,14 @@ export class OptimizedJsonHandler {
              delete logicalItem.fragmentCount;
              delete logicalItem.fragmentJoinerBefore;
              delete logicalItem.isV2Unit;
-             completeResults.push({ ...logicalItem, i: parentId, t: translatedText, text: translatedText });
-             parent.emitted = true;
-             parent.fragments.clear();
-             appendFragmentDiagnostic('FRAGMENTED_UNIT_COMPLETED', parentId);
-             continue;
-           }
+              validateAndAdd({ ...logicalItem, i: parentId, t: translatedText, text: translatedText });
+              parent.emitted = true;
+              parent.fragments.clear();
+              appendFragmentDiagnostic('FRAGMENTED_UNIT_COMPLETED', parentId);
+              continue;
+            }
 
-           if (result?.isV3Fragment === true) {
+            if (result?.isV3Fragment === true) {
              const { parentId, fragmentIndex, fragmentCount } = result;
              if (!parentId || !Number.isInteger(fragmentIndex) || !Number.isInteger(fragmentCount) || fragmentIndex < 0 || fragmentIndex >= fragmentCount) {
                appendFragmentDiagnostic('INCOMPLETE_FRAGMENT_EVENT_SUPPRESSED', parentId);
@@ -161,14 +181,22 @@ export class OptimizedJsonHandler {
              delete logicalItem.fragmentIndex;
              delete logicalItem.fragmentCount;
              delete logicalItem.fragmentJoinerBefore;
-             completeResults.push({ ...logicalItem, i: parentId, t: translatedText, text: translatedText });
-             parent.emitted = true;
-             parent.fragments.clear();
-             appendFragmentDiagnostic('FRAGMENTED_UNIT_COMPLETED', parentId);
-             continue;
-           }
+              validateAndAdd({ ...logicalItem, i: parentId, t: translatedText, text: translatedText });
+              parent.emitted = true;
+              parent.fragments.clear();
+              appendFragmentDiagnostic('FRAGMENTED_UNIT_COMPLETED', parentId);
+              continue;
+            }
 
-           completeResults.push(result);
+            const logicalId = extractLogicalId(result);
+            if (logicalId !== undefined && sameBatchIds.has(logicalId)) {
+              const err = new Error(`Duplicate identity in batch: ${String(logicalId)}`);
+              err.isFatal = true;
+              err.type = ErrorTypes.VALIDATION;
+              throw err;
+            }
+            if (logicalId !== undefined) sameBatchIds.add(logicalId);
+            completeResults.push(result);
          }
 
          return completeResults;
@@ -317,21 +345,40 @@ export class OptimizedJsonHandler {
           const mappedResults = self._mapResults(batchPayload, translatedBatch, executionContext);
           const completeResults = collectCompleteFragments(mappedResults);
           checkCancellation();
-          // Terminal observation is restricted to the approved execution scope:
-          // structured Select Element + AI provider + unsplit ManifestView.
-          // Execution identity extraction is the router's responsibility, never this handler's.
+          const filteredResults = [];
+          const acceptedManifestUnits = [];
+          for (let idx = 0; idx < completeResults.length; idx++) {
+            const item = completeResults[idx];
+            const logicalId = extractLogicalId(item);
+            if (logicalId !== undefined && emittedLogicalIds.has(logicalId)) {
+              appendTranslationDiagnostic(executionContext, {
+                type: 'DUPLICATE_IDENTITY_SUPPRESSED',
+                stage: 'optimized-json-handler',
+                parentId: String(logicalId),
+              });
+              continue;
+            }
+            if (logicalId !== undefined) emittedLogicalIds.add(logicalId);
+            filteredResults.push(item);
+            // Track accepted manifest units for terminal observation
+            // (only valid for non-fragment batches where manifestView.units aligns positionally)
+            if (batchExecutionContext?.manifestView?.units && idx < batchExecutionContext.manifestView.units.length) {
+              acceptedManifestUnits.push(batchExecutionContext.manifestView.units[idx]);
+            }
+          }
+          // Terminal observation: accept only manifest units that survived suppression
           if (mode === TranslationMode.Select_Element
               && providerInstance.constructor.isAI
-              && batchExecutionContext?.manifestView?.units) {
-            executionContext?.onTerminalUnitsAccepted?.(batchExecutionContext.manifestView.units);
+              && acceptedManifestUnits.length > 0) {
+            executionContext?.onTerminalUnitsAccepted?.(acceptedManifestUnits);
           }
-          accumulatedResults.push(...completeResults);
+          accumulatedResults.push(...filteredResults);
           completedBatchCount++;
-          if (!skipStreaming && completeResults.length > 0) {
+          if (!skipStreaming && filteredResults.length > 0) {
             await self._streamResults(
               tabId,
               messageId,
-              completeResults,
+              filteredResults,
               i,
               batches.length,
               targetLanguage,
@@ -407,6 +454,7 @@ export class OptimizedJsonHandler {
           
           // Stop all other batches if error is fatal (429, etc.)
           if (isFatalError(batchError)) {
+            abortInitiator = 'fatal-error';
             abortController.abort();
           }
         } finally {
@@ -420,6 +468,18 @@ export class OptimizedJsonHandler {
       // Final check for cancellation before sending end-of-stream markers
       if (abortController.signal.aborted || engine.isCancelled(messageId)) {
         logger.debug(`[JsonHandler] Skipping stream end markers for cancelled request: ${messageId}`);
+        if (hasErrors && lastError && abortInitiator === 'fatal-error') {
+          return {
+            success: false,
+            streaming: true,
+            error: {
+              message: lastError.message || String(lastError),
+              type: lastError.type || matchErrorToType(lastError),
+              statusCode: lastError.statusCode
+            },
+            results: accumulatedResults
+          };
+        }
         return { success: false, streaming: true, error: { type: ErrorTypes.USER_CANCELLED, message: 'Cancelled' } };
       }
 
@@ -531,7 +591,7 @@ export class OptimizedJsonHandler {
       logger.error(`[JsonHandler] ${errorMsg}`);
       const err = new Error(errorMsg);
       err.isFatal = true;
-      err.type = ErrorTypes.VALIDATION_ERROR;
+      err.type = ErrorTypes.VALIDATION;
       throw err;
     };
 
@@ -571,7 +631,7 @@ export class OptimizedJsonHandler {
       logger.error(`[JsonHandler] ${errorMsg}`);
       const err = new Error(errorMsg);
       err.isFatal = true;
-      err.type = ErrorTypes.VALIDATION_ERROR;
+      err.type = ErrorTypes.VALIDATION;
       throw err;
     }
 
