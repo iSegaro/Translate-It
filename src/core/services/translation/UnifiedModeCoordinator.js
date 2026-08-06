@@ -8,6 +8,7 @@ import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { TranslationMode } from '@/shared/config/config.js';
 import { MessageActions } from '@/shared/messaging/core/MessageActions.js';
 import { RequestStatus } from './TranslationRequestTracker.js';
+import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
 import { appendTranslationDiagnostic } from '@/features/translation/ir/TranslationOperation.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.TRANSLATION, 'UnifiedModeCoordinator');
@@ -261,7 +262,7 @@ export class UnifiedModeCoordinator {
       const timeoutPromise = new Promise((_, reject) => {
         timeoutId = setTimeout(() => {
           const timeoutError = new Error(`Batch translation timed out after ${BATCH_TIMEOUT_MS}ms`);
-          timeoutError.type = 'TIMEOUT';
+          timeoutError.type = ErrorTypes.TRANSLATION_TIMEOUT;
           appendTranslationDiagnostic(executionContext, {
             type: 'BATCH_TIMEOUT',
             stage: 'mode-coordinator',

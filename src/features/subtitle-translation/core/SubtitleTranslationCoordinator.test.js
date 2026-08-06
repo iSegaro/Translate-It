@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { subtitleTranslationCoordinator } from './SubtitleTranslationCoordinator.js';
 import { SubtitleProgressTracker } from './SubtitleProgressTracker.js';
 import { unifiedTranslationService } from '@/core/services/translation/UnifiedTranslationService.js';
+import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
 
 vi.mock('@/core/services/translation/UnifiedTranslationService.js', () => ({
   unifiedTranslationService: {
@@ -46,16 +47,78 @@ describe('SubtitleTranslationCoordinator Stability', () => {
   });
 
   it('should handle timeout protection using Promise.race', async () => {
-    const jobId = 'test-job-timeout';
-    
-    // Mock progress tracker
+    vi.useFakeTimers();
+    try {
+      const jobId = 'test-job-timeout';
+
+      // Mock progress tracker
+      const mockTracker = { update: vi.fn() };
+      const batch = [{ id: '1', text: 'Hello', index: 1, warnings: [] }];
+      subtitleTranslationCoordinator.activeJobs.set(jobId, {
+        cues: batch,
+        status: 'running',
+        progressTracker: mockTracker
+      });
+
+      // Mock handleTranslationRequest to take forever
+      unifiedTranslationService.handleTranslationRequest.mockImplementation(() => new Promise(() => {}));
+
+      const promise = subtitleTranslationCoordinator._processBatch(
+        jobId,
+        batch,
+        'en',
+        'fa',
+        'google',
+        {}
+      );
+
+      const assertion = promise.then((result) => {
+        expect(result.success).toBe(false);
+        expect(result.isFatal).toBe(false);
+        expect(result.error).toMatch(/timed out/);
+        expect(result.error).not.toMatch(/cancell/i);
+        // Source preserved: cue is failed, never translated, never cancelled
+        expect(batch[0].status).toBe('failed');
+        expect(batch[0].translatedText).toBeUndefined();
+      });
+
+      await vi.advanceTimersByTimeAsync(301000);
+      await assertion;
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('should preserve a genuine USER_CANCELLED failure, never a timeout', async () => {
+    const jobId = 'test-job-cancel-type';
     const mockTracker = { update: vi.fn() };
-    subtitleTranslationCoordinator.activeJobs.set(jobId, { status: 'running', progressTracker: mockTracker });
+    const batch = [{ id: '1', text: 'Hello', index: 1, warnings: [] }];
+    subtitleTranslationCoordinator.activeJobs.set(jobId, {
+      cues: batch,
+      status: 'running',
+      progressTracker: mockTracker
+    });
 
-    // Mock handleTranslationRequest to take forever
-    unifiedTranslationService.handleTranslationRequest.mockImplementation(() => new Promise(() => {}));
+    unifiedTranslationService.handleTranslationRequest.mockResolvedValue({
+      success: false,
+      error: { type: ErrorTypes.USER_CANCELLED, message: 'Translation cancelled' }
+    });
 
-    // Verification of the code path is enough
+    const result = await subtitleTranslationCoordinator._processBatch(
+      jobId,
+      batch,
+      'en',
+      'fa',
+      'google',
+      {}
+    );
+
+    expect(result.success).toBe(false);
+    expect(result.error).toMatch(/cancell/i);
+    expect(result.error).not.toMatch(/timed out/);
+    // SUBTITLE coordinator keeps cancellation typed as USER_CANCELLED (fatal)
+    expect(result.isFatal).toBe(true);
+    expect(batch[0].translatedText).toBeUndefined();
   });
 });
 
@@ -179,7 +242,7 @@ describe('SubtitleTranslationCoordinator Source-Preservation Contract', () => {
     const batch = [cue('t1', 'Hello')];
     const tracker = makeJob(batch);
     const timeoutError = new Error('Batch translation timed out');
-    timeoutError.type = 'TIMEOUT';
+    timeoutError.type = ErrorTypes.TRANSLATION_TIMEOUT;
     unifiedTranslationService.handleTranslationRequest.mockRejectedValue(timeoutError);
 
     await subtitleTranslationCoordinator._processBatch('job', batch, 'en', 'fa', 'google', {});

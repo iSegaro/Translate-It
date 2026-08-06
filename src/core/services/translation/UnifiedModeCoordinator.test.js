@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { UnifiedModeCoordinator } from './UnifiedModeCoordinator.js';
 import { TranslationMode } from '@/shared/config/config.js';
 import { RequestStatus } from './TranslationRequestTracker.js';
+import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
 
 // Mock RateLimitManager
 vi.mock('@/features/translation/core/RateLimitManager.js', () => ({
@@ -302,6 +303,50 @@ describe('UnifiedModeCoordinator', () => {
       expect(result[0]).toEqual({ id: 'A', text: 'ترجمهٔ A' });
       expect(result[1]).toEqual({ id: 'B', text: 'B', isSkipped: true });
       expect(result[0].isSkipped).toBeUndefined();
+    });
+
+    it('rejects a batch timeout as TRANSLATION_TIMEOUT, never USER_CANCELLED', async () => {
+      vi.useFakeTimers();
+      try {
+        mockEngine.getProvider.mockResolvedValue({
+          translate: vi.fn(() => new Promise(() => {}))
+        });
+
+        const items = [{ id: 'A', text: 'A' }];
+        const promise = coordinator._processGenericBatch(
+          batchRequest(),
+          { translationEngine: mockEngine },
+          batchOptions(items)
+        );
+
+        const assertion = promise.then(
+          () => { throw new Error('expected a timeout rejection'); },
+          (error) => {
+            expect(error.type).toBe(ErrorTypes.TRANSLATION_TIMEOUT);
+            expect(error.type).not.toBe(ErrorTypes.USER_CANCELLED);
+          }
+        );
+
+        await vi.advanceTimersByTimeAsync(301000);
+        await assertion;
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it('reports a pre-execution cancellation as USER_CANCELLED, never a timeout', async () => {
+      mockEngine.lifecycleRegistry.registerRequest.mockReturnValue(undefined);
+
+      const items = [{ id: 'A', text: 'A' }];
+      const result = await coordinator._processGenericBatch(
+        batchRequest(),
+        { translationEngine: mockEngine },
+        batchOptions(items)
+      );
+
+      expect(result.cancelled).toBe(true);
+      expect(result.error.type).toBe(ErrorTypes.USER_CANCELLED);
+      expect(result.error.type).not.toBe(ErrorTypes.TRANSLATION_TIMEOUT);
     });
 
     it('never adds isSkipped when every item resolves', async () => {
