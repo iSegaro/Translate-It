@@ -1,5 +1,7 @@
 # Subtitle Translation System Documentation
 
+> **Feature contract:** see [Feature Behavioral Contracts](contracts/FEATURE_CONTRACTS.md#12-subtitle-contract) for the authoritative subtitle outcome contract (`isSkipped`, failed-cue originals, timeout/cancel).
+
 ## Overview
 
 The Subtitle Translation system is a standalone, robust, and extensible tool designed to translate subtitle files (specifically `.srt`) into different target languages while fully preserving subtitle formats, timestamps, and style tags. 

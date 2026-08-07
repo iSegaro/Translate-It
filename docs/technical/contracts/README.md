@@ -11,6 +11,7 @@ Purpose: **behavioral invariants and runtime contracts.**
 ## In this folder
 
 - [TRANSLATION_IDENTITY_AND_FRAGMENT_CONTRACT.md](TRANSLATION_IDENTITY_AND_FRAGMENT_CONTRACT.md) — logical identity, duplicate handling, and V2/V3 fragment aggregation contract.
+- [FEATURE_CONTRACTS.md](FEATURE_CONTRACTS.md) — per-feature observable behavior: input, routing, success, failure, partial success, timeout, cancellation, source preservation, revert/cleanup, consumer guarantees.
 
 ## What does not belong here
 

@@ -1,5 +1,7 @@
 # Whole Page Translation System
 
+> **Feature contract:** see [Feature Behavioral Contracts](contracts/FEATURE_CONTRACTS.md#10-whole-page-contract) for the authoritative whole-page outcome, progress-count, and revert contract.
+
 ## Overview
 
 The **Whole Page Translation** system is responsible for the recursive translation of all text content within a web page. Utilizing the `domtranslator` library and a specialized layered architecture, it provides a smooth, optimized, and fault-tolerant translation experience.

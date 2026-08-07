@@ -1,0 +1,416 @@
+# Feature Behavioral Contracts
+
+Authoritative reference for the **observable, feature-level behavior** of all user-facing translation modes after the shared translation pipeline returns an accepted result or a typed failure.
+
+- **Owner(s)**: feature consumers (`UnifiedModeCoordinator` routing, `DomTranslatorAdapter`, `PdfTranslationCoordinator`, `PageTranslationScheduler`, `SubtitleTranslationCoordinator`, selection/window handlers, Popup and Sidepanel stores and components).
+- **Scope**: selection, field, element, popup, sidepanel, whole-page, PDF, and subtitle translation.
+- **Status**: finalized for the documented scope.
+
+This document defines feature-level behavior only. It references, but does not replace, the shared pipeline contracts.
+
+---
+
+## 1. Purpose and Scope
+
+This document defines **feature-level observable behavior** after the shared translation pipeline returns accepted results or typed failures.
+
+The shared pipeline validates and classifies results. Each feature consumer decides how **source presentation is preserved or mutated**.
+
+```text
+shared pipeline
+→ validates and classifies results
+
+feature consumer
+→ decides how source presentation is preserved or mutated
+```
+
+Source preservation is a **feature decision**, not a provider fallback. The shared pipeline never silently substitutes the original source text as a successful translation; features state explicitly what happens to original content on failure.
+
+Sibling contract: [TRANSLATION_IDENTITY_AND_FRAGMENT_CONTRACT.md](TRANSLATION_IDENTITY_AND_FRAGMENT_CONTRACT.md) defines the structured identity/fragment rules shared by Select Element and PDF. This document covers the per-feature observable contract on top of those rules.
+
+---
+
+## 2. Shared Feature Invariants
+
+The following invariants hold for every feature unless a section below explicitly overrides them.
+
+```text
+valid complete result
+→ may be applied
+
+failed / missing / invalid result
+→ original source remains
+
+explicit source-equal result
+→ valid
+
+timeout
+→ TRANSLATION_TIMEOUT
+
+cancellation
+→ USER_CANCELLED
+
+late settlement
+→ ignored
+
+same logical identity
+→ applied at most once
+```
+
+Additional invariants:
+
+- **No nonblank source may be replaced by blank translated output.** A blank translation result is a failure; the feature keeps the original.
+- **Completed independent units may remain applied after a later failure.** Features process units independently; a later failure does not roll back already-accepted earlier units (see [Partial Success Contract](#13-partial-success-contract)).
+- **No raw V2/V3 fragment reaches feature consumers.** Fragments are assembled by the shared pipeline; features defensively suppress any fragment that still leaks through (Select Element and PDF directly).
+- **Feature counters must exclude suppressed or unresolved results.** Terms `translated`, `failed`, `skipped`, `unresolved`, and `partial` describe logical feature outcomes, never raw provider statistics.
+
+---
+
+## 3. Feature Matrix
+
+| Feature | Mutation owner | Partial success | Revert support | Timeout owner | Cancellation owner |
+| ------- | -------------- | --------------- | -------------- | ------------- | ------------------ |
+| Selection Window | none (read-only overlay) | n/a (single result) | not needed | `TranslationHandler` (window manager) | `WindowsManager.cancelCurrentTranslation` |
+| Inline Selection | none (tooltip overlay) | n/a (single result) | not needed | `TranslationHandler.performTranslation` | `HoverTranslationManager._cancelPendingHover` |
+| Select Element | `DomTranslatorAdapter` + `BlockGroupReconstructor` | yes (per-unit, A/B/C kept) | manual via `SelectElementManager.revertTranslations` | pipeline (`ErrorTypes.TRANSLATION_TIMEOUT`) | `SelectElementManager.handleKeyDown` → `deactivate({ fromCancel })` |
+| Field | smart-handler replacement service | n/a (single value) | no (write-on-apply) | shared pipeline | `cancelTranslation` via `useUnifiedTranslation` / `dataStore.abortExistingRequest` |
+| Popup | none (app-owned store) | n/a (single result) | not needed | shared pipeline | `cancelTranslation` (silent reset) |
+| Sidepanel | none (app-owned store) | n/a (single result) | not needed | shared pipeline | `cancelTranslation` |
+| Whole Page | `PageTranslationManager` → `PageTranslationScheduler` | yes (per-batch, kept) | yes (`restorePage`) | `Promise.race` timeout (shared) | `cancelTranslation` → abort + `restorePage` |
+| PDF | `PdfTranslationCoordinator` + `PdfTranslationAdapter` | yes (per-cell, kept) | no per-block revert | `getAbortTimeout` / `TRANSLATION_TIMEOUT` | `cancelActiveTranslation` (bumps `runId`) |
+| Subtitle | `SubtitleTranslationCoordinator` | yes (per-cue, kept) | no revert of committed cues | `Promise.race` (5-min) | `cancelJob` → `status: cancelled` |
+
+Feature mutation ownership:
+
+- **Selection Window / Inline / Popup / Sidepanel** do not mutate the page; they render into overlay or app-owned UI.
+- **Field / Select Element / Whole Page / PDF / Subtitle** own mutations and are responsible for per-unit application and any revert.
+
+---
+
+## 4. Selection Window Contract
+
+Modes: text-selection window (`SelectionWindow`), `Selection`/`Selection_Window` dispatch.
+
+- **Trigger**: from text selection (`mouseup` in text-selection handlers).
+- **Source DOM remains unchanged.** The window is a shadow-DOM Vue overlay; it never writes page text.
+- **Valid result** appears in the translation window via `TranslationDisplay`.
+- **Invalid / timeout / cancel / error** becomes error state (`isError`, `errorType`, `canRetry`).
+- **Closed or stale window must not accept late results.** `useWindowsManager.handleUpdateWindow` drops updates whose `id` is no longer present ("Window was closed before translation completed"); a late result cannot recreate a dismissed window. `TranslationHandler` also keys on `messageId` and returns `false` for unmatched results.
+- **No revert needed** because the source is never mutated.
+- **Source-equal translation remains valid.** It is non-destructive and stored as normal content.
+
+---
+
+## 5. Inline Selection Contract
+
+Modes: hover / mouse-on-hover inline tooltip.
+
+- **Selected page text is never replaced.** `HoverTranslationManager` only manages highlight classes and tooltip states; it never writes text to the page.
+- **Result box appears only for accepted output.** `_processHover` emits ready only when `currentMessageId` matches and `translatedText` is truthy; the tooltip also skips a missing translation.
+- **Loading UI settles on success / error / timeout / cancel.** Streaming settles via `isStreaming`; error → `showError`; timeout → `showError`; cancel → ignored (no UI error) and the tooltip hides.
+- **Duplicate result/display prevented.** Ready only emitted when message id matches; a redundant (source-equal) result hides the tooltip rather than displaying.
+- **Late result cannot recreate a dismissed box.** `_cancelPendingHover` bumps `messageId`; old resolve/reject does not match.
+
+---
+
+## 6. Select Element Contract
+
+Modes: `Select_Element`.
+
+- **DOM mutation owned by `DomTranslatorAdapter`** (via `_applyTranslationToNode`; block groups via `BlockGroupReconstructor.apply`).
+- **Accepted units are applied independently and immediately** (synchronously within the stream/direct loop; no batch flush/commit phase).
+- **Failed units remain original** — failure is recorded by omission (UID→node resolution simply never calls `_applyTranslationToNode`), so a failed node is untouched.
+- **Partial success scenario: A success, B failure, C success** → nodes A and C stay translated; node B remains original. No rollback of completed independent units on a later provider failure.
+- **Raw fragments suppressed** at the adapter boundary (`isSplitFragment` / `isV3Fragment` → skip before any write).
+- **Duplicate logical identities applied once** via UID + `processedUnits` set.
+- **Esc / user cancellation**: `SelectElementManager.handleKeyDown` → `deactivate({ fromCancel: true })` → `cancelTranslation`. It does **not** revert already-applied partial translations.
+- **Revert** (`SelectElementManager.revertTranslations`) restores the **original text and direction metadata** (`restoreElementDirection`, removes `data-has-original`).
+- **Block-group reconstruction is atomic.** `BlockGroupReconstructor` validates first (segment markers, node connectivity/content), then commits all units synchronously; any failure aborts before the mutation phase.
+
+Revert can be invoked for a partial state: `preserveTranslations` keeps intervening decomposable successes; only reverted on explicit user action.
+
+---
+
+## 7. Field Contract
+
+Modes: `Field` (`textarea`, `contentEditable`) via smart-translation field service and text-field interactions.
+
+Coverage includes `input` and `textarea`, `contentEditable`, and framework-controlled fields.
+
+- **Ctrl+/ and inline icon use the same behavioral contract.** Both funnel into `translateFieldViaSmartHandler({ text, target })` (icon manager and shortcut handler) before applying results.
+- **Failed / invalid / empty translation leaves the field value unchanged.** The application service throws without writing; a failed insert returns false with no DOM mutation.
+- **Cursor/selection must not be corrupted.** Replacement goes through via `range`/selectionStart/End and re-setSelectionRange after applying.
+- **Accepted update emits only the required `input`/`change` events** (with `bubbles`), not synthetic unrelated events.
+- **Cancellation never clears user text.** Cancellation dismisses UI and discards pending data without modifying `target`.
+- **Stale translation instance cannot overwrite newer user input.** `translateFieldViaSmartHandler` aborts on an existing request for the same target, and a pending-result guard (`STALE_DATA_THRESHOLD` timestamp) drops stale data.
+- **Source-equal output is valid** — it is accepted and, being identical to the field value, applies as an effective no-op.
+
+Same-language popup fallback explicitly does NOT apply to fields within the field path; fields only write a truly accepted result.
+
+---
+
+## 8. Popup Contract
+
+Modes: `Popup Translation` (direct result in the popup UI).
+
+- **Input remains visible on failure.** Textarea keeps `sourceText`; only the result area resets.
+- **Result area contains only accepted output.** On error `translatedText` is cleared and the error state is shown. **No source fallback is inserted as a translation** on failure.
+- **Same-language display caveat:** when source and target languages are equal, the popup app may display the original text as the result. This is a deliberate display behavior, not a source fallback on failure; it is never used to mask a failed translation.
+- **Spinner always settles** on success, error, no-valid-response, timeout, or cancel.
+- **Copy / TTS controls are enabled only for valid result content.** The display toolbar renders only when content is non-empty (not loading).
+- **Cancellation and timeout remain distinct.** Cancel is a silent reset with no error state; timeout is a typed `TRANSLATION_TIMEOUT` error state.
+- **Direct result does not mutate page content.** `UnifiedResultDispatcher` routes `Popup_Translate` results directly back to the popup; it does not dispatch Popup mode to the tab. (History persistence writes to storage, not the DOM.)
+
+---
+
+## 9. Sidepanel Contract
+
+Modes: `Sidepanel Translation`, `Popup Translation`-equivalent direct result in the app.
+
+- **Same direct-translation result contract as Popup.** It reuses the same unified composable/store and direct-mode principle: source remains, result area shows only accepted output, no source fallback on failure.
+- **Persistent view lifecycle.** Local refs and store keep the current translation across panel usage.
+- **Stale request protection.** A `pendingRequests` set filters out late/unknown results; the awaited response or a matching id is the only accepted terminal.
+- **Result/history state after error:** source kept in the textarea, result cleared to error state; no history write is recorded (history records only success).
+- **Page source remains unchanged.** Sidepanel results return directly to the app and are never dispatched to the tab DOM.
+- **Navigation or panel closure prevents late UI mutation.** `onUnmounted` removes the message listener and clears pending requests signal so late updates are dropped.
+
+---
+
+## 10. Whole Page Contract
+
+Modes: `whole_page` / batch translation.
+
+- **Page mutation owned by the page-translation feature** (`PageTranslationManager` → `PageTranslationBridge`, which wraps the `domtranslator` library).
+- **Accepted nodes are applied independently** (each text/attribute node translated via `NodesTranslator`, driven by `DomTranslator`'s per-node walk).
+- **Failed nodes remain original.** An errored batch item is resolved but the node's original text is retained and the DOM is not marked translated.
+- **Completed nodes remain translated after a later failure/timeout.** Already-settled resolved nodes are not rolled back; only the in-flight batch is affected.
+- **Blank output keeps the original node text.** When the translated value is empty or functionally identical, the bridge keeps the node's original text (no blank replaces nonblank source); the item does not become a translated success.
+- **Progress uses terminal counts (translated + failed) against the total.** Counts describe logical nodes, not provider statistics. Suppressed (context-mismatched, empty, excluded) items are excluded from totals before counting. Current-code note: a resolved batch item is tallied as translated even if its value is empty or identical to source (scheduler increments on resolve); the DOM still shows original text. The intended invariant — blank/duplicate results do not increment the translated count — is **not** met by the current scheduler. Flagged as a gap, not documented as fact.
+- **Nested/child omission:** traversal recurses into shadow roots and visits all text nodes and translatable attributes (`title`, `alt`, `placeholder`); nodes for excluded selectors / internal UI hosts and empty text are omitted from translation and counting.
+- **Cancellation:** `cancelTranslation` aborts the current session and prevents partial commits of in-flight un-committed nodes; committed nodes follow the feature's revert policy.
+- **Revert behavior and metadata ownership.** Full-page revert (`restorePage`) calls the underlying translator's `restore` to restore original node text and then deep-cleans page markers (`data-page-translated`, direction, original-text metadata), restoring both translation markers and direction.
+
+A batch is not individually atomic-in-partial: only the in-flight batch is bounded by failure; committed earlier nodes persist.
+
+---
+
+## 11. PDF Contract
+
+Modes: `pdf_translation` (whole document) and structured cell batches.
+
+- **Block/cell application owned by `PdfTranslationCoordinator` + `PdfTranslationAdapter`.** Results applied into session state (`setBlockTranslationState`).
+- **Structured cells use `cellId`** to disambiguate cells within a block; `lineIndex`/`cellIndex` position cells, `cellId` identifies.
+- **Numeric `cellId: 0` is valid** and preserved (identity uses nullish, not truthy `||`).
+- **null/undefined/blank translated slot becomes unresolved/error** (normalizes to empty; a block whose text is empty becomes error).
+- **Original rendered PDF content remains available.** The source cell text is stored alongside and, when a cell is unresolved, the overlay preserves the original text for display. This is source preservation — the original is never emitted as a *translated* result.
+- **Explicit source-equal output is valid** (status set by presence, not by inequality to source).
+- **Missing cell keeps position and does not shift later cells.** Position is placed at the local index (write `cells[cellIndex]`); a gap does not slide later cells.
+- **A mixed block may contain valid and unresolved cells.** Missing/empty cells become empty holes; the block falls back to source for those cells.
+- **Block-level status rules:** block status is per-block scalar — `idle / loading / routed / translated / error`; on empty it is `error`; a run-level summary can be `partial` when `failedCount > 0`.
+- **Duplicate cell identity:** within a batch, the last result at the same position overwrites; an identity duplicate produced by the pipeline is suppressed here.
+- **No raw fragments in final PDF results.** Only assembled cells are applied; fragments are not concatenated into final results.
+
+Link: [TRANSLATION_IDENTITY_AND_FRAGMENT_CONTRACT.md](TRANSLATION_IDENTITY_AND_FRAGMENT_CONTRACT.md) for identity precedence (`uid ?? cellId ?? i ?? id ?? blockId`), duplicate and fragment rules.
+
+---
+
+## 12. Subtitle Contract
+
+Modes: `subtitle_translation`.
+
+```text
+under-returned result
+→ isSkipped
+→ original cue preserved
+→ failed count increments
+```
+
+Additional rules:
+
+- **Blank / whitespace output fails** — treated as missing translation.
+- **Explicit source-equal translation remains valid** — never a failure.
+- **Cue timing/order is unchanged** — cues keep parse order and serialize them in that order (in-place array order).
+- **Failed cues serialize using original text.** Export writes `translatedText` only when present; otherwise the cue's `text`.
+- **Mixed batch counts translated and failed accurately** — `validateAndRestore` sets per-cue status; the progress tracker sums `translated`, `failed`, `skipped`.
+- **Timeout/cancel does not write late translated text.** Timeout (`Promise.race`) marks the cue failed; late-resolving value ignored. Cancel sets the job status without writing later cue contents.
+- **No rollback of already translated independent cues.** Each batch settles independently; a later fatal error keeps earlier committed cues.
+
+---
+
+## 13. Partial Success Contract
+
+Shared example:
+
+```text
+A succeeds
+B fails
+C succeeds
+```
+
+Expected behavior by feature:
+
+| Feature | A/B/C result | Revert on later failure | Counts |
+| --- | --- | --- | --- |
+| Select Element | A, C applied; B original | no | A/C marked accepted, B failed |
+| Whole Page | A, C translated; B original | no (completed nodes kept) | translated=2, failed=1 |
+| PDF | A, C cells/block accepted; B unresolved | no | translated + failed from block states |
+| Subtitle | A, C translated; B failed (original) | no | translated=2, failed=1 |
+
+Required result:
+
+```text
+A/C accepted
+B original
+counts accurate
+no global rollback
+terminal state reports partial/failure accurately
+```
+
+Exceptions:
+
+- **Select Element** supports *explicit* whole-session revert of completed units (manual, not automatic) — distinct from automatic rollback.
+- **Whole Page `stopAutoTranslation`** stops producing new translations but leaves committed nodes (no revert) by design.
+- **PDF block** is `error` when its text is empty; a run is `partial` only at the run summary level, never a block-level partial.
+
+---
+
+## 14. Timeout and Cancellation
+
+Ownership and distinction:
+
+```text
+timeout
+→ TRANSLATION_TIMEOUT
+→ no late mutation
+
+user cancellation
+→ USER_CANCELLED
+→ no late mutation
+```
+
+- **Terminal request state is immutable.** After a request reaches a terminal state (success / timeout / cancel), a later settlement is ignored (`TranslationRequestTracker`, dispatcher processed-set, handler guards).
+- **Abort-related late `USER_CANCELLED` after a timeout is suppressed.** A cancel arriving on an already timed-out request does not override the timeout outcome.
+- **Feature UI must not reinterpret timeout as cancellation.** They are distinct typed states; features render them differently (e.g. Popup: timeout → error state, cancel → silent).
+- **Previously completed units follow the feature's approved partial-success policy** (unchanged by a later timeout/cancel).
+
+---
+
+## 15. Source Preservation vs Source Fallback
+
+Distinguish:
+
+```text
+source preservation
+→ feature leaves original presentation unchanged after failure
+
+source fallback
+→ original source inserted as translated output
+```
+
+```text
+source preservation is required
+source fallback is prohibited
+```
+
+Examples of valid source-equal translations (NOT failures, NOT fallback):
+
+```text
+URL → URL
+OpenAI → OpenAI
+2026 → 2026
+```
+
+- Source-equal output is a **valid accepted result**, meaning a consumer must not treat equality as a failure.
+- Source-equal is **never** a fallback (the source was not substituted as a success).
+
+---
+
+## 16. Feature Consumer Guarantees
+
+Feature consumers may **assume**:
+
+- typed terminal errors (timeout vs cancel distinct);
+- no source-filled invalid result;
+- no raw fragments;
+- an accepted identity set already deduplicated where the structured handler applies;
+- timeout/cancel late settlements are suppressed;
+- unresolved object results may carry explicit status metadata such as `isSkipped`.
+
+Feature consumers **must not**:
+
+- infer failure from text equality;
+- convert missing results into successful source text;
+- apply blank translated output to nonblank text;
+- independently retry providers;
+- rebuild fragments.
+
+---
+
+## 17. Diagnostics and Progress
+
+- Feature progress counters are **not** actual provider statistics.
+- `translated` / `failed` counts describe logical feature units.
+- Suppressed duplicates do not count as translated.
+- Unresolved subtitle/PDF units count as failed.
+- Diagnostics must avoid raw source or translation bodies unless sanitized.
+
+---
+
+## 18. Non-Goals
+
+This document does not define:
+
+- provider implementation;
+- API-key failover;
+- QueueManager retry policy;
+- domain AI recovery;
+- conversation lifecycle;
+- identity/fragment mechanics;
+- canonical `TranslationOutcome` runtime adoption (deferred).
+
+Links:
+- [../providers/PROVIDERS.md](../providers/PROVIDERS.md)
+- [TRANSLATION_IDENTITY_AND_FRAGMENT_CONTRACT.md](TRANSLATION_IDENTITY_AND_FRAGMENT_CONTRACT.md)
+- [../architecture/TRANSLATION_SYSTEM.md](../architecture/TRANSLATION_SYSTEM.md)
+- [../../adr/ADR-015-translation-outcome-semantics.md](../../adr/ADR-015-translation-outcome-semantics.md)
+
+---
+
+## 19. Test Map
+
+| Feature | Primary tests | Contract areas covered | Known coverage gaps |
+| --- | --- | --- | --- |
+| Selection Window | `src/features/windows/managers/translation/TranslationHandler.test.js`, `src/features/windows/managers/WindowsManager.test.js`, `src/utils/rendering/TranslationRenderer.test.js` | result display, error/timeout/cancel display, closed-window late-result drop, renderer error/markdown | no test asserts source-equal result rendered as normal (non-destructive) in the window; source-DOM-untouched is structural (no DOM write APIs), not asserted |
+| Inline Selection | `src/features/mouse-hover/HoverTranslationManager.test.js`, `src/apps/content/components/MouseHoverTooltip.test.js`, `src/features/shared/hover-preview/HoverPreviewManager.test.js` | text never replaced, ready-only-on-accepted, mouseleave cancel, stale-request isolation, loading settle, error cleanup | no dedicated test for duplicate/source-equal suppression path asserting the tooltip hides on redundant output |
+| Select Element | `src/features/element-selection/core/DomTranslatorAdapter.test.js`, `DomTranslatorState.test.js`, `DomTranslatorStress.test.js`, `BlockGroupReconstructor.test.js`, `SelectElementManager.test.js`, `ElementSelectionFactory.test.js` | per-unit apply, A/B/C partial, fragment suppression, dedup, ESC/cancel, revert, block-group atomicity, direction metadata | none material; most behavioral guarantees are directly asserted |
+| Field | `src/features/text-field-interaction/managers/TextFieldIconManager.test.js`, `components/TextFieldIcon.test.js`, `managers/FieldShortcutManager.test.js`, `handlers/TextFieldHandler.test.js`, `TextFieldDetector.test.js` | icon triggers, double-click, shortcut gate, detector classification | **no test file for the replacement `service.js`** (smart-translation apply, cursor preservation, event dedup, stale override). Those guarantees are covered only via the legacy `framework-compat` path, not asserted |
+| Whole Page | `src/features/page-translation/PageTranslationScheduler.test.js`, `PageTranslationBridge.test.js`, `PageTranslationManager.test.js`, `PageTranslationFilters.test.js`, `usePageTranslation.test.js`, `PageTranslationHelper.test.js` | batch error→original, per-batch queueing, cancel, restore, progress counts | counter counts blank/duplicate as translated (not asserted/excluded); mocks only, no integration against real `domtranslator` walk |
+| PDF | `src/features/pdf-translation/core/PdfTranslationAdapter.test.js`, `PdfTranslationCoordinator.test.js`, `PdfTranslationState.test.js`, `src/apps/pdf/presentation/operationResults.test.js`, `presentationPresenter.test.js`, `PdfBlockOverlayItem.test.js` | cell/cellId, mixed block, missing-cell-no-shift, no raw cells, typed timeout/cancel, progress, partial summary | duplicate-cell-identity (last-write-wins) untested for explicit same-`cellId` collisions; numeric `cellId: 0` map-layer validity only, not overlay |
+| Subtitle | `src/features/subtitle-translation/core/SubtitleTranslationCoordinator.test.js`, `SubtitleBatchPlanner.test.js`, `SubtitleTextProtector.test.js` | isSkipped→original+failed, blank fails, source-equal valid, mixed counts, timeout/cancel, no rollback | no separate `SubtitleValidationService`/`SubtitleProgressTracker`/`SrtAdapter` test files; those are covered only through the coordinator test |
+
+---
+
+## 20. Current Code Gaps <a name="current-gaps"></a>
+
+Known deviations between this document's stated invariant and current production behavior. These are flagged as gaps, not documented as facts:
+
+- **Whole Page translated counter.** Blank or source-equal output accepted for a batch item increments `translatedCount` (scheduler resolves and counters unconditionally), even though the DOM keeps the original text. Intended invariant "blank/duplicate results do not increment translated count" is not yet met.
+- **Whole Page fallback to source is a preservation mechanism, not a success.** Resolving a failed/empty item with its original text keeps the node unchanged; it does not mark it translated.
+- **PDF `cellId: 0`** is valid at the mapping layer (nullish identity), but the overlay mask lookup uses a truthy guard, so string-keyed cells are the practical path.
+- **Popup same-language display** writes the source into the result area when languages match. This is an explicit display behavior, not a source fallback on failure, and must not be generalized to other features.
+- **Field service-tier guarantees** (cursor preservation, event dedup, stale override) are not directly unit-tested; only the legacy framework-compat path is asserted.
+
+---
+
+## 21. Cross-References
+
+Related contracts and architecture:
+
+- [TRANSLATION_IDENTITY_AND_FRAGMENT_CONTRACT.md](TRANSLATION_IDENTITY_AND_FRAGMENT_CONTRACT.md) — identity, duplicates, V2/V3 fragment contract.
+- [../architecture/TRANSLATION_SYSTEM.md](../architecture/TRANSLATION_SYSTEM.md) — shared translation pipeline and routing.
+- [../providers/PROVIDERS.md](../providers/PROVIDERS.md) — provider implementation (out of scope here).
+- [../../adr/ADR-015-translation-outcome-semantics.md](../../adr/ADR-015-translation-outcome-semantics.md) — outcome semantics (runtime adoption deferred).
+- [../SUBTITLE_TRANSLATION_SYSTEM.md](../SUBTITLE_TRANSLATION_SYSTEM.md) — subtitle architecture.
+- [../WHOLE_PAGE_TRANSLATION.md](../WHOLE_PAGE_TRANSLATION.md) — whole-page architecture.
+- [../SELECT_ELEMENT_SYSTEM.md](../SELECT_ELEMENT_SYSTEM.md) — element-selection architecture.
+- [../pdf-translator/PDF_TRANSLATION_ARCHITECTURE.md](../pdf-translator/PDF_TRANSLATION_ARCHITECTURE.md) — PDF translation architecture.
