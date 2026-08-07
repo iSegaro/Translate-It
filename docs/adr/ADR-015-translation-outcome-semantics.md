@@ -410,7 +410,7 @@ The behavioral contract is substantially implemented. Subsequent production work
 
 These changes enforce the ADR's core invariants (no source substitution, no invented translated output, timeout≠cancellation, atomic fragment aggregation) in production, without adopting the canonical `TranslationOutcome` type as the universal result shape.
 
-For the detailed identity precedence, duplicate policies, and V2/V3 fragment aggregation contract, see [TRANSLATION_IDENTITY_AND_FRAGMENT_CONTRACT.md](../technical/TRANSLATION_IDENTITY_AND_FRAGMENT_CONTRACT.md).
+For the detailed identity precedence, duplicate policies, and V2/V3 fragment aggregation contract, see [TRANSLATION_IDENTITY_AND_FRAGMENT_CONTRACT.md](../technical/contracts/TRANSLATION_IDENTITY_AND_FRAGMENT_CONTRACT.md).
 
 ### Deferred Scope
 

@@ -59,7 +59,7 @@ The system utilizes a provider hierarchy pattern:
 - **`RateLimitManager`**: Manages rate limits and the Circuit Breaker.
 - **`StreamingManager`**: Manages real-time translation streaming.
 
-To implement a new provider, refer to the `docs/technical/PROVIDERS.md` documentation.
+To implement a new provider, refer to the `docs/technical/providers/PROVIDERS.md` documentation.
 
 ## Project Structure (Feature-Based Architecture)
 
@@ -113,8 +113,8 @@ Comprehensive documentation is available in the `docs/` folder:
 ### Core Documentation
 - [**ARCHITECTURE.md**](docs/technical/ARCHITECTURE.md): Full project architecture and system overview.
 - [**MessagingSystem.md**](docs/technical/MessagingSystem.md): **Messaging System** – Race-condition-free communication.
-- [**TRANSLATION_SYSTEM.md**](docs/technical/TRANSLATION_SYSTEM.md): **Translation Service** – Coordination and result routing.
-- [**PROVIDERS.md**](docs/technical/PROVIDERS.md): **Provider Implementation Guide** – BaseProvider and Circuit Breaker.
+- [**TRANSLATION_SYSTEM.md**](docs/technical/architecture/TRANSLATION_SYSTEM.md): **Translation Service** – Coordination and result routing.
+- [**PROVIDERS.md**](docs/technical/providers/PROVIDERS.md): **Provider Implementation Guide** – BaseProvider and Circuit Breaker.
 - [**MARKDOWN_RENDERING.md**](docs/technical/MARKDOWN_RENDERING.md): Markdown rendering, preview pipeline, TTS extraction boundaries, and provider Markdown contracts.
 - [**ERROR_MANAGEMENT_SYSTEM.md**](docs/technical/ERROR_MANAGEMENT_SYSTEM.md): Centralized error management and context safety.
 - [**STORAGE_MANAGER.md**](docs/technical/STORAGE_MANAGER.md): **StorageCore Guide** – Unified storage API with caching.
@@ -131,7 +131,7 @@ Comprehensive documentation is available in the `docs/` folder:
 - [**LANGUAGE_DETECTION.md**](docs/technical/LANGUAGE_DETECTION.md): Hierarchical language and direction detection.
 - [**LOCALIZATION.md**](docs/technical/LOCALIZATION.md): Internationalization and locale management guide.
 - [**TESTING_STRATEGY.md**](docs/technical/TESTING_STRATEGY.md): Unit, integration, and UI testing guidelines.
-- [**STATS_MANAGER.md**](docs/technical/STATS_MANAGER.md): System for tracking usage statistics and analytics.
+- [**STATS_MANAGER.md**](docs/technical/infrastructure/STATS_MANAGER.md): System for tracking usage statistics and analytics.
 - [**TRANSLATION_PROVIDER_LOGIC.md**](docs/technical/TRANSLATION_PROVIDER_LOGIC.md): Waterfall logic for provider selection.
 
 ### Feature Documentation

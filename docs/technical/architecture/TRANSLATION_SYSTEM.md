@@ -196,7 +196,7 @@ Tracker terminal records leave active tab and toast indexes immediately. They ar
 
 ### Specialized Workflow Boundaries
 
-For the logical identity and fragment contract governing structured Select Element and PDF flows, see [TRANSLATION_IDENTITY_AND_FRAGMENT_CONTRACT.md](TRANSLATION_IDENTITY_AND_FRAGMENT_CONTRACT.md).
+For the logical identity and fragment contract governing structured Select Element and PDF flows, see [TRANSLATION_IDENTITY_AND_FRAGMENT_CONTRACT.md](../contracts/TRANSLATION_IDENTITY_AND_FRAGMENT_CONTRACT.md).
 
 | Workflow | Local Owner | Shared Runtime Boundary | Stale Guard |
 |---|---|---|---|
@@ -242,7 +242,7 @@ The foundation layer is structural and observation-only: it establishes contract
 - **Observational Validation Foundation**: Request structure is validated observationally against the manifest without altering execution or observable behavior. This validation never performs recovery and never decides semantic success.
 - **TranslationDiagnosticReport Preservation**: Parser and execution facts feed an immutable terminal diagnostic report. `UnifiedTranslationService` retains that report privately in service-owned `WeakMap` storage for internal lifecycle/debugging use; it has no public retrieval, export, persistence, or time-based retention guarantee. This is distinct from tracker lifecycle records.
 
-> **Deferred**: Runtime production and adoption of `TranslationOutcome` is intentionally deferred to a future initiative. See the [ADR-015 Implementation Status](../adr/ADR-015-translation-outcome-semantics.md). Runtime adoption should begin only after a concrete `TranslationOutcome` consumer has been defined.
+> **Deferred**: Runtime production and adoption of `TranslationOutcome` is intentionally deferred to a future initiative. See the [ADR-015 Implementation Status](../../adr/ADR-015-translation-outcome-semantics.md). Runtime adoption should begin only after a concrete `TranslationOutcome` consumer has been defined.
 
 ### Unified Result Dispatcher
 **File**: `src/core/services/translation/UnifiedResultDispatcher.js`

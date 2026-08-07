@@ -263,4 +263,4 @@ Subtitle operations utilize the `LOG_COMPONENTS.SUBTITLE` component key.
 ## References
 *   [Unified Messaging System](./MessagingSystem.md)
 *   [Memory Management and Resource Tracker](./MEMORY_GARBAGE_COLLECTOR.md)
-*   [Centralized Translation Providers](./PROVIDERS.md)
+*   [Centralized Translation Providers](./providers/PROVIDERS.md)

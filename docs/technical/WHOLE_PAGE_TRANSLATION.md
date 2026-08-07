@@ -134,7 +134,7 @@ The system is fully integrated with `ResourceTracker`. All queues, observers, an
 
 ## References
 - [Optimization Levels System](./OPTIMIZATION_LEVELS.md)
-- [Translation Provider System](./PROVIDERS.md)
+- [Translation Provider System](./providers/PROVIDERS.md)
 - [Messaging System](./MessagingSystem.md)
 - [UI Host System](./UI_HOST_SYSTEM.md)
 

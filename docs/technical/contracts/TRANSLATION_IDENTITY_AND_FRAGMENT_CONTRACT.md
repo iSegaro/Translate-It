@@ -254,12 +254,12 @@ Diagnostics must contain identifiers and structural facts only, not raw source o
 
 This document does not define:
 
-- **Provider selection** — see [`PROVIDERS.md`](PROVIDERS.md).
-- **QueueManager retries** — see [`TRANSLATION_SYSTEM.md`](TRANSLATION_SYSTEM.md).
-- **API-key failover** — see [`PROVIDERS.md`](PROVIDERS.md).
-- **Structured AI recovery** — see [`PROVIDERS.md`](PROVIDERS.md) and [`ADR-015`](../adr/ADR-015-translation-outcome-semantics.md).
-- **Feature revert behavior** — see [`TRANSLATION_SYSTEM.md`](TRANSLATION_SYSTEM.md).
-- **Canonical `TranslationOutcome` runtime adoption** — see [`ADR-015`](../adr/ADR-015-translation-outcome-semantics.md).
+- **Provider selection** — see [`PROVIDERS.md`](../providers/PROVIDERS.md).
+- **QueueManager retries** — see [`TRANSLATION_SYSTEM.md`](../architecture/TRANSLATION_SYSTEM.md).
+- **API-key failover** — see [`PROVIDERS.md`](../providers/PROVIDERS.md).
+- **Structured AI recovery** — see [`PROVIDERS.md`](../providers/PROVIDERS.md) and [`ADR-015`](../../adr/ADR-015-translation-outcome-semantics.md).
+- **Feature revert behavior** — see [`TRANSLATION_SYSTEM.md`](../architecture/TRANSLATION_SYSTEM.md).
+- **Canonical `TranslationOutcome` runtime adoption** — see [`ADR-015`](../../adr/ADR-015-translation-outcome-semantics.md).
 
 For structured-response recovery details, see PROVIDERS.md's *Structured Response Handling* and ADR-015's *Production Improvements*.
 

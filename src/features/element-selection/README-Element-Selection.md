@@ -139,8 +139,8 @@ This feature integrates with:
 ## Related Systems
 
 - **[Memory Garbage Collector](MEMORY_GARBAGE_COLLECTOR.md)** - Resource tracking and cleanup
-- **[Translation System](TRANSLATION_SYSTEM.md)** - Text translation processing and streaming
-- **[Unified Translation Service](../../docs/TRANSLATION_SYSTEM.md)** - Centralized translation coordination
+- **[Translation System](../../../docs/technical/architecture/TRANSLATION_SYSTEM.md)** - Text translation processing and streaming
+- **[Unified Translation Service](../../../docs/technical/architecture/TRANSLATION_SYSTEM.md)** - Centralized translation coordination
 - **[UI Host System](UI_HOST_SYSTEM.md)** - Overlay rendering and Shadow DOM
 - **[Error Management](ERROR_MANAGEMENT_SYSTEM.md)** - Error handling and recovery
 - **[Toast Integration System](../../docs/TOAST_INTEGRATION_SYSTEM.md)** - Notification management

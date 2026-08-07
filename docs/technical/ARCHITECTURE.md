@@ -16,8 +16,8 @@
 ### Core Documentation
 - **[Architecture](ARCHITECTURE.md)** - This file - Complete system overview and integration guide
 - **[Messaging System](MessagingSystem.md)** - Race-condition-free inter-component communication with intelligent timeout management and Unified Translation Service integration
-- **[Translation System](TRANSLATION_SYSTEM.md)** - Unified Translation Service architecture with centralized coordination, duplicate prevention, and intelligent result routing
-- **[Provider Implementation Guide](PROVIDERS.md)** - Complete guide for implementing translation providers with BaseProvider, RateLimitManager, and Circuit Breaker
+- **[Translation System](architecture/TRANSLATION_SYSTEM.md)** - Unified Translation Service architecture with centralized coordination, duplicate prevention, and intelligent result routing
+- **[Provider Implementation Guide](providers/PROVIDERS.md)** - Complete guide for implementing translation providers with BaseProvider, RateLimitManager, and Circuit Breaker
 - **[Markdown Rendering](MARKDOWN_RENDERING.md)** - Shared preview pipeline, SafeMarkdownPreview boundary, and extraction ownership
 - **[Error Management](ERROR_MANAGEMENT_SYSTEM.md)** - Centralized error handling and context safety
 - **[Testing Strategy](TESTING_STRATEGY.md)** - Guidelines and roadmap for unit and integration testing
@@ -33,7 +33,7 @@
 - **[Element Detection Service](ELEMENT_DETECTION_SERVICE.md)** - Centralized element detection system with optimized DOM queries and caching
 - **[Language Detection](LANGUAGE_DETECTION.md)** - Hierarchical language and direction detection system with provider feedback loop
 - **[Localization](LOCALIZATION.md)** - Guide for internationalization and locale management
-- **[Stats Manager](STATS_MANAGER.md)** - System for tracking usage statistics and analytics
+- **[Stats Manager](infrastructure/STATS_MANAGER.md)** - System for tracking usage statistics and analytics
 - **[Translation Provider Logic](TRANSLATION_PROVIDER_LOGIC.md)** - Detailed waterfall logic for provider selection
 
 ### Feature-Specific Documentation
@@ -63,9 +63,9 @@
 
 ### Getting Started
 1. **New Developers**: Start with [Architecture](ARCHITECTURE.md) → [Messaging System](MessagingSystem.md)
-2. **Feature Development**: [Smart Handler Registration](SMART_HANDLER_REGISTRATION_SYSTEM.md) → [Translation System](TRANSLATION_SYSTEM.md)
-3. **Translation Features**: [Translation System](TRANSLATION_SYSTEM.md) → [Provider Implementation Guide](PROVIDERS.md)
-4. **Provider Development**: [Provider Implementation Guide](PROVIDERS.md) → [Provider System](#provider-system)
+2. **Feature Development**: [Smart Handler Registration](SMART_HANDLER_REGISTRATION_SYSTEM.md) → [Translation System](architecture/TRANSLATION_SYSTEM.md)
+3. **Translation Features**: [Translation System](architecture/TRANSLATION_SYSTEM.md) → [Provider Implementation Guide](providers/PROVIDERS.md)
+4. **Provider Development**: [Provider Implementation Guide](providers/PROVIDERS.md) → [Provider System](#provider-system)
 5. **UI Development**: [Windows Manager Integration](WINDOWS_MANAGER_UI_HOST_INTEGRATION.md) → [Text Actions](TEXT_ACTIONS_SYSTEM.md)
 6. **Error Handling**: [Error Management](ERROR_MANAGEMENT_SYSTEM.md) → [Logging System](LOGGING_SYSTEM.md)
 7. **Storage Operations**: [Storage Manager](STORAGE_MANAGER.md)
@@ -477,7 +477,7 @@ The system is built on three specialized services that handle different stages o
 - **`handleTranslationResult.js`**: Processes incoming results from providers and hands them back to the dispatcher.
 
 ### Documentation & Deep Dive
-For detailed information on implementation, message formats, and streaming logic, refer to the **[Translation System Guide](TRANSLATION_SYSTEM.md)**. For the selection strategy and waterfall logic, see the **[Translation Provider Logic](TRANSLATION_PROVIDER_LOGIC.md)**.
+For detailed information on implementation, message formats, and streaming logic, refer to the **[Translation System Guide](architecture/TRANSLATION_SYSTEM.md)**. For the selection strategy and waterfall logic, see the **[Translation Provider Logic](TRANSLATION_PROVIDER_LOGIC.md)**.
 
 </details>
 
@@ -584,7 +584,7 @@ The architecture includes several mission-critical features to ensure high avail
 - **Structured Response Handling**: `AIResponseParser` reports whether structured-response recovery is required; `BaseAIProvider` owns the recovery strategy. The current implementation performs a sequential re-request within a single execution attempt. This is distinct from Multi-API Key Failover and provider/key failover.
 
 ### Documentation and Implementation
-For a comprehensive guide on implementing new providers, capability gating, and technical specifications, see the **[Provider Implementation Guide](PROVIDERS.md)**. To understand how providers are selected for different features, refer to the **[Translation Provider Logic](TRANSLATION_PROVIDER_LOGIC.md)**.
+For a comprehensive guide on implementing new providers, capability gating, and technical specifications, see the **[Provider Implementation Guide](providers/PROVIDERS.md)**. To understand how providers are selected for different features, refer to the **[Translation Provider Logic](TRANSLATION_PROVIDER_LOGIC.md)**.
 
 </details>
 
@@ -1270,7 +1270,7 @@ The stats manager system is a centralized, high-precision framework for tracking
 - **Unified Reporting**: Centralizes the aggregation and formatting of usage summaries, providing consistent logs and debugging tables.
 
 ### Documentation
-For detailed information on explicit reporting flows, delta extraction, and dual-metric logic, refer to the **[Stats Manager Documentation](STATS_MANAGER.md)**.
+For detailed information on explicit reporting flows, delta extraction, and dual-metric logic, refer to the **[Stats Manager Documentation](infrastructure/STATS_MANAGER.md)**.
 
 </details>
 

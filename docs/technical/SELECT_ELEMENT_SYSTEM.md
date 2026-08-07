@@ -250,7 +250,7 @@ Set `loglevel` to `debug` to see the `contextSummary` and `textsToTranslate` pay
 - [Options Page Documentation](./OPTIONS_PAGE.md)
 - [Toast Integration System](./TOAST_INTEGRATION_SYSTEM.md)
 - [Feature Manager System](./SMART_HANDLER_REGISTRATION_SYSTEM.md)
-- [Translation Provider System](./PROVIDERS.md)
+- [Translation Provider System](./providers/PROVIDERS.md)
 - [Messaging System](./MessagingSystem.md)
 - [Translation Provider Logic](./TRANSLATION_PROVIDER_LOGIC.md)
 
