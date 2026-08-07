@@ -68,6 +68,15 @@
 4. **Provider Development**: [Provider Implementation Guide](providers/PROVIDERS.md) → [Provider System](#provider-system)
 5. **UI Development**: [Windows Manager Integration](WINDOWS_MANAGER_UI_HOST_INTEGRATION.md) → [Text Actions](TEXT_ACTIONS_SYSTEM.md)
 6. **Error Handling**: [Error Management](ERROR_MANAGEMENT_SYSTEM.md) → [Logging System](LOGGING_SYSTEM.md)
+
+### Authoritative Contracts & Diagrams
+For behavior-level guarantees, refer to the contract documents rather than inferring from this overview:
+
+- [Translation System](architecture/TRANSLATION_SYSTEM.md) and [Architecture Diagrams](architecture/DIAGRAMS.md) — runtime flow, provider execution, conversation, identity/fragment, and terminal-state diagrams.
+- [Feature Contracts](contracts/FEATURE_CONTRACTS.md) — per-mode (popup, sidepanel, selection, field, whole-page, PDF, subtitle, hover) mutation/timeout/revert guarantees.
+- [Provider Contract](contracts/PROVIDER_CONTRACT.md) — result/error/retry/health/stats/circuit ownership.
+- [Conversation Contract](contracts/CONVERSATION_CONTRACT.md) — AI stage/commit/discard and recovery exclusion.
+- [Identity & Fragment Contract](contracts/TRANSLATION_IDENTITY_AND_FRAGMENT_CONTRACT.md) — logical identity and fragment aggregation.
 7. **Storage Operations**: [Storage Manager](STORAGE_MANAGER.md)
 
 ---
@@ -101,7 +110,9 @@
                     ▼
 ┌─────────────────────────────────────────────────────────────────┐
 │                    CORE SYSTEMS                                │
-│  UnifiedTranslationService → TranslationRequestTracker → TranslationResultDispatcher → Provider Factory → BaseProvider (BaseTranslateProvider, BaseAIProvider) → RateLimitManager → StreamingManager │
+│  Translation engine: Feature → UnifiedTranslationService → UnifiedModeCoordinator → TranslationEngine → ProviderCoordinator → QueueManager → Provider → ProviderRequestEngine → validation → UnifiedResultDispatcher → feature consumer │
+│  Provider infra: RateLimitManager (provider health + circuit) and ApiKeyManager (key failover) wrap ProviderRequestEngine; BaseAIProvider owns structured AI recovery. No automatic cross-provider fallback. │
+│  For full routing, identity/fragment, conversation, and terminal-state diagrams, see architecture/DIAGRAMS.md │
 │  Storage Manager → Error Handler → Logger System → Unified TTS System → Windows Manager → Memory Garbage Collector → Toast Integration System │
 └─────────────────────────────────────────────────────────────────┘
                     │
@@ -142,6 +153,14 @@ src/
 │   │   └── tabs/                   # Configuration tabs
 │   └── content/                    # ContentApp.vue (UI Host)
 │       └── components/             # Content UI components
+│   ├── pdf/                        # PdfApp.vue - Standalone PDF translation UI
+│   │   └── PdfApp.vue
+│   └── subtitle/                   # SubtitleApp.vue - Standalone subtitle (.srt) translation UI
+│       └── SubtitleApp.vue
+│
+├── app/                            # Per-app bundle/entry layer (Vite entry points)
+│   ├── main.js
+│   └── main/                       # popup.js, sidepanel.js, options.js, pdf.js, subtitle.js
 │
 ├── components/                     # Vue Components (Preserved Structure)
 │   ├── base/                       # Base UI components
@@ -282,8 +301,9 @@ src/
 │   ├── services/                   # Core Services
 │   │   └── translation/            # Unified Translation Service
 │   │       ├── UnifiedTranslationService.js     # Central translation coordinator
-│   │       ├── TranslationRequestTracker.js     # Request lifecycle management
-│   │       └── TranslationResultDispatcher.js   # Intelligent result routing
+│   │       ├── UnifiedModeCoordinator.js        # Unified Mode selection coordination
+│   │       ├── UnifiedResultDispatcher.js       # Intelligent result routing
+│   │       └── TranslationRequestTracker.js     # Request lifecycle management
 │   ├── memory/                     # Memory Garbage Collector System with Critical Protection
 │   │   ├── MemoryManager.js        # Core memory management with critical resource support
 │   │   ├── ResourceTracker.js      # Resource tracking mixin with critical protection
@@ -468,7 +488,7 @@ The system is built on three specialized services that handle different stages o
 
 1. **UnifiedTranslationService (Coordinator)**: The primary entry point that manages the end-to-end translation flow.
 2. **TranslationRequestTracker (Lifecycle)**: Prevents duplicate requests and tracks active operations using unique `messageId` signatures.
-3. **TranslationResultDispatcher (Distribution)**: Intelligently routes results back to the correct tab or component based on the translation mode (Field, Select Element, or Standard).
+3. **UnifiedResultDispatcher (Distribution)**: Intelligently routes results back to the correct tab or component based on the translation mode (Field, Select Element, or Standard).
 
 **Translation Pipeline Foundation**: Project A introduced the Translation Pipeline Foundation, an execution foundation under `src/features/translation/ir/` providing terminal execution routing, an observational validation foundation, and diagnostics preservation across execution boundaries. Runtime production and adoption of `TranslationOutcome` remain intentionally deferred to the future **Translation Outcome Adoption** initiative.
 
@@ -728,6 +748,9 @@ For detailed information on UI hosting and in-page integration, refer to the fol
 - `src/apps/popup/PopupApp.vue` - Main popup application
 - `src/apps/sidepanel/SidepanelApp.vue` - Sidepanel application
 - `src/apps/options/OptionsApp.vue` - Options page application
+- `src/apps/content/ContentApp.vue` - In-page UI Host (Shadow DOM)
+- `src/apps/pdf/PdfApp.vue` - Standalone PDF translation application
+- `src/apps/subtitle/SubtitleApp.vue` - Standalone subtitle (.srt) translation application
 
 </details>
 
@@ -751,8 +774,9 @@ For detailed information on UI hosting and in-page integration, refer to the fol
 
 ### Unified Translation Service
 - `src/core/services/translation/UnifiedTranslationService.js` - Central translation coordinator
+- `src/core/services/translation/UnifiedModeCoordinator.js` - Unified Mode selection coordination
+- `src/core/services/translation/UnifiedResultDispatcher.js` - Intelligent result routing
 - `src/core/services/translation/TranslationRequestTracker.js` - Request lifecycle management
-- `src/core/services/translation/TranslationResultDispatcher.js` - Intelligent result routing
 - `src/features/translation/handlers/handleTranslate.js` - Translation request handler
 - `src/features/translation/handlers/handleTranslationResult.js` - Translation result processor
 
@@ -762,6 +786,8 @@ For detailed information on UI hosting and in-page integration, refer to the fol
 - `src/features/translation/ir/TranslationOperation.js` - Execution lifecycle
 - `src/features/translation/ir/TranslationOutcome.js` - Immutable outcome contract
 - `src/features/translation/ir/TranslationUnit.js` - Unit disposition contract
+
+> **Legacy note:** `TranslationResultDispatcher.js` (`src/core/services/translation/`) still exists in-tree but has **no runtime consumer**; result routing is now performed by `UnifiedResultDispatcher.js` (see the Unified Translation Service section above).
 
 </details>
 
@@ -1223,12 +1249,58 @@ The error management system provides a centralized, context-aware framework for 
 
 ### Architecture and Integration
 - **Context Safety**: `ExtensionContextManager` monitors the validity of the extension's runtime context, preventing "Extension context invalidated" errors from crashing content scripts.
-- **Centralized Handler**: The `ErrorHandler` singleton processes all caught exceptions, categorizing them by severity and type (Network, Auth, UI, System).
-- **Graceful Recovery**: Implements retry logic and circuit-breaker patterns for critical services like translation and TTS.
+- **Error routing**: `ErrorHandler` processes caught exceptions, categorizing them by severity and type (Network, Auth, UI, System). Retry, circuit-breaker, failover, and structured-recovery scheduling are **not** performed here — they are owned by `QueueManager` (retry), `RateLimitManager` (provider health + circuit), `ProviderRequestEngine`/`ApiKeyManager` (API-key failover), and `BaseAIProvider` (structured AI recovery). See [contracts/PROVIDER_CONTRACT.md](contracts/PROVIDER_CONTRACT.md) for the ownership and retry policy.
 - **Localized Feedback**: Translates technical error codes into user-friendly notifications via the integrated toast system.
 
 ### Documentation
 For detailed information on error classification, context validation patterns, and reporting protocols, refer to the **[Error Management Documentation](ERROR_MANAGEMENT_SYSTEM.md)**.
+
+</details>
+
+---
+
+## AI Conversation & Context
+
+<details>
+<summary>View AI Conversation details</summary>
+
+AI primary translations may participate in an in-memory conversation context via the `TranslationSessionManager`:
+
+- **Accepted primary** → stage / validate → **commit** (at most once).
+- **Structured recovery** → no conversation commit (recovery may re-request, but does not persist a candidate).
+- **Timeout / cancel / failure** → **discard** (no commit); late settlement cannot commit after terminal state.
+
+This is transient, in-memory history only. For the authoritative stage/commit/discard semantics and recovery exclusion, see [Conversation Contract](contracts/CONVERSATION_CONTRACT.md).
+
+See also [Architecture Diagrams](architecture/DIAGRAMS.md) for the AI conversation lifecycle.
+
+</details>
+
+---
+
+## Identity & Fragments
+
+<details>
+<summary>View Identity & Fragments details</summary>
+
+Structured Select Element and PDF flows use explicit logical identity and fragment aggregation rather than naive keying. Runtime enforcement of identity precedence, duplicate suppression, and fragment assembly is owned by `OptimizedJsonHandler` (request-local, no global cache).
+
+Identity follows the precedence `uid ?? cellId ?? i ?? id ?? blockId` (nullish-coalesced; `0` is valid). Full rules — including V2/V3 fragment handling and request-local dedup — live in the [Identity & Fragment Contract](contracts/TRANSLATION_IDENTITY_AND_FRAGMENT_CONTRACT.md), shown from [Architecture Diagrams](architecture/DIAGRAMS.md).
+
+</details>
+
+---
+
+## Translation Modes
+
+<details>
+<summary>View Translation Modes</summary>
+
+Current user-facing translation modes:
+
+- Selection Window · Inline Selection · Select Element · Field · Popup · Sidepanel · Whole Page · PDF · Subtitle
+
+Per-mode mutation/timeout/revert guarantees are defined in the [Feature Contracts](contracts/FEATURE_CONTRACTS.md).
 
 </details>
 
