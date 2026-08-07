@@ -128,7 +128,7 @@ The `features` array defines what the UI and Orchestrators allow for this provid
 
 ### 1. Coordination Principle
 **NEVER override the `translate()` method.** 
-The `BaseProvider.translate()` method delegates to the `ProviderCoordinator`, which orchestrates critical services like Language Detection, Bilingual Swapping, and Stats Tracking. All custom logic—including specialized dictionary preprocessing—must be implemented within `_batchTranslate` or lower-level utilities.
+The `BaseProvider.translate()` method delegates to the `ProviderCoordinator`, which orchestrates critical services like Language Detection and Bilingual Swapping. Physical API-call stats are recorded separately by `ProviderRequestEngine` (see [STATS_MANAGER.md](../infrastructure/STATS_MANAGER.md)), not by `ProviderCoordinator`. All custom logic—including specialized dictionary preprocessing—must be implemented within `_batchTranslate` or lower-level utilities.
 
 ### 2. Optimization Level AwarenessProviders must be "Optimization-Aware." Use the `getProviderOptimizationLevelAsync` helper to adjust behavior:
 - **Level 1 (Economy)**: Large batches, low concurrency.

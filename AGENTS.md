@@ -24,7 +24,7 @@ Your mission is to evolve this codebase while rigorously maintaining its structu
 - **IFrame Support**: Simple and effective iframe support system with ResourceTracker integration and unified memory management.
 - **Toast Integration System**: A unified notification system with ToastEventHandler, ToastElementDetector, and support for interactive action buttons.
 - **Modern CSS Architecture**: Principled CSS architecture featuring CSS Grid, containment, safe variable functions, forward-looking SCSS patterns, and Shadow DOM isolation using strategic `!important` declarations.
-- **Icon System**: Standardized monochrome UI icons via CSS Mask (`SvgIcon`) with `currentColor` theming, SVG assets as single source of truth, and clear conventions for brand/multicolor `<img>` assets. See [docs/technical/ICON_SYSTEM.md](docs/technical/ICON_SYSTEM.md) and [docs/adr/ADR-SVG-ICON-SYSTEM.md](docs/adr/ADR-SVG-ICON-SYSTEM.md).
+- **Icon System**: Standardized monochrome UI icons via CSS Mask (`SvgIcon`) with `currentColor` theming, SVG assets as single source of truth, and clear conventions for brand/multicolor `<img>` assets. See [docs/technical/ICON_SYSTEM.md](docs/technical/ICON_SYSTEM.md) and [docs/adr/ADR-001-svg-icon-system.md](docs/adr/ADR-001-svg-icon-system.md).
 - **Provider System**: 10+ translation services with a hierarchical architecture (BaseProvider, BaseTranslateProvider, BaseAIProvider) including Rate Limiting and Circuit Breaker management.
 - **Error Management**: Centralized error management system.
 - **Storage Manager**: Smart storage with built-in caching.

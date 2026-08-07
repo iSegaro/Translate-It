@@ -51,7 +51,7 @@ It implements a progressive batching translation model designed to handle large 
 
 ## Core Components
 
-### 1. [SubtitleApp.vue](file:///home/amir/Works/Translate-It/Extension/src/apps/subtitle/SubtitleApp.vue)
+### 1. [SubtitleApp.vue](../../src/apps/subtitle/SubtitleApp.vue)
 The main entry point for the subtitle translation user interface, designed as a premium, glassmorphic standalone application.
 
 *   **Responsibilities:**
@@ -63,7 +63,7 @@ The main entry point for the subtitle translation user interface, designed as a 
 
 ---
 
-### 2. [useSubtitleTranslation.js](file:///home/amir/Works/Translate-It/Extension/src/features/subtitle-translation/composables/useSubtitleTranslation.js)
+### 2. [useSubtitleTranslation.js](../../src/features/subtitle-translation/composables/useSubtitleTranslation.js)
 A reactive composable bridging the Subtitle UI application with the background service worker using the message bus.
 
 *   **Responsibilities:**
@@ -74,7 +74,7 @@ A reactive composable bridging the Subtitle UI application with the background s
 
 ---
 
-### 3. [SubtitleTranslationCoordinator.js](file:///home/amir/Works/Translate-It/Extension/src/features/subtitle-translation/core/SubtitleTranslationCoordinator.js)
+### 3. [SubtitleTranslationCoordinator.js](../../src/features/subtitle-translation/core/SubtitleTranslationCoordinator.js)
 The **Background Orchestrator**. It owns the lifecycle of a subtitle translation job from raw string parsing to finalized output serialization.
 
 *   **Key Flow:**
@@ -109,7 +109,7 @@ Instead of waiting for the entire file to finish, the system streams translated 
 
 ---
 
-### 4. [SubtitleValidationService.js](file:///home/amir/Works/Translate-It/Extension/src/features/subtitle-translation/core/SubtitleValidationService.js)
+### 4. [SubtitleValidationService.js](../../src/features/subtitle-translation/core/SubtitleValidationService.js)
 A critical service responsible for ensuring the integrity of translation results before they are committed to the final file.
 
 *   **Responsibilities:**
@@ -120,16 +120,16 @@ A critical service responsible for ensuring the integrity of translation results
 
 ---
 
-### 5. [SubtitleParserFactory.js](file:///home/amir/Works/Translate-It/Extension/src/features/subtitle-translation/parsers/SubtitleParserFactory.js)
+### 5. [SubtitleParserFactory.js](../../src/features/subtitle-translation/parsers/SubtitleParserFactory.js)
 A creational design pattern factory that determines and instantiates the correct parser adapter based on the file name extension.
 
 *   **API & Adapters:**
     *   `getAdapter(filename)`: Inspects file extension (e.g., `.srt`) and returns the appropriate adapter.
-    *   [SrtAdapter.js](file:///home/amir/Works/Translate-It/Extension/src/features/subtitle-translation/parsers/SrtAdapter.js): Handles `.srt` parser (`parse`) and string serializer (`serialize`).
+    *   [SrtAdapter.js](../../src/features/subtitle-translation/parsers/SrtAdapter.js): Handles `.srt` parser (`parse`) and string serializer (`serialize`).
 
 ---
 
-### 6. [SubtitleTextProtector.js](file:///home/amir/Works/Translate-It/Extension/src/features/subtitle-translation/formatting/SubtitleTextProtector.js)
+### 6. [SubtitleTextProtector.js](../../src/features/subtitle-translation/formatting/SubtitleTextProtector.js)
 A specialized protection adapter designed to shield formatting elements from being altered, corrupted, or translated by AI/traditional translation engines.
 
 *   **Protected Elements:**
@@ -142,7 +142,7 @@ A specialized protection adapter designed to shield formatting elements from bei
 
 ---
 
-### 7. [SubtitleBatchPlanner.js](file:///home/amir/Works/Translate-It/Extension/src/features/subtitle-translation/core/SubtitleBatchPlanner.js)
+### 7. [SubtitleBatchPlanner.js](../../src/features/subtitle-translation/core/SubtitleBatchPlanner.js)
 Handles the mathematical chunking of structured cue arrays to guarantee optimal translation volume without exceeding API payloads.
 
 *   **Key Features:**
@@ -152,7 +152,7 @@ Handles the mathematical chunking of structured cue arrays to guarantee optimal 
 
 ---
 
-### 8. [SubtitleProgressTracker.js](file:///home/amir/Works/Translate-It/Extension/src/features/subtitle-translation/core/SubtitleProgressTracker.js)
+### 8. [SubtitleProgressTracker.js](../../src/features/subtitle-translation/core/SubtitleProgressTracker.js)
 A high-accuracy mathematical tracker that manages translation completion metrics.
 
 *   **Metrics Tracked:**
@@ -162,7 +162,7 @@ A high-accuracy mathematical tracker that manages translation completion metrics
 
 ---
 
-### 9. [SubtitleContextBuilder.js](file:///home/amir/Works/Translate-It/Extension/src/features/subtitle-translation/core/SubtitleContextBuilder.js)
+### 9. [SubtitleContextBuilder.js](../../src/features/subtitle-translation/core/SubtitleContextBuilder.js)
 Provides context-aware capabilities to AI providers to improve translation coherence.
 
 *   **AI Sliding Window**: Appends a sliding window of metadata containing immediately preceding cues to help LLMs understand dialogue flow.
@@ -179,7 +179,7 @@ The system uses specialized templates defined in `src/features/subtitle-translat
 *   **Batch Instructions**: Directs the AI to return results in a strict JSON format for reliable parsing.
 
 ### 2. Progressive Limit Resolution
-Different translation services enforce widely different payload limitations. The [SubtitleProviderLimitsResolver](file:///home/amir/Works/Translate-It/Extension/src/features/subtitle-translation/core/SubtitleProviderLimitsResolver.js) adaptively scales constraints:
+Different translation services enforce widely different payload limitations. The [SubtitleProviderLimitsResolver](../../src/features/subtitle-translation/core/SubtitleProviderLimitsResolver.js) adaptively scales constraints:
 *   **Traditional Engines (Google/Yandex)**: Set to high cue counts but strictly capped total characters.
 *   **AI Engines (OpenAI/Gemini)**: Scaled to balance token budgets, context envelopes, and rate limits.
 
