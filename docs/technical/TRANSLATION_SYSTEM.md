@@ -196,6 +196,8 @@ Tracker terminal records leave active tab and toast indexes immediately. They ar
 
 ### Specialized Workflow Boundaries
 
+For the logical identity and fragment contract governing structured Select Element and PDF flows, see [TRANSLATION_IDENTITY_AND_FRAGMENT_CONTRACT.md](TRANSLATION_IDENTITY_AND_FRAGMENT_CONTRACT.md).
+
 | Workflow | Local Owner | Shared Runtime Boundary | Stale Guard |
 |---|---|---|---|
 | PDF visible blocks | `PdfTranslationCoordinator.activeRunId` | Exact active request IDs | Run ID before block update |

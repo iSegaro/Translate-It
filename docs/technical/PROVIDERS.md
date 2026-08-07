@@ -144,6 +144,8 @@ If your provider merges multiple text segments into a single request, you **MUST
 
 ### 5. Structured Response Handling
 
+For the logical identity and split-fragment contract that governs how structured results are deduplicated and reassembled, see [TRANSLATION_IDENTITY_AND_FRAGMENT_CONTRACT.md](TRANSLATION_IDENTITY_AND_FRAGMENT_CONTRACT.md).
+
 Structured (JSON) responses can violate their response contract — for example through unmapped or gap-filled slots, or an unparseable response. The system recovers explicitly instead of silently corrupting results.
 
 - **`AIResponseParser`** parses structured responses and reports whether structured-response recovery is required. It never decides semantic success and never owns the recovery strategy.
