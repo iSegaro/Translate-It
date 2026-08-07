@@ -415,14 +415,16 @@ try {
 }
 ```
 
-### Provider Fallback
-```javascript
-// Automatic fallback to Google Translate if primary provider fails
-if (!result.success && data.provider !== 'google-translate') {
-  const fallbackProvider = this.factory.getProvider('google-translate')
-  result = await fallbackProvider.translate(text, sourceLang, targetLang)
-}
-```
+### Failure Handling
+
+There is **no automatic cross-provider fallback**. If a translation request fails, the system does **not** substitute another provider. Instead it applies recovery mechanisms **within the selected provider**, then surfaces a final typed failure to the caller:
+
+- **QueueManager retry**: transient errors (e.g. `NETWORK_ERROR`, `RATE_LIMIT_REACHED`, `SERVER_ERROR`) are retried by `QueueManager` with backoff according to error policy before a final failure is reported.
+- **API-key failover**: `ProviderRequestEngine` may rotate to another API key **of the same provider** (e.g. `RATE_LIMIT_REACHED`, `API_KEY_INVALID`, `QUOTA_EXCEEDED`).
+- **BaseAIProvider structured recovery**: a structured batch response that violates its contract triggers one sequential re-request of the affected batch (`STRUCTURED_RECOVERY`).
+- **No cross-provider fallback**: the selected provider's final failure is returned to the caller.
+
+These are distinct mechanisms; do not label QueueManager retry, key failover, or structured recovery with the single term "fallback."
 
 ## Development Guide
 

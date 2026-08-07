@@ -373,7 +373,7 @@ UI must never infer semantic outcome from source/translated equality, empty text
 | 6. Select Element adoption | Consume outcome in Select workflow | Explicit subtree application and revert policy | Partial DOM behavior | Deferred |
 | 7. PDF adoption | Consume outcome in PDF workflow | Explicit block/cell partial state | Session and renderer state | Deferred |
 | 8. Popup and Sidepanel adoption | Consume outcome in view workflows | Consistent direct-translation state | Existing success/error assumptions | Deferred |
-| 9. Legacy fallback removal | Remove hidden source substitution | One recovery boundary | Provider and batch compatibility paths | Deferred |
+| 9. Legacy fallback removal | Remove hidden source substitution | One recovery boundary | Provider and batch compatibility paths | Completed |
 | 10. Transport reassessment | Reassess OpenAI-Compatible and LM Studio behavior using preserved diagnostics | Transport policy separated from semantics | Provider-specific compatibility matrix | Deferred |
 
 ---
@@ -393,18 +393,32 @@ A foundational implementation phase delivered the observational and structural g
 
 ### Production Improvements
 
-The structured-response recovery path is the only production behavior change delivered by this phase. When a structured batch response violates its contract (unmapped or gap-filled slots, or an unparseable response), the parser reports that structured-response recovery is required, and the provider owns and executes the recovery strategy — re-requesting sequentially. This replaces silent result corruption with an explicit, provider-owned recovery decision. The parser only signals whether recovery is required; it never decides semantic success. This is an interim production improvement, not a phase of the migration roadmap.
+The structured-response recovery path was the first production behavior change delivered by this phase. When a structured batch response violates its contract (unmapped or gap-filled slots, or an unparseable response), the parser reports that structured-response recovery is required, and the provider owns and executes the recovery strategy — re-requesting sequentially. This replaces silent result corruption with an explicit, provider-owned recovery decision. The parser only signals whether recovery is required; it never decides semantic success. This is an interim production improvement, not a phase of the migration roadmap.
+
+#### Completed after the ADR
+
+The behavioral contract is substantially implemented. Subsequent production work, completed after this ADR was written, delivered:
+
+- **Provider silent source substitution removed**: `BaseProvider`/`BaseAIProvider` and `ProviderCoordinator` no longer return original text as a "successful" translation on nonfatal failure; failures are thrown loudly.
+- **Parser unresolved slots no longer source-fill**: `AIResponseParser` fills unresolved structured slots with empty placeholders, never original source, on a contract violation.
+- **Malformed structured candidates fail or recover explicitly**: a structured-response contract violation triggers exactly one sequential recovery pass (BaseAIProvider, `STRUCTURED_RECOVERY` purpose) or a typed failure.
+- **Duplicate identity enforcement**: duplicate logical identities are detected through manifest-aware validation and enforced by `OptimizedJsonHandler`.
+- **V2/V3 fragment aggregation**: split V2/V3 fragments are reassembled atomically and out-of-order; no raw fragments reach DOM/PDF/final results.
+- **Canonical timeout/cancellation typing**: timeout uses `ErrorTypes.TRANSLATION_TIMEOUT` and cancellation uses `ErrorTypes.USER_CANCELLED`; they remain distinct.
+- **Feature-level source preservation**: PDF missing results and subtitle under-return (via `isSkipped`) preserve original presentation without classifying it as translated output.
+- **Conversation commit isolation**: `BaseAIProvider` does not commit a conversation candidate after cancellation or timeout, and discards a rejected/conversation-staged candidate during structured recovery.
+
+These changes enforce the ADR's core invariants (no source substitution, no invented translated output, timeout≠cancellation, atomic fragment aggregation) in production, without adopting the canonical `TranslationOutcome` type as the universal result shape.
 
 ### Deferred Scope
 
-The remaining phases are intentionally deferred to a future initiative named **Translation Outcome Adoption**:
+The following remain **intentionally deferred** to a future initiative named **Translation Outcome Adoption**:
 
-- Runtime production and adoption of `TranslationOutcome` (`ValidationResult` runtime integration and `TranslationOutcomeAssembler`).
-- `TranslationOutcomeAssembler` and runtime consumers of assembled outcomes.
-- Feature adoption across Whole Page, Select Element, PDF, Popup, and Sidepanel workflows.
-- Legacy fallback removal (including parser gap-fill source substitution).
+- Full runtime adoption of canonical `TranslationOutcome` (`ValidationResult` runtime integration and `TranslationOutcomeAssembler`) and runtime consumers of assembled outcomes.
+- Replacement of existing runtime result shapes (raw strings/arrays, unified coordinator responses) by the ADR model.
+- Any adapter migration not currently present in production.
 
-This is a deliberate scope decision, not unfinished work. The canonical pipeline described in this ADR remains the target; the deferred initiative will carry these phases forward as a separate effort without altering this document's architecture.
+The canonical `TranslationOutcome` model is not yet the universal runtime representation. The robust pipeline described in this ADR remains the target; the deferred initiative will carry these phases as a separate effort without altering this document's architecture.
 
 Runtime adoption should begin only after a concrete `TranslationOutcome` consumer has been defined.
 

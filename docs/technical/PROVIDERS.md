@@ -171,7 +171,7 @@ Requests are queued based on their impact on UX:
 - **LOW**: Background tasks (Whole Page Translation).
 
 ### 3. Circuit Breaker
-If all available keys fail or the provider is consistently unstable, the **RateLimitManager** "opens the circuit," temporarily disabling the provider for 60 seconds to prevent wasted requests and UI lag.
+If all available keys fail or the provider is consistently unstable, the **RateLimitManager** "opens the circuit," temporarily disabling the provider for **30 seconds** (default `circuitRecoveryTime`) to prevent wasted requests and UI lag. Rate limiting and circuit recovery are owned by `RateLimitManager`; it also exposes adaptive backoff and priority-based admission.
 
 ---
 
