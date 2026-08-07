@@ -10,6 +10,7 @@ Purpose: **system-level runtime architecture and routing.**
 ## In this folder
 
 - [TRANSLATION_SYSTEM.md](TRANSLATION_SYSTEM.md) — Translation Service: coordination, request tracking, result routing, runtime ownership and delivery.
+- [DIAGRAMS.md](DIAGRAMS.md) — Mermaid architecture diagrams of the current translation runtime.
 
 ## What does not belong here
 

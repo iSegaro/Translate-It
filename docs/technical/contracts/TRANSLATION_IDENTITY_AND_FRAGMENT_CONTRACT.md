@@ -263,6 +263,8 @@ This document does not define:
 
 For structured-response recovery details, see PROVIDERS.md's *Structured Response Handling* and ADR-015's *Production Improvements*.
 
+Diagram: see the identity/fragment lifecycle in [../architecture/DIAGRAMS.md](../architecture/DIAGRAMS.md).
+
 ---
 
 ## 15. Test Map

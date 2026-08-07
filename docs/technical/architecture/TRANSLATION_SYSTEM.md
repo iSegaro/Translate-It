@@ -1,5 +1,7 @@
 # Translation System Guide
 
+> **Architecture diagrams:** see [DIAGRAMS.md](DIAGRAMS.md) for the end-to-end pipeline, provider ownership, conversation lifecycle, identity/fragment, terminal-state, and feature-routing diagrams.
+>
 > **Feature contracts:** see [Feature Behavioral Contracts](../contracts/FEATURE_CONTRACTS.md) for the authoritative per-feature observable outcome contracts on top of this shared pipeline.
 
 The translation system handles translation requests from popup, sidepanel, and content scripts through a **Unified Translation Service** architecture (2025) that provides centralized coordination, duplicate prevention, and intelligent result routing.

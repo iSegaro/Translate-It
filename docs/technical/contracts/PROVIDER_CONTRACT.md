@@ -275,6 +275,8 @@ This document does not define:
 - shared pipeline/routing → [../architecture/TRANSLATION_SYSTEM.md](../architecture/TRANSLATION_SYSTEM.md).
 - canonical `TranslationOutcome` model → [../../adr/ADR-015-translation-outcome-semantics.md](../../adr/ADR-015-translation-outcome-semantics.md).
 
+Diagrams: see the provider execution/retry and conversation lifecycle diagrams in [../architecture/DIAGRAMS.md](../architecture/DIAGRAMS.md).
+
 ---
 
 ## 18. Test Map

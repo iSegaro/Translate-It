@@ -414,3 +414,4 @@ Related contracts and architecture:
 - [../WHOLE_PAGE_TRANSLATION.md](../WHOLE_PAGE_TRANSLATION.md) — whole-page architecture.
 - [../SELECT_ELEMENT_SYSTEM.md](../SELECT_ELEMENT_SYSTEM.md) — element-selection architecture.
 - [../pdf-translator/PDF_TRANSLATION_ARCHITECTURE.md](../pdf-translator/PDF_TRANSLATION_ARCHITECTURE.md) — PDF translation architecture.
+- [../architecture/DIAGRAMS.md](../architecture/DIAGRAMS.md) — architecture diagrams of the current runtime.

@@ -225,6 +225,8 @@ This document does not define:
 - feature source preservation → [FEATURE_CONTRACTS.md](FEATURE_CONTRACTS.md).
 - canonical `TranslationOutcome` model → [../../adr/ADR-015-translation-outcome-semantics.md](../../adr/ADR-015-translation-outcome-semantics.md).
 
+Diagram: see the AI conversation lifecycle in [../architecture/DIAGRAMS.md](../architecture/DIAGRAMS.md).
+
 ---
 
 ## 18. Test Map
