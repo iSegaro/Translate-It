@@ -307,6 +307,8 @@ Text Field → Direct Request → UnifiedTranslationService → Direct Response 
 
 ## Provider System
 
+> **Contracts:** [Provider Contract](../contracts/PROVIDER_CONTRACT.md) (result/error/retry/health/stats) and [Conversation Contract](../contracts/CONVERSATION_CONTRACT.md) (AI conversation-candidate lifecycle).
+
 ### Supported Providers
 - **Google Translate** (Free, default)
 - **DeepL** (AI-powered with formal/informal styles)

@@ -12,6 +12,8 @@ Purpose: **behavioral invariants and runtime contracts.**
 
 - [TRANSLATION_IDENTITY_AND_FRAGMENT_CONTRACT.md](TRANSLATION_IDENTITY_AND_FRAGMENT_CONTRACT.md) — logical identity, duplicate handling, and V2/V3 fragment aggregation contract.
 - [FEATURE_CONTRACTS.md](FEATURE_CONTRACTS.md) — per-feature observable behavior: input, routing, success, failure, partial success, timeout, cancellation, source preservation, revert/cleanup, consumer guarantees.
+- [PROVIDER_CONTRACT.md](PROVIDER_CONTRACT.md) — provider result/error/retry/health/stats contracts, structured recovery, source-equal rules.
+- [CONVERSATION_CONTRACT.md](CONVERSATION_CONTRACT.md) — AI conversation candidate lifecycle: stage/commit/discard, recovery exclusion, timeout/cancel/late-settlement.
 
 ## What does not belong here
 
