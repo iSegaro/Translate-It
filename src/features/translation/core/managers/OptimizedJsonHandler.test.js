@@ -216,6 +216,388 @@ describe('OptimizedJsonHandler', () => {
     });
   });
 
+  describe('V3 marker contract validation', () => {
+    const MARKER = '@@TI_SEG_s1_e1_n1@@';
+    const mockSender = { tab: { id: 123 } };
+    const mockData = {
+      text: JSON.stringify(['s1', 's2']),
+      sourceLanguage: 'auto',
+      targetLanguage: 'fa',
+      mode: 'select_element',
+      messageId: 'msg-1',
+      sessionId: 'sess-1'
+    };
+
+    it('accepts equal V3 marker count and order in non-fragment items', async () => {
+      const browser = (await import('webextension-polyfill')).default;
+      browser.tabs.sendMessage.mockClear();
+
+      const source = `Text ${MARKER} with marker`;
+      const payload = [{ t: source, i: 'n1' }];
+      mockEngine.createIntelligentBatches = vi.fn(() => [payload]);
+      mockProvider.translate.mockResolvedValueOnce({ translatedText: [`Translated ${MARKER} text`] });
+
+      const result = await handler.execute(
+        mockEngine,
+        { ...mockData, sourceLanguage: 'en', text: JSON.stringify(payload) },
+        mockProvider, 'en', 'fa', 'msg-v3-accept', mockSender
+      );
+
+      expect(result.success).toBe(true);
+      expect(result.results[0].t).toBe(`Translated ${MARKER} text`);
+    });
+
+    it('rejects extra V3 marker in AI response (g3 case)', async () => {
+      const browser = (await import('webextension-polyfill')).default;
+      browser.tabs.sendMessage.mockClear();
+
+      const source = `Text ${MARKER} with marker`;
+      const payload = [{ t: source, i: 'n1' }];
+      mockEngine.createIntelligentBatches = vi.fn(() => [payload]);
+      mockProvider.translate.mockResolvedValueOnce({ translatedText: [`Translated ${MARKER} ${MARKER} text`] });
+
+      const result = await handler.execute(
+        mockEngine,
+        { ...mockData, sourceLanguage: 'en', text: JSON.stringify(payload) },
+        mockProvider, 'en', 'fa', 'msg-v3-extra', mockSender
+      );
+
+      expect(result.success).toBe(false);
+      expect(result.error.message).toContain('V3 marker contract violation');
+      expect(result.error.message).toContain('MARKER_COUNT_MISMATCH');
+      const updates = browser.tabs.sendMessage.mock.calls
+        .map(([, m]) => m)
+        .filter(m => m.action === MessageActions.TRANSLATION_STREAM_UPDATE);
+      expect(updates).toHaveLength(0);
+    });
+
+    it('rejects missing V3 marker in AI response', async () => {
+      const browser = (await import('webextension-polyfill')).default;
+      browser.tabs.sendMessage.mockClear();
+
+      const source = `Text ${MARKER} with marker`;
+      const payload = [{ t: source, i: 'n1' }];
+      mockEngine.createIntelligentBatches = vi.fn(() => [payload]);
+      mockProvider.translate.mockResolvedValueOnce({ translatedText: [`Translated text without marker`] });
+
+      const result = await handler.execute(
+        mockEngine,
+        { ...mockData, sourceLanguage: 'en', text: JSON.stringify(payload) },
+        mockProvider, 'en', 'fa', 'msg-v3-missing', mockSender
+      );
+
+      expect(result.success).toBe(false);
+      expect(result.error.message).toContain('MARKER_COUNT_MISMATCH');
+      expect(result.error.type).toBe(ErrorTypes.VALIDATION);
+    });
+
+    it('rejects reordered V3 markers', async () => {
+      const marker1 = '@@TI_SEG_s1_e1_n1@@';
+      const marker2 = '@@TI_SEG_s1_e1_n2@@';
+
+      const browser = (await import('webextension-polyfill')).default;
+      browser.tabs.sendMessage.mockClear();
+
+      const source = `${marker1}${marker2}text`;
+      const payload = [{ t: source, i: 'n1' }];
+      mockEngine.createIntelligentBatches = vi.fn(() => [payload]);
+      mockProvider.translate.mockResolvedValueOnce({ translatedText: [`text${marker2}${marker1}`] });
+
+      const result = await handler.execute(
+        mockEngine,
+        { ...mockData, sourceLanguage: 'en', text: JSON.stringify(payload) },
+        mockProvider, 'en', 'fa', 'msg-v3-reorder', mockSender
+      );
+
+      expect(result.success).toBe(false);
+      expect(result.error.message).toContain('MARKER_SEQUENCE_MISMATCH');
+    });
+
+    it('rejects duplicate V3 markers in translated text', async () => {
+      const browser = (await import('webextension-polyfill')).default;
+      browser.tabs.sendMessage.mockClear();
+
+      const source = `${MARKER}text`;
+      const payload = [{ t: source, i: 'n1' }];
+      mockEngine.createIntelligentBatches = vi.fn(() => [payload]);
+      mockProvider.translate.mockResolvedValueOnce({ translatedText: [`text${MARKER}${MARKER}`] });
+
+      const result = await handler.execute(
+        mockEngine,
+        { ...mockData, sourceLanguage: 'en', text: JSON.stringify(payload) },
+        mockProvider, 'en', 'fa', 'msg-v3-dup', mockSender
+      );
+
+      expect(result.success).toBe(false);
+      expect(result.error.message).toContain('MARKER_COUNT_MISMATCH');
+    });
+
+    it('single V3 fragment with no markers passes without marker validation', async () => {
+      const fragment = { t: 'A.', i: 'n1', blockId: 'g1', isV3Fragment: true, parentId: 'g1', fragmentIndex: 0, fragmentCount: 1, fragmentJoinerBefore: '' };
+      mockEngine.createIntelligentBatches = vi.fn(() => [[fragment]]);
+      mockProvider.translate.mockResolvedValueOnce({ translatedText: ['Translated.'] });
+
+      const result = await handler.execute(
+        mockEngine,
+        { ...mockData, sourceLanguage: 'en', text: JSON.stringify([{ t: 'Hello.', blockId: 'g1', i: 'n1' }]) },
+        mockProvider, 'en', 'fa', 'msg-v3-frag-skip', mockSender
+      );
+
+      expect(result.success).toBe(true);
+      expect(result.results[0].__sourceT).toBeUndefined();
+    });
+
+    it('valid two-fragment parent with markers spanning fragments', async () => {
+      const browser = (await import('webextension-polyfill')).default;
+      browser.tabs.sendMessage.mockClear();
+
+      const m2 = '@@TI_SEG_e_s_n2@@';
+      const m3 = '@@TI_SEG_e_s_n3@@';
+      const fragment0 = { t: `A${m2}B`, i: 'n1', blockId: 'g1', isV3Fragment: true, parentId: 'g1', fragmentIndex: 0, fragmentCount: 2, fragmentJoinerBefore: '' };
+      const fragment1 = { t: `${m3}C`, i: 'n1', blockId: 'g1', isV3Fragment: true, parentId: 'g1', fragmentIndex: 1, fragmentCount: 2, fragmentJoinerBefore: ' ' };
+      mockEngine.createIntelligentBatches = vi.fn(() => [[fragment0], [fragment1]]);
+      mockProvider.translate
+        .mockResolvedValueOnce({ translatedText: [`A${m2}B`] })
+        .mockResolvedValueOnce({ translatedText: [`${m3}C`] });
+
+      const result = await handler.execute(
+        mockEngine,
+        { ...mockData, sourceLanguage: 'en', text: JSON.stringify([{ t: `A${m2}B ${m3}C`, blockId: 'g1', i: 'n1' }]) },
+        mockProvider, 'en', 'fa', 'msg-v3-multifrag-ok', mockSender
+      );
+
+      expect(result.success).toBe(true);
+      const updates = browser.tabs.sendMessage.mock.calls
+        .map(([, m]) => m)
+        .filter(m => m.action === MessageActions.TRANSLATION_STREAM_UPDATE);
+      expect(updates).toHaveLength(1);
+      expect(updates[0].data.data[0].t).toBe(`A${m2}B ${m3}C`);
+      expect(result.results[0].__sourceT).toBeUndefined();
+    });
+
+    it('rejects extra marker in second fragment of two-fragment parent', async () => {
+      const browser = (await import('webextension-polyfill')).default;
+      browser.tabs.sendMessage.mockClear();
+
+      const m2 = '@@TI_SEG_e_s_n2@@';
+      const m3 = '@@TI_SEG_e_s_n3@@';
+      const fragment0 = { t: `A${m2}B`, i: 'n1', blockId: 'g1', isV3Fragment: true, parentId: 'g1', fragmentIndex: 0, fragmentCount: 2, fragmentJoinerBefore: '' };
+      const fragment1 = { t: `${m3}C`, i: 'n1', blockId: 'g1', isV3Fragment: true, parentId: 'g1', fragmentIndex: 1, fragmentCount: 2, fragmentJoinerBefore: ' ' };
+      mockEngine.createIntelligentBatches = vi.fn(() => [[fragment0], [fragment1]]);
+      mockProvider.translate
+        .mockResolvedValueOnce({ translatedText: [`A${m2}B`] })
+        .mockResolvedValueOnce({ translatedText: [`${m3}${m3}C`] });
+
+      const result = await handler.execute(
+        mockEngine,
+        { ...mockData, sourceLanguage: 'en', text: JSON.stringify([{ t: `A${m2}B ${m3}C`, blockId: 'g1', i: 'n1' }]) },
+        mockProvider, 'en', 'fa', 'msg-v3-multifrag-extra', mockSender
+      );
+
+      expect(result.success).toBe(false);
+      expect(result.error.type).toBe(ErrorTypes.VALIDATION);
+      const diagnostic = appendTranslationDiagnostic.mock.calls.find(call => call[1]?.type === 'V3_MARKER_CONTRACT_REJECTED');
+      expect(diagnostic).toBeDefined();
+      expect(diagnostic[1]).toMatchObject({
+        type: 'V3_MARKER_CONTRACT_REJECTED',
+        expectedMarkerCount: 2,
+        actualMarkerCount: 3,
+        reason: 'MARKER_COUNT_MISMATCH',
+        parentId: 'g1',
+      });
+      const updates = browser.tabs.sendMessage.mock.calls
+        .map(([, m]) => m)
+        .filter(m => m.action === MessageActions.TRANSLATION_STREAM_UPDATE);
+      expect(updates).toHaveLength(0);
+    });
+
+    it('rejects missing marker across fragment boundary', async () => {
+      const browser = (await import('webextension-polyfill')).default;
+      browser.tabs.sendMessage.mockClear();
+
+      const m2 = '@@TI_SEG_e_s_n2@@';
+      const m3 = '@@TI_SEG_e_s_n3@@';
+      const fragment0 = { t: `A${m2}B`, i: 'n1', blockId: 'g1', isV3Fragment: true, parentId: 'g1', fragmentIndex: 0, fragmentCount: 2, fragmentJoinerBefore: '' };
+      const fragment1 = { t: `${m3}C`, i: 'n1', blockId: 'g1', isV3Fragment: true, parentId: 'g1', fragmentIndex: 1, fragmentCount: 2, fragmentJoinerBefore: ' ' };
+      mockEngine.createIntelligentBatches = vi.fn(() => [[fragment0], [fragment1]]);
+      mockProvider.translate
+        .mockResolvedValueOnce({ translatedText: [`A${m2}B`] })
+        .mockResolvedValueOnce({ translatedText: [`C`] });
+
+      const result = await handler.execute(
+        mockEngine,
+        { ...mockData, sourceLanguage: 'en', text: JSON.stringify([{ t: `A${m2}B ${m3}C`, blockId: 'g1', i: 'n1' }]) },
+        mockProvider, 'en', 'fa', 'msg-v3-multifrag-missing', mockSender
+      );
+
+      expect(result.success).toBe(false);
+      expect(result.error.message).toContain('MARKER_COUNT_MISMATCH');
+      const updates = browser.tabs.sendMessage.mock.calls
+        .map(([, m]) => m)
+        .filter(m => m.action === MessageActions.TRANSLATION_STREAM_UPDATE);
+      expect(updates).toHaveLength(0);
+    });
+
+    it('rejects reordered markers across fragments', async () => {
+      const browser = (await import('webextension-polyfill')).default;
+      browser.tabs.sendMessage.mockClear();
+
+      const m2 = '@@TI_SEG_e_s_n2@@';
+      const m3 = '@@TI_SEG_e_s_n3@@';
+      const fragment0 = { t: `A${m2}`, i: 'n1', blockId: 'g1', isV3Fragment: true, parentId: 'g1', fragmentIndex: 0, fragmentCount: 2, fragmentJoinerBefore: '' };
+      const fragment1 = { t: `${m3}B`, i: 'n1', blockId: 'g1', isV3Fragment: true, parentId: 'g1', fragmentIndex: 1, fragmentCount: 2, fragmentJoinerBefore: ' ' };
+      mockEngine.createIntelligentBatches = vi.fn(() => [[fragment0], [fragment1]]);
+      mockProvider.translate
+        .mockResolvedValueOnce({ translatedText: [`A${m3}`] })
+        .mockResolvedValueOnce({ translatedText: [`${m2}B`] });
+
+      const result = await handler.execute(
+        mockEngine,
+        { ...mockData, sourceLanguage: 'en', text: JSON.stringify([{ t: `A${m2} ${m3}B`, blockId: 'g1', i: 'n1' }]) },
+        mockProvider, 'en', 'fa', 'msg-v3-multifrag-reorder', mockSender
+      );
+
+      expect(result.success).toBe(false);
+      expect(result.error.message).toContain('MARKER_SEQUENCE_MISMATCH');
+      const updates = browser.tabs.sendMessage.mock.calls
+        .map(([, m]) => m)
+        .filter(m => m.action === MessageActions.TRANSLATION_STREAM_UPDATE);
+      expect(updates).toHaveLength(0);
+    });
+
+    it('reconstructs full parent from out-of-order fragment arrival', async () => {
+      const browser = (await import('webextension-polyfill')).default;
+      browser.tabs.sendMessage.mockClear();
+
+      const m2 = '@@TI_SEG_e_s_n2@@';
+      const m3 = '@@TI_SEG_e_s_n3@@';
+      const fragment0 = { t: `A${m2}B`, i: 'n1', blockId: 'g1', isV3Fragment: true, parentId: 'g1', fragmentIndex: 0, fragmentCount: 2, fragmentJoinerBefore: '' };
+      const fragment1 = { t: `${m3}C`, i: 'n1', blockId: 'g1', isV3Fragment: true, parentId: 'g1', fragmentIndex: 1, fragmentCount: 2, fragmentJoinerBefore: ' ' };
+      const d0 = createDeferred();
+      const d1 = createDeferred();
+      mockEngine.createIntelligentBatches = vi.fn(() => [[fragment0], [fragment1]]);
+      mockProvider.translate
+        .mockImplementationOnce(() => d0.promise)
+        .mockImplementationOnce(() => d1.promise);
+
+      const execution = handler.execute(
+        mockEngine,
+        { ...mockData, sourceLanguage: 'en', text: JSON.stringify([{ t: `A${m2}B ${m3}C`, blockId: 'g1', i: 'n1' }]) },
+        mockProvider, 'en', 'fa', 'msg-v3-multifrag-ooo', mockSender
+      );
+
+      await vi.waitFor(() => expect(mockProvider.translate).toHaveBeenCalledTimes(2));
+
+      d1.resolve({ translatedText: [`${m3}C`] });
+      await Promise.resolve();
+      expect(browser.tabs.sendMessage).not.toHaveBeenCalled();
+
+      d0.resolve({ translatedText: [`A${m2}B`] });
+      const result = await execution;
+
+      expect(result.success).toBe(true);
+      const updates = browser.tabs.sendMessage.mock.calls
+        .map(([, m]) => m)
+        .filter(m => m.action === MessageActions.TRANSLATION_STREAM_UPDATE);
+      expect(updates).toHaveLength(1);
+      expect(updates[0].data.data[0].t).toBe(`A${m2}B ${m3}C`);
+    });
+
+    it('preserves fragmentJoinerBefore semantics in source reconstruction', async () => {
+      const browser = (await import('webextension-polyfill')).default;
+      browser.tabs.sendMessage.mockClear();
+
+      const m2 = '@@TI_SEG_e_s_n2@@';
+      const marker = '@@TI_SEG_e_s_n3@@';
+      const joiner = '\n';
+      const fragment0 = { t: `Line1 ${m2}`, i: 'n1', blockId: 'g1', isV3Fragment: true, parentId: 'g1', fragmentIndex: 0, fragmentCount: 2, fragmentJoinerBefore: '' };
+      const fragment1 = { t: `${marker}Line3`, i: 'n1', blockId: 'g1', isV3Fragment: true, parentId: 'g1', fragmentIndex: 1, fragmentCount: 2, fragmentJoinerBefore: joiner };
+      mockEngine.createIntelligentBatches = vi.fn(() => [[fragment0], [fragment1]]);
+      mockProvider.translate
+        .mockResolvedValueOnce({ translatedText: [`Line1 ${m2}`] })
+        .mockResolvedValueOnce({ translatedText: [`${marker}Line3`] });
+
+      const result = await handler.execute(
+        mockEngine,
+        { ...mockData, sourceLanguage: 'en', text: JSON.stringify([{ t: `Line1 ${m2}\n${marker}Line3`, blockId: 'g1', i: 'n1' }]) },
+        mockProvider, 'en', 'fa', 'msg-v3-joiner', mockSender
+      );
+
+      expect(result.success).toBe(true);
+    });
+
+    it('rejects V3 markers stripped entirely from translated output (source-side gating)', async () => {
+      const browser = (await import('webextension-polyfill')).default;
+      browser.tabs.sendMessage.mockClear();
+
+      const m2 = '@@TI_SEG_e_s_n2@@';
+      const m3 = '@@TI_SEG_e_s_n3@@';
+      const fragment0 = { t: `A${m2}B`, i: 'n1', blockId: 'g1', isV3Fragment: true, parentId: 'g1', fragmentIndex: 0, fragmentCount: 2, fragmentJoinerBefore: '' };
+      const fragment1 = { t: `${m3}C`, i: 'n1', blockId: 'g1', isV3Fragment: true, parentId: 'g1', fragmentIndex: 1, fragmentCount: 2, fragmentJoinerBefore: ' ' };
+      mockEngine.createIntelligentBatches = vi.fn(() => [[fragment0], [fragment1]]);
+      mockProvider.translate
+        .mockResolvedValueOnce({ translatedText: ['ترجمه کامل بدون'] })
+        .mockResolvedValueOnce({ translatedText: ['هیچ marker'] });
+
+      const result = await handler.execute(
+        mockEngine,
+        { ...mockData, sourceLanguage: 'en', text: JSON.stringify([{ t: `A${m2}B ${m3}C`, blockId: 'g1', i: 'n1' }]) },
+        mockProvider, 'en', 'fa', 'msg-v3-stripped', mockSender
+      );
+
+      expect(result.success).toBe(false);
+      expect(result.error.type).toBe(ErrorTypes.VALIDATION);
+      expect(result.error.message).toContain('MARKER_COUNT_MISMATCH');
+      const diagnostic = appendTranslationDiagnostic.mock.calls.find(call => call[1]?.type === 'V3_MARKER_CONTRACT_REJECTED');
+      expect(diagnostic).toBeDefined();
+      expect(diagnostic[1]).toMatchObject({
+        type: 'V3_MARKER_CONTRACT_REJECTED',
+        expectedMarkerCount: 2,
+        actualMarkerCount: 0,
+        reason: 'MARKER_COUNT_MISMATCH',
+        parentId: 'g1',
+      });
+      const updates = browser.tabs.sendMessage.mock.calls
+        .map(([, m]) => m)
+        .filter(m => m.action === MessageActions.TRANSLATION_STREAM_UPDATE);
+      expect(updates).toHaveLength(0);
+    });
+
+    it('does not validate V2-only text without @@TI_SEG_ markers', async () => {
+      const payload = [{ t: 'Plain text', i: 'n1' }];
+      mockEngine.createIntelligentBatches = vi.fn(() => [payload]);
+      mockProvider.translate.mockResolvedValueOnce({ translatedText: ['Plain translated'] });
+
+      const result = await handler.execute(
+        mockEngine,
+        { ...mockData, sourceLanguage: 'en', text: JSON.stringify(payload) },
+        mockProvider, 'en', 'fa', 'msg-v2-no-marker', mockSender
+      );
+
+      expect(result.success).toBe(true);
+    });
+
+    it('tolerates internal whitespace in V3 markers', async () => {
+      const browser = (await import('webextension-polyfill')).default;
+      browser.tabs.sendMessage.mockClear();
+
+      const marker = '@@TI_SEG_s1_e1_n1@@';
+      const whitespaceMarker = '@@ TI _ SEG _ s1_e1_n1@@';
+      const source = `${marker}text`;
+      const payload = [{ t: source, i: 'n1' }];
+      mockEngine.createIntelligentBatches = vi.fn(() => [payload]);
+      mockProvider.translate.mockResolvedValueOnce({ translatedText: [`text${whitespaceMarker}`] });
+
+      const result = await handler.execute(
+        mockEngine,
+        { ...mockData, sourceLanguage: 'en', text: JSON.stringify(payload) },
+        mockProvider, 'en', 'fa', 'msg-v3-ws', mockSender
+      );
+
+      expect(result.success).toBe(true);
+    });
+  });
+
   describe('manifest membership', () => {
     it('constructs views from carried manifest records and keeps provider payload unchanged', async () => {
       const segments = ['same', 'same'];
@@ -1508,6 +1890,7 @@ describe('OptimizedJsonHandler', () => {
           expect(item.fragmentJoinerBefore).toBeUndefined();
           expect(item.isSplit).toBeUndefined();
           expect(item.partIndex).toBeUndefined();
+          expect(item.__sourceT).toBeUndefined();
         });
       });
 
