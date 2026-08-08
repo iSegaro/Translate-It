@@ -9,11 +9,19 @@ import { TranslationMode } from '@/shared/config/config.js';
 import { MessageActions } from '@/shared/messaging/core/MessageActions.js';
 import { RequestStatus } from './TranslationRequestTracker.js';
 import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
+import { AUTO_DETECT_VALUE } from '@/shared/constants/core.js';
 import { appendTranslationDiagnostic } from '@/features/translation/ir/TranslationOperation.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.TRANSLATION, 'UnifiedModeCoordinator');
 
 export class UnifiedModeCoordinator {
+  constructor() {
+    // sessionId -> per-session source-language resolution state for Page 'auto' batches.
+    // Exactly one batch owns resolution per session; concurrent batches await it.
+    // Entries are cleared on session terminal lifecycle (complete/cancel/error).
+    this.pageSourceResolvers = new Map();
+  }
+
   /**
    * Process a translation request based on its mode.
    * 
@@ -205,6 +213,121 @@ export class UnifiedModeCoordinator {
   }
 
   /**
+   * Acquire the source-language resolution slot for a Page 'auto' batch session.
+   *
+   * Concurrency contract:
+   *   - No language yet and no pending resolution -> this batch becomes the
+   *     owner and is the ONLY one allowed to invoke the provider with 'auto'.
+   *   - Language already resolved -> return it directly.
+   *   - Resolution in flight        -> return the promise to await instead of
+   *     issuing a duplicate 'auto' provider call.
+   *
+   * @param {string} sessionId - Page translation session identifier
+   * @returns {object} { state|null, isOwner, language|resolutionPromise }
+   * @private
+   */
+  _acquirePageSourceResolution(sessionId) {
+    let state = this.pageSourceResolvers.get(sessionId);
+
+    if (!state) {
+      state = { language: null, resolutionPromise: null, _resolveSource: null, _rejectSource: null };
+      this.pageSourceResolvers.set(sessionId, state);
+    }
+
+    if (state.language) {
+      return { language: state.language };
+    }
+    if (state.resolutionPromise) {
+      return { resolutionPromise: state.resolutionPromise };
+    }
+
+    state.resolutionPromise = new Promise((resolve, reject) => {
+      state._resolveSource = resolve;
+      state._rejectSource = reject;
+    });
+    // Swallow unobserved rejections (owner cleared before any waiter joined);
+    // awaiting consumers still observe the rejection via their own subscription.
+    state.resolutionPromise.catch(() => {});
+    return { state, isOwner: true };
+  }
+
+  /**
+   * Owner batch finalizes the session source from the request-local detected
+   * language carried by its own provider response. A clear that already
+   * removed the session (cancellation/restore) prevents a late owner success
+   * from repopulating the lock.
+   *
+   * @param {string} sessionId
+   * @param {object} resolution - The { state } tuple handed to the owner
+   * @param {string|null} detectedLanguage - Request-local detected source
+   * @private
+   */
+  _finalizePageSourceResolution(sessionId, resolution, detectedLanguage) {
+    if (!resolution?.state) return;
+    const state = resolution.state;
+
+    // Late owner completion after a clear must not recreate removed state.
+    if (this.pageSourceResolvers.get(sessionId) !== state) return;
+
+    if (detectedLanguage && detectedLanguage !== AUTO_DETECT_VALUE) {
+      state.language = detectedLanguage;
+      if (state._resolveSource) state._resolveSource(detectedLanguage);
+    } else {
+      // No usable language confirmed: release any waiters and drop the slot so a
+      // later attempt can become the resolver again. No arbitrary fallback is kept.
+      this.pageSourceResolvers.delete(sessionId);
+      const error = new Error(`No source language detected for page session ${sessionId}`);
+      if (state._rejectSource) state._rejectSource(error);
+    }
+
+    state._resolveSource = null;
+    state._rejectSource = null;
+  }
+
+  /**
+   * Owner batch failed: reject all waiters, clear the slot, and allow a fresh
+   * resolution attempt by the next batch. Preserves underlying batch failure
+   * semantics (the error propagates to concurrent waiters as a rejection).
+   *
+   * @param {string} sessionId
+   * @param {object} resolution - The { state , isOwner } tuple returned to the owner
+   * @param {*} error - The failure that terminated the owner batch
+   * @private
+   */
+  _failPageSourceResolution(sessionId, resolution, error) {
+    if (!resolution?.state) return;
+    const state = resolution.state;
+    if (this.pageSourceResolvers.get(sessionId) !== state) return;
+
+    this.pageSourceResolvers.delete(sessionId);
+    if (state._rejectSource) state._rejectSource(error);
+    state._resolveSource = null;
+    state._rejectSource = null;
+  }
+
+  /**
+   * Force-clear a session's source-resolution state (terminal lifecycle).
+   * Pending waiters are released so they never hang on a promise that will
+   * never resolve. Safe to call from completion, cancellation, and error paths.
+   *
+   * @param {string} sessionId
+   */
+  clearPageSourceLanguage(sessionId) {
+    if (!sessionId) return;
+    const state = this.pageSourceResolvers.get(sessionId);
+    if (!state) return;
+
+    this.pageSourceResolvers.delete(sessionId);
+    if (state._rejectSource) {
+      const error = new Error(`Page translation session ended: ${sessionId}`);
+      error.type = ErrorTypes.USER_CANCELLED;
+      state._rejectSource(error);
+    }
+    state._resolveSource = null;
+    state._rejectSource = null;
+  }
+
+  /**
    * Generic handler for batch translation operations (Page, Subtitle).
    * Implements common logic for lifecycle management, character counting, and provider coordination.
    * 
@@ -248,10 +371,36 @@ export class UnifiedModeCoordinator {
     if (!providerInstance) throw new Error(`Provider '${provider}' initialization failed`);
 
     let timeoutId;
+    let sessionId = null;
+    let sourceResolution = null;
 
     try {
-      const sessionId = request.sessionId || data.sessionId || messageId;
-      
+      sessionId = request.sessionId || data.sessionId || messageId;
+
+      // Per-session source-language resolution for auto-detected Page batches.
+      // Concurrency-safe: only the ownership batch issues a provider call with
+      // 'auto'; concurrent batches await the session's resolution instead of
+      // launching duplicate 'auto' requests (which surfaced transient detections
+      // like 'it'/'sv' failing sibling batches mid-session). Language is taken
+      // from the request's own response, never from mutable provider state.
+      let effectiveSourceLanguage = sourceLanguage;
+
+      if (mode === TranslationMode.Page && sourceLanguage === AUTO_DETECT_VALUE) {
+        sourceResolution = this._acquirePageSourceResolution(sessionId);
+
+        if (sourceResolution.isOwner) {
+          // Resolution owner: the only path permitted to execute with 'auto'.
+          effectiveSourceLanguage = sourceLanguage;
+        } else if (sourceResolution.language) {
+          effectiveSourceLanguage = sourceResolution.language;
+        } else {
+          // Concurrent batch: wait for the owner to confirm the session language.
+          effectiveSourceLanguage = await sourceResolution.resolutionPromise;
+        }
+      }
+
+      logger.debug(`[UnifiedCoordinator] ${mode} batch source: ${effectiveSourceLanguage}`);
+
       // Determine what to pass to the provider
       const translationPayload = useRawItems 
         ? items 
@@ -280,7 +429,7 @@ export class UnifiedModeCoordinator {
       });
 
       const response = await Promise.race([
-        providerInstance.translate(translationPayload, sourceLanguage, targetLanguage, {
+        providerInstance.translate(translationPayload, effectiveSourceLanguage, targetLanguage, {
           mode,
           abortController,
           messageId,
@@ -293,6 +442,12 @@ export class UnifiedModeCoordinator {
         }),
         timeoutPromise
       ]);
+
+      // Resolution owner finalizes the session source from its own response's
+      // request-local detected language once the provider call completes.
+      if (sourceResolution?.isOwner) {
+        this._finalizePageSourceResolution(sessionId, sourceResolution, response?.detectedLanguage);
+      }
 
       const translatedSegments = (response && typeof response === 'object' && response.translatedText !== undefined) 
         ? response.translatedText 
@@ -327,6 +482,11 @@ export class UnifiedModeCoordinator {
         originalCharCount: totalOriginalChars
       };
     } catch (error) {
+      // Resolution owner batch failed: reject concurrent waiters and clear the
+      // session slot so a later batch may establish a fresh resolver.
+      if (sourceResolution?.isOwner) {
+        this._failPageSourceResolution(sessionId, sourceResolution, error);
+      }
       if (handleError) {
         return await handleError(error, items);
       }
