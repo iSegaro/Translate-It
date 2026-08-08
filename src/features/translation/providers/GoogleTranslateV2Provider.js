@@ -146,150 +146,150 @@ export class GoogleTranslateV2Provider extends BaseTranslateProvider {
     const body = new URLSearchParams();
     body.append("q", combinedText);
 
-    const responseObj = await this._executeApiCall({
-      url: url.toString(),
-      fetchOptions: {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8",
-          "Accept": "*/*",
-          "Sec-Fetch-Dest": "empty",
-          "Sec-Fetch-Mode": "cors",
-          "Sec-Fetch-Site": "same-origin",
-          "Referer": new URL(apiUrl).origin + "/",
-          "Priority": "u=1, i"
+    const chunkResponse = await this._executeApiCall({
+        url: url.toString(),
+        fetchOptions: {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8",
+            "Accept": "*/*",
+            "Sec-Fetch-Dest": "empty",
+            "Sec-Fetch-Mode": "cors",
+            "Sec-Fetch-Site": "same-origin",
+            "Referer": new URL(apiUrl).origin + "/",
+            "Priority": "u=1, i"
+          },
+          body: body.toString()
         },
-        body: body.toString()
-      },
-      extractResponse: (data) => {
-        if (!data || (!data[0] && !data.sentences)) {
-          const error = new Error('Google V2 response has invalid format');
-          error.type = ErrorTypes.API_RESPONSE_INVALID;
-          throw error;
-        }
-
-        // Capture detected source language if available
-        // dj=1 uses data.src, legacy uses index 2 or index 8
-        this._setDetectedLanguage(data.src || data[2] || (data[8] && data[8][0] && data[8][0][0]));
-
-        // For single segments, keep existing stable behavior but add JSON support
-        if (chunkTexts.length === 1) {
-          const sourceText = getTextInfo(chunkTexts[0]).text;
-
-          // If dj=1 was used, data.sentences will exist
-          if (data.sentences) {
-            const translatedText = normalizeGoogleSlashDashArtifact(
-              data.sentences
-              .filter(s => s.trans)
-              .map(s => s.trans)
-              .join(''),
-              sourceText
-            );
-            
-            // Pass the whole data object for rich markdown formatting
-            const response = { translatedText, candidateText: shouldIncludeDictionary ? data : "" };
-            return response;
+        extractResponse: (data) => {
+          if (!data || (!data[0] && !data.sentences)) {
+            const error = new Error('Google V2 response has invalid format');
+            error.type = ErrorTypes.API_RESPONSE_INVALID;
+            throw error;
           }
 
-          // Fallback to legacy array format
-          if (!Array.isArray(data[0])) {
+          // Capture detected source language if available
+          // dj=1 uses data.src, legacy uses index 2 or index 8
+          this._setDetectedLanguage(data.src || data[2] || (data[8] && data[8][0] && data[8][0][0]));
+
+          // For single segments, keep existing stable behavior but add JSON support
+          if (chunkTexts.length === 1) {
+            const sourceText = getTextInfo(chunkTexts[0]).text;
+
+            // If dj=1 was used, data.sentences will exist
+            if (data.sentences) {
+              const translatedText = normalizeGoogleSlashDashArtifact(
+                data.sentences
+                .filter(s => s.trans)
+                .map(s => s.trans)
+                .join(''),
+                sourceText
+              );
+
+              // Pass the whole data object for rich markdown formatting
+              const response = { translatedText, candidateText: shouldIncludeDictionary ? data : "" };
+              return response;
+            }
+
+            // Fallback to legacy array format
+            if (!Array.isArray(data[0])) {
+              const error = new Error('Google V2 response has invalid segment data');
+              error.type = ErrorTypes.API_RESPONSE_INVALID;
+              throw error;
+            }
+            const translatedText = normalizeGoogleSlashDashArtifact(
+              data[0].map(segment => segment[0] || "").join(''),
+              sourceText
+            );
+
+            let candidateText = "";
+            if (shouldIncludeDictionary && data[1]) {
+              candidateText = data[1].map((dict) => {
+                const pos = dict[0] || "";
+                const terms = dict[1] || [];
+                return `${pos}${pos !== "" ? ": " : ""}${terms.join(", ")}\n`;
+              }).join("");
+            }
+            return { translatedText, candidateText: candidateText.trim() };
+          }
+
+          // For multiple segments, reconstruct the array to prevent delimiter leakage.
+          // Multiple segments NEVER use dj=1 in our implementation, so we keep the legacy logic.
+          const segments = data[0];
+          if (!Array.isArray(segments)) {
             const error = new Error('Google V2 response has invalid segment data');
             error.type = ErrorTypes.API_RESPONSE_INVALID;
             throw error;
           }
-          const translatedText = normalizeGoogleSlashDashArtifact(
-            data[0].map(segment => segment[0] || "").join(''),
-            sourceText
-          );
-          
-          let candidateText = "";
-          if (shouldIncludeDictionary && data[1]) {
-            candidateText = data[1].map((dict) => {
-              const pos = dict[0] || "";
-              const terms = dict[1] || [];
-              return `${pos}${pos !== "" ? ": " : ""}${terms.join(", ")}\n`;
-            }).join("");
-          }
-          return { translatedText, candidateText: candidateText.trim() };
-        }
+          const results = new Array(chunkTexts.length).fill("");
+          let currentIdx = 0;
+          let inDelimiterZone = false;
 
-        // For multiple segments, reconstruct the array to prevent delimiter leakage.
-        // Multiple segments NEVER use dj=1 in our implementation, so we keep the legacy logic.
-        const segments = data[0];
-        if (!Array.isArray(segments)) {
-          const error = new Error('Google V2 response has invalid segment data');
-          error.type = ErrorTypes.API_RESPONSE_INVALID;
-          throw error;
-        }
-        const results = new Array(chunkTexts.length).fill("");
-        let currentIdx = 0;
-        let inDelimiterZone = false;
+          const delimiterToken = TRANSLATION_CONSTANTS.TEXT_DELIMITER.trim();
+          for (const segment of segments) {
+            const trans = segment[0] || "";
+            const orig = segment[1] || "";
 
-        for (const segment of segments) {
-          const trans = segment[0] || "";
-          const orig = segment[1] || "";
-          
-          // Identify if this segment is part of the delimiter pattern
-          const isDelimiterPart = /^[[\]\s\n\r.——–…ـ·・-]+$/.test(orig) && 
-                                  (orig.includes('-') || orig.includes('.') || orig.includes('[') || orig.includes(']') || 
-                                   orig.includes('—') || orig.includes('–') || orig.includes('…') || orig.includes('ـ') || 
-                                   orig.includes('·') || orig.includes('・'));
-          
-          if (isDelimiterPart) {
-            if (!inDelimiterZone) {
-              currentIdx++;
-              inDelimiterZone = true;
+            const isStructuralDelimiter = orig.trim() === delimiterToken;
+
+            if (isStructuralDelimiter) {
+              if (!inDelimiterZone) {
+                currentIdx++;
+                inDelimiterZone = true;
+              }
+              continue;
             }
-            continue;
+
+            // Delimiter-like orig WITH meaningful translated text is real content.
+            // Also: any non-delimiter orig is real content. In both cases, write
+            // the translation to the current logical slot.
+            inDelimiterZone = false;
+            if (currentIdx < results.length) {
+              const cleanTrans = TraditionalTextProcessor.scrubBidiArtifacts(trans);
+              results[currentIdx] += cleanTrans;
+            }
           }
 
-          inDelimiterZone = false;
-          if (currentIdx < results.length) {
-            const cleanTrans = TraditionalTextProcessor.scrubBidiArtifacts(trans);
-            results[currentIdx] += cleanTrans;
+          const hasEmpty = results.some((r, i) => !r.trim() && chunkTexts[i] && getTextInfo(chunkTexts[i]).text.trim());
+          if (hasEmpty) {
+            const error = new Error('Google V2 response omitted a translated segment');
+            error.type = ErrorTypes.API_RESPONSE_INVALID;
+            throw error;
           }
-        }
 
-        const hasEmpty = results.some((r, i) => !r.trim() && chunkTexts[i] && getTextInfo(chunkTexts[i]).text.trim());
-        if (hasEmpty) {
-          const error = new Error('Google V2 response omitted a translated segment');
-          error.type = ErrorTypes.API_RESPONSE_INVALID;
-          throw error;
-        }
+          return { translatedText: results, candidateText: "" };
+        },
+        context: 'googlev2-translate-chunk',
+        abortController,
+        sessionId: options.sessionId,
+        charCount: this._calculateTraditionalCharCount(chunkTexts),
+        originalCharCount: options.originalCharCount || TraditionalTextProcessor.calculateTraditionalCharCount(chunkTexts)
+      });
 
-        return { translatedText: results, candidateText: "" };
-      },
-      context: 'googlev2-translate-chunk',
-      abortController,
-      sessionId: options.sessionId,
-      charCount: this._calculateTraditionalCharCount(chunkTexts),
-      originalCharCount: options.originalCharCount || TraditionalTextProcessor.calculateTraditionalCharCount(chunkTexts)
-    });
+      // Handle dictionary formatting for single segment
+      if (chunkTexts.length === 1 && chunkResponse?.candidateText) {
+        const formattedDictionary = await this._formatDictionaryAsMarkdown(chunkResponse.candidateText);
+        const translatedWithDict = `${chunkResponse.translatedText}\n\n${formattedDictionary}`;
 
-    // Handle dictionary formatting for single segment
-    if (chunkTexts.length === 1 && responseObj?.candidateText) {
-      const formattedDictionary = await this._formatDictionaryAsMarkdown(responseObj.candidateText);
-      const translatedWithDict = `${responseObj.translatedText}\n\n${formattedDictionary}`;
-      
-      logger.info(`[GoogleV2] Translation with dictionary completed successfully`);
-      return translatedWithDict;
-    }
+        logger.info(`[GoogleV2] Translation with dictionary completed successfully`);
+        return translatedWithDict;
+      }
 
-    // Return translated text. Coordinator will handle robust splitting for multiple segments.
-    const finalResult = responseObj?.translatedText;
-    if ((typeof finalResult !== 'string' && !Array.isArray(finalResult)) ||
-        (typeof finalResult === 'string' && !finalResult.trim()) ||
-        (Array.isArray(finalResult) && (finalResult.length === 0 || finalResult.some(item => typeof item !== 'string' || !item.trim())))) {
-      const error = new Error('Google V2 response has no translation text');
-      error.type = ErrorTypes.API_RESPONSE_INVALID;
-      throw error;
-    }
+      // Return translated text. Coordinator will handle robust splitting for multiple segments.
+      const finalResult = chunkResponse?.translatedText;
+      if ((typeof finalResult !== 'string' && !Array.isArray(finalResult)) ||
+          (typeof finalResult === 'string' && !finalResult.trim()) ||
+          (Array.isArray(finalResult) && (finalResult.length === 0 || finalResult.some(item => typeof item !== 'string' || !item.trim())))) {
+        const error = new Error('Google V2 response has no translation text');
+        error.type = ErrorTypes.API_RESPONSE_INVALID;
+        throw error;
+      }
 
-    if (finalResult) {
-      logger.info(`[GoogleV2] Translation completed successfully`);
-    }
+      if (finalResult) {
+        logger.info(`[GoogleV2] Translation completed successfully`);
+      }
 
-    return finalResult;
+      return finalResult;
   }
 
   async _formatDictionaryAsMarkdown(candidateData) {

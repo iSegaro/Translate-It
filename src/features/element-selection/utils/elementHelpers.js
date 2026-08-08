@@ -47,6 +47,11 @@ export function hasValidTextContent(element, options = {}) {
     return false;
   }
 
+  // Skip BIDI/zero-width formatting-mark-only text (no visible glyphs to translate)
+  if (DOM_FILTERS.isFormattingOnly(text)) {
+    return false;
+  }
+
   // Skip if the entire text is a technical pattern (URL, Email, etc.)
   if (DOM_FILTERS.isTechnicalPattern(text)) {
     return false;

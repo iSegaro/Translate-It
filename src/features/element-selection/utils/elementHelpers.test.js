@@ -99,6 +99,27 @@ describe('elementHelpers', () => {
       el.textContent = 'Cancel';
       expect(hasValidTextContent(el)).toBe(true);
     });
+
+    it('should return false for BIDI/zero-width formatting-mark-only text', () => {
+      const el = document.createElement('div');
+      el.textContent = '\u200E';
+      expect(hasValidTextContent(el)).toBe(false);
+
+      el.textContent = ' \u200F ';
+      expect(hasValidTextContent(el)).toBe(false);
+
+      el.textContent = '\u200B\u200F';
+      expect(hasValidTextContent(el)).toBe(false);
+    });
+
+    it('should return true when meaningful text contains formatting marks', () => {
+      const el = document.createElement('div');
+      el.textContent = '\u200EHello World';
+      expect(hasValidTextContent(el)).toBe(true);
+
+      el.textContent = 'سلام\u200F';
+      expect(hasValidTextContent(el)).toBe(true);
+    });
   });
 
   describe('isValidTextElement', () => {

@@ -185,6 +185,23 @@ describe('DomTranslatorUtils', () => {
       expect(nodes[0].text).toBe('Actual text');
     });
 
+    it('should reject BIDI/zero-width formatting-mark-only text nodes', () => {
+      const container = document.createElement('div');
+      container.innerHTML = `
+        <p>Readable text</p>
+        <p>\u200E</p>
+        <p>\u200F</p>
+        <p> \u200B </p>
+        <p>\u2060</p>
+      `;
+      document.body.appendChild(container);
+
+      const nodes = collectTextNodes(container);
+
+      expect(nodes.length).toBe(1);
+      expect(nodes[0].text.trim()).toBe('Readable text');
+    });
+
     it('should reject text nodes inside interactive elements (textarea, input, select, button) and contenteditable elements recursively', () => {
       const container = document.createElement('div');
       container.innerHTML = `
@@ -263,6 +280,30 @@ describe('DomTranslatorUtils', () => {
       expect(units[0].text).toBe('Hello world');
       expect(units[0].leadingWS).toBe('  ');
       expect(units[0].trailingWS).toBe(' \n');
+    });
+
+    it('should reject BIDI/zero-width formatting-mark-only text nodes in block grouping mode', () => {
+      const container = document.createElement('div');
+      container.innerHTML = `
+        <p>Readable text</p>
+        <p>\u200E</p>
+        <p> \u200F </p>
+      `;
+      document.body.appendChild(container);
+
+      const originalGetComputedStyle = window.getComputedStyle;
+      window.getComputedStyle = vi.fn().mockReturnValue({
+        display: 'block',
+        visibility: 'visible'
+      });
+
+      try {
+        const units = collectBlockGroups(container);
+        expect(units.length).toBe(1);
+        expect(units[0].text).toBe('Readable text');
+      } finally {
+        window.getComputedStyle = originalGetComputedStyle;
+      }
     });
 
     it('should implement reversible escaping of printable segment delimiters', () => {

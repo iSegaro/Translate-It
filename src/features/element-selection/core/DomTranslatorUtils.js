@@ -300,7 +300,7 @@ export function collectTextNodes(element) {
       }
 
       const trimmed = node.textContent.trim();
-      if (!trimmed || DOM_FILTERS.isTechnicalPattern(trimmed)) {
+      if (!trimmed || DOM_FILTERS.isTechnicalPattern(trimmed) || DOM_FILTERS.isFormattingOnly(trimmed)) {
         return NodeFilter.FILTER_REJECT;
       }
       
@@ -419,7 +419,7 @@ export function collectBlockGroups(element, sessionContext = {}) {
       }
 
       const trimmed = node.textContent.trim();
-      if (!trimmed || DOM_FILTERS.isTechnicalPattern(trimmed)) {
+      if (!trimmed || DOM_FILTERS.isTechnicalPattern(trimmed) || DOM_FILTERS.isFormattingOnly(trimmed)) {
         return NodeFilter.FILTER_REJECT;
       }
 
