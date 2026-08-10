@@ -106,6 +106,22 @@ function validateV3Parent(sourceText, translatedText, parentId = 'unknown') {
     }
   }
 
+  const orphanDelimiters = translated.structuralFacts.orphanDelimiters
+  if (Array.isArray(orphanDelimiters) && orphanDelimiters.length > 0) {
+    const firstOrphan = orphanDelimiters[0]
+    const intervalIndex = translated.intervals.findIndex((interval) => (
+      firstOrphan >= interval.start && firstOrphan < interval.end
+    ))
+    violations.push({
+      code: 'V3_ORPHAN_DELIMITER',
+      reason: 'ORPHAN_DELIMITER',
+      parentId,
+      count: orphanDelimiters.length,
+      intervalIndex,
+      markerId: intervalIndex >= 0 ? source.intervals[intervalIndex]?.markerId : null,
+    })
+  }
+
   return {
     isValid: violations.length === 0,
     violations,

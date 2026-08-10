@@ -51,6 +51,58 @@ function getMarkerIdentity(raw) {
 }
 
 /**
+ * Escape-token regex for literal delimiter escaping.
+ *
+ * Matches only the canonical tokens produced by BlockGroupReconstructor.injectMarkers()
+ * and restored verbatim by BlockGroupReconstructor.apply():
+ *   @@TI_ESC_<entropy>@@   (entropy = lowercase base36)
+ *   @@TI_ESC@@             (fallback when no entropy is provided)
+ *
+ * Strict by design: marker tolerance (internal whitespace, keyword casing) is NOT
+ * inherited here. A token is masked only when the downstream unescape path can
+ * reliably restore it, so a provider-mutated token stays visible to
+ * orphan-delimiter detection.
+ */
+function createEscapeTokenRegex() {
+  return /@@TI_ESC(?:_[a-z0-9]+)?@@/g
+}
+
+/**
+ * Scan for orphan `@@` delimiters that belong to no valid token.
+ *
+ * Structural-only: positions inside well-formed markers (from the marker regex)
+ * and well-formed escape tokens (TI_ESC) are masked. Any remaining `@@` pair in
+ * the original text is raw delimiter residue that the provider must not emit.
+ *
+ * @param {string} text - The scanned text
+ * @param {Object[]} markers - Discovered valid markers (start/end spans)
+ * @param {Object[]} escapeTokens - Discovered valid escape tokens (start/end spans)
+ * @returns {number[]} Positions of orphan `@@` delimiters in `text`
+ */
+function findOrphanDelimiters(text, markers, escapeTokens) {
+  const ranges = markers.map(({ start, end }) => ({ start, end }))
+    .concat(escapeTokens.map(({ start, end }) => ({ start, end })))
+    .sort((a, b) => a.start - b.start || a.end - b.end)
+
+  const orphans = []
+  let rangeIndex = 0
+  let index = 0
+  while (index < text.length) {
+    while (rangeIndex < ranges.length && ranges[rangeIndex].end <= index) rangeIndex++
+    const current = ranges[rangeIndex]
+    const insideToken = current !== undefined && index >= current.start && index < current.end
+
+    if (text[index] === '@' && text[index + 1] === '@') {
+      if (!insideToken) orphans.push(index)
+      index += 2
+    } else {
+      index += 1
+    }
+  }
+  return orphans
+}
+
+/**
  * Parse observed V3 intervals without applying semantic policy.
  *
  * @param {string} text - Marker-bearing source or translated text
@@ -63,7 +115,7 @@ export function parseV3Intervals(text, options = {}) {
       leadingText: '',
       intervals: [],
       markers: [],
-      structuralFacts: { invalidInput: true, isV3: false },
+      structuralFacts: { invalidInput: true, isV3: false, orphanDelimiters: [] },
     }
   }
 
@@ -85,6 +137,18 @@ export function parseV3Intervals(text, options = {}) {
       end: match.index + raw.length,
     })
   }
+
+  const escapeTokens = []
+  const escapeRegex = createEscapeTokenRegex()
+  let escapeMatch
+  while ((escapeMatch = escapeRegex.exec(text)) !== null) {
+    escapeTokens.push({
+      start: escapeMatch.index,
+      end: escapeMatch.index + escapeMatch[0].length,
+    })
+  }
+
+  const orphanDelimiters = findOrphanDelimiters(text, markers, escapeTokens)
 
   const leadingText = markers.length > 0 ? text.slice(0, markers[0].start) : text
   const intervals = [{
@@ -112,6 +176,7 @@ export function parseV3Intervals(text, options = {}) {
     structuralFacts: {
       invalidInput: false,
       isV3: markers.length > 0,
+      orphanDelimiters,
     },
   }
 }

@@ -78,6 +78,57 @@ describe('TranslationContractValidator', () => {
         expect.objectContaining({ code: 'V3_EMPTY_TRANSLATED_INTERVAL', markerId: 'n3' }),
       ]))
     })
+
+    it('rejects a translated parent carrying orphan delimiter residue', () => {
+      const result = TranslationContractValidator.validateV3Parent(
+        'A@@TI_SEG_e1_s1_n2@@B@@TI_SEG_e1_s1_n3@@C',
+        'X@@TI_SEG_e1_s1_n2@@Y@@TI_SEG_e1_s1_n3@@Z@@',
+        'g5',
+      )
+
+      expect(result.isValid).toBe(false)
+      expect(result.violations).toEqual(expect.arrayContaining([
+        expect.objectContaining({ code: 'V3_ORPHAN_DELIMITER', intervalIndex: 2, markerId: 'n3', count: 1 }),
+      ]))
+    })
+
+    it('reports the leading-interval orphan delimiter with a usable interval index', () => {
+      const result = TranslationContractValidator.validateV3Parent(
+        'Welcome to@@TI_SEG_e1_s1_n2@@Wikipedia',
+        'به @@TI_SEG_e1_s1_n2@@ویکی‌پدیا@@ خوش آمدید',
+        'g1',
+      )
+
+      expect(result.isValid).toBe(false)
+      expect(result.violations).toEqual(expect.arrayContaining([
+        expect.objectContaining({ code: 'V3_ORPHAN_DELIMITER', intervalIndex: 1, markerId: 'n2' }),
+      ]))
+    })
+
+    it('accepts a translated parent whose literal delimiters are escaped', () => {
+      const result = TranslationContractValidator.validateV3Parent(
+        'A@@TI_ESC_e1@@B@@TI_SEG_e1_s1_n2@@C',
+        'X@@TI_ESC_e1@@Y@@TI_SEG_e1_s1_n2@@Z',
+        'g5',
+      )
+
+      expect(result.isValid).toBe(true)
+    })
+
+    it('rejects a translated parent whose TI_ESC token was mutated by the provider', () => {
+      const result = TranslationContractValidator.validateV3Parent(
+        'A@@TI_ESC_e1@@B@@TI_SEG_e1_s1_n2@@C',
+        'X@@TI _ ESC _ e1@@Y@@TI_SEG_e1_s1_n2@@Z',
+        'g5',
+      )
+
+      expect(result.isValid).toBe(false)
+      expect(result.violations).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ code: 'V3_ORPHAN_DELIMITER' }),
+        ]),
+      )
+    })
   })
 
   describe('response identity namespaces', () => {

@@ -227,6 +227,46 @@ describe('AIResponseParser', () => {
       });
     });
 
+    it('reaches selective recovery facts for V3 orphan delimiter residue', () => {
+      const originalBatch = [
+        { i: 'g1', t: 'A' },
+        { i: 'g2', t: 'A@@TI_SEG_e1_s1_n13@@video game publisher@@TI_SEG_e1_s1_n14@@Electronic Arts' },
+        { i: 'g3', t: 'C' },
+      ];
+      const result = AIResponseParser.parseBatchResult(
+        JSON.stringify({ translations: [
+          { id: 'g1', text: 'AA' },
+          { id: 'g2', text: 'خرید@@TI_SEG_e1_s1_n13@@ناشر بازی‌ها@@TI_SEG_e1_s1_n14@@الکترونیک آرتس@@' },
+          { id: 'g3', text: 'CC' },
+        ] }),
+        3,
+        originalBatch,
+        'WebAI',
+        ResponseFormat.JSON_OBJECT,
+        {},
+        createManifestView(createRequestUnitManifest(originalBatch)),
+      );
+
+      expect(result.contractViolation).toBe(true);
+      expect(result.invalidUnits).toEqual([
+        expect.objectContaining({
+          requestIndex: 1,
+          responseId: 'g2',
+          violationCodes: expect.arrayContaining(['V3_ORPHAN_DELIMITER']),
+        }),
+      ]);
+      expect(result.mappingFacts).toEqual({ identityReliable: true, complete: true, ambiguous: false });
+      expect(result.repairContext).toMatchObject({
+        reason: expect.stringContaining('V3_ORPHAN_DELIMITER'),
+        affectedUnits: [expect.objectContaining({
+          requestIndex: 1,
+          responseId: 'g2',
+          markerId: 'n14',
+          sourceText: 'Electronic Arts',
+        })],
+      });
+    });
+
     it('uses manifest identity mapping rather than response order for invalid indexes', () => {
       const originalBatch = [
         { i: 'g1', t: 'A' },
