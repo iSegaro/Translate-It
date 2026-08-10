@@ -62,16 +62,27 @@ flowchart LR
 
     PRE --> CALL[physical provider call]
 
-    subgraph recovery[Ai structured recovery]
-        CALL --> P[AIResponseParser.parseBatchResult]
-        P -->|contractViolation?| CRIT{valid?}
-        CRIT -->|no| DISC[discard primary candidate]
-        CRIT -->|yes| ACCEPT[accepted]
-        DISC --> SEQ[BaseAIProvider sequential recovery]
+    subgraph recovery[Structured recovery — BaseAIProvider]
+        CALL --> P[AIResponseParser]
+        P --> V[TranslationContractValidator]
+        V -->|valid| PC[primary candidate]
+        V -->|contractViolation| DISC[discard primary candidate]
+        DISC --> FACTS[parser / mapping facts]
+        FACTS -->|safe mapping| SEL[selective recovery<br/>preserve valid primaries]
+        FACTS -->|unsafe mapping| FULL[full sequential recovery<br/>recover full batch]
+        SEL --> MERGE[merge recovered values<br/>into original indexes]
+        FULL --> REPL[recovered batch candidate]
+        PC --> FINAL[final candidate]
+        MERGE --> FINAL
+        REPL --> FINAL
+        FINAL --> OH[OptimizedJsonHandler<br/>pre-stream validation]
+        OH -->|valid| ACCEPTED[accepted result]
+        OH -->|invalid| FAIL[typed provider failure]
+        ACCEPTED --> OUT[stream / delivery]
     end
 ```
 
-Separate bounded mechanisms — do not merge them: **retry** (`QueueManager`) is the same item, **key failover** (`ProviderRequestEngine`/`ApiKeyManager`) is the same provider's keys, **structured recovery** (`BaseAIProvider`) is one sequential pass. No single cross-layer total-attempt guard exists.
+Separate bounded mechanisms — do not merge them: **retry** (`QueueManager`) is the same item, **key failover** (`ProviderRequestEngine`/`ApiKeyManager`) is the same provider's keys, **structured recovery** (`BaseAIProvider`) is one provider-local pass that is selective when mapping is safe and full sequential otherwise. `AIResponseParser` parses and produces facts; `TranslationContractValidator` decides semantic validity; recovery merges or replaces the candidate before final validation and stream visibility. No single cross-layer total-attempt guard exists. Recovery failure produces a typed provider failure; no second recovery pass or source fallback is introduced.
 
 ---
 
@@ -84,13 +95,13 @@ stateDiagram-v2
     Staged --> Parsed: parse / validate
     Parsed --> Crit{accepted?}
 
-    Crit --> Commit: yes (abort check)
-    Commit --> [*]: commit once
-
     Crit --> Discard: contract violation
     Discard --> Recovery
     Recovery --> Done: return result
     Done --> [*]: no conversation commit
+
+    Crit --> Commit: yes (abort check)
+    Commit --> [*]: commit once
 
     Parsed --> Fail: failure / timeout / cancel
     Fail --> Discard2: discard
@@ -101,7 +112,7 @@ stateDiagram-v2
     }
 ```
 
-`STRUCTURED_RECOVERY` never participates in conversation history. A timed-out/cancelled request discards its candidate; the external outcome stays `TRANSLATION_TIMEOUT` or `USER_CANCELLED`.
+`STRUCTURED_RECOVERY` never participates in conversation history. A timed-out/cancelled request discards its candidate; the external outcome stays `TRANSLATION_TIMEOUT` or `USER_CANCELLED`. Recovery may be selective or full per provider policy; either way, no history entry is committed.
 
 ---
 
@@ -201,6 +212,8 @@ High-level mutation owners. See [FEATURE_CONTRACTS.md](../contracts/FEATURE_CONT
 
 - [TRANSLATION_SYSTEM.md](TRANSLATION_SYSTEM.md) — architecture guide and runtime freeze.
 - [../contracts/FEATURE_CONTRACTS.md](../contracts/FEATURE_CONTRACTS.md) — feature observable contracts.
-- [../contracts/PROVIDER_CONTRACT.md](../contracts/PROVIDER_CONTRACT.md) — provider/retry/health/stats contracts.
-- [../contracts/CONVERSATION_CONTRACT.md](../contracts/CONVERSATION_CONTRACT.md) — conversation candidate lifecycle.
+- [../contracts/PROVIDER_CONTRACT.md](../contracts/PROVIDER_CONTRACT.md) — provider/retry/health/stats contracts and structured-recovery guarantees.
+- [../contracts/CONVERSATION_CONTRACT.md](../contracts/CONVERSATION_CONTRACT.md) — conversation candidate lifecycle and recovery history exclusion.
 - [../contracts/TRANSLATION_IDENTITY_AND_FRAGMENT_CONTRACT.md](../contracts/TRANSLATION_IDENTITY_AND_FRAGMENT_CONTRACT.md) — identity / fragment contract.
+- [../TRANSLATION_PROVIDER_LOGIC.md](../TRANSLATION_PROVIDER_LOGIC.md) — structured-response execution and recovery policy.
+- [../../adr/ADR-015-translation-outcome-semantics.md](../../adr/ADR-015-translation-outcome-semantics.md) — architectural decisions and deferred outcome adoption.
