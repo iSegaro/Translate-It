@@ -146,6 +146,29 @@ describe('AIConversationHelper', () => {
     expect(translationSessionManager.sessions.get('recovery-session')).toEqual(before);
   });
 
+  it('renders repair context only for structured recovery prompts', async () => {
+    const { getPromptAsync, getPromptBASEAIBatchAsync } = await import('@/shared/config/config.js');
+    getPromptAsync.mockResolvedValue('translate instructions');
+    getPromptBASEAIBatchAsync.mockResolvedValue('batch $_{PROMPT_INSTRUCTIONS} $_{TEXT}');
+    const repairContext = {
+      reason: 'V3_EMPTY_TRANSLATED_INTERVAL',
+      affectedUnits: [{ requestIndex: 1, responseId: '1', markerId: 'n13', sourceText: 'video game publisher' }],
+    };
+
+    const recovery = await AIConversationHelper.preparePromptAndText(
+      ['source'], 'en', 'fa', 'select-element', 'ai', null,
+      { callPurpose: TranslationCallPurpose.STRUCTURED_RECOVERY, repairContext },
+    );
+    const primary = await AIConversationHelper.preparePromptAndText(
+      ['source'], 'en', 'fa', 'select-element', 'ai', null,
+      { callPurpose: TranslationCallPurpose.PRIMARY_TRANSLATION, repairContext },
+    );
+
+    expect(recovery.systemPrompt).toContain('Structured recovery repair context:');
+    expect(recovery.systemPrompt).toContain('V3_EMPTY_TRANSLATED_INTERVAL');
+    expect(primary.systemPrompt).not.toContain('Structured recovery repair context:');
+  });
+
   it.each([
     ['primary', TranslationCallPurpose.PRIMARY_TRANSLATION],
     ['missing', undefined],

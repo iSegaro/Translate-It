@@ -50,6 +50,58 @@ function createConversationCommitCandidate() {
   };
 }
 
+function getSelectiveRecoveryPlan(parsed, texts) {
+  const invalidUnits = Array.isArray(parsed?.invalidUnits) ? parsed.invalidUnits : [];
+  const mappingFacts = parsed?.mappingFacts;
+  if (!Array.isArray(texts)
+      || !Array.isArray(parsed?.results)
+      || parsed.results.length !== texts.length) {
+    return null;
+  }
+  if (!mappingFacts?.identityReliable) {
+    return null;
+  }
+  if (!mappingFacts.complete) {
+    return null;
+  }
+  if (mappingFacts.ambiguous) {
+    return null;
+  }
+  if (invalidUnits.length === 0) {
+    return null;
+  }
+
+  const indexes = invalidUnits.map(({ requestIndex }) => requestIndex);
+  if (indexes.some((index) => !Number.isInteger(index) || index < 0 || index >= texts.length)) {
+    return null;
+  }
+  const invalidIndexes = [...new Set(indexes)].sort((a, b) => a - b);
+  if (invalidIndexes.length !== indexes.length) {
+    return null;
+  }
+  if (invalidIndexes.length >= texts.length) {
+    return null;
+  }
+  if (invalidIndexes.some((index) => parsed.results[index] === undefined)) {
+    return null;
+  }
+
+  return {
+    invalidIndexes,
+    recoveryTexts: invalidIndexes.map((index) => texts[index]),
+  };
+}
+
+function validateSelectiveRecoveryResult(recoveryResult, expectedCount) {
+  const values = Array.isArray(recoveryResult) ? recoveryResult : [recoveryResult];
+  if (values.length !== expectedCount || values.some((value) => typeof value !== 'string' || value.trim() === '')) {
+    const error = new Error(`Selective structured recovery returned ${values.length} invalid results; expected ${expectedCount}`);
+    error.type = ErrorTypes.API_RESPONSE_INVALID;
+    throw error;
+  }
+  return values;
+}
+
 export class BaseAIProvider extends BaseProvider {
   // AI-specific capabilities - to be overridden by subclasses
   static isAI = true;
@@ -197,6 +249,7 @@ export class BaseAIProvider extends BaseProvider {
       // the canonical structured-batch array shape so downstream contract cleaning
       // (ProviderCoordinator._cleanResult) receives the same shape as the normal path.
       if (parsed.contractViolation) {
+        const selectivePlan = getSelectiveRecoveryPlan(parsed, texts);
         conversationCommitCandidate?.discard();
         logger.warn(`[${this.providerName}] Structured response violated its contract; sequential recovery started`);
         appendTranslationDiagnostic(executionContext, {
@@ -209,7 +262,7 @@ export class BaseAIProvider extends BaseProvider {
 
         let recoveryResult;
         try {
-          recoveryResult = await this.executeSequentialBatch(texts, sourceLang, targetLang, {
+          recoveryResult = await this.executeSequentialBatch(selectivePlan?.recoveryTexts || texts, sourceLang, targetLang, {
             translateMode,
             engine,
             messageId,
@@ -218,6 +271,7 @@ export class BaseAIProvider extends BaseProvider {
             sessionId,
             expectedFormat: ResponseFormat.STRING,
             contextMetadata,
+            repairContext: parsed.repairContext,
             callPurpose: TranslationCallPurpose.STRUCTURED_RECOVERY,
           });
         } catch (error) {
@@ -233,12 +287,25 @@ export class BaseAIProvider extends BaseProvider {
           throw error;
         }
 
+        const recoveryValues = selectivePlan
+          ? validateSelectiveRecoveryResult(recoveryResult, selectivePlan.invalidIndexes.length)
+          : (Array.isArray(recoveryResult) ? recoveryResult : [recoveryResult]);
+        const finalResults = selectivePlan
+          ? (() => {
+            const merged = [...parsed.results];
+            selectivePlan.invalidIndexes.forEach((index, recoveryIndex) => {
+              merged[index] = recoveryValues[recoveryIndex];
+            });
+            return merged;
+          })()
+          : recoveryValues;
+
         appendTranslationDiagnostic(executionContext, {
           type: 'RECOVERY_SUCCEEDED',
           stage: 'recovery',
           provider: this.providerName,
         });
-        return Array.isArray(recoveryResult) ? recoveryResult : [recoveryResult];
+        return finalResults;
       }
 
       acceptedResults = parsed.results;
@@ -322,11 +389,19 @@ export class BaseAIProvider extends BaseProvider {
     sessionId,
     expectedFormat,
     contextMetadata = {},
+    repairContext = null,
     callPurpose,
   } = {}) {
     return this._traditionalBatchTranslate(
       texts, sourceLang, targetLang, translateMode, engine, messageId, abortController,
-      priority, sessionId, expectedFormat, { ...contextMetadata, ...(callPurpose && { callPurpose }) }
+      priority,
+      sessionId,
+      expectedFormat,
+      {
+        ...contextMetadata,
+        ...(repairContext && { repairContext }),
+        ...(callPurpose && { callPurpose }),
+      }
     );
   }
 

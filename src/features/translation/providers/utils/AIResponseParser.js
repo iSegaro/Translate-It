@@ -69,6 +69,9 @@ function evaluateStructuredCandidate({ validationResult, mappingFacts, originalB
   }
 
   const validatorCodes = new Set(validationResult?.violations?.map(({ code }) => code));
+  if (validationResult?.violations?.some(({ code }) => code.startsWith('V3_'))) {
+    reasons.push('V3_MARKER_CONTRACT');
+  }
   if (!hasUnresolvedSlots && reasons.length === 0 && (
     validatorCodes.has('CARDINALITY_MISMATCH') ||
     validatorCodes.has('UNEXPECTED_POSITION') ||
@@ -82,6 +85,114 @@ function evaluateStructuredCandidate({ validationResult, mappingFacts, originalB
     reasons: [...new Set(reasons)],
     warnings,
   };
+}
+
+function createParserFacts({
+  validationResult,
+  snapshot,
+  originalBatch,
+  manifestView,
+  rawItems,
+  mappedRawUnits,
+  duplicateMappedIndexes,
+  identityPositionalFallback,
+  unresolvedIds,
+  unknownIdCount,
+  missingCount,
+  expectedCount,
+  mappedRequestIndexesByResponseIndex,
+}) {
+  const violations = Array.isArray(validationResult?.violations) ? validationResult.violations : [];
+  const invalidUnits = Array.isArray(validationResult?.invalidUnits) ? validationResult.invalidUnits : [];
+  const identityMode = manifestView?.declaredMappingStrategy === MappingStrategy.IDENTITY_REQUIRED;
+  const missingResponseId = violations.some(({ code }) => code === 'MISSING_RESPONSE_ID');
+  const ambiguous = duplicateMappedIndexes.size > 0
+    || identityPositionalFallback
+    || unresolvedIds.length > 0
+    || unknownIdCount > 0
+    || (identityMode && missingResponseId);
+  const identityReliable = !ambiguous && (!identityMode || snapshot.units.every((unit) => unit.hasResponseId));
+  const complete = rawItems.length === expectedCount && missingCount === 0 && !ambiguous;
+  const codesByIndex = new Map();
+  const addCode = (index, code) => {
+    if (!Number.isInteger(index) || typeof code !== 'string') return;
+    const codes = codesByIndex.get(index) || new Set();
+    codes.add(code);
+    codesByIndex.set(index, codes);
+  };
+
+  violations.forEach(({ index, code }) => addCode(index, code));
+  duplicateMappedIndexes.forEach((index) => addCode(index, 'DUPLICATE_MAPPED_SLOT'));
+  mappedRawUnits.forEach((unit, index) => {
+    const sourceText = getSourceText(originalBatch[index]);
+    if (!unit.hasTranslatedText || typeof unit.translatedText !== 'string') {
+      addCode(index, 'INVALID_TRANSLATED_TEXT');
+    } else if (!isBlankText(sourceText) && isBlankText(unit.translatedText)) {
+      addCode(index, 'EMPTY_TRANSLATED_TEXT');
+    }
+  });
+
+  const invalidFactsByIndex = new Map(invalidUnits
+    .filter(({ index }) => Number.isInteger(index))
+    .map((unit) => [unit.index, unit]));
+  const invalidIndexes = new Set([...codesByIndex.keys(), ...invalidFactsByIndex.keys()]);
+  const parserInvalidUnits = [...invalidIndexes].sort((a, b) => a - b).map((index) => {
+    const invalidUnit = invalidFactsByIndex.get(index);
+    const provenRequestIndex = mappedRequestIndexesByResponseIndex.get(index);
+    const requestIndex = identityReliable && Number.isInteger(provenRequestIndex)
+      ? provenRequestIndex
+      : null;
+    return {
+      requestIndex,
+      responseId: invalidUnit?.responseId ?? snapshot.units[index]?.responseId ?? null,
+      violationCodes: [...(codesByIndex.get(index) || [])],
+    };
+  });
+
+  return {
+    invalidUnits: parserInvalidUnits,
+    mappingFacts: { identityReliable, complete, ambiguous },
+  };
+}
+
+function createRepairContext(parserFacts, validationResult, snapshot, originalBatch) {
+  if (!Array.isArray(parserFacts?.invalidUnits) || parserFacts.invalidUnits.length === 0) return null;
+
+  const violations = Array.isArray(validationResult?.violations) ? validationResult.violations : [];
+  const invalidFacts = Array.isArray(validationResult?.invalidUnits) ? validationResult.invalidUnits : [];
+  const responseIndexById = new Map(invalidFacts
+    .filter(({ index, responseId }) => Number.isInteger(index) && responseId !== null && responseId !== undefined)
+    .map(({ index, responseId }) => [String(responseId), index]));
+  const violationCodes = [...new Set(violations.map(({ code }) => code).filter((code) => typeof code === 'string'))];
+
+  const affectedUnits = parserFacts.invalidUnits.map(({ requestIndex, responseId, violationCodes: unitCodes }) => {
+    const responseIndex = responseIndexById.get(String(responseId));
+    const sourceText = requestIndex !== null && requestIndex !== undefined
+      ? getSourceText(originalBatch[requestIndex])
+      : undefined;
+    const translatedText = Number.isInteger(responseIndex) ? snapshot.units[responseIndex]?.translatedText : undefined;
+    let markerId;
+    let affectedSourceText = sourceText;
+
+    if (unitCodes.some((code) => code.startsWith('V3_')) && typeof sourceText === 'string') {
+      const v3Result = TranslationContractValidator.validateV3Parent(sourceText, translatedText, responseId);
+      const v3Violation = v3Result?.violations.find(({ code }) => code.startsWith('V3_'));
+      const interval = Number.isInteger(v3Violation?.intervalIndex)
+        ? v3Result.source.intervals[v3Violation.intervalIndex]
+        : null;
+      markerId = v3Violation?.markerId ?? interval?.markerId;
+      affectedSourceText = interval?.text ?? sourceText;
+    }
+
+    return {
+      requestIndex,
+      responseId,
+      ...(markerId ? { markerId } : {}),
+      ...(typeof affectedSourceText === 'string' ? { sourceText: affectedSourceText } : {}),
+    };
+  });
+
+  return { reason: violationCodes.join(','), affectedUnits };
 }
 
 /**
@@ -289,16 +400,20 @@ export const AIResponseParser = {
       if (!parsed) throw new Error('Empty or invalid response');
 
       let rawItems = this._normalizeToItems(parsed);
+      const plainStringBatch = originalBatch.every((item) => typeof item === 'string');
       const snapshot = createParserSnapshot(rawItems, parserEvidence);
       let validationResult = null;
       if (hasValidManifestView(manifestView, expectedCount)) {
-        validationResult = TranslationContractValidator.validate(manifestView, snapshot, parserEvidence);
-        observeValidationResult(executionContext, validationResult);
+        validationResult = TranslationContractValidator.validate(manifestView, snapshot, parserEvidence, {
+          sourceItems: originalBatch,
+          responseIdentityMode: plainStringBatch ? 'positional-wire' : 'logical',
+        });
+       observeValidationResult(executionContext, validationResult);
       }
       const results = new Array(expectedCount).fill(null);
       const unmappedTexts = [];
       const mappedIndexes = new Set();
-      const plainStringBatch = originalBatch.every((item) => typeof item === 'string');
+      const mappedRequestIndexesByResponseIndex = new Map();
       const positionalWithoutIds = plainStringBatch && snapshot.units.every((unit) => !unit.hasResponseId);
       const responseIds = [];
       const unresolvedIds = [];
@@ -333,6 +448,7 @@ export const AIResponseParser = {
             identityPositionalFallback = true;
           }
           mappedIndexes.add(idx);
+          mappedRequestIndexesByResponseIndex.set(responseIndex, idx);
           results[idx] = text;
           resolvedIndexes.push(idx);
           mappedRawUnits.set(idx, snapshot.units[responseIndex]);
@@ -373,6 +489,27 @@ export const AIResponseParser = {
         originalBatch,
       });
       const contractViolation = policyResult.invalid;
+      const parserFacts = contractViolation
+        ? createParserFacts({
+          validationResult,
+          snapshot,
+          originalBatch,
+          manifestView,
+          rawItems,
+          mappedRawUnits,
+          duplicateMappedIndexes,
+          identityPositionalFallback,
+          unresolvedIds,
+          unknownIdCount,
+          missingCount,
+          expectedCount,
+          mappedRequestIndexesByResponseIndex,
+        })
+        : null;
+      const repairContext = parserFacts
+        ? createRepairContext(parserFacts, validationResult, snapshot, originalBatch)
+        : null;
+
       if (policyResult.warnings.length > 0) {
         appendTranslationDiagnostic(executionContext, {
           type: 'STRUCTURED_CONTRACT_WARNING',
@@ -398,6 +535,8 @@ export const AIResponseParser = {
       return {
         results: this._fillResultsGaps(results, unmappedTexts, expectedCount),
         contractViolation,
+        ...(parserFacts || {}),
+        ...(repairContext ? { repairContext } : {}),
       };
     } catch (error) {
       logger.error(`[${providerName}] Strict parse failed: ${error.message}`);
@@ -412,6 +551,8 @@ export const AIResponseParser = {
       return {
         results: Array(originalBatch.length).fill(''),
         contractViolation: true,
+        invalidUnits: [],
+        mappingFacts: { identityReliable: false, complete: false, ambiguous: true },
       };
     }
   },

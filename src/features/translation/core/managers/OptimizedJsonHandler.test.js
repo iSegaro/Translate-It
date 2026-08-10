@@ -526,6 +526,59 @@ describe('OptimizedJsonHandler', () => {
       expect(result.success).toBe(true);
     });
 
+    it('rejects an ownership-invalid parent before stream visibility', async () => {
+      const browser = (await import('webextension-polyfill')).default;
+      browser.tabs.sendMessage.mockClear();
+
+      const source = 'Purchases@@TI_SEG_e1_s1_n13@@video game publisher@@TI_SEG_e1_s1_n14@@Electronic Arts';
+      const translated = 'خرید@@TI_SEG_e1_s1_n13@@ @@TI_SEG_e1_s1_n14@@الکترونیک آرتس';
+      const payload = [{ t: source, i: 'g5' }];
+      mockEngine.createIntelligentBatches = vi.fn(() => [payload]);
+      mockProvider.translate.mockResolvedValueOnce({ translatedText: [translated] });
+
+      const result = await handler.execute(
+        mockEngine,
+        { ...mockData, sourceLanguage: 'en', text: JSON.stringify(payload) },
+        mockProvider, 'en', 'fa', 'msg-v3-ownership-invalid', mockSender,
+      );
+
+      const updates = browser.tabs.sendMessage.mock.calls
+        .map(([, message]) => message)
+        .filter((message) => message.action === MessageActions.TRANSLATION_STREAM_UPDATE);
+      const diagnostic = appendTranslationDiagnostic.mock.calls.find(([, value]) => value?.type === 'V3_MARKER_CONTRACT_REJECTED');
+
+      expect(result.success).toBe(false);
+      expect(updates).toHaveLength(0);
+      expect(diagnostic?.[1]).toMatchObject({ reason: 'V3_EMPTY_TRANSLATED_INTERVAL', parentId: 'g5' });
+    });
+
+    it('rejects a foreign marker identity before stream visibility', async () => {
+      const browser = (await import('webextension-polyfill')).default;
+      browser.tabs.sendMessage.mockClear();
+
+      const source = 'A@@TI_SEG_e1_s1_n13@@B';
+      const translated = 'الف@@TI_SEG_e1_s1_N13@@ب';
+      const payload = [{ t: source, i: 'g5' }];
+      mockEngine.createIntelligentBatches = vi.fn(() => [payload]);
+      mockProvider.translate.mockResolvedValueOnce({ translatedText: [translated] });
+
+      const result = await handler.execute(
+        mockEngine,
+        { ...mockData, sourceLanguage: 'en', text: JSON.stringify(payload) },
+        mockProvider, 'en', 'fa', 'msg-v3-foreign-identity', mockSender,
+      );
+
+      const updates = browser.tabs.sendMessage.mock.calls
+        .map(([, message]) => message)
+        .filter((message) => message.action === MessageActions.TRANSLATION_STREAM_UPDATE);
+      const diagnostic = appendTranslationDiagnostic.mock.calls.find(([, value]) => value?.type === 'V3_MARKER_CONTRACT_REJECTED');
+
+      expect(result.success).toBe(false);
+      expect(result.error.type).toBe(ErrorTypes.VALIDATION);
+      expect(updates).toHaveLength(0);
+      expect(diagnostic?.[1]).toMatchObject({ reason: 'MARKER_SEQUENCE_MISMATCH', parentId: 'g5' });
+    });
+
     it('rejects V3 markers stripped entirely from translated output (source-side gating)', async () => {
       const browser = (await import('webextension-polyfill')).default;
       browser.tabs.sendMessage.mockClear();
@@ -586,7 +639,7 @@ describe('OptimizedJsonHandler', () => {
       const source = `${marker}text`;
       const payload = [{ t: source, i: 'n1' }];
       mockEngine.createIntelligentBatches = vi.fn(() => [payload]);
-      mockProvider.translate.mockResolvedValueOnce({ translatedText: [`text${whitespaceMarker}`] });
+      mockProvider.translate.mockResolvedValueOnce({ translatedText: [`text${whitespaceMarker}translated`] });
 
       const result = await handler.execute(
         mockEngine,

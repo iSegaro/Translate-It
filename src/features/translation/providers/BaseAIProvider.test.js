@@ -72,9 +72,9 @@ class MockAIProvider extends BaseAIProvider {
 describe('BaseAIProvider', () => {
   let provider;
 
-  beforeEach(() => {
-    vi.clearAllMocks();
-    provider = new MockAIProvider();
+beforeEach(() => {
+  vi.clearAllMocks();
+  provider = new MockAIProvider();
     vi.mocked(isFatalError).mockReturnValue(false);
     vi.mocked(isTransientError).mockReturnValue(false);
     vi.mocked(matchErrorToType).mockReturnValue('UNKNOWN');
@@ -634,6 +634,138 @@ describe('BaseAIProvider', () => {
         [{ i: 'n1', t: 'A' }, { i: 'n2', t: 'B' }], 'en', 'fa', 'select-element', null, null, 'rec-fail', 'session-1', null, ResponseFormat.JSON_ARRAY
       )).rejects.toBe(error);
       expect(recoverySpy).toHaveBeenCalledTimes(1);
+    });
+
+    it('selectively recovers one reliable invalid middle item and preserves valid results', async () => {
+      const { AIResponseParser } = await import('./utils/AIResponseParser.js');
+      AIResponseParser.parseBatchResult.mockReturnValue({
+        results: ['A', 'invalid', 'C'],
+        contractViolation: true,
+        invalidUnits: [{ requestIndex: 1, responseId: '1', violationCodes: ['V3_EMPTY_TRANSLATED_INTERVAL'] }],
+        mappingFacts: { identityReliable: true, complete: true, ambiguous: false },
+        repairContext: {
+          reason: 'V3_EMPTY_TRANSLATED_INTERVAL',
+          affectedUnits: [{ requestIndex: 1, responseId: '1', markerId: 'n13', sourceText: 'video game publisher' }],
+        },
+      });
+      const recoverySpy = vi.spyOn(provider, '_traditionalBatchTranslate').mockResolvedValue(['B']);
+
+      const result = await provider._translateBatch(['a', 'b', 'c'], 'en', 'fa', 'select-element');
+
+      expect(recoverySpy.mock.calls[0][0]).toEqual(['b']);
+      expect(recoverySpy.mock.calls[0][10]).toMatchObject({
+        repairContext: expect.objectContaining({ reason: 'V3_EMPTY_TRANSLATED_INTERVAL' }),
+      });
+      expect(result).toEqual(['A', 'B', 'C']);
+    });
+
+    it('selectively recovers multiple indexes in sorted original order', async () => {
+      const { AIResponseParser } = await import('./utils/AIResponseParser.js');
+      AIResponseParser.parseBatchResult.mockReturnValue({
+        results: ['A', 'bad-1', 'C', 'bad-2', 'E'],
+        contractViolation: true,
+        invalidUnits: [
+          { requestIndex: 3, responseId: '3', violationCodes: ['EMPTY_TRANSLATED_TEXT'] },
+          { requestIndex: 1, responseId: '1', violationCodes: ['INVALID_TRANSLATED_TEXT'] },
+        ],
+        mappingFacts: { identityReliable: true, complete: true, ambiguous: false },
+      });
+      const recoverySpy = vi.spyOn(provider, '_traditionalBatchTranslate').mockResolvedValue(['B', 'D']);
+
+      const result = await provider._translateBatch(['a', 'b', 'c', 'd', 'e'], 'en', 'fa', 'select-element');
+
+      expect(recoverySpy.mock.calls[0][0]).toEqual(['b', 'd']);
+      expect(result).toEqual(['A', 'B', 'C', 'D', 'E']);
+    });
+
+    it.each([
+      ['first', ['bad', 'B', 'C'], [0], ['A']],
+      ['last', ['A', 'B', 'bad'], [2], ['C']],
+    ])('selectively recovers the %s invalid item', async (_label, primary, invalidIndexes, recovered) => {
+      const { AIResponseParser } = await import('./utils/AIResponseParser.js');
+      AIResponseParser.parseBatchResult.mockReturnValue({
+        results: primary,
+        contractViolation: true,
+        invalidUnits: invalidIndexes.map((requestIndex) => ({ requestIndex, responseId: String(requestIndex), violationCodes: ['EMPTY_TRANSLATED_TEXT'] })),
+        mappingFacts: { identityReliable: true, complete: true, ambiguous: false },
+      });
+      const recoverySpy = vi.spyOn(provider, '_traditionalBatchTranslate').mockResolvedValue(recovered);
+
+      const result = await provider._translateBatch(['A', 'B', 'C'], 'en', 'fa', 'select-element');
+
+      expect(recoverySpy.mock.calls[0][0]).toEqual(invalidIndexes.map((index) => ['A', 'B', 'C'][index]));
+      expect(result).toEqual(['A', 'B', 'C']);
+    });
+
+    it.each([
+      ['missing facts', { results: ['A', 'bad', 'C'], contractViolation: true }],
+      ['ambiguous mapping', {
+        results: ['A', 'bad', 'C'],
+        contractViolation: true,
+        invalidUnits: [{ requestIndex: 1, responseId: '1', violationCodes: ['DUPLICATE_MAPPED_SLOT'] }],
+        mappingFacts: { identityReliable: false, complete: false, ambiguous: true },
+      }],
+      ['invalid request index', {
+        results: ['A', 'bad', 'C'],
+        contractViolation: true,
+        invalidUnits: [{ requestIndex: null, responseId: '1', violationCodes: ['V3_EMPTY_TRANSLATED_INTERVAL'] }],
+        mappingFacts: { identityReliable: true, complete: true, ambiguous: false },
+      }],
+    ])('keeps full-batch recovery for %s', async (_label, parsed) => {
+      const { AIResponseParser } = await import('./utils/AIResponseParser.js');
+      AIResponseParser.parseBatchResult.mockReturnValue(parsed);
+      const recoverySpy = vi.spyOn(provider, '_traditionalBatchTranslate').mockResolvedValue(['A', 'B', 'C']);
+
+      await provider._translateBatch(['a', 'b', 'c'], 'en', 'fa', 'select-element');
+
+      expect(recoverySpy.mock.calls[0][0]).toEqual(['a', 'b', 'c']);
+    });
+
+    it('fails selective recovery on result length mismatch without source fallback', async () => {
+      const { AIResponseParser } = await import('./utils/AIResponseParser.js');
+      AIResponseParser.parseBatchResult.mockReturnValue({
+        results: ['A', 'source-value', 'C'],
+        contractViolation: true,
+        invalidUnits: [
+          { requestIndex: 1, responseId: '1', violationCodes: ['V3_EMPTY_TRANSLATED_INTERVAL'] },
+          { requestIndex: 2, responseId: '2', violationCodes: ['EMPTY_TRANSLATED_TEXT'] },
+        ],
+        mappingFacts: { identityReliable: true, complete: true, ambiguous: false },
+      });
+      vi.spyOn(provider, '_traditionalBatchTranslate').mockResolvedValue(['B']);
+
+      await expect(provider._translateBatch(['a', 'b', 'c'], 'en', 'fa', 'select-element'))
+        .rejects.toMatchObject({ type: ErrorTypes.API_RESPONSE_INVALID });
+    });
+
+    it('fails selective recovery when the recovery request throws', async () => {
+      const { AIResponseParser } = await import('./utils/AIResponseParser.js');
+      const error = Object.assign(new Error('subset failed'), { type: 'NETWORK_ERROR' });
+      AIResponseParser.parseBatchResult.mockReturnValue({
+        results: ['A', 'bad', 'C'],
+        contractViolation: true,
+        invalidUnits: [{ requestIndex: 1, responseId: '1', violationCodes: ['EMPTY_TRANSLATED_TEXT'] }],
+        mappingFacts: { identityReliable: true, complete: true, ambiguous: false },
+      });
+      vi.spyOn(provider, '_traditionalBatchTranslate').mockRejectedValue(error);
+
+      await expect(provider._translateBatch(['a', 'b', 'c'], 'en', 'fa', 'select-element'))
+        .rejects.toBe(error);
+    });
+
+    it('keeps full-batch recovery when every item is invalid', async () => {
+      const { AIResponseParser } = await import('./utils/AIResponseParser.js');
+      AIResponseParser.parseBatchResult.mockReturnValue({
+        results: ['bad-a', 'bad-b', 'bad-c'],
+        contractViolation: true,
+        invalidUnits: [0, 1, 2].map((requestIndex) => ({ requestIndex, responseId: String(requestIndex), violationCodes: ['INVALID_TRANSLATED_TEXT'] })),
+        mappingFacts: { identityReliable: true, complete: true, ambiguous: false },
+      });
+      const recoverySpy = vi.spyOn(provider, '_traditionalBatchTranslate').mockResolvedValue(['A', 'B', 'C']);
+
+      await provider._translateBatch(['a', 'b', 'c'], 'en', 'fa', 'select-element');
+
+      expect(recoverySpy.mock.calls[0][0]).toEqual(['a', 'b', 'c']);
     });
   });
 

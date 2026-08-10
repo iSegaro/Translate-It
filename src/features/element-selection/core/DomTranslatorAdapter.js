@@ -92,8 +92,6 @@ export class DomTranslatorAdapter extends ResourceTracker {
     const { onProgress, onComplete, onError } = options;
     this.logger.operation('Starting element translation');
 
-    const snapshotTime = performance.now();
-    let shadowMutationAudit = null;
     try {
       // Strategy X - Subtree Exclusion Check
       for (const root of activeTranslationRoots) {
@@ -119,25 +117,6 @@ export class DomTranslatorAdapter extends ResourceTracker {
       const originalClone = element.cloneNode(true);
       this.translatedSegmentMap = new Map();
 
-      // --- TEMP: SHADOW MUTATION AUDIT ---
-      if (this.logger?.isDebugEnabled?.()) {
-        const audit = { snapshotTime, mutations: [], observer: null };
-        shadowMutationAudit = audit;
-        audit.observer = new MutationObserver((records) => {
-          for (const record of records) {
-            audit.mutations.push({
-              type: record.type,
-              elapsed: Math.round((performance.now() - snapshotTime) * 100) / 100,
-              targetTag: record.target?.tagName || record.target?.nodeType,
-              addedNodes: Array.from(record.addedNodes).map((n) => n.tagName || (n.nodeType === 3 ? 'TEXT' : 'OTHER')),
-              removedNodes: Array.from(record.removedNodes).map((n) => n.tagName || (n.nodeType === 3 ? 'TEXT' : 'OTHER')),
-            });
-          }
-        });
-        audit.observer.observe(element, { childList: true, subtree: true });
-      }
-      // END TEMP: SHADOW MUTATION AUDIT
-      
       // Resolve provider and target language early to determine extraction strategy
       const [provider, targetLanguage] = await Promise.all([
         options.provider || getEffectiveProviderAsync(TranslationMode.Select_Element),
@@ -334,24 +313,15 @@ export class DomTranslatorAdapter extends ResourceTracker {
 
               if (data.data && Array.isArray(data.data)) {
                 data.data.forEach((translatedItem, index) => {
-               if (translatedItem?.isSplitFragment === true || translatedItem?.isV3Fragment === true) {
-                     this.logger.warn('[DomTranslatorAdapter] Suppressed incomplete fragment event');
-                     return;
-                   }
-                  // Handle both abbreviated and full keys for backward compatibility
-                   const uid = translatedItem?.i || translatedItem?.uid || (data.originalData && (data.originalData[index]?.i || data.originalData[index]?.uid));
-                   const text = translatedItem?.t || translatedItem?.text || translatedItem;
+                   if (translatedItem?.isSplitFragment === true || translatedItem?.isV3Fragment === true) {
+                      this.logger.warn('[DomTranslatorAdapter] Suppressed incomplete fragment event');
+                      return;
+                    }
+                   // Handle both abbreviated and full keys for backward compatibility
+                    const uid = translatedItem?.i || translatedItem?.uid || (data.originalData && (data.originalData[index]?.i || data.originalData[index]?.uid));
+                    const text = translatedItem?.t || translatedItem?.text || translatedItem;
 
-                   // --- TEMP: n13 TRACE ---
-                   if (typeof text === 'string' && text.includes('n13')) {
-                     console.error('[N13_TRACE]', JSON.stringify({
-                       stage: 'provider-raw-response',
-                       matchedTextSnippet: text.substring(Math.max(0, text.indexOf('n13') - 50), text.indexOf('n13') + 100),
-                     }, null, 2));
-                   }
-                   // END TEMP
-
-                  if (isBlockGroupingEnabled && groupMap && groupMap.has(uid)) {
+                   if (isBlockGroupingEnabled && groupMap && groupMap.has(uid)) {
                     const group = groupMap.get(uid);
                     if (group.isV2Passthrough) {
                       const unit = group.units[0];
@@ -365,26 +335,7 @@ export class DomTranslatorAdapter extends ResourceTracker {
                       const anyProcessed = group.units.some(u => processedUids.has(u.id));
                       if (!anyProcessed) {
                         try {
-                          const applyResult = BlockGroupReconstructor.apply(group.units, text, effectiveTargetLanguage, element, this.currentSessionId, this.currentEntropy);
-
-                          // --- TEMP: n13 TRACE ---
-                          if (applyResult && group.units.some(u => u.id === 'n13')) {
-                            const n13Unit = group.units.find(u => u.id === 'n13');
-                            const n13Seg = BlockGroupReconstructor.splitTranslatedBlock(text, group.units, this.currentSessionId, this.currentEntropy).find(s => s.id === 'n13');
-                            console.error('[N13_TRACE]', JSON.stringify({
-                              stage: 'post-V3-apply',
-                              blockId: group.blockId,
-                              unitId: 'n13',
-                              originalText: n13Unit.text,
-                              nodeValueAfterApply: JSON.stringify(n13Unit.node?.nodeValue || ''),
-                              nodeValueNormalized: n13Unit.node?.nodeValue || '',
-                              leadingWS: n13Unit.leadingWS,
-                              trailingWS: n13Unit.trailingWS,
-                              splitSegmentText: n13Seg ? JSON.stringify(n13Seg.text) : 'NOT_FOUND',
-                              splitSegmentTrimmed: n13Seg ? JSON.stringify(n13Seg.text.trim()) : 'NOT_FOUND',
-                            }, null, 2));
-                          }
-                          // END TEMP
+                          BlockGroupReconstructor.apply(group.units, text, effectiveTargetLanguage, element, this.currentSessionId, this.currentEntropy);
                           group.units.forEach(u => processedUids.add(u.id));
                           
                           // Capture split segment translations for shadow comparison
@@ -392,18 +343,6 @@ export class DomTranslatorAdapter extends ResourceTracker {
                             const parsed = BlockGroupReconstructor.splitTranslatedBlock(text, group.units, this.currentSessionId, this.currentEntropy);
                             parsed.forEach(seg => {
                               this.translatedSegmentMap.set(seg.id, seg.text);
-                              // --- TEMP: n13 TRACE ---
-                              if (seg.id === 'n13') {
-                                console.error('[N13_TRACE]', JSON.stringify({
-                                  stage: 'post-splitTranslatedBlock',
-                                  segId: 'n13',
-                                  segTextRaw: JSON.stringify(seg.text),
-                                  segTextTrimmed: seg.text.trim(),
-                                  storedInSegmentMap: this.translatedSegmentMap.get('n13') !== undefined,
-                                  storedValue: JSON.stringify(this.translatedSegmentMap.get('n13')),
-                                }, null, 2));
-                              }
-                              // END TEMP
                             });
                           } catch {
                             // Ignore split errors for shadow comparison
@@ -538,46 +477,28 @@ export class DomTranslatorAdapter extends ResourceTracker {
         try {
           const { ShadowComparisonEngine } = await import('./ShadowComparisonEngine.js');
           const v2Clone = originalClone.cloneNode(true);
-          
+
           // Map live text nodes to clone text nodes to bypass disconnected getComputedStyle issues
           const liveToCloneMap = new WeakMap();
-          const treeWalkerMapping = [];
           const walker1 = document.createTreeWalker(element, NodeFilter.SHOW_TEXT, null);
           const walker2 = document.createTreeWalker(v2Clone, NodeFilter.SHOW_TEXT, null);
           let n1, n2;
           while ((n1 = walker1.nextNode()) && (n2 = walker2.nextNode())) {
             liveToCloneMap.set(n1, n2);
-            treeWalkerMapping.push({
-              liveText: (n1.nodeValue || '').substring(0, 40),
-              cloneText: (n2.nodeValue || '').substring(0, 40),
-            });
           }
 
           // Extract unique units from groupMap safely
           const uniqueUnits = Array.from(new Set(
             Array.from(this.groupMap.values()).flatMap(group => group.units)
           ));
-          
+
           this.logger.debug('[ShadowMode] textsToTranslate:', textsToTranslate);
           this.logger.debug('[ShadowMode] keys in translatedSegmentMap:', Array.from(this.translatedSegmentMap.keys()));
           this.logger.debug('[ShadowMode] mapped units for V2 simulation:', uniqueUnits.length);
-          
+
           uniqueUnits.forEach((unit) => {
             if (!unit || !unit.id) return;
             const translatedText = this.translatedSegmentMap.get(unit.id);
-
-            // --- TEMP: n13 TRACE ---
-            if (unit.id === 'n13') {
-              console.error('[N13_TRACE]', JSON.stringify({
-                stage: 'v2-simulation-start',
-                unitId: 'n13',
-                sourceText: unit.text,
-                translatedTextRaw: translatedText !== undefined ? JSON.stringify(translatedText) : 'UNDEFINED',
-                translatedTextTrimmed: translatedText !== undefined ? translatedText.trim() : 'N/A',
-                hasKey: translatedText !== undefined,
-              }, null, 2));
-            }
-            // END TEMP
 
             if (translatedText !== undefined) {
               const targetNodeInClone = liveToCloneMap.get(unit.node);
@@ -587,26 +508,7 @@ export class DomTranslatorAdapter extends ResourceTracker {
             }
           });
 
-          const comparison = ShadowComparisonEngine.compare(v2Clone, element, [], {
-            groupMap: this.groupMap,
-            translatedSegmentMap: this.translatedSegmentMap,
-            treeWalkerMapping,
-          });
-
-          if (shadowMutationAudit && !comparison.equivalent && comparison.reason?.includes('Child count mismatch')) {
-            const liMatch = comparison.reason.match(/tag (\w+)/);
-            const failingTag = liMatch ? liMatch[1] : 'UNKNOWN';
-            const liMutations = shadowMutationAudit.mutations
-              .filter((m) => m.type === 'childList' && m.targetTag === failingTag)
-              .map((m) => ({ elapsed: m.elapsed, added: m.addedNodes, removed: m.removedNodes }));
-
-            this.logger.error('[SHADOW_MUTATION_AUDIT]', JSON.stringify({
-              reason: comparison.reason,
-              failingTag,
-              totalMutations: shadowMutationAudit.mutations.length,
-              liMutations,
-            }));
-          }
+          const comparison = ShadowComparisonEngine.compare(v2Clone, element, []);
 
           if (!comparison.equivalent) {
             this.logger.error(`[ShadowMode] Reconstruction anomaly detected!\nReason: ${comparison.reason}`);
@@ -624,7 +526,7 @@ export class DomTranslatorAdapter extends ResourceTracker {
 
     } catch (error) {
       this.isTranslating = false; 
-      
+
       const type = matchErrorToType(error);
       const isCancellation = type === ErrorTypes.USER_CANCELLED || type === ErrorTypes.TRANSLATION_CANCELLED;
 
@@ -635,9 +537,6 @@ export class DomTranslatorAdapter extends ResourceTracker {
       if (onError) await onError({ status: TRANSLATION_STATUS.ERROR, error });
       throw error;
     } finally {
-      if (shadowMutationAudit?.observer) {
-        shadowMutationAudit.observer.disconnect();
-      }
       activeTranslationRoots.delete(element);
       this._cleanupCurrentSession(true);
     }
@@ -684,22 +583,9 @@ export class DomTranslatorAdapter extends ResourceTracker {
     let finalTranslation = '';
     if (typeof translatedText === 'string') {
       finalTranslation = translatedText;
-    } else if (typeof translatedText === 'object' && translatedText !== null) {
+     } else if (typeof translatedText === 'object' && translatedText !== null) {
       finalTranslation = translatedText.text || translatedText.translation || '';
     }
-
-    // --- TEMP: n13 TRACE ---
-    if (textNode.textContent?.trim() === 'video game publisher') {
-      console.error('[N13_TRACE]', JSON.stringify({
-        stage: 'applyTranslationToNode-entry',
-        incomingTranslation: JSON.stringify(translatedText),
-        isTextNode: textNode.nodeType === 3,
-        originalTextContent: JSON.stringify(textNode.textContent),
-        finalTranslationExtracted: JSON.stringify(finalTranslation),
-        finalTranslationTrimmed: finalTranslation.trim(),
-      }, null, 2));
-    }
-    // END TEMP
 
     if (!finalTranslation || finalTranslation.trim() === '') return;
 

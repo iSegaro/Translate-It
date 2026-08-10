@@ -155,6 +155,15 @@ describe('BlockGroupReconstructor', () => {
       const reordered = 'مرحبا @@SEG_n3@@.@@SEG_n2@@بالعالم';
       expect(() => BlockGroupReconstructor.splitTranslatedBlock(reordered, units)).toThrow(/Structural validation failure \(monotonicity\)/);
     });
+
+    it('does not repair a marker-less interval with an expected unit ID', () => {
+      const twoUnits = [
+        { id: 'n1', text: 'A' },
+        { id: 'n2', text: 'B' },
+      ];
+
+      expect(() => BlockGroupReconstructor.splitTranslatedBlock('A B', twoUnits)).toThrow(/Segment count mismatch/);
+    });
   });
 
   describe('Validation Resilience & Unescaping', () => {

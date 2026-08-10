@@ -4,6 +4,131 @@ import { createManifestView, createRequestUnitManifest } from '../ir/RequestUnit
 import { TranslationContractValidator } from './TranslationContractValidator.js'
 
 describe('TranslationContractValidator', () => {
+  describe('V3 marker ownership', () => {
+    const source = 'Purchases@@TI_SEG_e1_s1_n13@@video game publisher@@TI_SEG_e1_s1_n14@@Electronic Arts'
+
+    it('accepts ownership-preserving intervals', () => {
+      const result = TranslationContractValidator.validateV3Parent(
+        source,
+        'خرید@@TI_SEG_e1_s1_n13@@ناشر بازی‌های ویدئویی@@TI_SEG_e1_s1_n14@@الکترونیک آرتس',
+        'g5',
+      )
+
+      expect(result).toMatchObject({ isValid: true, violations: [] })
+    })
+
+    it('rejects a blank meaningful member interval', () => {
+      const result = TranslationContractValidator.validateV3Parent(
+        source,
+        'خرید@@TI_SEG_e1_s1_n13@@ @@TI_SEG_e1_s1_n14@@الکترونیک آرتس',
+        'g5',
+      )
+
+      expect(result.violations).toEqual(expect.arrayContaining([
+        expect.objectContaining({ code: 'V3_EMPTY_TRANSLATED_INTERVAL', markerId: 'n13' }),
+      ]))
+    })
+
+    it('rejects foreign entropy and session while preserving marker diagnostics', () => {
+      const foreignEntropy = TranslationContractValidator.validateV3Parent(
+        'A@@TI_SEG_e1_s1_n13@@B',
+        'الف@@TI_SEG_x9_s1_n13@@ب',
+        'g5',
+      )
+      const foreignSession = TranslationContractValidator.validateV3Parent(
+        'A@@TI_SEG_e1_s1_n13@@B',
+        'الف@@TI_SEG_e1_s999_n13@@ب',
+        'g5',
+      )
+      const uppercaseMarkerId = TranslationContractValidator.validateV3Parent(
+        'A@@TI_SEG_e1_s1_n13@@B',
+        'الف@@TI_SEG_e1_s1_N13@@ب',
+        'g5',
+      )
+
+      expect(foreignEntropy.violations.map(({ code }) => code)).toContain('V3_MARKER_IDENTITY_MISMATCH')
+      expect(foreignSession.violations.map(({ code }) => code)).toContain('V3_MARKER_IDENTITY_MISMATCH')
+      expect(uppercaseMarkerId.violations.map(({ code }) => code)).toContain('V3_MARKER_IDENTITY_MISMATCH')
+      expect(foreignEntropy.violations[0].reason).toBe('MARKER_SEQUENCE_MISMATCH')
+    })
+
+    it('reports marker identity and order violations', () => {
+      const duplicate = TranslationContractValidator.validateV3Parent(
+        source,
+        'خرید@@TI_SEG_e1_s1_n13@@ناشر@@TI_SEG_e1_s1_n13@@الکترونیک آرتس',
+        'g5',
+      )
+      const missing = TranslationContractValidator.validateV3Parent(source, 'خرید', 'g5')
+
+      expect(duplicate.violations.map(({ code }) => code)).toContain('V3_DUPLICATE_MARKER')
+      expect(duplicate.violations.map(({ code }) => code)).toContain('V3_MISSING_MARKER')
+      expect(missing.violations.map(({ code }) => code)).toContain('V3_MISSING_MARKER')
+      expect(missing.violations[0].reason).toBe('MARKER_COUNT_MISMATCH')
+    })
+
+    it('validates marker-owned intervals even when the leading interval is empty', () => {
+      const result = TranslationContractValidator.validateV3Parent(
+        '@@TI_SEG_e1_s1_n2@@foo@@TI_SEG_e1_s1_n3@@bar',
+        '@@TI_SEG_e1_s1_n2@@ @@TI_SEG_e1_s1_n3@@',
+        'g5',
+      )
+
+      expect(result.violations).toEqual(expect.arrayContaining([
+        expect.objectContaining({ code: 'V3_EMPTY_TRANSLATED_INTERVAL', markerId: 'n2' }),
+        expect.objectContaining({ code: 'V3_EMPTY_TRANSLATED_INTERVAL', markerId: 'n3' }),
+      ]))
+    })
+  })
+
+  describe('response identity namespaces', () => {
+    const logicalUnits = [{ i: 'g1', t: 'one' }, { i: 'g2', t: 'two' }]
+    const manifestView = createManifestView(createRequestUnitManifest(logicalUnits))
+
+    it('accepts positional wire IDs only in positional-wire mode', () => {
+      const result = TranslationContractValidator.validate(
+        manifestView,
+        createParserSnapshot([{ id: '0', text: 'یک' }, { id: '1', text: 'دو' }]),
+        undefined,
+        { responseIdentityMode: 'positional-wire' },
+      )
+
+      expect(result).toMatchObject({ isValid: true, orderingFacts: { mode: 'POSITIONAL_WIRE', isInRequestOrder: true } })
+      expect(result.violations).not.toEqual(expect.arrayContaining([
+        expect.objectContaining({ code: 'UNKNOWN_RESPONSE_ID' }),
+      ]))
+    })
+
+    it('keeps logical identity mode strict for numeric response IDs', () => {
+      const result = TranslationContractValidator.validate(
+        manifestView,
+        createParserSnapshot([{ id: '0', text: 'یک' }, { id: '1', text: 'دو' }]),
+        undefined,
+        { responseIdentityMode: 'logical' },
+      )
+
+      expect(result.violations).toEqual(expect.arrayContaining([
+        expect.objectContaining({ code: 'UNKNOWN_RESPONSE_ID' }),
+      ]))
+    })
+
+    it.each([
+      ['duplicate', [{ id: '0', text: 'یک' }, { id: '0', text: 'دو' }], 'DUPLICATE_RESPONSE_ID'],
+      ['out of range', [{ id: '0', text: 'یک' }, { id: '9', text: 'دو' }], 'UNKNOWN_RESPONSE_ID'],
+      ['non-numeric', [{ id: '0', text: 'یک' }, { id: 'foo', text: 'دو' }], 'UNKNOWN_RESPONSE_ID'],
+    ])('rejects positional-wire %s IDs', (_label, units, code) => {
+      const result = TranslationContractValidator.validate(
+        manifestView,
+        createParserSnapshot(units),
+        undefined,
+        { responseIdentityMode: 'positional-wire' },
+      )
+
+      expect(result.violations).toEqual(expect.arrayContaining([
+        expect.objectContaining({ code }),
+      ]))
+    })
+  })
+
   it('records identity, cardinality, ordering, shape, and empty-content facts without changing candidates', () => {
     const nestedText = { unexpected: true }
     const snapshot = createParserSnapshot([

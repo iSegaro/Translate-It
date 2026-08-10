@@ -365,6 +365,10 @@ export const AIConversationHelper = {
         .replace(/\$_{TARGET}/g, targetName);
     }
 
+    if (metadata?.callPurpose === TranslationCallPurpose.STRUCTURED_RECOVERY && metadata.repairContext) {
+      promptInstructions += `\n\nStructured recovery repair context:\n${JSON.stringify(metadata.repairContext)}\nRe-translate the affected source unit(s) and preserve their marker ownership.`;
+    }
+
     // Append semantic translation context when available (PDF mode only)
     if (translateMode === TranslationMode.PDF && metadata?.semanticHint) {
       const semanticInstructions = buildSemanticInstructions(metadata.semanticHint)
