@@ -57,8 +57,9 @@ No layer calls a different provider.
 - **Malformed response** — rejected; reported as `API_RESPONSE_INVALID` / contract violation.
 - **Blank result** — blank output for a nonblank source is rejected (failure). Blank source output handling is feature-side.
 - **Source-equal result** — valid; never treated as failure or as a gap.
-- **Structured responses** — validated via `AIResponseParser` + `TranslationContractValidator`; assembled or reported as a contract violation (see [Structured AI Response Contract](#11-structured-ai-response-contract)).
+- **Structured responses** — parsed via `AIResponseParser` and validated via `TranslationContractValidator` (see [Structured AI Response Contract](#11-structured-ai-response-contract), [V3 Provider Contract](#18-v3-provider-contract), and [Response Identity](#19-response-identity)); assembled or reported as a contract violation.
 - **Explicit typed errors** — `ErrorTypes` values (see [Error Contract](#4-error-contract)).
+- **Successful structured result** — a structured result is accepted provider output only when it is syntactically parseable, contract-valid, identity/mapping-valid enough for the accepted path, and recovered and merged when necessary. A primary response that violates its contract is not successful provider output merely because transport succeeded.
 
 **Invariant:** an unresolved/missing result is never replaced with source text as translated output.
 
@@ -97,7 +98,13 @@ Owned by `QueueManager`. Per-item `attempts`; exponential backoff with cap; retr
 Owned by `ProviderRequestEngine` + `ApiKeyManager`. `executeRequest` iterates the provider's keys; on a failover-triggering error (`API_KEY_INVALID`, `INSUFFICIENT_BALANCE`, `QUOTA_EXCEEDED`, `RATE_LIMIT_REACHED`, `DEEPL_QUOTA_EXCEEDED`) `ApiKeyManager.shouldFailover` selects the next key. Cancellation aborts the failover loop. There is a cap on counted keys.
 
 #### Structured recovery
-Owned by `BaseAIProvider`. On a structured contract violation the provider runs **one sequential recovery pass** (see [Structured AI Response Contract](#11-structured-ai-response-contract)), not recursive.
+Owned by `BaseAIProvider`. On a structured contract violation the provider runs
+**one provider-local recovery pass**. The pass is selective when invalid units
+are reliably and unambiguously mapped — preserving valid primary results and
+merging recovered values back into their original indexes — and falls back to
+full sequential recovery when mapping is unsafe or ambiguous (see
+[Structured AI Response Contract](#11-structured-ai-response-contract)). Not
+recursive.
 
 #### Provider-local partitioning
 Example: `LingvaProvider._partitionByBudget` splits by serialized request-URL length against `FULL_URL_BUDGET`. Provider-local forwarding.
@@ -188,19 +195,24 @@ Recovery calls are attributed separately and do not masquerade as primary calls.
 
 ```text
 structured primary call
-→ AIResponseParser.parseBatchResult
-→ accepted candidate OR contractViolation
+→ AIResponseParser
+→ TranslationContractValidator
+→ parser/mapping facts
+→ provider recovery policy (selective or full)
+→ merge
+→ accepted candidate OR typed failure
 ```
 
-- `AIResponseParser` **parses and validates only**; it does not trigger recovery.
-- **Acceptance:** once a valid structured candidate is accepted, `BaseAIProvider` checks the abort signal then **commits** conversation once.
-- **On contract violation:**
-  ```
-  discard primary conversation candidate,
-  → executeSequentialBatch (one recovery pass, callPurpose STRUCTURED_RECOVERY)
-  → recovery success returned
-  → recovery failure rethrown
-  ```
+- `AIResponseParser` parses and exposes parser/mapping facts; it does not trigger recovery and does not decide semantic provider validity.
+- **Acceptance:** once a valid structured candidate is accepted, `BaseAIProvider` checks the abort signal then commits conversation once.
+- **On contract violation:** discard the primary conversation candidate, then execute a single provider-local recovery pass:
+  - **Selective recovery** when invalid units are reliably and unambiguously mapped: recover only the invalid subset, preserving valid primary results and merging recovered values back into their original request indexes.
+  - **Full sequential recovery** when mapping is unsafe or ambiguous.
+  - Merge and final validation complete before the accepted result is returned downstream.
+  - Recovery success returns the merged final result.
+  - **Recovery failure fails the provider batch.** No mixed successful/unresolved result is returned through this path, and unresolved values are never source-filled. No second structured-recovery loop is implied.
+- Recovery facts are inputs to provider recovery policy; they do not decide that policy themselves.
+- Structured recovery may carry transient repair context, which does not redefine provider validity.
 
 - **No parser source-fill may escape as success.** Gap filling uses blank/unmapped placeholders, never the source text as a real translation.
 
@@ -250,7 +262,8 @@ Consumers may assume:
 - no silent source-fill;
 - no invalid blank success;
 - typed errors;
-- structured recovery already resolved where applicable.
+- structured recovery already resolved where applicable;
+- final accepted provider results after any recovery/merge, not the rejected primary candidate.
 
 Consumers must **not** independently:
 - retry the **provider** (that is `QueueManager`'s scope) — a consumer must not loop a provider on its own;
@@ -274,12 +287,43 @@ This document does not define:
 - identity / duplicate / fragment rules → [TRANSLATION_IDENTITY_AND_FRAGMENT_CONTRACT.md](TRANSLATION_IDENTITY_AND_FRAGMENT_CONTRACT.md).
 - shared pipeline/routing → [../architecture/TRANSLATION_SYSTEM.md](../architecture/TRANSLATION_SYSTEM.md).
 - canonical `TranslationOutcome` model → [../../adr/ADR-015-translation-outcome-semantics.md](../../adr/ADR-015-translation-outcome-semantics.md).
+- structured-recovery execution policy and provider recovery decisions → [../TRANSLATION_PROVIDER_LOGIC.md](../TRANSLATION_PROVIDER_LOGIC.md).
 
-Diagrams: see the provider execution/retry and conversation lifecycle diagrams in [../architecture/DIAGRAMS.md](../architecture/DIAGRAMS.md).
+For the overall translation architecture and runtime-diagram references, see
+[TRANSLATION_SYSTEM.md](../architecture/TRANSLATION_SYSTEM.md) and
+[DIAGRAMS.md](../architecture/DIAGRAMS.md).
+
+## 18. V3 Provider Contract
+
+V3 marker ownership is part of the provider response contract. For a V3 parent, the provider must preserve:
+
+- marker count;
+- marker identity;
+- marker ordering;
+- absence of duplicate markers;
+- presence of all expected markers (no missing markers);
+- absence of unexpected markers;
+- marker-owned interval content.
+
+Semantic content belonging to one source interval must remain within its corresponding translated interval. Providers must not move or merge content across marker boundaries, and a meaningful source interval must not translate to a blank interval (`V3_EMPTY_TRANSLATED_INTERVAL`). V3 contract violations are provider contract failures. See [ADR-015](../../adr/ADR-015-translation-outcome-semantics.md) for the ownership decision.
+
+## 19. Response Identity
+
+Provider response identity uses distinct namespaces and must not be conflated:
+
+| Term | Meaning |
+|---|---|
+| Logical ID | Logical source/request identity such as `g1`, `g2`. |
+| Positional Wire ID | Provider transport identity such as `"0"`, `"1"` in a proven positional-wire batch. |
+| V3 Member ID | Marker/member identity inside a V3 parent such as `n1`, `n2`, `n13`. |
+| `requestIndex` | Original request-array position. |
+| `responseId` | Identifier returned by the provider response. |
+
+Numeric response IDs are valid only in a proven positional-wire context; they are not globally valid logical IDs. Unknown, duplicate, or unresolved identity remains contract-relevant. For detailed identity and fragment rules, see [TRANSLATION_IDENTITY_AND_FRAGMENT_CONTRACT.md](TRANSLATION_IDENTITY_AND_FRAGMENT_CONTRACT.md).
 
 ---
 
-## 18. Test Map
+## 20. Test Map
 
 | Contract area | Primary tests |
 | --- | --- |
