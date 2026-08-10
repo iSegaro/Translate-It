@@ -228,6 +228,22 @@ export class BlockGroupReconstructor {
         finalValue,
         originalText: unit.node.textContent
       });
+
+      // --- TEMP: n13 TRACE ---
+      if (unit.id === 'n13') {
+        console.error('[N13_TRACE]', JSON.stringify({
+          stage: 'reconstructor-commitPlan',
+          unitId: 'n13',
+          exactTranslation: JSON.stringify(exactTranslation),
+          exactTranslationTrimmed: exactTranslation.trim(),
+          leadingWS: JSON.stringify(unit.leadingWS),
+          trailingWS: JSON.stringify(unit.trailingWS),
+          finalValue: JSON.stringify(finalValue),
+          finalValueTrimmed: finalValue.trim(),
+          originalNodeValue: JSON.stringify(unit.node.nodeValue),
+        }, null, 2));
+      }
+      // END TEMP
     }
 
     // --- Mutation Phase (Synchronous DOM writes) ---
