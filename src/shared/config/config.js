@@ -926,27 +926,27 @@ export const getPromptPopupTranslateAsync = async () => {
 };
 
 export const getPromptBASESelectAsync = async () => {
-  return getSettingValueAsync("PROMPT_BASE_SELECT", CONFIG.PROMPT_BASE_SELECT);
+  return CONFIG.PROMPT_BASE_SELECT;
 };
 
 export const getPromptBASEBatchAsync = async () => {
-  return getSettingValueAsync("PROMPT_BASE_BATCH", CONFIG.PROMPT_BASE_BATCH);
+  return CONFIG.PROMPT_BASE_BATCH;
 };
 
 export const getPromptBASEAIBatchAsync = async () => {
-  return getSettingValueAsync("PROMPT_BASE_AI_BATCH", CONFIG.PROMPT_BASE_AI_BATCH);
+  return CONFIG.PROMPT_BASE_AI_BATCH;
 };
 
 export const getPromptBASEAIBatchAutoAsync = async () => {
-  return getSettingValueAsync("PROMPT_BASE_AI_BATCH_AUTO", CONFIG.PROMPT_BASE_AI_BATCH_AUTO);
+  return CONFIG.PROMPT_BASE_AI_BATCH_AUTO;
 };
 
 export const getPromptBASEAIFollowupAsync = async () => {
-  return getSettingValueAsync("PROMPT_BASE_AI_FOLLOWUP", CONFIG.PROMPT_BASE_AI_FOLLOWUP);
+  return CONFIG.PROMPT_BASE_AI_FOLLOWUP;
 };
 
 export const getPromptBASEAIFollowupAutoAsync = async () => {
-  return getSettingValueAsync("PROMPT_BASE_AI_FOLLOWUP_AUTO", CONFIG.PROMPT_BASE_AI_FOLLOWUP_AUTO);
+  return CONFIG.PROMPT_BASE_AI_FOLLOWUP_AUTO;
 };
 
 export const getPromptBASEFieldAsync = async () => {
@@ -962,15 +962,15 @@ export const getPromptSubtitleUserAsync = async () => {
 };
 
 export const getPromptSubtitleBaseAsync = async () => {
-  return getSettingValueAsync("PROMPT_SUBTITLE_BASE", CONFIG.PROMPT_SUBTITLE_BASE);
+  return CONFIG.PROMPT_SUBTITLE_BASE;
 };
 
 export const getPromptSubtitleBatchAsync = async () => {
-  return getSettingValueAsync("PROMPT_SUBTITLE_BATCH", CONFIG.PROMPT_SUBTITLE_BATCH);
+  return CONFIG.PROMPT_SUBTITLE_BATCH;
 };
 
 export const getPromptBASEScreenCaptureAsync = async () => {
-  return getSettingValueAsync("PROMPT_BASE_SCREEN_CAPTURE", CONFIG.PROMPT_BASE_SCREEN_CAPTURE);
+  return CONFIG.PROMPT_BASE_SCREEN_CAPTURE;
 };
 
 export const getTranslationApiAsync = async () => {
