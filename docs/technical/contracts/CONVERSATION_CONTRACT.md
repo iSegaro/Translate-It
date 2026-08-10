@@ -25,7 +25,7 @@ Conversation/history participation is separate from provider-call success. A pro
 | **commit** | Persist the staged candidate into conversation history (at most once). |
 | **discard** | Drop the staged candidate; not committed (at most once for the terminal path). |
 | **primary translation** | A `PRIMARY_TRANSLATION` provider call (participates in conversation). |
-| **structured recovery** | The single sequential `STRUCTURED_RECOVERY` pass after a contract violation (does not participate). |
+| **structured recovery** | A provider-local `STRUCTURED_RECOVERY` pass after a contract violation (does not participate, regardless of subset or full-batch scope). |
 | **late settlement** | A provider outcome arriving after the request reached a terminal state. |
 | **history-enabled request** | A request whose call purpose participates in conversation. |
 
@@ -72,22 +72,39 @@ primary call succeeds
 
 ```text
 structured candidate invalid (contractViolation)
-→ discard candidate
-→ one sequential recovery pass (callPurpose STRUCTURED_RECOVERY)
+→ discard primary candidate
+→ structured recovery (selective or full, per provider policy)
 ```
 
-- The invalid candidate is **discarded**; recovery does not reuse or commit it.
+- The invalid primary candidate is **discarded**; recovery does not reuse or commit it. The rejected candidate must never be committed merely because recovery later succeeds.
+- Recovery scope may cover a subset of invalid request units or the full structured batch; conversation semantics are identical either way. The subset or full distinction is a provider recovery-policy concern, not a conversation concern.
+- Recovery is a single provider-local pass (see [TRANSLATION_PROVIDER_LOGIC.md](../TRANSLATION_PROVIDER_LOGIC.md)).
 - Exactly **one** sequential recovery pass is attempted.
 
 ---
 
 ## 6. Recovery Lifecycle
 
-- Call purpose: `STRUCTURED_RECOVERY` via `executeSequentialBatch`.
+- Call purpose: `STRUCTURED_RECOVERY`.
 - No conversation participation (excluded from history, per [Participation Policy](#3-participation-policy)).
-- Ordered results: sequential 1:1 mapping of units.
-- Atomic failure: a single failure rejects the whole recovery.
+- Recovery may operate on a subset of invalid request units or the full structured batch; conversation isolation is unchanged either way.
+- Atomic failure: a failure rejects the active structured-recovery operation.
 - Original recovery error is propagated with its `type` preserved (e.g. `NETWORK_ERROR`).
+
+***
+
+## 6.5. Repair Context Lifetime
+
+`repairContext` is transient recovery metadata supplied to the structured
+recovery request. It:
+
+- exists only for the recovery request;
+- is not committed into normal conversation history;
+- does not alter conversation turn-counter semantics;
+- does not become provider memory.
+
+The fact that recovery may be supplied with failure-specific repair guidance does
+not change the conversation-isolation rules above.
 
 ---
 
@@ -168,6 +185,7 @@ Nuance: discard is effectively **idempotent** rather than strictly once, because
 - A failed candidate from a prior attempt is **not committed** and **not reused**.
 - **Recovery failure** is rethrown and may enter the outer `QueueManager` retry of the whole task.
 - **Retries must not double-commit** any previous candidate (candidates are per-attempt and consumed by commit/discard).
+- **Structured recovery is not queue retry.** Structured recovery is a provider-local contract-failure response path excluded from conversation history; queue retry is a separate execution retry lifecycle. They must not be conflated in conversation semantics. See [TRANSLATION_PROVIDER_LOGIC.md](../TRANSLATION_PROVIDER_LOGIC.md) for execution policy.
 
 ---
 
@@ -221,9 +239,11 @@ This is an intentional current policy, **not a bug**, and is covered by `BaseAIP
 
 This document does not define:
 - provider retry algorithms → [PROVIDER_CONTRACT.md](PROVIDER_CONTRACT.md).
+- provider recovery execution policy (selective vs full eligibility) → [TRANSLATION_PROVIDER_LOGIC.md](../TRANSLATION_PROVIDER_LOGIC.md).
 - identity/fragment rules → [TRANSLATION_IDENTITY_AND_FRAGMENT_CONTRACT.md](TRANSLATION_IDENTITY_AND_FRAGMENT_CONTRACT.md).
 - feature source preservation → [FEATURE_CONTRACTS.md](FEATURE_CONTRACTS.md).
 - canonical `TranslationOutcome` model → [../../adr/ADR-015-translation-outcome-semantics.md](../../adr/ADR-015-translation-outcome-semantics.md).
+- overall shared pipeline and runtime flow → [../architecture/TRANSLATION_SYSTEM.md](../architecture/TRANSLATION_SYSTEM.md).
 
 Diagram: see the AI conversation lifecycle in [../architecture/DIAGRAMS.md](../architecture/DIAGRAMS.md).
 
