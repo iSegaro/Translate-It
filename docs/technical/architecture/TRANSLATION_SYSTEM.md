@@ -29,7 +29,11 @@ UI Component → useMessaging → browser.runtime.sendMessage
      ↓
 Background: UnifiedTranslationService → handleTranslate.js
      ↓
-TranslationEngine → Provider → Terminal Execution Router → Result Dispatcher → Target Context
+TranslationEngine → Provider Execution → Response Parsing → Contract Validation
+      ↓
+Recovery When Required → Final Merge → Terminal Execution Router
+      ↓
+Result Dispatcher → Target Context
 ```
 
 ### Unified Translation Service Architecture (2025)
@@ -124,7 +128,12 @@ UI / workflow creates messageId
 | `StreamingManager` | Sender routing, chunk transport, local stream terminal suppression, delayed stream retention | Translation workflow lifecycle |
 | `UnifiedResultDispatcher` | Accepted result and cancellation delivery; per-instance result deduplication | Tracker state mutation |
 | Terminal execution router | Completed and cancelled terminal routing; one stable terminal outcome per request | Semantic success, recovery strategy, tracker state mutation |
-| Execution foundation | Request unit manifest, observation-only validation facts, preserved diagnostics | Semantic success, recovery strategy, tracker terminal transition |
+| Execution foundation | Request unit manifest, validation facts, preserved diagnostics | Semantic success, recovery strategy, tracker terminal transition |
+| `V3IntervalParser` | Shared structural V3 marker and interval parsing | Semantic validity and recovery policy |
+| `TranslationContractValidator` | Canonical provider-contract validity, including V3 marker ownership | Recovery policy and feature mutation |
+| `AIResponseParser` | Structured response parsing, mapping, and parser/recovery facts | Semantic provider validity and recovery policy |
+| `BaseAIProvider` | Provider-local structured recovery policy, execution, and merge | V3 semantic interpretation and queue retry policy |
+| `OptimizedJsonHandler` | Final structured-result orchestration and pre-stream enforcement | Independent V3 semantic validity rules |
 
 ### Request Lifecycle
 
@@ -198,9 +207,23 @@ Tracker terminal records leave active tab and toast indexes immediately. They ar
 
 `UnifiedResultDispatcher` owns delivery after tracker acceptance. Its `processedResults` set is per dispatcher instance, so duplicate-result suppression remains scoped to the owning `UnifiedTranslationService` instance. Delivery failure returns a delivery error and never rewrites accepted tracker state.
 
+Structured contract-invalid results, including invalid V3 results, are rejected
+before stream visibility. Recovery and merge complete before downstream
+streaming and delivery; consumers receive final validated provider results
+rather than raw failed primary candidates. `OptimizedJsonHandler` enforces this
+canonical boundary without becoming a second semantic validation owner.
+
 ### Specialized Workflow Boundaries
 
 For the logical identity and fragment contract governing structured Select Element and PDF flows, see [TRANSLATION_IDENTITY_AND_FRAGMENT_CONTRACT.md](../contracts/TRANSLATION_IDENTITY_AND_FRAGMENT_CONTRACT.md).
+
+At the shared architecture boundary, keep these identities distinct:
+
+- **Logical ID**: source/request identity.
+- **Positional Wire ID**: provider transport identity in a proven positional-wire batch.
+- **V3 Member ID**: marker/member identity inside a V3 parent.
+
+The detailed namespace and fragment rules remain in the identity contract.
 
 | Workflow | Local Owner | Shared Runtime Boundary | Stale Guard |
 |---|---|---|---|
@@ -240,11 +263,18 @@ Failed and timed-out states do not yet route through the terminal execution rout
 
 **Files**: `src/features/translation/ir/` (request unit manifest, operation, outcome and unit contracts, terminal execution router)
 
-The foundation layer is structural and observation-only: it establishes contracts and observational validation without changing observable translation behavior.
+The foundation layer establishes request structure, validation boundaries, and
+immutable execution contracts without moving feature ownership into the shared
+runtime.
 
-- **Request Unit Manifest**: A deterministic manifest of a request's translation units (`RequestUnitManifest`). It is the structural reference for observation-only validation.
-- **Observational Validation Foundation**: Request structure is validated observationally against the manifest without altering execution or observable behavior. This validation never performs recovery and never decides semantic success.
+- **Request Unit Manifest**: A deterministic manifest of a request's translation units (`RequestUnitManifest`). It is the structural reference for request membership and mapping facts.
+- **Validation boundaries**: `V3IntervalParser` provides structural V3 facts only. `TranslationContractValidator` owns semantic provider-contract validity, including V3 marker ownership. Parser and mapping facts remain separate from recovery policy.
 - **TranslationDiagnosticReport Preservation**: Parser and execution facts feed an immutable terminal diagnostic report. `UnifiedTranslationService` retains that report privately in service-owned `WeakMap` storage for internal lifecycle/debugging use; it has no public retrieval, export, persistence, or time-based retention guarantee. This is distinct from tracker lifecycle records.
+
+For provider-owned structured recovery and response-ID namespaces, see
+[TRANSLATION_PROVIDER_LOGIC.md](../TRANSLATION_PROVIDER_LOGIC.md). For the
+identity and fragment contract, see
+[TRANSLATION_IDENTITY_AND_FRAGMENT_CONTRACT.md](../contracts/TRANSLATION_IDENTITY_AND_FRAGMENT_CONTRACT.md).
 
 > **Deferred**: Runtime production and adoption of `TranslationOutcome` is intentionally deferred to a future initiative. See the [ADR-015 Implementation Status](../../adr/ADR-015-translation-outcome-semantics.md). Runtime adoption should begin only after a concrete `TranslationOutcome` consumer has been defined.
 
@@ -281,7 +311,11 @@ User Input → useSidepanelTranslation → handleTranslate.js → Provider → U
 
 ### 3. Select Element Translation
 ```
-DOM Selection → JSON Payload → UnifiedTranslationService → Streaming Coordinator → DOM Update
+DOM Selection → Structured Provider Response → Parse / Validate
+      ↓
+Recovery / Merge When Required → Final Validation → Stream Final Results
+      ↓
+BlockGroup Reconstruction → DOM Apply
 ```
 
 ### 4. Subtitle Translation
@@ -295,6 +329,11 @@ File Upload → SubtitleTranslationCoordinator → Progressive Batching → SrtA
 - **JSON Processing**: Efficient handling of multiple text elements
 - **Broadcast Results**: Updates sent to all relevant tabs
 - **Progress Tracking**: Visual feedback during translation
+
+Select Element receives final accepted structured results. Detailed provider
+recovery policy belongs in [TRANSLATION_PROVIDER_LOGIC.md](../TRANSLATION_PROVIDER_LOGIC.md),
+while V3 identity and fragment rules belong in
+[TRANSLATION_IDENTITY_AND_FRAGMENT_CONTRACT.md](../contracts/TRANSLATION_IDENTITY_AND_FRAGMENT_CONTRACT.md).
 
 ### 4. Field Mode Translation (New)
 ```
@@ -348,13 +387,26 @@ const result = await provider.translate(text, sourceLang, targetLang, mode)
 
 ### Structured-Response Recovery
 
-When a structured batch response violates its contract (unmapped or gap-filled slots, or an unparseable response), the system recovers explicitly instead of silently corrupting results.
+When a structured batch response violates its contract, the system recovers
+explicitly instead of silently corrupting results. Contract failures do not
+automatically require full-batch recovery.
 
-- **`AIResponseParser`** only reports whether structured-response recovery is required. It never decides semantic success.
-- **`BaseAIProvider`** owns the recovery strategy. The current implementation re-requests the affected batch sequentially via `_traditionalBatchTranslate`.
-- **Recovery is a sequential re-request**, not a silent result rewrite.
+- **`AIResponseParser`** provides parser and mapping facts; it does not decide semantic validity or recovery policy.
+- **`BaseAIProvider`** owns provider-local recovery policy. It may selectively recover safely mapped invalid items, preserving valid primary results, or use full sequential recovery when mapping is unsafe.
+- **Recovery and merge complete before final delivery.** Repair-aware recovery context may be supplied to structured recovery, and recovery failure becomes a typed provider failure.
 
-This is the only production behavior change introduced by the Translation Pipeline Foundation.
+See [TRANSLATION_PROVIDER_LOGIC.md](../TRANSLATION_PROVIDER_LOGIC.md) for the
+canonical provider execution and recovery policy. Queue retry remains separate
+from structured recovery and is owned by the existing queue/request
+infrastructure.
+
+Structured recovery remains conversation-isolated; see
+[CONVERSATION_CONTRACT.md](../contracts/CONVERSATION_CONTRACT.md) for the full
+conversation lifecycle.
+
+> **Temporary note:** The structured-recovery flow in [DIAGRAMS.md](DIAGRAMS.md)
+> still presents the earlier sequential-only summary and should be updated in a
+> separate documentation pass.
 
 ## Context Separation
 
@@ -429,7 +481,7 @@ There is **no automatic cross-provider fallback**. If a translation request fail
 
 - **QueueManager retry**: transient errors (e.g. `NETWORK_ERROR`, `RATE_LIMIT_REACHED`, `SERVER_ERROR`) are retried by `QueueManager` with backoff according to error policy before a final failure is reported.
 - **API-key failover**: `ProviderRequestEngine` may rotate to another API key **of the same provider** (e.g. `RATE_LIMIT_REACHED`, `API_KEY_INVALID`, `QUOTA_EXCEEDED`).
-- **BaseAIProvider structured recovery**: a structured batch response that violates its contract triggers one sequential re-request of the affected batch (`STRUCTURED_RECOVERY`).
+- **BaseAIProvider structured recovery**: a structured contract violation triggers selective provider recovery when mapping is safe, otherwise full sequential provider recovery (`STRUCTURED_RECOVERY`); recovery failure becomes a typed failure.
 - **No cross-provider fallback**: the selected provider's final failure is returned to the caller.
 
 These are distinct mechanisms; do not label QueueManager retry, key failover, or structured recovery with the single term "fallback."
