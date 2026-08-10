@@ -132,7 +132,10 @@ Comprehensive documentation is available in the `docs/` folder:
 - [**LOCALIZATION.md**](docs/technical/LOCALIZATION.md): Internationalization and locale management guide.
 - [**TESTING_STRATEGY.md**](docs/technical/TESTING_STRATEGY.md): Unit, integration, and UI testing guidelines.
 - [**STATS_MANAGER.md**](docs/technical/infrastructure/STATS_MANAGER.md): System for tracking usage statistics and analytics.
-- [**TRANSLATION_PROVIDER_LOGIC.md**](docs/technical/TRANSLATION_PROVIDER_LOGIC.md): Waterfall logic for provider selection.
+- [**TRANSLATION_PROVIDER_LOGIC.md**](docs/technical/TRANSLATION_PROVIDER_LOGIC.md): Provider execution and structured-recovery policy.
+- [**PROVIDER_CONTRACT.md**](docs/technical/contracts/PROVIDER_CONTRACT.md): Authoritative provider result/recovery guarantees.
+- [**CONVERSATION_CONTRACT.md**](docs/technical/contracts/CONVERSATION_CONTRACT.md): AI conversation-candidate lifecycle and recovery history exclusion.
+- [**TRANSLATION_IDENTITY_AND_FRAGMENT_CONTRACT.md**](docs/technical/contracts/TRANSLATION_IDENTITY_AND_FRAGMENT_CONTRACT.md): Identity namespace and fragment aggregation rules.
 
 ### Feature Documentation
 - [**MOBILE_SUPPORT.md**](docs/technical/MOBILE_SUPPORT.md): **Touch & Mobile Support** – Bottom Sheet and gestures.
@@ -226,3 +229,15 @@ Comprehensive documentation is available in the `docs/` folder:
 - **Modular Logging**: Components-based logging with production awareness.
 - **Advanced Memory Management**: ResourceTracker and Memory Garbage Collector with integrated Critical Protection System.
 - **TTS System**: Full cross-context coordination and auto-language fallback.
+
+## Translation Architecture Guardrails
+
+Concise contributor rules to prevent architectural drift. Full rationale: see *ADR-015*, *TRANSLATION_PROVIDER_LOGIC.md*, and the contract documents linked above.
+
+- Use `V3IntervalParser` for V3 marker/interval parsing; it is structural-only. Do not create feature- or provider-specific V3 parsers.
+- `TranslationContractValidator` is the single semantic owner of V3 provider-contract validity (marker count/identity/order/duplicates/missing/unexpected, interval content, `V3_EMPTY_TRANSLATED_INTERVAL`). Do not independently validate these in DOM, feature, or provider-adapter code.
+- `BaseAIProvider` owns structured-recovery policy and must not branch on V3-specific violation codes or marker semantics.
+- Keep response identities distinct: logical IDs, positional wire IDs (numeric transport IDs valid only in proven positional-wire batches), V3 member IDs; `requestIndex` and `responseId` are separate concepts. Do not treat numeric response IDs as globally valid logical IDs.
+- `repairContext` is generic, transient recovery metadata. The parser packages facts, `BaseAIProvider` transports them, `AIConversationHelper` renders repair guidance. It does not enter normal conversation history or become provider memory.
+- Do not conflate structured recovery, `QueueManager` retry, API-key failover, or automatic cross-provider fallback. Structured recovery is provider-local; queue retry is execution retry; no cross-provider fallback is automatic.
+- Invalid structured/V3 results must not become stream-visible; `OptimizedJsonHandler` enforces the canonical pre-stream validation boundary.
