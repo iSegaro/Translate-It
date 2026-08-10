@@ -404,10 +404,6 @@ Structured recovery remains conversation-isolated; see
 [CONVERSATION_CONTRACT.md](../contracts/CONVERSATION_CONTRACT.md) for the full
 conversation lifecycle.
 
-> **Temporary note:** The structured-recovery flow in [DIAGRAMS.md](DIAGRAMS.md)
-> still presents the earlier sequential-only summary and should be updated in a
-> separate documentation pass.
-
 ## Context Separation
 
 ### Multi-Context Isolation

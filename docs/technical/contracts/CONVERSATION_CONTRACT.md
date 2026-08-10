@@ -79,7 +79,7 @@ structured candidate invalid (contractViolation)
 - The invalid primary candidate is **discarded**; recovery does not reuse or commit it. The rejected candidate must never be committed merely because recovery later succeeds.
 - Recovery scope may cover a subset of invalid request units or the full structured batch; conversation semantics are identical either way. The subset or full distinction is a provider recovery-policy concern, not a conversation concern.
 - Recovery is a single provider-local pass (see [TRANSLATION_PROVIDER_LOGIC.md](../TRANSLATION_PROVIDER_LOGIC.md)).
-- Exactly **one** sequential recovery pass is attempted.
+- Exactly one provider-local structured recovery pass is attempted, using selective or full sequential recovery according to provider policy.
 
 ---
 

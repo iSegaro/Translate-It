@@ -601,7 +601,7 @@ The architecture includes several mission-critical features to ensure high avail
 - **Circuit Breaker**: Automatically disables unstable providers or those with exhausted quotas for a cooling period to prevent UI lag.
 - **RateLimitManager**: Governs request throttling and prioritization based on user interaction levels.
 - **Unified Response Contract**: Enforces a strict data format for all providers to ensure system-wide stability and prevent runtime errors.
-- **Structured Response Handling**: `AIResponseParser` reports whether structured-response recovery is required; `BaseAIProvider` owns the recovery strategy. The current implementation performs a sequential re-request within a single execution attempt. This is distinct from Multi-API Key Failover and provider/key failover.
+- **Structured Response Handling**: `AIResponseParser` reports whether structured-response recovery is required; `BaseAIProvider` owns the recovery strategy. Structured recovery is one provider-local pass that is selective when invalid request units are safely mapped, otherwise uses full sequential recovery. This is distinct from Multi-API Key Failover and provider/key failover. See [Translation Provider Logic](TRANSLATION_PROVIDER_LOGIC.md) for execution policy.
 
 ### Documentation and Implementation
 For a comprehensive guide on implementing new providers, capability gating, and technical specifications, see the **[Provider Implementation Guide](providers/PROVIDERS.md)**. To understand how providers are selected for different features, refer to the **[Translation Provider Logic](TRANSLATION_PROVIDER_LOGIC.md)**.
@@ -1267,7 +1267,7 @@ For detailed information on error classification, context validation patterns, a
 AI primary translations may participate in an in-memory conversation context via the `TranslationSessionManager`:
 
 - **Accepted primary** → stage / validate → **commit** (at most once).
-- **Structured recovery** → no conversation commit (recovery may re-request, but does not persist a candidate).
+- **Structured recovery** → no conversation commit (the structured recovery pass does not persist a conversation candidate).
 - **Timeout / cancel / failure** → **discard** (no commit); late settlement cannot commit after terminal state.
 
 This is transient, in-memory history only. For the authoritative stage/commit/discard semantics and recovery exclusion, see [Conversation Contract](contracts/CONVERSATION_CONTRACT.md).

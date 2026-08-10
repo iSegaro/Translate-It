@@ -34,7 +34,7 @@ The system automatically determines how to display characters in logs based on t
 Each physical request is normalized to one purpose before recording:
 
 - `PRIMARY_TRANSLATION`: Normal provider execution.
-- `STRUCTURED_RECOVERY`: Sequential recovery after a structured response contract violation.
+- `STRUCTURED_RECOVERY`: Provider-local structured recovery after a structured response contract violation.
 
 Calls, network characters, original characters, and non-cancellation physical failures are counted once per physical request. Missing or invalid purposes are normalized to `PRIMARY_TRANSLATION` before recording.
 
