@@ -11,6 +11,13 @@ import { ProviderNames } from "@/features/translation/providers/ProviderConstant
 import { AIConversationHelper } from "./utils/AIConversationHelper.js";
 import { AITextProcessor } from "./utils/AITextProcessor.js";
 import { ResponseFormat } from "@/shared/config/translationConstants.js";
+import {
+  CompletionProviderFamily,
+  createCompletionRecord,
+  createUsageRecord,
+  normalizeTermination,
+} from "@/features/translation/ir/CompletionContract.js";
+import { recordProviderCompletion } from "@/features/translation/ir/TranslationOperation.js";
 
 const logger = getScopedLogger(LOG_COMPONENTS.PROVIDERS, 'DeepSeek');
 
@@ -22,6 +29,30 @@ export class DeepSeekProvider extends BaseAIProvider {
   constructor() {
     super(ProviderNames.DEEPSEEK);
     this.providerSettingKey = 'DEEPSEEK_API_KEY';
+  }
+
+  /**
+   * Normalizes one raw DeepSeek response into one completion record at the
+   * adapter boundary. Missing metadata remains absent and recording cannot
+   * alter existing text or error behavior.
+   * @private
+   */
+  _recordDeepSeekCompletion(data, executionContext) {
+    const choice = data?.choices?.[0];
+    if (!choice) return false;
+
+    return recordProviderCompletion(executionContext, createCompletionRecord({
+      provider: this.providerName,
+      model: data?.model ?? null,
+      termination: normalizeTermination(CompletionProviderFamily.OPENAI_COMPATIBLE, choice?.finish_reason),
+      responseId: data?.id ?? null,
+      usage: createUsageRecord({
+        inputTokens: data?.usage?.prompt_tokens,
+        outputTokens: data?.usage?.completion_tokens,
+        reasoningTokens: data?.usage?.completion_tokens_details?.reasoning_tokens,
+        totalTokens: data?.usage?.total_tokens,
+      }),
+    }));
   }
 
   /**
@@ -74,6 +105,7 @@ export class DeepSeekProvider extends BaseAIProvider {
         if (data?.error) {
           throw new Error(`API_ERROR: ${data.error.message || 'Unknown DeepSeek Error'}`);
         }
+        this._recordDeepSeekCompletion(data, executionContext);
         return data?.choices?.[0]?.message?.content;
       },
       context: `${this.providerName.toLowerCase()}-translation`,
