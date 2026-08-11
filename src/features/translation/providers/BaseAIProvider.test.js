@@ -925,6 +925,194 @@ beforeEach(() => {
     });
   });
 
+  describe('P5 truncation recovery invariants', () => {
+    it('uses full recovery for TRUNCATED plus unparseable structured output', async () => {
+      const { AIResponseParser: realParser } = await vi.importActual('./utils/AIResponseParser.js');
+      AIResponseParser.parseBatchResult.mockImplementation(realParser.parseBatchResult.bind(realParser));
+      const operation = createTranslationOperation('p5-truncated-parse');
+      const completion = createCompletionRecord({
+        provider: 'MockAI',
+        termination: CompletionTermination.TRUNCATED,
+        responseId: 'p5-primary',
+      });
+      let callCount = 0;
+      provider._callAI = vi.fn().mockImplementation(async (_sys, _text, options) => {
+        callCount += 1;
+        if (callCount === 1) {
+          recordProviderCompletion(options.executionContext, completion);
+          return '{"translations":';
+        }
+        return `recovered-${callCount - 1}`;
+      });
+
+      const result = await provider._translateBatch(
+        ['a', 'b'], 'en', 'fa', 'select-element', null, null, 'p5-truncated-parse', 'session-1',
+        { executionContext: { operation } }, ResponseFormat.JSON_OBJECT
+      );
+      const report = operation.finalize();
+
+      expect(result).toEqual(['recovered-1', 'recovered-2']);
+      expect(callCount).toBe(3);
+      expect(report.entries).toEqual(expect.arrayContaining([
+        expect.objectContaining({ type: 'RECOVERY_TRIGGERED', classification: 'TRUNCATED_RESPONSE' }),
+        expect.objectContaining({ type: 'RECOVERY_SUCCEEDED' }),
+      ]));
+    });
+
+    it('keeps selective recovery for TRUNCATED plus reliably mapped invalid subset', async () => {
+      const operation = createTranslationOperation('p5-truncated-selective');
+      const completion = createCompletionRecord({
+        provider: 'MockAI',
+        termination: CompletionTermination.TRUNCATED,
+        responseId: 'p5-selective-primary',
+      });
+      AIResponseParser.parseBatchResult.mockReturnValue({
+        results: ['primary-a', 'invalid-b', 'primary-c'],
+        contractViolation: true,
+        invalidUnits: [{ requestIndex: 1, responseId: '1', violationCodes: ['EMPTY_TRANSLATED_TEXT'] }],
+        mappingFacts: { identityReliable: true, complete: true, ambiguous: false },
+      });
+      provider._callAI = vi.fn().mockImplementation(async (_sys, _text, options) => {
+        if (options.callPurpose === TranslationCallPurpose.PRIMARY_TRANSLATION) {
+          recordProviderCompletion(options.executionContext, completion);
+          return 'structured-primary';
+        }
+        return 'recovered-b';
+      });
+
+      const result = await provider._translateBatch(
+        ['a', 'b', 'c'], 'en', 'fa', 'select-element', null, null, 'p5-truncated-selective', 'session-1',
+        { executionContext: { operation } }, ResponseFormat.JSON_OBJECT
+      );
+      const recoveryCall = provider._callAI.mock.calls[1];
+      const trigger = operation.finalize().entries.find(({ type }) => type === 'RECOVERY_TRIGGERED');
+
+      expect(result).toEqual(['primary-a', 'recovered-b', 'primary-c']);
+      expect(provider._callAI).toHaveBeenCalledTimes(2);
+      expect(provider._callAI.mock.calls.map(([, , options]) => options.callPurpose)).toEqual([
+        TranslationCallPurpose.PRIMARY_TRANSLATION,
+        TranslationCallPurpose.STRUCTURED_RECOVERY,
+      ]);
+      expect(recoveryCall[1]).toContain('b');
+      expect(trigger).toMatchObject({ classification: 'TRUNCATED_RESPONSE' });
+    });
+
+    it('accepts TRUNCATED plus contract-valid structured output without recovery', async () => {
+      const { AIResponseParser: realParser } = await vi.importActual('./utils/AIResponseParser.js');
+      AIResponseParser.parseBatchResult.mockImplementation(realParser.parseBatchResult.bind(realParser));
+      const operation = createTranslationOperation('p5-truncated-valid');
+      const completion = createCompletionRecord({
+        provider: 'MockAI',
+        termination: CompletionTermination.TRUNCATED,
+        responseId: 'p5-valid-primary',
+      });
+      provider._callAI = vi.fn().mockImplementation(async (_sys, _text, options) => {
+        recordProviderCompletion(options.executionContext, completion);
+        return '[{"id":"0","text":"TA"},{"id":"1","text":"TB"}]';
+      });
+
+      const result = await provider._translateBatch(
+        ['a', 'b'], 'en', 'fa', 'select-element', null, null, 'p5-truncated-valid', 'session-1',
+        { executionContext: { operation } }, ResponseFormat.JSON_OBJECT
+      );
+
+      expect(result).toEqual(['TA', 'TB']);
+      expect(provider._callAI).toHaveBeenCalledTimes(1);
+      expect(operation.snapshotCompletions()).toEqual([
+        expect.objectContaining({ termination: CompletionTermination.TRUNCATED }),
+      ]);
+      expect(operation.finalize().entries.some(({ type }) => type === 'RECOVERY_TRIGGERED')).toBe(false);
+    });
+
+    it('propagates TRUNCATED recovery failure without a second recovery pass', async () => {
+      const { AIResponseParser: realParser } = await vi.importActual('./utils/AIResponseParser.js');
+      AIResponseParser.parseBatchResult.mockImplementation(realParser.parseBatchResult.bind(realParser));
+      const operation = createTranslationOperation('p5-truncated-recovery-failure');
+      const completion = createCompletionRecord({
+        provider: 'MockAI',
+        termination: CompletionTermination.TRUNCATED,
+        responseId: 'p5-failed-primary',
+      });
+      const error = Object.assign(new Error('recovery transport failure'), { type: 'NETWORK_ERROR' });
+      let callCount = 0;
+      provider._callAI = vi.fn().mockImplementation(async (_sys, _text, options) => {
+        callCount += 1;
+        if (callCount === 1) {
+          recordProviderCompletion(options.executionContext, completion);
+          return '{"translations":';
+        }
+        throw error;
+      });
+
+      await expect(provider._translateBatch(
+        ['a', 'b'], 'en', 'fa', 'select-element', null, null, 'p5-truncated-recovery-failure', 'session-1',
+        { executionContext: { operation } }, ResponseFormat.JSON_OBJECT
+      )).rejects.toBe(error);
+
+      const entries = operation.finalize().entries;
+      expect(callCount).toBe(2);
+      expect(entries).toEqual(expect.arrayContaining([
+        expect.objectContaining({ type: 'RECOVERY_TRIGGERED', classification: 'TRUNCATED_RESPONSE' }),
+        expect.objectContaining({ type: 'RECOVERY_FAILED', code: 'NETWORK_ERROR' }),
+      ]));
+      expect(entries.some(({ type }) => type === 'RECOVERY_SUCCEEDED')).toBe(false);
+    });
+
+    it('keeps NORMAL plus equivalent parse failure on existing full recovery path', async () => {
+      const { AIResponseParser: realParser } = await vi.importActual('./utils/AIResponseParser.js');
+      AIResponseParser.parseBatchResult.mockImplementation(realParser.parseBatchResult.bind(realParser));
+      const operation = createTranslationOperation('p5-normal-parse-failure');
+      const completion = createCompletionRecord({
+        provider: 'MockAI',
+        termination: CompletionTermination.NORMAL,
+        responseId: 'p5-normal-primary',
+      });
+      let callCount = 0;
+      provider._callAI = vi.fn().mockImplementation(async (_sys, _text, options) => {
+        callCount += 1;
+        if (callCount === 1) {
+          recordProviderCompletion(options.executionContext, completion);
+          return '{"translations":';
+        }
+        return `normal-recovered-${callCount - 1}`;
+      });
+
+      const result = await provider._translateBatch(
+        ['a', 'b'], 'en', 'fa', 'select-element', null, null, 'p5-normal-parse-failure', 'session-1',
+        { executionContext: { operation } }, ResponseFormat.JSON_OBJECT
+      );
+      const trigger = operation.finalize().entries.find(({ type }) => type === 'RECOVERY_TRIGGERED');
+
+      expect(result).toEqual(['normal-recovered-1', 'normal-recovered-2']);
+      expect(callCount).toBe(3);
+      expect(trigger).toMatchObject({ classification: 'PARSE_FAILURE' });
+    });
+
+    it('keeps unmigrated-provider recovery behavior without fabricating completion', async () => {
+      const operation = createTranslationOperation('p5-absent-completion');
+      AIResponseParser.parseBatchResult.mockReturnValue({
+        results: ['primary-a', 'invalid-b'],
+        contractViolation: true,
+        invalidUnits: [{ requestIndex: 1, responseId: '1', violationCodes: ['EMPTY_TRANSLATED_TEXT'] }],
+        mappingFacts: { identityReliable: true, complete: true, ambiguous: false },
+      });
+      provider._callAI = vi.fn()
+        .mockResolvedValueOnce('structured-primary')
+        .mockResolvedValueOnce('recovered-b');
+
+      const result = await provider._translateBatch(
+        ['a', 'b'], 'en', 'fa', 'select-element', null, null, 'p5-absent-completion', 'session-1',
+        { executionContext: { operation } }, ResponseFormat.JSON_OBJECT
+      );
+      const trigger = operation.finalize().entries.find(({ type }) => type === 'RECOVERY_TRIGGERED');
+
+      expect(result).toEqual(['primary-a', 'recovered-b']);
+      expect(provider._callAI).toHaveBeenCalledTimes(2);
+      expect(operation.snapshotCompletions()).toEqual([]);
+      expect(trigger).toMatchObject({ classification: 'CONTRACT_VIOLATION' });
+    });
+  });
+
   describe('_shouldUseStreaming', () => {
     it('should not use streaming for PDF mode', async () => {
       const shouldStream = await provider._shouldUseStreaming(['a', 'b'], 'msg-1', { name: 'engine' }, 'pdf-translation');
