@@ -26,6 +26,15 @@ vi.mock('@/shared/config/config.js', async (importOriginal) => {
   };
 });
 
+const OPENAI_RAW_RESPONSE_FIXTURES = Object.freeze({
+  metadataAbsent: Object.freeze({
+    choices: [{ message: { content: 'سلام دنیا' } }],
+  }),
+  errorEnvelope: Object.freeze({
+    error: { message: 'Rate limit reached', type: 'insufficient_quota' },
+  }),
+});
+
 describe('OpenAIProvider Error Handling', () => {
   let provider;
 
@@ -39,9 +48,7 @@ describe('OpenAIProvider Error Handling', () => {
       ok: true,
       status: 200,
       headers: new Map([['content-type', 'application/json']]),
-      json: () => Promise.resolve({
-        choices: [{ message: { content: 'سلام دنیا' } }]
-      }),
+      json: () => Promise.resolve(OPENAI_RAW_RESPONSE_FIXTURES.metadataAbsent),
       clone: function() { return this; }
     });
 
@@ -168,9 +175,7 @@ describe('OpenAIProvider Error Handling', () => {
       ok: true,
       status: 200,
       headers: new Map([['content-type', 'application/json']]),
-      json: () => Promise.resolve({
-        error: { message: 'Rate limit reached', type: 'insufficient_quota' }
-      }),
+      json: () => Promise.resolve(OPENAI_RAW_RESPONSE_FIXTURES.errorEnvelope),
       clone: function() { return this; }
     });
 

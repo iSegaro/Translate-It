@@ -55,6 +55,11 @@ vi.mock('@/features/translation/core/ProviderCoordinator.js', () => ({
   }
 }));
 
+const WEBAI_RAW_RESPONSE_FIXTURES = Object.freeze({
+  success: Object.freeze({ response: 'WebAI Result' }),
+  missingResponse: Object.freeze({}),
+});
+
 import { WebAIProvider } from './WebAI.js';
 import { AIConversationHelper } from './utils/AIConversationHelper.js';
 import { getAIConversationHistoryEnabledAsync } from '@/shared/config/config.js';
@@ -65,6 +70,16 @@ describe('WebAIProvider history support', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     provider = new WebAIProvider();
+  });
+
+  it('uses current response fixture and preserves absent completion metadata', async () => {
+    const executeRequest = vi.spyOn(provider, '_executeRequest')
+      .mockImplementation(async ({ extractResponse }) => extractResponse(WEBAI_RAW_RESPONSE_FIXTURES.success));
+
+    await expect(provider._callAI('system', 'text')).resolves.toBe('WebAI Result');
+
+    executeRequest.mockImplementation(async ({ extractResponse }) => extractResponse(WEBAI_RAW_RESPONSE_FIXTURES.missingResponse));
+    await expect(provider._callAI('system', 'text')).resolves.toBeUndefined();
   });
 
   it('forwards call purpose outside the provider payload', async () => {

@@ -26,6 +26,15 @@ vi.mock('@/shared/config/config.js', async (importOriginal) => {
   };
 });
 
+const CUSTOM_RAW_RESPONSE_FIXTURES = Object.freeze({
+  contentOnly: Object.freeze({
+    choices: [{ message: { content: 'Custom AI Result' } }],
+  }),
+  errorEnvelope: Object.freeze({
+    error: { message: 'Internal Model Error', code: 'model_error' },
+  }),
+});
+
 describe('CustomProvider Error Handling', () => {
   let provider;
 
@@ -39,9 +48,7 @@ describe('CustomProvider Error Handling', () => {
       ok: true,
       status: 200,
       headers: new Map([['content-type', 'application/json']]),
-      json: () => Promise.resolve({
-        choices: [{ message: { content: 'Custom AI Result' } }]
-      }),
+      json: () => Promise.resolve(CUSTOM_RAW_RESPONSE_FIXTURES.contentOnly),
       clone: function() { return this; }
     });
 
@@ -185,9 +192,7 @@ describe('CustomProvider Error Handling', () => {
       ok: true,
       status: 200,
       headers: new Map([['content-type', 'application/json']]),
-      json: () => Promise.resolve({
-        error: { message: 'Internal Model Error', code: 'model_error' }
-      }),
+      json: () => Promise.resolve(CUSTOM_RAW_RESPONSE_FIXTURES.errorEnvelope),
       clone: function() { return this; }
     });
 

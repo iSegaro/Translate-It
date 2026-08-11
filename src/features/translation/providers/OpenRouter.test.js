@@ -23,6 +23,21 @@ vi.mock('@/shared/config/config.js', async (importOriginal) => {
   };
 });
 
+const OPENROUTER_RAW_RESPONSE_FIXTURES = Object.freeze({
+  objectResponse: Object.freeze({
+    choices: [{ message: { content: 'OpenRouter Result' } }],
+  }),
+  stringifiedResponse: JSON.stringify({
+    choices: [{ message: { content: 'OpenRouter String Result' } }],
+  }),
+  errorEnvelope: Object.freeze({
+    error: { message: 'Provider timeout', metadata: { raw: 'Gateway Timeout' } },
+  }),
+  singleFieldErrorEnvelope: Object.freeze({
+    error: { message: 'Model not found' },
+  }),
+});
+
 describe('OpenRouterProvider Error Handling', () => {
   let provider;
 
@@ -36,14 +51,24 @@ describe('OpenRouterProvider Error Handling', () => {
       ok: true,
       status: 200,
       headers: new Map([['content-type', 'application/json']]),
-      json: () => Promise.resolve({
-        choices: [{ message: { content: 'OpenRouter Result' } }]
-      }),
+      json: () => Promise.resolve(OPENROUTER_RAW_RESPONSE_FIXTURES.objectResponse),
       clone: function() { return this; }
     });
 
     const result = await provider._callAI('system', 'Hello World');
     expect(result).toBe('OpenRouter Result');
+  });
+
+  it('extracts the currently supported stringified response shape', async () => {
+    proxyManager.fetch.mockResolvedValue({
+      ok: true,
+      status: 200,
+      headers: new Map([['content-type', 'application/json']]),
+      json: () => Promise.resolve(OPENROUTER_RAW_RESPONSE_FIXTURES.stringifiedResponse),
+      clone: function() { return this; }
+    });
+
+    await expect(provider._callAI('system', 'Hello World')).resolves.toBe('OpenRouter String Result');
   });
 
   it('forwards call purpose outside the provider payload', async () => {
@@ -100,9 +125,7 @@ describe('OpenRouterProvider Error Handling', () => {
       ok: true,
       status: 200,
       headers: new Map([['content-type', 'application/json']]),
-      json: () => Promise.resolve({
-        error: { message: 'Provider timeout', metadata: { raw: 'Gateway Timeout' } }
-      }),
+      json: () => Promise.resolve(OPENROUTER_RAW_RESPONSE_FIXTURES.errorEnvelope),
       clone: function() { return this; }
     });
 
@@ -115,9 +138,7 @@ describe('OpenRouterProvider Error Handling', () => {
       ok: true,
       status: 200,
       headers: new Map([['content-type', 'application/json']]),
-      json: () => Promise.resolve({
-        error: { message: 'Model not found' }
-      }),
+      json: () => Promise.resolve(OPENROUTER_RAW_RESPONSE_FIXTURES.singleFieldErrorEnvelope),
       clone: function() { return this; }
     });
 

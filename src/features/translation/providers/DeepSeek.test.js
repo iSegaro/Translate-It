@@ -25,6 +25,15 @@ vi.mock('@/shared/config/config.js', async (importOriginal) => {
   };
 });
 
+const DEEPSEEK_RAW_RESPONSE_FIXTURES = Object.freeze({
+  contentOnly: Object.freeze({
+    choices: [{ message: { content: 'DeepSeek Result' } }],
+  }),
+  errorEnvelope: Object.freeze({
+    error: { message: 'Insufficient Balance', code: 'insufficient_balance' },
+  }),
+});
+
 describe('DeepSeekProvider Error Handling', () => {
   let provider;
 
@@ -38,9 +47,7 @@ describe('DeepSeekProvider Error Handling', () => {
       ok: true,
       status: 200,
       headers: new Map([['content-type', 'application/json']]),
-      json: () => Promise.resolve({
-        choices: [{ message: { content: 'DeepSeek Result' } }]
-      }),
+      json: () => Promise.resolve(DEEPSEEK_RAW_RESPONSE_FIXTURES.contentOnly),
       clone: function() { return this; }
     });
 
@@ -158,9 +165,7 @@ describe('DeepSeekProvider Error Handling', () => {
       ok: true,
       status: 200,
       headers: new Map([['content-type', 'application/json']]),
-      json: () => Promise.resolve({
-        error: { message: 'Insufficient Balance', code: 'insufficient_balance' }
-      }),
+      json: () => Promise.resolve(DEEPSEEK_RAW_RESPONSE_FIXTURES.errorEnvelope),
       clone: function() { return this; }
     });
 
