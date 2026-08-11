@@ -14,6 +14,13 @@ import { ProviderNames } from "@/features/translation/providers/ProviderConstant
 import { AIConversationHelper } from "./utils/AIConversationHelper.js";
 import { AITextProcessor } from "./utils/AITextProcessor.js";
 import { ResponseFormat, TRANSLATION_CONSTANTS } from "@/shared/config/translationConstants.js";
+import {
+  CompletionProviderFamily,
+  createCompletionRecord,
+  createUsageRecord,
+  normalizeTermination,
+} from "@/features/translation/ir/CompletionContract.js";
+import { recordProviderCompletion } from "@/features/translation/ir/TranslationOperation.js";
 const logger = getScopedLogger(LOG_COMPONENTS.PROVIDERS, 'GoogleGemini');
 
 export class GeminiProvider extends BaseAIProvider {
@@ -24,6 +31,33 @@ export class GeminiProvider extends BaseAIProvider {
   constructor() {
     super(ProviderNames.GEMINI);
     this.providerSettingKey = 'GEMINI_API_KEY';
+  }
+
+  /**
+   * Normalizes one raw Gemini response into a single completion record and
+   * attaches it to the current operation. Executes exactly once per physical
+   * Gemini response at the provider-adapter boundary. Null-safe: recording
+   * never throws and never alters translation. SAFETY responses record POLICY
+   * before the existing throw so the response fact survives.
+   * @private
+   */
+  _recordGeminiCompletion(data, executionContext) {
+    const candidate = data?.candidates?.[0];
+    if (!candidate) return false;
+
+    const usageMetadata = data?.usageMetadata;
+    return recordProviderCompletion(executionContext, createCompletionRecord({
+      provider: this.providerName,
+      model: data?.modelVersion ?? null,
+      termination: normalizeTermination(CompletionProviderFamily.GEMINI, candidate?.finishReason),
+      responseId: data?.responseId ?? null,
+      usage: createUsageRecord({
+        inputTokens: usageMetadata?.promptTokenCount,
+        outputTokens: usageMetadata?.candidatesTokenCount,
+        reasoningTokens: usageMetadata?.thoughtsTokenCount,
+        totalTokens: usageMetadata?.totalTokenCount,
+      }),
+    }));
   }
 
   /**
@@ -117,6 +151,7 @@ export class GeminiProvider extends BaseAIProvider {
         charCount: fetchOptions.body.length,
         originalCharCount,
         extractResponse: (data) => {
+        this._recordGeminiCompletion(data, executionContext);
         if (data?.error) {
           throw new Error(`API_ERROR: ${data.error.message || 'Unknown Gemini Error'}`);
         }
@@ -160,6 +195,7 @@ export class GeminiProvider extends BaseAIProvider {
           charCount: retryBodyJson.length,
           originalCharCount,
           extractResponse: (data) => {
+        this._recordGeminiCompletion(data, executionContext);
         if (data?.error) {
           throw new Error(`API_ERROR: ${data.error.message || 'Unknown Gemini Error'}`);
         }
