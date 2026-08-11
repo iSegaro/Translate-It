@@ -5,6 +5,8 @@
  * Uses Web Crypto API for strong encryption
  */
 
+import { PROMPT_REGISTRY } from '@/shared/config/PromptRegistry.js';
+
 
 class SecureStorage {
   constructor() {
@@ -219,6 +221,14 @@ class SecureStorage {
     excludeFields.forEach((field) => {
       delete cleanSettings[field];
     });
+
+    // Non-editable prompt wrappers are CONFIG-owned implementation defaults, not
+    // user configuration. They are no longer persisted and must not be exported.
+    Object.values(PROMPT_REGISTRY)
+      .filter((prompt) => !prompt.editable)
+      .forEach((prompt) => {
+        delete cleanSettings[prompt.key];
+      });
 
     return cleanSettings;
   }

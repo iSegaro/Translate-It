@@ -39,26 +39,19 @@ function getDefaultSettings() {
     COPY_REPLACE: CONFIG.COPY_REPLACE || 'replace',
     REPLACE_SPECIAL_SITES: CONFIG.REPLACE_SPECIAL_SITES ?? true,
     // --- Prompt Templates ---
-    // Keep all prompt templates in settings so existing overrides survive
+    // Keep user-editable prompt templates in settings so existing overrides survive
     // save/load, import/export, and prompt migrations. UI exposure is controlled
     // separately by PromptRegistry.editable.
+    // Non-editable prompt wrappers are CONFIG-owned implementation defaults and
+    // are intentionally NOT persisted.
     PROMPT_TEMPLATE: CONFIG.PROMPT_TEMPLATE,
     PROMPT_TEMPLATE_AUTO: CONFIG.PROMPT_TEMPLATE_AUTO,
     PROMPT_BASE_FIELD: CONFIG.PROMPT_BASE_FIELD,
     PROMPT_BASE_FIELD_AUTO: CONFIG.PROMPT_BASE_FIELD_AUTO,
     PROMPT_BASE_POPUP_TRANSLATE: CONFIG.PROMPT_BASE_POPUP_TRANSLATE,
     PROMPT_BASE_DICTIONARY: CONFIG.PROMPT_BASE_DICTIONARY,
-    PROMPT_BASE_SCREEN_CAPTURE: CONFIG.PROMPT_BASE_SCREEN_CAPTURE,
-    PROMPT_BASE_SELECT: CONFIG.PROMPT_BASE_SELECT,
-    PROMPT_BASE_BATCH: CONFIG.PROMPT_BASE_BATCH,
-    PROMPT_BASE_AI_BATCH: CONFIG.PROMPT_BASE_AI_BATCH,
-    PROMPT_BASE_AI_BATCH_AUTO: CONFIG.PROMPT_BASE_AI_BATCH_AUTO,
-    PROMPT_BASE_AI_FOLLOWUP: CONFIG.PROMPT_BASE_AI_FOLLOWUP,
-    PROMPT_BASE_AI_FOLLOWUP_AUTO: CONFIG.PROMPT_BASE_AI_FOLLOWUP_AUTO,
     // --- Subtitle Prompts ---
     PROMPT_SUBTITLE_USER: CONFIG.PROMPT_SUBTITLE_USER,
-    PROMPT_SUBTITLE_BASE: CONFIG.PROMPT_SUBTITLE_BASE,
-    PROMPT_SUBTITLE_BATCH: CONFIG.PROMPT_SUBTITLE_BATCH,
     API_KEY: CONFIG.API_KEY || '',
     OPENAI_API_KEY: CONFIG.OPENAI_API_KEY || '',
     OPENAI_API_URL: CONFIG.OPENAI_API_URL || '',
@@ -535,6 +528,15 @@ export const useSettingsStore = defineStore('settings', () => {
 
       // 1. Merge imported settings with default settings to ensure no missing keys
       const defaultSettings = getDefaultSettings();
+      // Non-editable prompt wrappers are CONFIG-owned implementation defaults that
+      // are no longer persisted. Silently drop any copies carried by older backups
+      // so they never re-enter storage via import.
+      const nonEditablePromptKeys = Object.values(PROMPT_REGISTRY)
+        .filter(p => !p.editable)
+        .map(p => p.key);
+      nonEditablePromptKeys.forEach(key => {
+        delete processedSettings[key];
+      });
       const mergedSettings = { ...defaultSettings, ...processedSettings };
       
       // Special handling for nested MODE_PROVIDERS to ensure deep merge

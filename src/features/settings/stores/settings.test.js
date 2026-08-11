@@ -57,6 +57,25 @@ describe('Settings Store', () => {
     expect(store.settings.THEME).toBe('auto');
   });
 
+  it('should not seed non-editable prompt wrappers into default settings', () => {
+    const store = useSettingsStore();
+
+    // Editable prompts remain seeded
+    expect(store.settings.PROMPT_TEMPLATE).toBe(CONFIG.PROMPT_TEMPLATE);
+    expect(store.settings.PROMPT_SUBTITLE_USER).toBe(CONFIG.PROMPT_SUBTITLE_USER);
+
+    // Non-editable wrappers are CONFIG-owned and must not be persisted
+    expect(store.settings.PROMPT_BASE_AI_BATCH).toBeUndefined();
+    expect(store.settings.PROMPT_BASE_AI_BATCH_AUTO).toBeUndefined();
+    expect(store.settings.PROMPT_BASE_SELECT).toBeUndefined();
+    expect(store.settings.PROMPT_BASE_BATCH).toBeUndefined();
+    expect(store.settings.PROMPT_BASE_AI_FOLLOWUP).toBeUndefined();
+    expect(store.settings.PROMPT_BASE_AI_FOLLOWUP_AUTO).toBeUndefined();
+    expect(store.settings.PROMPT_BASE_SCREEN_CAPTURE).toBeUndefined();
+    expect(store.settings.PROMPT_SUBTITLE_BASE).toBeUndefined();
+    expect(store.settings.PROMPT_SUBTITLE_BATCH).toBeUndefined();
+  });
+
   it('should include BILINGUAL_TRANSLATION_MODES.PDF with the CONFIG default', () => {
     const store = useSettingsStore();
     expect(store.settings.BILINGUAL_TRANSLATION_MODES[TranslationMode.PDF])
@@ -200,6 +219,25 @@ describe('Settings Store', () => {
 
       expect(store.settings.THEME).toBe('dark');
       expect(storageManager.set).toHaveBeenCalled();
+    });
+
+    it('importSettings should drop non-editable wrappers from old backups and keep editable prompts', async () => {
+      secureStorage.processImportedSettings.mockResolvedValue({
+        THEME: 'dark',
+        PROMPT_BASE_AI_BATCH: 'OLD_MARKER',
+        PROMPT_SUBTITLE_BASE: 'OLD_SUBTITLE',
+        PROMPT_TEMPLATE: 'custom user template $_{TEXT}'
+      });
+      const store = useSettingsStore();
+
+      await store.importSettings({ THEME: 'dark', _exported: true });
+
+      // Legacy wrappers from the backup are discarded
+      expect(store.settings.PROMPT_BASE_AI_BATCH).toBeUndefined();
+      expect(store.settings.PROMPT_SUBTITLE_BASE).toBeUndefined();
+      // Editable customized prompt survives
+      expect(store.settings.PROMPT_TEMPLATE).toBe('custom user template $_{TEXT}');
+      expect(store.settings.THEME).toBe('dark');
     });  });
 
   describe('Strict Validation', () => {

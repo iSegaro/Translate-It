@@ -11,8 +11,33 @@ import { storageManager } from "@/shared/storage/core/StorageCore.js";
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { runSettingsMigrations } from "@/shared/config/settingsMigrations.js";
+import { PROMPT_REGISTRY } from "@/shared/config/PromptRegistry.js";
 
 const logger = getScopedLogger(LOG_COMPONENTS.BACKGROUND, 'InstallHandler');
+
+/**
+ * Persisted-settings schema guard.
+ *
+ * Non-editable prompt wrappers are CONFIG-owned implementation defaults.
+ * They must never be persisted — runtime getters consume them directly
+ * from CONFIG. Derived from PromptRegistry so it cannot drift from the
+ * authoritative classification.
+ */
+const NON_EDITABLE_PROMPT_KEYS = Object.values(PROMPT_REGISTRY)
+  .filter(p => !p.editable)
+  .map(p => p.key);
+
+/**
+ * Build the persisted defaults baseline from CONFIG.
+ *
+ * Returns CONFIG minus non-editable prompt wrappers, so fresh installs and
+ * legacy migrations never seed obsolete internal wrappers into storage.
+ */
+function getPersistedConfigDefaults() {
+  const defaults = { ...CONFIG };
+  NON_EDITABLE_PROMPT_KEYS.forEach(key => delete defaults[key]);
+  return defaults;
+}
 
 /**
  * Detects if this is a migration from old version to Vue version
@@ -79,8 +104,15 @@ async function performLegacyMigration(existingData) {
 
     Object.assign(migratedData, vueDefaults);
 
-    // 4. Ensure all CONFIG defaults are present
+    // 4. Ensure all persisted CONFIG defaults are present (excluding non-editable
+    //    prompt wrappers, which are CONFIG-owned runtime-only assets).
+    //    Also drop any legacy wrapper copies carried from old storage so they
+    //    never get re-stored.
     Object.keys(CONFIG).forEach((key) => {
+      if (NON_EDITABLE_PROMPT_KEYS.includes(key)) {
+        delete migratedData[key];
+        return;
+      }
       if (!(key in migratedData)) {
         migratedData[key] = CONFIG[key];
         migrationLog.push(`Added missing config key: ${key}`);
@@ -134,20 +166,24 @@ async function migrateConfigSettings() {
 
 /**
  * Runs incremental settings migrations based on version tracking
+ *
+ * Persistence owner for migration application: applies returned `updates` and
+ * `removals` to browser storage. The migration layer itself stays pure.
  */
-async function runIncrementalSettingsMigrations() {
+export async function runIncrementalSettingsMigrations() {
   try {
     // Get current settings from storage
     const currentSettings = await storageManager.get();
 
     // Always run migration for update events to ensure users get latest settings
     // The migration function itself will check if updates are actually needed
-    const { updates, logs } = await runSettingsMigrations(
+    const { updates, removals = [], logs } = await runSettingsMigrations(
       { ...currentSettings } // Pass copy of current settings
     );
 
     logger.debug('Migration result', {
       updatesCount: Object.keys(updates).length,
+      removalsCount: removals.length,
       updateKeys: Object.keys(updates),
       logs
     });
@@ -161,6 +197,12 @@ async function runIncrementalSettingsMigrations() {
       });
     } else {
       logger.debug('No settings updates needed');
+    }
+
+    // Apply removals if any (e.g. obsolete non-editable prompt wrappers)
+    if (removals.length > 0) {
+      await storageManager.remove(removals);
+      logger.debug('Removed obsolete settings keys', { removals });
     }
 
   } catch (error) {
@@ -179,15 +221,18 @@ async function handleFreshInstallation() {
   if (hasExistingData) {
     logger.init('Legacy migration detected during fresh install');
 
-    // Initialize with default settings for migrated users
-    await storageManager.set(CONFIG);
+    // Initialize with default settings for migrated users.
+    // Exclude non-editable prompt wrappers — runtime is CONFIG-authoritative.
+    await storageManager.set(getPersistedConfigDefaults());
 
     // Open options page to languages page for initial setup
     const optionsUrl = browser.runtime.getURL("src/html/options.html#languages");
     await browser.tabs.create({ url: optionsUrl });
   } else {
-    // Truly fresh installation - initialize with default settings
-    await storageManager.set(CONFIG);
+    // Truly fresh installation - initialize with default settings.
+    // Exclude non-editable prompt wrappers — they are CONFIG-owned defaults,
+    // not persisted settings; runtime getters consume them from CONFIG directly.
+    await storageManager.set(getPersistedConfigDefaults());
     logger.init('Fresh installation completed with default settings');
 
     const optionsUrl = browser.runtime.getURL("src/html/options.html#languages");

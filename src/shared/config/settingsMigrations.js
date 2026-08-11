@@ -209,6 +209,13 @@ function runMainMigration(currentSettings) {
     .filter(p => p.editable)
     .map(p => p.key);
 
+  // Non-editable prompt wrappers are CONFIG-owned implementation defaults and are
+  // NOT part of the persisted settings schema. They must never be re-added by
+  // missing-key fill (step A) and leftover stored copies are cleaned up below.
+  const NON_EDITABLE_PROMPT_KEYS = Object.values(PROMPT_REGISTRY)
+    .filter(p => !p.editable)
+    .map(p => p.key);
+
   // 4. Synchronized Option Lists (UI Options that should always match CONFIG)
   const OPTION_LISTS = [
     'FONT_SIZE_OPTIONS',
@@ -221,6 +228,8 @@ function runMainMigration(currentSettings) {
   // A. Check for missing settings and add them
   Object.keys(CONFIG).forEach(key => {
     if (DO_NOT_MIGRATE.includes(key)) return;
+    // Non-editable prompt wrappers are not persisted; never re-add them.
+    if (NON_EDITABLE_PROMPT_KEYS.includes(key)) return;
     if (!(key in currentSettings)) {
       updates[key] = CONFIG[key];
       migrationLog.push(`Added missing setting: ${key}`);
@@ -236,6 +245,17 @@ function runMainMigration(currentSettings) {
       }
     }
   });
+
+  // A2. Legacy storage cleanup: non-editable prompt wrappers were persisted by
+  // older versions. Remove leftover copies so storage no longer carries them.
+  const removals = currentSettings
+    ? NON_EDITABLE_PROMPT_KEYS.filter(key => key in currentSettings)
+    : [];
+  if (removals.length > 0) {
+    removals.forEach(key => {
+      migrationLog.push(`Removing obsolete stored prompt wrapper: ${key}`);
+    });
+  }
 
   // B. Handle model lists - Dynamic update & reset if model removed
   Object.entries(MODEL_MAPPING).forEach(([modelListKey, currentModelKey]) => {
@@ -334,29 +354,38 @@ function runMainMigration(currentSettings) {
     });
   }
 
-  return { updates, migrationLog };
+  return { updates, migrationLog, removals };
 }
 
 
 /**
- * Run settings migrations - always checks for missing/updated settings
+ * Run settings migrations - always checks for missing/updated settings.
+ *
+ * PURE · DECLARATIVE: computes migration decisions only. It never reads/writes
+ * browser storage. The caller (persistence owner) applies `updates` and
+ * `removals` to the persisted settings.
+ *
+ * @param {object} currentSettings Current persisted settings
+ * @returns {Promise<{updates: object, removals: string[], logs: string[]>}}
  */
 export async function runSettingsMigrations(currentSettings) {
   logger.info('Running settings migrations check');
 
   const allUpdates = {};
   const allLogs = [];
+  const allRemovals = [];
 
   // Always run main migration to check for missing/updated settings
-  const { updates, migrationLog } = runMainMigration(currentSettings);
+  const { updates, migrationLog, removals = [] } = runMainMigration(currentSettings);
   Object.assign(allUpdates, updates);
   allLogs.push(...migrationLog);
+  allRemovals.push(...removals);
 
   logger.debug('Settings migrations completed', {
     updatesCount: Object.keys(allUpdates).length,
     logs: allLogs
   });
 
-  return { updates: allUpdates, logs: allLogs };
+  return { updates: allUpdates, logs: allLogs, removals: allRemovals };
 }
 
