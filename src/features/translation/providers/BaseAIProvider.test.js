@@ -1,5 +1,16 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
+const loggerMock = vi.hoisted(() => ({
+  debug: vi.fn(),
+  info: vi.fn(),
+  warn: vi.fn(),
+  error: vi.fn(),
+  debugLazy: vi.fn(),
+  init: vi.fn(),
+  operation: vi.fn(),
+  performance: vi.fn(),
+}));
+
 // 1. Mock minimal dependencies
 vi.mock('webextension-polyfill', () => ({
   default: {
@@ -9,16 +20,7 @@ vi.mock('webextension-polyfill', () => ({
 }));
 
 vi.mock('@/shared/logging/logger.js', () => ({
-  getScopedLogger: () => ({
-    debug: vi.fn(),
-    info: vi.fn(),
-    warn: vi.fn(),
-    error: vi.fn(),
-    debugLazy: vi.fn(),
-    init: vi.fn(),
-    operation: vi.fn(),
-    performance: vi.fn(),
-  })
+  getScopedLogger: () => loggerMock
 }));
 
 // Mock StatsManager early
@@ -926,6 +928,40 @@ beforeEach(() => {
   });
 
   describe('P5 truncation recovery invariants', () => {
+    it('logs PARSE_FAILURE for NORMAL completion with unparseable structured output', async () => {
+      const operation = createTranslationOperation('p7-normal-parse-failure');
+      const completion = createCompletionRecord({
+        provider: 'MockAI',
+        termination: CompletionTermination.NORMAL,
+        responseId: 'p7-normal',
+      });
+      AIResponseParser.parseBatchResult.mockReturnValue({
+        results: ['', ''],
+        contractViolation: true,
+        parseFailed: true,
+        invalidUnits: [],
+        mappingFacts: { identityReliable: false, complete: false, ambiguous: true },
+      });
+      provider._callAI = vi.fn().mockImplementation(async (_system, _text, options) => {
+        recordProviderCompletion(options.executionContext, completion);
+        return 'primary';
+      });
+      vi.spyOn(provider, '_traditionalBatchTranslate').mockResolvedValue(['A', 'B']);
+
+      await provider._translateBatch(
+        ['a', 'b'], 'en', 'fa', 'select-element', null, null, 'p7-normal-parse-failure', 'session-1',
+        { executionContext: { operation } }, ResponseFormat.JSON_OBJECT
+      );
+
+      const recoveryLog = loggerMock.debug.mock.calls.find(([message]) => message.includes('Structured recovery triggered'));
+      expect(recoveryLog?.[1]).toMatchObject({
+        classification: 'PARSE_FAILURE',
+        termination: CompletionTermination.NORMAL,
+        parseFailed: true,
+        strategy: 'FULL',
+      });
+    });
+
     it('uses full recovery for TRUNCATED plus unparseable structured output', async () => {
       const { AIResponseParser: realParser } = await vi.importActual('./utils/AIResponseParser.js');
       AIResponseParser.parseBatchResult.mockImplementation(realParser.parseBatchResult.bind(realParser));
@@ -957,6 +993,31 @@ beforeEach(() => {
         expect.objectContaining({ type: 'RECOVERY_TRIGGERED', classification: 'TRUNCATED_RESPONSE' }),
         expect.objectContaining({ type: 'RECOVERY_SUCCEEDED' }),
       ]));
+      const recoveryLog = loggerMock.debug.mock.calls.find(([message]) => message.includes('Structured recovery triggered'));
+      expect(recoveryLog?.[1]).toMatchObject({
+        classification: 'TRUNCATED_RESPONSE',
+        termination: CompletionTermination.TRUNCATED,
+        parseFailed: true,
+        strategy: 'FULL',
+      });
+      const completionLog = loggerMock.debug.mock.calls.find(([message]) => message.includes('Provider completion record'));
+      expect(completionLog?.[1]).toMatchObject({
+        provider: 'MockAI',
+        model: null,
+        termination: CompletionTermination.TRUNCATED,
+        responseId: 'p5-primary',
+        usage: null,
+      });
+      expect(JSON.stringify(loggerMock.debug.mock.calls)).not.toContain('SECRET_SOURCE_TEXT');
+      expect(JSON.stringify(loggerMock.debug.mock.calls)).not.toContain('SECRET_TRANSLATED_TEXT');
+      expect(JSON.stringify(loggerMock.debug.mock.calls)).not.toContain('finish_reason');
+      expect(JSON.stringify(loggerMock.debug.mock.calls)).not.toContain('choices');
+      const completedLog = loggerMock.debug.mock.calls.find(([message]) => message.includes('Structured recovery completed'));
+      expect(completedLog?.[1]).toMatchObject({
+        classification: 'TRUNCATED_RESPONSE',
+        strategy: 'FULL',
+        recoveredUnitCount: 2,
+      });
     });
 
     it('keeps selective recovery for TRUNCATED plus reliably mapped invalid subset', async () => {
@@ -995,6 +1056,19 @@ beforeEach(() => {
       ]);
       expect(recoveryCall[1]).toContain('b');
       expect(trigger).toMatchObject({ classification: 'TRUNCATED_RESPONSE' });
+      const recoveryLog = loggerMock.debug.mock.calls.find(([message]) => message.includes('Structured recovery triggered'));
+      expect(recoveryLog?.[1]).toMatchObject({
+        classification: 'TRUNCATED_RESPONSE',
+        strategy: 'SELECTIVE',
+        invalidUnitCount: 1,
+        mappingFacts: { identityReliable: true, complete: true, ambiguous: false },
+      });
+      const completedLog = loggerMock.debug.mock.calls.find(([message]) => message.includes('Structured recovery completed'));
+      expect(completedLog?.[1]).toMatchObject({
+        classification: 'TRUNCATED_RESPONSE',
+        strategy: 'SELECTIVE',
+        recoveredUnitCount: 1,
+      });
     });
 
     it('accepts TRUNCATED plus contract-valid structured output without recovery', async () => {
@@ -1110,6 +1184,61 @@ beforeEach(() => {
       expect(provider._callAI).toHaveBeenCalledTimes(2);
       expect(operation.snapshotCompletions()).toEqual([]);
       expect(trigger).toMatchObject({ classification: 'CONTRACT_VIOLATION' });
+    });
+  });
+
+  describe('P7 bounded completion diagnostics', () => {
+    it.each([
+      ['short', 'resp-123', 'resp-123'],
+      ['long', '1234567890123456789012345678901234567890', '12345678901234567890123456789012…'],
+      ['absent', null, null],
+    ])('formats %s responseId without changing stored completion', async (_label, responseId, loggedId) => {
+      const operation = createTranslationOperation(`p7-response-id-${_label}`);
+      const completion = createCompletionRecord({
+        provider: 'MockAI',
+        termination: CompletionTermination.NORMAL,
+        responseId,
+      });
+      AIResponseParser.parseBatchResult.mockReturnValue({ results: ['translated'], contractViolation: false });
+      provider._callAI = vi.fn().mockImplementation(async (_system, _text, options) => {
+        recordProviderCompletion(options.executionContext, completion);
+        return 'translated';
+      });
+
+      await provider._translateBatch(
+        ['source'], 'en', 'fa', 'select-element', null, null, `p7-${_label}`, 'session-1',
+        { executionContext: { operation } }, ResponseFormat.JSON_ARRAY
+      );
+
+      const relevantLogs = loggerMock.debug.mock.calls.filter(([message]) => message.includes('Provider completion record'));
+      expect(relevantLogs).toHaveLength(1);
+      expect(relevantLogs[0][1].responseId).toBe(loggedId);
+      expect(operation.snapshotCompletions()[0].responseId).toBe(responseId);
+      if (typeof responseId === 'string' && responseId.length > 32) {
+        expect(JSON.stringify(relevantLogs[0])).not.toContain(responseId);
+      }
+    });
+
+    it('does not retain logger calls from previous tests', async () => {
+      const operation = createTranslationOperation('p7-logger-isolation');
+      const completion = createCompletionRecord({
+        provider: 'MockAI',
+        termination: CompletionTermination.NORMAL,
+        responseId: 'isolated-response',
+      });
+      AIResponseParser.parseBatchResult.mockReturnValue({ results: ['translated'], contractViolation: false });
+      provider._callAI = vi.fn().mockImplementation(async (_system, _text, options) => {
+        recordProviderCompletion(options.executionContext, completion);
+        return 'translated';
+      });
+
+      await provider._translateBatch(
+        ['source'], 'en', 'fa', 'select-element', null, null, 'p7-isolation', 'session-1',
+        { executionContext: { operation } }, ResponseFormat.JSON_ARRAY
+      );
+
+      expect(loggerMock.debug.mock.calls.filter(([message]) => message.includes('Provider completion record'))).toHaveLength(1);
+      expect(loggerMock.warn.mock.calls).toHaveLength(0);
     });
   });
 

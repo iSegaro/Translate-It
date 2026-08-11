@@ -116,6 +116,11 @@ function collectRecoveryViolationCodes(parsed) {
   return [...codes];
 }
 
+function formatDiagnosticId(value, maxLength = 32) {
+  if (typeof value !== 'string' || !value) return null;
+  return value.length <= maxLength ? value : `${value.slice(0, maxLength)}…`;
+}
+
 export class BaseAIProvider extends BaseProvider {
   // AI-specific capabilities - to be overridden by subclasses
   static isAI = true;
@@ -285,6 +290,16 @@ export class BaseAIProvider extends BaseProvider {
           })
         : null;
 
+      if (completionRef?.record) {
+        logger.debug(`[${this.providerName}] Provider completion record`, {
+          provider: completionRef.record.provider,
+          model: completionRef.record.model,
+          termination: completionRef.record.termination,
+          responseId: formatDiagnosticId(completionRef.record.responseId),
+          usage: completionRef.record.usage,
+        });
+      }
+
       // Structured recovery: the parser reports facts only; recovery ownership stays
       // here. A contract violation triggers exactly one sequential re-request.
       // The sequential pass returns a scalar for a single segment; normalize it to
@@ -292,8 +307,25 @@ export class BaseAIProvider extends BaseProvider {
       // (ProviderCoordinator._cleanResult) receives the same shape as the normal path.
       if (parsed.contractViolation) {
         const selectivePlan = getSelectiveRecoveryPlan(parsed, texts);
+        const recoveryStrategy = selectivePlan ? 'SELECTIVE' : 'FULL';
+        const mappingFacts = parsed.mappingFacts || {};
         conversationCommitCandidate?.discard();
         logger.warn(`[${this.providerName}] Structured response violated its contract; sequential recovery started`);
+        logger.debug(`[${this.providerName}] Structured recovery triggered`, {
+          classification: recoveryClassification?.classification ?? null,
+          termination: recoveryClassification?.termination ?? null,
+          parseFailed: parsed.parseFailed === true,
+          contractViolation: parsed.contractViolation === true,
+          invalidUnitCount: Array.isArray(parsed.invalidUnits) ? parsed.invalidUnits.length : 0,
+          violationCodes: collectRecoveryViolationCodes(parsed),
+          mappingFacts: {
+            identityReliable: mappingFacts.identityReliable ?? null,
+            complete: mappingFacts.complete ?? null,
+            ambiguous: mappingFacts.ambiguous ?? null,
+          },
+          strategy: recoveryStrategy,
+          unitCount: texts.length,
+        });
         appendTranslationDiagnostic(executionContext, {
           type: 'RECOVERY_TRIGGERED',
           stage: 'recovery',
@@ -326,6 +358,11 @@ export class BaseAIProvider extends BaseProvider {
               reason: error.message,
               ...(typeof error.type === 'string' && { code: error.type }),
             });
+            logger.debug(`[${this.providerName}] Structured recovery failed`, {
+              classification: recoveryClassification?.classification ?? null,
+              strategy: recoveryStrategy,
+              errorType: typeof error.type === 'string' ? error.type : null,
+            });
           }
           throw error;
         }
@@ -347,6 +384,11 @@ export class BaseAIProvider extends BaseProvider {
           type: 'RECOVERY_SUCCEEDED',
           stage: 'recovery',
           provider: this.providerName,
+        });
+        logger.debug(`[${this.providerName}] Structured recovery completed`, {
+          classification: recoveryClassification?.classification ?? null,
+          strategy: recoveryStrategy,
+          recoveredUnitCount: recoveryValues.length,
         });
         return finalResults;
       }
