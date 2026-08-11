@@ -213,6 +213,19 @@ export class BaseAIProvider extends BaseProvider {
    */
   async _translateBatch(texts, sourceLang, targetLang, translateMode, abortController, engine, messageId, sessionId, contextMetadata = null, expectedFormat = null, priority = null) {
     const structuredFormat = expectedFormat || ResponseFormat.JSON_ARRAY;
+    // Per-call completion slot: the adapter records the completion during its
+    // physical response, and recordProviderCompletion publishes the frozen
+    // record into this fresh per-call slot. Parallel batches share one
+    // operation, so the slot is derived per call to keep the correlation
+    // response-scoped (no "latest completion" shared state).
+    const baseExecutionContext = contextMetadata?.executionContext;
+    const completionRef = baseExecutionContext ? { record: null } : null;
+    const callExecutionContext = baseExecutionContext
+      ? { ...baseExecutionContext, completionRef }
+      : null;
+    const callContextMetadata = callExecutionContext
+      ? { ...contextMetadata, executionContext: callExecutionContext }
+      : contextMetadata;
     const conversationCommitCandidate = (
       structuredFormat === ResponseFormat.JSON_ARRAY || structuredFormat === ResponseFormat.JSON_OBJECT
     ) ? createConversationCommitCandidate() : null;
@@ -223,7 +236,7 @@ export class BaseAIProvider extends BaseProvider {
         abortController,
         messageId,
         sessionId,
-        contextMetadata,
+        contextMetadata: callContextMetadata,
         expectedFormat,
         priority,
         conversationCommitCandidate,
@@ -231,7 +244,7 @@ export class BaseAIProvider extends BaseProvider {
 
       // Stats recording is handled by ProviderRequestEngine. 
       // Orchestrators (like OptimizedJsonHandler or UnifiedService) handle the reporting.
-      const executionContext = contextMetadata?.executionContext;
+      const executionContext = callExecutionContext || contextMetadata?.executionContext;
 
       const parsed = AIResponseParser.parseBatchResult(
         response,
@@ -241,6 +254,7 @@ export class BaseAIProvider extends BaseProvider {
         expectedFormat || ResponseFormat.JSON_ARRAY,
         executionContext,
         executionContext?.manifestView,
+        completionRef?.record ?? null,
       );
 
       // Structured recovery: the parser reports facts only; recovery ownership stays

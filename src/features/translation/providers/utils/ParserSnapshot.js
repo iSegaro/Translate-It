@@ -31,11 +31,17 @@ function createUnit(item) {
 /**
  * Creates a shallowly immutable parser snapshot without mapping candidates to
  * source units or repairing semantic content. Nested provider values remain
- * opaque references because validator only observes them.
+ * opaque references because validator only observes them. Optional `completion`
+ * reference is carried through parser facts when present so the correlated
+ * provider completion stays visible to validator observers.
  */
-export function createParserSnapshot(items, { repaired = false } = {}) {
+export function createParserSnapshot(items, { repaired = false, completion = null } = {}) {
+  const evidence = { repaired };
+  if (completion && typeof completion === 'object') {
+    evidence.completion = completion;
+  }
   return Object.freeze({
     units: Object.freeze((Array.isArray(items) ? items : []).map(createUnit)),
-    parserEvidence: Object.freeze({ repaired }),
+    parserEvidence: Object.freeze(evidence),
   })
 }

@@ -167,8 +167,9 @@ export function createTranslationOperation(messageId, manifest = null) {
     recordCompletion(record) {
       if (finalized) return false
       if (completions.length >= MAX_COMPLETION_ENTRIES) return false
-      completions.push(sanitizeCompletion(record))
-      return true
+      const stored = sanitizeCompletion(record)
+      completions.push(stored)
+      return stored
     },
     snapshotCompletions() {
       return Object.freeze([...completions])
@@ -251,10 +252,20 @@ export function appendTranslationDiagnostic(executionContext, fact) {
 /**
  * Records one normalized provider completion on the execution context. Safe
  * when no execution context exists; preserves response order across multiple
- * physical responses within one operation.
+ * physical responses within one operation. Returns the frozen stored record
+ * so callers can correlate the response with its completion fact.
+ *
+ * When the execution context carries a per-call `completionRef` slot
+ * (`{ record: null }`), the frozen stored record is also published there.
+ * The slot is response-scoped: it must be a fresh object per physical
+ * provider call so concurrent calls sharing one operation stay isolated.
  */
 export function recordProviderCompletion(executionContext, record) {
-  return executionContext?.operation?.recordCompletion(record) || false
+  const stored = executionContext?.operation?.recordCompletion(record) || false
+  if (stored && executionContext?.completionRef) {
+    executionContext.completionRef.record = stored
+  }
+  return stored
 }
 
 export function finalizeTranslationOperation(executionContext) {

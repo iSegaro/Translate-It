@@ -235,7 +235,16 @@ describe('TranslationOperation completion record attachment', () => {
       responseId: 'resp-1',
     })
 
-    expect(operation.recordCompletion(record)).toBe(true)
+    const stored = operation.recordCompletion(record)
+    expect(stored).not.toBe(false)
+    expect(stored).toMatchObject({
+      provider: 'gemini',
+      model: 'gemini-1.5-flash',
+      termination: 'NORMAL',
+      responseId: 'resp-1',
+    })
+    expect(Object.isFrozen(stored)).toBe(true)
+    expect(operation.snapshotCompletions()[0]).toBe(stored)
 
     const snapshot = operation.snapshotCompletions()
     expect(snapshot).toHaveLength(1)
@@ -316,6 +325,51 @@ describe('TranslationOperation completion record attachment', () => {
     expect(recordProviderCompletion({ operation: null }, createCompletionRecord({ provider: 'gemini' }))).toBe(false)
   })
 
+  it('returns the frozen stored record and publishes it into the per-call completionRef slot', () => {
+    const operation = createTranslationOperation('completion-slot')
+    const completionRef = { record: null }
+    const executionContext = { operation, completionRef }
+    const record = createCompletionRecord({
+      provider: 'gemini',
+      termination: CompletionTermination.NORMAL,
+      responseId: 'resp-slot',
+    })
+
+    const stored = recordProviderCompletion(executionContext, record)
+
+    expect(stored).not.toBe(false)
+    expect(Object.isFrozen(stored)).toBe(true)
+    expect(operation.snapshotCompletions()[0]).toBe(stored)
+    expect(completionRef.record).toBe(stored)
+    expect(stored.responseId).toBe('resp-slot')
+  })
+
+  it('keeps per-call completionRef slots isolated across concurrent providers', () => {
+    const operation = createTranslationOperation('completion-slot-concurrent')
+    const slotA = { record: null }
+    const slotB = { record: null }
+    const contextA = { operation, completionRef: slotA }
+    const contextB = { operation, completionRef: slotB }
+
+    const storedA = recordProviderCompletion(contextA, createCompletionRecord({ provider: 'gemini', termination: CompletionTermination.TRUNCATED, responseId: 'resp-a' }))
+    const storedB = recordProviderCompletion(contextB, createCompletionRecord({ provider: 'openai', termination: CompletionTermination.NORMAL, responseId: 'resp-b' }))
+
+    expect(slotA.record).toBe(storedA)
+    expect(slotB.record).toBe(storedB)
+    expect(slotA.record).not.toBe(slotB.record)
+    expect(slotA.record.responseId).toBe('resp-a')
+    expect(slotB.record.responseId).toBe('resp-b')
+    expect(operation.snapshotCompletions()).toHaveLength(2)
+  })
+
+  it('leaves completionRef untouched when recording fails', () => {
+    const completionRef = { record: null }
+    const executionContext = { completionRef }
+
+    expect(recordProviderCompletion(executionContext, createCompletionRecord({ provider: 'gemini' }))).toBe(false)
+    expect(completionRef.record).toBeNull()
+  })
+
   it('rejects completions after finalization', () => {
     const operation = createTranslationOperation('completion-finalized')
     operation.finalize()
@@ -328,7 +382,7 @@ describe('TranslationOperation completion record attachment', () => {
     const operation = createTranslationOperation('completion-capacity')
 
     for (let index = 0; index < 100; index++) {
-      expect(operation.recordCompletion(createCompletionRecord({ provider: 'gemini', termination: CompletionTermination.NORMAL, responseId: `resp-${index}` }))).toBe(true)
+      expect(operation.recordCompletion(createCompletionRecord({ provider: 'gemini', termination: CompletionTermination.NORMAL, responseId: `resp-${index}` }))).not.toBe(false)
     }
 
     expect(operation.recordCompletion(createCompletionRecord({ provider: 'gemini', termination: CompletionTermination.NORMAL, responseId: 'resp-overflow' }))).toBe(false)

@@ -37,7 +37,8 @@ vi.mock('@/shared/error-management/ErrorMatcher.js', () => ({
 import { BaseAIProvider } from './BaseAIProvider.js';
 import { ResponseFormat } from '@/shared/config/translationConstants.js';
 import { isCancellationError, isFatalError, isTransientError, matchErrorToType } from '@/shared/error-management/ErrorMatcher.js';
-import { createTranslationOperation } from '../ir/TranslationOperation.js';
+import { createTranslationOperation, recordProviderCompletion } from '../ir/TranslationOperation.js';
+import { createCompletionRecord, CompletionTermination } from '../ir/CompletionContract.js';
 import { TranslationCallPurpose } from './ProviderConstants.js';
 import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
 import { translationSessionManager } from '../core/TranslationSessionManager.js';
@@ -67,6 +68,18 @@ class MockAIProvider extends BaseAIProvider {
   async _preparePromptAndText(texts) {
     return { systemPrompt: 'Sys', userText: JSON.stringify(texts) };
   }
+}
+
+function createGate() {
+  const holders = [];
+  return {
+    defer() {
+      return new Promise((resolve) => holders.push(resolve));
+    },
+    release() {
+      holders.splice(0).forEach((resolve) => resolve());
+    },
+  };
 }
 
 describe('BaseAIProvider', () => {
@@ -766,6 +779,119 @@ beforeEach(() => {
       await provider._translateBatch(['a', 'b', 'c'], 'en', 'fa', 'select-element');
 
       expect(recoverySpy.mock.calls[0][0]).toEqual(['a', 'b', 'c']);
+    });
+  });
+
+  describe('_translateBatch completion correlation (ADR-016 P3)', () => {
+    it('passes the NORMAL completion recorded by the adapter to the parser', async () => {
+      const { AIResponseParser: realParser } = await vi.importActual('./utils/AIResponseParser.js');
+      AIResponseParser.parseBatchResult.mockImplementation(realParser.parseBatchResult.bind(realParser));
+      const operation = createTranslationOperation('p3-stop');
+      const record = createCompletionRecord({ provider: 'MockAI', termination: CompletionTermination.NORMAL, responseId: 'resp-1' });
+      let stored = null;
+      provider._callAI = vi.fn().mockImplementation(async (_sys, _text, options) => {
+        stored = recordProviderCompletion(options.executionContext, record);
+        return '[{"id":"0","text":"AA"},{"id":"1","text":"BB"}]';
+      });
+
+      const result = await provider._translateBatch(
+        ['A', 'B'], 'en', 'fa', 'select-element', null, null, 'p3-stop', 'session-1',
+        { executionContext: { operation } }
+      );
+
+      expect(result).toEqual(['AA', 'BB']);
+      expect(AIResponseParser.parseBatchResult.mock.calls.at(-1)[7]).toBe(stored);
+      expect(AIResponseParser.parseBatchResult.mock.calls.at(-1)[7]).not.toBe(record);
+      expect(operation.snapshotCompletions()).toEqual([stored]);
+    });
+
+    it('passes a TRUNCATED completion through with identical behavior to NORMAL', async () => {
+      const { AIResponseParser: realParser } = await vi.importActual('./utils/AIResponseParser.js');
+      AIResponseParser.parseBatchResult.mockImplementation(realParser.parseBatchResult.bind(realParser));
+      const operation = createTranslationOperation('p3-truncated');
+      const truncRecord = createCompletionRecord({ provider: 'MockAI', termination: CompletionTermination.TRUNCATED, responseId: 'resp-t' });
+      const normRecord = createCompletionRecord({ provider: 'MockAI', termination: CompletionTermination.NORMAL, responseId: 'resp-n' });
+      const completions = [];
+      provider._callAI = vi.fn().mockImplementation(async (_sys, _text, options) => {
+        const stored = recordProviderCompletion(options.executionContext, completions.length ? normRecord : truncRecord);
+        completions.push(stored);
+        return '[{"id":"0","text":"X"}]';
+      });
+
+      const truncatedResult = await provider._translateBatch(
+        ['a'], 'en', 'fa', 'select-element', null, null, 'p3-trunc', 'session-1',
+        { executionContext: { operation } }
+      );
+      const normalResult = await provider._translateBatch(
+        ['a'], 'en', 'fa', 'select-element', null, null, 'p3-trunc', 'session-1',
+        { executionContext: { operation } }
+      );
+
+      expect(truncatedResult).toEqual(normalResult);
+      expect(AIResponseParser.parseBatchResult.mock.calls.at(-2)[7]).toBe(completions[0]);
+      expect(AIResponseParser.parseBatchResult.mock.calls.at(-1)[7]).toBe(completions[1]);
+      expect(completions[0].termination).toBe(CompletionTermination.TRUNCATED);
+      expect(completions[1].termination).toBe(CompletionTermination.NORMAL);
+    });
+
+    it('correlates each parallel batch with its own per-call completion slot', async () => {
+      const { AIResponseParser: realParser } = await vi.importActual('./utils/AIResponseParser.js');
+      AIResponseParser.parseBatchResult.mockImplementation(realParser.parseBatchResult.bind(realParser));
+      const operation = createTranslationOperation('p3-parallel');
+      const recordA = createCompletionRecord({ provider: 'MockAI', termination: CompletionTermination.NORMAL, responseId: 'resp-a' });
+      const recordB = createCompletionRecord({ provider: 'MockAI', termination: CompletionTermination.TRUNCATED, responseId: 'resp-b' });
+      const stored = [];
+      const gate = createGate();
+      provider._callAI = vi.fn().mockImplementation(async (_sys, text, options) => {
+        const record = text.includes('resp-a-target') ? recordA : recordB;
+        stored.push(recordProviderCompletion(options.executionContext, record));
+        await gate.defer();
+        return `[{"id":"0","text":"${record.responseId}"}]`;
+      });
+
+      const promiseA = provider._translateBatch(['resp-a-target'], 'en', 'fa', 'select-element', null, null, 'p3-par', 'session-1', { executionContext: { operation } });
+      const promiseB = provider._translateBatch(['resp-b-target'], 'en', 'fa', 'select-element', null, null, 'p3-par', 'session-1', { executionContext: { operation } });
+      await vi.waitFor(() => expect(provider._callAI).toHaveBeenCalledTimes(2));
+      gate.release();
+      const [resultA, resultB] = await Promise.all([promiseA, promiseB]);
+
+      expect(resultA).toEqual(['resp-a']);
+      expect(resultB).toEqual(['resp-b']);
+      expect(AIResponseParser.parseBatchResult.mock.calls.at(-2)[7]).toBe(stored.find(({ responseId }) => responseId === 'resp-a'));
+      expect(AIResponseParser.parseBatchResult.mock.calls.at(-1)[7]).toBe(stored.find(({ responseId }) => responseId === 'resp-b'));
+      expect(operation.snapshotCompletions()).toHaveLength(2);
+    });
+
+    it('records the primary completion on the primary slot and the recovery completion on the operation', async () => {
+      const operation = createTranslationOperation('p3-primary-recovery');
+      const primary = createCompletionRecord({ provider: 'MockAI', termination: CompletionTermination.TRUNCATED, responseId: 'resp-primary' });
+      const recovery = createCompletionRecord({ provider: 'MockAI', termination: CompletionTermination.NORMAL, responseId: 'resp-recovery' });
+      const primaryStored = [];
+      const recoveryStored = [];
+      AIResponseParser.parseBatchResult.mockReturnValue({
+        results: ['bad-a'],
+        contractViolation: true,
+        invalidUnits: [{ requestIndex: 0, responseId: '0', violationCodes: ['EMPTY_TRANSLATED_TEXT'] }],
+        mappingFacts: { identityReliable: true, complete: true, ambiguous: false },
+      });
+      provider._callAI = vi.fn().mockImplementation(async (_sys, _text, options) => {
+        if (options.callPurpose === TranslationCallPurpose.STRUCTURED_RECOVERY) {
+          recoveryStored.push(recordProviderCompletion(options.executionContext, recovery));
+          return 'recovered-A';
+        }
+        primaryStored.push(recordProviderCompletion(options.executionContext, primary));
+        return '[{"id":"0","text":"bad-a"}]';
+      });
+
+      const result = await provider._translateBatch(
+        ['A'], 'en', 'fa', 'select-element', null, null, 'p3-prim', 'session-1',
+        { executionContext: { operation } }, ResponseFormat.JSON_ARRAY
+      );
+
+      expect(result).toEqual(['recovered-A']);
+      expect(AIResponseParser.parseBatchResult.mock.calls.at(-1)[7]).toBe(primaryStored[0]);
+      expect(operation.snapshotCompletions()).toHaveLength(2);
+      expect(operation.snapshotCompletions().map(({ responseId }) => responseId)).toEqual(['resp-primary', 'resp-recovery']);
     });
   });
 

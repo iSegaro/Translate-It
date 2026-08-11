@@ -4,6 +4,7 @@ import { ResponseFormat } from '@/shared/config/translationConstants.js';
 import { TranslationContractValidator } from '@/features/translation/core/TranslationContractValidator.js';
 import { createManifestView, createRequestUnitManifest, MappingStrategy } from '@/features/translation/ir/RequestUnitManifest.js';
 import { createTranslationOperation } from '@/features/translation/ir/TranslationOperation.js';
+import { createCompletionRecord, CompletionTermination } from '@/features/translation/ir/CompletionContract.js';
 
 describe('AIResponseParser', () => {
   describe('cleanAIResponse - String Format', () => {
@@ -650,6 +651,83 @@ describe('AIResponseParser', () => {
 
       expect(result.results).toEqual(['A', 'B']);
       expect(result.contractViolation).toBe(false);
+    });
+  });
+
+  describe('completion correlation (ADR-016 P3)', () => {
+    const sourceBatch = [{ i: 'first', t: 'source' }];
+
+    it('attaches the correlated completion to parser and validation facts', () => {
+      const operation = createTranslationOperation('p3-correlate');
+      const observeValidationResult = vi.fn();
+      const completion = createCompletionRecord({
+        provider: 'Gemini',
+        termination: CompletionTermination.NORMAL,
+        responseId: 'resp-1',
+      });
+
+      const result = AIResponseParser.parseBatchResult(
+        '[{"i":"first","t":"translated"}]',
+        1,
+        sourceBatch,
+        'Gemini',
+        ResponseFormat.JSON_ARRAY,
+        { operation, observeValidationResult },
+        createManifestView(createRequestUnitManifest(sourceBatch)),
+        completion,
+      );
+
+      expect(result.results).toEqual(['translated']);
+      expect(result.contractViolation).toBe(false);
+      const validationResult = observeValidationResult.mock.calls[0][0];
+      expect(validationResult.parserEvidence.completion).toBe(completion);
+    });
+
+    it('keeps an absent completion distinct from an explicit UNKNOWN record', () => {
+      const operation = createTranslationOperation('p3-absent');
+      const observeValidationResult = vi.fn();
+
+      const result = AIResponseParser.parseBatchResult(
+        '[{"i":"first","t":"translated"}]',
+        1,
+        sourceBatch,
+        'WebAI',
+        ResponseFormat.JSON_ARRAY,
+        { operation, observeValidationResult },
+        createManifestView(createRequestUnitManifest(sourceBatch)),
+        null,
+      );
+
+      expect(result.results).toEqual(['translated']);
+      const validationResult = observeValidationResult.mock.calls[0][0];
+      expect(validationResult.parserEvidence).not.toHaveProperty('completion');
+    });
+
+    it('never branches parser behavior on termination value', () => {
+      const operation = createTranslationOperation('p3-nobranch');
+
+      const truncated = AIResponseParser.parseBatchResult(
+        '[{"i":"first","t":"partial"}]',
+        1,
+        sourceBatch,
+        'Gemini',
+        ResponseFormat.JSON_ARRAY,
+        { operation },
+        createManifestView(createRequestUnitManifest(sourceBatch)),
+        createCompletionRecord({ provider: 'Gemini', termination: CompletionTermination.TRUNCATED, responseId: 'resp-1' }),
+      );
+      const normal = AIResponseParser.parseBatchResult(
+        '[{"i":"first","t":"partial"}]',
+        1,
+        sourceBatch,
+        'Gemini',
+        ResponseFormat.JSON_ARRAY,
+        { operation },
+        createManifestView(createRequestUnitManifest(sourceBatch)),
+        createCompletionRecord({ provider: 'Gemini', termination: CompletionTermination.NORMAL, responseId: 'resp-2' }),
+      );
+
+      expect(truncated).toEqual(normal);
     });
   });
 });
