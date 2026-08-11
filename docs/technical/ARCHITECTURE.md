@@ -620,12 +620,13 @@ The extension uses Pinia for reactive state management across all Vue applicatio
 
 **Core Stores:**
 ```javascript
-// Global settings store
+// Global settings store (Pinia setup store)
 import { useSettingsStore } from '@/features/settings/stores/settings.js'
 
 const settings = useSettingsStore()
-await settings.updateProvider('openai')
-await settings.saveApiKey('OPENAI_API_KEY', 'sk-...')
+await settings.loadSettings()                    // merge persisted settings from storage
+await settings.updateSettingAndPersist('THEME', 'dark')
+await settings.resetSettings()                   // restore canonical persisted defaults
 ```
 
 **Feature-Specific Stores:**
@@ -647,27 +648,9 @@ const activeProvider = providers.getActiveProvider()
 ```
 
 ### Store Integration with Storage Manager
-All stores automatically sync with browser storage:
+The settings store is a Pinia setup store. It delegates its default values to `getPersistedDefaultSettings()`, which is the single authority for the persisted settings schema. Components and features never import `settingsDefaults.js` directly; only the settings store, InstallHandler, and migrations consume the builder.
 
-```javascript
-// Settings store automatically uses StorageManager
-export const useSettingsStore = defineStore('settings', {
-  state: () => ({
-    API_KEYS: {},
-    PROVIDER: 'google-translate',
-    SOURCE_LANG: 'auto',
-    TARGET_LANG: 'en'
-  }),
-  
-  actions: {
-    async updateProvider(provider) {
-      this.PROVIDER = provider
-      // Automatically synced to browser.storage
-      await this.saveSettings()
-    }
-  }
-})
-```
+`CONFIG` owns default values; `getPersistedDefaultSettings()` in `src/shared/config/settingsDefaults.js` owns persisted key membership and drives fresh install, reset, import defaults, and migration fill. The store handles load (merge persisted settings into reactive state), save (persist to `browser.storage`), and reset (restore canonical persisted defaults).
 
 ### Reactive Data Flow
 ```
@@ -805,7 +788,7 @@ For detailed information on UI hosting and in-page integration, refer to the fol
 <summary>State Management</summary>
 
 ### State Management
-- `src/store/core/settings.js` - Global settings store
+- `src/features/settings/stores/settings.js` - Global settings store
 - `src/store/modules/translation.js` - Translation state management
 - `src/shared/storage/core/StorageCore.js` - Centralized storage system
 

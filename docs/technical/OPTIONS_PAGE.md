@@ -60,17 +60,22 @@ To ensure a new configuration key is properly tracked, persisted, and synchroniz
 
 ### 1. Define the Default Value
 Add your new key and its default value to the `CONFIG` object in `src/shared/config/config.js`.
-*Why:* This acts as the source of truth for the extension's default state.
 
-### 2. Register in the Settings Store
-Add the key to the `getDefaultSettings()` function in `src/features/settings/stores/settings.js`.
-**CRITICAL:** If you skip this step, the setting will not be reactive, and it will be lost whenever the extension reloads or the store initializes.
+Adding a key to `CONFIG` **does not** automatically make it a persisted setting. `CONFIG` owns default values only; CONFIG-only runtime constants are never stored in browser storage. A persisted setting therefore requires two registrations: its default value in `CONFIG`, and its membership in `getPersistedDefaultSettings()`.
 
-### 3. Create an Async Getter (Optional but Recommended)
+### 2. Register in the Canonical Persisted Schema
+Add the key to `getPersistedDefaultSettings()` in `src/shared/config/settingsDefaults.js`.
+This is the single authority for persisted key membership and drives fresh install, reset, import defaults, and migration fill.
+**CRITICAL:** If you skip this step, the setting will not be persisted and will be lost on extension reload.
+
+### 3. Store-Only Runtime State
+If the value is runtime state and not a persisted setting (e.g., `translationHistory`), it does **not** belong in `getPersistedDefaultSettings()`. Initialize it separately in the settings store and manage its lifecycle independently.
+
+### 4. Create an Async Getter (Optional but Recommended)
 Add an async getter function in `src/shared/config/config.js` (e.g., `export const getMySettingAsync = ...`).
 *Why:* This allows background scripts and non-Vue logic to access the setting reliably using the `StorageManager`.
 
-### 4. Implement the UI Control
+### 5. Implement the UI Control
 Add the appropriate input or toggle in the relevant tab component (under `src/components/feature/options/tabs/`).
 - Use **`updateSettingLocally(key, value)`** for most settings (requires clicking the "Save" button).
 - Use **`updateSettingAndPersist(key, value)`** for settings that should take effect instantly (e.g., UI theme, language).
@@ -141,7 +146,7 @@ Located in `src/shared/config/settingsMigrations.js`, this system ensures that u
 
 ### Key Responsibilities:
 -   **Structure Alignment**: Remaps old configuration keys to new formats (e.g., migrating `select_element` to the new `MessageContexts` format).
--   **Default Filling**: Adds any newly introduced settings from `CONFIG` that are missing in the user's current storage.
+-   **Default Filling**: Adds any newly introduced settings from the canonical persisted settings schema (`getPersistedDefaultSettings()`) that are missing in the user's current storage.
 -   **Model List Updates**: Synchronizes AI model lists (Gemini, OpenAI, etc.) while preserving the user's specific model selection if it still exists.
 -   **Legacy Conversions**: Handles complex migrations like moving from a single `API_KEY` to the multi-key `GEMINI_API_KEY` system.
 

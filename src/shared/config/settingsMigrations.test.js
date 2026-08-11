@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { runSettingsMigrations, mergeMissingNestedMembers } from './settingsMigrations.js';
 import { HISTORICAL_PROMPT_DEFAULTS } from './promptHistoricalDefaults.js';
 import { CONFIG, TranslationMode } from './config.js';
+import { getPersistedDefaultSettings } from './settingsDefaults.js';
 
 // Mock logger
 vi.mock('@/shared/logging/logger.js', () => ({
@@ -18,12 +19,17 @@ describe('Settings Migrations', () => {
     vi.clearAllMocks();
   });
 
-  it('should add missing settings from CONFIG', async () => {
+  it('should add missing settings from canonical persisted defaults', async () => {
     const currentSettings = { THEME: 'dark' }; // Missing most things
     const { updates, logs } = await runSettingsMigrations(currentSettings);
     
-    expect(updates.APP_NAME).toBe(CONFIG.APP_NAME);
-    expect(logs).toContain('Added missing setting: APP_NAME');
+    const persistedDefaults = getPersistedDefaultSettings();
+    expect(updates.APPLICATION_LOCALIZE).toBe(persistedDefaults.APPLICATION_LOCALIZE);
+    expect(logs).toContain('Added missing setting: APPLICATION_LOCALIZE');
+    expect(updates.TIMEOUT).toBe(CONFIG.TIMEOUT);
+    expect(updates.TEXT_FIELD_SHORTCUT).toBe(CONFIG.TEXT_FIELD_SHORTCUT);
+    expect(updates.translationHistory).toBeUndefined();
+    expect(updates.CHANGELOG_URL).toBeUndefined();
   });
 
   it('should not re-add non-editable prompt wrappers via missing-setting fill', async () => {
@@ -31,7 +37,8 @@ describe('Settings Migrations', () => {
     const { updates } = await runSettingsMigrations(currentSettings);
 
     // Genuinely persisted settings are still filled
-    expect(updates.APP_NAME).toBe(CONFIG.APP_NAME);
+    expect(updates.APPLICATION_LOCALIZE).toBe(CONFIG.APPLICATION_LOCALIZE);
+    expect(updates.CHANGELOG_URL).toBeUndefined();
     // Non-editable wrappers are CONFIG-owned and must not be written to storage
     expect(updates.PROMPT_BASE_AI_BATCH).toBeUndefined();
     expect(updates.PROMPT_BASE_AI_BATCH_AUTO).toBeUndefined();

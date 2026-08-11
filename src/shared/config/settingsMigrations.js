@@ -18,6 +18,7 @@
 
 import { CONFIG, TranslationMode } from './config.js';
 import { PROMPT_REGISTRY } from './PromptRegistry.js';
+import { getPersistedDefaultSettings } from './settingsDefaults.js';
 import { HISTORICAL_PROMPT_DEFAULTS } from './promptHistoricalDefaults.js';
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
@@ -169,6 +170,11 @@ function runMainMigration(currentSettings) {
   const updates = {};
   const migrationLog = [];
 
+  // Canonical persisted-settings schema — the single source of which keys
+  // belong in storage. New persisted keys here automatically become migration
+  // targets; CONFIG-only runtime constants are excluded by not appearing here.
+  const persistedDefaults = getPersistedDefaultSettings();
+
   // Migrate Mode Provider keys first to ensure new structure is used
   migrateModeProviderKeys(currentSettings, updates, migrationLog);
   
@@ -209,9 +215,9 @@ function runMainMigration(currentSettings) {
     .filter(p => p.editable)
     .map(p => p.key);
 
-  // Non-editable prompt wrappers are CONFIG-owned implementation defaults and are
-  // NOT part of the persisted settings schema. They must never be re-added by
-  // missing-key fill (step A) and leftover stored copies are cleaned up below.
+  // Non-editable prompt wrappers are CONFIG-owned implementation defaults and
+  // are absent from persistedDefaults. Keep registry-derived keys only for
+  // legacy storage cleanup below.
   const NON_EDITABLE_PROMPT_KEYS = Object.values(PROMPT_REGISTRY)
     .filter(p => !p.editable)
     .map(p => p.key);
@@ -226,19 +232,17 @@ function runMainMigration(currentSettings) {
   // --- Start Migration Process ---
 
   // A. Check for missing settings and add them
-  Object.keys(CONFIG).forEach(key => {
+  Object.keys(persistedDefaults).forEach(key => {
     if (DO_NOT_MIGRATE.includes(key)) return;
-    // Non-editable prompt wrappers are not persisted; never re-add them.
-    if (NON_EDITABLE_PROMPT_KEYS.includes(key)) return;
     if (!(key in currentSettings)) {
-      updates[key] = CONFIG[key];
+      updates[key] = persistedDefaults[key];
       migrationLog.push(`Added missing setting: ${key}`);
     } else if (!(key in updates)) {
       // Backfill missing nested members for existing settings. The merge
       // helper is the single owner of mergeability validation (plain object,
       // cross-type, leaf values) and returns null when not applicable.
       // Skips keys already updated by earlier passes (e.g. MODE_PROVIDERS/BILINGUAL remaps).
-      const merged = mergeMissingNestedMembers(currentSettings[key], CONFIG[key]);
+      const merged = mergeMissingNestedMembers(currentSettings[key], persistedDefaults[key]);
       if (merged !== null) {
         updates[key] = merged;
         migrationLog.push(`Added missing nested members for ${key}`);
@@ -388,4 +392,3 @@ export async function runSettingsMigrations(currentSettings) {
 
   return { updates: allUpdates, logs: allLogs, removals: allRemovals };
 }
-

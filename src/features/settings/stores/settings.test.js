@@ -5,6 +5,7 @@ import useSettingsStore from './settings.js';
 import { storageManager } from '@/shared/storage/core/StorageCore.js';
 import secureStorage from '@/shared/storage/core/SecureStorage.js';
 import { SelectionTranslationMode, CONFIG, TranslationMode } from '@/shared/config/config.js';
+import { getPersistedDefaultSettings } from '@/shared/config/settingsDefaults.js';
 
 // Mock Dependencies
 vi.mock('@/shared/storage/core/StorageCore.js', () => ({
@@ -74,6 +75,15 @@ describe('Settings Store', () => {
     expect(store.settings.PROMPT_BASE_SCREEN_CAPTURE).toBeUndefined();
     expect(store.settings.PROMPT_SUBTITLE_BASE).toBeUndefined();
     expect(store.settings.PROMPT_SUBTITLE_BATCH).toBeUndefined();
+  });
+
+  it('should initialize with canonical persisted default keys', () => {
+    const store = useSettingsStore();
+
+    expect(Object.keys(store.settings).sort()).toEqual(
+      [...Object.keys(getPersistedDefaultSettings()), 'translationHistory'].sort()
+    );
+    expect(store.settings.translationHistory).toEqual([]);
   });
 
   it('should include BILINGUAL_TRANSLATION_MODES.PDF with the CONFIG default', () => {
@@ -279,7 +289,9 @@ describe('Settings Store', () => {
     await nextTick();
     
     expect(storageManager.clear).toHaveBeenCalled();
+    expect(storageManager.set).toHaveBeenCalledWith(getPersistedDefaultSettings());
     expect(store.settings.THEME).toBe('auto');
+    expect(store.settings.translationHistory).toEqual([]);
   });
 
   it('exportSettings should call secureStorage', async () => {

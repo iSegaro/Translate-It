@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { storageManager } from '@/shared/storage/core/StorageCore.js';
 import { runSettingsMigrations } from '@/shared/config/settingsMigrations.js';
 import { PROMPT_REGISTRY } from '@/shared/config/PromptRegistry.js';
+import { getPersistedDefaultSettings } from '@/shared/config/settingsDefaults.js';
 import {
   runIncrementalSettingsMigrations,
   handleInstallationEvent
@@ -110,22 +111,17 @@ describe('InstallHandler fresh-install persistence', () => {
     runSettingsMigrations.mockResolvedValue({ updates: {}, removals: [], logs: [] });
   });
 
-  it('should persist CONFIG defaults WITHOUT non-editable prompt wrappers', async () => {
+  it('should persist exactly canonical defaults', async () => {
     await handleInstallationEvent({ reason: 'install' });
 
     expect(storageManager.set).toHaveBeenCalledTimes(1);
     const persisted = storageManager.set.mock.calls[0][0];
 
-    // None of the 9 internal wrappers may be persisted.
-    NON_EDITABLE_KEYS.forEach(key => {
-      expect(persisted).not.toHaveProperty(key);
-    });
-
-    // Representative persisted settings remain intact.
+    expect(Object.keys(persisted).sort()).toEqual(
+      Object.keys(getPersistedDefaultSettings()).sort()
+    );
     expect(persisted).toHaveProperty('THEME');
-    expect(persisted).toHaveProperty('TRANSLATION_API');
-    expect(persisted).toHaveProperty('PROMPT_TEMPLATE'); // editable
-    expect(persisted).toHaveProperty('PROMPT_SUBTITLE_USER'); // editable
+    expect(persisted).toHaveProperty('PROMPT_TEMPLATE');
   });
 });
 
@@ -140,6 +136,7 @@ describe('InstallHandler legacy migration persistence', () => {
       THEME: 'dark',
       TRANSLATION_API: 'googlev2',
       CUSTOM_API_URL: 'https://x',
+      CHANGELOG_URL: 'stale runtime constant',
       PROMPT_TEMPLATE: 'custom user $_{TEXT}', // editable custom — survives
       PROMPT_SUBTITLE_USER: 'subtitle $_{SOURCE} $_{TARGET}', // editable
       PROMPT_BASE_AI_BATCH: 'stale wrapper'     // legacy wrapper — must not be re-added
@@ -163,6 +160,7 @@ describe('InstallHandler legacy migration persistence', () => {
     expect(persisted.TRANSLATION_API).toBe('googlev2');
     expect(persisted.API_KEY).toBe('legacy-key');
     expect(persisted.CUSTOM_API_URL).toBe('https://x');
+    expect(persisted.CHANGELOG_URL).toBeUndefined();
 
     // Editable customized prompts survive.
     expect(persisted.PROMPT_TEMPLATE).toBe('custom user $_{TEXT}');
