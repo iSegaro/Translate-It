@@ -63,6 +63,9 @@ const WEBAI_RAW_RESPONSE_FIXTURES = Object.freeze({
 import { WebAIProvider } from './WebAI.js';
 import { AIConversationHelper } from './utils/AIConversationHelper.js';
 import { getAIConversationHistoryEnabledAsync } from '@/shared/config/config.js';
+import { proxyManager } from '@/shared/proxy/ProxyManager.js';
+import { CompletionTermination } from '@/features/translation/ir/CompletionContract.js';
+import { createTranslationOperation } from '@/features/translation/ir/TranslationOperation.js';
 
 describe('WebAIProvider history support', () => {
   let provider;
@@ -226,5 +229,149 @@ describe('WebAIProvider history support', () => {
     const body = JSON.parse(capturedRequest.fetchOptions.body);
     expect(body.message).toBe('System prompt\n\nText to translate:\nCurrent text');
     expect(body.message).not.toContain('Previous translation context:');
+  });
+});
+
+describe('WebAIProvider Completion Recording (ADR-016)', () => {
+  let provider;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    provider = new WebAIProvider();
+  });
+
+  it('records content-only completion with absent metadata', async () => {
+    const operation = createTranslationOperation('webai-completion');
+    proxyManager.fetch.mockResolvedValue({
+      ok: true,
+      status: 200,
+      headers: new Map([['content-type', 'application/json']]),
+      json: () => Promise.resolve(WEBAI_RAW_RESPONSE_FIXTURES.success),
+      clone: function() { return this; }
+    });
+
+    const result = await provider._callAI('system', 'text', { executionContext: { operation } });
+    const [record] = operation.snapshotCompletions();
+
+    expect(result).toBe('WebAI Result');
+    expect(record).toEqual({
+      provider: 'WebAI',
+      model: null,
+      termination: CompletionTermination.UNKNOWN,
+      responseId: null,
+      usage: null,
+    });
+  });
+
+  it('does not record a completion for a missing response', async () => {
+    const operation = createTranslationOperation('webai-missing');
+    proxyManager.fetch.mockResolvedValue({
+      ok: true,
+      status: 200,
+      headers: new Map([['content-type', 'application/json']]),
+      json: () => Promise.resolve(WEBAI_RAW_RESPONSE_FIXTURES.missingResponse),
+      clone: function() { return this; }
+    });
+
+    await expect(provider._callAI('system', 'text', { executionContext: { operation } }))
+      .rejects.toThrow();
+    expect(operation.snapshotCompletions()).toEqual([]);
+  });
+
+  it('does not copy requested model into the completion record', async () => {
+    const operation = createTranslationOperation('webai-model-not-inferred');
+    proxyManager.fetch.mockResolvedValue({
+      ok: true,
+      status: 200,
+      headers: new Map([['content-type', 'application/json']]),
+      json: () => Promise.resolve(WEBAI_RAW_RESPONSE_FIXTURES.success),
+      clone: function() { return this; }
+    });
+
+    await provider._callAI('system', 'text', { executionContext: { operation } });
+    expect(operation.snapshotCompletions()[0].model).toBe(null);
+  });
+
+  it('does not infer termination from request max_tokens', async () => {
+    const operation = createTranslationOperation('webai-no-termination-inference');
+    proxyManager.fetch.mockResolvedValue({
+      ok: true,
+      status: 200,
+      headers: new Map([['content-type', 'application/json']]),
+      json: () => Promise.resolve(WEBAI_RAW_RESPONSE_FIXTURES.success),
+      clone: function() { return this; }
+    });
+
+    await provider._callAI('system', 'text', { executionContext: { operation } });
+    expect(operation.snapshotCompletions()[0].termination).toBe(CompletionTermination.UNKNOWN);
+  });
+
+  it('records nothing and returns normally without executionContext', async () => {
+    proxyManager.fetch.mockResolvedValue({
+      ok: true,
+      status: 200,
+      headers: new Map([['content-type', 'application/json']]),
+      json: () => Promise.resolve(WEBAI_RAW_RESPONSE_FIXTURES.success),
+      clone: function() { return this; }
+    });
+
+    const result = await provider._callAI('system', 'text');
+    expect(result).toBe('WebAI Result');
+  });
+
+  it('records two physical responses in order', async () => {
+    const operation = createTranslationOperation('webai-multiple');
+    proxyManager.fetch
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        headers: new Map([['content-type', 'application/json']]),
+        json: () => Promise.resolve(WEBAI_RAW_RESPONSE_FIXTURES.success),
+        clone: function() { return this; }
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        headers: new Map([['content-type', 'application/json']]),
+        json: () => Promise.resolve({ response: 'WebAI second result' }),
+        clone: function() { return this; }
+      });
+
+    await provider._callAI('system', 'first', { executionContext: { operation } });
+    await provider._callAI('system', 'second', { executionContext: { operation } });
+
+    const records = operation.snapshotCompletions();
+    expect(records).toHaveLength(2);
+    expect(records.map(({ termination, model, responseId, usage }) => ({ termination, model, responseId, usage }))).toEqual([
+      { termination: CompletionTermination.UNKNOWN, model: null, responseId: null, usage: null },
+      { termination: CompletionTermination.UNKNOWN, model: null, responseId: null, usage: null },
+    ]);
+  });
+
+  it('does not leak raw response or request fields into the completion record', async () => {
+    const operation = createTranslationOperation('webai-privacy');
+    proxyManager.fetch.mockResolvedValue({
+      ok: true,
+      status: 200,
+      headers: new Map([['content-type', 'application/json']]),
+      json: () => Promise.resolve({ ...WEBAI_RAW_RESPONSE_FIXTURES.success, request_id: 'request-namespace', created: 123 }),
+      clone: function() { return this; }
+    });
+
+    await provider._callAI('system', 'text', { executionContext: { operation } });
+    const record = operation.snapshotCompletions()[0];
+
+    expect(record).not.toHaveProperty('response');
+    expect(record.model).toBe(null);
+    expect(record).not.toHaveProperty('max_tokens');
+    expect(record).not.toHaveProperty('request_id');
+    expect(record).not.toHaveProperty('created');
+    expect(record).not.toHaveProperty('images');
+    expect(record).not.toHaveProperty('x-request-id');
+    expect(record).not.toHaveProperty('message');
+    expect(record).not.toHaveProperty('content');
+    expect(record).not.toHaveProperty('finish_reason');
+    expect(record).not.toHaveProperty('usage_details');
+    expect(record).not.toHaveProperty('reasoning_tokens');
   });
 });

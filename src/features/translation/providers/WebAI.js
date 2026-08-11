@@ -12,6 +12,8 @@ import { ProviderNames } from "@/features/translation/providers/ProviderConstant
 import { AIConversationHelper } from "./utils/AIConversationHelper.js";
 import { AITextProcessor } from "./utils/AITextProcessor.js";
 import { ResponseFormat } from "@/shared/config/translationConstants.js";
+import { CompletionTermination, createCompletionRecord } from "@/features/translation/ir/CompletionContract.js";
+import { recordProviderCompletion } from "@/features/translation/ir/TranslationOperation.js";
 
 const logger = getScopedLogger(LOG_COMPONENTS.PROVIDERS, 'WebAI');
 
@@ -22,6 +24,28 @@ export class WebAIProvider extends BaseAIProvider {
 
   constructor() {
     super(ProviderNames.WEBAI);
+  }
+
+  /**
+   * Records a content-only completion for the WebAI /translate endpoint.
+   *
+   * The current WebAI protocol exposes only `response` text — no model,
+   * finish reason, usage, or completion identity. The record therefore
+   * carries absent metadata (null/UNKNOWN) rather than fabricating facts
+   * from request configuration. No completion record is created for a
+   * malformed response.
+   * @private
+   */
+  _recordWebAICompletion(data, executionContext) {
+    if (typeof data?.response !== 'string') return false;
+
+    return recordProviderCompletion(executionContext, createCompletionRecord({
+      provider: this.providerName,
+      model: null,
+      termination: CompletionTermination.UNKNOWN,
+      responseId: null,
+      usage: null,
+    }));
   }
 
   /**
@@ -81,7 +105,10 @@ export class WebAIProvider extends BaseAIProvider {
       fetchOptions,
       charCount: fetchOptions.body.length,
       originalCharCount: isBatch ? AITextProcessor.estimateOriginalChars(userText) : userText.length,
-      extractResponse: (data) => typeof data.response === "string" ? data.response : undefined,
+      extractResponse: (data) => {
+        this._recordWebAICompletion(data, executionContext);
+        return typeof data.response === "string" ? data.response : undefined;
+      },
       context: `${this.providerName.toLowerCase()}-translation`,
       abortController,
       sessionId,
