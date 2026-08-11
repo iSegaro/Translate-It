@@ -4,6 +4,8 @@ import { proxyManager } from '@/shared/proxy/ProxyManager.js';
 import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
 import { TranslationCallPurpose } from './ProviderConstants.js';
 import { AIConversationHelper } from './utils/AIConversationHelper.js';
+import { CompletionTermination } from '@/features/translation/ir/CompletionContract.js';
+import { createTranslationOperation } from '@/features/translation/ir/TranslationOperation.js';
 
 // Mock Dependencies
 vi.mock('@/shared/proxy/ProxyManager.js', () => ({
@@ -27,8 +29,58 @@ vi.mock('@/shared/config/config.js', async (importOriginal) => {
 });
 
 const OPENAI_RAW_RESPONSE_FIXTURES = Object.freeze({
+  metadataRich: Object.freeze({
+    id: 'chatcmpl-test-1',
+    model: 'gpt-test-model',
+    choices: [{
+      index: 0,
+      finish_reason: 'stop',
+      message: {
+        role: 'assistant',
+        content: 'OpenAI translated text',
+      },
+    }],
+    usage: {
+      prompt_tokens: 100,
+      completion_tokens: 30,
+      total_tokens: 130,
+      completion_tokens_details: {
+        reasoning_tokens: 12,
+      },
+    },
+  }),
   metadataAbsent: Object.freeze({
     choices: [{ message: { content: 'سلام دنیا' } }],
+  }),
+  requestErrorIdSeparation: Object.freeze({
+    id: 'chatcmpl-test',
+    request_id: 'req-test',
+    choices: [{ finish_reason: 'stop', message: { content: 'OpenAI translated text' } }],
+  }),
+  truncated: Object.freeze({
+    choices: [{ finish_reason: 'length', message: { content: 'OpenAI truncated' } }],
+  }),
+  policy: Object.freeze({
+    choices: [{ finish_reason: 'content_filter', message: { content: 'OpenAI filtered' } }],
+  }),
+  toolCalls: Object.freeze({
+    choices: [{ finish_reason: 'tool_calls', message: { content: 'OpenAI tool' } }],
+  }),
+  functionCall: Object.freeze({
+    choices: [{ finish_reason: 'function_call', message: { content: 'OpenAI function' } }],
+  }),
+  unknownTermination: Object.freeze({
+    choices: [{ finish_reason: 'repository_test_unknown', message: { content: 'OpenAI unknown' } }],
+  }),
+  noUsage: Object.freeze({
+    choices: [{ finish_reason: 'stop', message: { content: 'OpenAI no usage' } }],
+  }),
+  partialUsage: Object.freeze({
+    choices: [{ finish_reason: 'stop', message: { content: 'OpenAI partial' } }],
+    usage: { prompt_tokens: 10, total_tokens: 12 },
+  }),
+  emptyChoices: Object.freeze({
+    choices: [],
   }),
   errorEnvelope: Object.freeze({
     error: { message: 'Rate limit reached', type: 'insufficient_quota' },
@@ -54,6 +106,217 @@ describe('OpenAIProvider Error Handling', () => {
 
     const result = await provider._callAI('system', 'Hello World');
     expect(result).toBe('سلام دنیا');
+  });
+
+  it('records normalized metadata from the confirmed OpenAI Chat Completions shape', async () => {
+    const operation = createTranslationOperation('openai-completion');
+    proxyManager.fetch.mockResolvedValue({
+      ok: true,
+      status: 200,
+      headers: new Map([['content-type', 'application/json']]),
+      json: () => Promise.resolve(OPENAI_RAW_RESPONSE_FIXTURES.metadataRich),
+      clone: function() { return this; }
+    });
+
+    const result = await provider._callAI('system', 'text', { executionContext: { operation } });
+    const [record] = operation.snapshotCompletions();
+
+    expect(result).toBe('OpenAI translated text');
+    expect(record).toEqual({
+      provider: 'OpenAI',
+      model: 'gpt-test-model',
+      termination: CompletionTermination.NORMAL,
+      responseId: 'chatcmpl-test-1',
+      usage: {
+        inputTokens: 100,
+        outputTokens: 30,
+        reasoningTokens: 12,
+        totalTokens: 130,
+      },
+    });
+    expect(record).not.toHaveProperty('choices');
+    expect(record).not.toHaveProperty('message');
+    expect(record).not.toHaveProperty('content');
+    expect(record).not.toHaveProperty('finish_reason');
+    expect(record).not.toHaveProperty('request_id');
+    expect(record.usage).toEqual({
+      inputTokens: 100,
+      outputTokens: 30,
+      reasoningTokens: 12,
+      totalTokens: 130,
+    });
+  });
+
+  it.each([
+    ['TRUNCATED', OPENAI_RAW_RESPONSE_FIXTURES.truncated, CompletionTermination.TRUNCATED],
+    ['POLICY', OPENAI_RAW_RESPONSE_FIXTURES.policy, CompletionTermination.POLICY],
+    ['tool_calls fallback', OPENAI_RAW_RESPONSE_FIXTURES.toolCalls, CompletionTermination.UNKNOWN],
+    ['function_call fallback', OPENAI_RAW_RESPONSE_FIXTURES.functionCall, CompletionTermination.UNKNOWN],
+    ['synthetic unknown', OPENAI_RAW_RESPONSE_FIXTURES.unknownTermination, CompletionTermination.UNKNOWN],
+  ])('normalizes %s termination without changing text', async (_label, fixture, termination) => {
+    const operation = createTranslationOperation(`openai-${_label}`);
+    proxyManager.fetch.mockResolvedValue({
+      ok: true,
+      status: 200,
+      headers: new Map([['content-type', 'application/json']]),
+      json: () => Promise.resolve(fixture),
+      clone: function() { return this; }
+    });
+
+    await expect(provider._callAI('system', 'text', { executionContext: { operation } }))
+      .resolves.toBe(fixture.choices[0].message.content);
+    expect(operation.snapshotCompletions()[0].termination).toBe(termination);
+  });
+
+  it('preserves usage absence and partial usage without deriving values', async () => {
+    const operation = createTranslationOperation('openai-usage');
+    proxyManager.fetch
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        headers: new Map([['content-type', 'application/json']]),
+        json: () => Promise.resolve(OPENAI_RAW_RESPONSE_FIXTURES.noUsage),
+        clone: function() { return this; }
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        headers: new Map([['content-type', 'application/json']]),
+        json: () => Promise.resolve(OPENAI_RAW_RESPONSE_FIXTURES.partialUsage),
+        clone: function() { return this; }
+      });
+
+    await provider._callAI('system', 'no-usage', { executionContext: { operation } });
+    await provider._callAI('system', 'partial', { executionContext: { operation } });
+
+    expect(operation.snapshotCompletions().map(({ usage }) => usage)).toEqual([
+      null,
+      { inputTokens: 10, outputTokens: null, reasoningTokens: null, totalTokens: 12 },
+    ]);
+  });
+
+  it('keeps missing model and response ID absent', async () => {
+    const operation = createTranslationOperation('openai-absent-identities');
+    proxyManager.fetch.mockResolvedValue({
+      ok: true,
+      status: 200,
+      headers: new Map([['content-type', 'application/json']]),
+      json: () => Promise.resolve(OPENAI_RAW_RESPONSE_FIXTURES.metadataAbsent),
+      clone: function() { return this; }
+    });
+
+    await provider._callAI('system', 'text', { executionContext: { operation } });
+    expect(operation.snapshotCompletions()[0]).toMatchObject({ model: null, responseId: null });
+  });
+
+  it('uses data.id as responseId and ignores request_id', async () => {
+    const operation = createTranslationOperation('openai-request-id');
+    proxyManager.fetch.mockResolvedValue({
+      ok: true,
+      status: 200,
+      headers: new Map([['content-type', 'application/json']]),
+      json: () => Promise.resolve(OPENAI_RAW_RESPONSE_FIXTURES.requestErrorIdSeparation),
+      clone: function() { return this; }
+    });
+
+    await provider._callAI('system', 'text', { executionContext: { operation } });
+    expect(operation.snapshotCompletions()[0].responseId).toBe('chatcmpl-test');
+    expect(operation.snapshotCompletions()[0]).not.toHaveProperty('request_id');
+  });
+
+  it('returns translation normally without executionContext', async () => {
+    proxyManager.fetch.mockResolvedValue({
+      ok: true,
+      status: 200,
+      headers: new Map([['content-type', 'application/json']]),
+      json: () => Promise.resolve(OPENAI_RAW_RESPONSE_FIXTURES.metadataRich),
+      clone: function() { return this; }
+    });
+
+    const result = await provider._callAI('system', 'text');
+    expect(result).toBe('OpenAI translated text');
+  });
+
+  it('records two physical responses independently and in order', async () => {
+    const operation = createTranslationOperation('openai-multiple');
+    proxyManager.fetch
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        headers: new Map([['content-type', 'application/json']]),
+        json: () => Promise.resolve({ ...OPENAI_RAW_RESPONSE_FIXTURES.truncated, id: 'chatcmpl-1' }),
+        clone: function() { return this; }
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        headers: new Map([['content-type', 'application/json']]),
+        json: () => Promise.resolve({ ...OPENAI_RAW_RESPONSE_FIXTURES.metadataRich, id: 'chatcmpl-2' }),
+        clone: function() { return this; }
+      });
+
+    await provider._callAI('system', 'first', { executionContext: { operation } });
+    await provider._callAI('system', 'second', { executionContext: { operation } });
+
+    expect(operation.snapshotCompletions().map(({ responseId, termination }) => ({ responseId, termination }))).toEqual([
+      { responseId: 'chatcmpl-1', termination: CompletionTermination.TRUNCATED },
+      { responseId: 'chatcmpl-2', termination: CompletionTermination.NORMAL },
+    ]);
+  });
+
+  it('does not create a completion record for an error envelope', async () => {
+    const operation = createTranslationOperation('openai-error');
+    proxyManager.fetch.mockResolvedValue({
+      ok: true,
+      status: 200,
+      headers: new Map([['content-type', 'application/json']]),
+      json: () => Promise.resolve(OPENAI_RAW_RESPONSE_FIXTURES.errorEnvelope),
+      clone: function() { return this; }
+    });
+
+    await expect(provider._callAI('system', 'text', { executionContext: { operation } }))
+      .rejects.toThrow('API_ERROR: Rate limit reached');
+    expect(operation.snapshotCompletions()).toEqual([]);
+  });
+
+  it('does not create a completion record for a choice-less response', async () => {
+    const operation = createTranslationOperation('openai-empty-choices');
+    proxyManager.fetch.mockResolvedValue({
+      ok: true,
+      status: 200,
+      headers: new Map([['content-type', 'application/json']]),
+      json: () => Promise.resolve(OPENAI_RAW_RESPONSE_FIXTURES.emptyChoices),
+      clone: function() { return this; }
+    });
+
+    await expect(provider._callAI('system', 'text', { executionContext: { operation } }))
+      .rejects.toThrow();
+    expect(operation.snapshotCompletions()).toEqual([]);
+  });
+
+  it('does not leak raw provider fields into the completion record', async () => {
+    const operation = createTranslationOperation('openai-privacy');
+    proxyManager.fetch.mockResolvedValue({
+      ok: true,
+      status: 200,
+      headers: new Map([['content-type', 'application/json']]),
+      json: () => Promise.resolve(OPENAI_RAW_RESPONSE_FIXTURES.metadataRich),
+      clone: function() { return this; }
+    });
+
+    await provider._callAI('system', 'text', { executionContext: { operation } });
+    const record = operation.snapshotCompletions()[0];
+
+    expect(record).not.toHaveProperty('choices');
+    expect(record).not.toHaveProperty('message');
+    expect(record).not.toHaveProperty('content');
+    expect(record).not.toHaveProperty('finish_reason');
+    expect(record).not.toHaveProperty('request_id');
+    expect(record).not.toHaveProperty('logprobs');
+    expect(record).not.toHaveProperty('system_fingerprint');
+    expect(record).not.toHaveProperty('service_tier');
+    expect(record).not.toHaveProperty('prompt_tokens_details');
+    expect(record).not.toHaveProperty('raw response');
   });
 
   it('forwards call purpose outside the provider payload', async () => {
