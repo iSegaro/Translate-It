@@ -11,6 +11,13 @@ import { ProviderNames } from "@/features/translation/providers/ProviderConstant
 import { AIConversationHelper } from "./utils/AIConversationHelper.js";
 import { AITextProcessor } from "./utils/AITextProcessor.js";
 import { ResponseFormat } from "@/shared/config/translationConstants.js";
+import {
+  CompletionProviderFamily,
+  createCompletionRecord,
+  createUsageRecord,
+  normalizeTermination,
+} from "@/features/translation/ir/CompletionContract.js";
+import { recordProviderCompletion } from "@/features/translation/ir/TranslationOperation.js";
 
 const logger = getScopedLogger(LOG_COMPONENTS.PROVIDERS, 'Custom');
 
@@ -23,6 +30,32 @@ export class CustomProvider extends BaseAIProvider {
     super(ProviderNames.CUSTOM);
     this.providerSettingKey = 'CUSTOM_API_KEY';
   }
+
+  /**
+   * Normalizes one raw CustomProvider response into a provider-neutral
+   * completion record at the adapter boundary. Optional OpenAI-compatible
+   * metadata is recorded when present; absent facts remain null. No-op when
+   * no selected choice exists.
+   * @private
+   */
+  _recordCustomCompletion(data, executionContext) {
+    const choice = data?.choices?.[0];
+    if (!choice) return false;
+
+    return recordProviderCompletion(executionContext, createCompletionRecord({
+      provider: this.providerName,
+      model: data?.model ?? null,
+      termination: normalizeTermination(CompletionProviderFamily.OPENAI_COMPATIBLE, choice?.finish_reason),
+      responseId: data?.id ?? null,
+      usage: createUsageRecord({
+        inputTokens: data?.usage?.prompt_tokens,
+        outputTokens: data?.usage?.completion_tokens,
+        reasoningTokens: data?.usage?.completion_tokens_details?.reasoning_tokens,
+        totalTokens: data?.usage?.total_tokens,
+      }),
+    }));
+  }
+
 
   /**
    * Internal implementation of the AI API call.
@@ -76,6 +109,7 @@ export class CustomProvider extends BaseAIProvider {
         if (data?.error) {
           throw new Error(`API_ERROR: ${data.error.message || 'Unknown Custom AI Error'}`);
         }
+        this._recordCustomCompletion(data, executionContext);
         return data?.choices?.[0]?.message?.content;
       },
       context: `${this.providerName.toLowerCase()}-translation`,
