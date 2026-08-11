@@ -534,6 +534,7 @@ describe('AIResponseParser', () => {
 
       expect(result.results).toEqual(['']);
       expect(result.contractViolation).toBe(true);
+      expect(result.parseFailed).toBe(true);
       expect(observeValidationResult).not.toHaveBeenCalled();
     });
 
@@ -551,6 +552,7 @@ describe('AIResponseParser', () => {
       expect(result.results).not.toContain('B');
       expect(result.results).not.toContain('C');
       expect(result.contractViolation).toBe(true);
+      expect(result.parseFailed).toBe(true);
     });
 
     it('does not observe split batches without a manifest view', () => {

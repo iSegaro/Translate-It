@@ -82,7 +82,7 @@ function sanitizeDiagnostic(messageId, fact = {}) {
     const value = safeNumber(fact[key])
     if (value !== undefined) diagnostic[key] = value
   }
-  for (const key of ['provider', 'reason', 'code', 'parentId']) {
+  for (const key of ['provider', 'reason', 'code', 'parentId', 'classification']) {
     const value = safeString(fact[key])
     if (value !== undefined) diagnostic[key] = value
   }

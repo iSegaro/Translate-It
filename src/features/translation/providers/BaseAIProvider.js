@@ -21,6 +21,7 @@ import { isCancellationError } from "@/shared/error-management/ErrorMatcher.js";
 import { ErrorTypes } from "@/shared/error-management/ErrorTypes.js";
 import { appendTranslationDiagnostic } from "@/features/translation/ir/TranslationOperation.js";
 import { TranslationCallPurpose } from "@/features/translation/providers/ProviderConstants.js";
+import { classifyRecoveryFailure } from "@/features/translation/ir/RecoveryClassification.js";
 
 const logger = getScopedLogger(LOG_COMPONENTS.TRANSLATION, 'BaseAIProvider');
 
@@ -100,6 +101,19 @@ function validateSelectiveRecoveryResult(recoveryResult, expectedCount) {
     throw error;
   }
   return values;
+}
+
+function collectRecoveryViolationCodes(parsed) {
+  const invalidUnits = Array.isArray(parsed?.invalidUnits) ? parsed.invalidUnits : [];
+  const codes = new Set();
+  for (const unit of invalidUnits) {
+    if (Array.isArray(unit?.violationCodes)) {
+      for (const code of unit.violationCodes) {
+        if (typeof code === 'string') codes.add(code);
+      }
+    }
+  }
+  return [...codes];
 }
 
 export class BaseAIProvider extends BaseProvider {
@@ -257,6 +271,20 @@ export class BaseAIProvider extends BaseProvider {
         completionRef?.record ?? null,
       );
 
+      // Recovery classification (ADR-016 P4): only responses entering structured
+      // recovery are classified. It combines the normalized completion of this
+      // primary response with parser/validator facts to describe WHY it failed.
+      // Accepted responses remain unclassified; recovery policy, retry, and
+      // recovery shape are unchanged — classification is decision input, not policy.
+      const recoveryClassification = parsed.contractViolation
+        ? classifyRecoveryFailure({
+            completion: completionRef?.record ?? null,
+            parseFailed: parsed.parseFailed === true,
+            contractViolation: parsed.contractViolation === true,
+            violationCodes: collectRecoveryViolationCodes(parsed),
+          })
+        : null;
+
       // Structured recovery: the parser reports facts only; recovery ownership stays
       // here. A contract violation triggers exactly one sequential re-request.
       // The sequential pass returns a scalar for a single segment; normalize it to
@@ -272,6 +300,7 @@ export class BaseAIProvider extends BaseProvider {
           provider: this.providerName,
           code: 'CONTRACT_VIOLATION',
           count: texts.length,
+          classification: recoveryClassification?.classification ?? null,
         });
 
         let recoveryResult;

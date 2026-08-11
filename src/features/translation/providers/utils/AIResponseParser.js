@@ -568,6 +568,11 @@ export const AIResponseParser = {
         contractViolation: true,
         invalidUnits: [],
         mappingFacts: { identityReliable: false, complete: false, ambiguous: true },
+        // Explicit parser fact: the payload could not be decoded into a
+        // structured candidate. Distinct from a semantic contract violation
+        // where parsing succeeded but mapping/validation failed. Absent in the
+        // success path so absent facts stay absent (never fabricated as false).
+        parseFailed: true,
       };
     }
   },

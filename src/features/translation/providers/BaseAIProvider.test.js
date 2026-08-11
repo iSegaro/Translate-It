@@ -805,6 +805,36 @@ beforeEach(() => {
       expect(operation.snapshotCompletions()).toEqual([stored]);
     });
 
+    it('attaches TRUNCATED classification while preserving full recovery behavior', async () => {
+      const { AIResponseParser: realParser } = await vi.importActual('./utils/AIResponseParser.js');
+      AIResponseParser.parseBatchResult.mockImplementation(realParser.parseBatchResult.bind(realParser));
+      const operation = createTranslationOperation('p4-truncated-parse');
+      const record = createCompletionRecord({
+        provider: 'MockAI',
+        termination: CompletionTermination.TRUNCATED,
+        responseId: 'resp-truncated',
+      });
+      let calls = 0;
+      provider._callAI = vi.fn().mockImplementation(async (_sys, _text, options) => {
+        calls += 1;
+        if (calls === 1) {
+          recordProviderCompletion(options.executionContext, record);
+          return '{"translations":';
+        }
+        return 'recovered';
+      });
+
+      const result = await provider._translateBatch(
+        ['source'], 'en', 'fa', 'select-element', null, null, 'p4-truncated-parse', 'session-1',
+        { executionContext: { operation } }, ResponseFormat.JSON_OBJECT
+      );
+      const trigger = operation.finalize().entries.find(({ type }) => type === 'RECOVERY_TRIGGERED');
+
+      expect(result).toEqual(['recovered']);
+      expect(provider._callAI).toHaveBeenCalledTimes(2);
+      expect(trigger).toMatchObject({ classification: 'TRUNCATED_RESPONSE' });
+    });
+
     it('passes a TRUNCATED completion through with identical behavior to NORMAL', async () => {
       const { AIResponseParser: realParser } = await vi.importActual('./utils/AIResponseParser.js');
       AIResponseParser.parseBatchResult.mockImplementation(realParser.parseBatchResult.bind(realParser));
