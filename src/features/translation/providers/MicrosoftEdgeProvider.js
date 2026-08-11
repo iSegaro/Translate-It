@@ -174,7 +174,7 @@ export class MicrosoftEdgeProvider extends BaseTranslateProvider {
           // No silent empty-fill: a malformed response must fail loudly so the
           // caller never mistakes empty strings for a successful translation.
           if (!data?.[0]?.translations) {
-            logger.error('[Edge] Unexpected API response format:', data);
+            logger.error('[Edge] Unexpected API response format');
             const err = new Error(ErrorTypes.API_RESPONSE_INVALID);
             err.type = ErrorTypes.API_RESPONSE_INVALID;
             throw err;
