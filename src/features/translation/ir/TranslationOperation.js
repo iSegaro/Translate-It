@@ -1,6 +1,8 @@
 import { createTranslationDiagnosticReport } from './TranslationOutcome.js'
+import { createUsageRecord, normalizeCompletionTermination } from './CompletionContract.js'
 
 const MAX_DIAGNOSTIC_ENTRIES = 100
+const MAX_COMPLETION_ENTRIES = 100
 const MAX_STRING_LENGTH = 256
 const SettlementState = Object.freeze({
   UNSETTLED: Symbol('UNSETTLED'),
@@ -93,11 +95,36 @@ function sanitizeDiagnostic(messageId, fact = {}) {
 }
 
 /**
+ * Sanitizes a normalized completion record at the operation boundary. Only
+ * whitelisted keys survive; unknown keys are stripped for privacy. Termination
+ * must be a CompletionTermination value; anything else collapses to UNKNOWN so
+ * raw provider termination strings never leak into the stored record.
+ */
+function sanitizeCompletion(record = {}) {
+  const usage = record.usage
+  return Object.freeze({
+    provider: safeString(record.provider) ?? null,
+    model: safeString(record.model) ?? null,
+    termination: normalizeCompletionTermination(record.termination),
+    responseId: safeString(record.responseId) ?? null,
+    usage: usage && typeof usage === 'object'
+      ? createUsageRecord({
+        inputTokens: usage.inputTokens,
+        outputTokens: usage.outputTokens,
+        reasoningTokens: usage.reasoningTokens,
+        totalTokens: usage.totalTokens,
+      })
+      : null,
+  })
+}
+
+/**
  * Creates the private runtime context for one messageId. It is never serialized
  * or sent through messaging; only its immutable terminal report leaves it.
  */
 export function createTranslationOperation(messageId, manifest = null) {
   const diagnostics = []
+  const completions = []
   const manifestUnits = Array.isArray(manifest?.units) ? manifest.units : []
   let unitStates = null
   function getUnitStates() {
@@ -136,6 +163,15 @@ export function createTranslationOperation(messageId, manifest = null) {
       }
       diagnostics.push(sanitizeDiagnostic(messageId, fact))
       return true
+    },
+    recordCompletion(record) {
+      if (finalized) return false
+      if (completions.length >= MAX_COMPLETION_ENTRIES) return false
+      completions.push(sanitizeCompletion(record))
+      return true
+    },
+    snapshotCompletions() {
+      return Object.freeze([...completions])
     },
     settleUnits(unitIds) {
       const accepted = []
@@ -210,6 +246,15 @@ export function createTranslationOperation(messageId, manifest = null) {
 
 export function appendTranslationDiagnostic(executionContext, fact) {
   return executionContext?.operation?.appendDiagnostic(fact) || false
+}
+
+/**
+ * Records one normalized provider completion on the execution context. Safe
+ * when no execution context exists; preserves response order across multiple
+ * physical responses within one operation.
+ */
+export function recordProviderCompletion(executionContext, record) {
+  return executionContext?.operation?.recordCompletion(record) || false
 }
 
 export function finalizeTranslationOperation(executionContext) {

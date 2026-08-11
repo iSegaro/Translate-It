@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { createTranslationOperation, deriveRecoverySummary, RecoveryFinalOutcome } from './TranslationOperation.js'
+import { createTranslationOperation, deriveRecoverySummary, recordProviderCompletion, RecoveryFinalOutcome } from './TranslationOperation.js'
+import { CompletionTermination, createCompletionRecord } from './CompletionContract.js'
 import { AIResponseParser } from '../providers/utils/AIResponseParser.js'
 import { ResponseFormat } from '@/shared/config/translationConstants.js'
 import { createManifestView, createRequestUnitManifest } from './RequestUnitManifest.js'
@@ -221,5 +222,146 @@ describe('TranslationOperation pending accepted units', () => {
     expect(operation.snapshotCancelled()).toEqual([])
     expect(operation.settleUnits(drained)).toEqual(['first', 'second'])
     expect(operation.cancelRemaining()).toEqual(['third'])
+  })
+})
+
+describe('TranslationOperation completion record attachment', () => {
+  it('records one normalized completion', () => {
+    const operation = createTranslationOperation('completion-single')
+    const record = createCompletionRecord({
+      provider: 'gemini',
+      model: 'gemini-1.5-flash',
+      termination: CompletionTermination.NORMAL,
+      responseId: 'resp-1',
+    })
+
+    expect(operation.recordCompletion(record)).toBe(true)
+
+    const snapshot = operation.snapshotCompletions()
+    expect(snapshot).toHaveLength(1)
+    expect(snapshot[0]).toMatchObject({
+      provider: 'gemini',
+      model: 'gemini-1.5-flash',
+      termination: 'NORMAL',
+      responseId: 'resp-1',
+    })
+    expect(Object.isFrozen(snapshot)).toBe(true)
+    expect(Object.isFrozen(snapshot[0])).toBe(true)
+  })
+
+  it('preserves response order across multiple physical responses', () => {
+    const operation = createTranslationOperation('completion-multi')
+
+    operation.recordCompletion(createCompletionRecord({ provider: 'gemini', termination: CompletionTermination.NORMAL, responseId: 'resp-1' }))
+    operation.recordCompletion(createCompletionRecord({ provider: 'gemini', termination: CompletionTermination.TRUNCATED, responseId: 'resp-2' }))
+    operation.recordCompletion(createCompletionRecord({ provider: 'openai', termination: CompletionTermination.POLICY, responseId: 'resp-3' }))
+
+    expect(operation.snapshotCompletions().map(({ responseId, termination, provider }) => ({ responseId, termination, provider }))).toEqual([
+      { responseId: 'resp-1', termination: 'NORMAL', provider: 'gemini' },
+      { responseId: 'resp-2', termination: 'TRUNCATED', provider: 'gemini' },
+      { responseId: 'resp-3', termination: 'POLICY', provider: 'openai' },
+    ])
+  })
+
+  it('returns a fresh frozen snapshot without exposing the private collection', () => {
+    const operation = createTranslationOperation('completion-snapshot')
+
+    operation.recordCompletion(createCompletionRecord({ provider: 'gemini', termination: CompletionTermination.UNKNOWN }))
+
+    const first = operation.snapshotCompletions()
+    const second = operation.snapshotCompletions()
+    expect(first).toEqual(second)
+    expect(first).not.toBe(second)
+    expect(() => { first.push({}) }).toThrow()
+  })
+
+  it('collapses raw provider termination strings at the operation boundary', () => {
+    const operation = createTranslationOperation('completion-privacy')
+    const executionContext = { operation }
+
+    recordProviderCompletion(executionContext, {
+      provider: 'gemini',
+      termination: 'MAX_TOKENS',
+      responseId: 'resp-raw',
+      body: 'must not be retained',
+      sourceText: 'must not be retained',
+      translatedText: 'must not be retained',
+    })
+
+    const [stored] = operation.snapshotCompletions()
+    expect(stored).toEqual({
+      provider: 'gemini',
+      model: null,
+      termination: 'UNKNOWN',
+      responseId: 'resp-raw',
+      usage: null,
+    })
+  })
+
+  it('keeps unrelated execution-context state intact', () => {
+    const operation = createTranslationOperation('completion-isolation')
+    const executionContext = { operation, marker: 'unchanged' }
+
+    recordProviderCompletion(executionContext, createCompletionRecord({ provider: 'openai', termination: CompletionTermination.NORMAL }))
+    operation.appendDiagnostic({ type: 'SOME_DIAGNOSTIC', stage: 'test' })
+
+    expect(executionContext.marker).toBe('unchanged')
+    expect(operation.snapshotCompletions()).toHaveLength(1)
+    expect(operation.finalize().entries).toHaveLength(1)
+  })
+
+  it('is safe when no execution context exists', () => {
+    expect(recordProviderCompletion(null, createCompletionRecord({ provider: 'gemini' }))).toBe(false)
+    expect(recordProviderCompletion({}, createCompletionRecord({ provider: 'gemini' }))).toBe(false)
+    expect(recordProviderCompletion({ operation: null }, createCompletionRecord({ provider: 'gemini' }))).toBe(false)
+  })
+
+  it('rejects completions after finalization', () => {
+    const operation = createTranslationOperation('completion-finalized')
+    operation.finalize()
+
+    expect(operation.recordCompletion(createCompletionRecord({ provider: 'gemini', termination: CompletionTermination.NORMAL }))).toBe(false)
+    expect(operation.snapshotCompletions()).toEqual([])
+  })
+
+  it('accepts exactly 100 records and rejects the 101st', () => {
+    const operation = createTranslationOperation('completion-capacity')
+
+    for (let index = 0; index < 100; index++) {
+      expect(operation.recordCompletion(createCompletionRecord({ provider: 'gemini', termination: CompletionTermination.NORMAL, responseId: `resp-${index}` }))).toBe(true)
+    }
+
+    expect(operation.recordCompletion(createCompletionRecord({ provider: 'gemini', termination: CompletionTermination.NORMAL, responseId: 'resp-overflow' }))).toBe(false)
+    expect(operation.snapshotCompletions()).toHaveLength(100)
+    expect(operation.snapshotCompletions().at(-1).responseId).toBe('resp-99')
+  })
+
+  it('is idempotent across repeated boundary sanitization', () => {
+    const operation = createTranslationOperation('completion-idempotent')
+
+    const record = createCompletionRecord({
+      provider: 'gemini',
+      termination: CompletionTermination.TRUNCATED,
+      usage: { inputTokens: 5, outputTokens: 9 },
+    })
+    operation.recordCompletion(record)
+    const first = operation.snapshotCompletions()[0]
+
+    operation.recordCompletion(first)
+    expect(operation.snapshotCompletions()[1]).toEqual(first)
+  })
+
+  it('freezes records and nested usage at the operation boundary', () => {
+    const operation = createTranslationOperation('completion-immutable')
+
+    operation.recordCompletion(createCompletionRecord({
+      provider: 'gemini',
+      termination: CompletionTermination.NORMAL,
+      usage: { inputTokens: 3, outputTokens: 4 },
+    }))
+
+    const [stored] = operation.snapshotCompletions()
+    expect(Object.isFrozen(stored)).toBe(true)
+    expect(Object.isFrozen(stored.usage)).toBe(true)
   })
 })
