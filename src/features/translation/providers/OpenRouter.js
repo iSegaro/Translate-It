@@ -10,6 +10,13 @@ import { ProviderNames } from "@/features/translation/providers/ProviderConstant
 import { AIConversationHelper } from "./utils/AIConversationHelper.js";
 import { AITextProcessor } from "./utils/AITextProcessor.js";
 import { ResponseFormat } from "@/shared/config/translationConstants.js";
+import {
+  CompletionProviderFamily,
+  createCompletionRecord,
+  createUsageRecord,
+  normalizeTermination,
+} from "@/features/translation/ir/CompletionContract.js";
+import { recordProviderCompletion } from "@/features/translation/ir/TranslationOperation.js";
 
 const logger = getScopedLogger(LOG_COMPONENTS.PROVIDERS, 'OpenRouter');
 
@@ -21,6 +28,31 @@ export class OpenRouterProvider extends BaseAIProvider {
   constructor() {
     super(ProviderNames.OPENROUTER);
     this.providerSettingKey = 'OPENROUTER_API_KEY';
+  }
+
+  /**
+   * Normalizes one raw OpenRouter response into one completion record at the
+   * adapter boundary. Optional metadata remains absent; provider-specific
+   * fields are deliberately ignored. Recording is null-safe and cannot alter
+   * translated text or existing error behavior.
+   * @private
+   */
+  _recordOpenRouterCompletion(data, executionContext) {
+    const choice = data?.choices?.[0];
+    if (!choice) return false;
+
+    return recordProviderCompletion(executionContext, createCompletionRecord({
+      provider: this.providerName,
+      model: data?.model ?? null,
+      termination: normalizeTermination(CompletionProviderFamily.OPENAI_COMPATIBLE, choice?.finish_reason),
+      responseId: data?.id ?? null,
+      usage: createUsageRecord({
+        inputTokens: data?.usage?.prompt_tokens,
+        outputTokens: data?.usage?.completion_tokens,
+        reasoningTokens: data?.usage?.completion_tokens_details?.reasoning_tokens,
+        totalTokens: data?.usage?.total_tokens,
+      }),
+    }));
   }
 
   /**
@@ -84,6 +116,7 @@ export class OpenRouterProvider extends BaseAIProvider {
            throw new Error(`API_ERROR: ${parsed.error.message || 'Unknown OpenRouter Error'}`);
         }
 
+        this._recordOpenRouterCompletion(parsed, executionContext);
         return parsed?.choices?.[0]?.message?.content;
       },
       context: `${this.providerName.toLowerCase()}-translation`,
