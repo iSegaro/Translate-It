@@ -1795,6 +1795,131 @@ describe('DomTranslatorAdapter', () => {
   });
 
   describe('Strategy X Subtree Exclusion and V3 Rollback integration tests', () => {
+    it('aggregates shared-block V2 passthrough units into one parent and ACK', async () => {
+      const { getFeatureSemanticBlockGroupingAsync } = await import('@/config.js');
+      const { collectBlockGroups } = await import('./DomTranslatorUtils.js');
+      getFeatureSemanticBlockGroupingAsync.mockResolvedValueOnce(true);
+      const nodes = [document.createTextNode('A'), document.createTextNode('B')];
+      testElement.replaceChildren(...nodes);
+      collectBlockGroups.mockReturnValueOnce(nodes.map((node, index) => ({
+        id: `n${index + 1}`,
+        blockId: 'g1',
+        text: node.nodeValue,
+        leadingWS: '',
+        trailingWS: '',
+        inlineParentTags: ['pre'],
+        mode: 'V2_PASSTHROUGH',
+        node,
+      })));
+      contentScriptIntegration.sendTranslationRequest.mockResolvedValueOnce({
+        success: true,
+        streaming: false,
+        translatedText: [{ t: 'Uno', i: 'n1' }, { t: 'Dos', i: 'n2' }]
+      });
+
+      await adapter.translateElement(testElement);
+
+      const request = contentScriptIntegration.sendTranslationRequest.mock.calls[0][0].data;
+      expect(JSON.parse(request.text).map(item => item.i)).toEqual(['n1', 'n2']);
+      expect(request.conversationParents).toEqual([{ parentId: 'g1', cleanSource: 'AB' }]);
+      expect(nodes[0].nodeValue).toContain('Uno');
+      expect(nodes[1].nodeValue).toContain('Dos');
+      expect(sendRegularMessage.mock.calls.filter(([message]) => (
+        message.data?.parentId === 'g1' && message.data?.accepted === true
+      ))).toHaveLength(1);
+    });
+
+    it('keeps shared-block V2 passthrough parent original when one result is invalid', async () => {
+      const { getFeatureSemanticBlockGroupingAsync } = await import('@/config.js');
+      const { collectBlockGroups } = await import('./DomTranslatorUtils.js');
+      getFeatureSemanticBlockGroupingAsync.mockResolvedValueOnce(true);
+      const nodes = [document.createTextNode('A'), document.createTextNode('B')];
+      testElement.replaceChildren(...nodes);
+      collectBlockGroups.mockReturnValueOnce(nodes.map((node, index) => ({
+        id: `n${index + 1}`,
+        blockId: 'g1',
+        text: node.nodeValue,
+        leadingWS: '',
+        trailingWS: '',
+        inlineParentTags: ['pre'],
+        mode: 'V2_PASSTHROUGH',
+        node,
+      })));
+      contentScriptIntegration.sendTranslationRequest.mockResolvedValueOnce({
+        success: true,
+        streaming: false,
+        translatedText: [{ t: 'Uno', i: 'n1' }, { t: '', i: 'n2' }]
+      });
+
+      await adapter.translateElement(testElement);
+
+      expect(nodes.map(node => node.nodeValue)).toEqual(['A', 'B']);
+      expect(sendRegularMessage).not.toHaveBeenCalledWith(expect.objectContaining({
+        data: expect.objectContaining({ parentId: 'g1', accepted: true })
+      }), { silent: true });
+    });
+
+    it('accepts distinct V2 passthrough block parents independently', async () => {
+      const { getFeatureSemanticBlockGroupingAsync } = await import('@/config.js');
+      const { collectBlockGroups } = await import('./DomTranslatorUtils.js');
+      getFeatureSemanticBlockGroupingAsync.mockResolvedValueOnce(true);
+      const nodes = [document.createTextNode('A'), document.createTextNode('B')];
+      testElement.replaceChildren(...nodes);
+      collectBlockGroups.mockReturnValueOnce(nodes.map((node, index) => ({
+        id: `n${index + 1}`,
+        blockId: `g${index + 1}`,
+        text: node.nodeValue,
+        leadingWS: '',
+        trailingWS: '',
+        inlineParentTags: ['pre'],
+        mode: 'V2_PASSTHROUGH',
+        node,
+      })));
+      contentScriptIntegration.sendTranslationRequest.mockResolvedValueOnce({
+        success: true,
+        streaming: false,
+        translatedText: [{ t: 'Uno', i: 'n1' }, { t: 'Dos', i: 'n2' }]
+      });
+
+      await adapter.translateElement(testElement);
+
+      expect(sendRegularMessage.mock.calls.filter(([message]) => message.data?.accepted === true)
+        .map(([message]) => message.data.parentId)).toEqual(['g1', 'g2']);
+    });
+
+    it('waits for all streamed V2 passthrough units in one block before applying', async () => {
+      const { getFeatureSemanticBlockGroupingAsync } = await import('@/config.js');
+      const { collectBlockGroups } = await import('./DomTranslatorUtils.js');
+      getFeatureSemanticBlockGroupingAsync.mockResolvedValueOnce(true);
+      const nodes = [document.createTextNode('A'), document.createTextNode('B')];
+      testElement.replaceChildren(...nodes);
+      collectBlockGroups.mockReturnValueOnce(nodes.map((node, index) => ({
+        id: `n${index + 1}`,
+        blockId: 'g1',
+        text: node.nodeValue,
+        leadingWS: '',
+        trailingWS: '',
+        inlineParentTags: ['pre'],
+        mode: 'V2_PASSTHROUGH',
+        node,
+      })));
+      let callbacks;
+      registerTranslation.mockImplementationOnce((_id, registered) => { callbacks = registered; });
+      contentScriptIntegration.sendTranslationRequest.mockResolvedValueOnce({ success: true, streaming: true });
+
+      const translation = adapter.translateElement(testElement);
+      await vi.waitFor(() => expect(callbacks).toBeDefined());
+      callbacks.onStreamUpdate({ success: true, data: [{ t: 'Uno', i: 'n1' }] });
+      expect(nodes.map(node => node.nodeValue)).toEqual(['A', 'B']);
+      callbacks.onStreamUpdate({ success: true, data: [{ t: 'Dos', i: 'n2' }] });
+      callbacks.onStreamEnd({ success: true });
+      await translation;
+
+      expect(nodes[0].nodeValue).toContain('Uno');
+      expect(nodes[1].nodeValue).toContain('Dos');
+      expect(sendRegularMessage.mock.calls.filter(([message]) => message.data?.accepted === true)).toHaveLength(1);
+    });
+
     it('should reject overlapping concurrent translation requests (Strategy X)', async () => {
       let resolveFirst;
       const firstPromise = new Promise((resolve) => {
