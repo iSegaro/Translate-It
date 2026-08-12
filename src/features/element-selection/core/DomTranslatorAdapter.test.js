@@ -782,6 +782,17 @@ describe('DomTranslatorAdapter', () => {
       expect(cancelSpy).not.toHaveBeenCalled();
     });
 
+    it('clears temporary translated segment state after session cleanup', () => {
+      adapter.translatedSegmentMap.set('n1', 'translated');
+      adapter.currentTranslationToken = { messageId: 'cleanup' };
+      adapter.currentMessageId = 'cleanup';
+      adapter.isTranslating = true;
+
+      adapter._cleanupCurrentSession(false, adapter.currentTranslationToken);
+
+      expect(adapter.translatedSegmentMap.size).toBe(0);
+    });
+
     it('ignores late stream updates after cancellation without DOM mutation or ACK', async () => {
       let streamCallbacks;
       registerTranslation.mockImplementation((_id, callbacks) => {
@@ -878,6 +889,30 @@ describe('DomTranslatorAdapter', () => {
       adapter._cleanupCurrentSession(false, secondToken);
       expect(adapter.isTranslating).toBe(false);
     });
+  });
+
+  it('creates one distinct revert session per translated element', async () => {
+    const secondElement = document.createElement('div');
+    secondElement.textContent = 'World';
+    document.body.appendChild(secondElement);
+    contentScriptIntegration.sendTranslationRequest.mockResolvedValue({
+      success: true,
+      streaming: false,
+      translatedText: JSON.stringify([{ t: 'Translated', i: 'n1' }])
+    });
+
+    await adapter.translateElement(testElement);
+    await adapter.translateElement(secondElement);
+
+    const entries = globalSelectElementState.translationHistory.slice(-2);
+    expect(entries).toHaveLength(2);
+    expect(entries[0].element).toBe(testElement);
+    expect(entries[1].element).toBe(secondElement);
+    expect(entries[0].sessionId).toBeTruthy();
+    expect(entries[1].sessionId).toBeTruthy();
+    expect(entries[0].sessionId).not.toBe(entries[1].sessionId);
+
+    document.body.removeChild(secondElement);
   });
 
   describe('revertTranslation', () => {

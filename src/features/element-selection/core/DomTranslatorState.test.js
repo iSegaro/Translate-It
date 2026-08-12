@@ -1,5 +1,10 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { getSelectElementTranslationState, revertSelectElementTranslation, globalSelectElementState } from './DomTranslatorState.js';
+import {
+  getSelectElementTranslationState,
+  pruneDisconnectedSelectElementTranslations,
+  revertSelectElementTranslation,
+  globalSelectElementState
+} from './DomTranslatorState.js';
 
 // Mock dependencies
 vi.mock('@/shared/logging/logger.js', () => ({
@@ -34,6 +39,7 @@ describe('DomTranslatorState', () => {
     globalSelectElementState.translationHistory = [];
     globalSelectElementState.isTranslating = false;
     globalSelectElementState.currentTranslation = null;
+    globalSelectElementState.snapshots = new Map();
   });
 
   describe('getSelectElementTranslationState', () => {
@@ -137,6 +143,27 @@ describe('DomTranslatorState', () => {
       expect(globalSelectElementState.translationHistory).toHaveLength(0);
 
       document.body.removeChild(container);
+    });
+  });
+
+  describe('pruneDisconnectedSelectElementTranslations', () => {
+    it('removes disconnected session state while preserving connected revert state', () => {
+      const connected = document.createElement('div');
+      const detached = document.createElement('div');
+      document.body.appendChild(connected);
+      globalSelectElementState.translationHistory = [
+        { element: connected, sessionId: 'connected' },
+        { element: detached, sessionId: 'detached' },
+      ];
+      globalSelectElementState.snapshots.set('detached:g1', [{ node: detached }]);
+
+      expect(pruneDisconnectedSelectElementTranslations()).toBe(1);
+      expect(globalSelectElementState.translationHistory).toEqual([
+        expect.objectContaining({ sessionId: 'connected' })
+      ]);
+      expect(globalSelectElementState.snapshots.has('detached:g1')).toBe(false);
+
+      document.body.removeChild(connected);
     });
   });
 });

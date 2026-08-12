@@ -36,7 +36,11 @@ import { isFatalError, matchErrorToType } from '@/shared/error-management/ErrorM
 
 import { registryIdToName, isProviderType, ProviderTypes } from '@/features/translation/providers/ProviderConstants.js';
 
-import { globalSelectElementState, revertSelectElementTranslation } from './DomTranslatorState.js';
+import {
+  globalSelectElementState,
+  pruneDisconnectedSelectElementTranslations,
+  revertSelectElementTranslation
+} from './DomTranslatorState.js';
 import { collectTextNodes, collectBlockGroups, generateElementId, extractContextMetadata } from './DomTranslatorUtils.js';
 import { BlockGroupReconstructor } from './BlockGroupReconstructor.js';
 import * as DirectionManager from '@/utils/dom/DomDirectionManager.js';
@@ -856,6 +860,7 @@ export class DomTranslatorAdapter extends ResourceTracker {
 
   _storeTranslationState(data) {
     const { element, originalTextNodesData, sessionId } = data;
+    pruneDisconnectedSelectElementTranslations();
     
     // Ensure absolute immutability of the rollback text node snapshots and register them
     const frozenTextNodesData = originalTextNodesData
@@ -927,6 +932,7 @@ export class DomTranslatorAdapter extends ResourceTracker {
       this.currentMessageId = null;
     }
     if (this.currentTranslationToken === token) this.currentTranslationToken = null;
+    this.translatedSegmentMap.clear();
   }
 
   _isCurrentTranslation(token) {
