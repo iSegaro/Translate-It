@@ -31,6 +31,9 @@ import { createManifestView, createRequestUnitManifest } from '@/features/transl
 import { TerminalExecutionRouter } from '@/features/translation/ir/TerminalExecutionRouter.js';
 import { TranslationCallPurpose, isProviderType, registryIdToName, ProviderTypes } from '@/features/translation/providers/ProviderConstants.js';
 import { AIConversationHelper } from '@/features/translation/providers/utils/AIConversationHelper.js';
+import { ConversationAcceptanceHandoff } from '@/features/translation/conversation/ConversationAcceptanceHandoff.js';
+import { ConversationAcceptanceHandle } from '@/features/translation/conversation/ConversationAcceptanceHandle.js';
+import { ConversationAcceptanceCoordinator } from '@/features/translation/conversation/ConversationAcceptanceCoordinator.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.TRANSLATION, 'UnifiedTranslationService');
 
@@ -39,6 +42,7 @@ export class UnifiedTranslationService {
     this.requestTracker = translationRequestTracker;
     this.resultDispatcher = new UnifiedResultDispatcher();
     this.modeCoordinator = new UnifiedModeCoordinator();
+    this.conversationAcceptanceCoordinator = new ConversationAcceptanceCoordinator();
 
     this.translationEngine = null;
     this.backgroundService = null;
@@ -187,14 +191,14 @@ export class UnifiedTranslationService {
       const participates = await AIConversationHelper.getConversationParticipation({
         callPurpose: TranslationCallPurpose.PRIMARY_TRANSLATION,
         translateMode: data?.mode,
-        sessionId: request.sessionId,
+        sessionId: request.data?.sessionId,
         isAIProvider: isProviderType(providerName, ProviderTypes.AI),
       });
       if (parentMetadata.length > 0 && participates) {
         operation.registerParentCandidates(parentMetadata.map((parent, sourceOrder) => ({
           ...parent,
           sourceOrder,
-          sessionId: request.sessionId,
+          sessionId: request.data?.sessionId,
           provider: providerName,
           mode: data.mode,
           callPurpose: TranslationCallPurpose.PRIMARY_TRANSLATION,
@@ -237,6 +241,7 @@ export class UnifiedTranslationService {
 
       const transition = this.requestTracker.completeRequest(messageId, result);
       if (!transition.accepted) return this._createSuppressedResponse(messageId, transition);
+      this._registerConversationAcceptance(request, executionContext, result, providerName, participates);
       TerminalExecutionRouter.routeTerminalExecution(executionContext.operation, { status: transition.status });
       this._finalizeDiagnostics(request, executionContext, {
         type: transition.status === RequestStatus.FAILED ? 'OPERATION_FAILED' : 'OPERATION_COMPLETED',
@@ -416,6 +421,42 @@ export class UnifiedTranslationService {
       }
     }
     this._clearOperation(request);
+  }
+
+  _registerConversationAcceptance(request, executionContext, result, providerName, participates) {
+    if (!participates || !result?.success) return false;
+
+    const parents = executionContext.operation.snapshotParentCandidates()
+      .filter(parent => parent.conversationParticipates && parent.cleanSource !== null)
+      .map(({ parentId, sourceOrder, cleanSource }) => ({ parentId, sourceOrder, cleanSource }));
+    if (parents.length === 0) return false;
+
+    try {
+      const handoff = new ConversationAcceptanceHandoff({
+        messageId: request.messageId,
+        sessionId: request.data?.sessionId,
+        provider: providerName,
+        mode: request.data?.mode,
+        parents,
+      });
+      const handle = new ConversationAcceptanceHandle(handoff);
+      if (this.conversationAcceptanceCoordinator.register(request.messageId, handle)) return true;
+
+      logger.warn(`[UnifiedTranslationService] Conversation acceptance registration rejected for ${request.messageId}`);
+      appendTranslationDiagnostic(executionContext, {
+        type: 'CONVERSATION_ACCEPTANCE_REGISTRATION_REJECTED',
+        stage: 'service',
+        reason: 'duplicate_message_id',
+      });
+    } catch (error) {
+      logger.warn(`[UnifiedTranslationService] Conversation acceptance handoff failed for ${request.messageId}:`, error.message);
+      appendTranslationDiagnostic(executionContext, {
+        type: 'CONVERSATION_ACCEPTANCE_HANDOFF_FAILED',
+        stage: 'service',
+        reason: error.message,
+      });
+    }
+    return false;
   }
 
   _setOperation(request, operation) {

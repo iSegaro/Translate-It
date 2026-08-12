@@ -346,7 +346,11 @@ export class DomTranslatorAdapter extends ResourceTracker {
                       const anyProcessed = group.units.some(u => processedUids.has(u.id));
                       if (!anyProcessed) {
                         try {
-                          BlockGroupReconstructor.apply(group.units, text, effectiveTargetLanguage, element, this.currentSessionId, this.currentEntropy);
+                           const reconstruction = BlockGroupReconstructor.apply(group.units, text, effectiveTargetLanguage, element, this.currentSessionId, this.currentEntropy);
+                           reconstruction.segments.forEach(segment => {
+                             this.translatedSegmentMap.set(segment.id, segment.text);
+                           });
+                           this._sendParentAcceptanceAck(group.blockId, reconstruction.cleanResult, true).catch(() => {});
                           group.units.forEach(u => processedUids.add(u.id));
                           
                           // Capture split segment translations for shadow comparison
@@ -360,8 +364,9 @@ export class DomTranslatorAdapter extends ResourceTracker {
                           }
                         } catch (error) {
                           this.logger.error(`[Reconstructor] Apply failed for block group ${group.blockId}:`, error);
-                          this._rollbackBlockGroup(this.currentSessionId, group.blockId);
-                          throw error;
+                           this._rollbackBlockGroup(this.currentSessionId, group.blockId);
+                           this._sendParentAcceptanceAck(group.blockId, null, false).catch(() => {});
+                           throw error;
                         }
                       }
                     }
@@ -695,7 +700,11 @@ export class DomTranslatorAdapter extends ResourceTracker {
             const anyProcessed = group.units.some(u => processedUids.has(u.id));
             if (!anyProcessed) {
               try {
-                 BlockGroupReconstructor.apply(group.units, text, finalTargetLanguage, element, this.currentSessionId, this.currentEntropy);
+                 const reconstruction = BlockGroupReconstructor.apply(group.units, text, finalTargetLanguage, element, this.currentSessionId, this.currentEntropy);
+                 reconstruction.segments.forEach(segment => {
+                   this.translatedSegmentMap.set(segment.id, segment.text);
+                 });
+                 this._sendParentAcceptanceAck(group.blockId, reconstruction.cleanResult, true).catch(() => {});
                  group.units.forEach(u => processedUids.add(u.id));
                  
                  // Capture split segment translations for shadow comparison
@@ -709,8 +718,9 @@ export class DomTranslatorAdapter extends ResourceTracker {
                  }
               } catch (error) {
                 this.logger.error(`[Reconstructor] Apply failed for block group ${group.blockId}:`, error);
-                this._rollbackBlockGroup(this.currentSessionId, group.blockId);
-                throw error;
+                 this._rollbackBlockGroup(this.currentSessionId, group.blockId);
+                 this._sendParentAcceptanceAck(group.blockId, null, false).catch(() => {});
+                 throw error;
               }
             }
           }
@@ -777,6 +787,15 @@ export class DomTranslatorAdapter extends ResourceTracker {
 
     if (onComplete) await onComplete({ status: TRANSLATION_STATUS.COMPLETED, elementId, translated: true });
     return { success: true, elementId, element };
+  }
+
+  async _sendParentAcceptanceAck(parentId, cleanResult, accepted) {
+    if (!this.currentMessageId || !parentId) return;
+    await sendRegularMessage({
+      action: MessageActions.PARENT_ACCEPTANCE_ACK,
+      messageId: this.currentMessageId,
+      data: { parentId, cleanResult: accepted ? cleanResult : undefined, accepted },
+    }, { silent: true });
   }
 
   _storeTranslationState(data) {

@@ -162,6 +162,66 @@ describe('UnifiedTranslationService', () => {
   });
 
   describe('handleTranslationRequest', () => {
+    it('registers immutable conversation handoff after execution and preserves handle after operation finalization', async () => {
+      const message = {
+        messageId: 'handoff-runtime',
+        data: {
+          text: 'source',
+          mode: 'select-element',
+          provider: 'openai',
+          sessionId: 'session-1',
+          conversationParents: [
+            { parentId: 'g2', cleanSource: 'second' },
+            { parentId: 'g1', cleanSource: 'first' },
+          ],
+        },
+        context: 'select-element',
+      };
+      const mockRequest = { messageId: message.messageId, data: message.data };
+      expect(mockRequest).not.toHaveProperty('mode');
+      expect(mockRequest).not.toHaveProperty('sessionId');
+      translationRequestTracker.createRequest.mockReturnValue(mockRequest);
+      service.modeCoordinator.processRequest.mockResolvedValue({ success: true, translatedText: 'translated' });
+
+      await expect(service.handleTranslationRequest(message)).resolves.toMatchObject({ success: true });
+
+      const handle = service.conversationAcceptanceCoordinator.lookup(message.messageId);
+      expect(handle).not.toBeNull();
+      expect(handle.snapshot()).toMatchObject({
+        messageId: message.messageId,
+        sessionId: 'session-1',
+        parents: [
+          { parentId: 'g2', sourceOrder: 0, cleanSource: 'second', state: 'PENDING' },
+          { parentId: 'g1', sourceOrder: 1, cleanSource: 'first', state: 'PENDING' },
+        ],
+      });
+      expect(handle.snapshot().parents[0].cleanResult).toBeNull();
+      expect(finalizeTranslationOperation).toHaveBeenCalled();
+      expect(service.conversationAcceptanceCoordinator.lookup(message.messageId)).toBe(handle);
+
+      service.conversationAcceptanceCoordinator.remove(message.messageId);
+      handle.dispose();
+    });
+
+    it('does not register conversation acceptance for non-participating execution', async () => {
+      const message = {
+        messageId: 'handoff-stateless',
+        data: {
+          text: 'source', mode: 'select-element', provider: 'openai', sessionId: 'session-1',
+          conversationParents: [{ parentId: 'g1', cleanSource: 'source' }],
+        },
+        context: 'select-element',
+      };
+      const mockRequest = { messageId: message.messageId, data: message.data };
+      const { getAIConversationHistoryEnabledAsync } = await import('../../../shared/config/config.js');
+      getAIConversationHistoryEnabledAsync.mockResolvedValue(false);
+      translationRequestTracker.createRequest.mockReturnValue(mockRequest);
+      service.modeCoordinator.processRequest.mockResolvedValue({ success: true, translatedText: 'translated' });
+
+      await service.handleTranslationRequest(message);
+
+      expect(service.conversationAcceptanceCoordinator.lookup(message.messageId)).toBeNull();
+    });
     it.each([
       ['AI participating parent', 'openai', 's1', true, 1],
       ['traditional provider', 'google', 's1', true, 0],

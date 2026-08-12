@@ -75,6 +75,16 @@ export async function handleCancelSessionLazy(message, sender, sendResponse) {
     }
 }
 
+export async function handleParentAcceptanceAckLazy(message, sender, sendResponse) {
+    try {
+        const { handleParentAcceptanceAck } = await import('@/features/translation/handlers/handleParentAcceptanceAck.js');
+        return handleParentAcceptanceAck(message, sender, sendResponse);
+    } catch (error) {
+        logger.error('Failed to load parent acceptance ACK handler:', error);
+        return { acknowledged: false, status: 'STALE' };
+    }
+}
+
 export async function handleCheckTranslationStatusLazy(message, sender, sendResponse) {
     try {
         logger.debug('Loading CheckTranslationStatus handler');

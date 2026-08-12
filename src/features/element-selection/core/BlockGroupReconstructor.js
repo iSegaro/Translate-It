@@ -222,7 +222,11 @@ export class BlockGroupReconstructor {
         applyNodeDirection(task.unit.node, targetLanguage, rootElement);
       }
 
-      return true;
+      return {
+        success: true,
+        cleanResult: parsedSegments.map(segment => segment.text).join(''),
+        segments: parsedSegments,
+      };
     } finally {
       if (firstNodeParent) {
         firstNodeParent.classList.remove('ti-translating');
