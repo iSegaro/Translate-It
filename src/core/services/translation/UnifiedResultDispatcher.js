@@ -185,30 +185,45 @@ export class UnifiedResultDispatcher {
     }
   }
 
+  async _sendSelectElementResult({ messageId, data, request, context }) {
+    const tabId = request?.sender?.tab?.id;
+    const frameId = request?.sender?.frameId;
+    if (typeof tabId !== 'number' || typeof frameId !== 'number') {
+      logger.warn('[ResultDispatcher] Missing Select Element tab/frame identity', { messageId, tabId, frameId });
+      return false;
+    }
+
+    try {
+      await browser.tabs.sendMessage(tabId, {
+        action: MessageActions.TRANSLATION_RESULT_UPDATE,
+        messageId,
+        data: {
+          ...data,
+          translationMode: TranslationMode.Select_Element,
+          context,
+          isBroadcast: false
+        }
+      }, { frameId });
+      return true;
+    } catch (sendError) {
+      if (!ExtensionContextManager.isContextError(sendError)) {
+        logger.warn(`[ResultDispatcher] Failed to send Select Element result:`, sendError.message);
+      }
+      return false;
+    }
+  }
+
   /**
    * Dispatch select-element translation result (handles large payloads surgically).
    */
   async dispatchSelectElementResult({ messageId, result, request }) {
-    // Select Element results should ALWAYS be sent back to the original tab, not broadcast.
-    // Broadcasting to ALL tabs (potentially hundreds) is extremely slow and causes background hangs.
-    try {
-      if (request?.sender?.tab?.id) {
-        await browser.tabs.sendMessage(request.sender.tab.id, {
-          action: MessageActions.TRANSLATION_RESULT_UPDATE,
-          messageId,
-          data: {
-            ...result,
-            translationMode: TranslationMode.Select_Element,
-            context: 'select-element-direct',
-            isBroadcast: false
-          }
-        });
-      }
-    } catch (sendError) {
-      if (!ExtensionContextManager.isContextError(sendError)) {
-        logger.warn(`[ResultDispatcher] Failed to send select-element result:`, sendError.message);
-      }
-    }
+    // Select Element results target originating tab and frame; never broadcast.
+    return this._sendSelectElementResult({
+      messageId,
+      data: result,
+      request,
+      context: 'select-element-direct'
+    });
   }
 
   /**
@@ -242,17 +257,12 @@ export class UnifiedResultDispatcher {
    */
   async dispatchStreamingUpdate({ messageId, data, request }) {
     if (request && request.status === RequestStatus.PROCESSING) {
-      if (request.mode === TranslationMode.Select_Element && request?.sender?.tab?.id) {
-        await browser.tabs.sendMessage(request.sender.tab.id, {
-          action: MessageActions.TRANSLATION_RESULT_UPDATE,
+      if (request.mode === TranslationMode.Select_Element) {
+        await this._sendSelectElementResult({
           messageId,
-          data: {
-            streaming: true,
-            ...data,
-            translationMode: TranslationMode.Select_Element,
-            context: 'select-element-streaming',
-            isBroadcast: false
-          }
+          data: { streaming: true, ...data },
+          request,
+          context: 'select-element-streaming'
         });
       } else {
         await this.broadcastResult({
