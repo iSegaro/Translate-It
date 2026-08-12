@@ -519,11 +519,15 @@ class SelectElementManager extends ResourceTracker {
       }
     } catch (error) {
       const isCancellation = isCancellationError(error);
-      const isValidation = error.type === ErrorTypes.VALIDATION || error.message?.includes('No translatable text found');
+      const isNoTranslatableContent = error.message === 'No translatable text found';
+      const isSilentSkip = isCancellation
+        || isNoTranslatableContent
+        || error.type === ErrorTypes.FEATURE_BLOCKED
+        || ExtensionContextManager.isContextError(error);
 
       if (isCancellation) {
         this.logger.debug('Select Element translation cancelled:', error.message);
-      } else if (isValidation) {
+      } else if (isSilentSkip) {
         this.logger.debug('Select Element translation skipped:', error.message);
       } else {
         this.logger.warn('Select Element translation failed:', error);
@@ -535,10 +539,10 @@ class SelectElementManager extends ResourceTracker {
         ExtensionContextManager.handleContextError(error, 'element-selection');
       }
 
-      if (isFatalError(error) && !isCancellation && !isValidation) {
+      if (isFatalError(error) && !isSilentSkip) {
         this.deactivate({ preserveTranslations: true, reason: 'error' });
       } else {
-        this.performPostTranslationCleanup({ reason: isCancellation || isValidation ? 'cancel' : 'error' });
+        this.performPostTranslationCleanup({ reason: isSilentSkip ? 'cancel' : 'error' });
       }
     } finally {
       // Clear flag after translation is complete (success or error)
