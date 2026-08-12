@@ -797,7 +797,19 @@ export class DomTranslatorAdapter extends ResourceTracker {
         targetLanguage: finalTargetLanguage
       };
     } catch (err) {
-      this.logger.error('Invalid translation format during direct handling:', err);
+      this.logger.error('Direct translation handling failed:', err);
+      const errorType = matchErrorToType(err);
+      if (
+        err?.type
+        || err?.statusCode
+        || err?.isCancelled
+        || err?.name === 'AbortError'
+        || errorType === ErrorTypes.USER_CANCELLED
+        || errorType === ErrorTypes.TRANSLATION_CANCELLED
+        || errorType === ErrorTypes.TRANSLATION_TIMEOUT
+      ) {
+        throw err;
+      }
       throw new Error('Invalid translation format');
     }
   }

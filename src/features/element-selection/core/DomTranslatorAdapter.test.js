@@ -733,6 +733,33 @@ describe('DomTranslatorAdapter', () => {
 
       await expect(adapter.translateElement(testElement)).rejects.toThrow('Invalid translation format');
     });
+
+    it.each([
+      ['authentication', 'API_KEY_INVALID'],
+      ['network', 'NETWORK_ERROR'],
+      ['rate limit', 'RATE_LIMIT_REACHED'],
+      ['timeout', 'TRANSLATION_TIMEOUT'],
+      ['cancellation', 'USER_CANCELLED'],
+    ])('preserves typed %s errors during direct response handling', async (_label, type) => {
+      vi.spyOn(adapter, '_applyTranslationToNode').mockImplementation(() => {
+        const error = new Error(`${type} failure`);
+        error.type = type;
+        if (type === 'USER_CANCELLED') error.isCancelled = true;
+        throw error;
+      });
+
+      const response = {
+        success: true,
+        streaming: false,
+        translatedText: JSON.stringify([{ t: 'Translated', i: 'n1' }]),
+      };
+      contentScriptIntegration.sendTranslationRequest.mockResolvedValue(response);
+
+      await expect(adapter.translateElement(testElement)).rejects.toMatchObject({
+        message: `${type} failure`,
+        type,
+      });
+    });
   });
 
   describe('cancelTranslation', () => {
