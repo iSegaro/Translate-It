@@ -2,6 +2,7 @@ export const ParentAcceptanceState = Object.freeze({
   PENDING: 'PENDING',
   ACCEPTED: 'ACCEPTED',
   REJECTED: 'REJECTED',
+  DISCARDED: 'DISCARDED',
   COMMITTED: 'COMMITTED',
   COMMIT_FAILED: 'COMMIT_FAILED',
 })

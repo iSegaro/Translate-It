@@ -87,6 +87,14 @@ export class ConversationAcceptanceHandle {
     return AcceptanceResult.COMMIT_FAILED
   }
 
+  discardPending() {
+    if (this.#state === HandleState.DISPOSED) return false
+    for (const parent of this.#parents.values()) {
+      if (parent.state === ParentAcceptanceState.PENDING) parent.state = ParentAcceptanceState.DISCARDED
+    }
+    return true
+  }
+
   snapshot() {
     return Object.freeze({
       state: this.#state,

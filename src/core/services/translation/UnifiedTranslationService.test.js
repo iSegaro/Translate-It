@@ -394,14 +394,29 @@ describe('UnifiedTranslationService', () => {
     });
 
     it('returns a delivery failure without changing accepted completion', async () => {
-      const message = { messageId: 'm-dispatch', data: { text: 'hello', mode: 'selection' }, context: 'content' };
-      translationRequestTracker.createRequest.mockReturnValue({ messageId: 'm-dispatch', data: message.data, mode: 'selection' });
+      const message = {
+        messageId: 'm-dispatch',
+        data: {
+          text: 'hello', mode: 'select-element', provider: 'openai', sessionId: 'dispatch-session',
+          conversationParents: [{ parentId: 'g1', cleanSource: 'hello' }],
+        },
+        context: 'select-element',
+      };
+      const request = { messageId: 'm-dispatch', data: message.data, mode: 'select-element' };
+      translationRequestTracker.createRequest.mockReturnValue(request);
       service.modeCoordinator.processRequest.mockResolvedValue({ success: true, translatedText: 'bonjour' });
-      service.resultDispatcher.dispatchResult.mockRejectedValue(new Error('delivery failed'));
+      let registeredHandle;
+      service.resultDispatcher.dispatchResult.mockImplementation(async () => {
+        registeredHandle = service.conversationAcceptanceCoordinator.lookup(message.messageId);
+        throw new Error('delivery failed');
+      });
 
       const result = await service.handleTranslationRequest(message);
+      const handle = service.conversationAcceptanceCoordinator.lookup(message.messageId);
 
       expect(result).toMatchObject({ success: false, error: 'delivery failed' });
+      expect(handle).toBeNull();
+      expect(registeredHandle.snapshot().state).toBe('DISPOSED');
       expect(translationRequestTracker.failRequest).not.toHaveBeenCalled();
       expect(translationRequestTracker.completeRequest).toHaveBeenCalledTimes(1);
     });

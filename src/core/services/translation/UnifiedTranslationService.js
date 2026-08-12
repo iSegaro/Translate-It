@@ -257,8 +257,10 @@ export class UnifiedTranslationService {
 
       try {
         await this.resultDispatcher.dispatchResult({ messageId, result, request, originalMessage: message });
+        this.conversationAcceptanceCoordinator.activate(messageId);
       } catch (error) {
         logger.error('Result dispatch failed:', error.message);
+        this.conversationAcceptanceCoordinator.remove(messageId);
         return MessageFormat.createErrorResponse(error, messageId);
       }
 
