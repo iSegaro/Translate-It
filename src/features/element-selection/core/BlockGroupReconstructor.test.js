@@ -203,6 +203,15 @@ describe('BlockGroupReconstructor', () => {
       const translated = 'مرحبا @@SEG_n2@@بالعالم@@SEG_n3@@.';
       expect(() => BlockGroupReconstructor.apply(units, translated, 'fa', document.body)).toThrow();
     });
+
+    it.each([
+      ['@@SEG_n2@@world@@SEG_n3@@.'],
+      ['مرحبا @@SEG_n2@@   @@SEG_n3@@.'],
+    ])('rejects invalid translated segment content before mutation', (translated) => {
+      const originals = textNodes.map(node => node.nodeValue);
+      expect(() => BlockGroupReconstructor.apply(units, translated, 'fa', document.body)).toThrow(/Invalid translated segment content/);
+      expect(textNodes.map(node => node.nodeValue)).toEqual(originals);
+    });
   });
 
   describe('Hardened Protocol & Adversarial Tests', () => {
@@ -266,7 +275,7 @@ describe('BlockGroupReconstructor', () => {
   describe('Invisible Character Defenses', () => {
     it('should normalize markers containing ZWSP but preserve ZWSP in content', () => {
       // Marker has ZWSP (\u200b) injected by model
-      const translated = 'مرحبا @@SEG\u200b_n2@@\u200bبالعالم@@SEG_n3@@';
+      const translated = 'مرحبا @@SEG\u200b_n2@@\u200bبالعالم@@SEG_n3@@.';
       
       // Sanitization happens in apply(), so we test it here
       BlockGroupReconstructor.apply(units, translated, 'fa', document.body);

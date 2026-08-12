@@ -346,10 +346,15 @@ export class DomTranslatorAdapter extends ResourceTracker {
                    // Handle documented aliases for canonical unit identity.
                    const identityResult = this._getResultIdentity(translatedItem);
                    const uid = identityResult.identity;
-                   const text = translatedItem?.t || translatedItem?.text || translatedItem;
+                   const contentResult = this._getResultContent(translatedItem);
+                   const text = contentResult.content;
 
                    if (identityResult.status !== 'valid' || duplicateIdentities.has(uid)) {
                      this._logRejectedMapping(index, uid, duplicateIdentities.has(uid) ? 'duplicate' : identityResult.status);
+                     return;
+                   }
+                   if (contentResult.status !== 'valid') {
+                     this._logRejectedContent(index, contentResult.status);
                      return;
                    }
 
@@ -358,7 +363,7 @@ export class DomTranslatorAdapter extends ResourceTracker {
                     if (group.isV2Passthrough) {
                       const unit = group.units[0];
                       if (!processedUids.has(unit.id)) {
-                        const text = translatedItem?.t || translatedItem?.text || translatedItem;
+                         const text = contentResult.content;
                          if (!this._isCurrentTranslation(translationToken)) return;
                          this._applyTranslationToNode(unit.node, text, effectiveTargetLanguage, element);
                          processedUids.add(unit.id);
@@ -649,18 +654,33 @@ export class DomTranslatorAdapter extends ResourceTracker {
     });
   }
 
+  _getResultContent(item) {
+    if (!item || typeof item !== 'object') return { status: 'invalid', content: null };
+
+    const fields = ['t', 'text', 'translation'];
+    const field = fields.find(name => Object.prototype.hasOwnProperty.call(item, name));
+    if (!field) return { status: 'missing', content: null };
+
+    const content = item[field];
+    if (typeof content !== 'string' || !content.trim()) {
+      return { status: 'invalid', content: null };
+    }
+    return { status: 'valid', content };
+  }
+
+  _logRejectedContent(index, reason) {
+    this.logger.warn('[DomTranslatorAdapter] Rejected translation result content', {
+      reason,
+      resultIndex: index,
+    });
+  }
+
   _applyTranslationToNode(textNode, translatedText, targetLanguage, rootElement) {
     if (!textNode || !translatedText) return;
     
     // Safety check: extract string content
-    let finalTranslation = '';
-    if (typeof translatedText === 'string') {
-      finalTranslation = translatedText;
-     } else if (typeof translatedText === 'object' && translatedText !== null) {
-      finalTranslation = translatedText.text || translatedText.translation || '';
-    }
-
-    if (!finalTranslation || finalTranslation.trim() === '') return;
+    let finalTranslation = typeof translatedText === 'string' ? translatedText : null;
+    if (!finalTranslation || !finalTranslation.trim()) return;
 
     const originalText = textNode.textContent;
     const leadingMatch = originalText.match(/^(\s*)/);
@@ -745,10 +765,15 @@ export class DomTranslatorAdapter extends ResourceTracker {
         }
         const identityResult = this._getResultIdentity(item);
         const uid = identityResult.identity;
-        const text = item?.t || item?.text || item;
+        const contentResult = this._getResultContent(item);
+        const text = contentResult.content;
 
         if (identityResult.status !== 'valid' || duplicateIdentities.has(uid)) {
           this._logRejectedMapping(i, uid, duplicateIdentities.has(uid) ? 'duplicate' : identityResult.status);
+          return;
+        }
+        if (contentResult.status !== 'valid') {
+          this._logRejectedContent(i, contentResult.status);
           return;
         }
 

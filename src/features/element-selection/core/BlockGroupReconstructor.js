@@ -160,6 +160,13 @@ export class BlockGroupReconstructor {
 
     const parsedSegments = this.splitTranslatedBlock(sanitizedText, expectedUnits, sessionId, entropy);
 
+    if (parsedSegments.some((segment, index) => (
+      typeof segment.text !== 'string' || !segment.text.trim() ||
+      typeof expectedUnits[index]?.text !== 'string' || !expectedUnits[index].text.trim()
+    ))) {
+      throw new Error('Invalid translated segment content');
+    }
+
     // --- Preparation Phase (Calculate everything before DOM mutations) ---
     const commitPlan = [];
     const unescapeReplacement = '@@';

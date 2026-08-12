@@ -1150,10 +1150,44 @@ describe('DomTranslatorAdapter', () => {
       detectDirectionFromContent.mockReturnValue('rtl');
     });
 
-    it('should handle object formatted translated text', () => {
+    it('should reject object formatted translated text', () => {
       const textNode = testElement.firstChild;
       adapter._applyTranslationToNode(textNode, { text: 'سلام' }, 'fa', testElement);
-      expect(textNode.nodeValue).toContain('سلام');
+      expect(textNode.nodeValue).toBe('Hello');
+    });
+
+    it.each([
+      [{ t: '' }, 'empty canonical field'],
+      [{ t: '   ' }, 'whitespace canonical field'],
+      [{ text: '' }, 'empty text field'],
+      [{ translation: {} }, 'non-string translation field'],
+      [{ t: 42 }, 'numeric canonical field'],
+      [{}, 'missing translation field'],
+    ])('rejects invalid direct content: %s', async (item) => {
+      await adapter._handleDirectResponse({
+        success: true,
+        translatedText: [{ ...item, i: 'n1' }],
+        targetLanguage: 'fa'
+      }, [{ node: testElement.firstChild, uid: 'n1', blockId: 'b1' }], new Map([
+        ['n1', { node: testElement.firstChild, uid: 'n1', blockId: 'b1' }]
+      ]), 'fa', testElement);
+
+      expect(testElement.textContent).toBe('Hello');
+      expect(sendRegularMessage).not.toHaveBeenCalledWith(expect.objectContaining({
+        data: expect.objectContaining({ accepted: true })
+      }), expect.anything());
+    });
+
+    it('does not fall back from invalid canonical t to text', async () => {
+      await adapter._handleDirectResponse({
+        success: true,
+        translatedText: [{ t: '', text: 'Unsafe fallback', i: 'n1' }],
+        targetLanguage: 'fa'
+      }, [{ node: testElement.firstChild, uid: 'n1' }], new Map([
+        ['n1', { node: testElement.firstChild, uid: 'n1' }]
+      ]), 'fa', testElement);
+
+      expect(testElement.textContent).toBe('Hello');
     });
 
     it('should preserve original ZWNJ if translation is functionally identical (cleaned ZWNJ)', () => {
