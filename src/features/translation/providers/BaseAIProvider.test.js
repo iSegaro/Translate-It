@@ -261,6 +261,25 @@ beforeEach(() => {
       }
     });
 
+    it('suppresses legacy commit while parent conversation lifecycle is active', async () => {
+      const { AIResponseParser } = await import('./utils/AIResponseParser.js');
+      const update = vi.spyOn((await import('./utils/AIConversationHelper.js')).AIConversationHelper, 'updateSessionHistory');
+      provider._callAI = vi.fn(async (_system, userText, options) => {
+        options.conversationCommitCandidate.stage({ sessionId: options.sessionId, userContent: userText, assistantContent: 'raw' });
+        return 'raw';
+      });
+      AIResponseParser.parseBatchResult.mockReturnValue({ results: ['translated'], contractViolation: false });
+      try {
+        await expect(provider._translateBatch(['source'], 'en', 'fa', 'select-element', null, null, 'm', 'parent-session', {
+          conversationParticipates: true,
+          useParentConversationLifecycle: true,
+        }, ResponseFormat.JSON_ARRAY)).resolves.toEqual(['translated']);
+        expect(update).not.toHaveBeenCalled();
+      } finally {
+        update.mockRestore();
+      }
+    });
+
     it('discards a staged malformed structured primary response before recovery', async () => {
       const { AIResponseParser } = await import("./utils/AIResponseParser.js");
       const session = translationSessionManager.getOrCreateSession('rejected-session', 'MockAI');

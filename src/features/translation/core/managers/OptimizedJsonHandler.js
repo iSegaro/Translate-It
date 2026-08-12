@@ -333,8 +333,55 @@ export class OptimizedJsonHandler {
             abortController.signal.addEventListener('abort', onAbort);
           });
 
-          batchPayload = hasManifestMembership ? batch.map(({ payload }) => payload) : batch;
-          const batchExecutionContext = hasManifestMembership
+           batchPayload = hasManifestMembership ? batch.map(({ payload }) => payload) : batch;
+           const explicitParentIds = batch.map(item => item && typeof item === 'object'
+             ? (item.parentId ?? item.blockId)
+             : null);
+           const hasExplicitParentIdentity = explicitParentIds.some(parentId => parentId !== null && parentId !== undefined);
+           const hasMissingParentIdentity = explicitParentIds.some(parentId => parentId === null || parentId === undefined);
+           const ownedCount = explicitParentIds.filter(parentId => (
+             parentId !== null
+             && parentId !== undefined
+             && executionContext?.operation?.getParentCandidate(parentId)
+           )).length;
+           const unownedCount = explicitParentIds.filter(parentId => (
+             parentId !== null
+             && parentId !== undefined
+             && !executionContext?.operation?.getParentCandidate(parentId)
+           )).length;
+           if (hasExplicitParentIdentity && hasMissingParentIdentity) {
+             appendTranslationDiagnostic(executionContext, {
+               type: 'MIXED_PARENT_CONVERSATION_OWNERSHIP',
+               stage: 'optimized-json-handler',
+               batchIndex: i,
+               reason: 'Batch mixes explicit and missing canonical parent identity',
+             });
+             const ownershipError = new Error('Mixed parent conversation ownership')
+             ownershipError.type = ErrorTypes.VALIDATION
+             ownershipError.isFatal = true
+              throw ownershipError
+            }
+           if (ownedCount > 0 && unownedCount > 0) {
+             appendTranslationDiagnostic(executionContext, {
+               type: 'MIXED_PARENT_CONVERSATION_OWNERSHIP',
+               stage: 'optimized-json-handler',
+               batchIndex: i,
+               reason: 'Batch mixes owned and unowned canonical parents',
+             });
+             const ownershipError = new Error('Mixed parent conversation ownership')
+             ownershipError.type = ErrorTypes.VALIDATION
+             ownershipError.isFatal = true
+             throw ownershipError
+           }
+           const useParentConversationLifecycle = providerInstance.constructor.isAI
+             && hasExplicitParentIdentity
+             && ownedCount > 0
+             && unownedCount === 0;
+           const batchContextMetadata = {
+             ...options?.contextMetadata,
+             ...(useParentConversationLifecycle && { useParentConversationLifecycle: true }),
+           };
+           const batchExecutionContext = hasManifestMembership
             ? self._createBatchExecutionContext(executionContext, batch)
             : executionContext;
           const providerPromise = self._performBatchCall(
@@ -346,7 +393,7 @@ export class OptimizedJsonHandler {
               abortController, 
               messageId, 
               sessionId, 
-              options?.contextMetadata, 
+               batchContextMetadata, 
               options?.contextSummary,
               engine,
               sender,
