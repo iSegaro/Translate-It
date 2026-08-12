@@ -1,10 +1,10 @@
 # Conversation Contract
 
-Authoritative contract for conversation/context participation in AI-provider translation. Conversation/history participation is **separate from provider-call success**.
+Authoritative semantic contract for conversation/context participation in AI-provider translation. Conversation history represents accepted semantic translations, not provider transport activity.
 
-- **Owner(s)**: `BaseAIProvider`, `AIConversationHelper`, `TranslationSessionManager`, `AIResponseParser`.
-- **Scope**: conversation candidate lifecycle for AI providers.
-- **Status**: finalized for the documented scope.
+- **Owner(s)**: `TranslationSessionManager`, `AIConversationHelper`, conversation lifecycle, `OptimizedJsonHandler`, and feature acceptance boundaries.
+- **Scope**: conversation participation, logical-parent turns, candidate lifecycle, and final acceptance for AI translation.
+- **Status**: semantic foundation for P8 implementation phases.
 
 - **Owner of storage**: `TranslationSessionManager` (in-memory session map, TTL 30 min, max 50, LRU evict). `AIConversationHelper` reads/writes through it and does **not** touch browser storage.
 
@@ -12,7 +12,11 @@ Authoritative contract for conversation/context participation in AI-provider tra
 
 ## 1. Purpose and Scope
 
-Conversation/history participation is separate from provider-call success. A provider call may succeed without any conversation commit (e.g. structured recovery); conversely, no history entry may be created for a failed request.
+Conversation history exists to provide accepted translation context, including linguistic/style continuity for eligible Select Element AI translations. It is separate from provider-call success.
+
+A provider call may succeed without any conversation commit. A provider completion, provider batch, retry, failover, or recovery pass is not itself a conversation turn.
+
+For structured Select Element translation, one logical parent is the semantic translation unit. Transport fragmentation is transparent to conversation semantics.
 
 ---
 
@@ -20,49 +24,197 @@ Conversation/history participation is separate from provider-call success. A pro
 
 | Term | Definition |
 | --- | --- |
-| **conversation candidate** | The staged, commit-or-discard payload for one structured primary translation (`createConversationCommitCandidate`). |
-| **stage** | Capture the candidate payload before any commit (at most once). |
-| **commit** | Persist the staged candidate into conversation history (at most once). |
-| **discard** | Drop the staged candidate; not committed (at most once for the terminal path). |
-| **primary translation** | A `PRIMARY_TRANSLATION` provider call (participates in conversation). |
-| **structured recovery** | A provider-local `STRUCTURED_RECOVERY` pass after a contract violation (does not participate, regardless of subset or full-batch scope). |
+| **ConversationSession** | Extension-managed in-memory conversation namespace. Owned by `TranslationSessionManager`; not provider-native state. |
+| **ConversationTurn** | One finally accepted semantic translation context. For Select Element structured AI translation, one turn represents one accepted logical parent. |
+| **ConversationCandidate** | Provisional parent-scoped source/result contribution awaiting final acceptance. It is not history. |
+| **HistoryRead** | Projection of committed conversation turns into an eligible provider prompt. Owned by `AIConversationHelper`. |
+| **HistoryWrite** | Creation of provisional semantic history data. It is not durable until commit. |
+| **HistoryCommit** | Irreversible append of one accepted `ConversationTurn` to session history. |
+| **HistoryDiscard** | Removal of provisional candidate without changing committed history. |
+| **LogicalParent** | Semantic translation unit, such as one Select Element BlockGroup. It may contain multiple transport fragments. |
+| **ProviderBatch** | Provider execution unit. It is not a canonical conversation unit. |
+| **PhysicalProviderResponse** | One provider response fact represented by an ADR-016 `CompletionRecord`. It is not history. |
+| **FeatureOperation** | One user translation workflow that may contain multiple logical parents. It is not automatically one conversation turn. |
+| **FinalAcceptance** | The earliest semantic point at which a `LogicalParent` is fully validated and accepted by the feature, making it eligible for both DOM commit and Conversation commit. It is not the DOM mutation itself. |
+| **stage** | Capture provisional parent-level semantic content before commit. |
+| **commit** | Persist one accepted turn into conversation history, at most once. |
+| **discard** | Drop provisional candidate without history mutation. |
+| **primary translation** | A normal `PRIMARY_TRANSLATION` execution eligible only when participation rules pass. |
+| **structured recovery** | A provider-local `STRUCTURED_RECOVERY` pass after a contract violation; never normal history. |
 | **late settlement** | A provider outcome arriving after the request reached a terminal state. |
-| **history-enabled request** | A request whose call purpose participates in conversation. |
+| **history-enabled request** | A request satisfying the complete conversation participation predicate, including mode, setting, purpose, provider, and session identity. |
 
 ---
 
 ## 3. Participation Policy
 
-`AIConversationHelper.shouldParticipateInConversation(callPurpose)` (module-internal):
+Conversation participation is evaluated once per `LogicalParent`, not once per fragment, provider batch, retry, or physical response.
+
+A request participates only when all conditions hold:
 
 ```text
-callPurpose === PRIMARY_TRANSLATION (or undefined/invalid)
-→ participates
-
-callPurpose === STRUCTURED_RECOVERY
-→ excluded from conversation history
+AI provider
+AND history setting enabled
+AND mode is history-eligible
+AND callPurpose === PRIMARY_TRANSLATION
+AND valid session identity exists
 ```
 
-- `PRIMARY_TRANSLATION` participates.
-- `STRUCTURED_RECOVERY` is **excluded from conversation history** — recovery must not contaminate the normal conversation context.
-- Nothing is written to session history without participation.
+Current history-eligible mode is Select Element. Other modes remain non-participating until separately defined by product contract.
+
+Participation controls both directions:
+
+```text
+participating request
+→ may read normal history
+→ may write normal history
+
+non-participating request
+→ no normal history read
+→ no normal history write
+```
+
+Read/write symmetry is mandatory. Accidental write-only participation and prewarming are prohibited.
+
+`STRUCTURED_RECOVERY` is always excluded from normal history, regardless of subset/full scope.
+
+Operational call sequencing may remain independent, but operational sequence is not a `ConversationTurn`.
+
+---
+
+## 3.1. CompletionRecord Is Not ConversationTurn
+
+ADR-016 `CompletionRecord` describes one physical provider response:
+
+```text
+PhysicalProviderResponse → CompletionRecord
+```
+
+`ConversationTurn` describes one accepted semantic translation:
+
+```text
+FinalAcceptance(LogicalParent) → ConversationTurn
+```
+
+Therefore:
+
+- one provider completion does not imply a conversation commit;
+- multiple physical responses may produce one conversation turn;
+- retries, failover, and recovery do not create additional turns;
+- completion termination and conversation acceptance remain separate facts.
+
+---
+
+## 3.2. Canonical History Content
+
+`ConversationTurn.userContent` is clean logical parent source content.
+
+`ConversationTurn.assistantContent` is the final accepted clean logical translation.
+
+Conversation history must never contain:
+
+- provider prompts or request payloads;
+- JSON transport envelopes;
+- internal marker-bearing source or output;
+- individual transport-fragment text;
+- raw provider responses;
+- repair prompts or `repairContext`;
+- rejected or source-filled output.
+
+Content is copied into the provisional candidate and does not depend on later mutable DOM state.
+
+---
+
+## 3.3. Final Acceptance and DOM Atomicity
+
+For Select Element logical parents, the acceptance lifecycle is:
+
+```text
+Provider execution
+→ semantic validation
+→ feature acceptance = FinalAcceptance
+→ eligible for DOM commit
+→ eligible for Conversation commit
+```
+
+`FinalAcceptance` is the earliest semantic point at which the parent is fully validated and accepted by the feature. It is not the DOM mutation itself. DOM commit and Conversation commit both consume the same accepted semantic parent; neither commit defines, replaces, or changes semantic acceptance.
+
+A failed parent produces neither normal conversation history nor a committed parent DOM result.
+
+DOM mutation and history storage remain separate responsibilities, but both consume the same accepted logical-parent result. A failure in one accepted parent does not roll back unrelated accepted parents.
+
+---
+
+## 3.4. Logical Parent Fragmentation Invariant
+
+Provider transport may execute:
+
+```text
+LogicalParent
+→ N ProviderBatches
+→ M PhysicalProviderResponses
+```
+
+Conversation semantics remain:
+
+```text
+one finally accepted LogicalParent
+→ one ConversationTurn
+```
+
+The conversation lifecycle must never observe provider fragmentation as separate semantic turns.
+
+The following are implementation details only and must never become semantic history units:
+
+- `ProviderBatch`;
+- transport fragment;
+- `PhysicalProviderResponse`.
+
+Examples:
+
+```text
+1 LogicalParent
+5 ProviderBatches
+9 PhysicalProviderResponses
+
+→ 1 ConversationTurn
+```
+
+```text
+1 LogicalParent
+3 retries
+
+→ 1 ConversationTurn
+```
+
+```text
+1 LogicalParent
+provider failover
+
+→ 1 ConversationTurn
+```
 
 ---
 
 ## 4. Primary Success Lifecycle
 
 ```text
-primary call succeeds
-→ candidate staged
-→ parser/contract accepted
-→ abort check
-→ commit once
+eligible logical parent begins
+→ parent candidate staged
+→ provider/parser/recovery execution
+→ final parent acceptance
+→ abort/cancel check
+→ commit one ConversationTurn
 ```
 
-- Staging captures the payload (`stage(payload)`, only if not settled/staged).
-- `AIResponseParser.parseBatchResult` acceptance is required.
-- The late-abort check runs **after** acceptance and **before** commit.
-- Commit always records with `callPurpose: PRIMARY_TRANSLATION`.
+- A `ConversationCandidate` is provisional and does not imply accepted history.
+- Provider-batch acceptance is necessary but not sufficient when a logical parent is fragmented.
+- Transport fragmentation does not create additional turns.
+- One parent with one fragment produces at most one turn.
+- One parent with five fragments produces at most one turn.
+- Provider retries and failover do not create additional turns.
+- The final parent acceptance barrier must precede conversation commit.
+- The late-abort check runs after final acceptance and before commit.
 
 **No commit before candidate acceptance.**
 
@@ -71,12 +223,14 @@ primary call succeeds
 ## 5. Contract Violation Lifecycle
 
 ```text
-structured candidate invalid (contractViolation)
-→ discard primary candidate
+provider/parser candidate invalid
+→ discard provisional candidate contribution
 → structured recovery (selective or full, per provider policy)
 ```
 
-- The invalid primary candidate is **discarded**; recovery does not reuse or commit it. The rejected candidate must never be committed merely because recovery later succeeds.
+- A provider/parser-invalid contribution is provisional and is discarded; recovery does not reuse or commit it.
+- A provider-level recovery success does not itself create history. The final logical parent must still pass final acceptance.
+- A post-merge logical-parent failure discards the parent candidate, even when every physical provider call succeeded.
 - Recovery scope may cover a subset of invalid request units or the full structured batch; conversation semantics are identical either way. The subset or full distinction is a provider recovery-policy concern, not a conversation concern.
 - Recovery is a single provider-local pass (see [TRANSLATION_PROVIDER_LOGIC.md](../TRANSLATION_PROVIDER_LOGIC.md)).
 - Exactly one provider-local structured recovery pass is attempted, using selective or full sequential recovery according to provider policy.
@@ -165,15 +319,16 @@ A genuine cancellation must not be reported as a timeout or generic translation 
 ## 11. Exactly-Once Lifecycle
 
 ```text
-stage:    at most once
-commit:   at most once
-discard:  at most once for the terminal path
+stage:    at most once per parent candidate
+commit:   at most once per accepted logical parent
+discard:  at most once for the parent terminal path
 ```
 
-- Candidate is **per `_translateBatch` execution** (local state, not shared across attempts).
-- `stage` guarded by `!settled && !staged`.
-- `commit` guarded by `settled || !staged`.
-- `discard` sets `settled`; a second `discard` is a no-op (idempotent via the `settled` flag).
+- Candidate is parent-scoped for eligible fragmented structured work and must not be independently committed per provider batch.
+- `stage` captures semantic parent content only while the candidate remains provisional.
+- `commit` is allowed only after final logical-parent acceptance and the cancellation check.
+- `discard` invalidates the entire provisional parent contribution.
+- A second `discard` is a no-op; commit after discard is prohibited.
 
 Nuance: discard is effectively **idempotent** rather than strictly once, because repeated `discard` calls are no-ops once settled. Do not overstate strictly-once semantics.
 
@@ -181,10 +336,10 @@ Nuance: discard is effectively **idempotent** rather than strictly once, because
 
 ## 12. Retry Interaction
 
-- **Queue retry creates a fresh translation attempt** (new candidate per `_translateBatch`).
-- A failed candidate from a prior attempt is **not committed** and **not reused**.
+- **Queue retry creates a fresh translation attempt**. It does not create a new semantic conversation turn.
+- A failed parent candidate from a prior attempt is **not committed** and **not reused**.
 - **Recovery failure** is rethrown and may enter the outer `QueueManager` retry of the whole task.
-- **Retries must not double-commit** any previous candidate (candidates are per-attempt and consumed by commit/discard).
+- **Retries must not double-commit** any previous parent candidate; only one candidate can commit for one accepted logical parent.
 - **Structured recovery is not queue retry.** Structured recovery is a provider-local contract-failure response path excluded from conversation history; queue retry is a separate execution retry lifecycle. They must not be conflated in conversation semantics. See [TRANSLATION_PROVIDER_LOGIC.md](../TRANSLATION_PROVIDER_LOGIC.md) for execution policy.
 
 ---
@@ -214,16 +369,119 @@ Do not state more than verified: raw request/response content is retained in the
 
 ---
 
-## 15. Consumer Guarantees
+## 15. Canonical Ordering
+
+Conversation history order follows logical/source parent order, not:
+
+- provider completion timing;
+- provider execution order;
+- retry order;
+- failover order;
+- fragment arrival order;
+- stream arrival order.
+
+Concurrent provider execution must not change semantic history ordering. Accepted parent candidates may wait for earlier logical parents before commit.
+
+---
+
+## 16. Session and Operational Sequence Semantics
+
+`sessionId` identifies an extension-managed conversation namespace. It is not provider-native conversation state.
+
+`TranslationSessionManager` owns in-memory session storage, TTL, eviction, and committed message pairs. `turnCounter` is operational sequence bookkeeping for diagnostics and provider logging. It is not `ConversationTurn` identity and does not define history order.
+
+Gaps in operational sequence numbers caused by failure, cancellation, retry, or excluded recovery are not semantic history gaps.
+
+---
+
+## 17. Ownership Contract
+
+| Responsibility | Owner |
+| --- | --- |
+| Session storage and committed messages | `TranslationSessionManager` |
+| Participation predicate and history projection | `AIConversationHelper` |
+| Provider protocol execution | Provider adapters and `BaseAIProvider` |
+| Provisional parent candidate | Conversation lifecycle |
+| Logical-parent acceptance | `OptimizedJsonHandler` and feature reconstruction boundary |
+| DOM mutation | `BlockGroupReconstructor` / feature adapter |
+| History commit/discard | Conversation lifecycle |
+| Terminal request state | `UnifiedTranslationService` |
+
+Provider adapters may contribute provisional semantic data, but must not decide final logical-parent acceptance or independently commit history.
+
+---
+
+## 18. Architecture Invariants
+
+- `CompletionRecord` is not `ConversationTurn`.
+- Conversation lifecycle must never observe provider fragmentation as semantic history.
+- History participation is evaluated once per logical parent.
+- History read and write eligibility are symmetric.
+- History disabled means no normal history read and no normal history write.
+- Transport execution never defines semantic history.
+- Recovery, retry, failover, and physical response count do not create extra turns.
+- History ordering must never depend on completion timing.
+- A failed logical parent contributes no normal conversation history.
+- Unrelated accepted parents remain committed.
+
+---
+
+## 19. Consumer Guarantees
 
 Callers may assume:
-- accepted, committed history corresponds only to **accepted primary translations**;
+- accepted, committed history corresponds only to **finally accepted logical parents**;
 - **structured recovery does not pollute** conversation history;
 - timeout/cancel **cannot create phantom history entries**.
 
 ---
 
-## 16. Known Intentional Behavior
+## 20. P8 Implementation Scope
+
+This contract defines semantics only. Runtime alignment is staged:
+
+### P8.1 — Participation Gating
+
+Align history reads and writes with the participation predicate. History-disabled and non-participating requests create no normal history contribution.
+
+### P8.2 — Parent Candidate Foundation
+
+Introduce parent-scoped provisional conversation data without independently committing provider-batch or fragment contributions.
+
+### P8.3 — Fragmented Parent Commit
+
+Commit one clean turn only after final logical-parent acceptance. Discard the entire parent contribution on parent validation failure, cancellation, timeout, or reconstruction failure.
+
+### P8.4 — Non-Fragmented Alignment
+
+Evaluate the same parent-level lifecycle for non-fragmented Select Element parents so fragmentation remains transport-transparent.
+
+### P8.5 — Documentation and Cleanup
+
+Remove obsolete provider-batch conversation assumptions only after runtime alignment is complete.
+
+These phases must not change ADR-015 outcome semantics or ADR-016 completion semantics.
+
+---
+
+## 21. ADR Consistency
+
+ADR-015 remains authoritative for translation outcomes, validation, feature acceptance, and DOM/feature mutation semantics.
+
+ADR-016 remains authoritative for normalized physical provider completion facts.
+
+This contract complements both decisions:
+
+```text
+CompletionRecord → physical provider fact
+ConversationTurn → accepted semantic translation context
+TranslationOutcome → final workflow outcome
+```
+
+No contract here reclassifies completion termination, changes recovery policy, or changes final translation outcome semantics.
+
+---
+
+## 22. Known Intentional Behavior
 
 ```text
 successful structured recovery
@@ -231,11 +489,11 @@ successful structured recovery
 → not committed into conversation history
 ```
 
-This is an intentional current policy, **not a bug**, and is covered by `BaseAIProvider` and `AIConversationHelper` tests.
+This remains an intentional policy: recovery can produce an accepted translation result without creating a separate recovery history turn. The eventual accepted logical parent may create one normal turn under the parent lifecycle.
 
 ---
 
-## 17. Non-Goals
+## 23. Non-Goals
 
 This document does not define:
 - provider retry algorithms → [PROVIDER_CONTRACT.md](PROVIDER_CONTRACT.md).
@@ -249,12 +507,12 @@ Diagram: see the AI conversation lifecycle in [../architecture/DIAGRAMS.md](../a
 
 ---
 
-## 18. Test Map
+## 24. Test Map
 
 | Lifecycle guarantee | Primary tests |
 | --- | --- |
 | Participation policy / recovery exclusion | `src/features/translation/providers/utils/AIConversationHelper.test.js` |
-| Commit-once, no commit before acceptance, abort guard | `src/features/translation/providers/BaseAIProvider.test.js` |
+| Commit-once, final-acceptance and abort guard | `src/features/translation/providers/BaseAIProvider.test.js` |
 | Contract violation → discard → one recovery | `src/features/translation/providers/BaseAIProvider.test.js`, `AIResponseParser.test.js` |
 | Recovery no history pollution | `src/features/translation/providers/BaseAIProvider.test.js`, `AIConversationHelper.test.js` |
 | Failure discards, no history write | `src/features/translation/providers/BaseAIProvider.test.js` |
