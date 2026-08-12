@@ -411,7 +411,8 @@ export class DomTranslatorAdapter extends ResourceTracker {
                     if (nodeData && !processedUids.has(nodeData.uid)) {
                        try {
                          if (!this._isCurrentTranslation(translationToken)) return;
-                         this._applyTranslationToNode(nodeData.node, text, effectiveTargetLanguage, element);
+                          if (!this._isDirectSourceCurrent(nodeData, translationToken)) return;
+                          this._applyTranslationToNode(nodeData.node, text, effectiveTargetLanguage, element);
                          processedUids.add(nodeData.uid);
                           if (!this._isCurrentTranslation(translationToken)) return;
                          this._sendParentAcceptanceAck(nodeData.blockId, String(text), true).catch(() => {});
@@ -675,6 +676,16 @@ export class DomTranslatorAdapter extends ResourceTracker {
     });
   }
 
+  _isDirectSourceCurrent(nodeData, translationToken = null) {
+    if (translationToken && !this._isCurrentTranslation(translationToken)) return false;
+    const node = nodeData?.node;
+    return Boolean(
+      node?.isConnected
+      && typeof nodeData?.text === 'string'
+      && node.nodeValue === nodeData.text
+    );
+  }
+
   _applyTranslationToNode(textNode, translatedText, targetLanguage, rootElement) {
     if (!textNode || !translatedText) return;
     
@@ -829,6 +840,7 @@ export class DomTranslatorAdapter extends ResourceTracker {
             if (nodeData && !processedUids.has(nodeData.uid)) {
               try {
                 if (translationToken && !this._isCurrentTranslation(translationToken)) return;
+                if (!this._isDirectSourceCurrent(nodeData, translationToken)) return;
                 this._applyTranslationToNode(nodeData.node, text, finalTargetLanguage, element);
                 processedUids.add(nodeData.uid);
                 if (translationToken && !this._isCurrentTranslation(translationToken)) return;

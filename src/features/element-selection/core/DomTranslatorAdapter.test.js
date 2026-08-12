@@ -573,6 +573,153 @@ describe('DomTranslatorAdapter', () => {
       expect(testElement.textContent).toContain('سلام');
     });
 
+    it.each([
+      ['text drift', () => { testElement.firstChild.nodeValue = 'Changed'; }],
+      ['whitespace drift', () => { testElement.firstChild.nodeValue = 'Hello '; }],
+      ['detached node', () => { testElement.firstChild.remove(); }],
+      ['replaced node', () => { testElement.replaceChildren(document.createTextNode('Hello')); }],
+    ])('rejects direct result after %s without mutation or accepted ACK', async (_caseName, mutateSource) => {
+      contentScriptIntegration.sendTranslationRequest.mockImplementation(async () => {
+        mutateSource();
+        return {
+          success: true,
+          streaming: false,
+          translatedText: JSON.stringify([{ t: 'سلام', i: 'n1' }])
+        };
+      });
+
+      await adapter.translateElement(testElement);
+
+      expect(testElement.textContent).toBe(testElement.firstChild?.nodeValue || '');
+      expect(testElement.textContent).not.toContain('سلام');
+      expect(sendRegularMessage).not.toHaveBeenCalledWith(expect.objectContaining({
+        data: expect.objectContaining({ accepted: true })
+      }), expect.anything());
+    });
+
+    it('rejects direct result when token is current but source changed', async () => {
+      const originalNode = testElement.firstChild;
+      contentScriptIntegration.sendTranslationRequest.mockImplementation(async () => {
+        originalNode.nodeValue = 'Changed';
+        return {
+          success: true,
+          streaming: false,
+          translatedText: JSON.stringify([{ t: 'سلام', i: 'n1' }])
+        };
+      });
+
+      await adapter.translateElement(testElement);
+
+      expect(originalNode.nodeValue).toBe('Changed');
+      expect(sendRegularMessage).not.toHaveBeenCalledWith(expect.objectContaining({
+        data: expect.objectContaining({ accepted: true })
+      }), expect.anything());
+    });
+
+    it('rejects stale token with unchanged source through existing guard', async () => {
+      let streamCallbacks;
+      registerTranslation.mockImplementation((_id, callbacks) => { streamCallbacks = callbacks; });
+      contentScriptIntegration.sendTranslationRequest.mockResolvedValue({ success: true, streaming: true });
+
+      const translation = adapter.translateElement(testElement);
+      await vi.waitFor(() => expect(streamCallbacks).toBeDefined());
+      await adapter.cancelTranslation({ silent: true });
+      streamCallbacks.onStreamUpdate({ success: true, data: [{ t: 'سلام', i: 'n1' }] });
+      streamCallbacks.onStreamEnd({ success: true });
+      await translation;
+
+      expect(testElement.textContent).toBe('Hello');
+      expect(sendRegularMessage).not.toHaveBeenCalledWith(expect.objectContaining({
+        data: expect.objectContaining({ accepted: true })
+      }), expect.anything());
+    });
+
+    it('rejects direct streaming result after source drift without mutation or ACK', async () => {
+      let streamCallbacks;
+      registerTranslation.mockImplementation((_id, callbacks) => { streamCallbacks = callbacks; });
+      contentScriptIntegration.sendTranslationRequest.mockImplementation(async () => {
+        testElement.firstChild.nodeValue = 'Changed';
+        setTimeout(() => {
+          streamCallbacks.onStreamUpdate({ success: true, data: [{ t: 'سلام', i: 'n1' }] });
+          streamCallbacks.onStreamEnd({ success: true });
+        }, 0);
+        return { success: true, streaming: true };
+      });
+
+      await adapter.translateElement(testElement);
+
+      expect(testElement.textContent).toBe('Changed');
+      expect(sendRegularMessage).not.toHaveBeenCalledWith(expect.objectContaining({
+        data: expect.objectContaining({ accepted: true })
+      }), expect.anything());
+    });
+
+    it('skips stale direct unit while applying later valid unit', async () => {
+      const staleNode = document.createTextNode('A');
+      const validNode = document.createTextNode('B');
+      testElement.replaceChildren(staleNode, validNode);
+      staleNode.nodeValue = 'Changed A';
+      adapter.currentMessageId = 'mixed-direct';
+
+      await adapter._handleDirectResponse({
+        success: true,
+        translatedText: [
+          { t: 'Translated A', i: 'n1' },
+          { t: 'Translated B', i: 'n2' }
+        ],
+        targetLanguage: 'fa'
+      }, [], new Map([
+        ['n1', { node: staleNode, text: 'A', uid: 'n1', blockId: 'b1' }],
+        ['n2', { node: validNode, text: 'B', uid: 'n2', blockId: 'b2' }]
+      ]), 'fa', testElement);
+
+      expect(staleNode.nodeValue).toBe('Changed A');
+      expect(validNode.nodeValue).toContain('Translated B');
+      expect(sendRegularMessage).toHaveBeenCalledWith(expect.objectContaining({
+        data: expect.objectContaining({ parentId: 'b2', accepted: true })
+      }), { silent: true });
+      expect(sendRegularMessage).not.toHaveBeenCalledWith(expect.objectContaining({
+        data: expect.objectContaining({ parentId: 'b1', accepted: true })
+      }), { silent: true });
+    });
+
+    it('skips stale streaming unit while applying later valid unit', async () => {
+      const staleNode = document.createTextNode('A');
+      const validNode = document.createTextNode('B');
+      testElement.replaceChildren(staleNode, validNode);
+      const { collectTextNodes } = await import('./DomTranslatorUtils.js');
+      collectTextNodes.mockReturnValueOnce([
+        { node: staleNode, text: 'A', uid: 'n1', blockId: 'b1', role: 'div' },
+        { node: validNode, text: 'B', uid: 'n2', blockId: 'b2', role: 'div' }
+      ]);
+
+      let streamCallbacks;
+      registerTranslation.mockImplementationOnce((_id, callbacks) => { streamCallbacks = callbacks; });
+      contentScriptIntegration.sendTranslationRequest.mockResolvedValueOnce({ success: true, streaming: true });
+
+      const translation = adapter.translateElement(testElement);
+      await vi.waitFor(() => expect(streamCallbacks).toBeDefined());
+      staleNode.nodeValue = 'Changed A';
+      streamCallbacks.onStreamUpdate({
+        success: true,
+        data: [
+          { t: 'Translated A', i: 'n1' },
+          { t: 'Translated B', i: 'n2' }
+        ]
+      });
+      streamCallbacks.onStreamEnd({ success: true });
+      await translation;
+
+      expect(staleNode.nodeValue).toBe('Changed A');
+      expect(validNode.nodeValue).toContain('Translated B');
+      expect(sendRegularMessage).toHaveBeenCalledWith(expect.objectContaining({
+        data: expect.objectContaining({ parentId: 'b2', accepted: true })
+      }), { silent: true });
+      expect(sendRegularMessage).not.toHaveBeenCalledWith(expect.objectContaining({
+        data: expect.objectContaining({ parentId: 'b1', accepted: true })
+      }), { silent: true });
+    });
+
     it('should keep A and C translated while fragmented B remains original after stream failure', async () => {
       const nodeA = document.createTextNode('Original A');
       const nodeB = document.createTextNode('Original B');
@@ -961,7 +1108,7 @@ describe('DomTranslatorAdapter', () => {
         translatedText: JSON.stringify([{ t: 'سلام', i: 'n1' }]),
         targetLanguage: 'fa'
       };
-      const nodeMap = new Map([['n1', { node: testElement.firstChild, uid: 'n1' }]]);
+      const nodeMap = new Map([['n1', { node: testElement.firstChild, text: 'Hello', uid: 'n1' }]]);
       
       const result = await adapter._handleDirectResponse(response, [], nodeMap, 'fa', testElement);
       
@@ -975,7 +1122,7 @@ describe('DomTranslatorAdapter', () => {
         translatedText: [{ t: 'سلام', i: 'n1' }],
         targetLanguage: 'fa'
       };
-      const nodeMap = new Map([['n1', { node: testElement.firstChild, uid: 'n1' }]]);
+      const nodeMap = new Map([['n1', { node: testElement.firstChild, text: 'Hello', uid: 'n1' }]]);
       
       const result = await adapter._handleDirectResponse(response, [], nodeMap, 'fa', testElement);
       
@@ -989,7 +1136,7 @@ describe('DomTranslatorAdapter', () => {
         translatedText: [{ t: 'سلام' }],
         targetLanguage: 'fa'
       };
-      const textNodesData = [{ node: testElement.firstChild, uid: 'n1' }];
+      const textNodesData = [{ node: testElement.firstChild, text: 'Hello', uid: 'n1' }];
       
       const result = await adapter._handleDirectResponse(response, textNodesData, new Map(), 'fa', testElement);
 
@@ -1009,8 +1156,8 @@ describe('DomTranslatorAdapter', () => {
         success: true,
         translatedText: [{ ...item, t: 'Unsafe' }],
         targetLanguage: 'fa'
-      }, [{ node: testElement.firstChild, uid: 'n1' }], new Map([
-        ['n1', { node: testElement.firstChild, uid: 'n1' }]
+      }, [{ node: testElement.firstChild, text: 'Hello', uid: 'n1' }], new Map([
+        ['n1', { node: testElement.firstChild, text: 'Hello', uid: 'n1' }]
       ]), 'fa', testElement);
 
       expect(testElement.textContent).toContain('Hello');
@@ -1024,8 +1171,8 @@ describe('DomTranslatorAdapter', () => {
         success: true,
         translatedText: [{ t: 'سلام', i: 'n1', uid: 'n1', id: 'n1' }],
         targetLanguage: 'fa'
-      }, [{ node: testElement.firstChild, uid: 'n1' }], new Map([
-        ['n1', { node: testElement.firstChild, uid: 'n1', blockId: 'b1' }]
+      }, [{ node: testElement.firstChild, text: 'Hello', uid: 'n1' }], new Map([
+        ['n1', { node: testElement.firstChild, text: 'Hello', uid: 'n1', blockId: 'b1' }]
       ]), 'fa', testElement);
 
       expect(testElement.textContent).toContain('سلام');
@@ -1063,11 +1210,11 @@ describe('DomTranslatorAdapter', () => {
         translatedText: [{ t: 'Unknown', i: 'missing-source' }, { t: 'First', i: 'n1' }],
         targetLanguage: 'fa'
       }, [
-        { node: first, uid: 'n1' },
-        { node: second, uid: 'n2' }
+        { node: first, text: 'Hello', uid: 'n1' },
+        { node: second, text: 'World', uid: 'n2' }
       ], new Map([
-        ['n1', { node: first, uid: 'n1' }],
-        ['n2', { node: second, uid: 'n2' }]
+        ['n1', { node: first, text: 'Hello', uid: 'n1' }],
+        ['n2', { node: second, text: 'World', uid: 'n2' }]
       ]), 'fa', testElement);
 
       expect(first.textContent).toContain('First');
@@ -1079,8 +1226,8 @@ describe('DomTranslatorAdapter', () => {
       const first = testElement.firstChild.firstChild;
       const second = testElement.childNodes[1].firstChild;
       const nodeMap = new Map([
-        ['n1', { node: first, uid: 'n1' }],
-        ['n2', { node: second, uid: 'n2' }]
+        ['n1', { node: first, text: 'Hello', uid: 'n1' }],
+        ['n2', { node: second, text: 'World', uid: 'n2' }]
       ]);
 
       await adapter._handleDirectResponse({
@@ -1095,8 +1242,8 @@ describe('DomTranslatorAdapter', () => {
 
     it('should apply both translations for different uids (direct response)', async () => {
       testElement.innerHTML = '<span>Hello</span><span>World</span>';
-      const first = testElement.firstChild;
-      const second = testElement.childNodes[1];
+      const first = testElement.firstChild.firstChild;
+      const second = testElement.childNodes[1].firstChild;
 
       const applySpy = vi.spyOn(adapter, '_applyTranslationToNode');
       const response = {
@@ -1108,8 +1255,8 @@ describe('DomTranslatorAdapter', () => {
         targetLanguage: 'fa'
       };
       const nodeMap = new Map([
-        ['n1', { node: first, uid: 'n1' }],
-        ['n2', { node: second, uid: 'n2' }]
+        ['n1', { node: first, text: 'Hello', uid: 'n1' }],
+        ['n2', { node: second, text: 'World', uid: 'n2' }]
       ]);
 
       await adapter._handleDirectResponse(response, [], nodeMap, 'fa', testElement);
