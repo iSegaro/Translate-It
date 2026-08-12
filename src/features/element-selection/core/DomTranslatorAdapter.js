@@ -338,9 +338,10 @@ export class DomTranslatorAdapter extends ResourceTracker {
                       const unit = group.units[0];
                       if (!processedUids.has(unit.id)) {
                         const text = translatedItem?.t || translatedItem?.text || translatedItem;
-                        this._applyTranslationToNode(unit.node, text, effectiveTargetLanguage, element);
-                        processedUids.add(unit.id);
-                        this.translatedSegmentMap.set(unit.id, text);
+                         this._applyTranslationToNode(unit.node, text, effectiveTargetLanguage, element);
+                         processedUids.add(unit.id);
+                         this.translatedSegmentMap.set(unit.id, text);
+                         this._sendParentAcceptanceAck(group.blockId, String(text), true).catch(() => {});
                       }
                     } else {
                       const anyProcessed = group.units.some(u => processedUids.has(u.id));
@@ -386,9 +387,15 @@ export class DomTranslatorAdapter extends ResourceTracker {
                     }
 
                     if (nodeData && !processedUids.has(nodeData.uid)) {
-                      this._applyTranslationToNode(nodeData.node, text, effectiveTargetLanguage, element);
-                      processedUids.add(nodeData.uid);
-                    }
+                       try {
+                         this._applyTranslationToNode(nodeData.node, text, effectiveTargetLanguage, element);
+                         processedUids.add(nodeData.uid);
+                          this._sendParentAcceptanceAck(nodeData.blockId, String(text), true).catch(() => {});
+                        } catch (error) {
+                          this._sendParentAcceptanceAck(nodeData.blockId, null, false).catch(() => {});
+                         throw error;
+                       }
+                     }
                   }
                 });
 
@@ -692,9 +699,10 @@ export class DomTranslatorAdapter extends ResourceTracker {
           if (group.isV2Passthrough) {
             const unit = group.units[0];
             if (!processedUids.has(unit.id)) {
-              this._applyTranslationToNode(unit.node, text, finalTargetLanguage, element);
-              processedUids.add(unit.id);
-              this.translatedSegmentMap.set(unit.id, text);
+               this._applyTranslationToNode(unit.node, text, finalTargetLanguage, element);
+               processedUids.add(unit.id);
+               this.translatedSegmentMap.set(unit.id, text);
+               this._sendParentAcceptanceAck(group.blockId, String(text), true).catch(() => {});
             }
           } else {
             const anyProcessed = group.units.some(u => processedUids.has(u.id));
@@ -730,10 +738,16 @@ export class DomTranslatorAdapter extends ResourceTracker {
              nodeData = textNodesData[i];
            }
 
-           if (nodeData && !processedUids.has(nodeData.uid)) {
-             this._applyTranslationToNode(nodeData.node, text, finalTargetLanguage, element);
-             processedUids.add(nodeData.uid);
-           }
+            if (nodeData && !processedUids.has(nodeData.uid)) {
+              try {
+                this._applyTranslationToNode(nodeData.node, text, finalTargetLanguage, element);
+                processedUids.add(nodeData.uid);
+                this._sendParentAcceptanceAck(nodeData.blockId, String(text), true).catch(() => {});
+              } catch (error) {
+                this._sendParentAcceptanceAck(nodeData.blockId, null, false).catch(() => {});
+                throw error;
+              }
+            }
          }
       });
 
@@ -790,7 +804,14 @@ export class DomTranslatorAdapter extends ResourceTracker {
   }
 
   async _sendParentAcceptanceAck(parentId, cleanResult, accepted) {
-    if (!this.currentMessageId || !parentId) return;
+    if (!this.currentMessageId || !parentId) {
+      this.logger.error('[DomTranslatorAdapter] Missing canonical blockId for parent acceptance ACK', {
+        code: 'MISSING_CANONICAL_PARENT_IDENTITY',
+        messageId: this.currentMessageId,
+        accepted,
+      });
+      return;
+    }
     await sendRegularMessage({
       action: MessageActions.PARENT_ACCEPTANCE_ACK,
       messageId: this.currentMessageId,
