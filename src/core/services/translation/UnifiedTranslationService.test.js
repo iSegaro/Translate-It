@@ -143,6 +143,7 @@ import { createRequestUnitManifest } from '../../../features/translation/ir/Requ
 import { TerminalExecutionRouter } from '../../../features/translation/ir/TerminalExecutionRouter.js';
 import { ActionReasons } from '../../../shared/messaging/core/MessagingCore.js';
 import { statsManager } from '../../../features/translation/core/TranslationStatsManager.js';
+import { translationSessionManager } from '../../../features/translation/core/TranslationSessionManager.js';
 
 describe('UnifiedTranslationService', () => {
   let service;
@@ -151,6 +152,7 @@ describe('UnifiedTranslationService', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    translationRequestTracker.getRequest.mockReset();
     service = new UnifiedTranslationService();
     mockEngine = { cancelTranslation: vi.fn() };
     mockBackground = { translationEngine: mockEngine };
@@ -162,7 +164,7 @@ describe('UnifiedTranslationService', () => {
   });
 
   describe('handleTranslationRequest', () => {
-    it('registers immutable conversation handoff after execution and preserves handle after operation finalization', async () => {
+    it('registers immutable conversation handoff before execution and preserves handle after operation finalization', async () => {
       const message = {
         messageId: 'handoff-runtime',
         data: {
@@ -181,12 +183,19 @@ describe('UnifiedTranslationService', () => {
       expect(mockRequest).not.toHaveProperty('mode');
       expect(mockRequest).not.toHaveProperty('sessionId');
       translationRequestTracker.createRequest.mockReturnValue(mockRequest);
-      service.modeCoordinator.processRequest.mockResolvedValue({ success: true, translatedText: 'translated' });
+      const registrationSpy = vi.spyOn(service, '_registerConversationAcceptance');
+      let handleDuringProcessing;
+      service.modeCoordinator.processRequest.mockImplementation(async () => {
+        handleDuringProcessing = service.conversationAcceptanceCoordinator.lookup(message.messageId);
+        return { success: true, translatedText: 'translated' };
+      });
 
       await expect(service.handleTranslationRequest(message)).resolves.toMatchObject({ success: true });
 
       const handle = service.conversationAcceptanceCoordinator.lookup(message.messageId);
       expect(handle).not.toBeNull();
+      expect(handleDuringProcessing).toBe(handle);
+      expect(registrationSpy).toHaveBeenCalledTimes(1);
       expect(handle.snapshot()).toMatchObject({
         messageId: message.messageId,
         sessionId: 'session-1',
@@ -201,6 +210,150 @@ describe('UnifiedTranslationService', () => {
 
       service.conversationAcceptanceCoordinator.remove(message.messageId);
       handle.dispose();
+    });
+
+    it('accepts ACK before execution completes without activating timeout', async () => {
+      vi.useFakeTimers();
+      const { getAIConversationHistoryEnabledAsync } = await import('../../../shared/config/config.js');
+      getAIConversationHistoryEnabledAsync.mockResolvedValue(true);
+      const message = {
+        messageId: 'early-ack',
+        data: {
+          text: 'source', mode: 'select-element', provider: 'openai', sessionId: 'session-1',
+          conversationParents: [
+            { parentId: 'g1', cleanSource: 'source' },
+            { parentId: 'g2', cleanSource: 'sibling' },
+          ],
+        },
+        context: 'select-element',
+      };
+      const request = { messageId: message.messageId, data: message.data, mode: 'select-element' };
+      let resolveExecution;
+      translationRequestTracker.createRequest.mockReturnValue(request);
+      service.modeCoordinator.processRequest.mockReturnValue(new Promise(resolve => {
+        resolveExecution = resolve;
+      }));
+
+      const pending = service.handleTranslationRequest(message);
+      for (let index = 0; index < 30 && !service.conversationAcceptanceCoordinator.lookup(message.messageId); index++) {
+        await Promise.resolve();
+      }
+      expect(service.conversationAcceptanceCoordinator.lookup(message.messageId)).not.toBeNull();
+
+      await expect(service.conversationAcceptanceCoordinator.acknowledge(message.messageId, 'g1', true, 'translated'))
+        .resolves.toMatchObject({ status: 'ACCEPTED' });
+      await vi.advanceTimersByTimeAsync(300000);
+      expect(service.conversationAcceptanceCoordinator.lookup(message.messageId)).not.toBeNull();
+
+      resolveExecution({ success: true, translatedText: 'translated' });
+      await pending;
+      vi.useRealTimers();
+    });
+
+    it.each([
+      ['execution failure', () => service.modeCoordinator.processRequest.mockRejectedValue(new Error('execution failed'))],
+      ['execution timeout', () => service.modeCoordinator.processRequest.mockRejectedValue(Object.assign(new Error('timed out'), { type: ErrorTypes.TRANSLATION_TIMEOUT }))],
+    ])('removes early handle on %s', async (_label, rejectExecution) => {
+      const message = {
+        messageId: `early-failure-${_label}`,
+        data: {
+          text: 'source', mode: 'select-element', provider: 'openai', sessionId: 'session-1',
+          conversationParents: [{ parentId: 'g1', cleanSource: 'source' }],
+        },
+        context: 'select-element',
+      };
+      translationRequestTracker.createRequest.mockReturnValue({ messageId: message.messageId, data: message.data, mode: 'select-element' });
+      rejectExecution();
+
+      await service.handleTranslationRequest(message);
+
+      expect(service.conversationAcceptanceCoordinator.lookup(message.messageId)).toBeNull();
+    });
+
+    it('removes early handle when cancellation wins during execution', async () => {
+      const message = {
+        messageId: 'early-cancel',
+        data: {
+          text: 'source', mode: 'select-element', provider: 'openai', sessionId: 'session-1',
+          conversationParents: [{ parentId: 'g1', cleanSource: 'source' }],
+        },
+        context: 'select-element',
+      };
+      const request = { messageId: message.messageId, data: message.data, mode: 'select-element' };
+      let resolveExecution;
+      translationRequestTracker.createRequest.mockReturnValue(request);
+      translationRequestTracker.getRequest
+        .mockReturnValueOnce(null)
+        .mockReturnValue(request);
+      service.modeCoordinator.processRequest.mockReturnValue(new Promise(resolve => {
+        resolveExecution = resolve;
+      }));
+
+      const pending = service.handleTranslationRequest(message);
+      for (let index = 0; index < 30 && !service.conversationAcceptanceCoordinator.lookup(message.messageId); index++) {
+        await Promise.resolve();
+      }
+      expect(service.conversationAcceptanceCoordinator.lookup(message.messageId)).not.toBeNull();
+
+      await service.cancelRequest(message.messageId);
+      expect(service.conversationAcceptanceCoordinator.lookup(message.messageId)).toBeNull();
+
+      translationRequestTracker.completeRequest.mockReturnValue({ accepted: false, status: 'cancelled', reason: 'already_terminal' });
+      resolveExecution({ success: true, translatedText: 'translated' });
+      await pending;
+    });
+
+    it('keeps an early-committed parent after later execution failure', async () => {
+      vi.useRealTimers();
+      const { getAIConversationHistoryEnabledAsync } = await import('../../../shared/config/config.js');
+      getAIConversationHistoryEnabledAsync.mockResolvedValue(true);
+      translationSessionManager.sessions.clear();
+
+      const message = {
+        messageId: 'early-commit-later-failure',
+        data: {
+          text: 'source',
+          mode: 'select-element',
+          provider: 'openai',
+          sessionId: 'early-commit-session',
+          conversationParents: [
+            { parentId: 'g1', cleanSource: 'source A' },
+            { parentId: 'g2', cleanSource: 'source B' },
+          ],
+        },
+        context: 'select-element',
+      };
+      const request = { messageId: message.messageId, data: message.data, mode: 'select-element' };
+      let rejectExecution;
+      translationRequestTracker.createRequest.mockReturnValue(request);
+      service.modeCoordinator.processRequest.mockReturnValue(new Promise((_resolve, reject) => {
+        rejectExecution = reject;
+      }));
+
+      const pending = service.handleTranslationRequest(message);
+      for (let index = 0; index < 30 && !service.conversationAcceptanceCoordinator.lookup(message.messageId); index++) {
+        await Promise.resolve();
+      }
+      expect(service.conversationAcceptanceCoordinator.lookup(message.messageId)).not.toBeNull();
+
+      const firstAck = await service.conversationAcceptanceCoordinator.acknowledge(
+        message.messageId,
+        'g1',
+        true,
+        'translated A',
+      );
+      expect(firstAck).toMatchObject({ status: 'ACCEPTED', committed: ['g1'] });
+
+      const session = translationSessionManager.sessions.get(message.data.sessionId);
+      expect(session.history.map(({ content }) => content)).toEqual(['source A', 'translated A']);
+      expect(session.history).toHaveLength(2);
+
+      rejectExecution(new Error('sibling execution failed'));
+      await pending;
+
+      expect(service.conversationAcceptanceCoordinator.lookup(message.messageId)).toBeNull();
+      expect(session.history.map(({ content }) => content)).toEqual(['source A', 'translated A']);
+      expect(session.history).toHaveLength(2);
     });
 
     it('does not register conversation acceptance for non-participating execution', async () => {

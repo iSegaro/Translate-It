@@ -156,6 +156,17 @@ describe('ConversationAcceptanceCoordinator', () => {
     expect(coordinator.lookup('m1')).toBeNull()
   })
 
+  it('accepts an inactive handle without starting its timeout', async () => {
+    vi.useFakeTimers()
+    const coordinator = new ConversationAcceptanceCoordinator()
+    const handle = new ConversationAcceptanceHandle(createHandoff())
+    coordinator.register('inactive', handle)
+
+    await expect(coordinator.acknowledge('inactive', 'g1', true, 'translated'))
+      .resolves.toMatchObject({ status: AcceptanceResult.ACCEPTED, committed: ['g1'] })
+    expect(coordinator.lookup('inactive')).toBeNull()
+  })
+
   it('expires pending parents independently and makes late ACK stale', async () => {
     vi.useFakeTimers()
     const coordinator = new ConversationAcceptanceCoordinator()
@@ -274,5 +285,26 @@ describe('ConversationAcceptanceCoordinator', () => {
     await coordinator.acknowledge('partial', 'g1', false)
     expect(await coordinator.acknowledge('partial', 'g2', true, 'b')).toMatchObject({ committed: ['g2'] })
     expect(translationSessionManager.sessions.get('partial-session').history).toHaveLength(2)
+  })
+
+  it('preserves committed parent when later sibling is rejected', async () => {
+    const coordinator = new ConversationAcceptanceCoordinator()
+    const handle = new ConversationAcceptanceHandle(new ConversationAcceptanceHandoff({
+      messageId: 'sibling-failure', sessionId: 'sibling-session', provider: 'OpenAI', mode: 'select-element',
+      parents: [
+        { parentId: 'g1', sourceOrder: 0, cleanSource: 'A' },
+        { parentId: 'g2', sourceOrder: 1, cleanSource: 'B' },
+      ],
+    }))
+    const { translationSessionManager } = await import('@/features/translation/core/TranslationSessionManager.js')
+    translationSessionManager.sessions.clear()
+    translationSessionManager.getOrCreateSession('sibling-session', 'OpenAI')
+    coordinator.register('sibling-failure', handle)
+
+    await coordinator.acknowledge('sibling-failure', 'g1', true, 'a')
+    await coordinator.acknowledge('sibling-failure', 'g2', false)
+
+    expect(handle.snapshot().parents.map(parent => parent.state)).toEqual(['COMMITTED', 'REJECTED'])
+    expect(translationSessionManager.sessions.get('sibling-session').history.map(item => item.content)).toEqual(['A', 'a'])
   })
 })

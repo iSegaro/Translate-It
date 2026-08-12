@@ -211,6 +211,7 @@ export class UnifiedTranslationService {
         onTerminalUnitsAccepted: TerminalExecutionRouter.createTerminalUnitsObserver(operation),
       };
       this._setOperation(request, executionContext.operation);
+      this._registerConversationAcceptance(request, executionContext, providerName, participates);
 
       let result;
       try {
@@ -225,7 +226,11 @@ export class UnifiedTranslationService {
         const transition = isTimeout
           ? this.requestTracker.markTimeout(messageId)
           : this.requestTracker.failRequest(messageId, error);
-        if (!transition.accepted) return this._createSuppressedResponse(messageId, transition);
+        if (!transition.accepted) {
+          this.conversationAcceptanceCoordinator.remove(messageId);
+          return this._createSuppressedResponse(messageId, transition);
+        }
+        this.conversationAcceptanceCoordinator.remove(messageId);
         if (isTimeout) {
           await this._finalizeAcceptedTimeout(request, messageId, error.message);
         } else {
@@ -240,8 +245,10 @@ export class UnifiedTranslationService {
       }
 
       const transition = this.requestTracker.completeRequest(messageId, result);
-      if (!transition.accepted) return this._createSuppressedResponse(messageId, transition);
-      this._registerConversationAcceptance(request, executionContext, result, providerName, participates);
+      if (!transition.accepted) {
+        this.conversationAcceptanceCoordinator.remove(messageId);
+        return this._createSuppressedResponse(messageId, transition);
+      }
       TerminalExecutionRouter.routeTerminalExecution(executionContext.operation, { status: transition.status });
       this._finalizeDiagnostics(request, executionContext, {
         type: transition.status === RequestStatus.FAILED ? 'OPERATION_FAILED' : 'OPERATION_COMPLETED',
@@ -271,6 +278,7 @@ export class UnifiedTranslationService {
 
     } catch (error) {
       logger.debug('Request setup failed:', error.message);
+      this.conversationAcceptanceCoordinator.remove(messageId);
       if (tracked && this.requestTracker.isRequestActive(messageId)) {
         const transition = this.requestTracker.failRequest(messageId, error);
         if (!transition.accepted) return this._createSuppressedResponse(messageId, transition);
@@ -335,6 +343,7 @@ export class UnifiedTranslationService {
     const cancellation = this.requestTracker.cancelRequest(messageId, reason);
     if (!cancellation.accepted) return { handled: true, success: false, error: cancellation.reason };
 
+    this.conversationAcceptanceCoordinator.remove(messageId);
     const operation = this._getOperation(request);
     TerminalExecutionRouter.routeTerminalExecution(operation, { status: cancellation.status });
     this._finalizeDiagnostics(request, { operation }, {
@@ -354,6 +363,7 @@ export class UnifiedTranslationService {
     if (!request) return { handled: false, success: false, error: 'Request not found' };
     const timeout = this.requestTracker.markTimeout(messageId);
     if (!timeout.accepted) return { handled: true, success: false, error: timeout.reason };
+    this.conversationAcceptanceCoordinator.remove(messageId);
     await this._finalizeAcceptedTimeout(request, messageId, reason, timeoutType);
     return { handled: true, success: true };
   }
@@ -425,8 +435,8 @@ export class UnifiedTranslationService {
     this._clearOperation(request);
   }
 
-  _registerConversationAcceptance(request, executionContext, result, providerName, participates) {
-    if (!participates || !result?.success) return false;
+  _registerConversationAcceptance(request, executionContext, providerName, participates) {
+    if (!participates) return false;
 
     const parents = executionContext.operation.snapshotParentCandidates()
       .filter(parent => parent.conversationParticipates && parent.cleanSource !== null)
