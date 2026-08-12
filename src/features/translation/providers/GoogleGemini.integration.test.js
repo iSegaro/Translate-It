@@ -31,6 +31,7 @@ vi.mock('@/shared/proxy/ProxyManager.js', () => ({
 
 vi.mock('./utils/AIConversationHelper.js', () => ({
   AIConversationHelper: {
+    getConversationParticipation: vi.fn().mockResolvedValue(false),
     claimNextTurn: vi.fn().mockResolvedValue(1),
     getConversationHistory: vi.fn().mockResolvedValue([]),
     updateSessionHistory: vi.fn().mockResolvedValue(true)

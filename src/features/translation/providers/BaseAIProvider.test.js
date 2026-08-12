@@ -251,7 +251,7 @@ beforeEach(() => {
       AIResponseParser.parseBatchResult.mockReturnValue({ results: ['translated'], contractViolation: false });
 
       try {
-        await expect(provider._translateBatch(['source'], 'en', 'fa', 'select-element', null, null, 'm', 'accepted-session', null, ResponseFormat.JSON_ARRAY))
+         await expect(provider._translateBatch(['source'], 'en', 'fa', 'select-element', null, null, 'm', 'accepted-session', { conversationParticipates: true }, ResponseFormat.JSON_ARRAY))
           .resolves.toEqual(['translated']);
         expect(writeSpy).toHaveBeenCalledTimes(1);
         expect(session.batchCount).toBe(1);
@@ -274,7 +274,7 @@ beforeEach(() => {
       AIResponseParser.parseBatchResult.mockReturnValue({ results: ['source'], contractViolation: true });
 
       try {
-        await expect(provider._translateBatch(['source'], 'en', 'fa', 'select-element', null, null, 'm', 'rejected-session', null, ResponseFormat.JSON_ARRAY))
+         await expect(provider._translateBatch(['source'], 'en', 'fa', 'select-element', null, null, 'm', 'rejected-session', { conversationParticipates: true }, ResponseFormat.JSON_ARRAY))
           .resolves.toEqual(['translated']);
         expect(recoverySpy).toHaveBeenCalledTimes(1);
         expect(writeSpy).not.toHaveBeenCalled();
@@ -297,7 +297,7 @@ beforeEach(() => {
       });
 
       try {
-        await expect(provider._translateBatch(['source'], 'en', 'fa', 'select-element', null, null, 'm', session.id, null, ResponseFormat.JSON_ARRAY))
+           await expect(provider._translateBatch(['source'], 'en', 'fa', 'select-element', null, null, 'm', session.id, { conversationParticipates: true }, ResponseFormat.JSON_ARRAY))
           .rejects.toBe(error);
         expect(writeSpy).not.toHaveBeenCalled();
         expect(session).toEqual(before);
@@ -320,8 +320,8 @@ beforeEach(() => {
         .mockReturnValueOnce({ results: ['accepted'], contractViolation: false });
 
       try {
-        await provider._translateBatch(['discarded'], 'en', 'fa', 'select-element', null, null, 'm1', session.id, null, ResponseFormat.JSON_ARRAY);
-        await provider._translateBatch(['accepted'], 'en', 'fa', 'select-element', null, null, 'm2', session.id, null, ResponseFormat.JSON_ARRAY);
+         await provider._translateBatch(['discarded'], 'en', 'fa', 'select-element', null, null, 'm1', session.id, { conversationParticipates: true }, ResponseFormat.JSON_ARRAY);
+         await provider._translateBatch(['accepted'], 'en', 'fa', 'select-element', null, null, 'm2', session.id, { conversationParticipates: true }, ResponseFormat.JSON_ARRAY);
         expect(recoverySpy).toHaveBeenCalledTimes(1);
         expect(writeSpy).toHaveBeenCalledTimes(1);
         expect(session.history).toHaveLength(2);
@@ -349,7 +349,7 @@ beforeEach(() => {
 
       try {
         await expect(
-          provider._translateBatch(['source'], 'en', 'fa', 'select-element', abortController, null, 'm', 'late-abort-session', null, ResponseFormat.JSON_ARRAY)
+           provider._translateBatch(['source'], 'en', 'fa', 'select-element', abortController, null, 'm', 'late-abort-session', { conversationParticipates: true }, ResponseFormat.JSON_ARRAY)
         ).rejects.toMatchObject({ type: ErrorTypes.USER_CANCELLED });
         expect(commitSpy).not.toHaveBeenCalled();
         expect(discardSpy).toHaveBeenCalledTimes(1);
@@ -377,7 +377,7 @@ beforeEach(() => {
       });
 
       try {
-        const result = await provider._translateBatch(['source'], 'en', 'fa', 'select-element', abortController, null, 'm', 'normal-accept-session', null, ResponseFormat.JSON_ARRAY);
+         const result = await provider._translateBatch(['source'], 'en', 'fa', 'select-element', abortController, null, 'm', 'normal-accept-session', { conversationParticipates: true }, ResponseFormat.JSON_ARRAY);
         expect(result).toEqual(['translated']);
         expect(commitSpy).toHaveBeenCalledTimes(1);
         expect(discardSpy).not.toHaveBeenCalled();
@@ -414,7 +414,7 @@ beforeEach(() => {
 
       try {
         await expect(
-          provider._translateBatch(['source'], 'en', 'fa', 'selection', abortController, null, 'm', 'recovery-abort-session', null, ResponseFormat.JSON_ARRAY)
+          provider._translateBatch(['source'], 'en', 'fa', 'select-element', abortController, null, 'm', 'recovery-abort-session', { conversationParticipates: true }, ResponseFormat.JSON_ARRAY)
         ).rejects.toMatchObject({ type: ErrorTypes.USER_CANCELLED });
         expect(commitSpy).toBeDefined();
         expect(commitSpy).not.toHaveBeenCalled();

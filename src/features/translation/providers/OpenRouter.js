@@ -60,7 +60,10 @@ export class OpenRouterProvider extends BaseAIProvider {
    * @protected
    */
   async _callAI(systemPrompt, userText, options = {}) {
-    const { abortController, sessionId, expectedFormat, isBatch, executionContext, callPurpose, conversationCommitCandidate } = options;
+    const { abortController, sessionId, expectedFormat, isBatch, executionContext, callPurpose, conversationCommitCandidate, conversationParticipates: participationOverride, mode } = options;
+    const conversationParticipates = typeof participationOverride === 'boolean'
+      ? participationOverride
+      : await AIConversationHelper.getConversationParticipation({ callPurpose, translateMode: mode, sessionId });
 
     const [apiKeys, model] = await Promise.all([
       getOpenRouterApiKeysAsync(),
@@ -71,10 +74,12 @@ export class OpenRouterProvider extends BaseAIProvider {
 
     this._validateConfig({ apiKey }, ["apiKey"], `${this.providerName.toLowerCase()}-translation`);
 
-    const turnNumber = await AIConversationHelper.claimNextTurn(sessionId, this.providerName, { callPurpose });
+    const turnNumber = conversationParticipates
+      ? await AIConversationHelper.claimNextTurn(sessionId, this.providerName, { callPurpose, translateMode: mode, conversationParticipates })
+      : 1;
     logger.info(`[OpenRouter] Model: ${model || 'default'}${sessionId ? ` (Session: ${sessionId.substring(0, 15)}..., Turn: ${turnNumber})` : ''}`);
 
-    const { messages } = await AIConversationHelper.getConversationMessages(sessionId, this.providerName, userText, systemPrompt, options.mode, { callPurpose });
+    const { messages } = await AIConversationHelper.getConversationMessages(sessionId, this.providerName, userText, systemPrompt, mode, { callPurpose, conversationParticipates });
 
     const fetchOptions = {
       method: "POST",
@@ -131,9 +136,9 @@ export class OpenRouterProvider extends BaseAIProvider {
       }
     });
 
-    if (sessionId && result) {
+    if (sessionId && result && conversationParticipates) {
       if (conversationCommitCandidate) conversationCommitCandidate.stage({ sessionId, userContent: userText, assistantContent: result });
-      else await AIConversationHelper.updateSessionHistory(sessionId, userText, result, { callPurpose });
+      else await AIConversationHelper.updateSessionHistory(sessionId, userText, result, { callPurpose, translateMode: mode, conversationParticipates });
     }
 
     return result;

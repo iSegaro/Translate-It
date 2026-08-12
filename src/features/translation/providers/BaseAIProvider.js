@@ -25,7 +25,7 @@ import { classifyRecoveryFailure } from "@/features/translation/ir/RecoveryClass
 
 const logger = getScopedLogger(LOG_COMPONENTS.TRANSLATION, 'BaseAIProvider');
 
-function createConversationCommitCandidate() {
+function createConversationCommitCandidate(translateMode) {
   let staged = null;
   let settled = false;
   return {
@@ -39,7 +39,11 @@ function createConversationCommitCandidate() {
         staged.sessionId,
         staged.userContent,
         staged.assistantContent,
-        { callPurpose: TranslationCallPurpose.PRIMARY_TRANSLATION }
+         {
+           callPurpose: TranslationCallPurpose.PRIMARY_TRANSLATION,
+           translateMode,
+           conversationParticipates: true,
+         }
       );
     },
     discard() {
@@ -157,6 +161,12 @@ export class BaseAIProvider extends BaseProvider {
    * Enhanced batch translation with streaming support
    */
   async _batchTranslate(texts, sourceLang, targetLang, translateMode, engine, messageId, abortController, priority, sessionId, expectedFormat, options = {}) {
+    const conversationParticipates = await AIConversationHelper.getConversationParticipation({
+      callPurpose: TranslationCallPurpose.PRIMARY_TRANSLATION,
+      translateMode,
+      sessionId,
+    });
+    const conversationOptions = { ...options, conversationParticipates };
     const supportsStreaming = await this.getSupportsStreaming();
     const batchStrategy = await this.getBatchStrategy(translateMode);
 
@@ -166,12 +176,12 @@ export class BaseAIProvider extends BaseProvider {
     const isAlreadyStreaming = messageId && AIStreamManager.isStreamActive(messageId);
 
     if (supportsStreaming && (shouldStream || isAlreadyStreaming)) {
-      return this._streamingBatchTranslate(texts, sourceLang, targetLang, translateMode, engine, messageId, abortController, priority, sessionId, expectedFormat, options);
+      return this._streamingBatchTranslate(texts, sourceLang, targetLang, translateMode, engine, messageId, abortController, priority, sessionId, expectedFormat, conversationOptions);
     }
 
     // 2. If not streaming but segments exist, use the provider's batch strategy (e.g. smart JSON batching)
     if (texts.length >= 1 && (batchStrategy === 'json' || batchStrategy === 'smart')) {
-      return this._translateBatch(texts, sourceLang, targetLang, translateMode, abortController, engine, messageId, sessionId, options, expectedFormat, priority);
+      return this._translateBatch(texts, sourceLang, targetLang, translateMode, abortController, engine, messageId, sessionId, conversationOptions, expectedFormat, priority);
     }
 
     // 3. Fallback to traditional sequential batching for single segments or non-JSON providers
@@ -183,7 +193,7 @@ export class BaseAIProvider extends BaseProvider {
       priority,
       sessionId,
       expectedFormat,
-      contextMetadata: options,
+      contextMetadata: conversationOptions,
     });
   }
 
@@ -232,6 +242,13 @@ export class BaseAIProvider extends BaseProvider {
    */
   async _translateBatch(texts, sourceLang, targetLang, translateMode, abortController, engine, messageId, sessionId, contextMetadata = null, expectedFormat = null, priority = null) {
     const structuredFormat = expectedFormat || ResponseFormat.JSON_ARRAY;
+    const conversationParticipates = typeof contextMetadata?.conversationParticipates === 'boolean'
+      ? contextMetadata.conversationParticipates
+      : await AIConversationHelper.getConversationParticipation({
+        callPurpose: TranslationCallPurpose.PRIMARY_TRANSLATION,
+        translateMode,
+        sessionId,
+      });
     // Per-call completion slot: the adapter records the completion during its
     // physical response, and recordProviderCompletion publishes the frozen
     // record into this fresh per-call slot. Parallel batches share one
@@ -246,8 +263,9 @@ export class BaseAIProvider extends BaseProvider {
       ? { ...contextMetadata, executionContext: callExecutionContext }
       : contextMetadata;
     const conversationCommitCandidate = (
-      structuredFormat === ResponseFormat.JSON_ARRAY || structuredFormat === ResponseFormat.JSON_OBJECT
-    ) ? createConversationCommitCandidate() : null;
+      (structuredFormat === ResponseFormat.JSON_ARRAY || structuredFormat === ResponseFormat.JSON_OBJECT)
+      && conversationParticipates
+    ) ? createConversationCommitCandidate(translateMode) : null;
     let acceptedResults;
     try {
       const response = await this.executeStructuredBatch(texts, sourceLang, targetLang, {
@@ -454,10 +472,11 @@ export class BaseAIProvider extends BaseProvider {
         sourceLang,
         targetLang,
         isBatch: true,
-        expectedFormat: expectedFormat || ResponseFormat.JSON_ARRAY,
-        executionContext: contextMetadata?.executionContext,
-        callPurpose: TranslationCallPurpose.PRIMARY_TRANSLATION,
-        conversationCommitCandidate,
+         expectedFormat: expectedFormat || ResponseFormat.JSON_ARRAY,
+         executionContext: contextMetadata?.executionContext,
+         callPurpose: TranslationCallPurpose.PRIMARY_TRANSLATION,
+         conversationParticipates: contextMetadata?.conversationParticipates === true,
+         conversationCommitCandidate,
       }),
       context,
       priority,
@@ -499,6 +518,11 @@ export class BaseAIProvider extends BaseProvider {
     const callPurpose = options.callPurpose === TranslationCallPurpose.STRUCTURED_RECOVERY
       ? TranslationCallPurpose.STRUCTURED_RECOVERY
       : TranslationCallPurpose.PRIMARY_TRANSLATION;
+    const conversationParticipates = await AIConversationHelper.getConversationParticipation({
+      callPurpose,
+      translateMode,
+      sessionId,
+    });
 
     for (let i = 0; i < texts.length; i++) {
       if (abortController?.signal?.aborted) {
@@ -527,6 +551,7 @@ export class BaseAIProvider extends BaseProvider {
             expectedFormat: expectedFormat || ResponseFormat.STRING,
             executionContext: options.executionContext,
             callPurpose,
+            conversationParticipates,
           }),
           chunkContext,
           priority,

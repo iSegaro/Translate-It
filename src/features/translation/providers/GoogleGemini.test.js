@@ -52,7 +52,7 @@ describe('GeminiProvider Error Handling', () => {
     expect(result).toBe('سلام دنیا');
   });
 
-  it('threads recovery purpose through Gemini conversation helpers', async () => {
+  it('does not read or write normal history for structured recovery', async () => {
     const claim = vi.spyOn(AIConversationHelper, 'claimNextTurn').mockResolvedValue(1);
     const history = vi.spyOn(AIConversationHelper, 'getConversationHistory').mockResolvedValue([]);
     const update = vi.spyOn(AIConversationHelper, 'updateSessionHistory').mockResolvedValue();
@@ -62,9 +62,9 @@ describe('GeminiProvider Error Handling', () => {
       mode: 'select-element',
       callPurpose: TranslationCallPurpose.STRUCTURED_RECOVERY
     });
-    expect(claim).toHaveBeenCalledWith('session-1', 'Gemini', { callPurpose: TranslationCallPurpose.STRUCTURED_RECOVERY });
-    expect(history).toHaveBeenCalledWith('session-1', 'select-element', expect.objectContaining({ maxTurns: 2, callPurpose: TranslationCallPurpose.STRUCTURED_RECOVERY }));
-    expect(update).toHaveBeenCalledWith('session-1', 'current segment', 'translated', { callPurpose: TranslationCallPurpose.STRUCTURED_RECOVERY });
+    expect(claim).not.toHaveBeenCalled();
+    expect(history).not.toHaveBeenCalled();
+    expect(update).not.toHaveBeenCalled();
     claim.mockRestore(); history.mockRestore(); update.mockRestore();
   });
 
@@ -73,18 +73,18 @@ describe('GeminiProvider Error Handling', () => {
     const update = vi.spyOn(AIConversationHelper, 'updateSessionHistory').mockResolvedValue();
     vi.spyOn(provider, '_executeRequest').mockResolvedValue('translated');
     try {
-      await provider._callAI('system', 'source', { sessionId: 'session-1', callPurpose: TranslationCallPurpose.PRIMARY_TRANSLATION, conversationCommitCandidate: candidate });
+      await provider._callAI('system', 'source', { sessionId: 'session-1', mode: 'select-element', callPurpose: TranslationCallPurpose.PRIMARY_TRANSLATION, conversationParticipates: true, conversationCommitCandidate: candidate });
       expect(candidate.stage).toHaveBeenCalledWith({ sessionId: 'session-1', userContent: 'source', assistantContent: 'translated' });
       expect(update).not.toHaveBeenCalled();
     } finally { update.mockRestore(); }
   });
 
-  it('keeps direct history writes for primary calls without a candidate', async () => {
+  it('writes history for eligible Select Element primary calls without a candidate', async () => {
     const update = vi.spyOn(AIConversationHelper, 'updateSessionHistory').mockResolvedValue();
     vi.spyOn(provider, '_executeRequest').mockResolvedValue('translated');
     try {
-      await provider._callAI('system', 'source', { sessionId: 'session-1', callPurpose: TranslationCallPurpose.PRIMARY_TRANSLATION });
-      expect(update).toHaveBeenCalledWith('session-1', 'source', 'translated', { callPurpose: TranslationCallPurpose.PRIMARY_TRANSLATION });
+      await provider._callAI('system', 'source', { sessionId: 'session-1', mode: 'select-element', callPurpose: TranslationCallPurpose.PRIMARY_TRANSLATION, conversationParticipates: true });
+      expect(update).toHaveBeenCalledWith('session-1', 'source', 'translated', expect.objectContaining({ callPurpose: TranslationCallPurpose.PRIMARY_TRANSLATION, conversationParticipates: true }));
     } finally { update.mockRestore(); }
   });
 
@@ -224,7 +224,9 @@ describe('GeminiProvider Error Handling', () => {
 
     const result = await provider._callAI('system', 'text', {
       sessionId: 'session-1',
+      mode: 'select-element',
       callPurpose: TranslationCallPurpose.PRIMARY_TRANSLATION,
+      conversationParticipates: true,
       conversationCommitCandidate
     });
 

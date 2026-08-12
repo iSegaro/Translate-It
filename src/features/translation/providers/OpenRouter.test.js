@@ -230,16 +230,19 @@ describe('OpenRouterProvider Error Handling', () => {
     expect(JSON.parse(request.fetchOptions.body)).not.toHaveProperty('callPurpose');
   });
 
-  it('threads recovery purpose through all conversation helpers', async () => {
+  it('does not read or write normal history for structured recovery', async () => {
     const claim = vi.spyOn(AIConversationHelper, 'claimNextTurn').mockResolvedValue(1);
     const messages = vi.spyOn(AIConversationHelper, 'getConversationMessages').mockResolvedValue({ messages: [{ role: 'system', content: 'system prompt' }, { role: 'user', content: 'current recovery segment' }], session: null });
     const update = vi.spyOn(AIConversationHelper, 'updateSessionHistory').mockResolvedValue();
     const execute = vi.spyOn(provider, '_executeRequest').mockResolvedValue('translated');
     try {
       const result = await provider._callAI('system prompt', 'current recovery segment', { sessionId: 'session-1', mode: 'select-element', callPurpose: TranslationCallPurpose.STRUCTURED_RECOVERY });
-      expect(claim).toHaveBeenCalledWith('session-1', provider.providerName, { callPurpose: TranslationCallPurpose.STRUCTURED_RECOVERY });
-      expect(messages).toHaveBeenCalledWith('session-1', provider.providerName, 'current recovery segment', 'system prompt', 'select-element', { callPurpose: TranslationCallPurpose.STRUCTURED_RECOVERY });
-      expect(update).toHaveBeenCalledWith('session-1', 'current recovery segment', 'translated', { callPurpose: TranslationCallPurpose.STRUCTURED_RECOVERY });
+      expect(claim).not.toHaveBeenCalled();
+      expect(messages).toHaveBeenCalledWith(
+        'session-1', provider.providerName, 'current recovery segment', 'system prompt', 'select-element',
+        expect.objectContaining({ callPurpose: TranslationCallPurpose.STRUCTURED_RECOVERY, conversationParticipates: false })
+      );
+      expect(update).not.toHaveBeenCalled();
       const request = execute.mock.calls[0][0];
       expect(request).toMatchObject({ callPurpose: TranslationCallPurpose.STRUCTURED_RECOVERY });
       expect(request.fetchOptions.headers).not.toHaveProperty('callPurpose');
@@ -255,18 +258,18 @@ describe('OpenRouterProvider Error Handling', () => {
     const update = vi.spyOn(AIConversationHelper, 'updateSessionHistory').mockResolvedValue();
     vi.spyOn(provider, '_executeRequest').mockResolvedValue('translated');
     try {
-      await provider._callAI('system', 'source', { sessionId: 'session-1', callPurpose: TranslationCallPurpose.PRIMARY_TRANSLATION, conversationCommitCandidate: candidate });
+      await provider._callAI('system', 'source', { sessionId: 'session-1', mode: 'select-element', callPurpose: TranslationCallPurpose.PRIMARY_TRANSLATION, conversationParticipates: true, conversationCommitCandidate: candidate });
       expect(candidate.stage).toHaveBeenCalledWith({ sessionId: 'session-1', userContent: 'source', assistantContent: 'translated' });
       expect(update).not.toHaveBeenCalled();
     } finally { update.mockRestore(); }
   });
 
-  it('keeps direct history writes for primary calls without a candidate', async () => {
+  it('writes history for eligible Select Element primary calls without a candidate', async () => {
     const update = vi.spyOn(AIConversationHelper, 'updateSessionHistory').mockResolvedValue();
     vi.spyOn(provider, '_executeRequest').mockResolvedValue('translated');
     try {
-      await provider._callAI('system', 'source', { sessionId: 'session-1', callPurpose: TranslationCallPurpose.PRIMARY_TRANSLATION });
-      expect(update).toHaveBeenCalledWith('session-1', 'source', 'translated', { callPurpose: TranslationCallPurpose.PRIMARY_TRANSLATION });
+      await provider._callAI('system', 'source', { sessionId: 'session-1', mode: 'select-element', callPurpose: TranslationCallPurpose.PRIMARY_TRANSLATION, conversationParticipates: true });
+      expect(update).toHaveBeenCalledWith('session-1', 'source', 'translated', expect.objectContaining({ callPurpose: TranslationCallPurpose.PRIMARY_TRANSLATION, conversationParticipates: true }));
     } finally { update.mockRestore(); }
   });
 

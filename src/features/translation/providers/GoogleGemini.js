@@ -65,7 +65,10 @@ export class GeminiProvider extends BaseAIProvider {
    * @protected
    */
   async _callAI(systemPrompt, userText, options = {}) {
-    const { abortController, sessionId, expectedFormat, isBatch, executionContext, callPurpose, conversationCommitCandidate } = options;
+    const { abortController, sessionId, expectedFormat, isBatch, executionContext, callPurpose, conversationCommitCandidate, conversationParticipates: participationOverride, mode } = options;
+    const conversationParticipates = typeof participationOverride === 'boolean'
+      ? participationOverride
+      : await AIConversationHelper.getConversationParticipation({ callPurpose, translateMode: mode, sessionId });
 
     const [apiKeys, model, thinkingEnabled, rawApiUrl] = await Promise.all([
       getGeminiApiKeysAsync(),
@@ -78,7 +81,9 @@ export class GeminiProvider extends BaseAIProvider {
 
     this._validateConfig({ apiKey }, ["apiKey"], `${this.providerName.toLowerCase()}-translation`);
 
-    const turnNumber = await AIConversationHelper.claimNextTurn(sessionId, this.providerName, { callPurpose });
+    const turnNumber = conversationParticipates
+      ? await AIConversationHelper.claimNextTurn(sessionId, this.providerName, { callPurpose, translateMode: mode, conversationParticipates })
+      : 1;
     logger.info(`[Gemini] Model: ${model || 'gemini-1.5-flash'}${sessionId ? ` (Session: ${sessionId.substring(0, 15)}..., Turn: ${turnNumber})` : ''}`);
 
     const requestBody = {
@@ -96,12 +101,13 @@ export class GeminiProvider extends BaseAIProvider {
       }
     };
 
-    if (sessionId) {
+    if (sessionId && conversationParticipates) {
       // Limit history to last 2 turns with character capping to optimize tokens
       const history = await AIConversationHelper.getConversationHistory(sessionId, options.mode, { 
         maxTurns: 2,
         maxChars: TRANSLATION_CONSTANTS.HISTORY_CHARACTER_LIMITS.AI,
-        callPurpose
+         callPurpose,
+         conversationParticipates
       });
       
       if (history.length > 0) {
@@ -177,9 +183,9 @@ export class GeminiProvider extends BaseAIProvider {
         }
       });
 
-      if (sessionId && result) {
+      if (sessionId && result && conversationParticipates) {
         if (conversationCommitCandidate) conversationCommitCandidate.stage({ sessionId, userContent: userText, assistantContent: result });
-        else await AIConversationHelper.updateSessionHistory(sessionId, userText, result, { callPurpose });
+        else await AIConversationHelper.updateSessionHistory(sessionId, userText, result, { callPurpose, translateMode: mode, conversationParticipates });
       }
 
       return result;
@@ -221,9 +227,9 @@ export class GeminiProvider extends BaseAIProvider {
           }
         });
 
-        if (sessionId && fallbackResult) {
+        if (sessionId && fallbackResult && conversationParticipates) {
           if (conversationCommitCandidate) conversationCommitCandidate.stage({ sessionId, userContent: userText, assistantContent: fallbackResult });
-          else await AIConversationHelper.updateSessionHistory(sessionId, userText, fallbackResult, { callPurpose });
+          else await AIConversationHelper.updateSessionHistory(sessionId, userText, fallbackResult, { callPurpose, translateMode: mode, conversationParticipates });
         }
 
         return fallbackResult;

@@ -30,6 +30,7 @@ vi.mock('@/shared/proxy/ProxyManager.js', () => ({
 
 vi.mock('./utils/AIConversationHelper.js', () => ({
   AIConversationHelper: {
+    getConversationParticipation: vi.fn().mockResolvedValue(false),
     claimNextTurn: vi.fn().mockResolvedValue(7),
     formatCompactHistoryContext: vi.fn().mockResolvedValue('Previous translation context:\nOriginal:\nPrevious original text\n\nTranslated:\nPrevious translated text'),
     updateSessionHistory: vi.fn().mockResolvedValue(true)
@@ -94,7 +95,7 @@ describe('WebAIProvider history support', () => {
     expect(JSON.parse(request.fetchOptions.body)).not.toHaveProperty('callPurpose');
   });
 
-  it('threads recovery purpose through every conversation helper under active history gates', async () => {
+  it('does not read or write normal history for structured recovery', async () => {
     getAIConversationHistoryEnabledAsync.mockResolvedValue(true);
     vi.spyOn(provider, '_executeRequest').mockResolvedValue('translated');
     await provider._callAI('system', 'current segment', {
@@ -103,33 +104,30 @@ describe('WebAIProvider history support', () => {
       callPurpose: TranslationCallPurpose.STRUCTURED_RECOVERY
     });
 
-    expect(AIConversationHelper.claimNextTurn).toHaveBeenCalledWith('session-1', 'WebAI', { callPurpose: TranslationCallPurpose.STRUCTURED_RECOVERY });
-    expect(AIConversationHelper.formatCompactHistoryContext).toHaveBeenCalledWith('session-1', 'select-element', {
-      maxChars: 300,
-      callPurpose: TranslationCallPurpose.STRUCTURED_RECOVERY
-    });
-    expect(AIConversationHelper.updateSessionHistory).toHaveBeenCalledWith('session-1', 'current segment', 'translated', { callPurpose: TranslationCallPurpose.STRUCTURED_RECOVERY });
+    expect(AIConversationHelper.claimNextTurn).not.toHaveBeenCalled();
+    expect(AIConversationHelper.formatCompactHistoryContext).not.toHaveBeenCalled();
+    expect(AIConversationHelper.updateSessionHistory).not.toHaveBeenCalled();
   });
 
-  it('stages a primary candidate under active history gates', async () => {
+  it('stages an eligible Select Element primary candidate', async () => {
     getAIConversationHistoryEnabledAsync.mockResolvedValue(true);
     const candidate = { stage: vi.fn() };
     const update = vi.spyOn(AIConversationHelper, 'updateSessionHistory').mockResolvedValue();
     vi.spyOn(provider, '_executeRequest').mockResolvedValue('translated');
     try {
-      await provider._callAI('system', 'source', { sessionId: 'session-1', mode: 'select-element', callPurpose: TranslationCallPurpose.PRIMARY_TRANSLATION, conversationCommitCandidate: candidate });
+      await provider._callAI('system', 'source', { sessionId: 'session-1', mode: 'select-element', callPurpose: TranslationCallPurpose.PRIMARY_TRANSLATION, conversationParticipates: true, conversationCommitCandidate: candidate });
       expect(candidate.stage).toHaveBeenCalledWith({ sessionId: 'session-1', userContent: 'source', assistantContent: 'translated' });
       expect(update).not.toHaveBeenCalled();
     } finally { update.mockRestore(); }
   });
 
-  it('keeps direct history writes for primary calls without a candidate', async () => {
+  it('writes history for eligible Select Element primary calls without a candidate', async () => {
     getAIConversationHistoryEnabledAsync.mockResolvedValue(true);
     const update = vi.spyOn(AIConversationHelper, 'updateSessionHistory').mockResolvedValue();
     vi.spyOn(provider, '_executeRequest').mockResolvedValue('translated');
     try {
-      await provider._callAI('system', 'source', { sessionId: 'session-1', mode: 'select-element', callPurpose: TranslationCallPurpose.PRIMARY_TRANSLATION });
-      expect(update).toHaveBeenCalledWith('session-1', 'source', 'translated', { callPurpose: TranslationCallPurpose.PRIMARY_TRANSLATION });
+      await provider._callAI('system', 'source', { sessionId: 'session-1', mode: 'select-element', callPurpose: TranslationCallPurpose.PRIMARY_TRANSLATION, conversationParticipates: true });
+      expect(update).toHaveBeenCalledWith('session-1', 'source', 'translated', expect.objectContaining({ callPurpose: TranslationCallPurpose.PRIMARY_TRANSLATION, conversationParticipates: true }));
     } finally { update.mockRestore(); }
   });
 
@@ -148,15 +146,39 @@ describe('WebAIProvider history support', () => {
       {
         sessionId: 'session-1',
         mode: 'select-element',
-        expectedFormat: ResponseFormat.JSON_OBJECT,
+         callPurpose: TranslationCallPurpose.PRIMARY_TRANSLATION,
+         conversationParticipates: true,
+         expectedFormat: ResponseFormat.JSON_OBJECT,
         isBatch: false
       }
     );
 
     expect(result).toBe('translated');
-    expect(AIConversationHelper.claimNextTurn).toHaveBeenCalledWith('session-1', 'WebAI', { callPurpose: undefined });
-    expect(AIConversationHelper.formatCompactHistoryContext).toHaveBeenCalledWith('session-1', 'select-element', { maxChars: 300, callPurpose: undefined });
-    expect(AIConversationHelper.updateSessionHistory).toHaveBeenCalledWith('session-1', 'Current text', 'translated', { callPurpose: undefined });
+     expect(AIConversationHelper.claimNextTurn).toHaveBeenCalledWith(
+       'session-1',
+       'WebAI',
+       expect.objectContaining({
+         callPurpose: TranslationCallPurpose.PRIMARY_TRANSLATION,
+         conversationParticipates: true,
+       })
+     );
+     expect(AIConversationHelper.formatCompactHistoryContext).toHaveBeenCalledWith(
+       'session-1',
+       'select-element',
+       expect.objectContaining({
+         callPurpose: TranslationCallPurpose.PRIMARY_TRANSLATION,
+         conversationParticipates: true,
+       })
+     );
+     expect(AIConversationHelper.updateSessionHistory).toHaveBeenCalledWith(
+       'session-1',
+       'Current text',
+       'translated',
+       expect.objectContaining({
+         callPurpose: TranslationCallPurpose.PRIMARY_TRANSLATION,
+         conversationParticipates: true,
+       })
+     );
 
     const body = JSON.parse(capturedRequest.fetchOptions.body);
     expect(body).toEqual(expect.objectContaining({
