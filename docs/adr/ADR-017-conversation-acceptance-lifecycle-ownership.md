@@ -34,7 +34,7 @@ These are conversation lifecycle concerns, not provider execution concerns.
 
 Translation execution and Conversation acceptance are independent lifecycles.
 
-`TranslationOperation` owns execution. `ConversationAcceptanceLifecycle` owns semantic parent acceptance and conversation commit.
+`TranslationOperation` owns execution. `ConversationAcceptanceCoordinator` owns semantic parent acceptance and conversation commit. The broader acceptance lifecycle is the coordinator's bounded state machine.
 
 Execution completion does not imply conversation completion.
 
@@ -42,7 +42,7 @@ Execution completion does not imply conversation completion.
 Provider execution
 → TranslationOperation finalized
 → immutable semantic handoff
-→ ConversationAcceptanceLifecycle continues
+→ ConversationAcceptanceCoordinator continues
 → Content FinalAcceptance
 → ConversationTurn commit
 ```
@@ -73,7 +73,7 @@ Never owns:
 - Conversation history commit.
 - Duplicate acknowledgement handling.
 
-### ConversationAcceptanceLifecycle
+### ConversationAcceptanceCoordinator
 
 Owns:
 
@@ -92,6 +92,20 @@ Never owns:
 - Structured recovery policy.
 
 History storage remains owned by `TranslationSessionManager`; acceptance lifecycle coordinates commits through canonical conversation APIs.
+
+The concrete runtime handoff is:
+
+```text
+ConversationAcceptanceHandoff
+→ ConversationAcceptanceHandle registration
+→ successful result dispatch
+→ coordinator activation / ACK window
+→ Content FinalAcceptance
+→ PARENT_ACCEPTANCE_ACK
+→ sourceOrder commit via commitAcceptedParent()
+```
+
+Registration does not start the ACK timeout. Activation is idempotent. Timeout or dispatch failure disposes the handle and removes the coordinator entry; late ACKs are stale. Canonical parent identity is `blockId`/`parentId` from the immutable handoff, never a fragment, unit, or DOM node identity.
 
 ---
 
