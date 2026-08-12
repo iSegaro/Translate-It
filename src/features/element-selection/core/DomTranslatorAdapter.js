@@ -42,7 +42,7 @@ import {
   revertSelectElementTranslation
 } from './DomTranslatorState.js';
 import { collectTextNodes, collectBlockGroups, generateElementId, extractContextMetadata } from './DomTranslatorUtils.js';
-import { BlockGroupReconstructor } from './BlockGroupReconstructor.js';
+import { BlockGroupReconstructor, BlockGroupMutationFailure } from './BlockGroupReconstructor.js';
 import * as DirectionManager from '@/utils/dom/DomDirectionManager.js';
 
 // Import hover manager dependencies
@@ -58,6 +58,12 @@ class DirectMutationFailure {
   constructor(cause) {
     this.cause = cause;
   }
+}
+
+function unwrapMutationFailure(error) {
+  return error instanceof DirectMutationFailure || error instanceof BlockGroupMutationFailure
+    ? error.cause
+    : error;
 }
 
 /**
@@ -533,42 +539,38 @@ export class DomTranslatorAdapter extends ResourceTracker {
 
                    if (isBlockGroupingEnabled && groupMap && groupMap.has(uid)) {
                     const group = groupMap.get(uid);
-                    if (group.isV2Passthrough) {
-                      const unit = group.units[0];
-                      if (!processedUids.has(unit.id)) {
-                         const text = contentResult.content;
-                         if (!this._isCurrentTranslation(translationToken)) return;
-                         this._applyTranslationToNode(unit.node, text, effectiveTargetLanguage, element);
-                         processedUids.add(unit.id);
-                         this.translatedSegmentMap.set(unit.id, text);
-                         if (!this._isCurrentTranslation(translationToken)) return;
-                         this._sendParentAcceptanceAck(group.blockId, String(text), true).catch(() => {});
-                      }
+                     if (group.isV2Passthrough) {
+                       const unit = group.units[0];
+                       if (!processedUids.has(unit.id)) {
+                         try {
+                           if (!this._isCurrentTranslation(translationToken)) return;
+                           const reconstruction = BlockGroupReconstructor.apply(group.units, text, effectiveTargetLanguage, element, this.currentSessionId, this.currentEntropy);
+                           this._commitBlockGroup(group, reconstruction, text, processedUids, translationToken);
+                         } catch (error) {
+                           const originalError = unwrapMutationFailure(error);
+                           this.logger.error(`[Reconstructor] Apply failed for V2 group ${group.blockId}:`, originalError);
+                           if (error instanceof BlockGroupMutationFailure) {
+                             error.rollbackFailures.forEach(failure => this.logger.error('[Reconstructor] Group rollback failed', failure));
+                           }
+                           this._sendParentAcceptanceAck(group.blockId, null, false, translationToken).catch(() => {});
+                           throw error;
+                         }
+                       }
                     } else {
                       const anyProcessed = group.units.some(u => processedUids.has(u.id));
                       if (!anyProcessed) {
                         try {
                            if (!this._isCurrentTranslation(translationToken)) return;
                            const reconstruction = BlockGroupReconstructor.apply(group.units, text, effectiveTargetLanguage, element, this.currentSessionId, this.currentEntropy);
-                           reconstruction.segments.forEach(segment => {
-                             this.translatedSegmentMap.set(segment.id, segment.text);
-                           });
-                           if (!this._isCurrentTranslation(translationToken)) return;
-                           this._sendParentAcceptanceAck(group.blockId, reconstruction.cleanResult, true).catch(() => {});
-                          group.units.forEach(u => processedUids.add(u.id));
-                          
-                          // Capture split segment translations for shadow comparison
-                          try {
-                            const parsed = BlockGroupReconstructor.splitTranslatedBlock(text, group.units, this.currentSessionId, this.currentEntropy);
-                            parsed.forEach(seg => {
-                              this.translatedSegmentMap.set(seg.id, seg.text);
-                            });
-                          } catch {
-                            // Ignore split errors for shadow comparison
-                          }
+                           this._commitBlockGroup(group, reconstruction, text, processedUids, translationToken);
                         } catch (error) {
-                          this.logger.error(`[Reconstructor] Apply failed for block group ${group.blockId}:`, error);
-                           this._rollbackBlockGroup(this.currentSessionId, group.blockId);
+                          const originalError = unwrapMutationFailure(error);
+                          this.logger.error(`[Reconstructor] Apply failed for block group ${group.blockId}:`, originalError);
+                          if (error instanceof BlockGroupMutationFailure) {
+                            error.rollbackFailures.forEach(failure => this.logger.error('[Reconstructor] Group rollback failed', failure));
+                          } else {
+                            this._rollbackBlockGroup(this.currentSessionId, group.blockId);
+                          }
                            this._sendParentAcceptanceAck(group.blockId, null, false, translationToken).catch(() => {});
                            throw error;
                         }
@@ -746,7 +748,7 @@ export class DomTranslatorAdapter extends ResourceTracker {
       return finalResult;
 
     } catch (error) {
-      const originalError = error instanceof DirectMutationFailure ? error.cause : error;
+      const originalError = unwrapMutationFailure(error);
       this.isTranslating = false; 
 
       const type = matchErrorToType(originalError);
@@ -903,6 +905,47 @@ export class DomTranslatorAdapter extends ResourceTracker {
     DirectionManager.applyNodeDirection(textNode, targetLanguage, rootElement);
   }
 
+  _commitBlockGroup(group, reconstruction, translatedText, processedUids, translationToken) {
+    const previousMap = new Map(group.units.map(unit => [
+      unit.id,
+      { present: this.translatedSegmentMap.has(unit.id), value: this.translatedSegmentMap.get(unit.id) }
+    ]));
+    const previousProcessed = new Map(group.units.map(unit => [unit.id, processedUids.has(unit.id)]));
+
+    try {
+      reconstruction.segments.forEach(segment => this.translatedSegmentMap.set(segment.id, segment.text));
+      group.units.forEach(unit => processedUids.add(unit.id));
+      if (!group.isV2Passthrough) {
+        try {
+          const parsed = BlockGroupReconstructor.splitTranslatedBlock(
+            translatedText,
+            group.units,
+            this.currentSessionId,
+            this.currentEntropy
+          );
+          parsed.forEach(segment => this.translatedSegmentMap.set(segment.id, segment.text));
+        } catch {
+          // Optional shadow refinement must not reject an accepted reconstruction.
+        }
+      }
+      if (translationToken && !this._isCurrentTranslation(translationToken)) {
+        throw new Error('Grouped translation became stale before acceptance');
+      }
+      reconstruction.transaction.finalize();
+      this._sendParentAcceptanceAck(group.blockId, reconstruction.cleanResult, true, translationToken).catch(() => {});
+    } catch (error) {
+      for (const [uid, state] of previousMap) {
+        if (state.present) this.translatedSegmentMap.set(uid, state.value);
+        else this.translatedSegmentMap.delete(uid);
+      }
+      for (const [uid, wasProcessed] of previousProcessed) {
+        if (wasProcessed) processedUids.add(uid);
+        else processedUids.delete(uid);
+      }
+      throw new BlockGroupMutationFailure(error, reconstruction.transaction.rollback());
+    }
+  }
+
   async _handleDirectResponse(response, textNodesData, nodeMap, targetLanguage, element, translationToken, ingestDirectResult, finalizeDirectParents) {
     this.logger.debug(`[DomTranslatorAdapter] _handleDirectResponse called (batchCount: ${this.batchCount})`);
 
@@ -971,40 +1014,37 @@ export class DomTranslatorAdapter extends ResourceTracker {
           if (group.isV2Passthrough) {
             const unit = group.units[0];
             if (!processedUids.has(unit.id)) {
-               if (translationToken && !this._isCurrentTranslation(translationToken)) return;
-               this._applyTranslationToNode(unit.node, text, finalTargetLanguage, element);
-               processedUids.add(unit.id);
-               this.translatedSegmentMap.set(unit.id, text);
-               if (translationToken && !this._isCurrentTranslation(translationToken)) return;
-               this._sendParentAcceptanceAck(group.blockId, String(text), true).catch(() => {});
+               try {
+                 if (translationToken && !this._isCurrentTranslation(translationToken)) return;
+                 const reconstruction = BlockGroupReconstructor.apply(group.units, text, finalTargetLanguage, element, this.currentSessionId, this.currentEntropy);
+                 this._commitBlockGroup(group, reconstruction, text, processedUids, translationToken);
+               } catch (error) {
+                 const originalError = unwrapMutationFailure(error);
+                 this.logger.error(`[Reconstructor] Apply failed for V2 group ${group.blockId}:`, originalError);
+                 if (error instanceof BlockGroupMutationFailure) {
+                   error.rollbackFailures.forEach(failure => this.logger.error('[Reconstructor] Group rollback failed', failure));
+                 }
+                 this._sendParentAcceptanceAck(group.blockId, null, false, translationToken).catch(() => {});
+                 throw error;
+               }
             }
           } else {
             const anyProcessed = group.units.some(u => processedUids.has(u.id));
             if (!anyProcessed) {
               try {
-                 if (translationToken && !this._isCurrentTranslation(translationToken)) return;
-                 const reconstruction = BlockGroupReconstructor.apply(group.units, text, finalTargetLanguage, element, this.currentSessionId, this.currentEntropy);
-                 reconstruction.segments.forEach(segment => {
-                   this.translatedSegmentMap.set(segment.id, segment.text);
-                 });
-                 if (translationToken && !this._isCurrentTranslation(translationToken)) return;
-                 this._sendParentAcceptanceAck(group.blockId, reconstruction.cleanResult, true).catch(() => {});
-                 group.units.forEach(u => processedUids.add(u.id));
-                 
-                 // Capture split segment translations for shadow comparison
-                 try {
-                   const parsed = BlockGroupReconstructor.splitTranslatedBlock(text, group.units, this.currentSessionId, this.currentEntropy);
-                   parsed.forEach(seg => {
-                     this.translatedSegmentMap.set(seg.id, seg.text);
-                   });
-                 } catch {
-                   // Ignore split errors for shadow comparison
+                  if (translationToken && !this._isCurrentTranslation(translationToken)) return;
+                  const reconstruction = BlockGroupReconstructor.apply(group.units, text, finalTargetLanguage, element, this.currentSessionId, this.currentEntropy);
+                  this._commitBlockGroup(group, reconstruction, text, processedUids, translationToken);
+               } catch (error) {
+                 const originalError = unwrapMutationFailure(error);
+                 this.logger.error(`[Reconstructor] Apply failed for block group ${group.blockId}:`, originalError);
+                 if (error instanceof BlockGroupMutationFailure) {
+                   error.rollbackFailures.forEach(failure => this.logger.error('[Reconstructor] Group rollback failed', failure));
+                 } else {
+                   this._rollbackBlockGroup(this.currentSessionId, group.blockId);
                  }
-              } catch (error) {
-                this.logger.error(`[Reconstructor] Apply failed for block group ${group.blockId}:`, error);
-                 this._rollbackBlockGroup(this.currentSessionId, group.blockId);
-                 this._sendParentAcceptanceAck(group.blockId, null, false, translationToken).catch(() => {});
-                 throw error;
+                  this._sendParentAcceptanceAck(group.blockId, null, false, translationToken).catch(() => {});
+                  throw error;
               }
             }
           }
@@ -1045,6 +1085,7 @@ export class DomTranslatorAdapter extends ResourceTracker {
         || err?.isCancelled
         || err?.name === 'AbortError'
         || err instanceof DirectMutationFailure
+        || err instanceof BlockGroupMutationFailure
         || errorType === ErrorTypes.USER_CANCELLED
         || errorType === ErrorTypes.TRANSLATION_CANCELLED
         || errorType === ErrorTypes.TRANSLATION_TIMEOUT

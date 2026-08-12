@@ -1665,6 +1665,84 @@ describe('DomTranslatorAdapter', () => {
     });
   });
 
+  describe('_commitBlockGroup', () => {
+    it('rolls back DOM and exact adapter state when bookkeeping fails before ACK', async () => {
+      const { BlockGroupReconstructor } = await import('./BlockGroupReconstructor.js');
+      const node = testElement.firstChild;
+      const unit = { id: 'n1', blockId: 'g1', text: 'Hello', leadingWS: '', trailingWS: '', node };
+      const group = { blockId: 'g1', units: [unit] };
+      const reconstruction = BlockGroupReconstructor.apply([unit], 'Translated', 'fa', testElement);
+      const rollback = vi.spyOn(reconstruction.transaction, 'rollback');
+      const finalize = vi.spyOn(reconstruction.transaction, 'finalize');
+      adapter.translatedSegmentMap.set('n1', 'Previous');
+      const processedUids = new Set();
+      vi.spyOn(processedUids, 'add').mockImplementationOnce(() => {
+        throw new Error('bookkeeping failed');
+      });
+
+      let failure;
+      try {
+        adapter._commitBlockGroup(group, reconstruction, 'Translated', processedUids, null);
+      } catch (error) {
+        failure = error;
+      }
+
+      expect(failure.cause).toMatchObject({ message: 'bookkeeping failed' });
+      expect(rollback).toHaveBeenCalledOnce();
+      expect(finalize).not.toHaveBeenCalled();
+      expect(node.nodeValue).toBe('Hello');
+      expect(adapter.translatedSegmentMap.get('n1')).toBe('Previous');
+      expect(processedUids.has('n1')).toBe(false);
+      expect(sendRegularMessage).not.toHaveBeenCalledWith(expect.objectContaining({
+        data: expect.objectContaining({ parentId: 'g1', accepted: true })
+      }), { silent: true });
+    });
+
+    it('accepts canonical grouped result when optional shadow refinement fails', async () => {
+      const { BlockGroupReconstructor } = await import('./BlockGroupReconstructor.js');
+      const node = testElement.firstChild;
+      const unit = { id: 'n1', blockId: 'g1', text: 'Hello', leadingWS: '', trailingWS: '', node };
+      const group = { blockId: 'g1', isV2Passthrough: false, units: [unit] };
+      const reconstruction = BlockGroupReconstructor.apply([unit], 'Translated', 'fa', testElement);
+      const rollback = vi.spyOn(reconstruction.transaction, 'rollback');
+      const finalize = vi.spyOn(reconstruction.transaction, 'finalize');
+      const processedUids = new Set();
+      adapter.currentMessageId = 'grouped-refinement';
+      vi.spyOn(BlockGroupReconstructor, 'splitTranslatedBlock').mockImplementationOnce(() => {
+        throw new Error('optional refinement failed');
+      });
+
+      adapter._commitBlockGroup(group, reconstruction, 'Translated', processedUids, null);
+
+      expect(node.nodeValue).toContain('Translated');
+      expect(adapter.translatedSegmentMap.get('n1')).toBe('Translated');
+      expect(processedUids.has('n1')).toBe(true);
+      expect(rollback).not.toHaveBeenCalled();
+      expect(finalize).toHaveBeenCalledOnce();
+      expect(sendRegularMessage).toHaveBeenCalledWith(expect.objectContaining({
+        data: expect.objectContaining({ parentId: 'g1', accepted: true })
+      }), { silent: true });
+    });
+
+    it('skips optional shadow refinement for V2 passthrough groups', async () => {
+      const { BlockGroupReconstructor } = await import('./BlockGroupReconstructor.js');
+      const node = testElement.firstChild;
+      const unit = { id: 'n1', blockId: 'g1', text: 'Hello', leadingWS: '', trailingWS: '', node };
+      const group = { blockId: 'g1', isV2Passthrough: true, units: [unit] };
+      const reconstruction = BlockGroupReconstructor.apply([unit], 'Translated', 'fa', testElement);
+      const split = vi.spyOn(BlockGroupReconstructor, 'splitTranslatedBlock');
+      split.mockClear();
+      const processedUids = new Set();
+      adapter.currentMessageId = 'v2-passthrough';
+
+      adapter._commitBlockGroup(group, reconstruction, 'Translated', processedUids, null);
+
+      expect(split).not.toHaveBeenCalled();
+      expect(node.nodeValue).toContain('Translated');
+      expect(adapter.translatedSegmentMap.get('n1')).toBe('Translated');
+    });
+  });
+
   describe('_applyTranslationToNode', () => {
     it('should apply translation with BIDI marks and register for hover preview', () => {
       const textNode = testElement.firstChild;

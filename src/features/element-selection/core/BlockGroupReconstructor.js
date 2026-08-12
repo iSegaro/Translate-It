@@ -2,10 +2,17 @@ import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { hoverPreviewLookup } from '@/features/shared/hover-preview/HoverPreviewLookup.js';
 import { PAGE_TRANSLATION_ATTRIBUTES } from '@/features/page-translation/PageTranslationConstants.js';
-import { detectDirectionFromContent, applyNodeDirection, BIDI_MARKS } from '@/utils/dom/DomDirectionManager.js';
+import { detectDirectionFromContent, applyNodeDirection, captureNodeDirectionState, restoreNodeDirectionState, BIDI_MARKS } from '@/utils/dom/DomDirectionManager.js';
 import { parseV3Intervals } from '@/features/translation/core/V3IntervalParser.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.ELEMENT_SELECTION, 'BlockGroupReconstructor');
+
+export class BlockGroupMutationFailure {
+  constructor(cause, rollbackFailures = []) {
+    this.cause = cause;
+    this.rollbackFailures = rollbackFailures;
+  }
+}
 
 /**
  * Escapes a string for use in a RegExp.
@@ -211,7 +218,58 @@ export class BlockGroupReconstructor {
 
     // --- Mutation Phase (Synchronous DOM writes) ---
     const firstNodeParent = expectedUnits[0].node.parentElement;
-    
+    const attributeParents = new Map();
+    const directionSnapshots = [];
+    const directionElements = new Set();
+    const hoverSnapshots = commitPlan.map(({ unit }) => ({ node: unit.node, value: hoverPreviewLookup.get(unit.node) }));
+    for (const { unit } of commitPlan) {
+      const parentElement = unit.node.parentElement;
+      if (parentElement && !attributeParents.has(parentElement)) {
+        attributeParents.set(parentElement, {
+          present: parentElement.hasAttribute(PAGE_TRANSLATION_ATTRIBUTES.HAS_ORIGINAL),
+          value: parentElement.getAttribute(PAGE_TRANSLATION_ATTRIBUTES.HAS_ORIGINAL),
+        });
+      }
+      for (const snapshot of captureNodeDirectionState(unit.node, rootElement)) {
+        if (!directionElements.has(snapshot.element)) {
+          directionElements.add(snapshot.element);
+          directionSnapshots.push(snapshot);
+        }
+      }
+    }
+    const hadTranslatingClass = firstNodeParent?.classList.contains('ti-translating') || false;
+    let active = true;
+    const restoreTranslatingClass = () => {
+      if (!firstNodeParent) return;
+      if (hadTranslatingClass) firstNodeParent.classList.add('ti-translating');
+      else firstNodeParent.classList.remove('ti-translating');
+    };
+    const rollback = () => {
+      if (!active) return [];
+      active = false;
+      const failures = [];
+      for (const task of [...commitPlan].reverse()) {
+        try { task.unit.node.nodeValue = task.originalText; }
+        catch (error) { failures.push({ kind: 'text', id: task.unit.id, error }); }
+      }
+      for (const [element, state] of attributeParents) {
+        try {
+          if (state.present) element.setAttribute(PAGE_TRANSLATION_ATTRIBUTES.HAS_ORIGINAL, state.value);
+          else element.removeAttribute(PAGE_TRANSLATION_ATTRIBUTES.HAS_ORIGINAL);
+        } catch (error) { failures.push({ kind: 'attribute', element, error }); }
+      }
+      failures.push(...restoreNodeDirectionState(directionSnapshots));
+      for (const { node, value } of hoverSnapshots) {
+        try {
+          if (value === undefined) hoverPreviewLookup.delete(node);
+          else hoverPreviewLookup.add(node, value);
+        } catch (error) { failures.push({ kind: 'hover', node, error }); }
+      }
+      try { restoreTranslatingClass(); }
+      catch (error) { failures.push({ kind: 'class', element: firstNodeParent, error }); }
+      return failures;
+    };
+
     try {
       if (firstNodeParent) {
         firstNodeParent.classList.add('ti-translating');
@@ -228,16 +286,19 @@ export class BlockGroupReconstructor {
         task.unit.node.nodeValue = task.finalValue;
         applyNodeDirection(task.unit.node, targetLanguage, rootElement);
       }
+      restoreTranslatingClass();
 
       return {
         success: true,
         cleanResult: parsedSegments.map(segment => segment.text).join(''),
         segments: parsedSegments,
+        transaction: {
+          rollback,
+          finalize() { active = false; },
+        },
       };
-    } finally {
-      if (firstNodeParent) {
-        firstNodeParent.classList.remove('ti-translating');
-      }
+    } catch (error) {
+      throw new BlockGroupMutationFailure(error, rollback());
     }
   }
 }

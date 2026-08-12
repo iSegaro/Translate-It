@@ -65,7 +65,9 @@ vi.mock('@/shared/error-management/ErrorTypes.js', () => ({
 
 vi.mock('@/features/shared/hover-preview/HoverPreviewLookup.js', () => ({
   hoverPreviewLookup: {
-    add: vi.fn()
+    add: vi.fn(),
+    get: vi.fn(),
+    delete: vi.fn()
   }
 }));
 
