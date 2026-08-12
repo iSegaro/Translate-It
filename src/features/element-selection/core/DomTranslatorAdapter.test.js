@@ -754,6 +754,103 @@ describe('DomTranslatorAdapter', () => {
       await adapter.cancelTranslation();
       expect(cancelSpy).not.toHaveBeenCalled();
     });
+
+    it('ignores late stream updates after cancellation without DOM mutation or ACK', async () => {
+      let streamCallbacks;
+      registerTranslation.mockImplementation((_id, callbacks) => {
+        streamCallbacks = callbacks;
+      });
+      contentScriptIntegration.sendTranslationRequest.mockResolvedValue({ success: true, streaming: true });
+
+      const translation = adapter.translateElement(testElement);
+      await vi.waitFor(() => expect(streamCallbacks).toBeDefined());
+      await adapter.cancelTranslation({ silent: true });
+
+      streamCallbacks.onStreamUpdate({ success: true, data: [{ t: 'late', i: 'n1' }] });
+      expect(testElement.textContent).toBe('Hello');
+      expect(sendRegularMessage).not.toHaveBeenCalledWith(expect.objectContaining({
+        data: expect.objectContaining({ accepted: true })
+      }), expect.anything());
+
+      streamCallbacks.onStreamEnd({ success: true });
+      await expect(translation).resolves.toMatchObject({ success: false, cancelled: true });
+    });
+
+    it('ignores callbacks from previous session after a new translation starts', async () => {
+      const firstElement = testElement;
+      const secondElement = document.createElement('div');
+      secondElement.textContent = 'Hello';
+      document.body.appendChild(secondElement);
+
+      const callbacks = [];
+      registerTranslation.mockImplementation((_id, registered) => {
+        callbacks.push(registered);
+      });
+      contentScriptIntegration.sendTranslationRequest
+        .mockResolvedValueOnce({ success: true, streaming: true })
+        .mockResolvedValueOnce({
+          success: true,
+          streaming: true
+        });
+
+      const firstTranslation = adapter.translateElement(firstElement);
+      await vi.waitFor(() => expect(callbacks).toHaveLength(1));
+      await adapter.cancelTranslation({ silent: true });
+
+      const secondTranslation = adapter.translateElement(secondElement);
+      await vi.waitFor(() => expect(callbacks).toHaveLength(2));
+      callbacks[1].onStreamUpdate({ success: true, data: [{ t: 'active', i: 'n1' }] });
+      callbacks[1].onStreamEnd({ success: true });
+      await secondTranslation;
+
+      callbacks[0].onStreamUpdate({ success: true, data: [{ t: 'stale', i: 'n1' }] });
+      expect(firstElement.textContent).toBe('Hello');
+      expect(secondElement.textContent).toContain('active');
+
+      callbacks[0].onStreamEnd({ success: true });
+      await firstTranslation;
+    });
+
+    it('keeps newer session state when stale session cleanup runs', async () => {
+      const firstCallbacks = [];
+      registerTranslation.mockImplementation((_id, callbacks) => {
+        firstCallbacks.push(callbacks);
+      });
+      contentScriptIntegration.sendTranslationRequest
+        .mockResolvedValueOnce({ success: true, streaming: true })
+        .mockResolvedValueOnce({
+          success: true,
+          streaming: true
+        });
+
+      const firstTranslation = adapter.translateElement(testElement);
+      await vi.waitFor(() => expect(firstCallbacks).toHaveLength(1));
+      const firstToken = adapter.currentTranslationToken;
+      await adapter.cancelTranslation({ silent: true });
+
+      const secondElement = document.createElement('div');
+      secondElement.textContent = 'Hello';
+      document.body.appendChild(secondElement);
+      const secondTranslation = adapter.translateElement(secondElement);
+      await vi.waitFor(() => expect(firstCallbacks).toHaveLength(2));
+      firstCallbacks[1].onStreamUpdate({ success: true, data: [{ t: 'active', i: 'n1' }] });
+      const secondMessageId = adapter.currentMessageId;
+      const secondToken = adapter.currentTranslationToken;
+
+      adapter._cleanupCurrentSession(true, firstToken);
+
+      expect(adapter.currentMessageId).toBe(secondMessageId);
+      expect(adapter.currentTranslationToken).toBe(secondToken);
+      expect(adapter.isTranslating).toBe(true);
+      expect(secondElement.textContent).toContain('active');
+
+      firstCallbacks[0].onStreamEnd({ success: true });
+      await firstTranslation;
+      firstCallbacks[1].onStreamEnd({ success: true });
+      await secondTranslation;
+      adapter._cleanupCurrentSession(false, secondToken);
+      expect(adapter.isTranslating).toBe(false);
+    });
   });
 
   describe('revertTranslation', () => {

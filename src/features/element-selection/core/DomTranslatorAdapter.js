@@ -64,6 +64,7 @@ export class DomTranslatorAdapter extends ResourceTracker {
     this.currentMessageId = null;
     this.currentStreamEndReject = null;
     this.currentSessionId = null;
+    this.currentTranslationToken = null;
     this.translatedSegmentMap = new Map();
 
     // Cache for original settings
@@ -90,6 +91,7 @@ export class DomTranslatorAdapter extends ResourceTracker {
    */
   async translateElement(element, options = {}) {
     const { onProgress, onComplete, onError } = options;
+    let translationToken = null;
     this.logger.operation('Starting element translation');
 
     try {
@@ -287,6 +289,8 @@ export class DomTranslatorAdapter extends ResourceTracker {
 
       const messageId = `m${Math.random().toString(36).substr(2, 6)}`;
       this.currentMessageId = messageId;
+      translationToken = { messageId, cancelled: false };
+      this.currentTranslationToken = translationToken;
       let effectiveTargetLanguage = targetLanguage;
       
       // Tracking processed nodes to avoid multi-batch conflicts
@@ -306,6 +310,7 @@ export class DomTranslatorAdapter extends ResourceTracker {
         registerTranslation(messageId, {
           onStreamUpdate: (data) => {
             if (isSettled) return;
+            if (!this._isCurrentTranslation(translationToken)) return;
             try {
               if (data.success === false || data.error) {
                 if (isFatalError(data.error)) {
@@ -338,19 +343,23 @@ export class DomTranslatorAdapter extends ResourceTracker {
                       const unit = group.units[0];
                       if (!processedUids.has(unit.id)) {
                         const text = translatedItem?.t || translatedItem?.text || translatedItem;
+                         if (!this._isCurrentTranslation(translationToken)) return;
                          this._applyTranslationToNode(unit.node, text, effectiveTargetLanguage, element);
                          processedUids.add(unit.id);
                          this.translatedSegmentMap.set(unit.id, text);
+                         if (!this._isCurrentTranslation(translationToken)) return;
                          this._sendParentAcceptanceAck(group.blockId, String(text), true).catch(() => {});
                       }
                     } else {
                       const anyProcessed = group.units.some(u => processedUids.has(u.id));
                       if (!anyProcessed) {
                         try {
+                           if (!this._isCurrentTranslation(translationToken)) return;
                            const reconstruction = BlockGroupReconstructor.apply(group.units, text, effectiveTargetLanguage, element, this.currentSessionId, this.currentEntropy);
                            reconstruction.segments.forEach(segment => {
                              this.translatedSegmentMap.set(segment.id, segment.text);
                            });
+                           if (!this._isCurrentTranslation(translationToken)) return;
                            this._sendParentAcceptanceAck(group.blockId, reconstruction.cleanResult, true).catch(() => {});
                           group.units.forEach(u => processedUids.add(u.id));
                           
@@ -366,7 +375,7 @@ export class DomTranslatorAdapter extends ResourceTracker {
                         } catch (error) {
                           this.logger.error(`[Reconstructor] Apply failed for block group ${group.blockId}:`, error);
                            this._rollbackBlockGroup(this.currentSessionId, group.blockId);
-                           this._sendParentAcceptanceAck(group.blockId, null, false).catch(() => {});
+                           this._sendParentAcceptanceAck(group.blockId, null, false, translationToken).catch(() => {});
                            throw error;
                         }
                       }
@@ -388,11 +397,13 @@ export class DomTranslatorAdapter extends ResourceTracker {
 
                     if (nodeData && !processedUids.has(nodeData.uid)) {
                        try {
+                         if (!this._isCurrentTranslation(translationToken)) return;
                          this._applyTranslationToNode(nodeData.node, text, effectiveTargetLanguage, element);
                          processedUids.add(nodeData.uid);
-                          this._sendParentAcceptanceAck(nodeData.blockId, String(text), true).catch(() => {});
+                          if (!this._isCurrentTranslation(translationToken)) return;
+                         this._sendParentAcceptanceAck(nodeData.blockId, String(text), true).catch(() => {});
                         } catch (error) {
-                          this._sendParentAcceptanceAck(nodeData.blockId, null, false).catch(() => {});
+                           this._sendParentAcceptanceAck(nodeData.blockId, null, false, translationToken).catch(() => {});
                          throw error;
                        }
                      }
@@ -422,6 +433,7 @@ export class DomTranslatorAdapter extends ResourceTracker {
           },
           onStreamEnd: (data) => {
             if (isSettled) return;
+            if (!this._isCurrentTranslation(translationToken)) return safeResolve({ success: false, cancelled: true });
             if (data.cancelled) return safeResolve({ success: false, cancelled: true });
             if (data.success === false || data.error) {
               const errObj = typeof data.error === 'object' ? data.error : { message: data.error, type: matchErrorToType(data.error) };
@@ -435,7 +447,10 @@ export class DomTranslatorAdapter extends ResourceTracker {
             safeResolve({ success: true, targetLanguage: finalLang });
           },
           onError: (error) => {
-            if (isSettled || !this.currentMessageId) return;
+            if (isSettled) return;
+            if (!this._isCurrentTranslation(translationToken)) {
+              return safeResolve({ success: false, cancelled: true });
+            }
             
             // Still resolve to allow cleanup, but pass the error
             safeResolve({ success: false, error });
@@ -477,7 +492,7 @@ export class DomTranslatorAdapter extends ResourceTracker {
         }
         result = await streamEndPromise;
       } else if (response?.success) {
-        result = await this._handleDirectResponse(response, textNodesData, nodeMap, effectiveTargetLanguage, element);
+        result = await this._handleDirectResponse(response, textNodesData, nodeMap, effectiveTargetLanguage, element, translationToken);
       } else {
         result = response;
       }
@@ -562,7 +577,7 @@ export class DomTranslatorAdapter extends ResourceTracker {
       throw error;
     } finally {
       activeTranslationRoots.delete(element);
-      this._cleanupCurrentSession(true);
+      this._cleanupCurrentSession(true, translationToken);
     }
   }
 
@@ -654,7 +669,7 @@ export class DomTranslatorAdapter extends ResourceTracker {
     DirectionManager.applyNodeDirection(textNode, targetLanguage, rootElement);
   }
 
-  async _handleDirectResponse(response, textNodesData, nodeMap, targetLanguage, element) {
+  async _handleDirectResponse(response, textNodesData, nodeMap, targetLanguage, element, translationToken = null) {
     this.logger.debug(`[DomTranslatorAdapter] _handleDirectResponse called (batchCount: ${this.batchCount})`);
 
     try {
@@ -681,6 +696,7 @@ export class DomTranslatorAdapter extends ResourceTracker {
       const isBlockGroupingEnabled = this.sessionContext !== undefined;
 
       results.forEach((item, i) => {
+        if (translationToken && !this._isCurrentTranslation(translationToken)) return;
         if (item?.isSplitFragment === true) {
           this.logger.warn('[DomTranslatorAdapter] Suppressed incomplete V2 fragment result');
           return;
@@ -699,19 +715,23 @@ export class DomTranslatorAdapter extends ResourceTracker {
           if (group.isV2Passthrough) {
             const unit = group.units[0];
             if (!processedUids.has(unit.id)) {
+               if (translationToken && !this._isCurrentTranslation(translationToken)) return;
                this._applyTranslationToNode(unit.node, text, finalTargetLanguage, element);
                processedUids.add(unit.id);
                this.translatedSegmentMap.set(unit.id, text);
+               if (translationToken && !this._isCurrentTranslation(translationToken)) return;
                this._sendParentAcceptanceAck(group.blockId, String(text), true).catch(() => {});
             }
           } else {
             const anyProcessed = group.units.some(u => processedUids.has(u.id));
             if (!anyProcessed) {
               try {
+                 if (translationToken && !this._isCurrentTranslation(translationToken)) return;
                  const reconstruction = BlockGroupReconstructor.apply(group.units, text, finalTargetLanguage, element, this.currentSessionId, this.currentEntropy);
                  reconstruction.segments.forEach(segment => {
                    this.translatedSegmentMap.set(segment.id, segment.text);
                  });
+                 if (translationToken && !this._isCurrentTranslation(translationToken)) return;
                  this._sendParentAcceptanceAck(group.blockId, reconstruction.cleanResult, true).catch(() => {});
                  group.units.forEach(u => processedUids.add(u.id));
                  
@@ -727,7 +747,7 @@ export class DomTranslatorAdapter extends ResourceTracker {
               } catch (error) {
                 this.logger.error(`[Reconstructor] Apply failed for block group ${group.blockId}:`, error);
                  this._rollbackBlockGroup(this.currentSessionId, group.blockId);
-                 this._sendParentAcceptanceAck(group.blockId, null, false).catch(() => {});
+                 this._sendParentAcceptanceAck(group.blockId, null, false, translationToken).catch(() => {});
                  throw error;
               }
             }
@@ -740,11 +760,13 @@ export class DomTranslatorAdapter extends ResourceTracker {
 
             if (nodeData && !processedUids.has(nodeData.uid)) {
               try {
+                if (translationToken && !this._isCurrentTranslation(translationToken)) return;
                 this._applyTranslationToNode(nodeData.node, text, finalTargetLanguage, element);
                 processedUids.add(nodeData.uid);
+                if (translationToken && !this._isCurrentTranslation(translationToken)) return;
                 this._sendParentAcceptanceAck(nodeData.blockId, String(text), true).catch(() => {});
               } catch (error) {
-                this._sendParentAcceptanceAck(nodeData.blockId, null, false).catch(() => {});
+                this._sendParentAcceptanceAck(nodeData.blockId, null, false, translationToken).catch(() => {});
                 throw error;
               }
             }
@@ -803,7 +825,8 @@ export class DomTranslatorAdapter extends ResourceTracker {
     return { success: true, elementId, element };
   }
 
-  async _sendParentAcceptanceAck(parentId, cleanResult, accepted) {
+  async _sendParentAcceptanceAck(parentId, cleanResult, accepted, translationToken = null) {
+    if (translationToken && !this._isCurrentTranslation(translationToken)) return;
     if (!this.currentMessageId || !parentId) {
       this.logger.error('[DomTranslatorAdapter] Missing canonical blockId for parent acceptance ACK', {
         code: 'MISSING_CANONICAL_PARENT_IDENTITY',
@@ -875,9 +898,15 @@ export class DomTranslatorAdapter extends ResourceTracker {
     }
   }
 
-  _cleanupCurrentSession(isSuccess = false) {
+  _cleanupCurrentSession(isSuccess = false, token = this.currentTranslationToken) {
+    if (token && this.currentTranslationToken !== token) {
+      if (!isSuccess) token.cancelled = true;
+      return;
+    }
+
     this.isTranslating = false;
     const messageId = this.currentMessageId;
+    if (token && !isSuccess) token.cancelled = true;
     if (messageId) {
       // Use the correct API from contentScriptIntegration
       if (!isSuccess) {
@@ -885,6 +914,14 @@ export class DomTranslatorAdapter extends ResourceTracker {
       }
       this.currentMessageId = null;
     }
+    if (this.currentTranslationToken === token) this.currentTranslationToken = null;
+  }
+
+  _isCurrentTranslation(token) {
+    return Boolean(token)
+      && !token.cancelled
+      && this.currentTranslationToken === token
+      && this.currentMessageId === token.messageId;
   }
 
   async cancelTranslation(options = {}) {
