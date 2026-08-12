@@ -299,7 +299,6 @@ export class DomTranslatorAdapter extends ResourceTracker {
       
       // Tracking processed nodes to avoid multi-batch conflicts
       const processedUids = new Set();
-      let lastProcessedIndex = 0;
 
       // ELIMINATE UNCAUGHT PROMISE ERRORS: Use resolve-only pattern for the stream promise
       const streamEndPromise = new Promise((resolve) => {
@@ -332,14 +331,27 @@ export class DomTranslatorAdapter extends ResourceTracker {
               }
 
               if (data.data && Array.isArray(data.data)) {
+                const resultIdentities = data.data.map(item => this._getResultIdentity(item));
+                const duplicateIdentities = new Set(
+                  resultIdentities
+                    .filter(result => result.status === 'valid')
+                    .map(result => result.identity)
+                    .filter((identity, index, identities) => identities.indexOf(identity) !== index)
+                );
                 data.data.forEach((translatedItem, index) => {
                    if (translatedItem?.isSplitFragment === true || translatedItem?.isV3Fragment === true) {
                       this.logger.warn('[DomTranslatorAdapter] Suppressed incomplete fragment event');
                       return;
                     }
-                   // Handle both abbreviated and full keys for backward compatibility
-                    const uid = translatedItem?.i || translatedItem?.uid || (data.originalData && (data.originalData[index]?.i || data.originalData[index]?.uid));
-                    const text = translatedItem?.t || translatedItem?.text || translatedItem;
+                   // Handle documented aliases for canonical unit identity.
+                   const identityResult = this._getResultIdentity(translatedItem);
+                   const uid = identityResult.identity;
+                   const text = translatedItem?.t || translatedItem?.text || translatedItem;
+
+                   if (identityResult.status !== 'valid' || duplicateIdentities.has(uid)) {
+                     this._logRejectedMapping(index, uid, duplicateIdentities.has(uid) ? 'duplicate' : identityResult.status);
+                     return;
+                   }
 
                    if (isBlockGroupingEnabled && groupMap && groupMap.has(uid)) {
                     const group = groupMap.get(uid);
@@ -385,19 +397,11 @@ export class DomTranslatorAdapter extends ResourceTracker {
                       }
                     }
                   } else {
-                    let nodeData = null;
-                    if (uid) {
-                      nodeData = nodeMap.get(uid);
-                    }
-
-                    // Fallback to sequential index ONLY if UID mapping fails or is missing
-                    if (!nodeData) {
-                      nodeData = textNodesData[lastProcessedIndex++];
-                    } else {
-                      // If we found by UID, update our sequential pointer if possible
-                      const currentIdx = textNodesData.findIndex(d => d.uid === uid);
-                      if (currentIdx !== -1) lastProcessedIndex = Math.max(lastProcessedIndex, currentIdx + 1);
-                    }
+                     const nodeData = nodeMap.get(uid);
+                     if (!nodeData) {
+                       this._logRejectedMapping(index, uid, 'unknown');
+                       return;
+                     }
 
                     if (nodeData && !processedUids.has(nodeData.uid)) {
                        try {
@@ -619,6 +623,32 @@ export class DomTranslatorAdapter extends ResourceTracker {
     return detectedDir !== parentDir;
   }
 
+  _getResultIdentity(item) {
+    if (!item || typeof item !== 'object') return { status: 'missing', identity: null };
+
+    const aliases = ['i', 'uid', 'id']
+      .filter(alias => Object.prototype.hasOwnProperty.call(item, alias));
+    if (aliases.length === 0) return { status: 'missing', identity: null };
+
+    const values = aliases.map(alias => item[alias]);
+    if (values.some(value => typeof value !== 'string' || !value.trim())) {
+      return { status: 'missing', identity: null };
+    }
+
+    const identities = new Set(values);
+    if (identities.size > 1) return { status: 'ambiguous', identity: null };
+    return { status: 'valid', identity: values[0] };
+  }
+
+  _logRejectedMapping(index, identity, reason) {
+    this.logger.warn('[DomTranslatorAdapter] Rejected translation result mapping', {
+      reason,
+      resultIndex: index,
+      identityPresent: Boolean(identity),
+      identityKnown: reason !== 'unknown',
+    });
+  }
+
   _applyTranslationToNode(textNode, translatedText, targetLanguage, rootElement) {
     if (!textNode || !translatedText) return;
     
@@ -699,18 +729,26 @@ export class DomTranslatorAdapter extends ResourceTracker {
       const processedUids = new Set();
       const isBlockGroupingEnabled = this.sessionContext !== undefined;
 
+      const resultIdentities = results.map(item => this._getResultIdentity(item));
+      const duplicateIdentities = new Set(
+        resultIdentities
+          .filter(result => result.status === 'valid')
+          .map(result => result.identity)
+          .filter((identity, index, identities) => identities.indexOf(identity) !== index)
+      );
+
       results.forEach((item, i) => {
         if (translationToken && !this._isCurrentTranslation(translationToken)) return;
         if (item?.isSplitFragment === true) {
           this.logger.warn('[DomTranslatorAdapter] Suppressed incomplete V2 fragment result');
           return;
         }
-        // Handle abbreviated key 'i' for UID
-        const uid = item?.i || item?.uid || item?.id;
+        const identityResult = this._getResultIdentity(item);
+        const uid = identityResult.identity;
         const text = item?.t || item?.text || item;
 
-        if (text === undefined || text === null) {
-          this.logger.warn(`[DomTranslatorAdapter] Skipping undefined/null translation at index ${i}`);
+        if (identityResult.status !== 'valid' || duplicateIdentities.has(uid)) {
+          this._logRejectedMapping(i, uid, duplicateIdentities.has(uid) ? 'duplicate' : identityResult.status);
           return;
         }
 
@@ -757,10 +795,11 @@ export class DomTranslatorAdapter extends ResourceTracker {
             }
           }
          } else {
-           let nodeData = uid ? nodeMap.get(uid) : null;
-           if (!nodeData) {
-             nodeData = textNodesData[i];
-           }
+            const nodeData = nodeMap.get(uid);
+            if (!nodeData) {
+              this._logRejectedMapping(i, uid, 'unknown');
+              return;
+            }
 
             if (nodeData && !processedUids.has(nodeData.uid)) {
               try {

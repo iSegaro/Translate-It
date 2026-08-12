@@ -604,7 +604,7 @@ describe('DomTranslatorAdapter', () => {
       expect(nodeC.nodeValue).toContain('Translated C');
     });
 
-    it('should fallback to sequential mapping if UID is missing in stream', async () => {
+    it('should ignore missing UID in stream without mutating or ACKing', async () => {
       let streamCallbacks;
       registerTranslation.mockImplementation((id, callbacks) => {
         streamCallbacks = callbacks;
@@ -622,7 +622,34 @@ describe('DomTranslatorAdapter', () => {
       });
 
       await adapter.translateElement(testElement);
-      expect(testElement.textContent).toContain('سلام');
+      expect(testElement.textContent).toContain('Hello');
+      expect(sendRegularMessage).not.toHaveBeenCalledWith(expect.objectContaining({
+        data: expect.objectContaining({ accepted: true })
+      }), expect.anything());
+    });
+
+    it('should ignore ambiguous aliases in stream without mutating or ACKing', async () => {
+      let streamCallbacks;
+      registerTranslation.mockImplementation((_id, callbacks) => {
+        streamCallbacks = callbacks;
+      });
+      contentScriptIntegration.sendTranslationRequest.mockImplementation(async () => {
+        setTimeout(() => {
+          streamCallbacks.onStreamUpdate({
+            success: true,
+            data: [{ t: 'سلام', i: 'n1', uid: 'n2' }]
+          });
+          streamCallbacks.onStreamEnd({ success: true });
+        }, 10);
+        return { success: true, streaming: true };
+      });
+
+      await adapter.translateElement(testElement);
+
+      expect(testElement.textContent).toContain('Hello');
+      expect(sendRegularMessage).not.toHaveBeenCalledWith(expect.objectContaining({
+        data: expect.objectContaining({ accepted: true })
+      }), expect.anything());
     });
 
     it('should send AI context when enabled', async () => {
@@ -682,7 +709,7 @@ describe('DomTranslatorAdapter', () => {
       expect(cleanupSpy).toHaveBeenCalled();
     });
 
-    it('should handle sequential fallback if direct response is not an array', async () => {
+    it('should preserve original text when direct response has no identity', async () => {
       contentScriptIntegration.sendTranslationRequest.mockResolvedValue({
         success: true,
         streaming: false,
@@ -691,7 +718,7 @@ describe('DomTranslatorAdapter', () => {
 
       const result = await adapter.translateElement(testElement);
       expect(result.success).toBe(true);
-      expect(testElement.textContent).toContain('Plain text translation');
+      expect(testElement.textContent).toContain('Hello');
     });
 
     it('should handle error in onStreamEnd', async () => {
@@ -728,7 +755,7 @@ describe('DomTranslatorAdapter', () => {
       contentScriptIntegration.sendTranslationRequest.mockResolvedValue({
         success: true,
         streaming: false,
-        translatedText: 'Test'
+        translatedText: JSON.stringify([{ t: 'Test', i: 'n1' }])
       });
 
       await expect(adapter.translateElement(testElement)).rejects.toThrow('Invalid translation format');
@@ -956,7 +983,7 @@ describe('DomTranslatorAdapter', () => {
       expect(testElement.textContent).toContain('سلام');
     });
 
-    it('should fallback to sequential mapping if UID is missing', async () => {
+    it('should ignore missing UID without mutating or ACKing', async () => {
       const response = {
         success: true,
         translatedText: [{ t: 'سلام' }],
@@ -965,12 +992,46 @@ describe('DomTranslatorAdapter', () => {
       const textNodesData = [{ node: testElement.firstChild, uid: 'n1' }];
       
       const result = await adapter._handleDirectResponse(response, textNodesData, new Map(), 'fa', testElement);
-      
+
       expect(result.success).toBe(true);
+      expect(testElement.textContent).toContain('Hello');
+      expect(sendRegularMessage).not.toHaveBeenCalledWith(expect.objectContaining({
+        data: expect.objectContaining({ accepted: true })
+      }), expect.anything());
+    });
+
+    it.each([
+      [{ i: 'n1', uid: 'n2' }],
+      [{ i: 'n1', id: 'n2' }],
+      [{ uid: 'n1', id: 'n2' }],
+    ])('should reject conflicting identity aliases without mutation or ACK: %o', async (item) => {
+      await adapter._handleDirectResponse({
+        success: true,
+        translatedText: [{ ...item, t: 'Unsafe' }],
+        targetLanguage: 'fa'
+      }, [{ node: testElement.firstChild, uid: 'n1' }], new Map([
+        ['n1', { node: testElement.firstChild, uid: 'n1' }]
+      ]), 'fa', testElement);
+
+      expect(testElement.textContent).toContain('Hello');
+      expect(sendRegularMessage).not.toHaveBeenCalledWith(expect.objectContaining({
+        data: expect.objectContaining({ accepted: true })
+      }), expect.anything());
+    });
+
+    it('should accept equal identity aliases', async () => {
+      await adapter._handleDirectResponse({
+        success: true,
+        translatedText: [{ t: 'سلام', i: 'n1', uid: 'n1', id: 'n1' }],
+        targetLanguage: 'fa'
+      }, [{ node: testElement.firstChild, uid: 'n1' }], new Map([
+        ['n1', { node: testElement.firstChild, uid: 'n1', blockId: 'b1' }]
+      ]), 'fa', testElement);
+
       expect(testElement.textContent).toContain('سلام');
     });
 
-    it('should apply only first translation for duplicate uid (direct response, non-block-grouping)', async () => {
+    it('should reject duplicate uid without mutating or ACKing', async () => {
       const applySpy = vi.spyOn(adapter, '_applyTranslationToNode');
       const response = {
         success: true,
@@ -984,9 +1045,52 @@ describe('DomTranslatorAdapter', () => {
 
       await adapter._handleDirectResponse(response, [], nodeMap, 'fa', testElement);
 
-      expect(applySpy).toHaveBeenCalledTimes(1);
-      expect(applySpy).toHaveBeenCalledWith(testElement.firstChild, 'First', 'fa', testElement);
+      expect(applySpy).not.toHaveBeenCalled();
+      expect(testElement.textContent).toContain('Hello');
+      expect(sendRegularMessage).not.toHaveBeenCalledWith(expect.objectContaining({
+        data: expect.objectContaining({ accepted: true })
+      }), expect.anything());
       applySpy.mockRestore();
+    });
+
+    it('should ignore unknown identity without mutating neighboring nodes', async () => {
+      testElement.innerHTML = '<span>Hello</span><span>World</span>';
+      const first = testElement.firstChild.firstChild;
+      const second = testElement.childNodes[1].firstChild;
+
+      await adapter._handleDirectResponse({
+        success: true,
+        translatedText: [{ t: 'Unknown', i: 'missing-source' }, { t: 'First', i: 'n1' }],
+        targetLanguage: 'fa'
+      }, [
+        { node: first, uid: 'n1' },
+        { node: second, uid: 'n2' }
+      ], new Map([
+        ['n1', { node: first, uid: 'n1' }],
+        ['n2', { node: second, uid: 'n2' }]
+      ]), 'fa', testElement);
+
+      expect(first.textContent).toContain('First');
+      expect(second.textContent).toBe('World');
+    });
+
+    it('should apply reordered valid identities to matching nodes', async () => {
+      testElement.innerHTML = '<span>Hello</span><span>World</span>';
+      const first = testElement.firstChild.firstChild;
+      const second = testElement.childNodes[1].firstChild;
+      const nodeMap = new Map([
+        ['n1', { node: first, uid: 'n1' }],
+        ['n2', { node: second, uid: 'n2' }]
+      ]);
+
+      await adapter._handleDirectResponse({
+        success: true,
+        translatedText: [{ t: 'Second', i: 'n2' }, { t: 'First', i: 'n1' }],
+        targetLanguage: 'fa'
+      }, [], nodeMap, 'fa', testElement);
+
+      expect(first.textContent).toContain('First');
+      expect(second.textContent).toContain('Second');
     });
 
     it('should apply both translations for different uids (direct response)', async () => {
