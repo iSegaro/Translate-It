@@ -60,6 +60,7 @@ vi.mock('../../../shared/config/config.js', () => ({
   getSidepanelMaxCharsAsync: vi.fn().mockResolvedValue(10000),
   getSelectionMaxCharsAsync: vi.fn().mockResolvedValue(5000),
   getSelectElementMaxCharsAsync: vi.fn().mockResolvedValue(20000)
+  ,getAIConversationHistoryEnabledAsync: vi.fn().mockResolvedValue(true)
 }));
 
 vi.mock('../../../shared/messaging/core/MessagingCore.js', () => ({
@@ -161,6 +162,66 @@ describe('UnifiedTranslationService', () => {
   });
 
   describe('handleTranslationRequest', () => {
+    it.each([
+      ['AI participating parent', 'openai', 's1', true, 1],
+      ['traditional provider', 'google', 's1', true, 0],
+      ['history disabled', 'openai', 's1', false, 0],
+      ['invalid session', 'openai', '', true, 0],
+    ])('%s registers only eligible parent candidates', async (_label, provider, sessionId, historyEnabled, expectedCount) => {
+      const { getAIConversationHistoryEnabledAsync } = await import('../../../shared/config/config.js');
+      getAIConversationHistoryEnabledAsync.mockResolvedValue(historyEnabled);
+      const message = {
+        messageId: `parent-${_label}`,
+        sessionId,
+        data: {
+          text: JSON.stringify([{ t: 'source', i: 'n1', b: 'g1' }]),
+          mode: 'select-element',
+          provider,
+          sessionId,
+          conversationParents: [{ parentId: 'g1', cleanSource: 'source' }],
+        },
+        context: 'select-element',
+      };
+      const mockRequest = { messageId: message.messageId, data: message.data, sessionId };
+      let candidatesDuringProcessing;
+      translationRequestTracker.createRequest.mockReturnValue(mockRequest);
+      service.modeCoordinator.processRequest.mockImplementation(async (_request, options) => {
+        candidatesDuringProcessing = options.executionContext.operation.snapshotParentCandidates();
+        return { success: true, translatedText: 'translated' };
+      });
+
+      await service.handleTranslationRequest(message);
+
+      expect(candidatesDuringProcessing).toHaveLength(expectedCount);
+    });
+
+    it('registers an eligible AI parent before operation processing without throwing', async () => {
+      const { getAIConversationHistoryEnabledAsync } = await import('../../../shared/config/config.js');
+      getAIConversationHistoryEnabledAsync.mockResolvedValue(true);
+      const message = {
+        messageId: 'parent-runtime',
+        data: {
+          text: JSON.stringify([{ t: 'source', i: 'n1', b: 'g1' }]),
+          mode: 'select-element',
+          provider: 'openai',
+          sessionId: 's1',
+          conversationParents: [{ parentId: 'g1', cleanSource: 'source' }],
+        },
+        context: 'select-element',
+      };
+      const mockRequest = { messageId: 'parent-runtime', data: message.data, sessionId: 's1' };
+      let candidatesDuringProcessing;
+      translationRequestTracker.createRequest.mockReturnValue(mockRequest);
+      service.modeCoordinator.processRequest.mockImplementation(async (_request, options) => {
+        candidatesDuringProcessing = options.executionContext.operation.snapshotParentCandidates();
+        return { success: true, translatedText: 'translated' };
+      });
+
+      await expect(service.handleTranslationRequest(message)).resolves.toMatchObject({ success: true });
+      expect(candidatesDuringProcessing).toEqual([
+        expect.objectContaining({ parentId: 'g1', sourceOrder: 0, cleanSource: 'source', state: 'STAGED' }),
+      ]);
+    });
     it('creates isolated result dispatchers for separate services', () => {
       const secondService = new UnifiedTranslationService();
 

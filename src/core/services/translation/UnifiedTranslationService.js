@@ -29,6 +29,8 @@ import {
 } from '@/features/translation/ir/TranslationOperation.js';
 import { createManifestView, createRequestUnitManifest } from '@/features/translation/ir/RequestUnitManifest.js';
 import { TerminalExecutionRouter } from '@/features/translation/ir/TerminalExecutionRouter.js';
+import { TranslationCallPurpose, isProviderType, registryIdToName, ProviderTypes } from '@/features/translation/providers/ProviderConstants.js';
+import { AIConversationHelper } from '@/features/translation/providers/utils/AIConversationHelper.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.TRANSLATION, 'UnifiedTranslationService');
 
@@ -180,6 +182,25 @@ export class UnifiedTranslationService {
 
       const requestUnitManifest = createRequestUnitManifest(data?.text);
       const operation = createTranslationOperation(messageId, requestUnitManifest);
+      const parentMetadata = Array.isArray(data?.conversationParents) ? data.conversationParents : [];
+      const providerName = registryIdToName(data?.provider);
+      const participates = await AIConversationHelper.getConversationParticipation({
+        callPurpose: TranslationCallPurpose.PRIMARY_TRANSLATION,
+        translateMode: data?.mode,
+        sessionId: request.sessionId,
+        isAIProvider: isProviderType(providerName, ProviderTypes.AI),
+      });
+      if (parentMetadata.length > 0 && participates) {
+        operation.registerParentCandidates(parentMetadata.map((parent, sourceOrder) => ({
+          ...parent,
+          sourceOrder,
+          sessionId: request.sessionId,
+          provider: providerName,
+          mode: data.mode,
+          callPurpose: TranslationCallPurpose.PRIMARY_TRANSLATION,
+          conversationParticipates: participates,
+        })));
+      }
       const executionContext = {
         operation,
         manifestView: createManifestView(requestUnitManifest),

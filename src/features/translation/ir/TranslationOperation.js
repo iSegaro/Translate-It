@@ -11,6 +11,69 @@ const SettlementState = Object.freeze({
 })
 const EMPTY_CANCELLED_UNIT_IDS = Object.freeze([])
 
+export const ParentCandidateState = Object.freeze({
+  PROVISIONAL: 'PROVISIONAL',
+  STAGED: 'STAGED',
+  RESULT_STAGED: 'RESULT_STAGED',
+  DISCARDED: 'DISCARDED',
+})
+
+/**
+ * Provisional semantic contribution owned by one TranslationOperation.
+ * Provider batches may locate it by parentId, but never own its lifecycle.
+ */
+function createParentCandidate(metadata) {
+  let source = null
+  let result = null
+  let state = ParentCandidateState.PROVISIONAL
+
+  const candidate = {
+    parentId: metadata.parentId,
+    sourceOrder: metadata.sourceOrder,
+    sessionId: metadata.sessionId,
+    provider: metadata.provider,
+    mode: metadata.mode,
+    conversationParticipates: true,
+    get state() { return state },
+    stageSource(value) {
+      if (state === ParentCandidateState.DISCARDED) return false
+      if (source !== null) return false
+      if (typeof value !== 'string') return false
+      source = value
+      if (result === null) state = ParentCandidateState.STAGED
+      return true
+    },
+    stageResult(value) {
+      if (state === ParentCandidateState.DISCARDED) return false
+      if (result !== null) return false
+      if (typeof value !== 'string') return false
+      result = value
+      state = ParentCandidateState.RESULT_STAGED
+      return true
+    },
+    discard() {
+      if (state === ParentCandidateState.DISCARDED) return false
+      state = ParentCandidateState.DISCARDED
+      return true
+    },
+    snapshot() {
+      return Object.freeze({
+        parentId: candidate.parentId,
+        sourceOrder: candidate.sourceOrder,
+        sessionId: candidate.sessionId,
+        provider: candidate.provider,
+        mode: candidate.mode,
+        conversationParticipates: candidate.conversationParticipates,
+        cleanSource: source,
+        cleanResult: result,
+        state,
+      })
+    },
+  }
+
+  return candidate
+}
+
 export const RecoveryFinalOutcome = Object.freeze({
   NONE: 'NONE',
   SUCCEEDED: 'SUCCEEDED',
@@ -125,6 +188,7 @@ function sanitizeCompletion(record = {}) {
 export function createTranslationOperation(messageId, manifest = null) {
   const diagnostics = []
   const completions = []
+  const parentCandidates = new Map()
   const manifestUnits = Array.isArray(manifest?.units) ? manifest.units : []
   let unitStates = null
   function getUnitStates() {
@@ -170,6 +234,33 @@ export function createTranslationOperation(messageId, manifest = null) {
       const stored = sanitizeCompletion(record)
       completions.push(stored)
       return stored
+    },
+    /** Creates one provisional candidate for one logical parent. */
+    createParentCandidate(metadata = {}) {
+      if (!metadata.conversationParticipates || metadata.parentId === undefined || metadata.parentId === null || parentCandidates.has(metadata.parentId)) return null
+      const candidate = createParentCandidate(metadata)
+      parentCandidates.set(metadata.parentId, candidate)
+      if (metadata.cleanSource !== undefined) candidate.stageSource(metadata.cleanSource)
+      return candidate
+    },
+    registerParentCandidates(metadataList = []) {
+      if (!Array.isArray(metadataList)) return 0
+      let created = 0
+      for (const metadata of metadataList) {
+        if (this.createParentCandidate(metadata)) created++
+      }
+      return created
+    },
+    /** Returns candidate associated with explicit logical parent identity. */
+    getParentCandidate(parentId) {
+      return parentCandidates.get(parentId) || null
+    },
+    snapshotParentCandidates() {
+      return Object.freeze([...parentCandidates.values()].map(candidate => candidate.snapshot()))
+    },
+    discardParentCandidates() {
+      for (const candidate of parentCandidates.values()) candidate.discard()
+      parentCandidates.clear()
     },
     snapshotCompletions() {
       return Object.freeze([...completions])
@@ -229,6 +320,8 @@ export function createTranslationOperation(messageId, manifest = null) {
     finalize() {
       if (report) return report
       finalized = true
+      for (const candidate of parentCandidates.values()) candidate.discard()
+      parentCandidates.clear()
       if (droppedDiagnostics > 0) {
         diagnostics.push(sanitizeDiagnostic(messageId, {
           type: 'DIAGNOSTICS_TRUNCATED',

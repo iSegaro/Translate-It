@@ -58,10 +58,11 @@ export const AIConversationHelper = {
    * Resolves one conversation participation decision for current semantic call.
    * The result governs both history reads and normal history writes.
    */
-  async getConversationParticipation({ callPurpose, translateMode, sessionId } = {}) {
+  async getConversationParticipation({ callPurpose, translateMode, sessionId, isAIProvider = true } = {}) {
     if (callPurpose !== TranslationCallPurpose.PRIMARY_TRANSLATION) return false;
     if (translateMode !== TranslationMode.Select_Element) return false;
     if (typeof sessionId !== 'string' || sessionId.length === 0) return false;
+    if (!isAIProvider) return false;
     return getAIConversationHistoryEnabledAsync();
   },
 

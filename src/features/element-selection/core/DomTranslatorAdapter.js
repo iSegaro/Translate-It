@@ -251,6 +251,17 @@ export class DomTranslatorAdapter extends ResourceTracker {
 
       const nodeMap = new Map();
       textNodesData.forEach(data => nodeMap.set(data.uid, data));
+      const conversationParents = isBlockGroupingEnabled
+        ? groups.map(group => ({
+            parentId: group.blockId,
+            cleanSource: group.isV2Passthrough
+              ? group.text || ''
+              : group.units.map(unit => `${unit.leadingWS || ''}${unit.text}${unit.trailingWS || ''}`).join(''),
+          }))
+        : textNodesData.map(data => ({
+            parentId: data.blockId || data.uid,
+            cleanSource: data.text || '',
+          }));
 
       // Context
       const contextMetadata = extractContextMetadata(element);
@@ -441,6 +452,7 @@ export class DomTranslatorAdapter extends ResourceTracker {
           contextSummary: contextSummary,
           options: { rawJsonPayload: true, enableDictionary: false, smartContext: isAIContextEnabled },
           sessionId: this.currentSessionId,
+          conversationParents,
         },
         context: MessageContexts.SELECT_ELEMENT,
       });
