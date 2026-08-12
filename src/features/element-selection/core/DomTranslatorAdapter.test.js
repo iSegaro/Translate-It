@@ -66,6 +66,8 @@ const errorHandlerMock = ErrorHandler.getInstance();
 vi.mock('@/utils/dom/DomDirectionManager.js', () => ({
   detectDirectionFromContent: vi.fn(() => 'rtl'),
   applyNodeDirection: vi.fn(),
+  captureNodeDirectionState: vi.fn(() => []),
+  restoreNodeDirectionState: vi.fn(() => []),
   applyElementDirection: vi.fn(),
   BIDI_MARKS: { RLM: '\u200f', LRM: '\u200e' }
 }));
@@ -96,7 +98,9 @@ import {
 
 vi.mock('@/features/shared/hover-preview/HoverPreviewLookup.js', () => ({
   hoverPreviewLookup: {
-    add: vi.fn()
+    add: vi.fn(),
+    get: vi.fn(),
+    delete: vi.fn()
   }
 }));
 
@@ -1179,8 +1183,9 @@ describe('DomTranslatorAdapter', () => {
 
     it('should throw error if direct response handling fails', async () => {
       // Mock error during node application
+      const mutationError = new Error('Apply failed');
       vi.spyOn(adapter, '_applyTranslationToNode').mockImplementation(() => {
-        throw new Error('Apply failed');
+        throw mutationError;
       });
 
       contentScriptIntegration.sendTranslationRequest.mockResolvedValue({
@@ -1189,7 +1194,262 @@ describe('DomTranslatorAdapter', () => {
         translatedText: JSON.stringify([{ t: 'Test', i: 'n1' }])
       });
 
+      await expect(adapter.translateElement(testElement)).rejects.toBe(mutationError);
+    });
+
+    it('rolls back earlier direct unit writes when a later unit fails', async () => {
+      const first = document.createTextNode('A');
+      const second = document.createTextNode('B');
+      testElement.replaceChildren(first, second);
+      const { collectTextNodes } = await import('./DomTranslatorUtils.js');
+      collectTextNodes.mockReturnValueOnce([
+        { node: first, text: 'A', uid: 'n1', blockId: 'b1', role: 'div' },
+        { node: second, text: 'B', uid: 'n2', blockId: 'b1', role: 'div' }
+      ]);
+      const apply = vi.spyOn(adapter, '_applyTranslationToNode');
+      apply.mockImplementationOnce((...args) => DomTranslatorAdapter.prototype._applyTranslationToNode.call(adapter, ...args));
+      apply.mockImplementationOnce(() => { throw new Error('second write failed'); });
+      contentScriptIntegration.sendTranslationRequest.mockResolvedValueOnce({
+        success: true,
+        streaming: false,
+        translatedText: [{ t: 'Uno', i: 'n1' }, { t: 'Dos', i: 'n2' }]
+      });
+
+      await expect(adapter.translateElement(testElement)).rejects.toThrow('second write failed');
+      expect(first.nodeValue).toBe('A');
+      expect(second.nodeValue).toBe('B');
+      expect(sendRegularMessage).not.toHaveBeenCalledWith(expect.objectContaining({
+        data: expect.objectContaining({ accepted: true })
+      }), expect.anything());
+      apply.mockRestore();
+    });
+
+    it('preserves primitive mutation failures after rollback', async () => {
+      const first = document.createTextNode('A');
+      const second = document.createTextNode('B');
+      testElement.replaceChildren(first, second);
+      const { collectTextNodes } = await import('./DomTranslatorUtils.js');
+      collectTextNodes.mockReturnValueOnce([
+        { node: first, text: 'A', uid: 'n1', blockId: 'b1', role: 'div' },
+        { node: second, text: 'B', uid: 'n2', blockId: 'b1', role: 'div' }
+      ]);
+      const apply = vi.spyOn(adapter, '_applyTranslationToNode');
+      apply.mockImplementationOnce((...args) => DomTranslatorAdapter.prototype._applyTranslationToNode.call(adapter, ...args));
+      apply.mockImplementationOnce(() => { throw 'mutation-failure'; });
+      contentScriptIntegration.sendTranslationRequest.mockResolvedValueOnce({
+        success: true,
+        streaming: false,
+        translatedText: [{ t: 'Uno', i: 'n1' }, { t: 'Dos', i: 'n2' }]
+      });
+
+      await expect(adapter.translateElement(testElement)).rejects.toBe('mutation-failure');
+      expect(first.nodeValue).toBe('A');
+      expect(second.nodeValue).toBe('B');
+      expect(sendRegularMessage).not.toHaveBeenCalledWith(expect.objectContaining({
+        data: expect.objectContaining({ parentId: 'b1', accepted: true })
+      }), { silent: true });
+      apply.mockRestore();
+    });
+
+    it('preserves streaming mutation failures after rollback', async () => {
+      const first = document.createTextNode('A');
+      const second = document.createTextNode('B');
+      testElement.replaceChildren(first, second);
+      const { collectTextNodes } = await import('./DomTranslatorUtils.js');
+      collectTextNodes.mockReturnValueOnce([
+        { node: first, text: 'A', uid: 'n1', blockId: 'b1', role: 'div' },
+        { node: second, text: 'B', uid: 'n2', blockId: 'b1', role: 'div' }
+      ]);
+      let callbacks;
+      registerTranslation.mockImplementationOnce((_id, registered) => { callbacks = registered; });
+      contentScriptIntegration.sendTranslationRequest.mockResolvedValueOnce({ success: true, streaming: true });
+      const apply = vi.spyOn(adapter, '_applyTranslationToNode');
+      apply.mockImplementationOnce((...args) => DomTranslatorAdapter.prototype._applyTranslationToNode.call(adapter, ...args));
+      apply.mockImplementationOnce(() => { throw 'stream-mutation-failure'; });
+
+      const translation = adapter.translateElement(testElement);
+      await vi.waitFor(() => expect(callbacks).toBeDefined());
+      callbacks.onStreamUpdate({ success: true, data: [{ t: 'Uno', i: 'n1' }, { t: 'Dos', i: 'n2' }] });
+
+      await expect(translation).rejects.toBe('stream-mutation-failure');
+      expect(first.nodeValue).toBe('A');
+      expect(second.nodeValue).toBe('B');
+      expect(sendRegularMessage).not.toHaveBeenCalledWith(expect.objectContaining({
+        data: expect.objectContaining({ parentId: 'b1', accepted: true })
+      }), { silent: true });
+      apply.mockRestore();
+    });
+
+    it('does not leak streaming mutation classification to the next request', async () => {
+      let callbacks;
+      registerTranslation.mockImplementationOnce((_id, registered) => { callbacks = registered; });
+      contentScriptIntegration.sendTranslationRequest.mockResolvedValueOnce({ success: true, streaming: true });
+      const apply = vi.spyOn(adapter, '_applyTranslationToNode').mockImplementationOnce(() => { throw 'stream failure'; });
+
+      const firstTranslation = adapter.translateElement(testElement);
+      await vi.waitFor(() => expect(callbacks).toBeDefined());
+      callbacks.onStreamUpdate({ success: true, data: [{ t: 'Uno', i: 'n1' }] });
+      await expect(firstTranslation).rejects.toBe('stream failure');
+
+      apply.mockRestore();
+      contentScriptIntegration.sendTranslationRequest.mockResolvedValueOnce({
+        success: true,
+        streaming: false,
+        translatedText: [{ t: 'Uno', i: 'n1' }]
+      });
+      vi.spyOn(adapter, '_getResultIdentity').mockImplementationOnce(() => { throw new Error('ordinary parse failure'); });
+
       await expect(adapter.translateElement(testElement)).rejects.toThrow('Invalid translation format');
+    });
+
+    it('restores shared parent marker after direct rollback', async () => {
+      const first = document.createTextNode('A');
+      const second = document.createTextNode('B');
+      testElement.replaceChildren(first, second);
+      const { collectTextNodes } = await import('./DomTranslatorUtils.js');
+      collectTextNodes.mockReturnValueOnce([
+        { node: first, text: 'A', uid: 'n1', blockId: 'b1', role: 'div' },
+        { node: second, text: 'B', uid: 'n2', blockId: 'b1', role: 'div' }
+      ]);
+      vi.spyOn(adapter, '_applyTranslationToNode')
+        .mockImplementationOnce((...args) => DomTranslatorAdapter.prototype._applyTranslationToNode.call(adapter, ...args))
+        .mockImplementationOnce(() => { throw new Error('marker failure'); });
+      contentScriptIntegration.sendTranslationRequest.mockResolvedValueOnce({
+        success: true,
+        streaming: false,
+        translatedText: [{ t: 'Uno', i: 'n1' }, { t: 'Dos', i: 'n2' }]
+      });
+
+      await expect(adapter.translateElement(testElement)).rejects.toThrow('marker failure');
+      expect(testElement.hasAttribute('data-has-original')).toBe(false);
+    });
+
+    it('preserves existing shared parent marker after direct rollback', async () => {
+      testElement.setAttribute('data-has-original', 'custom');
+      const first = document.createTextNode('A');
+      const second = document.createTextNode('B');
+      testElement.replaceChildren(first, second);
+      const { collectTextNodes } = await import('./DomTranslatorUtils.js');
+      collectTextNodes.mockReturnValueOnce([
+        { node: first, text: 'A', uid: 'n1', blockId: 'b1', role: 'div' },
+        { node: second, text: 'B', uid: 'n2', blockId: 'b1', role: 'div' }
+      ]);
+      vi.spyOn(adapter, '_applyTranslationToNode')
+        .mockImplementationOnce((...args) => DomTranslatorAdapter.prototype._applyTranslationToNode.call(adapter, ...args))
+        .mockImplementationOnce(() => { throw new Error('existing marker failure'); });
+      contentScriptIntegration.sendTranslationRequest.mockResolvedValueOnce({
+        success: true,
+        streaming: false,
+        translatedText: [{ t: 'Uno', i: 'n1' }, { t: 'Dos', i: 'n2' }]
+      });
+
+      await expect(adapter.translateElement(testElement)).rejects.toThrow('existing marker failure');
+      expect(testElement.getAttribute('data-has-original')).toBe('custom');
+    });
+
+    it('restores text when direction mutation fails after an earlier parent was accepted', async () => {
+      const first = document.createTextNode('A');
+      const second = document.createTextNode('B');
+      testElement.replaceChildren(first, second);
+      const { collectTextNodes } = await import('./DomTranslatorUtils.js');
+      collectTextNodes.mockReturnValueOnce([
+        { node: first, text: 'A', uid: 'n1', blockId: 'b1', role: 'div' },
+        { node: second, text: 'B', uid: 'n2', blockId: 'b2', role: 'div' }
+      ]);
+      const { applyNodeDirection } = await import('@/utils/dom/DomDirectionManager.js');
+      applyNodeDirection
+        .mockImplementationOnce(() => {})
+        .mockImplementationOnce(() => { throw new Error('direction failed'); });
+      contentScriptIntegration.sendTranslationRequest.mockResolvedValueOnce({
+        success: true,
+        streaming: false,
+        translatedText: [{ t: 'Uno', i: 'n1' }, { t: 'Dos', i: 'n2' }]
+      });
+
+      await expect(adapter.translateElement(testElement)).rejects.toThrow('direction failed');
+      expect(first.nodeValue).toContain('Uno');
+      expect(second.nodeValue).toBe('B');
+      expect(sendRegularMessage.mock.calls.filter(([message]) => message.data?.accepted === true)
+        .map(([message]) => message.data.parentId)).toEqual(['b1']);
+    });
+
+    it('restores all units when direction mutation fails within one parent', async () => {
+      const first = document.createTextNode('A');
+      const second = document.createTextNode('B');
+      testElement.replaceChildren(first, second);
+      const { collectTextNodes } = await import('./DomTranslatorUtils.js');
+      collectTextNodes.mockReturnValueOnce([
+        { node: first, text: 'A', uid: 'n1', blockId: 'b1', role: 'div' },
+        { node: second, text: 'B', uid: 'n2', blockId: 'b1', role: 'div' }
+      ]);
+      const { applyNodeDirection, restoreNodeDirectionState } = await import('@/utils/dom/DomDirectionManager.js');
+      applyNodeDirection
+        .mockImplementationOnce(() => {})
+        .mockImplementationOnce(() => { throw new Error('same parent direction failed'); });
+      contentScriptIntegration.sendTranslationRequest.mockResolvedValueOnce({
+        success: true,
+        streaming: false,
+        translatedText: [{ t: 'Uno', i: 'n1' }, { t: 'Dos', i: 'n2' }]
+      });
+
+      await expect(adapter.translateElement(testElement)).rejects.toThrow('same parent direction failed');
+      expect(first.nodeValue).toBe('A');
+      expect(second.nodeValue).toBe('B');
+      expect(restoreNodeDirectionState).toHaveBeenCalled();
+      expect(sendRegularMessage).not.toHaveBeenCalledWith(expect.objectContaining({
+        data: expect.objectContaining({ parentId: 'b1', accepted: true })
+      }), { silent: true });
+    });
+
+    it('logs direction rollback failures while preserving mutation error', async () => {
+      const { collectTextNodes } = await import('./DomTranslatorUtils.js');
+      collectTextNodes.mockReturnValueOnce([
+        { node: testElement.firstChild, text: 'Hello', uid: 'n1', blockId: 'b1', role: 'div' }
+      ]);
+      const { applyNodeDirection, restoreNodeDirectionState } = await import('@/utils/dom/DomDirectionManager.js');
+      applyNodeDirection.mockImplementationOnce(() => { throw new Error('mutation error'); });
+      restoreNodeDirectionState.mockReturnValueOnce([
+        { kind: 'style', name: 'direction', error: new Error('rollback error') }
+      ]);
+      contentScriptIntegration.sendTranslationRequest.mockResolvedValueOnce({
+        success: true,
+        streaming: false,
+        translatedText: [{ t: 'Uno', i: 'n1' }]
+      });
+      const errorSpy = vi.spyOn(adapter.logger, 'error');
+
+      await expect(adapter.translateElement(testElement)).rejects.toThrow('mutation error');
+      expect(errorSpy).toHaveBeenCalledWith(
+        '[DomTranslatorAdapter] Direct direction rollback failed',
+        expect.objectContaining({ name: 'direction' })
+      );
+    });
+
+    it('removes transaction-only hover state after direct rollback', async () => {
+      const lookup = new Map();
+      hoverPreviewLookup.get.mockImplementation(node => lookup.get(node));
+      hoverPreviewLookup.add.mockImplementation((node, value) => lookup.set(node, value));
+      hoverPreviewLookup.delete.mockImplementation(node => lookup.delete(node));
+      const first = document.createTextNode('A');
+      const second = document.createTextNode('B');
+      testElement.replaceChildren(first, second);
+      const { collectTextNodes } = await import('./DomTranslatorUtils.js');
+      collectTextNodes.mockReturnValueOnce([
+        { node: first, text: 'A', uid: 'n1', blockId: 'b1', role: 'div' },
+        { node: second, text: 'B', uid: 'n2', blockId: 'b1', role: 'div' }
+      ]);
+      vi.spyOn(adapter, '_applyTranslationToNode')
+        .mockImplementationOnce((...args) => DomTranslatorAdapter.prototype._applyTranslationToNode.call(adapter, ...args))
+        .mockImplementationOnce(() => { throw new Error('hover rollback failure'); });
+      contentScriptIntegration.sendTranslationRequest.mockResolvedValueOnce({
+        success: true,
+        streaming: false,
+        translatedText: [{ t: 'Uno', i: 'n1' }, { t: 'Dos', i: 'n2' }]
+      });
+
+      await expect(adapter.translateElement(testElement)).rejects.toThrow('hover rollback failure');
+      expect(lookup.has(first)).toBe(false);
+      expect(lookup.has(second)).toBe(false);
     });
 
     it.each([

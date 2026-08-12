@@ -216,6 +216,88 @@ export function applyNodeDirection(textNode, targetLanguage, rootElement = null)
   }
 }
 
+const DIRECTION_STATE_ATTRIBUTES = [
+  'data-dir-original-saved',
+  'data-original-direction',
+  'data-original-text-align',
+  'data-original-unicode-bidi',
+  'data-original-max-width',
+  'data-original-dir',
+  'data-translate-dir',
+];
+
+const DIRECTION_STATE_STYLES = ['direction', 'unicode-bidi', 'max-width', 'text-align'];
+
+function captureElementDirectionState(element) {
+  return {
+    element,
+    attributes: Object.fromEntries(DIRECTION_STATE_ATTRIBUTES.map(name => [
+      name,
+      { present: element.hasAttribute(name), value: element.getAttribute(name) }
+    ])),
+    styles: Object.fromEntries(DIRECTION_STATE_STYLES.map(name => [
+      name,
+      { present: element.style.getPropertyValue(name) !== '', value: element.style.getPropertyValue(name), priority: element.style.getPropertyPriority(name) }
+    ])),
+  };
+}
+
+/**
+ * Captures exact direction state touched by applyNodeDirection without mutating DOM.
+ * @param {Node} textNode - Text node whose direction path will be applied
+ * @param {HTMLElement|null} rootElement - Optional traversal boundary
+ * @returns {Object[]} Deduplicated element snapshots
+ */
+export function captureNodeDirectionState(textNode, rootElement = null) {
+  const snapshots = [];
+  const seen = new Set();
+  let container = textNode?.parentElement;
+  let level = 0;
+
+  while (container && container !== document.body && container !== document.documentElement) {
+    if (level > 0 && isLayoutBarrier(container)) break;
+    if (!seen.has(container)) {
+      snapshots.push(captureElementDirectionState(container));
+      seen.add(container);
+    }
+    if (rootElement && container === rootElement) break;
+    if (rootElement && !rootElement.contains(container)) break;
+    container = container.parentElement;
+    level++;
+  }
+
+  return snapshots;
+}
+
+/**
+ * Restores exact state captured by captureNodeDirectionState.
+ * @param {Object[]} snapshots - Direction element snapshots
+ */
+export function restoreNodeDirectionState(snapshots = []) {
+  const failures = [];
+  for (const snapshot of [...snapshots].reverse()) {
+    const { element } = snapshot;
+    if (!element) continue;
+    for (const [name, state] of Object.entries(snapshot.styles)) {
+      try {
+        if (state.present) element.style.setProperty(name, state.value, state.priority);
+        else element.style.removeProperty(name);
+      } catch (error) {
+        failures.push({ element, kind: 'style', name, error });
+      }
+    }
+    for (const [name, state] of Object.entries(snapshot.attributes)) {
+      try {
+        if (state.present) element.setAttribute(name, state.value);
+        else element.removeAttribute(name);
+      } catch (error) {
+        failures.push({ element, kind: 'attribute', name, error });
+      }
+    }
+  }
+  return failures;
+}
+
 /**
  * Direct Application: For high-level element management.
  */

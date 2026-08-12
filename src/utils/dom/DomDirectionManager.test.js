@@ -4,7 +4,9 @@ import {
   stripBiDiMarks, 
   applyNodeDirection, 
   applyElementDirection,
-  restoreElementDirection
+  restoreElementDirection,
+  captureNodeDirectionState,
+  restoreNodeDirectionState
 } from './DomDirectionManager.js';
 import { LanguageDetectionService } from '@/shared/services/LanguageDetectionService.js';
 
@@ -105,6 +107,64 @@ describe('DomDirectionManager', () => {
   });
 
   describe('Restoration', () => {
+    it('captures and restores exact node direction state', () => {
+      const div = document.createElement('div');
+      const span = document.createElement('span');
+      const text = document.createTextNode('Original');
+      span.appendChild(text);
+      div.appendChild(span);
+      div.style.direction = 'ltr';
+      div.setAttribute('data-translate-dir', 'ltr');
+      document.body.appendChild(div);
+
+      const snapshot = captureNodeDirectionState(text, div);
+      div.style.direction = 'rtl';
+      div.style.unicodeBidi = 'isolate';
+      div.setAttribute('data-translate-dir', 'rtl');
+
+      restoreNodeDirectionState(snapshot);
+
+      expect(div.style.direction).toBe('ltr');
+      expect(div.style.unicodeBidi).toBe('');
+      expect(div.getAttribute('data-translate-dir')).toBe('ltr');
+    });
+
+    it('restores previously absent direction state as absent', () => {
+      const div = document.createElement('div');
+      const text = document.createTextNode('Original');
+      div.appendChild(text);
+      document.body.appendChild(div);
+
+      const snapshot = captureNodeDirectionState(text, div);
+      div.style.direction = 'rtl';
+      div.setAttribute('data-translate-dir', 'rtl');
+
+      restoreNodeDirectionState(snapshot);
+
+      expect(div.style.direction).toBe('');
+      expect(div.hasAttribute('data-translate-dir')).toBe(false);
+    });
+
+    it('continues restoring later snapshots when one restore operation fails', () => {
+      const first = document.createElement('div');
+      const second = document.createElement('div');
+      document.body.append(first, second);
+      first.setAttribute('data-translate-dir', 'ltr');
+      const firstSnapshot = captureNodeDirectionState(first.appendChild(document.createTextNode('A')), first);
+      const secondSnapshot = captureNodeDirectionState(second.appendChild(document.createTextNode('B')), second);
+      const originalSetAttribute = first.setAttribute.bind(first);
+      vi.spyOn(first, 'setAttribute').mockImplementation((name, value) => {
+        if (name === 'data-translate-dir') throw new Error('first restore failed');
+        return originalSetAttribute(name, value);
+      });
+
+      const failures = restoreNodeDirectionState([...secondSnapshot, ...firstSnapshot]);
+
+      expect(failures).toHaveLength(1);
+      expect(failures[0].name).toBe('data-translate-dir');
+      expect(second.hasAttribute('data-translate-dir')).toBe(false);
+    });
+
     it('should perfectly restore original styles', () => {
       const div = document.createElement('div');
       // Use classes or defaults instead of inline if we want to test automatic alignment change

@@ -54,6 +54,12 @@ export { getSelectElementTranslationState, revertSelectElementTranslation } from
 // Strategy X - Subtree Exclusion Active Set
 const activeTranslationRoots = new Set();
 
+class DirectMutationFailure {
+  constructor(cause) {
+    this.cause = cause;
+  }
+}
+
 /**
  * Specialized adapter that coordinates between background services and visual DOM management.
  * Designed for low-latency, high-precision translation of specific DOM branches.
@@ -315,6 +321,29 @@ export class DomTranslatorAdapter extends ResourceTracker {
           plan.push({ nodeData, translatedText: pending.translatedText });
         }
 
+        const mutationSnapshot = {
+          nodes: plan.map(({ nodeData }) => ({ node: nodeData.node, value: nodeData.node.nodeValue })),
+          attributeParents: new Map(),
+          directionSnapshots: [],
+          hoverNodes: plan.map(({ nodeData }) => ({ node: nodeData.node, value: hoverPreviewLookup.get(nodeData.node) })),
+        };
+        const directionElements = new Set();
+        for (const { nodeData } of plan) {
+          const parentElement = nodeData.node.parentElement;
+          if (parentElement && !mutationSnapshot.attributeParents.has(parentElement)) {
+            mutationSnapshot.attributeParents.set(parentElement, {
+              present: parentElement.hasAttribute(PAGE_TRANSLATION_ATTRIBUTES.HAS_ORIGINAL),
+              value: parentElement.getAttribute(PAGE_TRANSLATION_ATTRIBUTES.HAS_ORIGINAL),
+            });
+          }
+          for (const snapshot of DirectionManager.captureNodeDirectionState(nodeData.node, element)) {
+            if (!directionElements.has(snapshot.element)) {
+              directionElements.add(snapshot.element);
+              mutationSnapshot.directionSnapshots.push(snapshot);
+            }
+          }
+        }
+
         try {
           for (const { nodeData, translatedText } of plan) {
             this._applyTranslationToNode(nodeData.node, translatedText, targetLanguage, element);
@@ -331,7 +360,36 @@ export class DomTranslatorAdapter extends ResourceTracker {
           }
         } catch (error) {
           parent.invalid = true;
-          throw error;
+          parent.applied = false;
+          parent.acknowledged = false;
+          for (const { node, value } of [...mutationSnapshot.nodes].reverse()) {
+            try {
+              if (node) node.nodeValue = value;
+            } catch (rollbackError) {
+              this.logger.error('[DomTranslatorAdapter] Direct text rollback failed', { error: rollbackError });
+            }
+          }
+          for (const [parentElement, state] of mutationSnapshot.attributeParents) {
+            try {
+              if (state.present) parentElement.setAttribute(PAGE_TRANSLATION_ATTRIBUTES.HAS_ORIGINAL, state.value);
+              else parentElement.removeAttribute(PAGE_TRANSLATION_ATTRIBUTES.HAS_ORIGINAL);
+            } catch (rollbackError) {
+              this.logger.error('[DomTranslatorAdapter] Direct attribute rollback failed', { error: rollbackError });
+            }
+          }
+          const directionFailures = DirectionManager.restoreNodeDirectionState(mutationSnapshot.directionSnapshots) || [];
+          for (const failure of directionFailures) {
+            this.logger.error('[DomTranslatorAdapter] Direct direction rollback failed', failure);
+          }
+          for (const { node, value } of mutationSnapshot.hoverNodes) {
+            try {
+              if (value === undefined) hoverPreviewLookup.delete(node);
+              else hoverPreviewLookup.add(node, value);
+            } catch (rollbackError) {
+              this.logger.error('[DomTranslatorAdapter] Direct hover rollback failed', { error: rollbackError });
+            }
+          }
+          throw new DirectMutationFailure(error);
         }
       };
 
@@ -688,17 +746,18 @@ export class DomTranslatorAdapter extends ResourceTracker {
       return finalResult;
 
     } catch (error) {
+      const originalError = error instanceof DirectMutationFailure ? error.cause : error;
       this.isTranslating = false; 
 
-      const type = matchErrorToType(error);
+      const type = matchErrorToType(originalError);
       const isCancellation = type === ErrorTypes.USER_CANCELLED || type === ErrorTypes.TRANSLATION_CANCELLED;
 
       if (!isCancellation) {
-        this.logger.debug('Translation error in DomTranslatorAdapter:', error.message || error);
+        this.logger.debug('Translation error in DomTranslatorAdapter:', originalError?.message || originalError);
       }
 
-      if (onError) await onError({ status: TRANSLATION_STATUS.ERROR, error });
-      throw error;
+      if (onError) await onError({ status: TRANSLATION_STATUS.ERROR, error: originalError });
+      throw originalError;
     } finally {
       activeTranslationRoots.delete(element);
       this._cleanupCurrentSession(true, translationToken);
@@ -985,6 +1044,7 @@ export class DomTranslatorAdapter extends ResourceTracker {
         || err?.statusCode
         || err?.isCancelled
         || err?.name === 'AbortError'
+        || err instanceof DirectMutationFailure
         || errorType === ErrorTypes.USER_CANCELLED
         || errorType === ErrorTypes.TRANSLATION_CANCELLED
         || errorType === ErrorTypes.TRANSLATION_TIMEOUT
