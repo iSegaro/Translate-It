@@ -92,6 +92,8 @@ export class ConversationAcceptanceHandle {
       state: this.#state,
       messageId: this.#handoff.messageId,
       sessionId: this.#handoff.sessionId,
+      provider: this.#handoff.provider,
+      mode: this.#handoff.mode,
       parents: Object.freeze([...this.#parents.values()].map(parentSnapshot)),
     })
   }

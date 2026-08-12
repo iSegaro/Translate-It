@@ -62,6 +62,17 @@ class TranslationSessionManager {
     }
   }
 
+  commitAcceptedParent({ sessionId, provider, cleanSource, cleanResult } = {}) {
+    if (typeof sessionId !== 'string' || typeof cleanSource !== 'string' || typeof cleanResult !== 'string') {
+      throw new TypeError('commitAcceptedParent requires valid session and content')
+    }
+    const session = this.getOrCreateSession(sessionId, provider || 'Unknown')
+    this.addMessage(sessionId, 'user', cleanSource)
+    this.addMessage(sessionId, 'assistant', cleanResult)
+    session.batchCount++
+    return true
+  }
+
   /**
    * Get logical turn number and increment it.
    * Ensures the session exists before incrementing.

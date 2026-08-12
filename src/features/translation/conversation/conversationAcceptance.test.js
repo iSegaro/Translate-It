@@ -136,4 +136,44 @@ describe('ConversationAcceptanceCoordinator', () => {
     expect(coordinator.lookup('m1')).toBeNull()
     expect(coordinator.remove('m1')).toBe(false)
   })
+
+  it('commits accepted parents in source order and cleans up after terminal parents', async () => {
+    const coordinator = new ConversationAcceptanceCoordinator()
+    const handle = new ConversationAcceptanceHandle(new ConversationAcceptanceHandoff({
+      messageId: 'ordered', sessionId: 'ordered-session', provider: 'OpenAI', mode: 'select-element',
+      parents: [
+        { parentId: 'g2', sourceOrder: 1, cleanSource: 'B' },
+        { parentId: 'g1', sourceOrder: 0, cleanSource: 'A' },
+      ],
+    }))
+    const { translationSessionManager } = await import('@/features/translation/core/TranslationSessionManager.js')
+    translationSessionManager.sessions.clear()
+    translationSessionManager.getOrCreateSession('ordered-session', 'OpenAI')
+    coordinator.register('ordered', handle)
+
+    await expect(coordinator.acknowledge('ordered', 'g2', true, 'b')).resolves.toMatchObject({ committed: [] })
+    await expect(coordinator.acknowledge('ordered', 'g1', true, 'a')).resolves.toMatchObject({ committed: ['g1', 'g2'] })
+    expect(handle.snapshot().parents.map(parent => parent.state)).toEqual(['COMMITTED', 'COMMITTED'])
+    expect(translationSessionManager.sessions.get('ordered-session').history.map(item => item.content)).toEqual(['A', 'a', 'B', 'b'])
+    expect(coordinator.lookup('ordered')).toBeNull()
+  })
+
+  it('skips rejected parent and does not continue after commit failure', async () => {
+    const coordinator = new ConversationAcceptanceCoordinator()
+    const handle = new ConversationAcceptanceHandle(new ConversationAcceptanceHandoff({
+      messageId: 'partial', sessionId: 'partial-session', provider: 'OpenAI', mode: 'select-element',
+      parents: [
+        { parentId: 'g1', sourceOrder: 0, cleanSource: 'A' },
+        { parentId: 'g2', sourceOrder: 1, cleanSource: 'B' },
+      ],
+    }))
+    const { translationSessionManager } = await import('@/features/translation/core/TranslationSessionManager.js')
+    translationSessionManager.sessions.clear()
+    translationSessionManager.getOrCreateSession('partial-session', 'OpenAI')
+    coordinator.register('partial', handle)
+
+    await coordinator.acknowledge('partial', 'g1', false)
+    expect(await coordinator.acknowledge('partial', 'g2', true, 'b')).toMatchObject({ committed: ['g2'] })
+    expect(translationSessionManager.sessions.get('partial-session').history).toHaveLength(2)
+  })
 })

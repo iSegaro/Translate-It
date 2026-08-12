@@ -6,14 +6,17 @@ const logger = getScopedLogger(LOG_COMPONENTS.TRANSLATION, 'handleParentAcceptan
 
 export async function handleParentAcceptanceAck(message) {
   const data = message.data || {};
-  const handle = unifiedTranslationService.conversationAcceptanceCoordinator.lookup(message.messageId);
-  if (!handle) {
+  const coordinator = unifiedTranslationService.conversationAcceptanceCoordinator;
+  if (!coordinator.lookup(message.messageId)) {
     logger.debug(`Ignoring parent acceptance ACK for unknown message: ${message.messageId}`);
     return { acknowledged: false, status: 'STALE' };
   }
 
-  const status = data.accepted === false
-    ? handle.rejectParent(data.parentId)
-    : handle.acceptParent(data.parentId, data.cleanResult);
-  return { acknowledged: status !== 'UNKNOWN_PARENT' && status !== 'STALE', status };
+  const { status, committed } = await coordinator.acknowledge(
+    message.messageId,
+    data.parentId,
+    data.accepted,
+    data.cleanResult,
+  );
+  return { acknowledged: status !== 'UNKNOWN_PARENT' && status !== 'STALE', status, committed };
 }
