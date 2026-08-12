@@ -170,6 +170,86 @@ describe('DomTranslatorAdapter', () => {
       );
     });
 
+    it('should create one conversation parent and ACK once for shared blockId units', async () => {
+      const first = document.createTextNode('A');
+      const second = document.createTextNode('B');
+      testElement.replaceChildren(first, second);
+      const { collectTextNodes } = await import('./DomTranslatorUtils.js');
+      collectTextNodes.mockReturnValueOnce([
+        { node: first, text: 'A', uid: 'n1', blockId: 'b1', role: 'div' },
+        { node: second, text: 'B', uid: 'n2', blockId: 'b1', role: 'div' }
+      ]);
+
+      let streamCallbacks;
+      registerTranslation.mockImplementationOnce((_id, callbacks) => { streamCallbacks = callbacks; });
+      contentScriptIntegration.sendTranslationRequest.mockResolvedValueOnce({ success: true, streaming: true });
+
+      const translation = adapter.translateElement(testElement);
+      await vi.waitFor(() => expect(streamCallbacks).toBeDefined());
+      const request = contentScriptIntegration.sendTranslationRequest.mock.calls[0][0];
+      expect(request.data.conversationParents).toEqual([{ parentId: 'b1', cleanSource: 'AB' }]);
+
+      streamCallbacks.onStreamUpdate({ success: true, data: [{ t: 'Uno', i: 'n1' }] });
+      expect(sendRegularMessage).not.toHaveBeenCalledWith(expect.objectContaining({
+        data: expect.objectContaining({ parentId: 'b1', accepted: true })
+      }), { silent: true });
+      streamCallbacks.onStreamUpdate({ success: true, data: [{ t: 'Dos', i: 'n2' }] });
+      streamCallbacks.onStreamEnd({ success: true });
+      await translation;
+
+      const accepted = sendRegularMessage.mock.calls.filter(([message, options]) => (
+        options?.silent === true && message?.data?.parentId === 'b1' && message?.data?.accepted === true
+      ));
+      expect(accepted).toHaveLength(1);
+    });
+
+    it('should order unique conversation parents by earliest source unit', async () => {
+      const nodes = ['A', 'B', 'C'].map(text => document.createTextNode(text));
+      testElement.replaceChildren(...nodes);
+      const { collectTextNodes } = await import('./DomTranslatorUtils.js');
+      collectTextNodes.mockReturnValueOnce([
+        { node: nodes[0], text: 'A', uid: 'n1', blockId: 'b1', role: 'div' },
+        { node: nodes[1], text: 'B', uid: 'n2', blockId: 'b1', role: 'div' },
+        { node: nodes[2], text: 'C', uid: 'n3', blockId: 'b2', role: 'div' }
+      ]);
+      contentScriptIntegration.sendTranslationRequest.mockResolvedValueOnce({ success: true, streaming: false, translatedText: 'invalid' });
+
+      await adapter.translateElement(testElement);
+
+      const request = contentScriptIntegration.sendTranslationRequest.mock.calls[0][0];
+      expect(request.data.conversationParents).toEqual([
+        { parentId: 'b1', cleanSource: 'AB' },
+        { parentId: 'b2', cleanSource: 'C' }
+      ]);
+    });
+
+    it('should ACK complete independent direct parents separately', async () => {
+      const first = document.createTextNode('A');
+      const second = document.createTextNode('B');
+      testElement.replaceChildren(first, second);
+      const { collectTextNodes } = await import('./DomTranslatorUtils.js');
+      collectTextNodes.mockReturnValueOnce([
+        { node: first, text: 'A', uid: 'n1', blockId: 'b1', role: 'div' },
+        { node: second, text: 'B', uid: 'n2', blockId: 'b2', role: 'div' }
+      ]);
+
+      let streamCallbacks;
+      registerTranslation.mockImplementationOnce((_id, callbacks) => { streamCallbacks = callbacks; });
+      contentScriptIntegration.sendTranslationRequest.mockResolvedValueOnce({ success: true, streaming: true });
+
+      const translation = adapter.translateElement(testElement);
+      await vi.waitFor(() => expect(streamCallbacks).toBeDefined());
+      streamCallbacks.onStreamUpdate({ success: true, data: [{ t: 'Uno', i: 'n1' }] });
+      streamCallbacks.onStreamUpdate({ success: true, data: [{ t: 'Dos', i: 'n2' }] });
+      streamCallbacks.onStreamEnd({ success: true });
+      await translation;
+
+      const acceptedParents = sendRegularMessage.mock.calls
+        .filter(([message, options]) => options?.silent === true && message?.data?.accepted === true)
+        .map(([message]) => message.data.parentId);
+      expect(acceptedParents).toEqual(['b1', 'b2']);
+    });
+
     it('should fallback to V2 node-by-node extraction for traditional providers even if Block Grouping is globally enabled', async () => {
       const { getFeatureSemanticBlockGroupingAsync, getEffectiveProviderAsync } = await import('@/config.js');
       const { collectTextNodes, collectBlockGroups } = await import('./DomTranslatorUtils.js');
@@ -292,7 +372,7 @@ describe('DomTranslatorAdapter', () => {
       }), { silent: true });
     });
 
-    it('should not guess parent identity from uid when blockId is missing', async () => {
+    it('should not ACK a parent when blockId is missing', async () => {
       const { collectTextNodes } = await import('./DomTranslatorUtils.js');
       collectTextNodes.mockReturnValueOnce([
         { node: testElement.firstChild, text: 'Hello', uid: 'node-only', role: 'div' }
@@ -306,13 +386,8 @@ describe('DomTranslatorAdapter', () => {
       await adapter.translateElement(testElement);
 
       expect(sendRegularMessage).not.toHaveBeenCalledWith(expect.objectContaining({
-        action: expect.anything(),
         data: expect.objectContaining({ parentId: 'node-only' })
-      }), expect.anything());
-      expect(adapter.logger.error).toHaveBeenCalledWith(
-        '[DomTranslatorAdapter] Missing canonical blockId for parent acceptance ACK',
-        expect.objectContaining({ code: 'MISSING_CANONICAL_PARENT_IDENTITY' })
-      );
+      }), { silent: true });
     });
 
     it('should suppress a raw V2 fragment without mutating its node', async () => {
@@ -671,7 +746,11 @@ describe('DomTranslatorAdapter', () => {
       }, [], new Map([
         ['n1', { node: staleNode, text: 'A', uid: 'n1', blockId: 'b1' }],
         ['n2', { node: validNode, text: 'B', uid: 'n2', blockId: 'b2' }]
-      ]), 'fa', testElement);
+      ]), 'fa', testElement, null, (nodeData, cleanResult) => {
+        if (nodeData.blockId === 'b2') {
+          adapter._sendParentAcceptanceAck(nodeData.blockId, cleanResult, true);
+        }
+      });
 
       expect(staleNode.nodeValue).toBe('Changed A');
       expect(validNode.nodeValue).toContain('Translated B');

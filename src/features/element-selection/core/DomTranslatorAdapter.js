@@ -257,6 +257,7 @@ export class DomTranslatorAdapter extends ResourceTracker {
 
       const nodeMap = new Map();
       textNodesData.forEach(data => nodeMap.set(data.uid, data));
+      const directParentStates = new Map();
       const conversationParents = isBlockGroupingEnabled
         ? groups.map(group => ({
             parentId: group.blockId,
@@ -264,10 +265,31 @@ export class DomTranslatorAdapter extends ResourceTracker {
               ? group.text || ''
               : group.units.map(unit => `${unit.leadingWS || ''}${unit.text}${unit.trailingWS || ''}`).join(''),
           }))
-        : textNodesData.map(data => ({
-            parentId: data.blockId || data.uid,
-            cleanSource: data.text || '',
-          }));
+        : textNodesData.reduce((parents, data, sourceOrder) => {
+            const parentId = typeof data.blockId === 'string' && data.blockId.trim()
+              ? data.blockId
+              : null;
+            if (!parentId) return parents;
+            let parent = directParentStates.get(parentId);
+            if (!parent) {
+              parent = {
+                parentId,
+                sourceOrder,
+                cleanSource: '',
+                handoffParent: { parentId, cleanSource: '' },
+                expectedUids: new Set(),
+                completedUids: new Set(),
+                translatedByUid: new Map(),
+                acknowledged: false,
+              };
+              directParentStates.set(parentId, parent);
+              parents.push(parent.handoffParent);
+            }
+            parent.cleanSource += data.text || '';
+            parent.expectedUids.add(data.uid);
+            parent.handoffParent.cleanSource = parent.cleanSource;
+            return parents;
+          }, []);
 
       // Context
       const contextMetadata = extractContextMetadata(element);
@@ -415,9 +437,9 @@ export class DomTranslatorAdapter extends ResourceTracker {
                           this._applyTranslationToNode(nodeData.node, text, effectiveTargetLanguage, element);
                          processedUids.add(nodeData.uid);
                           if (!this._isCurrentTranslation(translationToken)) return;
-                         this._sendParentAcceptanceAck(nodeData.blockId, String(text), true).catch(() => {});
+                          acknowledgeDirectUnit(nodeData, String(text));
                         } catch (error) {
-                           this._sendParentAcceptanceAck(nodeData.blockId, null, false, translationToken).catch(() => {});
+                            this._sendParentAcceptanceAck(nodeData.blockId, null, false, translationToken).catch(() => {});
                          throw error;
                        }
                      }
@@ -472,6 +494,22 @@ export class DomTranslatorAdapter extends ResourceTracker {
         });
       });
 
+      const acknowledgeDirectUnit = (nodeData, cleanResult) => {
+        const parentId = typeof nodeData.blockId === 'string' && nodeData.blockId.trim()
+          ? nodeData.blockId
+          : null;
+        const parent = directParentStates.get(parentId);
+        if (!parent || parent.acknowledged) return;
+        parent.completedUids.add(nodeData.uid);
+        parent.translatedByUid.set(nodeData.uid, cleanResult);
+        if (parent.completedUids.size !== parent.expectedUids.size) return;
+        parent.acknowledged = true;
+        const parentCleanResult = [...parent.expectedUids]
+          .map(uid => parent.translatedByUid.get(uid))
+          .join('');
+        this._sendParentAcceptanceAck(parent.parentId, parentCleanResult, true, translationToken).catch(() => {});
+      };
+
       this.isTranslating = true;
       this.currentMessageId = messageId;
 
@@ -506,7 +544,7 @@ export class DomTranslatorAdapter extends ResourceTracker {
         }
         result = await streamEndPromise;
       } else if (response?.success) {
-        result = await this._handleDirectResponse(response, textNodesData, nodeMap, effectiveTargetLanguage, element, translationToken);
+        result = await this._handleDirectResponse(response, textNodesData, nodeMap, effectiveTargetLanguage, element, translationToken, acknowledgeDirectUnit);
       } else {
         result = response;
       }
@@ -734,7 +772,7 @@ export class DomTranslatorAdapter extends ResourceTracker {
     DirectionManager.applyNodeDirection(textNode, targetLanguage, rootElement);
   }
 
-  async _handleDirectResponse(response, textNodesData, nodeMap, targetLanguage, element, translationToken = null) {
+  async _handleDirectResponse(response, textNodesData, nodeMap, targetLanguage, element, translationToken = null, acknowledgeDirectUnit = () => {}) {
     this.logger.debug(`[DomTranslatorAdapter] _handleDirectResponse called (batchCount: ${this.batchCount})`);
 
     try {
@@ -844,7 +882,7 @@ export class DomTranslatorAdapter extends ResourceTracker {
                 this._applyTranslationToNode(nodeData.node, text, finalTargetLanguage, element);
                 processedUids.add(nodeData.uid);
                 if (translationToken && !this._isCurrentTranslation(translationToken)) return;
-                this._sendParentAcceptanceAck(nodeData.blockId, String(text), true).catch(() => {});
+                acknowledgeDirectUnit(nodeData, String(text));
               } catch (error) {
                 this._sendParentAcceptanceAck(nodeData.blockId, null, false, translationToken).catch(() => {});
                 throw error;
