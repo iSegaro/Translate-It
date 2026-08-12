@@ -242,11 +242,25 @@ export class UnifiedResultDispatcher {
    */
   async dispatchStreamingUpdate({ messageId, data, request }) {
     if (request && request.status === RequestStatus.PROCESSING) {
-      await this.broadcastResult({
-        messageId,
-        result: { streaming: true, ...data },
-        request
-      });
+      if (request.mode === TranslationMode.Select_Element && request?.sender?.tab?.id) {
+        await browser.tabs.sendMessage(request.sender.tab.id, {
+          action: MessageActions.TRANSLATION_RESULT_UPDATE,
+          messageId,
+          data: {
+            streaming: true,
+            ...data,
+            translationMode: TranslationMode.Select_Element,
+            context: 'select-element-streaming',
+            isBroadcast: false
+          }
+        });
+      } else {
+        await this.broadcastResult({
+          messageId,
+          result: { streaming: true, ...data },
+          request
+        });
+      }
     }
   }
 

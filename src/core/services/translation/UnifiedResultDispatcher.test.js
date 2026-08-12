@@ -144,6 +144,26 @@ describe('UnifiedResultDispatcher', () => {
   });
 
   describe('dispatchStreamingUpdate', () => {
+    it('should send Select Element updates only to originating tab', async () => {
+      const request = {
+        status: 'processing',
+        mode: TranslationMode.Select_Element,
+        sender: { tab: { id: 456 } }
+      };
+
+      await dispatcher.dispatchStreamingUpdate({ messageId: 'm-select', data: { chunk: '..' }, request });
+
+      expect(browser.tabs.query).not.toHaveBeenCalled();
+      expect(browser.tabs.sendMessage).toHaveBeenCalledTimes(1);
+      expect(browser.tabs.sendMessage).toHaveBeenCalledWith(456, expect.objectContaining({
+        data: expect.objectContaining({
+          translationMode: TranslationMode.Select_Element,
+          context: 'select-element-streaming',
+          isBroadcast: false
+        })
+      }));
+    });
+
     it('should broadcast if request is processing', async () => {
       const request = { status: 'processing', mode: 'test' };
       await dispatcher.dispatchStreamingUpdate({ messageId: 'm1', data: { chunk: '..' }, request });
