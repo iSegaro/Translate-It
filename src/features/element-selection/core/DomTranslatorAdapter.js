@@ -278,8 +278,9 @@ export class DomTranslatorAdapter extends ResourceTracker {
                 cleanSource: '',
                 handoffParent: { parentId, cleanSource: '' },
                 expectedUids: new Set(),
-                completedUids: new Set(),
-                translatedByUid: new Map(),
+                pendingResultsByUid: new Map(),
+                invalid: false,
+                applied: false,
                 acknowledged: false,
               };
               directParentStates.set(parentId, parent);
@@ -289,7 +290,94 @@ export class DomTranslatorAdapter extends ResourceTracker {
             parent.expectedUids.add(data.uid);
             parent.handoffParent.cleanSource = parent.cleanSource;
             return parents;
-          }, []);
+           }, []);
+
+      const applyCompleteDirectParent = (parent, targetLanguage, translationToken) => {
+        if (!parent || parent.invalid || parent.applied) return;
+        if (parent.pendingResultsByUid.size !== parent.expectedUids.size) return;
+        if (translationToken && !this._isCurrentTranslation(translationToken)) return;
+
+        const plan = [];
+        for (const uid of parent.expectedUids) {
+          const pending = parent.pendingResultsByUid.get(uid);
+          const nodeData = pending?.nodeData;
+          if (
+            !pending
+            || !nodeData
+            || nodeData.blockId !== parent.parentId
+            || !this._isDirectSourceCurrent(nodeData, translationToken)
+            || typeof pending.translatedText !== 'string'
+            || !pending.translatedText.trim()
+          ) {
+            parent.invalid = true;
+            return;
+          }
+          plan.push({ nodeData, translatedText: pending.translatedText });
+        }
+
+        try {
+          for (const { nodeData, translatedText } of plan) {
+            this._applyTranslationToNode(nodeData.node, translatedText, targetLanguage, element);
+          }
+          parent.applied = true;
+          if (!parent.acknowledged) {
+            parent.acknowledged = true;
+            this._sendParentAcceptanceAck(
+              parent.parentId,
+              plan.map(({ translatedText }) => translatedText).join(''),
+              true,
+              translationToken
+            ).catch(() => {});
+          }
+        } catch (error) {
+          parent.invalid = true;
+          throw error;
+        }
+      };
+
+      const ingestDirectResult = (item, index, targetLanguage, translationToken) => {
+        if (translationToken && !this._isCurrentTranslation(translationToken)) return;
+        const identityResult = this._getResultIdentity(item);
+        const uid = identityResult.identity;
+        const contentResult = this._getResultContent(item);
+        const nodeData = nodeMap.get(uid);
+
+        if (identityResult.status !== 'valid') {
+          this._logRejectedMapping(index, uid, identityResult.status);
+          return;
+        }
+        if (!nodeData) {
+          this._logRejectedMapping(index, uid, 'unknown');
+          return;
+        }
+        const parent = directParentStates.get(nodeData.blockId);
+        if (!parent || !parent.expectedUids.has(uid)) {
+          this._logRejectedMapping(index, uid, 'wrong-parent');
+          return;
+        }
+        if (contentResult.status !== 'valid') {
+          this._logRejectedContent(index, contentResult.status);
+          parent.invalid = true;
+          return;
+        }
+        if (parent.invalid || parent.applied) return;
+        if (parent.pendingResultsByUid.has(uid)) {
+          this._logRejectedMapping(index, uid, 'duplicate');
+          parent.invalid = true;
+          return;
+        }
+
+        parent.pendingResultsByUid.set(uid, {
+          nodeData,
+          translatedText: contentResult.content,
+        });
+      };
+
+      const finalizeDirectParents = (targetLanguage, translationToken) => {
+        for (const parent of directParentStates.values()) {
+          applyCompleteDirectParent(parent, targetLanguage, translationToken);
+        }
+      };
 
       // Context
       const contextMetadata = extractContextMetadata(element);
@@ -371,14 +459,19 @@ export class DomTranslatorAdapter extends ResourceTracker {
                    const contentResult = this._getResultContent(translatedItem);
                    const text = contentResult.content;
 
-                   if (identityResult.status !== 'valid' || duplicateIdentities.has(uid)) {
-                     this._logRejectedMapping(index, uid, duplicateIdentities.has(uid) ? 'duplicate' : identityResult.status);
+                   if (!isBlockGroupingEnabled) {
+                     ingestDirectResult(translatedItem, index, effectiveTargetLanguage, translationToken);
                      return;
                    }
-                   if (contentResult.status !== 'valid') {
-                     this._logRejectedContent(index, contentResult.status);
-                     return;
-                   }
+
+                   if (identityResult.status !== 'valid' || (isBlockGroupingEnabled && duplicateIdentities.has(uid))) {
+                      this._logRejectedMapping(index, uid, duplicateIdentities.has(uid) ? 'duplicate' : identityResult.status);
+                      return;
+                    }
+                    if (contentResult.status !== 'valid' && isBlockGroupingEnabled) {
+                      this._logRejectedContent(index, contentResult.status);
+                      return;
+                    }
 
                    if (isBlockGroupingEnabled && groupMap && groupMap.has(uid)) {
                     const group = groupMap.get(uid);
@@ -423,30 +516,16 @@ export class DomTranslatorAdapter extends ResourceTracker {
                         }
                       }
                     }
-                  } else {
-                     const nodeData = nodeMap.get(uid);
-                     if (!nodeData) {
-                       this._logRejectedMapping(index, uid, 'unknown');
-                       return;
-                     }
+                   } else {
+                     ingestDirectResult(translatedItem, index, effectiveTargetLanguage, translationToken);
+                   }
+                 });
 
-                    if (nodeData && !processedUids.has(nodeData.uid)) {
-                       try {
-                         if (!this._isCurrentTranslation(translationToken)) return;
-                          if (!this._isDirectSourceCurrent(nodeData, translationToken)) return;
-                          this._applyTranslationToNode(nodeData.node, text, effectiveTargetLanguage, element);
-                         processedUids.add(nodeData.uid);
-                          if (!this._isCurrentTranslation(translationToken)) return;
-                          acknowledgeDirectUnit(nodeData, String(text));
-                        } catch (error) {
-                            this._sendParentAcceptanceAck(nodeData.blockId, null, false, translationToken).catch(() => {});
-                         throw error;
-                       }
-                     }
-                  }
-                });
+                 if (!isBlockGroupingEnabled) {
+                   finalizeDirectParents(effectiveTargetLanguage, translationToken);
+                 }
 
-                // Emit progress update using completed count when available, with batch index as fallback.
+                 // Emit progress update using completed count when available, with batch index as fallback.
                 if (data.totalBatches !== undefined) {
                   const completed = typeof data.completedCount === 'number'
                     ? data.completedCount
@@ -494,22 +573,6 @@ export class DomTranslatorAdapter extends ResourceTracker {
         });
       });
 
-      const acknowledgeDirectUnit = (nodeData, cleanResult) => {
-        const parentId = typeof nodeData.blockId === 'string' && nodeData.blockId.trim()
-          ? nodeData.blockId
-          : null;
-        const parent = directParentStates.get(parentId);
-        if (!parent || parent.acknowledged) return;
-        parent.completedUids.add(nodeData.uid);
-        parent.translatedByUid.set(nodeData.uid, cleanResult);
-        if (parent.completedUids.size !== parent.expectedUids.size) return;
-        parent.acknowledged = true;
-        const parentCleanResult = [...parent.expectedUids]
-          .map(uid => parent.translatedByUid.get(uid))
-          .join('');
-        this._sendParentAcceptanceAck(parent.parentId, parentCleanResult, true, translationToken).catch(() => {});
-      };
-
       this.isTranslating = true;
       this.currentMessageId = messageId;
 
@@ -544,7 +607,16 @@ export class DomTranslatorAdapter extends ResourceTracker {
         }
         result = await streamEndPromise;
       } else if (response?.success) {
-        result = await this._handleDirectResponse(response, textNodesData, nodeMap, effectiveTargetLanguage, element, translationToken, acknowledgeDirectUnit);
+        result = await this._handleDirectResponse(
+          response,
+          textNodesData,
+          nodeMap,
+          effectiveTargetLanguage,
+          element,
+          translationToken,
+          ingestDirectResult,
+          finalizeDirectParents
+        );
       } else {
         result = response;
       }
@@ -772,8 +844,12 @@ export class DomTranslatorAdapter extends ResourceTracker {
     DirectionManager.applyNodeDirection(textNode, targetLanguage, rootElement);
   }
 
-  async _handleDirectResponse(response, textNodesData, nodeMap, targetLanguage, element, translationToken = null, acknowledgeDirectUnit = () => {}) {
+  async _handleDirectResponse(response, textNodesData, nodeMap, targetLanguage, element, translationToken, ingestDirectResult, finalizeDirectParents) {
     this.logger.debug(`[DomTranslatorAdapter] _handleDirectResponse called (batchCount: ${this.batchCount})`);
+
+    if (this.sessionContext === undefined && (!ingestDirectResult || !finalizeDirectParents)) {
+      throw new Error('Direct response requires canonical parent lifecycle callbacks');
+    }
 
     try {
       // Robust result extraction - handle both unified response and direct results
@@ -817,11 +893,16 @@ export class DomTranslatorAdapter extends ResourceTracker {
         const contentResult = this._getResultContent(item);
         const text = contentResult.content;
 
-        if (identityResult.status !== 'valid' || duplicateIdentities.has(uid)) {
+        if (!isBlockGroupingEnabled) {
+          ingestDirectResult(item, i, finalTargetLanguage, translationToken);
+          return;
+        }
+
+        if (identityResult.status !== 'valid' || (isBlockGroupingEnabled && duplicateIdentities.has(uid))) {
           this._logRejectedMapping(i, uid, duplicateIdentities.has(uid) ? 'duplicate' : identityResult.status);
           return;
         }
-        if (contentResult.status !== 'valid') {
+        if (contentResult.status !== 'valid' && isBlockGroupingEnabled) {
           this._logRejectedContent(i, contentResult.status);
           return;
         }
@@ -868,28 +949,10 @@ export class DomTranslatorAdapter extends ResourceTracker {
               }
             }
           }
-         } else {
-            const nodeData = nodeMap.get(uid);
-            if (!nodeData) {
-              this._logRejectedMapping(i, uid, 'unknown');
-              return;
-            }
-
-            if (nodeData && !processedUids.has(nodeData.uid)) {
-              try {
-                if (translationToken && !this._isCurrentTranslation(translationToken)) return;
-                if (!this._isDirectSourceCurrent(nodeData, translationToken)) return;
-                this._applyTranslationToNode(nodeData.node, text, finalTargetLanguage, element);
-                processedUids.add(nodeData.uid);
-                if (translationToken && !this._isCurrentTranslation(translationToken)) return;
-                acknowledgeDirectUnit(nodeData, String(text));
-              } catch (error) {
-                this._sendParentAcceptanceAck(nodeData.blockId, null, false, translationToken).catch(() => {});
-                throw error;
-              }
-            }
-         }
+          }
       });
+
+      if (finalizeDirectParents) finalizeDirectParents(finalTargetLanguage, translationToken);
 
       // Emit final progress for non-streaming mode
       // Use batch count if available, otherwise use 1 (single request)
