@@ -161,10 +161,10 @@ export function getTextSelectionWindowRelay() {
 
 /**
  * Bootstrap wiring for the top frame: installs the relay and registers the
- * activation callback on the reactivation-capable contentScriptCore.loadFeature
- * path (whose lazy-feature cache is cleared by notifyFeatureDeactivated, unlike
- * loadFeatureFromMain). Uses the same feature-loading path as every other
- * consumer (MainFrameCoordinator, InteractionCoordinator).
+ * activation callback on the canonical contentScriptCore.loadFeature path. This
+ * is the lifecycle/reactivation-capable path (its lazy-feature cache is cleared
+ * by notifyFeatureDeactivated), used by every feature-loading consumer
+ * (MainFrameCoordinator, InteractionCoordinator).
  *
  * The callback MUST return the loadFeature result: _ensureActivation() awaits it,
  * so activation stays in-flight until windowsManager is actually loaded. Without

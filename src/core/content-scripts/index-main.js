@@ -123,8 +123,6 @@ async function initializeLogger(subComponent = 'Main') {
 
         // 2. Feature Loader: Handles prioritised loading sequence
         const featureLoader = new MainFeatureLoader(contentScriptCore, initializeLogger);
-        // Expose loadFeature for compatibility with InteractionCoordinator or other modules
-        contentScriptCore.loadFeatureFromMain = featureLoader.loadFeature.bind(featureLoader);
 
         // 3. Coordinator: Handles cross-frame and bus synchronization
         new MainFrameCoordinator(aggregator, MessageActions, contentScriptCore);
