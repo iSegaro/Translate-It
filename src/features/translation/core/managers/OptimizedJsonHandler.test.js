@@ -1291,6 +1291,233 @@ describe('OptimizedJsonHandler', () => {
       }
     });
 
+    it('shares one absolute deadline across sequential batches', async () => {
+      vi.useFakeTimers();
+      const { getAIConversationHistoryEnabledAsync } = await import('@/shared/config/config.js');
+      const firstBatch = createDeferred();
+      const secondBatch = createDeferred();
+
+      try {
+        getAIConversationHistoryEnabledAsync.mockResolvedValue(true);
+        mockProvider.translate
+          .mockImplementationOnce(() => firstBatch.promise)
+          .mockImplementationOnce(() => secondBatch.promise);
+
+        const execution = handler.execute(mockEngine, mockData, mockProvider, 'en', 'fa', 'msg-shared-deadline', mockSender);
+        execution.catch(() => {});
+        await vi.waitFor(() => expect(mockProvider.translate).toHaveBeenCalledTimes(1));
+
+        await vi.advanceTimersByTimeAsync(TRANSLATION_BATCH_EXECUTION_TIMEOUT_MS - 1000);
+        firstBatch.resolve({ translatedText: ['t1'] });
+        await vi.waitFor(() => expect(mockProvider.translate).toHaveBeenCalledTimes(2));
+
+        await vi.advanceTimersByTimeAsync(1000);
+        await expect(execution).rejects.toMatchObject({ type: 'TRANSLATION_TIMEOUT' });
+        expect(mockAbortController.abort).toHaveBeenCalledTimes(1);
+        expect(mockProvider.translate).toHaveBeenCalledTimes(2);
+      } finally {
+        firstBatch.resolve({ translatedText: ['late'] });
+        secondBatch.resolve({ translatedText: ['late'] });
+        getAIConversationHistoryEnabledAsync.mockResolvedValue(false);
+        vi.useRealTimers();
+      }
+    });
+
+    it('shares one absolute deadline across auto-detection and remaining batches', async () => {
+      vi.useFakeTimers();
+      const { getAIConversationHistoryEnabledAsync } = await import('@/shared/config/config.js');
+      const firstBatch = createDeferred();
+      const secondBatch = createDeferred();
+
+      try {
+        getAIConversationHistoryEnabledAsync.mockResolvedValue(false);
+        mockProvider.translate
+          .mockImplementationOnce(() => firstBatch.promise)
+          .mockImplementationOnce(() => secondBatch.promise);
+
+        const execution = handler.execute(mockEngine, mockData, mockProvider, 'auto', 'fa', 'msg-auto-deadline', mockSender);
+        execution.catch(() => {});
+        await vi.waitFor(() => expect(mockProvider.translate).toHaveBeenCalledTimes(1));
+
+        await vi.advanceTimersByTimeAsync(TRANSLATION_BATCH_EXECUTION_TIMEOUT_MS - 1000);
+        firstBatch.resolve({ translatedText: ['t1'], detectedLanguage: 'en' });
+        await vi.waitFor(() => expect(mockProvider.translate).toHaveBeenCalledTimes(2));
+
+        await vi.advanceTimersByTimeAsync(1000);
+        await expect(execution).rejects.toMatchObject({ type: 'TRANSLATION_TIMEOUT' });
+        expect(mockAbortController.abort).toHaveBeenCalledTimes(1);
+      } finally {
+        firstBatch.resolve({ translatedText: ['late'] });
+        secondBatch.resolve({ translatedText: ['late'] });
+        getAIConversationHistoryEnabledAsync.mockResolvedValue(false);
+        vi.useRealTimers();
+      }
+    });
+
+    it('uses one absolute deadline for parallel batches', async () => {
+      vi.useFakeTimers();
+      const { getAIConversationHistoryEnabledAsync } = await import('@/shared/config/config.js');
+      const firstBatch = createDeferred();
+      const secondBatch = createDeferred();
+
+      try {
+        getAIConversationHistoryEnabledAsync.mockResolvedValue(false);
+        mockProvider.translate
+          .mockImplementationOnce(() => firstBatch.promise)
+          .mockImplementationOnce(() => secondBatch.promise);
+
+        const execution = handler.execute(mockEngine, { ...mockData, sourceLanguage: 'en' }, mockProvider, 'en', 'fa', 'msg-parallel-deadline', mockSender);
+        execution.catch(() => {});
+        await vi.waitFor(() => expect(mockProvider.translate).toHaveBeenCalledTimes(2));
+        expect(mockProvider.translate.mock.calls[0][3].executionContext.deadlineAt)
+          .toBe(mockProvider.translate.mock.calls[1][3].executionContext.deadlineAt);
+
+        await vi.advanceTimersByTimeAsync(TRANSLATION_BATCH_EXECUTION_TIMEOUT_MS);
+        await expect(execution).rejects.toMatchObject({ type: 'TRANSLATION_TIMEOUT' });
+        expect(mockAbortController.abort).toHaveBeenCalledTimes(1);
+      } finally {
+        firstBatch.resolve({ translatedText: ['late'] });
+        secondBatch.resolve({ translatedText: ['late'] });
+        getAIConversationHistoryEnabledAsync.mockResolvedValue(false);
+        vi.useRealTimers();
+      }
+    });
+
+    it('does not start a batch when the operation deadline already expired', async () => {
+      vi.useFakeTimers();
+      const executionContext = { deadlineAt: Date.now() - 1 };
+
+      try {
+        const execution = handler.execute(
+          mockEngine,
+          mockData,
+          mockProvider,
+          'en',
+          'fa',
+          'msg-expired-deadline',
+          mockSender,
+          'unknown',
+          executionContext
+        );
+
+        await expect(execution).rejects.toMatchObject({ type: 'TRANSLATION_TIMEOUT' });
+        expect(mockProvider.translate).not.toHaveBeenCalled();
+        expect(mockAbortController.abort).toHaveBeenCalledTimes(1);
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it('preserves an earlier supplied deadline', async () => {
+      vi.useFakeTimers();
+      const { getAIConversationHistoryEnabledAsync } = await import('@/shared/config/config.js');
+      const deferred = createDeferred();
+      const suppliedDeadlineAt = Date.now() + 50000;
+
+      try {
+        getAIConversationHistoryEnabledAsync.mockResolvedValue(false);
+        mockProvider.translate.mockImplementationOnce(() => deferred.promise);
+
+        const execution = handler.execute(
+          mockEngine,
+          mockData,
+          mockProvider,
+          'en',
+          'fa',
+          'msg-earlier-deadline',
+          mockSender,
+          'unknown',
+          { deadlineAt: suppliedDeadlineAt }
+        );
+        execution.catch(() => {});
+        await vi.waitFor(() => expect(mockProvider.translate).toHaveBeenCalledTimes(1));
+        expect(mockProvider.translate.mock.calls[0][3].executionContext.deadlineAt).toBe(suppliedDeadlineAt);
+
+        await vi.advanceTimersByTimeAsync(Math.max(0, suppliedDeadlineAt - Date.now() - 1));
+        expect(mockAbortController.abort).not.toHaveBeenCalled();
+        await vi.advanceTimersByTimeAsync(1);
+        await expect(execution).rejects.toMatchObject({ type: 'TRANSLATION_TIMEOUT' });
+        expect(mockAbortController.abort).toHaveBeenCalledTimes(1);
+      } finally {
+        deferred.resolve({ translatedText: ['late'] });
+        getAIConversationHistoryEnabledAsync.mockResolvedValue(false);
+        vi.useRealTimers();
+      }
+    });
+
+    it('clamps a later supplied deadline to the canonical operation budget', async () => {
+      vi.useFakeTimers();
+      const { getAIConversationHistoryEnabledAsync } = await import('@/shared/config/config.js');
+      const deferred = createDeferred();
+      const localStart = Date.now();
+      const suppliedDeadlineAt = localStart + 600000;
+
+      try {
+        getAIConversationHistoryEnabledAsync.mockResolvedValue(false);
+        mockProvider.translate.mockImplementationOnce(() => deferred.promise);
+
+        const execution = handler.execute(
+          mockEngine,
+          mockData,
+          mockProvider,
+          'en',
+          'fa',
+          'msg-later-deadline',
+          mockSender,
+          'unknown',
+          { deadlineAt: suppliedDeadlineAt }
+        );
+        execution.catch(() => {});
+        await vi.waitFor(() => expect(mockProvider.translate).toHaveBeenCalledTimes(1));
+        expect(mockProvider.translate.mock.calls[0][3].executionContext.deadlineAt)
+          .toBe(localStart + TRANSLATION_BATCH_EXECUTION_TIMEOUT_MS);
+
+        await vi.advanceTimersByTimeAsync(TRANSLATION_BATCH_EXECUTION_TIMEOUT_MS);
+        await expect(execution).rejects.toMatchObject({ type: 'TRANSLATION_TIMEOUT' });
+        expect(mockAbortController.abort).toHaveBeenCalledTimes(1);
+      } finally {
+        deferred.resolve({ translatedText: ['late'] });
+        getAIConversationHistoryEnabledAsync.mockResolvedValue(false);
+        vi.useRealTimers();
+      }
+    });
+
+    it('falls back to the canonical budget for malformed deadline metadata', async () => {
+      vi.useFakeTimers();
+      const { getAIConversationHistoryEnabledAsync } = await import('@/shared/config/config.js');
+      const deferred = createDeferred();
+      const localStart = Date.now();
+
+      try {
+        getAIConversationHistoryEnabledAsync.mockResolvedValue(false);
+        mockProvider.translate.mockImplementationOnce(() => deferred.promise);
+
+        const execution = handler.execute(
+          mockEngine,
+          mockData,
+          mockProvider,
+          'en',
+          'fa',
+          'msg-invalid-deadline',
+          mockSender,
+          'unknown',
+          { deadlineAt: Number.NaN }
+        );
+        execution.catch(() => {});
+        await vi.waitFor(() => expect(mockProvider.translate).toHaveBeenCalledTimes(1));
+        expect(mockProvider.translate.mock.calls[0][3].executionContext.deadlineAt)
+          .toBe(localStart + TRANSLATION_BATCH_EXECUTION_TIMEOUT_MS);
+        expect(mockAbortController.abort).not.toHaveBeenCalled();
+
+        await vi.advanceTimersByTimeAsync(TRANSLATION_BATCH_EXECUTION_TIMEOUT_MS);
+        await expect(execution).rejects.toMatchObject({ type: 'TRANSLATION_TIMEOUT' });
+      } finally {
+        deferred.resolve({ translatedText: ['late'] });
+        getAIConversationHistoryEnabledAsync.mockResolvedValue(false);
+        vi.useRealTimers();
+      }
+    });
+
     it('should clear successful batch deadlines without appending a late timeout diagnostic', async () => {
       vi.useFakeTimers();
       try {

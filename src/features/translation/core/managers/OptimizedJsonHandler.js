@@ -25,6 +25,15 @@ export class OptimizedJsonHandler {
    */
   async execute(engine, data, providerInstance, originalSourceLang, originalTargetLang, messageId, sender, uiContext = 'unknown', executionContext = null) {
     const { text, sourceLanguage, targetLanguage, mode, options } = data;
+    const localDeadlineAt = Date.now() + TRANSLATION_BATCH_EXECUTION_TIMEOUT_MS;
+    const suppliedDeadlineAt = executionContext?.deadlineAt;
+    const operationDeadlineAt = Number.isFinite(suppliedDeadlineAt)
+      ? Math.min(suppliedDeadlineAt, localDeadlineAt)
+      : localDeadlineAt;
+    const operationExecutionContext = {
+      ...(executionContext || {}),
+      deadlineAt: operationDeadlineAt,
+    };
     const sessionId = data.sessionId || messageId;
     const tabId = sender?.tab?.id;
     const abortController = engine.lifecycleRegistry.getAbortController(messageId) || 
@@ -307,6 +316,22 @@ export class OptimizedJsonHandler {
         try {
           checkCancellation();
 
+          const remainingMs = operationDeadlineAt - Date.now();
+          if (remainingMs <= 0) {
+            didTimeout = true;
+            timeoutError = new Error(`Batch translation timed out after ${TRANSLATION_BATCH_EXECUTION_TIMEOUT_MS}ms`);
+            timeoutError.type = ErrorTypes.TRANSLATION_TIMEOUT;
+            appendTranslationDiagnostic(executionContext, {
+              type: 'BATCH_TIMEOUT',
+              stage: 'optimized-json-handler',
+              batchIndex: i,
+              reason: timeoutError.message,
+              code: timeoutError.type,
+            });
+            if (!abortController.signal.aborted) abortController.abort();
+            throw timeoutError;
+          }
+
           const statsBefore = statsManager.getSessionSummary(sessionId);
           const charsBefore = statsBefore ? statsBefore.chars : 0;
           const originalCharsBefore = statsBefore ? statsBefore.originalChars : 0;
@@ -326,8 +351,8 @@ export class OptimizedJsonHandler {
                 code: timeoutError.type,
               });
               resolve({ __kind: 'timeout', error: timeoutError });
-              abortController.abort();
-            }, BATCH_TIMEOUT_MS);
+              if (!abortController.signal.aborted) abortController.abort();
+            }, remainingMs);
             
             // Link timeout cleanup to abort signal
             onAbort = () => clearTimeout(timeoutId);
@@ -382,9 +407,9 @@ export class OptimizedJsonHandler {
              ...options?.contextMetadata,
              ...(useParentConversationLifecycle && { useParentConversationLifecycle: true }),
            };
-           const batchExecutionContext = hasManifestMembership
-            ? self._createBatchExecutionContext(executionContext, batch)
-            : executionContext;
+          const batchExecutionContext = hasManifestMembership
+            ? self._createBatchExecutionContext(operationExecutionContext, batch)
+            : operationExecutionContext;
           const providerPromise = self._performBatchCall(
               providerInstance, 
               batchPayload, 
@@ -552,7 +577,7 @@ export class OptimizedJsonHandler {
           // Stop all other batches if error is fatal (429, etc.)
           if (isFatalError(batchError)) {
             abortInitiator = 'fatal-error';
-            abortController.abort();
+            if (!abortController.signal.aborted) abortController.abort();
           }
         } finally {
           clearTimeout(timeoutId);
