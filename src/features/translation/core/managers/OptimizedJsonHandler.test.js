@@ -439,6 +439,83 @@ describe('OptimizedJsonHandler', () => {
       expect(updates).toHaveLength(0);
     });
 
+    it('rejects a 39-unit fragmented parent after two successful provider batches', async () => {
+      const browser = (await import('webextension-polyfill')).default;
+      browser.tabs.sendMessage.mockClear();
+      // Production ErrorMatcher does not treat VALIDATION as fatal solely from isFatal.
+      isFatalError.mockReturnValue(false);
+
+      const marker = (index) => `@@TI_SEG_s1_e1_n${index}@@`;
+      const unit = (index) => `Unit ${index}${marker(index)}`;
+      const firstFragment = Array.from({ length: 20 }, (_, index) => unit(index + 1)).join(' ');
+      const secondFragment = Array.from({ length: 19 }, (_, index) => unit(index + 21)).join(' ');
+      const source = `${firstFragment} ${secondFragment}`;
+      const fragment0 = {
+        t: firstFragment,
+        i: 'n1',
+        blockId: 'g1',
+        isV3Fragment: true,
+        parentId: 'g1',
+        fragmentIndex: 0,
+        fragmentCount: 2,
+        fragmentJoinerBefore: ''
+      };
+      const fragment1 = {
+        t: secondFragment,
+        i: 'n1',
+        blockId: 'g1',
+        isV3Fragment: true,
+        parentId: 'g1',
+        fragmentIndex: 1,
+        fragmentCount: 2,
+        fragmentJoinerBefore: ' '
+      };
+      const translatedFragment0 = firstFragment.replace(/Unit /g, 'Translated ');
+      const translatedFragment1 = secondFragment
+        .replace(/Unit 39@@TI_SEG_s1_e1_n39@@/, 'Translated 39')
+        .replace(/Unit /g, 'Translated ');
+      mockEngine.createIntelligentBatches = vi.fn(() => [[fragment0], [fragment1]]);
+      mockProvider.translate
+        .mockResolvedValueOnce({ translatedText: [translatedFragment0] })
+        .mockResolvedValueOnce({ translatedText: [translatedFragment1] });
+
+      const result = await handler.execute(
+        mockEngine,
+        { ...mockData, sourceLanguage: 'en', text: JSON.stringify([{ t: source, blockId: 'g1', i: 'n1' }]) },
+        mockProvider,
+        'en',
+        'fa',
+        'msg-v3-39-unit-mismatch',
+        mockSender
+      );
+
+      expect(mockProvider.translate).toHaveBeenCalledTimes(2);
+      expect(result).toMatchObject({
+        success: false,
+        error: { type: ErrorTypes.VALIDATION }
+      });
+      expect(result.error.message).toContain('MARKER_COUNT_MISMATCH');
+      expect(result.results).toEqual([]);
+
+      const diagnostic = appendTranslationDiagnostic.mock.calls.find(
+        (call) => call[1]?.type === 'V3_MARKER_CONTRACT_REJECTED'
+      );
+      expect(diagnostic?.[1]).toMatchObject({
+        parentId: 'g1',
+        expectedMarkerCount: 39,
+        actualMarkerCount: 38,
+        reason: 'MARKER_COUNT_MISMATCH'
+      });
+
+      const messages = browser.tabs.sendMessage.mock.calls.map(([, message]) => message);
+      const updates = messages.filter((message) => message.action === MessageActions.TRANSLATION_STREAM_UPDATE);
+      const ends = messages.filter((message) => message.action === MessageActions.TRANSLATION_STREAM_END);
+      expect(updates).toHaveLength(0);
+      expect(ends).toHaveLength(1);
+      expect(ends[0].data).toMatchObject({ success: false });
+      expect(JSON.stringify(messages)).not.toContain('Translated 1');
+    });
+
     it('rejects reordered markers across fragments', async () => {
       const browser = (await import('webextension-polyfill')).default;
       browser.tabs.sendMessage.mockClear();
