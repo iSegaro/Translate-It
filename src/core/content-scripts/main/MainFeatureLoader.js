@@ -110,8 +110,11 @@ export class MainFeatureLoader {
     }
 
     const strategy = this.LOAD_STRATEGIES[category] || { delay: 0 };
-    
-    const loadPromise = (async () => {
+
+    // Declared before the IIFE so the cleanup finalizer below can reference the
+    // same promise it cleans up (identity-safe removal).
+    let loadPromise;
+    loadPromise = (async () => {
       try {
         // Apply strategic delay if necessary
         if (strategy.delay > 0 && category !== 'INTERACTIVE') {
@@ -134,6 +137,17 @@ export class MainFeatureLoader {
     })();
 
     this.featureLoadPromises.set(featureName, loadPromise);
+
+    // In-flight-only cache: dedupe concurrent loads, then release the entry so a
+    // later call delegates again to contentScriptCore.loadFeature. The lower
+    // lazy-features layer owns loaded-state, so this stays safe for retry and
+    // reactivation without duplicating lifecycle state here.
+    loadPromise.finally(() => {
+      if (this.featureLoadPromises.get(featureName) === loadPromise) {
+        this.featureLoadPromises.delete(featureName);
+      }
+    });
+
     return loadPromise;
   }
 
