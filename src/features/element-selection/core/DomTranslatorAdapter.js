@@ -192,6 +192,7 @@ export class DomTranslatorAdapter extends ResourceTracker {
         }));
       } else {
         this.groupMap = null;
+        this.sessionContext = undefined;
         textNodesData = collectTextNodes(element);
       }
 
@@ -710,8 +711,22 @@ export class DomTranslatorAdapter extends ResourceTracker {
         throw result.error;
       }
 
+      // Snapshot request-local commit state while parent/group objects still exist.
+      const committedParentCount = isBlockGroupingEnabled
+        ? groups.filter(group => group.applied === true).length
+        : Array.from(directParentStates.values()).filter(parent => parent.applied === true).length;
+      const rejectedParentCount = isBlockGroupingEnabled
+        ? groups.filter(group => group.invalid === true).length
+        : Array.from(directParentStates.values()).filter(parent => parent.invalid === true).length;
+
+      this.logger.debug('[DomTranslatorAdapter] Operation commit summary', {
+        committedParentCount,
+        rejectedParentCount,
+        zeroCommit: committedParentCount === 0,
+      });
+
       const finalResult = await this._finalizeTranslation({
-        result, element, elementId, targetLanguage: effectiveTargetLanguage, onComplete, sessionId: this.currentSessionId
+        result, element, elementId, targetLanguage: effectiveTargetLanguage, onComplete, sessionId: this.currentSessionId, committedParentCount
       });
 
       // --- Phase 6 Shadow Mode Validation Gate ---
@@ -951,6 +966,7 @@ export class DomTranslatorAdapter extends ResourceTracker {
         throw new Error('Grouped translation became stale before acceptance');
       }
       reconstruction.transaction.finalize();
+      group.applied = true;
       this._sendParentAcceptanceAck(group.blockId, reconstruction.cleanResult, true, translationToken).catch(() => {});
     } catch (error) {
       for (const [uid, state] of previousMap) {
@@ -1113,10 +1129,18 @@ export class DomTranslatorAdapter extends ResourceTracker {
     }
   }
 
-  async _finalizeTranslation({ result, element, elementId, targetLanguage, onComplete, sessionId }) {
+  async _finalizeTranslation({ result, element, elementId, targetLanguage, onComplete, sessionId, committedParentCount = 0 }) {
     if (!result?.success) {
-      if (result.cancelled) return { success: false, cancelled: true, element };
+      if (result.cancelled) return { success: false, cancelled: true, element, committedParentCount };
       throw result.error || new Error('Translation failed');
+    }
+
+    // Operation-level contract: provider/transport success is not operation success.
+    // At least one logical parent must have reached the accepted/applied terminal state.
+    if (committedParentCount === 0) {
+      const error = new Error('No translation results were accepted');
+      error.type = ErrorTypes.NO_ACCEPTED_TRANSLATION_RESULTS;
+      return { success: false, error, committedParentCount, element };
     }
 
     const finalTarget = result.targetLanguage || targetLanguage;
@@ -1133,7 +1157,7 @@ export class DomTranslatorAdapter extends ResourceTracker {
     }
 
     if (onComplete) await onComplete({ status: TRANSLATION_STATUS.COMPLETED, elementId, translated: true });
-    return { success: true, elementId, element };
+    return { success: true, elementId, element, committedParentCount };
   }
 
   async _sendParentAcceptanceAck(parentId, cleanResult, accepted, translationToken = null) {

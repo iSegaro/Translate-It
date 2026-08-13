@@ -508,45 +508,57 @@ class SelectElementManager extends ResourceTracker {
         }
       });
 
-      if (result && result.success) {
+      if (result?.success) {
         pageEventBus.emit('hide-translation', { element: targetElement });
         pageEventBus.emit('ELEMENT_TRANSLATIONS_AVAILABLE'); // Notify that revert is now possible
         this.performPostTranslationCleanup({ reason: 'success' });
-      } else if (result && result.cancelled) {
+      } else if (result?.cancelled) {
         this.deactivate({ reason: 'cancel', silent: true });
       } else {
-        this.performPostTranslationCleanup({ reason: 'success' }); // Fallback to success if result exists but structure is weird
+        // Explicit failure contract: any resolved value that is neither success
+        // nor cancellation (zero-commit results, undefined, {}) is a failure.
+        const failure = (result && result.error) || new Error('Translation failed');
+        this._handleTranslationFailure(failure);
       }
     } catch (error) {
-      const isCancellation = isCancellationError(error);
-      const isNoTranslatableContent = error.message === 'No translatable text found';
-      const isSilentSkip = isCancellation
-        || isNoTranslatableContent
-        || error.type === ErrorTypes.FEATURE_BLOCKED
-        || ExtensionContextManager.isContextError(error);
-
-      if (isCancellation) {
-        this.logger.debug('Select Element translation cancelled:', error.message);
-      } else if (isSilentSkip) {
-        this.logger.debug('Select Element translation skipped:', error.message);
-      } else {
-        this.logger.warn('Select Element translation failed:', error);
-        // Delegate to centralized error handler to show notification
-        ErrorHandler.getInstance().handle(error, { context: 'select-element', showToast: true }).catch(() => {});
-      }
-      
-      if (ExtensionContextManager.isContextError(error)) {
-        ExtensionContextManager.handleContextError(error, 'element-selection');
-      }
-
-      if (isFatalError(error) && !isSilentSkip) {
-        this.deactivate({ preserveTranslations: true, reason: 'error' });
-      } else {
-        this.performPostTranslationCleanup({ reason: isSilentSkip ? 'cancel' : 'error' });
-      }
+      this._handleTranslationFailure(error);
     } finally {
       // Clear flag after translation is complete (success or error)
       window.isTranslationInProgress = false;
+    }
+  }
+
+  /**
+   * Routes a Select Element translation failure through the standard error
+   * pipeline (ErrorHandler notification + cleanup), preserving silent paths.
+   * @private
+   */
+  _handleTranslationFailure(error) {
+    const isCancellation = isCancellationError(error);
+    const isNoTranslatableContent = error.message === 'No translatable text found';
+    const isSilentSkip = isCancellation
+      || isNoTranslatableContent
+      || error.type === ErrorTypes.FEATURE_BLOCKED
+      || ExtensionContextManager.isContextError(error);
+
+    if (isCancellation) {
+      this.logger.debug('Select Element translation cancelled:', error.message);
+    } else if (isSilentSkip) {
+      this.logger.debug('Select Element translation skipped:', error.message);
+    } else {
+      this.logger.warn('Select Element translation failed:', error);
+      // Delegate to centralized error handler to show notification
+      ErrorHandler.getInstance().handle(error, { context: 'select-element', showToast: true }).catch(() => {});
+    }
+    
+    if (ExtensionContextManager.isContextError(error)) {
+      ExtensionContextManager.handleContextError(error, 'element-selection');
+    }
+
+    if (isFatalError(error) && !isSilentSkip) {
+      this.deactivate({ preserveTranslations: true, reason: 'error' });
+    } else {
+      this.performPostTranslationCleanup({ reason: isSilentSkip ? 'cancel' : 'error' });
     }
   }
 
