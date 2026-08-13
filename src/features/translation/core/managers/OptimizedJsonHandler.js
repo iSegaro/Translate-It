@@ -21,6 +21,11 @@ import { TranslationBatcher } from '@/features/translation/core/utils/Translatio
 
 const logger = getScopedLogger(LOG_COMPONENTS.TRANSLATION, 'OptimizedJsonHandler');
 
+function getParentRecoveryCharacterLimit(primaryFragmentLimit) {
+  // Halve marker density without producing tiny recovery calls; never exceed primary policy.
+  return Math.min(primaryFragmentLimit, Math.max(500, Math.floor(primaryFragmentLimit / 2)));
+}
+
 export class OptimizedJsonHandler {
   /**
    * Orchestrates the optimized translation process.
@@ -105,6 +110,7 @@ export class OptimizedJsonHandler {
             parentId,
             sourceText,
             violation,
+            markerCount: validation.source?.markers?.length ?? null,
             originalError: error,
           };
           return error;
@@ -152,17 +158,24 @@ export class OptimizedJsonHandler {
 
           const sourceParent = v3Parents.get(parentId);
           if (!sourceParent) throw failure;
+          const recoveryCharacterLimit = getParentRecoveryCharacterLimit(characterLimit);
           const recoveryFragments = TranslationBatcher.splitOversizedSegment(
             sourceParent,
-            characterLimit
+            recoveryCharacterLimit
           );
           appendTranslationDiagnostic(executionContext, {
             type: 'PARENT_RECOVERY_STARTED',
             stage: 'parent-recovery',
             parentId,
             originalReason: violation.reason || violation.code,
+            attempt: 1,
             recoveryAttempt: 1,
             fragmentCount: recoveryFragments.length,
+            primaryFragmentLimit: characterLimit,
+            recoveryFragmentLimit: recoveryCharacterLimit,
+            primaryFragmentCount: failure.parentRecovery.primaryFragmentCount,
+            recoveryFragmentCount: recoveryFragments.length,
+            markerCount: failure.parentRecovery.markerCount,
             callPurpose: TranslationCallPurpose.PARENT_RECOVERY,
           });
 
@@ -403,9 +416,10 @@ export class OptimizedJsonHandler {
                    actualMarkerCount: violation.actualMarkerCount ?? null,
                    reason,
                  });
-                  const parentError = createParentValidationError(parentIdStr, sourceText, translatedText, validation);
-                  parentError.parentRecovery.completeResults = completeResults;
-                  throw parentError;
+                   const parentError = createParentValidationError(parentIdStr, sourceText, translatedText, validation);
+                   parentError.parentRecovery.completeResults = completeResults;
+                   parentError.parentRecovery.primaryFragmentCount = orderedFragments.length;
+                   throw parentError;
               }
                validateAndAdd(buildV3ParentResult(orderedFragments, translatedText), `v3:${parentId}`);
               parent.emitted = true;

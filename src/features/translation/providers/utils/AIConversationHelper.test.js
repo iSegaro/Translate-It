@@ -173,6 +173,27 @@ describe('AIConversationHelper', () => {
     expect(primary.systemPrompt).not.toContain('Structured recovery repair context:');
   });
 
+  it('adds strict marker preservation only for parent recovery prompts', async () => {
+    const { getPromptAsync, getPromptBASEAIBatchAsync } = await import('@/shared/config/config.js');
+    getPromptAsync.mockResolvedValue('translate instructions');
+    getPromptBASEAIBatchAsync.mockResolvedValue('batch $_{PROMPT_INSTRUCTIONS} $_{TEXT}');
+
+    const prepare = (callPurpose) => AIConversationHelper.preparePromptAndText(
+      ['A@@TI_SEG_s1_e1_n1@@B'], 'en', 'fa', 'select-element', 'ai', null, { callPurpose },
+    );
+    const [primary, structuredRecovery, parentRecovery] = await Promise.all([
+      prepare(TranslationCallPurpose.PRIMARY_TRANSLATION),
+      prepare(TranslationCallPurpose.STRUCTURED_RECOVERY),
+      prepare(TranslationCallPurpose.PARENT_RECOVERY),
+    ]);
+
+    expect(primary.systemPrompt).not.toContain('Strict parent recovery translation');
+    expect(structuredRecovery.systemPrompt).not.toContain('Strict parent recovery translation');
+    expect(parentRecovery.systemPrompt).toContain('Strict parent recovery translation');
+    expect(parentRecovery.systemPrompt).toContain('exactly once');
+    expect(parentRecovery.systemPrompt).toContain('Do not translate, modify, remove, duplicate, reorder, or invent markers');
+  });
+
   it('keeps primary purpose in normal conversation lifecycle', async () => {
     const { getAIConversationHistoryEnabledAsync } = await import('@/shared/config/config.js');
     getAIConversationHistoryEnabledAsync.mockResolvedValue(true);

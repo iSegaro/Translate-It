@@ -381,6 +381,10 @@ export const AIConversationHelper = {
       promptInstructions += `\n\nStructured recovery repair context:\n${JSON.stringify(metadata.repairContext)}\nRe-translate the affected source unit(s) and preserve their marker ownership.`;
     }
 
+    if (metadata?.callPurpose === TranslationCallPurpose.PARENT_RECOVERY) {
+      promptInstructions += '\n\nStrict parent recovery translation: Preserve every @@TI_SEG_...@@ marker present in the input exactly. Each input marker must appear exactly once in the output. Do not translate, modify, remove, duplicate, reorder, or invent markers.';
+    }
+
     // Append semantic translation context when available (PDF mode only)
     if (translateMode === TranslationMode.PDF && metadata?.semanticHint) {
       const semanticInstructions = buildSemanticInstructions(metadata.semanticHint)

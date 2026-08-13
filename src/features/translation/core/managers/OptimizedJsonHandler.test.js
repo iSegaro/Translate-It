@@ -490,7 +490,14 @@ describe('OptimizedJsonHandler', () => {
         mockSender
       );
 
-      expect(mockProvider.translate).toHaveBeenCalledTimes(4);
+      const recoveryCalls = mockProvider.translate.mock.calls.filter(
+        call => call[3].callPurpose === TranslationCallPurpose.PARENT_RECOVERY
+      );
+      expect(mockProvider.translate).toHaveBeenCalledTimes(5);
+      expect(recoveryCalls).toHaveLength(3);
+      const recoveryMarkerCounts = recoveryCalls.map(call => call[0][0].match(/@@TI_SEG_/g)?.length || 0);
+      expect(recoveryMarkerCounts.reduce((sum, count) => sum + count, 0)).toBe(39);
+      expect(recoveryMarkerCounts.every(count => count < 20)).toBe(true);
       expect(result).toMatchObject({
         success: false,
         error: { type: ErrorTypes.VALIDATION }
@@ -507,6 +514,16 @@ describe('OptimizedJsonHandler', () => {
         actualMarkerCount: 38,
         reason: 'MARKER_COUNT_MISMATCH'
       });
+      expect(appendTranslationDiagnostic).toHaveBeenCalledWith(null, expect.objectContaining({
+        type: 'PARENT_RECOVERY_STARTED',
+        parentId: 'g1',
+        primaryFragmentLimit: 1000,
+        recoveryFragmentLimit: 500,
+        primaryFragmentCount: 2,
+        recoveryFragmentCount: 3,
+        markerCount: 39,
+        callPurpose: TranslationCallPurpose.PARENT_RECOVERY,
+      }));
 
       const messages = browser.tabs.sendMessage.mock.calls.map(([, message]) => message);
       const updates = messages.filter((message) => message.action === MessageActions.TRANSLATION_STREAM_UPDATE);
@@ -647,11 +664,11 @@ describe('OptimizedJsonHandler', () => {
       const marker = '@@TI_SEG_s1_e1_n1@@';
       const source = `${'word '.repeat(260)}${marker}`;
       const fragment = { t: source, i: 'n1', blockId: 'g1', isV3Fragment: true, parentId: 'g1', fragmentIndex: 0, fragmentCount: 1, fragmentJoinerBefore: '' };
+      const splitSpy = vi.spyOn(TranslationBatcher, 'splitOversizedSegment');
       mockEngine.createIntelligentBatches = vi.fn(() => [[fragment]]);
       mockProvider.translate
         .mockResolvedValueOnce({ translatedText: ['word '.repeat(260)] })
-        .mockResolvedValueOnce({ translatedText: ['word '.repeat(260)] })
-        .mockResolvedValueOnce({ translatedText: [source] });
+        .mockImplementation((texts) => Promise.resolve({ translatedText: texts }));
 
       const result = await handler.execute(
         mockEngine,
@@ -661,6 +678,70 @@ describe('OptimizedJsonHandler', () => {
 
       expect(result.success).toBe(true);
       expect(mockProvider.translate.mock.calls.filter(call => call[3].callPurpose === TranslationCallPurpose.PARENT_RECOVERY).length).toBeGreaterThan(1);
+      expect(splitSpy).toHaveBeenCalledWith(expect.objectContaining({ t: source }), 500);
+      const recoveryInputs = mockProvider.translate.mock.calls
+        .filter(call => call[3].callPurpose === TranslationCallPurpose.PARENT_RECOVERY)
+        .map(call => call[0][0]);
+      expect(recoveryInputs.every(fragmentText => fragmentText.length <= 500)).toBe(true);
+      expect(recoveryInputs.join(' ').replace(/\s+/g, ' ').trim()).toBe(source.replace(/\s+/g, ' ').trim());
+      expect((recoveryInputs.join('').match(/@@TI_SEG_/g) || [])).toHaveLength(1);
+      expect(recoveryInputs.join('')).toContain(marker);
+    });
+
+    it('derives smaller recovery fragments from the real primary V3 split limit', async () => {
+      getProviderConfiguration.mockReturnValueOnce({
+        batching: {
+          optimalSize: 1000,
+          characterLimit: 5000,
+          modeOverrides: {
+            select_element: { optimalSize: 1000, characterLimit: 3500 },
+          },
+        },
+        rateLimit: { maxConcurrent: 4 },
+      });
+      mockEngine.createIntelligentBatches = (segments, size, chars) => TranslationBatcher.createIntelligentBatches(segments, size, chars);
+      const marker = (index) => `@@TI_SEG_s1_e1_n${index}@@`;
+      const source = Array.from({ length: 120 }, (_, index) => `${'word '.repeat(8)}${marker(index + 1)}`).join(' ');
+      const sourceParent = { t: source, i: 'n1', blockId: 'g1' };
+      const primaryBatches = TranslationBatcher.createIntelligentBatches([sourceParent], 1000, 3500);
+      const primaryFragments = primaryBatches.flat();
+      const primaryMarkerCounts = primaryFragments.map(fragment => fragment.t.match(/@@TI_SEG_/g)?.length || 0);
+      let primaryCall = 0;
+      mockProvider.translate.mockImplementation((texts, _source, _target, options) => {
+        if (options.callPurpose === TranslationCallPurpose.PARENT_RECOVERY) {
+          return Promise.resolve({ translatedText: texts });
+        }
+        const translated = primaryCall++ === primaryFragments.length - 1
+          ? texts.map(text => text.replace(marker(120), ''))
+          : texts;
+        return Promise.resolve({ translatedText: translated });
+      });
+
+      const result = await handler.execute(
+        mockEngine,
+        { ...mockData, sourceLanguage: 'en', text: JSON.stringify([sourceParent]) },
+        mockProvider, 'en', 'fa', 'msg-real-primary-sizing', mockSender
+      );
+
+      const recoveryCalls = mockProvider.translate.mock.calls.filter(
+        call => call[3].callPurpose === TranslationCallPurpose.PARENT_RECOVERY
+      );
+      const recoveryFragments = recoveryCalls.map(call => call[0][0]);
+      const recoveryMarkerCounts = recoveryFragments.map(fragment => fragment.match(/@@TI_SEG_/g)?.length || 0);
+      expect(result.success).toBe(true);
+      expect(primaryFragments.length).toBeGreaterThan(1);
+      expect(recoveryFragments.length).toBeGreaterThan(primaryFragments.length);
+      expect(Math.max(...primaryFragments.map(fragment => fragment.t.length))).toBeLessThanOrEqual(3500);
+      expect(Math.max(...recoveryFragments.map(fragment => fragment.length))).toBeLessThanOrEqual(1750);
+      expect(Math.max(...recoveryMarkerCounts)).toBeLessThan(Math.max(...primaryMarkerCounts));
+      expect(recoveryMarkerCounts.reduce((sum, count) => sum + count, 0)).toBe(120);
+      expect(appendTranslationDiagnostic).toHaveBeenCalledWith(null, expect.objectContaining({
+        type: 'PARENT_RECOVERY_STARTED',
+        primaryFragmentLimit: 3500,
+        recoveryFragmentLimit: 1750,
+        primaryFragmentCount: primaryFragments.length,
+        recoveryFragmentCount: recoveryFragments.length,
+      }));
     });
 
     it('aborts in-flight parent recovery at shared deadline and suppresses late settlement', async () => {
