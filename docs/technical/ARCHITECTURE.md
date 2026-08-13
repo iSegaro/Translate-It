@@ -371,6 +371,7 @@ Feature Categories:
 - **Dynamic Imports**: Code splitting with lazy-loaded chunks via `lazy-features.js`
 - **Memory Optimization**: Significant memory reduction through selective loading
 - **Idle Deadline Loading**: Uses `requestIdleCallback` for lower priority categories (`LAZY_UI`, `ON_DEMAND`)
+- **Delay Ownership**: `startIntelligentLoading()` owns all stage delays exactly once; `loadFeature()` only delegates, dedupes, and logs
 
 **Key Components**:
 - **index-main.js**: Ultra-minimal entry point with initial architecture loading

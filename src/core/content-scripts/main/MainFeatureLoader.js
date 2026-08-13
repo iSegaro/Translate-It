@@ -8,6 +8,7 @@ export class MainFeatureLoader {
     this.initializeLogger = initializeLogger;
     this.featureLoadPromises = new Map();
     this.logger = null;
+    this._intelligentLoadingStarted = false;
 
     // Smart loading configuration
     this.LOAD_STRATEGIES = {
@@ -45,9 +46,13 @@ export class MainFeatureLoader {
 
   /**
    * Starts the multi-stage intelligent loading sequence.
+   * Idempotent per instance: only the first call schedules startup stages.
    */
   async startIntelligentLoading() {
-    // Stage 1: Critical features (immediate)
+    if (this._intelligentLoadingStarted) return;
+    this._intelligentLoadingStarted = true;
+
+    // Stage 1: Critical features (immediate, awaited)
     await Promise.all(
       this.FEATURE_CATEGORIES.CRITICAL.map(feature =>
         this.loadFeature(feature, 'CRITICAL')
@@ -89,27 +94,22 @@ export class MainFeatureLoader {
   }
 
   /**
-   * Loads a specific feature with a given strategy.
+   * Loads a specific feature, delegating to the lower feature-loading layer.
+   * Delay ownership is exclusive to startIntelligentLoading(); this method
+   * schedules nothing and only dedupes, delegates, logs, and handles errors.
    * @param {string} featureName - Name of the feature to load.
-   * @param {string} category - Category defining the loading strategy.
+   * @param {string} category - Category for logging and error context.
    */
   async loadFeature(featureName, category) {
     if (this.featureLoadPromises.has(featureName)) {
       return this.featureLoadPromises.get(featureName);
     }
 
-    const strategy = this.LOAD_STRATEGIES[category] || { delay: 0 };
-
     // Declared before the IIFE so the cleanup finalizer below can reference the
     // same promise it cleans up (identity-safe removal).
     let loadPromise;
     loadPromise = (async () => {
       try {
-        // Apply strategic delay if necessary
-        if (strategy.delay > 0 && category !== 'INTERACTIVE') {
-          await new Promise(resolve => setTimeout(resolve, strategy.delay));
-        }
-
         if (this.contentScriptCore && this.contentScriptCore.loadFeature) {
           const logger = await this.getLogger();
           logger.info(`Loading feature: ${featureName} (${category})`);

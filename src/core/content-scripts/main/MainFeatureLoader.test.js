@@ -139,3 +139,193 @@ describe('MainFeatureLoader in-flight-only cache', () => {
     expect(loader.featureLoadPromises.has('extensionContext')).toBe(false);
   });
 });
+
+describe('MainFeatureLoader startup scheduling', () => {
+  const flushMicrotasks = async () => {
+    for (let i = 0; i < 16; i++) await Promise.resolve();
+  };
+
+  const makeDelegatingCore = (impl) => {
+    const logger = { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() };
+    return {
+      logger,
+      loader: new MainFeatureLoader({ loadFeature: impl }, async () => logger)
+    };
+  };
+
+  let idleCallbacks;
+  let originalRequestIdleCallback;
+
+  beforeEach(() => {
+    vi.useFakeTimers();
+    idleCallbacks = [];
+    originalRequestIdleCallback = window.requestIdleCallback;
+    window.requestIdleCallback = vi.fn(cb => { idleCallbacks.push(cb); });
+  });
+
+  afterEach(() => {
+    if (originalRequestIdleCallback === undefined) {
+      delete window.requestIdleCallback;
+    } else {
+      window.requestIdleCallback = originalRequestIdleCallback;
+    }
+    vi.useRealTimers();
+  });
+
+  it('is idempotent: second call schedules no duplicate work', async () => {
+    const delegated = vi.fn().mockResolvedValue({});
+    const { loader } = makeDelegatingCore(delegated);
+    const setTimeoutSpy = vi.spyOn(globalThis, 'setTimeout');
+
+    await loader.startIntelligentLoading();
+    await loader.startIntelligentLoading();
+    await flushMicrotasks();
+
+    // CRITICAL delegated exactly once per feature despite two starts.
+    expect(delegated).toHaveBeenCalledWith('messaging');
+    expect(delegated).toHaveBeenCalledWith('extensionContext');
+    expect(delegated).toHaveBeenCalledTimes(2);
+
+    // Exactly one ESSENTIAL timeout + no fallbacks (requestIdleCallback present).
+    expect(setTimeoutSpy).toHaveBeenCalledTimes(1);
+
+    // Exactly one idle registration per Lazy/On-demand stage.
+    expect(window.requestIdleCallback).toHaveBeenCalledTimes(2);
+
+    // ESSENTIAL still not delegated at t=0.
+    expect(delegated).not.toHaveBeenCalledWith('contentMessageHandler');
+  });
+
+  it('CRITICAL is awaited before delayed stages are scheduled', async () => {
+    let resolveCritical;
+    const criticalGate = new Promise(resolve => { resolveCritical = resolve; });
+    const delegated = vi.fn(featureName => {
+      if (featureName === 'extensionContext') return criticalGate;
+      return Promise.resolve({});
+    });
+    const { loader } = makeDelegatingCore(delegated);
+    const setTimeoutSpy = vi.spyOn(globalThis, 'setTimeout');
+
+    const started = loader.startIntelligentLoading();
+    await flushMicrotasks();
+
+    // extensionContext still in-flight: ESSENTIAL setTimeout must not exist yet.
+    expect(setTimeoutSpy).not.toHaveBeenCalled();
+
+    resolveCritical();
+    await started;
+    await flushMicrotasks();
+
+    // Only after CRITICAL settles does ESSENTIAL scheduling begin.
+    expect(setTimeoutSpy).toHaveBeenCalledTimes(1);
+  });
+
+  it('ESSENTIAL delegates at exactly the 400ms outer delay (no double-delay)', async () => {
+    const delegated = vi.fn().mockResolvedValue({});
+    const { loader } = makeDelegatingCore(delegated);
+
+    await loader.startIntelligentLoading();
+    await flushMicrotasks();
+
+    expect(delegated).not.toHaveBeenCalledWith('contentMessageHandler');
+
+    await vi.advanceTimersByTimeAsync(399);
+    expect(delegated).not.toHaveBeenCalledWith('contentMessageHandler');
+
+    await vi.advanceTimersByTimeAsync(1);
+    await flushMicrotasks();
+
+    expect(delegated).toHaveBeenCalledWith('contentMessageHandler');
+    expect(delegated).toHaveBeenCalledTimes(3);
+  });
+
+  it('LAZY_UI idle callback delegates immediately (no extra 2500ms)', async () => {
+    const delegated = vi.fn().mockResolvedValue({});
+    const { loader } = makeDelegatingCore(delegated);
+
+    await loader.startIntelligentLoading();
+    await flushMicrotasks();
+
+    expect(idleCallbacks).toHaveLength(2);
+
+    idleCallbacks[0]();
+    await flushMicrotasks();
+
+    expect(delegated).toHaveBeenCalledWith('vue');
+    expect(delegated).toHaveBeenCalledWith('textSelection');
+    expect(delegated).toHaveBeenCalledWith('mouseHover');
+  });
+
+  it('ON_DEMAND idle callback delegates immediately (no extra 4000ms)', async () => {
+    const delegated = vi.fn().mockResolvedValue({});
+    const { loader } = makeDelegatingCore(delegated);
+
+    await loader.startIntelligentLoading();
+    await flushMicrotasks();
+
+    idleCallbacks[1]();
+    await flushMicrotasks();
+
+    expect(delegated).toHaveBeenCalledWith('shortcut');
+    expect(delegated).toHaveBeenCalledWith('textFieldIcon');
+  });
+
+  it('fallback without requestIdleCallback uses outer delays, delegation immediate on fire', async () => {
+    delete window.requestIdleCallback;
+    const delegated = vi.fn().mockResolvedValue({});
+    const { loader } = makeDelegatingCore(delegated);
+
+    await loader.startIntelligentLoading();
+    await flushMicrotasks();
+
+    expect(delegated).not.toHaveBeenCalledWith('vue');
+
+    await vi.advanceTimersByTimeAsync(2500);
+    await flushMicrotasks();
+    expect(delegated).toHaveBeenCalledWith('vue');
+    expect(delegated).toHaveBeenCalledWith('textSelection');
+    expect(delegated).toHaveBeenCalledWith('mouseHover');
+
+    expect(delegated).not.toHaveBeenCalledWith('shortcut');
+    await vi.advanceTimersByTimeAsync(1500);
+    await flushMicrotasks();
+    expect(delegated).toHaveBeenCalledWith('shortcut');
+    expect(delegated).toHaveBeenCalledWith('textFieldIcon');
+  });
+
+  it('direct loadFeature schedules nothing: delegating without timer advance is end-to-end', async () => {
+    const delegated = vi.fn().mockResolvedValue({});
+    const { loader } = makeDelegatingCore(delegated);
+
+    await loader.loadFeature('contentMessageHandler', 'ESSENTIAL');
+    await flushMicrotasks();
+
+    expect(delegated).toHaveBeenCalledWith('contentMessageHandler');
+    expect(delegated).toHaveBeenCalledTimes(1);
+  });
+
+  it('error isolation: one failed feature does not block siblings or later stages', async () => {
+    const delegated = vi.fn().mockImplementation(featureName => {
+      if (featureName === 'extensionContext') return Promise.reject(new Error('boom'));
+      return Promise.resolve({});
+    });
+    const { loader, logger } = makeDelegatingCore(delegated);
+
+    await loader.startIntelligentLoading();
+    await flushMicrotasks();
+
+    // extensionContext failure swallowed, messaging sibling still loaded.
+    expect(logger.warn).toHaveBeenCalled();
+    expect(delegated).toHaveBeenCalledWith('messaging');
+
+    // Later stages still schedule and run.
+    idleCallbacks[0]();
+    idleCallbacks[1]();
+    await vi.advanceTimersByTimeAsync(400);
+    await flushMicrotasks();
+
+    expect(delegated).toHaveBeenCalledWith('contentMessageHandler');
+    expect(delegated).toHaveBeenCalledWith('vue');
+    expect(delegated).toHaveBeenCalledWith('shortcut');
+  });
+});
