@@ -2,7 +2,6 @@
 // Updated paths after migration to features/windows
 
 export { WindowsManager as default } from '../../features/windows/managers/WindowsManager.js';
-export { dismissAllSelectionWindows } from '../../features/windows/managers/utils/DismissAll.js';
 
 // Re-export for backward compatibility with SelectionWindows name
 export { WindowsManager as SelectionWindows } from '../../features/windows/managers/WindowsManager.js';

@@ -30,6 +30,3 @@ export { ClickManager } from './interaction/ClickManager.js';
 
 // Theme modules
 export { ThemeManager } from './theme/ThemeManager.js';
-
-// Utility functions
-export { dismissAllSelectionWindows } from './utils/DismissAll.js';
