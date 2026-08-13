@@ -16,6 +16,8 @@ import { appendTranslationDiagnostic } from '@/features/translation/ir/Translati
 import { createManifestViewFromUnits } from '@/features/translation/ir/RequestUnitManifest.js';
 import { TranslationContractValidator } from '@/features/translation/core/TranslationContractValidator.js';
 import { TRANSLATION_BATCH_EXECUTION_TIMEOUT_MS } from '@/shared/constants/translation.js';
+import { TranslationCallPurpose } from '@/features/translation/providers/ProviderConstants.js';
+import { TranslationBatcher } from '@/features/translation/core/utils/TranslationBatcher.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.TRANSLATION, 'OptimizedJsonHandler');
 
@@ -48,6 +50,11 @@ export class OptimizedJsonHandler {
 
     try {
       const segments = typeof text === 'string' ? JSON.parse(text) : text;
+      const v3Parents = new Map(
+        (Array.isArray(segments) ? segments : [])
+          .filter((segment) => segment && typeof segment === 'object' && (segment.blockId != null || segment.b != null))
+          .map((segment) => [segment.blockId ?? segment.b, segment])
+      );
       const { getProviderConfiguration } = await import('@/features/translation/core/ProviderConfigurations.js');
       const { getProviderOptimizationLevelAsync } = await import('@/shared/config/config.js');
       
@@ -80,13 +87,202 @@ export class OptimizedJsonHandler {
       fragmentedUnits = new Map();
       const skipStreaming = mode === TranslationMode.PDF;
       const emittedLogicalIds = new Set();
+      const logicalIdOverrides = new WeakMap();
       let abortInitiator = null;
 
-      const appendFragmentDiagnostic = (type, parentId) => appendTranslationDiagnostic(executionContext, {
+        const appendFragmentDiagnostic = (type, parentId) => appendTranslationDiagnostic(executionContext, {
         type,
         stage: 'optimized-json-handler',
         parentId,
-      });
+        });
+
+        const createParentValidationError = (parentId, sourceText, translatedText, validation) => {
+          const violation = validation.violations[0];
+          const error = new Error(`V3 marker contract violation for fragmented parent ${parentId}: ${violation.reason || violation.code}`);
+          error.isFatal = true;
+          error.type = ErrorTypes.VALIDATION;
+          error.parentRecovery = {
+            parentId,
+            sourceText,
+            violation,
+            originalError: error,
+          };
+          return error;
+        };
+
+        const isRecoverableParentViolation = (violation) => [
+          'V3_MARKER_COUNT_MISMATCH',
+          'V3_MARKER_IDENTITY_MISMATCH',
+          'V3_DUPLICATE_MARKER',
+          'V3_MISSING_MARKER',
+          'V3_UNEXPECTED_MARKER',
+          'V3_MARKER_ORDER_MISMATCH',
+          'V3_EMPTY_TRANSLATED_INTERVAL',
+        ].includes(violation?.code);
+
+        const buildV3ParentResult = (orderedFragments, translatedText) => {
+          const logicalItem = { ...orderedFragments[0], t: translatedText, text: translatedText };
+          delete logicalItem.isSplit;
+          delete logicalItem.partIndex;
+          delete logicalItem.isV3Fragment;
+          delete logicalItem.parentId;
+          delete logicalItem.fragmentIndex;
+          delete logicalItem.fragmentCount;
+          delete logicalItem.fragmentJoinerBefore;
+          delete logicalItem.__sourceT;
+          delete logicalItem.recoveryFragmentIndex;
+          return logicalItem;
+        };
+
+        const recoverFailedV3Parent = async (failure, batchExecutionContext, parallelExecution) => {
+          const { parentId, violation } = failure.parentRecovery;
+          if (!isRecoverableParentViolation(violation)) throw failure;
+          if (abortController.signal.aborted || engine.isCancelled(messageId)) {
+            const cancellation = new Error('Translation task cancelled');
+            cancellation.name = 'AbortError';
+            cancellation.isCancelled = true;
+            throw cancellation;
+          }
+          if (operationDeadlineAt - Date.now() <= 0) {
+            const timeout = new Error(`Batch translation timed out after ${TRANSLATION_BATCH_EXECUTION_TIMEOUT_MS}ms`);
+            timeout.type = ErrorTypes.TRANSLATION_TIMEOUT;
+            if (!abortController.signal.aborted) abortController.abort();
+            throw timeout;
+          }
+
+          const sourceParent = v3Parents.get(parentId);
+          if (!sourceParent) throw failure;
+          const recoveryFragments = TranslationBatcher.splitOversizedSegment(
+            sourceParent,
+            characterLimit
+          );
+          appendTranslationDiagnostic(executionContext, {
+            type: 'PARENT_RECOVERY_STARTED',
+            stage: 'parent-recovery',
+            parentId,
+            originalReason: violation.reason || violation.code,
+            recoveryAttempt: 1,
+            fragmentCount: recoveryFragments.length,
+            callPurpose: TranslationCallPurpose.PARENT_RECOVERY,
+          });
+
+          let recoveryResults;
+          const recoveryRemainingMs = operationDeadlineAt - Date.now();
+          let recoveryTimeoutId;
+          const recoveryTimeout = new Promise((_, reject) => {
+            recoveryTimeoutId = setTimeout(() => {
+              const timeout = new Error(`Batch translation timed out after ${TRANSLATION_BATCH_EXECUTION_TIMEOUT_MS}ms`);
+              timeout.type = ErrorTypes.TRANSLATION_TIMEOUT;
+              if (!abortController.signal.aborted) abortController.abort();
+              reject(timeout);
+            }, recoveryRemainingMs);
+          });
+          try {
+            recoveryResults = await Promise.race([
+              Promise.all(recoveryFragments.map(async (fragment, fragmentIndex) => {
+            if (abortController.signal.aborted || engine.isCancelled(messageId)) {
+              const cancellation = new Error('Translation task cancelled');
+              cancellation.name = 'AbortError';
+              cancellation.isCancelled = true;
+              throw cancellation;
+            }
+            if (operationDeadlineAt - Date.now() <= 0) {
+              const timeout = new Error(`Batch translation timed out after ${TRANSLATION_BATCH_EXECUTION_TIMEOUT_MS}ms`);
+              timeout.type = ErrorTypes.TRANSLATION_TIMEOUT;
+              if (!abortController.signal.aborted) abortController.abort();
+              throw timeout;
+            }
+            const recoveryContext = {
+              ...batchExecutionContext,
+              deadlineAt: operationDeadlineAt,
+            };
+            const response = await self._performBatchCall(
+              providerInstance,
+              [fragment],
+              detectedSourceLanguage,
+              targetLanguage,
+              mode,
+              abortController,
+              messageId,
+              sessionId,
+              {
+                ...options?.contextMetadata,
+                callPurpose: TranslationCallPurpose.PARENT_RECOVERY,
+                conversationParticipates: false,
+                useParentConversationLifecycle: false,
+              },
+              options?.contextSummary,
+              engine,
+              sender,
+              originalSourceLang,
+              originalTargetLang,
+              parallelExecution,
+              recoveryContext,
+              TranslationCallPurpose.PARENT_RECOVERY
+            );
+            const translated = response?.translatedText !== undefined ? response.translatedText : response;
+            const mapped = self._mapResults([fragment], translated, executionContext)[0];
+            return { ...mapped, recoveryFragmentIndex: fragmentIndex };
+              })),
+              recoveryTimeout,
+            ]);
+          } catch (recoveryError) {
+            const recoveryType = recoveryError?.type || matchErrorToType(recoveryError);
+            const isCancellation = recoveryError?.name === 'AbortError'
+              || recoveryError?.isCancelled
+              || recoveryType === ErrorTypes.USER_CANCELLED
+              || recoveryType === ErrorTypes.TRANSLATION_CANCELLED;
+            if (recoveryType === ErrorTypes.TRANSLATION_TIMEOUT || isCancellation) throw recoveryError;
+            appendTranslationDiagnostic(executionContext, {
+              type: 'PARENT_RECOVERY_FAILED',
+              stage: 'parent-recovery',
+              parentId,
+              originalReason: violation.reason || violation.code,
+              recoveryAttempt: 1,
+              fragmentCount: recoveryFragments.length,
+              finalReason: recoveryError?.message || recoveryType,
+              callPurpose: TranslationCallPurpose.PARENT_RECOVERY,
+            });
+            throw failure;
+          } finally {
+            clearTimeout(recoveryTimeoutId);
+          }
+
+          const ordered = recoveryResults.sort((a, b) => a.recoveryFragmentIndex - b.recoveryFragmentIndex);
+          const translatedText = ordered
+            .map((fragment, index) => `${index === 0 ? '' : (fragment.fragmentJoinerBefore || '')}${fragment.t || fragment.text || ''}`)
+            .join('');
+          const validation = TranslationContractValidator.validateV3Parent(
+            sourceParent.t ?? sourceParent.text ?? '',
+            translatedText,
+            parentId
+          );
+          if (!validation?.isValid) {
+            const finalViolation = validation?.violations?.[0];
+            appendTranslationDiagnostic(executionContext, {
+              type: 'PARENT_RECOVERY_FAILED',
+              stage: 'parent-recovery',
+              parentId,
+              originalReason: violation.reason || violation.code,
+              recoveryAttempt: 1,
+              fragmentCount: recoveryFragments.length,
+              finalReason: finalViolation?.reason || finalViolation?.code,
+              callPurpose: TranslationCallPurpose.PARENT_RECOVERY,
+            });
+            throw failure;
+          }
+
+          appendTranslationDiagnostic(executionContext, {
+            type: 'PARENT_RECOVERY_SUCCEEDED',
+            stage: 'parent-recovery',
+            parentId,
+            originalReason: violation.reason || violation.code,
+            recoveryAttempt: 1,
+            fragmentCount: recoveryFragments.length,
+            callPurpose: TranslationCallPurpose.PARENT_RECOVERY,
+          });
+          return buildV3ParentResult(ordered, translatedText);
+        };
 
         const extractLogicalId = (item) => {
           if (typeof item !== 'object' || item === null) return undefined;
@@ -103,14 +299,15 @@ export class OptimizedJsonHandler {
           const completeResults = [];
           const sameBatchIds = new Set();
 
-          const validateAndAdd = (item) => {
-            const logicalId = extractLogicalId(item);
+          const validateAndAdd = (item, logicalIdOverride) => {
+            const logicalId = logicalIdOverride ?? extractLogicalId(item);
             if (logicalId !== undefined && sameBatchIds.has(logicalId)) {
               const err = new Error(`Duplicate identity in batch: ${String(logicalId)}`);
               err.isFatal = true;
               err.type = ErrorTypes.VALIDATION;
               throw err;
             }
+            if (logicalIdOverride !== undefined) logicalIdOverrides.set(item, logicalIdOverride);
             if (logicalId !== undefined) sameBatchIds.add(logicalId);
             completeResults.push(item);
           };
@@ -194,7 +391,7 @@ export class OptimizedJsonHandler {
                 .map((fragment, index) => `${index === 0 ? '' : (fragment.fragmentJoinerBefore || '')}${fragment.__sourceT ?? fragment.t ?? fragment.text ?? ''}`)
                 .join('');
                const validation = TranslationContractValidator.validateV3Parent(sourceText, translatedText, parentId);
-               if (validation && !validation.isValid) {
+                if (validation && !validation.isValid) {
                  const violation = validation.violations[0];
                  const parentIdStr = String(parentId ?? 'unknown');
                  const reason = violation.reason || violation.code || 'V3_CONTRACT_VIOLATION';
@@ -206,21 +403,11 @@ export class OptimizedJsonHandler {
                    actualMarkerCount: violation.actualMarkerCount ?? null,
                    reason,
                  });
-                 const err = new Error(`V3 marker contract violation for fragmented parent ${parentIdStr}: ${reason}`);
-                err.isFatal = true;
-                err.type = ErrorTypes.VALIDATION;
-                throw err;
+                  const parentError = createParentValidationError(parentIdStr, sourceText, translatedText, validation);
+                  parentError.parentRecovery.completeResults = completeResults;
+                  throw parentError;
               }
-              const logicalItem = { ...orderedFragments[0] };
-              delete logicalItem.isSplit;
-              delete logicalItem.partIndex;
-              delete logicalItem.isV3Fragment;
-              delete logicalItem.parentId;
-              delete logicalItem.fragmentIndex;
-              delete logicalItem.fragmentCount;
-              delete logicalItem.fragmentJoinerBefore;
-              delete logicalItem.__sourceT;
-              validateAndAdd({ ...logicalItem, i: parentId, t: translatedText, text: translatedText });
+               validateAndAdd(buildV3ParentResult(orderedFragments, translatedText), `v3:${parentId}`);
               parent.emitted = true;
               parent.fragments.clear();
               appendFragmentDiagnostic('FRAGMENTED_UNIT_COMPLETED', parentId);
@@ -465,13 +652,30 @@ export class OptimizedJsonHandler {
             : translatedBatchResponse;
 
           const mappedResults = self._mapResults(batchPayload, translatedBatch, executionContext);
-          const completeResults = collectCompleteFragments(mappedResults);
+           let completeResults;
+           try {
+             completeResults = collectCompleteFragments(mappedResults);
+           } catch (batchError) {
+             if (!batchError.parentRecovery) throw batchError;
+             let recoveredParent;
+             try {
+               recoveredParent = await recoverFailedV3Parent(batchError, batchExecutionContext, parallelExecution);
+             } catch (recoveryError) {
+               if ((recoveryError?.type || matchErrorToType(recoveryError)) === ErrorTypes.TRANSLATION_TIMEOUT) {
+                 didTimeout = true;
+                 timeoutError = recoveryError;
+               }
+               throw recoveryError;
+             }
+              completeResults = [...(batchError.parentRecovery.completeResults || []), recoveredParent];
+              logicalIdOverrides.set(recoveredParent, `v3:${batchError.parentRecovery.parentId}`);
+           }
           checkCancellation();
           const filteredResults = [];
           const acceptedManifestUnits = [];
           for (let idx = 0; idx < completeResults.length; idx++) {
             const item = completeResults[idx];
-            const logicalId = extractLogicalId(item);
+             const logicalId = logicalIdOverrides.get(item) ?? extractLogicalId(item);
             if (logicalId !== undefined && emittedLogicalIds.has(logicalId)) {
               appendTranslationDiagnostic(executionContext, {
                 type: 'DUPLICATE_IDENTITY_SUPPRESSED',
@@ -636,7 +840,7 @@ export class OptimizedJsonHandler {
     }
   }
 
-  async _performBatchCall(providerInstance, batch, source, target, mode, abortController, messageId, sessionId, contextMetadata, contextSummary, engine, sender, originalSourceLang = null, originalTargetLang = null, parallelExecution = false, executionContext = null) {
+  async _performBatchCall(providerInstance, batch, source, target, mode, abortController, messageId, sessionId, contextMetadata, contextSummary, engine, sender, originalSourceLang = null, originalTargetLang = null, parallelExecution = false, executionContext = null, callPurpose = null) {
     const isArrayInput = Array.isArray(batch);
     const textsToTranslate = isArrayInput 
       ? batch.map(item => typeof item === 'object' ? (item.t || item.text || '') : (item || ''))
@@ -655,6 +859,7 @@ export class OptimizedJsonHandler {
         engine, sender, priority: 'high', rawJsonPayload: true, parallelExecution,
          originalSourceLang, originalTargetLang,
          expectedFormat,
+         ...(callPurpose && { callPurpose }),
          executionContext
       }
     );

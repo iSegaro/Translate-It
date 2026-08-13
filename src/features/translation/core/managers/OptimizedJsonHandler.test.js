@@ -29,6 +29,7 @@ import { getProviderConfiguration } from '@/features/translation/core/ProviderCo
 import { TranslationBatcher } from '@/features/translation/core/utils/TranslationBatcher.js';
 import { createManifestView, createRequestUnitManifest } from '@/features/translation/ir/RequestUnitManifest.js';
 import { TRANSLATION_BATCH_EXECUTION_TIMEOUT_MS } from '@/shared/constants/translation.js';
+import { TranslationCallPurpose } from '@/features/translation/providers/ProviderConstants.js';
 
 // Mock dependencies
 vi.mock('@/shared/logging/logger.js', () => ({
@@ -489,7 +490,7 @@ describe('OptimizedJsonHandler', () => {
         mockSender
       );
 
-      expect(mockProvider.translate).toHaveBeenCalledTimes(2);
+      expect(mockProvider.translate).toHaveBeenCalledTimes(4);
       expect(result).toMatchObject({
         success: false,
         error: { type: ErrorTypes.VALIDATION }
@@ -541,6 +542,164 @@ describe('OptimizedJsonHandler', () => {
         .map(([, m]) => m)
         .filter(m => m.action === MessageActions.TRANSLATION_STREAM_UPDATE);
       expect(updates).toHaveLength(0);
+    });
+
+    it('recovers one invalid V3 parent with isolated parent recovery calls', async () => {
+      const browser = (await import('webextension-polyfill')).default;
+      browser.tabs.sendMessage.mockClear();
+      const m2 = '@@TI_SEG_e_s_n2@@';
+      const m3 = '@@TI_SEG_e_s_n3@@';
+      const source = `A${m2}B ${m3}C`;
+      const fragment0 = { t: `A${m2}B`, i: 'n1', blockId: 'g1', isV3Fragment: true, parentId: 'g1', fragmentIndex: 0, fragmentCount: 2, fragmentJoinerBefore: '' };
+      const fragment1 = { t: `${m3}C`, i: 'n1', blockId: 'g1', isV3Fragment: true, parentId: 'g1', fragmentIndex: 1, fragmentCount: 2, fragmentJoinerBefore: ' ' };
+      mockEngine.createIntelligentBatches = vi.fn(() => [[fragment0], [fragment1]]);
+      mockProvider.translate
+        .mockResolvedValueOnce({ translatedText: [`A${m2}B`] })
+        .mockResolvedValueOnce({ translatedText: [`${m3}${m3}C`] })
+        .mockResolvedValueOnce({ translatedText: [source] });
+
+      const result = await handler.execute(
+        mockEngine,
+        { ...mockData, sourceLanguage: 'en', text: JSON.stringify([{ t: source, blockId: 'g1', i: 'n1' }]) },
+        mockProvider, 'en', 'fa', 'msg-v3-parent-recovery', mockSender
+      );
+
+      expect(result.success).toBe(true);
+      expect(mockProvider.translate).toHaveBeenCalledTimes(3);
+      expect(mockProvider.translate.mock.calls.slice(2).map(call => call[3].callPurpose))
+        .toEqual([TranslationCallPurpose.PARENT_RECOVERY]);
+      expect(mockProvider.translate.mock.calls[2][3].contextMetadata.conversationParticipates).toBe(false);
+      expect(mockProvider.translate.mock.calls[2][3].contextMetadata.useParentConversationLifecycle).toBe(false);
+      expect(mockProvider.translate.mock.calls[2][3].executionContext.deadlineAt)
+        .toBe(mockProvider.translate.mock.calls[0][3].executionContext.deadlineAt);
+      const updates = browser.tabs.sendMessage.mock.calls
+        .map(([, message]) => message)
+        .filter(message => message.action === MessageActions.TRANSLATION_STREAM_UPDATE);
+      expect(updates).toHaveLength(1);
+      expect(updates[0].data.data[0].t).toBe(source);
+      expect(appendTranslationDiagnostic).toHaveBeenCalledWith(null, expect.objectContaining({ type: 'PARENT_RECOVERY_STARTED', parentId: 'g1' }));
+      expect(appendTranslationDiagnostic).toHaveBeenCalledWith(null, expect.objectContaining({ type: 'PARENT_RECOVERY_SUCCEEDED', parentId: 'g1' }));
+    });
+
+    it('preserves the original validation failure when parent recovery fails', async () => {
+      const m2 = '@@TI_SEG_e_s_n2@@';
+      const m3 = '@@TI_SEG_e_s_n3@@';
+      const fragment0 = { t: `A${m2}B`, i: 'n1', blockId: 'g1', isV3Fragment: true, parentId: 'g1', fragmentIndex: 0, fragmentCount: 2, fragmentJoinerBefore: '' };
+      const fragment1 = { t: `${m3}C`, i: 'n1', blockId: 'g1', isV3Fragment: true, parentId: 'g1', fragmentIndex: 1, fragmentCount: 2, fragmentJoinerBefore: ' ' };
+      mockEngine.createIntelligentBatches = vi.fn(() => [[fragment0], [fragment1]]);
+      mockProvider.translate
+        .mockResolvedValueOnce({ translatedText: [`A${m2}B`] })
+        .mockResolvedValueOnce({ translatedText: [`${m3}${m3}C`] })
+        .mockResolvedValueOnce({ translatedText: [`${m3}${m3}C`] });
+
+      const result = await handler.execute(
+        mockEngine,
+        { ...mockData, sourceLanguage: 'en', text: JSON.stringify([{ t: `A${m2}B ${m3}C`, blockId: 'g1', i: 'n1' }]) },
+        mockProvider, 'en', 'fa', 'msg-v3-parent-recovery-fail', mockSender
+      );
+
+      expect(result.success).toBe(false);
+      expect(result.error.type).toBe(ErrorTypes.VALIDATION);
+      expect(result.error.message).toContain('MARKER_COUNT_MISMATCH');
+      expect(result.results).toEqual([]);
+      expect(appendTranslationDiagnostic).toHaveBeenCalledWith(null, expect.objectContaining({ type: 'PARENT_RECOVERY_FAILED', parentId: 'g1' }));
+    });
+
+    it('does not retry parent recovery recursively after one failed pass', async () => {
+      const m2 = '@@TI_SEG_e_s_n2@@';
+      const m3 = '@@TI_SEG_e_s_n3@@';
+      const fragment0 = { t: `A${m2}B`, i: 'n1', blockId: 'g1', isV3Fragment: true, parentId: 'g1', fragmentIndex: 0, fragmentCount: 2, fragmentJoinerBefore: '' };
+      const fragment1 = { t: `${m3}C`, i: 'n1', blockId: 'g1', isV3Fragment: true, parentId: 'g1', fragmentIndex: 1, fragmentCount: 2, fragmentJoinerBefore: ' ' };
+      mockEngine.createIntelligentBatches = vi.fn(() => [[fragment0], [fragment1]]);
+      mockProvider.translate
+        .mockResolvedValueOnce({ translatedText: [`A${m2}B`] })
+        .mockResolvedValueOnce({ translatedText: [`${m3}${m3}C`] })
+        .mockResolvedValueOnce({ translatedText: [`${m3}${m3}C`] });
+
+      const result = await handler.execute(
+        mockEngine,
+        { ...mockData, sourceLanguage: 'en', text: JSON.stringify([{ t: `A${m2}B ${m3}C`, blockId: 'g1', i: 'n1' }]) },
+        mockProvider, 'en', 'fa', 'msg-v3-parent-recovery-once', mockSender
+      );
+
+      expect(result.success).toBe(false);
+      expect(mockProvider.translate).toHaveBeenCalledTimes(3);
+      expect(mockProvider.translate.mock.calls.filter(call => call[3].callPurpose === TranslationCallPurpose.PARENT_RECOVERY)).toHaveLength(1);
+    });
+
+    it('does not start parent recovery when its inherited deadline is expired', async () => {
+      const m2 = '@@TI_SEG_e_s_n2@@';
+      const m3 = '@@TI_SEG_e_s_n3@@';
+      const fragment0 = { t: `A${m2}B`, i: 'n1', blockId: 'g1', isV3Fragment: true, parentId: 'g1', fragmentIndex: 0, fragmentCount: 2, fragmentJoinerBefore: '' };
+      const fragment1 = { t: `${m3}C`, i: 'n1', blockId: 'g1', isV3Fragment: true, parentId: 'g1', fragmentIndex: 1, fragmentCount: 2, fragmentJoinerBefore: ' ' };
+      mockEngine.createIntelligentBatches = vi.fn(() => [[fragment0], [fragment1]]);
+      mockProvider.translate.mockResolvedValueOnce({ translatedText: [`A${m2}B`] });
+
+      await expect(handler.execute(
+        mockEngine,
+        { ...mockData, sourceLanguage: 'en', text: JSON.stringify([{ t: `A${m2}B ${m3}C`, blockId: 'g1', i: 'n1' }]) },
+        mockProvider, 'en', 'fa', 'msg-v3-parent-recovery-expired', mockSender, 'unknown', { deadlineAt: Date.now() - 1 }
+      )).rejects.toMatchObject({ type: ErrorTypes.TRANSLATION_TIMEOUT });
+      expect(mockProvider.translate).not.toHaveBeenCalled();
+    });
+
+    it('freshly fragments oversized parent recovery input', async () => {
+      const marker = '@@TI_SEG_s1_e1_n1@@';
+      const source = `${'word '.repeat(260)}${marker}`;
+      const fragment = { t: source, i: 'n1', blockId: 'g1', isV3Fragment: true, parentId: 'g1', fragmentIndex: 0, fragmentCount: 1, fragmentJoinerBefore: '' };
+      mockEngine.createIntelligentBatches = vi.fn(() => [[fragment]]);
+      mockProvider.translate
+        .mockResolvedValueOnce({ translatedText: ['word '.repeat(260)] })
+        .mockResolvedValueOnce({ translatedText: ['word '.repeat(260)] })
+        .mockResolvedValueOnce({ translatedText: [source] });
+
+      const result = await handler.execute(
+        mockEngine,
+        { ...mockData, sourceLanguage: 'en', text: JSON.stringify([{ t: source, blockId: 'g1', i: 'n1' }]) },
+        mockProvider, 'en', 'fa', 'msg-v3-parent-recovery-fragments', mockSender
+      );
+
+      expect(result.success).toBe(true);
+      expect(mockProvider.translate.mock.calls.filter(call => call[3].callPurpose === TranslationCallPurpose.PARENT_RECOVERY).length).toBeGreaterThan(1);
+    });
+
+    it('aborts in-flight parent recovery at shared deadline and suppresses late settlement', async () => {
+      const browser = (await import('webextension-polyfill')).default;
+      browser.tabs.sendMessage.mockClear();
+      const m2 = '@@TI_SEG_e_s_n2@@';
+      const m3 = '@@TI_SEG_e_s_n3@@';
+      const recovery = createDeferred();
+      const { getAIConversationHistoryEnabledAsync } = await import('@/shared/config/config.js');
+      getAIConversationHistoryEnabledAsync.mockResolvedValue(true);
+      const fragment0 = { t: `A${m2}B`, i: 'n1', blockId: 'g1', isV3Fragment: true, parentId: 'g1', fragmentIndex: 0, fragmentCount: 2, fragmentJoinerBefore: '' };
+      const fragment1 = { t: `${m3}C`, i: 'n1', blockId: 'g1', isV3Fragment: true, parentId: 'g1', fragmentIndex: 1, fragmentCount: 2, fragmentJoinerBefore: ' ' };
+      mockEngine.createIntelligentBatches = vi.fn(() => [[fragment0, fragment1]]);
+      mockProvider.translate
+        .mockResolvedValueOnce({ translatedText: [`A${m2}B`, `${m3}${m3}C`] })
+        .mockImplementationOnce(() => recovery.promise);
+
+      try {
+        const execution = handler.execute(
+          mockEngine,
+          { ...mockData, sourceLanguage: 'en', text: JSON.stringify([{ t: `A${m2}B ${m3}C`, blockId: 'g1', i: 'n1' }]) },
+          mockProvider, 'en', 'fa', 'msg-v3-recovery-timeout', mockSender, 'unknown', { deadlineAt: Date.now() + 50 }
+        );
+        execution.catch(() => {});
+        await vi.waitFor(() => expect(mockProvider.translate).toHaveBeenCalledTimes(2));
+        expect(mockProvider.translate.mock.calls[1][3].callPurpose).toBe(TranslationCallPurpose.PARENT_RECOVERY);
+        await new Promise(resolve => setTimeout(resolve, 60));
+         await expect(execution).rejects.toMatchObject({ type: ErrorTypes.TRANSLATION_TIMEOUT });
+        expect(mockAbortController.abort).toHaveBeenCalledTimes(1);
+        recovery.resolve({ translatedText: [`A${m2}B ${m3}C`] });
+        await Promise.resolve();
+        const updates = browser.tabs.sendMessage.mock.calls
+          .map(([, message]) => message)
+          .filter(message => message.action === MessageActions.TRANSLATION_STREAM_UPDATE);
+        expect(updates).toHaveLength(0);
+      } finally {
+        recovery.resolve({ translatedText: ['late'] });
+        getAIConversationHistoryEnabledAsync.mockResolvedValue(false);
+      }
     });
 
     it('reconstructs full parent from out-of-order fragment arrival', async () => {
@@ -2089,7 +2248,7 @@ describe('OptimizedJsonHandler', () => {
           .map(([, m]) => m)
           .filter(m => m.action === MessageActions.TRANSLATION_STREAM_UPDATE);
         expect(updates).toHaveLength(1);
-        expect(updates[0].data.data).toEqual([{ t: 'Translated one. Translated two.', text: 'Translated one. Translated two.', blockId: 'g1', i: 'g1', role: 'paragraph' }]);
+         expect(updates[0].data.data).toEqual([{ t: 'Translated one. Translated two.', text: 'Translated one. Translated two.', blockId: 'g1', i: 'n1', role: 'paragraph' }]);
       });
 
       it('reassembles V3 fragments by fragmentIndex regardless of batch completion order', async () => {
@@ -2221,7 +2380,7 @@ describe('OptimizedJsonHandler', () => {
         const updates = browser.tabs.sendMessage.mock.calls
           .map(([, m]) => m)
           .filter(m => m.action === MessageActions.TRANSLATION_STREAM_UPDATE);
-        expect(updates[0].data.data[0].i).toBe('g1');
+        expect(updates[0].data.data[0].i).toBe('n1');
         expect(updates[0].data.data[0].blockId).toBe('g1');
       });
 
@@ -2903,7 +3062,26 @@ describe('OptimizedJsonHandler', () => {
         expect(updates[0].data.data[0].t).toBe('TB.');
         expect(updates[1].data.data[0].t).toBe('TA.');
         expect(updates[0].data.data[0].i).toBe('n1');
-        expect(updates[1].data.data[0].i).toBe('g1');
+        expect(updates[1].data.data[0].i).toBe('n1');
+      });
+
+      it('preserves separate generic identities when direct items share blockId', async () => {
+        const first = { i: 'n1', blockId: 'b1', t: 'First.' };
+        const second = { i: 'n2', blockId: 'b1', t: 'Second.' };
+        mockEngine.createIntelligentBatches = vi.fn(() => [[first, second]]);
+        mockProvider.translate.mockResolvedValueOnce({ translatedText: ['Translated first.', 'Translated second.'] });
+
+        const result = await handler.execute(
+          mockEngine,
+          { ...mockData, sourceLanguage: 'en', text: JSON.stringify([first, second]) },
+          mockProvider, 'en', 'fa', 'msg-shared-generic-block', mockSender
+        );
+
+        expect(result.success).toBe(true);
+        expect(result.results.map(({ i, blockId }) => ({ i, blockId }))).toEqual([
+          { i: 'n1', blockId: 'b1' },
+          { i: 'n2', blockId: 'b1' },
+        ]);
       });
 
       it('cross-batch duplicate: onTerminalUnitsAccepted only called for first occurrence', async () => {
