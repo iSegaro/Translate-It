@@ -742,9 +742,11 @@ export class TextFieldDoubleClickHandler extends ResourceTracker {
   /**
    * Calculate position for text field translation UI
    *
-   * This method provides document-relative positioning for WindowsManager.
-   * Based on the logs, WindowsManager expects document-relative coordinates
-   * even for fixed positioning elements.
+   * Aligns with the canonical iframe coordinate contract (see SelectionManager):
+   * - Top frame: viewport + top-page scroll → document-relative, _isViewportRelative: false.
+   * - iframe: viewport-relative (NO iframe scroll added), _isViewportRelative: true.
+   * For iframe producers, EventCoordinator adds iframe.getBoundingClientRect().left/top,
+   * so the position lands correctly in the top frame's viewport.
    *
    * @param {Event} event - Double-click event containing client coordinates
    * @param {Element|null} actualTextField - The actual text field element (may differ from event.target)
@@ -771,10 +773,12 @@ export class TextFieldDoubleClickHandler extends ResourceTracker {
         isFromMouseEvent = false;
       }
 
-      // Convert viewport coordinates to document-relative coordinates
-      // WindowsManager appears to expect document coordinates even for fixed positioning
-      const documentX = baseX + window.scrollX;
-      const documentY = baseY + window.scrollY;
+      // Convert viewport coordinates according to the canonical contract:
+      // Top frame converts to document-relative (viewport + top-page scroll);
+      // iframe stays viewport-relative because the main frame adds the iframe offset.
+      const isTopFrame = window === window.top;
+      const adjustedX = isTopFrame ? baseX + window.scrollX : baseX;
+      const adjustedY = isTopFrame ? baseY + window.scrollY : baseY;
 
       // Calculate position with icon offset
       const iconSize = 32; // Same as WindowsConfig
@@ -784,29 +788,32 @@ export class TextFieldDoubleClickHandler extends ResourceTracker {
 
       if (isFromMouseEvent) {
         // Center icon horizontally on cursor, place slightly below cursor
-        finalX = documentX - (iconSize / 2);
-        finalY = documentY + iconOffset;
+        finalX = adjustedX - (iconSize / 2);
+        finalY = adjustedY + iconOffset;
       } else {
         // Center icon on element bottom edge
-        finalX = documentX - (iconSize / 2);
-        finalY = documentY + iconOffset;
+        finalX = adjustedX - (iconSize / 2);
+        finalY = adjustedY + iconOffset;
       }
 
       const position = {
         x: finalX,
         y: finalY,
         isFromMouseEvent,
-        strategy: 'document-relative-with-scroll',
-        isInIframe: window !== window.top,
-        isViewportRelative: false // Mark as document-relative for WindowsManager
+        strategy: isTopFrame ? 'document-relative-with-scroll' : 'viewport-relative',
+        isInIframe: !isTopFrame,
+        // Canonical flag consumed by usePositioning; must be false in top frame
+        // (document-relative) and true in iframes (viewport-relative).
+        _isViewportRelative: !isTopFrame
       };
 
-      logger.debug('Calculated text field position (document-relative)', {
+      logger.debug('Calculated text field position', {
         element: element.tagName,
         baseCoords: { x: baseX, y: baseY },
         scrollOffset: { x: window.scrollX, y: window.scrollY },
+        isTopFrame,
         calculatedPosition: position,
-        isInIframe: window !== window.top,
+        isInIframe: !isTopFrame,
         documentSize: {
           width: document.documentElement.scrollWidth,
           height: document.documentElement.scrollHeight
