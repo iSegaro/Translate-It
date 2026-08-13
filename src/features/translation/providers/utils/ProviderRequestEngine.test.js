@@ -225,6 +225,7 @@ describe('ProviderRequestEngine', () => {
       ['UNKNOWN', TranslationCallPurpose.PRIMARY_TRANSLATION],
       [TranslationCallPurpose.PRIMARY_TRANSLATION, TranslationCallPurpose.PRIMARY_TRANSLATION],
       [TranslationCallPurpose.STRUCTURED_RECOVERY, TranslationCallPurpose.STRUCTURED_RECOVERY],
+      [TranslationCallPurpose.PARENT_RECOVERY, TranslationCallPurpose.PARENT_RECOVERY],
     ])('attributes direct physical %p purpose as %s', async (callPurpose, expectedPurpose) => {
       proxyManager.fetch.mockResolvedValue({
         ok: true,
@@ -278,6 +279,16 @@ describe('ProviderRequestEngine', () => {
       })).rejects.toThrow('NetworkError');
       expect(statsManager.recordRequest).toHaveBeenCalledWith('TestProvider', 's1', 10, 5, TranslationCallPurpose.STRUCTURED_RECOVERY);
       expect(statsManager.recordError).toHaveBeenCalledWith('TestProvider', 's1', TranslationCallPurpose.STRUCTURED_RECOVERY);
+    });
+
+    it('attributes parent recovery transport calls to parent recovery', async () => {
+      proxyManager.fetch.mockRejectedValue(new TypeError('NetworkError: Failed to fetch'));
+      const { statsManager } = await import('../../core/TranslationStatsManager.js');
+      await expect(ProviderRequestEngine.executeApiCall(mockProvider, {
+        ...baseParams(), callPurpose: TranslationCallPurpose.PARENT_RECOVERY
+      })).rejects.toThrow('NetworkError');
+      expect(statsManager.recordRequest).toHaveBeenCalledWith('TestProvider', 's1', 10, 5, TranslationCallPurpose.PARENT_RECOVERY);
+      expect(statsManager.recordError).toHaveBeenCalledWith('TestProvider', 's1', TranslationCallPurpose.PARENT_RECOVERY);
     });
 
     it('attributes a recovery abort without recording a recovery error', async () => {

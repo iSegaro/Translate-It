@@ -239,6 +239,103 @@ beforeEach(() => {
       expect(callSpy.mock.calls[0][2].callPurpose).toBe(TranslationCallPurpose.PRIMARY_TRANSLATION);
     });
 
+    it('forces parent recovery to remain non-conversational despite caller metadata', async () => {
+      const { AIResponseParser } = await import('./utils/AIResponseParser.js');
+      AIResponseParser.parseBatchResult.mockReturnValue({ results: ['R1'], contractViolation: false });
+      const callSpy = vi.spyOn(provider, '_callAI');
+      const history = vi.spyOn((await import('./utils/AIConversationHelper.js')).AIConversationHelper, 'getConversationHistory');
+      const session = translationSessionManager.getOrCreateSession('parent-recovery-session', 'MockAI');
+
+      await provider._translateBatch(['source'], 'en', 'fa', 'select-element', null, null, 'm', session.id, {
+        callPurpose: TranslationCallPurpose.PARENT_RECOVERY,
+        conversationParticipates: true,
+      }, ResponseFormat.JSON_ARRAY);
+
+      expect(callSpy.mock.calls[0][2]).toMatchObject({
+        callPurpose: TranslationCallPurpose.PARENT_RECOVERY,
+        conversationParticipates: false,
+        useParentConversationLifecycle: false,
+      });
+      expect(callSpy.mock.calls[0][2].conversationCommitCandidate).toBeNull();
+      expect(history).not.toHaveBeenCalled();
+      history.mockRestore();
+    });
+
+    it('sanitizes parent recovery metadata through traditional sequential execution', async () => {
+      const { AIConversationHelper } = await import('./utils/AIConversationHelper.js');
+      const callSpy = vi.spyOn(provider, '_callAI').mockResolvedValue('translated');
+      const claimSpy = vi.spyOn(AIConversationHelper, 'claimNextTurn');
+      const historySpy = vi.spyOn(AIConversationHelper, 'getConversationHistory');
+      const writeSpy = vi.spyOn(AIConversationHelper, 'updateSessionHistory');
+      provider.getSupportsStreaming = vi.fn().mockResolvedValue(false);
+      provider.getBatchStrategy = vi.fn().mockResolvedValue('sequential');
+
+      try {
+        await provider._batchTranslate(['source'], 'en', 'fa', 'select-element', null, null, 'm', null, 'traditional-parent', 'text', {
+          callPurpose: TranslationCallPurpose.PARENT_RECOVERY,
+          conversationParticipates: true,
+          useParentConversationLifecycle: true,
+        });
+
+        expect(callSpy.mock.calls[0][2]).toMatchObject({
+          callPurpose: TranslationCallPurpose.PARENT_RECOVERY,
+          conversationParticipates: false,
+          useParentConversationLifecycle: false,
+        });
+        expect(claimSpy).not.toHaveBeenCalled();
+        expect(historySpy).not.toHaveBeenCalled();
+        expect(writeSpy).not.toHaveBeenCalled();
+      } finally {
+        claimSpy.mockRestore();
+        historySpy.mockRestore();
+        writeSpy.mockRestore();
+      }
+    });
+
+    it('keeps nested structured recovery purpose distinct from parent recovery', async () => {
+      const { AIResponseParser } = await import('./utils/AIResponseParser.js');
+      AIResponseParser.parseBatchResult.mockReturnValueOnce({ results: ['bad'], contractViolation: true });
+      provider.executeSequentialBatch = vi.fn().mockResolvedValue(['recovered']);
+      const callSpy = vi.spyOn(provider, 'executeStructuredBatch');
+
+      await provider._translateBatch(['source'], 'en', 'fa', 'select-element', null, null, 'm', 'nested-parent', {
+        callPurpose: TranslationCallPurpose.PARENT_RECOVERY,
+        conversationParticipates: true,
+      }, ResponseFormat.JSON_ARRAY);
+
+      expect(callSpy.mock.calls[0][3].callPurpose).toBe(TranslationCallPurpose.PARENT_RECOVERY);
+      expect(callSpy.mock.calls[0][3].contextMetadata).toMatchObject({
+        conversationParticipates: false,
+        useParentConversationLifecycle: false,
+      });
+      expect(callSpy.mock.calls[0][3].conversationCommitCandidate).toBeNull();
+      expect(provider.executeSequentialBatch).toHaveBeenCalledWith(
+        expect.anything(),
+        'en',
+        'fa',
+        expect.objectContaining({ callPurpose: TranslationCallPurpose.STRUCTURED_RECOVERY })
+      );
+    });
+
+    it('forces structured recovery to disable inherited conversation lifecycle metadata', async () => {
+      const { AIResponseParser } = await import('./utils/AIResponseParser.js');
+      AIResponseParser.parseBatchResult.mockReturnValue({ results: ['R1'], contractViolation: false });
+      const callSpy = vi.spyOn(provider, '_callAI');
+
+      await provider._translateBatch(['source'], 'en', 'fa', 'select-element', null, null, 'm', 'structured-recovery', {
+        callPurpose: TranslationCallPurpose.STRUCTURED_RECOVERY,
+        conversationParticipates: true,
+        useParentConversationLifecycle: true,
+      }, ResponseFormat.JSON_ARRAY);
+
+      expect(callSpy.mock.calls[0][2]).toMatchObject({
+        callPurpose: TranslationCallPurpose.STRUCTURED_RECOVERY,
+        conversationParticipates: false,
+        useParentConversationLifecycle: false,
+        conversationCommitCandidate: null,
+      });
+    });
+
     it('commits one staged valid structured primary response after parser acceptance', async () => {
       const { AIResponseParser } = await import("./utils/AIResponseParser.js");
       const response = '{"translations":["translated"]}';
@@ -259,6 +356,25 @@ beforeEach(() => {
       } finally {
         writeSpy.mockRestore();
       }
+    });
+
+    it('preserves primary conversation lifecycle metadata and candidate creation', async () => {
+      const { AIResponseParser } = await import('./utils/AIResponseParser.js');
+      AIResponseParser.parseBatchResult.mockReturnValue({ results: ['translated'], contractViolation: false });
+      const callSpy = vi.spyOn(provider, '_callAI').mockResolvedValue('raw');
+
+      await provider._translateBatch(['source'], 'en', 'fa', 'select-element', null, null, 'm', 'primary-lifecycle', {
+        callPurpose: TranslationCallPurpose.PRIMARY_TRANSLATION,
+        conversationParticipates: true,
+        useParentConversationLifecycle: true,
+      }, ResponseFormat.JSON_ARRAY);
+
+      expect(callSpy.mock.calls[0][2]).toMatchObject({
+        callPurpose: TranslationCallPurpose.PRIMARY_TRANSLATION,
+        conversationParticipates: true,
+        useParentConversationLifecycle: true,
+      });
+      expect(callSpy.mock.calls[0][2].conversationCommitCandidate).not.toBeNull();
     });
 
     it('suppresses legacy commit while parent conversation lifecycle is active', async () => {

@@ -200,12 +200,18 @@ export class BaseAIProvider extends BaseProvider {
    * Enhanced batch translation with streaming support
    */
   async _batchTranslate(texts, sourceLang, targetLang, translateMode, engine, messageId, abortController, priority, sessionId, expectedFormat, options = {}) {
-    const conversationParticipates = await AIConversationHelper.getConversationParticipation({
-      callPurpose: TranslationCallPurpose.PRIMARY_TRANSLATION,
-      translateMode,
-      sessionId,
-    });
-    const conversationOptions = { ...options, conversationParticipates };
+    const callPurpose = options.callPurpose || TranslationCallPurpose.PRIMARY_TRANSLATION;
+    const isPrimaryCall = callPurpose === TranslationCallPurpose.PRIMARY_TRANSLATION;
+    const conversationParticipates = isPrimaryCall
+      && (typeof options.conversationParticipates === 'boolean'
+        ? options.conversationParticipates
+        : await AIConversationHelper.getConversationParticipation({ callPurpose, translateMode, sessionId }));
+    const conversationOptions = {
+      ...options,
+      callPurpose,
+      conversationParticipates,
+      useParentConversationLifecycle: isPrimaryCall && options.useParentConversationLifecycle === true,
+    };
     const supportsStreaming = await this.getSupportsStreaming();
     const batchStrategy = await this.getBatchStrategy(translateMode);
 
@@ -281,13 +287,16 @@ export class BaseAIProvider extends BaseProvider {
    */
   async _translateBatch(texts, sourceLang, targetLang, translateMode, abortController, engine, messageId, sessionId, contextMetadata = null, expectedFormat = null, priority = null) {
     const structuredFormat = expectedFormat || ResponseFormat.JSON_ARRAY;
-    const conversationParticipates = typeof contextMetadata?.conversationParticipates === 'boolean'
-      ? contextMetadata.conversationParticipates
-      : await AIConversationHelper.getConversationParticipation({
-        callPurpose: TranslationCallPurpose.PRIMARY_TRANSLATION,
-        translateMode,
-        sessionId,
-      });
+    const callPurpose = contextMetadata?.callPurpose || TranslationCallPurpose.PRIMARY_TRANSLATION;
+    const isPrimaryCall = callPurpose === TranslationCallPurpose.PRIMARY_TRANSLATION;
+    const conversationParticipates = callPurpose === TranslationCallPurpose.PRIMARY_TRANSLATION
+      && (typeof contextMetadata?.conversationParticipates === 'boolean'
+        ? contextMetadata.conversationParticipates
+        : await AIConversationHelper.getConversationParticipation({
+          callPurpose,
+          translateMode,
+          sessionId,
+        }));
     // Per-call completion slot: the adapter records the completion during its
     // physical response, and recordProviderCompletion publishes the frozen
     // record into this fresh per-call slot. Parallel batches share one
@@ -298,9 +307,12 @@ export class BaseAIProvider extends BaseProvider {
     const callExecutionContext = baseExecutionContext
       ? { ...baseExecutionContext, completionRef }
       : null;
-    const callContextMetadata = callExecutionContext
-      ? { ...contextMetadata, executionContext: callExecutionContext }
-      : contextMetadata;
+    const callContextMetadata = {
+      ...contextMetadata,
+      conversationParticipates,
+      useParentConversationLifecycle: isPrimaryCall && contextMetadata?.useParentConversationLifecycle === true,
+      ...(callExecutionContext && { executionContext: callExecutionContext }),
+    };
     const conversationCommitCandidate = (
       (structuredFormat === ResponseFormat.JSON_ARRAY || structuredFormat === ResponseFormat.JSON_OBJECT)
       && conversationParticipates
@@ -316,6 +328,7 @@ export class BaseAIProvider extends BaseProvider {
         expectedFormat,
         priority,
         conversationCommitCandidate,
+        callPurpose,
       });
 
       // Stats recording is handled by ProviderRequestEngine. 
@@ -521,6 +534,7 @@ export class BaseAIProvider extends BaseProvider {
     expectedFormat = null,
     priority = null,
     conversationCommitCandidate = null,
+    callPurpose = TranslationCallPurpose.PRIMARY_TRANSLATION,
   } = {}) {
     const { systemPrompt, userText } = await this._preparePromptAndText(texts, sourceLang, targetLang, translateMode, contextMetadata, sessionId);
     logger.debugLazy(() => [`[${this.providerName}] Batch Prompt preparation complete`, {
@@ -541,8 +555,11 @@ export class BaseAIProvider extends BaseProvider {
         isBatch: true,
          expectedFormat: expectedFormat || ResponseFormat.JSON_ARRAY,
          executionContext: contextMetadata?.executionContext,
-         callPurpose: TranslationCallPurpose.PRIMARY_TRANSLATION,
-         conversationParticipates: contextMetadata?.conversationParticipates === true,
+          callPurpose,
+          conversationParticipates: callPurpose === TranslationCallPurpose.PRIMARY_TRANSLATION
+            && contextMetadata?.conversationParticipates === true,
+          useParentConversationLifecycle: callPurpose === TranslationCallPurpose.PRIMARY_TRANSLATION
+            && contextMetadata?.useParentConversationLifecycle === true,
          conversationCommitCandidate,
       }),
       context,
@@ -582,9 +599,8 @@ export class BaseAIProvider extends BaseProvider {
   async _traditionalBatchTranslate(texts, sourceLang, targetLang, translateMode, engine, messageId, abortController, priority, sessionId, expectedFormat, options = {}) {
     const results = [];
     const context = `${this.providerName.toLowerCase()}-traditional-sequential`;
-    const callPurpose = options.callPurpose === TranslationCallPurpose.STRUCTURED_RECOVERY
-      ? TranslationCallPurpose.STRUCTURED_RECOVERY
-      : TranslationCallPurpose.PRIMARY_TRANSLATION;
+    const callPurpose = options.callPurpose || TranslationCallPurpose.PRIMARY_TRANSLATION;
+    const isPrimaryCall = callPurpose === TranslationCallPurpose.PRIMARY_TRANSLATION;
     const conversationParticipates = await AIConversationHelper.getConversationParticipation({
       callPurpose,
       translateMode,
@@ -619,6 +635,7 @@ export class BaseAIProvider extends BaseProvider {
             executionContext: options.executionContext,
             callPurpose,
             conversationParticipates,
+            useParentConversationLifecycle: isPrimaryCall && options.useParentConversationLifecycle === true,
           }),
           chunkContext,
           priority,

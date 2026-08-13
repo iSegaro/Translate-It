@@ -81,6 +81,7 @@ export const ProviderTypes = {
 export const TranslationCallPurpose = Object.freeze({
   PRIMARY_TRANSLATION: 'PRIMARY_TRANSLATION',
   STRUCTURED_RECOVERY: 'STRUCTURED_RECOVERY',
+  PARENT_RECOVERY: 'PARENT_RECOVERY',
 });
 
 /**

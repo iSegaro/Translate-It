@@ -15,6 +15,7 @@ import { providerCoordinator } from './ProviderCoordinator.js';
 import { ResponseFormat } from "@/shared/config/translationConstants.js";
 import { AUTO_DETECT_VALUE } from "@/shared/constants/core.js";
 import { isFatalError, isTransientError, matchErrorToType } from "@/shared/error-management/ErrorMatcher.js";
+import { TranslationCallPurpose } from '@/features/translation/providers/ProviderConstants.js';
 
 // Mock dependencies
 vi.mock('@/shared/logging/logger.js', () => ({
@@ -220,6 +221,21 @@ describe('ProviderCoordinator', () => {
   });
 
   describe('Queue routing', () => {
+    it('preserves explicit parent recovery purpose through queue/provider execution', async () => {
+      await providerCoordinator.execute(mockProvider, 'Input Text', 'en', 'fa', {
+        mode: 'select_element',
+        callPurpose: TranslationCallPurpose.PARENT_RECOVERY,
+        messageId: 'parent-recovery'
+      });
+
+      expect(mockProvider.translate).toHaveBeenCalledWith(
+        'Input Text',
+        'en',
+        'fa',
+        expect.objectContaining({ callPurpose: TranslationCallPurpose.PARENT_RECOVERY })
+      );
+    });
+
     it('should route parallel Select Element work through the parallel queue key', async () => {
       const result = await providerCoordinator.execute(
         mockProvider,

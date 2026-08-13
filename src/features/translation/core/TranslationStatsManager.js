@@ -15,7 +15,8 @@ const logger = getScopedLogger(LOG_COMPONENTS.TRANSLATION, 'StatsManager');
 function createPurposeCounters() {
   return {
     [TranslationCallPurpose.PRIMARY_TRANSLATION]: 0,
-    [TranslationCallPurpose.STRUCTURED_RECOVERY]: 0
+    [TranslationCallPurpose.STRUCTURED_RECOVERY]: 0,
+    [TranslationCallPurpose.PARENT_RECOVERY]: 0,
   };
 }
 
