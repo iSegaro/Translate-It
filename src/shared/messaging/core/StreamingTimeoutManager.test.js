@@ -210,6 +210,26 @@ describe('StreamingTimeoutManager', () => {
     expect(onTimeout).toHaveBeenCalledTimes(1);
   });
 
+  it('does not timeout a silent structured operation at the former 160-second deadline', async () => {
+    const onTimeout = vi.fn();
+    const promise = manager.registerStreamingOperation('structured-silent', 330000, {
+      maxProgressTimeout: 330000,
+      onTimeout,
+    });
+
+    vi.advanceTimersByTime(160000);
+
+    expect(manager.isStreaming('structured-silent')).toBe(true);
+    expect(onTimeout).not.toHaveBeenCalled();
+
+    vi.advanceTimersByTime(170000);
+    await expect(promise).resolves.toMatchObject({
+      timedOut: true,
+      type: 'TRANSLATION_TIMEOUT',
+      timeoutType: 'FINAL_TIMEOUT'
+    });
+  });
+
   it('resets progress timeout with the configured short duration', async () => {
     const onTimeout = vi.fn();
     const promise = manager.registerStreamingOperation('progress-short', 300000, {

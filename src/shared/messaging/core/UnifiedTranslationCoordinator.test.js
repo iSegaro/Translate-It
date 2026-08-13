@@ -98,6 +98,36 @@ describe('UnifiedTranslationCoordinator', () => {
   });
 
   describe('Timeout Calculation', () => {
+    it('keeps structured Select Element watchdog beyond the batch deadline', () => {
+      const data = {
+        text: JSON.stringify(Array.from({ length: 23 }, (_, index) => ({ t: `segment-${index}` }))),
+        mode: 'select-element',
+        options: { rawJsonPayload: true }
+      };
+      const timeouts = coordinator._calculateStreamingTimeouts(data);
+
+      expect(timeouts).toEqual({
+        initialTimeout: 330000,
+        progressTimeout: 330000,
+        gracePeriod: 30000,
+        estimatedSegments: 23
+      });
+    });
+
+    it('does not let custom transport timeout undercut structured execution budget', () => {
+      const data = {
+        text: JSON.stringify([{ t: 'segment' }]),
+        mode: 'select_element',
+        options: { rawJsonPayload: true }
+      };
+
+      expect(coordinator._calculateStreamingTimeouts(data, 90000)).toMatchObject({
+        initialTimeout: 330000,
+        progressTimeout: 330000,
+        gracePeriod: 30000
+      });
+    });
+
     it('should calculate longer timeouts for select-element mode', () => {
       const data = { text: 'a'.repeat(2000), mode: 'select-element' };
       const timeouts = coordinator._calculateStreamingTimeouts(data);
@@ -110,6 +140,16 @@ describe('UnifiedTranslationCoordinator', () => {
       const timeouts = coordinator._calculateStreamingTimeouts(data);
       
       expect(timeouts.initialTimeout).toBeLessThan(300000);
+    });
+
+    it('does not alter non-structured Select Element streaming policy', () => {
+      const timeouts = coordinator._calculateStreamingTimeouts({
+        text: 'a'.repeat(2000),
+        mode: 'select-element'
+      });
+
+      expect(timeouts.progressTimeout).toBe(160000);
+      expect(timeouts.initialTimeout).toBe(200000);
     });
   });
 

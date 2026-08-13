@@ -18,6 +18,9 @@ import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.MESSAGING, 'UnifiedTranslationCoordinator');
 
+const STRUCTURED_BATCH_TIMEOUT_MS = 300000;
+const STRUCTURED_TRANSPORT_ALLOWANCE_MS = 30000;
+
 export class UnifiedTranslationCoordinator {
   constructor() {
     this.activeTranslations = new Map();
@@ -343,10 +346,19 @@ export class UnifiedTranslationCoordinator {
 
     // Enhanced timeouts for Select Element mode - allow longer processing times
     const isSelectElementMode = data?.mode === 'select_element' || data?.mode === 'select-element' || data?.options?.mode === 'select_element';
+    const isStructuredSelectElement = isSelectElementMode && data?.options?.rawJsonPayload === true;
 
     let initialTimeout, progressTimeout, gracePeriod;
 
-    if (isSelectElementMode) {
+    if (isStructuredSelectElement) {
+      // Structured Select Element emits no progress while its single provider batch is in flight.
+      // Keep every Content-side watchdog beyond the authoritative batch deadline.
+      const executionDeadline = Math.max(customTimeout || 0, STRUCTURED_BATCH_TIMEOUT_MS);
+      const transportWatchdog = executionDeadline + STRUCTURED_TRANSPORT_ALLOWANCE_MS;
+      initialTimeout = transportWatchdog;
+      progressTimeout = transportWatchdog;
+      gracePeriod = STRUCTURED_TRANSPORT_ALLOWANCE_MS;
+    } else if (isSelectElementMode) {
       // Select Element mode needs much longer timeouts due to batching and API delays.
       // We align this with the system retries (2x60s) but add a generous buffer for network overhead.
       const baseTimeout = Math.max(180000, segmentCount * 6000); // 6s per segment, min 180s
@@ -363,6 +375,7 @@ export class UnifiedTranslationCoordinator {
 
     logger.debug(`Streaming timeouts calculated:`, {
       mode: isSelectElementMode ? 'select-element' : 'regular',
+      structured: isStructuredSelectElement,
       segments: segmentCount,
       textLength,
       initialTimeout,
