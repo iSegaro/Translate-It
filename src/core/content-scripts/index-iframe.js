@@ -65,6 +65,13 @@ if (!window.translateItContentScriptCore) {
         await interactionCoordinator.initialize();
       } catch { /* ignore */ }
 
+      // Text selection window relay: single-owner upward routing for translation
+      // windows (installed before any windows manager can be activated).
+      try {
+        const { getTextSelectionWindowRelay } = await import('@/features/windows/managers/crossframe/TextSelectionWindowRelay.js');
+        getTextSelectionWindowRelay();
+      } catch { /* ignore */ }
+
       // Load Lite Features
       const LITE_FEATURES = ['messaging', 'extensionContext', 'contentMessageHandler', 'mouseHover'];
       for (const feature of LITE_FEATURES) {

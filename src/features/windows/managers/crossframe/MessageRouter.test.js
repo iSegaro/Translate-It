@@ -20,8 +20,7 @@ describe('MessageRouter', () => {
       onOutsideClick: vi.fn(),
       onWindowCreationRequest: vi.fn(),
       onWindowCreatedResponse: vi.fn(),
-      onBroadcastStateChange: vi.fn(),
-      onTextSelectionWindowRequest: vi.fn()
+      onBroadcastStateChange: vi.fn()
     };
 
     addEventListenerSpy = vi.spyOn(window, 'addEventListener');
@@ -180,7 +179,7 @@ describe('MessageRouter', () => {
       expect(mockOptions.onWindowCreatedResponse).toHaveBeenCalledWith(event.data);
     });
 
-    it('should handle TEXT_SELECTION_WINDOW_REQUEST in main frame', () => {
+    it('should ignore TEXT_SELECTION_WINDOW_REQUEST (relay owns this route)', () => {
       mockFrameRegistry.isInIframe = false;
       const event = {
         data: { 
@@ -191,8 +190,8 @@ describe('MessageRouter', () => {
         source: 'mock-source'
       };
       
-      messageRouter._handleCrossFrameMessage(event);
-      expect(mockOptions.onTextSelectionWindowRequest).toHaveBeenCalledWith(event.data, event.source);
+      expect(() => messageRouter._handleCrossFrameMessage(event)).not.toThrow();
+      expect(messageRouter.onTextSelectionWindowRequest).toBeUndefined();
     });
   });
 

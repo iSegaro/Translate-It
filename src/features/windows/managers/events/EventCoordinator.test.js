@@ -24,6 +24,7 @@ vi.mock('@/features/text-selection/events/SelectionEvents.js', () => ({
 }));
 
 import { EventCoordinator } from './EventCoordinator.js';
+import { getTextSelectionWindowRelay } from '../crossframe/TextSelectionWindowRelay.js';
 
 describe('EventCoordinator cross-frame coordinate adjustment', () => {
   let facade;
@@ -34,16 +35,17 @@ describe('EventCoordinator cross-frame coordinate adjustment', () => {
     facade = { show: vi.fn() };
     coordinator = new EventCoordinator(facade, {
       state: {},
-      crossFrameManager: { isTopFrame: true },
+      crossFrameManager: { isTopFrame: true, setEventHandlers: vi.fn() },
       translationHandler: {},
       errorHandler: {},
-      clickManager: {},
+      clickManager: { setHandlers: vi.fn() },
       themeManager: {},
       positionCalculator: {}
     });
   });
 
   afterEach(() => {
+    getTextSelectionWindowRelay().destroy();
     vi.restoreAllMocks();
   });
 
@@ -134,5 +136,51 @@ describe('EventCoordinator cross-frame coordinate adjustment', () => {
     );
 
     expect(facade.show).not.toHaveBeenCalled();
+  });
+});
+
+describe('EventCoordinator relay sink ownership', () => {
+  let facade;
+  let coordinator;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    facade = { show: vi.fn() };
+    coordinator = new EventCoordinator(facade, {
+      state: {},
+      crossFrameManager: { isTopFrame: true, setEventHandlers: vi.fn() },
+      translationHandler: {},
+      errorHandler: {},
+      clickManager: { setHandlers: vi.fn() },
+      themeManager: {},
+      positionCalculator: {}
+    });
+  });
+
+  afterEach(() => {
+    getTextSelectionWindowRelay().destroy();
+    vi.restoreAllMocks();
+  });
+
+  it('setup registers a sink and cleanup clears exactly it', () => {
+    const relay = getTextSelectionWindowRelay();
+    coordinator.setup();
+
+    const registered = relay._sink;
+    expect(registered).toBeTypeOf('function');
+
+    coordinator.cleanup();
+    expect(relay._sink).toBeNull();
+  });
+
+  it('cleanup never clears a replacement sink registered after setup', () => {
+    const relay = getTextSelectionWindowRelay();
+    coordinator.setup();
+
+    const replacement = vi.fn();
+    relay.setSink(replacement);
+
+    coordinator.cleanup();
+    expect(relay._sink).toBe(replacement);
   });
 });

@@ -99,6 +99,14 @@ describe('CrossFrameManager', () => {
     expect(cfManager.messageRouter.requestWindowCreation).toHaveBeenCalledWith('text', { x: 0, y: 0 });
   });
 
+  it('should no longer own text selection window routing (relay owns it)', () => {
+    const handler = vi.fn();
+    cfManager.setEventHandlers({ onTextSelectionWindowRequest: handler });
+
+    expect(cfManager.onTextSelectionWindowRequest).toBeUndefined();
+    expect(cfManager._handleTextSelectionWindowRequest).toBeUndefined();
+  });
+
   it('should cleanup resources', () => {
     cfManager.cleanup();
     

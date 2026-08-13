@@ -139,6 +139,20 @@ async function initializeLogger(subComponent = 'Main') {
           scriptLogger.error('Failed to initialize InteractionCoordinator:', coordError);
         }
 
+        // Text selection window relay: single-owner upward routing for translation
+        // windows (installed before any windows manager can be activated). The
+        // activation callback ensures a pre-activation request triggers the lazy
+        // windows feature load instead of being dropped.
+        try {
+          const { getTextSelectionWindowRelay } = await import('@/features/windows/managers/crossframe/TextSelectionWindowRelay.js');
+          const textSelectionWindowRelay = getTextSelectionWindowRelay();
+          textSelectionWindowRelay.setEnsureActive(() => {
+            if (contentScriptCore?.loadFeatureFromMain) {
+              contentScriptCore.loadFeatureFromMain('windowsManager', 'INTERACTIVE');
+            }
+          });
+        } catch { /* ignore */ }
+
         // Start the multi-stage loading sequence (Interaction-driven lazy loading)
         featureLoader.startIntelligentLoading();
 
