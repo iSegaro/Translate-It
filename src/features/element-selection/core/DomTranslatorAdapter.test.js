@@ -945,6 +945,101 @@ describe('DomTranslatorAdapter', () => {
       expect(testElement.textContent).toContain('سلام');
     });
 
+    it('keeps stream open after non-fatal update and rejects zero-commit success', async () => {
+      let streamCallbacks;
+      registerTranslation.mockImplementationOnce((_id, callbacks) => {
+        streamCallbacks = callbacks;
+      });
+      contentScriptIntegration.sendTranslationRequest.mockResolvedValueOnce({ success: true, streaming: true });
+
+      const translation = adapter.translateElement(testElement);
+      await vi.waitFor(() => expect(streamCallbacks).toBeDefined());
+
+      streamCallbacks.onStreamUpdate({
+        success: false,
+        error: { message: 'Network failed', type: 'NETWORK_ERROR' }
+      });
+      expect(streamCallbacks).toBeDefined();
+      streamCallbacks.onStreamEnd({ success: true });
+
+      const result = await translation;
+      expect(result).toMatchObject({
+        success: false,
+        committedParentCount: 0,
+        error: { type: 'NO_ACCEPTED_TRANSLATION_RESULTS' }
+      });
+      expect(testElement.textContent).toBe('Hello');
+      expect(sendRegularMessage).not.toHaveBeenCalledWith(
+        expect.objectContaining({ data: expect.objectContaining({ accepted: true }) }),
+        expect.anything()
+      );
+    });
+
+    it('continues after non-fatal update and preserves later committed parent', async () => {
+      let streamCallbacks;
+      registerTranslation.mockImplementationOnce((_id, callbacks) => {
+        streamCallbacks = callbacks;
+      });
+      contentScriptIntegration.sendTranslationRequest.mockResolvedValueOnce({ success: true, streaming: true });
+
+      const translation = adapter.translateElement(testElement);
+      await vi.waitFor(() => expect(streamCallbacks).toBeDefined());
+      streamCallbacks.onStreamUpdate({
+        success: false,
+        error: { message: 'Network failed', type: 'NETWORK_ERROR' }
+      });
+      streamCallbacks.onStreamUpdate({ success: true, data: [{ t: 'سلام', i: 'n1' }] });
+      streamCallbacks.onStreamEnd({ success: true });
+
+      const result = await translation;
+      expect(result).toMatchObject({ success: true, committedParentCount: 1 });
+      expect(testElement.textContent).toContain('سلام');
+    });
+
+    it('keeps committed parent when terminal stream failure follows non-fatal update', async () => {
+      let streamCallbacks;
+      registerTranslation.mockImplementationOnce((_id, callbacks) => {
+        streamCallbacks = callbacks;
+      });
+      contentScriptIntegration.sendTranslationRequest.mockResolvedValueOnce({ success: true, streaming: true });
+
+      const translation = adapter.translateElement(testElement);
+      await vi.waitFor(() => expect(streamCallbacks).toBeDefined());
+      streamCallbacks.onStreamUpdate({
+        success: false,
+        error: { message: 'Network failed', type: 'NETWORK_ERROR' }
+      });
+      streamCallbacks.onStreamUpdate({ success: true, data: [{ t: 'سلام', i: 'n1' }] });
+      streamCallbacks.onStreamEnd({
+        success: false,
+        error: { message: 'Terminal stream failure', type: 'TRANSLATION_FAILED' }
+      });
+
+      await expect(translation).rejects.toThrow('Terminal stream failure');
+      expect(testElement.textContent).toContain('سلام');
+    });
+
+    it('keeps committed parent when cancellation follows non-fatal update', async () => {
+      let streamCallbacks;
+      registerTranslation.mockImplementationOnce((_id, callbacks) => {
+        streamCallbacks = callbacks;
+      });
+      contentScriptIntegration.sendTranslationRequest.mockResolvedValueOnce({ success: true, streaming: true });
+
+      const translation = adapter.translateElement(testElement);
+      await vi.waitFor(() => expect(streamCallbacks).toBeDefined());
+      streamCallbacks.onStreamUpdate({
+        success: false,
+        error: { message: 'Network failed', type: 'NETWORK_ERROR' }
+      });
+      streamCallbacks.onStreamUpdate({ success: true, data: [{ t: 'سلام', i: 'n1' }] });
+      streamCallbacks.onStreamEnd({ cancelled: true });
+
+      const result = await translation;
+      expect(result).toMatchObject({ success: false, cancelled: true });
+      expect(testElement.textContent).toContain('سلام');
+    });
+
     it.each([
       ['text drift', () => { testElement.firstChild.nodeValue = 'Changed'; }],
       ['whitespace drift', () => { testElement.firstChild.nodeValue = 'Hello '; }],
