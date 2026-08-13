@@ -8,9 +8,11 @@
 //
 // Sink readiness: the top frame's windows feature is lazy-loaded, so a request
 // can arrive before any sink is registered. The relay buffers a single request
-// (the latest selection supersedes earlier ones) and asks the bootstrap-registered
-// activation callback to ensure the windows feature loads; setSink() then flushes
-// the buffered request so a pre-activation request is never silently lost.
+// (the latest selection supersedes earlier ones) and owns exactly one in-flight
+// activation attempt via the bootstrap-registered callback. When the attempt
+// settles, setSink() flushes the buffered request; if the attempt settles
+// WITHOUT a sink (excluded, context invalid, partial init), the pending request
+// is dropped so a later request can retry with a fresh activation attempt.
 
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
@@ -27,6 +29,7 @@ export class TextSelectionWindowRelay {
     this._sink = null;
     this._pendingRequest = null;
     this._ensureActive = null;
+    this._activationPromise = null;
     this._boundHandleMessage = this._handleMessage.bind(this);
     window.addEventListener('message', this._boundHandleMessage);
     logger.debug('TextSelectionWindowRelay installed', { isTopFrame: this._isTopFrame });
@@ -48,7 +51,10 @@ export class TextSelectionWindowRelay {
 
   /**
    * Registers the sink that owns window creation. Delivers a single buffered
-   * request (if any) that arrived before this sink was ready.
+   * request (if any) that arrived before this sink was ready. This flush is the
+   * authoritative delivery path for an activation that is in flight: it runs
+   * before the activation promise settles, so the settle-time drop check below
+   * never races it.
    */
   setSink(sink) {
     this._sink = sink;
@@ -78,6 +84,32 @@ export class TextSelectionWindowRelay {
     }
   }
 
+  /**
+   * Starts exactly one activation attempt. No-op while one is already in flight,
+   * so concurrent requests never duplicate activation. Normalizes the callback
+   * through Promise semantics: a synchronous throw or a rejection is consumed
+   * (never escaping _handleMessage), the in-flight state always clears, and a
+   * settle without a sink drops the pending request for a future retry.
+   */
+  _ensureActivation() {
+    if (this._activationPromise) return;
+
+    this._activationPromise = Promise.resolve()
+      .then(() => (this._ensureActive ? this._ensureActive() : null))
+      .catch((error) => {
+        logger.warn('Windows feature activation attempt failed', error?.message);
+      })
+      .finally(() => {
+        this._activationPromise = null;
+        // Single-flight + atomic finalizer make stale cleanup impossible: a new
+        // activation cannot start until this finalizer has run, and setSink()
+        // flushes before this promise settles.
+        if (!this._sink && this._pendingRequest) {
+          this._pendingRequest = null;
+        }
+      });
+  }
+
   _handleMessage(event) {
     const data = event.data;
 
@@ -95,11 +127,9 @@ export class TextSelectionWindowRelay {
         this._deliver(data, event.source);
       } else {
         // Single-slot buffer: latest selection wins while the windows feature
-        // activates. Cleared on delivery, destroy, or owner cleanup.
+        // activates. Cleared on delivery, destroy, or settle-without-sink.
         this._pendingRequest = { data, source: event.source };
-        if (this._ensureActive) {
-          this._ensureActive();
-        }
+        this._ensureActivation();
       }
       return;
     }
@@ -120,10 +150,29 @@ export class TextSelectionWindowRelay {
     this._sink = null;
     this._pendingRequest = null;
     this._ensureActive = null;
+    this._activationPromise = null;
     relayInstance = null;
   }
 }
 
 export function getTextSelectionWindowRelay() {
   return TextSelectionWindowRelay.getInstance();
+}
+
+/**
+ * Bootstrap wiring for the top frame: installs the relay and registers the
+ * activation callback on the reactivation-capable contentScriptCore.loadFeature
+ * path (whose lazy-feature cache is cleared by notifyFeatureDeactivated, unlike
+ * loadFeatureFromMain). Uses the same feature-loading path as every other
+ * consumer (MainFrameCoordinator, InteractionCoordinator).
+ *
+ * The callback MUST return the loadFeature result: _ensureActivation() awaits it,
+ * so activation stays in-flight until windowsManager is actually loaded. Without
+ * the returned promise the activation settles immediately and its finally() drops
+ * the buffered request while the feature is still loading.
+ */
+export function installTextSelectionWindowRelay(contentScriptCore) {
+  const relay = getTextSelectionWindowRelay();
+  relay.setEnsureActive(() => contentScriptCore?.loadFeature?.('windowsManager') ?? null);
+  return relay;
 }

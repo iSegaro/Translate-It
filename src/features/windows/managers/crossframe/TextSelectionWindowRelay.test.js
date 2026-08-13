@@ -9,11 +9,23 @@ vi.mock('@/shared/logging/logger.js', () => ({
   }))
 }));
 
-import { TextSelectionWindowRelay, getTextSelectionWindowRelay } from './TextSelectionWindowRelay.js';
+import { TextSelectionWindowRelay, getTextSelectionWindowRelay, installTextSelectionWindowRelay } from './TextSelectionWindowRelay.js';
 import { adjustForDirectChild } from './coordinateUtils.js';
 import { WindowsConfig } from '../core/WindowsConfig.js';
 
 const REQUEST = WindowsConfig.CROSS_FRAME.TEXT_SELECTION_WINDOW_REQUEST;
+
+const flushPromises = () => new Promise((resolve) => setTimeout(resolve, 0));
+
+const deferred = () => {
+  let resolve;
+  let reject;
+  const promise = new Promise((res, rej) => {
+    resolve = res;
+    reject = rej;
+  });
+  return { promise, resolve, reject };
+};
 
 const requestMessage = (overrides = {}, source = {}) => ({
   data: {
@@ -63,7 +75,7 @@ describe('TextSelectionWindowRelay', () => {
       relay.destroy();
     });
 
-    it('buffers a request that arrives before any sink is registered', () => {
+    it('buffers a request that arrives before any sink is registered', async () => {
       const relay = new TextSelectionWindowRelay();
       const ensureActive = vi.fn();
       relay.setEnsureActive(ensureActive);
@@ -71,12 +83,15 @@ describe('TextSelectionWindowRelay', () => {
       relay._handleMessage(requestMessage());
 
       expect(relay._pendingRequest).not.toBeNull();
-      expect(ensureActive).toHaveBeenCalledTimes(1);
       expect(parentPostMessage).not.toHaveBeenCalled();
+
+      await flushPromises();
+      expect(ensureActive).toHaveBeenCalledTimes(1);
+      expect(relay._pendingRequest).toBeNull();
       relay.destroy();
     });
 
-    it('delivers a pre-activation request once the sink is registered (not silently lost)', () => {
+    it('delivers a pre-activation request once the sink is registered (not silently lost)', async () => {
       const sink = vi.fn();
       const relay = new TextSelectionWindowRelay();
       const ensureActive = vi.fn();
@@ -87,13 +102,15 @@ describe('TextSelectionWindowRelay', () => {
       relay._handleMessage({ data, source });
 
       expect(sink).not.toHaveBeenCalled();
-      expect(ensureActive).toHaveBeenCalledTimes(1);
 
       relay.setSink(sink);
 
       expect(sink).toHaveBeenCalledTimes(1);
       expect(sink).toHaveBeenCalledWith(data, source);
       expect(relay._pendingRequest).toBeNull();
+
+      await flushPromises();
+      expect(ensureActive).toHaveBeenCalledTimes(1);
       relay.destroy();
     });
 
@@ -284,6 +301,157 @@ describe('TextSelectionWindowRelay', () => {
       const messageRemoves = removeSpy.mock.calls.filter(([type]) => type === 'message');
       expect(messageAdds.length - messageRemoves.length).toBe(1);
       expect(messageRemoves).toHaveLength(1);
+    });
+  });
+
+  describe('activation lifecycle', () => {
+    it('keeps pending and in-flight state while the activation promise is unresolved', async () => {
+      const activation = deferred();
+      const relay = new TextSelectionWindowRelay();
+      relay.setEnsureActive(() => activation.promise);
+
+      relay._handleMessage(requestMessage({ selectedText: 'deferred' }));
+
+      expect(relay._activationPromise).not.toBeNull();
+      expect(relay._pendingRequest).not.toBeNull();
+      expect(relay._pendingRequest.data.selectedText).toBe('deferred');
+
+      await flushPromises();
+      expect(relay._activationPromise).not.toBeNull();
+      expect(relay._pendingRequest).not.toBeNull();
+
+      activation.resolve();
+      relay.destroy();
+    });
+
+    it('delivers pending exactly once when the sink registers before a deferred activation resolves', async () => {
+      const sink = vi.fn();
+      const activation = deferred();
+      const relay = new TextSelectionWindowRelay();
+      relay.setEnsureActive(() => activation.promise);
+
+      relay._handleMessage(requestMessage({ selectedText: 'deferred' }));
+      relay.setSink(sink);
+
+      expect(sink).toHaveBeenCalledTimes(1);
+      expect(sink.mock.calls[0][0].selectedText).toBe('deferred');
+
+      activation.resolve();
+      await flushPromises();
+
+      expect(sink).toHaveBeenCalledTimes(1);
+      expect(relay._pendingRequest).toBeNull();
+      relay.destroy();
+    });
+
+    it('drops pending only after a deferred activation resolves without a sink', async () => {
+      const activation = deferred();
+      const relay = new TextSelectionWindowRelay();
+      relay.setEnsureActive(() => activation.promise);
+
+      relay._handleMessage(requestMessage({ selectedText: 'deferred' }));
+
+      await flushPromises();
+      expect(relay._pendingRequest).not.toBeNull();
+
+      activation.resolve();
+      await flushPromises();
+
+      expect(relay._pendingRequest).toBeNull();
+      expect(relay._activationPromise).toBeNull();
+      relay.destroy();
+    });
+
+    it('does not drop a request that arrives while an activation is in flight', async () => {
+      const sink = vi.fn();
+      const relay = new TextSelectionWindowRelay();
+      relay.setEnsureActive(() => new Promise(() => {}));
+      relay._handleMessage(requestMessage({ selectedText: 'during-activation' }));
+
+      relay.setSink(sink);
+      expect(sink).toHaveBeenCalledTimes(1);
+      expect(sink.mock.calls[0][0].selectedText).toBe('during-activation');
+      relay.destroy();
+    });
+
+    it('retries activation after the callback rejects and delivers a later request', async () => {
+      const sink = vi.fn();
+      const ensureActive = vi.fn()
+        .mockRejectedValueOnce(new Error('first attempt failed'))
+        .mockResolvedValueOnce();
+      const relay = new TextSelectionWindowRelay();
+      relay.setEnsureActive(ensureActive);
+
+      relay._handleMessage(requestMessage({ selectedText: 'first' }));
+      await flushPromises();
+
+      relay._handleMessage(requestMessage({ selectedText: 'second' }));
+      relay.setSink(sink);
+      await flushPromises();
+
+      expect(ensureActive).toHaveBeenCalledTimes(2);
+      expect(sink).toHaveBeenCalledTimes(1);
+      expect(sink.mock.calls[0][0].selectedText).toBe('second');
+      relay.destroy();
+    });
+
+    it('starts fresh activation on the next request after a failed attempt', async () => {
+      const ensureActive = vi.fn().mockRejectedValue(new Error('boom'));
+      const relay = new TextSelectionWindowRelay();
+      relay.setEnsureActive(ensureActive);
+
+      relay._handleMessage(requestMessage({ selectedText: 'A' }));
+      await flushPromises();
+      relay._handleMessage(requestMessage({ selectedText: 'B' }));
+      await flushPromises();
+
+      expect(ensureActive).toHaveBeenCalledTimes(2);
+      expect(relay._pendingRequest).toBeNull();
+      relay.destroy();
+    });
+  });
+
+  describe('installTextSelectionWindowRelay', () => {
+    it('activates the windows feature on the content core, not via loadFeatureFromMain', async () => {
+      const loadFeature = vi.fn().mockReturnValue(Promise.resolve());
+      const loadFeatureFromMain = vi.fn();
+      const relay = installTextSelectionWindowRelay({ loadFeature, loadFeatureFromMain });
+
+      relay._handleMessage(requestMessage());
+      await flushPromises();
+
+      expect(loadFeature).toHaveBeenCalledWith('windowsManager');
+      expect(loadFeatureFromMain).not.toHaveBeenCalled();
+      relay.destroy();
+    });
+
+    it('governs the relay lifecycle by the returned loadFeature promise', async () => {
+      const activation = deferred();
+      const loadFeature = vi.fn().mockReturnValue(activation.promise);
+      const relay = installTextSelectionWindowRelay({ loadFeature });
+
+      relay._handleMessage(requestMessage({ selectedText: 'deferred' }));
+      await flushPromises();
+
+      // Feature still loading: activation stays in-flight, pending retained.
+      expect(relay._activationPromise).not.toBeNull();
+      expect(relay._pendingRequest).not.toBeNull();
+
+      activation.resolve();
+      await flushPromises();
+
+      // Only after the returned promise resolves does the settle-drop run.
+      expect(relay._activationPromise).toBeNull();
+      expect(relay._pendingRequest).toBeNull();
+      relay.destroy();
+    });
+
+    it('tolerates a core without loadFeature support', async () => {
+      const relay = installTextSelectionWindowRelay({});
+      relay._handleMessage(requestMessage());
+      await flushPromises();
+      expect(relay._pendingRequest).toBeNull();
+      relay.destroy();
     });
   });
 });

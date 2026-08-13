@@ -140,17 +140,12 @@ async function initializeLogger(subComponent = 'Main') {
         }
 
         // Text selection window relay: single-owner upward routing for translation
-        // windows (installed before any windows manager can be activated). The
-        // activation callback ensures a pre-activation request triggers the lazy
-        // windows feature load instead of being dropped.
+        // windows, installed before any windows manager can be activated. Uses the
+        // reactivation-capable contentScriptCore.loadFeature path so a pre-activation
+        // (or post-deactivation) request triggers the lazy windows feature load.
         try {
-          const { getTextSelectionWindowRelay } = await import('@/features/windows/managers/crossframe/TextSelectionWindowRelay.js');
-          const textSelectionWindowRelay = getTextSelectionWindowRelay();
-          textSelectionWindowRelay.setEnsureActive(() => {
-            if (contentScriptCore?.loadFeatureFromMain) {
-              contentScriptCore.loadFeatureFromMain('windowsManager', 'INTERACTIVE');
-            }
-          });
+          const { installTextSelectionWindowRelay } = await import('@/features/windows/managers/crossframe/TextSelectionWindowRelay.js');
+          installTextSelectionWindowRelay(contentScriptCore);
         } catch { /* ignore */ }
 
         // Start the multi-stage loading sequence (Interaction-driven lazy loading)
