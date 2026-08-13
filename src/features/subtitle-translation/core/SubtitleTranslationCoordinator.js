@@ -75,7 +75,9 @@ export class SubtitleTranslationCoordinator {
       if (cues.length === 0) throw new Error('No valid subtitle cues found in file.');
 
       const progressTracker = new SubtitleProgressTracker(cues.length);
-      this.activeJobs.set(jobId, { cues, progressTracker, adapter, status: 'running' });
+      // activeBatchMessageId tracks the in-flight service request so the outer
+      // batch timeout and cancelJob can terminate its lifecycle (no zombie).
+      this.activeJobs.set(jobId, { cues, progressTracker, adapter, status: 'running', activeBatchMessageId: null });
 
       // 2. Resolve Limits
       const limits = SubtitleProviderLimitsResolver.resolve(providerId);
@@ -175,21 +177,58 @@ export class SubtitleTranslationCoordinator {
         contextMetadata: batchContext ? { dialogueContext: batchContext } : null
       }, MessageContexts.TRANSLATION_SERVICE);
 
-      // Timeout Protection (5 minutes) for the batch request
+      // Timeout Protection (5 minutes) for the batch request.
+      // The outer timer owns termination: on fire it awaits the canonical service
+      // timeout lifecycle for the exact batch messageId — so cleanup (engine abort,
+      // lifecycle, queue) settles before the batch returns and the next batch can
+      // proceed — then rejects locally with TRANSLATION_TIMEOUT.
+      // Once the timer fires, the timeout owns the outcome: a late request
+      // settlement (e.g. abort-induced suppressed USER_CANCELLED) must not replace it.
       const BATCH_TIMEOUT_MS = 300000;
+      job.activeBatchMessageId = message.messageId;
+      const timeoutError = new Error(`Batch translation timed out after ${BATCH_TIMEOUT_MS}ms`);
+      timeoutError.type = ErrorTypes.TRANSLATION_TIMEOUT;
+
+      let timedOut = false;
+      let timeoutId;
       const timeoutPromise = new Promise((_, reject) => {
-        setTimeout(() => {
-          const timeoutError = new Error(`Batch translation timed out after ${BATCH_TIMEOUT_MS}ms`);
-          timeoutError.type = ErrorTypes.TRANSLATION_TIMEOUT;
+        timeoutId = setTimeout(async () => {
+          timedOut = true;
+          try {
+            await unifiedTranslationService.handleTimeout(message.messageId);
+          } catch (error) {
+            logger.warn(`Batch timeout cleanup failed for ${message.messageId}:`, error);
+            try {
+              await unifiedTranslationService.cancelRequest(message.messageId);
+            } catch (fallbackError) {
+              logger.warn(`Batch timeout fallback cancel failed for ${message.messageId}:`, fallbackError);
+            }
+          }
           reject(timeoutError);
         }, BATCH_TIMEOUT_MS);
       });
 
-      // Execute request with timeout protection
-      const response = await Promise.race([
-        unifiedTranslationService.handleTranslationRequest(message, { internal: true }),
-        timeoutPromise
-      ]);
+      // A request that settles after the timeout fired must not surface its own
+      // result; it defers to the (still pending) timeout outcome instead.
+      const requestPromise = unifiedTranslationService
+        .handleTranslationRequest(message, { internal: true })
+        .then(
+          (result) => (timedOut ? timeoutPromise : result),
+          (error) => (timedOut ? timeoutPromise : Promise.reject(error))
+        );
+
+      let response;
+      try {
+        // Execute request with timeout protection
+        response = await Promise.race([requestPromise, timeoutPromise]);
+      } finally {
+        // Always clear the outer timer. Only clear the job's active ID when it still
+        // refers to this batch (stale-finally must not clear a newer batch's ID).
+        clearTimeout(timeoutId);
+        if (job.activeBatchMessageId === message.messageId) {
+          job.activeBatchMessageId = null;
+        }
+      }
 
       if (!response.success) {
         // UnifiedTranslationService returns error details inside a response.error object
@@ -237,10 +276,20 @@ export class SubtitleTranslationCoordinator {
 
   cancelJob(jobId) {
     const job = this.activeJobs.get(jobId);
-    if (job) {
-      job.status = 'cancelled';
-      logger.info(`Subtitle job ${jobId} cancelled.`);
+    if (!job) return;
+
+    job.status = 'cancelled';
+
+    // Cancel the in-flight batch request (if any) so its service-owned lifecycle
+    // terminates instead of running to completion or hitting the batch timeout.
+    // Best-effort: if the request already completed, cancelRequest is a no-op.
+    if (job.activeBatchMessageId) {
+      const messageId = job.activeBatchMessageId;
+      job.activeBatchMessageId = null;
+      unifiedTranslationService.cancelRequest(messageId).catch(() => {});
     }
+
+    logger.info(`Subtitle job ${jobId} cancelled.`);
   }
 
   _notifyProgress(jobId, updatedCues = []) {
