@@ -22,7 +22,7 @@ export class MainFeatureLoader {
     this.FEATURE_CATEGORIES = {
       CRITICAL: ['messaging', 'extensionContext'], // Core infrastructure
       ESSENTIAL: ['contentMessageHandler'], // Essential communication
-      LAZY_UI: ['vue', 'textSelection', 'mouseHover'], // UI & Selection (can be promoted)
+      LAZY_UI: ['vue', 'textSelection', 'mouseHover'], // UI & Selection
       INTERACTIVE: ['windowsManager', 'selectElement', 'pageTranslation', 'screenCapture'], // On-demand heavy UI
       ON_DEMAND: ['shortcut', 'textFieldIcon'] // Optional features
     };
@@ -41,17 +41,6 @@ export class MainFeatureLoader {
     } catch {
       return console;
     }
-  }
-
-  /**
-   * Promotes a feature to load immediately.
-   */
-  async promoteFeature(featureName) {
-    if (process.env.NODE_ENV === 'development') {
-      const logger = await this.getLogger();
-      logger.debug(`Promoting feature: ${featureName}`);
-    }
-    return this.loadFeature(featureName, 'INTERACTIVE');
   }
 
   /**
