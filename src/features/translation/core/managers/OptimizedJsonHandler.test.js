@@ -28,6 +28,7 @@ import { appendTranslationDiagnostic } from '@/features/translation/ir/Translati
 import { getProviderConfiguration } from '@/features/translation/core/ProviderConfigurations.js';
 import { TranslationBatcher } from '@/features/translation/core/utils/TranslationBatcher.js';
 import { createManifestView, createRequestUnitManifest } from '@/features/translation/ir/RequestUnitManifest.js';
+import { TRANSLATION_BATCH_EXECUTION_TIMEOUT_MS } from '@/shared/constants/translation.js';
 
 // Mock dependencies
 vi.mock('@/shared/logging/logger.js', () => ({
@@ -1199,7 +1200,7 @@ describe('OptimizedJsonHandler', () => {
         execution = handler.execute(mockEngine, mockData, mockProvider, 'en', 'fa', 'msg-timeout', mockSender);
         execution.catch(() => {});
         await vi.waitFor(() => expect(mockProvider.translate).toHaveBeenCalledTimes(1));
-        await vi.advanceTimersByTimeAsync(300000);
+        await vi.advanceTimersByTimeAsync(TRANSLATION_BATCH_EXECUTION_TIMEOUT_MS);
 
         expect(mockAbortController.abort).toHaveBeenCalledTimes(1);
         await expect(execution).rejects.toMatchObject({ type: 'TRANSLATION_TIMEOUT' });

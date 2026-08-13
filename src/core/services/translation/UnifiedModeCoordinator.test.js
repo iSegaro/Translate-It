@@ -3,6 +3,7 @@ import { UnifiedModeCoordinator } from './UnifiedModeCoordinator.js';
 import { TranslationMode } from '@/shared/config/config.js';
 import { RequestStatus } from './TranslationRequestTracker.js';
 import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
+import { TRANSLATION_BATCH_EXECUTION_TIMEOUT_MS } from '@/shared/constants/translation.js';
 
 // Mock RateLimitManager
 vi.mock('@/features/translation/core/RateLimitManager.js', () => ({
@@ -743,6 +744,31 @@ describe('UnifiedModeCoordinator', () => {
       expect(result[0]).toEqual({ id: 'A', text: 'ترجمهٔ A' });
       expect(result[1]).toEqual({ id: 'B', text: 'B', isSkipped: true });
       expect(result[0].isSkipped).toBeUndefined();
+    });
+
+    it('fires the generic batch guard exactly at the canonical batch execution budget', async () => {
+      vi.useFakeTimers();
+      try {
+        mockEngine.getProvider.mockResolvedValue({
+          translate: vi.fn(() => new Promise(() => {}))
+        });
+
+        const promise = coordinator._processGenericBatch(
+          batchRequest(),
+          { translationEngine: mockEngine },
+          batchOptions([{ id: 'A', text: 'A' }])
+        );
+        let rejected = false;
+        promise.catch(() => { rejected = true; });
+
+        await vi.advanceTimersByTimeAsync(TRANSLATION_BATCH_EXECUTION_TIMEOUT_MS - 1);
+        expect(rejected).toBe(false);
+
+        await vi.advanceTimersByTimeAsync(1);
+        await expect(promise).rejects.toMatchObject({ type: ErrorTypes.TRANSLATION_TIMEOUT });
+      } finally {
+        vi.useRealTimers();
+      }
     });
 
     it('rejects a batch timeout as TRANSLATION_TIMEOUT, never USER_CANCELLED', async () => {

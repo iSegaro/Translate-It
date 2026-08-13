@@ -3,6 +3,7 @@ import { UnifiedTranslationCoordinator } from './UnifiedTranslationCoordinator.j
 import { streamingTimeoutManager } from './StreamingTimeoutManager.js';
 import { sendRegularMessage } from './UnifiedMessaging.js';
 import { MessageActions } from './MessageActions.js';
+import { TRANSLATION_BATCH_EXECUTION_TIMEOUT_MS } from '@/shared/constants/translation.js';
 
 // Mock dependencies
 vi.mock('./StreamingTimeoutManager.js', () => ({
@@ -98,6 +99,11 @@ describe('UnifiedTranslationCoordinator', () => {
   });
 
   describe('Timeout Calculation', () => {
+    // Structured Content transport allowance is local to messaging/transport
+    // policy (see UnifiedTranslationCoordinator). The watchdog must derive to
+    // canonical batch execution budget + allowance.
+    const STRUCTURED_TRANSPORT_ALLOWANCE_MS = 30000;
+
     it('keeps structured Select Element watchdog beyond the batch deadline', () => {
       const data = {
         text: JSON.stringify(Array.from({ length: 23 }, (_, index) => ({ t: `segment-${index}` }))),
@@ -107,9 +113,9 @@ describe('UnifiedTranslationCoordinator', () => {
       const timeouts = coordinator._calculateStreamingTimeouts(data);
 
       expect(timeouts).toEqual({
-        initialTimeout: 330000,
-        progressTimeout: 330000,
-        gracePeriod: 30000,
+        initialTimeout: TRANSLATION_BATCH_EXECUTION_TIMEOUT_MS + STRUCTURED_TRANSPORT_ALLOWANCE_MS,
+        progressTimeout: TRANSLATION_BATCH_EXECUTION_TIMEOUT_MS + STRUCTURED_TRANSPORT_ALLOWANCE_MS,
+        gracePeriod: STRUCTURED_TRANSPORT_ALLOWANCE_MS,
         estimatedSegments: 23
       });
     });
@@ -122,9 +128,9 @@ describe('UnifiedTranslationCoordinator', () => {
       };
 
       expect(coordinator._calculateStreamingTimeouts(data, 90000)).toMatchObject({
-        initialTimeout: 330000,
-        progressTimeout: 330000,
-        gracePeriod: 30000
+        initialTimeout: TRANSLATION_BATCH_EXECUTION_TIMEOUT_MS + STRUCTURED_TRANSPORT_ALLOWANCE_MS,
+        progressTimeout: TRANSLATION_BATCH_EXECUTION_TIMEOUT_MS + STRUCTURED_TRANSPORT_ALLOWANCE_MS,
+        gracePeriod: STRUCTURED_TRANSPORT_ALLOWANCE_MS
       });
     });
 

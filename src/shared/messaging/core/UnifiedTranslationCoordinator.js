@@ -15,10 +15,13 @@ import { sendRegularMessage } from './UnifiedMessaging.js';
 import { MessageActions } from './MessageActions.js';
 import { matchErrorToType } from '@/shared/error-management/ErrorMatcher.js';
 import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
+import { TRANSLATION_BATCH_EXECUTION_TIMEOUT_MS } from '@/shared/constants/translation.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.MESSAGING, 'UnifiedTranslationCoordinator');
 
-const STRUCTURED_BATCH_TIMEOUT_MS = 300000;
+// Transport/streaming allowance added on top of the canonical batch execution
+// budget. Local to Content messaging/transport policy: covers final stream-end
+// delivery and Content-side result handling, not provider execution.
 const STRUCTURED_TRANSPORT_ALLOWANCE_MS = 30000;
 
 export class UnifiedTranslationCoordinator {
@@ -353,7 +356,7 @@ export class UnifiedTranslationCoordinator {
     if (isStructuredSelectElement) {
       // Structured Select Element emits no progress while its single provider batch is in flight.
       // Keep every Content-side watchdog beyond the authoritative batch deadline.
-      const executionDeadline = Math.max(customTimeout || 0, STRUCTURED_BATCH_TIMEOUT_MS);
+      const executionDeadline = Math.max(customTimeout || 0, TRANSLATION_BATCH_EXECUTION_TIMEOUT_MS);
       const transportWatchdog = executionDeadline + STRUCTURED_TRANSPORT_ALLOWANCE_MS;
       initialTimeout = transportWatchdog;
       progressTimeout = transportWatchdog;
