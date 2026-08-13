@@ -26,6 +26,11 @@ function getParentRecoveryCharacterLimit(primaryFragmentLimit) {
   return Math.min(primaryFragmentLimit, Math.max(500, Math.floor(primaryFragmentLimit / 2)));
 }
 
+function getParentRecoveryStageLimit(primaryFragmentLimit, recoveryStage) {
+  if (recoveryStage === 2) return getParentRecoveryCharacterLimit(primaryFragmentLimit);
+  return Math.min(primaryFragmentLimit, Math.max(500, Math.floor(primaryFragmentLimit * 0.75)));
+}
+
 export class OptimizedJsonHandler {
   /**
    * Orchestrates the optimized translation process.
@@ -140,8 +145,9 @@ export class OptimizedJsonHandler {
           return logicalItem;
         };
 
-        const recoverFailedV3Parent = async (failure, batchExecutionContext, parallelExecution) => {
-          const { parentId, violation } = failure.parentRecovery;
+        const runParentRecoveryStage = async ({ failure, batchExecutionContext, parallelExecution, recoveryStage, fragmentLimit, violation: stageViolation }) => {
+          const { parentId, violation: primaryViolation } = failure.parentRecovery;
+          const violation = stageViolation || primaryViolation;
           if (!isRecoverableParentViolation(violation)) throw failure;
           if (abortController.signal.aborted || engine.isCancelled(messageId)) {
             const cancellation = new Error('Translation task cancelled');
@@ -158,21 +164,18 @@ export class OptimizedJsonHandler {
 
           const sourceParent = v3Parents.get(parentId);
           if (!sourceParent) throw failure;
-          const recoveryCharacterLimit = getParentRecoveryCharacterLimit(characterLimit);
           const recoveryFragments = TranslationBatcher.splitOversizedSegment(
             sourceParent,
-            recoveryCharacterLimit
+            fragmentLimit
           );
           appendTranslationDiagnostic(executionContext, {
             type: 'PARENT_RECOVERY_STARTED',
             stage: 'parent-recovery',
             parentId,
             originalReason: violation.reason || violation.code,
-            attempt: 1,
-            recoveryAttempt: 1,
-            fragmentCount: recoveryFragments.length,
+            recoveryStage,
             primaryFragmentLimit: characterLimit,
-            recoveryFragmentLimit: recoveryCharacterLimit,
+            recoveryFragmentLimit: fragmentLimit,
             primaryFragmentCount: failure.parentRecovery.primaryFragmentCount,
             recoveryFragmentCount: recoveryFragments.length,
             markerCount: failure.parentRecovery.markerCount,
@@ -251,12 +254,12 @@ export class OptimizedJsonHandler {
               stage: 'parent-recovery',
               parentId,
               originalReason: violation.reason || violation.code,
-              recoveryAttempt: 1,
-              fragmentCount: recoveryFragments.length,
+               recoveryStage,
+               recoveryFragmentCount: recoveryFragments.length,
               finalReason: recoveryError?.message || recoveryType,
               callPurpose: TranslationCallPurpose.PARENT_RECOVERY,
             });
-            throw failure;
+             throw failure;
           } finally {
             clearTimeout(recoveryTimeoutId);
           }
@@ -277,12 +280,24 @@ export class OptimizedJsonHandler {
               stage: 'parent-recovery',
               parentId,
               originalReason: violation.reason || violation.code,
-              recoveryAttempt: 1,
-              fragmentCount: recoveryFragments.length,
+               recoveryStage,
+               recoveryFragmentCount: recoveryFragments.length,
               finalReason: finalViolation?.reason || finalViolation?.code,
               callPurpose: TranslationCallPurpose.PARENT_RECOVERY,
             });
-            throw failure;
+            if (!isRecoverableParentViolation(finalViolation)) {
+              const terminalError = new Error(
+                `V3 marker contract violation for fragmented parent ${parentId}: ${finalViolation?.reason || finalViolation?.code}`
+              );
+              terminalError.isFatal = true;
+              terminalError.type = ErrorTypes.VALIDATION;
+              terminalError.v3Violation = finalViolation;
+              throw terminalError;
+            }
+            return {
+              recoverableFailure: failure,
+              recoveryViolation: finalViolation,
+            };
           }
 
           appendTranslationDiagnostic(executionContext, {
@@ -290,11 +305,41 @@ export class OptimizedJsonHandler {
             stage: 'parent-recovery',
             parentId,
             originalReason: violation.reason || violation.code,
-            recoveryAttempt: 1,
-            fragmentCount: recoveryFragments.length,
+             recoveryStage,
+             recoveryFragmentCount: recoveryFragments.length,
             callPurpose: TranslationCallPurpose.PARENT_RECOVERY,
           });
           return buildV3ParentResult(ordered, translatedText);
+        };
+
+        const recoverFailedV3Parent = async (failure, batchExecutionContext, parallelExecution) => {
+          const stage1 = await runParentRecoveryStage({
+            failure,
+            batchExecutionContext,
+            parallelExecution,
+            recoveryStage: 1,
+            fragmentLimit: getParentRecoveryStageLimit(characterLimit, 1),
+          });
+          if (!stage1?.recoverableFailure) return stage1;
+
+          const remainingMs = operationDeadlineAt - Date.now();
+          if (remainingMs <= 0) {
+            const timeout = new Error(`Batch translation timed out after ${TRANSLATION_BATCH_EXECUTION_TIMEOUT_MS}ms`);
+            timeout.type = ErrorTypes.TRANSLATION_TIMEOUT;
+            if (!abortController.signal.aborted) abortController.abort();
+            throw timeout;
+          }
+
+          const stage2 = await runParentRecoveryStage({
+            failure: stage1.recoverableFailure,
+            batchExecutionContext,
+            parallelExecution,
+            recoveryStage: 2,
+            fragmentLimit: getParentRecoveryStageLimit(characterLimit, 2),
+            violation: stage1.recoveryViolation,
+          });
+          if (stage2?.recoverableFailure) throw failure;
+          return stage2;
         };
 
         const extractLogicalId = (item) => {

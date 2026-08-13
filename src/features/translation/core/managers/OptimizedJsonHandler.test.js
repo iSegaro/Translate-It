@@ -312,7 +312,7 @@ describe('OptimizedJsonHandler', () => {
       );
 
       expect(result.success).toBe(false);
-      expect(result.error.message).toContain('MARKER_SEQUENCE_MISMATCH');
+       expect(result.error.message).toContain('MARKER_SEQUENCE_MISMATCH');
     });
 
     it('rejects duplicate V3 markers in translated text', async () => {
@@ -424,6 +424,7 @@ describe('OptimizedJsonHandler', () => {
       mockEngine.createIntelligentBatches = vi.fn(() => [[fragment0], [fragment1]]);
       mockProvider.translate
         .mockResolvedValueOnce({ translatedText: [`A${m2}B`] })
+        .mockResolvedValueOnce({ translatedText: [`C`] })
         .mockResolvedValueOnce({ translatedText: [`C`] });
 
       const result = await handler.execute(
@@ -478,7 +479,13 @@ describe('OptimizedJsonHandler', () => {
       mockEngine.createIntelligentBatches = vi.fn(() => [[fragment0], [fragment1]]);
       mockProvider.translate
         .mockResolvedValueOnce({ translatedText: [translatedFragment0] })
-        .mockResolvedValueOnce({ translatedText: [translatedFragment1] });
+        .mockResolvedValueOnce({ translatedText: [translatedFragment1] })
+        .mockImplementation((texts, _source, _target, options) => {
+          if (options.callPurpose === TranslationCallPurpose.PARENT_RECOVERY) {
+            return Promise.resolve({ translatedText: texts.map((text) => text.replace(marker(39), '')) });
+          }
+          return Promise.resolve({ translatedText: texts });
+        });
 
       const result = await handler.execute(
         mockEngine,
@@ -493,16 +500,16 @@ describe('OptimizedJsonHandler', () => {
       const recoveryCalls = mockProvider.translate.mock.calls.filter(
         call => call[3].callPurpose === TranslationCallPurpose.PARENT_RECOVERY
       );
-      expect(mockProvider.translate).toHaveBeenCalledTimes(5);
-      expect(recoveryCalls).toHaveLength(3);
+       expect(mockProvider.translate).toHaveBeenCalledTimes(7);
+       expect(recoveryCalls).toHaveLength(5);
       const recoveryMarkerCounts = recoveryCalls.map(call => call[0][0].match(/@@TI_SEG_/g)?.length || 0);
-      expect(recoveryMarkerCounts.reduce((sum, count) => sum + count, 0)).toBe(39);
-      expect(recoveryMarkerCounts.every(count => count < 20)).toBe(true);
+       expect(recoveryMarkerCounts.reduce((sum, count) => sum + count, 0)).toBe(78);
+       expect(recoveryMarkerCounts.slice(-3).every(count => count < 20)).toBe(true);
       expect(result).toMatchObject({
         success: false,
         error: { type: ErrorTypes.VALIDATION }
       });
-      expect(result.error.message).toContain('MARKER_COUNT_MISMATCH');
+       expect(result.error.message).toContain('MARKER_COUNT_MISMATCH');
       expect(result.results).toEqual([]);
 
       const diagnostic = appendTranslationDiagnostic.mock.calls.find(
@@ -514,13 +521,13 @@ describe('OptimizedJsonHandler', () => {
         actualMarkerCount: 38,
         reason: 'MARKER_COUNT_MISMATCH'
       });
-      expect(appendTranslationDiagnostic).toHaveBeenCalledWith(null, expect.objectContaining({
-        type: 'PARENT_RECOVERY_STARTED',
-        parentId: 'g1',
-        primaryFragmentLimit: 1000,
-        recoveryFragmentLimit: 500,
-        primaryFragmentCount: 2,
-        recoveryFragmentCount: 3,
+       expect(appendTranslationDiagnostic).toHaveBeenCalledWith(null, expect.objectContaining({
+         type: 'PARENT_RECOVERY_STARTED',
+         parentId: 'g1',
+         recoveryStage: 2,
+         recoveryFragmentLimit: 500,
+         primaryFragmentCount: 2,
+         recoveryFragmentCount: 3,
         markerCount: 39,
         callPurpose: TranslationCallPurpose.PARENT_RECOVERY,
       }));
@@ -545,6 +552,8 @@ describe('OptimizedJsonHandler', () => {
       mockEngine.createIntelligentBatches = vi.fn(() => [[fragment0], [fragment1]]);
       mockProvider.translate
         .mockResolvedValueOnce({ translatedText: [`A${m3}`] })
+        .mockResolvedValueOnce({ translatedText: [`${m2}B`] })
+        .mockResolvedValueOnce({ translatedText: [`A${m3}`] })
         .mockResolvedValueOnce({ translatedText: [`${m2}B`] });
 
       const result = await handler.execute(
@@ -554,7 +563,7 @@ describe('OptimizedJsonHandler', () => {
       );
 
       expect(result.success).toBe(false);
-      expect(result.error.message).toContain('MARKER_SEQUENCE_MISMATCH');
+       expect(result.error.message).toContain('MARKER_SEQUENCE_MISMATCH');
       const updates = browser.tabs.sendMessage.mock.calls
         .map(([, m]) => m)
         .filter(m => m.action === MessageActions.TRANSLATION_STREAM_UPDATE);
@@ -598,6 +607,46 @@ describe('OptimizedJsonHandler', () => {
       expect(appendTranslationDiagnostic).toHaveBeenCalledWith(null, expect.objectContaining({ type: 'PARENT_RECOVERY_SUCCEEDED', parentId: 'g1' }));
     });
 
+    it.each([
+      ['non-recoverable validation', 'validation'],
+      ['provider rejection', 'provider'],
+      ['timeout', 'timeout'],
+      ['cancellation', 'cancelled'],
+    ])('does not start Stage 2 after Stage 1 %s', async (_label, outcome) => {
+      const m2 = '@@TI_SEG_e_s_n2@@';
+      const m3 = '@@TI_SEG_e_s_n3@@';
+      const source = `A${m2}B ${m3}C`;
+      const fragment0 = { t: `A${m2}B`, i: 'n1', blockId: 'g1', isV3Fragment: true, parentId: 'g1', fragmentIndex: 0, fragmentCount: 2, fragmentJoinerBefore: '' };
+      const fragment1 = { t: `${m3}C`, i: 'n1', blockId: 'g1', isV3Fragment: true, parentId: 'g1', fragmentIndex: 1, fragmentCount: 2, fragmentJoinerBefore: ' ' };
+      mockEngine.createIntelligentBatches = vi.fn(() => [[fragment0], [fragment1]]);
+      let primaryCall = 0;
+      mockProvider.translate.mockImplementation((texts, _source, _target, options) => {
+        if (options.callPurpose !== TranslationCallPurpose.PARENT_RECOVERY) {
+          primaryCall += 1;
+          return Promise.resolve({ translatedText: primaryCall === 2 ? [`${m3}${m3}C`] : ['A@@TI_SEG_e_s_n2@@B'] });
+        }
+        if (outcome === 'validation') return Promise.resolve({ translatedText: [`${source}@@`] });
+        if (outcome === 'timeout') return Promise.reject(Object.assign(new Error('stage timeout'), { type: ErrorTypes.TRANSLATION_TIMEOUT }));
+        if (outcome === 'cancelled') return Promise.reject(Object.assign(new Error('stage cancelled'), { name: 'AbortError' }));
+        return Promise.reject(Object.assign(new Error('stage provider failure'), { type: ErrorTypes.NETWORK_ERROR }));
+      });
+
+      const execution = handler.execute(
+        mockEngine,
+        { ...mockData, sourceLanguage: 'en', text: JSON.stringify([{ t: source, blockId: 'g1', i: 'n1' }]) },
+        mockProvider, 'en', 'fa', `stage-1-terminal-${outcome}`, mockSender
+      );
+      await execution.catch(() => {});
+
+      const recoveryCalls = mockProvider.translate.mock.calls.filter(
+        call => call[3].callPurpose === TranslationCallPurpose.PARENT_RECOVERY
+      );
+      expect(recoveryCalls).toHaveLength(1);
+      expect(appendTranslationDiagnostic.mock.calls.filter(([, diagnostic]) => (
+        diagnostic?.type === 'PARENT_RECOVERY_STARTED' && diagnostic.recoveryStage === 2
+      ))).toHaveLength(0);
+    });
+
     it('preserves the original validation failure when parent recovery fails', async () => {
       const m2 = '@@TI_SEG_e_s_n2@@';
       const m3 = '@@TI_SEG_e_s_n3@@';
@@ -606,6 +655,7 @@ describe('OptimizedJsonHandler', () => {
       mockEngine.createIntelligentBatches = vi.fn(() => [[fragment0], [fragment1]]);
       mockProvider.translate
         .mockResolvedValueOnce({ translatedText: [`A${m2}B`] })
+        .mockResolvedValueOnce({ translatedText: [`${m3}${m3}C`] })
         .mockResolvedValueOnce({ translatedText: [`${m3}${m3}C`] })
         .mockResolvedValueOnce({ translatedText: [`${m3}${m3}C`] });
 
@@ -617,7 +667,7 @@ describe('OptimizedJsonHandler', () => {
 
       expect(result.success).toBe(false);
       expect(result.error.type).toBe(ErrorTypes.VALIDATION);
-      expect(result.error.message).toContain('MARKER_COUNT_MISMATCH');
+       expect(result.error.message).toContain('MARKER_COUNT_MISMATCH');
       expect(result.results).toEqual([]);
       expect(appendTranslationDiagnostic).toHaveBeenCalledWith(null, expect.objectContaining({ type: 'PARENT_RECOVERY_FAILED', parentId: 'g1' }));
     });
@@ -678,11 +728,11 @@ describe('OptimizedJsonHandler', () => {
 
       expect(result.success).toBe(true);
       expect(mockProvider.translate.mock.calls.filter(call => call[3].callPurpose === TranslationCallPurpose.PARENT_RECOVERY).length).toBeGreaterThan(1);
-      expect(splitSpy).toHaveBeenCalledWith(expect.objectContaining({ t: source }), 500);
+       expect(splitSpy).toHaveBeenCalledWith(expect.objectContaining({ t: source }), 750);
       const recoveryInputs = mockProvider.translate.mock.calls
         .filter(call => call[3].callPurpose === TranslationCallPurpose.PARENT_RECOVERY)
         .map(call => call[0][0]);
-      expect(recoveryInputs.every(fragmentText => fragmentText.length <= 500)).toBe(true);
+       expect(recoveryInputs.every(fragmentText => fragmentText.length <= 750)).toBe(true);
       expect(recoveryInputs.join(' ').replace(/\s+/g, ' ').trim()).toBe(source.replace(/\s+/g, ' ').trim());
       expect((recoveryInputs.join('').match(/@@TI_SEG_/g) || [])).toHaveLength(1);
       expect(recoveryInputs.join('')).toContain(marker);
@@ -730,15 +780,16 @@ describe('OptimizedJsonHandler', () => {
       const recoveryMarkerCounts = recoveryFragments.map(fragment => fragment.match(/@@TI_SEG_/g)?.length || 0);
       expect(result.success).toBe(true);
       expect(primaryFragments.length).toBeGreaterThan(1);
-      expect(recoveryFragments.length).toBeGreaterThan(primaryFragments.length);
+       expect(recoveryFragments.length).toBeGreaterThanOrEqual(primaryFragments.length);
       expect(Math.max(...primaryFragments.map(fragment => fragment.t.length))).toBeLessThanOrEqual(3500);
-      expect(Math.max(...recoveryFragments.map(fragment => fragment.length))).toBeLessThanOrEqual(1750);
+       expect(Math.max(...recoveryFragments.map(fragment => fragment.length))).toBeLessThanOrEqual(2625);
       expect(Math.max(...recoveryMarkerCounts)).toBeLessThan(Math.max(...primaryMarkerCounts));
       expect(recoveryMarkerCounts.reduce((sum, count) => sum + count, 0)).toBe(120);
       expect(appendTranslationDiagnostic).toHaveBeenCalledWith(null, expect.objectContaining({
         type: 'PARENT_RECOVERY_STARTED',
         primaryFragmentLimit: 3500,
-        recoveryFragmentLimit: 1750,
+         recoveryStage: 1,
+         recoveryFragmentLimit: 2625,
         primaryFragmentCount: primaryFragments.length,
         recoveryFragmentCount: recoveryFragments.length,
       }));
@@ -907,6 +958,8 @@ describe('OptimizedJsonHandler', () => {
       const fragment1 = { t: `${m3}C`, i: 'n1', blockId: 'g1', isV3Fragment: true, parentId: 'g1', fragmentIndex: 1, fragmentCount: 2, fragmentJoinerBefore: ' ' };
       mockEngine.createIntelligentBatches = vi.fn(() => [[fragment0], [fragment1]]);
       mockProvider.translate
+        .mockResolvedValueOnce({ translatedText: ['ترجمه کامل بدون'] })
+        .mockResolvedValueOnce({ translatedText: ['هیچ marker'] })
         .mockResolvedValueOnce({ translatedText: ['ترجمه کامل بدون'] })
         .mockResolvedValueOnce({ translatedText: ['هیچ marker'] });
 
