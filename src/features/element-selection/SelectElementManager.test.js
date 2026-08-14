@@ -554,6 +554,87 @@ describe('SelectElementManager', () => {
       expect(cleanupSpy).toHaveBeenCalledWith({ reason: 'error' });
     });
 
+    it('preserves committed content while routing non-context fatal errors through error deactivation', async () => {
+      const error = Object.assign(new Error('API key is invalid'), {
+        type: ErrorTypes.API_KEY_INVALID,
+      });
+      const displayError = Object.assign(new Error('API key is wrong or invalid'), {
+        type: ErrorTypes.API_KEY_INVALID,
+        cause: error,
+      });
+      const { createPublicDisplayError } = await import('@/shared/error-management/PublicErrorPolicy.js');
+      const { isFatalError } = await import('@/shared/error-management/ErrorMatcher.js');
+      createPublicDisplayError.mockResolvedValueOnce(displayError);
+      isFatalError.mockReturnValueOnce(true);
+      const deactivateSpy = vi.spyOn(manager, 'deactivate').mockResolvedValue(undefined);
+      manager.domTranslatorAdapter.translateElement.mockRejectedValue(error);
+
+      await manager.startTranslation(document.createElement('div'));
+
+      expect(createPublicDisplayError).toHaveBeenCalledTimes(1);
+      expect(createPublicDisplayError).toHaveBeenCalledWith(error);
+      expect(errorHandler.handle).toHaveBeenCalledTimes(1);
+      expect(errorHandler.handle).toHaveBeenCalledWith(
+        displayError,
+        expect.objectContaining({ context: 'select-element', showToast: true })
+      );
+      expect(deactivateSpy).toHaveBeenCalledWith({ preserveTranslations: true, reason: 'error' });
+      expect(cleanupSpy).not.toHaveBeenCalled();
+      expect(manager.domTranslatorAdapter.cancelTranslation).not.toHaveBeenCalled();
+      expect(manager.domTranslatorAdapter.revertTranslation).not.toHaveBeenCalled();
+      const { pageEventBus } = await import('@/core/PageEventBus.js');
+      expect(pageEventBus.emit).not.toHaveBeenCalledWith('show-select-element-info', expect.anything());
+      expect(pageEventBus.emit).not.toHaveBeenCalledWith('cancel-select-element-mode');
+    });
+
+    it('keeps context failures on ExtensionContextManager instead of the generic fatal branch', async () => {
+      const ExtensionContextManager = (await import('@/core/extensionContext.js')).default;
+      const error = Object.assign(new Error('Extension context invalidated'), {
+        type: ErrorTypes.EXTENSION_CONTEXT_INVALIDATED,
+      });
+      const deactivateSpy = vi.spyOn(manager, 'deactivate').mockResolvedValue(undefined);
+      ExtensionContextManager.isContextError.mockReturnValue(true);
+      const { isFatalError } = await import('@/shared/error-management/ErrorMatcher.js');
+      const { createPublicDisplayError } = await import('@/shared/error-management/PublicErrorPolicy.js');
+
+      try {
+        isFatalError.mockReturnValue(true);
+        manager.domTranslatorAdapter.translateElement.mockRejectedValue(error);
+
+        await manager.startTranslation(document.createElement('div'));
+
+        expect(ExtensionContextManager.handleContextError).toHaveBeenCalledWith(error, 'element-selection');
+        expect(createPublicDisplayError).not.toHaveBeenCalled();
+        expect(errorHandler.handle).not.toHaveBeenCalled();
+        expect(deactivateSpy).not.toHaveBeenCalled();
+        expect(cleanupSpy).toHaveBeenCalledWith({ reason: 'cancel' });
+      } finally {
+        ExtensionContextManager.isContextError.mockReturnValue(false);
+        isFatalError.mockReturnValue(false);
+      }
+    });
+
+    it('keeps FEATURE_BLOCKED as a silent defensive skip', async () => {
+      const error = Object.assign(new Error('Translation already in progress for this element'), {
+        type: ErrorTypes.FEATURE_BLOCKED,
+      });
+      const { createPublicDisplayError } = await import('@/shared/error-management/PublicErrorPolicy.js');
+      manager.domTranslatorAdapter.translateElement.mockRejectedValue(error);
+
+      await manager.startTranslation(document.createElement('div'));
+
+      expect(createPublicDisplayError).not.toHaveBeenCalled();
+      expect(errorHandler.handle).not.toHaveBeenCalled();
+      expect(cleanupSpy).toHaveBeenCalledWith({ reason: 'cancel' });
+      expect(manager.domTranslatorAdapter.revertTranslation).not.toHaveBeenCalled();
+      expect(manager.logger.debug).toHaveBeenCalledWith(
+        'Select Element translation skipped:',
+        error.message
+      );
+      const { pageEventBus } = await import('@/core/PageEventBus.js');
+      expect(pageEventBus.emit).not.toHaveBeenCalledWith('show-select-element-info', expect.anything());
+    });
+
     it.each([
       ['API key', 'API_KEY_INVALID'],
       ['rate limit', 'RATE_LIMIT_REACHED'],

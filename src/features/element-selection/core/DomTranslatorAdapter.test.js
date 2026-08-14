@@ -199,6 +199,28 @@ describe('DomTranslatorAdapter', () => {
       expect(contentScriptIntegration.sendTranslationRequest).not.toHaveBeenCalled();
     });
 
+    it('rejects an overlapping translation root as FEATURE_BLOCKED before a second request', async () => {
+      const { ErrorTypes } = await import('@/shared/error-management/ErrorTypes.js');
+      let streamCallbacks;
+      registerTranslation.mockImplementationOnce((_id, callbacks) => { streamCallbacks = callbacks; });
+      contentScriptIntegration.sendTranslationRequest.mockResolvedValueOnce({ success: true, streaming: true });
+
+      const firstTranslation = adapter.translateElement(testElement);
+      await vi.waitFor(() => expect(streamCallbacks).toBeDefined());
+      const requestCount = contentScriptIntegration.sendTranslationRequest.mock.calls.length;
+
+      await expect(adapter.translateElement(testElement)).rejects.toMatchObject({
+        type: ErrorTypes.FEATURE_BLOCKED,
+        translationOutcome: { committedParentCount: 0, totalParentCount: 0, cancelled: false },
+      });
+      expect(contentScriptIntegration.sendTranslationRequest).toHaveBeenCalledTimes(requestCount);
+      expect(testElement.textContent).toBe('Hello');
+
+      await adapter.cancelTranslation({ silent: true });
+      streamCallbacks.onStreamEnd({ cancelled: true });
+      await expect(firstTranslation).resolves.toMatchObject({ success: false, cancelled: true });
+    });
+
     it('maps the non-grouping strategy to V2 extraction mode exactly once', async () => {
       const { collectTextNodes } = await import('./DomTranslatorUtils.js');
       collectTextNodes.mockClear();
