@@ -177,6 +177,42 @@ describe('DomTranslatorAdapter', () => {
       );
     });
 
+    it('maps the non-grouping strategy to V2 extraction mode exactly once', async () => {
+      const { collectTextNodes } = await import('./DomTranslatorUtils.js');
+      collectTextNodes.mockClear();
+      let callbacks;
+      registerTranslation.mockImplementationOnce((_id, registered) => { callbacks = registered; });
+      contentScriptIntegration.sendTranslationRequest.mockResolvedValueOnce({ success: true, streaming: true });
+
+      const translation = adapter.translateElement(testElement);
+      await vi.waitFor(() => expect(callbacks).toBeDefined());
+      callbacks.onStreamUpdate({ success: true, data: [{ t: 'سلام', i: 'n1' }] });
+      callbacks.onStreamEnd({ success: true });
+      await translation;
+
+      expect(collectTextNodes).toHaveBeenCalledTimes(1);
+      expect(collectTextNodes).toHaveBeenCalledWith(testElement, { extractionMode: 'v2' });
+    });
+
+    it('maps the grouping strategy to V3 extraction mode exactly once', async () => {
+      const { getFeatureSemanticBlockGroupingAsync } = await import('@/config.js');
+      getFeatureSemanticBlockGroupingAsync.mockResolvedValueOnce(true);
+      const { collectBlockGroups } = await import('./DomTranslatorUtils.js');
+      collectBlockGroups.mockClear();
+      let callbacks;
+      registerTranslation.mockImplementationOnce((_id, registered) => { callbacks = registered; });
+      contentScriptIntegration.sendTranslationRequest.mockResolvedValueOnce({ success: true, streaming: true });
+
+      const translation = adapter.translateElement(testElement);
+      await vi.waitFor(() => expect(callbacks).toBeDefined());
+      callbacks.onStreamUpdate({ success: true, data: [{ t: 'سلام', i: 'n1' }] });
+      callbacks.onStreamEnd({ success: true });
+      await translation;
+
+      expect(collectBlockGroups).toHaveBeenCalledTimes(1);
+      expect(collectBlockGroups).toHaveBeenCalledWith(testElement, expect.any(Object), { extractionMode: 'v3' });
+    });
+
     it('A: returns zero-commit failure for rejected streaming result', async () => {
       let callbacks;
       registerTranslation.mockImplementationOnce((_id, registered) => { callbacks = registered; });

@@ -65,26 +65,48 @@ describe('SelectElementPolicy', () => {
       }
     });
 
-    it('keeps PRE/CODE selectable as root; traversable only with allowPreformatted (V3)', () => {
+    it('keeps PRE/CODE selectable as root; traversable only under V3 mode', () => {
       for (const tag of ['pre', 'code']) {
         const el = makeElement(tag);
         expect(getSelectElementRootEligibility(el).selectableRoot).toBe(true);
         expect(isSelectElementTraversable(el).traversable).toBe(false);
-        const v3 = isSelectElementTraversable(el, { allowPreformatted: true });
+        expect(isSelectElementTraversable(el, { extractionMode: SelectElementExtractionMode.V2 }).traversable).toBe(false);
+        const v3 = isSelectElementTraversable(el, { extractionMode: SelectElementExtractionMode.V3 });
         expect(v3.traversable).toBe(true);
         expect(v3.category).toBe(SelectElementCategory.PREFORMATTED);
         expect(v3.supportedModes).toEqual([SelectElementExtractionMode.V3]);
       }
     });
 
-    it('rejects KBD/SAMP as root; traversable only with allowPreformatted (V3)', () => {
+    it('rejects KBD/SAMP as root; traversable only under V3 mode', () => {
       for (const tag of ['kbd', 'samp']) {
         const el = makeElement(tag);
         expect(getSelectElementRootEligibility(el).selectableRoot).toBe(false);
         expect(isSelectElementTraversable(el).traversable).toBe(false);
-        const v3 = isSelectElementTraversable(el, { allowPreformatted: true });
+        expect(isSelectElementTraversable(el, { extractionMode: SelectElementExtractionMode.V2 }).traversable).toBe(false);
+        const v3 = isSelectElementTraversable(el, { extractionMode: SelectElementExtractionMode.V3 });
         expect(v3.traversable).toBe(true);
         expect(v3.supportedModes).toEqual([SelectElementExtractionMode.V3]);
+      }
+    });
+
+    it('rejects PREFORMATTED with UNSUPPORTED_MODE under missing/invalid mode (conservative)', () => {
+      for (const tag of ['pre', 'code', 'kbd', 'samp']) {
+        const el = makeElement(tag);
+        const missing = isSelectElementTraversable(el);
+        expect(missing.traversable).toBe(false);
+        expect(missing.reason).toBe(SelectElementReason.UNSUPPORTED_MODE);
+
+        const invalid = isSelectElementTraversable(el, { extractionMode: 'v9' });
+        expect(invalid.traversable).toBe(false);
+        expect(invalid.reason).toBe(SelectElementReason.UNSUPPORTED_MODE);
+      }
+    });
+
+    it('is mode-independent for ordinary content', () => {
+      for (const mode of [SelectElementExtractionMode.V2, SelectElementExtractionMode.V3, undefined, 'v9']) {
+        const el = makeElement('div');
+        expect(isSelectElementTraversable(el, { extractionMode: mode }).traversable).toBe(true);
       }
     });
 

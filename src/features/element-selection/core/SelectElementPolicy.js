@@ -61,6 +61,7 @@ export const SelectElementReason = Object.freeze({
   NOTRANSLATE: 'notranslate',
   HIDDEN: 'hidden',
   CODE_CLASS: 'code-class',
+  UNSUPPORTED_MODE: 'unsupported-mode',
 });
 
 /**
@@ -241,6 +242,9 @@ function classifyRootAxis(element) {
  * Cheap: tag/role/editable/marker only. NO style reads — the extractor's
  * TreeWalker owns hidden-node filtering separately.
  * isRoot only lifts the GitHub code-class exclusion (preserved behavior).
+ * Preformatted traversal is an extraction capability derived from the
+ * resolved extraction mode (V3 allows; any other/missing mode conservatively
+ * rejects) — never from an independent preformatted flag.
  */
 function classifyTraversalAxis(element, options = {}) {
   if (!element || element.nodeType !== Node.ELEMENT_NODE) {
@@ -248,7 +252,7 @@ function classifyTraversalAxis(element, options = {}) {
   }
 
   const isRoot = options.isRoot === true;
-  const allowPreformatted = options.allowPreformatted === true;
+  const extractionMode = options.extractionMode || null;
   const { tagName, category, supportedModes } = classifyCategory(element);
 
   if (isHardExcludedCategory(category)) {
@@ -256,9 +260,9 @@ function classifyTraversalAxis(element, options = {}) {
   }
 
   if (category === SelectElementCategory.PREFORMATTED) {
-    // Capability-dependent: V3 (allowPreformatted) may traverse; V2 may not.
-    if (!allowPreformatted) {
-      return { traversable: false, reason: SelectElementReason.EXCLUDED_TAG, tagName, category, supportedModes };
+    // Capability constraint: preformatted traversal only under V3.
+    if (extractionMode !== SelectElementExtractionMode.V3) {
+      return { traversable: false, reason: SelectElementReason.UNSUPPORTED_MODE, tagName, category, supportedModes };
     }
     return { traversable: true, reason: null, tagName, category, supportedModes };
   }
@@ -288,7 +292,7 @@ function classifyTraversalAxis(element, options = {}) {
  * @param {Element} element
  * @param {Object} [options]
  * @param {boolean} [options.isRoot=false] - whether this is the selected root
- * @param {boolean} [options.allowPreformatted=false] - V3 preformatted allowance
+ * @param {string} [options.extractionMode] - resolved extraction mode ('v2'|'v3')
  * @returns {{category: string, selectableRoot: boolean, traversable: boolean,
  *            supportedModes: string[], rootReason: (string|null), traversalReason: (string|null)}}
  */
@@ -341,7 +345,10 @@ export function getSelectElementRootEligibility(element) {
  * @param {Element} element
  * @param {Object} [options]
  * @param {boolean} [options.isRoot=false]
- * @param {boolean} [options.allowPreformatted=false]
+ * @param {string} [options.extractionMode] - resolved extraction mode ('v2'|'v3').
+ *   Required for preformatted traversal (V3); missing/invalid modes are
+ *   conservatively rejected for mode-dependent categories and ignored for
+ *   ordinary content.
  * @returns {{traversable: boolean, reason: (string|null), category: (string|null), supportedModes: string[]}}
  */
 export function isSelectElementTraversable(element, options = {}) {

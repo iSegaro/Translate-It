@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { extractContextMetadata, collectTextNodes, generateElementId, collectBlockGroups, isExcludedAncestor } from './DomTranslatorUtils.js';
+import { SelectElementExtractionMode } from './SelectElementPolicy.js';
 
 // Mock logger
 vi.mock('@/shared/logging/logger.js', () => ({
@@ -231,6 +232,35 @@ describe('DomTranslatorUtils', () => {
         window.getComputedStyle = originalGetComputedStyle;
       }
     });
+
+    it('should reject preformatted nodes in V2 mode (explicit mode)', () => {
+      const container = document.createElement('div');
+      container.innerHTML = `
+        <p>Standard text</p>
+        <pre>Preformatted text</pre>
+        <code>Code text</code>
+      `;
+      document.body.appendChild(container);
+
+      const nodes = collectTextNodes(container, { extractionMode: SelectElementExtractionMode.V2 });
+
+      expect(nodes.length).toBe(1);
+      expect(nodes[0].text.trim()).toBe('Standard text');
+    });
+
+    it('should reject preformatted nodes in V2 mode (default, mode-agnostic call)', () => {
+      const container = document.createElement('div');
+      container.innerHTML = `
+        <p>Standard text</p>
+        <pre>Preformatted text</pre>
+      `;
+      document.body.appendChild(container);
+
+      const nodes = collectTextNodes(container);
+
+      expect(nodes.length).toBe(1);
+      expect(nodes[0].text.trim()).toBe('Standard text');
+    });
   });
 
   describe('collectBlockGroups', () => {
@@ -326,7 +356,8 @@ describe('DomTranslatorUtils', () => {
       `;
       document.body.appendChild(container);
 
-      const units = collectBlockGroups(container);
+      // V3 mode is required for preformatted traversal
+      const units = collectBlockGroups(container, {}, { extractionMode: SelectElementExtractionMode.V3 });
 
       expect(units.length).toBe(3);
       expect(units[0].mode).toBe('standard');
@@ -339,6 +370,22 @@ describe('DomTranslatorUtils', () => {
       expect(units[2].mode).toBe('V2_PASSTHROUGH');
       expect(units[2].preWhitespace).toBe(true);
       expect(units[2].text).toBe('Code text');
+    });
+
+    it('should reject preformatted nodes when extraction mode is not V3', () => {
+      const container = document.createElement('div');
+      container.innerHTML = `
+        <p>Standard text</p>
+        <pre>Preformatted text</pre>
+        <code>Code text</code>
+      `;
+      document.body.appendChild(container);
+
+      const units = collectBlockGroups(container, {}, { extractionMode: SelectElementExtractionMode.V2 });
+
+      expect(units.length).toBe(1);
+      expect(units[0].mode).toBe('standard');
+      expect(units[0].text).toBe('Standard text');
     });
 
     it('should correctly capture direction hints and inline parent tags', () => {

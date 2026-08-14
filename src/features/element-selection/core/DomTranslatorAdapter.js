@@ -42,6 +42,7 @@ import {
   revertSelectElementTranslation
 } from './DomTranslatorState.js';
 import { collectTextNodes, collectBlockGroups, generateElementId, extractContextMetadata } from './DomTranslatorUtils.js';
+import { SelectElementExtractionMode } from './SelectElementPolicy.js';
 import { BlockGroupReconstructor, BlockGroupMutationFailure } from './BlockGroupReconstructor.js';
 import * as DirectionManager from '@/utils/dom/DomDirectionManager.js';
 
@@ -163,6 +164,11 @@ export class DomTranslatorAdapter extends ResourceTracker {
       // 1. Collect all valid text nodes using V2 or V3 extraction based on feature flag and provider type
       const isAIProvider = isProviderType(registryIdToName(provider), ProviderTypes.AI);
       const isBlockGroupingEnabled = isAIProvider && (await getFeatureSemanticBlockGroupingAsync());
+      // Resolve the abstract extraction mode once per operation; the policy
+      // decides traversal/capability from this mode (never from provider names).
+      const extractionMode = isBlockGroupingEnabled
+        ? SelectElementExtractionMode.V3
+        : SelectElementExtractionMode.V2;
       
       let textNodesData = [];
       const groupMap = new Map();
@@ -174,7 +180,7 @@ export class DomTranslatorAdapter extends ResourceTracker {
           blockCounter: { value: 0 },
           activeSessionId: this.currentSessionId
         };
-        const translationUnits = collectBlockGroups(element, this.sessionContext);
+        const translationUnits = collectBlockGroups(element, this.sessionContext, { extractionMode });
         
         // Build groups and maps for V3 block grouping
         const blockMap = new Map();
@@ -212,7 +218,7 @@ export class DomTranslatorAdapter extends ResourceTracker {
       } else {
         this.groupMap = null;
         this.sessionContext = undefined;
-        textNodesData = collectTextNodes(element);
+        textNodesData = collectTextNodes(element, { extractionMode });
       }
 
       if (textNodesData.length === 0) {

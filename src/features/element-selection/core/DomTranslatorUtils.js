@@ -173,13 +173,14 @@ function isExcludedElement(el, isRoot = false, options = {}) {
 
   const { traversable, reason } = isSelectElementTraversable(el, {
     isRoot,
-    allowPreformatted: options.allowPreformatted,
+    extractionMode: options.extractionMode,
   });
 
   if (traversable) return false;
 
   switch (reason) {
     case SelectElementReason.EXCLUDED_TAG:
+    case SelectElementReason.UNSUPPORTED_MODE:
       logger.debug(`[isExcludedElement] Rejected by tag: ${el.tagName.toUpperCase()}`, el);
       break;
     case SelectElementReason.NOTRANSLATE:
@@ -236,11 +237,13 @@ function isExcludedAncestorWithOptions(node, isRoot = false, options = {}) {
 /**
  * Collect all visible text nodes with unique structural IDs for accurate batch mapping
  * @param {HTMLElement} element - Root element to crawl
+ * @param {Object} [options] - Collection options
+ * @param {string} [options.extractionMode] - Resolved extraction mode ('v2'|'v3')
  * @returns {Object[]} Array of objects { node, text, uid, blockId, role }
  */
-export function collectTextNodes(element) {
+export function collectTextNodes(element, options = {}) {
   // 1. Entry check: If the starting element is already excluded, return empty
-  if (isExcludedAncestor(element, true)) {
+  if (isExcludedAncestorWithOptions(element, true, { extractionMode: options.extractionMode })) {
     return [];
   }
 
@@ -251,7 +254,7 @@ export function collectTextNodes(element) {
     // Branch Filtering (Elements)
     if (node.nodeType === Node.ELEMENT_NODE) {
       // Business logic exclusions (Tags, Class, Attributes, Editable, Roles)
-      if (isExcludedElement(node)) return NodeFilter.FILTER_REJECT;
+      if (isExcludedElement(node, false, { extractionMode: options.extractionMode })) return NodeFilter.FILTER_REJECT;
       
       // Visibility check
       try {
@@ -268,7 +271,7 @@ export function collectTextNodes(element) {
 
     // Leaf Filtering (Text Nodes)
     if (node.nodeType === Node.TEXT_NODE) {
-      if (isExcludedAncestor(node)) {
+      if (isExcludedAncestorWithOptions(node, false, { extractionMode: options.extractionMode })) {
         return NodeFilter.FILTER_REJECT;
       }
 
@@ -348,11 +351,15 @@ export function collectTextNodes(element) {
  * @param {Object} [sessionContext={}] - Session-scoped context to track block IDs across calls
  * @param {WeakMap} [sessionContext.blockMap] - Maps elements to blockIds
  * @param {Object} [sessionContext.blockCounter] - Sequential counter object { value: number }
+ * @param {Object} [options] - Collection options
+ * @param {string} [options.extractionMode] - Resolved extraction mode ('v2'|'v3').
+ *   Required for preformatted traversal (V3); absent mode conservatively rejects
+ *   preformatted categories.
  * @returns {TranslationUnit[]} Array of enriched TranslationUnits
  */
-export function collectBlockGroups(element, sessionContext = {}) {
+export function collectBlockGroups(element, sessionContext = {}, options = {}) {
   // 1. Entry check: If the starting element is already excluded, return empty
-  if (isExcludedAncestorWithOptions(element, true, { allowPreformatted: true })) {
+  if (isExcludedAncestorWithOptions(element, true, { extractionMode: options.extractionMode })) {
     return [];
   }
 
@@ -370,7 +377,7 @@ export function collectBlockGroups(element, sessionContext = {}) {
     // Branch Filtering (Elements)
     if (node.nodeType === Node.ELEMENT_NODE) {
       // Business logic exclusions (Tags, Class, Attributes, Editable, Roles)
-      if (isExcludedElement(node, false, { allowPreformatted: true })) return NodeFilter.FILTER_REJECT;
+      if (isExcludedElement(node, false, { extractionMode: options.extractionMode })) return NodeFilter.FILTER_REJECT;
       
       // Visibility check
       try {
@@ -387,7 +394,7 @@ export function collectBlockGroups(element, sessionContext = {}) {
 
     // Leaf Filtering (Text Nodes)
     if (node.nodeType === Node.TEXT_NODE) {
-      if (isExcludedAncestorWithOptions(node, false, { allowPreformatted: true })) {
+      if (isExcludedAncestorWithOptions(node, false, { extractionMode: options.extractionMode })) {
         return NodeFilter.FILTER_REJECT;
       }
 
