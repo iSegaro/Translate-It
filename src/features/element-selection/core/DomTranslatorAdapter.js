@@ -93,6 +93,9 @@ export class DomTranslatorAdapter extends ResourceTracker {
     this.currentSessionId = null;
     this.currentTranslationToken = null;
     this.translatedSegmentMap = new Map();
+    // Operation-local: mirrors the background ConversationAcceptanceCoordinator
+    // registration decision for the current translation. Reset per operation.
+    this._conversationAcceptanceEnabled = false;
 
     // Cache for original settings
     this.originalSettings = null;
@@ -136,6 +139,9 @@ export class DomTranslatorAdapter extends ResourceTracker {
       activeTranslationRoots.add(element);
 
       this.isTranslating = true;
+      // Reset per operation: never let a previous translation's participation
+      // decision leak into this one.
+      this._conversationAcceptanceEnabled = false;
       
       // Generate a fresh session ID and entropy-scoped escaping prefix for this specific translation request
       this.currentSessionId = `s${Math.random().toString(36).substr(2, 6)}`;
@@ -700,6 +706,11 @@ export class DomTranslatorAdapter extends ResourceTracker {
         context: MessageContexts.SELECT_ELEMENT,
       });
 
+      // Authoritative background signal: parent acceptance ACKs are only emitted
+      // when the ConversationAcceptanceCoordinator registered a handle for this
+      // request (mirrors the background participation decision).
+      this._conversationAcceptanceEnabled = response?.conversationAcceptance === true;
+
       // CRITICAL: Await stream completion if streaming was used, otherwise process direct response
       let result;
       if (response?.success && (response.streaming || response.type === 'stream_end')) {
@@ -1230,6 +1241,10 @@ export class DomTranslatorAdapter extends ResourceTracker {
   }
 
   async _sendParentAcceptanceAck(parentId, cleanResult, accepted, translationToken = null) {
+    // No-op when the operation did not register conversation acceptance:
+    // the background has no handle for this message, so the ACK would be
+    // dropped as "unknown message". Emission mirrors registration exactly.
+    if (!this._conversationAcceptanceEnabled) return;
     if (translationToken && !this._isCurrentTranslation(translationToken)) return;
     if (!this.currentMessageId || !parentId) {
       this.logger.error('[DomTranslatorAdapter] Missing canonical blockId for parent acceptance ACK', {

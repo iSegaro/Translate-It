@@ -211,7 +211,10 @@ export class UnifiedTranslationService {
         onTerminalUnitsAccepted: TerminalExecutionRouter.createTerminalUnitsObserver(operation),
       };
       this._setOperation(request, executionContext.operation);
-      this._registerConversationAcceptance(request, executionContext, providerName, participates);
+      // Authoritative participation decision: true only when a
+      // ConversationAcceptanceHandle was actually registered for this request.
+      // The consuming feature gates parent acceptance ACK emission on this value.
+      const conversationAcceptanceRegistered = this._registerConversationAcceptance(request, executionContext, providerName, participates);
 
       let result;
       try {
@@ -242,6 +245,12 @@ export class UnifiedTranslationService {
           });
         }
         return MessageFormat.createErrorResponse(error, messageId);
+      }
+
+      // Propagate the authoritative conversation acceptance decision to the
+      // requesting feature so ACK emission mirrors registration exactly.
+      if (result && typeof result === 'object') {
+        result.conversationAcceptance = conversationAcceptanceRegistered;
       }
 
       const transition = this.requestTracker.completeRequest(messageId, result);

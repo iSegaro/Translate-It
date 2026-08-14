@@ -212,6 +212,39 @@ describe('UnifiedTranslationService', () => {
       handle.dispose();
     });
 
+    it('propagates the authoritative conversation acceptance decision to the result', async () => {
+      const { getAIConversationHistoryEnabledAsync } = await import('../../../shared/config/config.js');
+      const buildMessage = (messageId) => ({
+        messageId,
+        data: {
+          text: 'source',
+          mode: 'select-element',
+          provider: 'openai',
+          sessionId: messageId,
+          conversationParents: [{ parentId: 'g1', cleanSource: 'source' }],
+        },
+        context: 'select-element',
+      });
+
+      getAIConversationHistoryEnabledAsync.mockResolvedValue(true);
+      const messageOn = buildMessage('propagation-on');
+      const requestOn = { messageId: messageOn.messageId, data: messageOn.data };
+      translationRequestTracker.createRequest.mockReturnValueOnce(requestOn);
+      service.modeCoordinator.processRequest.mockResolvedValueOnce({ success: true, translatedText: 'translated' });
+
+      const resultOn = await service.handleTranslationRequest(messageOn);
+      expect(resultOn).toMatchObject({ success: true, conversationAcceptance: true });
+
+      getAIConversationHistoryEnabledAsync.mockResolvedValue(false);
+      const messageOff = buildMessage('propagation-off');
+      const requestOff = { messageId: messageOff.messageId, data: messageOff.data };
+      translationRequestTracker.createRequest.mockReturnValueOnce(requestOff);
+      service.modeCoordinator.processRequest.mockResolvedValueOnce({ success: true, translatedText: 'translated' });
+
+      const resultOff = await service.handleTranslationRequest(messageOff);
+      expect(resultOff).toMatchObject({ success: true, conversationAcceptance: false });
+    });
+
     it('accepts ACK before execution completes without activating timeout', async () => {
       vi.useFakeTimers();
       const { getAIConversationHistoryEnabledAsync } = await import('../../../shared/config/config.js');
