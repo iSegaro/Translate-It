@@ -39,7 +39,8 @@ vi.mock('@/core/extensionContext.js', () => ({
   default: {
     isTabActive: vi.fn(() => true),
     isValidSync: vi.fn(() => true),
-    isContextError: vi.fn(() => false)
+    isContextError: vi.fn(() => false),
+    handleContextError: vi.fn()
   }
 }));
 vi.mock('@/shared/error-management/ErrorHandler.js', () => ({
@@ -832,6 +833,107 @@ describe('SelectElementManager', () => {
       
       expect(manager.isActive).toBe(false);
       expect(document.documentElement.getAttribute('data-translate-it-select-mode')).toBeNull();
+      vi.useRealTimers();
+    });
+
+    it('should route watchdog context invalidation to the canonical context-error owner', async () => {
+      vi.useFakeTimers();
+      await manager.initialize();
+      await manager.activateSelectElementMode();
+
+      const ExtensionContextManager = (await import('@/core/extensionContext.js')).default;
+      ExtensionContextManager.isValidSync.mockReturnValue(false);
+
+      vi.advanceTimersByTime(2500);
+
+      expect(ExtensionContextManager.handleContextError).toHaveBeenCalledTimes(1);
+      const [contextError, context] = ExtensionContextManager.handleContextError.mock.calls[0];
+      expect(context).toBe('element-selection-watchdog');
+      expect(contextError.type).toBe(ErrorTypes.EXTENSION_CONTEXT_INVALIDATED);
+      expect(String(contextError.message).toLowerCase()).toContain('extension context invalidated');
+      vi.useRealTimers();
+    });
+
+    it('should not repeat context handling on subsequent watchdog ticks', async () => {
+      vi.useFakeTimers();
+      await manager.initialize();
+      await manager.activateSelectElementMode();
+
+      const ExtensionContextManager = (await import('@/core/extensionContext.js')).default;
+      ExtensionContextManager.isValidSync.mockReturnValue(false);
+
+      vi.advanceTimersByTime(2500);
+      expect(ExtensionContextManager.handleContextError).toHaveBeenCalledTimes(1);
+
+      vi.advanceTimersByTime(10000);
+      expect(ExtensionContextManager.handleContextError).toHaveBeenCalledTimes(1);
+      vi.useRealTimers();
+    });
+
+    it('should not emit a generic error toast for watchdog context invalidation', async () => {
+      vi.useFakeTimers();
+      await manager.initialize();
+      await manager.activateSelectElementMode();
+
+      const ExtensionContextManager = (await import('@/core/extensionContext.js')).default;
+      ExtensionContextManager.isValidSync.mockReturnValue(false);
+
+      vi.advanceTimersByTime(2500);
+
+      expect(errorHandler.handle).not.toHaveBeenCalled();
+      vi.useRealTimers();
+    });
+
+    it('should not emit a no-content info notification for watchdog context invalidation', async () => {
+      vi.useFakeTimers();
+      await manager.initialize();
+      await manager.activateSelectElementMode();
+
+      const { pageEventBus } = await import('@/core/PageEventBus.js');
+      pageEventBus.emit.mockClear();
+
+      const ExtensionContextManager = (await import('@/core/extensionContext.js')).default;
+      ExtensionContextManager.isValidSync.mockReturnValue(false);
+
+      vi.advanceTimersByTime(2500);
+
+      expect(pageEventBus.emit).not.toHaveBeenCalledWith('show-select-element-info', expect.anything());
+      vi.useRealTimers();
+    });
+
+    it('keeps the existing translation-failure context path intact', async () => {
+      const ExtensionContextManager = (await import('@/core/extensionContext.js')).default;
+      ExtensionContextManager.isContextError.mockReturnValue(true);
+      try {
+        manager.isActive = true;
+        const error = Object.assign(new Error('Extension context invalidated'), {
+          type: ErrorTypes.EXTENSION_CONTEXT_INVALIDATED,
+        });
+        manager.domTranslatorAdapter.translateElement.mockRejectedValue(error);
+
+        await manager.startTranslation(document.createElement('div'));
+
+        expect(ExtensionContextManager.handleContextError).toHaveBeenCalledTimes(1);
+        expect(ExtensionContextManager.handleContextError).toHaveBeenCalledWith(error, 'element-selection');
+      } finally {
+        ExtensionContextManager.isContextError.mockReturnValue(false);
+      }
+    });
+
+    it('should not cleanup or notify while context remains valid', async () => {
+      vi.useFakeTimers();
+      await manager.initialize();
+      await manager.activateSelectElementMode();
+
+      const ExtensionContextManager = (await import('@/core/extensionContext.js')).default;
+      ExtensionContextManager.isValidSync.mockReturnValue(true);
+      const cleanupSpy = vi.spyOn(manager, 'emergencyCleanup');
+
+      vi.advanceTimersByTime(9000);
+
+      expect(manager.isActive).toBe(true);
+      expect(cleanupSpy).not.toHaveBeenCalled();
+      expect(ExtensionContextManager.handleContextError).not.toHaveBeenCalled();
       vi.useRealTimers();
     });
   });

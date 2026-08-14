@@ -774,8 +774,24 @@ class SelectElementManager extends ResourceTracker {
       if (this.isActive && !ExtensionContextManager.isValidSync()) {
         this.logger.warn('Extension context invalidated while in select mode. Performing emergency cleanup...');
         this.emergencyCleanup();
+        this._notifyContextInvalidation();
       }
     }, 2000); // Check every 2 seconds - balanced for performance and safety
+  }
+
+  /**
+   * Routes watchdog-detected extension-context invalidation through the
+   * canonical ExtensionContextManager recovery contract. isValidSync() only
+   * reports a boolean signal, so the minimum typed context-invalidated error
+   * required by the contract is constructed here. Runs after emergencyCleanup
+   * so cleanup always completes even if notification handling were to fail.
+   * @private
+   */
+  _notifyContextInvalidation() {
+    const contextError = Object.assign(new Error('Extension context invalidated'), {
+      type: ErrorTypes.EXTENSION_CONTEXT_INVALIDATED,
+    });
+    ExtensionContextManager.handleContextError(contextError, 'element-selection-watchdog');
   }
 
   /**
