@@ -216,12 +216,19 @@ export function isExcludedAncestor(node, isRoot = false) {
 function isExcludedAncestorWithOptions(node, isRoot = false, options = {}) {
   if (!node) return false;
   
+  // The collection root is validated once by the entry check with isRoot=true.
+  // rootElement prevents descendant leaf checks from re-classifying it as a
+  // nested descendant (which would reject the selected root's own text, e.g.
+  // an explicitly selected interactive root).
+  const { rootElement = null, ...checkOptions } = options;
+
   // Start from the node itself if it's an element, or its parent if it's text
   let curr = node.nodeType === Node.ELEMENT_NODE ? node : node.parentNode;
   let currentIsRoot = isRoot;
 
   while (curr) {
-    if (isExcludedElement(curr, currentIsRoot, options)) return true;
+    const nodeIsRoot = currentIsRoot || (rootElement && curr === rootElement);
+    if (isExcludedElement(curr, nodeIsRoot, checkOptions)) return true;
 
     // Cross Shadow DOM boundary
     if (curr.host) {
@@ -229,7 +236,7 @@ function isExcludedAncestorWithOptions(node, isRoot = false, options = {}) {
     } else {
       curr = curr.parentNode;
     }
-    currentIsRoot = false; // Ancestors are never the root
+    currentIsRoot = false;
   }
   return false;
 }
@@ -271,7 +278,7 @@ export function collectTextNodes(element, options = {}) {
 
     // Leaf Filtering (Text Nodes)
     if (node.nodeType === Node.TEXT_NODE) {
-      if (isExcludedAncestorWithOptions(node, false, { extractionMode: options.extractionMode })) {
+      if (isExcludedAncestorWithOptions(node, false, { extractionMode: options.extractionMode, rootElement: element })) {
         return NodeFilter.FILTER_REJECT;
       }
 
@@ -394,7 +401,7 @@ export function collectBlockGroups(element, sessionContext = {}, options = {}) {
 
     // Leaf Filtering (Text Nodes)
     if (node.nodeType === Node.TEXT_NODE) {
-      if (isExcludedAncestorWithOptions(node, false, { extractionMode: options.extractionMode })) {
+      if (isExcludedAncestorWithOptions(node, false, { extractionMode: options.extractionMode, rootElement: element })) {
         return NodeFilter.FILTER_REJECT;
       }
 

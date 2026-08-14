@@ -213,6 +213,36 @@ describe('DomTranslatorAdapter', () => {
       expect(collectBlockGroups).toHaveBeenCalledWith(testElement, expect.any(Object), { extractionMode: 'v3' });
     });
 
+    it('translates an explicitly selected BUTTON root through the normal flow', async () => {
+      const button = document.createElement('button');
+      button.textContent = 'Follow this account to see their updates';
+      document.body.appendChild(button);
+
+      const { collectTextNodes } = await import('./DomTranslatorUtils.js');
+      collectTextNodes.mockReturnValueOnce([{
+        node: button.firstChild,
+        text: button.firstChild.textContent,
+        uid: 'n1',
+        blockId: 'b1',
+        role: 'button'
+      }]);
+
+      let callbacks;
+      registerTranslation.mockImplementationOnce((_id, registered) => { callbacks = registered; });
+      contentScriptIntegration.sendTranslationRequest.mockImplementationOnce(async () => {
+        setTimeout(() => {
+          callbacks.onStreamUpdate({ success: true, data: [{ t: 'دنبال کردن', i: 'n1' }] });
+          callbacks.onStreamEnd({ success: true });
+        }, 0);
+        return { success: true, streaming: true };
+      });
+
+      const result = await adapter.translateElement(button);
+
+      expect(result.success).toBe(true);
+      expect(button.textContent).toContain('دنبال کردن');
+    });
+
     it('A: returns zero-commit failure for rejected streaming result', async () => {
       let callbacks;
       registerTranslation.mockImplementationOnce((_id, registered) => { callbacks = registered; });

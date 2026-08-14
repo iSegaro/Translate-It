@@ -21,8 +21,11 @@
  * this module, in DomTranslatorAdapter.
  *
  * Migration note: this module PRESERVES the exact current product behavior,
- * including every known selector/extractor asymmetry (BUTTON, SELECT/OPTION,
- * PRE/CODE/KBD/SAMP, role=code, opacity:0). No product decisions are made here.
+ * including every known selector/extractor asymmetry (SELECT/OPTION,
+ * PRE/CODE/KBD/SAMP, role=code, opacity:0), with one product decision:
+ * interactive containers (literal BUTTON and role=button) are always
+ * traversable content — both as explicitly selected roots and nested inside a
+ * selected container — and classify as ordinary CONTENT.
  */
 
 import { TRANSLATION_HTML } from '@/shared/constants/translation.js';
@@ -43,7 +46,6 @@ export const SelectElementExtractionMode = Object.freeze({
 export const SelectElementCategory = Object.freeze({
   NON_CONTENT: 'non-content',
   FORM_CONTROL: 'form-control',
-  INTERACTIVE_CONTAINER: 'interactive-container',
   PREFORMATTED: 'preformatted',
   SEMANTIC_SPECIAL: 'semantic-special',
   CONTENT: 'content',
@@ -76,9 +78,6 @@ const CATEGORY_TAGS = Object.freeze({
   [SelectElementCategory.FORM_CONTROL]: Object.freeze([
     'INPUT', 'TEXTAREA', 'SELECT', 'OPTION',
   ]),
-  [SelectElementCategory.INTERACTIVE_CONTAINER]: Object.freeze([
-    'BUTTON',
-  ]),
   [SelectElementCategory.PREFORMATTED]: Object.freeze([
     'PRE', 'CODE', 'KBD', 'SAMP',
   ]),
@@ -100,9 +99,9 @@ const EXCLUDED_TAGS = new Set(TAG_CATEGORY_MAP.keys());
 
 /**
  * Tags the SELECTOR currently accepts as roots despite being extractor-excluded.
- * Preserved mismatch: SELECT/OPTION, BUTTON, PRE/CODE are selectable-root=true.
+ * Preserved mismatch: SELECT/OPTION, PRE/CODE are selectable-root=true.
  */
-const ROOT_SELECTABLE_EXCEPTIONS = new Set(['SELECT', 'OPTION', 'BUTTON', 'PRE', 'CODE']);
+const ROOT_SELECTABLE_EXCEPTIONS = new Set(['SELECT', 'OPTION', 'PRE', 'CODE']);
 
 /**
  * Root-excluded tags — equivalent to the selector's previous invalidTags list.
@@ -181,19 +180,19 @@ const CAPABILITY_BY_CATEGORY = Object.freeze({
   [SelectElementCategory.PREFORMATTED]: [SelectElementExtractionMode.V3],
   [SelectElementCategory.NON_CONTENT]: [],
   [SelectElementCategory.FORM_CONTROL]: [],
-  [SelectElementCategory.INTERACTIVE_CONTAINER]: [],
   [SelectElementCategory.SEMANTIC_SPECIAL]: [],
 });
 
+// Hard-excluded categories reject traversal unconditionally, regardless of
+// whether the element is the explicitly selected root.
 const isHardExcludedCategory = (category) =>
   category === SelectElementCategory.NON_CONTENT
   || category === SelectElementCategory.FORM_CONTROL
-  || category === SelectElementCategory.INTERACTIVE_CONTAINER
   || category === SelectElementCategory.SEMANTIC_SPECIAL;
 
 /**
  * Classify an element's category and extraction capability.
- * Cheap: tag lookup only, no DOM traversal, no style reads.
+ * Cheap: tag lookup + role read, no DOM traversal, no style reads.
  */
 function classifyCategory(element) {
   const tagName = element.tagName.toUpperCase();
