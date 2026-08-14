@@ -9,22 +9,9 @@ import { SELECT_ELEMENT_BLOCK_TAGS } from '@/utils/dom/DomTranslatorConstants.js
 import { DOM_FILTERS } from '@/utils/dom/DomFilters.js';
 import { TranslationUnit } from '@/features/translation/ir/TranslationUnit.js';
 import { detectDirectionFromContent } from '@/utils/dom/DomDirectionManager.js';
-import { TRANSLATION_HTML } from '@/shared/constants/translation.js';
+import { isSelectElementTraversable, SelectElementReason } from '@/features/element-selection/core/SelectElementPolicy.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.ELEMENT_SELECTION, 'DomTranslatorUtils');
-
-/**
- * Shared configuration for elements that should be excluded from translation
- */
-const EXCLUDED_TAGS = [
-  'SCRIPT', 'STYLE', 'NOSCRIPT', 'IFRAME', 'TEXTAREA', 'INPUT', 
-  'SELECT', 'OPTION', 'BUTTON',
-  'HEAD', 'META', 'LINK', 'SVG', 'TIME',
-  'RUBY', 'RT', 'RP', 'PRE', 'CODE', 'KBD', 'SAMP'
-];
-
-const EXCLUDED_ROLES = ['textbox', 'searchbox', 'combobox', 'code'];
-const PREFORMATTED_TAGS = new Set(['PRE', 'CODE', 'KBD', 'SAMP']);
 
 /**
  * Finds the closest block-level parent for a node based on context boundaries
@@ -173,59 +160,45 @@ export function extractContextMetadata(element) {
 /**
  * Checks if a single element should be excluded based on its tags, classes, or attributes.
  * Does NOT check ancestors.
- * 
+ *
+ * The eligibility taxonomy is owned by SelectElementPolicy (traversal axis);
+ * this wrapper maps the structural reason back to the extractor's log messages.
+ *
  * @param {Element} el - The element to check
  * @param {boolean} isRoot - Whether this is the root element being translated
  * @returns {boolean}
  */
 function isExcludedElement(el, isRoot = false, options = {}) {
   if (!el || el.nodeType !== Node.ELEMENT_NODE) return false;
-  
-  const tagName = el.tagName.toUpperCase();
-  
-  // 1. Technical/Interactive tags
-  if (EXCLUDED_TAGS.includes(tagName)) {
-    if (options.allowPreformatted && PREFORMATTED_TAGS.has(tagName)) {
-      return false;
-    }
-    logger.debug(`[isExcludedElement] Rejected by tag: ${tagName}`, el);
-    return true;
-  }
-  
-  // 2. Explicit exclusions (class/attribute)
-  if (el.classList?.contains(TRANSLATION_HTML.NO_TRANSLATE_CLASS) || 
-      el.classList?.contains(TRANSLATION_HTML.IGNORE_CLASS) ||
-      el.getAttribute?.('translate') === TRANSLATION_HTML.NO_TRANSLATE_VALUE ||
-      el.hasAttribute?.('data-translate-ignore')) {
-    logger.debug(`[isExcludedElement] Rejected by exclusion marker (class or attr)`, el);
-    return true;
-  }
 
-  // 3. GitHub and other common code editor line detection
-  if (el.classList?.contains('react-code-text') || 
-      el.classList?.contains('react-file-line') ||
-      el.classList?.contains('blob-code')) {
-    if (!isRoot) {
+  const { traversable, reason } = isSelectElementTraversable(el, {
+    isRoot,
+    allowPreformatted: options.allowPreformatted,
+  });
+
+  if (traversable) return false;
+
+  switch (reason) {
+    case SelectElementReason.EXCLUDED_TAG:
+      logger.debug(`[isExcludedElement] Rejected by tag: ${el.tagName.toUpperCase()}`, el);
+      break;
+    case SelectElementReason.NOTRANSLATE:
+      logger.debug(`[isExcludedElement] Rejected by exclusion marker (class or attr)`, el);
+      break;
+    case SelectElementReason.CODE_CLASS:
       logger.debug(`[isExcludedElement] Rejected by code-related class`, el);
-      return true;
-    }
+      break;
+    case SelectElementReason.EDITABLE:
+      logger.debug(`[isExcludedElement] Rejected by contenteditable`, el);
+      break;
+    case SelectElementReason.EXCLUDED_ROLE:
+      logger.debug(`[isExcludedElement] Rejected by role: ${el.getAttribute?.('role')?.toLowerCase()}`, el);
+      break;
+    default:
+      logger.debug(`[isExcludedElement] Rejected: ${reason}`, el);
   }
 
-  // 4. User-editable content (Attribute check is more robust in some environments)
-  const contentEditable = el.getAttribute?.('contenteditable');
-  if (el.isContentEditable || (contentEditable !== null && contentEditable !== 'false')) {
-    logger.debug(`[isExcludedElement] Rejected by contenteditable`, el);
-    return true;
-  }
-
-  // 5. Custom interactive or code roles
-  const role = el.getAttribute?.('role')?.toLowerCase();
-  if (role && EXCLUDED_ROLES.includes(role)) {
-    logger.debug(`[isExcludedElement] Rejected by role: ${role}`, el);
-    return true;
-  }
-
-  return false;
+  return true;
 }
 
 /**
