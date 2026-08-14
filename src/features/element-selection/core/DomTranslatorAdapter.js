@@ -245,7 +245,11 @@ export class DomTranslatorAdapter extends ResourceTracker {
       const WARNING_SEGMENTS = 500; // Increased from 200
       if (textNodesData.length > MAX_SEGMENTS) {
         this.logger.debug(`[DomTranslatorAdapter] Element contains ${textNodesData.length} segments, exceeding limit of ${MAX_SEGMENTS}`);
-        throw new Error(`Element is too large to translate (${textNodesData.length} text segments). Please select a smaller element.`);
+        const error = new Error(`Element is too large to translate (${textNodesData.length} text segments). Please select a smaller element.`);
+        error.type = ErrorTypes.ELEMENT_TOO_LARGE;
+        error.segmentCount = textNodesData.length;
+        error.maxSegmentCount = MAX_SEGMENTS;
+        throw error;
       } else if (textNodesData.length > WARNING_SEGMENTS) {
         this.logger.debug(`[DomTranslatorAdapter] Element contains ${textNodesData.length} segments, translation may take longer`);
       }

@@ -530,6 +530,9 @@
   "ERRORS_TRANSLATION_TIMEOUT": {
     "message": "Translation timed out. Please try again."
   },
+  "ERRORS_ELEMENT_TOO_LARGE": {
+    "message": "This element is too large to translate at once."
+  },
   "ERRORS_SELECT_ELEMENT_PARTIAL_TRANSLATION_FAILED": {
     "message": "Some content could not be translated."
   },

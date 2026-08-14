@@ -575,13 +575,53 @@ describe('SelectElementManager', () => {
       expect(errorHandler.handle).toHaveBeenCalledWith(expect.objectContaining({ cause: error }), expect.objectContaining({ showToast: true }));
     });
 
-    it('preserves actionable element-size feedback', async () => {
+    it('routes typed element-too-large through the central public-error boundary', async () => {
+      const error = Object.assign(new Error('Element is too large to translate (1001 text segments). Please select a smaller element.'), {
+        type: ErrorTypes.ELEMENT_TOO_LARGE,
+      });
+      const displayError = Object.assign(new Error('This element is too large to translate at once.'), {
+        type: ErrorTypes.ELEMENT_TOO_LARGE,
+        cause: error,
+      });
+      const { createPublicDisplayError } = await import('@/shared/error-management/PublicErrorPolicy.js');
+      createPublicDisplayError.mockResolvedValueOnce(displayError);
+      manager.domTranslatorAdapter.translateElement.mockRejectedValue(error);
+
+      await manager.startTranslation(document.createElement('div'));
+
+      expect(createPublicDisplayError).toHaveBeenCalledTimes(1);
+      expect(createPublicDisplayError).toHaveBeenCalledWith(error);
+      expect(errorHandler.handle).toHaveBeenCalledWith(displayError, expect.objectContaining({
+        context: 'select-element',
+        showToast: true,
+      }));
+      expect(errorHandler.handle.mock.calls[0][0]).toMatchObject({
+        type: ErrorTypes.ELEMENT_TOO_LARGE,
+        message: 'This element is too large to translate at once.',
+        cause: error,
+      });
+      expect(errorHandler.handle.mock.calls[0][0]).not.toBe(error);
+      expect(errorHandler.handle.mock.calls[0][0].message).not.toContain('1001');
+      expect(errorHandler.handle.mock.calls[0][0].message).not.toContain('text segments');
+      expect(cleanupSpy).toHaveBeenCalledWith({ reason: 'error' });
+      const { pageEventBus } = await import('@/core/PageEventBus.js');
+      expect(pageEventBus.emit).not.toHaveBeenCalledWith('show-select-element-info', expect.anything());
+    });
+
+    it('does not special-case an untyped error that merely contains the legacy phrase', async () => {
       const error = new Error('Element is too large to translate (1001 text segments). Please select a smaller element.');
       manager.domTranslatorAdapter.translateElement.mockRejectedValue(error);
 
       await manager.startTranslation(document.createElement('div'));
 
-      expect(errorHandler.handle).toHaveBeenCalledWith(error, expect.objectContaining({ showToast: true }));
+      const { createPublicDisplayError } = await import('@/shared/error-management/PublicErrorPolicy.js');
+      expect(createPublicDisplayError).toHaveBeenCalledWith(error);
+      expect(errorHandler.handle).toHaveBeenCalledWith(expect.objectContaining({
+        type: 'TRANSLATION_FAILED',
+        cause: error,
+      }), expect.objectContaining({ showToast: true }));
+      expect(errorHandler.handle.mock.calls[0][0]).not.toBe(error);
+      expect(cleanupSpy).toHaveBeenCalledWith({ reason: 'error' });
     });
 
     it.each([

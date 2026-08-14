@@ -54,6 +54,7 @@ describe('PublicErrorPolicy', () => {
     [ErrorTypes.RATE_LIMIT_REACHED, ErrorTypes.RATE_LIMIT_REACHED],
     [ErrorTypes.QUOTA_EXCEEDED, ErrorTypes.QUOTA_EXCEEDED],
     [ErrorTypes.MODEL_OVERLOADED, ErrorTypes.MODEL_OVERLOADED],
+    [ErrorTypes.ELEMENT_TOO_LARGE, ErrorTypes.ELEMENT_TOO_LARGE],
   ])('%s uses localized public type %s', (type, publicType) => {
     expect(getPublicErrorPolicy(type)).toMatchObject({
       policy: PublicErrorMessagePolicy.LOCALIZED_TYPED,
@@ -126,5 +127,22 @@ describe('PublicErrorPolicy', () => {
       type: ErrorTypes.TRANSLATION_TIMEOUT,
       message: 'Translated: ERRORS_TRANSLATION_TIMEOUT',
     });
+  });
+
+  it('sanitizes element-too-large to a localized typed message with cause preserved', async () => {
+    const original = Object.assign(new Error('Element is too large to translate (1001 text segments). Please select a smaller element.'), {
+      type: ErrorTypes.ELEMENT_TOO_LARGE,
+      segmentCount: 1001,
+      maxSegmentCount: 1000,
+    });
+    const display = await createPublicDisplayError(original);
+
+    expect(display).toMatchObject({
+      type: ErrorTypes.ELEMENT_TOO_LARGE,
+      message: 'Translated: ERRORS_ELEMENT_TOO_LARGE',
+      cause: original,
+    });
+    expect(display.message).not.toContain('1001');
+    expect(display.message).not.toContain('text segments');
   });
 });

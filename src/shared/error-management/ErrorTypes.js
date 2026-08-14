@@ -37,6 +37,10 @@ export class ErrorTypes {
   static PROMPT_INVALID = "PROMPT_INVALID";
   static TEXT_EMPTY = "TEXT_EMPTY";
   static TEXT_TOO_LONG = "TEXT_TOO_LONG";
+  // Local Select Element structural limit: the selected DOM element exceeds
+  // the segment/unit count supported for processing. Distinct from TEXT_TOO_LONG
+  // which is provider/request text-size semantics.
+  static ELEMENT_TOO_LARGE = "ELEMENT_TOO_LARGE";
   static TRANSLATION_NOT_FOUND = "TRANSLATION_NOT_FOUND";
   static TRANSLATION_FAILED = "TRANSLATION_FAILED";
   static NO_ACCEPTED_TRANSLATION_RESULTS = "NO_ACCEPTED_TRANSLATION_RESULTS";

@@ -56,11 +56,6 @@ async function getPartialCompletionMessage() {
     || SELECT_ELEMENT_PARTIAL_ERROR_FALLBACK;
 }
 
-function isElementTooLargeError(error) {
-  return typeof error?.message === 'string'
-    && /element is too large to translate/i.test(error.message);
-}
-
 /**
  * SelectElementManager - Coordinates the interactive Select Element mode.
  * Uses a specialized DomTranslatorAdapter optimized for AI/DeepL context and token efficiency.
@@ -611,8 +606,6 @@ class SelectElementManager extends ResourceTracker {
           cause: error,
           translationOutcome: outcome,
         });
-      } else if (isElementTooLargeError(error)) {
-        displayError = error;
       } else {
         displayError = await createPublicDisplayError(error);
       }

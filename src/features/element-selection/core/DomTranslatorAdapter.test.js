@@ -177,6 +177,28 @@ describe('DomTranslatorAdapter', () => {
       );
     });
 
+    it('rejects elements above the local segment limit with a typed error before requesting translation', async () => {
+      const { collectTextNodes } = await import('./DomTranslatorUtils.js');
+      const { ErrorTypes } = await import('@/shared/error-management/ErrorTypes.js');
+      const segments = Array.from({ length: 1001 }, (_, index) => ({
+        node: testElement.firstChild,
+        text: `Segment ${index}`,
+        uid: `n${index}`,
+        blockId: `b${index}`,
+        role: 'div',
+      }));
+      collectTextNodes.mockReturnValueOnce(segments);
+
+      const translation = adapter.translateElement(testElement);
+      await expect(translation).rejects.toMatchObject({
+        type: ErrorTypes.ELEMENT_TOO_LARGE,
+        segmentCount: 1001,
+        maxSegmentCount: 1000,
+      });
+      await expect(translation).rejects.toThrow('1001 text segments');
+      expect(contentScriptIntegration.sendTranslationRequest).not.toHaveBeenCalled();
+    });
+
     it('maps the non-grouping strategy to V2 extraction mode exactly once', async () => {
       const { collectTextNodes } = await import('./DomTranslatorUtils.js');
       collectTextNodes.mockClear();

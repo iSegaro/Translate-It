@@ -464,6 +464,9 @@
   "ERRORS_TRANSLATION_TIMEOUT": {
     "message": "翻訳がタイムアウトしました。もう一度お試しください。"
   },
+  "ERRORS_ELEMENT_TOO_LARGE": {
+    "message": "この要素は大きすぎて一度に翻訳できません。"
+  },
   "ERRORS_SELECT_ELEMENT_PARTIAL_TRANSLATION_FAILED": {
     "message": "一部のコンテンツを翻訳できませんでした。"
   },
