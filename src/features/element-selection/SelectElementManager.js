@@ -30,7 +30,7 @@ import selectionStyles from './SelectElement.scss?inline';
 // Import new simplified services
 import { DomTranslatorAdapter } from './core/DomTranslatorAdapter.js';
 import { ElementSelector } from './core/ElementSelector.js';
-import { extractTextFromElement, isValidTextElement } from './utils/elementHelpers.js';
+import { extractTextFromElement, isSelectableTextRoot } from './utils/elementHelpers.js';
 
 // Import notification manager
 import { getSelectElementNotificationManager } from './SelectElementNotificationManager.js';
@@ -466,7 +466,11 @@ class SelectElementManager extends ResourceTracker {
     try {
       this.isProcessingClick = true;
       const elementToTranslate = this.elementSelector.getHighlightedElement() || event.target;
-      if (!isValidTextElement(elementToTranslate)) return;
+
+      // Authoritative click revalidation: re-run root eligibility at click time
+      // even if the element was highlighted earlier. The DOM may change between
+      // hover and click, so hover eligibility is never trusted blindly.
+      if (!isSelectableTextRoot(elementToTranslate)) return;
 
       const text = extractTextFromElement(elementToTranslate);
       if (text && text.trim()) {

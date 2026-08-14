@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { isSelectableTextRoot } from './utils/elementHelpers.js';
 
 // Mock dependencies
 vi.mock('@/shared/logging/logConstants.js', () => ({
@@ -149,7 +150,7 @@ vi.mock('./core/ElementSelector.js', () => ({
 
 vi.mock('./utils/elementHelpers.js', () => ({
   extractTextFromElement: vi.fn(() => 'test text'),
-  isValidTextElement: vi.fn(() => true)
+  isSelectableTextRoot: vi.fn(() => true)
 }));
 
 vi.mock('./SelectElementNotificationManager.js', () => ({
@@ -222,6 +223,7 @@ describe('SelectElementManager', () => {
 
   beforeEach(async () => {
     vi.clearAllMocks();
+    isSelectableTextRoot.mockReturnValue(true);
     if (!SelectElementManager) {
       const module = await import('./SelectElementManager.js');
       SelectElementManager = module.SelectElementManager;
@@ -285,6 +287,93 @@ describe('SelectElementManager', () => {
     expect(manager.domTranslatorAdapter.translateElement).toHaveBeenCalledWith(mockElement, expect.any(Object));
     expect(manager.isActive).toBe(false); // Should deactivate after translation
     expect(document.documentElement.getAttribute('data-translate-it-select-mode')).toBeNull();
+  });
+
+  describe('click-time revalidation', () => {
+    beforeEach(() => {
+      manager.isActive = true;
+      manager.activationTime = 0;
+      isSelectableTextRoot.mockReturnValue(true);
+    });
+
+    it('revalidates the target even after highlight', async () => {
+      const el = document.createElement('div');
+      manager.elementSelector.getHighlightedElement.mockReturnValue(el);
+      isSelectableTextRoot.mockReturnValue(false);
+
+      await manager.handleClick(new MouseEvent('click'));
+
+      expect(manager.domTranslatorAdapter.translateElement).not.toHaveBeenCalled();
+      expect(manager.elementSelector.deactivate).not.toHaveBeenCalled();
+    });
+
+    it('lets an eligible target reach translateElement', async () => {
+      const el = document.createElement('div');
+      manager.elementSelector.getHighlightedElement.mockReturnValue(el);
+
+      await manager.handleClick(new MouseEvent('click'));
+
+      expect(manager.domTranslatorAdapter.translateElement).toHaveBeenCalledWith(el, expect.any(Object));
+    });
+
+    it('does not translate a target that became invalid between hover and click', async () => {
+      const el = document.createElement('div');
+      manager.elementSelector.getHighlightedElement.mockReturnValue(el);
+      isSelectableTextRoot.mockReturnValue(false);
+
+      await manager.handleClick(new MouseEvent('click'));
+
+      expect(manager.domTranslatorAdapter.translateElement).not.toHaveBeenCalled();
+    });
+
+    it('applies the same eligibility rule to the event.target fallback', async () => {
+      const el = document.createElement('div');
+      manager.elementSelector.getHighlightedElement.mockReturnValue(null);
+      const event = new MouseEvent('click', { bubbles: true, cancelable: true });
+      Object.defineProperty(event, 'target', { value: el });
+
+      isSelectableTextRoot.mockReturnValue(true);
+      await manager.handleClick(event);
+      expect(manager.domTranslatorAdapter.translateElement).toHaveBeenCalledWith(el, expect.any(Object));
+
+      manager.domTranslatorAdapter.translateElement.mockClear();
+      isSelectableTextRoot.mockReturnValue(false);
+      await manager.handleClick(event);
+      expect(manager.domTranslatorAdapter.translateElement).not.toHaveBeenCalled();
+    });
+
+    it('still forwards BUTTON to the adapter', async () => {
+      const btn = document.createElement('button');
+      manager.elementSelector.getHighlightedElement.mockReturnValue(btn);
+
+      await manager.handleClick(new MouseEvent('click'));
+
+      expect(manager.domTranslatorAdapter.translateElement).toHaveBeenCalledWith(btn, expect.any(Object));
+    });
+
+    it('returns silently for an invalid root', async () => {
+      const el = document.createElement('div');
+      manager.elementSelector.getHighlightedElement.mockReturnValue(el);
+      isSelectableTextRoot.mockReturnValue(false);
+
+      await manager.handleClick(new MouseEvent('click'));
+
+      expect(manager.domTranslatorAdapter.translateElement).not.toHaveBeenCalled();
+      expect(errorHandler.handle).not.toHaveBeenCalled();
+      expect(manager.isProcessingClick).toBe(false);
+    });
+
+    it('does not consult provider/config during click validation', async () => {
+      const { getEffectiveProviderAsync } = await import('@/shared/config/config.js');
+      getEffectiveProviderAsync.mockClear();
+      const el = document.createElement('div');
+      manager.elementSelector.getHighlightedElement.mockReturnValue(el);
+      isSelectableTextRoot.mockReturnValue(false);
+
+      await manager.handleClick(new MouseEvent('click'));
+
+      expect(getEffectiveProviderAsync).not.toHaveBeenCalled();
+    });
   });
 
   describe('translation failure classification', () => {

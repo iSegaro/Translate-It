@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { ElementSelector } from './ElementSelector.js';
+import { isSelectableTextRoot } from '../utils/elementHelpers.js';
 
 // Mock dependencies
 vi.mock('@/shared/logging/logger.js', () => ({
@@ -19,7 +20,7 @@ vi.mock('@/shared/constants/ui.js', () => ({
 }));
 
 vi.mock('../utils/elementHelpers.js', () => ({
-  isValidTextElement: vi.fn(() => true)
+  isSelectableTextRoot: vi.fn(() => true)
 }));
 
 describe('ElementSelector', () => {
@@ -27,6 +28,7 @@ describe('ElementSelector', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    isSelectableTextRoot.mockReturnValue(true);
     selector = new ElementSelector();
     document.body.innerHTML = '';
   });
@@ -168,6 +170,35 @@ describe('ElementSelector', () => {
       selector.handleMouseOver(el2);
       expect(el1.classList.contains('translate-it-element-highlighted')).toBe(false);
       expect(el2.classList.contains('translate-it-element-highlighted')).toBe(true);
+    });
+  });
+
+  describe('root eligibility via isSelectableTextRoot', () => {
+    it('does not highlight an element rejected by root eligibility', () => {
+      selector.activate();
+      isSelectableTextRoot.mockReturnValue(false);
+      const el = document.createElement('div');
+      el.textContent = 'Valid text for highlighting purposes that meets the length.';
+      Object.defineProperty(el, 'offsetWidth', { value: 200 });
+      Object.defineProperty(el, 'offsetHeight', { value: 100 });
+
+      selector.handleMouseOver(el);
+
+      expect(el.classList.contains('translate-it-element-highlighted')).toBe(false);
+      expect(selector.getHighlightedElement()).toBeNull();
+    });
+
+    it('applies text-length heuristic independently of root eligibility', () => {
+      selector.activate();
+      isSelectableTextRoot.mockReturnValue(true); // Root says eligible
+      const el = document.createElement('div');
+      el.textContent = 'Too short'; // Below minTextLength (20)
+      Object.defineProperty(el, 'offsetWidth', { value: 200 });
+      Object.defineProperty(el, 'offsetHeight', { value: 100 });
+
+      selector.handleMouseOver(el);
+
+      expect(selector.getHighlightedElement()).toBeNull();
     });
   });
 

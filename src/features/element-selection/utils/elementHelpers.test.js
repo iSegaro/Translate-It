@@ -169,6 +169,41 @@ describe('elementHelpers', () => {
       expect(isValidTextElement(el)).toBe(false);
       vi.restoreAllMocks();
     });
+
+    it('defers root tag eligibility to SelectElementPolicy', () => {
+      const button = document.createElement('button');
+      button.textContent = 'Click me';
+      expect(isValidTextElement(button)).toBe(true);
+
+      const kbd = document.createElement('kbd');
+      kbd.textContent = 'Ctrl';
+      expect(isValidTextElement(kbd)).toBe(false);
+
+      const input = document.createElement('input');
+      input.value = 'Value';
+      expect(isValidTextElement(input)).toBe(false);
+    });
+
+    it('applies the text-content gate', () => {
+      const el = document.createElement('div');
+      expect(isValidTextElement(el)).toBe(false);
+    });
+
+    it('isSelectableTextRoot composes ancestor exclusion and text content', () => {
+      const { isSelectableTextRoot } = helpers;
+      const el = document.createElement('div');
+      el.textContent = 'Valid text';
+      expect(isSelectableTextRoot(el)).toBe(true);
+
+      const noTranslate = document.createElement('div');
+      noTranslate.className = TRANSLATION_HTML.NO_TRANSLATE_CLASS;
+      const child = document.createElement('span');
+      child.textContent = 'Valid text';
+      noTranslate.appendChild(child);
+      document.body.appendChild(noTranslate);
+      expect(isSelectableTextRoot(child)).toBe(false);
+      document.body.removeChild(noTranslate);
+    });
   });
 
   describe('getImmediateTextContent', () => {

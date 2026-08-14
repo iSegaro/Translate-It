@@ -62,18 +62,23 @@ export function hasValidTextContent(element, options = {}) {
 }
 
 /**
- * Check if element is valid for translation (root selectability contract).
- * The eligibility taxonomy (tags, editable, roles, visibility) is owned by
- * SelectElementPolicy; this wrapper adds the ancestor-level notranslate walk
- * and the text-content gate.
+ * Check if an element is a selectable text ROOT (canonical hover/click contract).
+ * Composes:
+ *  - ancestor-level notranslate walk (closest('.notranslate, [translate="no"]'))
+ *  - SelectElementPolicy root eligibility (tags, editable, roles, visibility)
+ *  - text-content gate (hasValidTextContent)
+ *
+ * This is the single root-eligibility source consumed by ElementSelector
+ * (hover) and SelectElementManager (click revalidation).
+ *
  * @param {HTMLElement} element - Element to validate
  * @returns {boolean} Whether element is valid
  */
-export function isValidTextElement(element) {
+export function isSelectableTextRoot(element) {
   if (!element) return false;
 
   // 1. Respect standard 'notranslate' class and 'translate=no' attribute
-  // on the element AND its ancestors (ancestor walk stays local to the selector)
+  // on the element AND its ancestors (ancestor walk stays local to the helper)
   const isExcluded = element.closest(`.${TRANSLATION_HTML.NO_TRANSLATE_CLASS}, [translate='${TRANSLATION_HTML.NO_TRANSLATE_VALUE}']`);
   if (isExcluded) {
     return false;
@@ -87,6 +92,17 @@ export function isValidTextElement(element) {
 
   // 3. Check for text content
   return hasValidTextContent(element);
+}
+
+/**
+ * Check if element is valid for translation.
+ * Compatibility alias for isSelectableTextRoot; kept for existing consumers
+ * and public helper surface.
+ * @param {HTMLElement} element - Element to validate
+ * @returns {boolean} Whether element is valid
+ */
+export function isValidTextElement(element) {
+  return isSelectableTextRoot(element);
 }
 
 /**
@@ -271,6 +287,7 @@ export function scrollIntoView(element, options = {}) {
 export default {
   extractTextFromElement,
   hasValidTextContent,
+  isSelectableTextRoot,
   isValidTextElement,
   findBestContainer,
   getImmediateTextContent,
