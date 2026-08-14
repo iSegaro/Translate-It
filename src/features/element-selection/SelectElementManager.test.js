@@ -414,25 +414,35 @@ describe('SelectElementManager', () => {
       expect(cleanupSpy).toHaveBeenCalledWith({ reason: 'error' });
     });
 
-    it('keeps explicit no-content failures silent', async () => {
+    it('shows one informational message for no-content; not an error or cancellation', async () => {
       const error = Object.assign(new Error('No translatable text found'), { type: ErrorTypes.NO_TRANSLATABLE_CONTENT });
       manager.domTranslatorAdapter.translateElement.mockRejectedValue(error);
 
       await manager.startTranslation(document.createElement('div'));
 
       expect(errorHandler.handle).not.toHaveBeenCalled();
-      expect(cleanupSpy).toHaveBeenCalledWith({ reason: 'cancel' });
-      expect(manager.logger.debug).toHaveBeenCalledWith('Select Element translation skipped:', error.message);
+      const { createPublicDisplayError } = await import('@/shared/error-management/PublicErrorPolicy.js');
+      expect(createPublicDisplayError).not.toHaveBeenCalled();
+      expect(cleanupSpy).toHaveBeenCalledWith({ reason: 'no-content' });
+      expect(manager.logger.debug).toHaveBeenCalledWith('Select Element translation completed with no translatable content:', error.message);
+
+      const { pageEventBus } = await import('@/core/PageEventBus.js');
+      const infoCalls = pageEventBus.emit.mock.calls.filter(([event]) => event === 'show-select-element-info');
+      expect(infoCalls).toHaveLength(1);
+      expect(infoCalls[0][1]).toEqual(expect.objectContaining({ message: expect.any(String) }));
     });
 
-    it('identifies no-content by semantic type, not message', async () => {
+    it('shows the same informational UX regardless of the diagnostic message', async () => {
       const error = Object.assign(new Error('different diagnostic text'), { type: ErrorTypes.NO_TRANSLATABLE_CONTENT });
       manager.domTranslatorAdapter.translateElement.mockRejectedValue(error);
 
       await manager.startTranslation(document.createElement('div'));
 
       expect(errorHandler.handle).not.toHaveBeenCalled();
-      expect(cleanupSpy).toHaveBeenCalledWith({ reason: 'cancel' });
+      expect(cleanupSpy).toHaveBeenCalledWith({ reason: 'no-content' });
+      const { pageEventBus } = await import('@/core/PageEventBus.js');
+      const infoCalls = pageEventBus.emit.mock.calls.filter(([event]) => event === 'show-select-element-info');
+      expect(infoCalls).toHaveLength(1);
     });
 
     it('keeps unrelated VALIDATION failures visible (message is not the discriminator)', async () => {
@@ -447,6 +457,8 @@ describe('SelectElementManager', () => {
         cause: error,
       }), expect.objectContaining({ showToast: true }));
       expect(cleanupSpy).toHaveBeenCalledWith({ reason: 'error' });
+      const { pageEventBus } = await import('@/core/PageEventBus.js');
+      expect(pageEventBus.emit).not.toHaveBeenCalledWith('show-select-element-info', expect.anything());
     });
 
     it('keeps user cancellation silent', async () => {
@@ -459,6 +471,8 @@ describe('SelectElementManager', () => {
 
       expect(errorHandler.handle).not.toHaveBeenCalled();
       expect(cleanupSpy).toHaveBeenCalledWith({ reason: 'cancel' });
+      const { pageEventBus } = await import('@/core/PageEventBus.js');
+      expect(pageEventBus.emit).not.toHaveBeenCalledWith('show-select-element-info', expect.anything());
     });
 
     it('keeps stale cancellation results silent', async () => {
@@ -572,6 +586,8 @@ describe('SelectElementManager', () => {
 
       expect(errorHandler.handle).not.toHaveBeenCalled();
       expect(cleanupSpy).toHaveBeenCalledWith({ reason: 'cancel' });
+      const { pageEventBus } = await import('@/core/PageEventBus.js');
+      expect(pageEventBus.emit).not.toHaveBeenCalledWith('show-select-element-info', expect.anything());
     });
 
     it('keeps successful translation cleanup unchanged', async () => {
@@ -642,6 +658,7 @@ describe('SelectElementManager', () => {
       expect(pageEventBus.emit).toHaveBeenCalledWith('hide-translation', expect.any(Object));
       expect(pageEventBus.emit).toHaveBeenCalledWith('ELEMENT_TRANSLATIONS_AVAILABLE');
       expect(manager.domTranslatorAdapter.revertTranslation).not.toHaveBeenCalled();
+      expect(pageEventBus.emit).not.toHaveBeenCalledWith('show-select-element-info', expect.anything());
       failureSpy.mockRestore();
     });
   });

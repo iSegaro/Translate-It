@@ -1952,6 +1952,9 @@
   "SELECT_ELEMENT_CANCEL": {
     "message": "Cancel"
   },
+  "SELECT_ELEMENT_NO_TRANSLATABLE_CONTENT": {
+    "message": "No translatable text was found in this element."
+  },
   "LINGVA_WPT_WARNING": {
     "message": "Lingva may fail on long texts."
   },

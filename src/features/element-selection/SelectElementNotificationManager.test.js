@@ -71,7 +71,8 @@ describe('SelectElementNotificationManager', () => {
     mockNotificationManager = {
       showStatus: vi.fn(() => 'test-toast-id'),
       update: vi.fn(),
-      dismiss: vi.fn()
+      dismiss: vi.fn(),
+      show: vi.fn(() => 'info-toast-id')
     };
     
     // Reset singleton instance
@@ -90,6 +91,7 @@ describe('SelectElementNotificationManager', () => {
     it('should setup listeners on initialization', () => {
       expect(pageEventBus.on).toHaveBeenCalledWith('show-select-element-notification', expect.any(Function));
       expect(pageEventBus.on).toHaveBeenCalledWith('dismiss-select-element-notification', expect.any(Function));
+      expect(pageEventBus.on).toHaveBeenCalledWith('show-select-element-info', expect.any(Function));
     });
   });
 
@@ -223,6 +225,45 @@ describe('SelectElementNotificationManager', () => {
       
       expect(mockNotificationManager.dismiss).toHaveBeenCalledWith('toast-to-dismiss');
       expect(manager.toastId).toBeNull();
+    });
+  });
+
+  describe('showInfoNotification', () => {
+    it('should not show if not in top frame', () => {
+      const originalWindow = global.window;
+      global.window = { top: {} }; // window !== window.top
+
+      manager.showInfoNotification({ message: 'msg' });
+
+      expect(mockNotificationManager.show).not.toHaveBeenCalled();
+
+      global.window = originalWindow;
+    });
+
+    it('should replace any existing toast and show an informational message', () => {
+      manager.toastId = 'progress-toast';
+
+      manager.showInfoNotification({ message: 'no content message' });
+
+      expect(mockNotificationManager.dismiss).toHaveBeenCalledWith('progress-toast');
+      expect(manager.toastId).toBeNull();
+      expect(mockNotificationManager.show).toHaveBeenCalledWith(
+        'no content message',
+        'info',
+        4000,
+        { id: 'select-element-toast' }
+      );
+    });
+
+    it('should fall back to a default message when data is missing', () => {
+      manager.showInfoNotification(null);
+
+      expect(mockNotificationManager.show).toHaveBeenCalledWith(
+        'No translatable text was found in this element.',
+        'info',
+        4000,
+        expect.anything()
+      );
     });
   });
 

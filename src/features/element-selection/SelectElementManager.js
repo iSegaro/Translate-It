@@ -38,6 +38,9 @@ import { getSelectElementNotificationManager } from './SelectElementNotification
 const SELECT_ELEMENT_PARTIAL_ERROR_KEY = 'ERRORS_SELECT_ELEMENT_PARTIAL_TRANSLATION_FAILED';
 const SELECT_ELEMENT_PARTIAL_ERROR_FALLBACK = 'Some content could not be translated.';
 
+const SELECT_ELEMENT_NO_TRANSLATABLE_CONTENT_KEY = 'SELECT_ELEMENT_NO_TRANSLATABLE_CONTENT';
+const SELECT_ELEMENT_NO_TRANSLATABLE_CONTENT_FALLBACK = 'No translatable text was found in this element.';
+
 /**
  * Resolves the localized partial-completion message shared by non-terminal
  * PARTIAL_SUCCESS and terminal PARTIAL_FAILURE paths.
@@ -586,12 +589,13 @@ class SelectElementManager extends ResourceTracker {
       && committedParentCount < totalParentCount;
     const isNoTranslatableContent = error.type === ErrorTypes.NO_TRANSLATABLE_CONTENT;
     const isSilentSkip = isCancellation
-      || isNoTranslatableContent
       || error.type === ErrorTypes.FEATURE_BLOCKED
       || ExtensionContextManager.isContextError(error);
 
     if (isCancellation) {
       this.logger.debug('Select Element translation cancelled:', error.message);
+    } else if (isNoTranslatableContent) {
+      await this._handleNoTranslatableContent(error);
     } else if (isSilentSkip) {
       this.logger.debug('Select Element translation skipped:', error.message);
     } else {
@@ -625,9 +629,35 @@ class SelectElementManager extends ResourceTracker {
 
     if (isFatalError(error) && !isSilentSkip) {
       this.deactivate({ preserveTranslations: true, reason: 'error' });
+    } else if (isNoTranslatableContent) {
+      this.performPostTranslationCleanup({ reason: 'no-content' });
     } else {
       this.performPostTranslationCleanup({ reason: isSilentSkip ? 'cancel' : 'error' });
     }
+  }
+
+  /**
+   * Handles an accepted Select Element request that produced zero translatable
+   * units. Non-error, non-cancellation outcome: shows one informational message
+   * and lets cleanup run on a semantic 'no-content' reason. Deliberately keeps
+   * the outcome out of ErrorHandler / PublicErrorPolicy error semantics.
+   * @private
+   * @param {Error} error - The NO_TRANSLATABLE_CONTENT error.
+   */
+  async _handleNoTranslatableContent(error) {
+    this.logger.debug('Select Element translation completed with no translatable content:', error.message);
+    const message = (await getTranslationString(SELECT_ELEMENT_NO_TRANSLATABLE_CONTENT_KEY))
+      || SELECT_ELEMENT_NO_TRANSLATABLE_CONTENT_FALLBACK;
+    this.showNoContentNotification(message);
+  }
+
+  /**
+   * Routes an informational Select Element message through the notification
+   * owner. Feature-owned non-error path; never PublicErrorPolicy.
+   * @param {string} message - Localized informational message.
+   */
+  showNoContentNotification(message) {
+    pageEventBus.emit('show-select-element-info', { message });
   }
 
   performPostTranslationCleanup(options = {}) {

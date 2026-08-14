@@ -1952,6 +1952,9 @@
   "SELECT_ELEMENT_CANCEL": {
     "message": "キャンセル"
   },
+  "SELECT_ELEMENT_NO_TRANSLATABLE_CONTENT": {
+    "message": "この要素には翻訳可能なテキストが見つかりませんでした。"
+  },
   "LINGVA_WPT_WARNING": {
     "message": "Lingvaは長いテキストで失敗する可能性があります。"
   },
