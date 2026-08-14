@@ -38,6 +38,17 @@ import { getSelectElementNotificationManager } from './SelectElementNotification
 const SELECT_ELEMENT_PARTIAL_ERROR_KEY = 'ERRORS_SELECT_ELEMENT_PARTIAL_TRANSLATION_FAILED';
 const SELECT_ELEMENT_PARTIAL_ERROR_FALLBACK = 'Some content could not be translated.';
 
+/**
+ * Resolves the localized partial-completion message shared by non-terminal
+ * PARTIAL_SUCCESS and terminal PARTIAL_FAILURE paths.
+ * @private
+ * @returns {Promise<string>}
+ */
+async function getPartialCompletionMessage() {
+  return (await getTranslationString(SELECT_ELEMENT_PARTIAL_ERROR_KEY))
+    || SELECT_ELEMENT_PARTIAL_ERROR_FALLBACK;
+}
+
 function isElementTooLargeError(error) {
   return typeof error?.message === 'string'
     && /element is too large to translate/i.test(error.message);
@@ -520,6 +531,22 @@ class SelectElementManager extends ResourceTracker {
       if (result?.success) {
         pageEventBus.emit('hide-translation', { element: targetElement });
         pageEventBus.emit('ELEMENT_TRANSLATIONS_AVAILABLE'); // Notify that revert is now possible
+
+        if (result.partial === true) {
+          // Non-terminal partial completion: stream/provider completed normally but
+          // some requested logical parents remain uncommitted. Committed translations
+          // are valid and preserved; this is feature outcome UX, not a terminal error.
+          this.logger.debug('Select Element translation completed partially', {
+            committedParentCount: result.committedParentCount,
+            totalParentCount: result.totalParentCount,
+          });
+          const partialMessage = await getPartialCompletionMessage();
+          const partialDisplayError = Object.assign(new Error(partialMessage), {
+            type: ErrorTypes.TRANSLATION_FAILED,
+          });
+          ErrorHandler.getInstance().handle(partialDisplayError, { context: 'select-element', showToast: true }).catch(() => {});
+        }
+
         this.performPostTranslationCleanup({ reason: 'success' });
       } else if (result?.cancelled) {
         this.deactivate({ reason: 'cancel', silent: true });
@@ -567,9 +594,7 @@ class SelectElementManager extends ResourceTracker {
       this.logger.warn('Select Element translation failed:', error);
       let displayError;
       if (isPartialFailure) {
-        displayError = Object.assign(new Error(
-          await getTranslationString(SELECT_ELEMENT_PARTIAL_ERROR_KEY) || SELECT_ELEMENT_PARTIAL_ERROR_FALLBACK
-        ), {
+        displayError = Object.assign(new Error(await getPartialCompletionMessage()), {
           type: ErrorTypes.TRANSLATION_FAILED,
           cause: error,
           translationOutcome: outcome,

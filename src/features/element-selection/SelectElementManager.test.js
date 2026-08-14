@@ -129,6 +129,7 @@ vi.mock('./core/DomTranslatorAdapter.js', () => ({
     translateElement = vi.fn(() => Promise.resolve({ success: true }));
     cleanup = vi.fn();
     cancelTranslation = vi.fn();
+    revertTranslation = vi.fn();
   }
 }));
 
@@ -486,16 +487,48 @@ describe('SelectElementManager', () => {
       expect(cleanupSpy).toHaveBeenCalledWith({ reason: 'error' });
     });
 
-    it('preserves partial translations after successful partial commit', async () => {
+    it('keeps FULL_SUCCESS cleanup unchanged without partial message', async () => {
       manager.domTranslatorAdapter.translateElement.mockResolvedValue({
         success: true,
-        committedParentCount: 1
+        partial: false,
+        committedParentCount: 2,
+        totalParentCount: 2
       });
 
       await manager.startTranslation(document.createElement('div'));
 
       expect(errorHandler.handle).not.toHaveBeenCalled();
       expect(cleanupSpy).toHaveBeenCalledWith({ reason: 'success' });
+      const { pageEventBus } = await import('@/core/PageEventBus.js');
+      expect(pageEventBus.emit).toHaveBeenCalledWith('ELEMENT_TRANSLATIONS_AVAILABLE');
+    });
+
+    it('shows the partial message once and keeps success cleanup for PARTIAL_SUCCESS', async () => {
+      const failureSpy = vi.spyOn(manager, '_handleTranslationFailure').mockImplementation(() => Promise.resolve());
+      manager.domTranslatorAdapter.translateElement.mockResolvedValue({
+        success: true,
+        partial: true,
+        committedParentCount: 1,
+        totalParentCount: 2
+      });
+
+      await manager.startTranslation(document.createElement('div'));
+
+      expect(errorHandler.handle).toHaveBeenCalledTimes(1);
+      expect(errorHandler.handle).toHaveBeenCalledWith(
+        expect.objectContaining({
+          message: 'Some content could not be translated.',
+          type: 'TRANSLATION_FAILED',
+        }),
+        expect.objectContaining({ context: 'select-element', showToast: true })
+      );
+      expect(failureSpy).not.toHaveBeenCalled();
+      expect(cleanupSpy).toHaveBeenCalledWith({ reason: 'success' });
+      const { pageEventBus } = await import('@/core/PageEventBus.js');
+      expect(pageEventBus.emit).toHaveBeenCalledWith('hide-translation', expect.any(Object));
+      expect(pageEventBus.emit).toHaveBeenCalledWith('ELEMENT_TRANSLATIONS_AVAILABLE');
+      expect(manager.domTranslatorAdapter.revertTranslation).not.toHaveBeenCalled();
+      failureSpy.mockRestore();
     });
   });
 

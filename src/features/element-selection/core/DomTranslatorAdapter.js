@@ -594,6 +594,7 @@ export class DomTranslatorAdapter extends ResourceTracker {
                     } else {
                       if (contentResult.status !== 'valid') {
                         this._logRejectedContent(index, contentResult.status);
+                        group.invalid = true;
                         return;
                       }
                       const anyProcessed = group.units.some(u => processedUids.has(u.id));
@@ -1095,6 +1096,7 @@ export class DomTranslatorAdapter extends ResourceTracker {
           } else {
             if (contentResult.status !== 'valid') {
               this._logRejectedContent(i, contentResult.status);
+              group.invalid = true;
               return;
             }
             const anyProcessed = group.units.some(u => processedUids.has(u.id));
@@ -1212,7 +1214,19 @@ export class DomTranslatorAdapter extends ResourceTracker {
     }
 
     if (onComplete) await onComplete({ status: TRANSLATION_STATUS.COMPLETED, elementId, translated: true });
-    return { success: true, elementId, element, committedParentCount };
+
+    // Non-terminal partial completion: some requested logical parents committed,
+    // at least one remains uncommitted (invalid/pending/missing/rejected), and the
+    // stream/provider completed normally. Keeps success true to avoid failure/retry
+    // semantics while exposing the partial bit to the consuming feature.
+    const partial = committedParentCount > 0 && committedParentCount < totalParentCount;
+    if (partial) {
+      this.logger.debug('[DomTranslatorAdapter] Select Element translation completed partially', {
+        committedParentCount,
+        totalParentCount,
+      });
+    }
+    return { success: true, partial, elementId, element, committedParentCount, totalParentCount };
   }
 
   async _sendParentAcceptanceAck(parentId, cleanResult, accepted, translationToken = null) {
