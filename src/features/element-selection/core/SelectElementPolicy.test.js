@@ -67,13 +67,39 @@ describe('SelectElementPolicy', () => {
       expect(defaultCall.traversable).toBe(true);
     });
 
-    it('keeps SELECT/OPTION selectable as root but rejects traversal', () => {
-      for (const tag of ['select', 'option']) {
-        const el = makeElement(tag);
-        const root = getSelectElementRootEligibility(el);
-        const traversal = isSelectElementTraversable(el);
-        expect(root.selectableRoot).toBe(true);
+    it('rejects SELECT/OPTION as roots; SELECT is a traversable label container', () => {
+      const select = makeElement('select');
+      const selectRoot = getSelectElementRootEligibility(select);
+      expect(selectRoot.selectableRoot).toBe(false);
+      expect(selectRoot.category).toBe(SelectElementCategory.CHOICE_LABEL);
+
+      // Container: traversal passes through so option children are visited.
+      for (const mode of [SelectElementExtractionMode.V2, SelectElementExtractionMode.V3]) {
+        const nested = isSelectElementTraversable(select, { extractionMode: mode });
+        expect(nested.traversable).toBe(true);
+        expect(nested.category).toBe(SelectElementCategory.CHOICE_LABEL);
+        expect(nested.supportedModes).toEqual([SelectElementExtractionMode.V2, SelectElementExtractionMode.V3]);
+      }
+    });
+
+    it('rejects OPTION as root; traversable only with an explicit value attribute', () => {
+      const implicit = makeElement('option');
+      implicit.textContent = 'English';
+      expect(getSelectElementRootEligibility(implicit).selectableRoot).toBe(false);
+      expect(getSelectElementRootEligibility(implicit).category).toBe(SelectElementCategory.CHOICE_LABEL);
+
+      for (const mode of [SelectElementExtractionMode.V2, SelectElementExtractionMode.V3]) {
+        const traversal = isSelectElementTraversable(implicit, { extractionMode: mode });
         expect(traversal.traversable).toBe(false);
+        expect(traversal.reason).toBe(SelectElementReason.IMPLICIT_OPTION_VALUE);
+
+        const explicit = makeElement('option');
+        explicit.setAttribute('value', 'en');
+        explicit.textContent = 'English';
+        const safe = isSelectElementTraversable(explicit, { extractionMode: mode });
+        expect(safe.traversable).toBe(true);
+        expect(safe.category).toBe(SelectElementCategory.CHOICE_LABEL);
+        expect(safe.supportedModes).toEqual([SelectElementExtractionMode.V2, SelectElementExtractionMode.V3]);
       }
     });
 

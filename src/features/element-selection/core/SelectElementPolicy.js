@@ -21,11 +21,15 @@
  * this module, in DomTranslatorAdapter.
  *
  * Migration note: this module PRESERVES the exact current product behavior,
- * including every known selector/extractor asymmetry (SELECT/OPTION,
- * PRE/CODE/KBD/SAMP, role=code, opacity:0), with one product decision:
- * interactive containers (literal BUTTON and role=button) are always
- * traversable content — both as explicitly selected roots and nested inside a
- * selected container — and classify as ordinary CONTENT.
+ * including every known selector/extractor asymmetry (PRE/CODE/KBD/SAMP,
+ * role=code, opacity:0), with these product decisions:
+ * - interactive containers (literal BUTTON and role=button) are always
+ *   traversable content — both as explicitly selected roots and nested inside a
+ *   selected container — and classify as ordinary CONTENT;
+ * - SELECT/OPTION are no longer Select Element roots (root axis rejected);
+ *   nested OPTION labels participate in parent translation only when the option
+ *   carries an explicit value attribute (implicit-value labels are excluded to
+ *   preserve form/value semantics).
  */
 
 import { TRANSLATION_HTML } from '@/shared/constants/translation.js';
@@ -46,6 +50,7 @@ export const SelectElementExtractionMode = Object.freeze({
 export const SelectElementCategory = Object.freeze({
   NON_CONTENT: 'non-content',
   FORM_CONTROL: 'form-control',
+  CHOICE_LABEL: 'choice-label',
   PREFORMATTED: 'preformatted',
   SEMANTIC_SPECIAL: 'semantic-special',
   CONTENT: 'content',
@@ -64,6 +69,7 @@ export const SelectElementReason = Object.freeze({
   HIDDEN: 'hidden',
   CODE_CLASS: 'code-class',
   UNSUPPORTED_MODE: 'unsupported-mode',
+  IMPLICIT_OPTION_VALUE: 'implicit-option-value',
 });
 
 /**
@@ -76,7 +82,10 @@ const CATEGORY_TAGS = Object.freeze({
     'SCRIPT', 'STYLE', 'NOSCRIPT', 'IFRAME', 'SVG', 'HEAD', 'META', 'LINK',
   ]),
   [SelectElementCategory.FORM_CONTROL]: Object.freeze([
-    'INPUT', 'TEXTAREA', 'SELECT', 'OPTION',
+    'INPUT', 'TEXTAREA',
+  ]),
+  [SelectElementCategory.CHOICE_LABEL]: Object.freeze([
+    'SELECT', 'OPTION',
   ]),
   [SelectElementCategory.PREFORMATTED]: Object.freeze([
     'PRE', 'CODE', 'KBD', 'SAMP',
@@ -99,9 +108,10 @@ const EXCLUDED_TAGS = new Set(TAG_CATEGORY_MAP.keys());
 
 /**
  * Tags the SELECTOR currently accepts as roots despite being extractor-excluded.
- * Preserved mismatch: SELECT/OPTION, PRE/CODE are selectable-root=true.
+ * Preserved mismatch: PRE/CODE are selectable-root=true (V2 unsupported /
+ * V3 passthrough). SELECT/OPTION were removed: they are no longer valid roots.
  */
-const ROOT_SELECTABLE_EXCEPTIONS = new Set(['SELECT', 'OPTION', 'PRE', 'CODE']);
+const ROOT_SELECTABLE_EXCEPTIONS = new Set(['PRE', 'CODE']);
 
 /**
  * Root-excluded tags — equivalent to the selector's previous invalidTags list.
@@ -177,6 +187,7 @@ const isHiddenForRoot = (element) => {
 
 const CAPABILITY_BY_CATEGORY = Object.freeze({
   [SelectElementCategory.CONTENT]: [SelectElementExtractionMode.V2, SelectElementExtractionMode.V3],
+  [SelectElementCategory.CHOICE_LABEL]: [SelectElementExtractionMode.V2, SelectElementExtractionMode.V3],
   [SelectElementCategory.PREFORMATTED]: [SelectElementExtractionMode.V3],
   [SelectElementCategory.NON_CONTENT]: [],
   [SelectElementCategory.FORM_CONTROL]: [],
@@ -256,6 +267,22 @@ function classifyTraversalAxis(element, options = {}) {
 
   if (isHardExcludedCategory(category)) {
     return { traversable: false, reason: SelectElementReason.EXCLUDED_TAG, tagName, category, supportedModes };
+  }
+
+  if (category === SelectElementCategory.CHOICE_LABEL) {
+    // SELECT is a pure container for option labels: traversal passes through so
+    // its option children are visited.
+    if (tagName === 'SELECT') {
+      return { traversable: true, reason: null, tagName, category, supportedModes };
+    }
+    // OPTION label text is only translation-eligible when the option carries an
+    // explicit value attribute. Implicit-value options derive option.value from
+    // their text content, so mutating the label would silently change the
+    // logical option value observed by page JS / form submission.
+    if (element.hasAttribute('value')) {
+      return { traversable: true, reason: null, tagName, category, supportedModes };
+    }
+    return { traversable: false, reason: SelectElementReason.IMPLICIT_OPTION_VALUE, tagName, category, supportedModes };
   }
 
   if (category === SelectElementCategory.PREFORMATTED) {

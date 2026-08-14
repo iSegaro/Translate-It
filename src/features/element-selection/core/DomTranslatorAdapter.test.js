@@ -1003,6 +1003,51 @@ describe('DomTranslatorAdapter', () => {
       document.body.removeChild(div);
     });
 
+    it('preserves option value/selection through translate and restores the label on revert', async () => {
+      const { collectTextNodes } = await import('./DomTranslatorUtils.js');
+      const { revertSelectElementTranslation } = await import('./DomTranslatorState.js');
+      const { getFeatureSemanticBlockGroupingAsync } = await import('@/config.js');
+      // Reset queued once-implementations so this test runs a deterministic V2
+      // (non-grouping) path; a preceding test short-circuits the block-grouping
+      // read when it stubs a traditional provider, leaving a queued once behind.
+      getFeatureSemanticBlockGroupingAsync.mockReset();
+      getFeatureSemanticBlockGroupingAsync.mockResolvedValue(false);
+
+      const select = document.createElement('select');
+      select.innerHTML = `
+        <option value="en" selected>English</option>
+        <option value="fa">Persian</option>
+      `;
+      document.body.appendChild(select);
+
+      const safeLabel = select.options[0].firstChild;
+      collectTextNodes.mockReturnValueOnce([
+        { node: safeLabel, text: 'English', uid: 'opt1', blockId: 'b1', role: 'option' }
+      ]);
+
+      contentScriptIntegration.sendTranslationRequest.mockResolvedValue({
+        success: true,
+        streaming: false,
+        translatedText: JSON.stringify([{ t: 'انگلیسی', i: 'opt1' }])
+      });
+
+      await adapter.translateElement(select);
+
+      // Translated label, but explicit value and selected state untouched.
+      expect(select.options[0].text).toContain('انگلیسی');
+      expect(select.options[0].value).toBe('en');
+      expect(select.selectedIndex).toBe(0);
+
+      // Generic revert restores the original label.
+      await revertSelectElementTranslation();
+
+      expect(select.options[0].text).toBe('English');
+      expect(select.options[0].value).toBe('en');
+      expect(select.selectedIndex).toBe(0);
+
+      document.body.removeChild(select);
+    });
+
     it('should route through collectBlockGroups when FEATURE_SEMANTIC_BLOCK_GROUPING is true', async () => {
       const { getFeatureSemanticBlockGroupingAsync } = await import('@/config.js');
       const { collectTextNodes, collectBlockGroups } = await import('./DomTranslatorUtils.js');
@@ -2976,7 +3021,7 @@ describe('DomTranslatorAdapter', () => {
         expect(isValidTextElement(p)).toBe(true);
         expect(isValidTextElement(textarea)).toBe(false);
         expect(isValidTextElement(input)).toBe(false);
-        expect(isValidTextElement(select)).toBe(true);
+        expect(isValidTextElement(select)).toBe(false);
         expect(isValidTextElement(button)).toBe(true);
       } finally {
         window.getComputedStyle = originalGetComputedStyle;

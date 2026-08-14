@@ -327,6 +327,24 @@ describe('SelectElementManager', () => {
       expect(manager.domTranslatorAdapter.translateElement).not.toHaveBeenCalled();
     });
 
+    it('rejects SELECT/OPTION roots silently through the root-eligibility contract', async () => {
+      // The real policy (getSelectElementRootEligibility) now returns
+      // selectableRoot:false for SELECT/OPTION, so isSelectableTextRoot is
+      // false and the manager must never reach the adapter — no toast, no
+      // NO_TRANSLATABLE_CONTENT outcome.
+      for (const tag of ['select', 'option']) {
+        const el = document.createElement(tag);
+        el.textContent = 'English Persian';
+        manager.elementSelector.getHighlightedElement.mockReturnValue(el);
+        isSelectableTextRoot.mockReturnValue(false);
+
+        await manager.handleClick(new MouseEvent('click'));
+
+        expect(manager.domTranslatorAdapter.translateElement).not.toHaveBeenCalled();
+        expect(manager.elementSelector.deactivate).not.toHaveBeenCalled();
+      }
+    });
+
     it('applies the same eligibility rule to the event.target fallback', async () => {
       const el = document.createElement('div');
       manager.elementSelector.getHighlightedElement.mockReturnValue(null);

@@ -203,14 +203,15 @@ describe('DomTranslatorUtils', () => {
       expect(nodes[0].text.trim()).toBe('Readable text');
     });
 
-    it('should reject text nodes inside form controls and contenteditable elements recursively, but not inside BUTTON', () => {
+    it('should reject text nodes inside form controls, unsafe options, and contenteditable elements recursively, but not inside BUTTON', () => {
       const container = document.createElement('div');
       container.innerHTML = `
         <p>Translatable text outside.</p>
         <textarea>Should be rejected text.</textarea>
         <input type="text" value="Should be rejected text." />
         <select>
-          <option>Should be rejected option text.</option>
+          <option value="en">Safe option label.</option>
+          <option>Unsafe implicit-value option text.</option>
         </select>
         <button><span>Should be translated nested button text.</span></button>
         <div contenteditable="true">Should be rejected editor text.</div>
@@ -229,8 +230,9 @@ describe('DomTranslatorUtils', () => {
         const collected = textNodes.map(n => n.text.trim());
         expect(collected).toContain('Translatable text outside.');
         expect(collected).toContain('Should be translated nested button text.');
+        expect(collected).toContain('Safe option label.');
         expect(collected).not.toContain('Should be rejected text.');
-        expect(collected).not.toContain('Should be rejected option text.');
+        expect(collected).not.toContain('Unsafe implicit-value option text.');
         expect(collected).not.toContain('Should be rejected editor text.');
         expect(collected).not.toContain('Should be rejected deeply nested editor text.');
       } finally {
@@ -518,13 +520,14 @@ describe('DomTranslatorUtils', () => {
       expect(units[0].inlineParentTags).toEqual(['strong', 'span']);
     });
 
-    it('should reject text nodes inside form controls and contenteditable elements recursively, but not inside BUTTON (block grouping)', () => {
+    it('should reject text nodes inside form controls, unsafe options, and contenteditable elements recursively, but not inside BUTTON (block grouping)', () => {
       const container = document.createElement('div');
       container.innerHTML = `
         <p>Translatable text outside.</p>
         <textarea>Should be rejected text.</textarea>
         <select>
-          <option>Should be rejected option text.</option>
+          <option value="en">Safe option label.</option>
+          <option>Unsafe implicit-value option text.</option>
         </select>
         <button><span>Should be translated nested button text.</span></button>
         <div contenteditable="true">Should be rejected editor text.</div>
@@ -543,8 +546,9 @@ describe('DomTranslatorUtils', () => {
         const collected = units.map(u => u.text.trim());
         expect(collected).toContain('Translatable text outside.');
         expect(collected).toContain('Should be translated nested button text.');
+        expect(collected).toContain('Safe option label.');
         expect(collected).not.toContain('Should be rejected text.');
-        expect(collected).not.toContain('Should be rejected option text.');
+        expect(collected).not.toContain('Unsafe implicit-value option text.');
         expect(collected).not.toContain('Should be rejected editor text.');
         expect(collected).not.toContain('Should be rejected deeply nested editor text.');
       } finally {
@@ -552,8 +556,75 @@ describe('DomTranslatorUtils', () => {
       }
     });
 
+    it('collects safe option labels in a selected parent under explicit V2 mode', () => {
+      const container = document.createElement('div');
+      container.innerHTML = `
+        <p>Ordinary text.</p>
+        <select>
+          <option value="en">English</option>
+          <option>Persian</option>
+          <option value="fa">Farsi</option>
+        </select>
+        <textarea>Should be rejected text.</textarea>
+        <input type="text" value="Should be rejected text." />
+      `;
+      document.body.appendChild(container);
+
+      const originalGetComputedStyle = window.getComputedStyle;
+      window.getComputedStyle = vi.fn().mockReturnValue({
+        display: 'block',
+        visibility: 'visible'
+      });
+
+      try {
+        const nodes = collectTextNodes(container, { extractionMode: SelectElementExtractionMode.V2 });
+        const collected = nodes.map(n => n.text.trim());
+        expect(collected).toContain('Ordinary text.');
+        expect(collected).toContain('English');
+        expect(collected).toContain('Farsi');
+        expect(collected).not.toContain('Persian');
+        expect(collected).not.toContain('Should be rejected text.');
+      } finally {
+        window.getComputedStyle = originalGetComputedStyle;
+      }
+    });
+
+    it('collects safe option labels in a selected parent under explicit V3 mode', () => {
+      const container = document.createElement('div');
+      container.innerHTML = `
+        <p>Ordinary text.</p>
+        <select>
+          <option value="en">English</option>
+          <option>Persian</option>
+          <option value="fa">Farsi</option>
+        </select>
+        <textarea>Should be rejected text.</textarea>
+        <input type="text" value="Should be rejected text." />
+      `;
+      document.body.appendChild(container);
+
+      const originalGetComputedStyle = window.getComputedStyle;
+      window.getComputedStyle = vi.fn().mockReturnValue({
+        display: 'block',
+        visibility: 'visible'
+      });
+
+      try {
+        const sessionContext = { blockMap: new WeakMap(), blockCounter: { value: 0 } };
+        const units = collectBlockGroups(container, sessionContext, { extractionMode: SelectElementExtractionMode.V3 });
+        const collected = units.map(u => u.text.trim());
+        expect(collected).toContain('Ordinary text.');
+        expect(collected).toContain('English');
+        expect(collected).toContain('Farsi');
+        expect(collected).not.toContain('Persian');
+        expect(collected).not.toContain('Should be rejected text.');
+} finally {
+        window.getComputedStyle = originalGetComputedStyle;
+      }
+    });
+
     it('collects text from an explicitly selected BUTTON root in block grouping (V3)', () => {
-      const button = document.createElement('button');
+        const button = document.createElement('button');
       const span = document.createElement('span');
       span.textContent = 'Follow this account to see their updates';
       button.appendChild(span);
