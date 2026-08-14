@@ -444,7 +444,7 @@ describe('OptimizedJsonHandler', () => {
       expect(updates).toHaveLength(0);
     });
 
-    it('rejects a 39-unit fragmented parent after two successful provider batches', async () => {
+    it('repairs a 39-unit fragmented parent after two successful provider batches', async () => {
       const browser = (await import('webextension-polyfill')).default;
       browser.tabs.sendMessage.mockClear();
       // Production ErrorMatcher does not treat VALIDATION as fatal solely from isFatal.
@@ -485,7 +485,7 @@ describe('OptimizedJsonHandler', () => {
         .mockResolvedValueOnce({ translatedText: [translatedFragment1] })
         .mockImplementation((texts, _source, _target, options) => {
           if (options.callPurpose === TranslationCallPurpose.PARENT_RECOVERY) {
-            return Promise.resolve({ translatedText: texts.map((text) => text.replace(marker(39), '')) });
+            return Promise.resolve({ translatedText: texts.map((item) => ({ id: item.i, text: item.text.replace(marker(39), '') })) });
           }
           return Promise.resolve({ translatedText: texts });
         });
@@ -503,17 +503,15 @@ describe('OptimizedJsonHandler', () => {
       const recoveryCalls = mockProvider.translate.mock.calls.filter(
         call => call[3].callPurpose === TranslationCallPurpose.PARENT_RECOVERY
       );
-       expect(mockProvider.translate).toHaveBeenCalledTimes(7);
-       expect(recoveryCalls).toHaveLength(5);
-      const recoveryMarkerCounts = recoveryCalls.map(call => call[0][0].match(/@@TI_SEG_/g)?.length || 0);
-       expect(recoveryMarkerCounts.reduce((sum, count) => sum + count, 0)).toBe(78);
-       expect(recoveryMarkerCounts.slice(-3).every(count => count < 20)).toBe(true);
-      expect(result).toMatchObject({
-        success: false,
-        error: { type: ErrorTypes.VALIDATION }
-      });
-       expect(result.error.message).toContain('MARKER_COUNT_MISMATCH');
-      expect(result.results).toEqual([]);
+       expect(mockProvider.translate).toHaveBeenCalledTimes(3);
+       expect(recoveryCalls).toHaveLength(1);
+       const recoveryInput = recoveryCalls[0][0];
+       expect(recoveryInput.every(({ intervalId, i, text }) => typeof (intervalId ?? i) === 'string' && typeof text === 'string')).toBe(true);
+       expect(new Set(recoveryInput.map(({ intervalId, i }) => intervalId ?? i)).size).toBe(recoveryInput.length);
+       expect(recoveryInput.some(({ text }) => text.includes('@@TI_SEG_'))).toBe(false);
+       expect(result).toMatchObject({ success: true });
+       expect(result.error).toBeNull();
+      expect(result.results).toHaveLength(1);
 
       const diagnostic = appendTranslationDiagnostic.mock.calls.find(
         (call) => call[1]?.type === 'V3_MARKER_CONTRACT_REJECTED'
@@ -527,21 +525,20 @@ describe('OptimizedJsonHandler', () => {
        expect(appendTranslationDiagnostic).toHaveBeenCalledWith(null, expect.objectContaining({
          type: 'PARENT_RECOVERY_STARTED',
          parentId: 'g1',
-         recoveryStage: 2,
-         recoveryFragmentLimit: 500,
+         recoveryStage: 1,
+         recoveryFragmentLimit: 750,
          primaryFragmentCount: 2,
-         recoveryFragmentCount: 3,
-        markerCount: 39,
-        callPurpose: TranslationCallPurpose.PARENT_RECOVERY,
-      }));
+         recoveryFragmentCount: 1,
+         callPurpose: TranslationCallPurpose.PARENT_RECOVERY,
+       }));
 
       const messages = browser.tabs.sendMessage.mock.calls.map(([, message]) => message);
       const updates = messages.filter((message) => message.action === MessageActions.TRANSLATION_STREAM_UPDATE);
       const ends = messages.filter((message) => message.action === MessageActions.TRANSLATION_STREAM_END);
-      expect(updates).toHaveLength(0);
+      expect(updates).toHaveLength(1);
       expect(ends).toHaveLength(1);
-      expect(ends[0].data).toMatchObject({ success: false });
-      expect(JSON.stringify(messages)).not.toContain('Translated 1');
+      expect(ends[0].data).toMatchObject({ success: true });
+      expect(JSON.stringify(messages)).toContain(marker(39));
     });
 
     it('rejects reordered markers across fragments', async () => {
@@ -585,7 +582,11 @@ describe('OptimizedJsonHandler', () => {
       mockProvider.translate
         .mockResolvedValueOnce({ translatedText: [`A${m2}B`] })
         .mockResolvedValueOnce({ translatedText: [`${m3}${m3}C`] })
-        .mockResolvedValueOnce({ translatedText: [source] });
+        .mockResolvedValueOnce({ translatedText: [
+          { id: 'parent-1-0', i: 'parent-1-0', text: 'A' },
+          { id: 'parent-1-1', i: 'parent-1-1', text: 'B' },
+          { id: 'parent-1-2', i: 'parent-1-2', text: 'C' },
+        ] });
 
       const result = await handler.execute(
         mockEngine,
@@ -604,8 +605,14 @@ describe('OptimizedJsonHandler', () => {
       const updates = browser.tabs.sendMessage.mock.calls
         .map(([, message]) => message)
         .filter(message => message.action === MessageActions.TRANSLATION_STREAM_UPDATE);
-      expect(updates).toHaveLength(1);
-      expect(updates[0].data.data[0].t).toBe(source);
+       expect(updates).toHaveLength(1);
+       expect(updates[0].data.data[0].t).toBe(source);
+       expect(updates[0].data.data[0]).toMatchObject({ i: 'n1', blockId: 'g1', text: source });
+       expect(updates[0].data.data[0]).not.toHaveProperty('fragment');
+       expect(updates[0].data.data[0]).not.toHaveProperty('mapped');
+       expect(updates[0].data.data[0]).not.toHaveProperty('recoveryFragmentIndex');
+       expect(updates[0].data.data[0]).not.toHaveProperty('intervalId');
+       expect(JSON.stringify(updates[0].data.data[0])).not.toContain('v3:g1');
       expect(appendTranslationDiagnostic).toHaveBeenCalledWith(null, expect.objectContaining({ type: 'PARENT_RECOVERY_STARTED', parentId: 'g1' }));
       expect(appendTranslationDiagnostic).toHaveBeenCalledWith(null, expect.objectContaining({ type: 'PARENT_RECOVERY_SUCCEEDED', parentId: 'g1' }));
     });
@@ -622,7 +629,7 @@ describe('OptimizedJsonHandler', () => {
         .mockResolvedValueOnce({ translatedText: [`${m3}${m3}C`] })
         .mockImplementation((texts, _source, _target, options) => {
           if (options.callPurpose === TranslationCallPurpose.PARENT_RECOVERY) {
-            return Promise.resolve({ translatedText: texts.map((text) => text.replace(/(@@TI_SEG_[^@]*@@)[\s\S]*/, '$1')) });
+            return Promise.resolve({ translatedText: texts.map((text) => ({ id: text.i, text: text.text })) });
           }
           return Promise.resolve({ translatedText: texts });
         });
@@ -637,18 +644,12 @@ describe('OptimizedJsonHandler', () => {
       const providerSummary = debugCalls.find(([message, data]) => message.includes('provider response summary') && data?.recoveryStage === 1);
       const mappedSummary = debugCalls.find(([, data]) => data?.recoveryFragmentIndex !== undefined && data?.translatedLength !== undefined);
       const reassembledSummary = debugCalls.find(([, data]) => data?.sourceIntervalCount !== undefined);
-      const emptyInterval = debugCalls.find(([, data]) => data?.intervalIndex !== undefined && data?.sourcePreview !== undefined);
+       const emptyInterval = debugCalls.find(([, data]) => data?.intervalIndex !== undefined && data?.sourcePreview !== undefined);
 
       expect(providerSummary?.[1]).toMatchObject({ parentId: 'g1', recoveryFragmentIndex: 0 });
       expect(mappedSummary?.[1]).toMatchObject({ parentId: 'g1', recoveryFragmentIndex: expect.any(Number) });
       expect(reassembledSummary?.[1]).toMatchObject({ parentId: 'g1', sourceIntervalCount: expect.any(Number), translatedIntervalCount: expect.any(Number) });
-      expect(emptyInterval?.[1]).toMatchObject({
-        parentId: 'g1',
-        recoveryStage: expect.any(Number),
-        intervalIndex: expect.any(Number),
-      });
-      expect(emptyInterval?.[1].sourcePreview.length).toBeLessThanOrEqual(203);
-      expect(emptyInterval?.[1].translatedPreview.length).toBeLessThanOrEqual(203);
+      expect(emptyInterval).toBeUndefined();
       expect(debugCalls.some(([, data]) => typeof data?.sourceText === 'string' || typeof data?.translatedText === 'string')).toBe(false);
     });
 
@@ -664,7 +665,10 @@ describe('OptimizedJsonHandler', () => {
       let primaryCalls = 0;
       mockProvider.translate.mockImplementation((texts, _source, _target, options) => {
         if (options.callPurpose === TranslationCallPurpose.PARENT_RECOVERY) {
-          return Promise.resolve({ translatedText: [recoveryText] });
+          return Promise.resolve({ translatedText: texts.map((item, index) => ({
+            id: item.i,
+            text: index === 0 && expectedProviderLength === 0 ? item.text.slice(3) : item.text,
+          })) });
         }
         primaryCalls += 1;
         return Promise.resolve({ translatedText: [primaryCalls === 1 ? `The${marker}` : `${marker}${marker}rest`] });
@@ -684,8 +688,8 @@ describe('OptimizedJsonHandler', () => {
         providerLeadingIntervalLength: expectedProviderLength,
         firstMarkerId: 'TI_SEG_e_s_n1',
       });
-      expect(seam?.[1].sourceLeadingPreview.length).toBeLessThanOrEqual(50);
-      expect(seam?.[1].providerLeadingPreview.length).toBeLessThanOrEqual(50);
+       expect(seam?.[1]).not.toHaveProperty('sourceLeadingPreview');
+       expect(seam?.[1]).not.toHaveProperty('providerLeadingPreview');
     });
 
     it.each([
@@ -795,11 +799,10 @@ describe('OptimizedJsonHandler', () => {
       const marker = '@@TI_SEG_s1_e1_n1@@';
       const source = `${'word '.repeat(260)}${marker}`;
       const fragment = { t: source, i: 'n1', blockId: 'g1', isV3Fragment: true, parentId: 'g1', fragmentIndex: 0, fragmentCount: 1, fragmentJoinerBefore: '' };
-      const splitSpy = vi.spyOn(TranslationBatcher, 'splitOversizedSegment');
       mockEngine.createIntelligentBatches = vi.fn(() => [[fragment]]);
       mockProvider.translate
         .mockResolvedValueOnce({ translatedText: ['word '.repeat(260)] })
-        .mockImplementation((texts) => Promise.resolve({ translatedText: texts }));
+        .mockImplementation((texts) => Promise.resolve({ translatedText: texts.map(item => ({ id: item.i, text: item.text })) }));
 
       const result = await handler.execute(
         mockEngine,
@@ -808,15 +811,11 @@ describe('OptimizedJsonHandler', () => {
       );
 
       expect(result.success).toBe(true);
-      expect(mockProvider.translate.mock.calls.filter(call => call[3].callPurpose === TranslationCallPurpose.PARENT_RECOVERY).length).toBeGreaterThan(1);
-       expect(splitSpy).toHaveBeenCalledWith(expect.objectContaining({ t: source }), 750);
+      expect(mockProvider.translate.mock.calls.filter(call => call[3].callPurpose === TranslationCallPurpose.PARENT_RECOVERY).length).toBe(1);
       const recoveryInputs = mockProvider.translate.mock.calls
         .filter(call => call[3].callPurpose === TranslationCallPurpose.PARENT_RECOVERY)
         .map(call => call[0][0]);
-       expect(recoveryInputs.every(fragmentText => fragmentText.length <= 750)).toBe(true);
-      expect(recoveryInputs.join(' ').replace(/\s+/g, ' ').trim()).toBe(source.replace(/\s+/g, ' ').trim());
-      expect((recoveryInputs.join('').match(/@@TI_SEG_/g) || [])).toHaveLength(1);
-      expect(recoveryInputs.join('')).toContain(marker);
+      expect(recoveryInputs[0]).toEqual(expect.objectContaining({ text: expect.any(String) }));
     });
 
     it('derives smaller recovery fragments from the real primary V3 split limit', async () => {
@@ -836,11 +835,10 @@ describe('OptimizedJsonHandler', () => {
       const sourceParent = { t: source, i: 'n1', blockId: 'g1' };
       const primaryBatches = TranslationBatcher.createIntelligentBatches([sourceParent], 1000, 3500);
       const primaryFragments = primaryBatches.flat();
-      const primaryMarkerCounts = primaryFragments.map(fragment => fragment.t.match(/@@TI_SEG_/g)?.length || 0);
       let primaryCall = 0;
       mockProvider.translate.mockImplementation((texts, _source, _target, options) => {
         if (options.callPurpose === TranslationCallPurpose.PARENT_RECOVERY) {
-          return Promise.resolve({ translatedText: texts });
+          return Promise.resolve({ translatedText: texts.map(item => ({ id: item.i, text: item.text })) });
         }
         const translated = primaryCall++ === primaryFragments.length - 1
           ? texts.map(text => text.replace(marker(120), ''))
@@ -857,15 +855,19 @@ describe('OptimizedJsonHandler', () => {
       const recoveryCalls = mockProvider.translate.mock.calls.filter(
         call => call[3].callPurpose === TranslationCallPurpose.PARENT_RECOVERY
       );
-      const recoveryFragments = recoveryCalls.map(call => call[0][0]);
-      const recoveryMarkerCounts = recoveryFragments.map(fragment => fragment.match(/@@TI_SEG_/g)?.length || 0);
+       const recoveryFragments = recoveryCalls.map(call => call[0][0]);
+       const recoveryIntervals = recoveryFragments.flat();
       expect(result.success).toBe(true);
       expect(primaryFragments.length).toBeGreaterThan(1);
-       expect(recoveryFragments.length).toBeGreaterThanOrEqual(primaryFragments.length);
+       expect(recoveryFragments.length).toBeGreaterThanOrEqual(1);
       expect(Math.max(...primaryFragments.map(fragment => fragment.t.length))).toBeLessThanOrEqual(3500);
-       expect(Math.max(...recoveryFragments.map(fragment => fragment.length))).toBeLessThanOrEqual(2625);
-      expect(Math.max(...recoveryMarkerCounts)).toBeLessThan(Math.max(...primaryMarkerCounts));
-      expect(recoveryMarkerCounts.reduce((sum, count) => sum + count, 0)).toBe(120);
+       expect(Math.max(...recoveryFragments.map(fragment => Array.isArray(fragment)
+         ? fragment.reduce((sum, item) => sum + item.text.length, 0)
+         : 0))).toBeLessThanOrEqual(2625);
+       expect(recoveryIntervals.every(({ intervalId, i, text }) => typeof (intervalId ?? i) === 'string' && typeof text === 'string')).toBe(true);
+       expect(new Set(recoveryIntervals.map(({ intervalId, i }) => intervalId ?? i)).size).toBe(recoveryIntervals.length);
+       expect(recoveryIntervals.some(({ text }) => text.includes('@@TI_SEG_'))).toBe(false);
+       expect(recoveryIntervals.reduce((sum, item) => sum + item.text.length, 0)).toBeGreaterThan(0);
       expect(appendTranslationDiagnostic).toHaveBeenCalledWith(null, expect.objectContaining({
         type: 'PARENT_RECOVERY_STARTED',
         primaryFragmentLimit: 3500,

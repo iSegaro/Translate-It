@@ -18,7 +18,6 @@ import { TranslationContractValidator } from '@/features/translation/core/Transl
 import { parseV3Intervals } from '@/features/translation/core/V3IntervalParser.js';
 import { TRANSLATION_BATCH_EXECUTION_TIMEOUT_MS } from '@/shared/constants/translation.js';
 import { TranslationCallPurpose } from '@/features/translation/providers/ProviderConstants.js';
-import { TranslationBatcher } from '@/features/translation/core/utils/TranslationBatcher.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.TRANSLATION, 'OptimizedJsonHandler');
 
@@ -32,11 +31,6 @@ function getParentRecoveryStageLimit(primaryFragmentLimit, recoveryStage) {
   return Math.min(primaryFragmentLimit, Math.max(500, Math.floor(primaryFragmentLimit * 0.75)));
 }
 
-function boundedPreview(value, maxLength = 200) {
-  if (typeof value !== 'string') return '';
-  return value.length <= maxLength ? value : `${value.slice(0, maxLength)}...`;
-}
-
 function markerSummary(text, maxMarkers = 32) {
   const matches = typeof text === 'string'
     ? text.match(/@@TI_SEG_[^@]*@@/g) || []
@@ -44,6 +38,7 @@ function markerSummary(text, maxMarkers = 32) {
   return {
     count: matches.length,
     ids: matches.slice(0, maxMarkers),
+    idsTruncated: matches.length > maxMarkers,
   };
 }
 
@@ -53,6 +48,7 @@ function recoveryTextSummary(text) {
     length: typeof text === 'string' ? text.length : 0,
     markerCount: markers.count,
     markerIds: markers.ids,
+    markerIdsTruncated: markers.idsTruncated,
   };
 }
 
@@ -61,7 +57,6 @@ function leadingIntervalSummary(text) {
   const leading = parsed.intervals[0]?.text || '';
   return {
     length: leading.length,
-    preview: boundedPreview(leading, 50),
     firstMarkerId: parsed.markers[0]?.normalizedIdentity || null,
   };
 }
@@ -166,8 +161,13 @@ export class OptimizedJsonHandler {
           'V3_EMPTY_TRANSLATED_INTERVAL',
         ].includes(violation?.code);
 
-        const buildV3ParentResult = (orderedFragments, translatedText) => {
-          const logicalItem = { ...orderedFragments[0], t: translatedText, text: translatedText };
+        const buildV3ParentResult = (seed, translatedText) => {
+          const logicalItem = { ...seed, t: translatedText, text: translatedText };
+          delete logicalItem.fragment;
+          delete logicalItem.mapped;
+          delete logicalItem.intervalId;
+          delete logicalItem.intervalIndex;
+          delete logicalItem.markerId;
           delete logicalItem.isSplit;
           delete logicalItem.partIndex;
           delete logicalItem.isV3Fragment;
@@ -177,6 +177,8 @@ export class OptimizedJsonHandler {
           delete logicalItem.fragmentJoinerBefore;
           delete logicalItem.__sourceT;
           delete logicalItem.recoveryFragmentIndex;
+          delete logicalItem.recoveryStage;
+          delete logicalItem.recoveryFragmentCount;
           return logicalItem;
         };
 
@@ -199,10 +201,45 @@ export class OptimizedJsonHandler {
 
           const sourceParent = v3Parents.get(parentId);
           if (!sourceParent) throw failure;
-          const recoveryFragments = TranslationBatcher.splitOversizedSegment(
-            sourceParent,
-            fragmentLimit
-          );
+          const parsedSource = parseV3Intervals(sourceParent.t ?? sourceParent.text ?? '', { grammar: 'ti' });
+          const recoveryIntervals = parsedSource.intervals
+            .map((interval, intervalIndex) => ({
+              intervalId: `parent-${recoveryStage}-${intervalIndex}`,
+              i: `parent-${recoveryStage}-${intervalIndex}`,
+              intervalIndex,
+              markerId: interval.markerId,
+              text: interval.text,
+            }))
+            .filter(({ text }) => text.trim() !== '');
+          if (recoveryIntervals.length === 0) {
+            appendTranslationDiagnostic(executionContext, {
+              type: 'PARENT_RECOVERY_FAILED',
+              stage: 'parent-recovery',
+              parentId,
+              originalReason: violation.reason || violation.code,
+              recoveryStage,
+              recoveryFragmentCount: 0,
+              unitCount: 0,
+              strategy: 'PARENT_RECOVERY',
+              attempt: recoveryStage,
+              finalReason: 'NO_TRANSLATABLE_INTERVALS',
+              callPurpose: TranslationCallPurpose.PARENT_RECOVERY,
+            });
+            throw failure;
+          }
+          const recoveryFragments = [];
+          let currentFragment = [];
+          let currentLength = 0;
+          for (const interval of recoveryIntervals) {
+            if (currentFragment.length > 0 && currentLength + interval.text.length > fragmentLimit) {
+              recoveryFragments.push(currentFragment);
+              currentFragment = [];
+              currentLength = 0;
+            }
+            currentFragment.push(interval);
+            currentLength += interval.text.length;
+          }
+          if (currentFragment.length > 0) recoveryFragments.push(currentFragment);
           appendTranslationDiagnostic(executionContext, {
             type: 'PARENT_RECOVERY_STARTED',
             stage: 'parent-recovery',
@@ -213,7 +250,10 @@ export class OptimizedJsonHandler {
             recoveryFragmentLimit: fragmentLimit,
             primaryFragmentCount: failure.parentRecovery.primaryFragmentCount,
             recoveryFragmentCount: recoveryFragments.length,
+            unitCount: recoveryIntervals.length,
             markerCount: failure.parentRecovery.markerCount,
+            strategy: 'PARENT_RECOVERY',
+            attempt: recoveryStage,
             callPurpose: TranslationCallPurpose.PARENT_RECOVERY,
           });
           logger.debug(`[JsonHandler] PARENT_RECOVERY stage ${recoveryStage} started`, {
@@ -254,7 +294,7 @@ export class OptimizedJsonHandler {
             };
             const response = await self._performBatchCall(
               providerInstance,
-              [fragment],
+              fragment,
               detectedSourceLanguage,
               targetLanguage,
               mode,
@@ -266,6 +306,7 @@ export class OptimizedJsonHandler {
                 callPurpose: TranslationCallPurpose.PARENT_RECOVERY,
                 conversationParticipates: false,
                 useParentConversationLifecycle: false,
+                parentRecoveryIntervalUnits: true,
               },
               options?.contextSummary,
               engine,
@@ -277,21 +318,25 @@ export class OptimizedJsonHandler {
               TranslationCallPurpose.PARENT_RECOVERY
             );
             const translated = response?.translatedText !== undefined ? response.translatedText : response;
-            const sourceText = fragment.t ?? fragment.text ?? '';
-            const providerText = Array.isArray(translated) ? translated[0] : translated;
+            const sourceText = fragment.map(({ text }) => text).join('');
+            const providerText = Array.isArray(translated)
+              ? translated.map((item) => item?.t ?? item?.text ?? item ?? '').join('')
+              : translated;
             const sourceSummary = recoveryTextSummary(sourceText);
             const providerSummary = recoveryTextSummary(providerText);
             if (fragmentIndex === 0) {
-              const sourceLeading = leadingIntervalSummary(sourceText);
-              const providerLeading = leadingIntervalSummary(providerText);
+              const sourceLeading = leadingIntervalSummary(sourceParent.t ?? sourceParent.text ?? '');
+              const providerLeadingText = Array.isArray(translated)
+                ? (translated[0]?.t ?? translated[0]?.text ?? '')
+                : providerText;
+              const providerLeading = { length: providerLeadingText.length, firstMarkerId: sourceLeading.firstMarkerId };
               logger.debug('[JsonHandler] PARENT_RECOVERY leading interval seam', {
+                event: 'PARENT_RECOVERY_DIAGNOSTIC',
                 parentId,
                 recoveryStage,
                 recoveryFragmentIndex: fragmentIndex,
                 sourceLeadingIntervalLength: sourceLeading.length,
-                sourceLeadingPreview: sourceLeading.preview,
                 providerLeadingIntervalLength: providerLeading.length,
-                providerLeadingPreview: providerLeading.preview,
                 firstMarkerId: providerLeading.firstMarkerId || sourceLeading.firstMarkerId,
               });
             }
@@ -307,17 +352,18 @@ export class OptimizedJsonHandler {
               sourceMarkerIds: sourceSummary.markerIds,
               translatedMarkerIds: providerSummary.markerIds,
             });
-            const mapped = self._mapResults([fragment], translated, executionContext)[0];
-            const mappedText = mapped?.t ?? mapped?.text ?? mapped;
+            const mapped = self._mapResults(fragment, translated, executionContext);
+            const mappedText = mapped.map((item) => item?.t ?? item?.text ?? item).join('');
             const mappedSummary = recoveryTextSummary(mappedText);
             if (fragmentIndex === 0) {
-              const mappedLeading = leadingIntervalSummary(mappedText);
+              const mappedLeadingText = mapped[0]?.t ?? mapped[0]?.text ?? '';
+              const mappedLeading = { length: mappedLeadingText.length, firstMarkerId: sourceParent ? leadingIntervalSummary(sourceParent.t ?? sourceParent.text ?? '').firstMarkerId : null };
               logger.debug('[JsonHandler] PARENT_RECOVERY mapped leading interval seam', {
+                event: 'PARENT_RECOVERY_DIAGNOSTIC',
                 parentId,
                 recoveryStage,
                 recoveryFragmentIndex: fragmentIndex,
                 mappedLeadingIntervalLength: mappedLeading.length,
-                mappedLeadingPreview: mappedLeading.preview,
                 firstMarkerId: mappedLeading.firstMarkerId,
               });
             }
@@ -333,7 +379,7 @@ export class OptimizedJsonHandler {
               sourceMarkerIds: sourceSummary.markerIds,
               translatedMarkerIds: mappedSummary.markerIds,
             });
-            return { ...mapped, recoveryFragmentIndex: fragmentIndex };
+            return { fragment, mapped, recoveryFragmentIndex: fragmentIndex };
               })),
               recoveryTimeout,
             ]);
@@ -349,24 +395,60 @@ export class OptimizedJsonHandler {
               stage: 'parent-recovery',
               parentId,
               originalReason: violation.reason || violation.code,
-               recoveryStage,
-               recoveryFragmentCount: recoveryFragments.length,
-              finalReason: recoveryError?.message || recoveryType,
+              recoveryStage,
+              recoveryFragmentCount: recoveryFragments.length,
+              strategy: 'PARENT_RECOVERY',
+              attempt: recoveryStage,
+              finalReason: recoveryType,
               callPurpose: TranslationCallPurpose.PARENT_RECOVERY,
             });
-            logger.debug(`[JsonHandler] PARENT_RECOVERY stage ${recoveryStage} failed: ${recoveryError?.message || recoveryType}`, {
+            logger.debug(`[JsonHandler] PARENT_RECOVERY stage ${recoveryStage} failed`, {
               parentId,
               recoveryStage,
               recoveryFragmentCount: recoveryFragments.length,
+              reason: recoveryType,
             });
-             throw failure;
+            throw failure;
           } finally {
             clearTimeout(recoveryTimeoutId);
           }
 
           const ordered = recoveryResults.sort((a, b) => a.recoveryFragmentIndex - b.recoveryFragmentIndex);
-          const translatedText = ordered
-            .map((fragment, index) => `${index === 0 ? '' : (fragment.fragmentJoinerBefore || '')}${fragment.t || fragment.text || ''}`)
+          const translatedByInterval = new Map();
+          for (const result of ordered) {
+            for (const item of result.mapped) {
+              const intervalId = item?.i ?? item?.id;
+              if (translatedByInterval.has(intervalId)) {
+                const duplicate = new Error(`Duplicate recovery interval id: ${intervalId}`);
+                duplicate.type = ErrorTypes.VALIDATION;
+                duplicate.isFatal = true;
+                throw duplicate;
+              }
+              translatedByInterval.set(intervalId, item?.t ?? item?.text ?? '');
+            }
+          }
+          const expectedIntervalIds = recoveryIntervals.map(({ intervalId }) => intervalId);
+          if (expectedIntervalIds.some((id) => !translatedByInterval.has(id))
+              || [...translatedByInterval.keys()].some((id) => !expectedIntervalIds.includes(id))) {
+            const missing = expectedIntervalIds.filter((id) => !translatedByInterval.has(id));
+            const unexpected = [...translatedByInterval.keys()].filter((id) => !expectedIntervalIds.includes(id));
+            const identityError = new Error('Parent recovery interval identity mismatch');
+            identityError.type = ErrorTypes.VALIDATION;
+            identityError.isFatal = true;
+            identityError.missingIntervalIds = missing;
+            identityError.unexpectedIntervalIds = unexpected;
+            throw identityError;
+          }
+          const translatedText = parsedSource.intervals
+            .map((interval, intervalIndex) => {
+              const intervalId = `parent-${recoveryStage}-${intervalIndex}`;
+              const translatedInterval = translatedByInterval.has(intervalId)
+                ? translatedByInterval.get(intervalId)
+                : interval.text;
+              const marker = intervalIndex > 0 ? parsedSource.markers[intervalIndex - 1]?.raw || '' : '';
+              const joiner = intervalIndex > 0 ? (parsedSource.intervals[intervalIndex - 1].text.match(/\s*$/)?.[0] || '') : '';
+              return `${intervalIndex === 0 ? '' : joiner + marker}${translatedInterval}`;
+            })
             .join('');
           const validation = TranslationContractValidator.validateV3Parent(
             sourceParent.t ?? sourceParent.text ?? '',
@@ -394,9 +476,11 @@ export class OptimizedJsonHandler {
               stage: 'parent-recovery',
               parentId,
               originalReason: violation.reason || violation.code,
-               recoveryStage,
-               recoveryFragmentCount: recoveryFragments.length,
-              finalReason: finalViolation?.reason || finalViolation?.code,
+              recoveryStage,
+              recoveryFragmentCount: recoveryFragments.length,
+              strategy: 'PARENT_RECOVERY',
+              attempt: recoveryStage,
+              finalReason: finalViolation?.code,
               callPurpose: TranslationCallPurpose.PARENT_RECOVERY,
             });
             if (finalViolation?.code === 'V3_EMPTY_TRANSLATED_INTERVAL') {
@@ -411,8 +495,6 @@ export class OptimizedJsonHandler {
                 translatedIntervalLength: translatedInterval?.text?.length ?? 0,
                 sourceWhitespaceOnly: sourceInterval?.text?.trim() === '',
                 translatedWhitespaceOnly: translatedInterval?.text?.trim() === '',
-                sourcePreview: boundedPreview(sourceInterval?.text),
-                translatedPreview: boundedPreview(translatedInterval?.text),
               });
             }
             if (!isRecoverableParentViolation(finalViolation)) {
@@ -435,8 +517,11 @@ export class OptimizedJsonHandler {
             stage: 'parent-recovery',
             parentId,
             originalReason: violation.reason || violation.code,
-             recoveryStage,
-             recoveryFragmentCount: recoveryFragments.length,
+            recoveryStage,
+            recoveryFragmentCount: recoveryFragments.length,
+            unitCount: recoveryIntervals.length,
+            strategy: 'PARENT_RECOVERY',
+            attempt: recoveryStage,
             callPurpose: TranslationCallPurpose.PARENT_RECOVERY,
           });
           logger.debug(`[JsonHandler] PARENT_RECOVERY stage ${recoveryStage} succeeded`, {
@@ -444,7 +529,7 @@ export class OptimizedJsonHandler {
             recoveryStage,
             recoveryFragmentCount: recoveryFragments.length,
           });
-          return buildV3ParentResult(ordered, translatedText);
+          return buildV3ParentResult(sourceParent, translatedText);
         };
 
         const recoverFailedV3Parent = async (failure, batchExecutionContext, parallelExecution) => {
@@ -601,7 +686,7 @@ export class OptimizedJsonHandler {
                    parentError.parentRecovery.primaryFragmentCount = orderedFragments.length;
                    throw parentError;
               }
-               validateAndAdd(buildV3ParentResult(orderedFragments, translatedText), `v3:${parentId}`);
+               validateAndAdd(buildV3ParentResult(orderedFragments[0], translatedText), `v3:${parentId}`);
               parent.emitted = true;
               parent.fragments.clear();
               appendFragmentDiagnostic('FRAGMENTED_UNIT_COMPLETED', parentId);
@@ -1036,8 +1121,10 @@ export class OptimizedJsonHandler {
 
   async _performBatchCall(providerInstance, batch, source, target, mode, abortController, messageId, sessionId, contextMetadata, contextSummary, engine, sender, originalSourceLang = null, originalTargetLang = null, parallelExecution = false, executionContext = null, callPurpose = null) {
     const isArrayInput = Array.isArray(batch);
-    const textsToTranslate = isArrayInput 
-      ? batch.map(item => typeof item === 'object' ? (item.t || item.text || '') : (item || ''))
+    const textsToTranslate = isArrayInput
+      ? (contextMetadata?.parentRecoveryIntervalUnits
+        ? batch
+        : batch.map(item => typeof item === 'object' ? (item.t || item.text || '') : (item || '')))
       : (typeof batch === 'object' ? (batch.t || batch.text || '') : (batch || ''));
 
     const expectedFormat = (providerInstance.constructor.batchStrategy === 'json' || providerInstance.constructor.isAI)

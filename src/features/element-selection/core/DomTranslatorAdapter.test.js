@@ -210,6 +210,28 @@ describe('DomTranslatorAdapter', () => {
       expect(result.committedParentCount).toBeGreaterThanOrEqual(1);
     });
 
+    it('accepts recovered logical parent identity in grouped streaming result', async () => {
+      const { getFeatureSemanticBlockGroupingAsync } = await import('@/config.js');
+      getFeatureSemanticBlockGroupingAsync.mockResolvedValueOnce(true);
+      let callbacks;
+      registerTranslation.mockImplementationOnce((_id, registered) => { callbacks = registered; });
+      contentScriptIntegration.sendTranslationRequest.mockImplementationOnce(async () => {
+        setTimeout(() => {
+          callbacks.onStreamUpdate({
+            success: true,
+            data: [{ i: 'n1', blockId: 'g1', t: 'سلام', text: 'سلام' }],
+          });
+          callbacks.onStreamEnd({ success: true });
+        }, 0);
+        return { success: true, streaming: true };
+      });
+
+      const result = await adapter.translateElement(testElement);
+
+      expect(result).toMatchObject({ success: true, committedParentCount: 1 });
+      expect(testElement.textContent).toContain('سلام');
+    });
+
     it('C: returns zero-commit failure when grouped results are silently rejected', async () => {
       const { getFeatureSemanticBlockGroupingAsync } = await import('@/config.js');
       getFeatureSemanticBlockGroupingAsync.mockResolvedValueOnce(true);

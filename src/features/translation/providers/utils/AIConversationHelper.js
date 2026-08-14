@@ -4,6 +4,7 @@
  */
 
 import { buildPrompt } from "@/features/translation/utils/promptBuilder.js";
+import { ResponseFormat } from '@/shared/config/translationConstants.js';
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { TRANSLATION_CONSTANTS } from '@/shared/config/translationConstants.js';
@@ -320,14 +321,18 @@ export const AIConversationHelper = {
 
     // Determine if we should use AI batch prompt
     // Use batch prompt for structured batch modes OR when input is in JSON format
-    const shouldUseBatchPrompt = !isDictionary && (
+    const isStructuredRecovery = metadata?.callPurpose === TranslationCallPurpose.STRUCTURED_RECOVERY;
+    const isScalarStructuredRecovery = isStructuredRecovery && metadata?.expectedFormat === ResponseFormat.STRING;
+    const isStructuredRecoveryFormat = isStructuredRecovery
+      && (metadata?.expectedFormat === ResponseFormat.JSON_OBJECT || metadata?.expectedFormat === ResponseFormat.JSON_ARRAY);
+    const shouldUseBatchPrompt = !isDictionary && !isScalarStructuredRecovery && (
       translateMode === TranslationMode.Select_Element ||
       translateMode === TranslationMode.Page ||
       translateMode === TranslationMode.PDF ||
       translateMode === TranslationMode.Subtitle ||
-      isJsonMode
+      isJsonMode ||
+      isStructuredRecoveryFormat
     );
-
     if (shouldUseBatchPrompt) {
       const useFollowup = !firstTurn && historyEnabled && translateMode === TranslationMode.Select_Element;
 
@@ -350,7 +355,13 @@ export const AIConversationHelper = {
     } else {
       // For other modes (Popup, Sidepanel, Field, Selection, ScreenCapture), use the standard buildPrompt logic
       const promptText = Array.isArray(text) ? text[0] : text;
-      promptTemplate = await buildPrompt(promptText, sourceLang, targetLang, translateMode, providerType);
+      promptTemplate = await buildPrompt(
+        promptText,
+        sourceLang,
+        targetLang,
+        isScalarStructuredRecovery ? TranslationMode.Field : translateMode,
+        providerType,
+      );
     }
 
     // Resolve instructions from template even for AI batch prompts
@@ -378,11 +389,13 @@ export const AIConversationHelper = {
     }
 
     if (metadata?.callPurpose === TranslationCallPurpose.STRUCTURED_RECOVERY && metadata.repairContext) {
-      promptInstructions += `\n\nStructured recovery repair context:\n${JSON.stringify(metadata.repairContext)}\nRe-translate the affected source unit(s) and preserve their marker ownership.`;
+      const repairInstructions = `\n\nStructured recovery repair context:\n${JSON.stringify(metadata.repairContext)}\nRe-translate the affected source unit(s) and preserve their marker ownership.`;
+      promptInstructions += repairInstructions;
+      if (isStructuredRecovery) promptTemplate += repairInstructions;
     }
 
     if (metadata?.callPurpose === TranslationCallPurpose.PARENT_RECOVERY) {
-      promptInstructions += '\n\nStrict parent recovery translation: Preserve every @@TI_SEG_...@@ marker present in the input exactly. Each input marker must appear exactly once in the output. Do not translate, modify, remove, duplicate, reorder, or invent markers.';
+      promptInstructions += '\n\nStrict parent recovery translation: Translate each interval item in the input JSON and return exactly one item with the same id and translated text for each item. Translate all non-empty interval text, including leading, internal, and trailing intervals. Do not omit short text. Do not copy source text as a structural fallback. Marker reconstruction is handled by the caller.';
     }
 
     // Append semantic translation context when available (PDF mode only)
@@ -447,7 +460,7 @@ export const AIConversationHelper = {
             const originalText = t.t || t.text || '';
             const protectedText = NewlineManager.protect(originalText);
             return {
-              id: String(t.i || t.id || idx),
+              id: String(t.i ?? t.id ?? idx),
               text: protectedText,
               // Include per-cue context if available (critical for Subtitles)
               ...(t.context && { context: t.context })
@@ -458,8 +471,13 @@ export const AIConversationHelper = {
       });
     } else {
       // For non-batch prompts, the text is already injected into systemPrompt via buildPrompt
-      // User text should be empty or a simple placeholder message
-      userText = "";
+      // Scalar structured recovery sends source text as the provider user payload.
+      const scalarText = Array.isArray(text) ? text[0] : text;
+       userText = isScalarStructuredRecovery
+        ? (typeof scalarText === 'object' && scalarText !== null
+          ? (scalarText.t ?? scalarText.text ?? '')
+          : String(scalarText ?? ''))
+        : "";
     }
 
     let finalSystemPrompt = systemPrompt;

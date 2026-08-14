@@ -7,6 +7,14 @@ vi.mock('@/shared/config/config.js', () => ({
   getPromptBASEAIBatchAutoAsync: vi.fn(),
   getPromptBASEAIFollowupAsync: vi.fn(),
   getPromptBASEAIFollowupAutoAsync: vi.fn(),
+  getPromptBASESelectAsync: vi.fn().mockResolvedValue('select $_{PROMPT_INSTRUCTIONS} $_{TEXT}'),
+  getPromptPopupTranslateAsync: vi.fn().mockResolvedValue('popup $_{PROMPT_INSTRUCTIONS} $_{TEXT}'),
+  getPromptBASEFieldAsync: vi.fn().mockResolvedValue('field $_{PROMPT_INSTRUCTIONS} $_{TEXT}'),
+  getPromptBASEFieldAutoAsync: vi.fn().mockResolvedValue('field-auto $_{PROMPT_INSTRUCTIONS} $_{TEXT}'),
+  getPromptBASEBatchAsync: vi.fn().mockResolvedValue('batch $_{PROMPT_INSTRUCTIONS} $_{TEXT}'),
+  getPromptBASEScreenCaptureAsync: vi.fn().mockResolvedValue('screen $_{PROMPT_INSTRUCTIONS} $_{TEXT}'),
+  getEnableDictionaryAsync: vi.fn().mockResolvedValue(false),
+  getPromptDictionaryAsync: vi.fn().mockResolvedValue('dictionary $_{PROMPT_INSTRUCTIONS} $_{TEXT}'),
   getAIContextTranslationEnabledAsync: vi.fn().mockResolvedValue(false),
   getAIConversationHistoryEnabledAsync: vi.fn().mockResolvedValue(false),
   getSourceLanguageAsync: vi.fn().mockResolvedValue('auto'),
@@ -41,6 +49,7 @@ vi.mock('@/features/translation/utils/bilingualPromptHelper.js', () => ({
 import { AIConversationHelper } from './AIConversationHelper.js';
 import { translationSessionManager } from '@/features/translation/core/TranslationSessionManager.js';
 import { TranslationCallPurpose } from '../ProviderConstants.js';
+import { ResponseFormat } from '@/shared/config/translationConstants.js';
 
 describe('AIConversationHelper', () => {
   beforeEach(() => {
@@ -161,7 +170,7 @@ describe('AIConversationHelper', () => {
 
     const recovery = await AIConversationHelper.preparePromptAndText(
       ['source'], 'en', 'fa', 'select-element', 'ai', null,
-      { callPurpose: TranslationCallPurpose.STRUCTURED_RECOVERY, repairContext },
+      { callPurpose: TranslationCallPurpose.STRUCTURED_RECOVERY, expectedFormat: ResponseFormat.STRING, repairContext },
     );
     const primary = await AIConversationHelper.preparePromptAndText(
       ['source'], 'en', 'fa', 'select-element', 'ai', null,
@@ -173,13 +182,51 @@ describe('AIConversationHelper', () => {
     expect(primary.systemPrompt).not.toContain('Structured recovery repair context:');
   });
 
-  it('adds strict marker preservation only for parent recovery prompts', async () => {
+  it('uses scalar prompt contract for structured recovery in select-element mode', async () => {
+    const { getPromptAsync, getPromptBASEAIBatchAsync } = await import('@/shared/config/config.js');
+    getPromptAsync.mockResolvedValue('SCALAR $_{SOURCE} to $_{TARGET} $_{PROMPT_INSTRUCTIONS} $_{TEXT}');
+    getPromptBASEAIBatchAsync.mockResolvedValue('BATCH $_{PROMPT_INSTRUCTIONS} $_{TEXT}');
+
+    const result = await AIConversationHelper.preparePromptAndText(
+      ['The'], 'en', 'fa', 'select-element', 'ai', null,
+      { callPurpose: TranslationCallPurpose.STRUCTURED_RECOVERY, expectedFormat: ResponseFormat.STRING },
+    );
+
+    expect(result.systemPrompt).toContain('The');
+    expect(result.systemPrompt).not.toContain('translations');
+    expect(result.userText).toBe('The');
+  });
+
+  it.each([ResponseFormat.JSON_OBJECT, ResponseFormat.JSON_ARRAY])(
+    'uses structured batch prompt for full recovery format %s',
+    async (expectedFormat) => {
+      const { getPromptAsync, getPromptBASEAIBatchAsync } = await import('@/shared/config/config.js');
+      getPromptAsync.mockResolvedValue('SCALAR $_{SOURCE} to $_{TARGET} $_{PROMPT_INSTRUCTIONS} $_{TEXT}');
+      getPromptBASEAIBatchAsync.mockResolvedValue('BATCH $_{PROMPT_INSTRUCTIONS} $_{TEXT}');
+      const input = [{ i: 0, text: 'First' }, { i: 'unit-2', text: 'Second' }];
+
+      const result = await AIConversationHelper.preparePromptAndText(
+        input, 'en', 'fa', 'select-element', 'ai', null,
+        { callPurpose: TranslationCallPurpose.STRUCTURED_RECOVERY, expectedFormat },
+      );
+
+      expect(result.systemPrompt).toContain('BATCH');
+      expect(result.userText).toContain('"translations"');
+      expect(JSON.parse(result.userText).translations).toEqual([
+        { id: '0', text: 'First' },
+        { id: 'unit-2', text: 'Second' },
+      ]);
+      expect(result.userText).not.toBe('First');
+    },
+  );
+
+  it('adds strict interval identity rules only for parent recovery prompts', async () => {
     const { getPromptAsync, getPromptBASEAIBatchAsync } = await import('@/shared/config/config.js');
     getPromptAsync.mockResolvedValue('translate instructions');
     getPromptBASEAIBatchAsync.mockResolvedValue('batch $_{PROMPT_INSTRUCTIONS} $_{TEXT}');
 
     const prepare = (callPurpose) => AIConversationHelper.preparePromptAndText(
-      ['A@@TI_SEG_s1_e1_n1@@B'], 'en', 'fa', 'select-element', 'ai', null, { callPurpose },
+      [{ id: 'parent-1-0', text: 'A' }, { id: 'parent-1-1', text: 'B' }], 'en', 'fa', 'select-element', 'ai', null, { callPurpose },
     );
     const [primary, structuredRecovery, parentRecovery] = await Promise.all([
       prepare(TranslationCallPurpose.PRIMARY_TRANSLATION),
@@ -190,8 +237,9 @@ describe('AIConversationHelper', () => {
     expect(primary.systemPrompt).not.toContain('Strict parent recovery translation');
     expect(structuredRecovery.systemPrompt).not.toContain('Strict parent recovery translation');
     expect(parentRecovery.systemPrompt).toContain('Strict parent recovery translation');
-    expect(parentRecovery.systemPrompt).toContain('exactly once');
-    expect(parentRecovery.systemPrompt).toContain('Do not translate, modify, remove, duplicate, reorder, or invent markers');
+    expect(parentRecovery.systemPrompt).toContain('exactly one item with the same id');
+    expect(parentRecovery.systemPrompt).toContain('Marker reconstruction is handled by the caller');
+    expect(parentRecovery.systemPrompt).not.toContain('Do not translate, modify, remove, duplicate, reorder, or invent markers');
   });
 
   it('keeps primary purpose in normal conversation lifecycle', async () => {

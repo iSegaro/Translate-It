@@ -7,6 +7,59 @@ import { createTranslationOperation } from '@/features/translation/ir/Translatio
 import { createCompletionRecord, CompletionTermination } from '@/features/translation/ir/CompletionContract.js';
 
 describe('AIResponseParser', () => {
+  it('emits bounded mapping diagnostics with accurate totals and no response text', () => {
+    const operation = createTranslationOperation('parser-diagnostics');
+    const originalBatch = Array.from({ length: 40 }, (_, index) => ({ id: `request-${index}`, text: `source-${index}` }));
+    const response = JSON.stringify({
+      translations: originalBatch.map(({ id }) => ({ id, text: '' })),
+    });
+
+    const result = AIResponseParser.parseBatchResult(
+      response,
+      originalBatch.length,
+      originalBatch,
+      'MockAI',
+      ResponseFormat.JSON_OBJECT,
+      { operation },
+    );
+    const diagnostic = operation.finalize().entries.find(({ type }) => type === 'PARSER_MAPPING_FACTS');
+
+    expect(diagnostic).toMatchObject({
+      type: 'PARSER_MAPPING_FACTS',
+      provider: 'MockAI',
+      requestCount: 40,
+      responseCount: 40,
+      invalidCount: 40,
+      invalidTextCount: 40,
+      requestIdsTotal: 40,
+      responseIdsTotal: 40,
+      invalidTextIndexesTotal: 40,
+      arraysTruncated: true,
+    });
+    expect(diagnostic.requestIds).toHaveLength(32);
+    expect(diagnostic.responseIds).toHaveLength(32);
+    expect(diagnostic.invalidTextIndexes).toHaveLength(32);
+    expect(JSON.stringify(diagnostic)).not.toContain('source-0');
+    expect(result.parserDiagnostics.requestIds).toHaveLength(32);
+    expect(result.parserDiagnostics.requestIdsTotal).toBe(40);
+  });
+
+  it('does not emit mapping diagnostics for healthy structured responses', () => {
+    const operation = createTranslationOperation('parser-healthy');
+    const originalBatch = [{ id: 'request-1', text: 'source-1' }, { id: 'request-2', text: 'source-2' }];
+
+    AIResponseParser.parseBatchResult(
+      '{"translations":[{"id":"request-1","text":"translated-1"},{"id":"request-2","text":"translated-2"}]}',
+      originalBatch.length,
+      originalBatch,
+      'MockAI',
+      ResponseFormat.JSON_OBJECT,
+      { operation },
+    );
+
+    expect(operation.finalize().entries.some(({ type }) => type === 'PARSER_MAPPING_FACTS')).toBe(false);
+  });
+
   describe('cleanAIResponse - String Format', () => {
     it('should strip markdown code blocks', () => {
       const input = '```\nHello World\n```';
