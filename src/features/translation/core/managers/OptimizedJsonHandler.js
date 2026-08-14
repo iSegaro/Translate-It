@@ -15,6 +15,7 @@ import { ErrorTypes } from "@/shared/error-management/ErrorTypes.js";
 import { appendTranslationDiagnostic } from '@/features/translation/ir/TranslationOperation.js';
 import { createManifestViewFromUnits } from '@/features/translation/ir/RequestUnitManifest.js';
 import { TranslationContractValidator } from '@/features/translation/core/TranslationContractValidator.js';
+import { parseV3Intervals } from '@/features/translation/core/V3IntervalParser.js';
 import { TRANSLATION_BATCH_EXECUTION_TIMEOUT_MS } from '@/shared/constants/translation.js';
 import { TranslationCallPurpose } from '@/features/translation/providers/ProviderConstants.js';
 import { TranslationBatcher } from '@/features/translation/core/utils/TranslationBatcher.js';
@@ -29,6 +30,40 @@ function getParentRecoveryCharacterLimit(primaryFragmentLimit) {
 function getParentRecoveryStageLimit(primaryFragmentLimit, recoveryStage) {
   if (recoveryStage === 2) return getParentRecoveryCharacterLimit(primaryFragmentLimit);
   return Math.min(primaryFragmentLimit, Math.max(500, Math.floor(primaryFragmentLimit * 0.75)));
+}
+
+function boundedPreview(value, maxLength = 200) {
+  if (typeof value !== 'string') return '';
+  return value.length <= maxLength ? value : `${value.slice(0, maxLength)}...`;
+}
+
+function markerSummary(text, maxMarkers = 32) {
+  const matches = typeof text === 'string'
+    ? text.match(/@@TI_SEG_[^@]*@@/g) || []
+    : [];
+  return {
+    count: matches.length,
+    ids: matches.slice(0, maxMarkers),
+  };
+}
+
+function recoveryTextSummary(text) {
+  const markers = markerSummary(text);
+  return {
+    length: typeof text === 'string' ? text.length : 0,
+    markerCount: markers.count,
+    markerIds: markers.ids,
+  };
+}
+
+function leadingIntervalSummary(text) {
+  const parsed = parseV3Intervals(typeof text === 'string' ? text : '', { grammar: 'ti' });
+  const leading = parsed.intervals[0]?.text || '';
+  return {
+    length: leading.length,
+    preview: boundedPreview(leading, 50),
+    firstMarkerId: parsed.markers[0]?.normalizedIdentity || null,
+  };
 }
 
 export class OptimizedJsonHandler {
@@ -181,6 +216,11 @@ export class OptimizedJsonHandler {
             markerCount: failure.parentRecovery.markerCount,
             callPurpose: TranslationCallPurpose.PARENT_RECOVERY,
           });
+          logger.debug(`[JsonHandler] PARENT_RECOVERY stage ${recoveryStage} started`, {
+            parentId,
+            recoveryStage,
+            recoveryFragmentCount: recoveryFragments.length,
+          });
 
           let recoveryResults;
           const recoveryRemainingMs = operationDeadlineAt - Date.now();
@@ -237,7 +277,62 @@ export class OptimizedJsonHandler {
               TranslationCallPurpose.PARENT_RECOVERY
             );
             const translated = response?.translatedText !== undefined ? response.translatedText : response;
+            const sourceText = fragment.t ?? fragment.text ?? '';
+            const providerText = Array.isArray(translated) ? translated[0] : translated;
+            const sourceSummary = recoveryTextSummary(sourceText);
+            const providerSummary = recoveryTextSummary(providerText);
+            if (fragmentIndex === 0) {
+              const sourceLeading = leadingIntervalSummary(sourceText);
+              const providerLeading = leadingIntervalSummary(providerText);
+              logger.debug('[JsonHandler] PARENT_RECOVERY leading interval seam', {
+                parentId,
+                recoveryStage,
+                recoveryFragmentIndex: fragmentIndex,
+                sourceLeadingIntervalLength: sourceLeading.length,
+                sourceLeadingPreview: sourceLeading.preview,
+                providerLeadingIntervalLength: providerLeading.length,
+                providerLeadingPreview: providerLeading.preview,
+                firstMarkerId: providerLeading.firstMarkerId || sourceLeading.firstMarkerId,
+              });
+            }
+            logger.debug('[JsonHandler] PARENT_RECOVERY provider response summary', {
+              parentId,
+              recoveryStage,
+              recoveryFragmentIndex: fragmentIndex,
+              recoveryFragmentCount: recoveryFragments.length,
+              sourceLength: sourceSummary.length,
+              translatedLength: providerSummary.length,
+              sourceMarkerCount: sourceSummary.markerCount,
+              translatedMarkerCount: providerSummary.markerCount,
+              sourceMarkerIds: sourceSummary.markerIds,
+              translatedMarkerIds: providerSummary.markerIds,
+            });
             const mapped = self._mapResults([fragment], translated, executionContext)[0];
+            const mappedText = mapped?.t ?? mapped?.text ?? mapped;
+            const mappedSummary = recoveryTextSummary(mappedText);
+            if (fragmentIndex === 0) {
+              const mappedLeading = leadingIntervalSummary(mappedText);
+              logger.debug('[JsonHandler] PARENT_RECOVERY mapped leading interval seam', {
+                parentId,
+                recoveryStage,
+                recoveryFragmentIndex: fragmentIndex,
+                mappedLeadingIntervalLength: mappedLeading.length,
+                mappedLeadingPreview: mappedLeading.preview,
+                firstMarkerId: mappedLeading.firstMarkerId,
+              });
+            }
+            logger.debug('[JsonHandler] PARENT_RECOVERY mapped response summary', {
+              parentId,
+              recoveryStage,
+              recoveryFragmentIndex: fragmentIndex,
+              recoveryFragmentCount: recoveryFragments.length,
+              sourceLength: sourceSummary.length,
+              translatedLength: mappedSummary.length,
+              sourceMarkerCount: sourceSummary.markerCount,
+              translatedMarkerCount: mappedSummary.markerCount,
+              sourceMarkerIds: sourceSummary.markerIds,
+              translatedMarkerIds: mappedSummary.markerIds,
+            });
             return { ...mapped, recoveryFragmentIndex: fragmentIndex };
               })),
               recoveryTimeout,
@@ -259,6 +354,11 @@ export class OptimizedJsonHandler {
               finalReason: recoveryError?.message || recoveryType,
               callPurpose: TranslationCallPurpose.PARENT_RECOVERY,
             });
+            logger.debug(`[JsonHandler] PARENT_RECOVERY stage ${recoveryStage} failed: ${recoveryError?.message || recoveryType}`, {
+              parentId,
+              recoveryStage,
+              recoveryFragmentCount: recoveryFragments.length,
+            });
              throw failure;
           } finally {
             clearTimeout(recoveryTimeoutId);
@@ -273,6 +373,20 @@ export class OptimizedJsonHandler {
             translatedText,
             parentId
           );
+          const sourceSummary = recoveryTextSummary(sourceParent.t ?? sourceParent.text ?? '');
+          const translatedSummary = recoveryTextSummary(translatedText);
+          logger.debug('[JsonHandler] PARENT_RECOVERY reassembled response summary', {
+            parentId,
+            recoveryStage,
+            sourceLength: sourceSummary.length,
+            translatedLength: translatedSummary.length,
+            sourceMarkerCount: sourceSummary.markerCount,
+            translatedMarkerCount: translatedSummary.markerCount,
+            sourceMarkerIds: sourceSummary.markerIds,
+            translatedMarkerIds: translatedSummary.markerIds,
+            sourceIntervalCount: validation?.source?.intervals?.length ?? null,
+            translatedIntervalCount: validation?.translated?.intervals?.length ?? null,
+          });
           if (!validation?.isValid) {
             const finalViolation = validation?.violations?.[0];
             appendTranslationDiagnostic(executionContext, {
@@ -285,6 +399,22 @@ export class OptimizedJsonHandler {
               finalReason: finalViolation?.reason || finalViolation?.code,
               callPurpose: TranslationCallPurpose.PARENT_RECOVERY,
             });
+            if (finalViolation?.code === 'V3_EMPTY_TRANSLATED_INTERVAL') {
+              const sourceInterval = validation.source?.intervals?.[finalViolation.intervalIndex];
+              const translatedInterval = validation.translated?.intervals?.[finalViolation.intervalIndex];
+              logger.debug('[JsonHandler] PARENT_RECOVERY empty translated interval', {
+                parentId,
+                recoveryStage,
+                intervalIndex: finalViolation.intervalIndex,
+                markerId: finalViolation.markerId ?? sourceInterval?.markerId ?? null,
+                sourceIntervalLength: sourceInterval?.text?.length ?? 0,
+                translatedIntervalLength: translatedInterval?.text?.length ?? 0,
+                sourceWhitespaceOnly: sourceInterval?.text?.trim() === '',
+                translatedWhitespaceOnly: translatedInterval?.text?.trim() === '',
+                sourcePreview: boundedPreview(sourceInterval?.text),
+                translatedPreview: boundedPreview(translatedInterval?.text),
+              });
+            }
             if (!isRecoverableParentViolation(finalViolation)) {
               const terminalError = new Error(
                 `V3 marker contract violation for fragmented parent ${parentId}: ${finalViolation?.reason || finalViolation?.code}`
@@ -308,6 +438,11 @@ export class OptimizedJsonHandler {
              recoveryStage,
              recoveryFragmentCount: recoveryFragments.length,
             callPurpose: TranslationCallPurpose.PARENT_RECOVERY,
+          });
+          logger.debug(`[JsonHandler] PARENT_RECOVERY stage ${recoveryStage} succeeded`, {
+            parentId,
+            recoveryStage,
+            recoveryFragmentCount: recoveryFragments.length,
           });
           return buildV3ParentResult(ordered, translatedText);
         };

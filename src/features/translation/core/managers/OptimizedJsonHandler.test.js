@@ -1,5 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
+const loggerDebug = vi.hoisted(() => vi.fn());
+
 // Mock webextension-polyfill
 vi.mock('webextension-polyfill', () => ({
   default: {
@@ -34,7 +36,7 @@ import { TranslationCallPurpose } from '@/features/translation/providers/Provide
 // Mock dependencies
 vi.mock('@/shared/logging/logger.js', () => ({
   getScopedLogger: () => ({
-    debug: vi.fn(),
+    debug: loggerDebug,
     info: vi.fn(),
     warn: vi.fn(),
     error: vi.fn()
@@ -92,6 +94,7 @@ describe('OptimizedJsonHandler', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    loggerDebug.mockClear();
 
     // Default mock behavior for ErrorMatcher
     isFatalError.mockImplementation((err) => err?.isFatal || false);
@@ -605,6 +608,84 @@ describe('OptimizedJsonHandler', () => {
       expect(updates[0].data.data[0].t).toBe(source);
       expect(appendTranslationDiagnostic).toHaveBeenCalledWith(null, expect.objectContaining({ type: 'PARENT_RECOVERY_STARTED', parentId: 'g1' }));
       expect(appendTranslationDiagnostic).toHaveBeenCalledWith(null, expect.objectContaining({ type: 'PARENT_RECOVERY_SUCCEEDED', parentId: 'g1' }));
+    });
+
+    it('emits bounded provider, mapped, reassembled, and empty-interval diagnostics', async () => {
+      const m2 = '@@TI_SEG_e_s_n2@@';
+      const m3 = '@@TI_SEG_e_s_n3@@';
+      const source = `A${m2}${'word '.repeat(180)}${m3}C`;
+      const fragment0 = { t: `A${m2}${'word '.repeat(90)}`, i: 'n1', blockId: 'g1', isV3Fragment: true, parentId: 'g1', fragmentIndex: 0, fragmentCount: 2, fragmentJoinerBefore: '' };
+      const fragment1 = { t: `${'word '.repeat(90)}${m3}C`, i: 'n1', blockId: 'g1', isV3Fragment: true, parentId: 'g1', fragmentIndex: 1, fragmentCount: 2, fragmentJoinerBefore: ' ' };
+      mockEngine.createIntelligentBatches = vi.fn(() => [[fragment0], [fragment1]]);
+      mockProvider.translate
+        .mockResolvedValueOnce({ translatedText: [`A${m2}B`] })
+        .mockResolvedValueOnce({ translatedText: [`${m3}${m3}C`] })
+        .mockImplementation((texts, _source, _target, options) => {
+          if (options.callPurpose === TranslationCallPurpose.PARENT_RECOVERY) {
+            return Promise.resolve({ translatedText: texts.map((text) => text.replace(/(@@TI_SEG_[^@]*@@)[\s\S]*/, '$1')) });
+          }
+          return Promise.resolve({ translatedText: texts });
+        });
+
+      await handler.execute(
+        mockEngine,
+        { ...mockData, sourceLanguage: 'en', text: JSON.stringify([{ t: source, blockId: 'g1', i: 'n1' }]) },
+        mockProvider, 'en', 'fa', 'msg-recovery-diagnostics', mockSender
+      );
+
+      const debugCalls = loggerDebug.mock.calls;
+      const providerSummary = debugCalls.find(([message, data]) => message.includes('provider response summary') && data?.recoveryStage === 1);
+      const mappedSummary = debugCalls.find(([, data]) => data?.recoveryFragmentIndex !== undefined && data?.translatedLength !== undefined);
+      const reassembledSummary = debugCalls.find(([, data]) => data?.sourceIntervalCount !== undefined);
+      const emptyInterval = debugCalls.find(([, data]) => data?.intervalIndex !== undefined && data?.sourcePreview !== undefined);
+
+      expect(providerSummary?.[1]).toMatchObject({ parentId: 'g1', recoveryFragmentIndex: 0 });
+      expect(mappedSummary?.[1]).toMatchObject({ parentId: 'g1', recoveryFragmentIndex: expect.any(Number) });
+      expect(reassembledSummary?.[1]).toMatchObject({ parentId: 'g1', sourceIntervalCount: expect.any(Number), translatedIntervalCount: expect.any(Number) });
+      expect(emptyInterval?.[1]).toMatchObject({
+        parentId: 'g1',
+        recoveryStage: expect.any(Number),
+        intervalIndex: expect.any(Number),
+      });
+      expect(emptyInterval?.[1].sourcePreview.length).toBeLessThanOrEqual(203);
+      expect(emptyInterval?.[1].translatedPreview.length).toBeLessThanOrEqual(203);
+      expect(debugCalls.some(([, data]) => typeof data?.sourceText === 'string' || typeof data?.translatedText === 'string')).toBe(false);
+    });
+
+    it.each([
+      ['provider omits leading text', '@@TI_SEG_e_s_n1@@translated', 0],
+      ['provider preserves leading text', 'The@@TI_SEG_e_s_n1@@translated', 3],
+    ])('attributes leading interval to provider output: %s', async (_label, recoveryText, expectedProviderLength) => {
+      const marker = '@@TI_SEG_e_s_n1@@';
+      const source = `The${marker}rest`;
+      const first = { t: `The${marker}`, i: 'n1', blockId: 'g1', isV3Fragment: true, parentId: 'g1', fragmentIndex: 0, fragmentCount: 2, fragmentJoinerBefore: '' };
+      const second = { t: 'rest', i: 'n1', blockId: 'g1', isV3Fragment: true, parentId: 'g1', fragmentIndex: 1, fragmentCount: 2, fragmentJoinerBefore: '' };
+      mockEngine.createIntelligentBatches = vi.fn(() => [[first], [second]]);
+      let primaryCalls = 0;
+      mockProvider.translate.mockImplementation((texts, _source, _target, options) => {
+        if (options.callPurpose === TranslationCallPurpose.PARENT_RECOVERY) {
+          return Promise.resolve({ translatedText: [recoveryText] });
+        }
+        primaryCalls += 1;
+        return Promise.resolve({ translatedText: [primaryCalls === 1 ? `The${marker}` : `${marker}${marker}rest`] });
+      });
+
+      await handler.execute(
+        mockEngine,
+        { ...mockData, sourceLanguage: 'en', text: JSON.stringify([{ t: source, blockId: 'g1', i: 'n1' }]) },
+        mockProvider, 'en', 'fa', `leading-seam-${expectedProviderLength}`, mockSender
+      );
+
+      const seam = loggerDebug.mock.calls.find(([message, data]) => (
+        message.includes('leading interval seam') && data?.recoveryStage === 1
+      ));
+      expect(seam?.[1]).toMatchObject({
+        sourceLeadingIntervalLength: 3,
+        providerLeadingIntervalLength: expectedProviderLength,
+        firstMarkerId: 'TI_SEG_e_s_n1',
+      });
+      expect(seam?.[1].sourceLeadingPreview.length).toBeLessThanOrEqual(50);
+      expect(seam?.[1].providerLeadingPreview.length).toBeLessThanOrEqual(50);
     });
 
     it.each([
