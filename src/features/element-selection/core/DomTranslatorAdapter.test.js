@@ -2411,6 +2411,50 @@ describe('DomTranslatorAdapter', () => {
       await expect(translation).resolves.toMatchObject({ success: false, cancelled: true });
     });
 
+    it('preserves committed parents and blocks late DOM/ACK work after conflict-style cancellation', async () => {
+      const first = document.createTextNode('A');
+      const second = document.createTextNode('B');
+      testElement.replaceChildren(first, second);
+      const { collectTextNodes } = await import('./DomTranslatorUtils.js');
+      collectTextNodes.mockReturnValueOnce([
+        { node: first, text: 'A', uid: 'n1', blockId: 'b1', role: 'div' },
+        { node: second, text: 'B', uid: 'n2', blockId: 'b2', role: 'div' },
+      ]);
+
+      let streamCallbacks;
+      registerTranslation.mockImplementationOnce((_id, callbacks) => { streamCallbacks = callbacks; });
+      contentScriptIntegration.sendTranslationRequest.mockResolvedValueOnce({
+        success: true,
+        streaming: true,
+        conversationAcceptance: true,
+      });
+
+      const translation = adapter.translateElement(testElement);
+      await vi.waitFor(() => expect(streamCallbacks).toBeDefined());
+      streamCallbacks.onStreamUpdate({ success: true, data: [{ t: 'Uno', i: 'n1' }] });
+      await vi.waitFor(() => expect(sendRegularMessage).toHaveBeenCalledWith(
+        expect.objectContaining({ data: expect.objectContaining({ parentId: 'b1', accepted: true }) }),
+        { silent: true }
+      ));
+      const acceptedBeforeConflict = sendRegularMessage.mock.calls.filter(([message]) => (
+        message?.data?.accepted === true
+      ));
+
+      await adapter.cancelTranslation({ silent: true });
+      streamCallbacks.onStreamUpdate({ success: true, data: [{ t: 'Dos', i: 'n2' }] });
+      streamCallbacks.onStreamEnd({ success: true });
+
+      await expect(translation).resolves.toMatchObject({ success: false, cancelled: true });
+      expect(first.nodeValue).toContain('Uno');
+      expect(second.nodeValue).toBe('B');
+      expect(sendRegularMessage.mock.calls.filter(([message]) => message?.data?.accepted === true))
+        .toHaveLength(acceptedBeforeConflict.length);
+      expect(sendRegularMessage).not.toHaveBeenCalledWith(
+        expect.objectContaining({ data: expect.objectContaining({ parentId: 'b2' }) }),
+        expect.anything()
+      );
+    });
+
     it('ignores callbacks from previous session after a new translation starts', async () => {
       const firstElement = testElement;
       const secondElement = document.createElement('div');

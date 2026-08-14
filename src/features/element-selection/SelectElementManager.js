@@ -288,9 +288,12 @@ class SelectElementManager extends ResourceTracker {
       this._stopContextWatchdog();
       document.documentElement.removeAttribute('data-translate-it-select-mode');
 
-      // Only cancel if we are actually in the middle of a translation
+      // User/manual cancellation and conflict teardown both invalidate active
+      // adapter work, while retaining distinct cleanup reasons and UX.
       if (reason === 'cancel' || reason === 'manual') {
         this.domTranslatorAdapter.cancelTranslation({ silent });
+      } else if (reason === 'conflict') {
+        this.domTranslatorAdapter.cancelTranslation({ silent: true });
       }
 
       this.removeEventListeners();

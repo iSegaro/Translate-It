@@ -860,6 +860,56 @@ describe('SelectElementManager', () => {
     });
   });
 
+  describe('conflict deactivation', () => {
+    it('exits silently and uses safe no-request cancellation before translation starts', async () => {
+      manager.isActive = true;
+
+      await manager.deactivate({ reason: 'conflict', silent: true });
+
+      expect(manager.isActive).toBe(false);
+      expect(manager.domTranslatorAdapter.cancelTranslation).toHaveBeenCalledTimes(1);
+      expect(manager.domTranslatorAdapter.cancelTranslation).toHaveBeenCalledWith({ silent: true });
+      expect(manager.domTranslatorAdapter.revertTranslation).not.toHaveBeenCalled();
+      expect(errorHandler.handle).not.toHaveBeenCalled();
+      const { pageEventBus } = await import('@/core/PageEventBus.js');
+      expect(pageEventBus.emit).not.toHaveBeenCalledWith('show-select-element-info', expect.anything());
+    });
+
+    it('cancels active adapter work without changing conflict UX or cleanup semantics', async () => {
+      manager.isActive = true;
+      manager.domTranslatorAdapter.isTranslating = true;
+
+      await manager.deactivate({ reason: 'conflict', silent: false });
+
+      expect(manager.domTranslatorAdapter.cancelTranslation).toHaveBeenCalledWith({ silent: true });
+      expect(manager.domTranslatorAdapter.revertTranslation).not.toHaveBeenCalled();
+      expect(errorHandler.handle).not.toHaveBeenCalled();
+      expect(manager.logger.debug).toHaveBeenCalledWith(
+        expect.stringContaining('Reason: conflict'),
+        expect.objectContaining({ reason: 'conflict' })
+      );
+    });
+
+    it('does not repeat conflict cancellation after the manager is inactive', async () => {
+      manager.isActive = true;
+
+      await manager.deactivate({ reason: 'conflict', silent: true });
+      await manager.deactivate({ reason: 'conflict', silent: true });
+
+      expect(manager.domTranslatorAdapter.cancelTranslation).toHaveBeenCalledTimes(1);
+      expect(errorHandler.handle).not.toHaveBeenCalled();
+    });
+
+    it('does not turn already-terminal work into conflict cancellation', async () => {
+      manager.isActive = false;
+
+      await manager.deactivate({ reason: 'conflict', silent: true });
+
+      expect(manager.domTranslatorAdapter.cancelTranslation).not.toHaveBeenCalled();
+      expect(manager.domTranslatorAdapter.revertTranslation).not.toHaveBeenCalled();
+    });
+  });
+
   describe('emergency cleanup', () => {
     it('should perform emergency cleanup if context becomes invalid', async () => {
       vi.useFakeTimers();
