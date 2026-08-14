@@ -25,6 +25,7 @@ import { classifyRecoveryFailure } from "@/features/translation/ir/RecoveryClass
 import { TranslationContractValidator } from "@/features/translation/core/TranslationContractValidator.js";
 
 const logger = getScopedLogger(LOG_COMPONENTS.TRANSLATION, 'BaseAIProvider');
+const MAX_SCALAR_SELECTIVE_RECOVERY_UNITS = 3;
 
 function createConversationCommitCandidate(translateMode) {
   let staged = null;
@@ -420,7 +421,15 @@ export class BaseAIProvider extends BaseProvider {
       // one bounded structured retry.
       if (parsed.contractViolation) {
         const selectivePlan = getSelectiveRecoveryPlan(parsed, texts);
-        const recoveryStrategy = selectivePlan ? 'SELECTIVE' : 'FULL_STRUCTURED_RETRY';
+        const subsetPlan = selectivePlan && selectivePlan.invalidIndexes.length > MAX_SCALAR_SELECTIVE_RECOVERY_UNITS
+          ? {
+            invalidIndexes: selectivePlan.invalidIndexes,
+            recoveryTexts: selectivePlan.invalidIndexes.map((index) => texts[index]),
+          }
+          : null;
+        const recoveryStrategy = subsetPlan
+          ? 'STRUCTURED_SUBSET_RETRY'
+          : (selectivePlan ? 'SELECTIVE' : 'FULL_STRUCTURED_RETRY');
         const isFullStructuredRetry = contextMetadata?.fullParseRecoveryRetry === true;
         const mappingFacts = parsed.mappingFacts || {};
         conversationCommitCandidate?.discard();
@@ -440,6 +449,8 @@ export class BaseAIProvider extends BaseProvider {
           },
           strategy: recoveryStrategy,
           unitCount: texts.length,
+          invalidCount: selectivePlan?.invalidIndexes.length || 0,
+          originalUnitCount: texts.length,
           ...(recoveryStrategy === 'FULL_STRUCTURED_RETRY' && {
             reason: parsed.parseFailed === true ? 'PARSE_FAILURE' : 'UNTRUSTWORTHY_MAPPING',
             attempt: 1,
@@ -471,7 +482,13 @@ export class BaseAIProvider extends BaseProvider {
           strategy: recoveryStrategy,
           attempt: 1,
           unitCount: texts.length,
+          invalidCount: selectivePlan?.invalidIndexes.length || 0,
+          originalUnitCount: texts.length,
         });
+
+        if (contextMetadata?.isSubsetRecoveryAttempt) {
+          throw createStructuredRecoveryFailure();
+        }
 
         if (isFullStructuredRetry) {
           const error = createStructuredRecoveryFailure();
@@ -559,6 +576,98 @@ export class BaseAIProvider extends BaseProvider {
                 strategy: recoveryStrategy,
                 attempt: 1,
                 unitCount: texts.length,
+              });
+            }
+            throw error;
+          }
+        }
+
+        if (subsetPlan) {
+          if (abortController?.signal?.aborted) {
+            const error = new Error('Translation cancelled by user');
+            error.name = 'AbortError';
+            error.type = ErrorTypes.USER_CANCELLED;
+            throw error;
+          }
+          const subsetExpectedFormat = expectedFormat || ResponseFormat.JSON_ARRAY;
+          const subsetExecutionContext = contextMetadata?.executionContext;
+          if (Number.isFinite(subsetExecutionContext?.deadlineAt) && Date.now() >= subsetExecutionContext.deadlineAt) {
+            const error = new Error('Batch translation timed out');
+            error.type = ErrorTypes.TRANSLATION_TIMEOUT;
+            throw error;
+          }
+          try {
+            const subsetResults = await this._translateBatch(
+              subsetPlan.recoveryTexts,
+              sourceLang,
+              targetLang,
+              translateMode,
+              abortController,
+              engine,
+              messageId,
+              sessionId,
+              {
+                ...contextMetadata,
+                callPurpose: TranslationCallPurpose.STRUCTURED_RECOVERY,
+                conversationParticipates: false,
+                useParentConversationLifecycle: false,
+                expectedFormat: subsetExpectedFormat,
+                repairContext: parsed.repairContext,
+                isSubsetRecoveryAttempt: true,
+              },
+              subsetExpectedFormat,
+              priority,
+            );
+            if (!Array.isArray(subsetResults) || subsetResults.length !== subsetPlan.invalidIndexes.length) {
+              throw createStructuredRecoveryFailure();
+            }
+            const finalResults = [...parsed.results];
+            subsetPlan.invalidIndexes.forEach((requestIndex, subsetIndex) => {
+              finalResults[requestIndex] = subsetResults[subsetIndex];
+            });
+            validateRecoveredResults(texts, finalResults);
+            appendTranslationDiagnostic(executionContext, {
+              type: 'RECOVERY_SUCCEEDED',
+              event: 'STRUCTURED_RECOVERY_RESULT',
+              stage: 'recovery',
+              provider: this.providerName,
+              callPurpose: TranslationCallPurpose.STRUCTURED_RECOVERY,
+              outerCallPurpose: callPurpose,
+              expectedFormat: subsetExpectedFormat,
+              strategy: 'STRUCTURED_SUBSET_RETRY',
+              attempt: 1,
+              unitCount: subsetPlan.invalidIndexes.length,
+              invalidCount: subsetPlan.invalidIndexes.length,
+              originalUnitCount: texts.length,
+            });
+            logger.debug(`[${this.providerName}] Structured recovery completed`, {
+              event: 'STRUCTURED_RECOVERY_RESULT',
+              outerCallPurpose: callPurpose,
+              expectedFormat: subsetExpectedFormat,
+              strategy: 'STRUCTURED_SUBSET_RETRY',
+              attempt: 1,
+              unitCount: subsetPlan.invalidIndexes.length,
+              invalidCount: subsetPlan.invalidIndexes.length,
+              originalUnitCount: texts.length,
+            });
+            return finalResults;
+          } catch (error) {
+            if (!abortController?.signal?.aborted && !isCancellationError(error)) {
+              appendTranslationDiagnostic(executionContext, {
+                type: 'RECOVERY_FAILED',
+                event: 'STRUCTURED_RECOVERY_FAILED',
+                stage: 'recovery',
+                provider: this.providerName,
+                reason: error.type || error.name || 'RECOVERY_FAILED',
+                ...(typeof error.type === 'string' && { code: error.type }),
+                callPurpose: TranslationCallPurpose.STRUCTURED_RECOVERY,
+                outerCallPurpose: callPurpose,
+                expectedFormat: subsetExpectedFormat,
+                strategy: 'STRUCTURED_SUBSET_RETRY',
+                attempt: 1,
+                unitCount: subsetPlan.invalidIndexes.length,
+                invalidCount: subsetPlan.invalidIndexes.length,
+                originalUnitCount: texts.length,
               });
             }
             throw error;

@@ -395,7 +395,7 @@ export const AIConversationHelper = {
     }
 
     if (metadata?.callPurpose === TranslationCallPurpose.PARENT_RECOVERY) {
-      promptInstructions += '\n\nStrict parent recovery translation: Translate each interval item in the input JSON and return exactly one item with the same id and translated text for each item. Translate all non-empty interval text, including leading, internal, and trailing intervals. Do not omit short text. Do not copy source text as a structural fallback. Marker reconstruction is handled by the caller.';
+      promptInstructions += '\n\nTranslate every input item, including very short items; preserve each input id.';
     }
 
     // Append semantic translation context when available (PDF mode only)

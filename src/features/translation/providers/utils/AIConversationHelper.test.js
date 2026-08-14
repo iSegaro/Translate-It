@@ -220,10 +220,12 @@ describe('AIConversationHelper', () => {
     },
   );
 
-  it('adds strict interval identity rules only for parent recovery prompts', async () => {
+  it('adds only minimal interval guidance for parent recovery prompts', async () => {
     const { getPromptAsync, getPromptBASEAIBatchAsync } = await import('@/shared/config/config.js');
     getPromptAsync.mockResolvedValue('translate instructions');
-    getPromptBASEAIBatchAsync.mockResolvedValue('batch $_{PROMPT_INSTRUCTIONS} $_{TEXT}');
+    getPromptBASEAIBatchAsync.mockResolvedValue(
+      'batch $_{PROMPT_INSTRUCTIONS} Schema: translations array with exactly $_{COUNT} items containing id and text. Return ONLY JSON. $_{TEXT}'
+    );
 
     const prepare = (callPurpose) => AIConversationHelper.preparePromptAndText(
       [{ id: 'parent-1-0', text: 'A' }, { id: 'parent-1-1', text: 'B' }], 'en', 'fa', 'select-element', 'ai', null, { callPurpose },
@@ -234,12 +236,16 @@ describe('AIConversationHelper', () => {
       prepare(TranslationCallPurpose.PARENT_RECOVERY),
     ]);
 
-    expect(primary.systemPrompt).not.toContain('Strict parent recovery translation');
-    expect(structuredRecovery.systemPrompt).not.toContain('Strict parent recovery translation');
-    expect(parentRecovery.systemPrompt).toContain('Strict parent recovery translation');
-    expect(parentRecovery.systemPrompt).toContain('exactly one item with the same id');
-    expect(parentRecovery.systemPrompt).toContain('Marker reconstruction is handled by the caller');
-    expect(parentRecovery.systemPrompt).not.toContain('Do not translate, modify, remove, duplicate, reorder, or invent markers');
+    const minimalInstruction = 'Translate every input item, including very short items; preserve each input id.';
+    expect(primary.systemPrompt).not.toContain(minimalInstruction);
+    expect(structuredRecovery.systemPrompt).not.toContain(minimalInstruction);
+    expect(parentRecovery.systemPrompt).toContain(minimalInstruction);
+    expect(parentRecovery.systemPrompt).not.toContain('Marker reconstruction is handled by the caller');
+    expect(parentRecovery.systemPrompt).not.toContain('structural fallback');
+    expect(parentRecovery.systemPrompt).not.toContain('leading, internal, and trailing intervals');
+    expect(parentRecovery.systemPrompt).not.toContain('exactly one item with the same id');
+    expect(parentRecovery.systemPrompt).toContain('Schema: translations array with exactly 2 items containing id and text.');
+    expect(parentRecovery.systemPrompt).toContain('Return ONLY JSON.');
   });
 
   it('keeps primary purpose in normal conversation lifecycle', async () => {

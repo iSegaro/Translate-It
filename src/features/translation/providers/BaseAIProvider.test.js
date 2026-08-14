@@ -735,6 +735,174 @@ beforeEach(() => {
       });
     });
 
+    it('keeps three reliable invalid units on scalar selective recovery', async () => {
+      const { AIResponseParser } = await import('./utils/AIResponseParser.js');
+      AIResponseParser.parseBatchResult.mockReturnValue({
+        results: ['A', 'bad-b', 'C', 'bad-d', 'E', 'bad-f'],
+        contractViolation: true,
+        invalidUnits: [1, 3, 5].map((requestIndex) => ({ requestIndex, responseId: String(requestIndex), violationCodes: ['EMPTY_TRANSLATED_TEXT'] })),
+        mappingFacts: { identityReliable: true, complete: true, ambiguous: false },
+      });
+      const sequentialSpy = vi.spyOn(provider, 'executeSequentialBatch').mockResolvedValue(['B', 'D', 'F']);
+
+      const result = await provider._translateBatch(['a', 'b', 'c', 'd', 'e', 'f'], 'en', 'fa', 'select-element');
+
+      expect(sequentialSpy).toHaveBeenCalledWith(['b', 'd', 'f'], 'en', 'fa', expect.objectContaining({
+        callPurpose: TranslationCallPurpose.STRUCTURED_RECOVERY,
+        expectedFormat: ResponseFormat.STRING,
+      }));
+      expect(result).toEqual(['A', 'B', 'C', 'D', 'E', 'F']);
+    });
+
+    it('uses one structured subset retry for four reliable invalid units', async () => {
+      const { AIResponseParser } = await import('./utils/AIResponseParser.js');
+      AIResponseParser.parseBatchResult
+        .mockReturnValueOnce({
+          results: ['A', 'bad-b', 'C', 'bad-d', 'bad-e', 'bad-f'],
+          contractViolation: true,
+          invalidUnits: [1, 3, 4, 5].map((requestIndex) => ({ requestIndex, responseId: `unit-${requestIndex}`, violationCodes: ['EMPTY_TRANSLATED_TEXT'] })),
+          mappingFacts: { identityReliable: true, complete: true, ambiguous: false },
+        })
+        .mockReturnValueOnce({ results: ['B', 'D', 'E', 'F'], contractViolation: false });
+      const sequentialSpy = vi.spyOn(provider, 'executeSequentialBatch');
+      const callSpy = vi.spyOn(provider, '_callAI').mockResolvedValue('structured');
+      const texts = [1, 2, 3, 4, 5, 6].map((id) => ({ i: `unit-${id}`, text: `source-${id}` }));
+      const operation = createTranslationOperation('subset-purpose-success');
+
+      const result = await provider._translateBatch(texts, 'en', 'fa', 'select-element', null, null, 'subset', 'session-1', {
+        callPurpose: TranslationCallPurpose.PARENT_RECOVERY,
+        executionContext: { operation },
+      }, ResponseFormat.JSON_OBJECT);
+
+      expect(result).toEqual(['A', 'B', 'C', 'D', 'E', 'F']);
+      expect(callSpy).toHaveBeenCalledTimes(2);
+      expect(callSpy.mock.calls[1][2]).toMatchObject({
+        callPurpose: TranslationCallPurpose.STRUCTURED_RECOVERY,
+        expectedFormat: ResponseFormat.JSON_OBJECT,
+        conversationParticipates: false,
+        useParentConversationLifecycle: false,
+      });
+      expect(callSpy.mock.calls[1][1]).toContain('unit-2');
+      expect(callSpy.mock.calls[1][1]).toContain('unit-6');
+      expect(sequentialSpy).not.toHaveBeenCalled();
+      expect(loggerMock.debug.mock.calls.some(([message, data]) => message.includes('Structured recovery triggered') && data.strategy === 'STRUCTURED_SUBSET_RETRY' && data.invalidUnitCount === 4)).toBe(true);
+      expect(operation.finalize().entries).toContainEqual(expect.objectContaining({
+        type: 'RECOVERY_SUCCEEDED',
+        strategy: 'STRUCTURED_SUBSET_RETRY',
+        callPurpose: TranslationCallPurpose.STRUCTURED_RECOVERY,
+        outerCallPurpose: TranslationCallPurpose.PARENT_RECOVERY,
+      }));
+    });
+
+    it('finalizes bounded structured subset recovery diagnostics', async () => {
+      const { appendTranslationDiagnostic } = await import('../ir/TranslationOperation.js');
+      const operation = createTranslationOperation('subset-diagnostic');
+      appendTranslationDiagnostic({ operation }, {
+        type: 'RECOVERY_SUCCEEDED',
+        stage: 'recovery',
+        provider: 'MockAI',
+        strategy: 'STRUCTURED_SUBSET_RETRY',
+        unitCount: 6,
+        invalidCount: 6,
+        originalUnitCount: 13,
+        attempt: 1,
+        expectedFormat: ResponseFormat.JSON_OBJECT,
+        callPurpose: TranslationCallPurpose.STRUCTURED_RECOVERY,
+        outerCallPurpose: TranslationCallPurpose.PARENT_RECOVERY,
+      });
+
+      const diagnostic = operation.finalize().entries[0];
+      expect(diagnostic).toMatchObject({
+        strategy: 'STRUCTURED_SUBSET_RETRY',
+        unitCount: 6,
+        invalidCount: 6,
+        originalUnitCount: 13,
+        attempt: 1,
+        expectedFormat: ResponseFormat.JSON_OBJECT,
+        callPurpose: TranslationCallPurpose.STRUCTURED_RECOVERY,
+        outerCallPurpose: TranslationCallPurpose.PARENT_RECOVERY,
+      });
+    });
+
+    it('merges reordered structured subset responses by parser identity', async () => {
+      const { AIResponseParser: realParser } = await vi.importActual('./utils/AIResponseParser.js');
+      AIResponseParser.parseBatchResult
+        .mockReturnValueOnce({
+          results: ['bad-1', 'valid-2', 'bad-3', 'bad-4', 'bad-5', 'valid-6'],
+          contractViolation: true,
+          invalidUnits: [0, 2, 3, 4].map((requestIndex) => ({ requestIndex, responseId: `unit-${requestIndex + 1}`, violationCodes: ['EMPTY_TRANSLATED_TEXT'] })),
+          mappingFacts: { identityReliable: true, complete: true, ambiguous: false },
+        })
+        .mockImplementationOnce(realParser.parseBatchResult.bind(realParser));
+      const callSpy = vi.spyOn(provider, '_callAI')
+        .mockResolvedValueOnce('primary')
+        .mockResolvedValueOnce(JSON.stringify({
+          translations: [
+            { id: 'unit-5', text: 'translated-5' },
+            { id: 'unit-1', text: 'translated-1' },
+            { id: 'unit-4', text: 'translated-4' },
+            { id: 'unit-3', text: 'translated-3' },
+          ],
+        }));
+      const sequentialSpy = vi.spyOn(provider, 'executeSequentialBatch');
+      const texts = [1, 2, 3, 4, 5, 6].map((id) => ({ i: `unit-${id}`, text: `source-${id}` }));
+
+      const result = await provider._translateBatch(texts, 'en', 'fa', 'select-element', null, null, 'reordered-subset', 'session-1', null, ResponseFormat.JSON_OBJECT);
+
+      expect(result).toEqual(['translated-1', 'valid-2', 'translated-3', 'translated-4', 'translated-5', 'valid-6']);
+      expect(callSpy).toHaveBeenCalledTimes(2);
+      expect(sequentialSpy).not.toHaveBeenCalled();
+    });
+
+    it.each(['missing identity', 'duplicate identity', 'malformed response'])('fails subset recovery atomically for %s', async () => {
+      const { AIResponseParser } = await import('./utils/AIResponseParser.js');
+      AIResponseParser.parseBatchResult
+        .mockReturnValueOnce({
+          results: ['bad-a', 'bad-b', 'bad-c', 'bad-d', 'valid'],
+          contractViolation: true,
+          invalidUnits: [0, 1, 2, 3].map((requestIndex) => ({ requestIndex, responseId: String(requestIndex), violationCodes: ['EMPTY_TRANSLATED_TEXT'] })),
+          mappingFacts: { identityReliable: true, complete: true, ambiguous: false },
+        })
+        .mockReturnValueOnce({ results: ['bad-a', 'bad-b', 'bad-c', 'bad-d'], contractViolation: true });
+      const callSpy = vi.spyOn(provider, '_callAI').mockResolvedValue('structured');
+      const sequentialSpy = vi.spyOn(provider, 'executeSequentialBatch');
+
+      await expect(provider._translateBatch(['a', 'b', 'c', 'd', 'e'], 'en', 'fa', 'select-element', null, null, null, 'subset-failure', null, ResponseFormat.JSON_OBJECT))
+        .rejects.toMatchObject({ type: ErrorTypes.API_RESPONSE_INVALID });
+      expect(callSpy).toHaveBeenCalledTimes(2);
+      expect(sequentialSpy).not.toHaveBeenCalled();
+    });
+
+    it('propagates subset provider failure without scalar fallback', async () => {
+      const { AIResponseParser } = await import('./utils/AIResponseParser.js');
+      const providerError = Object.assign(new Error('subset network failure'), { type: ErrorTypes.NETWORK_ERROR });
+      AIResponseParser.parseBatchResult.mockReturnValueOnce({
+        results: ['bad-a', 'bad-b', 'bad-c', 'bad-d', 'valid'],
+        contractViolation: true,
+        invalidUnits: [0, 1, 2, 3].map((requestIndex) => ({ requestIndex, responseId: String(requestIndex), violationCodes: ['EMPTY_TRANSLATED_TEXT'] })),
+        mappingFacts: { identityReliable: true, complete: true, ambiguous: false },
+      });
+      const callSpy = vi.spyOn(provider, '_callAI')
+        .mockResolvedValueOnce('structured')
+        .mockRejectedValueOnce(providerError);
+      const sequentialSpy = vi.spyOn(provider, 'executeSequentialBatch');
+      const operation = createTranslationOperation('subset-purpose-failure');
+
+      await expect(provider._translateBatch(['a', 'b', 'c', 'd', 'e'], 'en', 'fa', 'select-element', null, null, null, 'subset-provider-failure', {
+        callPurpose: TranslationCallPurpose.PARENT_RECOVERY,
+        executionContext: { operation },
+      }, ResponseFormat.JSON_OBJECT))
+        .rejects.toBe(providerError);
+      expect(callSpy).toHaveBeenCalledTimes(2);
+      expect(sequentialSpy).not.toHaveBeenCalled();
+      expect(operation.finalize().entries).toContainEqual(expect.objectContaining({
+        type: 'RECOVERY_FAILED',
+        strategy: 'STRUCTURED_SUBSET_RETRY',
+        callPurpose: TranslationCallPurpose.STRUCTURED_RECOVERY,
+        outerCallPurpose: TranslationCallPurpose.PARENT_RECOVERY,
+      }));
+    });
+
     it('fails atomically when bounded structured retry is invalid', async () => {
       const { AIResponseParser } = await import('./utils/AIResponseParser.js');
       AIResponseParser.parseBatchResult

@@ -158,7 +158,7 @@ function sanitizeDiagnostic(messageId, fact = {}) {
     'invalidTextCount', 'requestIdsTotal', 'responseIdsTotal', 'unresolvedIdsTotal',
     'duplicateResponseIdsTotal', 'invalidTextIndexesTotal', 'expectedMarkerCount',
     'actualMarkerCount', 'recoveryStage', 'primaryFragmentLimit', 'recoveryFragmentLimit',
-    'primaryFragmentCount', 'recoveryFragmentCount', 'unitCount', 'intervalIndex',
+    'primaryFragmentCount', 'recoveryFragmentCount', 'unitCount', 'originalUnitCount', 'intervalIndex',
     'sourceLength', 'translatedLength', 'sourceIntervalCount', 'translatedIntervalCount',
     'sourceMarkerCount', 'translatedMarkerCount', 'sourceIntervalLength',
     'translatedIntervalLength', 'mappedLeadingIntervalLength', 'providerLeadingIntervalLength',
