@@ -107,6 +107,8 @@ vi.mock('@/utils/i18n/i18n.js', () => ({
   getTranslationString: vi.fn((key) => ({
     ERRORS_SELECT_ELEMENT_PARTIAL_TRANSLATION_FAILED: 'Some content could not be translated.',
     ERRORS_TRANSLATION_FAILED: 'Translation failed',
+    SELECT_ELEMENT_NO_TRANSLATABLE_CONTENT: 'No translatable text was found in this element.',
+    SELECT_ELEMENT_UNSUPPORTED_TRANSLATION_MODE: 'This content cannot be translated with the current translation mode.',
   }[key] || key))
 }));
 
@@ -447,7 +449,33 @@ describe('SelectElementManager', () => {
       const { pageEventBus } = await import('@/core/PageEventBus.js');
       const infoCalls = pageEventBus.emit.mock.calls.filter(([event]) => event === 'show-select-element-info');
       expect(infoCalls).toHaveLength(1);
-      expect(infoCalls[0][1]).toEqual(expect.objectContaining({ message: expect.any(String) }));
+      expect(infoCalls[0][1]).toEqual(expect.objectContaining({
+        message: 'No translatable text was found in this element.',
+      }));
+    });
+
+    it('shows the capability-specific message for UNSUPPORTED_MODE; still no error pipeline', async () => {
+      const { SelectElementReason } = await import('./core/SelectElementPolicy.js');
+      const error = Object.assign(new Error('Selected content is not supported by the current extraction mode'), {
+        type: ErrorTypes.NO_TRANSLATABLE_CONTENT,
+        reason: SelectElementReason.UNSUPPORTED_MODE,
+      });
+      manager.domTranslatorAdapter.translateElement.mockRejectedValue(error);
+
+      await manager.startTranslation(document.createElement('div'));
+
+      expect(errorHandler.handle).not.toHaveBeenCalled();
+      const { createPublicDisplayError } = await import('@/shared/error-management/PublicErrorPolicy.js');
+      expect(createPublicDisplayError).not.toHaveBeenCalled();
+      expect(cleanupSpy).toHaveBeenCalledWith({ reason: 'no-content' });
+
+      const { pageEventBus } = await import('@/core/PageEventBus.js');
+      const infoCalls = pageEventBus.emit.mock.calls.filter(([event]) => event === 'show-select-element-info');
+      expect(infoCalls).toHaveLength(1);
+      expect(infoCalls[0][1]).toEqual(expect.objectContaining({
+        message: 'This content cannot be translated with the current translation mode.',
+      }));
+      expect(infoCalls[0][1].message).not.toBe('No translatable text was found in this element.');
     });
 
     it('shows the same informational UX regardless of the diagnostic message', async () => {

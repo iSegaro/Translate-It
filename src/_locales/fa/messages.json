@@ -1955,6 +1955,9 @@
   "SELECT_ELEMENT_NO_TRANSLATABLE_CONTENT": {
     "message": "متن قابل ترجمه‌ای در این بخش پیدا نشد."
   },
+  "SELECT_ELEMENT_UNSUPPORTED_TRANSLATION_MODE": {
+    "message": "این محتوا با حالت فعلی ترجمه قابل ترجمه نیست."
+  },
   "LINGVA_WPT_WARNING": {
     "message": "سرویس Lingva ممکن است در متن‌های طولانی دچار خطا شود."
   },

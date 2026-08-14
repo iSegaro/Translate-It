@@ -227,6 +227,12 @@ describe('SelectElementPolicy', () => {
       expect(getSelectElementRootEligibility(el).selectableRoot).toBe(true);
       expect(isSelectElementTraversable(el).traversable).toBe(false);
       expect(isSelectElementTraversable(el).reason).toBe(SelectElementReason.EXCLUDED_ROLE);
+      // Mode capability must not attach to the role exclusion: role="code" stays
+      // role-excluded (EXCLUDED_ROLE) under V2, never UNSUPPORTED_MODE.
+      const v2 = isSelectElementTraversable(el, { extractionMode: SelectElementExtractionMode.V2 });
+      expect(v2.traversable).toBe(false);
+      expect(v2.reason).toBe(SelectElementReason.EXCLUDED_ROLE);
+      expect(v2.reason).not.toBe(SelectElementReason.UNSUPPORTED_MODE);
     });
   });
 

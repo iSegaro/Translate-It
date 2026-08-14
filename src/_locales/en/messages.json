@@ -1955,6 +1955,9 @@
   "SELECT_ELEMENT_NO_TRANSLATABLE_CONTENT": {
     "message": "No translatable text was found in this element."
   },
+  "SELECT_ELEMENT_UNSUPPORTED_TRANSLATION_MODE": {
+    "message": "This content cannot be translated with the current translation mode."
+  },
   "LINGVA_WPT_WARNING": {
     "message": "Lingva may fail on long texts."
   },

@@ -42,7 +42,7 @@ import {
   revertSelectElementTranslation
 } from './DomTranslatorState.js';
 import { collectTextNodes, collectBlockGroups, generateElementId, extractContextMetadata } from './DomTranslatorUtils.js';
-import { SelectElementExtractionMode } from './SelectElementPolicy.js';
+import { SelectElementExtractionMode, isSelectElementTraversable, SelectElementReason } from './SelectElementPolicy.js';
 import { BlockGroupReconstructor, BlockGroupMutationFailure } from './BlockGroupReconstructor.js';
 import * as DirectionManager from '@/utils/dom/DomDirectionManager.js';
 
@@ -169,6 +169,19 @@ export class DomTranslatorAdapter extends ResourceTracker {
       const extractionMode = isBlockGroupingEnabled
         ? SelectElementExtractionMode.V3
         : SelectElementExtractionMode.V2;
+
+      // Capability preflight: the policy owns mode capability. A PRE/CODE root
+      // under V2 is valid content the current mode cannot represent — surface it
+      // as a capability-specific no-content outcome instead of letting the
+      // collector report a misleading "no translatable text" result. Element-level
+      // policy only: no DOM walk, no provider request, no collector call.
+      const preflight = isSelectElementTraversable(element, { isRoot: true, extractionMode });
+      if (!preflight.traversable && preflight.reason === SelectElementReason.UNSUPPORTED_MODE) {
+        const error = new Error('Selected content is not supported by the current extraction mode');
+        error.type = ErrorTypes.NO_TRANSLATABLE_CONTENT;
+        error.reason = SelectElementReason.UNSUPPORTED_MODE;
+        throw error;
+      }
       
       let textNodesData = [];
       const groupMap = new Map();

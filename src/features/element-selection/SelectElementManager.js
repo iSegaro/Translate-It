@@ -31,6 +31,7 @@ import selectionStyles from './SelectElement.scss?inline';
 import { DomTranslatorAdapter } from './core/DomTranslatorAdapter.js';
 import { ElementSelector } from './core/ElementSelector.js';
 import { extractTextFromElement, isSelectableTextRoot } from './utils/elementHelpers.js';
+import { SelectElementReason } from './core/SelectElementPolicy.js';
 
 // Import notification manager
 import { getSelectElementNotificationManager } from './SelectElementNotificationManager.js';
@@ -40,6 +41,9 @@ const SELECT_ELEMENT_PARTIAL_ERROR_FALLBACK = 'Some content could not be transla
 
 const SELECT_ELEMENT_NO_TRANSLATABLE_CONTENT_KEY = 'SELECT_ELEMENT_NO_TRANSLATABLE_CONTENT';
 const SELECT_ELEMENT_NO_TRANSLATABLE_CONTENT_FALLBACK = 'No translatable text was found in this element.';
+
+const SELECT_ELEMENT_UNSUPPORTED_TRANSLATION_MODE_KEY = 'SELECT_ELEMENT_UNSUPPORTED_TRANSLATION_MODE';
+const SELECT_ELEMENT_UNSUPPORTED_TRANSLATION_MODE_FALLBACK = 'This content cannot be translated with the current translation mode.';
 
 /**
  * Resolves the localized partial-completion message shared by non-terminal
@@ -646,8 +650,12 @@ class SelectElementManager extends ResourceTracker {
    */
   async _handleNoTranslatableContent(error) {
     this.logger.debug('Select Element translation completed with no translatable content:', error.message);
-    const message = (await getTranslationString(SELECT_ELEMENT_NO_TRANSLATABLE_CONTENT_KEY))
-      || SELECT_ELEMENT_NO_TRANSLATABLE_CONTENT_FALLBACK;
+    const isUnsupportedMode = error.reason === SelectElementReason.UNSUPPORTED_MODE;
+    const message = isUnsupportedMode
+      ? ((await getTranslationString(SELECT_ELEMENT_UNSUPPORTED_TRANSLATION_MODE_KEY))
+        || SELECT_ELEMENT_UNSUPPORTED_TRANSLATION_MODE_FALLBACK)
+      : ((await getTranslationString(SELECT_ELEMENT_NO_TRANSLATABLE_CONTENT_KEY))
+        || SELECT_ELEMENT_NO_TRANSLATABLE_CONTENT_FALLBACK);
     this.showNoContentNotification(message);
   }
 

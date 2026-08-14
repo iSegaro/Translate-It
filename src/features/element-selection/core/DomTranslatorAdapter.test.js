@@ -1292,6 +1292,169 @@ describe('DomTranslatorAdapter', () => {
       }
     });
 
+    describe('mode capability preflight', () => {
+      // Deterministically fix the block-grouping flag. mockReset also clears any
+      // once-implementation leaked by earlier tests that short-circuit the
+      // block-grouping read, so each preflight test observes the mode it requests.
+      async function configureBlockGrouping(enabled) {
+        const { getFeatureSemanticBlockGroupingAsync } = await import('@/config.js');
+        getFeatureSemanticBlockGroupingAsync.mockReset();
+        getFeatureSemanticBlockGroupingAsync.mockResolvedValue(false);
+        if (enabled) getFeatureSemanticBlockGroupingAsync.mockResolvedValueOnce(true);
+      }
+
+      async function expectUnsupportedModePreflight(tag, html) {
+        const { collectTextNodes, collectBlockGroups } = await import('./DomTranslatorUtils.js');
+        const { ErrorTypes } = await import('@/shared/error-management/ErrorTypes.js');
+        const { SelectElementReason } = await import('./SelectElementPolicy.js');
+
+        await configureBlockGrouping(false);
+
+        const el = document.createElement(tag);
+        el.textContent = html;
+        document.body.appendChild(el);
+
+        await expect(adapter.translateElement(el)).rejects.toMatchObject({
+          type: ErrorTypes.NO_TRANSLATABLE_CONTENT,
+          reason: SelectElementReason.UNSUPPORTED_MODE,
+        });
+        expect(collectTextNodes).not.toHaveBeenCalled();
+        expect(collectBlockGroups).not.toHaveBeenCalled();
+        expect(contentScriptIntegration.sendTranslationRequest).not.toHaveBeenCalled();
+        document.body.removeChild(el);
+      }
+
+      it('rejects PRE root under V2 with UNSUPPORTED_MODE before extraction or request', async () => {
+        await expectUnsupportedModePreflight('pre', 'const x = 1;');
+      });
+
+      it('rejects CODE root under V2 with UNSUPPORTED_MODE before extraction or request', async () => {
+        await expectUnsupportedModePreflight('code', 'const x = 1;');
+      });
+
+      it('rejects a <pre><code> shape under V2 without special-casing the child', async () => {
+        const { collectTextNodes, collectBlockGroups } = await import('./DomTranslatorUtils.js');
+        const { ErrorTypes } = await import('@/shared/error-management/ErrorTypes.js');
+        const { SelectElementReason } = await import('./SelectElementPolicy.js');
+
+        await configureBlockGrouping(false);
+
+        const pre = document.createElement('pre');
+        const code = document.createElement('code');
+        code.textContent = 'const x = 1;';
+        pre.appendChild(code);
+        document.body.appendChild(pre);
+
+        await expect(adapter.translateElement(pre)).rejects.toMatchObject({
+          type: ErrorTypes.NO_TRANSLATABLE_CONTENT,
+          reason: SelectElementReason.UNSUPPORTED_MODE,
+        });
+        expect(collectTextNodes).not.toHaveBeenCalled();
+        expect(collectBlockGroups).not.toHaveBeenCalled();
+        expect(contentScriptIntegration.sendTranslationRequest).not.toHaveBeenCalled();
+        document.body.removeChild(pre);
+      });
+
+      it('passes PRE root under V3 through block grouping unchanged', async () => {
+        await configureBlockGrouping(true);
+        const { collectBlockGroups } = await import('./DomTranslatorUtils.js');
+        collectBlockGroups.mockClear();
+
+        const pre = document.createElement('pre');
+        pre.textContent = 'const x = 1;';
+        document.body.appendChild(pre);
+        collectBlockGroups.mockReturnValueOnce([{
+          id: 'n1',
+          blockId: 'g1',
+          text: 'const x = 1;',
+          leadingWS: '',
+          trailingWS: '',
+          preWhitespace: true,
+          directionHint: 'ltr',
+          inlineParentTags: ['pre'],
+          mode: 'V2_PASSTHROUGH',
+          node: pre.firstChild
+        }]);
+
+        contentScriptIntegration.sendTranslationRequest.mockResolvedValue({
+          success: true,
+          streaming: false,
+          translatedText: JSON.stringify([{ t: 'x', i: 'n1' }])
+        });
+
+        const result = await adapter.translateElement(pre);
+        expect(result.success).toBe(true);
+        expect(collectBlockGroups).toHaveBeenCalledTimes(1);
+        expect(collectBlockGroups).toHaveBeenCalledWith(pre, expect.any(Object), { extractionMode: 'v3' });
+        expect(pre.textContent).toContain('x');
+        document.body.removeChild(pre);
+      });
+
+      it('passes CODE root under V3 through block grouping unchanged', async () => {
+        await configureBlockGrouping(true);
+        const { collectBlockGroups } = await import('./DomTranslatorUtils.js');
+        collectBlockGroups.mockClear();
+
+        const code = document.createElement('code');
+        code.textContent = 'const y = 2;';
+        document.body.appendChild(code);
+        collectBlockGroups.mockReturnValueOnce([{
+          id: 'n1',
+          blockId: 'g1',
+          text: 'const y = 2;',
+          leadingWS: '',
+          trailingWS: '',
+          preWhitespace: true,
+          directionHint: 'ltr',
+          inlineParentTags: ['code'],
+          mode: 'V2_PASSTHROUGH',
+          node: code.firstChild
+        }]);
+
+        contentScriptIntegration.sendTranslationRequest.mockResolvedValue({
+          success: true,
+          streaming: false,
+          translatedText: JSON.stringify([{ t: 'y', i: 'n1' }])
+        });
+
+        const result = await adapter.translateElement(code);
+        expect(result.success).toBe(true);
+        expect(collectBlockGroups).toHaveBeenCalledTimes(1);
+        expect(collectBlockGroups).toHaveBeenCalledWith(code, expect.any(Object), { extractionMode: 'v3' });
+        expect(code.textContent).toContain('y');
+        document.body.removeChild(code);
+      });
+
+      it('leaves an ordinary DIV root under V2 untouched by the preflight', async () => {
+        await configureBlockGrouping(false);
+        const { collectTextNodes } = await import('./DomTranslatorUtils.js');
+        collectTextNodes.mockClear();
+
+        const div = document.createElement('div');
+        div.textContent = 'Ordinary paragraph text';
+        document.body.appendChild(div);
+        collectTextNodes.mockReturnValueOnce([{
+          node: div.firstChild,
+          text: div.firstChild.textContent,
+          uid: 'n1',
+          blockId: 'b1',
+          role: 'div'
+        }]);
+
+        contentScriptIntegration.sendTranslationRequest.mockResolvedValue({
+          success: true,
+          streaming: false,
+          translatedText: JSON.stringify([{ t: 'پاراگراف', i: 'n1' }])
+        });
+
+        const result = await adapter.translateElement(div);
+        expect(result.success).toBe(true);
+        expect(collectTextNodes).toHaveBeenCalledWith(div, { extractionMode: 'v2' });
+        expect(div.textContent).toContain('پاراگراف');
+        document.body.removeChild(div);
+      });
+    });
+
     it('should handle fatal stream errors', async () => {
       let streamCallbacks;
       registerTranslation.mockImplementation((id, callbacks) => {
