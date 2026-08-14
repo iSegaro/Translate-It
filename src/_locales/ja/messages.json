@@ -464,6 +464,9 @@
   "ERRORS_TRANSLATION_TIMEOUT": {
     "message": "翻訳がタイムアウトしました。もう一度お試しください。"
   },
+  "ERRORS_SELECT_ELEMENT_PARTIAL_TRANSLATION_FAILED": {
+    "message": "一部のコンテンツを翻訳できませんでした。"
+  },
   "ERRORS_SETTINGS_LOADING_TIMEOUT": {
     "message": "設定の読み込みがタイムアウトしました。もう一度お試しください。"
   },

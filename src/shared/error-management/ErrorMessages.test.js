@@ -99,4 +99,5 @@ describe('ErrorMessages', () => {
       expect(msg).toBe(errorMessages[ErrorTypes.UNKNOWN]);
     });
   });
+
 });

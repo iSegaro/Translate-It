@@ -11,6 +11,7 @@ import ExtensionContextManager from '@/core/extensionContext.js';
 import { ErrorHandler } from '@/shared/error-management/ErrorHandler.js';
 import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
 import { isFatalError, isCancellationError } from '@/shared/error-management/ErrorMatcher.js';
+import { createPublicDisplayError } from '@/shared/error-management/PublicErrorPolicy.js';
 import { getEffectiveProviderAsync, TranslationMode } from '@/shared/config/config.js';
 import { NOTIFICATION_TIME } from '@/shared/constants/ui.js';
 import { TRANSLATION_STATUS } from '@/shared/constants/translation.js';
@@ -33,6 +34,14 @@ import { extractTextFromElement, isValidTextElement } from './utils/elementHelpe
 
 // Import notification manager
 import { getSelectElementNotificationManager } from './SelectElementNotificationManager.js';
+
+const SELECT_ELEMENT_PARTIAL_ERROR_KEY = 'ERRORS_SELECT_ELEMENT_PARTIAL_TRANSLATION_FAILED';
+const SELECT_ELEMENT_PARTIAL_ERROR_FALLBACK = 'Some content could not be translated.';
+
+function isElementTooLargeError(error) {
+  return typeof error?.message === 'string'
+    && /element is too large to translate/i.test(error.message);
+}
 
 /**
  * SelectElementManager - Coordinates the interactive Select Element mode.
@@ -518,10 +527,10 @@ class SelectElementManager extends ResourceTracker {
         // Explicit failure contract: any resolved value that is neither success
         // nor cancellation (zero-commit results, undefined, {}) is a failure.
         const failure = (result && result.error) || new Error('Translation failed');
-        this._handleTranslationFailure(failure, result?.translationOutcome || failure.translationOutcome);
+        await this._handleTranslationFailure(failure, result?.translationOutcome || failure.translationOutcome);
       }
     } catch (error) {
-      this._handleTranslationFailure(error, error?.translationOutcome);
+      await this._handleTranslationFailure(error, error?.translationOutcome);
     } finally {
       // Clear flag after translation is complete (success or error)
       window.isTranslationInProgress = false;
@@ -533,7 +542,7 @@ class SelectElementManager extends ResourceTracker {
    * pipeline (ErrorHandler notification + cleanup), preserving silent paths.
    * @private
    */
-  _handleTranslationFailure(error, outcome = error?.translationOutcome) {
+  async _handleTranslationFailure(error, outcome = error?.translationOutcome) {
     const committedParentCount = Number.isInteger(outcome?.committedParentCount)
       ? outcome.committedParentCount
       : 0;
@@ -556,21 +565,29 @@ class SelectElementManager extends ResourceTracker {
       this.logger.debug('Select Element translation skipped:', error.message);
     } else {
       this.logger.warn('Select Element translation failed:', error);
-      // Delegate to centralized error handler to show notification
-      const displayError = isPartialFailure
-        ? Object.assign(new Error('Translation failed'), {
+      let displayError;
+      if (isPartialFailure) {
+        displayError = Object.assign(new Error(
+          await getTranslationString(SELECT_ELEMENT_PARTIAL_ERROR_KEY) || SELECT_ELEMENT_PARTIAL_ERROR_FALLBACK
+        ), {
           type: ErrorTypes.TRANSLATION_FAILED,
           cause: error,
           translationOutcome: outcome,
-        })
-        : error;
+        });
+      } else if (isElementTooLargeError(error)) {
+        displayError = error;
+      } else {
+        displayError = await createPublicDisplayError(error);
+      }
       if (isPartialFailure) {
         this.logger.warn('Select Element translation partially failed:', {
           committedParentCount,
           totalParentCount,
         });
       }
-      ErrorHandler.getInstance().handle(displayError, { context: 'select-element', showToast: true }).catch(() => {});
+      if (displayError) {
+        ErrorHandler.getInstance().handle(displayError, { context: 'select-element', showToast: true }).catch(() => {});
+      }
     }
     
     if (ExtensionContextManager.isContextError(error)) {

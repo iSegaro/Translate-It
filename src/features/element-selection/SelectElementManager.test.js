@@ -45,10 +45,19 @@ vi.mock('@/shared/error-management/ErrorHandler.js', () => ({
     getInstance: vi.fn()
   }
 }));
+vi.mock('@/shared/error-management/PublicErrorPolicy.js', () => ({
+  createPublicDisplayError: vi.fn(async (originalError) => {
+    const displayError = new Error('Translation failed');
+    displayError.type = 'TRANSLATION_FAILED';
+    displayError.cause = originalError;
+    return displayError;
+  })
+}));
 
 vi.mock('@/shared/error-management/ErrorMatcher.js', () => ({
   isFatalError: vi.fn(() => false),
-  isCancellationError: vi.fn(() => false)
+  isCancellationError: vi.fn(() => false),
+  matchErrorToType: vi.fn((error) => error?.type || 'TRANSLATION_ERROR')
 }));
 
 vi.mock('@/shared/constants/ui.js', () => ({
@@ -93,7 +102,10 @@ vi.mock('@/shared/config/constants.js', () => ({
 }));
 
 vi.mock('@/utils/i18n/i18n.js', () => ({
-  getTranslationString: vi.fn((key) => key)
+  getTranslationString: vi.fn((key) => ({
+    ERRORS_SELECT_ELEMENT_PARTIAL_TRANSLATION_FAILED: 'Some content could not be translated.',
+    ERRORS_TRANSLATION_FAILED: 'Translation failed',
+  }[key] || key))
 }));
 
 vi.mock('@/shared/utils/warning-manager.js', () => ({
@@ -288,10 +300,11 @@ describe('SelectElementManager', () => {
 
       await manager.startTranslation(document.createElement('div'));
 
-      expect(errorHandler.handle).toHaveBeenCalledWith(error, {
-        context: 'select-element',
-        showToast: true
-      });
+      expect(errorHandler.handle).toHaveBeenCalledWith(expect.objectContaining({
+        message: 'Translation failed',
+        type: 'TRANSLATION_FAILED',
+        cause: error,
+      }), expect.objectContaining({ context: 'select-element', showToast: true }));
       expect(cleanupSpy).toHaveBeenCalledWith({ reason: 'error' });
       expect(manager.logger.warn).toHaveBeenCalledWith('Select Element translation failed:', error);
     });
@@ -302,7 +315,11 @@ describe('SelectElementManager', () => {
 
       await manager.startTranslation(document.createElement('div'));
 
-      expect(errorHandler.handle).toHaveBeenCalledWith(error, expect.objectContaining({ showToast: true }));
+      expect(errorHandler.handle).toHaveBeenCalledWith(expect.objectContaining({
+        message: 'Translation failed',
+        type: 'TRANSLATION_FAILED',
+        cause: error,
+      }), expect.objectContaining({ showToast: true }));
       expect(cleanupSpy).toHaveBeenCalledWith({ reason: 'error' });
     });
 
@@ -339,14 +356,74 @@ describe('SelectElementManager', () => {
       expect(deactivateSpy).toHaveBeenCalledWith({ reason: 'cancel', silent: true });
     });
 
+    it('respects a central silent policy without skipping cleanup', async () => {
+      const { createPublicDisplayError } = await import('@/shared/error-management/PublicErrorPolicy.js');
+      const error = Object.assign(new Error('Already translated'), { type: 'NODE_ALREADY_TRANSLATED' });
+      createPublicDisplayError.mockResolvedValueOnce(null);
+      manager.domTranslatorAdapter.translateElement.mockRejectedValue(error);
+
+      await manager.startTranslation(document.createElement('div'));
+
+      expect(errorHandler.handle).not.toHaveBeenCalled();
+      expect(cleanupSpy).toHaveBeenCalledWith({ reason: 'error' });
+    });
+
     it('keeps provider failures visible', async () => {
       const error = Object.assign(new Error('Network failed'), { type: 'NETWORK_ERROR' });
       manager.domTranslatorAdapter.translateElement.mockRejectedValue(error);
 
       await manager.startTranslation(document.createElement('div'));
 
-      expect(errorHandler.handle).toHaveBeenCalledWith(error, expect.objectContaining({ showToast: true }));
+      expect(errorHandler.handle).toHaveBeenCalledWith(expect.objectContaining({ cause: error }), expect.objectContaining({ showToast: true }));
       expect(cleanupSpy).toHaveBeenCalledWith({ reason: 'error' });
+    });
+
+    it.each([
+      ['API key', 'API_KEY_INVALID'],
+      ['rate limit', 'RATE_LIMIT_REACHED'],
+    ])('preserves actionable %s handling', async (_label, type) => {
+      const error = Object.assign(new Error(type), { type });
+      manager.domTranslatorAdapter.translateElement.mockRejectedValue(error);
+
+      await manager.startTranslation(document.createElement('div'));
+
+      expect(errorHandler.handle).toHaveBeenCalledWith(expect.objectContaining({ cause: error }), expect.objectContaining({ showToast: true }));
+    });
+
+    it('preserves total timeout handling while hiding raw timeout text', async () => {
+      const error = Object.assign(new Error('Batch translation timed out after 60000ms'), { type: 'TRANSLATION_TIMEOUT' });
+      manager.domTranslatorAdapter.translateElement.mockRejectedValue(error);
+
+      await manager.startTranslation(document.createElement('div'));
+
+      expect(errorHandler.handle).toHaveBeenCalledWith(expect.objectContaining({ cause: error }), expect.objectContaining({ showToast: true }));
+    });
+
+    it('preserves actionable element-size feedback', async () => {
+      const error = new Error('Element is too large to translate (1001 text segments). Please select a smaller element.');
+      manager.domTranslatorAdapter.translateElement.mockRejectedValue(error);
+
+      await manager.startTranslation(document.createElement('div'));
+
+      expect(errorHandler.handle).toHaveBeenCalledWith(error, expect.objectContaining({ showToast: true }));
+    });
+
+    it.each([
+      { mode: 'throw', value: Object.assign(new Error('Duplicate identity in batch: n1'), { type: 'VALIDATION' }) },
+      { mode: 'resolve', value: Object.assign(new Error('No translation results were accepted'), { type: 'NO_ACCEPTED_TRANSLATION_RESULTS' }) },
+    ])('normalizes internal failures consistently for $mode paths', async ({ mode, value }) => {
+      if (mode === 'throw') manager.domTranslatorAdapter.translateElement.mockRejectedValue(value);
+      else manager.domTranslatorAdapter.translateElement.mockResolvedValue({ success: false, error: value });
+
+      await manager.startTranslation(document.createElement('div'));
+
+      expect(errorHandler.handle).toHaveBeenCalledWith(expect.objectContaining({
+        message: 'Translation failed',
+        type: 'TRANSLATION_FAILED',
+        cause: value,
+      }), expect.objectContaining({ context: 'select-element', showToast: true }));
+      expect(errorHandler.handle.mock.calls[0][0].message).not.toContain('Duplicate');
+      expect(errorHandler.handle.mock.calls[0][0].message).not.toContain('accepted');
     });
 
     it.each([
@@ -361,7 +438,7 @@ describe('SelectElementManager', () => {
 
       expect(errorHandler.handle).toHaveBeenCalledWith(
         expect.objectContaining({
-          message: 'Translation failed',
+          message: 'Some content could not be translated.',
           type: 'TRANSLATION_FAILED',
           cause: error,
         }),
@@ -403,7 +480,7 @@ describe('SelectElementManager', () => {
       await manager.startTranslation(document.createElement('div'));
 
       expect(errorHandler.handle).toHaveBeenCalledWith(
-        result?.error || expect.any(Error),
+        expect.objectContaining({ message: 'Translation failed', type: 'TRANSLATION_FAILED' }),
         expect.objectContaining({ context: 'select-element', showToast: true })
       );
       expect(cleanupSpy).toHaveBeenCalledWith({ reason: 'error' });
