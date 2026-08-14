@@ -518,10 +518,10 @@ class SelectElementManager extends ResourceTracker {
         // Explicit failure contract: any resolved value that is neither success
         // nor cancellation (zero-commit results, undefined, {}) is a failure.
         const failure = (result && result.error) || new Error('Translation failed');
-        this._handleTranslationFailure(failure);
+        this._handleTranslationFailure(failure, result?.translationOutcome || failure.translationOutcome);
       }
     } catch (error) {
-      this._handleTranslationFailure(error);
+      this._handleTranslationFailure(error, error?.translationOutcome);
     } finally {
       // Clear flag after translation is complete (success or error)
       window.isTranslationInProgress = false;
@@ -533,8 +533,17 @@ class SelectElementManager extends ResourceTracker {
    * pipeline (ErrorHandler notification + cleanup), preserving silent paths.
    * @private
    */
-  _handleTranslationFailure(error) {
-    const isCancellation = isCancellationError(error);
+  _handleTranslationFailure(error, outcome = error?.translationOutcome) {
+    const committedParentCount = Number.isInteger(outcome?.committedParentCount)
+      ? outcome.committedParentCount
+      : 0;
+    const totalParentCount = Number.isInteger(outcome?.totalParentCount)
+      ? outcome.totalParentCount
+      : 0;
+    const isCancellation = Boolean(outcome?.cancelled) || isCancellationError(error);
+    const isPartialFailure = !isCancellation
+      && committedParentCount > 0
+      && committedParentCount < totalParentCount;
     const isNoTranslatableContent = error.message === 'No translatable text found';
     const isSilentSkip = isCancellation
       || isNoTranslatableContent
@@ -548,7 +557,20 @@ class SelectElementManager extends ResourceTracker {
     } else {
       this.logger.warn('Select Element translation failed:', error);
       // Delegate to centralized error handler to show notification
-      ErrorHandler.getInstance().handle(error, { context: 'select-element', showToast: true }).catch(() => {});
+      const displayError = isPartialFailure
+        ? Object.assign(new Error('Translation failed'), {
+          type: ErrorTypes.TRANSLATION_FAILED,
+          cause: error,
+          translationOutcome: outcome,
+        })
+        : error;
+      if (isPartialFailure) {
+        this.logger.warn('Select Element translation partially failed:', {
+          committedParentCount,
+          totalParentCount,
+        });
+      }
+      ErrorHandler.getInstance().handle(displayError, { context: 'select-element', showToast: true }).catch(() => {});
     }
     
     if (ExtensionContextManager.isContextError(error)) {

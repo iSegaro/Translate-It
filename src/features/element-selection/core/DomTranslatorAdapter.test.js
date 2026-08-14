@@ -943,7 +943,7 @@ describe('DomTranslatorAdapter', () => {
       expect(applyElementDirection).toHaveBeenCalledWith(testElement, 'ja');
     });
 
-    it('should retain successful batches and report failure when the stream ends with an error', async () => {
+    it('should retain successful batches when stream end fails after complete commit', async () => {
       let streamCallbacks;
       registerTranslation.mockImplementation((id, callbacks) => {
         streamCallbacks = callbacks;
@@ -963,7 +963,10 @@ describe('DomTranslatorAdapter', () => {
         return { success: true, streaming: true };
       });
 
-      await expect(adapter.translateElement(testElement)).rejects.toThrow('Batch failed');
+      await expect(adapter.translateElement(testElement)).resolves.toMatchObject({
+        success: true,
+        committedParentCount: 1,
+      });
       expect(testElement.textContent).toContain('سلام');
     });
 
@@ -1037,7 +1040,7 @@ describe('DomTranslatorAdapter', () => {
         error: { message: 'Terminal stream failure', type: 'TRANSLATION_FAILED' }
       });
 
-      await expect(translation).rejects.toThrow('Terminal stream failure');
+      await expect(translation).resolves.toMatchObject({ success: true, committedParentCount: 1 });
       expect(testElement.textContent).toContain('سلام');
     });
 
@@ -1374,6 +1377,72 @@ describe('DomTranslatorAdapter', () => {
       await expect(adapter.translateElement(testElement)).rejects.toThrow('Final stream error');
     });
 
+    it('attaches partial outcome to stream failures after a direct parent commit', async () => {
+      const first = document.createTextNode('A');
+      const second = document.createTextNode('B');
+      testElement.replaceChildren(first, second);
+      const { collectTextNodes } = await import('./DomTranslatorUtils.js');
+      collectTextNodes.mockReturnValueOnce([
+        { node: first, text: 'A', uid: 'n1', blockId: 'b1', role: 'div' },
+        { node: second, text: 'B', uid: 'n2', blockId: 'b2', role: 'div' }
+      ]);
+      let callbacks;
+      registerTranslation.mockImplementationOnce((_id, registered) => { callbacks = registered; });
+      contentScriptIntegration.sendTranslationRequest.mockResolvedValueOnce({ success: true, streaming: true });
+
+      const translation = adapter.translateElement(testElement);
+      await vi.waitFor(() => expect(callbacks).toBeDefined());
+      callbacks.onStreamUpdate({ success: true, data: [{ t: 'Uno', i: 'n1' }] });
+      callbacks.onStreamEnd({ success: false, error: { message: 'Network failed', type: 'NETWORK_ERROR' } });
+
+      await expect(translation).rejects.toMatchObject({
+        translationOutcome: { committedParentCount: 1, totalParentCount: 2, cancelled: false }
+      });
+      expect(first.nodeValue).toContain('Uno');
+      expect(second.nodeValue).toBe('B');
+    });
+
+    it('attaches grouped outcome to failures after an earlier BlockGroup commit', async () => {
+      const { getFeatureSemanticBlockGroupingAsync } = await import('@/config.js');
+      const { collectBlockGroups } = await import('./DomTranslatorUtils.js');
+      getFeatureSemanticBlockGroupingAsync.mockResolvedValueOnce(true);
+      const first = document.createTextNode('A');
+      const second = document.createTextNode('B');
+      testElement.replaceChildren(first, second);
+      collectBlockGroups.mockReturnValueOnce([
+        { id: 'n1', blockId: 'g1', text: 'A', leadingWS: '', trailingWS: '', preWhitespace: false, directionHint: 'ltr', inlineParentTags: ['div'], mode: 'standard', node: first },
+        { id: 'n2', blockId: 'g2', text: 'B', leadingWS: '', trailingWS: '', preWhitespace: false, directionHint: 'ltr', inlineParentTags: ['div'], mode: 'standard', node: second },
+      ]);
+      let callbacks;
+      registerTranslation.mockImplementationOnce((_id, registered) => { callbacks = registered; });
+      contentScriptIntegration.sendTranslationRequest.mockResolvedValueOnce({ success: true, streaming: true });
+
+      const translation = adapter.translateElement(testElement);
+      await vi.waitFor(() => expect(callbacks).toBeDefined());
+      callbacks.onStreamUpdate({ success: true, data: [{ t: 'Uno', i: 'n1' }] });
+      callbacks.onStreamEnd({ success: false, error: { message: 'V3 marker failure', type: 'VALIDATION' } });
+
+      await expect(translation).rejects.toMatchObject({
+        translationOutcome: { committedParentCount: 1, totalParentCount: 2, cancelled: false }
+      });
+      expect(first.nodeValue).toContain('Uno');
+      expect(second.nodeValue).toBe('B');
+    });
+
+    it('suppresses a failed stream end after every direct parent committed', async () => {
+      let callbacks;
+      registerTranslation.mockImplementationOnce((_id, registered) => { callbacks = registered; });
+      contentScriptIntegration.sendTranslationRequest.mockResolvedValueOnce({ success: true, streaming: true });
+
+      const translation = adapter.translateElement(testElement);
+      await vi.waitFor(() => expect(callbacks).toBeDefined());
+      callbacks.onStreamUpdate({ success: true, data: [{ t: 'سلام', i: 'n1' }] });
+      callbacks.onStreamEnd({ success: false, error: { message: 'Late transport failure', type: 'NETWORK_ERROR' } });
+
+      await expect(translation).resolves.toMatchObject({ success: true, committedParentCount: 1 });
+      expect(testElement.textContent).toContain('سلام');
+    });
+
     it('should not apply empty translation', () => {
       const textNode = testElement.firstChild;
       const originalValue = textNode.nodeValue;
@@ -1444,7 +1513,10 @@ describe('DomTranslatorAdapter', () => {
         translatedText: [{ t: 'Uno', i: 'n1' }, { t: 'Dos', i: 'n2' }]
       });
 
-      await expect(adapter.translateElement(testElement)).rejects.toBe('mutation-failure');
+      await expect(adapter.translateElement(testElement)).rejects.toMatchObject({
+        message: 'mutation-failure',
+        cause: 'mutation-failure',
+      });
       expect(first.nodeValue).toBe('A');
       expect(second.nodeValue).toBe('B');
       expect(sendRegularMessage).not.toHaveBeenCalledWith(expect.objectContaining({
@@ -1473,7 +1545,9 @@ describe('DomTranslatorAdapter', () => {
       await vi.waitFor(() => expect(callbacks).toBeDefined());
       callbacks.onStreamUpdate({ success: true, data: [{ t: 'Uno', i: 'n1' }, { t: 'Dos', i: 'n2' }] });
 
-      await expect(translation).rejects.toBe('stream-mutation-failure');
+      await expect(translation).rejects.toMatchObject({
+        message: 'stream-mutation-failure',
+      });
       expect(first.nodeValue).toBe('A');
       expect(second.nodeValue).toBe('B');
       expect(sendRegularMessage).not.toHaveBeenCalledWith(expect.objectContaining({
@@ -1491,7 +1565,9 @@ describe('DomTranslatorAdapter', () => {
       const firstTranslation = adapter.translateElement(testElement);
       await vi.waitFor(() => expect(callbacks).toBeDefined());
       callbacks.onStreamUpdate({ success: true, data: [{ t: 'Uno', i: 'n1' }] });
-      await expect(firstTranslation).rejects.toBe('stream failure');
+      await expect(firstTranslation).rejects.toMatchObject({
+        message: 'stream failure',
+      });
 
       apply.mockRestore();
       contentScriptIntegration.sendTranslationRequest.mockResolvedValueOnce({

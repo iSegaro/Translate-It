@@ -349,6 +349,39 @@ describe('SelectElementManager', () => {
       expect(cleanupSpy).toHaveBeenCalledWith({ reason: 'error' });
     });
 
+    it.each([
+      ['V3 failure', Object.assign(new Error('V3 marker contract violation'), { type: 'VALIDATION' })],
+      ['timeout', Object.assign(new Error('Batch translation timed out'), { type: 'TRANSLATION_TIMEOUT' })],
+      ['provider failure', Object.assign(new Error('Network failed'), { type: 'NETWORK_ERROR' })],
+    ])('uses generic partial-failure display for %s', async (_label, error) => {
+      error.translationOutcome = { committedParentCount: 1, totalParentCount: 2, cancelled: false };
+      manager.domTranslatorAdapter.translateElement.mockRejectedValue(error);
+
+      await manager.startTranslation(document.createElement('div'));
+
+      expect(errorHandler.handle).toHaveBeenCalledWith(
+        expect.objectContaining({
+          message: 'Translation failed',
+          type: 'TRANSLATION_FAILED',
+          cause: error,
+        }),
+        expect.objectContaining({ context: 'select-element', showToast: true })
+      );
+      expect(errorHandler.handle.mock.calls[0][0].message).not.toContain('V3');
+      expect(cleanupSpy).toHaveBeenCalledWith({ reason: 'error' });
+    });
+
+    it('keeps committed translations and suppresses partial error on cancellation', async () => {
+      const error = Object.assign(new Error('cancelled'), { type: 'USER_CANCELLED' });
+      error.translationOutcome = { committedParentCount: 1, totalParentCount: 2, cancelled: true };
+      manager.domTranslatorAdapter.translateElement.mockRejectedValue(error);
+
+      await manager.startTranslation(document.createElement('div'));
+
+      expect(errorHandler.handle).not.toHaveBeenCalled();
+      expect(cleanupSpy).toHaveBeenCalledWith({ reason: 'cancel' });
+    });
+
     it('keeps successful translation cleanup unchanged', async () => {
       manager.domTranslatorAdapter.translateElement.mockResolvedValue({ success: true });
 

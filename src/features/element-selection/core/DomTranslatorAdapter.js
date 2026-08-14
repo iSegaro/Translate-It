@@ -66,6 +66,17 @@ function unwrapMutationFailure(error) {
     : error;
 }
 
+function attachTranslationOutcome(error, outcome) {
+  const meaningfulError = error && typeof error === 'object' && 'cause' in error
+    ? error.cause
+    : error;
+  const normalizedError = error instanceof Error
+    ? error
+    : Object.assign(new Error(String(meaningfulError || 'Translation failed')), { cause: error });
+  normalizedError.translationOutcome = outcome;
+  return normalizedError;
+}
+
 /**
  * Specialized adapter that coordinates between background services and visual DOM management.
  * Designed for low-latency, high-precision translation of specific DOM branches.
@@ -108,6 +119,8 @@ export class DomTranslatorAdapter extends ResourceTracker {
   async translateElement(element, options = {}) {
     const { onProgress, onComplete, onError } = options;
     let translationToken = null;
+    let getCurrentOutcome = () => ({ committedParentCount: 0, totalParentCount: 0, cancelled: false });
+    let terminalStreamFailure = false;
     this.logger.operation('Starting element translation');
 
     try {
@@ -293,7 +306,14 @@ export class DomTranslatorAdapter extends ResourceTracker {
             parent.expectedUids.add(data.uid);
             parent.handoffParent.cleanSource = parent.cleanSource;
             return parents;
-           }, []);
+            }, []);
+
+      getCurrentOutcome = (cancelled = false) => {
+        const parents = isBlockGroupingEnabled ? groups : Array.from(directParentStates.values());
+        const totalParentCount = parents.length;
+        const committedParentCount = parents.filter(parent => parent.applied === true).length;
+        return { committedParentCount, totalParentCount, cancelled };
+      };
 
       const applyCompleteDirectParent = (parent, targetLanguage, translationToken) => {
         if (!parent || parent.invalid || parent.applied) return;
@@ -625,13 +645,14 @@ export class DomTranslatorAdapter extends ResourceTracker {
               safeResolve({ success: false, error: err });
             }
           },
-          onStreamEnd: (data) => {
-            if (isSettled) return;
-            if (!this._isCurrentTranslation(translationToken)) return safeResolve({ success: false, cancelled: true });
-            if (data.cancelled) return safeResolve({ success: false, cancelled: true });
-            if (data.success === false || data.error) {
-              const errObj = typeof data.error === 'object' ? data.error : { message: data.error, type: matchErrorToType(data.error) };
-              const error = new Error(errObj.message || 'Stream failed');
+           onStreamEnd: (data) => {
+             if (isSettled) return;
+             if (!this._isCurrentTranslation(translationToken)) return safeResolve({ success: false, cancelled: true });
+             if (data.cancelled) return safeResolve({ success: false, cancelled: true });
+             if (data.success === false || data.error) {
+               terminalStreamFailure = true;
+               const errObj = typeof data.error === 'object' ? data.error : { message: data.error, type: matchErrorToType(data.error) };
+               const error = new Error(errObj.message || 'Stream failed');
               Object.assign(error, errObj);
               return safeResolve({ success: false, error });
             }
@@ -706,10 +727,22 @@ export class DomTranslatorAdapter extends ResourceTracker {
         effectiveTargetLanguage = result.targetLanguage;
       }
 
-      // If the result contains an error, throw it now
-      if (result && result.success === false && result.error) {
-        throw result.error;
-      }
+       // If the result contains an error, throw it now
+       if (result && result.success === false && result.error) {
+         const outcome = getCurrentOutcome(Boolean(result.cancelled));
+         if (terminalStreamFailure
+             && !outcome.cancelled
+             && outcome.totalParentCount > 0
+             && outcome.committedParentCount === outcome.totalParentCount) {
+           this.logger.warn('[DomTranslatorAdapter] Suppressed terminal stream failure after complete commit', {
+             committedParentCount: outcome.committedParentCount,
+             totalParentCount: outcome.totalParentCount,
+           });
+           result = { success: true, targetLanguage: result.targetLanguage };
+         } else {
+           throw attachTranslationOutcome(result.error, outcome);
+         }
+       }
 
       // Snapshot request-local commit state while parent/group objects still exist.
       const committedParentCount = isBlockGroupingEnabled
@@ -725,9 +758,9 @@ export class DomTranslatorAdapter extends ResourceTracker {
         zeroCommit: committedParentCount === 0,
       });
 
-      const finalResult = await this._finalizeTranslation({
-        result, element, elementId, targetLanguage: effectiveTargetLanguage, onComplete, sessionId: this.currentSessionId, committedParentCount
-      });
+       const finalResult = await this._finalizeTranslation({
+        result, element, elementId, targetLanguage: effectiveTargetLanguage, onComplete, sessionId: this.currentSessionId, committedParentCount, totalParentCount: getCurrentOutcome().totalParentCount
+       });
 
       // --- Phase 6 Shadow Mode Validation Gate ---
       if (isBlockGroupingEnabled && finalResult?.success) {
@@ -787,13 +820,15 @@ export class DomTranslatorAdapter extends ResourceTracker {
 
       const type = matchErrorToType(originalError);
       const isCancellation = type === ErrorTypes.USER_CANCELLED || type === ErrorTypes.TRANSLATION_CANCELLED;
+      const outcome = getCurrentOutcome(isCancellation);
+      const finalError = attachTranslationOutcome(originalError, outcome);
 
       if (!isCancellation) {
-        this.logger.debug('Translation error in DomTranslatorAdapter:', originalError?.message || originalError);
+        this.logger.debug('Translation error in DomTranslatorAdapter:', finalError);
       }
 
-      if (onError) await onError({ status: TRANSLATION_STATUS.ERROR, error: originalError });
-      throw originalError;
+      if (onError) await onError({ status: TRANSLATION_STATUS.ERROR, error: finalError });
+      throw finalError;
     } finally {
       activeTranslationRoots.delete(element);
       this._cleanupCurrentSession(true, translationToken);
@@ -1129,10 +1164,23 @@ export class DomTranslatorAdapter extends ResourceTracker {
     }
   }
 
-  async _finalizeTranslation({ result, element, elementId, targetLanguage, onComplete, sessionId, committedParentCount = 0 }) {
+  async _finalizeTranslation({ result, element, elementId, targetLanguage, onComplete, sessionId, committedParentCount = 0, totalParentCount = 0 }) {
+    const translationOutcome = {
+      committedParentCount,
+      totalParentCount,
+      cancelled: Boolean(result?.cancelled),
+    };
     if (!result?.success) {
-      if (result.cancelled) return { success: false, cancelled: true, element, committedParentCount };
-      throw result.error || new Error('Translation failed');
+      if (result.cancelled) return {
+        success: false,
+        cancelled: true,
+        element,
+        committedParentCount,
+        totalParentCount,
+        translationOutcome,
+      };
+      const error = attachTranslationOutcome(result.error || new Error('Translation failed'), translationOutcome);
+      throw error;
     }
 
     // Operation-level contract: provider/transport success is not operation success.
@@ -1140,7 +1188,14 @@ export class DomTranslatorAdapter extends ResourceTracker {
     if (committedParentCount === 0) {
       const error = new Error('No translation results were accepted');
       error.type = ErrorTypes.NO_ACCEPTED_TRANSLATION_RESULTS;
-      return { success: false, error, committedParentCount, element };
+      return {
+        success: false,
+        error: attachTranslationOutcome(error, translationOutcome),
+        committedParentCount,
+        totalParentCount,
+        translationOutcome,
+        element,
+      };
     }
 
     const finalTarget = result.targetLanguage || targetLanguage;
