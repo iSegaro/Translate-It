@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { isSelectableTextRoot } from './utils/elementHelpers.js';
+import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
 
 // Mock dependencies
 vi.mock('@/shared/logging/logConstants.js', () => ({
@@ -414,7 +415,7 @@ describe('SelectElementManager', () => {
     });
 
     it('keeps explicit no-content failures silent', async () => {
-      const error = new Error('No translatable text found');
+      const error = Object.assign(new Error('No translatable text found'), { type: ErrorTypes.NO_TRANSLATABLE_CONTENT });
       manager.domTranslatorAdapter.translateElement.mockRejectedValue(error);
 
       await manager.startTranslation(document.createElement('div'));
@@ -422,6 +423,30 @@ describe('SelectElementManager', () => {
       expect(errorHandler.handle).not.toHaveBeenCalled();
       expect(cleanupSpy).toHaveBeenCalledWith({ reason: 'cancel' });
       expect(manager.logger.debug).toHaveBeenCalledWith('Select Element translation skipped:', error.message);
+    });
+
+    it('identifies no-content by semantic type, not message', async () => {
+      const error = Object.assign(new Error('different diagnostic text'), { type: ErrorTypes.NO_TRANSLATABLE_CONTENT });
+      manager.domTranslatorAdapter.translateElement.mockRejectedValue(error);
+
+      await manager.startTranslation(document.createElement('div'));
+
+      expect(errorHandler.handle).not.toHaveBeenCalled();
+      expect(cleanupSpy).toHaveBeenCalledWith({ reason: 'cancel' });
+    });
+
+    it('keeps unrelated VALIDATION failures visible (message is not the discriminator)', async () => {
+      const error = Object.assign(new Error('some unrelated validation failure'), { type: 'VALIDATION' });
+      manager.domTranslatorAdapter.translateElement.mockRejectedValue(error);
+
+      await manager.startTranslation(document.createElement('div'));
+
+      expect(errorHandler.handle).toHaveBeenCalledWith(expect.objectContaining({
+        message: 'Translation failed',
+        type: 'TRANSLATION_FAILED',
+        cause: error,
+      }), expect.objectContaining({ showToast: true }));
+      expect(cleanupSpy).toHaveBeenCalledWith({ reason: 'error' });
     });
 
     it('keeps user cancellation silent', async () => {

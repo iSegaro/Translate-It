@@ -23,6 +23,7 @@ export class ErrorTypes {
   static UNKNOWN = "UNKNOWN";
   static SELECT_ELEMENT = "SELECT_ELEMENT";
   static NODE_ALREADY_TRANSLATED = "NODE_ALREADY_TRANSLATED";
+  static NO_TRANSLATABLE_CONTENT = "NO_TRANSLATABLE_CONTENT";
 
   // Tab Accessibility errors
   static TAB_RESTRICTED = "TAB_RESTRICTED";

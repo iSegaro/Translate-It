@@ -1236,7 +1236,15 @@ describe('DomTranslatorAdapter', () => {
       const { collectTextNodes } = await import('./DomTranslatorUtils.js');
       collectTextNodes.mockReturnValueOnce([]);
 
-      await expect(adapter.translateElement(testElement)).rejects.toThrow('No translatable text found');
+      const { ErrorTypes } = await import('@/shared/error-management/ErrorTypes.js');
+      try {
+        await adapter.translateElement(testElement);
+        expect.fail('translateElement should have thrown');
+      } catch (error) {
+        expect(error.message).toBe('No translatable text found');
+        expect(error.type).toBe(ErrorTypes.NO_TRANSLATABLE_CONTENT);
+        expect(error.type).not.toBe(ErrorTypes.VALIDATION);
+      }
     });
 
     it('should handle fatal stream errors', async () => {

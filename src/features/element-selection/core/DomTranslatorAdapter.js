@@ -223,7 +223,7 @@ export class DomTranslatorAdapter extends ResourceTracker {
 
       if (textNodesData.length === 0) {
         const error = new Error('No translatable text found');
-        error.type = ErrorTypes.VALIDATION;
+        error.type = ErrorTypes.NO_TRANSLATABLE_CONTENT;
         throw error;
       }
 

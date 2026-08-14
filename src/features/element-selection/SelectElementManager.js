@@ -584,7 +584,7 @@ class SelectElementManager extends ResourceTracker {
     const isPartialFailure = !isCancellation
       && committedParentCount > 0
       && committedParentCount < totalParentCount;
-    const isNoTranslatableContent = error.message === 'No translatable text found';
+    const isNoTranslatableContent = error.type === ErrorTypes.NO_TRANSLATABLE_CONTENT;
     const isSilentSkip = isCancellation
       || isNoTranslatableContent
       || error.type === ErrorTypes.FEATURE_BLOCKED
