@@ -29,6 +29,11 @@ import {
 } from '@/features/translation/ir/TranslationOperation.js';
 import { createManifestView, createRequestUnitManifest } from '@/features/translation/ir/RequestUnitManifest.js';
 import { TerminalExecutionRouter } from '@/features/translation/ir/TerminalExecutionRouter.js';
+import { TranslationCallPurpose, isProviderType, registryIdToName, ProviderTypes } from '@/features/translation/providers/ProviderConstants.js';
+import { AIConversationHelper } from '@/features/translation/providers/utils/AIConversationHelper.js';
+import { ConversationAcceptanceHandoff } from '@/features/translation/conversation/ConversationAcceptanceHandoff.js';
+import { ConversationAcceptanceHandle } from '@/features/translation/conversation/ConversationAcceptanceHandle.js';
+import { ConversationAcceptanceCoordinator } from '@/features/translation/conversation/ConversationAcceptanceCoordinator.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.TRANSLATION, 'UnifiedTranslationService');
 
@@ -37,6 +42,7 @@ export class UnifiedTranslationService {
     this.requestTracker = translationRequestTracker;
     this.resultDispatcher = new UnifiedResultDispatcher();
     this.modeCoordinator = new UnifiedModeCoordinator();
+    this.conversationAcceptanceCoordinator = new ConversationAcceptanceCoordinator();
 
     this.translationEngine = null;
     this.backgroundService = null;
@@ -180,12 +186,32 @@ export class UnifiedTranslationService {
 
       const requestUnitManifest = createRequestUnitManifest(data?.text);
       const operation = createTranslationOperation(messageId, requestUnitManifest);
+      const parentMetadata = Array.isArray(data?.conversationParents) ? data.conversationParents : [];
+      const providerName = registryIdToName(data?.provider);
+      const participates = await AIConversationHelper.getConversationParticipation({
+        callPurpose: TranslationCallPurpose.PRIMARY_TRANSLATION,
+        translateMode: data?.mode,
+        sessionId: request.data?.sessionId,
+        isAIProvider: isProviderType(providerName, ProviderTypes.AI),
+      });
+      if (parentMetadata.length > 0 && participates) {
+        operation.registerParentCandidates(parentMetadata.map((parent, sourceOrder) => ({
+          ...parent,
+          sourceOrder,
+          sessionId: request.data?.sessionId,
+          provider: providerName,
+          mode: data.mode,
+          callPurpose: TranslationCallPurpose.PRIMARY_TRANSLATION,
+          conversationParticipates: participates,
+        })));
+      }
       const executionContext = {
         operation,
         manifestView: createManifestView(requestUnitManifest),
         onTerminalUnitsAccepted: TerminalExecutionRouter.createTerminalUnitsObserver(operation),
       };
       this._setOperation(request, executionContext.operation);
+      this._registerConversationAcceptance(request, executionContext, providerName, participates);
 
       let result;
       try {
@@ -200,7 +226,11 @@ export class UnifiedTranslationService {
         const transition = isTimeout
           ? this.requestTracker.markTimeout(messageId)
           : this.requestTracker.failRequest(messageId, error);
-        if (!transition.accepted) return this._createSuppressedResponse(messageId, transition);
+        if (!transition.accepted) {
+          this.conversationAcceptanceCoordinator.remove(messageId);
+          return this._createSuppressedResponse(messageId, transition);
+        }
+        this.conversationAcceptanceCoordinator.remove(messageId);
         if (isTimeout) {
           await this._finalizeAcceptedTimeout(request, messageId, error.message);
         } else {
@@ -215,7 +245,10 @@ export class UnifiedTranslationService {
       }
 
       const transition = this.requestTracker.completeRequest(messageId, result);
-      if (!transition.accepted) return this._createSuppressedResponse(messageId, transition);
+      if (!transition.accepted) {
+        this.conversationAcceptanceCoordinator.remove(messageId);
+        return this._createSuppressedResponse(messageId, transition);
+      }
       TerminalExecutionRouter.routeTerminalExecution(executionContext.operation, { status: transition.status });
       this._finalizeDiagnostics(request, executionContext, {
         type: transition.status === RequestStatus.FAILED ? 'OPERATION_FAILED' : 'OPERATION_COMPLETED',
@@ -231,8 +264,10 @@ export class UnifiedTranslationService {
 
       try {
         await this.resultDispatcher.dispatchResult({ messageId, result, request, originalMessage: message });
+        this.conversationAcceptanceCoordinator.activate(messageId);
       } catch (error) {
         logger.error('Result dispatch failed:', error.message);
+        this.conversationAcceptanceCoordinator.remove(messageId);
         return MessageFormat.createErrorResponse(error, messageId);
       }
 
@@ -243,6 +278,7 @@ export class UnifiedTranslationService {
 
     } catch (error) {
       logger.debug('Request setup failed:', error.message);
+      this.conversationAcceptanceCoordinator.remove(messageId);
       if (tracked && this.requestTracker.isRequestActive(messageId)) {
         const transition = this.requestTracker.failRequest(messageId, error);
         if (!transition.accepted) return this._createSuppressedResponse(messageId, transition);
@@ -307,6 +343,7 @@ export class UnifiedTranslationService {
     const cancellation = this.requestTracker.cancelRequest(messageId, reason);
     if (!cancellation.accepted) return { handled: true, success: false, error: cancellation.reason };
 
+    this.conversationAcceptanceCoordinator.remove(messageId);
     const operation = this._getOperation(request);
     TerminalExecutionRouter.routeTerminalExecution(operation, { status: cancellation.status });
     this._finalizeDiagnostics(request, { operation }, {
@@ -326,6 +363,7 @@ export class UnifiedTranslationService {
     if (!request) return { handled: false, success: false, error: 'Request not found' };
     const timeout = this.requestTracker.markTimeout(messageId);
     if (!timeout.accepted) return { handled: true, success: false, error: timeout.reason };
+    this.conversationAcceptanceCoordinator.remove(messageId);
     await this._finalizeAcceptedTimeout(request, messageId, reason, timeoutType);
     return { handled: true, success: true };
   }
@@ -395,6 +433,42 @@ export class UnifiedTranslationService {
       }
     }
     this._clearOperation(request);
+  }
+
+  _registerConversationAcceptance(request, executionContext, providerName, participates) {
+    if (!participates) return false;
+
+    const parents = executionContext.operation.snapshotParentCandidates()
+      .filter(parent => parent.conversationParticipates && parent.cleanSource !== null)
+      .map(({ parentId, sourceOrder, cleanSource }) => ({ parentId, sourceOrder, cleanSource }));
+    if (parents.length === 0) return false;
+
+    try {
+      const handoff = new ConversationAcceptanceHandoff({
+        messageId: request.messageId,
+        sessionId: request.data?.sessionId,
+        provider: providerName,
+        mode: request.data?.mode,
+        parents,
+      });
+      const handle = new ConversationAcceptanceHandle(handoff);
+      if (this.conversationAcceptanceCoordinator.register(request.messageId, handle)) return true;
+
+      logger.warn(`[UnifiedTranslationService] Conversation acceptance registration rejected for ${request.messageId}`);
+      appendTranslationDiagnostic(executionContext, {
+        type: 'CONVERSATION_ACCEPTANCE_REGISTRATION_REJECTED',
+        stage: 'service',
+        reason: 'duplicate_message_id',
+      });
+    } catch (error) {
+      logger.warn(`[UnifiedTranslationService] Conversation acceptance handoff failed for ${request.messageId}:`, error.message);
+      appendTranslationDiagnostic(executionContext, {
+        type: 'CONVERSATION_ACCEPTANCE_HANDOFF_FAILED',
+        stage: 'service',
+        reason: error.message,
+      });
+    }
+    return false;
   }
 
   _setOperation(request, operation) {

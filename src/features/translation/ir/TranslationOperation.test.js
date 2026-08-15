@@ -1,11 +1,90 @@
 import { describe, expect, it } from 'vitest'
-import { createTranslationOperation, deriveRecoverySummary, recordProviderCompletion, RecoveryFinalOutcome } from './TranslationOperation.js'
+import { createTranslationOperation, deriveRecoverySummary, recordProviderCompletion, RecoveryFinalOutcome, ParentCandidateState } from './TranslationOperation.js'
 import { CompletionTermination, createCompletionRecord } from './CompletionContract.js'
 import { AIResponseParser } from '../providers/utils/AIResponseParser.js'
 import { ResponseFormat } from '@/shared/config/translationConstants.js'
 import { createManifestView, createRequestUnitManifest } from './RequestUnitManifest.js'
 
 describe('TranslationOperation', () => {
+  it('keeps parent candidates operation-scoped, write-once, and history-free', () => {
+    const operation = createTranslationOperation('parent-candidates')
+    const parent = operation.createParentCandidate({
+      parentId: 'g1', sourceOrder: 0, sessionId: 's1', provider: 'OpenAI', mode: 'select-element',
+      conversationParticipates: true, cleanSource: 'clean source',
+    })
+    const sameParent = operation.createParentCandidate({ parentId: 'g1', sourceOrder: 0, conversationParticipates: true })
+    const otherParent = operation.createParentCandidate({ parentId: 'g2', sourceOrder: 1, conversationParticipates: true })
+
+    expect(sameParent).toBeNull()
+    expect(parent).toBe(operation.getParentCandidate('g1'))
+    expect(otherParent).not.toBe(parent)
+    expect(parent.stageSource('replacement')).toBe(false)
+    expect(parent.stageResult('translated')).toBe(true)
+    expect(parent.state).toBe(ParentCandidateState.RESULT_STAGED)
+    expect(parent.stageSource('replacement')).toBe(false)
+    expect(parent).not.toHaveProperty('commit')
+    expect(parent.discard()).toBe(true)
+    expect(parent.discard()).toBe(false)
+    expect(operation.snapshotParentCandidates()).toEqual([
+      expect.objectContaining({ parentId: 'g1', cleanSource: 'clean source', cleanResult: 'translated', state: ParentCandidateState.DISCARDED }),
+      expect.objectContaining({ parentId: 'g2', state: ParentCandidateState.PROVISIONAL }),
+    ])
+  })
+
+  it('does not create parent candidates without participation', () => {
+    const operation = createTranslationOperation('non-participating')
+    expect(operation.createParentCandidate({ parentId: 'g1', conversationParticipates: false })).toBeNull()
+    expect(operation.snapshotParentCandidates()).toEqual([])
+  })
+
+  it('keeps result-staged state when source is staged afterward', () => {
+    const operation = createTranslationOperation('reverse-staging')
+    const candidate = operation.createParentCandidate({ parentId: 'g1', conversationParticipates: true })
+
+    expect(candidate.stageResult('translated')).toBe(true)
+    expect(candidate.state).toBe(ParentCandidateState.RESULT_STAGED)
+    expect(candidate.stageSource('source')).toBe(true)
+    expect(candidate.state).toBe(ParentCandidateState.RESULT_STAGED)
+  })
+
+  it('returns one parent candidate under concurrent fragment lookup', async () => {
+    const operation = createTranslationOperation('parallel-parent')
+    const lookups = await Promise.all([
+      Promise.resolve(operation.createParentCandidate({ parentId: 'g1', sourceOrder: 0, conversationParticipates: true })),
+      Promise.resolve(operation.getParentCandidate('g1')),
+      Promise.resolve(operation.getParentCandidate('g1')),
+    ])
+
+    expect(lookups[0]).toBe(lookups[1])
+    expect(lookups[1]).toBe(lookups[2])
+    expect(operation.snapshotParentCandidates()).toHaveLength(1)
+  })
+
+  it('registers duplicate parents once and preserves explicit source order', () => {
+    const operation = createTranslationOperation('registration')
+    expect(operation.registerParentCandidates([
+      { parentId: 'g2', sourceOrder: 7, conversationParticipates: true },
+      { parentId: 'g1', sourceOrder: 2, conversationParticipates: true },
+      { parentId: 'g2', sourceOrder: 99, conversationParticipates: true },
+    ])).toBe(2)
+
+    expect(operation.snapshotParentCandidates()).toEqual([
+      expect.objectContaining({ parentId: 'g2', sourceOrder: 7 }),
+      expect.objectContaining({ parentId: 'g1', sourceOrder: 2 }),
+    ])
+  })
+
+  it('discards and clears candidates on finalize', () => {
+    const operation = createTranslationOperation('finalize-parents')
+    const candidate = operation.createParentCandidate({ parentId: 'g1', conversationParticipates: true })
+
+    operation.finalize()
+
+    expect(operation.snapshotParentCandidates()).toEqual([])
+    expect(candidate.state).toBe(ParentCandidateState.DISCARDED)
+    expect(candidate.stageResult('late result')).toBe(false)
+    expect(operation.getParentCandidate('g1')).toBeNull()
+  })
   it('derives immutable recovery summaries from ordered diagnostics', () => {
     const report = Object.freeze({ entries: Object.freeze([
       Object.freeze({ type: 'RECOVERY_TRIGGERED', provider: 'A' }),

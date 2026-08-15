@@ -54,6 +54,7 @@ vi.mock('@/shared/messaging/core/ContentScriptIntegration.js', () => ({
 
 // Re-export mocked functions for easy access in tests
 const { registerTranslation, contentScriptIntegration } = await import('@/shared/messaging/core/ContentScriptIntegration.js');
+const { sendRegularMessage } = await import('@/shared/messaging/core/UnifiedMessaging.js');
 
 vi.mock('@/shared/error-management/ErrorHandler.js');
 vi.mock('@/shared/error-management/ErrorMatcher.js');
@@ -275,6 +276,43 @@ describe('DomTranslatorAdapter', () => {
 
       expect(result.success).toBe(true);
       expect(testElement.textContent).toContain('سلام');
+    });
+
+    it('should ACK non-fragmented parent after direct node acceptance', async () => {
+      contentScriptIntegration.sendTranslationRequest.mockResolvedValue({
+        success: true,
+        streaming: false,
+        translatedText: JSON.stringify([{ t: 'سلام', i: 'n1' }])
+      });
+
+      await adapter.translateElement(testElement);
+
+      expect(sendRegularMessage).toHaveBeenCalledWith(expect.objectContaining({
+        data: expect.objectContaining({ parentId: 'b1', cleanResult: 'سلام', accepted: true })
+      }), { silent: true });
+    });
+
+    it('should not guess parent identity from uid when blockId is missing', async () => {
+      const { collectTextNodes } = await import('./DomTranslatorUtils.js');
+      collectTextNodes.mockReturnValueOnce([
+        { node: testElement.firstChild, text: 'Hello', uid: 'node-only', role: 'div' }
+      ]);
+      contentScriptIntegration.sendTranslationRequest.mockResolvedValue({
+        success: true,
+        streaming: false,
+        translatedText: JSON.stringify([{ t: 'سلام', i: 'node-only' }])
+      });
+
+      await adapter.translateElement(testElement);
+
+      expect(sendRegularMessage).not.toHaveBeenCalledWith(expect.objectContaining({
+        action: expect.anything(),
+        data: expect.objectContaining({ parentId: 'node-only' })
+      }), expect.anything());
+      expect(adapter.logger.error).toHaveBeenCalledWith(
+        '[DomTranslatorAdapter] Missing canonical blockId for parent acceptance ACK',
+        expect.objectContaining({ code: 'MISSING_CANONICAL_PARENT_IDENTITY' })
+      );
     });
 
     it('should suppress a raw V2 fragment without mutating its node', async () => {

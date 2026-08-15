@@ -2,7 +2,7 @@
 
 Authoritative semantic contract for conversation/context participation in AI-provider translation. Conversation history represents accepted semantic translations, not provider transport activity.
 
-- **Owner(s)**: `TranslationSessionManager`, `AIConversationHelper`, conversation lifecycle, `OptimizedJsonHandler`, and feature acceptance boundaries.
+- **Owner(s)**: `TranslationSessionManager`, `AIConversationHelper`, `ConversationAcceptanceCoordinator`, `OptimizedJsonHandler`, and feature acceptance boundaries.
 - **Scope**: conversation participation, logical-parent turns, candidate lifecycle, and final acceptance for AI translation.
 - **Status**: semantic foundation for P8 implementation phases.
 
@@ -26,7 +26,10 @@ For structured Select Element translation, one logical parent is the semantic tr
 | --- | --- |
 | **ConversationSession** | Extension-managed in-memory conversation namespace. Owned by `TranslationSessionManager`; not provider-native state. |
 | **ConversationTurn** | One finally accepted semantic translation context. For Select Element structured AI translation, one turn represents one accepted logical parent. |
-| **ConversationCandidate** | Provisional parent-scoped source/result contribution awaiting final acceptance. It is not history. |
+| **ConversationCandidate** | Provisional parent-scoped source/result contribution used by non-migrated provider paths. It is not history. |
+| **ConversationAcceptanceHandoff** | Immutable Background-to-Content parent identity and clean-source handoff. |
+| **ConversationAcceptanceHandle** | Private mutable lifecycle state for one request's logical parents. |
+| **ConversationAcceptanceCoordinator** | Background owner of ACK routing, ordered commits, timeout, idempotency, and lifecycle cleanup. |
 | **HistoryRead** | Projection of committed conversation turns into an eligible provider prompt. Owned by `AIConversationHelper`. |
 | **HistoryWrite** | Creation of provisional semantic history data. It is not durable until commit. |
 | **HistoryCommit** | Irreversible append of one accepted `ConversationTurn` to session history. |
@@ -35,7 +38,7 @@ For structured Select Element translation, one logical parent is the semantic tr
 | **ProviderBatch** | Provider execution unit. It is not a canonical conversation unit. |
 | **PhysicalProviderResponse** | One provider response fact represented by an ADR-016 `CompletionRecord`. It is not history. |
 | **FeatureOperation** | One user translation workflow that may contain multiple logical parents. It is not automatically one conversation turn. |
-| **FinalAcceptance** | The earliest semantic point at which a `LogicalParent` is fully validated and accepted by the feature, making it eligible for both DOM commit and Conversation commit. It is not the DOM mutation itself. |
+| **FinalAcceptance** | Content-side point at which a `LogicalParent` is fully reconstructed, validated, and accepted, making it eligible for DOM commit and causing a parent ACK. It is not the DOM mutation itself. |
 | **stage** | Capture provisional parent-level semantic content before commit. |
 | **commit** | Persist one accepted turn into conversation history, at most once. |
 | **discard** | Drop provisional candidate without history mutation. |
@@ -132,16 +135,20 @@ For Select Element logical parents, the acceptance lifecycle is:
 ```text
 Provider execution
 → semantic validation
-→ feature acceptance = FinalAcceptance
-→ eligible for DOM commit
-→ eligible for Conversation commit
+→ immutable handoff registered in Background
+→ result dispatched to Content
+→ BlockGroupReconstructor.apply()
+→ FinalAcceptance
+→ PARENT_ACCEPTANCE_ACK
+→ ConversationAcceptanceCoordinator
+→ ordered commitAcceptedParent()
 ```
 
 `FinalAcceptance` is the earliest semantic point at which the parent is fully validated and accepted by the feature. It is not the DOM mutation itself. DOM commit and Conversation commit both consume the same accepted semantic parent; neither commit defines, replaces, or changes semantic acceptance.
 
 A failed parent produces neither normal conversation history nor a committed parent DOM result.
 
-DOM mutation and history storage remain separate responsibilities, but both consume the same accepted logical-parent result. A failure in one accepted parent does not roll back unrelated accepted parents.
+DOM mutation and history storage remain separate responsibilities, but both consume the same accepted logical-parent result. A failure in one parent emits a rejected ACK and writes no normal history. A failure does not roll back unrelated accepted parents.
 
 ---
 
@@ -200,23 +207,30 @@ provider failover
 
 ```text
 eligible logical parent begins
-→ parent candidate staged
+→ parent candidate/handoff created
 → provider/parser/recovery execution
-→ final parent acceptance
-→ abort/cancel check
-→ commit one ConversationTurn
+→ result dispatched to Content
+→ FinalAcceptance
+→ ACK
+→ ordered Coordinator commit
+→ one ConversationTurn
 ```
 
 - A `ConversationCandidate` is provisional and does not imply accepted history.
-- Provider-batch acceptance is necessary but not sufficient when a logical parent is fragmented.
+- For migrated Select Element parent lifecycles, provider adapters stage or discard provisional data; they never durably commit the parent.
+- `ConversationAcceptanceCoordinator` is the only durable writer for migrated parent lifecycles, through `TranslationSessionManager.commitAcceptedParent()`.
+- ACK activation starts only after successful result dispatch; registration alone starts no timer.
+- ACK timeout disposes the handle and removes the coordinator entry. Pending parents are discarded; accepted-but-uncommitted parents remain accepted in the disposed handle and cannot commit.
+- Late ACKs return `STALE`; duplicate ACKs cannot create duplicate writes.
 - Transport fragmentation does not create additional turns.
-- One parent with one fragment produces at most one turn.
-- One parent with five fragments produces at most one turn.
+- Non-fragmented and fragmented parents use identical parent-level semantics.
+- One accepted parent with one or five transport fragments produces exactly one turn.
 - Provider retries and failover do not create additional turns.
-- The final parent acceptance barrier must precede conversation commit.
-- The late-abort check runs after final acceptance and before commit.
+- The final parent acceptance barrier and ACK must precede conversation commit.
 
-**No commit before candidate acceptance.**
+**No migrated parent commit before Content ACK.**
+
+For non-migrated/direct provider paths, the existing provider candidate commit remains available. Such paths do not use the parent acceptance lifecycle and are outside this ACK contract.
 
 ---
 
@@ -294,6 +308,20 @@ timeout / signal aborted before commit
 - If the abort surfacing was a cancellation, it is raised as `USER_CANCELLED`; the canonical external timeout stays `TRANSLATION_TIMEOUT`.
 - **Late-commit guard:** after a discard or an aborted signal, `commit()` is a no-op (`settled` guard).
 
+Conversation acceptance timeout is separate from provider execution timeout:
+
+```text
+handle registered
+→ result dispatch succeeds
+→ acceptance window activated
+→ ACK timeout
+→ pending parents discarded
+→ handle disposed and coordinator entry removed
+→ late ACK = STALE
+```
+
+Timeout cleanup never creates history and never rewrites an `ACCEPTED` parent as `REJECTED`.
+
 ---
 
 ## 9. Cancellation Lifecycle
@@ -324,7 +352,7 @@ commit:   at most once per accepted logical parent
 discard:  at most once for the parent terminal path
 ```
 
-- Candidate is parent-scoped for eligible fragmented structured work and must not be independently committed per provider batch.
+- Candidate is parent-scoped for eligible migrated Select Element work and must not be independently committed per provider batch.
 - `stage` captures semantic parent content only while the candidate remains provisional.
 - `commit` is allowed only after final logical-parent acceptance and the cancellation check.
 - `discard` invalidates the entire provisional parent contribution.
@@ -447,9 +475,9 @@ Align history reads and writes with the participation predicate. History-disable
 
 Introduce parent-scoped provisional conversation data without independently committing provider-batch or fragment contributions.
 
-### P8.3 — Fragmented Parent Commit
+### P8.3 — Parent Acceptance Commit
 
-Commit one clean turn only after final logical-parent acceptance. Discard the entire parent contribution on parent validation failure, cancellation, timeout, or reconstruction failure.
+Commit one clean turn only after Content FinalAcceptance and ACK. Discard or reject the parent contribution on parent validation failure, cancellation, timeout, dispatch failure, or reconstruction failure.
 
 ### P8.4 — Non-Fragmented Alignment
 
@@ -457,7 +485,7 @@ Evaluate the same parent-level lifecycle for non-fragmented Select Element paren
 
 ### P8.5 — Documentation and Cleanup
 
-Remove obsolete provider-batch conversation assumptions only after runtime alignment is complete.
+Synchronize documentation with parent acceptance ownership. Legacy provider candidate commits remain valid only for non-migrated paths.
 
 These phases must not change ADR-015 outcome semantics or ADR-016 completion semantics.
 

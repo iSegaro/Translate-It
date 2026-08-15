@@ -83,7 +83,7 @@ describe('TranslationSessionManager', () => {
   });
 
   describe('Message History', () => {
-    it('should add messages to history', () => {
+  it('should add messages to history', () => {
       const id = 'msg-test';
       sessionManager.getOrCreateSession(id, 'P');
       sessionManager.addMessage(id, 'user', 'hello');
@@ -107,6 +107,19 @@ describe('TranslationSessionManager', () => {
       expect(session.history[0].content).toBe('content-5');
       expect(session.history[19].content).toBe('content-24');
     });
+  });
+
+  it('commits accepted parent through session-owned history API', () => {
+    const session = sessionManager.getOrCreateSession('accepted-parent', 'OpenAI');
+
+    expect(sessionManager.commitAcceptedParent({
+      sessionId: session.id,
+      provider: 'OpenAI',
+      cleanSource: 'source',
+      cleanResult: 'translated',
+    })).toBe(true);
+    expect(session.history.map(message => message.content)).toEqual(['source', 'translated']);
+    expect(session.batchCount).toBe(1);
   });
 
   describe('Turn Management', () => {

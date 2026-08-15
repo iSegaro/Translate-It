@@ -170,7 +170,9 @@ describe('BlockGroupReconstructor', () => {
     it('should accept hydration adjustments but reject content changes', () => {
       textNodes[0].nodeValue = 'Hello\u00A0'; // nbsp
       const translated = 'مرحبا @@SEG_n2@@بالعالم@@SEG_n3@@.';
-      expect(BlockGroupReconstructor.apply(units, translated, 'fa', document.body)).toBe(true);
+       const result = BlockGroupReconstructor.apply(units, translated, 'fa', document.body);
+       expect(result.success).toBe(true);
+       expect(result.cleanResult).toBe('مرحبا بالعالم.');
     });
 
     it('should correctly unescape entropy-scoped escaping in apply()', () => {

@@ -441,7 +441,11 @@ export class BaseAIProvider extends BaseProvider {
       throw cancelError;
     }
 
-    await conversationCommitCandidate?.commit();
+    if (!contextMetadata?.useParentConversationLifecycle) {
+      await conversationCommitCandidate?.commit();
+    } else {
+      conversationCommitCandidate?.discard();
+    }
     return acceptedResults;
   }
 
