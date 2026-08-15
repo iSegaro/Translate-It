@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 const loggerDebug = vi.hoisted(() => vi.fn());
+const resolveOperationSourceLanguage = vi.hoisted(() => vi.fn());
 
 // Mock webextension-polyfill
 vi.mock('webextension-polyfill', () => ({
@@ -50,6 +51,10 @@ vi.mock('@/features/translation/core/TranslationStatsManager.js', () => ({
   }
 }));
 
+vi.mock('@/features/translation/core/OperationSourceLanguageResolver.js', () => ({
+  resolveOperationSourceLanguage,
+}));
+
 vi.mock('@/features/translation/ir/TranslationOperation.js', () => ({
   appendTranslationDiagnostic: vi.fn()
 }));
@@ -95,6 +100,10 @@ describe('OptimizedJsonHandler', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     loggerDebug.mockClear();
+    resolveOperationSourceLanguage.mockResolvedValue({
+      canBypassSequentialGate: false,
+      bypassReason: 'LOW_CONFIDENCE',
+    });
 
     // Default mock behavior for ErrorMatcher
     isFatalError.mockImplementation((err) => err?.isFatal || false);
@@ -1381,6 +1390,136 @@ describe('OptimizedJsonHandler', () => {
 
       secondBatch.resolve({ translatedText: ['t2'] });
       await execution;
+    });
+
+    it('should dispatch all stateless AUTO batches immediately for a bypass-safe resolution', async () => {
+      const firstBatch = createDeferred();
+      const secondBatch = createDeferred();
+      resolveOperationSourceLanguage.mockResolvedValueOnce({
+        canBypassSequentialGate: true,
+        bypassReason: 'HIGH_CONFIDENCE_STATISTICAL',
+        effectiveSourceLanguage: 'en',
+        effectiveTargetLanguage: 'fa',
+        detection: { confidence: 'high', provenance: 'statistical' },
+      });
+      mockProvider.translate
+        .mockImplementationOnce(() => firstBatch.promise)
+        .mockImplementationOnce(() => secondBatch.promise);
+
+      const execution = handler.execute(mockEngine, mockData, mockProvider, 'auto', 'fa', 'msg-auto-bypass', mockSender);
+
+      await vi.waitFor(() => expect(mockProvider.translate).toHaveBeenCalledTimes(2));
+      expect(resolveOperationSourceLanguage).toHaveBeenCalledTimes(1);
+      expect(mockProvider.translate.mock.calls[0][1]).toBe('en');
+      expect(mockProvider.translate.mock.calls[0][2]).toBe('fa');
+      expect(mockProvider.translate.mock.calls[1][1]).toBe('en');
+      expect(mockProvider.translate.mock.calls[1][2]).toBe('fa');
+
+      secondBatch.resolve({ translatedText: ['t2'] });
+      firstBatch.resolve({ translatedText: ['t1'], detectedLanguage: 'de' });
+      const result = await execution;
+
+      expect(result.results).toEqual(['t1', 't2']);
+      expect(result.results).not.toContain('de');
+    });
+
+    it('should propagate one swapped source/target pair to every bypassed batch', async () => {
+      const firstBatch = createDeferred();
+      const secondBatch = createDeferred();
+      resolveOperationSourceLanguage.mockResolvedValueOnce({
+        canBypassSequentialGate: true,
+        bypassReason: 'LANGUAGE_SPECIFIC_DETERMINISTIC',
+        effectiveSourceLanguage: 'fa',
+        effectiveTargetLanguage: 'en',
+        detection: { confidence: 'high', provenance: 'deterministic-script' },
+      });
+      mockProvider.translate
+        .mockImplementationOnce(() => firstBatch.promise)
+        .mockImplementationOnce(() => secondBatch.promise);
+
+      const execution = handler.execute(mockEngine, mockData, mockProvider, 'auto', 'fa', 'msg-auto-swap', mockSender);
+
+      await vi.waitFor(() => expect(mockProvider.translate).toHaveBeenCalledTimes(2));
+      expect(mockProvider.translate.mock.calls[0].slice(1, 3)).toEqual(['fa', 'en']);
+      expect(mockProvider.translate.mock.calls[1].slice(1, 3)).toEqual(['fa', 'en']);
+
+      firstBatch.resolve({ translatedText: ['t1'] });
+      secondBatch.resolve({ translatedText: ['t2'] });
+      await execution;
+    });
+
+    it.each([
+      ['EXACT_CACHE_NOT_VERIFIED'],
+      ['MIXED_LANGUAGE_RISK'],
+    ])('should retain first-batch fallback for denied AUTO resolution: %s', async (bypassReason) => {
+      const firstBatch = createDeferred();
+      const secondBatch = createDeferred();
+      resolveOperationSourceLanguage.mockResolvedValueOnce({
+        canBypassSequentialGate: false,
+        bypassReason,
+      });
+      mockProvider.translate
+        .mockImplementationOnce(() => firstBatch.promise)
+        .mockImplementationOnce(() => secondBatch.promise);
+
+      const execution = handler.execute(mockEngine, mockData, mockProvider, 'auto', 'fa', `msg-auto-${bypassReason}`, mockSender);
+
+      await vi.waitFor(() => expect(mockProvider.translate).toHaveBeenCalledTimes(1));
+      firstBatch.resolve({ translatedText: ['t1'], detectedLanguage: 'en' });
+      await vi.waitFor(() => expect(mockProvider.translate).toHaveBeenCalledTimes(2));
+      secondBatch.resolve({ translatedText: ['t2'] });
+      await execution;
+    });
+
+    it('should keep high-confidence AUTO operations sequential when history is enabled', async () => {
+      const { getAIConversationHistoryEnabledAsync } = await import('@/shared/config/config.js');
+      getAIConversationHistoryEnabledAsync.mockResolvedValue(true);
+      resolveOperationSourceLanguage.mockResolvedValueOnce({
+        canBypassSequentialGate: true,
+        effectiveSourceLanguage: 'en',
+        effectiveTargetLanguage: 'fa',
+      });
+      const firstBatch = createDeferred();
+      const secondBatch = createDeferred();
+      mockProvider.translate
+        .mockImplementationOnce(() => firstBatch.promise)
+        .mockImplementationOnce(() => secondBatch.promise);
+
+      const execution = handler.execute(mockEngine, mockData, mockProvider, 'auto', 'fa', 'msg-auto-history', mockSender);
+
+      await vi.waitFor(() => expect(mockProvider.translate).toHaveBeenCalledTimes(1));
+      expect(resolveOperationSourceLanguage).not.toHaveBeenCalled();
+      firstBatch.resolve({ translatedText: ['t1'] });
+      await vi.waitFor(() => expect(mockProvider.translate).toHaveBeenCalledTimes(2));
+      secondBatch.resolve({ translatedText: ['t2'] });
+      await execution;
+      getAIConversationHistoryEnabledAsync.mockResolvedValue(false);
+    });
+
+    it('should abort in-flight siblings when a bypassed batch fails fatally', async () => {
+      const fatalError = new Error('429 Too Many Requests');
+      fatalError.isFatal = true;
+      const siblingBatch = createDeferred();
+      resolveOperationSourceLanguage.mockResolvedValueOnce({
+        canBypassSequentialGate: true,
+        bypassReason: 'HIGH_CONFIDENCE_STATISTICAL',
+        effectiveSourceLanguage: 'en',
+        effectiveTargetLanguage: 'fa',
+        detection: { confidence: 'high', provenance: 'statistical' },
+      });
+      mockProvider.translate
+        .mockRejectedValueOnce(fatalError)
+        .mockImplementationOnce(() => siblingBatch.promise);
+
+      const execution = handler.execute(mockEngine, mockData, mockProvider, 'auto', 'fa', 'msg-auto-fatal', mockSender);
+      await vi.waitFor(() => expect(mockProvider.translate).toHaveBeenCalledTimes(2));
+      siblingBatch.resolve({ translatedText: ['late-sibling'] });
+
+      const result = await execution;
+
+      expect(mockAbortController.abort).toHaveBeenCalled();
+      expect(result.success).toBe(false);
+      expect(result.results).not.toContain('late-sibling');
     });
 
     it('should ignore late parallel batch completions after response resolution cancellation', async () => {
@@ -3027,7 +3166,7 @@ describe('OptimizedJsonHandler', () => {
         batches.forEach(([part]) => expect(part.fragmentCount).toBe(3));
       });
 
-      it('buffers abbreviated V3 fragments and emits the assembled parent once (auto first-batch, out-of-order)', async () => {
+      it('buffers abbreviated V3 fragments and emits the assembled parent once (auto bypass, out-of-order)', async () => {
         const browser = (await import('webextension-polyfill')).default;
         browser.tabs.sendMessage.mockClear();
 
@@ -3041,6 +3180,13 @@ describe('OptimizedJsonHandler', () => {
           calls.push({ texts, resolve: deferred.resolve });
           return deferred.promise;
         });
+        resolveOperationSourceLanguage.mockResolvedValueOnce({
+          canBypassSequentialGate: true,
+          bypassReason: 'HIGH_CONFIDENCE_STATISTICAL',
+          effectiveSourceLanguage: 'en',
+          effectiveTargetLanguage: 'fa',
+          detection: { confidence: 'high', provenance: 'statistical' },
+        });
 
         const execution = handler.execute(
           mockEngine,
@@ -3048,19 +3194,16 @@ describe('OptimizedJsonHandler', () => {
           mockProvider, 'auto', 'fa', 'msg-abbrev-v3', mockSender
         );
 
-        // Auto-detection mode: first batch (fragment 0) resolves sequentially.
-        await vi.waitFor(() => expect(calls.length).toBe(1));
-        expect(calls[0].texts).toEqual([expect.stringContaining(M(2))]);
-
-        // Fragment 0 completes; sibling fragments not yet complete => no stream.
-        calls[0].resolve({ translatedText: [toTranslated(calls[0].texts[0])] });
+        // High-confidence operation resolution starts all fragments together.
         await vi.waitFor(() => expect(calls.length).toBe(3));
+        expect(calls[0].texts).toEqual([expect.stringContaining(M(2))]);
 
         let updates = await streamUpdates();
         expect(updates).toHaveLength(0);
 
-        // Out-of-order completion: fragment 2 resolves before fragment 1.
+        // Out-of-order completion: fragment 2 and fragment 0 resolve first.
         calls[2].resolve({ translatedText: [toTranslated(calls[2].texts[0])] });
+        calls[0].resolve({ translatedText: [toTranslated(calls[0].texts[0])] });
         await Promise.resolve();
         updates = await streamUpdates();
         expect(updates).toHaveLength(0);
