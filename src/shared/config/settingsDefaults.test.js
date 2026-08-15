@@ -23,6 +23,7 @@ describe('getPersistedDefaultSettings', () => {
 
     expect(defaults.THEME).toBe(CONFIG.THEME);
     expect(defaults.TIMEOUT).toBe(CONFIG.TIMEOUT);
+    expect(defaults.GEMINI_THINKING_MODE).toBe('default');
     expect(defaults.TEXT_FIELD_SHORTCUT).toBe(CONFIG.TEXT_FIELD_SHORTCUT);
     expect(defaults.translationHistory).toBeUndefined();
     expect(defaults.PROMPT_TEMPLATE).toBe(CONFIG.PROMPT_TEMPLATE);

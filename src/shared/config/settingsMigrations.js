@@ -250,6 +250,16 @@ function runMainMigration(currentSettings) {
     }
   });
 
+  // Migrate legacy Gemini thinking toggle without deleting it for downgrade compatibility.
+  const thinkingMode = currentSettings.GEMINI_THINKING_MODE;
+  if (thinkingMode !== 'default' && thinkingMode !== 'minimal') {
+    const migratedThinkingMode = Object.prototype.hasOwnProperty.call(currentSettings, 'GEMINI_THINKING_MODE')
+      ? 'default'
+      : currentSettings.GEMINI_THINKING_ENABLED === true ? 'minimal' : 'default';
+    updates.GEMINI_THINKING_MODE = migratedThinkingMode;
+    migrationLog.push(`Migrated GEMINI_THINKING_MODE to ${migratedThinkingMode}`);
+  }
+
   // A2. Legacy storage cleanup: non-editable prompt wrappers were persisted by
   // older versions. Remove leftover copies so storage no longer carries them.
   const removals = currentSettings

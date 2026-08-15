@@ -116,6 +116,23 @@ describe('Settings Migrations', () => {
     expect(logs).toContain('Migrated API_KEY to GEMINI_API_KEY (multi-key support)');
   });
 
+  it.each([
+    [{ GEMINI_THINKING_ENABLED: false }, 'default'],
+    [{ GEMINI_THINKING_ENABLED: true }, 'minimal'],
+    [{ GEMINI_THINKING_ENABLED: true, GEMINI_THINKING_MODE: 'invalid' }, 'default'],
+    [{}, 'default'],
+  ])('migrates Gemini thinking setting %o to %s', async (currentSettings, expectedMode) => {
+    const { updates } = await runSettingsMigrations(currentSettings);
+
+    expect(updates.GEMINI_THINKING_MODE).toBe(expectedMode);
+  });
+
+  it('preserves legacy Gemini thinking setting during migration', async () => {
+    const { updates } = await runSettingsMigrations({ GEMINI_THINKING_ENABLED: true });
+
+    expect(updates.GEMINI_THINKING_ENABLED).toBeUndefined();
+  });
+
   it('should preserve user sensitive data like translationHistory', async () => {
     const history = [{ text: 'a', translated: 'b' }];
     const currentSettings = {

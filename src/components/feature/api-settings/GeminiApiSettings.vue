@@ -49,31 +49,29 @@
         {{ t('gemini_custom_api_url_info') || 'Enter the complete API URL including the model name' }}
       </p>
     </div>
-    <div
-      v-if="isThinkingSupported"
-      class="setting-group vertical"
-    >
-      <BaseCheckbox
-        v-model="geminiThinking"
-        :disabled="!isThinkingControllable"
-        :label="t('gemini_thinking_label') || 'Enable Thinking Mode'"
+    <div class="setting-group vertical">
+      <label>{{ t('gemini_thinking_mode_label') || 'Thinking Mode' }}</label>
+      <BaseSelect
+        v-model="geminiThinkingMode"
+        :options="geminiThinkingModeOptions"
+        class="thinking-mode-select"
+        :style="rtlSelectStyle"
       />
       <p class="setting-description">
-        {{ t('gemini_thinking_description') || thinkingDescription }}
+        {{ t('gemini_thinking_mode_description') || 'Provider Default uses provider behavior. Minimal is stored for future provider support.' }}
       </p>
     </div>
   </div>
 </template>
 
 <script setup>
-import { computed, ref, onMounted, watch } from 'vue'
+import { computed, ref, onMounted } from 'vue'
 import "./GeminiApiSettings.scss"
 import { useI18n } from 'vue-i18n'
 import { useSettingsStore } from '@/features/settings/stores/settings.js'
 import { CONFIG } from '@/shared/config/config.js'
 import BaseInput from '@/components/base/BaseInput.vue'
 import BaseSelect from '@/components/base/BaseSelect.vue'
-import BaseCheckbox from '@/components/base/BaseCheckbox.vue'
 import ApiKeyInput from './ApiKeyInput.vue'
 import { useRTLSelect } from '@/composables/ui/useRTLSelect.js'
 import { ApiKeyManager } from '@/features/translation/providers/ApiKeyManager.js'
@@ -113,10 +111,15 @@ const geminiModel = computed({
   }
 })
 
-const geminiThinking = computed({
-  get: () => settingsStore.settings?.GEMINI_THINKING_ENABLED ?? true,
-  set: (value) => settingsStore.updateSettingLocally('GEMINI_THINKING_ENABLED', value)
+const geminiThinkingMode = computed({
+  get: () => settingsStore.settings?.GEMINI_THINKING_MODE || 'default',
+  set: (value) => settingsStore.updateSettingLocally('GEMINI_THINKING_MODE', value)
 })
+
+const geminiThinkingModeOptions = computed(() => [
+  { value: 'default', label: t('gemini_thinking_mode_default') || 'Provider Default' },
+  { value: 'minimal', label: t('gemini_thinking_mode_minimal') || 'Minimal' }
+])
 
 // Get model options from settingsStore to maintain consistency with migrations
 const geminiModelOptions = computed(() => {
@@ -126,11 +129,6 @@ const geminiModelOptions = computed(() => {
     label: model.name || model.value
   }))
 })
-
-// Track thinking mode properties for current model
-const isThinkingSupported = ref(false)
-const isThinkingControllable = ref(true)
-const thinkingDescription = ref('Allow the model to think step-by-step before responding.')
 
 // Test keys functionality
 const testingKeys = ref(false)
@@ -173,49 +171,6 @@ const testKeys = async (providerName) => {
     testingKeys.value = false
   }
 }
-
-// Watch for model changes to update thinking mode availability
-const updateThinkingModeAvailability = (newModel) => {
-  const modelConfig = CONFIG.GEMINI_MODELS?.find(model => model.value === newModel)
-  if (modelConfig && modelConfig.thinking) {
-    const { supported, controllable, defaultEnabled } = modelConfig.thinking
-
-    isThinkingSupported.value = supported
-
-    if (supported) {
-      isThinkingControllable.value = controllable
-
-      // Update description based on model
-      if (newModel === 'gemini-2.5-pro' && !controllable) {
-        thinkingDescription.value = 'Thinking mode is always enabled for Gemini 2.5 Pro and cannot be disabled.'
-      } else {
-        thinkingDescription.value = 'Allow the model to think step-by-step before responding.'
-      }
-
-      // Set default value for non-controllable models
-      if (!controllable) {
-        geminiThinking.value = defaultEnabled
-      }
-    }
-  } else {
-    // For custom models, allow user to control thinking mode
-    if (newModel === 'custom') {
-      isThinkingSupported.value = true
-      isThinkingControllable.value = true
-      thinkingDescription.value = 'Allow the model to think step-by-step before responding.'
-    } else {
-      // For unknown models or those without thinking support
-      isThinkingSupported.value = false
-      isThinkingControllable.value = false
-    }
-  }
-}
-
-// Watch for selectedModelOption changes to update thinking mode availability
-const watchRef = ref(null)
-watchRef.value = watch(selectedModelOption, (newModel) => {
-  updateThinkingModeAvailability(newModel)
-}, { immediate: true })
 
 // Initialize model selection on mount
 onMounted(() => {

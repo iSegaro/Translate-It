@@ -114,6 +114,7 @@ export const CONFIG = {
   GEMINI_API_URL: "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent", // Default Gemini API URL
   GEMINI_MODEL: "gemini-2.5-flash", // Selected Gemini model
   GEMINI_THINKING_ENABLED: false, // Enable/disable thinking for supported models
+  GEMINI_THINKING_MODE: "default", // Provider default or deferred minimal thinking mode
   GEMINI_MODELS: [
     // Gemini 3.1 Series (NEW - Latest & Most Advanced)
     { value: "gemini-3.1-pro-preview", name: "Gemini 3.1 Pro Preview", url: "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-pro-preview:generateContent", thinking: { supported: true, controllable: false, defaultEnabled: false } },
@@ -800,9 +801,6 @@ export const getApiKeyAsync = async () => {
 
 export const getGeminiModelAsync = async () => {
   return getSettingValueAsync("GEMINI_MODEL", CONFIG.GEMINI_MODEL);
-};
-export const getGeminiThinkingEnabledAsync = async () => {
-  return getSettingValueAsync("GEMINI_THINKING_ENABLED", CONFIG.GEMINI_THINKING_ENABLED);
 };
 
 export const getGeminiApiUrlAsync = async () => {

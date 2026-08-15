@@ -1841,11 +1841,17 @@
   "ERRORS_USER_CANCELLED": {
     "message": "Translation cancelled by user."
   },
-  "gemini_thinking_label": {
-    "message": "Enable Thinking Mode"
+  "gemini_thinking_mode_label": {
+    "message": "Thinking Mode"
   },
-  "gemini_thinking_description": {
-    "message": "Allow the model to think step-by-step before responding."
+  "gemini_thinking_mode_default": {
+    "message": "Provider Default"
+  },
+  "gemini_thinking_mode_minimal": {
+    "message": "Minimal"
+  },
+  "gemini_thinking_mode_description": {
+    "message": "Provider Default uses provider behavior. Minimal is saved for future provider support."
   },
   "advance_section_title": {
     "message": "Advanced Settings"

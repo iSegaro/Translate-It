@@ -1841,11 +1841,17 @@
   "ERRORS_USER_CANCELLED": {
     "message": "ترجمه توسط کاربر لغو شد."
   },
-  "gemini_thinking_label": {
-    "message": "فعال‌سازی حالت تفکر"
+  "gemini_thinking_mode_label": {
+    "message": "حالت تفکر"
   },
-  "gemini_thinking_description": {
-    "message": "اجازه دهید مدل قبل از پاسخ، گام به گام فکر کند."
+  "gemini_thinking_mode_default": {
+    "message": "پیش‌فرض سرویس‌دهنده"
+  },
+  "gemini_thinking_mode_minimal": {
+    "message": "حداقلی"
+  },
+  "gemini_thinking_mode_description": {
+    "message": "پیش‌فرض سرویس‌دهنده از رفتار سرویس استفاده می‌کند. حالت حداقلی برای پشتیبانی آینده ذخیره می‌شود."
   },
   "advance_section_title": {
     "message": "بخش پیشرفته"
