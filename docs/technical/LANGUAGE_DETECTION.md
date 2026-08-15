@@ -74,11 +74,31 @@ The system handles two primary responsibilities:
 ### 1. `LanguageDetectionService.js` (The Brain)
 The central orchestrator for all detection and direction requests. It manages:
 - **`detect(text, options)`**: Main entry point for identifying the language code.
+- **`detectDetailed(text, options)`**: Metadata-bearing detection contract for future confidence-aware routing. Returns `language`, `confidence`, `provenance`, `reliable`, and numeric `percentage` only when supplied by browser statistical detection.
 - **`isRTL(langCodeOrName)`**: Checks if a language code (or full name) is natively RTL using the master `RTL_LANGUAGES` set.
 - **`getDirection(text, langCode)`**: The unified method to determine `rtl` or `ltr`. It intelligently combines language hints and content analysis.
 - **Layer 0 Cache**: A dual-mode session cache storing exact text matches (`textHash`) and URL-based script inheritance (`URL + ScriptFamily`).
 - **Provider Feedback Loop**: Implements `registerDetectionResult(text, lang, context)` to ingest verified detections.
 - **Cache Invalidation**: Listens to `browser.storage.onChanged` to clear detection history when settings change.
+
+#### Detection Metadata Contract
+
+`detectDetailed()` preserves the existing detection pipeline and returns:
+
+```js
+{
+  language: 'en' | null,
+  confidence: 'high' | 'medium' | 'low' | 'unknown',
+  provenance: 'exact-cache' | 'contextual-cache' | 'statistical'
+    | 'deterministic-script' | 'user-language' | 'heuristic' | 'unknown',
+  reliable: boolean,
+  percentage: number | null
+}
+```
+
+`percentage` is exposed only when browser statistical detection supplies a finite numeric value. Exact verified cache hits are high-confidence; contextual script-family cache inheritance is medium-confidence and not reliable. Accepted statistical results are high-confidence when browser reliability is true or percentage exceeds 85, otherwise medium-confidence. Deterministic unique markers are high-confidence. User-language and heuristic fallbacks are low-confidence. Unknown or rejected results return `language: null` with `confidence` and `provenance` set to `unknown`.
+
+`detect()` remains the legacy single-pass projection and returns `result.language` as `string | null`. Existing callers do not need migration.
 
 ### 2. `textAnalysis.js` (The Engine)
 Contains low-level Unicode range analysis and script-specific detection functions.
@@ -204,4 +224,3 @@ const { textDirectionStyle } = useTextDirection(text, langCode);
 
 ---
 **Last Updated**: May 2026
-

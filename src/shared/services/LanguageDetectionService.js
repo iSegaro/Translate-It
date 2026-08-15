@@ -87,6 +87,48 @@ export function sanitizeDetectionSample(text) {
 const SESSION_CACHE = new Map();
 const MAX_CACHE_SIZE = 500;
 
+export const DETECTION_CONFIDENCE = Object.freeze({
+  HIGH: 'high',
+  MEDIUM: 'medium',
+  LOW: 'low',
+  UNKNOWN: 'unknown',
+});
+
+export const DETECTION_PROVENANCE = Object.freeze({
+  EXACT_CACHE: 'exact-cache',
+  CONTEXTUAL_CACHE: 'contextual-cache',
+  STATISTICAL: 'statistical',
+  DETERMINISTIC_SCRIPT: 'deterministic-script',
+  USER_LANGUAGE: 'user-language',
+  HEURISTIC: 'heuristic',
+  UNKNOWN: 'unknown',
+});
+
+/**
+ * @typedef {Object} DetectionResult
+ * @property {string|null} language
+ * @property {'high'|'medium'|'low'|'unknown'} confidence
+ * @property {'exact-cache'|'contextual-cache'|'statistical'|'deterministic-script'|'user-language'|'heuristic'|'unknown'} provenance
+ * @property {boolean} reliable
+ * @property {number|null} percentage Browser statistical percentage when available
+ */
+
+const unknownDetection = () => ({
+  language: null,
+  confidence: DETECTION_CONFIDENCE.UNKNOWN,
+  provenance: DETECTION_PROVENANCE.UNKNOWN,
+  reliable: false,
+  percentage: null,
+});
+
+const createDetection = (language, confidence, provenance, reliable, percentage = null) => ({
+  language,
+  confidence,
+  provenance,
+  reliable,
+  percentage,
+});
+
 // Cleanup cache when provider or detection preferences change to ensure fresh detection
 if (typeof browser !== 'undefined' && browser.storage && browser.storage.onChanged) {
   browser.storage.onChanged.addListener((changes) => {
@@ -206,7 +248,7 @@ export class LanguageDetectionService {
   }
 
   /**
-   * Main detection entry point
+   * Detailed detection entry point
    * 0. Layer 0: Session Cache (Contextual & Exact)
    * 1. Layer 1: Deterministic Layer (Unique Markers)
    * 2. Layer 2: Statistical Layer (Browser API)
@@ -214,10 +256,10 @@ export class LanguageDetectionService {
    *
    * @param {string} text - Text to analyze
    * @param {Object} options - Detection options (url, tabId)
-   * @returns {string|null} Detected language code
+   * @returns {Promise<DetectionResult>} Detection metadata contract
    */
-  static async detect(text, options = {}) {
-    if (!text || typeof text !== 'string' || !text.trim()) return null;
+  static async detectDetailed(text, options = {}) {
+    if (!text || typeof text !== 'string' || !text.trim()) return unknownDetection();
 
     try {
       const sample = text.trim();
@@ -227,7 +269,12 @@ export class LanguageDetectionService {
       const exactCached = SESSION_CACHE.get(`text:${sample}`);
       if (exactCached) {
         logger.debug(`[LanguageDetectionService] Layer 0: Exact match cache hit: ${exactCached}`);
-        return exactCached;
+        return createDetection(
+          exactCached,
+          DETECTION_CONFIDENCE.HIGH,
+          DETECTION_PROVENANCE.EXACT_CACHE,
+          true,
+        );
       }
 
       // Check for URL/Script-based inheritance
@@ -236,7 +283,12 @@ export class LanguageDetectionService {
         const contextualCached = SESSION_CACHE.get(`url:${options.url}:${scriptFamily}`);
         if (contextualCached) {
           logger.debug(`[LanguageDetectionService] Layer 0: Contextual cache hit (${scriptFamily}): ${contextualCached}`);
-          return contextualCached;
+          return createDetection(
+            contextualCached,
+            DETECTION_CONFIDENCE.MEDIUM,
+            DETECTION_PROVENANCE.CONTEXTUAL_CACHE,
+            false,
+          );
         }
       }
 
@@ -342,8 +394,19 @@ export class LanguageDetectionService {
                 return null;
               }
 
+              const percentage = typeof top.percentage === 'number' && Number.isFinite(top.percentage)
+                ? top.percentage
+                : null;
+              const reliable = result.isReliable === true || (percentage !== null && percentage > 85);
+
               logger.debug(`[LanguageDetectionService] Statistical detection accepted: ${lang}`);
-              return lang;
+              return createDetection(
+                lang,
+                reliable ? DETECTION_CONFIDENCE.HIGH : DETECTION_CONFIDENCE.MEDIUM,
+                DETECTION_PROVENANCE.STATISTICAL,
+                reliable,
+                percentage,
+              );
             }
           }
         } catch (err) {
@@ -392,11 +455,25 @@ export class LanguageDetectionService {
         if (statistical) return statistical;
 
         const deterministic = getDeterministicResult();
-        if (deterministic) return deterministic;
+        if (deterministic) {
+          return createDetection(
+            deterministic,
+            DETECTION_CONFIDENCE.HIGH,
+            DETECTION_PROVENANCE.DETERMINISTIC_SCRIPT,
+            true,
+          );
+        }
       } else {
         // Short text: Deterministic -> (User Priority for Latin) -> Statistical -> Heuristic
         const deterministic = getDeterministicResult();
-        if (deterministic) return deterministic;
+        if (deterministic) {
+          return createDetection(
+            deterministic,
+            DETECTION_CONFIDENCE.HIGH,
+            DETECTION_PROVENANCE.DETERMINISTIC_SCRIPT,
+            true,
+          );
+        }
 
         // Special handling for Latin Script Priority:
         // If it's Latin and the user has a specific priority (NOT 'none'), apply it BEFORE statistical detection.
@@ -405,7 +482,12 @@ export class LanguageDetectionService {
           const userLatinPriority = preferences['latin-script'];
           if (userLatinPriority && LATIN_SCRIPT_PRIORITY_LANGUAGES.includes(userLatinPriority)) {
             logger.debug(`[LanguageDetectionService] Applying User Latin Priority: ${userLatinPriority}`);
-            return userLatinPriority;
+            return createDetection(
+              userLatinPriority,
+              DETECTION_CONFIDENCE.LOW,
+              DETECTION_PROVENANCE.USER_LANGUAGE,
+              false,
+            );
           }
         }
 
@@ -415,12 +497,28 @@ export class LanguageDetectionService {
 
       // Final fallback
       const heuristic = getHeuristicResult();
-      if (heuristic) return heuristic;
+      if (heuristic) {
+        return createDetection(
+          heuristic,
+          DETECTION_CONFIDENCE.LOW,
+          DETECTION_PROVENANCE.HEURISTIC,
+          false,
+        );
+      }
 
-      return null;
+      return unknownDetection();
     } catch (error) {
       logger.error(`[LanguageDetectionService] Error in detection flow:`, error);
-      return null;
+      return unknownDetection();
     }
+  }
+
+  /**
+   * Legacy language-only projection over one detailed detection pass.
+   * @returns {Promise<string|null>} Detected language code
+   */
+  static async detect(text, options = {}) {
+    const result = await this.detectDetailed(text, options);
+    return result.language;
   }
 }
