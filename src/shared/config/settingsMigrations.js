@@ -34,6 +34,10 @@ const MODEL_VALUE_MIGRATIONS = {
     'chatgpt-4o-latest': 'gpt-5.6-terra',
     'gpt-4o': 'gpt-5.6-terra'
   },
+  DEEPSEEK_MODELS: {
+    'deepseek-chat': 'deepseek-v4-flash',
+    'deepseek-reasoner': 'deepseek-v4-pro'
+  },
   GEMINI_MODELS: {
     'gemini-3.1-flash-lite-preview': 'gemini-3.5-flash-lite',
     'gemini-3.1-pro-preview': 'gemini-3.6-flash',

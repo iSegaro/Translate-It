@@ -6,6 +6,8 @@ import { TranslationCallPurpose } from './ProviderConstants.js';
 import { AIConversationHelper } from './utils/AIConversationHelper.js';
 import { CompletionTermination } from '@/features/translation/ir/CompletionContract.js';
 import { createTranslationOperation } from '@/features/translation/ir/TranslationOperation.js';
+import { CONFIG, getDeepSeekApiModelAsync } from '@/shared/config/config.js';
+import { ResponseFormat } from '@/shared/config/translationConstants.js';
 
 // Mock Dependencies
 vi.mock('@/shared/proxy/ProxyManager.js', () => ({
@@ -22,7 +24,7 @@ vi.mock('@/shared/config/config.js', async (importOriginal) => {
     ...actual,
     getDeepSeekApiKeysAsync: vi.fn().mockResolvedValue(['test-key']),
     getDeepSeekApiUrlAsync: vi.fn().mockResolvedValue('https://api.deepseek.com/chat/completions'),
-    getDeepSeekApiModelAsync: vi.fn().mockResolvedValue('deepseek-chat'),
+    getDeepSeekApiModelAsync: vi.fn().mockResolvedValue('deepseek-v4-flash'),
     getSettingsAsync: vi.fn().mockResolvedValue({}),
   };
 });
@@ -30,7 +32,7 @@ vi.mock('@/shared/config/config.js', async (importOriginal) => {
 const DEEPSEEK_RAW_RESPONSE_FIXTURES = Object.freeze({
   metadataRich: Object.freeze({
     id: 'deepseek-response-1',
-    model: 'deepseek-chat',
+    model: 'deepseek-v4-flash',
     choices: [{
       index: 0,
       finish_reason: 'stop',
@@ -103,6 +105,33 @@ describe('DeepSeekProvider Error Handling', () => {
     expect(result).toBe('DeepSeek Result');
   });
 
+  it.each(['deepseek-v4-flash', 'deepseek-v4-pro'])('builds V4 JSON translation payload for %s', async (model) => {
+    getDeepSeekApiModelAsync.mockResolvedValue(model);
+    const executeRequest = vi.spyOn(provider, '_executeRequest').mockResolvedValue('translated');
+
+    await provider._callAI('system', 'source', { expectedFormat: ResponseFormat.JSON_OBJECT });
+
+    const request = executeRequest.mock.calls[0][0];
+    const payload = JSON.parse(request.fetchOptions.body);
+    expect(payload).toMatchObject({
+      model,
+      temperature: 0.1,
+      max_tokens: 4096,
+      response_format: { type: 'json_object' }
+    });
+    expect(payload).not.toHaveProperty('thinking');
+  });
+
+  it('uses CONFIG default for missing text model selection', async () => {
+    getDeepSeekApiModelAsync.mockResolvedValue(undefined);
+    const executeRequest = vi.spyOn(provider, '_executeRequest').mockResolvedValue('translated');
+
+    await provider._callAI('system', 'source');
+
+    const payload = JSON.parse(executeRequest.mock.calls[0][0].fetchOptions.body);
+    expect(payload.model).toBe(CONFIG.DEEPSEEK_API_MODEL);
+  });
+
   it('records normalized metadata from the confirmed Chat Completions shape', async () => {
     const operation = createTranslationOperation('deepseek-completion');
     proxyManager.fetch.mockResolvedValue({
@@ -119,7 +148,7 @@ describe('DeepSeekProvider Error Handling', () => {
     expect(result).toBe('DeepSeek translated text');
     expect(record).toEqual({
       provider: 'DeepSeek',
-      model: 'deepseek-chat',
+      model: 'deepseek-v4-flash',
       termination: CompletionTermination.NORMAL,
       responseId: 'deepseek-response-1',
       usage: {

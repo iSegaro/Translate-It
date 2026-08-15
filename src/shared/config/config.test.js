@@ -92,6 +92,22 @@ describe('Config Module', () => {
       );
     });
 
+    it('should expose approved DeepSeek text models in order', () => {
+      expect(CONFIG.DEEPSEEK_API_MODEL).toBe('deepseek-v4-flash');
+      expect(CONFIG.DEEPSEEK_API_URL).toBe('https://api.deepseek.com/chat/completions');
+      expect(CONFIG.DEEPSEEK_MODELS.map(model => model.value)).toEqual([
+        'deepseek-v4-flash',
+        'deepseek-v4-pro',
+        'custom'
+      ]);
+      expect(CONFIG.DEEPSEEK_MODELS).not.toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ value: 'deepseek-chat' }),
+          expect.objectContaining({ value: 'deepseek-reasoner' })
+        ])
+      );
+    });
+
     it('should expose approved Gemini selector models in order', () => {
       expect(CONFIG.GEMINI_MODEL).toBe('gemini-3.5-flash');
       expect(CONFIG.GEMINI_API_URL).toBe(

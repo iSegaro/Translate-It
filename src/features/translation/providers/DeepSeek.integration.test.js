@@ -14,7 +14,7 @@ vi.mock('webextension-polyfill', () => ({
 vi.mock('@/shared/config/config.js', () => ({
   getDeepSeekApiKeysAsync: vi.fn().mockResolvedValue(['ds-key-1', 'ds-key-2']),
   getDeepSeekApiUrlAsync: vi.fn().mockResolvedValue('https://api.deepseek.com/chat/completions'),
-  getDeepSeekApiModelAsync: vi.fn().mockResolvedValue('deepseek-chat'),
+  getDeepSeekApiModelAsync: vi.fn().mockResolvedValue('deepseek-v4-flash'),
   getSettingsAsync: vi.fn().mockResolvedValue({}),
   getProviderOptimizationLevelAsync: vi.fn(() => Promise.resolve('balanced')),
 }));

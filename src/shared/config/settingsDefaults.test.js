@@ -28,6 +28,8 @@ describe('getPersistedDefaultSettings', () => {
     expect(defaults.GEMINI_MODELS).toEqual(CONFIG.GEMINI_MODELS);
     expect(defaults.OPENAI_API_MODEL).toBe(CONFIG.OPENAI_API_MODEL);
     expect(defaults.OPENAI_MODELS).toEqual(CONFIG.OPENAI_MODELS);
+    expect(defaults.DEEPSEEK_API_MODEL).toBe(CONFIG.DEEPSEEK_API_MODEL);
+    expect(defaults.DEEPSEEK_MODELS).toEqual(CONFIG.DEEPSEEK_MODELS);
     expect(defaults.GEMINI_THINKING_MODE).toBe('default');
     expect(defaults.TEXT_FIELD_SHORTCUT).toBe(CONFIG.TEXT_FIELD_SHORTCUT);
     expect(defaults.translationHistory).toBeUndefined();

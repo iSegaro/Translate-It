@@ -234,12 +234,10 @@ export const CONFIG = {
   ],
   DEEPSEEK_API_KEY: "",
   DEEPSEEK_API_URL: "https://api.deepseek.com/chat/completions",
-  DEEPSEEK_API_MODEL: "deepseek-chat",
+  DEEPSEEK_API_MODEL: "deepseek-v4-flash",
   DEEPSEEK_MODELS: [
-    // --- DeepSeek Official Models ---
-    { value: "deepseek-chat", name: "DeepSeek V3 (Chat & Code)" },
-    { value: "deepseek-reasoner", name: "DeepSeek R1 (Reasoner)" },
-
+    { value: "deepseek-v4-flash", name: "DeepSeek V4 Flash" },
+    { value: "deepseek-v4-pro", name: "DeepSeek V4 Pro" },
     { value: "custom", name: "Custom Model" }
   ],
   CUSTOM_API_URL: "",
