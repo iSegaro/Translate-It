@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
 
 // Mock dependencies
 vi.mock('@/shared/logging/logger.js', () => ({
@@ -63,8 +64,15 @@ vi.mock('@/shared/error-management/ErrorTypes.js', async () => {
   return actual;
 });
 
+vi.mock('@/core/extensionContext.js', () => ({
+  default: {
+    isValidSync: vi.fn(() => true),
+  },
+}));
+
 import { ErrorHandler } from '@/shared/error-management/ErrorHandler.js';
 const errorHandlerMock = ErrorHandler.getInstance();
+const { default: ExtensionContextManager } = await import('@/core/extensionContext.js');
 
 vi.mock('@/utils/dom/DomDirectionManager.js', () => ({
   detectDirectionFromContent: vi.fn(() => 'rtl'),
@@ -132,6 +140,7 @@ describe('DomTranslatorAdapter', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    ExtensionContextManager.isValidSync.mockReturnValue(true);
     globalSelectElementState.translationHistory = [];
     adapter = new DomTranslatorAdapter();
     testElement = document.createElement('div');    testElement.textContent = 'Hello';
@@ -2115,6 +2124,113 @@ describe('DomTranslatorAdapter', () => {
 
       await expect(translation).resolves.toMatchObject({ success: true, committedParentCount: 1 });
       expect(testElement.textContent).toContain('سلام');
+    });
+
+    it('preserves committed parents and blocks late stream mutation and ACK after context loss', async () => {
+      const first = document.createTextNode('A');
+      const second = document.createTextNode('B');
+      testElement.replaceChildren(first, second);
+      const { collectTextNodes } = await import('./DomTranslatorUtils.js');
+      collectTextNodes.mockReturnValueOnce([
+        { node: first, text: 'A', uid: 'n1', blockId: 'b1', role: 'div' },
+        { node: second, text: 'B', uid: 'n2', blockId: 'b2', role: 'div' },
+      ]);
+
+      let callbacks;
+      registerTranslation.mockImplementationOnce((_id, registered) => { callbacks = registered; });
+      contentScriptIntegration.sendTranslationRequest.mockResolvedValueOnce({
+        success: true,
+        streaming: true,
+        conversationAcceptance: true,
+      });
+
+      const translation = adapter.translateElement(testElement);
+      await vi.waitFor(() => expect(callbacks).toBeDefined());
+      callbacks.onStreamUpdate({ success: true, data: [{ t: 'Uno', i: 'n1' }] });
+      await vi.waitFor(() => expect(sendRegularMessage).toHaveBeenCalledWith(
+        expect.objectContaining({ data: expect.objectContaining({ parentId: 'b1', accepted: true }) }),
+        { silent: true }
+      ));
+
+      ExtensionContextManager.isValidSync.mockReturnValue(false);
+      adapter.invalidateContext();
+      callbacks.onStreamUpdate({ success: true, data: [{ t: 'Dos', i: 'n2' }] });
+      callbacks.onStreamEnd({ success: true });
+
+      await expect(translation).rejects.toMatchObject({ type: ErrorTypes.EXTENSION_CONTEXT_INVALIDATED });
+      expect(first.nodeValue).toContain('Uno');
+      expect(second.nodeValue).toBe('B');
+      expect(sendRegularMessage.mock.calls.filter(([message]) => message?.data?.accepted === true))
+        .toHaveLength(1);
+      expect(sendRegularMessage).not.toHaveBeenCalledWith(
+        expect.objectContaining({ data: expect.objectContaining({ parentId: 'b2' }) }),
+        expect.anything()
+      );
+      expect(contentScriptIntegration.cancelTranslationRequest).not.toHaveBeenCalled();
+    });
+
+    it('settles before first commit when context is invalidated during streaming', async () => {
+      let callbacks;
+      registerTranslation.mockImplementationOnce((_id, registered) => { callbacks = registered; });
+      contentScriptIntegration.sendTranslationRequest.mockResolvedValueOnce({
+        success: true,
+        streaming: true,
+        conversationAcceptance: true,
+      });
+
+      const translation = adapter.translateElement(testElement);
+      await vi.waitFor(() => expect(callbacks).toBeDefined());
+      ExtensionContextManager.isValidSync.mockReturnValue(false);
+      adapter.invalidateContext();
+      callbacks.onStreamUpdate({ success: true, data: [{ t: 'late', i: 'n1' }] });
+
+      await expect(translation).rejects.toMatchObject({ type: ErrorTypes.EXTENSION_CONTEXT_INVALIDATED });
+      expect(testElement.textContent).toBe('Hello');
+      expect(sendRegularMessage).not.toHaveBeenCalled();
+      expect(contentScriptIntegration.cancelTranslationRequest).not.toHaveBeenCalled();
+    });
+
+    it('releases the active root after context invalidation', async () => {
+      let callbacks;
+      registerTranslation.mockImplementationOnce((_id, registered) => { callbacks = registered; });
+      contentScriptIntegration.sendTranslationRequest.mockResolvedValueOnce({ success: true, streaming: true });
+
+      const translation = adapter.translateElement(testElement);
+      await vi.waitFor(() => expect(callbacks).toBeDefined());
+      ExtensionContextManager.isValidSync.mockReturnValue(false);
+      adapter.invalidateContext();
+      await expect(translation).rejects.toMatchObject({ type: ErrorTypes.EXTENSION_CONTEXT_INVALIDATED });
+
+      ExtensionContextManager.isValidSync.mockReturnValue(true);
+      let retryCallbacks;
+      registerTranslation.mockImplementationOnce((_id, registered) => { retryCallbacks = registered; });
+      contentScriptIntegration.sendTranslationRequest.mockResolvedValueOnce({ success: true, streaming: true });
+      const retry = adapter.translateElement(testElement);
+      await vi.waitFor(() => expect(retryCallbacks).toBeDefined());
+      retryCallbacks.onStreamUpdate({ success: true, data: [{ t: 'Retry', i: 'n1' }] });
+      retryCallbacks.onStreamEnd({ success: true });
+
+      await expect(retry).resolves.toMatchObject({ success: true });
+      expect(testElement.textContent).toContain('Retry');
+    });
+
+    it('rejects a direct response after context loss before DOM application', async () => {
+      contentScriptIntegration.sendTranslationRequest.mockImplementationOnce(async () => {
+        ExtensionContextManager.isValidSync.mockReturnValue(false);
+        return {
+          success: true,
+          streaming: false,
+          translatedText: [{ t: 'late', i: 'n1' }],
+          conversationAcceptance: true,
+        };
+      });
+
+      await expect(adapter.translateElement(testElement)).rejects.toMatchObject({
+        type: ErrorTypes.EXTENSION_CONTEXT_INVALIDATED,
+      });
+      expect(testElement.textContent).toBe('Hello');
+      expect(sendRegularMessage).not.toHaveBeenCalled();
+      expect(contentScriptIntegration.cancelTranslationRequest).not.toHaveBeenCalled();
     });
 
     it('should not apply empty translation', () => {

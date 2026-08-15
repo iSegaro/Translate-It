@@ -500,13 +500,13 @@ class SelectElementManager extends ResourceTracker {
 
   /**
    * Unlock page interaction immediately after selection
-   * Restores cursor, pointer events, and stops the safety watchdog
+   * Restores cursor and pointer events while the watchdog continues to cover
+   * the in-flight translation lifecycle.
    * @private
    */
   _unlockPageInteraction() {
     this.logger.debug('Restoring page interaction after selection');
     document.documentElement.removeAttribute('data-translate-it-select-mode');
-    this._stopContextWatchdog();
     this.removeEventListeners();
   }
 
@@ -756,7 +756,10 @@ class SelectElementManager extends ResourceTracker {
     this._stopContextWatchdog();
     document.documentElement.removeAttribute('data-translate-it-select-mode');
     this.isActive = false;
+    const adapterWasTranslating = this.domTranslatorAdapter?.isCurrentlyTranslating?.() === true;
+    this.domTranslatorAdapter?.invalidateContext?.();
     this.forceCleanup();
+    if (!adapterWasTranslating) this._notifyContextInvalidation();
   }
 
   /**
@@ -770,7 +773,6 @@ class SelectElementManager extends ResourceTracker {
       if (this.isActive && !ExtensionContextManager.isValidSync()) {
         this.logger.warn('Extension context invalidated while in select mode. Performing emergency cleanup...');
         this.emergencyCleanup();
-        this._notifyContextInvalidation();
       }
     }, 2000); // Check every 2 seconds - balanced for performance and safety
   }
