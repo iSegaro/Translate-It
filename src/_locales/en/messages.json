@@ -530,6 +530,9 @@
   "ERRORS_TRANSLATION_TIMEOUT": {
     "message": "Translation timed out. Please try again."
   },
+  "ERRORS_SELECT_ELEMENT_PARTIAL_TRANSLATION_FAILED": {
+    "message": "Some content could not be translated."
+  },
   "ERRORS_SETTINGS_LOADING_TIMEOUT": {
     "message": "Settings loading timed out. Please try again."
   },

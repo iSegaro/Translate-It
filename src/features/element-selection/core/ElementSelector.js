@@ -5,7 +5,7 @@ import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import ResourceTracker from '@/core/memory/ResourceTracker.js';
 import { UI_HOST_IDS } from '@/shared/constants/ui.js';
-import { isValidTextElement } from '../utils/elementHelpers.js';
+import { isSelectableTextRoot } from '../utils/elementHelpers.js';
 import { ToastElementDetector } from '@/shared/toast/ToastElementDetector.js';
 
 /**
@@ -199,6 +199,10 @@ export class ElementSelector extends ResourceTracker {
 
   /**
    * Check if element is a valid candidate for text translation
+   * Root eligibility comes from the shared isSelectableTextRoot contract
+   * (policy root eligibility + ancestor notranslate + text content).
+   * Selector-only heuristics (area, text length, word count) live in
+   * findBestTextElement, NOT here and NOT in SelectElementPolicy.
    * @param {HTMLElement} element - Element to check
    * @returns {boolean} Whether element is valid
    */
@@ -210,8 +214,8 @@ export class ElementSelector extends ResourceTracker {
       return false;
     }
 
-    // 2. Use shared validation for general text elements
-    return isValidTextElement(element);
+    // 2. Use shared root-eligibility contract for text elements
+    return isSelectableTextRoot(element);
   }
 
   /**

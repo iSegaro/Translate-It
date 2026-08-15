@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { isSelectableTextRoot } from './utils/elementHelpers.js';
 
 // Mock dependencies
 vi.mock('@/shared/logging/logConstants.js', () => ({
@@ -45,10 +46,19 @@ vi.mock('@/shared/error-management/ErrorHandler.js', () => ({
     getInstance: vi.fn()
   }
 }));
+vi.mock('@/shared/error-management/PublicErrorPolicy.js', () => ({
+  createPublicDisplayError: vi.fn(async (originalError) => {
+    const displayError = new Error('Translation failed');
+    displayError.type = 'TRANSLATION_FAILED';
+    displayError.cause = originalError;
+    return displayError;
+  })
+}));
 
 vi.mock('@/shared/error-management/ErrorMatcher.js', () => ({
   isFatalError: vi.fn(() => false),
-  isCancellationError: vi.fn(() => false)
+  isCancellationError: vi.fn(() => false),
+  matchErrorToType: vi.fn((error) => error?.type || 'TRANSLATION_ERROR')
 }));
 
 vi.mock('@/shared/constants/ui.js', () => ({
@@ -93,7 +103,10 @@ vi.mock('@/shared/config/constants.js', () => ({
 }));
 
 vi.mock('@/utils/i18n/i18n.js', () => ({
-  getTranslationString: vi.fn((key) => key)
+  getTranslationString: vi.fn((key) => ({
+    ERRORS_SELECT_ELEMENT_PARTIAL_TRANSLATION_FAILED: 'Some content could not be translated.',
+    ERRORS_TRANSLATION_FAILED: 'Translation failed',
+  }[key] || key))
 }));
 
 vi.mock('@/shared/utils/warning-manager.js', () => ({
@@ -117,6 +130,7 @@ vi.mock('./core/DomTranslatorAdapter.js', () => ({
     translateElement = vi.fn(() => Promise.resolve({ success: true }));
     cleanup = vi.fn();
     cancelTranslation = vi.fn();
+    revertTranslation = vi.fn();
   }
 }));
 
@@ -136,7 +150,7 @@ vi.mock('./core/ElementSelector.js', () => ({
 
 vi.mock('./utils/elementHelpers.js', () => ({
   extractTextFromElement: vi.fn(() => 'test text'),
-  isValidTextElement: vi.fn(() => true)
+  isSelectableTextRoot: vi.fn(() => true)
 }));
 
 vi.mock('./SelectElementNotificationManager.js', () => ({
@@ -209,6 +223,7 @@ describe('SelectElementManager', () => {
 
   beforeEach(async () => {
     vi.clearAllMocks();
+    isSelectableTextRoot.mockReturnValue(true);
     if (!SelectElementManager) {
       const module = await import('./SelectElementManager.js');
       SelectElementManager = module.SelectElementManager;
@@ -274,6 +289,93 @@ describe('SelectElementManager', () => {
     expect(document.documentElement.getAttribute('data-translate-it-select-mode')).toBeNull();
   });
 
+  describe('click-time revalidation', () => {
+    beforeEach(() => {
+      manager.isActive = true;
+      manager.activationTime = 0;
+      isSelectableTextRoot.mockReturnValue(true);
+    });
+
+    it('revalidates the target even after highlight', async () => {
+      const el = document.createElement('div');
+      manager.elementSelector.getHighlightedElement.mockReturnValue(el);
+      isSelectableTextRoot.mockReturnValue(false);
+
+      await manager.handleClick(new MouseEvent('click'));
+
+      expect(manager.domTranslatorAdapter.translateElement).not.toHaveBeenCalled();
+      expect(manager.elementSelector.deactivate).not.toHaveBeenCalled();
+    });
+
+    it('lets an eligible target reach translateElement', async () => {
+      const el = document.createElement('div');
+      manager.elementSelector.getHighlightedElement.mockReturnValue(el);
+
+      await manager.handleClick(new MouseEvent('click'));
+
+      expect(manager.domTranslatorAdapter.translateElement).toHaveBeenCalledWith(el, expect.any(Object));
+    });
+
+    it('does not translate a target that became invalid between hover and click', async () => {
+      const el = document.createElement('div');
+      manager.elementSelector.getHighlightedElement.mockReturnValue(el);
+      isSelectableTextRoot.mockReturnValue(false);
+
+      await manager.handleClick(new MouseEvent('click'));
+
+      expect(manager.domTranslatorAdapter.translateElement).not.toHaveBeenCalled();
+    });
+
+    it('applies the same eligibility rule to the event.target fallback', async () => {
+      const el = document.createElement('div');
+      manager.elementSelector.getHighlightedElement.mockReturnValue(null);
+      const event = new MouseEvent('click', { bubbles: true, cancelable: true });
+      Object.defineProperty(event, 'target', { value: el });
+
+      isSelectableTextRoot.mockReturnValue(true);
+      await manager.handleClick(event);
+      expect(manager.domTranslatorAdapter.translateElement).toHaveBeenCalledWith(el, expect.any(Object));
+
+      manager.domTranslatorAdapter.translateElement.mockClear();
+      isSelectableTextRoot.mockReturnValue(false);
+      await manager.handleClick(event);
+      expect(manager.domTranslatorAdapter.translateElement).not.toHaveBeenCalled();
+    });
+
+    it('still forwards BUTTON to the adapter', async () => {
+      const btn = document.createElement('button');
+      manager.elementSelector.getHighlightedElement.mockReturnValue(btn);
+
+      await manager.handleClick(new MouseEvent('click'));
+
+      expect(manager.domTranslatorAdapter.translateElement).toHaveBeenCalledWith(btn, expect.any(Object));
+    });
+
+    it('returns silently for an invalid root', async () => {
+      const el = document.createElement('div');
+      manager.elementSelector.getHighlightedElement.mockReturnValue(el);
+      isSelectableTextRoot.mockReturnValue(false);
+
+      await manager.handleClick(new MouseEvent('click'));
+
+      expect(manager.domTranslatorAdapter.translateElement).not.toHaveBeenCalled();
+      expect(errorHandler.handle).not.toHaveBeenCalled();
+      expect(manager.isProcessingClick).toBe(false);
+    });
+
+    it('does not consult provider/config during click validation', async () => {
+      const { getEffectiveProviderAsync } = await import('@/shared/config/config.js');
+      getEffectiveProviderAsync.mockClear();
+      const el = document.createElement('div');
+      manager.elementSelector.getHighlightedElement.mockReturnValue(el);
+      isSelectableTextRoot.mockReturnValue(false);
+
+      await manager.handleClick(new MouseEvent('click'));
+
+      expect(getEffectiveProviderAsync).not.toHaveBeenCalled();
+    });
+  });
+
   describe('translation failure classification', () => {
     let cleanupSpy;
 
@@ -288,10 +390,11 @@ describe('SelectElementManager', () => {
 
       await manager.startTranslation(document.createElement('div'));
 
-      expect(errorHandler.handle).toHaveBeenCalledWith(error, {
-        context: 'select-element',
-        showToast: true
-      });
+      expect(errorHandler.handle).toHaveBeenCalledWith(expect.objectContaining({
+        message: 'Translation failed',
+        type: 'TRANSLATION_FAILED',
+        cause: error,
+      }), expect.objectContaining({ context: 'select-element', showToast: true }));
       expect(cleanupSpy).toHaveBeenCalledWith({ reason: 'error' });
       expect(manager.logger.warn).toHaveBeenCalledWith('Select Element translation failed:', error);
     });
@@ -302,7 +405,11 @@ describe('SelectElementManager', () => {
 
       await manager.startTranslation(document.createElement('div'));
 
-      expect(errorHandler.handle).toHaveBeenCalledWith(error, expect.objectContaining({ showToast: true }));
+      expect(errorHandler.handle).toHaveBeenCalledWith(expect.objectContaining({
+        message: 'Translation failed',
+        type: 'TRANSLATION_FAILED',
+        cause: error,
+      }), expect.objectContaining({ showToast: true }));
       expect(cleanupSpy).toHaveBeenCalledWith({ reason: 'error' });
     });
 
@@ -339,14 +446,107 @@ describe('SelectElementManager', () => {
       expect(deactivateSpy).toHaveBeenCalledWith({ reason: 'cancel', silent: true });
     });
 
+    it('respects a central silent policy without skipping cleanup', async () => {
+      const { createPublicDisplayError } = await import('@/shared/error-management/PublicErrorPolicy.js');
+      const error = Object.assign(new Error('Already translated'), { type: 'NODE_ALREADY_TRANSLATED' });
+      createPublicDisplayError.mockResolvedValueOnce(null);
+      manager.domTranslatorAdapter.translateElement.mockRejectedValue(error);
+
+      await manager.startTranslation(document.createElement('div'));
+
+      expect(errorHandler.handle).not.toHaveBeenCalled();
+      expect(cleanupSpy).toHaveBeenCalledWith({ reason: 'error' });
+    });
+
     it('keeps provider failures visible', async () => {
       const error = Object.assign(new Error('Network failed'), { type: 'NETWORK_ERROR' });
       manager.domTranslatorAdapter.translateElement.mockRejectedValue(error);
 
       await manager.startTranslation(document.createElement('div'));
 
-      expect(errorHandler.handle).toHaveBeenCalledWith(error, expect.objectContaining({ showToast: true }));
+      expect(errorHandler.handle).toHaveBeenCalledWith(expect.objectContaining({ cause: error }), expect.objectContaining({ showToast: true }));
       expect(cleanupSpy).toHaveBeenCalledWith({ reason: 'error' });
+    });
+
+    it.each([
+      ['API key', 'API_KEY_INVALID'],
+      ['rate limit', 'RATE_LIMIT_REACHED'],
+    ])('preserves actionable %s handling', async (_label, type) => {
+      const error = Object.assign(new Error(type), { type });
+      manager.domTranslatorAdapter.translateElement.mockRejectedValue(error);
+
+      await manager.startTranslation(document.createElement('div'));
+
+      expect(errorHandler.handle).toHaveBeenCalledWith(expect.objectContaining({ cause: error }), expect.objectContaining({ showToast: true }));
+    });
+
+    it('preserves total timeout handling while hiding raw timeout text', async () => {
+      const error = Object.assign(new Error('Batch translation timed out after 60000ms'), { type: 'TRANSLATION_TIMEOUT' });
+      manager.domTranslatorAdapter.translateElement.mockRejectedValue(error);
+
+      await manager.startTranslation(document.createElement('div'));
+
+      expect(errorHandler.handle).toHaveBeenCalledWith(expect.objectContaining({ cause: error }), expect.objectContaining({ showToast: true }));
+    });
+
+    it('preserves actionable element-size feedback', async () => {
+      const error = new Error('Element is too large to translate (1001 text segments). Please select a smaller element.');
+      manager.domTranslatorAdapter.translateElement.mockRejectedValue(error);
+
+      await manager.startTranslation(document.createElement('div'));
+
+      expect(errorHandler.handle).toHaveBeenCalledWith(error, expect.objectContaining({ showToast: true }));
+    });
+
+    it.each([
+      { mode: 'throw', value: Object.assign(new Error('Duplicate identity in batch: n1'), { type: 'VALIDATION' }) },
+      { mode: 'resolve', value: Object.assign(new Error('No translation results were accepted'), { type: 'NO_ACCEPTED_TRANSLATION_RESULTS' }) },
+    ])('normalizes internal failures consistently for $mode paths', async ({ mode, value }) => {
+      if (mode === 'throw') manager.domTranslatorAdapter.translateElement.mockRejectedValue(value);
+      else manager.domTranslatorAdapter.translateElement.mockResolvedValue({ success: false, error: value });
+
+      await manager.startTranslation(document.createElement('div'));
+
+      expect(errorHandler.handle).toHaveBeenCalledWith(expect.objectContaining({
+        message: 'Translation failed',
+        type: 'TRANSLATION_FAILED',
+        cause: value,
+      }), expect.objectContaining({ context: 'select-element', showToast: true }));
+      expect(errorHandler.handle.mock.calls[0][0].message).not.toContain('Duplicate');
+      expect(errorHandler.handle.mock.calls[0][0].message).not.toContain('accepted');
+    });
+
+    it.each([
+      ['V3 failure', Object.assign(new Error('V3 marker contract violation'), { type: 'VALIDATION' })],
+      ['timeout', Object.assign(new Error('Batch translation timed out'), { type: 'TRANSLATION_TIMEOUT' })],
+      ['provider failure', Object.assign(new Error('Network failed'), { type: 'NETWORK_ERROR' })],
+    ])('uses generic partial-failure display for %s', async (_label, error) => {
+      error.translationOutcome = { committedParentCount: 1, totalParentCount: 2, cancelled: false };
+      manager.domTranslatorAdapter.translateElement.mockRejectedValue(error);
+
+      await manager.startTranslation(document.createElement('div'));
+
+      expect(errorHandler.handle).toHaveBeenCalledWith(
+        expect.objectContaining({
+          message: 'Some content could not be translated.',
+          type: 'TRANSLATION_FAILED',
+          cause: error,
+        }),
+        expect.objectContaining({ context: 'select-element', showToast: true })
+      );
+      expect(errorHandler.handle.mock.calls[0][0].message).not.toContain('V3');
+      expect(cleanupSpy).toHaveBeenCalledWith({ reason: 'error' });
+    });
+
+    it('keeps committed translations and suppresses partial error on cancellation', async () => {
+      const error = Object.assign(new Error('cancelled'), { type: 'USER_CANCELLED' });
+      error.translationOutcome = { committedParentCount: 1, totalParentCount: 2, cancelled: true };
+      manager.domTranslatorAdapter.translateElement.mockRejectedValue(error);
+
+      await manager.startTranslation(document.createElement('div'));
+
+      expect(errorHandler.handle).not.toHaveBeenCalled();
+      expect(cleanupSpy).toHaveBeenCalledWith({ reason: 'cancel' });
     });
 
     it('keeps successful translation cleanup unchanged', async () => {
@@ -370,22 +570,54 @@ describe('SelectElementManager', () => {
       await manager.startTranslation(document.createElement('div'));
 
       expect(errorHandler.handle).toHaveBeenCalledWith(
-        result?.error || expect.any(Error),
+        expect.objectContaining({ message: 'Translation failed', type: 'TRANSLATION_FAILED' }),
         expect.objectContaining({ context: 'select-element', showToast: true })
       );
       expect(cleanupSpy).toHaveBeenCalledWith({ reason: 'error' });
     });
 
-    it('preserves partial translations after successful partial commit', async () => {
+    it('keeps FULL_SUCCESS cleanup unchanged without partial message', async () => {
       manager.domTranslatorAdapter.translateElement.mockResolvedValue({
         success: true,
-        committedParentCount: 1
+        partial: false,
+        committedParentCount: 2,
+        totalParentCount: 2
       });
 
       await manager.startTranslation(document.createElement('div'));
 
       expect(errorHandler.handle).not.toHaveBeenCalled();
       expect(cleanupSpy).toHaveBeenCalledWith({ reason: 'success' });
+      const { pageEventBus } = await import('@/core/PageEventBus.js');
+      expect(pageEventBus.emit).toHaveBeenCalledWith('ELEMENT_TRANSLATIONS_AVAILABLE');
+    });
+
+    it('shows the partial message once and keeps success cleanup for PARTIAL_SUCCESS', async () => {
+      const failureSpy = vi.spyOn(manager, '_handleTranslationFailure').mockImplementation(() => Promise.resolve());
+      manager.domTranslatorAdapter.translateElement.mockResolvedValue({
+        success: true,
+        partial: true,
+        committedParentCount: 1,
+        totalParentCount: 2
+      });
+
+      await manager.startTranslation(document.createElement('div'));
+
+      expect(errorHandler.handle).toHaveBeenCalledTimes(1);
+      expect(errorHandler.handle).toHaveBeenCalledWith(
+        expect.objectContaining({
+          message: 'Some content could not be translated.',
+          type: 'TRANSLATION_FAILED',
+        }),
+        expect.objectContaining({ context: 'select-element', showToast: true })
+      );
+      expect(failureSpy).not.toHaveBeenCalled();
+      expect(cleanupSpy).toHaveBeenCalledWith({ reason: 'success' });
+      const { pageEventBus } = await import('@/core/PageEventBus.js');
+      expect(pageEventBus.emit).toHaveBeenCalledWith('hide-translation', expect.any(Object));
+      expect(pageEventBus.emit).toHaveBeenCalledWith('ELEMENT_TRANSLATIONS_AVAILABLE');
+      expect(manager.domTranslatorAdapter.revertTranslation).not.toHaveBeenCalled();
+      failureSpy.mockRestore();
     });
   });
 

@@ -29,6 +29,7 @@ export const errorMessages = {
   [ErrorTypes.MODEL_MISSING]: "AI Model is missing or invalid",
   [ErrorTypes.MODEL_OVERLOADED]: "The Model is overloaded",
   [ErrorTypes.QUOTA_EXCEEDED]: "You exceeded your current quota",
+  [ErrorTypes.DEEPL_QUOTA_EXCEEDED]: "DeepL quota exceeded. Please check your plan.",
   [ErrorTypes.GEMINI_QUOTA_REGION]:
     "You reached the Gemini quota. (Region issue)",
   [ErrorTypes.INVALID_REQUEST]: "Invalid request format or parameters.",
@@ -147,4 +148,3 @@ export async function translateErrorMessage(error) {
   
   return errorMessages[ErrorTypes.UNKNOWN];
 }
-

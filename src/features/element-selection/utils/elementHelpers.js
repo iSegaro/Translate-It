@@ -3,6 +3,7 @@
 
 import { DOM_FILTERS } from '@/utils/dom/DomFilters.js';
 import { TRANSLATION_HTML } from '@/shared/constants/translation.js';
+import { getSelectElementRootEligibility } from '@/features/element-selection/core/SelectElementPolicy.js';
 
 /**
  * Extract meaningful text from an element
@@ -61,53 +62,47 @@ export function hasValidTextContent(element, options = {}) {
 }
 
 /**
- * Check if element is valid for translation
+ * Check if an element is a selectable text ROOT (canonical hover/click contract).
+ * Composes:
+ *  - ancestor-level notranslate walk (closest('.notranslate, [translate="no"]'))
+ *  - SelectElementPolicy root eligibility (tags, editable, roles, visibility)
+ *  - text-content gate (hasValidTextContent)
+ *
+ * This is the single root-eligibility source consumed by ElementSelector
+ * (hover) and SelectElementManager (click revalidation).
+ *
  * @param {HTMLElement} element - Element to validate
  * @returns {boolean} Whether element is valid
  */
-export function isValidTextElement(element) {
+export function isSelectableTextRoot(element) {
   if (!element) return false;
 
-  // 1. Skip invalid tags
-  const invalidTags = [
-    'SCRIPT', 'STYLE', 'NOSCRIPT', 'HEAD', 'META', 'LINK', 'IFRAME', 'TEXTAREA', 'INPUT', 
-    'SVG', 'KBD', 'SAMP', 'TIME', 'RUBY', 'RT', 'RP'
-  ];
-
-  if (invalidTags.includes(element.tagName.toUpperCase())) {
-    return false;
-  }
-
-  // 2. Respect standard 'notranslate' class and 'translate=no' attribute
-  // Check the element and its ancestors
+  // 1. Respect standard 'notranslate' class and 'translate=no' attribute
+  // on the element AND its ancestors (ancestor walk stays local to the helper)
   const isExcluded = element.closest(`.${TRANSLATION_HTML.NO_TRANSLATE_CLASS}, [translate='${TRANSLATION_HTML.NO_TRANSLATE_VALUE}']`);
   if (isExcluded) {
     return false;
   }
 
-  // 3. Skip editable and interactive role elements
-  if (element.isContentEditable) {
+  // 2. Root selectability (tags, editable, roles, visibility) from the policy
+  const { selectableRoot } = getSelectElementRootEligibility(element);
+  if (!selectableRoot) {
     return false;
   }
 
-  const role = element.getAttribute?.('role')?.toLowerCase();
-  if (role && ['textbox', 'searchbox', 'combobox'].includes(role)) {
-    return false;
-  }
-
-  // 4. Skip invisible elements
-  try {
-    const style = window.getComputedStyle(element);
-    if (style.display === 'none' || style.visibility === 'hidden' || style.opacity === '0') {
-      return false;
-    }
-  } catch {
-    // If getComputedStyle fails, consider it invalid
-    return false;
-  }
-
-  // 4. Check for text content
+  // 3. Check for text content
   return hasValidTextContent(element);
+}
+
+/**
+ * Check if element is valid for translation.
+ * Compatibility alias for isSelectableTextRoot; kept for existing consumers
+ * and public helper surface.
+ * @param {HTMLElement} element - Element to validate
+ * @returns {boolean} Whether element is valid
+ */
+export function isValidTextElement(element) {
+  return isSelectableTextRoot(element);
 }
 
 /**
@@ -292,6 +287,7 @@ export function scrollIntoView(element, options = {}) {
 export default {
   extractTextFromElement,
   hasValidTextContent,
+  isSelectableTextRoot,
   isValidTextElement,
   findBestContainer,
   getImmediateTextContent,

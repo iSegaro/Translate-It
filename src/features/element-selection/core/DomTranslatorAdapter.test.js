@@ -177,6 +177,42 @@ describe('DomTranslatorAdapter', () => {
       );
     });
 
+    it('maps the non-grouping strategy to V2 extraction mode exactly once', async () => {
+      const { collectTextNodes } = await import('./DomTranslatorUtils.js');
+      collectTextNodes.mockClear();
+      let callbacks;
+      registerTranslation.mockImplementationOnce((_id, registered) => { callbacks = registered; });
+      contentScriptIntegration.sendTranslationRequest.mockResolvedValueOnce({ success: true, streaming: true });
+
+      const translation = adapter.translateElement(testElement);
+      await vi.waitFor(() => expect(callbacks).toBeDefined());
+      callbacks.onStreamUpdate({ success: true, data: [{ t: 'سلام', i: 'n1' }] });
+      callbacks.onStreamEnd({ success: true });
+      await translation;
+
+      expect(collectTextNodes).toHaveBeenCalledTimes(1);
+      expect(collectTextNodes).toHaveBeenCalledWith(testElement, { extractionMode: 'v2' });
+    });
+
+    it('maps the grouping strategy to V3 extraction mode exactly once', async () => {
+      const { getFeatureSemanticBlockGroupingAsync } = await import('@/config.js');
+      getFeatureSemanticBlockGroupingAsync.mockResolvedValueOnce(true);
+      const { collectBlockGroups } = await import('./DomTranslatorUtils.js');
+      collectBlockGroups.mockClear();
+      let callbacks;
+      registerTranslation.mockImplementationOnce((_id, registered) => { callbacks = registered; });
+      contentScriptIntegration.sendTranslationRequest.mockResolvedValueOnce({ success: true, streaming: true });
+
+      const translation = adapter.translateElement(testElement);
+      await vi.waitFor(() => expect(callbacks).toBeDefined());
+      callbacks.onStreamUpdate({ success: true, data: [{ t: 'سلام', i: 'n1' }] });
+      callbacks.onStreamEnd({ success: true });
+      await translation;
+
+      expect(collectBlockGroups).toHaveBeenCalledTimes(1);
+      expect(collectBlockGroups).toHaveBeenCalledWith(testElement, expect.any(Object), { extractionMode: 'v3' });
+    });
+
     it('A: returns zero-commit failure for rejected streaming result', async () => {
       let callbacks;
       registerTranslation.mockImplementationOnce((_id, registered) => { callbacks = registered; });
@@ -280,6 +316,299 @@ describe('DomTranslatorAdapter', () => {
       expect(testElement.textContent).toContain('دوم');
     });
 
+    it('reports FULL_SUCCESS for direct 2/2 committed parents', async () => {
+      const first = document.createTextNode('A');
+      const second = document.createTextNode('B');
+      testElement.replaceChildren(first, second);
+      const { collectTextNodes } = await import('./DomTranslatorUtils.js');
+      collectTextNodes.mockReturnValueOnce([
+        { node: first, text: 'A', uid: 'n1', blockId: 'b1', role: 'div' },
+        { node: second, text: 'B', uid: 'n2', blockId: 'b2', role: 'div' }
+      ]);
+      contentScriptIntegration.sendTranslationRequest.mockResolvedValueOnce({
+        success: true,
+        streaming: false,
+        translatedText: [{ t: 'Uno', i: 'n1' }, { t: 'Dos', i: 'n2' }]
+      });
+
+      const result = await adapter.translateElement(testElement);
+
+      expect(result).toMatchObject({
+        success: true,
+        partial: false,
+        committedParentCount: 2,
+        totalParentCount: 2,
+      });
+    });
+
+    it('reports PARTIAL_SUCCESS for direct 1 committed + 1 invalid parent', async () => {
+      const first = document.createTextNode('A');
+      const second = document.createTextNode('B');
+      testElement.replaceChildren(first, second);
+      const { collectTextNodes } = await import('./DomTranslatorUtils.js');
+      collectTextNodes.mockReturnValueOnce([
+        { node: first, text: 'A', uid: 'n1', blockId: 'b1', role: 'div' },
+        { node: second, text: 'B', uid: 'n2', blockId: 'b2', role: 'div' }
+      ]);
+      contentScriptIntegration.sendTranslationRequest.mockResolvedValueOnce({
+        success: true,
+        streaming: false,
+        translatedText: [{ t: 'Uno', i: 'n1' }, { t: '', i: 'n2' }]
+      });
+
+      const result = await adapter.translateElement(testElement);
+
+      expect(result).toMatchObject({
+        success: true,
+        partial: true,
+        committedParentCount: 1,
+        totalParentCount: 2,
+      });
+      expect(first.nodeValue).toContain('Uno');
+      expect(second.nodeValue).toBe('B');
+    });
+
+    it('reports PARTIAL_SUCCESS when a direct parent receives no accepted result', async () => {
+      const first = document.createTextNode('A');
+      const second = document.createTextNode('B');
+      testElement.replaceChildren(first, second);
+      const { collectTextNodes } = await import('./DomTranslatorUtils.js');
+      collectTextNodes.mockReturnValueOnce([
+        { node: first, text: 'A', uid: 'n1', blockId: 'b1', role: 'div' },
+        { node: second, text: 'B', uid: 'n2', blockId: 'b2', role: 'div' }
+      ]);
+      let callbacks;
+      registerTranslation.mockImplementationOnce((_id, registered) => { callbacks = registered; });
+      contentScriptIntegration.sendTranslationRequest.mockResolvedValueOnce({ success: true, streaming: true });
+
+      const translation = adapter.translateElement(testElement);
+      await vi.waitFor(() => expect(callbacks).toBeDefined());
+      callbacks.onStreamUpdate({ success: true, data: [{ t: 'Uno', i: 'n1' }] });
+      callbacks.onStreamEnd({ success: true });
+
+      const result = await translation;
+      expect(result).toMatchObject({
+        success: true,
+        partial: true,
+        committedParentCount: 1,
+        totalParentCount: 2,
+      });
+      expect(first.nodeValue).toContain('Uno');
+      expect(second.nodeValue).toBe('B');
+    });
+
+    it('reports PARTIAL_SUCCESS when a direct parent result is stale', async () => {
+      const first = document.createTextNode('A');
+      const second = document.createTextNode('B');
+      testElement.replaceChildren(first, second);
+      const { collectTextNodes } = await import('./DomTranslatorUtils.js');
+      collectTextNodes.mockReturnValueOnce([
+        { node: first, text: 'A', uid: 'n1', blockId: 'b1', role: 'div' },
+        { node: second, text: 'B', uid: 'n2', blockId: 'b2', role: 'div' }
+      ]);
+      let callbacks;
+      registerTranslation.mockImplementationOnce((_id, registered) => { callbacks = registered; });
+      contentScriptIntegration.sendTranslationRequest.mockResolvedValueOnce({ success: true, streaming: true });
+
+      const translation = adapter.translateElement(testElement);
+      await vi.waitFor(() => expect(callbacks).toBeDefined());
+      // Stale source drift: mutate the node so _isDirectSourceCurrent fails on apply
+      second.nodeValue = 'Changed B';
+      callbacks.onStreamUpdate({ success: true, data: [{ t: 'Uno', i: 'n1' }, { t: 'Dos', i: 'n2' }] });
+      callbacks.onStreamEnd({ success: true });
+
+      const result = await translation;
+      expect(result).toMatchObject({
+        success: true,
+        partial: true,
+        committedParentCount: 1,
+        totalParentCount: 2,
+      });
+      expect(first.nodeValue).toContain('Uno');
+      expect(second.nodeValue).toBe('Changed B');
+    });
+
+    it('reports FULL_SUCCESS for grouped 2/2 applied groups', async () => {
+      const { getFeatureSemanticBlockGroupingAsync } = await import('@/config.js');
+      getFeatureSemanticBlockGroupingAsync.mockResolvedValueOnce(true);
+      const first = document.createTextNode('A');
+      const second = document.createTextNode('B');
+      testElement.replaceChildren(first, second);
+      const { collectBlockGroups } = await import('./DomTranslatorUtils.js');
+      collectBlockGroups.mockReturnValueOnce([
+        { id: 'n1', blockId: 'g1', text: 'A', leadingWS: '', trailingWS: '', preWhitespace: false, directionHint: 'ltr', inlineParentTags: ['div'], mode: 'standard', node: first },
+        { id: 'n2', blockId: 'g2', text: 'B', leadingWS: '', trailingWS: '', preWhitespace: false, directionHint: 'ltr', inlineParentTags: ['div'], mode: 'standard', node: second },
+      ]);
+      let callbacks;
+      registerTranslation.mockImplementationOnce((_id, registered) => { callbacks = registered; });
+      contentScriptIntegration.sendTranslationRequest.mockResolvedValueOnce({ success: true, streaming: true });
+
+      const translation = adapter.translateElement(testElement);
+      await vi.waitFor(() => expect(callbacks).toBeDefined());
+      callbacks.onStreamUpdate({ success: true, data: [{ t: 'Uno', i: 'n1' }, { t: 'Dos', i: 'n2' }] });
+      callbacks.onStreamEnd({ success: true });
+
+      const result = await translation;
+      expect(result).toMatchObject({
+        success: true,
+        partial: false,
+        committedParentCount: 2,
+        totalParentCount: 2,
+      });
+    });
+
+    it('marks grouped non-passthrough rejected content invalid and reports PARTIAL_SUCCESS', async () => {
+      const { getFeatureSemanticBlockGroupingAsync } = await import('@/config.js');
+      getFeatureSemanticBlockGroupingAsync.mockResolvedValueOnce(true);
+      const first = document.createTextNode('A');
+      const second = document.createTextNode('B');
+      testElement.replaceChildren(first, second);
+      const { collectBlockGroups } = await import('./DomTranslatorUtils.js');
+      collectBlockGroups.mockReturnValueOnce([
+        { id: 'n1', blockId: 'g1', text: 'A', leadingWS: '', trailingWS: '', preWhitespace: false, directionHint: 'ltr', inlineParentTags: ['div'], mode: 'standard', node: first },
+        { id: 'n2', blockId: 'g2', text: 'B', leadingWS: '', trailingWS: '', preWhitespace: false, directionHint: 'ltr', inlineParentTags: ['div'], mode: 'standard', node: second },
+      ]);
+      let callbacks;
+      registerTranslation.mockImplementationOnce((_id, registered) => { callbacks = registered; });
+      contentScriptIntegration.sendTranslationRequest.mockResolvedValueOnce({ success: true, streaming: true });
+
+      const translation = adapter.translateElement(testElement);
+      await vi.waitFor(() => expect(callbacks).toBeDefined());
+      callbacks.onStreamUpdate({ success: true, data: [{ t: 'Uno', i: 'n1' }, { t: '', i: 'n2' }] });
+      callbacks.onStreamEnd({ success: true });
+
+      const result = await translation;
+      expect(result).toMatchObject({
+        success: true,
+        partial: true,
+        committedParentCount: 1,
+        totalParentCount: 2,
+      });
+      expect(adapter.groupMap.get('g2').invalid).toBe(true);
+      expect(adapter.groupMap.get('g2').applied).toBe(false);
+    });
+
+    it('reports PARTIAL_SUCCESS with one committed group and one invalid V2 passthrough group', async () => {
+      const { getFeatureSemanticBlockGroupingAsync } = await import('@/config.js');
+      getFeatureSemanticBlockGroupingAsync.mockResolvedValueOnce(true);
+      const first = document.createTextNode('A');
+      const second = document.createTextNode('B');
+      testElement.replaceChildren(first, second);
+      const { collectBlockGroups } = await import('./DomTranslatorUtils.js');
+      collectBlockGroups.mockReturnValueOnce([
+        { id: 'n1', blockId: 'g1', text: 'A', leadingWS: '', trailingWS: '', preWhitespace: false, directionHint: 'ltr', inlineParentTags: ['div'], mode: 'standard', node: first },
+        { id: 'n2', blockId: 'g2', text: 'B', leadingWS: '', trailingWS: '', preWhitespace: false, directionHint: 'ltr', inlineParentTags: ['div'], mode: 'V2_PASSTHROUGH', node: second },
+      ]);
+      let callbacks;
+      registerTranslation.mockImplementationOnce((_id, registered) => { callbacks = registered; });
+      contentScriptIntegration.sendTranslationRequest.mockResolvedValueOnce({ success: true, streaming: true });
+
+      const translation = adapter.translateElement(testElement);
+      await vi.waitFor(() => expect(callbacks).toBeDefined());
+      callbacks.onStreamUpdate({ success: true, data: [{ t: 'Uno', i: 'n1' }, { t: '', i: 'n2' }] });
+      callbacks.onStreamEnd({ success: true });
+
+      const result = await translation;
+      expect(result).toMatchObject({
+        success: true,
+        partial: true,
+        committedParentCount: 1,
+        totalParentCount: 2,
+      });
+      expect(adapter.groupMap.get('g2').invalid).toBe(true);
+    });
+
+    it('reports PARTIAL_SUCCESS when one grouped parent receives no accepted result', async () => {
+      const { getFeatureSemanticBlockGroupingAsync } = await import('@/config.js');
+      getFeatureSemanticBlockGroupingAsync.mockResolvedValueOnce(true);
+      const first = document.createTextNode('A');
+      const second = document.createTextNode('B');
+      testElement.replaceChildren(first, second);
+      const { collectBlockGroups } = await import('./DomTranslatorUtils.js');
+      collectBlockGroups.mockReturnValueOnce([
+        { id: 'n1', blockId: 'g1', text: 'A', leadingWS: '', trailingWS: '', preWhitespace: false, directionHint: 'ltr', inlineParentTags: ['div'], mode: 'standard', node: first },
+        { id: 'n2', blockId: 'g2', text: 'B', leadingWS: '', trailingWS: '', preWhitespace: false, directionHint: 'ltr', inlineParentTags: ['div'], mode: 'standard', node: second },
+      ]);
+      let callbacks;
+      registerTranslation.mockImplementationOnce((_id, registered) => { callbacks = registered; });
+      contentScriptIntegration.sendTranslationRequest.mockResolvedValueOnce({ success: true, streaming: true });
+
+      const translation = adapter.translateElement(testElement);
+      await vi.waitFor(() => expect(callbacks).toBeDefined());
+      callbacks.onStreamUpdate({ success: true, data: [{ t: 'Uno', i: 'n1' }] });
+      callbacks.onStreamEnd({ success: true });
+
+      const result = await translation;
+      expect(result).toMatchObject({
+        success: true,
+        partial: true,
+        committedParentCount: 1,
+        totalParentCount: 2,
+      });
+      expect(adapter.groupMap.get('g2').applied).toBe(false);
+    });
+
+    it('reports PARTIAL_SUCCESS when a grouped parent result is a suppressed fragment', async () => {
+      const { getFeatureSemanticBlockGroupingAsync } = await import('@/config.js');
+      getFeatureSemanticBlockGroupingAsync.mockResolvedValueOnce(true);
+      const first = document.createTextNode('A');
+      const second = document.createTextNode('B');
+      testElement.replaceChildren(first, second);
+      const { collectBlockGroups } = await import('./DomTranslatorUtils.js');
+      collectBlockGroups.mockReturnValueOnce([
+        { id: 'n1', blockId: 'g1', text: 'A', leadingWS: '', trailingWS: '', preWhitespace: false, directionHint: 'ltr', inlineParentTags: ['div'], mode: 'standard', node: first },
+        { id: 'n2', blockId: 'g2', text: 'B', leadingWS: '', trailingWS: '', preWhitespace: false, directionHint: 'ltr', inlineParentTags: ['div'], mode: 'standard', node: second },
+      ]);
+      let callbacks;
+      registerTranslation.mockImplementationOnce((_id, registered) => { callbacks = registered; });
+      contentScriptIntegration.sendTranslationRequest.mockResolvedValueOnce({ success: true, streaming: true });
+
+      const translation = adapter.translateElement(testElement);
+      await vi.waitFor(() => expect(callbacks).toBeDefined());
+      callbacks.onStreamUpdate({ success: true, data: [
+        { t: 'Uno', i: 'n1' },
+        { isSplitFragment: true, t: 'Dos', i: 'n2' },
+      ] });
+      callbacks.onStreamEnd({ success: true });
+
+      const result = await translation;
+      expect(result).toMatchObject({
+        success: true,
+        partial: true,
+        committedParentCount: 1,
+        totalParentCount: 2,
+      });
+      expect(adapter.groupMap.get('g2').applied).toBe(false);
+    });
+
+    it('treats mutation rollback after a commit as PARTIAL_FAILURE, not PARTIAL_SUCCESS', async () => {
+      const first = document.createTextNode('A');
+      const second = document.createTextNode('B');
+      testElement.replaceChildren(first, second);
+      const { collectTextNodes } = await import('./DomTranslatorUtils.js');
+      collectTextNodes.mockReturnValueOnce([
+        { node: first, text: 'A', uid: 'n1', blockId: 'b1', role: 'div' },
+        { node: second, text: 'B', uid: 'n2', blockId: 'b2', role: 'div' }
+      ]);
+      const apply = vi.spyOn(adapter, '_applyTranslationToNode');
+      apply.mockImplementationOnce((...args) => DomTranslatorAdapter.prototype._applyTranslationToNode.call(adapter, ...args));
+      apply.mockImplementationOnce(() => { throw 'rollback-failure'; });
+      contentScriptIntegration.sendTranslationRequest.mockResolvedValueOnce({
+        success: true,
+        streaming: false,
+        translatedText: [{ t: 'Uno', i: 'n1' }, { t: 'Dos', i: 'n2' }]
+      });
+
+      await expect(adapter.translateElement(testElement)).rejects.toMatchObject({
+        message: 'rollback-failure',
+        cause: 'rollback-failure',
+        translationOutcome: { committedParentCount: 1, totalParentCount: 2, cancelled: false },
+      });
+      expect(first.nodeValue).toContain('Uno');
+      expect(second.nodeValue).toBe('B');
+      apply.mockRestore();
+    });
+
     it('should create one conversation parent and ACK once for shared blockId units', async () => {
       const first = document.createTextNode('A');
       const second = document.createTextNode('B');
@@ -292,7 +621,7 @@ describe('DomTranslatorAdapter', () => {
 
       let streamCallbacks;
       registerTranslation.mockImplementationOnce((_id, callbacks) => { streamCallbacks = callbacks; });
-      contentScriptIntegration.sendTranslationRequest.mockResolvedValueOnce({ success: true, streaming: true });
+      contentScriptIntegration.sendTranslationRequest.mockResolvedValueOnce({ success: true, streaming: true, conversationAcceptance: true });
 
       const translation = adapter.translateElement(testElement);
       await vi.waitFor(() => expect(streamCallbacks).toBeDefined());
@@ -374,7 +703,7 @@ describe('DomTranslatorAdapter', () => {
 
       let streamCallbacks;
       registerTranslation.mockImplementationOnce((_id, callbacks) => { streamCallbacks = callbacks; });
-      contentScriptIntegration.sendTranslationRequest.mockResolvedValueOnce({ success: true, streaming: true });
+      contentScriptIntegration.sendTranslationRequest.mockResolvedValueOnce({ success: true, streaming: true, conversationAcceptance: true });
 
       const translation = adapter.translateElement(testElement);
       await vi.waitFor(() => expect(streamCallbacks).toBeDefined());
@@ -401,7 +730,8 @@ describe('DomTranslatorAdapter', () => {
       contentScriptIntegration.sendTranslationRequest.mockResolvedValueOnce({
         success: true,
         streaming: false,
-        translatedText: [{ t: 'Uno', i: 'n1' }, { t: 'Dos', i: 'n2' }]
+        translatedText: [{ t: 'Uno', i: 'n1' }, { t: 'Dos', i: 'n2' }],
+        conversationAcceptance: true
       });
 
       await adapter.translateElement(testElement);
@@ -427,7 +757,8 @@ describe('DomTranslatorAdapter', () => {
           { t: 'Uno', i: 'n1' },
           { t: '', i: 'n2' },
           { t: 'Tres', i: 'n3' }
-        ]
+        ],
+        conversationAcceptance: true
       });
 
       await adapter.translateElement(testElement);
@@ -681,7 +1012,8 @@ describe('DomTranslatorAdapter', () => {
       contentScriptIntegration.sendTranslationRequest.mockResolvedValue({
         success: true,
         streaming: false,
-        translatedText: JSON.stringify([{ t: 'سلام', i: 'n1' }])
+        translatedText: JSON.stringify([{ t: 'سلام', i: 'n1' }]),
+        conversationAcceptance: true
       });
 
       await adapter.translateElement(testElement);
@@ -943,7 +1275,7 @@ describe('DomTranslatorAdapter', () => {
       expect(applyElementDirection).toHaveBeenCalledWith(testElement, 'ja');
     });
 
-    it('should retain successful batches and report failure when the stream ends with an error', async () => {
+    it('should retain successful batches when stream end fails after complete commit', async () => {
       let streamCallbacks;
       registerTranslation.mockImplementation((id, callbacks) => {
         streamCallbacks = callbacks;
@@ -963,7 +1295,10 @@ describe('DomTranslatorAdapter', () => {
         return { success: true, streaming: true };
       });
 
-      await expect(adapter.translateElement(testElement)).rejects.toThrow('Batch failed');
+      await expect(adapter.translateElement(testElement)).resolves.toMatchObject({
+        success: true,
+        committedParentCount: 1,
+      });
       expect(testElement.textContent).toContain('سلام');
     });
 
@@ -1037,7 +1372,7 @@ describe('DomTranslatorAdapter', () => {
         error: { message: 'Terminal stream failure', type: 'TRANSLATION_FAILED' }
       });
 
-      await expect(translation).rejects.toThrow('Terminal stream failure');
+      await expect(translation).resolves.toMatchObject({ success: true, committedParentCount: 1 });
       expect(testElement.textContent).toContain('سلام');
     });
 
@@ -1184,7 +1519,7 @@ describe('DomTranslatorAdapter', () => {
 
       let streamCallbacks;
       registerTranslation.mockImplementationOnce((_id, callbacks) => { streamCallbacks = callbacks; });
-      contentScriptIntegration.sendTranslationRequest.mockResolvedValueOnce({ success: true, streaming: true });
+      contentScriptIntegration.sendTranslationRequest.mockResolvedValueOnce({ success: true, streaming: true, conversationAcceptance: true });
 
       const translation = adapter.translateElement(testElement);
       await vi.waitFor(() => expect(streamCallbacks).toBeDefined());
@@ -1374,6 +1709,72 @@ describe('DomTranslatorAdapter', () => {
       await expect(adapter.translateElement(testElement)).rejects.toThrow('Final stream error');
     });
 
+    it('attaches partial outcome to stream failures after a direct parent commit', async () => {
+      const first = document.createTextNode('A');
+      const second = document.createTextNode('B');
+      testElement.replaceChildren(first, second);
+      const { collectTextNodes } = await import('./DomTranslatorUtils.js');
+      collectTextNodes.mockReturnValueOnce([
+        { node: first, text: 'A', uid: 'n1', blockId: 'b1', role: 'div' },
+        { node: second, text: 'B', uid: 'n2', blockId: 'b2', role: 'div' }
+      ]);
+      let callbacks;
+      registerTranslation.mockImplementationOnce((_id, registered) => { callbacks = registered; });
+      contentScriptIntegration.sendTranslationRequest.mockResolvedValueOnce({ success: true, streaming: true });
+
+      const translation = adapter.translateElement(testElement);
+      await vi.waitFor(() => expect(callbacks).toBeDefined());
+      callbacks.onStreamUpdate({ success: true, data: [{ t: 'Uno', i: 'n1' }] });
+      callbacks.onStreamEnd({ success: false, error: { message: 'Network failed', type: 'NETWORK_ERROR' } });
+
+      await expect(translation).rejects.toMatchObject({
+        translationOutcome: { committedParentCount: 1, totalParentCount: 2, cancelled: false }
+      });
+      expect(first.nodeValue).toContain('Uno');
+      expect(second.nodeValue).toBe('B');
+    });
+
+    it('attaches grouped outcome to failures after an earlier BlockGroup commit', async () => {
+      const { getFeatureSemanticBlockGroupingAsync } = await import('@/config.js');
+      const { collectBlockGroups } = await import('./DomTranslatorUtils.js');
+      getFeatureSemanticBlockGroupingAsync.mockResolvedValueOnce(true);
+      const first = document.createTextNode('A');
+      const second = document.createTextNode('B');
+      testElement.replaceChildren(first, second);
+      collectBlockGroups.mockReturnValueOnce([
+        { id: 'n1', blockId: 'g1', text: 'A', leadingWS: '', trailingWS: '', preWhitespace: false, directionHint: 'ltr', inlineParentTags: ['div'], mode: 'standard', node: first },
+        { id: 'n2', blockId: 'g2', text: 'B', leadingWS: '', trailingWS: '', preWhitespace: false, directionHint: 'ltr', inlineParentTags: ['div'], mode: 'standard', node: second },
+      ]);
+      let callbacks;
+      registerTranslation.mockImplementationOnce((_id, registered) => { callbacks = registered; });
+      contentScriptIntegration.sendTranslationRequest.mockResolvedValueOnce({ success: true, streaming: true });
+
+      const translation = adapter.translateElement(testElement);
+      await vi.waitFor(() => expect(callbacks).toBeDefined());
+      callbacks.onStreamUpdate({ success: true, data: [{ t: 'Uno', i: 'n1' }] });
+      callbacks.onStreamEnd({ success: false, error: { message: 'V3 marker failure', type: 'VALIDATION' } });
+
+      await expect(translation).rejects.toMatchObject({
+        translationOutcome: { committedParentCount: 1, totalParentCount: 2, cancelled: false }
+      });
+      expect(first.nodeValue).toContain('Uno');
+      expect(second.nodeValue).toBe('B');
+    });
+
+    it('suppresses a failed stream end after every direct parent committed', async () => {
+      let callbacks;
+      registerTranslation.mockImplementationOnce((_id, registered) => { callbacks = registered; });
+      contentScriptIntegration.sendTranslationRequest.mockResolvedValueOnce({ success: true, streaming: true });
+
+      const translation = adapter.translateElement(testElement);
+      await vi.waitFor(() => expect(callbacks).toBeDefined());
+      callbacks.onStreamUpdate({ success: true, data: [{ t: 'سلام', i: 'n1' }] });
+      callbacks.onStreamEnd({ success: false, error: { message: 'Late transport failure', type: 'NETWORK_ERROR' } });
+
+      await expect(translation).resolves.toMatchObject({ success: true, committedParentCount: 1 });
+      expect(testElement.textContent).toContain('سلام');
+    });
+
     it('should not apply empty translation', () => {
       const textNode = testElement.firstChild;
       const originalValue = textNode.nodeValue;
@@ -1444,7 +1845,10 @@ describe('DomTranslatorAdapter', () => {
         translatedText: [{ t: 'Uno', i: 'n1' }, { t: 'Dos', i: 'n2' }]
       });
 
-      await expect(adapter.translateElement(testElement)).rejects.toBe('mutation-failure');
+      await expect(adapter.translateElement(testElement)).rejects.toMatchObject({
+        message: 'mutation-failure',
+        cause: 'mutation-failure',
+      });
       expect(first.nodeValue).toBe('A');
       expect(second.nodeValue).toBe('B');
       expect(sendRegularMessage).not.toHaveBeenCalledWith(expect.objectContaining({
@@ -1473,7 +1877,9 @@ describe('DomTranslatorAdapter', () => {
       await vi.waitFor(() => expect(callbacks).toBeDefined());
       callbacks.onStreamUpdate({ success: true, data: [{ t: 'Uno', i: 'n1' }, { t: 'Dos', i: 'n2' }] });
 
-      await expect(translation).rejects.toBe('stream-mutation-failure');
+      await expect(translation).rejects.toMatchObject({
+        message: 'stream-mutation-failure',
+      });
       expect(first.nodeValue).toBe('A');
       expect(second.nodeValue).toBe('B');
       expect(sendRegularMessage).not.toHaveBeenCalledWith(expect.objectContaining({
@@ -1491,7 +1897,9 @@ describe('DomTranslatorAdapter', () => {
       const firstTranslation = adapter.translateElement(testElement);
       await vi.waitFor(() => expect(callbacks).toBeDefined());
       callbacks.onStreamUpdate({ success: true, data: [{ t: 'Uno', i: 'n1' }] });
-      await expect(firstTranslation).rejects.toBe('stream failure');
+      await expect(firstTranslation).rejects.toMatchObject({
+        message: 'stream failure',
+      });
 
       apply.mockRestore();
       contentScriptIntegration.sendTranslationRequest.mockResolvedValueOnce({
@@ -1565,7 +1973,8 @@ describe('DomTranslatorAdapter', () => {
       contentScriptIntegration.sendTranslationRequest.mockResolvedValueOnce({
         success: true,
         streaming: false,
-        translatedText: [{ t: 'Uno', i: 'n1' }, { t: 'Dos', i: 'n2' }]
+        translatedText: [{ t: 'Uno', i: 'n1' }, { t: 'Dos', i: 'n2' }],
+        conversationAcceptance: true
       });
 
       await expect(adapter.translateElement(testElement)).rejects.toThrow('direction failed');
@@ -1910,6 +2319,7 @@ describe('DomTranslatorAdapter', () => {
       const finalize = vi.spyOn(reconstruction.transaction, 'finalize');
       const processedUids = new Set();
       adapter.currentMessageId = 'grouped-refinement';
+      adapter._conversationAcceptanceEnabled = true;
       vi.spyOn(BlockGroupReconstructor, 'splitTranslatedBlock').mockImplementationOnce(() => {
         throw new Error('optional refinement failed');
       });
@@ -2016,7 +2426,8 @@ describe('DomTranslatorAdapter', () => {
       contentScriptIntegration.sendTranslationRequest.mockResolvedValueOnce({
         success: true,
         streaming: false,
-        translatedText: [{ t: 'Uno', i: 'n1' }, { t: 'Dos', i: 'n2' }]
+        translatedText: [{ t: 'Uno', i: 'n1' }, { t: 'Dos', i: 'n2' }],
+        conversationAcceptance: true
       });
 
       await adapter.translateElement(testElement);
@@ -2080,7 +2491,8 @@ describe('DomTranslatorAdapter', () => {
       contentScriptIntegration.sendTranslationRequest.mockResolvedValueOnce({
         success: true,
         streaming: false,
-        translatedText: [{ t: 'Uno', i: 'n1' }, { t: 'Dos', i: 'n2' }]
+        translatedText: [{ t: 'Uno', i: 'n1' }, { t: 'Dos', i: 'n2' }],
+        conversationAcceptance: true
       });
 
       await adapter.translateElement(testElement);
@@ -2107,7 +2519,7 @@ describe('DomTranslatorAdapter', () => {
       })));
       let callbacks;
       registerTranslation.mockImplementationOnce((_id, registered) => { callbacks = registered; });
-      contentScriptIntegration.sendTranslationRequest.mockResolvedValueOnce({ success: true, streaming: true });
+      contentScriptIntegration.sendTranslationRequest.mockResolvedValueOnce({ success: true, streaming: true, conversationAcceptance: true });
 
       const translation = adapter.translateElement(testElement);
       await vi.waitFor(() => expect(callbacks).toBeDefined());
@@ -2544,6 +2956,149 @@ describe('DomTranslatorAdapter', () => {
 
       expect(testElement.textContent).toContain('Hello');
       expect(testElement.textContent).not.toContain('Translated fragment');
+    });
+  });
+
+  describe('conversation acceptance ACK gating', () => {
+    it('A: emits no parent acceptance ACK when conversation acceptance is not registered (streaming)', async () => {
+      contentScriptIntegration.sendTranslationRequest.mockResolvedValueOnce({
+        success: true,
+        streaming: true,
+        conversationAcceptance: false
+      });
+      let streamCallbacks;
+      registerTranslation.mockImplementationOnce((_id, callbacks) => { streamCallbacks = callbacks; });
+
+      const translation = adapter.translateElement(testElement);
+      await vi.waitFor(() => expect(streamCallbacks).toBeDefined());
+      streamCallbacks.onStreamUpdate({ success: true, data: [{ t: 'سلام', i: 'n1' }] });
+      streamCallbacks.onStreamEnd({ success: true });
+      await translation;
+
+      expect(sendRegularMessage.mock.calls.filter(([message]) => message.data?.accepted === true)).toHaveLength(0);
+    });
+
+    it('A-direct: emits no parent acceptance ACK when conversation acceptance is not registered (direct)', async () => {
+      contentScriptIntegration.sendTranslationRequest.mockResolvedValueOnce({
+        success: true,
+        streaming: false,
+        translatedText: [{ t: 'سلام', i: 'n1' }],
+        conversationAcceptance: false
+      });
+
+      await adapter.translateElement(testElement);
+
+      expect(sendRegularMessage.mock.calls.filter(([message]) => message.data?.accepted === true)).toHaveLength(0);
+    });
+
+    it('B: emits parent acceptance ACK when conversation acceptance is registered', async () => {
+      contentScriptIntegration.sendTranslationRequest.mockResolvedValueOnce({
+        success: true,
+        streaming: false,
+        translatedText: [{ t: 'سلام', i: 'n1' }],
+        conversationAcceptance: true
+      });
+
+      await adapter.translateElement(testElement);
+
+      expect(sendRegularMessage.mock.calls.filter(([message]) => message.data?.accepted === true)).toHaveLength(1);
+    });
+
+    it('C: accepted ACK carries canonical messageId, parentId and clean result', async () => {
+      contentScriptIntegration.sendTranslationRequest.mockResolvedValueOnce({
+        success: true,
+        streaming: false,
+        translatedText: [{ t: 'سلام', i: 'n1' }],
+        conversationAcceptance: true
+      });
+
+      await adapter.translateElement(testElement);
+
+      const request = contentScriptIntegration.sendTranslationRequest.mock.calls[0][0];
+      const ack = sendRegularMessage.mock.calls.find(([message]) => message.data?.accepted === true)[0];
+      expect(ack.messageId).toBe(request.messageId);
+      expect(ack.data.parentId).toBe('b1');
+      expect(ack.data.cleanResult).toBe('سلام');
+    });
+
+    it('D: rejection ACK is still emitted when conversation acceptance is registered', async () => {
+      const { getFeatureSemanticBlockGroupingAsync } = await import('@/config.js');
+      const { collectBlockGroups } = await import('./DomTranslatorUtils.js');
+      const { BlockGroupReconstructor } = await import('./BlockGroupReconstructor.js');
+      getFeatureSemanticBlockGroupingAsync.mockResolvedValueOnce(true);
+      collectBlockGroups.mockReturnValueOnce([
+        { id: 'n1', blockId: 'g1', text: 'Hello', leadingWS: '', trailingWS: '', preWhitespace: false, directionHint: 'ltr', inlineParentTags: ['div'], mode: 'standard', node: testElement.firstChild }
+      ]);
+      vi.spyOn(BlockGroupReconstructor, 'apply').mockImplementationOnce(() => {
+        throw new Error('apply failed');
+      });
+      contentScriptIntegration.sendTranslationRequest.mockResolvedValueOnce({
+        success: true,
+        streaming: true,
+        conversationAcceptance: true
+      });
+      let streamCallbacks;
+      registerTranslation.mockImplementationOnce((_id, callbacks) => { streamCallbacks = callbacks; });
+
+      const translation = adapter.translateElement(testElement);
+      await vi.waitFor(() => expect(streamCallbacks).toBeDefined());
+      streamCallbacks.onStreamUpdate({ success: true, data: [{ t: 'سلام', i: 'n1' }] });
+      await expect(translation).rejects.toThrow('apply failed');
+
+      const rejection = sendRegularMessage.mock.calls.filter(([message]) => message.data?.accepted === false);
+      expect(rejection).toHaveLength(1);
+      expect(rejection[0][0].data.parentId).toBe('g1');
+    });
+
+    it('E: emits exactly one ACK per parent across stream updates', async () => {
+      const first = document.createTextNode('A');
+      const second = document.createTextNode('B');
+      testElement.replaceChildren(first, second);
+      const { collectTextNodes } = await import('./DomTranslatorUtils.js');
+      collectTextNodes.mockReturnValueOnce([
+        { node: first, text: 'A', uid: 'n1', blockId: 'b1', role: 'div' },
+        { node: second, text: 'B', uid: 'n2', blockId: 'b1', role: 'div' }
+      ]);
+      contentScriptIntegration.sendTranslationRequest.mockResolvedValueOnce({
+        success: true,
+        streaming: true,
+        conversationAcceptance: true
+      });
+      let streamCallbacks;
+      registerTranslation.mockImplementationOnce((_id, callbacks) => { streamCallbacks = callbacks; });
+
+      const translation = adapter.translateElement(testElement);
+      await vi.waitFor(() => expect(streamCallbacks).toBeDefined());
+      streamCallbacks.onStreamUpdate({ success: true, data: [{ t: 'Uno', i: 'n1' }] });
+      streamCallbacks.onStreamUpdate({ success: true, data: [{ t: 'Dos', i: 'n2' }] });
+      streamCallbacks.onStreamEnd({ success: true });
+      await translation;
+
+      expect(sendRegularMessage.mock.calls.filter(([message]) => message.data?.accepted === true)).toHaveLength(1);
+    });
+
+    it('F: resets acceptance state between consecutive operations', async () => {
+      contentScriptIntegration.sendTranslationRequest.mockResolvedValueOnce({
+        success: true,
+        streaming: false,
+        translatedText: [{ t: 'سلام', i: 'n1' }],
+        conversationAcceptance: true
+      });
+      await adapter.translateElement(testElement);
+      expect(sendRegularMessage.mock.calls.filter(([message]) => message.data?.accepted === true)).toHaveLength(1);
+
+      const secondElement = document.createElement('div');
+      secondElement.textContent = 'Hello';
+      document.body.appendChild(secondElement);
+      vi.clearAllMocks();
+      contentScriptIntegration.sendTranslationRequest.mockResolvedValueOnce({
+        success: true,
+        streaming: false,
+        translatedText: [{ t: 'مرحبا', i: 'n1' }]
+      });
+      await adapter.translateElement(secondElement);
+
+      expect(sendRegularMessage.mock.calls.filter(([message]) => message.data?.accepted === true)).toHaveLength(0);
     });
   });
 });

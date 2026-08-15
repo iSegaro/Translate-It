@@ -530,6 +530,9 @@
   "ERRORS_TRANSLATION_TIMEOUT": {
     "message": "ترجمه با زمان‌انتظار مواجه شد. لطفا دوباره تلاش کنید."
   },
+  "ERRORS_SELECT_ELEMENT_PARTIAL_TRANSLATION_FAILED": {
+    "message": "بخشی از محتوا ترجمه نشد."
+  },
   "ERRORS_SETTINGS_LOADING_TIMEOUT": {
     "message": "زمان بارگذاری تنظیمات به پایان رسید. لطفا دوباره تلاش کنید."
   },
