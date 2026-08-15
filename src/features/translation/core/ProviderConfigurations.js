@@ -86,12 +86,10 @@ export const BASE_MAX_CHUNKS_PER_BATCH = {
 export const AI_BATCHING_LIMITS = {
   OPTIMAL_SIZE: 20,
   MAX_COMPLEXITY: 350,
-  SINGLE_BATCH_THRESHOLD: 15,
   CHARACTER_LIMIT: 5000,
   // Select Element Overrides (Optimized for balance)
   SELECT_OPTIMAL_SIZE: 25,
   SELECT_MAX_COMPLEXITY: 500,
-  SELECT_SINGLE_BATCH_THRESHOLD: 20,
   SELECT_CHARACTER_LIMIT: 3500,
 };
 
@@ -99,13 +97,11 @@ const UNIFIED_AI_BATCHING_CONFIG = {
   strategy: 'json', // Default to JSON for all AI providers
   optimalSize: AI_BATCHING_LIMITS.OPTIMAL_SIZE,
   maxComplexity: AI_BATCHING_LIMITS.MAX_COMPLEXITY,
-  singleBatchThreshold: AI_BATCHING_LIMITS.SINGLE_BATCH_THRESHOLD,
   characterLimit: AI_BATCHING_LIMITS.CHARACTER_LIMIT,
   modeOverrides: {
     select_element: {
       optimalSize: AI_BATCHING_LIMITS.SELECT_OPTIMAL_SIZE,
       maxComplexity: AI_BATCHING_LIMITS.SELECT_MAX_COMPLEXITY,
-      singleBatchThreshold: AI_BATCHING_LIMITS.SELECT_SINGLE_BATCH_THRESHOLD,
       characterLimit: AI_BATCHING_LIMITS.SELECT_CHARACTER_LIMIT,
       balancedBatching: true,
     },
@@ -940,11 +936,6 @@ function applyOptimizationLevel(config, level) {
 
     result.batching.optimalSize = Math.max(5, Math.round(config.batching.optimalSize * multiplier));
     result.batching.maxComplexity = Math.max(100, Math.round(config.batching.maxComplexity * multiplier));
-    
-    // Scale singleBatchThreshold as well for AI
-    if (result.batching.singleBatchThreshold) {
-      result.batching.singleBatchThreshold = Math.max(5, Math.round(config.batching.singleBatchThreshold * multiplier));
-    }
   } else if (config.batching.strategy === 'character_limit') {
     // Traditional: Level 1 (Economy/Stability) -> Large chunks, Level 5 (Turbo) -> Small chunks
     const multiplier = sizeMultipliers[safeLevel];
@@ -996,7 +987,6 @@ function applyOptimizationLevel(config, level) {
           modeConfig.optimalSize = Math.max(5, Math.round(modeConfig.optimalSize * multiplier));
         }
         if (modeConfig.maxComplexity) modeConfig.maxComplexity = Math.max(100, Math.round(modeConfig.maxComplexity * multiplier));
-        if (modeConfig.singleBatchThreshold) modeConfig.singleBatchThreshold = Math.max(5, Math.round(modeConfig.singleBatchThreshold * multiplier));
         if (modeConfig.maxBatchSizeChars) modeConfig.maxBatchSizeChars = Math.max(500, Math.round(modeConfig.maxBatchSizeChars * multiplier));
         // Select Element parents commit only after all fragments complete. Keep
         // their established split ceiling stable; scale throughput fields above.

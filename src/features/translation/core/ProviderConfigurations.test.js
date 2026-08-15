@@ -75,7 +75,6 @@ describe('ProviderConfigurations optimization scaling', () => {
     expect(batching.map(config => config.characterLimit)).toEqual([3500, 3500, 3500, 3500, 3500]);
     expect(batching[4]).toMatchObject({
       maxComplexity: 150,
-      singleBatchThreshold: 6,
     });
     expect(getProviderRateLimit('WebAI', 3).maxConcurrent).toBe(2);
     expect(getProviderRateLimit('WebAI', 5).maxConcurrent).toBe(4);
