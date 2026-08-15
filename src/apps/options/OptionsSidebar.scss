@@ -99,14 +99,40 @@
   color: var(--color-text-secondary);
   text-align: center;
 
-  .github-icon {
+  .footer-icon-links {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--spacing-sm);
+    margin-bottom: var(--spacing-sm);
+  }
+
+  .footer-icon-links a {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+
+    &:focus-visible {
+      outline: 2px solid var(--color-primary);
+      outline-offset: 3px;
+      border-radius: var(--border-radius-sm);
+    }
+  }
+
+  .footer-icon {
+    width: 22px;
+    height: 22px;
     opacity: 0.7;
     transition: opacity var(--transition-fast);
-    filter: var(--github-icon-filter, none);
 
     &:hover {
       opacity: 1;
     }
+  }
+
+  .github-icon {
+    filter: var(--github-icon-filter, none);
+    transition: opacity var(--transition-fast), filter var(--transition-base);
   }
 
   .about-link {

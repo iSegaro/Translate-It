@@ -1,21 +1,13 @@
 @use "@/assets/styles/base/variables" as *;
 
 .pdf-tab {
-  padding: 1rem;
-
   .tab-header {
-    margin-bottom: 2rem;
-
-    h2 {
-      font-size: 1.5rem;
-      font-weight: 600;
-      margin-bottom: 0.5rem;
-      color: var(--text-primary);
-    }
+    margin-bottom: $spacing-xl;
 
     .tab-description {
-      color: var(--text-secondary);
-      font-size: 0.9rem;
+      margin: 0;
+      color: var(--color-text-secondary);
+      font-size: $font-size-sm;
     }
   }
 
@@ -24,7 +16,7 @@
     margin-bottom: 1.5rem;
 
     &:first-child {
-      margin-top: 0.5rem; /* Add space for header actions */
+      margin-top: $spacing-sm;
     }
 
     &:last-child {

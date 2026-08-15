@@ -9,5 +9,6 @@ export const DEFAULT_TARGET_LANGUAGE = "fa";
 // ===== GLOBAL REPOSITORY URLS =====
 export const REPO_URLS = {
   GITHUB_MAIN: 'https://github.com/iSegaro/Translate-It',
+  WEBSITE_MAIN: 'https://translate-it.app',
   WEBAI_API: 'https://github.com/Amm1rr/WebAI-to-API'
 };
