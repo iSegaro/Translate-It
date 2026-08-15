@@ -15,6 +15,7 @@ import { ErrorTypes } from "@/shared/error-management/ErrorTypes.js";
 import { appendTranslationDiagnostic } from '@/features/translation/ir/TranslationOperation.js';
 import { createManifestViewFromUnits } from '@/features/translation/ir/RequestUnitManifest.js';
 import { TranslationContractValidator } from '@/features/translation/core/TranslationContractValidator.js';
+import { TRANSLATION_BATCH_EXECUTION_TIMEOUT_MS } from '@/shared/constants/translation.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.TRANSLATION, 'OptimizedJsonHandler');
 
@@ -311,7 +312,7 @@ export class OptimizedJsonHandler {
           const originalCharsBefore = statsBefore ? statsBefore.originalChars : 0;
 
           // Timeout Protection (5 minutes) for each batch call
-          const BATCH_TIMEOUT_MS = 300000;
+          const BATCH_TIMEOUT_MS = TRANSLATION_BATCH_EXECUTION_TIMEOUT_MS;
           const timeoutPromise = new Promise((resolve) => {
             timeoutId = setTimeout(() => {
               didTimeout = true;

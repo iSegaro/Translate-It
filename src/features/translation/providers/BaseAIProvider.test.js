@@ -637,6 +637,39 @@ beforeEach(() => {
       expect(result[0]).not.toBeInstanceOf(Array);
     });
 
+    it('completes recovery when recovered V3 intervals pass semantic validation', async () => {
+      const { AIResponseParser } = await import('./utils/AIResponseParser.js');
+      const source = 'A@@TI_SEG_e1_s1_n1@@B@@TI_SEG_e1_s1_n2@@C';
+      AIResponseParser.parseBatchResult.mockReturnValue({ results: ['invalid'], contractViolation: true });
+      vi.spyOn(provider, '_traditionalBatchTranslate').mockResolvedValue([
+        'TA@@TI_SEG_e1_s1_n1@@TB@@TI_SEG_e1_s1_n2@@TC'
+      ]);
+
+      const result = await provider._translateBatch(
+        [source], 'en', 'fa', 'select-element', null, null, null, 'recovery-valid', null, null, ResponseFormat.JSON_OBJECT
+      );
+
+      expect(result).toEqual(['TA@@TI_SEG_e1_s1_n1@@TB@@TI_SEG_e1_s1_n2@@TC']);
+      expect(loggerMock.debug.mock.calls.some(([message]) => message.includes('Structured recovery completed'))).toBe(true);
+    });
+
+    it('rejects shape-valid recovery with an empty V3 interval before completion', async () => {
+      const { AIResponseParser } = await import('./utils/AIResponseParser.js');
+      const source = 'A@@TI_SEG_e1_s1_n1@@B@@TI_SEG_e1_s1_n2@@C';
+      AIResponseParser.parseBatchResult.mockReturnValue({ results: ['invalid'], contractViolation: true });
+      vi.spyOn(provider, '_traditionalBatchTranslate').mockResolvedValue([
+        'TA@@TI_SEG_e1_s1_n1@@@@TI_SEG_e1_s1_n2@@TC'
+      ]);
+
+      await expect(provider._translateBatch(
+        [source], 'en', 'fa', 'select-element', null, null, null, 'recovery-invalid', null, null, ResponseFormat.JSON_OBJECT
+      )).rejects.toMatchObject({
+        type: ErrorTypes.VALIDATION,
+        contractViolation: 'V3_EMPTY_TRANSLATED_INTERVAL',
+      });
+      expect(loggerMock.debug.mock.calls.some(([message]) => message.includes('Structured recovery completed'))).toBe(false);
+    });
+
     it('rejects duplicate primary candidate, runs sequential recovery, returns ordered results without parser source-fill escaping', async () => {
       const { AIResponseParser: realParser } = await vi.importActual("./utils/AIResponseParser.js");
       AIResponseParser.parseBatchResult.mockImplementation(realParser.parseBatchResult.bind(realParser));

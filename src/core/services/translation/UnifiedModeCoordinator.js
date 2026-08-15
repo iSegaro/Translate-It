@@ -10,6 +10,7 @@ import { MessageActions } from '@/shared/messaging/core/MessageActions.js';
 import { RequestStatus } from './TranslationRequestTracker.js';
 import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
 import { AUTO_DETECT_VALUE } from '@/shared/constants/core.js';
+import { TRANSLATION_BATCH_EXECUTION_TIMEOUT_MS } from '@/shared/constants/translation.js';
 import { appendTranslationDiagnostic } from '@/features/translation/ir/TranslationOperation.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.TRANSLATION, 'UnifiedModeCoordinator');
@@ -407,7 +408,7 @@ export class UnifiedModeCoordinator {
         : items.map(item => (typeof item === 'string' ? item : item.text) || '');
 
       // Timeout Protection (5 minutes) for each batch call
-      const BATCH_TIMEOUT_MS = 300000;
+      const BATCH_TIMEOUT_MS = TRANSLATION_BATCH_EXECUTION_TIMEOUT_MS;
       const timeoutPromise = new Promise((_, reject) => {
         timeoutId = setTimeout(() => {
           const timeoutError = new Error(`Batch translation timed out after ${BATCH_TIMEOUT_MS}ms`);

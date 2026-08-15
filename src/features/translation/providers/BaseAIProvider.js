@@ -22,6 +22,7 @@ import { ErrorTypes } from "@/shared/error-management/ErrorTypes.js";
 import { appendTranslationDiagnostic } from "@/features/translation/ir/TranslationOperation.js";
 import { TranslationCallPurpose } from "@/features/translation/providers/ProviderConstants.js";
 import { classifyRecoveryFailure } from "@/features/translation/ir/RecoveryClassification.js";
+import { TranslationContractValidator } from "@/features/translation/core/TranslationContractValidator.js";
 
 const logger = getScopedLogger(LOG_COMPONENTS.TRANSLATION, 'BaseAIProvider');
 
@@ -123,6 +124,44 @@ function collectRecoveryViolationCodes(parsed) {
 function formatDiagnosticId(value, maxLength = 32) {
   if (typeof value !== 'string' || !value) return null;
   return value.length <= maxLength ? value : `${value.slice(0, maxLength)}…`;
+}
+
+function getSourceText(source) {
+  return typeof source === 'object' && source !== null
+    ? (source.t ?? source.text ?? '')
+    : source;
+}
+
+function getRecoveryParentId(source, index) {
+  if (typeof source === 'object' && source !== null) {
+    return source.b ?? source.blockId ?? source.i ?? source.uid ?? `recovery-${index}`;
+  }
+  return `recovery-${index}`;
+}
+
+function validateRecoveredResults(sourceTexts, recoveredResults) {
+  for (let index = 0; index < sourceTexts.length; index++) {
+    const sourceText = getSourceText(sourceTexts[index]);
+    if (typeof sourceText !== 'string' || !sourceText.includes('@@TI_SEG_')) continue;
+
+    const validation = TranslationContractValidator.validateV3Parent(
+      sourceText,
+      recoveredResults[index],
+      getRecoveryParentId(sourceTexts[index], index),
+    );
+    if (validation && !validation.isValid) {
+      const violation = validation.violations[0];
+      const error = new Error(
+        `Structured recovery semantic validation failed: ${violation.code}`,
+      );
+      error.type = ErrorTypes.VALIDATION;
+      error.contractViolation = violation.code;
+      error.parentId = violation.parentId;
+      error.intervalIndex = violation.intervalIndex;
+      error.markerId = violation.markerId;
+      throw error;
+    }
+  }
 }
 
 export class BaseAIProvider extends BaseProvider {
@@ -397,6 +436,30 @@ export class BaseAIProvider extends BaseProvider {
             return merged;
           })()
           : recoveryValues;
+
+        const recoverySourceTexts = selectivePlan
+          ? [...texts]
+          : texts;
+        try {
+          validateRecoveredResults(recoverySourceTexts, finalResults);
+        } catch (error) {
+          if (!abortController?.signal?.aborted && !isCancellationError(error)) {
+            appendTranslationDiagnostic(executionContext, {
+              type: 'RECOVERY_FAILED',
+              stage: 'recovery-validation',
+              provider: this.providerName,
+              reason: error.message,
+              ...(typeof error.type === 'string' && { code: error.type }),
+            });
+            logger.debug(`[${this.providerName}] Structured recovery failed semantic validation`, {
+              classification: recoveryClassification?.classification ?? null,
+              strategy: recoveryStrategy,
+              errorType: typeof error.type === 'string' ? error.type : null,
+              violation: error.contractViolation ?? null,
+            });
+          }
+          throw error;
+        }
 
         appendTranslationDiagnostic(executionContext, {
           type: 'RECOVERY_SUCCEEDED',

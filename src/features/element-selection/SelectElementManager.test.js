@@ -36,14 +36,13 @@ vi.mock('@/shared/messaging/core/UnifiedMessaging.js', () => ({
 vi.mock('@/core/extensionContext.js', () => ({
   default: {
     isTabActive: vi.fn(() => true),
-    isValidSync: vi.fn(() => true)
+    isValidSync: vi.fn(() => true),
+    isContextError: vi.fn(() => false)
   }
 }));
 vi.mock('@/shared/error-management/ErrorHandler.js', () => ({
   ErrorHandler: {
-    getInstance: vi.fn(() => ({
-      handle: vi.fn(() => Promise.resolve())
-    }))
+    getInstance: vi.fn()
   }
 }));
 
@@ -206,6 +205,7 @@ let SelectElementManager;
 
 describe('SelectElementManager', () => {
   let manager;
+  let errorHandler;
 
   beforeEach(async () => {
     vi.clearAllMocks();
@@ -214,6 +214,9 @@ describe('SelectElementManager', () => {
       SelectElementManager = module.SelectElementManager;
     }
     manager = new SelectElementManager();
+    const { ErrorHandler } = await import('@/shared/error-management/ErrorHandler.js');
+    errorHandler = { handle: vi.fn(() => Promise.resolve()) };
+    ErrorHandler.getInstance.mockReturnValue(errorHandler);
   });
 
   it('should be instantiable', () => {
@@ -269,6 +272,91 @@ describe('SelectElementManager', () => {
     expect(manager.domTranslatorAdapter.translateElement).toHaveBeenCalledWith(mockElement, expect.any(Object));
     expect(manager.isActive).toBe(false); // Should deactivate after translation
     expect(document.documentElement.getAttribute('data-translate-it-select-mode')).toBeNull();
+  });
+
+  describe('translation failure classification', () => {
+    let cleanupSpy;
+
+    beforeEach(() => {
+      manager.isActive = true;
+      cleanupSpy = vi.spyOn(manager, 'performPostTranslationCleanup').mockImplementation(() => {});
+    });
+
+    it('shows validation failures as visible errors', async () => {
+      const error = Object.assign(new Error('V3 marker contract violation'), { type: 'VALIDATION' });
+      manager.domTranslatorAdapter.translateElement.mockRejectedValue(error);
+
+      await manager.startTranslation(document.createElement('div'));
+
+      expect(errorHandler.handle).toHaveBeenCalledWith(error, {
+        context: 'select-element',
+        showToast: true
+      });
+      expect(cleanupSpy).toHaveBeenCalledWith({ reason: 'error' });
+      expect(manager.logger.warn).toHaveBeenCalledWith('Select Element translation failed:', error);
+    });
+
+    it('shows V3 empty interval failures as visible errors', async () => {
+      const error = Object.assign(new Error('V3_EMPTY_TRANSLATED_INTERVAL'), { type: 'VALIDATION' });
+      manager.domTranslatorAdapter.translateElement.mockRejectedValue(error);
+
+      await manager.startTranslation(document.createElement('div'));
+
+      expect(errorHandler.handle).toHaveBeenCalledWith(error, expect.objectContaining({ showToast: true }));
+      expect(cleanupSpy).toHaveBeenCalledWith({ reason: 'error' });
+    });
+
+    it('keeps explicit no-content failures silent', async () => {
+      const error = new Error('No translatable text found');
+      manager.domTranslatorAdapter.translateElement.mockRejectedValue(error);
+
+      await manager.startTranslation(document.createElement('div'));
+
+      expect(errorHandler.handle).not.toHaveBeenCalled();
+      expect(cleanupSpy).toHaveBeenCalledWith({ reason: 'cancel' });
+      expect(manager.logger.debug).toHaveBeenCalledWith('Select Element translation skipped:', error.message);
+    });
+
+    it('keeps user cancellation silent', async () => {
+      const { isCancellationError } = await import('@/shared/error-management/ErrorMatcher.js');
+      isCancellationError.mockReturnValueOnce(true);
+      const error = Object.assign(new Error('cancelled'), { type: 'USER_CANCELLED' });
+      manager.domTranslatorAdapter.translateElement.mockRejectedValue(error);
+
+      await manager.startTranslation(document.createElement('div'));
+
+      expect(errorHandler.handle).not.toHaveBeenCalled();
+      expect(cleanupSpy).toHaveBeenCalledWith({ reason: 'cancel' });
+    });
+
+    it('keeps stale cancellation results silent', async () => {
+      const deactivateSpy = vi.spyOn(manager, 'deactivate').mockImplementation(() => {});
+      manager.domTranslatorAdapter.translateElement.mockResolvedValue({ success: false, cancelled: true });
+
+      await manager.startTranslation(document.createElement('div'));
+
+      expect(errorHandler.handle).not.toHaveBeenCalled();
+      expect(deactivateSpy).toHaveBeenCalledWith({ reason: 'cancel', silent: true });
+    });
+
+    it('keeps provider failures visible', async () => {
+      const error = Object.assign(new Error('Network failed'), { type: 'NETWORK_ERROR' });
+      manager.domTranslatorAdapter.translateElement.mockRejectedValue(error);
+
+      await manager.startTranslation(document.createElement('div'));
+
+      expect(errorHandler.handle).toHaveBeenCalledWith(error, expect.objectContaining({ showToast: true }));
+      expect(cleanupSpy).toHaveBeenCalledWith({ reason: 'error' });
+    });
+
+    it('keeps successful translation cleanup unchanged', async () => {
+      manager.domTranslatorAdapter.translateElement.mockResolvedValue({ success: true });
+
+      await manager.startTranslation(document.createElement('div'));
+
+      expect(errorHandler.handle).not.toHaveBeenCalled();
+      expect(cleanupSpy).toHaveBeenCalledWith({ reason: 'success' });
+    });
   });
 
   describe('event handling', () => {
