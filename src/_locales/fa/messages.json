@@ -1961,6 +1961,9 @@
   "SELECT_ELEMENT_UNSUPPORTED_TRANSLATION_MODE": {
     "message": "این محتوا با حالت فعلی ترجمه قابل ترجمه نیست."
   },
+  "SELECT_ELEMENT_ACTIVATION_FAILED": {
+    "message": "فعال‌سازی حالت انتخاب عنصر امکان‌پذیر نبود."
+  },
   "LINGVA_WPT_WARNING": {
     "message": "سرویس Lingva ممکن است در متن‌های طولانی دچار خطا شود."
   },

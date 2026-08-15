@@ -1961,6 +1961,9 @@
   "SELECT_ELEMENT_UNSUPPORTED_TRANSLATION_MODE": {
     "message": "This content cannot be translated with the current translation mode."
   },
+  "SELECT_ELEMENT_ACTIVATION_FAILED": {
+    "message": "Could not activate Select Element mode."
+  },
   "LINGVA_WPT_WARNING": {
     "message": "Lingva may fail on long texts."
   },

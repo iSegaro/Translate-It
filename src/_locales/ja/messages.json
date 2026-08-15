@@ -1961,6 +1961,9 @@
   "SELECT_ELEMENT_UNSUPPORTED_TRANSLATION_MODE": {
     "message": "このコンテンツは現在の翻訳モードでは翻訳できません。"
   },
+  "SELECT_ELEMENT_ACTIVATION_FAILED": {
+    "message": "要素選択モードを有効にできませんでした。"
+  },
   "LINGVA_WPT_WARNING": {
     "message": "Lingvaは長いテキストで失敗する可能性があります。"
   },
