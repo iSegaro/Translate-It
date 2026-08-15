@@ -997,7 +997,8 @@ export class ContextMenuManager extends ResourceTracker {
             'MODE_PROVIDERS', 
             'EXTENSION_ENABLED', 
             'DEBUG_MODE', 
-            'CONTEXT_MENU_VISIBILITY'
+            'CONTEXT_MENU_VISIBILITY',
+            'HIDDEN_PROVIDERS'
           ];
           
           const isRelevantChange = Object.keys(changes).some(key => 
