@@ -495,13 +495,18 @@ describe('QueueManager', () => {
       const promise = queueManager.enqueue('bound-test-provider', mockRequest, 0, 'select_element', {
         messageId: 'bound-test'
       });
+      const rejection = expect(promise).rejects.toMatchObject({
+        type: ErrorTypes.NETWORK_ERROR,
+        message: 'network failure',
+      });
 
       await vi.advanceTimersByTimeAsync(30000);
-      await promise.catch(() => {});
+      await rejection;
 
       // NETWORK_ERROR maxRetries=4, so exactly 4 attempts before permanent failure
       expect(callCount).toBe(4);
       expect(queueManager.getQueueStatus('bound-test-provider').total).toBe(0);
+      expect(queueManager.retryTimeouts.size).toBe(0);
     });
   });
 });
