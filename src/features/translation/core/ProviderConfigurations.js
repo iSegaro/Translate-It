@@ -1100,7 +1100,11 @@ function applyOptimizationLevel(config, level) {
         if (modeConfig.maxComplexity) modeConfig.maxComplexity = Math.max(100, Math.round(modeConfig.maxComplexity * multiplier));
         if (modeConfig.singleBatchThreshold) modeConfig.singleBatchThreshold = Math.max(5, Math.round(modeConfig.singleBatchThreshold * multiplier));
         if (modeConfig.maxBatchSizeChars) modeConfig.maxBatchSizeChars = Math.max(500, Math.round(modeConfig.maxBatchSizeChars * multiplier));
-        if (modeConfig.characterLimit) modeConfig.characterLimit = Math.max(500, Math.round(modeConfig.characterLimit * multiplier));
+        // Select Element parents commit only after all fragments complete. Keep
+        // their established split ceiling stable; scale throughput fields above.
+        if (mode !== 'select_element' && modeConfig.characterLimit) {
+          modeConfig.characterLimit = Math.max(500, Math.round(modeConfig.characterLimit * multiplier));
+        }
       } else if (config.batching.strategy === 'character_limit') {
         const multiplier = sizeMultipliers[safeLevel];
         if (modeConfig.characterLimit) modeConfig.characterLimit = Math.max(500, Math.round(modeConfig.characterLimit * multiplier));

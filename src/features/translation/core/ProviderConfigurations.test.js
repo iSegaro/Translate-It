@@ -9,7 +9,11 @@ vi.mock('@/shared/logging/logger.js', () => ({
   })
 }));
 
-import { PROVIDER_CONFIGURATIONS, getProviderRateLimit } from './ProviderConfigurations.js';
+import {
+  PROVIDER_CONFIGURATIONS,
+  getProviderBatching,
+  getProviderRateLimit,
+} from './ProviderConfigurations.js';
 
 describe('ProviderConfigurations optimization scaling', () => {
   it('should give base-2 providers a distinct Level 2 concurrency step', () => {
@@ -59,5 +63,23 @@ describe('ProviderConfigurations optimization scaling', () => {
 
     expect(levels.map(level => getProviderRateLimit('WebAI', level).modeOverrides.select_element.maxConcurrent))
       .toEqual(expected);
+  });
+
+  it('keeps the AI Select Element character ceiling stable across levels', () => {
+    const levels = [1, 2, 3, 4, 5];
+    const batching = levels.map(level => getProviderBatching('WebAI', 'select_element', level));
+
+    expect(batching.map(config => config.characterLimit)).toEqual([3500, 3500, 3500, 3500, 3500]);
+    expect(batching[4]).toMatchObject({
+      optimalSize: 8,
+      maxComplexity: 150,
+      singleBatchThreshold: 6,
+    });
+    expect(getProviderRateLimit('WebAI', 5).maxConcurrent).toBe(4);
+  });
+
+  it('keeps traditional provider character scaling unchanged', () => {
+    expect(getProviderBatching('GoogleTranslate', null, 5).characterLimit).toBe(3000);
+    expect(getProviderBatching('BingTranslate', null, 5).characterLimit).toBe(2400);
   });
 });
