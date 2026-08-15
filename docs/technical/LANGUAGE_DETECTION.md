@@ -100,6 +100,19 @@ The central orchestrator for all detection and direction requests. It manages:
 
 `detect()` remains the legacy single-pass projection and returns `result.language` as `string | null`. Existing callers do not need migration.
 
+### Operation Source Resolution
+
+Detection, operation source resolution, and scheduling are separate concerns.
+`src/features/translation/core/OperationSourceLanguageResolver.js` builds one bounded representative sample, reuses one detailed detection result, applies existing swap semantics once, and returns an explicit `canBypassSequentialGate` decision with a stable reason. AUTO scheduling does not consume this contract yet; current first-batch sequencing remains unchanged.
+
+Bypass is intentionally stricter than `DetectionResult.reliable`:
+
+- high reliable statistical results can qualify;
+- language-specific deterministic results can qualify;
+- contextual cache, exact cache, heuristic, user-language, weak statistical, ambiguous deterministic, unknown, and mixed-script operations do not qualify;
+- exact cache is not automatically trusted because current provider feedback can be stale and is registered from only the first array item.
+- history-enabled operations remain ordered even when local source resolution is strong.
+
 ### 2. `textAnalysis.js` (The Engine)
 Contains low-level Unicode range analysis and script-specific detection functions.
 - **`isRTLStrongCharacter(code)`**: Identifies inherently RTL characters (Arabic, Hebrew, Syriac, etc.).
