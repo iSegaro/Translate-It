@@ -551,16 +551,34 @@ export class ContentMessageHandler extends ResourceTracker {
   // IFrame support handlers
   async handleIFrameActivateSelectElement(/* data */) {
     this.logger.info('IFrame activate select element request');
-    if (this.selectElementManager) {
-      // Initialize if not already initialized
-      if (!this.selectElementManager.isInitialized) {
-        await this.selectElementManager.initialize();
+    try {
+      if (this.selectElementManager) {
+        // Initialize if not already initialized
+        if (!this.selectElementManager.isInitialized) {
+          await this.selectElementManager.initialize();
+        }
+
+        const result = await this.selectElementManager.activateSelectElementMode();
+        return { success: true, activated: result.isActive, managerId: result.instanceId };
       }
 
-      const result = await this.selectElementManager.activateSelectElementMode();
-      return { success: true, activated: result.isActive, managerId: result.instanceId };
+      const safeMessage = await getSelectElementActivationErrorMessage();
+      return {
+        success: false,
+        message: safeMessage,
+        error: safeMessage,
+        errorType: ErrorTypes.SELECT_ELEMENT,
+      };
+    } catch (error) {
+      this.logger.warn('IFrame Select Element activation failed:', error);
+      const safeMessage = await getSelectElementActivationErrorMessage();
+      return {
+        success: false,
+        message: safeMessage,
+        error: safeMessage,
+        errorType: ErrorTypes.SELECT_ELEMENT,
+      };
     }
-    return { success: false, error: 'SelectElementManager not available' };
   }
 
   async handleIFrameTranslateSelection(data) {
