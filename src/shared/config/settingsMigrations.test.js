@@ -273,6 +273,29 @@ describe('Settings Migrations', () => {
     expect(logs.some(log => log.includes('Reset OPENROUTER_API_MODEL'))).toBe(true);
   });
 
+  it.each(['gemini-3-flash', 'gemini-3-pro', 'provider/custom-model'])(
+    'preserves WebAI model %s during model-list synchronization',
+    async (model) => {
+      const { updates } = await runSettingsMigrations({
+        WEBAI_MODELS: [{ value: 'legacy-model', label: 'Legacy' }],
+        WEBAI_API_MODEL: model
+      });
+
+      expect(updates.WEBAI_MODELS).toEqual(CONFIG.WEBAI_MODELS);
+      expect(updates.WEBAI_API_MODEL).toBeUndefined();
+    }
+  );
+
+  it('resets an empty WebAI model to the configured default', async () => {
+    const { updates, logs } = await runSettingsMigrations({
+      WEBAI_MODELS: CONFIG.WEBAI_MODELS,
+      WEBAI_API_MODEL: ''
+    });
+
+    expect(updates.WEBAI_API_MODEL).toBe('gemini-3-flash');
+    expect(logs.some(log => log.includes('Reset WEBAI_API_MODEL'))).toBe(true);
+  });
+
   it('should preserve arbitrary custom model IDs when a model list changes', async () => {
     const currentSettings = {
       GEMINI_MODELS: [{ value: 'old-model', label: 'Old' }],

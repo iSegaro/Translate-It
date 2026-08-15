@@ -180,7 +180,12 @@ export const CONFIG = {
   MICROSOFT_EDGE_TRANSLATE_URL: "https://api-edge.cognitive.microsofttranslator.com/translate",
   LINGVA_API_URL: "",
   WEBAI_API_URL: "",
-  WEBAI_API_MODEL: "",
+  WEBAI_API_MODEL: "gemini-3-flash",
+  WEBAI_MODELS: [
+    { value: "gemini-3-flash", name: "Gemini 3 Flash" },
+    { value: "gemini-3-pro", name: "Gemini 3 Pro" },
+    { value: "custom", name: "Custom Model", custom: true }
+  ],
   OPENAI_API_KEY: "",
   OPENAI_API_URL: "https://api.openai.com/v1/chat/completions",
   OPENAI_API_MODEL: "gpt-5.6-luna",

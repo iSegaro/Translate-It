@@ -71,6 +71,16 @@ describe('Config Module', () => {
       expect(CONFIG.APP_NAME).toBe('Translate It');
     });
 
+    it('should expose approved WebAI models in order', () => {
+      expect(CONFIG.WEBAI_API_MODEL).toBe('gemini-3-flash');
+      expect(CONFIG.WEBAI_API_URL).toBe('');
+      expect(CONFIG.WEBAI_MODELS).toEqual([
+        { value: 'gemini-3-flash', name: 'Gemini 3 Flash' },
+        { value: 'gemini-3-pro', name: 'Gemini 3 Pro' },
+        { value: 'custom', name: 'Custom Model', custom: true }
+      ]);
+    });
+
     it('should expose approved OpenAI text models in order', () => {
       expect(CONFIG.OPENAI_API_MODEL).toBe('gpt-5.6-luna');
       expect(CONFIG.OPENAI_MODELS.map(model => model.value)).toEqual([
