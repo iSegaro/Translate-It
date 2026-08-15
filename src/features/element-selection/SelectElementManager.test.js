@@ -444,6 +444,8 @@ describe('SelectElementManager', () => {
       expect(errorHandler.handle).not.toHaveBeenCalled();
       const { createPublicDisplayError } = await import('@/shared/error-management/PublicErrorPolicy.js');
       expect(createPublicDisplayError).not.toHaveBeenCalled();
+      const ExtensionContextManager = (await import('@/core/extensionContext.js')).default;
+      expect(ExtensionContextManager.handleContextError).not.toHaveBeenCalled();
       expect(cleanupSpy).toHaveBeenCalledWith({ reason: 'no-content' });
       expect(manager.logger.debug).toHaveBeenCalledWith('Select Element translation completed with no translatable content:', error.message);
 
@@ -468,6 +470,8 @@ describe('SelectElementManager', () => {
       expect(errorHandler.handle).not.toHaveBeenCalled();
       const { createPublicDisplayError } = await import('@/shared/error-management/PublicErrorPolicy.js');
       expect(createPublicDisplayError).not.toHaveBeenCalled();
+      const ExtensionContextManager = (await import('@/core/extensionContext.js')).default;
+      expect(ExtensionContextManager.handleContextError).not.toHaveBeenCalled();
       expect(cleanupSpy).toHaveBeenCalledWith({ reason: 'no-content' });
 
       const { pageEventBus } = await import('@/core/PageEventBus.js');
@@ -506,6 +510,8 @@ describe('SelectElementManager', () => {
       expect(cleanupSpy).toHaveBeenCalledWith({ reason: 'error' });
       const { pageEventBus } = await import('@/core/PageEventBus.js');
       expect(pageEventBus.emit).not.toHaveBeenCalledWith('show-select-element-info', expect.anything());
+      const ExtensionContextManager = (await import('@/core/extensionContext.js')).default;
+      expect(ExtensionContextManager.handleContextError).not.toHaveBeenCalled();
     });
 
     it('keeps user cancellation silent', async () => {
@@ -520,6 +526,10 @@ describe('SelectElementManager', () => {
       expect(cleanupSpy).toHaveBeenCalledWith({ reason: 'cancel' });
       const { pageEventBus } = await import('@/core/PageEventBus.js');
       expect(pageEventBus.emit).not.toHaveBeenCalledWith('show-select-element-info', expect.anything());
+      const ExtensionContextManager = (await import('@/core/extensionContext.js')).default;
+      expect(ExtensionContextManager.handleContextError).not.toHaveBeenCalled();
+      const { createPublicDisplayError } = await import('@/shared/error-management/PublicErrorPolicy.js');
+      expect(createPublicDisplayError).not.toHaveBeenCalled();
     });
 
     it('keeps stale cancellation results silent', async () => {
@@ -550,7 +560,14 @@ describe('SelectElementManager', () => {
 
       await manager.startTranslation(document.createElement('div'));
 
+      const { createPublicDisplayError } = await import('@/shared/error-management/PublicErrorPolicy.js');
+      const ExtensionContextManager = (await import('@/core/extensionContext.js')).default;
+      expect(createPublicDisplayError).toHaveBeenCalledTimes(1);
       expect(errorHandler.handle).toHaveBeenCalledWith(expect.objectContaining({ cause: error }), expect.objectContaining({ showToast: true }));
+      expect(errorHandler.handle).toHaveBeenCalledTimes(1);
+      expect(ExtensionContextManager.handleContextError).not.toHaveBeenCalled();
+      const { pageEventBus } = await import('@/core/PageEventBus.js');
+      expect(pageEventBus.emit).not.toHaveBeenCalledWith('show-select-element-info', expect.anything());
       expect(cleanupSpy).toHaveBeenCalledWith({ reason: 'error' });
     });
 
@@ -582,6 +599,8 @@ describe('SelectElementManager', () => {
       expect(cleanupSpy).not.toHaveBeenCalled();
       expect(manager.domTranslatorAdapter.cancelTranslation).not.toHaveBeenCalled();
       expect(manager.domTranslatorAdapter.revertTranslation).not.toHaveBeenCalled();
+      const ExtensionContextManager = (await import('@/core/extensionContext.js')).default;
+      expect(ExtensionContextManager.handleContextError).not.toHaveBeenCalled();
       const { pageEventBus } = await import('@/core/PageEventBus.js');
       expect(pageEventBus.emit).not.toHaveBeenCalledWith('show-select-element-info', expect.anything());
       expect(pageEventBus.emit).not.toHaveBeenCalledWith('cancel-select-element-mode');
@@ -633,6 +652,8 @@ describe('SelectElementManager', () => {
       );
       const { pageEventBus } = await import('@/core/PageEventBus.js');
       expect(pageEventBus.emit).not.toHaveBeenCalledWith('show-select-element-info', expect.anything());
+      const ExtensionContextManager = (await import('@/core/extensionContext.js')).default;
+      expect(ExtensionContextManager.handleContextError).not.toHaveBeenCalled();
     });
 
     it.each([
@@ -676,6 +697,7 @@ describe('SelectElementManager', () => {
         context: 'select-element',
         showToast: true,
       }));
+      expect(errorHandler.handle).toHaveBeenCalledTimes(1);
       expect(errorHandler.handle.mock.calls[0][0]).toMatchObject({
         type: ErrorTypes.ELEMENT_TOO_LARGE,
         message: 'This element is too large to translate at once.',
@@ -687,6 +709,8 @@ describe('SelectElementManager', () => {
       expect(cleanupSpy).toHaveBeenCalledWith({ reason: 'error' });
       const { pageEventBus } = await import('@/core/PageEventBus.js');
       expect(pageEventBus.emit).not.toHaveBeenCalledWith('show-select-element-info', expect.anything());
+      const ExtensionContextManager = (await import('@/core/extensionContext.js')).default;
+      expect(ExtensionContextManager.handleContextError).not.toHaveBeenCalled();
     });
 
     it('does not special-case an untyped error that merely contains the legacy phrase', async () => {
@@ -701,6 +725,7 @@ describe('SelectElementManager', () => {
         type: 'TRANSLATION_FAILED',
         cause: error,
       }), expect.objectContaining({ showToast: true }));
+      expect(errorHandler.handle).toHaveBeenCalledTimes(1);
       expect(errorHandler.handle.mock.calls[0][0]).not.toBe(error);
       expect(cleanupSpy).toHaveBeenCalledWith({ reason: 'error' });
     });
@@ -741,7 +766,14 @@ describe('SelectElementManager', () => {
         }),
         expect.objectContaining({ context: 'select-element', showToast: true })
       );
+      expect(errorHandler.handle).toHaveBeenCalledTimes(1);
+      const { createPublicDisplayError } = await import('@/shared/error-management/PublicErrorPolicy.js');
+      expect(createPublicDisplayError).not.toHaveBeenCalled();
       expect(errorHandler.handle.mock.calls[0][0].message).not.toContain('V3');
+      const { pageEventBus } = await import('@/core/PageEventBus.js');
+      expect(pageEventBus.emit).not.toHaveBeenCalledWith('show-select-element-info', expect.anything());
+      const ExtensionContextManager = (await import('@/core/extensionContext.js')).default;
+      expect(ExtensionContextManager.handleContextError).not.toHaveBeenCalled();
       expect(cleanupSpy).toHaveBeenCalledWith({ reason: 'error' });
     });
 
@@ -756,6 +788,10 @@ describe('SelectElementManager', () => {
       expect(cleanupSpy).toHaveBeenCalledWith({ reason: 'cancel' });
       const { pageEventBus } = await import('@/core/PageEventBus.js');
       expect(pageEventBus.emit).not.toHaveBeenCalledWith('show-select-element-info', expect.anything());
+      const ExtensionContextManager = (await import('@/core/extensionContext.js')).default;
+      expect(ExtensionContextManager.handleContextError).not.toHaveBeenCalled();
+      const { createPublicDisplayError } = await import('@/shared/error-management/PublicErrorPolicy.js');
+      expect(createPublicDisplayError).not.toHaveBeenCalled();
     });
 
     it('keeps successful translation cleanup unchanged', async () => {
@@ -764,6 +800,12 @@ describe('SelectElementManager', () => {
       await manager.startTranslation(document.createElement('div'));
 
       expect(errorHandler.handle).not.toHaveBeenCalled();
+      const { createPublicDisplayError } = await import('@/shared/error-management/PublicErrorPolicy.js');
+      expect(createPublicDisplayError).not.toHaveBeenCalled();
+      const { pageEventBus } = await import('@/core/PageEventBus.js');
+      expect(pageEventBus.emit).not.toHaveBeenCalledWith('show-select-element-info', expect.anything());
+      const ExtensionContextManager = (await import('@/core/extensionContext.js')).default;
+      expect(ExtensionContextManager.handleContextError).not.toHaveBeenCalled();
       expect(cleanupSpy).toHaveBeenCalledWith({ reason: 'success' });
     });
 
@@ -799,6 +841,11 @@ describe('SelectElementManager', () => {
       expect(cleanupSpy).toHaveBeenCalledWith({ reason: 'success' });
       const { pageEventBus } = await import('@/core/PageEventBus.js');
       expect(pageEventBus.emit).toHaveBeenCalledWith('ELEMENT_TRANSLATIONS_AVAILABLE');
+      expect(pageEventBus.emit).not.toHaveBeenCalledWith('show-select-element-info', expect.anything());
+      const { createPublicDisplayError } = await import('@/shared/error-management/PublicErrorPolicy.js');
+      expect(createPublicDisplayError).not.toHaveBeenCalled();
+      const ExtensionContextManager = (await import('@/core/extensionContext.js')).default;
+      expect(ExtensionContextManager.handleContextError).not.toHaveBeenCalled();
     });
 
     it('shows the partial message once and keeps success cleanup for PARTIAL_SUCCESS', async () => {
@@ -821,6 +868,10 @@ describe('SelectElementManager', () => {
         expect.objectContaining({ context: 'select-element', showToast: true })
       );
       expect(failureSpy).not.toHaveBeenCalled();
+      const { createPublicDisplayError } = await import('@/shared/error-management/PublicErrorPolicy.js');
+      expect(createPublicDisplayError).not.toHaveBeenCalled();
+      const ExtensionContextManager = (await import('@/core/extensionContext.js')).default;
+      expect(ExtensionContextManager.handleContextError).not.toHaveBeenCalled();
       expect(cleanupSpy).toHaveBeenCalledWith({ reason: 'success' });
       const { pageEventBus } = await import('@/core/PageEventBus.js');
       expect(pageEventBus.emit).toHaveBeenCalledWith('hide-translation', expect.any(Object));
@@ -954,6 +1005,8 @@ describe('SelectElementManager', () => {
       expect(errorHandler.handle).not.toHaveBeenCalled();
       const { pageEventBus } = await import('@/core/PageEventBus.js');
       expect(pageEventBus.emit).not.toHaveBeenCalledWith('show-select-element-info', expect.anything());
+      const ExtensionContextManager = (await import('@/core/extensionContext.js')).default;
+      expect(ExtensionContextManager.handleContextError).not.toHaveBeenCalled();
     });
 
     it('cancels active adapter work without changing conflict UX or cleanup semantics', async () => {
@@ -1074,6 +1127,7 @@ describe('SelectElementManager', () => {
 
     it('keeps the existing translation-failure context path intact', async () => {
       const ExtensionContextManager = (await import('@/core/extensionContext.js')).default;
+      const cleanupSpy = vi.spyOn(manager, 'performPostTranslationCleanup').mockImplementation(() => {});
       ExtensionContextManager.isContextError.mockReturnValue(true);
       try {
         manager.isActive = true;
@@ -1086,6 +1140,12 @@ describe('SelectElementManager', () => {
 
         expect(ExtensionContextManager.handleContextError).toHaveBeenCalledTimes(1);
         expect(ExtensionContextManager.handleContextError).toHaveBeenCalledWith(error, 'element-selection');
+        const { createPublicDisplayError } = await import('@/shared/error-management/PublicErrorPolicy.js');
+        expect(createPublicDisplayError).not.toHaveBeenCalled();
+        expect(errorHandler.handle).not.toHaveBeenCalled();
+        const { pageEventBus } = await import('@/core/PageEventBus.js');
+        expect(pageEventBus.emit).not.toHaveBeenCalledWith('show-select-element-info', expect.anything());
+        expect(cleanupSpy).toHaveBeenCalledWith({ reason: 'cancel' });
       } finally {
         ExtensionContextManager.isContextError.mockReturnValue(false);
       }
