@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { DomTranslatorAdapter } from './DomTranslatorAdapter.js';
 import { BlockGroupReconstructor } from './BlockGroupReconstructor.js';
 import { collectBlockGroups } from './DomTranslatorUtils.js';
+import { SelectElementExtractionMode } from './SelectElementPolicy.js';
 
 // Clean mock setup for dependencies
 vi.mock('@/shared/logging/logger.js', () => ({
@@ -65,7 +66,9 @@ vi.mock('@/shared/error-management/ErrorTypes.js', () => ({
 
 vi.mock('@/features/shared/hover-preview/HoverPreviewLookup.js', () => ({
   hoverPreviewLookup: {
-    add: vi.fn()
+    add: vi.fn(),
+    get: vi.fn(),
+    delete: vi.fn()
   }
 }));
 
@@ -279,7 +282,8 @@ describe('DomTranslatorAdapter Stress and Edge-Case Testing', () => {
       document.body.appendChild(container);
 
       const context = { blockMap: new WeakMap(), blockCounter: { value: 0 }, activeSessionId: 'test-session' };
-      const units = collectBlockGroups(container, context);
+      // V3 mode is required for preformatted traversal
+      const units = collectBlockGroups(container, context, { extractionMode: SelectElementExtractionMode.V3 });
 
       // We expect 3 main text segments
       const normalUnit = units.find(u => u.text.includes('Normal'));

@@ -171,9 +171,13 @@ export class MicrosoftEdgeProvider extends BaseTranslateProvider {
           body: JSON.stringify(body)
         },
         extractResponse: (data) => {
+          // No silent empty-fill: a malformed response must fail loudly so the
+          // caller never mistakes empty strings for a successful translation.
           if (!data?.[0]?.translations) {
-            logger.error('[Edge] Unexpected API response format:', data);
-            return chunkTexts.map(() => "");
+            logger.error('[Edge] Unexpected API response format');
+            const err = new Error(ErrorTypes.API_RESPONSE_INVALID);
+            err.type = ErrorTypes.API_RESPONSE_INVALID;
+            throw err;
           }
           
           // Capture detected language from metadata if available
@@ -181,7 +185,11 @@ export class MicrosoftEdgeProvider extends BaseTranslateProvider {
           
           // Match anylang logic: Join multiple translation segments if present
           return data.map(item => {
-            if (!item.translations || !Array.isArray(item.translations)) return "";
+            if (!item.translations || !Array.isArray(item.translations)) {
+              const err = new Error(ErrorTypes.API_RESPONSE_INVALID);
+              err.type = ErrorTypes.API_RESPONSE_INVALID;
+              throw err;
+            }
             return item.translations.map(t => t.text).join(' ');
           });
         },

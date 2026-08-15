@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { extractContextMetadata, collectTextNodes, generateElementId, collectBlockGroups, isExcludedAncestor } from './DomTranslatorUtils.js';
+import { SelectElementExtractionMode } from './SelectElementPolicy.js';
 
 // Mock logger
 vi.mock('@/shared/logging/logger.js', () => ({
@@ -185,16 +186,34 @@ describe('DomTranslatorUtils', () => {
       expect(nodes[0].text).toBe('Actual text');
     });
 
-    it('should reject text nodes inside interactive elements (textarea, input, select, button) and contenteditable elements recursively', () => {
+    it('should reject BIDI/zero-width formatting-mark-only text nodes', () => {
+      const container = document.createElement('div');
+      container.innerHTML = `
+        <p>Readable text</p>
+        <p>\u200E</p>
+        <p>\u200F</p>
+        <p> \u200B </p>
+        <p>\u2060</p>
+      `;
+      document.body.appendChild(container);
+
+      const nodes = collectTextNodes(container);
+
+      expect(nodes.length).toBe(1);
+      expect(nodes[0].text.trim()).toBe('Readable text');
+    });
+
+    it('should reject text nodes inside form controls, unsafe options, and contenteditable elements recursively, but not inside BUTTON', () => {
       const container = document.createElement('div');
       container.innerHTML = `
         <p>Translatable text outside.</p>
         <textarea>Should be rejected text.</textarea>
         <input type="text" value="Should be rejected text." />
         <select>
-          <option>Should be rejected option text.</option>
+          <option value="en">Safe option label.</option>
+          <option>Unsafe implicit-value option text.</option>
         </select>
-        <button><span>Should be rejected nested button text.</span></button>
+        <button><span>Should be translated nested button text.</span></button>
         <div contenteditable="true">Should be rejected editor text.</div>
         <div class="nested-editor"><p contenteditable="true">Should be rejected deeply nested editor text.</p></div>
       `;
@@ -208,8 +227,150 @@ describe('DomTranslatorUtils', () => {
 
       try {
         const textNodes = collectTextNodes(container);
-        expect(textNodes.length).toBe(1);
-        expect(textNodes[0].text.trim()).toBe('Translatable text outside.');
+        const collected = textNodes.map(n => n.text.trim());
+        expect(collected).toContain('Translatable text outside.');
+        expect(collected).toContain('Should be translated nested button text.');
+        expect(collected).toContain('Safe option label.');
+        expect(collected).not.toContain('Should be rejected text.');
+        expect(collected).not.toContain('Unsafe implicit-value option text.');
+        expect(collected).not.toContain('Should be rejected editor text.');
+        expect(collected).not.toContain('Should be rejected deeply nested editor text.');
+      } finally {
+        window.getComputedStyle = originalGetComputedStyle;
+      }
+    });
+
+    it('should reject preformatted nodes in V2 mode (explicit mode)', () => {
+      const container = document.createElement('div');
+      container.innerHTML = `
+        <p>Standard text</p>
+        <pre>Preformatted text</pre>
+        <code>Code text</code>
+      `;
+      document.body.appendChild(container);
+
+      const nodes = collectTextNodes(container, { extractionMode: SelectElementExtractionMode.V2 });
+
+      expect(nodes.length).toBe(1);
+      expect(nodes[0].text.trim()).toBe('Standard text');
+    });
+
+    it('should reject preformatted nodes in V2 mode (default, mode-agnostic call)', () => {
+      const container = document.createElement('div');
+      container.innerHTML = `
+        <p>Standard text</p>
+        <pre>Preformatted text</pre>
+      `;
+      document.body.appendChild(container);
+
+      const nodes = collectTextNodes(container);
+
+      expect(nodes.length).toBe(1);
+      expect(nodes[0].text.trim()).toBe('Standard text');
+    });
+
+    it('collects text from an explicitly selected BUTTON root (V2)', () => {
+      const button = document.createElement('button');
+      const span = document.createElement('span');
+      span.textContent = 'Follow this account to see their updates';
+      button.appendChild(span);
+      document.body.appendChild(button);
+
+      const originalGetComputedStyle = window.getComputedStyle;
+      window.getComputedStyle = vi.fn().mockReturnValue({
+        display: 'block',
+        visibility: 'visible'
+      });
+
+      try {
+        const nodes = collectTextNodes(button, { extractionMode: SelectElementExtractionMode.V2 });
+        expect(nodes.length).toBeGreaterThan(0);
+        expect(nodes.map(n => n.text).join(' ')).toContain('Follow this account');
+      } finally {
+        window.getComputedStyle = originalGetComputedStyle;
+      }
+    });
+
+    it('extracts text from a nested role=button subtree when a parent is selected (V2)', () => {
+      const container = document.createElement('div');
+      container.innerHTML = `
+        <p>Readable parent text.</p>
+        <div role="button"><span>Nested button label</span></div>
+      `;
+      document.body.appendChild(container);
+
+      const originalGetComputedStyle = window.getComputedStyle;
+      window.getComputedStyle = vi.fn().mockReturnValue({
+        display: 'block',
+        visibility: 'visible'
+      });
+
+      try {
+        const nodes = collectTextNodes(container, { extractionMode: SelectElementExtractionMode.V2 });
+        const collected = nodes.map(n => n.text.trim());
+        expect(collected).toContain('Readable parent text.');
+        expect(collected).toContain('Nested button label');
+      } finally {
+        window.getComputedStyle = originalGetComputedStyle;
+      }
+    });
+
+    it('collects text from an explicitly selected role=button root (V2)', () => {
+      const root = document.createElement('div');
+      root.setAttribute('role', 'button');
+      const span = document.createElement('span');
+      span.textContent = 'Open account settings and manage preferences';
+      root.appendChild(span);
+      document.body.appendChild(root);
+
+      const originalGetComputedStyle = window.getComputedStyle;
+      window.getComputedStyle = vi.fn().mockReturnValue({
+        display: 'block',
+        visibility: 'visible'
+      });
+
+      try {
+        const nodes = collectTextNodes(root, { extractionMode: SelectElementExtractionMode.V2 });
+        expect(nodes.length).toBeGreaterThan(0);
+        expect(nodes.map(n => n.text).join(' ')).toContain('Open account settings');
+      } finally {
+        window.getComputedStyle = originalGetComputedStyle;
+      }
+    });
+
+    it('collects an explicitly selected GitHub code-class root but excludes a nested code-class subtree (V2)', () => {
+      const root = document.createElement('div');
+      root.className = 'react-code-text';
+      root.textContent = 'const value = 42;';
+      document.body.appendChild(root);
+
+      const originalGetComputedStyle = window.getComputedStyle;
+      window.getComputedStyle = vi.fn().mockReturnValue({
+        display: 'block',
+        visibility: 'visible'
+      });
+
+      try {
+        const rootNodes = collectTextNodes(root, { extractionMode: SelectElementExtractionMode.V2 });
+        expect(rootNodes.length).toBe(1);
+        expect(rootNodes[0].text.trim()).toBe('const value = 42;');
+      } finally {
+        window.getComputedStyle = originalGetComputedStyle;
+      }
+
+      const nested = document.createElement('div');
+      const nestedLine = document.createElement('div');
+      nestedLine.className = 'react-code-text';
+      nestedLine.textContent = 'return 0;';
+      nested.appendChild(document.createTextNode('Surrounding prose.'));
+      nested.appendChild(nestedLine);
+      document.body.appendChild(nested);
+
+      try {
+        const nestedNodes = collectTextNodes(nested, { extractionMode: SelectElementExtractionMode.V2 });
+        const collected = nestedNodes.map(n => n.text.trim());
+        expect(collected).toContain('Surrounding prose.');
+        expect(collected).not.toContain('return 0;');
       } finally {
         window.getComputedStyle = originalGetComputedStyle;
       }
@@ -265,6 +426,30 @@ describe('DomTranslatorUtils', () => {
       expect(units[0].trailingWS).toBe(' \n');
     });
 
+    it('should reject BIDI/zero-width formatting-mark-only text nodes in block grouping mode', () => {
+      const container = document.createElement('div');
+      container.innerHTML = `
+        <p>Readable text</p>
+        <p>\u200E</p>
+        <p> \u200F </p>
+      `;
+      document.body.appendChild(container);
+
+      const originalGetComputedStyle = window.getComputedStyle;
+      window.getComputedStyle = vi.fn().mockReturnValue({
+        display: 'block',
+        visibility: 'visible'
+      });
+
+      try {
+        const units = collectBlockGroups(container);
+        expect(units.length).toBe(1);
+        expect(units[0].text).toBe('Readable text');
+      } finally {
+        window.getComputedStyle = originalGetComputedStyle;
+      }
+    });
+
     it('should implement reversible escaping of printable segment delimiters', () => {
       const container = document.createElement('div');
       container.innerHTML = `<p>Check [--SEG:n2--] tag</p>`;
@@ -285,7 +470,8 @@ describe('DomTranslatorUtils', () => {
       `;
       document.body.appendChild(container);
 
-      const units = collectBlockGroups(container);
+      // V3 mode is required for preformatted traversal
+      const units = collectBlockGroups(container, {}, { extractionMode: SelectElementExtractionMode.V3 });
 
       expect(units.length).toBe(3);
       expect(units[0].mode).toBe('standard');
@@ -298,6 +484,22 @@ describe('DomTranslatorUtils', () => {
       expect(units[2].mode).toBe('V2_PASSTHROUGH');
       expect(units[2].preWhitespace).toBe(true);
       expect(units[2].text).toBe('Code text');
+    });
+
+    it('should reject preformatted nodes when extraction mode is not V3', () => {
+      const container = document.createElement('div');
+      container.innerHTML = `
+        <p>Standard text</p>
+        <pre>Preformatted text</pre>
+        <code>Code text</code>
+      `;
+      document.body.appendChild(container);
+
+      const units = collectBlockGroups(container, {}, { extractionMode: SelectElementExtractionMode.V2 });
+
+      expect(units.length).toBe(1);
+      expect(units[0].mode).toBe('standard');
+      expect(units[0].text).toBe('Standard text');
     });
 
     it('should correctly capture direction hints and inline parent tags', () => {
@@ -318,15 +520,16 @@ describe('DomTranslatorUtils', () => {
       expect(units[0].inlineParentTags).toEqual(['strong', 'span']);
     });
 
-    it('should reject text nodes inside interactive elements (textarea, input, select, button) and contenteditable elements in block grouping mode recursively', () => {
+    it('should reject text nodes inside form controls, unsafe options, and contenteditable elements recursively, but not inside BUTTON (block grouping)', () => {
       const container = document.createElement('div');
       container.innerHTML = `
         <p>Translatable text outside.</p>
         <textarea>Should be rejected text.</textarea>
         <select>
-          <option>Should be rejected option text.</option>
+          <option value="en">Safe option label.</option>
+          <option>Unsafe implicit-value option text.</option>
         </select>
-        <button><span>Should be rejected nested button text.</span></button>
+        <button><span>Should be translated nested button text.</span></button>
         <div contenteditable="true">Should be rejected editor text.</div>
         <div class="nested-editor"><p contenteditable="true">Should be rejected deeply nested editor text.</p></div>
       `;
@@ -340,8 +543,201 @@ describe('DomTranslatorUtils', () => {
 
       try {
         const units = collectBlockGroups(container);
-        expect(units.length).toBe(1);
-        expect(units[0].text.trim()).toBe('Translatable text outside.');
+        const collected = units.map(u => u.text.trim());
+        expect(collected).toContain('Translatable text outside.');
+        expect(collected).toContain('Should be translated nested button text.');
+        expect(collected).toContain('Safe option label.');
+        expect(collected).not.toContain('Should be rejected text.');
+        expect(collected).not.toContain('Unsafe implicit-value option text.');
+        expect(collected).not.toContain('Should be rejected editor text.');
+        expect(collected).not.toContain('Should be rejected deeply nested editor text.');
+      } finally {
+        window.getComputedStyle = originalGetComputedStyle;
+      }
+    });
+
+    it('collects safe option labels in a selected parent under explicit V2 mode', () => {
+      const container = document.createElement('div');
+      container.innerHTML = `
+        <p>Ordinary text.</p>
+        <select>
+          <option value="en">English</option>
+          <option>Persian</option>
+          <option value="fa">Farsi</option>
+        </select>
+        <textarea>Should be rejected text.</textarea>
+        <input type="text" value="Should be rejected text." />
+      `;
+      document.body.appendChild(container);
+
+      const originalGetComputedStyle = window.getComputedStyle;
+      window.getComputedStyle = vi.fn().mockReturnValue({
+        display: 'block',
+        visibility: 'visible'
+      });
+
+      try {
+        const nodes = collectTextNodes(container, { extractionMode: SelectElementExtractionMode.V2 });
+        const collected = nodes.map(n => n.text.trim());
+        expect(collected).toContain('Ordinary text.');
+        expect(collected).toContain('English');
+        expect(collected).toContain('Farsi');
+        expect(collected).not.toContain('Persian');
+        expect(collected).not.toContain('Should be rejected text.');
+      } finally {
+        window.getComputedStyle = originalGetComputedStyle;
+      }
+    });
+
+    it('collects safe option labels in a selected parent under explicit V3 mode', () => {
+      const container = document.createElement('div');
+      container.innerHTML = `
+        <p>Ordinary text.</p>
+        <select>
+          <option value="en">English</option>
+          <option>Persian</option>
+          <option value="fa">Farsi</option>
+        </select>
+        <textarea>Should be rejected text.</textarea>
+        <input type="text" value="Should be rejected text." />
+      `;
+      document.body.appendChild(container);
+
+      const originalGetComputedStyle = window.getComputedStyle;
+      window.getComputedStyle = vi.fn().mockReturnValue({
+        display: 'block',
+        visibility: 'visible'
+      });
+
+      try {
+        const sessionContext = { blockMap: new WeakMap(), blockCounter: { value: 0 } };
+        const units = collectBlockGroups(container, sessionContext, { extractionMode: SelectElementExtractionMode.V3 });
+        const collected = units.map(u => u.text.trim());
+        expect(collected).toContain('Ordinary text.');
+        expect(collected).toContain('English');
+        expect(collected).toContain('Farsi');
+        expect(collected).not.toContain('Persian');
+        expect(collected).not.toContain('Should be rejected text.');
+} finally {
+        window.getComputedStyle = originalGetComputedStyle;
+      }
+    });
+
+    it('collects text from an explicitly selected BUTTON root in block grouping (V3)', () => {
+        const button = document.createElement('button');
+      const span = document.createElement('span');
+      span.textContent = 'Follow this account to see their updates';
+      button.appendChild(span);
+      document.body.appendChild(button);
+
+      const sessionContext = { blockMap: new WeakMap(), blockCounter: { value: 0 } };
+
+      const originalGetComputedStyle = window.getComputedStyle;
+      window.getComputedStyle = vi.fn().mockReturnValue({
+        display: 'block',
+        visibility: 'visible',
+        whiteSpace: 'normal'
+      });
+
+      try {
+        const units = collectBlockGroups(button, sessionContext, { extractionMode: SelectElementExtractionMode.V3 });
+        expect(units.length).toBeGreaterThan(0);
+        expect(units.map(u => u.text).join(' ')).toContain('Follow this account');
+        expect(units.every(u => u.mode === 'standard')).toBe(true);
+      } finally {
+        window.getComputedStyle = originalGetComputedStyle;
+      }
+    });
+
+    it('extracts text from a nested role=button subtree when a parent is selected (V3)', () => {
+      const container = document.createElement('div');
+      container.innerHTML = `
+        <p>Readable parent text.</p>
+        <div role="button"><span>Nested button label</span></div>
+      `;
+      document.body.appendChild(container);
+
+      const sessionContext = { blockMap: new WeakMap(), blockCounter: { value: 0 } };
+
+      const originalGetComputedStyle = window.getComputedStyle;
+      window.getComputedStyle = vi.fn().mockReturnValue({
+        display: 'block',
+        visibility: 'visible',
+        whiteSpace: 'normal'
+      });
+
+      try {
+        const units = collectBlockGroups(container, sessionContext, { extractionMode: SelectElementExtractionMode.V3 });
+        const collected = units.map(u => u.text.trim());
+        expect(collected).toContain('Readable parent text.');
+        expect(collected).toContain('Nested button label');
+      } finally {
+        window.getComputedStyle = originalGetComputedStyle;
+      }
+    });
+
+    it('collects text from an explicitly selected role=button root in block grouping (V3)', () => {
+      const root = document.createElement('div');
+      root.setAttribute('role', 'button');
+      const span = document.createElement('span');
+      span.textContent = 'Open account settings and manage preferences';
+      root.appendChild(span);
+      document.body.appendChild(root);
+
+      const sessionContext = { blockMap: new WeakMap(), blockCounter: { value: 0 } };
+
+      const originalGetComputedStyle = window.getComputedStyle;
+      window.getComputedStyle = vi.fn().mockReturnValue({
+        display: 'block',
+        visibility: 'visible',
+        whiteSpace: 'normal'
+      });
+
+      try {
+        const units = collectBlockGroups(root, sessionContext, { extractionMode: SelectElementExtractionMode.V3 });
+        expect(units.length).toBeGreaterThan(0);
+        expect(units.map(u => u.text).join(' ')).toContain('Open account settings');
+      } finally {
+        window.getComputedStyle = originalGetComputedStyle;
+      }
+    });
+
+    it('collects an explicitly selected GitHub code-class root but excludes a nested code-class subtree (V3)', () => {
+      const root = document.createElement('div');
+      root.className = 'react-code-text';
+      root.textContent = 'const value = 42;';
+      document.body.appendChild(root);
+
+      const sessionContext = { blockMap: new WeakMap(), blockCounter: { value: 0 } };
+
+      const originalGetComputedStyle = window.getComputedStyle;
+      window.getComputedStyle = vi.fn().mockReturnValue({
+        display: 'block',
+        visibility: 'visible',
+        whiteSpace: 'normal'
+      });
+
+      try {
+        const rootUnits = collectBlockGroups(root, sessionContext, { extractionMode: SelectElementExtractionMode.V3 });
+        expect(rootUnits.length).toBe(1);
+        expect(rootUnits[0].text.trim()).toBe('const value = 42;');
+      } finally {
+        window.getComputedStyle = originalGetComputedStyle;
+      }
+
+      const nested = document.createElement('div');
+      const nestedLine = document.createElement('div');
+      nestedLine.className = 'react-code-text';
+      nestedLine.textContent = 'return 0;';
+      nested.appendChild(document.createTextNode('Surrounding prose.'));
+      nested.appendChild(nestedLine);
+      document.body.appendChild(nested);
+
+      try {
+        const nestedUnits = collectBlockGroups(nested, sessionContext, { extractionMode: SelectElementExtractionMode.V3 });
+        const collected = nestedUnits.map(u => u.text.trim());
+        expect(collected).toContain('Surrounding prose.');
+        expect(collected).not.toContain('return 0;');
       } finally {
         window.getComputedStyle = originalGetComputedStyle;
       }
@@ -349,7 +745,7 @@ describe('DomTranslatorUtils', () => {
   });
 
   describe('isExcludedAncestor', () => {
-    it('should correctly identify text nodes inside normal interactive tags', () => {
+    it('should identify text nodes inside form controls but not inside BUTTON', () => {
       const textarea = document.createElement('textarea');
       textarea.textContent = 'text';
       expect(isExcludedAncestor(textarea.firstChild)).toBe(true);
@@ -358,7 +754,7 @@ describe('DomTranslatorUtils', () => {
       const span = document.createElement('span');
       span.textContent = 'click';
       button.appendChild(span);
-      expect(isExcludedAncestor(span.firstChild)).toBe(true);
+      expect(isExcludedAncestor(span.firstChild)).toBe(false);
     });
 
     it('should identify text nodes inside contenteditable containers', () => {

@@ -11,6 +11,7 @@ import ExtensionContextManager from '@/core/extensionContext.js';
 import { ErrorHandler } from '@/shared/error-management/ErrorHandler.js';
 import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
 import { isFatalError, isCancellationError } from '@/shared/error-management/ErrorMatcher.js';
+import { createPublicDisplayError } from '@/shared/error-management/PublicErrorPolicy.js';
 import { getEffectiveProviderAsync, TranslationMode } from '@/shared/config/config.js';
 import { NOTIFICATION_TIME } from '@/shared/constants/ui.js';
 import { TRANSLATION_STATUS } from '@/shared/constants/translation.js';
@@ -29,10 +30,31 @@ import selectionStyles from './SelectElement.scss?inline';
 // Import new simplified services
 import { DomTranslatorAdapter } from './core/DomTranslatorAdapter.js';
 import { ElementSelector } from './core/ElementSelector.js';
-import { extractTextFromElement, isValidTextElement } from './utils/elementHelpers.js';
+import { extractTextFromElement, isSelectableTextRoot } from './utils/elementHelpers.js';
+import { SelectElementReason } from './core/SelectElementPolicy.js';
 
 // Import notification manager
 import { getSelectElementNotificationManager } from './SelectElementNotificationManager.js';
+
+const SELECT_ELEMENT_PARTIAL_ERROR_KEY = 'ERRORS_SELECT_ELEMENT_PARTIAL_TRANSLATION_FAILED';
+const SELECT_ELEMENT_PARTIAL_ERROR_FALLBACK = 'Some content could not be translated.';
+
+const SELECT_ELEMENT_NO_TRANSLATABLE_CONTENT_KEY = 'SELECT_ELEMENT_NO_TRANSLATABLE_CONTENT';
+const SELECT_ELEMENT_NO_TRANSLATABLE_CONTENT_FALLBACK = 'No translatable text was found in this element.';
+
+const SELECT_ELEMENT_UNSUPPORTED_TRANSLATION_MODE_KEY = 'SELECT_ELEMENT_UNSUPPORTED_TRANSLATION_MODE';
+const SELECT_ELEMENT_UNSUPPORTED_TRANSLATION_MODE_FALLBACK = 'This content cannot be translated with the current translation mode.';
+
+/**
+ * Resolves the localized partial-completion message shared by non-terminal
+ * PARTIAL_SUCCESS and terminal PARTIAL_FAILURE paths.
+ * @private
+ * @returns {Promise<string>}
+ */
+async function getPartialCompletionMessage() {
+  return (await getTranslationString(SELECT_ELEMENT_PARTIAL_ERROR_KEY))
+    || SELECT_ELEMENT_PARTIAL_ERROR_FALLBACK;
+}
 
 /**
  * SelectElementManager - Coordinates the interactive Select Element mode.
@@ -266,9 +288,12 @@ class SelectElementManager extends ResourceTracker {
       this._stopContextWatchdog();
       document.documentElement.removeAttribute('data-translate-it-select-mode');
 
-      // Only cancel if we are actually in the middle of a translation
+      // User/manual cancellation and conflict teardown both invalidate active
+      // adapter work, while retaining distinct cleanup reasons and UX.
       if (reason === 'cancel' || reason === 'manual') {
         this.domTranslatorAdapter.cancelTranslation({ silent });
+      } else if (reason === 'conflict') {
+        this.domTranslatorAdapter.cancelTranslation({ silent: true });
       }
 
       this.removeEventListeners();
@@ -446,7 +471,11 @@ class SelectElementManager extends ResourceTracker {
     try {
       this.isProcessingClick = true;
       const elementToTranslate = this.elementSelector.getHighlightedElement() || event.target;
-      if (!isValidTextElement(elementToTranslate)) return;
+
+      // Authoritative click revalidation: re-run root eligibility at click time
+      // even if the element was highlighted earlier. The DOM may change between
+      // hover and click, so hover eligibility is never trusted blindly.
+      if (!isSelectableTextRoot(elementToTranslate)) return;
 
       const text = extractTextFromElement(elementToTranslate);
       if (text && text.trim()) {
@@ -471,13 +500,13 @@ class SelectElementManager extends ResourceTracker {
 
   /**
    * Unlock page interaction immediately after selection
-   * Restores cursor, pointer events, and stops the safety watchdog
+   * Restores cursor and pointer events while the watchdog continues to cover
+   * the in-flight translation lifecycle.
    * @private
    */
   _unlockPageInteraction() {
     this.logger.debug('Restoring page interaction after selection');
     document.documentElement.removeAttribute('data-translate-it-select-mode');
-    this._stopContextWatchdog();
     this.removeEventListeners();
   }
 
@@ -508,42 +537,131 @@ class SelectElementManager extends ResourceTracker {
         }
       });
 
-      if (result && result.success) {
+      if (result?.success) {
         pageEventBus.emit('hide-translation', { element: targetElement });
         pageEventBus.emit('ELEMENT_TRANSLATIONS_AVAILABLE'); // Notify that revert is now possible
+
+        if (result.partial === true) {
+          // Non-terminal partial completion: stream/provider completed normally but
+          // some requested logical parents remain uncommitted. Committed translations
+          // are valid and preserved; this is feature outcome UX, not a terminal error.
+          this.logger.debug('Select Element translation completed partially', {
+            committedParentCount: result.committedParentCount,
+            totalParentCount: result.totalParentCount,
+          });
+          const partialMessage = await getPartialCompletionMessage();
+          const partialDisplayError = Object.assign(new Error(partialMessage), {
+            type: ErrorTypes.TRANSLATION_FAILED,
+          });
+          ErrorHandler.getInstance().handle(partialDisplayError, { context: 'select-element', showToast: true }).catch(() => {});
+        }
+
         this.performPostTranslationCleanup({ reason: 'success' });
-      } else if (result && result.cancelled) {
+      } else if (result?.cancelled) {
         this.deactivate({ reason: 'cancel', silent: true });
       } else {
-        this.performPostTranslationCleanup({ reason: 'success' }); // Fallback to success if result exists but structure is weird
+        // Explicit failure contract: any resolved value that is neither success
+        // nor cancellation (zero-commit results, undefined, {}) is a failure.
+        const failure = (result && result.error) || new Error('Translation failed');
+        await this._handleTranslationFailure(failure, result?.translationOutcome || failure.translationOutcome);
       }
     } catch (error) {
-      const isCancellation = isCancellationError(error);
-      const isValidation = error.type === ErrorTypes.VALIDATION || error.message?.includes('No translatable text found');
-
-      if (isCancellation) {
-        this.logger.debug('Select Element translation cancelled:', error.message);
-      } else if (isValidation) {
-        this.logger.debug('Select Element translation skipped:', error.message);
-      } else {
-        this.logger.warn('Select Element translation failed:', error);
-        // Delegate to centralized error handler to show notification
-        ErrorHandler.getInstance().handle(error, { context: 'select-element', showToast: true }).catch(() => {});
-      }
-      
-      if (ExtensionContextManager.isContextError(error)) {
-        ExtensionContextManager.handleContextError(error, 'element-selection');
-      }
-
-      if (isFatalError(error) && !isCancellation && !isValidation) {
-        this.deactivate({ preserveTranslations: true, reason: 'error' });
-      } else {
-        this.performPostTranslationCleanup({ reason: isCancellation || isValidation ? 'cancel' : 'error' });
-      }
+      await this._handleTranslationFailure(error, error?.translationOutcome);
     } finally {
       // Clear flag after translation is complete (success or error)
       window.isTranslationInProgress = false;
     }
+  }
+
+  /**
+   * Routes a Select Element translation failure through the standard error
+   * pipeline (ErrorHandler notification + cleanup), preserving silent paths.
+   * @private
+   */
+  async _handleTranslationFailure(error, outcome = error?.translationOutcome) {
+    const committedParentCount = Number.isInteger(outcome?.committedParentCount)
+      ? outcome.committedParentCount
+      : 0;
+    const totalParentCount = Number.isInteger(outcome?.totalParentCount)
+      ? outcome.totalParentCount
+      : 0;
+    const isCancellation = Boolean(outcome?.cancelled) || isCancellationError(error);
+    const isPartialFailure = !isCancellation
+      && committedParentCount > 0
+      && committedParentCount < totalParentCount;
+    const isNoTranslatableContent = error.type === ErrorTypes.NO_TRANSLATABLE_CONTENT;
+    const isSilentSkip = isCancellation
+      || error.type === ErrorTypes.FEATURE_BLOCKED
+      || ExtensionContextManager.isContextError(error);
+
+    if (isCancellation) {
+      this.logger.debug('Select Element translation cancelled:', error.message);
+    } else if (isNoTranslatableContent) {
+      await this._handleNoTranslatableContent(error);
+    } else if (isSilentSkip) {
+      this.logger.debug('Select Element translation skipped:', error.message);
+    } else {
+      this.logger.warn('Select Element translation failed:', error);
+      let displayError;
+      if (isPartialFailure) {
+        displayError = Object.assign(new Error(await getPartialCompletionMessage()), {
+          type: ErrorTypes.TRANSLATION_FAILED,
+          cause: error,
+          translationOutcome: outcome,
+        });
+      } else {
+        displayError = await createPublicDisplayError(error);
+      }
+      if (isPartialFailure) {
+        this.logger.warn('Select Element translation partially failed:', {
+          committedParentCount,
+          totalParentCount,
+        });
+      }
+      if (displayError) {
+        ErrorHandler.getInstance().handle(displayError, { context: 'select-element', showToast: true }).catch(() => {});
+      }
+    }
+    
+    if (ExtensionContextManager.isContextError(error)) {
+      ExtensionContextManager.handleContextError(error, 'element-selection');
+    }
+
+    if (isFatalError(error) && !isSilentSkip) {
+      this.deactivate({ preserveTranslations: true, reason: 'error' });
+    } else if (isNoTranslatableContent) {
+      this.performPostTranslationCleanup({ reason: 'no-content' });
+    } else {
+      this.performPostTranslationCleanup({ reason: isSilentSkip ? 'cancel' : 'error' });
+    }
+  }
+
+  /**
+   * Handles an accepted Select Element request that produced zero translatable
+   * units. Non-error, non-cancellation outcome: shows one informational message
+   * and lets cleanup run on a semantic 'no-content' reason. Deliberately keeps
+   * the outcome out of ErrorHandler / PublicErrorPolicy error semantics.
+   * @private
+   * @param {Error} error - The NO_TRANSLATABLE_CONTENT error.
+   */
+  async _handleNoTranslatableContent(error) {
+    this.logger.debug('Select Element translation completed with no translatable content:', error.message);
+    const isUnsupportedMode = error.reason === SelectElementReason.UNSUPPORTED_MODE;
+    const message = isUnsupportedMode
+      ? ((await getTranslationString(SELECT_ELEMENT_UNSUPPORTED_TRANSLATION_MODE_KEY))
+        || SELECT_ELEMENT_UNSUPPORTED_TRANSLATION_MODE_FALLBACK)
+      : ((await getTranslationString(SELECT_ELEMENT_NO_TRANSLATABLE_CONTENT_KEY))
+        || SELECT_ELEMENT_NO_TRANSLATABLE_CONTENT_FALLBACK);
+    this.showNoContentNotification(message);
+  }
+
+  /**
+   * Routes an informational Select Element message through the notification
+   * owner. Feature-owned non-error path; never PublicErrorPolicy.
+   * @param {string} message - Localized informational message.
+   */
+  showNoContentNotification(message) {
+    pageEventBus.emit('show-select-element-info', { message });
   }
 
   performPostTranslationCleanup(options = {}) {
@@ -638,7 +756,10 @@ class SelectElementManager extends ResourceTracker {
     this._stopContextWatchdog();
     document.documentElement.removeAttribute('data-translate-it-select-mode');
     this.isActive = false;
+    const adapterWasTranslating = this.domTranslatorAdapter?.isCurrentlyTranslating?.() === true;
+    this.domTranslatorAdapter?.invalidateContext?.();
     this.forceCleanup();
+    if (!adapterWasTranslating) this._notifyContextInvalidation();
   }
 
   /**
@@ -654,6 +775,21 @@ class SelectElementManager extends ResourceTracker {
         this.emergencyCleanup();
       }
     }, 2000); // Check every 2 seconds - balanced for performance and safety
+  }
+
+  /**
+   * Routes watchdog-detected extension-context invalidation through the
+   * canonical ExtensionContextManager recovery contract. isValidSync() only
+   * reports a boolean signal, so the minimum typed context-invalidated error
+   * required by the contract is constructed here. Runs after emergencyCleanup
+   * so cleanup always completes even if notification handling were to fail.
+   * @private
+   */
+  _notifyContextInvalidation() {
+    const contextError = Object.assign(new Error('Extension context invalidated'), {
+      type: ErrorTypes.EXTENSION_CONTEXT_INVALIDATED,
+    });
+    ExtensionContextManager.handleContextError(contextError, 'element-selection-watchdog');
   }
 
   /**

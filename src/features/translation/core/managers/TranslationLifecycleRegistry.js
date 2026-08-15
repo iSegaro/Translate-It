@@ -92,9 +92,12 @@ export class TranslationLifecycleRegistry {
    * Cancel a specific translation by ID.
    * 
    * @param {string} messageId - The request ID
+   * @param {boolean} [timeout=false] - Whether cancellation follows a timeout
+   * @param {string} [timeoutType] - Internal timeout subtype
+   * @param {string} [reason] - Timeout or cancellation reason
    * @returns {Promise<boolean>} True if found and cancelled
    */
-  async cancelTranslation(messageId) {
+  async cancelTranslation(messageId, timeout = false, timeoutType, reason = timeout ? 'Translation timed out' : ErrorTypes.USER_CANCELLED) {
     if (!messageId) return false;
 
     this._pruneCancelledRequests();
@@ -107,7 +110,13 @@ export class TranslationLifecycleRegistry {
 
     try {
       // Notify streaming manager to clean up resources
-      await streamingManager.cancelStream(messageId, ErrorTypes.USER_CANCELLED);
+      if (timeoutType) {
+        await streamingManager.cancelStream(messageId, reason, timeout, timeoutType);
+      } else if (timeout) {
+        await streamingManager.cancelStream(messageId, reason, true);
+      } else {
+        await streamingManager.cancelStream(messageId, reason);
+      }
     } catch { /* ignore */ }
 
     return true;

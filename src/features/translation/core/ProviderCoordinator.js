@@ -29,6 +29,7 @@ export class ProviderCoordinator {
     const providerName = provider.providerName;
     const { messageId, engine, sessionId, mode } = options;
     const translateMode = mode || TranslationMode.Selection;
+    const languagePairResolved = options.languagePairResolved === true;
 
     // 1. Language Detection & Swapping (Bilingual logic / Auto-detect swap)
     // Perform this BEFORE normalization to use standard codes
@@ -65,7 +66,7 @@ export class ProviderCoordinator {
       const supportsBilingual = manifest?.features?.includes('bilingual') ?? true;
 
       // 1a. Apply Language Swapping (Bilingual Logic)
-      if (supportsBilingual) {
+      if (supportsBilingual && !languagePairResolved) {
         const [swappedSource, swappedTarget] = await LanguageSwappingService.applyLanguageSwapping(
           sampleText,
           sourceLang,
@@ -85,7 +86,7 @@ export class ProviderCoordinator {
       // 1b. Auto-Detection Fallback
       // If we are still at 'auto' (meaning bilingual was disabled or didn't swap),
       // we must detect the language now to provide a concrete code to the provider.
-      if (processedSourceLang === AUTO_DETECT_VALUE) {
+      if (!languagePairResolved && processedSourceLang === AUTO_DETECT_VALUE) {
         const detectedLanguage = await LanguageDetectionService.detect(sampleText, { url: options.url });
         if (detectedLanguage) {
           logger.debug(`[Coordinator] Using detected source language: ${detectedLanguage} (instead of auto)`);
@@ -177,7 +178,8 @@ export class ProviderCoordinator {
       const result = await queueManager.enqueue(queueProviderName, executeTask, numericPriority, translateMode, {
         messageId: options.messageId,
         uiContext: options.uiContext,
-        parallelExecution: !!options.parallelExecution
+        parallelExecution: !!options.parallelExecution,
+        executionContext: options.executionContext,
       });
 
       // 7. Post-processing & Normalization
@@ -260,17 +262,11 @@ export class ProviderCoordinator {
 
       // Throw if it's a recognized fatal/transient error or a generic system Error
       if (isFatalError(error) || isTransient) throw error;
-      
-      // Wrap fallback in a standard result object to avoid destructuring errors in the engine
-      const fallbackResult = Array.isArray(text) ? text.map(t => typeof t === 'object' ? (t.t || t.text) : t) : text;
-      return {
-        success: true,
-        translatedText: fallbackResult,
-        provider: providerName,
-        sourceLanguage: processedSourceLang,
-        targetLanguage: processedTargetLang,
-        isFallback: true
-      };
+
+      // Non-fatal, non-transient: previously fell back to returning the original text
+      // wrapped in a "successful" result. That is silent success - the caller believes
+      // the text was translated when it was not. Throw so the failure surfaces loudly.
+      throw error;
     }
   }
 
@@ -384,7 +380,7 @@ export class ProviderCoordinator {
       });
       return JSON.stringify(translatedJson, null, 2);
     }
-    
+
     if (results?.length !== jsonArray.length) {
       logger.warn(`[Coordinator] JSON mismatch: ${results?.length} vs ${jsonArray.length}. Attempting cleanup...`);
     }
@@ -394,7 +390,7 @@ export class ProviderCoordinator {
     if (Array.isArray(results)) {
       return JSON.stringify(results.map(r => this._ensureString(r)));
     }
-    
+
     return this._ensureString(results);
   }
 

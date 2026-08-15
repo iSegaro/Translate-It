@@ -16,8 +16,8 @@
 ### Core Documentation
 - **[Architecture](ARCHITECTURE.md)** - This file - Complete system overview and integration guide
 - **[Messaging System](MessagingSystem.md)** - Race-condition-free inter-component communication with intelligent timeout management and Unified Translation Service integration
-- **[Translation System](TRANSLATION_SYSTEM.md)** - Unified Translation Service architecture with centralized coordination, duplicate prevention, and intelligent result routing
-- **[Provider Implementation Guide](PROVIDERS.md)** - Complete guide for implementing translation providers with BaseProvider, RateLimitManager, and Circuit Breaker
+- **[Translation System](architecture/TRANSLATION_SYSTEM.md)** - Unified Translation Service architecture with centralized coordination, duplicate prevention, and intelligent result routing
+- **[Provider Implementation Guide](providers/PROVIDERS.md)** - Complete guide for implementing translation providers with BaseProvider, RateLimitManager, and Circuit Breaker
 - **[Markdown Rendering](MARKDOWN_RENDERING.md)** - Shared preview pipeline, SafeMarkdownPreview boundary, and extraction ownership
 - **[Error Management](ERROR_MANAGEMENT_SYSTEM.md)** - Centralized error handling and context safety
 - **[Testing Strategy](TESTING_STRATEGY.md)** - Guidelines and roadmap for unit and integration testing
@@ -33,7 +33,7 @@
 - **[Element Detection Service](ELEMENT_DETECTION_SERVICE.md)** - Centralized element detection system with optimized DOM queries and caching
 - **[Language Detection](LANGUAGE_DETECTION.md)** - Hierarchical language and direction detection system with provider feedback loop
 - **[Localization](LOCALIZATION.md)** - Guide for internationalization and locale management
-- **[Stats Manager](STATS_MANAGER.md)** - System for tracking usage statistics and analytics
+- **[Stats Manager](infrastructure/STATS_MANAGER.md)** - System for tracking usage statistics and analytics
 - **[Translation Provider Logic](TRANSLATION_PROVIDER_LOGIC.md)** - Detailed waterfall logic for provider selection
 
 ### Feature-Specific Documentation
@@ -63,11 +63,20 @@
 
 ### Getting Started
 1. **New Developers**: Start with [Architecture](ARCHITECTURE.md) → [Messaging System](MessagingSystem.md)
-2. **Feature Development**: [Smart Handler Registration](SMART_HANDLER_REGISTRATION_SYSTEM.md) → [Translation System](TRANSLATION_SYSTEM.md)
-3. **Translation Features**: [Translation System](TRANSLATION_SYSTEM.md) → [Provider Implementation Guide](PROVIDERS.md)
-4. **Provider Development**: [Provider Implementation Guide](PROVIDERS.md) → [Provider System](#provider-system)
+2. **Feature Development**: [Smart Handler Registration](SMART_HANDLER_REGISTRATION_SYSTEM.md) → [Translation System](architecture/TRANSLATION_SYSTEM.md)
+3. **Translation Features**: [Translation System](architecture/TRANSLATION_SYSTEM.md) → [Provider Implementation Guide](providers/PROVIDERS.md)
+4. **Provider Development**: [Provider Implementation Guide](providers/PROVIDERS.md) → [Provider System](#provider-system)
 5. **UI Development**: [Windows Manager Integration](WINDOWS_MANAGER_UI_HOST_INTEGRATION.md) → [Text Actions](TEXT_ACTIONS_SYSTEM.md)
 6. **Error Handling**: [Error Management](ERROR_MANAGEMENT_SYSTEM.md) → [Logging System](LOGGING_SYSTEM.md)
+
+### Authoritative Contracts & Diagrams
+For behavior-level guarantees, refer to the contract documents rather than inferring from this overview:
+
+- [Translation System](architecture/TRANSLATION_SYSTEM.md) and [Architecture Diagrams](architecture/DIAGRAMS.md) — runtime flow, provider execution, conversation, identity/fragment, and terminal-state diagrams.
+- [Feature Contracts](contracts/FEATURE_CONTRACTS.md) — per-mode (popup, sidepanel, selection, field, whole-page, PDF, subtitle, hover) mutation/timeout/revert guarantees.
+- [Provider Contract](contracts/PROVIDER_CONTRACT.md) — result/error/retry/health/stats/circuit ownership.
+- [Conversation Contract](contracts/CONVERSATION_CONTRACT.md) — AI stage/commit/discard and recovery exclusion.
+- [Identity & Fragment Contract](contracts/TRANSLATION_IDENTITY_AND_FRAGMENT_CONTRACT.md) — logical identity and fragment aggregation.
 7. **Storage Operations**: [Storage Manager](STORAGE_MANAGER.md)
 
 ---
@@ -101,7 +110,9 @@
                     ▼
 ┌─────────────────────────────────────────────────────────────────┐
 │                    CORE SYSTEMS                                │
-│  UnifiedTranslationService → TranslationRequestTracker → TranslationResultDispatcher → Provider Factory → BaseProvider (BaseTranslateProvider, BaseAIProvider) → RateLimitManager → StreamingManager │
+│  Translation engine: Feature → UnifiedTranslationService → UnifiedModeCoordinator → TranslationEngine → ProviderCoordinator → QueueManager → Provider → ProviderRequestEngine → validation → UnifiedResultDispatcher → feature consumer │
+│  Provider infra: RateLimitManager (provider health + circuit) and ApiKeyManager (key failover) wrap ProviderRequestEngine; BaseAIProvider owns structured AI recovery. No automatic cross-provider fallback. │
+│  For full routing, identity/fragment, conversation, and terminal-state diagrams, see architecture/DIAGRAMS.md │
 │  Storage Manager → Error Handler → Logger System → Unified TTS System → Windows Manager → Memory Garbage Collector → Toast Integration System │
 └─────────────────────────────────────────────────────────────────┘
                     │
@@ -142,6 +153,14 @@ src/
 │   │   └── tabs/                   # Configuration tabs
 │   └── content/                    # ContentApp.vue (UI Host)
 │       └── components/             # Content UI components
+│   ├── pdf/                        # PdfApp.vue - Standalone PDF translation UI
+│   │   └── PdfApp.vue
+│   └── subtitle/                   # SubtitleApp.vue - Standalone subtitle (.srt) translation UI
+│       └── SubtitleApp.vue
+│
+├── app/                            # Per-app bundle/entry layer (Vite entry points)
+│   ├── main.js
+│   └── main/                       # popup.js, sidepanel.js, options.js, pdf.js, subtitle.js
 │
 ├── components/                     # Vue Components (Preserved Structure)
 │   ├── base/                       # Base UI components
@@ -175,6 +194,7 @@ src/
 │   ├── translation/
 │   │   ├── core/                   # TranslationEngine, ProviderFactory, StreamingManager
 │   │   │   └── translation-engine.js # Translation coordination
+│   │   ├── ir/                     # Translation Pipeline Foundation (request manifest, execution router, outcome contracts)
 │   │   ├── handlers/               # handleTranslate.js, handleTranslationResult.js
 │   │   ├── stores/                 # translation.js store
 │   │   ├── composables/            # useTranslation, useTranslationModes
@@ -281,8 +301,9 @@ src/
 │   ├── services/                   # Core Services
 │   │   └── translation/            # Unified Translation Service
 │   │       ├── UnifiedTranslationService.js     # Central translation coordinator
-│   │       ├── TranslationRequestTracker.js     # Request lifecycle management
-│   │       └── TranslationResultDispatcher.js   # Intelligent result routing
+│   │       ├── UnifiedModeCoordinator.js        # Unified Mode selection coordination
+│   │       ├── UnifiedResultDispatcher.js       # Intelligent result routing
+│   │       └── TranslationRequestTracker.js     # Request lifecycle management
 │   ├── memory/                     # Memory Garbage Collector System with Critical Protection
 │   │   ├── MemoryManager.js        # Core memory management with critical resource support
 │   │   ├── ResourceTracker.js      # Resource tracking mixin with critical protection
@@ -350,6 +371,7 @@ Feature Categories:
 - **Dynamic Imports**: Code splitting with lazy-loaded chunks via `lazy-features.js`
 - **Memory Optimization**: Significant memory reduction through selective loading
 - **Idle Deadline Loading**: Uses `requestIdleCallback` for lower priority categories (`LAZY_UI`, `ON_DEMAND`)
+- **Delay Ownership**: `startIntelligentLoading()` owns all stage delays exactly once; `loadFeature()` only delegates, dedupes, and logs
 
 **Key Components**:
 - **index-main.js**: Ultra-minimal entry point with initial architecture loading
@@ -467,14 +489,16 @@ The system is built on three specialized services that handle different stages o
 
 1. **UnifiedTranslationService (Coordinator)**: The primary entry point that manages the end-to-end translation flow.
 2. **TranslationRequestTracker (Lifecycle)**: Prevents duplicate requests and tracks active operations using unique `messageId` signatures.
-3. **TranslationResultDispatcher (Distribution)**: Intelligently routes results back to the correct tab or component based on the translation mode (Field, Select Element, or Standard).
+3. **UnifiedResultDispatcher (Distribution)**: Intelligently routes results back to the correct tab or component based on the translation mode (Field, Select Element, or Standard).
+
+**Translation Pipeline Foundation**: Project A introduced the Translation Pipeline Foundation, an execution foundation under `src/features/translation/ir/` providing terminal execution routing, an observational validation foundation, and diagnostics preservation across execution boundaries. Runtime production and adoption of `TranslationOutcome` remain intentionally deferred to the future **Translation Outcome Adoption** initiative.
 
 ### Key Integration Points
 - **`handleTranslate.js`**: The single background handler that initializes and delegates to the service.
 - **`handleTranslationResult.js`**: Processes incoming results from providers and hands them back to the dispatcher.
 
 ### Documentation & Deep Dive
-For detailed information on implementation, message formats, and streaming logic, refer to the **[Translation System Guide](TRANSLATION_SYSTEM.md)**. For the selection strategy and waterfall logic, see the **[Translation Provider Logic](TRANSLATION_PROVIDER_LOGIC.md)**.
+For detailed information on implementation, message formats, and streaming logic, refer to the **[Translation System Guide](architecture/TRANSLATION_SYSTEM.md)**. For the selection strategy and waterfall logic, see the **[Translation Provider Logic](TRANSLATION_PROVIDER_LOGIC.md)**.
 
 </details>
 
@@ -578,9 +602,10 @@ The architecture includes several mission-critical features to ensure high avail
 - **Circuit Breaker**: Automatically disables unstable providers or those with exhausted quotas for a cooling period to prevent UI lag.
 - **RateLimitManager**: Governs request throttling and prioritization based on user interaction levels.
 - **Unified Response Contract**: Enforces a strict data format for all providers to ensure system-wide stability and prevent runtime errors.
+- **Structured Response Handling**: `AIResponseParser` reports whether structured-response recovery is required; `BaseAIProvider` owns the recovery strategy. Structured recovery is one provider-local pass that is selective when invalid request units are safely mapped, otherwise uses full sequential recovery. This is distinct from Multi-API Key Failover and provider/key failover. See [Translation Provider Logic](TRANSLATION_PROVIDER_LOGIC.md) for execution policy.
 
 ### Documentation and Implementation
-For a comprehensive guide on implementing new providers, capability gating, and technical specifications, see the **[Provider Implementation Guide](PROVIDERS.md)**. To understand how providers are selected for different features, refer to the **[Translation Provider Logic](TRANSLATION_PROVIDER_LOGIC.md)**.
+For a comprehensive guide on implementing new providers, capability gating, and technical specifications, see the **[Provider Implementation Guide](providers/PROVIDERS.md)**. To understand how providers are selected for different features, refer to the **[Translation Provider Logic](TRANSLATION_PROVIDER_LOGIC.md)**.
 
 </details>
 
@@ -596,12 +621,13 @@ The extension uses Pinia for reactive state management across all Vue applicatio
 
 **Core Stores:**
 ```javascript
-// Global settings store
+// Global settings store (Pinia setup store)
 import { useSettingsStore } from '@/features/settings/stores/settings.js'
 
 const settings = useSettingsStore()
-await settings.updateProvider('openai')
-await settings.saveApiKey('OPENAI_API_KEY', 'sk-...')
+await settings.loadSettings()                    // merge persisted settings from storage
+await settings.updateSettingAndPersist('THEME', 'dark')
+await settings.resetSettings()                   // restore canonical persisted defaults
 ```
 
 **Feature-Specific Stores:**
@@ -623,27 +649,9 @@ const activeProvider = providers.getActiveProvider()
 ```
 
 ### Store Integration with Storage Manager
-All stores automatically sync with browser storage:
+The settings store is a Pinia setup store. It delegates its default values to `getPersistedDefaultSettings()`, which is the single authority for the persisted settings schema. Components and features never import `settingsDefaults.js` directly; only the settings store, InstallHandler, and migrations consume the builder.
 
-```javascript
-// Settings store automatically uses StorageManager
-export const useSettingsStore = defineStore('settings', {
-  state: () => ({
-    API_KEYS: {},
-    PROVIDER: 'google-translate',
-    SOURCE_LANG: 'auto',
-    TARGET_LANG: 'en'
-  }),
-  
-  actions: {
-    async updateProvider(provider) {
-      this.PROVIDER = provider
-      // Automatically synced to browser.storage
-      await this.saveSettings()
-    }
-  }
-})
-```
+`CONFIG` owns default values; `getPersistedDefaultSettings()` in `src/shared/config/settingsDefaults.js` owns persisted key membership and drives fresh install, reset, import defaults, and migration fill. The store handles load (merge persisted settings into reactive state), save (persist to `browser.storage`), and reset (restore canonical persisted defaults).
 
 ### Reactive Data Flow
 ```
@@ -724,6 +732,9 @@ For detailed information on UI hosting and in-page integration, refer to the fol
 - `src/apps/popup/PopupApp.vue` - Main popup application
 - `src/apps/sidepanel/SidepanelApp.vue` - Sidepanel application
 - `src/apps/options/OptionsApp.vue` - Options page application
+- `src/apps/content/ContentApp.vue` - In-page UI Host (Shadow DOM)
+- `src/apps/pdf/PdfApp.vue` - Standalone PDF translation application
+- `src/apps/subtitle/SubtitleApp.vue` - Standalone subtitle (.srt) translation application
 
 </details>
 
@@ -747,10 +758,20 @@ For detailed information on UI hosting and in-page integration, refer to the fol
 
 ### Unified Translation Service
 - `src/core/services/translation/UnifiedTranslationService.js` - Central translation coordinator
+- `src/core/services/translation/UnifiedModeCoordinator.js` - Unified Mode selection coordination
+- `src/core/services/translation/UnifiedResultDispatcher.js` - Intelligent result routing
 - `src/core/services/translation/TranslationRequestTracker.js` - Request lifecycle management
-- `src/core/services/translation/TranslationResultDispatcher.js` - Intelligent result routing
 - `src/features/translation/handlers/handleTranslate.js` - Translation request handler
 - `src/features/translation/handlers/handleTranslationResult.js` - Translation result processor
+
+### Execution Foundation (Translation Pipeline Foundation)
+- `src/features/translation/ir/RequestUnitManifest.js` - Request unit manifest
+- `src/features/translation/ir/TerminalExecutionRouter.js` - Terminal execution routing
+- `src/features/translation/ir/TranslationOperation.js` - Execution lifecycle
+- `src/features/translation/ir/TranslationOutcome.js` - Immutable outcome contract
+- `src/features/translation/ir/TranslationUnit.js` - Unit disposition contract
+
+> **Legacy note:** `TranslationResultDispatcher.js` (`src/core/services/translation/`) still exists in-tree but has **no runtime consumer**; result routing is now performed by `UnifiedResultDispatcher.js` (see the Unified Translation Service section above).
 
 </details>
 
@@ -768,7 +789,7 @@ For detailed information on UI hosting and in-page integration, refer to the fol
 <summary>State Management</summary>
 
 ### State Management
-- `src/store/core/settings.js` - Global settings store
+- `src/features/settings/stores/settings.js` - Global settings store
 - `src/store/modules/translation.js` - Translation state management
 - `src/shared/storage/core/StorageCore.js` - Centralized storage system
 
@@ -1212,12 +1233,58 @@ The error management system provides a centralized, context-aware framework for 
 
 ### Architecture and Integration
 - **Context Safety**: `ExtensionContextManager` monitors the validity of the extension's runtime context, preventing "Extension context invalidated" errors from crashing content scripts.
-- **Centralized Handler**: The `ErrorHandler` singleton processes all caught exceptions, categorizing them by severity and type (Network, Auth, UI, System).
-- **Graceful Recovery**: Implements retry logic and circuit-breaker patterns for critical services like translation and TTS.
+- **Error routing**: `ErrorHandler` processes caught exceptions, categorizing them by severity and type (Network, Auth, UI, System). Retry, circuit-breaker, failover, and structured-recovery scheduling are **not** performed here — they are owned by `QueueManager` (retry), `RateLimitManager` (provider health + circuit), `ProviderRequestEngine`/`ApiKeyManager` (API-key failover), and `BaseAIProvider` (structured AI recovery). See [contracts/PROVIDER_CONTRACT.md](contracts/PROVIDER_CONTRACT.md) for the ownership and retry policy.
 - **Localized Feedback**: Translates technical error codes into user-friendly notifications via the integrated toast system.
 
 ### Documentation
 For detailed information on error classification, context validation patterns, and reporting protocols, refer to the **[Error Management Documentation](ERROR_MANAGEMENT_SYSTEM.md)**.
+
+</details>
+
+---
+
+## AI Conversation & Context
+
+<details>
+<summary>View AI Conversation details</summary>
+
+AI primary translations may participate in an in-memory conversation context via the `TranslationSessionManager`:
+
+- **Accepted primary** → stage / validate → **commit** (at most once).
+- **Structured recovery** → no conversation commit (the structured recovery pass does not persist a conversation candidate).
+- **Timeout / cancel / failure** → **discard** (no commit); late settlement cannot commit after terminal state.
+
+This is transient, in-memory history only. For the authoritative stage/commit/discard semantics and recovery exclusion, see [Conversation Contract](contracts/CONVERSATION_CONTRACT.md).
+
+See also [Architecture Diagrams](architecture/DIAGRAMS.md) for the AI conversation lifecycle.
+
+</details>
+
+---
+
+## Identity & Fragments
+
+<details>
+<summary>View Identity & Fragments details</summary>
+
+Structured Select Element and PDF flows use explicit logical identity and fragment aggregation rather than naive keying. Runtime enforcement of identity precedence, duplicate suppression, and fragment assembly is owned by `OptimizedJsonHandler` (request-local, no global cache).
+
+Identity follows the precedence `uid ?? cellId ?? i ?? id ?? blockId` (nullish-coalesced; `0` is valid). Full rules — including V2/V3 fragment handling and request-local dedup — live in the [Identity & Fragment Contract](contracts/TRANSLATION_IDENTITY_AND_FRAGMENT_CONTRACT.md), shown from [Architecture Diagrams](architecture/DIAGRAMS.md).
+
+</details>
+
+---
+
+## Translation Modes
+
+<details>
+<summary>View Translation Modes</summary>
+
+Current user-facing translation modes:
+
+- Selection Window · Inline Selection · Select Element · Field · Popup · Sidepanel · Whole Page · PDF · Subtitle
+
+Per-mode mutation/timeout/revert guarantees are defined in the [Feature Contracts](contracts/FEATURE_CONTRACTS.md).
 
 </details>
 
@@ -1259,7 +1326,7 @@ The stats manager system is a centralized, high-precision framework for tracking
 - **Unified Reporting**: Centralizes the aggregation and formatting of usage summaries, providing consistent logs and debugging tables.
 
 ### Documentation
-For detailed information on explicit reporting flows, delta extraction, and dual-metric logic, refer to the **[Stats Manager Documentation](STATS_MANAGER.md)**.
+For detailed information on explicit reporting flows, delta extraction, and dual-metric logic, refer to the **[Stats Manager Documentation](infrastructure/STATS_MANAGER.md)**.
 
 </details>
 

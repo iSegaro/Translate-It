@@ -223,4 +223,68 @@ describe('TextFieldDoubleClickHandler', () => {
       expect(handler.typingDetection.timeout).toBeDefined();
     });
   });
+
+  describe('calculateTextFieldPosition', () => {
+    afterEach(() => {
+      vi.unstubAllGlobals();
+    });
+
+    const makeMouseEvent = () => {
+      const el = document.createElement('textarea');
+      const event = new MouseEvent('dblclick', { bubbles: true, clientX: 100, clientY: 200 });
+      Object.defineProperty(event, 'target', { value: el });
+      return { event, el };
+    };
+
+    it('top frame + no scroll preserves viewport coordinates and marks document-relative', () => {
+      vi.stubGlobal('scrollX', 0);
+      vi.stubGlobal('scrollY', 0);
+      const { event, el } = makeMouseEvent();
+
+      const position = handler.calculateTextFieldPosition(event, el);
+
+      expect(position.x).toBe(100 - 16); // center cursor, half icon
+      expect(position.y).toBe(200 + 10); // below cursor, small offset
+      expect(position._isViewportRelative).toBe(false);
+    });
+
+    it('top frame + scroll adds scrollX/scrollY exactly once and marks document-relative', () => {
+      vi.stubGlobal('scrollX', 50);
+      vi.stubGlobal('scrollY', 60);
+      const { event, el } = makeMouseEvent();
+
+      const position = handler.calculateTextFieldPosition(event, el);
+
+      expect(position.x).toBe(100 + 50 - 16); // scroll added exactly once
+      expect(position.y).toBe(200 + 60 + 10);
+      expect(position._isViewportRelative).toBe(false);
+    });
+
+    it('iframe + no internal scroll emits viewport coordinates and marks viewport-relative', () => {
+      vi.stubGlobal('top', {});
+      vi.stubGlobal('scrollX', 0);
+      vi.stubGlobal('scrollY', 0);
+      const { event, el } = makeMouseEvent();
+
+      const position = handler.calculateTextFieldPosition(event, el);
+
+      expect(position.x).toBe(100 - 16);
+      expect(position.y).toBe(200 + 10);
+      expect(position._isViewportRelative).toBe(true);
+    });
+
+    it('iframe + internal scroll does NOT add iframe scroll; coordinates match viewport geometry', () => {
+      vi.stubGlobal('top', {});
+      vi.stubGlobal('scrollX', 50);
+      vi.stubGlobal('scrollY', 60);
+      const { event, el } = makeMouseEvent();
+
+      const position = handler.calculateTextFieldPosition(event, el);
+
+      // Regression: iframe scroll must not change the emitted coordinates.
+      expect(position.x).toBe(100 - 16);
+      expect(position.y).toBe(200 + 10);
+      expect(position._isViewportRelative).toBe(true);
+    });
+  });
 });

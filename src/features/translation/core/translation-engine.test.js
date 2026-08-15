@@ -110,6 +110,24 @@ describe('TranslationEngine', () => {
     getEnableDictionaryAsync.mockResolvedValue(true);
   });
 
+  it('forwards timeout classification and reason to lifecycle', async () => {
+    engine.lifecycleRegistry.cancelTranslation = vi.fn().mockResolvedValue(true);
+
+    await engine.cancelTranslation(
+      'message-id',
+      true,
+      'PROGRESS_TIMEOUT',
+      'Streaming translation timed out'
+    );
+
+    expect(engine.lifecycleRegistry.cancelTranslation).toHaveBeenCalledWith(
+      'message-id',
+      true,
+      'PROGRESS_TIMEOUT',
+      'Streaming translation timed out'
+    );
+  });
+
   describe('handleMessage', () => {
     it('should process TRANSLATE message successfully', async () => {
       const request = {
@@ -190,6 +208,20 @@ describe('TranslationEngine', () => {
       expect(result.success).toBe(false);
       expect(result.error.message).toBe('API Down');
     });
+
+    it('should not stamp success on a raw-string result from the provider', async () => {
+      const mockProvider = await engine.getProvider('google');
+      mockProvider.translate.mockResolvedValue('Plain String Result');
+
+      const request = {
+        action: MessageActions.TRANSLATE,
+        data: { text: 'Test', provider: 'google', mode: 'selection' }
+      };
+
+      const result = await engine.handleMessage(request, {});
+
+      expect(result.success).toBe(false);
+    });
   });
 
   describe('Validation Logic', () => {
@@ -204,6 +236,21 @@ describe('TranslationEngine', () => {
 
       expect(result.success).toBe(false);
       expect(result.error.message).toContain('Text too long');
+    });
+
+    it('should reject an empty string translation as "no text" through the failure path', async () => {
+      const mockProvider = await engine.getProvider('google');
+      mockProvider.translate.mockResolvedValue({ translatedText: '' });
+
+      const request = {
+        action: MessageActions.TRANSLATE,
+        data: { text: 'Hello world', provider: 'google', mode: 'selection' }
+      };
+
+      const result = await engine.handleMessage(request, {});
+
+      expect(result.success).toBe(false);
+      expect(result.error.message).toBe('Translation returned no text');
     });
   });
 

@@ -16,6 +16,22 @@ export const DOM_FILTERS = {
   NUMERIC_REGEX: /^\d+$/,
   TIME_REGEX: /^(\d+:)+\d+$/,
   METRIC_REGEX: /^\d+(\.\d+)?[kKM]$/,
+
+  // Zero-width / BIDI formatting marks that carry no visible glyph (category Cf).
+  // A text node containing ONLY these marks has no translatable content: sending it
+  // through the pipeline yields an "empty result" that providers interpret as an
+  // API_RESPONSE_INVALID omitted segment. Whitespace may surround the marks.
+  FORMATTING_MARKS_REGEX: /^[\s\u200b\u200e\u200f\u2060\ufeff]+$/,
+
+  /**
+   * Determine whether text contains only whitespace and zero-width/BIDI formatting marks.
+   * @param {string} text - The trimmed text to check
+   * @returns {boolean} True if it should be skipped
+   */
+  isFormattingOnly(text) {
+    if (!text) return false;
+    return this.FORMATTING_MARKS_REGEX.test(text);
+  },
   
   /**
    * Determine if a string matches any technical non-translatable pattern

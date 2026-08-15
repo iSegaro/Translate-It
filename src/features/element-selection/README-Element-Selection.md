@@ -18,7 +18,6 @@ The feature has been refactored to a more modular and efficient architecture usi
 ### Utilities & Helpers
 - **`utils/elementHelpers.js`** - Text extraction, element validation, and viewport checking.
 - **`utils/textDirection.js`** - RTL/LTR detection and management.
-- **`utils/timeoutCalculator.js`** - Dynamic timeout calculation based on content complexity.
 - **`SelectElementNotificationManager.js`** - Unified lifecycle management for user feedback.
 
 ### Handlers
@@ -79,10 +78,8 @@ This feature integrates with the **Memory Garbage Collector** system to prevent 
 
 ### Timeout Configuration
 - **Hover Delay**: Configurable delay for highlight removal (default: 50ms)
-- **Translation Timeout**: Dynamic timeout based on segment count and content size
 - **Streaming Threshold**: Content size threshold for streaming mode (default: 1000 chars or >3 segments)
 - **Cleanup Interval**: Periodic cleanup of old requests (5 minutes)
-- **Multi-Segment Timeout**: Extended timeout for complex content with multiple paragraphs
 
 ## Integration
 
@@ -138,13 +135,13 @@ This feature integrates with:
 
 ## Related Systems
 
-- **[Memory Garbage Collector](MEMORY_GARBAGE_COLLECTOR.md)** - Resource tracking and cleanup
-- **[Translation System](TRANSLATION_SYSTEM.md)** - Text translation processing and streaming
-- **[Unified Translation Service](../../docs/TRANSLATION_SYSTEM.md)** - Centralized translation coordination
-- **[UI Host System](UI_HOST_SYSTEM.md)** - Overlay rendering and Shadow DOM
-- **[Error Management](ERROR_MANAGEMENT_SYSTEM.md)** - Error handling and recovery
-- **[Toast Integration System](../../docs/TOAST_INTEGRATION_SYSTEM.md)** - Notification management
-- **[Messaging System](../../docs/MessagingSystem.md)** - Unified communication layer
+- **[Memory Garbage Collector](../../../docs/technical/MEMORY_GARBAGE_COLLECTOR.md)** - Resource tracking and cleanup
+- **[Translation System](../../../docs/technical/architecture/TRANSLATION_SYSTEM.md)** - Text translation processing and streaming
+- **[Unified Translation Service](../../../docs/technical/architecture/TRANSLATION_SYSTEM.md)** - Centralized translation coordination
+- **[UI Host System](../../../docs/technical/UI_HOST_SYSTEM.md)** - Overlay rendering and Shadow DOM
+- **[Error Management](../../../docs/technical/ERROR_MANAGEMENT_SYSTEM.md)** - Error handling and recovery
+- **[Toast Integration System](../../../docs/technical/TOAST_INTEGRATION_SYSTEM.md)** - Notification management
+- **[Messaging System](../../../docs/technical/MessagingSystem.md)** - Unified communication layer
 
 ## Recent Improvements (2025)
 

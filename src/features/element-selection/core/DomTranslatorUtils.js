@@ -9,22 +9,9 @@ import { SELECT_ELEMENT_BLOCK_TAGS } from '@/utils/dom/DomTranslatorConstants.js
 import { DOM_FILTERS } from '@/utils/dom/DomFilters.js';
 import { TranslationUnit } from '@/features/translation/ir/TranslationUnit.js';
 import { detectDirectionFromContent } from '@/utils/dom/DomDirectionManager.js';
-import { TRANSLATION_HTML } from '@/shared/constants/translation.js';
+import { isSelectElementTraversable, SelectElementReason } from '@/features/element-selection/core/SelectElementPolicy.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.ELEMENT_SELECTION, 'DomTranslatorUtils');
-
-/**
- * Shared configuration for elements that should be excluded from translation
- */
-const EXCLUDED_TAGS = [
-  'SCRIPT', 'STYLE', 'NOSCRIPT', 'IFRAME', 'TEXTAREA', 'INPUT', 
-  'SELECT', 'OPTION', 'BUTTON',
-  'HEAD', 'META', 'LINK', 'SVG', 'TIME',
-  'RUBY', 'RT', 'RP', 'PRE', 'CODE', 'KBD', 'SAMP'
-];
-
-const EXCLUDED_ROLES = ['textbox', 'searchbox', 'combobox', 'code'];
-const PREFORMATTED_TAGS = new Set(['PRE', 'CODE', 'KBD', 'SAMP']);
 
 /**
  * Finds the closest block-level parent for a node based on context boundaries
@@ -173,59 +160,46 @@ export function extractContextMetadata(element) {
 /**
  * Checks if a single element should be excluded based on its tags, classes, or attributes.
  * Does NOT check ancestors.
- * 
+ *
+ * The eligibility taxonomy is owned by SelectElementPolicy (traversal axis);
+ * this wrapper maps the structural reason back to the extractor's log messages.
+ *
  * @param {Element} el - The element to check
  * @param {boolean} isRoot - Whether this is the root element being translated
  * @returns {boolean}
  */
 function isExcludedElement(el, isRoot = false, options = {}) {
   if (!el || el.nodeType !== Node.ELEMENT_NODE) return false;
-  
-  const tagName = el.tagName.toUpperCase();
-  
-  // 1. Technical/Interactive tags
-  if (EXCLUDED_TAGS.includes(tagName)) {
-    if (options.allowPreformatted && PREFORMATTED_TAGS.has(tagName)) {
-      return false;
-    }
-    logger.debug(`[isExcludedElement] Rejected by tag: ${tagName}`, el);
-    return true;
-  }
-  
-  // 2. Explicit exclusions (class/attribute)
-  if (el.classList?.contains(TRANSLATION_HTML.NO_TRANSLATE_CLASS) || 
-      el.classList?.contains(TRANSLATION_HTML.IGNORE_CLASS) ||
-      el.getAttribute?.('translate') === TRANSLATION_HTML.NO_TRANSLATE_VALUE ||
-      el.hasAttribute?.('data-translate-ignore')) {
-    logger.debug(`[isExcludedElement] Rejected by exclusion marker (class or attr)`, el);
-    return true;
-  }
 
-  // 3. GitHub and other common code editor line detection
-  if (el.classList?.contains('react-code-text') || 
-      el.classList?.contains('react-file-line') ||
-      el.classList?.contains('blob-code')) {
-    if (!isRoot) {
+  const { traversable, reason } = isSelectElementTraversable(el, {
+    isRoot,
+    extractionMode: options.extractionMode,
+  });
+
+  if (traversable) return false;
+
+  switch (reason) {
+    case SelectElementReason.EXCLUDED_TAG:
+    case SelectElementReason.UNSUPPORTED_MODE:
+      logger.debug(`[isExcludedElement] Rejected by tag: ${el.tagName.toUpperCase()}`, el);
+      break;
+    case SelectElementReason.NOTRANSLATE:
+      logger.debug(`[isExcludedElement] Rejected by exclusion marker (class or attr)`, el);
+      break;
+    case SelectElementReason.CODE_CLASS:
       logger.debug(`[isExcludedElement] Rejected by code-related class`, el);
-      return true;
-    }
+      break;
+    case SelectElementReason.EDITABLE:
+      logger.debug(`[isExcludedElement] Rejected by contenteditable`, el);
+      break;
+    case SelectElementReason.EXCLUDED_ROLE:
+      logger.debug(`[isExcludedElement] Rejected by role: ${el.getAttribute?.('role')?.toLowerCase()}`, el);
+      break;
+    default:
+      logger.debug(`[isExcludedElement] Rejected: ${reason}`, el);
   }
 
-  // 4. User-editable content (Attribute check is more robust in some environments)
-  const contentEditable = el.getAttribute?.('contenteditable');
-  if (el.isContentEditable || (contentEditable !== null && contentEditable !== 'false')) {
-    logger.debug(`[isExcludedElement] Rejected by contenteditable`, el);
-    return true;
-  }
-
-  // 5. Custom interactive or code roles
-  const role = el.getAttribute?.('role')?.toLowerCase();
-  if (role && EXCLUDED_ROLES.includes(role)) {
-    logger.debug(`[isExcludedElement] Rejected by role: ${role}`, el);
-    return true;
-  }
-
-  return false;
+  return true;
 }
 
 /**
@@ -242,12 +216,19 @@ export function isExcludedAncestor(node, isRoot = false) {
 function isExcludedAncestorWithOptions(node, isRoot = false, options = {}) {
   if (!node) return false;
   
+  // The collection root is validated once by the entry check with isRoot=true.
+  // rootElement prevents descendant leaf checks from re-classifying it as a
+  // nested descendant (which would reject the selected root's own text, e.g.
+  // an explicitly selected interactive root).
+  const { rootElement = null, ...checkOptions } = options;
+
   // Start from the node itself if it's an element, or its parent if it's text
   let curr = node.nodeType === Node.ELEMENT_NODE ? node : node.parentNode;
   let currentIsRoot = isRoot;
 
   while (curr) {
-    if (isExcludedElement(curr, currentIsRoot, options)) return true;
+    const nodeIsRoot = currentIsRoot || (rootElement && curr === rootElement);
+    if (isExcludedElement(curr, nodeIsRoot, checkOptions)) return true;
 
     // Cross Shadow DOM boundary
     if (curr.host) {
@@ -255,7 +236,7 @@ function isExcludedAncestorWithOptions(node, isRoot = false, options = {}) {
     } else {
       curr = curr.parentNode;
     }
-    currentIsRoot = false; // Ancestors are never the root
+    currentIsRoot = false;
   }
   return false;
 }
@@ -263,11 +244,13 @@ function isExcludedAncestorWithOptions(node, isRoot = false, options = {}) {
 /**
  * Collect all visible text nodes with unique structural IDs for accurate batch mapping
  * @param {HTMLElement} element - Root element to crawl
+ * @param {Object} [options] - Collection options
+ * @param {string} [options.extractionMode] - Resolved extraction mode ('v2'|'v3')
  * @returns {Object[]} Array of objects { node, text, uid, blockId, role }
  */
-export function collectTextNodes(element) {
+export function collectTextNodes(element, options = {}) {
   // 1. Entry check: If the starting element is already excluded, return empty
-  if (isExcludedAncestor(element, true)) {
+  if (isExcludedAncestorWithOptions(element, true, { extractionMode: options.extractionMode })) {
     return [];
   }
 
@@ -278,7 +261,7 @@ export function collectTextNodes(element) {
     // Branch Filtering (Elements)
     if (node.nodeType === Node.ELEMENT_NODE) {
       // Business logic exclusions (Tags, Class, Attributes, Editable, Roles)
-      if (isExcludedElement(node)) return NodeFilter.FILTER_REJECT;
+      if (isExcludedElement(node, false, { extractionMode: options.extractionMode })) return NodeFilter.FILTER_REJECT;
       
       // Visibility check
       try {
@@ -295,12 +278,12 @@ export function collectTextNodes(element) {
 
     // Leaf Filtering (Text Nodes)
     if (node.nodeType === Node.TEXT_NODE) {
-      if (isExcludedAncestor(node)) {
+      if (isExcludedAncestorWithOptions(node, false, { extractionMode: options.extractionMode, rootElement: element })) {
         return NodeFilter.FILTER_REJECT;
       }
 
       const trimmed = node.textContent.trim();
-      if (!trimmed || DOM_FILTERS.isTechnicalPattern(trimmed)) {
+      if (!trimmed || DOM_FILTERS.isTechnicalPattern(trimmed) || DOM_FILTERS.isFormattingOnly(trimmed)) {
         return NodeFilter.FILTER_REJECT;
       }
       
@@ -375,11 +358,15 @@ export function collectTextNodes(element) {
  * @param {Object} [sessionContext={}] - Session-scoped context to track block IDs across calls
  * @param {WeakMap} [sessionContext.blockMap] - Maps elements to blockIds
  * @param {Object} [sessionContext.blockCounter] - Sequential counter object { value: number }
+ * @param {Object} [options] - Collection options
+ * @param {string} [options.extractionMode] - Resolved extraction mode ('v2'|'v3').
+ *   Required for preformatted traversal (V3); absent mode conservatively rejects
+ *   preformatted categories.
  * @returns {TranslationUnit[]} Array of enriched TranslationUnits
  */
-export function collectBlockGroups(element, sessionContext = {}) {
+export function collectBlockGroups(element, sessionContext = {}, options = {}) {
   // 1. Entry check: If the starting element is already excluded, return empty
-  if (isExcludedAncestorWithOptions(element, true, { allowPreformatted: true })) {
+  if (isExcludedAncestorWithOptions(element, true, { extractionMode: options.extractionMode })) {
     return [];
   }
 
@@ -397,7 +384,7 @@ export function collectBlockGroups(element, sessionContext = {}) {
     // Branch Filtering (Elements)
     if (node.nodeType === Node.ELEMENT_NODE) {
       // Business logic exclusions (Tags, Class, Attributes, Editable, Roles)
-      if (isExcludedElement(node, false, { allowPreformatted: true })) return NodeFilter.FILTER_REJECT;
+      if (isExcludedElement(node, false, { extractionMode: options.extractionMode })) return NodeFilter.FILTER_REJECT;
       
       // Visibility check
       try {
@@ -414,12 +401,12 @@ export function collectBlockGroups(element, sessionContext = {}) {
 
     // Leaf Filtering (Text Nodes)
     if (node.nodeType === Node.TEXT_NODE) {
-      if (isExcludedAncestorWithOptions(node, false, { allowPreformatted: true })) {
+      if (isExcludedAncestorWithOptions(node, false, { extractionMode: options.extractionMode, rootElement: element })) {
         return NodeFilter.FILTER_REJECT;
       }
 
       const trimmed = node.textContent.trim();
-      if (!trimmed || DOM_FILTERS.isTechnicalPattern(trimmed)) {
+      if (!trimmed || DOM_FILTERS.isTechnicalPattern(trimmed) || DOM_FILTERS.isFormattingOnly(trimmed)) {
         return NodeFilter.FILTER_REJECT;
       }
 

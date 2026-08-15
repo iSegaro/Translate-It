@@ -263,6 +263,51 @@ describe('StreamingManager', () => {
   });
 
   describe('cancelStream', () => {
+    it('should complete a timed-out stream without marking it cancelled', async () => {
+      const { default: browser } = await import('webextension-polyfill');
+      const messageId = 'msg-timeout';
+      streamingManager.initializeStream(messageId, { tab: { id: 1 } }, { providerName: 'P' }, ['s1']);
+
+      await streamingManager.cancelStream(messageId, 'Translation timed out', true, 'PROGRESS_TIMEOUT');
+
+      expect(streamingManager.getStreamInfo(messageId).status).toBe('error');
+      expect(browser.tabs.sendMessage).toHaveBeenCalledWith(1, expect.objectContaining({
+        action: MessageActions.TRANSLATION_STREAM_END,
+        data: expect.objectContaining({
+          timedOut: true,
+          cancelled: false,
+          type: 'TRANSLATION_TIMEOUT',
+          timeoutType: 'PROGRESS_TIMEOUT',
+          error: {
+            type: 'TRANSLATION_TIMEOUT',
+            message: 'Translation timed out'
+          }
+        })
+      }));
+    });
+
+    it.each(['FINAL_TIMEOUT', undefined])('preserves timeout reason for %s subtype', async (timeoutType) => {
+      const { default: browser } = await import('webextension-polyfill');
+      const messageId = `msg-timeout-${timeoutType || 'unknown'}`;
+      streamingManager.initializeStream(messageId, { tab: { id: 1 } }, { providerName: 'P' }, ['s1']);
+
+      await streamingManager.cancelStream(messageId, 'Streaming translation timed out', true, timeoutType);
+
+      expect(browser.tabs.sendMessage).toHaveBeenCalledWith(1, expect.objectContaining({
+        action: MessageActions.TRANSLATION_STREAM_END,
+        data: expect.objectContaining({
+          timedOut: true,
+          cancelled: false,
+          type: 'TRANSLATION_TIMEOUT',
+          timeoutType,
+          error: {
+            type: 'TRANSLATION_TIMEOUT',
+            message: 'Streaming translation timed out'
+          }
+        })
+      }));
+    });
+
     it('should mark stream as cancelled and complete it', async () => {
       const messageId = 'msg-cancel';
       streamingManager.initializeStream(messageId, { tab: { id: 1 } }, { providerName: 'P' }, ['s1']);

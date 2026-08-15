@@ -75,6 +75,24 @@ describe('LanguageSwappingService', () => {
       expect(tgt).toBe('en');
     });
 
+    it('should reuse supplied detection without performing a second detection pass', async () => {
+      const { LanguageDetectionService } = await import("@/shared/services/LanguageDetectionService.js");
+      const { getCanonicalCode } = await import("@/shared/config/languageConstants.js");
+
+      getCanonicalCode.mockImplementation(l => l);
+
+      const [src, tgt] = await LanguageSwappingService.applyLanguageSwapping(
+        'سلام دنیا', AUTO_DETECT_VALUE, 'fa', 'en', {
+          mode: 'selection',
+          detectedLanguage: 'fa',
+        }
+      );
+
+      expect(src).toBe('fa');
+      expect(tgt).toBe('en');
+      expect(LanguageDetectionService.detect).not.toHaveBeenCalled();
+    });
+
     it('should NOT swap when detected does NOT match target', async () => {
       const { LanguageDetectionService } = await import("@/shared/services/LanguageDetectionService.js");
       

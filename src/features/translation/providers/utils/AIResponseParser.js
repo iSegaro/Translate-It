@@ -7,8 +7,249 @@ import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { ResponseFormat } from '@/shared/config/translationConstants.js';
 import { NewlineManager } from '@/features/translation/utils/NewlineManager.js';
+import { appendTranslationDiagnostic } from '@/features/translation/ir/TranslationOperation.js';
+import { createParserSnapshot } from '@/features/translation/providers/utils/ParserSnapshot.js';
+import { TranslationContractValidator } from '@/features/translation/core/TranslationContractValidator.js';
+import { MappingStrategy } from '@/features/translation/ir/RequestUnitManifest.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.TRANSLATION, 'AIResponseParser');
+const VALID_MAPPING_STRATEGIES = new Set(Object.values(MappingStrategy));
+const DIAGNOSTIC_ARRAY_LIMIT = 32;
+
+function formatDiagnosticId(value, maxLength = 64) {
+  if (value === null || value === undefined) return null;
+  const normalized = String(value);
+  return normalized.length <= maxLength ? normalized : `${normalized.slice(0, maxLength)}...`;
+}
+
+function boundDiagnosticArray(values, formatter = (value) => value) {
+  const normalized = Array.isArray(values) ? values : [];
+  return normalized.slice(0, DIAGNOSTIC_ARRAY_LIMIT).map(formatter);
+}
+
+function hasValidManifestView(manifestView, expectedCount) {
+  if (!manifestView || !Array.isArray(manifestView.units) || manifestView.units.length !== expectedCount) return false;
+  if (!VALID_MAPPING_STRATEGIES.has(manifestView.declaredMappingStrategy)) return false;
+
+  const requestIndexes = new Set();
+  return manifestView.units.every((unit) => {
+    if (!unit || !Object.isFrozen(unit) || !Number.isInteger(unit.requestIndex)) return false;
+    if (requestIndexes.has(unit.requestIndex)) return false;
+    requestIndexes.add(unit.requestIndex);
+    return true;
+  });
+}
+
+function observeValidationResult(executionContext, validationResult) {
+  try {
+    executionContext?.observeValidationResult?.(validationResult);
+  } catch (error) {
+    logger.debug('[AIResponseParser] Validation observation failed:', error?.message);
+  }
+}
+
+function getSourceText(source) {
+  return typeof source === 'object' && source !== null
+    ? (source.t ?? source.text ?? '')
+    : source;
+}
+
+function getObjectIdentity(item) {
+  return item?.i ?? item?.uid ?? item?.id
+}
+
+function isBlankText(value) {
+  return typeof value === 'string' && value.trim() === '';
+}
+
+function evaluateStructuredCandidate({ validationResult, mappingFacts, originalBatch }) {
+  const reasons = [];
+  const warnings = [];
+  const hasUnresolvedSlots = mappingFacts.unresolvedSlotCount > 0;
+
+  if (hasUnresolvedSlots) reasons.push('UNRESOLVED_MAPPING');
+  if (mappingFacts.duplicateMappedIndexes.size > 0) reasons.push('DUPLICATE_MAPPED_SLOT');
+  if (mappingFacts.identityPositionalFallback) reasons.push('IDENTITY_POSITIONAL_FALLBACK');
+
+  for (const [index, rawUnit] of mappingFacts.mappedRawUnits) {
+    const sourceText = getSourceText(originalBatch[index]);
+    if (!rawUnit.hasTranslatedText || typeof rawUnit.translatedText !== 'string') {
+      reasons.push('INVALID_TRANSLATED_TEXT');
+    } else if (!isBlankText(sourceText) && isBlankText(rawUnit.translatedText)) {
+      reasons.push('EMPTY_TRANSLATED_TEXT');
+    }
+  }
+
+  const validatorCodes = new Set(validationResult?.violations?.map(({ code }) => code));
+  if (validationResult?.violations?.some(({ code }) => code.startsWith('V3_'))) {
+    reasons.push('V3_MARKER_CONTRACT');
+  }
+  if (!hasUnresolvedSlots && reasons.length === 0 && (
+    validatorCodes.has('CARDINALITY_MISMATCH') ||
+    validatorCodes.has('UNEXPECTED_POSITION') ||
+    mappingFacts.unresolvedIds.length > 0
+  )) {
+    warnings.push('HARMLESS_SURPLUS_RESPONSE');
+  }
+
+  return {
+    invalid: reasons.length > 0,
+    reasons: [...new Set(reasons)],
+    warnings,
+  };
+}
+
+function createParserFacts({
+  validationResult,
+  snapshot,
+  originalBatch,
+  manifestView,
+  rawItems,
+  mappedRawUnits,
+  duplicateMappedIndexes,
+  identityPositionalFallback,
+  unresolvedIds,
+  unknownIdCount,
+  missingCount,
+  expectedCount,
+  mappedRequestIndexesByResponseIndex,
+}) {
+  const violations = Array.isArray(validationResult?.violations) ? validationResult.violations : [];
+  const invalidUnits = Array.isArray(validationResult?.invalidUnits) ? validationResult.invalidUnits : [];
+  const identityMode = manifestView?.declaredMappingStrategy === MappingStrategy.IDENTITY_REQUIRED;
+  const missingResponseId = violations.some(({ code }) => code === 'MISSING_RESPONSE_ID');
+  const ambiguous = duplicateMappedIndexes.size > 0
+    || identityPositionalFallback
+    || unresolvedIds.length > 0
+    || unknownIdCount > 0
+    || (identityMode && missingResponseId);
+  const identityReliable = !ambiguous && (!identityMode || snapshot.units.every((unit) => unit.hasResponseId));
+  const complete = rawItems.length === expectedCount && missingCount === 0 && !ambiguous;
+  const codesByIndex = new Map();
+  const addCode = (index, code) => {
+    if (!Number.isInteger(index) || typeof code !== 'string') return;
+    const codes = codesByIndex.get(index) || new Set();
+    codes.add(code);
+    codesByIndex.set(index, codes);
+  };
+
+  violations.forEach(({ index, code }) => addCode(index, code));
+  duplicateMappedIndexes.forEach((index) => addCode(index, 'DUPLICATE_MAPPED_SLOT'));
+  mappedRawUnits.forEach((unit, index) => {
+    const sourceText = getSourceText(originalBatch[index]);
+    if (!unit.hasTranslatedText || typeof unit.translatedText !== 'string') {
+      addCode(index, 'INVALID_TRANSLATED_TEXT');
+    } else if (!isBlankText(sourceText) && isBlankText(unit.translatedText)) {
+      addCode(index, 'EMPTY_TRANSLATED_TEXT');
+    }
+  });
+
+  const invalidFactsByIndex = new Map(invalidUnits
+    .filter(({ index }) => Number.isInteger(index))
+    .map((unit) => [unit.index, unit]));
+  const invalidIndexes = new Set([...codesByIndex.keys(), ...invalidFactsByIndex.keys()]);
+  const parserInvalidUnits = [...invalidIndexes].sort((a, b) => a - b).map((index) => {
+    const invalidUnit = invalidFactsByIndex.get(index);
+    const provenRequestIndex = mappedRequestIndexesByResponseIndex.get(index);
+    const requestIndex = identityReliable && Number.isInteger(provenRequestIndex)
+      ? provenRequestIndex
+      : null;
+    return {
+      requestIndex,
+      responseId: invalidUnit?.responseId ?? snapshot.units[index]?.responseId ?? null,
+      violationCodes: [...(codesByIndex.get(index) || [])],
+    };
+  });
+
+  const responseIds = snapshot.units.map((unit) => unit.responseId ?? null);
+  const responseIdCounts = new Map();
+  responseIds.forEach((id) => {
+    if (id !== null && id !== undefined) responseIdCounts.set(String(id), (responseIdCounts.get(String(id)) || 0) + 1);
+  });
+  const duplicateResponseIds = [...responseIdCounts.entries()]
+    .filter(([, count]) => count > 1)
+    .map(([id]) => id);
+
+  const invalidTextIndexes = [...codesByIndex.entries()]
+    .filter(([, codes]) => [...codes].some((code) => code === 'INVALID_TRANSLATED_TEXT' || code === 'EMPTY_TRANSLATED_TEXT'))
+    .map(([index]) => index);
+  const diagnosticRequestIds = originalBatch.map((item) => getObjectIdentity(item) ?? null);
+  const diagnosticResponseIds = responseIds;
+  const diagnosticUnresolvedIds = unresolvedIds;
+  const diagnosticDuplicateResponseIds = duplicateResponseIds;
+
+  return {
+    invalidUnits: parserInvalidUnits,
+    mappingFacts: {
+      identityReliable,
+      complete,
+      ambiguous,
+    },
+    parserDiagnostics: {
+      requestCount: originalBatch.length,
+      responseCount: diagnosticResponseIds.length,
+      invalidCount: parserInvalidUnits.length,
+      unresolvedCount: diagnosticUnresolvedIds.length,
+      duplicateCount: diagnosticDuplicateResponseIds.length,
+      invalidTextCount: invalidTextIndexes.length,
+      requestIds: boundDiagnosticArray(diagnosticRequestIds, formatDiagnosticId),
+      responseIds: boundDiagnosticArray(diagnosticResponseIds, formatDiagnosticId),
+      unresolvedIds: boundDiagnosticArray(diagnosticUnresolvedIds, formatDiagnosticId),
+      duplicateResponseIds: boundDiagnosticArray(diagnosticDuplicateResponseIds, formatDiagnosticId),
+      invalidTextIndexes: boundDiagnosticArray(invalidTextIndexes),
+      requestIdsTotal: diagnosticRequestIds.length,
+      responseIdsTotal: diagnosticResponseIds.length,
+      unresolvedIdsTotal: diagnosticUnresolvedIds.length,
+      duplicateResponseIdsTotal: diagnosticDuplicateResponseIds.length,
+      invalidTextIndexesTotal: invalidTextIndexes.length,
+      arraysTruncated: diagnosticRequestIds.length > DIAGNOSTIC_ARRAY_LIMIT
+        || diagnosticResponseIds.length > DIAGNOSTIC_ARRAY_LIMIT
+        || diagnosticUnresolvedIds.length > DIAGNOSTIC_ARRAY_LIMIT
+        || diagnosticDuplicateResponseIds.length > DIAGNOSTIC_ARRAY_LIMIT
+        || invalidTextIndexes.length > DIAGNOSTIC_ARRAY_LIMIT,
+    },
+  };
+}
+
+function createRepairContext(parserFacts, validationResult, snapshot, originalBatch) {
+  if (!Array.isArray(parserFacts?.invalidUnits) || parserFacts.invalidUnits.length === 0) return null;
+
+  const violations = Array.isArray(validationResult?.violations) ? validationResult.violations : [];
+  const invalidFacts = Array.isArray(validationResult?.invalidUnits) ? validationResult.invalidUnits : [];
+  const responseIndexById = new Map(invalidFacts
+    .filter(({ index, responseId }) => Number.isInteger(index) && responseId !== null && responseId !== undefined)
+    .map(({ index, responseId }) => [String(responseId), index]));
+  const violationCodes = [...new Set(violations.map(({ code }) => code).filter((code) => typeof code === 'string'))];
+
+  const affectedUnits = parserFacts.invalidUnits.map(({ requestIndex, responseId, violationCodes: unitCodes }) => {
+    const responseIndex = responseIndexById.get(String(responseId));
+    const sourceText = requestIndex !== null && requestIndex !== undefined
+      ? getSourceText(originalBatch[requestIndex])
+      : undefined;
+    const translatedText = Number.isInteger(responseIndex) ? snapshot.units[responseIndex]?.translatedText : undefined;
+    let markerId;
+    let affectedSourceText = sourceText;
+
+    if (unitCodes.some((code) => code.startsWith('V3_')) && typeof sourceText === 'string') {
+      const v3Result = TranslationContractValidator.validateV3Parent(sourceText, translatedText, responseId);
+      const v3Violation = v3Result?.violations.find(({ code }) => code.startsWith('V3_'));
+      const interval = Number.isInteger(v3Violation?.intervalIndex)
+        ? v3Result.source.intervals[v3Violation.intervalIndex]
+        : null;
+      markerId = v3Violation?.markerId ?? interval?.markerId;
+      affectedSourceText = interval?.text ?? sourceText;
+    }
+
+    return {
+      requestIndex,
+      responseId,
+      ...(markerId ? { markerId } : {}),
+      ...(typeof affectedSourceText === 'string' ? { sourceText: affectedSourceText } : {}),
+    };
+  });
+
+  return { reason: violationCodes.join(','), affectedUnits };
+}
 
 /**
  * Pipeline-based AI Response Healers.
@@ -110,7 +351,7 @@ export const AIResponseParser = {
   /**
    * Cleans AI responses based on the expected contract.
    */
-  cleanAIResponse(result, expectedFormat = ResponseFormat.STRING) {
+  cleanAIResponse(result, expectedFormat = ResponseFormat.STRING, executionContext = null, parserEvidence = null) {
     if (!result || typeof result !== 'string') return result;
 
     // Strategy 1: RAW STRING (Popup, Sidepanel, Field)
@@ -151,6 +392,14 @@ export const AIResponseParser = {
       const healed = Healers.PreProcessors.reduce((text, healer) => healer(text), result);
       if (healed !== result) {
         parsed = this._extractAndParseJson(healed, expectedFormat);
+        if (parsed) {
+          appendTranslationDiagnostic(executionContext, {
+            type: 'PARSER_REPAIRED_RESPONSE',
+            stage: 'parser',
+            repaired: true,
+          });
+          if (parserEvidence) parserEvidence.repaired = true;
+        }
       } else if (!parsed) {
         // If no healing was possible and we still don't have a result, re-run to throw original error
         parsed = this._extractAndParseJson(result, expectedFormat);
@@ -195,35 +444,203 @@ export const AIResponseParser = {
 
   /**
    * Parse batch translation results from JSON response.
+   *
+   * @param {string} result Raw provider response text.
+   * @param {number} expectedCount Number of requested units.
+   * @param {Array} originalBatch Requested units.
+   * @param {string} [providerName='Unknown'] Provider display name (facts only).
+   * @param {string} [expectedFormat=ResponseFormat.JSON_ARRAY] Response contract.
+   * @param {object|null} [executionContext] Operation execution context for diagnostics.
+   * @param {object|null} [manifestView] Manifest view for contract validation.
+   * @param {object|null} [completion] Frozen normalized completion record of the
+   * physical provider response that produced `result`. Attached to parser facts
+   * so downstream observers can correlate each response's completion with its
+   * parser/validation outcome. Never branched on here; absent stays absent
+   * (never fabricated as UNKNOWN).
+   * @returns {{ results: Array<string>, contractViolation: boolean }} Parsed results plus whether
+   * the response violated the structured contract (slots gap-filled or unparseable).
    */
-  parseBatchResult(result, expectedCount, originalBatch, providerName = 'Unknown', expectedFormat = ResponseFormat.JSON_ARRAY) {
+  parseBatchResult(result, expectedCount, originalBatch, providerName = 'Unknown', expectedFormat = ResponseFormat.JSON_ARRAY, executionContext = null, manifestView = null, completion = null) {
     try {
-      const parsed = this.cleanAIResponse(result, expectedFormat);
+      const parserEvidence = { repaired: false };
+      if (completion && typeof completion === 'object') {
+        parserEvidence.completion = completion;
+      }
+      const parsed = this.cleanAIResponse(result, expectedFormat, executionContext, parserEvidence);
       
       if (!parsed) throw new Error('Empty or invalid response');
 
       let rawItems = this._normalizeToItems(parsed);
+      const plainStringBatch = originalBatch.every((item) => typeof item === 'string');
+      const snapshot = createParserSnapshot(rawItems, parserEvidence);
+      let validationResult = null;
+      if (hasValidManifestView(manifestView, expectedCount)) {
+        validationResult = TranslationContractValidator.validate(manifestView, snapshot, parserEvidence, {
+          sourceItems: originalBatch,
+          responseIdentityMode: plainStringBatch ? 'positional-wire' : 'logical',
+        });
+       observeValidationResult(executionContext, validationResult);
+      }
       const results = new Array(expectedCount).fill(null);
       const unmappedTexts = [];
+      const mappedIndexes = new Set();
+      const mappedRequestIndexesByResponseIndex = new Map();
+      const positionalWithoutIds = plainStringBatch && snapshot.units.every((unit) => !unit.hasResponseId);
+      const responseIds = [];
+      const unresolvedIds = [];
+      const resolvedIndexes = [];
+      const duplicateMappedIndexes = new Set();
+      const mappedRawUnits = new Map();
+      let identityPositionalFallback = false;
+      let unknownIdCount = 0;
 
-      rawItems.forEach((item) => {
+      rawItems.forEach((item, responseIndex) => {
         const { text, id } = this._extractItemData(item);
-        if (id !== null && id !== undefined) {
-          const idx = this._findOriginalIndex(id, originalBatch, expectedCount);
-          if (idx !== -1) {
-            results[idx] = text;
-          } else {
-            unmappedTexts.push(text);
+        responseIds.push(id === null || id === undefined ? '<missing>' : String(id));
+        const identityIndex = !plainStringBatch && id !== null && id !== undefined
+          ? this._findObjectIdentityIndex(id, originalBatch)
+          : -1;
+        const idx = identityIndex !== -1
+          ? identityIndex
+          : (id !== null && id !== undefined
+              ? this._findOriginalIndex(id, originalBatch, expectedCount, plainStringBatch)
+              : (positionalWithoutIds && responseIndex < expectedCount ? responseIndex : -1));
+
+        if (idx !== -1) {
+          if (mappedIndexes.has(idx)) {
+            duplicateMappedIndexes.add(idx);
+            appendTranslationDiagnostic(executionContext, {
+              type: 'PARSER_DUPLICATE_ID',
+              stage: 'parser',
+              code: 'DUPLICATE_ID',
+            });
           }
+          if (!plainStringBatch && identityIndex === -1 && typeof id === 'number') {
+            identityPositionalFallback = true;
+          }
+          mappedIndexes.add(idx);
+          mappedRequestIndexesByResponseIndex.set(responseIndex, idx);
+          results[idx] = text;
+          resolvedIndexes.push(idx);
+          mappedRawUnits.set(idx, snapshot.units[responseIndex]);
+        } else if (id !== null && id !== undefined) {
+          unknownIdCount++;
+          unresolvedIds.push(String(id));
+          unmappedTexts.push(text);
         } else {
+          unresolvedIds.push('<missing>');
           unmappedTexts.push(text);
         }
       });
 
-      return this._fillResultsGaps(results, unmappedTexts, originalBatch, expectedCount);
-    } catch (error) {
-      logger.error(`[${providerName}] Strict parse failed: ${error.message}`);
-      return originalBatch.map(item => typeof item === 'object' ? (item.t || item.text) : item);
+      const missingCount = results.filter(item => item === null).length;
+      // A null slot means this response violated the structured contract: it will
+      // be gap-filled with unmapped translations or original text below. The parser
+      // reports this fact only; recovery is owned by the provider.
+      const policyResult = evaluateStructuredCandidate({
+        validationResult,
+        mappingFacts: {
+          duplicateMappedIndexes,
+          identityPositionalFallback,
+          mappedRawUnits,
+          unresolvedIds,
+          unresolvedSlotCount: missingCount,
+        },
+        originalBatch,
+      });
+      const contractViolation = policyResult.invalid;
+      const parserFacts = contractViolation
+        ? createParserFacts({
+          validationResult,
+          snapshot,
+          originalBatch,
+          manifestView,
+          rawItems,
+          mappedRawUnits,
+          duplicateMappedIndexes,
+          identityPositionalFallback,
+          unresolvedIds,
+          unknownIdCount,
+          missingCount,
+          expectedCount,
+          mappedRequestIndexesByResponseIndex,
+        })
+        : null;
+      const repairContext = parserFacts
+        ? createRepairContext(parserFacts, validationResult, snapshot, originalBatch)
+        : null;
+
+      const parserDiagnostics = parserFacts?.parserDiagnostics;
+      const parserMappingFacts = parserFacts?.mappingFacts;
+      const hasMappingIssue = contractViolation
+        || parserMappingFacts?.identityReliable === false
+        || parserMappingFacts?.complete === false
+        || parserMappingFacts?.ambiguous === true
+        || (parserDiagnostics?.invalidCount || 0) > 0
+        || (parserDiagnostics?.unresolvedCount || 0) > 0
+        || (parserDiagnostics?.duplicateCount || 0) > 0
+        || (parserDiagnostics?.invalidTextCount || 0) > 0;
+
+      if (parserFacts && hasMappingIssue) {
+        appendTranslationDiagnostic(executionContext, {
+          type: 'PARSER_MAPPING_FACTS',
+          stage: 'parser',
+          provider: providerName,
+          expectedFormat,
+          mappingFacts: parserFacts.mappingFacts,
+          ...parserFacts.parserDiagnostics,
+        });
+      }
+
+      if (policyResult.warnings.length > 0) {
+        appendTranslationDiagnostic(executionContext, {
+          type: 'STRUCTURED_CONTRACT_WARNING',
+          stage: 'parser-policy',
+          expectedCount,
+          receivedCount: rawItems.length,
+          code: 'HARMLESS_SURPLUS_RESPONSE',
+          reason: policyResult.warnings.join(','),
+        });
+      }
+      if (contractViolation) {
+        appendTranslationDiagnostic(executionContext, {
+          type: 'STRUCTURED_CONTRACT_REJECTED',
+          stage: 'parser-policy',
+          expectedCount,
+          receivedCount: rawItems.length,
+          missingCount,
+          code: 'STRUCTURED_CONTRACT_REJECTED',
+          reason: `reasons=${policyResult.reasons.join(',')}; mappingMode=${plainStringBatch ? 'POSITIONAL_NUMERIC' : 'IDENTITY'}; responseCount=${responseIds.length}; unresolvedCount=${unresolvedIds.length}; resolvedCount=${resolvedIndexes.length}`,
+        });
+      }
+
+      return {
+        results: this._fillResultsGaps(results, unmappedTexts, expectedCount),
+        contractViolation,
+        ...(parserFacts || {}),
+        ...(repairContext ? { repairContext } : {}),
+      };
+    } catch {
+      logger.error(`[${providerName}] Strict parse failed`, { code: 'PARSE_FAILED' });
+      appendTranslationDiagnostic(executionContext, {
+        type: 'PARSER_MALFORMED_RESPONSE',
+        stage: 'parser',
+        provider: providerName,
+        reason: 'PARSE_FAILED',
+        code: 'PARSE_FAILED',
+        fallback: true,
+      });
+      return {
+        results: Array(originalBatch.length).fill(''),
+        contractViolation: true,
+        invalidUnits: [],
+        mappingFacts: { identityReliable: false, complete: false, ambiguous: true },
+        // Explicit parser fact: the payload could not be decoded into a
+        // structured candidate. Distinct from a semantic contract violation
+        // where parsing succeeded but mapping/validation failed. Absent in the
+        // success path so absent facts stay absent (never fabricated as false).
+        parseFailed: true,
+      };
     }
   },
 
@@ -312,29 +729,43 @@ export const AIResponseParser = {
    * Finds the index of the original segment matching the AI's ID.
    * @private
    */
-  _findOriginalIndex(id, originalBatch, expectedCount) {
-    const idx = typeof id === 'string' 
-      ? originalBatch.findIndex(ob => (typeof ob === 'object' ? (ob.i || ob.uid || ob.id) : null) === id)
-      : parseInt(id, 10);
+  _findOriginalIndex(id, originalBatch, expectedCount, plainStringBatch = false) {
+    if (plainStringBatch) {
+      const index = typeof id === 'number'
+        ? id
+        : (/^(0|[1-9]\d*)$/.test(id) ? Number(id) : -1);
+      return Number.isInteger(index) && index >= 0 && index < expectedCount ? index : -1;
+    }
+
+    const idx = typeof id === 'number' ? id : -1;
       
     return (idx !== -1 && idx >= 0 && idx < expectedCount) ? idx : -1;
   },
 
-  /**
-   * Fills gaps in results with sequential unmapped translations.
-   * @private
-   */
-  _fillResultsGaps(results, unmappedTexts, originalBatch, expectedCount) {
-    let unmappedIdx = 0;
-    for (let i = 0; i < expectedCount; i++) {
-      if (results[i] === null) {
-        results[i] = unmappedTexts[unmappedIdx] || 
-                    (typeof originalBatch[i] === 'object' ? (originalBatch[i].t || originalBatch[i].text) : originalBatch[i]) || '';
-        unmappedIdx++;
-      }
-    }
-    return results;
+  _findObjectIdentityIndex(id, originalBatch) {
+    return originalBatch.findIndex((item) => (
+      item && typeof item === 'object' &&
+      getObjectIdentity(item) !== null && getObjectIdentity(item) !== undefined &&
+      String(getObjectIdentity(item)) === String(id)
+    ));
   },
+
+   /**
+    * Fills gaps in results with sequential unmapped translations. Remaining
+    * slots receive an empty string so original source text never escapes on a
+    * contract violation. Recovery (owned by the provider) replaces these gaps.
+    * @private
+    */
+   _fillResultsGaps(results, unmappedTexts, expectedCount) {
+     let unmappedIdx = 0;
+     for (let i = 0; i < expectedCount; i++) {
+       if (results[i] === null) {
+         results[i] = unmappedTexts?.[unmappedIdx] ?? '';
+         unmappedIdx++;
+       }
+     }
+     return results;
+   },
 
   /**
    * Strips markdown code blocks if present.

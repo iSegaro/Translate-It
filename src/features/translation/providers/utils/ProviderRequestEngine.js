@@ -11,9 +11,16 @@ import { statsManager } from '../../core/TranslationStatsManager.js';
 import { ApiKeyManager } from "@/features/translation/providers/ApiKeyManager.js";
 import { ErrorTypes } from "@/shared/error-management/ErrorTypes.js";
 import { matchErrorToType } from "@/shared/error-management/ErrorMatcher.js";
-import { ProviderNames } from "@/features/translation/providers/ProviderConstants.js";
+import { ProviderNames, TranslationCallPurpose } from "@/features/translation/providers/ProviderConstants.js";
+import { appendTranslationDiagnostic } from '@/features/translation/ir/TranslationOperation.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.TRANSLATION, 'ProviderRequestEngine');
+
+function normalizeCallPurpose(callPurpose) {
+  return Object.values(TranslationCallPurpose).includes(callPurpose)
+    ? callPurpose
+    : TranslationCallPurpose.PRIMARY_TRANSLATION;
+}
 
 export const ProviderRequestEngine = {
   /**
@@ -47,7 +54,8 @@ export const ProviderRequestEngine = {
   /**
    * UNIFIED API REQUEST HANDLER
    */
-  async executeRequest(provider, { url, fetchOptions, extractResponse, context, abortController, updateApiKey, charCount, originalCharCount, sessionId }) {
+  async executeRequest(provider, { url, fetchOptions, extractResponse, context, abortController, updateApiKey, charCount, originalCharCount, sessionId, executionContext, callPurpose }) {
+    const normalizedCallPurpose = normalizeCallPurpose(callPurpose);
     // 1. Determine how many attempts we should make based on available keys
     let availableKeysCount = 1;
     if (provider.providerSettingKey && updateApiKey) {
@@ -73,7 +81,8 @@ export const ProviderRequestEngine = {
           abortController,
           sessionId: sessionId || null,
           charCount: charCount !== undefined ? charCount : 0,
-          originalCharCount: originalCharCount || 0
+          originalCharCount: originalCharCount || 0,
+          callPurpose: normalizedCallPurpose,
         });
 
         // 3. Success! Promote the working key
@@ -84,6 +93,12 @@ export const ProviderRequestEngine = {
           if (currentKey) {
             await ApiKeyManager.promoteKey(provider.providerSettingKey, currentKey);
             logger.info(`[${provider.providerName}] Failover successful on attempt ${attempt + 1}, key promoted.`);
+            appendTranslationDiagnostic(executionContext, {
+              type: 'PROVIDER_KEY_FAILOVER',
+              stage: 'provider-request',
+              provider: provider.providerName,
+              attempt: attempt + 1,
+            });
           }
         }
 
@@ -94,6 +109,14 @@ export const ProviderRequestEngine = {
 
         const errorType = error.type || matchErrorToType(error);
         if (errorType === ErrorTypes.USER_CANCELLED || errorType === ErrorTypes.TRANSLATION_CANCELLED) {
+          appendTranslationDiagnostic(executionContext, {
+            type: 'PROVIDER_CANCELLED',
+            stage: 'provider-request',
+            provider: provider.providerName,
+            reason: error.message,
+            code: errorType,
+            cancelled: true,
+          });
           throw error;
         }
 
@@ -102,6 +125,14 @@ export const ProviderRequestEngine = {
           const keys = await ApiKeyManager.getKeys(provider.providerSettingKey);
           if (keys.length > attempt + 1) {
             logger.warn(`[${provider.providerName}] Key error, attempting failover (${attempt + 1}/${availableKeysCount})`);
+            appendTranslationDiagnostic(executionContext, {
+              type: 'PROVIDER_KEY_FAILOVER_ATTEMPT',
+              stage: 'provider-request',
+              provider: provider.providerName,
+              attempt: attempt + 1,
+              reason: error.message,
+              code: errorType,
+            });
             const nextKey = keys[attempt + 1];
             await updateApiKey(nextKey, fetchOptions);
             
@@ -117,6 +148,14 @@ export const ProviderRequestEngine = {
         }
 
         if (!error.type) error.type = errorType;
+        appendTranslationDiagnostic(executionContext, {
+          type: 'PROVIDER_REQUEST_FAILURE',
+          stage: 'provider-request',
+          provider: provider.providerName,
+          attempt: attempt + 1,
+          reason: error.message,
+          code: error.type,
+        });
         throw error;
       }
     }
@@ -126,12 +165,13 @@ export const ProviderRequestEngine = {
   /**
    * Executes a fetch call and normalizes errors
    */
-  async executeApiCall(provider, { url, fetchOptions, extractResponse = (data) => data, context, abortController, sessionId, charCount, originalCharCount }) {
+  async executeApiCall(provider, { url, fetchOptions, extractResponse = (data) => data, context, abortController, sessionId, charCount, originalCharCount, callPurpose }) {
+    const normalizedCallPurpose = normalizeCallPurpose(callPurpose);
     const finalSessionId = sessionId || abortController?.sessionId || null;
     const finalCharCount = charCount || 0;
     const finalOriginalCharCount = originalCharCount || 0;
 
-    const { globalCallId, sessionCallId } = statsManager.recordRequest(provider.providerName, finalSessionId, finalCharCount, finalOriginalCharCount);
+    const { globalCallId, sessionCallId } = statsManager.recordRequest(provider.providerName, finalSessionId, finalCharCount, finalOriginalCharCount, normalizedCallPurpose);
 
     // MOCK BYPASS: If URL is a mock protocol, skip actual fetch but keep stats and logs
     if (url.startsWith('mock://')) {
@@ -149,35 +189,16 @@ export const ProviderRequestEngine = {
     const sessionTag = finalSessionId ? ` [Session: ${finalSessionId.substring(0, 8)}${sessionCallId > 0 ? ` #${sessionCallId}` : ''}]` : '';
     
     // CENTRALIZED SMART LOGGING: REQUEST
-    logger.debugLazy(() => {
-      const sanitizedUrl = this._maskSensitiveData(url);
-      const payload = this._parsePayload(fetchOptions.body);
-      
-      // Extract a readable summary of what's being sent
-      let textPreview = '';
-      if (payload) {
-        if (Array.isArray(payload.messages)) {
-          const lastUserMsg = payload.messages.filter(m => m.role === 'user').pop();
-          textPreview = lastUserMsg?.content?.substring(0, 100) || '';
-        } else if (payload.text) {
-          textPreview = String(payload.text).substring(0, 100);
-        } else if (payload.q) {
-          textPreview = Array.isArray(payload.q) ? payload.q[0].substring(0, 100) : payload.q.substring(0, 100);
-        } else if (Array.isArray(payload) && payload.length > 0) {
-          // Handle Microsoft Edge array format [{ Text: "..." }] or raw arrays
-          const firstItem = payload[0];
-          textPreview = (firstItem?.Text || firstItem?.text || (typeof firstItem === 'string' ? firstItem : ''))
-            .substring(0, 100);
-        }
-      }
+      logger.debugLazy(() => {
+        const sanitizedUrl = this._maskSensitiveData(url);
+        const payload = this._parsePayload(fetchOptions.body);
 
-      return [`[Call #${globalCallId}]${sessionTag} Request: ${sanitizedUrl}`, {
-        context,
-        charCount: finalCharCount,
-        preview: textPreview,
-        payload
-      }];
-    });
+        return [`[Call #${globalCallId}]${sessionTag} Request: ${sanitizedUrl}`, {
+          context,
+          charCount: finalCharCount,
+          payloadType: payload ? (Array.isArray(payload) ? 'array' : typeof payload) : 'empty',
+        }];
+      });
     
     const startTime = Date.now();
 
@@ -218,19 +239,22 @@ export const ProviderRequestEngine = {
 
       // CENTRALIZED SMART LOGGING: RESPONSE
       logger.debugLazy(() => {
-        let resultPreview = '';
-        if (responseData) {
-          try {
-            const preview = typeof responseData === 'string' ? responseData : JSON.stringify(responseData);
-            resultPreview = preview.substring(0, 500);
-          } catch { /* ignore */ }
+        let responseSize = 0;
+        try {
+          if (typeof responseData === 'string') {
+            responseSize = responseData.length;
+          } else if (responseData != null) {
+            responseSize = JSON.stringify(responseData)?.length ?? 0;
+          }
+        } catch {
+          responseSize = 0;
         }
 
         return [`[Call #${globalCallId}] Response: ${response.status} (${duration}ms)`, {
           status: response.status,
           duration,
-          preview: resultPreview,
-          responseData
+          responseType: responseData ? (typeof responseData === 'object' && !Array.isArray(responseData) && responseData !== null ? 'json' : typeof responseData) : 'empty',
+          responseSize,
         }];
       });
 
@@ -252,7 +276,6 @@ export const ProviderRequestEngine = {
         }
         
         const msg = body.detail || body.error?.message || response.statusText || `HTTP ${response.status}`;
-        const isDeepL400 = provider.providerName === ProviderNames.DEEPL_TRANSLATE && response.status === 400;
         const logLevel = 'warn'; // Providers only warn, upper layers handle errors
         
         let sanitizedUrl = url;
@@ -267,7 +290,6 @@ export const ProviderRequestEngine = {
           status: response.status,
           message: msg,
           url: sanitizedUrl,
-          ...(isDeepL400 && { errorBody: body })
         });
 
         const errorType = matchErrorToType({ 
@@ -335,7 +357,7 @@ export const ProviderRequestEngine = {
                              err.name === 'AbortError';
       
       if (!isCancellation) {
-        statsManager.recordError(provider.providerName, finalSessionId);
+        statsManager.recordError(provider.providerName, finalSessionId, normalizedCallPurpose);
       }
 
       if (err.name === 'AbortError') {

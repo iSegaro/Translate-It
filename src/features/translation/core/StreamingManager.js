@@ -343,15 +343,30 @@ export class StreamingManager extends ResourceTracker {
    * Cancel streaming session
    * @param {string} messageId - Message ID
    * @param {string} reason - Cancellation reason
+   * @param {boolean} timeout - Whether cancellation follows a timeout
    */
-  async cancelStream(messageId, reason = 'User cancelled') {
+  async cancelStream(messageId, reason = 'User cancelled', timeout = false, timeoutType) {
     const streamInfo = this.activeStreams.get(messageId);
     if (!streamInfo || streamInfo.status !== 'active') {
       return; // Already finished or not found
     }
 
     logger.debug(`[StreamingManager] Cancelling stream ${messageId}: ${reason}`);
-    
+
+    if (timeout) {
+      await this.completeStream(messageId, false, {
+        timedOut: true,
+        cancelled: false,
+        type: ErrorTypes.TRANSLATION_TIMEOUT,
+        timeoutType,
+        error: {
+          type: ErrorTypes.TRANSLATION_TIMEOUT,
+          message: reason
+        }
+      });
+      return;
+    }
+
     streamInfo.status = 'cancelled';
     streamInfo.cancellationReason = reason;
 

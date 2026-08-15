@@ -23,6 +23,7 @@ export class ErrorTypes {
   static UNKNOWN = "UNKNOWN";
   static SELECT_ELEMENT = "SELECT_ELEMENT";
   static NODE_ALREADY_TRANSLATED = "NODE_ALREADY_TRANSLATED";
+  static NO_TRANSLATABLE_CONTENT = "NO_TRANSLATABLE_CONTENT";
 
   // Tab Accessibility errors
   static TAB_RESTRICTED = "TAB_RESTRICTED";
@@ -36,10 +37,17 @@ export class ErrorTypes {
   static PROMPT_INVALID = "PROMPT_INVALID";
   static TEXT_EMPTY = "TEXT_EMPTY";
   static TEXT_TOO_LONG = "TEXT_TOO_LONG";
+  // Local Select Element structural limit: the selected DOM element exceeds
+  // the segment/unit count supported for processing. Distinct from TEXT_TOO_LONG
+  // which is provider/request text-size semantics.
+  static ELEMENT_TOO_LARGE = "ELEMENT_TOO_LARGE";
   static TRANSLATION_NOT_FOUND = "TRANSLATION_NOT_FOUND";
   static TRANSLATION_FAILED = "TRANSLATION_FAILED";
+  static NO_ACCEPTED_TRANSLATION_RESULTS = "NO_ACCEPTED_TRANSLATION_RESULTS";
   static TRANSLATION_ERROR = "TRANSLATION_ERROR";
   static TRANSLATION_TIMEOUT = "TRANSLATION_TIMEOUT";
+  static PROGRESS_TIMEOUT = "PROGRESS_TIMEOUT";
+  static FINAL_TIMEOUT = "FINAL_TIMEOUT";
   static OPERATION_TIMEOUT = "OPERATION_TIMEOUT";
   static SETTINGS_LOADING_TIMEOUT = "SETTINGS_LOADING_TIMEOUT";
   static LANGUAGE_PAIR_NOT_SUPPORTED = "LANGUAGE_PAIR_NOT_SUPPORTED";

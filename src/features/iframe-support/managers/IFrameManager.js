@@ -8,6 +8,7 @@ import { ErrorHandler } from '@/shared/error-management/ErrorHandler.js';
 import SmartCache from '@/core/memory/SmartCache.js';
 import { sendMessage } from '@/shared/messaging/core/UnifiedMessaging.js';
 import { MessageActions } from '@/shared/messaging/core/MessageActions.js';
+import { getSelectElementActivationErrorMessage } from '@/features/element-selection/utils/activationError.js';
 
 /**
  * Enhanced IFrame Manager with full integration to existing systems
@@ -355,7 +356,8 @@ export class IFrameManager extends ResourceTracker {
         context: 'iframe-activate-select-element',
         showToast: false
       });
-      return { success: false, error: error.message };
+      const message = await getSelectElementActivationErrorMessage();
+      return { success: false, message, error: message };
     }
   }
 

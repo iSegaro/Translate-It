@@ -1,7 +1,8 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { runSettingsMigrations, mergeMissingNestedMembers } from './settingsMigrations.js';
 import { HISTORICAL_PROMPT_DEFAULTS } from './promptHistoricalDefaults.js';
 import { CONFIG, TranslationMode } from './config.js';
+import { getPersistedDefaultSettings } from './settingsDefaults.js';
 
 // Mock logger
 vi.mock('@/shared/logging/logger.js', () => ({
@@ -14,12 +15,64 @@ vi.mock('@/shared/logging/logger.js', () => ({
 }));
 
 describe('Settings Migrations', () => {
-  it('should add missing settings from CONFIG', async () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('should add missing settings from canonical persisted defaults', async () => {
     const currentSettings = { THEME: 'dark' }; // Missing most things
     const { updates, logs } = await runSettingsMigrations(currentSettings);
     
-    expect(updates.APP_NAME).toBe(CONFIG.APP_NAME);
-    expect(logs).toContain('Added missing setting: APP_NAME');
+    const persistedDefaults = getPersistedDefaultSettings();
+    expect(updates.APPLICATION_LOCALIZE).toBe(persistedDefaults.APPLICATION_LOCALIZE);
+    expect(logs).toContain('Added missing setting: APPLICATION_LOCALIZE');
+    expect(updates.TIMEOUT).toBe(CONFIG.TIMEOUT);
+    expect(updates.TEXT_FIELD_SHORTCUT).toBe(CONFIG.TEXT_FIELD_SHORTCUT);
+    expect(updates.translationHistory).toBeUndefined();
+    expect(updates.CHANGELOG_URL).toBeUndefined();
+  });
+
+  it('should not re-add non-editable prompt wrappers via missing-setting fill', async () => {
+    const currentSettings = { THEME: 'dark' }; // Missing most things
+    const { updates } = await runSettingsMigrations(currentSettings);
+
+    // Genuinely persisted settings are still filled
+    expect(updates.APPLICATION_LOCALIZE).toBe(CONFIG.APPLICATION_LOCALIZE);
+    expect(updates.CHANGELOG_URL).toBeUndefined();
+    // Non-editable wrappers are CONFIG-owned and must not be written to storage
+    expect(updates.PROMPT_BASE_AI_BATCH).toBeUndefined();
+    expect(updates.PROMPT_BASE_AI_BATCH_AUTO).toBeUndefined();
+    expect(updates.PROMPT_BASE_SELECT).toBeUndefined();
+    expect(updates.PROMPT_BASE_BATCH).toBeUndefined();
+    expect(updates.PROMPT_BASE_SCREEN_CAPTURE).toBeUndefined();
+    expect(updates.PROMPT_SUBTITLE_BASE).toBeUndefined();
+    expect(updates.PROMPT_SUBTITLE_BATCH).toBeUndefined();
+  });
+
+  it('should report legacy stored non-editable prompt wrappers for cleanup while keeping editable prompts', async () => {
+    const currentSettings = {
+      THEME: 'dark',
+      PROMPT_BASE_AI_BATCH: 'old wrapper',
+      PROMPT_SUBTITLE_BASE: 'old subtitle wrapper',
+      PROMPT_TEMPLATE: 'custom user edit $_{TEXT}'
+    };
+    const { updates, logs, removals } = await runSettingsMigrations(currentSettings);
+
+    // Leftover wrappers are reported for removal by the persistence owner
+    expect(removals).toEqual(
+      expect.arrayContaining(['PROMPT_BASE_AI_BATCH', 'PROMPT_SUBTITLE_BASE'])
+    );
+    // Editable customized prompt is preserved (neither removed nor overwritten)
+    expect(removals).not.toContain('PROMPT_TEMPLATE');
+    expect(updates.PROMPT_TEMPLATE).toBeUndefined();
+    expect(logs.some(l => l.includes('Removing obsolete stored prompt wrapper: PROMPT_BASE_AI_BATCH'))).toBe(true);
+  });
+
+  it('should report empty removals when no legacy wrappers are present', async () => {
+    const currentSettings = { THEME: 'dark', PROMPT_TEMPLATE: CONFIG.PROMPT_TEMPLATE };
+    const { removals } = await runSettingsMigrations(currentSettings);
+
+    expect(removals).toEqual([]);
   });
 
   it('should migrate legacy MODE_PROVIDERS keys', async () => {

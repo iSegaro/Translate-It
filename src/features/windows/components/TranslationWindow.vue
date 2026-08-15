@@ -414,6 +414,9 @@ onMounted(async () => {
 
   // Track all resources for automatic cleanup
   tracker.trackResource('positioning', () => cleanupPositioning());
+  tracker.trackResource('resize-user-select', () => {
+    document.body.style.userSelect = '';
+  });
   tracker.trackResource('tts-stop', () => {
     tts.stopAll({ stopOnlyIfOwner: true }).catch(() => {});
   });
@@ -457,13 +460,15 @@ const startResize = (event) => {
     document.removeEventListener('mouseup', stopResize);
     document.removeEventListener('touchmove', handleResizeMove);
     document.removeEventListener('touchend', stopResize);
+    document.removeEventListener('touchcancel', stopResize);
     document.body.style.userSelect = '';
   };
 
-  document.addEventListener('mousemove', handleResizeMove);
-  document.addEventListener('mouseup', stopResize);
-  document.addEventListener('touchmove', handleResizeMove, { passive: false });
-  document.addEventListener('touchend', stopResize);
+  tracker.addEventListener(document, 'mousemove', handleResizeMove);
+  tracker.addEventListener(document, 'mouseup', stopResize);
+  tracker.addEventListener(document, 'touchmove', handleResizeMove, { passive: false });
+  tracker.addEventListener(document, 'touchend', stopResize);
+  tracker.addEventListener(document, 'touchcancel', stopResize);
   document.body.style.userSelect = 'none';
 };
 

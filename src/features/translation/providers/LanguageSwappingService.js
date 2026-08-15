@@ -55,7 +55,12 @@ export class LanguageSwappingService {
       }
 
       // Detection is only needed if bilingual is active OR it's dictionary mode
-      const accurateDetectedLang = await this.getDetectedLanguage(text);
+      // Operation-level callers can reuse one detailed detection result. The
+      // legacy path still detects here when no result is supplied.
+      const hasSuppliedDetection = Object.prototype.hasOwnProperty.call(options, 'detectedLanguage');
+      const accurateDetectedLang = hasSuppliedDetection
+        ? options.detectedLanguage
+        : await this.getDetectedLanguage(text);
 
       if (accurateDetectedLang) {
         const detectedLangCode = getCanonicalCode(accurateDetectedLang);

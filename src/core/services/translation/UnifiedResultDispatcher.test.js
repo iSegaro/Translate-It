@@ -124,12 +124,27 @@ describe('UnifiedResultDispatcher', () => {
   });
 
   describe('dispatchSelectElementResult', () => {
-    it('should send direct result to tab', async () => {
-      const request = { mode: TranslationMode.Select_Element, sender: { tab: { id: 1 } } };
+    it('should send direct result to originating top frame', async () => {
+      const request = { mode: TranslationMode.Select_Element, sender: { tab: { id: 1 }, frameId: 0 } };
       await dispatcher.dispatchSelectElementResult({ messageId: 'm1', result: { success: true }, request });
       expect(browser.tabs.sendMessage).toHaveBeenCalledWith(1, expect.objectContaining({
         data: expect.objectContaining({ context: 'select-element-direct' })
-      }));
+      }), { frameId: 0 });
+    });
+
+    it('should send direct result only to originating iframe', async () => {
+      const request = { mode: TranslationMode.Select_Element, sender: { tab: { id: 1 }, frameId: 7 } };
+      await dispatcher.dispatchSelectElementResult({ messageId: 'm-frame', result: { success: true }, request });
+      expect(browser.tabs.query).not.toHaveBeenCalled();
+      expect(browser.tabs.sendMessage).toHaveBeenCalledTimes(1);
+      expect(browser.tabs.sendMessage).toHaveBeenCalledWith(1, expect.anything(), { frameId: 7 });
+    });
+
+    it('should not send or broadcast when frame identity is missing', async () => {
+      const request = { mode: TranslationMode.Select_Element, sender: { tab: { id: 1 } } };
+      await dispatcher.dispatchSelectElementResult({ messageId: 'm-missing-frame', result: { success: true }, request });
+      expect(browser.tabs.query).not.toHaveBeenCalled();
+      expect(browser.tabs.sendMessage).not.toHaveBeenCalled();
     });
   });
 
@@ -144,6 +159,41 @@ describe('UnifiedResultDispatcher', () => {
   });
 
   describe('dispatchStreamingUpdate', () => {
+    it('should send Select Element updates only to originating tab', async () => {
+      const request = {
+        status: 'processing',
+        mode: TranslationMode.Select_Element,
+        sender: { tab: { id: 456 }, frameId: 7 }
+      };
+
+      await dispatcher.dispatchStreamingUpdate({ messageId: 'm-select', data: { chunk: '..' }, request });
+
+      expect(browser.tabs.query).not.toHaveBeenCalled();
+      expect(browser.tabs.sendMessage).toHaveBeenCalledTimes(1);
+      expect(browser.tabs.sendMessage).toHaveBeenCalledWith(456, expect.objectContaining({
+        data: expect.objectContaining({
+          translationMode: TranslationMode.Select_Element,
+          context: 'select-element-streaming',
+          isBroadcast: false
+        })
+      }), { frameId: 7 });
+    });
+
+    it('should not fall back to tab broadcast when targeted frame disappears', async () => {
+      browser.tabs.sendMessage.mockRejectedValueOnce(new Error('Could not establish connection'));
+      const request = {
+        status: 'processing',
+        mode: TranslationMode.Select_Element,
+        sender: { tab: { id: 456 }, frameId: 7 }
+      };
+
+      await dispatcher.dispatchStreamingUpdate({ messageId: 'm-gone', data: { chunk: '..' }, request });
+
+      expect(browser.tabs.query).not.toHaveBeenCalled();
+      expect(browser.tabs.sendMessage).toHaveBeenCalledTimes(1);
+      expect(browser.tabs.sendMessage).toHaveBeenCalledWith(456, expect.anything(), { frameId: 7 });
+    });
+
     it('should broadcast if request is processing', async () => {
       const request = { status: 'processing', mode: 'test' };
       await dispatcher.dispatchStreamingUpdate({ messageId: 'm1', data: { chunk: '..' }, request });

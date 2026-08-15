@@ -45,7 +45,6 @@ describe('QueueManager', () => {
     const errMod = await import('@/shared/error-management/ErrorTypes.js');
     ErrorTypes = errMod.ErrorTypes;
     
-    queueManager.clearAll();
     vi.spyOn(Math, 'random').mockReturnValue(0.5); // Predictable jitter (0.75x)
   });
 
@@ -146,6 +145,72 @@ describe('QueueManager', () => {
   });
 
   describe('Cancellation', () => {
+    it('does not retry a cancellation-shaped rejection', async () => {
+      const cancellation = Object.assign(new Error('Request cancelled'), {
+        type: ErrorTypes.USER_CANCELLED,
+        isCancelled: true,
+      });
+      const request = vi.fn().mockRejectedValue(cancellation);
+      const executionContext = { operation: { appendDiagnostic: vi.fn() } };
+      const promise = queueManager.enqueue('cancel-error-provider', request, 0, 'context', { executionContext });
+
+      await expect(promise).rejects.toBe(cancellation);
+      await vi.advanceTimersByTimeAsync(10000);
+
+      expect(request).toHaveBeenCalledTimes(1);
+      expect(queueManager.retryTimeouts.size).toBe(0);
+      expect(queueManager.getQueueStatus('cancel-error-provider').total).toBe(0);
+      expect(executionContext.operation.appendDiagnostic).not.toHaveBeenCalledWith(expect.objectContaining({ type: 'QUEUE_RETRY' }));
+    });
+
+    it('keeps a cancelled running item terminal after late resolution', async () => {
+      const deferred = createDeferred();
+      const promise = queueManager.enqueue('late-resolve-provider', () => deferred.promise, 0, 'context', { messageId: 'late-resolve' });
+      await Promise.resolve();
+      const item = queueManager.queues.get('late-resolve-provider')[0];
+
+      queueManager.cancelByMessageId('late-resolve');
+      await expect(promise).rejects.toMatchObject({ type: ErrorTypes.USER_CANCELLED });
+      deferred.resolve('late result');
+      await Promise.resolve();
+
+      expect(item.status).toBe('failed');
+      expect(queueManager.retryTimeouts.size).toBe(0);
+      expect(queueManager.getQueueStatus('late-resolve-provider').total).toBe(0);
+    });
+
+    it('does not retry a cancelled running item after late rejection', async () => {
+      const deferred = createDeferred();
+      const promise = queueManager.enqueue('late-reject-provider', () => deferred.promise, 0, 'context', { messageId: 'late-reject' });
+      await Promise.resolve();
+
+      queueManager.cancelByMessageId('late-reject');
+      await expect(promise).rejects.toMatchObject({ type: ErrorTypes.USER_CANCELLED });
+      const error = Object.assign(new Error('network failed'), { type: ErrorTypes.NETWORK_ERROR });
+      deferred.reject(error);
+      await Promise.resolve();
+      await vi.advanceTimersByTimeAsync(10000);
+
+      expect(queueManager.retryTimeouts.size).toBe(0);
+      expect(queueManager.getQueueStatus('late-reject-provider').total).toBe(0);
+    });
+
+    it('clears retry delay when the message is cancelled', async () => {
+      const retryable = Object.assign(new Error('network failed'), { type: ErrorTypes.NETWORK_ERROR });
+      const request = vi.fn().mockRejectedValue(retryable);
+      const promise = queueManager.enqueue('retry-cancel-provider', request, 0, 'context', { messageId: 'retry-cancel' });
+      promise.catch(() => {});
+      await vi.advanceTimersByTimeAsync(100);
+
+      expect(queueManager.retryTimeouts.size).toBe(1);
+      queueManager.cancelByMessageId('retry-cancel');
+      await expect(promise).rejects.toMatchObject({ type: ErrorTypes.USER_CANCELLED });
+      await vi.advanceTimersByTimeAsync(10000);
+
+      expect(request).toHaveBeenCalledTimes(1);
+      expect(queueManager.retryTimeouts.size).toBe(0);
+    });
+
     it('should cancel all items (including processing) for a provider', async () => {
       const mockRequest1 = vi.fn().mockImplementation(() => new Promise(resolve => setTimeout(() => resolve('R1'), 1000)));
       const mockRequest2 = vi.fn().mockResolvedValue('R2');
@@ -191,6 +256,138 @@ describe('QueueManager', () => {
       expect(cancelledCount).toBe(1);
 
       await expect(p1).rejects.toMatchObject({ type: ErrorTypes.USER_CANCELLED });
+    });
+  });
+
+  describe('TEXT_TOO_LONG deterministic validation', () => {
+    it('does not retry explicit TEXT_TOO_LONG errors', async () => {
+      const textTooLongError = { type: ErrorTypes.TEXT_TOO_LONG, message: 'text is too long' };
+      const mockRequest = vi.fn().mockRejectedValue(textTooLongError);
+
+      const promise = queueManager.enqueue('text-long-provider', mockRequest);
+      promise.catch(() => {});
+
+      await vi.advanceTimersByTimeAsync(10000);
+
+      expect(mockRequest).toHaveBeenCalledTimes(1);
+      await expect(promise).rejects.toBe(textTooLongError);
+      expect(queueManager.retryTimeouts.size).toBe(0);
+    });
+
+    it('does not append QUEUE_RETRY diagnostic for TEXT_TOO_LONG', async () => {
+      const textTooLongError = { type: ErrorTypes.TEXT_TOO_LONG, message: 'text is too long' };
+      const mockRequest = vi.fn().mockRejectedValue(textTooLongError);
+      const executionContext = { operation: { appendDiagnostic: vi.fn() } };
+
+      const promise = queueManager.enqueue('text-long-diag', mockRequest, 0, 'context', { executionContext });
+      promise.catch(() => {});
+
+      await vi.advanceTimersByTimeAsync(10000);
+
+      expect(executionContext.operation.appendDiagnostic).not.toHaveBeenCalledWith(
+        expect.objectContaining({ type: 'QUEUE_RETRY' })
+      );
+    });
+
+    it('settles and removes TEXT_TOO_LONG item from queue', async () => {
+      const textTooLongError = { type: ErrorTypes.TEXT_TOO_LONG, message: 'text is too long' };
+      const mockRequest = vi.fn().mockRejectedValue(textTooLongError);
+
+      await queueManager.enqueue('text-long-settle', mockRequest).catch(() => {});
+      await vi.advanceTimersByTimeAsync(100);
+
+      expect(queueManager.getQueueStatus('text-long-settle').total).toBe(0);
+    });
+
+    it('does not treat message-only "text is too long" as local validation', async () => {
+      const messageError = { message: 'text is too long' };
+      const mockRequest = vi.fn()
+        .mockRejectedValueOnce(messageError)
+        .mockResolvedValue('Success');
+
+      const promise = queueManager.enqueue('msg-long', mockRequest);
+
+      await vi.advanceTimersByTimeAsync(150);
+      expect(mockRequest).toHaveBeenCalledTimes(1);
+
+      await vi.advanceTimersByTimeAsync(3000);
+      expect(mockRequest).toHaveBeenCalledTimes(2);
+
+      const result = await promise;
+      expect(result).toBe('Success');
+    });
+
+    it('does not treat HTTP 413 shaped error as local validation', async () => {
+      const httpError = { statusCode: 413, message: 'payload too large' };
+      const mockRequest = vi.fn()
+        .mockRejectedValueOnce(httpError)
+        .mockResolvedValue('Success');
+
+      const promise = queueManager.enqueue('http-long', mockRequest);
+
+      await vi.advanceTimersByTimeAsync(150);
+      expect(mockRequest).toHaveBeenCalledTimes(1);
+
+      await vi.advanceTimersByTimeAsync(3000);
+      expect(mockRequest).toHaveBeenCalledTimes(2);
+
+      const result = await promise;
+      expect(result).toBe('Success');
+    });
+
+    it('still retries NETWORK_ERROR', async () => {
+      const networkError = { type: ErrorTypes.NETWORK_ERROR, message: 'failed to fetch' };
+      const mockRequest = vi.fn()
+        .mockRejectedValueOnce(networkError)
+        .mockResolvedValue('Success');
+
+      const promise = queueManager.enqueue('net-retry', mockRequest);
+
+      await vi.advanceTimersByTimeAsync(150);
+      expect(mockRequest).toHaveBeenCalledTimes(1);
+
+      await vi.advanceTimersByTimeAsync(3000);
+      expect(mockRequest).toHaveBeenCalledTimes(2);
+
+      const result = await promise;
+      expect(result).toBe('Success');
+    });
+
+    it('still retries API_RESPONSE_INVALID', async () => {
+      const apiError = { type: ErrorTypes.API_RESPONSE_INVALID, message: 'invalid response' };
+      const mockRequest = vi.fn()
+        .mockRejectedValueOnce(apiError)
+        .mockResolvedValue('Success');
+
+      const promise = queueManager.enqueue('api-retry', mockRequest);
+
+      await vi.advanceTimersByTimeAsync(150);
+      expect(mockRequest).toHaveBeenCalledTimes(1);
+
+      await vi.advanceTimersByTimeAsync(3000);
+      expect(mockRequest).toHaveBeenCalledTimes(2);
+
+      const result = await promise;
+      expect(result).toBe('Success');
+    });
+
+    it('processes subsequent tasks after TEXT_TOO_LONG rejection', async () => {
+      const textTooLongError = { type: ErrorTypes.TEXT_TOO_LONG, message: 'text is too long' };
+      let callCount = 0;
+      const mockRequest = vi.fn().mockImplementation(() => {
+        callCount++;
+        if (callCount === 1) return Promise.reject(textTooLongError);
+        return Promise.resolve('task2-ok');
+      });
+
+      const p1 = queueManager.enqueue('progress-provider', mockRequest).catch(error => error);
+      const p2 = queueManager.enqueue('progress-provider', mockRequest);
+
+      await vi.advanceTimersByTimeAsync(200);
+
+      await expect(p1).resolves.toBe(textTooLongError);
+      await expect(p2).resolves.toBe('task2-ok');
+      expect(queueManager.getQueueStatus('progress-provider').total).toBe(0);
     });
   });
 
@@ -285,6 +482,31 @@ describe('QueueManager', () => {
       await vi.advanceTimersByTimeAsync(2500);
       await expect(promise).resolves.toBe('R1');
       expect(queueManager.getQueueStatus('retry-parallel::parallel').total).toBe(0);
+    });
+
+    it('queue retry bound: NETWORK_ERROR is bounded to maxRetries attempts', async () => {
+      const mockError = { type: ErrorTypes.NETWORK_ERROR, message: 'network failure' };
+      let callCount = 0;
+      const mockRequest = vi.fn(() => {
+        callCount++;
+        return Promise.reject(mockError);
+      });
+
+      const promise = queueManager.enqueue('bound-test-provider', mockRequest, 0, 'select_element', {
+        messageId: 'bound-test'
+      });
+      const rejection = expect(promise).rejects.toMatchObject({
+        type: ErrorTypes.NETWORK_ERROR,
+        message: 'network failure',
+      });
+
+      await vi.advanceTimersByTimeAsync(30000);
+      await rejection;
+
+      // NETWORK_ERROR maxRetries=4, so exactly 4 attempts before permanent failure
+      expect(callCount).toBe(4);
+      expect(queueManager.getQueueStatus('bound-test-provider').total).toBe(0);
+      expect(queueManager.retryTimeouts.size).toBe(0);
     });
   });
 });

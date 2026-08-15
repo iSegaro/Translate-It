@@ -4,6 +4,7 @@
  */
 
 import { buildPrompt } from "@/features/translation/utils/promptBuilder.js";
+import { ResponseFormat } from '@/shared/config/translationConstants.js';
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { TRANSLATION_CONSTANTS } from '@/shared/config/translationConstants.js';
@@ -21,8 +22,17 @@ import {
 import { NewlineManager } from '@/features/translation/utils/NewlineManager.js';
 import { shouldUseAutoPromptAsync } from '@/features/translation/utils/bilingualPromptHelper.js';
 import { buildSemanticInstructions } from './SemanticPromptBuilder.js';
+import { TranslationCallPurpose } from '../ProviderConstants.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.TRANSLATION, 'AIConversationHelper');
+
+function hasCommittedConversationPair(session) {
+  const history = session?.history;
+  if (!Array.isArray(history)) return false;
+  return history.some((message, index) => (
+    message?.role === 'user' && history[index + 1]?.role === 'assistant'
+  ));
+}
 
 /**
  * Checks if the parsed JSON object matches the specific format
@@ -45,6 +55,18 @@ function isSpecificTextJsonFormat(obj) {
 }
 
 export const AIConversationHelper = {
+  /**
+   * Resolves one conversation participation decision for current semantic call.
+   * The result governs both history reads and normal history writes.
+   */
+  async getConversationParticipation({ callPurpose, translateMode, sessionId, isAIProvider = true } = {}) {
+    if (callPurpose !== TranslationCallPurpose.PRIMARY_TRANSLATION) return false;
+    if (translateMode !== TranslationMode.Select_Element) return false;
+    if (typeof sessionId !== 'string' || sessionId.length === 0) return false;
+    if (!isAIProvider) return false;
+    return getAIConversationHistoryEnabledAsync();
+  },
+
   /**
    * Internal helper to truncate text intelligently at sentence or word boundaries
    * to maintain meaning while staying under the character limit.
@@ -88,7 +110,7 @@ export const AIConversationHelper = {
     try {
       const { translationSessionManager } = await import('@/features/translation/core/TranslationSessionManager.js');
       const session = translationSessionManager.sessions.get(sessionId);
-      return !session || session.turnCounter <= 1;
+      return !hasCommittedConversationPair(session);
     } catch {
       return true;
     }
@@ -97,7 +119,11 @@ export const AIConversationHelper = {
   /**
    * Reserve and get the next turn number for a session
    */
-  async claimNextTurn(sessionId, providerName = 'Unknown') {
+  async claimNextTurn(sessionId, providerName = 'Unknown', { callPurpose, translateMode, conversationParticipates } = {}) {
+    const participates = typeof conversationParticipates === 'boolean'
+      ? conversationParticipates
+      : await this.getConversationParticipation({ callPurpose, translateMode, sessionId });
+    if (!participates) return 1;
     if (!sessionId) return 1;
     try {
       const { translationSessionManager } = await import('@/features/translation/core/TranslationSessionManager.js');
@@ -127,13 +153,14 @@ export const AIConversationHelper = {
    * @param {Object} options - Options for history (maxTurns, maxChars)
    */
   async getConversationHistory(sessionId, translateMode = '', options = {}) {
-    if (!sessionId) return [];
-
-    // History is primarily used for Select Element to maintain style
-    if (translateMode !== TranslationMode.Select_Element) return [];
-
-    const historyEnabled = await getAIConversationHistoryEnabledAsync();
-    if (!historyEnabled) return [];
+    const participates = typeof options.conversationParticipates === 'boolean'
+      ? options.conversationParticipates
+      : await this.getConversationParticipation({
+        callPurpose: options.callPurpose,
+        translateMode,
+        sessionId,
+      });
+    if (!participates) return [];
 
     const { 
       maxTurns = 1, 
@@ -172,7 +199,9 @@ export const AIConversationHelper = {
   async formatCompactHistoryContext(sessionId, translateMode = '', options = {}) {
     const turns = await this.getConversationHistory(sessionId, translateMode, {
       maxTurns: 1,
-      maxChars: options.maxChars ?? TRANSLATION_CONSTANTS.HISTORY_CHARACTER_LIMITS.AI
+      maxChars: options.maxChars ?? TRANSLATION_CONSTANTS.HISTORY_CHARACTER_LIMITS.AI,
+      callPurpose: options.callPurpose,
+      conversationParticipates: options.conversationParticipates,
     });
 
     if (!turns.length) return '';
@@ -292,14 +321,18 @@ export const AIConversationHelper = {
 
     // Determine if we should use AI batch prompt
     // Use batch prompt for structured batch modes OR when input is in JSON format
-    const shouldUseBatchPrompt = !isDictionary && (
+    const isStructuredRecovery = metadata?.callPurpose === TranslationCallPurpose.STRUCTURED_RECOVERY;
+    const isScalarStructuredRecovery = isStructuredRecovery && metadata?.expectedFormat === ResponseFormat.STRING;
+    const isStructuredRecoveryFormat = isStructuredRecovery
+      && (metadata?.expectedFormat === ResponseFormat.JSON_OBJECT || metadata?.expectedFormat === ResponseFormat.JSON_ARRAY);
+    const shouldUseBatchPrompt = !isDictionary && !isScalarStructuredRecovery && (
       translateMode === TranslationMode.Select_Element ||
       translateMode === TranslationMode.Page ||
       translateMode === TranslationMode.PDF ||
       translateMode === TranslationMode.Subtitle ||
-      isJsonMode
+      isJsonMode ||
+      isStructuredRecoveryFormat
     );
-
     if (shouldUseBatchPrompt) {
       const useFollowup = !firstTurn && historyEnabled && translateMode === TranslationMode.Select_Element;
 
@@ -322,7 +355,13 @@ export const AIConversationHelper = {
     } else {
       // For other modes (Popup, Sidepanel, Field, Selection, ScreenCapture), use the standard buildPrompt logic
       const promptText = Array.isArray(text) ? text[0] : text;
-      promptTemplate = await buildPrompt(promptText, sourceLang, targetLang, translateMode, providerType);
+      promptTemplate = await buildPrompt(
+        promptText,
+        sourceLang,
+        targetLang,
+        isScalarStructuredRecovery ? TranslationMode.Field : translateMode,
+        providerType,
+      );
     }
 
     // Resolve instructions from template even for AI batch prompts
@@ -347,6 +386,16 @@ export const AIConversationHelper = {
       promptInstructions = promptInstructionsWithoutText
         .replace(/\$_{SOURCE}/g, sourceName)
         .replace(/\$_{TARGET}/g, targetName);
+    }
+
+    if (metadata?.callPurpose === TranslationCallPurpose.STRUCTURED_RECOVERY && metadata.repairContext) {
+      const repairInstructions = `\n\nStructured recovery repair context:\n${JSON.stringify(metadata.repairContext)}\nRe-translate the affected source unit(s) and preserve their marker ownership.`;
+      promptInstructions += repairInstructions;
+      if (isStructuredRecovery) promptTemplate += repairInstructions;
+    }
+
+    if (metadata?.callPurpose === TranslationCallPurpose.PARENT_RECOVERY) {
+      promptInstructions += '\n\nTranslate every input item, including very short items; preserve each input id.';
     }
 
     // Append semantic translation context when available (PDF mode only)
@@ -411,7 +460,7 @@ export const AIConversationHelper = {
             const originalText = t.t || t.text || '';
             const protectedText = NewlineManager.protect(originalText);
             return {
-              id: String(t.i || t.id || idx),
+              id: String(t.i ?? t.id ?? idx),
               text: protectedText,
               // Include per-cue context if available (critical for Subtitles)
               ...(t.context && { context: t.context })
@@ -422,8 +471,13 @@ export const AIConversationHelper = {
       });
     } else {
       // For non-batch prompts, the text is already injected into systemPrompt via buildPrompt
-      // User text should be empty or a simple placeholder message
-      userText = "";
+      // Scalar structured recovery sends source text as the provider user payload.
+      const scalarText = Array.isArray(text) ? text[0] : text;
+       userText = isScalarStructuredRecovery
+        ? (typeof scalarText === 'object' && scalarText !== null
+          ? (scalarText.t ?? scalarText.text ?? '')
+          : String(scalarText ?? ''))
+        : "";
     }
 
     let finalSystemPrompt = systemPrompt;
@@ -457,7 +511,16 @@ export const AIConversationHelper = {
   /**
    * Helper to get conversation messages for AI providers
    */
-  async getConversationMessages(sessionId, providerName, currentText, systemPrompt, translateMode = '') {
+  async getConversationMessages(sessionId, providerName, currentText, systemPrompt, translateMode = '', { callPurpose, conversationParticipates } = {}) {
+    const participates = typeof conversationParticipates === 'boolean'
+      ? conversationParticipates
+      : await this.getConversationParticipation({ callPurpose, translateMode, sessionId });
+    if (!participates) {
+      return {
+        messages: [{ role: 'system', content: systemPrompt }, { role: 'user', content: currentText }],
+        session: null
+      };
+    }
     if (!sessionId) {
       return {
         messages: [{ role: 'system', content: systemPrompt }, { role: 'user', content: currentText }],
@@ -467,9 +530,7 @@ export const AIConversationHelper = {
 
     const { translationSessionManager } = await import('@/features/translation/core/TranslationSessionManager.js');
     const session = translationSessionManager.getOrCreateSession(sessionId, providerName);
-    const historyEnabled = await getAIConversationHistoryEnabledAsync();
-
-    if (session.turnCounter <= 1) {
+    if (!hasCommittedConversationPair(session)) {
       session.systemPrompt = systemPrompt;
       return {
         messages: [{ role: 'system', content: systemPrompt }, { role: 'user', content: currentText }],
@@ -482,7 +543,7 @@ export const AIConversationHelper = {
     ];
 
     // History limited to last 1 turn with character capping for token optimization
-    if (historyEnabled && translateMode === TranslationMode.Select_Element) {
+    if (participates && translateMode === TranslationMode.Select_Element) {
       const maxHistoryMessages = 2; // Last 1 turn (User + Assistant)
       const rawHistory = session.history.slice(-maxHistoryMessages);
       
@@ -503,8 +564,11 @@ export const AIConversationHelper = {
   /**
    * Helper to update session history with results
    */
-  async updateSessionHistory(sessionId, userContent, assistantContent) {
-    if (!sessionId) return;
+  async updateSessionHistory(sessionId, userContent, assistantContent, { callPurpose, translateMode, conversationParticipates } = {}) {
+    const participates = typeof conversationParticipates === 'boolean'
+      ? conversationParticipates
+      : await this.getConversationParticipation({ callPurpose, translateMode, sessionId });
+    if (!participates) return;
     try {
       const { translationSessionManager } = await import('@/features/translation/core/TranslationSessionManager.js');
       translationSessionManager.addMessage(sessionId, 'user', userContent);

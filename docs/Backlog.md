@@ -8,6 +8,13 @@ List of features, enhancements, and ideas planned for future development.
 - **Code Cleanup**: Remove unused `compact` mode from `ProviderSelector.vue` to improve maintainability.
 - **Error Handling Refactoring**: The error handling logic is still inherited from a legacy version. Although the system currently functions correctly, it is architecturally unsound as both lower and upper layers are redundantly handling errors. Detailed information can be found in `ERROR_MANAGMENT_ISSUE.md`.
 
+- Test Connection در صفحه تنظیمات مشکل داره و همیشه fail میشه.
+- وقتی در صفحه تنظیمات Enable in Provider list رو فعال/غیرفعال میکنیم، همون موقع در افزونه اعمال نمیشه و باید ریلود کردن تا اعمال بشه.
+- صفحه تنظیمات TTS Voice Test در فایرفاکس کار نمیکنه.
+- در صفحه تنظیمات در تب Advance یک آکاردون Language Detection اشتباهی وجود دارد و باید حذف شود.
+- بروزرسانی Model ها، مثلا DeepSeek 4
+
+
 - Integration Module: Gmail, Twitter, Goolge Docs
 
 - در ترجمه صفحه و ترجمه المان، در سایت زیر باعث میشه جهت که راست چین میشود، زیر عکس ها قرار بگیره. باید جلوی جابه جا شدن متن ها رو گرفت در موقع چپ چین و راست چین شدن

@@ -52,10 +52,10 @@ export class TranslationRequestTracker {
     this.tabRequests = new Map(); // tabId -> Set<messageId>
     this.toastRequests = new Map(); // toastId -> messageId
     this.elementRequests = new WeakMap(); // DOM element -> messageId
+    this._diagnosticReports = new WeakMap(); // request -> immutable terminal report
 
     // Performance monitoring
     this.requestTimes = new Map(); // messageId -> timestamp
-    this.retryCounts = new Map(); // messageId -> retry count
 
     // Statistics
     this.stats = {
@@ -138,6 +138,14 @@ export class TranslationRequestTracker {
    */
   getRequest(messageId) {
     return this.requests.get(messageId);
+  }
+
+  _setDiagnosticReport(request, report) {
+    if (request && report) this._diagnosticReports.set(request, report);
+  }
+
+  _getDiagnosticReport(request) {
+    return request ? this._diagnosticReports.get(request) || null : null;
   }
 
   /**
@@ -286,8 +294,6 @@ export class TranslationRequestTracker {
   }
 
   _removeFromActiveIndexes(request) {
-    this.retryCounts.delete(request.messageId);
-
     if (request.sender?.tab?.id) {
       const tabSet = this.tabRequests.get(request.sender.tab.id);
       if (tabSet) {
@@ -299,35 +305,6 @@ export class TranslationRequestTracker {
     if (request.metadata?.toastId) {
       this.toastRequests.delete(request.metadata.toastId);
     }
-  }
-
-  /**
-   * Record retry attempt
-   */
-  recordRetry(messageId) {
-    const count = this.retryCounts.get(messageId) || 0;
-    this.retryCounts.set(messageId, count + 1);
-
-    this.updateRequest(messageId, {
-      retryCount: count + 1,
-      lastRetryAt: Date.now()
-    });
-
-    logger.debug(`[RequestTracker] Retry ${count + 1} for request: ${messageId}`);
-  }
-
-  /**
-   * Get retry count for request
-   */
-  getRetryCount(messageId) {
-    return this.retryCounts.get(messageId) || 0;
-  }
-
-  /**
-   * Check if request has exceeded max retries
-   */
-  hasExceededMaxRetries(messageId, maxRetries = 3) {
-    return this.getRetryCount(messageId) >= maxRetries;
   }
 
   /**
@@ -562,7 +539,6 @@ export class TranslationRequestTracker {
     this.toastRequests.clear();
     this.elementRequests = new WeakMap();
     this.requestTimes.clear();
-    this.retryCounts.clear();
   }
 }
 

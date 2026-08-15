@@ -161,10 +161,16 @@ export class browserTranslateProvider extends BaseTranslateProvider {
 
       try {
         const result = await translator.translate(text);
+        if (typeof result !== 'string' || !result.trim()) {
+          const error = new Error('Browser Translation API returned no text');
+          error.type = ErrorTypes.API_RESPONSE_INVALID;
+          throw error;
+        }
         results.push(result);
       } catch (error) {
         logger.error(`[BrowserAPI] Chunk translation failed for segment`, error);
-        results.push(text); // Fallback to original
+        if (!error.type) error.type = ErrorTypes.API_ERROR;
+        throw error;
       }
     }
 

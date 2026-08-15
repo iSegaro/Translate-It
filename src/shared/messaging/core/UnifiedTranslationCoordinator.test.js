@@ -3,6 +3,7 @@ import { UnifiedTranslationCoordinator } from './UnifiedTranslationCoordinator.j
 import { streamingTimeoutManager } from './StreamingTimeoutManager.js';
 import { sendRegularMessage } from './UnifiedMessaging.js';
 import { MessageActions } from './MessageActions.js';
+import { TRANSLATION_BATCH_EXECUTION_TIMEOUT_MS } from '@/shared/constants/translation.js';
 
 // Mock dependencies
 vi.mock('./StreamingTimeoutManager.js', () => ({
@@ -98,6 +99,41 @@ describe('UnifiedTranslationCoordinator', () => {
   });
 
   describe('Timeout Calculation', () => {
+    // Structured Content transport allowance is local to messaging/transport
+    // policy (see UnifiedTranslationCoordinator). The watchdog must derive to
+    // canonical batch execution budget + allowance.
+    const STRUCTURED_TRANSPORT_ALLOWANCE_MS = 30000;
+
+    it('keeps structured Select Element watchdog beyond the batch deadline', () => {
+      const data = {
+        text: JSON.stringify(Array.from({ length: 23 }, (_, index) => ({ t: `segment-${index}` }))),
+        mode: 'select-element',
+        options: { rawJsonPayload: true }
+      };
+      const timeouts = coordinator._calculateStreamingTimeouts(data);
+
+      expect(timeouts).toEqual({
+        initialTimeout: TRANSLATION_BATCH_EXECUTION_TIMEOUT_MS + STRUCTURED_TRANSPORT_ALLOWANCE_MS,
+        progressTimeout: TRANSLATION_BATCH_EXECUTION_TIMEOUT_MS + STRUCTURED_TRANSPORT_ALLOWANCE_MS,
+        gracePeriod: STRUCTURED_TRANSPORT_ALLOWANCE_MS,
+        estimatedSegments: 23
+      });
+    });
+
+    it('does not let custom transport timeout undercut structured execution budget', () => {
+      const data = {
+        text: JSON.stringify([{ t: 'segment' }]),
+        mode: 'select_element',
+        options: { rawJsonPayload: true }
+      };
+
+      expect(coordinator._calculateStreamingTimeouts(data, 90000)).toMatchObject({
+        initialTimeout: TRANSLATION_BATCH_EXECUTION_TIMEOUT_MS + STRUCTURED_TRANSPORT_ALLOWANCE_MS,
+        progressTimeout: TRANSLATION_BATCH_EXECUTION_TIMEOUT_MS + STRUCTURED_TRANSPORT_ALLOWANCE_MS,
+        gracePeriod: STRUCTURED_TRANSPORT_ALLOWANCE_MS
+      });
+    });
+
     it('should calculate longer timeouts for select-element mode', () => {
       const data = { text: 'a'.repeat(2000), mode: 'select-element' };
       const timeouts = coordinator._calculateStreamingTimeouts(data);
@@ -111,6 +147,16 @@ describe('UnifiedTranslationCoordinator', () => {
       
       expect(timeouts.initialTimeout).toBeLessThan(300000);
     });
+
+    it('does not alter non-structured Select Element streaming policy', () => {
+      const timeouts = coordinator._calculateStreamingTimeouts({
+        text: 'a'.repeat(2000),
+        mode: 'select-element'
+      });
+
+      expect(timeouts.progressTimeout).toBe(160000);
+      expect(timeouts.initialTimeout).toBe(200000);
+    });
   });
 
   describe('Cancellation', () => {
@@ -121,7 +167,7 @@ describe('UnifiedTranslationCoordinator', () => {
       
       coordinator.cancelTranslation(messageId, 'Test cancel');
       
-      expect(streamingTimeoutManager.cancelStreaming).toHaveBeenCalledWith(messageId, 'Test cancel');
+      expect(streamingTimeoutManager.cancelStreaming).toHaveBeenCalledWith(messageId, 'Test cancel', false);
       expect(sendRegularMessage).toHaveBeenCalledWith(expect.objectContaining({
         action: MessageActions.CANCEL_TRANSLATION
       }));
@@ -131,12 +177,12 @@ describe('UnifiedTranslationCoordinator', () => {
       const messageId = 'msg-timeout';
       coordinator.activeTranslations.set(messageId, { type: 'streaming' });
 
-      coordinator._handleStreamingTimeout(messageId);
+      coordinator._handleStreamingTimeout(messageId, { timeoutType: 'PROGRESS_TIMEOUT' });
 
-      expect(streamingTimeoutManager.cancelStreaming).toHaveBeenCalledWith(messageId, 'Streaming translation timed out');
+      expect(streamingTimeoutManager.cancelStreaming).toHaveBeenCalledWith(messageId, 'Streaming translation timed out', true, 'PROGRESS_TIMEOUT');
       expect(sendRegularMessage).toHaveBeenCalledWith(expect.objectContaining({
         action: MessageActions.CANCEL_TRANSLATION,
-        data: expect.objectContaining({ messageId, timeout: true })
+        data: expect.objectContaining({ messageId, timeout: true, timeoutType: 'PROGRESS_TIMEOUT' })
       }));
       expect(coordinator.activeTranslations.has(messageId)).toBe(false);
     });

@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { GoogleTranslateV2Provider } from './GoogleTranslateV2Provider.js';
 import { BaseTranslateProvider } from './BaseTranslateProvider.js';
+import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
 import {
   getDictionaryShowPronunciationAsync,
   getDictionaryShowPosAsync,
@@ -236,6 +237,17 @@ describe('GoogleTranslateV2Provider newline chunk isolation', () => {
       expect(result).toBe('translated text');
     });
 
+    it.each([
+      ['empty response', {}],
+      ['empty modern result', { sentences: [] }],
+      ['invalid legacy result', { 0: {} }],
+    ])('throws API_RESPONSE_INVALID for %s', async (_label, response) => {
+      vi.spyOn(provider, '_executeApiCall').mockImplementation(async (opts) => opts.extractResponse(response));
+
+      await expect(provider._translateChunk(['source'], 'en', 'fa', 'page', null, 0, 1, 0, 1, {}))
+        .rejects.toMatchObject({ type: 'API_RESPONSE_INVALID' });
+    });
+
     it('appends single-segment dictionary output using the current Markdown contract', async () => {
       vi.spyOn(provider, '_executeApiCall').mockImplementation(async (opts) =>
         opts.extractResponse({
@@ -427,5 +439,223 @@ describe('GoogleTranslateV2Provider newline chunk isolation', () => {
     );
 
     expect(result).toBe('+ /-');
+  });
+});
+
+describe('GoogleTranslateV2Provider delimiter classification', () => {
+  let provider;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    provider = new GoogleTranslateV2Provider();
+  });
+
+  it('1. recognizes a structural delimiter even when trans is nonblank', async () => {
+    vi.spyOn(provider, '_executeApiCall').mockImplementation(async (opts) =>
+      opts.extractResponse([
+        [
+          ['ترجمه اول', 'A'],
+          ['[[---]]\n ', '[[---]]\n '],
+          ['ترجمه دوم', 'B']
+        ]
+      ])
+    );
+
+    const result = await provider._translateChunk(
+      ['A', 'B'], 'en', 'fa', 'page', null, 0, 2, 0, 1, {}
+    );
+
+    expect(result).toEqual(['ترجمه اول', 'ترجمه دوم']);
+  });
+
+  it('2. preserves leading punctuation row (. ) as content', async () => {
+    vi.spyOn(provider, '_executeApiCall').mockImplementation(async (opts) =>
+      opts.extractResponse([
+        [
+          ['. ', '. '],
+          ['مک اندرو', 'Macandrew']
+        ]
+      ])
+    );
+
+    const result = await provider._translateChunk(
+      ['. Macandrew'], 'en', 'fa', 'page', null, 0, 1, 0, 1, {}
+    );
+
+    expect(result).toBe('. مک اندرو');
+  });
+
+  it('3. preserves comma punctuation as content', async () => {
+    vi.spyOn(provider, '_executeApiCall').mockImplementation(async (opts) =>
+      opts.extractResponse([
+        [
+          [', ', ', '],
+          ['رهبری آن', 'leading it']
+        ]
+      ])
+    );
+
+    const result = await provider._translateChunk(
+      [', leading it'], 'en', 'fa', 'page', null, 0, 1, 0, 1, {}
+    );
+
+    expect(result).toBe(', رهبری آن');
+  });
+
+  it('4. preserves (EP) as content', async () => {
+    vi.spyOn(provider, '_executeApiCall').mockImplementation(async (opts) =>
+      opts.extractResponse([
+        [
+          ['(EP)', '(EP)']
+        ]
+      ])
+    );
+
+    const result = await provider._translateChunk(
+      ['(EP)'], 'en', 'fa', 'page', null, 0, 1, 0, 1, {}
+    );
+
+    expect(result).toBe('(EP)');
+  });
+
+  it('5. preserves 2PM as source-equal translation content', async () => {
+    vi.spyOn(provider, '_executeApiCall').mockImplementation(async (opts) =>
+      opts.extractResponse([
+        [
+          ['2PM', '2PM']
+        ]
+      ])
+    );
+
+    const result = await provider._translateChunk(
+      ['2PM'], 'en', 'fa', 'page', null, 0, 1, 0, 1, {}
+    );
+
+    expect(result).toBe('2PM');
+  });
+
+  it('6. preserves "before [[---]] after" as content, not delimiter', async () => {
+    vi.spyOn(provider, '_executeApiCall').mockImplementation(async (opts) =>
+      opts.extractResponse([
+        [
+          ['قبل [[---]] بعد', 'before [[---]] after']
+        ]
+      ])
+    );
+
+    const result = await provider._translateChunk(
+      ['before [[---]] after'], 'en', 'fa', 'page', null, 0, 1, 0, 1, {}
+    );
+
+    expect(result).toBe('قبل [[---]] بعد');
+  });
+
+  it('7. preserves "foo---bar" as normal content', async () => {
+    vi.spyOn(provider, '_executeApiCall').mockImplementation(async (opts) =>
+      opts.extractResponse([
+        [
+          ['فو---بار', 'foo---bar']
+        ]
+      ])
+    );
+
+    const result = await provider._translateChunk(
+      ['foo---bar'], 'en', 'fa', 'page', null, 0, 1, 0, 1, {}
+    );
+
+    expect(result).toBe('فو---بار');
+  });
+
+  it('8. advances index exactly once per real delimiter zone', async () => {
+    vi.spyOn(provider, '_executeApiCall').mockImplementation(async (opts) =>
+      opts.extractResponse([
+        [
+          ['ترجمه اول', 'A'],
+          ['', '\n[[---]]\n'],
+          ['', '[[---]]\n'],
+          ['ترجمه دوم', 'B']
+        ]
+      ])
+    );
+
+    const result = await provider._translateChunk(
+      ['A', 'B'], 'en', 'fa', 'page', null, 0, 2, 0, 1, {}
+    );
+
+    expect(result).toEqual(['ترجمه اول', 'ترجمه دوم']);
+  });
+
+  it('9. handles Wikipedia-style split rows with nonblank trans delimiter without index drift', async () => {
+    vi.spyOn(provider, '_executeApiCall').mockImplementation(async (opts) =>
+      opts.extractResponse([
+        [
+          ['. ', '. '],
+          ['فرماندهی مک اندرو', 'Macandrew assumed command of the'],
+          ['[[---]]\n ', '[[---]]\n '],
+          ['لشکر دوم سواره نظام هند', '2nd Indian Cavalry Division']
+        ]
+      ])
+    );
+
+    const result = await provider._translateChunk(
+      ['. Macandrew assumed command of the', '2nd Indian Cavalry Division'],
+      'en',
+      'fa',
+      'page',
+      null,
+      0,
+      2,
+      0,
+      1,
+      {}
+    );
+
+    expect(Array.isArray(result)).toBe(true);
+    expect(result).toHaveLength(2);
+    expect(result[0]).toContain('فرماندهی مک اندرو');
+    expect(result[0]).toContain('.');
+    expect(result[1]).toBe('لشکر دوم سواره نظام هند');
+  });
+
+  it('10. reconstructs exact N non-missing outputs for N source items', async () => {
+    vi.spyOn(provider, '_executeApiCall').mockImplementation(async (opts) =>
+      opts.extractResponse([
+        [
+          ['یک', 'One'],
+          ['[[---]]', '[[---]]'],
+          ['دو', 'Two'],
+          ['[[---]]', '[[---]]'],
+          ['سه', 'Three']
+        ]
+      ])
+    );
+
+    const result = await provider._translateChunk(
+      ['One', 'Two', 'Three'], 'en', 'fa', 'page', null, 0, 3, 0, 1, {}
+    );
+
+    expect(result).toEqual(['یک', 'دو', 'سه']);
+  });
+
+  it('11. still rejects truly missing/omitted segments with API_RESPONSE_INVALID', async () => {
+    vi.spyOn(provider, '_executeApiCall').mockImplementation(async (opts) =>
+      // Response contains translation for 'first' only, missing 'second'
+      opts.extractResponse([
+        [
+          ['تنها اولی', 'first']
+        ]
+      ])
+    );
+
+    let caughtError;
+    try {
+      await provider._translateChunk(['first', 'second'], 'en', 'fa', 'page', null, 0, 2, 0, 1, {});
+    } catch (err) {
+      caughtError = err;
+    }
+
+    expect(caughtError).toBeDefined();
+    expect(caughtError.type).toBe(ErrorTypes.API_RESPONSE_INVALID);
+    expect(caughtError.message).toBe('Google V2 response omitted a translated segment');
   });
 });

@@ -79,6 +79,10 @@ vi.mock("@/shared/messaging/core/MessageHandler.js", () => ({
 vi.mock("@/shared/error-management/ErrorMatcher.js");
 vi.mock("@/shared/error-management/ErrorTypes.js");
 
+vi.mock("@/features/element-selection/utils/activationError.js", () => ({
+  getSelectElementActivationErrorMessage: vi.fn(() => Promise.resolve('Could not activate Select Element mode.')),
+}));
+
 vi.mock("@/shared/utils/text/textAnalysis.js", () => ({
   isSingleWordOrShortPhrase: vi.fn().mockReturnValue(false),
 }));
@@ -188,6 +192,19 @@ describe("useTranslationModes", () => {
 
       expect(success).toBe(false);
       expect(composable.error.value).toBe("Restricted page");
+    });
+
+    it("uses safe fallback when activation request throws a technical error", async () => {
+      const [composable] = withSetup(() => useSelectElementTranslation());
+      const { sendMessage } = await import("@/shared/messaging/core/UnifiedMessaging.js");
+      const technicalMessage = 'chrome.runtime.lastError: INTERNAL_PORT_9f81';
+      sendMessage.mockRejectedValueOnce(new Error(technicalMessage));
+
+      await composable.activateSelectMode();
+
+      expect(composable.error.value).toBe('Could not activate Select Element mode.');
+      expect(composable.error.value).not.toContain('INTERNAL_PORT_9f81');
+      expect(composable.error.value).not.toContain('chrome.runtime.lastError');
     });
 
     it("should toggle select element mode optimistically", async () => {

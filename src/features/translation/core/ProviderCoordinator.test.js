@@ -15,6 +15,7 @@ import { providerCoordinator } from './ProviderCoordinator.js';
 import { ResponseFormat } from "@/shared/config/translationConstants.js";
 import { AUTO_DETECT_VALUE } from "@/shared/constants/core.js";
 import { isFatalError, isTransientError, matchErrorToType } from "@/shared/error-management/ErrorMatcher.js";
+import { TranslationCallPurpose } from '@/features/translation/providers/ProviderConstants.js';
 
 // Mock dependencies
 vi.mock('@/shared/logging/logger.js', () => ({
@@ -88,6 +89,34 @@ describe('ProviderCoordinator', () => {
       expect(mockProvider.translate).toHaveBeenCalledWith(
         expect.anything(), 'fr', 'en', expect.anything()
       );
+    });
+
+    it('should preserve an authoritative operation-level language pair', async () => {
+      const { LanguageDetectionService } = await import("@/shared/services/LanguageDetectionService.js");
+      const { LanguageSwappingService } = await import("@/features/translation/providers/LanguageSwappingService.js");
+
+      const results = await Promise.all([
+        providerCoordinator.execute(mockProvider, 'Batch 1', 'en', 'fa', { languagePairResolved: true }),
+        providerCoordinator.execute(mockProvider, 'Batch 2', 'en', 'fa', { languagePairResolved: true }),
+        providerCoordinator.execute(mockProvider, 'Batch 3', 'en', 'fa', { languagePairResolved: true }),
+        providerCoordinator.execute(mockProvider, 'Batch 4', 'en', 'fa', { languagePairResolved: true }),
+      ]);
+
+      expect(results).toHaveLength(4);
+      expect(results.every(({ sourceLanguage, targetLanguage }) => sourceLanguage === 'en' && targetLanguage === 'fa')).toBe(true);
+      expect(LanguageDetectionService.detect).not.toHaveBeenCalled();
+      expect(LanguageSwappingService.applyLanguageSwapping).not.toHaveBeenCalled();
+    });
+
+    it('should retain explicit-source bilingual resolution without the authoritative flag', async () => {
+      const { LanguageSwappingService } = await import("@/features/translation/providers/LanguageSwappingService.js");
+      LanguageSwappingService.applyLanguageSwapping.mockResolvedValueOnce(['fa', 'de']);
+
+      const result = await providerCoordinator.execute(mockProvider, 'Persian text', 'de', 'fa');
+
+      expect(LanguageSwappingService.applyLanguageSwapping).toHaveBeenCalledTimes(1);
+      expect(result.sourceLanguage).toBe('fa');
+      expect(result.targetLanguage).toBe('de');
     });
 
     it('should register detection feedback when source is auto', async () => {
@@ -187,18 +216,26 @@ describe('ProviderCoordinator', () => {
 
       expect(result.translatedText).toBe('Part 1\nPart 2');
     });
+
+    it('should pass recovery-shaped array through JSON_OBJECT cleaning without collapsing to empty string', async () => {
+      mockProvider.translate.mockResolvedValue(['Bonjour']);
+
+      const result = await providerCoordinator.execute(
+        mockProvider, 'Input', 'en', 'fa', { expectedFormat: ResponseFormat.JSON_OBJECT }
+      );
+
+      expect(result.translatedText).toEqual(['Bonjour']);
+      expect(result.translatedText).not.toBe('');
+    });
   });
 
   describe('Error Resilience', () => {
-    it('should return original text if provider fails with a non-fatal error', async () => {
+    it('should throw if provider fails with a non-fatal non-transient error instead of fabricating success', async () => {
       mockProvider.translate.mockRejectedValue(new Error('Temporary API Error'));
-      
-      const result = await providerCoordinator.execute(
-        mockProvider, 'Original Text', 'en', 'fa'
-      );
 
-      expect(result.translatedText).toBe('Original Text');
-      expect(result.isFallback).toBe(true);
+      await expect(providerCoordinator.execute(
+        mockProvider, 'Original Text', 'en', 'fa'
+      )).rejects.toThrow('Temporary API Error');
     });
 
     it('should throw immediately if provider fails with a fatal error', async () => {
@@ -212,6 +249,21 @@ describe('ProviderCoordinator', () => {
   });
 
   describe('Queue routing', () => {
+    it('preserves explicit parent recovery purpose through queue/provider execution', async () => {
+      await providerCoordinator.execute(mockProvider, 'Input Text', 'en', 'fa', {
+        mode: 'select_element',
+        callPurpose: TranslationCallPurpose.PARENT_RECOVERY,
+        messageId: 'parent-recovery'
+      });
+
+      expect(mockProvider.translate).toHaveBeenCalledWith(
+        'Input Text',
+        'en',
+        'fa',
+        expect.objectContaining({ callPurpose: TranslationCallPurpose.PARENT_RECOVERY })
+      );
+    });
+
     it('should route parallel Select Element work through the parallel queue key', async () => {
       const result = await providerCoordinator.execute(
         mockProvider,

@@ -213,15 +213,20 @@ export function usePositioning(initialPosition, options = {}) {
     currentPosition.value = clampToViewport({ x: rawX, y: rawY });
   };
 
-  const stopDrag = () => {
-    isDragging.value = false;
+  const teardownDragSession = () => {
     document.removeEventListener('mousemove', onDrag);
     document.removeEventListener('mouseup', stopDrag);
     document.removeEventListener('touchmove', onDrag);
     document.removeEventListener('touchend', stopDrag);
-    
+    document.removeEventListener('touchcancel', stopDrag);
+
     // Restore text selection
     document.body.style.userSelect = '';
+  };
+
+  const stopDrag = () => {
+    isDragging.value = false;
+    teardownDragSession();
   };
 
   const startDrag = (event) => {
@@ -240,6 +245,7 @@ export function usePositioning(initialPosition, options = {}) {
     document.addEventListener('mouseup', stopDrag);
     document.addEventListener('touchmove', onDrag, { passive: false });
     document.addEventListener('touchend', stopDrag);
+    document.addEventListener('touchcancel', stopDrag);
     
     // Prevent text selection during drag
     document.body.style.userSelect = 'none';
@@ -261,21 +267,8 @@ export function usePositioning(initialPosition, options = {}) {
     }, 100);
   };
 
-  // Handle scroll events (for components that need to maintain position relative to content)
-  let scrollTimeout;
-  const handleScroll = () => {
-    // Debounced scroll handling - only for cases where position should be maintained
-    // Fixed positioned elements don't normally need scroll updates, but adding for completeness
-    clearTimeout(scrollTimeout);
-    scrollTimeout = setTimeout(() => {
-      // For fixed positioning, we typically don't need to update on scroll
-      // But this hook is available for special cases
-    }, 50);
-  };
-
   // Setup event listeners
   window.addEventListener('resize', handleResize);
-  window.addEventListener('scroll', handleScroll, { passive: true });
 
   return {
     // State
@@ -300,12 +293,9 @@ export function usePositioning(initialPosition, options = {}) {
     // Cleanup
     cleanup: () => {
       clearTimeout(resizeTimeout);
-      clearTimeout(scrollTimeout);
       window.removeEventListener('resize', handleResize);
-      window.removeEventListener('scroll', handleScroll);
       if (enableDragging) {
-        document.removeEventListener('mousemove', dragHandlers.onDrag);
-        document.removeEventListener('mouseup', dragHandlers.stopDrag);
+        stopDrag();
       }
     }
   };

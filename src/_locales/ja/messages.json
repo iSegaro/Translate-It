@@ -464,6 +464,12 @@
   "ERRORS_TRANSLATION_TIMEOUT": {
     "message": "翻訳がタイムアウトしました。もう一度お試しください。"
   },
+  "ERRORS_ELEMENT_TOO_LARGE": {
+    "message": "この要素は大きすぎて一度に翻訳できません。"
+  },
+  "ERRORS_SELECT_ELEMENT_PARTIAL_TRANSLATION_FAILED": {
+    "message": "一部のコンテンツを翻訳できませんでした。"
+  },
   "ERRORS_SETTINGS_LOADING_TIMEOUT": {
     "message": "設定の読み込みがタイムアウトしました。もう一度お試しください。"
   },
@@ -1948,6 +1954,15 @@
   },
   "SELECT_ELEMENT_CANCEL": {
     "message": "キャンセル"
+  },
+  "SELECT_ELEMENT_NO_TRANSLATABLE_CONTENT": {
+    "message": "この要素には翻訳可能なテキストが見つかりませんでした。"
+  },
+  "SELECT_ELEMENT_UNSUPPORTED_TRANSLATION_MODE": {
+    "message": "このコンテンツは現在の翻訳モードでは翻訳できません。"
+  },
+  "SELECT_ELEMENT_ACTIVATION_FAILED": {
+    "message": "要素選択モードを有効にできませんでした。"
   },
   "LINGVA_WPT_WARNING": {
     "message": "Lingvaは長いテキストで失敗する可能性があります。"

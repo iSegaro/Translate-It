@@ -99,6 +99,27 @@ describe('elementHelpers', () => {
       el.textContent = 'Cancel';
       expect(hasValidTextContent(el)).toBe(true);
     });
+
+    it('should return false for BIDI/zero-width formatting-mark-only text', () => {
+      const el = document.createElement('div');
+      el.textContent = '\u200E';
+      expect(hasValidTextContent(el)).toBe(false);
+
+      el.textContent = ' \u200F ';
+      expect(hasValidTextContent(el)).toBe(false);
+
+      el.textContent = '\u200B\u200F';
+      expect(hasValidTextContent(el)).toBe(false);
+    });
+
+    it('should return true when meaningful text contains formatting marks', () => {
+      const el = document.createElement('div');
+      el.textContent = '\u200EHello World';
+      expect(hasValidTextContent(el)).toBe(true);
+
+      el.textContent = 'سلام\u200F';
+      expect(hasValidTextContent(el)).toBe(true);
+    });
   });
 
   describe('isValidTextElement', () => {
@@ -147,6 +168,41 @@ describe('elementHelpers', () => {
       
       expect(isValidTextElement(el)).toBe(false);
       vi.restoreAllMocks();
+    });
+
+    it('defers root tag eligibility to SelectElementPolicy', () => {
+      const button = document.createElement('button');
+      button.textContent = 'Click me';
+      expect(isValidTextElement(button)).toBe(true);
+
+      const kbd = document.createElement('kbd');
+      kbd.textContent = 'Ctrl';
+      expect(isValidTextElement(kbd)).toBe(false);
+
+      const input = document.createElement('input');
+      input.value = 'Value';
+      expect(isValidTextElement(input)).toBe(false);
+    });
+
+    it('applies the text-content gate', () => {
+      const el = document.createElement('div');
+      expect(isValidTextElement(el)).toBe(false);
+    });
+
+    it('isSelectableTextRoot composes ancestor exclusion and text content', () => {
+      const { isSelectableTextRoot } = helpers;
+      const el = document.createElement('div');
+      el.textContent = 'Valid text';
+      expect(isSelectableTextRoot(el)).toBe(true);
+
+      const noTranslate = document.createElement('div');
+      noTranslate.className = TRANSLATION_HTML.NO_TRANSLATE_CLASS;
+      const child = document.createElement('span');
+      child.textContent = 'Valid text';
+      noTranslate.appendChild(child);
+      document.body.appendChild(noTranslate);
+      expect(isSelectableTextRoot(child)).toBe(false);
+      document.body.removeChild(noTranslate);
     });
   });
 

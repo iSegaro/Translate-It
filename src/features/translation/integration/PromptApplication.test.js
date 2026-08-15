@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import browser from 'webextension-polyfill';
-import { TranslationMode } from '@/shared/config/config.js';
+import { TranslationMode, CONFIG } from '@/shared/config/config.js';
 
 describe('Prompt Application Runtime Audit', () => {
   let mockStorageData = {};
@@ -46,19 +46,34 @@ describe('Prompt Application Runtime Audit', () => {
     });
   });
 
+  const NON_EDITABLE_PROMPTS = new Set([
+    'PROMPT_BASE_SELECT',
+    'PROMPT_BASE_BATCH',
+    'PROMPT_BASE_AI_BATCH',
+    'PROMPT_BASE_AI_BATCH_AUTO',
+    'PROMPT_BASE_AI_FOLLOWUP',
+    'PROMPT_BASE_AI_FOLLOWUP_AUTO',
+    'PROMPT_BASE_SCREEN_CAPTURE',
+    'PROMPT_SUBTITLE_BASE',
+    'PROMPT_SUBTITLE_BATCH'
+  ]);
+
   const testPromptApplication = async (promptKey, mode, sourceLang = 'en', targetLang = 'fa') => {
     const marker = `MARKER_${promptKey}`;
     
-    // 1. Inject marker into storage
-    if (promptKey === 'PROMPT_TEMPLATE' || promptKey === 'PROMPT_TEMPLATE_AUTO') {
-        mockStorageData[promptKey] = `${marker} instructions $_{SOURCE} $_{TARGET} $_{TEXT}`;
-    } else if (promptKey.includes('BASE')) {
-        mockStorageData[promptKey] = `${marker} wrapper $_{PROMPT_INSTRUCTIONS} $_{TEXT}`;
-        if (promptKey === 'PROMPT_BASE_DICTIONARY') {
-            mockStorageData[promptKey] = `${marker} dict $_{SOURCE} $_{TARGET} $_{TEXT}`;
-        }
-    } else {
-        mockStorageData[promptKey] = `${marker} custom $_{SOURCE} $_{TARGET}`;
+    // 1. Inject marker into storage for editable prompts only.
+    // Non-editable wrappers are CONFIG-authoritative: stored values are inert.
+    if (!NON_EDITABLE_PROMPTS.has(promptKey)) {
+      if (promptKey === 'PROMPT_TEMPLATE' || promptKey === 'PROMPT_TEMPLATE_AUTO') {
+          mockStorageData[promptKey] = `${marker} instructions $_{SOURCE} $_{TARGET} $_{TEXT}`;
+      } else if (promptKey.includes('BASE')) {
+          mockStorageData[promptKey] = `${marker} wrapper $_{PROMPT_INSTRUCTIONS} $_{TEXT}`;
+          if (promptKey === 'PROMPT_BASE_DICTIONARY') {
+              mockStorageData[promptKey] = `${marker} dict $_{SOURCE} $_{TARGET} $_{TEXT}`;
+          }
+      } else {
+          mockStorageData[promptKey] = `${marker} custom $_{SOURCE} $_{TARGET}`;
+      }
     }
 
     // 2. Clear cache to force fresh load from mocked storage
@@ -75,8 +90,15 @@ describe('Prompt Application Runtime Audit', () => {
       'ai'
     );
 
-    // 4. Assert marker exists in final assembled prompt
-    expect(systemPrompt).toContain(marker);
+    // 4. Assert applied prompt source
+    if (NON_EDITABLE_PROMPTS.has(promptKey)) {
+      // Non-editable wrapper: stored marker must NOT appear; CONFIG default is applied
+      expect(systemPrompt).not.toContain(marker);
+      expect(systemPrompt).toContain(CONFIG[promptKey].split('$_{')[0].trim());
+    } else {
+      // Editable prompt: stored marker is applied
+      expect(systemPrompt).toContain(marker);
+    }
     return systemPrompt;
   };
 
@@ -109,7 +131,7 @@ describe('Prompt Application Runtime Audit', () => {
     const baseMarker = "MARKER_SUBTITLE_BASE";
     
     mockStorageData.PROMPT_SUBTITLE_USER = `${userMarker} rules $_{SOURCE} $_{TARGET}`;
-    mockStorageData.PROMPT_SUBTITLE_BASE = `${baseMarker} wrapper $_{PROMPT_INSTRUCTIONS} $_{TEXT}`;
+    // PROMPT_SUBTITLE_BASE is non-editable: stored value must stay inert, CONFIG is applied.
 
     const { storageManager } = await import('@/shared/storage/core/StorageCore.js');
     const { 
@@ -147,8 +169,10 @@ describe('Prompt Application Runtime Audit', () => {
       metadata
     );
 
-    expect(systemPrompt).toContain(baseMarker);
     expect(systemPrompt).toContain(userMarker);
+    // Non-editable base wrapper: stored marker must NOT appear, CONFIG default applied
+    expect(systemPrompt).not.toContain(baseMarker);
+    expect(systemPrompt).toContain(CONFIG.PROMPT_SUBTITLE_BASE.split('$_{')[0].trim());
   });
 
   it('applies PROMPT_BASE_SCREEN_CAPTURE even if locked in UI', async () => {

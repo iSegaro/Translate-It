@@ -28,6 +28,10 @@ export class HoverPreviewLookup {
     return this.lookup.get(node);
   }
 
+  delete(node) {
+    if (node) this.lookup.delete(node);
+  }
+
   /**
    * Clear all lookups (manual cleanup if needed)
    */

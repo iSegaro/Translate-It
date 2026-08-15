@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { BlockGroupReconstructor } from './BlockGroupReconstructor.js';
+import { BlockGroupReconstructor, BlockGroupMutationFailure } from './BlockGroupReconstructor.js';
 import { TranslationUnit } from '@/features/translation/ir/TranslationUnit.js';
 
 
@@ -128,6 +128,19 @@ describe('BlockGroupReconstructor', () => {
       expect(() => BlockGroupReconstructor.splitTranslatedBlock(mismatched, units, 's123', 'xyz')).toThrow(/Segment count mismatch/);
     });
 
+    it('rejects localized digits inside a segment marker', () => {
+      const translated = 'A @@TI_SEG_xyz_s123_n۲@@ B @@TI_SEG_xyz_s123_n3@@ C';
+
+      expect(() => BlockGroupReconstructor.splitTranslatedBlock(translated, units, 's123', 'xyz')).toThrow(/Segment count mismatch/);
+    });
+
+    it('allows localized digits after a completed segment marker', () => {
+      const translated = 'A @@TI_SEG_xyz_s123_n2@@۲۴۳@@TI_SEG_xyz_s123_n3@@ C';
+      const segments = BlockGroupReconstructor.splitTranslatedBlock(translated, units, 's123', 'xyz');
+
+      expect(segments[1].text).toBe('۲۴۳');
+    });
+
     it('should reject foreign session IDs', () => {
       const translated = 'مرحبا @@TI_SEG_abc_n2@@بالعالم@@TI_SEG_abc_n3@@.';
       expect(() => BlockGroupReconstructor.splitTranslatedBlock(translated, units, 'def')).toThrow();
@@ -142,13 +155,52 @@ describe('BlockGroupReconstructor', () => {
       const reordered = 'مرحبا @@SEG_n3@@.@@SEG_n2@@بالعالم';
       expect(() => BlockGroupReconstructor.splitTranslatedBlock(reordered, units)).toThrow(/Structural validation failure \(monotonicity\)/);
     });
+
+    it('does not repair a marker-less interval with an expected unit ID', () => {
+      const twoUnits = [
+        { id: 'n1', text: 'A' },
+        { id: 'n2', text: 'B' },
+      ];
+
+      expect(() => BlockGroupReconstructor.splitTranslatedBlock('A B', twoUnits)).toThrow(/Segment count mismatch/);
+    });
   });
 
   describe('Validation Resilience & Unescaping', () => {
+    it('rolls back earlier segments when a later text mutation throws', () => {
+      const originalSecond = textNodes[1].nodeValue;
+      Object.defineProperty(textNodes[1], 'nodeValue', {
+        configurable: true,
+        get: () => originalSecond,
+        set: () => { throw 'group-failure'; }
+      });
+
+      let failure;
+      try {
+        BlockGroupReconstructor.apply(units, 'Uno @@SEG_n2@@Dos@@SEG_n3@@Tres', 'fa', document.body);
+      } catch (error) {
+        failure = error;
+      }
+
+      expect(failure).toBeInstanceOf(BlockGroupMutationFailure);
+      expect(failure.cause).toBe('group-failure');
+      expect(textNodes[0].nodeValue).toBe('Hello ');
+    });
+
+    it('preserves pre-existing translating class on success and failure', () => {
+      const parent = textNodes[0].parentElement;
+      parent.classList.add('ti-translating');
+      const result = BlockGroupReconstructor.apply(units, 'Uno @@SEG_n2@@Dos@@SEG_n3@@Tres', 'fa', document.body);
+      result.transaction.finalize();
+      expect(parent.classList.contains('ti-translating')).toBe(true);
+    });
+
     it('should accept hydration adjustments but reject content changes', () => {
       textNodes[0].nodeValue = 'Hello\u00A0'; // nbsp
       const translated = 'مرحبا @@SEG_n2@@بالعالم@@SEG_n3@@.';
-      expect(BlockGroupReconstructor.apply(units, translated, 'fa', document.body)).toBe(true);
+       const result = BlockGroupReconstructor.apply(units, translated, 'fa', document.body);
+       expect(result.success).toBe(true);
+       expect(result.cleanResult).toBe('مرحبا بالعالم.');
     });
 
     it('should correctly unescape entropy-scoped escaping in apply()', () => {
@@ -178,6 +230,15 @@ describe('BlockGroupReconstructor', () => {
       textNodes[0].nodeValue = 'Helloworld'; // Space removed
       const translated = 'مرحبا @@SEG_n2@@بالعالم@@SEG_n3@@.';
       expect(() => BlockGroupReconstructor.apply(units, translated, 'fa', document.body)).toThrow();
+    });
+
+    it.each([
+      ['@@SEG_n2@@world@@SEG_n3@@.'],
+      ['مرحبا @@SEG_n2@@   @@SEG_n3@@.'],
+    ])('rejects invalid translated segment content before mutation', (translated) => {
+      const originals = textNodes.map(node => node.nodeValue);
+      expect(() => BlockGroupReconstructor.apply(units, translated, 'fa', document.body)).toThrow(/Invalid translated segment content/);
+      expect(textNodes.map(node => node.nodeValue)).toEqual(originals);
     });
   });
 
@@ -242,7 +303,7 @@ describe('BlockGroupReconstructor', () => {
   describe('Invisible Character Defenses', () => {
     it('should normalize markers containing ZWSP but preserve ZWSP in content', () => {
       // Marker has ZWSP (\u200b) injected by model
-      const translated = 'مرحبا @@SEG\u200b_n2@@\u200bبالعالم@@SEG_n3@@';
+      const translated = 'مرحبا @@SEG\u200b_n2@@\u200bبالعالم@@SEG_n3@@.';
       
       // Sanitization happens in apply(), so we test it here
       BlockGroupReconstructor.apply(units, translated, 'fa', document.body);

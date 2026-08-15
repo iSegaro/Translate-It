@@ -201,6 +201,7 @@ export class WindowsManager extends ResourceTracker {
 
   destroy() {
     this.cleanup();
+    if (this.eventCoordinator?.cleanup) this.eventCoordinator.cleanup();
     this.eventCoordinator = null;
     this.displayManager = null;
     this.dismissalManager = null;

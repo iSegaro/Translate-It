@@ -15,8 +15,14 @@ import { sendRegularMessage } from './UnifiedMessaging.js';
 import { MessageActions } from './MessageActions.js';
 import { matchErrorToType } from '@/shared/error-management/ErrorMatcher.js';
 import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
+import { TRANSLATION_BATCH_EXECUTION_TIMEOUT_MS } from '@/shared/constants/translation.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.MESSAGING, 'UnifiedTranslationCoordinator');
+
+// Transport/streaming allowance added on top of the canonical batch execution
+// budget. Local to Content messaging/transport policy: covers final stream-end
+// delivery and Content-side result handling, not provider execution.
+const STRUCTURED_TRANSPORT_ALLOWANCE_MS = 30000;
 
 export class UnifiedTranslationCoordinator {
   constructor() {
@@ -244,7 +250,7 @@ export class UnifiedTranslationCoordinator {
    * @param {string} messageId - Message ID
    * @param {string} reason - Cancellation reason
    */
-  cancelTranslation(messageId, reason = 'User cancelled', timeout = false) {
+  cancelTranslation(messageId, reason = 'User cancelled', timeout = false, timeoutType) {
     if (!messageId) return false;
     const translation = this.activeTranslations.get(messageId);
     if (!translation) {
@@ -254,14 +260,18 @@ export class UnifiedTranslationCoordinator {
     logger.debug(`Cancelling translation: ${messageId} (${translation.type})`);
 
     if (translation.type === 'streaming') {
-      streamingTimeoutManager.cancelStreaming(messageId, reason);
+      if (timeoutType) {
+        streamingTimeoutManager.cancelStreaming(messageId, reason, timeout, timeoutType);
+      } else {
+        streamingTimeoutManager.cancelStreaming(messageId, reason, timeout);
+      }
     }
 
     // Notify background to stop translation immediately
     // We don't await this as we want the content-side cancellation to be immediate
     sendRegularMessage({
       action: MessageActions.CANCEL_TRANSLATION,
-      data: { messageId, reason, timeout }
+      data: { messageId, reason, timeout, ...(timeoutType && { timeoutType }) }
     }).catch(err => {
       // Log at debug level as this is often due to extension context invalidation during cancellation
       logger.debug(`Cancellation message to background failed for ${messageId}:`, err.message);
@@ -339,10 +349,19 @@ export class UnifiedTranslationCoordinator {
 
     // Enhanced timeouts for Select Element mode - allow longer processing times
     const isSelectElementMode = data?.mode === 'select_element' || data?.mode === 'select-element' || data?.options?.mode === 'select_element';
+    const isStructuredSelectElement = isSelectElementMode && data?.options?.rawJsonPayload === true;
 
     let initialTimeout, progressTimeout, gracePeriod;
 
-    if (isSelectElementMode) {
+    if (isStructuredSelectElement) {
+      // Structured Select Element emits no progress while its single provider batch is in flight.
+      // Keep every Content-side watchdog beyond the authoritative batch deadline.
+      const executionDeadline = Math.max(customTimeout || 0, TRANSLATION_BATCH_EXECUTION_TIMEOUT_MS);
+      const transportWatchdog = executionDeadline + STRUCTURED_TRANSPORT_ALLOWANCE_MS;
+      initialTimeout = transportWatchdog;
+      progressTimeout = transportWatchdog;
+      gracePeriod = STRUCTURED_TRANSPORT_ALLOWANCE_MS;
+    } else if (isSelectElementMode) {
       // Select Element mode needs much longer timeouts due to batching and API delays.
       // We align this with the system retries (2x60s) but add a generous buffer for network overhead.
       const baseTimeout = Math.max(180000, segmentCount * 6000); // 6s per segment, min 180s
@@ -359,6 +378,7 @@ export class UnifiedTranslationCoordinator {
 
     logger.debug(`Streaming timeouts calculated:`, {
       mode: isSelectElementMode ? 'select-element' : 'regular',
+      structured: isStructuredSelectElement,
       segments: segmentCount,
       textLength,
       initialTimeout,
@@ -378,13 +398,13 @@ export class UnifiedTranslationCoordinator {
    * Handle streaming timeout
    * @private
    */
-  _handleStreamingTimeout(messageId) {
+  _handleStreamingTimeout(messageId, timeoutError) {
     if (!messageId) return;
     logger.warn(`Handling streaming timeout for: ${messageId}`);
 
     const translation = this.activeTranslations.get(messageId);
     if (translation) {
-      this.cancelTranslation(messageId, 'Streaming translation timed out', true);
+      this.cancelTranslation(messageId, 'Streaming translation timed out', true, timeoutError?.timeoutType);
     }
   }
 

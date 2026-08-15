@@ -5,7 +5,18 @@ import {
   getApiKeyAsync, 
   getDebugModeAsync,
   TranslationMode,
-  IsDebug 
+  IsDebug,
+  getPromptBASESelectAsync,
+  getPromptBASEBatchAsync,
+  getPromptBASEAIBatchAsync,
+  getPromptBASEAIBatchAutoAsync,
+  getPromptBASEAIFollowupAsync,
+  getPromptBASEAIFollowupAutoAsync,
+  getPromptSubtitleBaseAsync,
+  getPromptSubtitleBatchAsync,
+  getPromptBASEScreenCaptureAsync,
+  getPromptAsync,
+  getPromptBASEFieldAsync
 } from './config.js';
 import { storageManager } from '../storage/core/StorageCore.js';
 
@@ -58,6 +69,15 @@ describe('Config Module', () => {
     it('should have basic app info in CONFIG', () => {
       expect(CONFIG.APP_NAME).toBe('Translate It');
     });
+
+    it.each(['PROMPT_BASE_AI_BATCH', 'PROMPT_BASE_AI_BATCH_AUTO'])(
+      '%s documents the runtime segment marker protocol',
+      (key) => {
+        expect(CONFIG[key]).toContain('@@TI_SEG_');
+        expect(CONFIG[key]).toContain('@@TI_SEG_xxx_session_n5@@');
+        expect(CONFIG[key]).not.toContain('[--SEG:nN--]');
+      }
+    );
   });
 
   describe('Async Getters', () => {
@@ -115,6 +135,53 @@ describe('Config Module', () => {
       const settings = await getSettingsAsync();
       expect(settings.APP_NAME).toBe(CONFIG.APP_NAME);
       expect(settings.THEME).toBe(CONFIG.THEME);
+    });
+  });
+
+  describe('Prompt Getters', () => {
+    const NON_EDITABLE_GETTERS = [
+      ['PROMPT_BASE_SELECT', getPromptBASESelectAsync],
+      ['PROMPT_BASE_BATCH', getPromptBASEBatchAsync],
+      ['PROMPT_BASE_AI_BATCH', getPromptBASEAIBatchAsync],
+      ['PROMPT_BASE_AI_BATCH_AUTO', getPromptBASEAIBatchAutoAsync],
+      ['PROMPT_BASE_AI_FOLLOWUP', getPromptBASEAIFollowupAsync],
+      ['PROMPT_BASE_AI_FOLLOWUP_AUTO', getPromptBASEAIFollowupAutoAsync],
+      ['PROMPT_SUBTITLE_BASE', getPromptSubtitleBaseAsync],
+      ['PROMPT_SUBTITLE_BATCH', getPromptSubtitleBatchAsync],
+      ['PROMPT_BASE_SCREEN_CAPTURE', getPromptBASEScreenCaptureAsync]
+    ];
+
+    it.each(NON_EDITABLE_GETTERS)(
+      'non-editable getter %s returns CONFIG and ignores stale storage',
+      async (key, getter) => {
+        storageManager.get.mockResolvedValue({ [key]: 'STALE_STORED_VALUE' });
+
+        const result = await getter();
+
+        expect(result).toBe(CONFIG[key]);
+        expect(storageManager.get).not.toHaveBeenCalled();
+      }
+    );
+
+    it('editable getter honors custom stored value', async () => {
+      const customPrompt = 'My custom template $_{SOURCE} $_{TARGET} $_{TEXT}';
+      storageManager.get.mockResolvedValue({ PROMPT_TEMPLATE: customPrompt });
+
+      const result = await getPromptAsync();
+
+      expect(result).toBe(customPrompt);
+      expect(storageManager.get).toHaveBeenCalledWith(
+        { PROMPT_TEMPLATE: CONFIG.PROMPT_TEMPLATE }
+      );
+    });
+
+    it('editable base field getter honors custom stored value', async () => {
+      const customPrompt = 'My custom base $_{PROMPT_INSTRUCTIONS} $_{TEXT}';
+      storageManager.get.mockResolvedValue({ PROMPT_BASE_FIELD: customPrompt });
+
+      const result = await getPromptBASEFieldAsync();
+
+      expect(result).toBe(customPrompt);
     });
   });
 });

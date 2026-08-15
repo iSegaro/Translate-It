@@ -55,7 +55,7 @@ export class TranslationEngine {
   /**
    * Handle translation request messages
    */
-  async handleTranslateMessage(request, sender) {
+  async handleTranslateMessage(request, sender, executionContext = null) {
     if (!request || typeof request !== "object") {
       throw new Error(`Invalid request: expected object, got ${typeof request}`);
     }
@@ -85,7 +85,7 @@ export class TranslationEngine {
     }
 
     try {
-      const result = await this.executeTranslation(data, sender, context);
+      const result = await this.executeTranslation(data, sender, context, executionContext);
 
       if (!result || typeof result !== "object") {
         throw new Error(`Translation failed: invalid result format (${typeof result})`);
@@ -106,7 +106,7 @@ export class TranslationEngine {
   /**
    * Core translation execution logic with streaming and JSON optimization support
    */
-  async executeTranslation(data, sender, uiContext = 'unknown') {
+  async executeTranslation(data, sender, uiContext = 'unknown', executionContext = null) {
     const { text, provider, sourceLanguage, targetLanguage } = data;
     let { mode } = data;
 
@@ -142,7 +142,7 @@ export class TranslationEngine {
     const isPdfJson = mode === TranslationMode.PDF && data.options?.rawJsonPayload;
     if (isSelectJson || isPdfJson) {
       logger.debug('[TranslationEngine] Using optimized structured batch strategy for provider:', provider);
-      return await this.jsonHandler.execute(this, data, providerInstance, originalSourceLang, originalTargetLang, data.messageId, sender, uiContext);
+      return await this.jsonHandler.execute(this, data, providerInstance, originalSourceLang, originalTargetLang, data.messageId, sender, uiContext, executionContext);
     }
 
     // 5. Standard execution via ProviderCoordinator
@@ -156,16 +156,36 @@ export class TranslationEngine {
       sessionId: data.sessionId || data.messageId,
       textLength: text.length,
       engine: this,
-      sender: sender
+       sender: sender,
+       executionContext
     });
 
-    // CRITICAL: Defensive check if coordinator returned a raw string (fallback case)
+    // Coordinator contract: returns a successful unified result OR throws.
+    // Do NOT infer success from a raw string / missing success flag - that would be
+    // silent success. These guards keep the contract loud.
     if (typeof result === 'string') {
-      result = { translatedText: result, success: true };
+      const invalidResult = new Error('Translation result was a raw string instead of a unified response');
+      invalidResult.type = ErrorTypes.TRANSLATION_FAILED;
+      throw invalidResult;
+    }
+
+    if (result.success === false) {
+      const failed = new Error(result.error?.message || 'Translation failed');
+      failed.type = result.error?.type || matchErrorToType(result.error);
+      throw failed;
     }
 
     // Extract values from the unified coordinator response
     const { translatedText, detectedLanguage, targetLanguage: finalTargetLanguage, sourceLanguage: finalSourceLanguage } = result;
+
+    // An empty string also represents "no translation". Earlier normalization
+    // layers may convert missing provider output into "", so treat it the same
+    // as null/undefined to avoid classifying an empty translation as success.
+    if (translatedText === null || translatedText === undefined || translatedText === '') {
+      const emptyResult = new Error('Translation returned no text');
+      emptyResult.type = ErrorTypes.TRANSLATION_FAILED;
+      throw emptyResult;
+    }
 
     // Resolve the final source language, prioritizing the detected one if the requested one was 'auto'
     const resolvedSourceLanguage = (finalSourceLanguage === 'auto' || !finalSourceLanguage) 
@@ -175,7 +195,7 @@ export class TranslationEngine {
     return {
       success: true,
       translatedText: translatedText,
-      streaming: typeof result === 'object' && result?.streaming, 
+      streaming: result.streaming,
       provider,
       sourceLanguage: resolvedSourceLanguage, 
       targetLanguage: finalTargetLanguage || targetLanguage, // Use swapped target language if available
@@ -267,7 +287,9 @@ export class TranslationEngine {
 
   // --- Delegation Methods ---
   
-  async cancelTranslation(messageId) { return await this.lifecycleRegistry.cancelTranslation(messageId); }
+  async cancelTranslation(messageId, timeout = false, timeoutType, reason) {
+    return await this.lifecycleRegistry.cancelTranslation(messageId, timeout, timeoutType, reason);
+  }
   async cancelAllTranslations(context = null) { return await this.lifecycleRegistry.cancelAllTranslations(context); }
   getActiveTranslationIds(context = null) { return this.lifecycleRegistry.getActiveTranslationIds(context); }
   getAbortController(messageId) { return this.lifecycleRegistry.getAbortController(messageId); }
@@ -297,5 +319,9 @@ export class TranslationEngine {
    */
   createIntelligentBatches(segments, baseBatchSize, maxCharsPerBatch) {
     return TranslationBatcher.createIntelligentBatches(segments, baseBatchSize, maxCharsPerBatch);
+  }
+
+  createIntelligentMembershipBatches(segments, manifestUnits, baseBatchSize, maxCharsPerBatch) {
+    return TranslationBatcher.createIntelligentMembershipBatches(segments, manifestUnits, baseBatchSize, maxCharsPerBatch);
   }
 }

@@ -19,3 +19,10 @@ export const TRANSLATION_STATUS = {
   COMPLETED: 'completed',
   ERROR: 'error'
 };
+
+// ===== TRANSLATION EXECUTION BUDGET =====
+// Per-batch execution budget for ONE provider batch call. This is a batch
+// attempt budget, NOT a universal translation/request timeout: each batch
+// attempt (and each retry attempt) receives its own fresh budget. Structured
+// (Select Element/PDF) and generic (Page/Subtitle) batch guards share it.
+export const TRANSLATION_BATCH_EXECUTION_TIMEOUT_MS = 300000;

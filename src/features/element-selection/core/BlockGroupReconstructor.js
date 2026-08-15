@@ -2,9 +2,17 @@ import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { hoverPreviewLookup } from '@/features/shared/hover-preview/HoverPreviewLookup.js';
 import { PAGE_TRANSLATION_ATTRIBUTES } from '@/features/page-translation/PageTranslationConstants.js';
-import { detectDirectionFromContent, applyNodeDirection, BIDI_MARKS } from '@/utils/dom/DomDirectionManager.js';
+import { detectDirectionFromContent, applyNodeDirection, captureNodeDirectionState, restoreNodeDirectionState, BIDI_MARKS } from '@/utils/dom/DomDirectionManager.js';
+import { parseV3Intervals } from '@/features/translation/core/V3IntervalParser.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.ELEMENT_SELECTION, 'BlockGroupReconstructor');
+
+export class BlockGroupMutationFailure {
+  constructor(cause, rollbackFailures = []) {
+    this.cause = cause;
+    this.rollbackFailures = rollbackFailures;
+  }
+}
 
 /**
  * Escapes a string for use in a RegExp.
@@ -74,44 +82,15 @@ export class BlockGroupReconstructor {
       throw new Error('Translated text is empty or invalid');
     }
 
-    // --- Hardened Deterministic Parser Logic ---
-    let regex;
-    if (sessionId) {
-      const escapedSessionId = escapeRegExp(sessionId);
-      
-      // Strict generator / tolerant parser model:
-      // We allow optional whitespace around delimiters and keywords.
-      // We allow case-insensitivity for 'TI_SEG'.
-      // BUT we require EXACT matches for entropy and sessionId.
-      // segmentId (capture 1) remains exact and case-sensitive.
-      
-      if (entropy) {
-        const escapedEntropy = escapeRegExp(entropy);
-        regex = new RegExp(`@@\\s*TI\\s*_\\s*SEG\\s*_\\s*${escapedEntropy}\\s*_\\s*${escapedSessionId}\\s*_\\s*(n\\d+)\\s*@@`, 'giu');
-      } else {
-        regex = new RegExp(`@@\\s*TI\\s*_\\s*SEG\\s*_\\s*${escapedSessionId}\\s*_\\s*(n\\d+)\\s*@@`, 'giu');
-      }
-    } else {
-      // capture 1: (n\d+)
-      // Plan: @@SEG_<segmentId>@@
-      regex = /@@\s*SEG\s*_\s*(n\d+)\s*@@/giu;
-    }
-
-    const parts = translatedText.split(regex);
-    const segments = [];
-    
-    // The first part is always the text before the first marker (segment n1)
-    segments.push({
-      id: expectedUnits[0].id,
-      text: parts[0] || ''
+    const parsed = parseV3Intervals(translatedText, {
+      sessionId,
+      entropy,
+      grammar: sessionId ? 'ti' : 'legacy',
     });
-
-    // Subsequent parts come in pairs: [segmentId, textAfterMarker]
-    for (let i = 1; i < parts.length; i += 2) {
-      const id = parts[i];
-      const text = parts[i + 1] || '';
-      segments.push({ id, text });
-    }
+    const segments = parsed.intervals.map((interval, index) => ({
+      id: index === 0 ? expectedUnits[0]?.id : interval.markerId,
+      text: interval.text || '',
+    }));
 
     // --- Deterministic Structural Validation Gates ---
     
@@ -188,6 +167,13 @@ export class BlockGroupReconstructor {
 
     const parsedSegments = this.splitTranslatedBlock(sanitizedText, expectedUnits, sessionId, entropy);
 
+    if (parsedSegments.some((segment, index) => (
+      typeof segment.text !== 'string' || !segment.text.trim() ||
+      typeof expectedUnits[index]?.text !== 'string' || !expectedUnits[index].text.trim()
+    ))) {
+      throw new Error('Invalid translated segment content');
+    }
+
     // --- Preparation Phase (Calculate everything before DOM mutations) ---
     const commitPlan = [];
     const unescapeReplacement = '@@';
@@ -226,13 +212,64 @@ export class BlockGroupReconstructor {
       commitPlan.push({
         unit,
         finalValue,
-        originalText: unit.node.textContent
+        originalText: unit.node.textContent,
       });
     }
 
     // --- Mutation Phase (Synchronous DOM writes) ---
     const firstNodeParent = expectedUnits[0].node.parentElement;
-    
+    const attributeParents = new Map();
+    const directionSnapshots = [];
+    const directionElements = new Set();
+    const hoverSnapshots = commitPlan.map(({ unit }) => ({ node: unit.node, value: hoverPreviewLookup.get(unit.node) }));
+    for (const { unit } of commitPlan) {
+      const parentElement = unit.node.parentElement;
+      if (parentElement && !attributeParents.has(parentElement)) {
+        attributeParents.set(parentElement, {
+          present: parentElement.hasAttribute(PAGE_TRANSLATION_ATTRIBUTES.HAS_ORIGINAL),
+          value: parentElement.getAttribute(PAGE_TRANSLATION_ATTRIBUTES.HAS_ORIGINAL),
+        });
+      }
+      for (const snapshot of captureNodeDirectionState(unit.node, rootElement)) {
+        if (!directionElements.has(snapshot.element)) {
+          directionElements.add(snapshot.element);
+          directionSnapshots.push(snapshot);
+        }
+      }
+    }
+    const hadTranslatingClass = firstNodeParent?.classList.contains('ti-translating') || false;
+    let active = true;
+    const restoreTranslatingClass = () => {
+      if (!firstNodeParent) return;
+      if (hadTranslatingClass) firstNodeParent.classList.add('ti-translating');
+      else firstNodeParent.classList.remove('ti-translating');
+    };
+    const rollback = () => {
+      if (!active) return [];
+      active = false;
+      const failures = [];
+      for (const task of [...commitPlan].reverse()) {
+        try { task.unit.node.nodeValue = task.originalText; }
+        catch (error) { failures.push({ kind: 'text', id: task.unit.id, error }); }
+      }
+      for (const [element, state] of attributeParents) {
+        try {
+          if (state.present) element.setAttribute(PAGE_TRANSLATION_ATTRIBUTES.HAS_ORIGINAL, state.value);
+          else element.removeAttribute(PAGE_TRANSLATION_ATTRIBUTES.HAS_ORIGINAL);
+        } catch (error) { failures.push({ kind: 'attribute', element, error }); }
+      }
+      failures.push(...restoreNodeDirectionState(directionSnapshots));
+      for (const { node, value } of hoverSnapshots) {
+        try {
+          if (value === undefined) hoverPreviewLookup.delete(node);
+          else hoverPreviewLookup.add(node, value);
+        } catch (error) { failures.push({ kind: 'hover', node, error }); }
+      }
+      try { restoreTranslatingClass(); }
+      catch (error) { failures.push({ kind: 'class', element: firstNodeParent, error }); }
+      return failures;
+    };
+
     try {
       if (firstNodeParent) {
         firstNodeParent.classList.add('ti-translating');
@@ -249,12 +286,19 @@ export class BlockGroupReconstructor {
         task.unit.node.nodeValue = task.finalValue;
         applyNodeDirection(task.unit.node, targetLanguage, rootElement);
       }
+      restoreTranslatingClass();
 
-      return true;
-    } finally {
-      if (firstNodeParent) {
-        firstNodeParent.classList.remove('ti-translating');
-      }
+      return {
+        success: true,
+        cleanResult: parsedSegments.map(segment => segment.text).join(''),
+        segments: parsedSegments,
+        transaction: {
+          rollback,
+          finalize() { active = false; },
+        },
+      };
+    } catch (error) {
+      throw new BlockGroupMutationFailure(error, rollback());
     }
   }
 }

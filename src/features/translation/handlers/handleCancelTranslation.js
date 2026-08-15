@@ -5,6 +5,8 @@ import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { streamingManager } from "../core/StreamingManager.js";
 import { translationRequestTracker } from '@/core/services/translation/TranslationRequestTracker.js';
 import { dispatchTranslationCancellation } from '@/core/services/translation/UnifiedResultDispatcher.js';
+import { unifiedTranslationService } from '@/core/services/translation/UnifiedTranslationService.js';
+import { ActionReasons } from '@/shared/messaging/core/MessagingCore.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.TRANSLATION, 'handleCancelTranslation');
 
@@ -32,7 +34,7 @@ export async function handleCancelTranslation(request, sender) {
     }
 
     // Cancel operations with proper order: Engine → Streaming → RateLimit
-    const { cancelAll, reason, context, sessionId, timeout } = request.data || {};
+    const { cancelAll, reason, context, sessionId, timeout, timeoutType } = request.data || {};
     const tabId = sender?.tab?.id;
     
     // Step 1: Identify messageIds to cancel
@@ -70,25 +72,59 @@ export async function handleCancelTranslation(request, sender) {
     const { queueManager } = await import("../core/QueueManager.js");
     const { rateLimitManager } = await import("../core/RateLimitManager.js");
 
+    const resolvedReason = reason ?? (timeout ? 'Translation timed out' : ActionReasons.USER_CANCELLED);
+
     const results = await Promise.allSettled(messageIdsToCancel.map(async (id) => {
       let cancelled = false;
-      const cancellation = timeout
-        ? translationRequestTracker.markTimeout(id)
-        : translationRequestTracker.cancelRequest(id, reason || 'Translation cancelled by user');
-      if (timeout && !cancellation.accepted) return false;
-      if (cancellation.accepted && !timeout) {
+
+      if (timeout) {
         try {
-          await dispatchTranslationCancellation({ messageId: id, request: cancellation.request });
-        } catch { /* continue exact-ID cleanup */ }
+          const timeoutResult = await unifiedTranslationService.handleTimeout(
+            id,
+            resolvedReason,
+            timeoutType
+          );
+          cancelled = timeoutResult.success;
+          if (timeoutResult.handled && !timeoutResult.success) return false;
+        } catch { /* continue remaining exact-ID cleanup */ }
+      } else {
+        // Delegate service ownership first; fall back only when unhandled.
+        let delegatedResult;
+        try {
+          delegatedResult = await unifiedTranslationService.cancelRequest(
+            id,
+            resolvedReason,
+          );
+        } catch {
+          delegatedResult = { handled: false, success: false };
+        }
+
+        if (delegatedResult.handled) {
+          cancelled = delegatedResult.success;
+          if (!delegatedResult.success) {
+            // Preserve abort-always behavior; never touch tracker/dispatch again.
+            try {
+              await translationEngine.cancelTranslation(id);
+            } catch { /* continue remaining exact-ID cleanup */ }
+          }
+        } else {
+          // Legacy fallback for non-service / engine-only / unknown requests.
+          const cancellation = translationRequestTracker.cancelRequest(id, resolvedReason);
+          if (cancellation.accepted) {
+            try {
+              await dispatchTranslationCancellation({ messageId: id, request: cancellation.request });
+            } catch { /* continue exact-ID cleanup */ }
+          }
+          try {
+            cancelled = await translationEngine.cancelTranslation(id);
+          } catch { /* continue remaining exact-ID cleanup */ }
+        }
       }
-      try {
-        cancelled = await translationEngine.cancelTranslation(id);
-      } catch { /* continue remaining exact-ID cleanup */ }
 
       await Promise.allSettled([
         Promise.resolve().then(() => streamingManager.cancelStream(
           id,
-          reason || 'Translation cancelled by user'
+          resolvedReason
         )),
         Promise.resolve().then(() => rateLimitManager.clearPendingRequests(id)),
         Promise.resolve().then(() => queueManager.cancelByMessageId(id))

@@ -14,13 +14,26 @@ import {
   getSelectionMaxCharsAsync,
   getSelectElementMaxCharsAsync
 } from '@/shared/config/config.js';
-import { MessageFormat, MessageContexts } from '@/shared/messaging/core/MessagingCore.js';
-import { translationRequestTracker } from './TranslationRequestTracker.js';
+import { MessageFormat, MessageContexts, ActionReasons } from '@/shared/messaging/core/MessagingCore.js';
+import { RequestStatus, translationRequestTracker } from './TranslationRequestTracker.js';
 import { UnifiedResultDispatcher } from './UnifiedResultDispatcher.js';
 import { UnifiedModeCoordinator } from './UnifiedModeCoordinator.js';
 import { statsManager } from '@/features/translation/core/TranslationStatsManager.js';
 import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
 import { isEligibleForDictionaryUpgrade } from '@/features/translation/utils/translationModeHelper.js';
+import {
+  appendTranslationDiagnostic,
+  createTranslationOperation,
+  deriveRecoverySummary,
+  finalizeTranslationOperation,
+} from '@/features/translation/ir/TranslationOperation.js';
+import { createManifestView, createRequestUnitManifest } from '@/features/translation/ir/RequestUnitManifest.js';
+import { TerminalExecutionRouter } from '@/features/translation/ir/TerminalExecutionRouter.js';
+import { TranslationCallPurpose, isProviderType, registryIdToName, ProviderTypes } from '@/features/translation/providers/ProviderConstants.js';
+import { AIConversationHelper } from '@/features/translation/providers/utils/AIConversationHelper.js';
+import { ConversationAcceptanceHandoff } from '@/features/translation/conversation/ConversationAcceptanceHandoff.js';
+import { ConversationAcceptanceHandle } from '@/features/translation/conversation/ConversationAcceptanceHandle.js';
+import { ConversationAcceptanceCoordinator } from '@/features/translation/conversation/ConversationAcceptanceCoordinator.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.TRANSLATION, 'UnifiedTranslationService');
 
@@ -29,9 +42,12 @@ export class UnifiedTranslationService {
     this.requestTracker = translationRequestTracker;
     this.resultDispatcher = new UnifiedResultDispatcher();
     this.modeCoordinator = new UnifiedModeCoordinator();
+    this.conversationAcceptanceCoordinator = new ConversationAcceptanceCoordinator();
 
     this.translationEngine = null;
     this.backgroundService = null;
+    this._operations = new WeakMap();
+    this._diagnosticReports = new WeakMap();
 
     logger.info('UnifiedTranslationService initialized');
   }
@@ -168,31 +184,99 @@ export class UnifiedTranslationService {
         throw new Error('Translation request registration failed');
       }
 
+      const requestUnitManifest = createRequestUnitManifest(data?.text);
+      const operation = createTranslationOperation(messageId, requestUnitManifest);
+      const parentMetadata = Array.isArray(data?.conversationParents) ? data.conversationParents : [];
+      const providerName = registryIdToName(data?.provider);
+      const participates = await AIConversationHelper.getConversationParticipation({
+        callPurpose: TranslationCallPurpose.PRIMARY_TRANSLATION,
+        translateMode: data?.mode,
+        sessionId: request.data?.sessionId,
+        isAIProvider: isProviderType(providerName, ProviderTypes.AI),
+      });
+      if (parentMetadata.length > 0 && participates) {
+        operation.registerParentCandidates(parentMetadata.map((parent, sourceOrder) => ({
+          ...parent,
+          sourceOrder,
+          sessionId: request.data?.sessionId,
+          provider: providerName,
+          mode: data.mode,
+          callPurpose: TranslationCallPurpose.PRIMARY_TRANSLATION,
+          conversationParticipates: participates,
+        })));
+      }
+      const executionContext = {
+        operation,
+        manifestView: createManifestView(requestUnitManifest),
+        onTerminalUnitsAccepted: TerminalExecutionRouter.createTerminalUnitsObserver(operation),
+      };
+      this._setOperation(request, executionContext.operation);
+      // Authoritative participation decision: true only when a
+      // ConversationAcceptanceHandle was actually registered for this request.
+      // The consuming feature gates parent acceptance ACK emission on this value.
+      const conversationAcceptanceRegistered = this._registerConversationAcceptance(request, executionContext, providerName, participates);
+
       let result;
       try {
         result = await this.modeCoordinator.processRequest(request, {
           translationEngine: this.translationEngine,
-          backgroundService: this.backgroundService
+          backgroundService: this.backgroundService,
+          executionContext
         });
       } catch (error) {
         logger.debug('Request failed:', error.message);
-        const transition = error.type === 'TIMEOUT'
+        const isTimeout = error.type === ErrorTypes.TRANSLATION_TIMEOUT || error.type === 'TIMEOUT';
+        const transition = isTimeout
           ? this.requestTracker.markTimeout(messageId)
           : this.requestTracker.failRequest(messageId, error);
-        if (!transition.accepted) return this._createSuppressedResponse(messageId, transition);
+        if (!transition.accepted) {
+          this.conversationAcceptanceCoordinator.remove(messageId);
+          return this._createSuppressedResponse(messageId, transition);
+        }
+        this.conversationAcceptanceCoordinator.remove(messageId);
+        if (isTimeout) {
+          await this._finalizeAcceptedTimeout(request, messageId, error.message);
+        } else {
+          this._finalizeDiagnostics(request, executionContext, {
+            type: 'OPERATION_FAILED',
+            stage: 'service',
+            reason: error.message,
+            code: error.type,
+          });
+        }
         return MessageFormat.createErrorResponse(error, messageId);
       }
 
+      // Propagate the authoritative conversation acceptance decision to the
+      // requesting feature so ACK emission mirrors registration exactly.
+      if (result && typeof result === 'object') {
+        result.conversationAcceptance = conversationAcceptanceRegistered;
+      }
+
       const transition = this.requestTracker.completeRequest(messageId, result);
-      if (!transition.accepted) return this._createSuppressedResponse(messageId, transition);
+      if (!transition.accepted) {
+        this.conversationAcceptanceCoordinator.remove(messageId);
+        return this._createSuppressedResponse(messageId, transition);
+      }
+      TerminalExecutionRouter.routeTerminalExecution(executionContext.operation, { status: transition.status });
+      this._finalizeDiagnostics(request, executionContext, {
+        type: transition.status === RequestStatus.FAILED ? 'OPERATION_FAILED' : 'OPERATION_COMPLETED',
+        stage: 'service',
+        ...(transition.status === RequestStatus.FAILED && {
+          reason: typeof result.error === 'object' ? result.error?.message : result.error,
+          code: typeof result.error === 'object' ? result.error?.type : undefined,
+        }),
+      });
 
       // Special handling for Field mode (direct return)
       if (request.mode === TranslationMode.Field) return result;
 
       try {
         await this.resultDispatcher.dispatchResult({ messageId, result, request, originalMessage: message });
+        this.conversationAcceptanceCoordinator.activate(messageId);
       } catch (error) {
         logger.error('Result dispatch failed:', error.message);
+        this.conversationAcceptanceCoordinator.remove(messageId);
         return MessageFormat.createErrorResponse(error, messageId);
       }
 
@@ -203,9 +287,18 @@ export class UnifiedTranslationService {
 
     } catch (error) {
       logger.debug('Request setup failed:', error.message);
+      this.conversationAcceptanceCoordinator.remove(messageId);
       if (tracked && this.requestTracker.isRequestActive(messageId)) {
         const transition = this.requestTracker.failRequest(messageId, error);
         if (!transition.accepted) return this._createSuppressedResponse(messageId, transition);
+        const request = this.requestTracker.getRequest(messageId);
+        const operation = this._getOperation(request);
+        this._finalizeDiagnostics(request, { operation }, {
+          type: 'OPERATION_FAILED',
+          stage: 'service',
+          reason: error.message,
+          code: error.type,
+        });
       }
       return MessageFormat.createErrorResponse(error, messageId);
     }
@@ -247,19 +340,56 @@ export class UnifiedTranslationService {
   }
 
   /**
-   * Cancel an active request through the engine and notify UI.
+   * Cancel an active service-owned request.
+   * User-cancellation entry point only; timeout stays outside this API.
+   * Returns { handled } so callers can fall back for non-service requests.
    */
-  async cancelRequest(messageId) {
+  async cancelRequest(messageId, reason = ActionReasons.USER_CANCELLED) {
     logger.info(`Cancelling request: ${messageId}`);
     const request = this.requestTracker.getRequest(messageId);
-    if (!request) return { success: false, error: 'Request not found' };
+    if (!request) return { handled: false, success: false, error: 'Request not found' };
 
-    const cancellation = this.requestTracker.cancelRequest(messageId);
-    if (!cancellation.accepted) return { success: false, error: cancellation.reason };
+    const cancellation = this.requestTracker.cancelRequest(messageId, reason);
+    if (!cancellation.accepted) return { handled: true, success: false, error: cancellation.reason };
+
+    this.conversationAcceptanceCoordinator.remove(messageId);
+    const operation = this._getOperation(request);
+    TerminalExecutionRouter.routeTerminalExecution(operation, { status: cancellation.status });
+    this._finalizeDiagnostics(request, { operation }, {
+      type: 'OPERATION_CANCELLED',
+      stage: 'service',
+      reason: cancellation.reason,
+      cancelled: true,
+    });
     if (this.translationEngine) this.translationEngine.cancelTranslation(messageId);
     
     await this.resultDispatcher.dispatchCancellation({ messageId, request });
-    return { success: true };
+    return { handled: true, success: true };
+  }
+
+  async handleTimeout(messageId, reason = 'Translation timed out', timeoutType) {
+    const request = this.requestTracker.getRequest(messageId);
+    if (!request) return { handled: false, success: false, error: 'Request not found' };
+    const timeout = this.requestTracker.markTimeout(messageId);
+    if (!timeout.accepted) return { handled: true, success: false, error: timeout.reason };
+    this.conversationAcceptanceCoordinator.remove(messageId);
+    await this._finalizeAcceptedTimeout(request, messageId, reason, timeoutType);
+    return { handled: true, success: true };
+  }
+
+  async _finalizeAcceptedTimeout(request, messageId, reason, timeoutType) {
+    const operation = this._getOperation(request);
+    this._finalizeDiagnostics(request, { operation }, {
+      type: 'OPERATION_TIMEOUT',
+      stage: 'service',
+      reason,
+      code: 'TIMEOUT',
+    });
+    try {
+      await this.translationEngine?.cancelTranslation(messageId, true, timeoutType, reason);
+    } catch (error) {
+      logger.debug('Timeout cancellation failed:', error.message);
+    }
   }
 
   _createCancelledResponse(messageId) {
@@ -291,6 +421,90 @@ export class UnifiedTranslationService {
       reason: transition.reason,
       status: transition.status
     };
+  }
+
+  _finalizeDiagnostics(request, executionContext, terminalFact) {
+    appendTranslationDiagnostic(executionContext, terminalFact);
+    const report = finalizeTranslationOperation(executionContext);
+    if (report) {
+      this._setDiagnosticReport(request, report);
+      const terminalStatus = {
+        OPERATION_COMPLETED: 'completed',
+        OPERATION_FAILED: 'failed',
+        OPERATION_CANCELLED: 'cancelled',
+        OPERATION_TIMEOUT: 'timeout',
+      }[terminalFact.type];
+      if (terminalStatus) {
+        statsManager.recordOperationQuality(deriveRecoverySummary(report, {
+          terminalStatus,
+          operationSucceeded: terminalStatus === 'completed',
+        }));
+      }
+    }
+    this._clearOperation(request);
+  }
+
+  _registerConversationAcceptance(request, executionContext, providerName, participates) {
+    if (!participates) return false;
+
+    const parents = executionContext.operation.snapshotParentCandidates()
+      .filter(parent => parent.conversationParticipates && parent.cleanSource !== null)
+      .map(({ parentId, sourceOrder, cleanSource }) => ({ parentId, sourceOrder, cleanSource }));
+    if (parents.length === 0) return false;
+
+    try {
+      const handoff = new ConversationAcceptanceHandoff({
+        messageId: request.messageId,
+        sessionId: request.data?.sessionId,
+        provider: providerName,
+        mode: request.data?.mode,
+        parents,
+      });
+      const handle = new ConversationAcceptanceHandle(handoff);
+      if (this.conversationAcceptanceCoordinator.register(request.messageId, handle)) return true;
+
+      logger.warn(`[UnifiedTranslationService] Conversation acceptance registration rejected for ${request.messageId}`);
+      appendTranslationDiagnostic(executionContext, {
+        type: 'CONVERSATION_ACCEPTANCE_REGISTRATION_REJECTED',
+        stage: 'service',
+        reason: 'duplicate_message_id',
+      });
+    } catch (error) {
+      logger.warn(`[UnifiedTranslationService] Conversation acceptance handoff failed for ${request.messageId}:`, error.message);
+      appendTranslationDiagnostic(executionContext, {
+        type: 'CONVERSATION_ACCEPTANCE_HANDOFF_FAILED',
+        stage: 'service',
+        reason: error.message,
+      });
+    }
+    return false;
+  }
+
+  _setOperation(request, operation) {
+    this._operations.set(request, operation);
+  }
+
+  _getOperation(request) {
+    return this._operations.get(request) || null;
+  }
+
+  _clearOperation(request) {
+    this._operations.delete(request);
+  }
+
+  _setDiagnosticReport(request, report) {
+    this._diagnosticReports.set(request, report);
+    this.requestTracker._setDiagnosticReport?.(request, report);
+  }
+
+  /**
+   * Force-clear a Page session's source-resolution state.
+   * Invoked on session terminal lifecycle (complete/cancel/error/restore).
+   *
+   * @param {string} sessionId - Page translation session identifier
+   */
+  clearPageSourceSession(sessionId) {
+    if (sessionId) this.modeCoordinator.clearPageSourceLanguage(sessionId);
   }
 
   /**

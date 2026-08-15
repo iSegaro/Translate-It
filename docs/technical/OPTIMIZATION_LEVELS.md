@@ -20,9 +20,57 @@ The system operates on an **Inverted Scaling** principle:
 2.  **Level 3 (Balanced)**:
     *   **Goal**: The standard reliable experience (Default).
 3.  **Level 5 (Turbo)**:
-    *   **Goal**: Lowest latency and fastest UI response.
+    *   **Goal**: Highest tested aggressiveness and fastest possible UI response.
     *   **Strategy**: "Many requests, tiny payloads, high concurrency."
-    *   **Benefit**: Enables streaming-like UI updates where text appears in chunks almost instantly.
+    *   **Benefit**: Can enable streaming-like UI updates where text appears in chunks faster, subject to provider/backend capacity.
+
+### Optimization Level Semantics
+
+Optimization Levels are ordered aggressiveness preferences mapped onto each
+provider's safe, discrete runtime capabilities. They are not five guaranteed
+unique execution states.
+
+- Providers may map adjacent levels to the same effective runtime state.
+- Such collisions are valid and are not configuration errors.
+- Higher levels must remain monotonic: they must never be less aggressive than lower levels.
+- Level 3 is the Balanced/default provider baseline.
+- Level 5 represents the highest tested aggressiveness, not a latency guarantee for every provider or backend.
+
+#### Base-2 Provider Collision
+
+Base-2 AI providers use this concurrency curve:
+
+| Provider family | L1 | L2 | L3 | L4 | L5 |
+| :--- | ---: | ---: | ---: | ---: | ---: |
+| Base-2 AI providers | 1 | 2 | 2 | 3 | 4 |
+| Gemini | 1 | 2 | 3 | 5 | 6 |
+
+Level 2 and Level 3 intentionally share concurrency `2` for base-2
+providers. Level 2 must step above Level 1, while Level 3 remains the
+established Balanced baseline. Raising Level 3 would increase default provider
+pressure; lowering Level 2 would only move collision to Levels 1 and 2.
+
+#### AI Select Element
+
+AI Select Element keeps physical batching stable across levels:
+
+```text
+optimalSize = 25
+characterLimit = 3500
+```
+
+Optimization Level therefore primarily changes available provider concurrency,
+not by manufacturing smaller physical batches. For identical Select Element
+input, level changes do not necessarily change API request count. Concurrency
+changes timing and simultaneous provider pressure; higher concurrency does not
+inherently reduce API cost, and actual latency depends on provider/backend
+capacity.
+
+Traditional providers may additionally differ across levels through their
+batching and character-limit policies.
+
+> Future UI copy may clarify: actual effect depends on provider capabilities;
+> adjacent levels may share the same effective runtime limit.
 
 ---
 
@@ -49,6 +97,22 @@ The system is integrated vertically from the UI settings down to the raw network
 │  - BaseTranslateProvider: Scales Character limits           │
 └─────────────────────────────────────────────────────────────┘
 ```
+
+### Runtime Ownership Contract
+
+Rate limiting is provider-global. `RateLimitManager` maintains one state per
+provider name, so Select Element, Popup, Field, Whole Page, Sidepanel, and
+other modes share one provider concurrency budget and one provider-level
+`delayBetweenRequests` policy. Translation mode is not part of the limiter
+state key.
+
+Batching may be mode-specific. `getProviderBatching(provider, mode, level)`
+merges `batching.modeOverrides` before batching consumers use the result.
+
+`rateLimit.modeOverrides` are currently declarative only. They are not merged
+into `RateLimitManager` state and must not be interpreted as independent
+per-mode concurrency caps. Activating them requires an outer provider-global
+safety budget so combined mode traffic cannot exceed provider limits.
 
 ---
 
@@ -102,8 +166,36 @@ Handles the **Frontend Chunking**.
 
 ### 3. RateLimitManager.js (`src/features/translation/core/`)
 The **Enforcement Engine**.
-- Uses an implementation of the **Token Bucket** and **Semaphore** patterns.
-- It dynamically fetches the current user's optimization level and applies the scaled `maxConcurrent` and `subsequentDelay`.
+- Uses provider-global active-request accounting and priority queues.
+- It dynamically fetches the current user's optimization level and applies the scaled provider-level `maxConcurrent` and `delayBetweenRequests`.
+- It does not apply `rateLimit.modeOverrides`.
+
+### Runtime-Effective Configuration Matrix
+
+| Configuration | Status | Current consumer/scope |
+| :--- | :--- | :--- |
+| `batching.optimalSize` | Active | Select Element and other batching paths |
+| `batching.characterLimit` | Active | Select Element and traditional batching |
+| `rateLimit.maxConcurrent` | Active | Provider-global `RateLimitManager` state |
+| `rateLimit.delayBetweenRequests` | Active | Provider-global `RateLimitManager` queue |
+| QueueManager retry policy | Active | Queue retry count and retry delay |
+| Runtime backoff/circuit breaker | Active | `RateLimitManager` runtime state |
+| `maxComplexity` | Active elsewhere | `AITextProcessor`; not current Select Element batcher |
+| `maxBatchSizeChars` | Conditional | `AITextProcessor` when configured |
+| `balancedBatching` | Conditional | Character batching path when configured |
+| Traditional batching fields | Active elsewhere | Traditional provider chunkers |
+| `rateLimit.modeOverrides` | Declarative/unused | Not applied by `RateLimitManager` |
+
+#### Dead Configuration Inventory
+
+- **Removed legacy rate-limit fields:** `initialDelay`, `subsequentDelay`, `burstLimit`, and `burstWindow` were removed after provider-global limiter ownership was formalized.
+- **Removed legacy batching field:** `singleBatchThreshold` was removed after confirming current batching logic has no runtime consumer.
+- **Removed legacy provider retry config:** `errorHandling.retryStrategies` was removed; QueueManager owns retry policy.
+- **Future design candidates:** `rateLimit.modeOverrides`, if implemented behind a provider-global safety budget.
+- **Active elsewhere:** `maxComplexity`, `maxBatchSizeChars`, `balancedBatching`, traditional batching fields.
+
+Do not activate or remove these fields without updating their owning runtime
+contract and tests.
 
 ---
 

@@ -11,6 +11,7 @@ import { storageManager } from "@/shared/storage/core/StorageCore.js";
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { runSettingsMigrations } from "@/shared/config/settingsMigrations.js";
+import { getPersistedDefaultSettings } from "@/shared/config/settingsDefaults.js";
 
 const logger = getScopedLogger(LOG_COMPONENTS.BACKGROUND, 'InstallHandler');
 
@@ -49,7 +50,12 @@ async function detectLegacyMigration() {
  */
 async function performLegacyMigration(existingData) {
   try {
-    const migratedData = { ...existingData };
+    const persistedDefaults = getPersistedDefaultSettings();
+    const migratedData = Object.fromEntries(
+      Object.entries(existingData).filter(([key]) =>
+        key in persistedDefaults || !(key in CONFIG)
+      )
+    );
     const migrationLog = [];
 
     // 1. Migrate complex objects
@@ -74,20 +80,15 @@ async function performLegacyMigration(existingData) {
       migrationLog.push("Preserved encrypted API keys structure");
     }
 
-    // 3. Add Vue-specific settings
-    const vueDefaults = {};
-
-    Object.assign(migratedData, vueDefaults);
-
-    // 4. Ensure all CONFIG defaults are present
-    Object.keys(CONFIG).forEach((key) => {
+    // 3. Ensure all canonical persisted defaults are present.
+    Object.entries(persistedDefaults).forEach(([key, defaultValue]) => {
       if (!(key in migratedData)) {
-        migratedData[key] = CONFIG[key];
+        migratedData[key] = defaultValue;
         migrationLog.push(`Added missing config key: ${key}`);
       }
     });
 
-    // 5. Save migrated data
+    // 4. Save migrated data
     await storageManager.clear();
     await storageManager.set(migratedData);
 
@@ -134,20 +135,24 @@ async function migrateConfigSettings() {
 
 /**
  * Runs incremental settings migrations based on version tracking
+ *
+ * Persistence owner for migration application: applies returned `updates` and
+ * `removals` to browser storage. The migration layer itself stays pure.
  */
-async function runIncrementalSettingsMigrations() {
+export async function runIncrementalSettingsMigrations() {
   try {
     // Get current settings from storage
     const currentSettings = await storageManager.get();
 
     // Always run migration for update events to ensure users get latest settings
     // The migration function itself will check if updates are actually needed
-    const { updates, logs } = await runSettingsMigrations(
+    const { updates, removals = [], logs } = await runSettingsMigrations(
       { ...currentSettings } // Pass copy of current settings
     );
 
     logger.debug('Migration result', {
       updatesCount: Object.keys(updates).length,
+      removalsCount: removals.length,
       updateKeys: Object.keys(updates),
       logs
     });
@@ -163,6 +168,12 @@ async function runIncrementalSettingsMigrations() {
       logger.debug('No settings updates needed');
     }
 
+    // Apply removals if any (e.g. obsolete non-editable prompt wrappers)
+    if (removals.length > 0) {
+      await storageManager.remove(removals);
+      logger.debug('Removed obsolete settings keys', { removals });
+    }
+
   } catch (error) {
     logger.error('Settings migration failed:', error);
     // Don't throw - allow extension to continue working
@@ -176,23 +187,20 @@ async function handleFreshInstallation() {
   const storage = await storageManager.get();
   const hasExistingData = Object.keys(storage).length > 0;
 
+  // Initialize with present-or-default settings.
+  // Exclude non-editable prompt wrappers — they are CONFIG-owned defaults,
+  // not persisted settings; runtime getters consume them from CONFIG directly.
+  await storageManager.set(getPersistedDefaultSettings());
+
   if (hasExistingData) {
     logger.init('Legacy migration detected during fresh install');
-
-    // Initialize with default settings for migrated users
-    await storageManager.set(CONFIG);
-
-    // Open options page to languages page for initial setup
-    const optionsUrl = browser.runtime.getURL("src/html/options.html#languages");
-    await browser.tabs.create({ url: optionsUrl });
   } else {
-    // Truly fresh installation - initialize with default settings
-    await storageManager.set(CONFIG);
     logger.init('Fresh installation completed with default settings');
-
-    const optionsUrl = browser.runtime.getURL("src/html/options.html#languages");
-    await browser.tabs.create({ url: optionsUrl });
   }
+
+  // Open options page to languages page for initial setup
+  const optionsUrl = browser.runtime.getURL("src/html/options.html#languages");
+  await browser.tabs.create({ url: optionsUrl });
 }
 
 /**

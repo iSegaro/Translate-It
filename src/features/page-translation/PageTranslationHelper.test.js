@@ -49,6 +49,24 @@ describe('PageTranslationHelper', () => {
       expect(PageTranslationHelper.shouldTranslate('آ')).toBe(true); 
     });
 
+    it('should return false for BIDI/zero-width formatting-mark-only strings', () => {
+      expect(PageTranslationHelper.shouldTranslate('\u200E')).toBe(false);
+      expect(PageTranslationHelper.shouldTranslate('\u200F')).toBe(false);
+      expect(PageTranslationHelper.shouldTranslate('\u200B')).toBe(false);
+      expect(PageTranslationHelper.shouldTranslate('\u2060')).toBe(false);
+      expect(PageTranslationHelper.shouldTranslate('\uFEFF')).toBe(false);
+      expect(PageTranslationHelper.shouldTranslate(' \u200E ')).toBe(false);
+      expect(PageTranslationHelper.shouldTranslate('\u200B\u200F')).toBe(false);
+    });
+
+    it('should translate meaningful text that contains leading formatting marks', () => {
+      expect(PageTranslationHelper.shouldTranslate('\u200ESome text')).toBe(true);
+    });
+
+    it('should translate Persian text containing a trailing RTL mark', () => {
+      expect(PageTranslationHelper.shouldTranslate('سلام\u200F')).toBe(true);
+    });
+
     it('should return true for valid sentences', () => {
       expect(PageTranslationHelper.shouldTranslate('Hello World')).toBe(true);
       expect(PageTranslationHelper.shouldTranslate('This is a test.')).toBe(true);

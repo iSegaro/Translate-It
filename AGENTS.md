@@ -24,7 +24,7 @@ Your mission is to evolve this codebase while rigorously maintaining its structu
 - **IFrame Support**: Simple and effective iframe support system with ResourceTracker integration and unified memory management.
 - **Toast Integration System**: A unified notification system with ToastEventHandler, ToastElementDetector, and support for interactive action buttons.
 - **Modern CSS Architecture**: Principled CSS architecture featuring CSS Grid, containment, safe variable functions, forward-looking SCSS patterns, and Shadow DOM isolation using strategic `!important` declarations.
-- **Icon System**: Standardized monochrome UI icons via CSS Mask (`SvgIcon`) with `currentColor` theming, SVG assets as single source of truth, and clear conventions for brand/multicolor `<img>` assets. See [docs/technical/ICON_SYSTEM.md](docs/technical/ICON_SYSTEM.md) and [docs/adr/ADR-SVG-ICON-SYSTEM.md](docs/adr/ADR-SVG-ICON-SYSTEM.md).
+- **Icon System**: Standardized monochrome UI icons via CSS Mask (`SvgIcon`) with `currentColor` theming, SVG assets as single source of truth, and clear conventions for brand/multicolor `<img>` assets. See [docs/technical/ICON_SYSTEM.md](docs/technical/ICON_SYSTEM.md) and [docs/adr/ADR-001-svg-icon-system.md](docs/adr/ADR-001-svg-icon-system.md).
 - **Provider System**: 10+ translation services with a hierarchical architecture (BaseProvider, BaseTranslateProvider, BaseAIProvider) including Rate Limiting and Circuit Breaker management.
 - **Error Management**: Centralized error management system.
 - **Storage Manager**: Smart storage with built-in caching.
@@ -59,7 +59,7 @@ The system utilizes a provider hierarchy pattern:
 - **`RateLimitManager`**: Manages rate limits and the Circuit Breaker.
 - **`StreamingManager`**: Manages real-time translation streaming.
 
-To implement a new provider, refer to the `docs/technical/PROVIDERS.md` documentation.
+To implement a new provider, refer to the `docs/technical/providers/PROVIDERS.md` documentation.
 
 ## Project Structure (Feature-Based Architecture)
 
@@ -113,8 +113,8 @@ Comprehensive documentation is available in the `docs/` folder:
 ### Core Documentation
 - [**ARCHITECTURE.md**](docs/technical/ARCHITECTURE.md): Full project architecture and system overview.
 - [**MessagingSystem.md**](docs/technical/MessagingSystem.md): **Messaging System** – Race-condition-free communication.
-- [**TRANSLATION_SYSTEM.md**](docs/technical/TRANSLATION_SYSTEM.md): **Translation Service** – Coordination and result routing.
-- [**PROVIDERS.md**](docs/technical/PROVIDERS.md): **Provider Implementation Guide** – BaseProvider and Circuit Breaker.
+- [**TRANSLATION_SYSTEM.md**](docs/technical/architecture/TRANSLATION_SYSTEM.md): **Translation Service** – Coordination and result routing.
+- [**PROVIDERS.md**](docs/technical/providers/PROVIDERS.md): **Provider Implementation Guide** – BaseProvider and Circuit Breaker.
 - [**MARKDOWN_RENDERING.md**](docs/technical/MARKDOWN_RENDERING.md): Markdown rendering, preview pipeline, TTS extraction boundaries, and provider Markdown contracts.
 - [**ERROR_MANAGEMENT_SYSTEM.md**](docs/technical/ERROR_MANAGEMENT_SYSTEM.md): Centralized error management and context safety.
 - [**STORAGE_MANAGER.md**](docs/technical/STORAGE_MANAGER.md): **StorageCore Guide** – Unified storage API with caching.
@@ -131,8 +131,11 @@ Comprehensive documentation is available in the `docs/` folder:
 - [**LANGUAGE_DETECTION.md**](docs/technical/LANGUAGE_DETECTION.md): Hierarchical language and direction detection.
 - [**LOCALIZATION.md**](docs/technical/LOCALIZATION.md): Internationalization and locale management guide.
 - [**TESTING_STRATEGY.md**](docs/technical/TESTING_STRATEGY.md): Unit, integration, and UI testing guidelines.
-- [**STATS_MANAGER.md**](docs/technical/STATS_MANAGER.md): System for tracking usage statistics and analytics.
-- [**TRANSLATION_PROVIDER_LOGIC.md**](docs/technical/TRANSLATION_PROVIDER_LOGIC.md): Waterfall logic for provider selection.
+- [**STATS_MANAGER.md**](docs/technical/infrastructure/STATS_MANAGER.md): System for tracking usage statistics and analytics.
+- [**TRANSLATION_PROVIDER_LOGIC.md**](docs/technical/TRANSLATION_PROVIDER_LOGIC.md): Provider execution and structured-recovery policy.
+- [**PROVIDER_CONTRACT.md**](docs/technical/contracts/PROVIDER_CONTRACT.md): Authoritative provider result/recovery guarantees.
+- [**CONVERSATION_CONTRACT.md**](docs/technical/contracts/CONVERSATION_CONTRACT.md): AI conversation-candidate lifecycle and recovery history exclusion.
+- [**TRANSLATION_IDENTITY_AND_FRAGMENT_CONTRACT.md**](docs/technical/contracts/TRANSLATION_IDENTITY_AND_FRAGMENT_CONTRACT.md): Identity namespace and fragment aggregation rules.
 
 ### Feature Documentation
 - [**MOBILE_SUPPORT.md**](docs/technical/MOBILE_SUPPORT.md): **Touch & Mobile Support** – Bottom Sheet and gestures.
@@ -226,3 +229,15 @@ Comprehensive documentation is available in the `docs/` folder:
 - **Modular Logging**: Components-based logging with production awareness.
 - **Advanced Memory Management**: ResourceTracker and Memory Garbage Collector with integrated Critical Protection System.
 - **TTS System**: Full cross-context coordination and auto-language fallback.
+
+## Translation Architecture Guardrails
+
+Concise contributor rules to prevent architectural drift. Full rationale: see *ADR-015*, *TRANSLATION_PROVIDER_LOGIC.md*, and the contract documents linked above.
+
+- Use `V3IntervalParser` for V3 marker/interval parsing; it is structural-only. Do not create feature- or provider-specific V3 parsers.
+- `TranslationContractValidator` is the single semantic owner of V3 provider-contract validity (marker count/identity/order/duplicates/missing/unexpected, interval content, `V3_EMPTY_TRANSLATED_INTERVAL`). Do not independently validate these in DOM, feature, or provider-adapter code.
+- `BaseAIProvider` owns structured-recovery policy and must not branch on V3-specific violation codes or marker semantics.
+- Keep response identities distinct: logical IDs, positional wire IDs (numeric transport IDs valid only in proven positional-wire batches), V3 member IDs; `requestIndex` and `responseId` are separate concepts. Do not treat numeric response IDs as globally valid logical IDs.
+- `repairContext` is generic, transient recovery metadata. The parser packages facts, `BaseAIProvider` transports them, `AIConversationHelper` renders repair guidance. It does not enter normal conversation history or become provider memory.
+- Do not conflate structured recovery, `QueueManager` retry, API-key failover, or automatic cross-provider fallback. Structured recovery is provider-local; queue retry is execution retry; no cross-provider fallback is automatic.
+- Invalid structured/V3 results must not become stream-visible; `OptimizedJsonHandler` enforces the canonical pre-stream validation boundary.

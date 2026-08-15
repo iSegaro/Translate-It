@@ -14,6 +14,13 @@ import { ProviderNames } from "@/features/translation/providers/ProviderConstant
 import { AIConversationHelper } from "./utils/AIConversationHelper.js";
 import { AITextProcessor } from "./utils/AITextProcessor.js";
 import { ResponseFormat, TRANSLATION_CONSTANTS } from "@/shared/config/translationConstants.js";
+import {
+  CompletionProviderFamily,
+  createCompletionRecord,
+  createUsageRecord,
+  normalizeTermination,
+} from "@/features/translation/ir/CompletionContract.js";
+import { recordProviderCompletion } from "@/features/translation/ir/TranslationOperation.js";
 const logger = getScopedLogger(LOG_COMPONENTS.PROVIDERS, 'GoogleGemini');
 
 export class GeminiProvider extends BaseAIProvider {
@@ -27,11 +34,41 @@ export class GeminiProvider extends BaseAIProvider {
   }
 
   /**
+   * Normalizes one raw Gemini response into a single completion record and
+   * attaches it to the current operation. Executes exactly once per physical
+   * Gemini response at the provider-adapter boundary. Null-safe: recording
+   * never throws and never alters translation. SAFETY responses record POLICY
+   * before the existing throw so the response fact survives.
+   * @private
+   */
+  _recordGeminiCompletion(data, executionContext) {
+    const candidate = data?.candidates?.[0];
+    if (!candidate) return false;
+
+    const usageMetadata = data?.usageMetadata;
+    return recordProviderCompletion(executionContext, createCompletionRecord({
+      provider: this.providerName,
+      model: data?.modelVersion ?? null,
+      termination: normalizeTermination(CompletionProviderFamily.GEMINI, candidate?.finishReason),
+      responseId: data?.responseId ?? null,
+      usage: createUsageRecord({
+        inputTokens: usageMetadata?.promptTokenCount,
+        outputTokens: usageMetadata?.candidatesTokenCount,
+        reasoningTokens: usageMetadata?.thoughtsTokenCount,
+        totalTokens: usageMetadata?.totalTokenCount,
+      }),
+    }));
+  }
+
+  /**
    * Internal implementation of the Gemini API call.
    * @protected
    */
   async _callAI(systemPrompt, userText, options = {}) {
-    const { abortController, sessionId, expectedFormat, isBatch } = options;
+    const { abortController, sessionId, expectedFormat, isBatch, executionContext, callPurpose, conversationCommitCandidate, conversationParticipates: participationOverride, mode } = options;
+    const conversationParticipates = typeof participationOverride === 'boolean'
+      ? participationOverride
+      : await AIConversationHelper.getConversationParticipation({ callPurpose, translateMode: mode, sessionId });
 
     const [apiKeys, model, thinkingEnabled, rawApiUrl] = await Promise.all([
       getGeminiApiKeysAsync(),
@@ -44,7 +81,9 @@ export class GeminiProvider extends BaseAIProvider {
 
     this._validateConfig({ apiKey }, ["apiKey"], `${this.providerName.toLowerCase()}-translation`);
 
-    const turnNumber = await AIConversationHelper.claimNextTurn(sessionId, this.providerName);
+    const turnNumber = conversationParticipates
+      ? await AIConversationHelper.claimNextTurn(sessionId, this.providerName, { callPurpose, translateMode: mode, conversationParticipates })
+      : 1;
     logger.info(`[Gemini] Model: ${model || 'gemini-1.5-flash'}${sessionId ? ` (Session: ${sessionId.substring(0, 15)}..., Turn: ${turnNumber})` : ''}`);
 
     const requestBody = {
@@ -62,11 +101,13 @@ export class GeminiProvider extends BaseAIProvider {
       }
     };
 
-    if (sessionId) {
+    if (sessionId && conversationParticipates) {
       // Limit history to last 2 turns with character capping to optimize tokens
       const history = await AIConversationHelper.getConversationHistory(sessionId, options.mode, { 
         maxTurns: 2,
-        maxChars: TRANSLATION_CONSTANTS.HISTORY_CHARACTER_LIMITS.AI 
+        maxChars: TRANSLATION_CONSTANTS.HISTORY_CHARACTER_LIMITS.AI,
+         callPurpose,
+         conversationParticipates
       });
       
       if (history.length > 0) {
@@ -107,14 +148,16 @@ export class GeminiProvider extends BaseAIProvider {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(requestBody),
     };
+    const originalCharCount = isBatch ? AITextProcessor.estimateOriginalChars(userText) : userText.length;
 
     try {
       const result = await this._executeRequest({
         url,
         fetchOptions,
         charCount: fetchOptions.body.length,
-        originalCharCount: isBatch ? AITextProcessor.estimateOriginalChars(userText) : userText.length,
+        originalCharCount,
         extractResponse: (data) => {
+        this._recordGeminiCompletion(data, executionContext);
         if (data?.error) {
           throw new Error(`API_ERROR: ${data.error.message || 'Unknown Gemini Error'}`);
         }
@@ -129,6 +172,8 @@ export class GeminiProvider extends BaseAIProvider {
         context: `${this.providerName.toLowerCase()}-translation`,
         abortController,
         sessionId,
+        executionContext,
+        callPurpose,
         updateApiKey: (newKey, options) => {
           if (options.url) {
             const urlObj = new URL(options.url);
@@ -138,8 +183,9 @@ export class GeminiProvider extends BaseAIProvider {
         }
       });
 
-      if (sessionId && result) {
-        await AIConversationHelper.updateSessionHistory(sessionId, userText, result);
+      if (sessionId && result && conversationParticipates) {
+        if (conversationCommitCandidate) conversationCommitCandidate.stage({ sessionId, userContent: userText, assistantContent: result });
+        else await AIConversationHelper.updateSessionHistory(sessionId, userText, result, { callPurpose, translateMode: mode, conversationParticipates });
       }
 
       return result;
@@ -149,11 +195,13 @@ export class GeminiProvider extends BaseAIProvider {
         const retryBody = { ...requestBody };
         delete retryBody.generationConfig.thinking_config;
         const retryBodyJson = JSON.stringify(retryBody);
-        return await this._executeRequest({
+        const fallbackResult = await this._executeRequest({
           url,
           fetchOptions: { ...fetchOptions, body: retryBodyJson },
           charCount: retryBodyJson.length,
+          originalCharCount,
           extractResponse: (data) => {
+        this._recordGeminiCompletion(data, executionContext);
         if (data?.error) {
           throw new Error(`API_ERROR: ${data.error.message || 'Unknown Gemini Error'}`);
         }
@@ -168,13 +216,23 @@ export class GeminiProvider extends BaseAIProvider {
           context: `${this.providerName.toLowerCase()}-translation-fallback`,
           abortController,
           sessionId,
+          executionContext,
+          callPurpose,
           updateApiKey: (newKey, options) => {
             if (options.url) {
               const urlObj = new URL(options.url);
               urlObj.searchParams.set('key', newKey);
               options.url = urlObj.toString();
             }
-          }        });
+          }
+        });
+
+        if (sessionId && fallbackResult && conversationParticipates) {
+          if (conversationCommitCandidate) conversationCommitCandidate.stage({ sessionId, userContent: userText, assistantContent: fallbackResult });
+          else await AIConversationHelper.updateSessionHistory(sessionId, userText, fallbackResult, { callPurpose, translateMode: mode, conversationParticipates });
+        }
+
+        return fallbackResult;
       }
       throw error;
     }

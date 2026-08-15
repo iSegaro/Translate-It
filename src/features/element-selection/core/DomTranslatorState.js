@@ -43,6 +43,36 @@ export function getSelectElementTranslationState() {
 }
 
 /**
+ * Releases revert records whose owning element is no longer connected.
+ * Connected records remain available for explicit user revert.
+ */
+export function pruneDisconnectedSelectElementTranslations() {
+  const history = globalSelectElementState.translationHistory;
+  if (!Array.isArray(history) || history.length === 0) return 0;
+
+  const staleSessions = new Set(
+    history
+      .filter(({ element }) => !element || !element.isConnected)
+      .map(({ sessionId }) => sessionId)
+      .filter(Boolean)
+  );
+  if (staleSessions.size === 0) return 0;
+
+  globalSelectElementState.translationHistory = history.filter(({ sessionId, element }) => (
+    element?.isConnected !== false && !staleSessions.has(sessionId)
+  ));
+  for (const key of globalSelectElementState.snapshots?.keys() || []) {
+    if ([...staleSessions].some(sessionId => key.startsWith(`${sessionId}:`))) {
+      globalSelectElementState.snapshots.delete(key);
+    }
+  }
+  if (globalSelectElementState.currentTranslation && staleSessions.has(globalSelectElementState.currentTranslation.sessionId)) {
+    globalSelectElementState.currentTranslation = null;
+  }
+  return history.length - globalSelectElementState.translationHistory.length;
+}
+
+/**
  * Reverts active translations. Supports session-owned reversion to prevent stale races.
  *
  * @param {string|null} [targetSessionId=null] - The target session ID to revert, or null for all

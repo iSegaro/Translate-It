@@ -5,6 +5,8 @@
 
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
+import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
+import { getSelectElementActivationErrorMessage } from '@/features/element-selection/utils/activationError.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.ELEMENT_SELECTION, 'ElementSelectionLazyHandler');
 
@@ -71,12 +73,12 @@ export const handleActivateSelectElementModeLazy = async (message, sender, sendR
     return await handleActivateSelectElementMode(message, sender, sendResponse);
   } catch (error) {
     logger.error('Failed to handle activateSelectElementMode:', error);
+    const message = await getSelectElementActivationErrorMessage();
     return {
       success: false,
-      error: {
-        message: 'Failed to load Element Selection functionality',
-        type: 'ELEMENT_SELECTION_LOADING_ERROR'
-      }
+      message,
+      error: message,
+      errorType: ErrorTypes.SELECT_ELEMENT,
     };
   }
 };

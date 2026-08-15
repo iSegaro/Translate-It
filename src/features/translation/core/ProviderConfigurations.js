@@ -86,12 +86,10 @@ export const BASE_MAX_CHUNKS_PER_BATCH = {
 export const AI_BATCHING_LIMITS = {
   OPTIMAL_SIZE: 20,
   MAX_COMPLEXITY: 350,
-  SINGLE_BATCH_THRESHOLD: 15,
   CHARACTER_LIMIT: 5000,
   // Select Element Overrides (Optimized for balance)
   SELECT_OPTIMAL_SIZE: 25,
   SELECT_MAX_COMPLEXITY: 500,
-  SELECT_SINGLE_BATCH_THRESHOLD: 20,
   SELECT_CHARACTER_LIMIT: 3500,
 };
 
@@ -99,13 +97,11 @@ const UNIFIED_AI_BATCHING_CONFIG = {
   strategy: 'json', // Default to JSON for all AI providers
   optimalSize: AI_BATCHING_LIMITS.OPTIMAL_SIZE,
   maxComplexity: AI_BATCHING_LIMITS.MAX_COMPLEXITY,
-  singleBatchThreshold: AI_BATCHING_LIMITS.SINGLE_BATCH_THRESHOLD,
   characterLimit: AI_BATCHING_LIMITS.CHARACTER_LIMIT,
   modeOverrides: {
     select_element: {
       optimalSize: AI_BATCHING_LIMITS.SELECT_OPTIMAL_SIZE,
       maxComplexity: AI_BATCHING_LIMITS.SELECT_MAX_COMPLEXITY,
-      singleBatchThreshold: AI_BATCHING_LIMITS.SELECT_SINGLE_BATCH_THRESHOLD,
       characterLimit: AI_BATCHING_LIMITS.SELECT_CHARACTER_LIMIT,
       balancedBatching: true,
     },
@@ -122,10 +118,6 @@ export const PROVIDER_CONFIGURATIONS = {
     rateLimit: {
       maxConcurrent: 3, // Increased for even better throughput
       delayBetweenRequests: 0, // No delay for first request, adaptive backoff handles errors
-      initialDelay: 0, // First request immediate
-      subsequentDelay: 2000, // Reduced from 8000ms to 2000ms for better UX
-      burstLimit: 3, // Allow more burst processing for better performance
-      burstWindow: 5000, // Reduced burst window
       adaptiveBackoff: {
         enabled: true,
         baseMultiplier: 2, // Reduced multiplier for less aggressive backoff
@@ -135,8 +127,6 @@ export const PROVIDER_CONFIGURATIONS = {
       // Mode-specific overrides
       modeOverrides: {
         select_element: {
-          subsequentDelay: 1000, // Even faster for Select Element mode
-          burstLimit: 4, // Allow more burst for better UX
           maxConcurrent: 3 // Maintain concurrency for Select Element
         }
       }
@@ -155,13 +145,6 @@ export const PROVIDER_CONFIGURATIONS = {
         'concurrent_requests',
         'model_overloaded'
       ],
-      retryStrategies: {
-        'requests_per_minute': { delay: 60000, temporary: true },
-        'tokens_per_minute': { delay: 60000, temporary: true },
-        'requests_per_day': { delay: 86400000, temporary: false },
-        'concurrent_requests': { delay: 8000, temporary: true },
-        'model_overloaded': { delay: 15000, temporary: true } // 503 overload errors
-      },
       enableCircuitBreaker: true
     },
     features: {
@@ -179,10 +162,6 @@ export const PROVIDER_CONFIGURATIONS = {
     rateLimit: {
       maxConcurrent: 2,
       delayBetweenRequests: 0, // No delay for first request
-      initialDelay: 0,
-      subsequentDelay: 1000, // 1 second between subsequent requests
-      burstLimit: 3,
-      burstWindow: 2000,
       adaptiveBackoff: {
         enabled: true,
         baseMultiplier: 1.5,
@@ -192,8 +171,6 @@ export const PROVIDER_CONFIGURATIONS = {
       // Mode-specific overrides
       modeOverrides: {
         select_element: {
-          subsequentDelay: 600, // Faster for Select Element mode
-          burstLimit: 4, // Allow more burst for better UX
           maxConcurrent: 2 // Maintain concurrency for Select Element
         }
       }
@@ -210,11 +187,6 @@ export const PROVIDER_CONFIGURATIONS = {
         'tokens_per_minute',
         'requests_per_day'
       ],
-      retryStrategies: {
-        'requests_per_minute': { delay: 60000, temporary: true },
-        'tokens_per_minute': { delay: 60000, temporary: true },
-        'requests_per_day': { delay: 86400000, temporary: false }
-      },
       enableCircuitBreaker: true
     },
     features: {
@@ -232,10 +204,6 @@ export const PROVIDER_CONFIGURATIONS = {
     rateLimit: {
       maxConcurrent: 2, // Increased from 1 for better throughput
       delayBetweenRequests: 0, // No delay for first request
-      initialDelay: 0,
-      subsequentDelay: 1200, // Reduced from 2000ms to 1200ms
-      burstLimit: 3, // Increased from 2
-      burstWindow: 3000,
       adaptiveBackoff: {
         enabled: true,
         baseMultiplier: 2,
@@ -245,8 +213,6 @@ export const PROVIDER_CONFIGURATIONS = {
       // Mode-specific overrides
       modeOverrides: {
         select_element: {
-          subsequentDelay: 800, // Faster for Select Element mode
-          burstLimit: 4, // Allow more burst for better UX
           maxConcurrent: 2 // Maintain concurrency for Select Element
         }
       }
@@ -262,10 +228,6 @@ export const PROVIDER_CONFIGURATIONS = {
         'requests_per_minute',
         'rate_limit'
       ],
-      retryStrategies: {
-        'requests_per_minute': { delay: 60000, temporary: true },
-        'rate_limit': { delay: 30000, temporary: true }
-      },
       enableCircuitBreaker: true
     },
     features: {
@@ -283,10 +245,6 @@ export const PROVIDER_CONFIGURATIONS = {
     rateLimit: {
       maxConcurrent: 2,
       delayBetweenRequests: 0, // No delay for first request
-      initialDelay: 0,
-      subsequentDelay: 1000, // Reduced from 1500ms to 1000ms
-      burstLimit: 3,
-      burstWindow: 3000,
       adaptiveBackoff: {
         enabled: true,
         baseMultiplier: 1.8,
@@ -296,8 +254,6 @@ export const PROVIDER_CONFIGURATIONS = {
       // Mode-specific overrides
       modeOverrides: {
         select_element: {
-          subsequentDelay: 800, // Faster for Select Element mode
-          burstLimit: 4, // Allow more burst for better UX
           maxConcurrent: 3 // Increased from 2 for Select Element
         }
       }
@@ -314,11 +270,6 @@ export const PROVIDER_CONFIGURATIONS = {
         'tokens_per_minute',
         'model_overloaded'
       ],
-      retryStrategies: {
-        'requests_per_minute': { delay: 60000, temporary: true },
-        'tokens_per_minute': { delay: 60000, temporary: true },
-        'model_overloaded': { delay: 10000, temporary: true }
-      },
       enableCircuitBreaker: true
     },
     features: {
@@ -336,10 +287,6 @@ export const PROVIDER_CONFIGURATIONS = {
     rateLimit: {
       maxConcurrent: 2, // Standard concurrent requests
       delayBetweenRequests: 0, // No delay for first request
-      initialDelay: 0,
-      subsequentDelay: 1000, // Standard delay for subsequent requests // Standard delay
-      burstLimit: 3,
-      burstWindow: 2000,
       adaptiveBackoff: {
         enabled: true,
         baseMultiplier: 1.5,
@@ -349,8 +296,6 @@ export const PROVIDER_CONFIGURATIONS = {
       // Mode-specific overrides
       modeOverrides: {
         select_element: {
-          subsequentDelay: 700, // Faster for Select Element mode
-          burstLimit: 4, // Allow more burst for better UX
           maxConcurrent: 2 // Maintain concurrency for Select Element
         }
       }
@@ -367,11 +312,6 @@ export const PROVIDER_CONFIGURATIONS = {
         'rate_limit',
         'server_overload'
       ],
-      retryStrategies: {
-        'requests_per_minute': { delay: 60000, temporary: true },
-        'rate_limit': { delay: 30000, temporary: true },
-        'server_overload': { delay: 10000, temporary: true }
-      },
       enableCircuitBreaker: true
     },
     features: {
@@ -389,10 +329,6 @@ export const PROVIDER_CONFIGURATIONS = {
     rateLimit: {
       maxConcurrent: 4, // Moderate concurrent requests
       delayBetweenRequests: 0, // No delay for first request
-      initialDelay: 0,
-      subsequentDelay: 100, // Fast requests for free service
-      burstLimit: 5,
-      burstWindow: 1000,
       adaptiveBackoff: {
         enabled: true,
         baseMultiplier: 1.5,
@@ -418,11 +354,6 @@ export const PROVIDER_CONFIGURATIONS = {
         'daily_quota',
         'rate_limit'
       ],
-      retryStrategies: {
-        'requests_per_minute': { delay: 60000, temporary: true },
-        'daily_quota': { delay: 86400000, temporary: false },
-        'rate_limit': { delay: 5000, temporary: true }
-      },
       enableCircuitBreaker: true
     },
     features: {
@@ -440,10 +371,6 @@ export const PROVIDER_CONFIGURATIONS = {
     rateLimit: {
       maxConcurrent: 4,
       delayBetweenRequests: 0,
-      initialDelay: 0,
-      subsequentDelay: 200,
-      burstLimit: 5,
-      burstWindow: 1000,
       adaptiveBackoff: {
         enabled: true,
         baseMultiplier: 1.5,
@@ -469,11 +396,6 @@ export const PROVIDER_CONFIGURATIONS = {
         'rate_limit',
         'tkk_error'
       ],
-      retryStrategies: {
-        'requests_per_minute': { delay: 60000, temporary: true },
-        'rate_limit': { delay: 10000, temporary: true },
-        'tkk_error': { delay: 0, temporary: true }
-      },
       enableCircuitBreaker: true
     },
     features: {
@@ -491,10 +413,6 @@ export const PROVIDER_CONFIGURATIONS = {
     rateLimit: {
       maxConcurrent: 4, // Moderate concurrent requests
       delayBetweenRequests: 0, // No delay for first request
-      initialDelay: 0,
-      subsequentDelay: 150, // Slightly slower than Google for subsequent requests
-      burstLimit: 4,
-      burstWindow: 1200,
       adaptiveBackoff: {
         enabled: true,
         baseMultiplier: 1.5,
@@ -521,12 +439,6 @@ export const PROVIDER_CONFIGURATIONS = {
         'rate_limit',
         'server_error'
       ],
-      retryStrategies: {
-        'requests_per_minute': { delay: 60000, temporary: true },
-        'daily_quota': { delay: 86400000, temporary: false },
-        'rate_limit': { delay: 10000, temporary: true },
-        'server_error': { delay: 5000, temporary: true }
-      },
       enableCircuitBreaker: true
     },
     features: {
@@ -544,10 +456,6 @@ export const PROVIDER_CONFIGURATIONS = {
     rateLimit: {
       maxConcurrent: 5, // Higher for paid API
       delayBetweenRequests: 0, // No delay for first request
-      initialDelay: 0,
-      subsequentDelay: 100, // Fast for paid service
-      burstLimit: 10,
-      burstWindow: 1000,
       adaptiveBackoff: {
         enabled: true,
         baseMultiplier: 1.5,
@@ -574,12 +482,6 @@ export const PROVIDER_CONFIGURATIONS = {
         'daily_quota',
         'invalid_api_key'
       ],
-      retryStrategies: {
-        'requests_per_minute': { delay: 60000, temporary: true },
-        'character_limit': { delay: 1000, temporary: true, retryWithSmallerChunk: true },
-        'daily_quota': { delay: 86400000, temporary: false },
-        'invalid_api_key': { delay: 0, temporary: false }
-      },
       enableCircuitBreaker: true
     },
     features: {
@@ -598,10 +500,6 @@ export const PROVIDER_CONFIGURATIONS = {
     rateLimit: {
       maxConcurrent: 3, // Conservative due to HTML response issues
       delayBetweenRequests: 0, // No delay for first request
-      initialDelay: 0,
-      subsequentDelay: 500, // 1 second between subsequent requests
-      burstLimit: 2,
-      burstWindow: 3000,
       adaptiveBackoff: {
         enabled: true,
         baseMultiplier: 2, // Aggressive backoff for HTML responses
@@ -632,13 +530,6 @@ export const PROVIDER_CONFIGURATIONS = {
         'json_parsing_error',
         'server_error'
       ],
-      retryStrategies: {
-        'requests_per_minute': { delay: 60000, temporary: true },
-        'rate_limit': { delay: 30000, temporary: true },
-        'html_response': { delay: 5000, temporary: true, retryWithSmallerChunk: true },
-        'json_parsing_error': { delay: 5000, temporary: true, retryWithSmallerChunk: true },
-        'server_error': { delay: 10000, temporary: true }
-      },
       enableCircuitBreaker: true,
       circuitBreakThreshold: 3 // Open circuit after 3 failures (reduced from default 5)
     },
@@ -657,10 +548,6 @@ export const PROVIDER_CONFIGURATIONS = {
     rateLimit: {
       maxConcurrent: 5, // Increased from 4
       delayBetweenRequests: 0,
-      initialDelay: 0,
-      subsequentDelay: 100, // Reduced from 200 to match Google's speed
-      burstLimit: 12, // Increased from 10
-      burstWindow: 1000,
       adaptiveBackoff: {
         enabled: true,
         baseMultiplier: 1.5,
@@ -686,11 +573,6 @@ export const PROVIDER_CONFIGURATIONS = {
         'rate_limit',
         'auth_error'
       ],
-      retryStrategies: {
-        'requests_per_minute': { delay: 60000, temporary: true },
-        'rate_limit': { delay: 10000, temporary: true },
-        'auth_error': { delay: 0, temporary: true } // Instant retry with new token
-      },
       enableCircuitBreaker: true
     },
     features: {
@@ -708,10 +590,6 @@ export const PROVIDER_CONFIGURATIONS = {
     rateLimit: {
       maxConcurrent: 5, // High for local processing
       delayBetweenRequests: 0,
-      initialDelay: 0,
-      subsequentDelay: 0,
-      burstLimit: 10,
-      burstWindow: 1000
     },
     batching: {
       strategy: 'character_limit',
@@ -727,10 +605,6 @@ export const PROVIDER_CONFIGURATIONS = {
     },
     errorHandling: {
       quotaTypes: ['api_unavailable', 'language_not_supported'],
-      retryStrategies: {
-        'api_unavailable': { delay: 0, temporary: false },
-        'language_not_supported': { delay: 0, temporary: false }
-      },
       enableCircuitBreaker: true
     },
     features: {
@@ -747,10 +621,6 @@ export const PROVIDER_CONFIGURATIONS = {
     rateLimit: {
       maxConcurrent: 2,
       delayBetweenRequests: 1000,
-      initialDelay: 0,
-      subsequentDelay: 1000,
-      burstLimit: 5,
-      burstWindow: 60000
     },
     batching: {
       strategy: 'character_limit',
@@ -766,10 +636,6 @@ export const PROVIDER_CONFIGURATIONS = {
     },
     errorHandling: {
       quotaTypes: ['rate_limit', 'word_not_found'],
-      retryStrategies: {
-        'rate_limit': { delay: 60000, temporary: true },
-        'word_not_found': { delay: 0, temporary: false }
-      },
       enableCircuitBreaker: true
     },
     features: {
@@ -787,10 +653,6 @@ export const PROVIDER_CONFIGURATIONS = {
     rateLimit: {
       maxConcurrent: 3, // Conservative for public instances
       delayBetweenRequests: 0,
-      initialDelay: 0,
-      subsequentDelay: 500,
-      burstLimit: 2,
-      burstWindow: 2000,
       adaptiveBackoff: {
         enabled: true,
         baseMultiplier: 2,
@@ -815,10 +677,6 @@ export const PROVIDER_CONFIGURATIONS = {
         'requests_per_minute',
         'rate_limit'
       ],
-      retryStrategies: {
-        'requests_per_minute': { delay: 60000, temporary: true },
-        'rate_limit': { delay: 30000, temporary: true }
-      },
       enableCircuitBreaker: true
     },
     features: {
@@ -836,10 +694,6 @@ export const PROVIDER_CONFIGURATIONS = {
     rateLimit: {
       maxConcurrent: 2, // Safe default
       delayBetweenRequests: 0, // No delay for first request
-      initialDelay: 0,
-      subsequentDelay: 1000, // Standard delay for subsequent requests
-      burstLimit: 3,
-      burstWindow: 2000,
       adaptiveBackoff: {
         enabled: true,
         baseMultiplier: 1.5,
@@ -849,8 +703,6 @@ export const PROVIDER_CONFIGURATIONS = {
       // Mode-specific overrides
       modeOverrides: {
         select_element: {
-          subsequentDelay: 800, // Faster for Select Element mode
-          burstLimit: 4, // Allow more burst for better UX
           maxConcurrent: 2 // Maintain concurrency for Select Element
         }
       }
@@ -867,11 +719,6 @@ export const PROVIDER_CONFIGURATIONS = {
         'rate_limit',
         'quota_exceeded'
       ],
-      retryStrategies: {
-        'requests_per_minute': { delay: 60000, temporary: true },
-        'rate_limit': { delay: 30000, temporary: true },
-        'quota_exceeded': { delay: 3600000, temporary: false }
-      },
       enableCircuitBreaker: true
     },
     features: {
@@ -889,10 +736,6 @@ export const PROVIDER_CONFIGURATIONS = {
     rateLimit: {
       maxConcurrent: 5, // High for local mock testing
       delayBetweenRequests: 0,
-      initialDelay: 0,
-      subsequentDelay: 100, // Minimal delay for mock
-      burstLimit: 10,
-      burstWindow: 1000,
       adaptiveBackoff: {
         enabled: true,
         baseMultiplier: 1.5,
@@ -912,9 +755,6 @@ export const PROVIDER_CONFIGURATIONS = {
     },
     errorHandling: {
       quotaTypes: ['rate_limit'],
-      retryStrategies: {
-        'rate_limit': { delay: 1000, temporary: true }
-      },
       enableCircuitBreaker: true
     },
     features: {
@@ -993,30 +833,12 @@ function applyOptimizationLevel(config, level) {
   const baseConcurrent = config.rateLimit.maxConcurrent;
   result.rateLimit.maxConcurrent = scaleConcurrentLimit(baseConcurrent, safeLevel);
 
-  // Scale Burst Limit if it exists, using the original conservative curve.
-  if (config.rateLimit.burstLimit) {
-    const baseBurst = config.rateLimit.burstLimit;
-    if (safeLevel < 3) {
-      result.rateLimit.burstLimit = Math.max(1, Math.floor(baseBurst * concurrentMultipliers[safeLevel]));
-    } else if (safeLevel > 3) {
-      result.rateLimit.burstLimit = Math.max(baseBurst, Math.ceil(baseBurst * concurrentMultipliers[safeLevel]));
-    }
-  }
-
   // Guardrails: Scale with safety
   if (result.rateLimit.maxConcurrent > 1) {
     result.rateLimit.maxConcurrent = Math.min(result.rateLimit.maxConcurrent, 12);
   } else if (safeLevel >= 4) {
     result.rateLimit.maxConcurrent = 2;
   }
-  
-  // Ensure burstLimit doesn't exceed maxConcurrent
-  if (result.rateLimit.burstLimit > result.rateLimit.maxConcurrent) {
-    result.rateLimit.burstLimit = result.rateLimit.maxConcurrent;
-  }
-
-  // Subsequent Delay multipliers: Level 1 (2.5), Level 2 (1.5), Level 3 (1.0), Level 4 (0.7), Level 5 (0.4)
-  result.rateLimit.subsequentDelay = Math.round(config.rateLimit.subsequentDelay * delayMultipliers[safeLevel]);
   
   // Scale Batching Delays if present
   if (result.batching.delayBetweenRequests) {
@@ -1034,11 +856,6 @@ function applyOptimizationLevel(config, level) {
 
     result.batching.optimalSize = Math.max(5, Math.round(config.batching.optimalSize * multiplier));
     result.batching.maxComplexity = Math.max(100, Math.round(config.batching.maxComplexity * multiplier));
-    
-    // Scale singleBatchThreshold as well for AI
-    if (result.batching.singleBatchThreshold) {
-      result.batching.singleBatchThreshold = Math.max(5, Math.round(config.batching.singleBatchThreshold * multiplier));
-    }
   } else if (config.batching.strategy === 'character_limit') {
     // Traditional: Level 1 (Economy/Stability) -> Large chunks, Level 5 (Turbo) -> Small chunks
     const multiplier = sizeMultipliers[safeLevel];
@@ -1072,18 +889,6 @@ function applyOptimizationLevel(config, level) {
         modeConfig.maxConcurrent = Math.min(scaleConcurrentLimit(modeConfig.maxConcurrent, safeLevel), 12);
       }
       
-      if (modeConfig.burstLimit) {
-        if (safeLevel < 3) {
-          modeConfig.burstLimit = Math.max(1, Math.floor(modeConfig.burstLimit * concurrentMultipliers[safeLevel]));
-        } else if (safeLevel > 3) {
-          modeConfig.burstLimit = Math.max(modeConfig.burstLimit, Math.ceil(modeConfig.burstLimit * concurrentMultipliers[safeLevel]));
-        }
-      }
-      
-      if (modeConfig.subsequentDelay) {
-        modeConfig.subsequentDelay = Math.round(modeConfig.subsequentDelay * delayMultipliers[safeLevel]);
-      }
-      
       result.rateLimit.modeOverrides[mode] = modeConfig;
     }
   }
@@ -1096,11 +901,18 @@ function applyOptimizationLevel(config, level) {
       
       if (isAIStrategy) {
         const multiplier = aiSizeMultipliers[safeLevel];
-        if (modeConfig.optimalSize) modeConfig.optimalSize = Math.max(5, Math.round(modeConfig.optimalSize * multiplier));
+        // Select Element uses logical-parent commits; do not manufacture extra
+        // physical requests solely from optimization-level selection.
+        if (mode !== 'select_element' && modeConfig.optimalSize) {
+          modeConfig.optimalSize = Math.max(5, Math.round(modeConfig.optimalSize * multiplier));
+        }
         if (modeConfig.maxComplexity) modeConfig.maxComplexity = Math.max(100, Math.round(modeConfig.maxComplexity * multiplier));
-        if (modeConfig.singleBatchThreshold) modeConfig.singleBatchThreshold = Math.max(5, Math.round(modeConfig.singleBatchThreshold * multiplier));
         if (modeConfig.maxBatchSizeChars) modeConfig.maxBatchSizeChars = Math.max(500, Math.round(modeConfig.maxBatchSizeChars * multiplier));
-        if (modeConfig.characterLimit) modeConfig.characterLimit = Math.max(500, Math.round(modeConfig.characterLimit * multiplier));
+        // Select Element parents commit only after all fragments complete. Keep
+        // their established split ceiling stable; scale throughput fields above.
+        if (mode !== 'select_element' && modeConfig.characterLimit) {
+          modeConfig.characterLimit = Math.max(500, Math.round(modeConfig.characterLimit * multiplier));
+        }
       } else if (config.batching.strategy === 'character_limit') {
         const multiplier = sizeMultipliers[safeLevel];
         if (modeConfig.characterLimit) modeConfig.characterLimit = Math.max(500, Math.round(modeConfig.characterLimit * multiplier));
@@ -1216,17 +1028,6 @@ export function getProviderBatching(providerName, translateMode = null, level = 
 export function getProviderStreaming(providerName, level = 3) {
   const config = getProviderConfiguration(providerName, level);
   return config.streaming;
-}
-
-/**
- * Get error handling configuration for a provider
- * @param {string} providerName - Provider name
- * @param {number} level - Optimization level
- * @returns {object} - Error handling configuration
- */
-export function getProviderErrorHandling(providerName, level = 3) {
-  const config = getProviderConfiguration(providerName, level);
-  return config.errorHandling;
 }
 
 /**

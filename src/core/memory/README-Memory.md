@@ -418,6 +418,6 @@ setInterval(() => {
 
 ---
 
-**For more information, see the [main project documentation](../../README.md)**  
-**For complete Memory Garbage Collector documentation, see [docs/MEMORY_GARBAGE_COLLECTOR.md](../../docs/MEMORY_GARBAGE_COLLECTOR.md)**</content>
+**For more information, see the [main project documentation](../../../README.md)**  
+**For complete Memory Garbage Collector documentation, see [MEMORY_GARBAGE_COLLECTOR.md](../../../docs/technical/MEMORY_GARBAGE_COLLECTOR.md)**</content>
 <parameter name="oldString"># Memory Garbage Collector System

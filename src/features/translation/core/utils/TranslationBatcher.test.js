@@ -1,6 +1,9 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { TranslationBatcher } from './TranslationBatcher.js';
 import { ComplexityAnalyzer } from './ComplexityAnalyzer.js';
+import { createRequestUnitManifest } from '../../ir/RequestUnitManifest.js';
+import { parseV3Intervals } from '../V3IntervalParser.js';
+import { getProviderBatching } from '../ProviderConfigurations.js';
 
 // Mock ComplexityAnalyzer
 vi.mock('./ComplexityAnalyzer.js', () => ({
@@ -69,6 +72,44 @@ describe('TranslationBatcher', () => {
         partIndex: 1
       });
     });
+
+    it('should retain V2 parent identity and complete fragment membership', () => {
+      const segment = { t: 'Part one. Part two.', i: 'n7', isV2Unit: true };
+      const result = TranslationBatcher.splitOversizedSegment(segment, 10);
+
+      expect(result).toHaveLength(2);
+      expect(result).toEqual(expect.arrayContaining([
+        expect.objectContaining({ parentId: 'n7', fragmentIndex: 0, fragmentCount: 2, isSplitFragment: true }),
+        expect.objectContaining({ parentId: 'n7', fragmentIndex: 1, fragmentCount: 2, isSplitFragment: true })
+      ]));
+    });
+
+    it.each([
+      ['single space', 'one two', 4],
+      ['multiple spaces', 'one   two', 4],
+      ['newline', 'one\ntwo', 4],
+      ['multiple newlines', 'one\n\ntwo', 4],
+      ['tab', 'one\ttwo', 4],
+      ['no whitespace', 'abcdef', 3],
+    ])('preserves %s removed at a V2 fragment boundary', (_label, source, maxChars) => {
+      const fragments = TranslationBatcher.splitOversizedSegment({ t: source, i: 'n7', isV2Unit: true }, maxChars);
+      const restored = fragments
+        .map((fragment, index) => `${index === 0 ? '' : fragment.fragmentJoinerBefore}${fragment.t}`)
+        .join('');
+
+      expect(restored).toBe(source);
+    });
+
+    it('does not add V2 fragment metadata to other object payloads', () => {
+      const fragments = TranslationBatcher.splitOversizedSegment({ t: 'Part one. Part two.', i: 'g1' }, 10);
+
+      expect(fragments).toHaveLength(2);
+      fragments.forEach(fragment => {
+        expect(fragment).not.toHaveProperty('parentId');
+        expect(fragment).not.toHaveProperty('fragmentCount');
+        expect(fragment).not.toHaveProperty('isSplitFragment');
+      });
+    });
   });
 
   describe('createIntelligentBatches', () => {
@@ -134,12 +175,310 @@ describe('TranslationBatcher', () => {
     });
   });
 
+  describe('createIntelligentMembershipBatches', () => {
+    it('preserves distinct manifest references for duplicate values and references', () => {
+      const repeated = { t: 'same' };
+      const segments = ['same', 'same', repeated, repeated, { t: 'same' }];
+      const manifest = createRequestUnitManifest(segments);
+      const batches = TranslationBatcher.createIntelligentMembershipBatches(segments, manifest.units, 10, 1000);
+      const members = batches.flat();
+
+      expect(members.map(({ payload }) => payload)).toEqual(segments);
+      expect(members.map(({ manifestUnit }) => manifestUnit)).toEqual(manifest.units);
+      expect(members.every(({ isSplitFragment }) => isSplitFragment === false)).toBe(true);
+      expect(members[0].manifestUnit).not.toBe(members[1].manifestUnit);
+      expect(members[2].manifestUnit).not.toBe(members[3].manifestUnit);
+      expect(members[2].payload).toBe(members[3].payload);
+    });
+
+    it('marks split fragments as ineligible for manifest observation', () => {
+      const segments = ['First sentence. Second sentence.'];
+      const manifest = createRequestUnitManifest(segments);
+      const members = TranslationBatcher.createIntelligentMembershipBatches(segments, manifest.units, 10, 15).flat();
+
+      expect(members.length).toBeGreaterThan(1);
+      expect(members.every(({ manifestUnit }) => manifestUnit === null)).toBe(true);
+      expect(members.every(({ isSplitFragment }) => isSplitFragment === true)).toBe(true);
+    });
+  });
+
   describe('createOptimalBatches', () => {
     it('should slice segments into equal batches', () => {
       const segments = [1, 2, 3, 4, 5];
       const batches = TranslationBatcher.createOptimalBatches(segments, 2);
       
       expect(batches).toEqual([[1, 2], [3, 4], [5]]);
+    });
+  });
+
+  describe('V3 BlockGroup fragment metadata', () => {
+    const marker = (id) => `@@TI_SEG_e1_s1_n${id}@@`;
+    const markerIds = (text) => parseV3Intervals(text, { grammar: 'ti' }).markers.map(({ normalizedIdentity }) => normalizedIdentity);
+    const reconstruct = (parts) => parts
+      .map((part, index) => `${index === 0 ? '' : (part.fragmentJoinerBefore || '')}${part.t}`)
+      .join('');
+    const hasPartialMarker = (text) => (text.match(/@@/g) || []).length % 2 !== 0;
+
+    it('adds V3 fragment metadata when a V3 block group exceeds maxChars', () => {
+      const segment = { t: 'A very long text that exceeds the maximum character limit for a single batch request.', blockId: 'g1', i: 'n1' };
+      const parts = TranslationBatcher.splitOversizedSegment(segment, 30);
+
+      expect(parts.length).toBeGreaterThan(1);
+      parts.forEach((part, index) => {
+        expect(part.isV3Fragment).toBe(true);
+        expect(part.parentId).toBe('g1');
+        expect(part.fragmentIndex).toBe(index);
+        expect(part.fragmentCount).toBe(parts.length);
+        expect(part.isSplit).toBe(true);
+        expect(part.partIndex).toBe(index);
+      });
+    });
+
+    it('preserves source identity fields with nullish semantics for falsy numeric IDs', () => {
+      const segment = { t: 'Long text here.', blockId: 'g1', i: 0 };
+      const parts = TranslationBatcher.splitOversizedSegment(segment, 5);
+
+      expect(parts.length).toBeGreaterThan(1);
+      parts.forEach((part) => {
+        expect(part.i).toBe(0);
+        expect(part.blockId).toBe('g1');
+      });
+    });
+
+    it('does not add V3 fragment metadata to non-split V3 units', () => {
+      const segment = { t: 'Short text.', blockId: 'g1', i: 'n1' };
+      const parts = TranslationBatcher.splitOversizedSegment(segment, 1000);
+
+      expect(parts.length).toBe(1);
+      expect(parts[0].isV3Fragment).toBeUndefined();
+      expect(parts[0].isSplit).toBeUndefined();
+      expect(parts[0].parentId).toBeUndefined();
+    });
+
+    it('keeps a medium Select Element parent in one batch at levels 3 and 5', () => {
+      const segment = { t: 'word '.repeat(380), blockId: 'g1', i: 'n1' };
+      const batchesByLevel = [3, 5].map((level) => {
+        const config = getProviderBatching('WebAI', 'select_element', level);
+        return TranslationBatcher.createIntelligentBatches(
+          [segment],
+          config.optimalSize,
+          config.characterLimit,
+        );
+      });
+
+      expect(batchesByLevel.map((batches) => batches.length)).toEqual([1, 1]);
+      expect(batchesByLevel[0][0][0].t.length).toBeGreaterThan(1800);
+      expect(batchesByLevel[1][0][0].t.length).toBeGreaterThan(1800);
+    });
+
+    it('keeps a 96-segment Select Element workload at the same batch count across levels', () => {
+      const segments = Array.from({ length: 96 }, (_, index) => ({
+        t: `Segment ${index}`,
+        i: `n${index}`,
+      }));
+      const batchCounts = [3, 5].map((level) => {
+        const config = getProviderBatching('WebAI', 'select_element', level);
+        return TranslationBatcher.createIntelligentBatches(
+          segments,
+          config.optimalSize,
+          config.characterLimit,
+        ).length;
+      });
+
+      expect(batchCounts).toEqual([4, 4]);
+    });
+
+    it('does not add V3 fragment metadata to plain non-V3 objects', () => {
+      const segment = { t: 'A very long text that exceeds the maximum character limit for a single batch request.', role: 'paragraph' };
+      const parts = TranslationBatcher.splitOversizedSegment(segment, 30);
+
+      expect(parts.length).toBeGreaterThan(1);
+      parts.forEach((part) => {
+        expect(part.isV3Fragment).toBeUndefined();
+        expect(part.isSplit).toBe(true);
+        expect(part.partIndex).toBeDefined();
+      });
+    });
+
+    it('does not add V3 fragment metadata to V2 units', () => {
+      const segment = { t: 'A very long text that exceeds the maximum character limit for a single batch request.', isV2Unit: true, i: 'n7' };
+      const parts = TranslationBatcher.splitOversizedSegment(segment, 30);
+
+      expect(parts.length).toBeGreaterThan(1);
+      parts.forEach((part) => {
+        expect(part.isV2Unit).toBe(true);
+        expect(part.isSplitFragment).toBe(true);
+        expect(part.isV3Fragment).toBeUndefined();
+      });
+    });
+
+    it('preserves V2 metadata unchanged when V3 metadata is also present', () => {
+      const segment = { t: 'A very long text that exceeds the maximum character limit for a single batch request.', isV2Unit: true, i: 'n7', blockId: 'g1' };
+      const parts = TranslationBatcher.splitOversizedSegment(segment, 30);
+
+      expect(parts.length).toBeGreaterThan(1);
+      parts.forEach((part) => {
+        expect(part.isV2Unit).toBe(true);
+        expect(part.isSplitFragment).toBe(true);
+        expect(part.isV3Fragment).toBeUndefined();
+      });
+    });
+
+    it('includes fragmentJoinerBefore for V3 fragments', () => {
+      const segment = { t: 'First part.  Second part.', blockId: 'g1', i: 'n1' };
+      const parts = TranslationBatcher.splitOversizedSegment(segment, 12);
+
+      expect(parts.length).toBeGreaterThan(1);
+      expect(parts[0].fragmentJoinerBefore).toBeDefined();
+      expect(parts[1].fragmentJoinerBefore).toBeDefined();
+    });
+
+    it('adds V3 fragment metadata for abbreviated Select Element payloads (b key)', () => {
+      const segment = {
+        t: 'Toys for Bob, Inc.@@TI_SEG_e1_a1_n1@@video game developer@@TI_SEG_e1_a1_n2@@based in Novato, California.',
+        i: 'g1',
+        b: 'g1',
+        r: 'content'
+      };
+      const parts = TranslationBatcher.splitOversizedSegment(segment, 30);
+
+      expect(parts.length).toBeGreaterThan(1);
+      parts.forEach((part, index) => {
+        expect(part.isV3Fragment).toBe(true);
+        expect(part.parentId).toBe('g1');
+        expect(part.fragmentIndex).toBe(index);
+        expect(part.fragmentCount).toBe(parts.length);
+        expect(part.isSplit).toBe(true);
+        expect(part.partIndex).toBe(index);
+      });
+      expect(parts.map((part) => part.fragmentIndex)).toEqual(parts.map((_, index) => index));
+    });
+
+    it('preserves abbreviated identity when full-field blockId is also present', () => {
+      const segment = { t: 'A very long text that exceeds the maximum character limit for a single batch request.', b: 'b-alias', blockId: 'g1', i: 'n1' };
+      const parts = TranslationBatcher.splitOversizedSegment(segment, 30);
+
+      expect(parts.length).toBeGreaterThan(1);
+      parts.forEach((part) => {
+        expect(part.isV3Fragment).toBe(true);
+        expect(part.parentId).toBe('g1');
+        expect(part.blockId).toBe('g1');
+        expect(part.b).toBe('b-alias');
+      });
+    });
+
+    it('preserves all V3 markers exactly once and in order across fragment boundaries', () => {
+      const M = (n) => `@@TI_SEG_e1_a1_n${n}@@`;
+      const source = `Alpha beta gamma delta${M(2)}Epsilon zeta eta theta${M(3)}Iota kappa lambda mu${M(4)}Nu xi omicron pi`;
+      const segment = { t: source, i: 'g1', b: 'g1', r: 'content' };
+      const parts = TranslationBatcher.splitOversizedSegment(segment, 50);
+
+      expect(parts.length).toBe(3);
+
+      const markerOf = (t) => (t.match(/@@TI_SEG_[a-z0-9_]+@@/g) || []);
+      const reassembledMarkers = parts.flatMap((part) => markerOf(part.t));
+      expect(reassembledMarkers).toEqual(markerOf(source));
+    });
+
+    it.each([
+      ['marker prefix', `abcdefgh${marker(1)}tail`, 10],
+      ['marker identity', `abcdefghij${marker(123)}tail`, 14],
+      ['before marker closing delimiter', `abcdefgh${marker(2)}tail`, 18],
+      ['marker internal whitespace', `abcdefgh@@TI _ SEG _ e1_s1_n3@@tail`, 12],
+      ['marker at source start', `${marker(4)}abcdefgh`, 5],
+      ['marker longer than limit', `${marker(123456789)}tail`, 5],
+    ])('never emits partial marker for %s', (_label, source, maxChars) => {
+      const parts = TranslationBatcher.splitOversizedSegment({ t: source, blockId: 'g1', i: 'n1' }, maxChars);
+
+      expect(parts.length).toBeGreaterThan(1);
+      expect(parts.some(({ t }) => hasPartialMarker(t))).toBe(false);
+      expect(reconstruct(parts)).toBe(source);
+      expect(parts.flatMap(({ t }) => markerIds(t))).toEqual(markerIds(source));
+    });
+
+    it('splits before marker when after-marker boundary exceeds maxChars', () => {
+      const source = `abcdefgh${marker(10)}tail`;
+      const maxChars = 10;
+      const parts = TranslationBatcher.splitOversizedSegment({ t: source, blockId: 'g1', i: 'n1' }, maxChars);
+
+      expect(parts[0].t).toBe('abcdefgh');
+      expect(parts[0].t.length).toBeLessThanOrEqual(maxChars);
+      expect(parts[1].t.startsWith(marker(10))).toBe(true);
+      expect(reconstruct(parts)).toBe(source);
+    });
+
+    it('emits marker intact when marker starts at remaining offset zero and exceeds maxChars', () => {
+      const source = `${marker(11)}tail`;
+      const maxChars = 5;
+      const parts = TranslationBatcher.splitOversizedSegment({ t: source, blockId: 'g1', i: 'n1' }, maxChars);
+
+      expect(parts[0].t).toBe(marker(11));
+      expect(parts[0].t.length).toBeGreaterThan(maxChars);
+      expect(hasPartialMarker(parts[0].t)).toBe(false);
+      expect(reconstruct(parts)).toBe(source);
+    });
+
+    it('consumes ordinary text before an oversized marker before oversizing', () => {
+      const source = `abcde${marker(12)}tail`;
+      const maxChars = 5;
+      const parts = TranslationBatcher.splitOversizedSegment({ t: source, blockId: 'g1', i: 'n1' }, maxChars);
+
+      expect(parts[0].t).toBe('abcde');
+      expect(parts[0].t.length).toBe(maxChars);
+      expect(parts[1].t.startsWith(marker(12))).toBe(true);
+      expect(parts[1].t.length).toBeGreaterThan(maxChars);
+      expect(reconstruct(parts)).toBe(source);
+    });
+
+    it('justifies every oversize fragment by an indivisible marker', () => {
+      const source = `prefix ${marker(13)} tail ${marker(14)} end`;
+      const maxChars = 5;
+      const parts = TranslationBatcher.splitOversizedSegment({ t: source, blockId: 'g1', i: 'n1' }, maxChars);
+      const sourceMarkers = parseV3Intervals(source, { grammar: 'ti' }).markers;
+
+      for (const part of parts) {
+        if (part.t.length <= maxChars) continue;
+        const containedMarkers = parseV3Intervals(part.t, { grammar: 'ti' }).markers;
+        expect(containedMarkers.length).toBeGreaterThan(0);
+        expect(containedMarkers.some(({ raw }) => raw.length > maxChars)).toBe(true);
+        expect(containedMarkers.every(({ normalizedIdentity }) => (
+          sourceMarkers.some((sourceMarker) => sourceMarker.normalizedIdentity === normalizedIdentity)
+        ))).toBe(true);
+      }
+    });
+
+    it('preserves marker order across multiple fragments and repeated whitespace', () => {
+      const source = `before  ${marker(1)}\n\ninside\t${marker(2)} after ${marker(3)} end`;
+      const parts = TranslationBatcher.splitOversizedSegment({ t: source, blockId: 'g1', i: 'n1' }, 16);
+
+      expect(parts.some(({ t }) => hasPartialMarker(t))).toBe(false);
+      expect(reconstruct(parts)).toBe(source);
+      expect(parts.flatMap(({ t }) => markerIds(t))).toEqual(markerIds(source));
+    });
+
+    it('splits oversized ordinary V3 interval without splitting marker spans', () => {
+      const source = `${marker(1)}${'ordinary '.repeat(100)}${marker(2)}`;
+      const parts = TranslationBatcher.splitOversizedSegment({ t: source, blockId: 'g1', i: 'n1' }, 30);
+
+      expect(parts.length).toBeGreaterThan(2);
+      expect(parts.some(({ t }) => hasPartialMarker(t))).toBe(false);
+      expect(reconstruct(parts)).toBe(source);
+      expect(parts.flatMap(({ t }) => markerIds(t))).toEqual(markerIds(source));
+    });
+
+    it('keeps V2 splitting behavior isolated from marker protection', () => {
+      const source = 'one   two\nthree';
+      const parts = TranslationBatcher.splitOversizedSegment({ t: source, i: 'n7', isV2Unit: true }, 4);
+
+      expect(reconstruct(parts)).toBe(source);
+      expect(parts.every(({ isSplitFragment, isV3Fragment }) => isSplitFragment === true && isV3Fragment === undefined)).toBe(true);
+    });
+
+    it('keeps generic non-V3 splitting behavior unchanged', () => {
+      const parts = TranslationBatcher.splitOversizedSegment('This is a very long text without punctuation', 10);
+
+      expect(parts.slice(0, 2)).toEqual(['This is a', 'very long']);
+      expect(parts.every((part) => typeof part === 'string')).toBe(true);
     });
   });
 });

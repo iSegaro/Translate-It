@@ -6,6 +6,7 @@
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { ComplexityAnalyzer } from './ComplexityAnalyzer.js';
+import { parseV3Intervals } from '../V3IntervalParser.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.TRANSLATION, 'TranslationBatcher');
 
@@ -26,7 +27,30 @@ export const TranslationBatcher = {
     
     const chunks = [];
     let remaining = text;
+    let remainingOffset = 0;
     let partIndex = 0;
+    let fragmentJoinerBefore = '';
+    const isV2Unit = isObject && segment.isV2Unit === true;
+    // Normalized V3 parent identity: full-field blockId (may be absent) falls
+    // back to the abbreviated Select Element representation (b). V3 detection
+    // and parentId must both resolve from the same normalized value.
+    const blockId = isObject ? (segment.blockId ?? segment.b) : null;
+    const isV3Block = isObject && !isV2Unit && blockId !== null && blockId !== undefined;
+    let markerSpans = null;
+
+    if (isV3Block) {
+      const parsed = parseV3Intervals(text, { grammar: 'ti' });
+      if (parsed.structuralFacts.isV3) markerSpans = parsed.markers;
+    }
+
+    const createObjectPart = (partText, index) => ({
+      ...segment,
+      t: partText,
+      text: partText,
+      isSplit: true,
+      partIndex: index,
+      ...(isV2Unit || isV3Block ? { fragmentJoinerBefore } : {}),
+    });
     
     while (remaining.length > maxChars) {
       let breakPoint = -1;
@@ -43,23 +67,62 @@ export const TranslationBatcher = {
         breakPoint = space !== -1 ? maxChars - lookback + space : maxChars;
       }
       
-      const partText = remaining.substring(0, breakPoint).trim();
+      if (markerSpans) {
+        const absoluteBreakPoint = remainingOffset + breakPoint;
+        const marker = markerSpans.find(({ start, end }) => absoluteBreakPoint > start && absoluteBreakPoint < end);
+        if (marker) {
+          const before = marker.start > remainingOffset ? marker.start - remainingOffset : null;
+          const after = marker.end - remainingOffset;
+          if (before === null || breakPoint - before > after - breakPoint) breakPoint = after;
+          else breakPoint = before;
+        }
+      }
+
+      if (breakPoint <= 0 || breakPoint > remaining.length) breakPoint = Math.min(maxChars, remaining.length);
+
+      const rawPart = remaining.substring(0, breakPoint);
+      const partText = rawPart.trim();
       if (isObject) {
-        chunks.push({ ...segment, t: partText, text: partText, isSplit: true, partIndex: partIndex++ });
+        chunks.push(createObjectPart(partText, partIndex++));
       } else {
         chunks.push(partText);
         partIndex++;
       }
       
-      remaining = remaining.substring(breakPoint).trim();
+      const rawRemaining = remaining.substring(breakPoint);
+      fragmentJoinerBefore = (rawPart.match(/\s*$/)?.[0] || '') + (rawRemaining.match(/^\s*/)?.[0] || '');
+      remainingOffset += breakPoint + (rawRemaining.match(/^\s*/)?.[0].length || 0);
+      remaining = rawRemaining.trim();
     }
     
     if (remaining.length > 0) {
       if (isObject) {
-        chunks.push({ ...segment, t: remaining, text: remaining, isSplit: true, partIndex: partIndex });
+        chunks.push(createObjectPart(remaining, partIndex));
       } else {
         chunks.push(remaining);
       }
+    }
+    
+    if (isV2Unit) {
+      const parentId = segment.i ?? segment.uid ?? segment.id;
+      return chunks.map((chunk, fragmentIndex) => ({
+        ...chunk,
+        parentId,
+        fragmentIndex,
+        fragmentCount: chunks.length,
+        isSplitFragment: true
+      }));
+    }
+
+    if (isV3Block) {
+      const parentId = blockId;
+      return chunks.map((chunk, fragmentIndex) => ({
+        ...chunk,
+        isV3Fragment: true,
+        parentId,
+        fragmentIndex,
+        fragmentCount: chunks.length,
+      }));
     }
     
     return chunks;
@@ -81,14 +144,40 @@ export const TranslationBatcher = {
       flattenedSegments.push(...this.splitOversizedSegment(seg, maxCharsPerBatch));
     }
 
+    const batches = this._groupIntelligentBatches(flattenedSegments, baseBatchSize, maxCharsPerBatch, (segment) => segment);
+    logger.debug(`[TranslationBatcher] Created ${batches.length} intelligent batches (total input: ${segments.length} segments)`);
+    return batches;
+  },
+
+  /**
+   * Groups execution-owned payload/unit pairs without changing provider payloads.
+   * Split fragments intentionally carry no manifest unit because they have no
+   * deterministic one-to-one request-unit provenance yet.
+   */
+  createIntelligentMembershipBatches(segments, manifestUnits, baseBatchSize, maxCharsPerBatch = 5000) {
+    if (!Array.isArray(segments) || !Array.isArray(manifestUnits) || segments.length !== manifestUnits.length) return [];
+
+    const members = [];
+    segments.forEach((segment, requestIndex) => {
+      const parts = this.splitOversizedSegment(segment, maxCharsPerBatch);
+      const isSplitFragment = parts.length > 1;
+      const manifestUnit = isSplitFragment ? null : manifestUnits[requestIndex];
+      parts.forEach((payload) => members.push({ payload, manifestUnit, isSplitFragment }));
+    });
+
+    return this._groupIntelligentBatches(members, baseBatchSize, maxCharsPerBatch, (member) => member.payload);
+  },
+
+  _groupIntelligentBatches(items, baseBatchSize, maxCharsPerBatch, getPayload) {
     const batches = [];
     let currentBatch = [];
     let currentBatchComplexity = 0;
     let currentBatchChars = 0;
     let lastBlockId = null;
     
-    for (let i = 0; i < flattenedSegments.length; i++) {
-      const segment = flattenedSegments[i];
+    for (let i = 0; i < items.length; i++) {
+      const item = items[i];
+      const segment = getPayload(item);
       const isObject = typeof segment === 'object';
       const text = isObject ? (segment.t || segment.text || '') : (segment || '');
       
@@ -119,7 +208,7 @@ export const TranslationBatcher = {
         }
       }
       
-      currentBatch.push(segment);
+      currentBatch.push(item);
       currentBatchComplexity += segmentComplexity;
       currentBatchChars += segmentChars;
       lastBlockId = blockId;
@@ -130,7 +219,6 @@ export const TranslationBatcher = {
       batches.push(currentBatch);
     }
     
-    logger.debug(`[TranslationBatcher] Created ${batches.length} intelligent batches (total input: ${segments.length} segments)`);
     return batches;
   },
 
