@@ -818,6 +818,8 @@ export class DomTranslatorAdapter extends ResourceTracker {
         result = response;
       }
 
+      this._assertCurrentTranslationContext(translationToken);
+
       // Update effective target language from result if it changed
       if (result?.targetLanguage) {
         effectiveTargetLanguage = result.targetLanguage;
@@ -854,9 +856,9 @@ export class DomTranslatorAdapter extends ResourceTracker {
         zeroCommit: committedParentCount === 0,
       });
 
-       const finalResult = await this._finalizeTranslation({
-        result, element, elementId, targetLanguage: effectiveTargetLanguage, onComplete, sessionId: this.currentSessionId, committedParentCount, totalParentCount: getCurrentOutcome().totalParentCount
-       });
+      const finalResult = await this._finalizeTranslation({
+        result, element, elementId, targetLanguage: effectiveTargetLanguage, onComplete, sessionId: this.currentSessionId, translationToken, committedParentCount, totalParentCount: getCurrentOutcome().totalParentCount
+      });
 
       // --- Phase 6 Shadow Mode Validation Gate ---
       if (isBlockGroupingEnabled && finalResult?.success) {
@@ -1263,7 +1265,9 @@ export class DomTranslatorAdapter extends ResourceTracker {
     }
   }
 
-  async _finalizeTranslation({ result, element, elementId, targetLanguage, onComplete, sessionId, committedParentCount = 0, totalParentCount = 0 }) {
+  async _finalizeTranslation({ result, element, elementId, targetLanguage, onComplete, sessionId, translationToken, committedParentCount = 0, totalParentCount = 0 }) {
+    this._assertCurrentTranslationContext(translationToken);
+
     const translationOutcome = {
       committedParentCount,
       totalParentCount,
@@ -1434,6 +1438,14 @@ export class DomTranslatorAdapter extends ResourceTracker {
       && this.currentTranslationToken === token
       && this.currentMessageId === token.messageId
       && ExtensionContextManager.isValidSync();
+  }
+
+  _assertCurrentTranslationContext(token) {
+    if (this._isCurrentTranslation(token)) return;
+    if (this._contextInvalidated || !ExtensionContextManager.isValidSync()) {
+      this.invalidateContext();
+      throw this._createContextInvalidationError();
+    }
   }
 
   async cancelTranslation(options = {}) {

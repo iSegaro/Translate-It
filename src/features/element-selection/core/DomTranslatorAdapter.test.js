@@ -2169,6 +2169,56 @@ describe('DomTranslatorAdapter', () => {
       expect(contentScriptIntegration.cancelTranslationRequest).not.toHaveBeenCalled();
     });
 
+    it('rejects context loss after stream success but before finalization', async () => {
+      const first = document.createTextNode('A');
+      const second = document.createTextNode('B');
+      testElement.replaceChildren(first, second);
+      const { collectTextNodes } = await import('./DomTranslatorUtils.js');
+      collectTextNodes.mockReturnValueOnce([
+        { node: first, text: 'A', uid: 'n1', blockId: 'b1', role: 'div' },
+        { node: second, text: 'B', uid: 'n2', blockId: 'b2', role: 'div' },
+      ]);
+
+      let callbacks;
+      registerTranslation.mockImplementationOnce((_id, registered) => { callbacks = registered; });
+      contentScriptIntegration.sendTranslationRequest.mockResolvedValueOnce({
+        success: true,
+        streaming: true,
+        conversationAcceptance: true,
+      });
+
+      const finalize = adapter._finalizeTranslation.bind(adapter);
+      vi.spyOn(adapter, '_finalizeTranslation').mockImplementation(async (args) => {
+        ExtensionContextManager.isValidSync.mockReturnValue(false);
+        return finalize(args);
+      });
+
+      const translation = adapter.translateElement(testElement);
+      await vi.waitFor(() => expect(callbacks).toBeDefined());
+      callbacks.onStreamUpdate({
+        success: true,
+        data: [{ t: 'Uno', i: 'n1' }, { t: 'Dos', i: 'n2' }],
+      });
+      await vi.waitFor(() => {
+        expect(testElement.textContent).toContain('Uno');
+        expect(testElement.textContent).toContain('Dos');
+      });
+      const { applyElementDirection } = await import('@/utils/dom/DomDirectionManager.js');
+      applyElementDirection.mockClear();
+      const ackCount = sendRegularMessage.mock.calls.length;
+      callbacks.onStreamEnd({ success: true });
+
+      await expect(translation).rejects.toMatchObject({
+        type: ErrorTypes.EXTENSION_CONTEXT_INVALIDATED,
+      });
+      expect(applyElementDirection).not.toHaveBeenCalled();
+      expect(testElement.textContent).toContain('Uno');
+      expect(testElement.textContent).toContain('Dos');
+      expect(globalSelectElementState.currentTranslation.partial).toBe(true);
+      expect(sendRegularMessage).toHaveBeenCalledTimes(ackCount);
+      expect(adapter.isCurrentlyTranslating()).toBe(false);
+    });
+
     it('settles before first commit when context is invalidated during streaming', async () => {
       let callbacks;
       registerTranslation.mockImplementationOnce((_id, registered) => { callbacks = registered; });
