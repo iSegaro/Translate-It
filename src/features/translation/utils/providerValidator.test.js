@@ -6,6 +6,7 @@ describe('providerValidator', () => {
   it('does not require an API key for the OpenAI Compatible provider', () => {
     const provider = findProviderById('custom');
 
+    expect(provider?.needsApiKey).toBe(false);
     expect(provider?.requiredSettings).toEqual(['CUSTOM_API_URL', 'CUSTOM_API_MODEL']);
     expect(
       getFirstMissingSetting('custom', {

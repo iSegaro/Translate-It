@@ -2006,6 +2006,18 @@
   "api_test_result_all_invalid": {
     "message": "All {count} key(s) are invalid"
   },
+  "api_test_custom_connection_success": {
+    "message": "Connection and configured model verified"
+  },
+  "api_test_custom_config_missing": {
+    "message": "Custom API URL and model are required"
+  },
+  "api_test_custom_model_not_found": {
+    "message": "Configured model was not found: {model}"
+  },
+  "api_test_custom_connection_failed": {
+    "message": "Connection or configured model test failed"
+  },
   "api_test_unknown_provider": {
     "message": "Unknown provider: {provider}"
   },

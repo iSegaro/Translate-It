@@ -2006,6 +2006,18 @@
   "api_test_result_all_invalid": {
     "message": "{count}個のキーがすべて無効です"
   },
+  "api_test_custom_connection_success": {
+    "message": "接続と設定済みモデルを確認しました"
+  },
+  "api_test_custom_config_missing": {
+    "message": "カスタムAPI URLとモデルは必須です"
+  },
+  "api_test_custom_model_not_found": {
+    "message": "設定済みモデルが見つかりません: {model}"
+  },
+  "api_test_custom_connection_failed": {
+    "message": "接続または設定済みモデルのテストに失敗しました"
+  },
   "api_test_unknown_provider": {
     "message": "不明なプロバイダー：{provider}"
   },

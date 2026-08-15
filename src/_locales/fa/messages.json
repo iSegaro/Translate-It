@@ -2006,6 +2006,18 @@
   "api_test_result_all_invalid": {
     "message": "همه {count} کلید نامعتبر هستند"
   },
+  "api_test_custom_connection_success": {
+    "message": "اتصال و مدل پیکربندی‌شده تایید شد"
+  },
+  "api_test_custom_config_missing": {
+    "message": "نشانی API و مدل سفارشی الزامی هستند"
+  },
+  "api_test_custom_model_not_found": {
+    "message": "مدل پیکربندی‌شده پیدا نشد: {model}"
+  },
+  "api_test_custom_connection_failed": {
+    "message": "تست اتصال یا مدل پیکربندی‌شده با شکست مواجه شد"
+  },
   "api_test_unknown_provider": {
     "message": "ارائه‌دهنده ناشناخته: {provider}"
   },
