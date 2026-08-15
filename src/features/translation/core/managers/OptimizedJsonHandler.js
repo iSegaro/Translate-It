@@ -17,7 +17,9 @@ import { createManifestViewFromUnits } from '@/features/translation/ir/RequestUn
 import { TranslationContractValidator } from '@/features/translation/core/TranslationContractValidator.js';
 import { parseV3Intervals } from '@/features/translation/core/V3IntervalParser.js';
 import { TRANSLATION_BATCH_EXECUTION_TIMEOUT_MS } from '@/shared/constants/translation.js';
-import { TranslationCallPurpose } from '@/features/translation/providers/ProviderConstants.js';
+import { TranslationCallPurpose, nameToRegistryId } from '@/features/translation/providers/ProviderConstants.js';
+import { findProviderById } from '@/features/translation/providers/ProviderManifest.js';
+import { resolveOperationSourceLanguage } from '@/features/translation/core/OperationSourceLanguageResolver.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.TRANSLATION, 'OptimizedJsonHandler');
 
@@ -66,7 +68,8 @@ export class OptimizedJsonHandler {
    * Orchestrates the optimized translation process.
    */
   async execute(engine, data, providerInstance, originalSourceLang, originalTargetLang, messageId, sender, uiContext = 'unknown', executionContext = null) {
-    const { text, sourceLanguage, targetLanguage, mode, options } = data;
+    const { text, sourceLanguage, mode, options } = data;
+    let targetLanguage = data.targetLanguage;
     const localDeadlineAt = Date.now() + TRANSLATION_BATCH_EXECUTION_TIMEOUT_MS;
     const suppliedDeadlineAt = executionContext?.deadlineAt;
     const operationDeadlineAt = Number.isFinite(suppliedDeadlineAt)
@@ -118,12 +121,58 @@ export class OptimizedJsonHandler {
         ? engine.createIntelligentMembershipBatches(segments, manifestUnits, optimalSize, characterLimit)
         : engine.createIntelligentBatches(segments, optimalSize, characterLimit);
 
+      let bypassAutoSequentialGate = false;
+      if (!historyEnabled && sourceLanguage === 'auto' && batches.length > 0) {
+        const providerId = nameToRegistryId(providerInstance.providerName) || providerInstance.providerName;
+        const providerManifest = findProviderById(providerId);
+        const supportsBilingual = providerManifest?.features?.includes('bilingual') ?? true;
+
+        try {
+          const operationResolution = await resolveOperationSourceLanguage({
+            items: segments,
+            sourceLanguage,
+            targetLanguage,
+            originalSourceLanguage: originalSourceLang,
+            originalMode: data.originalMode || mode,
+            mode,
+            providerName: providerInstance.providerName,
+            supportsBilingual,
+            historyEnabled: false,
+            url: options?.url ?? data.url,
+            tabId: options?.tabId ?? tabId,
+          });
+
+          bypassAutoSequentialGate = operationResolution.canBypassSequentialGate === true;
+          if (bypassAutoSequentialGate) {
+            detectedSourceLanguage = operationResolution.effectiveSourceLanguage;
+            targetLanguage = operationResolution.effectiveTargetLanguage;
+            logger.debug('[JsonHandler] AUTO source resolved locally before dispatch', {
+              language: detectedSourceLanguage,
+              provenance: operationResolution.detection?.provenance,
+              confidence: operationResolution.detection?.confidence,
+              bypassReason: operationResolution.bypassReason,
+              batchCount: batches.length,
+            });
+          } else {
+            logger.debug('[JsonHandler] AUTO source using first-batch fallback', {
+              bypassReason: operationResolution.bypassReason,
+              batchCount: batches.length,
+            });
+          }
+        } catch (resolutionError) {
+          logger.debug('[JsonHandler] AUTO source resolution unavailable; using first-batch fallback', {
+            reason: resolutionError?.message || 'UNKNOWN_RESOLUTION_ERROR',
+            batchCount: batches.length,
+          });
+        }
+      }
+
       logger.debug(`[JsonHandler] Executing ${batches.length} batches for ${segments.length} segments (Concurrency: ${providerConfig.rateLimit.maxConcurrent})`);
       logger.debug(`[JsonHandler] Structured batch ${laneLabel} (${mode})`);
 
       const self = this;
       let completedBatchCount = 0;
-      const accumulatedResults = [];
+      const batchResults = Array.from({ length: batches.length }, () => []);
       fragmentedUnits = new Map();
       const skipStreaming = mode === TranslationMode.PDF;
       const emittedLogicalIds = new Set();
@@ -315,7 +364,8 @@ export class OptimizedJsonHandler {
               originalTargetLang,
               parallelExecution,
               recoveryContext,
-              TranslationCallPurpose.PARENT_RECOVERY
+              TranslationCallPurpose.PARENT_RECOVERY,
+              bypassAutoSequentialGate
             );
             const translated = response?.translatedText !== undefined ? response.translatedText : response;
             const sourceText = fragment.map(({ text }) => text).join('');
@@ -738,7 +788,7 @@ export class OptimizedJsonHandler {
         let startIndex = 0;
         // OPTIMIZATION: If source is auto, wait for the first batch to detect the language.
         // This prevents redundant detection calls for all subsequent batches.
-        if (detectedSourceLanguage === 'auto' && batches.length > 0) {
+        if (!bypassAutoSequentialGate && detectedSourceLanguage === 'auto' && batches.length > 0) {
           logger.debug(`[JsonHandler] Auto-detection mode: Executing first batch sequentially to resolve source language...`);
           await processBatch(batches[0], 0, { parallelExecution: false });
           
@@ -752,7 +802,7 @@ export class OptimizedJsonHandler {
                 type: lastError.type || matchErrorToType(lastError),
                 statusCode: lastError.statusCode
               },
-              results: accumulatedResults
+              results: batchResults.flat()
             };
           }
           startIndex = 1;
@@ -892,7 +942,9 @@ export class OptimizedJsonHandler {
                originalSourceLang,
                originalTargetLang,
                parallelExecution,
-                batchExecutionContext
+                batchExecutionContext,
+                null,
+                bypassAutoSequentialGate
             );
 
           // Guard provider promise so late rejection after timeout cannot become
@@ -921,7 +973,7 @@ export class OptimizedJsonHandler {
           checkCancellation();
 
           // Capture detected language from the first successful batch if it's currently 'auto'
-          if (detectedSourceLanguage === 'auto' && translatedBatchResponse?.detectedLanguage) {
+          if (!bypassAutoSequentialGate && detectedSourceLanguage === 'auto' && translatedBatchResponse?.detectedLanguage) {
             detectedSourceLanguage = translatedBatchResponse.detectedLanguage;
             logger.debug(`[JsonHandler] Captured detected source language: ${detectedSourceLanguage}`);
           }
@@ -977,7 +1029,7 @@ export class OptimizedJsonHandler {
               && acceptedManifestUnits.length > 0) {
             executionContext?.onTerminalUnitsAccepted?.(acceptedManifestUnits);
           }
-          accumulatedResults.push(...filteredResults);
+           batchResults[i] = filteredResults;
           completedBatchCount++;
           if (!skipStreaming && filteredResults.length > 0) {
             await self._streamResults(
@@ -1050,8 +1102,9 @@ export class OptimizedJsonHandler {
              code: batchError.type || matchErrorToType(batchError),
              fallback: true,
            });
-          hasErrors = true;
-          lastError = batchError;
+           hasErrors = true;
+           lastError = batchError;
+           batchResults[i] = [];
           
           // Count the attempted batch to keep progress accounting stable.
           // Never stream the original batch as translated output on failure.
@@ -1082,7 +1135,7 @@ export class OptimizedJsonHandler {
               type: lastError.type || matchErrorToType(lastError),
               statusCode: lastError.statusCode
             },
-            results: accumulatedResults
+            results: batchResults.flat()
           };
         }
         return { success: false, streaming: true, error: { type: ErrorTypes.USER_CANCELLED, message: 'Cancelled' } };
@@ -1108,7 +1161,7 @@ export class OptimizedJsonHandler {
         success: !hasErrors,
         streaming: true,
         error: formattedError,
-        results: accumulatedResults,
+        results: batchResults.flat(),
         metadata: {
           batchCount: batches.length
         }
@@ -1119,7 +1172,7 @@ export class OptimizedJsonHandler {
     }
   }
 
-  async _performBatchCall(providerInstance, batch, source, target, mode, abortController, messageId, sessionId, contextMetadata, contextSummary, engine, sender, originalSourceLang = null, originalTargetLang = null, parallelExecution = false, executionContext = null, callPurpose = null) {
+  async _performBatchCall(providerInstance, batch, source, target, mode, abortController, messageId, sessionId, contextMetadata, contextSummary, engine, sender, originalSourceLang = null, originalTargetLang = null, parallelExecution = false, executionContext = null, callPurpose = null, languagePairResolved = false) {
     const isArrayInput = Array.isArray(batch);
     const textsToTranslate = isArrayInput
       ? (contextMetadata?.parentRecoveryIntervalUnits
@@ -1139,6 +1192,7 @@ export class OptimizedJsonHandler {
         mode, abortController, messageId, sessionId, contextMetadata, contextSummary,
         engine, sender, priority: 'high', rawJsonPayload: true, parallelExecution,
          originalSourceLang, originalTargetLang,
+         ...(languagePairResolved && { languagePairResolved: true }),
          expectedFormat,
          ...(callPurpose && { callPurpose }),
          executionContext

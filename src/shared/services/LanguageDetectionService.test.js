@@ -19,6 +19,7 @@ const { mockDetectLanguage, browserMock, mockShouldApplyRtl } = vi.hoisted(() =>
       },
       i18n: {
         getMessage: (key) => key,
+        getUILanguage: () => 'en-US',
         detectLanguage: mDetect,
       },
     },
@@ -64,7 +65,13 @@ vi.mock('@/shared/config/config.js', () => ({
   })),
 }));
 
-import { LanguageDetectionService, sanitizeDetectionSample, SOURCE_V3_SEGMENT_MARKER_REGEX } from './LanguageDetectionService.js';
+import {
+  DETECTION_CONFIDENCE,
+  DETECTION_PROVENANCE,
+  LanguageDetectionService,
+  sanitizeDetectionSample,
+  SOURCE_V3_SEGMENT_MARKER_REGEX,
+} from './LanguageDetectionService.js';
 import * as textAnalysis from '@/shared/utils/text/textAnalysis.js';
 
 // Canonical marker fixtures matching BlockGroupReconstructor.injectMarkers() output
@@ -468,5 +475,152 @@ describe('LanguageDetectionService - SOURCE_V3_SEGMENT_MARKER_REGEX', () => {
       // Requires both entropy and sessionId to be empty; no path produces this form
       expect('@@TI_SEG__n1@@'.match(SOURCE_V3_SEGMENT_MARKER_REGEX)).toBeNull();
     });
+  });
+});
+
+describe('LanguageDetectionService - detailed detection contract', () => {
+  const longEnglishText = 'This is a sufficiently long English sample used to exercise statistical language detection safely.';
+
+  beforeEach(() => {
+    LanguageDetectionService.clearSessionCache();
+    mockDetectLanguage.mockReset();
+    Object.values(textAnalysis).forEach((mock) => {
+      if (typeof mock?.mockReset === 'function') mock.mockReset();
+    });
+  });
+
+  it('returns high-confidence statistical metadata without exposing browser response details', async () => {
+    mockDetectLanguage.mockResolvedValue({
+      isReliable: true,
+      languages: [{ language: 'en', percentage: 92 }],
+    });
+
+    const result = await LanguageDetectionService.detectDetailed(longEnglishText);
+
+    expect(result).toEqual({
+      language: 'en',
+      confidence: DETECTION_CONFIDENCE.HIGH,
+      provenance: DETECTION_PROVENANCE.STATISTICAL,
+      reliable: true,
+      percentage: 92,
+    });
+  });
+
+  it('classifies accepted statistical guesses below strong percentage as medium', async () => {
+    mockDetectLanguage.mockResolvedValue({
+      isReliable: false,
+      languages: [{ language: 'en', percentage: 60 }],
+    });
+
+    const result = await LanguageDetectionService.detectDetailed(longEnglishText);
+
+    expect(result).toMatchObject({
+      language: 'en',
+      confidence: DETECTION_CONFIDENCE.MEDIUM,
+      provenance: DETECTION_PROVENANCE.STATISTICAL,
+      reliable: false,
+      percentage: 60,
+    });
+  });
+
+  it('classifies unique script markers as deterministic and high confidence', async () => {
+    textAnalysis.detectLatinScriptLanguage.mockReturnValue('de');
+
+    const result = await LanguageDetectionService.detectDetailed('Grüße');
+
+    expect(result).toMatchObject({
+      language: 'de',
+      confidence: DETECTION_CONFIDENCE.HIGH,
+      provenance: DETECTION_PROVENANCE.DETERMINISTIC_SCRIPT,
+      reliable: true,
+    });
+    expect(mockDetectLanguage).not.toHaveBeenCalled();
+  });
+
+  it('classifies exact verified cache hits separately and preserves language', async () => {
+    LanguageDetectionService.registerDetectionResult('cached sample', 'en');
+
+    const result = await LanguageDetectionService.detectDetailed('cached sample');
+
+    expect(result).toMatchObject({
+      language: 'en',
+      confidence: DETECTION_CONFIDENCE.HIGH,
+      provenance: DETECTION_PROVENANCE.EXACT_CACHE,
+      reliable: true,
+    });
+    expect(mockDetectLanguage).not.toHaveBeenCalled();
+  });
+
+  it('classifies contextual script-family cache hits conservatively', async () => {
+    textAnalysis.isLatinScriptText.mockReturnValue(true);
+    const cachedText = 'x'.repeat(600);
+    const queryText = 'y'.repeat(600);
+
+    LanguageDetectionService.registerDetectionResult(cachedText, 'en', { url: 'https://example.com' });
+    const result = await LanguageDetectionService.detectDetailed(queryText, { url: 'https://example.com' });
+
+    expect(result).toMatchObject({
+      language: 'en',
+      confidence: DETECTION_CONFIDENCE.MEDIUM,
+      provenance: DETECTION_PROVENANCE.CONTEXTUAL_CACHE,
+      reliable: false,
+    });
+  });
+
+  it('does not classify heuristic or user-default results as high confidence', async () => {
+    textAnalysis.isArabicScriptText.mockReturnValue(true);
+    textAnalysis.detectArabicScriptLanguage.mockImplementation((_text, _preferences, options) => (
+      options.useDefaults ? 'fa' : null
+    ));
+
+    const result = await LanguageDetectionService.detectDetailed('سلام');
+
+    expect(result).toMatchObject({
+      language: 'fa',
+      confidence: DETECTION_CONFIDENCE.LOW,
+      provenance: DETECTION_PROVENANCE.HEURISTIC,
+      reliable: false,
+    });
+  });
+
+  it('represents unsupported results as explicit unknown detection', async () => {
+    mockDetectLanguage.mockResolvedValue({
+      isReliable: true,
+      languages: [{ language: 'xx', percentage: 100 }],
+    });
+
+    const result = await LanguageDetectionService.detectDetailed(longEnglishText);
+
+    expect(result).toEqual({
+      language: null,
+      confidence: DETECTION_CONFIDENCE.UNKNOWN,
+      provenance: DETECTION_PROVENANCE.UNKNOWN,
+      reliable: false,
+      percentage: null,
+    });
+  });
+
+  it('keeps detect() equal to the detailed language projection', async () => {
+    const statisticalResult = {
+      isReliable: true,
+      languages: [{ language: 'en', percentage: 100 }],
+    };
+    mockDetectLanguage.mockResolvedValue(statisticalResult);
+
+    const detailed = await LanguageDetectionService.detectDetailed(longEnglishText);
+    const legacy = await LanguageDetectionService.detect(longEnglishText);
+
+    expect(legacy).toBe(detailed.language);
+  });
+
+  it('performs one browser detection pass for the legacy method', async () => {
+    mockDetectLanguage.mockResolvedValue({
+      isReliable: true,
+      languages: [{ language: 'en', percentage: 100 }],
+    });
+
+    await LanguageDetectionService.detect(longEnglishText);
+
+    expect(mockDetectLanguage).toHaveBeenCalledTimes(1);
   });
 });

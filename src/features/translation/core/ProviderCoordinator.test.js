@@ -91,6 +91,34 @@ describe('ProviderCoordinator', () => {
       );
     });
 
+    it('should preserve an authoritative operation-level language pair', async () => {
+      const { LanguageDetectionService } = await import("@/shared/services/LanguageDetectionService.js");
+      const { LanguageSwappingService } = await import("@/features/translation/providers/LanguageSwappingService.js");
+
+      const results = await Promise.all([
+        providerCoordinator.execute(mockProvider, 'Batch 1', 'en', 'fa', { languagePairResolved: true }),
+        providerCoordinator.execute(mockProvider, 'Batch 2', 'en', 'fa', { languagePairResolved: true }),
+        providerCoordinator.execute(mockProvider, 'Batch 3', 'en', 'fa', { languagePairResolved: true }),
+        providerCoordinator.execute(mockProvider, 'Batch 4', 'en', 'fa', { languagePairResolved: true }),
+      ]);
+
+      expect(results).toHaveLength(4);
+      expect(results.every(({ sourceLanguage, targetLanguage }) => sourceLanguage === 'en' && targetLanguage === 'fa')).toBe(true);
+      expect(LanguageDetectionService.detect).not.toHaveBeenCalled();
+      expect(LanguageSwappingService.applyLanguageSwapping).not.toHaveBeenCalled();
+    });
+
+    it('should retain explicit-source bilingual resolution without the authoritative flag', async () => {
+      const { LanguageSwappingService } = await import("@/features/translation/providers/LanguageSwappingService.js");
+      LanguageSwappingService.applyLanguageSwapping.mockResolvedValueOnce(['fa', 'de']);
+
+      const result = await providerCoordinator.execute(mockProvider, 'Persian text', 'de', 'fa');
+
+      expect(LanguageSwappingService.applyLanguageSwapping).toHaveBeenCalledTimes(1);
+      expect(result.sourceLanguage).toBe('fa');
+      expect(result.targetLanguage).toBe('de');
+    });
+
     it('should register detection feedback when source is auto', async () => {
       const { LanguageDetectionService } = await import("@/shared/services/LanguageDetectionService.js");
       mockProvider.lastDetectedLanguage = 'de';

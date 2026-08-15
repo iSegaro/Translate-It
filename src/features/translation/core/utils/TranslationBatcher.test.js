@@ -3,6 +3,7 @@ import { TranslationBatcher } from './TranslationBatcher.js';
 import { ComplexityAnalyzer } from './ComplexityAnalyzer.js';
 import { createRequestUnitManifest } from '../../ir/RequestUnitManifest.js';
 import { parseV3Intervals } from '../V3IntervalParser.js';
+import { getProviderBatching } from '../ProviderConfigurations.js';
 
 // Mock ComplexityAnalyzer
 vi.mock('./ComplexityAnalyzer.js', () => ({
@@ -252,6 +253,39 @@ describe('TranslationBatcher', () => {
       expect(parts[0].isV3Fragment).toBeUndefined();
       expect(parts[0].isSplit).toBeUndefined();
       expect(parts[0].parentId).toBeUndefined();
+    });
+
+    it('keeps a medium Select Element parent in one batch at levels 3 and 5', () => {
+      const segment = { t: 'word '.repeat(380), blockId: 'g1', i: 'n1' };
+      const batchesByLevel = [3, 5].map((level) => {
+        const config = getProviderBatching('WebAI', 'select_element', level);
+        return TranslationBatcher.createIntelligentBatches(
+          [segment],
+          config.optimalSize,
+          config.characterLimit,
+        );
+      });
+
+      expect(batchesByLevel.map((batches) => batches.length)).toEqual([1, 1]);
+      expect(batchesByLevel[0][0][0].t.length).toBeGreaterThan(1800);
+      expect(batchesByLevel[1][0][0].t.length).toBeGreaterThan(1800);
+    });
+
+    it('keeps a 96-segment Select Element workload at the same batch count across levels', () => {
+      const segments = Array.from({ length: 96 }, (_, index) => ({
+        t: `Segment ${index}`,
+        i: `n${index}`,
+      }));
+      const batchCounts = [3, 5].map((level) => {
+        const config = getProviderBatching('WebAI', 'select_element', level);
+        return TranslationBatcher.createIntelligentBatches(
+          segments,
+          config.optimalSize,
+          config.characterLimit,
+        ).length;
+      });
+
+      expect(batchCounts).toEqual([4, 4]);
     });
 
     it('does not add V3 fragment metadata to plain non-V3 objects', () => {

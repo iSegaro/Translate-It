@@ -29,6 +29,7 @@ export class ProviderCoordinator {
     const providerName = provider.providerName;
     const { messageId, engine, sessionId, mode } = options;
     const translateMode = mode || TranslationMode.Selection;
+    const languagePairResolved = options.languagePairResolved === true;
 
     // 1. Language Detection & Swapping (Bilingual logic / Auto-detect swap)
     // Perform this BEFORE normalization to use standard codes
@@ -65,7 +66,7 @@ export class ProviderCoordinator {
       const supportsBilingual = manifest?.features?.includes('bilingual') ?? true;
 
       // 1a. Apply Language Swapping (Bilingual Logic)
-      if (supportsBilingual) {
+      if (supportsBilingual && !languagePairResolved) {
         const [swappedSource, swappedTarget] = await LanguageSwappingService.applyLanguageSwapping(
           sampleText,
           sourceLang,
@@ -85,7 +86,7 @@ export class ProviderCoordinator {
       // 1b. Auto-Detection Fallback
       // If we are still at 'auto' (meaning bilingual was disabled or didn't swap),
       // we must detect the language now to provide a concrete code to the provider.
-      if (processedSourceLang === AUTO_DETECT_VALUE) {
+      if (!languagePairResolved && processedSourceLang === AUTO_DETECT_VALUE) {
         const detectedLanguage = await LanguageDetectionService.detect(sampleText, { url: options.url });
         if (detectedLanguage) {
           logger.debug(`[Coordinator] Using detected source language: ${detectedLanguage} (instead of auto)`);
