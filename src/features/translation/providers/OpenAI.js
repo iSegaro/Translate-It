@@ -22,6 +22,13 @@ import { recordProviderCompletion } from "@/features/translation/ir/TranslationO
 
 const logger = getScopedLogger(LOG_COMPONENTS.PROVIDERS, 'OpenAI');
 
+const OPENAI_REQUEST_CAPABILITIES = Object.freeze({
+  'gpt-4o': Object.freeze({ supportsTemperature: true }),
+  'gpt-4o-mini': Object.freeze({ supportsTemperature: true }),
+});
+
+const getRequestCapabilities = (model) => OPENAI_REQUEST_CAPABILITIES[model] || { supportsTemperature: false };
+
 export class OpenAIProvider extends BaseAIProvider {
   static type = "ai";
   static description = "OpenAI's GPT models (GPT-4, GPT-3.5)";
@@ -83,6 +90,7 @@ export class OpenAIProvider extends BaseAIProvider {
     logger.info(`[OpenAI] Model: ${activeModel}${sessionId ? ` (Session: ${sessionId.substring(0, 15)}..., Turn: ${turnNumber})` : ''}`);
 
     const { messages } = await AIConversationHelper.getConversationMessages(sessionId, this.providerName, userText, systemPrompt, mode, { callPurpose, conversationParticipates });
+    const requestCapabilities = getRequestCapabilities(activeModel);
 
     const fetchOptions = {
       method: "POST",
@@ -93,8 +101,8 @@ export class OpenAIProvider extends BaseAIProvider {
       body: JSON.stringify({
         model: activeModel,
         messages: messages,
-        temperature: 0.1,
-        max_tokens: 4096,
+        max_completion_tokens: 4096,
+        ...(requestCapabilities.supportsTemperature && { temperature: 0.1 }),
         // Enforce JSON Mode for both Object and Batch (Array) contracts
         ...((expectedFormat === ResponseFormat.JSON_OBJECT || expectedFormat === ResponseFormat.JSON_ARRAY) && { 
           response_format: { type: "json_object" } 

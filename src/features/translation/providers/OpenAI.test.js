@@ -6,6 +6,8 @@ import { TranslationCallPurpose } from './ProviderConstants.js';
 import { AIConversationHelper } from './utils/AIConversationHelper.js';
 import { CompletionTermination } from '@/features/translation/ir/CompletionContract.js';
 import { createTranslationOperation } from '@/features/translation/ir/TranslationOperation.js';
+import { getOpenAIModelAsync } from '@/shared/config/config.js';
+import { ResponseFormat } from '@/shared/config/translationConstants.js';
 
 // Mock Dependencies
 vi.mock('@/shared/proxy/ProxyManager.js', () => ({
@@ -92,7 +94,38 @@ describe('OpenAIProvider Error Handling', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    getOpenAIModelAsync.mockResolvedValue('gpt-4o-mini');
     provider = new OpenAIProvider();
+  });
+
+  it.each([
+    ['gpt-4o', true],
+    ['gpt-4o-mini', true],
+    ['gpt-5.6-terra', false],
+    ['gpt-5.6-sol', false],
+    ['custom-model-id', false],
+  ])('builds modern text request for %s', async (model, supportsTemperature) => {
+    getOpenAIModelAsync.mockResolvedValue(model);
+    const executeRequest = vi.spyOn(provider, '_executeRequest').mockResolvedValue('translated');
+
+    await provider._callAI('system', 'text', { expectedFormat: ResponseFormat.JSON_OBJECT });
+
+    const payload = JSON.parse(executeRequest.mock.calls[0][0].fetchOptions.body);
+    expect(payload).toMatchObject({
+      model,
+      max_completion_tokens: 4096,
+      response_format: { type: 'json_object' },
+      messages: [
+        { role: 'system', content: 'system' },
+        { role: 'user', content: 'text' },
+      ],
+    });
+    expect(payload).not.toHaveProperty('max_tokens');
+    if (supportsTemperature) {
+      expect(payload).toHaveProperty('temperature', 0.1);
+    } else {
+      expect(payload).not.toHaveProperty('temperature');
+    }
   });
 
   it('should handle successful translation', async () => {
