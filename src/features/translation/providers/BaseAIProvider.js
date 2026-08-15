@@ -17,9 +17,37 @@ import { AIResponseParser } from "./utils/AIResponseParser.js";
 import { AITextProcessor } from "./utils/AITextProcessor.js";
 import { TranslationMode, getProviderOptimizationLevelAsync } from "@/shared/config/config.js";
 import { AIStreamManager } from "./utils/AIStreamManager.js";
-import { appendTranslationDiagnostic } from '@/features/translation/ir/TranslationOperation.js';
+import { isCancellationError } from "@/shared/error-management/ErrorMatcher.js";
+import { appendTranslationDiagnostic } from "@/features/translation/ir/TranslationOperation.js";
+import { TranslationCallPurpose } from "@/features/translation/providers/ProviderConstants.js";
 
 const logger = getScopedLogger(LOG_COMPONENTS.TRANSLATION, 'BaseAIProvider');
+
+function createConversationCommitCandidate() {
+  let staged = null;
+  let settled = false;
+  return {
+    stage(payload) {
+      if (!settled && !staged) staged = payload;
+    },
+    async commit() {
+      if (settled || !staged) return;
+      settled = true;
+      await AIConversationHelper.updateSessionHistory(
+        staged.sessionId,
+        staged.userContent,
+        staged.assistantContent,
+        { callPurpose: TranslationCallPurpose.PRIMARY_TRANSLATION }
+      );
+    },
+    discard() {
+      if (!settled) {
+        settled = true;
+        staged = null;
+      }
+    }
+  };
+}
 
 export class BaseAIProvider extends BaseProvider {
   // AI-specific capabilities - to be overridden by subclasses
@@ -75,7 +103,16 @@ export class BaseAIProvider extends BaseProvider {
     }
 
     // 3. Fallback to traditional sequential batching for single segments or non-JSON providers
-    return this._traditionalBatchTranslate(texts, sourceLang, targetLang, translateMode, engine, messageId, abortController, priority, sessionId, expectedFormat, options);
+    return this.executeSequentialBatch(texts, sourceLang, targetLang, {
+      translateMode,
+      engine,
+      messageId,
+      abortController,
+      priority,
+      sessionId,
+      expectedFormat,
+      contextMetadata: options,
+    });
   }
 
   /**
@@ -122,41 +159,27 @@ export class BaseAIProvider extends BaseProvider {
    * @protected
    */
   async _translateBatch(texts, sourceLang, targetLang, translateMode, abortController, engine, messageId, sessionId, contextMetadata = null, expectedFormat = null, priority = null) {
+    const structuredFormat = expectedFormat || ResponseFormat.JSON_ARRAY;
+    const conversationCommitCandidate = (
+      structuredFormat === ResponseFormat.JSON_ARRAY || structuredFormat === ResponseFormat.JSON_OBJECT
+    ) ? createConversationCommitCandidate() : null;
     try {
-      const { systemPrompt, userText } = await this._preparePromptAndText(texts, sourceLang, targetLang, translateMode, contextMetadata, sessionId);
-      
-      logger.debugLazy(() => [`[${this.providerName}] Batch Prompt preparation complete`, { 
-        systemPrompt, 
-        userText: typeof userText === 'string' ? userText : JSON.parse(userText) 
-      }]);
-
-      // Ensure promptText is a string for the AI API
-      const finalUserText = typeof userText === 'string' ? userText : JSON.stringify(userText);
-      const context = `${this.providerName.toLowerCase()}-batch-translation`;
-
-      const response = await this._executeWithRateLimit(
-        (opts) => this._callAI(systemPrompt, finalUserText, {
-          ...opts,
-          abortController,
-          messageId,
-          sessionId,
-          mode: translateMode,
-          sourceLang,
-          targetLang,
-           isBatch: true,
-           expectedFormat: expectedFormat || ResponseFormat.JSON_ARRAY,
-           executionContext: contextMetadata?.executionContext,
-        }),
-        context,
+      const response = await this.executeStructuredBatch(texts, sourceLang, targetLang, {
+        translateMode,
+        abortController,
+        messageId,
+        sessionId,
+        contextMetadata,
+        expectedFormat,
         priority,
-        { sessionId, abortController, messageId, executionContext: contextMetadata?.executionContext }
-      );
+        conversationCommitCandidate,
+      });
 
       // Stats recording is handled by ProviderRequestEngine. 
       // Orchestrators (like OptimizedJsonHandler or UnifiedService) handle the reporting.
       const executionContext = contextMetadata?.executionContext;
 
-      return AIResponseParser.parseBatchResult(
+      const parsed = AIResponseParser.parseBatchResult(
         response,
         texts.length,
         texts,
@@ -165,38 +188,129 @@ export class BaseAIProvider extends BaseProvider {
         executionContext,
         executionContext?.manifestView,
       );
-    } catch (error) {
-      if (sessionId) {
-        import('../core/TranslationStatsManager.js').then(m => {
-          m.statsManager.recordError(this.providerName, sessionId);
-        }).catch(() => { /* ignore */ });
-      }
-      
-      const { matchErrorToType, isFatalError, isTransientError } = await import('@/shared/error-management/ErrorMatcher.js');
-      const errorType = error.type || matchErrorToType(error);
-      const isFatal = isFatalError(error) || isFatalError(errorType);
-      const isTransient = isTransientError(error) || isTransientError(errorType);
 
-      logger.debug(`[${this.providerName}] Batch translation failed:`, error.message);
-      
-      // CRITICAL FALLBACK: ONLY return clean original text if the error is non-fatal AND non-transient.
-      // If it is transient (Network, 429, 5xx), we MUST throw so QueueManager can retry.
-      // For fatal errors (401, 403), we MUST throw to inform the UI and stop the process.
-      if (!isFatal && !isTransient && Array.isArray(texts)) {
-        logger.warn(`[${this.providerName}] Non-fatal error, falling back to original text for mapping safety`);
-        appendTranslationDiagnostic(contextMetadata?.executionContext, {
-          type: 'PROVIDER_FALLBACK',
-          stage: 'base-ai-provider',
+      // Structured recovery: the parser reports facts only; recovery ownership stays
+      // here. A contract violation triggers exactly one sequential re-request.
+      // The sequential pass returns a scalar for a single segment; normalize it to
+      // the canonical structured-batch array shape so downstream contract cleaning
+      // (ProviderCoordinator._cleanResult) receives the same shape as the normal path.
+      if (parsed.contractViolation) {
+        conversationCommitCandidate?.discard();
+        logger.warn(`[${this.providerName}] Structured response violated its contract; sequential recovery started`);
+        appendTranslationDiagnostic(executionContext, {
+          type: 'RECOVERY_TRIGGERED',
+          stage: 'recovery',
           provider: this.providerName,
-          reason: error.message,
-          code: errorType,
-          fallback: true,
+          code: 'CONTRACT_VIOLATION',
+          count: texts.length,
         });
-        return texts.map(t => typeof t === 'object' ? (t.t || t.text || "") : (t || ""));
+
+        let recoveryResult;
+        try {
+          recoveryResult = await this.executeSequentialBatch(texts, sourceLang, targetLang, {
+            translateMode,
+            engine,
+            messageId,
+            abortController,
+            priority,
+            sessionId,
+            expectedFormat: ResponseFormat.STRING,
+            contextMetadata,
+            callPurpose: TranslationCallPurpose.STRUCTURED_RECOVERY,
+          });
+        } catch (error) {
+          if (!abortController?.signal?.aborted && !isCancellationError(error)) {
+            appendTranslationDiagnostic(executionContext, {
+              type: 'RECOVERY_FAILED',
+              stage: 'recovery',
+              provider: this.providerName,
+              reason: error.message,
+              ...(typeof error.type === 'string' && { code: error.type }),
+            });
+          }
+          throw error;
+        }
+
+        appendTranslationDiagnostic(executionContext, {
+          type: 'RECOVERY_SUCCEEDED',
+          stage: 'recovery',
+          provider: this.providerName,
+        });
+        return Array.isArray(recoveryResult) ? recoveryResult : [recoveryResult];
       }
-      
+
+      await conversationCommitCandidate?.commit();
+      return parsed.results;
+    } catch (error) {
+      conversationCommitCandidate?.discard();
+      // Error accounting is owned exclusively by ProviderRequestEngine.executeApiCall:
+      // TranslationStatsManager.errors counts failed physical HTTP calls only.
+      // This batch boundary only logs and rethrows; it must not double-record transport
+      // failures or classify cancellation, timeout, or pre-transport rejection as one.
+      logger.debug(`[${this.providerName}] Batch translation failed:`, error.message);
+
+      // EVERY error is thrown - never return original text as a "successful" translation.
+      // - Transient (Network, 429, 5xx): thrown so QueueManager can retry.
+      // - Fatal (401, 403): thrown to inform the UI and stop the process.
+      // - Non-fatal, non-transient: thrown so the failure surfaces loudly instead of
+      //   silently reporting the untranslated original as a success.
       throw error;
     }
+  }
+
+  async executeStructuredBatch(texts, sourceLang, targetLang, {
+    translateMode,
+    abortController,
+    messageId,
+    sessionId,
+    contextMetadata = null,
+    expectedFormat = null,
+    priority = null,
+    conversationCommitCandidate = null,
+  } = {}) {
+    const { systemPrompt, userText } = await this._preparePromptAndText(texts, sourceLang, targetLang, translateMode, contextMetadata, sessionId);
+    logger.debugLazy(() => [`[${this.providerName}] Batch Prompt preparation complete`, {
+      systemPrompt,
+      userText: typeof userText === 'string' ? userText : JSON.parse(userText)
+    }]);
+    const finalUserText = typeof userText === 'string' ? userText : JSON.stringify(userText);
+    const context = `${this.providerName.toLowerCase()}-batch-translation`;
+    return this._executeWithRateLimit(
+      (opts) => this._callAI(systemPrompt, finalUserText, {
+        ...opts,
+        abortController,
+        messageId,
+        sessionId,
+        mode: translateMode,
+        sourceLang,
+        targetLang,
+        isBatch: true,
+        expectedFormat: expectedFormat || ResponseFormat.JSON_ARRAY,
+        executionContext: contextMetadata?.executionContext,
+        callPurpose: TranslationCallPurpose.PRIMARY_TRANSLATION,
+        conversationCommitCandidate,
+      }),
+      context,
+      priority,
+      { sessionId, abortController, messageId, executionContext: contextMetadata?.executionContext }
+    );
+  }
+
+  async executeSequentialBatch(texts, sourceLang, targetLang, {
+    translateMode,
+    engine,
+    messageId,
+    abortController,
+    priority,
+    sessionId,
+    expectedFormat,
+    contextMetadata = {},
+    callPurpose,
+  } = {}) {
+    return this._traditionalBatchTranslate(
+      texts, sourceLang, targetLang, translateMode, engine, messageId, abortController,
+      priority, sessionId, expectedFormat, { ...contextMetadata, ...(callPurpose && { callPurpose }) }
+    );
   }
 
   /**
@@ -205,6 +319,9 @@ export class BaseAIProvider extends BaseProvider {
   async _traditionalBatchTranslate(texts, sourceLang, targetLang, translateMode, engine, messageId, abortController, priority, sessionId, expectedFormat, options = {}) {
     const results = [];
     const context = `${this.providerName.toLowerCase()}-traditional-sequential`;
+    const callPurpose = options.callPurpose === TranslationCallPurpose.STRUCTURED_RECOVERY
+      ? TranslationCallPurpose.STRUCTURED_RECOVERY
+      : TranslationCallPurpose.PRIMARY_TRANSLATION;
 
     for (let i = 0; i < texts.length; i++) {
       if (abortController?.signal?.aborted) throw new Error('Cancelled');
@@ -227,6 +344,7 @@ export class BaseAIProvider extends BaseProvider {
             targetLang,
             expectedFormat: expectedFormat || ResponseFormat.STRING,
             executionContext: options.executionContext,
+            callPurpose,
           }),
           chunkContext,
           priority,
@@ -236,16 +354,9 @@ export class BaseAIProvider extends BaseProvider {
         results.push(AIResponseParser.cleanAIResponse(response, expectedFormat || ResponseFormat.STRING));
       } catch (error) {
         logger.error(`[${this.providerName}] Traditional segment translation failed:`, error.message);
-        appendTranslationDiagnostic(options.executionContext, {
-          type: 'PROVIDER_FALLBACK',
-          stage: 'base-ai-provider',
-          provider: this.providerName,
-          reason: error.message,
-          code: error.type,
-          fallback: true,
-        });
-        // Return clean original text as fallback for this segment
-        results.push(typeof text === 'object' ? (text.t || text.text || "") : (text || ""));
+        // No silent success: a failed segment fails the batch loudly. The error
+        // propagates for retry (transient) or explicit failure reporting (fatal/permanent).
+        throw error;
       }
     }
     return results.length === 1 && texts.length === 1 ? results[0] : results;

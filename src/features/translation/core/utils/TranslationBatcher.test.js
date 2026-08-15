@@ -70,6 +70,44 @@ describe('TranslationBatcher', () => {
         partIndex: 1
       });
     });
+
+    it('should retain V2 parent identity and complete fragment membership', () => {
+      const segment = { t: 'Part one. Part two.', i: 'n7', isV2Unit: true };
+      const result = TranslationBatcher.splitOversizedSegment(segment, 10);
+
+      expect(result).toHaveLength(2);
+      expect(result).toEqual(expect.arrayContaining([
+        expect.objectContaining({ parentId: 'n7', fragmentIndex: 0, fragmentCount: 2, isSplitFragment: true }),
+        expect.objectContaining({ parentId: 'n7', fragmentIndex: 1, fragmentCount: 2, isSplitFragment: true })
+      ]));
+    });
+
+    it.each([
+      ['single space', 'one two', 4],
+      ['multiple spaces', 'one   two', 4],
+      ['newline', 'one\ntwo', 4],
+      ['multiple newlines', 'one\n\ntwo', 4],
+      ['tab', 'one\ttwo', 4],
+      ['no whitespace', 'abcdef', 3],
+    ])('preserves %s removed at a V2 fragment boundary', (_label, source, maxChars) => {
+      const fragments = TranslationBatcher.splitOversizedSegment({ t: source, i: 'n7', isV2Unit: true }, maxChars);
+      const restored = fragments
+        .map((fragment, index) => `${index === 0 ? '' : fragment.fragmentJoinerBefore}${fragment.t}`)
+        .join('');
+
+      expect(restored).toBe(source);
+    });
+
+    it('does not add V2 fragment metadata to other object payloads', () => {
+      const fragments = TranslationBatcher.splitOversizedSegment({ t: 'Part one. Part two.', i: 'g1' }, 10);
+
+      expect(fragments).toHaveLength(2);
+      fragments.forEach(fragment => {
+        expect(fragment).not.toHaveProperty('parentId');
+        expect(fragment).not.toHaveProperty('fragmentCount');
+        expect(fragment).not.toHaveProperty('isSplitFragment');
+      });
+    });
   });
 
   describe('createIntelligentBatches', () => {

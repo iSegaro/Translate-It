@@ -84,7 +84,8 @@ vi.mock('../../../shared/messaging/core/MessagingCore.js', () => ({
 
 vi.mock('../../../features/translation/core/TranslationStatsManager.js', () => ({
   statsManager: {
-    printSummary: vi.fn()
+    printSummary: vi.fn(),
+    recordOperationQuality: vi.fn()
   }
 }));
 
@@ -140,6 +141,7 @@ import { createTranslationOperation, finalizeTranslationOperation } from '../../
 import { createRequestUnitManifest } from '../../../features/translation/ir/RequestUnitManifest.js';
 import { TerminalExecutionRouter } from '../../../features/translation/ir/TerminalExecutionRouter.js';
 import { ActionReasons } from '../../../shared/messaging/core/MessagingCore.js';
+import { statsManager } from '../../../features/translation/core/TranslationStatsManager.js';
 
 describe('UnifiedTranslationService', () => {
   let service;
@@ -207,6 +209,56 @@ describe('UnifiedTranslationService', () => {
       expect(service.resultDispatcher.dispatchResult).toHaveBeenCalled();
     });
 
+    it('records OPERATION_FAILED with reason and code when the tracker transition is FAILED', async () => {
+      const message = {
+        messageId: 'm-fail',
+        data: { text: 'hello', mode: 'selection' },
+        context: 'content'
+      };
+
+      const mockRequest = { messageId: 'm-fail', data: message.data };
+      translationRequestTracker.createRequest.mockReturnValue(mockRequest);
+      translationRequestTracker.completeRequest.mockReturnValue({ accepted: true, status: 'failed' });
+
+      service.modeCoordinator.processRequest.mockResolvedValue({
+        success: false,
+        error: { type: 'API_ERROR', message: 'Provider rejected request' }
+      });
+
+      await service.handleTranslationRequest(message);
+
+      const calls = finalizeTranslationOperation.mock.results;
+      const report = calls[calls.length - 1].value;
+      expect(report).toBeTruthy();
+      const terminal = report.entries[report.entries.length - 1];
+      expect(terminal.type).toBe('OPERATION_FAILED');
+      expect(terminal.reason).toBe('Provider rejected request');
+      expect(terminal.code).toBe('API_ERROR');
+    });
+
+    it('records OPERATION_COMPLETED when the tracker transition is COMPLETED', async () => {
+      const message = {
+        messageId: 'm-ok',
+        data: { text: 'hello', mode: 'selection' },
+        context: 'content'
+      };
+
+      const mockRequest = { messageId: 'm-ok', data: message.data };
+      translationRequestTracker.createRequest.mockReturnValue(mockRequest);
+
+      service.modeCoordinator.processRequest.mockResolvedValue({ success: true, translatedText: 'bonjour' });
+
+      await service.handleTranslationRequest(message);
+
+      const calls = finalizeTranslationOperation.mock.results;
+      const report = calls[calls.length - 1].value;
+      expect(report).toBeTruthy();
+      const terminal = report.entries[report.entries.length - 1];
+      expect(terminal.type).toBe('OPERATION_COMPLETED');
+      const { statsManager } = await import('../../../features/translation/core/TranslationStatsManager.js');
+      expect(statsManager.recordOperationQuality).toHaveBeenCalledTimes(1);
+    });
+
     it('suppresses a late success result when cancellation already won', async () => {
       const message = { messageId: 'm-cancelled', data: { text: 'hello', mode: 'selection' }, context: 'content' };
       const request = { messageId: 'm-cancelled', data: message.data, mode: 'selection' };
@@ -265,6 +317,22 @@ describe('UnifiedTranslationService', () => {
 
       expect(result).toMatchObject({ success: false, cancelled: true });
       expect(service.resultDispatcher.dispatchResult).not.toHaveBeenCalled();
+    });
+
+    it('marks a canonical provider timeout as TIMEOUT and records OPERATION_TIMEOUT', async () => {
+      const message = { messageId: 'm-provider-timeout', data: { text: 'hello', mode: 'selection' }, context: 'content' };
+      translationRequestTracker.createRequest.mockReturnValue({ messageId: message.messageId, data: message.data, mode: 'selection' });
+      const timeout = Object.assign(new Error('Batch translation timed out'), {
+        type: ErrorTypes.TRANSLATION_TIMEOUT
+      });
+      service.modeCoordinator.processRequest.mockRejectedValue(timeout);
+
+      await service.handleTranslationRequest(message);
+
+      expect(translationRequestTracker.markTimeout).toHaveBeenCalledWith(message.messageId);
+      expect(translationRequestTracker.failRequest).not.toHaveBeenCalled();
+      const report = finalizeTranslationOperation.mock.results.at(-1).value;
+      expect(report.entries.at(-1).type).toBe('OPERATION_TIMEOUT');
     });
 
     it('preserves timeout when late completion is rejected', async () => {
@@ -507,6 +575,124 @@ describe('UnifiedTranslationService', () => {
       await service.cancelRequest('m-reject-cancel');
 
       expect(TerminalExecutionRouter.routeTerminalExecution).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('handleTimeout', () => {
+    async function startTimedOutRequest(outcome) {
+      const message = { messageId: 'm-timeout', data: { text: 'hello', mode: 'selection' }, context: 'content' };
+      const request = { messageId: 'm-timeout', data: message.data, mode: 'selection' };
+      let settle;
+      const pending = new Promise((resolve, reject) => {
+        settle = value => value instanceof Error ? reject(value) : resolve(value);
+      });
+      translationRequestTracker.getRequest
+        .mockReturnValueOnce(null)
+        .mockReturnValue(request);
+      translationRequestTracker.createRequest.mockReturnValue(request);
+      translationRequestTracker.completeRequest.mockReturnValue({ accepted: false, status: 'timeout', reason: 'already_terminal' });
+      translationRequestTracker.failRequest.mockReturnValue({ accepted: false, status: 'timeout', reason: 'already_terminal' });
+      service.modeCoordinator.processRequest.mockReturnValue(pending);
+
+      const inFlight = service.handleTranslationRequest(message);
+      await vi.waitFor(() => expect(service.modeCoordinator.processRequest).toHaveBeenCalledTimes(1));
+      await service.handleTimeout('m-timeout');
+      settle(outcome);
+      return inFlight;
+    }
+
+    it('finalizes and cancels once after an accepted timeout', async () => {
+      const request = { messageId: 'm-timeout' };
+      translationRequestTracker.getRequest.mockReturnValue(request);
+      service._setOperation(request, createTranslationOperation('m-timeout'));
+
+      const result = await service.handleTimeout(
+        'm-timeout',
+        'Streaming translation timed out',
+        'PROGRESS_TIMEOUT'
+      );
+
+      expect(result).toEqual({ handled: true, success: true });
+      expect(translationRequestTracker.markTimeout).toHaveBeenCalledTimes(1);
+      expect(finalizeTranslationOperation).toHaveBeenCalledTimes(1);
+      expect(statsManager.recordOperationQuality).toHaveBeenCalledTimes(1);
+      expect(service._getOperation(request)).toBeNull();
+      expect(mockEngine.cancelTranslation).toHaveBeenCalledWith(
+        'm-timeout',
+        true,
+        'PROGRESS_TIMEOUT',
+        'Streaming translation timed out'
+      );
+    });
+
+    it('does no terminal work when timeout transition is rejected', async () => {
+      translationRequestTracker.getRequest.mockReturnValue({ messageId: 'm-timeout' });
+      translationRequestTracker.markTimeout.mockReturnValue({ accepted: false, status: 'completed', reason: 'already_terminal' });
+
+      const result = await service.handleTimeout('m-timeout');
+
+      expect(result).toEqual({ handled: true, success: false, error: 'already_terminal' });
+      expect(finalizeTranslationOperation).not.toHaveBeenCalled();
+      expect(statsManager.recordOperationQuality).not.toHaveBeenCalled();
+      expect(mockEngine.cancelTranslation).not.toHaveBeenCalled();
+    });
+
+    it('finalizes only once when duplicate timeout is rejected', async () => {
+      const request = { messageId: 'm-timeout' };
+      translationRequestTracker.getRequest.mockReturnValue(request);
+      translationRequestTracker.markTimeout
+        .mockReturnValueOnce({ accepted: true, status: 'timeout' })
+        .mockReturnValueOnce({ accepted: false, status: 'timeout', reason: 'already_terminal' });
+      service._setOperation(request, createTranslationOperation('m-timeout'));
+
+      await service.handleTimeout('m-timeout');
+      await service.handleTimeout('m-timeout');
+
+      expect(finalizeTranslationOperation).toHaveBeenCalledTimes(1);
+      expect(statsManager.recordOperationQuality).toHaveBeenCalledTimes(1);
+      expect(mockEngine.cancelTranslation).toHaveBeenCalledTimes(1);
+    });
+
+    it('records an incomplete recovery summary for timeout', async () => {
+      const request = { messageId: 'm-timeout' };
+      const operation = createTranslationOperation('m-timeout');
+      operation.appendDiagnostic({ type: 'RECOVERY_TRIGGERED', provider: 'google' });
+      translationRequestTracker.getRequest.mockReturnValue(request);
+      service._setOperation(request, operation);
+
+      await service.handleTimeout('m-timeout');
+
+      expect(statsManager.recordOperationQuality).toHaveBeenCalledWith(expect.objectContaining({
+        hadRecovery: true,
+        finalRecoveryOutcome: 'INCOMPLETE',
+      }));
+    });
+
+    it('does not aggregate again when success arrives after timeout', async () => {
+      const result = await startTimedOutRequest({ success: true });
+
+      expect(result).toMatchObject({ success: false, timedOut: true });
+      expect(statsManager.recordOperationQuality).toHaveBeenCalledTimes(1);
+    });
+
+    it('does not aggregate again when failure arrives after timeout', async () => {
+      const result = await startTimedOutRequest(new Error('late failure'));
+
+      expect(result).toMatchObject({ success: false, timedOut: true });
+      expect(statsManager.recordOperationQuality).toHaveBeenCalledTimes(1);
+    });
+
+    it('keeps timeout finalization when engine cancellation fails', async () => {
+      const request = { messageId: 'm-timeout' };
+      translationRequestTracker.getRequest.mockReturnValue(request);
+      service._setOperation(request, createTranslationOperation('m-timeout'));
+      mockEngine.cancelTranslation.mockRejectedValueOnce(new Error('abort failed'));
+
+      await expect(service.handleTimeout('m-timeout')).resolves.toEqual({ handled: true, success: true });
+
+      expect(finalizeTranslationOperation).toHaveBeenCalledTimes(1);
+      expect(statsManager.recordOperationQuality).toHaveBeenCalledTimes(1);
+      expect(service._getOperation(request)).toBeNull();
     });
   });
 

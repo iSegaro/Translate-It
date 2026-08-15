@@ -490,7 +490,7 @@ Each item MUST contain the "id" and the translated "text".
 
 CRITICAL - Formatting & Structure:
   - Strictly preserve all line breaks (\\n), indentation, and formatting.
-  - If the translated text contains segment markers like [--SEG:nN--], you MUST preserve them exactly as-is. Do not translate, modify, rearrange, or remove these markers.
+  - Preserve every segment marker that begins with @@TI_SEG_ and ends with @@ exactly as it appears. Example: @@TI_SEG_xxx_session_n5@@. Do not translate, remove, duplicate, reorder, or modify any character inside these markers.
 
 Return ONLY the JSON object, no additional text or markdown.
 
@@ -509,7 +509,7 @@ Each item MUST contain the "id" and the translated "text".
 
 CRITICAL - Formatting & Structure:
   - Strictly preserve all line breaks (\\n), indentation, and formatting.
-  - If the translated text contains segment markers like [--SEG:nN--], you MUST preserve them exactly as-is. Do not translate, modify, rearrange, or remove these markers.
+  - Preserve every segment marker that begins with @@TI_SEG_ and ends with @@ exactly as it appears. Example: @@TI_SEG_xxx_session_n5@@. Do not translate, remove, duplicate, reorder, or modify any character inside these markers.
 
 Return ONLY the JSON object, no additional text or markdown.
 

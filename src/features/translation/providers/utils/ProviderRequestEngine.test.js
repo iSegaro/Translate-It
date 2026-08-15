@@ -42,6 +42,7 @@ vi.mock('@/utils/browser/compatibility.js', () => ({
 }));
 
 import { ProviderRequestEngine } from './ProviderRequestEngine.js';
+import { TranslationCallPurpose } from '../ProviderConstants.js';
 import { ApiKeyManager } from '../ApiKeyManager.js';
 import { proxyManager } from '@/shared/proxy/ProxyManager.js';
 import { getBrowserInfoSync } from '@/utils/browser/compatibility.js';
@@ -60,6 +61,17 @@ describe('ProviderRequestEngine', () => {
   });
 
   describe('executeRequest - Failover Logic', () => {
+    it.each([undefined, 'INVALID_PURPOSE'])('normalizes %p purpose to primary before physical accounting', async (callPurpose) => {
+      const apiCallSpy = vi.spyOn(ProviderRequestEngine, 'executeApiCall').mockResolvedValue('translated');
+      try {
+        await ProviderRequestEngine.executeRequest(mockProvider, {
+          url: 'https://api.test.com', fetchOptions: { headers: {} }, extractResponse: mockExtractResponse, callPurpose
+        });
+        expect(apiCallSpy).toHaveBeenCalledWith(mockProvider, expect.objectContaining({ callPurpose: TranslationCallPurpose.PRIMARY_TRANSLATION }));
+      } finally {
+        apiCallSpy.mockRestore();
+      }
+    });
     it('should failover to the second key if the first one fails with a retryable error', async () => {
       // 1. Setup: Two keys available
       const keys = ['bad-key', 'good-key'];
@@ -94,7 +106,8 @@ describe('ProviderRequestEngine', () => {
           headers: { 'Authorization': 'Bearer bad-key' } 
         },
         extractResponse: mockExtractResponse,
-        updateApiKey
+        updateApiKey,
+        callPurpose: TranslationCallPurpose.STRUCTURED_RECOVERY
       });
 
       // 4. Verification
@@ -106,6 +119,11 @@ describe('ProviderRequestEngine', () => {
       
       // Check if the working key was promoted
       expect(ApiKeyManager.promoteKey).toHaveBeenCalledWith('test_key_setting', 'good-key');
+      const { statsManager } = await import('../../core/TranslationStatsManager.js');
+      expect(statsManager.recordRequest).toHaveBeenCalledTimes(2);
+      expect(statsManager.recordError).toHaveBeenCalledTimes(1);
+      expect(statsManager.recordRequest.mock.calls.every(([, , , , purpose]) => purpose === TranslationCallPurpose.STRUCTURED_RECOVERY)).toBe(true);
+      expect(statsManager.recordError).toHaveBeenCalledWith('TestProvider', null, TranslationCallPurpose.STRUCTURED_RECOVERY);
     });
 
     it('should throw error immediately if shouldFailover is false', async () => {
@@ -130,6 +148,44 @@ describe('ProviderRequestEngine', () => {
 
       expect(proxyManager.fetch).toHaveBeenCalledTimes(1);
     });
+
+    it.each([
+      ['missing purpose', undefined, TranslationCallPurpose.PRIMARY_TRANSLATION],
+      ['invalid purpose', 'OTHER', TranslationCallPurpose.PRIMARY_TRANSLATION],
+      ['recovery purpose', TranslationCallPurpose.STRUCTURED_RECOVERY, TranslationCallPurpose.STRUCTURED_RECOVERY],
+    ])('should forward normalized %s to every physical call', async (_label, callPurpose, expectedPurpose) => {
+      const apiCallSpy = vi.spyOn(ProviderRequestEngine, 'executeApiCall').mockResolvedValue('translated');
+
+      await ProviderRequestEngine.executeRequest(mockProvider, {
+        url: 'https://api.test.com',
+        fetchOptions: { headers: {} },
+        extractResponse: mockExtractResponse,
+        callPurpose,
+      });
+
+      expect(apiCallSpy).toHaveBeenCalledWith(mockProvider, expect.objectContaining({ callPurpose: expectedPurpose }));
+      apiCallSpy.mockRestore();
+    });
+
+    it('should preserve recovery purpose across key failover', async () => {
+      ApiKeyManager.getKeys.mockResolvedValue(['bad-key', 'good-key']);
+      ApiKeyManager.shouldFailover.mockReturnValue(true);
+      const apiCallSpy = vi.spyOn(ProviderRequestEngine, 'executeApiCall')
+        .mockRejectedValueOnce(Object.assign(new Error('bad key'), { type: 'API_ERROR' }))
+        .mockResolvedValueOnce('translated');
+
+      await ProviderRequestEngine.executeRequest(mockProvider, {
+        url: 'https://api.test.com',
+        fetchOptions: { headers: {} },
+        extractResponse: mockExtractResponse,
+        updateApiKey: vi.fn(),
+        callPurpose: TranslationCallPurpose.STRUCTURED_RECOVERY,
+      });
+
+      expect(apiCallSpy).toHaveBeenCalledTimes(2);
+      expect(apiCallSpy.mock.calls.every(([, params]) => params.callPurpose === TranslationCallPurpose.STRUCTURED_RECOVERY)).toBe(true);
+      apiCallSpy.mockRestore();
+    });
   });
 
   describe('prepareHeaders', () => {
@@ -148,6 +204,90 @@ describe('ProviderRequestEngine', () => {
       expect(result['Content-Type']).toBe('application/json');
       expect(result['Sec-Fetch-Mode']).toBeUndefined();
       expect(result['Referer']).toBeUndefined();
+    });
+  });
+
+  describe('Error Accounting', () => {
+    const baseParams = () => ({
+      url: 'https://api.test.com',
+      fetchOptions: { headers: {} },
+      extractResponse: mockExtractResponse,
+      context: 'test',
+      sessionId: 's1',
+      charCount: 10,
+      originalCharCount: 5
+    });
+
+    it.each([
+      [undefined, TranslationCallPurpose.PRIMARY_TRANSLATION],
+      [null, TranslationCallPurpose.PRIMARY_TRANSLATION],
+      ['', TranslationCallPurpose.PRIMARY_TRANSLATION],
+      ['UNKNOWN', TranslationCallPurpose.PRIMARY_TRANSLATION],
+      [TranslationCallPurpose.PRIMARY_TRANSLATION, TranslationCallPurpose.PRIMARY_TRANSLATION],
+      [TranslationCallPurpose.STRUCTURED_RECOVERY, TranslationCallPurpose.STRUCTURED_RECOVERY],
+    ])('attributes direct physical %p purpose as %s', async (callPurpose, expectedPurpose) => {
+      proxyManager.fetch.mockResolvedValue({
+        ok: true,
+        status: 200,
+        headers: new Map([['content-type', 'application/json']]),
+        clone() { return this; },
+        json: async () => ({ translated: 'translated' })
+      });
+      const { statsManager } = await import('../../core/TranslationStatsManager.js');
+
+      await ProviderRequestEngine.executeApiCall(mockProvider, { ...baseParams(), callPurpose });
+
+      expect(statsManager.recordRequest).toHaveBeenCalledWith(
+        'TestProvider',
+        's1',
+        10,
+        5,
+        expectedPurpose
+      );
+    });
+
+    it('should record exactly one error for a non-cancellation transport failure and rethrow', async () => {
+      proxyManager.fetch.mockRejectedValue(new TypeError('NetworkError: Failed to fetch'));
+      const { statsManager } = await import('../../core/TranslationStatsManager.js');
+
+      await expect(ProviderRequestEngine.executeApiCall(mockProvider, baseParams()))
+        .rejects.toThrow('NetworkError');
+
+      expect(statsManager.recordRequest).toHaveBeenCalledTimes(1);
+      expect(statsManager.recordError).toHaveBeenCalledTimes(1);
+      expect(statsManager.recordRequest).toHaveBeenCalledWith('TestProvider', 's1', 10, 5, TranslationCallPurpose.PRIMARY_TRANSLATION);
+      expect(statsManager.recordError).toHaveBeenCalledWith('TestProvider', 's1', TranslationCallPurpose.PRIMARY_TRANSLATION);
+    });
+
+    it('should not record an error for an aborted transport call', async () => {
+      proxyManager.fetch.mockRejectedValue(new DOMException('Aborted', 'AbortError'));
+      const { statsManager } = await import('../../core/TranslationStatsManager.js');
+
+      await expect(ProviderRequestEngine.executeApiCall(mockProvider, baseParams()))
+        .rejects.toThrow('Translation cancelled by user');
+
+      expect(statsManager.recordRequest).toHaveBeenCalledTimes(1);
+      expect(statsManager.recordError).not.toHaveBeenCalled();
+    });
+
+    it('attributes a recovery transport failure to recovery exactly once', async () => {
+      proxyManager.fetch.mockRejectedValue(new TypeError('NetworkError: Failed to fetch'));
+      const { statsManager } = await import('../../core/TranslationStatsManager.js');
+      await expect(ProviderRequestEngine.executeApiCall(mockProvider, {
+        ...baseParams(), callPurpose: TranslationCallPurpose.STRUCTURED_RECOVERY
+      })).rejects.toThrow('NetworkError');
+      expect(statsManager.recordRequest).toHaveBeenCalledWith('TestProvider', 's1', 10, 5, TranslationCallPurpose.STRUCTURED_RECOVERY);
+      expect(statsManager.recordError).toHaveBeenCalledWith('TestProvider', 's1', TranslationCallPurpose.STRUCTURED_RECOVERY);
+    });
+
+    it('attributes a recovery abort without recording a recovery error', async () => {
+      proxyManager.fetch.mockRejectedValue(new DOMException('Aborted', 'AbortError'));
+      const { statsManager } = await import('../../core/TranslationStatsManager.js');
+      await expect(ProviderRequestEngine.executeApiCall(mockProvider, {
+        ...baseParams(), callPurpose: TranslationCallPurpose.STRUCTURED_RECOVERY
+      })).rejects.toThrow('Translation cancelled by user');
+      expect(statsManager.recordRequest).toHaveBeenCalledWith('TestProvider', 's1', 10, 5, TranslationCallPurpose.STRUCTURED_RECOVERY);
+      expect(statsManager.recordError).not.toHaveBeenCalled();
     });
   });
 });

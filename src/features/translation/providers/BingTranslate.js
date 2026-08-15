@@ -166,9 +166,10 @@ export class BingTranslateProvider extends BaseTranslateProvider {
           this._setDetectedLanguage(data?.[0]?.detectedLanguage?.language);
           
           const targetText = data?.[0]?.translations?.[0]?.text;
-          if (typeof targetText !== 'string') {
-            // Fallback to original text strings if translation is missing
-            return chunkTexts.map(t => getTextInfo(t).text);
+          if (typeof targetText !== 'string' || !targetText.trim()) {
+            const error = new Error('Bing response contained no translation text');
+            error.type = ErrorTypes.API_RESPONSE_INVALID;
+            throw error;
           }
           
           // Return raw text string. 
@@ -186,7 +187,12 @@ export class BingTranslateProvider extends BaseTranslateProvider {
 
       // If result is a string and we have multiple segments, let Coordinator split it.
       // If we are in a recursive call, we might need to wrap it in an array for the parent.
-      const finalResult = typeof result === 'string' ? [result] : (result || chunkTexts.map(t => getTextInfo(t).text));
+      if (!result || (typeof result === 'string' && !result.trim())) {
+        const error = new Error('Bing response contained no translation text');
+        error.type = ErrorTypes.API_RESPONSE_INVALID;
+        throw error;
+      }
+      const finalResult = typeof result === 'string' ? [result] : result;
 
       // Add completion log for successful translation
       if (retryAttempt === 0 && finalResult.length > 0) {
@@ -250,11 +256,7 @@ export class BingTranslateProvider extends BaseTranslateProvider {
           }
         }
 
-        // CRITICAL FINAL FALLBACK: If we've exhausted retries or can't split further, 
-        // return the original text for THIS chunk instead of throwing.
-        // This prevents one bad chunk from breaking the entire page translation.
-        logger.debug(`[Bing] Translation consistently failed for this chunk. Returning original text to preserve stability.`);
-        return chunkTexts.map(t => getTextInfo(t).text);
+        throw error;
       }
 
       const isFatal = isFatalError(error) || isFatalError(errorType);

@@ -103,5 +103,23 @@ describe('BingTranslateProvider', () => {
       await expect(provider._translateChunk(['text'], 'en', 'fa'))
         .rejects.toThrow();
     });
+
+    it.each([undefined, '', '   '])('throws when Bing response has %p translation text', async (text) => {
+      vi.spyOn(provider, '_executeApiCall').mockImplementation(async (options) => options.extractResponse({
+        headers: { get: () => 'application/json' },
+        text: async () => JSON.stringify([{ translations: [{ text }] }])
+      }));
+
+      await expect(provider._translateChunk(['source'], 'en', 'fa')).rejects.toMatchObject({ type: 'API_RESPONSE_INVALID' });
+    });
+
+    it('accepts a valid Bing translation equal to source', async () => {
+      vi.spyOn(provider, '_executeApiCall').mockImplementation(async (options) => options.extractResponse({
+        headers: { get: () => 'application/json' },
+        text: async () => JSON.stringify([{ translations: [{ text: 'URL' }] }])
+      }));
+
+      await expect(provider._translateChunk(['URL'], 'en', 'fa')).resolves.toEqual(['URL']);
+    });
   });
 });

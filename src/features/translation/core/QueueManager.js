@@ -7,6 +7,7 @@ import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { ErrorTypes } from "@/shared/error-management/ErrorTypes.js";
 import { isFatalError, isCancellationError } from "@/shared/error-management/ErrorMatcher.js";
+import { isLocalDeterministicValidationError } from "@/shared/error-management/ValidationPolicy.js";
 import { appendTranslationDiagnostic } from '@/features/translation/ir/TranslationOperation.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.TRANSLATION, 'QueueManager');
@@ -129,6 +130,11 @@ class QueueItem {
    * Check if item should be retried
    */
   shouldRetry() {
+    if (isCancellationError(this.lastError)) return false;
+
+    // Local deterministic validation errors (e.g., TEXT_TOO_LONG) must never be retried
+    if (isLocalDeterministicValidationError(this.lastError)) return false;
+
     // 1. If we have a fatal error (like invalid API key), do NOT retry
     if (this.lastError && isFatalError(this.lastError)) {
       // CIRCUIT_BREAKER_OPEN is considered fatal in ErrorMatcher.
@@ -339,8 +345,10 @@ export class QueueManager {
     
     try {
       const result = await item.requestFunction();
+      if (item.status !== QueueStatus.PROCESSING) return;
       
-      // Success
+      // Execution success (the callback resolved); this is NOT a claim about
+      // translation validity - semantic success is decided by downstream layers.
       item.status = QueueStatus.COMPLETED;
       item.result = result;
       
@@ -348,7 +356,7 @@ export class QueueManager {
         item.callbacks.resolve(result);
       }
       
-      logger.debug(`Item ${item.id} completed successfully`);
+      logger.debug(`Item ${item.id} execution completed`);
       
     } catch (error) {
       // Re-check status: it might have been changed to FAILED by an external cancellation during the request
@@ -606,22 +614,6 @@ export class QueueManager {
     return cleanedCount;
   }
   
-  /**
-   * Clear all queues (for testing)
-   */
-  clearAll() {
-    // Cancel all retry timeouts
-    for (const [, timeout] of this.retryTimeouts) {
-      clearTimeout(timeout);
-    }
-    
-    this.queues.clear();
-    this.processing.clear();
-    this.retryTimeouts.clear();
-    this.itemCounter = 0;
-    
-    logger.debug('Cleared all queues');
-  }
 }
 
 // Export singleton instance

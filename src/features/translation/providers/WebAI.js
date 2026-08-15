@@ -29,7 +29,7 @@ export class WebAIProvider extends BaseAIProvider {
    * @protected
    */
   async _callAI(systemPrompt, userText, options = {}) {
-    const { abortController, sessionId, expectedFormat, isBatch, executionContext } = options;
+    const { abortController, sessionId, expectedFormat, isBatch, executionContext, callPurpose, conversationCommitCandidate } = options;
 
     const [apiUrl, apiModel] = await Promise.all([
       getWebAIApiUrlAsync(),
@@ -43,7 +43,7 @@ export class WebAIProvider extends BaseAIProvider {
       historyEnabled && options.mode === TranslationMode.Select_Element;
 
     const turnNumber = shouldUseConversationHistory
-      ? await AIConversationHelper.claimNextTurn(sessionId, this.providerName)
+      ? await AIConversationHelper.claimNextTurn(sessionId, this.providerName, { callPurpose })
       : null;
     logger.info(`[WebAI] Model: ${apiModel}${sessionId ? ` (Session: ${sessionId.substring(0, 15)}...${turnNumber ? `, Turn: ${turnNumber}` : ''})` : ''}`);
 
@@ -51,7 +51,8 @@ export class WebAIProvider extends BaseAIProvider {
     // We combine the system prompt and user text into a final message
     const historyContext = shouldUseConversationHistory
       ? await AIConversationHelper.formatCompactHistoryContext(sessionId, options.mode, {
-          maxChars: 300
+          maxChars: 300,
+          callPurpose
         })
       : '';
 
@@ -84,11 +85,13 @@ export class WebAIProvider extends BaseAIProvider {
       context: `${this.providerName.toLowerCase()}-translation`,
       abortController,
       sessionId,
-      executionContext
+      executionContext,
+      callPurpose
     });
 
     if (shouldUseConversationHistory && sessionId && result) {
-      await AIConversationHelper.updateSessionHistory(sessionId, userText, result);
+      if (conversationCommitCandidate) conversationCommitCandidate.stage({ sessionId, userContent: userText, assistantContent: result });
+      else await AIConversationHelper.updateSessionHistory(sessionId, userText, result, { callPurpose });
     }
     
     return result;

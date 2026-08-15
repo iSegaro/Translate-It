@@ -27,6 +27,17 @@ export const TranslationBatcher = {
     const chunks = [];
     let remaining = text;
     let partIndex = 0;
+    let fragmentJoinerBefore = '';
+    const isV2Unit = isObject && segment.isV2Unit === true;
+
+    const createObjectPart = (partText, index) => ({
+      ...segment,
+      t: partText,
+      text: partText,
+      isSplit: true,
+      partIndex: index,
+      ...(isV2Unit && { fragmentJoinerBefore })
+    });
     
     while (remaining.length > maxChars) {
       let breakPoint = -1;
@@ -43,26 +54,38 @@ export const TranslationBatcher = {
         breakPoint = space !== -1 ? maxChars - lookback + space : maxChars;
       }
       
-      const partText = remaining.substring(0, breakPoint).trim();
+      const rawPart = remaining.substring(0, breakPoint);
+      const partText = rawPart.trim();
       if (isObject) {
-        chunks.push({ ...segment, t: partText, text: partText, isSplit: true, partIndex: partIndex++ });
+        chunks.push(createObjectPart(partText, partIndex++));
       } else {
         chunks.push(partText);
         partIndex++;
       }
       
-      remaining = remaining.substring(breakPoint).trim();
+      const rawRemaining = remaining.substring(breakPoint);
+      fragmentJoinerBefore = (rawPart.match(/\s*$/)?.[0] || '') + (rawRemaining.match(/^\s*/)?.[0] || '');
+      remaining = rawRemaining.trim();
     }
     
     if (remaining.length > 0) {
       if (isObject) {
-        chunks.push({ ...segment, t: remaining, text: remaining, isSplit: true, partIndex: partIndex });
+        chunks.push(createObjectPart(remaining, partIndex));
       } else {
         chunks.push(remaining);
       }
     }
     
-    return chunks;
+    if (!isV2Unit) return chunks;
+
+    const parentId = segment.i ?? segment.uid ?? segment.id;
+    return chunks.map((chunk, fragmentIndex) => ({
+      ...chunk,
+      parentId,
+      fragmentIndex,
+      fragmentCount: chunks.length,
+      isSplitFragment: true
+    }));
   },
 
   /**

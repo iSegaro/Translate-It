@@ -187,18 +187,26 @@ describe('ProviderCoordinator', () => {
 
       expect(result.translatedText).toBe('Part 1\nPart 2');
     });
+
+    it('should pass recovery-shaped array through JSON_OBJECT cleaning without collapsing to empty string', async () => {
+      mockProvider.translate.mockResolvedValue(['Bonjour']);
+
+      const result = await providerCoordinator.execute(
+        mockProvider, 'Input', 'en', 'fa', { expectedFormat: ResponseFormat.JSON_OBJECT }
+      );
+
+      expect(result.translatedText).toEqual(['Bonjour']);
+      expect(result.translatedText).not.toBe('');
+    });
   });
 
   describe('Error Resilience', () => {
-    it('should return original text if provider fails with a non-fatal error', async () => {
+    it('should throw if provider fails with a non-fatal non-transient error instead of fabricating success', async () => {
       mockProvider.translate.mockRejectedValue(new Error('Temporary API Error'));
-      
-      const result = await providerCoordinator.execute(
-        mockProvider, 'Original Text', 'en', 'fa'
-      );
 
-      expect(result.translatedText).toBe('Original Text');
-      expect(result.isFallback).toBe(true);
+      await expect(providerCoordinator.execute(
+        mockProvider, 'Original Text', 'en', 'fa'
+      )).rejects.toThrow('Temporary API Error');
     });
 
     it('should throw immediately if provider fails with a fatal error', async () => {

@@ -215,7 +215,7 @@ describe('UnifiedModeCoordinator', () => {
         .rejects.toThrow("Provider 'invalid' initialization failed");
     });
 
-    it('should handle provider errors gracefully and return fallback', async () => {
+    it('should handle provider errors and report failure with fallback content', async () => {
       const request = {
         mode: TranslationMode.Page,
         data: { text: [{ text: 'orig' }], provider: 'google' },
@@ -228,7 +228,7 @@ describe('UnifiedModeCoordinator', () => {
 
       const result = await coordinator.processPageTranslation(request, { translationEngine: mockEngine });
 
-      expect(result.success).toBe(true); // Should return success true for Page mode partial failure
+      expect(result.success).toBe(false); // Failed batch reports failure, not fabricated success
       expect(result.hasError).toBe(true);
       expect(JSON.parse(result.translatedText)[0].text).toBe('orig');
     });

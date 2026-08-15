@@ -18,9 +18,6 @@ import { AUTO_DETECT_VALUE } from "@/shared/constants/core.js";
 import { queueManager } from "./QueueManager.js";
 import { TranslationPriority } from "./RateLimitManager.js";
 import { streamingManager } from "./StreamingManager.js";
-import {
-  appendTranslationDiagnostic,
-} from '@/features/translation/ir/TranslationOperation.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.TRANSLATION, 'ProviderCoordinator');
 
@@ -265,25 +262,10 @@ export class ProviderCoordinator {
       // Throw if it's a recognized fatal/transient error or a generic system Error
       if (isFatalError(error) || isTransient) throw error;
 
-      appendTranslationDiagnostic(options.executionContext, {
-        type: 'COORDINATOR_FALLBACK',
-        stage: 'provider-coordinator',
-        provider: providerName,
-        reason: error.message,
-        code: errorType,
-        fallback: true,
-      });
-      
-      // Wrap fallback in a standard result object to avoid destructuring errors in the engine
-      const fallbackResult = Array.isArray(text) ? text.map(t => typeof t === 'object' ? (t.t || t.text) : t) : text;
-      return {
-        success: true,
-        translatedText: fallbackResult,
-        provider: providerName,
-        sourceLanguage: processedSourceLang,
-        targetLanguage: processedTargetLang,
-        isFallback: true
-      };
+      // Non-fatal, non-transient: previously fell back to returning the original text
+      // wrapped in a "successful" result. That is silent success - the caller believes
+      // the text was translated when it was not. Throw so the failure surfaces loudly.
+      throw error;
     }
   }
 
@@ -397,7 +379,7 @@ export class ProviderCoordinator {
       });
       return JSON.stringify(translatedJson, null, 2);
     }
-    
+
     if (results?.length !== jsonArray.length) {
       logger.warn(`[Coordinator] JSON mismatch: ${results?.length} vs ${jsonArray.length}. Attempting cleanup...`);
     }
@@ -407,7 +389,7 @@ export class ProviderCoordinator {
     if (Array.isArray(results)) {
       return JSON.stringify(results.map(r => this._ensureString(r)));
     }
-    
+
     return this._ensureString(results);
   }
 

@@ -31,6 +31,7 @@ export class OptimizedJsonHandler {
     let hasErrors = false;
     let lastError = null;
     let detectedSourceLanguage = sourceLanguage;
+    let fragmentedUnits;
     const historyEnabled = await getAIConversationHistoryEnabledAsync();
     const laneLabel = historyEnabled ? 'ordered history lane' : 'stateless parallel lane';
 
@@ -65,7 +66,83 @@ export class OptimizedJsonHandler {
       const self = this;
       let completedBatchCount = 0;
       const accumulatedResults = [];
+      fragmentedUnits = new Map();
       const skipStreaming = mode === TranslationMode.PDF;
+
+      const appendFragmentDiagnostic = (type, parentId) => appendTranslationDiagnostic(executionContext, {
+        type,
+        stage: 'optimized-json-handler',
+        parentId,
+      });
+
+      const collectCompleteFragments = (mappedResults) => {
+        const completeResults = [];
+
+        for (const result of mappedResults) {
+          if (result?.isV2Unit !== true || result?.isSplitFragment !== true) {
+            completeResults.push(result);
+            continue;
+          }
+
+          const { parentId, fragmentIndex, fragmentCount } = result;
+          if (!parentId || !Number.isInteger(fragmentIndex) || !Number.isInteger(fragmentCount) || fragmentIndex < 0 || fragmentIndex >= fragmentCount) {
+            appendFragmentDiagnostic('INCOMPLETE_FRAGMENT_EVENT_SUPPRESSED', parentId);
+            continue;
+          }
+
+          let parent = fragmentedUnits.get(parentId);
+          if (!parent) {
+            parent = { expectedCount: fragmentCount, fragments: new Map(), failed: false, emitted: false };
+            fragmentedUnits.set(parentId, parent);
+          }
+
+          if (parent.failed || parent.emitted || parent.expectedCount !== fragmentCount || parent.fragments.has(fragmentIndex)) continue;
+          parent.fragments.set(fragmentIndex, result);
+
+          if (parent.fragments.size !== parent.expectedCount) continue;
+
+          const orderedFragments = Array.from({ length: parent.expectedCount }, (_, index) => parent.fragments.get(index));
+          if (orderedFragments.some(fragment => !fragment)) {
+            parent.failed = true;
+            parent.fragments.clear();
+            appendFragmentDiagnostic('INCOMPLETE_FRAGMENT_EVENT_SUPPRESSED', parentId);
+            continue;
+          }
+
+          const translatedText = orderedFragments
+            .map((fragment, index) => `${index === 0 ? '' : (fragment.fragmentJoinerBefore || '')}${fragment.t || fragment.text || ''}`)
+            .join('');
+          const logicalItem = { ...orderedFragments[0] };
+          delete logicalItem.isSplit;
+          delete logicalItem.isSplitFragment;
+          delete logicalItem.partIndex;
+          delete logicalItem.parentId;
+          delete logicalItem.fragmentIndex;
+          delete logicalItem.fragmentCount;
+          delete logicalItem.fragmentJoinerBefore;
+          delete logicalItem.isV2Unit;
+          completeResults.push({ ...logicalItem, i: parentId, t: translatedText, text: translatedText });
+          parent.emitted = true;
+          parent.fragments.clear();
+          appendFragmentDiagnostic('FRAGMENTED_UNIT_COMPLETED', parentId);
+        }
+
+        return completeResults;
+      };
+
+      const discardFailedFragments = (batchPayload) => {
+        for (const payload of batchPayload) {
+          if (payload?.isV2Unit !== true || payload?.isSplitFragment !== true) continue;
+          const parentId = payload.parentId;
+          if (!parentId) continue;
+          const parent = fragmentedUnits.get(parentId) || { expectedCount: payload.fragmentCount, fragments: new Map(), failed: false, emitted: false };
+          if (parent.emitted || parent.failed) continue;
+          parent.failed = true;
+          parent.fragments.clear();
+          fragmentedUnits.set(parentId, parent);
+          appendFragmentDiagnostic('FRAGMENTED_UNIT_FAILED', parentId);
+        }
+      };
       
       // Preserve the ordered lane when conversation continuity is enabled.
       if (historyEnabled) {
@@ -108,6 +185,12 @@ export class OptimizedJsonHandler {
       }
 
       async function processBatch(batch, i, { parallelExecution = false } = {}) {
+        let timeoutId = null;
+        let onAbort = null;
+        let timeoutError = null;
+        let didTimeout = false;
+        let batchPayload = [];
+
         const checkCancellation = () => {
           if (engine.isCancelled(messageId) || abortController.signal.aborted) {
             const abortError = new Error('Translation task cancelled');
@@ -127,24 +210,27 @@ export class OptimizedJsonHandler {
           // Timeout Protection (5 minutes) for each batch call
           const BATCH_TIMEOUT_MS = 300000;
           const timeoutPromise = new Promise((_, reject) => {
-            const timeoutId = setTimeout(() => {
-            const timeoutError = new Error(`Batch translation timed out after ${BATCH_TIMEOUT_MS}ms`);
-            timeoutError.type = 'TIMEOUT';
-            appendTranslationDiagnostic(executionContext, {
-              type: 'BATCH_TIMEOUT',
-              stage: 'optimized-json-handler',
-              batchIndex: i,
-              reason: timeoutError.message,
-              code: timeoutError.type,
-            });
+            timeoutId = setTimeout(() => {
+              didTimeout = true;
+              timeoutError = new Error(`Batch translation timed out after ${BATCH_TIMEOUT_MS}ms`);
+              timeoutError.type = ErrorTypes.TRANSLATION_TIMEOUT;
+              appendTranslationDiagnostic(executionContext, {
+                type: 'BATCH_TIMEOUT',
+                stage: 'optimized-json-handler',
+                batchIndex: i,
+                reason: timeoutError.message,
+                code: timeoutError.type,
+              });
               reject(timeoutError);
+              abortController.abort();
             }, BATCH_TIMEOUT_MS);
             
             // Link timeout cleanup to abort signal
-            abortController.signal.addEventListener('abort', () => clearTimeout(timeoutId));
+            onAbort = () => clearTimeout(timeoutId);
+            abortController.signal.addEventListener('abort', onAbort);
           });
 
-          const batchPayload = hasManifestMembership ? batch.map(({ payload }) => payload) : batch;
+          batchPayload = hasManifestMembership ? batch.map(({ payload }) => payload) : batch;
           const batchExecutionContext = hasManifestMembership
             ? self._createBatchExecutionContext(executionContext, batch)
             : executionContext;
@@ -183,6 +269,7 @@ export class OptimizedJsonHandler {
             : translatedBatchResponse;
 
           const mappedResults = self._mapResults(batchPayload, translatedBatch, executionContext);
+          const completeResults = collectCompleteFragments(mappedResults);
           checkCancellation();
           // Terminal observation is restricted to the approved execution scope:
           // structured Select Element + AI provider + unsplit ManifestView.
@@ -192,13 +279,13 @@ export class OptimizedJsonHandler {
               && batchExecutionContext?.manifestView?.units) {
             executionContext?.onTerminalUnitsAccepted?.(batchExecutionContext.manifestView.units);
           }
-          accumulatedResults.push(...mappedResults);
+          accumulatedResults.push(...completeResults);
           completedBatchCount++;
-          if (!skipStreaming) {
+          if (!skipStreaming && completeResults.length > 0) {
             await self._streamResults(
               tabId,
               messageId,
-              mappedResults,
+              completeResults,
               i,
               batches.length,
               targetLanguage,
@@ -220,6 +307,11 @@ export class OptimizedJsonHandler {
           }
           
         } catch (batchError) {
+          if (didTimeout) {
+            fragmentedUnits.clear();
+            throw timeoutError;
+          }
+
           const errorType = matchErrorToType(batchError);
           const isCancellation = batchError.name === 'AbortError' || 
                                batchError.isCancelled || 
@@ -227,6 +319,7 @@ export class OptimizedJsonHandler {
                                errorType === ErrorTypes.TRANSLATION_CANCELLED;
 
           if (isCancellation) {
+            fragmentedUnits.clear();
             logger.debug(`[JsonHandler] Batch ${i + 1} cancelled for messageId: ${messageId}`);
             
             // FIX: Explicitly cancel any other pending batches for this provider in the QueueManager
@@ -250,6 +343,7 @@ export class OptimizedJsonHandler {
           }
           
            logger.debug(`[JsonHandler] Batch ${i + 1} failed:`, batchError.message);
+           discardFailedFragments(batchPayload);
            appendTranslationDiagnostic(executionContext, {
              type: 'STRUCTURED_BATCH_FAILURE',
              stage: 'optimized-json-handler',
@@ -261,28 +355,17 @@ export class OptimizedJsonHandler {
           hasErrors = true;
           lastError = batchError;
           
-          // Stream empty/original results on failure to keep progress moving
+          // Count the attempted batch to keep progress accounting stable.
+          // Never stream the original batch as translated output on failure.
           completedBatchCount++;
-          if (!skipStreaming) {
-            await self._streamResults(
-              tabId,
-              messageId,
-              batch,
-              i,
-              batches.length,
-              targetLanguage,
-              undefined,
-              mode,
-              completedBatchCount,
-              abortController,
-              engine
-            );
-          }
           
           // Stop all other batches if error is fatal (429, etc.)
           if (isFatalError(batchError)) {
             abortController.abort();
           }
+        } finally {
+          clearTimeout(timeoutId);
+          abortController.signal.removeEventListener('abort', onAbort);
         }
       }
 
@@ -320,6 +403,7 @@ export class OptimizedJsonHandler {
         }
       };
     } finally {
+      fragmentedUnits?.clear();
       engine.lifecycleRegistry.unregisterRequest(messageId);
     }
   }

@@ -20,6 +20,7 @@ import {
 import { ProviderNames } from "@/features/translation/providers/ProviderConstants.js";
 import { getTextInfo } from "./utils/TraditionalTextProcessor.js";
 import { matchErrorToType, isFatalError } from '@/shared/error-management/ErrorMatcher.js';
+import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
 import { NewlineManager } from '@/features/translation/utils/NewlineManager.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.PROVIDERS, 'DeepLTranslate');
@@ -416,15 +417,21 @@ export class DeepLTranslateProvider extends BaseTranslateProvider {
         },
         extractResponse: (data) => {
           if (!data?.translations || !Array.isArray(data.translations)) {
-            logger.warn('[DeepL] Invalid API response format');
-            return chunkTexts.map(() => '');
+            const error = new Error('DeepL response has invalid format');
+            error.type = ErrorTypes.API_RESPONSE_INVALID;
+            throw error;
           }
 
           // Capture detected source language from metadata if available (using first segment)
           this._setDetectedLanguage(data.translations[0]?.detected_source_language);
 
           // DeepL returns array of translation objects for valid texts only
-          const validTranslations = data.translations.map(t => t.text || '');
+          if (data.translations.length !== validTexts.length || data.translations.some(t => typeof t?.text !== 'string' || !t.text.trim())) {
+            const error = new Error('DeepL response omitted a translated segment');
+            error.type = ErrorTypes.API_RESPONSE_INVALID;
+            throw error;
+          }
+          const validTranslations = data.translations.map(t => t.text);
 
           // CRITICAL: Validate XML placeholders if present in request
           if (hasXMLPlaceholders) {
@@ -473,11 +480,6 @@ export class DeepLTranslateProvider extends BaseTranslateProvider {
             return restored;
           });
 
-          // Validate segment count (should match valid texts, not original chunkTexts)
-          if (restoredTranslations.length !== validTexts.length) {
-            logger.debug('[DeepL] Segment count mismatch');
-          }
-
           // Map translations back to original chunkTexts order
           // Fill in empty strings for filtered texts
           const result = [];
@@ -487,7 +489,7 @@ export class DeepLTranslateProvider extends BaseTranslateProvider {
             const text = getTextInfo(chunkTexts[i]).text;
             if (text && text.trim().length > 0) {
               // This text was translated - use restored translation
-              result.push(restoredTranslations[validIndex] || '');
+               result.push(restoredTranslations[validIndex]);
               validIndex++;
             } else {
               // This text was filtered out, return empty
@@ -504,7 +506,15 @@ export class DeepLTranslateProvider extends BaseTranslateProvider {
         originalCharCount: options.originalCharCount || originalCharCount
       });
 
-      const finalResult = result || chunkTexts.map(() => '');
+      const finalResult = result;
+      if (!Array.isArray(finalResult) || finalResult.length !== chunkTexts.length || finalResult.some((translation, index) => {
+        const source = getTextInfo(chunkTexts[index]).text;
+        return source?.trim() && (typeof translation !== 'string' || !translation.trim());
+      })) {
+        const error = new Error('DeepL response has no complete translation result');
+        error.type = ErrorTypes.API_RESPONSE_INVALID;
+        throw error;
+      }
 
       // Add completion log for successful translation
       if (finalResult.length > 0) {
@@ -515,8 +525,8 @@ export class DeepLTranslateProvider extends BaseTranslateProvider {
     } catch (error) {
       // CRITICAL: Check if this is an XML corruption error and trigger fallback
       if (error.isXMLCorruptionError) {
-        logger.error('[DeepL] XML corruption detected, falling back to original text for this chunk');
-        return chunkTexts.map(t => getTextInfo(t).text);
+        error.type = ErrorTypes.API_RESPONSE_INVALID;
+        throw error;
       }
 
       // If HTTP 400 error and we have more than 1 segment, try splitting into smaller chunks
@@ -529,10 +539,8 @@ export class DeepLTranslateProvider extends BaseTranslateProvider {
 
         // Run both halves in parallel for better performance during fallback
         const [firstResult, secondResult] = await Promise.all([
-          this._translateChunk(firstHalf, sourceLang, targetLang, translateMode, abortController, retryAttempt + 1, segmentCount, chunkIndex, totalChunks, options)
-            .catch(() => firstHalf.map(t => getTextInfo(t).text)),
+          this._translateChunk(firstHalf, sourceLang, targetLang, translateMode, abortController, retryAttempt + 1, segmentCount, chunkIndex, totalChunks, options),
           this._translateChunk(secondHalf, sourceLang, targetLang, translateMode, abortController, retryAttempt + 1, segmentCount, chunkIndex, totalChunks, options)
-            .catch(() => secondHalf.map(t => getTextInfo(t).text))
         ]);
 
         return [...firstResult, ...secondResult];
@@ -550,13 +558,9 @@ export class DeepLTranslateProvider extends BaseTranslateProvider {
             continue;
           }
 
-          try {
-            // Simplified call for single segment fallback
-            const res = await this._translateChunk([text], sourceLang, targetLang, translateMode, abortController, 5, 1, 0, 1, options);
-            results.push(Array.isArray(res) ? res[0] : res);
-          } catch {
-            results.push(originalText);
-          }
+          // Simplified call for single segment fallback
+          const res = await this._translateChunk([text], sourceLang, targetLang, translateMode, abortController, 5, 1, 0, 1, options);
+          results.push(Array.isArray(res) ? res[0] : res);
         }
 
         logger.info(`[DeepL] Sequential fallback completed`);

@@ -48,6 +48,31 @@ describe('TranslationLifecycleRegistry', () => {
     expect(cancelStreamMock).toHaveBeenCalledTimes(2)
   })
 
+  it('preserves timeout classification while aborting active work', async () => {
+    const controller = registry.registerRequest('timed-out', 'Hello')
+
+    await registry.cancelTranslation('timed-out', true)
+
+    expect(controller.signal.aborted).toBe(true)
+    expect(cancelStreamMock).toHaveBeenCalledWith('timed-out', expect.anything(), true)
+  })
+
+  it('forwards the timeout reason to stream completion', async () => {
+    await registry.cancelTranslation(
+      'timed-out',
+      true,
+      'PROGRESS_TIMEOUT',
+      'Streaming translation timed out'
+    )
+
+    expect(cancelStreamMock).toHaveBeenCalledWith(
+      'timed-out',
+      'Streaming translation timed out',
+      true,
+      'PROGRESS_TIMEOUT'
+    )
+  })
+
   it('continues rejecting duplicate delivery after active cancellation settles', async () => {
     registry.registerRequest('active', 'Hello')
     await registry.cancelTranslation('active')

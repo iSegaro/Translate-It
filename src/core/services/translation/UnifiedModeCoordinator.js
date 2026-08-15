@@ -93,7 +93,7 @@ export class UnifiedModeCoordinator {
         const { isFatalError, matchErrorToType } = await import('@/shared/error-management/ErrorMatcher.js');
         const fallbackResults = items.map(item => ({ text: item.text || item }));
         return {
-          success: true, 
+          success: false,
           translatedText: JSON.stringify(fallbackResults),
           actualCharCount: 0,
           originalCharCount: items.reduce((sum, i) => sum + (i.text?.length || i.length || 0), 0),

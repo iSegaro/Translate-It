@@ -236,6 +236,17 @@ describe('GoogleTranslateV2Provider newline chunk isolation', () => {
       expect(result).toBe('translated text');
     });
 
+    it.each([
+      ['empty response', {}],
+      ['empty modern result', { sentences: [] }],
+      ['invalid legacy result', { 0: {} }],
+    ])('throws API_RESPONSE_INVALID for %s', async (_label, response) => {
+      vi.spyOn(provider, '_executeApiCall').mockImplementation(async (opts) => opts.extractResponse(response));
+
+      await expect(provider._translateChunk(['source'], 'en', 'fa', 'page', null, 0, 1, 0, 1, {}))
+        .rejects.toMatchObject({ type: 'API_RESPONSE_INVALID' });
+    });
+
     it('appends single-segment dictionary output using the current Markdown contract', async () => {
       vi.spyOn(provider, '_executeApiCall').mockImplementation(async (opts) =>
         opts.extractResponse({

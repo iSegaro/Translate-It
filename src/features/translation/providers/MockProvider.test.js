@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { MockProvider } from './MockProvider.js';
 import { ResponseFormat } from '@/shared/config/translationConstants.js';
+import { TranslationCallPurpose } from './ProviderConstants.js';
 
 vi.mock('@/shared/logging/logger.js', () => ({
   getScopedLogger: () => ({
@@ -17,6 +18,18 @@ vi.mock('@/shared/logging/logger.js', () => ({
 describe('MockProvider dictionary samples', () => {
   afterEach(() => {
     vi.useRealTimers();
+  });
+
+  it('forwards call purpose to its mock request without payload metadata', async () => {
+    vi.useFakeTimers();
+    const provider = new MockProvider();
+    const executeRequest = vi.spyOn(provider, '_executeRequest').mockResolvedValue(undefined);
+    const promise = provider._callAI('system', 'text', { callPurpose: TranslationCallPurpose.STRUCTURED_RECOVERY });
+    await vi.runAllTimersAsync();
+    await promise;
+    expect(executeRequest).toHaveBeenCalledWith(expect.objectContaining({
+      callPurpose: TranslationCallPurpose.STRUCTURED_RECOVERY
+    }));
   });
 
   it('returns the English pronunciation dictionary sample for Expression', () => {

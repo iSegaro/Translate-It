@@ -3,6 +3,7 @@ import { AIResponseParser } from './AIResponseParser.js';
 import { ResponseFormat } from '@/shared/config/translationConstants.js';
 import { TranslationContractValidator } from '@/features/translation/core/TranslationContractValidator.js';
 import { createManifestView, createRequestUnitManifest, MappingStrategy } from '@/features/translation/ir/RequestUnitManifest.js';
+import { createTranslationOperation } from '@/features/translation/ir/TranslationOperation.js';
 
 describe('AIResponseParser', () => {
   describe('cleanAIResponse - String Format', () => {
@@ -104,6 +105,171 @@ describe('AIResponseParser', () => {
   });
 
   describe('parseBatchResult manifest validation', () => {
+    it('maps string numeric response IDs positionally for plain-string batches', () => {
+      const result = AIResponseParser.parseBatchResult(
+        '{"translations":[{"id":"0","text":"AA"},{"id":"1","text":"BB"},{"id":"2","text":"CC"}]}',
+        3,
+        ['A', 'B', 'C'],
+        'WebAI',
+        ResponseFormat.JSON_OBJECT,
+      );
+
+      expect(result).toEqual({
+        results: ['AA', 'BB', 'CC'],
+        contractViolation: false,
+      });
+    });
+
+    it('accepts a structured response preserving a runtime segment marker', () => {
+      const text = 'Commons@@TI_SEG_ab12_session_n8@@Free media collection';
+      const result = AIResponseParser.parseBatchResult(
+        `{"translations":[{"id":"0","text":"${text}"}]}`,
+        1,
+        [text],
+        'WebAI',
+        ResponseFormat.JSON_OBJECT,
+      );
+
+      expect(result).toEqual({ results: [text], contractViolation: false });
+    });
+
+    it('maps numeric response IDs positionally for plain-string batches', () => {
+      const result = AIResponseParser.parseBatchResult(
+        '[{"id":0,"text":"AA"},{"id":1,"text":"BB"},{"id":2,"text":"CC"}]',
+        3,
+        ['A', 'B', 'C'],
+      );
+
+      expect(result).toEqual({ results: ['AA', 'BB', 'CC'], contractViolation: false });
+    });
+
+    it('keeps object batch mapping identity-based', () => {
+      const result = AIResponseParser.parseBatchResult(
+        '[{"id":"y","text":"BB"},{"id":"x","text":"AA"}]',
+        2,
+        [{ id: 'x', text: 'A' }, { id: 'y', text: 'B' }],
+      );
+
+      expect(result).toEqual({ results: ['AA', 'BB'], contractViolation: false });
+    });
+
+    it.each([
+      ['unknown ID', '[{"id":"9","text":"AA"},{"id":"1","text":"BB"}]'],
+      ['duplicate ID', '[{"id":"0","text":"AA"},{"id":"0","text":"BB"}]'],
+      ['missing ID', '[{"id":"0","text":"AA"}]'],
+    ])('keeps %s as a contract violation', (_label, response) => {
+      const result = AIResponseParser.parseBatchResult(response, 2, ['A', 'B']);
+
+      expect(result.contractViolation).toBe(true);
+    });
+
+    it('rejects duplicate mappings even when every requested slot is filled', () => {
+      const result = AIResponseParser.parseBatchResult(
+        '[{"id":"0","text":"first"},{"id":"0","text":"replacement"},{"id":"1","text":"second"}]',
+        2,
+        ['A', 'B'],
+      );
+
+      expect(result.contractViolation).toBe(true);
+    });
+
+    it('rejects null translated text for a non-empty source', () => {
+      const result = AIResponseParser.parseBatchResult(
+        '[{"id":"0","text":null}]',
+        1,
+        ['A'],
+      );
+
+      expect(result.contractViolation).toBe(true);
+    });
+
+    it('accepts matching numeric IDs for object identity batches', () => {
+      const result = AIResponseParser.parseBatchResult(
+        '[{"id":0,"text":"AA"},{"id":1,"text":"BB"}]',
+        2,
+        [{ id: 0, text: 'A' }, { id: 1, text: 'B' }],
+      );
+
+      expect(result.contractViolation).toBe(false);
+    });
+
+    it('rejects numeric positional fallback for object string identities', () => {
+      const result = AIResponseParser.parseBatchResult(
+        '[{"id":0,"text":"AA"},{"id":"y","text":"BB"}]',
+        2,
+        [{ id: 'x', text: 'A' }, { id: 'y', text: 'B' }],
+      );
+
+      expect(result.contractViolation).toBe(true);
+    });
+
+    it('accepts harmless unknown surplus output with a warning diagnostic', () => {
+      const operation = createTranslationOperation('harmless-surplus');
+      const result = AIResponseParser.parseBatchResult(
+        '[{"id":"0","text":"AA"},{"id":"1","text":"BB"},{"id":"99","text":"unused"}]',
+        2,
+        ['A', 'B'],
+        'WebAI',
+        ResponseFormat.JSON_OBJECT,
+        { operation },
+      );
+
+      expect(result).toEqual({ results: ['AA', 'BB'], contractViolation: false });
+      expect(operation.finalize().entries).toEqual(expect.arrayContaining([
+        expect.objectContaining({ type: 'STRUCTURED_CONTRACT_WARNING', code: 'HARMLESS_SURPLUS_RESPONSE' })
+      ]));
+    });
+
+    it('accepts positional surplus output when requested units are complete', () => {
+      const result = AIResponseParser.parseBatchResult(
+        '["AA","BB","unused"]',
+        2,
+        ['A', 'B'],
+      );
+
+      expect(result).toEqual({ results: ['AA', 'BB'], contractViolation: false });
+    });
+
+    it.each([
+      ['null', null],
+      ['empty', ''],
+      ['whitespace', '   '],
+      ['number', 123],
+      ['object', {}],
+      ['array', ['AA']],
+      ['boolean', true],
+    ])('rejects %s translated text for a non-empty source', (_label, text) => {
+      const result = AIResponseParser.parseBatchResult(
+        JSON.stringify([{ id: '0', text }]),
+        1,
+        ['A'],
+      );
+
+      expect(result.contractViolation).toBe(true);
+    });
+
+    it.each(['', '   '])('accepts %j output for a blank source', (text) => {
+      const result = AIResponseParser.parseBatchResult(
+        JSON.stringify([{ id: '0', text }]),
+        1,
+        [text],
+      );
+
+      expect(result).toEqual({ results: [''], contractViolation: false });
+    });
+
+    it('accepts a repaired response when its candidate is otherwise valid', () => {
+      const result = AIResponseParser.parseBatchResult(
+        "{'translations':[{'id':'0','text':'AA'}]}",
+        1,
+        ['A'],
+        'WebAI',
+        ResponseFormat.JSON_OBJECT,
+      );
+
+      expect(result).toEqual({ results: ['AA'], contractViolation: false });
+    });
+
     it('observes immutable validation without changing legacy output', () => {
       const originalBatch = [{ i: 'first', t: 'source' }];
       const observeValidationResult = vi.fn();
@@ -117,7 +283,8 @@ describe('AIResponseParser', () => {
         createManifestView(createRequestUnitManifest(originalBatch)),
       );
 
-      expect(result).toEqual(['translated']);
+      expect(result.results).toEqual(['translated']);
+      expect(result.contractViolation).toBe(false);
       expect(observeValidationResult).toHaveBeenCalledTimes(1);
       expect(observeValidationResult).toHaveBeenCalledWith(expect.objectContaining({
         isValid: true,
@@ -139,7 +306,8 @@ describe('AIResponseParser', () => {
         createManifestView(createRequestUnitManifest(originalBatch)),
       );
 
-      expect(result).toEqual(['source one', 'second']);
+      expect(result.results).toEqual(['source one', 'second']);
+      expect(result.contractViolation).toBe(true);
       expect(observeValidationResult).toHaveBeenCalledWith(expect.objectContaining({ isValid: false }));
     });
 
@@ -155,7 +323,8 @@ describe('AIResponseParser', () => {
         createManifestView(createRequestUnitManifest(originalBatch)),
       );
 
-      expect(result).toEqual(['translated']);
+      expect(result.results).toEqual(['translated']);
+      expect(result.contractViolation).toBe(false);
     });
 
     it('does not observe malformed parser fallback', () => {
@@ -170,7 +339,8 @@ describe('AIResponseParser', () => {
         createManifestView(createRequestUnitManifest(['source'])),
       );
 
-      expect(result).toEqual(['source']);
+      expect(result.results).toEqual(['source']);
+      expect(result.contractViolation).toBe(true);
       expect(observeValidationResult).not.toHaveBeenCalled();
     });
 
@@ -186,7 +356,8 @@ describe('AIResponseParser', () => {
         null,
       );
 
-      expect(result).toEqual(['translated']);
+      expect(result.results).toEqual(['translated']);
+      expect(result.contractViolation).toBe(false);
       expect(observeValidationResult).not.toHaveBeenCalled();
     });
 
@@ -206,7 +377,8 @@ describe('AIResponseParser', () => {
         },
       );
 
-      expect(result).toEqual(['translated']);
+      expect(result.results).toEqual(['translated']);
+      expect(result.contractViolation).toBe(false);
       expect(validate).not.toHaveBeenCalled();
       validate.mockRestore();
     });

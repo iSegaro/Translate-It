@@ -160,13 +160,32 @@ export class TranslationEngine {
        executionContext
     });
 
-    // CRITICAL: Defensive check if coordinator returned a raw string (fallback case)
+    // Coordinator contract: returns a successful unified result OR throws.
+    // Do NOT infer success from a raw string / missing success flag - that would be
+    // silent success. These guards keep the contract loud.
     if (typeof result === 'string') {
-      result = { translatedText: result, success: true };
+      const invalidResult = new Error('Translation result was a raw string instead of a unified response');
+      invalidResult.type = ErrorTypes.TRANSLATION_FAILED;
+      throw invalidResult;
+    }
+
+    if (result.success === false) {
+      const failed = new Error(result.error?.message || 'Translation failed');
+      failed.type = result.error?.type || matchErrorToType(result.error);
+      throw failed;
     }
 
     // Extract values from the unified coordinator response
     const { translatedText, detectedLanguage, targetLanguage: finalTargetLanguage, sourceLanguage: finalSourceLanguage } = result;
+
+    // An empty string also represents "no translation". Earlier normalization
+    // layers may convert missing provider output into "", so treat it the same
+    // as null/undefined to avoid classifying an empty translation as success.
+    if (translatedText === null || translatedText === undefined || translatedText === '') {
+      const emptyResult = new Error('Translation returned no text');
+      emptyResult.type = ErrorTypes.TRANSLATION_FAILED;
+      throw emptyResult;
+    }
 
     // Resolve the final source language, prioritizing the detected one if the requested one was 'auto'
     const resolvedSourceLanguage = (finalSourceLanguage === 'auto' || !finalSourceLanguage) 
@@ -176,7 +195,7 @@ export class TranslationEngine {
     return {
       success: true,
       translatedText: translatedText,
-      streaming: typeof result === 'object' && result?.streaming, 
+      streaming: result.streaming,
       provider,
       sourceLanguage: resolvedSourceLanguage, 
       targetLanguage: finalTargetLanguage || targetLanguage, // Use swapped target language if available
@@ -268,7 +287,9 @@ export class TranslationEngine {
 
   // --- Delegation Methods ---
   
-  async cancelTranslation(messageId) { return await this.lifecycleRegistry.cancelTranslation(messageId); }
+  async cancelTranslation(messageId, timeout = false, timeoutType, reason) {
+    return await this.lifecycleRegistry.cancelTranslation(messageId, timeout, timeoutType, reason);
+  }
   async cancelAllTranslations(context = null) { return await this.lifecycleRegistry.cancelAllTranslations(context); }
   getActiveTranslationIds(context = null) { return this.lifecycleRegistry.getActiveTranslationIds(context); }
   getAbortController(messageId) { return this.lifecycleRegistry.getAbortController(messageId); }

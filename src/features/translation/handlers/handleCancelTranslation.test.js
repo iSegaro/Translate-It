@@ -18,7 +18,7 @@ vi.mock('@/core/services/translation/TranslationRequestTracker.js', () => ({
 }))
 
 vi.mock('@/core/services/translation/UnifiedTranslationService.js', () => ({
-  unifiedTranslationService: { cancelRequest: vi.fn() }
+  unifiedTranslationService: { cancelRequest: vi.fn(), handleTimeout: vi.fn() }
 }))
 
 const dispatchCancellationMock = vi.fn()
@@ -50,6 +50,8 @@ describe('handleCancelTranslation', () => {
     translationRequestTracker.markTimeout.mockReturnValue({ accepted: true, request: { messageId: 'request' } })
     unifiedTranslationService.cancelRequest.mockReset()
     unifiedTranslationService.cancelRequest.mockResolvedValue({ handled: false, success: false })
+    unifiedTranslationService.handleTimeout.mockReset()
+    unifiedTranslationService.handleTimeout.mockResolvedValue({ handled: true, success: true })
     dispatchCancellationMock.mockReset()
     queueCancelMock.mockReset()
     rateLimitCancelMock.mockReset()
@@ -95,23 +97,55 @@ describe('handleCancelTranslation', () => {
     expect(engine.cancelTranslation).toHaveBeenCalledWith('terminal')
   })
 
-  it('marks an active request timed out before exact-ID cleanup', async () => {
+  it('delegates active timeout lifecycle before exact-ID cleanup', async () => {
     engine.getActiveTranslationIds.mockReturnValue(['timed-out'])
 
     await handleCancelTranslation({ data: { cancelAll: true, timeout: true } }, {})
 
-    expect(translationRequestTracker.markTimeout).toHaveBeenCalledWith('timed-out')
+    expect(unifiedTranslationService.handleTimeout).toHaveBeenCalledWith('timed-out', 'Translation timed out', undefined)
+    expect(translationRequestTracker.markTimeout).not.toHaveBeenCalled()
     expect(translationRequestTracker.cancelRequest).not.toHaveBeenCalled()
     expect(dispatchCancellationMock).not.toHaveBeenCalled()
-    expect(engine.cancelTranslation).toHaveBeenCalledWith('timed-out')
-    expect(cancelStreamMock).toHaveBeenCalledWith('timed-out', 'user_cancelled')
+    expect(engine.cancelTranslation).not.toHaveBeenCalledWith('timed-out')
+    expect(cancelStreamMock).toHaveBeenCalledWith('timed-out', 'Translation timed out')
+    expect(rateLimitCancelMock).toHaveBeenCalledWith('timed-out')
+    expect(queueCancelMock).toHaveBeenCalledWith('timed-out')
+  })
+
+  it('keeps stream, rate-limit, and queue cleanup after timeout delegation', async () => {
+    engine.getActiveTranslationIds.mockReturnValue(['timed-out'])
+
+    await handleCancelTranslation({ data: { cancelAll: true, timeout: true } }, {})
+
+    expect(cancelStreamMock).toHaveBeenCalledWith('timed-out', 'Translation timed out')
+    expect(rateLimitCancelMock).toHaveBeenCalledWith('timed-out')
+    expect(queueCancelMock).toHaveBeenCalledWith('timed-out')
+  })
+
+  it('forwards a timeout reason without a subtype and keeps exact-ID cleanup', async () => {
+    engine.getActiveTranslationIds.mockReturnValue(['timed-out'])
+
+    await handleCancelTranslation({
+      data: {
+        cancelAll: true,
+        timeout: true,
+        reason: 'Streaming translation timed out'
+      }
+    }, {})
+
+    expect(unifiedTranslationService.handleTimeout).toHaveBeenCalledWith(
+      'timed-out',
+      'Streaming translation timed out',
+      undefined
+    )
+    expect(cancelStreamMock).toHaveBeenCalledWith('timed-out', 'Streaming translation timed out')
     expect(rateLimitCancelMock).toHaveBeenCalledWith('timed-out')
     expect(queueCancelMock).toHaveBeenCalledWith('timed-out')
   })
 
   it.each(['completed', 'cancelled'])('skips duplicate timeout cleanup after %s terminal state', async (status) => {
     engine.getActiveTranslationIds.mockReturnValue(['terminal'])
-    translationRequestTracker.markTimeout.mockReturnValue({ accepted: false, status })
+    unifiedTranslationService.handleTimeout.mockResolvedValue({ handled: true, success: false, error: status })
 
     const result = await handleCancelTranslation({ data: { cancelAll: true, timeout: true } }, {})
 
@@ -235,13 +269,14 @@ describe('handleCancelTranslation', () => {
     expect(engine.cancelTranslation).toHaveBeenCalledWith('legacy')
   })
 
-  it('never delegates a timeout through the service cancellation API', async () => {
+  it('delegates timeout through the service timeout API only', async () => {
     engine.getActiveTranslationIds.mockReturnValue(['timed-out'])
 
     await handleCancelTranslation({ data: { cancelAll: true, timeout: true } }, {})
 
     expect(unifiedTranslationService.cancelRequest).not.toHaveBeenCalled()
-    expect(translationRequestTracker.markTimeout).toHaveBeenCalledWith('timed-out')
+    expect(unifiedTranslationService.handleTimeout).toHaveBeenCalledWith('timed-out', 'Translation timed out', undefined)
+    expect(translationRequestTracker.markTimeout).not.toHaveBeenCalled()
     expect(translationRequestTracker.cancelRequest).not.toHaveBeenCalled()
   })
 

@@ -277,6 +277,19 @@ describe('DomTranslatorAdapter', () => {
       expect(testElement.textContent).toContain('سلام');
     });
 
+    it('should suppress a raw V2 fragment without mutating its node', async () => {
+      contentScriptIntegration.sendTranslationRequest.mockResolvedValue({
+        success: true,
+        streaming: false,
+        translatedText: JSON.stringify([{ t: 'Partial translation', i: 'n1', isSplitFragment: true }])
+      });
+
+      await adapter.translateElement(testElement);
+
+      expect(testElement.textContent).toContain('Hello');
+      expect(testElement.textContent).not.toContain('Partial translation');
+    });
+
     it('should keep traditional Select Element payload 1:1 for a paragraph-bearing node', async () => {
       testElement.textContent = 'Paragraph one\n\nParagraph two';
       const textNode = testElement.firstChild;
@@ -496,6 +509,61 @@ describe('DomTranslatorAdapter', () => {
       
       // Verify finalization used the detected language
       expect(applyElementDirection).toHaveBeenCalledWith(testElement, 'ja');
+    });
+
+    it('should retain successful batches and report failure when the stream ends with an error', async () => {
+      let streamCallbacks;
+      registerTranslation.mockImplementation((id, callbacks) => {
+        streamCallbacks = callbacks;
+      });
+
+      contentScriptIntegration.sendTranslationRequest.mockImplementation(async () => {
+        setTimeout(() => {
+          streamCallbacks.onStreamUpdate({
+            success: true,
+            data: [{ t: 'سلام', i: 'n1' }]
+          });
+          streamCallbacks.onStreamEnd({
+            success: false,
+            error: { message: 'Batch failed', type: 'TRANSLATION_FAILED' }
+          });
+        }, 10);
+        return { success: true, streaming: true };
+      });
+
+      await expect(adapter.translateElement(testElement)).rejects.toThrow('Batch failed');
+      expect(testElement.textContent).toContain('سلام');
+    });
+
+    it('should keep A and C translated while fragmented B remains original after stream failure', async () => {
+      const nodeA = document.createTextNode('Original A');
+      const nodeB = document.createTextNode('Original B');
+      const nodeC = document.createTextNode('Original C');
+      testElement.replaceChildren(nodeA, nodeB, nodeC);
+      const { collectTextNodes } = await import('./DomTranslatorUtils.js');
+      collectTextNodes.mockReturnValueOnce([
+        { node: nodeA, text: nodeA.nodeValue, uid: 'n1', blockId: 'b1', role: 'div' },
+        { node: nodeB, text: nodeB.nodeValue, uid: 'n2', blockId: 'b1', role: 'div' },
+        { node: nodeC, text: nodeC.nodeValue, uid: 'n3', blockId: 'b1', role: 'div' }
+      ]);
+      let streamCallbacks;
+      registerTranslation.mockImplementation((_id, callbacks) => {
+        streamCallbacks = callbacks;
+      });
+      contentScriptIntegration.sendTranslationRequest.mockImplementation(async () => {
+        setTimeout(() => {
+          streamCallbacks.onStreamUpdate({ success: true, data: [{ i: 'n1', t: 'Translated A' }] });
+          streamCallbacks.onStreamUpdate({ success: true, data: [{ i: 'n3', t: 'Translated C' }] });
+          streamCallbacks.onStreamEnd({ success: false, error: { message: 'B failed', type: 'TRANSLATION_FAILED' } });
+        }, 10);
+        return { success: true, streaming: true };
+      });
+
+      await expect(adapter.translateElement(testElement)).rejects.toThrow('B failed');
+
+      expect(nodeA.nodeValue).toContain('Translated A');
+      expect(nodeB.nodeValue).toBe('Original B');
+      expect(nodeC.nodeValue).toContain('Translated C');
     });
 
     it('should fallback to sequential mapping if UID is missing in stream', async () => {

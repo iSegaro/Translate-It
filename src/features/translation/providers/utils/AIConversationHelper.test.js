@@ -40,11 +40,131 @@ vi.mock('@/features/translation/utils/bilingualPromptHelper.js', () => ({
 
 import { AIConversationHelper } from './AIConversationHelper.js';
 import { translationSessionManager } from '@/features/translation/core/TranslationSessionManager.js';
+import { TranslationCallPurpose } from '../ProviderConstants.js';
 
 describe('AIConversationHelper', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     translationSessionManager.sessions.clear();
+  });
+
+  describe('committed-history eligibility', () => {
+    it('keeps failed-attempt-only sessions first-turn eligible', async () => {
+      const { getAIConversationHistoryEnabledAsync } = await import('@/shared/config/config.js');
+      getAIConversationHistoryEnabledAsync.mockResolvedValue(true);
+      const session = translationSessionManager.getOrCreateSession('failed-attempts', 'OpenAI');
+      session.turnCounter = 3;
+
+      expect(await AIConversationHelper.isFirstTurn(session.id)).toBe(true);
+      await expect(AIConversationHelper.getConversationMessages(
+        session.id, 'OpenAI', 'current', 'system', 'select-element'
+      )).resolves.toMatchObject({
+        messages: [{ role: 'system', content: 'system' }, { role: 'user', content: 'current' }],
+      });
+      const { getPromptAsync, getPromptBASEAIBatchAsync, getPromptBASEAIFollowupAsync } = await import('@/shared/config/config.js');
+      getPromptAsync.mockResolvedValue('instructions $_{SOURCE} $_{TARGET}');
+      getPromptBASEAIBatchAsync.mockResolvedValue('base $_{PROMPT_INSTRUCTIONS} $_{TEXT}');
+      getPromptBASEAIFollowupAsync.mockResolvedValue('follow-up $_{PROMPT_INSTRUCTIONS} $_{TEXT}');
+      await expect(AIConversationHelper.preparePromptAndText(
+        ['current'], 'en', 'fa', 'select-element', 'ai', session.id
+      )).resolves.toMatchObject({ systemPrompt: expect.stringContaining('base') });
+      expect(getPromptBASEAIFollowupAsync).not.toHaveBeenCalled();
+      getAIConversationHistoryEnabledAsync.mockResolvedValue(false);
+    });
+
+    it('recognizes only ordered user-assistant history pairs', async () => {
+      const invalidHistories = [
+        [{ role: 'assistant', content: 'result' }],
+        [{ role: 'user', content: 'source' }],
+        [{ role: 'assistant', content: 'result' }, { role: 'user', content: 'source' }],
+        [{ role: 'user', content: 'one' }, { role: 'user', content: 'two' }],
+        [{ role: 'assistant', content: 'one' }, { role: 'assistant', content: 'two' }],
+        [null, { role: 'user', content: 'source' }],
+        [{ role: 'user' }, { type: 'assistant' }],
+      ];
+
+      for (const [index, history] of invalidHistories.entries()) {
+        const session = translationSessionManager.getOrCreateSession(`invalid-${index}`, 'OpenAI');
+        session.turnCounter = 10;
+        session.history = history;
+        await expect(AIConversationHelper.isFirstTurn(session.id)).resolves.toBe(true);
+      }
+
+      const valid = translationSessionManager.getOrCreateSession('valid-pair', 'OpenAI');
+      valid.turnCounter = 1;
+      valid.history = [{ role: 'system', content: 'ignored' }, { role: 'user', content: 'source' }, { role: 'assistant', content: 'result' }];
+      await expect(AIConversationHelper.isFirstTurn(valid.id)).resolves.toBe(false);
+    });
+
+    it('becomes follow-up eligible only after a committed history write', async () => {
+      const session = translationSessionManager.getOrCreateSession('commit-transition', 'OpenAI');
+      session.turnCounter = 10;
+
+      await expect(AIConversationHelper.isFirstTurn(session.id)).resolves.toBe(true);
+      await AIConversationHelper.updateSessionHistory(session.id, 'source', 'result');
+
+      await expect(AIConversationHelper.isFirstTurn(session.id)).resolves.toBe(false);
+      expect(session.batchCount).toBe(1);
+      expect(session.history).toHaveLength(2);
+    });
+  });
+
+  it('keeps compact history empty for recovery with a populated session', async () => {
+    const { getAIConversationHistoryEnabledAsync, TranslationMode } = await import('@/shared/config/config.js');
+    getAIConversationHistoryEnabledAsync.mockResolvedValue(true);
+    const session = translationSessionManager.getOrCreateSession('compact-recovery', 'WebAI');
+    session.turnCounter = 7;
+    session.batchCount = 2;
+    session.history.push({ role: 'user', content: 'previous source' }, { role: 'assistant', content: 'previous result' });
+    const before = structuredClone(session);
+
+    await expect(AIConversationHelper.formatCompactHistoryContext(
+      session.id,
+      TranslationMode.Select_Element,
+      { callPurpose: TranslationCallPurpose.STRUCTURED_RECOVERY },
+    )).resolves.toBe('');
+
+    expect(session).toEqual(before);
+    getAIConversationHistoryEnabledAsync.mockResolvedValue(false);
+  });
+
+  it('keeps recovery calls outside conversation state', async () => {
+    const session = translationSessionManager.getOrCreateSession('recovery-session', 'OpenAI');
+    session.turnCounter = 4;
+    session.batchCount = 2;
+    session.history.push({ role: 'user', content: 'old' }, { role: 'assistant', content: 'translated' });
+    const before = structuredClone(session);
+    const options = { callPurpose: TranslationCallPurpose.STRUCTURED_RECOVERY };
+
+    expect(await AIConversationHelper.claimNextTurn('recovery-session', 'OpenAI', options)).toBe(1);
+    expect(await AIConversationHelper.getConversationMessages('recovery-session', 'OpenAI', 'current', 'system', 'select-element', options))
+      .toEqual({ messages: [{ role: 'system', content: 'system' }, { role: 'user', content: 'current' }], session: null });
+    expect(await AIConversationHelper.getConversationHistory('recovery-session', 'select-element', options)).toEqual([]);
+    expect(await AIConversationHelper.formatCompactHistoryContext('recovery-session', 'select-element', options)).toBe('');
+    await AIConversationHelper.updateSessionHistory('recovery-session', 'current', 'result', options);
+
+    expect(translationSessionManager.sessions.get('recovery-session')).toEqual(before);
+  });
+
+  it.each([
+    ['primary', TranslationCallPurpose.PRIMARY_TRANSLATION],
+    ['missing', undefined],
+    ['invalid', 'INVALID_PURPOSE'],
+  ])('keeps %s purpose in normal conversation lifecycle', async (_label, callPurpose) => {
+    const { getAIConversationHistoryEnabledAsync } = await import('@/shared/config/config.js');
+    getAIConversationHistoryEnabledAsync.mockResolvedValue(true);
+    const session = translationSessionManager.getOrCreateSession(`compat-${_label}`, 'OpenAI');
+    session.history.push({ role: 'user', content: 'old' }, { role: 'assistant', content: 'translated' });
+    const options = callPurpose === undefined ? {} : { callPurpose };
+
+    expect(await AIConversationHelper.claimNextTurn(session.id, 'OpenAI', options)).toBe(1);
+    expect(await AIConversationHelper.getConversationHistory(session.id, 'select-element', { ...options, maxTurns: 1, maxChars: 100 }))
+      .toEqual([{ user: 'old', assistant: 'translated' }]);
+    await AIConversationHelper.updateSessionHistory(session.id, 'new', 'new translated', options);
+
+    expect(session.turnCounter).toBe(1);
+    expect(session.batchCount).toBe(1);
+    expect(session.history).toHaveLength(4);
   });
 
   it('uses the non-auto batch prompt when bilingual auto prompts are disabled', async () => {
@@ -70,6 +190,23 @@ describe('AIConversationHelper', () => {
     expect(systemPrompt).toContain('BATCH: translate from English to Persian');
     expect(systemPrompt).not.toContain('BATCH_AUTO');
     expect(userText).toContain('"translations"');
+  });
+
+  it('uses the segment-marker rule for primary and one-item recovery preparation', async () => {
+    const { getPromptAsync, getPromptBASEAIBatchAsync } = await import('@/shared/config/config.js');
+    const markerRule = 'Preserve every segment marker that begins with @@TI_SEG_ and ends with @@ exactly as it appears. Example: @@TI_SEG_xxx_session_n5@@.';
+    getPromptAsync.mockResolvedValue('INSTRUCTIONS: $_{SOURCE} $_{TARGET}');
+    getPromptBASEAIBatchAsync.mockResolvedValue(`BATCH: ${markerRule}\n$_{PROMPT_INSTRUCTIONS}\n$_{TEXT}`);
+
+    const primary = await AIConversationHelper.preparePromptAndText(
+      ['Commons@@TI_SEG_ab12_session_n8@@Free media collection'], 'en', 'fa', 'select-element', 'ai'
+    );
+    const recovery = await AIConversationHelper.preparePromptAndText(
+      'Commons@@TI_SEG_ab12_session_n8@@Free media collection', 'en', 'fa', 'select-element', 'ai'
+    );
+
+    expect(primary.systemPrompt).toContain(markerRule);
+    expect(recovery.systemPrompt).toContain(markerRule);
   });
 
   it('uses the batch prompt for PDF structured translation without select-element coupling', async () => {

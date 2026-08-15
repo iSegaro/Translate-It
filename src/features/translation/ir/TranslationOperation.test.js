@@ -1,10 +1,60 @@
 import { describe, expect, it } from 'vitest'
-import { createTranslationOperation } from './TranslationOperation.js'
+import { createTranslationOperation, deriveRecoverySummary, RecoveryFinalOutcome } from './TranslationOperation.js'
 import { AIResponseParser } from '../providers/utils/AIResponseParser.js'
 import { ResponseFormat } from '@/shared/config/translationConstants.js'
 import { createManifestView, createRequestUnitManifest } from './RequestUnitManifest.js'
 
 describe('TranslationOperation', () => {
+  it('derives immutable recovery summaries from ordered diagnostics', () => {
+    const report = Object.freeze({ entries: Object.freeze([
+      Object.freeze({ type: 'RECOVERY_TRIGGERED', provider: 'A' }),
+      Object.freeze({ type: 'RECOVERY_FAILED', provider: 'A' }),
+      Object.freeze({ type: 'RECOVERY_TRIGGERED', provider: 'B' }),
+      Object.freeze({ type: 'RECOVERY_SUCCEEDED', provider: 'B' }),
+    ]) })
+    const summary = deriveRecoverySummary(report, { operationSucceeded: true })
+    expect(summary).toMatchObject({ structuredResponseViolations: 2, recoveryPasses: 2, hadRecovery: true, hadRecoverySuccess: true, hadRecoveryFailure: true, recoveryIncomplete: false, finalRecoveryOutcome: RecoveryFinalOutcome.SUCCEEDED })
+    expect(summary.providerFacts).toEqual([
+      expect.objectContaining({ provider: 'A', recoveryFailures: 1 }),
+      expect.objectContaining({ provider: 'B', recoverySuccesses: 1 }),
+    ])
+    expect(Object.isFrozen(summary)).toBe(true)
+    expect(Object.isFrozen(summary.providerFacts)).toBe(true)
+  })
+
+  it('returns safe none summary for absent diagnostics and supersedes failed recovery after terminal success', () => {
+    expect(deriveRecoverySummary()).toMatchObject({ recoveryPasses: 0, finalRecoveryOutcome: RecoveryFinalOutcome.NONE, providerFacts: [] })
+    expect(deriveRecoverySummary({ entries: [{ type: 'RECOVERY_TRIGGERED', provider: 'A' }, { type: 'RECOVERY_FAILED', provider: 'A' }] }, { operationSucceeded: true }).finalRecoveryOutcome)
+      .toBe(RecoveryFinalOutcome.SUPERSEDED)
+  })
+
+  it.each([
+    ['succeeds with terminal success', ['RECOVERY_TRIGGERED', 'RECOVERY_SUCCEEDED'], { operationSucceeded: true }, RecoveryFinalOutcome.SUCCEEDED, false],
+    ['fails with terminal failure', ['RECOVERY_TRIGGERED', 'RECOVERY_FAILED'], { terminalStatus: 'failed' }, RecoveryFinalOutcome.FAILED, false],
+    ['is incomplete without terminal event', ['RECOVERY_TRIGGERED'], {}, RecoveryFinalOutcome.INCOMPLETE, true],
+    ['is incomplete when success lacks terminal context', ['RECOVERY_TRIGGERED', 'RECOVERY_SUCCEEDED'], {}, RecoveryFinalOutcome.INCOMPLETE, false],
+    ['is incomplete when failure lacks terminal context', ['RECOVERY_TRIGGERED', 'RECOVERY_FAILED'], {}, RecoveryFinalOutcome.INCOMPLETE, false],
+    ['is superseded by later primary success', ['RECOVERY_TRIGGERED', 'RECOVERY_FAILED'], { operationSucceeded: true }, RecoveryFinalOutcome.SUPERSEDED, false],
+    ['fails after two failed passes', ['RECOVERY_TRIGGERED', 'RECOVERY_FAILED', 'RECOVERY_TRIGGERED', 'RECOVERY_FAILED'], { terminalStatus: 'failed' }, RecoveryFinalOutcome.FAILED, false],
+  ])('classifies recovery outcome when it %s', (_label, types, terminalContext, outcome, incomplete) => {
+    const entries = types.map((type, index) => ({ type, provider: index < 2 ? 'A' : 'B' }))
+    const summary = deriveRecoverySummary({ entries }, terminalContext)
+    expect(summary.finalRecoveryOutcome).toBe(outcome)
+    expect(summary.recoveryIncomplete).toBe(incomplete)
+  })
+
+  it('ignores orphan terminal events and falls back missing terminal providers', () => {
+    expect(deriveRecoverySummary({ entries: [{ type: 'RECOVERY_SUCCEEDED' }, { type: 'RECOVERY_FAILED' }] }).finalRecoveryOutcome).toBe(RecoveryFinalOutcome.NONE)
+    const report = { entries: [{ type: 'RECOVERY_TRIGGERED', provider: 'A' }, { type: 'RECOVERY_FAILED' }] }
+    const first = deriveRecoverySummary(report, { terminalStatus: 'failed' })
+    const second = deriveRecoverySummary(report, { terminalStatus: 'failed' })
+    expect(first).toEqual(second)
+    expect(first.providerFacts[0]).toMatchObject({ provider: 'A', recoveryFailures: 1 })
+    expect(Object.isFrozen(first)).toBe(true)
+    expect(Object.isFrozen(first.providerFacts)).toBe(true)
+    expect(Object.isFrozen(first.providerFacts[0])).toBe(true)
+    expect(report.entries).toHaveLength(2)
+  })
   it('keeps private settlement state in manifest order', () => {
     const manifest = createRequestUnitManifest([{ i: 'first' }, { i: 'second' }, { i: 'third' }])
     const operation = createTranslationOperation('message-settlement', manifest)
@@ -88,7 +138,8 @@ describe('TranslationOperation', () => {
       { operation },
     )
 
-    expect(result).toEqual(originalBatch)
+    expect(result.results).toEqual(originalBatch)
+    expect(result.contractViolation).toBe(true)
     expect(operation.finalize().entries).toContainEqual(expect.objectContaining({
       type: 'PARSER_MALFORMED_RESPONSE',
       stage: 'parser',
@@ -110,7 +161,8 @@ describe('TranslationOperation', () => {
       manifestView,
     )
 
-    expect(result).toEqual(['source one', 'second'])
+    expect(result.results).toEqual(['source one', 'second'])
+    expect(result.contractViolation).toBe(true)
     expect(operation.finalize().entries).toContainEqual(expect.objectContaining({
       type: 'PARSER_DUPLICATE_ID',
       stage: 'parser',

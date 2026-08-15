@@ -21,8 +21,21 @@ import {
 import { NewlineManager } from '@/features/translation/utils/NewlineManager.js';
 import { shouldUseAutoPromptAsync } from '@/features/translation/utils/bilingualPromptHelper.js';
 import { buildSemanticInstructions } from './SemanticPromptBuilder.js';
+import { TranslationCallPurpose } from '../ProviderConstants.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.TRANSLATION, 'AIConversationHelper');
+
+function shouldParticipateInConversation(callPurpose) {
+  return callPurpose !== TranslationCallPurpose.STRUCTURED_RECOVERY;
+}
+
+function hasCommittedConversationPair(session) {
+  const history = session?.history;
+  if (!Array.isArray(history)) return false;
+  return history.some((message, index) => (
+    message?.role === 'user' && history[index + 1]?.role === 'assistant'
+  ));
+}
 
 /**
  * Checks if the parsed JSON object matches the specific format
@@ -88,7 +101,7 @@ export const AIConversationHelper = {
     try {
       const { translationSessionManager } = await import('@/features/translation/core/TranslationSessionManager.js');
       const session = translationSessionManager.sessions.get(sessionId);
-      return !session || session.turnCounter <= 1;
+      return !hasCommittedConversationPair(session);
     } catch {
       return true;
     }
@@ -97,7 +110,8 @@ export const AIConversationHelper = {
   /**
    * Reserve and get the next turn number for a session
    */
-  async claimNextTurn(sessionId, providerName = 'Unknown') {
+  async claimNextTurn(sessionId, providerName = 'Unknown', { callPurpose } = {}) {
+    if (!shouldParticipateInConversation(callPurpose)) return 1;
     if (!sessionId) return 1;
     try {
       const { translationSessionManager } = await import('@/features/translation/core/TranslationSessionManager.js');
@@ -127,6 +141,7 @@ export const AIConversationHelper = {
    * @param {Object} options - Options for history (maxTurns, maxChars)
    */
   async getConversationHistory(sessionId, translateMode = '', options = {}) {
+    if (!shouldParticipateInConversation(options.callPurpose)) return [];
     if (!sessionId) return [];
 
     // History is primarily used for Select Element to maintain style
@@ -172,7 +187,8 @@ export const AIConversationHelper = {
   async formatCompactHistoryContext(sessionId, translateMode = '', options = {}) {
     const turns = await this.getConversationHistory(sessionId, translateMode, {
       maxTurns: 1,
-      maxChars: options.maxChars ?? TRANSLATION_CONSTANTS.HISTORY_CHARACTER_LIMITS.AI
+      maxChars: options.maxChars ?? TRANSLATION_CONSTANTS.HISTORY_CHARACTER_LIMITS.AI,
+      callPurpose: options.callPurpose,
     });
 
     if (!turns.length) return '';
@@ -457,7 +473,13 @@ export const AIConversationHelper = {
   /**
    * Helper to get conversation messages for AI providers
    */
-  async getConversationMessages(sessionId, providerName, currentText, systemPrompt, translateMode = '') {
+  async getConversationMessages(sessionId, providerName, currentText, systemPrompt, translateMode = '', { callPurpose } = {}) {
+    if (!shouldParticipateInConversation(callPurpose)) {
+      return {
+        messages: [{ role: 'system', content: systemPrompt }, { role: 'user', content: currentText }],
+        session: null
+      };
+    }
     if (!sessionId) {
       return {
         messages: [{ role: 'system', content: systemPrompt }, { role: 'user', content: currentText }],
@@ -469,7 +491,7 @@ export const AIConversationHelper = {
     const session = translationSessionManager.getOrCreateSession(sessionId, providerName);
     const historyEnabled = await getAIConversationHistoryEnabledAsync();
 
-    if (session.turnCounter <= 1) {
+    if (!hasCommittedConversationPair(session)) {
       session.systemPrompt = systemPrompt;
       return {
         messages: [{ role: 'system', content: systemPrompt }, { role: 'user', content: currentText }],
@@ -503,7 +525,8 @@ export const AIConversationHelper = {
   /**
    * Helper to update session history with results
    */
-  async updateSessionHistory(sessionId, userContent, assistantContent) {
+  async updateSessionHistory(sessionId, userContent, assistantContent, { callPurpose } = {}) {
+    if (!shouldParticipateInConversation(callPurpose)) return;
     if (!sessionId) return;
     try {
       const { translationSessionManager } = await import('@/features/translation/core/TranslationSessionManager.js');

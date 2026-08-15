@@ -11,10 +11,16 @@ import { statsManager } from '../../core/TranslationStatsManager.js';
 import { ApiKeyManager } from "@/features/translation/providers/ApiKeyManager.js";
 import { ErrorTypes } from "@/shared/error-management/ErrorTypes.js";
 import { matchErrorToType } from "@/shared/error-management/ErrorMatcher.js";
-import { ProviderNames } from "@/features/translation/providers/ProviderConstants.js";
+import { ProviderNames, TranslationCallPurpose } from "@/features/translation/providers/ProviderConstants.js";
 import { appendTranslationDiagnostic } from '@/features/translation/ir/TranslationOperation.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.TRANSLATION, 'ProviderRequestEngine');
+
+function normalizeCallPurpose(callPurpose) {
+  return Object.values(TranslationCallPurpose).includes(callPurpose)
+    ? callPurpose
+    : TranslationCallPurpose.PRIMARY_TRANSLATION;
+}
 
 export const ProviderRequestEngine = {
   /**
@@ -48,7 +54,8 @@ export const ProviderRequestEngine = {
   /**
    * UNIFIED API REQUEST HANDLER
    */
-  async executeRequest(provider, { url, fetchOptions, extractResponse, context, abortController, updateApiKey, charCount, originalCharCount, sessionId, executionContext }) {
+  async executeRequest(provider, { url, fetchOptions, extractResponse, context, abortController, updateApiKey, charCount, originalCharCount, sessionId, executionContext, callPurpose }) {
+    const normalizedCallPurpose = normalizeCallPurpose(callPurpose);
     // 1. Determine how many attempts we should make based on available keys
     let availableKeysCount = 1;
     if (provider.providerSettingKey && updateApiKey) {
@@ -74,7 +81,8 @@ export const ProviderRequestEngine = {
           abortController,
           sessionId: sessionId || null,
           charCount: charCount !== undefined ? charCount : 0,
-          originalCharCount: originalCharCount || 0
+          originalCharCount: originalCharCount || 0,
+          callPurpose: normalizedCallPurpose,
         });
 
         // 3. Success! Promote the working key
@@ -157,12 +165,13 @@ export const ProviderRequestEngine = {
   /**
    * Executes a fetch call and normalizes errors
    */
-  async executeApiCall(provider, { url, fetchOptions, extractResponse = (data) => data, context, abortController, sessionId, charCount, originalCharCount }) {
+  async executeApiCall(provider, { url, fetchOptions, extractResponse = (data) => data, context, abortController, sessionId, charCount, originalCharCount, callPurpose }) {
+    const normalizedCallPurpose = normalizeCallPurpose(callPurpose);
     const finalSessionId = sessionId || abortController?.sessionId || null;
     const finalCharCount = charCount || 0;
     const finalOriginalCharCount = originalCharCount || 0;
 
-    const { globalCallId, sessionCallId } = statsManager.recordRequest(provider.providerName, finalSessionId, finalCharCount, finalOriginalCharCount);
+    const { globalCallId, sessionCallId } = statsManager.recordRequest(provider.providerName, finalSessionId, finalCharCount, finalOriginalCharCount, normalizedCallPurpose);
 
     // MOCK BYPASS: If URL is a mock protocol, skip actual fetch but keep stats and logs
     if (url.startsWith('mock://')) {
@@ -366,7 +375,7 @@ export const ProviderRequestEngine = {
                              err.name === 'AbortError';
       
       if (!isCancellation) {
-        statsManager.recordError(provider.providerName, finalSessionId);
+        statsManager.recordError(provider.providerName, finalSessionId, normalizedCallPurpose);
       }
 
       if (err.name === 'AbortError') {

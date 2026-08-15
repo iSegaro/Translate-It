@@ -177,11 +177,10 @@ If all available keys fail or the provider is consistently unstable, the **RateL
 
 ## Services & Specialized Components
 
-- **RateLimitManager**: The core governance layer for request throttling, prioritization, and stability.
+- **RateLimitManager**: Owns active provider admission, adaptive delay, and circuit behavior.
 - **ApiKeyManager**: Manages the lifecycle of API keys, failover logic, and health testing.
 - **LanguageDetectionService**: Used by the Coordinator to resolve `auto` source languages.
 - **LanguageSwappingService**: Implements Bilingual Logic (swapping based on detected input).
-- **RequestHealthMonitor**: Monitors provider success rates and triggers health-based alerts.
 - **StreamingManager**: A global registry that coordinates real-time UI updates from multiple background streams.
 
 ---

@@ -29,7 +29,7 @@ export class DeepSeekProvider extends BaseAIProvider {
    * @protected
    */
   async _callAI(systemPrompt, userText, options = {}) {
-    const { abortController, sessionId, expectedFormat, isBatch, executionContext } = options;
+    const { abortController, sessionId, expectedFormat, isBatch, executionContext, callPurpose, conversationCommitCandidate } = options;
 
     const [apiKeys, apiUrl, model] = await Promise.all([
       getDeepSeekApiKeysAsync(),
@@ -41,11 +41,11 @@ export class DeepSeekProvider extends BaseAIProvider {
 
     this._validateConfig({ apiKey }, ["apiKey"], `${this.providerName.toLowerCase()}-translation`);
 
-    const turnNumber = await AIConversationHelper.claimNextTurn(sessionId, this.providerName);
+    const turnNumber = await AIConversationHelper.claimNextTurn(sessionId, this.providerName, { callPurpose });
     const activeModel = model || "deepseek-chat";
     logger.info(`[DeepSeek] Model: ${activeModel}${sessionId ? ` (Session: ${sessionId.substring(0, 15)}..., Turn: ${turnNumber})` : ''}`);
 
-    const { messages } = await AIConversationHelper.getConversationMessages(sessionId, this.providerName, userText, systemPrompt, options.mode);
+    const { messages } = await AIConversationHelper.getConversationMessages(sessionId, this.providerName, userText, systemPrompt, options.mode, { callPurpose });
 
     const fetchOptions = {
       method: "POST",
@@ -80,6 +80,7 @@ export class DeepSeekProvider extends BaseAIProvider {
       abortController,
       sessionId,
       executionContext,
+      callPurpose,
       updateApiKey: (newKey, options) => {
         if (options && options.headers) {
           options.headers.Authorization = `Bearer ${newKey}`;
@@ -88,7 +89,8 @@ export class DeepSeekProvider extends BaseAIProvider {
     });
 
     if (sessionId && result) {
-      await AIConversationHelper.updateSessionHistory(sessionId, userText, result);
+      if (conversationCommitCandidate) conversationCommitCandidate.stage({ sessionId, userContent: userText, assistantContent: result });
+      else await AIConversationHelper.updateSessionHistory(sessionId, userText, result, { callPurpose });
     }
 
     return result;

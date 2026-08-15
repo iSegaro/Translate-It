@@ -58,6 +58,15 @@ describe('Config Module', () => {
     it('should have basic app info in CONFIG', () => {
       expect(CONFIG.APP_NAME).toBe('Translate It');
     });
+
+    it.each(['PROMPT_BASE_AI_BATCH', 'PROMPT_BASE_AI_BATCH_AUTO'])(
+      '%s documents the runtime segment marker protocol',
+      (key) => {
+        expect(CONFIG[key]).toContain('@@TI_SEG_');
+        expect(CONFIG[key]).toContain('@@TI_SEG_xxx_session_n5@@');
+        expect(CONFIG[key]).not.toContain('[--SEG:nN--]');
+      }
+    );
   });
 
   describe('Async Getters', () => {

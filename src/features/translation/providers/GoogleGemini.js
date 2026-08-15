@@ -31,7 +31,7 @@ export class GeminiProvider extends BaseAIProvider {
    * @protected
    */
   async _callAI(systemPrompt, userText, options = {}) {
-    const { abortController, sessionId, expectedFormat, isBatch, executionContext } = options;
+    const { abortController, sessionId, expectedFormat, isBatch, executionContext, callPurpose, conversationCommitCandidate } = options;
 
     const [apiKeys, model, thinkingEnabled, rawApiUrl] = await Promise.all([
       getGeminiApiKeysAsync(),
@@ -44,7 +44,7 @@ export class GeminiProvider extends BaseAIProvider {
 
     this._validateConfig({ apiKey }, ["apiKey"], `${this.providerName.toLowerCase()}-translation`);
 
-    const turnNumber = await AIConversationHelper.claimNextTurn(sessionId, this.providerName);
+    const turnNumber = await AIConversationHelper.claimNextTurn(sessionId, this.providerName, { callPurpose });
     logger.info(`[Gemini] Model: ${model || 'gemini-1.5-flash'}${sessionId ? ` (Session: ${sessionId.substring(0, 15)}..., Turn: ${turnNumber})` : ''}`);
 
     const requestBody = {
@@ -66,7 +66,8 @@ export class GeminiProvider extends BaseAIProvider {
       // Limit history to last 2 turns with character capping to optimize tokens
       const history = await AIConversationHelper.getConversationHistory(sessionId, options.mode, { 
         maxTurns: 2,
-        maxChars: TRANSLATION_CONSTANTS.HISTORY_CHARACTER_LIMITS.AI 
+        maxChars: TRANSLATION_CONSTANTS.HISTORY_CHARACTER_LIMITS.AI,
+        callPurpose
       });
       
       if (history.length > 0) {
@@ -107,13 +108,14 @@ export class GeminiProvider extends BaseAIProvider {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(requestBody),
     };
+    const originalCharCount = isBatch ? AITextProcessor.estimateOriginalChars(userText) : userText.length;
 
     try {
       const result = await this._executeRequest({
         url,
         fetchOptions,
         charCount: fetchOptions.body.length,
-        originalCharCount: isBatch ? AITextProcessor.estimateOriginalChars(userText) : userText.length,
+        originalCharCount,
         extractResponse: (data) => {
         if (data?.error) {
           throw new Error(`API_ERROR: ${data.error.message || 'Unknown Gemini Error'}`);
@@ -130,6 +132,7 @@ export class GeminiProvider extends BaseAIProvider {
         abortController,
         sessionId,
         executionContext,
+        callPurpose,
         updateApiKey: (newKey, options) => {
           if (options.url) {
             const urlObj = new URL(options.url);
@@ -140,7 +143,8 @@ export class GeminiProvider extends BaseAIProvider {
       });
 
       if (sessionId && result) {
-        await AIConversationHelper.updateSessionHistory(sessionId, userText, result);
+        if (conversationCommitCandidate) conversationCommitCandidate.stage({ sessionId, userContent: userText, assistantContent: result });
+        else await AIConversationHelper.updateSessionHistory(sessionId, userText, result, { callPurpose });
       }
 
       return result;
@@ -150,10 +154,11 @@ export class GeminiProvider extends BaseAIProvider {
         const retryBody = { ...requestBody };
         delete retryBody.generationConfig.thinking_config;
         const retryBodyJson = JSON.stringify(retryBody);
-        return await this._executeRequest({
+        const fallbackResult = await this._executeRequest({
           url,
           fetchOptions: { ...fetchOptions, body: retryBodyJson },
           charCount: retryBodyJson.length,
+          originalCharCount,
           extractResponse: (data) => {
         if (data?.error) {
           throw new Error(`API_ERROR: ${data.error.message || 'Unknown Gemini Error'}`);
@@ -169,13 +174,23 @@ export class GeminiProvider extends BaseAIProvider {
           context: `${this.providerName.toLowerCase()}-translation-fallback`,
           abortController,
           sessionId,
+          executionContext,
+          callPurpose,
           updateApiKey: (newKey, options) => {
             if (options.url) {
               const urlObj = new URL(options.url);
               urlObj.searchParams.set('key', newKey);
               options.url = urlObj.toString();
             }
-          }        });
+          }
+        });
+
+        if (sessionId && fallbackResult) {
+          if (conversationCommitCandidate) conversationCommitCandidate.stage({ sessionId, userContent: userText, assistantContent: fallbackResult });
+          else await AIConversationHelper.updateSessionHistory(sessionId, userText, fallbackResult, { callPurpose });
+        }
+
+        return fallbackResult;
       }
       throw error;
     }

@@ -244,7 +244,7 @@ export class UnifiedTranslationCoordinator {
    * @param {string} messageId - Message ID
    * @param {string} reason - Cancellation reason
    */
-  cancelTranslation(messageId, reason = 'User cancelled', timeout = false) {
+  cancelTranslation(messageId, reason = 'User cancelled', timeout = false, timeoutType) {
     if (!messageId) return false;
     const translation = this.activeTranslations.get(messageId);
     if (!translation) {
@@ -254,14 +254,18 @@ export class UnifiedTranslationCoordinator {
     logger.debug(`Cancelling translation: ${messageId} (${translation.type})`);
 
     if (translation.type === 'streaming') {
-      streamingTimeoutManager.cancelStreaming(messageId, reason);
+      if (timeoutType) {
+        streamingTimeoutManager.cancelStreaming(messageId, reason, timeout, timeoutType);
+      } else {
+        streamingTimeoutManager.cancelStreaming(messageId, reason, timeout);
+      }
     }
 
     // Notify background to stop translation immediately
     // We don't await this as we want the content-side cancellation to be immediate
     sendRegularMessage({
       action: MessageActions.CANCEL_TRANSLATION,
-      data: { messageId, reason, timeout }
+      data: { messageId, reason, timeout, ...(timeoutType && { timeoutType }) }
     }).catch(err => {
       // Log at debug level as this is often due to extension context invalidation during cancellation
       logger.debug(`Cancellation message to background failed for ${messageId}:`, err.message);
@@ -378,13 +382,13 @@ export class UnifiedTranslationCoordinator {
    * Handle streaming timeout
    * @private
    */
-  _handleStreamingTimeout(messageId) {
+  _handleStreamingTimeout(messageId, timeoutError) {
     if (!messageId) return;
     logger.warn(`Handling streaming timeout for: ${messageId}`);
 
     const translation = this.activeTranslations.get(messageId);
     if (translation) {
-      this.cancelTranslation(messageId, 'Streaming translation timed out', true);
+      this.cancelTranslation(messageId, 'Streaming translation timed out', true, timeoutError?.timeoutType);
     }
   }
 

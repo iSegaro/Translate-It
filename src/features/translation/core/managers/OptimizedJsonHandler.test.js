@@ -22,6 +22,8 @@ vi.mock('@/shared/error-management/ErrorMatcher.js');
 
 import { OptimizedJsonHandler } from './OptimizedJsonHandler.js';
 import { isFatalError, matchErrorToType } from '@/shared/error-management/ErrorMatcher.js';
+import { MessageActions } from '@/shared/messaging/core/MessageActions.js';
+import { appendTranslationDiagnostic } from '@/features/translation/ir/TranslationOperation.js';
 import { getProviderConfiguration } from '@/features/translation/core/ProviderConfigurations.js';
 import { TranslationBatcher } from '@/features/translation/core/utils/TranslationBatcher.js';
 import { createManifestView, createRequestUnitManifest } from '@/features/translation/ir/RequestUnitManifest.js';
@@ -41,6 +43,10 @@ vi.mock('@/features/translation/core/TranslationStatsManager.js', () => ({
     getSessionSummary: vi.fn(() => ({ chars: 100, originalChars: 80 })),
     printSummary: vi.fn()
   }
+}));
+
+vi.mock('@/features/translation/ir/TranslationOperation.js', () => ({
+  appendTranslationDiagnostic: vi.fn()
 }));
 
 // Partial mocks for dynamic imports
@@ -464,6 +470,474 @@ describe('OptimizedJsonHandler', () => {
       await handler.execute(mockEngine, mockData, mockProvider, 'en', 'fa', 'msg-1', mockSender);
 
       expect(mockAbortController.abort).toHaveBeenCalled();
+    });
+
+    it('should never stream original content for a failed batch', async () => {
+      const browser = (await import('webextension-polyfill')).default;
+      browser.tabs.sendMessage.mockClear();
+
+      const failure = new Error('Non-fatal batch failure');
+      failure.type = 'TRANSLATION_FAILED';
+
+      mockProvider.translate
+        .mockRejectedValueOnce(failure)
+        .mockResolvedValueOnce({ translatedText: ['t2'] });
+
+      const result = await handler.execute(mockEngine, mockData, mockProvider, 'auto', 'fa', 'msg-fail-1', mockSender);
+
+      expect(result.success).toBe(false);
+      expect(result.error).toBeDefined();
+
+      const messages = browser.tabs.sendMessage.mock.calls.map(c => c[1]);
+      const updates = messages.filter(m => m.action === MessageActions.TRANSLATION_STREAM_UPDATE);
+      expect(updates).toHaveLength(1);
+      updates.forEach((update) => {
+        expect(JSON.stringify(update.data.data)).not.toContain('s1');
+      });
+    });
+
+    it('should emit a failing stream end when a batch fails', async () => {
+      const browser = (await import('webextension-polyfill')).default;
+      browser.tabs.sendMessage.mockClear();
+
+      const failure = new Error('Non-fatal batch failure');
+      failure.type = 'TRANSLATION_FAILED';
+
+      mockProvider.translate
+        .mockRejectedValueOnce(failure)
+        .mockResolvedValueOnce({ translatedText: ['t2'] });
+
+      const result = await handler.execute(mockEngine, mockData, mockProvider, 'auto', 'fa', 'msg-fail-2', mockSender);
+
+      expect(result.success).toBe(false);
+
+      const messages = browser.tabs.sendMessage.mock.calls.map(c => c[1]);
+      const ends = messages.filter(m => m.action === MessageActions.TRANSLATION_STREAM_END);
+      expect(ends).toHaveLength(1);
+      expect(ends[0].data.success).toBe(false);
+      expect(ends[0].data.error).toBeDefined();
+    });
+
+    it('should keep streaming successful batches unchanged', async () => {
+      const browser = (await import('webextension-polyfill')).default;
+      browser.tabs.sendMessage.mockClear();
+
+      mockProvider.translate
+        .mockResolvedValueOnce({ translatedText: ['t1'] })
+        .mockResolvedValueOnce({ translatedText: ['t2'] });
+
+      const result = await handler.execute(mockEngine, mockData, mockProvider, 'auto', 'fa', 'msg-ok', mockSender);
+
+      expect(result.success).toBe(true);
+
+      const messages = browser.tabs.sendMessage.mock.calls.map(c => c[1]);
+      const updates = messages.filter(m => m.action === MessageActions.TRANSLATION_STREAM_UPDATE);
+      expect(updates).toHaveLength(2);
+      expect(updates.map(u => u.data.data)).toEqual([['t1'], ['t2']]);
+
+      const ends = messages.filter(m => m.action === MessageActions.TRANSLATION_STREAM_END);
+      expect(ends).toHaveLength(1);
+      expect(ends[0].data.success).toBe(true);
+    });
+
+    it('should abort other batches on fatal error without streaming original content', async () => {
+      const browser = (await import('webextension-polyfill')).default;
+      browser.tabs.sendMessage.mockClear();
+
+      const fatalError = new Error('429 Too Many Requests');
+      fatalError.isFatal = true;
+
+      mockProvider.translate
+        .mockRejectedValueOnce(fatalError)
+        .mockResolvedValueOnce({ translatedText: ['t2'] });
+
+      const result = await handler.execute(mockEngine, mockData, mockProvider, 'auto', 'fa', 'msg-fatal', mockSender);
+
+      expect(mockAbortController.abort).toHaveBeenCalled();
+      expect(result.success).toBe(false);
+
+      const messages = browser.tabs.sendMessage.mock.calls.map(c => c[1]);
+      const updates = messages.filter(m => m.action === MessageActions.TRANSLATION_STREAM_UPDATE);
+      updates.forEach((update) => {
+        expect(JSON.stringify(update.data.data)).not.toContain('s1');
+      });
+    });
+
+    it('should abort and propagate a canonical timeout without starting the next sequential batch', async () => {
+      vi.useFakeTimers();
+      const { getAIConversationHistoryEnabledAsync } = await import('@/shared/config/config.js');
+      const firstBatch = createDeferred();
+      let execution;
+
+      try {
+        getAIConversationHistoryEnabledAsync.mockResolvedValue(true);
+        mockProvider.translate
+          .mockImplementationOnce(() => firstBatch.promise)
+          .mockResolvedValue({ translatedText: ['t2'] });
+
+        execution = handler.execute(mockEngine, mockData, mockProvider, 'en', 'fa', 'msg-timeout', mockSender);
+        await vi.waitFor(() => expect(mockProvider.translate).toHaveBeenCalledTimes(1));
+        await vi.advanceTimersByTimeAsync(300000);
+
+        expect(mockAbortController.abort).toHaveBeenCalledTimes(1);
+        await expect(execution).rejects.toMatchObject({ type: 'TRANSLATION_TIMEOUT' });
+        expect(mockProvider.translate).toHaveBeenCalledTimes(1);
+
+      } finally {
+        firstBatch.resolve({ translatedText: ['late'] });
+        await execution?.catch(() => {});
+        getAIConversationHistoryEnabledAsync.mockResolvedValue(false);
+        vi.useRealTimers();
+      }
+    });
+
+    it('should clear successful batch deadlines without appending a late timeout diagnostic', async () => {
+      vi.useFakeTimers();
+      try {
+        mockProvider.translate
+          .mockResolvedValueOnce({ translatedText: ['t1'] })
+          .mockResolvedValueOnce({ translatedText: ['t2'] });
+
+        const execution = handler.execute(mockEngine, mockData, mockProvider, 'en', 'fa', 'msg-cleanup', mockSender);
+        await vi.waitFor(() => expect(mockProvider.translate).toHaveBeenCalledTimes(2));
+        await vi.advanceTimersByTimeAsync(50);
+        await expect(execution).resolves.toMatchObject({ success: true });
+        await vi.advanceTimersByTimeAsync(300000);
+
+        expect(mockAbortController.abort).not.toHaveBeenCalled();
+        expect(appendTranslationDiagnostic).not.toHaveBeenCalledWith(
+          expect.anything(),
+          expect.objectContaining({ type: 'BATCH_TIMEOUT' })
+        );
+        expect(mockAbortController.signal.removeEventListener).toHaveBeenCalledTimes(2);
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it('should suppress late provider settlement after a timeout', async () => {
+      vi.useFakeTimers();
+      const { getAIConversationHistoryEnabledAsync } = await import('@/shared/config/config.js');
+      const browser = (await import('webextension-polyfill')).default;
+      const firstBatch = createDeferred();
+
+      try {
+        getAIConversationHistoryEnabledAsync.mockResolvedValue(true);
+        mockProvider.translate.mockImplementationOnce(() => firstBatch.promise);
+        browser.tabs.sendMessage.mockClear();
+
+        const execution = handler.execute(mockEngine, mockData, mockProvider, 'en', 'fa', 'msg-late', mockSender);
+        await vi.waitFor(() => expect(mockProvider.translate).toHaveBeenCalledTimes(1));
+        await vi.advanceTimersByTimeAsync(300000);
+        await expect(execution).rejects.toMatchObject({ type: 'TRANSLATION_TIMEOUT' });
+
+        firstBatch.resolve({ translatedText: ['late'] });
+        await Promise.resolve();
+
+        expect(mockProvider.translate).toHaveBeenCalledTimes(1);
+        expect(browser.tabs.sendMessage).not.toHaveBeenCalled();
+      } finally {
+        firstBatch.resolve({ translatedText: ['late'] });
+        getAIConversationHistoryEnabledAsync.mockResolvedValue(false);
+        vi.useRealTimers();
+      }
+    });
+
+    it('should emit one assembled V2 node after all fragments succeed', async () => {
+      const browser = (await import('webextension-polyfill')).default;
+      const fragments = [
+        { t: 'Part one.', i: 'n7', isV2Unit: true, isSplitFragment: true, parentId: 'n7', fragmentIndex: 0, fragmentCount: 2, fragmentJoinerBefore: '' },
+        { t: 'Part two.', i: 'n7', isV2Unit: true, isSplitFragment: true, parentId: 'n7', fragmentIndex: 1, fragmentCount: 2, fragmentJoinerBefore: ' ' }
+      ];
+      mockEngine.createIntelligentBatches = vi.fn(() => [[fragments[0]], [fragments[1]]]);
+      mockProvider.translate
+        .mockResolvedValueOnce({ translatedText: ['Translated one.'] })
+        .mockResolvedValueOnce({ translatedText: ['Translated two.'] });
+      browser.tabs.sendMessage.mockClear();
+
+      const result = await handler.execute(
+        mockEngine,
+        { text: JSON.stringify(fragments), sourceLanguage: 'en', targetLanguage: 'fa', mode: 'select_element' },
+        mockProvider,
+        'en',
+        'fa',
+        'fragment-success',
+        mockSender
+      );
+
+      const updates = browser.tabs.sendMessage.mock.calls
+        .map(([, message]) => message)
+        .filter(message => message.action === MessageActions.TRANSLATION_STREAM_UPDATE);
+      expect(updates).toHaveLength(1);
+      expect(updates[0].data.data).toEqual([{ t: 'Translated one. Translated two.', text: 'Translated one. Translated two.', i: 'n7' }]);
+      expect(result.results).toEqual(updates[0].data.data);
+    });
+
+    it('should assemble out-of-order V2 fragments by fragment index', async () => {
+      const browser = (await import('webextension-polyfill')).default;
+      const first = createDeferred();
+      const second = createDeferred();
+      const fragments = [
+        { t: 'Part one.', i: 'n7', isV2Unit: true, isSplitFragment: true, parentId: 'n7', fragmentIndex: 0, fragmentCount: 2, fragmentJoinerBefore: '' },
+        { t: 'Part two.', i: 'n7', isV2Unit: true, isSplitFragment: true, parentId: 'n7', fragmentIndex: 1, fragmentCount: 2, fragmentJoinerBefore: ' ' }
+      ];
+      mockEngine.createIntelligentBatches = vi.fn(() => [[fragments[0]], [fragments[1]]]);
+      mockProvider.translate
+        .mockImplementationOnce(() => first.promise)
+        .mockImplementationOnce(() => second.promise);
+      browser.tabs.sendMessage.mockClear();
+
+      const execution = handler.execute(
+        mockEngine,
+        { text: JSON.stringify(fragments), sourceLanguage: 'en', targetLanguage: 'fa', mode: 'select_element' },
+        mockProvider,
+        'en',
+        'fa',
+        'fragment-order',
+        mockSender
+      );
+      await vi.waitFor(() => expect(mockProvider.translate).toHaveBeenCalledTimes(2));
+
+      second.resolve({ translatedText: ['Translated two.'] });
+      await Promise.resolve();
+      expect(browser.tabs.sendMessage).not.toHaveBeenCalled();
+
+      first.resolve({ translatedText: ['Translated one.'] });
+      await execution;
+
+      const update = browser.tabs.sendMessage.mock.calls
+        .map(([, message]) => message)
+        .find(message => message.action === MessageActions.TRANSLATION_STREAM_UPDATE);
+      expect(update.data.data[0].t).toBe('Translated one. Translated two.');
+    });
+
+    it('should ignore duplicate fragments before and after parent emission', async () => {
+      const browser = (await import('webextension-polyfill')).default;
+      const fragments = [
+        { t: 'Part one.', i: 'n7', isV2Unit: true, isSplitFragment: true, parentId: 'n7', fragmentIndex: 0, fragmentCount: 2, fragmentJoinerBefore: '' },
+        { t: 'Part two.', i: 'n7', isV2Unit: true, isSplitFragment: true, parentId: 'n7', fragmentIndex: 1, fragmentCount: 2, fragmentJoinerBefore: ' ' }
+      ];
+      mockEngine.createIntelligentBatches = vi.fn(() => [[fragments[0]], [fragments[0]], [fragments[1]], [fragments[0]]]);
+      mockProvider.translate
+        .mockResolvedValueOnce({ translatedText: ['First accepted.'] })
+        .mockResolvedValueOnce({ translatedText: ['Duplicate before completion.'] })
+        .mockResolvedValueOnce({ translatedText: ['Second part.'] })
+        .mockResolvedValueOnce({ translatedText: ['Duplicate after completion.'] });
+      browser.tabs.sendMessage.mockClear();
+
+      const result = await handler.execute(
+        mockEngine,
+        { text: JSON.stringify(fragments), sourceLanguage: 'en', targetLanguage: 'fa', mode: 'select_element' },
+        mockProvider,
+        'en',
+        'fa',
+        'fragment-duplicate',
+        mockSender
+      );
+
+      const updates = browser.tabs.sendMessage.mock.calls
+        .map(([, message]) => message)
+        .filter(message => message.action === MessageActions.TRANSLATION_STREAM_UPDATE);
+      expect(updates).toHaveLength(1);
+      expect(updates[0].data.data[0].t).toBe('First accepted. Second part.');
+      expect(result.results).toHaveLength(1);
+    });
+
+    it('should not emit a V2 node when one fragment fails', async () => {
+      const browser = (await import('webextension-polyfill')).default;
+      const fragments = [
+        { t: 'Part one.', i: 'n7', isV2Unit: true, isSplitFragment: true, parentId: 'n7', fragmentIndex: 0, fragmentCount: 2, fragmentJoinerBefore: '' },
+        { t: 'Part two.', i: 'n7', isV2Unit: true, isSplitFragment: true, parentId: 'n7', fragmentIndex: 1, fragmentCount: 2, fragmentJoinerBefore: ' ' }
+      ];
+      mockEngine.createIntelligentBatches = vi.fn(() => [[fragments[0]], [fragments[1]]]);
+      mockProvider.translate
+        .mockResolvedValueOnce({ translatedText: ['Translated one.'] })
+        .mockRejectedValueOnce(Object.assign(new Error('fragment failed'), { type: 'TRANSLATION_FAILED' }));
+      browser.tabs.sendMessage.mockClear();
+
+      const result = await handler.execute(
+        mockEngine,
+        { text: JSON.stringify(fragments), sourceLanguage: 'en', targetLanguage: 'fa', mode: 'select_element' },
+        mockProvider,
+        'en',
+        'fa',
+        'fragment-failure',
+        mockSender
+      );
+
+      const updates = browser.tabs.sendMessage.mock.calls
+        .map(([, message]) => message)
+        .filter(message => message.action === MessageActions.TRANSLATION_STREAM_UPDATE);
+      expect(updates).toHaveLength(0);
+      expect(result).toMatchObject({ success: false, results: [] });
+    });
+
+    it.each([0, 1, 2])('should suppress a three-fragment parent when fragment %i fails while independent nodes continue', async (failedIndex) => {
+      const browser = (await import('webextension-polyfill')).default;
+      const fragments = [0, 1, 2].map(fragmentIndex => ({
+        t: `Part ${fragmentIndex}.`,
+        i: 'n7',
+        isV2Unit: true,
+        isSplitFragment: true,
+        parentId: 'n7',
+        fragmentIndex,
+        fragmentCount: 3,
+        fragmentJoinerBefore: fragmentIndex === 0 ? '' : ' '
+      }));
+      const independent = { t: 'Independent.', i: 'n8', isV2Unit: true };
+      mockEngine.createIntelligentBatches = vi.fn(() => [...fragments.map(fragment => [fragment]), [independent]]);
+      mockProvider.translate.mockImplementation(([text]) => {
+        if (text === `Part ${failedIndex}.`) {
+          return Promise.reject(Object.assign(new Error('fragment failed'), { type: 'TRANSLATION_FAILED' }));
+        }
+        return Promise.resolve({ translatedText: [`Translated ${text}`] });
+      });
+      browser.tabs.sendMessage.mockClear();
+
+      const result = await handler.execute(
+        mockEngine,
+        { text: JSON.stringify([...fragments, independent]), sourceLanguage: 'en', targetLanguage: 'fa', mode: 'select_element' },
+        mockProvider,
+        'en',
+        'fa',
+        `fragment-failure-${failedIndex}`,
+        mockSender
+      );
+
+      const updates = browser.tabs.sendMessage.mock.calls
+        .map(([, message]) => message)
+        .filter(message => message.action === MessageActions.TRANSLATION_STREAM_UPDATE);
+      expect(updates).toHaveLength(1);
+      expect(updates[0].data.data).toEqual([{ t: 'Translated Independent.', text: 'Translated Independent.', i: 'n8', isV2Unit: true }]);
+      expect(result).toMatchObject({ success: false, results: updates[0].data.data });
+    });
+
+    it('should discard buffered fragments after timeout and ignore late settlement', async () => {
+      vi.useFakeTimers();
+      const browser = (await import('webextension-polyfill')).default;
+      const pending = createDeferred();
+      const fragments = [
+        { t: 'Part one.', i: 'n7', isV2Unit: true, isSplitFragment: true, parentId: 'n7', fragmentIndex: 0, fragmentCount: 2, fragmentJoinerBefore: '' },
+        { t: 'Part two.', i: 'n7', isV2Unit: true, isSplitFragment: true, parentId: 'n7', fragmentIndex: 1, fragmentCount: 2, fragmentJoinerBefore: ' ' }
+      ];
+      try {
+        mockEngine.createIntelligentBatches = vi.fn(() => [[fragments[0]], [fragments[1]]]);
+        mockProvider.translate
+          .mockResolvedValueOnce({ translatedText: ['Translated one.'] })
+          .mockImplementationOnce(() => pending.promise);
+        browser.tabs.sendMessage.mockClear();
+
+        const execution = handler.execute(
+          mockEngine,
+          { text: JSON.stringify(fragments), sourceLanguage: 'en', targetLanguage: 'fa', mode: 'select_element' },
+          mockProvider,
+          'en',
+          'fa',
+          'fragment-timeout',
+          mockSender
+        );
+        await vi.waitFor(() => expect(mockProvider.translate).toHaveBeenCalledTimes(2));
+        await vi.advanceTimersByTimeAsync(300000);
+
+        await expect(execution).rejects.toMatchObject({ type: 'TRANSLATION_TIMEOUT' });
+        expect(browser.tabs.sendMessage).not.toHaveBeenCalled();
+
+        pending.resolve({ translatedText: ['Translated two.'] });
+        await Promise.resolve();
+        expect(browser.tabs.sendMessage).not.toHaveBeenCalled();
+      } finally {
+        pending.resolve({ translatedText: ['Translated two.'] });
+        vi.useRealTimers();
+      }
+    });
+
+    it('should ignore a late fragment failure after timeout without retrying', async () => {
+      vi.useFakeTimers();
+      const pending = createDeferred();
+      const fragments = [
+        { t: 'Part one.', i: 'n7', isV2Unit: true, isSplitFragment: true, parentId: 'n7', fragmentIndex: 0, fragmentCount: 2, fragmentJoinerBefore: '' },
+        { t: 'Part two.', i: 'n7', isV2Unit: true, isSplitFragment: true, parentId: 'n7', fragmentIndex: 1, fragmentCount: 2, fragmentJoinerBefore: ' ' }
+      ];
+      try {
+        mockEngine.createIntelligentBatches = vi.fn(() => [[fragments[0]], [fragments[1]]]);
+        mockProvider.translate
+          .mockResolvedValueOnce({ translatedText: ['Translated one.'] })
+          .mockImplementationOnce(() => pending.promise);
+
+        const execution = handler.execute(
+          mockEngine,
+          { text: JSON.stringify(fragments), sourceLanguage: 'en', targetLanguage: 'fa', mode: 'select_element' },
+          mockProvider,
+          'en',
+          'fa',
+          'fragment-late-failure',
+          mockSender
+        );
+        await vi.waitFor(() => expect(mockProvider.translate).toHaveBeenCalledTimes(2));
+        await vi.advanceTimersByTimeAsync(300000);
+        await expect(execution).rejects.toMatchObject({ type: 'TRANSLATION_TIMEOUT' });
+
+        pending.reject(new Error('late provider failure'));
+        await Promise.resolve();
+        expect(mockProvider.translate).toHaveBeenCalledTimes(2);
+      } finally {
+        pending.resolve({ translatedText: ['ignored'] });
+        vi.useRealTimers();
+      }
+    });
+
+    it('should discard buffered fragments after cancellation and ignore late success', async () => {
+      const browser = (await import('webextension-polyfill')).default;
+      const pending = createDeferred();
+      const fragments = [
+        { t: 'Part one.', i: 'n7', isV2Unit: true, isSplitFragment: true, parentId: 'n7', fragmentIndex: 0, fragmentCount: 2, fragmentJoinerBefore: '' },
+        { t: 'Part two.', i: 'n7', isV2Unit: true, isSplitFragment: true, parentId: 'n7', fragmentIndex: 1, fragmentCount: 2, fragmentJoinerBefore: ' ' }
+      ];
+      mockEngine.createIntelligentBatches = vi.fn(() => [[fragments[0]], [fragments[1]]]);
+      mockProvider.translate
+        .mockResolvedValueOnce({ translatedText: ['Translated one.'] })
+        .mockImplementationOnce(() => pending.promise);
+      browser.tabs.sendMessage.mockClear();
+
+      const execution = handler.execute(
+        mockEngine,
+        { text: JSON.stringify(fragments), sourceLanguage: 'en', targetLanguage: 'fa', mode: 'select_element' },
+        mockProvider,
+        'en',
+        'fa',
+        'fragment-cancel',
+        mockSender
+      );
+      await vi.waitFor(() => expect(mockProvider.translate).toHaveBeenCalledTimes(2));
+
+      mockAbortController.abort();
+      pending.resolve({ translatedText: ['Translated two.'] });
+
+      await expect(execution).resolves.toMatchObject({ success: false, error: { type: 'USER_CANCELLED' } });
+      expect(browser.tabs.sendMessage).not.toHaveBeenCalled();
+    });
+
+    it('should isolate same parent IDs across separate requests', async () => {
+      const browser = (await import('webextension-polyfill')).default;
+      const fragments = [
+        { t: 'Part one.', i: 'n7', isV2Unit: true, isSplitFragment: true, parentId: 'n7', fragmentIndex: 0, fragmentCount: 2, fragmentJoinerBefore: '' },
+        { t: 'Part two.', i: 'n7', isV2Unit: true, isSplitFragment: true, parentId: 'n7', fragmentIndex: 1, fragmentCount: 2, fragmentJoinerBefore: ' ' }
+      ];
+      mockEngine.createIntelligentBatches = vi.fn(() => [[fragments[0]], [fragments[1]]]);
+      mockProvider.translate
+        .mockResolvedValueOnce({ translatedText: ['Request one.'] })
+        .mockResolvedValueOnce({ translatedText: ['Complete.'] })
+        .mockResolvedValueOnce({ translatedText: ['Request two.'] })
+        .mockResolvedValueOnce({ translatedText: ['Complete.'] });
+      browser.tabs.sendMessage.mockClear();
+
+      await handler.execute(mockEngine, { text: JSON.stringify(fragments), sourceLanguage: 'en', targetLanguage: 'fa', mode: 'select_element' }, mockProvider, 'en', 'fa', 'fragment-isolation-one', mockSender);
+      await handler.execute(mockEngine, { text: JSON.stringify(fragments), sourceLanguage: 'en', targetLanguage: 'fa', mode: 'select_element' }, mockProvider, 'en', 'fa', 'fragment-isolation-two', mockSender);
+
+      const updates = browser.tabs.sendMessage.mock.calls
+        .map(([, message]) => message)
+        .filter(message => message.action === MessageActions.TRANSLATION_STREAM_UPDATE);
+      expect(updates.map(update => update.data.data[0].t)).toEqual(['Request one. Complete.', 'Request two. Complete.']);
     });
 
     it('should abort execution and bubble validation error on count mismatch', async () => {

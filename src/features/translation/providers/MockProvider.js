@@ -88,7 +88,7 @@ export class MockProvider extends BaseAIProvider {
    * @protected
    */
   async _callAI(systemPrompt, userText, options = {}) {
-    const { expectedFormat, isBatch } = options;
+    const { expectedFormat, isBatch, callPurpose } = options;
     
     // 1. Simulate network latency to make UI interactions feel realistic (LLMs usually take 2-5 seconds for batch/stream)
     const latency = 800 + Math.random() * 1200;
@@ -180,7 +180,8 @@ export class MockProvider extends BaseAIProvider {
         context: 'mock-provider',
         charCount: userText.length,
         originalCharCount: userText.length,
-        sessionId: options.sessionId
+        sessionId: options.sessionId,
+        callPurpose
       });
     } catch {
       // Ignore mock-only errors
