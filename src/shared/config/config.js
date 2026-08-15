@@ -196,9 +196,17 @@ export const CONFIG = {
   OPENROUTER_API_MODEL: "openai/gpt-4o-mini",
   OPENROUTER_MODELS: [
     { value: "openai/gpt-4o-mini", name: "OpenAI GPT-4o Mini" },
-    { value: "openai/gpt-4o", name: "OpenAI GPT-4o" },
-
-    // --- Custom ---
+    { value: "google/gemini-2.5-flash-lite", name: "Google Gemini 2.5 Flash-Lite" },
+    { value: "mistralai/mistral-small-3.2-24b-instruct", name: "Mistral Small 3.2" },
+    { value: "google/gemini-2.5-flash", name: "Google Gemini 2.5 Flash" },
+    { value: "anthropic/claude-haiku-4.5", name: "Anthropic Claude Haiku 4.5" },
+    { value: "openai/gpt-4.1-mini", name: "OpenAI GPT-4.1 Mini" },
+    { value: "deepseek/deepseek-chat", name: "DeepSeek Chat" },
+    { value: "qwen/qwen3.5-flash-02-23", name: "Qwen 3.5 Flash" },
+    { value: "meta-llama/llama-3.3-70b-instruct", name: "Meta Llama 3.3 70B" },
+    { value: "anthropic/claude-sonnet-4.6", name: "Anthropic Claude Sonnet 4.6" },
+    { value: "google/gemma-4-26b-a4b-it:free", name: "Google Gemma 4 26B A4B (Free)" },
+    { value: "nvidia/nemotron-3-super-120b-a12b:free", name: "NVIDIA Nemotron 3 Super (Free)" },
     { value: "custom", name: "Custom Model" }
   ],
   DEEPSEEK_API_KEY: "",

@@ -235,17 +235,31 @@ describe('Settings Migrations', () => {
     expect(logs.some(log => log.includes('Reset DEEPSEEK_API_MODEL'))).toBe(true);
   });
 
-  it('preserves curated and arbitrary OpenRouter model IDs', async () => {
+  it.each(CONFIG.OPENROUTER_MODELS
+    .filter(model => model.value !== 'custom')
+    .map(model => model.value))('preserves curated OpenRouter model ID %s during list synchronization', async (model) => {
     const current = await runSettingsMigrations({
       OPENROUTER_MODELS: [{ value: 'legacy-model', label: 'Legacy' }],
-      OPENROUTER_API_MODEL: 'openai/gpt-4o-mini'
+      OPENROUTER_API_MODEL: model
+    });
+
+    expect(current.updates.OPENROUTER_MODELS).toEqual(CONFIG.OPENROUTER_MODELS);
+    expect(current.updates.OPENROUTER_API_MODEL).toBeUndefined();
+  });
+
+  it('preserves removed and arbitrary OpenRouter model IDs during list synchronization', async () => {
+    const removed = await runSettingsMigrations({
+      OPENROUTER_MODELS: [{ value: 'legacy-model', label: 'Legacy' }],
+      OPENROUTER_API_MODEL: 'openai/gpt-4o'
     });
     const custom = await runSettingsMigrations({
       OPENROUTER_MODELS: [{ value: 'legacy-model', label: 'Legacy' }],
       OPENROUTER_API_MODEL: 'provider/custom-model'
     });
 
-    expect(current.updates.OPENROUTER_API_MODEL).toBeUndefined();
+    expect(removed.updates.OPENROUTER_MODELS).toEqual(CONFIG.OPENROUTER_MODELS);
+    expect(removed.updates.OPENROUTER_API_MODEL).toBeUndefined();
+    expect(custom.updates.OPENROUTER_MODELS).toEqual(CONFIG.OPENROUTER_MODELS);
     expect(custom.updates.OPENROUTER_API_MODEL).toBeUndefined();
   });
 
