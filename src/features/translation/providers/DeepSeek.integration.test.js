@@ -79,6 +79,8 @@ describe('DeepSeekProvider Internal Integration (Failover & Response)', () => {
         })
       })
     );
+    expect(JSON.parse(proxyManager.fetch.mock.calls[0][1].body).thinking)
+      .toEqual({ type: 'disabled' });
   });
 
   it('should handle failover when the first DeepSeek key is invalid', async () => {

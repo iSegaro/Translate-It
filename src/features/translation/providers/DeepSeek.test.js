@@ -117,9 +117,9 @@ describe('DeepSeekProvider Error Handling', () => {
       model,
       temperature: 0.1,
       max_tokens: 4096,
+      thinking: { type: 'disabled' },
       response_format: { type: 'json_object' }
     });
-    expect(payload).not.toHaveProperty('thinking');
   });
 
   it('uses CONFIG default for missing text model selection', async () => {
@@ -315,6 +315,7 @@ describe('DeepSeekProvider Error Handling', () => {
         .not.toHaveProperty('callPurpose');
       expect(JSON.parse(request.fetchOptions.body))
         .not.toHaveProperty('callPurpose');
+      expect(JSON.parse(request.fetchOptions.body).thinking).toEqual({ type: 'disabled' });
       expect(result).toBe('translated');
     } finally {
       claim.mockRestore();

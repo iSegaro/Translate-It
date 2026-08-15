@@ -95,6 +95,9 @@ export class DeepSeekProvider extends BaseAIProvider {
         messages: messages,
         temperature: 0.1,
         max_tokens: 4096,
+        thinking: {
+          type: 'disabled'
+        },
         // DeepSeek supports JSON Mode for structured data
         ...((expectedFormat === ResponseFormat.JSON_OBJECT || expectedFormat === ResponseFormat.JSON_ARRAY) && { 
           response_format: { type: "json_object" } 
