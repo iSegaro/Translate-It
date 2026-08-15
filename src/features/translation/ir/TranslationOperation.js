@@ -4,6 +4,8 @@ import { createUsageRecord, normalizeCompletionTermination } from './CompletionC
 const MAX_DIAGNOSTIC_ENTRIES = 100
 const MAX_COMPLETION_ENTRIES = 100
 const MAX_STRING_LENGTH = 256
+const MAX_DIAGNOSTIC_ARRAY_ITEMS = 32
+const MAX_DIAGNOSTIC_ID_LENGTH = 64
 const SettlementState = Object.freeze({
   UNSETTLED: Symbol('UNSETTLED'),
   SETTLED: Symbol('SETTLED'),
@@ -133,6 +135,15 @@ function safeNumber(value) {
   return Number.isFinite(value) ? value : undefined
 }
 
+function safeDiagnosticArray(value) {
+  if (!Array.isArray(value)) return undefined
+  return value.slice(0, MAX_DIAGNOSTIC_ARRAY_ITEMS).map((item) => {
+    if (typeof item === 'number' && Number.isFinite(item)) return item
+    if (typeof item === 'string') return item.slice(0, MAX_DIAGNOSTIC_ID_LENGTH)
+    return null
+  })
+}
+
 function sanitizeDiagnostic(messageId, fact = {}) {
   const diagnostic = {
     type: safeString(fact.type) || 'DIAGNOSTIC',
@@ -141,17 +152,54 @@ function sanitizeDiagnostic(messageId, fact = {}) {
     timestamp: safeNumber(fact.timestamp) ?? Date.now(),
   }
 
-  for (const key of ['batchIndex', 'attempt', 'count', 'expectedCount', 'receivedCount', 'missingCount', 'expectedMarkerCount', 'actualMarkerCount']) {
+  for (const key of [
+    'batchIndex', 'attempt', 'count', 'expectedCount', 'receivedCount', 'missingCount',
+    'requestCount', 'responseCount', 'invalidCount', 'unresolvedCount', 'duplicateCount',
+    'invalidTextCount', 'requestIdsTotal', 'responseIdsTotal', 'unresolvedIdsTotal',
+    'duplicateResponseIdsTotal', 'invalidTextIndexesTotal', 'expectedMarkerCount',
+    'actualMarkerCount', 'recoveryStage', 'primaryFragmentLimit', 'recoveryFragmentLimit',
+    'primaryFragmentCount', 'recoveryFragmentCount', 'unitCount', 'originalUnitCount', 'intervalIndex',
+    'sourceLength', 'translatedLength', 'sourceIntervalCount', 'translatedIntervalCount',
+    'sourceMarkerCount', 'translatedMarkerCount', 'sourceIntervalLength',
+    'translatedIntervalLength', 'mappedLeadingIntervalLength', 'providerLeadingIntervalLength',
+  ]) {
     const value = safeNumber(fact[key])
     if (value !== undefined) diagnostic[key] = value
   }
-  for (const key of ['provider', 'reason', 'code', 'parentId', 'classification']) {
+  for (const key of [
+    'event', 'provider', 'reason', 'code', 'parentId', 'classification', 'callPurpose',
+    'outerCallPurpose', 'expectedFormat', 'strategy', 'finalReason', 'originalReason',
+    'firstMarkerId', 'markerId',
+  ]) {
     const value = safeString(fact[key])
     if (value !== undefined) diagnostic[key] = value
   }
 
   for (const key of ['repaired', 'fallback', 'cancelled']) {
     if (typeof fact[key] === 'boolean') diagnostic[key] = fact[key]
+  }
+
+  for (const key of [
+    'arraysTruncated', 'requestIdsTruncated', 'responseIdsTruncated',
+    'unresolvedIdsTruncated', 'duplicateResponseIdsTruncated', 'invalidTextIndexesTruncated',
+  ]) {
+    if (typeof fact[key] === 'boolean') diagnostic[key] = fact[key]
+  }
+
+  for (const key of [
+    'requestIds', 'responseIds', 'unresolvedIds', 'duplicateResponseIds',
+    'invalidTextIndexes', 'invalidUnitIndexes', 'sourceMarkerIds', 'translatedMarkerIds',
+  ]) {
+    const value = safeDiagnosticArray(fact[key])
+    if (value !== undefined) diagnostic[key] = value
+  }
+
+  if (fact.mappingFacts && typeof fact.mappingFacts === 'object') {
+    diagnostic.mappingFacts = {
+      identityReliable: fact.mappingFacts.identityReliable === true,
+      complete: fact.mappingFacts.complete === true,
+      ambiguous: fact.mappingFacts.ambiguous === true,
+    }
   }
 
   return diagnostic

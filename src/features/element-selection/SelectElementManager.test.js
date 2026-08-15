@@ -357,6 +357,36 @@ describe('SelectElementManager', () => {
       expect(errorHandler.handle).not.toHaveBeenCalled();
       expect(cleanupSpy).toHaveBeenCalledWith({ reason: 'success' });
     });
+
+    it.each([
+      undefined,
+      {},
+      { success: false, error: Object.assign(new Error('No translation results were accepted'), {
+        type: 'NO_ACCEPTED_TRANSLATION_RESULTS'
+      }) }
+    ])('classifies resolved non-success result as visible failure: %o', async (result) => {
+      manager.domTranslatorAdapter.translateElement.mockResolvedValue(result);
+
+      await manager.startTranslation(document.createElement('div'));
+
+      expect(errorHandler.handle).toHaveBeenCalledWith(
+        result?.error || expect.any(Error),
+        expect.objectContaining({ context: 'select-element', showToast: true })
+      );
+      expect(cleanupSpy).toHaveBeenCalledWith({ reason: 'error' });
+    });
+
+    it('preserves partial translations after successful partial commit', async () => {
+      manager.domTranslatorAdapter.translateElement.mockResolvedValue({
+        success: true,
+        committedParentCount: 1
+      });
+
+      await manager.startTranslation(document.createElement('div'));
+
+      expect(errorHandler.handle).not.toHaveBeenCalled();
+      expect(cleanupSpy).toHaveBeenCalledWith({ reason: 'success' });
+    });
   });
 
   describe('event handling', () => {

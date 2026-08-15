@@ -6,6 +6,7 @@
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { ComplexityAnalyzer } from './ComplexityAnalyzer.js';
+import { parseV3Intervals } from '../V3IntervalParser.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.TRANSLATION, 'TranslationBatcher');
 
@@ -26,6 +27,7 @@ export const TranslationBatcher = {
     
     const chunks = [];
     let remaining = text;
+    let remainingOffset = 0;
     let partIndex = 0;
     let fragmentJoinerBefore = '';
     const isV2Unit = isObject && segment.isV2Unit === true;
@@ -34,6 +36,12 @@ export const TranslationBatcher = {
     // and parentId must both resolve from the same normalized value.
     const blockId = isObject ? (segment.blockId ?? segment.b) : null;
     const isV3Block = isObject && !isV2Unit && blockId !== null && blockId !== undefined;
+    let markerSpans = null;
+
+    if (isV3Block) {
+      const parsed = parseV3Intervals(text, { grammar: 'ti' });
+      if (parsed.structuralFacts.isV3) markerSpans = parsed.markers;
+    }
 
     const createObjectPart = (partText, index) => ({
       ...segment,
@@ -59,6 +67,19 @@ export const TranslationBatcher = {
         breakPoint = space !== -1 ? maxChars - lookback + space : maxChars;
       }
       
+      if (markerSpans) {
+        const absoluteBreakPoint = remainingOffset + breakPoint;
+        const marker = markerSpans.find(({ start, end }) => absoluteBreakPoint > start && absoluteBreakPoint < end);
+        if (marker) {
+          const before = marker.start > remainingOffset ? marker.start - remainingOffset : null;
+          const after = marker.end - remainingOffset;
+          if (before === null || breakPoint - before > after - breakPoint) breakPoint = after;
+          else breakPoint = before;
+        }
+      }
+
+      if (breakPoint <= 0 || breakPoint > remaining.length) breakPoint = Math.min(maxChars, remaining.length);
+
       const rawPart = remaining.substring(0, breakPoint);
       const partText = rawPart.trim();
       if (isObject) {
@@ -70,6 +91,7 @@ export const TranslationBatcher = {
       
       const rawRemaining = remaining.substring(breakPoint);
       fragmentJoinerBefore = (rawPart.match(/\s*$/)?.[0] || '') + (rawRemaining.match(/^\s*/)?.[0] || '');
+      remainingOffset += breakPoint + (rawRemaining.match(/^\s*/)?.[0].length || 0);
       remaining = rawRemaining.trim();
     }
     

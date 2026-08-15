@@ -74,15 +74,18 @@ describe('TranslationStatsManager', () => {
 
       expect(statsManager.global.callsByPurpose).toEqual({
         PRIMARY_TRANSLATION: 1,
-        STRUCTURED_RECOVERY: 1
+        STRUCTURED_RECOVERY: 1,
+        PARENT_RECOVERY: 0
       });
       expect(statsManager.global.charsByPurpose).toEqual({
         PRIMARY_TRANSLATION: 100,
-        STRUCTURED_RECOVERY: 25
+        STRUCTURED_RECOVERY: 25,
+        PARENT_RECOVERY: 0
       });
       expect(statsManager.global.errorsByPurpose).toEqual({
         PRIMARY_TRANSLATION: 0,
-        STRUCTURED_RECOVERY: 1
+        STRUCTURED_RECOVERY: 1,
+        PARENT_RECOVERY: 0
       });
       expect(statsManager.providers.get('Google').callsByPurpose).not.toBe(statsManager.global.callsByPurpose);
       expect(statsManager.sessions.get('session-1').callsByPurpose).toEqual(statsManager.global.callsByPurpose);
@@ -95,9 +98,9 @@ describe('TranslationStatsManager', () => {
       expect(statsManager.global.totalErrors).toBe(1);
       expect(statsManager.providers.get('P1').callsByPurpose).not.toBe(statsManager.sessions.get('s1').callsByPurpose);
       statsManager.reset();
-      expect(statsManager.global.callsByPurpose).toEqual({ PRIMARY_TRANSLATION: 0, STRUCTURED_RECOVERY: 0 });
-      expect(statsManager.global.charsByPurpose).toEqual({ PRIMARY_TRANSLATION: 0, STRUCTURED_RECOVERY: 0 });
-      expect(statsManager.global.errorsByPurpose).toEqual({ PRIMARY_TRANSLATION: 0, STRUCTURED_RECOVERY: 0 });
+      expect(statsManager.global.callsByPurpose).toEqual({ PRIMARY_TRANSLATION: 0, STRUCTURED_RECOVERY: 0, PARENT_RECOVERY: 0 });
+      expect(statsManager.global.charsByPurpose).toEqual({ PRIMARY_TRANSLATION: 0, STRUCTURED_RECOVERY: 0, PARENT_RECOVERY: 0 });
+      expect(statsManager.global.errorsByPurpose).toEqual({ PRIMARY_TRANSLATION: 0, STRUCTURED_RECOVERY: 0, PARENT_RECOVERY: 0 });
       expect(statsManager.global.totalCalls).toBe(0);
       expect(statsManager.global.totalErrors).toBe(0);
     });

@@ -25,6 +25,7 @@ import { classifyRecoveryFailure } from "@/features/translation/ir/RecoveryClass
 import { TranslationContractValidator } from "@/features/translation/core/TranslationContractValidator.js";
 
 const logger = getScopedLogger(LOG_COMPONENTS.TRANSLATION, 'BaseAIProvider');
+const MAX_SCALAR_SELECTIVE_RECOVERY_UNITS = 3;
 
 function createConversationCommitCandidate(translateMode) {
   let staged = null;
@@ -94,7 +95,7 @@ function getSelectiveRecoveryPlan(parsed, texts) {
 
   return {
     invalidIndexes,
-    recoveryTexts: invalidIndexes.map((index) => texts[index]),
+    recoveryTexts: invalidIndexes.map((index) => getSourceText(texts[index])),
   };
 }
 
@@ -106,6 +107,46 @@ function validateSelectiveRecoveryResult(recoveryResult, expectedCount) {
     throw error;
   }
   return values;
+}
+
+function createStructuredRecoveryFailure() {
+  const error = new Error('Structured recovery returned an invalid response after one bounded retry');
+  error.type = ErrorTypes.API_RESPONSE_INVALID;
+  return error;
+}
+
+function summarizeRecoveryValue(value) {
+  const DIAGNOSTIC_ARRAY_LIMIT = 32;
+  const summarize = (item) => {
+    if (typeof item === 'string') {
+      return {
+        type: 'string',
+        length: item.length,
+        whitespaceOnly: item.trim() === '',
+      };
+    }
+    if (item && typeof item === 'object') {
+      const keys = Object.keys(item);
+      return {
+        type: 'object',
+        keys: keys.slice(0, 12),
+        resemblesIdText: typeof item.id === 'string' && typeof item.text === 'string',
+        resemblesIT: typeof item.i === 'string' && typeof item.t === 'string',
+      };
+    }
+    return { type: item === null ? 'null' : typeof item };
+  };
+
+  if (Array.isArray(value)) {
+    return {
+      containerType: 'array',
+      arrayLength: value.length,
+      values: value.slice(0, DIAGNOSTIC_ARRAY_LIMIT).map(summarize),
+      valuesTotal: value.length,
+      valuesTruncated: value.length > DIAGNOSTIC_ARRAY_LIMIT,
+    };
+  }
+  return { containerType: typeof value, arrayLength: null, values: [summarize(value)], valuesTotal: 1, valuesTruncated: false };
 }
 
 function collectRecoveryViolationCodes(parsed) {
@@ -124,6 +165,10 @@ function collectRecoveryViolationCodes(parsed) {
 function formatDiagnosticId(value, maxLength = 32) {
   if (typeof value !== 'string' || !value) return null;
   return value.length <= maxLength ? value : `${value.slice(0, maxLength)}…`;
+}
+
+function boundDiagnosticValues(values, formatter = (value) => value) {
+  return Array.isArray(values) ? values.slice(0, 32).map(formatter) : [];
 }
 
 function getSourceText(source) {
@@ -200,12 +245,18 @@ export class BaseAIProvider extends BaseProvider {
    * Enhanced batch translation with streaming support
    */
   async _batchTranslate(texts, sourceLang, targetLang, translateMode, engine, messageId, abortController, priority, sessionId, expectedFormat, options = {}) {
-    const conversationParticipates = await AIConversationHelper.getConversationParticipation({
-      callPurpose: TranslationCallPurpose.PRIMARY_TRANSLATION,
-      translateMode,
-      sessionId,
-    });
-    const conversationOptions = { ...options, conversationParticipates };
+    const callPurpose = options.callPurpose || TranslationCallPurpose.PRIMARY_TRANSLATION;
+    const isPrimaryCall = callPurpose === TranslationCallPurpose.PRIMARY_TRANSLATION;
+    const conversationParticipates = isPrimaryCall
+      && (typeof options.conversationParticipates === 'boolean'
+        ? options.conversationParticipates
+        : await AIConversationHelper.getConversationParticipation({ callPurpose, translateMode, sessionId }));
+    const conversationOptions = {
+      ...options,
+      callPurpose,
+      conversationParticipates,
+      useParentConversationLifecycle: isPrimaryCall && options.useParentConversationLifecycle === true,
+    };
     const supportsStreaming = await this.getSupportsStreaming();
     const batchStrategy = await this.getBatchStrategy(translateMode);
 
@@ -281,13 +332,16 @@ export class BaseAIProvider extends BaseProvider {
    */
   async _translateBatch(texts, sourceLang, targetLang, translateMode, abortController, engine, messageId, sessionId, contextMetadata = null, expectedFormat = null, priority = null) {
     const structuredFormat = expectedFormat || ResponseFormat.JSON_ARRAY;
-    const conversationParticipates = typeof contextMetadata?.conversationParticipates === 'boolean'
-      ? contextMetadata.conversationParticipates
-      : await AIConversationHelper.getConversationParticipation({
-        callPurpose: TranslationCallPurpose.PRIMARY_TRANSLATION,
-        translateMode,
-        sessionId,
-      });
+    const callPurpose = contextMetadata?.callPurpose || TranslationCallPurpose.PRIMARY_TRANSLATION;
+    const isPrimaryCall = callPurpose === TranslationCallPurpose.PRIMARY_TRANSLATION;
+    const conversationParticipates = callPurpose === TranslationCallPurpose.PRIMARY_TRANSLATION
+      && (typeof contextMetadata?.conversationParticipates === 'boolean'
+        ? contextMetadata.conversationParticipates
+        : await AIConversationHelper.getConversationParticipation({
+          callPurpose,
+          translateMode,
+          sessionId,
+        }));
     // Per-call completion slot: the adapter records the completion during its
     // physical response, and recordProviderCompletion publishes the frozen
     // record into this fresh per-call slot. Parallel batches share one
@@ -298,9 +352,13 @@ export class BaseAIProvider extends BaseProvider {
     const callExecutionContext = baseExecutionContext
       ? { ...baseExecutionContext, completionRef }
       : null;
-    const callContextMetadata = callExecutionContext
-      ? { ...contextMetadata, executionContext: callExecutionContext }
-      : contextMetadata;
+    const callContextMetadata = {
+      ...contextMetadata,
+      conversationParticipates,
+      expectedFormat: structuredFormat,
+      useParentConversationLifecycle: isPrimaryCall && contextMetadata?.useParentConversationLifecycle === true,
+      ...(callExecutionContext && { executionContext: callExecutionContext }),
+    };
     const conversationCommitCandidate = (
       (structuredFormat === ResponseFormat.JSON_ARRAY || structuredFormat === ResponseFormat.JSON_OBJECT)
       && conversationParticipates
@@ -316,6 +374,7 @@ export class BaseAIProvider extends BaseProvider {
         expectedFormat,
         priority,
         conversationCommitCandidate,
+        callPurpose,
       });
 
       // Stats recording is handled by ProviderRequestEngine. 
@@ -358,17 +417,25 @@ export class BaseAIProvider extends BaseProvider {
       }
 
       // Structured recovery: the parser reports facts only; recovery ownership stays
-      // here. A contract violation triggers exactly one sequential re-request.
-      // The sequential pass returns a scalar for a single segment; normalize it to
-      // the canonical structured-batch array shape so downstream contract cleaning
-      // (ProviderCoordinator._cleanResult) receives the same shape as the normal path.
+      // here. Reliable mappings use selective scalar repair; unmappable responses get
+      // one bounded structured retry.
       if (parsed.contractViolation) {
         const selectivePlan = getSelectiveRecoveryPlan(parsed, texts);
-        const recoveryStrategy = selectivePlan ? 'SELECTIVE' : 'FULL';
+        const subsetPlan = selectivePlan && selectivePlan.invalidIndexes.length > MAX_SCALAR_SELECTIVE_RECOVERY_UNITS
+          ? {
+            invalidIndexes: selectivePlan.invalidIndexes,
+            recoveryTexts: selectivePlan.invalidIndexes.map((index) => texts[index]),
+          }
+          : null;
+        const recoveryStrategy = subsetPlan
+          ? 'STRUCTURED_SUBSET_RETRY'
+          : (selectivePlan ? 'SELECTIVE' : 'FULL_STRUCTURED_RETRY');
+        const isFullStructuredRetry = contextMetadata?.fullParseRecoveryRetry === true;
         const mappingFacts = parsed.mappingFacts || {};
         conversationCommitCandidate?.discard();
-        logger.warn(`[${this.providerName}] Structured response violated its contract; sequential recovery started`);
+        logger.warn(`[${this.providerName}] Structured response violated its contract; ${recoveryStrategy} started`);
         logger.debug(`[${this.providerName}] Structured recovery triggered`, {
+          event: 'STRUCTURED_RECOVERY_TRIGGERED',
           classification: recoveryClassification?.classification ?? null,
           termination: recoveryClassification?.termination ?? null,
           parseFailed: parsed.parseFailed === true,
@@ -382,14 +449,248 @@ export class BaseAIProvider extends BaseProvider {
           },
           strategy: recoveryStrategy,
           unitCount: texts.length,
+          invalidCount: selectivePlan?.invalidIndexes.length || 0,
+          originalUnitCount: texts.length,
+          ...(recoveryStrategy === 'FULL_STRUCTURED_RETRY' && {
+            reason: parsed.parseFailed === true ? 'PARSE_FAILURE' : 'UNTRUSTWORTHY_MAPPING',
+            attempt: 1,
+          }),
+        });
+        logger.debug(`[${this.providerName}] Original structured violation facts`, {
+          violationCodes: collectRecoveryViolationCodes(parsed),
+          invalidUnitIndexes: boundDiagnosticValues(parsed.invalidUnits?.map(({ requestIndex }) => requestIndex)),
+          responseIds: boundDiagnosticValues(parsed.parserDiagnostics?.responseIds, formatDiagnosticId),
+          requestIds: boundDiagnosticValues(
+            parsed.parserDiagnostics?.requestIds || texts.map((text) => text?.i ?? text?.id ?? null),
+            formatDiagnosticId,
+          ),
+          unresolvedIds: boundDiagnosticValues(parsed.parserDiagnostics?.unresolvedIds, formatDiagnosticId),
+          duplicateIds: boundDiagnosticValues(parsed.parserDiagnostics?.duplicateResponseIds, formatDiagnosticId),
+          invalidTextIndexes: boundDiagnosticValues(parsed.parserDiagnostics?.invalidTextIndexes),
         });
         appendTranslationDiagnostic(executionContext, {
           type: 'RECOVERY_TRIGGERED',
+          event: 'STRUCTURED_RECOVERY_TRIGGERED',
           stage: 'recovery',
           provider: this.providerName,
           code: 'CONTRACT_VIOLATION',
           count: texts.length,
           classification: recoveryClassification?.classification ?? null,
+          callPurpose,
+          outerCallPurpose: callPurpose,
+          expectedFormat,
+          strategy: recoveryStrategy,
+          attempt: 1,
+          unitCount: texts.length,
+          invalidCount: selectivePlan?.invalidIndexes.length || 0,
+          originalUnitCount: texts.length,
+        });
+
+        if (contextMetadata?.isSubsetRecoveryAttempt) {
+          throw createStructuredRecoveryFailure();
+        }
+
+        if (isFullStructuredRetry) {
+          const error = createStructuredRecoveryFailure();
+          appendTranslationDiagnostic(executionContext, {
+            type: 'RECOVERY_FAILED',
+            event: 'STRUCTURED_RECOVERY_FAILED',
+            stage: 'recovery-validation',
+            provider: this.providerName,
+            reason: error.type || error.name || 'RECOVERY_FAILED',
+            code: error.type,
+            callPurpose,
+            outerCallPurpose: callPurpose,
+            expectedFormat,
+            strategy: recoveryStrategy,
+            attempt: 1,
+            unitCount: texts.length,
+          });
+          throw error;
+        }
+
+        if (!selectivePlan) {
+          if (abortController?.signal?.aborted) {
+            const error = new Error('Translation cancelled by user');
+            error.name = 'AbortError';
+            error.type = ErrorTypes.USER_CANCELLED;
+            throw error;
+          }
+          logger.warn(`[${this.providerName}] Full structured recovery retry started`);
+          try {
+            const retryResult = await this._translateBatch(
+              texts,
+              sourceLang,
+              targetLang,
+              translateMode,
+              abortController,
+              engine,
+              messageId,
+              sessionId,
+              {
+                ...contextMetadata,
+                callPurpose: TranslationCallPurpose.STRUCTURED_RECOVERY,
+                conversationParticipates: false,
+                useParentConversationLifecycle: false,
+                repairContext: parsed.repairContext,
+                fullParseRecoveryRetry: true,
+              },
+              expectedFormat,
+              priority,
+            );
+            appendTranslationDiagnostic(executionContext, {
+              type: 'RECOVERY_SUCCEEDED',
+              event: 'STRUCTURED_RECOVERY_RESULT',
+              stage: 'recovery',
+              provider: this.providerName,
+              callPurpose,
+              outerCallPurpose: callPurpose,
+              expectedFormat,
+              strategy: recoveryStrategy,
+              attempt: 1,
+              unitCount: texts.length,
+            });
+            logger.debug(`[${this.providerName}] Structured recovery completed`, {
+              event: 'STRUCTURED_RECOVERY_RESULT',
+              outerCallPurpose: callPurpose,
+              expectedFormat,
+              attempt: 1,
+              unitCount: texts.length,
+              classification: recoveryClassification?.classification ?? null,
+              strategy: recoveryStrategy,
+              recoveredUnitCount: texts.length,
+            });
+            return retryResult;
+          } catch (error) {
+            if (!abortController?.signal?.aborted && !isCancellationError(error)) {
+              appendTranslationDiagnostic(executionContext, {
+                type: 'RECOVERY_FAILED',
+                event: 'STRUCTURED_RECOVERY_FAILED',
+                stage: 'recovery',
+                provider: this.providerName,
+                reason: error.type || error.name || 'RECOVERY_FAILED',
+                ...(typeof error.type === 'string' && { code: error.type }),
+                callPurpose,
+                outerCallPurpose: callPurpose,
+                expectedFormat,
+                strategy: recoveryStrategy,
+                attempt: 1,
+                unitCount: texts.length,
+              });
+            }
+            throw error;
+          }
+        }
+
+        if (subsetPlan) {
+          if (abortController?.signal?.aborted) {
+            const error = new Error('Translation cancelled by user');
+            error.name = 'AbortError';
+            error.type = ErrorTypes.USER_CANCELLED;
+            throw error;
+          }
+          const subsetExpectedFormat = expectedFormat || ResponseFormat.JSON_ARRAY;
+          const subsetExecutionContext = contextMetadata?.executionContext;
+          if (Number.isFinite(subsetExecutionContext?.deadlineAt) && Date.now() >= subsetExecutionContext.deadlineAt) {
+            const error = new Error('Batch translation timed out');
+            error.type = ErrorTypes.TRANSLATION_TIMEOUT;
+            throw error;
+          }
+          try {
+            const subsetResults = await this._translateBatch(
+              subsetPlan.recoveryTexts,
+              sourceLang,
+              targetLang,
+              translateMode,
+              abortController,
+              engine,
+              messageId,
+              sessionId,
+              {
+                ...contextMetadata,
+                callPurpose: TranslationCallPurpose.STRUCTURED_RECOVERY,
+                conversationParticipates: false,
+                useParentConversationLifecycle: false,
+                expectedFormat: subsetExpectedFormat,
+                repairContext: parsed.repairContext,
+                isSubsetRecoveryAttempt: true,
+              },
+              subsetExpectedFormat,
+              priority,
+            );
+            if (!Array.isArray(subsetResults) || subsetResults.length !== subsetPlan.invalidIndexes.length) {
+              throw createStructuredRecoveryFailure();
+            }
+            const finalResults = [...parsed.results];
+            subsetPlan.invalidIndexes.forEach((requestIndex, subsetIndex) => {
+              finalResults[requestIndex] = subsetResults[subsetIndex];
+            });
+            validateRecoveredResults(texts, finalResults);
+            appendTranslationDiagnostic(executionContext, {
+              type: 'RECOVERY_SUCCEEDED',
+              event: 'STRUCTURED_RECOVERY_RESULT',
+              stage: 'recovery',
+              provider: this.providerName,
+              callPurpose: TranslationCallPurpose.STRUCTURED_RECOVERY,
+              outerCallPurpose: callPurpose,
+              expectedFormat: subsetExpectedFormat,
+              strategy: 'STRUCTURED_SUBSET_RETRY',
+              attempt: 1,
+              unitCount: subsetPlan.invalidIndexes.length,
+              invalidCount: subsetPlan.invalidIndexes.length,
+              originalUnitCount: texts.length,
+            });
+            logger.debug(`[${this.providerName}] Structured recovery completed`, {
+              event: 'STRUCTURED_RECOVERY_RESULT',
+              outerCallPurpose: callPurpose,
+              expectedFormat: subsetExpectedFormat,
+              strategy: 'STRUCTURED_SUBSET_RETRY',
+              attempt: 1,
+              unitCount: subsetPlan.invalidIndexes.length,
+              invalidCount: subsetPlan.invalidIndexes.length,
+              originalUnitCount: texts.length,
+            });
+            return finalResults;
+          } catch (error) {
+            if (!abortController?.signal?.aborted && !isCancellationError(error)) {
+              appendTranslationDiagnostic(executionContext, {
+                type: 'RECOVERY_FAILED',
+                event: 'STRUCTURED_RECOVERY_FAILED',
+                stage: 'recovery',
+                provider: this.providerName,
+                reason: error.type || error.name || 'RECOVERY_FAILED',
+                ...(typeof error.type === 'string' && { code: error.type }),
+                callPurpose: TranslationCallPurpose.STRUCTURED_RECOVERY,
+                outerCallPurpose: callPurpose,
+                expectedFormat: subsetExpectedFormat,
+                strategy: 'STRUCTURED_SUBSET_RETRY',
+                attempt: 1,
+                unitCount: subsetPlan.invalidIndexes.length,
+                invalidCount: subsetPlan.invalidIndexes.length,
+                originalUnitCount: texts.length,
+              });
+            }
+            throw error;
+          }
+        }
+
+        logger.debug(`[${this.providerName}] Selective structured recovery input`, {
+          event: 'STRUCTURED_RECOVERY_INPUT',
+          outerCallPurpose: callPurpose,
+          strategy: recoveryStrategy,
+          expectedFormat: ResponseFormat.STRING,
+          unitCount: texts.length,
+          selectedUnitCount: selectivePlan?.invalidIndexes.length || 0,
+          selectedUnitsTruncated: (selectivePlan?.invalidIndexes.length || 0) > 32,
+          selectedUnits: selectivePlan?.invalidIndexes.slice(0, 32).map((requestIndex) => {
+            const source = texts[requestIndex];
+            const sourceText = getSourceText(source);
+            return {
+              requestIndex,
+              sourceIdentity: formatDiagnosticId(source?.i ?? source?.id ?? source?.uid ?? null),
+              sourceLength: typeof sourceText === 'string' ? sourceText.length : null,
+            };
+          }) || [],
         });
 
         let recoveryResult;
@@ -410,12 +711,24 @@ export class BaseAIProvider extends BaseProvider {
           if (!abortController?.signal?.aborted && !isCancellationError(error)) {
             appendTranslationDiagnostic(executionContext, {
               type: 'RECOVERY_FAILED',
+              event: 'STRUCTURED_RECOVERY_FAILED',
               stage: 'recovery',
               provider: this.providerName,
-              reason: error.message,
+              reason: error.type || error.name || 'RECOVERY_FAILED',
               ...(typeof error.type === 'string' && { code: error.type }),
+              callPurpose,
+              outerCallPurpose: callPurpose,
+              expectedFormat,
+              strategy: recoveryStrategy,
+              attempt: 1,
+              unitCount: texts.length,
             });
             logger.debug(`[${this.providerName}] Structured recovery failed`, {
+              event: 'STRUCTURED_RECOVERY_FAILED',
+              outerCallPurpose: callPurpose,
+              expectedFormat,
+              attempt: 1,
+              unitCount: texts.length,
               classification: recoveryClassification?.classification ?? null,
               strategy: recoveryStrategy,
               errorType: typeof error.type === 'string' ? error.type : null,
@@ -423,6 +736,15 @@ export class BaseAIProvider extends BaseProvider {
           }
           throw error;
         }
+
+        logger.debug(`[${this.providerName}] Selective structured recovery result`, {
+          event: 'STRUCTURED_RECOVERY_RESULT',
+          outerCallPurpose: callPurpose,
+          strategy: recoveryStrategy,
+          expectedFormat: ResponseFormat.STRING,
+          unitCount: texts.length,
+          summary: summarizeRecoveryValue(recoveryResult),
+        });
 
         const recoveryValues = selectivePlan
           ? validateSelectiveRecoveryResult(recoveryResult, selectivePlan.invalidIndexes.length)
@@ -446,12 +768,18 @@ export class BaseAIProvider extends BaseProvider {
           if (!abortController?.signal?.aborted && !isCancellationError(error)) {
             appendTranslationDiagnostic(executionContext, {
               type: 'RECOVERY_FAILED',
+              event: 'STRUCTURED_RECOVERY_FAILED',
               stage: 'recovery-validation',
               provider: this.providerName,
-              reason: error.message,
+              reason: error.type || error.name || 'RECOVERY_FAILED',
               ...(typeof error.type === 'string' && { code: error.type }),
             });
             logger.debug(`[${this.providerName}] Structured recovery failed semantic validation`, {
+              event: 'STRUCTURED_RECOVERY_FAILED',
+              outerCallPurpose: callPurpose,
+              expectedFormat,
+              attempt: 1,
+              unitCount: texts.length,
               classification: recoveryClassification?.classification ?? null,
               strategy: recoveryStrategy,
               errorType: typeof error.type === 'string' ? error.type : null,
@@ -463,10 +791,22 @@ export class BaseAIProvider extends BaseProvider {
 
         appendTranslationDiagnostic(executionContext, {
           type: 'RECOVERY_SUCCEEDED',
+          event: 'STRUCTURED_RECOVERY_RESULT',
           stage: 'recovery',
           provider: this.providerName,
+          callPurpose,
+          outerCallPurpose: callPurpose,
+          expectedFormat,
+          strategy: recoveryStrategy,
+          attempt: 1,
+          unitCount: texts.length,
         });
         logger.debug(`[${this.providerName}] Structured recovery completed`, {
+          event: 'STRUCTURED_RECOVERY_RESULT',
+          outerCallPurpose: callPurpose,
+          expectedFormat,
+          attempt: 1,
+          unitCount: texts.length,
           classification: recoveryClassification?.classification ?? null,
           strategy: recoveryStrategy,
           recoveredUnitCount: recoveryValues.length,
@@ -481,7 +821,9 @@ export class BaseAIProvider extends BaseProvider {
       // TranslationStatsManager.errors counts failed physical HTTP calls only.
       // This batch boundary only logs and rethrows; it must not double-record transport
       // failures or classify cancellation, timeout, or pre-transport rejection as one.
-      logger.debug(`[${this.providerName}] Batch translation failed:`, error.message);
+      logger.debug(`[${this.providerName}] Batch translation failed`, {
+        errorType: error.type || error.name || 'UNKNOWN',
+      });
 
       // EVERY error is thrown - never return original text as a "successful" translation.
       // - Transient (Network, 429, 5xx): thrown so QueueManager can retry.
@@ -521,6 +863,7 @@ export class BaseAIProvider extends BaseProvider {
     expectedFormat = null,
     priority = null,
     conversationCommitCandidate = null,
+    callPurpose = TranslationCallPurpose.PRIMARY_TRANSLATION,
   } = {}) {
     const { systemPrompt, userText } = await this._preparePromptAndText(texts, sourceLang, targetLang, translateMode, contextMetadata, sessionId);
     logger.debugLazy(() => [`[${this.providerName}] Batch Prompt preparation complete`, {
@@ -541,8 +884,11 @@ export class BaseAIProvider extends BaseProvider {
         isBatch: true,
          expectedFormat: expectedFormat || ResponseFormat.JSON_ARRAY,
          executionContext: contextMetadata?.executionContext,
-         callPurpose: TranslationCallPurpose.PRIMARY_TRANSLATION,
-         conversationParticipates: contextMetadata?.conversationParticipates === true,
+          callPurpose,
+          conversationParticipates: callPurpose === TranslationCallPurpose.PRIMARY_TRANSLATION
+            && contextMetadata?.conversationParticipates === true,
+          useParentConversationLifecycle: callPurpose === TranslationCallPurpose.PRIMARY_TRANSLATION
+            && contextMetadata?.useParentConversationLifecycle === true,
          conversationCommitCandidate,
       }),
       context,
@@ -563,8 +909,11 @@ export class BaseAIProvider extends BaseProvider {
     repairContext = null,
     callPurpose,
   } = {}) {
+    const recoveryTexts = callPurpose === TranslationCallPurpose.STRUCTURED_RECOVERY
+      ? texts.map(getSourceText)
+      : texts;
     return this._traditionalBatchTranslate(
-      texts, sourceLang, targetLang, translateMode, engine, messageId, abortController,
+      recoveryTexts, sourceLang, targetLang, translateMode, engine, messageId, abortController,
       priority,
       sessionId,
       expectedFormat,
@@ -582,14 +931,24 @@ export class BaseAIProvider extends BaseProvider {
   async _traditionalBatchTranslate(texts, sourceLang, targetLang, translateMode, engine, messageId, abortController, priority, sessionId, expectedFormat, options = {}) {
     const results = [];
     const context = `${this.providerName.toLowerCase()}-traditional-sequential`;
-    const callPurpose = options.callPurpose === TranslationCallPurpose.STRUCTURED_RECOVERY
-      ? TranslationCallPurpose.STRUCTURED_RECOVERY
-      : TranslationCallPurpose.PRIMARY_TRANSLATION;
+    const callPurpose = options.callPurpose || TranslationCallPurpose.PRIMARY_TRANSLATION;
+    const isPrimaryCall = callPurpose === TranslationCallPurpose.PRIMARY_TRANSLATION;
     const conversationParticipates = await AIConversationHelper.getConversationParticipation({
       callPurpose,
       translateMode,
       sessionId,
     });
+    const effectiveExpectedFormat = expectedFormat || ResponseFormat.STRING;
+    const inheritedContextMetadata = options.contextMetadata || {};
+    const effectiveContextMetadata = {
+      ...options,
+      ...inheritedContextMetadata,
+      callPurpose,
+      expectedFormat: effectiveExpectedFormat,
+      conversationParticipates,
+      useParentConversationLifecycle: isPrimaryCall && options.useParentConversationLifecycle === true,
+      contextMetadata: undefined,
+    };
 
     for (let i = 0; i < texts.length; i++) {
       if (abortController?.signal?.aborted) {
@@ -600,7 +959,7 @@ export class BaseAIProvider extends BaseProvider {
       }
       
       const text = texts[i];
-      const { systemPrompt, userText } = await this._preparePromptAndText(text, sourceLang, targetLang, translateMode, options, sessionId);
+      const { systemPrompt, userText } = await this._preparePromptAndText(text, sourceLang, targetLang, translateMode, effectiveContextMetadata, sessionId);
       
       logger.debugLazy(() => [`[${this.providerName}] Traditional Prompt preparation complete`, { systemPrompt, userText }]);
       const chunkContext = `${context}-segment-${i + 1}/${texts.length}`;
@@ -615,10 +974,11 @@ export class BaseAIProvider extends BaseProvider {
             mode: translateMode,
             sourceLang,
             targetLang,
-            expectedFormat: expectedFormat || ResponseFormat.STRING,
-            executionContext: options.executionContext,
+            expectedFormat: effectiveExpectedFormat,
+            executionContext: effectiveContextMetadata.executionContext,
             callPurpose,
             conversationParticipates,
+            useParentConversationLifecycle: effectiveContextMetadata.useParentConversationLifecycle,
           }),
           chunkContext,
           priority,

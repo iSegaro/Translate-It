@@ -89,6 +89,7 @@ describe('BaseAIProvider', () => {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  AIResponseParser.parseBatchResult.mockReset().mockImplementation((res) => ({ results: res, contractViolation: false }));
   provider = new MockAIProvider();
     vi.mocked(isFatalError).mockReturnValue(false);
     vi.mocked(isTransientError).mockReturnValue(false);
@@ -131,6 +132,88 @@ beforeEach(() => {
         TranslationCallPurpose.STRUCTURED_RECOVERY,
         TranslationCallPurpose.STRUCTURED_RECOVERY,
       ]);
+    });
+
+    it('unwraps object sources before structured recovery sequential translation', async () => {
+      const sequential = vi.spyOn(provider, '_traditionalBatchTranslate').mockResolvedValue(['The']);
+
+      await provider.executeSequentialBatch([{ i: 'parent-1-0', text: 'The' }], 'en', 'fa', {
+        translateMode: 'select-element',
+        expectedFormat: ResponseFormat.STRING,
+        callPurpose: TranslationCallPurpose.STRUCTURED_RECOVERY,
+      });
+
+      expect(sequential).toHaveBeenCalledWith(
+        ['The'],
+        'en', 'fa', 'select-element', undefined, undefined, undefined, undefined, undefined,
+        ResponseFormat.STRING,
+        expect.objectContaining({ callPurpose: TranslationCallPurpose.STRUCTURED_RECOVERY }),
+      );
+    });
+
+    it('passes scalar userText to _callAI through the real structured recovery prompt path', async () => {
+      provider._preparePromptAndText = BaseAIProvider.prototype._preparePromptAndText.bind(provider);
+      provider._callAI = vi.fn().mockResolvedValue('The');
+
+      await provider.executeSequentialBatch(['The'], 'en', 'fa', {
+        translateMode: 'select-element',
+        expectedFormat: ResponseFormat.STRING,
+        callPurpose: TranslationCallPurpose.STRUCTURED_RECOVERY,
+      });
+
+      const [, userText, options] = provider._callAI.mock.calls[0];
+      expect(userText).toContain('The');
+      expect(userText).not.toContain('translations');
+      expect(userText).not.toContain('"id":"0"');
+      expect(options).toMatchObject({
+        expectedFormat: ResponseFormat.STRING,
+        callPurpose: TranslationCallPurpose.STRUCTURED_RECOVERY,
+        conversationParticipates: false,
+        useParentConversationLifecycle: false,
+      });
+    });
+
+    it('overrides inherited parent metadata for the nested physical recovery call', async () => {
+      provider._preparePromptAndText = BaseAIProvider.prototype._preparePromptAndText.bind(provider);
+      provider._callAI = vi.fn().mockResolvedValue('The');
+      const promptSpy = vi.spyOn(provider, '_preparePromptAndText');
+
+      await provider.executeSequentialBatch(['The'], 'en', 'fa', {
+        translateMode: 'select-element',
+        expectedFormat: ResponseFormat.STRING,
+        contextMetadata: {
+          callPurpose: TranslationCallPurpose.STRUCTURED_RECOVERY,
+          expectedFormat: ResponseFormat.STRING,
+          contextMetadata: {
+            callPurpose: TranslationCallPurpose.PARENT_RECOVERY,
+            expectedFormat: ResponseFormat.JSON_OBJECT,
+            conversationParticipates: false,
+            useParentConversationLifecycle: false,
+            semanticHint: { role: 'content' },
+          },
+        },
+        callPurpose: TranslationCallPurpose.STRUCTURED_RECOVERY,
+      });
+
+      const [, userText, options] = provider._callAI.mock.calls[0];
+      const promptMetadata = promptSpy.mock.calls[0][4];
+      expect(userText).toBe('The');
+      expect(promptMetadata).toMatchObject({
+        callPurpose: TranslationCallPurpose.STRUCTURED_RECOVERY,
+        expectedFormat: ResponseFormat.STRING,
+        conversationParticipates: false,
+        useParentConversationLifecycle: false,
+      });
+      expect(promptMetadata.semanticHint).toEqual({ role: 'content' });
+      expect(promptMetadata.contextMetadata).toBeUndefined();
+      expect(options).toMatchObject({
+        callPurpose: TranslationCallPurpose.STRUCTURED_RECOVERY,
+        expectedFormat: ResponseFormat.STRING,
+        conversationParticipates: false,
+        useParentConversationLifecycle: false,
+      });
+      expect(options.callPurpose).not.toBe(TranslationCallPurpose.PARENT_RECOVERY);
+      expect(options.expectedFormat).not.toBe(ResponseFormat.JSON_OBJECT);
     });
   });
 
@@ -239,6 +322,164 @@ beforeEach(() => {
       expect(callSpy.mock.calls[0][2].callPurpose).toBe(TranslationCallPurpose.PRIMARY_TRANSLATION);
     });
 
+    it('forces parent recovery to remain non-conversational despite caller metadata', async () => {
+      const { AIResponseParser } = await import('./utils/AIResponseParser.js');
+      AIResponseParser.parseBatchResult.mockReturnValue({ results: ['R1'], contractViolation: false });
+      const callSpy = vi.spyOn(provider, '_callAI');
+      const history = vi.spyOn((await import('./utils/AIConversationHelper.js')).AIConversationHelper, 'getConversationHistory');
+      const session = translationSessionManager.getOrCreateSession('parent-recovery-session', 'MockAI');
+
+      await provider._translateBatch(['source'], 'en', 'fa', 'select-element', null, null, 'm', session.id, {
+        callPurpose: TranslationCallPurpose.PARENT_RECOVERY,
+        conversationParticipates: true,
+      }, ResponseFormat.JSON_ARRAY);
+
+      expect(callSpy.mock.calls[0][2]).toMatchObject({
+        callPurpose: TranslationCallPurpose.PARENT_RECOVERY,
+        conversationParticipates: false,
+        useParentConversationLifecycle: false,
+      });
+      expect(callSpy.mock.calls[0][2].conversationCommitCandidate).toBeNull();
+      expect(history).not.toHaveBeenCalled();
+      history.mockRestore();
+    });
+
+    it('sanitizes parent recovery metadata through traditional sequential execution', async () => {
+      const { AIConversationHelper } = await import('./utils/AIConversationHelper.js');
+      const callSpy = vi.spyOn(provider, '_callAI').mockResolvedValue('translated');
+      const claimSpy = vi.spyOn(AIConversationHelper, 'claimNextTurn');
+      const historySpy = vi.spyOn(AIConversationHelper, 'getConversationHistory');
+      const writeSpy = vi.spyOn(AIConversationHelper, 'updateSessionHistory');
+      provider.getSupportsStreaming = vi.fn().mockResolvedValue(false);
+      provider.getBatchStrategy = vi.fn().mockResolvedValue('sequential');
+
+      try {
+        await provider._batchTranslate(['source'], 'en', 'fa', 'select-element', null, null, 'm', null, 'traditional-parent', 'text', {
+          callPurpose: TranslationCallPurpose.PARENT_RECOVERY,
+          conversationParticipates: true,
+          useParentConversationLifecycle: true,
+        });
+
+        expect(callSpy.mock.calls[0][2]).toMatchObject({
+          callPurpose: TranslationCallPurpose.PARENT_RECOVERY,
+          conversationParticipates: false,
+          useParentConversationLifecycle: false,
+        });
+        expect(claimSpy).not.toHaveBeenCalled();
+        expect(historySpy).not.toHaveBeenCalled();
+        expect(writeSpy).not.toHaveBeenCalled();
+      } finally {
+        claimSpy.mockRestore();
+        historySpy.mockRestore();
+        writeSpy.mockRestore();
+      }
+    });
+
+    it('keeps nested structured recovery purpose distinct from parent recovery', async () => {
+      const { AIResponseParser } = await import('./utils/AIResponseParser.js');
+      AIResponseParser.parseBatchResult
+        .mockReturnValueOnce({ results: ['bad'], contractViolation: true })
+        .mockReturnValueOnce({ results: ['recovered'], contractViolation: false });
+      const callSpy = vi.spyOn(provider, 'executeStructuredBatch');
+
+      await provider._translateBatch(['source'], 'en', 'fa', 'select-element', null, null, 'm', 'nested-parent', {
+        callPurpose: TranslationCallPurpose.PARENT_RECOVERY,
+        conversationParticipates: true,
+      }, ResponseFormat.JSON_ARRAY);
+
+      expect(callSpy.mock.calls[0][3].callPurpose).toBe(TranslationCallPurpose.PARENT_RECOVERY);
+      expect(callSpy.mock.calls[0][3].contextMetadata).toMatchObject({
+        conversationParticipates: false,
+        useParentConversationLifecycle: false,
+      });
+      expect(callSpy.mock.calls[0][3].conversationCommitCandidate).toBeNull();
+      expect(callSpy).toHaveBeenCalledTimes(2);
+      expect(callSpy.mock.calls[1][3]).toMatchObject({
+        callPurpose: TranslationCallPurpose.STRUCTURED_RECOVERY,
+        contextMetadata: expect.objectContaining({
+          conversationParticipates: false,
+          useParentConversationLifecycle: false,
+        }),
+      });
+    });
+
+    it('accepts explicit parent recovery interval identity and unchanged text', async () => {
+      const { AIResponseParser: realParser } = await vi.importActual('./utils/AIResponseParser.js');
+      AIResponseParser.parseBatchResult.mockImplementation(realParser.parseBatchResult.bind(realParser));
+      provider._callAI = vi.fn().mockResolvedValue('{"translations":[{"id":"parent-1-0","text":"The"}]}');
+
+      await expect(provider._translateBatch(
+        [{ i: 'parent-1-0', text: 'The' }], 'en', 'fa', 'select-element', null, null, null, null,
+        { callPurpose: TranslationCallPurpose.PARENT_RECOVERY }, ResponseFormat.JSON_OBJECT
+      )).resolves.toEqual(['The']);
+      expect(provider._callAI).toHaveBeenCalledTimes(1);
+    });
+
+    it.each([
+      ['scalar', 'The', ['The', 'valid']],
+      ['empty scalar', '', ErrorTypes.API_RESPONSE_INVALID],
+      ['id/text object', { id: 'parent-1-0', text: 'The' }, ErrorTypes.API_RESPONSE_INVALID],
+      ['WebAI JSON wrapper', '{"translations":[{"id":"parent-1-0","text":"The"}]}', ['{"translations":[{"id":"parent-1-0","text":"The"}]}', 'valid']],
+    ])('records selective recovery result contract for %s', async (_label, selectiveResult, expected) => {
+      const { AIResponseParser } = await import('./utils/AIResponseParser.js');
+      AIResponseParser.parseBatchResult.mockReturnValue({
+        results: ['invalid', 'valid'],
+        contractViolation: true,
+        invalidUnits: [{ requestIndex: 0, responseId: 'parent-1-0', violationCodes: ['EMPTY_TRANSLATED_TEXT'] }],
+        mappingFacts: { identityReliable: true, complete: true, ambiguous: false },
+      });
+      provider.executeSequentialBatch = vi.fn().mockResolvedValue(selectiveResult);
+
+      const operation = createTranslationOperation(`selective-shape-${_label}`);
+      const action = provider._translateBatch(
+        [{ i: 'parent-1-0', text: 'The' }, { i: 'parent-1-1', text: 'Other' }], 'en', 'fa', 'select-element', null, null, null, null,
+        { callPurpose: TranslationCallPurpose.PARENT_RECOVERY, executionContext: { operation } }, ResponseFormat.JSON_OBJECT
+      );
+
+      if (typeof expected === 'string') {
+        await expect(action).rejects.toMatchObject({ type: expected });
+      } else {
+        await expect(action).resolves.toEqual(expected);
+      }
+      expect(provider.executeSequentialBatch).toHaveBeenCalledWith(
+        ['The'],
+        'en', 'fa',
+        expect.objectContaining({ callPurpose: TranslationCallPurpose.STRUCTURED_RECOVERY })
+      );
+      const inputLog = loggerMock.debug.mock.calls.find(([message]) => message.includes('Selective structured recovery input'));
+      const resultLog = loggerMock.debug.mock.calls.find(([message]) => message.includes('Selective structured recovery result'));
+      expect(inputLog?.[1]).toMatchObject({
+        event: 'STRUCTURED_RECOVERY_INPUT',
+        outerCallPurpose: TranslationCallPurpose.PARENT_RECOVERY,
+        strategy: 'SELECTIVE',
+        unitCount: 2,
+        selectedUnits: [{ requestIndex: 0, sourceIdentity: 'parent-1-0', sourceLength: 3 }],
+        expectedFormat: ResponseFormat.STRING,
+      });
+      expect(inputLog?.[1]).not.toHaveProperty('sourcePreview');
+      expect(resultLog?.[1]).toMatchObject({ event: 'STRUCTURED_RECOVERY_RESULT' });
+      expect(JSON.stringify(resultLog?.[1])).not.toContain('The');
+    });
+
+    it('forces structured recovery to disable inherited conversation lifecycle metadata', async () => {
+      const { AIResponseParser } = await import('./utils/AIResponseParser.js');
+      AIResponseParser.parseBatchResult.mockReturnValue({ results: ['R1'], contractViolation: false });
+      const callSpy = vi.spyOn(provider, '_callAI');
+
+      await provider._translateBatch(['source'], 'en', 'fa', 'select-element', null, null, 'm', 'structured-recovery', {
+        callPurpose: TranslationCallPurpose.STRUCTURED_RECOVERY,
+        conversationParticipates: true,
+        useParentConversationLifecycle: true,
+      }, ResponseFormat.JSON_ARRAY);
+
+      expect(callSpy.mock.calls[0][2]).toMatchObject({
+        callPurpose: TranslationCallPurpose.STRUCTURED_RECOVERY,
+        conversationParticipates: false,
+        useParentConversationLifecycle: false,
+        conversationCommitCandidate: null,
+      });
+    });
+
     it('commits one staged valid structured primary response after parser acceptance', async () => {
       const { AIResponseParser } = await import("./utils/AIResponseParser.js");
       const response = '{"translations":["translated"]}';
@@ -259,6 +500,25 @@ beforeEach(() => {
       } finally {
         writeSpy.mockRestore();
       }
+    });
+
+    it('preserves primary conversation lifecycle metadata and candidate creation', async () => {
+      const { AIResponseParser } = await import('./utils/AIResponseParser.js');
+      AIResponseParser.parseBatchResult.mockReturnValue({ results: ['translated'], contractViolation: false });
+      const callSpy = vi.spyOn(provider, '_callAI').mockResolvedValue('raw');
+
+      await provider._translateBatch(['source'], 'en', 'fa', 'select-element', null, null, 'm', 'primary-lifecycle', {
+        callPurpose: TranslationCallPurpose.PRIMARY_TRANSLATION,
+        conversationParticipates: true,
+        useParentConversationLifecycle: true,
+      }, ResponseFormat.JSON_ARRAY);
+
+      expect(callSpy.mock.calls[0][2]).toMatchObject({
+        callPurpose: TranslationCallPurpose.PRIMARY_TRANSLATION,
+        conversationParticipates: true,
+        useParentConversationLifecycle: true,
+      });
+      expect(callSpy.mock.calls[0][2].conversationCommitCandidate).not.toBeNull();
     });
 
     it('suppresses legacy commit while parent conversation lifecycle is active', async () => {
@@ -286,16 +546,18 @@ beforeEach(() => {
       const before = structuredClone(session);
       const writeSpy = vi.spyOn((await import('./utils/AIConversationHelper.js')).AIConversationHelper, 'updateSessionHistory');
       provider._callAI = vi.fn(async (_system, userText, options) => {
-        options.conversationCommitCandidate.stage({ sessionId: options.sessionId, userContent: userText, assistantContent: 'malformed' });
+        options.conversationCommitCandidate?.stage({ sessionId: options.sessionId, userContent: userText, assistantContent: 'malformed' });
         return 'malformed';
       });
-      const recoverySpy = vi.spyOn(provider, '_traditionalBatchTranslate').mockResolvedValue(['translated']);
-      AIResponseParser.parseBatchResult.mockReturnValue({ results: ['source'], contractViolation: true });
+      const recoverySpy = vi.spyOn(provider, '_traditionalBatchTranslate');
+      AIResponseParser.parseBatchResult
+        .mockReturnValueOnce({ results: ['source'], contractViolation: true })
+        .mockReturnValueOnce({ results: ['translated'], contractViolation: false });
 
       try {
          await expect(provider._translateBatch(['source'], 'en', 'fa', 'select-element', null, null, 'm', 'rejected-session', { conversationParticipates: true }, ResponseFormat.JSON_ARRAY))
           .resolves.toEqual(['translated']);
-        expect(recoverySpy).toHaveBeenCalledTimes(1);
+         expect(recoverySpy).not.toHaveBeenCalled();
         expect(writeSpy).not.toHaveBeenCalled();
         expect(session).toEqual(before);
       } finally {
@@ -311,7 +573,7 @@ beforeEach(() => {
       const before = structuredClone(session);
       const writeSpy = vi.spyOn((await import('./utils/AIConversationHelper.js')).AIConversationHelper, 'updateSessionHistory');
       provider._callAI = vi.fn(async (_system, userText, options) => {
-        options.conversationCommitCandidate.stage({ sessionId: options.sessionId, userContent: userText, assistantContent: 'raw' });
+        options.conversationCommitCandidate?.stage({ sessionId: options.sessionId, userContent: userText, assistantContent: 'raw' });
         throw error;
       });
 
@@ -330,7 +592,7 @@ beforeEach(() => {
       const session = translationSessionManager.getOrCreateSession('local-candidates', 'MockAI');
       const writeSpy = vi.spyOn((await import('./utils/AIConversationHelper.js')).AIConversationHelper, 'updateSessionHistory');
       provider._callAI = vi.fn(async (_system, userText, options) => {
-        options.conversationCommitCandidate.stage({ sessionId: options.sessionId, userContent: userText, assistantContent: userText });
+        options.conversationCommitCandidate?.stage({ sessionId: options.sessionId, userContent: userText, assistantContent: userText });
         return userText;
       });
       const recoverySpy = vi.spyOn(provider, '_traditionalBatchTranslate').mockResolvedValue(['recovered']);
@@ -341,7 +603,7 @@ beforeEach(() => {
       try {
          await provider._translateBatch(['discarded'], 'en', 'fa', 'select-element', null, null, 'm1', session.id, { conversationParticipates: true }, ResponseFormat.JSON_ARRAY);
          await provider._translateBatch(['accepted'], 'en', 'fa', 'select-element', null, null, 'm2', session.id, { conversationParticipates: true }, ResponseFormat.JSON_ARRAY);
-        expect(recoverySpy).toHaveBeenCalledTimes(1);
+         expect(recoverySpy).not.toHaveBeenCalled();
         expect(writeSpy).toHaveBeenCalledTimes(1);
         expect(session.history).toHaveLength(2);
       } finally {
@@ -444,209 +706,295 @@ beforeEach(() => {
       }
     });
 
-    it('rethrows a network recovery failure with its original error type', async () => {
-      const { AIResponseParser } = await import("./utils/AIResponseParser.js");
-      AIResponseParser.parseBatchResult.mockReturnValue({ results: ['source'], contractViolation: true });
-      const networkError = Object.assign(new Error('network down'), { type: ErrorTypes.NETWORK_ERROR });
-      vi.spyOn(provider, '_traditionalBatchTranslate').mockRejectedValue(networkError);
-
-      await expect(
-        provider._translateBatch(['source'], 'en', 'fa', 'selection', null, null, null, 'recovery-fail-session', null, ResponseFormat.JSON_ARRAY)
-      ).rejects.toBe(networkError);
-    });
-
-    it('should perform exactly one sequential recovery when the contract is violated', async () => {
-      const { AIResponseParser } = await import("./utils/AIResponseParser.js");
-      AIResponseParser.parseBatchResult.mockReturnValue({ results: ['seg1'], contractViolation: true });
-      const structuredSpy = vi.spyOn(provider, 'executeStructuredBatch');
+    it('uses one bounded structured retry for full parse failure', async () => {
+      const { AIResponseParser } = await import('./utils/AIResponseParser.js');
+      const texts = Array.from({ length: 31 }, (_, index) => ({ id: String(index), text: `source-${index}` }));
+      AIResponseParser.parseBatchResult
+        .mockReturnValueOnce({ results: [], contractViolation: true, parseFailed: true, invalidUnits: [], mappingFacts: { identityReliable: false } })
+        .mockReturnValueOnce({ results: texts.map((_, index) => `translated-${index}`), contractViolation: false });
       const sequentialSpy = vi.spyOn(provider, 'executeSequentialBatch');
-      const fallbackSpy = vi.spyOn(provider, '_traditionalBatchTranslate').mockResolvedValue(['F1']);
+      const callSpy = vi.spyOn(provider, '_callAI').mockResolvedValue('structured');
 
       const result = await provider._translateBatch(
-        ['seg1', 'seg2'], 'en', 'fa', 'selection', null, null, null, 'session-1', { metadata: true }
+        texts, 'en', 'fa', 'selection', null, null, 'full-retry', 'session-1',
+        { callPurpose: TranslationCallPurpose.PARENT_RECOVERY }, ResponseFormat.JSON_OBJECT
       );
 
-      expect(fallbackSpy).toHaveBeenCalledTimes(1);
-      expect(structuredSpy).toHaveBeenCalledTimes(1);
-      expect(sequentialSpy).toHaveBeenCalledTimes(1);
-      expect(fallbackSpy).toHaveBeenCalledWith(
-        ['seg1', 'seg2'], 'en', 'fa', 'selection', null, null, null, null,
-        'session-1', ResponseFormat.STRING, expect.objectContaining({
-          metadata: true,
-          callPurpose: TranslationCallPurpose.STRUCTURED_RECOVERY
-        })
-      );
-      expect(result).toEqual(['F1']);
-    });
-
-    it('should retain triggered and successful recovery facts without changing the result', async () => {
-      const { AIResponseParser } = await import("./utils/AIResponseParser.js");
-      const operation = createTranslationOperation('recovery-success');
-      AIResponseParser.parseBatchResult.mockReturnValue({ results: ['seg1', 'seg2'], contractViolation: true });
-      vi.spyOn(provider, '_traditionalBatchTranslate').mockResolvedValue(['F1', 'F2']);
-
-      const result = await provider._translateBatch(
-        ['seg1', 'seg2'], 'en', 'fa', 'selection', null, null, 'recovery-success', 'session-1',
-        { executionContext: { operation } }
-      );
-      const report = operation.finalize();
-      const recoveryFacts = report.entries.filter(({ type }) => type.startsWith('RECOVERY_'));
-
-      expect(result).toEqual(['F1', 'F2']);
-      expect(recoveryFacts).toEqual([
-        expect.objectContaining({
-          type: 'RECOVERY_TRIGGERED',
-          stage: 'recovery',
-          provider: 'MockAI',
-          code: 'CONTRACT_VIOLATION',
-          count: 2,
-          messageId: 'recovery-success'
-        }),
-        expect.objectContaining({
-          type: 'RECOVERY_SUCCEEDED',
-          stage: 'recovery',
-          provider: 'MockAI',
-          messageId: 'recovery-success'
-        })
-      ]);
-      expect(Object.isFrozen(report)).toBe(true);
-      expect(Object.isFrozen(report.entries)).toBe(true);
-      expect(Object.isFrozen(recoveryFacts[0])).toBe(true);
-    });
-
-    it('should retain recovery failure facts and rethrow the original error', async () => {
-      const { AIResponseParser } = await import("./utils/AIResponseParser.js");
-      const operation = createTranslationOperation('recovery-failure');
-      const error = Object.assign(new Error('Recovery network failure'), { type: 'NETWORK_ERROR' });
-      AIResponseParser.parseBatchResult.mockReturnValue({ results: ['seg1'], contractViolation: true });
-      vi.spyOn(provider, '_traditionalBatchTranslate').mockRejectedValue(error);
-
-      await expect(provider._translateBatch(
-        ['seg1'], 'en', 'fa', 'selection', null, null, 'recovery-failure', 'session-1',
-        { executionContext: { operation } }
-      )).rejects.toBe(error);
-
-      const recoveryFacts = operation.finalize().entries.filter(({ type }) => type.startsWith('RECOVERY_'));
-      expect(recoveryFacts).toEqual([
-        expect.objectContaining({ type: 'RECOVERY_TRIGGERED' }),
-        expect.objectContaining({
-          type: 'RECOVERY_FAILED',
-          stage: 'recovery',
-          provider: 'MockAI',
-          reason: 'Recovery network failure',
-          code: 'NETWORK_ERROR'
-        })
-      ]);
-    });
-
-    it('should not record recovery failure for cancellation and rethrow the original error', async () => {
-      const { AIResponseParser } = await import("./utils/AIResponseParser.js");
-      const operation = createTranslationOperation('recovery-cancelled');
-      const error = Object.assign(new Error('Translation cancelled by user'), { type: 'USER_CANCELLED' });
-      AIResponseParser.parseBatchResult.mockReturnValue({ results: ['seg1'], contractViolation: true });
-      vi.mocked(isCancellationError).mockReturnValue(true);
-      vi.spyOn(provider, '_traditionalBatchTranslate').mockRejectedValue(error);
-
-      await expect(provider._translateBatch(
-        ['seg1'], 'en', 'fa', 'selection', null, null, 'recovery-cancelled', 'session-1',
-        { executionContext: { operation } }
-      )).rejects.toBe(error);
-
-      const recoveryFacts = operation.finalize().entries.filter(({ type }) => type.startsWith('RECOVERY_'));
-      expect(recoveryFacts).toHaveLength(1);
-      expect(recoveryFacts[0]).toMatchObject({ type: 'RECOVERY_TRIGGERED' });
-    });
-
-    it('should emit no per-segment recovery facts for multi-segment recovery', async () => {
-      const { AIResponseParser } = await import("./utils/AIResponseParser.js");
-      const operation = createTranslationOperation('recovery-multi-segment');
-      AIResponseParser.parseBatchResult.mockReturnValue({ results: ['seg1', 'seg2', 'seg3'], contractViolation: true });
-      vi.spyOn(provider, '_traditionalBatchTranslate').mockResolvedValue(['F1', 'F2', 'F3']);
-
-      const result = await provider._translateBatch(
-        ['seg1', 'seg2', 'seg3'], 'en', 'fa', 'selection', null, null, 'recovery-multi-segment', 'session-1',
-        { executionContext: { operation } }
-      );
-      const recoveryFacts = operation.finalize().entries.filter(({ type }) => type.startsWith('RECOVERY_'));
-
-      expect(result).toEqual(['F1', 'F2', 'F3']);
-      expect(recoveryFacts).toHaveLength(2);
-    });
-
-    it('should use recovery purpose without mutating the original metadata', async () => {
-      const { AIResponseParser } = await import("./utils/AIResponseParser.js");
-      const operation = createTranslationOperation('recovery-purpose');
-      const executionContext = { operation };
-      const originalMetadata = { executionContext, marker: 'unchanged' };
-      const beforeMetadata = { ...originalMetadata };
-      AIResponseParser.parseBatchResult.mockReturnValue({ results: ['seg1', 'seg2'], contractViolation: true });
-      const callSpy = vi.spyOn(provider, '_callAI').mockResolvedValueOnce('structured').mockResolvedValueOnce('F1').mockResolvedValueOnce('F2');
-
-      const result = await provider._translateBatch(
-        ['seg1', 'seg2'], 'en', 'fa', 'selection', null, null, 'recovery-purpose', 'session-1',
-        originalMetadata, ResponseFormat.JSON_OBJECT
-      );
-
-      expect(result).toEqual(['F1', 'F2']);
+      expect(result).toHaveLength(31);
+      expect(callSpy).toHaveBeenCalledTimes(2);
+      expect(sequentialSpy).not.toHaveBeenCalled();
+      expect(callSpy.mock.calls[1][1]).toContain('source-30');
       expect(callSpy.mock.calls.map(([, , options]) => options.callPurpose)).toEqual([
-        TranslationCallPurpose.PRIMARY_TRANSLATION,
+        TranslationCallPurpose.PARENT_RECOVERY,
         TranslationCallPurpose.STRUCTURED_RECOVERY,
-        TranslationCallPurpose.STRUCTURED_RECOVERY
       ]);
-      expect(originalMetadata).toEqual(beforeMetadata);
-      expect(originalMetadata.callPurpose).toBeUndefined();
-      expect(originalMetadata.executionContext).toBe(executionContext);
+      expect(callSpy.mock.calls[1][2]).toMatchObject({
+        expectedFormat: ResponseFormat.JSON_OBJECT,
+        conversationParticipates: false,
+        useParentConversationLifecycle: false,
+      });
+    });
+
+    it('keeps three reliable invalid units on scalar selective recovery', async () => {
+      const { AIResponseParser } = await import('./utils/AIResponseParser.js');
+      AIResponseParser.parseBatchResult.mockReturnValue({
+        results: ['A', 'bad-b', 'C', 'bad-d', 'E', 'bad-f'],
+        contractViolation: true,
+        invalidUnits: [1, 3, 5].map((requestIndex) => ({ requestIndex, responseId: String(requestIndex), violationCodes: ['EMPTY_TRANSLATED_TEXT'] })),
+        mappingFacts: { identityReliable: true, complete: true, ambiguous: false },
+      });
+      const sequentialSpy = vi.spyOn(provider, 'executeSequentialBatch').mockResolvedValue(['B', 'D', 'F']);
+
+      const result = await provider._translateBatch(['a', 'b', 'c', 'd', 'e', 'f'], 'en', 'fa', 'select-element');
+
+      expect(sequentialSpy).toHaveBeenCalledWith(['b', 'd', 'f'], 'en', 'fa', expect.objectContaining({
+        callPurpose: TranslationCallPurpose.STRUCTURED_RECOVERY,
+        expectedFormat: ResponseFormat.STRING,
+      }));
+      expect(result).toEqual(['A', 'B', 'C', 'D', 'E', 'F']);
+    });
+
+    it('uses one structured subset retry for four reliable invalid units', async () => {
+      const { AIResponseParser } = await import('./utils/AIResponseParser.js');
+      AIResponseParser.parseBatchResult
+        .mockReturnValueOnce({
+          results: ['A', 'bad-b', 'C', 'bad-d', 'bad-e', 'bad-f'],
+          contractViolation: true,
+          invalidUnits: [1, 3, 4, 5].map((requestIndex) => ({ requestIndex, responseId: `unit-${requestIndex}`, violationCodes: ['EMPTY_TRANSLATED_TEXT'] })),
+          mappingFacts: { identityReliable: true, complete: true, ambiguous: false },
+        })
+        .mockReturnValueOnce({ results: ['B', 'D', 'E', 'F'], contractViolation: false });
+      const sequentialSpy = vi.spyOn(provider, 'executeSequentialBatch');
+      const callSpy = vi.spyOn(provider, '_callAI').mockResolvedValue('structured');
+      const texts = [1, 2, 3, 4, 5, 6].map((id) => ({ i: `unit-${id}`, text: `source-${id}` }));
+      const operation = createTranslationOperation('subset-purpose-success');
+
+      const result = await provider._translateBatch(texts, 'en', 'fa', 'select-element', null, null, 'subset', 'session-1', {
+        callPurpose: TranslationCallPurpose.PARENT_RECOVERY,
+        executionContext: { operation },
+      }, ResponseFormat.JSON_OBJECT);
+
+      expect(result).toEqual(['A', 'B', 'C', 'D', 'E', 'F']);
+      expect(callSpy).toHaveBeenCalledTimes(2);
+      expect(callSpy.mock.calls[1][2]).toMatchObject({
+        callPurpose: TranslationCallPurpose.STRUCTURED_RECOVERY,
+        expectedFormat: ResponseFormat.JSON_OBJECT,
+        conversationParticipates: false,
+        useParentConversationLifecycle: false,
+      });
+      expect(callSpy.mock.calls[1][1]).toContain('unit-2');
+      expect(callSpy.mock.calls[1][1]).toContain('unit-6');
+      expect(sequentialSpy).not.toHaveBeenCalled();
+      expect(loggerMock.debug.mock.calls.some(([message, data]) => message.includes('Structured recovery triggered') && data.strategy === 'STRUCTURED_SUBSET_RETRY' && data.invalidUnitCount === 4)).toBe(true);
+      expect(operation.finalize().entries).toContainEqual(expect.objectContaining({
+        type: 'RECOVERY_SUCCEEDED',
+        strategy: 'STRUCTURED_SUBSET_RETRY',
+        callPurpose: TranslationCallPurpose.STRUCTURED_RECOVERY,
+        outerCallPurpose: TranslationCallPurpose.PARENT_RECOVERY,
+      }));
+    });
+
+    it('finalizes bounded structured subset recovery diagnostics', async () => {
+      const { appendTranslationDiagnostic } = await import('../ir/TranslationOperation.js');
+      const operation = createTranslationOperation('subset-diagnostic');
+      appendTranslationDiagnostic({ operation }, {
+        type: 'RECOVERY_SUCCEEDED',
+        stage: 'recovery',
+        provider: 'MockAI',
+        strategy: 'STRUCTURED_SUBSET_RETRY',
+        unitCount: 6,
+        invalidCount: 6,
+        originalUnitCount: 13,
+        attempt: 1,
+        expectedFormat: ResponseFormat.JSON_OBJECT,
+        callPurpose: TranslationCallPurpose.STRUCTURED_RECOVERY,
+        outerCallPurpose: TranslationCallPurpose.PARENT_RECOVERY,
+      });
+
+      const diagnostic = operation.finalize().entries[0];
+      expect(diagnostic).toMatchObject({
+        strategy: 'STRUCTURED_SUBSET_RETRY',
+        unitCount: 6,
+        invalidCount: 6,
+        originalUnitCount: 13,
+        attempt: 1,
+        expectedFormat: ResponseFormat.JSON_OBJECT,
+        callPurpose: TranslationCallPurpose.STRUCTURED_RECOVERY,
+        outerCallPurpose: TranslationCallPurpose.PARENT_RECOVERY,
+      });
+    });
+
+    it('merges reordered structured subset responses by parser identity', async () => {
+      const { AIResponseParser: realParser } = await vi.importActual('./utils/AIResponseParser.js');
+      AIResponseParser.parseBatchResult
+        .mockReturnValueOnce({
+          results: ['bad-1', 'valid-2', 'bad-3', 'bad-4', 'bad-5', 'valid-6'],
+          contractViolation: true,
+          invalidUnits: [0, 2, 3, 4].map((requestIndex) => ({ requestIndex, responseId: `unit-${requestIndex + 1}`, violationCodes: ['EMPTY_TRANSLATED_TEXT'] })),
+          mappingFacts: { identityReliable: true, complete: true, ambiguous: false },
+        })
+        .mockImplementationOnce(realParser.parseBatchResult.bind(realParser));
+      const callSpy = vi.spyOn(provider, '_callAI')
+        .mockResolvedValueOnce('primary')
+        .mockResolvedValueOnce(JSON.stringify({
+          translations: [
+            { id: 'unit-5', text: 'translated-5' },
+            { id: 'unit-1', text: 'translated-1' },
+            { id: 'unit-4', text: 'translated-4' },
+            { id: 'unit-3', text: 'translated-3' },
+          ],
+        }));
+      const sequentialSpy = vi.spyOn(provider, 'executeSequentialBatch');
+      const texts = [1, 2, 3, 4, 5, 6].map((id) => ({ i: `unit-${id}`, text: `source-${id}` }));
+
+      const result = await provider._translateBatch(texts, 'en', 'fa', 'select-element', null, null, 'reordered-subset', 'session-1', null, ResponseFormat.JSON_OBJECT);
+
+      expect(result).toEqual(['translated-1', 'valid-2', 'translated-3', 'translated-4', 'translated-5', 'valid-6']);
+      expect(callSpy).toHaveBeenCalledTimes(2);
+      expect(sequentialSpy).not.toHaveBeenCalled();
+    });
+
+    it.each(['missing identity', 'duplicate identity', 'malformed response'])('fails subset recovery atomically for %s', async () => {
+      const { AIResponseParser } = await import('./utils/AIResponseParser.js');
+      AIResponseParser.parseBatchResult
+        .mockReturnValueOnce({
+          results: ['bad-a', 'bad-b', 'bad-c', 'bad-d', 'valid'],
+          contractViolation: true,
+          invalidUnits: [0, 1, 2, 3].map((requestIndex) => ({ requestIndex, responseId: String(requestIndex), violationCodes: ['EMPTY_TRANSLATED_TEXT'] })),
+          mappingFacts: { identityReliable: true, complete: true, ambiguous: false },
+        })
+        .mockReturnValueOnce({ results: ['bad-a', 'bad-b', 'bad-c', 'bad-d'], contractViolation: true });
+      const callSpy = vi.spyOn(provider, '_callAI').mockResolvedValue('structured');
+      const sequentialSpy = vi.spyOn(provider, 'executeSequentialBatch');
+
+      await expect(provider._translateBatch(['a', 'b', 'c', 'd', 'e'], 'en', 'fa', 'select-element', null, null, null, 'subset-failure', null, ResponseFormat.JSON_OBJECT))
+        .rejects.toMatchObject({ type: ErrorTypes.API_RESPONSE_INVALID });
+      expect(callSpy).toHaveBeenCalledTimes(2);
+      expect(sequentialSpy).not.toHaveBeenCalled();
+    });
+
+    it('propagates subset provider failure without scalar fallback', async () => {
+      const { AIResponseParser } = await import('./utils/AIResponseParser.js');
+      const providerError = Object.assign(new Error('subset network failure'), { type: ErrorTypes.NETWORK_ERROR });
+      AIResponseParser.parseBatchResult.mockReturnValueOnce({
+        results: ['bad-a', 'bad-b', 'bad-c', 'bad-d', 'valid'],
+        contractViolation: true,
+        invalidUnits: [0, 1, 2, 3].map((requestIndex) => ({ requestIndex, responseId: String(requestIndex), violationCodes: ['EMPTY_TRANSLATED_TEXT'] })),
+        mappingFacts: { identityReliable: true, complete: true, ambiguous: false },
+      });
+      const callSpy = vi.spyOn(provider, '_callAI')
+        .mockResolvedValueOnce('structured')
+        .mockRejectedValueOnce(providerError);
+      const sequentialSpy = vi.spyOn(provider, 'executeSequentialBatch');
+      const operation = createTranslationOperation('subset-purpose-failure');
+
+      await expect(provider._translateBatch(['a', 'b', 'c', 'd', 'e'], 'en', 'fa', 'select-element', null, null, null, 'subset-provider-failure', {
+        callPurpose: TranslationCallPurpose.PARENT_RECOVERY,
+        executionContext: { operation },
+      }, ResponseFormat.JSON_OBJECT))
+        .rejects.toBe(providerError);
+      expect(callSpy).toHaveBeenCalledTimes(2);
+      expect(sequentialSpy).not.toHaveBeenCalled();
+      expect(operation.finalize().entries).toContainEqual(expect.objectContaining({
+        type: 'RECOVERY_FAILED',
+        strategy: 'STRUCTURED_SUBSET_RETRY',
+        callPurpose: TranslationCallPurpose.STRUCTURED_RECOVERY,
+        outerCallPurpose: TranslationCallPurpose.PARENT_RECOVERY,
+      }));
+    });
+
+    it('fails atomically when bounded structured retry is invalid', async () => {
+      const { AIResponseParser } = await import('./utils/AIResponseParser.js');
+      AIResponseParser.parseBatchResult
+        .mockReturnValueOnce({ results: [], contractViolation: true, parseFailed: true, invalidUnits: [], mappingFacts: { identityReliable: false } })
+        .mockReturnValueOnce({ results: [], contractViolation: true, parseFailed: true, invalidUnits: [], mappingFacts: { identityReliable: false } });
+      const sequentialSpy = vi.spyOn(provider, 'executeSequentialBatch');
+      const callSpy = vi.spyOn(provider, '_callAI').mockResolvedValue('structured');
+
+      await expect(provider._translateBatch(['a', 'b'], 'en', 'fa', 'selection', null, null, null, 'session-1', null, ResponseFormat.JSON_OBJECT))
+        .rejects.toMatchObject({ type: ErrorTypes.API_RESPONSE_INVALID });
+      expect(callSpy).toHaveBeenCalledTimes(2);
+      expect(sequentialSpy).not.toHaveBeenCalled();
+    });
+
+    it('keeps each outer retry bounded to two structured calls', async () => {
+      const { AIResponseParser } = await import('./utils/AIResponseParser.js');
+      AIResponseParser.parseBatchResult
+        .mockReturnValueOnce({ results: [], contractViolation: true, parseFailed: true, invalidUnits: [], mappingFacts: { identityReliable: false } })
+        .mockReturnValueOnce({ results: ['recovered'], contractViolation: false })
+        .mockReturnValueOnce({ results: [], contractViolation: true, parseFailed: true, invalidUnits: [], mappingFacts: { identityReliable: false } })
+        .mockReturnValueOnce({ results: ['recovered'], contractViolation: false });
+      const callSpy = vi.spyOn(provider, '_callAI').mockResolvedValue('structured');
+
+      await provider._translateBatch(['source'], 'en', 'fa', 'selection');
+      await provider._translateBatch(['source'], 'en', 'fa', 'selection');
+
+      expect(callSpy).toHaveBeenCalledTimes(4);
+    });
+
+    it('does not selectively recover an unreliable bounded retry', async () => {
+      const { AIResponseParser } = await import('./utils/AIResponseParser.js');
+      AIResponseParser.parseBatchResult
+        .mockReturnValueOnce({ results: [], contractViolation: true, parseFailed: true, invalidUnits: [], mappingFacts: { identityReliable: false } })
+        .mockReturnValueOnce({ results: ['bad'], contractViolation: true, invalidUnits: [{ requestIndex: 0 }], mappingFacts: { identityReliable: true, complete: true, ambiguous: false } });
+      const sequentialSpy = vi.spyOn(provider, 'executeSequentialBatch');
+      const callSpy = vi.spyOn(provider, '_callAI').mockResolvedValue('structured');
+
+      await expect(provider._translateBatch(['a'], 'en', 'fa', 'selection'))
+        .rejects.toMatchObject({ type: ErrorTypes.API_RESPONSE_INVALID });
+      expect(callSpy).toHaveBeenCalledTimes(2);
+      expect(sequentialSpy).not.toHaveBeenCalled();
+    });
+
+    it('preserves full retry diagnostics and conversation isolation', async () => {
+      const { AIResponseParser } = await import('./utils/AIResponseParser.js');
+      const operation = createTranslationOperation('full-retry-diagnostics');
+      AIResponseParser.parseBatchResult
+        .mockReturnValueOnce({ results: [], contractViolation: true, parseFailed: true, invalidUnits: [], mappingFacts: { identityReliable: false }, repairContext: { reason: 'parse failure' } })
+        .mockReturnValueOnce({ results: ['translated'], contractViolation: false });
+      const callSpy = vi.spyOn(provider, '_callAI').mockResolvedValue('structured');
+
+      await provider._translateBatch(['source'], 'en', 'fa', 'selection', null, null, 'diagnostics', 'session-1', {
+        callPurpose: TranslationCallPurpose.PARENT_RECOVERY,
+        conversationParticipates: true,
+        useParentConversationLifecycle: true,
+        executionContext: { operation },
+      }, ResponseFormat.JSON_OBJECT);
+
+      expect(callSpy.mock.calls[1][2]).toMatchObject({
+        callPurpose: TranslationCallPurpose.STRUCTURED_RECOVERY,
+        conversationParticipates: false,
+        useParentConversationLifecycle: false,
+      });
+      expect(loggerMock.debug.mock.calls.some(([message, data]) => message.includes('Structured recovery triggered') && data.strategy === 'FULL_STRUCTURED_RETRY' && data.reason === 'PARSE_FAILURE' && data.attempt === 1)).toBe(true);
       expect(operation.finalize().entries).toEqual(expect.arrayContaining([
         expect.objectContaining({ type: 'RECOVERY_TRIGGERED' }),
-        expect.objectContaining({ type: 'RECOVERY_SUCCEEDED' })
       ]));
     });
 
-    it('should normalize single-segment sequential recovery output to the structured-batch array shape (JSON_OBJECT)', async () => {
-      const { AIResponseParser } = await import("./utils/AIResponseParser.js");
-      AIResponseParser.parseBatchResult.mockReturnValue({ results: ['Bonjour'], contractViolation: true });
-      provider._callAI = vi.fn()
-        .mockResolvedValueOnce('structured-response')
-        .mockResolvedValueOnce('Bonjour');
-      const recoverySpy = vi.spyOn(provider, '_traditionalBatchTranslate');
+    it('stops before retry when cancellation occurs after primary response', async () => {
+      const { AIResponseParser } = await import('./utils/AIResponseParser.js');
+      const abortController = new AbortController();
+      AIResponseParser.parseBatchResult.mockReturnValue({ results: [], contractViolation: true, parseFailed: true, invalidUnits: [], mappingFacts: { identityReliable: false } });
+      provider._callAI = vi.fn().mockImplementationOnce(async (_system, _text, options) => {
+        options.abortController.abort();
+        return 'structured';
+      });
 
-      const result = await provider._translateBatch(
-        ['Bonjour'], 'en', 'fa', 'selection', null, null, null, 'session-1', null, ResponseFormat.JSON_OBJECT
-      );
-
-      expect(recoverySpy).toHaveBeenCalledTimes(1);
-      expect(Array.isArray(result)).toBe(true);
-      expect(result).toEqual(['Bonjour']);
-    });
-
-    it('should keep multi-segment sequential recovery output as a flat array (no nesting)', async () => {
-      const { AIResponseParser } = await import("./utils/AIResponseParser.js");
-      AIResponseParser.parseBatchResult.mockReturnValue({ results: ['F1', 'F2'], contractViolation: true });
-      provider._callAI = vi.fn()
-        .mockResolvedValueOnce('structured-response')
-        .mockResolvedValueOnce('F1')
-        .mockResolvedValueOnce('F2');
-      const recoverySpy = vi.spyOn(provider, '_traditionalBatchTranslate');
-
-      const result = await provider._translateBatch(
-        ['seg1', 'seg2'], 'en', 'fa', 'selection', null, null, null, 'session-1', null, ResponseFormat.JSON_OBJECT
-      );
-
-      expect(recoverySpy).toHaveBeenCalledTimes(1);
-      expect(result).toEqual(['F1', 'F2']);
-      expect(result[0]).not.toBeInstanceOf(Array);
+      await expect(provider._translateBatch(['source'], 'en', 'fa', 'selection', abortController))
+        .rejects.toMatchObject({ type: ErrorTypes.USER_CANCELLED });
+      expect(provider._callAI).toHaveBeenCalledTimes(1);
     });
 
     it('completes recovery when recovered V3 intervals pass semantic validation', async () => {
       const { AIResponseParser } = await import('./utils/AIResponseParser.js');
       const source = 'A@@TI_SEG_e1_s1_n1@@B@@TI_SEG_e1_s1_n2@@C';
-      AIResponseParser.parseBatchResult.mockReturnValue({ results: ['invalid'], contractViolation: true });
-      vi.spyOn(provider, '_traditionalBatchTranslate').mockResolvedValue([
-        'TA@@TI_SEG_e1_s1_n1@@TB@@TI_SEG_e1_s1_n2@@TC'
-      ]);
+      AIResponseParser.parseBatchResult
+        .mockReturnValueOnce({ results: ['invalid'], contractViolation: true, parseFailed: true, invalidUnits: [], mappingFacts: { identityReliable: false } })
+        .mockReturnValueOnce({ results: ['TA@@TI_SEG_e1_s1_n1@@TB@@TI_SEG_e1_s1_n2@@TC'], contractViolation: false });
 
       const result = await provider._translateBatch(
-        [source], 'en', 'fa', 'select-element', null, null, null, 'recovery-valid', null, null, ResponseFormat.JSON_OBJECT
+        [source], 'en', 'fa', 'select-element', null, null, null, 'recovery-valid', null, ResponseFormat.JSON_OBJECT
       );
 
       expect(result).toEqual(['TA@@TI_SEG_e1_s1_n1@@TB@@TI_SEG_e1_s1_n2@@TC']);
@@ -656,37 +1004,30 @@ beforeEach(() => {
     it('rejects shape-valid recovery with an empty V3 interval before completion', async () => {
       const { AIResponseParser } = await import('./utils/AIResponseParser.js');
       const source = 'A@@TI_SEG_e1_s1_n1@@B@@TI_SEG_e1_s1_n2@@C';
-      AIResponseParser.parseBatchResult.mockReturnValue({ results: ['invalid'], contractViolation: true });
-      vi.spyOn(provider, '_traditionalBatchTranslate').mockResolvedValue([
-        'TA@@TI_SEG_e1_s1_n1@@@@TI_SEG_e1_s1_n2@@TC'
-      ]);
+      AIResponseParser.parseBatchResult
+        .mockReturnValueOnce({ results: ['invalid'], contractViolation: true, parseFailed: true, invalidUnits: [], mappingFacts: { identityReliable: false } })
+        .mockReturnValueOnce({ results: ['TA@@TI_SEG_e1_s1_n1@@@@TI_SEG_e1_s1_n2@@TC'], contractViolation: true, parseFailed: false, invalidUnits: [], mappingFacts: { identityReliable: false } });
 
       await expect(provider._translateBatch(
-        [source], 'en', 'fa', 'select-element', null, null, null, 'recovery-invalid', null, null, ResponseFormat.JSON_OBJECT
-      )).rejects.toMatchObject({
-        type: ErrorTypes.VALIDATION,
-        contractViolation: 'V3_EMPTY_TRANSLATED_INTERVAL',
-      });
+        [source], 'en', 'fa', 'select-element', null, null, null, 'recovery-invalid', null, ResponseFormat.JSON_OBJECT
+      )).rejects.toMatchObject({ type: ErrorTypes.API_RESPONSE_INVALID });
       expect(loggerMock.debug.mock.calls.some(([message]) => message.includes('Structured recovery completed'))).toBe(false);
     });
 
-    it('rejects duplicate primary candidate, runs sequential recovery, returns ordered results without parser source-fill escaping', async () => {
+    it('rejects duplicate primary candidate without scalar fan-out', async () => {
       const { AIResponseParser: realParser } = await vi.importActual("./utils/AIResponseParser.js");
       AIResponseParser.parseBatchResult.mockImplementation(realParser.parseBatchResult.bind(realParser));
 
       provider._callAI = vi.fn().mockResolvedValue('[{"i":"n1","t":"TA"},{"i":"n1","t":"TB"}]');
-      const recoverySpy = vi.spyOn(provider, '_traditionalBatchTranslate').mockResolvedValue(['recovered-A', 'recovered-B']);
+      const recoverySpy = vi.spyOn(provider, '_traditionalBatchTranslate');
 
-      const result = await provider._translateBatch(
+      await expect(provider._translateBatch(
         [{ i: 'n1', t: 'A' }, { i: 'n2', t: 'B' }], 'en', 'fa', 'select-element', null, null, 'rec-real', 'session-1', null, ResponseFormat.JSON_ARRAY
-      );
+      )).rejects.toMatchObject({ type: ErrorTypes.API_RESPONSE_INVALID });
 
-      expect(AIResponseParser.parseBatchResult).toHaveBeenCalledTimes(1);
+      expect(AIResponseParser.parseBatchResult).toHaveBeenCalledTimes(2);
       expect(AIResponseParser.parseBatchResult.mock.results[0].value.contractViolation).toBe(true);
-      expect(recoverySpy).toHaveBeenCalledTimes(1);
-      expect(result).toEqual(['recovered-A', 'recovered-B']);
-      expect(result).not.toContain('A');
-      expect(result).not.toContain('B');
+      expect(recoverySpy).not.toHaveBeenCalled();
     });
 
     it('propagates recovery failure error without returning source-filled parser results', async () => {
@@ -699,8 +1040,8 @@ beforeEach(() => {
 
       await expect(provider._translateBatch(
         [{ i: 'n1', t: 'A' }, { i: 'n2', t: 'B' }], 'en', 'fa', 'select-element', null, null, 'rec-fail', 'session-1', null, ResponseFormat.JSON_ARRAY
-      )).rejects.toBe(error);
-      expect(recoverySpy).toHaveBeenCalledTimes(1);
+      )).rejects.toMatchObject({ type: ErrorTypes.API_RESPONSE_INVALID });
+      expect(recoverySpy).not.toHaveBeenCalled();
     });
 
     it('selectively recovers one reliable invalid middle item and preserves valid results', async () => {
@@ -780,12 +1121,14 @@ beforeEach(() => {
       }],
     ])('keeps full-batch recovery for %s', async (_label, parsed) => {
       const { AIResponseParser } = await import('./utils/AIResponseParser.js');
-      AIResponseParser.parseBatchResult.mockReturnValue(parsed);
-      const recoverySpy = vi.spyOn(provider, '_traditionalBatchTranslate').mockResolvedValue(['A', 'B', 'C']);
+      AIResponseParser.parseBatchResult
+        .mockReturnValueOnce(parsed)
+        .mockReturnValueOnce({ results: ['A', 'B', 'C'], contractViolation: false });
+      const recoverySpy = vi.spyOn(provider, '_traditionalBatchTranslate');
 
       await provider._translateBatch(['a', 'b', 'c'], 'en', 'fa', 'select-element');
 
-      expect(recoverySpy.mock.calls[0][0]).toEqual(['a', 'b', 'c']);
+      expect(recoverySpy).not.toHaveBeenCalled();
     });
 
     it('fails selective recovery on result length mismatch without source fallback', async () => {
@@ -822,17 +1165,19 @@ beforeEach(() => {
 
     it('keeps full-batch recovery when every item is invalid', async () => {
       const { AIResponseParser } = await import('./utils/AIResponseParser.js');
-      AIResponseParser.parseBatchResult.mockReturnValue({
-        results: ['bad-a', 'bad-b', 'bad-c'],
-        contractViolation: true,
-        invalidUnits: [0, 1, 2].map((requestIndex) => ({ requestIndex, responseId: String(requestIndex), violationCodes: ['INVALID_TRANSLATED_TEXT'] })),
-        mappingFacts: { identityReliable: true, complete: true, ambiguous: false },
-      });
-      const recoverySpy = vi.spyOn(provider, '_traditionalBatchTranslate').mockResolvedValue(['A', 'B', 'C']);
+      AIResponseParser.parseBatchResult
+        .mockReturnValueOnce({
+          results: ['bad-a', 'bad-b', 'bad-c'],
+          contractViolation: true,
+          invalidUnits: [0, 1, 2].map((requestIndex) => ({ requestIndex, responseId: String(requestIndex), violationCodes: ['INVALID_TRANSLATED_TEXT'] })),
+          mappingFacts: { identityReliable: true, complete: true, ambiguous: false },
+        })
+        .mockReturnValueOnce({ results: ['A', 'B', 'C'], contractViolation: false });
+      const recoverySpy = vi.spyOn(provider, '_traditionalBatchTranslate');
 
       await provider._translateBatch(['a', 'b', 'c'], 'en', 'fa', 'select-element');
 
-      expect(recoverySpy.mock.calls[0][0]).toEqual(['a', 'b', 'c']);
+      expect(recoverySpy).not.toHaveBeenCalled();
     });
   });
 
@@ -875,7 +1220,7 @@ beforeEach(() => {
           recordProviderCompletion(options.executionContext, record);
           return '{"translations":';
         }
-        return 'recovered';
+         return '{"translations":[{"id":"0","text":"recovered"}]}';
       });
 
       const result = await provider._translateBatch(
@@ -952,16 +1297,18 @@ beforeEach(() => {
       const recovery = createCompletionRecord({ provider: 'MockAI', termination: CompletionTermination.NORMAL, responseId: 'resp-recovery' });
       const primaryStored = [];
       const recoveryStored = [];
-      AIResponseParser.parseBatchResult.mockReturnValue({
-        results: ['bad-a'],
-        contractViolation: true,
-        invalidUnits: [{ requestIndex: 0, responseId: '0', violationCodes: ['EMPTY_TRANSLATED_TEXT'] }],
-        mappingFacts: { identityReliable: true, complete: true, ambiguous: false },
-      });
+       AIResponseParser.parseBatchResult
+         .mockReturnValueOnce({
+           results: ['bad-a'],
+           contractViolation: true,
+           invalidUnits: [{ requestIndex: 0, responseId: '0', violationCodes: ['EMPTY_TRANSLATED_TEXT'] }],
+           mappingFacts: { identityReliable: true, complete: true, ambiguous: false },
+         })
+         .mockReturnValueOnce({ results: ['recovered-A'], contractViolation: false });
       provider._callAI = vi.fn().mockImplementation(async (_sys, _text, options) => {
         if (options.callPurpose === TranslationCallPurpose.STRUCTURED_RECOVERY) {
           recoveryStored.push(recordProviderCompletion(options.executionContext, recovery));
-          return 'recovered-A';
+           return '[{"id":"0","text":"recovered-A"}]';
         }
         primaryStored.push(recordProviderCompletion(options.executionContext, primary));
         return '[{"id":"0","text":"bad-a"}]';
@@ -973,7 +1320,7 @@ beforeEach(() => {
       );
 
       expect(result).toEqual(['recovered-A']);
-      expect(AIResponseParser.parseBatchResult.mock.calls.at(-1)[7]).toBe(primaryStored[0]);
+       expect(AIResponseParser.parseBatchResult.mock.calls.at(-1)[7]).toBe(recoveryStored[0]);
       expect(operation.snapshotCompletions()).toHaveLength(2);
       expect(operation.snapshotCompletions().map(({ responseId }) => responseId)).toEqual(['resp-primary', 'resp-recovery']);
     });
@@ -987,30 +1334,28 @@ beforeEach(() => {
         termination: CompletionTermination.NORMAL,
         responseId: 'p7-normal',
       });
-      AIResponseParser.parseBatchResult.mockReturnValue({
-        results: ['', ''],
-        contractViolation: true,
-        parseFailed: true,
-        invalidUnits: [],
-        mappingFacts: { identityReliable: false, complete: false, ambiguous: true },
-      });
+       AIResponseParser.parseBatchResult.mockReturnValue({
+         results: ['', ''],
+         contractViolation: true,
+         parseFailed: true,
+         invalidUnits: [],
+         mappingFacts: { identityReliable: false, complete: false, ambiguous: true },
+       });
       provider._callAI = vi.fn().mockImplementation(async (_system, _text, options) => {
         recordProviderCompletion(options.executionContext, completion);
         return 'primary';
       });
-      vi.spyOn(provider, '_traditionalBatchTranslate').mockResolvedValue(['A', 'B']);
-
-      await provider._translateBatch(
-        ['a', 'b'], 'en', 'fa', 'select-element', null, null, 'p7-normal-parse-failure', 'session-1',
-        { executionContext: { operation } }, ResponseFormat.JSON_OBJECT
-      );
+       await expect(provider._translateBatch(
+         ['a', 'b'], 'en', 'fa', 'select-element', null, null, 'p7-normal-parse-failure', 'session-1',
+         { executionContext: { operation } }, ResponseFormat.JSON_OBJECT
+       )).rejects.toMatchObject({ type: ErrorTypes.API_RESPONSE_INVALID });
 
       const recoveryLog = loggerMock.debug.mock.calls.find(([message]) => message.includes('Structured recovery triggered'));
       expect(recoveryLog?.[1]).toMatchObject({
         classification: 'PARSE_FAILURE',
         termination: CompletionTermination.NORMAL,
         parseFailed: true,
-        strategy: 'FULL',
+         strategy: 'FULL_STRUCTURED_RETRY',
       });
     });
 
@@ -1030,7 +1375,7 @@ beforeEach(() => {
           recordProviderCompletion(options.executionContext, completion);
           return '{"translations":';
         }
-        return `recovered-${callCount - 1}`;
+         return '{"translations":[{"id":"0","text":"recovered-1"},{"id":"1","text":"recovered-2"}]}';
       });
 
       const result = await provider._translateBatch(
@@ -1039,8 +1384,8 @@ beforeEach(() => {
       );
       const report = operation.finalize();
 
-      expect(result).toEqual(['recovered-1', 'recovered-2']);
-      expect(callCount).toBe(3);
+       expect(result).toEqual(['recovered-1', 'recovered-2']);
+       expect(callCount).toBe(2);
       expect(report.entries).toEqual(expect.arrayContaining([
         expect.objectContaining({ type: 'RECOVERY_TRIGGERED', classification: 'TRUNCATED_RESPONSE' }),
         expect.objectContaining({ type: 'RECOVERY_SUCCEEDED' }),
@@ -1050,7 +1395,7 @@ beforeEach(() => {
         classification: 'TRUNCATED_RESPONSE',
         termination: CompletionTermination.TRUNCATED,
         parseFailed: true,
-        strategy: 'FULL',
+         strategy: 'FULL_STRUCTURED_RETRY',
       });
       const completionLog = loggerMock.debug.mock.calls.find(([message]) => message.includes('Provider completion record'));
       expect(completionLog?.[1]).toMatchObject({
@@ -1067,7 +1412,7 @@ beforeEach(() => {
       const completedLog = loggerMock.debug.mock.calls.find(([message]) => message.includes('Structured recovery completed'));
       expect(completedLog?.[1]).toMatchObject({
         classification: 'TRUNCATED_RESPONSE',
-        strategy: 'FULL',
+         strategy: 'FULL_STRUCTURED_RETRY',
         recoveredUnitCount: 2,
       });
     });
@@ -1160,6 +1505,7 @@ beforeEach(() => {
         responseId: 'p5-failed-primary',
       });
       const error = Object.assign(new Error('recovery transport failure'), { type: 'NETWORK_ERROR' });
+      const sequentialSpy = vi.spyOn(provider, 'executeSequentialBatch');
       let callCount = 0;
       provider._callAI = vi.fn().mockImplementation(async (_sys, _text, options) => {
         callCount += 1;
@@ -1177,6 +1523,7 @@ beforeEach(() => {
 
       const entries = operation.finalize().entries;
       expect(callCount).toBe(2);
+      expect(sequentialSpy).not.toHaveBeenCalled();
       expect(entries).toEqual(expect.arrayContaining([
         expect.objectContaining({ type: 'RECOVERY_TRIGGERED', classification: 'TRUNCATED_RESPONSE' }),
         expect.objectContaining({ type: 'RECOVERY_FAILED', code: 'NETWORK_ERROR' }),
@@ -1200,7 +1547,7 @@ beforeEach(() => {
           recordProviderCompletion(options.executionContext, completion);
           return '{"translations":';
         }
-        return `normal-recovered-${callCount - 1}`;
+         return '{"translations":[{"id":"0","text":"normal-recovered-1"},{"id":"1","text":"normal-recovered-2"}]}';
       });
 
       const result = await provider._translateBatch(
@@ -1210,7 +1557,7 @@ beforeEach(() => {
       const trigger = operation.finalize().entries.find(({ type }) => type === 'RECOVERY_TRIGGERED');
 
       expect(result).toEqual(['normal-recovered-1', 'normal-recovered-2']);
-      expect(callCount).toBe(3);
+       expect(callCount).toBe(2);
       expect(trigger).toMatchObject({ classification: 'PARSE_FAILURE' });
     });
 

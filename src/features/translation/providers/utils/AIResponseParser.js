@@ -14,6 +14,18 @@ import { MappingStrategy } from '@/features/translation/ir/RequestUnitManifest.j
 
 const logger = getScopedLogger(LOG_COMPONENTS.TRANSLATION, 'AIResponseParser');
 const VALID_MAPPING_STRATEGIES = new Set(Object.values(MappingStrategy));
+const DIAGNOSTIC_ARRAY_LIMIT = 32;
+
+function formatDiagnosticId(value, maxLength = 64) {
+  if (value === null || value === undefined) return null;
+  const normalized = String(value);
+  return normalized.length <= maxLength ? normalized : `${normalized.slice(0, maxLength)}...`;
+}
+
+function boundDiagnosticArray(values, formatter = (value) => value) {
+  const normalized = Array.isArray(values) ? values : [];
+  return normalized.slice(0, DIAGNOSTIC_ARRAY_LIMIT).map(formatter);
+}
 
 function hasValidManifestView(manifestView, expectedCount) {
   if (!manifestView || !Array.isArray(manifestView.units) || manifestView.units.length !== expectedCount) return false;
@@ -149,9 +161,53 @@ function createParserFacts({
     };
   });
 
+  const responseIds = snapshot.units.map((unit) => unit.responseId ?? null);
+  const responseIdCounts = new Map();
+  responseIds.forEach((id) => {
+    if (id !== null && id !== undefined) responseIdCounts.set(String(id), (responseIdCounts.get(String(id)) || 0) + 1);
+  });
+  const duplicateResponseIds = [...responseIdCounts.entries()]
+    .filter(([, count]) => count > 1)
+    .map(([id]) => id);
+
+  const invalidTextIndexes = [...codesByIndex.entries()]
+    .filter(([, codes]) => [...codes].some((code) => code === 'INVALID_TRANSLATED_TEXT' || code === 'EMPTY_TRANSLATED_TEXT'))
+    .map(([index]) => index);
+  const diagnosticRequestIds = originalBatch.map((item) => getObjectIdentity(item) ?? null);
+  const diagnosticResponseIds = responseIds;
+  const diagnosticUnresolvedIds = unresolvedIds;
+  const diagnosticDuplicateResponseIds = duplicateResponseIds;
+
   return {
     invalidUnits: parserInvalidUnits,
-    mappingFacts: { identityReliable, complete, ambiguous },
+    mappingFacts: {
+      identityReliable,
+      complete,
+      ambiguous,
+    },
+    parserDiagnostics: {
+      requestCount: originalBatch.length,
+      responseCount: diagnosticResponseIds.length,
+      invalidCount: parserInvalidUnits.length,
+      unresolvedCount: diagnosticUnresolvedIds.length,
+      duplicateCount: diagnosticDuplicateResponseIds.length,
+      invalidTextCount: invalidTextIndexes.length,
+      requestIds: boundDiagnosticArray(diagnosticRequestIds, formatDiagnosticId),
+      responseIds: boundDiagnosticArray(diagnosticResponseIds, formatDiagnosticId),
+      unresolvedIds: boundDiagnosticArray(diagnosticUnresolvedIds, formatDiagnosticId),
+      duplicateResponseIds: boundDiagnosticArray(diagnosticDuplicateResponseIds, formatDiagnosticId),
+      invalidTextIndexes: boundDiagnosticArray(invalidTextIndexes),
+      requestIdsTotal: diagnosticRequestIds.length,
+      responseIdsTotal: diagnosticResponseIds.length,
+      unresolvedIdsTotal: diagnosticUnresolvedIds.length,
+      duplicateResponseIdsTotal: diagnosticDuplicateResponseIds.length,
+      invalidTextIndexesTotal: invalidTextIndexes.length,
+      arraysTruncated: diagnosticRequestIds.length > DIAGNOSTIC_ARRAY_LIMIT
+        || diagnosticResponseIds.length > DIAGNOSTIC_ARRAY_LIMIT
+        || diagnosticUnresolvedIds.length > DIAGNOSTIC_ARRAY_LIMIT
+        || diagnosticDuplicateResponseIds.length > DIAGNOSTIC_ARRAY_LIMIT
+        || invalidTextIndexes.length > DIAGNOSTIC_ARRAY_LIMIT,
+    },
   };
 }
 
@@ -478,17 +534,6 @@ export const AIResponseParser = {
       });
 
       const missingCount = results.filter(item => item === null).length;
-      if (unknownIdCount > 0 || missingCount > 0 || rawItems.length !== expectedCount) {
-        appendTranslationDiagnostic(executionContext, {
-          type: 'PARSER_MAPPING_DEGRADED',
-          stage: 'parser',
-          expectedCount,
-          receivedCount: rawItems.length,
-          missingCount,
-          count: unknownIdCount,
-        });
-      }
-
       // A null slot means this response violated the structured contract: it will
       // be gap-filled with unmapped translations or original text below. The parser
       // reports this fact only; recovery is owned by the provider.
@@ -525,6 +570,28 @@ export const AIResponseParser = {
         ? createRepairContext(parserFacts, validationResult, snapshot, originalBatch)
         : null;
 
+      const parserDiagnostics = parserFacts?.parserDiagnostics;
+      const parserMappingFacts = parserFacts?.mappingFacts;
+      const hasMappingIssue = contractViolation
+        || parserMappingFacts?.identityReliable === false
+        || parserMappingFacts?.complete === false
+        || parserMappingFacts?.ambiguous === true
+        || (parserDiagnostics?.invalidCount || 0) > 0
+        || (parserDiagnostics?.unresolvedCount || 0) > 0
+        || (parserDiagnostics?.duplicateCount || 0) > 0
+        || (parserDiagnostics?.invalidTextCount || 0) > 0;
+
+      if (parserFacts && hasMappingIssue) {
+        appendTranslationDiagnostic(executionContext, {
+          type: 'PARSER_MAPPING_FACTS',
+          stage: 'parser',
+          provider: providerName,
+          expectedFormat,
+          mappingFacts: parserFacts.mappingFacts,
+          ...parserFacts.parserDiagnostics,
+        });
+      }
+
       if (policyResult.warnings.length > 0) {
         appendTranslationDiagnostic(executionContext, {
           type: 'STRUCTURED_CONTRACT_WARNING',
@@ -543,7 +610,7 @@ export const AIResponseParser = {
           receivedCount: rawItems.length,
           missingCount,
           code: 'STRUCTURED_CONTRACT_REJECTED',
-          reason: `reasons=${policyResult.reasons.join(',')}; mappingMode=${plainStringBatch ? 'POSITIONAL_NUMERIC' : 'IDENTITY'}; responseIds=${responseIds.join(',')}; unresolvedIds=${unresolvedIds.join(',')}; resolvedIndexes=${resolvedIndexes.join(',')}`,
+          reason: `reasons=${policyResult.reasons.join(',')}; mappingMode=${plainStringBatch ? 'POSITIONAL_NUMERIC' : 'IDENTITY'}; responseCount=${responseIds.length}; unresolvedCount=${unresolvedIds.length}; resolvedCount=${resolvedIndexes.length}`,
         });
       }
 
@@ -553,13 +620,13 @@ export const AIResponseParser = {
         ...(parserFacts || {}),
         ...(repairContext ? { repairContext } : {}),
       };
-    } catch (error) {
-      logger.error(`[${providerName}] Strict parse failed: ${error.message}`);
+    } catch {
+      logger.error(`[${providerName}] Strict parse failed`, { code: 'PARSE_FAILED' });
       appendTranslationDiagnostic(executionContext, {
         type: 'PARSER_MALFORMED_RESPONSE',
         stage: 'parser',
         provider: providerName,
-        reason: error.message,
+        reason: 'PARSE_FAILED',
         code: 'PARSE_FAILED',
         fallback: true,
       });
