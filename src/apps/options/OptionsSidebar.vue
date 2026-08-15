@@ -100,21 +100,7 @@
           </a>
         </div>
         <p>
-          by
-          <a
-            class="about-link"
-            href="https://x.com/M_Khani65"
-            target="_blank"
-            rel="noopener noreferrer"
-          >Me</a>
-          and
-          <a
-            class="about-link"
-            href="https://x.com/iSegar0"
-            target="_blank"
-            rel="noopener noreferrer"
-          >iSegar0</a>
-          <span>&copy; {{ copyrightYear }}</span>
+          <span>Translate It &copy; {{ copyrightYear }}</span>
         </p>
       </div>
     </div>
