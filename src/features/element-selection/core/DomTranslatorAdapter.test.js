@@ -199,7 +199,7 @@ describe('DomTranslatorAdapter', () => {
       expect(contentScriptIntegration.sendTranslationRequest).not.toHaveBeenCalled();
     });
 
-    it('rejects an overlapping translation root as FEATURE_BLOCKED before a second request', async () => {
+    it('keeps overlapping roots blocked until owning translation releases the root', async () => {
       const { ErrorTypes } = await import('@/shared/error-management/ErrorTypes.js');
       let streamCallbacks;
       registerTranslation.mockImplementationOnce((_id, callbacks) => { streamCallbacks = callbacks; });
@@ -216,9 +216,61 @@ describe('DomTranslatorAdapter', () => {
       expect(contentScriptIntegration.sendTranslationRequest).toHaveBeenCalledTimes(requestCount);
       expect(testElement.textContent).toBe('Hello');
 
+      await expect(adapter.translateElement(testElement)).rejects.toMatchObject({
+        type: ErrorTypes.FEATURE_BLOCKED,
+        translationOutcome: { committedParentCount: 0, totalParentCount: 0, cancelled: false },
+      });
+      expect(contentScriptIntegration.sendTranslationRequest).toHaveBeenCalledTimes(requestCount);
+
       await adapter.cancelTranslation({ silent: true });
       streamCallbacks.onStreamEnd({ cancelled: true });
       await expect(firstTranslation).resolves.toMatchObject({ success: false, cancelled: true });
+
+      let releasedCallbacks;
+      registerTranslation.mockImplementationOnce((_id, callbacks) => { releasedCallbacks = callbacks; });
+      contentScriptIntegration.sendTranslationRequest.mockResolvedValueOnce({ success: true, streaming: true });
+      const releasedTranslation = adapter.translateElement(testElement);
+      await vi.waitFor(() => expect(releasedCallbacks).toBeDefined());
+      expect(contentScriptIntegration.sendTranslationRequest).toHaveBeenCalledTimes(requestCount + 1);
+      releasedCallbacks.onStreamUpdate({ success: true, data: [{ t: 'Released', i: 'n1' }] });
+      releasedCallbacks.onStreamEnd({ success: true });
+      await expect(releasedTranslation).resolves.toMatchObject({ success: true });
+      expect(testElement.textContent).toContain('Released');
+    });
+
+    it('allows two non-overlapping roots to translate concurrently', async () => {
+      const firstAdapter = adapter;
+      const secondAdapter = new DomTranslatorAdapter();
+      const firstRoot = document.createElement('div');
+      const secondRoot = document.createElement('div');
+      firstRoot.textContent = 'First';
+      secondRoot.textContent = 'Second';
+      document.body.append(firstRoot, secondRoot);
+      const { collectTextNodes } = await import('./DomTranslatorUtils.js');
+      collectTextNodes
+        .mockReturnValueOnce([{ node: firstRoot.firstChild, text: 'First', uid: 'n1', blockId: 'b1', role: 'div' }])
+        .mockReturnValueOnce([{ node: secondRoot.firstChild, text: 'Second', uid: 'n1', blockId: 'b1', role: 'div' }]);
+
+      const callbacks = [];
+      registerTranslation.mockImplementation((_id, registered) => { callbacks.push(registered); });
+      contentScriptIntegration.sendTranslationRequest.mockResolvedValue({ success: true, streaming: true });
+
+      const firstTranslation = firstAdapter.translateElement(firstRoot);
+      const secondTranslation = secondAdapter.translateElement(secondRoot);
+      await vi.waitFor(() => expect(callbacks).toHaveLength(2));
+      expect(contentScriptIntegration.sendTranslationRequest).toHaveBeenCalledTimes(2);
+
+      callbacks[0].onStreamUpdate({ success: true, data: [{ t: 'Uno', i: 'n1' }] });
+      callbacks[0].onStreamEnd({ success: true });
+      callbacks[1].onStreamUpdate({ success: true, data: [{ t: 'Dos', i: 'n1' }] });
+      callbacks[1].onStreamEnd({ success: true });
+
+      await expect(firstTranslation).resolves.toMatchObject({ success: true });
+      await expect(secondTranslation).resolves.toMatchObject({ success: true });
+      expect(firstRoot.textContent).toContain('Uno');
+      expect(secondRoot.textContent).toContain('Dos');
+      document.body.removeChild(firstRoot);
+      document.body.removeChild(secondRoot);
     });
 
     it('maps the non-grouping strategy to V2 extraction mode exactly once', async () => {

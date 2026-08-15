@@ -123,6 +123,7 @@ export class DomTranslatorAdapter extends ResourceTracker {
   async translateElement(element, options = {}) {
     const { onProgress, onComplete, onError } = options;
     let translationToken = null;
+    let ownsActiveTranslationRoot = false;
     let getCurrentOutcome = () => ({ committedParentCount: 0, totalParentCount: 0, cancelled: false });
     let terminalStreamFailure = false;
     this.logger.operation('Starting element translation');
@@ -138,6 +139,7 @@ export class DomTranslatorAdapter extends ResourceTracker {
         }
       }
       activeTranslationRoots.add(element);
+      ownsActiveTranslationRoot = true;
 
       this.isTranslating = true;
       // Reset per operation: never let a previous translation's participation
@@ -865,7 +867,9 @@ export class DomTranslatorAdapter extends ResourceTracker {
       if (onError) await onError({ status: TRANSLATION_STATUS.ERROR, error: finalError });
       throw finalError;
     } finally {
-      activeTranslationRoots.delete(element);
+      if (ownsActiveTranslationRoot) {
+        activeTranslationRoots.delete(element);
+      }
       this._cleanupCurrentSession(true, translationToken);
     }
   }
