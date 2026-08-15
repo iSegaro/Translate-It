@@ -92,9 +92,7 @@ describe('Settings Migrations', () => {
 
   it.each([
     ['gemini-3.1-flash-lite-preview', 'gemini-3.5-flash-lite'],
-    ['gemini-3.1-pro-preview', 'gemini-3.6-flash'],
     ['gemini-3-pro-preview', 'gemini-3.5-flash'],
-    ['gemini-3-flash-preview', 'gemini-3.5-flash'],
     ['gemini-2.5-pro', 'gemini-3.6-flash'],
     ['gemini-2.5-flash', 'gemini-3.5-flash'],
     ['gemini-2.5-flash-lite', 'gemini-3.5-flash-lite']
@@ -105,7 +103,53 @@ describe('Settings Migrations', () => {
     });
 
     expect(updates.GEMINI_MODEL).toBe(newModel);
+    expect(CONFIG.GEMINI_MODELS.some(model => model.value === newModel)).toBe(true);
     expect(logs).toContain(`Migrated GEMINI_MODEL from ${oldModel} to ${newModel}`);
+  });
+
+  it.each([
+    ['gemini-3.1-pro-preview', 'gemini-3.6-flash'],
+    ['gemini-3-flash-preview', 'gemini-3.5-flash']
+  ])('migrates inactive preview model %s to %s', async (oldModel, newModel) => {
+    const activeModels = CONFIG.GEMINI_MODELS;
+    CONFIG.GEMINI_MODELS = activeModels.filter(model => model.value !== oldModel);
+
+    try {
+      const { updates } = await runSettingsMigrations({
+        GEMINI_MODELS: [{ value: oldModel, label: 'Legacy' }],
+        GEMINI_MODEL: oldModel
+      });
+
+      expect(updates.GEMINI_MODEL).toBe(newModel);
+    } finally {
+      CONFIG.GEMINI_MODELS = activeModels;
+    }
+  });
+
+  it.each(['gemini-3.1-pro-preview', 'gemini-3-flash-preview'])(
+    'preserves active preview model %s',
+    async (model) => {
+      const { updates } = await runSettingsMigrations({
+        GEMINI_MODELS: [{ value: 'legacy-model', label: 'Legacy' }],
+        GEMINI_MODEL: model
+      });
+
+      expect(updates.GEMINI_MODEL).toBeUndefined();
+    }
+  );
+
+  it('keeps stable Gemini 3.1 Flash-Lite distinct from preview migration ID', async () => {
+    const stableResult = await runSettingsMigrations({
+      GEMINI_MODELS: [{ value: 'legacy-model', label: 'Legacy' }],
+      GEMINI_MODEL: 'gemini-3.1-flash-lite'
+    });
+    const previewResult = await runSettingsMigrations({
+      GEMINI_MODELS: [{ value: 'legacy-model', label: 'Legacy' }],
+      GEMINI_MODEL: 'gemini-3.1-flash-lite-preview'
+    });
+
+    expect(stableResult.updates.GEMINI_MODEL).toBeUndefined();
+    expect(previewResult.updates.GEMINI_MODEL).toBe('gemini-3.5-flash-lite');
   });
 
   it('should preserve arbitrary custom model IDs when a model list changes', async () => {

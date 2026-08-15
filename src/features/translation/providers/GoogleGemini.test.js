@@ -7,6 +7,7 @@ import { AIConversationHelper } from './utils/AIConversationHelper.js';
 import { createTranslationOperation } from '../ir/TranslationOperation.js';
 import { CompletionTermination } from '../ir/CompletionContract.js';
 import { ResponseFormat } from '@/shared/config/translationConstants.js';
+import { CONFIG } from '@/shared/config/config.js';
 
 // Mock Dependencies
 vi.mock('@/shared/proxy/ProxyManager.js', () => ({
@@ -22,7 +23,7 @@ vi.mock('@/shared/config/config.js', async (importOriginal) => {
   return {
     ...actual,
     getGeminiApiKeysAsync: vi.fn().mockResolvedValue(['test-key']),
-    getGeminiModelAsync: vi.fn().mockResolvedValue('gemini-1.5-flash'),
+  getGeminiModelAsync: vi.fn().mockResolvedValue('gemini-3.5-flash'),
     getGeminiApiUrlAsync: vi.fn().mockResolvedValue('https://generativelanguage.googleapis.com/v1beta/models'),
     getSettingsAsync: vi.fn().mockResolvedValue({}),
     getPromptBASEScreenCaptureAsync: vi.fn().mockResolvedValue('Translate this image to {targetLanguage}'),
@@ -54,14 +55,14 @@ describe('GeminiProvider Error Handling', () => {
 
   it.each([ResponseFormat.JSON_OBJECT, ResponseFormat.JSON_ARRAY])('uses REST JSON MIME field for %s', async (expectedFormat) => {
     const { getGeminiModelAsync } = await import('@/shared/config/config.js');
-    getGeminiModelAsync.mockResolvedValue('gemini-2.5-flash');
+    getGeminiModelAsync.mockResolvedValue('gemini-3.5-flash');
     const executeRequest = vi.spyOn(provider, '_executeRequest').mockResolvedValue('translated');
 
     await provider._callAI('system prompt', 'source text', { expectedFormat });
 
     const request = executeRequest.mock.calls[0][0];
     const payload = JSON.parse(request.fetchOptions.body);
-    expect(request.url).toContain('/models/gemini-2.5-flash:generateContent?key=');
+    expect(request.url).toContain('/models/gemini-3.5-flash:generateContent?key=');
     expect(payload.generationConfig).toMatchObject({
       temperature: 0.1,
       maxOutputTokens: 8192,
@@ -71,6 +72,25 @@ describe('GeminiProvider Error Handling', () => {
     expect(payload.generationConfig).not.toHaveProperty('thinking_config');
     expect(payload.systemInstruction).toEqual({ parts: [{ text: 'system prompt' }] });
     expect(payload.contents).toEqual([{ parts: [{ text: 'source text' }] }]);
+  });
+
+  it.each([
+    ['gemini-3.7-flash', 'https://generativelanguage.googleapis.com/v1beta/models/gemini-3.7-flash:generateContent'],
+    ['gemini-3.6-flash', 'https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent'],
+    ['gemini-3.5-flash', 'https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent'],
+    ['gemini-3.5-flash-lite', 'https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite:generateContent'],
+    ['gemini-3.1-flash-lite', 'https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite:generateContent'],
+    ['gemini-3.1-pro-preview', 'https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-pro-preview:generateContent'],
+    ['gemini-3-flash-preview', 'https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent']
+  ])('resolves %s to its configured endpoint', async (model, endpoint) => {
+    const { getGeminiModelAsync } = await import('@/shared/config/config.js');
+    getGeminiModelAsync.mockResolvedValue(model);
+    const executeRequest = vi.spyOn(provider, '_executeRequest').mockResolvedValue('translated');
+
+    await provider._callAI('system prompt', 'source text');
+
+    expect(executeRequest.mock.calls[0][0].url).toBe(`${endpoint}?key=test-key`);
+    expect(CONFIG.GEMINI_MODELS.find(configuredModel => configuredModel.value === model).url).toBe(endpoint);
   });
 
   it('does not read or write normal history for structured recovery', async () => {

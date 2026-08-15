@@ -70,6 +70,72 @@ describe('Config Module', () => {
       expect(CONFIG.APP_NAME).toBe('Translate It');
     });
 
+    it('should expose approved Gemini selector models in order', () => {
+      expect(CONFIG.GEMINI_MODEL).toBe('gemini-3.5-flash');
+      expect(CONFIG.GEMINI_API_URL).toBe(
+        'https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent'
+      );
+      expect(CONFIG.GEMINI_MODELS.map(model => model.value)).toEqual([
+        'gemini-3.7-flash',
+        'gemini-3.6-flash',
+        'gemini-3.5-flash',
+        'gemini-3.5-flash-lite',
+        'gemini-3.1-flash-lite',
+        'gemini-3.1-pro-preview',
+        'gemini-3-flash-preview',
+        'custom'
+      ]);
+      expect(CONFIG.GEMINI_MODELS.every(model => !model.value.startsWith('gemini-2.5-'))).toBe(true);
+    });
+
+    it('should retain exact Gemini model endpoints and Thinking metadata', () => {
+      expect(CONFIG.GEMINI_MODELS).toEqual([
+        expect.objectContaining({
+          value: 'gemini-3.7-flash',
+          name: 'Gemini 3.7 Flash',
+          url: 'https://generativelanguage.googleapis.com/v1beta/models/gemini-3.7-flash:generateContent',
+          thinking: { minimal: null }
+        }),
+        expect.objectContaining({
+          value: 'gemini-3.6-flash',
+          name: 'Gemini 3.6 Flash',
+          url: 'https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent',
+          thinking: { minimal: { type: 'level', value: 'minimal' } }
+        }),
+        expect.objectContaining({
+          value: 'gemini-3.5-flash',
+          name: 'Gemini 3.5 Flash',
+          url: 'https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent',
+          thinking: { minimal: { type: 'level', value: 'minimal' } }
+        }),
+        expect.objectContaining({
+          value: 'gemini-3.5-flash-lite',
+          name: 'Gemini 3.5 Flash-Lite',
+          url: 'https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite:generateContent',
+          thinking: { minimal: null }
+        }),
+        expect.objectContaining({
+          value: 'gemini-3.1-flash-lite',
+          name: 'Gemini 3.1 Flash-Lite',
+          url: 'https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite:generateContent',
+          thinking: { minimal: { type: 'level', value: 'minimal' } }
+        }),
+        expect.objectContaining({
+          value: 'gemini-3.1-pro-preview',
+          name: 'Gemini 3.1 Pro Preview',
+          url: 'https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-pro-preview:generateContent',
+          thinking: { minimal: { type: 'level', value: 'minimal' } }
+        }),
+        expect.objectContaining({
+          value: 'gemini-3-flash-preview',
+          name: 'Gemini 3 Flash Preview',
+          url: 'https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent',
+          thinking: { minimal: { type: 'level', value: 'minimal' } }
+        }),
+        { value: 'custom', name: 'Custom Model', custom: true }
+      ]);
+    });
+
     it.each(['PROMPT_BASE_AI_BATCH', 'PROMPT_BASE_AI_BATCH_AUTO'])(
       '%s documents the runtime segment marker protocol',
       (key) => {

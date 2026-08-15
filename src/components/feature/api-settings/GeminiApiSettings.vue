@@ -92,11 +92,11 @@ const geminiApiUrl = computed({
 })
 
 // Track dropdown selection separately from stored value
-const selectedModelOption = ref('gemini-2.5-flash')
+const selectedModelOption = ref(CONFIG.GEMINI_MODEL)
 
 // Initialize selectedModelOption based on current stored value
 const initializeModelSelection = () => {
-  const currentModel = settingsStore.settings?.GEMINI_MODEL || 'gemini-2.5-flash';
+  const currentModel = settingsStore.settings?.GEMINI_MODEL || CONFIG.GEMINI_MODEL;
   // If currentModel is 'custom' or not in predefined options, set to 'custom'
   const isPredefined = geminiModelOptions.value.some(option => option.value === currentModel && option.value !== 'custom');
   selectedModelOption.value = (currentModel === 'custom' || !isPredefined) ? 'custom' : currentModel;

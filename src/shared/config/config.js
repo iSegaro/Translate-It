@@ -111,25 +111,64 @@ export const CONFIG = {
 
   API_KEY: "", // Gemini specific (deprecated, use GEMINI_API_KEY)
   GEMINI_API_KEY: "", // Gemini API keys (newline-separated)
-  GEMINI_API_URL: "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent", // Default Gemini API URL
-  GEMINI_MODEL: "gemini-2.5-flash", // Selected Gemini model
+  GEMINI_API_URL: "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent", // Default Gemini API URL
+  GEMINI_MODEL: "gemini-3.5-flash", // Selected Gemini model
   GEMINI_THINKING_ENABLED: false, // Enable/disable thinking for supported models
   GEMINI_THINKING_MODE: "default", // Provider default or deferred minimal thinking mode
   GEMINI_MODELS: [
-    // Gemini 3.1 Series (NEW - Latest & Most Advanced)
-    { value: "gemini-3.1-pro-preview", name: "Gemini 3.1 Pro Preview", url: "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-pro-preview:generateContent", thinking: { supported: true, controllable: false, defaultEnabled: false } },
-    { value: "gemini-3.1-flash-lite-preview", name: "Gemini 3.1 Flash-Lite Preview", url: "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite-preview:generateContent", thinking: { supported: true, controllable: true, defaultEnabled: false } },
-
-    // Gemini 3.0 Series (Advanced)
-    { value: "gemini-3-pro-preview", name: "Gemini 3 Pro Preview", url: "https://generativelanguage.googleapis.com/v1beta/models/gemini-3-pro-preview:generateContent", thinking: { supported: true, controllable: false, defaultEnabled: false } },
-    { value: "gemini-3-flash-preview", name: "Gemini 3 Flash Preview", url: "https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent", thinking: { supported: true, controllable: true, defaultEnabled: false } },
-
-    // Gemini 2.5 Series (Stable)
-    { value: "gemini-2.5-pro", name: "Gemini 2.5 Pro", url: "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-pro:generateContent", thinking: { supported: true, controllable: false, defaultEnabled: false } },
-    { value: "gemini-2.5-flash", name: "Gemini 2.5 Flash", url: "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent", thinking: { supported: true, controllable: true, defaultEnabled: false } },
-    { value: "gemini-2.5-flash-lite", name: "Gemini 2.5 Flash-Lite", url: "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent", thinking: { supported: true, controllable: true, defaultEnabled: false } },
-
-    { value: "custom", name: "Custom Model", custom: true, thinking: { supported: true, controllable: true, defaultEnabled: false } }
+    {
+      value: "gemini-3.7-flash",
+      name: "Gemini 3.7 Flash",
+      url: "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.7-flash:generateContent",
+      thinking: { minimal: null }
+    },
+    {
+      value: "gemini-3.6-flash",
+      name: "Gemini 3.6 Flash",
+      url: "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent",
+      thinking: {
+        minimal: { type: "level", value: "minimal" }
+      }
+    },
+    {
+      value: "gemini-3.5-flash",
+      name: "Gemini 3.5 Flash",
+      url: "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent",
+      thinking: {
+        minimal: { type: "level", value: "minimal" }
+      }
+    },
+    {
+      value: "gemini-3.5-flash-lite",
+      name: "Gemini 3.5 Flash-Lite",
+      url: "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite:generateContent",
+      thinking: { minimal: null }
+    },
+    {
+      value: "gemini-3.1-flash-lite",
+      name: "Gemini 3.1 Flash-Lite",
+      url: "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite:generateContent",
+      thinking: {
+        minimal: { type: "level", value: "minimal" }
+      }
+    },
+    {
+      value: "gemini-3.1-pro-preview",
+      name: "Gemini 3.1 Pro Preview",
+      url: "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-pro-preview:generateContent",
+      thinking: {
+        minimal: { type: "level", value: "minimal" }
+      }
+    },
+    {
+      value: "gemini-3-flash-preview",
+      name: "Gemini 3 Flash Preview",
+      url: "https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent",
+      thinking: {
+        minimal: { type: "level", value: "minimal" }
+      }
+    },
+    { value: "custom", name: "Custom Model", custom: true }
   ],
   GOOGLE_TRANSLATE_URL: "https://translate.googleapis.com/translate_a/single",
   GOOGLE_TRANSLATE_V2_URL: "https://translate.google.com/translate_a/single",

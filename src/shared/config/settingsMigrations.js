@@ -288,8 +288,11 @@ function runMainMigration(currentSettings) {
     if (!(modelListKey in currentSettings)) return;
 
     const currentUserModel = currentSettings[currentModelKey];
-    const explicitReplacement = MODEL_VALUE_MIGRATIONS[modelListKey]?.[currentUserModel];
     const newModels = CONFIG[modelListKey];
+    const modelIsActive = newModels.some(model => model.value === currentUserModel);
+    const explicitReplacement = modelIsActive
+      ? undefined
+      : MODEL_VALUE_MIGRATIONS[modelListKey]?.[currentUserModel];
     const modelListChanged = JSON.stringify(currentSettings[modelListKey]) !== JSON.stringify(newModels);
 
     if (explicitReplacement) {

@@ -23,6 +23,9 @@ describe('getPersistedDefaultSettings', () => {
 
     expect(defaults.THEME).toBe(CONFIG.THEME);
     expect(defaults.TIMEOUT).toBe(CONFIG.TIMEOUT);
+    expect(defaults.GEMINI_MODEL).toBe(CONFIG.GEMINI_MODEL);
+    expect(defaults.GEMINI_API_URL).toBe(CONFIG.GEMINI_API_URL);
+    expect(defaults.GEMINI_MODELS).toEqual(CONFIG.GEMINI_MODELS);
     expect(defaults.GEMINI_THINKING_MODE).toBe('default');
     expect(defaults.TEXT_FIELD_SHORTCUT).toBe(CONFIG.TEXT_FIELD_SHORTCUT);
     expect(defaults.translationHistory).toBeUndefined();

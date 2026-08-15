@@ -82,7 +82,7 @@ export class GeminiProvider extends BaseAIProvider {
     const turnNumber = conversationParticipates
       ? await AIConversationHelper.claimNextTurn(sessionId, this.providerName, { callPurpose, translateMode: mode, conversationParticipates })
       : 1;
-    logger.info(`[Gemini] Model: ${model || 'gemini-1.5-flash'}${sessionId ? ` (Session: ${sessionId.substring(0, 15)}..., Turn: ${turnNumber})` : ''}`);
+    logger.info(`[Gemini] Model: ${model || CONFIG.GEMINI_MODEL}${sessionId ? ` (Session: ${sessionId.substring(0, 15)}..., Turn: ${turnNumber})` : ''}`);
 
     const requestBody = {
       contents: [{
