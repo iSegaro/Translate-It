@@ -1,137 +1,139 @@
 <template>
-  <div class="ocr-tab">
-    <div class="tab-header">
-      <h2>{{ t('ocr_tab_title') }}</h2>
-      <p class="tab-description">
-        {{ t('ocr_tab_desc') }}
-      </p>
-    </div>
+  <section class="options-tab-content ocr-tab">
+    <div class="settings-container">
+      <div class="tab-header">
+        <h2>{{ t('ocr_tab_title') }}</h2>
+        <p class="tab-description">
+          {{ t('ocr_tab_desc') }}
+        </p>
+      </div>
 
-    <!-- OCR Toggle Section -->
-    <BaseFieldset
-      id="ocr_toggle_section"
-      :legend="t('ocr_toggle_section_title') || t('ocr_tab_title')"
-    >
-      <template #header>
-        <div 
-          id="OCR_PROVIDER_SELECTOR"
-          class="legend-actions-wrapper"
+      <!-- OCR Toggle Section -->
+      <BaseFieldset
+        id="ocr_toggle_section"
+        :legend="t('ocr_toggle_section_title') || t('ocr_tab_title')"
+      >
+        <template #header>
+          <div 
+            id="OCR_PROVIDER_SELECTOR"
+            class="legend-actions-wrapper"
+          >
+            <span 
+              class="legend-action-label"
+              :class="{ 'is-disabled': !enableScreenCapture }"
+            >{{ t('provider_label') }}:</span>
+            <ProviderSelector
+              v-model="ocrProvider"
+              allow-default
+              mode="button"
+              only-configured
+              :is-global="false"
+              :disabled="!enableScreenCapture"
+            />
+          </div>
+        </template>
+
+        <div class="setting-group">
+          <BaseCheckbox
+            id="ENABLE_SCREEN_CAPTURE"
+            v-model="enableScreenCapture"
+            :label="t('ocr_enabled_label')"
+          />
+          <p class="setting-description">
+            {{ t('ocr_enabled_desc') }}
+          </p>
+        </div>
+
+        <div
+          class="setting-group"
+          :class="{ 'is-disabled': !enableScreenCapture }"
         >
-          <span 
-            class="legend-action-label"
-            :class="{ 'is-disabled': !enableScreenCapture }"
-          >{{ t('provider_label') }}:</span>
-          <ProviderSelector
-            v-model="ocrProvider"
-            allow-default
-            mode="button"
-            only-configured
-            :is-global="false"
+          <BaseCheckbox
+            id="PAGE_CONTEXT_SCREEN_CAPTURE"
+            v-model="showInContextMenu"
+            :label="t('ocr_context_menu_label')"
             :disabled="!enableScreenCapture"
           />
+          <p class="setting-description">
+            {{ t('ocr_context_menu_desc') }}
+          </p>
         </div>
-      </template>
+      </BaseFieldset>
 
-      <div class="setting-group">
-        <BaseCheckbox
-          id="ENABLE_SCREEN_CAPTURE"
-          v-model="enableScreenCapture"
-          :label="t('ocr_enabled_label')"
-        />
-        <p class="setting-description">
-          {{ t('ocr_enabled_desc') }}
-        </p>
-      </div>
-
-      <div
-        class="setting-group"
-        :class="{ 'is-disabled': !enableScreenCapture }"
+      <BaseFieldset
+        id="ocr_languages_section"
+        :legend="t('ocr_languages_label')"
+        :disabled="!enableScreenCapture"
       >
-        <BaseCheckbox
-          id="PAGE_CONTEXT_SCREEN_CAPTURE"
-          v-model="showInContextMenu"
-          :label="t('ocr_context_menu_label')"
-          :disabled="!enableScreenCapture"
-        />
-        <p class="setting-description">
-          {{ t('ocr_context_menu_desc') }}
-        </p>
-      </div>
-    </BaseFieldset>
-
-    <BaseFieldset
-      id="ocr_languages_section"
-      :legend="t('ocr_languages_label')"
-      :disabled="!enableScreenCapture"
-    >
-      <template #header>
-        <div class="legend-actions-wrapper">
-          <div class="search-box">
-            <input 
-              v-model="searchQuery" 
-              type="text" 
-              :placeholder="t('search_placeholder')"
-              class="search-input"
-              :disabled="!enableScreenCapture"
-            >
+        <template #header>
+          <div class="legend-actions-wrapper">
+            <div class="search-box">
+              <input 
+                v-model="searchQuery" 
+                type="text" 
+                :placeholder="t('search_placeholder')"
+                class="search-input"
+                :disabled="!enableScreenCapture"
+              >
+            </div>
           </div>
-        </div>
-      </template>
+        </template>
       
-      <div class="language-list">
-        <div 
-          v-for="lang in supportedLanguages" 
-          :key="lang.code"
-          class="language-item"
-          :class="{ 'installed': ocrStore.isDownloaded(lang.code) }"
-        >
-          <div class="lang-info">
-            <span class="lang-name">{{ lang.name }}</span>
-            <span class="lang-status">
-              {{ ocrStore.isDownloaded(lang.code) ? t('ocr_status_installed') : t('ocr_status_not_installed') }}
-            </span>
-          </div>
+        <div class="language-list">
+          <div 
+            v-for="lang in supportedLanguages" 
+            :key="lang.code"
+            class="language-item"
+            :class="{ 'installed': ocrStore.isDownloaded(lang.code) }"
+          >
+            <div class="lang-info">
+              <span class="lang-name">{{ lang.name }}</span>
+              <span class="lang-status">
+                {{ ocrStore.isDownloaded(lang.code) ? t('ocr_status_installed') : t('ocr_status_not_installed') }}
+              </span>
+            </div>
           
-          <div class="lang-actions">
-            <button 
-              v-if="!ocrStore.isDownloaded(lang.code)"
-              class="btn-download"
-              :disabled="ocrStore.isDownloading(lang.code)"
-              @click="ocrStore.downloadLanguage(lang.code)"
-            >
-              <template v-if="ocrStore.isDownloading(lang.code)">
-                {{ ocrStore.getDownloadProgress(lang.code) }}%
-              </template>
-              <template v-else>
-                {{ t('ocr_download_button') }}
-              </template>
-            </button>
-            <button 
-              v-else
-              class="btn-delete"
-              @click="ocrStore.deleteLanguage(lang.code)"
-            >
-              {{ t('ocr_delete_button') }}
-            </button>
+            <div class="lang-actions">
+              <button 
+                v-if="!ocrStore.isDownloaded(lang.code)"
+                class="btn-download"
+                :disabled="ocrStore.isDownloading(lang.code)"
+                @click="ocrStore.downloadLanguage(lang.code)"
+              >
+                <template v-if="ocrStore.isDownloading(lang.code)">
+                  {{ ocrStore.getDownloadProgress(lang.code) }}%
+                </template>
+                <template v-else>
+                  {{ t('ocr_download_button') }}
+                </template>
+              </button>
+              <button 
+                v-else
+                class="btn-delete"
+                @click="ocrStore.deleteLanguage(lang.code)"
+              >
+                {{ t('ocr_delete_button') }}
+              </button>
+            </div>
           </div>
         </div>
-      </div>
-    </BaseFieldset>
+      </BaseFieldset>
 
-    <BaseFieldset
-      id="ocr_danger_zone"
-      :legend="t('ocr_cache_clear_button')"
-      class="danger-zone-fieldset"
-    >
-      <p>{{ t('ocr_cache_clear_desc') }}</p>
-      <button 
-        class="btn-danger"
-        @click="confirmClearCache"
+      <BaseFieldset
+        id="ocr_danger_zone"
+        :legend="t('ocr_cache_clear_button')"
+        class="danger-zone-fieldset"
       >
-        {{ t('ocr_cache_clear_button') }}
-      </button>
-    </BaseFieldset>
-  </div>
+        <p>{{ t('ocr_cache_clear_desc') }}</p>
+        <button 
+          class="btn-danger"
+          @click="confirmClearCache"
+        >
+          {{ t('ocr_cache_clear_button') }}
+        </button>
+      </BaseFieldset>
+    </div>
+  </section>
 </template>
 
 <script setup>

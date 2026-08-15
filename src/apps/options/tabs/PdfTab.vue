@@ -1,28 +1,30 @@
 <template>
-  <div class="pdf-tab">
-    <div class="tab-header">
-      <h2>{{ t('pdf_tab_title') }}</h2>
-      <p class="tab-description">
-        {{ t('pdf_tab_desc') }}
-      </p>
-    </div>
-
-    <BaseFieldset
-      id="pdf_context_menu_section"
-      :legend="t('pdf_context_menu_section_title')"
-    >
-      <div class="setting-group">
-        <BaseCheckbox
-          id="PAGE_CONTEXT_PDF_TRANSLATOR"
-          v-model="showPdfTranslatorInContextMenu"
-          :label="t('pdf_context_menu_label')"
-        />
-        <p class="setting-description">
-          {{ t('pdf_context_menu_desc') }}
+  <section class="options-tab-content pdf-tab">
+    <div class="settings-container">
+      <div class="tab-header">
+        <h2>{{ t('pdf_tab_title') }}</h2>
+        <p class="tab-description">
+          {{ t('pdf_tab_desc') }}
         </p>
       </div>
-    </BaseFieldset>
-  </div>
+
+      <BaseFieldset
+        id="pdf_context_menu_section"
+        :legend="t('pdf_context_menu_section_title')"
+      >
+        <div class="setting-group">
+          <BaseCheckbox
+            id="PAGE_CONTEXT_PDF_TRANSLATOR"
+            v-model="showPdfTranslatorInContextMenu"
+            :label="t('pdf_context_menu_label')"
+          />
+          <p class="setting-description">
+            {{ t('pdf_context_menu_desc') }}
+          </p>
+        </div>
+      </BaseFieldset>
+    </div>
+  </section>
 </template>
 
 <script setup>
