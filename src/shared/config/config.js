@@ -842,6 +842,10 @@ export const getGeminiModelAsync = async () => {
   return getSettingValueAsync("GEMINI_MODEL", CONFIG.GEMINI_MODEL);
 };
 
+export const getGeminiThinkingModeAsync = async () => {
+  return getSettingValueAsync("GEMINI_THINKING_MODE", CONFIG.GEMINI_THINKING_MODE);
+};
+
 export const getGeminiApiUrlAsync = async () => {
   return getSettingValueAsync("GEMINI_API_URL", CONFIG.GEMINI_API_URL);
 };

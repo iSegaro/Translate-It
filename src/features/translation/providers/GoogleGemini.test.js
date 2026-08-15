@@ -23,7 +23,8 @@ vi.mock('@/shared/config/config.js', async (importOriginal) => {
   return {
     ...actual,
     getGeminiApiKeysAsync: vi.fn().mockResolvedValue(['test-key']),
-  getGeminiModelAsync: vi.fn().mockResolvedValue('gemini-3.5-flash'),
+    getGeminiModelAsync: vi.fn().mockResolvedValue('gemini-3.5-flash'),
+    getGeminiThinkingModeAsync: vi.fn().mockResolvedValue('default'),
     getGeminiApiUrlAsync: vi.fn().mockResolvedValue('https://generativelanguage.googleapis.com/v1beta/models'),
     getSettingsAsync: vi.fn().mockResolvedValue({}),
     getPromptBASEScreenCaptureAsync: vi.fn().mockResolvedValue('Translate this image to {targetLanguage}'),
@@ -93,7 +94,74 @@ describe('GeminiProvider Error Handling', () => {
     expect(CONFIG.GEMINI_MODELS.find(configuredModel => configuredModel.value === model).url).toBe(endpoint);
   });
 
+  it('omits thinkingConfig in default mode for a verified model', async () => {
+    const { getGeminiModelAsync, getGeminiThinkingModeAsync } = await import('@/shared/config/config.js');
+    getGeminiModelAsync.mockResolvedValue('gemini-3.6-flash');
+    getGeminiThinkingModeAsync.mockResolvedValue('default');
+    const executeRequest = vi.spyOn(provider, '_executeRequest').mockResolvedValue('translated');
+
+    await provider._callAI('system prompt', 'source text');
+
+    const payload = JSON.parse(executeRequest.mock.calls[0][0].fetchOptions.body);
+    expect(payload.generationConfig).not.toHaveProperty('thinkingConfig');
+  });
+
+  it.each([
+    'gemini-3.6-flash',
+    'gemini-3.5-flash',
+    'gemini-3.1-flash-lite',
+    'gemini-3.1-pro-preview',
+    'gemini-3-flash-preview'
+  ])('emits minimal thinkingConfig for verified model %s', async (model) => {
+    const { getGeminiModelAsync, getGeminiThinkingModeAsync } = await import('@/shared/config/config.js');
+    getGeminiModelAsync.mockResolvedValue(model);
+    getGeminiThinkingModeAsync.mockResolvedValue('minimal');
+    const executeRequest = vi.spyOn(provider, '_executeRequest').mockResolvedValue('translated');
+
+    await provider._callAI('system prompt', 'source text');
+
+    const payload = JSON.parse(executeRequest.mock.calls[0][0].fetchOptions.body);
+    expect(payload.generationConfig.thinkingConfig).toEqual({ thinkingLevel: 'minimal' });
+  });
+
+  it.each(['gemini-3.7-flash', 'gemini-3.5-flash-lite', 'custom', 'unknown-model'])(
+    'omits minimal thinkingConfig for unverified model %s',
+    async (model) => {
+      const { getGeminiModelAsync, getGeminiThinkingModeAsync } = await import('@/shared/config/config.js');
+      getGeminiModelAsync.mockResolvedValue(model);
+      getGeminiThinkingModeAsync.mockResolvedValue('minimal');
+      const executeRequest = vi.spyOn(provider, '_executeRequest').mockResolvedValue('translated');
+
+      await provider._callAI('system prompt', 'source text');
+
+      const payload = JSON.parse(executeRequest.mock.calls[0][0].fetchOptions.body);
+      expect(payload.generationConfig).not.toHaveProperty('thinkingConfig');
+    }
+  );
+
+  it.each([ResponseFormat.JSON_OBJECT, ResponseFormat.JSON_ARRAY])(
+    'composes minimal thinking with structured JSON mode for %s',
+    async (expectedFormat) => {
+      const { getGeminiModelAsync, getGeminiThinkingModeAsync } = await import('@/shared/config/config.js');
+      getGeminiModelAsync.mockResolvedValue('gemini-3.5-flash');
+      getGeminiThinkingModeAsync.mockResolvedValue('minimal');
+      const executeRequest = vi.spyOn(provider, '_executeRequest').mockResolvedValue('translated');
+
+      await provider._callAI('system prompt', 'source text', { expectedFormat });
+
+      const payload = JSON.parse(executeRequest.mock.calls[0][0].fetchOptions.body);
+      expect(payload.generationConfig).toMatchObject({
+        temperature: 0.1,
+        maxOutputTokens: 8192,
+        responseMimeType: 'application/json',
+        thinkingConfig: { thinkingLevel: 'minimal' }
+      });
+    }
+  );
+
   it('does not read or write normal history for structured recovery', async () => {
+    const { getGeminiThinkingModeAsync } = await import('@/shared/config/config.js');
+    getGeminiThinkingModeAsync.mockResolvedValue('default');
     const claim = vi.spyOn(AIConversationHelper, 'claimNextTurn').mockResolvedValue(1);
     const history = vi.spyOn(AIConversationHelper, 'getConversationHistory').mockResolvedValue([]);
     const update = vi.spyOn(AIConversationHelper, 'updateSessionHistory').mockResolvedValue();
@@ -112,6 +180,44 @@ describe('GeminiProvider Error Handling', () => {
     expect(payload.generationConfig).not.toHaveProperty('response_mime_type');
     expect(payload.generationConfig).not.toHaveProperty('thinking_config');
     claim.mockRestore(); history.mockRestore(); update.mockRestore();
+  });
+
+  it.each([
+    ['default', false],
+    ['minimal', true]
+  ])('applies %s Thinking mode during structured recovery for verified model', async (thinkingMode, shouldThink) => {
+    const { getGeminiModelAsync, getGeminiThinkingModeAsync } = await import('@/shared/config/config.js');
+    getGeminiModelAsync.mockResolvedValue('gemini-3.6-flash');
+    getGeminiThinkingModeAsync.mockResolvedValue(thinkingMode);
+    vi.spyOn(provider, '_executeRequest').mockResolvedValue('translated');
+
+    await provider._callAI('system', 'current segment', {
+      callPurpose: TranslationCallPurpose.STRUCTURED_RECOVERY,
+      expectedFormat: ResponseFormat.JSON_ARRAY
+    });
+
+    const payload = JSON.parse(provider._executeRequest.mock.calls[0][0].fetchOptions.body);
+    expect(payload.generationConfig.responseMimeType).toBe('application/json');
+    if (shouldThink) {
+      expect(payload.generationConfig.thinkingConfig).toEqual({ thinkingLevel: 'minimal' });
+    } else {
+      expect(payload.generationConfig).not.toHaveProperty('thinkingConfig');
+    }
+  });
+
+  it('omits Thinking config during structured recovery for unverified model', async () => {
+    const { getGeminiModelAsync, getGeminiThinkingModeAsync } = await import('@/shared/config/config.js');
+    getGeminiModelAsync.mockResolvedValue('gemini-3.7-flash');
+    getGeminiThinkingModeAsync.mockResolvedValue('minimal');
+    vi.spyOn(provider, '_executeRequest').mockResolvedValue('translated');
+
+    await provider._callAI('system', 'current segment', {
+      callPurpose: TranslationCallPurpose.STRUCTURED_RECOVERY,
+      expectedFormat: ResponseFormat.JSON_ARRAY
+    });
+
+    const payload = JSON.parse(provider._executeRequest.mock.calls[0][0].fetchOptions.body);
+    expect(payload.generationConfig).not.toHaveProperty('thinkingConfig');
   });
 
   it('stages a normal primary candidate instead of writing history directly', async () => {

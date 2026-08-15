@@ -4,6 +4,7 @@ import {
   CONFIG,
   getGeminiApiKeysAsync,
   getGeminiModelAsync,
+  getGeminiThinkingModeAsync,
   getGeminiApiUrlAsync,
   getPromptBASEScreenCaptureAsync
 } from "@/shared/config/config.js";
@@ -69,9 +70,10 @@ export class GeminiProvider extends BaseAIProvider {
       ? participationOverride
       : await AIConversationHelper.getConversationParticipation({ callPurpose, translateMode: mode, sessionId });
 
-    const [apiKeys, model, rawApiUrl] = await Promise.all([
+    const [apiKeys, model, thinkingMode, rawApiUrl] = await Promise.all([
       getGeminiApiKeysAsync(),
       getGeminiModelAsync(),
+      getGeminiThinkingModeAsync(),
       getGeminiApiUrlAsync()
     ]);
 
@@ -84,6 +86,14 @@ export class GeminiProvider extends BaseAIProvider {
       : 1;
     logger.info(`[Gemini] Model: ${model || CONFIG.GEMINI_MODEL}${sessionId ? ` (Session: ${sessionId.substring(0, 15)}..., Turn: ${turnNumber})` : ''}`);
 
+    const modelConfig = CONFIG.GEMINI_MODELS?.find(configuredModel => configuredModel.value === model);
+    const minimalThinking = modelConfig?.thinking?.minimal;
+    const thinkingConfig = thinkingMode === 'minimal' &&
+      minimalThinking?.type === 'level' &&
+      minimalThinking.value === 'minimal'
+      ? { thinkingLevel: 'minimal' }
+      : undefined;
+
     const requestBody = {
       contents: [{
         parts: [{ text: userText }]
@@ -95,7 +105,8 @@ export class GeminiProvider extends BaseAIProvider {
         temperature: 0.1,
         maxOutputTokens: 8192, 
         // Enforce JSON Mode for Structured Data
-        ...((expectedFormat === ResponseFormat.JSON_OBJECT || expectedFormat === ResponseFormat.JSON_ARRAY) && { responseMimeType: "application/json" })
+        ...((expectedFormat === ResponseFormat.JSON_OBJECT || expectedFormat === ResponseFormat.JSON_ARRAY) && { responseMimeType: "application/json" }),
+        ...(thinkingConfig && { thinkingConfig })
       }
     };
 

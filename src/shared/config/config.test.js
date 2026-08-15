@@ -16,7 +16,8 @@ import {
   getPromptSubtitleBatchAsync,
   getPromptBASEScreenCaptureAsync,
   getPromptAsync,
-  getPromptBASEFieldAsync
+  getPromptBASEFieldAsync,
+  getGeminiThinkingModeAsync
 } from './config.js';
 import { storageManager } from '../storage/core/StorageCore.js';
 
@@ -160,6 +161,15 @@ describe('Config Module', () => {
       expect(settings.DEBUG_MODE).toBe(true);
       // Verify defaults are still there
       expect(settings.APP_NAME).toBe('Translate It');
+    });
+
+    it('getGeminiThinkingModeAsync reads stored mode and uses CONFIG default', async () => {
+      storageManager.get.mockResolvedValue({ GEMINI_THINKING_MODE: 'minimal' });
+      await expect(getGeminiThinkingModeAsync()).resolves.toBe('minimal');
+      expect(storageManager.get).toHaveBeenCalledWith({ GEMINI_THINKING_MODE: CONFIG.GEMINI_THINKING_MODE });
+
+      storageManager.get.mockResolvedValue({ GEMINI_THINKING_MODE: CONFIG.GEMINI_THINKING_MODE });
+      await expect(getGeminiThinkingModeAsync()).resolves.toBe('default');
     });
 
     it('getApiKeyAsync should return value from storage', async () => {
