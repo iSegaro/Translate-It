@@ -389,12 +389,27 @@ export const AIResponseParser = {
   /**
    * Parse batch translation results from JSON response.
    *
+   * @param {string} result Raw provider response text.
+   * @param {number} expectedCount Number of requested units.
+   * @param {Array} originalBatch Requested units.
+   * @param {string} [providerName='Unknown'] Provider display name (facts only).
+   * @param {string} [expectedFormat=ResponseFormat.JSON_ARRAY] Response contract.
+   * @param {object|null} [executionContext] Operation execution context for diagnostics.
+   * @param {object|null} [manifestView] Manifest view for contract validation.
+   * @param {object|null} [completion] Frozen normalized completion record of the
+   * physical provider response that produced `result`. Attached to parser facts
+   * so downstream observers can correlate each response's completion with its
+   * parser/validation outcome. Never branched on here; absent stays absent
+   * (never fabricated as UNKNOWN).
    * @returns {{ results: Array<string>, contractViolation: boolean }} Parsed results plus whether
    * the response violated the structured contract (slots gap-filled or unparseable).
    */
-  parseBatchResult(result, expectedCount, originalBatch, providerName = 'Unknown', expectedFormat = ResponseFormat.JSON_ARRAY, executionContext = null, manifestView = null) {
+  parseBatchResult(result, expectedCount, originalBatch, providerName = 'Unknown', expectedFormat = ResponseFormat.JSON_ARRAY, executionContext = null, manifestView = null, completion = null) {
     try {
       const parserEvidence = { repaired: false };
+      if (completion && typeof completion === 'object') {
+        parserEvidence.completion = completion;
+      }
       const parsed = this.cleanAIResponse(result, expectedFormat, executionContext, parserEvidence);
       
       if (!parsed) throw new Error('Empty or invalid response');
@@ -553,6 +568,11 @@ export const AIResponseParser = {
         contractViolation: true,
         invalidUnits: [],
         mappingFacts: { identityReliable: false, complete: false, ambiguous: true },
+        // Explicit parser fact: the payload could not be decoded into a
+        // structured candidate. Distinct from a semantic contract violation
+        // where parsing succeeded but mapping/validation failed. Absent in the
+        // success path so absent facts stay absent (never fabricated as false).
+        parseFailed: true,
       };
     }
   },

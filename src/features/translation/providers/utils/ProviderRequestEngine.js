@@ -189,35 +189,16 @@ export const ProviderRequestEngine = {
     const sessionTag = finalSessionId ? ` [Session: ${finalSessionId.substring(0, 8)}${sessionCallId > 0 ? ` #${sessionCallId}` : ''}]` : '';
     
     // CENTRALIZED SMART LOGGING: REQUEST
-    logger.debugLazy(() => {
-      const sanitizedUrl = this._maskSensitiveData(url);
-      const payload = this._parsePayload(fetchOptions.body);
-      
-      // Extract a readable summary of what's being sent
-      let textPreview = '';
-      if (payload) {
-        if (Array.isArray(payload.messages)) {
-          const lastUserMsg = payload.messages.filter(m => m.role === 'user').pop();
-          textPreview = lastUserMsg?.content?.substring(0, 100) || '';
-        } else if (payload.text) {
-          textPreview = String(payload.text).substring(0, 100);
-        } else if (payload.q) {
-          textPreview = Array.isArray(payload.q) ? payload.q[0].substring(0, 100) : payload.q.substring(0, 100);
-        } else if (Array.isArray(payload) && payload.length > 0) {
-          // Handle Microsoft Edge array format [{ Text: "..." }] or raw arrays
-          const firstItem = payload[0];
-          textPreview = (firstItem?.Text || firstItem?.text || (typeof firstItem === 'string' ? firstItem : ''))
-            .substring(0, 100);
-        }
-      }
+      logger.debugLazy(() => {
+        const sanitizedUrl = this._maskSensitiveData(url);
+        const payload = this._parsePayload(fetchOptions.body);
 
-      return [`[Call #${globalCallId}]${sessionTag} Request: ${sanitizedUrl}`, {
-        context,
-        charCount: finalCharCount,
-        preview: textPreview,
-        payload
-      }];
-    });
+        return [`[Call #${globalCallId}]${sessionTag} Request: ${sanitizedUrl}`, {
+          context,
+          charCount: finalCharCount,
+          payloadType: payload ? (Array.isArray(payload) ? 'array' : typeof payload) : 'empty',
+        }];
+      });
     
     const startTime = Date.now();
 
@@ -258,19 +239,22 @@ export const ProviderRequestEngine = {
 
       // CENTRALIZED SMART LOGGING: RESPONSE
       logger.debugLazy(() => {
-        let resultPreview = '';
-        if (responseData) {
-          try {
-            const preview = typeof responseData === 'string' ? responseData : JSON.stringify(responseData);
-            resultPreview = preview.substring(0, 500);
-          } catch { /* ignore */ }
+        let responseSize = 0;
+        try {
+          if (typeof responseData === 'string') {
+            responseSize = responseData.length;
+          } else if (responseData != null) {
+            responseSize = JSON.stringify(responseData)?.length ?? 0;
+          }
+        } catch {
+          responseSize = 0;
         }
 
         return [`[Call #${globalCallId}] Response: ${response.status} (${duration}ms)`, {
           status: response.status,
           duration,
-          preview: resultPreview,
-          responseData
+          responseType: responseData ? (typeof responseData === 'object' && !Array.isArray(responseData) && responseData !== null ? 'json' : typeof responseData) : 'empty',
+          responseSize,
         }];
       });
 
@@ -292,7 +276,6 @@ export const ProviderRequestEngine = {
         }
         
         const msg = body.detail || body.error?.message || response.statusText || `HTTP ${response.status}`;
-        const isDeepL400 = provider.providerName === ProviderNames.DEEPL_TRANSLATE && response.status === 400;
         const logLevel = 'warn'; // Providers only warn, upper layers handle errors
         
         let sanitizedUrl = url;
@@ -307,7 +290,6 @@ export const ProviderRequestEngine = {
           status: response.status,
           message: msg,
           url: sanitizedUrl,
-          ...(isDeepL400 && { errorBody: body })
         });
 
         const errorType = matchErrorToType({ 

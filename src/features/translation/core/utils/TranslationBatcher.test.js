@@ -290,5 +290,52 @@ describe('TranslationBatcher', () => {
       expect(parts[0].fragmentJoinerBefore).toBeDefined();
       expect(parts[1].fragmentJoinerBefore).toBeDefined();
     });
+
+    it('adds V3 fragment metadata for abbreviated Select Element payloads (b key)', () => {
+      const segment = {
+        t: 'Toys for Bob, Inc.@@TI_SEG_e1_a1_n1@@video game developer@@TI_SEG_e1_a1_n2@@based in Novato, California.',
+        i: 'g1',
+        b: 'g1',
+        r: 'content'
+      };
+      const parts = TranslationBatcher.splitOversizedSegment(segment, 30);
+
+      expect(parts.length).toBeGreaterThan(1);
+      parts.forEach((part, index) => {
+        expect(part.isV3Fragment).toBe(true);
+        expect(part.parentId).toBe('g1');
+        expect(part.fragmentIndex).toBe(index);
+        expect(part.fragmentCount).toBe(parts.length);
+        expect(part.isSplit).toBe(true);
+        expect(part.partIndex).toBe(index);
+      });
+      expect(parts.map((part) => part.fragmentIndex)).toEqual(parts.map((_, index) => index));
+    });
+
+    it('preserves abbreviated identity when full-field blockId is also present', () => {
+      const segment = { t: 'A very long text that exceeds the maximum character limit for a single batch request.', b: 'b-alias', blockId: 'g1', i: 'n1' };
+      const parts = TranslationBatcher.splitOversizedSegment(segment, 30);
+
+      expect(parts.length).toBeGreaterThan(1);
+      parts.forEach((part) => {
+        expect(part.isV3Fragment).toBe(true);
+        expect(part.parentId).toBe('g1');
+        expect(part.blockId).toBe('g1');
+        expect(part.b).toBe('b-alias');
+      });
+    });
+
+    it('preserves all V3 markers exactly once and in order across fragment boundaries', () => {
+      const M = (n) => `@@TI_SEG_e1_a1_n${n}@@`;
+      const source = `Alpha beta gamma delta${M(2)}Epsilon zeta eta theta${M(3)}Iota kappa lambda mu${M(4)}Nu xi omicron pi`;
+      const segment = { t: source, i: 'g1', b: 'g1', r: 'content' };
+      const parts = TranslationBatcher.splitOversizedSegment(segment, 50);
+
+      expect(parts.length).toBe(3);
+
+      const markerOf = (t) => (t.match(/@@TI_SEG_[a-z0-9_]+@@/g) || []);
+      const reassembledMarkers = parts.flatMap((part) => markerOf(part.t));
+      expect(reassembledMarkers).toEqual(markerOf(source));
+    });
   });
 });

@@ -104,7 +104,7 @@ export class YandexTranslateProvider extends BaseTranslateProvider {
       },
       extractResponse: (data) => {
         if (!data || data.code !== 200 || !data.text || !Array.isArray(data.text) || data.text.length !== chunkTexts.length) {
-          logger.error('Yandex API returned invalid or mismatched response for a chunk', data);
+          logger.error('Yandex API returned invalid or mismatched response for a chunk');
           const err = new Error(`Yandex API error (Code: ${data?.code || 'unknown'})`);
           err.type = ErrorTypes.API_RESPONSE_INVALID;
           err.statusCode = data?.code;
@@ -135,7 +135,7 @@ export class YandexTranslateProvider extends BaseTranslateProvider {
   }
 
   async detect_with_yandex(text, hintLangs = []) {
-    logger.debug(`Yandex: Detecting language for text: "${text.substring(0, 50)}..."`);
+    logger.debug(`Yandex: Detecting language`);
 
     const uuid = this._generateUuid();
     const url = new URL(YandexTranslateProvider.detectUrl);
@@ -167,7 +167,7 @@ export class YandexTranslateProvider extends BaseTranslateProvider {
             logger.debug(`Yandex: Detected language: ${data.lang}`);
             return { detectedLang: data.lang };
           }
-          logger.error("Yandex detect API returned invalid response:", data);
+          logger.error("Yandex detect API returned invalid response");
           return undefined;
         },
         context: `${this.providerName.toLowerCase()}-detect`,

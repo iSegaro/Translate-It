@@ -6,6 +6,12 @@
  * When editable prompt templates are updated in Translate-It, we need a way
  * to upgrade users who are using the default templates to the latest version,
  * while strictly preserving user-customized prompts.
+ *
+ * SCOPE: EDITABLE-ONLY.
+ * Historical prompt migration applies ONLY to editable persisted prompts.
+ * Non-editable internal wrappers (PROMPT_REGISTRY.editable === false) are
+ * CONFIG-owned implementation defaults: they are not persisted, not exported,
+ * not imported, and never migrated. Do NOT register them here.
  * 
  * HOW SAFE PROMPT MIGRATION WORKS:
  * 1. Missing Prompt: If a prompt key is missing in user settings, we add the current CONFIG default.
@@ -17,7 +23,8 @@
  * 5. Customized Prompt: If it does not match current or legacy defaults, we preserve the user's edits.
  * 
  * WHEN DEVELOPERS MUST ADD ENTRIES:
- * Whenever you modify a default prompt in `src/shared/config/config.js` (e.g., changing CONFIG.PROMPT_TEMPLATE):
+ * Whenever you modify an EDITABLE default prompt in `src/shared/config/config.js`
+ * (e.g., changing CONFIG.PROMPT_TEMPLATE):
  * 1. Copy the EXACT previous multi-line default string.
  * 2. Add it to this registry under the corresponding prompt key as a new object:
  *    {

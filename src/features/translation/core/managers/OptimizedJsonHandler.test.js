@@ -2311,6 +2311,104 @@ describe('OptimizedJsonHandler', () => {
       });
     });
 
+    describe('abbreviated Select Element payload (b key) fragmentation', () => {
+      const mockSender = { tab: { id: 123 } };
+      const M = (n) => `@@TI_SEG_e1_a1_n${n}@@`;
+      const SOURCE = `Alpha beta gamma delta${M(2)}Epsilon zeta eta theta${M(3)}Iota kappa lambda mu${M(4)}Nu xi omicron pi`;
+      const toTranslated = (src) => src
+        .split(/(@@TI_SEG_[a-z0-9_]+@@)/g)
+        .map((part) => (part.startsWith('@@TI_SEG_') ? part : part.replace(/[a-zA-Z]+/g, 'x')))
+        .join('');
+      const streamUpdates = async () => {
+        const browser = (await import('webextension-polyfill')).default;
+        return browser.tabs.sendMessage.mock.calls
+          .map(([, m]) => m)
+          .filter(m => m.action === MessageActions.TRANSLATION_STREAM_UPDATE);
+      };
+
+      it('real batcher tags abbreviated-payload fragments as V3 (regression path sanity)', () => {
+        const batches = TranslationBatcher.createIntelligentBatches(
+          [{ t: SOURCE, i: 'g1', b: 'g1', r: 'content' }],
+          2,
+          50
+        );
+
+        expect(batches.length).toBe(3);
+        batches.forEach((batch) => {
+          expect(batch).toHaveLength(1);
+          const part = batch[0];
+          expect(part.isV3Fragment).toBe(true);
+          expect(part.parentId).toBe('g1');
+          expect(part.isSplit).toBe(true);
+        });
+        const indexes = batches.map(([part]) => part.fragmentIndex);
+        expect(indexes).toEqual([0, 1, 2]);
+        batches.forEach(([part]) => expect(part.fragmentCount).toBe(3));
+      });
+
+      it('buffers abbreviated V3 fragments and emits the assembled parent once (auto first-batch, out-of-order)', async () => {
+        const browser = (await import('webextension-polyfill')).default;
+        browser.tabs.sendMessage.mockClear();
+
+        // Real Select Element payload: abbreviated i/b/r keys, no full blockId.
+        const payload = [{ t: SOURCE, i: 'g1', b: 'g1', r: 'content' }];
+        mockEngine.createIntelligentBatches = vi.fn(() => TranslationBatcher.createIntelligentBatches(payload, 2, 50));
+
+        const calls = [];
+        mockProvider.translate.mockImplementation((texts) => {
+          const deferred = createDeferred();
+          calls.push({ texts, resolve: deferred.resolve });
+          return deferred.promise;
+        });
+
+        const execution = handler.execute(
+          mockEngine,
+          { ...mockData, sourceLanguage: 'auto', text: JSON.stringify(payload) },
+          mockProvider, 'auto', 'fa', 'msg-abbrev-v3', mockSender
+        );
+
+        // Auto-detection mode: first batch (fragment 0) resolves sequentially.
+        await vi.waitFor(() => expect(calls.length).toBe(1));
+        expect(calls[0].texts).toEqual([expect.stringContaining(M(2))]);
+
+        // Fragment 0 completes; sibling fragments not yet complete => no stream.
+        calls[0].resolve({ translatedText: [toTranslated(calls[0].texts[0])] });
+        await vi.waitFor(() => expect(calls.length).toBe(3));
+
+        let updates = await streamUpdates();
+        expect(updates).toHaveLength(0);
+
+        // Out-of-order completion: fragment 2 resolves before fragment 1.
+        calls[2].resolve({ translatedText: [toTranslated(calls[2].texts[0])] });
+        await Promise.resolve();
+        updates = await streamUpdates();
+        expect(updates).toHaveLength(0);
+
+        calls[1].resolve({ translatedText: [toTranslated(calls[1].texts[0])] });
+        const result = await execution;
+
+        expect(result.success).toBe(true);
+        updates = await streamUpdates();
+        expect(updates).toHaveLength(1);
+
+        const parent = updates[0].data.data[0];
+        expect(updates[0].data.data).toHaveLength(1);
+        expect(parent.i).toBe('g1');
+        expect(parent.isV3Fragment).toBeUndefined();
+        expect(parent.fragmentIndex).toBeUndefined();
+        expect(parent.fragmentCount).toBeUndefined();
+        expect(parent.parentId).toBeUndefined();
+
+        // Complete parent: all markers present once, in order, plus all three chunks.
+        expect(parent.t.match(/@@TI_SEG_\w+@@/g)).toEqual([M(2), M(3), M(4)]);
+        expect(parent.t).toBe(calls.map((call) => toTranslated(call.texts[0])).join(' '));
+
+        // Exactly one accepted logical parent; raw fragments never surface.
+        expect(result.results).toHaveLength(1);
+        expect(result.results[0]).toMatchObject({ i: 'g1', t: parent.t });
+      });
+    });
+
     describe('non-fragment duplicate identity', () => {
       const mockSender = { tab: { id: 123 } };
 

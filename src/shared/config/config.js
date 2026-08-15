@@ -86,6 +86,8 @@ export const CONFIG = {
 
   COPY_REPLACE: "replace", // "copy",
   REPLACE_SPECIAL_SITES: true,
+  TIMEOUT: 30000,
+  TEXT_FIELD_SHORTCUT: 'Ctrl+/',
   CHANGELOG_URL: "https://raw.githubusercontent.com/iSegaro/Translate-It/main/Changelog.md",
 
   // --- Character Limits ---

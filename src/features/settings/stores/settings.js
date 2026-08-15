@@ -2,8 +2,8 @@ import { defineStore } from 'pinia'
 import { ref, computed, watch } from 'vue'
 import browser from 'webextension-polyfill'
 import { CONFIG, TranslationMode, SelectionTranslationMode } from '@/shared/config/config.js'
-import { MOBILE_CONSTANTS } from '@/shared/constants/mobile.js'
 import { ProviderRegistryIds } from '@/features/translation/providers/ProviderConstants.js'
+import { getPersistedDefaultSettings } from '@/shared/config/settingsDefaults.js'
 import secureStorage from '@/shared/storage/core/SecureStorage.js'
 import { storageManager } from '@/shared/storage/core/StorageCore.js'
 import ExtensionContextManager from '@/core/extensionContext.js'
@@ -12,195 +12,21 @@ import { PROMPT_REGISTRY } from '@/shared/config/PromptRegistry.js'
 import { findProviderById } from '@/features/translation/providers/ProviderManifest.js'
 import { getFirstMissingSetting } from '@/features/translation/utils/providerValidator.js'
 import { getScopedLogger } from '@/shared/logging/logger.js';
-import { TTS_ENGINES } from '@/shared/constants/tts.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 const logger = getScopedLogger(LOG_COMPONENTS.SETTINGS, 'settings');
 
 // --- Helpers ------------------------------------------------------------
+/**
+ * Canonical persisted-settings defaults source.
+ *
+ * Thin delegate to the shared builder in src/shared/config/settingsDefaults.js,
+ * which is the single persisted-schema authority. Translation history is
+ * feature data, not a persisted setting-schema member, so store initialization
+ * owns its empty runtime value here.
+ */
 function getDefaultSettings() {
   return {
-    THEME: CONFIG.THEME || 'auto',
-    APPLICATION_LOCALIZE: CONFIG.APPLICATION_LOCALIZE || 'en',
-    EXTENSION_ENABLED: CONFIG.EXTENSION_ENABLED ?? true,
-    ENABLE_TRANSLATION_HISTORY: CONFIG.ENABLE_TRANSLATION_HISTORY ?? true,
-    TRANSLATION_API: CONFIG.TRANSLATION_API || ProviderRegistryIds.GOOGLE_V2,
-    MODE_PROVIDERS: CONFIG.MODE_PROVIDERS,
-    SOURCE_LANGUAGE: CONFIG.SOURCE_LANGUAGE || 'auto',
-    TARGET_LANGUAGE: CONFIG.TARGET_LANGUAGE || 'en',
-    LANGUAGE_DETECTION_PREFERENCES: CONFIG.LANGUAGE_DETECTION_PREFERENCES || {
-      "arabic-script": "fa", // پیش‌فرض: وقتی اسکریپت عربی تشخیص داده شد، اولویت با فارسی باشد
-      "chinese-script": "zh-cn", // چینی ساده‌شده
-      "devanagari-script": "hi", // هندی
-      "latin-script": "none" // هیچکدام (اجازه به تشخیص خودکار پرووایدر)
-    },
-    TIMEOUT: CONFIG.TIMEOUT || 30000,
-    selectionTranslationMode: CONFIG.selectionTranslationMode || SelectionTranslationMode.ON_CLICK,
-    FEATURE_SEMANTIC_BLOCK_GROUPING: CONFIG.FEATURE_SEMANTIC_BLOCK_GROUPING ?? true,
-    COPY_REPLACE: CONFIG.COPY_REPLACE || 'replace',
-    REPLACE_SPECIAL_SITES: CONFIG.REPLACE_SPECIAL_SITES ?? true,
-    // --- Prompt Templates ---
-    // Keep all prompt templates in settings so existing overrides survive
-    // save/load, import/export, and prompt migrations. UI exposure is controlled
-    // separately by PromptRegistry.editable.
-    PROMPT_TEMPLATE: CONFIG.PROMPT_TEMPLATE,
-    PROMPT_TEMPLATE_AUTO: CONFIG.PROMPT_TEMPLATE_AUTO,
-    PROMPT_BASE_FIELD: CONFIG.PROMPT_BASE_FIELD,
-    PROMPT_BASE_FIELD_AUTO: CONFIG.PROMPT_BASE_FIELD_AUTO,
-    PROMPT_BASE_POPUP_TRANSLATE: CONFIG.PROMPT_BASE_POPUP_TRANSLATE,
-    PROMPT_BASE_DICTIONARY: CONFIG.PROMPT_BASE_DICTIONARY,
-    PROMPT_BASE_SCREEN_CAPTURE: CONFIG.PROMPT_BASE_SCREEN_CAPTURE,
-    PROMPT_BASE_SELECT: CONFIG.PROMPT_BASE_SELECT,
-    PROMPT_BASE_BATCH: CONFIG.PROMPT_BASE_BATCH,
-    PROMPT_BASE_AI_BATCH: CONFIG.PROMPT_BASE_AI_BATCH,
-    PROMPT_BASE_AI_BATCH_AUTO: CONFIG.PROMPT_BASE_AI_BATCH_AUTO,
-    PROMPT_BASE_AI_FOLLOWUP: CONFIG.PROMPT_BASE_AI_FOLLOWUP,
-    PROMPT_BASE_AI_FOLLOWUP_AUTO: CONFIG.PROMPT_BASE_AI_FOLLOWUP_AUTO,
-    // --- Subtitle Prompts ---
-    PROMPT_SUBTITLE_USER: CONFIG.PROMPT_SUBTITLE_USER,
-    PROMPT_SUBTITLE_BASE: CONFIG.PROMPT_SUBTITLE_BASE,
-    PROMPT_SUBTITLE_BATCH: CONFIG.PROMPT_SUBTITLE_BATCH,
-    API_KEY: CONFIG.API_KEY || '',
-    OPENAI_API_KEY: CONFIG.OPENAI_API_KEY || '',
-    OPENAI_API_URL: CONFIG.OPENAI_API_URL || '',
-    OPENAI_API_MODEL: CONFIG.OPENAI_API_MODEL || 'gpt-4o',
-    OPENAI_MODELS: CONFIG.OPENAI_MODELS || [],
-    OPENROUTER_API_KEY: CONFIG.OPENROUTER_API_KEY || '',
-    OPENROUTER_API_URL: CONFIG.OPENROUTER_API_URL || '',
-    OPENROUTER_API_MODEL: CONFIG.OPENROUTER_API_MODEL || 'openai/gpt-4o',
-    OPENROUTER_MODELS: CONFIG.OPENROUTER_MODELS || [],
-    DEEPSEEK_API_KEY: CONFIG.DEEPSEEK_API_KEY || '',
-    DEEPSEEK_API_URL: CONFIG.DEEPSEEK_API_URL || '',
-    DEEPSEEK_API_MODEL: CONFIG.DEEPSEEK_API_MODEL || 'deepseek-chat',
-    DEEPSEEK_MODELS: CONFIG.DEEPSEEK_MODELS || [],
-    GEMINI_API_KEY: CONFIG.GEMINI_API_KEY || '',
-    GEMINI_API_URL: CONFIG.GEMINI_API_URL || '',
-    GEMINI_MODEL: CONFIG.GEMINI_MODEL || 'gemini-2.5-flash',
-    GEMINI_MODELS: CONFIG.GEMINI_MODELS || [],
-    GEMINI_THINKING_ENABLED: CONFIG.GEMINI_THINKING_ENABLED ?? false,
-    LINGVA_API_URL: CONFIG.LINGVA_API_URL || '',
-    CUSTOM_API_URL: CONFIG.CUSTOM_API_URL || '',
-    CUSTOM_API_KEY: CONFIG.CUSTOM_API_KEY || '',
-    CUSTOM_API_MODEL: CONFIG.CUSTOM_API_MODEL || '',
-    WEBAI_API_URL: CONFIG.WEBAI_API_URL || '',
-    WEBAI_API_MODEL: CONFIG.WEBAI_API_MODEL || '',
-    // DeepL Settings
-    DEEPL_API_KEY: CONFIG.DEEPL_API_KEY || '',
-    DEEPL_API_TIER: CONFIG.DEEPL_API_TIER || 'free',
-    DEEPL_FORMALITY: CONFIG.DEEPL_FORMALITY || 'default',
-    DEEPL_BETA_LANGUAGES_ENABLED: CONFIG.DEEPL_BETA_LANGUAGES_ENABLED ?? true,
-    // browser Translation API Settings
-    BROWSER_TRANSLATE_ENABLED: CONFIG.BROWSER_TRANSLATE_ENABLED ?? true,
-    BROWSER_TRANSLATE_AUTO_DOWNLOAD: CONFIG.BROWSER_TRANSLATE_AUTO_DOWNLOAD ?? true,
-    TTS_ENGINE: CONFIG.TTS_ENGINE || TTS_ENGINES.EDGE,
-    TTS_FALLBACK_ENABLED: CONFIG.TTS_FALLBACK_ENABLED ?? true,
-    TTS_AUTO_DETECT_ENABLED: CONFIG.TTS_AUTO_DETECT_ENABLED ?? true,
-    TTS_PREFERRED_VOICES: CONFIG.TTS_PREFERRED_VOICES || {},
-    SHOW_DESKTOP_FAB: CONFIG.SHOW_DESKTOP_FAB ?? true,
-    SHOW_MOBILE_FAB: CONFIG.SHOW_MOBILE_FAB ?? true,
-    FAB_IDLE_OPACITY: CONFIG.FAB_IDLE_OPACITY ?? 20,
-    FAB_SIZE: CONFIG.FAB_SIZE || "1",
-    WINDOW_IS_PINNED: CONFIG.WINDOW_IS_PINNED ?? false,
-    WINDOW_DOCK_MODE: CONFIG.WINDOW_DOCK_MODE || 'none',
-    WINDOW_DOCKED_WIDTH: CONFIG.WINDOW_DOCKED_WIDTH || 300,
-    TRANSLATE_ON_TEXT_FIELDS: CONFIG.TRANSLATE_ON_TEXT_FIELDS ?? false,
-    ENABLE_SHORTCUT_FOR_TEXT_FIELDS: CONFIG.ENABLE_SHORTCUT_FOR_TEXT_FIELDS ?? true,
-    TEXT_FIELD_SHORTCUT: CONFIG.TEXT_FIELD_SHORTCUT || 'Ctrl+/',
-    TRANSLATE_WITH_SELECT_ELEMENT: CONFIG.TRANSLATE_WITH_SELECT_ELEMENT ?? true,
-    SELECT_ELEMENT_SHOW_ORIGINAL_ON_HOVER: CONFIG.SELECT_ELEMENT_SHOW_ORIGINAL_ON_HOVER ?? false, // نمایش متن اصلی هنگام hover در حالت انتخاب المان
-    TRANSLATE_ON_TEXT_SELECTION: CONFIG.TRANSLATE_ON_TEXT_SELECTION,
-    REQUIRE_CTRL_FOR_TEXT_SELECTION: CONFIG.REQUIRE_CTRL_FOR_TEXT_SELECTION ?? false,
-    SHOW_TTS_ICON_IN_TOOLBAR: CONFIG.SHOW_TTS_ICON_IN_TOOLBAR ?? true,
-    SHOW_TRANSLATE_ICON_IN_TOOLBAR: CONFIG.SHOW_TRANSLATE_ICON_IN_TOOLBAR ?? true,
-    ENABLE_DICTIONARY: CONFIG.ENABLE_DICTIONARY ?? true,
-    ENABLE_SCREEN_CAPTURE: CONFIG.ENABLE_SCREEN_CAPTURE ?? true,
-    OCR_DEFAULT_LANG: CONFIG.OCR_DEFAULT_LANG || 'eng',
-    OCR_PREFERRED_ACTION: CONFIG.OCR_PREFERRED_ACTION || 'region',
-    ACTIVE_SELECTION_ICON_ON_TEXTFIELDS: CONFIG.ACTIVE_SELECTION_ICON_ON_TEXTFIELDS ?? true,
-    ENHANCED_TRIPLE_CLICK_DRAG: CONFIG.ENHANCED_TRIPLE_CLICK_DRAG ?? false,
-    // Dictionary Display Settings
-    DICTIONARY_SHOW_PRONUNCIATION: CONFIG.DICTIONARY_SHOW_PRONUNCIATION ?? true,
-    DICTIONARY_SHOW_POS: CONFIG.DICTIONARY_SHOW_POS ?? true,
-    DICTIONARY_SHOW_DEFINITIONS: CONFIG.DICTIONARY_SHOW_DEFINITIONS ?? false,
-    DICTIONARY_SHOW_EXAMPLES: CONFIG.DICTIONARY_SHOW_EXAMPLES ?? false,
-    // Character Limits
-    POPUP_MAX_CHARS: CONFIG.POPUP_MAX_CHARS || 5000,
-    SIDEPANEL_MAX_CHARS: CONFIG.SIDEPANEL_MAX_CHARS || 10000,
-    SELECTION_MAX_CHARS: CONFIG.SELECTION_MAX_CHARS || 5000,
-    SELECT_ELEMENT_MAX_CHARS: CONFIG.SELECT_ELEMENT_MAX_CHARS || 300000,
-    MOBILE_UI_MODE: CONFIG.MOBILE_UI_MODE || MOBILE_CONSTANTS.UI_MODE.AUTO,
-    MOBILE_PAGE_TRANSLATION_AUTO_CLOSE: CONFIG.MOBILE_PAGE_TRANSLATION_AUTO_CLOSE ?? false,
-    DEBUG_MODE: CONFIG.DEBUG_MODE ?? false,
-    HIDDEN_PROVIDERS: CONFIG.HIDDEN_PROVIDERS || [],
-    COMPONENT_LOG_LEVELS: CONFIG.COMPONENT_LOG_LEVELS || {},
-    EXCLUDED_SITES: CONFIG.EXCLUDED_SITES || [],
-    // Proxy Settings
-    PROXY_ENABLED: CONFIG.PROXY_ENABLED ?? false,
-    PROXY_TYPE: CONFIG.PROXY_TYPE || 'http',
-    PROXY_HOST: CONFIG.PROXY_HOST || '',
-    PROXY_PORT: CONFIG.PROXY_PORT || 8080,
-    PROXY_USERNAME: CONFIG.PROXY_USERNAME || '',
-    PROXY_PASSWORD: CONFIG.PROXY_PASSWORD || '',
-    // Font Settings
-    TRANSLATION_FONT_FAMILY: CONFIG.TRANSLATION_FONT_FAMILY || 'auto',
-    TRANSLATION_FONT_SIZE: CONFIG.TRANSLATION_FONT_SIZE || '14',
-    // Whole Page Translation Settings
-    SMART_CONTEXT_TRANSLATION_ENABLED: CONFIG.SMART_CONTEXT_TRANSLATION_ENABLED ?? true,
-    WHOLE_PAGE_TRANSLATION_ENABLED: CONFIG.WHOLE_PAGE_TRANSLATION_ENABLED ?? true,
-    WHOLE_PAGE_LAZY_LOADING: CONFIG.WHOLE_PAGE_LAZY_LOADING ?? true,
-    WHOLE_PAGE_AUTO_TRANSLATE_ON_DOM_CHANGES: CONFIG.WHOLE_PAGE_AUTO_TRANSLATE_ON_DOM_CHANGES ?? true,
-    WHOLE_PAGE_EXCLUDED_SELECTORS: CONFIG.WHOLE_PAGE_EXCLUDED_SELECTORS || ["script", "style", "code", "pre", "noscript", "meta", "textarea", "link", "time", "kbd", "svg", "ruby", "rt", "rp", "math", "d-math", "samp", ".notranslate", "[contenteditable='true']", "[translate=no]", ".social-share", ".share-nav", "[data-toolbar=share]", ".o-share", ".prism-code", ".enlighter-code", ".rc-CodeBlock", "[role=code]", "table.highlight", "hypothesis-highlight", ".hypothesis-highlight", ".material-icons", "material-icon", "span[class^=material-symbols-]", ".google-symbols", "i.fa", "i[class^=fa-]", "visuallyhidden", "[data-translate-ignore]"],
-    WHOLE_PAGE_ATTRIBUTES_TO_TRANSLATE: CONFIG.WHOLE_PAGE_ATTRIBUTES_TO_TRANSLATE || ["title", "alt", "placeholder", "label", "value"],
-    WHOLE_PAGE_MAX_ELEMENTS: CONFIG.WHOLE_PAGE_MAX_ELEMENTS || 10000,
-    WHOLE_PAGE_CHUNK_SIZE: CONFIG.WHOLE_PAGE_CHUNK_SIZE || 250,
-    WHOLE_PAGE_MAX_CHARS: CONFIG.WHOLE_PAGE_MAX_CHARS || 5000,
-    WHOLE_PAGE_AI_MAX_CHARS: CONFIG.WHOLE_PAGE_AI_MAX_CHARS || 15000,
-    WHOLE_PAGE_DEBOUNCE_DELAY: CONFIG.WHOLE_PAGE_DEBOUNCE_DELAY || 500,
-    WHOLE_PAGE_ROOT_MARGIN: CONFIG.WHOLE_PAGE_ROOT_MARGIN || '10px',
-    WHOLE_PAGE_PROGRESS_UPDATE_INTERVAL: CONFIG.WHOLE_PAGE_PROGRESS_UPDATE_INTERVAL || 100,
-    WHOLE_PAGE_SHOW_ORIGINAL_ON_HOVER: CONFIG.WHOLE_PAGE_SHOW_ORIGINAL_ON_HOVER ?? false,
-    WHOLE_PAGE_TRANSLATE_AFTER_SCROLL_STOP: CONFIG.WHOLE_PAGE_TRANSLATE_AFTER_SCROLL_STOP ?? false,
-    WHOLE_PAGE_SCROLL_STOP_DELAY: CONFIG.WHOLE_PAGE_SCROLL_STOP_DELAY || 500,
-    WHOLE_PAGE_TOKEN_WARNING_HIDDEN: CONFIG.WHOLE_PAGE_TOKEN_WARNING_HIDDEN ?? false,
-    WHOLE_PAGE_AUTO_TRANSLATE_RULES: CONFIG.WHOLE_PAGE_AUTO_TRANSLATE_RULES || [],
-    // AI Optimization Settings
-    AI_CONTEXT_TRANSLATION_ENABLED: CONFIG.AI_CONTEXT_TRANSLATION_ENABLED ?? true,
-    AI_CONVERSATION_HISTORY_ENABLED: CONFIG.AI_CONVERSATION_HISTORY_ENABLED ?? false,
-    OPTIMIZATION_LEVEL: CONFIG.OPTIMIZATION_LEVEL || 3,
-    PROVIDER_OPTIMIZATION_LEVELS: CONFIG.PROVIDER_OPTIMIZATION_LEVELS || {},
-    BILINGUAL_TRANSLATION: CONFIG.BILINGUAL_TRANSLATION ?? true,
-    BILINGUAL_TRANSLATION_MODES: CONFIG.BILINGUAL_TRANSLATION_MODES || {
-      [TranslationMode.Popup_Translate]: true,
-      [TranslationMode.Sidepanel_Translate]: true,
-      [TranslationMode.Select_Element]: true,
-      [TranslationMode.Field]: true,
-      [TranslationMode.Selection]: true,
-      [TranslationMode.Page]: false,
-      [TranslationMode.PDF]: false,
-      [TranslationMode.Dictionary_Translation]: true,
-      [TranslationMode.ScreenCapture]: true,
-      [TranslationMode.MouseHover]: true
-    },
-    CONTEXT_MENU_VISIBILITY: CONFIG.CONTEXT_MENU_VISIBILITY || {
-      PAGE_CONTEXT_SELECT_ELEMENT: true,
-      PAGE_CONTEXT_SCREEN_CAPTURE: true,
-      PAGE_CONTEXT_PDF_TRANSLATOR: true,
-      ACTION_CONTEXT_SELECT_ELEMENT: true,
-      ACTION_CONTEXT_SCREEN_CAPTURE: true,
-      ACTION_CONTEXT_PDF_TRANSLATOR: true,
-      ACTION_CONTEXT_SUBTITLE_TRANSLATOR: true,
-      ACTION_CONTEXT_OPTIONS: true,
-      ACTION_CONTEXT_SHORTCUTS: true,
-      ACTION_CONTEXT_HELP: true
-    },
-    // --- Mouse on Hover Translation Settings ---
-    MOUSE_HOVER_TRANSLATION_ENABLED: CONFIG.MOUSE_HOVER_TRANSLATION_ENABLED ?? false,
-    MOUSE_HOVER_SCOPE: CONFIG.MOUSE_HOVER_SCOPE || 'container',
-    MOUSE_HOVER_TRIGGER: CONFIG.MOUSE_HOVER_TRIGGER || 'ctrl',
-    MOUSE_HOVER_DELAY: CONFIG.MOUSE_HOVER_DELAY || 500,
-    MOUSE_HOVER_AUTO_CLOSE: CONFIG.MOUSE_HOVER_AUTO_CLOSE || 'mouseleave',
-    MOUSE_HOVER_TIMER_DURATION: CONFIG.MOUSE_HOVER_TIMER_DURATION || 3000,
-    MOUSE_HOVER_SHOW_CONTAINER_BORDER: CONFIG.MOUSE_HOVER_SHOW_CONTAINER_BORDER ?? true,
-    SHOW_MOUSE_HOVER_IN_FAB: CONFIG.SHOW_MOUSE_HOVER_IN_FAB ?? true,
+    ...getPersistedDefaultSettings(),
     translationHistory: []
   };
 }
@@ -459,7 +285,9 @@ export const useSettingsStore = defineStore('settings', () => {
       // Preserve reference to reactive object
       Object.keys(settings.value).forEach(k => delete settings.value[k]);
       Object.assign(settings.value, defaults);
-      await saveAllSettings(true);
+      // Persist canonical settings only; translation history is store-owned
+      // feature data and is already cleared with storage above.
+      await storageManager.set(getPersistedDefaultSettings());
       return true;
     } catch (error) {
       if (ExtensionContextManager.isContextError(error)) {
@@ -535,6 +363,15 @@ export const useSettingsStore = defineStore('settings', () => {
 
       // 1. Merge imported settings with default settings to ensure no missing keys
       const defaultSettings = getDefaultSettings();
+      // Non-editable prompt wrappers are CONFIG-owned implementation defaults that
+      // are no longer persisted. Silently drop any copies carried by older backups
+      // so they never re-enter storage via import.
+      const nonEditablePromptKeys = Object.values(PROMPT_REGISTRY)
+        .filter(p => !p.editable)
+        .map(p => p.key);
+      nonEditablePromptKeys.forEach(key => {
+        delete processedSettings[key];
+      });
       const mergedSettings = { ...defaultSettings, ...processedSettings };
       
       // Special handling for nested MODE_PROVIDERS to ensure deep merge

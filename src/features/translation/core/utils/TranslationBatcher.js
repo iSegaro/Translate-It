@@ -29,7 +29,11 @@ export const TranslationBatcher = {
     let partIndex = 0;
     let fragmentJoinerBefore = '';
     const isV2Unit = isObject && segment.isV2Unit === true;
-    const isV3Block = isObject && !isV2Unit && !!(segment.blockId);
+    // Normalized V3 parent identity: full-field blockId (may be absent) falls
+    // back to the abbreviated Select Element representation (b). V3 detection
+    // and parentId must both resolve from the same normalized value.
+    const blockId = isObject ? (segment.blockId ?? segment.b) : null;
+    const isV3Block = isObject && !isV2Unit && blockId !== null && blockId !== undefined;
 
     const createObjectPart = (partText, index) => ({
       ...segment,
@@ -89,7 +93,7 @@ export const TranslationBatcher = {
     }
 
     if (isV3Block) {
-      const parentId = segment.blockId;
+      const parentId = blockId;
       return chunks.map((chunk, fragmentIndex) => ({
         ...chunk,
         isV3Fragment: true,

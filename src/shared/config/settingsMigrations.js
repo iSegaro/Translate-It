@@ -18,6 +18,7 @@
 
 import { CONFIG, TranslationMode } from './config.js';
 import { PROMPT_REGISTRY } from './PromptRegistry.js';
+import { getPersistedDefaultSettings } from './settingsDefaults.js';
 import { HISTORICAL_PROMPT_DEFAULTS } from './promptHistoricalDefaults.js';
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
@@ -169,6 +170,11 @@ function runMainMigration(currentSettings) {
   const updates = {};
   const migrationLog = [];
 
+  // Canonical persisted-settings schema — the single source of which keys
+  // belong in storage. New persisted keys here automatically become migration
+  // targets; CONFIG-only runtime constants are excluded by not appearing here.
+  const persistedDefaults = getPersistedDefaultSettings();
+
   // Migrate Mode Provider keys first to ensure new structure is used
   migrateModeProviderKeys(currentSettings, updates, migrationLog);
   
@@ -209,6 +215,13 @@ function runMainMigration(currentSettings) {
     .filter(p => p.editable)
     .map(p => p.key);
 
+  // Non-editable prompt wrappers are CONFIG-owned implementation defaults and
+  // are absent from persistedDefaults. Keep registry-derived keys only for
+  // legacy storage cleanup below.
+  const NON_EDITABLE_PROMPT_KEYS = Object.values(PROMPT_REGISTRY)
+    .filter(p => !p.editable)
+    .map(p => p.key);
+
   // 4. Synchronized Option Lists (UI Options that should always match CONFIG)
   const OPTION_LISTS = [
     'FONT_SIZE_OPTIONS',
@@ -219,23 +232,34 @@ function runMainMigration(currentSettings) {
   // --- Start Migration Process ---
 
   // A. Check for missing settings and add them
-  Object.keys(CONFIG).forEach(key => {
+  Object.keys(persistedDefaults).forEach(key => {
     if (DO_NOT_MIGRATE.includes(key)) return;
     if (!(key in currentSettings)) {
-      updates[key] = CONFIG[key];
+      updates[key] = persistedDefaults[key];
       migrationLog.push(`Added missing setting: ${key}`);
     } else if (!(key in updates)) {
       // Backfill missing nested members for existing settings. The merge
       // helper is the single owner of mergeability validation (plain object,
       // cross-type, leaf values) and returns null when not applicable.
       // Skips keys already updated by earlier passes (e.g. MODE_PROVIDERS/BILINGUAL remaps).
-      const merged = mergeMissingNestedMembers(currentSettings[key], CONFIG[key]);
+      const merged = mergeMissingNestedMembers(currentSettings[key], persistedDefaults[key]);
       if (merged !== null) {
         updates[key] = merged;
         migrationLog.push(`Added missing nested members for ${key}`);
       }
     }
   });
+
+  // A2. Legacy storage cleanup: non-editable prompt wrappers were persisted by
+  // older versions. Remove leftover copies so storage no longer carries them.
+  const removals = currentSettings
+    ? NON_EDITABLE_PROMPT_KEYS.filter(key => key in currentSettings)
+    : [];
+  if (removals.length > 0) {
+    removals.forEach(key => {
+      migrationLog.push(`Removing obsolete stored prompt wrapper: ${key}`);
+    });
+  }
 
   // B. Handle model lists - Dynamic update & reset if model removed
   Object.entries(MODEL_MAPPING).forEach(([modelListKey, currentModelKey]) => {
@@ -334,29 +358,37 @@ function runMainMigration(currentSettings) {
     });
   }
 
-  return { updates, migrationLog };
+  return { updates, migrationLog, removals };
 }
 
 
 /**
- * Run settings migrations - always checks for missing/updated settings
+ * Run settings migrations - always checks for missing/updated settings.
+ *
+ * PURE · DECLARATIVE: computes migration decisions only. It never reads/writes
+ * browser storage. The caller (persistence owner) applies `updates` and
+ * `removals` to the persisted settings.
+ *
+ * @param {object} currentSettings Current persisted settings
+ * @returns {Promise<{updates: object, removals: string[], logs: string[]>}}
  */
 export async function runSettingsMigrations(currentSettings) {
   logger.info('Running settings migrations check');
 
   const allUpdates = {};
   const allLogs = [];
+  const allRemovals = [];
 
   // Always run main migration to check for missing/updated settings
-  const { updates, migrationLog } = runMainMigration(currentSettings);
+  const { updates, migrationLog, removals = [] } = runMainMigration(currentSettings);
   Object.assign(allUpdates, updates);
   allLogs.push(...migrationLog);
+  allRemovals.push(...removals);
 
   logger.debug('Settings migrations completed', {
     updatesCount: Object.keys(allUpdates).length,
     logs: allLogs
   });
 
-  return { updates: allUpdates, logs: allLogs };
+  return { updates: allUpdates, logs: allLogs, removals: allRemovals };
 }
-

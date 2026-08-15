@@ -116,6 +116,11 @@ valid primary items
 Valid primary results are preserved. Recovered values replace only invalid
 indexes, and the merge completes before final result visibility.
 
+`TRUNCATED_RESPONSE` does not override mapping-based selective/full recovery
+eligibility: unreliable or incomplete mapping uses full structured recovery,
+reliably mapped invalid subsets may use selective recovery, and a
+contract-valid truncated response remains accepted.
+
 ### Full Recovery Fallback
 
 Unsafe or ambiguous mapping uses the existing full sequential structured
