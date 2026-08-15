@@ -145,13 +145,6 @@ export const PROVIDER_CONFIGURATIONS = {
         'concurrent_requests',
         'model_overloaded'
       ],
-      retryStrategies: {
-        'requests_per_minute': { delay: 60000, temporary: true },
-        'tokens_per_minute': { delay: 60000, temporary: true },
-        'requests_per_day': { delay: 86400000, temporary: false },
-        'concurrent_requests': { delay: 8000, temporary: true },
-        'model_overloaded': { delay: 15000, temporary: true } // 503 overload errors
-      },
       enableCircuitBreaker: true
     },
     features: {
@@ -194,11 +187,6 @@ export const PROVIDER_CONFIGURATIONS = {
         'tokens_per_minute',
         'requests_per_day'
       ],
-      retryStrategies: {
-        'requests_per_minute': { delay: 60000, temporary: true },
-        'tokens_per_minute': { delay: 60000, temporary: true },
-        'requests_per_day': { delay: 86400000, temporary: false }
-      },
       enableCircuitBreaker: true
     },
     features: {
@@ -240,10 +228,6 @@ export const PROVIDER_CONFIGURATIONS = {
         'requests_per_minute',
         'rate_limit'
       ],
-      retryStrategies: {
-        'requests_per_minute': { delay: 60000, temporary: true },
-        'rate_limit': { delay: 30000, temporary: true }
-      },
       enableCircuitBreaker: true
     },
     features: {
@@ -286,11 +270,6 @@ export const PROVIDER_CONFIGURATIONS = {
         'tokens_per_minute',
         'model_overloaded'
       ],
-      retryStrategies: {
-        'requests_per_minute': { delay: 60000, temporary: true },
-        'tokens_per_minute': { delay: 60000, temporary: true },
-        'model_overloaded': { delay: 10000, temporary: true }
-      },
       enableCircuitBreaker: true
     },
     features: {
@@ -333,11 +312,6 @@ export const PROVIDER_CONFIGURATIONS = {
         'rate_limit',
         'server_overload'
       ],
-      retryStrategies: {
-        'requests_per_minute': { delay: 60000, temporary: true },
-        'rate_limit': { delay: 30000, temporary: true },
-        'server_overload': { delay: 10000, temporary: true }
-      },
       enableCircuitBreaker: true
     },
     features: {
@@ -380,11 +354,6 @@ export const PROVIDER_CONFIGURATIONS = {
         'daily_quota',
         'rate_limit'
       ],
-      retryStrategies: {
-        'requests_per_minute': { delay: 60000, temporary: true },
-        'daily_quota': { delay: 86400000, temporary: false },
-        'rate_limit': { delay: 5000, temporary: true }
-      },
       enableCircuitBreaker: true
     },
     features: {
@@ -427,11 +396,6 @@ export const PROVIDER_CONFIGURATIONS = {
         'rate_limit',
         'tkk_error'
       ],
-      retryStrategies: {
-        'requests_per_minute': { delay: 60000, temporary: true },
-        'rate_limit': { delay: 10000, temporary: true },
-        'tkk_error': { delay: 0, temporary: true }
-      },
       enableCircuitBreaker: true
     },
     features: {
@@ -475,12 +439,6 @@ export const PROVIDER_CONFIGURATIONS = {
         'rate_limit',
         'server_error'
       ],
-      retryStrategies: {
-        'requests_per_minute': { delay: 60000, temporary: true },
-        'daily_quota': { delay: 86400000, temporary: false },
-        'rate_limit': { delay: 10000, temporary: true },
-        'server_error': { delay: 5000, temporary: true }
-      },
       enableCircuitBreaker: true
     },
     features: {
@@ -524,12 +482,6 @@ export const PROVIDER_CONFIGURATIONS = {
         'daily_quota',
         'invalid_api_key'
       ],
-      retryStrategies: {
-        'requests_per_minute': { delay: 60000, temporary: true },
-        'character_limit': { delay: 1000, temporary: true, retryWithSmallerChunk: true },
-        'daily_quota': { delay: 86400000, temporary: false },
-        'invalid_api_key': { delay: 0, temporary: false }
-      },
       enableCircuitBreaker: true
     },
     features: {
@@ -578,13 +530,6 @@ export const PROVIDER_CONFIGURATIONS = {
         'json_parsing_error',
         'server_error'
       ],
-      retryStrategies: {
-        'requests_per_minute': { delay: 60000, temporary: true },
-        'rate_limit': { delay: 30000, temporary: true },
-        'html_response': { delay: 5000, temporary: true, retryWithSmallerChunk: true },
-        'json_parsing_error': { delay: 5000, temporary: true, retryWithSmallerChunk: true },
-        'server_error': { delay: 10000, temporary: true }
-      },
       enableCircuitBreaker: true,
       circuitBreakThreshold: 3 // Open circuit after 3 failures (reduced from default 5)
     },
@@ -628,11 +573,6 @@ export const PROVIDER_CONFIGURATIONS = {
         'rate_limit',
         'auth_error'
       ],
-      retryStrategies: {
-        'requests_per_minute': { delay: 60000, temporary: true },
-        'rate_limit': { delay: 10000, temporary: true },
-        'auth_error': { delay: 0, temporary: true } // Instant retry with new token
-      },
       enableCircuitBreaker: true
     },
     features: {
@@ -665,10 +605,6 @@ export const PROVIDER_CONFIGURATIONS = {
     },
     errorHandling: {
       quotaTypes: ['api_unavailable', 'language_not_supported'],
-      retryStrategies: {
-        'api_unavailable': { delay: 0, temporary: false },
-        'language_not_supported': { delay: 0, temporary: false }
-      },
       enableCircuitBreaker: true
     },
     features: {
@@ -700,10 +636,6 @@ export const PROVIDER_CONFIGURATIONS = {
     },
     errorHandling: {
       quotaTypes: ['rate_limit', 'word_not_found'],
-      retryStrategies: {
-        'rate_limit': { delay: 60000, temporary: true },
-        'word_not_found': { delay: 0, temporary: false }
-      },
       enableCircuitBreaker: true
     },
     features: {
@@ -745,10 +677,6 @@ export const PROVIDER_CONFIGURATIONS = {
         'requests_per_minute',
         'rate_limit'
       ],
-      retryStrategies: {
-        'requests_per_minute': { delay: 60000, temporary: true },
-        'rate_limit': { delay: 30000, temporary: true }
-      },
       enableCircuitBreaker: true
     },
     features: {
@@ -791,11 +719,6 @@ export const PROVIDER_CONFIGURATIONS = {
         'rate_limit',
         'quota_exceeded'
       ],
-      retryStrategies: {
-        'requests_per_minute': { delay: 60000, temporary: true },
-        'rate_limit': { delay: 30000, temporary: true },
-        'quota_exceeded': { delay: 3600000, temporary: false }
-      },
       enableCircuitBreaker: true
     },
     features: {
@@ -832,9 +755,6 @@ export const PROVIDER_CONFIGURATIONS = {
     },
     errorHandling: {
       quotaTypes: ['rate_limit'],
-      retryStrategies: {
-        'rate_limit': { delay: 1000, temporary: true }
-      },
       enableCircuitBreaker: true
     },
     features: {
@@ -1108,17 +1028,6 @@ export function getProviderBatching(providerName, translateMode = null, level = 
 export function getProviderStreaming(providerName, level = 3) {
   const config = getProviderConfiguration(providerName, level);
   return config.streaming;
-}
-
-/**
- * Get error handling configuration for a provider
- * @param {string} providerName - Provider name
- * @param {number} level - Optimization level
- * @returns {object} - Error handling configuration
- */
-export function getProviderErrorHandling(providerName, level = 3) {
-  const config = getProviderConfiguration(providerName, level);
-  return config.errorHandling;
 }
 
 /**
