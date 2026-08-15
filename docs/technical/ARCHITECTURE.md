@@ -175,6 +175,7 @@ src/
 │   ├── translation/
 │   │   ├── core/                   # TranslationEngine, ProviderFactory, StreamingManager
 │   │   │   └── translation-engine.js # Translation coordination
+│   │   ├── ir/                     # Translation Pipeline Foundation (request manifest, execution router, outcome contracts)
 │   │   ├── handlers/               # handleTranslate.js, handleTranslationResult.js
 │   │   ├── stores/                 # translation.js store
 │   │   ├── composables/            # useTranslation, useTranslationModes
@@ -469,6 +470,8 @@ The system is built on three specialized services that handle different stages o
 2. **TranslationRequestTracker (Lifecycle)**: Prevents duplicate requests and tracks active operations using unique `messageId` signatures.
 3. **TranslationResultDispatcher (Distribution)**: Intelligently routes results back to the correct tab or component based on the translation mode (Field, Select Element, or Standard).
 
+**Translation Pipeline Foundation**: Project A introduced the Translation Pipeline Foundation, an execution foundation under `src/features/translation/ir/` providing terminal execution routing, an observational validation foundation, and diagnostics preservation across execution boundaries. Runtime production and adoption of `TranslationOutcome` remain intentionally deferred to the future **Translation Outcome Adoption** initiative.
+
 ### Key Integration Points
 - **`handleTranslate.js`**: The single background handler that initializes and delegates to the service.
 - **`handleTranslationResult.js`**: Processes incoming results from providers and hands them back to the dispatcher.
@@ -578,6 +581,7 @@ The architecture includes several mission-critical features to ensure high avail
 - **Circuit Breaker**: Automatically disables unstable providers or those with exhausted quotas for a cooling period to prevent UI lag.
 - **RateLimitManager**: Governs request throttling and prioritization based on user interaction levels.
 - **Unified Response Contract**: Enforces a strict data format for all providers to ensure system-wide stability and prevent runtime errors.
+- **Structured Response Handling**: `AIResponseParser` reports whether structured-response recovery is required; `BaseAIProvider` owns the recovery strategy. The current implementation performs a sequential re-request within a single execution attempt. This is distinct from Multi-API Key Failover and provider/key failover.
 
 ### Documentation and Implementation
 For a comprehensive guide on implementing new providers, capability gating, and technical specifications, see the **[Provider Implementation Guide](PROVIDERS.md)**. To understand how providers are selected for different features, refer to the **[Translation Provider Logic](TRANSLATION_PROVIDER_LOGIC.md)**.
@@ -751,6 +755,13 @@ For detailed information on UI hosting and in-page integration, refer to the fol
 - `src/core/services/translation/TranslationResultDispatcher.js` - Intelligent result routing
 - `src/features/translation/handlers/handleTranslate.js` - Translation request handler
 - `src/features/translation/handlers/handleTranslationResult.js` - Translation result processor
+
+### Execution Foundation (Translation Pipeline Foundation)
+- `src/features/translation/ir/RequestUnitManifest.js` - Request unit manifest
+- `src/features/translation/ir/TerminalExecutionRouter.js` - Terminal execution routing
+- `src/features/translation/ir/TranslationOperation.js` - Execution lifecycle
+- `src/features/translation/ir/TranslationOutcome.js` - Immutable outcome contract
+- `src/features/translation/ir/TranslationUnit.js` - Unit disposition contract
 
 </details>
 

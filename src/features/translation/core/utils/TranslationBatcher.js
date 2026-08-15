@@ -81,14 +81,40 @@ export const TranslationBatcher = {
       flattenedSegments.push(...this.splitOversizedSegment(seg, maxCharsPerBatch));
     }
 
+    const batches = this._groupIntelligentBatches(flattenedSegments, baseBatchSize, maxCharsPerBatch, (segment) => segment);
+    logger.debug(`[TranslationBatcher] Created ${batches.length} intelligent batches (total input: ${segments.length} segments)`);
+    return batches;
+  },
+
+  /**
+   * Groups execution-owned payload/unit pairs without changing provider payloads.
+   * Split fragments intentionally carry no manifest unit because they have no
+   * deterministic one-to-one request-unit provenance yet.
+   */
+  createIntelligentMembershipBatches(segments, manifestUnits, baseBatchSize, maxCharsPerBatch = 5000) {
+    if (!Array.isArray(segments) || !Array.isArray(manifestUnits) || segments.length !== manifestUnits.length) return [];
+
+    const members = [];
+    segments.forEach((segment, requestIndex) => {
+      const parts = this.splitOversizedSegment(segment, maxCharsPerBatch);
+      const isSplitFragment = parts.length > 1;
+      const manifestUnit = isSplitFragment ? null : manifestUnits[requestIndex];
+      parts.forEach((payload) => members.push({ payload, manifestUnit, isSplitFragment }));
+    });
+
+    return this._groupIntelligentBatches(members, baseBatchSize, maxCharsPerBatch, (member) => member.payload);
+  },
+
+  _groupIntelligentBatches(items, baseBatchSize, maxCharsPerBatch, getPayload) {
     const batches = [];
     let currentBatch = [];
     let currentBatchComplexity = 0;
     let currentBatchChars = 0;
     let lastBlockId = null;
     
-    for (let i = 0; i < flattenedSegments.length; i++) {
-      const segment = flattenedSegments[i];
+    for (let i = 0; i < items.length; i++) {
+      const item = items[i];
+      const segment = getPayload(item);
       const isObject = typeof segment === 'object';
       const text = isObject ? (segment.t || segment.text || '') : (segment || '');
       
@@ -119,7 +145,7 @@ export const TranslationBatcher = {
         }
       }
       
-      currentBatch.push(segment);
+      currentBatch.push(item);
       currentBatchComplexity += segmentComplexity;
       currentBatchChars += segmentChars;
       lastBlockId = blockId;
@@ -130,7 +156,6 @@ export const TranslationBatcher = {
       batches.push(currentBatch);
     }
     
-    logger.debug(`[TranslationBatcher] Created ${batches.length} intelligent batches (total input: ${segments.length} segments)`);
     return batches;
   },
 

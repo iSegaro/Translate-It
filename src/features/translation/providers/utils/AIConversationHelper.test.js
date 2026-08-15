@@ -94,6 +94,24 @@ describe('AIConversationHelper', () => {
     expect(userText).toContain('"translations"');
   });
 
+  it('keeps existing provider payload identities independent of internal manifests', async () => {
+    const { getPromptAsync, getPromptBASEAIBatchAsync } = await import('@/shared/config/config.js');
+    getPromptAsync.mockResolvedValue('INSTRUCTIONS: translate from $_{SOURCE} to $_{TARGET}');
+    getPromptBASEAIBatchAsync.mockResolvedValue('BATCH: $_{PROMPT_INSTRUCTIONS}');
+
+    const { userText } = await AIConversationHelper.preparePromptAndText(
+      [{ i: 'provider-id', t: 'Hello' }],
+      'en',
+      'fa',
+      'select-element',
+      'ai'
+    );
+
+    expect(JSON.parse(userText)).toEqual({
+      translations: [{ id: 'provider-id', text: 'Hello' }]
+    });
+  });
+
   it('correctly assembles subtitle prompt with base, user, and batch instructions', async () => {
     const metadata = {
       promptTemplate: 'BASE: $_{PROMPT_INSTRUCTIONS}\nFORMAT: $_{BATCH_INSTRUCTION}\nTEXT: $_{TEXT}',

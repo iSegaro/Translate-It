@@ -14,13 +14,20 @@ import {
   getSelectionMaxCharsAsync,
   getSelectElementMaxCharsAsync
 } from '@/shared/config/config.js';
-import { MessageFormat, MessageContexts } from '@/shared/messaging/core/MessagingCore.js';
+import { MessageFormat, MessageContexts, ActionReasons } from '@/shared/messaging/core/MessagingCore.js';
 import { translationRequestTracker } from './TranslationRequestTracker.js';
 import { UnifiedResultDispatcher } from './UnifiedResultDispatcher.js';
 import { UnifiedModeCoordinator } from './UnifiedModeCoordinator.js';
 import { statsManager } from '@/features/translation/core/TranslationStatsManager.js';
 import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
 import { isEligibleForDictionaryUpgrade } from '@/features/translation/utils/translationModeHelper.js';
+import {
+  appendTranslationDiagnostic,
+  createTranslationOperation,
+  finalizeTranslationOperation,
+} from '@/features/translation/ir/TranslationOperation.js';
+import { createManifestView, createRequestUnitManifest } from '@/features/translation/ir/RequestUnitManifest.js';
+import { TerminalExecutionRouter } from '@/features/translation/ir/TerminalExecutionRouter.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.TRANSLATION, 'UnifiedTranslationService');
 
@@ -32,6 +39,8 @@ export class UnifiedTranslationService {
 
     this.translationEngine = null;
     this.backgroundService = null;
+    this._operations = new WeakMap();
+    this._diagnosticReports = new WeakMap();
 
     logger.info('UnifiedTranslationService initialized');
   }
@@ -168,11 +177,21 @@ export class UnifiedTranslationService {
         throw new Error('Translation request registration failed');
       }
 
+      const requestUnitManifest = createRequestUnitManifest(data?.text);
+      const operation = createTranslationOperation(messageId, requestUnitManifest);
+      const executionContext = {
+        operation,
+        manifestView: createManifestView(requestUnitManifest),
+        onTerminalUnitsAccepted: TerminalExecutionRouter.createTerminalUnitsObserver(operation),
+      };
+      this._setOperation(request, executionContext.operation);
+
       let result;
       try {
         result = await this.modeCoordinator.processRequest(request, {
           translationEngine: this.translationEngine,
-          backgroundService: this.backgroundService
+          backgroundService: this.backgroundService,
+          executionContext
         });
       } catch (error) {
         logger.debug('Request failed:', error.message);
@@ -180,11 +199,22 @@ export class UnifiedTranslationService {
           ? this.requestTracker.markTimeout(messageId)
           : this.requestTracker.failRequest(messageId, error);
         if (!transition.accepted) return this._createSuppressedResponse(messageId, transition);
+        this._finalizeDiagnostics(request, executionContext, {
+          type: error.type === 'TIMEOUT' ? 'OPERATION_TIMEOUT' : 'OPERATION_FAILED',
+          stage: 'service',
+          reason: error.message,
+          code: error.type,
+        });
         return MessageFormat.createErrorResponse(error, messageId);
       }
 
       const transition = this.requestTracker.completeRequest(messageId, result);
       if (!transition.accepted) return this._createSuppressedResponse(messageId, transition);
+      TerminalExecutionRouter.routeTerminalExecution(executionContext.operation, { status: transition.status });
+      this._finalizeDiagnostics(request, executionContext, {
+        type: 'OPERATION_COMPLETED',
+        stage: 'service',
+      });
 
       // Special handling for Field mode (direct return)
       if (request.mode === TranslationMode.Field) return result;
@@ -206,6 +236,14 @@ export class UnifiedTranslationService {
       if (tracked && this.requestTracker.isRequestActive(messageId)) {
         const transition = this.requestTracker.failRequest(messageId, error);
         if (!transition.accepted) return this._createSuppressedResponse(messageId, transition);
+        const request = this.requestTracker.getRequest(messageId);
+        const operation = this._getOperation(request);
+        this._finalizeDiagnostics(request, { operation }, {
+          type: 'OPERATION_FAILED',
+          stage: 'service',
+          reason: error.message,
+          code: error.type,
+        });
       }
       return MessageFormat.createErrorResponse(error, messageId);
     }
@@ -247,19 +285,30 @@ export class UnifiedTranslationService {
   }
 
   /**
-   * Cancel an active request through the engine and notify UI.
+   * Cancel an active service-owned request.
+   * User-cancellation entry point only; timeout stays outside this API.
+   * Returns { handled } so callers can fall back for non-service requests.
    */
-  async cancelRequest(messageId) {
+  async cancelRequest(messageId, reason = ActionReasons.USER_CANCELLED) {
     logger.info(`Cancelling request: ${messageId}`);
     const request = this.requestTracker.getRequest(messageId);
-    if (!request) return { success: false, error: 'Request not found' };
+    if (!request) return { handled: false, success: false, error: 'Request not found' };
 
-    const cancellation = this.requestTracker.cancelRequest(messageId);
-    if (!cancellation.accepted) return { success: false, error: cancellation.reason };
+    const cancellation = this.requestTracker.cancelRequest(messageId, reason);
+    if (!cancellation.accepted) return { handled: true, success: false, error: cancellation.reason };
+
+    const operation = this._getOperation(request);
+    TerminalExecutionRouter.routeTerminalExecution(operation, { status: cancellation.status });
+    this._finalizeDiagnostics(request, { operation }, {
+      type: 'OPERATION_CANCELLED',
+      stage: 'service',
+      reason: cancellation.reason,
+      cancelled: true,
+    });
     if (this.translationEngine) this.translationEngine.cancelTranslation(messageId);
     
     await this.resultDispatcher.dispatchCancellation({ messageId, request });
-    return { success: true };
+    return { handled: true, success: true };
   }
 
   _createCancelledResponse(messageId) {
@@ -291,6 +340,30 @@ export class UnifiedTranslationService {
       reason: transition.reason,
       status: transition.status
     };
+  }
+
+  _finalizeDiagnostics(request, executionContext, terminalFact) {
+    appendTranslationDiagnostic(executionContext, terminalFact);
+    const report = finalizeTranslationOperation(executionContext);
+    if (report) this._setDiagnosticReport(request, report);
+    this._clearOperation(request);
+  }
+
+  _setOperation(request, operation) {
+    this._operations.set(request, operation);
+  }
+
+  _getOperation(request) {
+    return this._operations.get(request) || null;
+  }
+
+  _clearOperation(request) {
+    this._operations.delete(request);
+  }
+
+  _setDiagnosticReport(request, report) {
+    this._diagnosticReports.set(request, report);
+    this.requestTracker._setDiagnosticReport?.(request, report);
   }
 
   /**

@@ -12,6 +12,8 @@ import browser from "webextension-polyfill";
 import { statsManager } from '@/features/translation/core/TranslationStatsManager.js';
 import { isFatalError, matchErrorToType } from '@/shared/error-management/ErrorMatcher.js';
 import { ErrorTypes } from "@/shared/error-management/ErrorTypes.js";
+import { appendTranslationDiagnostic } from '@/features/translation/ir/TranslationOperation.js';
+import { createManifestViewFromUnits } from '@/features/translation/ir/RequestUnitManifest.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.TRANSLATION, 'OptimizedJsonHandler');
 
@@ -19,7 +21,7 @@ export class OptimizedJsonHandler {
   /**
    * Orchestrates the optimized translation process.
    */
-  async execute(engine, data, providerInstance, originalSourceLang, originalTargetLang, messageId, sender, uiContext = 'unknown') {
+  async execute(engine, data, providerInstance, originalSourceLang, originalTargetLang, messageId, sender, uiContext = 'unknown', executionContext = null) {
     const { text, sourceLanguage, targetLanguage, mode, options } = data;
     const sessionId = data.sessionId || messageId;
     const tabId = sender?.tab?.id;
@@ -50,11 +52,12 @@ export class OptimizedJsonHandler {
       const optimalSize = structuredOverride.optimalSize || providerConfig?.batching?.optimalSize || 25;
       const characterLimit = structuredOverride.characterLimit || providerConfig?.batching?.characterLimit || providerConfig?.batching?.maxChars || 5000;
 
-      const batches = engine.createIntelligentBatches(
-        segments, 
-        optimalSize, 
-        characterLimit
-      );
+      const manifestUnits = executionContext?.manifestView?.units;
+      const hasManifestMembership = Array.isArray(manifestUnits) && manifestUnits.length === segments.length
+        && typeof engine.createIntelligentMembershipBatches === 'function';
+      const batches = hasManifestMembership
+        ? engine.createIntelligentMembershipBatches(segments, manifestUnits, optimalSize, characterLimit)
+        : engine.createIntelligentBatches(segments, optimalSize, characterLimit);
 
       logger.debug(`[JsonHandler] Executing ${batches.length} batches for ${segments.length} segments (Concurrency: ${providerConfig.rateLimit.maxConcurrent})`);
       logger.debug(`[JsonHandler] Structured batch ${laneLabel} (${mode})`);
@@ -125,8 +128,15 @@ export class OptimizedJsonHandler {
           const BATCH_TIMEOUT_MS = 300000;
           const timeoutPromise = new Promise((_, reject) => {
             const timeoutId = setTimeout(() => {
-              const timeoutError = new Error(`Batch translation timed out after ${BATCH_TIMEOUT_MS}ms`);
-              timeoutError.type = 'TIMEOUT';
+            const timeoutError = new Error(`Batch translation timed out after ${BATCH_TIMEOUT_MS}ms`);
+            timeoutError.type = 'TIMEOUT';
+            appendTranslationDiagnostic(executionContext, {
+              type: 'BATCH_TIMEOUT',
+              stage: 'optimized-json-handler',
+              batchIndex: i,
+              reason: timeoutError.message,
+              code: timeoutError.type,
+            });
               reject(timeoutError);
             }, BATCH_TIMEOUT_MS);
             
@@ -134,10 +144,14 @@ export class OptimizedJsonHandler {
             abortController.signal.addEventListener('abort', () => clearTimeout(timeoutId));
           });
 
+          const batchPayload = hasManifestMembership ? batch.map(({ payload }) => payload) : batch;
+          const batchExecutionContext = hasManifestMembership
+            ? self._createBatchExecutionContext(executionContext, batch)
+            : executionContext;
           const translatedBatchResponse = await Promise.race([
             self._performBatchCall(
               providerInstance, 
-              batch, 
+              batchPayload, 
               detectedSourceLanguage, 
               targetLanguage, 
               mode, 
@@ -148,9 +162,10 @@ export class OptimizedJsonHandler {
               options?.contextSummary,
               engine,
               sender,
-              originalSourceLang,
-              originalTargetLang,
-              parallelExecution
+               originalSourceLang,
+               originalTargetLang,
+               parallelExecution,
+                batchExecutionContext
             ),
             timeoutPromise
           ]);
@@ -167,8 +182,16 @@ export class OptimizedJsonHandler {
             ? translatedBatchResponse.translatedText
             : translatedBatchResponse;
 
-          const mappedResults = self._mapResults(batch, translatedBatch);
+          const mappedResults = self._mapResults(batchPayload, translatedBatch, executionContext);
           checkCancellation();
+          // Terminal observation is restricted to the approved execution scope:
+          // structured Select Element + AI provider + unsplit ManifestView.
+          // Execution identity extraction is the router's responsibility, never this handler's.
+          if (mode === TranslationMode.Select_Element
+              && providerInstance.constructor.isAI
+              && batchExecutionContext?.manifestView?.units) {
+            executionContext?.onTerminalUnitsAccepted?.(batchExecutionContext.manifestView.units);
+          }
           accumulatedResults.push(...mappedResults);
           completedBatchCount++;
           if (!skipStreaming) {
@@ -226,7 +249,15 @@ export class OptimizedJsonHandler {
             return; // Exit silently on cancellation
           }
           
-          logger.debug(`[JsonHandler] Batch ${i + 1} failed:`, batchError.message);
+           logger.debug(`[JsonHandler] Batch ${i + 1} failed:`, batchError.message);
+           appendTranslationDiagnostic(executionContext, {
+             type: 'STRUCTURED_BATCH_FAILURE',
+             stage: 'optimized-json-handler',
+             batchIndex: i,
+             reason: batchError.message,
+             code: batchError.type || matchErrorToType(batchError),
+             fallback: true,
+           });
           hasErrors = true;
           lastError = batchError;
           
@@ -293,7 +324,7 @@ export class OptimizedJsonHandler {
     }
   }
 
-  async _performBatchCall(providerInstance, batch, source, target, mode, abortController, messageId, sessionId, contextMetadata, contextSummary, engine, sender, originalSourceLang = null, originalTargetLang = null, parallelExecution = false) {
+  async _performBatchCall(providerInstance, batch, source, target, mode, abortController, messageId, sessionId, contextMetadata, contextSummary, engine, sender, originalSourceLang = null, originalTargetLang = null, parallelExecution = false, executionContext = null) {
     const isArrayInput = Array.isArray(batch);
     const textsToTranslate = isArrayInput 
       ? batch.map(item => typeof item === 'object' ? (item.t || item.text || '') : (item || ''))
@@ -310,13 +341,29 @@ export class OptimizedJsonHandler {
       {
         mode, abortController, messageId, sessionId, contextMetadata, contextSummary,
         engine, sender, priority: 'high', rawJsonPayload: true, parallelExecution,
-        originalSourceLang, originalTargetLang,
-        expectedFormat
+         originalSourceLang, originalTargetLang,
+         expectedFormat,
+         executionContext
       }
     );
   }
 
-  _mapResults(originalBatch, translatedResults) {
+  _createBatchExecutionContext(executionContext, batch) {
+    if (!executionContext?.manifestView || !Array.isArray(batch)) return executionContext
+
+    if (batch.some(({ isSplitFragment }) => isSplitFragment)) {
+      return { ...executionContext, manifestView: null }
+    }
+
+    const manifestUnits = batch.map(({ manifestUnit }) => manifestUnit)
+
+    return {
+      ...executionContext,
+      manifestView: createManifestViewFromUnits(executionContext.manifestView, manifestUnits),
+    }
+  }
+
+  _mapResults(originalBatch, translatedResults, executionContext = null) {
     // Robust normalization: AI providers might return objects, arrays, or bridged structures
     let rawItems = [];
     let currentResults = translatedResults;
@@ -353,11 +400,17 @@ export class OptimizedJsonHandler {
       
       // FINAL SAFETY: If the extracted text still looks like JSON (e.g. contains {"translations":),
       // it means parsing failed completely. We should NOT show this to the user.
-      if (typeof text === 'string' && text.length > 20 && 
+        if (typeof text === 'string' && text.length > 20 && 
           (text.includes('{"') || text.includes('["')) && 
           (text.includes('":') || text.includes('",'))) {
-        logger.warn('[JsonHandler] Extracted text looks like raw JSON, rejecting to prevent UI corruption');
-        return null; // Force fallback to original text below
+          logger.warn('[JsonHandler] Extracted text looks like raw JSON, rejecting to prevent UI corruption');
+          appendTranslationDiagnostic(executionContext, {
+            type: 'STRUCTURED_RESULT_REJECTED',
+            stage: 'optimized-json-handler',
+            code: 'RAW_JSON_RESULT',
+            fallback: true,
+          });
+          return null; // Force fallback to original text below
       }
       
       return text;

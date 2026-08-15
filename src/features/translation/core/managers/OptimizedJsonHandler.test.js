@@ -24,6 +24,7 @@ import { OptimizedJsonHandler } from './OptimizedJsonHandler.js';
 import { isFatalError, matchErrorToType } from '@/shared/error-management/ErrorMatcher.js';
 import { getProviderConfiguration } from '@/features/translation/core/ProviderConfigurations.js';
 import { TranslationBatcher } from '@/features/translation/core/utils/TranslationBatcher.js';
+import { createManifestView, createRequestUnitManifest } from '@/features/translation/ir/RequestUnitManifest.js';
 
 // Mock dependencies
 vi.mock('@/shared/logging/logger.js', () => ({
@@ -143,6 +144,183 @@ describe('OptimizedJsonHandler', () => {
       const original = ['s1', 's2'];
       const translated = ['t1'];
       expect(() => handler._mapResults(original, translated)).toThrow(/Segment count mismatch/);
+    });
+  });
+
+  describe('manifest membership', () => {
+    it('constructs views from carried manifest records and keeps provider payload unchanged', async () => {
+      const segments = ['same', 'same'];
+      const manifest = createRequestUnitManifest(segments);
+      const executionContext = { manifestView: createManifestView(manifest) };
+      mockEngine.createIntelligentMembershipBatches = vi.fn((items, manifestUnits) => (
+        items.map((payload, index) => [{ payload, manifestUnit: manifestUnits[index] }])
+      ));
+      mockProvider.translate
+        .mockResolvedValueOnce({ translatedText: ['first'] })
+        .mockResolvedValueOnce({ translatedText: ['second'] });
+
+      await handler.execute(
+        mockEngine,
+        { text: JSON.stringify(segments), sourceLanguage: 'en', targetLanguage: 'fa', mode: 'select_element', messageId: 'manifest-1' },
+        mockProvider,
+        'en',
+        'fa',
+        'manifest-1',
+        { tab: { id: 123 } },
+        'unknown',
+        executionContext,
+      );
+
+      expect(mockProvider.translate.mock.calls.map(([payload]) => payload)).toEqual([['same'], ['same']]);
+      const batchView = handler._createBatchExecutionContext(executionContext, [{ payload: 'same', manifestUnit: manifest.units[1] }]).manifestView;
+      expect(batchView.units[0]).toBe(manifest.units[1]);
+    });
+
+    it('skips manifest observation for split batch members', () => {
+      const manifest = createRequestUnitManifest(['source']);
+      const executionContext = { manifestView: createManifestView(manifest) };
+      const batchContext = handler._createBatchExecutionContext(executionContext, [{ payload: 'fragment', manifestUnit: null, isSplitFragment: true }]);
+
+      expect(batchContext.manifestView).toBeNull();
+    });
+
+    it('rejects missing non-split membership as an invalid view', () => {
+      const manifest = createRequestUnitManifest(['source']);
+      const executionContext = { manifestView: createManifestView(manifest) };
+      const batchContext = handler._createBatchExecutionContext(executionContext, [{ payload: 'source', manifestUnit: null, isSplitFragment: false }]);
+
+      expect(batchContext.manifestView).toBeNull();
+    });
+
+    it('forwards terminally accepted manifest unit references without mapping unitIds', async () => {
+      const segments = ['same', 'same'];
+      const manifest = createRequestUnitManifest(segments);
+      const onTerminalUnitsAccepted = vi.fn();
+      const executionContext = {
+        manifestView: createManifestView(manifest),
+        onTerminalUnitsAccepted,
+      };
+      mockEngine.createIntelligentMembershipBatches = vi.fn((items, manifestUnits) => (
+        items.map((payload, index) => [{ payload, manifestUnit: manifestUnits[index] }])
+      ));
+      mockProvider.translate
+        .mockResolvedValueOnce({ translatedText: ['first'] })
+        .mockResolvedValueOnce({ translatedText: ['second'] });
+
+      await handler.execute(
+        mockEngine,
+        { text: JSON.stringify(segments), sourceLanguage: 'en', targetLanguage: 'fa', mode: 'select_element', messageId: 'manifest-units-1' },
+        mockProvider,
+        'en',
+        'fa',
+        'manifest-units-1',
+        { tab: { id: 123 } },
+        'unknown',
+        executionContext,
+      );
+
+      expect(onTerminalUnitsAccepted).toHaveBeenCalledTimes(2);
+      const firstBatchUnits = onTerminalUnitsAccepted.mock.calls[0][0];
+      const secondBatchUnits = onTerminalUnitsAccepted.mock.calls[1][0];
+      expect(firstBatchUnits).toHaveLength(1);
+      expect(firstBatchUnits[0]).toBe(manifest.units[0]);
+      expect(secondBatchUnits[0]).toBe(manifest.units[1]);
+      expect(typeof firstBatchUnits[0]).toBe('object');
+    });
+
+    it('never invokes terminal observation for structured PDF', async () => {
+      const segments = ['same', 'same'];
+      const manifest = createRequestUnitManifest(segments);
+      const onTerminalUnitsAccepted = vi.fn();
+      const executionContext = {
+        manifestView: createManifestView(manifest),
+        onTerminalUnitsAccepted,
+      };
+      mockEngine.createIntelligentMembershipBatches = vi.fn((items, manifestUnits) => (
+        items.map((payload, index) => [{ payload, manifestUnit: manifestUnits[index] }])
+      ));
+      mockProvider.translate
+        .mockResolvedValueOnce({ translatedText: ['first'] })
+        .mockResolvedValueOnce({ translatedText: ['second'] });
+
+      await handler.execute(
+        mockEngine,
+        { text: JSON.stringify(segments), sourceLanguage: 'en', targetLanguage: 'fa', mode: 'pdf-translation', messageId: 'pdf-observe-1' },
+        mockProvider,
+        'en',
+        'fa',
+        'pdf-observe-1',
+        { tab: { id: 123 } },
+        'unknown',
+        executionContext,
+      );
+
+      expect(onTerminalUnitsAccepted).not.toHaveBeenCalled();
+    });
+
+    it('never invokes terminal observation for traditional Select providers', async () => {
+      const segments = ['same', 'same'];
+      const manifest = createRequestUnitManifest(segments);
+      const onTerminalUnitsAccepted = vi.fn();
+      const executionContext = {
+        manifestView: createManifestView(manifest),
+        onTerminalUnitsAccepted,
+      };
+      mockEngine.createIntelligentMembershipBatches = vi.fn((items, manifestUnits) => (
+        items.map((payload, index) => [{ payload, manifestUnit: manifestUnits[index] }])
+      ));
+      const traditionalProvider = {
+        ...mockProvider,
+        constructor: { batchStrategy: 'string', isAI: false },
+      };
+      traditionalProvider.translate
+        .mockResolvedValueOnce({ translatedText: ['first'] })
+        .mockResolvedValueOnce({ translatedText: ['second'] });
+
+      await handler.execute(
+        mockEngine,
+        { text: JSON.stringify(segments), sourceLanguage: 'en', targetLanguage: 'fa', mode: 'select_element', messageId: 'traditional-observe-1' },
+        traditionalProvider,
+        'en',
+        'fa',
+        'traditional-observe-1',
+        { tab: { id: 123 } },
+        'unknown',
+        executionContext,
+      );
+
+      expect(onTerminalUnitsAccepted).not.toHaveBeenCalled();
+    });
+
+    it('never invokes terminal observation for split batch members', async () => {
+      const segments = ['same', 'same'];
+      const manifest = createRequestUnitManifest(segments);
+      const onTerminalUnitsAccepted = vi.fn();
+      const executionContext = {
+        manifestView: createManifestView(manifest),
+        onTerminalUnitsAccepted,
+      };
+      mockEngine.createIntelligentMembershipBatches = vi.fn(() => ([
+        [{ payload: 'frag-a', manifestUnit: null, isSplitFragment: true }],
+        [{ payload: 'frag-b', manifestUnit: null, isSplitFragment: true }],
+      ]));
+      mockProvider.translate
+        .mockResolvedValueOnce({ translatedText: ['first'] })
+        .mockResolvedValueOnce({ translatedText: ['second'] });
+
+      await handler.execute(
+        mockEngine,
+        { text: JSON.stringify(segments), sourceLanguage: 'en', targetLanguage: 'fa', mode: 'select_element', messageId: 'split-observe-1' },
+        mockProvider,
+        'en',
+        'fa',
+        'split-observe-1',
+        { tab: { id: 123 } },
+        'unknown',
+        executionContext,
+      );
+
+      expect(onTerminalUnitsAccepted).not.toHaveBeenCalled();
     });
   });
 

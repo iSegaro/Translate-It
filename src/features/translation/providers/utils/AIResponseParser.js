@@ -7,8 +7,34 @@ import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { ResponseFormat } from '@/shared/config/translationConstants.js';
 import { NewlineManager } from '@/features/translation/utils/NewlineManager.js';
+import { appendTranslationDiagnostic } from '@/features/translation/ir/TranslationOperation.js';
+import { createParserSnapshot } from '@/features/translation/providers/utils/ParserSnapshot.js';
+import { TranslationContractValidator } from '@/features/translation/core/TranslationContractValidator.js';
+import { MappingStrategy } from '@/features/translation/ir/RequestUnitManifest.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.TRANSLATION, 'AIResponseParser');
+const VALID_MAPPING_STRATEGIES = new Set(Object.values(MappingStrategy));
+
+function hasValidManifestView(manifestView, expectedCount) {
+  if (!manifestView || !Array.isArray(manifestView.units) || manifestView.units.length !== expectedCount) return false;
+  if (!VALID_MAPPING_STRATEGIES.has(manifestView.declaredMappingStrategy)) return false;
+
+  const requestIndexes = new Set();
+  return manifestView.units.every((unit) => {
+    if (!unit || !Object.isFrozen(unit) || !Number.isInteger(unit.requestIndex)) return false;
+    if (requestIndexes.has(unit.requestIndex)) return false;
+    requestIndexes.add(unit.requestIndex);
+    return true;
+  });
+}
+
+function observeValidationResult(executionContext, validationResult) {
+  try {
+    executionContext?.observeValidationResult?.(validationResult);
+  } catch (error) {
+    logger.debug('[AIResponseParser] Validation observation failed:', error?.message);
+  }
+}
 
 /**
  * Pipeline-based AI Response Healers.
@@ -110,7 +136,7 @@ export const AIResponseParser = {
   /**
    * Cleans AI responses based on the expected contract.
    */
-  cleanAIResponse(result, expectedFormat = ResponseFormat.STRING) {
+  cleanAIResponse(result, expectedFormat = ResponseFormat.STRING, executionContext = null, parserEvidence = null) {
     if (!result || typeof result !== 'string') return result;
 
     // Strategy 1: RAW STRING (Popup, Sidepanel, Field)
@@ -151,6 +177,14 @@ export const AIResponseParser = {
       const healed = Healers.PreProcessors.reduce((text, healer) => healer(text), result);
       if (healed !== result) {
         parsed = this._extractAndParseJson(healed, expectedFormat);
+        if (parsed) {
+          appendTranslationDiagnostic(executionContext, {
+            type: 'PARSER_REPAIRED_RESPONSE',
+            stage: 'parser',
+            repaired: true,
+          });
+          if (parserEvidence) parserEvidence.repaired = true;
+        }
       } else if (!parsed) {
         // If no healing was possible and we still don't have a result, re-run to throw original error
         parsed = this._extractAndParseJson(result, expectedFormat);
@@ -196,23 +230,40 @@ export const AIResponseParser = {
   /**
    * Parse batch translation results from JSON response.
    */
-  parseBatchResult(result, expectedCount, originalBatch, providerName = 'Unknown', expectedFormat = ResponseFormat.JSON_ARRAY) {
+  parseBatchResult(result, expectedCount, originalBatch, providerName = 'Unknown', expectedFormat = ResponseFormat.JSON_ARRAY, executionContext = null, manifestView = null) {
     try {
-      const parsed = this.cleanAIResponse(result, expectedFormat);
+      const parserEvidence = { repaired: false };
+      const parsed = this.cleanAIResponse(result, expectedFormat, executionContext, parserEvidence);
       
       if (!parsed) throw new Error('Empty or invalid response');
 
       let rawItems = this._normalizeToItems(parsed);
+      const snapshot = createParserSnapshot(rawItems, parserEvidence);
+      if (hasValidManifestView(manifestView, expectedCount)) {
+        const validationResult = TranslationContractValidator.validate(manifestView, snapshot, parserEvidence);
+        observeValidationResult(executionContext, validationResult);
+      }
       const results = new Array(expectedCount).fill(null);
       const unmappedTexts = [];
+      const mappedIndexes = new Set();
+      let unknownIdCount = 0;
 
       rawItems.forEach((item) => {
         const { text, id } = this._extractItemData(item);
         if (id !== null && id !== undefined) {
           const idx = this._findOriginalIndex(id, originalBatch, expectedCount);
           if (idx !== -1) {
+            if (mappedIndexes.has(idx)) {
+              appendTranslationDiagnostic(executionContext, {
+                type: 'PARSER_DUPLICATE_ID',
+                stage: 'parser',
+                code: 'DUPLICATE_ID',
+              });
+            }
+            mappedIndexes.add(idx);
             results[idx] = text;
           } else {
+            unknownIdCount++;
             unmappedTexts.push(text);
           }
         } else {
@@ -220,9 +271,28 @@ export const AIResponseParser = {
         }
       });
 
+      const missingCount = results.filter(item => item === null).length;
+      if (unknownIdCount > 0 || missingCount > 0 || rawItems.length !== expectedCount) {
+        appendTranslationDiagnostic(executionContext, {
+          type: 'PARSER_MAPPING_DEGRADED',
+          stage: 'parser',
+          expectedCount,
+          receivedCount: rawItems.length,
+          missingCount,
+          count: unknownIdCount,
+        });
+      }
       return this._fillResultsGaps(results, unmappedTexts, originalBatch, expectedCount);
     } catch (error) {
       logger.error(`[${providerName}] Strict parse failed: ${error.message}`);
+      appendTranslationDiagnostic(executionContext, {
+        type: 'PARSER_MALFORMED_RESPONSE',
+        stage: 'parser',
+        provider: providerName,
+        reason: error.message,
+        code: 'PARSE_FAILED',
+        fallback: true,
+      });
       return originalBatch.map(item => typeof item === 'object' ? (item.t || item.text) : item);
     }
   },

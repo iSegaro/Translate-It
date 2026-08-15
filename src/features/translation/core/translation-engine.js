@@ -55,7 +55,7 @@ export class TranslationEngine {
   /**
    * Handle translation request messages
    */
-  async handleTranslateMessage(request, sender) {
+  async handleTranslateMessage(request, sender, executionContext = null) {
     if (!request || typeof request !== "object") {
       throw new Error(`Invalid request: expected object, got ${typeof request}`);
     }
@@ -85,7 +85,7 @@ export class TranslationEngine {
     }
 
     try {
-      const result = await this.executeTranslation(data, sender, context);
+      const result = await this.executeTranslation(data, sender, context, executionContext);
 
       if (!result || typeof result !== "object") {
         throw new Error(`Translation failed: invalid result format (${typeof result})`);
@@ -106,7 +106,7 @@ export class TranslationEngine {
   /**
    * Core translation execution logic with streaming and JSON optimization support
    */
-  async executeTranslation(data, sender, uiContext = 'unknown') {
+  async executeTranslation(data, sender, uiContext = 'unknown', executionContext = null) {
     const { text, provider, sourceLanguage, targetLanguage } = data;
     let { mode } = data;
 
@@ -142,7 +142,7 @@ export class TranslationEngine {
     const isPdfJson = mode === TranslationMode.PDF && data.options?.rawJsonPayload;
     if (isSelectJson || isPdfJson) {
       logger.debug('[TranslationEngine] Using optimized structured batch strategy for provider:', provider);
-      return await this.jsonHandler.execute(this, data, providerInstance, originalSourceLang, originalTargetLang, data.messageId, sender, uiContext);
+      return await this.jsonHandler.execute(this, data, providerInstance, originalSourceLang, originalTargetLang, data.messageId, sender, uiContext, executionContext);
     }
 
     // 5. Standard execution via ProviderCoordinator
@@ -156,7 +156,8 @@ export class TranslationEngine {
       sessionId: data.sessionId || data.messageId,
       textLength: text.length,
       engine: this,
-      sender: sender
+       sender: sender,
+       executionContext
     });
 
     // CRITICAL: Defensive check if coordinator returned a raw string (fallback case)
@@ -297,5 +298,9 @@ export class TranslationEngine {
    */
   createIntelligentBatches(segments, baseBatchSize, maxCharsPerBatch) {
     return TranslationBatcher.createIntelligentBatches(segments, baseBatchSize, maxCharsPerBatch);
+  }
+
+  createIntelligentMembershipBatches(segments, manifestUnits, baseBatchSize, maxCharsPerBatch) {
+    return TranslationBatcher.createIntelligentMembershipBatches(segments, manifestUnits, baseBatchSize, maxCharsPerBatch);
   }
 }

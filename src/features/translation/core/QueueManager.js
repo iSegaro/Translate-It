@@ -7,6 +7,7 @@ import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { ErrorTypes } from "@/shared/error-management/ErrorTypes.js";
 import { isFatalError, isCancellationError } from "@/shared/error-management/ErrorMatcher.js";
+import { appendTranslationDiagnostic } from '@/features/translation/ir/TranslationOperation.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.TRANSLATION, 'QueueManager');
 
@@ -100,6 +101,7 @@ class QueueItem {
     this.context = context; // Usually translateMode
     this.messageId = options.messageId || null;
     this.uiContext = options.uiContext || null; // popup, sidepanel, etc.
+    this.executionContext = options.executionContext || null;
     this.status = QueueStatus.PENDING;
     this.createdAt = Date.now();
     this.attempts = 0;
@@ -326,6 +328,12 @@ export class QueueManager {
     item.status = QueueStatus.PROCESSING;
     item.attempts++;
     item.lastAttemptAt = Date.now();
+    appendTranslationDiagnostic(item.executionContext, {
+      type: 'QUEUE_ATTEMPT',
+      stage: 'queue',
+      provider: item.providerName,
+      attempt: item.attempts,
+    });
     
     logger.debug(`Processing item ${item.id} (attempt ${item.attempts}/${item.getRetryStrategy().maxRetries})`);
     
@@ -361,6 +369,14 @@ export class QueueManager {
         const delay = item.getNextRetryDelay();
         
         logger.warn(`Item ${item.id} failed, retrying in ${delay}ms (attempt ${item.attempts}/${item.getRetryStrategy().maxRetries})`, error);
+        appendTranslationDiagnostic(item.executionContext, {
+          type: 'QUEUE_RETRY',
+          stage: 'queue',
+          provider: item.providerName,
+          attempt: item.attempts,
+          reason: error.message,
+          code: error.type,
+        });
         
         this.retryTimeouts.set(item.id, setTimeout(() => {
           this.retryTimeouts.delete(item.id);

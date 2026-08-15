@@ -76,6 +76,9 @@ vi.mock('../../../shared/messaging/core/MessagingCore.js', () => ({
     CONTENT: 'content',
     MOBILE_TRANSLATE: 'mobile-translate',
     SELECTION_MANAGER: 'selection-manager'
+  },
+  ActionReasons: {
+    USER_CANCELLED: 'user_cancelled'
   }
 }));
 
@@ -100,11 +103,43 @@ vi.mock('../../../shared/logging/logConstants.js', () => ({
   }
 }));
 
+vi.mock('../../../features/translation/ir/TranslationOperation.js', async (importOriginal) => {
+  const actual = await importOriginal();
+  return {
+    ...actual,
+    createTranslationOperation: vi.fn(actual.createTranslationOperation),
+    finalizeTranslationOperation: vi.fn(actual.finalizeTranslationOperation)
+  };
+});
+
+vi.mock('../../../features/translation/ir/RequestUnitManifest.js', async (importOriginal) => {
+  const actual = await importOriginal();
+  return {
+    ...actual,
+    createRequestUnitManifest: vi.fn(actual.createRequestUnitManifest)
+  };
+});
+
+vi.mock('../../../features/translation/ir/TerminalExecutionRouter.js', async (importOriginal) => {
+  const actual = await importOriginal();
+  return {
+    ...actual,
+    TerminalExecutionRouter: {
+      ...actual.TerminalExecutionRouter,
+      routeTerminalExecution: vi.fn(actual.TerminalExecutionRouter.routeTerminalExecution)
+    }
+  };
+});
+
 // 2. Imports second
 import { describe, it, expect, beforeEach } from 'vitest';
 import { UnifiedTranslationService } from './UnifiedTranslationService.js';
 import { ErrorTypes } from '../../../shared/error-management/ErrorTypes.js';
 import { translationRequestTracker } from './TranslationRequestTracker.js';
+import { createTranslationOperation, finalizeTranslationOperation } from '../../../features/translation/ir/TranslationOperation.js';
+import { createRequestUnitManifest } from '../../../features/translation/ir/RequestUnitManifest.js';
+import { TerminalExecutionRouter } from '../../../features/translation/ir/TerminalExecutionRouter.js';
+import { ActionReasons } from '../../../shared/messaging/core/MessagingCore.js';
 
 describe('UnifiedTranslationService', () => {
   let service;
@@ -345,6 +380,41 @@ describe('UnifiedTranslationService', () => {
       expect(result.success).toBe(true);
       expect(service.modeCoordinator.processRequest).toHaveBeenCalledWith(mockRequest, expect.any(Object));
     });
+
+    it('passes the exact manifest instance to TranslationOperation', async () => {
+      const message = { messageId: 'm-manifest', data: { text: 'hello', mode: 'selection' }, context: 'content' };
+      translationRequestTracker.createRequest.mockReturnValue({ messageId: 'm-manifest', data: message.data, mode: 'selection' });
+      service.modeCoordinator.processRequest.mockResolvedValue({ success: true, translatedText: 'bonjour' });
+
+      await service.handleTranslationRequest(message);
+
+      const manifest = createRequestUnitManifest.mock.results[0].value;
+      expect(createTranslationOperation).toHaveBeenCalledWith('m-manifest', manifest);
+    });
+
+    it('invokes the router once for an accepted completion', async () => {
+      const message = { messageId: 'm-route', data: { text: 'hello', mode: 'selection' }, context: 'content' };
+      translationRequestTracker.createRequest.mockReturnValue({ messageId: 'm-route', data: message.data, mode: 'selection' });
+      translationRequestTracker.completeRequest.mockReturnValue({ accepted: true, status: 'completed' });
+      service.modeCoordinator.processRequest.mockResolvedValue({ success: true, translatedText: 'bonjour' });
+
+      await service.handleTranslationRequest(message);
+
+      expect(TerminalExecutionRouter.routeTerminalExecution).toHaveBeenCalledTimes(1);
+      expect(TerminalExecutionRouter.routeTerminalExecution).toHaveBeenCalledWith(expect.any(Object), { status: 'completed' });
+    });
+
+    it('never invokes the router when completion is rejected', async () => {
+      const message = { messageId: 'm-rejected', data: { text: 'hello', mode: 'selection' }, context: 'content' };
+      translationRequestTracker.createRequest.mockReturnValue({ messageId: 'm-rejected', data: message.data, mode: 'selection' });
+      translationRequestTracker.completeRequest.mockReturnValue({ accepted: false, status: 'cancelled', reason: 'already_terminal' });
+      service.modeCoordinator.processRequest.mockResolvedValue({ success: true, translatedText: 'bonjour' });
+
+      const result = await service.handleTranslationRequest(message);
+
+      expect(result).toMatchObject({ success: false, cancelled: true });
+      expect(TerminalExecutionRouter.routeTerminalExecution).not.toHaveBeenCalled();
+    });
   });
 
   describe('_resolveEffectiveProvider', () => {
@@ -378,19 +448,65 @@ describe('UnifiedTranslationService', () => {
 
       const result = await service.cancelRequest('m1');
 
-      expect(result.success).toBe(true);
+      expect(result).toEqual({ handled: true, success: true });
+      expect(translationRequestTracker.cancelRequest).toHaveBeenCalledWith('m1', ActionReasons.USER_CANCELLED);
       expect(mockEngine.cancelTranslation).toHaveBeenCalledWith('m1');
-      expect(translationRequestTracker.cancelRequest).toHaveBeenCalledWith('m1');
       expect(service.resultDispatcher.dispatchCancellation).toHaveBeenCalled();
     });
 
-    it('should return error if request not found', async () => {
+    it('should return unhandled when request not found', async () => {
       translationRequestTracker.getRequest.mockReturnValue(null);
 
       const result = await service.cancelRequest('unknown');
 
-      expect(result.success).toBe(false);
-      expect(result.error).toBe('Request not found');
+      expect(result).toEqual({ handled: false, success: false, error: 'Request not found' });
+    });
+
+    it('reports handled-but-rejected cancellation without finalizing or dispatching', async () => {
+      translationRequestTracker.getRequest.mockReturnValue({ messageId: 'm-rejected' });
+      translationRequestTracker.cancelRequest.mockReturnValue({ accepted: false, status: 'completed', reason: 'already_terminal' });
+
+      const result = await service.cancelRequest('m-rejected');
+
+      expect(result).toEqual({ handled: true, success: false, error: 'already_terminal' });
+      expect(finalizeTranslationOperation).not.toHaveBeenCalled();
+      expect(service.resultDispatcher.dispatchCancellation).not.toHaveBeenCalled();
+    });
+
+    it('threads the supplied reason unchanged to the tracker', async () => {
+      translationRequestTracker.getRequest.mockReturnValue({ messageId: 'm-reason' });
+
+      await service.cancelRequest('m-reason', 'user-typed');
+
+      expect(translationRequestTracker.cancelRequest).toHaveBeenCalledWith('m-reason', 'user-typed');
+    });
+
+    it('finalizes, aborts and dispatches exactly once on accepted cancellation', async () => {
+      translationRequestTracker.getRequest.mockReturnValue({ messageId: 'm-finalize' });
+
+      await service.cancelRequest('m-finalize');
+
+      expect(finalizeTranslationOperation).toHaveBeenCalledTimes(1);
+      expect(mockEngine.cancelTranslation).toHaveBeenCalledTimes(1);
+      expect(service.resultDispatcher.dispatchCancellation).toHaveBeenCalledTimes(1);
+    });
+
+    it('routes the accepted cancellation to the router exactly once', async () => {
+      translationRequestTracker.getRequest.mockReturnValue({ messageId: 'm-route-cancel' });
+
+      await service.cancelRequest('m-route-cancel');
+
+      expect(TerminalExecutionRouter.routeTerminalExecution).toHaveBeenCalledTimes(1);
+      expect(TerminalExecutionRouter.routeTerminalExecution).toHaveBeenCalledWith(expect.any(Object), { status: 'cancelled' });
+    });
+
+    it('never routes when cancellation is rejected', async () => {
+      translationRequestTracker.getRequest.mockReturnValue({ messageId: 'm-reject-cancel' });
+      translationRequestTracker.cancelRequest.mockReturnValue({ accepted: false, status: 'completed', reason: 'already_terminal' });
+
+      await service.cancelRequest('m-reject-cancel');
+
+      expect(TerminalExecutionRouter.routeTerminalExecution).not.toHaveBeenCalled();
     });
   });
 

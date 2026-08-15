@@ -14,7 +14,11 @@ vi.mock('../core/StreamingManager.js', () => ({
 }))
 
 vi.mock('@/core/services/translation/TranslationRequestTracker.js', () => ({
-  translationRequestTracker: { getTabRequests: getTabRequestsMock, cancelRequest: vi.fn(), markTimeout: vi.fn() }
+  translationRequestTracker: { getTabRequests: getTabRequestsMock, getRequest: vi.fn(), cancelRequest: vi.fn(), markTimeout: vi.fn() }
+}))
+
+vi.mock('@/core/services/translation/UnifiedTranslationService.js', () => ({
+  unifiedTranslationService: { cancelRequest: vi.fn() }
 }))
 
 const dispatchCancellationMock = vi.fn()
@@ -32,6 +36,7 @@ vi.mock('../core/RateLimitManager.js', () => ({
 
 const { handleCancelTranslation } = await import('./handleCancelTranslation.js')
 const { translationRequestTracker } = await import('@/core/services/translation/TranslationRequestTracker.js')
+const { unifiedTranslationService } = await import('@/core/services/translation/UnifiedTranslationService.js')
 
 describe('handleCancelTranslation', () => {
   let engine
@@ -43,6 +48,8 @@ describe('handleCancelTranslation', () => {
     translationRequestTracker.cancelRequest.mockReturnValue({ accepted: true, request: { messageId: 'request' } })
     translationRequestTracker.markTimeout.mockReset()
     translationRequestTracker.markTimeout.mockReturnValue({ accepted: true, request: { messageId: 'request' } })
+    unifiedTranslationService.cancelRequest.mockReset()
+    unifiedTranslationService.cancelRequest.mockResolvedValue({ handled: false, success: false })
     dispatchCancellationMock.mockReset()
     queueCancelMock.mockReset()
     rateLimitCancelMock.mockReset()
@@ -61,9 +68,9 @@ describe('handleCancelTranslation', () => {
     expect(result).toMatchObject({ success: true, cancelledCount: 2 })
     for (const id of ['one', 'two']) {
       expect(engine.cancelTranslation).toHaveBeenCalledWith(id)
-      expect(translationRequestTracker.cancelRequest).toHaveBeenCalledWith(id, 'Translation cancelled by user')
+      expect(translationRequestTracker.cancelRequest).toHaveBeenCalledWith(id, 'user_cancelled')
       expect(dispatchCancellationMock).toHaveBeenCalledWith({ messageId: id, request: { messageId: 'request' } })
-      expect(cancelStreamMock).toHaveBeenCalledWith(id, 'Translation cancelled by user')
+      expect(cancelStreamMock).toHaveBeenCalledWith(id, 'user_cancelled')
       expect(rateLimitCancelMock).toHaveBeenCalledWith(id)
       expect(queueCancelMock).toHaveBeenCalledWith(id)
     }
@@ -97,7 +104,7 @@ describe('handleCancelTranslation', () => {
     expect(translationRequestTracker.cancelRequest).not.toHaveBeenCalled()
     expect(dispatchCancellationMock).not.toHaveBeenCalled()
     expect(engine.cancelTranslation).toHaveBeenCalledWith('timed-out')
-    expect(cancelStreamMock).toHaveBeenCalledWith('timed-out', 'Translation cancelled by user')
+    expect(cancelStreamMock).toHaveBeenCalledWith('timed-out', 'user_cancelled')
     expect(rateLimitCancelMock).toHaveBeenCalledWith('timed-out')
     expect(queueCancelMock).toHaveBeenCalledWith('timed-out')
   })
@@ -122,7 +129,7 @@ describe('handleCancelTranslation', () => {
     await handleCancelTranslation({ data: { cancelAll: true } }, {})
 
     expect(engine.cancelTranslation).toHaveBeenCalledWith('one')
-    expect(cancelStreamMock).toHaveBeenCalledWith('one', 'Translation cancelled by user')
+    expect(cancelStreamMock).toHaveBeenCalledWith('one', 'user_cancelled')
     expect(rateLimitCancelMock).toHaveBeenCalledWith('one')
     expect(queueCancelMock).toHaveBeenCalledWith('one')
   })
@@ -155,7 +162,7 @@ describe('handleCancelTranslation', () => {
 
     await handleCancelTranslation({ data: { cancelAll: true } }, {})
 
-    expect(cancelStreamMock).toHaveBeenCalledWith('one', 'Translation cancelled by user')
+    expect(cancelStreamMock).toHaveBeenCalledWith('one', 'user_cancelled')
     expect(rateLimitCancelMock).toHaveBeenCalledWith('one')
     expect(queueCancelMock).toHaveBeenCalledWith('one')
   })
@@ -166,7 +173,7 @@ describe('handleCancelTranslation', () => {
 
     await handleCancelTranslation({ data: { cancelAll: true } }, {})
 
-    expect(cancelStreamMock).toHaveBeenCalledWith('one', 'Translation cancelled by user')
+    expect(cancelStreamMock).toHaveBeenCalledWith('one', 'user_cancelled')
     expect(rateLimitCancelMock).toHaveBeenCalledWith('one')
     expect(queueCancelMock).toHaveBeenCalledWith('one')
   })
@@ -193,5 +200,109 @@ describe('handleCancelTranslation', () => {
 
     expect(result).toMatchObject({ success: true, cancelledCount: 0 })
     expect(cancelStreamMock).not.toHaveBeenCalled()
+  })
+
+  it('delegates a service-owned user cancellation exactly once', async () => {
+    engine.getActiveTranslationIds.mockReturnValue(['owned'])
+    unifiedTranslationService.cancelRequest.mockResolvedValue({ handled: true, success: true })
+
+    const result = await handleCancelTranslation({ data: { cancelAll: true } }, {})
+
+    expect(result).toMatchObject({ success: true, cancelledCount: 1 })
+    expect(unifiedTranslationService.cancelRequest).toHaveBeenCalledTimes(1)
+    expect(unifiedTranslationService.cancelRequest).toHaveBeenCalledWith('owned', 'user_cancelled')
+  })
+
+  it('does not repeat tracker transition, dispatch or engine abort on delegated success', async () => {
+    engine.getActiveTranslationIds.mockReturnValue(['owned'])
+    unifiedTranslationService.cancelRequest.mockResolvedValue({ handled: true, success: true })
+
+    await handleCancelTranslation({ data: { cancelAll: true } }, {})
+
+    expect(translationRequestTracker.cancelRequest).not.toHaveBeenCalled()
+    expect(dispatchCancellationMock).not.toHaveBeenCalled()
+    expect(engine.cancelTranslation).not.toHaveBeenCalled()
+  })
+
+  it('runs the legacy fallback when the service reports unhandled', async () => {
+    engine.getActiveTranslationIds.mockReturnValue(['legacy'])
+    unifiedTranslationService.cancelRequest.mockResolvedValue({ handled: false, success: false })
+
+    await handleCancelTranslation({ data: { cancelAll: true } }, {})
+
+    expect(translationRequestTracker.cancelRequest).toHaveBeenCalledWith('legacy', 'user_cancelled')
+    expect(dispatchCancellationMock).toHaveBeenCalledWith({ messageId: 'legacy', request: { messageId: 'request' } })
+    expect(engine.cancelTranslation).toHaveBeenCalledWith('legacy')
+  })
+
+  it('never delegates a timeout through the service cancellation API', async () => {
+    engine.getActiveTranslationIds.mockReturnValue(['timed-out'])
+
+    await handleCancelTranslation({ data: { cancelAll: true, timeout: true } }, {})
+
+    expect(unifiedTranslationService.cancelRequest).not.toHaveBeenCalled()
+    expect(translationRequestTracker.markTimeout).toHaveBeenCalledWith('timed-out')
+    expect(translationRequestTracker.cancelRequest).not.toHaveBeenCalled()
+  })
+
+  it('preserves abort-always without touching tracker or dispatch when handled-but-rejected', async () => {
+    engine.getActiveTranslationIds.mockReturnValue(['terminal'])
+    unifiedTranslationService.cancelRequest.mockResolvedValue({ handled: true, success: false, error: 'already_terminal' })
+
+    await handleCancelTranslation({ data: { cancelAll: true } }, {})
+
+    expect(translationRequestTracker.cancelRequest).not.toHaveBeenCalled()
+    expect(dispatchCancellationMock).not.toHaveBeenCalled()
+    expect(engine.cancelTranslation).toHaveBeenCalledWith('terminal')
+  })
+
+  it('safely falls back when the delegate rejects', async () => {
+    engine.getActiveTranslationIds.mockReturnValue(['fallback'])
+    unifiedTranslationService.cancelRequest.mockRejectedValue(new Error('service failure'))
+
+    const result = await handleCancelTranslation({ data: { cancelAll: true } }, {})
+
+    expect(result).toMatchObject({ success: true })
+    expect(translationRequestTracker.cancelRequest).toHaveBeenCalledWith('fallback', 'user_cancelled')
+    expect(engine.cancelTranslation).toHaveBeenCalledWith('fallback')
+  })
+
+  it('supports mixed delegated and fallback IDs for cancelAll', async () => {
+    engine.getActiveTranslationIds.mockReturnValue(['owned', 'fallback'])
+    unifiedTranslationService.cancelRequest.mockImplementation((id) =>
+      id === 'owned'
+        ? Promise.resolve({ handled: true, success: true })
+        : Promise.resolve({ handled: false, success: false })
+    )
+
+    await handleCancelTranslation({ data: { cancelAll: true } }, {})
+
+    expect(unifiedTranslationService.cancelRequest).toHaveBeenCalledTimes(2)
+    expect(translationRequestTracker.cancelRequest).toHaveBeenCalledTimes(1)
+    expect(translationRequestTracker.cancelRequest).toHaveBeenCalledWith('fallback', 'user_cancelled')
+  })
+
+  it('runs streaming, rate-limit and queue cleanup exactly once per target', async () => {
+    engine.getActiveTranslationIds.mockReturnValue(['owned'])
+    unifiedTranslationService.cancelRequest.mockResolvedValue({ handled: true, success: true })
+
+    await handleCancelTranslation({ data: { cancelAll: true } }, {})
+
+    expect(cancelStreamMock).toHaveBeenCalledTimes(1)
+    expect(rateLimitCancelMock).toHaveBeenCalledTimes(1)
+    expect(queueCancelMock).toHaveBeenCalledTimes(1)
+    expect(cancelStreamMock).toHaveBeenCalledWith('owned', 'user_cancelled')
+    expect(rateLimitCancelMock).toHaveBeenCalledWith('owned')
+    expect(queueCancelMock).toHaveBeenCalledWith('owned')
+  })
+
+  it('preserves the acknowledgment shape for delegated cancellations', async () => {
+    engine.getActiveTranslationIds.mockReturnValue(['owned'])
+    unifiedTranslationService.cancelRequest.mockResolvedValue({ handled: true, success: true })
+
+    const result = await handleCancelTranslation({ data: { cancelAll: true, reason: 'Test cancel' } }, {})
+
+    expect(result).toMatchObject({ success: true, cancelledCount: 1, reason: 'Test cancel', context: 'background', message: 'Translation cancellation acknowledged' })
+    expect(unifiedTranslationService.cancelRequest).toHaveBeenCalledWith('owned', 'Test cancel')
   })
 })

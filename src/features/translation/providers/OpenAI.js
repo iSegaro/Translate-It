@@ -30,7 +30,7 @@ export class OpenAIProvider extends BaseAIProvider {
    * @protected
    */
   async _callAI(systemPrompt, userText, options = {}) {
-    const { abortController, sessionId, expectedFormat, isBatch } = options;
+    const { abortController, sessionId, expectedFormat, isBatch, executionContext } = options;
 
     const [apiKeys, apiUrl, model] = await Promise.all([
       getOpenAIApiKeysAsync(),
@@ -80,6 +80,7 @@ export class OpenAIProvider extends BaseAIProvider {
       context: `${this.providerName.toLowerCase()}-translation`,
       abortController,
       sessionId,
+      executionContext,
       updateApiKey: (newKey, options) => {
         if (options && options.headers) {
           options.headers.Authorization = `Bearer ${newKey}`;

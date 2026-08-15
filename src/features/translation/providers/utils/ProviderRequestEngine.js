@@ -12,6 +12,7 @@ import { ApiKeyManager } from "@/features/translation/providers/ApiKeyManager.js
 import { ErrorTypes } from "@/shared/error-management/ErrorTypes.js";
 import { matchErrorToType } from "@/shared/error-management/ErrorMatcher.js";
 import { ProviderNames } from "@/features/translation/providers/ProviderConstants.js";
+import { appendTranslationDiagnostic } from '@/features/translation/ir/TranslationOperation.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.TRANSLATION, 'ProviderRequestEngine');
 
@@ -47,7 +48,7 @@ export const ProviderRequestEngine = {
   /**
    * UNIFIED API REQUEST HANDLER
    */
-  async executeRequest(provider, { url, fetchOptions, extractResponse, context, abortController, updateApiKey, charCount, originalCharCount, sessionId }) {
+  async executeRequest(provider, { url, fetchOptions, extractResponse, context, abortController, updateApiKey, charCount, originalCharCount, sessionId, executionContext }) {
     // 1. Determine how many attempts we should make based on available keys
     let availableKeysCount = 1;
     if (provider.providerSettingKey && updateApiKey) {
@@ -84,6 +85,12 @@ export const ProviderRequestEngine = {
           if (currentKey) {
             await ApiKeyManager.promoteKey(provider.providerSettingKey, currentKey);
             logger.info(`[${provider.providerName}] Failover successful on attempt ${attempt + 1}, key promoted.`);
+            appendTranslationDiagnostic(executionContext, {
+              type: 'PROVIDER_KEY_FAILOVER',
+              stage: 'provider-request',
+              provider: provider.providerName,
+              attempt: attempt + 1,
+            });
           }
         }
 
@@ -94,6 +101,14 @@ export const ProviderRequestEngine = {
 
         const errorType = error.type || matchErrorToType(error);
         if (errorType === ErrorTypes.USER_CANCELLED || errorType === ErrorTypes.TRANSLATION_CANCELLED) {
+          appendTranslationDiagnostic(executionContext, {
+            type: 'PROVIDER_CANCELLED',
+            stage: 'provider-request',
+            provider: provider.providerName,
+            reason: error.message,
+            code: errorType,
+            cancelled: true,
+          });
           throw error;
         }
 
@@ -102,6 +117,14 @@ export const ProviderRequestEngine = {
           const keys = await ApiKeyManager.getKeys(provider.providerSettingKey);
           if (keys.length > attempt + 1) {
             logger.warn(`[${provider.providerName}] Key error, attempting failover (${attempt + 1}/${availableKeysCount})`);
+            appendTranslationDiagnostic(executionContext, {
+              type: 'PROVIDER_KEY_FAILOVER_ATTEMPT',
+              stage: 'provider-request',
+              provider: provider.providerName,
+              attempt: attempt + 1,
+              reason: error.message,
+              code: errorType,
+            });
             const nextKey = keys[attempt + 1];
             await updateApiKey(nextKey, fetchOptions);
             
@@ -117,6 +140,14 @@ export const ProviderRequestEngine = {
         }
 
         if (!error.type) error.type = errorType;
+        appendTranslationDiagnostic(executionContext, {
+          type: 'PROVIDER_REQUEST_FAILURE',
+          stage: 'provider-request',
+          provider: provider.providerName,
+          attempt: attempt + 1,
+          reason: error.message,
+          code: error.type,
+        });
         throw error;
       }
     }

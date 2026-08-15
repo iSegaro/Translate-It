@@ -1,6 +1,8 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { AIResponseParser } from './AIResponseParser.js';
 import { ResponseFormat } from '@/shared/config/translationConstants.js';
+import { TranslationContractValidator } from '@/features/translation/core/TranslationContractValidator.js';
+import { createManifestView, createRequestUnitManifest, MappingStrategy } from '@/features/translation/ir/RequestUnitManifest.js';
 
 describe('AIResponseParser', () => {
   describe('cleanAIResponse - String Format', () => {
@@ -98,6 +100,115 @@ describe('AIResponseParser', () => {
       const input = 'undefined';
       const result = AIResponseParser.cleanAIResponse(input, ResponseFormat.STRING);
       expect(result).toBe('undefined');
+    });
+  });
+
+  describe('parseBatchResult manifest validation', () => {
+    it('observes immutable validation without changing legacy output', () => {
+      const originalBatch = [{ i: 'first', t: 'source' }];
+      const observeValidationResult = vi.fn();
+      const result = AIResponseParser.parseBatchResult(
+        '[{"i":"first","t":"translated"}]',
+        1,
+        originalBatch,
+        'Custom',
+        ResponseFormat.JSON_ARRAY,
+        { observeValidationResult },
+        createManifestView(createRequestUnitManifest(originalBatch)),
+      );
+
+      expect(result).toEqual(['translated']);
+      expect(observeValidationResult).toHaveBeenCalledTimes(1);
+      expect(observeValidationResult).toHaveBeenCalledWith(expect.objectContaining({
+        isValid: true,
+        validatedUnits: [{ requestIndex: 0, unitId: 'first', translatedText: 'translated', violationCodes: [] }],
+      }));
+      expect(Object.isFrozen(observeValidationResult.mock.calls[0][0])).toBe(true);
+    });
+
+    it('observes invalid validation while preserving legacy fallback mapping', () => {
+      const originalBatch = [{ i: 'first', t: 'source one' }, { i: 'second', t: 'source two' }];
+      const observeValidationResult = vi.fn();
+      const result = AIResponseParser.parseBatchResult(
+        '[{"i":"second","t":"translated"},{"i":"second","t":""}]',
+        2,
+        originalBatch,
+        'Custom',
+        ResponseFormat.JSON_ARRAY,
+        { observeValidationResult },
+        createManifestView(createRequestUnitManifest(originalBatch)),
+      );
+
+      expect(result).toEqual(['source one', 'second']);
+      expect(observeValidationResult).toHaveBeenCalledWith(expect.objectContaining({ isValid: false }));
+    });
+
+    it('ignores observer failures without changing legacy output', () => {
+      const originalBatch = ['source'];
+      const result = AIResponseParser.parseBatchResult(
+        '["translated"]',
+        1,
+        originalBatch,
+        'Custom',
+        ResponseFormat.JSON_ARRAY,
+        { observeValidationResult: () => { throw new Error('ignore'); } },
+        createManifestView(createRequestUnitManifest(originalBatch)),
+      );
+
+      expect(result).toEqual(['translated']);
+    });
+
+    it('does not observe malformed parser fallback', () => {
+      const observeValidationResult = vi.fn();
+      const result = AIResponseParser.parseBatchResult(
+        '{"translations":',
+        1,
+        ['source'],
+        'Custom',
+        ResponseFormat.JSON_OBJECT,
+        { observeValidationResult },
+        createManifestView(createRequestUnitManifest(['source'])),
+      );
+
+      expect(result).toEqual(['source']);
+      expect(observeValidationResult).not.toHaveBeenCalled();
+    });
+
+    it('does not observe split batches without a manifest view', () => {
+      const observeValidationResult = vi.fn();
+      const result = AIResponseParser.parseBatchResult(
+        '["translated"]',
+        1,
+        ['source'],
+        'Custom',
+        ResponseFormat.JSON_ARRAY,
+        { observeValidationResult },
+        null,
+      );
+
+      expect(result).toEqual(['translated']);
+      expect(observeValidationResult).not.toHaveBeenCalled();
+    });
+
+    it('skips observation for an inconsistent manifest view without changing parser output', () => {
+      const validate = vi.spyOn(TranslationContractValidator, 'validate');
+
+      const result = AIResponseParser.parseBatchResult(
+        '["translated"]',
+        1,
+        ['source'],
+        'Custom',
+        ResponseFormat.JSON_ARRAY,
+        null,
+        {
+          units: [{ unitId: 'unit-0', requestIndex: 0 }],
+          declaredMappingStrategy: MappingStrategy.POSITIONAL_ONLY,
+        },
+      );
+
+      expect(result).toEqual(['translated']);
+      expect(validate).not.toHaveBeenCalled();
+      validate.mockRestore();
     });
   });
 });
