@@ -13,7 +13,7 @@
     >
       <div class="sidebar-header">
         <a
-          :href="REPO_URLS.GITHUB_MAIN"
+          :href="REPO_URLS.WEBSITE_MAIN"
           target="_blank"
           rel="noopener noreferrer"
           class="header-logo-link"
@@ -71,19 +71,34 @@
       </a>
 
       <div class="sidebar-footer">
-        <a
-          :href="REPO_URLS.GITHUB_MAIN"
-          target="_blank"
-          rel="noopener noreferrer"
-          :title="t('github_link_title') || 'GitHub'"
-        >
-          <img
-            src="@/icons/ui/github.svg"
-            alt="GitHub"
-            height="22"
-            class="github-icon"
+        <div class="footer-icon-links">
+          <a
+            :href="REPO_URLS.GITHUB_MAIN"
+            target="_blank"
+            rel="noopener noreferrer"
+            :title="t('github_link_title') || 'GitHub'"
           >
-        </a>
+            <img
+              src="@/icons/ui/github.svg"
+              alt="GitHub"
+              height="22"
+              class="footer-icon github-icon"
+            >
+          </a>
+          <a
+            :href="REPO_URLS.WEBSITE_MAIN"
+            target="_blank"
+            rel="noopener noreferrer"
+            title="Translate It Website"
+          >
+            <img
+              src="@/icons/extension/extension_icon_64.png"
+              alt="Translate It Website"
+              height="22"
+              class="footer-icon"
+            >
+          </a>
+        </div>
         <p>
           by
           <a
