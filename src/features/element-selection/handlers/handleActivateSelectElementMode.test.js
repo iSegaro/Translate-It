@@ -31,6 +31,10 @@ vi.mock('@/core/extensionContext.js', () => ({
 
 vi.mock('@/shared/error-management/ErrorHandler.js');
 
+vi.mock('../utils/activationError.js', () => ({
+  getSelectElementActivationErrorMessage: vi.fn(() => Promise.resolve('Could not activate Select Element mode.')),
+}));
+
 vi.mock('@/shared/logging/logger.js', () => ({
   getScopedLogger: vi.fn(() => ({
     debug: vi.fn(),
@@ -143,8 +147,24 @@ describe('handleActivateSelectElementMode', () => {
     const response = await handleActivateSelectElementMode(message, {});
 
     expect(response.success).toBe(false);
-    expect(response.message).toBe('Already active');
+    expect(response.message).toBe('Could not activate Select Element mode.');
+    expect(response.error).toBe('Could not activate Select Element mode.');
     expect(response.isCompatibilityIssue).toBe(true);
+  });
+
+  it('sanitizes unknown activation exceptions while retaining diagnostics in logs', async () => {
+    const technicalMessage = 'Could not establish connection. Receiving end does not exist: INTERNAL_PORT_9f81';
+    browser.tabs.query.mockRejectedValueOnce(new Error(technicalMessage));
+
+    const response = await handleActivateSelectElementMode({ data: { active: true } }, {});
+
+    expect(response).toMatchObject({
+      success: false,
+      message: 'Could not activate Select Element mode.',
+      error: 'Could not activate Select Element mode.',
+    });
+    expect(JSON.stringify(response)).not.toContain('INTERNAL_PORT_9f81');
+    expect(JSON.stringify(response)).not.toContain('Receiving end does not exist');
   });
 
   it('should deactivate mode', async () => {

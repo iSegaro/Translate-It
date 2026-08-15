@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
 
 // Mock dependencies
 vi.mock('@/shared/logging/logger.js', () => ({
@@ -63,8 +64,15 @@ vi.mock('@/shared/error-management/ErrorTypes.js', async () => {
   return actual;
 });
 
+vi.mock('@/core/extensionContext.js', () => ({
+  default: {
+    isValidSync: vi.fn(() => true),
+  },
+}));
+
 import { ErrorHandler } from '@/shared/error-management/ErrorHandler.js';
 const errorHandlerMock = ErrorHandler.getInstance();
+const { default: ExtensionContextManager } = await import('@/core/extensionContext.js');
 
 vi.mock('@/utils/dom/DomDirectionManager.js', () => ({
   detectDirectionFromContent: vi.fn(() => 'rtl'),
@@ -132,6 +140,7 @@ describe('DomTranslatorAdapter', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    ExtensionContextManager.isValidSync.mockReturnValue(true);
     globalSelectElementState.translationHistory = [];
     adapter = new DomTranslatorAdapter();
     testElement = document.createElement('div');    testElement.textContent = 'Hello';
@@ -177,6 +186,102 @@ describe('DomTranslatorAdapter', () => {
       );
     });
 
+    it('rejects elements above the local segment limit with a typed error before requesting translation', async () => {
+      const { collectTextNodes } = await import('./DomTranslatorUtils.js');
+      const { ErrorTypes } = await import('@/shared/error-management/ErrorTypes.js');
+      const segments = Array.from({ length: 1001 }, (_, index) => ({
+        node: testElement.firstChild,
+        text: `Segment ${index}`,
+        uid: `n${index}`,
+        blockId: `b${index}`,
+        role: 'div',
+      }));
+      collectTextNodes.mockReturnValueOnce(segments);
+
+      const translation = adapter.translateElement(testElement);
+      await expect(translation).rejects.toMatchObject({
+        type: ErrorTypes.ELEMENT_TOO_LARGE,
+        segmentCount: 1001,
+        maxSegmentCount: 1000,
+      });
+      await expect(translation).rejects.toThrow('1001 text segments');
+      expect(contentScriptIntegration.sendTranslationRequest).not.toHaveBeenCalled();
+    });
+
+    it('keeps overlapping roots blocked until owning translation releases the root', async () => {
+      const { ErrorTypes } = await import('@/shared/error-management/ErrorTypes.js');
+      let streamCallbacks;
+      registerTranslation.mockImplementationOnce((_id, callbacks) => { streamCallbacks = callbacks; });
+      contentScriptIntegration.sendTranslationRequest.mockResolvedValueOnce({ success: true, streaming: true });
+
+      const firstTranslation = adapter.translateElement(testElement);
+      await vi.waitFor(() => expect(streamCallbacks).toBeDefined());
+      const requestCount = contentScriptIntegration.sendTranslationRequest.mock.calls.length;
+
+      await expect(adapter.translateElement(testElement)).rejects.toMatchObject({
+        type: ErrorTypes.FEATURE_BLOCKED,
+        translationOutcome: { committedParentCount: 0, totalParentCount: 0, cancelled: false },
+      });
+      expect(contentScriptIntegration.sendTranslationRequest).toHaveBeenCalledTimes(requestCount);
+      expect(testElement.textContent).toBe('Hello');
+
+      await expect(adapter.translateElement(testElement)).rejects.toMatchObject({
+        type: ErrorTypes.FEATURE_BLOCKED,
+        translationOutcome: { committedParentCount: 0, totalParentCount: 0, cancelled: false },
+      });
+      expect(contentScriptIntegration.sendTranslationRequest).toHaveBeenCalledTimes(requestCount);
+
+      await adapter.cancelTranslation({ silent: true });
+      streamCallbacks.onStreamEnd({ cancelled: true });
+      await expect(firstTranslation).resolves.toMatchObject({ success: false, cancelled: true });
+
+      let releasedCallbacks;
+      registerTranslation.mockImplementationOnce((_id, callbacks) => { releasedCallbacks = callbacks; });
+      contentScriptIntegration.sendTranslationRequest.mockResolvedValueOnce({ success: true, streaming: true });
+      const releasedTranslation = adapter.translateElement(testElement);
+      await vi.waitFor(() => expect(releasedCallbacks).toBeDefined());
+      expect(contentScriptIntegration.sendTranslationRequest).toHaveBeenCalledTimes(requestCount + 1);
+      releasedCallbacks.onStreamUpdate({ success: true, data: [{ t: 'Released', i: 'n1' }] });
+      releasedCallbacks.onStreamEnd({ success: true });
+      await expect(releasedTranslation).resolves.toMatchObject({ success: true });
+      expect(testElement.textContent).toContain('Released');
+    });
+
+    it('allows two non-overlapping roots to translate concurrently', async () => {
+      const firstAdapter = adapter;
+      const secondAdapter = new DomTranslatorAdapter();
+      const firstRoot = document.createElement('div');
+      const secondRoot = document.createElement('div');
+      firstRoot.textContent = 'First';
+      secondRoot.textContent = 'Second';
+      document.body.append(firstRoot, secondRoot);
+      const { collectTextNodes } = await import('./DomTranslatorUtils.js');
+      collectTextNodes
+        .mockReturnValueOnce([{ node: firstRoot.firstChild, text: 'First', uid: 'n1', blockId: 'b1', role: 'div' }])
+        .mockReturnValueOnce([{ node: secondRoot.firstChild, text: 'Second', uid: 'n1', blockId: 'b1', role: 'div' }]);
+
+      const callbacks = [];
+      registerTranslation.mockImplementation((_id, registered) => { callbacks.push(registered); });
+      contentScriptIntegration.sendTranslationRequest.mockResolvedValue({ success: true, streaming: true });
+
+      const firstTranslation = firstAdapter.translateElement(firstRoot);
+      const secondTranslation = secondAdapter.translateElement(secondRoot);
+      await vi.waitFor(() => expect(callbacks).toHaveLength(2));
+      expect(contentScriptIntegration.sendTranslationRequest).toHaveBeenCalledTimes(2);
+
+      callbacks[0].onStreamUpdate({ success: true, data: [{ t: 'Uno', i: 'n1' }] });
+      callbacks[0].onStreamEnd({ success: true });
+      callbacks[1].onStreamUpdate({ success: true, data: [{ t: 'Dos', i: 'n1' }] });
+      callbacks[1].onStreamEnd({ success: true });
+
+      await expect(firstTranslation).resolves.toMatchObject({ success: true });
+      await expect(secondTranslation).resolves.toMatchObject({ success: true });
+      expect(firstRoot.textContent).toContain('Uno');
+      expect(secondRoot.textContent).toContain('Dos');
+      document.body.removeChild(firstRoot);
+      document.body.removeChild(secondRoot);
+    });
+
     it('maps the non-grouping strategy to V2 extraction mode exactly once', async () => {
       const { collectTextNodes } = await import('./DomTranslatorUtils.js');
       collectTextNodes.mockClear();
@@ -211,6 +316,36 @@ describe('DomTranslatorAdapter', () => {
 
       expect(collectBlockGroups).toHaveBeenCalledTimes(1);
       expect(collectBlockGroups).toHaveBeenCalledWith(testElement, expect.any(Object), { extractionMode: 'v3' });
+    });
+
+    it('translates an explicitly selected BUTTON root through the normal flow', async () => {
+      const button = document.createElement('button');
+      button.textContent = 'Follow this account to see their updates';
+      document.body.appendChild(button);
+
+      const { collectTextNodes } = await import('./DomTranslatorUtils.js');
+      collectTextNodes.mockReturnValueOnce([{
+        node: button.firstChild,
+        text: button.firstChild.textContent,
+        uid: 'n1',
+        blockId: 'b1',
+        role: 'button'
+      }]);
+
+      let callbacks;
+      registerTranslation.mockImplementationOnce((_id, registered) => { callbacks = registered; });
+      contentScriptIntegration.sendTranslationRequest.mockImplementationOnce(async () => {
+        setTimeout(() => {
+          callbacks.onStreamUpdate({ success: true, data: [{ t: 'دنبال کردن', i: 'n1' }] });
+          callbacks.onStreamEnd({ success: true });
+        }, 0);
+        return { success: true, streaming: true };
+      });
+
+      const result = await adapter.translateElement(button);
+
+      expect(result.success).toBe(true);
+      expect(button.textContent).toContain('دنبال کردن');
     });
 
     it('A: returns zero-commit failure for rejected streaming result', async () => {
@@ -973,6 +1108,51 @@ describe('DomTranslatorAdapter', () => {
       document.body.removeChild(div);
     });
 
+    it('preserves option value/selection through translate and restores the label on revert', async () => {
+      const { collectTextNodes } = await import('./DomTranslatorUtils.js');
+      const { revertSelectElementTranslation } = await import('./DomTranslatorState.js');
+      const { getFeatureSemanticBlockGroupingAsync } = await import('@/config.js');
+      // Reset queued once-implementations so this test runs a deterministic V2
+      // (non-grouping) path; a preceding test short-circuits the block-grouping
+      // read when it stubs a traditional provider, leaving a queued once behind.
+      getFeatureSemanticBlockGroupingAsync.mockReset();
+      getFeatureSemanticBlockGroupingAsync.mockResolvedValue(false);
+
+      const select = document.createElement('select');
+      select.innerHTML = `
+        <option value="en" selected>English</option>
+        <option value="fa">Persian</option>
+      `;
+      document.body.appendChild(select);
+
+      const safeLabel = select.options[0].firstChild;
+      collectTextNodes.mockReturnValueOnce([
+        { node: safeLabel, text: 'English', uid: 'opt1', blockId: 'b1', role: 'option' }
+      ]);
+
+      contentScriptIntegration.sendTranslationRequest.mockResolvedValue({
+        success: true,
+        streaming: false,
+        translatedText: JSON.stringify([{ t: 'انگلیسی', i: 'opt1' }])
+      });
+
+      await adapter.translateElement(select);
+
+      // Translated label, but explicit value and selected state untouched.
+      expect(select.options[0].text).toContain('انگلیسی');
+      expect(select.options[0].value).toBe('en');
+      expect(select.selectedIndex).toBe(0);
+
+      // Generic revert restores the original label.
+      await revertSelectElementTranslation();
+
+      expect(select.options[0].text).toBe('English');
+      expect(select.options[0].value).toBe('en');
+      expect(select.selectedIndex).toBe(0);
+
+      document.body.removeChild(select);
+    });
+
     it('should route through collectBlockGroups when FEATURE_SEMANTIC_BLOCK_GROUPING is true', async () => {
       const { getFeatureSemanticBlockGroupingAsync } = await import('@/config.js');
       const { collectTextNodes, collectBlockGroups } = await import('./DomTranslatorUtils.js');
@@ -1206,7 +1386,178 @@ describe('DomTranslatorAdapter', () => {
       const { collectTextNodes } = await import('./DomTranslatorUtils.js');
       collectTextNodes.mockReturnValueOnce([]);
 
-      await expect(adapter.translateElement(testElement)).rejects.toThrow('No translatable text found');
+      const { ErrorTypes } = await import('@/shared/error-management/ErrorTypes.js');
+      try {
+        await adapter.translateElement(testElement);
+        expect.fail('translateElement should have thrown');
+      } catch (error) {
+        expect(error.message).toBe('No translatable text found');
+        expect(error.type).toBe(ErrorTypes.NO_TRANSLATABLE_CONTENT);
+        expect(error.type).not.toBe(ErrorTypes.VALIDATION);
+      }
+    });
+
+    describe('mode capability preflight', () => {
+      // Deterministically fix the block-grouping flag. mockReset also clears any
+      // once-implementation leaked by earlier tests that short-circuit the
+      // block-grouping read, so each preflight test observes the mode it requests.
+      async function configureBlockGrouping(enabled) {
+        const { getFeatureSemanticBlockGroupingAsync } = await import('@/config.js');
+        getFeatureSemanticBlockGroupingAsync.mockReset();
+        getFeatureSemanticBlockGroupingAsync.mockResolvedValue(false);
+        if (enabled) getFeatureSemanticBlockGroupingAsync.mockResolvedValueOnce(true);
+      }
+
+      async function expectUnsupportedModePreflight(tag, html) {
+        const { collectTextNodes, collectBlockGroups } = await import('./DomTranslatorUtils.js');
+        const { ErrorTypes } = await import('@/shared/error-management/ErrorTypes.js');
+        const { SelectElementReason } = await import('./SelectElementPolicy.js');
+
+        await configureBlockGrouping(false);
+
+        const el = document.createElement(tag);
+        el.textContent = html;
+        document.body.appendChild(el);
+
+        await expect(adapter.translateElement(el)).rejects.toMatchObject({
+          type: ErrorTypes.NO_TRANSLATABLE_CONTENT,
+          reason: SelectElementReason.UNSUPPORTED_MODE,
+        });
+        expect(collectTextNodes).not.toHaveBeenCalled();
+        expect(collectBlockGroups).not.toHaveBeenCalled();
+        expect(contentScriptIntegration.sendTranslationRequest).not.toHaveBeenCalled();
+        document.body.removeChild(el);
+      }
+
+      it('rejects PRE root under V2 with UNSUPPORTED_MODE before extraction or request', async () => {
+        await expectUnsupportedModePreflight('pre', 'const x = 1;');
+      });
+
+      it('rejects CODE root under V2 with UNSUPPORTED_MODE before extraction or request', async () => {
+        await expectUnsupportedModePreflight('code', 'const x = 1;');
+      });
+
+      it('rejects a <pre><code> shape under V2 without special-casing the child', async () => {
+        const { collectTextNodes, collectBlockGroups } = await import('./DomTranslatorUtils.js');
+        const { ErrorTypes } = await import('@/shared/error-management/ErrorTypes.js');
+        const { SelectElementReason } = await import('./SelectElementPolicy.js');
+
+        await configureBlockGrouping(false);
+
+        const pre = document.createElement('pre');
+        const code = document.createElement('code');
+        code.textContent = 'const x = 1;';
+        pre.appendChild(code);
+        document.body.appendChild(pre);
+
+        await expect(adapter.translateElement(pre)).rejects.toMatchObject({
+          type: ErrorTypes.NO_TRANSLATABLE_CONTENT,
+          reason: SelectElementReason.UNSUPPORTED_MODE,
+        });
+        expect(collectTextNodes).not.toHaveBeenCalled();
+        expect(collectBlockGroups).not.toHaveBeenCalled();
+        expect(contentScriptIntegration.sendTranslationRequest).not.toHaveBeenCalled();
+        document.body.removeChild(pre);
+      });
+
+      it('passes PRE root under V3 through block grouping unchanged', async () => {
+        await configureBlockGrouping(true);
+        const { collectBlockGroups } = await import('./DomTranslatorUtils.js');
+        collectBlockGroups.mockClear();
+
+        const pre = document.createElement('pre');
+        pre.textContent = 'const x = 1;';
+        document.body.appendChild(pre);
+        collectBlockGroups.mockReturnValueOnce([{
+          id: 'n1',
+          blockId: 'g1',
+          text: 'const x = 1;',
+          leadingWS: '',
+          trailingWS: '',
+          preWhitespace: true,
+          directionHint: 'ltr',
+          inlineParentTags: ['pre'],
+          mode: 'V2_PASSTHROUGH',
+          node: pre.firstChild
+        }]);
+
+        contentScriptIntegration.sendTranslationRequest.mockResolvedValue({
+          success: true,
+          streaming: false,
+          translatedText: JSON.stringify([{ t: 'x', i: 'n1' }])
+        });
+
+        const result = await adapter.translateElement(pre);
+        expect(result.success).toBe(true);
+        expect(collectBlockGroups).toHaveBeenCalledTimes(1);
+        expect(collectBlockGroups).toHaveBeenCalledWith(pre, expect.any(Object), { extractionMode: 'v3' });
+        expect(pre.textContent).toContain('x');
+        document.body.removeChild(pre);
+      });
+
+      it('passes CODE root under V3 through block grouping unchanged', async () => {
+        await configureBlockGrouping(true);
+        const { collectBlockGroups } = await import('./DomTranslatorUtils.js');
+        collectBlockGroups.mockClear();
+
+        const code = document.createElement('code');
+        code.textContent = 'const y = 2;';
+        document.body.appendChild(code);
+        collectBlockGroups.mockReturnValueOnce([{
+          id: 'n1',
+          blockId: 'g1',
+          text: 'const y = 2;',
+          leadingWS: '',
+          trailingWS: '',
+          preWhitespace: true,
+          directionHint: 'ltr',
+          inlineParentTags: ['code'],
+          mode: 'V2_PASSTHROUGH',
+          node: code.firstChild
+        }]);
+
+        contentScriptIntegration.sendTranslationRequest.mockResolvedValue({
+          success: true,
+          streaming: false,
+          translatedText: JSON.stringify([{ t: 'y', i: 'n1' }])
+        });
+
+        const result = await adapter.translateElement(code);
+        expect(result.success).toBe(true);
+        expect(collectBlockGroups).toHaveBeenCalledTimes(1);
+        expect(collectBlockGroups).toHaveBeenCalledWith(code, expect.any(Object), { extractionMode: 'v3' });
+        expect(code.textContent).toContain('y');
+        document.body.removeChild(code);
+      });
+
+      it('leaves an ordinary DIV root under V2 untouched by the preflight', async () => {
+        await configureBlockGrouping(false);
+        const { collectTextNodes } = await import('./DomTranslatorUtils.js');
+        collectTextNodes.mockClear();
+
+        const div = document.createElement('div');
+        div.textContent = 'Ordinary paragraph text';
+        document.body.appendChild(div);
+        collectTextNodes.mockReturnValueOnce([{
+          node: div.firstChild,
+          text: div.firstChild.textContent,
+          uid: 'n1',
+          blockId: 'b1',
+          role: 'div'
+        }]);
+
+        contentScriptIntegration.sendTranslationRequest.mockResolvedValue({
+          success: true,
+          streaming: false,
+          translatedText: JSON.stringify([{ t: 'پاراگراف', i: 'n1' }])
+        });
+
+        const result = await adapter.translateElement(div);
+        expect(result.success).toBe(true);
+        expect(collectTextNodes).toHaveBeenCalledWith(div, { extractionMode: 'v2' });
+        expect(div.textContent).toContain('پاراگراف');
+        document.body.removeChild(div);
+      });
     });
 
     it('should handle fatal stream errors', async () => {
@@ -1775,6 +2126,163 @@ describe('DomTranslatorAdapter', () => {
       expect(testElement.textContent).toContain('سلام');
     });
 
+    it('preserves committed parents and blocks late stream mutation and ACK after context loss', async () => {
+      const first = document.createTextNode('A');
+      const second = document.createTextNode('B');
+      testElement.replaceChildren(first, second);
+      const { collectTextNodes } = await import('./DomTranslatorUtils.js');
+      collectTextNodes.mockReturnValueOnce([
+        { node: first, text: 'A', uid: 'n1', blockId: 'b1', role: 'div' },
+        { node: second, text: 'B', uid: 'n2', blockId: 'b2', role: 'div' },
+      ]);
+
+      let callbacks;
+      registerTranslation.mockImplementationOnce((_id, registered) => { callbacks = registered; });
+      contentScriptIntegration.sendTranslationRequest.mockResolvedValueOnce({
+        success: true,
+        streaming: true,
+        conversationAcceptance: true,
+      });
+
+      const translation = adapter.translateElement(testElement);
+      await vi.waitFor(() => expect(callbacks).toBeDefined());
+      callbacks.onStreamUpdate({ success: true, data: [{ t: 'Uno', i: 'n1' }] });
+      await vi.waitFor(() => expect(sendRegularMessage).toHaveBeenCalledWith(
+        expect.objectContaining({ data: expect.objectContaining({ parentId: 'b1', accepted: true }) }),
+        { silent: true }
+      ));
+
+      ExtensionContextManager.isValidSync.mockReturnValue(false);
+      adapter.invalidateContext();
+      callbacks.onStreamUpdate({ success: true, data: [{ t: 'Dos', i: 'n2' }] });
+      callbacks.onStreamEnd({ success: true });
+
+      await expect(translation).rejects.toMatchObject({ type: ErrorTypes.EXTENSION_CONTEXT_INVALIDATED });
+      expect(first.nodeValue).toContain('Uno');
+      expect(second.nodeValue).toBe('B');
+      expect(sendRegularMessage.mock.calls.filter(([message]) => message?.data?.accepted === true))
+        .toHaveLength(1);
+      expect(sendRegularMessage).not.toHaveBeenCalledWith(
+        expect.objectContaining({ data: expect.objectContaining({ parentId: 'b2' }) }),
+        expect.anything()
+      );
+      expect(contentScriptIntegration.cancelTranslationRequest).not.toHaveBeenCalled();
+    });
+
+    it('rejects context loss after stream success but before finalization', async () => {
+      const first = document.createTextNode('A');
+      const second = document.createTextNode('B');
+      testElement.replaceChildren(first, second);
+      const { collectTextNodes } = await import('./DomTranslatorUtils.js');
+      collectTextNodes.mockReturnValueOnce([
+        { node: first, text: 'A', uid: 'n1', blockId: 'b1', role: 'div' },
+        { node: second, text: 'B', uid: 'n2', blockId: 'b2', role: 'div' },
+      ]);
+
+      let callbacks;
+      registerTranslation.mockImplementationOnce((_id, registered) => { callbacks = registered; });
+      contentScriptIntegration.sendTranslationRequest.mockResolvedValueOnce({
+        success: true,
+        streaming: true,
+        conversationAcceptance: true,
+      });
+
+      const finalize = adapter._finalizeTranslation.bind(adapter);
+      vi.spyOn(adapter, '_finalizeTranslation').mockImplementation(async (args) => {
+        ExtensionContextManager.isValidSync.mockReturnValue(false);
+        return finalize(args);
+      });
+
+      const translation = adapter.translateElement(testElement);
+      await vi.waitFor(() => expect(callbacks).toBeDefined());
+      callbacks.onStreamUpdate({
+        success: true,
+        data: [{ t: 'Uno', i: 'n1' }, { t: 'Dos', i: 'n2' }],
+      });
+      await vi.waitFor(() => {
+        expect(testElement.textContent).toContain('Uno');
+        expect(testElement.textContent).toContain('Dos');
+      });
+      const { applyElementDirection } = await import('@/utils/dom/DomDirectionManager.js');
+      applyElementDirection.mockClear();
+      const ackCount = sendRegularMessage.mock.calls.length;
+      callbacks.onStreamEnd({ success: true });
+
+      await expect(translation).rejects.toMatchObject({
+        type: ErrorTypes.EXTENSION_CONTEXT_INVALIDATED,
+      });
+      expect(applyElementDirection).not.toHaveBeenCalled();
+      expect(testElement.textContent).toContain('Uno');
+      expect(testElement.textContent).toContain('Dos');
+      expect(globalSelectElementState.currentTranslation.partial).toBe(true);
+      expect(sendRegularMessage).toHaveBeenCalledTimes(ackCount);
+      expect(adapter.isCurrentlyTranslating()).toBe(false);
+    });
+
+    it('settles before first commit when context is invalidated during streaming', async () => {
+      let callbacks;
+      registerTranslation.mockImplementationOnce((_id, registered) => { callbacks = registered; });
+      contentScriptIntegration.sendTranslationRequest.mockResolvedValueOnce({
+        success: true,
+        streaming: true,
+        conversationAcceptance: true,
+      });
+
+      const translation = adapter.translateElement(testElement);
+      await vi.waitFor(() => expect(callbacks).toBeDefined());
+      ExtensionContextManager.isValidSync.mockReturnValue(false);
+      adapter.invalidateContext();
+      callbacks.onStreamUpdate({ success: true, data: [{ t: 'late', i: 'n1' }] });
+
+      await expect(translation).rejects.toMatchObject({ type: ErrorTypes.EXTENSION_CONTEXT_INVALIDATED });
+      expect(testElement.textContent).toBe('Hello');
+      expect(sendRegularMessage).not.toHaveBeenCalled();
+      expect(contentScriptIntegration.cancelTranslationRequest).not.toHaveBeenCalled();
+    });
+
+    it('releases the active root after context invalidation', async () => {
+      let callbacks;
+      registerTranslation.mockImplementationOnce((_id, registered) => { callbacks = registered; });
+      contentScriptIntegration.sendTranslationRequest.mockResolvedValueOnce({ success: true, streaming: true });
+
+      const translation = adapter.translateElement(testElement);
+      await vi.waitFor(() => expect(callbacks).toBeDefined());
+      ExtensionContextManager.isValidSync.mockReturnValue(false);
+      adapter.invalidateContext();
+      await expect(translation).rejects.toMatchObject({ type: ErrorTypes.EXTENSION_CONTEXT_INVALIDATED });
+
+      ExtensionContextManager.isValidSync.mockReturnValue(true);
+      let retryCallbacks;
+      registerTranslation.mockImplementationOnce((_id, registered) => { retryCallbacks = registered; });
+      contentScriptIntegration.sendTranslationRequest.mockResolvedValueOnce({ success: true, streaming: true });
+      const retry = adapter.translateElement(testElement);
+      await vi.waitFor(() => expect(retryCallbacks).toBeDefined());
+      retryCallbacks.onStreamUpdate({ success: true, data: [{ t: 'Retry', i: 'n1' }] });
+      retryCallbacks.onStreamEnd({ success: true });
+
+      await expect(retry).resolves.toMatchObject({ success: true });
+      expect(testElement.textContent).toContain('Retry');
+    });
+
+    it('rejects a direct response after context loss before DOM application', async () => {
+      contentScriptIntegration.sendTranslationRequest.mockImplementationOnce(async () => {
+        ExtensionContextManager.isValidSync.mockReturnValue(false);
+        return {
+          success: true,
+          streaming: false,
+          translatedText: [{ t: 'late', i: 'n1' }],
+          conversationAcceptance: true,
+        };
+      });
+
+      await expect(adapter.translateElement(testElement)).rejects.toMatchObject({
+        type: ErrorTypes.EXTENSION_CONTEXT_INVALIDATED,
+      });
+      expect(testElement.textContent).toBe('Hello');
+      expect(sendRegularMessage).not.toHaveBeenCalled();
+      expect(contentScriptIntegration.cancelTranslationRequest).not.toHaveBeenCalled();
+    });
+
     it('should not apply empty translation', () => {
       const textNode = testElement.firstChild;
       const originalValue = textNode.nodeValue;
@@ -2141,6 +2649,50 @@ describe('DomTranslatorAdapter', () => {
 
       streamCallbacks.onStreamEnd({ success: true });
       await expect(translation).resolves.toMatchObject({ success: false, cancelled: true });
+    });
+
+    it('preserves committed parents and blocks late DOM/ACK work after conflict-style cancellation', async () => {
+      const first = document.createTextNode('A');
+      const second = document.createTextNode('B');
+      testElement.replaceChildren(first, second);
+      const { collectTextNodes } = await import('./DomTranslatorUtils.js');
+      collectTextNodes.mockReturnValueOnce([
+        { node: first, text: 'A', uid: 'n1', blockId: 'b1', role: 'div' },
+        { node: second, text: 'B', uid: 'n2', blockId: 'b2', role: 'div' },
+      ]);
+
+      let streamCallbacks;
+      registerTranslation.mockImplementationOnce((_id, callbacks) => { streamCallbacks = callbacks; });
+      contentScriptIntegration.sendTranslationRequest.mockResolvedValueOnce({
+        success: true,
+        streaming: true,
+        conversationAcceptance: true,
+      });
+
+      const translation = adapter.translateElement(testElement);
+      await vi.waitFor(() => expect(streamCallbacks).toBeDefined());
+      streamCallbacks.onStreamUpdate({ success: true, data: [{ t: 'Uno', i: 'n1' }] });
+      await vi.waitFor(() => expect(sendRegularMessage).toHaveBeenCalledWith(
+        expect.objectContaining({ data: expect.objectContaining({ parentId: 'b1', accepted: true }) }),
+        { silent: true }
+      ));
+      const acceptedBeforeConflict = sendRegularMessage.mock.calls.filter(([message]) => (
+        message?.data?.accepted === true
+      ));
+
+      await adapter.cancelTranslation({ silent: true });
+      streamCallbacks.onStreamUpdate({ success: true, data: [{ t: 'Dos', i: 'n2' }] });
+      streamCallbacks.onStreamEnd({ success: true });
+
+      await expect(translation).resolves.toMatchObject({ success: false, cancelled: true });
+      expect(first.nodeValue).toContain('Uno');
+      expect(second.nodeValue).toBe('B');
+      expect(sendRegularMessage.mock.calls.filter(([message]) => message?.data?.accepted === true))
+        .toHaveLength(acceptedBeforeConflict.length);
+      expect(sendRegularMessage).not.toHaveBeenCalledWith(
+        expect.objectContaining({ data: expect.objectContaining({ parentId: 'b2' }) }),
+        expect.anything()
+      );
     });
 
     it('ignores callbacks from previous session after a new translation starts', async () => {
@@ -2938,7 +3490,7 @@ describe('DomTranslatorAdapter', () => {
         expect(isValidTextElement(p)).toBe(true);
         expect(isValidTextElement(textarea)).toBe(false);
         expect(isValidTextElement(input)).toBe(false);
-        expect(isValidTextElement(select)).toBe(true);
+        expect(isValidTextElement(select)).toBe(false);
         expect(isValidTextElement(button)).toBe(true);
       } finally {
         window.getComputedStyle = originalGetComputedStyle;

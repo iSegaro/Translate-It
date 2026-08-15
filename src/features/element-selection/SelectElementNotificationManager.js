@@ -47,6 +47,7 @@ class SelectElementNotificationManager extends ResourceTracker {
     this.addEventListener(pageEventBus, 'update-select-element-notification', (data) => this.updateNotification(data));
     this.addEventListener(pageEventBus, 'dismiss-select-element-notification', () => this.dismissNotification());
     this.addEventListener(pageEventBus, 'cancel-select-element-mode', () => this.dismissNotification());
+    this.addEventListener(pageEventBus, 'show-select-element-info', (data) => this.showInfoNotification(data));
   }
   
   async showNotification(data = {}) {
@@ -146,6 +147,25 @@ class SelectElementNotificationManager extends ResourceTracker {
       this.notificationManager.dismiss(this.toastId);
       this.toastId = null;
     }
+  }
+
+  /**
+   * Shows a non-error informational Select Element message (e.g. no
+   * translatable content). Replaces any in-flight select-element toast so the
+   * activation/progress notification is never left stuck.
+   * @param {Object} [data={}] - Event payload.
+   * @param {string} [data.message] - Localized informational message.
+   */
+  showInfoNotification(data = {}) {
+    if (!data) data = {};
+
+    const isTopFrame = window === window.top;
+    if (!isTopFrame) return;
+
+    this.dismissNotification();
+
+    const message = data.message || 'No translatable text was found in this element.';
+    this.notificationManager.show(message, 'info', 4000, { id: 'select-element-toast' });
   }
   
   async cleanup() {

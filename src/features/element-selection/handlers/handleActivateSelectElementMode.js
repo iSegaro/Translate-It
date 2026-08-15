@@ -9,6 +9,7 @@ import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { tabPermissionChecker } from '@/core/tabPermissions.js';
 import ExtensionContextManager from '@/core/extensionContext.js';
 import { setStateForTab } from './selectElementStateManager.js';
+import { getSelectElementActivationErrorMessage } from '../utils/activationError.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.ELEMENT_SELECTION, 'handleActivateSelectElementMode');
 
@@ -111,12 +112,14 @@ export async function handleActivateSelectElementMode(message, sender) {
         logger.error(`Failed to send message to tab ${targetTabId}:`, error);
       }
       
-      return { 
+      const safeMessage = await getSelectElementActivationErrorMessage();
+      return {
         success: false, 
         message: 'Failed to communicate with tab - try refreshing the page',
         tabId: targetTabId,
         activated: false,
-        error: error.message
+        error: safeMessage,
+        errorType: ErrorTypes.SELECT_ELEMENT,
       };
     }
     
@@ -169,15 +172,17 @@ export async function handleActivateSelectElementMode(message, sender) {
         url: access.fullUrl.substring(0, 80) + (access.fullUrl.length > 80 ? '...' : '')
       });
       
-      // Use the error information from content script
+      const safeMessage = await getSelectElementActivationErrorMessage();
+
       return {
         success: false,
-        message: response.error,
+        message: safeMessage,
+        error: safeMessage,
         tabId: targetTabId,
         activated: false,
         isRestrictedPage: access.isRestricted, // Use actual permission check, not content script's guess
         isCompatibilityIssue: response.isCompatibilityIssue || false,
-        errorType: response.errorType,
+        errorType: response.errorType || ErrorTypes.SELECT_ELEMENT,
         tabUrl: access.fullUrl
       };
     }
@@ -221,18 +226,32 @@ export async function handleActivateSelectElementMode(message, sender) {
       response
     };
   } catch (error) {
-    if (ExtensionContextManager.isContextError(error)) {
+    const isContextError = ExtensionContextManager.isContextError(error);
+    if (isContextError) {
       ExtensionContextManager.handleContextError(error, 'handleActivateSelectElementMode');
     } else {
       logger.error('Exception in handleActivateSelectElementMode:', error);
-      errorHandler.handle(error, {
-        type: ErrorTypes.SELECT_ELEMENT,
-        context: "handleActivateSelectElementMode",
-        messageData: message
-      });
     }
     
-    const response = { success: false, message: error.message || 'Element selection activation failed' };
+    const safeMessage = await getSelectElementActivationErrorMessage();
+    const displayError = Object.assign(new Error(safeMessage), {
+      type: ErrorTypes.SELECT_ELEMENT,
+      cause: error,
+    });
+    if (!isContextError) {
+      errorHandler.handle(displayError, {
+        type: ErrorTypes.SELECT_ELEMENT,
+        context: 'handleActivateSelectElementMode',
+        messageData: message,
+      });
+    }
+
+    const response = {
+      success: false,
+      message: safeMessage,
+      error: safeMessage,
+      errorType: ErrorTypes.SELECT_ELEMENT,
+    };
     logger.debug('Returning error response:', response);
     return response;
   }

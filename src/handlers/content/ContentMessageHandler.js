@@ -6,6 +6,8 @@ import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { revertHandler } from './RevertHandler.js';
 import { applyTranslationToTextField } from '../smartTranslationIntegration.js';
 import { ErrorHandler } from '@/shared/error-management/ErrorHandler.js';
+import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
+import { getSelectElementActivationErrorMessage } from '@/features/element-selection/utils/activationError.js';
 import { pageEventBus } from '@/core/PageEventBus.js';
 import ResourceTracker from '@/core/memory/ResourceTracker.js';
 
@@ -253,7 +255,15 @@ export class ContentMessageHandler extends ResourceTracker {
           this.logger.error(`Error handling ${message.action}`, error);
         }
         try {
-          if (sendResponse) sendResponse({ success: false, error: error.message });
+          if (sendResponse && message.action === MessageActions.ACTIVATE_SELECT_ELEMENT_MODE) {
+            sendResponse({
+              success: false,
+              error: await getSelectElementActivationErrorMessage(),
+              errorType: ErrorTypes.SELECT_ELEMENT,
+            });
+          } else if (sendResponse) {
+            sendResponse({ success: false, error: error.message });
+          }
         } catch (e) {
           this.logger.error(`Failed to send error response for ${message.action}:`, e);
         }
@@ -317,8 +327,10 @@ export class ContentMessageHandler extends ResourceTracker {
     } catch (error) {
       this.logger.warn("ContentMessageHandler: SelectElement activation failed:", error);
       
-      // Use centralized error management to get classified error type and localized message
-      const errorInfo = await this.errorHandler.getErrorForUI(error, "ContentMessageHandler-activateSelectElement");
+      const errorInfo = {
+        message: await getSelectElementActivationErrorMessage(),
+        type: ErrorTypes.SELECT_ELEMENT,
+      };
 
       // Log as debug for internal tracking (silence red log)
       this.logger.debug("Error details for SelectElement activation:", { error, errorInfo });
@@ -539,16 +551,34 @@ export class ContentMessageHandler extends ResourceTracker {
   // IFrame support handlers
   async handleIFrameActivateSelectElement(/* data */) {
     this.logger.info('IFrame activate select element request');
-    if (this.selectElementManager) {
-      // Initialize if not already initialized
-      if (!this.selectElementManager.isInitialized) {
-        await this.selectElementManager.initialize();
+    try {
+      if (this.selectElementManager) {
+        // Initialize if not already initialized
+        if (!this.selectElementManager.isInitialized) {
+          await this.selectElementManager.initialize();
+        }
+
+        const result = await this.selectElementManager.activateSelectElementMode();
+        return { success: true, activated: result.isActive, managerId: result.instanceId };
       }
 
-      const result = await this.selectElementManager.activateSelectElementMode();
-      return { success: true, activated: result.isActive, managerId: result.instanceId };
+      const safeMessage = await getSelectElementActivationErrorMessage();
+      return {
+        success: false,
+        message: safeMessage,
+        error: safeMessage,
+        errorType: ErrorTypes.SELECT_ELEMENT,
+      };
+    } catch (error) {
+      this.logger.warn('IFrame Select Element activation failed:', error);
+      const safeMessage = await getSelectElementActivationErrorMessage();
+      return {
+        success: false,
+        message: safeMessage,
+        error: safeMessage,
+        errorType: ErrorTypes.SELECT_ELEMENT,
+      };
     }
-    return { success: false, error: 'SelectElementManager not available' };
   }
 
   async handleIFrameTranslateSelection(data) {

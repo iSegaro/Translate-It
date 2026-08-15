@@ -3,6 +3,8 @@ import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { MessageActions } from '@/shared/messaging/core/MessageActions.js';
 import browser from 'webextension-polyfill';
 import ExtensionContextManager from '@/core/extensionContext.js';
+import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
+import { getSelectElementActivationErrorMessage } from '@/features/element-selection/utils/activationError.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.SELECTION, 'handleSelectElement');
 
@@ -37,6 +39,15 @@ export async function handleSelectElement(message) {
     try {
       // Forward the message to the content script
       const response = await browser.tabs.sendMessage(tab.id, message);
+      if (message.action === MessageActions.ACTIVATE_SELECT_ELEMENT_MODE && response?.success === false) {
+        const safeMessage = await getSelectElementActivationErrorMessage();
+        return {
+          ...response,
+          message: safeMessage,
+          error: safeMessage,
+          errorType: response.errorType || ErrorTypes.SELECT_ELEMENT,
+        };
+      }
       return response || { success: true };
     } catch (sendError) {
       // Use centralized context error detection
@@ -49,6 +60,10 @@ export async function handleSelectElement(message) {
     }
   } catch (error) {
     logger.error('Error handling select element message:', error);
+    if (message.action === MessageActions.ACTIVATE_SELECT_ELEMENT_MODE) {
+      const safeMessage = await getSelectElementActivationErrorMessage();
+      return { success: false, message: safeMessage, error: safeMessage, errorType: ErrorTypes.SELECT_ELEMENT };
+    }
     return { success: false, error: error.message };
   }
 }

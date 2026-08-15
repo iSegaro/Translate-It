@@ -57,10 +57,10 @@ describe('ElementSelector with real SelectElementPolicy', () => {
     expect(selector.getHighlightedElement()).toBe(el);
   });
 
-  it('keeps SELECT highlightable', () => {
-    const el = sizedTextElement('select', LONG_TEXT);
+  it.each(['select', 'option'])('rejects %s as a root (no highlight)', (tag) => {
+    const el = sizedTextElement(tag, LONG_TEXT);
     selector.handleMouseOver(el);
-    expect(selector.getHighlightedElement()).toBe(el);
+    expect(selector.getHighlightedElement()).toBeNull();
   });
 
   it.each(['kbd', 'samp'])('rejects %s root', (tag) => {

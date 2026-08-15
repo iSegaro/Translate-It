@@ -33,6 +33,7 @@ import { registerTranslation, contentScriptIntegration } from '@/shared/messagin
 import { ErrorHandler } from '@/shared/error-management/ErrorHandler.js';
 import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
 import { isFatalError, matchErrorToType } from '@/shared/error-management/ErrorMatcher.js';
+import ExtensionContextManager from '@/core/extensionContext.js';
 
 import { registryIdToName, isProviderType, ProviderTypes } from '@/features/translation/providers/ProviderConstants.js';
 
@@ -42,7 +43,7 @@ import {
   revertSelectElementTranslation
 } from './DomTranslatorState.js';
 import { collectTextNodes, collectBlockGroups, generateElementId, extractContextMetadata } from './DomTranslatorUtils.js';
-import { SelectElementExtractionMode } from './SelectElementPolicy.js';
+import { SelectElementExtractionMode, isSelectElementTraversable, SelectElementReason } from './SelectElementPolicy.js';
 import { BlockGroupReconstructor, BlockGroupMutationFailure } from './BlockGroupReconstructor.js';
 import * as DirectionManager from '@/utils/dom/DomDirectionManager.js';
 
@@ -93,6 +94,9 @@ export class DomTranslatorAdapter extends ResourceTracker {
     this.currentStreamEndReject = null;
     this.currentSessionId = null;
     this.currentTranslationToken = null;
+    this._contextInvalidationResolver = null;
+    this._streamEndResolver = null;
+    this._contextInvalidated = false;
     this.translatedSegmentMap = new Map();
     // Operation-local: mirrors the background ConversationAcceptanceCoordinator
     // registration decision for the current translation. Reset per operation.
@@ -104,6 +108,27 @@ export class DomTranslatorAdapter extends ResourceTracker {
 
   async initialize() {
     await this._loadOriginalSettings();
+  }
+
+  _createContextInvalidationError() {
+    return Object.assign(new Error('Extension context invalidated'), {
+      type: ErrorTypes.EXTENSION_CONTEXT_INVALIDATED,
+    });
+  }
+
+  /**
+   * Invalidates current work without attempting runtime messaging. Context
+   * teardown can make cancellation APIs unsafe; local settlement is enough to
+   * prevent further DOM or conversation-ACK work.
+   */
+  invalidateContext() {
+    this._contextInvalidated = true;
+    this._conversationAcceptanceEnabled = false;
+    if (this.currentTranslationToken) this.currentTranslationToken.cancelled = true;
+
+    const error = this._createContextInvalidationError();
+    this._contextInvalidationResolver?.(error);
+    this._streamEndResolver?.({ success: false, error });
   }
 
   /**
@@ -123,6 +148,7 @@ export class DomTranslatorAdapter extends ResourceTracker {
   async translateElement(element, options = {}) {
     const { onProgress, onComplete, onError } = options;
     let translationToken = null;
+    let ownsActiveTranslationRoot = false;
     let getCurrentOutcome = () => ({ committedParentCount: 0, totalParentCount: 0, cancelled: false });
     let terminalStreamFailure = false;
     this.logger.operation('Starting element translation');
@@ -138,8 +164,10 @@ export class DomTranslatorAdapter extends ResourceTracker {
         }
       }
       activeTranslationRoots.add(element);
+      ownsActiveTranslationRoot = true;
 
       this.isTranslating = true;
+      this._contextInvalidated = false;
       // Reset per operation: never let a previous translation's participation
       // decision leak into this one.
       this._conversationAcceptanceEnabled = false;
@@ -169,6 +197,19 @@ export class DomTranslatorAdapter extends ResourceTracker {
       const extractionMode = isBlockGroupingEnabled
         ? SelectElementExtractionMode.V3
         : SelectElementExtractionMode.V2;
+
+      // Capability preflight: the policy owns mode capability. A PRE/CODE root
+      // under V2 is valid content the current mode cannot represent — surface it
+      // as a capability-specific no-content outcome instead of letting the
+      // collector report a misleading "no translatable text" result. Element-level
+      // policy only: no DOM walk, no provider request, no collector call.
+      const preflight = isSelectElementTraversable(element, { isRoot: true, extractionMode });
+      if (!preflight.traversable && preflight.reason === SelectElementReason.UNSUPPORTED_MODE) {
+        const error = new Error('Selected content is not supported by the current extraction mode');
+        error.type = ErrorTypes.NO_TRANSLATABLE_CONTENT;
+        error.reason = SelectElementReason.UNSUPPORTED_MODE;
+        throw error;
+      }
       
       let textNodesData = [];
       const groupMap = new Map();
@@ -223,7 +264,7 @@ export class DomTranslatorAdapter extends ResourceTracker {
 
       if (textNodesData.length === 0) {
         const error = new Error('No translatable text found');
-        error.type = ErrorTypes.VALIDATION;
+        error.type = ErrorTypes.NO_TRANSLATABLE_CONTENT;
         throw error;
       }
 
@@ -232,7 +273,11 @@ export class DomTranslatorAdapter extends ResourceTracker {
       const WARNING_SEGMENTS = 500; // Increased from 200
       if (textNodesData.length > MAX_SEGMENTS) {
         this.logger.debug(`[DomTranslatorAdapter] Element contains ${textNodesData.length} segments, exceeding limit of ${MAX_SEGMENTS}`);
-        throw new Error(`Element is too large to translate (${textNodesData.length} text segments). Please select a smaller element.`);
+        const error = new Error(`Element is too large to translate (${textNodesData.length} text segments). Please select a smaller element.`);
+        error.type = ErrorTypes.ELEMENT_TOO_LARGE;
+        error.segmentCount = textNodesData.length;
+        error.maxSegmentCount = MAX_SEGMENTS;
+        throw error;
       } else if (textNodesData.length > WARNING_SEGMENTS) {
         this.logger.debug(`[DomTranslatorAdapter] Element contains ${textNodesData.length} segments, translation may take longer`);
       }
@@ -492,6 +537,13 @@ export class DomTranslatorAdapter extends ResourceTracker {
       this.currentMessageId = messageId;
       translationToken = { messageId, cancelled: false };
       this.currentTranslationToken = translationToken;
+      const contextInvalidationPromise = new Promise((_, reject) => {
+        this._contextInvalidationResolver = reject;
+      });
+      if (!ExtensionContextManager.isValidSync()) {
+        this.invalidateContext();
+        throw this._createContextInvalidationError();
+      }
       let effectiveTargetLanguage = targetLanguage;
       
       // Tracking processed nodes to avoid multi-batch conflicts
@@ -537,10 +589,18 @@ export class DomTranslatorAdapter extends ResourceTracker {
           resolve(val);
         };
 
+        this._streamEndResolver = safeResolve;
+
         registerTranslation(messageId, {
           onStreamUpdate: (data) => {
             if (isSettled) return;
-            if (!this._isCurrentTranslation(translationToken)) return;
+            if (!this._isCurrentTranslation(translationToken)) {
+              if (!ExtensionContextManager.isValidSync()) {
+                this.invalidateContext();
+                safeResolve({ success: false, error: this._createContextInvalidationError() });
+              }
+              return;
+            }
             try {
               if (data.success === false || data.error) {
                 if (isFatalError(data.error)) {
@@ -660,7 +720,13 @@ export class DomTranslatorAdapter extends ResourceTracker {
           },
            onStreamEnd: (data) => {
              if (isSettled) return;
-             if (!this._isCurrentTranslation(translationToken)) return safeResolve({ success: false, cancelled: true });
+             if (!this._isCurrentTranslation(translationToken)) {
+               return safeResolve(
+                 ExtensionContextManager.isValidSync()
+                   ? { success: false, cancelled: true }
+                   : { success: false, error: this._createContextInvalidationError() }
+               );
+             }
              if (data.cancelled) return safeResolve({ success: false, cancelled: true });
              if (data.success === false || data.error) {
                terminalStreamFailure = true;
@@ -674,11 +740,15 @@ export class DomTranslatorAdapter extends ResourceTracker {
             const finalLang = data.targetLanguage || effectiveTargetLanguage;
             safeResolve({ success: true, targetLanguage: finalLang });
           },
-          onError: (error) => {
-            if (isSettled) return;
-            if (!this._isCurrentTranslation(translationToken)) {
-              return safeResolve({ success: false, cancelled: true });
-            }
+           onError: (error) => {
+             if (isSettled) return;
+             if (!this._isCurrentTranslation(translationToken)) {
+               return safeResolve(
+                 ExtensionContextManager.isValidSync()
+                   ? { success: false, cancelled: true }
+                   : { success: false, error: this._createContextInvalidationError() }
+               );
+             }
             
             // Still resolve to allow cleanup, but pass the error
             safeResolve({ success: false, error });
@@ -691,26 +761,34 @@ export class DomTranslatorAdapter extends ResourceTracker {
 
       await contentScriptIntegration.initialize();
       
-      const response = await contentScriptIntegration.sendTranslationRequest({
-        action: MessageActions.TRANSLATE,
-        messageId, 
-        data: {
-          text: JSON.stringify(textsToTranslate),
-          provider,
-          isExplicitProvider: !!options.provider,
-          sourceLanguage: AUTO_DETECT_VALUE,
-          targetLanguage: effectiveTargetLanguage,
-          originalSourceLang: this.originalSettings.source,
-          originalTargetLang: this.originalSettings.target,
-          mode: TranslationMode.Select_Element,
-          contextMetadata: isAIContextEnabled ? contextMetadata : null,
-          contextSummary: contextSummary,
-          options: { rawJsonPayload: true, enableDictionary: false, smartContext: isAIContextEnabled },
-          sessionId: this.currentSessionId,
-          conversationParents,
-        },
-        context: MessageContexts.SELECT_ELEMENT,
-      });
+      const response = await Promise.race([
+        contentScriptIntegration.sendTranslationRequest({
+          action: MessageActions.TRANSLATE,
+          messageId,
+          data: {
+            text: JSON.stringify(textsToTranslate),
+            provider,
+            isExplicitProvider: !!options.provider,
+            sourceLanguage: AUTO_DETECT_VALUE,
+            targetLanguage: effectiveTargetLanguage,
+            originalSourceLang: this.originalSettings.source,
+            originalTargetLang: this.originalSettings.target,
+            mode: TranslationMode.Select_Element,
+            contextMetadata: isAIContextEnabled ? contextMetadata : null,
+            contextSummary: contextSummary,
+            options: { rawJsonPayload: true, enableDictionary: false, smartContext: isAIContextEnabled },
+            sessionId: this.currentSessionId,
+            conversationParents,
+          },
+          context: MessageContexts.SELECT_ELEMENT,
+        }),
+        contextInvalidationPromise,
+      ]);
+
+      if (!ExtensionContextManager.isValidSync()) {
+        this.invalidateContext();
+        throw this._createContextInvalidationError();
+      }
 
       // Authoritative background signal: parent acceptance ACKs are only emitted
       // when the ConversationAcceptanceCoordinator registered a handle for this
@@ -739,6 +817,8 @@ export class DomTranslatorAdapter extends ResourceTracker {
       } else {
         result = response;
       }
+
+      this._assertCurrentTranslationContext(translationToken);
 
       // Update effective target language from result if it changed
       if (result?.targetLanguage) {
@@ -776,9 +856,9 @@ export class DomTranslatorAdapter extends ResourceTracker {
         zeroCommit: committedParentCount === 0,
       });
 
-       const finalResult = await this._finalizeTranslation({
-        result, element, elementId, targetLanguage: effectiveTargetLanguage, onComplete, sessionId: this.currentSessionId, committedParentCount, totalParentCount: getCurrentOutcome().totalParentCount
-       });
+      const finalResult = await this._finalizeTranslation({
+        result, element, elementId, targetLanguage: effectiveTargetLanguage, onComplete, sessionId: this.currentSessionId, translationToken, committedParentCount, totalParentCount: getCurrentOutcome().totalParentCount
+      });
 
       // --- Phase 6 Shadow Mode Validation Gate ---
       if (isBlockGroupingEnabled && finalResult?.success) {
@@ -848,7 +928,9 @@ export class DomTranslatorAdapter extends ResourceTracker {
       if (onError) await onError({ status: TRANSLATION_STATUS.ERROR, error: finalError });
       throw finalError;
     } finally {
-      activeTranslationRoots.delete(element);
+      if (ownsActiveTranslationRoot) {
+        activeTranslationRoots.delete(element);
+      }
       this._cleanupCurrentSession(true, translationToken);
     }
   }
@@ -1183,7 +1265,9 @@ export class DomTranslatorAdapter extends ResourceTracker {
     }
   }
 
-  async _finalizeTranslation({ result, element, elementId, targetLanguage, onComplete, sessionId, committedParentCount = 0, totalParentCount = 0 }) {
+  async _finalizeTranslation({ result, element, elementId, targetLanguage, onComplete, sessionId, translationToken, committedParentCount = 0, totalParentCount = 0 }) {
+    this._assertCurrentTranslationContext(translationToken);
+
     const translationOutcome = {
       committedParentCount,
       totalParentCount,
@@ -1251,6 +1335,7 @@ export class DomTranslatorAdapter extends ResourceTracker {
     // the background has no handle for this message, so the ACK would be
     // dropped as "unknown message". Emission mirrors registration exactly.
     if (!this._conversationAcceptanceEnabled) return;
+    if (!ExtensionContextManager.isValidSync()) return;
     if (translationToken && !this._isCurrentTranslation(translationToken)) return;
     if (!this.currentMessageId || !parentId) {
       this.logger.error('[DomTranslatorAdapter] Missing canonical blockId for parent acceptance ACK', {
@@ -1342,18 +1427,35 @@ export class DomTranslatorAdapter extends ResourceTracker {
     }
     if (this.currentTranslationToken === token) this.currentTranslationToken = null;
     this.translatedSegmentMap.clear();
+    this._contextInvalidationResolver = null;
+    this._streamEndResolver = null;
   }
 
   _isCurrentTranslation(token) {
     return Boolean(token)
+      && !this._contextInvalidated
       && !token.cancelled
       && this.currentTranslationToken === token
-      && this.currentMessageId === token.messageId;
+      && this.currentMessageId === token.messageId
+      && ExtensionContextManager.isValidSync();
+  }
+
+  _assertCurrentTranslationContext(token) {
+    if (this._isCurrentTranslation(token)) return;
+    if (this._contextInvalidated || !ExtensionContextManager.isValidSync()) {
+      this.invalidateContext();
+      throw this._createContextInvalidationError();
+    }
   }
 
   async cancelTranslation(options = {}) {
     const { silent = false } = options;
     if (!this.isTranslating) return;
+
+    if (this._contextInvalidated || !ExtensionContextManager.isValidSync()) {
+      this.invalidateContext();
+      return;
+    }
 
     if (!silent) {
       this.logger.debug('Cancelling element translation');

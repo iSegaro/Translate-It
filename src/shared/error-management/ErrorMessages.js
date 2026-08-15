@@ -10,6 +10,7 @@ export const errorMessages = {
   [ErrorTypes.TEXT_EMPTY]: "Text is empty",
   [ErrorTypes.PROMPT_INVALID]: "Prompt is invalid",
   [ErrorTypes.TEXT_TOO_LONG]: "Text is too long",
+  [ErrorTypes.ELEMENT_TOO_LARGE]: "This element is too large to translate at once",
   [ErrorTypes.TRANSLATION_NOT_FOUND]: "Translation not found",
   [ErrorTypes.TRANSLATION_FAILED]: "Translation failed",
   [ErrorTypes.TRANSLATION_TIMEOUT]: "Translation timed out",

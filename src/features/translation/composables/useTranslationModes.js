@@ -16,6 +16,7 @@ import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { createMessageHandler } from '@/shared/messaging/core/MessageHandler.js';
 import { matchErrorToType } from '@/shared/error-management/ErrorMatcher.js';
 import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
+import { getSelectElementActivationErrorMessage } from '@/features/element-selection/utils/activationError.js';
 
 // Lazy logger to avoid TDZ ReferenceErrors when bundled
 const logger = new Proxy({}, {
@@ -291,7 +292,7 @@ export function useSelectElementTranslation() {
       logger.debug('Select element mode activated');
       return true;
     } catch (err) {
-      const errorMsg = err.message || "Failed to activate select element mode";
+      const errorMsg = await getSelectElementActivationErrorMessage();
       error.value = errorMsg;
 
       // Use Error Management system to determine error type and logging level

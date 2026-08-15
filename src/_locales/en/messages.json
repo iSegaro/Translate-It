@@ -530,6 +530,9 @@
   "ERRORS_TRANSLATION_TIMEOUT": {
     "message": "Translation timed out. Please try again."
   },
+  "ERRORS_ELEMENT_TOO_LARGE": {
+    "message": "This element is too large to translate at once."
+  },
   "ERRORS_SELECT_ELEMENT_PARTIAL_TRANSLATION_FAILED": {
     "message": "Some content could not be translated."
   },
@@ -1951,6 +1954,15 @@
   },
   "SELECT_ELEMENT_CANCEL": {
     "message": "Cancel"
+  },
+  "SELECT_ELEMENT_NO_TRANSLATABLE_CONTENT": {
+    "message": "No translatable text was found in this element."
+  },
+  "SELECT_ELEMENT_UNSUPPORTED_TRANSLATION_MODE": {
+    "message": "This content cannot be translated with the current translation mode."
+  },
+  "SELECT_ELEMENT_ACTIVATION_FAILED": {
+    "message": "Could not activate Select Element mode."
   },
   "LINGVA_WPT_WARNING": {
     "message": "Lingva may fail on long texts."
