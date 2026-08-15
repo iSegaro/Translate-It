@@ -364,7 +364,8 @@ export class OptimizedJsonHandler {
               originalTargetLang,
               parallelExecution,
               recoveryContext,
-              TranslationCallPurpose.PARENT_RECOVERY
+              TranslationCallPurpose.PARENT_RECOVERY,
+              bypassAutoSequentialGate
             );
             const translated = response?.translatedText !== undefined ? response.translatedText : response;
             const sourceText = fragment.map(({ text }) => text).join('');
@@ -941,7 +942,9 @@ export class OptimizedJsonHandler {
                originalSourceLang,
                originalTargetLang,
                parallelExecution,
-                batchExecutionContext
+                batchExecutionContext,
+                null,
+                bypassAutoSequentialGate
             );
 
           // Guard provider promise so late rejection after timeout cannot become
@@ -1169,7 +1172,7 @@ export class OptimizedJsonHandler {
     }
   }
 
-  async _performBatchCall(providerInstance, batch, source, target, mode, abortController, messageId, sessionId, contextMetadata, contextSummary, engine, sender, originalSourceLang = null, originalTargetLang = null, parallelExecution = false, executionContext = null, callPurpose = null) {
+  async _performBatchCall(providerInstance, batch, source, target, mode, abortController, messageId, sessionId, contextMetadata, contextSummary, engine, sender, originalSourceLang = null, originalTargetLang = null, parallelExecution = false, executionContext = null, callPurpose = null, languagePairResolved = false) {
     const isArrayInput = Array.isArray(batch);
     const textsToTranslate = isArrayInput
       ? (contextMetadata?.parentRecoveryIntervalUnits
@@ -1189,6 +1192,7 @@ export class OptimizedJsonHandler {
         mode, abortController, messageId, sessionId, contextMetadata, contextSummary,
         engine, sender, priority: 'high', rawJsonPayload: true, parallelExecution,
          originalSourceLang, originalTargetLang,
+         ...(languagePairResolved && { languagePairResolved: true }),
          expectedFormat,
          ...(callPurpose && { callPurpose }),
          executionContext

@@ -1442,10 +1442,53 @@ describe('OptimizedJsonHandler', () => {
       await vi.waitFor(() => expect(mockProvider.translate).toHaveBeenCalledTimes(2));
       expect(mockProvider.translate.mock.calls[0].slice(1, 3)).toEqual(['fa', 'en']);
       expect(mockProvider.translate.mock.calls[1].slice(1, 3)).toEqual(['fa', 'en']);
+      expect(mockProvider.translate.mock.calls[0][3].languagePairResolved).toBe(true);
+      expect(mockProvider.translate.mock.calls[1][3].languagePairResolved).toBe(true);
 
       firstBatch.resolve({ translatedText: ['t1'] });
       secondBatch.resolve({ translatedText: ['t2'] });
       await execution;
+    });
+
+    it('should propagate authoritative pair semantics to every high-confidence AUTO batch', async () => {
+      const segments = ['s1', 's2', 's3', 's4'];
+      mockEngine.createIntelligentBatches = vi.fn((items) => items.map((item) => [item]));
+      resolveOperationSourceLanguage.mockResolvedValueOnce({
+        canBypassSequentialGate: true,
+        bypassReason: 'HIGH_CONFIDENCE_STATISTICAL',
+        effectiveSourceLanguage: 'en',
+        effectiveTargetLanguage: 'fa',
+        detection: { language: 'en', confidence: 'high', provenance: 'statistical' },
+      });
+      mockProvider.translate
+        .mockResolvedValueOnce({ translatedText: ['t1'] })
+        .mockResolvedValueOnce({ translatedText: ['t2'] })
+        .mockResolvedValueOnce({ translatedText: ['t3'] })
+        .mockResolvedValueOnce({ translatedText: ['t4'] });
+
+      await handler.execute(
+        mockEngine,
+        { ...mockData, text: JSON.stringify(segments), sourceLanguage: 'auto' },
+        mockProvider,
+        'auto',
+        'fa',
+        'msg-auto-authoritative',
+        mockSender,
+      );
+
+      expect(mockProvider.translate).toHaveBeenCalledTimes(4);
+      expect(mockProvider.translate.mock.calls.map(([, source, target]) => [source, target])).toEqual([
+        ['en', 'fa'],
+        ['en', 'fa'],
+        ['en', 'fa'],
+        ['en', 'fa'],
+      ]);
+      expect(mockProvider.translate.mock.calls.map((call) => call[3].languagePairResolved)).toEqual([
+        true,
+        true,
+        true,
+        true,
+      ]);
     });
 
     it.each([
@@ -1465,6 +1508,7 @@ describe('OptimizedJsonHandler', () => {
       const execution = handler.execute(mockEngine, mockData, mockProvider, 'auto', 'fa', `msg-auto-${bypassReason}`, mockSender);
 
       await vi.waitFor(() => expect(mockProvider.translate).toHaveBeenCalledTimes(1));
+      expect(mockProvider.translate.mock.calls[0][3].languagePairResolved).toBeUndefined();
       firstBatch.resolve({ translatedText: ['t1'], detectedLanguage: 'en' });
       await vi.waitFor(() => expect(mockProvider.translate).toHaveBeenCalledTimes(2));
       secondBatch.resolve({ translatedText: ['t2'] });
@@ -1489,6 +1533,7 @@ describe('OptimizedJsonHandler', () => {
 
       await vi.waitFor(() => expect(mockProvider.translate).toHaveBeenCalledTimes(1));
       expect(resolveOperationSourceLanguage).not.toHaveBeenCalled();
+      expect(mockProvider.translate.mock.calls[0][3].languagePairResolved).toBeUndefined();
       firstBatch.resolve({ translatedText: ['t1'] });
       await vi.waitFor(() => expect(mockProvider.translate).toHaveBeenCalledTimes(2));
       secondBatch.resolve({ translatedText: ['t2'] });
