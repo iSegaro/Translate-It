@@ -98,9 +98,18 @@ vi.mock('@/shared/messaging/composables/useMessaging.js', () => ({
   useMessaging: vi.fn(),
 }));
 
+const { trackedDisposers } = vi.hoisted(() => ({ trackedDisposers: [] }));
+
 vi.mock('@/composables/core/useResourceTracker.js', () => ({
   useResourceTracker: () => ({
-    trackResource: vi.fn(),
+    trackResource: vi.fn((resourceId, cleanupFn) => {
+      trackedDisposers.push(cleanupFn);
+    }),
+    addEventListener: vi.fn((element, event, handler, options) => {
+      element.addEventListener(event, handler, options);
+      trackedDisposers.push(() => element.removeEventListener(event, handler));
+    }),
+    trackTimeout: vi.fn(),
   }),
 }));
 
@@ -188,6 +197,7 @@ describe('TranslationWindow.vue', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    trackedDisposers.length = 0;
     vi.stubGlobal('requestAnimationFrame', (cb) => cb());
     globalThis.__mockSettingsStore = createSettingsStore();
     currentMediaQueryList = createMediaQueryList(false);
@@ -285,5 +295,76 @@ describe('TranslationWindow.vue', () => {
 
     expect(windowRoot.classes()).toContain('light');
     expect(windowRoot.classes()).not.toContain('dark');
+  });
+
+  describe('docked window resize lifecycle', () => {
+    const mountDocked = () => {
+      globalThis.__mockSettingsStore.settings.WINDOW_DOCK_MODE = 'left';
+      globalThis.__mockSettingsStore.settings.WINDOW_DOCKED_WIDTH = 350;
+      return mount(TranslationWindow, { props: baseProps });
+    };
+
+    const dispatchTouchOnDocument = (type, clientX) => {
+      const event = new Event(type, { bubbles: true, cancelable: true });
+      Object.defineProperty(event, 'touches', { value: [{ clientX, clientY: 100 }] });
+      document.dispatchEvent(event);
+    };
+
+    it('stops resizing when a touch is cancelled', async () => {
+      const wrapper = mountDocked();
+      const handle = wrapper.find('.ti-dock-resize-handle');
+      await handle.trigger('touchstart', { touches: [{ clientX: 100, clientY: 100 }] });
+      dispatchTouchOnDocument('touchmove', 150);
+      await nextTick();
+      expect(wrapper.find('.translation-window').attributes('style')).toContain('width: 400px');
+
+      dispatchTouchOnDocument('touchcancel', 150);
+      await nextTick();
+      expect(document.body.style.userSelect).toBe('');
+
+      dispatchTouchOnDocument('touchmove', 250);
+      await nextTick();
+      expect(wrapper.find('.translation-window').attributes('style')).toContain('width: 400px');
+    });
+
+    it('removes document listeners on unmount during an active resize', async () => {
+      const wrapper = mountDocked();
+      const handle = wrapper.find('.ti-dock-resize-handle');
+      await handle.trigger('touchstart', { touches: [{ clientX: 100, clientY: 100 }] });
+      dispatchTouchOnDocument('touchmove', 150);
+      await nextTick();
+      expect(wrapper.find('.translation-window').attributes('style')).toContain('width: 400px');
+
+      wrapper.unmount();
+      trackedDisposers.forEach((cleanupFn) => cleanupFn());
+
+      dispatchTouchOnDocument('touchmove', 250);
+      dispatchTouchOnDocument('touchend', 250);
+      expect(globalThis.__mockSettingsStore.updateSettingAndPersist).not.toHaveBeenCalledWith(
+        'WINDOW_DOCKED_WIDTH',
+        expect.any(Number)
+      );
+    });
+
+    it('keeps a single set of document listeners across repeated resize sessions', async () => {
+      const addSpy = vi.spyOn(document, 'addEventListener');
+      const removeSpy = vi.spyOn(document, 'removeEventListener');
+      const wrapper = mountDocked();
+      const handle = wrapper.find('.ti-dock-resize-handle');
+      await handle.trigger('touchstart', { touches: [{ clientX: 100, clientY: 100 }] });
+      dispatchTouchOnDocument('touchmove', 150);
+      dispatchTouchOnDocument('touchend', 150);
+      await nextTick();
+      await handle.trigger('touchstart', { touches: [{ clientX: 100, clientY: 100 }] });
+      dispatchTouchOnDocument('touchmove', 160);
+      await nextTick();
+
+      const countByType = (spy, type) => spy.mock.calls.filter((call) => call[0] === type).length;
+      for (const type of ['mousemove', 'mouseup', 'touchmove', 'touchend', 'touchcancel']) {
+        expect(countByType(addSpy, type) - countByType(removeSpy, type)).toBe(1);
+      }
+      addSpy.mockRestore();
+      removeSpy.mockRestore();
+    });
   });
 });

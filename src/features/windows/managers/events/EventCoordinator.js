@@ -4,6 +4,8 @@ import { WINDOWS_MANAGER_EVENTS, WindowsManagerEvents, pageEventBus } from '@/co
 import { SELECTION_EVENTS } from '@/features/text-selection/events/SelectionEvents.js';
 import { WindowsConfig } from "../core/WindowsConfig.js";
 import { state as globalState } from "@/shared/config/config.js";
+import { adjustForDirectChild } from "../crossframe/coordinateUtils.js";
+import { getTextSelectionWindowRelay } from "../crossframe/TextSelectionWindowRelay.js";
 
 /**
  * Handles internal Vue events and cross-frame messages
@@ -27,9 +29,19 @@ export class EventCoordinator {
     this.crossFrameManager.setEventHandlers({
       onOutsideClick: this._handleCrossFrameOutsideClick.bind(this),
       onWindowCreationRequest: this._handleWindowCreationRequest.bind(this),
-      onWindowCreatedResponse: this._handleWindowCreatedResponse.bind(this),
-      onTextSelectionWindowRequest: this._handleTextSelectionWindowRequest.bind(this)
+      onWindowCreatedResponse: this._handleWindowCreatedResponse.bind(this)
     });
+
+    if (window === window.top) {
+      // The relay owns cross-frame TEXT_SELECTION_WINDOW_REQUEST routing; register
+      // the top-frame sink here. Sink replacement is idempotent, so reactivation
+      // never duplicates the relay's message listener. The stored reference lets
+      // cleanup() release exactly this ownership.
+      this._textSelectionWindowSink = (data, sourceWindow) => {
+        this._handleTextSelectionWindowRequest(data, sourceWindow);
+      };
+      getTextSelectionWindowRelay().setSink(this._textSelectionWindowSink);
+    }
 
     this.clickManager.setHandlers({
       onOutsideClick: this._handleOutsideClick.bind(this),
@@ -76,6 +88,17 @@ export class EventCoordinator {
         this.facade.show(detail.text, detail.position, detail.options);
       };
       pageEventBus.on(SELECTION_EVENTS.GLOBAL_SELECTION_CHANGE, this.facade._selectionChangeHandler);
+    }
+  }
+
+  /**
+   * Release ownership of the relay sink so no stale delivery reaches a dead
+   * coordinator. Ownership-aware: a late cleanup never clears a replacement sink.
+   */
+  cleanup() {
+    if (this._textSelectionWindowSink) {
+      getTextSelectionWindowRelay().clearSink(this._textSelectionWindowSink);
+      this._textSelectionWindowSink = null;
     }
   }
 
@@ -359,25 +382,16 @@ export class EventCoordinator {
   }
 
   /**
-   * Handle text selection window request from iframe
+   * Handle text selection window request from an iframe (single-owner sink).
+   * Position is adjusted for the direct child iframe offset. When the sender is
+   * not a direct child, the raw position is passed through unchanged (legacy
+   * behavior preserved).
    */
   async _handleTextSelectionWindowRequest(data, sourceWindow) {
     if (!this.crossFrameManager.isTopFrame) return;
 
     try {
-      let adjustedPosition = { ...data.position };
-      const allIframes = document.querySelectorAll('iframe');
-      let iframe = Array.from(allIframes).find(frame => {
-        try { return frame.contentWindow === sourceWindow; } catch { return false; }
-      });
-      
-      if (iframe) {
-        const iframeRect = iframe.getBoundingClientRect();
-        adjustedPosition.x += iframeRect.left;
-        adjustedPosition.y += iframeRect.top;
-        adjustedPosition._isViewportRelative = true;
-        adjustedPosition._isAbsolute = false;
-      }
+      const adjustedPosition = adjustForDirectChild(sourceWindow, data.position) ?? { ...data.position };
 
       await this.facade.show(data.selectedText, adjustedPosition, data.options);
     } catch (error) {

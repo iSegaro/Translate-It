@@ -123,8 +123,6 @@ async function initializeLogger(subComponent = 'Main') {
 
         // 2. Feature Loader: Handles prioritised loading sequence
         const featureLoader = new MainFeatureLoader(contentScriptCore, initializeLogger);
-        // Expose loadFeature for compatibility with InteractionCoordinator or other modules
-        contentScriptCore.loadFeatureFromMain = featureLoader.loadFeature.bind(featureLoader);
 
         // 3. Coordinator: Handles cross-frame and bus synchronization
         new MainFrameCoordinator(aggregator, MessageActions, contentScriptCore);
@@ -138,6 +136,15 @@ async function initializeLogger(subComponent = 'Main') {
         } catch (coordError) {
           scriptLogger.error('Failed to initialize InteractionCoordinator:', coordError);
         }
+
+        // Text selection window relay: single-owner upward routing for translation
+        // windows, installed before any windows manager can be activated. Uses the
+        // reactivation-capable contentScriptCore.loadFeature path so a pre-activation
+        // (or post-deactivation) request triggers the lazy windows feature load.
+        try {
+          const { installTextSelectionWindowRelay } = await import('@/features/windows/managers/crossframe/TextSelectionWindowRelay.js');
+          installTextSelectionWindowRelay(contentScriptCore);
+        } catch { /* ignore */ }
 
         // Start the multi-stage loading sequence (Interaction-driven lazy loading)
         featureLoader.startIntelligentLoading();
