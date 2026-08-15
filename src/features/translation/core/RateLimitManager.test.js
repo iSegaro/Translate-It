@@ -44,8 +44,6 @@ vi.mock('@/features/translation/core/ProviderConfigurations.js', () => ({
         modeOverrides: {
           select_element: {
             maxConcurrent: 2,
-            subsequentDelay: 700,
-            burstLimit: 4
           }
         }
       }
@@ -64,8 +62,6 @@ vi.mock('@/features/translation/core/ProviderConfigurations.js', () => ({
         modeOverrides: {
           select_element: {
             maxConcurrent: 8,
-            subsequentDelay: 1,
-            burstLimit: 8,
           },
         },
       }

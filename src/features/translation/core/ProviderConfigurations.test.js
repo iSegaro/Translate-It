@@ -54,7 +54,9 @@ describe('ProviderConfigurations optimization scaling', () => {
 
   it('should keep WebAI aligned with the desired base-2 curve', () => {
     expect(getProviderRateLimit('WebAI', 2).maxConcurrent).toBe(2);
+    expect(getProviderRateLimit('WebAI', 3).delayBetweenRequests).toBe(0);
     expect(getProviderRateLimit('WebAI', 5).maxConcurrent).toBe(4);
+    expect(getProviderRateLimit('WebAI', 5).delayBetweenRequests).toBe(0);
   });
 
   it('should scale select element mode overrides for base-2 providers', () => {
@@ -90,11 +92,13 @@ describe('ProviderConfigurations optimization scaling', () => {
 
     expect(batching).toMatchObject({ optimalSize: 25, characterLimit: 3500 });
     expect(rateLimit.maxConcurrent).toBe(2);
+    expect(rateLimit.delayBetweenRequests).toBe(0);
     expect(rateLimit.modeOverrides.select_element.maxConcurrent).toBe(3);
   });
 
   it('keeps traditional provider character scaling unchanged', () => {
     expect(getProviderBatching('GoogleTranslate', null, 5).characterLimit).toBe(3000);
     expect(getProviderBatching('BingTranslate', null, 5).characterLimit).toBe(2400);
+    expect(getProviderRateLimit('GoogleTranslate', 5).delayBetweenRequests).toBe(0);
   });
 });

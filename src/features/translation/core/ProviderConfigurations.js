@@ -122,10 +122,6 @@ export const PROVIDER_CONFIGURATIONS = {
     rateLimit: {
       maxConcurrent: 3, // Increased for even better throughput
       delayBetweenRequests: 0, // No delay for first request, adaptive backoff handles errors
-      initialDelay: 0, // First request immediate
-      subsequentDelay: 2000, // Reduced from 8000ms to 2000ms for better UX
-      burstLimit: 3, // Allow more burst processing for better performance
-      burstWindow: 5000, // Reduced burst window
       adaptiveBackoff: {
         enabled: true,
         baseMultiplier: 2, // Reduced multiplier for less aggressive backoff
@@ -135,8 +131,6 @@ export const PROVIDER_CONFIGURATIONS = {
       // Mode-specific overrides
       modeOverrides: {
         select_element: {
-          subsequentDelay: 1000, // Even faster for Select Element mode
-          burstLimit: 4, // Allow more burst for better UX
           maxConcurrent: 3 // Maintain concurrency for Select Element
         }
       }
@@ -179,10 +173,6 @@ export const PROVIDER_CONFIGURATIONS = {
     rateLimit: {
       maxConcurrent: 2,
       delayBetweenRequests: 0, // No delay for first request
-      initialDelay: 0,
-      subsequentDelay: 1000, // 1 second between subsequent requests
-      burstLimit: 3,
-      burstWindow: 2000,
       adaptiveBackoff: {
         enabled: true,
         baseMultiplier: 1.5,
@@ -192,8 +182,6 @@ export const PROVIDER_CONFIGURATIONS = {
       // Mode-specific overrides
       modeOverrides: {
         select_element: {
-          subsequentDelay: 600, // Faster for Select Element mode
-          burstLimit: 4, // Allow more burst for better UX
           maxConcurrent: 2 // Maintain concurrency for Select Element
         }
       }
@@ -232,10 +220,6 @@ export const PROVIDER_CONFIGURATIONS = {
     rateLimit: {
       maxConcurrent: 2, // Increased from 1 for better throughput
       delayBetweenRequests: 0, // No delay for first request
-      initialDelay: 0,
-      subsequentDelay: 1200, // Reduced from 2000ms to 1200ms
-      burstLimit: 3, // Increased from 2
-      burstWindow: 3000,
       adaptiveBackoff: {
         enabled: true,
         baseMultiplier: 2,
@@ -245,8 +229,6 @@ export const PROVIDER_CONFIGURATIONS = {
       // Mode-specific overrides
       modeOverrides: {
         select_element: {
-          subsequentDelay: 800, // Faster for Select Element mode
-          burstLimit: 4, // Allow more burst for better UX
           maxConcurrent: 2 // Maintain concurrency for Select Element
         }
       }
@@ -283,10 +265,6 @@ export const PROVIDER_CONFIGURATIONS = {
     rateLimit: {
       maxConcurrent: 2,
       delayBetweenRequests: 0, // No delay for first request
-      initialDelay: 0,
-      subsequentDelay: 1000, // Reduced from 1500ms to 1000ms
-      burstLimit: 3,
-      burstWindow: 3000,
       adaptiveBackoff: {
         enabled: true,
         baseMultiplier: 1.8,
@@ -296,8 +274,6 @@ export const PROVIDER_CONFIGURATIONS = {
       // Mode-specific overrides
       modeOverrides: {
         select_element: {
-          subsequentDelay: 800, // Faster for Select Element mode
-          burstLimit: 4, // Allow more burst for better UX
           maxConcurrent: 3 // Increased from 2 for Select Element
         }
       }
@@ -336,10 +312,6 @@ export const PROVIDER_CONFIGURATIONS = {
     rateLimit: {
       maxConcurrent: 2, // Standard concurrent requests
       delayBetweenRequests: 0, // No delay for first request
-      initialDelay: 0,
-      subsequentDelay: 1000, // Standard delay for subsequent requests // Standard delay
-      burstLimit: 3,
-      burstWindow: 2000,
       adaptiveBackoff: {
         enabled: true,
         baseMultiplier: 1.5,
@@ -349,8 +321,6 @@ export const PROVIDER_CONFIGURATIONS = {
       // Mode-specific overrides
       modeOverrides: {
         select_element: {
-          subsequentDelay: 700, // Faster for Select Element mode
-          burstLimit: 4, // Allow more burst for better UX
           maxConcurrent: 2 // Maintain concurrency for Select Element
         }
       }
@@ -389,10 +359,6 @@ export const PROVIDER_CONFIGURATIONS = {
     rateLimit: {
       maxConcurrent: 4, // Moderate concurrent requests
       delayBetweenRequests: 0, // No delay for first request
-      initialDelay: 0,
-      subsequentDelay: 100, // Fast requests for free service
-      burstLimit: 5,
-      burstWindow: 1000,
       adaptiveBackoff: {
         enabled: true,
         baseMultiplier: 1.5,
@@ -440,10 +406,6 @@ export const PROVIDER_CONFIGURATIONS = {
     rateLimit: {
       maxConcurrent: 4,
       delayBetweenRequests: 0,
-      initialDelay: 0,
-      subsequentDelay: 200,
-      burstLimit: 5,
-      burstWindow: 1000,
       adaptiveBackoff: {
         enabled: true,
         baseMultiplier: 1.5,
@@ -491,10 +453,6 @@ export const PROVIDER_CONFIGURATIONS = {
     rateLimit: {
       maxConcurrent: 4, // Moderate concurrent requests
       delayBetweenRequests: 0, // No delay for first request
-      initialDelay: 0,
-      subsequentDelay: 150, // Slightly slower than Google for subsequent requests
-      burstLimit: 4,
-      burstWindow: 1200,
       adaptiveBackoff: {
         enabled: true,
         baseMultiplier: 1.5,
@@ -544,10 +502,6 @@ export const PROVIDER_CONFIGURATIONS = {
     rateLimit: {
       maxConcurrent: 5, // Higher for paid API
       delayBetweenRequests: 0, // No delay for first request
-      initialDelay: 0,
-      subsequentDelay: 100, // Fast for paid service
-      burstLimit: 10,
-      burstWindow: 1000,
       adaptiveBackoff: {
         enabled: true,
         baseMultiplier: 1.5,
@@ -598,10 +552,6 @@ export const PROVIDER_CONFIGURATIONS = {
     rateLimit: {
       maxConcurrent: 3, // Conservative due to HTML response issues
       delayBetweenRequests: 0, // No delay for first request
-      initialDelay: 0,
-      subsequentDelay: 500, // 1 second between subsequent requests
-      burstLimit: 2,
-      burstWindow: 3000,
       adaptiveBackoff: {
         enabled: true,
         baseMultiplier: 2, // Aggressive backoff for HTML responses
@@ -657,10 +607,6 @@ export const PROVIDER_CONFIGURATIONS = {
     rateLimit: {
       maxConcurrent: 5, // Increased from 4
       delayBetweenRequests: 0,
-      initialDelay: 0,
-      subsequentDelay: 100, // Reduced from 200 to match Google's speed
-      burstLimit: 12, // Increased from 10
-      burstWindow: 1000,
       adaptiveBackoff: {
         enabled: true,
         baseMultiplier: 1.5,
@@ -708,10 +654,6 @@ export const PROVIDER_CONFIGURATIONS = {
     rateLimit: {
       maxConcurrent: 5, // High for local processing
       delayBetweenRequests: 0,
-      initialDelay: 0,
-      subsequentDelay: 0,
-      burstLimit: 10,
-      burstWindow: 1000
     },
     batching: {
       strategy: 'character_limit',
@@ -747,10 +689,6 @@ export const PROVIDER_CONFIGURATIONS = {
     rateLimit: {
       maxConcurrent: 2,
       delayBetweenRequests: 1000,
-      initialDelay: 0,
-      subsequentDelay: 1000,
-      burstLimit: 5,
-      burstWindow: 60000
     },
     batching: {
       strategy: 'character_limit',
@@ -787,10 +725,6 @@ export const PROVIDER_CONFIGURATIONS = {
     rateLimit: {
       maxConcurrent: 3, // Conservative for public instances
       delayBetweenRequests: 0,
-      initialDelay: 0,
-      subsequentDelay: 500,
-      burstLimit: 2,
-      burstWindow: 2000,
       adaptiveBackoff: {
         enabled: true,
         baseMultiplier: 2,
@@ -836,10 +770,6 @@ export const PROVIDER_CONFIGURATIONS = {
     rateLimit: {
       maxConcurrent: 2, // Safe default
       delayBetweenRequests: 0, // No delay for first request
-      initialDelay: 0,
-      subsequentDelay: 1000, // Standard delay for subsequent requests
-      burstLimit: 3,
-      burstWindow: 2000,
       adaptiveBackoff: {
         enabled: true,
         baseMultiplier: 1.5,
@@ -849,8 +779,6 @@ export const PROVIDER_CONFIGURATIONS = {
       // Mode-specific overrides
       modeOverrides: {
         select_element: {
-          subsequentDelay: 800, // Faster for Select Element mode
-          burstLimit: 4, // Allow more burst for better UX
           maxConcurrent: 2 // Maintain concurrency for Select Element
         }
       }
@@ -889,10 +817,6 @@ export const PROVIDER_CONFIGURATIONS = {
     rateLimit: {
       maxConcurrent: 5, // High for local mock testing
       delayBetweenRequests: 0,
-      initialDelay: 0,
-      subsequentDelay: 100, // Minimal delay for mock
-      burstLimit: 10,
-      burstWindow: 1000,
       adaptiveBackoff: {
         enabled: true,
         baseMultiplier: 1.5,
@@ -993,30 +917,12 @@ function applyOptimizationLevel(config, level) {
   const baseConcurrent = config.rateLimit.maxConcurrent;
   result.rateLimit.maxConcurrent = scaleConcurrentLimit(baseConcurrent, safeLevel);
 
-  // Scale Burst Limit if it exists, using the original conservative curve.
-  if (config.rateLimit.burstLimit) {
-    const baseBurst = config.rateLimit.burstLimit;
-    if (safeLevel < 3) {
-      result.rateLimit.burstLimit = Math.max(1, Math.floor(baseBurst * concurrentMultipliers[safeLevel]));
-    } else if (safeLevel > 3) {
-      result.rateLimit.burstLimit = Math.max(baseBurst, Math.ceil(baseBurst * concurrentMultipliers[safeLevel]));
-    }
-  }
-
   // Guardrails: Scale with safety
   if (result.rateLimit.maxConcurrent > 1) {
     result.rateLimit.maxConcurrent = Math.min(result.rateLimit.maxConcurrent, 12);
   } else if (safeLevel >= 4) {
     result.rateLimit.maxConcurrent = 2;
   }
-  
-  // Ensure burstLimit doesn't exceed maxConcurrent
-  if (result.rateLimit.burstLimit > result.rateLimit.maxConcurrent) {
-    result.rateLimit.burstLimit = result.rateLimit.maxConcurrent;
-  }
-
-  // Subsequent Delay multipliers: Level 1 (2.5), Level 2 (1.5), Level 3 (1.0), Level 4 (0.7), Level 5 (0.4)
-  result.rateLimit.subsequentDelay = Math.round(config.rateLimit.subsequentDelay * delayMultipliers[safeLevel]);
   
   // Scale Batching Delays if present
   if (result.batching.delayBetweenRequests) {
@@ -1070,18 +976,6 @@ function applyOptimizationLevel(config, level) {
       
       if (modeConfig.maxConcurrent) {
         modeConfig.maxConcurrent = Math.min(scaleConcurrentLimit(modeConfig.maxConcurrent, safeLevel), 12);
-      }
-      
-      if (modeConfig.burstLimit) {
-        if (safeLevel < 3) {
-          modeConfig.burstLimit = Math.max(1, Math.floor(modeConfig.burstLimit * concurrentMultipliers[safeLevel]));
-        } else if (safeLevel > 3) {
-          modeConfig.burstLimit = Math.max(modeConfig.burstLimit, Math.ceil(modeConfig.burstLimit * concurrentMultipliers[safeLevel]));
-        }
-      }
-      
-      if (modeConfig.subsequentDelay) {
-        modeConfig.subsequentDelay = Math.round(modeConfig.subsequentDelay * delayMultipliers[safeLevel]);
       }
       
       result.rateLimit.modeOverrides[mode] = modeConfig;

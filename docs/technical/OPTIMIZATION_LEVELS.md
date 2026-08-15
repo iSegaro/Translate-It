@@ -136,16 +136,14 @@ The **Enforcement Engine**.
 | `maxBatchSizeChars` | Conditional | `AITextProcessor` when configured |
 | `balancedBatching` | Conditional | Character batching path when configured |
 | Traditional batching fields | Active elsewhere | Traditional provider chunkers |
-| `initialDelay` | Declarative/unused | No current production consumer |
-| `subsequentDelay` | Declarative/unused | No current production consumer |
-| `burstLimit` / `burstWindow` | Declarative/unused | No current production enforcement |
 | `singleBatchThreshold` | Declarative/unused | No current production consumer |
 | Provider `errorHandling.retryStrategies` | Declarative/unused | Queue uses its own retry policy |
 | `rateLimit.modeOverrides` | Declarative/unused | Not applied by `RateLimitManager` |
 
 #### Dead Configuration Inventory
 
-- **Remove candidates:** `initialDelay`, `subsequentDelay`, `burstLimit`, `burstWindow`, `singleBatchThreshold`.
+- **Removed legacy rate-limit fields:** `initialDelay`, `subsequentDelay`, `burstLimit`, and `burstWindow` were removed after provider-global limiter ownership was formalized.
+- **Remove candidate:** `singleBatchThreshold`.
 - **Future design candidates:** `rateLimit.modeOverrides`, if implemented behind a provider-global safety budget.
 - **Active elsewhere:** `maxComplexity`, `maxBatchSizeChars`, `balancedBatching`, traditional batching fields.
 
