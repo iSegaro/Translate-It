@@ -20,9 +20,57 @@ The system operates on an **Inverted Scaling** principle:
 2.  **Level 3 (Balanced)**:
     *   **Goal**: The standard reliable experience (Default).
 3.  **Level 5 (Turbo)**:
-    *   **Goal**: Lowest latency and fastest UI response.
+    *   **Goal**: Highest tested aggressiveness and fastest possible UI response.
     *   **Strategy**: "Many requests, tiny payloads, high concurrency."
-    *   **Benefit**: Enables streaming-like UI updates where text appears in chunks almost instantly.
+    *   **Benefit**: Can enable streaming-like UI updates where text appears in chunks faster, subject to provider/backend capacity.
+
+### Optimization Level Semantics
+
+Optimization Levels are ordered aggressiveness preferences mapped onto each
+provider's safe, discrete runtime capabilities. They are not five guaranteed
+unique execution states.
+
+- Providers may map adjacent levels to the same effective runtime state.
+- Such collisions are valid and are not configuration errors.
+- Higher levels must remain monotonic: they must never be less aggressive than lower levels.
+- Level 3 is the Balanced/default provider baseline.
+- Level 5 represents the highest tested aggressiveness, not a latency guarantee for every provider or backend.
+
+#### Base-2 Provider Collision
+
+Base-2 AI providers use this concurrency curve:
+
+| Provider family | L1 | L2 | L3 | L4 | L5 |
+| :--- | ---: | ---: | ---: | ---: | ---: |
+| Base-2 AI providers | 1 | 2 | 2 | 3 | 4 |
+| Gemini | 1 | 2 | 3 | 5 | 6 |
+
+Level 2 and Level 3 intentionally share concurrency `2` for base-2
+providers. Level 2 must step above Level 1, while Level 3 remains the
+established Balanced baseline. Raising Level 3 would increase default provider
+pressure; lowering Level 2 would only move collision to Levels 1 and 2.
+
+#### AI Select Element
+
+AI Select Element keeps physical batching stable across levels:
+
+```text
+optimalSize = 25
+characterLimit = 3500
+```
+
+Optimization Level therefore primarily changes available provider concurrency,
+not by manufacturing smaller physical batches. For identical Select Element
+input, level changes do not necessarily change API request count. Concurrency
+changes timing and simultaneous provider pressure; higher concurrency does not
+inherently reduce API cost, and actual latency depends on provider/backend
+capacity.
+
+Traditional providers may additionally differ across levels through their
+batching and character-limit policies.
+
+> Future UI copy may clarify: actual effect depends on provider capabilities;
+> adjacent levels may share the same effective runtime limit.
 
 ---
 

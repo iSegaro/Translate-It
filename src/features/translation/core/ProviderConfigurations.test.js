@@ -26,6 +26,13 @@ describe('ProviderConfigurations optimization scaling', () => {
     }
   });
 
+  it('should keep representative AI concurrency monotonic while allowing collisions', () => {
+    for (const providerName of ['WebAI', 'OpenAI', 'DeepSeek', 'OpenRouter', 'Custom', 'Gemini']) {
+      const concurrency = [1, 2, 3, 4, 5].map(level => getProviderRateLimit(providerName, level).maxConcurrent);
+      expect(concurrency.slice(1).every((value, index) => value >= concurrency[index])).toBe(true);
+    }
+  });
+
   it('should keep base-1 providers on the conservative matrix', () => {
     const levels = [1, 2, 3, 4, 5];
     const expected = [1, 1, 1, 2, 2];
