@@ -90,18 +90,71 @@ describe('Settings Migrations', () => {
     expect(updates.MODE_PROVIDERS['select_element']).toBeUndefined();
   });
 
-  it('should update model lists and reset selection if current model is gone', async () => {
+  it.each([
+    ['gemini-3.1-flash-lite-preview', 'gemini-3.5-flash-lite'],
+    ['gemini-3.1-pro-preview', 'gemini-3.6-flash'],
+    ['gemini-3-pro-preview', 'gemini-3.5-flash'],
+    ['gemini-3-flash-preview', 'gemini-3.5-flash'],
+    ['gemini-2.5-pro', 'gemini-3.6-flash'],
+    ['gemini-2.5-flash', 'gemini-3.5-flash'],
+    ['gemini-2.5-flash-lite', 'gemini-3.5-flash-lite']
+  ])('should migrate obsolete Gemini model %s to %s', async (oldModel, newModel) => {
+    const { updates, logs } = await runSettingsMigrations({
+      GEMINI_MODELS: [{ value: oldModel, label: 'Legacy' }],
+      GEMINI_MODEL: oldModel
+    });
+
+    expect(updates.GEMINI_MODEL).toBe(newModel);
+    expect(logs).toContain(`Migrated GEMINI_MODEL from ${oldModel} to ${newModel}`);
+  });
+
+  it('should preserve arbitrary custom model IDs when a model list changes', async () => {
     const currentSettings = {
       GEMINI_MODELS: [{ value: 'old-model', label: 'Old' }],
-      GEMINI_MODEL: 'old-model'
+      GEMINI_MODEL: 'provider/custom-model'
     };
-    
-    // CONFIG has different models
+
     const { updates, logs } = await runSettingsMigrations(currentSettings);
     
     expect(updates.GEMINI_MODELS).toEqual(CONFIG.GEMINI_MODELS);
-    expect(updates.GEMINI_MODEL).toBe(CONFIG.GEMINI_MODEL); // Reset to default
+    expect(updates.GEMINI_MODEL).toBeUndefined();
+    expect(logs.some(l => l.includes('Reset GEMINI_MODEL'))).toBe(false);
+  });
+
+  it('should preserve current static model values during model-list synchronization', async () => {
+    const { updates } = await runSettingsMigrations({
+      GEMINI_MODELS: [{ value: 'old-model', label: 'Old' }],
+      GEMINI_MODEL: 'custom'
+    });
+
+    expect(updates.GEMINI_MODEL).toBeUndefined();
+  });
+
+  it('should fall back when a custom-capable provider has no usable selected model', async () => {
+    const { updates, logs } = await runSettingsMigrations({
+      GEMINI_MODELS: CONFIG.GEMINI_MODELS,
+      GEMINI_MODEL: ''
+    });
+
+    expect(updates.GEMINI_MODEL).toBe(CONFIG.GEMINI_MODEL);
     expect(logs.some(l => l.includes('Reset GEMINI_MODEL'))).toBe(true);
+  });
+
+  it('should retain reset behavior for a provider without custom support', async () => {
+    const originalModels = CONFIG.GEMINI_MODELS;
+    CONFIG.GEMINI_MODELS = originalModels.filter(model => model.value !== 'custom');
+
+    try {
+      const { updates, logs } = await runSettingsMigrations({
+        GEMINI_MODELS: [{ value: 'old-model', label: 'Old' }],
+        GEMINI_MODEL: 'provider/custom-model'
+      });
+
+      expect(updates.GEMINI_MODEL).toBe(CONFIG.GEMINI_MODEL);
+      expect(logs.some(l => l.includes('Reset GEMINI_MODEL'))).toBe(true);
+    } finally {
+      CONFIG.GEMINI_MODELS = originalModels;
+    }
   });
 
   it('should migrate API_KEY to GEMINI_API_KEY', async () => {

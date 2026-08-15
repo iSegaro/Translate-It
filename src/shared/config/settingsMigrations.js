@@ -25,6 +25,18 @@ import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.CONFIG, 'SettingsMigrations');
 
+const MODEL_VALUE_MIGRATIONS = {
+  GEMINI_MODELS: {
+    'gemini-3.1-flash-lite-preview': 'gemini-3.5-flash-lite',
+    'gemini-3.1-pro-preview': 'gemini-3.6-flash',
+    'gemini-3-pro-preview': 'gemini-3.5-flash',
+    'gemini-3-flash-preview': 'gemini-3.5-flash',
+    'gemini-2.5-pro': 'gemini-3.6-flash',
+    'gemini-2.5-flash': 'gemini-3.5-flash',
+    'gemini-2.5-flash-lite': 'gemini-3.5-flash-lite'
+  }
+};
+
 /**
  * Determine whether a value is a plain object.
  *
@@ -275,19 +287,30 @@ function runMainMigration(currentSettings) {
   Object.entries(MODEL_MAPPING).forEach(([modelListKey, currentModelKey]) => {
     if (!(modelListKey in currentSettings)) return;
 
-    if (JSON.stringify(currentSettings[modelListKey]) !== JSON.stringify(CONFIG[modelListKey])) {
-      const currentUserModel = currentSettings[currentModelKey];
-      const newModels = CONFIG[modelListKey];
-      const modelStillExists = newModels.some(model => model.value === currentUserModel);
+    const currentUserModel = currentSettings[currentModelKey];
+    const explicitReplacement = MODEL_VALUE_MIGRATIONS[modelListKey]?.[currentUserModel];
+    const newModels = CONFIG[modelListKey];
+    const modelListChanged = JSON.stringify(currentSettings[modelListKey]) !== JSON.stringify(newModels);
 
-      updates[modelListKey] = CONFIG[modelListKey];
+    if (explicitReplacement) {
+      updates[currentModelKey] = explicitReplacement;
+      migrationLog.push(`Migrated ${currentModelKey} from ${currentUserModel} to ${explicitReplacement}`);
+    }
+
+    if (modelListChanged) {
+      updates[modelListKey] = newModels;
       migrationLog.push(`Updated ${modelListKey} list`);
+    }
 
-      // Reset selection if user's current model no longer exists in the new list
-      if (!modelStillExists && currentUserModel !== CONFIG[currentModelKey]) {
-        updates[currentModelKey] = CONFIG[currentModelKey];
-        migrationLog.push(`Reset ${currentModelKey} (previous model no longer available)`);
-      }
+    const modelToValidate = explicitReplacement || currentUserModel;
+    const modelStillExists = newModels.some(model => model.value === modelToValidate);
+    const supportsCustomModels = newModels.some(model => model.value === 'custom');
+
+    // Preserve arbitrary model IDs only for providers that expose custom models.
+    const hasUsableModelValue = typeof currentUserModel === 'string' && currentUserModel.trim().length > 0;
+    if (!explicitReplacement && (!hasUsableModelValue || (!modelStillExists && !supportsCustomModels))) {
+      updates[currentModelKey] = CONFIG[currentModelKey];
+      migrationLog.push(`Reset ${currentModelKey} (previous model no longer available)`);
     }
   });
 
