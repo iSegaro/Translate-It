@@ -4,7 +4,6 @@ import {
   CONFIG,
   getGeminiApiKeysAsync,
   getGeminiModelAsync,
-  getGeminiThinkingEnabledAsync,
   getGeminiApiUrlAsync,
   getPromptBASEScreenCaptureAsync
 } from "@/shared/config/config.js";
@@ -70,10 +69,9 @@ export class GeminiProvider extends BaseAIProvider {
       ? participationOverride
       : await AIConversationHelper.getConversationParticipation({ callPurpose, translateMode: mode, sessionId });
 
-    const [apiKeys, model, thinkingEnabled, rawApiUrl] = await Promise.all([
+    const [apiKeys, model, rawApiUrl] = await Promise.all([
       getGeminiApiKeysAsync(),
       getGeminiModelAsync(),
-      getGeminiThinkingEnabledAsync(),
       getGeminiApiUrlAsync()
     ]);
 
@@ -97,7 +95,7 @@ export class GeminiProvider extends BaseAIProvider {
         temperature: 0.1,
         maxOutputTokens: 8192, 
         // Enforce JSON Mode for Structured Data
-        ...(expectedFormat === ResponseFormat.JSON_OBJECT && { response_mime_type: "application/json" })
+        ...((expectedFormat === ResponseFormat.JSON_OBJECT || expectedFormat === ResponseFormat.JSON_ARRAY) && { responseMimeType: "application/json" })
       }
     };
 
@@ -119,12 +117,6 @@ export class GeminiProvider extends BaseAIProvider {
         contents.push({ role: 'user', parts: [{ text: userText }] });
         requestBody.contents = contents;
       }
-    }
-
-    if (thinkingEnabled && model?.includes('thinking')) {
-      requestBody.generationConfig.thinking_config = {
-        include_thoughts: false
-      };
     }
 
     let apiUrl = rawApiUrl;
@@ -150,92 +142,44 @@ export class GeminiProvider extends BaseAIProvider {
     };
     const originalCharCount = isBatch ? AITextProcessor.estimateOriginalChars(userText) : userText.length;
 
-    try {
-      const result = await this._executeRequest({
-        url,
-        fetchOptions,
-        charCount: fetchOptions.body.length,
-        originalCharCount,
-        extractResponse: (data) => {
+    const result = await this._executeRequest({
+      url,
+      fetchOptions,
+      charCount: fetchOptions.body.length,
+      originalCharCount,
+      extractResponse: (data) => {
         this._recordGeminiCompletion(data, executionContext);
         if (data?.error) {
           throw new Error(`API_ERROR: ${data.error.message || 'Unknown Gemini Error'}`);
         }
-        
+
         const candidate = data?.candidates?.[0];
         if (candidate?.finishReason === 'SAFETY') {
           throw new Error('API_ERROR: Content blocked by Gemini safety filters');
         }
-        
+
         return candidate?.content?.parts?.[0]?.text;
       },
-        context: `${this.providerName.toLowerCase()}-translation`,
-        abortController,
-        sessionId,
-        executionContext,
-        callPurpose,
-        updateApiKey: (newKey, options) => {
-          if (options.url) {
-            const urlObj = new URL(options.url);
-            urlObj.searchParams.set('key', newKey);
-            options.url = urlObj.toString();
-          }
+      context: `${this.providerName.toLowerCase()}-translation`,
+      abortController,
+      sessionId,
+      executionContext,
+      callPurpose,
+      updateApiKey: (newKey, options) => {
+        if (options.url) {
+          const urlObj = new URL(options.url);
+          urlObj.searchParams.set('key', newKey);
+          options.url = urlObj.toString();
         }
-      });
-
-      if (sessionId && result && conversationParticipates) {
-        if (conversationCommitCandidate) conversationCommitCandidate.stage({ sessionId, userContent: userText, assistantContent: result });
-        else await AIConversationHelper.updateSessionHistory(sessionId, userText, result, { callPurpose, translateMode: mode, conversationParticipates });
       }
+    });
 
-      return result;
-    } catch (error) {
-      // Thinking config fallback
-      if (thinkingEnabled && model?.includes('thinking') && (error.message?.includes('thinking_config') || error.message?.includes('400'))) {
-        const retryBody = { ...requestBody };
-        delete retryBody.generationConfig.thinking_config;
-        const retryBodyJson = JSON.stringify(retryBody);
-        const fallbackResult = await this._executeRequest({
-          url,
-          fetchOptions: { ...fetchOptions, body: retryBodyJson },
-          charCount: retryBodyJson.length,
-          originalCharCount,
-          extractResponse: (data) => {
-        this._recordGeminiCompletion(data, executionContext);
-        if (data?.error) {
-          throw new Error(`API_ERROR: ${data.error.message || 'Unknown Gemini Error'}`);
-        }
-        
-        const candidate = data?.candidates?.[0];
-        if (candidate?.finishReason === 'SAFETY') {
-          throw new Error('API_ERROR: Content blocked by Gemini safety filters');
-        }
-        
-        return candidate?.content?.parts?.[0]?.text;
-      },
-          context: `${this.providerName.toLowerCase()}-translation-fallback`,
-          abortController,
-          sessionId,
-          executionContext,
-          callPurpose,
-          updateApiKey: (newKey, options) => {
-            if (options.url) {
-              const urlObj = new URL(options.url);
-              urlObj.searchParams.set('key', newKey);
-              options.url = urlObj.toString();
-            }
-          }
-        });
-
-        if (sessionId && fallbackResult && conversationParticipates) {
-          if (conversationCommitCandidate) conversationCommitCandidate.stage({ sessionId, userContent: userText, assistantContent: fallbackResult });
-          else await AIConversationHelper.updateSessionHistory(sessionId, userText, fallbackResult, { callPurpose, translateMode: mode, conversationParticipates });
-        }
-
-        return fallbackResult;
-      }
-      throw error;
+    if (sessionId && result && conversationParticipates) {
+      if (conversationCommitCandidate) conversationCommitCandidate.stage({ sessionId, userContent: userText, assistantContent: result });
+      else await AIConversationHelper.updateSessionHistory(sessionId, userText, result, { callPurpose, translateMode: mode, conversationParticipates });
     }
+
+    return result;
   }
 
   async _translateImageInternal(base64Image, _sourceLang, targetLang, options = {}) {

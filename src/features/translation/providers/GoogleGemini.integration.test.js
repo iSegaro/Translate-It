@@ -15,7 +15,6 @@ vi.mock('@/shared/config/config.js', () => ({
   CONFIG: { GEMINI_API_URL: 'https://generativelanguage.googleapis.com/v1beta/models/gemini-pro' },
   getGeminiApiKeysAsync: vi.fn().mockResolvedValue(['key-1', 'key-2']),
   getGeminiModelAsync: vi.fn().mockResolvedValue('gemini-pro'),
-  getGeminiThinkingEnabledAsync: vi.fn().mockResolvedValue(false),
   getGeminiApiUrlAsync: vi.fn().mockResolvedValue(''),
   getPromptBASEScreenCaptureAsync: vi.fn().mockResolvedValue(''),
   getSettingsAsync: vi.fn().mockResolvedValue({}),
