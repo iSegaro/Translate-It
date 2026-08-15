@@ -1096,7 +1096,11 @@ function applyOptimizationLevel(config, level) {
       
       if (isAIStrategy) {
         const multiplier = aiSizeMultipliers[safeLevel];
-        if (modeConfig.optimalSize) modeConfig.optimalSize = Math.max(5, Math.round(modeConfig.optimalSize * multiplier));
+        // Select Element uses logical-parent commits; do not manufacture extra
+        // physical requests solely from optimization-level selection.
+        if (mode !== 'select_element' && modeConfig.optimalSize) {
+          modeConfig.optimalSize = Math.max(5, Math.round(modeConfig.optimalSize * multiplier));
+        }
         if (modeConfig.maxComplexity) modeConfig.maxComplexity = Math.max(100, Math.round(modeConfig.maxComplexity * multiplier));
         if (modeConfig.singleBatchThreshold) modeConfig.singleBatchThreshold = Math.max(5, Math.round(modeConfig.singleBatchThreshold * multiplier));
         if (modeConfig.maxBatchSizeChars) modeConfig.maxBatchSizeChars = Math.max(500, Math.round(modeConfig.maxBatchSizeChars * multiplier));

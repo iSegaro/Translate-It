@@ -271,6 +271,23 @@ describe('TranslationBatcher', () => {
       expect(batchesByLevel[1][0][0].t.length).toBeGreaterThan(1800);
     });
 
+    it('keeps a 96-segment Select Element workload at the same batch count across levels', () => {
+      const segments = Array.from({ length: 96 }, (_, index) => ({
+        t: `Segment ${index}`,
+        i: `n${index}`,
+      }));
+      const batchCounts = [3, 5].map((level) => {
+        const config = getProviderBatching('WebAI', 'select_element', level);
+        return TranslationBatcher.createIntelligentBatches(
+          segments,
+          config.optimalSize,
+          config.characterLimit,
+        ).length;
+      });
+
+      expect(batchCounts).toEqual([4, 4]);
+    });
+
     it('does not add V3 fragment metadata to plain non-V3 objects', () => {
       const segment = { t: 'A very long text that exceeds the maximum character limit for a single batch request.', role: 'paragraph' };
       const parts = TranslationBatcher.splitOversizedSegment(segment, 30);

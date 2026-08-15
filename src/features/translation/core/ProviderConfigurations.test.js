@@ -69,13 +69,19 @@ describe('ProviderConfigurations optimization scaling', () => {
     const levels = [1, 2, 3, 4, 5];
     const batching = levels.map(level => getProviderBatching('WebAI', 'select_element', level));
 
+    expect(batching.map(config => config.optimalSize)).toEqual([25, 25, 25, 25, 25]);
     expect(batching.map(config => config.characterLimit)).toEqual([3500, 3500, 3500, 3500, 3500]);
     expect(batching[4]).toMatchObject({
-      optimalSize: 8,
       maxComplexity: 150,
       singleBatchThreshold: 6,
     });
+    expect(getProviderRateLimit('WebAI', 3).maxConcurrent).toBe(2);
     expect(getProviderRateLimit('WebAI', 5).maxConcurrent).toBe(4);
+  });
+
+  it('keeps generic AI batching scaling for non-Select Element modes', () => {
+    expect([1, 2, 3, 4, 5].map(level => getProviderBatching('WebAI', null, level).optimalSize))
+      .toEqual([50, 30, 20, 12, 6]);
   });
 
   it('keeps traditional provider character scaling unchanged', () => {
