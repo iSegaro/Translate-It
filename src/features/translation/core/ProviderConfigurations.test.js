@@ -84,6 +84,15 @@ describe('ProviderConfigurations optimization scaling', () => {
       .toEqual([50, 30, 20, 12, 6]);
   });
 
+  it('keeps batching mode-aware while treating rate mode overrides as declarative', () => {
+    const batching = getProviderBatching('OpenRouter', 'select_element', 3);
+    const rateLimit = getProviderRateLimit('OpenRouter', 3);
+
+    expect(batching).toMatchObject({ optimalSize: 25, characterLimit: 3500 });
+    expect(rateLimit.maxConcurrent).toBe(2);
+    expect(rateLimit.modeOverrides.select_element.maxConcurrent).toBe(3);
+  });
+
   it('keeps traditional provider character scaling unchanged', () => {
     expect(getProviderBatching('GoogleTranslate', null, 5).characterLimit).toBe(3000);
     expect(getProviderBatching('BingTranslate', null, 5).characterLimit).toBe(2400);

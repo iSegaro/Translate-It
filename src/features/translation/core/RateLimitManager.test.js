@@ -60,7 +60,14 @@ vi.mock('@/features/translation/core/ProviderConfigurations.js', () => ({
     return {
       rateLimit: {
         maxConcurrent,
-        delayBetweenRequests: 0
+        delayBetweenRequests: 0,
+        modeOverrides: {
+          select_element: {
+            maxConcurrent: 8,
+            subsequentDelay: 1,
+            burstLimit: 8,
+          },
+        },
       }
     };
   })
@@ -220,6 +227,55 @@ describe('RateLimitManager', () => {
       const refreshedRun = Array.from({ length: 5 }, () => manager.executeWithRateLimit('WebAI', task));
       await Promise.all(refreshedRun);
       expect(maxSeenActive).toBe(4);
+    });
+
+    it('should enforce provider-level concurrency despite a larger mode override', async () => {
+      mockRuntime.providerLevels.set('WebAI', 3);
+
+      let activeCount = 0;
+      let maxSeenActive = 0;
+      const task = async () => {
+        activeCount++;
+        maxSeenActive = Math.max(maxSeenActive, activeCount);
+        await sleep(20);
+        activeCount--;
+      };
+
+      await Promise.all(Array.from({ length: 4 }, (_, index) => manager.executeWithRateLimit(
+        'WebAI',
+        task,
+        '',
+        TranslationPriority.NORMAL,
+        { mode: index % 2 === 0 ? 'select_element' : 'popup' },
+      )));
+
+      expect(maxSeenActive).toBe(2);
+      expect(manager.providerStates.has('WebAI')).toBe(true);
+    });
+
+    it('should share one provider budget across translation modes', async () => {
+      mockRuntime.providerLevels.set('WebAI', 3);
+
+      let activeCount = 0;
+      let maxSeenActive = 0;
+      const task = async () => {
+        activeCount++;
+        maxSeenActive = Math.max(maxSeenActive, activeCount);
+        await sleep(20);
+        activeCount--;
+      };
+
+      const selectRequests = Array.from({ length: 2 }, () => manager.executeWithRateLimit(
+        'WebAI', task, '', TranslationPriority.NORMAL, { mode: 'select_element' }
+      ));
+      const popupRequests = Array.from({ length: 2 }, () => manager.executeWithRateLimit(
+        'WebAI', task, '', TranslationPriority.NORMAL, { mode: 'popup' }
+      ));
+
+      await Promise.all([...selectRequests, ...popupRequests]);
+
+      expect(maxSeenActive).toBe(2);
+      expect([...manager.providerStates.keys()]).toEqual(['TestProvider', 'WebAI']);
     });
 
     it('should preserve manual override configs without refreshing them', async () => {

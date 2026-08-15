@@ -50,6 +50,22 @@ The system is integrated vertically from the UI settings down to the raw network
 └─────────────────────────────────────────────────────────────┘
 ```
 
+### Runtime Ownership Contract
+
+Rate limiting is provider-global. `RateLimitManager` maintains one state per
+provider name, so Select Element, Popup, Field, Whole Page, Sidepanel, and
+other modes share one provider concurrency budget and one provider-level
+`delayBetweenRequests` policy. Translation mode is not part of the limiter
+state key.
+
+Batching may be mode-specific. `getProviderBatching(provider, mode, level)`
+merges `batching.modeOverrides` before batching consumers use the result.
+
+`rateLimit.modeOverrides` are currently declarative only. They are not merged
+into `RateLimitManager` state and must not be interpreted as independent
+per-mode concurrency caps. Activating them requires an outer provider-global
+safety budget so combined mode traffic cannot exceed provider limits.
+
 ---
 
 ## Technical Multipliers
@@ -102,8 +118,39 @@ Handles the **Frontend Chunking**.
 
 ### 3. RateLimitManager.js (`src/features/translation/core/`)
 The **Enforcement Engine**.
-- Uses an implementation of the **Token Bucket** and **Semaphore** patterns.
-- It dynamically fetches the current user's optimization level and applies the scaled `maxConcurrent` and `subsequentDelay`.
+- Uses provider-global active-request accounting and priority queues.
+- It dynamically fetches the current user's optimization level and applies the scaled provider-level `maxConcurrent` and `delayBetweenRequests`.
+- It does not apply `rateLimit.modeOverrides`.
+
+### Runtime-Effective Configuration Matrix
+
+| Configuration | Status | Current consumer/scope |
+| :--- | :--- | :--- |
+| `batching.optimalSize` | Active | Select Element and other batching paths |
+| `batching.characterLimit` | Active | Select Element and traditional batching |
+| `rateLimit.maxConcurrent` | Active | Provider-global `RateLimitManager` state |
+| `rateLimit.delayBetweenRequests` | Active | Provider-global `RateLimitManager` queue |
+| QueueManager retry policy | Active | Queue retry count and retry delay |
+| Runtime backoff/circuit breaker | Active | `RateLimitManager` runtime state |
+| `maxComplexity` | Active elsewhere | `AITextProcessor`; not current Select Element batcher |
+| `maxBatchSizeChars` | Conditional | `AITextProcessor` when configured |
+| `balancedBatching` | Conditional | Character batching path when configured |
+| Traditional batching fields | Active elsewhere | Traditional provider chunkers |
+| `initialDelay` | Declarative/unused | No current production consumer |
+| `subsequentDelay` | Declarative/unused | No current production consumer |
+| `burstLimit` / `burstWindow` | Declarative/unused | No current production enforcement |
+| `singleBatchThreshold` | Declarative/unused | No current production consumer |
+| Provider `errorHandling.retryStrategies` | Declarative/unused | Queue uses its own retry policy |
+| `rateLimit.modeOverrides` | Declarative/unused | Not applied by `RateLimitManager` |
+
+#### Dead Configuration Inventory
+
+- **Remove candidates:** `initialDelay`, `subsequentDelay`, `burstLimit`, `burstWindow`, `singleBatchThreshold`.
+- **Future design candidates:** `rateLimit.modeOverrides`, if implemented behind a provider-global safety budget.
+- **Active elsewhere:** `maxComplexity`, `maxBatchSizeChars`, `balancedBatching`, traditional batching fields.
+
+Do not activate or remove these fields without updating their owning runtime
+contract and tests.
 
 ---
 
