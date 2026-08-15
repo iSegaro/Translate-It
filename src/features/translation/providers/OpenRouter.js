@@ -1,6 +1,7 @@
 // src/core/providers/OpenRouterProvider.js
 import { BaseAIProvider } from "@/features/translation/providers/BaseAIProvider.js";
 import {
+  CONFIG,
   getOpenRouterApiKeysAsync,
   getOpenRouterApiModelAsync,
 } from "@/shared/config/config.js";
@@ -90,7 +91,7 @@ export class OpenRouterProvider extends BaseAIProvider {
         "X-Title": "Translate-It Extension",
       },
       body: JSON.stringify({
-        model: model || "openai/gpt-3.5-turbo",
+        model: model || CONFIG.OPENROUTER_API_MODEL,
         messages: messages,
         max_tokens: 4096,
         // Enforce JSON Mode if requested

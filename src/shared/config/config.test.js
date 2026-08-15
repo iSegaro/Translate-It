@@ -108,6 +108,16 @@ describe('Config Module', () => {
       );
     });
 
+    it('should expose the curated OpenRouter models in order', () => {
+      expect(CONFIG.OPENROUTER_API_MODEL).toBe('openai/gpt-4o-mini');
+      expect(CONFIG.OPENROUTER_API_URL).toBe('https://openrouter.ai/api/v1/chat/completions');
+      expect(CONFIG.OPENROUTER_MODELS).toEqual([
+        { value: 'openai/gpt-4o-mini', name: 'OpenAI GPT-4o Mini' },
+        { value: 'openai/gpt-4o', name: 'OpenAI GPT-4o' },
+        { value: 'custom', name: 'Custom Model' }
+      ]);
+    });
+
     it('should expose approved Gemini selector models in order', () => {
       expect(CONFIG.GEMINI_MODEL).toBe('gemini-3.5-flash');
       expect(CONFIG.GEMINI_API_URL).toBe(
