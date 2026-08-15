@@ -26,6 +26,14 @@ import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 const logger = getScopedLogger(LOG_COMPONENTS.CONFIG, 'SettingsMigrations');
 
 const MODEL_VALUE_MIGRATIONS = {
+  OPENAI_MODELS: {
+    o1: 'gpt-5.6-terra',
+    'o1-mini': 'gpt-5.6-luna',
+    'o3-mini': 'gpt-5.6-luna',
+    'gpt-4.5-preview': 'gpt-5.6-terra',
+    'chatgpt-4o-latest': 'gpt-5.6-terra',
+    'gpt-4o': 'gpt-5.6-terra'
+  },
   GEMINI_MODELS: {
     'gemini-3.1-flash-lite-preview': 'gemini-3.5-flash-lite',
     'gemini-3.1-pro-preview': 'gemini-3.6-flash',

@@ -71,11 +71,11 @@ const openaiApiKey = computed({
 })
 
 // Track dropdown selection separately from stored value
-const selectedModelOption = ref('gpt-4o')
+const selectedModelOption = ref(CONFIG.OPENAI_API_MODEL)
 
 // Initialize selectedModelOption based on current stored value
 const initializeModelSelection = () => {
-  const currentModel = settingsStore.settings?.OPENAI_API_MODEL || 'gpt-4o';
+  const currentModel = settingsStore.settings?.OPENAI_API_MODEL || CONFIG.OPENAI_API_MODEL;
   const isPredefined = openaiApiModelOptions.value.some(option => option.value === currentModel && option.value !== 'custom');
   selectedModelOption.value = isPredefined ? currentModel : 'custom';
 }
@@ -93,7 +93,7 @@ const openaiApiModel = computed({
 
 const openaiCustomModel = computed({
   get: () => {
-    const currentModel = settingsStore.settings?.OPENAI_API_MODEL || 'gpt-4o';
+    const currentModel = settingsStore.settings?.OPENAI_API_MODEL || CONFIG.OPENAI_API_MODEL;
     const isPredefined = openaiApiModelOptions.value.some(option => option.value === currentModel && option.value !== 'custom');
     return isPredefined ? '' : currentModel;
   },

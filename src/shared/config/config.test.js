@@ -71,6 +71,27 @@ describe('Config Module', () => {
       expect(CONFIG.APP_NAME).toBe('Translate It');
     });
 
+    it('should expose approved OpenAI text models in order', () => {
+      expect(CONFIG.OPENAI_API_MODEL).toBe('gpt-5.6-luna');
+      expect(CONFIG.OPENAI_MODELS.map(model => model.value)).toEqual([
+        'gpt-5.6-terra',
+        'gpt-5.6-luna',
+        'gpt-5.6-sol',
+        'gpt-4o-mini',
+        'custom'
+      ]);
+      expect(CONFIG.OPENAI_MODELS).not.toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ value: 'o1' }),
+          expect.objectContaining({ value: 'o1-mini' }),
+          expect.objectContaining({ value: 'o3-mini' }),
+          expect.objectContaining({ value: 'gpt-4.5-preview' }),
+          expect.objectContaining({ value: 'gpt-4o' }),
+          expect.objectContaining({ value: 'chatgpt-4o-latest' })
+        ])
+      );
+    });
+
     it('should expose approved Gemini selector models in order', () => {
       expect(CONFIG.GEMINI_MODEL).toBe('gemini-3.5-flash');
       expect(CONFIG.GEMINI_API_URL).toBe(

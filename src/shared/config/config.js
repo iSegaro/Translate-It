@@ -183,17 +183,11 @@ export const CONFIG = {
   WEBAI_API_MODEL: "",
   OPENAI_API_KEY: "",
   OPENAI_API_URL: "https://api.openai.com/v1/chat/completions",
-  OPENAI_API_MODEL: "gpt-4o-mini",
+  OPENAI_API_MODEL: "gpt-5.6-luna",
   OPENAI_MODELS: [
-    // --- OpenAI Reasoning Models (برای حل مسائل پیچیده، ریاضیات و کدنویسی) ---
-    { value: "o1", name: "o1" },
-    { value: "o1-mini", name: "o1-mini" },
-    { value: "o3-mini", name: "o3-mini" },
-
-    // --- OpenAI Omni Series (مدل‌های سریع، ارزان و چندمنظوره) ---
-    { value: "gpt-4.5-preview", name: "GPT-4.5 Preview" },
-    { value: "gpt-4o", name: "GPT-4o" },
-    { value: "chatgpt-4o-latest", name: "ChatGPT-4o Latest" },
+    { value: "gpt-5.6-terra", name: "GPT-5.6 Terra" },
+    { value: "gpt-5.6-luna", name: "GPT-5.6 Luna" },
+    { value: "gpt-5.6-sol", name: "GPT-5.6 Sol" },
     { value: "gpt-4o-mini", name: "GPT-4o Mini" },
     { value: "custom", name: "Custom Model" }
   ],

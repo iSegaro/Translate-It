@@ -152,6 +152,47 @@ describe('Settings Migrations', () => {
     expect(previewResult.updates.GEMINI_MODEL).toBe('gemini-3.5-flash-lite');
   });
 
+  it.each([
+    ['o1', 'gpt-5.6-terra'],
+    ['o1-mini', 'gpt-5.6-luna'],
+    ['o3-mini', 'gpt-5.6-luna'],
+    ['gpt-4.5-preview', 'gpt-5.6-terra'],
+    ['chatgpt-4o-latest', 'gpt-5.6-terra'],
+    ['gpt-4o', 'gpt-5.6-terra']
+  ])('migrates inactive OpenAI model %s to %s', async (oldModel, newModel) => {
+    const { updates, logs } = await runSettingsMigrations({
+      OPENAI_MODELS: [{ value: oldModel, label: 'Legacy' }],
+      OPENAI_API_MODEL: oldModel
+    });
+
+    expect(updates.OPENAI_API_MODEL).toBe(newModel);
+    expect(logs).toContain(`Migrated OPENAI_API_MODEL from ${oldModel} to ${newModel}`);
+  });
+
+  it('preserves current OpenAI static and arbitrary custom models', async () => {
+    const currentStatic = await runSettingsMigrations({
+      OPENAI_MODELS: [{ value: 'legacy-model', label: 'Legacy' }],
+      OPENAI_API_MODEL: 'gpt-4o-mini'
+    });
+    const custom = await runSettingsMigrations({
+      OPENAI_MODELS: [{ value: 'legacy-model', label: 'Legacy' }],
+      OPENAI_API_MODEL: 'provider/custom-model'
+    });
+
+    expect(currentStatic.updates.OPENAI_API_MODEL).toBeUndefined();
+    expect(custom.updates.OPENAI_API_MODEL).toBeUndefined();
+  });
+
+  it('falls back to the new OpenAI default for an empty selection', async () => {
+    const { updates, logs } = await runSettingsMigrations({
+      OPENAI_MODELS: CONFIG.OPENAI_MODELS,
+      OPENAI_API_MODEL: ''
+    });
+
+    expect(updates.OPENAI_API_MODEL).toBe(CONFIG.OPENAI_API_MODEL);
+    expect(logs.some(log => log.includes('Reset OPENAI_API_MODEL'))).toBe(true);
+  });
+
   it('should preserve arbitrary custom model IDs when a model list changes', async () => {
     const currentSettings = {
       GEMINI_MODELS: [{ value: 'old-model', label: 'Old' }],

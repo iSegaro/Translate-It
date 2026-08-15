@@ -6,7 +6,7 @@ import { TranslationCallPurpose } from './ProviderConstants.js';
 import { AIConversationHelper } from './utils/AIConversationHelper.js';
 import { CompletionTermination } from '@/features/translation/ir/CompletionContract.js';
 import { createTranslationOperation } from '@/features/translation/ir/TranslationOperation.js';
-import { getOpenAIModelAsync } from '@/shared/config/config.js';
+import { CONFIG, getOpenAIModelAsync } from '@/shared/config/config.js';
 import { ResponseFormat } from '@/shared/config/translationConstants.js';
 
 // Mock Dependencies
@@ -102,6 +102,7 @@ describe('OpenAIProvider Error Handling', () => {
     ['gpt-4o', true],
     ['gpt-4o-mini', true],
     ['gpt-5.6-terra', false],
+    ['gpt-5.6-luna', false],
     ['gpt-5.6-sol', false],
     ['custom-model-id', false],
   ])('builds modern text request for %s', async (model, supportsTemperature) => {
@@ -126,6 +127,16 @@ describe('OpenAIProvider Error Handling', () => {
     } else {
       expect(payload).not.toHaveProperty('temperature');
     }
+  });
+
+  it('uses CONFIG default for missing text model selection', async () => {
+    getOpenAIModelAsync.mockResolvedValue(undefined);
+    const executeRequest = vi.spyOn(provider, '_executeRequest').mockResolvedValue('translated');
+
+    await provider._callAI('system', 'text');
+
+    const payload = JSON.parse(executeRequest.mock.calls[0][0].fetchOptions.body);
+    expect(payload.model).toBe(CONFIG.OPENAI_API_MODEL);
   });
 
   it('should handle successful translation', async () => {

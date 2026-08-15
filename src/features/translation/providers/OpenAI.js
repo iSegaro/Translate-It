@@ -1,6 +1,7 @@
 // src/core/providers/OpenAIProvider.js
 import { BaseAIProvider } from "@/features/translation/providers/BaseAIProvider.js";
 import {
+  CONFIG,
   getOpenAIApiKeysAsync,
   getOpenAIApiUrlAsync,
   getOpenAIModelAsync,
@@ -86,7 +87,7 @@ export class OpenAIProvider extends BaseAIProvider {
     const turnNumber = conversationParticipates
       ? await AIConversationHelper.claimNextTurn(sessionId, this.providerName, { callPurpose, translateMode: mode, conversationParticipates })
       : 1;
-    const activeModel = model || "gpt-4o-mini";
+    const activeModel = model || CONFIG.OPENAI_API_MODEL;
     logger.info(`[OpenAI] Model: ${activeModel}${sessionId ? ` (Session: ${sessionId.substring(0, 15)}..., Turn: ${turnNumber})` : ''}`);
 
     const { messages } = await AIConversationHelper.getConversationMessages(sessionId, this.providerName, userText, systemPrompt, mode, { callPurpose, conversationParticipates });
