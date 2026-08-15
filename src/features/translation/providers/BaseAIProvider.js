@@ -18,6 +18,7 @@ import { AITextProcessor } from "./utils/AITextProcessor.js";
 import { TranslationMode, getProviderOptimizationLevelAsync } from "@/shared/config/config.js";
 import { AIStreamManager } from "./utils/AIStreamManager.js";
 import { isCancellationError } from "@/shared/error-management/ErrorMatcher.js";
+import { ErrorTypes } from "@/shared/error-management/ErrorTypes.js";
 import { appendTranslationDiagnostic } from "@/features/translation/ir/TranslationOperation.js";
 import { TranslationCallPurpose } from "@/features/translation/providers/ProviderConstants.js";
 
@@ -47,6 +48,58 @@ function createConversationCommitCandidate() {
       }
     }
   };
+}
+
+function getSelectiveRecoveryPlan(parsed, texts) {
+  const invalidUnits = Array.isArray(parsed?.invalidUnits) ? parsed.invalidUnits : [];
+  const mappingFacts = parsed?.mappingFacts;
+  if (!Array.isArray(texts)
+      || !Array.isArray(parsed?.results)
+      || parsed.results.length !== texts.length) {
+    return null;
+  }
+  if (!mappingFacts?.identityReliable) {
+    return null;
+  }
+  if (!mappingFacts.complete) {
+    return null;
+  }
+  if (mappingFacts.ambiguous) {
+    return null;
+  }
+  if (invalidUnits.length === 0) {
+    return null;
+  }
+
+  const indexes = invalidUnits.map(({ requestIndex }) => requestIndex);
+  if (indexes.some((index) => !Number.isInteger(index) || index < 0 || index >= texts.length)) {
+    return null;
+  }
+  const invalidIndexes = [...new Set(indexes)].sort((a, b) => a - b);
+  if (invalidIndexes.length !== indexes.length) {
+    return null;
+  }
+  if (invalidIndexes.length >= texts.length) {
+    return null;
+  }
+  if (invalidIndexes.some((index) => parsed.results[index] === undefined)) {
+    return null;
+  }
+
+  return {
+    invalidIndexes,
+    recoveryTexts: invalidIndexes.map((index) => texts[index]),
+  };
+}
+
+function validateSelectiveRecoveryResult(recoveryResult, expectedCount) {
+  const values = Array.isArray(recoveryResult) ? recoveryResult : [recoveryResult];
+  if (values.length !== expectedCount || values.some((value) => typeof value !== 'string' || value.trim() === '')) {
+    const error = new Error(`Selective structured recovery returned ${values.length} invalid results; expected ${expectedCount}`);
+    error.type = ErrorTypes.API_RESPONSE_INVALID;
+    throw error;
+  }
+  return values;
 }
 
 export class BaseAIProvider extends BaseProvider {
@@ -163,6 +216,7 @@ export class BaseAIProvider extends BaseProvider {
     const conversationCommitCandidate = (
       structuredFormat === ResponseFormat.JSON_ARRAY || structuredFormat === ResponseFormat.JSON_OBJECT
     ) ? createConversationCommitCandidate() : null;
+    let acceptedResults;
     try {
       const response = await this.executeStructuredBatch(texts, sourceLang, targetLang, {
         translateMode,
@@ -195,6 +249,7 @@ export class BaseAIProvider extends BaseProvider {
       // the canonical structured-batch array shape so downstream contract cleaning
       // (ProviderCoordinator._cleanResult) receives the same shape as the normal path.
       if (parsed.contractViolation) {
+        const selectivePlan = getSelectiveRecoveryPlan(parsed, texts);
         conversationCommitCandidate?.discard();
         logger.warn(`[${this.providerName}] Structured response violated its contract; sequential recovery started`);
         appendTranslationDiagnostic(executionContext, {
@@ -207,7 +262,7 @@ export class BaseAIProvider extends BaseProvider {
 
         let recoveryResult;
         try {
-          recoveryResult = await this.executeSequentialBatch(texts, sourceLang, targetLang, {
+          recoveryResult = await this.executeSequentialBatch(selectivePlan?.recoveryTexts || texts, sourceLang, targetLang, {
             translateMode,
             engine,
             messageId,
@@ -216,6 +271,7 @@ export class BaseAIProvider extends BaseProvider {
             sessionId,
             expectedFormat: ResponseFormat.STRING,
             contextMetadata,
+            repairContext: parsed.repairContext,
             callPurpose: TranslationCallPurpose.STRUCTURED_RECOVERY,
           });
         } catch (error) {
@@ -231,16 +287,28 @@ export class BaseAIProvider extends BaseProvider {
           throw error;
         }
 
+        const recoveryValues = selectivePlan
+          ? validateSelectiveRecoveryResult(recoveryResult, selectivePlan.invalidIndexes.length)
+          : (Array.isArray(recoveryResult) ? recoveryResult : [recoveryResult]);
+        const finalResults = selectivePlan
+          ? (() => {
+            const merged = [...parsed.results];
+            selectivePlan.invalidIndexes.forEach((index, recoveryIndex) => {
+              merged[index] = recoveryValues[recoveryIndex];
+            });
+            return merged;
+          })()
+          : recoveryValues;
+
         appendTranslationDiagnostic(executionContext, {
           type: 'RECOVERY_SUCCEEDED',
           stage: 'recovery',
           provider: this.providerName,
         });
-        return Array.isArray(recoveryResult) ? recoveryResult : [recoveryResult];
+        return finalResults;
       }
 
-      await conversationCommitCandidate?.commit();
-      return parsed.results;
+      acceptedResults = parsed.results;
     } catch (error) {
       conversationCommitCandidate?.discard();
       // Error accounting is owned exclusively by ProviderRequestEngine.executeApiCall:
@@ -256,6 +324,22 @@ export class BaseAIProvider extends BaseProvider {
       //   silently reporting the untranslated original as a success.
       throw error;
     }
+
+    // Late-settlement guard: the outer handler (e.g. OptimizedJsonHandler) may
+    // abort the signal immediately after the provider response resolved but
+    // before this commit point. Once aborted, the user never receives the
+    // result, so the conversation must not be written. Discard the staged
+    // candidate and fail loudly as USER_CANCELLED.
+    if (abortController?.signal?.aborted) {
+      conversationCommitCandidate?.discard();
+      const cancelError = new Error('Translation cancelled by user');
+      cancelError.name = 'AbortError';
+      cancelError.type = ErrorTypes.USER_CANCELLED;
+      throw cancelError;
+    }
+
+    await conversationCommitCandidate?.commit();
+    return acceptedResults;
   }
 
   async executeStructuredBatch(texts, sourceLang, targetLang, {
@@ -305,11 +389,19 @@ export class BaseAIProvider extends BaseProvider {
     sessionId,
     expectedFormat,
     contextMetadata = {},
+    repairContext = null,
     callPurpose,
   } = {}) {
     return this._traditionalBatchTranslate(
       texts, sourceLang, targetLang, translateMode, engine, messageId, abortController,
-      priority, sessionId, expectedFormat, { ...contextMetadata, ...(callPurpose && { callPurpose }) }
+      priority,
+      sessionId,
+      expectedFormat,
+      {
+        ...contextMetadata,
+        ...(repairContext && { repairContext }),
+        ...(callPurpose && { callPurpose }),
+      }
     );
   }
 
@@ -324,7 +416,12 @@ export class BaseAIProvider extends BaseProvider {
       : TranslationCallPurpose.PRIMARY_TRANSLATION;
 
     for (let i = 0; i < texts.length; i++) {
-      if (abortController?.signal?.aborted) throw new Error('Cancelled');
+      if (abortController?.signal?.aborted) {
+        const cancelError = new Error('Translation cancelled by user');
+        cancelError.name = 'AbortError';
+        cancelError.type = ErrorTypes.USER_CANCELLED;
+        throw cancelError;
+      }
       
       const text = texts[i];
       const { systemPrompt, userText } = await this._preparePromptAndText(text, sourceLang, targetLang, translateMode, options, sessionId);

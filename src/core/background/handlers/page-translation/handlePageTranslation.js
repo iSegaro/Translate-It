@@ -93,6 +93,11 @@ export async function handlePageTranslation(message, sender) {
                          message.data?.messageId ||
                          message.messageId;
 
+        // Clear the coordinator's per-session source-resolution state on any
+        // terminal page event so the resolved language never leaks to a new
+        // session reusing the same identifier.
+        unifiedTranslationService.clearPageSourceSession(sessionId);
+
         // Map action to status label
         let status = 'Complete';
         if (message.action === MessageActions.PAGE_TRANSLATE_CANCELLED) status = 'Stopped';
@@ -114,7 +119,10 @@ export async function handlePageTranslation(message, sender) {
       // Special case: Clear session if a NEW translation starts on the same ID
       if (message.action === MessageActions.PAGE_TRANSLATE_START) {
         const sessionId = message.data?.sessionId || message.data?.messageId;
-        if (sessionId) statsManager.clearSession(sessionId);
+        if (sessionId) {
+          statsManager.clearSession(sessionId);
+          unifiedTranslationService.clearPageSourceSession(sessionId);
+        }
       }
 
       browser.runtime.sendMessage(message).catch(() => {});

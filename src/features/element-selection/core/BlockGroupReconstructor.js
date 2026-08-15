@@ -3,6 +3,7 @@ import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { hoverPreviewLookup } from '@/features/shared/hover-preview/HoverPreviewLookup.js';
 import { PAGE_TRANSLATION_ATTRIBUTES } from '@/features/page-translation/PageTranslationConstants.js';
 import { detectDirectionFromContent, applyNodeDirection, BIDI_MARKS } from '@/utils/dom/DomDirectionManager.js';
+import { parseV3Intervals } from '@/features/translation/core/V3IntervalParser.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.ELEMENT_SELECTION, 'BlockGroupReconstructor');
 
@@ -74,44 +75,15 @@ export class BlockGroupReconstructor {
       throw new Error('Translated text is empty or invalid');
     }
 
-    // --- Hardened Deterministic Parser Logic ---
-    let regex;
-    if (sessionId) {
-      const escapedSessionId = escapeRegExp(sessionId);
-      
-      // Strict generator / tolerant parser model:
-      // We allow optional whitespace around delimiters and keywords.
-      // We allow case-insensitivity for 'TI_SEG'.
-      // BUT we require EXACT matches for entropy and sessionId.
-      // segmentId (capture 1) remains exact and case-sensitive.
-      
-      if (entropy) {
-        const escapedEntropy = escapeRegExp(entropy);
-        regex = new RegExp(`@@\\s*TI\\s*_\\s*SEG\\s*_\\s*${escapedEntropy}\\s*_\\s*${escapedSessionId}\\s*_\\s*(n\\d+)\\s*@@`, 'giu');
-      } else {
-        regex = new RegExp(`@@\\s*TI\\s*_\\s*SEG\\s*_\\s*${escapedSessionId}\\s*_\\s*(n\\d+)\\s*@@`, 'giu');
-      }
-    } else {
-      // capture 1: (n\d+)
-      // Plan: @@SEG_<segmentId>@@
-      regex = /@@\s*SEG\s*_\s*(n\d+)\s*@@/giu;
-    }
-
-    const parts = translatedText.split(regex);
-    const segments = [];
-    
-    // The first part is always the text before the first marker (segment n1)
-    segments.push({
-      id: expectedUnits[0].id,
-      text: parts[0] || ''
+    const parsed = parseV3Intervals(translatedText, {
+      sessionId,
+      entropy,
+      grammar: sessionId ? 'ti' : 'legacy',
     });
-
-    // Subsequent parts come in pairs: [segmentId, textAfterMarker]
-    for (let i = 1; i < parts.length; i += 2) {
-      const id = parts[i];
-      const text = parts[i + 1] || '';
-      segments.push({ id, text });
-    }
+    const segments = parsed.intervals.map((interval, index) => ({
+      id: index === 0 ? expectedUnits[0]?.id : interval.markerId,
+      text: interval.text || '',
+    }));
 
     // --- Deterministic Structural Validation Gates ---
     
@@ -226,7 +198,7 @@ export class BlockGroupReconstructor {
       commitPlan.push({
         unit,
         finalValue,
-        originalText: unit.node.textContent
+        originalText: unit.node.textContent,
       });
     }
 

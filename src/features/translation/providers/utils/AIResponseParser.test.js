@@ -163,6 +163,21 @@ describe('AIResponseParser', () => {
       expect(result.contractViolation).toBe(true);
     });
 
+    it('keeps unknown identity mapping unavailable for selective recovery', () => {
+      const result = AIResponseParser.parseBatchResult(
+        '[{"id":"unknown","text":"AA"},{"id":"1","text":"BB"}]',
+        2,
+        [{ i: 'g1', t: 'A' }, { i: 'g2', t: 'B' }],
+        'WebAI',
+        ResponseFormat.JSON_OBJECT,
+        {},
+        createManifestView(createRequestUnitManifest([{ i: 'g1', t: 'A' }, { i: 'g2', t: 'B' }])),
+      );
+
+      expect(result.mappingFacts).toEqual({ identityReliable: false, complete: false, ambiguous: true });
+      expect(result.invalidUnits.every(({ requestIndex }) => requestIndex === null)).toBe(true);
+    });
+
     it('rejects duplicate mappings even when every requested slot is filled', () => {
       const result = AIResponseParser.parseBatchResult(
         '[{"id":"0","text":"first"},{"id":"0","text":"replacement"},{"id":"1","text":"second"}]',
@@ -171,6 +186,146 @@ describe('AIResponseParser', () => {
       );
 
       expect(result.contractViolation).toBe(true);
+    });
+
+    it('exposes reliable V3 invalid-unit indexes and exact violation codes', () => {
+      const originalBatch = [
+        { i: 'g1', t: 'A' },
+        { i: 'g2', t: 'A@@TI_SEG_e1_s1_n13@@video game publisher@@TI_SEG_e1_s1_n14@@Electronic Arts' },
+        { i: 'g3', t: 'C' },
+      ];
+      const result = AIResponseParser.parseBatchResult(
+        JSON.stringify({ translations: [
+          { id: 'g1', text: 'AA' },
+          { id: 'g2', text: 'خرید@@TI_SEG_e1_s1_n13@@ @@TI_SEG_e1_s1_n14@@الکترونیک آرتس' },
+          { id: 'g3', text: 'CC' },
+        ] }),
+        3,
+        originalBatch,
+        'WebAI',
+        ResponseFormat.JSON_OBJECT,
+        {},
+        createManifestView(createRequestUnitManifest(originalBatch)),
+      );
+
+      expect(result.invalidUnits).toEqual([
+        expect.objectContaining({
+          requestIndex: 1,
+          responseId: 'g2',
+          violationCodes: expect.arrayContaining(['V3_EMPTY_TRANSLATED_INTERVAL']),
+        }),
+      ]);
+      expect(result.mappingFacts).toEqual({ identityReliable: true, complete: true, ambiguous: false });
+      expect(result.repairContext).toMatchObject({
+        reason: expect.stringContaining('V3_EMPTY_TRANSLATED_INTERVAL'),
+        affectedUnits: [expect.objectContaining({
+          requestIndex: 1,
+          responseId: 'g2',
+          markerId: 'n13',
+          sourceText: 'video game publisher',
+        })],
+      });
+    });
+
+    it('reaches selective recovery facts for V3 orphan delimiter residue', () => {
+      const originalBatch = [
+        { i: 'g1', t: 'A' },
+        { i: 'g2', t: 'A@@TI_SEG_e1_s1_n13@@video game publisher@@TI_SEG_e1_s1_n14@@Electronic Arts' },
+        { i: 'g3', t: 'C' },
+      ];
+      const result = AIResponseParser.parseBatchResult(
+        JSON.stringify({ translations: [
+          { id: 'g1', text: 'AA' },
+          { id: 'g2', text: 'خرید@@TI_SEG_e1_s1_n13@@ناشر بازی‌ها@@TI_SEG_e1_s1_n14@@الکترونیک آرتس@@' },
+          { id: 'g3', text: 'CC' },
+        ] }),
+        3,
+        originalBatch,
+        'WebAI',
+        ResponseFormat.JSON_OBJECT,
+        {},
+        createManifestView(createRequestUnitManifest(originalBatch)),
+      );
+
+      expect(result.contractViolation).toBe(true);
+      expect(result.invalidUnits).toEqual([
+        expect.objectContaining({
+          requestIndex: 1,
+          responseId: 'g2',
+          violationCodes: expect.arrayContaining(['V3_ORPHAN_DELIMITER']),
+        }),
+      ]);
+      expect(result.mappingFacts).toEqual({ identityReliable: true, complete: true, ambiguous: false });
+      expect(result.repairContext).toMatchObject({
+        reason: expect.stringContaining('V3_ORPHAN_DELIMITER'),
+        affectedUnits: [expect.objectContaining({
+          requestIndex: 1,
+          responseId: 'g2',
+          markerId: 'n14',
+          sourceText: 'Electronic Arts',
+        })],
+      });
+    });
+
+    it('uses manifest identity mapping rather than response order for invalid indexes', () => {
+      const originalBatch = [
+        { i: 'g1', t: 'A' },
+        { i: 'g2', t: 'A@@TI_SEG_e1_s1_n13@@video game publisher@@TI_SEG_e1_s1_n14@@Electronic Arts' },
+        { i: 'g3', t: 'C' },
+      ];
+      const result = AIResponseParser.parseBatchResult(
+        JSON.stringify({ translations: [
+          { id: 'g3', text: 'CC' },
+          { id: 'g1', text: 'AA' },
+          { id: 'g2', text: 'خرید@@TI_SEG_e1_s1_n13@@ @@TI_SEG_e1_s1_n14@@الکترونیک آرتس' },
+        ] }),
+        3,
+        originalBatch,
+        'WebAI',
+        ResponseFormat.JSON_OBJECT,
+        {},
+        createManifestView(createRequestUnitManifest(originalBatch)),
+      );
+
+      expect(result.invalidUnits).toEqual([
+        expect.objectContaining({ requestIndex: 1, responseId: 'g2' }),
+      ]);
+    });
+
+    it('validates numeric provider wire IDs against positional context for logical source batches', () => {
+      const sourceBatch = [
+        'A',
+        'A@@TI_SEG_e1_s1_n13@@video game publisher@@TI_SEG_e1_s1_n14@@Electronic Arts',
+        'C',
+      ];
+      const manifestSource = [
+        { i: 'g1', t: sourceBatch[0] },
+        { i: 'g2', t: sourceBatch[1] },
+        { i: 'g3', t: sourceBatch[2] },
+      ];
+      const result = AIResponseParser.parseBatchResult(
+        JSON.stringify({ translations: [
+          { id: '0', text: 'AA' },
+          { id: '1', text: 'خرید@@TI_SEG_e1_s1_n13@@ @@TI_SEG_e1_s1_n14@@الکترونیک آرتس' },
+          { id: '2', text: 'CC' },
+        ] }),
+        3,
+        sourceBatch,
+        'WebAI',
+        ResponseFormat.JSON_OBJECT,
+        {},
+        createManifestView(createRequestUnitManifest(manifestSource)),
+      );
+
+      expect(result.invalidUnits).toEqual([
+        expect.objectContaining({
+          requestIndex: 1,
+          responseId: '1',
+          violationCodes: expect.arrayContaining(['V3_EMPTY_TRANSLATED_INTERVAL']),
+        }),
+      ]);
+      expect(result.invalidUnits).toHaveLength(1);
+      expect(result.mappingFacts).toEqual({ identityReliable: true, complete: true, ambiguous: false });
     });
 
     it('rejects null translated text for a non-empty source', () => {
@@ -201,6 +356,8 @@ describe('AIResponseParser', () => {
       );
 
       expect(result.contractViolation).toBe(true);
+      expect(result.mappingFacts.identityReliable).toBe(false);
+      expect(result.mappingFacts.ambiguous).toBe(true);
     });
 
     it('accepts harmless unknown surplus output with a warning diagnostic', () => {
@@ -293,7 +450,7 @@ describe('AIResponseParser', () => {
       expect(Object.isFrozen(observeValidationResult.mock.calls[0][0])).toBe(true);
     });
 
-    it('observes invalid validation while preserving legacy fallback mapping', () => {
+    it('observes invalid validation while filling resolved slots with empty string', () => {
       const originalBatch = [{ i: 'first', t: 'source one' }, { i: 'second', t: 'source two' }];
       const observeValidationResult = vi.fn();
       const result = AIResponseParser.parseBatchResult(
@@ -306,9 +463,44 @@ describe('AIResponseParser', () => {
         createManifestView(createRequestUnitManifest(originalBatch)),
       );
 
-      expect(result.results).toEqual(['source one', 'second']);
+      expect(result.results).toEqual(['', 'second']);
+      expect(result.results).not.toContain('source one');
+      expect(result.results).not.toContain('source two');
       expect(result.contractViolation).toBe(true);
       expect(observeValidationResult).toHaveBeenCalledWith(expect.objectContaining({ isValid: false }));
+    });
+
+    it('handles index-only invalid units in V3 contract violations', () => {
+      const originalBatch = [{ i: 'g1', t: 'A@@TI_SEG_e1_s1_n2@@B' }];
+      const validatorSpy = vi.spyOn(TranslationContractValidator, 'validate').mockReturnValue({
+        isValid: false,
+        violations: [{ code: 'V3_EMPTY_TRANSLATED_INTERVAL', index: 0 }],
+        invalidUnits: [{ index: 0, requestedIndex: 0, responseId: 'g1' }],
+        validatedUnits: [],
+        missingUnitIds: [],
+        duplicateUnitIds: [],
+        unknownUnitIds: [],
+        orderingFacts: null,
+        cardinality: { expectedCount: 1, receivedCount: 1 },
+        parserEvidence: null,
+      });
+
+      try {
+        const result = AIResponseParser.parseBatchResult(
+          '[{"i":"g1","t":"A@@TI_SEG_e1_s1_n2@@"}]',
+          1,
+          originalBatch,
+          'WebAI',
+          ResponseFormat.JSON_OBJECT,
+          {},
+          createManifestView(createRequestUnitManifest(originalBatch)),
+        );
+
+        expect(result).toMatchObject({ results: ['A@@TI_SEG_e1_s1_n2@@'], contractViolation: true });
+        expect(result.invalidUnits).toEqual([expect.objectContaining({ requestIndex: null, responseId: 'g1' })]);
+      } finally {
+        validatorSpy.mockRestore();
+      }
     });
 
     it('ignores observer failures without changing legacy output', () => {
@@ -339,9 +531,25 @@ describe('AIResponseParser', () => {
         createManifestView(createRequestUnitManifest(['source'])),
       );
 
-      expect(result.results).toEqual(['source']);
+      expect(result.results).toEqual(['']);
       expect(result.contractViolation).toBe(true);
       expect(observeValidationResult).not.toHaveBeenCalled();
+    });
+
+    it('total JSON parse failure fills all slots with empty string, not source', () => {
+      const result = AIResponseParser.parseBatchResult(
+        '{"translations":',
+        3,
+        ['A', 'B', 'C'],
+        'Custom',
+        ResponseFormat.JSON_OBJECT,
+      );
+
+      expect(result.results).toEqual(['', '', '']);
+      expect(result.results).not.toContain('A');
+      expect(result.results).not.toContain('B');
+      expect(result.results).not.toContain('C');
+      expect(result.contractViolation).toBe(true);
     });
 
     it('does not observe split batches without a manifest view', () => {
@@ -381,6 +589,67 @@ describe('AIResponseParser', () => {
       expect(result.contractViolation).toBe(false);
       expect(validate).not.toHaveBeenCalled();
       validate.mockRestore();
+    });
+
+    it('fills an unresolved slot with empty string when a duplicate response ID masks a missing slot', () => {
+      const response = '[{"i":"n1","t":"TA"},{"i":"n1","t":"TB"}]';
+      const result = AIResponseParser.parseBatchResult(
+        response,
+        2,
+        [{ i: 'n1', t: 'A' }, { i: 'n2', t: 'B' }],
+        'TestProvider',
+        ResponseFormat.JSON_ARRAY,
+      );
+
+      expect(result.results[1]).toBe('');
+      expect(result.results).not.toContain('A');
+      expect(result.results).not.toContain('B');
+      expect(result.contractViolation).toBe(true);
+    });
+
+    it('fills unresolved slots with empty string when response items are missing', () => {
+      const response = '[{"i":"n1","t":"TA"}]';
+      const result = AIResponseParser.parseBatchResult(
+        response,
+        3,
+        [{ i: 'n1', t: 'A' }, { i: 'n2', t: 'B' }, { i: 'n3', t: 'C' }],
+        'TestProvider',
+        ResponseFormat.JSON_ARRAY,
+      );
+
+      expect(result.results).toEqual(['TA', '', '']);
+      expect(result.results).not.toContain('A');
+      expect(result.results).not.toContain('B');
+      expect(result.results).not.toContain('C');
+      expect(result.contractViolation).toBe(true);
+    });
+
+    it('preserves valid mapped translations unchanged', () => {
+      const response = '[{"i":"n1","t":"TA"},{"i":"n2","t":"TB"}]';
+      const result = AIResponseParser.parseBatchResult(
+        response,
+        2,
+        [{ i: 'n1', t: 'A' }, { i: 'n2', t: 'B' }],
+        'TestProvider',
+        ResponseFormat.JSON_ARRAY,
+      );
+
+      expect(result.results).toEqual(['TA', 'TB']);
+      expect(result.contractViolation).toBe(false);
+    });
+
+    it('accepts source-equal translation as valid', () => {
+      const response = '[{"i":"n1","t":"A"},{"i":"n2","t":"B"}]';
+      const result = AIResponseParser.parseBatchResult(
+        response,
+        2,
+        [{ i: 'n1', t: 'A' }, { i: 'n2', t: 'B' }],
+        'TestProvider',
+        ResponseFormat.JSON_ARRAY,
+      );
+
+      expect(result.results).toEqual(['A', 'B']);
+      expect(result.contractViolation).toBe(false);
     });
   });
 });

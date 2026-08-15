@@ -65,6 +65,15 @@ ValidationResult
 
 Each boundary passes immutable facts forward. No lower layer may convert unresolved input into successful translated output.
 
+For structured V3 responses, `V3IntervalParser` provides structural marker
+and interval facts only. `TranslationContractValidator` owns semantic provider
+contract validity, including marker ownership. When a structured contract is
+invalid, `AIResponseParser` exposes mapping and repair facts, while
+`BaseAIProvider` owns the recovery policy. The provider may selectively recover
+reliably mapped invalid units or use full sequential recovery when mapping is
+unsafe. Recovery is merged before final delivery, and invalid V3 results are
+rejected before stream visibility.
+
 ### Domain Boundaries
 
 #### TranslationOperation
@@ -165,13 +174,41 @@ Original preservation is feature application state. It is never translated outpu
 - Invalid unit content.
 - Empty translation for a nonempty source unit.
 - Provider content that violates requested translation response contract.
+- V3 marker count, identity, ordering, duplicates, missing and unexpected markers.
+- V3 marker-owned interval content, including `V3_EMPTY_TRANSLATED_INTERVAL`.
 
-`ResponseParser` owns syntax decoding and repair only:
+`V3IntervalParser` is a pure structural parser. It discovers V3 markers,
+exposes marker identities and intervals, and preserves observed interval text;
+it does not determine semantic validity.
+
+V3 marker ownership is a provider contract: semantic content belonging to one
+source interval must remain within its corresponding translated interval.
+Feature and DOM layers do not independently redefine V3 provider validity.
+
+Structured response identity uses separate namespaces:
+
+| Term | Meaning |
+|---|---|
+| Logical ID | Logical source/request identity such as `g5`. |
+| Positional Wire ID | Provider transport identity such as `"4"` in a proven positional-wire batch. |
+| V3 Member ID | Marker/member identity such as `n13`. |
+| `requestIndex` | Original request-array position. |
+| `responseId` | Identifier returned by the provider response. |
+
+Numeric response IDs are not globally valid logical IDs. They are positional
+wire IDs only when the response is known to use positional-wire semantics.
+
+`ResponseParser` / `AIResponseParser` owns syntax decoding, parser repair,
+response/request mapping, and packaging parser or recovery facts only:
 
 - JSON decoding.
 - Fence and boundary extraction.
 - Escaping and limited malformed-JSON repair.
 - Parser repair evidence.
+
+On a structured contract violation, `AIResponseParser` may expose
+`invalidUnits`, `mappingFacts`, and transient `repairContext`. These are facts,
+not recovery policy.
 
 `TranslationContractValidator` must never:
 
@@ -190,8 +227,12 @@ Original preservation is feature application state. It is never translated outpu
 |---|---|---|
 | Transport | HTTP/proxy protocol, status, response bytes, abort signal | Translation text, semantic success, feature mutation |
 | Provider Adapter | Provider protocol, request construction, response-envelope normalization, provider-specific serialization/deserialization | Retry or failover policy, source substitution, UI state, feature recovery |
-| ResponseParser | Decoding, repair, parsed payload, repair evidence | Semantic outcome, source substitution, UI policy |
-| TranslationContractValidator | Contract validity and validation facts | Recovery, provider execution, feature mutation |
+| `V3IntervalParser` | Structural V3 marker and interval parsing | Semantic validity, recovery, feature mutation |
+| ResponseParser / `AIResponseParser` | Decoding, parser repair, parsed payload, response/request mapping, parser and recovery facts | Semantic provider validity, recovery policy, source substitution, UI policy |
+| `TranslationContractValidator` | Contract validity, V3 marker ownership, and validation facts | Recovery, provider execution, feature mutation |
+| `BaseAIProvider` | Selective/full structured recovery policy and recovery execution boundary | V3 semantic interpretation, feature mutation, queue retry policy |
+| `OptimizedJsonHandler` | Final structured-result orchestration and pre-stream enforcement of canonical validation | Independent semantic validity rules, provider recovery policy |
+| `AIConversationHelper` | Conversation-aware prompt rendering, including transient repair guidance | V3 validation and recovery policy |
 | TranslationOutcomeAssembler | Deterministic aggregation of execution and validation facts | Parsing, retries, DOM/PDF mutation, presentation |
 | TranslationOperation | Runtime lifecycle, attempts, timeout, cancellation, diagnostics | Feature resources and presentation |
 | Feature Workflow | DOM/PDF/view-state mutation, rollback, original preservation, partial application | Reclassification of core semantics, provider retry/failover |
@@ -208,6 +249,8 @@ Transport
 → ResponseParser
 → TranslationContractValidator
 → ValidationResult
+→ Recovery facts / provider recovery policy
+→ Final accepted result
 → TranslationOutcomeAssembler
 → TranslationOutcome
 → Feature Workflow
@@ -216,6 +259,10 @@ Transport
 → PresentationModel
 → UI
 ```
+
+For structured V3 results, final canonical validation and acceptance occur
+before stream visibility. `OptimizedJsonHandler` enforces this boundary without
+becoming a second semantic validation owner.
 
 ### Diagnostics
 
@@ -300,6 +347,20 @@ UI must never infer semantic outcome from source/translated equality, empty text
 - Parser never substitutes source text.
 - Parser output is immutable after parsing.
 - Provider never invents translated output after failure.
+- V3 structural parsing never decides semantic validity.
+- `TranslationContractValidator` is the single semantic owner of V3 validity.
+- Logical IDs, positional wire IDs, and V3 member IDs remain distinct.
+- Numeric response IDs are valid only as positional wire IDs in proven positional-wire contexts.
+- Invalid V3 results never become stream-visible.
+- Selective recovery requires reliable and unambiguous mapping.
+- Valid primary values are preserved during selective recovery.
+- Recovery merge completes before final delivery.
+- Unsafe mapping uses full structured recovery fallback.
+- Failed selective recovery fails the provider batch.
+- `repairContext` is transient and contains recovery facts rather than policy.
+- `BaseAIProvider` does not interpret V3 semantic rules.
+- Structured recovery does not alter normal conversation history or turn semantics.
+- Structured recovery is distinct from queue retry.
 - Execution orchestration never mutates feature resources.
 - Validator never performs recovery.
 - Validator never repairs parser output.
@@ -373,7 +434,7 @@ UI must never infer semantic outcome from source/translated equality, empty text
 | 6. Select Element adoption | Consume outcome in Select workflow | Explicit subtree application and revert policy | Partial DOM behavior | Deferred |
 | 7. PDF adoption | Consume outcome in PDF workflow | Explicit block/cell partial state | Session and renderer state | Deferred |
 | 8. Popup and Sidepanel adoption | Consume outcome in view workflows | Consistent direct-translation state | Existing success/error assumptions | Deferred |
-| 9. Legacy fallback removal | Remove hidden source substitution | One recovery boundary | Provider and batch compatibility paths | Deferred |
+| 9. Legacy fallback removal | Remove hidden source substitution | One recovery boundary | Provider and batch compatibility paths | Completed |
 | 10. Transport reassessment | Reassess OpenAI-Compatible and LM Studio behavior using preserved diagnostics | Transport policy separated from semantics | Provider-specific compatibility matrix | Deferred |
 
 ---
@@ -386,25 +447,45 @@ A foundational implementation phase delivered the observational and structural g
 
 - **Domain contracts**: Immutable domain contracts (`TranslationOutcome`, `ExecutionResult`, `TranslationUnit` disposition) have been established as structural contracts; their runtime production remains deferred.
 - **Diagnostics preservation**: Parser and execution facts are retained through the pipeline, feeding `TranslationDiagnosticReport` evidence without crossing presentation boundaries.
-- **Observational validation foundation**: An internal observation pipeline and a request unit manifest provide deterministic, observation-only validation of request structure without changing observable behavior.
+- **Validation foundation**: `V3IntervalParser` provides shared structural V3 parsing, while `TranslationContractValidator` provides canonical semantic contract validation without changing feature ownership.
 - **Terminal execution routing**: Completed and cancelled execution states currently route through the terminal execution router.
 - **Ownership clarification**: Execution strategy is separated from provider/key failover. A format-level re-request within a single execution attempt is execution strategy; provider/key failover remains owned by the operation lifecycle.
 - **Cancellation architecture**: Cancellation and timeout flow through exact request identity with a single accepted terminal transition per request.
 
 ### Production Improvements
 
-The structured-response recovery path is the only production behavior change delivered by this phase. When a structured batch response violates its contract (unmapped or gap-filled slots, or an unparseable response), the parser reports that structured-response recovery is required, and the provider owns and executes the recovery strategy — re-requesting sequentially. This replaces silent result corruption with an explicit, provider-owned recovery decision. The parser only signals whether recovery is required; it never decides semantic success. This is an interim production improvement, not a phase of the migration roadmap.
+The structured-response recovery path is an explicit provider-owned decision. When a structured batch response violates its contract, parser and mapping facts determine whether reliably mapped invalid units can be recovered selectively while preserving valid primary results. Unsafe or ambiguous mapping uses the existing full sequential recovery fallback. Recovered values are merged before final delivery; recovery failure fails the provider batch. Recovery may carry transient, repair-aware context into the existing structured-recovery prompt, without changing normal conversation history or queue retry ownership. This is a production behavior refinement, not a phase of the migration roadmap.
+
+#### Completed after the ADR
+
+The behavioral contract is substantially implemented. Subsequent production work, completed after this ADR was written, delivered:
+
+- **Provider silent source substitution removed**: `BaseProvider`/`BaseAIProvider` and `ProviderCoordinator` no longer return original text as a "successful" translation on nonfatal failure; failures are thrown loudly.
+- **Parser unresolved slots no longer source-fill**: `AIResponseParser` fills unresolved structured slots with empty placeholders, never original source, on a contract violation.
+- **Structured recovery policy finalized**: a structured contract violation uses selective recovery when mapping is reliable and unambiguous, otherwise one full sequential recovery pass (`BaseAIProvider`, `STRUCTURED_RECOVERY` purpose) or a typed failure.
+- **Duplicate identity enforcement**: duplicate logical identities are detected through manifest-aware validation and enforced by `OptimizedJsonHandler`.
+- **V2/V3 fragment aggregation**: split V2/V3 fragments are reassembled atomically and out-of-order; no raw fragments reach DOM/PDF/final results.
+- **V3 ownership validation**: shared structural interval parsing and centralized semantic marker-ownership validation reject invalid V3 results before stream visibility.
+- **Response identity namespaces**: logical IDs, positional wire IDs, and V3 member IDs remain distinct; positional-wire IDs are validated only in their proven transport context.
+- **Recovery facts and repair context**: mapped invalid-unit facts, mapping reliability facts, and transient repair context cross the provider boundary without moving V3 semantic ownership into `BaseAIProvider`.
+- **Structured recovery conversation isolation**: `STRUCTURED_RECOVERY` remains outside normal conversation history, does not change normal turn semantics, and does not become provider memory.
+- **Canonical timeout/cancellation typing**: timeout uses `ErrorTypes.TRANSLATION_TIMEOUT` and cancellation uses `ErrorTypes.USER_CANCELLED`; they remain distinct.
+- **Feature-level source preservation**: PDF missing results and subtitle under-return (via `isSkipped`) preserve original presentation without classifying it as translated output.
+- **Conversation commit isolation**: `BaseAIProvider` does not commit a conversation candidate after cancellation or timeout, and discards a rejected/conversation-staged candidate during structured recovery.
+
+These changes enforce the ADR's core invariants (no source substitution, no invented translated output, timeout≠cancellation, atomic fragment aggregation) in production, without adopting the canonical `TranslationOutcome` type as the universal result shape.
+
+For the detailed identity precedence, duplicate policies, and V2/V3 fragment aggregation contract, see [TRANSLATION_IDENTITY_AND_FRAGMENT_CONTRACT.md](../technical/contracts/TRANSLATION_IDENTITY_AND_FRAGMENT_CONTRACT.md). For provider selection and structured-recovery execution policy, see [TRANSLATION_PROVIDER_LOGIC.md](../technical/TRANSLATION_PROVIDER_LOGIC.md). For the provider result/error/retry/health/stats contract and the AI conversation-candidate lifecycle contract, see [PROVIDER_CONTRACT.md](../technical/contracts/PROVIDER_CONTRACT.md) and [CONVERSATION_CONTRACT.md](../technical/contracts/CONVERSATION_CONTRACT.md). For an architecture overview with runtime-diagram references, see [TRANSLATION_SYSTEM.md](../technical/architecture/TRANSLATION_SYSTEM.md) and [DIAGRAMS.md](../technical/architecture/DIAGRAMS.md).
 
 ### Deferred Scope
 
-The remaining phases are intentionally deferred to a future initiative named **Translation Outcome Adoption**:
+The following remain **intentionally deferred** to a future initiative named **Translation Outcome Adoption**:
 
-- Runtime production and adoption of `TranslationOutcome` (`ValidationResult` runtime integration and `TranslationOutcomeAssembler`).
-- `TranslationOutcomeAssembler` and runtime consumers of assembled outcomes.
-- Feature adoption across Whole Page, Select Element, PDF, Popup, and Sidepanel workflows.
-- Legacy fallback removal (including parser gap-fill source substitution).
+- Full runtime adoption of canonical `TranslationOutcome` (`ValidationResult` runtime integration and `TranslationOutcomeAssembler`) and runtime consumers of assembled outcomes.
+- Replacement of existing runtime result shapes (raw strings/arrays, unified coordinator responses) by the ADR model.
+- Any adapter migration not currently present in production.
 
-This is a deliberate scope decision, not unfinished work. The canonical pipeline described in this ADR remains the target; the deferred initiative will carry these phases forward as a separate effort without altering this document's architecture.
+The canonical `TranslationOutcome` model is not yet the universal runtime representation. The robust pipeline described in this ADR remains the target; the deferred initiative will carry these phases as a separate effort without altering this document's architecture.
 
 Runtime adoption should begin only after a concrete `TranslationOutcome` consumer has been defined.
 
@@ -412,8 +493,8 @@ Runtime adoption should begin only after a concrete `TranslationOutcome` consume
 
 ## Risks
 
-- Whole Page, Select Element, PDF, and traditional providers currently depend on distinct fallback behavior.
-- Structured batch identity and cardinality behavior requires regression characterization before migration.
+- Whole Page, Select Element, PDF, and traditional providers currently depend on distinct application and fallback behavior.
+- Broader cross-mode adoption and refinement of structured identity and mapping strategies remains part of the deferred outcome migration.
 - Existing UI may treat raw source text as successful translated output.
 - Provider compatibility behavior may expose previously hidden invalid-response failures.
 - Outcome and diagnostic messaging must remain bounded; raw provider data must never cross presentation boundaries.
@@ -422,9 +503,9 @@ Runtime adoption should begin only after a concrete `TranslationOutcome` consume
 
 ## Future Work
 
-- Define canonical translation-unit identity and declared mapping strategies.
-- Define unit-level error taxonomy and validation reason codes.
+- Broaden canonical translation-unit identity and declared mapping strategies across modes; the request-unit and structured mapping foundation is implemented.
+- Complete the unit-level error taxonomy and validation reason-code model beyond the currently implemented contract facts.
 - Define feature-specific application policies for partial and cancelled outcomes.
 - Define sanitized presentation projections for direct and streamed workflows.
 
-> **Status**: A request unit manifest now provides the foundation for canonical unit identity. Complete adoption of identity and mapping strategies remains deferred to the Translation Outcome Adoption initiative.
+> **Status**: Request-unit identity, structured mapping facts, V3 ownership validation, positional-wire handling, and structured recovery are implemented. Broader cross-mode identity/mapping adoption and the universal outcome migration remain deferred to the Translation Outcome Adoption initiative.

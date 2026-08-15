@@ -772,6 +772,52 @@ describe('DomTranslatorAdapter', () => {
       expect(result.success).toBe(true);
       expect(testElement.textContent).toContain('سلام');
     });
+
+    it('should apply only first translation for duplicate uid (direct response, non-block-grouping)', async () => {
+      const applySpy = vi.spyOn(adapter, '_applyTranslationToNode');
+      const response = {
+        success: true,
+        translatedText: [
+          { t: 'First', i: 'n1' },
+          { t: 'Second', i: 'n1' }
+        ],
+        targetLanguage: 'fa'
+      };
+      const nodeMap = new Map([['n1', { node: testElement.firstChild, uid: 'n1' }]]);
+
+      await adapter._handleDirectResponse(response, [], nodeMap, 'fa', testElement);
+
+      expect(applySpy).toHaveBeenCalledTimes(1);
+      expect(applySpy).toHaveBeenCalledWith(testElement.firstChild, 'First', 'fa', testElement);
+      applySpy.mockRestore();
+    });
+
+    it('should apply both translations for different uids (direct response)', async () => {
+      testElement.innerHTML = '<span>Hello</span><span>World</span>';
+      const first = testElement.firstChild;
+      const second = testElement.childNodes[1];
+
+      const applySpy = vi.spyOn(adapter, '_applyTranslationToNode');
+      const response = {
+        success: true,
+        translatedText: [
+          { t: 'First', i: 'n1' },
+          { t: 'Second', i: 'n2' }
+        ],
+        targetLanguage: 'fa'
+      };
+      const nodeMap = new Map([
+        ['n1', { node: first, uid: 'n1' }],
+        ['n2', { node: second, uid: 'n2' }]
+      ]);
+
+      await adapter._handleDirectResponse(response, [], nodeMap, 'fa', testElement);
+
+      expect(applySpy).toHaveBeenCalledTimes(2);
+      expect(applySpy).toHaveBeenNthCalledWith(1, first, 'First', 'fa', testElement);
+      expect(applySpy).toHaveBeenNthCalledWith(2, second, 'Second', 'fa', testElement);
+      applySpy.mockRestore();
+    });
   });
 
   describe('_applyTranslationToNode', () => {
@@ -1230,6 +1276,19 @@ describe('DomTranslatorAdapter', () => {
       } finally {
         window.getComputedStyle = originalGetComputedStyle;
       }
+    });
+
+    it('suppresses raw V3 fragment events without DOM mutation', async () => {
+      contentScriptIntegration.sendTranslationRequest.mockResolvedValue({
+        success: true,
+        streaming: false,
+        translatedText: JSON.stringify([{ t: 'Translated fragment', i: 'n1', blockId: 'g1', isV3Fragment: true, parentId: 'g1', fragmentIndex: 0, fragmentCount: 2 }])
+      });
+
+      await adapter.translateElement(testElement);
+
+      expect(testElement.textContent).toContain('Hello');
+      expect(testElement.textContent).not.toContain('Translated fragment');
     });
   });
 });

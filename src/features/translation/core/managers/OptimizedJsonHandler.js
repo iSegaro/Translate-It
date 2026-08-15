@@ -14,6 +14,7 @@ import { isFatalError, matchErrorToType } from '@/shared/error-management/ErrorM
 import { ErrorTypes } from "@/shared/error-management/ErrorTypes.js";
 import { appendTranslationDiagnostic } from '@/features/translation/ir/TranslationOperation.js';
 import { createManifestViewFromUnits } from '@/features/translation/ir/RequestUnitManifest.js';
+import { TranslationContractValidator } from '@/features/translation/core/TranslationContractValidator.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.TRANSLATION, 'OptimizedJsonHandler');
 
@@ -68,6 +69,8 @@ export class OptimizedJsonHandler {
       const accumulatedResults = [];
       fragmentedUnits = new Map();
       const skipStreaming = mode === TranslationMode.PDF;
+      const emittedLogicalIds = new Set();
+      let abortInitiator = null;
 
       const appendFragmentDiagnostic = (type, parentId) => appendTranslationDiagnostic(executionContext, {
         type,
@@ -75,74 +78,174 @@ export class OptimizedJsonHandler {
         parentId,
       });
 
-      const collectCompleteFragments = (mappedResults) => {
-        const completeResults = [];
+        const extractLogicalId = (item) => {
+          if (typeof item !== 'object' || item === null) return undefined;
+          // Structured PDF cells carry i/b/blockId (all = block.id); per-cell
+          // identity (cellId) takes precedence so distinct cells of one block are
+          // not treated as duplicates. Nullish semantics keep valid falsy IDs
+          // (e.g. numeric cellId 0) intact and skip fallback only for null/
+          // undefined. Non-PDF items without cellId fall through to the prior
+          // identity policy.
+          return item.uid ?? item.cellId ?? item.i ?? item.id ?? item.blockId;
+        };
 
-        for (const result of mappedResults) {
-          if (result?.isV2Unit !== true || result?.isSplitFragment !== true) {
+        const collectCompleteFragments = (mappedResults) => {
+          const completeResults = [];
+          const sameBatchIds = new Set();
+
+          const validateAndAdd = (item) => {
+            const logicalId = extractLogicalId(item);
+            if (logicalId !== undefined && sameBatchIds.has(logicalId)) {
+              const err = new Error(`Duplicate identity in batch: ${String(logicalId)}`);
+              err.isFatal = true;
+              err.type = ErrorTypes.VALIDATION;
+              throw err;
+            }
+            if (logicalId !== undefined) sameBatchIds.add(logicalId);
+            completeResults.push(item);
+          };
+
+          for (const result of mappedResults) {
+           if (result?.isV2Unit === true && result?.isSplitFragment === true) {
+             const { parentId, fragmentIndex, fragmentCount } = result;
+             if (!parentId || !Number.isInteger(fragmentIndex) || !Number.isInteger(fragmentCount) || fragmentIndex < 0 || fragmentIndex >= fragmentCount) {
+               appendFragmentDiagnostic('INCOMPLETE_FRAGMENT_EVENT_SUPPRESSED', parentId);
+               continue;
+             }
+
+             let parent = fragmentedUnits.get(parentId);
+             if (!parent) {
+               parent = { expectedCount: fragmentCount, fragments: new Map(), failed: false, emitted: false };
+               fragmentedUnits.set(parentId, parent);
+             }
+
+             if (parent.failed || parent.emitted || parent.expectedCount !== fragmentCount || parent.fragments.has(fragmentIndex)) continue;
+             parent.fragments.set(fragmentIndex, result);
+
+             if (parent.fragments.size !== parent.expectedCount) continue;
+
+             const orderedFragments = Array.from({ length: parent.expectedCount }, (_, index) => parent.fragments.get(index));
+             if (orderedFragments.some(fragment => !fragment)) {
+               parent.failed = true;
+               parent.fragments.clear();
+               appendFragmentDiagnostic('INCOMPLETE_FRAGMENT_EVENT_SUPPRESSED', parentId);
+               continue;
+             }
+
+             const translatedText = orderedFragments
+               .map((fragment, index) => `${index === 0 ? '' : (fragment.fragmentJoinerBefore || '')}${fragment.t || fragment.text || ''}`)
+               .join('');
+             const logicalItem = { ...orderedFragments[0] };
+             delete logicalItem.isSplit;
+             delete logicalItem.isSplitFragment;
+             delete logicalItem.partIndex;
+             delete logicalItem.parentId;
+             delete logicalItem.fragmentIndex;
+             delete logicalItem.fragmentCount;
+             delete logicalItem.fragmentJoinerBefore;
+             delete logicalItem.isV2Unit;
+              validateAndAdd({ ...logicalItem, i: parentId, t: translatedText, text: translatedText });
+              parent.emitted = true;
+              parent.fragments.clear();
+              appendFragmentDiagnostic('FRAGMENTED_UNIT_COMPLETED', parentId);
+              continue;
+            }
+
+            if (result?.isV3Fragment === true) {
+             const { parentId, fragmentIndex, fragmentCount } = result;
+             if (!parentId || !Number.isInteger(fragmentIndex) || !Number.isInteger(fragmentCount) || fragmentIndex < 0 || fragmentIndex >= fragmentCount) {
+               appendFragmentDiagnostic('INCOMPLETE_FRAGMENT_EVENT_SUPPRESSED', parentId);
+               continue;
+             }
+
+             let parent = fragmentedUnits.get(parentId);
+             if (!parent) {
+               parent = { expectedCount: fragmentCount, fragments: new Map(), failed: false, emitted: false };
+               fragmentedUnits.set(parentId, parent);
+             }
+
+             if (parent.failed || parent.emitted || parent.expectedCount !== fragmentCount || parent.fragments.has(fragmentIndex)) continue;
+             parent.fragments.set(fragmentIndex, result);
+
+             if (parent.fragments.size !== parent.expectedCount) continue;
+
+             const orderedFragments = Array.from({ length: parent.expectedCount }, (_, index) => parent.fragments.get(index));
+             if (orderedFragments.some(fragment => !fragment)) {
+               parent.failed = true;
+               parent.fragments.clear();
+               appendFragmentDiagnostic('INCOMPLETE_FRAGMENT_EVENT_SUPPRESSED', parentId);
+               continue;
+             }
+
+              const translatedText = orderedFragments
+                .map((fragment, index) => `${index === 0 ? '' : (fragment.fragmentJoinerBefore || '')}${fragment.t || fragment.text || ''}`)
+                .join('');
+              const sourceText = orderedFragments
+                .map((fragment, index) => `${index === 0 ? '' : (fragment.fragmentJoinerBefore || '')}${fragment.__sourceT ?? fragment.t ?? fragment.text ?? ''}`)
+                .join('');
+               const validation = TranslationContractValidator.validateV3Parent(sourceText, translatedText, parentId);
+               if (validation && !validation.isValid) {
+                 const violation = validation.violations[0];
+                 const parentIdStr = String(parentId ?? 'unknown');
+                 const reason = violation.reason || violation.code || 'V3_CONTRACT_VIOLATION';
+                 appendTranslationDiagnostic(executionContext, {
+                  type: 'V3_MARKER_CONTRACT_REJECTED',
+                  stage: 'optimized-json-handler',
+                  parentId: parentIdStr,
+                   expectedMarkerCount: violation.expectedMarkerCount ?? null,
+                   actualMarkerCount: violation.actualMarkerCount ?? null,
+                   reason,
+                 });
+                 const err = new Error(`V3 marker contract violation for fragmented parent ${parentIdStr}: ${reason}`);
+                err.isFatal = true;
+                err.type = ErrorTypes.VALIDATION;
+                throw err;
+              }
+              const logicalItem = { ...orderedFragments[0] };
+              delete logicalItem.isSplit;
+              delete logicalItem.partIndex;
+              delete logicalItem.isV3Fragment;
+              delete logicalItem.parentId;
+              delete logicalItem.fragmentIndex;
+              delete logicalItem.fragmentCount;
+              delete logicalItem.fragmentJoinerBefore;
+              delete logicalItem.__sourceT;
+              validateAndAdd({ ...logicalItem, i: parentId, t: translatedText, text: translatedText });
+              parent.emitted = true;
+              parent.fragments.clear();
+              appendFragmentDiagnostic('FRAGMENTED_UNIT_COMPLETED', parentId);
+              continue;
+            }
+
+            const logicalId = extractLogicalId(result);
+            if (logicalId !== undefined && sameBatchIds.has(logicalId)) {
+              const err = new Error(`Duplicate identity in batch: ${String(logicalId)}`);
+              err.isFatal = true;
+              err.type = ErrorTypes.VALIDATION;
+              throw err;
+            }
+            if (logicalId !== undefined) sameBatchIds.add(logicalId);
             completeResults.push(result);
-            continue;
-          }
+         }
 
-          const { parentId, fragmentIndex, fragmentCount } = result;
-          if (!parentId || !Number.isInteger(fragmentIndex) || !Number.isInteger(fragmentCount) || fragmentIndex < 0 || fragmentIndex >= fragmentCount) {
-            appendFragmentDiagnostic('INCOMPLETE_FRAGMENT_EVENT_SUPPRESSED', parentId);
-            continue;
-          }
+         return completeResults;
+       };
 
-          let parent = fragmentedUnits.get(parentId);
-          if (!parent) {
-            parent = { expectedCount: fragmentCount, fragments: new Map(), failed: false, emitted: false };
-            fragmentedUnits.set(parentId, parent);
-          }
-
-          if (parent.failed || parent.emitted || parent.expectedCount !== fragmentCount || parent.fragments.has(fragmentIndex)) continue;
-          parent.fragments.set(fragmentIndex, result);
-
-          if (parent.fragments.size !== parent.expectedCount) continue;
-
-          const orderedFragments = Array.from({ length: parent.expectedCount }, (_, index) => parent.fragments.get(index));
-          if (orderedFragments.some(fragment => !fragment)) {
-            parent.failed = true;
-            parent.fragments.clear();
-            appendFragmentDiagnostic('INCOMPLETE_FRAGMENT_EVENT_SUPPRESSED', parentId);
-            continue;
-          }
-
-          const translatedText = orderedFragments
-            .map((fragment, index) => `${index === 0 ? '' : (fragment.fragmentJoinerBefore || '')}${fragment.t || fragment.text || ''}`)
-            .join('');
-          const logicalItem = { ...orderedFragments[0] };
-          delete logicalItem.isSplit;
-          delete logicalItem.isSplitFragment;
-          delete logicalItem.partIndex;
-          delete logicalItem.parentId;
-          delete logicalItem.fragmentIndex;
-          delete logicalItem.fragmentCount;
-          delete logicalItem.fragmentJoinerBefore;
-          delete logicalItem.isV2Unit;
-          completeResults.push({ ...logicalItem, i: parentId, t: translatedText, text: translatedText });
-          parent.emitted = true;
-          parent.fragments.clear();
-          appendFragmentDiagnostic('FRAGMENTED_UNIT_COMPLETED', parentId);
-        }
-
-        return completeResults;
-      };
-
-      const discardFailedFragments = (batchPayload) => {
-        for (const payload of batchPayload) {
-          if (payload?.isV2Unit !== true || payload?.isSplitFragment !== true) continue;
-          const parentId = payload.parentId;
-          if (!parentId) continue;
-          const parent = fragmentedUnits.get(parentId) || { expectedCount: payload.fragmentCount, fragments: new Map(), failed: false, emitted: false };
-          if (parent.emitted || parent.failed) continue;
-          parent.failed = true;
-          parent.fragments.clear();
-          fragmentedUnits.set(parentId, parent);
-          appendFragmentDiagnostic('FRAGMENTED_UNIT_FAILED', parentId);
-        }
-      };
+       const discardFailedFragments = (batchPayload) => {
+         for (const payload of batchPayload) {
+           const isV2Fragment = payload?.isV2Unit === true && payload?.isSplitFragment === true;
+           const isV3Fragment = payload?.isV3Fragment === true;
+           if (!isV2Fragment && !isV3Fragment) continue;
+           const parentId = payload.parentId;
+           if (!parentId) continue;
+           const parent = fragmentedUnits.get(parentId) || { expectedCount: payload.fragmentCount, fragments: new Map(), failed: false, emitted: false };
+           if (parent.emitted || parent.failed) continue;
+           parent.failed = true;
+           parent.fragments.clear();
+           fragmentedUnits.set(parentId, parent);
+           appendFragmentDiagnostic('FRAGMENTED_UNIT_FAILED', parentId);
+         }
+       };
       
       // Preserve the ordered lane when conversation continuity is enabled.
       if (historyEnabled) {
@@ -209,7 +312,7 @@ export class OptimizedJsonHandler {
 
           // Timeout Protection (5 minutes) for each batch call
           const BATCH_TIMEOUT_MS = 300000;
-          const timeoutPromise = new Promise((_, reject) => {
+          const timeoutPromise = new Promise((resolve) => {
             timeoutId = setTimeout(() => {
               didTimeout = true;
               timeoutError = new Error(`Batch translation timed out after ${BATCH_TIMEOUT_MS}ms`);
@@ -221,7 +324,7 @@ export class OptimizedJsonHandler {
                 reason: timeoutError.message,
                 code: timeoutError.type,
               });
-              reject(timeoutError);
+              resolve({ __kind: 'timeout', error: timeoutError });
               abortController.abort();
             }, BATCH_TIMEOUT_MS);
             
@@ -234,8 +337,7 @@ export class OptimizedJsonHandler {
           const batchExecutionContext = hasManifestMembership
             ? self._createBatchExecutionContext(executionContext, batch)
             : executionContext;
-          const translatedBatchResponse = await Promise.race([
-            self._performBatchCall(
+          const providerPromise = self._performBatchCall(
               providerInstance, 
               batchPayload, 
               detectedSourceLanguage, 
@@ -252,9 +354,30 @@ export class OptimizedJsonHandler {
                originalTargetLang,
                parallelExecution,
                 batchExecutionContext
-            ),
+            );
+
+          // Guard provider promise so late rejection after timeout cannot become
+          // an unhandled rejection. The outcome object normalizes resolution/rejection
+          // into a value the race can consume without leaking.
+          const guardedProviderPromise = providerPromise.then(
+            (value) => ({ __kind: 'provider-success', value }),
+            (error) => ({ __kind: 'provider-error', error })
+          );
+
+          // timeoutPromise resolves (not rejects) with an outcome object
+          let translatedBatchResponse = await Promise.race([
+            guardedProviderPromise,
             timeoutPromise
           ]);
+
+          // Unwrap guarded provider outcome
+          if (translatedBatchResponse && typeof translatedBatchResponse === 'object' && translatedBatchResponse.__kind === 'provider-error') {
+            throw translatedBatchResponse.error;
+          } else if (translatedBatchResponse && typeof translatedBatchResponse === 'object' && translatedBatchResponse.__kind === 'timeout') {
+            throw translatedBatchResponse.error;
+          } else if (translatedBatchResponse && typeof translatedBatchResponse === 'object' && translatedBatchResponse.__kind === 'provider-success') {
+            translatedBatchResponse = translatedBatchResponse.value;
+          }
 
           checkCancellation();
 
@@ -271,21 +394,40 @@ export class OptimizedJsonHandler {
           const mappedResults = self._mapResults(batchPayload, translatedBatch, executionContext);
           const completeResults = collectCompleteFragments(mappedResults);
           checkCancellation();
-          // Terminal observation is restricted to the approved execution scope:
-          // structured Select Element + AI provider + unsplit ManifestView.
-          // Execution identity extraction is the router's responsibility, never this handler's.
+          const filteredResults = [];
+          const acceptedManifestUnits = [];
+          for (let idx = 0; idx < completeResults.length; idx++) {
+            const item = completeResults[idx];
+            const logicalId = extractLogicalId(item);
+            if (logicalId !== undefined && emittedLogicalIds.has(logicalId)) {
+              appendTranslationDiagnostic(executionContext, {
+                type: 'DUPLICATE_IDENTITY_SUPPRESSED',
+                stage: 'optimized-json-handler',
+                parentId: String(logicalId),
+              });
+              continue;
+            }
+            if (logicalId !== undefined) emittedLogicalIds.add(logicalId);
+            filteredResults.push(item);
+            // Track accepted manifest units for terminal observation
+            // (only valid for non-fragment batches where manifestView.units aligns positionally)
+            if (batchExecutionContext?.manifestView?.units && idx < batchExecutionContext.manifestView.units.length) {
+              acceptedManifestUnits.push(batchExecutionContext.manifestView.units[idx]);
+            }
+          }
+          // Terminal observation: accept only manifest units that survived suppression
           if (mode === TranslationMode.Select_Element
               && providerInstance.constructor.isAI
-              && batchExecutionContext?.manifestView?.units) {
-            executionContext?.onTerminalUnitsAccepted?.(batchExecutionContext.manifestView.units);
+              && acceptedManifestUnits.length > 0) {
+            executionContext?.onTerminalUnitsAccepted?.(acceptedManifestUnits);
           }
-          accumulatedResults.push(...completeResults);
+          accumulatedResults.push(...filteredResults);
           completedBatchCount++;
-          if (!skipStreaming && completeResults.length > 0) {
+          if (!skipStreaming && filteredResults.length > 0) {
             await self._streamResults(
               tabId,
               messageId,
-              completeResults,
+              filteredResults,
               i,
               batches.length,
               targetLanguage,
@@ -361,6 +503,7 @@ export class OptimizedJsonHandler {
           
           // Stop all other batches if error is fatal (429, etc.)
           if (isFatalError(batchError)) {
+            abortInitiator = 'fatal-error';
             abortController.abort();
           }
         } finally {
@@ -374,6 +517,18 @@ export class OptimizedJsonHandler {
       // Final check for cancellation before sending end-of-stream markers
       if (abortController.signal.aborted || engine.isCancelled(messageId)) {
         logger.debug(`[JsonHandler] Skipping stream end markers for cancelled request: ${messageId}`);
+        if (hasErrors && lastError && abortInitiator === 'fatal-error') {
+          return {
+            success: false,
+            streaming: true,
+            error: {
+              message: lastError.message || String(lastError),
+              type: lastError.type || matchErrorToType(lastError),
+              statusCode: lastError.statusCode
+            },
+            results: accumulatedResults
+          };
+        }
         return { success: false, streaming: true, error: { type: ErrorTypes.USER_CANCELLED, message: 'Cancelled' } };
       }
 
@@ -435,8 +590,8 @@ export class OptimizedJsonHandler {
   _createBatchExecutionContext(executionContext, batch) {
     if (!executionContext?.manifestView || !Array.isArray(batch)) return executionContext
 
-    if (batch.some(({ isSplitFragment }) => isSplitFragment)) {
-      return { ...executionContext, manifestView: null }
+    if (batch.some(({ isSplitFragment, isV3Fragment }) => isSplitFragment || isV3Fragment)) {
+      return { ...executionContext, manifestView: null };
     }
 
     const manifestUnits = batch.map(({ manifestUnit }) => manifestUnit)
@@ -477,11 +632,32 @@ export class OptimizedJsonHandler {
       rawItems = [currentResults];
     }
     
-    // Ensure rawItems is always an array of text strings
-    const results = rawItems.map(item => {
-      if (item === null || item === undefined) return '';
-      let text = (typeof item === 'object') ? (item.t || item.text || item.translation || JSON.stringify(item)) : String(item);
-      
+    // Shared pipeline contract: every nonblank source segment must receive valid
+    // nonblank translated text. Missing, blank, or raw-JSON output is a typed
+    // failure — never a silent source-fill into the success path.
+    const rejectInvalidResult = (index, code) => {
+      const errorMsg = `Invalid translation result at segment index ${index} (code: ${code})`;
+      logger.error(`[JsonHandler] ${errorMsg}`);
+      const err = new Error(errorMsg);
+      err.isFatal = true;
+      err.type = ErrorTypes.VALIDATION;
+      throw err;
+    };
+
+    const results = rawItems.map((item, index) => {
+      if (item === null || item === undefined) {
+        rejectInvalidResult(index, 'NULL_TRANSLATION_RESULT');
+      }
+      let text;
+      if (typeof item === 'object') {
+        text = item.t ?? item.text ?? item.translation;
+        if (text === undefined || text === null) {
+          rejectInvalidResult(index, 'MISSING_TRANSLATION_TEXT');
+        }
+      } else {
+        text = String(item);
+      }
+
       // FINAL SAFETY: If the extracted text still looks like JSON (e.g. contains {"translations":),
       // it means parsing failed completely. We should NOT show this to the user.
         if (typeof text === 'string' && text.length > 20 && 
@@ -492,9 +668,8 @@ export class OptimizedJsonHandler {
             type: 'STRUCTURED_RESULT_REJECTED',
             stage: 'optimized-json-handler',
             code: 'RAW_JSON_RESULT',
-            fallback: true,
           });
-          return null; // Force fallback to original text below
+          rejectInvalidResult(index, 'RAW_JSON_RESULT');
       }
       
       return text;
@@ -505,18 +680,49 @@ export class OptimizedJsonHandler {
       logger.error(`[JsonHandler] ${errorMsg}`);
       const err = new Error(errorMsg);
       err.isFatal = true;
-      err.type = ErrorTypes.VALIDATION_ERROR;
+      err.type = ErrorTypes.VALIDATION;
       throw err;
     }
 
     return originalBatch.map((item, idx) => {
-      // Use result if it exists and is not null (null means it was rejected by safety check)
-      const translatedContent = (results[idx] !== undefined && results[idx] !== null) 
-        ? results[idx] 
-        : (typeof item === 'object' ? (item.t || item.text) : item);
-        
-      if (typeof item === 'object') {
-        return { ...item, t: translatedContent, text: translatedContent };
+      const translatedContent = results[idx];
+      const sourceText = typeof item === 'object' ? (item.t ?? item.text) : item;
+      const sourceIsBlank = typeof sourceText === 'string' && sourceText.trim() === '';
+
+      // Blank output stays acceptable only for blank source positions.
+      if (typeof translatedContent !== 'string' || (translatedContent.trim() === '' && !sourceIsBlank)) {
+        rejectInvalidResult(idx, 'EMPTY_TRANSLATION_RESULT');
+      }
+
+      if (typeof item === 'object' && item !== null) {
+        const isFragment = item.isV3Fragment === true
+          || item.isSplitFragment === true
+          || item.isSplit === true;
+        if (!isFragment && typeof sourceText === 'string' && sourceText.includes('@@TI_SEG_')) {
+          const blockId = String(item.b ?? item.blockId ?? item.i ?? item.uid ?? 'unknown');
+          const validation = TranslationContractValidator.validateV3Parent(sourceText, translatedContent, blockId);
+          if (validation && !validation.isValid) {
+            const violation = validation.violations[0];
+            const reason = violation.reason || violation.code || 'V3_CONTRACT_VIOLATION';
+            appendTranslationDiagnostic(executionContext, {
+              type: 'V3_MARKER_CONTRACT_REJECTED',
+              stage: 'optimized-json-handler',
+              parentId: blockId,
+              expectedMarkerCount: violation.expectedMarkerCount ?? null,
+              actualMarkerCount: violation.actualMarkerCount ?? null,
+              reason,
+            });
+            const err = new Error(`V3 marker contract violation for block ${blockId}: ${reason}`);
+            err.isFatal = true;
+            err.type = ErrorTypes.VALIDATION;
+            throw err;
+          }
+        }
+        const result = { ...item, t: translatedContent, text: translatedContent };
+        if (item.isV3Fragment === true) {
+          result.__sourceT = sourceText;
+        }
+        return result;
       }
       return translatedContent;
     });

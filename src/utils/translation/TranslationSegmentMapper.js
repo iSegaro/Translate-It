@@ -10,12 +10,38 @@ import { DEFAULT_TEXT_DELIMITER, ALTERNATIVE_DELIMITERS } from '@/features/trans
 
 const logger = getScopedLogger(LOG_COMPONENTS.TRANSLATION, 'SegmentMapper');
 
+/**
+ * Delimiters that unambiguously mark structured segment output (bracket/dash
+ * markers). Only these may trigger hard INCOMPLETE_CARDINALITY rejection.
+ * Generic formatting separators (plain '\n', '\n\n') are deliberately excluded
+ * so ordinary multiline translations never hard-fail on line-break formatting.
+ */
+const STRUCTURAL_SEGMENT_DELIMITERS = new Set([
+  DEFAULT_TEXT_DELIMITER,   // '\n[[---]]\n'
+  '[[---]]',
+  '\n\n---\n\n',            // Lingva subgroup delimiter
+  '\n---\n',
+]);
+
+/**
+ * Generic formatting delimiters. Used for splitting/mapping only; they can
+ * never trigger INCOMPLETE_CARDINALITY.
+ */
+const GENERIC_FORMATTING_DELIMITERS = ALTERNATIVE_DELIMITERS.filter(
+  (delimiter) => !STRUCTURAL_SEGMENT_DELIMITERS.has(delimiter)
+);
+
 export class TranslationSegmentMapper {
   /**
    * Standard delimiter for separating text segments.
    * Using a more resilient pattern that traditional providers are less likely to merge.
    */
   static STANDARD_DELIMITER = DEFAULT_TEXT_DELIMITER;
+
+  /**
+   * Error type for incomplete cardinality: delimiter present but split count wrong.
+   */
+  static INCOMPLETE_CARDINALITY = 'INCOMPLETE_CARDINALITY';
 
   /**
    * Enhanced mapping: attempt to reconstruct original segments from translated text
@@ -61,12 +87,33 @@ export class TranslationSegmentMapper {
       return segments.map(s => scrub(s).trim());
     }
 
-    // 2. Try alternative common delimiters
-    for (const altDelim of ALTERNATIVE_DELIMITERS) {
+    // 2. Try alternative common delimiters.
+    // Structural delimiters prove segmented output; only they may trigger hard
+    // cardinality rejection. Generic formatting separators ('\n', '\n\n') are
+    // consulted only when no structural delimiter is present, so ordinary
+    // multiline translations never hard-fail.
+    const structuralDelims = [...STRUCTURAL_SEGMENT_DELIMITERS];
+    const genericDelims = GENERIC_FORMATTING_DELIMITERS;
+    let delimiterFound = false;
+
+    for (const altDelim of structuralDelims) {
       const testSegments = translatedText.split(altDelim);
       if (testSegments.length === originalSegments.length) {
         logger.info(`[${providerName}] Found working alternative delimiter: "${altDelim}"`);
         return testSegments.map(s => scrub(s).trim());
+      }
+      if (testSegments.length > 1) {
+        delimiterFound = true;
+      }
+    }
+
+    if (!delimiterFound) {
+      for (const altDelim of genericDelims) {
+        const testSegments = translatedText.split(altDelim);
+        if (testSegments.length === originalSegments.length) {
+          logger.info(`[${providerName}] Found working alternative delimiter: "${altDelim}"`);
+          return testSegments.map(s => scrub(s).trim());
+        }
       }
     }
 
@@ -80,17 +127,57 @@ export class TranslationSegmentMapper {
       result[nonEmptyOriginals[0].id] = translatedText.trim();
       return result;
     }
-    // 4. Last Resort: Smart Word-Based Distribution (Replacing the broken character-ratio split)
-    try {
-      // CRITICAL: Before word-ratio splitting, remove ALL possible delimiters from the text
-      // to avoid them appearing as "words" in the output segments.
-      const cleanedText = this.removeAllDelimiters(translatedText, delimiter);
-      return this.splitByWordRatio(cleanedText, originalSegments, providerName);
-    } catch (error) {
-      logger.warn(`[${providerName}] Smart splitting failed:`, error);
-      // Absolute fallback: first segment gets everything, others get original
-      return originalSegments.map((s, i) => i === 0 ? translatedText : s);
+
+    // 3.5. Source-aware blank reconstruction: translated parts match nonblank count.
+    // Structural delimiters take precedence; generic newlines are only consulted
+    // when no structural delimiter was found in the text.
+    if (nonEmptyOriginals.length > 1 && typeof translatedText === 'string') {
+      const reconstruct = (delims) => {
+        for (const altDelim of delims) {
+          const translatedParts = translatedText.split(altDelim);
+          if (translatedParts.length === nonEmptyOriginals.length) {
+            const result = new Array(originalSegments.length).fill('');
+            nonEmptyOriginals.forEach((entry, i) => {
+              result[entry.id] = scrub(translatedParts[i]).trim();
+            });
+            logger.info(`[${providerName}] Used source-aware blank reconstruction (${translatedParts.length} translated, ${nonEmptyOriginals.length} nonblank)`);
+            return result;
+          }
+        }
+        return null;
+      };
+
+      const structuralResult = reconstruct(structuralDelims);
+      if (structuralResult) return structuralResult;
+
+      if (!delimiterFound) {
+        const genericResult = reconstruct(genericDelims);
+        if (genericResult) return genericResult;
+      }
     }
+
+    // 3.6. Incomplete cardinality: delimiter present but no split matched total or nonblank
+    if (delimiterFound) {
+      const error = new Error(
+        `[${providerName}] Incomplete translation: delimiter found but split produced wrong segment count ` +
+        `(expected ${originalSegments.length} total / ${nonEmptyOriginals.length} nonblank)`
+      );
+      error.type = TranslationSegmentMapper.INCOMPLETE_CARDINALITY;
+      throw error;
+    }
+
+    // 4. Last Resort: Smart Word-Based Distribution (Replacing the broken character-ratio split)
+    // CRITICAL: Before word-ratio splitting, remove ALL possible delimiters from the text
+    // to avoid them appearing as "words" in the output segments.
+    const cleanedText = this.removeAllDelimiters(translatedText, delimiter);
+    // splitByWordRatio validates translation coverage and throws INCOMPLETE_CARDINALITY
+    // when any nonblank source segment would receive no translated content.
+    // The old greedy source-fallback (`i === 0 ? translatedText : source`) was REMOVED:
+    // it silently inserted original source as "translated" output and, once coverage
+    // rejection was added, would have converted the new typed failure back into silent
+    // success. Partial heuristic coverage must surface as an explicit failure, not a
+    // success (shared contract: valid deterministic reconstruction OR typed failure).
+    return this.splitByWordRatio(cleanedText, originalSegments, providerName);
   }
 
   /**
@@ -174,6 +261,25 @@ export class TranslationSegmentMapper {
 
       result[i] = segmentWords.join(" ");
       currentWordIdx += targetWordCount;
+    }
+
+    // Coverage invariant: the heuristic distribution must give every nonblank original
+    // segment nonblank translated content. A partial array with correct cardinality must
+    // not masquerade as a successful translation (silent gaps in nonblank positions).
+    // Reject loudly instead — the shared contract requires valid reconstruction OR an
+    // explicit typed failure. Blank original segments legitimately stay blank (`result[i]`
+    // may be "" only where the source position is itself blank).
+    for (let i = 0; i < originalSegments.length; i++) {
+      const segText = typeof originalSegments[i] === 'object'
+        ? (originalSegments[i].t || originalSegments[i].text || "")
+        : String(originalSegments[i] || "");
+      if (segText.trim() !== "" && String(result[i] || "").trim() === "") {
+        const error = new Error(
+          `[${providerName}] Incomplete translation: nonblank segment ${i} received no translated content`
+        );
+        error.type = TranslationSegmentMapper.INCOMPLETE_CARDINALITY;
+        throw error;
+      }
     }
 
     logger.info(`[${providerName}] Used Word-Ratio splitting to preserve word integrity`);

@@ -125,14 +125,13 @@ export class YandexTranslateProvider extends BaseTranslateProvider {
       originalCharCount: options.originalCharCount || originalCharCount
     });
 
-    const finalResult = result || chunkTexts.map(() => '');
-
-    // Add completion log for successful translation
-    if (finalResult.length > 0) {
+    // extractResponse throws on any invalid/mismatched response, so `result` is
+    // always a valid array here. No silent empty-fill fallback.
+    if (result.length > 0) {
       logger.info(`[Yandex] Translation completed successfully`);
     }
 
-    return finalResult;
+    return result;
   }
 
   async detect_with_yandex(text, hintLangs = []) {

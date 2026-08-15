@@ -1,5 +1,7 @@
 # Select Element System Documentation
 
+> **Feature contract:** see [Feature Behavioral Contracts](contracts/FEATURE_CONTRACTS.md#6-select-element-contract) for the authoritative element UI mutation, partial-success, revert, and fragment-suppression contract.
+
 ## Overview
 
 The Select Element system provides an intuitive way for users to translate content directly on a webpage. Users activate this mode, hover over any element to see a visual highlight, and click to translate its text content. After translation, it allows viewing the original text via a surgical hover tooltip (if enabled). It uses a token-optimized, context-aware batching strategy to ensure high-quality translations while minimizing costs.
@@ -250,7 +252,7 @@ Set `loglevel` to `debug` to see the `contextSummary` and `textsToTranslate` pay
 - [Options Page Documentation](./OPTIONS_PAGE.md)
 - [Toast Integration System](./TOAST_INTEGRATION_SYSTEM.md)
 - [Feature Manager System](./SMART_HANDLER_REGISTRATION_SYSTEM.md)
-- [Translation Provider System](./PROVIDERS.md)
+- [Translation Provider System](./providers/PROVIDERS.md)
 - [Messaging System](./MessagingSystem.md)
 - [Translation Provider Logic](./TRANSLATION_PROVIDER_LOGIC.md)
 

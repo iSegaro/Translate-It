@@ -66,7 +66,7 @@ New provider dictionary shapes must be covered by:
 ### 2. AI & Context Logic
 - **AIConversationHelper**: Manages session history and context-enriched prompt preparation (Injecting Page Title/Headings).
 - **AITextProcessor**: Handles complexity analysis and smart segment splitting.
-- **AIResponseParser**: Robustly parses results from AI artifacts (Markdown, JSON blocks) and cleans "AI Chatter." It also reports to the provider layer whether structured-response recovery is required.
+- **AIResponseParser**: Robustly parses results from AI artifacts (Markdown, JSON blocks) and cleans "AI Chatter." It exposes parser/mapping facts consumed by the provider recovery policy.
 
 ### 3. Traditional Provider Helpers
 - **TraditionalTextProcessor**: Handles character-limit chunking and network weight calculation.
@@ -128,7 +128,7 @@ The `features` array defines what the UI and Orchestrators allow for this provid
 
 ### 1. Coordination Principle
 **NEVER override the `translate()` method.** 
-The `BaseProvider.translate()` method delegates to the `ProviderCoordinator`, which orchestrates critical services like Language Detection, Bilingual Swapping, and Stats Tracking. All custom logic—including specialized dictionary preprocessing—must be implemented within `_batchTranslate` or lower-level utilities.
+The `BaseProvider.translate()` method delegates to the `ProviderCoordinator`, which orchestrates critical services like Language Detection and Bilingual Swapping. Physical API-call stats are recorded separately by `ProviderRequestEngine` (see [STATS_MANAGER.md](../infrastructure/STATS_MANAGER.md)), not by `ProviderCoordinator`. All custom logic—including specialized dictionary preprocessing—must be implemented within `_batchTranslate` or lower-level utilities.
 
 ### 2. Optimization Level AwarenessProviders must be "Optimization-Aware." Use the `getProviderOptimizationLevelAsync` helper to adjust behavior:
 - **Level 1 (Economy)**: Large batches, low concurrency.
@@ -144,15 +144,23 @@ If your provider merges multiple text segments into a single request, you **MUST
 
 ### 5. Structured Response Handling
 
+For the logical identity and split-fragment contract that governs how structured results are deduplicated and reassembled, see [TRANSLATION_IDENTITY_AND_FRAGMENT_CONTRACT.md](../contracts/TRANSLATION_IDENTITY_AND_FRAGMENT_CONTRACT.md).
+
+> **Contracts:** [Provider Contract](../contracts/PROVIDER_CONTRACT.md) covers provider result/error/retry/health/stats contracts; [Conversation Contract](../contracts/CONVERSATION_CONTRACT.md) covers conversation-candidate participation for AI providers.
+
 Structured (JSON) responses can violate their response contract — for example through unmapped or gap-filled slots, or an unparseable response. The system recovers explicitly instead of silently corrupting results.
 
-- **`AIResponseParser`** parses structured responses and reports whether structured-response recovery is required. It never decides semantic success and never owns the recovery strategy.
-- **`BaseAIProvider`** owns the recovery strategy. The current strategy is a sequential re-request of the affected batch through `_traditionalBatchTranslate`.
-- A format-level re-request is execution strategy within a single execution attempt.
-- Multi-API key failover and provider/key failover remain operation-lifecycle responsibilities and are unrelated to this recovery.
-- Provider implementations must not duplicate or override this decision logic; they consume the provider-owned recovery decision.
+- **`AIResponseParser`** parses structured responses and provides parser/mapping facts; it does not decide semantic provider validity or recovery policy.
+- **`BaseAIProvider`** owns the recovery strategy. On a structured contract violation it may use selective recovery when invalid request units are safely attributable, preserving valid primary results and merging recovered values back into their original indexes, or fall back to full sequential recovery when mapping is unsafe or ambiguous.
+- **Recovery is a provider-local recovery pass**, not a silent result rewrite, and recovery failure remains a provider failure.
 
-This is the only observable production behavior introduced by the Translation Pipeline Foundation.
+A structured contract violation does not unconditionally require recovery of the entire batch. See [`TRANSLATION_PROVIDER_LOGIC.md`](../TRANSLATION_PROVIDER_LOGIC.md) for recovery execution policy and [`PROVIDER_CONTRACT.md`](../contracts/PROVIDER_CONTRACT.md) for provider result/recovery guarantees.
+
+#### Repair-Aware Recovery
+
+Structured recovery may receive transient, failure-specific repair context. Provider authors must not implement independent recovery loops; recovery remains a single provider-local pass driven by parser/mapping facts.
+
+> **V3 provider guidance:** providers must preserve V3 marker count, identity, and order, and keep semantic content for one source interval inside its corresponding translated interval. A meaningful source interval must not translate to a blank interval (`V3_EMPTY_TRANSLATED_INTERVAL`). See [`PROVIDER_CONTRACT.md`](../contracts/PROVIDER_CONTRACT.md) and [ADR-015](../../adr/ADR-015-translation-outcome-semantics.md) for the V3 provider-contract ownership decision.
 
 ---
 
@@ -171,7 +179,7 @@ Requests are queued based on their impact on UX:
 - **LOW**: Background tasks (Whole Page Translation).
 
 ### 3. Circuit Breaker
-If all available keys fail or the provider is consistently unstable, the **RateLimitManager** "opens the circuit," temporarily disabling the provider for 60 seconds to prevent wasted requests and UI lag.
+If all available keys fail or the provider is consistently unstable, the **RateLimitManager** "opens the circuit," temporarily disabling the provider for **30 seconds** (default `circuitRecoveryTime`) to prevent wasted requests and UI lag. Rate limiting and circuit recovery are owned by `RateLimitManager`; it also exposes adaptive backoff and priority-based admission.
 
 ---
 

@@ -316,7 +316,7 @@ export class PdfTranslationAdapter {
                 columnIndex: block.columnIndex,
                 readingOrderIndex: block.readingOrderIndex,
                 position: items.length,
-                cellId: cell.cellId || null,
+                cellId: cell.cellId ?? null,
                 tableRowIndex: cell.rowIndex ?? null,
                 tableColumnIndex: cell.columnIndex ?? null,
                 colSpanCandidate: cell.colSpanCandidate || false,
@@ -502,7 +502,7 @@ export class PdfTranslationAdapter {
 
     batchItems.forEach((originalItem, index) => {
       const translatedItem = rawResults[index]
-      const translatedText = this._extractTranslatedText(translatedItem, originalItem)
+      const translatedText = this._extractTranslatedText(translatedItem)
       const blockId = extractBlockId(translatedItem, originalItem)
 
       if (!grouped.has(blockId)) {
@@ -532,7 +532,7 @@ export class PdfTranslationAdapter {
 
         if (cellIndex != null) {
           lineResult.cells[cellIndex] = translatedText
-          if (originalItem.cellId) lineResult.cellIds[cellIndex] = originalItem.cellId
+          if (originalItem.cellId != null) lineResult.cellIds[cellIndex] = originalItem.cellId
           if (originalItem.tableColumnIndex != null) lineResult.columnIndices[cellIndex] = originalItem.tableColumnIndex
           if (originalItem.tableRowIndex != null) lineResult.rowIndices[cellIndex] = originalItem.tableRowIndex
           if (originalItem.colSpanCandidate != null) lineResult.colSpanCandidates[cellIndex] = originalItem.colSpanCandidate
@@ -550,19 +550,21 @@ export class PdfTranslationAdapter {
     return [...grouped.values()].map((entry) => {
       const translatedCells = this._buildTranslatedCells(entry)
       const lineTexts = this._buildLineTexts(entry)
+      const translatedText = entry.isStructured
+        ? normalizeStructuredTranslatedText(lineTexts.join('\n'))
+        : normalizeTranslatedText(lineTexts.join(' '))
 
       return {
         blockId: entry.blockId,
-        translatedText: entry.isStructured
-          ? normalizeStructuredTranslatedText(lineTexts.join('\n'))
-          : normalizeTranslatedText(lineTexts.join(' ')),
+        translatedText,
         translatedCells: translatedCells || undefined,
-        status: entry.status,
+        status: translatedText ? 'translated' : 'error',
         provider: entry.provider,
         sourceLanguage: entry.sourceLanguage,
         targetLanguage: entry.targetLanguage,
         sourceTextHash: entry.sourceTextHash,
-        error: entry.error
+        error: entry.error ?? (translatedText ? null : 'Empty translation result'),
+        failureReason: translatedText ? null : PDF_TRANSLATION_FAILURE_REASON.EMPTY_RESPONSE
       }
     })
   }
@@ -604,7 +606,7 @@ export class PdfTranslationAdapter {
 
       const hasCellIds = lr.cellIds && lr.cellIds.some((id) => id != null)
       if (hasCellIds) {
-        result.cellIds = lr.cellIds.map((id) => id || null)
+        result.cellIds = lr.cellIds.map((id) => id ?? null)
       }
 
       const hasColumnIndices = lr.columnIndices && lr.columnIndices.some((idx) => idx != null)
@@ -731,7 +733,7 @@ export class PdfTranslationAdapter {
 
       if (item.cellIndex != null) {
         lr.cells[item.cellIndex] = text
-        if (item.cellId) lr.cellIds[item.cellIndex] = item.cellId
+        if (item.cellId != null) lr.cellIds[item.cellIndex] = item.cellId
         if (item.tableColumnIndex != null) lr.columnIndices[item.cellIndex] = item.tableColumnIndex
         if (item.tableRowIndex != null) lr.rowIndices[item.cellIndex] = item.tableRowIndex
         if (item.colSpanCandidate != null) lr.colSpanCandidates[item.cellIndex] = item.colSpanCandidate
@@ -769,7 +771,7 @@ export class PdfTranslationAdapter {
 
         const hasCellIds = lr.cellIds && lr.cellIds.some((id) => id != null)
         if (hasCellIds) {
-          result.cellIds = lr.cellIds.map((id) => id || null)
+          result.cellIds = lr.cellIds.map((id) => id ?? null)
         }
 
         const hasColumnIndices = lr.columnIndices && lr.columnIndices.some((ci) => ci != null)
@@ -813,9 +815,9 @@ export class PdfTranslationAdapter {
     }
   }
 
-  _extractTranslatedText(translatedItem, originalItem) {
+  _extractTranslatedText(translatedItem) {
     if (translatedItem === null || translatedItem === undefined) {
-      return normalizePdfText(originalItem?.text || originalItem?.t || '')
+      return ''
     }
 
     if (typeof translatedItem === 'string') {

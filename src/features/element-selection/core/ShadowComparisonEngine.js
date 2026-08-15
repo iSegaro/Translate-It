@@ -3,36 +3,44 @@
  * Used in Phase 6 to validate the V3 Block Grouping pipeline against the V2 pipeline in memory.
  */
 
-
-
-
-
 export class ShadowComparisonEngine {
   /**
-   * Deeply compares two elements under the semantic equivalence contract.
+   * Deeply compares two nodes under the semantic equivalence contract.
    *
    * @param {Node} nodeA - The V2 translated node clone
-   * @param {Node} nodeB - The V3 translated node clone
+   * @param {Node} nodeB - The V3 translated node (live DOM)
    * @param {string[]} warnings - Array to collect non-fatal warnings
    * @returns {Object} { equivalent: boolean, reason: string | null, warnings: string[] }
    */
   static compare(nodeA, nodeB, warnings = []) {
+    return this._compareRecursive(nodeA, nodeB, warnings);
+  }
+
+  /**
+   * Recursive comparison of two nodes.
+   * @private
+   * @param {Node} nodeA
+   * @param {Node} nodeB
+   * @param {string[]} warnings
+   * @returns {Object}
+   */
+  static _compareRecursive(nodeA, nodeB, warnings) {
     // 1. Handle null/missing checks
     if (!nodeA && !nodeB) return { equivalent: true, reason: null, warnings };
     if (!nodeA || !nodeB) {
-      return { 
-        equivalent: false, 
+      return {
+        equivalent: false,
         reason: `Node mismatch: nodeA is ${nodeA ? 'present' : 'absent'}, nodeB is ${nodeB ? 'present' : 'absent'}`,
-        warnings
+        warnings,
       };
     }
 
     // 2. Handle type mismatch
     if (nodeA.nodeType !== nodeB.nodeType) {
-      return { 
-        equivalent: false, 
+      return {
+        equivalent: false,
         reason: `NodeType mismatch: nodeA is ${nodeA.nodeType}, nodeB is ${nodeB.nodeType}`,
-        warnings
+        warnings,
       };
     }
 
@@ -41,10 +49,10 @@ export class ShadowComparisonEngine {
       const textA = this.normalizeText(nodeA.nodeValue);
       const textB = this.normalizeText(nodeB.nodeValue);
       if (textA !== textB) {
-        return { 
-          equivalent: false, 
+        return {
+          equivalent: false,
           reason: `Text content mismatch:\nNodeA: "${textA}"\nNodeB: "${textB}"`,
-          warnings
+          warnings,
         };
       }
       return { equivalent: true, reason: null, warnings };
@@ -54,37 +62,37 @@ export class ShadowComparisonEngine {
     if (nodeA.nodeType === Node.ELEMENT_NODE) {
       // Compare Tag Name
       if (nodeA.tagName !== nodeB.tagName) {
-        return { 
-          equivalent: false, 
+        return {
+          equivalent: false,
           reason: `TagName mismatch: nodeA is ${nodeA.tagName}, nodeB is ${nodeB.tagName}`,
-          warnings
+          warnings,
         };
       }
 
       // Compare non-framework Attributes (Non-fatal)
       const attrsA = this.getCleanAttributes(nodeA);
       const attrsB = this.getCleanAttributes(nodeB);
-      
+
       const attrsMatch = this.compareAttributes(attrsA, attrsB);
       if (!attrsMatch.equal) {
-        // Collect attribute mismatches as non-fatal warnings instead of failing equivalence
         warnings.push(`Attributes mismatch on tag ${nodeA.tagName}: ${attrsMatch.reason}`);
       }
 
       // Compare Child Nodes recursively
-      const childrenA = Array.from(nodeA.childNodes).filter(n => !this.isIgnorableNode(n));
-      const childrenB = Array.from(nodeB.childNodes).filter(n => !this.isIgnorableNode(n));
+      const childrenA = Array.from(nodeA.childNodes).filter((n) => !this.isIgnorableNode(n));
+      const childrenB = Array.from(nodeB.childNodes).filter((n) => !this.isIgnorableNode(n));
 
       if (childrenA.length !== childrenB.length) {
-        return { 
-          equivalent: false, 
+        const mismatch = {
+          equivalent: false,
           reason: `Child count mismatch on tag ${nodeA.tagName}: nodeA has ${childrenA.length}, nodeB has ${childrenB.length}`,
-          warnings
+          warnings,
         };
+        return mismatch;
       }
 
       for (let i = 0; i < childrenA.length; i++) {
-        const result = this.compare(childrenA[i], childrenB[i], warnings);
+        const result = this._compareRecursive(childrenA[i], childrenB[i], warnings);
         if (!result.equivalent) {
           return result;
         }
@@ -93,7 +101,6 @@ export class ShadowComparisonEngine {
       return { equivalent: true, reason: null, warnings };
     }
 
-    // Ignore other node types (comments, processing instructions, etc.)
     return { equivalent: true, reason: null, warnings };
   }
 
@@ -113,6 +120,7 @@ export class ShadowComparisonEngine {
    * Filter out ignorable nodes (like comment nodes or whitespace-only nodes between inline elements)
    */
   static isIgnorableNode(node) {
+    if (!node || !node.nodeType) return false;
     if (node.nodeType === Node.COMMENT_NODE) return true;
     if (node.nodeType === Node.TEXT_NODE) {
       // If it's a text node but contains only spaces and is empty after normalization
@@ -146,16 +154,16 @@ export class ShadowComparisonEngine {
   static getCleanAttributes(element) {
     const attrs = {};
     if (!element.attributes) return attrs;
-    
+
     for (let i = 0; i < element.attributes.length; i++) {
       const attr = element.attributes[i];
       const name = attr.name.toLowerCase();
-      
+
       // Ignore framework compiler identifiers (like data-v-xxxx) and reactive indexes/keys/block-ids/direction-attributes
       if (
-        name.startsWith('data-v-') || 
-        name === 'key' || 
-        name === 'ref' || 
+        name.startsWith('data-v-') ||
+        name === 'key' ||
+        name === 'ref' ||
         name === 'data-block-id' ||
         name === 'data-translate-dir' ||
         name === 'data-dir-original-saved' ||
@@ -169,12 +177,12 @@ export class ShadowComparisonEngine {
       ) {
         continue;
       }
-      
+
       // Ignore empty class attribute left by classList.remove in test environments
       if (name === 'class' && attr.value.trim() === '') {
         continue;
       }
-      
+
       if (name === 'style') {
         const cleanedStyle = this.cleanStyleString(attr.value);
         if (cleanedStyle === '') {
@@ -183,7 +191,7 @@ export class ShadowComparisonEngine {
         attrs[name] = cleanedStyle;
         continue;
       }
-      
+
       attrs[attr.name] = attr.value;
     }
     return attrs;

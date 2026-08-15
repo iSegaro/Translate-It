@@ -483,5 +483,25 @@ describe('QueueManager', () => {
       await expect(promise).resolves.toBe('R1');
       expect(queueManager.getQueueStatus('retry-parallel::parallel').total).toBe(0);
     });
+
+    it('queue retry bound: NETWORK_ERROR is bounded to maxRetries attempts', async () => {
+      const mockError = { type: ErrorTypes.NETWORK_ERROR, message: 'network failure' };
+      let callCount = 0;
+      const mockRequest = vi.fn(() => {
+        callCount++;
+        return Promise.reject(mockError);
+      });
+
+      const promise = queueManager.enqueue('bound-test-provider', mockRequest, 0, 'select_element', {
+        messageId: 'bound-test'
+      });
+
+      await vi.advanceTimersByTimeAsync(30000);
+      await promise.catch(() => {});
+
+      // NETWORK_ERROR maxRetries=4, so exactly 4 attempts before permanent failure
+      expect(callCount).toBe(4);
+      expect(queueManager.getQueueStatus('bound-test-provider').total).toBe(0);
+    });
   });
 });

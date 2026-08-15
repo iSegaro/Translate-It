@@ -98,7 +98,7 @@ describe('TraditionalBatchProcessor', () => {
   });
 
   describe('Error Handling and Fallbacks', () => {
-    it('should fallback to original text for a failed batch but continue others', async () => {
+    it('legacy dead-code: source fallback for non-fatal chunk error (no live caller)', async () => {
       const segments = ['batch1_s1', 'batch2_s1'];
       const mockLimitsSmall = { CHUNK_SIZE: 1, CHAR_LIMIT: 100 };
 

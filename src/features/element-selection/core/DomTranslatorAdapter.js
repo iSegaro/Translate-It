@@ -116,7 +116,7 @@ export class DomTranslatorAdapter extends ResourceTracker {
       const elementId = generateElementId();
       const originalClone = element.cloneNode(true);
       this.translatedSegmentMap = new Map();
-      
+
       // Resolve provider and target language early to determine extraction strategy
       const [provider, targetLanguage] = await Promise.all([
         options.provider || getEffectiveProviderAsync(TranslationMode.Select_Element),
@@ -313,15 +313,15 @@ export class DomTranslatorAdapter extends ResourceTracker {
 
               if (data.data && Array.isArray(data.data)) {
                 data.data.forEach((translatedItem, index) => {
-                  if (translatedItem?.isSplitFragment === true) {
-                    this.logger.warn('[DomTranslatorAdapter] Suppressed incomplete V2 fragment event');
-                    return;
-                  }
-                  // Handle both abbreviated and full keys for backward compatibility
-                  const uid = translatedItem?.i || translatedItem?.uid || (data.originalData && (data.originalData[index]?.i || data.originalData[index]?.uid));
-                  const text = translatedItem?.t || translatedItem?.text || translatedItem;
+                   if (translatedItem?.isSplitFragment === true || translatedItem?.isV3Fragment === true) {
+                      this.logger.warn('[DomTranslatorAdapter] Suppressed incomplete fragment event');
+                      return;
+                    }
+                   // Handle both abbreviated and full keys for backward compatibility
+                    const uid = translatedItem?.i || translatedItem?.uid || (data.originalData && (data.originalData[index]?.i || data.originalData[index]?.uid));
+                    const text = translatedItem?.t || translatedItem?.text || translatedItem;
 
-                  if (isBlockGroupingEnabled && groupMap && groupMap.has(uid)) {
+                   if (isBlockGroupingEnabled && groupMap && groupMap.has(uid)) {
                     const group = groupMap.get(uid);
                     if (group.isV2Passthrough) {
                       const unit = group.units[0];
@@ -477,7 +477,7 @@ export class DomTranslatorAdapter extends ResourceTracker {
         try {
           const { ShadowComparisonEngine } = await import('./ShadowComparisonEngine.js');
           const v2Clone = originalClone.cloneNode(true);
-          
+
           // Map live text nodes to clone text nodes to bypass disconnected getComputedStyle issues
           const liveToCloneMap = new WeakMap();
           const walker1 = document.createTreeWalker(element, NodeFilter.SHOW_TEXT, null);
@@ -491,14 +491,15 @@ export class DomTranslatorAdapter extends ResourceTracker {
           const uniqueUnits = Array.from(new Set(
             Array.from(this.groupMap.values()).flatMap(group => group.units)
           ));
-          
+
           this.logger.debug('[ShadowMode] textsToTranslate:', textsToTranslate);
           this.logger.debug('[ShadowMode] keys in translatedSegmentMap:', Array.from(this.translatedSegmentMap.keys()));
           this.logger.debug('[ShadowMode] mapped units for V2 simulation:', uniqueUnits.length);
-          
+
           uniqueUnits.forEach((unit) => {
             if (!unit || !unit.id) return;
             const translatedText = this.translatedSegmentMap.get(unit.id);
+
             if (translatedText !== undefined) {
               const targetNodeInClone = liveToCloneMap.get(unit.node);
               if (targetNodeInClone) {
@@ -507,7 +508,7 @@ export class DomTranslatorAdapter extends ResourceTracker {
             }
           });
 
-          const comparison = ShadowComparisonEngine.compare(v2Clone, element);
+          const comparison = ShadowComparisonEngine.compare(v2Clone, element, []);
 
           if (!comparison.equivalent) {
             this.logger.error(`[ShadowMode] Reconstruction anomaly detected!\nReason: ${comparison.reason}`);
@@ -525,7 +526,7 @@ export class DomTranslatorAdapter extends ResourceTracker {
 
     } catch (error) {
       this.isTranslating = false; 
-      
+
       const type = matchErrorToType(error);
       const isCancellation = type === ErrorTypes.USER_CANCELLED || type === ErrorTypes.TRANSLATION_CANCELLED;
 
@@ -582,10 +583,10 @@ export class DomTranslatorAdapter extends ResourceTracker {
     let finalTranslation = '';
     if (typeof translatedText === 'string') {
       finalTranslation = translatedText;
-    } else if (typeof translatedText === 'object' && translatedText !== null) {
+     } else if (typeof translatedText === 'object' && translatedText !== null) {
       finalTranslation = translatedText.text || translatedText.translation || '';
     }
-    
+
     if (!finalTranslation || finalTranslation.trim() === '') return;
 
     const originalText = textNode.textContent;
@@ -701,16 +702,17 @@ export class DomTranslatorAdapter extends ResourceTracker {
               }
             }
           }
-        } else {
-          let nodeData = uid ? nodeMap.get(uid) : null;
-          if (!nodeData) {
-            nodeData = textNodesData[i];
-          }
+         } else {
+           let nodeData = uid ? nodeMap.get(uid) : null;
+           if (!nodeData) {
+             nodeData = textNodesData[i];
+           }
 
-          if (nodeData) {
-            this._applyTranslationToNode(nodeData.node, text, finalTargetLanguage, element);
-          }
-        }
+           if (nodeData && !processedUids.has(nodeData.uid)) {
+             this._applyTranslationToNode(nodeData.node, text, finalTargetLanguage, element);
+             processedUids.add(nodeData.uid);
+           }
+         }
       });
 
       // Emit final progress for non-streaming mode

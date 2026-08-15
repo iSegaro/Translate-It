@@ -1671,4 +1671,89 @@ describe('PdfTranslationAdapter', () => {
       expect(request.data.options.contextMetadata.semanticHint).toBeDefined()
     })
   })
+
+  describe('_extractTranslatedText null/undefined/blank contract', () => {
+    function paragraphBlock(text, extra = {}) {
+      return { id: `blk-${text}`, text, role: 'paragraph', sourceTextHash: `hash-${text}`, pageNumber: 1, columnIndex: 0, readingOrderIndex: 0, roleMetadata: {}, lines: [{ text, boundingBox: { x: 40, y: 100, width: 300, height: 14 }, fontSize: 10, direction: 'ltr', items: [], roleMetadata: {} }], ...extra }
+    }
+
+    function a() { return new PdfTranslationAdapter() }
+
+    it('null translated slot keeps original source visible and marks status error', () => {
+      const b = a().toProviderItems([paragraphBlock('Hello')])
+      const mapped = a().mapBatchResponse(b, { success: true, translatedText: JSON.stringify([null]) })
+
+      expect(mapped[0].translatedText).toBe('')
+      expect(mapped[0].status).toBe('error')
+      expect(mapped[0].error).toBe('Empty translation result')
+      expect(mapped[0].translatedText).not.toBe('Hello')
+    })
+
+    it('undefined translated slot keeps original source visible and marks status error', () => {
+      const b = a().toProviderItems([paragraphBlock('Hello')])
+      const mapped = a().mapBatchResponse(b, { success: true, translatedText: JSON.stringify([]) })
+
+      expect(mapped[0].translatedText).toBe('')
+      expect(mapped[0].status).toBe('error')
+      expect(mapped[0].error).toBe('Empty translation result')
+      expect(mapped[0].translatedText).not.toBe('Hello')
+    })
+
+    it('blank/whitespace result marks status error', () => {
+      const b = a().toProviderItems([paragraphBlock('Hello')])
+      const mapped = a().mapBatchResponse(b, { success: true, translatedText: JSON.stringify(['   ']) })
+
+      expect(mapped[0].translatedText).toBe('')
+      expect(mapped[0].status).toBe('error')
+    })
+
+    it('valid translation is unchanged', () => {
+      const b = a().toProviderItems([paragraphBlock('Hello')])
+      const mapped = a().mapBatchResponse(b, { success: true, translatedText: JSON.stringify(['Hola']) })
+
+      expect(mapped[0].translatedText).toBe('Hola')
+      expect(mapped[0].status).toBe('translated')
+    })
+
+    it('explicit source-equal translation (URL -> URL) is accepted as translated', () => {
+      const url = 'https://example.com/page'
+      const b = a().toProviderItems([paragraphBlock(url)])
+      const mapped = a().mapBatchResponse(b, { success: true, translatedText: JSON.stringify([url]) })
+
+      expect(mapped[0].translatedText).toBe(url)
+      expect(mapped[0].status).toBe('translated')
+    })
+
+    it('mixed block retains valid cells and missing cell stays original without positional shift', () => {
+      const block = makeStructuredBlockWithCells('mixed', ['Key Value'], [
+        [{ text: 'Key', x: 40, y: 100, width: 100, height: 14 }, { text: 'Value', x: 160, y: 100, width: 100, height: 14 }]
+      ])
+      block.roleMetadata = { isStructured: true, fontSize: 10 }
+      const items = a().toProviderItems([block])
+
+      const mapped = a().mapBatchResponse(items, { success: true, translatedText: JSON.stringify(['ترجمه', null]) })
+
+      expect(mapped[0].translatedCells).toBeDefined()
+      expect(mapped[0].translatedCells[0].cells).toEqual(['ترجمه', ''])
+      expect(mapped[0].translatedCells[0].cells.length).toBe(2)
+      expect(mapped[0].translatedText).toContain('ترجمه')
+      expect(mapped[0].status).toBe('translated')
+    })
+
+    it('structured PDF numeric cellId 0 remains valid and is not dropped', () => {
+      const block = makeStructuredBlockWithCells('cellid-zero', ['Revenue Amount'], [
+        [
+          { text: 'Revenue', x: 40, y: 100, width: 100, height: 14, cellId: 0, columnIndex: 0 },
+          { text: 'Amount', x: 160, y: 100, width: 100, height: 14, cellId: 1, columnIndex: 1 }
+        ]
+      ])
+      block.roleMetadata = { isStructured: true, fontSize: 10 }
+      const items = a().toProviderItems([block])
+
+      const mapped = a().mapBatchResponse(items, { success: true, translatedText: JSON.stringify(['X', 'Y']) })
+
+      expect(mapped[0].translatedCells).toBeDefined()
+      expect(mapped[0].translatedCells[0].cellIds).toEqual([0, 1])
+    })
+  })
 })

@@ -76,12 +76,11 @@ function sanitizeDiagnostic(messageId, fact = {}) {
     timestamp: safeNumber(fact.timestamp) ?? Date.now(),
   }
 
-  for (const key of ['batchIndex', 'attempt', 'count', 'expectedCount', 'receivedCount', 'missingCount']) {
+  for (const key of ['batchIndex', 'attempt', 'count', 'expectedCount', 'receivedCount', 'missingCount', 'expectedMarkerCount', 'actualMarkerCount']) {
     const value = safeNumber(fact[key])
     if (value !== undefined) diagnostic[key] = value
   }
-
-  for (const key of ['provider', 'reason', 'code']) {
+  for (const key of ['provider', 'reason', 'code', 'parentId']) {
     const value = safeString(fact[key])
     if (value !== undefined) diagnostic[key] = value
   }

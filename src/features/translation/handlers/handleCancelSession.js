@@ -1,6 +1,7 @@
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { translationSessionManager } from '@/features/translation/core/TranslationSessionManager.js';
+import { unifiedTranslationService } from '@/core/services/translation/UnifiedTranslationService.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.TRANSLATION, 'handleCancelSession');
 
@@ -13,6 +14,7 @@ export async function handleCancelSession(message) {
   if (sessionId) {
     logger.debug(`Cleaning up session: ${sessionId}`);
     translationSessionManager.clearSession(sessionId);
+    unifiedTranslationService.clearPageSourceSession(sessionId);
     return { success: true };
   }
   

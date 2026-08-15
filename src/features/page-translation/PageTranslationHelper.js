@@ -27,6 +27,9 @@ export class PageTranslationHelper {
     // These items are universally non-translatable and often occur in technical content
     if (DOM_FILTERS.isTechnicalPattern(trimmed)) return false;
 
+    // 1b. BIDI/zero-width formatting-mark-only text (no visible glyphs to translate)
+    if (DOM_FILTERS.isFormattingOnly(trimmed)) return false;
+
     // 2. Numeric and Metric Filters
     const isNumeric = DOM_FILTERS.NUMERIC_REGEX.test(trimmed);
     const isTime = DOM_FILTERS.TIME_REGEX.test(trimmed);

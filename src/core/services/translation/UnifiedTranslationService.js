@@ -415,6 +415,16 @@ export class UnifiedTranslationService {
   }
 
   /**
+   * Force-clear a Page session's source-resolution state.
+   * Invoked on session terminal lifecycle (complete/cancel/error/restore).
+   *
+   * @param {string} sessionId - Page translation session identifier
+   */
+  clearPageSourceSession(sessionId) {
+    if (sessionId) this.modeCoordinator.clearPageSourceLanguage(sessionId);
+  }
+
+  /**
    * Periodically clean up old request records.
    */
   cleanup() {

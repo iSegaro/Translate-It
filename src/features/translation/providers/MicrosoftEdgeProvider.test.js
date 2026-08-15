@@ -110,6 +110,35 @@ describe('MicrosoftEdgeProvider', () => {
       expect(provider.lastDetectedLanguage).toBe('en');
     });
 
+    it('should throw API_RESPONSE_INVALID for malformed API response', async () => {
+      vi.spyOn(provider, '_getAuthToken').mockResolvedValue('valid-token');
+
+      const malformedResponse = { unexpected: 'shape' };
+
+      vi.spyOn(provider, '_executeRequest').mockImplementation(async (opts) => {
+        return opts.extractResponse(malformedResponse);
+      });
+
+      await expect(provider._translateChunk(['Hello'], 'en', 'fa', 'selection', null))
+        .rejects.toMatchObject({ type: 'API_RESPONSE_INVALID' });
+    });
+
+    it('should throw API_RESPONSE_INVALID when a translation item lacks translations', async () => {
+      vi.spyOn(provider, '_getAuthToken').mockResolvedValue('valid-token');
+
+      const malformedResponse = [
+        { translations: [{ text: 'سلام' }] },
+        { missing: 'translations field' }
+      ];
+
+      vi.spyOn(provider, '_executeRequest').mockImplementation(async (opts) => {
+        return opts.extractResponse(malformedResponse);
+      });
+
+      await expect(provider._translateChunk(['Hello', 'World'], 'en', 'fa', 'selection', null))
+        .rejects.toMatchObject({ type: 'API_RESPONSE_INVALID' });
+    });
+
     it('should retry without "from" param if source language is rejected', async () => {
       vi.spyOn(provider, '_getAuthToken').mockResolvedValue('valid-token');
       

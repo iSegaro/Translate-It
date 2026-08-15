@@ -34,22 +34,30 @@ export class SubtitleValidationService {
 
     originalCues.forEach((cue, idx) => {
       let rawTranslation = translatedResults[idx];
-      
+
+      // The pipeline attaches `isSkipped` to object results it could not resolve
+      // (batch under-return). Detection is status-driven, never text-based, so
+      // legitimate source-equal translations (e.g. "URL" -> "URL") stay valid.
+      const isSkipped = !!(rawTranslation && typeof rawTranslation === 'object' && rawTranslation.isSkipped === true);
+
       // Handle both raw string results and object results { id, text }
       if (rawTranslation && typeof rawTranslation === 'object' && rawTranslation.text !== undefined) {
         rawTranslation = rawTranslation.text;
       }
-      
-      if (!rawTranslation) {
+
+      if (isSkipped || !rawTranslation || !String(rawTranslation).trim()) {
         cue.status = 'failed';
-        cue.warnings.push('No translation returned for this cue.');
+        cue.warnings.push(isSkipped
+          ? 'Provider did not return a translation for this cue.'
+          : 'No translation returned for this cue.');
         validatedCues.push(cue);
         return;
       }
 
       const cueTokens = tokenRegistry.get(cue.id);
-      
+
       // 1. Check for missing tokens
+      let candidate;
       if (cueTokens && cueTokens.size > 0) {
         const missing = subtitleTextProtector.getMissingTokens(rawTranslation, cueTokens);
         if (missing.length > 0) {
@@ -58,11 +66,12 @@ export class SubtitleValidationService {
         }
 
         // 2. Restore tokens
-        cue.translatedText = subtitleTextProtector.restore(rawTranslation, cueTokens);
+        candidate = subtitleTextProtector.restore(rawTranslation, cueTokens);
       } else {
-        cue.translatedText = rawTranslation;
+        candidate = rawTranslation;
       }
 
+      cue.translatedText = candidate;
       cue.status = 'translated';
       validatedCues.push(cue);
     });

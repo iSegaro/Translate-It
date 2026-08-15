@@ -19,6 +19,7 @@ import { MessageContexts } from '@/shared/messaging/core/MessagingConstants.js';
 import { unifiedTranslationService } from '@/core/services/translation/UnifiedTranslationService.js';
 import { MessageFormat } from '@/shared/messaging/core/MessagingCore.js';
 import { ErrorMatcher } from '@/shared/error-management/ErrorMatcher.js';
+import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.SUBTITLE, 'SubtitleCoordinator');
 
@@ -179,7 +180,7 @@ export class SubtitleTranslationCoordinator {
       const timeoutPromise = new Promise((_, reject) => {
         setTimeout(() => {
           const timeoutError = new Error(`Batch translation timed out after ${BATCH_TIMEOUT_MS}ms`);
-          timeoutError.type = 'TIMEOUT';
+          timeoutError.type = ErrorTypes.TRANSLATION_TIMEOUT;
           reject(timeoutError);
         }, BATCH_TIMEOUT_MS);
       });

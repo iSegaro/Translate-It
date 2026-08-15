@@ -1193,6 +1193,8 @@ Where normalized values are `[0,1]` relative to page dimensions, and `textHash` 
 
 ## Translation Pipeline
 
+> **Feature contract:** see [Feature Behavioral Contracts](../contracts/FEATURE_CONTRACTS.md#11-pdf-contract) for the authoritative PDF cell/block outcome contract (cellId, mixed-block, no-shift, typed timeout/cancel).
+
 ### Orchestration (`PdfTranslationCoordinator`)
 
 **File**: `src/features/pdf-translation/core/PdfTranslationCoordinator.js`
