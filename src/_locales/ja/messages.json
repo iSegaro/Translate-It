@@ -1841,11 +1841,17 @@
   "ERRORS_USER_CANCELLED": {
     "message": "翻訳がキャンセルされました。"
   },
-  "gemini_thinking_label": {
-    "message": "思考モードを有効にする"
+  "gemini_thinking_mode_label": {
+    "message": "思考モード"
   },
-  "gemini_thinking_description": {
-    "message": "回答前にモデルがステップごとに考えられるようにします。"
+  "gemini_thinking_mode_default": {
+    "message": "プロバイダーのデフォルト"
+  },
+  "gemini_thinking_mode_minimal": {
+    "message": "最小"
+  },
+  "gemini_thinking_mode_description": {
+    "message": "プロバイダーのデフォルトはサービスの設定を使用します。最小モードは今後の対応に備えて保存されます。"
   },
   "advance_section_title": {
     "message": "詳細設定"
@@ -1999,6 +2005,18 @@
   },
   "api_test_result_all_invalid": {
     "message": "{count}個のキーがすべて無効です"
+  },
+  "api_test_custom_connection_success": {
+    "message": "接続と設定済みモデルを確認しました"
+  },
+  "api_test_custom_config_missing": {
+    "message": "カスタムAPI URLとモデルは必須です"
+  },
+  "api_test_custom_model_not_found": {
+    "message": "設定済みモデルが見つかりません: {model}"
+  },
+  "api_test_custom_connection_failed": {
+    "message": "接続または設定済みモデルのテストに失敗しました"
   },
   "api_test_unknown_provider": {
     "message": "不明なプロバイダー：{provider}"

@@ -5,6 +5,8 @@ import { TranslationCallPurpose } from './ProviderConstants.js';
 import { AIConversationHelper } from './utils/AIConversationHelper.js';
 import { CompletionTermination } from '@/features/translation/ir/CompletionContract.js';
 import { createTranslationOperation } from '@/features/translation/ir/TranslationOperation.js';
+import { CONFIG, getOpenRouterApiModelAsync } from '@/shared/config/config.js';
+import { ResponseFormat } from '@/shared/config/translationConstants.js';
 
 // Mock Dependencies
 vi.mock('@/shared/proxy/ProxyManager.js', () => ({
@@ -20,7 +22,7 @@ vi.mock('@/shared/config/config.js', async (importOriginal) => {
   return {
     ...actual,
     getOpenRouterApiKeysAsync: vi.fn().mockResolvedValue(['test-key']),
-    getOpenRouterApiModelAsync: vi.fn().mockResolvedValue('openai/gpt-3.5-turbo'),
+    getOpenRouterApiModelAsync: vi.fn().mockResolvedValue('openai/gpt-4o-mini'),
     getSettingsAsync: vi.fn().mockResolvedValue({}),
   };
 });
@@ -94,6 +96,35 @@ describe('OpenRouterProvider Error Handling', () => {
 
     const result = await provider._callAI('system', 'Hello World');
     expect(result).toBe('OpenRouter Result');
+  });
+
+  it.each(['openai/gpt-4o-mini', 'openai/gpt-4o'])('preserves curated model payload for %s', async (model) => {
+    getOpenRouterApiModelAsync.mockResolvedValue(model);
+    const executeRequest = vi.spyOn(provider, '_executeRequest').mockResolvedValue('translated');
+
+    await provider._callAI('system', 'source', { expectedFormat: ResponseFormat.JSON_OBJECT });
+
+    const payload = JSON.parse(executeRequest.mock.calls[0][0].fetchOptions.body);
+    expect(executeRequest.mock.calls[0][0].url).toBe(CONFIG.OPENROUTER_API_URL);
+    expect(payload).toMatchObject({
+      model,
+      messages: [
+        { role: 'system', content: 'system' },
+        { role: 'user', content: 'source' }
+      ],
+      max_tokens: 4096,
+      response_format: { type: 'json_object' }
+    });
+  });
+
+  it('uses CONFIG default for missing text model selection', async () => {
+    getOpenRouterApiModelAsync.mockResolvedValue(undefined);
+    const executeRequest = vi.spyOn(provider, '_executeRequest').mockResolvedValue('translated');
+
+    await provider._callAI('system', 'source');
+
+    const payload = JSON.parse(executeRequest.mock.calls[0][0].fetchOptions.body);
+    expect(payload.model).toBe(CONFIG.OPENROUTER_API_MODEL);
   });
 
   it('records normalized completion metadata from the confirmed response shape', async () => {

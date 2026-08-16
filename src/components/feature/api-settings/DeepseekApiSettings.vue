@@ -70,11 +70,11 @@ const deepseekApiKey = computed({
 })
 
 // Track dropdown selection separately from stored value
-const selectedModelOption = ref('deepseek-chat')
+const selectedModelOption = ref(CONFIG.DEEPSEEK_API_MODEL)
 
 // Initialize selectedModelOption based on current stored value
 const initializeModelSelection = () => {
-  const currentModel = settingsStore.settings?.DEEPSEEK_API_MODEL || 'deepseek-chat';
+  const currentModel = settingsStore.settings?.DEEPSEEK_API_MODEL || CONFIG.DEEPSEEK_API_MODEL;
   const isPredefined = deepseekApiModelOptions.value.some(option => option.value === currentModel && option.value !== 'custom');
   selectedModelOption.value = isPredefined ? currentModel : 'custom';
 }
@@ -92,7 +92,7 @@ const deepseekApiModel = computed({
 
 const deepseekCustomModel = computed({
   get: () => {
-    const currentModel = settingsStore.settings?.DEEPSEEK_API_MODEL || 'deepseek-chat';
+    const currentModel = settingsStore.settings?.DEEPSEEK_API_MODEL || CONFIG.DEEPSEEK_API_MODEL;
     const isPredefined = deepseekApiModelOptions.value.some(option => option.value === currentModel && option.value !== 'custom');
     return isPredefined ? '' : currentModel;
   },

@@ -1,8 +1,8 @@
 // src/core/providers/OpenAIProvider.js
 import { BaseAIProvider } from "@/features/translation/providers/BaseAIProvider.js";
 import {
+  CONFIG,
   getOpenAIApiKeysAsync,
-  getOpenAIApiUrlAsync,
   getOpenAIModelAsync,
   getPromptBASEScreenCaptureAsync
 } from "@/shared/config/config.js";
@@ -21,6 +21,13 @@ import {
 import { recordProviderCompletion } from "@/features/translation/ir/TranslationOperation.js";
 
 const logger = getScopedLogger(LOG_COMPONENTS.PROVIDERS, 'OpenAI');
+
+const OPENAI_REQUEST_CAPABILITIES = Object.freeze({
+  'gpt-4o': Object.freeze({ supportsTemperature: true }),
+  'gpt-4o-mini': Object.freeze({ supportsTemperature: true }),
+});
+
+const getRequestCapabilities = (model) => OPENAI_REQUEST_CAPABILITIES[model] || { supportsTemperature: false };
 
 export class OpenAIProvider extends BaseAIProvider {
   static type = "ai";
@@ -66,9 +73,8 @@ export class OpenAIProvider extends BaseAIProvider {
       ? participationOverride
       : await AIConversationHelper.getConversationParticipation({ callPurpose, translateMode: mode, sessionId });
 
-    const [apiKeys, apiUrl, model] = await Promise.all([
+    const [apiKeys, model] = await Promise.all([
       getOpenAIApiKeysAsync(),
-      getOpenAIApiUrlAsync(),
       getOpenAIModelAsync(),
     ]);
 
@@ -79,10 +85,11 @@ export class OpenAIProvider extends BaseAIProvider {
     const turnNumber = conversationParticipates
       ? await AIConversationHelper.claimNextTurn(sessionId, this.providerName, { callPurpose, translateMode: mode, conversationParticipates })
       : 1;
-    const activeModel = model || "gpt-4o-mini";
+    const activeModel = model || CONFIG.OPENAI_API_MODEL;
     logger.info(`[OpenAI] Model: ${activeModel}${sessionId ? ` (Session: ${sessionId.substring(0, 15)}..., Turn: ${turnNumber})` : ''}`);
 
     const { messages } = await AIConversationHelper.getConversationMessages(sessionId, this.providerName, userText, systemPrompt, mode, { callPurpose, conversationParticipates });
+    const requestCapabilities = getRequestCapabilities(activeModel);
 
     const fetchOptions = {
       method: "POST",
@@ -93,8 +100,8 @@ export class OpenAIProvider extends BaseAIProvider {
       body: JSON.stringify({
         model: activeModel,
         messages: messages,
-        temperature: 0.1,
-        max_tokens: 4096,
+        max_completion_tokens: 4096,
+        ...(requestCapabilities.supportsTemperature && { temperature: 0.1 }),
         // Enforce JSON Mode for both Object and Batch (Array) contracts
         ...((expectedFormat === ResponseFormat.JSON_OBJECT || expectedFormat === ResponseFormat.JSON_ARRAY) && { 
           response_format: { type: "json_object" } 
@@ -103,7 +110,7 @@ export class OpenAIProvider extends BaseAIProvider {
     };
 
     const result = await this._executeRequest({
-      url: apiUrl || "https://api.openai.com/v1/chat/completions",
+      url: CONFIG.OPENAI_API_URL,
       fetchOptions,
       charCount: fetchOptions.body.length,
       originalCharCount: isBatch ? AITextProcessor.estimateOriginalChars(userText) : userText.length,
@@ -141,9 +148,8 @@ export class OpenAIProvider extends BaseAIProvider {
   async _translateImageInternal(base64Image, _sourceLang, targetLang, options = {}) {
     const { abortController, sessionId } = options;
 
-    const [apiKeys, apiUrl, model, promptBase] = await Promise.all([
+    const [apiKeys, model, promptBase] = await Promise.all([
       getOpenAIApiKeysAsync(),
-      getOpenAIApiUrlAsync(),
       getOpenAIModelAsync(),
       getPromptBASEScreenCaptureAsync()
     ]);
@@ -178,7 +184,7 @@ export class OpenAIProvider extends BaseAIProvider {
     };
 
     return await this._executeRequest({
-      url: apiUrl,
+      url: CONFIG.OPENAI_API_URL,
       fetchOptions,
       charCount: AITextProcessor.calculatePayloadChars(messages),
       extractResponse: (data) => {

@@ -2,6 +2,10 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { ApiKeyManager } from './ApiKeyManager.js';
 import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
 
+const { mockProxyFetch } = vi.hoisted(() => ({
+  mockProxyFetch: vi.fn()
+}));
+
 // Mock storageManager
 const mockStorage = new Map();
 vi.mock('@/shared/storage/core/StorageCore.js', () => ({
@@ -30,6 +34,12 @@ vi.mock('@/shared/logging/logger.js', () => ({
     warn: vi.fn(),
     error: vi.fn()
   })
+}));
+
+vi.mock('@/shared/proxy/ProxyManager.js', () => ({
+  proxyManager: {
+    fetch: mockProxyFetch
+  }
 }));
 
 describe('ApiKeyManager', () => {
@@ -112,6 +122,96 @@ describe('ApiKeyManager', () => {
       
       // Check storage: valid should be first now
       expect(mockStorage.get('GEMINI_KEY')).toBe('valid_key\ninvalid_key');
+    });
+  });
+
+  describe('Custom Provider Testing', () => {
+    const context = {
+      apiUrl: 'https://example.com/v1/chat/completions',
+      apiModel: 'local-model'
+    };
+
+    const modelsResponse = (data) => ({
+      ok: true,
+      status: 200,
+      json: vi.fn().mockResolvedValue(data)
+    });
+
+    const chatResponse = (ok = true, status = ok ? 200 : 500) => ({
+      ok,
+      status,
+      json: vi.fn().mockResolvedValue({})
+    });
+
+    it('tests anonymous Custom connectivity without Authorization', async () => {
+      mockProxyFetch.mockResolvedValue(modelsResponse({ data: [{ id: 'local-model' }] }));
+
+      const result = await ApiKeyManager.testKeysDirect('', 'Custom', context);
+
+      expect(result).toMatchObject({ allInvalid: false, messageKey: 'api_test_custom_connection_success' });
+      expect(mockProxyFetch).toHaveBeenCalledWith(
+        'https://example.com/v1/models',
+        expect.objectContaining({ method: 'GET', headers: {} })
+      );
+    });
+
+    it('sends Authorization when testing a configured Custom key', async () => {
+      mockProxyFetch.mockResolvedValue(modelsResponse({ data: [{ id: 'local-model' }] }));
+
+      const result = await ApiKeyManager.testKeysDirect('secret-key', 'Custom', context);
+
+      expect(result.allInvalid).toBe(false);
+      expect(mockProxyFetch.mock.calls[0][1].headers).toEqual({ Authorization: 'Bearer secret-key' });
+    });
+
+    it('requires configured URL and model before making a remote request', async () => {
+      const result = await ApiKeyManager.testKeysDirect('', 'Custom', { apiUrl: '', apiModel: '' });
+
+      expect(result).toMatchObject({ allInvalid: true, messageKey: 'api_test_custom_config_missing' });
+      expect(mockProxyFetch).not.toHaveBeenCalled();
+    });
+
+    it('requires exact configured model membership from a standard models response', async () => {
+      mockProxyFetch.mockResolvedValue(modelsResponse({ data: [{ id: 'local-model-v2' }] }));
+
+      const result = await ApiKeyManager.testKeysDirect('', 'Custom', context);
+
+      expect(result).toMatchObject({ allInvalid: true, messageKey: 'api_test_custom_model_not_found' });
+      expect(mockProxyFetch).toHaveBeenCalledTimes(1);
+    });
+
+    it.each([
+      ['malformed JSON', { ok: true, status: 200, json: vi.fn().mockRejectedValue(new Error('invalid json')) }],
+      ['nonstandard shape', { ok: true, status: 200, json: vi.fn().mockResolvedValue({ models: [{ id: 'local-model' }] }) }],
+      ['404', { ok: false, status: 404, json: vi.fn().mockResolvedValue({}) }],
+      ['405', { ok: false, status: 405, json: vi.fn().mockResolvedValue({}) }]
+    ])('falls back to configured model chat test for %s models response', async (_name, modelsFailure) => {
+      mockProxyFetch
+        .mockResolvedValueOnce(modelsFailure)
+        .mockResolvedValueOnce(chatResponse());
+
+      const result = await ApiKeyManager.testKeysDirect('', 'Custom', context);
+      const chatRequest = mockProxyFetch.mock.calls[1];
+
+      expect(result.allInvalid).toBe(false);
+      expect(mockProxyFetch).toHaveBeenCalledTimes(2);
+      expect(mockProxyFetch.mock.calls[0][0]).toBe('https://example.com/v1/models');
+      expect(chatRequest[0]).toBe('https://example.com/v1/chat/completions');
+      expect(JSON.parse(chatRequest[1].body)).toMatchObject({
+        model: 'local-model',
+        messages: [{ role: 'user', content: 'hi' }],
+        max_tokens: 1
+      });
+      expect(JSON.stringify(chatRequest[1].body)).not.toContain('gpt-3.5-turbo');
+    });
+
+    it('does not fall back after genuine authentication failure', async () => {
+      mockProxyFetch.mockResolvedValue({ ok: false, status: 401, json: vi.fn() });
+
+      const result = await ApiKeyManager.testKeysDirect('secret-key', 'Custom', context);
+
+      expect(result.allInvalid).toBe(true);
+      expect(mockProxyFetch).toHaveBeenCalledTimes(1);
     });
   });
 });

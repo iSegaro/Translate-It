@@ -180,6 +180,14 @@ class ApiKeyManager {
   static async testAndReorderKeys(providerSettingKey, providerName) {
     const keys = await this.getKeys(providerSettingKey);
 
+    if (providerName === 'Custom') {
+      const result = await this._testCustomKeys(keys);
+      if (result.reorderedString !== undefined) {
+        await storageManager.set({ [providerSettingKey]: result.reorderedString });
+      }
+      return result;
+    }
+
     if (keys.length === 0) {
       return {
         valid: [],
@@ -258,6 +266,10 @@ class ApiKeyManager {
     // Parse keys from string
     const keys = this.parseKeys(keysString);
 
+    if (providerName === 'Custom') {
+      return this._testCustomKeys(keys, context);
+    }
+
     if (keys.length === 0) {
       return {
         valid: [],
@@ -317,6 +329,72 @@ class ApiKeyManager {
       allInvalid: valid.length === 0,
       messageKey,
       params,
+      reorderedString: [...valid, ...invalid].join('\n')
+    };
+  }
+
+  static async _testCustomKeys(keys, context = {}) {
+    if (keys.length === 0) {
+      const result = await this._testCustomConnection('', context);
+      if (result.reason === 'missing_config') {
+        return {
+          valid: [],
+          invalid: [],
+          allInvalid: true,
+          messageKey: 'api_test_custom_config_missing'
+        };
+      }
+      if (result.reason === 'model_not_found') {
+        return {
+          valid: [],
+          invalid: [],
+          allInvalid: true,
+          messageKey: 'api_test_custom_model_not_found',
+          params: { model: result.model }
+        };
+      }
+      if (result.valid) {
+        return {
+          valid: [],
+          invalid: [],
+          allInvalid: false,
+          messageKey: 'api_test_custom_connection_success'
+        };
+      }
+      return {
+        valid: [],
+        invalid: [],
+        allInvalid: true,
+        messageKey: 'api_test_custom_connection_failed'
+      };
+    }
+
+    const results = await Promise.all(keys.map(async (key) => ({
+      key,
+      result: await this._testCustomConnection(key, context)
+    })));
+    const valid = results.filter(({ result }) => result.valid).map(({ key }) => key);
+    const invalid = results.filter(({ result }) => !result.valid).map(({ key }) => key);
+    const firstFailure = results.find(({ result }) => !result.valid)?.result;
+
+    return {
+      valid,
+      invalid,
+      allInvalid: valid.length === 0,
+      messageKey: valid.length > 0
+        ? 'api_test_result_partial'
+        : firstFailure?.reason === 'missing_config'
+          ? 'api_test_custom_config_missing'
+        : firstFailure?.reason === 'model_not_found'
+          ? 'api_test_custom_model_not_found'
+          : 'api_test_result_all_invalid',
+      params: valid.length > 0
+        ? { valid: valid.length, invalid: invalid.length }
+        : firstFailure?.reason === 'missing_config'
+          ? undefined
+        : firstFailure?.reason === 'model_not_found'
+          ? { model: firstFailure.model }
+          : { count: invalid.length },
       reorderedString: [...valid, ...invalid].join('\n')
     };
   }
@@ -471,25 +549,26 @@ class ApiKeyManager {
    * @private
    */
   static async _testCustomKey(key, context = {}) {
-    try {
-      if (!key || key.trim() === '') return false;
+    return (await this._testCustomConnection(key, context)).valid;
+  }
 
+  static async _testCustomConnection(key, context = {}) {
+    try {
       // Priority: use provided context values, fallback to storage
       let apiUrl = context.apiUrl;
       let apiModel = context.apiModel;
 
-      if (!apiUrl) {
+      if (!apiUrl || !apiModel) {
         const settings = await storageManager.get({
           CUSTOM_API_URL: '',
           CUSTOM_API_MODEL: ''
         });
-        apiUrl = settings.CUSTOM_API_URL;
-        apiModel = settings.CUSTOM_API_MODEL;
+        apiUrl = apiUrl || settings.CUSTOM_API_URL;
+        apiModel = apiModel || settings.CUSTOM_API_MODEL;
       }
 
-      if (!apiUrl || apiUrl.trim() === '') {
-        logger.warn('[ApiKeyManager] Custom API URL is not configured, cannot test key');
-        return false;
+      if (!apiUrl?.trim() || !apiModel?.trim()) {
+        return { valid: false, reason: 'missing_config' };
       }
 
       // Try to determine models endpoint
@@ -501,43 +580,66 @@ class ApiKeyManager {
       }
 
       const { proxyManager } = await import('@/shared/proxy/ProxyManager.js');
-      
+      const headers = {};
+      if (key?.trim()) {
+        headers.Authorization = `Bearer ${key}`;
+      }
+
       try {
         // Try models endpoint first
         const response = await proxyManager.fetch(modelsUrl, {
           method: 'GET',
-          headers: {
-            'Authorization': `Bearer ${key}`
-          }
+          headers
         });
 
-        if (response.ok) return true;
-        
-        // If models endpoint failed, try minimal chat completion
-        if (response.status === 404 || response.status === 405) {
-          const chatResponse = await proxyManager.fetch(apiUrl, {
-            method: 'POST',
-            headers: {
-              'Authorization': `Bearer ${key}`,
-              'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-              model: apiModel || 'gpt-3.5-turbo',
-              messages: [{ role: 'user', content: 'hi' }],
-              max_tokens: 1
-            })
-          });
-          return chatResponse.ok;
+        if (response.status === 401 || response.status === 403) {
+          return { valid: false, reason: 'authentication' };
         }
 
-        return false;
+        if (response.ok) {
+          try {
+            const payload = await response.json();
+            const modelIds = Array.isArray(payload?.data)
+              && payload.data.every(model => model && typeof model.id === 'string')
+              ? payload.data.map(model => model.id)
+              : null;
+
+            if (modelIds) {
+              return modelIds.includes(apiModel)
+                ? { valid: true }
+                : { valid: false, reason: 'model_not_found', model: apiModel };
+            }
+          } catch {
+            // Fall back to a minimal chat test when model metadata is unreadable.
+          }
+        }
+
+        // Missing or nonstandard model metadata cannot prove model membership.
+        const chatResponse = await proxyManager.fetch(apiUrl, {
+          method: 'POST',
+          headers: {
+            ...headers,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            model: apiModel,
+            messages: [{ role: 'user', content: 'hi' }],
+            max_tokens: 1
+          })
+        });
+
+        if (chatResponse.status === 401 || chatResponse.status === 403) {
+          return { valid: false, reason: 'authentication' };
+        }
+
+        return { valid: chatResponse.ok };
       } catch (err) {
         logger.error('[ApiKeyManager] Custom API test error:', err);
-        return false;
+        return { valid: false, reason: 'request_failed' };
       }
     } catch (error) {
       logger.error('[ApiKeyManager] Custom API test failed:', error);
-      return false;
+      return { valid: false, reason: 'request_failed' };
     }
   }
 

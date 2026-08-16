@@ -360,6 +360,21 @@ export const useSettingsStore = defineStore('settings', () => {
       }
 
       const processedSettings = await secureStorage.processImportedSettings(importData, password);
+      const hasImportedThinkingMode = Object.prototype.hasOwnProperty.call(
+        processedSettings,
+        'GEMINI_THINKING_MODE'
+      );
+      if (!hasImportedThinkingMode) {
+        processedSettings.GEMINI_THINKING_MODE = processedSettings.GEMINI_THINKING_ENABLED === true
+          ? 'minimal'
+          : 'default';
+      }
+      // Legacy thinking state is converted before defaults are merged.
+      delete processedSettings.GEMINI_THINKING_ENABLED;
+      // OpenRouter endpoint is a CONFIG-owned runtime constant, not an imported setting.
+      delete processedSettings.OPENROUTER_API_URL;
+      // OpenAI endpoint is a CONFIG-owned runtime constant, not an imported setting.
+      delete processedSettings.OPENAI_API_URL;
 
       // 1. Merge imported settings with default settings to ensure no missing keys
       const defaultSettings = getDefaultSettings();

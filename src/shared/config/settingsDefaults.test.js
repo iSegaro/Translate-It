@@ -23,6 +23,21 @@ describe('getPersistedDefaultSettings', () => {
 
     expect(defaults.THEME).toBe(CONFIG.THEME);
     expect(defaults.TIMEOUT).toBe(CONFIG.TIMEOUT);
+    expect(defaults.GEMINI_MODEL).toBe(CONFIG.GEMINI_MODEL);
+    expect(defaults.GEMINI_API_URL).toBe(CONFIG.GEMINI_API_URL);
+    expect(defaults.GEMINI_MODELS).toEqual(CONFIG.GEMINI_MODELS);
+    expect(defaults).not.toHaveProperty('GEMINI_THINKING_ENABLED');
+    expect(defaults.OPENAI_API_MODEL).toBe(CONFIG.OPENAI_API_MODEL);
+    expect(defaults.OPENAI_MODELS).toEqual(CONFIG.OPENAI_MODELS);
+    expect(defaults.DEEPSEEK_API_MODEL).toBe(CONFIG.DEEPSEEK_API_MODEL);
+    expect(defaults.DEEPSEEK_MODELS).toEqual(CONFIG.DEEPSEEK_MODELS);
+    expect(defaults.OPENROUTER_API_MODEL).toBe(CONFIG.OPENROUTER_API_MODEL);
+    expect(defaults.OPENROUTER_MODELS).toEqual(CONFIG.OPENROUTER_MODELS);
+    expect(defaults).not.toHaveProperty('OPENROUTER_API_URL');
+    expect(defaults.WEBAI_API_MODEL).toBe(CONFIG.WEBAI_API_MODEL);
+    expect(defaults.WEBAI_MODELS).toEqual(CONFIG.WEBAI_MODELS);
+    expect(defaults.GEMINI_THINKING_MODE).toBe('default');
+    expect(defaults).not.toHaveProperty('OPENAI_API_URL');
     expect(defaults.TEXT_FIELD_SHORTCUT).toBe(CONFIG.TEXT_FIELD_SHORTCUT);
     expect(defaults.translationHistory).toBeUndefined();
     expect(defaults.PROMPT_TEMPLATE).toBe(CONFIG.PROMPT_TEMPLATE);

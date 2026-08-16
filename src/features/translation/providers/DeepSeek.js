@@ -1,6 +1,7 @@
 // src/core/providers/DeepSeekProvider.js
 import { BaseAIProvider } from "@/features/translation/providers/BaseAIProvider.js";
 import {
+  CONFIG,
   getDeepSeekApiKeysAsync,
   getDeepSeekApiUrlAsync,
   getDeepSeekApiModelAsync,
@@ -78,7 +79,7 @@ export class DeepSeekProvider extends BaseAIProvider {
     const turnNumber = conversationParticipates
       ? await AIConversationHelper.claimNextTurn(sessionId, this.providerName, { callPurpose, translateMode: mode, conversationParticipates })
       : 1;
-    const activeModel = model || "deepseek-chat";
+    const activeModel = model || CONFIG.DEEPSEEK_API_MODEL;
     logger.info(`[DeepSeek] Model: ${activeModel}${sessionId ? ` (Session: ${sessionId.substring(0, 15)}..., Turn: ${turnNumber})` : ''}`);
 
     const { messages } = await AIConversationHelper.getConversationMessages(sessionId, this.providerName, userText, systemPrompt, mode, { callPurpose, conversationParticipates });
@@ -94,6 +95,9 @@ export class DeepSeekProvider extends BaseAIProvider {
         messages: messages,
         temperature: 0.1,
         max_tokens: 4096,
+        thinking: {
+          type: 'disabled'
+        },
         // DeepSeek supports JSON Mode for structured data
         ...((expectedFormat === ResponseFormat.JSON_OBJECT || expectedFormat === ResponseFormat.JSON_ARRAY) && { 
           response_format: { type: "json_object" } 

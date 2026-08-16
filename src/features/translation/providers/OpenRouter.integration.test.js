@@ -11,9 +11,10 @@ vi.mock('webextension-polyfill', () => ({
   }
 }));
 
-vi.mock('@/shared/config/config.js', () => ({
+vi.mock('@/shared/config/config.js', async (importOriginal) => ({
+  ...(await importOriginal()),
   getOpenRouterApiKeysAsync: vi.fn().mockResolvedValue(['key-1', 'key-2']),
-  getOpenRouterApiModelAsync: vi.fn().mockResolvedValue('openai/gpt-3.5-turbo'),
+  getOpenRouterApiModelAsync: vi.fn().mockResolvedValue('openai/gpt-4o-mini'),
   getSettingsAsync: vi.fn().mockResolvedValue({}),
   getProviderOptimizationLevelAsync: vi.fn(() => Promise.resolve('balanced')),
 }));

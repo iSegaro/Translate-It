@@ -25,6 +25,30 @@ import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.CONFIG, 'SettingsMigrations');
 
+const MODEL_VALUE_MIGRATIONS = {
+  OPENAI_MODELS: {
+    o1: 'gpt-5.6-terra',
+    'o1-mini': 'gpt-5.6-luna',
+    'o3-mini': 'gpt-5.6-luna',
+    'gpt-4.5-preview': 'gpt-5.6-terra',
+    'chatgpt-4o-latest': 'gpt-5.6-terra',
+    'gpt-4o': 'gpt-5.6-terra'
+  },
+  DEEPSEEK_MODELS: {
+    'deepseek-chat': 'deepseek-v4-flash',
+    'deepseek-reasoner': 'deepseek-v4-pro'
+  },
+  GEMINI_MODELS: {
+    'gemini-3.1-flash-lite-preview': 'gemini-3.5-flash-lite',
+    'gemini-3.1-pro-preview': 'gemini-3.6-flash',
+    'gemini-3-pro-preview': 'gemini-3.5-flash',
+    'gemini-3-flash-preview': 'gemini-3.5-flash',
+    'gemini-2.5-pro': 'gemini-3.6-flash',
+    'gemini-2.5-flash': 'gemini-3.5-flash',
+    'gemini-2.5-flash-lite': 'gemini-3.5-flash-lite'
+  }
+};
+
 /**
  * Determine whether a value is a plain object.
  *
@@ -250,6 +274,16 @@ function runMainMigration(currentSettings) {
     }
   });
 
+  // Migrate and remove the legacy Gemini thinking toggle.
+  const thinkingMode = currentSettings.GEMINI_THINKING_MODE;
+  if (thinkingMode !== 'default' && thinkingMode !== 'minimal') {
+    const migratedThinkingMode = Object.prototype.hasOwnProperty.call(currentSettings, 'GEMINI_THINKING_MODE')
+      ? 'default'
+      : currentSettings.GEMINI_THINKING_ENABLED === true ? 'minimal' : 'default';
+    updates.GEMINI_THINKING_MODE = migratedThinkingMode;
+    migrationLog.push(`Migrated GEMINI_THINKING_MODE to ${migratedThinkingMode}`);
+  }
+
   // A2. Legacy storage cleanup: non-editable prompt wrappers were persisted by
   // older versions. Remove leftover copies so storage no longer carries them.
   const removals = currentSettings
@@ -260,24 +294,42 @@ function runMainMigration(currentSettings) {
       migrationLog.push(`Removing obsolete stored prompt wrapper: ${key}`);
     });
   }
+  if (Object.prototype.hasOwnProperty.call(currentSettings, 'GEMINI_THINKING_ENABLED')) {
+    removals.push('GEMINI_THINKING_ENABLED');
+    migrationLog.push('Removing obsolete stored setting: GEMINI_THINKING_ENABLED');
+  }
 
   // B. Handle model lists - Dynamic update & reset if model removed
   Object.entries(MODEL_MAPPING).forEach(([modelListKey, currentModelKey]) => {
     if (!(modelListKey in currentSettings)) return;
 
-    if (JSON.stringify(currentSettings[modelListKey]) !== JSON.stringify(CONFIG[modelListKey])) {
-      const currentUserModel = currentSettings[currentModelKey];
-      const newModels = CONFIG[modelListKey];
-      const modelStillExists = newModels.some(model => model.value === currentUserModel);
+    const currentUserModel = currentSettings[currentModelKey];
+    const newModels = CONFIG[modelListKey];
+    const modelIsActive = newModels.some(model => model.value === currentUserModel);
+    const explicitReplacement = modelIsActive
+      ? undefined
+      : MODEL_VALUE_MIGRATIONS[modelListKey]?.[currentUserModel];
+    const modelListChanged = JSON.stringify(currentSettings[modelListKey]) !== JSON.stringify(newModels);
 
-      updates[modelListKey] = CONFIG[modelListKey];
+    if (explicitReplacement) {
+      updates[currentModelKey] = explicitReplacement;
+      migrationLog.push(`Migrated ${currentModelKey} from ${currentUserModel} to ${explicitReplacement}`);
+    }
+
+    if (modelListChanged) {
+      updates[modelListKey] = newModels;
       migrationLog.push(`Updated ${modelListKey} list`);
+    }
 
-      // Reset selection if user's current model no longer exists in the new list
-      if (!modelStillExists && currentUserModel !== CONFIG[currentModelKey]) {
-        updates[currentModelKey] = CONFIG[currentModelKey];
-        migrationLog.push(`Reset ${currentModelKey} (previous model no longer available)`);
-      }
+    const modelToValidate = explicitReplacement || currentUserModel;
+    const modelStillExists = newModels.some(model => model.value === modelToValidate);
+    const supportsCustomModels = newModels.some(model => model.value === 'custom');
+
+    // Preserve arbitrary model IDs only for providers that expose custom models.
+    const hasUsableModelValue = typeof currentUserModel === 'string' && currentUserModel.trim().length > 0;
+    if (!explicitReplacement && (!hasUsableModelValue || (!modelStillExists && !supportsCustomModels))) {
+      updates[currentModelKey] = CONFIG[currentModelKey];
+      migrationLog.push(`Reset ${currentModelKey} (previous model no longer available)`);
     }
   });
 

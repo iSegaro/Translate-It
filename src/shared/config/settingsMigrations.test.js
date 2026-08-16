@@ -90,18 +90,259 @@ describe('Settings Migrations', () => {
     expect(updates.MODE_PROVIDERS['select_element']).toBeUndefined();
   });
 
-  it('should update model lists and reset selection if current model is gone', async () => {
+  it.each([
+    ['gemini-3.1-flash-lite-preview', 'gemini-3.5-flash-lite'],
+    ['gemini-3-pro-preview', 'gemini-3.5-flash'],
+    ['gemini-2.5-pro', 'gemini-3.6-flash'],
+    ['gemini-2.5-flash', 'gemini-3.5-flash'],
+    ['gemini-2.5-flash-lite', 'gemini-3.5-flash-lite']
+  ])('should migrate obsolete Gemini model %s to %s', async (oldModel, newModel) => {
+    const { updates, logs } = await runSettingsMigrations({
+      GEMINI_MODELS: [{ value: oldModel, label: 'Legacy' }],
+      GEMINI_MODEL: oldModel
+    });
+
+    expect(updates.GEMINI_MODEL).toBe(newModel);
+    expect(CONFIG.GEMINI_MODELS.some(model => model.value === newModel)).toBe(true);
+    expect(logs).toContain(`Migrated GEMINI_MODEL from ${oldModel} to ${newModel}`);
+  });
+
+  it.each([
+    ['gemini-3.1-pro-preview', 'gemini-3.6-flash'],
+    ['gemini-3-flash-preview', 'gemini-3.5-flash']
+  ])('migrates inactive preview model %s to %s', async (oldModel, newModel) => {
+    const activeModels = CONFIG.GEMINI_MODELS;
+    CONFIG.GEMINI_MODELS = activeModels.filter(model => model.value !== oldModel);
+
+    try {
+      const { updates } = await runSettingsMigrations({
+        GEMINI_MODELS: [{ value: oldModel, label: 'Legacy' }],
+        GEMINI_MODEL: oldModel
+      });
+
+      expect(updates.GEMINI_MODEL).toBe(newModel);
+    } finally {
+      CONFIG.GEMINI_MODELS = activeModels;
+    }
+  });
+
+  it.each(['gemini-3.1-pro-preview', 'gemini-3-flash-preview'])(
+    'preserves active preview model %s',
+    async (model) => {
+      const { updates } = await runSettingsMigrations({
+        GEMINI_MODELS: [{ value: 'legacy-model', label: 'Legacy' }],
+        GEMINI_MODEL: model
+      });
+
+      expect(updates.GEMINI_MODEL).toBeUndefined();
+    }
+  );
+
+  it('keeps stable Gemini 3.1 Flash-Lite distinct from preview migration ID', async () => {
+    const stableResult = await runSettingsMigrations({
+      GEMINI_MODELS: [{ value: 'legacy-model', label: 'Legacy' }],
+      GEMINI_MODEL: 'gemini-3.1-flash-lite'
+    });
+    const previewResult = await runSettingsMigrations({
+      GEMINI_MODELS: [{ value: 'legacy-model', label: 'Legacy' }],
+      GEMINI_MODEL: 'gemini-3.1-flash-lite-preview'
+    });
+
+    expect(stableResult.updates.GEMINI_MODEL).toBeUndefined();
+    expect(previewResult.updates.GEMINI_MODEL).toBe('gemini-3.5-flash-lite');
+  });
+
+  it.each([
+    ['o1', 'gpt-5.6-terra'],
+    ['o1-mini', 'gpt-5.6-luna'],
+    ['o3-mini', 'gpt-5.6-luna'],
+    ['gpt-4.5-preview', 'gpt-5.6-terra'],
+    ['chatgpt-4o-latest', 'gpt-5.6-terra'],
+    ['gpt-4o', 'gpt-5.6-terra']
+  ])('migrates inactive OpenAI model %s to %s', async (oldModel, newModel) => {
+    const { updates, logs } = await runSettingsMigrations({
+      OPENAI_MODELS: [{ value: oldModel, label: 'Legacy' }],
+      OPENAI_API_MODEL: oldModel
+    });
+
+    expect(updates.OPENAI_API_MODEL).toBe(newModel);
+    expect(logs).toContain(`Migrated OPENAI_API_MODEL from ${oldModel} to ${newModel}`);
+  });
+
+  it('preserves current OpenAI static and arbitrary custom models', async () => {
+    const currentStatic = await runSettingsMigrations({
+      OPENAI_MODELS: [{ value: 'legacy-model', label: 'Legacy' }],
+      OPENAI_API_MODEL: 'gpt-4o-mini'
+    });
+    const custom = await runSettingsMigrations({
+      OPENAI_MODELS: [{ value: 'legacy-model', label: 'Legacy' }],
+      OPENAI_API_MODEL: 'provider/custom-model'
+    });
+
+    expect(currentStatic.updates.OPENAI_API_MODEL).toBeUndefined();
+    expect(custom.updates.OPENAI_API_MODEL).toBeUndefined();
+  });
+
+  it('falls back to the new OpenAI default for an empty selection', async () => {
+    const { updates, logs } = await runSettingsMigrations({
+      OPENAI_MODELS: CONFIG.OPENAI_MODELS,
+      OPENAI_API_MODEL: ''
+    });
+
+    expect(updates.OPENAI_API_MODEL).toBe(CONFIG.OPENAI_API_MODEL);
+    expect(logs.some(log => log.includes('Reset OPENAI_API_MODEL'))).toBe(true);
+  });
+
+  it.each([
+    ['deepseek-chat', 'deepseek-v4-flash'],
+    ['deepseek-reasoner', 'deepseek-v4-pro']
+  ])('migrates inactive DeepSeek model %s to %s', async (oldModel, newModel) => {
+    const { updates, logs } = await runSettingsMigrations({
+      DEEPSEEK_MODELS: [{ value: oldModel, label: 'Legacy' }],
+      DEEPSEEK_API_MODEL: oldModel
+    });
+
+    expect(updates.DEEPSEEK_API_MODEL).toBe(newModel);
+    expect(logs).toContain(`Migrated DEEPSEEK_API_MODEL from ${oldModel} to ${newModel}`);
+  });
+
+  it('preserves current DeepSeek models and arbitrary custom IDs', async () => {
+    const currentFlash = await runSettingsMigrations({
+      DEEPSEEK_MODELS: [{ value: 'legacy-model', label: 'Legacy' }],
+      DEEPSEEK_API_MODEL: 'deepseek-v4-flash'
+    });
+    const currentPro = await runSettingsMigrations({
+      DEEPSEEK_MODELS: [{ value: 'legacy-model', label: 'Legacy' }],
+      DEEPSEEK_API_MODEL: 'deepseek-v4-pro'
+    });
+    const custom = await runSettingsMigrations({
+      DEEPSEEK_MODELS: [{ value: 'legacy-model', label: 'Legacy' }],
+      DEEPSEEK_API_MODEL: 'provider/custom-model'
+    });
+
+    expect(currentFlash.updates.DEEPSEEK_API_MODEL).toBeUndefined();
+    expect(currentPro.updates.DEEPSEEK_API_MODEL).toBeUndefined();
+    expect(custom.updates.DEEPSEEK_API_MODEL).toBeUndefined();
+  });
+
+  it('falls back to the DeepSeek V4 Flash default for an empty selection', async () => {
+    const { updates, logs } = await runSettingsMigrations({
+      DEEPSEEK_MODELS: CONFIG.DEEPSEEK_MODELS,
+      DEEPSEEK_API_MODEL: ''
+    });
+
+    expect(updates.DEEPSEEK_API_MODEL).toBe(CONFIG.DEEPSEEK_API_MODEL);
+    expect(logs.some(log => log.includes('Reset DEEPSEEK_API_MODEL'))).toBe(true);
+  });
+
+  it.each(CONFIG.OPENROUTER_MODELS
+    .filter(model => model.value !== 'custom')
+    .map(model => model.value))('preserves curated OpenRouter model ID %s during list synchronization', async (model) => {
+    const current = await runSettingsMigrations({
+      OPENROUTER_MODELS: [{ value: 'legacy-model', label: 'Legacy' }],
+      OPENROUTER_API_MODEL: model
+    });
+
+    expect(current.updates.OPENROUTER_MODELS).toEqual(CONFIG.OPENROUTER_MODELS);
+    expect(current.updates.OPENROUTER_API_MODEL).toBeUndefined();
+  });
+
+  it('preserves removed and arbitrary OpenRouter model IDs during list synchronization', async () => {
+    const removed = await runSettingsMigrations({
+      OPENROUTER_MODELS: [{ value: 'legacy-model', label: 'Legacy' }],
+      OPENROUTER_API_MODEL: 'openai/gpt-4o'
+    });
+    const custom = await runSettingsMigrations({
+      OPENROUTER_MODELS: [{ value: 'legacy-model', label: 'Legacy' }],
+      OPENROUTER_API_MODEL: 'provider/custom-model'
+    });
+
+    expect(removed.updates.OPENROUTER_MODELS).toEqual(CONFIG.OPENROUTER_MODELS);
+    expect(removed.updates.OPENROUTER_API_MODEL).toBeUndefined();
+    expect(custom.updates.OPENROUTER_MODELS).toEqual(CONFIG.OPENROUTER_MODELS);
+    expect(custom.updates.OPENROUTER_API_MODEL).toBeUndefined();
+  });
+
+  it('falls back to the OpenRouter curated default for an empty selection', async () => {
+    const { updates, logs } = await runSettingsMigrations({
+      OPENROUTER_MODELS: CONFIG.OPENROUTER_MODELS,
+      OPENROUTER_API_MODEL: ''
+    });
+
+    expect(updates.OPENROUTER_API_MODEL).toBe(CONFIG.OPENROUTER_API_MODEL);
+    expect(logs.some(log => log.includes('Reset OPENROUTER_API_MODEL'))).toBe(true);
+  });
+
+  it.each(['gemini-3-flash', 'gemini-3-pro', 'provider/custom-model'])(
+    'preserves WebAI model %s during model-list synchronization',
+    async (model) => {
+      const { updates } = await runSettingsMigrations({
+        WEBAI_MODELS: [{ value: 'legacy-model', label: 'Legacy' }],
+        WEBAI_API_MODEL: model
+      });
+
+      expect(updates.WEBAI_MODELS).toEqual(CONFIG.WEBAI_MODELS);
+      expect(updates.WEBAI_API_MODEL).toBeUndefined();
+    }
+  );
+
+  it('resets an empty WebAI model to the configured default', async () => {
+    const { updates, logs } = await runSettingsMigrations({
+      WEBAI_MODELS: CONFIG.WEBAI_MODELS,
+      WEBAI_API_MODEL: ''
+    });
+
+    expect(updates.WEBAI_API_MODEL).toBe('gemini-3-flash');
+    expect(logs.some(log => log.includes('Reset WEBAI_API_MODEL'))).toBe(true);
+  });
+
+  it('should preserve arbitrary custom model IDs when a model list changes', async () => {
     const currentSettings = {
       GEMINI_MODELS: [{ value: 'old-model', label: 'Old' }],
-      GEMINI_MODEL: 'old-model'
+      GEMINI_MODEL: 'provider/custom-model'
     };
-    
-    // CONFIG has different models
+
     const { updates, logs } = await runSettingsMigrations(currentSettings);
     
     expect(updates.GEMINI_MODELS).toEqual(CONFIG.GEMINI_MODELS);
-    expect(updates.GEMINI_MODEL).toBe(CONFIG.GEMINI_MODEL); // Reset to default
+    expect(updates.GEMINI_MODEL).toBeUndefined();
+    expect(logs.some(l => l.includes('Reset GEMINI_MODEL'))).toBe(false);
+  });
+
+  it('should preserve current static model values during model-list synchronization', async () => {
+    const { updates } = await runSettingsMigrations({
+      GEMINI_MODELS: [{ value: 'old-model', label: 'Old' }],
+      GEMINI_MODEL: 'custom'
+    });
+
+    expect(updates.GEMINI_MODEL).toBeUndefined();
+  });
+
+  it('should fall back when a custom-capable provider has no usable selected model', async () => {
+    const { updates, logs } = await runSettingsMigrations({
+      GEMINI_MODELS: CONFIG.GEMINI_MODELS,
+      GEMINI_MODEL: ''
+    });
+
+    expect(updates.GEMINI_MODEL).toBe(CONFIG.GEMINI_MODEL);
     expect(logs.some(l => l.includes('Reset GEMINI_MODEL'))).toBe(true);
+  });
+
+  it('should retain reset behavior for a provider without custom support', async () => {
+    const originalModels = CONFIG.GEMINI_MODELS;
+    CONFIG.GEMINI_MODELS = originalModels.filter(model => model.value !== 'custom');
+
+    try {
+      const { updates, logs } = await runSettingsMigrations({
+        GEMINI_MODELS: [{ value: 'old-model', label: 'Old' }],
+        GEMINI_MODEL: 'provider/custom-model'
+      });
+
+      expect(updates.GEMINI_MODEL).toBe(CONFIG.GEMINI_MODEL);
+      expect(logs.some(l => l.includes('Reset GEMINI_MODEL'))).toBe(true);
+    } finally {
+      CONFIG.GEMINI_MODELS = originalModels;
+    }
   });
 
   it('should migrate API_KEY to GEMINI_API_KEY', async () => {
@@ -114,6 +355,48 @@ describe('Settings Migrations', () => {
     expect(updates.GEMINI_API_KEY).toBe('my-old-key');
     expect(updates.API_KEY).toBe('');
     expect(logs).toContain('Migrated API_KEY to GEMINI_API_KEY (multi-key support)');
+  });
+
+  it.each([
+    [{ GEMINI_THINKING_ENABLED: false }, 'default'],
+    [{ GEMINI_THINKING_ENABLED: true }, 'minimal'],
+    [{ GEMINI_THINKING_ENABLED: true, GEMINI_THINKING_MODE: 'invalid' }, 'default'],
+    [{}, 'default'],
+  ])('migrates Gemini thinking setting %o to %s', async (currentSettings, expectedMode) => {
+    const { updates } = await runSettingsMigrations(currentSettings);
+
+    expect(updates.GEMINI_THINKING_MODE).toBe(expectedMode);
+  });
+
+  it.each([
+    [{ GEMINI_THINKING_ENABLED: true, GEMINI_THINKING_MODE: 'default' }, 'default'],
+    [{ GEMINI_THINKING_ENABLED: false, GEMINI_THINKING_MODE: 'minimal' }, 'minimal']
+  ])('preserves valid Gemini thinking mode %o over legacy state', async (currentSettings, expectedMode) => {
+    const { updates, removals } = await runSettingsMigrations(currentSettings);
+
+    expect(updates.GEMINI_THINKING_MODE).toBeUndefined();
+    expect(currentSettings.GEMINI_THINKING_MODE).toBe(expectedMode);
+    expect(removals).toContain('GEMINI_THINKING_ENABLED');
+  });
+
+  it.each([
+    [true, 'minimal'],
+    [false, 'default']
+  ])('removes legacy Gemini thinking state during migration (%s)', async (legacyValue, expectedMode) => {
+    const { updates, removals } = await runSettingsMigrations({ GEMINI_THINKING_ENABLED: legacyValue });
+
+    expect(updates.GEMINI_THINKING_MODE).toBe(expectedMode);
+    expect(removals).toContain('GEMINI_THINKING_ENABLED');
+  });
+
+  it('keeps invalid Gemini mode behavior and removes legacy state', async () => {
+    const { updates, removals } = await runSettingsMigrations({
+      GEMINI_THINKING_MODE: 'invalid',
+      GEMINI_THINKING_ENABLED: true
+    });
+
+    expect(updates.GEMINI_THINKING_MODE).toBe('default');
+    expect(removals).toContain('GEMINI_THINKING_ENABLED');
   });
 
   it('should preserve user sensitive data like translationHistory', async () => {

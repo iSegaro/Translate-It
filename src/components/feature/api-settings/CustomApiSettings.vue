@@ -27,6 +27,7 @@
       provider-name="Custom"
       :testing="testingKeys"
       :test-result="testResult"
+      :allow-empty-test="true"
       @test="testKeys"
     />
     <div class="setting-group vertical">

@@ -7,6 +7,7 @@ import { TranslationCallPurpose } from './ProviderConstants.js';
 import { AIConversationHelper } from './utils/AIConversationHelper.js';
 import { CompletionTermination } from '@/features/translation/ir/CompletionContract.js';
 import { createTranslationOperation } from '@/features/translation/ir/TranslationOperation.js';
+import { ResponseFormat } from '@/shared/config/translationConstants.js';
 
 // Mock Dependencies
 vi.mock('@/shared/proxy/ProxyManager.js', () => ({
@@ -202,6 +203,22 @@ describe('CustomProvider Error Handling', () => {
 
     expect(result).toBe('Anonymous Custom AI Result');
     expect(fetchOptions.headers.Authorization).toBeUndefined();
+  });
+
+  it('preserves the Custom translation request contract for anonymous calls', async () => {
+    vi.mocked(getCustomApiKeysAsync).mockResolvedValueOnce([]);
+    const executeRequest = vi.spyOn(provider, '_executeRequest').mockResolvedValue('translated');
+
+    await provider._callAI('system', 'source', { expectedFormat: ResponseFormat.JSON_OBJECT });
+
+    const request = executeRequest.mock.calls[0][0];
+    expect(request.fetchOptions.headers.Authorization).toBeUndefined();
+    expect(JSON.parse(request.fetchOptions.body)).toMatchObject({
+      model: 'custom-model',
+      messages: expect.any(Array),
+      max_tokens: 4096,
+      response_format: { type: 'json_object' }
+    });
   });
 
   it('should detect API_ERROR wrapped in 200 OK response', async () => {

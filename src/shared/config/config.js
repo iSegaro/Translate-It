@@ -111,24 +111,63 @@ export const CONFIG = {
 
   API_KEY: "", // Gemini specific (deprecated, use GEMINI_API_KEY)
   GEMINI_API_KEY: "", // Gemini API keys (newline-separated)
-  GEMINI_API_URL: "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent", // Default Gemini API URL
-  GEMINI_MODEL: "gemini-2.5-flash", // Selected Gemini model
-  GEMINI_THINKING_ENABLED: false, // Enable/disable thinking for supported models
+  GEMINI_API_URL: "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent", // Default Gemini API URL
+  GEMINI_MODEL: "gemini-3.5-flash", // Selected Gemini model
+  GEMINI_THINKING_MODE: "default", // Provider default or deferred minimal thinking mode
   GEMINI_MODELS: [
-    // Gemini 3.1 Series (NEW - Latest & Most Advanced)
-    { value: "gemini-3.1-pro-preview", name: "Gemini 3.1 Pro Preview", url: "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-pro-preview:generateContent", thinking: { supported: true, controllable: false, defaultEnabled: false } },
-    { value: "gemini-3.1-flash-lite-preview", name: "Gemini 3.1 Flash-Lite Preview", url: "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite-preview:generateContent", thinking: { supported: true, controllable: true, defaultEnabled: false } },
-
-    // Gemini 3.0 Series (Advanced)
-    { value: "gemini-3-pro-preview", name: "Gemini 3 Pro Preview", url: "https://generativelanguage.googleapis.com/v1beta/models/gemini-3-pro-preview:generateContent", thinking: { supported: true, controllable: false, defaultEnabled: false } },
-    { value: "gemini-3-flash-preview", name: "Gemini 3 Flash Preview", url: "https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent", thinking: { supported: true, controllable: true, defaultEnabled: false } },
-
-    // Gemini 2.5 Series (Stable)
-    { value: "gemini-2.5-pro", name: "Gemini 2.5 Pro", url: "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-pro:generateContent", thinking: { supported: true, controllable: false, defaultEnabled: false } },
-    { value: "gemini-2.5-flash", name: "Gemini 2.5 Flash", url: "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent", thinking: { supported: true, controllable: true, defaultEnabled: false } },
-    { value: "gemini-2.5-flash-lite", name: "Gemini 2.5 Flash-Lite", url: "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent", thinking: { supported: true, controllable: true, defaultEnabled: false } },
-
-    { value: "custom", name: "Custom Model", custom: true, thinking: { supported: true, controllable: true, defaultEnabled: false } }
+    {
+      value: "gemini-3.7-flash",
+      name: "Gemini 3.7 Flash",
+      url: "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.7-flash:generateContent",
+      thinking: { minimal: null }
+    },
+    {
+      value: "gemini-3.6-flash",
+      name: "Gemini 3.6 Flash",
+      url: "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent",
+      thinking: {
+        minimal: { type: "level", value: "minimal" }
+      }
+    },
+    {
+      value: "gemini-3.5-flash",
+      name: "Gemini 3.5 Flash",
+      url: "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent",
+      thinking: {
+        minimal: { type: "level", value: "minimal" }
+      }
+    },
+    {
+      value: "gemini-3.5-flash-lite",
+      name: "Gemini 3.5 Flash-Lite",
+      url: "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite:generateContent",
+      thinking: { minimal: null }
+    },
+    {
+      value: "gemini-3.1-flash-lite",
+      name: "Gemini 3.1 Flash-Lite",
+      url: "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite:generateContent",
+      thinking: {
+        minimal: { type: "level", value: "minimal" }
+      }
+    },
+    {
+      value: "gemini-3.1-pro-preview",
+      name: "Gemini 3.1 Pro Preview",
+      url: "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-pro-preview:generateContent",
+      thinking: {
+        minimal: { type: "level", value: "minimal" }
+      }
+    },
+    {
+      value: "gemini-3-flash-preview",
+      name: "Gemini 3 Flash Preview",
+      url: "https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent",
+      thinking: {
+        minimal: { type: "level", value: "minimal" }
+      }
+    },
+    { value: "custom", name: "Custom Model", custom: true }
   ],
   GOOGLE_TRANSLATE_URL: "https://translate.googleapis.com/translate_a/single",
   GOOGLE_TRANSLATE_V2_URL: "https://translate.google.com/translate_a/single",
@@ -140,72 +179,46 @@ export const CONFIG = {
   MICROSOFT_EDGE_TRANSLATE_URL: "https://api-edge.cognitive.microsofttranslator.com/translate",
   LINGVA_API_URL: "",
   WEBAI_API_URL: "",
-  WEBAI_API_MODEL: "",
+  WEBAI_API_MODEL: "gemini-3-flash",
+  WEBAI_MODELS: [
+    { value: "gemini-3-flash", name: "Gemini 3 Flash" },
+    { value: "gemini-3-pro", name: "Gemini 3 Pro" },
+    { value: "custom", name: "Custom Model", custom: true }
+  ],
   OPENAI_API_KEY: "",
   OPENAI_API_URL: "https://api.openai.com/v1/chat/completions",
-  OPENAI_API_MODEL: "gpt-4o-mini",
+  OPENAI_API_MODEL: "gpt-5.6-luna",
   OPENAI_MODELS: [
-    // --- OpenAI Reasoning Models (برای حل مسائل پیچیده، ریاضیات و کدنویسی) ---
-    { value: "o1", name: "o1" },
-    { value: "o1-mini", name: "o1-mini" },
-    { value: "o3-mini", name: "o3-mini" },
-
-    // --- OpenAI Omni Series (مدل‌های سریع، ارزان و چندمنظوره) ---
-    { value: "gpt-4.5-preview", name: "GPT-4.5 Preview" },
-    { value: "gpt-4o", name: "GPT-4o" },
-    { value: "chatgpt-4o-latest", name: "ChatGPT-4o Latest" },
+    { value: "gpt-5.6-terra", name: "GPT-5.6 Terra" },
+    { value: "gpt-5.6-luna", name: "GPT-5.6 Luna" },
+    { value: "gpt-5.6-sol", name: "GPT-5.6 Sol" },
     { value: "gpt-4o-mini", name: "GPT-4o Mini" },
     { value: "custom", name: "Custom Model" }
   ],
   OPENROUTER_API_KEY: "",
   OPENROUTER_API_URL: "https://openrouter.ai/api/v1/chat/completions",
-  OPENROUTER_API_MODEL: "openai/gpt-4o",
-    OPENROUTER_MODELS: [
-    // --- OpenAI ---
-    { value: "openai/o1", name: "OpenAI o1 (Reasoning)" },
-    { value: "openai/o3-mini", name: "OpenAI o3-mini (Reasoning)" },
-    { value: "openai/gpt-4.5-preview", name: "OpenAI GPT-4.5 Preview" },
-    { value: "openai/gpt-4o", name: "OpenAI GPT-4o" },
+  OPENROUTER_API_MODEL: "openai/gpt-4o-mini",
+  OPENROUTER_MODELS: [
     { value: "openai/gpt-4o-mini", name: "OpenAI GPT-4o Mini" },
-
-    // --- Anthropic ---
-    { value: "anthropic/claude-3.7-sonnet", name: "Claude 3.7 Sonnet" },
-    { value: "anthropic/claude-3.5-haiku", name: "Claude 3.5 Haiku" },
-
-    // --- DeepSeek ---
-    { value: "deepseek/deepseek-r1", name: "DeepSeek R1 (Reasoning)" },
-    { value: "deepseek/deepseek-chat", name: "DeepSeek V3 (Chat)" },
-
-    // --- Google ---
-    { value: "google/gemini-3.1-pro-preview", name: "Google Gemini 3.1 Pro" },
-    { value: "google/gemini-3.1-flash-lite-preview", name: "Google Gemini 3.1 Flash-Lite" },
-    { value: "google/gemini-2.5-pro", name: "Google Gemini 2.5 Pro" },
+    { value: "google/gemini-2.5-flash-lite", name: "Google Gemini 2.5 Flash-Lite" },
+    { value: "mistralai/mistral-small-3.2-24b-instruct", name: "Mistral Small 3.2" },
     { value: "google/gemini-2.5-flash", name: "Google Gemini 2.5 Flash" },
-
-    // --- Meta & Mistral ---
+    { value: "anthropic/claude-haiku-4.5", name: "Anthropic Claude Haiku 4.5" },
+    { value: "openai/gpt-4.1-mini", name: "OpenAI GPT-4.1 Mini" },
+    { value: "deepseek/deepseek-chat", name: "DeepSeek Chat" },
+    { value: "qwen/qwen3.5-flash-02-23", name: "Qwen 3.5 Flash" },
     { value: "meta-llama/llama-3.3-70b-instruct", name: "Meta Llama 3.3 70B" },
-    { value: "mistralai/mistral-large", name: "Mistral Large" },
-
-    // --- Free Models (Zero Cost / Rate Limited) ---
-    { value: "openrouter/free", name: "OpenRouter Auto-Free" }, // انتخاب خودکار بهترین مدل رایگان
-    { value: "nvidia/nemotron-3-super-120b-a12b:free", name: "Nvidia Nemotron 120B (Free)" }, // قدرتمند و عمومی
-    { value: "openai/gpt-oss-120b:free", name: "OpenAI OSS 120B (Free)" }, // استدلال و توابع
-    { value: "mistralai/devstral-2-2512:free", name: "Mistral Devstral (Free Coding)" }, // تخصصی کدنویسی
-    { value: "xiaomi/mimo-v2-flash:free", name: "Xiaomi Mimo V2 (Free Coding)" }, // تخصصی کدنویسی و سریع
-    { value: "meta-llama/llama-3.3-70b-instruct:free", name: "Llama 3.3 70B (Free)" }, // عمومی و محبوب
-    { value: "liquidai/lfm-2.5-1.2b-thinking:free", name: "Liquid LFM 2.5 Thinking (Free)" }, // استدلالی و بسیار سریع
-
-    // --- Custom ---
+    { value: "anthropic/claude-sonnet-4.6", name: "Anthropic Claude Sonnet 4.6" },
+    { value: "google/gemma-4-26b-a4b-it:free", name: "Google Gemma 4 26B A4B (Free)" },
+    { value: "nvidia/nemotron-3-super-120b-a12b:free", name: "NVIDIA Nemotron 3 Super (Free)" },
     { value: "custom", name: "Custom Model" }
   ],
   DEEPSEEK_API_KEY: "",
   DEEPSEEK_API_URL: "https://api.deepseek.com/chat/completions",
-  DEEPSEEK_API_MODEL: "deepseek-chat",
+  DEEPSEEK_API_MODEL: "deepseek-v4-flash",
   DEEPSEEK_MODELS: [
-    // --- DeepSeek Official Models ---
-    { value: "deepseek-chat", name: "DeepSeek V3 (Chat & Code)" },
-    { value: "deepseek-reasoner", name: "DeepSeek R1 (Reasoner)" },
-
+    { value: "deepseek-v4-flash", name: "DeepSeek V4 Flash" },
+    { value: "deepseek-v4-pro", name: "DeepSeek V4 Pro" },
     { value: "custom", name: "Custom Model" }
   ],
   CUSTOM_API_URL: "",
@@ -801,8 +814,9 @@ export const getApiKeyAsync = async () => {
 export const getGeminiModelAsync = async () => {
   return getSettingValueAsync("GEMINI_MODEL", CONFIG.GEMINI_MODEL);
 };
-export const getGeminiThinkingEnabledAsync = async () => {
-  return getSettingValueAsync("GEMINI_THINKING_ENABLED", CONFIG.GEMINI_THINKING_ENABLED);
+
+export const getGeminiThinkingModeAsync = async () => {
+  return getSettingValueAsync("GEMINI_THINKING_MODE", CONFIG.GEMINI_THINKING_MODE);
 };
 
 export const getGeminiApiUrlAsync = async () => {
@@ -1096,12 +1110,6 @@ export const getDeeplBetaLanguagesEnabledAsync = async () => {
 // OpenAI Specific
 export const getOpenAIApiKeyAsync = async () => {
   return getSettingValueAsync("OPENAI_API_KEY", CONFIG.OPENAI_API_KEY);
-};
-
-export const getOpenAIApiUrlAsync = async () => {
-  // Note: OpenAI URL might not be configurable in your options page?
-  // If it is, use getSettingValueAsync like others. If not, just return CONFIG.
-  return CONFIG.OPENAI_API_URL; // Or getSettingValueAsync if user can change it
 };
 
 export const getOpenAIModelAsync = async () => {

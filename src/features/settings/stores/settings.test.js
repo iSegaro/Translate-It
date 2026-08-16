@@ -6,6 +6,7 @@ import { storageManager } from '@/shared/storage/core/StorageCore.js';
 import secureStorage from '@/shared/storage/core/SecureStorage.js';
 import { SelectionTranslationMode, CONFIG, TranslationMode } from '@/shared/config/config.js';
 import { getPersistedDefaultSettings } from '@/shared/config/settingsDefaults.js';
+import { runSettingsMigrations } from '@/shared/config/settingsMigrations.js';
 
 // Mock Dependencies
 vi.mock('@/shared/storage/core/StorageCore.js', () => ({
@@ -249,6 +250,63 @@ describe('Settings Store', () => {
       expect(store.settings.PROMPT_TEMPLATE).toBe('custom user template $_{TEXT}');
       expect(store.settings.THEME).toBe('dark');
     });  });
+
+  it('importSettings should ignore legacy OpenRouter endpoint settings', async () => {
+    secureStorage.processImportedSettings.mockResolvedValue({
+      THEME: 'dark',
+      OPENROUTER_API_URL: 'https://legacy.example.test/chat/completions'
+    });
+    const store = useSettingsStore();
+
+    await store.importSettings({ THEME: 'dark', _exported: true });
+
+    expect(store.settings).not.toHaveProperty('OPENROUTER_API_URL');
+  });
+
+  it('importSettings should ignore legacy OpenAI endpoint settings', async () => {
+    secureStorage.processImportedSettings.mockResolvedValue({
+      THEME: 'dark',
+      OPENAI_API_URL: 'https://legacy.example.test/v1/chat/completions'
+    });
+    const store = useSettingsStore();
+
+    await store.importSettings({ THEME: 'dark', _exported: true });
+
+    expect(store.settings).not.toHaveProperty('OPENAI_API_URL');
+  });
+
+  it.each([
+    [{ GEMINI_THINKING_ENABLED: true }, 'minimal'],
+    [{ GEMINI_THINKING_ENABLED: false }, 'default'],
+    [{ GEMINI_THINKING_MODE: 'default', GEMINI_THINKING_ENABLED: true }, 'default']
+  ])('importSettings normalizes legacy Gemini thinking state %o', async (imported, expectedMode) => {
+    secureStorage.processImportedSettings.mockResolvedValue({ THEME: 'dark', ...imported });
+    const store = useSettingsStore();
+
+    await store.importSettings({ THEME: 'dark', _exported: true });
+
+    expect(store.settings.GEMINI_THINKING_MODE).toBe(expectedMode);
+    expect(store.settings).not.toHaveProperty('GEMINI_THINKING_ENABLED');
+  });
+
+  it('importSettings keeps default for invalid Gemini mode despite legacy state', async () => {
+    secureStorage.processImportedSettings.mockResolvedValue({
+      THEME: 'dark',
+      GEMINI_THINKING_MODE: 'invalid',
+      GEMINI_THINKING_ENABLED: true
+    });
+    runSettingsMigrations.mockResolvedValue({
+      updates: { GEMINI_THINKING_MODE: 'default' },
+      removals: [],
+      logs: []
+    });
+    const store = useSettingsStore();
+
+    await store.importSettings({ THEME: 'dark', _exported: true });
+
+    expect(store.settings.GEMINI_THINKING_MODE).toBe('default');
+    expect(store.settings).not.toHaveProperty('GEMINI_THINKING_ENABLED');
+  });
 
   describe('Strict Validation', () => {
     it('validateSettings should reject prompt without placeholder', () => {

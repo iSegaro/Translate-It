@@ -70,11 +70,11 @@ const openrouterApiKey = computed({
 })
 
 // Track dropdown selection separately from stored value
-const selectedModelOption = ref('openai/gpt-4o')
+const selectedModelOption = ref(CONFIG.OPENROUTER_API_MODEL)
 
 // Initialize selectedModelOption based on current stored value
 const initializeModelSelection = () => {
-  const currentModel = settingsStore.settings?.OPENROUTER_API_MODEL || 'openai/gpt-4o';
+  const currentModel = settingsStore.settings?.OPENROUTER_API_MODEL || CONFIG.OPENROUTER_API_MODEL;
   const isPredefined = openrouterApiModelOptions.value.some(option => option.value === currentModel && option.value !== 'custom');
   selectedModelOption.value = isPredefined ? currentModel : 'custom';
 }
@@ -92,7 +92,7 @@ const openrouterApiModel = computed({
 
 const openrouterCustomModel = computed({
   get: () => {
-    const currentModel = settingsStore.settings?.OPENROUTER_API_MODEL || 'openai/gpt-4o';
+    const currentModel = settingsStore.settings?.OPENROUTER_API_MODEL || CONFIG.OPENROUTER_API_MODEL;
     const isPredefined = openrouterApiModelOptions?.value?.some(option => option.value === currentModel && option.value !== 'custom') || false;
     return isPredefined ? '' : currentModel;
   },
