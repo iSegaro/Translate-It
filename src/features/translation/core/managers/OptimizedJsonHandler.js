@@ -22,6 +22,7 @@ import { findProviderById } from '@/features/translation/providers/ProviderManif
 import { resolveOperationSourceLanguage } from '@/features/translation/core/OperationSourceLanguageResolver.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.TRANSLATION, 'OptimizedJsonHandler');
+const MAX_PARENT_RECOVERIES_PER_BATCH = 2;
 
 function getParentRecoveryCharacterLimit(primaryFragmentLimit) {
   // Halve marker density without producing tiny recovery calls; never exceed primary policy.
@@ -1056,48 +1057,53 @@ const parentError = createParentValidationError(parentIdStr, sourceText, transla
             ? translatedBatchResponse.translatedText
             : translatedBatchResponse;
 
-          const mappedResults = self._mapResults(batchPayload, translatedBatch, executionContext);
-           let completeResults;
-           try {
-             completeResults = collectCompleteFragments(mappedResults);
-           } catch (batchError) {
-             if (!batchError.parentRecovery) throw batchError;
-             const parentRecovery = batchError.parentRecovery;
-             let recoveredParent;
-             try {
-               recoveredParent = await recoverFailedV3Parent(batchError, batchExecutionContext, parallelExecution);
-             } catch (recoveryError) {
-               if ((recoveryError?.type || matchErrorToType(recoveryError)) === ErrorTypes.TRANSLATION_TIMEOUT) {
-                 didTimeout = true;
-                 timeoutError = recoveryError;
-               }
-               // Recovery failures must still publish the results collected before
-               // the offending parent. Re-anchor the snapshot captured at the throw
-               // site when the provider rewrote the error object.
-               if (!recoveryError.parentRecovery) recoveryError.parentRecovery = parentRecovery;
-               throw recoveryError;
-             }
-             const { completeResults: preservedResults, sameBatchIds, resumeIndex, parentId } = parentRecovery;
-             // The recovered parent replaces the failed original; clear its fragment
-             // state so any trailing fragments are not double-collected.
-             const failedParent = fragmentedUnits.get(parentId);
-             if (failedParent) {
-               failedParent.emitted = true;
-               failedParent.fragments.clear();
-             }
-             completeResults = [...(preservedResults || []), recoveredParent];
-             logicalIdOverrides.set(recoveredParent, `v3:${parentId}`);
-             if (resumeIndex !== undefined && sameBatchIds) {
-               sameBatchIds.add(`v3:${parentId}`);
-               // Resume collection after the recovered parent so valid same-batch
-               // suffixes (Case B) survive without a full re-run.
-               completeResults = collectCompleteFragments(mappedResults, {
-                 completeResults,
-                 sameBatchIds,
-                 startIndex: resumeIndex + 1,
-               });
-             }
-           }
+           const mappedResults = self._mapResults(batchPayload, translatedBatch, executionContext);
+            let completeResults;
+            let collectionState;
+            let parentRecoveryCount = 0;
+            while (true) {
+              try {
+                completeResults = collectCompleteFragments(mappedResults, collectionState);
+                break;
+              } catch (batchError) {
+                if (!batchError.parentRecovery || parentRecoveryCount >= MAX_PARENT_RECOVERIES_PER_BATCH) throw batchError;
+                parentRecoveryCount++;
+                const parentRecovery = batchError.parentRecovery;
+                let recoveredParent;
+                try {
+                  recoveredParent = await recoverFailedV3Parent(batchError, batchExecutionContext, parallelExecution);
+                } catch (recoveryError) {
+                  if ((recoveryError?.type || matchErrorToType(recoveryError)) === ErrorTypes.TRANSLATION_TIMEOUT) {
+                    didTimeout = true;
+                    timeoutError = recoveryError;
+                  }
+                  // Recovery failures must still publish the results collected before
+                  // the offending parent. Re-anchor the snapshot captured at the throw
+                  // site when the provider rewrote the error object.
+                  if (!recoveryError.parentRecovery) recoveryError.parentRecovery = parentRecovery;
+                  throw recoveryError;
+                }
+                const { completeResults: preservedResults, sameBatchIds, resumeIndex, parentId } = parentRecovery;
+                // The recovered parent replaces the failed original; clear its fragment
+                // state so any trailing fragments are not double-collected.
+                const failedParent = fragmentedUnits.get(parentId);
+                if (failedParent) {
+                  failedParent.emitted = true;
+                  failedParent.fragments.clear();
+                }
+                completeResults = [...(preservedResults || []), recoveredParent];
+                logicalIdOverrides.set(recoveredParent, `v3:${parentId}`);
+                if (resumeIndex === undefined || !sameBatchIds) break;
+                sameBatchIds.add(`v3:${parentId}`);
+                // Resume collection after the recovered parent so valid same-batch
+                // suffixes survive without a full re-run.
+                collectionState = {
+                  completeResults,
+                  sameBatchIds,
+                  startIndex: resumeIndex + 1,
+                };
+              }
+            }
           checkCancellation();
           await publishResults(completeResults, batchExecutionContext, i);
           
