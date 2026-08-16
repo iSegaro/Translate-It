@@ -9,10 +9,27 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 // provider.translate and ProviderCoordinator.execute are NOT mocked, so the
 // swap/detect guard under test runs through its real control flow.
 
+vi.mock('webextension-polyfill', () => ({
+  default: {
+    runtime: { getBrowserInfo: vi.fn(), getManifest: () => ({ version: '1.0.0' }) },
+    storage: { local: { get: vi.fn(), set: vi.fn() } },
+    tabs: { sendMessage: vi.fn() },
+  },
+}));
+
+vi.mock('@/shared/proxy/ProxyManager.js', () => ({
+  proxyManager: {
+    fetch: vi.fn(),
+    setConfig: vi.fn(),
+    testConnection: vi.fn(),
+  },
+}));
+
 vi.mock('@/shared/logging/logger.js', () => ({
   getScopedLogger: () => ({
     init: vi.fn(),
     debug: vi.fn(),
+    debugLazy: vi.fn(),
     info: vi.fn(),
     warn: vi.fn(),
     error: vi.fn(),
@@ -23,6 +40,9 @@ vi.mock('@/features/translation/core/TranslationStatsManager.js', () => ({
   statsManager: {
     getSessionSummary: vi.fn(() => ({ chars: 100, originalChars: 80 })),
     printSummary: vi.fn(),
+    recordRequest: vi.fn(() => ({ globalCallId: 1, sessionCallId: 1 })),
+    recordSuccess: vi.fn(),
+    recordError: vi.fn(),
   },
 }));
 
@@ -49,6 +69,7 @@ import { OptimizedJsonHandler } from './OptimizedJsonHandler.js';
 import { BaseProvider } from '@/features/translation/providers/BaseProvider.js';
 import { LanguageSwappingService } from '@/features/translation/providers/LanguageSwappingService.js';
 import { LanguageDetectionService } from '@/shared/services/LanguageDetectionService.js';
+import { proxyManager } from '@/shared/proxy/ProxyManager.js';
 import { TranslationMode, getBilingualTranslationEnabledAsync, getBilingualTranslationModesAsync } from '@/shared/config/config.js';
 
 // 'select-element' is the real MessageContexts.SELECT_ELEMENT value that
@@ -67,6 +88,34 @@ class RecordingProvider extends BaseProvider {
   async _batchTranslate(texts, sourceLang, targetLang) {
     this.batchCalls.push([sourceLang, targetLang, texts.slice()]);
     return texts.map((text) => `[tr]${typeof text === 'object' ? (text.t ?? text.text) : text}`);
+  }
+}
+
+// Real provider reaching the fetch boundary. _batchTranslate executes through the
+// real ProviderRequestEngine (executeRequest → executeApiCall → proxyManager.fetch)
+// so a timeout's shared abort signal can be observed at the physical HTTP seam.
+class FetchSignalProvider extends BaseProvider {
+  static batchStrategy = 'json';
+  static isAI = true;
+
+  constructor() {
+    super('FetchSignalProvider');
+  }
+
+  async _batchTranslate(texts, sourceLang, targetLang, translateMode, engine, messageId, abortController, priority, sessionId, expectedFormat, options = {}) {
+    return this._executeRequest({
+      url: 'https://fetch-signal.test/translate',
+      fetchOptions: {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ texts }),
+      },
+      extractResponse: (data) => data.results || [],
+      context: 'structured-batch',
+      abortController,
+      sessionId,
+      callPurpose: options.callPurpose,
+    });
   }
 }
 
@@ -205,5 +254,80 @@ describe('OptimizedJsonHandler → ProviderCoordinator integration', () => {
       expect(source).toBe('en');
       expect(target).toBe('fa');
     });
+  });
+});
+
+describe('OptimizedJsonHandler physical abort propagation', () => {
+  beforeEach(() => {
+    vi.restoreAllMocks();
+    proxyManager.fetch.mockReset();
+    proxyManager.setConfig.mockReset();
+    proxyManager.testConnection.mockReset();
+    resolveOperationSourceLanguage.mockResolvedValue({
+      canBypassSequentialGate: false,
+      bypassReason: 'HEURISTIC_RESULT',
+    });
+    getBilingualTranslationEnabledAsync.mockResolvedValue(false);
+    getBilingualTranslationModesAsync.mockResolvedValue({});
+  });
+
+  it('timeout aborts the physical fetch through the shared AbortController signal', async () => {
+    const provider = new FetchSignalProvider();
+    const abortController = {
+      signal: {
+        aborted: false,
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+      },
+      abort: vi.fn(function () {
+        this.signal.aborted = true;
+      }),
+    };
+
+    const engine = {
+      lifecycleRegistry: {
+        getAbortController: vi.fn(() => abortController),
+        registerRequest: vi.fn(() => abortController),
+        unregisterRequest: vi.fn(),
+      },
+      createIntelligentBatches: vi.fn((segments) => segments.map((segment) => [segment])),
+      isCancelled: vi.fn(() => false),
+    };
+    const handler = new OptimizedJsonHandler();
+
+    // Leaf network boundary hangs; the request can only terminate via the
+    // shared abort signal reaching this fetch call.
+    proxyManager.fetch.mockImplementation(() => new Promise(() => {}));
+
+    const execution = handler.execute(
+      engine,
+      {
+        text: JSON.stringify(['hello world']),
+        sourceLanguage: 'en',
+        targetLanguage: 'fa',
+        mode: TranslationMode.Select_Element,
+        messageId: 'msg-fetch-abort',
+        sessionId: 'sess-fetch-abort',
+        options: {},
+      },
+      provider,
+      'en',
+      'fa',
+      'msg-fetch-abort',
+      { tab: { id: 1 }, frameId: 0 },
+      'unknown',
+      { deadlineAt: Date.now() + 500 }
+    );
+    execution.catch(() => {});
+
+    await vi.waitFor(() => expect(proxyManager.fetch).toHaveBeenCalledTimes(1));
+    expect(proxyManager.fetch.mock.calls[0][1].signal).toBe(abortController.signal);
+    expect(abortController.signal.aborted).toBe(false);
+
+    await expect(execution).rejects.toMatchObject({ type: 'TRANSLATION_TIMEOUT' });
+
+    // The same signal object handed to fetch transitioned to aborted.
+    expect(proxyManager.fetch.mock.calls[0][1].signal.aborted).toBe(true);
+    expect(engine.lifecycleRegistry.unregisterRequest).toHaveBeenCalledWith('msg-fetch-abort');
   });
 });
