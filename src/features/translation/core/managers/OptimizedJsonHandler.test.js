@@ -4124,4 +4124,95 @@ describe('OptimizedJsonHandler', () => {
       });
     });
   });
+
+  describe('frame-targeted streaming routing', () => {
+    const mockData = {
+      text: JSON.stringify([{ i: 'n1', t: 'Hello.' }]),
+      sourceLanguage: 'en',
+      targetLanguage: 'fa',
+      mode: 'select_element',
+      messageId: 'msg-1',
+      sessionId: 'sess-1'
+    };
+
+    it('targets the originating iframe for update and end sends', async () => {
+      const browser = (await import('webextension-polyfill')).default;
+      browser.tabs.sendMessage.mockClear();
+
+      mockEngine.createIntelligentBatches = vi.fn(() => [[{ i: 'n1', t: 'Hello.' }]]);
+      mockProvider.translate.mockResolvedValueOnce({ translatedText: ['Bonjour.'] });
+
+      const result = await handler.execute(
+        mockEngine,
+        mockData,
+        mockProvider, 'en', 'fa', 'msg-frame-3', { tab: { id: 123 }, frameId: 3 }
+      );
+
+      expect(result.success).toBe(true);
+      const calls = browser.tabs.sendMessage.mock.calls;
+      const update = calls.find(([, m]) => m.action === MessageActions.TRANSLATION_STREAM_UPDATE);
+      const end = calls.find(([, m]) => m.action === MessageActions.TRANSLATION_STREAM_END);
+      expect(update).toEqual([123, expect.objectContaining({ action: MessageActions.TRANSLATION_STREAM_UPDATE }), { frameId: 3 }]);
+      expect(end).toEqual([123, expect.objectContaining({ action: MessageActions.TRANSLATION_STREAM_END }), { frameId: 3 }]);
+    });
+
+    it('targets the originating iframe for error sends', async () => {
+      const browser = (await import('webextension-polyfill')).default;
+      browser.tabs.sendMessage.mockClear();
+
+      mockEngine.createIntelligentBatches = vi.fn(() => [[{ i: 'n1', t: 'Hello.' }]]);
+      const error = new Error('provider down');
+      error.type = 'NETWORK_ERROR';
+      mockProvider.translate.mockRejectedValueOnce(error);
+
+      const result = await handler.execute(
+        mockEngine,
+        mockData,
+        mockProvider, 'en', 'fa', 'msg-frame-err', { tab: { id: 123 }, frameId: 3 }
+      );
+
+      expect(result.success).toBe(false);
+      const calls = browser.tabs.sendMessage.mock.calls;
+      const end = calls.find(([, m]) => m.action === MessageActions.TRANSLATION_STREAM_END);
+      expect(end).toEqual([123, expect.objectContaining({ action: MessageActions.TRANSLATION_STREAM_END }), { frameId: 3 }]);
+    });
+
+    it('targets the top frame explicitly with frameId 0', async () => {
+      const browser = (await import('webextension-polyfill')).default;
+      browser.tabs.sendMessage.mockClear();
+
+      mockEngine.createIntelligentBatches = vi.fn(() => [[{ i: 'n1', t: 'Hello.' }]]);
+      mockProvider.translate.mockResolvedValueOnce({ translatedText: ['Bonjour.'] });
+
+      const result = await handler.execute(
+        mockEngine,
+        mockData,
+        mockProvider, 'en', 'fa', 'msg-frame-0', { tab: { id: 123 }, frameId: 0 }
+      );
+
+      expect(result.success).toBe(true);
+      const calls = browser.tabs.sendMessage.mock.calls;
+      expect(calls.length).toBeGreaterThan(0);
+      expect(calls.every(([, , options]) => options && options.frameId === 0)).toBe(true);
+    });
+
+    it('keeps broadcast behavior when frameId is unavailable', async () => {
+      const browser = (await import('webextension-polyfill')).default;
+      browser.tabs.sendMessage.mockClear();
+
+      mockEngine.createIntelligentBatches = vi.fn(() => [[{ i: 'n1', t: 'Hello.' }]]);
+      mockProvider.translate.mockResolvedValueOnce({ translatedText: ['Bonjour.'] });
+
+      const result = await handler.execute(
+        mockEngine,
+        mockData,
+        mockProvider, 'en', 'fa', 'msg-no-frame', { tab: { id: 123 } }
+      );
+
+      expect(result.success).toBe(true);
+      const calls = browser.tabs.sendMessage.mock.calls;
+      expect(calls.length).toBeGreaterThan(0);
+      calls.forEach((call) => expect(call).toHaveLength(2));
+    });
+  });
 });

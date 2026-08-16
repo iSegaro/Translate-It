@@ -176,6 +176,19 @@ describe('StreamingManager', () => {
       
       expect(browser.tabs.sendMessage).not.toHaveBeenCalled();
     });
+
+    it('should target the originating iframe when sender has frameId', async () => {
+      const { default: browser } = await import('webextension-polyfill');
+      const messageId = 'msg-frame';
+      streamingManager.initializeStream(messageId, { tab: { id: 999 }, frameId: 3 }, { providerName: 'P' }, ['s1']);
+
+      await streamingManager.streamBatchResults(messageId, ['res'], ['s1'], 0);
+
+      expect(browser.tabs.sendMessage).toHaveBeenCalledWith(999, expect.objectContaining({
+        action: MessageActions.TRANSLATION_STREAM_UPDATE,
+        messageId: messageId
+      }), { frameId: 3 });
+    });
   });
 
   describe('streamBatchError', () => {
@@ -201,6 +214,19 @@ describe('StreamingManager', () => {
           })
         })
       }));
+    });
+
+    it('should target the originating iframe on error', async () => {
+      const { default: browser } = await import('webextension-polyfill');
+      const messageId = 'msg-frame-err';
+      streamingManager.initializeStream(messageId, { tab: { id: 123 }, frameId: 3 }, { providerName: 'P' }, ['s1']);
+
+      await streamingManager.streamBatchError(messageId, new Error('boom'), 0);
+
+      expect(browser.tabs.sendMessage).toHaveBeenCalledWith(123, expect.objectContaining({
+        action: MessageActions.TRANSLATION_STREAM_UPDATE,
+        data: expect.objectContaining({ success: false })
+      }), { frameId: 3 });
     });
   });
 
@@ -244,6 +270,19 @@ describe('StreamingManager', () => {
       
       await streamingManager.completeStream(messageId, true);
       expect(streamingManager.stats).toEqual(statsAfterFirst);
+    });
+
+    it('should target the top frame with frameId 0', async () => {
+      const { default: browser } = await import('webextension-polyfill');
+      const messageId = 'msg-topframe';
+      streamingManager.initializeStream(messageId, { tab: { id: 123 }, frameId: 0 }, { providerName: 'P' }, ['s1']);
+
+      await streamingManager.completeStream(messageId, true);
+
+      expect(browser.tabs.sendMessage).toHaveBeenCalledWith(123, expect.objectContaining({
+        action: MessageActions.TRANSLATION_STREAM_END,
+        data: expect.objectContaining({ success: true })
+      }), { frameId: 0 });
     });
   });
 
@@ -306,6 +345,19 @@ describe('StreamingManager', () => {
           }
         })
       }));
+    });
+
+    it('keeps timeout completion targeted at the originating frame', async () => {
+      const { default: browser } = await import('webextension-polyfill');
+      const messageId = 'msg-timeout-frame';
+      streamingManager.initializeStream(messageId, { tab: { id: 1 }, frameId: 3 }, { providerName: 'P' }, ['s1']);
+
+      await streamingManager.cancelStream(messageId, 'Translation timed out', true, 'PROGRESS_TIMEOUT');
+
+      expect(browser.tabs.sendMessage).toHaveBeenCalledWith(1, expect.objectContaining({
+        action: MessageActions.TRANSLATION_STREAM_END,
+        data: expect.objectContaining({ timedOut: true })
+      }), { frameId: 3 });
     });
 
     it('should mark stream as cancelled and complete it', async () => {

@@ -112,6 +112,24 @@ export class StreamingManager extends ResourceTracker {
   }
 
   /**
+   * Build tabs.sendMessage arguments with frame targeting when the originating
+   * frame identity is available. Keeps the legacy broadcast call (2 args) when
+   * frameId is absent so extension-page and non-tab flows are unchanged.
+   * @param {number} tabId - Target tab ID
+   * @param {object} message - Message payload
+   * @param {object|null} senderInfo - Stored sender details
+   * @returns {Array} - sendMessage arguments
+   * @private
+   */
+  _createTabSendArgs(tabId, message, senderInfo) {
+    const args = [tabId, message];
+    if (typeof senderInfo?.frameId === 'number') {
+      args.push({ frameId: senderInfo.frameId });
+    }
+    return args;
+  }
+
+  /**
    * Stream batch results to content script
    * @param {string} messageId - Message ID
    * @param {string[]} batchResults - Results for this batch
@@ -164,7 +182,7 @@ export class StreamingManager extends ResourceTracker {
 
       // Send to content script or internal extension page (popup, sidepanel, options)
       if (senderInfo.tab?.id) {
-        await browser.tabs.sendMessage(senderInfo.tab.id, streamMessage);
+        await browser.tabs.sendMessage(...this._createTabSendArgs(senderInfo.tab.id, streamMessage, senderInfo));
       } else {
         // Broadcast to internal extension pages
         await browser.runtime.sendMessage(streamMessage);
@@ -219,7 +237,7 @@ export class StreamingManager extends ResourceTracker {
 
       // Send to content script or internal extension page
       if (senderInfo.tab?.id) {
-        await browser.tabs.sendMessage(senderInfo.tab.id, streamErrorMessage);
+        await browser.tabs.sendMessage(...this._createTabSendArgs(senderInfo.tab.id, streamErrorMessage, senderInfo));
         logger.debug(`[StreamingManager] Streamed error for batch ${batchIndex} to tab ${senderInfo.tab.id}`);
       } else {
         await browser.runtime.sendMessage(streamErrorMessage);
@@ -283,7 +301,7 @@ export class StreamingManager extends ResourceTracker {
       );
 
       if (senderInfo && senderInfo.tab?.id) {
-        await browser.tabs.sendMessage(senderInfo.tab.id, streamEndMessage);
+        await browser.tabs.sendMessage(...this._createTabSendArgs(senderInfo.tab.id, streamEndMessage, senderInfo));
         
         // Log Session Summary for streaming
         statsManager.printSummary(streamInfo.sessionId, { 
