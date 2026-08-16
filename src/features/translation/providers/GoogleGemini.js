@@ -5,8 +5,7 @@ import {
   getGeminiApiKeysAsync,
   getGeminiModelAsync,
   getGeminiThinkingModeAsync,
-  getGeminiApiUrlAsync,
-  getPromptBASEScreenCaptureAsync
+  getGeminiApiUrlAsync
 } from "@/shared/config/config.js";
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
@@ -191,68 +190,6 @@ export class GeminiProvider extends BaseAIProvider {
     }
 
     return result;
-  }
-
-  async _translateImageInternal(base64Image, _sourceLang, targetLang, options = {}) {
-    const { abortController, sessionId } = options;
-
-    const [apiKeys, model, rawApiUrl, promptBase] = await Promise.all([
-      getGeminiApiKeysAsync(),
-      getGeminiModelAsync(),
-      getGeminiApiUrlAsync(),
-      getPromptBASEScreenCaptureAsync()
-    ]);
-
-    const apiKey = apiKeys.length > 0 ? apiKeys[0] : '';
-    const systemPrompt = promptBase.replace("{targetLanguage}", targetLang);
-
-    let apiUrl = rawApiUrl;
-    const isStandardGoogleUrl = !rawApiUrl || rawApiUrl.includes('generativelanguage.googleapis.com') || rawApiUrl === CONFIG.GEMINI_API_URL;
-
-    if (isStandardGoogleUrl && model && CONFIG.GEMINI_MODELS) {
-      const modelConfig = CONFIG.GEMINI_MODELS.find(m => m.value === model);
-      if (modelConfig?.url) apiUrl = modelConfig.url;
-    }
-
-    const requestBody = {
-      contents: [{
-        parts: [{ text: systemPrompt }, { inline_data: { mime_type: "image/png", data: base64Image } }]
-      }],
-      generationConfig: { temperature: 0.1, maxOutputTokens: 2048 }
-    };
-
-    let url = apiUrl || CONFIG.GEMINI_API_URL;
-    if (!url.includes(':generateContent')) url = `${url}:generateContent`;
-    url = `${url}?key=${apiKey}`;
-
-    const fetchOptions = { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(requestBody) };
-
-    return await this._executeRequest({
-      url,
-      fetchOptions,
-      charCount: AITextProcessor.calculatePayloadChars(requestBody.contents),
-      extractResponse: (data) => {
-        if (data?.error) {
-          throw new Error(`API_ERROR: ${data.error.message || 'Unknown Gemini Error'}`);
-        }
-        
-        const candidate = data?.candidates?.[0];
-        if (candidate?.finishReason === 'SAFETY') {
-          throw new Error('API_ERROR: Content blocked by Gemini safety filters');
-        }
-        
-        return candidate?.content?.parts?.[0]?.text;
-      },
-      context: `${this.providerName.toLowerCase()}-image-translation`,
-      abortController,
-      sessionId,
-      updateApiKey: (newKey, options) => {
-        if (options.url) {
-          const urlObj = new URL(options.url);
-          urlObj.searchParams.set('key', newKey);
-          options.url = urlObj.toString();
-        }
-      }    });
   }
 }
 

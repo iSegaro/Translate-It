@@ -189,13 +189,4 @@ export class MockProvider extends BaseAIProvider {
 
     return result;
   }
-
-  /**
-   * Image translation simulation
-   * Exercises the BaseAIProvider.translateImage flow
-   */
-  async _translateImageInternal(base64Image, sourceLang, targetLang) {
-    await new Promise(resolve => setTimeout(resolve, 1500)); // Images take longer
-    return `[MOCK IMAGE TRANSLATION] Simulated result for image (${sourceLang} -> ${targetLang})`;
-  }
 }
