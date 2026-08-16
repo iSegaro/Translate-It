@@ -105,6 +105,7 @@ describe('OpenRouterProvider Error Handling', () => {
     await provider._callAI('system', 'source', { expectedFormat: ResponseFormat.JSON_OBJECT });
 
     const payload = JSON.parse(executeRequest.mock.calls[0][0].fetchOptions.body);
+    expect(executeRequest.mock.calls[0][0].url).toBe(CONFIG.OPENROUTER_API_URL);
     expect(payload).toMatchObject({
       model,
       messages: [

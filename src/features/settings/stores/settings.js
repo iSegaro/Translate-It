@@ -360,6 +360,8 @@ export const useSettingsStore = defineStore('settings', () => {
       }
 
       const processedSettings = await secureStorage.processImportedSettings(importData, password);
+      // OpenRouter endpoint is a CONFIG-owned runtime constant, not an imported setting.
+      delete processedSettings.OPENROUTER_API_URL;
 
       // 1. Merge imported settings with default settings to ensure no missing keys
       const defaultSettings = getDefaultSettings();

@@ -100,7 +100,7 @@ export class OpenRouterProvider extends BaseAIProvider {
     };
 
     const result = await this._executeRequest({
-      url: "https://openrouter.ai/api/v1/chat/completions",
+      url: CONFIG.OPENROUTER_API_URL,
       fetchOptions,
       charCount: fetchOptions.body.length,
       originalCharCount: isBatch ? AITextProcessor.estimateOriginalChars(userText) : userText.length,

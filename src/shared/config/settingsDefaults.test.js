@@ -32,6 +32,7 @@ describe('getPersistedDefaultSettings', () => {
     expect(defaults.DEEPSEEK_MODELS).toEqual(CONFIG.DEEPSEEK_MODELS);
     expect(defaults.OPENROUTER_API_MODEL).toBe(CONFIG.OPENROUTER_API_MODEL);
     expect(defaults.OPENROUTER_MODELS).toEqual(CONFIG.OPENROUTER_MODELS);
+    expect(defaults).not.toHaveProperty('OPENROUTER_API_URL');
     expect(defaults.WEBAI_API_MODEL).toBe(CONFIG.WEBAI_API_MODEL);
     expect(defaults.WEBAI_MODELS).toEqual(CONFIG.WEBAI_MODELS);
     expect(defaults.GEMINI_THINKING_MODE).toBe('default');

@@ -250,6 +250,18 @@ describe('Settings Store', () => {
       expect(store.settings.THEME).toBe('dark');
     });  });
 
+  it('importSettings should ignore legacy OpenRouter endpoint settings', async () => {
+    secureStorage.processImportedSettings.mockResolvedValue({
+      THEME: 'dark',
+      OPENROUTER_API_URL: 'https://legacy.example.test/chat/completions'
+    });
+    const store = useSettingsStore();
+
+    await store.importSettings({ THEME: 'dark', _exported: true });
+
+    expect(store.settings).not.toHaveProperty('OPENROUTER_API_URL');
+  });
+
   describe('Strict Validation', () => {
     it('validateSettings should reject prompt without placeholder', () => {
       const store = useSettingsStore();
