@@ -123,6 +123,33 @@ describe('MicrosoftEdgeProvider', () => {
         .rejects.toMatchObject({ type: 'API_RESPONSE_INVALID' });
     });
 
+    it.each([
+      ['empty translations array', [{ translations: [] }]],
+      ['empty translated text', [{ translations: [{ text: '' }] }]],
+      ['whitespace-only translated text', [{ translations: [{ text: '   ' }] }]],
+    ])('throws API_RESPONSE_INVALID for %s instead of returning empty output', async (_label, response) => {
+      vi.spyOn(provider, '_getAuthToken').mockResolvedValue('valid-token');
+
+      vi.spyOn(provider, '_executeRequest').mockImplementation(async (opts) => {
+        return opts.extractResponse(response);
+      });
+
+      await expect(provider._translateChunk(['Hello'], 'en', 'fa', 'selection', null))
+        .rejects.toMatchObject({ type: 'API_RESPONSE_INVALID' });
+    });
+
+    it('accepts identity translation where translated text equals source', async () => {
+      vi.spyOn(provider, '_getAuthToken').mockResolvedValue('valid-token');
+
+      const identityResponse = [{ translations: [{ text: 'URL' }] }];
+
+      vi.spyOn(provider, '_executeRequest').mockImplementation(async (opts) => {
+        return opts.extractResponse(identityResponse);
+      });
+
+      await expect(provider._translateChunk(['URL'], 'en', 'fa', 'selection', null)).resolves.toEqual(['URL']);
+    });
+
     it('should throw API_RESPONSE_INVALID when a translation item lacks translations', async () => {
       vi.spyOn(provider, '_getAuthToken').mockResolvedValue('valid-token');
 
