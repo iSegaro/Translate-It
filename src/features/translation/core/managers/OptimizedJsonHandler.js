@@ -630,9 +630,61 @@ export class OptimizedJsonHandler {
           return item.uid ?? item.cellId ?? item.i ?? item.id ?? item.blockId;
         };
 
-        const collectCompleteFragments = (mappedResults) => {
-          const completeResults = [];
-          const sameBatchIds = new Set();
+        // Single publication path for the canonical batch result: dedupe against
+        // already-emitted identities, terminal acceptance, batchResults, streaming.
+        // Shared by the success path and the outer catch (preserved prefix/suffix
+        // on recovery failure) so both go through exactly-once visibility.
+        const publishResults = async (resultsToPublish, batchContext, batchIndex) => {
+          const filteredResults = [];
+          const acceptedManifestUnits = [];
+          for (let idx = 0; idx < resultsToPublish.length; idx++) {
+            const item = resultsToPublish[idx];
+            const logicalId = logicalIdOverrides.get(item) ?? extractLogicalId(item);
+            if (logicalId !== undefined && emittedLogicalIds.has(logicalId)) {
+              appendTranslationDiagnostic(executionContext, {
+                type: 'DUPLICATE_IDENTITY_SUPPRESSED',
+                stage: 'optimized-json-handler',
+                parentId: String(logicalId),
+              });
+              continue;
+            }
+            if (logicalId !== undefined) emittedLogicalIds.add(logicalId);
+            filteredResults.push(item);
+            // Track accepted manifest units for terminal observation
+            // (only valid for non-fragment batches where manifestView.units aligns positionally)
+            if (batchContext?.manifestView?.units && idx < batchContext.manifestView.units.length) {
+              acceptedManifestUnits.push(batchContext.manifestView.units[idx]);
+            }
+          }
+          // Terminal observation: accept only manifest units that survived suppression
+          if (mode === TranslationMode.Select_Element
+              && providerInstance.constructor.isAI
+              && acceptedManifestUnits.length > 0) {
+            executionContext?.onTerminalUnitsAccepted?.(acceptedManifestUnits);
+          }
+          batchResults[batchIndex] = filteredResults;
+          completedBatchCount++;
+          if (!skipStreaming && filteredResults.length > 0) {
+            await self._streamResults(
+              tabId,
+              messageId,
+              filteredResults,
+              batchIndex,
+              batches.length,
+              targetLanguage,
+              detectedSourceLanguage,
+              mode,
+              completedBatchCount,
+              abortController,
+              engine
+            );
+          }
+        };
+
+        const collectCompleteFragments = (mappedResults, state = {}) => {
+          const completeResults = state.completeResults ?? [];
+          const sameBatchIds = state.sameBatchIds ?? new Set();
+          const startIndex = state.startIndex ?? 0;
 
           const validateAndAdd = (item, logicalIdOverride) => {
             const logicalId = logicalIdOverride ?? extractLogicalId(item);
@@ -647,7 +699,8 @@ export class OptimizedJsonHandler {
             completeResults.push(item);
           };
 
-          for (const result of mappedResults) {
+          for (let index = startIndex; index < mappedResults.length; index++) {
+            const result = mappedResults[index];
            if (result?.isV2Unit === true && result?.isSplitFragment === true) {
              const { parentId, fragmentIndex, fragmentCount } = result;
              if (!parentId || !Number.isInteger(fragmentIndex) || !Number.isInteger(fragmentCount) || fragmentIndex < 0 || fragmentIndex >= fragmentCount) {
@@ -738,10 +791,12 @@ export class OptimizedJsonHandler {
                    actualMarkerCount: violation.actualMarkerCount ?? null,
                    reason,
                  });
-                   const parentError = createParentValidationError(parentIdStr, sourceText, translatedText, validation);
-                   parentError.parentRecovery.completeResults = completeResults;
-                   parentError.parentRecovery.primaryFragmentCount = orderedFragments.length;
-                   throw parentError;
+const parentError = createParentValidationError(parentIdStr, sourceText, translatedText, validation);
+                    parentError.parentRecovery.completeResults = completeResults;
+                    parentError.parentRecovery.primaryFragmentCount = orderedFragments.length;
+                    parentError.parentRecovery.sameBatchIds = sameBatchIds;
+                    parentError.parentRecovery.resumeIndex = index;
+                    throw parentError;
               }
                validateAndAdd(buildV3ParentResult(orderedFragments[0], translatedText), `v3:${parentId}`);
               parent.emitted = true;
@@ -826,6 +881,7 @@ export class OptimizedJsonHandler {
         let timeoutError = null;
         let didTimeout = false;
         let batchPayload = [];
+        let batchExecutionContext;
 
         const checkCancellation = () => {
           if (engine.isCancelled(messageId) || abortController.signal.aborted) {
@@ -930,7 +986,7 @@ export class OptimizedJsonHandler {
              ...options?.contextMetadata,
              ...(useParentConversationLifecycle && { useParentConversationLifecycle: true }),
            };
-          const batchExecutionContext = hasManifestMembership
+          batchExecutionContext = hasManifestMembership
             ? self._createBatchExecutionContext(operationExecutionContext, batch)
             : operationExecutionContext;
           const providerPromise = self._performBatchCall(
@@ -1004,6 +1060,7 @@ export class OptimizedJsonHandler {
              completeResults = collectCompleteFragments(mappedResults);
            } catch (batchError) {
              if (!batchError.parentRecovery) throw batchError;
+             const parentRecovery = batchError.parentRecovery;
              let recoveredParent;
              try {
                recoveredParent = await recoverFailedV3Parent(batchError, batchExecutionContext, parallelExecution);
@@ -1012,56 +1069,35 @@ export class OptimizedJsonHandler {
                  didTimeout = true;
                  timeoutError = recoveryError;
                }
+               // Recovery failures must still publish the results collected before
+               // the offending parent. Re-anchor the snapshot captured at the throw
+               // site when the provider rewrote the error object.
+               if (!recoveryError.parentRecovery) recoveryError.parentRecovery = parentRecovery;
                throw recoveryError;
              }
-              completeResults = [...(batchError.parentRecovery.completeResults || []), recoveredParent];
-              logicalIdOverrides.set(recoveredParent, `v3:${batchError.parentRecovery.parentId}`);
+             const { completeResults: preservedResults, sameBatchIds, resumeIndex, parentId } = parentRecovery;
+             // The recovered parent replaces the failed original; clear its fragment
+             // state so any trailing fragments are not double-collected.
+             const failedParent = fragmentedUnits.get(parentId);
+             if (failedParent) {
+               failedParent.emitted = true;
+               failedParent.fragments.clear();
+             }
+             completeResults = [...(preservedResults || []), recoveredParent];
+             logicalIdOverrides.set(recoveredParent, `v3:${parentId}`);
+             if (resumeIndex !== undefined && sameBatchIds) {
+               sameBatchIds.add(`v3:${parentId}`);
+               // Resume collection after the recovered parent so valid same-batch
+               // suffixes (Case B) survive without a full re-run.
+               completeResults = collectCompleteFragments(mappedResults, {
+                 completeResults,
+                 sameBatchIds,
+                 startIndex: resumeIndex + 1,
+               });
+             }
            }
           checkCancellation();
-          const filteredResults = [];
-          const acceptedManifestUnits = [];
-          for (let idx = 0; idx < completeResults.length; idx++) {
-            const item = completeResults[idx];
-             const logicalId = logicalIdOverrides.get(item) ?? extractLogicalId(item);
-            if (logicalId !== undefined && emittedLogicalIds.has(logicalId)) {
-              appendTranslationDiagnostic(executionContext, {
-                type: 'DUPLICATE_IDENTITY_SUPPRESSED',
-                stage: 'optimized-json-handler',
-                parentId: String(logicalId),
-              });
-              continue;
-            }
-            if (logicalId !== undefined) emittedLogicalIds.add(logicalId);
-            filteredResults.push(item);
-            // Track accepted manifest units for terminal observation
-            // (only valid for non-fragment batches where manifestView.units aligns positionally)
-            if (batchExecutionContext?.manifestView?.units && idx < batchExecutionContext.manifestView.units.length) {
-              acceptedManifestUnits.push(batchExecutionContext.manifestView.units[idx]);
-            }
-          }
-          // Terminal observation: accept only manifest units that survived suppression
-          if (mode === TranslationMode.Select_Element
-              && providerInstance.constructor.isAI
-              && acceptedManifestUnits.length > 0) {
-            executionContext?.onTerminalUnitsAccepted?.(acceptedManifestUnits);
-          }
-           batchResults[i] = filteredResults;
-          completedBatchCount++;
-          if (!skipStreaming && filteredResults.length > 0) {
-            await self._streamResults(
-              tabId,
-              messageId,
-              filteredResults,
-              i,
-              batches.length,
-              targetLanguage,
-              detectedSourceLanguage,
-              mode,
-              completedBatchCount,
-              abortController,
-              engine
-            );
-          }
+          await publishResults(completeResults, batchExecutionContext, i);
           
           const statsAfter = statsManager.getSessionSummary(sessionId);
           if (statsAfter) {
@@ -1118,13 +1154,20 @@ export class OptimizedJsonHandler {
              code: batchError.type || matchErrorToType(batchError),
              fallback: true,
            });
-           hasErrors = true;
+hasErrors = true;
            lastError = batchError;
-           batchResults[i] = [];
-          
-          // Count the attempted batch to keep progress accounting stable.
-          // Never stream the original batch as translated output on failure.
-          completedBatchCount++;
+           const preservedResults = batchError?.parentRecovery?.completeResults;
+           if (preservedResults && preservedResults.length > 0) {
+             // Recovery failed (or a later parent violated after a recovery): keep
+             // the valid prefix/suffix collected before the failing parent instead
+             // of discarding the whole batch. publishResults already counts the batch.
+             await publishResults(preservedResults, batchExecutionContext, i);
+           } else {
+             batchResults[i] = [];
+             // Count the attempted batch to keep progress accounting stable.
+             // Never stream the original batch as translated output on failure.
+             completedBatchCount++;
+           }
           
           // Stop all other batches if error is fatal (429, etc.)
           if (isFatalError(batchError)) {

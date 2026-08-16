@@ -860,6 +860,307 @@ describe('OptimizedJsonHandler', () => {
       expect(mockProvider.translate.mock.calls.filter(call => call[3].callPurpose === TranslationCallPurpose.PARENT_RECOVERY)).toHaveLength(1);
     });
 
+    it('preserves a valid same-batch prefix when parent recovery fails (Case A)', async () => {
+      const browser = (await import('webextension-polyfill')).default;
+      browser.tabs.sendMessage.mockClear();
+      const m2 = '@@TI_SEG_e_s_n2@@';
+      const m3 = '@@TI_SEG_e_s_n3@@';
+      const fragment0 = { t: `X${m2}Y`, i: 'n1', blockId: 'b1', isV3Fragment: true, parentId: 'b1', fragmentIndex: 0, fragmentCount: 2, fragmentJoinerBefore: '' };
+      const fragment1 = { t: `${m3}Z`, i: 'n1', blockId: 'b1', isV3Fragment: true, parentId: 'b1', fragmentIndex: 1, fragmentCount: 2, fragmentJoinerBefore: ' ' };
+      const manifest = createRequestUnitManifest(['Hello', `X${m2}Y ${m3}Z`]);
+      const onTerminalUnitsAccepted = vi.fn();
+      const executionContext = {
+        manifestView: createManifestView(manifest),
+        onTerminalUnitsAccepted,
+      };
+      mockEngine.createIntelligentBatches = vi.fn(() => [[
+        { t: 'Hello', i: 'a', blockId: 'a' },
+        fragment0,
+        fragment1,
+      ]]);
+      mockProvider.translate
+        .mockResolvedValueOnce({ translatedText: ['Hello', `X${m2}Y`, `${m3}${m3}Z`] })
+        .mockResolvedValueOnce({ translatedText: [
+          { i: 'parent-1-0', text: 'X' },
+          { i: 'parent-1-1', text: 'Y' },
+          { i: 'parent-1-2', text: `Z${m3}` },
+        ] })
+        .mockResolvedValueOnce({ translatedText: [
+          { i: 'parent-2-0', text: 'X' },
+          { i: 'parent-2-1', text: 'Y' },
+          { i: 'parent-2-2', text: `Z${m3}` },
+        ] });
+
+      const result = await handler.execute(
+        mockEngine,
+        { ...mockData, sourceLanguage: 'en', text: JSON.stringify([
+          { t: 'Hello', i: 'a', blockId: 'a' },
+          { t: `X${m2}Y ${m3}Z`, i: 'n1', blockId: 'b1' },
+        ]) },
+        mockProvider, 'en', 'fa', 'msg-case-a-prefix-preserved', mockSender, 'unknown', executionContext
+      );
+
+      expect(result.success).toBe(false);
+      expect(result.error.type).toBe(ErrorTypes.VALIDATION);
+      expect(mockProvider.translate.mock.calls.filter(call => call[3].callPurpose === TranslationCallPurpose.PARENT_RECOVERY)).toHaveLength(2);
+      expect(result.results).toHaveLength(1);
+      expect(result.results[0]).toMatchObject({ i: 'a', t: 'Hello' });
+      // Canonical positional manifest acceptance: only the surviving prefix A
+      // reaches terminal observation, exactly once; the failed parent B never does.
+      expect(onTerminalUnitsAccepted).toHaveBeenCalledTimes(1);
+      expect(onTerminalUnitsAccepted.mock.calls[0][0]).toEqual([manifest.units[0]]);
+      const updates = browser.tabs.sendMessage.mock.calls
+        .map(([, m]) => m)
+        .filter(m => m.action === MessageActions.TRANSLATION_STREAM_UPDATE);
+      expect(updates).toHaveLength(1);
+      expect(updates[0].data.data).toHaveLength(1);
+      expect(updates[0].data.data[0].i).toBe('a');
+    });
+
+    it('preserves a valid same-batch suffix after successful parent recovery (Case B)', async () => {
+      const browser = (await import('webextension-polyfill')).default;
+      browser.tabs.sendMessage.mockClear();
+      const m2 = '@@TI_SEG_e_s_n2@@';
+      const m3 = '@@TI_SEG_e_s_n3@@';
+      const fragment0 = { t: `X${m2}Y`, i: 'n1', blockId: 'b1', isV3Fragment: true, parentId: 'b1', fragmentIndex: 0, fragmentCount: 2, fragmentJoinerBefore: '' };
+      const fragment1 = { t: `${m3}Z`, i: 'n1', blockId: 'b1', isV3Fragment: true, parentId: 'b1', fragmentIndex: 1, fragmentCount: 2, fragmentJoinerBefore: ' ' };
+      const manifest = createRequestUnitManifest(['Hello', `X${m2}Y ${m3}Z`, 'Goodbye']);
+      const onTerminalUnitsAccepted = vi.fn();
+      const executionContext = {
+        manifestView: createManifestView(manifest),
+        onTerminalUnitsAccepted,
+      };
+      mockEngine.createIntelligentBatches = vi.fn(() => [[
+        { t: 'Hello', i: 'a', blockId: 'a' },
+        fragment0,
+        fragment1,
+        { t: 'Goodbye', i: 'c', blockId: 'c' },
+      ]]);
+      mockProvider.translate
+        .mockResolvedValueOnce({ translatedText: ['Hello', `X${m2}Y`, `${m3}${m3}Z`, 'Goodbye'] })
+        .mockResolvedValueOnce({ translatedText: [
+          { i: 'parent-1-0', text: 'X' },
+          { i: 'parent-1-1', text: 'Y' },
+          { i: 'parent-1-2', text: 'Z' },
+        ] });
+
+      const result = await handler.execute(
+        mockEngine,
+        { ...mockData, sourceLanguage: 'en', text: JSON.stringify([
+          { t: 'Hello', i: 'a', blockId: 'a' },
+          { t: `X${m2}Y ${m3}Z`, i: 'n1', blockId: 'b1' },
+          { t: 'Goodbye', i: 'c', blockId: 'c' },
+        ]) },
+        mockProvider, 'en', 'fa', 'msg-case-b-suffix-preserved', mockSender, 'unknown', executionContext
+      );
+
+      expect(result.success).toBe(true);
+      expect(mockProvider.translate.mock.calls.filter(call => call[3].callPurpose === TranslationCallPurpose.PARENT_RECOVERY)).toHaveLength(1);
+      expect(result.results.map(r => r.i)).toEqual(['a', 'n1', 'c']);
+      expect(result.results[1].t).toBe(`X${m2}Y ${m3}Z`);
+      // Canonical positional manifest acceptance: A, the recovered B, and C each
+      // reach terminal observation exactly once, with no duplicate acceptance.
+      expect(onTerminalUnitsAccepted).toHaveBeenCalledTimes(1);
+      const acceptedUnits = onTerminalUnitsAccepted.mock.calls[0][0];
+      expect(acceptedUnits).toEqual([manifest.units[0], manifest.units[1], manifest.units[2]]);
+      expect(new Set(acceptedUnits).size).toBe(acceptedUnits.length);
+      const updates = browser.tabs.sendMessage.mock.calls
+        .map(([, m]) => m)
+        .filter(m => m.action === MessageActions.TRANSLATION_STREAM_UPDATE);
+      expect(updates).toHaveLength(1);
+      expect(updates[0].data.data.map(d => d.i)).toEqual(['a', 'n1', 'c']);
+    });
+
+    it('does not re-recover when a later parent violates after a successful recovery', async () => {
+      const browser = (await import('webextension-polyfill')).default;
+      browser.tabs.sendMessage.mockClear();
+      const m2 = '@@TI_SEG_e_s_n2@@';
+      const m3 = '@@TI_SEG_e_s_n3@@';
+      const b0 = { t: `X${m2}Y`, i: 'n1', blockId: 'b1', isV3Fragment: true, parentId: 'b1', fragmentIndex: 0, fragmentCount: 2, fragmentJoinerBefore: '' };
+      const b1 = { t: `${m3}Z`, i: 'n1', blockId: 'b1', isV3Fragment: true, parentId: 'b1', fragmentIndex: 1, fragmentCount: 2, fragmentJoinerBefore: ' ' };
+      const d0 = { t: `P${m2}Q`, i: 'n2', blockId: 'd1', isV3Fragment: true, parentId: 'd1', fragmentIndex: 0, fragmentCount: 2, fragmentJoinerBefore: '' };
+      const d1 = { t: `${m3}R`, i: 'n2', blockId: 'd1', isV3Fragment: true, parentId: 'd1', fragmentIndex: 1, fragmentCount: 2, fragmentJoinerBefore: ' ' };
+      mockEngine.createIntelligentBatches = vi.fn(() => [[
+        { t: 'Hello', i: 'a', blockId: 'a' },
+        b0,
+        b1,
+        { t: 'Goodbye', i: 'c', blockId: 'c' },
+        d0,
+        d1,
+      ]]);
+      mockProvider.translate
+        .mockResolvedValueOnce({ translatedText: ['Hello', `X${m2}Y`, `${m3}${m3}Z`, 'Goodbye', `P${m2}Q`, `${m3}${m3}R`] })
+        .mockResolvedValueOnce({ translatedText: [
+          { i: 'parent-1-0', text: 'X' },
+          { i: 'parent-1-1', text: 'Y' },
+          { i: 'parent-1-2', text: 'Z' },
+        ] });
+
+      const result = await handler.execute(
+        mockEngine,
+        { ...mockData, sourceLanguage: 'en', text: JSON.stringify([
+          { t: 'Hello', i: 'a', blockId: 'a' },
+          { t: `X${m2}Y ${m3}Z`, i: 'n1', blockId: 'b1' },
+          { t: 'Goodbye', i: 'c', blockId: 'c' },
+          { t: `P${m2}Q ${m3}R`, i: 'n2', blockId: 'd1' },
+        ]) },
+        mockProvider, 'en', 'fa', 'msg-multiple-invalid', mockSender
+      );
+
+      expect(result.success).toBe(false);
+      expect(mockProvider.translate.mock.calls.filter(call => call[3].callPurpose === TranslationCallPurpose.PARENT_RECOVERY)).toHaveLength(1);
+      expect(result.results).toHaveLength(3);
+      expect(result.results.map(r => r.i)).toEqual(['a', 'n1', 'c']);
+      const updates = browser.tabs.sendMessage.mock.calls
+        .map(([, m]) => m)
+        .filter(m => m.action === MessageActions.TRANSLATION_STREAM_UPDATE);
+      expect(updates).toHaveLength(1);
+      expect(updates[0].data.data.map(d => d.i)).toEqual(['a', 'n1', 'c']);
+    });
+
+    it('preserves the prefix in results without streaming when skipStreaming is set (PDF)', async () => {
+      const browser = (await import('webextension-polyfill')).default;
+      browser.tabs.sendMessage.mockClear();
+      const m2 = '@@TI_SEG_e_s_n2@@';
+      const m3 = '@@TI_SEG_e_s_n3@@';
+      const fragment0 = { t: `X${m2}Y`, i: 'n1', blockId: 'b1', isV3Fragment: true, parentId: 'b1', fragmentIndex: 0, fragmentCount: 2, fragmentJoinerBefore: '' };
+      const fragment1 = { t: `${m3}Z`, i: 'n1', blockId: 'b1', isV3Fragment: true, parentId: 'b1', fragmentIndex: 1, fragmentCount: 2, fragmentJoinerBefore: ' ' };
+      const manifest = createRequestUnitManifest(['Hello', `X${m2}Y ${m3}Z`]);
+      const onTerminalUnitsAccepted = vi.fn();
+      const executionContext = {
+        manifestView: createManifestView(manifest),
+        onTerminalUnitsAccepted,
+      };
+      mockEngine.createIntelligentBatches = vi.fn(() => [[
+        { t: 'Hello', i: 'a', blockId: 'a' },
+        fragment0,
+        fragment1,
+      ]]);
+      mockProvider.translate
+        .mockResolvedValueOnce({ translatedText: ['Hello', `X${m2}Y`, `${m3}${m3}Z`] })
+        .mockResolvedValueOnce({ translatedText: [
+          { i: 'parent-1-0', text: 'X' },
+          { i: 'parent-1-1', text: 'Y' },
+          { i: 'parent-1-2', text: `Z${m3}` },
+        ] })
+        .mockResolvedValueOnce({ translatedText: [
+          { i: 'parent-2-0', text: 'X' },
+          { i: 'parent-2-1', text: 'Y' },
+          { i: 'parent-2-2', text: `Z${m3}` },
+        ] });
+
+      const result = await handler.execute(
+        mockEngine,
+        { ...mockData, mode: 'pdf-translation', sourceLanguage: 'en', text: JSON.stringify([
+          { t: 'Hello', i: 'a', blockId: 'a' },
+          { t: `X${m2}Y ${m3}Z`, i: 'n1', blockId: 'b1' },
+        ]) },
+        mockProvider, 'en', 'fa', 'msg-skipstream-prefix', mockSender, 'unknown', executionContext
+      );
+
+      expect(result.success).toBe(false);
+      expect(result.error.type).toBe(ErrorTypes.VALIDATION);
+      expect(result.error.message).toContain('MARKER_COUNT_MISMATCH');
+      expect(result.results).toHaveLength(1);
+      expect(result.results[0]).toMatchObject({ i: 'a', t: 'Hello' });
+      expect(mockProvider.translate.mock.calls.filter(call => call[3].callPurpose === TranslationCallPurpose.PARENT_RECOVERY)).toHaveLength(2);
+      const updates = browser.tabs.sendMessage.mock.calls
+        .map(([, m]) => m)
+        .filter(m => m.action === MessageActions.TRANSLATION_STREAM_UPDATE);
+      expect(updates).toHaveLength(0);
+      // Canonical terminal observation is mode-gated: structured PDF never reaches
+      // onTerminalUnitsAccepted (existing PDF exclusion), so preservation must not
+      // introduce acceptance where the contract forbids it.
+      expect(onTerminalUnitsAccepted).not.toHaveBeenCalled();
+    });
+
+    it('recovers a parent with an empty prefix snapshot and keeps the suffix', async () => {
+      const browser = (await import('webextension-polyfill')).default;
+      browser.tabs.sendMessage.mockClear();
+      const m2 = '@@TI_SEG_e_s_n2@@';
+      const m3 = '@@TI_SEG_e_s_n3@@';
+      const fragment0 = { t: `X${m2}Y`, i: 'n1', blockId: 'b1', isV3Fragment: true, parentId: 'b1', fragmentIndex: 0, fragmentCount: 2, fragmentJoinerBefore: '' };
+      const fragment1 = { t: `${m3}Z`, i: 'n1', blockId: 'b1', isV3Fragment: true, parentId: 'b1', fragmentIndex: 1, fragmentCount: 2, fragmentJoinerBefore: ' ' };
+      mockEngine.createIntelligentBatches = vi.fn(() => [[
+        fragment0,
+        fragment1,
+        { t: 'Goodbye', i: 'c', blockId: 'c' },
+      ]]);
+      mockProvider.translate
+        .mockResolvedValueOnce({ translatedText: [`X${m2}Y`, `${m3}${m3}Z`, 'Goodbye'] })
+        .mockResolvedValueOnce({ translatedText: [
+          { i: 'parent-1-0', text: 'X' },
+          { i: 'parent-1-1', text: 'Y' },
+          { i: 'parent-1-2', text: 'Z' },
+        ] });
+
+      const result = await handler.execute(
+        mockEngine,
+        { ...mockData, sourceLanguage: 'en', text: JSON.stringify([
+          { t: `X${m2}Y ${m3}Z`, i: 'n1', blockId: 'b1' },
+          { t: 'Goodbye', i: 'c', blockId: 'c' },
+        ]) },
+        mockProvider, 'en', 'fa', 'msg-no-prefix-resume', mockSender
+      );
+
+      expect(result.success).toBe(true);
+      expect(mockProvider.translate.mock.calls.filter(call => call[3].callPurpose === TranslationCallPurpose.PARENT_RECOVERY)).toHaveLength(1);
+      expect(result.results.map(r => r.i)).toEqual(['n1', 'c']);
+      expect(result.results[0].t).toBe(`X${m2}Y ${m3}Z`);
+      const updates = browser.tabs.sendMessage.mock.calls
+        .map(([, m]) => m)
+        .filter(m => m.action === MessageActions.TRANSLATION_STREAM_UPDATE);
+      expect(updates).toHaveLength(1);
+      expect(updates[0].data.data.map(d => d.i)).toEqual(['n1', 'c']);
+    });
+
+    it('does not leak recovered parent fragment state into later batches', async () => {
+      const browser = (await import('webextension-polyfill')).default;
+      browser.tabs.sendMessage.mockClear();
+      const m2 = '@@TI_SEG_e_s_n2@@';
+      const m3 = '@@TI_SEG_e_s_n3@@';
+      const b0 = { t: `X${m2}Y`, i: 'n1', blockId: 'b1', isV3Fragment: true, parentId: 'b1', fragmentIndex: 0, fragmentCount: 2, fragmentJoinerBefore: '' };
+      const b1 = { t: `${m3}Z`, i: 'n1', blockId: 'b1', isV3Fragment: true, parentId: 'b1', fragmentIndex: 1, fragmentCount: 2, fragmentJoinerBefore: ' ' };
+      const d0 = { t: `P${m2}Q`, i: 'n2', blockId: 'd1', isV3Fragment: true, parentId: 'd1', fragmentIndex: 0, fragmentCount: 2, fragmentJoinerBefore: '' };
+      const d1 = { t: `${m3}R`, i: 'n2', blockId: 'd1', isV3Fragment: true, parentId: 'd1', fragmentIndex: 1, fragmentCount: 2, fragmentJoinerBefore: ' ' };
+      mockEngine.createIntelligentBatches = vi.fn(() => [[b0, b1], [d0, d1]]);
+      mockProvider.translate.mockImplementation((texts, _source, _target, options) => {
+        if (options.callPurpose === TranslationCallPurpose.PARENT_RECOVERY) {
+          return Promise.resolve({ translatedText: [
+            { i: 'parent-1-0', text: 'X' },
+            { i: 'parent-1-1', text: 'Y' },
+            { i: 'parent-1-2', text: 'Z' },
+          ] });
+        }
+        const first = Array.isArray(texts) ? (texts[0]?.t ?? texts[0]) : '';
+        if (String(first).startsWith('P')) {
+          return Promise.resolve({ translatedText: [`P${m2}Q`, `${m3}R`] });
+        }
+        return Promise.resolve({ translatedText: [`X${m2}Y`, `${m3}${m3}Z`] });
+      });
+
+      const result = await handler.execute(
+        mockEngine,
+        { ...mockData, sourceLanguage: 'en', text: JSON.stringify([
+          { t: `X${m2}Y ${m3}Z`, i: 'n1', blockId: 'b1' },
+          { t: `P${m2}Q ${m3}R`, i: 'n2', blockId: 'd1' },
+        ]) },
+        mockProvider, 'en', 'fa', 'msg-fragment-cleanup', mockSender
+      );
+
+      expect(result.success).toBe(true);
+      expect(mockProvider.translate.mock.calls.filter(call => call[3].callPurpose === TranslationCallPurpose.PARENT_RECOVERY)).toHaveLength(1);
+      expect(result.results.map(r => r.i)).toEqual(['n1', 'n2']);
+      expect(result.results[0].t).toBe(`X${m2}Y ${m3}Z`);
+      expect(result.results[1].t).toBe(`P${m2}Q ${m3}R`);
+      const updates = browser.tabs.sendMessage.mock.calls
+        .map(([, m]) => m)
+        .filter(m => m.action === MessageActions.TRANSLATION_STREAM_UPDATE);
+      expect(updates).toHaveLength(2);
+      const streamedIds = updates.flatMap(u => u.data.data.map(d => d.i)).sort();
+      expect(streamedIds).toEqual(['n1', 'n2']);
+    });
+
     it('does not start parent recovery when its inherited deadline is expired', async () => {
       const m2 = '@@TI_SEG_e_s_n2@@';
       const m3 = '@@TI_SEG_e_s_n3@@';
