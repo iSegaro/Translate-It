@@ -246,6 +246,11 @@ describe('Config Module', () => {
       await expect(getGeminiThinkingModeAsync()).resolves.toBe('default');
     });
 
+    it('should not expose the removed Gemini thinking toggle', () => {
+      expect(CONFIG).not.toHaveProperty('GEMINI_THINKING_ENABLED');
+      expect(CONFIG.GEMINI_THINKING_MODE).toBe('default');
+    });
+
     it('getApiKeyAsync should return value from storage', async () => {
       storageManager.get.mockResolvedValue({ API_KEY: 'secret-key' });
       const apiKey = await getApiKeyAsync();

@@ -101,6 +101,20 @@ describe('InstallHandler migration persistence', () => {
     expect(storageManager.set).toHaveBeenCalledWith({ APP_NAME: 'Translate It' });
     expect(storageManager.remove).toHaveBeenCalledWith(['PROMPT_SUBTITLE_BASE']);
   });
+
+  it('should persist legacy Gemini thinking conversion and remove the old key', async () => {
+    storageManager.get.mockResolvedValue({ GEMINI_THINKING_ENABLED: true });
+    runSettingsMigrations.mockResolvedValue({
+      updates: { GEMINI_THINKING_MODE: 'minimal' },
+      removals: ['GEMINI_THINKING_ENABLED'],
+      logs: []
+    });
+
+    await runIncrementalSettingsMigrations();
+
+    expect(storageManager.set).toHaveBeenCalledWith({ GEMINI_THINKING_MODE: 'minimal' });
+    expect(storageManager.remove).toHaveBeenCalledWith(['GEMINI_THINKING_ENABLED']);
+  });
 });
 
 describe('InstallHandler fresh-install persistence', () => {

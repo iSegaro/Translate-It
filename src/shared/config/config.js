@@ -113,7 +113,6 @@ export const CONFIG = {
   GEMINI_API_KEY: "", // Gemini API keys (newline-separated)
   GEMINI_API_URL: "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent", // Default Gemini API URL
   GEMINI_MODEL: "gemini-3.5-flash", // Selected Gemini model
-  GEMINI_THINKING_ENABLED: false, // Enable/disable thinking for supported models
   GEMINI_THINKING_MODE: "default", // Provider default or deferred minimal thinking mode
   GEMINI_MODELS: [
     {

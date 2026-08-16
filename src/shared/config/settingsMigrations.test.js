@@ -368,10 +368,35 @@ describe('Settings Migrations', () => {
     expect(updates.GEMINI_THINKING_MODE).toBe(expectedMode);
   });
 
-  it('preserves legacy Gemini thinking setting during migration', async () => {
-    const { updates } = await runSettingsMigrations({ GEMINI_THINKING_ENABLED: true });
+  it.each([
+    [{ GEMINI_THINKING_ENABLED: true, GEMINI_THINKING_MODE: 'default' }, 'default'],
+    [{ GEMINI_THINKING_ENABLED: false, GEMINI_THINKING_MODE: 'minimal' }, 'minimal']
+  ])('preserves valid Gemini thinking mode %o over legacy state', async (currentSettings, expectedMode) => {
+    const { updates, removals } = await runSettingsMigrations(currentSettings);
 
-    expect(updates.GEMINI_THINKING_ENABLED).toBeUndefined();
+    expect(updates.GEMINI_THINKING_MODE).toBeUndefined();
+    expect(currentSettings.GEMINI_THINKING_MODE).toBe(expectedMode);
+    expect(removals).toContain('GEMINI_THINKING_ENABLED');
+  });
+
+  it.each([
+    [true, 'minimal'],
+    [false, 'default']
+  ])('removes legacy Gemini thinking state during migration (%s)', async (legacyValue, expectedMode) => {
+    const { updates, removals } = await runSettingsMigrations({ GEMINI_THINKING_ENABLED: legacyValue });
+
+    expect(updates.GEMINI_THINKING_MODE).toBe(expectedMode);
+    expect(removals).toContain('GEMINI_THINKING_ENABLED');
+  });
+
+  it('keeps invalid Gemini mode behavior and removes legacy state', async () => {
+    const { updates, removals } = await runSettingsMigrations({
+      GEMINI_THINKING_MODE: 'invalid',
+      GEMINI_THINKING_ENABLED: true
+    });
+
+    expect(updates.GEMINI_THINKING_MODE).toBe('default');
+    expect(removals).toContain('GEMINI_THINKING_ENABLED');
   });
 
   it('should preserve user sensitive data like translationHistory', async () => {

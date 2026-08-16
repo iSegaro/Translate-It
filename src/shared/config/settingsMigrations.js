@@ -274,7 +274,7 @@ function runMainMigration(currentSettings) {
     }
   });
 
-  // Migrate legacy Gemini thinking toggle without deleting it for downgrade compatibility.
+  // Migrate and remove the legacy Gemini thinking toggle.
   const thinkingMode = currentSettings.GEMINI_THINKING_MODE;
   if (thinkingMode !== 'default' && thinkingMode !== 'minimal') {
     const migratedThinkingMode = Object.prototype.hasOwnProperty.call(currentSettings, 'GEMINI_THINKING_MODE')
@@ -293,6 +293,10 @@ function runMainMigration(currentSettings) {
     removals.forEach(key => {
       migrationLog.push(`Removing obsolete stored prompt wrapper: ${key}`);
     });
+  }
+  if (Object.prototype.hasOwnProperty.call(currentSettings, 'GEMINI_THINKING_ENABLED')) {
+    removals.push('GEMINI_THINKING_ENABLED');
+    migrationLog.push('Removing obsolete stored setting: GEMINI_THINKING_ENABLED');
   }
 
   // B. Handle model lists - Dynamic update & reset if model removed
