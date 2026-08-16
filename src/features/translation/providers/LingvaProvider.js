@@ -7,6 +7,7 @@ import { AUTO_DETECT_VALUE } from "@/shared/constants/core.js";
 import { getLingvaApiUrlAsync } from "@/shared/config/config.js";
 import { getProviderLanguageCode } from "@/shared/config/languageConstants.js";
 import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
+import { TranslationSegmentMapper } from '@/utils/translation/TranslationSegmentMapper.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.TRANSLATION, 'LingvaProvider');
 
@@ -125,6 +126,47 @@ export class LingvaProvider extends BaseTranslateProvider {
   }
 
   /**
+   * Validate mapped output before returning the joined provider result.
+   *
+   * @param {string} translatedText - Joined Lingva response.
+   * @param {Array} sourceTexts - Source items for the physical chunk.
+   * @throws {Error} with type API_RESPONSE_INVALID for invalid mapped output.
+   * @private
+   */
+  _validateMappedOutput(translatedText, sourceTexts) {
+    // No delimiter means BaseTranslateProvider owns fallback word-ratio mapping.
+    if (sourceTexts.length <= 1 || !translatedText.includes(LingvaProvider.TEXT_DELIMITER)) return;
+
+    let mappedTexts;
+    try {
+      mappedTexts = TranslationSegmentMapper.mapTranslationToOriginalSegments(
+        translatedText,
+        sourceTexts,
+        TranslationSegmentMapper.STANDARD_DELIMITER,
+        this.providerName
+      );
+    } catch (error) {
+      // Preserve BaseTranslateProvider's existing cardinality conversion path.
+      if (error.type === TranslationSegmentMapper.INCOMPLETE_CARDINALITY) return;
+      throw error;
+    }
+
+    const invalidIndex = mappedTexts.findIndex((translatedItem, index) => {
+      const sourceText = getTextInfo(sourceTexts[index]).text;
+      return sourceText.trim() !== ''
+        && (typeof translatedItem !== 'string' || translatedItem.trim() === '');
+    });
+
+    if (invalidIndex !== -1) {
+      const invalidResponse = new Error(
+        `[${this.providerName}] Invalid mapped translation at index ${invalidIndex}`
+      );
+      invalidResponse.type = ErrorTypes.API_RESPONSE_INVALID;
+      throw invalidResponse;
+    }
+  }
+
+  /**
    * Partition an array of normalized texts into URL-budget-safe subgroups.
    * Uses deterministic greedy grouping based on full encoded URL length.
    *
@@ -227,6 +269,8 @@ export class LingvaProvider extends BaseTranslateProvider {
         url, 'lingva-standard-chunk', abortController, joinedText.length, originalCharCount
       );
 
+      this._validateMappedOutput(result, chunkTexts);
+
       if (result) {
         logger.info(`[Lingva] Translation completed successfully`);
       }
@@ -251,6 +295,7 @@ export class LingvaProvider extends BaseTranslateProvider {
         subgroupOriginalCharCount
       );
 
+      this._validateMappedOutput(subgroupResult, subgroup);
       subgroupResponses.push(subgroupResult);
     }
 
