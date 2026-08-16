@@ -300,9 +300,11 @@ describe('UnifiedModeCoordinator', () => {
     function deferredProvider() {
       return {
         sources: [],
+        options: [],
         pending: [],
         translate() {
           this.sources.push(arguments[1]);
+          this.options.push(arguments[3]);
           const next = deferred();
           this.pending.push(next);
           return next.promise;
@@ -358,6 +360,12 @@ describe('UnifiedModeCoordinator', () => {
         await flush();
 
         expect(provider.sources).toEqual(['auto', 'en', 'en']);
+
+        // Only the owner resolves the session source; established waiters pass
+        // languagePairResolved so ProviderCoordinator skips semantic swap/detect.
+        expect(provider.options[0].languagePairResolved).toBeUndefined();
+        expect(provider.options[1].languagePairResolved).toBe(true);
+        expect(provider.options[2].languagePairResolved).toBe(true);
 
         provider.pending[1].resolve(provider.success('en'));
         provider.pending[2].resolve(provider.success('en'));
@@ -561,6 +569,8 @@ describe('UnifiedModeCoordinator', () => {
         await flush();
         expect(provider.sources).toEqual(['de', 'de']);
         expect(coordinator.pageSourceResolvers.size).toBe(0);
+        // Explicit source is not semantic resolution: no languagePairResolved.
+        expect(provider.options.every((o) => o.languagePairResolved === undefined)).toBe(true);
 
         provider.pending[0].resolve(provider.success('de'));
         provider.pending[1].resolve(provider.success('de'));
@@ -586,6 +596,8 @@ describe('UnifiedModeCoordinator', () => {
         await flush();
         await flush();
         expect(provider.sources).toEqual(['auto', 'auto']);
+        // Subtitle keeps per-batch AUTO: never resolved at session level.
+        expect(provider.options.every((o) => o.languagePairResolved === undefined)).toBe(true);
 
         provider.pending[0].resolve(provider.success('de'));
         provider.pending[1].resolve(provider.success('de'));
