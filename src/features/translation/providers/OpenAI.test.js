@@ -25,7 +25,6 @@ vi.mock('@/shared/config/config.js', async (importOriginal) => {
     getOpenAIApiKeysAsync: vi.fn().mockResolvedValue(['test-key']),
     getOpenAIModelAsync: vi.fn().mockResolvedValue('gpt-4o-mini'),
     getSettingsAsync: vi.fn().mockResolvedValue({}),
-    getPromptBASEScreenCaptureAsync: vi.fn().mockResolvedValue('Translate this image to {targetLanguage}'),
   };
 });
 
