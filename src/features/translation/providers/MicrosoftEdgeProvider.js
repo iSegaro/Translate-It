@@ -190,7 +190,17 @@ export class MicrosoftEdgeProvider extends BaseTranslateProvider {
               err.type = ErrorTypes.API_RESPONSE_INVALID;
               throw err;
             }
-            return item.translations.map(t => t.text).join(' ');
+            // No silent empty-fill: an empty, whitespace-only, or non-string
+            // joined result must fail loudly so the caller never mistakes it
+            // for a successful translation. Identity output (text === source)
+            // is legitimate and remains accepted.
+            const joinedText = item.translations.map(t => t.text).join(' ');
+            if (typeof joinedText !== 'string' || !joinedText.trim()) {
+              const err = new Error(ErrorTypes.API_RESPONSE_INVALID);
+              err.type = ErrorTypes.API_RESPONSE_INVALID;
+              throw err;
+            }
+            return joinedText;
           });
         },
         context: 'edge-translate-chunk',
