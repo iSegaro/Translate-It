@@ -17,7 +17,7 @@ const logger = getScopedLogger(LOG_COMPONENTS.TRANSLATION, 'UnifiedModeCoordinat
 
 export class UnifiedModeCoordinator {
   constructor() {
-    // sessionId -> per-session source-language resolution state for Page 'auto' batches.
+    // sessionId -> per-session semantic-pair resolution state for Page 'auto' batches.
     // Exactly one batch owns resolution per session; concurrent batches await it.
     // Entries are cleared on session terminal lifecycle (complete/cancel/error).
     this.pageSourceResolvers = new Map();
@@ -214,29 +214,38 @@ export class UnifiedModeCoordinator {
   }
 
   /**
-   * Acquire the source-language resolution slot for a Page 'auto' batch session.
+   * Acquire the semantic-pair resolution slot for a Page 'auto' batch session.
    *
    * Concurrency contract:
-   *   - No language yet and no pending resolution -> this batch becomes the
+   *   - No pair yet and no pending resolution -> this batch becomes the
    *     owner and is the ONLY one allowed to invoke the provider with 'auto'.
-   *   - Language already resolved -> return it directly.
+   *   - Semantic pair already resolved -> return it directly.
    *   - Resolution in flight        -> return the promise to await instead of
    *     issuing a duplicate 'auto' provider call.
    *
    * @param {string} sessionId - Page translation session identifier
-   * @returns {object} { state|null, isOwner, language|resolutionPromise }
+   * @returns {object} { state|null, isOwner, effectiveSourceLanguage, effectiveTargetLanguage|resolutionPromise }
    * @private
    */
   _acquirePageSourceResolution(sessionId) {
     let state = this.pageSourceResolvers.get(sessionId);
 
     if (!state) {
-      state = { language: null, resolutionPromise: null, _resolveSource: null, _rejectSource: null };
+      state = {
+        effectiveSourceLanguage: null,
+        effectiveTargetLanguage: null,
+        resolutionPromise: null,
+        _resolveSource: null,
+        _rejectSource: null
+      };
       this.pageSourceResolvers.set(sessionId, state);
     }
 
-    if (state.language) {
-      return { language: state.language };
+    if (state.effectiveSourceLanguage && state.effectiveTargetLanguage) {
+      return {
+        effectiveSourceLanguage: state.effectiveSourceLanguage,
+        effectiveTargetLanguage: state.effectiveTargetLanguage
+      };
     }
     if (state.resolutionPromise) {
       return { resolutionPromise: state.resolutionPromise };
@@ -253,31 +262,43 @@ export class UnifiedModeCoordinator {
   }
 
   /**
-   * Owner batch finalizes the session source from the request-local detected
-   * language carried by its own provider response. A clear that already
+   * Owner batch finalizes the session pair from the effective languages carried
+   * by its own ProviderCoordinator response. A clear that already
    * removed the session (cancellation/restore) prevents a late owner success
    * from repopulating the lock.
    *
    * @param {string} sessionId
    * @param {object} resolution - The { state } tuple handed to the owner
-   * @param {string|null} detectedLanguage - Request-local detected source
+   * @param {object} response - ProviderCoordinator response with effective pair
    * @private
    */
-  _finalizePageSourceResolution(sessionId, resolution, detectedLanguage) {
+  _finalizePageSourceResolution(sessionId, resolution, response) {
     if (!resolution?.state) return;
     const state = resolution.state;
 
     // Late owner completion after a clear must not recreate removed state.
     if (this.pageSourceResolvers.get(sessionId) !== state) return;
 
-    if (detectedLanguage && detectedLanguage !== AUTO_DETECT_VALUE) {
-      state.language = detectedLanguage;
-      if (state._resolveSource) state._resolveSource(detectedLanguage);
+    const effectiveSourceLanguage = response?.sourceLanguage;
+    const effectiveTargetLanguage = response?.targetLanguage;
+    const hasConcretePair = typeof effectiveSourceLanguage === 'string'
+      && effectiveSourceLanguage.trim() !== ''
+      && effectiveSourceLanguage !== AUTO_DETECT_VALUE
+      && typeof effectiveTargetLanguage === 'string'
+      && effectiveTargetLanguage.trim() !== ''
+      && effectiveTargetLanguage !== AUTO_DETECT_VALUE;
+
+    if (hasConcretePair) {
+      state.effectiveSourceLanguage = effectiveSourceLanguage;
+      state.effectiveTargetLanguage = effectiveTargetLanguage;
+      if (state._resolveSource) {
+        state._resolveSource({ effectiveSourceLanguage, effectiveTargetLanguage });
+      }
     } else {
-      // No usable language confirmed: release any waiters and drop the slot so a
-      // later attempt can become the resolver again. No arbitrary fallback is kept.
+      // No complete pair confirmed: release any waiters and drop the slot so a
+      // later attempt can become the resolver again. Never cache source alone.
       this.pageSourceResolvers.delete(sessionId);
-      const error = new Error(`No source language detected for page session ${sessionId}`);
+      const error = new Error(`No semantic language pair resolved for page session ${sessionId}`);
       if (state._rejectSource) state._rejectSource(error);
     }
 
@@ -340,7 +361,7 @@ export class UnifiedModeCoordinator {
     const { mode, items, transformOutput, handleError, useRawItems = false } = options;
     
     const sourceLanguage = data.sourceLanguage || data.sourceLang || 'auto';
-    const targetLanguage = data.targetLanguage || data.targetLang;
+    let targetLanguage = data.targetLanguage || data.targetLang;
 
     // Validate that items is an array.
     if (!items || !Array.isArray(items)) {
@@ -378,12 +399,12 @@ export class UnifiedModeCoordinator {
     try {
       sessionId = request.sessionId || data.sessionId || messageId;
 
-      // Per-session source-language resolution for auto-detected Page batches.
+      // Per-session semantic-pair resolution for auto-detected Page batches.
       // Concurrency-safe: only the ownership batch issues a provider call with
       // 'auto'; concurrent batches await the session's resolution instead of
       // launching duplicate 'auto' requests (which surfaced transient detections
-      // like 'it'/'sv' failing sibling batches mid-session). Language is taken
-      // from the request's own response, never from mutable provider state.
+      // like 'it'/'sv' failing sibling batches mid-session). The authoritative
+      // pair is taken from the request's own ProviderCoordinator response.
       let effectiveSourceLanguage = sourceLanguage;
 
       if (mode === TranslationMode.Page && sourceLanguage === AUTO_DETECT_VALUE) {
@@ -392,17 +413,20 @@ export class UnifiedModeCoordinator {
         if (sourceResolution.isOwner) {
           // Resolution owner: the only path permitted to execute with 'auto'.
           effectiveSourceLanguage = sourceLanguage;
-        } else if (sourceResolution.language) {
-          effectiveSourceLanguage = sourceResolution.language;
+        } else if (sourceResolution.effectiveSourceLanguage) {
+          effectiveSourceLanguage = sourceResolution.effectiveSourceLanguage;
+          targetLanguage = sourceResolution.effectiveTargetLanguage;
         } else {
-          // Concurrent batch: wait for the owner to confirm the session language.
-          effectiveSourceLanguage = await sourceResolution.resolutionPromise;
+          // Concurrent batch: wait for the owner to confirm the semantic pair.
+          const resolvedPair = await sourceResolution.resolutionPromise;
+          effectiveSourceLanguage = resolvedPair.effectiveSourceLanguage;
+          targetLanguage = resolvedPair.effectiveTargetLanguage;
         }
       }
 
       logger.debug(`[UnifiedCoordinator] ${mode} batch source: ${effectiveSourceLanguage}`);
 
-      // A Page waiter/established batch has a canonical session-resolved source.
+      // A Page waiter/established batch has a canonical session-resolved pair.
       // Pass languagePairResolved so ProviderCoordinator skips the semantic
       // swap/detection that the session owner already performed. The owner (and
       // every non-Page batch, e.g. Subtitle per-batch AUTO) stays unresolved.
@@ -454,10 +478,10 @@ export class UnifiedModeCoordinator {
         timeoutPromise
       ]);
 
-      // Resolution owner finalizes the session source from its own response's
-      // request-local detected language once the provider call completes.
+      // Resolution owner finalizes the session pair from the effective
+      // source/target returned by ProviderCoordinator.
       if (sourceResolution?.isOwner) {
-        this._finalizePageSourceResolution(sessionId, sourceResolution, response?.detectedLanguage);
+        this._finalizePageSourceResolution(sessionId, sourceResolution, response);
       }
 
       const translatedSegments = (response && typeof response === 'object' && response.translatedText !== undefined) 

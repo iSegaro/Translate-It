@@ -300,17 +300,24 @@ describe('UnifiedModeCoordinator', () => {
     function deferredProvider() {
       return {
         sources: [],
+        targets: [],
         options: [],
         pending: [],
         translate() {
           this.sources.push(arguments[1]);
+          this.targets.push(arguments[2]);
           this.options.push(arguments[3]);
           const next = deferred();
           this.pending.push(next);
           return next.promise;
         },
-        success(detectedLanguage) {
-          return { translatedText: ['ت۱', 'ت۲'], detectedLanguage };
+        success(detectedLanguage, effectiveSourceLanguage = detectedLanguage, effectiveTargetLanguage = 'fa') {
+          return {
+            translatedText: ['ت۱', 'ت۲'],
+            detectedLanguage,
+            sourceLanguage: effectiveSourceLanguage,
+            targetLanguage: effectiveTargetLanguage
+          };
         }
       };
     }
@@ -360,6 +367,7 @@ describe('UnifiedModeCoordinator', () => {
         await flush();
 
         expect(provider.sources).toEqual(['auto', 'en', 'en']);
+        expect(provider.targets).toEqual(['fa', 'fa', 'fa']);
 
         // Only the owner resolves the session source; established waiters pass
         // languagePairResolved so ProviderCoordinator skips semantic swap/detect.
@@ -373,6 +381,32 @@ describe('UnifiedModeCoordinator', () => {
         results.forEach(r => expect(r.success).toBe(true));
 
         expect(provider.sources.filter(s => s === 'auto')).toEqual(['auto']);
+        spy.restore();
+      });
+
+      it('propagates target-changing bilingual pair to Page waiters', async () => {
+        const provider = deferredProvider();
+        mockEngine.getProvider.mockResolvedValue(provider);
+        const spy = spyAcquires(coordinator, ['s1']);
+
+        const owner = coordinator.processRequest(pageBatchRequest({ sessionId: 's1', messageId: 'm-owner' }), { translationEngine: mockEngine });
+        const waiter = coordinator.processRequest(pageBatchRequest({ sessionId: 's1', messageId: 'm-waiter' }), { translationEngine: mockEngine });
+
+        await waitForAcquires(spy, 's1', 2);
+        expect(provider.sources).toEqual(['auto']);
+        expect(provider.targets).toEqual(['fa']);
+
+        // ProviderCoordinator has already applied bilingual semantics: fa -> en.
+        provider.pending[0].resolve(provider.success('fa', 'fa', 'en'));
+        await flush();
+        await flush();
+
+        expect(provider.sources).toEqual(['auto', 'fa']);
+        expect(provider.targets).toEqual(['fa', 'en']);
+        expect(provider.options[1].languagePairResolved).toBe(true);
+
+        provider.pending[1].resolve(provider.success('fa', 'fa', 'en'));
+        await Promise.all([owner, waiter]);
         spy.restore();
       });
     });
@@ -433,7 +467,7 @@ describe('UnifiedModeCoordinator', () => {
         expect(provider.sources).toEqual(['auto', 'auto']);
         provider.pending[1].resolve(provider.success('en'));
         await retry;
-        expect(coordinator.pageSourceResolvers.get('s1').language).toBe('en');
+        expect(coordinator.pageSourceResolvers.get('s1').effectiveSourceLanguage).toBe('en');
         spy.restore();
       });
     });
@@ -545,8 +579,8 @@ describe('UnifiedModeCoordinator', () => {
         provider.pending[1].resolve(provider.success('sv'));
         await Promise.all([sessionA, sessionB]);
 
-        expect(coordinator.pageSourceResolvers.get('s1').language).toBe('en');
-        expect(coordinator.pageSourceResolvers.get('s2').language).toBe('sv');
+        expect(coordinator.pageSourceResolvers.get('s1').effectiveSourceLanguage).toBe('en');
+        expect(coordinator.pageSourceResolvers.get('s2').effectiveSourceLanguage).toBe('sv');
         spy.restore();
       });
     });
@@ -635,7 +669,7 @@ describe('UnifiedModeCoordinator', () => {
         await flush();
         provider.pending[0].resolve(provider.success('en'));
         await first;
-        expect(coordinator.pageSourceResolvers.get('s1').language).toBe('en');
+        expect(coordinator.pageSourceResolvers.get('s1').effectiveSourceLanguage).toBe('en');
 
         // Terminal completion clears the resolved session.
         coordinator.clearPageSourceLanguage('s1');
@@ -676,14 +710,14 @@ describe('UnifiedModeCoordinator', () => {
       await flush();
       provider.pending[0].resolve(provider.success('en'));
       await first;
-      expect(coordinator.pageSourceResolvers.get('s1').language).toBe('en');
+      expect(coordinator.pageSourceResolvers.get('s1').effectiveSourceLanguage).toBe('en');
 
       const second = coordinator.processRequest(pageBatchRequest({ sessionId: 's1', messageId: 'm2' }), { translationEngine: mockEngine });
       await flush();
       expect(provider.sources).toEqual(['auto', 'en']);
       provider.pending[1].resolve(provider.success('en'));
       await second;
-      expect(coordinator.pageSourceResolvers.get('s1').language).toBe('en');
+      expect(coordinator.pageSourceResolvers.get('s1').effectiveSourceLanguage).toBe('en');
     });
 
     it('does not leak the lock across different sessions', async () => {
@@ -700,7 +734,7 @@ describe('UnifiedModeCoordinator', () => {
       expect(provider.sources).toEqual(['auto', 'auto']);
       provider.pending[1].resolve(provider.success('sv'));
       await s2;
-      expect(coordinator.pageSourceResolvers.get('s2').language).toBe('sv');
+      expect(coordinator.pageSourceResolvers.get('s2').effectiveSourceLanguage).toBe('sv');
     });
 
     it('leaves the session unlocked when the owner never confirms a language', async () => {
@@ -719,7 +753,7 @@ describe('UnifiedModeCoordinator', () => {
       expect(provider.sources).toEqual(['auto', 'auto']);
       provider.pending[1].resolve(provider.success('en'));
       await second;
-      expect(coordinator.pageSourceResolvers.get('s1').language).toBe('en');
+      expect(coordinator.pageSourceResolvers.get('s1').effectiveSourceLanguage).toBe('en');
     });
   });
 
