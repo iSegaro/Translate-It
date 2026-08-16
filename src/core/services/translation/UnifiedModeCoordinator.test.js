@@ -792,6 +792,57 @@ describe('UnifiedModeCoordinator', () => {
       expect(result[0].isSkipped).toBeUndefined();
     });
 
+    it('marks missing plain-string results as skipped', async () => {
+      mockEngine.getProvider.mockResolvedValue({
+        translate: vi.fn().mockResolvedValue(['A2', 'B2'])
+      });
+
+      const result = await coordinator._processGenericBatch(
+        batchRequest(),
+        { translationEngine: mockEngine },
+        batchOptions(['A', 'B', 'C'])
+      );
+
+      expect(result).toEqual([
+        { text: 'A2' },
+        { text: 'B2' },
+        { text: 'C', isSkipped: true }
+      ]);
+    });
+
+    it('does not mark complete plain-string results as skipped', async () => {
+      mockEngine.getProvider.mockResolvedValue({
+        translate: vi.fn().mockResolvedValue(['A2', 'B2'])
+      });
+
+      const result = await coordinator._processGenericBatch(
+        batchRequest(),
+        { translationEngine: mockEngine },
+        batchOptions(['A', 'B'])
+      );
+
+      expect(result).toEqual([{ text: 'A2' }, { text: 'B2' }]);
+      result.forEach(item => expect(item.isSkipped).toBeUndefined());
+    });
+
+    it('marks missing mixed string and object results according to item shape', async () => {
+      mockEngine.getProvider.mockResolvedValue({
+        translate: vi.fn().mockResolvedValue(['A2'])
+      });
+
+      const result = await coordinator._processGenericBatch(
+        batchRequest(),
+        { translationEngine: mockEngine },
+        batchOptions(['A', { text: 'B' }, 'C'])
+      );
+
+      expect(result).toEqual([
+        { text: 'A2' },
+        { text: 'B', isSkipped: true },
+        { text: 'C', isSkipped: true }
+      ]);
+    });
+
     it('fires the generic batch guard exactly at the canonical batch execution budget', async () => {
       vi.useFakeTimers();
       try {
@@ -877,6 +928,30 @@ describe('UnifiedModeCoordinator', () => {
       result.forEach(item => expect(item.isSkipped).toBeUndefined());
       expect(result[0].text).toBe('ترجمهٔ A');
       expect(result[1].text).toBe('ترجمهٔ B');
+    });
+  });
+
+  describe('Page plain-string batch payloads', () => {
+    it('marks under-returned string-array payload items as skipped', async () => {
+      mockEngine.getProvider.mockResolvedValue({
+        translate: vi.fn().mockResolvedValue(['A2'])
+      });
+
+      const result = await coordinator.processPageTranslation({
+        mode: TranslationMode.Page,
+        messageId: 'm-page-strings',
+        data: {
+          text: JSON.stringify(['A', 'B']),
+          provider: 'google',
+          sourceLanguage: 'en',
+          targetLanguage: 'fa'
+        }
+      }, { translationEngine: mockEngine });
+
+      expect(JSON.parse(result.translatedText)).toEqual([
+        { text: 'A2' },
+        { text: 'B', isSkipped: true }
+      ]);
     });
   });
 });
