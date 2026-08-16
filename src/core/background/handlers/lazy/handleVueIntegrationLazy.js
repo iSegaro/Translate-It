@@ -19,7 +19,6 @@ async function loadVueIntegrationHandlers() {
   logger.debug('Loading Vue integration handlers lazily');
 
   const [
-    translateImageModule,
     providerStatusModule,
     testProviderModule,
     saveProviderModule,
@@ -32,7 +31,6 @@ async function loadVueIntegrationHandlers() {
     syncOCRLanguagesModule,
     vueBridgeModule
   ] = await Promise.all([
-    import('../vue-integration/handleTranslateImage.js'),
     import('../vue-integration/handleProviderStatus.js'),
     import('../vue-integration/handleTestProviderConnection.js'),
     import('../vue-integration/handleSaveProviderConfig.js'),
@@ -47,7 +45,6 @@ async function loadVueIntegrationHandlers() {
   ]);
 
   vueIntegrationHandlers = {
-    handleTranslateImage: translateImageModule.handleTranslateImage,
     handleProviderStatus: providerStatusModule.handleProviderStatus,
     handleTestProviderConnection: testProviderModule.handleTestProviderConnection,
     handleSaveProviderConfig: saveProviderModule.handleSaveProviderConfig,
@@ -64,14 +61,6 @@ async function loadVueIntegrationHandlers() {
   logger.debug('Vue integration handlers loaded successfully');
   return vueIntegrationHandlers;
 }
-
-/**
- * Lazy handler for TRANSLATE_IMAGE
- */
-export const handleTranslateImageLazy = async (message, sender, sendResponse) => {
-  const { handleTranslateImage } = await loadVueIntegrationHandlers();
-  return await handleTranslateImage(message, sender, sendResponse);
-};
 
 /**
  * Lazy handler for PROVIDER_STATUS

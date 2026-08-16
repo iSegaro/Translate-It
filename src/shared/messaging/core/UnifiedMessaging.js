@@ -37,7 +37,6 @@ const OPERATION_TIMEOUTS = {
   'TRANSLATE_SELECTION': 45000,
   'TRANSLATE_PAGE': 60000,
   'TRANSLATE_TEXT': 45000,
-  'TRANSLATE_IMAGE': 35000,
   'page-translate-batch': 60000,
   'FETCH_TRANSLATION': 10000,
   'PROCESS_SELECTED_ELEMENT': 8000,
@@ -57,7 +56,6 @@ const OPERATION_TIMEOUTS = {
   'START_CAPTURE_SELECTION': 15000,
   'PROCESS_IMAGE_OCR': 30000,
   'OCR_PROCESS': 30000,
-  'CAPTURE_TRANSLATE_IMAGE_DIRECT': 35000,
   'PROCESS_SCREEN_CAPTURE': 20000,
   'START_AREA_CAPTURE': 15000,
   'START_SCREEN_AREA_SELECTION': 10000,
@@ -271,7 +269,7 @@ export async function sendRegularMessage(message, options = {}) {
 }
 
 function isTranslationAction(action) {
-  return ['TRANSLATE', 'TRANSLATE_SELECTION', 'TRANSLATE_TEXT', 'TRANSLATE_PAGE', 'TRANSLATE_IMAGE'].includes(action);
+  return ['TRANSLATE', 'TRANSLATE_SELECTION', 'TRANSLATE_TEXT', 'TRANSLATE_PAGE'].includes(action);
 }
 
 export default { sendMessage, sendRegularMessage };
