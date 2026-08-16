@@ -623,6 +623,52 @@ describe('DomTranslatorAdapter', () => {
       expect(adapter.groupMap.get('g2').applied).toBe(false);
     });
 
+    it('keeps an already-committed group when a later independent group mutation fails', async () => {
+      const { getFeatureSemanticBlockGroupingAsync } = await import('@/config.js');
+      getFeatureSemanticBlockGroupingAsync.mockResolvedValueOnce(true);
+      const first = document.createTextNode('A');
+      const second = document.createTextNode('B');
+      testElement.replaceChildren(first, second);
+      const { collectBlockGroups } = await import('./DomTranslatorUtils.js');
+      collectBlockGroups.mockReturnValueOnce([
+        { id: 'n1', blockId: 'g1', text: 'A', leadingWS: '', trailingWS: '', preWhitespace: false, directionHint: 'ltr', inlineParentTags: ['div'], mode: 'standard', node: first },
+        { id: 'n2', blockId: 'g2', text: 'B', leadingWS: '', trailingWS: '', preWhitespace: false, directionHint: 'ltr', inlineParentTags: ['div'], mode: 'standard', node: second },
+      ]);
+      const { BlockGroupReconstructor } = await import('./BlockGroupReconstructor.js');
+      const realApply = BlockGroupReconstructor.apply;
+      const applySpy = vi.spyOn(BlockGroupReconstructor, 'apply')
+        .mockImplementationOnce((...args) => realApply.call(BlockGroupReconstructor, ...args))
+        .mockImplementationOnce(() => { throw new Error('group2 mutation failed'); });
+      let callbacks;
+      registerTranslation.mockImplementationOnce((_id, registered) => { callbacks = registered; });
+      contentScriptIntegration.sendTranslationRequest.mockResolvedValueOnce({
+        success: true,
+        streaming: true,
+        conversationAcceptance: true,
+      });
+
+      const translation = adapter.translateElement(testElement);
+      await vi.waitFor(() => expect(callbacks).toBeDefined());
+      callbacks.onStreamUpdate({ success: true, data: [{ t: 'Uno', i: 'n1' }, { t: 'Dos', i: 'n2' }] });
+      callbacks.onStreamEnd({ success: true });
+
+      await expect(translation).rejects.toThrow('group2 mutation failed');
+      applySpy.mockRestore();
+      expect(first.nodeValue).toContain('Uno');
+      expect(second.nodeValue).toBe('B');
+
+      const accepted = sendRegularMessage.mock.calls
+        .map(([message]) => message?.data)
+        .filter(data => data?.accepted === true)
+        .map(data => data.parentId);
+      const rejected = sendRegularMessage.mock.calls
+        .map(([message]) => message?.data)
+        .filter(data => data?.accepted === false)
+        .map(data => data.parentId);
+      expect(accepted).toEqual(['g1']);
+      expect(rejected).toEqual(['g2']);
+    });
+
     it('reports PARTIAL_SUCCESS with one committed group and one invalid V2 passthrough group', async () => {
       const { getFeatureSemanticBlockGroupingAsync } = await import('@/config.js');
       getFeatureSemanticBlockGroupingAsync.mockResolvedValueOnce(true);
@@ -2569,6 +2615,240 @@ describe('DomTranslatorAdapter', () => {
       await expect(adapter.translateElement(testElement)).rejects.toThrow('hover rollback failure');
       expect(lookup.has(first)).toBe(false);
       expect(lookup.has(second)).toBe(false);
+    });
+
+    it('emits one rejection ACK on direct mutation failure and never a positive ACK', async () => {
+      const textNode = testElement.firstChild;
+      const { collectTextNodes } = await import('./DomTranslatorUtils.js');
+      collectTextNodes.mockReturnValueOnce([
+        { node: textNode, text: 'Hello', uid: 'n1', blockId: 'b1', role: 'div' }
+      ]);
+      vi.spyOn(adapter, '_applyTranslationToNode').mockImplementationOnce(() => {
+        throw new Error('mutation failure');
+      });
+      contentScriptIntegration.sendTranslationRequest.mockResolvedValueOnce({
+        success: true,
+        streaming: false,
+        translatedText: [{ t: 'Uno', i: 'n1' }],
+        conversationAcceptance: true,
+      });
+
+      await expect(adapter.translateElement(testElement)).rejects.toThrow('mutation failure');
+
+      const ackCalls = sendRegularMessage.mock.calls
+        .map(([message]) => message?.data)
+        .filter(data => data?.parentId === 'b1');
+      expect(ackCalls).toEqual([
+        expect.objectContaining({ parentId: 'b1', accepted: false })
+      ]);
+      expect(textNode.nodeValue).toBe('Hello');
+    });
+
+    it('aggregates direct rollback failures while preserving the original mutation error', async () => {
+      const first = document.createTextNode('A');
+      const second = document.createTextNode('B');
+      testElement.replaceChildren(first, second);
+      const { collectTextNodes } = await import('./DomTranslatorUtils.js');
+      collectTextNodes.mockReturnValueOnce([
+        { node: first, text: 'A', uid: 'n1', blockId: 'b1', role: 'div' },
+        { node: second, text: 'B', uid: 'n2', blockId: 'b1', role: 'div' }
+      ]);
+      let streamCallbacks;
+      registerTranslation.mockImplementationOnce((_id, callbacks) => { streamCallbacks = callbacks; });
+      contentScriptIntegration.sendTranslationRequest.mockResolvedValueOnce({
+        success: true,
+        streaming: true,
+        conversationAcceptance: true,
+      });
+      const { applyNodeDirection, restoreNodeDirectionState } = await import('@/utils/dom/DomDirectionManager.js');
+      vi.spyOn(adapter, '_applyTranslationToNode')
+        .mockImplementationOnce((...args) => DomTranslatorAdapter.prototype._applyTranslationToNode.call(adapter, ...args))
+        .mockImplementationOnce(() => { throw new Error('second node mutation failed'); });
+      applyNodeDirection.mockImplementation(() => {});
+      restoreNodeDirectionState.mockReturnValueOnce([
+        { kind: 'style', name: 'direction', error: new Error('direction restore failed') }
+      ]);
+
+      const translation = adapter.translateElement(testElement);
+      await vi.waitFor(() => expect(streamCallbacks).toBeDefined());
+      streamCallbacks.onStreamUpdate({ success: true, data: [{ t: 'Uno', i: 'n1' }, { t: 'Dos', i: 'n2' }] });
+      streamCallbacks.onStreamEnd({ success: true });
+
+      const rejection = await translation.catch(error => error);
+      expect(rejection.cause).toBeInstanceOf(Object);
+      expect(rejection.cause.rollbackFailures).toEqual([
+        expect.objectContaining({ kind: 'style', name: 'direction' })
+      ]);
+      expect(rejection.cause.cause?.message).toBe('second node mutation failed');
+      expect(first.nodeValue).toBe('A');
+      expect(second.nodeValue).toBe('B');
+      const b1Acks = sendRegularMessage.mock.calls
+        .map(([message]) => message)
+        .filter(message => message?.data?.parentId === 'b1');
+      expect(b1Acks).toEqual([
+        expect.objectContaining({ data: expect.objectContaining({ accepted: false }) })
+      ]);
+    });
+
+    it('continues text restorations past a failing restore and preserves the primary mutation error', async () => {
+      const first = document.createTextNode('A');
+      const second = document.createTextNode('B');
+      const third = document.createTextNode('C');
+      testElement.replaceChildren(first, second, third);
+      const originalSecond = second.nodeValue;
+      let currentSecond = originalSecond;
+      let secondWrites = 0;
+      Object.defineProperty(second, 'nodeValue', {
+        configurable: true,
+        get: () => currentSecond,
+        set: (value) => {
+          secondWrites += 1;
+          if (secondWrites > 1) throw new Error('text rollback failure');
+          currentSecond = value;
+        }
+      });
+      const { collectTextNodes } = await import('./DomTranslatorUtils.js');
+      collectTextNodes.mockReturnValueOnce([
+        { node: first, text: 'A', uid: 'n1', blockId: 'b1', role: 'div' },
+        { node: second, text: 'B', uid: 'n2', blockId: 'b1', role: 'div' },
+        { node: third, text: 'C', uid: 'n3', blockId: 'b1', role: 'div' }
+      ]);
+      let streamCallbacks;
+      registerTranslation.mockImplementationOnce((_id, callbacks) => { streamCallbacks = callbacks; });
+      contentScriptIntegration.sendTranslationRequest.mockResolvedValueOnce({
+        success: true,
+        streaming: true,
+        conversationAcceptance: true,
+      });
+      vi.spyOn(adapter, '_applyTranslationToNode')
+        .mockImplementationOnce((...args) => DomTranslatorAdapter.prototype._applyTranslationToNode.call(adapter, ...args))
+        .mockImplementationOnce((...args) => DomTranslatorAdapter.prototype._applyTranslationToNode.call(adapter, ...args))
+        .mockImplementationOnce(() => { throw new Error('primary mutation failure'); });
+
+      const translation = adapter.translateElement(testElement);
+      await vi.waitFor(() => expect(streamCallbacks).toBeDefined());
+      streamCallbacks.onStreamUpdate({ success: true, data: [{ t: 'Uno', i: 'n1' }, { t: 'Dos', i: 'n2' }, { t: 'Tres', i: 'n3' }] });
+      streamCallbacks.onStreamEnd({ success: true });
+
+      const rejection = await translation.catch(error => error);
+      expect(rejection.cause.cause?.message).toBe('primary mutation failure');
+      expect(rejection.cause.rollbackFailures).toEqual([
+        expect.objectContaining({ kind: 'text', node: second, error: expect.objectContaining({ message: 'text rollback failure' }) })
+      ]);
+      expect(third.nodeValue).toBe('C');
+      expect(first.nodeValue).toBe('A');
+      expect(second.nodeValue).toContain('Dos');
+
+      const b1Acks = sendRegularMessage.mock.calls
+        .map(([message]) => message)
+        .filter(message => message?.data?.parentId === 'b1');
+      expect(b1Acks).toEqual([
+        expect.objectContaining({ data: expect.objectContaining({ accepted: false }) })
+      ]);
+    });
+
+    it('commits independent parents around a failed middle parent', async () => {
+      const first = document.createTextNode('A');
+      const second = document.createTextNode('B');
+      const third = document.createTextNode('C');
+      testElement.replaceChildren(first, second, third);
+      const { collectTextNodes } = await import('./DomTranslatorUtils.js');
+      collectTextNodes.mockReturnValueOnce([
+        { node: first, text: 'A', uid: 'n1', blockId: 'b1', role: 'div' },
+        { node: second, text: 'B', uid: 'n2', blockId: 'b2', role: 'div' },
+        { node: third, text: 'C', uid: 'n3', blockId: 'b3', role: 'div' }
+      ]);
+      vi.spyOn(adapter, '_applyTranslationToNode')
+        .mockImplementationOnce((...args) => DomTranslatorAdapter.prototype._applyTranslationToNode.call(adapter, ...args))
+        .mockImplementationOnce(() => { throw new Error('middle parent failed'); })
+        .mockImplementationOnce((...args) => DomTranslatorAdapter.prototype._applyTranslationToNode.call(adapter, ...args));
+      contentScriptIntegration.sendTranslationRequest.mockResolvedValueOnce({
+        success: true,
+        streaming: false,
+        translatedText: [
+          { t: 'Uno', i: 'n1' },
+          { t: 'Dos', i: 'n2' },
+          { t: 'Tres', i: 'n3' }
+        ],
+        conversationAcceptance: true,
+      });
+
+      await expect(adapter.translateElement(testElement)).rejects.toThrow('middle parent failed');
+      expect(first.nodeValue).toContain('Uno');
+      expect(second.nodeValue).toBe('B');
+      expect(third.nodeValue).toContain('Tres');
+
+      const accepted = sendRegularMessage.mock.calls
+        .map(([message]) => message?.data)
+        .filter(data => data?.accepted === true)
+        .map(data => data.parentId)
+        .sort();
+      const rejected = sendRegularMessage.mock.calls
+        .map(([message]) => message?.data)
+        .filter(data => data?.accepted === false)
+        .map(data => data.parentId)
+        .sort();
+      expect(accepted).toEqual(['b1', 'b3']);
+      expect(rejected).toEqual(['b2']);
+    });
+
+    it('removes introduced direction attributes when original dir was absent and rollback runs', async () => {
+      const textNode = testElement.firstChild;
+      const { collectTextNodes } = await import('./DomTranslatorUtils.js');
+      collectTextNodes.mockReturnValueOnce([
+        { node: textNode, text: 'Hello', uid: 'n1', blockId: 'b1', role: 'div' }
+      ]);
+      const realDir = await vi.importActual('@/utils/dom/DomDirectionManager.js');
+      const { applyNodeDirection, captureNodeDirectionState, restoreNodeDirectionState, detectDirectionFromContent } =
+        await import('@/utils/dom/DomDirectionManager.js');
+      applyNodeDirection.mockImplementationOnce((node, lang, root) => {
+        realDir.applyNodeDirection(node, lang, root);
+        throw new Error('direction state introduced before failure');
+      });
+      captureNodeDirectionState.mockImplementationOnce((node, root) => realDir.captureNodeDirectionState(node, root));
+      restoreNodeDirectionState.mockImplementationOnce((snapshots) => realDir.restoreNodeDirectionState(snapshots));
+      detectDirectionFromContent.mockReturnValue('rtl');
+      contentScriptIntegration.sendTranslationRequest.mockResolvedValueOnce({
+        success: true,
+        streaming: false,
+        translatedText: [{ t: 'سلام', i: 'n1' }],
+        conversationAcceptance: true,
+      });
+
+      await expect(adapter.translateElement(testElement)).rejects.toThrow('direction state introduced before failure');
+      expect(testElement.hasAttribute('data-translate-dir')).toBe(false);
+      expect(testElement.hasAttribute('data-dir-original-saved')).toBe(false);
+      expect(testElement.style.direction).toBe('');
+      expect(testElement.hasAttribute('dir')).toBe(false);
+    });
+
+    it('restores exact inline direction style value and priority on rollback', async () => {
+      testElement.style.setProperty('direction', 'ltr', 'important');
+      const textNode = testElement.firstChild;
+      const { collectTextNodes } = await import('./DomTranslatorUtils.js');
+      collectTextNodes.mockReturnValueOnce([
+        { node: textNode, text: 'Hello', uid: 'n1', blockId: 'b1', role: 'div' }
+      ]);
+      const realDir = await vi.importActual('@/utils/dom/DomDirectionManager.js');
+      const { applyNodeDirection, captureNodeDirectionState, restoreNodeDirectionState, detectDirectionFromContent } =
+        await import('@/utils/dom/DomDirectionManager.js');
+      applyNodeDirection.mockImplementationOnce((node, lang, root) => {
+        realDir.applyNodeDirection(node, lang, root);
+        throw new Error('style mutation failed');
+      });
+      captureNodeDirectionState.mockImplementationOnce((node, root) => realDir.captureNodeDirectionState(node, root));
+      restoreNodeDirectionState.mockImplementationOnce((snapshots) => realDir.restoreNodeDirectionState(snapshots));
+      detectDirectionFromContent.mockReturnValue('rtl');
+      contentScriptIntegration.sendTranslationRequest.mockResolvedValueOnce({
+        success: true,
+        streaming: false,
+        translatedText: [{ t: 'سلام', i: 'n1' }],
+        conversationAcceptance: true,
+      });
+
+      await expect(adapter.translateElement(testElement)).rejects.toThrow('style mutation failed');
+      expect(testElement.style.getPropertyValue('direction')).toBe('ltr');
+      expect(testElement.style.getPropertyPriority('direction')).toBe('important');
     });
 
     it.each([

@@ -57,8 +57,9 @@ export { getSelectElementTranslationState, revertSelectElementTranslation } from
 const activeTranslationRoots = new Set();
 
 class DirectMutationFailure {
-  constructor(cause) {
+  constructor(cause, rollbackFailures = []) {
     this.cause = cause;
+    this.rollbackFailures = rollbackFailures;
   }
 }
 
@@ -436,10 +437,12 @@ export class DomTranslatorAdapter extends ResourceTracker {
           parent.invalid = true;
           parent.applied = false;
           parent.acknowledged = false;
+          const rollbackFailures = [];
           for (const { node, value } of [...mutationSnapshot.nodes].reverse()) {
             try {
               if (node) node.nodeValue = value;
             } catch (rollbackError) {
+              rollbackFailures.push({ kind: 'text', node, error: rollbackError });
               this.logger.error('[DomTranslatorAdapter] Direct text rollback failed', { error: rollbackError });
             }
           }
@@ -448,11 +451,13 @@ export class DomTranslatorAdapter extends ResourceTracker {
               if (state.present) parentElement.setAttribute(PAGE_TRANSLATION_ATTRIBUTES.HAS_ORIGINAL, state.value);
               else parentElement.removeAttribute(PAGE_TRANSLATION_ATTRIBUTES.HAS_ORIGINAL);
             } catch (rollbackError) {
+              rollbackFailures.push({ kind: 'attribute', element: parentElement, error: rollbackError });
               this.logger.error('[DomTranslatorAdapter] Direct attribute rollback failed', { error: rollbackError });
             }
           }
           const directionFailures = DirectionManager.restoreNodeDirectionState(mutationSnapshot.directionSnapshots) || [];
           for (const failure of directionFailures) {
+            rollbackFailures.push(failure);
             this.logger.error('[DomTranslatorAdapter] Direct direction rollback failed', failure);
           }
           for (const { node, value } of mutationSnapshot.hoverNodes) {
@@ -460,10 +465,15 @@ export class DomTranslatorAdapter extends ResourceTracker {
               if (value === undefined) hoverPreviewLookup.delete(node);
               else hoverPreviewLookup.add(node, value);
             } catch (rollbackError) {
+              rollbackFailures.push({ kind: 'hover', node, error: rollbackError });
               this.logger.error('[DomTranslatorAdapter] Direct hover rollback failed', { error: rollbackError });
             }
           }
-          throw new DirectMutationFailure(error);
+          // Mutation failure lifecycle: best-effort rollback performed above, then
+          // emit a rejection ACK for the failed canonical parent so the background
+          // coordinator marks it REJECTED (never left PENDING blocking later parents).
+          this._sendParentAcceptanceAck(parent.parentId, null, false, translationToken).catch(() => {});
+          throw new DirectMutationFailure(error, rollbackFailures);
         }
       };
 
@@ -506,9 +516,18 @@ export class DomTranslatorAdapter extends ResourceTracker {
       };
 
       const finalizeDirectParents = (targetLanguage, translationToken) => {
+        // Independent canonical parents: a mutation failure in one parent must
+        // not prevent remaining parents from committing. Preserve the first
+        // failure and rethrow after all parents have been attempted.
+        let firstFailure = null;
         for (const parent of directParentStates.values()) {
-          applyCompleteDirectParent(parent, targetLanguage, translationToken);
+          try {
+            applyCompleteDirectParent(parent, targetLanguage, translationToken);
+          } catch (error) {
+            if (!firstFailure) firstFailure = error;
+          }
         }
+        if (firstFailure) throw firstFailure;
       };
 
       // Context
