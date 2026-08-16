@@ -89,13 +89,6 @@ export class BaseProvider {
   }
 
   /**
-   * Abstract method for image translation
-   */
-  async translateImage() {
-    throw new Error(`translateImage method not supported by ${this.constructor.name}`);
-  }
-
-  /**
    * UNIFIED API REQUEST HANDLER - Delegated to ProviderRequestEngine
    */
   async _executeRequest(params) {

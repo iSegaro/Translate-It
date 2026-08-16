@@ -127,7 +127,6 @@ describe('BaseProvider', () => {
       const base = new BaseProvider('Base');
       expect(() => base._getLangCode()).toThrow(/must be implemented/);
       await expect(base._batchTranslate()).rejects.toThrow(/must be implemented/);
-      await expect(base.translateImage()).rejects.toThrow(/not supported/);
     });
   });
 

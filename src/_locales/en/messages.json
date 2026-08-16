@@ -2111,9 +2111,6 @@
   "history_text_translations": {
     "message": "Text Translations"
   },
-  "history_image_translations": {
-    "message": "Image Translations"
-  },
   "history_time_period": {
     "message": "Time Period"
   },
@@ -2170,9 +2167,6 @@
   },
   "history_no_history_hint": {
     "message": "Your translations will appear here"
-  },
-  "history_type_image": {
-    "message": "Image"
   },
   "history_type_text": {
     "message": "Text"

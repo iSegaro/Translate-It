@@ -199,7 +199,6 @@ class LifecycleManager {
       'openSidePanel': Handlers.handleOpenSidePanel,
       
       // Vue integration handlers - Lazy loaded for better performance
-      'translateImage': Handlers.handleTranslateImageLazy,
       'providerStatus': Handlers.handleProviderStatusLazy,
       'testProviderConnection': Handlers.handleTestProviderConnectionLazy,
       'saveProviderConfig': Handlers.handleSaveProviderConfigLazy,

@@ -3,8 +3,7 @@ import { BaseAIProvider } from "@/features/translation/providers/BaseAIProvider.
 import {
   CONFIG,
   getOpenAIApiKeysAsync,
-  getOpenAIModelAsync,
-  getPromptBASEScreenCaptureAsync
+  getOpenAIModelAsync
 } from "@/shared/config/config.js";
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
@@ -143,64 +142,5 @@ export class OpenAIProvider extends BaseAIProvider {
 
   _validateConfig(config, requiredFields, context) {
     super._validateConfig(config, requiredFields, context);
-  }
-
-  async _translateImageInternal(base64Image, _sourceLang, targetLang, options = {}) {
-    const { abortController, sessionId } = options;
-
-    const [apiKeys, model, promptBase] = await Promise.all([
-      getOpenAIApiKeysAsync(),
-      getOpenAIModelAsync(),
-      getPromptBASEScreenCaptureAsync()
-    ]);
-
-    const apiKey = apiKeys.length > 0 ? apiKeys[0] : '';
-    const systemPrompt = promptBase.replace("{targetLanguage}", targetLang);
-
-    const messages = [
-      {
-        role: "user",
-        content: [
-          { type: "text", text: systemPrompt },
-          {
-            type: "image_url",
-            image_url: { url: `data:image/png;base64,${base64Image}` }
-          }
-        ]
-      }
-    ];
-
-    const fetchOptions = {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${apiKey}`,
-      },
-      body: JSON.stringify({
-        model: model || "gpt-4-vision-preview",
-        messages: messages,
-        max_tokens: 1000
-      }),
-    };
-
-    return await this._executeRequest({
-      url: CONFIG.OPENAI_API_URL,
-      fetchOptions,
-      charCount: AITextProcessor.calculatePayloadChars(messages),
-      extractResponse: (data) => {
-        if (data?.error) {
-          throw new Error(`API_ERROR: ${data.error.message || 'Unknown OpenAI Error'}`);
-        }
-        return data?.choices?.[0]?.message?.content;
-      },
-      context: `${this.providerName.toLowerCase()}-image-translation`,
-      abortController,
-      sessionId,
-      updateApiKey: (newKey, options) => {
-        if (options && options.headers) {
-          options.headers.Authorization = `Bearer ${newKey}`;
-        }
-      }
-    });
   }
 }

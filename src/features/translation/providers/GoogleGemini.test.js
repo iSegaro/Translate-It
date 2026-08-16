@@ -27,7 +27,6 @@ vi.mock('@/shared/config/config.js', async (importOriginal) => {
     getGeminiThinkingModeAsync: vi.fn().mockResolvedValue('default'),
     getGeminiApiUrlAsync: vi.fn().mockResolvedValue('https://generativelanguage.googleapis.com/v1beta/models'),
     getSettingsAsync: vi.fn().mockResolvedValue({}),
-    getPromptBASEScreenCaptureAsync: vi.fn().mockResolvedValue('Translate this image to {targetLanguage}'),
   };
 });
 

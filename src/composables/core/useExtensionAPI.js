@@ -202,10 +202,6 @@ export function useExtensionAPI() {
     return await sendMessage(MessageActions.TRANSLATE_TEXT, { text, ...options });
   };
 
-  const translateImage = async (imageData, options = {}) => {
-    return await sendMessage(MessageActions.TRANSLATE_IMAGE, { imageData, ...options });
-  };
-
   // Screen capture methods
   const startScreenCapture = async () => {
     return await sendMessage(MessageActions.START_SCREEN_CAPTURE);
@@ -286,7 +282,6 @@ export function useExtensionAPI() {
 
     // Translation methods
     translateText,
-    translateImage,
 
     // Screen capture methods
     startScreenCapture,

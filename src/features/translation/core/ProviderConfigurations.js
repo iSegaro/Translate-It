@@ -149,7 +149,6 @@ export const PROVIDER_CONFIGURATIONS = {
     },
     features: {
       supportsTranslation: true,
-      supportsImageTranslation: true,
       supportsBatchRequests: true,
       supportsThinking: true,
       reliableJsonMode: false,
@@ -191,7 +190,6 @@ export const PROVIDER_CONFIGURATIONS = {
     },
     features: {
       supportsTranslation: true,
-      supportsImageTranslation: true,
       supportsBatchRequests: true,
       supportsThinking: false,
       reliableJsonMode: true,
@@ -232,7 +230,6 @@ export const PROVIDER_CONFIGURATIONS = {
     },
     features: {
       supportsTranslation: true,
-      supportsImageTranslation: false,
       supportsBatchRequests: true, // Enable batch requests for streaming
       supportsThinking: true,
       reliableJsonMode: false,
@@ -274,7 +271,6 @@ export const PROVIDER_CONFIGURATIONS = {
     },
     features: {
       supportsTranslation: true,
-      supportsImageTranslation: true, // Depends on model
       supportsBatchRequests: true,
       supportsThinking: false, // Varies by model
       reliableJsonMode: true,
@@ -316,7 +312,6 @@ export const PROVIDER_CONFIGURATIONS = {
     },
     features: {
       supportsTranslation: true,
-      supportsImageTranslation: false, // Depends on model
       supportsBatchRequests: true, // Enable batch requests
       supportsThinking: false,
       reliableJsonMode: false,
@@ -358,7 +353,6 @@ export const PROVIDER_CONFIGURATIONS = {
     },
     features: {
       supportsTranslation: true,
-      supportsImageTranslation: false,
       supportsBatchRequests: true, // Supports batch via chunking
       supportsThinking: false,
       reliableJsonMode: true,
@@ -400,7 +394,6 @@ export const PROVIDER_CONFIGURATIONS = {
     },
     features: {
       supportsTranslation: true,
-      supportsImageTranslation: false,
       supportsBatchRequests: true,
       supportsThinking: false,
       reliableJsonMode: false,
@@ -443,7 +436,6 @@ export const PROVIDER_CONFIGURATIONS = {
     },
     features: {
       supportsTranslation: true,
-      supportsImageTranslation: false,
       supportsBatchRequests: true, // Supports batch via chunking
       supportsThinking: false,
       reliableJsonMode: true,
@@ -486,7 +478,6 @@ export const PROVIDER_CONFIGURATIONS = {
     },
     features: {
       supportsTranslation: true,
-      supportsImageTranslation: false,
       supportsBatchRequests: true, // DeepL supports batch requests
       supportsThinking: false,
       reliableJsonMode: false,
@@ -535,7 +526,6 @@ export const PROVIDER_CONFIGURATIONS = {
     },
     features: {
       supportsTranslation: true,
-      supportsImageTranslation: false,
       supportsBatchRequests: true, // Supports batch via chunking
       supportsThinking: false,
       reliableJsonMode: true, // Bing usually provides reliable JSON
@@ -577,7 +567,6 @@ export const PROVIDER_CONFIGURATIONS = {
     },
     features: {
       supportsTranslation: true,
-      supportsImageTranslation: false,
       supportsBatchRequests: true, // Enable batch requests
       supportsThinking: false,
       reliableJsonMode: true,
@@ -609,7 +598,6 @@ export const PROVIDER_CONFIGURATIONS = {
     },
     features: {
       supportsTranslation: true,
-      supportsImageTranslation: false,
       supportsBatchRequests: true,
       supportsThinking: false,
       reliableJsonMode: true
@@ -640,7 +628,6 @@ export const PROVIDER_CONFIGURATIONS = {
     },
     features: {
       supportsTranslation: true,
-      supportsImageTranslation: false,
       supportsBatchRequests: false,
       supportsThinking: false,
       reliableJsonMode: true,
@@ -681,7 +668,6 @@ export const PROVIDER_CONFIGURATIONS = {
     },
     features: {
       supportsTranslation: true,
-      supportsImageTranslation: false,
       supportsBatchRequests: true, // Supports batch via chunking
       supportsThinking: false,
       reliableJsonMode: true,
@@ -723,7 +709,6 @@ export const PROVIDER_CONFIGURATIONS = {
     },
     features: {
       supportsTranslation: true,
-      supportsImageTranslation: false, // Conservative default
       supportsBatchRequests: true, // Enable batch requests for streaming
       supportsThinking: false,
       reliableJsonMode: false,
@@ -759,7 +744,6 @@ export const PROVIDER_CONFIGURATIONS = {
     },
     features: {
       supportsTranslation: true,
-      supportsImageTranslation: true,
       supportsBatchRequests: true,
       supportsThinking: true,
       reliableJsonMode: true,
@@ -1028,17 +1012,6 @@ export function getProviderBatching(providerName, translateMode = null, level = 
 export function getProviderStreaming(providerName, level = 3) {
   const config = getProviderConfiguration(providerName, level);
   return config.streaming;
-}
-
-/**
- * Get provider features/capabilities
- * @param {string} providerName - Provider name
- * @param {number} level - Optimization level
- * @returns {object} - Provider features
- */
-export function getProviderFeatures(providerName, level = 3) {
-  const config = getProviderConfiguration(providerName, level);
-  return config.features;
 }
 
 /**

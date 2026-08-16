@@ -6,8 +6,7 @@
 import { BaseProvider } from "@/features/translation/providers/BaseProvider.js";
 import {
   getProviderStreaming,
-  getProviderBatching,
-  getProviderFeatures
+  getProviderBatching
 } from "@/features/translation/core/ProviderConfigurations.js";
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
@@ -232,11 +231,6 @@ export class BaseAIProvider extends BaseProvider {
     return config.strategy || 'json';
   }
 
-  async getSupportsImageTranslation() {
-    const level = await getProviderOptimizationLevelAsync(this.providerName);
-    return getProviderFeatures(this.providerName, level).supportsImageTranslation;
-  }
-
   constructor(providerName) {
     super(providerName);
   }
@@ -285,29 +279,6 @@ export class BaseAIProvider extends BaseProvider {
       expectedFormat,
       contextMetadata: conversationOptions,
     });
-  }
-
-  /**
-   * Entry point for image translation with rate limiting
-   */
-  async translateImage(base64Image, sourceLang, targetLang, options = {}) {
-    const { priority, sessionId, abortController, messageId } = options;
-    const context = `${this.providerName.toLowerCase()}-image-translation`;
-
-    return await this._executeWithRateLimit(
-      (opts) => this._translateImageInternal(base64Image, sourceLang, targetLang, { ...opts, ...options }),
-      context,
-      priority,
-      { sessionId, abortController, messageId }
-    );
-  }
-
-  /**
-   * Abstract method for internal image translation logic
-   * @protected
-   */
-  async _translateImageInternal() {
-    throw new Error(`translateImage not supported by ${this.providerName}`);
   }
 
   /**

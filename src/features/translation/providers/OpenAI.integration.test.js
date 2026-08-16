@@ -20,7 +20,6 @@ vi.mock('@/shared/config/config.js', () => ({
   getOpenAIModelAsync: vi.fn().mockResolvedValue('gpt-4o-mini'),
   getSettingsAsync: vi.fn().mockResolvedValue({}),
   getProviderOptimizationLevelAsync: vi.fn(() => Promise.resolve('balanced')),
-  getPromptBASEScreenCaptureAsync: vi.fn().mockResolvedValue('Translate this image to {targetLanguage}'),
 }));
 
 vi.mock('@/shared/proxy/ProxyManager.js', () => ({
