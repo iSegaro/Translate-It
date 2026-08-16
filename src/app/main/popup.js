@@ -73,20 +73,3 @@ window.addEventListener('beforeunload', () => {
   const store = useSettingsStore()
   store.cleanupStoreResources()
 })
-
-// Lazy loading functions for heavy features (only load when needed)
-export const loadTranslationFeatures = async () => {
-  const [translation, providers] = await Promise.all([
-    import('@/features/translation/stores/translation.js'),
-    import('@/store/modules/providers.js')
-  ])
-  return { translation, providers }
-}
-
-export const loadAdvancedFeatures = async () => {
-  const [capture, history] = await Promise.all([
-    import('@/features/screen-capture/stores/capture.js'),
-    import('@/features/history/stores/history.js')
-  ])
-  return { capture, history }
-}

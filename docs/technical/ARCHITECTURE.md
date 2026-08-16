@@ -211,7 +211,7 @@ src/
 │   │   └── core/                   # TTSGlobalManager - exclusive playback coordination
 │   ├── screen-capture/
 │   │   ├── handlers/               # Background capture handlers
-│   │   ├── stores/                 # capture.js store
+│   │   ├── stores/                 # ocrStore.js
 │   │   ├── composables/            # useScreenCapture
 │   │   ├── managers/               # Capture managers
 │   │   └── utils/                  # Image processing
