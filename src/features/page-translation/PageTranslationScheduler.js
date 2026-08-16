@@ -449,14 +449,9 @@ export class PageTranslationScheduler extends ResourceTracker {
       batch.forEach((item, index) => {
         const translatedItem = translatedTexts[index];
 
-        // Explicit unresolved marker (isSkipped): keep original text and count as
-        // failed, never as translated. Only trust isSkipped === true; identity
-        // translations (text === source) are legitimate and resolve normally.
-        if (typeof translatedItem === 'object' && translatedItem !== null && translatedItem.isSkipped === true) {
-          item.resolve(typeof translatedItem.text === 'string' ? translatedItem.text : item.text);
-          this.failedCount++;
-          return;
-        }
+        const isExplicitlySkipped = typeof translatedItem === 'object'
+          && translatedItem !== null
+          && translatedItem.isSkipped === true;
 
         let translatedText = "";
 
@@ -474,10 +469,18 @@ export class PageTranslationScheduler extends ResourceTracker {
             translatedText = "";
           }
         } else {
-          translatedText = String(translatedItem || "");
+          translatedText = null;
         }
 
-        item.resolve(translatedText || "");
+        // Blank and non-string results are unresolved. Identity translations
+        // remain valid because only usability, not source equality, is checked.
+        if (isExplicitlySkipped || typeof translatedText !== 'string' || !translatedText.trim()) {
+          item.resolve(item.text);
+          this.failedCount++;
+          return;
+        }
+
+        item.resolve(translatedText);
         this.translatedCount++;
       });
 

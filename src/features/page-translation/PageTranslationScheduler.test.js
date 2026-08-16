@@ -160,6 +160,110 @@ describe('PageTranslationScheduler', () => {
       expect(scheduler.translatedCount).toBe(1);
     });
 
+    it.each(['', '   ', '\n\t'])('should preserve original and count blank result as failed: %j', async (blankText) => {
+      const mockItem = { text: 'Original', resolve: vi.fn(), score: 1 };
+      scheduler.queue.push(mockItem);
+
+      PageTranslationFluidFilter.process.mockReturnValue({ batchItems: [mockItem], remainingItems: [] });
+      vi.spyOn(scheduler, '_getBatchConfig').mockResolvedValue({ providerRegistryId: 'google', targetLanguage: 'fa' });
+      safeSendMessage.mockResolvedValue({
+        success: true,
+        translatedText: JSON.stringify([blankText])
+      });
+
+      await scheduler.flush();
+
+      expect(mockItem.resolve).toHaveBeenCalledWith('Original');
+      expect(scheduler.translatedCount).toBe(0);
+      expect(scheduler.failedCount).toBe(1);
+    });
+
+    it('should preserve original and count null result as failed', async () => {
+      const mockItem = { text: 'Original', resolve: vi.fn(), score: 1 };
+      scheduler.queue.push(mockItem);
+
+      PageTranslationFluidFilter.process.mockReturnValue({ batchItems: [mockItem], remainingItems: [] });
+      vi.spyOn(scheduler, '_getBatchConfig').mockResolvedValue({ providerRegistryId: 'google', targetLanguage: 'fa' });
+      safeSendMessage.mockResolvedValue({
+        success: true,
+        translatedText: JSON.stringify([null])
+      });
+
+      await scheduler.flush();
+
+      expect(mockItem.resolve).toHaveBeenCalledWith('Original');
+      expect(scheduler.translatedCount).toBe(0);
+      expect(scheduler.failedCount).toBe(1);
+    });
+
+    it('should continue valid siblings around a blank result', async () => {
+      const itemA = { text: 'A', resolve: vi.fn(), score: 1 };
+      const itemB = { text: 'B', resolve: vi.fn(), score: 1 };
+      const itemC = { text: 'C', resolve: vi.fn(), score: 1 };
+      scheduler.queue.push(itemA, itemB, itemC);
+
+      PageTranslationFluidFilter.process.mockReturnValue({ batchItems: [itemA, itemB, itemC], remainingItems: [] });
+      vi.spyOn(scheduler, '_getBatchConfig').mockResolvedValue({ providerRegistryId: 'google', targetLanguage: 'fa' });
+      safeSendMessage.mockResolvedValue({
+        success: true,
+        translatedText: JSON.stringify(['A2', '', 'C2'])
+      });
+
+      await scheduler.flush();
+
+      expect(itemA.resolve).toHaveBeenCalledWith('A2');
+      expect(itemB.resolve).toHaveBeenCalledWith('B');
+      expect(itemC.resolve).toHaveBeenCalledWith('C2');
+      expect(scheduler.translatedCount).toBe(2);
+      expect(scheduler.failedCount).toBe(1);
+    });
+
+    it('should complete all-blank batches through failed accounting', async () => {
+      const itemA = { text: 'A', resolve: vi.fn(), score: 1 };
+      const itemB = { text: 'B', resolve: vi.fn(), score: 1 };
+      scheduler.queue.push(itemA, itemB);
+      scheduler.totalTasks = 2;
+
+      PageTranslationFluidFilter.process.mockReturnValue({ batchItems: [itemA, itemB], remainingItems: [] });
+      vi.spyOn(scheduler, '_getBatchConfig').mockResolvedValue({ providerRegistryId: 'google', targetLanguage: 'fa' });
+      safeSendMessage.mockResolvedValue({
+        success: true,
+        translatedText: JSON.stringify(['', '   '])
+      });
+
+      await scheduler.flush();
+
+      expect(itemA.resolve).toHaveBeenCalledWith('A');
+      expect(itemB.resolve).toHaveBeenCalledWith('B');
+      expect(scheduler.translatedCount).toBe(0);
+      expect(scheduler.failedCount).toBe(2);
+      expect(scheduler.translatedCount + scheduler.failedCount).toBe(scheduler.totalTasks);
+      expect(scheduler.activeFlushes).toBe(0);
+      expect(scheduler.queue).toHaveLength(0);
+    });
+
+    it('should count blank and explicit skipped results once each', async () => {
+      const itemA = { text: 'A', resolve: vi.fn(), score: 1 };
+      const itemB = { text: 'B', resolve: vi.fn(), score: 1 };
+      scheduler.queue.push(itemA, itemB);
+
+      PageTranslationFluidFilter.process.mockReturnValue({ batchItems: [itemA, itemB], remainingItems: [] });
+      vi.spyOn(scheduler, '_getBatchConfig').mockResolvedValue({ providerRegistryId: 'google', targetLanguage: 'fa' });
+      safeSendMessage.mockResolvedValue({
+        success: true,
+        translatedText: JSON.stringify(['', { text: 'B', isSkipped: true }])
+      });
+
+      await scheduler.flush();
+
+      expect(itemA.resolve).toHaveBeenCalledTimes(1);
+      expect(itemA.resolve).toHaveBeenCalledWith('A');
+      expect(itemB.resolve).toHaveBeenCalledTimes(1);
+      expect(itemB.resolve).toHaveBeenCalledWith('B');
+      expect(scheduler.translatedCount).toBe(0);
+      expect(scheduler.failedCount).toBe(2);
+    });
+
     it('should honor isSkipped items in a mixed partial result', async () => {
       const itemA = { text: 'A', resolve: vi.fn(), score: 1 };
       const itemB = { text: 'B', resolve: vi.fn(), score: 1 };
