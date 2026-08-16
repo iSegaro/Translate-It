@@ -114,7 +114,6 @@ The `features` array defines what the UI and Orchestrators allow for this provid
 | `dictionary` | Provides rich definitions, kind (noun/verb), and pronunciation. | Enables formatted dictionary UI in Popup/Sidepanel. |
 | `bilingual` | Enables the **Language Swapping Service**. | Allows auto-swapping Target to Source when input matches Target. |
 | `smart` | Advanced AI processing capabilities. | Enables Smart Context and AI-specific UI enhancements. |
-| `image` | Supports OCR or Multi-modal image translation. | Future support for translating text inside images. |
 | `offline` | Works without an external internet connection. | For Local LLMs or Native Browser APIs. |
 | `context` | Supports injecting Page Titles/Headings as context. | Used by AI providers to improve accuracy based on surrounding text. |
 | `streaming` | Supports real-time chunked response delivery. | Required for the "Typing Effect" in UI during long translations. |

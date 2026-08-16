@@ -2111,9 +2111,6 @@
   "history_text_translations": {
     "message": "テキスト翻訳"
   },
-  "history_image_translations": {
-    "message": "画像翻訳"
-  },
   "history_time_period": {
     "message": "期間"
   },
@@ -2170,9 +2167,6 @@
   },
   "history_no_history_hint": {
     "message": "翻訳するとここに表示されます"
-  },
-  "history_type_image": {
-    "message": "画像"
   },
   "history_type_text": {
     "message": "テキスト"

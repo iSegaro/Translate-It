@@ -529,7 +529,6 @@ Handlers are organized by feature category for maintainability:
 **Translation Operations:**
 - `handleTranslate.js` - Main translation processor (ALL translation requests)
 - `handleTranslateText.js` - Direct text translation
-- `handleTranslateImage.js` - Image translation with OCR
 - `handleRevertTranslation.js` - Translation reversal
 
 **Vue Integration:**

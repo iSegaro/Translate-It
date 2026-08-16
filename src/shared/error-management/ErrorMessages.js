@@ -60,8 +60,6 @@ export const errorMessages = {
     "Screen capture is not supported in this browser or context.",
   [ErrorTypes.IMAGE_PROCESSING_FAILED]:
     "Failed to process captured image. Please try again.",
-  [ErrorTypes.PROVIDER_IMAGE_NOT_SUPPORTED]:
-    "Current translation provider does not support image translation. Please select an AI provider.",
 
   // General errors
   [ErrorTypes.NETWORK_ERROR]: "Connection to server failed",
