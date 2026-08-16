@@ -1112,12 +1112,6 @@ export const getOpenAIApiKeyAsync = async () => {
   return getSettingValueAsync("OPENAI_API_KEY", CONFIG.OPENAI_API_KEY);
 };
 
-export const getOpenAIApiUrlAsync = async () => {
-  // Note: OpenAI URL might not be configurable in your options page?
-  // If it is, use getSettingValueAsync like others. If not, just return CONFIG.
-  return CONFIG.OPENAI_API_URL; // Or getSettingValueAsync if user can change it
-};
-
 export const getOpenAIModelAsync = async () => {
   return getSettingValueAsync("OPENAI_API_MODEL", CONFIG.OPENAI_API_MODEL);
 };

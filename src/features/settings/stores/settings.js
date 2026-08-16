@@ -373,6 +373,8 @@ export const useSettingsStore = defineStore('settings', () => {
       delete processedSettings.GEMINI_THINKING_ENABLED;
       // OpenRouter endpoint is a CONFIG-owned runtime constant, not an imported setting.
       delete processedSettings.OPENROUTER_API_URL;
+      // OpenAI endpoint is a CONFIG-owned runtime constant, not an imported setting.
+      delete processedSettings.OPENAI_API_URL;
 
       // 1. Merge imported settings with default settings to ensure no missing keys
       const defaultSettings = getDefaultSettings();

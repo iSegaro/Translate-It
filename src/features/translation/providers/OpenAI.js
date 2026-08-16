@@ -3,7 +3,6 @@ import { BaseAIProvider } from "@/features/translation/providers/BaseAIProvider.
 import {
   CONFIG,
   getOpenAIApiKeysAsync,
-  getOpenAIApiUrlAsync,
   getOpenAIModelAsync,
   getPromptBASEScreenCaptureAsync
 } from "@/shared/config/config.js";
@@ -74,9 +73,8 @@ export class OpenAIProvider extends BaseAIProvider {
       ? participationOverride
       : await AIConversationHelper.getConversationParticipation({ callPurpose, translateMode: mode, sessionId });
 
-    const [apiKeys, apiUrl, model] = await Promise.all([
+    const [apiKeys, model] = await Promise.all([
       getOpenAIApiKeysAsync(),
-      getOpenAIApiUrlAsync(),
       getOpenAIModelAsync(),
     ]);
 
@@ -112,7 +110,7 @@ export class OpenAIProvider extends BaseAIProvider {
     };
 
     const result = await this._executeRequest({
-      url: apiUrl || "https://api.openai.com/v1/chat/completions",
+      url: CONFIG.OPENAI_API_URL,
       fetchOptions,
       charCount: fetchOptions.body.length,
       originalCharCount: isBatch ? AITextProcessor.estimateOriginalChars(userText) : userText.length,
@@ -150,9 +148,8 @@ export class OpenAIProvider extends BaseAIProvider {
   async _translateImageInternal(base64Image, _sourceLang, targetLang, options = {}) {
     const { abortController, sessionId } = options;
 
-    const [apiKeys, apiUrl, model, promptBase] = await Promise.all([
+    const [apiKeys, model, promptBase] = await Promise.all([
       getOpenAIApiKeysAsync(),
-      getOpenAIApiUrlAsync(),
       getOpenAIModelAsync(),
       getPromptBASEScreenCaptureAsync()
     ]);
@@ -187,7 +184,7 @@ export class OpenAIProvider extends BaseAIProvider {
     };
 
     return await this._executeRequest({
-      url: apiUrl,
+      url: CONFIG.OPENAI_API_URL,
       fetchOptions,
       charCount: AITextProcessor.calculatePayloadChars(messages),
       extractResponse: (data) => {

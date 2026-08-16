@@ -23,7 +23,6 @@ vi.mock('@/shared/config/config.js', async (importOriginal) => {
   return {
     ...actual,
     getOpenAIApiKeysAsync: vi.fn().mockResolvedValue(['test-key']),
-    getOpenAIApiUrlAsync: vi.fn().mockResolvedValue('https://api.openai.com/v1/chat/completions'),
     getOpenAIModelAsync: vi.fn().mockResolvedValue('gpt-4o-mini'),
     getSettingsAsync: vi.fn().mockResolvedValue({}),
     getPromptBASEScreenCaptureAsync: vi.fn().mockResolvedValue('Translate this image to {targetLanguage}'),
@@ -111,6 +110,7 @@ describe('OpenAIProvider Error Handling', () => {
 
     await provider._callAI('system', 'text', { expectedFormat: ResponseFormat.JSON_OBJECT });
 
+    expect(executeRequest.mock.calls[0][0].url).toBe(CONFIG.OPENAI_API_URL);
     const payload = JSON.parse(executeRequest.mock.calls[0][0].fetchOptions.body);
     expect(payload).toMatchObject({
       model,

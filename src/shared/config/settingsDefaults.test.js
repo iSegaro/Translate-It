@@ -37,6 +37,7 @@ describe('getPersistedDefaultSettings', () => {
     expect(defaults.WEBAI_API_MODEL).toBe(CONFIG.WEBAI_API_MODEL);
     expect(defaults.WEBAI_MODELS).toEqual(CONFIG.WEBAI_MODELS);
     expect(defaults.GEMINI_THINKING_MODE).toBe('default');
+    expect(defaults).not.toHaveProperty('OPENAI_API_URL');
     expect(defaults.TEXT_FIELD_SHORTCUT).toBe(CONFIG.TEXT_FIELD_SHORTCUT);
     expect(defaults.translationHistory).toBeUndefined();
     expect(defaults.PROMPT_TEMPLATE).toBe(CONFIG.PROMPT_TEMPLATE);

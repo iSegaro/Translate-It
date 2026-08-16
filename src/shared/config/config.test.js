@@ -82,6 +82,7 @@ describe('Config Module', () => {
     });
 
     it('should expose approved OpenAI text models in order', () => {
+      expect(CONFIG.OPENAI_API_URL).toBe('https://api.openai.com/v1/chat/completions');
       expect(CONFIG.OPENAI_API_MODEL).toBe('gpt-5.6-luna');
       expect(CONFIG.OPENAI_MODELS.map(model => model.value)).toEqual([
         'gpt-5.6-terra',

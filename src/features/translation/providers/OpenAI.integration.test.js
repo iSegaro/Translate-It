@@ -12,9 +12,11 @@ vi.mock('webextension-polyfill', () => ({
 }));
 
 vi.mock('@/shared/config/config.js', () => ({
-  CONFIG: { OPENAI_API_MODEL: 'gpt-5.6-terra' },
+  CONFIG: {
+    OPENAI_API_MODEL: 'gpt-5.6-terra',
+    OPENAI_API_URL: 'https://api.openai.com/v1/chat/completions'
+  },
   getOpenAIApiKeysAsync: vi.fn().mockResolvedValue(['key-1', 'key-2']),
-  getOpenAIApiUrlAsync: vi.fn().mockResolvedValue('https://api.openai.com/v1/chat/completions'),
   getOpenAIModelAsync: vi.fn().mockResolvedValue('gpt-4o-mini'),
   getSettingsAsync: vi.fn().mockResolvedValue({}),
   getProviderOptimizationLevelAsync: vi.fn(() => Promise.resolve('balanced')),

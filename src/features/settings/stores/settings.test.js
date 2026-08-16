@@ -263,6 +263,18 @@ describe('Settings Store', () => {
     expect(store.settings).not.toHaveProperty('OPENROUTER_API_URL');
   });
 
+  it('importSettings should ignore legacy OpenAI endpoint settings', async () => {
+    secureStorage.processImportedSettings.mockResolvedValue({
+      THEME: 'dark',
+      OPENAI_API_URL: 'https://legacy.example.test/v1/chat/completions'
+    });
+    const store = useSettingsStore();
+
+    await store.importSettings({ THEME: 'dark', _exported: true });
+
+    expect(store.settings).not.toHaveProperty('OPENAI_API_URL');
+  });
+
   it.each([
     [{ GEMINI_THINKING_ENABLED: true }, 'minimal'],
     [{ GEMINI_THINKING_ENABLED: false }, 'default'],
