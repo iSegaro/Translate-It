@@ -2925,29 +2925,28 @@ describe('OptimizedJsonHandler', () => {
       );
     });
 
-    it('should correctly scale and batch for Level 5 (Turbo) in an end-to-end flow', async () => {
+    it('should correctly batch for Level 5 (Turbo) in an end-to-end flow with the pinned Select Element mode override', async () => {
       mockEngine.createIntelligentBatches = (segments, size, chars) => TranslationBatcher.createIntelligentBatches(segments, size, chars);
 
-      // Mock a realistic AI provider config scaled to Level 5 (Turbo)
-      // At Level 5, multiplier is 0.3
-      // Scaled mode override: optimalSize: Math.max(5, Math.round(25 * 0.3)) = 8
-      // Scaled characterLimit: Math.max(500, Math.round(3500 * 0.3)) = 1050
+      // Mock a realistic AI provider config at Level 5 (Turbo).
+      // The Select Element mode override is pinned (optimalSize 25, characterLimit 3500)
+      // and must not be scaled by optimization level.
       getProviderConfiguration.mockReturnValueOnce({
         batching: {
-          optimalSize: 6, // scaled base
+          optimalSize: 6, // scaled base (non-Select Element modes)
           characterLimit: 5000,
           modeOverrides: {
             select_element: {
-              optimalSize: 8, // scaled override
-              characterLimit: 1050 // scaled override
+              optimalSize: 25, // pinned override — never scaled
+              characterLimit: 3500 // pinned override — never scaled
             }
           }
         },
         rateLimit: { maxConcurrent: 2 }
       });
 
-      // Prepare a larger set of segments (e.g., 20 segments of ~10 chars each)
-      const testSegments = Array.from({ length: 20 }, (_, index) => ({
+      // Prepare 60 segments (each ~24 chars) so the pinned optimalSize of 25 yields 3 batches
+      const testSegments = Array.from({ length: 60 }, (_, index) => ({
         t: `Segment ${index} text content.`,
         i: `uid-${index}`
       }));
@@ -2957,33 +2956,32 @@ describe('OptimizedJsonHandler', () => {
         text: JSON.stringify(testSegments)
       };
 
-      // Mock translate responses for the expected number of batches (20 segments / 8 size = 3 batches)
+      // Mock translate responses for the expected number of batches (60 segments / 25 size = 3 batches)
       mockProvider.translate
-        .mockResolvedValueOnce({ translatedText: testSegments.slice(0, 8).map(s => s.t) })
-        .mockResolvedValueOnce({ translatedText: testSegments.slice(8, 16).map(s => s.t) })
-        .mockResolvedValueOnce({ translatedText: testSegments.slice(16, 20).map(s => s.t) });
+        .mockResolvedValueOnce({ translatedText: testSegments.slice(0, 25).map(s => s.t) })
+        .mockResolvedValueOnce({ translatedText: testSegments.slice(25, 50).map(s => s.t) })
+        .mockResolvedValueOnce({ translatedText: testSegments.slice(50, 60).map(s => s.t) });
 
       const result = await handler.execute(mockEngine, customMockData, mockProvider, 'en', 'fa', 'msg-1', mockSender);
 
       expect(result.success).toBe(true);
-      expect(mockProvider.translate).toHaveBeenCalledTimes(3); // 3 batches (8, 8, 4)
+      expect(mockProvider.translate).toHaveBeenCalledTimes(3); // 3 batches (25, 25, 10)
     });
 
-    it('should correctly scale and batch for Level 1 (Economy) in an end-to-end flow', async () => {
+    it('should correctly batch for Level 1 (Economy) in an end-to-end flow with the pinned Select Element mode override', async () => {
       mockEngine.createIntelligentBatches = (segments, size, chars) => TranslationBatcher.createIntelligentBatches(segments, size, chars);
 
-      // Mock a realistic AI provider config scaled to Level 1 (Economy)
-      // At Level 1, multiplier is 2.5
-      // Scaled mode override: optimalSize: Math.max(5, Math.round(25 * 2.5)) = 62
-      // Scaled characterLimit: Math.max(500, Math.round(3500 * 2.5)) = 8750
+      // Mock a realistic AI provider config at Level 1 (Economy).
+      // The Select Element mode override is pinned (optimalSize 25, characterLimit 3500)
+      // and must not be scaled by optimization level.
       getProviderConfiguration.mockReturnValueOnce({
         batching: {
-          optimalSize: 50, // scaled base
+          optimalSize: 50, // scaled base (non-Select Element modes)
           characterLimit: 5000,
           modeOverrides: {
             select_element: {
-              optimalSize: 62, // scaled override
-              characterLimit: 8750 // scaled override
+              optimalSize: 25, // pinned override — never scaled
+              characterLimit: 3500 // pinned override — never scaled
             }
           }
         },
@@ -3001,7 +2999,7 @@ describe('OptimizedJsonHandler', () => {
         text: JSON.stringify(testSegments)
       };
 
-      // Mock translate response for 1 batch (20 segments < 62 optimalSize)
+      // Mock translate response for 1 batch (20 segments < 25 pinned optimalSize)
       mockProvider.translate
         .mockResolvedValueOnce({ translatedText: testSegments.map(s => s.t) });
 
