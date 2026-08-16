@@ -1284,6 +1284,8 @@ describe('OptimizedJsonHandler', () => {
         execution.catch(() => {});
         await vi.waitFor(() => expect(mockProvider.translate).toHaveBeenCalledTimes(2));
         expect(mockProvider.translate.mock.calls[1][3].callPurpose).toBe(TranslationCallPurpose.PARENT_RECOVERY);
+        // Recovery call shares the same abort signal/controller as the operation.
+        expect(mockProvider.translate.mock.calls[1][3].abortController).toBe(mockAbortController);
         await new Promise(resolve => setTimeout(resolve, 60));
          await expect(execution).rejects.toMatchObject({ type: ErrorTypes.TRANSLATION_TIMEOUT });
         expect(mockAbortController.abort).toHaveBeenCalledTimes(1);
@@ -1293,6 +1295,16 @@ describe('OptimizedJsonHandler', () => {
           .map(([, message]) => message)
           .filter(message => message.action === MessageActions.TRANSLATION_STREAM_UPDATE);
         expect(updates).toHaveLength(0);
+        // No late recovery terminal either.
+        expect(browser.tabs.sendMessage.mock.calls
+          .map(([, message]) => message)
+          .filter(message => message.action === MessageActions.TRANSLATION_STREAM_END)).toHaveLength(0);
+        // No second recovery stage starts after timeout; the late recovery
+        // settlement publishes nothing.
+        expect(mockProvider.translate).toHaveBeenCalledTimes(2);
+        // Owned recovery-stage abort listener removed and request unregistered.
+        expect(mockAbortController.signal.removeEventListener).toHaveBeenCalled();
+        expect(mockEngine.lifecycleRegistry.unregisterRequest).toHaveBeenCalledWith('msg-v3-recovery-timeout');
       } finally {
         recovery.resolve({ translatedText: ['late'] });
         getAIConversationHistoryEnabledAsync.mockResolvedValue(false);
@@ -4121,6 +4133,86 @@ describe('OptimizedJsonHandler', () => {
         const result = await execution;
         expect(result.success).toBe(false);
         expect(result.error.type).toBe(ErrorTypes.USER_CANCELLED);
+      });
+    });
+
+    describe('timeout/abort lifecycle hardening', () => {
+      it('emits exactly one terminal on timeout and unregisters owned resources', async () => {
+        vi.useFakeTimers();
+        const browser = (await import('webextension-polyfill')).default;
+        const { getAIConversationHistoryEnabledAsync } = await import('@/shared/config/config.js');
+        const firstBatch = createDeferred();
+        const unregister = vi.fn();
+        mockEngine.lifecycleRegistry = { ...mockEngine.lifecycleRegistry, unregisterRequest: unregister };
+
+        const timeoutDiagnostics = () => appendTranslationDiagnostic.mock.calls
+          .filter(([, diagnostic]) => diagnostic?.type === 'BATCH_TIMEOUT');
+
+        try {
+          getAIConversationHistoryEnabledAsync.mockResolvedValue(true);
+          mockProvider.translate.mockImplementationOnce(() => firstBatch.promise);
+          browser.tabs.sendMessage.mockClear();
+
+          const execution = handler.execute(mockEngine, mockData, mockProvider, 'en', 'fa', 'msg-exact-terminal', mockSender);
+          execution.catch(() => {});
+          await vi.waitFor(() => expect(mockProvider.translate).toHaveBeenCalledTimes(1));
+
+          // Real timer-driven timeout (not a manual signal.aborted flag).
+          await vi.advanceTimersByTimeAsync(TRANSLATION_BATCH_EXECUTION_TIMEOUT_MS);
+          await expect(execution).rejects.toMatchObject({ type: ErrorTypes.TRANSLATION_TIMEOUT });
+          expect(mockAbortController.abort).toHaveBeenCalledTimes(1);
+
+          // Owned per-batch abort listener removed and request unregistered.
+          expect(mockAbortController.signal.removeEventListener).toHaveBeenCalled();
+          expect(unregister).toHaveBeenCalledWith('msg-exact-terminal');
+
+          // Late provider settlement must not publish any stream/terminal message.
+          firstBatch.resolve({ translatedText: ['late'] });
+          await Promise.resolve();
+          await Promise.resolve();
+
+          const actions = browser.tabs.sendMessage.mock.calls.map(([, m]) => m?.action);
+          expect(actions).toHaveLength(0);
+          expect(actions).not.toContain(MessageActions.TRANSLATION_STREAM_UPDATE);
+          expect(actions).not.toContain(MessageActions.TRANSLATION_STREAM_END);
+
+          // No later callback fires after completion.
+          await vi.advanceTimersByTimeAsync(300000);
+          expect(mockAbortController.abort).toHaveBeenCalledTimes(1);
+          expect(timeoutDiagnostics()).toHaveLength(1);
+        } finally {
+          firstBatch.resolve({ translatedText: ['late'] });
+          getAIConversationHistoryEnabledAsync.mockResolvedValue(false);
+          vi.useRealTimers();
+        }
+      });
+
+      it('unregisters the request and removes listeners on cancellation', async () => {
+        vi.useRealTimers();
+        const { getAIConversationHistoryEnabledAsync } = await import('@/shared/config/config.js');
+        getAIConversationHistoryEnabledAsync.mockResolvedValue(false);
+
+        const unregister = vi.fn();
+        mockEngine.lifecycleRegistry = { ...mockEngine.lifecycleRegistry, unregisterRequest: unregister };
+        const firstBatch = createDeferred();
+        mockEngine.createIntelligentBatches = vi.fn(() => [[{ i: 'n1', t: 'Hello.' }]]);
+        mockProvider.translate.mockImplementationOnce(() => firstBatch.promise);
+
+        const execution = handler.execute(
+          mockEngine,
+          { ...mockData, sourceLanguage: 'en', text: JSON.stringify([{ i: 'n1', t: 'Hello.' }]) },
+          mockProvider, 'en', 'fa', 'msg-cancel-cleanup', mockSender
+        );
+
+        await vi.waitFor(() => expect(mockProvider.translate).toHaveBeenCalledTimes(1));
+        mockAbortController.signal.aborted = true;
+        firstBatch.resolve({ translatedText: ['Hello.'] });
+
+        const result = await execution;
+        expect(result.success).toBe(false);
+        expect(result.error.type).toBe(ErrorTypes.USER_CANCELLED);
+        expect(unregister).toHaveBeenCalledWith('msg-cancel-cleanup');
+        expect(mockAbortController.signal.removeEventListener).toHaveBeenCalled();
       });
     });
   });

@@ -55,6 +55,7 @@ vi.mock("./managers/OptimizedJsonHandler.js", () => {
 // 3. Imports
 import { TranslationEngine } from './translation-engine.js';
 import { MessageActions } from "@/shared/messaging/core/MessageActions.js";
+import { ErrorTypes } from "@/shared/error-management/ErrorTypes.js";
 import { getEnableDictionaryAsync } from "@/shared/config/config.js";
 
 // 4. Other dependencies
@@ -126,6 +127,21 @@ describe('TranslationEngine', () => {
       'PROGRESS_TIMEOUT',
       'Streaming translation timed out'
     );
+  });
+
+  it('formatError for a timeout yields a terminal response without streaming marker', () => {
+    const timeoutError = new Error('Batch translation timed out after 300000ms');
+    timeoutError.type = ErrorTypes.TRANSLATION_TIMEOUT;
+
+    const result = engine.formatError(timeoutError, 'select-element');
+
+    expect(result.success).toBe(false);
+    expect(result.error.type).toBe(ErrorTypes.TRANSLATION_TIMEOUT);
+    expect(result.error.message).toBe('Batch translation timed out after 300000ms');
+    // The timeout response must not claim active streaming: the coordinator
+    // routes on `response.streaming` truthiness, and a timeout returns the
+    // error response directly instead of awaiting a stream that never ends.
+    expect('streaming' in result).toBe(false);
   });
 
   describe('handleMessage', () => {
