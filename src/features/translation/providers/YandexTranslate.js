@@ -111,6 +111,20 @@ export class YandexTranslateProvider extends BaseTranslateProvider {
           throw err;
         }
 
+        const invalidIndex = data.text.findIndex((translatedItem, index) => {
+          if (typeof translatedItem !== 'string') return true;
+          const sourceText = getTextInfo(chunkTexts[index]).text;
+          return sourceText.trim() !== '' && translatedItem.trim() === '';
+        });
+
+        if (invalidIndex !== -1) {
+          logger.error(`Yandex API returned invalid translation text at index ${invalidIndex}`);
+          const err = new Error(`Yandex API returned invalid translation text at index ${invalidIndex}`);
+          err.type = ErrorTypes.API_RESPONSE_INVALID;
+          err.statusCode = data.code;
+          throw err;
+        }
+
         // Capture detected source language from 'lang' field (format: "en-fa")
         if (data.lang && typeof data.lang === 'string') {
           this._setDetectedLanguage(data.lang.split('-')[0]);
