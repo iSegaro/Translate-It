@@ -131,7 +131,7 @@ The `BaseProvider.translate()` method delegates to the `ProviderCoordinator`, wh
 
 ### 2. Optimization Level AwarenessProviders must be "Optimization-Aware." Use the `getProviderOptimizationLevelAsync` helper to adjust behavior:
 - **Level 1 (Economy)**: Large batches, low concurrency.
-- **Level 5 (Turbo)**: Small batches, high concurrency, enabled streaming.
+- **Level 5 (Turbo)**: May increase concurrency according to provider and runtime configuration. For Select Element, physical batching remains pinned at `optimalSize: 25` and `characterLimit: 3500`; optimization levels must not scale these mode overrides. Progressive Select Element updates come from validated batch publication in `OptimizedJsonHandler`. Provider streaming remains capability- and execution-path-specific.
 
 ### 3. Language Normalization
 Implement `convertLanguage(code)` in your provider class to map standard ISO codes to provider-specific codes (e.g., `fa` -> `farsi` for legacy APIs).
