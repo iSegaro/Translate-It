@@ -170,6 +170,13 @@ export class OptimizedJsonHandler {
       logger.debug(`[JsonHandler] Executing ${batches.length} batches for ${segments.length} segments (Concurrency: ${providerConfig.rateLimit.maxConcurrent})`);
       logger.debug(`[JsonHandler] Structured batch ${laneLabel} (${mode})`);
 
+      // Tracks whether the operation's semantic source/target pair is settled.
+      // Starts as the bypass decision, and is upgraded once the first resolved
+      // batch proves a concrete source (AUTO denied path). Later batches and
+      // parent recovery inherit this fact so ProviderCoordinator does not
+      // re-run semantic swap/detection per batch.
+      let languagePairResolved = bypassAutoSequentialGate;
+
       const self = this;
       let completedBatchCount = 0;
       const batchResults = Array.from({ length: batches.length }, () => []);
@@ -365,7 +372,7 @@ export class OptimizedJsonHandler {
               parallelExecution,
               recoveryContext,
               TranslationCallPurpose.PARENT_RECOVERY,
-              bypassAutoSequentialGate
+              languagePairResolved
             );
             const translated = response?.translatedText !== undefined ? response.translatedText : response;
             const sourceText = fragment.map(({ text }) => text).join('');
@@ -944,7 +951,7 @@ export class OptimizedJsonHandler {
                parallelExecution,
                 batchExecutionContext,
                 null,
-                bypassAutoSequentialGate
+                languagePairResolved
             );
 
           // Guard provider promise so late rejection after timeout cannot become
@@ -976,6 +983,15 @@ export class OptimizedJsonHandler {
           if (!bypassAutoSequentialGate && detectedSourceLanguage === 'auto' && translatedBatchResponse?.detectedLanguage) {
             detectedSourceLanguage = translatedBatchResponse.detectedLanguage;
             logger.debug(`[JsonHandler] Captured detected source language: ${detectedSourceLanguage}`);
+
+            // The response lifecycle proved a concrete semantic source. Later
+            // batches and PARENT_RECOVERY inherit the resolved pair so the
+            // semantic swap/detection is not repeated for this operation.
+            // A response that keeps source unresolved (e.g. 'auto') does not
+            // upgrade the flag: per-batch AUTO behavior is preserved.
+            if (detectedSourceLanguage !== 'auto') {
+              languagePairResolved = true;
+            }
           }
 
           const translatedBatch = (translatedBatchResponse && typeof translatedBatchResponse === 'object' && translatedBatchResponse.translatedText !== undefined)

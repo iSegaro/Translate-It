@@ -402,6 +402,15 @@ export class UnifiedModeCoordinator {
 
       logger.debug(`[UnifiedCoordinator] ${mode} batch source: ${effectiveSourceLanguage}`);
 
+      // A Page waiter/established batch has a canonical session-resolved source.
+      // Pass languagePairResolved so ProviderCoordinator skips the semantic
+      // swap/detection that the session owner already performed. The owner (and
+      // every non-Page batch, e.g. Subtitle per-batch AUTO) stays unresolved.
+      const languagePairResolved = mode === TranslationMode.Page
+        && sourceLanguage === AUTO_DETECT_VALUE
+        && sourceResolution !== null
+        && sourceResolution.isOwner !== true;
+
       // Determine what to pass to the provider
       const translationPayload = useRawItems 
         ? items 
@@ -440,6 +449,7 @@ export class UnifiedModeCoordinator {
             instruction,
             rawJsonPayload: true,
             executionContext,
+            ...(languagePairResolved && { languagePairResolved: true }),
         }),
         timeoutPromise
       ]);

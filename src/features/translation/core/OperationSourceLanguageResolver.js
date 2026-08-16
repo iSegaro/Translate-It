@@ -160,7 +160,9 @@ const getDetectionBypassDecision = (detection) => {
 
 /**
  * Resolve one operation's candidate source/target pair without scheduling it.
- * This is intentionally not wired into ProviderCoordinator or batch handlers.
+ * Consumed by OptimizedJsonHandler to gate AUTO first-batch translation:
+ * eligible resolutions bypass the sequential gate; denied resolutions retain
+ * the first-batch fallback (see LANGUAGE_DETECTION.md).
  */
 export const resolveOperationSourceLanguage = async ({
   text,

@@ -626,6 +626,78 @@ describe('OptimizedJsonHandler', () => {
       expect(appendTranslationDiagnostic).toHaveBeenCalledWith(null, expect.objectContaining({ type: 'PARENT_RECOVERY_SUCCEEDED', parentId: 'g1' }));
     });
 
+    it('makes PARENT_RECOVERY inherit the pair resolved by the first AUTO batch', async () => {
+      const m2 = '@@TI_SEG_e_s_n2@@';
+      const m3 = '@@TI_SEG_e_s_n3@@';
+      const source = `A${m2}B ${m3}C`;
+      const fragment0 = { t: `A${m2}B`, i: 'n1', blockId: 'g1', isV3Fragment: true, parentId: 'g1', fragmentIndex: 0, fragmentCount: 2, fragmentJoinerBefore: '' };
+      const fragment1 = { t: `${m3}C`, i: 'n1', blockId: 'g1', isV3Fragment: true, parentId: 'g1', fragmentIndex: 1, fragmentCount: 2, fragmentJoinerBefore: ' ' };
+      mockEngine.createIntelligentBatches = vi.fn(() => [[fragment0], [fragment1]]);
+      mockProvider.translate
+        .mockResolvedValueOnce({ translatedText: [`A${m2}B`], detectedLanguage: 'en' })
+        .mockResolvedValueOnce({ translatedText: [`${m3}${m3}C`] })
+        .mockResolvedValueOnce({ translatedText: [
+          { id: 'parent-1-0', i: 'parent-1-0', text: 'A' },
+          { id: 'parent-1-1', i: 'parent-1-1', text: 'B' },
+          { id: 'parent-1-2', i: 'parent-1-2', text: 'C' },
+        ] });
+
+      const result = await handler.execute(
+        mockEngine,
+        { ...mockData, text: JSON.stringify([{ t: source, blockId: 'g1', i: 'n1' }]) },
+        mockProvider, 'auto', 'fa', 'msg-v3-auto-recovery', mockSender
+      );
+
+      expect(result.success).toBe(true);
+      expect(mockProvider.translate).toHaveBeenCalledTimes(3);
+
+      // First batch runs unresolved; it proves 'en' via detectedLanguage.
+      expect(mockProvider.translate.mock.calls[0].slice(1, 3)).toEqual(['auto', 'fa']);
+      expect(mockProvider.translate.mock.calls[0][3].languagePairResolved).toBeUndefined();
+
+      // Second batch inherits the resolved pair.
+      expect(mockProvider.translate.mock.calls[1].slice(1, 3)).toEqual(['en', 'fa']);
+      expect(mockProvider.translate.mock.calls[1][3].languagePairResolved).toBe(true);
+
+      // PARENT_RECOVERY inherits the parent batch's resolved pair and skips
+      // semantic swap/detection, without re-running the bypass decision.
+      const recoveryCall = mockProvider.translate.mock.calls[2];
+      expect(recoveryCall[3].callPurpose).toBe(TranslationCallPurpose.PARENT_RECOVERY);
+      expect(recoveryCall.slice(1, 3)).toEqual(['en', 'fa']);
+      expect(recoveryCall[3].languagePairResolved).toBe(true);
+    });
+
+    it('keeps PARENT_RECOVERY unresolved when the operation source never resolves', async () => {
+      const m2 = '@@TI_SEG_e_s_n2@@';
+      const m3 = '@@TI_SEG_e_s_n3@@';
+      const source = `A${m2}B ${m3}C`;
+      const fragment0 = { t: `A${m2}B`, i: 'n1', blockId: 'g1', isV3Fragment: true, parentId: 'g1', fragmentIndex: 0, fragmentCount: 2, fragmentJoinerBefore: '' };
+      const fragment1 = { t: `${m3}C`, i: 'n1', blockId: 'g1', isV3Fragment: true, parentId: 'g1', fragmentIndex: 1, fragmentCount: 2, fragmentJoinerBefore: ' ' };
+      mockEngine.createIntelligentBatches = vi.fn(() => [[fragment0], [fragment1]]);
+      mockProvider.translate
+        .mockResolvedValueOnce({ translatedText: [`A${m2}B`], detectedLanguage: 'auto' })
+        .mockResolvedValueOnce({ translatedText: [`${m3}${m3}C`] })
+        .mockResolvedValueOnce({ translatedText: [
+          { id: 'parent-1-0', i: 'parent-1-0', text: 'A' },
+          { id: 'parent-1-1', i: 'parent-1-1', text: 'B' },
+          { id: 'parent-1-2', i: 'parent-1-2', text: 'C' },
+        ] });
+
+      const result = await handler.execute(
+        mockEngine,
+        { ...mockData, text: JSON.stringify([{ t: source, blockId: 'g1', i: 'n1' }]) },
+        mockProvider, 'auto', 'fa', 'msg-v3-auto-unresolved-recovery', mockSender
+      );
+
+      expect(result.success).toBe(true);
+      const recoveryCall = mockProvider.translate.mock.calls.find(
+        (call) => call[3].callPurpose === TranslationCallPurpose.PARENT_RECOVERY
+      );
+      expect(recoveryCall).toBeDefined();
+      expect(recoveryCall.slice(1, 3)).toEqual(['auto', 'fa']);
+      expect(recoveryCall[3].languagePairResolved).toBeUndefined();
+    });
+
     it('emits bounded provider, mapped, reassembled, and empty-interval diagnostics', async () => {
       const m2 = '@@TI_SEG_e_s_n2@@';
       const m3 = '@@TI_SEG_e_s_n3@@';
@@ -1508,9 +1580,57 @@ describe('OptimizedJsonHandler', () => {
       const execution = handler.execute(mockEngine, mockData, mockProvider, 'auto', 'fa', `msg-auto-${bypassReason}`, mockSender);
 
       await vi.waitFor(() => expect(mockProvider.translate).toHaveBeenCalledTimes(1));
+      expect(mockProvider.translate.mock.calls[0].slice(1, 3)).toEqual(['auto', 'fa']);
       expect(mockProvider.translate.mock.calls[0][3].languagePairResolved).toBeUndefined();
       firstBatch.resolve({ translatedText: ['t1'], detectedLanguage: 'en' });
       await vi.waitFor(() => expect(mockProvider.translate).toHaveBeenCalledTimes(2));
+
+      // Batch 1 resolved the semantic pair; later batches inherit the resolved
+      // source/target and skip ProviderCoordinator swap/detection.
+      expect(mockProvider.translate.mock.calls[1].slice(1, 3)).toEqual(['en', 'fa']);
+      expect(mockProvider.translate.mock.calls[1][3].languagePairResolved).toBe(true);
+      secondBatch.resolve({ translatedText: ['t2'] });
+      await execution;
+    });
+
+    it('keeps later batches unresolved when the first batch cannot confirm a source', async () => {
+      const firstBatch = createDeferred();
+      const secondBatch = createDeferred();
+      resolveOperationSourceLanguage.mockResolvedValueOnce({
+        canBypassSequentialGate: false,
+        bypassReason: 'HEURISTIC_RESULT',
+      });
+      mockProvider.translate
+        .mockImplementationOnce(() => firstBatch.promise)
+        .mockImplementationOnce(() => secondBatch.promise);
+
+      const execution = handler.execute(mockEngine, mockData, mockProvider, 'auto', 'fa', 'msg-auto-still-unresolved', mockSender);
+
+      await vi.waitFor(() => expect(mockProvider.translate).toHaveBeenCalledTimes(1));
+      // Response keeps source unresolved ('auto'): no concrete resolution was
+      // proven, so later batches must retain per-batch AUTO behavior.
+      firstBatch.resolve({ translatedText: ['t1'], detectedLanguage: 'auto' });
+      await vi.waitFor(() => expect(mockProvider.translate).toHaveBeenCalledTimes(2));
+      expect(mockProvider.translate.mock.calls[1].slice(1, 3)).toEqual(['auto', 'fa']);
+      expect(mockProvider.translate.mock.calls[1][3].languagePairResolved).toBeUndefined();
+      secondBatch.resolve({ translatedText: ['t2'] });
+      await execution;
+    });
+
+    it('keeps later batches unresolved when the first batch returns no detection', async () => {
+      const firstBatch = createDeferred();
+      const secondBatch = createDeferred();
+      mockProvider.translate
+        .mockImplementationOnce(() => firstBatch.promise)
+        .mockImplementationOnce(() => secondBatch.promise);
+
+      const execution = handler.execute(mockEngine, mockData, mockProvider, 'auto', 'fa', 'msg-auto-no-detection', mockSender);
+
+      await vi.waitFor(() => expect(mockProvider.translate).toHaveBeenCalledTimes(1));
+      firstBatch.resolve({ translatedText: ['t1'] });
+      await vi.waitFor(() => expect(mockProvider.translate).toHaveBeenCalledTimes(2));
+      expect(mockProvider.translate.mock.calls[1].slice(1, 3)).toEqual(['auto', 'fa']);
+      expect(mockProvider.translate.mock.calls[1][3].languagePairResolved).toBeUndefined();
       secondBatch.resolve({ translatedText: ['t2'] });
       await execution;
     });
