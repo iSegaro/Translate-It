@@ -448,6 +448,16 @@ export class PageTranslationScheduler extends ResourceTracker {
 
       batch.forEach((item, index) => {
         const translatedItem = translatedTexts[index];
+
+        // Explicit unresolved marker (isSkipped): keep original text and count as
+        // failed, never as translated. Only trust isSkipped === true; identity
+        // translations (text === source) are legitimate and resolve normally.
+        if (typeof translatedItem === 'object' && translatedItem !== null && translatedItem.isSkipped === true) {
+          item.resolve(typeof translatedItem.text === 'string' ? translatedItem.text : item.text);
+          this.failedCount++;
+          return;
+        }
+
         let translatedText = "";
 
         if (typeof translatedItem === 'string') {

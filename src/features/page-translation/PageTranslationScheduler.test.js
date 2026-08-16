@@ -160,6 +160,69 @@ describe('PageTranslationScheduler', () => {
       expect(scheduler.translatedCount).toBe(1);
     });
 
+    it('should honor isSkipped items in a mixed partial result', async () => {
+      const itemA = { text: 'A', resolve: vi.fn(), score: 1 };
+      const itemB = { text: 'B', resolve: vi.fn(), score: 1 };
+      const itemC = { text: 'C', resolve: vi.fn(), score: 1 };
+      scheduler.queue.push(itemA, itemB, itemC);
+
+      PageTranslationFluidFilter.process.mockReturnValue({ batchItems: [itemA, itemB, itemC], remainingItems: [] });
+      vi.spyOn(scheduler, '_getBatchConfig').mockResolvedValue({ providerRegistryId: 'google', targetLanguage: 'fa' });
+
+      safeSendMessage.mockResolvedValue({
+        success: true,
+        translatedText: JSON.stringify(['A2', { text: 'B', isSkipped: true }, 'C2'])
+      });
+
+      await scheduler.flush();
+
+      expect(itemA.resolve).toHaveBeenCalledWith('A2');
+      expect(itemB.resolve).toHaveBeenCalledWith('B');
+      expect(itemC.resolve).toHaveBeenCalledWith('C2');
+      expect(scheduler.translatedCount).toBe(2);
+      expect(scheduler.failedCount).toBe(1);
+    });
+
+    it('should preserve originals without counting translated when all items are skipped', async () => {
+      const itemA = { text: 'A', resolve: vi.fn(), score: 1 };
+      const itemB = { text: 'B', resolve: vi.fn(), score: 1 };
+      scheduler.queue.push(itemA, itemB);
+
+      PageTranslationFluidFilter.process.mockReturnValue({ batchItems: [itemA, itemB], remainingItems: [] });
+      vi.spyOn(scheduler, '_getBatchConfig').mockResolvedValue({ providerRegistryId: 'google', targetLanguage: 'fa' });
+
+      safeSendMessage.mockResolvedValue({
+        success: true,
+        translatedText: JSON.stringify([{ text: 'A', isSkipped: true }, { text: 'B', isSkipped: true }])
+      });
+
+      await scheduler.flush();
+
+      expect(itemA.resolve).toHaveBeenCalledWith('A');
+      expect(itemB.resolve).toHaveBeenCalledWith('B');
+      expect(scheduler.translatedCount).toBe(0);
+      expect(scheduler.failedCount).toBe(2);
+    });
+
+    it('should not treat identity translations as skipped', async () => {
+      const mockItem = { text: 'URL', resolve: vi.fn(), score: 1 };
+      scheduler.queue.push(mockItem);
+
+      PageTranslationFluidFilter.process.mockReturnValue({ batchItems: [mockItem], remainingItems: [] });
+      vi.spyOn(scheduler, '_getBatchConfig').mockResolvedValue({ providerRegistryId: 'google', targetLanguage: 'fa' });
+
+      safeSendMessage.mockResolvedValue({
+        success: true,
+        translatedText: JSON.stringify(['URL'])
+      });
+
+      await scheduler.flush();
+
+      expect(mockItem.resolve).toHaveBeenCalledWith('URL');
+      expect(scheduler.translatedCount).toBe(1);
+      expect(scheduler.failedCount).toBe(0);
+    });
+
     it('should handle batch errors and fallback to original text', async () => {
       const mockItem = { text: 'Failed Text', resolve: vi.fn(), score: 1 };
       scheduler.queue.push(mockItem);
