@@ -187,6 +187,36 @@ describe('BlockGroupReconstructor', () => {
       expect(textNodes[0].nodeValue).toBe('Hello ');
     });
 
+    it('continues restoring remaining segments and surfaces rollback failures', () => {
+      const originalSecond = textNodes[1].nodeValue;
+      let writes = 0;
+      Object.defineProperty(textNodes[1], 'nodeValue', {
+        configurable: true,
+        get: () => originalSecond,
+        set: () => {
+          writes += 1;
+          if (writes === 1) throw 'mutation-failure';
+          throw 'restore-failure';
+        }
+      });
+
+      let failure;
+      try {
+        BlockGroupReconstructor.apply(units, 'Uno @@SEG_n2@@Dos@@SEG_n3@@Tres', 'fa', document.body);
+      } catch (error) {
+        failure = error;
+      }
+
+      expect(failure).toBeInstanceOf(BlockGroupMutationFailure);
+      expect(failure.cause).toBe('mutation-failure');
+      expect(failure.rollbackFailures).toEqual([
+        expect.objectContaining({ kind: 'text', id: 'n2', error: 'restore-failure' })
+      ]);
+      expect(textNodes[0].nodeValue).toBe('Hello ');
+      expect(textNodes[1].nodeValue).toBe('world');
+      expect(textNodes[2].nodeValue).toBe('.');
+    });
+
     it('preserves pre-existing translating class on success and failure', () => {
       const parent = textNodes[0].parentElement;
       parent.classList.add('ti-translating');
