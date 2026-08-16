@@ -81,6 +81,7 @@ export class OptimizedJsonHandler {
     };
     const sessionId = data.sessionId || messageId;
     const tabId = sender?.tab?.id;
+    const frameId = typeof sender?.frameId === 'number' ? sender.frameId : null;
     const abortController = engine.lifecycleRegistry.getAbortController(messageId) || 
                              engine.lifecycleRegistry.registerRequest(messageId, typeof text === 'string' ? text.substring(0, 100) : '', uiContext);
 
@@ -676,7 +677,8 @@ export class OptimizedJsonHandler {
               mode,
               completedBatchCount,
               abortController,
-              engine
+              engine,
+              frameId
             );
           }
         };
@@ -1202,9 +1204,9 @@ hasErrors = true;
 
       if (!skipStreaming) {
         if (hasErrors) {
-          await this._sendStreamError(tabId, messageId, lastError, targetLanguage, detectedSourceLanguage, mode);
+          await this._sendStreamError(tabId, messageId, lastError, targetLanguage, detectedSourceLanguage, mode, frameId);
         } else {
-          await this._sendStreamEnd(tabId, messageId, providerInstance.providerName, targetLanguage, detectedSourceLanguage, mode);
+          await this._sendStreamEnd(tabId, messageId, providerInstance.providerName, targetLanguage, detectedSourceLanguage, mode, frameId);
         }
       }
 
@@ -1400,7 +1402,7 @@ hasErrors = true;
     });
   }
 
-  async _streamResults(tabId, messageId, translatedData, batchIndex, totalBatches, targetLanguage, sourceLanguage, translationMode, completedCount = null, abortController = null, engine = null) {
+  async _streamResults(tabId, messageId, translatedData, batchIndex, totalBatches, targetLanguage, sourceLanguage, translationMode, completedCount = null, abortController = null, engine = null, frameId = null) {
     if (!tabId) return;
     const isCancelled = () => {
       if (abortController?.signal?.aborted) return true;
@@ -1431,13 +1433,15 @@ hasErrors = true;
     try {
       await Promise.resolve();
       if (isCancelled()) return;
-      await browser.tabs.sendMessage(tabId, streamMessage);
+      const sendArgs = [tabId, streamMessage];
+      if (typeof frameId === 'number') sendArgs.push({ frameId });
+      await browser.tabs.sendMessage(...sendArgs);
     } catch (err) {
       logger.warn(`[JsonHandler] Failed to stream to tab ${tabId}:`, err.message);
     }
   }
 
-  async _sendStreamEnd(tabId, messageId, providerName, targetLanguage, sourceLanguage, translationMode) {
+  async _sendStreamEnd(tabId, messageId, providerName, targetLanguage, sourceLanguage, translationMode, frameId = null) {
     if (!tabId) return;
     const endMessage = {
       action: MessageActions.TRANSLATION_STREAM_END,
@@ -1453,11 +1457,13 @@ hasErrors = true;
       }
     };
     try {
-      await browser.tabs.sendMessage(tabId, endMessage);
+      const sendArgs = [tabId, endMessage];
+      if (typeof frameId === 'number') sendArgs.push({ frameId });
+      await browser.tabs.sendMessage(...sendArgs);
     } catch { /* ignore */ }
   }
 
-  async _sendStreamError(tabId, messageId, lastError, targetLanguage, sourceLanguage, translationMode) {
+  async _sendStreamError(tabId, messageId, lastError, targetLanguage, sourceLanguage, translationMode, frameId = null) {
     if (!tabId) return;
     const endMessage = {
       action: MessageActions.TRANSLATION_STREAM_END,
@@ -1476,7 +1482,9 @@ hasErrors = true;
       }
     };
     try {
-      await browser.tabs.sendMessage(tabId, endMessage);
+      const sendArgs = [tabId, endMessage];
+      if (typeof frameId === 'number') sendArgs.push({ frameId });
+      await browser.tabs.sendMessage(...sendArgs);
     } catch { /* ignore */ }
   }
 }
