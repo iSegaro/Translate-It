@@ -498,10 +498,10 @@ export class UnifiedModeCoordinator {
           : (typeof item === 'string' ? item : item.text);
 
         if (typeof item === 'string') {
-          return { text: translatedText };
+          return { text: translatedText, ...(isMissingResult ? { isSkipped: true } : {}) };
         }
 
-        // Object results (e.g. subtitle) carry an explicit unresolved marker so
+        // Results carry an explicit unresolved marker so
         // downstream consumers never mistake the source fallback for real output.
         return { ...item, text: translatedText, ...(isMissingResult ? { isSkipped: true } : {}) };
       });
