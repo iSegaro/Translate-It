@@ -128,9 +128,9 @@ The messaging system is now fully integrated with the **Unified Translation Serv
 - **Duplicate Prevention**: UnifiedTranslationService prevents duplicate processing via request tracking
 - **Element Recovery**: Smart element data recovery with TranslationRequestTracker
 
-**Select Element Mode** (Streaming/Broadcast):
+**Select Element Mode (Streaming):**
 - **Streaming Coordination**: Large translations automatically use streaming via UnifiedTranslationCoordinator
-- **Broadcast Results**: Results are broadcast to all tabs for streaming updates
+- **Frame-targeted Results**: Results route to the originating tab/frame for streaming updates
 - **Progress Tracking**: Real-time progress updates with proper request lifecycle management
 
 **Architecture Benefits**:

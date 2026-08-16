@@ -217,7 +217,7 @@ The UI dynamically rebrands the levels based on the active provider's type (`isA
 | **Traditional** | **Stable** | **Fast** | IP Reputation / Latency |
 
 ### 3. Real-time Synchronization
-When the user moves the slider, the change is saved via `updateSettingLocally`. The changes take effect after the user clicks the "Save" button in the Options page. The `SettingsUpdateHandler` in the background script then detects this and flushes the `RateLimitManager` cache, ensuring the new multipliers take effect across the extension.
+When the user moves the slider, the change is saved via `updateSettingLocally`. The changes take effect after the user clicks the "Save" button in the Options page. The `RateLimitManager` refreshes its configuration lazily on subsequent calls, so the new multipliers take effect across the extension without any explicit flush.
 
 ---
 

@@ -47,7 +47,7 @@ The translation system has been completely redesigned with a **Unified Translati
 
 **Translation Modes**:
 - **Field Mode**: Direct response pattern for text field translations
-- **Select Element Mode**: Streaming/broadcast for large content translations
+- **Select Element Mode**: Frame-targeted streaming for large content translations
 - **Standard Mode**: Regular translation with context-based routing
 
 ## Core Architecture
@@ -282,7 +282,7 @@ identity and fragment contract, see
 **File**: `src/core/services/translation/UnifiedResultDispatcher.js`
 - **Intelligent result routing** based on translation mode
 - **Direct response** for field mode translations
-- **Broadcast delivery** for select element streaming
+- **Frame-targeted streaming delivery** for Select Element requests, using the originating tab/frame
 - **Tab-specific routing** for context isolation
 
 ### Vue Composables
@@ -327,7 +327,7 @@ File Upload → SubtitleTranslationCoordinator → Progressive Batching → SrtA
 **Special Processing**: Select element mode uses streaming for large content:
 - **Streaming Updates**: Real-time translation progress
 - **JSON Processing**: Efficient handling of multiple text elements
-- **Broadcast Results**: Updates sent to all relevant tabs
+- **Frame-targeted Results**: Updates, errors, and completion target the originating tab/frame; internal extension contexts use runtime messaging
 - **Progress Tracking**: Visual feedback during translation
 
 Select Element receives final accepted structured results. Detailed provider
