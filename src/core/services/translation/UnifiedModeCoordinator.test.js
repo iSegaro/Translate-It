@@ -599,8 +599,9 @@ describe('UnifiedModeCoordinator', () => {
           { translationEngine: mockEngine }
         );
 
-        await flush();
-        await flush();
+        await vi.waitFor(() => {
+          expect(provider.sources).toEqual(['de', 'de']);
+        });
         expect(provider.sources).toEqual(['de', 'de']);
         expect(coordinator.pageSourceResolvers.size).toBe(0);
         // Explicit source is not semantic resolution: no languagePairResolved.
