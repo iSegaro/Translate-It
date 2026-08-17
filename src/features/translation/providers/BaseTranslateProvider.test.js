@@ -27,6 +27,7 @@ import { streamingManager } from '@/features/translation/core/StreamingManager.j
 import { TraditionalTextProcessor } from './utils/TraditionalTextProcessor.js';
 import { TraditionalStreamManager } from './utils/TraditionalStreamManager.js';
 import { createTranslationOperation } from '@/features/translation/ir/TranslationOperation.js';
+import { TranslationSegmentMapper } from '@/utils/translation/TranslationSegmentMapper.js';
 
 vi.mock('@/features/translation/core/StreamingManager.js', () => ({
   streamingManager: {
@@ -215,6 +216,30 @@ describe('BaseTranslateProvider', () => {
       expect(result).toEqual(['translated-Hello']);
     });
 
+    it('reuses one metadata slot across streaming retries', async () => {
+      const operation = createTranslationOperation('streaming-retry-slot');
+      const refs = [];
+      vi.spyOn(provider, '_translateChunk').mockImplementation(async (texts, ...args) => {
+        refs.push(args[8].providerMetadataRef);
+        args[8].providerMetadataRef.metadata.attempt = refs.length;
+        return texts.map(text => `translated-${text}`);
+      });
+      provider._executeWithRateLimit = vi.fn(async (task) => {
+        await task({ attempt: 1 });
+        return task({ attempt: 2 });
+      });
+
+      await provider._streamingBatchTranslate(
+        ['Hello'], 'en', 'fa', TranslationMode.Popup, null, null, null, 1, 'session-1', undefined,
+        { executionContext: { operation } },
+      );
+
+      expect(refs[0]).toBe(refs[1]);
+      expect(operation.snapshotProviderExecutionMetadata()).toHaveLength(1);
+      expect(operation.snapshotProviderExecutionMetadata()[0].metadata.attempt).toBe(2);
+      expect(provider).not.toHaveProperty('providerMetadataRef');
+    });
+
     it('should throw and cleanup on error during streaming', async () => {
       const texts = ['Fail'];
       const engine = { isCancelled: vi.fn(() => false) };
@@ -295,13 +320,61 @@ describe('BaseTranslateProvider', () => {
 
       await provider._traditionalBatchTranslate(
         ['A', 'B'], 'en', 'fa', TranslationMode.Popup, null, null, null, null, null, undefined,
-        { executionContext: { operation }, callPurpose: 'PRIMARY_TRANSLATION' },
+        { executionContext: { operation } },
       );
 
       const records = operation.snapshotProviderExecutionMetadata();
       expect(records).toHaveLength(2);
+      expect(records.every(({ callPurpose }) => callPurpose === 'PRIMARY_TRANSLATION')).toBe(true);
       expect(records.map(({ metadata }) => metadata.chunk)).toEqual(['A', 'B']);
       expect(records[0].metadata).not.toBe(records[1].metadata);
+    });
+
+    it('reuses one metadata slot across traditional retries', async () => {
+      const operation = createTranslationOperation('traditional-retry-slot');
+      const refs = [];
+      vi.spyOn(provider, '_translateChunk').mockImplementation(async (texts, ...args) => {
+        refs.push(args[8].providerMetadataRef);
+        args[8].providerMetadataRef.metadata.attempt = refs.length;
+        return texts.map(text => `translated-${text}`);
+      });
+      provider._executeWithRateLimit = vi.fn(async (task) => {
+        await task({ attempt: 1 });
+        return task({ attempt: 2 });
+      });
+
+      await provider._traditionalBatchTranslate(
+        ['A'], 'en', 'fa', TranslationMode.Popup, null, null, null, null, null, undefined,
+        { executionContext: { operation } },
+      );
+
+      expect(refs[0]).toBe(refs[1]);
+      expect(operation.snapshotProviderExecutionMetadata()).toHaveLength(1);
+      expect(operation.snapshotProviderExecutionMetadata()[0].metadata.attempt).toBe(2);
+      expect(provider).not.toHaveProperty('providerMetadataRef');
+    });
+
+    it('does not publish when all traditional retries fail', async () => {
+      const operation = createTranslationOperation('traditional-retry-failure');
+      const refs = [];
+      vi.spyOn(provider, '_translateChunk').mockImplementation(async (_texts, ...args) => {
+        refs.push(args[8].providerMetadataRef);
+        args[8].providerMetadataRef.metadata.failed = true;
+        throw new Error('retry failure');
+      });
+      provider._executeWithRateLimit = vi.fn(async (task) => {
+        await task({ attempt: 1 }).catch(() => {});
+        return task({ attempt: 2 });
+      });
+
+      await expect(provider._traditionalBatchTranslate(
+        ['A'], 'en', 'fa', TranslationMode.Popup, null, null, null, null, null, undefined,
+        { executionContext: { operation } },
+      )).rejects.toThrow('retry failure');
+
+      expect(refs[0]).toBe(refs[1]);
+      expect(operation.snapshotProviderExecutionMetadata()).toEqual([]);
+      expect(provider).not.toHaveProperty('providerMetadataRef');
     });
 
     it('does not publish metadata when a physical chunk fails', async () => {
@@ -316,6 +389,21 @@ describe('BaseTranslateProvider', () => {
         ['A'], 'en', 'fa', TranslationMode.Popup, null, null, null, null, null, undefined,
         { executionContext: { operation }, callPurpose: 'PRIMARY_TRANSLATION' },
       )).rejects.toThrow('physical failure');
+
+      expect(operation.snapshotProviderExecutionMetadata()).toEqual([]);
+    });
+
+    it('does not publish metadata when result mapping fails', async () => {
+      const operation = createTranslationOperation('traditional-mapping-failure');
+      vi.spyOn(provider, '_translateChunk').mockResolvedValue(['translated-A']);
+      vi.mocked(TranslationSegmentMapper.mapTranslationToOriginalSegments).mockImplementationOnce(() => {
+        throw new Error('mapping failure');
+      });
+
+      await expect(provider._traditionalBatchTranslate(
+        ['A', 'B'], 'en', 'fa', TranslationMode.Popup, null, null, null, null, null, undefined,
+        { executionContext: { operation }, callPurpose: 'PRIMARY_TRANSLATION' },
+      )).rejects.toThrow('mapping failure');
 
       expect(operation.snapshotProviderExecutionMetadata()).toEqual([]);
     });

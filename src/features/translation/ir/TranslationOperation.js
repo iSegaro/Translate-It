@@ -1,5 +1,6 @@
 import { createTranslationDiagnosticReport } from './TranslationOutcome.js'
 import { createUsageRecord, normalizeCompletionTermination } from './CompletionContract.js'
+import { TranslationCallPurpose } from '../providers/ProviderConstants.js'
 
 const MAX_DIAGNOSTIC_ENTRIES = 100
 const MAX_COMPLETION_ENTRIES = 100
@@ -317,7 +318,7 @@ export function createTranslationOperation(messageId, manifest = null) {
     recordProviderExecutionMetadata(metadata, callPurpose) {
       if (finalized || !metadata || typeof metadata !== 'object' || Array.isArray(metadata)) return false
       const stored = Object.freeze({
-        callPurpose: typeof callPurpose === 'string' ? callPurpose : null,
+        callPurpose: callPurpose == null ? TranslationCallPurpose.PRIMARY_TRANSLATION : callPurpose,
         metadata: Object.freeze({ ...metadata }),
       })
       providerMetadata.push(stored)
@@ -325,6 +326,18 @@ export function createTranslationOperation(messageId, manifest = null) {
     },
     snapshotProviderExecutionMetadata() {
       return Object.freeze([...providerMetadata])
+    },
+    snapshotAggregatedProviderMetadata() {
+      const languages = new Set()
+      for (const record of providerMetadata) {
+        if (record.callPurpose !== TranslationCallPurpose.PRIMARY_TRANSLATION) continue
+        const language = record.metadata?.detectedLanguage
+        if (typeof language !== 'string' || !language.trim()) continue
+        languages.add(language.trim().toLowerCase())
+      }
+      return languages.size === 1
+        ? Object.freeze({ detectedLanguage: languages.values().next().value })
+        : Object.freeze({})
     },
     settleUnits(unitIds) {
       const accepted = []

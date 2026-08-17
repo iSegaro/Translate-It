@@ -18,6 +18,7 @@ import {
   createProviderExecutionMetadataRef,
   publishProviderExecutionMetadata,
 } from "@/features/translation/ir/TranslationOperation.js";
+import { TranslationCallPurpose } from "@/features/translation/providers/ProviderConstants.js";
 
 const logger = getScopedLogger(LOG_COMPONENTS.TRANSLATION, 'BaseTranslateProvider');
 
@@ -99,6 +100,7 @@ export class BaseTranslateProvider extends BaseProvider {
     
     const chunks = await this._createChunks(texts);
     const allResults = [];
+    const callPurpose = options.callPurpose ?? TranslationCallPurpose.PRIMARY_TRANSLATION;
     
     for (let chunkIndex = 0; chunkIndex < chunks.length; chunkIndex++) {
       if ((abortController && abortController.signal.aborted) || (engine && engine.isCancelled(messageId))) {
@@ -116,9 +118,9 @@ export class BaseTranslateProvider extends BaseProvider {
 
         if (abortController) abortController.sessionId = sessionId;
 
+        const providerMetadataRef = createProviderExecutionMetadataRef();
         const chunkResponse = await this._executeWithRateLimit(
           (opts) => {
-            const providerMetadataRef = createProviderExecutionMetadataRef();
             return this._translateChunk(
               chunk.texts,
               sourceLang,
@@ -131,14 +133,11 @@ export class BaseTranslateProvider extends BaseProvider {
               chunks.length,
               {
                 ...opts,
-                callPurpose: options.callPurpose,
+                callPurpose,
                 originalCharCount: chunk.texts.reduce((sum, t) => sum + getTextInfo(t).length, 0),
                 providerMetadataRef,
               },
-            ).then((result) => {
-              publishProviderExecutionMetadata(options.executionContext, providerMetadataRef, options.callPurpose);
-              return result;
-            });
+            );
           },
           chunkContext,
           priority,
@@ -152,6 +151,8 @@ export class BaseTranslateProvider extends BaseProvider {
               return TraditionalTextProcessor.scrubBidiArtifacts(text);
             })
           : TraditionalTextProcessor.scrubBidiArtifacts(chunkResponse);
+
+        publishProviderExecutionMetadata(options.executionContext, providerMetadataRef, callPurpose);
 
         const statsAfter = sessionId ? statsManager.getSessionSummary(sessionId) : null;
         const actualChunkChars = statsAfter ? (statsAfter.chars - charsBefore) : this._calculateTraditionalCharCount(chunk.texts);
@@ -179,6 +180,7 @@ export class BaseTranslateProvider extends BaseProvider {
     const context = `${this.providerName.toLowerCase()}-traditional-batch`;
     const chunks = await this._createChunks(texts);
     const allResults = [];
+    const callPurpose = options.callPurpose ?? TranslationCallPurpose.PRIMARY_TRANSLATION;
 
     const { TranslationSegmentMapper } = await import("@/utils/translation/TranslationSegmentMapper.js");
 
@@ -196,9 +198,9 @@ export class BaseTranslateProvider extends BaseProvider {
       if (abortController) abortController.sessionId = sessionId;
       const originalCharCount = chunk.texts.reduce((sum, t) => sum + getTextInfo(t).length, 0);
 
+      const providerMetadataRef = createProviderExecutionMetadataRef();
       const chunkResponse = await this._executeWithRateLimit(
         (opts) => {
-          const providerMetadataRef = createProviderExecutionMetadataRef();
           return this._translateChunk(
             chunk.texts,
             sourceLang,
@@ -211,14 +213,11 @@ export class BaseTranslateProvider extends BaseProvider {
             chunks.length,
             {
               ...opts,
-              callPurpose: options.callPurpose,
+              callPurpose,
               originalCharCount,
               providerMetadataRef,
             },
-          ).then((result) => {
-            publishProviderExecutionMetadata(options.executionContext, providerMetadataRef, options.callPurpose);
-            return result;
-          });
+            );
         },
         chunkContext,
         priority,
@@ -265,6 +264,8 @@ export class BaseTranslateProvider extends BaseProvider {
           throw mapperError;
         }
       }
+
+      publishProviderExecutionMetadata(options.executionContext, providerMetadataRef, callPurpose);
 
       allResults.push(...chunkResults);
     }

@@ -863,6 +863,7 @@ export class BaseAIProvider extends BaseProvider {
     } else {
       conversationCommitCandidate?.discard();
     }
+    publishProviderExecutionMetadata(callExecutionContext || contextMetadata?.executionContext, providerMetadataRef, callPurpose);
     return acceptedResults;
   }
 
@@ -909,7 +910,6 @@ export class BaseAIProvider extends BaseProvider {
       priority,
       { sessionId, abortController, messageId, executionContext: contextMetadata?.executionContext }
     );
-    publishProviderExecutionMetadata(contextMetadata?.executionContext, providerMetadataRef, callPurpose);
     return result;
   }
 

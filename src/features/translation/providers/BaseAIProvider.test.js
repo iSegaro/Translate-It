@@ -110,14 +110,8 @@ beforeEach(() => {
       });
 
       await Promise.all([
-        provider.executeStructuredBatch(['first'], 'en', 'fa', {
-          translateMode: 'selection',
-          contextMetadata: { executionContext: { operation } },
-        }),
-        provider.executeStructuredBatch(['second'], 'en', 'fa', {
-          translateMode: 'selection',
-          contextMetadata: { executionContext: { operation } },
-        }),
+        provider._translateBatch(['first'], 'en', 'fa', 'selection', null, null, null, null, { executionContext: { operation } }),
+        provider._translateBatch(['second'], 'en', 'fa', 'selection', null, null, null, null, { executionContext: { operation } }),
       ]);
 
       expect(refs[0]).not.toBe(refs[1]);
@@ -132,12 +126,43 @@ beforeEach(() => {
         throw new Error('physical failure');
       });
 
-      await expect(provider.executeStructuredBatch(['source'], 'en', 'fa', {
-        translateMode: 'selection',
-        contextMetadata: { executionContext: { operation } },
-      })).rejects.toThrow('physical failure');
+      await expect(provider._translateBatch(['source'], 'en', 'fa', 'selection', null, null, null, null, { executionContext: { operation } }))
+        .rejects.toThrow('physical failure');
 
       expect(operation.snapshotProviderExecutionMetadata()).toEqual([]);
+    });
+
+    it('does not publish metadata when structured parsing fails after provider success', async () => {
+      const operation = createTranslationOperation('ai-parse-failure');
+      provider._callAI = vi.fn().mockImplementation(async (_system, _text, options) => {
+        options.providerMetadataRef.metadata.detectedLanguage = 'en';
+        return 'response';
+      });
+      AIResponseParser.parseBatchResult.mockImplementationOnce(() => {
+        throw new Error('parse failure');
+      });
+
+      await expect(provider._translateBatch(['source'], 'en', 'fa', 'selection', null, null, null, null, {
+        executionContext: { operation },
+      })).rejects.toThrow('parse failure');
+
+      expect(operation.snapshotProviderExecutionMetadata()).toEqual([]);
+    });
+
+    it('publishes one metadata record after successful AI validation', async () => {
+      const operation = createTranslationOperation('ai-success');
+      provider._callAI = vi.fn().mockImplementation(async (_system, _text, options) => {
+        options.providerMetadataRef.metadata.detectedLanguage = ' EN ';
+        return 'response';
+      });
+
+      await provider._translateBatch(['source'], 'en', 'fa', 'selection', null, null, null, null, {
+        executionContext: { operation },
+      });
+
+      expect(operation.snapshotProviderExecutionMetadata()).toEqual([
+        { callPurpose: TranslationCallPurpose.PRIMARY_TRANSLATION, metadata: { detectedLanguage: ' EN ' } },
+      ]);
     });
 
     it('keeps recovery metadata separate from primary metadata', async () => {
@@ -147,15 +172,13 @@ beforeEach(() => {
         return 'response';
       });
 
-      await provider.executeStructuredBatch(['primary'], 'en', 'fa', {
-        translateMode: 'selection',
+      await provider._translateBatch(['primary'], 'en', 'fa', 'selection', null, null, null, null, {
+        executionContext: { operation },
         callPurpose: TranslationCallPurpose.PRIMARY_TRANSLATION,
-        contextMetadata: { executionContext: { operation } },
       });
-      await provider.executeStructuredBatch(['recovery'], 'en', 'fa', {
-        translateMode: 'selection',
+      await provider._translateBatch(['recovery'], 'en', 'fa', 'selection', null, null, null, null, {
+        executionContext: { operation },
         callPurpose: TranslationCallPurpose.STRUCTURED_RECOVERY,
-        contextMetadata: { executionContext: { operation } },
       });
 
       expect(operation.snapshotProviderExecutionMetadata()).toEqual([
