@@ -205,11 +205,13 @@ describe('CustomProvider Error Handling', () => {
     expect(fetchOptions.headers.Authorization).toBeUndefined();
   });
 
-  it('preserves the Custom translation request contract for anonymous calls', async () => {
+  it.each([ResponseFormat.JSON_OBJECT, ResponseFormat.JSON_ARRAY])(
+    'sends json_object response format for %s anonymous calls',
+    async (expectedFormat) => {
     vi.mocked(getCustomApiKeysAsync).mockResolvedValueOnce([]);
     const executeRequest = vi.spyOn(provider, '_executeRequest').mockResolvedValue('translated');
 
-    await provider._callAI('system', 'source', { expectedFormat: ResponseFormat.JSON_OBJECT });
+    await provider._callAI('system', 'source', { expectedFormat });
 
     const request = executeRequest.mock.calls[0][0];
     expect(request.fetchOptions.headers.Authorization).toBeUndefined();
@@ -219,6 +221,16 @@ describe('CustomProvider Error Handling', () => {
       max_tokens: 4096,
       response_format: { type: 'json_object' }
     });
+    },
+  );
+
+  it('omits response format for STRING calls', async () => {
+    const executeRequest = vi.spyOn(provider, '_executeRequest').mockResolvedValue('translated');
+
+    await provider._callAI('system', 'source', { expectedFormat: ResponseFormat.STRING });
+
+    const payload = JSON.parse(executeRequest.mock.calls[0][0].fetchOptions.body);
+    expect(payload).not.toHaveProperty('response_format');
   });
 
   it('should detect API_ERROR wrapped in 200 OK response', async () => {

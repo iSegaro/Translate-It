@@ -101,7 +101,8 @@ export class CustomProvider extends BaseAIProvider {
         messages: messages,
         max_tokens: 4096,
         // Apply JSON mode if requested by the contract
-        ...(expectedFormat === ResponseFormat.JSON_OBJECT && { response_format: { type: "json_object" } })
+        ...((expectedFormat === ResponseFormat.JSON_OBJECT || expectedFormat === ResponseFormat.JSON_ARRAY)
+          && { response_format: { type: "json_object" } })
       }),
     };
 
