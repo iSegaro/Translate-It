@@ -132,6 +132,33 @@ beforeEach(() => {
       expect(operation.snapshotProviderExecutionMetadata()).toEqual([]);
     });
 
+    it('discards failed attempt metadata before a successful AI retry', async () => {
+      const operation = createTranslationOperation('ai-retry-isolation');
+      const refs = [];
+      let attempt = 0;
+      provider._callAI = vi.fn().mockImplementation(async (_system, _text, options) => {
+        refs.push(options.providerMetadataRef);
+        attempt++;
+        if (attempt === 1) {
+          options.providerMetadataRef.metadata.detectedLanguage = 'de';
+          throw new Error('first attempt failed');
+        }
+        return 'response';
+      });
+      provider._executeWithRateLimit = vi.fn(async (task) => {
+        await task({ attempt: 1 }).catch(() => {});
+        return task({ attempt: 2 });
+      });
+
+      await provider._translateBatch(['source'], 'en', 'fa', 'selection', null, null, null, null, {
+        executionContext: { operation },
+      });
+
+      expect(refs[0]).toBe(refs[1]);
+      expect(operation.snapshotProviderExecutionMetadata()).toEqual([]);
+      expect(operation.snapshotAggregatedProviderMetadata()).toEqual({});
+    });
+
     it('does not publish metadata when structured parsing fails after provider success', async () => {
       const operation = createTranslationOperation('ai-parse-failure');
       provider._callAI = vi.fn().mockImplementation(async (_system, _text, options) => {

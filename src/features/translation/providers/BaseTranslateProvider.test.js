@@ -240,6 +240,35 @@ describe('BaseTranslateProvider', () => {
       expect(provider).not.toHaveProperty('providerMetadataRef');
     });
 
+    it('discards failed streaming attempt metadata before retry success', async () => {
+      const operation = createTranslationOperation('streaming-retry-isolation');
+      const refs = [];
+      let attempt = 0;
+      vi.spyOn(provider, '_translateChunk').mockImplementation(async (texts, ...args) => {
+        const ref = args[8].providerMetadataRef;
+        refs.push(ref);
+        attempt++;
+        if (attempt === 1) {
+          ref.metadata.detectedLanguage = 'de';
+          throw new Error('first attempt failed');
+        }
+        return texts.map(text => `translated-${text}`);
+      });
+      provider._executeWithRateLimit = vi.fn(async (task) => {
+        await task({ attempt: 1 }).catch(() => {});
+        return task({ attempt: 2 });
+      });
+
+      await provider._streamingBatchTranslate(
+        ['Hello'], 'en', 'fa', TranslationMode.Popup, null, null, null, 1, 'session-1', undefined,
+        { executionContext: { operation } },
+      );
+
+      expect(refs[0]).toBe(refs[1]);
+      expect(operation.snapshotProviderExecutionMetadata()).toEqual([]);
+      expect(operation.snapshotAggregatedProviderMetadata()).toEqual({});
+    });
+
     it('should throw and cleanup on error during streaming', async () => {
       const texts = ['Fail'];
       const engine = { isCancelled: vi.fn(() => false) };
@@ -352,6 +381,61 @@ describe('BaseTranslateProvider', () => {
       expect(operation.snapshotProviderExecutionMetadata()).toHaveLength(1);
       expect(operation.snapshotProviderExecutionMetadata()[0].metadata.attempt).toBe(2);
       expect(provider).not.toHaveProperty('providerMetadataRef');
+    });
+
+    it('discards failed attempt metadata before retry success', async () => {
+      const operation = createTranslationOperation('traditional-retry-isolation');
+      const refs = [];
+      let attempt = 0;
+      vi.spyOn(provider, '_translateChunk').mockImplementation(async (texts, ...args) => {
+        const ref = args[8].providerMetadataRef;
+        refs.push(ref);
+        attempt++;
+        if (attempt === 1) {
+          ref.metadata.detectedLanguage = 'de';
+          throw new Error('first attempt failed');
+        }
+        return texts.map(text => `translated-${text}`);
+      });
+      provider._executeWithRateLimit = vi.fn(async (task) => {
+        await task({ attempt: 1 }).catch(() => {});
+        return task({ attempt: 2 });
+      });
+
+      await provider._traditionalBatchTranslate(
+        ['A'], 'en', 'fa', TranslationMode.Popup, null, null, null, null, null, undefined,
+        { executionContext: { operation } },
+      );
+
+      expect(refs[0]).toBe(refs[1]);
+      expect(operation.snapshotProviderExecutionMetadata()).toEqual([]);
+      expect(operation.snapshotAggregatedProviderMetadata()).toEqual({});
+    });
+
+    it('publishes only successful retry metadata', async () => {
+      const operation = createTranslationOperation('traditional-retry-success-metadata');
+      let attempt = 0;
+      vi.spyOn(provider, '_translateChunk').mockImplementation(async (texts, ...args) => {
+        const ref = args[8].providerMetadataRef;
+        attempt++;
+        ref.metadata.detectedLanguage = attempt === 1 ? 'de' : 'en';
+        if (attempt === 1) throw new Error('first attempt failed');
+        return texts.map(text => `translated-${text}`);
+      });
+      provider._executeWithRateLimit = vi.fn(async (task) => {
+        await task({ attempt: 1 }).catch(() => {});
+        return task({ attempt: 2 });
+      });
+
+      await provider._traditionalBatchTranslate(
+        ['A'], 'en', 'fa', TranslationMode.Popup, null, null, null, null, null, undefined,
+        { executionContext: { operation } },
+      );
+
+      expect(operation.snapshotProviderExecutionMetadata()).toEqual([
+        { callPurpose: 'PRIMARY_TRANSLATION', metadata: { detectedLanguage: 'en' } },
+      ]);
+      expect(operation.snapshotAggregatedProviderMetadata()).toEqual({ detectedLanguage: 'en' });
     });
 
     it('does not publish when all traditional retries fail', async () => {

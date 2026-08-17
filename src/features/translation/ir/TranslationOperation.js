@@ -443,6 +443,23 @@ export function createProviderExecutionMetadataRef() {
   return { metadata: {}, published: false }
 }
 
+export function discardProviderExecutionMetadata(providerMetadataRef) {
+  if (!providerMetadataRef || providerMetadataRef.published) return
+  providerMetadataRef.metadata = {}
+}
+
+export async function executeProviderExecutionAttempt(providerMetadataRef, attempt) {
+  if (!providerMetadataRef || typeof attempt !== 'function') return attempt()
+
+  providerMetadataRef.metadata = {}
+  try {
+    return await attempt()
+  } catch (error) {
+    discardProviderExecutionMetadata(providerMetadataRef)
+    throw error
+  }
+}
+
 /**
  * Publishes one successful provider-execution metadata slot into its
  * operation. Internal HTTP retries and failover stay inside this slot.

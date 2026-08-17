@@ -21,6 +21,8 @@ import { ErrorTypes } from "@/shared/error-management/ErrorTypes.js";
 import {
   appendTranslationDiagnostic,
   createProviderExecutionMetadataRef,
+  discardProviderExecutionMetadata,
+  executeProviderExecutionAttempt,
   publishProviderExecutionMetadata,
 } from "@/features/translation/ir/TranslationOperation.js";
 import { TranslationCallPurpose } from "@/features/translation/providers/ProviderConstants.js";
@@ -377,17 +379,19 @@ export class BaseAIProvider extends BaseProvider {
     ) ? createConversationCommitCandidate(translateMode) : null;
     let acceptedResults;
     try {
-      const response = await this.executeStructuredBatch(texts, sourceLang, targetLang, {
-        translateMode,
-        abortController,
-        messageId,
-        sessionId,
-        contextMetadata: callContextMetadata,
-        expectedFormat,
-        priority,
-        conversationCommitCandidate,
-        callPurpose,
-      });
+      const response = await executeProviderExecutionAttempt(providerMetadataRef, () => this.executeStructuredBatch(
+        texts, sourceLang, targetLang, {
+          translateMode,
+          abortController,
+          messageId,
+          sessionId,
+          contextMetadata: callContextMetadata,
+          expectedFormat,
+          priority,
+          conversationCommitCandidate,
+          callPurpose,
+        },
+      ));
 
       // Stats recording is handled by ProviderRequestEngine. 
       // Orchestrators (like OptimizedJsonHandler or UnifiedService) handle the reporting.
@@ -828,6 +832,7 @@ export class BaseAIProvider extends BaseProvider {
 
       acceptedResults = parsed.results;
     } catch (error) {
+      discardProviderExecutionMetadata(providerMetadataRef);
       conversationCommitCandidate?.discard();
       // Error accounting is owned exclusively by ProviderRequestEngine.executeApiCall:
       // TranslationStatsManager.errors counts failed physical HTTP calls only.
@@ -887,7 +892,7 @@ export class BaseAIProvider extends BaseProvider {
     const context = `${this.providerName.toLowerCase()}-batch-translation`;
     const providerMetadataRef = contextMetadata?.providerMetadataRef || createProviderExecutionMetadataRef();
     const result = await this._executeWithRateLimit(
-      (opts) => this._callAI(systemPrompt, finalUserText, {
+      (opts) => executeProviderExecutionAttempt(providerMetadataRef, () => this._callAI(systemPrompt, finalUserText, {
         ...opts,
         abortController,
         messageId,
@@ -896,16 +901,16 @@ export class BaseAIProvider extends BaseProvider {
         sourceLang,
         targetLang,
         isBatch: true,
-         expectedFormat: expectedFormat || ResponseFormat.JSON_ARRAY,
-         executionContext: contextMetadata?.executionContext,
-          callPurpose,
-          conversationParticipates: callPurpose === TranslationCallPurpose.PRIMARY_TRANSLATION
-            && contextMetadata?.conversationParticipates === true,
-          useParentConversationLifecycle: callPurpose === TranslationCallPurpose.PRIMARY_TRANSLATION
-            && contextMetadata?.useParentConversationLifecycle === true,
-         conversationCommitCandidate,
-         providerMetadataRef,
-       }),
+        expectedFormat: expectedFormat || ResponseFormat.JSON_ARRAY,
+        executionContext: contextMetadata?.executionContext,
+        callPurpose,
+        conversationParticipates: callPurpose === TranslationCallPurpose.PRIMARY_TRANSLATION
+          && contextMetadata?.conversationParticipates === true,
+        useParentConversationLifecycle: callPurpose === TranslationCallPurpose.PRIMARY_TRANSLATION
+          && contextMetadata?.useParentConversationLifecycle === true,
+        conversationCommitCandidate,
+        providerMetadataRef,
+      })),
       context,
       priority,
       { sessionId, abortController, messageId, executionContext: contextMetadata?.executionContext }
@@ -984,7 +989,7 @@ export class BaseAIProvider extends BaseProvider {
       try {
         const providerMetadataRef = createProviderExecutionMetadataRef();
         const response = await this._executeWithRateLimit(
-          (opts) => this._callAI(systemPrompt, userText, {
+          (opts) => executeProviderExecutionAttempt(providerMetadataRef, () => this._callAI(systemPrompt, userText, {
             ...opts,
             abortController,
             messageId,
@@ -998,7 +1003,7 @@ export class BaseAIProvider extends BaseProvider {
             conversationParticipates,
             useParentConversationLifecycle: effectiveContextMetadata.useParentConversationLifecycle,
             providerMetadataRef,
-          }),
+          })),
           chunkContext,
           priority,
           { sessionId, abortController, messageId }

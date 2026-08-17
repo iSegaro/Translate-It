@@ -16,6 +16,8 @@ import { statsManager } from '@/features/translation/core/TranslationStatsManage
 import { getProviderBatching } from "@/features/translation/core/ProviderConfigurations.js";
 import {
   createProviderExecutionMetadataRef,
+  discardProviderExecutionMetadata,
+  executeProviderExecutionAttempt,
   publishProviderExecutionMetadata,
 } from "@/features/translation/ir/TranslationOperation.js";
 import { TranslationCallPurpose } from "@/features/translation/providers/ProviderConstants.js";
@@ -111,6 +113,7 @@ export class BaseTranslateProvider extends BaseProvider {
 
       const chunk = chunks[chunkIndex];
       const chunkContext = `streaming-chunk-${chunkIndex + 1}/${chunks.length}`;
+      const providerMetadataRef = createProviderExecutionMetadataRef();
 
       try {
         const statsBefore = sessionId ? statsManager.getSessionSummary(sessionId) : null;
@@ -118,27 +121,24 @@ export class BaseTranslateProvider extends BaseProvider {
 
         if (abortController) abortController.sessionId = sessionId;
 
-        const providerMetadataRef = createProviderExecutionMetadataRef();
         const chunkResponse = await this._executeWithRateLimit(
-          (opts) => {
-            return this._translateChunk(
-              chunk.texts,
-              sourceLang,
-              targetLang,
-              translateMode,
-              abortController,
-              0,
-              chunk.texts.length,
-              chunkIndex,
-              chunks.length,
-              {
-                ...opts,
-                callPurpose,
-                originalCharCount: chunk.texts.reduce((sum, t) => sum + getTextInfo(t).length, 0),
-                providerMetadataRef,
-              },
-            );
-          },
+          (opts) => executeProviderExecutionAttempt(providerMetadataRef, () => this._translateChunk(
+            chunk.texts,
+            sourceLang,
+            targetLang,
+            translateMode,
+            abortController,
+            0,
+            chunk.texts.length,
+            chunkIndex,
+            chunks.length,
+            {
+              ...opts,
+              callPurpose,
+              originalCharCount: chunk.texts.reduce((sum, t) => sum + getTextInfo(t).length, 0),
+              providerMetadataRef,
+            },
+          )),
           chunkContext,
           priority,
           { sessionId, abortController, messageId }
@@ -161,6 +161,7 @@ export class BaseTranslateProvider extends BaseProvider {
         allResults.push(...(Array.isArray(scrubbedResponse) ? scrubbedResponse : [scrubbedResponse]));
         await TraditionalStreamManager.streamChunkResults(this.providerName, scrubbedResponse, chunk.texts, chunkIndex, messageId, sourceLang, targetLang, actualChunkChars, originalChunkChars);
       } catch (error) {
+        discardProviderExecutionMetadata(providerMetadataRef);
         const errorType = error.type || matchErrorToType(error);
         if (errorType === ErrorTypes.USER_CANCELLED) logger.debug(`[${this.providerName}] Streaming chunk ${chunkIndex + 1} cancelled:`, error);
         else logger.debug(`[${this.providerName}] Streaming chunk ${chunkIndex + 1} failed:`, error);
@@ -199,9 +200,9 @@ export class BaseTranslateProvider extends BaseProvider {
       const originalCharCount = chunk.texts.reduce((sum, t) => sum + getTextInfo(t).length, 0);
 
       const providerMetadataRef = createProviderExecutionMetadataRef();
-      const chunkResponse = await this._executeWithRateLimit(
-        (opts) => {
-          return this._translateChunk(
+      try {
+        const chunkResponse = await this._executeWithRateLimit(
+          (opts) => executeProviderExecutionAttempt(providerMetadataRef, () => this._translateChunk(
             chunk.texts,
             sourceLang,
             targetLang,
@@ -217,12 +218,11 @@ export class BaseTranslateProvider extends BaseProvider {
               originalCharCount,
               providerMetadataRef,
             },
-            );
-        },
-        chunkContext,
-        priority,
-        { sessionId, abortController, messageId }
-      );
+          )),
+          chunkContext,
+          priority,
+          { sessionId, abortController, messageId }
+        );
 
       // Handle different response formats and CRITICAL: Split joined strings back into segments
       let chunkResults = [];
@@ -265,9 +265,13 @@ export class BaseTranslateProvider extends BaseProvider {
         }
       }
 
-      publishProviderExecutionMetadata(options.executionContext, providerMetadataRef, callPurpose);
+        publishProviderExecutionMetadata(options.executionContext, providerMetadataRef, callPurpose);
 
-      allResults.push(...chunkResults);
+        allResults.push(...chunkResults);
+      } catch (error) {
+        discardProviderExecutionMetadata(providerMetadataRef);
+        throw error;
+      }
     }
     
     // Final safety check: if somehow we still have a mismatch, log it
