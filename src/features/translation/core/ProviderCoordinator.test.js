@@ -14,6 +14,7 @@ vi.mock("@/shared/error-management/ErrorMatcher.js");
 import { providerCoordinator } from './ProviderCoordinator.js';
 import { ResponseFormat } from "@/shared/config/translationConstants.js";
 import { AUTO_DETECT_VALUE } from "@/shared/constants/core.js";
+import { ErrorTypes } from "@/shared/error-management/ErrorTypes.js";
 import { isFatalError, isTransientError, matchErrorToType } from "@/shared/error-management/ErrorMatcher.js";
 import { TranslationCallPurpose } from '@/features/translation/providers/ProviderConstants.js';
 
@@ -226,6 +227,91 @@ describe('ProviderCoordinator', () => {
 
       expect(result.translatedText).toEqual(['Bonjour']);
       expect(result.translatedText).not.toBe('');
+    });
+
+    describe('JSON-wrapped output validation', () => {
+      const executeWrapped = (source, providerResult) => {
+        mockProvider.translate.mockResolvedValue(providerResult);
+        return providerCoordinator._executeJsonWrapped(
+          mockProvider,
+          source,
+          'en',
+          'fa',
+          'selection',
+          {},
+        );
+      };
+
+      it('reconstructs valid results while preserving metadata', async () => {
+        const source = [
+          { i: 'a', t: 'A', blockId: 'x' },
+          { i: 'b', t: 'B', blockId: 'y' },
+        ];
+
+        const result = await executeWrapped(source, ['A2', 'B2']);
+
+        expect(JSON.parse(result)).toEqual([
+          { i: 'a', t: 'A2', blockId: 'x' },
+          { i: 'b', t: 'B2', blockId: 'y' },
+        ]);
+      });
+
+      it('accepts identity translation', async () => {
+        const result = await executeWrapped([{ t: 'URL' }], ['URL']);
+
+        expect(JSON.parse(result)).toEqual([{ t: 'URL' }]);
+      });
+
+      it.each(['', '   ', null, undefined, 0, 42, false, true, {}, []])(
+        'rejects invalid nonblank result %p',
+        async (value) => {
+          await expect(executeWrapped([{ t: 'SOURCE' }], [value]))
+            .rejects.toMatchObject({ type: ErrorTypes.API_RESPONSE_INVALID });
+        },
+      );
+
+      it('rejects a sparse result slot', async () => {
+        const results = [];
+        results.length = 1;
+
+        await expect(executeWrapped([{ t: 'SOURCE' }], results))
+          .rejects.toMatchObject({ type: ErrorTypes.API_RESPONSE_INVALID });
+      });
+
+      it('preserves blank-source blank-output compatibility', async () => {
+        const result = await executeWrapped([{ t: '' }], ['']);
+
+        expect(JSON.parse(result)).toEqual([{ t: '' }]);
+      });
+
+      it.each([
+        [[{ t: 'A' }, { t: 'B' }, { t: 'C' }], ['A2', 'B2']],
+        [[{ t: 'A' }, { t: 'B' }], ['A2', 'B2', 'C2']],
+      ])('rejects cardinality mismatch', async (source, providerResult) => {
+        await expect(executeWrapped(source, providerResult))
+          .rejects.toMatchObject({ type: ErrorTypes.API_RESPONSE_INVALID });
+      });
+
+      it('keeps rawJsonPayload calls on standard execution path', async () => {
+        const jsonInput = JSON.stringify([{ t: 'SOURCE' }]);
+        mockProvider.translate.mockResolvedValue('TRANSLATED');
+
+        const result = await providerCoordinator.execute(
+          mockProvider,
+          jsonInput,
+          'en',
+          'fa',
+          { rawJsonPayload: true },
+        );
+
+        expect(mockProvider.translate).toHaveBeenCalledWith(
+          jsonInput,
+          'en',
+          'fa',
+          expect.objectContaining({ rawJsonPayload: true }),
+        );
+        expect(result.translatedText).toBe('TRANSLATED');
+      });
     });
   });
 

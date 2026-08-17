@@ -370,28 +370,39 @@ export class ProviderCoordinator {
       ? response.translatedText 
       : response;
 
-    if (Array.isArray(results) && results.length === jsonArray.length) {
-      // Re-map back to original JSON structure
-      const translatedJson = jsonArray.map((item, idx) => {
-        if (typeof item === 'object') {
-          return { ...item, t: results[idx] || (item.t || item.text) };
-        }
-        return results[idx];
-      });
-      return JSON.stringify(translatedJson, null, 2);
+    const invalidResponse = (reason) => {
+      const error = new Error(`[${provider.providerName}] Invalid JSON-wrapped response: ${reason}`);
+      error.type = ErrorTypes.API_RESPONSE_INVALID;
+      throw error;
+    };
+
+    if (!Array.isArray(jsonArray) || !Array.isArray(results) || results.length !== jsonArray.length) {
+      invalidResponse(`expected ${jsonArray?.length ?? 0} results, received ${results?.length ?? 0}`);
     }
 
-    if (results?.length !== jsonArray.length) {
-      logger.warn(`[Coordinator] JSON mismatch: ${results?.length} vs ${jsonArray.length}. Attempting cleanup...`);
+    for (let idx = 0; idx < jsonArray.length; idx++) {
+      const item = jsonArray[idx];
+      const sourceText = typeof item === 'object' && item !== null
+        ? (item.t ?? item.text ?? '')
+        : item;
+      const sourceIsBlank = typeof sourceText === 'string' && sourceText.trim() === '';
+      const translatedText = results[idx];
+      const isValidText = typeof translatedText === 'string'
+        && (translatedText.trim() !== '' || sourceIsBlank);
+
+      if (!isValidText) {
+        invalidResponse(`invalid result at index ${idx}`);
+      }
     }
 
-    // Fallback: If results don't match, map what we can or return joined string
-    // But CRITICAL: ensure every part is processed via _ensureString to prevent JSON artifacts
-    if (Array.isArray(results)) {
-      return JSON.stringify(results.map(r => this._ensureString(r)));
-    }
-
-    return this._ensureString(results);
+    // Re-map back to original JSON structure without fabricating source text.
+    const translatedJson = jsonArray.map((item, idx) => {
+      if (typeof item === 'object' && item !== null) {
+        return { ...item, t: results[idx] };
+      }
+      return results[idx];
+    });
+    return JSON.stringify(translatedJson, null, 2);
   }
 
   /**
