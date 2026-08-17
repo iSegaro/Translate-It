@@ -1,11 +1,40 @@
 import { describe, expect, it } from 'vitest'
-import { createTranslationOperation, deriveRecoverySummary, recordProviderCompletion, RecoveryFinalOutcome, ParentCandidateState } from './TranslationOperation.js'
+import { createProviderExecutionMetadataRef, createTranslationOperation, deriveRecoverySummary, recordProviderCompletion, RecoveryFinalOutcome, ParentCandidateState, publishProviderExecutionMetadata } from './TranslationOperation.js'
 import { CompletionTermination, createCompletionRecord } from './CompletionContract.js'
 import { AIResponseParser } from '../providers/utils/AIResponseParser.js'
 import { ResponseFormat } from '@/shared/config/translationConstants.js'
 import { createManifestView, createRequestUnitManifest } from './RequestUnitManifest.js'
 
 describe('TranslationOperation', () => {
+  it('publishes immutable snapshots from distinct provider execution slots', () => {
+    const operation = createTranslationOperation('metadata-slots')
+    const executionContext = { operation }
+    const first = createProviderExecutionMetadataRef()
+    const second = createProviderExecutionMetadataRef()
+    first.metadata.detectedLanguage = 'en'
+    second.metadata.detectedLanguage = 'fa'
+
+    expect(first).not.toBe(second)
+    expect(publishProviderExecutionMetadata(executionContext, first, 'PRIMARY_TRANSLATION')).not.toBe(false)
+    expect(publishProviderExecutionMetadata(executionContext, second, 'PRIMARY_TRANSLATION')).not.toBe(false)
+    expect(operation.snapshotProviderExecutionMetadata()).toEqual([
+      { callPurpose: 'PRIMARY_TRANSLATION', metadata: { detectedLanguage: 'en' } },
+      { callPurpose: 'PRIMARY_TRANSLATION', metadata: { detectedLanguage: 'fa' } },
+    ])
+    expect(operation.snapshotProviderExecutionMetadata()[0].metadata).not.toBe(first.metadata)
+  })
+
+  it('publishes one execution slot at most once', () => {
+    const operation = createTranslationOperation('metadata-publish-once')
+    const executionContext = { operation }
+    const ref = createProviderExecutionMetadataRef()
+    ref.metadata.detectedLanguage = 'en'
+
+    expect(publishProviderExecutionMetadata(executionContext, ref, 'PRIMARY_TRANSLATION')).not.toBe(false)
+    expect(publishProviderExecutionMetadata(executionContext, ref, 'PRIMARY_TRANSLATION')).toBe(false)
+    expect(operation.snapshotProviderExecutionMetadata()).toHaveLength(1)
+  })
+
   it('keeps parent candidates operation-scoped, write-once, and history-free', () => {
     const operation = createTranslationOperation('parent-candidates')
     const parent = operation.createParentCandidate({

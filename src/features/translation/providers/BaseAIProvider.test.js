@@ -99,6 +99,71 @@ beforeEach(() => {
   });
 
   describe('explicit batch execution APIs', () => {
+    it('gives concurrent physical AI calls distinct metadata slots', async () => {
+      const operation = createTranslationOperation('ai-slots');
+      const refs = [];
+      provider._callAI = vi.fn().mockImplementation(async (_system, userText, options) => {
+        refs.push(options.providerMetadataRef);
+        options.providerMetadataRef.metadata.request = userText;
+        await Promise.resolve();
+        return userText;
+      });
+
+      await Promise.all([
+        provider.executeStructuredBatch(['first'], 'en', 'fa', {
+          translateMode: 'selection',
+          contextMetadata: { executionContext: { operation } },
+        }),
+        provider.executeStructuredBatch(['second'], 'en', 'fa', {
+          translateMode: 'selection',
+          contextMetadata: { executionContext: { operation } },
+        }),
+      ]);
+
+      expect(refs[0]).not.toBe(refs[1]);
+      expect(operation.snapshotProviderExecutionMetadata().map(({ metadata }) => metadata.request).sort())
+        .toEqual(['["first"]', '["second"]']);
+    });
+
+    it('does not publish metadata from failed physical AI calls', async () => {
+      const operation = createTranslationOperation('ai-failure');
+      provider._callAI = vi.fn().mockImplementation(async (_system, _text, options) => {
+        options.providerMetadataRef.metadata.request = 'failed';
+        throw new Error('physical failure');
+      });
+
+      await expect(provider.executeStructuredBatch(['source'], 'en', 'fa', {
+        translateMode: 'selection',
+        contextMetadata: { executionContext: { operation } },
+      })).rejects.toThrow('physical failure');
+
+      expect(operation.snapshotProviderExecutionMetadata()).toEqual([]);
+    });
+
+    it('keeps recovery metadata separate from primary metadata', async () => {
+      const operation = createTranslationOperation('ai-recovery-slots');
+      provider._callAI = vi.fn().mockImplementation(async (_system, _text, options) => {
+        options.providerMetadataRef.metadata.request = options.callPurpose;
+        return 'response';
+      });
+
+      await provider.executeStructuredBatch(['primary'], 'en', 'fa', {
+        translateMode: 'selection',
+        callPurpose: TranslationCallPurpose.PRIMARY_TRANSLATION,
+        contextMetadata: { executionContext: { operation } },
+      });
+      await provider.executeStructuredBatch(['recovery'], 'en', 'fa', {
+        translateMode: 'selection',
+        callPurpose: TranslationCallPurpose.STRUCTURED_RECOVERY,
+        contextMetadata: { executionContext: { operation } },
+      });
+
+      expect(operation.snapshotProviderExecutionMetadata()).toEqual([
+        { callPurpose: TranslationCallPurpose.PRIMARY_TRANSLATION, metadata: { request: TranslationCallPurpose.PRIMARY_TRANSLATION } },
+        { callPurpose: TranslationCallPurpose.STRUCTURED_RECOVERY, metadata: { request: TranslationCallPurpose.STRUCTURED_RECOVERY } },
+      ]);
+    });
+
     it('executeStructuredBatch returns raw primary response unchanged', async () => {
       provider._callAI = vi.fn().mockResolvedValue('raw structured response');
 

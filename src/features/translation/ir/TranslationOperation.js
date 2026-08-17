@@ -236,6 +236,7 @@ function sanitizeCompletion(record = {}) {
 export function createTranslationOperation(messageId, manifest = null) {
   const diagnostics = []
   const completions = []
+  const providerMetadata = []
   const parentCandidates = new Map()
   const manifestUnits = Array.isArray(manifest?.units) ? manifest.units : []
   let unitStates = null
@@ -312,6 +313,18 @@ export function createTranslationOperation(messageId, manifest = null) {
     },
     snapshotCompletions() {
       return Object.freeze([...completions])
+    },
+    recordProviderExecutionMetadata(metadata, callPurpose) {
+      if (finalized || !metadata || typeof metadata !== 'object' || Array.isArray(metadata)) return false
+      const stored = Object.freeze({
+        callPurpose: typeof callPurpose === 'string' ? callPurpose : null,
+        metadata: Object.freeze({ ...metadata }),
+      })
+      providerMetadata.push(stored)
+      return stored
+    },
+    snapshotProviderExecutionMetadata() {
+      return Object.freeze([...providerMetadata])
     },
     settleUnits(unitIds) {
       const accepted = []
@@ -406,6 +419,27 @@ export function recordProviderCompletion(executionContext, record) {
   if (stored && executionContext?.completionRef) {
     executionContext.completionRef.record = stored
   }
+  return stored
+}
+
+/**
+ * Creates mutable metadata storage for one semantic provider execution. The
+ * ref is detached from the logical operation until execution succeeds.
+ */
+export function createProviderExecutionMetadataRef() {
+  return { metadata: {}, published: false }
+}
+
+/**
+ * Publishes one successful provider-execution metadata slot into its
+ * operation. Internal HTTP retries and failover stay inside this slot.
+ * Recovery and primary records remain separate; aggregation is a later phase.
+ */
+export function publishProviderExecutionMetadata(executionContext, providerMetadataRef, callPurpose) {
+  const metadata = providerMetadataRef?.metadata
+  if (providerMetadataRef?.published || !metadata || typeof metadata !== 'object' || Array.isArray(metadata) || Object.keys(metadata).length === 0) return false
+  const stored = executionContext?.operation?.recordProviderExecutionMetadata(metadata, callPurpose) || false
+  if (stored) providerMetadataRef.published = true
   return stored
 }
 

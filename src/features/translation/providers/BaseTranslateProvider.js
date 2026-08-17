@@ -14,6 +14,10 @@ import { TraditionalTextProcessor, getTextInfo } from "./utils/TraditionalTextPr
 import { TraditionalStreamManager } from "./utils/TraditionalStreamManager.js";
 import { statsManager } from '@/features/translation/core/TranslationStatsManager.js';
 import { getProviderBatching } from "@/features/translation/core/ProviderConfigurations.js";
+import {
+  createProviderExecutionMetadataRef,
+  publishProviderExecutionMetadata,
+} from "@/features/translation/ir/TranslationOperation.js";
 
 const logger = getScopedLogger(LOG_COMPONENTS.TRANSLATION, 'BaseTranslateProvider');
 
@@ -113,7 +117,29 @@ export class BaseTranslateProvider extends BaseProvider {
         if (abortController) abortController.sessionId = sessionId;
 
         const chunkResponse = await this._executeWithRateLimit(
-          (opts) => this._translateChunk(chunk.texts, sourceLang, targetLang, translateMode, abortController, 0, chunk.texts.length, chunkIndex, chunks.length, { ...opts, callPurpose: options.callPurpose, originalCharCount: chunk.texts.reduce((sum, t) => sum + getTextInfo(t).length, 0) }),
+          (opts) => {
+            const providerMetadataRef = createProviderExecutionMetadataRef();
+            return this._translateChunk(
+              chunk.texts,
+              sourceLang,
+              targetLang,
+              translateMode,
+              abortController,
+              0,
+              chunk.texts.length,
+              chunkIndex,
+              chunks.length,
+              {
+                ...opts,
+                callPurpose: options.callPurpose,
+                originalCharCount: chunk.texts.reduce((sum, t) => sum + getTextInfo(t).length, 0),
+                providerMetadataRef,
+              },
+            ).then((result) => {
+              publishProviderExecutionMetadata(options.executionContext, providerMetadataRef, options.callPurpose);
+              return result;
+            });
+          },
           chunkContext,
           priority,
           { sessionId, abortController, messageId }
@@ -171,7 +197,29 @@ export class BaseTranslateProvider extends BaseProvider {
       const originalCharCount = chunk.texts.reduce((sum, t) => sum + getTextInfo(t).length, 0);
 
       const chunkResponse = await this._executeWithRateLimit(
-        (opts) => this._translateChunk(chunk.texts, sourceLang, targetLang, translateMode, abortController, 0, chunk.texts.length, i, chunks.length, { ...opts, callPurpose: options.callPurpose, originalCharCount }),
+        (opts) => {
+          const providerMetadataRef = createProviderExecutionMetadataRef();
+          return this._translateChunk(
+            chunk.texts,
+            sourceLang,
+            targetLang,
+            translateMode,
+            abortController,
+            0,
+            chunk.texts.length,
+            i,
+            chunks.length,
+            {
+              ...opts,
+              callPurpose: options.callPurpose,
+              originalCharCount,
+              providerMetadataRef,
+            },
+          ).then((result) => {
+            publishProviderExecutionMetadata(options.executionContext, providerMetadataRef, options.callPurpose);
+            return result;
+          });
+        },
         chunkContext,
         priority,
         { sessionId, abortController, messageId }

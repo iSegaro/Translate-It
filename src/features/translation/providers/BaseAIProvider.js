@@ -18,7 +18,11 @@ import { TranslationMode, getProviderOptimizationLevelAsync } from "@/shared/con
 import { AIStreamManager } from "./utils/AIStreamManager.js";
 import { isCancellationError } from "@/shared/error-management/ErrorMatcher.js";
 import { ErrorTypes } from "@/shared/error-management/ErrorTypes.js";
-import { appendTranslationDiagnostic } from "@/features/translation/ir/TranslationOperation.js";
+import {
+  appendTranslationDiagnostic,
+  createProviderExecutionMetadataRef,
+  publishProviderExecutionMetadata,
+} from "@/features/translation/ir/TranslationOperation.js";
 import { TranslationCallPurpose } from "@/features/translation/providers/ProviderConstants.js";
 import { classifyRecoveryFailure } from "@/features/translation/ir/RecoveryClassification.js";
 import { TranslationContractValidator } from "@/features/translation/core/TranslationContractValidator.js";
@@ -350,14 +354,14 @@ export class BaseAIProvider extends BaseProvider {
           sessionId,
         }));
     // Per-call completion slot: the adapter records the completion during its
-    // physical response, and recordProviderCompletion publishes the frozen
-    // record into this fresh per-call slot. Parallel batches share one
-    // operation, so the slot is derived per call to keep the correlation
-    // response-scoped (no "latest completion" shared state).
+    // provider execution, and recordProviderCompletion publishes the frozen
+    // record into this fresh execution slot. Parallel batches share one
+    // operation, so each execution owns its own metadata state.
     const baseExecutionContext = contextMetadata?.executionContext;
     const completionRef = baseExecutionContext ? { record: null } : null;
+    const providerMetadataRef = createProviderExecutionMetadataRef();
     const callExecutionContext = baseExecutionContext
-      ? { ...baseExecutionContext, completionRef }
+      ? { ...baseExecutionContext, completionRef, providerMetadataRef }
       : null;
     const callContextMetadata = {
       ...contextMetadata,
@@ -365,6 +369,7 @@ export class BaseAIProvider extends BaseProvider {
       expectedFormat: structuredFormat,
       useParentConversationLifecycle: isPrimaryCall && contextMetadata?.useParentConversationLifecycle === true,
       ...(callExecutionContext && { executionContext: callExecutionContext }),
+      providerMetadataRef,
     };
     const conversationCommitCandidate = (
       (structuredFormat === ResponseFormat.JSON_ARRAY || structuredFormat === ResponseFormat.JSON_OBJECT)
@@ -879,7 +884,8 @@ export class BaseAIProvider extends BaseProvider {
     }]);
     const finalUserText = typeof userText === 'string' ? userText : JSON.stringify(userText);
     const context = `${this.providerName.toLowerCase()}-batch-translation`;
-    return this._executeWithRateLimit(
+    const providerMetadataRef = contextMetadata?.providerMetadataRef || createProviderExecutionMetadataRef();
+    const result = await this._executeWithRateLimit(
       (opts) => this._callAI(systemPrompt, finalUserText, {
         ...opts,
         abortController,
@@ -897,11 +903,14 @@ export class BaseAIProvider extends BaseProvider {
           useParentConversationLifecycle: callPurpose === TranslationCallPurpose.PRIMARY_TRANSLATION
             && contextMetadata?.useParentConversationLifecycle === true,
          conversationCommitCandidate,
-      }),
+         providerMetadataRef,
+       }),
       context,
       priority,
       { sessionId, abortController, messageId, executionContext: contextMetadata?.executionContext }
     );
+    publishProviderExecutionMetadata(contextMetadata?.executionContext, providerMetadataRef, callPurpose);
+    return result;
   }
 
   async executeSequentialBatch(texts, sourceLang, targetLang, {
@@ -973,6 +982,7 @@ export class BaseAIProvider extends BaseProvider {
       const chunkContext = `${context}-segment-${i + 1}/${texts.length}`;
 
       try {
+        const providerMetadataRef = createProviderExecutionMetadataRef();
         const response = await this._executeWithRateLimit(
           (opts) => this._callAI(systemPrompt, userText, {
             ...opts,
@@ -987,6 +997,7 @@ export class BaseAIProvider extends BaseProvider {
             callPurpose,
             conversationParticipates,
             useParentConversationLifecycle: effectiveContextMetadata.useParentConversationLifecycle,
+            providerMetadataRef,
           }),
           chunkContext,
           priority,
@@ -996,8 +1007,10 @@ export class BaseAIProvider extends BaseProvider {
         if (isStringContract) {
           validateSequentialStringResponse(response, [text], this.providerName);
         }
-        
-        results.push(AIResponseParser.cleanAIResponse(response, expectedFormat || ResponseFormat.STRING));
+
+        const cleanedResponse = AIResponseParser.cleanAIResponse(response, expectedFormat || ResponseFormat.STRING);
+        publishProviderExecutionMetadata(effectiveContextMetadata.executionContext, providerMetadataRef, callPurpose);
+        results.push(cleanedResponse);
       } catch (error) {
         logger.error(`[${this.providerName}] Traditional segment translation failed:`, error.message);
         // No silent success: a failed segment fails the batch loudly. The error

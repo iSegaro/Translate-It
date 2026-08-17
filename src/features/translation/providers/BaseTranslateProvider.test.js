@@ -26,6 +26,7 @@ import { TranslationMode } from '@/shared/config/config.js';
 import { streamingManager } from '@/features/translation/core/StreamingManager.js';
 import { TraditionalTextProcessor } from './utils/TraditionalTextProcessor.js';
 import { TraditionalStreamManager } from './utils/TraditionalStreamManager.js';
+import { createTranslationOperation } from '@/features/translation/ir/TranslationOperation.js';
 
 vi.mock('@/features/translation/core/StreamingManager.js', () => ({
   streamingManager: {
@@ -110,7 +111,11 @@ class TestProvider extends BaseTranslateProvider {
   constructor() {
     super('TestProvider');
   }
-  async _translateChunk(texts) {
+  async _translateChunk(texts, ...args) {
+    const options = args[8] || {};
+    if (options.providerMetadataRef) {
+      options.providerMetadataRef.metadata.chunk = texts[0];
+    }
     return texts.map(t => `translated-${t}`);
   }
 }
@@ -279,6 +284,40 @@ describe('BaseTranslateProvider', () => {
 
       // Result comes from SegmentMapper mock
       expect(result).toEqual(['mapped-A', 'mapped-B']);
+    });
+
+    it('publishes separate metadata slots for separate physical chunks', async () => {
+      TraditionalTextProcessor.createChunks.mockReturnValue([
+        { texts: ['A'] },
+        { texts: ['B'] },
+      ]);
+      const operation = createTranslationOperation('traditional-slots');
+
+      await provider._traditionalBatchTranslate(
+        ['A', 'B'], 'en', 'fa', TranslationMode.Popup, null, null, null, null, null, undefined,
+        { executionContext: { operation }, callPurpose: 'PRIMARY_TRANSLATION' },
+      );
+
+      const records = operation.snapshotProviderExecutionMetadata();
+      expect(records).toHaveLength(2);
+      expect(records.map(({ metadata }) => metadata.chunk)).toEqual(['A', 'B']);
+      expect(records[0].metadata).not.toBe(records[1].metadata);
+    });
+
+    it('does not publish metadata when a physical chunk fails', async () => {
+      const operation = createTranslationOperation('traditional-failure');
+      vi.spyOn(provider, '_translateChunk').mockImplementation(async (_texts, ...args) => {
+        const options = args[8];
+        options.providerMetadataRef.metadata.chunk = 'failed';
+        throw new Error('physical failure');
+      });
+
+      await expect(provider._traditionalBatchTranslate(
+        ['A'], 'en', 'fa', TranslationMode.Popup, null, null, null, null, null, undefined,
+        { executionContext: { operation }, callPurpose: 'PRIMARY_TRANSLATION' },
+      )).rejects.toThrow('physical failure');
+
+      expect(operation.snapshotProviderExecutionMetadata()).toEqual([]);
     });
   });
 
