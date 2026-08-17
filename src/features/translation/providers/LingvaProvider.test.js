@@ -203,6 +203,20 @@ describe('LingvaProvider', () => {
       expect(exec).toHaveBeenCalledTimes(2);
     });
 
+    it('preserves callPurpose across rebatched subgroup requests', async () => {
+      const item = 'a'.repeat(27);
+      const exec = vi.spyOn(provider, '_executeRequest').mockResolvedValue('ok');
+
+      await provider._translateChunk(
+        [item, item], 'en', 'fa', 'selection', null, 0, 2, 0, 1,
+        { callPurpose: 'PARENT_RECOVERY' }
+      );
+
+      expect(exec).toHaveBeenCalledTimes(2);
+      expect(exec.mock.calls.map(([options]) => options.callPurpose))
+        .toEqual(['PARENT_RECOVERY', 'PARENT_RECOVERY']);
+    });
+
     it('every subgroup URL is within budget', async () => {
       const item = 'a'.repeat(27);
       const urls = [];

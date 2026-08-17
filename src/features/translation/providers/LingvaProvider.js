@@ -108,7 +108,7 @@ export class LingvaProvider extends BaseTranslateProvider {
    * @returns {Promise<string>}
    * @private
    */
-  async _executeLingvaRequest(url, context, abortController, charCount, originalCharCount) {
+  async _executeLingvaRequest(url, context, abortController, charCount, originalCharCount, options = {}) {
     return this._executeRequest({
       url,
       fetchOptions: {
@@ -121,7 +121,8 @@ export class LingvaProvider extends BaseTranslateProvider {
       context,
       abortController,
       charCount,
-      originalCharCount
+      originalCharCount,
+      callPurpose: options.callPurpose
     });
   }
 
@@ -236,7 +237,7 @@ export class LingvaProvider extends BaseTranslateProvider {
    * @param {number} totalChunks - Total number of chunks
    * @returns {Promise<string>}
    */
-  async _translateChunk(chunkTexts, sourceLang, targetLang, translateMode, abortController, retryAttempt, segmentCount, chunkIndex, totalChunks) {
+  async _translateChunk(chunkTexts, sourceLang, targetLang, translateMode, abortController, retryAttempt, segmentCount, chunkIndex, totalChunks, options = {}) {
     const rawApiPath = await this._getApiPath();
     const apiPath = this._normalizeApiPath(rawApiPath);
     const sl = this._getLangCode(sourceLang);
@@ -266,7 +267,7 @@ export class LingvaProvider extends BaseTranslateProvider {
       const url = this._buildRequestUrl(apiPath, sl, tl, joinedText);
 
       const result = await this._executeLingvaRequest(
-        url, 'lingva-standard-chunk', abortController, joinedText.length, originalCharCount
+        url, 'lingva-standard-chunk', abortController, joinedText.length, originalCharCount, options
       );
 
       this._validateMappedOutput(result, chunkTexts);
@@ -292,7 +293,8 @@ export class LingvaProvider extends BaseTranslateProvider {
         `lingva-rebatched-subgroup-${i + 1}/${subgroups.length}`,
         abortController,
         joinedText.length,
-        subgroupOriginalCharCount
+        subgroupOriginalCharCount,
+        options
       );
 
       this._validateMappedOutput(subgroupResult, subgroup);

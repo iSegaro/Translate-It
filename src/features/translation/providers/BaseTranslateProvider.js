@@ -31,11 +31,11 @@ export class BaseTranslateProvider extends BaseProvider {
   /**
    * Enhanced batch translation with streaming support
    */
-  async _batchTranslate(texts, sourceLang, targetLang, translateMode, engine, messageId, abortController, priority, sessionId, expectedFormat) {
+  async _batchTranslate(texts, sourceLang, targetLang, translateMode, engine, messageId, abortController, priority, sessionId, expectedFormat, options = {}) {
     if (this.constructor.supportsStreaming && this._shouldUseStreaming(texts, messageId, engine, translateMode)) {
-      return this._streamingBatchTranslate(texts, sourceLang, targetLang, translateMode, engine, messageId, abortController, priority, sessionId, expectedFormat);
+      return this._streamingBatchTranslate(texts, sourceLang, targetLang, translateMode, engine, messageId, abortController, priority, sessionId, expectedFormat, options);
     }
-    return this._traditionalBatchTranslate(texts, sourceLang, targetLang, translateMode, engine, messageId, abortController, priority, sessionId, expectedFormat);
+    return this._traditionalBatchTranslate(texts, sourceLang, targetLang, translateMode, engine, messageId, abortController, priority, sessionId, expectedFormat, options);
   }
 
   /**
@@ -79,7 +79,7 @@ export class BaseTranslateProvider extends BaseProvider {
   /**
    * Streaming batch translation with real-time results
    */
-  async _streamingBatchTranslate(texts, sourceLang, targetLang, translateMode, engine, messageId, abortController, priority, sessionId, expectedFormat) {
+  async _streamingBatchTranslate(texts, sourceLang, targetLang, translateMode, engine, messageId, abortController, priority, sessionId, expectedFormat, options = {}) {
     logger.debug(`[${this.providerName}] Starting streaming translation for ${texts.length} texts (Format: ${expectedFormat || 'default'})`);
     
     if (messageId && engine) {
@@ -113,7 +113,7 @@ export class BaseTranslateProvider extends BaseProvider {
         if (abortController) abortController.sessionId = sessionId;
 
         const chunkResponse = await this._executeWithRateLimit(
-          (opts) => this._translateChunk(chunk.texts, sourceLang, targetLang, translateMode, abortController, 0, chunk.texts.length, chunkIndex, chunks.length, { ...opts, originalCharCount: chunk.texts.reduce((sum, t) => sum + getTextInfo(t).length, 0) }),
+          (opts) => this._translateChunk(chunk.texts, sourceLang, targetLang, translateMode, abortController, 0, chunk.texts.length, chunkIndex, chunks.length, { ...opts, callPurpose: options.callPurpose, originalCharCount: chunk.texts.reduce((sum, t) => sum + getTextInfo(t).length, 0) }),
           chunkContext,
           priority,
           { sessionId, abortController, messageId }
@@ -148,7 +148,7 @@ export class BaseTranslateProvider extends BaseProvider {
     return allResults;
   }
 
-  async _traditionalBatchTranslate(texts, sourceLang, targetLang, translateMode, engine, messageId, abortController, priority, sessionId, expectedFormat) {
+  async _traditionalBatchTranslate(texts, sourceLang, targetLang, translateMode, engine, messageId, abortController, priority, sessionId, expectedFormat, options = {}) {
     logger.debug(`[${this.providerName}] Starting traditional batch translation for ${texts.length} texts (Format: ${expectedFormat || 'default'})`);
     const context = `${this.providerName.toLowerCase()}-traditional-batch`;
     const chunks = await this._createChunks(texts);
@@ -171,7 +171,7 @@ export class BaseTranslateProvider extends BaseProvider {
       const originalCharCount = chunk.texts.reduce((sum, t) => sum + getTextInfo(t).length, 0);
 
       const chunkResponse = await this._executeWithRateLimit(
-        (opts) => this._translateChunk(chunk.texts, sourceLang, targetLang, translateMode, abortController, 0, chunk.texts.length, i, chunks.length, { ...opts, originalCharCount }),
+        (opts) => this._translateChunk(chunk.texts, sourceLang, targetLang, translateMode, abortController, 0, chunk.texts.length, i, chunks.length, { ...opts, callPurpose: options.callPurpose, originalCharCount }),
         chunkContext,
         priority,
         { sessionId, abortController, messageId }

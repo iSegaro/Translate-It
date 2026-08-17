@@ -136,7 +136,8 @@ export class YandexTranslateProvider extends BaseTranslateProvider {
       abortController,
       charCount: originalCharCount,
       sessionId: options.sessionId,
-      originalCharCount: options.originalCharCount || originalCharCount
+      originalCharCount: options.originalCharCount || originalCharCount,
+      callPurpose: options.callPurpose
     });
 
     // extractResponse throws on any invalid/mismatched response, so `result` is

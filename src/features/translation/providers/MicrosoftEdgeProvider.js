@@ -207,7 +207,8 @@ export class MicrosoftEdgeProvider extends BaseTranslateProvider {
         abortController,
         charCount: chunkTexts.reduce((s, t) => s + getTextInfo(t).length, 0),
         sessionId: options.sessionId,
-        originalCharCount: options.originalCharCount || chunkTexts.reduce((s, t) => s + getTextInfo(t).length, 0)
+        originalCharCount: options.originalCharCount || chunkTexts.reduce((s, t) => s + getTextInfo(t).length, 0),
+        callPurpose: options.callPurpose
       });
     };
 

@@ -93,6 +93,17 @@ describe('VajehyabProvider', () => {
       );
     });
 
+    it('forwards explicit callPurpose to its physical request', async () => {
+      await provider._batchTranslate(
+        ['سلام'], 'en', 'fa', undefined, undefined, undefined, undefined, undefined, undefined,
+        undefined, { callPurpose: 'PARENT_RECOVERY' }
+      );
+
+      expect(provider._executeApiCall).toHaveBeenCalledWith(
+        expect.objectContaining({ callPurpose: 'PARENT_RECOVERY' })
+      );
+    });
+
     it('should return formatted result on success without fabricating auto detection feedback', async () => {
       const result = await provider._batchTranslate(['سلام'], 'auto', 'fa');
 

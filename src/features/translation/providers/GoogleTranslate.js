@@ -209,7 +209,8 @@ export class GoogleTranslateProvider extends BaseTranslateProvider {
       abortController,
       charCount: this._calculateTraditionalCharCount(chunkTexts),
       sessionId: options.sessionId,
-      originalCharCount: options.originalCharCount || TraditionalTextProcessor.calculateTraditionalCharCount(chunkTexts)
+      originalCharCount: options.originalCharCount || TraditionalTextProcessor.calculateTraditionalCharCount(chunkTexts),
+      callPurpose: options.callPurpose
     });
 
     // Handle dictionary formatting for single segment

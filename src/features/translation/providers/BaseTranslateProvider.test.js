@@ -178,6 +178,19 @@ describe('BaseTranslateProvider', () => {
   });
 
   describe('_streamingBatchTranslate', () => {
+    it('forwards request-local callPurpose through streaming chunks', async () => {
+      const translateChunk = vi.spyOn(provider, '_translateChunk');
+
+      await provider._streamingBatchTranslate(
+        ['Hello'], 'en', 'fa', TranslationMode.Popup, null, null, null, 1, 'session-1', undefined,
+        { callPurpose: 'PARENT_RECOVERY', someUnrelatedField: 'must-not-propagate' }
+      );
+
+      expect(translateChunk.mock.calls[0][9]).toMatchObject({ callPurpose: 'PARENT_RECOVERY' });
+      expect(translateChunk.mock.calls[0][9]).not.toHaveProperty('someUnrelatedField');
+      expect(provider).not.toHaveProperty('callPurpose');
+    });
+
     it('should initialize stream and process chunks', async () => {
       const texts = ['Hello'];
       const engine = { 
@@ -227,6 +240,24 @@ describe('BaseTranslateProvider', () => {
   });
 
   describe('_traditionalBatchTranslate', () => {
+    it('forwards request-local callPurpose through traditional chunks', async () => {
+      const translateChunk = vi.spyOn(provider, '_translateChunk');
+      TraditionalTextProcessor.createChunks.mockReturnValue([
+        { texts: ['A'] },
+        { texts: ['B'] },
+      ]);
+
+      await provider._batchTranslate(
+        ['A', 'B'], 'en', 'fa', TranslationMode.Popup, null, null, null, null, null, undefined,
+        { callPurpose: 'PARENT_RECOVERY', someUnrelatedField: 'must-not-propagate' }
+      );
+
+      expect(translateChunk.mock.calls).toHaveLength(2);
+      expect(translateChunk.mock.calls.every((call) => call[9].callPurpose === 'PARENT_RECOVERY')).toBe(true);
+      expect(translateChunk.mock.calls.every((call) => !('someUnrelatedField' in call[9]))).toBe(true);
+      expect(provider).not.toHaveProperty('callPurpose');
+    });
+
     it('should handle ideal case where response count matches request count', async () => {
       const texts = ['A', 'B'];
       const result = await provider._traditionalBatchTranslate(

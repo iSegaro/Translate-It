@@ -182,7 +182,8 @@ export class BingTranslateProvider extends BaseTranslateProvider {
         abortController,
         charCount: TraditionalTextProcessor.calculateTraditionalCharCount(chunkTexts),
         sessionId: options.sessionId,
-        originalCharCount: options.originalCharCount || TraditionalTextProcessor.calculateTraditionalCharCount(chunkTexts)
+        originalCharCount: options.originalCharCount || TraditionalTextProcessor.calculateTraditionalCharCount(chunkTexts),
+        callPurpose: options.callPurpose
       });
 
       // If result is a string and we have multiple segments, let Coordinator split it.

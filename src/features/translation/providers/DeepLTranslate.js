@@ -503,7 +503,8 @@ export class DeepLTranslateProvider extends BaseTranslateProvider {
         abortController,
         charCount: validTexts.join('').length,
         sessionId: options.sessionId,
-        originalCharCount: options.originalCharCount || originalCharCount
+        originalCharCount: options.originalCharCount || originalCharCount,
+        callPurpose: options.callPurpose
       });
 
       const finalResult = result;
