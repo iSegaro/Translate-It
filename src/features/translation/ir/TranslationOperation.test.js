@@ -48,6 +48,38 @@ describe('TranslationOperation', () => {
     ])
   })
 
+  it('blocks metadata publication after finalization', () => {
+    const operation = createTranslationOperation('metadata-finalized-publication')
+    const first = createProviderExecutionMetadataRef()
+    const second = createProviderExecutionMetadataRef()
+    first.metadata.detectedLanguage = 'en'
+    second.metadata.detectedLanguage = 'de'
+
+    publishProviderExecutionMetadata({ operation }, first)
+    operation.finalize()
+
+    expect(publishProviderExecutionMetadata({ operation }, second)).toBe(false)
+    expect(operation.snapshotProviderExecutionMetadata()).toHaveLength(1)
+  })
+
+  it('keeps published metadata and aggregate readable after finalization', () => {
+    const operation = createTranslationOperation('metadata-finalized-snapshot')
+    const ref = createProviderExecutionMetadataRef()
+    ref.metadata.detectedLanguage = ' EN '
+
+    publishProviderExecutionMetadata({ operation }, ref)
+    operation.finalize()
+
+    const records = operation.snapshotProviderExecutionMetadata()
+    expect(records).toEqual([
+      { callPurpose: TranslationCallPurpose.PRIMARY_TRANSLATION, metadata: { detectedLanguage: ' EN ' } },
+    ])
+    expect(operation.snapshotAggregatedProviderMetadata()).toEqual({ detectedLanguage: 'en' })
+    expect(Object.isFrozen(records)).toBe(true)
+    expect(Object.isFrozen(records[0])).toBe(true)
+    expect(Object.isFrozen(records[0].metadata)).toBe(true)
+  })
+
   it.each([
     ['no records', [], {}],
     ['missing language', [{ callPurpose: TranslationCallPurpose.PRIMARY_TRANSLATION, metadata: {} }], {}],

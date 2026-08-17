@@ -17,6 +17,7 @@ import { AUTO_DETECT_VALUE } from "@/shared/constants/core.js";
 import { ErrorTypes } from "@/shared/error-management/ErrorTypes.js";
 import { isFatalError, isTransientError, matchErrorToType } from "@/shared/error-management/ErrorMatcher.js";
 import { TranslationCallPurpose } from '@/features/translation/providers/ProviderConstants.js';
+import { createTranslationOperation } from '@/features/translation/ir/TranslationOperation.js';
 
 // Mock dependencies
 vi.mock('@/shared/logging/logger.js', () => ({
@@ -120,7 +121,7 @@ describe('ProviderCoordinator', () => {
       expect(result.targetLanguage).toBe('de');
     });
 
-    it('should not register shared provider detection state as feedback', async () => {
+    it('should not feed provider metadata into language detection caches', async () => {
       const { LanguageDetectionService } = await import("@/shared/services/LanguageDetectionService.js");
       LanguageDetectionService.detect.mockResolvedValue('en');
 
@@ -130,6 +131,26 @@ describe('ProviderCoordinator', () => {
 
       expect(result.detectedLanguage).toBe('en');
       expect(LanguageDetectionService.registerDetectionResult).not.toHaveBeenCalled();
+    });
+
+    it('keeps provider metadata out of the public coordinator result', async () => {
+      const operation = createTranslationOperation('coordinator-internal-metadata');
+      mockProvider.translate.mockImplementation(async (_text, _source, _target, options) => {
+        options.executionContext.operation.recordProviderExecutionMetadata({ detectedLanguage: 'en' });
+        return 'Translated Text';
+      });
+
+      const result = await providerCoordinator.execute(
+        mockProvider,
+        'Hello',
+        'en',
+        'fa',
+        { executionContext: { operation }, languagePairResolved: true },
+      );
+
+      expect(operation.snapshotAggregatedProviderMetadata()).toEqual({ detectedLanguage: 'en' });
+      expect(result).not.toHaveProperty('providerMetadata');
+      expect(result).not.toHaveProperty('metadata.provider');
     });
 
     it('does not leak stale detection state into explicit-source metadata', async () => {

@@ -2,7 +2,7 @@
 
 ## Overview
 
-The **Language Detection System** is a centralized, high-precision architecture designed to identify both the **language** and **text direction (RTL/LTR)** of any text across the extension. It follows a **"Detection Inheritance"** philosophy, where detection results from powerful translation providers (Google, DeepL, Edge, etc.) are captured and reused across the system to eliminate redundant processing and maximize accuracy.
+The **Language Detection System** is a centralized, high-precision architecture designed to identify both the **language** and **text direction (RTL/LTR)** of any text across the extension. Production translation requests resolve effective source language locally and keep that semantic result separate from provider-reported detection. Provider-reported detection is stored as internal request/operation metadata for deterministic aggregation, but is not currently promoted into public source-language fields or fed back into detection caches.
 
 **Single Source of Truth**: `LanguageDetectionService.js`
 
@@ -61,7 +61,7 @@ The system handles two primary responsibilities:
 ```
 
 ### Priority Hierarchy
-1.  **Layer 0: Provider Feedback (Verified Results)**: If the text was previously translated, the provider's verified detection is cached in `SESSION_CACHE`. This cache is automatically invalidated when translation settings or providers change.
+1.  **Layer 0: Cached Local Detection**: Previously resolved local detection can be reused from `SESSION_CACHE`. Provider feedback registration infrastructure exists, but is inactive in production; provider-reported metadata is not currently written into this cache. The cache is automatically invalidated when translation settings or providers change.
 2.  **Layer 1: Deterministic Layer**: Unicode range analysis for unique script markers (e.g., Persian `پ`).
 3.  **Layer 1.5: User Priority (Short Latin Strings)**: For Latin strings < 60 chars, the user's "Latin Script Priority" setting is checked *before* statistical detection to prevent common false positives (e.g., English "articles" as Catalan "ca"). Only whitelisted Latin priority codes are accepted.
 4.  **Layer 2: Statistical Layer**: Browser `i18n` API (prioritized for texts > 60 chars).
@@ -78,7 +78,7 @@ The central orchestrator for all detection and direction requests. It manages:
 - **`isRTL(langCodeOrName)`**: Checks if a language code (or full name) is natively RTL using the master `RTL_LANGUAGES` set.
 - **`getDirection(text, langCode)`**: The unified method to determine `rtl` or `ltr`. It intelligently combines language hints and content analysis.
 - **Layer 0 Cache**: A dual-mode session cache storing exact text matches (`textHash`) and URL-based script inheritance (`URL + ScriptFamily`).
-- **Provider Feedback Loop**: Implements `registerDetectionResult(text, lang, context)` to ingest verified detections.
+- **Provider Feedback Infrastructure**: Implements `registerDetectionResult(text, lang, context)` for possible future verified-detection feedback. Current production translation flow does not call it with provider metadata.
 - **Cache Invalidation**: Listens to `browser.storage.onChanged` to clear detection history when settings change.
 
 #### Detection Metadata Contract
@@ -110,7 +110,7 @@ Bypass is intentionally stricter than `DetectionResult.reliable`:
 - high reliable statistical results can qualify;
 - language-specific deterministic results can qualify;
 - contextual cache, exact cache, heuristic, user-language, weak statistical, ambiguous deterministic, unknown, and mixed-script operations do not qualify;
-- exact cache is not automatically trusted because current provider feedback can be stale and is registered from only the first array item.
+- exact cache is not automatically trusted because cached feedback can be stale; provider feedback registration is currently inactive.
 - history-enabled operations remain ordered even when local source resolution is strong.
 
 ### 2. `textAnalysis.js` (The Engine)

@@ -222,9 +222,9 @@ export class ProviderCoordinator {
         };
       }
 
-      // Provider instances are shared across requests. Their mutable detection
-      // state is not request-owned, so response metadata must use this request's
-      // resolved source language until request-scoped provider metadata exists.
+      // Provider-reported detection is stored in request/operation-scoped metadata.
+      // This public field intentionally remains the effective processed source
+      // language; provider metadata is not promoted into its semantic contract.
       const detectedLanguage = processedSourceLang;
 
       // Return unified response object
