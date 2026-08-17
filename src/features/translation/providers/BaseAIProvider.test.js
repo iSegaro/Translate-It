@@ -134,6 +134,66 @@ beforeEach(() => {
       ]);
     });
 
+    describe('STRING output contract', () => {
+      const runSequential = (source, response, options = {}) => {
+        provider._callAI = vi.fn().mockResolvedValue(response);
+        return provider.executeSequentialBatch([source], 'en', 'fa', {
+          translateMode: 'selection',
+          expectedFormat: ResponseFormat.STRING,
+          ...options,
+        });
+      };
+
+      it.each([null, undefined, 0, 42, false, true, {}, { text: 'translation' }, [], ['translation']])(
+        'rejects native non-string response %p',
+        async (response) => {
+          await expect(runSequential('source', response))
+            .rejects.toMatchObject({ type: ErrorTypes.API_RESPONSE_INVALID });
+        },
+      );
+
+      it.each(['', '   ', '\n\t'])('rejects blank response %j for nonblank source', async (response) => {
+        await expect(runSequential('source', response))
+          .rejects.toMatchObject({ type: ErrorTypes.API_RESPONSE_INVALID });
+      });
+
+      it.each(['42', 'true', 'null', 'translation'])('accepts valid STRING response %j', async (response) => {
+        await expect(runSequential('source', response)).resolves.toBe(response);
+      });
+
+      it('accepts identity translation', async () => {
+        await expect(runSequential('URL', 'URL')).resolves.toBe('URL');
+      });
+
+      it('preserves blank-source blank-output compatibility', async () => {
+        await expect(runSequential('', '')).resolves.toBe('');
+      });
+
+      it('rejects malformed sequential strategy output before coordinator normalization', async () => {
+        provider.getBatchStrategy = vi.fn().mockResolvedValue('sequential');
+        provider._callAI = vi.fn().mockResolvedValue(42);
+
+        await expect(provider._batchTranslate(
+          ['source'],
+          'en',
+          'fa',
+          'selection',
+          null,
+          null,
+          null,
+          null,
+          null,
+          ResponseFormat.STRING,
+        )).rejects.toMatchObject({ type: ErrorTypes.API_RESPONSE_INVALID });
+      });
+
+      it('rejects malformed scalar structured recovery output at the same boundary', async () => {
+        await expect(runSequential('source', { text: 'translation' }, {
+          callPurpose: TranslationCallPurpose.STRUCTURED_RECOVERY,
+        })).rejects.toMatchObject({ type: ErrorTypes.API_RESPONSE_INVALID });
+      });
+    });
+
     it('unwraps object sources before structured recovery sequential translation', async () => {
       const sequential = vi.spyOn(provider, '_traditionalBatchTranslate').mockResolvedValue(['The']);
 

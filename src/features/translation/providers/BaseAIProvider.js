@@ -208,6 +208,42 @@ function validateRecoveredResults(sourceTexts, recoveredResults) {
   }
 }
 
+function createInvalidStringResultError(providerName, index) {
+  const error = new Error(`[${providerName}] Invalid STRING response at index ${index}`);
+  error.type = ErrorTypes.API_RESPONSE_INVALID;
+  return error;
+}
+
+function isBlankSource(source) {
+  const sourceText = getSourceText(source);
+  return typeof sourceText === 'string' && sourceText.trim() === '';
+}
+
+function validateStringResponseValue(value, source, providerName, index) {
+  if (typeof value !== 'string' || (value.trim() === '' && !isBlankSource(source))) {
+    throw createInvalidStringResultError(providerName, index);
+  }
+}
+
+function validateSequentialStringResponse(response, sourceTexts, providerName) {
+  if (Array.isArray(response)) {
+    // A single STRING request must not accept an array-shaped native value.
+    if (sourceTexts.length === 1) {
+      throw createInvalidStringResultError(providerName, 0);
+    }
+
+    response.forEach((value, index) => {
+      validateStringResponseValue(value, sourceTexts[index], providerName, index);
+    });
+    return;
+  }
+
+  const allSourcesBlank = sourceTexts.every(isBlankSource);
+  if (typeof response !== 'string' || (response.trim() === '' && !allSourcesBlank)) {
+    throw createInvalidStringResultError(providerName, 0);
+  }
+}
+
 export class BaseAIProvider extends BaseProvider {
   // AI-specific capabilities - to be overridden by subclasses
   static isAI = true;
@@ -903,6 +939,7 @@ export class BaseAIProvider extends BaseProvider {
     const results = [];
     const context = `${this.providerName.toLowerCase()}-traditional-sequential`;
     const callPurpose = options.callPurpose || TranslationCallPurpose.PRIMARY_TRANSLATION;
+    const isStringContract = (expectedFormat || ResponseFormat.STRING) === ResponseFormat.STRING;
     const isPrimaryCall = callPurpose === TranslationCallPurpose.PRIMARY_TRANSLATION;
     const conversationParticipates = await AIConversationHelper.getConversationParticipation({
       callPurpose,
@@ -955,6 +992,10 @@ export class BaseAIProvider extends BaseProvider {
           priority,
           { sessionId, abortController, messageId }
         );
+
+        if (isStringContract) {
+          validateSequentialStringResponse(response, [text], this.providerName);
+        }
         
         results.push(AIResponseParser.cleanAIResponse(response, expectedFormat || ResponseFormat.STRING));
       } catch (error) {
