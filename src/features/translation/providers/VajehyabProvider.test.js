@@ -109,7 +109,7 @@ describe('VajehyabProvider', () => {
 
       expect(result[0]).toContain('سلام');
       expect(result[0]).toContain('لغت‌نامه عمید');
-      expect(provider.lastDetectedLanguage).toBeNull();
+      expect(provider).not.toHaveProperty('lastDetectedLanguage');
     });
 
     it('should format successful lookups with pronunciation as the current Markdown contract', async () => {

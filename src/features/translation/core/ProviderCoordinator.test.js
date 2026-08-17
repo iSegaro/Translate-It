@@ -122,7 +122,6 @@ describe('ProviderCoordinator', () => {
 
     it('should not register shared provider detection state as feedback', async () => {
       const { LanguageDetectionService } = await import("@/shared/services/LanguageDetectionService.js");
-      mockProvider.lastDetectedLanguage = 'de';
       LanguageDetectionService.detect.mockResolvedValue('en');
 
       const result = await providerCoordinator.execute(
@@ -134,8 +133,6 @@ describe('ProviderCoordinator', () => {
     });
 
     it('does not leak stale detection state into explicit-source metadata', async () => {
-      mockProvider.lastDetectedLanguage = 'fr';
-
       const result = await providerCoordinator.execute(
         mockProvider,
         'Guten Tag',
@@ -146,19 +143,14 @@ describe('ProviderCoordinator', () => {
 
       expect(result.sourceLanguage).toBe('de');
       expect(result.detectedLanguage).toBe('de');
-      expect(result.detectedLanguage).not.toBe('fr');
     });
 
-    it('keeps concurrent response metadata request-local despite shared provider mutation', async () => {
+    it('keeps concurrent response metadata request-local', async () => {
       const sharedProvider = {
         ...mockProvider,
         translate: vi.fn(async (text) => {
           if (text === 'request-a') {
-            sharedProvider.lastDetectedLanguage = 'fr';
             await new Promise(resolve => setTimeout(resolve, 10));
-          } else {
-            sharedProvider.lastDetectedLanguage = 'de';
-            await Promise.resolve();
           }
           return `translated-${text}`;
         }),
@@ -177,15 +169,12 @@ describe('ProviderCoordinator', () => {
 
       expect(requestA.detectedLanguage).toBe('ja');
       expect(requestB.detectedLanguage).toBe('ko');
-      expect(requestA.detectedLanguage).not.toBe(sharedProvider.lastDetectedLanguage);
-      expect(requestB.detectedLanguage).not.toBe(sharedProvider.lastDetectedLanguage);
     });
 
     it('should not register feedback for Vajehyab auto lookups without verified detection', async () => {
       const { LanguageDetectionService } = await import("@/shared/services/LanguageDetectionService.js");
 
       mockProvider.providerName = 'Vajehyab';
-      mockProvider.lastDetectedLanguage = null;
       LanguageDetectionService.detect.mockResolvedValue('en');
 
       const result = await providerCoordinator.execute(

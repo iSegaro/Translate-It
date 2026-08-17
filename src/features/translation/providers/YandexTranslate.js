@@ -127,7 +127,7 @@ export class YandexTranslateProvider extends BaseTranslateProvider {
 
         // Capture detected source language from 'lang' field (format: "en-fa")
         if (data.lang && typeof data.lang === 'string') {
-          this._setDetectedLanguage(data.lang.split('-')[0]);
+          this._setExecutionDetectedLanguage(options, data.lang.split('-')[0]);
         }
 
         return data.text;

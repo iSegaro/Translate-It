@@ -119,8 +119,7 @@ export class GoogleTranslateProvider extends BaseTranslateProvider {
           throw error;
         }
 
-        // Capture detected source language from metadata
-        this._setDetectedLanguage(data.src || data[2]);
+        const detectedLanguage = data.src || data[2];
 
         // For single segments, handle JSON and legacy formats
         if (chunkTexts.length === 1) {
@@ -134,7 +133,9 @@ export class GoogleTranslateProvider extends BaseTranslateProvider {
               .join(''),
               sourceText
             );
-            
+
+            if (translatedText.trim()) this._setExecutionDetectedLanguage(options, detectedLanguage);
+
             const response = { translatedText, candidateText: shouldIncludeDictionary ? data : "" };
             return response;
           }
@@ -144,6 +145,8 @@ export class GoogleTranslateProvider extends BaseTranslateProvider {
               data[0].map(segment => segment[0] || "").join(''),
               sourceText
             );
+
+            if (translatedText.trim()) this._setExecutionDetectedLanguage(options, detectedLanguage);
             
             let candidateText = "";
             if (shouldIncludeDictionary && data[1]) {
@@ -197,6 +200,8 @@ export class GoogleTranslateProvider extends BaseTranslateProvider {
             error.type = ErrorTypes.API_RESPONSE_INVALID;
             throw error;
           }
+
+          this._setExecutionDetectedLanguage(options, detectedLanguage);
 
           return { translatedText: results, candidateText: "" };
         }

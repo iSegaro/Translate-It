@@ -168,9 +168,8 @@ export class GoogleTranslateV2Provider extends BaseTranslateProvider {
             throw error;
           }
 
-          // Capture detected source language if available
           // dj=1 uses data.src, legacy uses index 2 or index 8
-          this._setDetectedLanguage(data.src || data[2] || (data[8] && data[8][0] && data[8][0][0]));
+          const detectedLanguage = data.src || data[2] || (data[8] && data[8][0] && data[8][0][0]);
 
           // For single segments, keep existing stable behavior but add JSON support
           if (chunkTexts.length === 1) {
@@ -185,6 +184,8 @@ export class GoogleTranslateV2Provider extends BaseTranslateProvider {
                 .join(''),
                 sourceText
               );
+
+              if (translatedText.trim()) this._setExecutionDetectedLanguage(options, detectedLanguage);
 
               // Pass the whole data object for rich markdown formatting
               const response = { translatedText, candidateText: shouldIncludeDictionary ? data : "" };
@@ -201,6 +202,8 @@ export class GoogleTranslateV2Provider extends BaseTranslateProvider {
               data[0].map(segment => segment[0] || "").join(''),
               sourceText
             );
+
+            if (translatedText.trim()) this._setExecutionDetectedLanguage(options, detectedLanguage);
 
             let candidateText = "";
             if (shouldIncludeDictionary && data[1]) {
@@ -256,6 +259,8 @@ export class GoogleTranslateV2Provider extends BaseTranslateProvider {
             error.type = ErrorTypes.API_RESPONSE_INVALID;
             throw error;
           }
+
+          this._setExecutionDetectedLanguage(options, detectedLanguage);
 
           return { translatedText: results, candidateText: "" };
         },

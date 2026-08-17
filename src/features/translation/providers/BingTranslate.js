@@ -162,15 +162,14 @@ export class BingTranslateProvider extends BaseTranslateProvider {
             throw err;
           }
 
-          // Capture detected source language from metadata if available
-          this._setDetectedLanguage(data?.[0]?.detectedLanguage?.language);
-          
           const targetText = data?.[0]?.translations?.[0]?.text;
           if (typeof targetText !== 'string' || !targetText.trim()) {
             const error = new Error('Bing response contained no translation text');
             error.type = ErrorTypes.API_RESPONSE_INVALID;
             throw error;
           }
+
+          this._setExecutionDetectedLanguage(options, data?.[0]?.detectedLanguage?.language);
           
           // Return raw text string. 
           // Centralized TranslationSegmentMapper will handle robust splitting, 

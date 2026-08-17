@@ -345,17 +345,22 @@ describe('BaseTranslateProvider', () => {
   });
 
   describe('Metadata and Helpers', () => {
-    it('should update lastDetectedLanguage correctly', () => {
-      provider._setDetectedLanguage('  FR  ');
-      expect(provider.lastDetectedLanguage).toBe('fr');
+    it('writes valid detected language into execution metadata', () => {
+      const options = { providerMetadataRef: { metadata: {} } };
+
+      provider._setExecutionDetectedLanguage(options, '  FR  ');
+
+      expect(options.providerMetadataRef.metadata.detectedLanguage).toBe('fr');
+      expect(provider).not.toHaveProperty('lastDetectedLanguage');
     });
 
-    it('should ignore empty or invalid detected language', () => {
-      provider.lastDetectedLanguage = 'en';
-      provider._setDetectedLanguage('');
-      expect(provider.lastDetectedLanguage).toBe('en');
-      provider._setDetectedLanguage(null);
-      expect(provider.lastDetectedLanguage).toBe('en');
+    it.each(['', '  ', null, undefined])('does not write invalid detected language %p', (lang) => {
+      const options = { providerMetadataRef: { metadata: {} } };
+
+      provider._setExecutionDetectedLanguage(options, lang);
+
+      expect(options.providerMetadataRef.metadata).toEqual({});
+      expect(provider).not.toHaveProperty('lastDetectedLanguage');
     });
   });
 });

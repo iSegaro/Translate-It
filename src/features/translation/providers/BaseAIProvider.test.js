@@ -104,7 +104,7 @@ beforeEach(() => {
       const refs = [];
       provider._callAI = vi.fn().mockImplementation(async (_system, userText, options) => {
         refs.push(options.providerMetadataRef);
-        options.providerMetadataRef.metadata.request = userText;
+        options.providerMetadataRef.metadata.detectedLanguage = userText.includes('first') ? 'en' : 'de';
         await Promise.resolve();
         return userText;
       });
@@ -121,8 +121,8 @@ beforeEach(() => {
       ]);
 
       expect(refs[0]).not.toBe(refs[1]);
-      expect(operation.snapshotProviderExecutionMetadata().map(({ metadata }) => metadata.request).sort())
-        .toEqual(['["first"]', '["second"]']);
+      expect(operation.snapshotProviderExecutionMetadata().map(({ metadata }) => metadata.detectedLanguage).sort())
+        .toEqual(['de', 'en']);
     });
 
     it('does not publish metadata from failed physical AI calls', async () => {

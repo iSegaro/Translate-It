@@ -37,14 +37,14 @@ describe('YandexTranslateProvider output contract', () => {
     vi.restoreAllMocks();
   });
 
-  const runResponse = (sources, translations, lang = 'en-fa') => {
+  const runResponse = (sources, translations, lang = 'en-fa', options = { providerMetadataRef: { metadata: {} } }) => {
     vi.spyOn(provider, '_executeRequest').mockImplementation(async (options) => options.extractResponse({
       code: 200,
       text: translations,
       lang
     }));
 
-    return provider._translateChunk(sources, 'en', 'fa', 'selection', null, 0, sources.length, 0, 1);
+    return provider._translateChunk(sources, 'en', 'fa', 'selection', null, 0, sources.length, 0, 1, options);
   };
 
   it.each(['', '   ', '\n\t', null, undefined])('rejects unusable output for nonblank source: %j', async (translatedItem) => {
@@ -72,17 +72,20 @@ describe('YandexTranslateProvider output contract', () => {
   });
 
   it('preserves detected language for valid output', async () => {
-    await runResponse(['A'], ['A2'], 'en-fa');
+    const options = { providerMetadataRef: { metadata: {} } };
+    await runResponse(['A'], ['A2'], 'en-fa', options);
 
-    expect(provider.lastDetectedLanguage).toBe('en');
+    expect(options.providerMetadataRef.metadata.detectedLanguage).toBe('en');
+    expect(provider).not.toHaveProperty('lastDetectedLanguage');
   });
 
   it('does not update detected language for invalid output', async () => {
-    provider.lastDetectedLanguage = 'fr';
+    const options = { providerMetadataRef: { metadata: {} } };
 
-    await expect(runResponse(['A'], [''], 'en-fa'))
+    await expect(runResponse(['A'], [''], 'en-fa', options))
       .rejects.toMatchObject({ type: 'API_RESPONSE_INVALID' });
 
-    expect(provider.lastDetectedLanguage).toBe('fr');
+    expect(options.providerMetadataRef.metadata).toEqual({});
+    expect(provider).not.toHaveProperty('lastDetectedLanguage');
   });
 });

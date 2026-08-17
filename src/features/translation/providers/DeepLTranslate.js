@@ -422,9 +422,6 @@ export class DeepLTranslateProvider extends BaseTranslateProvider {
             throw error;
           }
 
-          // Capture detected source language from metadata if available (using first segment)
-          this._setDetectedLanguage(data.translations[0]?.detected_source_language);
-
           // DeepL returns array of translation objects for valid texts only
           if (data.translations.length !== validTexts.length || data.translations.some(t => typeof t?.text !== 'string' || !t.text.trim())) {
             const error = new Error('DeepL response omitted a translated segment');
@@ -458,6 +455,14 @@ export class DeepLTranslateProvider extends BaseTranslateProvider {
             }
 
             logger.debug('[DeepL] XML placeholder validation passed for all translations');
+          }
+
+          const detectedLanguages = data.translations
+            .map(translation => translation?.detected_source_language)
+            .filter(language => typeof language === 'string' && language.trim())
+            .map(language => language.toLowerCase().trim());
+          if (detectedLanguages.length > 0 && detectedLanguages.every(language => language === detectedLanguages[0])) {
+            this._setExecutionDetectedLanguage(options, detectedLanguages[0]);
           }
 
           // Restore ALL newlines using the unified NewlineManager

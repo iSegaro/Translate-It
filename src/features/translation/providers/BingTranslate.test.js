@@ -76,6 +76,39 @@ describe('BingTranslateProvider', () => {
   });
 
   describe('_translateChunk', () => {
+    const runResponse = (response, options) => {
+      provider._executeApiCall.mockImplementation(async (request) => request.extractResponse({
+        headers: { get: () => 'application/json' },
+        text: () => Promise.resolve(JSON.stringify(response)),
+      }));
+      return provider._translateChunk(['Hello'], 'en', 'fa', 'selection', null, 0, 1, 0, 1, options);
+    };
+
+    it('writes valid response detection into execution metadata', async () => {
+      const options = { providerMetadataRef: { metadata: {} } };
+      await runResponse([
+        { translations: [{ text: 'translated' }], detectedLanguage: { language: 'en' } },
+      ], options);
+
+      expect(options.providerMetadataRef.metadata.detectedLanguage).toBe('en');
+      expect(provider).not.toHaveProperty('lastDetectedLanguage');
+    });
+
+    it('does not write missing or invalid response detection', async () => {
+      const missingOptions = { providerMetadataRef: { metadata: {} } };
+      await runResponse([
+        { translations: [{ text: 'translated' }] },
+      ], missingOptions);
+      expect(missingOptions.providerMetadataRef.metadata).toEqual({});
+
+      const invalidOptions = { providerMetadataRef: { metadata: {} } };
+      await expect(runResponse([
+        { detectedLanguage: { language: 'en' } },
+      ], invalidOptions))
+        .rejects.toMatchObject({ type: 'API_RESPONSE_INVALID' });
+      expect(invalidOptions.providerMetadataRef.metadata).toEqual({});
+    });
+
     it('should call API with correctly formatted body', async () => {
       const texts = ['Hello', 'World'];
       await provider._translateChunk(texts, 'en', 'fa');
