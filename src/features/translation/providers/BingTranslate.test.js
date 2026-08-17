@@ -69,6 +69,19 @@ describe('BingTranslateProvider', () => {
     expect(provider.providerName).toBe(ProviderNames.BING_TRANSLATE);
   });
 
+  it('resetSessionContext clears shared cached token state', () => {
+    BingTranslateProvider.bingAccessToken = {
+      token: 'cached-token',
+      tokenTs: Date.now(),
+      tokenExpiryInterval: 60000,
+      count: 3,
+    };
+
+    provider.resetSessionContext();
+
+    expect(BingTranslateProvider.bingAccessToken).toBeNull();
+  });
+
   it('should correctly map language codes', () => {
     expect(provider._getLangCode('auto')).toBe('auto-detect');
     expect(provider._getLangCode('en')).toBe('en');

@@ -78,8 +78,10 @@ describe('BaseProvider', () => {
   describe('Constructor and Initialization', () => {
     it('should initialize with correct name and default values', () => {
       expect(provider.providerName).toBe('MockProvider');
-      expect(provider.sessionContext).toBeNull();
+      expect(provider).not.toHaveProperty('sessionContext');
       expect(provider.providerSettingKey).toBeNull();
+      expect(provider).not.toHaveProperty('storeSessionContext');
+      expect(provider).not.toHaveProperty('shouldResetSession');
     });
 
     it('should have default static capabilities', () => {
@@ -235,28 +237,9 @@ describe('BaseProvider', () => {
     });
   });
 
-  describe('Session Context', () => {
-    it('should store and reset session context', () => {
-      provider.storeSessionContext({ id: 1 });
-      expect(provider.sessionContext).toMatchObject({ id: 1 });
-      expect(provider.sessionContext.timestamp).toBeDefined();
-
-      provider.resetSessionContext();
-      expect(provider.sessionContext).toBeNull();
-    });
-
-    it('should correctly identify when session should be reset', () => {
-      vi.useFakeTimers();
-      const now = Date.now();
-      
-      provider.storeSessionContext({ lastUsed: now });
-      expect(provider.shouldResetSession()).toBe(false);
-
-      // Advance time by 6 minutes (360,000 ms)
-      vi.setSystemTime(now + 360000);
-      expect(provider.shouldResetSession()).toBe(true);
-
-      vi.useRealTimers();
+  describe('Provider Cleanup Hook', () => {
+    it('keeps resetSessionContext callable as a compatibility hook', () => {
+      expect(() => provider.resetSessionContext()).not.toThrow();
     });
   });
 

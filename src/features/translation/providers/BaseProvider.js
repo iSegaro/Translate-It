@@ -19,7 +19,6 @@ const logger = getScopedLogger(LOG_COMPONENTS.TRANSLATION, 'BaseProvider');
 export class BaseProvider {
   constructor(providerName) {
     this.providerName = providerName;
-    this.sessionContext = null;
     this.providerSettingKey = null; // To be set by subclasses that use API keys
     this._initializeProxy();
   }
@@ -154,11 +153,9 @@ export class BaseProvider {
   }
 
   /**
-   * Session context management
+   * Provider cleanup hook retained for subclasses and factory dispatch.
    */
-  storeSessionContext(ctx) { this.sessionContext = { ...ctx, timestamp: Date.now() }; }
-  resetSessionContext() { this.sessionContext = null; }
-  shouldResetSession() { return this.sessionContext && Date.now() - this.sessionContext.lastUsed > 300000; }
+  resetSessionContext() {}
 
   /**
    * Check if source and target languages are the same

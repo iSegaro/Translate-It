@@ -12,6 +12,7 @@ describe('browserTranslateProvider', () => {
 
   beforeEach(() => {
     provider = new browserTranslateProvider();
+    browserTranslateProvider.detector = null;
     browserTranslateProvider.translators = {};
     globalThis.LanguageDetector = {};
   });
@@ -48,5 +49,24 @@ describe('browserTranslateProvider', () => {
     installTranslator(vi.fn().mockResolvedValueOnce('first').mockRejectedValueOnce(new Error('second failed')));
 
     await expect(provider._translateChunk(['one', 'two'], 'en', 'fa', 'selection')).rejects.toMatchObject({ type: ErrorTypes.API_ERROR });
+  });
+
+  it('resetSessionContext destroys detector and all cached translators', () => {
+    const detector = { destroy: vi.fn() };
+    const firstTranslator = { destroy: vi.fn() };
+    const secondTranslator = { destroy: vi.fn() };
+    browserTranslateProvider.detector = detector;
+    browserTranslateProvider.translators = {
+      'en-fa': firstTranslator,
+      'de-en': secondTranslator,
+    };
+
+    provider.resetSessionContext();
+
+    expect(detector.destroy).toHaveBeenCalledOnce();
+    expect(firstTranslator.destroy).toHaveBeenCalledOnce();
+    expect(secondTranslator.destroy).toHaveBeenCalledOnce();
+    expect(browserTranslateProvider.detector).toBeNull();
+    expect(browserTranslateProvider.translators).toEqual({});
   });
 });
