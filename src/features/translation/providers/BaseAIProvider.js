@@ -345,6 +345,7 @@ export class BaseAIProvider extends BaseProvider {
    */
   async _translateBatch(texts, sourceLang, targetLang, translateMode, abortController, engine, messageId, sessionId, contextMetadata = null, expectedFormat = null, priority = null) {
     const structuredFormat = expectedFormat || ResponseFormat.JSON_ARRAY;
+    const customResponseFormatCapabilityRef = contextMetadata?.customResponseFormatCapabilityRef || { responseFormatUnsupported: false };
     const callPurpose = contextMetadata?.callPurpose || TranslationCallPurpose.PRIMARY_TRANSLATION;
     const isPrimaryCall = callPurpose === TranslationCallPurpose.PRIMARY_TRANSLATION;
     const conversationParticipates = callPurpose === TranslationCallPurpose.PRIMARY_TRANSLATION
@@ -372,6 +373,7 @@ export class BaseAIProvider extends BaseProvider {
       useParentConversationLifecycle: isPrimaryCall && contextMetadata?.useParentConversationLifecycle === true,
       ...(callExecutionContext && { executionContext: callExecutionContext }),
       providerMetadataRef,
+      customResponseFormatCapabilityRef,
     };
     const conversationCommitCandidate = (
       (structuredFormat === ResponseFormat.JSON_ARRAY || structuredFormat === ResponseFormat.JSON_OBJECT)
@@ -548,6 +550,7 @@ export class BaseAIProvider extends BaseProvider {
                 callPurpose: TranslationCallPurpose.STRUCTURED_RECOVERY,
                 conversationParticipates: false,
                 useParentConversationLifecycle: false,
+                customResponseFormatCapabilityRef: undefined,
                 repairContext: parsed.repairContext,
                 fullParseRecoveryRetry: true,
               },
@@ -627,6 +630,7 @@ export class BaseAIProvider extends BaseProvider {
                 callPurpose: TranslationCallPurpose.STRUCTURED_RECOVERY,
                 conversationParticipates: false,
                 useParentConversationLifecycle: false,
+                customResponseFormatCapabilityRef: undefined,
                 expectedFormat: subsetExpectedFormat,
                 repairContext: parsed.repairContext,
                 isSubsetRecoveryAttempt: true,
@@ -720,6 +724,7 @@ export class BaseAIProvider extends BaseProvider {
             sessionId,
             expectedFormat: ResponseFormat.STRING,
             contextMetadata,
+            customResponseFormatCapabilityRef: undefined,
             repairContext: parsed.repairContext,
             callPurpose: TranslationCallPurpose.STRUCTURED_RECOVERY,
           });
@@ -910,6 +915,7 @@ export class BaseAIProvider extends BaseProvider {
           && contextMetadata?.useParentConversationLifecycle === true,
         conversationCommitCandidate,
         providerMetadataRef,
+        customResponseFormatCapabilityRef: contextMetadata?.customResponseFormatCapabilityRef,
       })),
       context,
       priority,
@@ -987,6 +993,7 @@ export class BaseAIProvider extends BaseProvider {
       const chunkContext = `${context}-segment-${i + 1}/${texts.length}`;
 
       try {
+        const customResponseFormatCapabilityRef = { responseFormatUnsupported: false };
         const providerMetadataRef = createProviderExecutionMetadataRef();
         const response = await this._executeWithRateLimit(
           (opts) => executeProviderExecutionAttempt(providerMetadataRef, () => this._callAI(systemPrompt, userText, {
@@ -1003,6 +1010,7 @@ export class BaseAIProvider extends BaseProvider {
             conversationParticipates,
             useParentConversationLifecycle: effectiveContextMetadata.useParentConversationLifecycle,
             providerMetadataRef,
+            customResponseFormatCapabilityRef,
           })),
           chunkContext,
           priority,
