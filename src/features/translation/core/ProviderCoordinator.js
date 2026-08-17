@@ -222,23 +222,10 @@ export class ProviderCoordinator {
         };
       }
 
-      // 8. Capture Detected Language & Register Feedback
-      const detectedLanguage = provider.lastDetectedLanguage || processedSourceLang;
-      
-      // Register detection result back to the service for future hits (Layer 0)
-      // SECURITY: Only register feedback if the user's initial request was 'auto'.
-      // This prevents manual user errors from poisoning the cache.
-      const isAutoRequest = sourceLang === AUTO_DETECT_VALUE || !sourceLang;
-      
-      if (isAutoRequest && provider.lastDetectedLanguage && provider.lastDetectedLanguage !== AUTO_DETECT_VALUE) {
-        const sampleText = Array.isArray(text) ? text[0] : (typeof text === 'string' ? text : '');
-        if (sampleText) {
-          LanguageDetectionService.registerDetectionResult(sampleText, provider.lastDetectedLanguage, {
-            url: options.url,
-            tabId: options.tabId
-          });
-        }
-      }
+      // Provider instances are shared across requests. Their mutable detection
+      // state is not request-owned, so response metadata must use this request's
+      // resolved source language until request-scoped provider metadata exists.
+      const detectedLanguage = processedSourceLang;
 
       // Return unified response object
       return {

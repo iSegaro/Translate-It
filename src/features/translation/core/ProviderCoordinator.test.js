@@ -120,17 +120,65 @@ describe('ProviderCoordinator', () => {
       expect(result.targetLanguage).toBe('de');
     });
 
-    it('should register detection feedback when source is auto', async () => {
+    it('should not register shared provider detection state as feedback', async () => {
       const { LanguageDetectionService } = await import("@/shared/services/LanguageDetectionService.js");
       mockProvider.lastDetectedLanguage = 'de';
+      LanguageDetectionService.detect.mockResolvedValue('en');
 
-      await providerCoordinator.execute(
+      const result = await providerCoordinator.execute(
         mockProvider, 'Guten Tag', AUTO_DETECT_VALUE, 'en'
       );
 
-      expect(LanguageDetectionService.registerDetectionResult).toHaveBeenCalledWith(
-        'Guten Tag', 'de', expect.anything()
+      expect(result.detectedLanguage).toBe('en');
+      expect(LanguageDetectionService.registerDetectionResult).not.toHaveBeenCalled();
+    });
+
+    it('does not leak stale detection state into explicit-source metadata', async () => {
+      mockProvider.lastDetectedLanguage = 'fr';
+
+      const result = await providerCoordinator.execute(
+        mockProvider,
+        'Guten Tag',
+        'de',
+        'en',
+        { languagePairResolved: true },
       );
+
+      expect(result.sourceLanguage).toBe('de');
+      expect(result.detectedLanguage).toBe('de');
+      expect(result.detectedLanguage).not.toBe('fr');
+    });
+
+    it('keeps concurrent response metadata request-local despite shared provider mutation', async () => {
+      const sharedProvider = {
+        ...mockProvider,
+        translate: vi.fn(async (text) => {
+          if (text === 'request-a') {
+            sharedProvider.lastDetectedLanguage = 'fr';
+            await new Promise(resolve => setTimeout(resolve, 10));
+          } else {
+            sharedProvider.lastDetectedLanguage = 'de';
+            await Promise.resolve();
+          }
+          return `translated-${text}`;
+        }),
+      };
+
+      const [requestA, requestB] = await Promise.all([
+        providerCoordinator.execute(sharedProvider, 'request-a', 'ja', 'en', {
+          languagePairResolved: true,
+          parallelExecution: true,
+        }),
+        providerCoordinator.execute(sharedProvider, 'request-b', 'ko', 'en', {
+          languagePairResolved: true,
+          parallelExecution: true,
+        }),
+      ]);
+
+      expect(requestA.detectedLanguage).toBe('ja');
+      expect(requestB.detectedLanguage).toBe('ko');
+      expect(requestA.detectedLanguage).not.toBe(sharedProvider.lastDetectedLanguage);
+      expect(requestB.detectedLanguage).not.toBe(sharedProvider.lastDetectedLanguage);
     });
 
     it('should not register feedback for Vajehyab auto lookups without verified detection', async () => {
