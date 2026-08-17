@@ -100,5 +100,12 @@ describe('TraditionalStreamManager', () => {
         options
       );
     });
+
+    it('should handle stream-end delivery errors without throwing', async () => {
+      const { streamingManager } = await import("@/features/translation/core/StreamingManager.js");
+      streamingManager.completeStream.mockRejectedValue(new Error('Network error'));
+
+      await expect(TraditionalStreamManager.sendStreamEnd(provider, messageId)).resolves.not.toThrow();
+    });
   });
 });

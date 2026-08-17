@@ -152,6 +152,7 @@ export class BaseTranslateProvider extends BaseProvider {
             })
           : TraditionalTextProcessor.scrubBidiArtifacts(chunkResponse);
 
+        // Provider metadata records validated execution provenance; delivery remains best-effort.
         publishProviderExecutionMetadata(options.executionContext, providerMetadataRef, callPurpose);
 
         const statsAfter = sessionId ? statsManager.getSessionSummary(sessionId) : null;

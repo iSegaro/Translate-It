@@ -269,6 +269,39 @@ describe('BaseTranslateProvider', () => {
       expect(operation.snapshotAggregatedProviderMetadata()).toEqual({});
     });
 
+    it('preserves metadata when chunk delivery fails', async () => {
+      const operation = createTranslationOperation('streaming-delivery-failure');
+      const translateChunk = vi.spyOn(provider, '_translateChunk').mockImplementation(async (texts, ...args) => {
+        args[8].providerMetadataRef.metadata.detectedLanguage = 'en';
+        return texts.map(text => `translated-${text}`);
+      });
+      TraditionalStreamManager.streamChunkResults.mockRejectedValueOnce(new Error('delivery failed'));
+
+      await expect(provider._streamingBatchTranslate(
+        ['Hello'], 'en', 'fa', TranslationMode.Popup, null, null, null, 1, 'session-1', undefined,
+        { executionContext: { operation } },
+      )).rejects.toThrow('delivery failed');
+
+      expect(translateChunk).toHaveBeenCalledOnce();
+      expect(operation.snapshotAggregatedProviderMetadata()).toEqual({ detectedLanguage: 'en' });
+    });
+
+    it('preserves metadata when stream-end delivery fails', async () => {
+      const operation = createTranslationOperation('streaming-end-delivery-failure');
+      vi.spyOn(provider, '_translateChunk').mockImplementation(async (texts, ...args) => {
+        args[8].providerMetadataRef.metadata.detectedLanguage = 'en';
+        return texts.map(text => `translated-${text}`);
+      });
+      TraditionalStreamManager.sendStreamEnd.mockRejectedValueOnce(new Error('stream end delivery failed'));
+
+      await expect(provider._streamingBatchTranslate(
+        ['Hello'], 'en', 'fa', TranslationMode.Popup, null, null, null, 1, 'session-1', undefined,
+        { executionContext: { operation } },
+      )).rejects.toThrow('stream end delivery failed');
+
+      expect(operation.snapshotAggregatedProviderMetadata()).toEqual({ detectedLanguage: 'en' });
+    });
+
     it('should throw and cleanup on error during streaming', async () => {
       const texts = ['Fail'];
       const engine = { isCancelled: vi.fn(() => false) };
@@ -431,6 +464,29 @@ describe('BaseTranslateProvider', () => {
         ['A'], 'en', 'fa', TranslationMode.Popup, null, null, null, null, null, undefined,
         { executionContext: { operation } },
       );
+
+      expect(operation.snapshotProviderExecutionMetadata()).toEqual([
+        { callPurpose: 'PRIMARY_TRANSLATION', metadata: { detectedLanguage: 'en' } },
+      ]);
+      expect(operation.snapshotAggregatedProviderMetadata()).toEqual({ detectedLanguage: 'en' });
+    });
+
+    it('retains successful chunk metadata when a later provider chunk fails', async () => {
+      const operation = createTranslationOperation('traditional-partial-provider-failure');
+      TraditionalTextProcessor.createChunks.mockReturnValue([
+        { texts: ['A'] },
+        { texts: ['B'] },
+      ]);
+      vi.spyOn(provider, '_translateChunk').mockImplementation(async (texts, ...args) => {
+        if (texts[0] === 'B') throw new Error('second provider chunk failed');
+        args[8].providerMetadataRef.metadata.detectedLanguage = 'en';
+        return texts.map(text => `translated-${text}`);
+      });
+
+      await expect(provider._traditionalBatchTranslate(
+        ['A', 'B'], 'en', 'fa', TranslationMode.Popup, null, null, null, null, null, undefined,
+        { executionContext: { operation } },
+      )).rejects.toThrow('second provider chunk failed');
 
       expect(operation.snapshotProviderExecutionMetadata()).toEqual([
         { callPurpose: 'PRIMARY_TRANSLATION', metadata: { detectedLanguage: 'en' } },
