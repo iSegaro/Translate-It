@@ -100,6 +100,84 @@ describe('TranslationOperation', () => {
     expect(operation.snapshotAggregatedProviderMetadata()).toEqual(expected)
   })
 
+  it.each([
+    ['no records', [], { status: 'absent' }],
+    ['missing language', [{ callPurpose: TranslationCallPurpose.PRIMARY_TRANSLATION, metadata: {} }], { status: 'absent' }],
+    ['non-string language', [{ callPurpose: TranslationCallPurpose.PRIMARY_TRANSLATION, metadata: { detectedLanguage: 42 } }], { status: 'absent' }],
+    ['blank language', [{ callPurpose: TranslationCallPurpose.PRIMARY_TRANSLATION, metadata: { detectedLanguage: '  ' } }], { status: 'absent' }],
+    ['recovery-only metadata', [{ callPurpose: TranslationCallPurpose.STRUCTURED_RECOVERY, metadata: { detectedLanguage: 'en' } }], { status: 'absent' }],
+    ['unknown-purpose-only metadata', [{ callPurpose: 'UNKNOWN', metadata: { detectedLanguage: 'en' } }], { status: 'absent' }],
+    ['one language', [{ callPurpose: TranslationCallPurpose.PRIMARY_TRANSLATION, metadata: { detectedLanguage: 'en' } }], { status: 'unanimous', detectedLanguage: 'en' }],
+    ['identical languages', [
+      { callPurpose: TranslationCallPurpose.PRIMARY_TRANSLATION, metadata: { detectedLanguage: 'en' } },
+      { callPurpose: TranslationCallPurpose.PRIMARY_TRANSLATION, metadata: { detectedLanguage: 'en' } },
+    ], { status: 'unanimous', detectedLanguage: 'en' }],
+    ['canonicalized languages', [
+      { callPurpose: TranslationCallPurpose.PRIMARY_TRANSLATION, metadata: { detectedLanguage: 'en' } },
+      { callPurpose: TranslationCallPurpose.PRIMARY_TRANSLATION, metadata: { detectedLanguage: ' EN ' } },
+      { callPurpose: TranslationCallPurpose.PRIMARY_TRANSLATION, metadata: { detectedLanguage: 'En' } },
+    ], { status: 'unanimous', detectedLanguage: 'en' }],
+    ['distinct languages', [
+      { callPurpose: TranslationCallPurpose.PRIMARY_TRANSLATION, metadata: { detectedLanguage: 'en' } },
+      { callPurpose: TranslationCallPurpose.PRIMARY_TRANSLATION, metadata: { detectedLanguage: 'de' } },
+    ], { status: 'conflict' }],
+  ])('returns diagnostic status for %s', (_label, records, expected) => {
+    const operation = createTranslationOperation(`diagnostic-${_label}`)
+    records.forEach(({ callPurpose, metadata }) => operation.recordProviderExecutionMetadata(metadata, callPurpose))
+
+    expect(operation.snapshotProviderDetectionDiagnostic()).toEqual(expected)
+  })
+
+  it('keeps diagnostic status independent of publication order', () => {
+    const createOperation = (languages) => {
+      const operation = createTranslationOperation('diagnostic-order')
+      languages.forEach((detectedLanguage) => operation.recordProviderExecutionMetadata(
+        { detectedLanguage }, TranslationCallPurpose.PRIMARY_TRANSLATION,
+      ))
+      return operation
+    }
+
+    expect(createOperation(['en', 'de']).snapshotProviderDetectionDiagnostic()).toEqual({ status: 'conflict' })
+    expect(createOperation(['de', 'en']).snapshotProviderDetectionDiagnostic()).toEqual({ status: 'conflict' })
+  })
+
+  it('ignores recovery records when primary evidence is unanimous', () => {
+    const operation = createTranslationOperation('diagnostic-recovery-unanimous')
+    operation.recordProviderExecutionMetadata({ detectedLanguage: 'en' }, TranslationCallPurpose.PRIMARY_TRANSLATION)
+    operation.recordProviderExecutionMetadata({ detectedLanguage: 'de' }, TranslationCallPurpose.STRUCTURED_RECOVERY)
+    operation.recordProviderExecutionMetadata({ detectedLanguage: 'fa' }, TranslationCallPurpose.PARENT_RECOVERY)
+
+    expect(operation.snapshotProviderDetectionDiagnostic()).toEqual({ status: 'unanimous', detectedLanguage: 'en' })
+    expect(operation.snapshotAggregatedProviderMetadata()).toEqual({ detectedLanguage: 'en' })
+  })
+
+  it('ignores recovery records when primary evidence conflicts', () => {
+    const operation = createTranslationOperation('diagnostic-recovery-conflict')
+    operation.recordProviderExecutionMetadata({ detectedLanguage: 'en' }, TranslationCallPurpose.PRIMARY_TRANSLATION)
+    operation.recordProviderExecutionMetadata({ detectedLanguage: 'de' }, TranslationCallPurpose.PRIMARY_TRANSLATION)
+    operation.recordProviderExecutionMetadata({ detectedLanguage: 'fa' }, TranslationCallPurpose.STRUCTURED_RECOVERY)
+
+    expect(operation.snapshotProviderDetectionDiagnostic()).toEqual({ status: 'conflict' })
+    expect(operation.snapshotAggregatedProviderMetadata()).toEqual({})
+  })
+
+  it('returns an immutable diagnostic snapshot after finalization without mutating metadata', () => {
+    const operation = createTranslationOperation('diagnostic-finalized')
+    const metadata = { detectedLanguage: ' EN ' }
+    operation.recordProviderExecutionMetadata(metadata, TranslationCallPurpose.PRIMARY_TRANSLATION)
+    const beforeFinalize = operation.snapshotProviderDetectionDiagnostic()
+    operation.finalize()
+
+    const snapshot = operation.snapshotProviderDetectionDiagnostic()
+    metadata.detectedLanguage = 'de'
+
+    expect(snapshot).toEqual(beforeFinalize)
+    expect(snapshot).toEqual({ status: 'unanimous', detectedLanguage: 'en' })
+    expect(Object.isFrozen(snapshot)).toBe(true)
+    expect(operation.snapshotProviderExecutionMetadata()[0].metadata).toEqual({ detectedLanguage: ' EN ' })
+    expect(operation.snapshotAggregatedProviderMetadata()).toEqual({ detectedLanguage: 'en' })
+  })
+
   it('ignores recovery, unknown, empty, and non-string candidates', () => {
     const operation = createTranslationOperation('aggregate-filtering')
     for (const [callPurpose, detectedLanguage] of [

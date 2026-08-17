@@ -267,6 +267,17 @@ export function createTranslationOperation(messageId, manifest = null) {
     return { list: pendingAcceptedUnitIds, set: pendingAcceptedUnitIdSet }
   }
 
+  function getPrimaryDetectedLanguages() {
+    const languages = new Set()
+    for (const record of providerMetadata) {
+      if (record.callPurpose !== TranslationCallPurpose.PRIMARY_TRANSLATION) continue
+      const language = record.metadata?.detectedLanguage
+      if (typeof language !== 'string' || !language.trim()) continue
+      languages.add(language.trim().toLowerCase())
+    }
+    return languages
+  }
+
   return {
     messageId,
     appendDiagnostic(fact) {
@@ -328,16 +339,19 @@ export function createTranslationOperation(messageId, manifest = null) {
       return Object.freeze([...providerMetadata])
     },
     snapshotAggregatedProviderMetadata() {
-      const languages = new Set()
-      for (const record of providerMetadata) {
-        if (record.callPurpose !== TranslationCallPurpose.PRIMARY_TRANSLATION) continue
-        const language = record.metadata?.detectedLanguage
-        if (typeof language !== 'string' || !language.trim()) continue
-        languages.add(language.trim().toLowerCase())
-      }
+      const languages = getPrimaryDetectedLanguages()
       return languages.size === 1
         ? Object.freeze({ detectedLanguage: languages.values().next().value })
         : Object.freeze({})
+    },
+    snapshotProviderDetectionDiagnostic() {
+      const languages = getPrimaryDetectedLanguages()
+      if (languages.size === 0) return Object.freeze({ status: 'absent' })
+      if (languages.size > 1) return Object.freeze({ status: 'conflict' })
+      return Object.freeze({
+        status: 'unanimous',
+        detectedLanguage: languages.values().next().value,
+      })
     },
     settleUnits(unitIds) {
       const accepted = []
