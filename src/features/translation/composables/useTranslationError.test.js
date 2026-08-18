@@ -4,6 +4,7 @@ import { useTranslationError } from './useTranslationError.js';
 import * as ErrorDisplayStrategies from '@/shared/error-management/ErrorDisplayStrategies.js';
 import { matchErrorToType } from '@/shared/error-management/ErrorMatcher.js';
 import { mockErrorHandlerInstance } from '@/shared/error-management/ErrorHandler.js';
+import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
 
 // --- Shared Mock Objects ---
 const mockUseErrorHandler = {
@@ -88,21 +89,37 @@ describe('useTranslationError', () => {
 
   it('should handle error and update state', async () => {
     const [composable] = withSetup(() => useTranslationError('popup'));
-    const testError = new Error('Test Error');
+    const testError = Object.assign(new Error('raw provider detail'), {
+      type: ErrorTypes.API_ERROR,
+      providerName: 'provider-secret',
+      statusCode: 500
+    });
 
     await composable.handleError(testError);
 
     expect(composable.hasError.value).toBe(true);
-    expect(composable.errorMessage.value).toBe('Displayed Error');
+    expect(composable.currentError.value).toBe(testError);
+    expect(composable.errorMessage.value).toBe('ERRORS_API_ERROR');
     expect(composable.errorType.value).toBe('API_ERROR');
     expect(composable.canRetry.value).toBe(true);
-    expect(composable.errorTimestamp.value).toBe(12345);
+    expect(composable.errorTimestamp.value).toEqual(expect.any(Number));
     
     expect(mockUseErrorHandler.handleTranslationError).toHaveBeenCalledWith(
-      testError,
+      expect.objectContaining({
+        type: ErrorTypes.API_ERROR,
+        message: 'ERRORS_API_ERROR',
+        cause: testError
+      }),
       'popup',
-      expect.objectContaining({ showInUI: true })
+      expect.objectContaining({
+        showInUI: true,
+        type: ErrorTypes.API_ERROR
+      })
     );
+    expect(mockUseErrorHandler.handleTranslationError.mock.calls[0][0]).not.toBe(testError);
+    expect(mockUseErrorHandler.handleTranslationError.mock.calls[0][0].message).not.toContain('raw provider detail');
+    expect(mockUseErrorHandler.handleTranslationError.mock.calls[0][0]).not.toHaveProperty('providerName');
+    expect(mockUseErrorHandler.handleTranslationError.mock.calls[0][0]).not.toHaveProperty('statusCode');
   });
 
   it('should ignore user cancellation errors', async () => {
@@ -113,6 +130,121 @@ describe('useTranslationError', () => {
 
     expect(composable.hasError.value).toBe(false);
     expect(mockUseErrorHandler.handleTranslationError).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    [ErrorTypes.API_ERROR, ErrorTypes.API_ERROR, 'raw api detail'],
+    [ErrorTypes.HTTP_ERROR, ErrorTypes.HTTP_ERROR, 'raw http body'],
+    [ErrorTypes.NETWORK_ERROR, ErrorTypes.NETWORK_ERROR, 'raw network detail'],
+    [ErrorTypes.SERVER_ERROR, ErrorTypes.SERVER_ERROR, 'raw server detail'],
+    [ErrorTypes.MODEL_OVERLOADED, ErrorTypes.MODEL_OVERLOADED, 'raw overload detail'],
+    [ErrorTypes.TRANSLATION_TIMEOUT, ErrorTypes.TRANSLATION_TIMEOUT, 'raw timeout detail'],
+    [ErrorTypes.API_RESPONSE_INVALID, ErrorTypes.API_RESPONSE_INVALID, 'raw response detail'],
+    [ErrorTypes.JSON_PARSING_ERROR, ErrorTypes.API_RESPONSE_INVALID, 'raw parser detail'],
+    [ErrorTypes.VALIDATION, ErrorTypes.TRANSLATION_FAILED, 'raw validation detail'],
+    [ErrorTypes.OPERATION_TIMEOUT, ErrorTypes.TRANSLATION_TIMEOUT, 'raw operation timeout detail'],
+    [undefined, ErrorTypes.TRANSLATION_FAILED, 'raw unknown detail']
+  ])('sanitizes %s while preserving canonical strategy type', async (canonicalType, displayType, rawMessage) => {
+    const [composable] = withSetup(() => useTranslationError('popup'));
+    const testError = Object.assign(new Error(rawMessage), {
+      ...(canonicalType && { type: canonicalType }),
+      ...(canonicalType === ErrorTypes.CIRCUIT_BREAKER_OPEN && {
+        originalType: ErrorTypes.NETWORK_ERROR
+      }),
+      statusCode: 502,
+      providerName: 'provider-secret',
+      providerId: 'provider-id',
+      code: 'UPSTREAM_SECRET',
+      errorCode: 'E_SECRET',
+      translationOutcome: { secret: true },
+      arbitrary: { secret: true }
+    });
+    matchErrorToType.mockReturnValue(canonicalType || ErrorTypes.UNKNOWN);
+
+    await composable.handleError(testError);
+
+    const [displayError, displayContext, options] = mockUseErrorHandler.handleTranslationError.mock.calls[0];
+    expect(displayContext).toBe('popup');
+    expect(options.type).toBe(canonicalType || ErrorTypes.UNKNOWN);
+    expect(displayError.type).toBe(displayType);
+    expect(displayError.message).not.toContain(rawMessage);
+    expect(displayError).not.toHaveProperty('originalType');
+    expect(displayError).not.toHaveProperty('statusCode');
+    expect(displayError).not.toHaveProperty('providerName');
+    expect(displayError).not.toHaveProperty('providerId');
+    expect(displayError).not.toHaveProperty('code');
+    expect(displayError).not.toHaveProperty('errorCode');
+    expect(displayError).not.toHaveProperty('translationOutcome');
+    expect(displayError).not.toHaveProperty('arbitrary');
+    expect(displayError.cause).toBe(testError);
+    expect(Object.prototype.propertyIsEnumerable.call(displayError, 'cause')).toBe(false);
+    expect(composable.errorMessage.value).not.toContain(rawMessage);
+    expect(composable.errorType.value).toBe(canonicalType || ErrorTypes.UNKNOWN);
+    if (canonicalType === ErrorTypes.CIRCUIT_BREAKER_OPEN) {
+      expect(composable.errorMessage.value).toBe('ERRORS_CIRCUIT_BREAKER_OPEN');
+    }
+  });
+
+  it.each([
+    [ErrorTypes.MODEL_MISSING, 'ERRORS_MODEL_MISSING'],
+    [ErrorTypes.API_KEY_MISSING, 'ERRORS_API_KEY_MISSING'],
+    [ErrorTypes.API_KEY_INVALID, 'ERRORS_API_KEY_INVALID'],
+    [ErrorTypes.QUOTA_EXCEEDED, 'ERRORS_QUOTA_EXCEEDED'],
+    [ErrorTypes.RATE_LIMIT_REACHED, 'ERRORS_RATE_LIMIT_REACHED']
+  ])('keeps useful safe message for %s', async (type, messageKey) => {
+    const [composable] = withSetup(() => useTranslationError('sidepanel'));
+    const testError = Object.assign(new Error('raw provider detail'), { type });
+    matchErrorToType.mockReturnValue(type);
+
+    await composable.handleError(testError);
+
+    expect(composable.errorMessage.value).toBe(messageKey);
+    expect(mockUseErrorHandler.handleTranslationError.mock.calls[0][0].message).toBe(messageKey);
+  });
+
+  it.each(['popup', 'sidepanel'])('preserves critical toast strategy for %s', async (context) => {
+    const [composable] = withSetup(() => useTranslationError(context));
+    const testError = Object.assign(new Error('raw API key detail'), {
+      type: ErrorTypes.API_KEY_INVALID
+    });
+    matchErrorToType.mockReturnValue(ErrorTypes.API_KEY_INVALID);
+    ErrorDisplayStrategies.getErrorDisplayStrategy.mockReturnValue({
+      showToast: true,
+      showInUI: true,
+      errorLevel: 'detailed'
+    });
+
+    await composable.handleError(testError);
+
+    expect(mockUseErrorHandler.handleTranslationError).toHaveBeenCalledWith(
+      expect.objectContaining({ message: 'ERRORS_API_KEY_INVALID' }),
+      context,
+      expect.objectContaining({
+        type: ErrorTypes.API_KEY_INVALID,
+        showToast: true,
+        showInUI: true
+      })
+    );
+    expect(composable.errorMessage.value).toBe('ERRORS_API_KEY_INVALID');
+  });
+
+  it('keeps local text-too-long validation on existing presentation path', async () => {
+    const [composable] = withSetup(() => useTranslationError('popup'));
+    const testError = Object.assign(new Error('Text too long (5001 chars)'), {
+      type: ErrorTypes.TEXT_TOO_LONG
+    });
+    matchErrorToType.mockReturnValue(ErrorTypes.TEXT_TOO_LONG);
+
+    await composable.handleError(testError);
+
+    expect(mockUseErrorHandler.getErrorForDisplay).toHaveBeenCalledWith(testError, 'popup');
+    expect(mockUseErrorHandler.handleTranslationError).toHaveBeenCalledWith(
+      testError,
+      'popup',
+      expect.objectContaining({ showInUI: true })
+    );
+    expect(mockUseErrorHandler.handleTranslationError.mock.calls[0][2]).not.toHaveProperty('type');
+    expect(composable.errorMessage.value).toBe('Displayed Error');
   });
 
   it('should clear error state', async () => {

@@ -4,8 +4,12 @@
 import { ref, computed, onUnmounted } from 'vue'
 import { useErrorHandler } from '@/composables/shared/useErrorHandler.js'
 import { ErrorHandler } from '@/shared/error-management/ErrorHandler.js'
+import ExtensionContextManager from '@/core/extensionContext.js'
+import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js'
 import { getErrorDisplayStrategy, processErrorMessage, shouldShowRetry, shouldShowSettings } from '@/shared/error-management/ErrorDisplayStrategies.js'
 import { matchErrorToType } from '@/shared/error-management/ErrorMatcher.js'
+import { mapCanonicalTranslationError } from '@/shared/error-management/PublicTranslationErrorPolicy.js'
+import { createLegacyDisplayError } from '@/shared/error-management/PublicTranslationErrorAdapter.js'
 import { getScopedLogger } from '@/shared/logging/logger.js'
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js'
 
@@ -74,8 +78,27 @@ export function useTranslationError(context = 'unknown') {
     try {
       logger.debug(`[${context}] Handling translation error:`, error)
       
-      // Get error information
-      const errorInfo = await getErrorForDisplay(error, context)
+      const isContextError = ExtensionContextManager.isContextError(error)
+      const isLocalValidationError = [ErrorTypes.TEXT_EMPTY, ErrorTypes.TEXT_TOO_LONG].includes(errorTypeValue)
+      const usePublicBoundary = !isContextError && !isLocalValidationError
+      let displayError = error
+      let errorInfo
+
+      if (usePublicBoundary) {
+        const publicError = mapCanonicalTranslationError(error)
+        displayError = await createLegacyDisplayError(error, publicError)
+        if (!displayError) return
+
+        errorInfo = {
+          message: displayError.message,
+          timestamp: Date.now()
+        }
+      } else {
+        // Preserve context and local input-validation behavior outside the
+        // ordinary translation public boundary.
+        errorInfo = await getErrorForDisplay(error, context)
+      }
+
       const strategy = getErrorDisplayStrategy(context, errorTypeValue)
       
       // Update error state
@@ -95,7 +118,10 @@ export function useTranslationError(context = 'unknown') {
         ...options
       }
       
-      await handleTranslationError(error, context, enhancedOptions)
+      await handleTranslationError(displayError, context, {
+        ...enhancedOptions,
+        ...(usePublicBoundary && { type: errorTypeValue })
+      })
       
       logger.debug(`[${context}] Error handled with strategy:`, strategy)
       
