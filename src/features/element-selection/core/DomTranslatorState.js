@@ -86,6 +86,10 @@ export async function revertSelectElementTranslation(targetSessionId = null) {
   const logger = getScopedLogger(LOG_COMPONENTS.ELEMENT_SELECTION, 'GlobalRevert');
   let revertedCount = 0;
 
+  const logRestoreFailure = (phase, error, details = {}) => {
+    logger.error(`[Rollback] ${phase} failed`, { ...details, error });
+  };
+
   try {
     // Process all translations in reverse order (newest first)
     const translationsToRevert = [...globalSelectElementState.translationHistory].reverse();
@@ -113,31 +117,69 @@ export async function revertSelectElementTranslation(targetSessionId = null) {
       // 1. Restore content - SURGICAL RESTORATION ONLY
       if (originalTextNodesData && originalTextNodesData.length > 0) {
         let restoredNodes = 0;
-        originalTextNodesData.forEach(({ node, originalText }) => {
+        for (const { node, originalText } of originalTextNodesData) {
           // Verify the node still exists and is attached to the document
-          if (node && node.parentNode && document.documentElement.contains(node)) {
+          let isAttached = false;
+          try {
+            isAttached = Boolean(node && node.parentNode && document.documentElement.contains(node));
+          } catch (error) {
+            logRestoreFailure('Text attachment check', error);
+            continue;
+          }
+
+          if (!isAttached) continue;
+
+          try {
             node.nodeValue = originalText;
             restoredNodes++;
+          } catch (error) {
+            logRestoreFailure('Text restoration', error, { tagName: element?.tagName });
           }
-        });
-        
+        }
+
+        if (restoredNodes === 0) {
+          logger.debug('No valid text nodes found to restore for this element');
+        }
         if (restoredNodes > 0) {
           revertedCount++;
-        } else {
-          logger.debug('No valid text nodes found to restore for this element');
         }
       } else {
         logger.debug('Missing originalTextNodesData for surgical revert. Skipping content restoration.');
       }
 
       // 2. Restore direction and styles
-      if (element) {
-        const attr = PAGE_TRANSLATION_ATTRIBUTES.HAS_ORIGINAL;
-        element.removeAttribute(attr);
-        element.querySelectorAll(`[${attr}]`).forEach(el => el.removeAttribute(attr));
+      if (!element) continue;
 
+      const attr = PAGE_TRANSLATION_ATTRIBUTES.HAS_ORIGINAL;
+      try {
+        element.removeAttribute(attr);
+      } catch (error) {
+        logRestoreFailure('Root metadata cleanup', error, { tagName: element.tagName });
+      }
+
+      try {
+        const descendants = element.querySelectorAll(`[${attr}]`);
+        descendants.forEach((descendant) => {
+          try {
+            descendant.removeAttribute(attr);
+          } catch (error) {
+            logRestoreFailure('Descendant metadata cleanup', error, { tagName: descendant?.tagName });
+          }
+        });
+      } catch (error) {
+        logRestoreFailure('Descendant metadata discovery', error, { tagName: element.tagName });
+      }
+
+      try {
         restoreElementDirection(element);
+      } catch (error) {
+        logRestoreFailure('Direction/style restoration', error, { tagName: element.tagName });
+      }
+
+      try {
         pageEventBus.emit('hide-translation', { element });
+      } catch (error) {
+        logRestoreFailure('Hide translation event', error, { tagName: element.tagName });
       }
     }
 
