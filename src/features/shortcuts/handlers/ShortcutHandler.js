@@ -8,6 +8,8 @@ import { shortcutManager } from '@/core/managers/content/shortcuts/ShortcutManag
 import { INPUT_TYPES } from '@/shared/constants/detection.js';
 import { NOTIFICATION_TIME } from '@/shared/constants/ui.js';
 import NotificationManager from '@/core/managers/core/NotificationManager.js';
+import { getFieldTranslationErrorPresentation } from '@/features/text-field-interaction/utils/FieldTranslationErrorPresenter.js';
+import { isFieldTranslationRequestError } from '@/handlers/smart-translation/translationErrorOwnership.js';
 
 const Platform = {
   MAC: 'MAC',
@@ -466,7 +468,20 @@ export class ShortcutHandler extends ResourceTracker {
       logger.error('Error triggering text field translation via shortcut:', error);
       
       const { ErrorHandler } = await import('@/shared/error-management/ErrorHandler.js');
-      ErrorHandler.getInstance().handle(error, {
+      const errorHandler = ErrorHandler.getInstance();
+      if (isFieldTranslationRequestError(error)) {
+        const presentation = await getFieldTranslationErrorPresentation(error);
+        if (!presentation) return;
+
+        errorHandler.handle(presentation.displayError, {
+          context: 'shortcut-field-translation',
+          showToast: true,
+          type: presentation.canonicalType || presentation.displayError.type,
+        }).catch(() => {});
+        return;
+      }
+
+      errorHandler.handle(error, {
         context: 'shortcut-field-translation',
         showToast: true
       }).catch(() => {});

@@ -18,6 +18,8 @@ import { ExclusionChecker } from '@/features/exclusion/core/ExclusionChecker.js'
 
 import ElementDetectionService from '@/shared/services/ElementDetectionService.js';
 import { settingsManager } from '@/shared/managers/SettingsManager.js';
+import { getFieldTranslationErrorPresentation } from '../utils/FieldTranslationErrorPresenter.js';
+import { isFieldTranslationRequestError } from '@/handlers/smart-translation/translationErrorOwnership.js';
 
 // Singleton instance for TextFieldIconManager
 let textFieldIconManagerInstance = null;
@@ -110,7 +112,20 @@ export class TextFieldIconManager extends ResourceTracker {
       this.logger.error('Failed to execute translation:', error);
       
       const { ErrorHandler } = await import('@/shared/error-management/ErrorHandler.js');
-      ErrorHandler.getInstance().handle(error, {
+      const errorHandler = ErrorHandler.getInstance();
+      if (isFieldTranslationRequestError(error)) {
+        const presentation = await getFieldTranslationErrorPresentation(error);
+        if (!presentation) return;
+
+        errorHandler.handle(presentation.displayError, {
+          context: 'text-field-icon-execution',
+          showToast: true,
+          type: presentation.canonicalType || presentation.displayError.type,
+        }).catch(() => {});
+        return;
+      }
+
+      errorHandler.handle(error, {
         context: 'text-field-icon-execution',
         showToast: true
       }).catch(() => {});

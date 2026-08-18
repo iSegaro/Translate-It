@@ -1,14 +1,24 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { flushPromises } from '@vue/test-utils';
 
-const { mockEmit, mockSettingsGet, mockDetect } = vi.hoisted(() => ({
+const {
+  mockEmit,
+  mockSettingsGet,
+  mockDetect,
+  mockErrorHandler,
+  mockIsFieldTranslationRequestError,
+  mockGetFieldTranslationErrorPresentation,
+} = vi.hoisted(() => ({
   mockEmit: vi.fn(),
   mockSettingsGet: vi.fn((key, def) => {
     if (key === 'EXTENSION_ENABLED') return true;
     if (key === 'TRANSLATE_ON_TEXT_FIELDS') return true;
     return def;
   }),
-  mockDetect: vi.fn(() => Promise.resolve({ shouldShowTextFieldIcon: true }))
+  mockDetect: vi.fn(() => Promise.resolve({ shouldShowTextFieldIcon: true })),
+  mockErrorHandler: { handle: vi.fn(() => Promise.resolve()) },
+  mockIsFieldTranslationRequestError: vi.fn(() => false),
+  mockGetFieldTranslationErrorPresentation: vi.fn(),
 }));
 
 // Mock state
@@ -125,6 +135,20 @@ vi.mock('@/handlers/smartTranslationIntegration.js', () => ({
   translateFieldViaSmartHandler: vi.fn()
 }));
 
+vi.mock('@/shared/error-management/ErrorHandler.js', () => ({
+  ErrorHandler: {
+    getInstance: vi.fn(() => mockErrorHandler),
+  },
+}));
+
+vi.mock('@/handlers/smart-translation/translationErrorOwnership.js', () => ({
+  isFieldTranslationRequestError: mockIsFieldTranslationRequestError,
+}));
+
+vi.mock('../utils/FieldTranslationErrorPresenter.js', () => ({
+  getFieldTranslationErrorPresentation: mockGetFieldTranslationErrorPresentation,
+}));
+
 // 2. Import after mocks
 import { TextFieldIconManager } from './TextFieldIconManager.js';
 import { ExtensionContextManager } from '@/core/extensionContext.js';
@@ -137,6 +161,8 @@ describe('TextFieldIconManager', () => {
     vi.clearAllMocks();
     TextFieldIconManager.resetInstance();
     manager = TextFieldIconManager.getInstance();
+    mockIsFieldTranslationRequestError.mockReturnValue(false);
+    mockGetFieldTranslationErrorPresentation.mockResolvedValue(null);
     
     // Mock location properly
     vi.stubGlobal('location', { protocol: 'https:' });
@@ -282,6 +308,79 @@ describe('TextFieldIconManager', () => {
         target: el
       });
       expect(spy).toHaveBeenCalledWith(el);
+    });
+
+    it('presents only marked request failures with adapted Error and canonical type metadata', async () => {
+      const { translateFieldViaSmartHandler } = await import('@/handlers/smartTranslationIntegration.js');
+      const requestError = Object.assign(new Error('raw provider detail'), {
+        type: 'API_ERROR',
+        providerName: 'Private Provider',
+      });
+      const displayError = Object.assign(new Error('safe localized error'), {
+        type: 'API_ERROR',
+      });
+      mockIsFieldTranslationRequestError.mockReturnValue(true);
+      mockGetFieldTranslationErrorPresentation.mockResolvedValue({
+        canonicalError: requestError,
+        displayError,
+        publicError: { type: 'API_FAILURE' },
+        canonicalType: 'API_ERROR',
+      });
+      translateFieldViaSmartHandler.mockRejectedValue(requestError);
+
+      await manager.executeTranslation({ targetElement: Object.assign(document.createElement('textarea'), { value: 'hello' }) });
+
+      expect(mockGetFieldTranslationErrorPresentation).toHaveBeenCalledTimes(1);
+      expect(mockGetFieldTranslationErrorPresentation).toHaveBeenCalledWith(requestError);
+      expect(mockErrorHandler.handle).toHaveBeenCalledTimes(1);
+      expect(mockErrorHandler.handle).toHaveBeenCalledWith(displayError, {
+        context: 'text-field-icon-execution',
+        showToast: true,
+        type: 'API_ERROR',
+      });
+      expect(mockErrorHandler.handle.mock.calls[0][0]).not.toBe(requestError);
+      expect(mockErrorHandler.handle.mock.calls[0][0].message).not.toContain('raw provider detail');
+    });
+
+    it('keeps unmarked Field-owned failures on existing ErrorHandler path', async () => {
+      const { translateFieldViaSmartHandler } = await import('@/handlers/smartTranslationIntegration.js');
+      const fieldError = new Error('clipboard write failed');
+      translateFieldViaSmartHandler.mockRejectedValue(fieldError);
+
+      await manager.executeTranslation({ targetElement: Object.assign(document.createElement('textarea'), { value: 'hello' }) });
+
+      expect(mockIsFieldTranslationRequestError).toHaveBeenCalledWith(fieldError);
+      expect(mockGetFieldTranslationErrorPresentation).not.toHaveBeenCalled();
+      expect(mockErrorHandler.handle).toHaveBeenCalledTimes(1);
+      expect(mockErrorHandler.handle).toHaveBeenCalledWith(fieldError, {
+        context: 'text-field-icon-execution',
+        showToast: true,
+      });
+    });
+
+    it('does not present when marked error has no presentation', async () => {
+      const { translateFieldViaSmartHandler } = await import('@/handlers/smartTranslationIntegration.js');
+      const cancellation = Object.assign(new Error('cancelled'), { type: 'USER_CANCELLED' });
+      mockIsFieldTranslationRequestError.mockReturnValue(true);
+      mockGetFieldTranslationErrorPresentation.mockResolvedValue(null);
+      translateFieldViaSmartHandler.mockRejectedValue(cancellation);
+
+      await manager.executeTranslation({ targetElement: Object.assign(document.createElement('textarea'), { value: 'hello' }) });
+
+      expect(mockGetFieldTranslationErrorPresentation).toHaveBeenCalledWith(cancellation);
+      expect(mockErrorHandler.handle).not.toHaveBeenCalled();
+    });
+
+    it('keeps successful translation cleanup unchanged', async () => {
+      const { translateFieldViaSmartHandler } = await import('@/handlers/smartTranslationIntegration.js');
+      const cleanup = vi.spyOn(manager, 'cleanupElement');
+      const element = Object.assign(document.createElement('textarea'), { value: 'hello' });
+      translateFieldViaSmartHandler.mockResolvedValue(undefined);
+
+      await manager.executeTranslation({ targetElement: element });
+
+      expect(cleanup).toHaveBeenCalledWith(element);
+      expect(mockErrorHandler.handle).not.toHaveBeenCalled();
     });
   });
 
