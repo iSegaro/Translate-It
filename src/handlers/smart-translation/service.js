@@ -31,8 +31,39 @@ import { determineReplaceMode, applyTranslation } from './executor.js';
 import { TRANSLATION_TIMEOUT, STALE_DATA_THRESHOLD } from './constants.js';
 import { SimpleMarkdown, ExtractionStrategy } from "@/shared/utils/text/markdown.js";
 import { markFieldTranslationRequestError } from './translationErrorOwnership.js';
+import { translationRequestTracker } from '@/core/services/translation/TranslationRequestTracker.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.TRANSLATION, 'SmartTranslationService');
+
+function terminalizeFieldRequest(ownership, outcome, details = {}) {
+  const messageId = ownership?.messageId;
+  if (!messageId) return null;
+
+  const isReplacement = outcome === 'replacement';
+  if (ownership.target && !isReplacement && !isCurrentFieldTranslationRequest(ownership.target, ownership)) {
+    return null;
+  }
+  if (!translationRequestTracker.isRequestActive(messageId)) return null;
+
+  switch (outcome) {
+    case 'completed':
+      return translationRequestTracker.completeRequest(messageId, { success: true, ...details });
+    case 'failed':
+      return translationRequestTracker.failRequest(messageId, details.error);
+    case 'cancelled':
+      return translationRequestTracker.cancelRequest(messageId, details.reason);
+    case 'replacement':
+      return translationRequestTracker.cancelRequest(messageId, 'replacement');
+    case 'timeout':
+      return translationRequestTracker.markTimeout(messageId);
+    default:
+      return null;
+  }
+}
+
+function isSuccessfulFieldApplication(result) {
+  return result?.applied === true || result?.mode === 'already-completed';
+}
 
 /**
  * Main entry point for field translation
@@ -53,6 +84,7 @@ export async function translateFieldViaSmartHandler({ text, target, selectionRan
 
   // Establish latest-request ownership before asynchronous setup.
   const { ownership, previous } = beginFieldTranslationRequest(target);
+  terminalizeFieldRequest(previous, 'replacement');
   const isCurrent = () => isCurrentFieldTranslationRequest(target, ownership);
   
   const mode = TranslationMode.Field;
@@ -156,11 +188,12 @@ export async function translateFieldViaSmartHandler({ text, target, selectionRan
       if (currentToastId) localNotificationManager.dismiss(currentToastId);
       clearPendingNotificationData('context-invalid', ownership);
       clearPendingTranslationData(currentToastId, ownership);
+      terminalizeFieldRequest(ownership, 'cancelled', { reason: 'context-invalidated' });
       return;
     }
 
     if (messageResult && messageResult.success) {
-      await applyTranslationToTextField(
+      const applicationResult = await applyTranslationToTextField(
         messageResult.translatedText,
         messageResult.originalText,
         messageResult.mode || TranslationMode.Field,
@@ -169,6 +202,12 @@ export async function translateFieldViaSmartHandler({ text, target, selectionRan
         localNotificationManager,
         ownership
       );
+      if (applicationResult?.mode === 'stale') return;
+      if (isSuccessfulFieldApplication(applicationResult)) {
+        terminalizeFieldRequest(ownership, 'completed', { result: applicationResult });
+      } else {
+        terminalizeFieldRequest(ownership, 'failed', { error: applicationResult?.error || 'Field application failed' });
+      }
     } else if (messageResult && messageResult.success === false) {
       if (!isCurrent()) return;
       if (currentToastId) localNotificationManager.dismiss(currentToastId);
@@ -178,9 +217,17 @@ export async function translateFieldViaSmartHandler({ text, target, selectionRan
       // Small delay to ensure status toast dismissal is processed before error toast appears
       await new Promise(r => setTimeout(r, 10));
 
+      const requestError = messageResult.error || 'Translation request failed';
+      terminalizeFieldRequest(ownership, 'failed', { error: requestError });
       if (messageResult.error) {
         throw markFieldTranslationRequestError(messageResult.error);
       }
+    } else {
+      if (!isCurrent()) return;
+      if (currentToastId) localNotificationManager.dismiss(currentToastId);
+      clearPendingNotificationData('invalid-response', ownership);
+      clearPendingTranslationData(currentToastId, ownership);
+      terminalizeFieldRequest(ownership, 'failed', { error: 'Invalid translation response' });
     }
   } catch (err) {
     if (timerId) resourceTracker.clearTimer(timerId);
@@ -189,7 +236,10 @@ export async function translateFieldViaSmartHandler({ text, target, selectionRan
 
     if (isAbortedForReplacement) return;
 
-    if (isCancellationError(err)) {
+    const isTimeout = err?.type === ErrorTypes.TRANSLATION_TIMEOUT;
+    const isCancellation = isCancellationError(err);
+
+    if (isCancellation) {
       logger.debug('Text field translation request cancelled:', err.message);
       
       // If this request is being replaced, do NOT dismiss the toast and do NOT re-throw
@@ -207,6 +257,13 @@ export async function translateFieldViaSmartHandler({ text, target, selectionRan
 
     clearPendingTranslationData(currentToastId, ownership);
     clearPendingNotificationData('error', ownership);
+    if (isTimeout) {
+      terminalizeFieldRequest(ownership, 'timeout');
+    } else if (isCancellation) {
+      terminalizeFieldRequest(ownership, 'cancelled', { reason: err?.type || 'user_cancelled' });
+    } else {
+      terminalizeFieldRequest(ownership, 'failed', { error: err });
+    }
     throw err;
   } finally {
     if (timerId) resourceTracker.clearTimer(timerId);

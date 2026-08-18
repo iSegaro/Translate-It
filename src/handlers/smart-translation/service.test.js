@@ -26,6 +26,14 @@ const mocks = vi.hoisted(() => ({
   activeAbortControllers: new WeakMap(),
   fieldRequestOwners: new WeakMap(),
   trackerRequests: new Map(),
+  successfullyCompletedToastIds: new Set(),
+  tracker: {
+    isRequestActive: vi.fn(),
+    completeRequest: vi.fn(),
+    failRequest: vi.fn(),
+    cancelRequest: vi.fn(),
+    markTimeout: vi.fn(),
+  },
   trackTimeout: vi.fn((callback, delay) => setTimeout(callback, delay)),
   clearTimer: vi.fn((timer) => clearTimeout(timer)),
 }));
@@ -91,7 +99,7 @@ vi.mock('./state.js', () => ({
   },
   processedMessageIds: new Set(),
   activeProcessing: new Map(),
-  successfullyCompletedToastIds: new Set(),
+  successfullyCompletedToastIds: mocks.successfullyCompletedToastIds,
 }));
 
 vi.mock('./dataStore.js', () => ({
@@ -111,23 +119,61 @@ vi.mock('./executor.js', () => ({
   applyTranslation: (...args) => mocks.applyTranslation(...args),
 }));
 
+vi.mock('@/core/services/translation/TranslationRequestTracker.js', () => ({
+  translationRequestTracker: mocks.tracker,
+}));
+
 vi.mock('@/shared/utils/text/markdown.js', () => ({
   SimpleMarkdown: { getCleanTranslation: vi.fn((text) => text) },
   ExtractionStrategy: { FULL_TEXT: 'full-text' },
 }));
 
-import { translateFieldViaSmartHandler } from './service.js';
+import { applyTranslationToTextField, translateFieldViaSmartHandler } from './service.js';
 
 const target = { tagName: 'TEXTAREA', value: 'original text' };
+let toastCount = 0;
 
 describe('translateFieldViaSmartHandler translation ownership', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mocks.showStatus.mockImplementation(() => `toast-${++toastCount}`);
     mocks.pendingTranslationByToastId.clear();
     mocks.pendingTranslationData = new WeakMap();
     mocks.activeAbortControllers.delete(target);
     mocks.fieldRequestOwners = new WeakMap();
     mocks.trackerRequests.clear();
+    mocks.successfullyCompletedToastIds.clear();
+    mocks.tracker.isRequestActive.mockImplementation((messageId) => {
+      const request = mocks.trackerRequests.get(messageId);
+      return request && request.status === 'pending';
+    });
+    mocks.tracker.completeRequest.mockImplementation((messageId, result) => {
+      const request = mocks.trackerRequests.get(messageId);
+      if (!request || request.status !== 'pending') return { accepted: false, reason: 'already_terminal' };
+      request.status = 'completed';
+      request.result = result;
+      return { accepted: true, status: 'completed', request };
+    });
+    mocks.tracker.failRequest.mockImplementation((messageId, error) => {
+      const request = mocks.trackerRequests.get(messageId);
+      if (!request || request.status !== 'pending') return { accepted: false, reason: 'already_terminal' };
+      request.status = 'failed';
+      request.error = error;
+      return { accepted: true, status: 'failed', request };
+    });
+    mocks.tracker.cancelRequest.mockImplementation((messageId, reason) => {
+      const request = mocks.trackerRequests.get(messageId);
+      if (!request || request.status !== 'pending') return { accepted: false, reason: 'already_terminal' };
+      request.status = 'cancelled';
+      request.reason = reason;
+      return { accepted: true, status: 'cancelled', request };
+    });
+    mocks.tracker.markTimeout.mockImplementation((messageId) => {
+      const request = mocks.trackerRequests.get(messageId);
+      if (!request || request.status !== 'pending') return { accepted: false, reason: 'already_terminal' };
+      request.status = 'timeout';
+      return { accepted: true, status: 'timeout', request };
+    });
     mocks.beginFieldTranslationRequest.mockImplementation((requestTarget) => {
       const previous = mocks.fieldRequestOwners.get(requestTarget) || null;
       if (previous) {
@@ -174,7 +220,7 @@ describe('translateFieldViaSmartHandler translation ownership', () => {
       }
       mocks.pendingTranslationData.set(target, data);
       if (toastId) mocks.pendingTranslationByToastId.set(toastId, data);
-      if (messageId) mocks.trackerRequests.set(messageId, { data, status: 'pending' });
+      if (messageId) mocks.trackerRequests.set(messageId, { messageId, data, status: 'pending' });
       return data;
     });
     mocks.clearPendingTranslationData.mockImplementation((toastId) => {
@@ -215,6 +261,9 @@ describe('translateFieldViaSmartHandler translation ownership', () => {
     expect(mocks.clearPendingTranslationData).toHaveBeenCalled();
     expect(mocks.clearPendingNotificationData).toHaveBeenCalled();
     expect(mocks.applyTranslationToTextField).not.toHaveBeenCalled();
+    const request = [...mocks.trackerRequests.values()][0];
+    expect(request.status).toBe('failed');
+    expect(mocks.tracker.failRequest).toHaveBeenCalledWith(request.messageId, error);
   });
 
   it('marks reconstructed transport rejection', async () => {
@@ -229,6 +278,7 @@ describe('translateFieldViaSmartHandler translation ownership', () => {
 
     expect(isFieldTranslationRequestError(error)).toBe(true);
     expect(mocks.applyTranslationToTextField).not.toHaveBeenCalled();
+    expect([...mocks.trackerRequests.values()][0].status).toBe('failed');
   });
 
   it('marks local translation timeout', async () => {
@@ -249,11 +299,23 @@ describe('translateFieldViaSmartHandler translation ownership', () => {
     expect(isFieldTranslationRequestError(thrownError)).toBe(true);
     expect(mocks.dismiss).toHaveBeenCalled();
     expect(mocks.clearPendingTranslationData).toHaveBeenCalled();
+    expect([...mocks.trackerRequests.values()][0].status).toBe('timeout');
+    expect(mocks.tracker.markTimeout).toHaveBeenCalledTimes(1);
+    expect(mocks.tracker.failRequest).not.toHaveBeenCalled();
+    expect(mocks.tracker.cancelRequest).not.toHaveBeenCalled();
+    expect(mocks.safeSendMessage).toHaveBeenCalledWith(
+      expect.objectContaining({ action: 'CANCEL_TRANSLATION' }),
+      expect.anything(),
+      'text-field-timeout'
+    );
+    expect(mocks.releaseFieldTranslationRequest).toHaveBeenCalled();
+    expect(mocks.tracker.markTimeout.mock.invocationCallOrder[0])
+      .toBeLessThan(mocks.releaseFieldTranslationRequest.mock.invocationCallOrder[0]);
   });
 
   it('does not mark application failure after request succeeds', async () => {
     const error = new Error('replacement failed');
-    mocks.applyTranslationToTextField.mockRejectedValue(error);
+    mocks.applyTranslation.mockRejectedValue(error);
 
     await expect(translateFieldViaSmartHandler({ text: 'hello', target }))
       .resolves.toBeUndefined();
@@ -263,12 +325,90 @@ describe('translateFieldViaSmartHandler translation ownership', () => {
 
   it('does not mark clipboard failure after request succeeds', async () => {
     const error = new Error('clipboard write failed');
-    mocks.applyTranslationToTextField.mockRejectedValue(error);
+    mocks.applyTranslation.mockRejectedValue(error);
 
     await expect(translateFieldViaSmartHandler({ text: 'hello', target }))
       .resolves.toBeUndefined();
 
     expect(isFieldTranslationRequestError(error)).toBe(false);
+    expect([...mocks.trackerRequests.values()][0].status).toBe('failed');
+  });
+
+  it('completes successful application', async () => {
+    await expect(translateFieldViaSmartHandler({ text: 'hello', target })).resolves.toBeUndefined();
+
+    const request = [...mocks.trackerRequests.values()][0];
+    expect(request.status).toBe('completed');
+    expect(mocks.tracker.completeRequest).toHaveBeenCalledWith(request.messageId, expect.objectContaining({
+      success: true,
+      result: { applied: true, mode: 'replace' },
+    }));
+  });
+
+  it('completes successful clipboard application', async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, 'clipboard', {
+      configurable: true,
+      value: { writeText },
+    });
+    mocks.determineReplaceMode.mockResolvedValue(false);
+
+    await expect(translateFieldViaSmartHandler({ text: 'hello', target })).resolves.toBeUndefined();
+
+    const request = [...mocks.trackerRequests.values()][0];
+    expect(request.status).toBe('completed');
+    expect(writeText).toHaveBeenCalledWith('translated text');
+  });
+
+  it('completes accepted already-completed application result', async () => {
+    const toastId = 'already-completed-toast';
+    mocks.showStatus.mockReturnValue(toastId);
+    mocks.successfullyCompletedToastIds.add(toastId);
+
+    const applicationResult = await applyTranslationToTextField(
+      'translated text',
+      'original text',
+      'field',
+      toastId,
+      'application-message',
+      new (class {
+        update() {}
+        dismiss() {}
+      })()
+    );
+
+    expect(applicationResult).toMatchObject({ applied: false, mode: 'already-completed' });
+
+    await expect(translateFieldViaSmartHandler({ text: 'hello', target })).resolves.toBeUndefined();
+
+    const request = [...mocks.trackerRequests.values()][0];
+    expect(request.status).toBe('completed');
+    expect(request.result.result.mode).toBe('already-completed');
+    expect(mocks.tracker.failRequest).not.toHaveBeenCalled();
+  });
+
+  it('fails application result without changing public error ownership', async () => {
+    const applicationError = new Error('copy failed');
+    mocks.applyTranslation.mockImplementation(() => { throw applicationError; });
+
+    await expect(translateFieldViaSmartHandler({ text: 'hello', target })).resolves.toBeUndefined();
+
+    const request = [...mocks.trackerRequests.values()][0];
+    expect(request.status).toBe('failed');
+    expect(request.error).toBe('copy failed');
+    expect(isFieldTranslationRequestError(applicationError)).toBe(false);
+  });
+
+  it('fails empty application result', async () => {
+    mocks.safeSendMessage.mockResolvedValue({
+      success: true,
+      translatedText: '',
+      originalText: 'original text',
+    });
+
+    await expect(translateFieldViaSmartHandler({ text: 'hello', target })).resolves.toBeUndefined();
+
+    expect([...mocks.trackerRequests.values()][0].status).toBe('failed');
   });
 
   it('keeps user cancellation silent and unmarked', async () => {
@@ -281,6 +421,11 @@ describe('translateFieldViaSmartHandler translation ownership', () => {
       .rejects.toBe(error);
 
     expect(isFieldTranslationRequestError(error)).toBe(false);
+    expect([...mocks.trackerRequests.values()][0].status).toBe('cancelled');
+    expect(mocks.tracker.cancelRequest).toHaveBeenCalledWith(
+      [...mocks.trackerRequests.keys()][0],
+      ErrorTypes.USER_CANCELLED
+    );
   });
 
   it('keeps context invalidation as the existing null return path', async () => {
@@ -292,6 +437,11 @@ describe('translateFieldViaSmartHandler translation ownership', () => {
     expect(mocks.dismiss).toHaveBeenCalled();
     expect(mocks.clearPendingTranslationData).toHaveBeenCalled();
     expect(mocks.applyTranslationToTextField).not.toHaveBeenCalled();
+    expect([...mocks.trackerRequests.values()][0].status).toBe('cancelled');
+    expect(mocks.tracker.cancelRequest).toHaveBeenCalledWith(
+      [...mocks.trackerRequests.keys()][0],
+      'context-invalidated'
+    );
   });
 
   it('characterizes post-registration replacement ownership across A and B', async () => {
@@ -355,8 +505,11 @@ describe('translateFieldViaSmartHandler translation ownership', () => {
     expect(mocks.dismiss).toHaveBeenCalledWith(toastIdA);
     expect(mocks.pendingTranslationByToastId.get(toastIdA).processed).toBe(true);
     expect(mocks.activeAbortControllers.get(target)).toBeUndefined();
-    expect(mocks.trackerRequests.get(messageIdA).status).toBe('pending');
-    expect(mocks.trackerRequests.get(messageIdB).status).toBe('pending');
+    expect(mocks.trackerRequests.get(messageIdA).status).toBe('cancelled');
+    expect(mocks.trackerRequests.get(messageIdA).reason).toBe('replacement');
+    expect(mocks.trackerRequests.get(messageIdB).status).toBe('completed');
+    expect(mocks.tracker.cancelRequest).toHaveBeenCalledWith(messageIdA, 'replacement');
+    expect(mocks.tracker.failRequest).not.toHaveBeenCalledWith(messageIdA, expect.anything());
   });
 
   it('prevents pre-registration stale request from issuing work', async () => {
@@ -413,6 +566,8 @@ describe('translateFieldViaSmartHandler translation ownership', () => {
     await expect(promiseB).resolves.toBeUndefined();
     await expect(promiseA).resolves.toBeUndefined();
     expect(mocks.activeAbortControllers.get(target)).toBeUndefined();
+    expect(mocks.trackerRequests.size).toBe(1);
+    expect(mocks.trackerRequests.get(messageIdB).status).toBe('completed');
   });
 
   it('prevents stale mid-setup request from creating state or sending work', async () => {
