@@ -35,6 +35,7 @@ export const PublicTranslationErrorMessageKeys = Object.freeze({
   [PublicTranslationErrorTypes.TEXT_EMPTY]: 'ERRORS_TEXT_EMPTY',
   [PublicTranslationErrorTypes.TEXT_TOO_LONG]: 'ERRORS_TEXT_TOO_LONG',
   [PublicTranslationErrorTypes.PROMPT_INVALID]: 'ERRORS_PROMPT_INVALID',
+  [PublicTranslationErrorTypes.LANGUAGE_PAIR_UNSUPPORTED]: 'ERRORS_LANGUAGE_PAIR_NOT_SUPPORTED',
   [PublicTranslationErrorTypes.TRANSLATION_FAILED]: 'ERRORS_TRANSLATION_FAILED',
 });
 
@@ -61,6 +62,7 @@ const PUBLIC_TYPE_BY_INTERNAL_TYPE = new Map([
   [ErrorTypes.TEXT_EMPTY, PublicTranslationErrorTypes.TEXT_EMPTY],
   [ErrorTypes.TEXT_TOO_LONG, PublicTranslationErrorTypes.TEXT_TOO_LONG],
   [ErrorTypes.PROMPT_INVALID, PublicTranslationErrorTypes.PROMPT_INVALID],
+  [ErrorTypes.LANGUAGE_PAIR_NOT_SUPPORTED, PublicTranslationErrorTypes.LANGUAGE_PAIR_UNSUPPORTED],
   [ErrorTypes.INVALID_REQUEST, PublicTranslationErrorTypes.INVALID_REQUEST],
   [ErrorTypes.HTTP_ERROR, PublicTranslationErrorTypes.REQUEST_FAILURE],
   [ErrorTypes.API_URL_MISSING, PublicTranslationErrorTypes.API_URL_MISSING],

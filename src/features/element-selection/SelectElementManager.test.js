@@ -79,6 +79,7 @@ vi.mock('@/shared/error-management/PublicTranslationErrorPolicy.js', () => ({
        TEXT_EMPTY: 'TEXT_EMPTY',
        TEXT_TOO_LONG: 'TEXT_TOO_LONG',
        PROMPT_INVALID: 'PROMPT_INVALID',
+       LANGUAGE_PAIR_NOT_SUPPORTED: 'LANGUAGE_PAIR_UNSUPPORTED',
        HTTP_ERROR: error?.originalType === 'MODEL_MISSING' ? 'MODEL_UNAVAILABLE' : 'REQUEST_FAILURE',
       UNKNOWN: 'TRANSLATION_FAILED',
     }[error?.type] || error?.type,
@@ -99,6 +100,7 @@ vi.mock('@/shared/error-management/PublicTranslationErrorPolicy.js', () => ({
        TEXT_EMPTY: 'ERRORS_TEXT_EMPTY',
        TEXT_TOO_LONG: 'ERRORS_TEXT_TOO_LONG',
        PROMPT_INVALID: 'ERRORS_PROMPT_INVALID',
+       LANGUAGE_PAIR_NOT_SUPPORTED: 'ERRORS_LANGUAGE_PAIR_NOT_SUPPORTED',
        HTTP_ERROR: error?.originalType === 'MODEL_MISSING' ? 'ERRORS_MODEL_MISSING' : 'ERRORS_HTTP_ERROR',
      }[error?.type] || 'ERRORS_TRANSLATION_FAILED',
     silent: false,
@@ -122,6 +124,7 @@ vi.mock('@/shared/error-management/PublicTranslationErrorAdapter.js', () => ({
        TEXT_EMPTY: 'TEXT_EMPTY',
        TEXT_TOO_LONG: 'TEXT_TOO_LONG',
        PROMPT_INVALID: 'PROMPT_INVALID',
+       LANGUAGE_PAIR_UNSUPPORTED: 'LANGUAGE_PAIR_NOT_SUPPORTED',
        TRANSLATION_FAILED: 'TRANSLATION_FAILED',
     }[publicError?.type] || publicError?.type || 'TRANSLATION_FAILED';
     const message = {
@@ -141,6 +144,7 @@ vi.mock('@/shared/error-management/PublicTranslationErrorAdapter.js', () => ({
        ERRORS_TEXT_EMPTY: 'Text is empty',
        ERRORS_TEXT_TOO_LONG: 'Text is too long',
        ERRORS_PROMPT_INVALID: 'Prompt is invalid',
+       ERRORS_LANGUAGE_PAIR_NOT_SUPPORTED: 'Language pair not supported by the selected translation service',
     }[publicError?.messageKey] || 'Translation failed';
     const displayError = new Error(message);
     displayError.type = legacyType;
@@ -152,6 +156,7 @@ vi.mock('@/shared/error-management/PublicTranslationErrorAdapter.js', () => ({
 vi.mock('@/shared/error-management/ErrorMatcher.js', () => ({
   isFatalError: vi.fn(() => false),
   isCancellationError: vi.fn(() => false),
+  isSilentError: vi.fn(() => false),
   matchErrorToType: vi.fn((error) => error?.type || 'TRANSLATION_ERROR')
 }));
 
@@ -721,6 +726,46 @@ describe('SelectElementManager', () => {
       expect(errorHandler.handle).toHaveBeenCalledTimes(1);
     });
 
+    it('preserves language-pair guidance and fatal cleanup', async () => {
+      const error = Object.assign(new Error('raw language-pair detail'), {
+        type: ErrorTypes.LANGUAGE_PAIR_NOT_SUPPORTED,
+      });
+      manager.domTranslatorAdapter.translateElement.mockRejectedValue(error);
+      const { isFatalError } = await import('@/shared/error-management/ErrorMatcher.js');
+      isFatalError.mockReturnValueOnce(true);
+      const deactivateSpy = vi.spyOn(manager, 'deactivate').mockResolvedValue(undefined);
+
+      await manager.startTranslation(document.createElement('div'));
+
+      const { createPublicDisplayError } = await import('@/shared/error-management/PublicErrorPolicy.js');
+      const { mapCanonicalTranslationError } = await import('@/shared/error-management/PublicTranslationErrorPolicy.js');
+      const { createLegacyDisplayError } = await import('@/shared/error-management/PublicTranslationErrorAdapter.js');
+      const { getErrorDisplayStrategy } = await import('@/shared/error-management/ErrorDisplayStrategies.js');
+      expect(createPublicDisplayError).not.toHaveBeenCalled();
+      expect(mapCanonicalTranslationError).toHaveBeenCalledWith(error);
+      expect(createLegacyDisplayError).toHaveBeenCalledWith(error, expect.objectContaining({
+        type: 'LANGUAGE_PAIR_UNSUPPORTED',
+        messageKey: 'ERRORS_LANGUAGE_PAIR_NOT_SUPPORTED',
+        silent: false,
+      }));
+      expect(errorHandler.handle).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: ErrorTypes.LANGUAGE_PAIR_NOT_SUPPORTED,
+          message: 'Language pair not supported by the selected translation service',
+          cause: error,
+        }),
+        expect.objectContaining({ context: 'select-element', showToast: true })
+      );
+      expect(errorHandler.handle.mock.calls[0][0].message).not.toContain('raw language-pair detail');
+      expect(getErrorDisplayStrategy('select-element', ErrorTypes.LANGUAGE_PAIR_NOT_SUPPORTED)).toMatchObject({
+        supportSettings: true,
+        supportRetry: false,
+        suggestAction: 'change-provider',
+      });
+      expect(deactivateSpy).toHaveBeenCalledWith({ preserveTranslations: true, reason: 'error' });
+      expect(errorHandler.handle).toHaveBeenCalledTimes(1);
+    });
+
     it.each([
       ErrorTypes.MODEL_MISSING,
       ErrorTypes.API_ERROR,
@@ -756,6 +801,7 @@ describe('SelectElementManager', () => {
        ErrorTypes.TEXT_EMPTY,
        ErrorTypes.TEXT_TOO_LONG,
        ErrorTypes.PROMPT_INVALID,
+       ErrorTypes.LANGUAGE_PAIR_NOT_SUPPORTED,
     ])('uses new public contract for safe type %s', async (type) => {
       const error = Object.assign(new Error(`raw internal detail for ${type}`), { type });
       manager.domTranslatorAdapter.translateElement.mockRejectedValue(error);
@@ -784,6 +830,7 @@ describe('SelectElementManager', () => {
          TEXT_EMPTY: 'TEXT_EMPTY',
          TEXT_TOO_LONG: 'TEXT_TOO_LONG',
          PROMPT_INVALID: 'PROMPT_INVALID',
+         LANGUAGE_PAIR_NOT_SUPPORTED: 'LANGUAGE_PAIR_UNSUPPORTED',
        }[type] || type;
       expect(createPublicDisplayError).not.toHaveBeenCalled();
       expect(mapCanonicalTranslationError).toHaveBeenCalledWith(error);

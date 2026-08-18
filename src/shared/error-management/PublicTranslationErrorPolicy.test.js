@@ -38,6 +38,7 @@ describe('PublicTranslationErrorPolicy', () => {
     [errorWithType(ErrorTypes.TEXT_EMPTY), PublicTranslationErrorTypes.TEXT_EMPTY],
     [errorWithType(ErrorTypes.TEXT_TOO_LONG), PublicTranslationErrorTypes.TEXT_TOO_LONG],
     [errorWithType(ErrorTypes.PROMPT_INVALID), PublicTranslationErrorTypes.PROMPT_INVALID],
+    [errorWithType(ErrorTypes.LANGUAGE_PAIR_NOT_SUPPORTED), PublicTranslationErrorTypes.LANGUAGE_PAIR_UNSUPPORTED],
   ])('maps %o to %s', (error, type) => {
     expect(mapCanonicalTranslationError(error)).toMatchObject({ type, silent: false });
   });
@@ -68,6 +69,22 @@ describe('PublicTranslationErrorPolicy', () => {
     expect(result).toMatchObject({
       type: publicType,
       messageKey,
+      severity: 'warning',
+      silent: false,
+    });
+    expect(result).not.toHaveProperty('action');
+    expect(result).not.toHaveProperty('message');
+  });
+
+  it('preserves language-pair guidance without public action', () => {
+    const result = mapCanonicalTranslationError({
+      type: ErrorTypes.LANGUAGE_PAIR_NOT_SUPPORTED,
+      message: 'raw provider detail',
+    });
+
+    expect(result).toMatchObject({
+      type: PublicTranslationErrorTypes.LANGUAGE_PAIR_UNSUPPORTED,
+      messageKey: 'ERRORS_LANGUAGE_PAIR_NOT_SUPPORTED',
       severity: 'warning',
       silent: false,
     });

@@ -55,6 +55,7 @@ describe('PublicTranslationErrorAdapter', () => {
     [PublicTranslationErrorTypes.TEXT_EMPTY, ErrorTypes.TEXT_EMPTY],
     [PublicTranslationErrorTypes.TEXT_TOO_LONG, ErrorTypes.TEXT_TOO_LONG],
     [PublicTranslationErrorTypes.PROMPT_INVALID, ErrorTypes.PROMPT_INVALID],
+    [PublicTranslationErrorTypes.LANGUAGE_PAIR_UNSUPPORTED, ErrorTypes.LANGUAGE_PAIR_NOT_SUPPORTED],
     [PublicTranslationErrorTypes.TRANSLATION_FAILED, ErrorTypes.TRANSLATION_FAILED],
   ])('maps %s to legacy type %s', async (publicType, legacyType) => {
     const displayError = await createLegacyDisplayError(canonicalError(), {
