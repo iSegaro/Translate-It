@@ -22,6 +22,53 @@ function normalizeCallPurpose(callPurpose) {
     : TranslationCallPurpose.PRIMARY_TRANSLATION;
 }
 
+const PROVIDER_ERROR_FIELD_MAX_LENGTH = 128;
+
+function getBoundedProviderErrorField(value) {
+  if (typeof value === 'number') return Number.isSafeInteger(value) ? value : undefined;
+  if (typeof value !== 'string') return undefined;
+
+  const normalized = value.trim();
+  return normalized.length > 0 && normalized.length <= PROVIDER_ERROR_FIELD_MAX_LENGTH
+    ? normalized
+    : undefined;
+}
+
+function extractProviderHttpErrorInfo(body) {
+  const topLevel = body && typeof body === 'object' && !Array.isArray(body) ? body : {};
+  const nestedError = topLevel.error && typeof topLevel.error === 'object' && !Array.isArray(topLevel.error)
+    ? topLevel.error
+    : {};
+  const info = {};
+
+  const fields = [
+    ['topLevelCode', topLevel.code],
+    ['nestedErrorCode', nestedError.code],
+    ['topLevelType', topLevel.type],
+    ['nestedErrorType', nestedError.type],
+  ];
+
+  for (const [field, value] of fields) {
+    const boundedValue = getBoundedProviderErrorField(value);
+    if (boundedValue !== undefined) info[field] = boundedValue;
+  }
+
+  return Object.freeze(info);
+}
+
+function classifyProviderHttpError(provider, errorInfo) {
+  if (typeof provider?.classifyProviderHttpError !== 'function') return null;
+
+  try {
+    const result = provider.classifyProviderHttpError(errorInfo);
+    const normalizedResult = typeof result === 'string' ? result.trim() : '';
+    return Object.values(ErrorTypes).includes(normalizedResult) ? normalizedResult : null;
+  } catch (error) {
+    logger.debug(`[${provider.providerName}] Provider HTTP error classification failed; using generic classification`, error);
+    return null;
+  }
+}
+
 export const ProviderRequestEngine = {
   /**
    * Internal helper to adapt request headers based on the environment (Browser/Platform)
@@ -292,7 +339,12 @@ export const ProviderRequestEngine = {
           url: sanitizedUrl,
         });
 
-        const errorType = matchErrorToType({ 
+        const providerErrorInfo = Object.freeze({
+          statusCode: response.status,
+          ...extractProviderHttpErrorInfo(body),
+        });
+        const providerErrorType = classifyProviderHttpError(provider, providerErrorInfo);
+        const errorType = providerErrorType || matchErrorToType({ 
           statusCode: response.status, 
           message: msg, 
           providerType: provider.constructor.type,

@@ -46,6 +46,7 @@ import { TranslationCallPurpose } from '../ProviderConstants.js';
 import { ApiKeyManager } from '../ApiKeyManager.js';
 import { proxyManager } from '@/shared/proxy/ProxyManager.js';
 import { getBrowserInfoSync } from '@/utils/browser/compatibility.js';
+import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
 
 describe('ProviderRequestEngine', () => {
   const mockProvider = {
@@ -58,6 +59,162 @@ describe('ProviderRequestEngine', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    delete mockProvider.classifyProviderHttpError;
+  });
+
+  describe('HTTP error classification hook', () => {
+    const httpErrorResponse = (body, status = 400, statusText = 'Bad Request') => ({
+      ok: false,
+      status,
+      statusText,
+      headers: new Map([['content-type', 'application/json']]),
+      json: async () => body,
+      clone() { return this; },
+    });
+
+    it('passes only bounded structured fields to provider hook', async () => {
+      const classifyProviderHttpError = vi.fn(() => ErrorTypes.API_RESPONSE_INVALID);
+      mockProvider.classifyProviderHttpError = classifyProviderHttpError;
+      proxyManager.fetch.mockResolvedValue(httpErrorResponse({
+        code: 4001,
+        type: 'top-level-type',
+        detail: 'must not be passed',
+        arbitrary: { secret: true },
+        error: {
+          code: 'nested-code',
+          type: 'nested-type',
+          message: 'must not be passed',
+        },
+      }));
+
+      await expect(ProviderRequestEngine.executeApiCall(mockProvider, {
+        url: 'https://api.test.com',
+        fetchOptions: { headers: {} },
+        context: 'hook-test',
+      })).rejects.toMatchObject({ type: ErrorTypes.API_RESPONSE_INVALID });
+
+      expect(classifyProviderHttpError).toHaveBeenCalledWith({
+        statusCode: 400,
+        topLevelCode: 4001,
+        nestedErrorCode: 'nested-code',
+        topLevelType: 'top-level-type',
+        nestedErrorType: 'nested-type',
+      });
+      expect(Object.isFrozen(classifyProviderHttpError.mock.calls[0][0])).toBe(true);
+      expect(classifyProviderHttpError.mock.calls[0][0]).not.toHaveProperty('detail');
+      expect(classifyProviderHttpError.mock.calls[0][0]).not.toHaveProperty('error');
+      expect(classifyProviderHttpError.mock.calls[0][0]).not.toHaveProperty('arbitrary');
+    });
+
+    it('excludes absent, non-scalar, and overlong provider fields', async () => {
+      const classifyProviderHttpError = vi.fn(() => null);
+      mockProvider.classifyProviderHttpError = classifyProviderHttpError;
+      proxyManager.fetch.mockResolvedValue(httpErrorResponse({
+        code: { invalid: true },
+        type: 'x'.repeat(129),
+        error: {
+          code: ['invalid'],
+          type: 503,
+        },
+      }));
+
+      await expect(ProviderRequestEngine.executeApiCall(mockProvider, {
+        url: 'https://api.test.com',
+        fetchOptions: { headers: {} },
+      })).rejects.toBeDefined();
+
+      expect(classifyProviderHttpError).toHaveBeenCalledWith({
+        statusCode: 400,
+        nestedErrorType: 503,
+      });
+    });
+
+    it('uses hook type before ErrorMatcher classification', async () => {
+      mockProvider.classifyProviderHttpError = vi.fn(() => ErrorTypes.MODEL_MISSING);
+      proxyManager.fetch.mockResolvedValue(httpErrorResponse({}, 404, 'Not Found'));
+
+      await expect(ProviderRequestEngine.executeApiCall(mockProvider, {
+        url: 'https://api.test.com',
+        fetchOptions: { headers: {} },
+        context: 'hook-precedence',
+      })).rejects.toMatchObject({
+        type: ErrorTypes.MODEL_MISSING,
+        statusCode: 404,
+        context: 'hook-precedence',
+        providerName: 'TestProvider',
+        message: 'Not Found',
+      });
+    });
+
+    it.each([null, undefined])('falls back to ErrorMatcher for %s hook result', async (result) => {
+      mockProvider.classifyProviderHttpError = vi.fn(() => result);
+      proxyManager.fetch.mockResolvedValue(httpErrorResponse({ error: { message: 'Invalid API key' } }, 401, 'Unauthorized'));
+
+      await expect(ProviderRequestEngine.executeApiCall(mockProvider, {
+        url: 'https://api.test.com',
+        fetchOptions: { headers: {} },
+      })).rejects.toMatchObject({
+        type: ErrorTypes.API_KEY_INVALID,
+        statusCode: 401,
+      });
+    });
+
+    it('falls back to ErrorMatcher when provider hook throws', async () => {
+      mockProvider.classifyProviderHttpError = vi.fn(() => {
+        throw new Error('hook failure');
+      });
+      proxyManager.fetch.mockResolvedValue(httpErrorResponse({}, 400, 'Bad Request'));
+
+      await expect(ProviderRequestEngine.executeApiCall(mockProvider, {
+        url: 'https://api.test.com',
+        fetchOptions: { headers: {} },
+      })).rejects.toMatchObject({
+        type: ErrorTypes.HTTP_ERROR,
+        statusCode: 400,
+      });
+    });
+
+    it('does not attach extracted provider fields to thrown error', async () => {
+      mockProvider.classifyProviderHttpError = vi.fn(() => ErrorTypes.HTTP_ERROR);
+      proxyManager.fetch.mockResolvedValue(httpErrorResponse({
+        code: 'provider-code',
+        type: 'provider-type',
+        error: { code: 'nested-code', type: 'nested-type' },
+      }));
+
+      const error = await ProviderRequestEngine.executeApiCall(mockProvider, {
+        url: 'https://api.test.com',
+        fetchOptions: { headers: {} },
+      }).catch((value) => value);
+
+      expect(error).toMatchObject({
+        message: 'Bad Request',
+        type: ErrorTypes.HTTP_ERROR,
+        statusCode: 400,
+        providerName: 'TestProvider',
+      });
+      expect(error).not.toHaveProperty('topLevelCode');
+      expect(error).not.toHaveProperty('nestedErrorCode');
+      expect(error).not.toHaveProperty('providerErrorInfo');
+      expect(error).not.toHaveProperty('code');
+      expect(error).not.toHaveProperty('errorCode');
+    });
+
+    it('keeps providers without hook on existing ErrorMatcher path', async () => {
+      proxyManager.fetch.mockResolvedValue(httpErrorResponse({ error: { message: 'Invalid API key' } }, 401, 'Unauthorized'));
+
+      await expect(ProviderRequestEngine.executeApiCall(mockProvider, {
+        url: 'https://api.test.com',
+        fetchOptions: { headers: {} },
+        context: 'existing-path',
+      })).rejects.toMatchObject({
+        message: 'Invalid API key',
+        type: ErrorTypes.API_KEY_INVALID,
+        statusCode: 401,
+        context: 'existing-path',
+        providerName: 'TestProvider',
+      });
+    });
   });
 
   describe('executeRequest - Failover Logic', () => {

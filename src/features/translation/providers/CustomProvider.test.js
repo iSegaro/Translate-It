@@ -109,6 +109,23 @@ describe('CustomProvider Error Handling', () => {
     expect(result).toBe('Custom AI Result');
   });
 
+  it('preserves existing generic Custom 404 classification before provider hook migration', async () => {
+    proxyManager.fetch.mockResolvedValue({
+      ok: false,
+      status: 404,
+      statusText: 'Not Found',
+      headers: new Map([['content-type', 'application/json']]),
+      json: () => Promise.resolve({}),
+      clone: function() { return this; }
+    });
+
+    await expect(provider._callAI('system', 'Hello World'))
+      .rejects.toMatchObject({
+        type: ErrorTypes.MODEL_MISSING,
+        statusCode: 404,
+      });
+  });
+
   it('forwards call purpose outside the provider payload', async () => {
     const executeRequest = vi.spyOn(provider, '_executeRequest').mockResolvedValue('translated');
     await provider._callAI('system', 'text', { callPurpose: TranslationCallPurpose.STRUCTURED_RECOVERY });
