@@ -118,4 +118,49 @@ describe('ContentMessageHandler iframe Select Element activation', () => {
       error: technicalMessage,
     });
   });
+
+  it('preserves canonical Field error identity while keeping UI presentation unchanged', async () => {
+    const error = {
+      message: 'API failure',
+      type: 'PROVIDER_ERROR',
+      originalType: 'HTTP_ERROR',
+      statusCode: 503,
+      context: 'field-translation',
+      providerName: 'Provider',
+      providerId: 'provider-id',
+      code: 'UPSTREAM_FAILURE',
+      errorCode: 'E_UPSTREAM',
+      translationOutcome: { partial: true },
+      cause: 'private',
+      arbitrary: { ignored: true }
+    };
+    handler.errorHandler = {
+      getErrorForUI: vi.fn().mockResolvedValue({ message: 'Localized failure', type: 'NETWORK_ERROR' }),
+      handle: vi.fn().mockResolvedValue(undefined)
+    };
+
+    await expect(handler.handleTranslationResult({
+      data: {
+        translationMode: TranslationMode.Field,
+        success: false,
+        error
+      }
+    })).rejects.toMatchObject({
+      message: 'Localized failure',
+      type: 'NETWORK_ERROR',
+      originalType: 'HTTP_ERROR',
+      statusCode: 503,
+      context: 'field-translation',
+      providerName: 'Provider',
+      providerId: 'provider-id',
+      code: 'UPSTREAM_FAILURE',
+      errorCode: 'E_UPSTREAM',
+      translationOutcome: { partial: true },
+      alreadyHandled: true
+    });
+
+    const handledError = handler.errorHandler.handle.mock.calls[0][0];
+    expect(handledError).toBe(error);
+    expect(handler.errorHandler.getErrorForUI).toHaveBeenCalledWith(error, 'text-field-translation');
+  });
 });

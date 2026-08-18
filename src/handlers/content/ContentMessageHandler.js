@@ -1,5 +1,5 @@
 import { MessageActions } from '@/shared/messaging/core/MessageActions.js';
-import { MessagingContexts } from '@/shared/messaging/core/MessagingCore.js';
+import { MessagingContexts, reconstructTranslationError } from '@/shared/messaging/core/MessagingCore.js';
 import { TranslationMode } from '@/shared/config/config.js';
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
@@ -481,7 +481,8 @@ export class ContentMessageHandler extends ResourceTracker {
             showToast: true
           });
           
-          const translationError = new Error(errorInfo.message);
+          const translationError = reconstructTranslationError(error);
+          translationError.message = errorInfo.message;
           translationError.type = errorInfo.type;
           translationError.alreadyHandled = true;
           throw translationError;
