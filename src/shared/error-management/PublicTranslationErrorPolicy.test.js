@@ -40,6 +40,7 @@ describe('PublicTranslationErrorPolicy', () => {
     [errorWithType(ErrorTypes.PROMPT_INVALID), PublicTranslationErrorTypes.PROMPT_INVALID],
     [errorWithType(ErrorTypes.LANGUAGE_PAIR_NOT_SUPPORTED), PublicTranslationErrorTypes.LANGUAGE_PAIR_UNSUPPORTED],
     [errorWithType(ErrorTypes.CIRCUIT_BREAKER_OPEN), PublicTranslationErrorTypes.PROVIDER_TEMPORARILY_UNAVAILABLE],
+    [errorWithType(ErrorTypes.TRANSLATION_NOT_FOUND), PublicTranslationErrorTypes.TRANSLATION_NOT_FOUND],
   ])('maps %o to %s', (error, type) => {
     expect(mapCanonicalTranslationError(error)).toMatchObject({ type, silent: false });
   });
@@ -111,6 +112,28 @@ describe('PublicTranslationErrorPolicy', () => {
     expect(result).not.toHaveProperty('originalType');
     expect(result).not.toHaveProperty('statusCode');
     expect(result).not.toHaveProperty('message');
+  });
+
+  it('preserves translation-not-found presentation without action or raw details', () => {
+    const result = mapCanonicalTranslationError({
+      type: ErrorTypes.TRANSLATION_NOT_FOUND,
+      message: 'raw provider detail',
+      statusCode: 404,
+      providerName: 'Provider',
+      translationOutcome: { committedParentCount: 0 },
+    });
+
+    expect(result).toMatchObject({
+      type: PublicTranslationErrorTypes.TRANSLATION_NOT_FOUND,
+      messageKey: 'ERRORS_TRANSLATION_NOT_FOUND',
+      severity: 'error',
+      silent: false,
+    });
+    expect(result).not.toHaveProperty('action');
+    expect(result).not.toHaveProperty('message');
+    expect(result).not.toHaveProperty('statusCode');
+    expect(result).not.toHaveProperty('providerName');
+    expect(result).not.toHaveProperty('translationOutcome');
   });
 
   it.each([

@@ -57,6 +57,7 @@ describe('PublicTranslationErrorAdapter', () => {
     [PublicTranslationErrorTypes.PROMPT_INVALID, ErrorTypes.PROMPT_INVALID],
     [PublicTranslationErrorTypes.LANGUAGE_PAIR_UNSUPPORTED, ErrorTypes.LANGUAGE_PAIR_NOT_SUPPORTED],
     [PublicTranslationErrorTypes.PROVIDER_TEMPORARILY_UNAVAILABLE, ErrorTypes.CIRCUIT_BREAKER_OPEN],
+    [PublicTranslationErrorTypes.TRANSLATION_NOT_FOUND, ErrorTypes.TRANSLATION_NOT_FOUND],
     [PublicTranslationErrorTypes.TRANSLATION_FAILED, ErrorTypes.TRANSLATION_FAILED],
   ])('maps %s to legacy type %s', async (publicType, legacyType) => {
     const displayError = await createLegacyDisplayError(canonicalError(), {
@@ -142,6 +143,25 @@ describe('PublicTranslationErrorAdapter', () => {
 
     expect(displayError.type).toBe(ErrorTypes.CIRCUIT_BREAKER_OPEN);
     expect(displayError.message).toBe('Localized ERRORS_CIRCUIT_BREAKER_OPEN');
+    expect(displayError.cause).toBe(source);
+    expect(displayError).not.toHaveProperty('originalType');
+    expect(displayError).not.toHaveProperty('statusCode');
+    expect(displayError).not.toHaveProperty('providerName');
+    expect(displayError).not.toHaveProperty('translationOutcome');
+    expect(Object.keys(displayError)).toEqual(['type']);
+  });
+
+  it('keeps translation-not-found metadata out of legacy display Error', async () => {
+    const source = Object.assign(canonicalError(), {
+      originalType: ErrorTypes.NETWORK_ERROR,
+    });
+    const displayError = await createLegacyDisplayError(source, {
+      type: PublicTranslationErrorTypes.TRANSLATION_NOT_FOUND,
+      messageKey: 'ERRORS_TRANSLATION_NOT_FOUND',
+    });
+
+    expect(displayError.type).toBe(ErrorTypes.TRANSLATION_NOT_FOUND);
+    expect(displayError.message).toBe('Localized ERRORS_TRANSLATION_NOT_FOUND');
     expect(displayError.cause).toBe(source);
     expect(displayError).not.toHaveProperty('originalType');
     expect(displayError).not.toHaveProperty('statusCode');

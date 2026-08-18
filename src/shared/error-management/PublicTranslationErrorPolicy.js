@@ -37,6 +37,7 @@ export const PublicTranslationErrorMessageKeys = Object.freeze({
   [PublicTranslationErrorTypes.PROMPT_INVALID]: 'ERRORS_PROMPT_INVALID',
   [PublicTranslationErrorTypes.LANGUAGE_PAIR_UNSUPPORTED]: 'ERRORS_LANGUAGE_PAIR_NOT_SUPPORTED',
   [PublicTranslationErrorTypes.PROVIDER_TEMPORARILY_UNAVAILABLE]: 'ERRORS_CIRCUIT_BREAKER_OPEN',
+  [PublicTranslationErrorTypes.TRANSLATION_NOT_FOUND]: 'ERRORS_TRANSLATION_NOT_FOUND',
   [PublicTranslationErrorTypes.TRANSLATION_FAILED]: 'ERRORS_TRANSLATION_FAILED',
 });
 
@@ -65,6 +66,7 @@ const PUBLIC_TYPE_BY_INTERNAL_TYPE = new Map([
   [ErrorTypes.PROMPT_INVALID, PublicTranslationErrorTypes.PROMPT_INVALID],
   [ErrorTypes.LANGUAGE_PAIR_NOT_SUPPORTED, PublicTranslationErrorTypes.LANGUAGE_PAIR_UNSUPPORTED],
   [ErrorTypes.CIRCUIT_BREAKER_OPEN, PublicTranslationErrorTypes.PROVIDER_TEMPORARILY_UNAVAILABLE],
+  [ErrorTypes.TRANSLATION_NOT_FOUND, PublicTranslationErrorTypes.TRANSLATION_NOT_FOUND],
   [ErrorTypes.INVALID_REQUEST, PublicTranslationErrorTypes.INVALID_REQUEST],
   [ErrorTypes.HTTP_ERROR, PublicTranslationErrorTypes.REQUEST_FAILURE],
   [ErrorTypes.API_URL_MISSING, PublicTranslationErrorTypes.API_URL_MISSING],
@@ -157,6 +159,7 @@ function getSeverity(type) {
     PublicTranslationErrorTypes.CONFIGURATION_INVALID,
     PublicTranslationErrorTypes.ENDPOINT_INVALID,
     PublicTranslationErrorTypes.BROWSER_API_UNAVAILABLE,
+    PublicTranslationErrorTypes.TRANSLATION_NOT_FOUND,
     PublicTranslationErrorTypes.TRANSLATION_FAILED,
   ].includes(type)
     ? PublicTranslationErrorSeverities.ERROR

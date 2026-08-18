@@ -81,6 +81,7 @@ vi.mock('@/shared/error-management/PublicTranslationErrorPolicy.js', () => ({
        PROMPT_INVALID: 'PROMPT_INVALID',
         LANGUAGE_PAIR_NOT_SUPPORTED: 'LANGUAGE_PAIR_UNSUPPORTED',
         CIRCUIT_BREAKER_OPEN: 'PROVIDER_TEMPORARILY_UNAVAILABLE',
+        TRANSLATION_NOT_FOUND: 'TRANSLATION_NOT_FOUND',
         HTTP_ERROR: error?.originalType === 'MODEL_MISSING' ? 'MODEL_UNAVAILABLE' : 'REQUEST_FAILURE',
       UNKNOWN: 'TRANSLATION_FAILED',
     }[error?.type] || error?.type,
@@ -103,9 +104,12 @@ vi.mock('@/shared/error-management/PublicTranslationErrorPolicy.js', () => ({
        PROMPT_INVALID: 'ERRORS_PROMPT_INVALID',
         LANGUAGE_PAIR_NOT_SUPPORTED: 'ERRORS_LANGUAGE_PAIR_NOT_SUPPORTED',
         CIRCUIT_BREAKER_OPEN: 'ERRORS_CIRCUIT_BREAKER_OPEN',
+        TRANSLATION_NOT_FOUND: 'ERRORS_TRANSLATION_NOT_FOUND',
         HTTP_ERROR: error?.originalType === 'MODEL_MISSING' ? 'ERRORS_MODEL_MISSING' : 'ERRORS_HTTP_ERROR',
       }[error?.type] || 'ERRORS_TRANSLATION_FAILED',
-     severity: error?.type === 'CIRCUIT_BREAKER_OPEN' ? 'warning' : undefined,
+     severity: error?.type === 'CIRCUIT_BREAKER_OPEN'
+       ? 'warning'
+       : error?.type === 'TRANSLATION_NOT_FOUND' ? 'error' : undefined,
      silent: false,
   }))
 }));
@@ -129,6 +133,7 @@ vi.mock('@/shared/error-management/PublicTranslationErrorAdapter.js', () => ({
        PROMPT_INVALID: 'PROMPT_INVALID',
         LANGUAGE_PAIR_UNSUPPORTED: 'LANGUAGE_PAIR_NOT_SUPPORTED',
         PROVIDER_TEMPORARILY_UNAVAILABLE: 'CIRCUIT_BREAKER_OPEN',
+        TRANSLATION_NOT_FOUND: 'TRANSLATION_NOT_FOUND',
         TRANSLATION_FAILED: 'TRANSLATION_FAILED',
     }[publicError?.type] || publicError?.type || 'TRANSLATION_FAILED';
     const message = {
@@ -150,6 +155,7 @@ vi.mock('@/shared/error-management/PublicTranslationErrorAdapter.js', () => ({
        ERRORS_PROMPT_INVALID: 'Prompt is invalid',
         ERRORS_LANGUAGE_PAIR_NOT_SUPPORTED: 'Language pair not supported by the selected translation service',
         ERRORS_CIRCUIT_BREAKER_OPEN: 'Circuit breaker is open. This provider is temporarily disabled due to too many failures.',
+        ERRORS_TRANSLATION_NOT_FOUND: 'Translation not found',
      }[publicError?.messageKey] || 'Translation failed';
     const displayError = new Error(message);
     displayError.type = legacyType;
@@ -749,6 +755,52 @@ describe('SelectElementManager', () => {
       );
       expect(errorHandler.handle).toHaveBeenCalledTimes(1);
       expect(deactivateSpy).toHaveBeenCalledWith({ preserveTranslations: true, reason: 'error' });
+    });
+
+    it('migrates translation-not-found without retry or fatal deactivation', async () => {
+      const error = Object.assign(new Error('raw provider detail'), {
+        type: ErrorTypes.TRANSLATION_NOT_FOUND,
+        originalType: ErrorTypes.NETWORK_ERROR,
+        statusCode: 404,
+        providerName: 'Provider',
+        translationOutcome: { committedParentCount: 0 },
+      });
+      manager.domTranslatorAdapter.translateElement.mockRejectedValue(error);
+      const deactivateSpy = vi.spyOn(manager, 'deactivate').mockResolvedValue(undefined);
+
+      await manager.startTranslation(document.createElement('div'));
+
+      const { createPublicDisplayError } = await import('@/shared/error-management/PublicErrorPolicy.js');
+      const { mapCanonicalTranslationError } = await import('@/shared/error-management/PublicTranslationErrorPolicy.js');
+      const { createLegacyDisplayError } = await import('@/shared/error-management/PublicTranslationErrorAdapter.js');
+      const { getErrorDisplayStrategy } = await import('@/shared/error-management/ErrorDisplayStrategies.js');
+      expect(createPublicDisplayError).not.toHaveBeenCalled();
+      expect(mapCanonicalTranslationError).toHaveBeenCalledWith(error);
+      expect(createLegacyDisplayError).toHaveBeenCalledWith(error, expect.objectContaining({
+        type: 'TRANSLATION_NOT_FOUND',
+        messageKey: 'ERRORS_TRANSLATION_NOT_FOUND',
+        severity: 'error',
+        silent: false,
+      }));
+      const displayError = errorHandler.handle.mock.calls[0][0];
+      expect(displayError).toMatchObject({
+        type: ErrorTypes.TRANSLATION_NOT_FOUND,
+        message: 'Translation not found',
+        cause: error,
+      });
+      expect(displayError).not.toHaveProperty('originalType');
+      expect(displayError).not.toHaveProperty('statusCode');
+      expect(displayError).not.toHaveProperty('providerName');
+      expect(displayError).not.toHaveProperty('translationOutcome');
+      expect(displayError.message).not.toContain('raw provider detail');
+      expect(getErrorDisplayStrategy('select-element', ErrorTypes.TRANSLATION_NOT_FOUND)).toMatchObject({
+        showToast: true,
+        supportRetry: false,
+        supportSettings: true,
+      });
+      expect(errorHandler.handle).toHaveBeenCalledTimes(1);
+      expect(deactivateSpy).not.toHaveBeenCalled();
+      expect(cleanupSpy).toHaveBeenCalledWith({ reason: 'error' });
     });
 
     it.each([
