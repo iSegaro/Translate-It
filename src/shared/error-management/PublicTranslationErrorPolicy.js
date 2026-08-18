@@ -10,12 +10,16 @@ import {
 
 export const PublicTranslationErrorMessageKeys = Object.freeze({
   [PublicTranslationErrorTypes.MODEL_UNAVAILABLE]: 'ERRORS_MODEL_MISSING',
+  [PublicTranslationErrorTypes.ELEMENT_TOO_LARGE]: 'ERRORS_ELEMENT_TOO_LARGE',
   [PublicTranslationErrorTypes.API_KEY_MISSING]: 'ERRORS_API_KEY_MISSING',
   [PublicTranslationErrorTypes.API_KEY_INVALID]: 'ERRORS_API_KEY_INVALID',
   [PublicTranslationErrorTypes.QUOTA_EXCEEDED]: 'ERRORS_QUOTA_EXCEEDED',
+  [PublicTranslationErrorTypes.GEMINI_QUOTA_REGION]: 'ERRORS_GEMINI_QUOTA_REGION',
+  [PublicTranslationErrorTypes.DEEPL_QUOTA_EXCEEDED]: 'ERRORS_DEEPL_QUOTA_EXCEEDED',
   [PublicTranslationErrorTypes.INSUFFICIENT_BALANCE]: 'ERRORS_INSUFFICIENT_BALANCE',
   [PublicTranslationErrorTypes.RATE_LIMITED]: 'ERRORS_RATE_LIMIT_REACHED',
   [PublicTranslationErrorTypes.MODEL_OVERLOADED]: 'ERRORS_MODEL_OVERLOADED',
+  [PublicTranslationErrorTypes.API_FAILURE]: 'ERRORS_API_ERROR',
   [PublicTranslationErrorTypes.NETWORK_ERROR]: 'ERRORS_NETWORK_ERROR',
   [PublicTranslationErrorTypes.SERVER_ERROR]: 'ERRORS_SERVER_ERROR',
   [PublicTranslationErrorTypes.TRANSLATION_TIMEOUT]: 'ERRORS_TRANSLATION_TIMEOUT',
@@ -27,14 +31,16 @@ export const PublicTranslationErrorMessageKeys = Object.freeze({
 
 const PUBLIC_TYPE_BY_INTERNAL_TYPE = new Map([
   [ErrorTypes.MODEL_MISSING, PublicTranslationErrorTypes.MODEL_UNAVAILABLE],
+  [ErrorTypes.ELEMENT_TOO_LARGE, PublicTranslationErrorTypes.ELEMENT_TOO_LARGE],
   [ErrorTypes.API_KEY_MISSING, PublicTranslationErrorTypes.API_KEY_MISSING],
   [ErrorTypes.API_KEY_INVALID, PublicTranslationErrorTypes.API_KEY_INVALID],
   [ErrorTypes.QUOTA_EXCEEDED, PublicTranslationErrorTypes.QUOTA_EXCEEDED],
-  [ErrorTypes.GEMINI_QUOTA_REGION, PublicTranslationErrorTypes.QUOTA_EXCEEDED],
-  [ErrorTypes.DEEPL_QUOTA_EXCEEDED, PublicTranslationErrorTypes.QUOTA_EXCEEDED],
+  [ErrorTypes.GEMINI_QUOTA_REGION, PublicTranslationErrorTypes.GEMINI_QUOTA_REGION],
+  [ErrorTypes.DEEPL_QUOTA_EXCEEDED, PublicTranslationErrorTypes.DEEPL_QUOTA_EXCEEDED],
   [ErrorTypes.INSUFFICIENT_BALANCE, PublicTranslationErrorTypes.INSUFFICIENT_BALANCE],
   [ErrorTypes.RATE_LIMIT_REACHED, PublicTranslationErrorTypes.RATE_LIMITED],
   [ErrorTypes.MODEL_OVERLOADED, PublicTranslationErrorTypes.MODEL_OVERLOADED],
+  [ErrorTypes.API_ERROR, PublicTranslationErrorTypes.API_FAILURE],
   [ErrorTypes.NETWORK_ERROR, PublicTranslationErrorTypes.NETWORK_ERROR],
   [ErrorTypes.SERVER_ERROR, PublicTranslationErrorTypes.SERVER_ERROR],
   [ErrorTypes.TRANSLATION_TIMEOUT, PublicTranslationErrorTypes.TRANSLATION_TIMEOUT],
@@ -46,7 +52,6 @@ const PUBLIC_TYPE_BY_INTERNAL_TYPE = new Map([
   [ErrorTypes.TEXT_EMPTY, PublicTranslationErrorTypes.INVALID_INPUT],
   [ErrorTypes.TEXT_TOO_LONG, PublicTranslationErrorTypes.INVALID_INPUT],
   [ErrorTypes.PROMPT_INVALID, PublicTranslationErrorTypes.INVALID_INPUT],
-  [ErrorTypes.ELEMENT_TOO_LARGE, PublicTranslationErrorTypes.INVALID_INPUT],
   [ErrorTypes.INVALID_REQUEST, PublicTranslationErrorTypes.INVALID_REQUEST],
   [ErrorTypes.TRANSLATION_FAILED, PublicTranslationErrorTypes.TRANSLATION_FAILED],
 ]);
@@ -127,6 +132,8 @@ function getAction(type) {
 
 function getSeverity(type) {
   return [
+    PublicTranslationErrorTypes.ELEMENT_TOO_LARGE,
+    PublicTranslationErrorTypes.API_FAILURE,
     PublicTranslationErrorTypes.INVALID_RESPONSE,
     PublicTranslationErrorTypes.INVALID_INPUT,
     PublicTranslationErrorTypes.TRANSLATION_FAILED,

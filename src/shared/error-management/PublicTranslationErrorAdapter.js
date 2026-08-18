@@ -9,17 +9,21 @@ import {
 
 export const PUBLIC_TO_LEGACY_ERROR_TYPES = Object.freeze({
   [PublicTranslationErrorTypes.MODEL_UNAVAILABLE]: ErrorTypes.MODEL_MISSING,
+  [PublicTranslationErrorTypes.ELEMENT_TOO_LARGE]: ErrorTypes.ELEMENT_TOO_LARGE,
   [PublicTranslationErrorTypes.API_KEY_MISSING]: ErrorTypes.API_KEY_MISSING,
   [PublicTranslationErrorTypes.API_KEY_INVALID]: ErrorTypes.API_KEY_INVALID,
   [PublicTranslationErrorTypes.QUOTA_EXCEEDED]: ErrorTypes.QUOTA_EXCEEDED,
+  [PublicTranslationErrorTypes.GEMINI_QUOTA_REGION]: ErrorTypes.GEMINI_QUOTA_REGION,
+  [PublicTranslationErrorTypes.DEEPL_QUOTA_EXCEEDED]: ErrorTypes.DEEPL_QUOTA_EXCEEDED,
   [PublicTranslationErrorTypes.INSUFFICIENT_BALANCE]: ErrorTypes.INSUFFICIENT_BALANCE,
   [PublicTranslationErrorTypes.RATE_LIMITED]: ErrorTypes.RATE_LIMIT_REACHED,
   [PublicTranslationErrorTypes.MODEL_OVERLOADED]: ErrorTypes.MODEL_OVERLOADED,
+  [PublicTranslationErrorTypes.API_FAILURE]: ErrorTypes.API_ERROR,
   [PublicTranslationErrorTypes.NETWORK_ERROR]: ErrorTypes.NETWORK_ERROR,
   [PublicTranslationErrorTypes.SERVER_ERROR]: ErrorTypes.SERVER_ERROR,
   [PublicTranslationErrorTypes.TRANSLATION_TIMEOUT]: ErrorTypes.TRANSLATION_TIMEOUT,
   [PublicTranslationErrorTypes.INVALID_RESPONSE]: ErrorTypes.API_RESPONSE_INVALID,
-  [PublicTranslationErrorTypes.INVALID_INPUT]: ErrorTypes.VALIDATION,
+  [PublicTranslationErrorTypes.INVALID_INPUT]: ErrorTypes.TRANSLATION_FAILED,
   [PublicTranslationErrorTypes.INVALID_REQUEST]: ErrorTypes.INVALID_REQUEST,
   [PublicTranslationErrorTypes.TRANSLATION_FAILED]: ErrorTypes.TRANSLATION_FAILED,
 });

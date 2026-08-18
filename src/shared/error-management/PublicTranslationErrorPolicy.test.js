@@ -13,12 +13,16 @@ const errorWithType = (type, fields = {}) => ({ type, ...fields });
 
 describe('PublicTranslationErrorPolicy', () => {
   it.each([
+    [errorWithType(ErrorTypes.ELEMENT_TOO_LARGE), PublicTranslationErrorTypes.ELEMENT_TOO_LARGE],
     [errorWithType(ErrorTypes.API_KEY_MISSING), PublicTranslationErrorTypes.API_KEY_MISSING],
     [errorWithType(ErrorTypes.API_KEY_INVALID), PublicTranslationErrorTypes.API_KEY_INVALID],
     [errorWithType(ErrorTypes.QUOTA_EXCEEDED), PublicTranslationErrorTypes.QUOTA_EXCEEDED],
+    [errorWithType(ErrorTypes.GEMINI_QUOTA_REGION), PublicTranslationErrorTypes.GEMINI_QUOTA_REGION],
+    [errorWithType(ErrorTypes.DEEPL_QUOTA_EXCEEDED), PublicTranslationErrorTypes.DEEPL_QUOTA_EXCEEDED],
     [errorWithType(ErrorTypes.INSUFFICIENT_BALANCE), PublicTranslationErrorTypes.INSUFFICIENT_BALANCE],
     [errorWithType(ErrorTypes.RATE_LIMIT_REACHED), PublicTranslationErrorTypes.RATE_LIMITED],
     [errorWithType(ErrorTypes.MODEL_OVERLOADED), PublicTranslationErrorTypes.MODEL_OVERLOADED],
+    [errorWithType(ErrorTypes.API_ERROR), PublicTranslationErrorTypes.API_FAILURE],
     [errorWithType(ErrorTypes.NETWORK_ERROR), PublicTranslationErrorTypes.NETWORK_ERROR],
     [errorWithType(ErrorTypes.SERVER_ERROR), PublicTranslationErrorTypes.SERVER_ERROR],
     [errorWithType(ErrorTypes.TRANSLATION_TIMEOUT), PublicTranslationErrorTypes.TRANSLATION_TIMEOUT],
@@ -28,6 +32,37 @@ describe('PublicTranslationErrorPolicy', () => {
     [errorWithType(ErrorTypes.INVALID_REQUEST), PublicTranslationErrorTypes.INVALID_REQUEST],
   ])('maps %o to %s', (error, type) => {
     expect(mapCanonicalTranslationError(error)).toMatchObject({ type, silent: false });
+  });
+
+  it.each([
+    [ErrorTypes.ELEMENT_TOO_LARGE, PublicTranslationErrorTypes.ELEMENT_TOO_LARGE, 'ERRORS_ELEMENT_TOO_LARGE'],
+    [ErrorTypes.GEMINI_QUOTA_REGION, PublicTranslationErrorTypes.GEMINI_QUOTA_REGION, 'ERRORS_GEMINI_QUOTA_REGION'],
+    [ErrorTypes.DEEPL_QUOTA_EXCEEDED, PublicTranslationErrorTypes.DEEPL_QUOTA_EXCEEDED, 'ERRORS_DEEPL_QUOTA_EXCEEDED'],
+    [ErrorTypes.API_ERROR, PublicTranslationErrorTypes.API_FAILURE, 'ERRORS_API_ERROR'],
+  ])('uses existing message key for %s', (internalType, type, messageKey) => {
+    expect(mapCanonicalTranslationError({ type: internalType })).toMatchObject({ type, messageKey });
+  });
+
+  it('keeps UNKNOWN as generic translation failure', () => {
+    expect(mapCanonicalTranslationError({ type: ErrorTypes.UNKNOWN })).toMatchObject({
+      type: PublicTranslationErrorTypes.TRANSLATION_FAILED,
+      messageKey: 'ERRORS_TRANSLATION_FAILED',
+    });
+  });
+
+  it('maps API_ERROR without exposing provider message', () => {
+    const result = mapCanonicalTranslationError({
+      type: ErrorTypes.API_ERROR,
+      message: 'API_ERROR: provider response contains private detail',
+      response: { body: 'private response' },
+    });
+
+    expect(result).toMatchObject({
+      type: PublicTranslationErrorTypes.API_FAILURE,
+      messageKey: 'ERRORS_API_ERROR',
+    });
+    expect(result).not.toHaveProperty('message');
+    expect(result).not.toHaveProperty('response');
   });
 
   it('refines generic HTTP model failures only through originalType', () => {
@@ -58,7 +93,7 @@ describe('PublicTranslationErrorPolicy', () => {
     },
   );
 
-  it.each([ErrorTypes.API_ERROR, ErrorTypes.TRANSLATION_ERROR, ErrorTypes.TRANSLATION_FAILED, ErrorTypes.UNKNOWN])(
+  it.each([ErrorTypes.TRANSLATION_ERROR, ErrorTypes.TRANSLATION_FAILED, ErrorTypes.UNKNOWN])(
     'does not apply HTTP status fallback to %s',
     (type) => {
       expect(mapCanonicalTranslationError(errorWithType(type, { statusCode: 400 })).type)
@@ -67,6 +102,15 @@ describe('PublicTranslationErrorPolicy', () => {
         .toBe(PublicTranslationErrorTypes.TRANSLATION_FAILED);
     },
   );
+
+  it('maps API_ERROR semantically without using status fallback', () => {
+    expect(mapCanonicalTranslationError(errorWithType(ErrorTypes.API_ERROR, { statusCode: 400 }))).toMatchObject({
+      type: PublicTranslationErrorTypes.API_FAILURE,
+      messageKey: 'ERRORS_API_ERROR',
+    });
+    expect(mapCanonicalTranslationError(errorWithType(ErrorTypes.API_ERROR, { statusCode: 500 })).type)
+      .toBe(PublicTranslationErrorTypes.API_FAILURE);
+  });
 
   it('keeps explicit semantic type ahead of conflicting status', () => {
     const result = mapCanonicalTranslationError(errorWithType(ErrorTypes.SERVER_ERROR, {
