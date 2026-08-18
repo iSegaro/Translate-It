@@ -71,6 +71,11 @@ vi.mock('@/shared/error-management/PublicTranslationErrorPolicy.js', () => ({
        TRANSLATION_ERROR: 'TRANSLATION_FAILED',
        CONNECTION_LOST: 'TRANSLATION_FAILED',
        NO_ACCEPTED_TRANSLATION_RESULTS: 'TRANSLATION_FAILED',
+       API_URL_MISSING: 'API_URL_MISSING',
+       API_CONFIG_INVALID: 'CONFIGURATION_INVALID',
+       API_ENDPOINT_INVALID: 'ENDPOINT_INVALID',
+       BROWSER_API_UNAVAILABLE: 'BROWSER_API_UNAVAILABLE',
+       FORBIDDEN_ERROR: 'ACCESS_DENIED',
        HTTP_ERROR: error?.originalType === 'MODEL_MISSING' ? 'MODEL_UNAVAILABLE' : 'REQUEST_FAILURE',
       UNKNOWN: 'TRANSLATION_FAILED',
     }[error?.type] || error?.type,
@@ -83,6 +88,11 @@ vi.mock('@/shared/error-management/PublicTranslationErrorPolicy.js', () => ({
       API_RESPONSE_INVALID: 'ERRORS_API_RESPONSE_INVALID',
       JSON_PARSING_ERROR: 'ERRORS_API_RESPONSE_INVALID',
       UNEXPECTED_RESPONSE_FORMAT: 'ERRORS_API_RESPONSE_INVALID',
+       API_URL_MISSING: 'ERRORS_API_URL_MISSING',
+       API_CONFIG_INVALID: 'ERRORS_API_CONFIG_INVALID',
+       API_ENDPOINT_INVALID: 'ERRORS_API_ENDPOINT_INVALID',
+       BROWSER_API_UNAVAILABLE: 'ERRORS_BROWSER_API_UNAVAILABLE',
+       FORBIDDEN_ERROR: 'ERRORS_FORBIDDEN_ERROR',
        HTTP_ERROR: error?.originalType === 'MODEL_MISSING' ? 'ERRORS_MODEL_MISSING' : 'ERRORS_HTTP_ERROR',
      }[error?.type] || 'ERRORS_TRANSLATION_FAILED',
     silent: false,
@@ -98,6 +108,11 @@ vi.mock('@/shared/error-management/PublicTranslationErrorAdapter.js', () => ({
       GEMINI_QUOTA_REGION: 'GEMINI_QUOTA_REGION',
        DEEPL_QUOTA_EXCEEDED: 'DEEPL_QUOTA_EXCEEDED',
        REQUEST_FAILURE: 'HTTP_ERROR',
+       API_URL_MISSING: 'API_URL_MISSING',
+       CONFIGURATION_INVALID: 'API_CONFIG_INVALID',
+       ENDPOINT_INVALID: 'API_ENDPOINT_INVALID',
+       BROWSER_API_UNAVAILABLE: 'BROWSER_API_UNAVAILABLE',
+       ACCESS_DENIED: 'FORBIDDEN_ERROR',
        TRANSLATION_FAILED: 'TRANSLATION_FAILED',
     }[publicError?.type] || publicError?.type || 'TRANSLATION_FAILED';
     const message = {
@@ -109,6 +124,11 @@ vi.mock('@/shared/error-management/PublicTranslationErrorAdapter.js', () => ({
        ERRORS_MODEL_MISSING: 'AI Model is missing or invalid',
        ERRORS_HTTP_ERROR: 'HTTP error',
        ERRORS_TRANSLATION_FAILED: 'Translation failed',
+       ERRORS_API_URL_MISSING: 'API URL is missing. Please enter it in settings.',
+       ERRORS_API_CONFIG_INVALID: 'Invalid API configuration. Please check your settings.',
+       ERRORS_API_ENDPOINT_INVALID: 'API Endpoint not found (404). Please check your URL.',
+       ERRORS_BROWSER_API_UNAVAILABLE: 'The translation API is not available or supported in this browser',
+       ERRORS_FORBIDDEN_ERROR: 'Access denied. Check permissions or potential content moderation.',
     }[publicError?.messageKey] || 'Translation failed';
     const displayError = new Error(message);
     displayError.type = legacyType;
@@ -636,6 +656,36 @@ describe('SelectElementManager', () => {
     });
 
     it.each([
+      [ErrorTypes.API_URL_MISSING, 'API_URL_MISSING', 'API URL is missing. Please enter it in settings.'],
+      [ErrorTypes.API_CONFIG_INVALID, 'API_CONFIG_INVALID', 'Invalid API configuration. Please check your settings.'],
+      [ErrorTypes.API_ENDPOINT_INVALID, 'API_ENDPOINT_INVALID', 'API Endpoint not found (404). Please check your URL.'],
+      [ErrorTypes.BROWSER_API_UNAVAILABLE, 'BROWSER_API_UNAVAILABLE', 'The translation API is not available or supported in this browser'],
+      [ErrorTypes.FORBIDDEN_ERROR, 'FORBIDDEN_ERROR', 'Access denied. Check permissions or potential content moderation.'],
+    ])('preserves localized config/access display for %s', async (type, legacyType, message) => {
+      const error = Object.assign(new Error(`raw canonical detail for ${type}`), { type });
+      manager.domTranslatorAdapter.translateElement.mockRejectedValue(error);
+      const { isFatalError } = await import('@/shared/error-management/ErrorMatcher.js');
+      isFatalError.mockReturnValueOnce(true);
+      const deactivateSpy = vi.spyOn(manager, 'deactivate').mockResolvedValue(undefined);
+
+      await manager.startTranslation(document.createElement('div'));
+
+      const { createPublicDisplayError } = await import('@/shared/error-management/PublicErrorPolicy.js');
+      const { mapCanonicalTranslationError } = await import('@/shared/error-management/PublicTranslationErrorPolicy.js');
+      const { createLegacyDisplayError } = await import('@/shared/error-management/PublicTranslationErrorAdapter.js');
+      expect(createPublicDisplayError).not.toHaveBeenCalled();
+      expect(mapCanonicalTranslationError).toHaveBeenCalledWith(error);
+      expect(createLegacyDisplayError).toHaveBeenCalled();
+      expect(errorHandler.handle).toHaveBeenCalledWith(
+        expect.objectContaining({ type: legacyType, message, cause: error }),
+        expect.objectContaining({ context: 'select-element', showToast: true })
+      );
+      expect(errorHandler.handle.mock.calls[0][0].message).not.toContain('raw canonical detail');
+      expect(errorHandler.handle).toHaveBeenCalledTimes(1);
+      expect(deactivateSpy).toHaveBeenCalledWith({ preserveTranslations: true, reason: 'error' });
+    });
+
+    it.each([
       ErrorTypes.MODEL_MISSING,
       ErrorTypes.API_ERROR,
       ErrorTypes.API_KEY_MISSING,
@@ -662,6 +712,11 @@ describe('SelectElementManager', () => {
        ErrorTypes.TRANSLATION_ERROR,
        ErrorTypes.CONNECTION_LOST,
        ErrorTypes.NO_ACCEPTED_TRANSLATION_RESULTS,
+       ErrorTypes.API_URL_MISSING,
+       ErrorTypes.API_CONFIG_INVALID,
+       ErrorTypes.API_ENDPOINT_INVALID,
+       ErrorTypes.BROWSER_API_UNAVAILABLE,
+       ErrorTypes.FORBIDDEN_ERROR,
     ])('uses new public contract for safe type %s', async (type) => {
       const error = Object.assign(new Error(`raw internal detail for ${type}`), { type });
       manager.domTranslatorAdapter.translateElement.mockRejectedValue(error);
@@ -682,6 +737,11 @@ describe('SelectElementManager', () => {
          TRANSLATION_ERROR: 'TRANSLATION_FAILED',
          CONNECTION_LOST: 'TRANSLATION_FAILED',
          NO_ACCEPTED_TRANSLATION_RESULTS: 'TRANSLATION_FAILED',
+         API_URL_MISSING: 'API_URL_MISSING',
+         API_CONFIG_INVALID: 'CONFIGURATION_INVALID',
+         API_ENDPOINT_INVALID: 'ENDPOINT_INVALID',
+         BROWSER_API_UNAVAILABLE: 'BROWSER_API_UNAVAILABLE',
+         FORBIDDEN_ERROR: 'ACCESS_DENIED',
        }[type] || type;
       expect(createPublicDisplayError).not.toHaveBeenCalled();
       expect(mapCanonicalTranslationError).toHaveBeenCalledWith(error);

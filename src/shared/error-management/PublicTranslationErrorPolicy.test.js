@@ -30,6 +30,11 @@ describe('PublicTranslationErrorPolicy', () => {
     [errorWithType(ErrorTypes.JSON_PARSING_ERROR), PublicTranslationErrorTypes.INVALID_RESPONSE],
     [errorWithType(ErrorTypes.VALIDATION), PublicTranslationErrorTypes.INVALID_INPUT],
     [errorWithType(ErrorTypes.INVALID_REQUEST), PublicTranslationErrorTypes.INVALID_REQUEST],
+    [errorWithType(ErrorTypes.API_URL_MISSING), PublicTranslationErrorTypes.API_URL_MISSING],
+    [errorWithType(ErrorTypes.API_CONFIG_INVALID), PublicTranslationErrorTypes.CONFIGURATION_INVALID],
+    [errorWithType(ErrorTypes.API_ENDPOINT_INVALID), PublicTranslationErrorTypes.ENDPOINT_INVALID],
+    [errorWithType(ErrorTypes.BROWSER_API_UNAVAILABLE), PublicTranslationErrorTypes.BROWSER_API_UNAVAILABLE],
+    [errorWithType(ErrorTypes.FORBIDDEN_ERROR), PublicTranslationErrorTypes.ACCESS_DENIED],
   ])('maps %o to %s', (error, type) => {
     expect(mapCanonicalTranslationError(error)).toMatchObject({ type, silent: false });
   });
@@ -48,6 +53,24 @@ describe('PublicTranslationErrorPolicy', () => {
       type: PublicTranslationErrorTypes.TRANSLATION_FAILED,
       messageKey: 'ERRORS_TRANSLATION_FAILED',
     });
+  });
+
+  it.each([
+    [ErrorTypes.API_URL_MISSING, PublicTranslationErrorTypes.API_URL_MISSING, 'ERRORS_API_URL_MISSING', PublicTranslationErrorActions.OPEN_SETTINGS, 'warning'],
+    [ErrorTypes.API_CONFIG_INVALID, PublicTranslationErrorTypes.CONFIGURATION_INVALID, 'ERRORS_API_CONFIG_INVALID', PublicTranslationErrorActions.OPEN_SETTINGS, 'error'],
+    [ErrorTypes.API_ENDPOINT_INVALID, PublicTranslationErrorTypes.ENDPOINT_INVALID, 'ERRORS_API_ENDPOINT_INVALID', PublicTranslationErrorActions.OPEN_SETTINGS, 'error'],
+    [ErrorTypes.BROWSER_API_UNAVAILABLE, PublicTranslationErrorTypes.BROWSER_API_UNAVAILABLE, 'ERRORS_BROWSER_API_UNAVAILABLE', undefined, 'error'],
+    [ErrorTypes.FORBIDDEN_ERROR, PublicTranslationErrorTypes.ACCESS_DENIED, 'ERRORS_FORBIDDEN_ERROR', undefined, 'warning'],
+  ])('preserves config/access UX for %s', (internalType, publicType, messageKey, action, severity) => {
+    const result = mapCanonicalTranslationError({
+      type: internalType,
+      message: 'raw canonical provider detail',
+    });
+
+    expect(result).toMatchObject({ type: publicType, messageKey, severity, silent: false });
+    if (action) expect(result.action).toBe(action);
+    else expect(result).not.toHaveProperty('action');
+    expect(result).not.toHaveProperty('message');
   });
 
   it('maps API_ERROR without exposing provider message', () => {

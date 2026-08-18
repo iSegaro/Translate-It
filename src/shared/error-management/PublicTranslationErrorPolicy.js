@@ -27,6 +27,11 @@ export const PublicTranslationErrorMessageKeys = Object.freeze({
   [PublicTranslationErrorTypes.INVALID_INPUT]: 'ERRORS_INVALID_INPUT',
   [PublicTranslationErrorTypes.INVALID_REQUEST]: 'ERRORS_INVALID_REQUEST',
   [PublicTranslationErrorTypes.REQUEST_FAILURE]: 'ERRORS_HTTP_ERROR',
+  [PublicTranslationErrorTypes.API_URL_MISSING]: 'ERRORS_API_URL_MISSING',
+  [PublicTranslationErrorTypes.CONFIGURATION_INVALID]: 'ERRORS_API_CONFIG_INVALID',
+  [PublicTranslationErrorTypes.ENDPOINT_INVALID]: 'ERRORS_API_ENDPOINT_INVALID',
+  [PublicTranslationErrorTypes.BROWSER_API_UNAVAILABLE]: 'ERRORS_BROWSER_API_UNAVAILABLE',
+  [PublicTranslationErrorTypes.ACCESS_DENIED]: 'ERRORS_FORBIDDEN_ERROR',
   [PublicTranslationErrorTypes.TRANSLATION_FAILED]: 'ERRORS_TRANSLATION_FAILED',
 });
 
@@ -55,6 +60,11 @@ const PUBLIC_TYPE_BY_INTERNAL_TYPE = new Map([
   [ErrorTypes.PROMPT_INVALID, PublicTranslationErrorTypes.INVALID_INPUT],
   [ErrorTypes.INVALID_REQUEST, PublicTranslationErrorTypes.INVALID_REQUEST],
   [ErrorTypes.HTTP_ERROR, PublicTranslationErrorTypes.REQUEST_FAILURE],
+  [ErrorTypes.API_URL_MISSING, PublicTranslationErrorTypes.API_URL_MISSING],
+  [ErrorTypes.API_CONFIG_INVALID, PublicTranslationErrorTypes.CONFIGURATION_INVALID],
+  [ErrorTypes.API_ENDPOINT_INVALID, PublicTranslationErrorTypes.ENDPOINT_INVALID],
+  [ErrorTypes.BROWSER_API_UNAVAILABLE, PublicTranslationErrorTypes.BROWSER_API_UNAVAILABLE],
+  [ErrorTypes.FORBIDDEN_ERROR, PublicTranslationErrorTypes.ACCESS_DENIED],
   [ErrorTypes.TRANSLATION_FAILED, PublicTranslationErrorTypes.TRANSLATION_FAILED],
 ]);
 
@@ -114,6 +124,9 @@ function getAction(type) {
     case PublicTranslationErrorTypes.QUOTA_EXCEEDED:
     case PublicTranslationErrorTypes.INSUFFICIENT_BALANCE:
     case PublicTranslationErrorTypes.INVALID_REQUEST:
+    case PublicTranslationErrorTypes.API_URL_MISSING:
+    case PublicTranslationErrorTypes.CONFIGURATION_INVALID:
+    case PublicTranslationErrorTypes.ENDPOINT_INVALID:
       return PublicTranslationErrorActions.OPEN_SETTINGS;
     case PublicTranslationErrorTypes.REQUEST_FAILURE:
     case PublicTranslationErrorTypes.MODEL_OVERLOADED:
@@ -134,6 +147,9 @@ function getSeverity(type) {
     PublicTranslationErrorTypes.API_FAILURE,
     PublicTranslationErrorTypes.INVALID_RESPONSE,
     PublicTranslationErrorTypes.INVALID_INPUT,
+    PublicTranslationErrorTypes.CONFIGURATION_INVALID,
+    PublicTranslationErrorTypes.ENDPOINT_INVALID,
+    PublicTranslationErrorTypes.BROWSER_API_UNAVAILABLE,
     PublicTranslationErrorTypes.TRANSLATION_FAILED,
   ].includes(type)
     ? PublicTranslationErrorSeverities.ERROR

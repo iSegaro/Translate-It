@@ -26,6 +26,11 @@ export const PUBLIC_TO_LEGACY_ERROR_TYPES = Object.freeze({
   [PublicTranslationErrorTypes.INVALID_INPUT]: ErrorTypes.TRANSLATION_FAILED,
   [PublicTranslationErrorTypes.INVALID_REQUEST]: ErrorTypes.INVALID_REQUEST,
   [PublicTranslationErrorTypes.REQUEST_FAILURE]: ErrorTypes.HTTP_ERROR,
+  [PublicTranslationErrorTypes.API_URL_MISSING]: ErrorTypes.API_URL_MISSING,
+  [PublicTranslationErrorTypes.CONFIGURATION_INVALID]: ErrorTypes.API_CONFIG_INVALID,
+  [PublicTranslationErrorTypes.ENDPOINT_INVALID]: ErrorTypes.API_ENDPOINT_INVALID,
+  [PublicTranslationErrorTypes.BROWSER_API_UNAVAILABLE]: ErrorTypes.BROWSER_API_UNAVAILABLE,
+  [PublicTranslationErrorTypes.ACCESS_DENIED]: ErrorTypes.FORBIDDEN_ERROR,
   [PublicTranslationErrorTypes.TRANSLATION_FAILED]: ErrorTypes.TRANSLATION_FAILED,
 });
 
