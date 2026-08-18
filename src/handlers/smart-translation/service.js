@@ -24,7 +24,8 @@ import {
   pendingTranslationByToastId,
   beginFieldTranslationRequest,
   isCurrentFieldTranslationRequest,
-  releaseFieldTranslationRequest
+  releaseFieldTranslationRequest,
+  cleanupSupersededFieldTranslationState
 } from './dataStore.js';
 import { isEditableElement, recoverTargetElement } from './elementHelper.js';
 import { determineReplaceMode, applyTranslation } from './executor.js';
@@ -84,11 +85,15 @@ export async function translateFieldViaSmartHandler({ text, target, selectionRan
 
   // Establish latest-request ownership before asynchronous setup.
   const { ownership, previous } = beginFieldTranslationRequest(target);
+  const inheritedState = previous?.supersededState || previous || null;
+  ownership.supersededState = inheritedState;
   const isCurrent = () => isCurrentFieldTranslationRequest(target, ownership);
   let currentToastId = null;
   let timerId = null;
   let myData = null;
   let setupPhase = 'pre-request';
+  let inheritedToastAdopted = !inheritedState?.toastId;
+  let inheritedPendingAdopted = !inheritedState?.data;
 
   try {
     terminalizeFieldRequest(previous, 'replacement');
@@ -96,7 +101,7 @@ export async function translateFieldViaSmartHandler({ text, target, selectionRan
     const mode = TranslationMode.Field;
     const platform = detectSite();
     const timestamp = Date.now();
-    currentToastId = toastId || previous?.toastId || null;
+    currentToastId = toastId || previous?.toastId || inheritedState?.toastId || null;
 
     setupPhase = 'provider-resolution';
     const currentProvider = await getEffectiveProviderAsync(TranslationMode.Field);
@@ -122,12 +127,26 @@ export async function translateFieldViaSmartHandler({ text, target, selectionRan
 
       // Ensure the reused toast still shows the translating message
       localNotificationManager.update(currentToastId, translatingMessage, { type: 'status', persistent: true });
+      inheritedToastAdopted = currentToastId === inheritedState?.toastId;
     }
     ownership.toastId = currentToastId;
     
     if (!isCurrent()) return;
     myData = storePendingTranslationData(target, mode, platform, tabId, selectionRange, timestamp, currentToastId, messageId, ownership);
     if (!myData || !isCurrent()) return;
+    inheritedPendingAdopted = true;
+    if (inheritedState && inheritedState !== ownership) {
+      cleanupSupersededFieldTranslationState(inheritedState);
+    }
+    if (
+      inheritedState?.toastId
+      && !inheritedToastAdopted
+      && inheritedState.toastId !== currentToastId
+    ) {
+      localNotificationManager.dismiss(inheritedState.toastId);
+      inheritedToastAdopted = true;
+    }
+    ownership.supersededState = ownership;
 
     setupPhase = 'request-setup';
     // Create a catchable timeout promise
@@ -271,8 +290,20 @@ export async function translateFieldViaSmartHandler({ text, target, selectionRan
        await new Promise(r => setTimeout(r, 10));
     }
 
-    clearPendingTranslationData(currentToastId, ownership);
+    if (currentToastId || !inheritedState) {
+      clearPendingTranslationData(currentToastId, ownership);
+    }
     clearPendingNotificationData('error', ownership);
+    if (inheritedState && !inheritedPendingAdopted) {
+      cleanupSupersededFieldTranslationState(inheritedState);
+    }
+    if (
+      inheritedState?.toastId
+      && !inheritedToastAdopted
+      && inheritedState.toastId !== currentToastId
+    ) {
+      localNotificationManager.dismiss(inheritedState.toastId);
+    }
     if (isTimeout) {
       terminalizeFieldRequest(ownership, 'timeout');
     } else if (isCancellation) {

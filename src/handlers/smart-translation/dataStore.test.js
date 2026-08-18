@@ -42,6 +42,7 @@ import {
   beginFieldTranslationRequest,
   clearPendingNotificationData,
   clearPendingTranslationData,
+  cleanupSupersededFieldTranslationState,
   fieldRequestOwners,
   getPendingTranslationData,
   isCurrentFieldTranslationRequest,
@@ -170,5 +171,54 @@ describe('Field request ownership data store', () => {
     mocks.tracker.findRequestByElement.mockReturnValue('tracker-request');
 
     expect(getPendingTranslationData(target, null, ownership)).toBe(ownership.data);
+  });
+
+  it('cleans superseded state only when target and toast identities match', () => {
+    const target = document.createElement('textarea');
+    const previous = {
+      target,
+      toastId: 'toast-a',
+      data: { target, messageId: 'request-a' },
+    };
+    pendingTranslationData.set(target, previous.data);
+    pendingTranslationByToastId.set(previous.toastId, previous.data);
+    window.pendingTranslationOwner = previous;
+    window.pendingTranslationTarget = target;
+    window.pendingTranslationToastId = previous.toastId;
+
+    cleanupSupersededFieldTranslationState(previous);
+
+    expect(pendingTranslationData.has(target)).toBe(false);
+    expect(pendingTranslationByToastId.has(previous.toastId)).toBe(false);
+    expect(window.pendingTranslationOwner).toBeNull();
+    expect(window.pendingTranslationTarget).toBeNull();
+    expect(window.pendingTranslationToastId).toBeNull();
+  });
+
+  it('does not delete newer target or toast data for same identities', () => {
+    const target = document.createElement('textarea');
+    const previous = {
+      target,
+      toastId: 'shared-toast',
+      data: { target, messageId: 'request-a' },
+    };
+    const currentData = { target, messageId: 'request-b' };
+    pendingTranslationData.set(target, currentData);
+    pendingTranslationByToastId.set(previous.toastId, currentData);
+    window.pendingTranslationOwner = { target, data: currentData };
+
+    cleanupSupersededFieldTranslationState(previous);
+
+    expect(pendingTranslationData.get(target)).toBe(currentData);
+    expect(pendingTranslationByToastId.get(previous.toastId)).toBe(currentData);
+    expect(window.pendingTranslationOwner).not.toBeNull();
+  });
+
+  it('is safe and idempotent for incomplete previous ownership', () => {
+    expect(() => cleanupSupersededFieldTranslationState(null)).not.toThrow();
+
+    const previous = { target: document.createElement('textarea'), data: null, toastId: null };
+    expect(() => cleanupSupersededFieldTranslationState(previous)).not.toThrow();
+    expect(() => cleanupSupersededFieldTranslationState(previous)).not.toThrow();
   });
 });

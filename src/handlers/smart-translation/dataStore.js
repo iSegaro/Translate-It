@@ -23,6 +23,37 @@ export const fieldRequestOwners = new WeakMap();
 export const pendingTranslationByToastId = new Map();
 
 /**
+ * Clear compatibility state that still belongs to a superseded Field request.
+ *
+ * @param {Object|null} previousOwnership
+ * @returns {void}
+ */
+export function cleanupSupersededFieldTranslationState(previousOwnership) {
+  if (!previousOwnership) return;
+
+  const { target, data, toastId } = previousOwnership;
+
+  if (target && data && pendingTranslationData.get(target) === data) {
+    pendingTranslationData.delete(target);
+  }
+
+  if (toastId && data && pendingTranslationByToastId.get(toastId) === data) {
+    pendingTranslationByToastId.delete(toastId);
+  }
+
+  if (window.pendingTranslationOwner === previousOwnership) {
+    window.pendingTranslationOwner = null;
+    window.pendingTranslationTarget = null;
+    window.pendingTranslationMode = null;
+    window.pendingTranslationPlatform = null;
+    window.pendingTranslationTabId = null;
+    window.pendingSelectionRange = null;
+    window.pendingTranslationTimestamp = null;
+    window.pendingTranslationToastId = null;
+  }
+}
+
+/**
  * Begin latest-request ownership for a target and abort its previous owner.
  * @param {HTMLElement} target
  * @returns {{ ownership: Object, previous: Object|null }} Ownership state.
