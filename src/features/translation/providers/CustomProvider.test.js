@@ -9,6 +9,8 @@ import { CompletionTermination } from '@/features/translation/ir/CompletionContr
 import { createTranslationOperation } from '@/features/translation/ir/TranslationOperation.js';
 import { ResponseFormat } from '@/shared/config/translationConstants.js';
 import { AIResponseParser } from './utils/AIResponseParser.js';
+import { mapCanonicalTranslationError } from '@/shared/error-management/PublicTranslationErrorPolicy.js';
+import { PublicTranslationErrorTypes } from '@/shared/error-management/PublicTranslationError.js';
 
 // Mock Dependencies
 vi.mock('@/shared/proxy/ProxyManager.js', () => ({
@@ -96,6 +98,19 @@ describe('CustomProvider Error Handling', () => {
     provider = new CustomProvider();
   });
 
+  const runHttpError = async (body, status = 404) => {
+    proxyManager.fetch.mockResolvedValue({
+      ok: false,
+      status,
+      statusText: status === 404 ? 'Not Found' : 'Bad Request',
+      headers: new Map([['content-type', 'application/json']]),
+      json: () => Promise.resolve(body),
+      clone: function() { return this; }
+    });
+
+    return provider._callAI('system', 'Hello World').catch(error => error);
+  };
+
   it('should handle successful translation', async () => {
     proxyManager.fetch.mockResolvedValue({
       ok: true,
@@ -109,21 +124,48 @@ describe('CustomProvider Error Handling', () => {
     expect(result).toBe('Custom AI Result');
   });
 
-  it('preserves existing generic Custom 404 classification before provider hook migration', async () => {
-    proxyManager.fetch.mockResolvedValue({
-      ok: false,
-      status: 404,
-      statusText: 'Not Found',
-      headers: new Map([['content-type', 'application/json']]),
-      json: () => Promise.resolve({}),
-      clone: function() { return this; }
-    });
+  it.each([
+    { label: 'top-level', body: { code: 'model_not_found' } },
+    { label: 'nested', body: { error: { code: 'model_not_found' } } },
+  ])('classifies proven $label model code as MODEL_MISSING', async ({ body }) => {
+    const error = await runHttpError(body);
 
-    await expect(provider._callAI('system', 'Hello World'))
-      .rejects.toMatchObject({
-        type: ErrorTypes.MODEL_MISSING,
-        statusCode: 404,
-      });
+    expect(error).toMatchObject({
+      type: ErrorTypes.MODEL_MISSING,
+      statusCode: 404,
+    });
+  });
+
+  it.each([
+    { label: 'route-not-found', body: { code: 'route_not_found' } },
+    { label: 'endpoint-not-found', body: { code: 'endpoint_not_found' } },
+    { label: 'generic not-found', body: { code: 'not_found' } },
+    { label: 'generic invalid-request type', body: { error: { type: 'invalid_request_error' } } },
+    { label: 'empty body', body: {} },
+    { label: 'malformed fields', body: { code: { value: 'model_not_found' }, error: { code: ['model_not_found'], type: 404 } } },
+  ])('keeps $label 404 as HTTP_ERROR', async ({ body }) => {
+    const error = await runHttpError(body);
+
+    expect(error).toMatchObject({
+      type: ErrorTypes.HTTP_ERROR,
+      statusCode: 404,
+    });
+  });
+
+  it('maps confirmed model failure to public model unavailable', async () => {
+    const error = await runHttpError({ error: { code: 'model_not_found' } });
+
+    expect(mapCanonicalTranslationError(error).type)
+      .toBe(PublicTranslationErrorTypes.MODEL_UNAVAILABLE);
+  });
+
+  it('does not restore MODEL_MISSING through global fallback for ambiguous 404', async () => {
+    const error = await runHttpError({ code: 'not_found' });
+
+    expect(error.type).toBe(ErrorTypes.HTTP_ERROR);
+    expect(error.originalType).toBeUndefined();
+    expect(mapCanonicalTranslationError(error).type)
+      .not.toBe(PublicTranslationErrorTypes.MODEL_UNAVAILABLE);
   });
 
   it('forwards call purpose outside the provider payload', async () => {
@@ -460,6 +502,7 @@ describe('CustomProvider Error Handling', () => {
   it.each([
     [400, 'Bad request'],
     [422, 'Invalid request'],
+    [404, 'Unknown parameter `response_format`'],
     [401, 'Unknown parameter `response_format`'],
     [429, 'Unknown parameter `response_format`'],
     [500, 'Unknown parameter `response_format`'],

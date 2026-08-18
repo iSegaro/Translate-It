@@ -8,6 +8,7 @@ import {
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { ProviderNames } from "@/features/translation/providers/ProviderConstants.js";
+import { ErrorTypes } from "@/shared/error-management/ErrorTypes.js";
 import { AIConversationHelper } from "./utils/AIConversationHelper.js";
 import { AITextProcessor } from "./utils/AITextProcessor.js";
 import { ResponseFormat } from "@/shared/config/translationConstants.js";
@@ -30,6 +31,8 @@ const UNSUPPORTED_RESPONSE_FORMAT_PATTERNS = [
   /\b(?:unknown|unsupported|unrecognized)\s+(?:parameter|field|property|key)?\s*[:=]?\s*[`'" ]*response_format\b/i,
   /[`'"]?response_format[`'"]?\s+(?:is\s+)?(?:not\s+supported|unsupported|unrecognized|unknown)\b/i,
 ];
+
+const CUSTOM_MODEL_NOT_FOUND_CODES = new Set(['model_not_found']);
 
 function isUnsupportedResponseFormatError(error) {
   const statusCode = Number(error?.statusCode);
@@ -59,6 +62,21 @@ export class CustomProvider extends BaseAIProvider {
   constructor() {
     super(ProviderNames.CUSTOM);
     this.providerSettingKey = 'CUSTOM_API_KEY';
+  }
+
+  /**
+   * Classify only explicit OpenAI-compatible model-not-found responses.
+   * Route and ambiguous 404 responses remain generic HTTP failures.
+   * @param {Object} errorInfo - Bounded transport error facts.
+   * @returns {string|null}
+   */
+  classifyProviderHttpError(errorInfo) {
+    if (Number(errorInfo?.statusCode) !== 404) return null;
+
+    const codes = [errorInfo.topLevelCode, errorInfo.nestedErrorCode];
+    return codes.some(code => CUSTOM_MODEL_NOT_FOUND_CODES.has(code))
+      ? ErrorTypes.MODEL_MISSING
+      : ErrorTypes.HTTP_ERROR;
   }
 
   /**
