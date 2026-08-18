@@ -46,9 +46,14 @@ const SELECT_ELEMENT_NO_TRANSLATABLE_CONTENT_FALLBACK = 'No translatable text wa
 
 const SAFE_PUBLIC_TRANSLATION_ERROR_TYPES = new Set([
   ErrorTypes.MODEL_MISSING,
+  ErrorTypes.API_ERROR,
   ErrorTypes.API_KEY_MISSING,
   ErrorTypes.API_KEY_INVALID,
   ErrorTypes.QUOTA_EXCEEDED,
+  ErrorTypes.VALIDATION,
+  ErrorTypes.ELEMENT_TOO_LARGE,
+  ErrorTypes.GEMINI_QUOTA_REGION,
+  ErrorTypes.DEEPL_QUOTA_EXCEEDED,
   ErrorTypes.INSUFFICIENT_BALANCE,
   ErrorTypes.RATE_LIMIT_REACHED,
   ErrorTypes.MODEL_OVERLOADED,
@@ -58,6 +63,7 @@ const SAFE_PUBLIC_TRANSLATION_ERROR_TYPES = new Set([
   ErrorTypes.OPERATION_TIMEOUT,
   ErrorTypes.INVALID_REQUEST,
   ErrorTypes.TRANSLATION_FAILED,
+  ErrorTypes.UNKNOWN,
 ]);
 
 function shouldUsePublicTranslationContract(error) {

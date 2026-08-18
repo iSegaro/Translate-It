@@ -58,15 +58,42 @@ vi.mock('@/shared/error-management/PublicErrorPolicy.js', () => ({
 }));
 vi.mock('@/shared/error-management/PublicTranslationErrorPolicy.js', () => ({
   mapCanonicalTranslationError: vi.fn((error) => ({
-    type: error?.type,
-    messageKey: 'ERRORS_TRANSLATION_FAILED',
+    type: {
+      API_ERROR: 'API_FAILURE',
+      VALIDATION: 'INVALID_INPUT',
+      ELEMENT_TOO_LARGE: 'ELEMENT_TOO_LARGE',
+      GEMINI_QUOTA_REGION: 'GEMINI_QUOTA_REGION',
+      DEEPL_QUOTA_EXCEEDED: 'DEEPL_QUOTA_EXCEEDED',
+      UNKNOWN: 'TRANSLATION_FAILED',
+    }[error?.type] || error?.type,
+    messageKey: {
+      API_ERROR: 'ERRORS_API_ERROR',
+      VALIDATION: 'ERRORS_INVALID_INPUT',
+      ELEMENT_TOO_LARGE: 'ERRORS_ELEMENT_TOO_LARGE',
+      GEMINI_QUOTA_REGION: 'ERRORS_GEMINI_QUOTA_REGION',
+      DEEPL_QUOTA_EXCEEDED: 'ERRORS_DEEPL_QUOTA_EXCEEDED',
+    }[error?.type] || 'ERRORS_TRANSLATION_FAILED',
     silent: false,
   }))
 }));
 vi.mock('@/shared/error-management/PublicTranslationErrorAdapter.js', () => ({
   createLegacyDisplayError: vi.fn(async (canonicalError, publicError) => {
-    const displayError = new Error('Translation failed');
-    displayError.type = publicError?.type || 'TRANSLATION_FAILED';
+    const legacyType = {
+      API_FAILURE: 'API_ERROR',
+      INVALID_INPUT: 'TRANSLATION_FAILED',
+      ELEMENT_TOO_LARGE: 'ELEMENT_TOO_LARGE',
+      GEMINI_QUOTA_REGION: 'GEMINI_QUOTA_REGION',
+      DEEPL_QUOTA_EXCEEDED: 'DEEPL_QUOTA_EXCEEDED',
+      TRANSLATION_FAILED: 'TRANSLATION_FAILED',
+    }[publicError?.type] || publicError?.type || 'TRANSLATION_FAILED';
+    const message = {
+      ERRORS_API_ERROR: 'Translation service API error.',
+      ERRORS_ELEMENT_TOO_LARGE: 'This element is too large to translate at once.',
+      ERRORS_GEMINI_QUOTA_REGION: 'You reached the Gemini quota. (Region issue)',
+      ERRORS_DEEPL_QUOTA_EXCEEDED: 'DeepL quota exceeded. Please check your plan.',
+    }[publicError?.messageKey] || 'Translation failed';
+    const displayError = new Error(message);
+    displayError.type = legacyType;
     displayError.cause = canonicalError;
     return displayError;
   })
@@ -592,9 +619,14 @@ describe('SelectElementManager', () => {
 
     it.each([
       ErrorTypes.MODEL_MISSING,
+      ErrorTypes.API_ERROR,
       ErrorTypes.API_KEY_MISSING,
       ErrorTypes.API_KEY_INVALID,
       ErrorTypes.QUOTA_EXCEEDED,
+      ErrorTypes.VALIDATION,
+      ErrorTypes.ELEMENT_TOO_LARGE,
+      ErrorTypes.GEMINI_QUOTA_REGION,
+      ErrorTypes.DEEPL_QUOTA_EXCEEDED,
       ErrorTypes.INSUFFICIENT_BALANCE,
       ErrorTypes.RATE_LIMIT_REACHED,
       ErrorTypes.MODEL_OVERLOADED,
@@ -604,6 +636,7 @@ describe('SelectElementManager', () => {
       ErrorTypes.OPERATION_TIMEOUT,
       ErrorTypes.INVALID_REQUEST,
       ErrorTypes.TRANSLATION_FAILED,
+      ErrorTypes.UNKNOWN,
     ])('uses new public contract for safe type %s', async (type) => {
       const error = Object.assign(new Error(type), { type });
       manager.domTranslatorAdapter.translateElement.mockRejectedValue(error);
@@ -613,22 +646,22 @@ describe('SelectElementManager', () => {
       const { createPublicDisplayError } = await import('@/shared/error-management/PublicErrorPolicy.js');
       const { mapCanonicalTranslationError } = await import('@/shared/error-management/PublicTranslationErrorPolicy.js');
       const { createLegacyDisplayError } = await import('@/shared/error-management/PublicTranslationErrorAdapter.js');
+      const expectedPublicType = {
+        API_ERROR: 'API_FAILURE',
+        VALIDATION: 'INVALID_INPUT',
+        UNKNOWN: 'TRANSLATION_FAILED',
+      }[type] || type;
       expect(createPublicDisplayError).not.toHaveBeenCalled();
       expect(mapCanonicalTranslationError).toHaveBeenCalledWith(error);
-      expect(createLegacyDisplayError).toHaveBeenCalledWith(error, expect.objectContaining({ type }));
+      expect(createLegacyDisplayError).toHaveBeenCalledWith(error, expect.objectContaining({ type: expectedPublicType }));
       expect(errorHandler.handle).toHaveBeenCalledTimes(1);
     });
 
     it.each([
       [ErrorTypes.HTTP_ERROR, { originalType: ErrorTypes.MODEL_MISSING, statusCode: 400 }],
-      [ErrorTypes.API_ERROR, { statusCode: 400 }],
       [ErrorTypes.API_RESPONSE_INVALID, {}],
       [ErrorTypes.JSON_PARSING_ERROR, {}],
       [ErrorTypes.UNEXPECTED_RESPONSE_FORMAT, {}],
-      [ErrorTypes.VALIDATION, {}],
-      [ErrorTypes.GEMINI_QUOTA_REGION, {}],
-      [ErrorTypes.DEEPL_QUOTA_EXCEEDED, {}],
-      [ErrorTypes.UNKNOWN, {}],
     ])('keeps blocked type %s on old public policy', async (type, fields) => {
       const error = Object.assign(new Error(type), { type, ...fields });
       manager.domTranslatorAdapter.translateElement.mockRejectedValue(error);
@@ -764,22 +797,23 @@ describe('SelectElementManager', () => {
       const error = Object.assign(new Error('Element is too large to translate (1001 text segments). Please select a smaller element.'), {
         type: ErrorTypes.ELEMENT_TOO_LARGE,
       });
-      const displayError = Object.assign(new Error('This element is too large to translate at once.'), {
-        type: ErrorTypes.ELEMENT_TOO_LARGE,
-        cause: error,
-      });
       const { createPublicDisplayError } = await import('@/shared/error-management/PublicErrorPolicy.js');
-      createPublicDisplayError.mockResolvedValueOnce(displayError);
+      const { mapCanonicalTranslationError } = await import('@/shared/error-management/PublicTranslationErrorPolicy.js');
+      const { createLegacyDisplayError } = await import('@/shared/error-management/PublicTranslationErrorAdapter.js');
       manager.domTranslatorAdapter.translateElement.mockRejectedValue(error);
 
       await manager.startTranslation(document.createElement('div'));
 
-      expect(createPublicDisplayError).toHaveBeenCalledTimes(1);
-      expect(createPublicDisplayError).toHaveBeenCalledWith(error);
-      expect(errorHandler.handle).toHaveBeenCalledWith(displayError, expect.objectContaining({
-        context: 'select-element',
-        showToast: true,
+      expect(createPublicDisplayError).not.toHaveBeenCalled();
+      expect(mapCanonicalTranslationError).toHaveBeenCalledWith(error);
+      expect(createLegacyDisplayError).toHaveBeenCalledWith(error, expect.objectContaining({
+        type: 'ELEMENT_TOO_LARGE',
+        messageKey: 'ERRORS_ELEMENT_TOO_LARGE',
       }));
+      expect(errorHandler.handle).toHaveBeenCalledWith(
+        expect.objectContaining({ type: ErrorTypes.ELEMENT_TOO_LARGE }),
+        expect.objectContaining({ context: 'select-element', showToast: true })
+      );
       expect(errorHandler.handle).toHaveBeenCalledTimes(1);
       expect(errorHandler.handle.mock.calls[0][0]).toMatchObject({
         type: ErrorTypes.ELEMENT_TOO_LARGE,
