@@ -312,19 +312,19 @@ describe('TextFieldIconManager', () => {
 
     it('presents only marked request failures with adapted Error and canonical type metadata', async () => {
       const { translateFieldViaSmartHandler } = await import('@/handlers/smartTranslationIntegration.js');
-      const requestError = Object.assign(new Error('raw provider detail'), {
-        type: 'API_ERROR',
+      const requestError = Object.assign(new Error('raw provider setup detail'), {
+        type: 'API_CONFIG_INVALID',
         providerName: 'Private Provider',
       });
       const displayError = Object.assign(new Error('safe localized error'), {
-        type: 'API_ERROR',
+        type: 'API_CONFIG_INVALID',
       });
       mockIsFieldTranslationRequestError.mockReturnValue(true);
       mockGetFieldTranslationErrorPresentation.mockResolvedValue({
         canonicalError: requestError,
         displayError,
         publicError: { type: 'API_FAILURE' },
-        canonicalType: 'API_ERROR',
+        canonicalType: 'API_CONFIG_INVALID',
       });
       translateFieldViaSmartHandler.mockRejectedValue(requestError);
 
@@ -336,10 +336,10 @@ describe('TextFieldIconManager', () => {
       expect(mockErrorHandler.handle).toHaveBeenCalledWith(displayError, {
         context: 'text-field-icon-execution',
         showToast: true,
-        type: 'API_ERROR',
+        type: 'API_CONFIG_INVALID',
       });
       expect(mockErrorHandler.handle.mock.calls[0][0]).not.toBe(requestError);
-      expect(mockErrorHandler.handle.mock.calls[0][0].message).not.toContain('raw provider detail');
+      expect(mockErrorHandler.handle.mock.calls[0][0].message).not.toContain('raw provider setup detail');
     });
 
     it('keeps unmarked Field-owned failures on existing ErrorHandler path', async () => {

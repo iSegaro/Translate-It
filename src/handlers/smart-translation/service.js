@@ -94,13 +94,19 @@ export async function translateFieldViaSmartHandler({ text, target, selectionRan
 
   let timerId = null;
   let myData = null;
+  let setupPhase = 'pre-request';
 
   try {
+    setupPhase = 'provider-resolution';
     const currentProvider = await getEffectiveProviderAsync(TranslationMode.Field);
+    setupPhase = 'source-language-resolution';
     const currentSourceLang = await getSourceLanguageAsync();
+    setupPhase = 'target-language-resolution';
     const currentTargetLang = await getTargetLanguageAsync();
 
+    setupPhase = 'request-construction';
     const messageId = `msg-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    setupPhase = 'ui-setup';
     const translatingMessage = await getTranslationString('SELECT_ELEMENT_TRANSLATING') || 'Translating...';
 
     if (!isCurrent()) return;
@@ -122,6 +128,7 @@ export async function translateFieldViaSmartHandler({ text, target, selectionRan
     myData = storePendingTranslationData(target, mode, platform, tabId, selectionRange, timestamp, currentToastId, messageId, ownership);
     if (!myData || !isCurrent()) return;
 
+    setupPhase = 'request-setup';
     // Create a catchable timeout promise
     const timeoutPromise = new Promise((_, reject) => {
       timerId = resourceTracker.trackTimeout(() => {
@@ -178,6 +185,8 @@ export async function translateFieldViaSmartHandler({ text, target, selectionRan
     }
 
     if (!isCurrent()) return;
+
+    setupPhase = 'application';
 
     if (timerId) {
       resourceTracker.clearTimer(timerId);
@@ -236,11 +245,17 @@ export async function translateFieldViaSmartHandler({ text, target, selectionRan
 
     if (isAbortedForReplacement) return;
 
-    const isTimeout = err?.type === ErrorTypes.TRANSLATION_TIMEOUT;
-    const isCancellation = isCancellationError(err);
+    const errorForCaller = (
+      setupPhase === 'provider-resolution'
+      || setupPhase === 'source-language-resolution'
+      || setupPhase === 'target-language-resolution'
+    ) ? markFieldTranslationRequestError(err) : err;
+
+    const isTimeout = errorForCaller?.type === ErrorTypes.TRANSLATION_TIMEOUT;
+    const isCancellation = isCancellationError(errorForCaller);
 
     if (isCancellation) {
-      logger.debug('Text field translation request cancelled:', err.message);
+      logger.debug('Text field translation request cancelled:', errorForCaller.message);
       
       // If this request is being replaced, do NOT dismiss the toast and do NOT re-throw
       if (isAbortedForReplacement) {
@@ -260,11 +275,11 @@ export async function translateFieldViaSmartHandler({ text, target, selectionRan
     if (isTimeout) {
       terminalizeFieldRequest(ownership, 'timeout');
     } else if (isCancellation) {
-      terminalizeFieldRequest(ownership, 'cancelled', { reason: err?.type || 'user_cancelled' });
+      terminalizeFieldRequest(ownership, 'cancelled', { reason: errorForCaller?.type || 'user_cancelled' });
     } else {
       terminalizeFieldRequest(ownership, 'failed', { error: err });
     }
-    throw err;
+    throw errorForCaller;
   } finally {
     if (timerId) resourceTracker.clearTimer(timerId);
     

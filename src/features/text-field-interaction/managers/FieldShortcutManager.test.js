@@ -318,27 +318,27 @@ describe('FieldShortcutManager', () => {
       document.body.appendChild(el);
       el.focus();
 
-      const rawError = Object.assign(new Error('raw API_ERROR details'), { type: 'API_ERROR' });
-      const displayError = Object.assign(new Error('safe localized API message'), { type: 'DISPLAY_TYPE' });
+      const rawError = Object.assign(new Error('raw provider setup details'), { type: 'API_CONFIG_INVALID' });
+      const displayError = Object.assign(new Error('safe localized setup message'), { type: 'DISPLAY_TYPE' });
       mockIsFieldTranslationRequestError.mockReturnValue(true);
       mockGetFieldTranslationErrorPresentation.mockResolvedValue({
         canonicalError: rawError,
         displayError,
-        canonicalType: 'API_ERROR',
+        canonicalType: 'API_CONFIG_INVALID',
       });
       mockTranslateFieldViaSmartHandler.mockRejectedValueOnce(rawError);
 
       const result = await manager.execute();
       
       expect(result.success).toBe(false);
-      expect(result.error).toBe('safe localized API message');
-      expect(result.error).not.toContain('raw API_ERROR details');
+      expect(result.error).toBe('safe localized setup message');
+      expect(result.error).not.toContain('raw provider setup details');
       expect(mockGetFieldTranslationErrorPresentation).toHaveBeenCalledWith(rawError);
       expect(errorHandler.handle).toHaveBeenCalledTimes(1);
       expect(errorHandler.handle).toHaveBeenCalledWith(displayError, {
         context: 'ctrl-slash-shortcut',
         showToast: true,
-        type: 'API_ERROR',
+        type: 'API_CONFIG_INVALID',
       });
       expect(errorHandler.handle.mock.calls[0][0]).not.toBe(rawError);
       

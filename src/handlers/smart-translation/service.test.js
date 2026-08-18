@@ -7,6 +7,8 @@ const mocks = vi.hoisted(() => ({
   getEffectiveProviderAsync: vi.fn(() => Promise.resolve('provider')),
   getSourceLanguageAsync: vi.fn(() => Promise.resolve('auto')),
   getTargetLanguageAsync: vi.fn(() => Promise.resolve('fa')),
+  getTranslationString: vi.fn(() => Promise.resolve('Translating...')),
+  detectSite: vi.fn(() => 'default'),
   applyTranslationToTextField: vi.fn(),
   determineReplaceMode: vi.fn(),
   applyTranslation: vi.fn(),
@@ -73,11 +75,11 @@ vi.mock('@/shared/config/config.js', () => ({
 }));
 
 vi.mock('@/utils/browser/compatibility.js', () => ({
-  detectSite: vi.fn(() => 'default'),
+  detectSite: (...args) => mocks.detectSite(...args),
 }));
 
 vi.mock('@/utils/i18n/i18n.js', () => ({
-  getTranslationString: vi.fn(() => Promise.resolve('Translating...')),
+  getTranslationString: (...args) => mocks.getTranslationString(...args),
 }));
 
 vi.mock('@/core/contextCore.js', () => ({
@@ -233,6 +235,9 @@ describe('translateFieldViaSmartHandler translation ownership', () => {
     mocks.getEffectiveProviderAsync.mockImplementation(() => Promise.resolve('provider'));
     mocks.getSourceLanguageAsync.mockImplementation(() => Promise.resolve('auto'));
     mocks.getTargetLanguageAsync.mockImplementation(() => Promise.resolve('fa'));
+    mocks.getTranslationString.mockImplementation(() => Promise.resolve('Translating...'));
+    mocks.detectSite.mockImplementation(() => 'default');
+    mocks.update.mockImplementation(() => undefined);
     mocks.determineReplaceMode.mockResolvedValue(true);
     mocks.applyTranslation.mockResolvedValue(true);
     mocks.getPendingTranslationData.mockImplementation((_target, toastId, ownership) => (
@@ -385,6 +390,126 @@ describe('translateFieldViaSmartHandler translation ownership', () => {
     expect(request.status).toBe('completed');
     expect(request.result.result.mode).toBe('already-completed');
     expect(mocks.tracker.failRequest).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ['provider', 'getEffectiveProviderAsync'],
+    ['source language', 'getSourceLanguageAsync'],
+    ['target language', 'getTargetLanguageAsync'],
+  ])('marks %s setup rejection without changing Error identity', async (_phase, getter) => {
+    const error = new Error(`${getter} failed`);
+    mocks[getter].mockRejectedValue(error);
+
+    await expect(translateFieldViaSmartHandler({ text: 'hello', target }))
+      .rejects.toBe(error);
+
+    expect(isFieldTranslationRequestError(error)).toBe(true);
+  });
+
+  it.each([
+    ['context', { type: ErrorTypes.CONTEXT }],
+    ['extension context', { type: ErrorTypes.EXTENSION_CONTEXT_INVALIDATED }],
+    ['user cancellation', { type: ErrorTypes.USER_CANCELLED }],
+    ['translation cancellation', { type: ErrorTypes.TRANSLATION_CANCELLED }],
+    ['abort', { name: 'AbortError' }],
+  ])('keeps %s setup failure unmarked', async (_name, details) => {
+    const error = Object.assign(new Error('setup stopped'), details);
+    mocks.getEffectiveProviderAsync.mockRejectedValue(error);
+
+    await expect(translateFieldViaSmartHandler({ text: 'hello', target }))
+      .rejects.toBe(error);
+
+    expect(isFieldTranslationRequestError(error)).toBe(false);
+  });
+
+  it('keeps i18n failure unmarked', async () => {
+    const error = new Error('translation label failed');
+    mocks.getTranslationString.mockRejectedValue(error);
+
+    await expect(translateFieldViaSmartHandler({ text: 'hello', target }))
+      .rejects.toBe(error);
+
+    expect(isFieldTranslationRequestError(error)).toBe(false);
+  });
+
+  it('keeps notification creation failure unmarked', async () => {
+    const error = new Error('status notification failed');
+    mocks.showStatus.mockImplementation(() => { throw error; });
+
+    await expect(translateFieldViaSmartHandler({ text: 'hello', target }))
+      .rejects.toBe(error);
+
+    expect(isFieldTranslationRequestError(error)).toBe(false);
+  });
+
+  it('keeps notification update failure unmarked', async () => {
+    const error = new Error('status notification update failed');
+    mocks.update.mockImplementation(() => { throw error; });
+
+    await expect(translateFieldViaSmartHandler({ text: 'hello', target, toastId: 'existing-toast' }))
+      .rejects.toBe(error);
+
+    expect(isFieldTranslationRequestError(error)).toBe(false);
+  });
+
+  it('keeps pending-state failure unmarked', async () => {
+    const error = new Error('pending state failed');
+    mocks.storePendingTranslationData.mockImplementation(() => { throw error; });
+
+    await expect(translateFieldViaSmartHandler({ text: 'hello', target }))
+      .rejects.toBe(error);
+
+    expect(isFieldTranslationRequestError(error)).toBe(false);
+  });
+
+  it('keeps platform detection failure unmarked', async () => {
+    const error = new Error('platform detection failed');
+    mocks.detectSite.mockImplementation(() => { throw error; });
+
+    await expect(translateFieldViaSmartHandler({ text: 'hello', target }))
+      .rejects.toBe(error);
+
+    expect(isFieldTranslationRequestError(error)).toBe(false);
+  });
+
+  it('does not mark stale setup failure after replacement and lets B continue', async () => {
+    let rejectProviderA;
+    let providerCall = 0;
+    const providerA = new Promise((_, reject) => { rejectProviderA = reject; });
+    mocks.getEffectiveProviderAsync.mockImplementation(() => {
+      providerCall += 1;
+      return providerCall === 1 ? providerA : Promise.resolve('provider-B');
+    });
+
+    const translationRequests = new Map();
+    mocks.safeSendMessage.mockImplementation((message) => new Promise((resolve) => {
+      translationRequests.set(message.data.options.messageId, resolve);
+    }));
+
+    const promiseA = translateFieldViaSmartHandler({ text: 'request A', target });
+    await Promise.resolve();
+    const promiseB = translateFieldViaSmartHandler({ text: 'request B', target });
+    await vi.waitFor(() => expect(translationRequests.size).toBe(1));
+
+    const ownershipB = mocks.fieldRequestOwners.get(target);
+    const error = new Error('provider setup A failed');
+    rejectProviderA(error);
+
+    await expect(promiseA).resolves.toBeUndefined();
+    expect(isFieldTranslationRequestError(error)).toBe(false);
+    expect(mocks.fieldRequestOwners.get(target)).toBe(ownershipB);
+    expect(mocks.clearPendingTranslationData).not.toHaveBeenCalled();
+    expect(mocks.clearPendingNotificationData).not.toHaveBeenCalled();
+
+    const [messageIdB] = translationRequests.keys();
+    translationRequests.get(messageIdB)({
+      success: true,
+      translatedText: 'translated B',
+      originalText: 'request B',
+    });
+
+    await expect(promiseB).resolves.toBeUndefined();
+    expect(mocks.trackerRequests.get(messageIdB).status).toBe('completed');
   });
 
   it('fails application result without changing public error ownership', async () => {
