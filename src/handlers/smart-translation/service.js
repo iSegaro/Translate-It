@@ -84,19 +84,20 @@ export async function translateFieldViaSmartHandler({ text, target, selectionRan
 
   // Establish latest-request ownership before asynchronous setup.
   const { ownership, previous } = beginFieldTranslationRequest(target);
-  terminalizeFieldRequest(previous, 'replacement');
   const isCurrent = () => isCurrentFieldTranslationRequest(target, ownership);
-  
-  const mode = TranslationMode.Field;
-  const platform = detectSite();
-  const timestamp = Date.now();
-  let currentToastId = toastId || previous?.toastId || null;
-
+  let currentToastId = null;
   let timerId = null;
   let myData = null;
   let setupPhase = 'pre-request';
 
   try {
+    terminalizeFieldRequest(previous, 'replacement');
+
+    const mode = TranslationMode.Field;
+    const platform = detectSite();
+    const timestamp = Date.now();
+    currentToastId = toastId || previous?.toastId || null;
+
     setupPhase = 'provider-resolution';
     const currentProvider = await getEffectiveProviderAsync(TranslationMode.Field);
     setupPhase = 'source-language-resolution';
