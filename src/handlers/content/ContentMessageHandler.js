@@ -10,6 +10,7 @@ import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
 import { getSelectElementActivationErrorMessage } from '@/features/element-selection/utils/activationError.js';
 import { pageEventBus } from '@/core/PageEventBus.js';
 import ResourceTracker from '@/core/memory/ResourceTracker.js';
+import { getFieldTranslationErrorPresentation } from '@/features/text-field-interaction/utils/FieldTranslationErrorPresenter.js';
 
 // Singleton instance for ContentMessageHandler
 let contentMessageHandlerInstance = null;
@@ -471,19 +472,20 @@ export class ContentMessageHandler extends ResourceTracker {
             window.pendingTranslationToastId = null;
           }
           
-          // Use centralized error handling system to get localized message and correct type
-          const errorInfo = await this.errorHandler.getErrorForUI(error, 'text-field-translation');
-          
-          // Log the error with proper context
-          await this.errorHandler.handle(error, {
-            context: 'text-field-translation',
-            type: errorInfo.type,
-            showToast: true
-          });
-          
+          const presentation = await getFieldTranslationErrorPresentation(error);
+          if (presentation) {
+            await this.errorHandler.handle(presentation.displayError, {
+              context: 'text-field-translation',
+              type: presentation.canonicalType || presentation.displayError.type,
+              showToast: true
+            });
+
+            presentation.displayError.alreadyHandled = true;
+            throw presentation.displayError;
+          }
+
+          // Preserve silent cancellation/context control flow without presenting.
           const translationError = reconstructTranslationError(error);
-          translationError.message = errorInfo.message;
-          translationError.type = errorInfo.type;
           translationError.alreadyHandled = true;
           throw translationError;
         }
