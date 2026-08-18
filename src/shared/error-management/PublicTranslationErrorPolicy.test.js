@@ -1,0 +1,182 @@
+import { describe, expect, it } from 'vitest';
+import { ErrorTypes } from './ErrorTypes.js';
+import {
+  mapCanonicalTranslationError,
+  PUBLIC_TRANSLATION_ORIGINAL_TYPE_ALLOWLIST,
+} from './PublicTranslationErrorPolicy.js';
+import {
+  PublicTranslationErrorActions,
+  PublicTranslationErrorTypes,
+} from './PublicTranslationError.js';
+
+const errorWithType = (type, fields = {}) => ({ type, ...fields });
+
+describe('PublicTranslationErrorPolicy', () => {
+  it.each([
+    [errorWithType(ErrorTypes.API_KEY_MISSING), PublicTranslationErrorTypes.API_KEY_MISSING],
+    [errorWithType(ErrorTypes.API_KEY_INVALID), PublicTranslationErrorTypes.API_KEY_INVALID],
+    [errorWithType(ErrorTypes.QUOTA_EXCEEDED), PublicTranslationErrorTypes.QUOTA_EXCEEDED],
+    [errorWithType(ErrorTypes.INSUFFICIENT_BALANCE), PublicTranslationErrorTypes.INSUFFICIENT_BALANCE],
+    [errorWithType(ErrorTypes.RATE_LIMIT_REACHED), PublicTranslationErrorTypes.RATE_LIMITED],
+    [errorWithType(ErrorTypes.MODEL_OVERLOADED), PublicTranslationErrorTypes.MODEL_OVERLOADED],
+    [errorWithType(ErrorTypes.NETWORK_ERROR), PublicTranslationErrorTypes.NETWORK_ERROR],
+    [errorWithType(ErrorTypes.SERVER_ERROR), PublicTranslationErrorTypes.SERVER_ERROR],
+    [errorWithType(ErrorTypes.TRANSLATION_TIMEOUT), PublicTranslationErrorTypes.TRANSLATION_TIMEOUT],
+    [errorWithType(ErrorTypes.API_RESPONSE_INVALID), PublicTranslationErrorTypes.INVALID_RESPONSE],
+    [errorWithType(ErrorTypes.JSON_PARSING_ERROR), PublicTranslationErrorTypes.INVALID_RESPONSE],
+    [errorWithType(ErrorTypes.VALIDATION), PublicTranslationErrorTypes.INVALID_INPUT],
+    [errorWithType(ErrorTypes.INVALID_REQUEST), PublicTranslationErrorTypes.INVALID_REQUEST],
+  ])('maps %o to %s', (error, type) => {
+    expect(mapCanonicalTranslationError(error)).toMatchObject({ type, silent: false });
+  });
+
+  it('refines generic HTTP model failures only through originalType', () => {
+    const result = mapCanonicalTranslationError(errorWithType(ErrorTypes.HTTP_ERROR, {
+      originalType: ErrorTypes.MODEL_MISSING,
+      statusCode: 400,
+    }));
+
+    expect(result).toMatchObject({
+      type: PublicTranslationErrorTypes.MODEL_UNAVAILABLE,
+      action: PublicTranslationErrorActions.OPEN_SETTINGS,
+    });
+  });
+
+  it('does not classify generic HTTP 400 as model unavailable', () => {
+    const result = mapCanonicalTranslationError(errorWithType(ErrorTypes.HTTP_ERROR, { statusCode: 400 }));
+
+    expect(result.type).toBe(PublicTranslationErrorTypes.INVALID_REQUEST);
+    expect(result.type).not.toBe(PublicTranslationErrorTypes.MODEL_UNAVAILABLE);
+  });
+
+  it.each([401, 402, 429, 456, 500, 502, 503, 504])(
+    'does not infer public type from generic HTTP %s',
+    (statusCode) => {
+      const result = mapCanonicalTranslationError(errorWithType(ErrorTypes.HTTP_ERROR, { statusCode }));
+
+      expect(result.type).toBe(PublicTranslationErrorTypes.TRANSLATION_FAILED);
+    },
+  );
+
+  it.each([ErrorTypes.API_ERROR, ErrorTypes.TRANSLATION_ERROR, ErrorTypes.TRANSLATION_FAILED, ErrorTypes.UNKNOWN])(
+    'does not apply HTTP status fallback to %s',
+    (type) => {
+      expect(mapCanonicalTranslationError(errorWithType(type, { statusCode: 400 })).type)
+        .toBe(PublicTranslationErrorTypes.TRANSLATION_FAILED);
+      expect(mapCanonicalTranslationError(errorWithType(type, { statusCode: 500 })).type)
+        .toBe(PublicTranslationErrorTypes.TRANSLATION_FAILED);
+    },
+  );
+
+  it('keeps explicit semantic type ahead of conflicting status', () => {
+    const result = mapCanonicalTranslationError(errorWithType(ErrorTypes.SERVER_ERROR, {
+      statusCode: 400,
+    }));
+
+    expect(result.type).toBe(PublicTranslationErrorTypes.SERVER_ERROR);
+  });
+
+  it('keeps allowlisted originalType ahead of conflicting status', () => {
+    const result = mapCanonicalTranslationError(errorWithType(ErrorTypes.HTTP_ERROR, {
+      originalType: ErrorTypes.MODEL_MISSING,
+      statusCode: 400,
+    }));
+
+    expect(result.type).toBe(PublicTranslationErrorTypes.MODEL_UNAVAILABLE);
+  });
+
+  it('does not allow unrelated original types to refine generic transport errors', () => {
+    const result = mapCanonicalTranslationError(errorWithType(ErrorTypes.HTTP_ERROR, {
+      originalType: 'UNTRUSTED_MODEL_FAILURE',
+      statusCode: 400,
+    }));
+
+    expect(result.type).toBe(PublicTranslationErrorTypes.INVALID_REQUEST);
+  });
+
+  it('keeps original type allowlist explicit', () => {
+    expect(PUBLIC_TRANSLATION_ORIGINAL_TYPE_ALLOWLIST.has(ErrorTypes.MODEL_MISSING)).toBe(true);
+    expect(PUBLIC_TRANSLATION_ORIGINAL_TYPE_ALLOWLIST.has('UNTRUSTED_MODEL_FAILURE')).toBe(false);
+  });
+
+  it('maps cancellation to silent semantics', () => {
+    const result = mapCanonicalTranslationError({
+      type: ErrorTypes.USER_CANCELLED,
+      message: 'raw cancellation detail',
+      isCancelled: true,
+    });
+
+    expect(result).toMatchObject({
+      silent: true,
+      type: PublicTranslationErrorTypes.TRANSLATION_FAILED,
+    });
+  });
+
+  it('maps unknown runtime failures to safe translation failure', () => {
+    const result = mapCanonicalTranslationError({
+      type: 'UNMAPPED_RUNTIME_ERROR',
+      message: 'provider secret response body',
+    });
+
+    expect(result).toMatchObject({
+      type: PublicTranslationErrorTypes.TRANSLATION_FAILED,
+      action: PublicTranslationErrorActions.RETRY,
+    });
+  });
+
+  it('includes only bounded provider detail from canonical fields', () => {
+    const result = mapCanonicalTranslationError(errorWithType(ErrorTypes.MODEL_MISSING, {
+      providerId: 'gemini',
+      providerName: 'Gemini',
+      message: "Unknown model name: 'gemini-flash-3'",
+      model: 'gemini-flash-3',
+    }));
+
+    expect(result.detail).toEqual({ kind: 'provider', value: 'gemini' });
+    expect(result).not.toHaveProperty('model');
+    expect(result).not.toHaveProperty('message');
+  });
+
+  it('drops unsafe provider detail', () => {
+    const result = mapCanonicalTranslationError(errorWithType(ErrorTypes.API_KEY_INVALID, {
+      providerId: '<script>alert(1)</script>',
+      providerName: 'A'.repeat(100),
+      message: 'raw provider response',
+    }));
+
+    expect(result).not.toHaveProperty('detail');
+  });
+
+  it('never exposes diagnostic or arbitrary fields', () => {
+    const result = mapCanonicalTranslationError(errorWithType(ErrorTypes.SERVER_ERROR, {
+      message: 'raw provider message',
+      cause: new Error('private cause'),
+      originalError: new Error('private original'),
+      stack: 'private stack',
+      response: { body: 'private response' },
+      body: 'private body',
+      arbitrary: { secret: true },
+      translationOutcome: { committedParentCount: 1 },
+    }));
+
+    expect(result).not.toHaveProperty('message');
+    expect(result).not.toHaveProperty('cause');
+    expect(result).not.toHaveProperty('originalError');
+    expect(result).not.toHaveProperty('stack');
+    expect(result).not.toHaveProperty('response');
+    expect(result).not.toHaveProperty('body');
+    expect(result).not.toHaveProperty('arbitrary');
+    expect(result).not.toHaveProperty('translationOutcome');
+  });
+
+  it('freezes DTO and nested detail', () => {
+    const result = mapCanonicalTranslationError(errorWithType(ErrorTypes.API_KEY_MISSING, {
+      providerId: 'openai',
+    }));
+
+    expect(Object.isFrozen(result)).toBe(true);
+    expect(Object.isFrozen(result.detail)).toBe(true);
+    expect(() => { result.type = 'MUTATED'; }).toThrow();
+    expect(() => { result.detail.value = 'MUTATED'; }).toThrow();
+  });
+});

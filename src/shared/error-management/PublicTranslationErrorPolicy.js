@@ -1,0 +1,171 @@
+import { ErrorTypes } from './ErrorTypes.js';
+import { isCancellationError } from './ErrorMatcher.js';
+import {
+  createProviderDetail,
+  createPublicTranslationError,
+  PublicTranslationErrorActions,
+  PublicTranslationErrorSeverities,
+  PublicTranslationErrorTypes,
+} from './PublicTranslationError.js';
+
+export const PublicTranslationErrorMessageKeys = Object.freeze({
+  [PublicTranslationErrorTypes.MODEL_UNAVAILABLE]: 'ERRORS_MODEL_MISSING',
+  [PublicTranslationErrorTypes.API_KEY_MISSING]: 'ERRORS_API_KEY_MISSING',
+  [PublicTranslationErrorTypes.API_KEY_INVALID]: 'ERRORS_API_KEY_INVALID',
+  [PublicTranslationErrorTypes.QUOTA_EXCEEDED]: 'ERRORS_QUOTA_EXCEEDED',
+  [PublicTranslationErrorTypes.INSUFFICIENT_BALANCE]: 'ERRORS_INSUFFICIENT_BALANCE',
+  [PublicTranslationErrorTypes.RATE_LIMITED]: 'ERRORS_RATE_LIMIT_REACHED',
+  [PublicTranslationErrorTypes.MODEL_OVERLOADED]: 'ERRORS_MODEL_OVERLOADED',
+  [PublicTranslationErrorTypes.NETWORK_ERROR]: 'ERRORS_NETWORK_ERROR',
+  [PublicTranslationErrorTypes.SERVER_ERROR]: 'ERRORS_SERVER_ERROR',
+  [PublicTranslationErrorTypes.TRANSLATION_TIMEOUT]: 'ERRORS_TRANSLATION_TIMEOUT',
+  [PublicTranslationErrorTypes.INVALID_RESPONSE]: 'ERRORS_API_RESPONSE_INVALID',
+  [PublicTranslationErrorTypes.INVALID_INPUT]: 'ERRORS_INVALID_INPUT',
+  [PublicTranslationErrorTypes.INVALID_REQUEST]: 'ERRORS_INVALID_REQUEST',
+  [PublicTranslationErrorTypes.TRANSLATION_FAILED]: 'ERRORS_TRANSLATION_FAILED',
+});
+
+const PUBLIC_TYPE_BY_INTERNAL_TYPE = new Map([
+  [ErrorTypes.MODEL_MISSING, PublicTranslationErrorTypes.MODEL_UNAVAILABLE],
+  [ErrorTypes.API_KEY_MISSING, PublicTranslationErrorTypes.API_KEY_MISSING],
+  [ErrorTypes.API_KEY_INVALID, PublicTranslationErrorTypes.API_KEY_INVALID],
+  [ErrorTypes.QUOTA_EXCEEDED, PublicTranslationErrorTypes.QUOTA_EXCEEDED],
+  [ErrorTypes.GEMINI_QUOTA_REGION, PublicTranslationErrorTypes.QUOTA_EXCEEDED],
+  [ErrorTypes.DEEPL_QUOTA_EXCEEDED, PublicTranslationErrorTypes.QUOTA_EXCEEDED],
+  [ErrorTypes.INSUFFICIENT_BALANCE, PublicTranslationErrorTypes.INSUFFICIENT_BALANCE],
+  [ErrorTypes.RATE_LIMIT_REACHED, PublicTranslationErrorTypes.RATE_LIMITED],
+  [ErrorTypes.MODEL_OVERLOADED, PublicTranslationErrorTypes.MODEL_OVERLOADED],
+  [ErrorTypes.NETWORK_ERROR, PublicTranslationErrorTypes.NETWORK_ERROR],
+  [ErrorTypes.SERVER_ERROR, PublicTranslationErrorTypes.SERVER_ERROR],
+  [ErrorTypes.TRANSLATION_TIMEOUT, PublicTranslationErrorTypes.TRANSLATION_TIMEOUT],
+  [ErrorTypes.OPERATION_TIMEOUT, PublicTranslationErrorTypes.TRANSLATION_TIMEOUT],
+  [ErrorTypes.API_RESPONSE_INVALID, PublicTranslationErrorTypes.INVALID_RESPONSE],
+  [ErrorTypes.JSON_PARSING_ERROR, PublicTranslationErrorTypes.INVALID_RESPONSE],
+  [ErrorTypes.UNEXPECTED_RESPONSE_FORMAT, PublicTranslationErrorTypes.INVALID_RESPONSE],
+  [ErrorTypes.VALIDATION, PublicTranslationErrorTypes.INVALID_INPUT],
+  [ErrorTypes.TEXT_EMPTY, PublicTranslationErrorTypes.INVALID_INPUT],
+  [ErrorTypes.TEXT_TOO_LONG, PublicTranslationErrorTypes.INVALID_INPUT],
+  [ErrorTypes.PROMPT_INVALID, PublicTranslationErrorTypes.INVALID_INPUT],
+  [ErrorTypes.ELEMENT_TOO_LARGE, PublicTranslationErrorTypes.INVALID_INPUT],
+  [ErrorTypes.INVALID_REQUEST, PublicTranslationErrorTypes.INVALID_REQUEST],
+  [ErrorTypes.TRANSLATION_FAILED, PublicTranslationErrorTypes.TRANSLATION_FAILED],
+]);
+
+const GENERIC_INTERNAL_TYPES = new Set([
+  ErrorTypes.HTTP_ERROR,
+  ErrorTypes.API_ERROR,
+  ErrorTypes.TRANSLATION_ERROR,
+  ErrorTypes.TRANSLATION_FAILED,
+  ErrorTypes.UNKNOWN,
+]);
+
+// Only canonical semantic identities may refine generic transport identities.
+export const PUBLIC_TRANSLATION_ORIGINAL_TYPE_ALLOWLIST = new Set([
+  ErrorTypes.MODEL_MISSING,
+  ErrorTypes.API_KEY_MISSING,
+  ErrorTypes.API_KEY_INVALID,
+  ErrorTypes.QUOTA_EXCEEDED,
+  ErrorTypes.GEMINI_QUOTA_REGION,
+  ErrorTypes.DEEPL_QUOTA_EXCEEDED,
+  ErrorTypes.INSUFFICIENT_BALANCE,
+  ErrorTypes.RATE_LIMIT_REACHED,
+  ErrorTypes.MODEL_OVERLOADED,
+  ErrorTypes.NETWORK_ERROR,
+  ErrorTypes.SERVER_ERROR,
+  ErrorTypes.API_RESPONSE_INVALID,
+  ErrorTypes.JSON_PARSING_ERROR,
+  ErrorTypes.UNEXPECTED_RESPONSE_FORMAT,
+  ErrorTypes.VALIDATION,
+  ErrorTypes.INVALID_REQUEST,
+]);
+
+function getStatusType(statusCode) {
+  const status = Number(statusCode);
+  return status === 400 ? PublicTranslationErrorTypes.INVALID_REQUEST : null;
+}
+
+function resolvePublicType(error) {
+  const internalType = error?.type;
+  const directType = PUBLIC_TYPE_BY_INTERNAL_TYPE.get(internalType);
+
+  if (directType && !GENERIC_INTERNAL_TYPES.has(internalType)) return directType;
+
+  if (
+    GENERIC_INTERNAL_TYPES.has(internalType)
+    && PUBLIC_TRANSLATION_ORIGINAL_TYPE_ALLOWLIST.has(error?.originalType)
+  ) {
+    return PUBLIC_TYPE_BY_INTERNAL_TYPE.get(error.originalType);
+  }
+
+  if (internalType === ErrorTypes.HTTP_ERROR) {
+    return getStatusType(error?.statusCode) || PublicTranslationErrorTypes.TRANSLATION_FAILED;
+  }
+
+  return directType || PublicTranslationErrorTypes.TRANSLATION_FAILED;
+}
+
+function getAction(type) {
+  switch (type) {
+    case PublicTranslationErrorTypes.MODEL_UNAVAILABLE:
+    case PublicTranslationErrorTypes.API_KEY_MISSING:
+    case PublicTranslationErrorTypes.API_KEY_INVALID:
+    case PublicTranslationErrorTypes.QUOTA_EXCEEDED:
+    case PublicTranslationErrorTypes.INSUFFICIENT_BALANCE:
+    case PublicTranslationErrorTypes.INVALID_REQUEST:
+      return PublicTranslationErrorActions.OPEN_SETTINGS;
+    case PublicTranslationErrorTypes.MODEL_OVERLOADED:
+    case PublicTranslationErrorTypes.NETWORK_ERROR:
+    case PublicTranslationErrorTypes.SERVER_ERROR:
+    case PublicTranslationErrorTypes.TRANSLATION_FAILED:
+      return PublicTranslationErrorActions.RETRY;
+    case PublicTranslationErrorTypes.RATE_LIMITED:
+      return PublicTranslationErrorActions.RETRY_LATER;
+    default:
+      return undefined;
+  }
+}
+
+function getSeverity(type) {
+  return [
+    PublicTranslationErrorTypes.INVALID_RESPONSE,
+    PublicTranslationErrorTypes.INVALID_INPUT,
+    PublicTranslationErrorTypes.TRANSLATION_FAILED,
+  ].includes(type)
+    ? PublicTranslationErrorSeverities.ERROR
+    : PublicTranslationErrorSeverities.WARNING;
+}
+
+/**
+ * Maps canonical translation errors to safe public semantics.
+ * No raw message parsing or diagnostic field copying occurs here.
+ */
+export function mapCanonicalTranslationError(error) {
+  if (isCancellationError(error)) {
+    return createPublicTranslationError({
+      type: PublicTranslationErrorTypes.TRANSLATION_FAILED,
+      messageKey: PublicTranslationErrorMessageKeys[PublicTranslationErrorTypes.TRANSLATION_FAILED],
+      severity: PublicTranslationErrorSeverities.WARNING,
+      silent: true,
+    });
+  }
+
+  const type = resolvePublicType(error);
+  const detail = [
+    PublicTranslationErrorTypes.MODEL_UNAVAILABLE,
+    PublicTranslationErrorTypes.API_KEY_MISSING,
+    PublicTranslationErrorTypes.API_KEY_INVALID,
+    PublicTranslationErrorTypes.QUOTA_EXCEEDED,
+    PublicTranslationErrorTypes.INSUFFICIENT_BALANCE,
+  ].includes(type)
+    ? createProviderDetail(error?.providerId, error?.providerName)
+    : undefined;
+
+  return createPublicTranslationError({
+    type,
+    messageKey: PublicTranslationErrorMessageKeys[type],
+    detail,
+    action: getAction(type),
+    severity: getSeverity(type),
+    silent: false,
+  });
+}
