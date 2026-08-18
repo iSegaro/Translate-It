@@ -112,6 +112,75 @@ describe('DomTranslatorUtils', () => {
       expect(nodes[4].text).toBe(' text');
     });
 
+    it('discovers open shadow text only when shadow traversal is enabled', () => {
+      const host = document.createElement('x-host');
+      const shadow = host.attachShadow({ mode: 'open' });
+      shadow.appendChild(document.createTextNode('Shadow content here'));
+
+      expect(collectTextNodes(host)).toHaveLength(0);
+      expect(collectTextNodes(host, { includeOpenShadowRoots: true })[0].text).toBe('Shadow content here');
+    });
+
+    it('discovers light and nested open-shadow text once without expanding slots', () => {
+      const host = document.createElement('x-host');
+      const lightText = document.createTextNode('Light content here');
+      host.appendChild(lightText);
+      const slot = document.createElement('slot');
+      slot.appendChild(document.createTextNode('Fallback slot text'));
+      slot.assignedNodes = vi.fn(slot.assignedNodes.bind(slot));
+      const shadow = host.attachShadow({ mode: 'open' });
+      shadow.appendChild(slot);
+      const nestedHost = document.createElement('x-nested');
+      const nestedShadow = nestedHost.attachShadow({ mode: 'open' });
+      nestedShadow.appendChild(document.createTextNode('Nested content here'));
+      shadow.appendChild(nestedHost);
+
+      const nodes = collectTextNodes(host, { includeOpenShadowRoots: true });
+      expect(nodes.map(({ text }) => text)).toContain('Light content here');
+      expect(nodes.map(({ text }) => text)).toContain('Fallback slot text');
+      expect(nodes.map(({ text }) => text)).toContain('Nested content here');
+      expect(nodes.filter(({ node }) => node === lightText)).toHaveLength(1);
+      expect(slot.assignedNodes).not.toHaveBeenCalled();
+    });
+
+    it('traverses an element selected inside an open shadow root and its nested roots', () => {
+      const host = document.createElement('x-host');
+      const shadow = host.attachShadow({ mode: 'open' });
+      const selected = document.createElement('section');
+      selected.appendChild(document.createTextNode('Selected shadow content'));
+      const nestedHost = document.createElement('x-nested');
+      const nestedShadow = nestedHost.attachShadow({ mode: 'open' });
+      nestedShadow.appendChild(document.createTextNode('Selected nested content'));
+      selected.appendChild(nestedHost);
+      shadow.appendChild(selected);
+
+      expect(collectTextNodes(selected, { includeOpenShadowRoots: true }).map(({ text }) => text))
+        .toEqual(['Selected shadow content', 'Selected nested content']);
+    });
+
+    it('honors host-level exclusion for internal shadow text', () => {
+      const host = document.createElement('x-host');
+      host.className = 'notranslate';
+      const shadow = host.attachShadow({ mode: 'open' });
+      shadow.appendChild(document.createTextNode('Excluded shadow content'));
+
+      expect(collectTextNodes(host, { includeOpenShadowRoots: true })).toEqual([]);
+    });
+
+    it('keeps shadow fallback block identities local', () => {
+      const host = document.createElement('x-host');
+      const shadow = host.attachShadow({ mode: 'open' });
+      shadow.appendChild(document.createTextNode('Shadow block content'));
+      document.body.appendChild(host);
+      delete document.body.dataset.blockId;
+
+      const nodes = collectTextNodes(host, { includeOpenShadowRoots: true });
+
+      expect(nodes[0].blockId).toMatch(/^sb/);
+      expect(nodes[0].role).toBe('shadow-root');
+      expect(document.body.dataset.blockId).toBeUndefined();
+    });
+
     it('should assign UIDs and block IDs', () => {
       const container = document.createElement('div');
       container.innerHTML = `<p>Test node</p>`;
@@ -378,6 +447,28 @@ describe('DomTranslatorUtils', () => {
   });
 
   describe('collectBlockGroups', () => {
+    it('keeps nested shadow groups independent without exposing ShadowRoot as a mutation target', () => {
+      const host = document.createElement('x-host');
+      const shadow = host.attachShadow({ mode: 'open' });
+      shadow.appendChild(document.createTextNode('Outer shadow content'));
+      const nestedHost = document.createElement('x-nested');
+      const nestedShadow = nestedHost.attachShadow({ mode: 'open' });
+      nestedShadow.appendChild(document.createTextNode('Nested shadow content'));
+      shadow.appendChild(nestedHost);
+
+      const units = collectBlockGroups(host, {
+        blockMap: new WeakMap(),
+        blockCounter: { value: 0 },
+      }, {
+        extractionMode: SelectElementExtractionMode.V3,
+        includeOpenShadowRoots: true,
+      });
+
+      expect(units.map(unit => unit.text)).toEqual(['Outer shadow content', 'Nested shadow content']);
+      expect(new Set(units.map(unit => unit.blockId)).size).toBe(2);
+      expect(units.every(unit => unit.node.getRootNode().host)).toBe(true);
+    });
+
     it('should successfully group nodes and assign sequential IDs using WeakMap session context without touching the DOM', () => {
       const container = document.createElement('div');
       container.innerHTML = `
@@ -788,6 +879,17 @@ describe('DomTranslatorUtils', () => {
       
       const textNode = textarea.firstChild;
       expect(isExcludedAncestor(textNode)).toBe(true);
+    });
+
+    it('should reject internal content when host has a notranslate marker', () => {
+      const host = document.createElement('div');
+      host.setAttribute('translate', 'no');
+      const shadow = host.attachShadow({ mode: 'open' });
+      const span = document.createElement('span');
+      span.textContent = 'shadow text';
+      shadow.appendChild(span);
+
+      expect(isExcludedAncestor(span.firstChild)).toBe(true);
     });
   });
 });

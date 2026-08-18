@@ -4,6 +4,7 @@
 import { DOM_FILTERS } from '@/utils/dom/DomFilters.js';
 import { TRANSLATION_HTML } from '@/shared/constants/translation.js';
 import { getSelectElementRootEligibility } from '@/features/element-selection/core/SelectElementPolicy.js';
+import { iterateSelectElementAncestors } from './shadowDom.js';
 
 /**
  * Extract meaningful text from an element
@@ -79,7 +80,10 @@ export function isSelectableTextRoot(element) {
 
   // 1. Respect standard 'notranslate' class and 'translate=no' attribute
   // on the element AND its ancestors (ancestor walk stays local to the helper)
-  const isExcluded = element.closest(`.${TRANSLATION_HTML.NO_TRANSLATE_CLASS}, [translate='${TRANSLATION_HTML.NO_TRANSLATE_VALUE}']`);
+  const isExcluded = [...iterateSelectElementAncestors(element)].find((ancestor) => (
+    ancestor.classList?.contains(TRANSLATION_HTML.NO_TRANSLATE_CLASS)
+    || ancestor.getAttribute?.('translate') === TRANSLATION_HTML.NO_TRANSLATE_VALUE
+  ));
   if (isExcluded) {
     return false;
   }

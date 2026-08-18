@@ -55,12 +55,15 @@ import * as DirectionManager from '@/utils/dom/DomDirectionManager.js';
 import { hoverPreviewLookup } from '@/features/shared/hover-preview/HoverPreviewLookup.js';
 import { PAGE_TRANSLATION_ATTRIBUTES } from '@/features/page-translation/PageTranslationConstants.js';
 import { runBestEffortRollback } from '@/utils/dom/DomRollback.js';
+import {
+  isSelectShadowNode,
+  SELECT_ELEMENT_SHADOW_DOM_ENABLED,
+} from '../utils/shadowDom.js';
 
 export { getSelectElementTranslationState, revertSelectElementTranslation } from './DomTranslatorState.js';
 
 // Strategy X - Subtree Exclusion Active Set
 const activeTranslationRoots = new Set();
-
 class DirectMutationFailure {
   constructor(cause, rollbackFailures = []) {
     this.cause = cause;
@@ -169,6 +172,13 @@ export class DomTranslatorAdapter extends ResourceTracker {
     this.logger.operation('Starting element translation');
 
     try {
+      if (!SELECT_ELEMENT_SHADOW_DOM_ENABLED && isSelectShadowNode(element)) {
+        const error = new Error('Shadow DOM translation is not enabled');
+        error.type = ErrorTypes.FEATURE_BLOCKED;
+        error.reason = 'shadow-dom-disabled';
+        throw error;
+      }
+
       // Strategy X - Subtree Exclusion Check
       for (const root of activeTranslationRoots) {
         if (root === element || root.contains(element) || element.contains(root)) {
@@ -236,7 +246,10 @@ export class DomTranslatorAdapter extends ResourceTracker {
           blockCounter: { value: 0 },
           activeSessionId: this.currentSessionId
         };
-        const translationUnits = collectBlockGroups(element, this.sessionContext, { extractionMode });
+        const translationUnits = collectBlockGroups(element, this.sessionContext, {
+          extractionMode,
+          includeOpenShadowRoots: SELECT_ELEMENT_SHADOW_DOM_ENABLED,
+        });
         
         // Build groups and maps for V3 block grouping
         const blockMap = new Map();
@@ -274,7 +287,10 @@ export class DomTranslatorAdapter extends ResourceTracker {
       } else {
         this.groupMap = null;
         this.sessionContext = undefined;
-        textNodesData = collectTextNodes(element, { extractionMode });
+        textNodesData = collectTextNodes(element, {
+          extractionMode,
+          includeOpenShadowRoots: SELECT_ELEMENT_SHADOW_DOM_ENABLED,
+        });
       }
 
       if (textNodesData.length === 0) {

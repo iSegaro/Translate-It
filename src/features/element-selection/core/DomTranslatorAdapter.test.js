@@ -186,6 +186,20 @@ describe('DomTranslatorAdapter', () => {
       );
     });
 
+    it('rejects direct internal shadow roots before extraction while shadow support is disabled', async () => {
+      const host = document.createElement('x-host');
+      const shadow = host.attachShadow({ mode: 'open' });
+      const internal = document.createElement('div');
+      internal.textContent = 'Shadow content';
+      shadow.appendChild(internal);
+
+      await expect(adapter.translateElement(internal)).rejects.toMatchObject({
+        type: ErrorTypes.FEATURE_BLOCKED,
+        reason: 'shadow-dom-disabled',
+      });
+      expect(contentScriptIntegration.sendTranslationRequest).not.toHaveBeenCalled();
+    });
+
     it('rejects elements above the local segment limit with a typed error before requesting translation', async () => {
       const { collectTextNodes } = await import('./DomTranslatorUtils.js');
       const { ErrorTypes } = await import('@/shared/error-management/ErrorTypes.js');
@@ -296,7 +310,10 @@ describe('DomTranslatorAdapter', () => {
       await translation;
 
       expect(collectTextNodes).toHaveBeenCalledTimes(1);
-      expect(collectTextNodes).toHaveBeenCalledWith(testElement, { extractionMode: 'v2' });
+      expect(collectTextNodes).toHaveBeenCalledWith(testElement, {
+        extractionMode: 'v2',
+        includeOpenShadowRoots: false,
+      });
     });
 
     it('maps the grouping strategy to V3 extraction mode exactly once', async () => {
@@ -315,7 +332,10 @@ describe('DomTranslatorAdapter', () => {
       await translation;
 
       expect(collectBlockGroups).toHaveBeenCalledTimes(1);
-      expect(collectBlockGroups).toHaveBeenCalledWith(testElement, expect.any(Object), { extractionMode: 'v3' });
+      expect(collectBlockGroups).toHaveBeenCalledWith(testElement, expect.any(Object), {
+        extractionMode: 'v3',
+        includeOpenShadowRoots: false,
+      });
     });
 
     it('translates an explicitly selected BUTTON root through the normal flow', async () => {
@@ -1536,7 +1556,10 @@ describe('DomTranslatorAdapter', () => {
         const result = await adapter.translateElement(pre);
         expect(result.success).toBe(true);
         expect(collectBlockGroups).toHaveBeenCalledTimes(1);
-        expect(collectBlockGroups).toHaveBeenCalledWith(pre, expect.any(Object), { extractionMode: 'v3' });
+        expect(collectBlockGroups).toHaveBeenCalledWith(pre, expect.any(Object), {
+          extractionMode: 'v3',
+          includeOpenShadowRoots: false,
+        });
         expect(pre.textContent).toContain('x');
         document.body.removeChild(pre);
       });
@@ -1571,7 +1594,10 @@ describe('DomTranslatorAdapter', () => {
         const result = await adapter.translateElement(code);
         expect(result.success).toBe(true);
         expect(collectBlockGroups).toHaveBeenCalledTimes(1);
-        expect(collectBlockGroups).toHaveBeenCalledWith(code, expect.any(Object), { extractionMode: 'v3' });
+        expect(collectBlockGroups).toHaveBeenCalledWith(code, expect.any(Object), {
+          extractionMode: 'v3',
+          includeOpenShadowRoots: false,
+        });
         expect(code.textContent).toContain('y');
         document.body.removeChild(code);
       });
@@ -1600,7 +1626,10 @@ describe('DomTranslatorAdapter', () => {
 
         const result = await adapter.translateElement(div);
         expect(result.success).toBe(true);
-        expect(collectTextNodes).toHaveBeenCalledWith(div, { extractionMode: 'v2' });
+        expect(collectTextNodes).toHaveBeenCalledWith(div, {
+          extractionMode: 'v2',
+          includeOpenShadowRoots: false,
+        });
         expect(div.textContent).toContain('پاراگراف');
         document.body.removeChild(div);
       });

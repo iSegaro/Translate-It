@@ -204,6 +204,18 @@ describe('elementHelpers', () => {
       expect(isSelectableTextRoot(child)).toBe(false);
       document.body.removeChild(noTranslate);
     });
+
+    it('crosses an open shadow boundary for root notranslate policy', () => {
+      const { isSelectableTextRoot } = helpers;
+      const host = document.createElement('div');
+      host.className = TRANSLATION_HTML.NO_TRANSLATE_CLASS;
+      const shadow = host.attachShadow({ mode: 'open' });
+      const child = document.createElement('span');
+      child.textContent = 'Valid shadow text';
+      shadow.appendChild(child);
+
+      expect(isSelectableTextRoot(child)).toBe(false);
+    });
   });
 
   describe('getImmediateTextContent', () => {

@@ -499,6 +499,23 @@ describe('SelectElementManager', () => {
       expect(manager.domTranslatorAdapter.translateElement).not.toHaveBeenCalled();
     });
 
+    it('falls back to retargeted host while shadow translation is disabled', async () => {
+      const host = document.createElement('x-host');
+      const shadow = host.attachShadow({ mode: 'open' });
+      const internal = document.createElement('button');
+      internal.textContent = 'Translate this button';
+      shadow.appendChild(internal);
+      manager.elementSelector.getHighlightedElement.mockReturnValue(null);
+      manager.elementSelector.isOurElement.mockReturnValue(false);
+      const event = new MouseEvent('click', { bubbles: true, cancelable: true });
+      Object.defineProperty(event, 'target', { value: host });
+      event.composedPath = () => [internal, shadow, host, document, window];
+
+      await manager.handleClick(event);
+
+      expect(manager.domTranslatorAdapter.translateElement).toHaveBeenCalledWith(host, expect.any(Object));
+    });
+
     it('still forwards BUTTON to the adapter', async () => {
       const btn = document.createElement('button');
       manager.elementSelector.getHighlightedElement.mockReturnValue(btn);

@@ -33,6 +33,10 @@ import { DomTranslatorAdapter } from './core/DomTranslatorAdapter.js';
 import { ElementSelector } from './core/ElementSelector.js';
 import { extractTextFromElement, isSelectableTextRoot } from './utils/elementHelpers.js';
 import { SelectElementReason } from './core/SelectElementPolicy.js';
+import {
+  resolveSelectInteractionElement,
+  SELECT_ELEMENT_SHADOW_DOM_ENABLED,
+} from './utils/shadowDom.js';
 
 // Import notification manager
 import { getSelectElementNotificationManager } from './SelectElementNotificationManager.js';
@@ -394,8 +398,13 @@ class SelectElementManager extends ResourceTracker {
     this.lastMouseX = currentX;
     this.lastMouseY = currentY;
     if (!this.hasInitialMovementOccurred) return;
-    if (this.elementSelector && this.elementSelector.isOurElement(event.target)) return;
-    this.elementSelector.handleMouseOver(event.target);
+    const target = resolveSelectInteractionElement(
+      event,
+      element => this.elementSelector?.isOurElement(element),
+      { allowShadowDom: SELECT_ELEMENT_SHADOW_DOM_ENABLED }
+    );
+    if (!target) return;
+    this.elementSelector.handleMouseOver(target);
   }
 
   handleTouchStart(event) {
@@ -422,8 +431,13 @@ class SelectElementManager extends ResourceTracker {
 
   handleMouseOut(event) {
     if (!this.isActive || this.isProcessingClick) return;
-    if (this.elementSelector && this.elementSelector.isOurElement(event.target)) return;
-    this.elementSelector.handleMouseOut(event.target);
+    const target = resolveSelectInteractionElement(
+      event,
+      element => this.elementSelector?.isOurElement(element),
+      { allowShadowDom: SELECT_ELEMENT_SHADOW_DOM_ENABLED }
+    );
+    if (!target) return;
+    this.elementSelector.handleMouseOut(target);
   }
 
   handleInteraction(event) {
@@ -471,7 +485,13 @@ class SelectElementManager extends ResourceTracker {
     if (this.isProcessingClick) return;
     try {
       this.isProcessingClick = true;
-      const elementToTranslate = this.elementSelector.getHighlightedElement() || event.target;
+      const elementToTranslate = this.elementSelector.getHighlightedElement()
+        || resolveSelectInteractionElement(
+          event,
+          element => this.elementSelector?.isOurElement(element),
+          { allowShadowDom: SELECT_ELEMENT_SHADOW_DOM_ENABLED }
+        );
+      if (!elementToTranslate) return;
 
       // Authoritative click revalidation: re-run root eligibility at click time
       // even if the element was highlighted earlier. The DOM may change between
