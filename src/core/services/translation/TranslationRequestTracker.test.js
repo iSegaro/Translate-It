@@ -80,6 +80,33 @@ describe('TranslationRequestTracker', () => {
       expect(tracker.createRequest({ messageId, data: { text: 'replacement' } })).toBeNull();
       expect(tracker.getRequest(messageId)).toBe(original);
     });
+
+    it('retains overlapping pending requests until caller terminalizes them', () => {
+      const target = { id: 'field-1' };
+      const first = tracker.createRequest({
+        messageId: 'field-request-a',
+        data: { text: 'A', target, toastId: 'field-toast' },
+      });
+      const second = tracker.createRequest({
+        messageId: 'field-request-b',
+        data: { text: 'B', target, toastId: 'field-toast' },
+      });
+
+      expect(first.status).toBe(RequestStatus.PENDING);
+      expect(second.status).toBe(RequestStatus.PENDING);
+      expect(tracker.getRequest('field-request-a')).toBe(first);
+      expect(tracker.getRequest('field-request-b')).toBe(second);
+      expect(tracker.getRequestsByStatus(RequestStatus.PENDING)).toEqual([first, second]);
+      expect(tracker.getRequestByToastId('field-toast')).toBe(second);
+
+      expect(tracker.cleanup()).toBe(0);
+      expect(tracker.getRequest('field-request-a')).toBe(first);
+
+      vi.advanceTimersByTime(30 * 60 * 1000 + 1);
+      expect(tracker.cleanup()).toBe(2);
+      expect(tracker.getRequest('field-request-a')).toBeUndefined();
+      expect(tracker.getRequest('field-request-b')).toBeUndefined();
+    });
   });
 
   describe('updateRequest', () => {
