@@ -26,6 +26,7 @@ export const PublicTranslationErrorMessageKeys = Object.freeze({
   [PublicTranslationErrorTypes.INVALID_RESPONSE]: 'ERRORS_API_RESPONSE_INVALID',
   [PublicTranslationErrorTypes.INVALID_INPUT]: 'ERRORS_INVALID_INPUT',
   [PublicTranslationErrorTypes.INVALID_REQUEST]: 'ERRORS_INVALID_REQUEST',
+  [PublicTranslationErrorTypes.REQUEST_FAILURE]: 'ERRORS_HTTP_ERROR',
   [PublicTranslationErrorTypes.TRANSLATION_FAILED]: 'ERRORS_TRANSLATION_FAILED',
 });
 
@@ -53,6 +54,7 @@ const PUBLIC_TYPE_BY_INTERNAL_TYPE = new Map([
   [ErrorTypes.TEXT_TOO_LONG, PublicTranslationErrorTypes.INVALID_INPUT],
   [ErrorTypes.PROMPT_INVALID, PublicTranslationErrorTypes.INVALID_INPUT],
   [ErrorTypes.INVALID_REQUEST, PublicTranslationErrorTypes.INVALID_REQUEST],
+  [ErrorTypes.HTTP_ERROR, PublicTranslationErrorTypes.REQUEST_FAILURE],
   [ErrorTypes.TRANSLATION_FAILED, PublicTranslationErrorTypes.TRANSLATION_FAILED],
 ]);
 
@@ -84,11 +86,6 @@ export const PUBLIC_TRANSLATION_ORIGINAL_TYPE_ALLOWLIST = new Set([
   ErrorTypes.INVALID_REQUEST,
 ]);
 
-function getStatusType(statusCode) {
-  const status = Number(statusCode);
-  return status === 400 ? PublicTranslationErrorTypes.INVALID_REQUEST : null;
-}
-
 function resolvePublicType(error) {
   const internalType = error?.type;
   const directType = PUBLIC_TYPE_BY_INTERNAL_TYPE.get(internalType);
@@ -103,7 +100,7 @@ function resolvePublicType(error) {
   }
 
   if (internalType === ErrorTypes.HTTP_ERROR) {
-    return getStatusType(error?.statusCode) || PublicTranslationErrorTypes.TRANSLATION_FAILED;
+    return PublicTranslationErrorTypes.REQUEST_FAILURE;
   }
 
   return directType || PublicTranslationErrorTypes.TRANSLATION_FAILED;
@@ -118,6 +115,7 @@ function getAction(type) {
     case PublicTranslationErrorTypes.INSUFFICIENT_BALANCE:
     case PublicTranslationErrorTypes.INVALID_REQUEST:
       return PublicTranslationErrorActions.OPEN_SETTINGS;
+    case PublicTranslationErrorTypes.REQUEST_FAILURE:
     case PublicTranslationErrorTypes.MODEL_OVERLOADED:
     case PublicTranslationErrorTypes.NETWORK_ERROR:
     case PublicTranslationErrorTypes.SERVER_ERROR:

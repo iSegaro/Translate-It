@@ -25,6 +25,7 @@ export const PUBLIC_TO_LEGACY_ERROR_TYPES = Object.freeze({
   [PublicTranslationErrorTypes.INVALID_RESPONSE]: ErrorTypes.API_RESPONSE_INVALID,
   [PublicTranslationErrorTypes.INVALID_INPUT]: ErrorTypes.TRANSLATION_FAILED,
   [PublicTranslationErrorTypes.INVALID_REQUEST]: ErrorTypes.INVALID_REQUEST,
+  [PublicTranslationErrorTypes.REQUEST_FAILURE]: ErrorTypes.HTTP_ERROR,
   [PublicTranslationErrorTypes.TRANSLATION_FAILED]: ErrorTypes.TRANSLATION_FAILED,
 });
 

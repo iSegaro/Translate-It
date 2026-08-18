@@ -46,6 +46,7 @@ describe('PublicTranslationErrorAdapter', () => {
     [PublicTranslationErrorTypes.INVALID_RESPONSE, ErrorTypes.API_RESPONSE_INVALID],
     [PublicTranslationErrorTypes.INVALID_INPUT, ErrorTypes.TRANSLATION_FAILED],
     [PublicTranslationErrorTypes.INVALID_REQUEST, ErrorTypes.INVALID_REQUEST],
+    [PublicTranslationErrorTypes.REQUEST_FAILURE, ErrorTypes.HTTP_ERROR],
     [PublicTranslationErrorTypes.TRANSLATION_FAILED, ErrorTypes.TRANSLATION_FAILED],
   ])('maps %s to legacy type %s', async (publicType, legacyType) => {
     const displayError = await createLegacyDisplayError(canonicalError(), {
@@ -64,6 +65,20 @@ describe('PublicTranslationErrorAdapter', () => {
 
     expect(getErrorMessage).toHaveBeenCalledWith('ERRORS_NETWORK_ERROR');
     expect(displayError.message).toBe('Localized ERRORS_NETWORK_ERROR');
+  });
+
+  it('preserves generic HTTP display semantics through REQUEST_FAILURE', async () => {
+    const displayError = await createLegacyDisplayError(canonicalError(), {
+      type: PublicTranslationErrorTypes.REQUEST_FAILURE,
+      messageKey: 'ERRORS_HTTP_ERROR',
+      action: PublicTranslationErrorActions.RETRY,
+      severity: 'warning',
+    });
+
+    expect(getErrorMessage).toHaveBeenCalledWith('ERRORS_HTTP_ERROR');
+    expect(displayError.type).toBe(ErrorTypes.HTTP_ERROR);
+    expect(displayError.message).toBe('Localized ERRORS_HTTP_ERROR');
+    expect(displayError.cause).toBeDefined();
   });
 
   it('never uses canonical raw message as display text', async () => {

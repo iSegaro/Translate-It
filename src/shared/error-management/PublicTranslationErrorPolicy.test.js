@@ -77,19 +77,19 @@ describe('PublicTranslationErrorPolicy', () => {
     });
   });
 
-  it('does not classify generic HTTP 400 as model unavailable', () => {
-    const result = mapCanonicalTranslationError(errorWithType(ErrorTypes.HTTP_ERROR, { statusCode: 400 }));
-
-    expect(result.type).toBe(PublicTranslationErrorTypes.INVALID_REQUEST);
-    expect(result.type).not.toBe(PublicTranslationErrorTypes.MODEL_UNAVAILABLE);
-  });
-
-  it.each([401, 402, 429, 456, 500, 502, 503, 504])(
-    'does not infer public type from generic HTTP %s',
+  it.each([400, 422, 404, 500, undefined])(
+    'maps generic HTTP %s to REQUEST_FAILURE without status inference',
     (statusCode) => {
-      const result = mapCanonicalTranslationError(errorWithType(ErrorTypes.HTTP_ERROR, { statusCode }));
+      const fields = statusCode === undefined ? {} : { statusCode };
+      const result = mapCanonicalTranslationError(errorWithType(ErrorTypes.HTTP_ERROR, fields));
 
-      expect(result.type).toBe(PublicTranslationErrorTypes.TRANSLATION_FAILED);
+      expect(result).toMatchObject({
+        type: PublicTranslationErrorTypes.REQUEST_FAILURE,
+        messageKey: 'ERRORS_HTTP_ERROR',
+        action: PublicTranslationErrorActions.RETRY,
+        severity: 'warning',
+        silent: false,
+      });
     },
   );
 
@@ -135,7 +135,7 @@ describe('PublicTranslationErrorPolicy', () => {
       statusCode: 400,
     }));
 
-    expect(result.type).toBe(PublicTranslationErrorTypes.INVALID_REQUEST);
+    expect(result.type).toBe(PublicTranslationErrorTypes.REQUEST_FAILURE);
   });
 
   it('keeps original type allowlist explicit', () => {

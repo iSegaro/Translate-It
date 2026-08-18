@@ -67,7 +67,7 @@ vi.mock('@/shared/error-management/PublicTranslationErrorPolicy.js', () => ({
       API_RESPONSE_INVALID: 'INVALID_RESPONSE',
       JSON_PARSING_ERROR: 'INVALID_RESPONSE',
       UNEXPECTED_RESPONSE_FORMAT: 'INVALID_RESPONSE',
-      HTTP_ERROR: error?.originalType === 'MODEL_MISSING' ? 'MODEL_UNAVAILABLE' : 'HTTP_ERROR',
+       HTTP_ERROR: error?.originalType === 'MODEL_MISSING' ? 'MODEL_UNAVAILABLE' : 'REQUEST_FAILURE',
       UNKNOWN: 'TRANSLATION_FAILED',
     }[error?.type] || error?.type,
     messageKey: {
@@ -79,8 +79,8 @@ vi.mock('@/shared/error-management/PublicTranslationErrorPolicy.js', () => ({
       API_RESPONSE_INVALID: 'ERRORS_API_RESPONSE_INVALID',
       JSON_PARSING_ERROR: 'ERRORS_API_RESPONSE_INVALID',
       UNEXPECTED_RESPONSE_FORMAT: 'ERRORS_API_RESPONSE_INVALID',
-      HTTP_ERROR: error?.originalType === 'MODEL_MISSING' ? 'ERRORS_MODEL_MISSING' : 'ERRORS_HTTP_ERROR',
-    }[error?.type] || 'ERRORS_TRANSLATION_FAILED',
+       HTTP_ERROR: error?.originalType === 'MODEL_MISSING' ? 'ERRORS_MODEL_MISSING' : 'ERRORS_HTTP_ERROR',
+     }[error?.type] || 'ERRORS_TRANSLATION_FAILED',
     silent: false,
   }))
 }));
@@ -92,16 +92,18 @@ vi.mock('@/shared/error-management/PublicTranslationErrorAdapter.js', () => ({
       INVALID_INPUT: 'TRANSLATION_FAILED',
       ELEMENT_TOO_LARGE: 'ELEMENT_TOO_LARGE',
       GEMINI_QUOTA_REGION: 'GEMINI_QUOTA_REGION',
-      DEEPL_QUOTA_EXCEEDED: 'DEEPL_QUOTA_EXCEEDED',
-      TRANSLATION_FAILED: 'TRANSLATION_FAILED',
+       DEEPL_QUOTA_EXCEEDED: 'DEEPL_QUOTA_EXCEEDED',
+       REQUEST_FAILURE: 'HTTP_ERROR',
+       TRANSLATION_FAILED: 'TRANSLATION_FAILED',
     }[publicError?.type] || publicError?.type || 'TRANSLATION_FAILED';
     const message = {
       ERRORS_API_ERROR: 'Translation service API error.',
       ERRORS_ELEMENT_TOO_LARGE: 'This element is too large to translate at once.',
       ERRORS_GEMINI_QUOTA_REGION: 'You reached the Gemini quota. (Region issue)',
       ERRORS_DEEPL_QUOTA_EXCEEDED: 'DeepL quota exceeded. Please check your plan.',
-      ERRORS_API_RESPONSE_INVALID: 'Invalid API response format',
-      ERRORS_MODEL_MISSING: 'AI Model is missing or invalid',
+       ERRORS_API_RESPONSE_INVALID: 'Invalid API response format',
+       ERRORS_MODEL_MISSING: 'AI Model is missing or invalid',
+       ERRORS_HTTP_ERROR: 'HTTP error',
     }[publicError?.messageKey] || 'Translation failed';
     const displayError = new Error(message);
     displayError.type = legacyType;
@@ -680,7 +682,7 @@ describe('SelectElementManager', () => {
       [ErrorTypes.HTTP_ERROR, { statusCode: 429 }],
       [ErrorTypes.HTTP_ERROR, { statusCode: 500 }],
       [ErrorTypes.HTTP_ERROR, { statusCode: 400, originalType: 'UNRELATED_TYPE' }],
-    ])('keeps blocked type %s on old public policy', async (type, fields) => {
+    ])('routes generic HTTP type %s through new public policy', async (type, fields) => {
       const error = Object.assign(new Error(type), { type, ...fields });
       manager.domTranslatorAdapter.translateElement.mockRejectedValue(error);
 
@@ -689,9 +691,20 @@ describe('SelectElementManager', () => {
       const { createPublicDisplayError } = await import('@/shared/error-management/PublicErrorPolicy.js');
       const { mapCanonicalTranslationError } = await import('@/shared/error-management/PublicTranslationErrorPolicy.js');
       const { createLegacyDisplayError } = await import('@/shared/error-management/PublicTranslationErrorAdapter.js');
-      expect(createPublicDisplayError).toHaveBeenCalledWith(error);
-      expect(mapCanonicalTranslationError).not.toHaveBeenCalled();
-      expect(createLegacyDisplayError).not.toHaveBeenCalled();
+      expect(createPublicDisplayError).not.toHaveBeenCalled();
+      expect(mapCanonicalTranslationError).toHaveBeenCalledWith(error);
+      expect(createLegacyDisplayError).toHaveBeenCalledWith(error, expect.objectContaining({
+        type: 'REQUEST_FAILURE',
+        messageKey: 'ERRORS_HTTP_ERROR',
+      }));
+      expect(errorHandler.handle).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: ErrorTypes.HTTP_ERROR,
+          message: 'HTTP error',
+          cause: error,
+        }),
+        expect.objectContaining({ context: 'select-element', showToast: true })
+      );
       expect(errorHandler.handle).toHaveBeenCalledTimes(1);
     });
 
