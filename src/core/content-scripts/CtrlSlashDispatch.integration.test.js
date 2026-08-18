@@ -161,7 +161,6 @@ describe('Ctrl+/ dispatch characterization', () => {
   let handler;
   let executeSpy;
   let delegatedKeyboardSpy;
-  let legacyTranslationSpy;
   let textarea;
 
   beforeEach(() => {
@@ -187,7 +186,6 @@ describe('Ctrl+/ dispatch characterization', () => {
     if (shortcutManager.initialized) shortcutManager.cleanup();
     executeSpy?.mockRestore();
     delegatedKeyboardSpy?.mockRestore();
-    legacyTranslationSpy?.mockRestore();
     textarea?.remove();
   });
 
@@ -195,7 +193,6 @@ describe('Ctrl+/ dispatch characterization', () => {
     handler = ShortcutHandler.getInstance({ featureManager: {} });
     await handler.activate();
     delegatedKeyboardSpy = vi.spyOn(handler, 'handleKeyboardEvent');
-    legacyTranslationSpy = vi.spyOn(handler, 'handleTranslationShortcut');
     mocks.shortcutHandler = handler;
     await coordinator.initialize();
   }
@@ -213,7 +210,6 @@ describe('Ctrl+/ dispatch characterization', () => {
 
     expect(mocks.translateFieldViaSmartHandler).toHaveBeenCalledTimes(1);
     expect(delegatedKeyboardSpy).not.toHaveBeenCalled();
-    expect(legacyTranslationSpy).not.toHaveBeenCalled();
     expect(executeSpy).toHaveBeenCalledTimes(1);
     expect(mocks.sendMessage).not.toHaveBeenCalled();
     expect(event.defaultPrevented).toBe(true);

@@ -5,11 +5,6 @@ import { ErrorHandler } from '@/shared/error-management/ErrorHandler.js';
 import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
 import { utilsFactory } from '@/utils/UtilsFactory.js';
 import { shortcutManager } from '@/core/managers/content/shortcuts/ShortcutManager.js';
-import { INPUT_TYPES } from '@/shared/constants/detection.js';
-import { NOTIFICATION_TIME } from '@/shared/constants/ui.js';
-import NotificationManager from '@/core/managers/core/NotificationManager.js';
-import { getFieldTranslationErrorPresentation } from '@/features/text-field-interaction/utils/FieldTranslationErrorPresenter.js';
-import { isFieldTranslationRequestError } from '@/handlers/smart-translation/translationErrorOwnership.js';
 
 const Platform = {
   MAC: 'MAC',
@@ -38,13 +33,11 @@ export class ShortcutHandler extends ResourceTracker {
     super('shortcut-handler');
 
     this.isActive = false;
-    this.keydownHandler = null;
     this.featureManager = options.featureManager;
 
     // Platform will be detected asynchronously in activate()
     this.platform = null;
     this.modifierKey = 'ctrlKey'; // Default value, will be updated in activate()
-    this.notificationManager = new NotificationManager();
 
     // Track this instance for debugging
     window.__shortcutHandlerInstances.add(this);
@@ -60,11 +53,9 @@ export class ShortcutHandler extends ResourceTracker {
 
       shortcutHandlerInstance = new ShortcutHandler(options);
       logger.info('ShortcutHandler singleton created');
-    } else {
+    } else if (options.featureManager) {
       // Update options if provided
-      if (options.featureManager) {
-        shortcutHandlerInstance.featureManager = options.featureManager;
-      }
+      shortcutHandlerInstance.featureManager = options.featureManager;
     }
 
     return shortcutHandlerInstance;
@@ -115,7 +106,6 @@ export class ShortcutHandler extends ResourceTracker {
       this.isActive = true;
       logger.info('ShortcutHandler activated successfully');
       return true;
-
     } catch (error) {
       const handler = ErrorHandler.getInstance();
       handler.handle(error, {
@@ -133,12 +123,6 @@ export class ShortcutHandler extends ResourceTracker {
     }
 
     try {
-      // Manually remove event listeners to ensure they're properly cleaned up
-      if (this.keydownHandler) {
-        this.removeEventListener(document, 'keydown', this.keydownHandler, { capture: true });
-        this.keydownHandler = null;
-      }
-
       // Cleanup ShortcutManager
       if (shortcutManager.initialized) {
         shortcutManager.cleanup();
@@ -153,19 +137,12 @@ export class ShortcutHandler extends ResourceTracker {
       this.isActive = false;
       logger.info('ShortcutHandler deactivated successfully');
       return true;
-
     } catch (error) {
       logger.error('Error deactivating ShortcutHandler:', error);
       // Continue with cleanup even if error occurs
       try {
         if (shortcutManager.initialized) {
           shortcutManager.cleanup();
-        }
-
-        // Ensure event listeners are removed even on error
-        if (this.keydownHandler) {
-          this.removeEventListener(document, 'keydown', this.keydownHandler, { capture: true });
-          this.keydownHandler = null;
         }
 
         this.cleanup();
@@ -184,382 +161,6 @@ export class ShortcutHandler extends ResourceTracker {
         return false;
       }
     }
-  }
-
-  /**
-   * Parse shortcut string into object
-   * @param {string} shortcut - Shortcut string (e.g., "Ctrl+Alt+T")
-   * @returns {Object} Parsed shortcut object
-   */
-  parseShortcut(shortcut) {
-    if (!shortcut || typeof shortcut !== 'string') {
-      return { ctrl: true, alt: false, shift: false, meta: false, key: '/' }; // fallback to Ctrl+/
-    }
-
-    const keys = shortcut.split('+').map(key => key.trim().toLowerCase());
-    const mainKey = keys.find(k => !['ctrl', 'control', 'alt', 'shift', 'meta', 'cmd'].includes(k));
-
-    // Handle special keys
-    let normalizedKey = mainKey || '/';
-    if (normalizedKey === 'space') normalizedKey = ' ';
-    if (normalizedKey === 'escape') normalizedKey = 'Escape';
-
-    logger.debug(`Parsed shortcut "${shortcut}" to keys:`, keys, `mainKey: ${mainKey}`);
-
-    return {
-      ctrl: keys.includes('ctrl') || keys.includes('control'),
-      alt: keys.includes('alt'),
-      shift: keys.includes('shift'),
-      meta: keys.includes('meta') || keys.includes('cmd'),
-      key: normalizedKey
-    };
-  }
-
-  /**
-   * Check if event matches the shortcut
-   * @param {KeyboardEvent} event - Keyboard event
-   * @param {Object} parsedShortcut - Parsed shortcut object
-   * @returns {boolean} Whether event matches the shortcut
-   */
-  isShortcutMatch(event, parsedShortcut) {
-    // Ignore modifier keys by themselves (Control, Shift, Alt, Meta)
-    const modifierKeys = ['Control', 'Shift', 'Alt', 'Meta'];
-    if (modifierKeys.includes(event.key)) {
-      return false;
-    }
-
-    return (
-      parsedShortcut.ctrl === event.ctrlKey &&
-      parsedShortcut.alt === event.altKey &&
-      parsedShortcut.shift === event.shiftKey &&
-      parsedShortcut.meta === event.metaKey &&
-      (event.key.toLowerCase() === parsedShortcut.key.toLowerCase())
-    );
-  }
-
-  setupShortcutListeners() {
-    try {
-      // Ctrl+/ (or Cmd+/ on Mac) shortcut handler
-      this.keydownHandler = (event) => {
-        // Check global disable flag first
-        if (window.__shortcutHandlerDisabled) {
-          return;
-        }
-
-        if (!this.isActive) return;
-
-        // Check for configured shortcut combination
-        (async () => {
-          try {
-            const { settingsManager } = await import('@/shared/managers/SettingsManager.js');
-            const isExtensionEnabled = settingsManager.get('EXTENSION_ENABLED', false);
-            const isShortcutEnabled = settingsManager.get('ENABLE_SHORTCUT_FOR_TEXT_FIELDS', false);
-
-            if (!isExtensionEnabled || !isShortcutEnabled) {
-              return; // Silently ignore when disabled
-            }
-
-            // Get current shortcut from settings
-            let currentShortcut = settingsManager.get('TEXT_FIELD_SHORTCUT', 'Ctrl+/');
-
-            // If still default, try to refresh from settings store
-            if (currentShortcut === 'Ctrl+/') {
-              try {
-                const { getActivePinia } = await import('pinia');
-                const activePinia = getActivePinia();
-                
-                if (activePinia) {
-                  const { useSettingsStore } = await import('@/features/settings/stores/settings.js');
-                  const settingsStore = useSettingsStore();
-                  if (settingsStore.settings?.TEXT_FIELD_SHORTCUT && settingsStore.settings.TEXT_FIELD_SHORTCUT !== 'Ctrl+/') {
-                    currentShortcut = settingsStore.settings.TEXT_FIELD_SHORTCUT;
-                    logger.debug(`Updated shortcut from settings store: ${currentShortcut}`);
-                  }
-                } else {
-                  logger.debug('Pinia not active yet, skipping store-based shortcut refresh');
-                }
-              } catch (storeError) {
-                logger.debug(`Skip shortcut refresh from store: ${storeError.message}`);
-              }
-            }
-
-            const parsedShortcut = this.parseShortcut(currentShortcut);
-
-            // Debug: Log what we're checking
-            logger.debug(`Checking shortcut: ${currentShortcut}`, {
-              event: {
-                key: event.key,
-                ctrlKey: event.ctrlKey,
-                altKey: event.altKey,
-                shiftKey: event.shiftKey,
-                metaKey: event.metaKey
-              },
-              parsed: parsedShortcut,
-              matches: this.isShortcutMatch(event, parsedShortcut)
-            });
-
-            // Check if event matches the current shortcut
-            if (this.isShortcutMatch(event, parsedShortcut)) {
-              logger.info(`Translation shortcut triggered: ${currentShortcut}`);
-
-              // Prevent default behavior
-              event.preventDefault();
-              event.stopPropagation();
-
-              // Handle the shortcut
-              await this.handleTranslationShortcut(event);
-            }
-          } catch (error) {
-            logger.error('Error checking shortcut:', error);
-            // Fallback to original behavior
-            if (event[this.modifierKey] && event.key === '/') {
-              this.handleTranslationShortcut(event);
-            }
-          }
-        })();
-      };
-
-      // Register the keydown listener
-      this.addEventListener(document, 'keydown', this.keydownHandler, { capture: true });
-
-      // Get initial shortcut for logging
-      (async () => {
-        try {
-          const { settingsManager } = await import('@/shared/managers/SettingsManager.js');
-          const currentShortcut = settingsManager.get('TEXT_FIELD_SHORTCUT', 'Ctrl+/');
-
-          // Force refresh of settings if they're not loaded
-          if (currentShortcut === 'Ctrl+/') {
-            // Try to get settings store directly
-            try {
-              const { getActivePinia } = await import('pinia');
-              const activePinia = getActivePinia();
-
-              if (activePinia) {
-                const { useSettingsStore } = await import('@/features/settings/stores/settings.js');
-                const settingsStore = useSettingsStore();
-                await settingsStore.loadSettings();
-                const refreshedShortcut = settingsStore.settings?.TEXT_FIELD_SHORTCUT || 'Ctrl+/';
-                logger.info(`Shortcut listener setup: ${refreshedShortcut} (refreshed from settings store)`);
-              } else {
-                logger.debug('Pinia not active, using default shortcut for listener setup');
-                logger.info(`Shortcut listener setup: ${currentShortcut}`);
-              }
-            } catch (storeError) {
-              logger.debug(`Failed to refresh from settings store: ${storeError.message}`);
-              logger.info(`Shortcut listener setup: ${currentShortcut} (using cache)`);
-            }
-          } else {
-            logger.info(`Shortcut listener setup: ${currentShortcut}`);
-          }
-        } catch (error) {
-          logger.error(`Failed to load shortcut settings: ${error.message}`);
-          logger.info(`Shortcut listener setup: Ctrl+/ (default)`);
-        }
-      })();
-      
-    } catch (error) {
-      logger.error('Failed to setup shortcut listeners:', error);
-    }
-  }
-
-  async handleTranslationShortcut() {
-    try {
-      // Import settings dynamically to avoid circular dependencies
-      const { settingsManager } = await import('@/shared/managers/SettingsManager.js');
-
-      // Check settings before processing
-      const isExtensionEnabled = settingsManager.get('EXTENSION_ENABLED', false);
-      const isShortcutEnabled = settingsManager.get('ENABLE_SHORTCUT_FOR_TEXT_FIELDS', false);
-
-      if (!isExtensionEnabled || !isShortcutEnabled) {
-        // Shortcut is disabled due to settings
-        return;
-      }
-
-      const activeElement = document.activeElement;
-
-      // Check if active element is a text field
-      if (this.isEditableElement(activeElement)) {
-        // Get text content
-        const text = this.getElementText(activeElement);
-        
-        if (!text || text.trim().length === 0) {
-          return;
-        }
-
-        // Trigger translation for text field
-        await this.triggerTextFieldTranslation(activeElement, text);
-        
-      } else {
-        // Check for selected text
-        const selection = window.getSelection();
-        const selectedText = selection.toString().trim();
-        
-        if (selectedText) {
-          logger.info(`Shortcut triggered with selection: ${selectedText.length} chars`);
-          
-          // Trigger translation for selected text
-          this.triggerSelectionTranslation(selectedText, selection);
-          
-        } else {
-          // Show a brief notification
-          this.showShortcutHint();
-        }
-      }
-      
-    } catch (error) {
-      logger.error('Error handling translation shortcut:', error);
-      const handler = ErrorHandler.getInstance();
-      handler.handle(error, {
-        type: ErrorTypes.SERVICE,
-        context: 'ShortcutHandler-handleShortcut',
-        showToast: false
-      });
-    }
-  }
-
-  isEditableElement(element) {
-    if (!element) return false;
-
-    const tagName = element.tagName.toLowerCase();
-    const type = element.type?.toLowerCase();
-
-    // Check for input elements - include all text field types or empty type (which defaults to text)
-    if (tagName === 'input') {
-      return !type || INPUT_TYPES.ALL_TEXT_FIELDS.includes(type);
-    }
-
-    // Check for textarea
-    if (tagName === 'textarea') return true;
-
-    // Check for contenteditable elements
-    if (element.contentEditable === 'true') return true;
-
-    return false;
-  }
-
-  getElementText(element) {
-    if (!element) return '';
-    
-    if (element.value !== undefined) {
-      // Input or textarea
-      return element.value;
-    } else if (element.textContent !== undefined) {
-      // Contenteditable
-      return element.textContent;
-    }
-    
-    return '';
-  }
-
-  async triggerTextFieldTranslation(element, text) {
-    try {
-      const { translateFieldViaSmartHandler } = await import('@/handlers/smartTranslationIntegration.js');
-      
-      await translateFieldViaSmartHandler({
-        text: text,
-        target: element
-      });
-    } catch (error) {
-      logger.error('Error triggering text field translation via shortcut:', error);
-      
-      const { ErrorHandler } = await import('@/shared/error-management/ErrorHandler.js');
-      const errorHandler = ErrorHandler.getInstance();
-      if (isFieldTranslationRequestError(error)) {
-        const presentation = await getFieldTranslationErrorPresentation(error);
-        if (!presentation) return;
-
-        errorHandler.handle(presentation.displayError, {
-          context: 'shortcut-field-translation',
-          showToast: true,
-          type: presentation.canonicalType || presentation.displayError.type,
-        }).catch(() => {});
-        return;
-      }
-
-      errorHandler.handle(error, {
-        context: 'shortcut-field-translation',
-        showToast: true
-      }).catch(() => {});
-    }
-  }
-
-  triggerSelectionTranslation(selectedText, selection) {
-    try {
-      // Ensure WindowsManager is activated through FeatureManager
-      if (this.featureManager) {
-        // Activate WindowsManager if not already active
-        if (!this.featureManager.activeFeatures.has('windowsManager')) {
-          this.featureManager.activateFeature('windowsManager').then(() => {
-            // Once activated, get the WindowsManager and show translation
-            const windowsManagerHandler = this.featureManager.getFeatureHandler('windowsManager');
-            if (windowsManagerHandler && windowsManagerHandler.getWindowsManager) {
-              const windowsManager = windowsManagerHandler.getWindowsManager();
-
-              // Calculate position for translation window
-              const range = selection.getRangeAt(0);
-              const rect = range.getBoundingClientRect();
-
-              const position = {
-                x: rect.left + (rect.width / 2),
-                y: rect.bottom + 10
-              };
-
-              // Show translation window
-              windowsManager.show(selectedText, position);
-            }
-          }).catch(() => {
-            // Error handled silently
-          });
-        } else {
-          // WindowsManager is already active
-          const windowsManagerHandler = this.featureManager.getFeatureHandler('windowsManager');
-          if (windowsManagerHandler && windowsManagerHandler.getWindowsManager) {
-            const windowsManager = windowsManagerHandler.getWindowsManager();
-
-            // Calculate position for translation window
-            const range = selection.getRangeAt(0);
-            const rect = range.getBoundingClientRect();
-
-            const position = {
-              x: rect.left + (rect.width / 2),
-              y: rect.bottom + 10
-            };
-
-            // Show translation window
-            windowsManager.show(selectedText, position);
-          }
-        }
-      }
-
-    } catch {
-      // Error handled silently
-    }
-  }
-
-  showShortcutHint() {
-    try {
-      // Use NotificationManager for standardized toast notifications
-      this.notificationManager.show(
-        `Press ${this.modifierKey === 'metaKey' ? 'Cmd' : 'Ctrl'}+/ in a text field or with selected text to translate`,
-        'info',
-        NOTIFICATION_TIME.HINT,
-        { id: 'shortcut-hint' }
-      );
-    } catch {
-      // Error handled silently
-    }
-  }
-
-  // Public API methods
-  getShortcutKey() {
-    const modifier = this.modifierKey === 'metaKey' ? 'Cmd' : 'Ctrl';
-    return `${modifier}+/`;
-  }
-
-  isShortcutSupported() {
-    return this.platform !== Platform.UNKNOWN;
   }
 
   /**
@@ -604,6 +205,15 @@ export class ShortcutHandler extends ResourceTracker {
   static enableGlobally() {
     window.__shortcutHandlerDisabled = false;
     logger.info('ShortcutHandler globally enabled');
+  }
+
+  getShortcutKey() {
+    const modifier = this.modifierKey === 'metaKey' ? 'Cmd' : 'Ctrl';
+    return `${modifier}+/`;
+  }
+
+  isShortcutSupported() {
+    return this.platform !== Platform.UNKNOWN;
   }
 
   getStatus() {
