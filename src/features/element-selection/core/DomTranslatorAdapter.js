@@ -1430,6 +1430,19 @@ export class DomTranslatorAdapter extends ResourceTracker {
         }))
       : null;
 
+    const metadataSnapshots = [];
+    const metadataElements = new Set();
+    for (const nodeData of frozenTextNodesData || []) {
+      const metadataElement = nodeData.node?.parentElement;
+      if (!metadataElement || metadataElements.has(metadataElement)) continue;
+      metadataElements.add(metadataElement);
+      metadataSnapshots.push(Object.freeze({
+        element: metadataElement,
+        present: metadataElement.hasAttribute(PAGE_TRANSLATION_ATTRIBUTES.HAS_ORIGINAL),
+        value: metadataElement.getAttribute(PAGE_TRANSLATION_ATTRIBUTES.HAS_ORIGINAL),
+      }));
+    }
+
     // Enforce namespaced and session-scoped snapshots for rollback safety
     if (frozenTextNodesData && sessionId) {
       if (!globalSelectElementState.snapshots) {
@@ -1450,6 +1463,7 @@ export class DomTranslatorAdapter extends ResourceTracker {
     const stateEntry = { 
       ...data, 
       originalTextNodesData: frozenTextNodesData,
+      originalMetadataSnapshots: Object.freeze(metadataSnapshots),
       originalDir: element.getAttribute('dir'),
       originalStyleDirection: element.style.direction,
       originalTextAlign: element.style.textAlign,
@@ -1467,7 +1481,7 @@ export class DomTranslatorAdapter extends ResourceTracker {
     if (snapshots && snapshots.length > 0) {
       this.logger.warn(`[Rollback] Performing atomic rollback for block group ${blockId} (Session: ${sessionId})`);
       snapshots.forEach(({ node, originalText }) => {
-        if (node && node.parentNode && document.documentElement.contains(node)) {
+        if (node?.isConnected) {
           node.nodeValue = originalText;
         }
       });

@@ -3294,6 +3294,67 @@ describe('DomTranslatorAdapter', () => {
     document.body.removeChild(secondElement);
   });
 
+  it('captures exact metadata owners for later shadow-safe manual revert', async () => {
+    const host = document.createElement('x-host');
+    const shadow = host.attachShadow({ mode: 'open' });
+    const firstOwner = document.createElement('span');
+    const secondOwner = document.createElement('span');
+    const firstNode = document.createTextNode('First translated');
+    const secondNode = document.createTextNode('Second translated');
+    firstOwner.appendChild(firstNode);
+    secondOwner.appendChild(secondNode);
+    secondOwner.setAttribute('data-has-original', 'existing');
+    shadow.append(firstOwner, secondOwner);
+    document.body.appendChild(host);
+
+    adapter._storeTranslationState({
+      element: host,
+      originalTextNodesData: [
+        { node: firstNode, originalText: 'First original', blockId: 'v2-parent' },
+        { node: secondNode, originalText: 'Second original', blockId: 'v3-parent' },
+        { node: firstNode, originalText: 'First original', blockId: 'v2-parent' },
+      ],
+      sessionId: 'shadow-state',
+    });
+    firstOwner.setAttribute('data-has-original', 'true');
+    secondOwner.setAttribute('data-has-original', 'true');
+
+    const entry = globalSelectElementState.translationHistory.at(-1);
+    expect(entry.originalMetadataSnapshots).toHaveLength(2);
+    expect(entry.originalMetadataSnapshots.map(snapshot => snapshot.element)).toEqual([firstOwner, secondOwner]);
+    expect(entry.originalMetadataSnapshots[0].present).toBe(false);
+    expect(entry.originalMetadataSnapshots[1]).toMatchObject({ present: true, value: 'existing' });
+
+    const { revertSelectElementTranslation } = await import('./DomTranslatorState.js');
+    await revertSelectElementTranslation('shadow-state');
+
+    expect(firstOwner.hasAttribute('data-has-original')).toBe(false);
+    expect(secondOwner.getAttribute('data-has-original')).toBe('existing');
+    document.body.removeChild(host);
+  });
+
+  it('restores connected shadow text in _rollbackBlockGroup and skips detached text', () => {
+    const host = document.createElement('x-host');
+    const shadow = host.attachShadow({ mode: 'open' });
+    const connectedNode = document.createTextNode('Translated connected');
+    const detachedNode = document.createTextNode('Translated detached');
+    shadow.append(connectedNode, detachedNode);
+    document.body.appendChild(host);
+    globalSelectElementState.snapshots = new Map([
+      ['shadow-session:block', [
+        { node: connectedNode, originalText: 'Original connected' },
+        { node: detachedNode, originalText: 'Original detached' },
+      ]]
+    ]);
+    shadow.removeChild(detachedNode);
+
+    adapter._rollbackBlockGroup('shadow-session', 'block');
+
+    expect(connectedNode.nodeValue).toBe('Original connected');
+    expect(detachedNode.nodeValue).toBe('Translated detached');
+    document.body.removeChild(host);
+  });
+
   describe('revertTranslation', () => {
     it('should call revertSelectElementTranslation', async () => {
       const { revertSelectElementTranslation } = await import('./DomTranslatorState.js');

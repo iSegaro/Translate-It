@@ -34,6 +34,18 @@ const getGlobalState = () => {
 
 export const globalSelectElementState = getGlobalState();
 
+function restoreMetadataSnapshot(snapshot, logger) {
+  const element = snapshot?.element;
+  if (!element?.isConnected) return;
+
+  try {
+    if (snapshot.present) element.setAttribute(PAGE_TRANSLATION_ATTRIBUTES.HAS_ORIGINAL, snapshot.value);
+    else element.removeAttribute(PAGE_TRANSLATION_ATTRIBUTES.HAS_ORIGINAL);
+  } catch (error) {
+    logger.error('[Rollback] Metadata restoration failed', { element, error });
+  }
+}
+
 /**
  * Get the global Select Element translation state
  * @returns {Object} Global state object
@@ -109,7 +121,7 @@ export async function revertSelectElementTranslation(targetSessionId = null) {
       }
 
       // Skip if element no longer exists in DOM
-      if (!document.documentElement.contains(element)) {
+      if (!element?.isConnected) {
         logger.debug('Element no longer in DOM, skipping', { tagName: element?.tagName });
         continue;
       }
@@ -121,7 +133,7 @@ export async function revertSelectElementTranslation(targetSessionId = null) {
           // Verify the node still exists and is attached to the document
           let isAttached = false;
           try {
-            isAttached = Boolean(node && node.parentNode && document.documentElement.contains(node));
+            isAttached = Boolean(node?.isConnected);
           } catch (error) {
             logRestoreFailure('Text attachment check', error);
             continue;
@@ -150,24 +162,38 @@ export async function revertSelectElementTranslation(targetSessionId = null) {
       // 2. Restore direction and styles
       if (!element) continue;
 
-      const attr = PAGE_TRANSLATION_ATTRIBUTES.HAS_ORIGINAL;
-      try {
-        element.removeAttribute(attr);
-      } catch (error) {
-        logRestoreFailure('Root metadata cleanup', error, { tagName: element.tagName });
-      }
-
-      try {
-        const descendants = element.querySelectorAll(`[${attr}]`);
-        descendants.forEach((descendant) => {
+      if (Array.isArray(translation.originalMetadataSnapshots)) {
+        const restoredMetadataElements = new Set();
+        for (const snapshot of translation.originalMetadataSnapshots) {
+          if (!snapshot?.element || restoredMetadataElements.has(snapshot.element)) continue;
+          restoredMetadataElements.add(snapshot.element);
+          restoreMetadataSnapshot(snapshot, logger);
+        }
+      } else {
+        // Legacy entries predate identity-captured metadata. Keep fallback scoped
+        // to light DOM so it cannot mutate replacement shadow content.
+        const attr = PAGE_TRANSLATION_ATTRIBUTES.HAS_ORIGINAL;
+        const isShadowRootElement = Boolean(element.getRootNode?.()?.host);
+        if (!isShadowRootElement) {
           try {
-            descendant.removeAttribute(attr);
+            element.removeAttribute(attr);
           } catch (error) {
-            logRestoreFailure('Descendant metadata cleanup', error, { tagName: descendant?.tagName });
+            logRestoreFailure('Root metadata cleanup', error, { tagName: element.tagName });
           }
-        });
-      } catch (error) {
-        logRestoreFailure('Descendant metadata discovery', error, { tagName: element.tagName });
+
+          try {
+            const descendants = element.querySelectorAll(`[${attr}]`);
+            descendants.forEach((descendant) => {
+              try {
+                descendant.removeAttribute(attr);
+              } catch (error) {
+                logRestoreFailure('Descendant metadata cleanup', error, { tagName: descendant?.tagName });
+              }
+            });
+          } catch (error) {
+            logRestoreFailure('Descendant metadata discovery', error, { tagName: element.tagName });
+          }
+        }
       }
 
       try {

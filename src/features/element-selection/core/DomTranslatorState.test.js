@@ -383,6 +383,118 @@ describe('DomTranslatorState', () => {
       document.body.removeChild(container);
     });
 
+    it('restores connected text inside an open shadow root and its exact metadata owner', async () => {
+      const host = document.createElement('x-host');
+      const shadow = host.attachShadow({ mode: 'open' });
+      const owner = document.createElement('span');
+      const textNode = document.createTextNode('Translated shadow text');
+      owner.appendChild(textNode);
+      owner.setAttribute('data-ti-has-original', 'true');
+      shadow.appendChild(owner);
+      document.body.appendChild(host);
+
+      globalSelectElementState.translationHistory = [{
+        element: owner,
+        originalTextNodesData: [{ node: textNode, originalText: 'Original shadow text' }],
+        originalMetadataSnapshots: [{ element: owner, present: false, value: null }],
+      }];
+
+      const count = await revertSelectElementTranslation();
+
+      expect(count).toBe(1);
+      expect(textNode.nodeValue).toBe('Original shadow text');
+      expect(owner.hasAttribute('data-ti-has-original')).toBe(false);
+      document.body.removeChild(host);
+    });
+
+    it('skips detached shadow history roots and text nodes', async () => {
+      const host = document.createElement('x-host');
+      const shadow = host.attachShadow({ mode: 'open' });
+      const owner = document.createElement('span');
+      const textNode = document.createTextNode('Translated');
+      owner.appendChild(textNode);
+      shadow.appendChild(owner);
+      document.body.appendChild(host);
+      host.remove();
+
+      globalSelectElementState.translationHistory = [{
+        element: owner,
+        originalTextNodesData: [{ node: textNode, originalText: 'Original' }],
+        originalMetadataSnapshots: [{ element: owner, present: false, value: null }],
+      }];
+
+      const count = await revertSelectElementTranslation();
+
+      expect(count).toBe(0);
+      expect(textNode.nodeValue).toBe('Translated');
+    });
+
+    it('does not mutate replacement shadow content during identity-based metadata revert', async () => {
+      const host = document.createElement('x-host');
+      const shadow = host.attachShadow({ mode: 'open' });
+      const oldOwner = document.createElement('span');
+      const oldText = document.createTextNode('Translated old');
+      oldOwner.appendChild(oldText);
+      oldOwner.setAttribute('data-ti-has-original', 'true');
+      shadow.appendChild(oldOwner);
+      document.body.appendChild(host);
+
+      globalSelectElementState.translationHistory = [{
+        element: host,
+        originalTextNodesData: [{ node: oldText, originalText: 'Original old' }],
+        originalMetadataSnapshots: [{ element: oldOwner, present: false, value: null }],
+      }];
+
+      const replacement = document.createElement('span');
+      replacement.textContent = 'Replacement';
+      replacement.setAttribute('data-ti-has-original', 'replacement');
+      shadow.replaceChildren(replacement);
+
+      const count = await revertSelectElementTranslation();
+
+      expect(count).toBe(0);
+      expect(oldText.nodeValue).toBe('Translated old');
+      expect(replacement.getAttribute('data-ti-has-original')).toBe('replacement');
+      document.body.removeChild(host);
+    });
+
+    it('restores nested shadow metadata once and continues after one failure', async () => {
+      const host = document.createElement('x-host');
+      const outerShadow = host.attachShadow({ mode: 'open' });
+      const failingOwner = document.createElement('span');
+      const nestedHost = document.createElement('x-nested');
+      const nestedShadow = nestedHost.attachShadow({ mode: 'open' });
+      const owner = document.createElement('span');
+      const textNode = document.createTextNode('Translated');
+      owner.appendChild(textNode);
+      failingOwner.setAttribute('data-ti-has-original', 'true');
+      owner.setAttribute('data-ti-has-original', 'true');
+      nestedShadow.appendChild(owner);
+      outerShadow.append(failingOwner, nestedHost);
+      document.body.appendChild(host);
+
+      const failingRemoveAttribute = vi.spyOn(failingOwner, 'removeAttribute').mockImplementationOnce(() => {
+        throw new Error('metadata failure');
+      });
+      globalSelectElementState.translationHistory = [{
+        element: host,
+        originalTextNodesData: [{ node: textNode, originalText: 'Original' }],
+        originalMetadataSnapshots: [
+          { element: failingOwner, present: false, value: null },
+          { element: owner, present: false, value: null },
+          { element: owner, present: false, value: null },
+        ],
+      }];
+
+      const count = await revertSelectElementTranslation();
+
+      expect(count).toBe(1);
+      expect(failingRemoveAttribute).toHaveBeenCalledOnce();
+      expect(failingOwner.hasAttribute('data-ti-has-original')).toBe(true);
+      expect(owner.hasAttribute('data-ti-has-original')).toBe(false);
+      document.body.removeChild(host);
+    });
+
     it('does not mutate a replacement node', async () => {
       const { container, nodes } = appendTextNodes(['Original']);
       const replacement = document.createTextNode('Replacement');
