@@ -35,6 +35,9 @@ describe('PublicTranslationErrorPolicy', () => {
     [errorWithType(ErrorTypes.API_ENDPOINT_INVALID), PublicTranslationErrorTypes.ENDPOINT_INVALID],
     [errorWithType(ErrorTypes.BROWSER_API_UNAVAILABLE), PublicTranslationErrorTypes.BROWSER_API_UNAVAILABLE],
     [errorWithType(ErrorTypes.FORBIDDEN_ERROR), PublicTranslationErrorTypes.ACCESS_DENIED],
+    [errorWithType(ErrorTypes.TEXT_EMPTY), PublicTranslationErrorTypes.TEXT_EMPTY],
+    [errorWithType(ErrorTypes.TEXT_TOO_LONG), PublicTranslationErrorTypes.TEXT_TOO_LONG],
+    [errorWithType(ErrorTypes.PROMPT_INVALID), PublicTranslationErrorTypes.PROMPT_INVALID],
   ])('maps %o to %s', (error, type) => {
     expect(mapCanonicalTranslationError(error)).toMatchObject({ type, silent: false });
   });
@@ -53,6 +56,23 @@ describe('PublicTranslationErrorPolicy', () => {
       type: PublicTranslationErrorTypes.TRANSLATION_FAILED,
       messageKey: 'ERRORS_TRANSLATION_FAILED',
     });
+  });
+
+  it.each([
+    [ErrorTypes.TEXT_EMPTY, PublicTranslationErrorTypes.TEXT_EMPTY, 'ERRORS_TEXT_EMPTY'],
+    [ErrorTypes.TEXT_TOO_LONG, PublicTranslationErrorTypes.TEXT_TOO_LONG, 'ERRORS_TEXT_TOO_LONG'],
+    [ErrorTypes.PROMPT_INVALID, PublicTranslationErrorTypes.PROMPT_INVALID, 'ERRORS_PROMPT_INVALID'],
+  ])('preserves dedicated input UX for %s', (internalType, publicType, messageKey) => {
+    const result = mapCanonicalTranslationError({ type: internalType, message: 'raw input detail' });
+
+    expect(result).toMatchObject({
+      type: publicType,
+      messageKey,
+      severity: 'warning',
+      silent: false,
+    });
+    expect(result).not.toHaveProperty('action');
+    expect(result).not.toHaveProperty('message');
   });
 
   it.each([

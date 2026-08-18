@@ -76,6 +76,9 @@ vi.mock('@/shared/error-management/PublicTranslationErrorPolicy.js', () => ({
        API_ENDPOINT_INVALID: 'ENDPOINT_INVALID',
        BROWSER_API_UNAVAILABLE: 'BROWSER_API_UNAVAILABLE',
        FORBIDDEN_ERROR: 'ACCESS_DENIED',
+       TEXT_EMPTY: 'TEXT_EMPTY',
+       TEXT_TOO_LONG: 'TEXT_TOO_LONG',
+       PROMPT_INVALID: 'PROMPT_INVALID',
        HTTP_ERROR: error?.originalType === 'MODEL_MISSING' ? 'MODEL_UNAVAILABLE' : 'REQUEST_FAILURE',
       UNKNOWN: 'TRANSLATION_FAILED',
     }[error?.type] || error?.type,
@@ -93,6 +96,9 @@ vi.mock('@/shared/error-management/PublicTranslationErrorPolicy.js', () => ({
        API_ENDPOINT_INVALID: 'ERRORS_API_ENDPOINT_INVALID',
        BROWSER_API_UNAVAILABLE: 'ERRORS_BROWSER_API_UNAVAILABLE',
        FORBIDDEN_ERROR: 'ERRORS_FORBIDDEN_ERROR',
+       TEXT_EMPTY: 'ERRORS_TEXT_EMPTY',
+       TEXT_TOO_LONG: 'ERRORS_TEXT_TOO_LONG',
+       PROMPT_INVALID: 'ERRORS_PROMPT_INVALID',
        HTTP_ERROR: error?.originalType === 'MODEL_MISSING' ? 'ERRORS_MODEL_MISSING' : 'ERRORS_HTTP_ERROR',
      }[error?.type] || 'ERRORS_TRANSLATION_FAILED',
     silent: false,
@@ -113,6 +119,9 @@ vi.mock('@/shared/error-management/PublicTranslationErrorAdapter.js', () => ({
        ENDPOINT_INVALID: 'API_ENDPOINT_INVALID',
        BROWSER_API_UNAVAILABLE: 'BROWSER_API_UNAVAILABLE',
        ACCESS_DENIED: 'FORBIDDEN_ERROR',
+       TEXT_EMPTY: 'TEXT_EMPTY',
+       TEXT_TOO_LONG: 'TEXT_TOO_LONG',
+       PROMPT_INVALID: 'PROMPT_INVALID',
        TRANSLATION_FAILED: 'TRANSLATION_FAILED',
     }[publicError?.type] || publicError?.type || 'TRANSLATION_FAILED';
     const message = {
@@ -129,6 +138,9 @@ vi.mock('@/shared/error-management/PublicTranslationErrorAdapter.js', () => ({
        ERRORS_API_ENDPOINT_INVALID: 'API Endpoint not found (404). Please check your URL.',
        ERRORS_BROWSER_API_UNAVAILABLE: 'The translation API is not available or supported in this browser',
        ERRORS_FORBIDDEN_ERROR: 'Access denied. Check permissions or potential content moderation.',
+       ERRORS_TEXT_EMPTY: 'Text is empty',
+       ERRORS_TEXT_TOO_LONG: 'Text is too long',
+       ERRORS_PROMPT_INVALID: 'Prompt is invalid',
     }[publicError?.messageKey] || 'Translation failed';
     const displayError = new Error(message);
     displayError.type = legacyType;
@@ -686,6 +698,30 @@ describe('SelectElementManager', () => {
     });
 
     it.each([
+      [ErrorTypes.TEXT_EMPTY, 'TEXT_EMPTY', 'Text is empty'],
+      [ErrorTypes.TEXT_TOO_LONG, 'TEXT_TOO_LONG', 'Text is too long'],
+      [ErrorTypes.PROMPT_INVALID, 'PROMPT_INVALID', 'Prompt is invalid'],
+    ])('preserves localized input display for %s', async (type, legacyType, message) => {
+      const error = Object.assign(new Error(`raw canonical detail for ${type}`), { type });
+      manager.domTranslatorAdapter.translateElement.mockRejectedValue(error);
+
+      await manager.startTranslation(document.createElement('div'));
+
+      const { createPublicDisplayError } = await import('@/shared/error-management/PublicErrorPolicy.js');
+      const { mapCanonicalTranslationError } = await import('@/shared/error-management/PublicTranslationErrorPolicy.js');
+      const { createLegacyDisplayError } = await import('@/shared/error-management/PublicTranslationErrorAdapter.js');
+      expect(createPublicDisplayError).not.toHaveBeenCalled();
+      expect(mapCanonicalTranslationError).toHaveBeenCalledWith(error);
+      expect(createLegacyDisplayError).toHaveBeenCalled();
+      expect(errorHandler.handle).toHaveBeenCalledWith(
+        expect.objectContaining({ type: legacyType, message, cause: error }),
+        expect.objectContaining({ context: 'select-element', showToast: true })
+      );
+      expect(errorHandler.handle.mock.calls[0][0].message).not.toContain('raw canonical detail');
+      expect(errorHandler.handle).toHaveBeenCalledTimes(1);
+    });
+
+    it.each([
       ErrorTypes.MODEL_MISSING,
       ErrorTypes.API_ERROR,
       ErrorTypes.API_KEY_MISSING,
@@ -717,6 +753,9 @@ describe('SelectElementManager', () => {
        ErrorTypes.API_ENDPOINT_INVALID,
        ErrorTypes.BROWSER_API_UNAVAILABLE,
        ErrorTypes.FORBIDDEN_ERROR,
+       ErrorTypes.TEXT_EMPTY,
+       ErrorTypes.TEXT_TOO_LONG,
+       ErrorTypes.PROMPT_INVALID,
     ])('uses new public contract for safe type %s', async (type) => {
       const error = Object.assign(new Error(`raw internal detail for ${type}`), { type });
       manager.domTranslatorAdapter.translateElement.mockRejectedValue(error);
@@ -742,6 +781,9 @@ describe('SelectElementManager', () => {
          API_ENDPOINT_INVALID: 'ENDPOINT_INVALID',
          BROWSER_API_UNAVAILABLE: 'BROWSER_API_UNAVAILABLE',
          FORBIDDEN_ERROR: 'ACCESS_DENIED',
+         TEXT_EMPTY: 'TEXT_EMPTY',
+         TEXT_TOO_LONG: 'TEXT_TOO_LONG',
+         PROMPT_INVALID: 'PROMPT_INVALID',
        }[type] || type;
       expect(createPublicDisplayError).not.toHaveBeenCalled();
       expect(mapCanonicalTranslationError).toHaveBeenCalledWith(error);

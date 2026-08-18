@@ -32,6 +32,9 @@ export const PublicTranslationErrorMessageKeys = Object.freeze({
   [PublicTranslationErrorTypes.ENDPOINT_INVALID]: 'ERRORS_API_ENDPOINT_INVALID',
   [PublicTranslationErrorTypes.BROWSER_API_UNAVAILABLE]: 'ERRORS_BROWSER_API_UNAVAILABLE',
   [PublicTranslationErrorTypes.ACCESS_DENIED]: 'ERRORS_FORBIDDEN_ERROR',
+  [PublicTranslationErrorTypes.TEXT_EMPTY]: 'ERRORS_TEXT_EMPTY',
+  [PublicTranslationErrorTypes.TEXT_TOO_LONG]: 'ERRORS_TEXT_TOO_LONG',
+  [PublicTranslationErrorTypes.PROMPT_INVALID]: 'ERRORS_PROMPT_INVALID',
   [PublicTranslationErrorTypes.TRANSLATION_FAILED]: 'ERRORS_TRANSLATION_FAILED',
 });
 
@@ -55,9 +58,9 @@ const PUBLIC_TYPE_BY_INTERNAL_TYPE = new Map([
   [ErrorTypes.JSON_PARSING_ERROR, PublicTranslationErrorTypes.INVALID_RESPONSE],
   [ErrorTypes.UNEXPECTED_RESPONSE_FORMAT, PublicTranslationErrorTypes.INVALID_RESPONSE],
   [ErrorTypes.VALIDATION, PublicTranslationErrorTypes.INVALID_INPUT],
-  [ErrorTypes.TEXT_EMPTY, PublicTranslationErrorTypes.INVALID_INPUT],
-  [ErrorTypes.TEXT_TOO_LONG, PublicTranslationErrorTypes.INVALID_INPUT],
-  [ErrorTypes.PROMPT_INVALID, PublicTranslationErrorTypes.INVALID_INPUT],
+  [ErrorTypes.TEXT_EMPTY, PublicTranslationErrorTypes.TEXT_EMPTY],
+  [ErrorTypes.TEXT_TOO_LONG, PublicTranslationErrorTypes.TEXT_TOO_LONG],
+  [ErrorTypes.PROMPT_INVALID, PublicTranslationErrorTypes.PROMPT_INVALID],
   [ErrorTypes.INVALID_REQUEST, PublicTranslationErrorTypes.INVALID_REQUEST],
   [ErrorTypes.HTTP_ERROR, PublicTranslationErrorTypes.REQUEST_FAILURE],
   [ErrorTypes.API_URL_MISSING, PublicTranslationErrorTypes.API_URL_MISSING],

@@ -77,6 +77,9 @@ const SAFE_PUBLIC_TRANSLATION_ERROR_TYPES = new Set([
   ErrorTypes.API_ENDPOINT_INVALID,
   ErrorTypes.BROWSER_API_UNAVAILABLE,
   ErrorTypes.FORBIDDEN_ERROR,
+  ErrorTypes.TEXT_EMPTY,
+  ErrorTypes.TEXT_TOO_LONG,
+  ErrorTypes.PROMPT_INVALID,
 ]);
 
 function shouldUsePublicTranslationContract(error) {
