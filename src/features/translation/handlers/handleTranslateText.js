@@ -1,5 +1,6 @@
 import { ErrorHandler } from '@/shared/error-management/ErrorHandler.js';
 import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
+import { MessageFormat } from '@/shared/messaging/core/MessagingCore.js';
 import { MessageActions } from '@/shared/messaging/core/MessageActions.js';
 import { ProviderRegistryIds } from '@/features/translation/providers/ProviderConstants.js';
 import { getScopedLogger } from '@/shared/logging/logger.js';
@@ -71,9 +72,13 @@ export async function handleTranslateText(message, sender, sendResponse) {
       logger.debug(`[TRANSLATE_TEXT] Returning successful response:`, response);
       return response;
     } else {
+      const errorMessage = result.error?.message || 'Translation failed';
       const response = {
         success: false,
-        error: result.error?.message || 'Translation failed'
+        error: errorMessage,
+        errorDetails: MessageFormat.serializeTranslationError(result.error ?? errorMessage, {
+          message: errorMessage
+        })
       };
       logger.debug(`[TRANSLATE_TEXT] Returning error response:`, response);
       return response;
@@ -87,9 +92,11 @@ export async function handleTranslateText(message, sender, sendResponse) {
       messageData: message
     });
     
+    const errorMessage = error.message || 'Translation failed';
     const errorResponse = {
       success: false,
-      error: error.message || 'Translation failed'
+      error: errorMessage,
+      errorDetails: MessageFormat.serializeTranslationError(error, { message: errorMessage })
     };
     logger.error(`[TRANSLATE_TEXT] Returning catch error response:`, error);
     return errorResponse;
