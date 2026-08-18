@@ -68,6 +68,10 @@ const SAFE_PUBLIC_TRANSLATION_ERROR_TYPES = new Set([
   ErrorTypes.JSON_PARSING_ERROR,
   ErrorTypes.UNEXPECTED_RESPONSE_FORMAT,
   ErrorTypes.HTTP_ERROR,
+  ErrorTypes.HTML_RESPONSE_ERROR,
+  ErrorTypes.TRANSLATION_ERROR,
+  ErrorTypes.CONNECTION_LOST,
+  ErrorTypes.NO_ACCEPTED_TRANSLATION_RESULTS,
 ]);
 
 function shouldUsePublicTranslationContract(error) {

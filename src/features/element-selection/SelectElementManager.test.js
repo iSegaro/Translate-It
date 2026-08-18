@@ -66,7 +66,11 @@ vi.mock('@/shared/error-management/PublicTranslationErrorPolicy.js', () => ({
       DEEPL_QUOTA_EXCEEDED: 'DEEPL_QUOTA_EXCEEDED',
       API_RESPONSE_INVALID: 'INVALID_RESPONSE',
       JSON_PARSING_ERROR: 'INVALID_RESPONSE',
-      UNEXPECTED_RESPONSE_FORMAT: 'INVALID_RESPONSE',
+       UNEXPECTED_RESPONSE_FORMAT: 'INVALID_RESPONSE',
+       HTML_RESPONSE_ERROR: 'TRANSLATION_FAILED',
+       TRANSLATION_ERROR: 'TRANSLATION_FAILED',
+       CONNECTION_LOST: 'TRANSLATION_FAILED',
+       NO_ACCEPTED_TRANSLATION_RESULTS: 'TRANSLATION_FAILED',
        HTTP_ERROR: error?.originalType === 'MODEL_MISSING' ? 'MODEL_UNAVAILABLE' : 'REQUEST_FAILURE',
       UNKNOWN: 'TRANSLATION_FAILED',
     }[error?.type] || error?.type,
@@ -104,6 +108,7 @@ vi.mock('@/shared/error-management/PublicTranslationErrorAdapter.js', () => ({
        ERRORS_API_RESPONSE_INVALID: 'Invalid API response format',
        ERRORS_MODEL_MISSING: 'AI Model is missing or invalid',
        ERRORS_HTTP_ERROR: 'HTTP error',
+       ERRORS_TRANSLATION_FAILED: 'Translation failed',
     }[publicError?.messageKey] || 'Translation failed';
     const displayError = new Error(message);
     displayError.type = legacyType;
@@ -650,11 +655,15 @@ describe('SelectElementManager', () => {
       ErrorTypes.INVALID_REQUEST,
       ErrorTypes.TRANSLATION_FAILED,
       ErrorTypes.UNKNOWN,
-      ErrorTypes.API_RESPONSE_INVALID,
-      ErrorTypes.JSON_PARSING_ERROR,
-      ErrorTypes.UNEXPECTED_RESPONSE_FORMAT,
+       ErrorTypes.API_RESPONSE_INVALID,
+       ErrorTypes.JSON_PARSING_ERROR,
+       ErrorTypes.UNEXPECTED_RESPONSE_FORMAT,
+       ErrorTypes.HTML_RESPONSE_ERROR,
+       ErrorTypes.TRANSLATION_ERROR,
+       ErrorTypes.CONNECTION_LOST,
+       ErrorTypes.NO_ACCEPTED_TRANSLATION_RESULTS,
     ])('uses new public contract for safe type %s', async (type) => {
-      const error = Object.assign(new Error(type), { type });
+      const error = Object.assign(new Error(`raw internal detail for ${type}`), { type });
       manager.domTranslatorAdapter.translateElement.mockRejectedValue(error);
 
       await manager.startTranslation(document.createElement('div'));
@@ -667,13 +676,27 @@ describe('SelectElementManager', () => {
         VALIDATION: 'INVALID_INPUT',
         UNKNOWN: 'TRANSLATION_FAILED',
         API_RESPONSE_INVALID: 'INVALID_RESPONSE',
-        JSON_PARSING_ERROR: 'INVALID_RESPONSE',
-        UNEXPECTED_RESPONSE_FORMAT: 'INVALID_RESPONSE',
-      }[type] || type;
+         JSON_PARSING_ERROR: 'INVALID_RESPONSE',
+         UNEXPECTED_RESPONSE_FORMAT: 'INVALID_RESPONSE',
+         HTML_RESPONSE_ERROR: 'TRANSLATION_FAILED',
+         TRANSLATION_ERROR: 'TRANSLATION_FAILED',
+         CONNECTION_LOST: 'TRANSLATION_FAILED',
+         NO_ACCEPTED_TRANSLATION_RESULTS: 'TRANSLATION_FAILED',
+       }[type] || type;
       expect(createPublicDisplayError).not.toHaveBeenCalled();
       expect(mapCanonicalTranslationError).toHaveBeenCalledWith(error);
       expect(createLegacyDisplayError).toHaveBeenCalledWith(error, expect.objectContaining({ type: expectedPublicType }));
       expect(errorHandler.handle).toHaveBeenCalledTimes(1);
+      if ([
+        ErrorTypes.HTML_RESPONSE_ERROR,
+        ErrorTypes.TRANSLATION_ERROR,
+        ErrorTypes.CONNECTION_LOST,
+        ErrorTypes.NO_ACCEPTED_TRANSLATION_RESULTS,
+      ].includes(type)) {
+        expect(errorHandler.handle.mock.calls[0][0].type).toBe(ErrorTypes.TRANSLATION_FAILED);
+        expect(errorHandler.handle.mock.calls[0][0].message).toBe('Translation failed');
+        expect(errorHandler.handle.mock.calls[0][0].message).not.toContain('raw internal detail');
+      }
     });
 
     it.each([
