@@ -9,6 +9,7 @@ import { streamingTimeoutManager } from './StreamingTimeoutManager.js';
 import { isFatalError, matchErrorToType, isSilentError } from '@/shared/error-management/ErrorMatcher.js';
 import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
 import { isRestrictedUrl } from '@/core/tabPermissions.js';
+import { reconstructTranslationError } from './MessagingCore.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.MESSAGING, 'UnifiedMessaging');
 
@@ -91,6 +92,45 @@ function createTimeout(ms, action) {
     promise,
     clear: () => clearTimeout(timeoutId)
   };
+}
+
+function getFailureMessage(response, responseError) {
+  if (responseError && typeof responseError === 'object') {
+    return responseError.message
+      || responseError.error
+      || responseError.statusText
+      || responseError.reason
+      || response.message
+      || response.statusText
+      || 'Unknown technical error';
+  }
+
+  return responseError
+    || response.message
+    || response.statusText
+    || 'Unknown technical error';
+}
+
+function reconstructResponseError(response) {
+  const responseError = response.error;
+  const message = getFailureMessage(response, responseError);
+
+  if (!responseError || typeof responseError !== 'object') {
+    return reconstructTranslationError(message);
+  }
+
+  return reconstructTranslationError({
+    message,
+    type: responseError.type,
+    originalType: responseError.originalType,
+    statusCode: responseError.statusCode,
+    context: responseError.context,
+    providerName: responseError.providerName,
+    providerId: responseError.providerId,
+    code: responseError.code,
+    errorCode: responseError.errorCode,
+    translationOutcome: responseError.translationOutcome
+  });
 }
 
 export async function sendMessage(message, options = {}) {
@@ -185,55 +225,7 @@ export async function sendRegularMessage(message, options = {}) {
         return response;
       }
 
-      // Safe error extraction
-      let errorMessage = '';
-      if (response.error) {
-        if (typeof response.error === 'string') {
-          errorMessage = response.error;
-        } else if (typeof response.error === 'object') {
-          // Try to find the most descriptive error message in common fields
-          errorMessage = response.error.message || 
-                         response.error.error || 
-                         response.error.statusText ||
-                         response.error.reason ||
-                         response.message || 
-                         response.statusText;
-          
-          // If still no message but it's an object, try to stringify it (excluding large partial results)
-          if (!errorMessage && response.error !== null) {
-            try {
-              const cleanError = { ...response.error };
-              delete cleanError.partialResults;
-              errorMessage = JSON.stringify(cleanError);
-              if (errorMessage === '{}') errorMessage = '';
-            } catch {
-              errorMessage = '';
-            }
-          }
-        }
-      } else if (response.message) {
-        errorMessage = response.message;
-      }
-      
-      if (!errorMessage) {
-        errorMessage = (response.error && typeof response.error.toString === 'function' && response.error.toString() !== '[object Object]') 
-                        ? response.error.toString() 
-                        : 'Unknown technical error';
-      }
-      
-      const error = new Error(String(errorMessage));
-
-      // Safe property copy
-      if (response.error && typeof response.error === 'object') {
-        Object.keys(response.error).forEach(key => {
-          if (key !== 'partialResults') error[key] = response.error[key];
-        });
-      }
-      Object.keys(response).forEach(key => {
-        if (key !== 'partialResults' && key !== 'error') error[key] = response[key];
-      });
-
-      throw error;
+      throw reconstructResponseError(response);
     }
 
     return response;

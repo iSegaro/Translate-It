@@ -3,6 +3,7 @@ import { sendMessage, sendRegularMessage } from './UnifiedMessaging.js';
 import browser from 'webextension-polyfill';
 import ExtensionContextManager from '@/core/extensionContext.js';
 import * as contextCore from '@/core/contextCore.js';
+import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
 
 // Mock dependencies
 vi.mock('webextension-polyfill', () => ({
@@ -121,6 +122,170 @@ describe('UnifiedMessaging', () => {
       });
 
       await expect(sendRegularMessage(message)).rejects.toThrow('Something went wrong');
+    });
+
+    it('reconstructs canonical error identity and drops transport metadata', async () => {
+      browser.runtime.sendMessage.mockResolvedValue({
+        success: false,
+        message: 'envelope message',
+        type: 'ENVELOPE_TYPE',
+        statusCode: 418,
+        messageId: 'response-id',
+        streaming: true,
+        translatedText: 'leak',
+        provider: 'top-level-provider',
+        sourceLanguage: 'en',
+        targetLanguage: 'fa',
+        error: {
+          message: 'canonical message',
+          type: 'API_ERROR',
+          originalType: 'HTTP_ERROR',
+          statusCode: 503,
+          context: 'translation',
+          providerName: 'Provider',
+          providerId: 'provider-id',
+          code: 'UPSTREAM_FAILURE',
+          errorCode: 'E_UPSTREAM',
+          translationOutcome: { committedParentCount: 1 },
+          isFatal: true,
+          cancelled: true,
+          alreadyHandled: true,
+          cause: new Error('unsafe cause'),
+          originalError: { message: 'unsafe original' },
+          stack: 'unsafe stack',
+          arbitrary: { secret: true }
+        }
+      });
+
+      const rejection = sendRegularMessage({ action: 'TRANSLATE' });
+      await expect(rejection).rejects.toThrow('canonical message');
+      try {
+        await rejection;
+      } catch (error) {
+        expect(error).toMatchObject({
+          message: 'canonical message',
+          type: 'API_ERROR',
+          originalType: 'HTTP_ERROR',
+          statusCode: 503,
+          context: 'translation',
+          providerName: 'Provider',
+          providerId: 'provider-id',
+          code: 'UPSTREAM_FAILURE',
+          errorCode: 'E_UPSTREAM',
+          translationOutcome: { committedParentCount: 1 }
+        });
+        expect(error).not.toHaveProperty('success');
+        expect(error).not.toHaveProperty('messageId');
+        expect(error).not.toHaveProperty('streaming');
+        expect(error).not.toHaveProperty('translatedText');
+        expect(error).not.toHaveProperty('provider');
+        expect(error).not.toHaveProperty('sourceLanguage');
+        expect(error).not.toHaveProperty('targetLanguage');
+        expect(error).not.toHaveProperty('isFatal');
+        expect(error).not.toHaveProperty('cancelled');
+        expect(error).not.toHaveProperty('isCancelled');
+        expect(error).not.toHaveProperty('alreadyHandled');
+        expect(error).not.toHaveProperty('cause');
+        expect(error).not.toHaveProperty('originalError');
+        expect(error).not.toHaveProperty('arbitrary');
+      }
+    });
+
+    it('keeps canonical error fields authoritative over conflicting envelope fields', async () => {
+      browser.runtime.sendMessage.mockResolvedValue({
+        success: false,
+        message: 'wrong envelope message',
+        type: 'WRONG_ENVELOPE_TYPE',
+        statusCode: 401,
+        error: {
+          message: 'canonical message',
+          type: 'API_ERROR',
+          statusCode: 503
+        }
+      });
+
+      const rejection = sendRegularMessage({ action: 'FAIL' });
+      await expect(rejection).rejects.toThrow('canonical message');
+      await rejection.catch((error) => {
+        expect(error.message).toBe('canonical message');
+        expect(error.type).toBe('API_ERROR');
+        expect(error.statusCode).toBe(503);
+      });
+    });
+
+    it('reconstructs string response errors', async () => {
+      browser.runtime.sendMessage.mockResolvedValue({ success: false, error: 'String failure' });
+
+      await expect(sendRegularMessage({ action: 'FAIL' })).rejects.toThrow('String failure');
+    });
+
+    it.each([
+      ['object error', { error: 'nested error' }, 'nested error'],
+      ['object reason', { reason: 'reason failure' }, 'reason failure'],
+      ['object statusText', { statusText: 'status failure' }, 'status failure'],
+      ['top-level message', {}, 'top-level failure', { message: 'top-level failure' }],
+      ['top-level statusText', {}, 'status failure', { statusText: 'status failure' }]
+    ])('preserves %s message fallback', async (_name, error, expected, envelope = {}) => {
+      browser.runtime.sendMessage.mockResolvedValue({
+        success: false,
+        ...envelope,
+        error
+      });
+
+      await expect(sendRegularMessage({ action: 'FAIL' })).rejects.toThrow(expected);
+    });
+
+    it('uses technical fallback for missing or malformed errors', async () => {
+      browser.runtime.sendMessage
+        .mockResolvedValueOnce({
+          success: false,
+          error: { arbitrary: { nested: true }, partialResults: ['unsafe'] }
+        })
+        .mockResolvedValueOnce({ success: false });
+
+      const malformedRejection = sendRegularMessage({ action: 'FAIL' });
+      await expect(malformedRejection).rejects.toThrow('Unknown technical error');
+      await malformedRejection.catch((error) => {
+        expect(error).not.toHaveProperty('arbitrary');
+        expect(error).not.toHaveProperty('partialResults');
+      });
+
+      await expect(sendRegularMessage({ action: 'FAIL' })).rejects.toThrow('Unknown technical error');
+    });
+
+    it('returns restricted-page failures unchanged', async () => {
+      const response = {
+        success: false,
+        isRestrictedPage: true,
+        error: { message: 'restricted' },
+        arbitrary: { preserved: true }
+      };
+      browser.runtime.sendMessage.mockResolvedValue(response);
+
+      await expect(sendRegularMessage({ action: 'FAIL' })).resolves.toBe(response);
+    });
+
+    it('leaves rejected runtime errors unchanged', async () => {
+      const runtimeError = Object.assign(new Error('Runtime failed'), {
+        type: 'RUNTIME_ERROR',
+        arbitrary: { preserved: true }
+      });
+      browser.runtime.sendMessage.mockRejectedValue(runtimeError);
+
+      await expect(sendRegularMessage({ action: 'FAIL' })).rejects.toBe(runtimeError);
+    });
+
+    it('keeps cancellation behavior unchanged', async () => {
+      const { streamingTimeoutManager } = await import('./StreamingTimeoutManager.js');
+      streamingTimeoutManager.shouldContinue.mockReturnValue(false);
+
+      try {
+        await expect(sendRegularMessage({ action: 'TRANSLATE', messageId: 'cancelled' }))
+          .rejects.toMatchObject({ type: ErrorTypes.USER_CANCELLED });
+        expect(browser.runtime.sendMessage).not.toHaveBeenCalled();
+      } finally {
+        streamingTimeoutManager.shouldContinue.mockReturnValue(true);
+      }
     });
 
     it('should throw if extension context is invalidated', async () => {
