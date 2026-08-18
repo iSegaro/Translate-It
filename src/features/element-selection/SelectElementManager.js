@@ -11,7 +11,6 @@ import ExtensionContextManager from '@/core/extensionContext.js';
 import { ErrorHandler } from '@/shared/error-management/ErrorHandler.js';
 import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
 import { isFatalError, isCancellationError } from '@/shared/error-management/ErrorMatcher.js';
-import { createPublicDisplayError } from '@/shared/error-management/PublicErrorPolicy.js';
 import { mapCanonicalTranslationError } from '@/shared/error-management/PublicTranslationErrorPolicy.js';
 import { createLegacyDisplayError } from '@/shared/error-management/PublicTranslationErrorAdapter.js';
 import { getEffectiveProviderAsync, TranslationMode } from '@/shared/config/config.js';
@@ -43,55 +42,6 @@ const SELECT_ELEMENT_PARTIAL_ERROR_FALLBACK = 'Some content could not be transla
 
 const SELECT_ELEMENT_NO_TRANSLATABLE_CONTENT_KEY = 'SELECT_ELEMENT_NO_TRANSLATABLE_CONTENT';
 const SELECT_ELEMENT_NO_TRANSLATABLE_CONTENT_FALLBACK = 'No translatable text was found in this element.';
-
-const SAFE_PUBLIC_TRANSLATION_ERROR_TYPES = new Set([
-  ErrorTypes.MODEL_MISSING,
-  ErrorTypes.API_ERROR,
-  ErrorTypes.API_KEY_MISSING,
-  ErrorTypes.API_KEY_INVALID,
-  ErrorTypes.QUOTA_EXCEEDED,
-  ErrorTypes.VALIDATION,
-  ErrorTypes.ELEMENT_TOO_LARGE,
-  ErrorTypes.GEMINI_QUOTA_REGION,
-  ErrorTypes.DEEPL_QUOTA_EXCEEDED,
-  ErrorTypes.INSUFFICIENT_BALANCE,
-  ErrorTypes.RATE_LIMIT_REACHED,
-  ErrorTypes.MODEL_OVERLOADED,
-  ErrorTypes.NETWORK_ERROR,
-  ErrorTypes.SERVER_ERROR,
-  ErrorTypes.TRANSLATION_TIMEOUT,
-  ErrorTypes.OPERATION_TIMEOUT,
-  ErrorTypes.INVALID_REQUEST,
-  ErrorTypes.TRANSLATION_FAILED,
-  ErrorTypes.UNKNOWN,
-  ErrorTypes.API_RESPONSE_INVALID,
-  ErrorTypes.JSON_PARSING_ERROR,
-  ErrorTypes.UNEXPECTED_RESPONSE_FORMAT,
-  ErrorTypes.HTTP_ERROR,
-  ErrorTypes.HTML_RESPONSE_ERROR,
-  ErrorTypes.TRANSLATION_ERROR,
-  ErrorTypes.CONNECTION_LOST,
-  ErrorTypes.NO_ACCEPTED_TRANSLATION_RESULTS,
-  ErrorTypes.API_URL_MISSING,
-  ErrorTypes.API_CONFIG_INVALID,
-  ErrorTypes.API_ENDPOINT_INVALID,
-  ErrorTypes.BROWSER_API_UNAVAILABLE,
-  ErrorTypes.FORBIDDEN_ERROR,
-  ErrorTypes.TEXT_EMPTY,
-  ErrorTypes.TEXT_TOO_LONG,
-  ErrorTypes.PROMPT_INVALID,
-  ErrorTypes.LANGUAGE_PAIR_NOT_SUPPORTED,
-  ErrorTypes.CIRCUIT_BREAKER_OPEN,
-  ErrorTypes.TRANSLATION_NOT_FOUND,
-]);
-
-function shouldUsePublicTranslationContract(error) {
-  return SAFE_PUBLIC_TRANSLATION_ERROR_TYPES.has(error?.type)
-    || (
-      error?.type === ErrorTypes.HTTP_ERROR
-      && error?.originalType === ErrorTypes.MODEL_MISSING
-    );
-}
 
 const SELECT_ELEMENT_UNSUPPORTED_TRANSLATION_MODE_KEY = 'SELECT_ELEMENT_UNSUPPORTED_TRANSLATION_MODE';
 const SELECT_ELEMENT_UNSUPPORTED_TRANSLATION_MODE_FALLBACK = 'This content cannot be translated with the current translation mode.';
@@ -641,6 +591,7 @@ class SelectElementManager extends ResourceTracker {
       && committedParentCount > 0
       && committedParentCount < totalParentCount;
     const isNoTranslatableContent = error.type === ErrorTypes.NO_TRANSLATABLE_CONTENT;
+    const isAlreadyTranslated = error.type === ErrorTypes.NODE_ALREADY_TRANSLATED;
     const isSilentSkip = isCancellation
       || error.type === ErrorTypes.FEATURE_BLOCKED
       || ExtensionContextManager.isContextError(error);
@@ -649,7 +600,7 @@ class SelectElementManager extends ResourceTracker {
       this.logger.debug('Select Element translation cancelled:', error.message);
     } else if (isNoTranslatableContent) {
       await this._handleNoTranslatableContent(error);
-    } else if (isSilentSkip) {
+    } else if (isSilentSkip || isAlreadyTranslated) {
       this.logger.debug('Select Element translation skipped:', error.message);
     } else {
       this.logger.warn('Select Element translation failed:', error);
@@ -660,11 +611,9 @@ class SelectElementManager extends ResourceTracker {
           cause: error,
           translationOutcome: outcome,
         });
-      } else if (shouldUsePublicTranslationContract(error)) {
+      } else {
         const publicError = mapCanonicalTranslationError(error);
         displayError = await createLegacyDisplayError(error, publicError);
-      } else {
-        displayError = await createPublicDisplayError(error);
       }
       if (isPartialFailure) {
         this.logger.warn('Select Element translation partially failed:', {
@@ -694,7 +643,7 @@ class SelectElementManager extends ResourceTracker {
    * Handles an accepted Select Element request that produced zero translatable
    * units. Non-error, non-cancellation outcome: shows one informational message
    * and lets cleanup run on a semantic 'no-content' reason. Deliberately keeps
-   * the outcome out of ErrorHandler / PublicErrorPolicy error semantics.
+    * the outcome out of ErrorHandler error semantics.
    * @private
    * @param {Error} error - The NO_TRANSLATABLE_CONTENT error.
    */
@@ -711,7 +660,7 @@ class SelectElementManager extends ResourceTracker {
 
   /**
    * Routes an informational Select Element message through the notification
-   * owner. Feature-owned non-error path; never PublicErrorPolicy.
+    * owner. Feature-owned non-error path; never public translation error handling.
    * @param {string} message - Localized informational message.
    */
   showNoContentNotification(message) {

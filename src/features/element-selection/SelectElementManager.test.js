@@ -66,25 +66,38 @@ vi.mock('@/shared/error-management/PublicTranslationErrorPolicy.js', () => ({
       DEEPL_QUOTA_EXCEEDED: 'DEEPL_QUOTA_EXCEEDED',
       API_RESPONSE_INVALID: 'INVALID_RESPONSE',
       JSON_PARSING_ERROR: 'INVALID_RESPONSE',
-       UNEXPECTED_RESPONSE_FORMAT: 'INVALID_RESPONSE',
-       HTML_RESPONSE_ERROR: 'TRANSLATION_FAILED',
-       TRANSLATION_ERROR: 'TRANSLATION_FAILED',
-       CONNECTION_LOST: 'TRANSLATION_FAILED',
-       NO_ACCEPTED_TRANSLATION_RESULTS: 'TRANSLATION_FAILED',
-       API_URL_MISSING: 'API_URL_MISSING',
-       API_CONFIG_INVALID: 'CONFIGURATION_INVALID',
-       API_ENDPOINT_INVALID: 'ENDPOINT_INVALID',
-       BROWSER_API_UNAVAILABLE: 'BROWSER_API_UNAVAILABLE',
-       FORBIDDEN_ERROR: 'ACCESS_DENIED',
-       TEXT_EMPTY: 'TEXT_EMPTY',
-       TEXT_TOO_LONG: 'TEXT_TOO_LONG',
-       PROMPT_INVALID: 'PROMPT_INVALID',
-        LANGUAGE_PAIR_NOT_SUPPORTED: 'LANGUAGE_PAIR_UNSUPPORTED',
-        CIRCUIT_BREAKER_OPEN: 'PROVIDER_TEMPORARILY_UNAVAILABLE',
-        TRANSLATION_NOT_FOUND: 'TRANSLATION_NOT_FOUND',
-        HTTP_ERROR: error?.originalType === 'MODEL_MISSING' ? 'MODEL_UNAVAILABLE' : 'REQUEST_FAILURE',
+      UNEXPECTED_RESPONSE_FORMAT: 'INVALID_RESPONSE',
+      HTML_RESPONSE_ERROR: 'TRANSLATION_FAILED',
+      TRANSLATION_ERROR: 'TRANSLATION_FAILED',
+      CONNECTION_LOST: 'TRANSLATION_FAILED',
+      NO_ACCEPTED_TRANSLATION_RESULTS: 'TRANSLATION_FAILED',
+      API_URL_MISSING: 'API_URL_MISSING',
+      API_CONFIG_INVALID: 'CONFIGURATION_INVALID',
+      API_ENDPOINT_INVALID: 'ENDPOINT_INVALID',
+      BROWSER_API_UNAVAILABLE: 'BROWSER_API_UNAVAILABLE',
+      FORBIDDEN_ERROR: 'ACCESS_DENIED',
+      TEXT_EMPTY: 'TEXT_EMPTY',
+      TEXT_TOO_LONG: 'TEXT_TOO_LONG',
+      PROMPT_INVALID: 'PROMPT_INVALID',
+      LANGUAGE_PAIR_NOT_SUPPORTED: 'LANGUAGE_PAIR_UNSUPPORTED',
+      CIRCUIT_BREAKER_OPEN: 'PROVIDER_TEMPORARILY_UNAVAILABLE',
+      TRANSLATION_NOT_FOUND: 'TRANSLATION_NOT_FOUND',
+      MODEL_MISSING: 'MODEL_UNAVAILABLE',
+      API_KEY_MISSING: 'API_KEY_MISSING',
+      API_KEY_INVALID: 'API_KEY_INVALID',
+      QUOTA_EXCEEDED: 'QUOTA_EXCEEDED',
+      INSUFFICIENT_BALANCE: 'INSUFFICIENT_BALANCE',
+      RATE_LIMIT_REACHED: 'RATE_LIMITED',
+      MODEL_OVERLOADED: 'MODEL_OVERLOADED',
+      NETWORK_ERROR: 'NETWORK_ERROR',
+      SERVER_ERROR: 'SERVER_ERROR',
+      TRANSLATION_TIMEOUT: 'TRANSLATION_TIMEOUT',
+      OPERATION_TIMEOUT: 'TRANSLATION_TIMEOUT',
+      INVALID_REQUEST: 'INVALID_REQUEST',
+      TRANSLATION_FAILED: 'TRANSLATION_FAILED',
+      HTTP_ERROR: error?.originalType === 'MODEL_MISSING' ? 'MODEL_UNAVAILABLE' : 'REQUEST_FAILURE',
       UNKNOWN: 'TRANSLATION_FAILED',
-    }[error?.type] || error?.type,
+     }[error?.type] || 'TRANSLATION_FAILED',
      messageKey: {
       API_ERROR: 'ERRORS_API_ERROR',
       VALIDATION: 'ERRORS_INVALID_INPUT',
@@ -94,18 +107,30 @@ vi.mock('@/shared/error-management/PublicTranslationErrorPolicy.js', () => ({
       API_RESPONSE_INVALID: 'ERRORS_API_RESPONSE_INVALID',
       JSON_PARSING_ERROR: 'ERRORS_API_RESPONSE_INVALID',
       UNEXPECTED_RESPONSE_FORMAT: 'ERRORS_API_RESPONSE_INVALID',
-       API_URL_MISSING: 'ERRORS_API_URL_MISSING',
-       API_CONFIG_INVALID: 'ERRORS_API_CONFIG_INVALID',
-       API_ENDPOINT_INVALID: 'ERRORS_API_ENDPOINT_INVALID',
-       BROWSER_API_UNAVAILABLE: 'ERRORS_BROWSER_API_UNAVAILABLE',
-       FORBIDDEN_ERROR: 'ERRORS_FORBIDDEN_ERROR',
-       TEXT_EMPTY: 'ERRORS_TEXT_EMPTY',
-       TEXT_TOO_LONG: 'ERRORS_TEXT_TOO_LONG',
-       PROMPT_INVALID: 'ERRORS_PROMPT_INVALID',
-        LANGUAGE_PAIR_NOT_SUPPORTED: 'ERRORS_LANGUAGE_PAIR_NOT_SUPPORTED',
-        CIRCUIT_BREAKER_OPEN: 'ERRORS_CIRCUIT_BREAKER_OPEN',
-        TRANSLATION_NOT_FOUND: 'ERRORS_TRANSLATION_NOT_FOUND',
-        HTTP_ERROR: error?.originalType === 'MODEL_MISSING' ? 'ERRORS_MODEL_MISSING' : 'ERRORS_HTTP_ERROR',
+      API_URL_MISSING: 'ERRORS_API_URL_MISSING',
+      API_CONFIG_INVALID: 'ERRORS_API_CONFIG_INVALID',
+      API_ENDPOINT_INVALID: 'ERRORS_API_ENDPOINT_INVALID',
+      BROWSER_API_UNAVAILABLE: 'ERRORS_BROWSER_API_UNAVAILABLE',
+      FORBIDDEN_ERROR: 'ERRORS_FORBIDDEN_ERROR',
+      TEXT_EMPTY: 'ERRORS_TEXT_EMPTY',
+      TEXT_TOO_LONG: 'ERRORS_TEXT_TOO_LONG',
+      PROMPT_INVALID: 'ERRORS_PROMPT_INVALID',
+      LANGUAGE_PAIR_NOT_SUPPORTED: 'ERRORS_LANGUAGE_PAIR_NOT_SUPPORTED',
+      CIRCUIT_BREAKER_OPEN: 'ERRORS_CIRCUIT_BREAKER_OPEN',
+      TRANSLATION_NOT_FOUND: 'ERRORS_TRANSLATION_NOT_FOUND',
+      MODEL_MISSING: 'ERRORS_MODEL_MISSING',
+      API_KEY_MISSING: 'ERRORS_API_KEY_MISSING',
+      API_KEY_INVALID: 'ERRORS_API_KEY_INVALID',
+      QUOTA_EXCEEDED: 'ERRORS_QUOTA_EXCEEDED',
+      INSUFFICIENT_BALANCE: 'ERRORS_INSUFFICIENT_BALANCE',
+      RATE_LIMIT_REACHED: 'ERRORS_RATE_LIMIT_REACHED',
+      MODEL_OVERLOADED: 'ERRORS_MODEL_OVERLOADED',
+      NETWORK_ERROR: 'ERRORS_NETWORK_ERROR',
+      SERVER_ERROR: 'ERRORS_SERVER_ERROR',
+      TRANSLATION_TIMEOUT: 'ERRORS_TRANSLATION_TIMEOUT',
+      INVALID_REQUEST: 'ERRORS_INVALID_REQUEST',
+      TRANSLATION_FAILED: 'ERRORS_TRANSLATION_FAILED',
+      HTTP_ERROR: error?.originalType === 'MODEL_MISSING' ? 'ERRORS_MODEL_MISSING' : 'ERRORS_HTTP_ERROR',
       }[error?.type] || 'ERRORS_TRANSLATION_FAILED',
      severity: error?.type === 'CIRCUIT_BREAKER_OPEN'
        ? 'warning'
@@ -134,6 +159,16 @@ vi.mock('@/shared/error-management/PublicTranslationErrorAdapter.js', () => ({
         LANGUAGE_PAIR_UNSUPPORTED: 'LANGUAGE_PAIR_NOT_SUPPORTED',
         PROVIDER_TEMPORARILY_UNAVAILABLE: 'CIRCUIT_BREAKER_OPEN',
         TRANSLATION_NOT_FOUND: 'TRANSLATION_NOT_FOUND',
+        API_KEY_MISSING: 'API_KEY_MISSING',
+        API_KEY_INVALID: 'API_KEY_INVALID',
+        QUOTA_EXCEEDED: 'QUOTA_EXCEEDED',
+        INSUFFICIENT_BALANCE: 'INSUFFICIENT_BALANCE',
+        RATE_LIMITED: 'RATE_LIMIT_REACHED',
+        MODEL_OVERLOADED: 'MODEL_OVERLOADED',
+        NETWORK_ERROR: 'NETWORK_ERROR',
+        SERVER_ERROR: 'SERVER_ERROR',
+        TRANSLATION_TIMEOUT: 'TRANSLATION_TIMEOUT',
+        INVALID_REQUEST: 'INVALID_REQUEST',
         TRANSLATION_FAILED: 'TRANSLATION_FAILED',
     }[publicError?.type] || publicError?.type || 'TRANSLATION_FAILED';
     const message = {
@@ -651,14 +686,18 @@ describe('SelectElementManager', () => {
     });
 
     it('respects a central silent policy without skipping cleanup', async () => {
-      const { createPublicDisplayError } = await import('@/shared/error-management/PublicErrorPolicy.js');
       const error = Object.assign(new Error('Already translated'), { type: 'NODE_ALREADY_TRANSLATED' });
-      createPublicDisplayError.mockResolvedValueOnce(null);
       manager.domTranslatorAdapter.translateElement.mockRejectedValue(error);
 
       await manager.startTranslation(document.createElement('div'));
 
+      const { createPublicDisplayError } = await import('@/shared/error-management/PublicErrorPolicy.js');
+      const { mapCanonicalTranslationError } = await import('@/shared/error-management/PublicTranslationErrorPolicy.js');
+      const { createLegacyDisplayError } = await import('@/shared/error-management/PublicTranslationErrorAdapter.js');
       expect(errorHandler.handle).not.toHaveBeenCalled();
+      expect(createPublicDisplayError).not.toHaveBeenCalled();
+      expect(mapCanonicalTranslationError).not.toHaveBeenCalled();
+      expect(createLegacyDisplayError).not.toHaveBeenCalled();
       expect(cleanupSpy).toHaveBeenCalledWith({ reason: 'error' });
     });
 
@@ -887,22 +926,24 @@ describe('SelectElementManager', () => {
       ErrorTypes.INVALID_REQUEST,
       ErrorTypes.TRANSLATION_FAILED,
       ErrorTypes.UNKNOWN,
-       ErrorTypes.API_RESPONSE_INVALID,
-       ErrorTypes.JSON_PARSING_ERROR,
-       ErrorTypes.UNEXPECTED_RESPONSE_FORMAT,
-       ErrorTypes.HTML_RESPONSE_ERROR,
-       ErrorTypes.TRANSLATION_ERROR,
-       ErrorTypes.CONNECTION_LOST,
-       ErrorTypes.NO_ACCEPTED_TRANSLATION_RESULTS,
-       ErrorTypes.API_URL_MISSING,
-       ErrorTypes.API_CONFIG_INVALID,
-       ErrorTypes.API_ENDPOINT_INVALID,
-       ErrorTypes.BROWSER_API_UNAVAILABLE,
-       ErrorTypes.FORBIDDEN_ERROR,
-       ErrorTypes.TEXT_EMPTY,
-       ErrorTypes.TEXT_TOO_LONG,
-       ErrorTypes.PROMPT_INVALID,
-       ErrorTypes.LANGUAGE_PAIR_NOT_SUPPORTED,
+      ErrorTypes.API_RESPONSE_INVALID,
+      ErrorTypes.JSON_PARSING_ERROR,
+      ErrorTypes.UNEXPECTED_RESPONSE_FORMAT,
+      ErrorTypes.HTML_RESPONSE_ERROR,
+      ErrorTypes.TRANSLATION_ERROR,
+      ErrorTypes.CONNECTION_LOST,
+      ErrorTypes.NO_ACCEPTED_TRANSLATION_RESULTS,
+      ErrorTypes.API_URL_MISSING,
+      ErrorTypes.API_CONFIG_INVALID,
+      ErrorTypes.API_ENDPOINT_INVALID,
+      ErrorTypes.BROWSER_API_UNAVAILABLE,
+      ErrorTypes.FORBIDDEN_ERROR,
+      ErrorTypes.TEXT_EMPTY,
+      ErrorTypes.TEXT_TOO_LONG,
+      ErrorTypes.PROMPT_INVALID,
+      ErrorTypes.LANGUAGE_PAIR_NOT_SUPPORTED,
+      ErrorTypes.CIRCUIT_BREAKER_OPEN,
+      ErrorTypes.TRANSLATION_NOT_FOUND,
     ])('uses new public contract for safe type %s', async (type) => {
       const error = Object.assign(new Error(`raw internal detail for ${type}`), { type });
       manager.domTranslatorAdapter.translateElement.mockRejectedValue(error);
@@ -917,21 +958,35 @@ describe('SelectElementManager', () => {
         VALIDATION: 'INVALID_INPUT',
         UNKNOWN: 'TRANSLATION_FAILED',
         API_RESPONSE_INVALID: 'INVALID_RESPONSE',
-         JSON_PARSING_ERROR: 'INVALID_RESPONSE',
-         UNEXPECTED_RESPONSE_FORMAT: 'INVALID_RESPONSE',
-         HTML_RESPONSE_ERROR: 'TRANSLATION_FAILED',
-         TRANSLATION_ERROR: 'TRANSLATION_FAILED',
-         CONNECTION_LOST: 'TRANSLATION_FAILED',
-         NO_ACCEPTED_TRANSLATION_RESULTS: 'TRANSLATION_FAILED',
-         API_URL_MISSING: 'API_URL_MISSING',
-         API_CONFIG_INVALID: 'CONFIGURATION_INVALID',
-         API_ENDPOINT_INVALID: 'ENDPOINT_INVALID',
-         BROWSER_API_UNAVAILABLE: 'BROWSER_API_UNAVAILABLE',
-         FORBIDDEN_ERROR: 'ACCESS_DENIED',
-         TEXT_EMPTY: 'TEXT_EMPTY',
-         TEXT_TOO_LONG: 'TEXT_TOO_LONG',
-         PROMPT_INVALID: 'PROMPT_INVALID',
-         LANGUAGE_PAIR_NOT_SUPPORTED: 'LANGUAGE_PAIR_UNSUPPORTED',
+        JSON_PARSING_ERROR: 'INVALID_RESPONSE',
+        UNEXPECTED_RESPONSE_FORMAT: 'INVALID_RESPONSE',
+        HTML_RESPONSE_ERROR: 'TRANSLATION_FAILED',
+        TRANSLATION_ERROR: 'TRANSLATION_FAILED',
+        CONNECTION_LOST: 'TRANSLATION_FAILED',
+        NO_ACCEPTED_TRANSLATION_RESULTS: 'TRANSLATION_FAILED',
+        API_URL_MISSING: 'API_URL_MISSING',
+        API_CONFIG_INVALID: 'CONFIGURATION_INVALID',
+        API_ENDPOINT_INVALID: 'ENDPOINT_INVALID',
+        BROWSER_API_UNAVAILABLE: 'BROWSER_API_UNAVAILABLE',
+        FORBIDDEN_ERROR: 'ACCESS_DENIED',
+        TEXT_EMPTY: 'TEXT_EMPTY',
+        TEXT_TOO_LONG: 'TEXT_TOO_LONG',
+        PROMPT_INVALID: 'PROMPT_INVALID',
+        LANGUAGE_PAIR_NOT_SUPPORTED: 'LANGUAGE_PAIR_UNSUPPORTED',
+        MODEL_MISSING: 'MODEL_UNAVAILABLE',
+        API_KEY_MISSING: 'API_KEY_MISSING',
+        API_KEY_INVALID: 'API_KEY_INVALID',
+        QUOTA_EXCEEDED: 'QUOTA_EXCEEDED',
+        INSUFFICIENT_BALANCE: 'INSUFFICIENT_BALANCE',
+        RATE_LIMIT_REACHED: 'RATE_LIMITED',
+        MODEL_OVERLOADED: 'MODEL_OVERLOADED',
+        NETWORK_ERROR: 'NETWORK_ERROR',
+        SERVER_ERROR: 'SERVER_ERROR',
+        TRANSLATION_TIMEOUT: 'TRANSLATION_TIMEOUT',
+        OPERATION_TIMEOUT: 'TRANSLATION_TIMEOUT',
+        INVALID_REQUEST: 'INVALID_REQUEST',
+        CIRCUIT_BREAKER_OPEN: 'PROVIDER_TEMPORARILY_UNAVAILABLE',
+        TRANSLATION_NOT_FOUND: 'TRANSLATION_NOT_FOUND',
        }[type] || type;
       expect(createPublicDisplayError).not.toHaveBeenCalled();
       expect(mapCanonicalTranslationError).toHaveBeenCalledWith(error);
@@ -1112,7 +1167,9 @@ describe('SelectElementManager', () => {
       const { createLegacyDisplayError } = await import('@/shared/error-management/PublicTranslationErrorAdapter.js');
       expect(createPublicDisplayError).not.toHaveBeenCalled();
       expect(mapCanonicalTranslationError).toHaveBeenCalledWith(error);
-      expect(createLegacyDisplayError).toHaveBeenCalledWith(error, expect.objectContaining({ type }));
+      expect(createLegacyDisplayError).toHaveBeenCalledWith(error, expect.objectContaining({
+        type: type === 'RATE_LIMIT_REACHED' ? 'RATE_LIMITED' : type,
+      }));
       expect(errorHandler.handle).toHaveBeenCalledWith(expect.objectContaining({ cause: error }), expect.objectContaining({ showToast: true }));
     });
 
@@ -1168,20 +1225,55 @@ describe('SelectElementManager', () => {
       expect(ExtensionContextManager.handleContextError).not.toHaveBeenCalled();
     });
 
-    it('does not special-case an untyped error that merely contains the legacy phrase', async () => {
+    it('routes untyped errors through generic new public mapping', async () => {
       const error = new Error('Element is too large to translate (1001 text segments). Please select a smaller element.');
       manager.domTranslatorAdapter.translateElement.mockRejectedValue(error);
 
       await manager.startTranslation(document.createElement('div'));
 
       const { createPublicDisplayError } = await import('@/shared/error-management/PublicErrorPolicy.js');
-      expect(createPublicDisplayError).toHaveBeenCalledWith(error);
+      const { mapCanonicalTranslationError } = await import('@/shared/error-management/PublicTranslationErrorPolicy.js');
+      const { createLegacyDisplayError } = await import('@/shared/error-management/PublicTranslationErrorAdapter.js');
+      expect(createPublicDisplayError).not.toHaveBeenCalled();
+      expect(mapCanonicalTranslationError).toHaveBeenCalledWith(error);
+      expect(createLegacyDisplayError).toHaveBeenCalledWith(error, expect.objectContaining({
+        messageKey: 'ERRORS_TRANSLATION_FAILED',
+        silent: false,
+      }));
       expect(errorHandler.handle).toHaveBeenCalledWith(expect.objectContaining({
         type: 'TRANSLATION_FAILED',
         cause: error,
       }), expect.objectContaining({ showToast: true }));
+      expect(errorHandler.handle.mock.calls[0][0].message).toBe('Translation failed');
+      expect(errorHandler.handle.mock.calls[0][0].message).not.toContain(error.message);
       expect(errorHandler.handle).toHaveBeenCalledTimes(1);
       expect(errorHandler.handle.mock.calls[0][0]).not.toBe(error);
+      expect(cleanupSpy).toHaveBeenCalledWith({ reason: 'error' });
+    });
+
+    it('routes unrecognized explicit types through generic new public mapping', async () => {
+      const error = Object.assign(new Error('raw unrecognized detail'), { type: 'UNRECOGNIZED_TYPE' });
+      manager.domTranslatorAdapter.translateElement.mockRejectedValue(error);
+
+      await manager.startTranslation(document.createElement('div'));
+
+      const { createPublicDisplayError } = await import('@/shared/error-management/PublicErrorPolicy.js');
+      const { mapCanonicalTranslationError } = await import('@/shared/error-management/PublicTranslationErrorPolicy.js');
+      const { createLegacyDisplayError } = await import('@/shared/error-management/PublicTranslationErrorAdapter.js');
+      expect(createPublicDisplayError).not.toHaveBeenCalled();
+      expect(mapCanonicalTranslationError).toHaveBeenCalledWith(error);
+      expect(createLegacyDisplayError).toHaveBeenCalledWith(error, expect.objectContaining({
+        type: 'TRANSLATION_FAILED',
+        messageKey: 'ERRORS_TRANSLATION_FAILED',
+        silent: false,
+      }));
+      expect(errorHandler.handle).toHaveBeenCalledWith(expect.objectContaining({
+        type: 'TRANSLATION_FAILED',
+        message: 'Translation failed',
+        cause: error,
+      }), expect.objectContaining({ context: 'select-element', showToast: true }));
+      expect(errorHandler.handle.mock.calls[0][0].message).not.toContain('raw unrecognized detail');
+      expect(errorHandler.handle).toHaveBeenCalledTimes(1);
       expect(cleanupSpy).toHaveBeenCalledWith({ reason: 'error' });
     });
 
