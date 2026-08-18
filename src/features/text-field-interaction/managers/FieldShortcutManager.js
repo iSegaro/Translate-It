@@ -7,9 +7,13 @@ import { getScopedLogger } from "@/shared/logging/logger.js";
 import { LOG_COMPONENTS } from "@/shared/logging/logConstants.js";
 import { ErrorHandler } from "@/shared/error-management/ErrorHandler.js";
 import { ErrorTypes } from "@/shared/error-management/ErrorTypes.js";
+import { isCancellationError } from "@/shared/error-management/ErrorMatcher.js";
+import ExtensionContextManager from '@/core/extensionContext.js';
 import { settingsManager } from '@/shared/managers/SettingsManager.js';
 import { INPUT_TYPES } from '@/shared/constants/detection.js';
 import { translateFieldViaSmartHandler } from '@/handlers/smartTranslationIntegration.js';
+import { isFieldTranslationRequestError } from '@/handlers/smart-translation/translationErrorOwnership.js';
+import { getFieldTranslationErrorPresentation } from '@/features/text-field-interaction/utils/FieldTranslationErrorPresenter.js';
 
 export class FieldShortcutManager {
   constructor() {
@@ -165,6 +169,38 @@ export class FieldShortcutManager {
 
     } catch (error) {
       this.logger.warn('Error in Ctrl+/ handler:', error);
+
+      const failure = (message = 'Shortcut execution failed') => ({
+        success: false,
+        error: message,
+        type: 'ctrl-slash'
+      });
+
+      const isSilentFailure = isCancellationError(error)
+        || error?.type === ErrorTypes.CONTEXT
+        || error?.type === ErrorTypes.EXTENSION_CONTEXT_INVALIDATED
+        || ExtensionContextManager.isContextError(error);
+
+      if (isSilentFailure) {
+        return failure(error?.message || 'Translation cancelled');
+      }
+
+      if (isFieldTranslationRequestError(error)) {
+        const presentation = await getFieldTranslationErrorPresentation(error);
+
+        if (!presentation) {
+          return failure('Translation failed');
+        }
+
+        const errorHandler = ErrorHandler.getInstance();
+        await errorHandler.handle(presentation.displayError, {
+          context: 'ctrl-slash-shortcut',
+          showToast: true,
+          type: presentation.canonicalType || presentation.displayError.type
+        });
+
+        return failure(presentation.displayError.message || 'Translation failed');
+      }
 
       // Use centralized error handling
       const errorHandler = ErrorHandler.getInstance();
