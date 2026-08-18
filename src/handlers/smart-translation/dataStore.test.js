@@ -43,8 +43,10 @@ import {
   clearPendingNotificationData,
   clearPendingTranslationData,
   fieldRequestOwners,
+  getPendingTranslationData,
   isCurrentFieldTranslationRequest,
   pendingTranslationByToastId,
+  pendingTranslationData,
   releaseFieldTranslationRequest,
   storePendingTranslationData,
 } from './dataStore.js';
@@ -56,6 +58,14 @@ describe('Field request ownership data store', () => {
     window.pendingTranslationOwner = null;
     window.pendingTranslationTarget = null;
     window.pendingTranslationToastId = null;
+    window.pendingTranslationMode = null;
+    window.pendingTranslationPlatform = null;
+    window.pendingTranslationTabId = null;
+    window.pendingSelectionRange = null;
+    window.pendingTranslationTimestamp = null;
+    mocks.tracker.getRequestByToastId.mockReturnValue(null);
+    mocks.tracker.findRequestByElement.mockReturnValue(undefined);
+    mocks.tracker.getRequest.mockReturnValue(undefined);
   });
 
   it('installs new owner before setup and aborts previous controller-only owner', () => {
@@ -99,5 +109,66 @@ describe('Field request ownership data store', () => {
     expect(releaseFieldTranslationRequest(target, second)).toBe(true);
     expect(fieldRequestOwners.get(target)).toBeUndefined();
     expect(activeAbortControllers.get(target)).toBeUndefined();
+  });
+
+  it('uses active tracker-backed element data when association is valid', () => {
+    const target = document.createElement('textarea');
+    const request = {
+      messageId: 'active-request',
+      mode: 'field',
+      timestamp: 123,
+      metadata: { source: 'default', platform: 'default', tabId: 7, toastId: 'active-toast', selectionRange: null },
+      elementData: { id: 'field-id', selector: '#field-id' },
+    };
+    mocks.tracker.findRequestByElement.mockReturnValue('active-request');
+    mocks.tracker.getRequest.mockReturnValue(request);
+
+    expect(getPendingTranslationData(target, null)).toEqual({
+      target,
+      mode: 'field',
+      platform: 'default',
+      tabId: 7,
+      selectionRange: null,
+      timestamp: 123,
+      toastId: 'active-toast',
+      messageId: 'active-request',
+      targetId: 'field-id',
+      targetSelector: '#field-id',
+    });
+  });
+
+  it('ignores terminal tracker association and continues fallback chain', () => {
+    const target = document.createElement('textarea');
+    const fallback = { target, mode: 'field', messageId: 'fallback-request' };
+    pendingTranslationByToastId.set('fallback-toast', fallback);
+
+    expect(getPendingTranslationData(target, 'fallback-toast')).toBe(fallback);
+  });
+
+  it('ignores missing tracker request and continues to pending toast fallback', () => {
+    const target = document.createElement('textarea');
+    const fallback = { target, mode: 'field', messageId: 'fallback-request' };
+    pendingTranslationByToastId.set('fallback-toast', fallback);
+    mocks.tracker.findRequestByElement.mockReturnValue('missing-request');
+
+    expect(getPendingTranslationData(target, 'fallback-toast')).toBe(fallback);
+  });
+
+  it('continues to pendingTranslationData fallback when element association is stale', () => {
+    const target = document.createElement('textarea');
+    const fallback = { target, mode: 'field', messageId: 'weak-request' };
+    pendingTranslationData.set(target, fallback);
+
+    expect(getPendingTranslationData(target, null)).toBe(fallback);
+  });
+
+  it('keeps ownership data ahead of tracker and fallback sources', () => {
+    const target = document.createElement('textarea');
+    const ownership = beginFieldTranslationRequest(target).ownership;
+    ownership.data = { target, mode: 'field', messageId: 'owned-request' };
+    pendingTranslationData.set(target, { messageId: 'weak-request' });
+    mocks.tracker.findRequestByElement.mockReturnValue('tracker-request');
+
+    expect(getPendingTranslationData(target, null, ownership)).toBe(ownership.data);
   });
 });

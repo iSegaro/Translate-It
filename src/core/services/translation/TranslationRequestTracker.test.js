@@ -290,10 +290,80 @@ describe('TranslationRequestTracker', () => {
   });
 
   describe('element association', () => {
-    it('should associate and find requests by element', () => {
+    it.each([
+      ['pending', null],
+      ['processing', RequestStatus.PROCESSING],
+      ['streaming', RequestStatus.STREAMING],
+    ])('returns %s request association while request is active', (_name, status) => {
       const el = { nodeType: 1 };
+      tracker.createRequest({ messageId: 'm1', data: { text: 'Hello' } });
       tracker.associateWithElement('m1', el);
+      if (status) tracker.updateRequest('m1', { status });
+
       expect(tracker.findRequestByElement(el)).toBe('m1');
+    });
+
+    it('returns undefined for a missing association', () => {
+      expect(tracker.findRequestByElement({ nodeType: 1 })).toBeUndefined();
+    });
+
+    it('removes missing request association and keeps repeated lookup empty', () => {
+      const el = { nodeType: 1 };
+      tracker.associateWithElement('missing', el);
+
+      expect(tracker.findRequestByElement(el)).toBeUndefined();
+      expect(tracker.findRequestByElement(el)).toBeUndefined();
+    });
+
+    it.each([
+      ['completed', (id) => tracker.completeRequest(id, { success: true })],
+      ['failed', (id) => tracker.failRequest(id, new Error('failed'))],
+      ['cancelled', (id) => tracker.cancelRequest(id, 'user_cancelled')],
+      ['timeout', (id) => tracker.markTimeout(id)],
+    ])('removes %s request association from lookup', (_name, terminalize) => {
+      const el = { nodeType: 1 };
+      tracker.createRequest({ messageId: 'm1', data: { text: 'Hello' } });
+      tracker.associateWithElement('m1', el);
+      terminalize('m1');
+
+      expect(tracker.findRequestByElement(el)).toBeUndefined();
+      expect(tracker.findRequestByElement(el)).toBeUndefined();
+    });
+
+    it('preserves newer association when older request terminalizes', () => {
+      const el = { nodeType: 1 };
+      tracker.createRequest({ messageId: 'request-a', data: { text: 'A' } });
+      tracker.createRequest({ messageId: 'request-b', data: { text: 'B' } });
+      tracker.associateWithElement('request-a', el);
+      tracker.associateWithElement('request-b', el);
+
+      tracker.completeRequest('request-a', { success: true });
+
+      expect(tracker.findRequestByElement(el)).toBe('request-b');
+    });
+
+    it('invalidates current association when newer request terminalizes', () => {
+      const el = { nodeType: 1 };
+      tracker.createRequest({ messageId: 'request-b', data: { text: 'B' } });
+      tracker.associateWithElement('request-b', el);
+
+      tracker.completeRequest('request-b', { success: true });
+
+      expect(tracker.findRequestByElement(el)).toBeUndefined();
+    });
+
+    it('does not rediscover terminal request after retention cleanup', () => {
+      const el = { nodeType: 1 };
+      tracker.createRequest({ messageId: 'request-b', data: { text: 'B' } });
+      tracker.associateWithElement('request-b', el);
+      tracker.completeRequest('request-b', { success: true });
+
+      expect(tracker.findRequestByElement(el)).toBeUndefined();
+      vi.advanceTimersByTime(6 * 60 * 1000);
+      tracker.cleanup();
+
+      expect(tracker.getRequest('request-b')).toBeUndefined();
+      expect(tracker.findRequestByElement(el)).toBeUndefined();
     });
   });
 

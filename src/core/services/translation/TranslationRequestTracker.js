@@ -419,7 +419,15 @@ export class TranslationRequestTracker {
    * Find request by DOM element
    */
   findRequestByElement(element) {
-    return this.elementRequests.get(element);
+    const messageId = this.elementRequests.get(element);
+    if (!messageId) return undefined;
+
+    if (!this.requests.has(messageId) || !this.isRequestActive(messageId)) {
+      this.elementRequests.delete(element);
+      return undefined;
+    }
+
+    return messageId;
   }
 
   /**
