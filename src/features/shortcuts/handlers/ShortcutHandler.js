@@ -112,9 +112,6 @@ export class ShortcutHandler extends ResourceTracker {
         featureManager: this.featureManager
       });
 
-      // Setup keyboard shortcut listeners (for Ctrl+/)
-      this.setupShortcutListeners();
-
       this.isActive = true;
       logger.info('ShortcutHandler activated successfully');
       return true;

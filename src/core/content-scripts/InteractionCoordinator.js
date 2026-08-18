@@ -4,6 +4,7 @@ import { settingsManager } from '@/shared/managers/SettingsManager.js';
 import { pageEventBus } from '@/core/PageEventBus.js';
 import { ExclusionChecker } from '@/features/exclusion/core/ExclusionChecker.js';
 import { checkUrlExclusionAsync } from '@/features/exclusion/utils/exclusion-utils.js';
+import { shortcutManager } from '@/core/managers/content/shortcuts/ShortcutManager.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.CONTENT, 'InteractionCoordinator');
 
@@ -115,14 +116,16 @@ class InteractionCoordinator {
     
     if (!isMainShortcut && !(isEscape && this.revertMightBeNeeded)) return;
 
+    const shortcutManagerWasInitialized = shortcutManager.initialized;
     const { loadFeature } = await import('./chunks/lazy-features.js');
     
-    // Delegate to feature handler
+    // Load shortcut feature on demand. ShortcutManager owns Ctrl+/ dispatch;
+    // only invoke it directly when this event triggered first-time activation.
     const handler = await loadFeature('shortcut', isEscape);
-    if (handler && typeof handler.handleKeyboardEvent === 'function') {
+    if (isEscape && handler && typeof handler.handleKeyboardEvent === 'function') {
       handler.handleKeyboardEvent(event);
-    } else if (isMainShortcut && handler?.handleTranslationShortcut) {
-      handler.handleTranslationShortcut();
+    } else if (isMainShortcut && !shortcutManagerWasInitialized && shortcutManager.initialized) {
+      shortcutManager.handleKeyboardEvent(event);
     }
   }
 

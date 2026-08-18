@@ -161,6 +161,7 @@ describe('Ctrl+/ dispatch characterization', () => {
   let handler;
   let executeSpy;
   let delegatedKeyboardSpy;
+  let legacyTranslationSpy;
   let textarea;
 
   beforeEach(() => {
@@ -186,6 +187,7 @@ describe('Ctrl+/ dispatch characterization', () => {
     if (shortcutManager.initialized) shortcutManager.cleanup();
     executeSpy?.mockRestore();
     delegatedKeyboardSpy?.mockRestore();
+    legacyTranslationSpy?.mockRestore();
     textarea?.remove();
   });
 
@@ -193,11 +195,12 @@ describe('Ctrl+/ dispatch characterization', () => {
     handler = ShortcutHandler.getInstance({ featureManager: {} });
     await handler.activate();
     delegatedKeyboardSpy = vi.spyOn(handler, 'handleKeyboardEvent');
+    legacyTranslationSpy = vi.spyOn(handler, 'handleTranslationShortcut');
     mocks.shortcutHandler = handler;
     await coordinator.initialize();
   }
 
-  it('locks activated wiring duplicate counts for one physical Ctrl+/', async () => {
+  it('dispatches one activated Ctrl+/ through canonical ownership', async () => {
     await activateShortcutWiring();
     const event = createEvent();
     const preventDefault = vi.spyOn(event, 'preventDefault');
@@ -209,17 +212,17 @@ describe('Ctrl+/ dispatch characterization', () => {
     await nextTask();
 
     expect(mocks.translateFieldViaSmartHandler).toHaveBeenCalledTimes(1);
-    expect(delegatedKeyboardSpy).toHaveBeenCalledTimes(1);
-    expect(executeSpy).toHaveBeenCalledTimes(2);
-    expect(mocks.sendMessage).toHaveBeenCalledTimes(2);
-    expect(mocks.sendMessage.mock.calls.every(([message]) => message.action === 'TRANSLATE')).toBe(true);
+    expect(delegatedKeyboardSpy).not.toHaveBeenCalled();
+    expect(legacyTranslationSpy).not.toHaveBeenCalled();
+    expect(executeSpy).toHaveBeenCalledTimes(1);
+    expect(mocks.sendMessage).not.toHaveBeenCalled();
     expect(event.defaultPrevented).toBe(true);
     expect(preventDefault).toHaveBeenCalled();
     expect(stopPropagation).toHaveBeenCalled();
     expect(stopImmediatePropagation).toHaveBeenCalled();
   });
 
-  it('scales duplicate counts per separate physical Ctrl+/ event', async () => {
+  it('scales one canonical execution per separate physical Ctrl+/ event', async () => {
     await activateShortcutWiring();
 
     document.dispatchEvent(createEvent());
@@ -230,8 +233,8 @@ describe('Ctrl+/ dispatch characterization', () => {
     await nextTask();
 
     expect(mocks.translateFieldViaSmartHandler).toHaveBeenCalledTimes(2);
-    expect(executeSpy).toHaveBeenCalledTimes(4);
-    expect(mocks.sendMessage).toHaveBeenCalledTimes(4);
+    expect(executeSpy).toHaveBeenCalledTimes(2);
+    expect(mocks.sendMessage).not.toHaveBeenCalled();
   });
 
   it('does not start Field translation for unrelated keydown', async () => {
@@ -260,10 +263,8 @@ describe('Ctrl+/ dispatch characterization', () => {
     await nextTask();
     await nextTask();
 
-    // Characterization: activation during event handling still results in one
-    // legacy Smart Translation start in current runtime wiring.
     expect(mocks.translateFieldViaSmartHandler).toHaveBeenCalledTimes(1);
     expect(executeSpy).toHaveBeenCalledTimes(1);
-    expect(mocks.sendMessage).toHaveBeenCalledTimes(1);
+    expect(mocks.sendMessage).not.toHaveBeenCalled();
   });
 });

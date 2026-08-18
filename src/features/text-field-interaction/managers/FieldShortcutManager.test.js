@@ -17,8 +17,8 @@ vi.mock('webextension-polyfill', () => ({
   }
 }));
 
-const { mockSendMessage } = vi.hoisted(() => ({
-  mockSendMessage: vi.fn(() => Promise.resolve({ success: true }))
+const { mockTranslateFieldViaSmartHandler } = vi.hoisted(() => ({
+  mockTranslateFieldViaSmartHandler: vi.fn(() => Promise.resolve())
 }));
 
 // Mock dependencies
@@ -47,27 +47,13 @@ vi.mock('@/shared/managers/SettingsManager.js', () => ({
   }
 }));
 
-vi.mock('@/shared/messaging/core/UnifiedMessaging.js', () => ({
-  sendMessage: mockSendMessage
-}));
-
-vi.mock('@/shared/messaging/core/MessagingCore.js', () => ({
-  MessageFormat: {
-    create: vi.fn((action, data) => ({ action, data }))
-  },
-  MessagingContexts: { CONTENT: 'content' }
+vi.mock('@/handlers/smartTranslationIntegration.js', () => ({
+  translateFieldViaSmartHandler: mockTranslateFieldViaSmartHandler
 }));
 
 vi.mock('@/shared/constants/detection.js', () => ({
   INPUT_TYPES: {
     ALL_TEXT_FIELDS: ['text', 'search', 'tel', 'url', 'email', 'password', 'number']
-  }
-}));
-
-vi.mock('@/shared/config/config.js', () => ({
-  getEffectiveProviderAsync: vi.fn(() => Promise.resolve('google')),
-  TranslationMode: {
-    Field: 'field'
   }
 }));
 
@@ -79,6 +65,7 @@ describe('FieldShortcutManager', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    mockTranslateFieldViaSmartHandler.mockResolvedValue(undefined);
     
     // Re-apply default mock implementations
     vi.mocked(settingsManager.get).mockImplementation((key, def) => {
@@ -285,7 +272,7 @@ describe('FieldShortcutManager', () => {
   });
 
   describe('execute', () => {
-    it('should send translation message and return success', async () => {
+    it('should use Smart Translation and return success', async () => {
       const el = document.createElement('textarea');
       el.value = 'hello';
       document.body.appendChild(el);
@@ -295,18 +282,21 @@ describe('FieldShortcutManager', () => {
       
       expect(result.success).toBe(true);
       expect(result.type).toBe('ctrl-slash');
-      expect(mockSendMessage).toHaveBeenCalled();
+      expect(mockTranslateFieldViaSmartHandler).toHaveBeenCalledWith({
+        text: 'hello',
+        target: el
+      });
       
       document.body.removeChild(el);
     });
 
-    it('should return failure if sendMessage fails', async () => {
+    it('should return failure if Smart Translation fails', async () => {
       const el = document.createElement('textarea');
       el.value = 'hello';
       document.body.appendChild(el);
       el.focus();
 
-      mockSendMessage.mockResolvedValueOnce({ success: false, error: 'API Error' });
+      mockTranslateFieldViaSmartHandler.mockRejectedValueOnce(new Error('API Error'));
 
       const result = await manager.execute();
       
@@ -316,13 +306,13 @@ describe('FieldShortcutManager', () => {
       document.body.removeChild(el);
     });
 
-    it('should handle exceptions and return failure', async () => {
+    it('should handle Smart Translation exceptions and return failure', async () => {
       const el = document.createElement('textarea');
       el.value = 'hello';
       document.body.appendChild(el);
       el.focus();
 
-      mockSendMessage.mockRejectedValueOnce(new Error('Network Error'));
+      mockTranslateFieldViaSmartHandler.mockRejectedValueOnce(new Error('Network Error'));
 
       const result = await manager.execute();
       

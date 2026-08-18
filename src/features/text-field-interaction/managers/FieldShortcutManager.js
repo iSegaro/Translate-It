@@ -8,11 +8,8 @@ import { LOG_COMPONENTS } from "@/shared/logging/logConstants.js";
 import { ErrorHandler } from "@/shared/error-management/ErrorHandler.js";
 import { ErrorTypes } from "@/shared/error-management/ErrorTypes.js";
 import { settingsManager } from '@/shared/managers/SettingsManager.js';
-import { MessageActions } from "@/shared/messaging/core/MessageActions.js";
-import { MessageFormat, MessagingContexts } from "@/shared/messaging/core/MessagingCore.js";
-import { sendMessage } from '@/shared/messaging/core/UnifiedMessaging.js';
 import { INPUT_TYPES } from '@/shared/constants/detection.js';
-import { TranslationMode, getEffectiveProviderAsync } from '@/shared/config/config.js';
+import { translateFieldViaSmartHandler } from '@/handlers/smartTranslationIntegration.js';
 
 export class FieldShortcutManager {
   constructor() {
@@ -156,46 +153,15 @@ export class FieldShortcutManager {
       }
       this.logger.debug(`Translating text via Ctrl+/: "${text.substring(0, 50)}..."`);
 
-      // Resolve effective provider for field translation
-      const provider = await getEffectiveProviderAsync(TranslationMode.Field);
+      await translateFieldViaSmartHandler({ text, target: activeElement });
 
-      // Send translation request using UnifiedMessaging
-      const message = MessageFormat.create(
-        MessageActions.TRANSLATE,
-        {
-          text: text,
-          provider,
-          sourceLanguage: settingsManager.get('SOURCE_LANGUAGE', 'auto'),
-          targetLanguage: settingsManager.get('TARGET_LANGUAGE', 'fa'),
-          mode: TranslationMode.Field,
-          options: {
-            element: activeElement.tagName,
-            type: activeElement.type || 'contenteditable',
-            url: window.location.href,
-            timestamp: Date.now()
-          }
-        },
-        MessagingContexts.CONTENT
-      );
-      // Use UnifiedMessaging with appropriate timeout
-      const response = await sendMessage(message, { timeout: 15000 });
-
-      if (response.success) {
-        this.logger.debug('Translation completed successfully');
-        return {
-          success: true,
-          type: 'ctrl-slash',
-          textLength: text.length,
-          target: activeElement.tagName
-        };
-      } else {
-        this.logger.warn('Translation failed:', response.error);
-        return {
-          success: false,
-          error: response.error || 'Translation failed',
-          type: 'ctrl-slash'
-        };
-      }
+      this.logger.debug('Translation completed successfully');
+      return {
+        success: true,
+        type: 'ctrl-slash',
+        textLength: text.length,
+        target: activeElement.tagName
+      };
 
     } catch (error) {
       this.logger.warn('Error in Ctrl+/ handler:', error);
