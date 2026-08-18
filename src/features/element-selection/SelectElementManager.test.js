@@ -56,6 +56,21 @@ vi.mock('@/shared/error-management/PublicErrorPolicy.js', () => ({
     return displayError;
   })
 }));
+vi.mock('@/shared/error-management/PublicTranslationErrorPolicy.js', () => ({
+  mapCanonicalTranslationError: vi.fn((error) => ({
+    type: error?.type,
+    messageKey: 'ERRORS_TRANSLATION_FAILED',
+    silent: false,
+  }))
+}));
+vi.mock('@/shared/error-management/PublicTranslationErrorAdapter.js', () => ({
+  createLegacyDisplayError: vi.fn(async (canonicalError, publicError) => {
+    const displayError = new Error('Translation failed');
+    displayError.type = publicError?.type || 'TRANSLATION_FAILED';
+    displayError.cause = canonicalError;
+    return displayError;
+  })
+}));
 
 vi.mock('@/shared/error-management/ErrorMatcher.js', () => ({
   isFatalError: vi.fn(() => false),
@@ -561,8 +576,12 @@ describe('SelectElementManager', () => {
       await manager.startTranslation(document.createElement('div'));
 
       const { createPublicDisplayError } = await import('@/shared/error-management/PublicErrorPolicy.js');
+      const { mapCanonicalTranslationError } = await import('@/shared/error-management/PublicTranslationErrorPolicy.js');
+      const { createLegacyDisplayError } = await import('@/shared/error-management/PublicTranslationErrorAdapter.js');
       const ExtensionContextManager = (await import('@/core/extensionContext.js')).default;
-      expect(createPublicDisplayError).toHaveBeenCalledTimes(1);
+      expect(createPublicDisplayError).not.toHaveBeenCalled();
+      expect(mapCanonicalTranslationError).toHaveBeenCalledWith(error);
+      expect(createLegacyDisplayError).toHaveBeenCalledWith(error, expect.objectContaining({ type: 'NETWORK_ERROR' }));
       expect(errorHandler.handle).toHaveBeenCalledWith(expect.objectContaining({ cause: error }), expect.objectContaining({ showToast: true }));
       expect(errorHandler.handle).toHaveBeenCalledTimes(1);
       expect(ExtensionContextManager.handleContextError).not.toHaveBeenCalled();
@@ -571,28 +590,80 @@ describe('SelectElementManager', () => {
       expect(cleanupSpy).toHaveBeenCalledWith({ reason: 'error' });
     });
 
+    it.each([
+      ErrorTypes.MODEL_MISSING,
+      ErrorTypes.API_KEY_MISSING,
+      ErrorTypes.API_KEY_INVALID,
+      ErrorTypes.QUOTA_EXCEEDED,
+      ErrorTypes.INSUFFICIENT_BALANCE,
+      ErrorTypes.RATE_LIMIT_REACHED,
+      ErrorTypes.MODEL_OVERLOADED,
+      ErrorTypes.NETWORK_ERROR,
+      ErrorTypes.SERVER_ERROR,
+      ErrorTypes.TRANSLATION_TIMEOUT,
+      ErrorTypes.OPERATION_TIMEOUT,
+      ErrorTypes.INVALID_REQUEST,
+      ErrorTypes.TRANSLATION_FAILED,
+    ])('uses new public contract for safe type %s', async (type) => {
+      const error = Object.assign(new Error(type), { type });
+      manager.domTranslatorAdapter.translateElement.mockRejectedValue(error);
+
+      await manager.startTranslation(document.createElement('div'));
+
+      const { createPublicDisplayError } = await import('@/shared/error-management/PublicErrorPolicy.js');
+      const { mapCanonicalTranslationError } = await import('@/shared/error-management/PublicTranslationErrorPolicy.js');
+      const { createLegacyDisplayError } = await import('@/shared/error-management/PublicTranslationErrorAdapter.js');
+      expect(createPublicDisplayError).not.toHaveBeenCalled();
+      expect(mapCanonicalTranslationError).toHaveBeenCalledWith(error);
+      expect(createLegacyDisplayError).toHaveBeenCalledWith(error, expect.objectContaining({ type }));
+      expect(errorHandler.handle).toHaveBeenCalledTimes(1);
+    });
+
+    it.each([
+      [ErrorTypes.HTTP_ERROR, { originalType: ErrorTypes.MODEL_MISSING, statusCode: 400 }],
+      [ErrorTypes.API_ERROR, { statusCode: 400 }],
+      [ErrorTypes.API_RESPONSE_INVALID, {}],
+      [ErrorTypes.JSON_PARSING_ERROR, {}],
+      [ErrorTypes.UNEXPECTED_RESPONSE_FORMAT, {}],
+      [ErrorTypes.VALIDATION, {}],
+      [ErrorTypes.GEMINI_QUOTA_REGION, {}],
+      [ErrorTypes.DEEPL_QUOTA_EXCEEDED, {}],
+      [ErrorTypes.UNKNOWN, {}],
+    ])('keeps blocked type %s on old public policy', async (type, fields) => {
+      const error = Object.assign(new Error(type), { type, ...fields });
+      manager.domTranslatorAdapter.translateElement.mockRejectedValue(error);
+
+      await manager.startTranslation(document.createElement('div'));
+
+      const { createPublicDisplayError } = await import('@/shared/error-management/PublicErrorPolicy.js');
+      const { mapCanonicalTranslationError } = await import('@/shared/error-management/PublicTranslationErrorPolicy.js');
+      const { createLegacyDisplayError } = await import('@/shared/error-management/PublicTranslationErrorAdapter.js');
+      expect(createPublicDisplayError).toHaveBeenCalledWith(error);
+      expect(mapCanonicalTranslationError).not.toHaveBeenCalled();
+      expect(createLegacyDisplayError).not.toHaveBeenCalled();
+      expect(errorHandler.handle).toHaveBeenCalledTimes(1);
+    });
+
     it('preserves committed content while routing non-context fatal errors through error deactivation', async () => {
       const error = Object.assign(new Error('API key is invalid'), {
         type: ErrorTypes.API_KEY_INVALID,
       });
-      const displayError = Object.assign(new Error('API key is wrong or invalid'), {
-        type: ErrorTypes.API_KEY_INVALID,
-        cause: error,
-      });
       const { createPublicDisplayError } = await import('@/shared/error-management/PublicErrorPolicy.js');
+      const { mapCanonicalTranslationError } = await import('@/shared/error-management/PublicTranslationErrorPolicy.js');
+      const { createLegacyDisplayError } = await import('@/shared/error-management/PublicTranslationErrorAdapter.js');
       const { isFatalError } = await import('@/shared/error-management/ErrorMatcher.js');
-      createPublicDisplayError.mockResolvedValueOnce(displayError);
       isFatalError.mockReturnValueOnce(true);
       const deactivateSpy = vi.spyOn(manager, 'deactivate').mockResolvedValue(undefined);
       manager.domTranslatorAdapter.translateElement.mockRejectedValue(error);
 
       await manager.startTranslation(document.createElement('div'));
 
-      expect(createPublicDisplayError).toHaveBeenCalledTimes(1);
-      expect(createPublicDisplayError).toHaveBeenCalledWith(error);
+      expect(createPublicDisplayError).not.toHaveBeenCalled();
+      expect(mapCanonicalTranslationError).toHaveBeenCalledWith(error);
+      expect(createLegacyDisplayError).toHaveBeenCalledWith(error, expect.objectContaining({ type: ErrorTypes.API_KEY_INVALID }));
       expect(errorHandler.handle).toHaveBeenCalledTimes(1);
       expect(errorHandler.handle).toHaveBeenCalledWith(
-        displayError,
+        expect.objectContaining({ type: ErrorTypes.API_KEY_INVALID, cause: error }),
         expect.objectContaining({ context: 'select-element', showToast: true })
       );
       expect(deactivateSpy).toHaveBeenCalledWith({ preserveTranslations: true, reason: 'error' });
@@ -665,6 +736,12 @@ describe('SelectElementManager', () => {
 
       await manager.startTranslation(document.createElement('div'));
 
+      const { createPublicDisplayError } = await import('@/shared/error-management/PublicErrorPolicy.js');
+      const { mapCanonicalTranslationError } = await import('@/shared/error-management/PublicTranslationErrorPolicy.js');
+      const { createLegacyDisplayError } = await import('@/shared/error-management/PublicTranslationErrorAdapter.js');
+      expect(createPublicDisplayError).not.toHaveBeenCalled();
+      expect(mapCanonicalTranslationError).toHaveBeenCalledWith(error);
+      expect(createLegacyDisplayError).toHaveBeenCalledWith(error, expect.objectContaining({ type }));
       expect(errorHandler.handle).toHaveBeenCalledWith(expect.objectContaining({ cause: error }), expect.objectContaining({ showToast: true }));
     });
 
@@ -674,6 +751,12 @@ describe('SelectElementManager', () => {
 
       await manager.startTranslation(document.createElement('div'));
 
+      const { createPublicDisplayError } = await import('@/shared/error-management/PublicErrorPolicy.js');
+      const { mapCanonicalTranslationError } = await import('@/shared/error-management/PublicTranslationErrorPolicy.js');
+      const { createLegacyDisplayError } = await import('@/shared/error-management/PublicTranslationErrorAdapter.js');
+      expect(createPublicDisplayError).not.toHaveBeenCalled();
+      expect(mapCanonicalTranslationError).toHaveBeenCalledWith(error);
+      expect(createLegacyDisplayError).toHaveBeenCalledWith(error, expect.objectContaining({ type: 'TRANSLATION_TIMEOUT' }));
       expect(errorHandler.handle).toHaveBeenCalledWith(expect.objectContaining({ cause: error }), expect.objectContaining({ showToast: true }));
     });
 

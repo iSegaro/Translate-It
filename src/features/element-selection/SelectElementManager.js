@@ -12,6 +12,8 @@ import { ErrorHandler } from '@/shared/error-management/ErrorHandler.js';
 import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
 import { isFatalError, isCancellationError } from '@/shared/error-management/ErrorMatcher.js';
 import { createPublicDisplayError } from '@/shared/error-management/PublicErrorPolicy.js';
+import { mapCanonicalTranslationError } from '@/shared/error-management/PublicTranslationErrorPolicy.js';
+import { createLegacyDisplayError } from '@/shared/error-management/PublicTranslationErrorAdapter.js';
 import { getEffectiveProviderAsync, TranslationMode } from '@/shared/config/config.js';
 import { NOTIFICATION_TIME } from '@/shared/constants/ui.js';
 import { TRANSLATION_STATUS } from '@/shared/constants/translation.js';
@@ -41,6 +43,26 @@ const SELECT_ELEMENT_PARTIAL_ERROR_FALLBACK = 'Some content could not be transla
 
 const SELECT_ELEMENT_NO_TRANSLATABLE_CONTENT_KEY = 'SELECT_ELEMENT_NO_TRANSLATABLE_CONTENT';
 const SELECT_ELEMENT_NO_TRANSLATABLE_CONTENT_FALLBACK = 'No translatable text was found in this element.';
+
+const SAFE_PUBLIC_TRANSLATION_ERROR_TYPES = new Set([
+  ErrorTypes.MODEL_MISSING,
+  ErrorTypes.API_KEY_MISSING,
+  ErrorTypes.API_KEY_INVALID,
+  ErrorTypes.QUOTA_EXCEEDED,
+  ErrorTypes.INSUFFICIENT_BALANCE,
+  ErrorTypes.RATE_LIMIT_REACHED,
+  ErrorTypes.MODEL_OVERLOADED,
+  ErrorTypes.NETWORK_ERROR,
+  ErrorTypes.SERVER_ERROR,
+  ErrorTypes.TRANSLATION_TIMEOUT,
+  ErrorTypes.OPERATION_TIMEOUT,
+  ErrorTypes.INVALID_REQUEST,
+  ErrorTypes.TRANSLATION_FAILED,
+]);
+
+function shouldUsePublicTranslationContract(error) {
+  return SAFE_PUBLIC_TRANSLATION_ERROR_TYPES.has(error?.type);
+}
 
 const SELECT_ELEMENT_UNSUPPORTED_TRANSLATION_MODE_KEY = 'SELECT_ELEMENT_UNSUPPORTED_TRANSLATION_MODE';
 const SELECT_ELEMENT_UNSUPPORTED_TRANSLATION_MODE_FALLBACK = 'This content cannot be translated with the current translation mode.';
@@ -609,6 +631,9 @@ class SelectElementManager extends ResourceTracker {
           cause: error,
           translationOutcome: outcome,
         });
+      } else if (shouldUsePublicTranslationContract(error)) {
+        const publicError = mapCanonicalTranslationError(error);
+        displayError = await createLegacyDisplayError(error, publicError);
       } else {
         displayError = await createPublicDisplayError(error);
       }
