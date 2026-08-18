@@ -54,6 +54,7 @@ import * as DirectionManager from '@/utils/dom/DomDirectionManager.js';
 // Import hover manager dependencies
 import { hoverPreviewLookup } from '@/features/shared/hover-preview/HoverPreviewLookup.js';
 import { PAGE_TRANSLATION_ATTRIBUTES } from '@/features/page-translation/PageTranslationConstants.js';
+import { runBestEffortRollback } from '@/utils/dom/DomRollback.js';
 
 export { getSelectElementTranslationState, revertSelectElementTranslation } from './DomTranslatorState.js';
 
@@ -450,38 +451,54 @@ export class DomTranslatorAdapter extends ResourceTracker {
           parent.invalid = true;
           parent.applied = false;
           parent.acknowledged = false;
-          const rollbackFailures = [];
-          for (const { node, value } of [...mutationSnapshot.nodes].reverse()) {
-            try {
-              if (node) node.nodeValue = value;
-            } catch (rollbackError) {
-              rollbackFailures.push({ kind: 'text', node, error: rollbackError });
-              this.logger.error('[DomTranslatorAdapter] Direct text rollback failed', { error: rollbackError });
-            }
-          }
-          for (const [parentElement, state] of mutationSnapshot.attributeParents) {
-            try {
-              if (state.present) parentElement.setAttribute(PAGE_TRANSLATION_ATTRIBUTES.HAS_ORIGINAL, state.value);
-              else parentElement.removeAttribute(PAGE_TRANSLATION_ATTRIBUTES.HAS_ORIGINAL);
-            } catch (rollbackError) {
-              rollbackFailures.push({ kind: 'attribute', element: parentElement, error: rollbackError });
-              this.logger.error('[DomTranslatorAdapter] Direct attribute rollback failed', { error: rollbackError });
-            }
-          }
-          const directionFailures = DirectionManager.restoreNodeDirectionState(mutationSnapshot.directionSnapshots) || [];
-          for (const failure of directionFailures) {
-            rollbackFailures.push(failure);
-            this.logger.error('[DomTranslatorAdapter] Direct direction rollback failed', failure);
-          }
-          for (const { node, value } of mutationSnapshot.hoverNodes) {
-            try {
-              if (value === undefined) hoverPreviewLookup.delete(node);
-              else hoverPreviewLookup.add(node, value);
-            } catch (rollbackError) {
-              rollbackFailures.push({ kind: 'hover', node, error: rollbackError });
-              this.logger.error('[DomTranslatorAdapter] Direct hover rollback failed', { error: rollbackError });
-            }
-          }
+          const restorations = [
+            ...[...mutationSnapshot.nodes].reverse().map(({ node, value }) => ({
+              kind: 'text',
+              restore: () => {
+                if (node) node.nodeValue = value;
+              },
+              createFailure: (rollbackError) => {
+                this.logger.error('[DomTranslatorAdapter] Direct text rollback failed', { error: rollbackError });
+                return { kind: 'text', node, error: rollbackError };
+              },
+            })),
+            ...[...mutationSnapshot.attributeParents].map(([parentElement, state]) => ({
+              kind: 'attribute',
+              restore: () => {
+                if (state.present) parentElement.setAttribute(PAGE_TRANSLATION_ATTRIBUTES.HAS_ORIGINAL, state.value);
+                else parentElement.removeAttribute(PAGE_TRANSLATION_ATTRIBUTES.HAS_ORIGINAL);
+              },
+              createFailure: (rollbackError) => {
+                this.logger.error('[DomTranslatorAdapter] Direct attribute rollback failed', { error: rollbackError });
+                return { kind: 'attribute', element: parentElement, error: rollbackError };
+              },
+            })),
+            {
+              kind: 'direction',
+              restore: () => {
+                const directionFailures = DirectionManager.restoreNodeDirectionState(mutationSnapshot.directionSnapshots) || [];
+                directionFailures.forEach(failure => {
+                  this.logger.error('[DomTranslatorAdapter] Direct direction rollback failed', failure);
+                });
+                return directionFailures;
+              },
+            },
+            ...mutationSnapshot.hoverNodes.map(({ node, value }) => ({
+              kind: 'hover',
+              restore: () => {
+                if (value === undefined) hoverPreviewLookup.delete(node);
+                else hoverPreviewLookup.add(node, value);
+              },
+              createFailure: (rollbackError) => {
+                this.logger.error('[DomTranslatorAdapter] Direct hover rollback failed', { error: rollbackError });
+                return { kind: 'hover', node, error: rollbackError };
+              },
+            })),
+          ];
+          const { rollbackFailures } = runBestEffortRollback({
+            primaryError: error,
+            restorations,
+          });
           // Mutation failure lifecycle: best-effort rollback performed above, then
           // emit a rejection ACK for the failed canonical parent so the background
           // coordinator marks it REJECTED (never left PENDING blocking later parents).
