@@ -144,6 +144,66 @@ describe('TranslationEngine', () => {
     expect('streaming' in result).toBe(false);
   });
 
+  it('formatError preserves canonical provider identity and visible fields', () => {
+    const providerError = new Error('Unknown model name');
+    Object.assign(providerError, {
+      type: ErrorTypes.HTTP_ERROR,
+      originalType: ErrorTypes.MODEL_MISSING,
+      statusCode: 400,
+      context: 'provider-request',
+      providerName: 'WebAI',
+    });
+
+    const result = engine.formatError(providerError, 'popup');
+
+    expect(result).toEqual({
+      success: false,
+      error: {
+        message: 'Unknown model name',
+        type: ErrorTypes.HTTP_ERROR,
+        originalType: ErrorTypes.MODEL_MISSING,
+        statusCode: 400,
+        context: 'provider-request',
+        providerName: 'WebAI',
+      },
+    });
+  });
+
+  it('preserves canonical fields when reconstructing resolved provider failures', async () => {
+    const mockProvider = await engine.getProvider('google');
+    mockProvider.translate.mockResolvedValue({
+      success: false,
+      error: {
+        message: 'Unknown model name',
+        type: ErrorTypes.HTTP_ERROR,
+        originalType: ErrorTypes.MODEL_MISSING,
+        statusCode: 400,
+        providerName: 'WebAI',
+      },
+    });
+
+    let caughtError;
+    try {
+      await engine.executeTranslation({
+        text: 'Hello',
+        provider: 'google',
+        sourceLanguage: 'en',
+        targetLanguage: 'fa',
+        mode: 'selection',
+      }, {});
+    } catch (error) {
+      caughtError = error;
+    }
+
+    expect(caughtError).toMatchObject({
+      message: 'Unknown model name',
+      type: ErrorTypes.HTTP_ERROR,
+      originalType: ErrorTypes.MODEL_MISSING,
+      statusCode: 400,
+      providerName: 'WebAI',
+    });
+  });
+
   describe('handleMessage', () => {
     it('should process TRANSLATE message successfully', async () => {
       const request = {
