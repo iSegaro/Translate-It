@@ -4,6 +4,7 @@ import { storageManager } from '@/shared/storage/core/StorageCore.js';
 import { TranslationMode } from '@/config.js';
 import ExtensionContextManager from '@/core/extensionContext.js';
 import { ErrorHandler } from '@/shared/error-management/ErrorHandler.js';
+import { MessageFormat } from '@/shared/messaging/core/MessagingCore.js';
 
 /**
  * PageTranslationEventManager - Specialized class to handle external events
@@ -158,6 +159,7 @@ export class PageTranslationEventManager {
 
       this.manager._broadcastEvent(MessageActions.PAGE_TRANSLATE_ERROR, {
         error: data.error?.message || String(data.error),
+        errorDetails: MessageFormat.serializeTranslationError(data.error),
         errorType: data.errorType,
         isFatal: false
       });

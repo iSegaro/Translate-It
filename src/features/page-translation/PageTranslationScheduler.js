@@ -1,5 +1,5 @@
 import { MessageActions } from '@/shared/messaging/core/MessageActions.js';
-import { MessageFormat, MessageContexts, ActionReasons } from '@/shared/messaging/core/MessagingCore.js';
+import { MessageFormat, MessageContexts, ActionReasons, reconstructTranslationError } from '@/shared/messaging/core/MessagingCore.js';
 import { TranslationMode } from '@/shared/config/config.js';
 import { 
   getTranslationApiAsync, 
@@ -425,16 +425,20 @@ export class PageTranslationScheduler extends ResourceTracker {
       // Detect failure or Soft-Failure with error details
       if (!result?.success || result?.hasError) {
         this.logger.debug('Batch failed:', result?.error || 'Unknown error');
-        const rawErrorMessage = result?.error || '';
-        const batchError = ((!result && !ExtensionContextManager.isValidSync()) || ExtensionContextManager.isContextError(rawErrorMessage))
-          ? new Error(rawErrorMessage || 'Extension context invalidated')
-          : new Error(rawErrorMessage || 'Batch translation failed');
+        const rawErrorMessage = typeof result?.error === 'string' ? result.error : '';
+        const fallbackErrorMessage = ((!result && !ExtensionContextManager.isValidSync()) || ExtensionContextManager.isContextError(rawErrorMessage))
+          ? 'Extension context invalidated'
+          : 'Batch translation failed';
+        const batchError = result?.errorDetails
+          ? reconstructTranslationError(result.errorDetails)
+          : new Error(rawErrorMessage || fallbackErrorMessage);
 
-        // Preserve error details from Soft-Failure for better categorization
-        if (result?.errorType) batchError.type = result.errorType;
+        // Preserve legacy Page classification without overwriting canonical identity.
+        const pageErrorType = result?.errorType;
+        if (!batchError.type && pageErrorType) batchError.type = pageErrorType;
         if (result?.isFatal) batchError.isFatal = true;
 
-        await this._handleBatchError(batchError, batch);
+        await this._handleBatchError(batchError, batch, pageErrorType);
         return;
       }
 
@@ -548,11 +552,11 @@ export class PageTranslationScheduler extends ResourceTracker {
     };
   }
 
-  async _handleBatchError(error, batch) {
+  async _handleBatchError(error, batch, pageErrorType = null) {
     if (this.fatalErrorOccurred) return;
 
     // Preserve original error identity as per guidelines
-    const errorType = matchErrorToType(error);
+    const errorType = pageErrorType || matchErrorToType(error);
     
     // Page Translation Specific: If a batch fails PERMANENTLY (after all internal retries)
     // due to network or server issues, we treat it as fatal for the session to prevent

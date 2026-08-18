@@ -29,6 +29,7 @@ import { isFatalError, matchErrorToType } from '@/shared/error-management/ErrorM
 import { PageTranslationQueueFilter } from './utils/PageTranslationQueueFilter.js';
 import { PageTranslationFluidFilter } from './utils/PageTranslationFluidFilter.js';
 import { safeSendMessage } from '@/shared/messaging/core/UnifiedMessaging.js';
+import { pageEventBus } from '@/core/PageEventBus.js';
 
 // 3. Mock other dependencies
 vi.mock('./utils/PageTranslationQueueFilter.js', () => ({
@@ -336,13 +337,75 @@ describe('PageTranslationScheduler', () => {
 
       safeSendMessage.mockResolvedValue({
         success: false,
-        error: 'Rate limit'
+        error: 'Rate limit',
+        errorType: 'SERVER_ERROR'
       });
+      const emitSpy = vi.spyOn(pageEventBus, 'emit');
 
       await scheduler.flush();
 
       expect(mockItem.resolve).toHaveBeenCalledWith('Failed Text');
       expect(scheduler.translatedCount).toBe(0);
+      const internalError = emitSpy.mock.calls.find(([event]) => event === 'page-translation-internal-error')?.[1];
+      expect(internalError.error.type).toBe('SERVER_ERROR');
+      expect(internalError.errorType).toBe('SERVER_ERROR');
+      expect(internalError.isFatal).toBe(true);
+      emitSpy.mockRestore();
+    });
+
+    it('reconstructs canonical Page batch error identity from transport DTO', async () => {
+      const mockItem = { text: 'Failed Text', resolve: vi.fn(), score: 1 };
+      scheduler.queue.push(mockItem);
+      PageTranslationFluidFilter.process.mockReturnValue({ batchItems: [mockItem], remainingItems: [] });
+      vi.spyOn(scheduler, '_getBatchConfig').mockResolvedValue({ providerRegistryId: 'google', targetLanguage: 'fa' });
+
+      const errorDetails = {
+        message: 'Provider failed',
+        type: 'PROVIDER_ERROR',
+        originalType: 'HTTP_ERROR',
+        statusCode: 503,
+        context: 'page-batch',
+        providerName: 'Provider',
+        providerId: 'provider-id',
+        code: 'UPSTREAM_FAILURE',
+        errorCode: 'E_UPSTREAM',
+        translationOutcome: { partial: true },
+        cause: 'private',
+        arbitrary: { ignored: true }
+      };
+      safeSendMessage.mockResolvedValue({
+        success: false,
+        translatedText: JSON.stringify([{ text: 'Failed Text' }]),
+        hasError: true,
+        error: 'Provider failed',
+        errorType: 'SERVER_ERROR',
+        errorDetails,
+        isFatal: false
+      });
+      const emitSpy = vi.spyOn(pageEventBus, 'emit');
+
+      await scheduler.flush();
+
+      const internalError = emitSpy.mock.calls.find(([event]) => event === 'page-translation-internal-error')?.[1];
+      expect(internalError.error).toMatchObject({
+        message: 'Provider failed',
+        type: 'PROVIDER_ERROR',
+        originalType: 'HTTP_ERROR',
+        statusCode: 503,
+        context: 'page-batch',
+        providerName: 'Provider',
+        providerId: 'provider-id',
+        code: 'UPSTREAM_FAILURE',
+        errorCode: 'E_UPSTREAM',
+        translationOutcome: { partial: true }
+      });
+      expect(internalError.error).not.toHaveProperty('cause');
+      expect(internalError.error).not.toHaveProperty('arbitrary');
+      expect(internalError.errorType).toBe('SERVER_ERROR');
+      expect(internalError.isFatal).toBe(true);
+      expect(scheduler.fatalErrorOccurred).toBe(true);
+      expect(mockItem.resolve).toHaveBeenCalledWith('Failed Text');
+      emitSpy.mockRestore();
     });
   });
 

@@ -4,7 +4,7 @@ import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import ResourceTracker from '@/core/memory/ResourceTracker.js';
 import { sendRegularMessage } from '@/shared/messaging/core/UnifiedMessaging.js';
 import { MessageActions } from '@/shared/messaging/core/MessageActions.js';
-import { ActionReasons } from '@/shared/messaging/core/MessagingCore.js';
+import { ActionReasons, MessageFormat } from '@/shared/messaging/core/MessagingCore.js';
 
 import { ErrorHandler } from '@/shared/error-management/ErrorHandler.js';
 import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
@@ -247,7 +247,10 @@ export class PageTranslationManager extends ResourceTracker {
       this.logger.error('translatePage failed', error);
       this.isTranslating = false;
       this.isAutoTranslating = false;
-      this._broadcastEvent(MessageActions.PAGE_TRANSLATE_ERROR, { error: error.message });
+      this._broadcastEvent(MessageActions.PAGE_TRANSLATE_ERROR, {
+        error: error.message,
+        errorDetails: MessageFormat.serializeTranslationError(error)
+      });
       throw error;
     }
   }
@@ -287,7 +290,10 @@ export class PageTranslationManager extends ResourceTracker {
       return { success: true, ...resultData };
     } catch (error) {
       this.logger.error('Restore failed', error);
-      this._broadcastEvent(MessageActions.PAGE_RESTORE_ERROR, { error: error.message });
+      this._broadcastEvent(MessageActions.PAGE_RESTORE_ERROR, {
+        error: error.message,
+        errorDetails: MessageFormat.serializeTranslationError(error)
+      });
       throw error;
     }
   }
@@ -458,6 +464,7 @@ export class PageTranslationManager extends ResourceTracker {
     if (!isContextError) {
       this._broadcastEvent(MessageActions.PAGE_TRANSLATE_ERROR, {
         error: localizedMessage || error.message || String(error),
+        errorDetails: MessageFormat.serializeTranslationError(error),
         errorType: errorType || ErrorTypes.TRANSLATION_FAILED,
         isFatal: true
       });

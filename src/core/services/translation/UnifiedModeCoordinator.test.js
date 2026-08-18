@@ -224,8 +224,22 @@ describe('UnifiedModeCoordinator', () => {
         messageId: 'm-err'
       };
 
+      const providerError = new Error('API Down');
+      Object.assign(providerError, {
+        type: 'PROVIDER_ERROR',
+        originalType: 'HTTP_ERROR',
+        statusCode: 503,
+        context: 'page-batch',
+        providerName: 'Provider',
+        providerId: 'provider-id',
+        code: 'UPSTREAM_FAILURE',
+        errorCode: 'E_UPSTREAM',
+        translationOutcome: { partial: true },
+        cause: 'private',
+        arbitrary: { ignored: true }
+      });
       mockEngine.getProvider.mockResolvedValue({
-        translate: vi.fn().mockRejectedValue(new Error('API Down'))
+        translate: vi.fn().mockRejectedValue(providerError)
       });
 
       const result = await coordinator.processPageTranslation(request, { translationEngine: mockEngine });
@@ -233,6 +247,22 @@ describe('UnifiedModeCoordinator', () => {
       expect(result.success).toBe(false); // Failed batch reports failure, not fabricated success
       expect(result.hasError).toBe(true);
       expect(JSON.parse(result.translatedText)[0].text).toBe('orig');
+      expect(result.error).toBe('API Down');
+      expect(result.errorType).toBeDefined();
+      expect(result.errorDetails).toMatchObject({
+        message: 'API Down',
+        type: 'PROVIDER_ERROR',
+        originalType: 'HTTP_ERROR',
+        statusCode: 503,
+        context: 'page-batch',
+        providerName: 'Provider',
+        providerId: 'provider-id',
+        code: 'UPSTREAM_FAILURE',
+        errorCode: 'E_UPSTREAM',
+        translationOutcome: { partial: true }
+      });
+      expect(result.errorDetails).not.toHaveProperty('cause');
+      expect(result.errorDetails).not.toHaveProperty('arbitrary');
     });
   });
 

@@ -7,6 +7,7 @@ import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { TranslationMode } from '@/shared/config/config.js';
 import { MessageActions } from '@/shared/messaging/core/MessageActions.js';
+import { MessageFormat } from '@/shared/messaging/core/MessagingCore.js';
 import { RequestStatus } from './TranslationRequestTracker.js';
 import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
 import { AUTO_DETECT_VALUE } from '@/shared/constants/core.js';
@@ -109,6 +110,7 @@ export class UnifiedModeCoordinator {
           originalCharCount: items.reduce((sum, i) => sum + (i.text?.length || i.length || 0), 0),
           hasError: true,
           error: error.message,
+          errorDetails: MessageFormat.serializeTranslationError(error),
           errorType: matchErrorToType(error),
           isFatal: isFatalError(error)
         };

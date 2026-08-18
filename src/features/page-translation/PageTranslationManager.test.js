@@ -271,11 +271,40 @@ describe('PageTranslationManager', () => {
   describe('Error Handling', () => {
     it('should handle fatal errors by stopping translation', () => {
       const error = new Error('Fatal failure');
+      Object.assign(error, {
+        type: 'PROVIDER_ERROR',
+        originalType: 'HTTP_ERROR',
+        statusCode: 503,
+        providerName: 'Provider',
+        providerId: 'provider-id',
+        code: 'UPSTREAM_FAILURE',
+        errorCode: 'E_UPSTREAM',
+        cause: 'private',
+        arbitrary: { ignored: true }
+      });
       manager._handleFatalError(error, 'TEST_ERROR');
       
       expect(manager.isTranslating).toBe(false);
       expect(manager.isAutoTranslating).toBe(false);
       expect(pageEventBus.emit).toHaveBeenCalledWith(MessageActions.PAGE_TRANSLATE_PROGRESS, expect.objectContaining({ status: 'idle' }));
+      expect(pageEventBus.emit).toHaveBeenCalledWith(MessageActions.PAGE_TRANSLATE_ERROR, expect.objectContaining({
+        error: 'Fatal failure',
+        errorType: 'TEST_ERROR',
+        isFatal: true,
+        errorDetails: expect.objectContaining({
+          message: 'Fatal failure',
+          type: 'PROVIDER_ERROR',
+          originalType: 'HTTP_ERROR',
+          statusCode: 503,
+          providerName: 'Provider',
+          providerId: 'provider-id',
+          code: 'UPSTREAM_FAILURE',
+          errorCode: 'E_UPSTREAM'
+        })
+      }));
+      const errorEvent = pageEventBus.emit.mock.calls.find(([action]) => action === MessageActions.PAGE_TRANSLATE_ERROR)[1];
+      expect(errorEvent.errorDetails).not.toHaveProperty('cause');
+      expect(errorEvent.errorDetails).not.toHaveProperty('arbitrary');
     });
   });
 
