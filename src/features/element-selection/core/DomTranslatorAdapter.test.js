@@ -1619,13 +1619,95 @@ describe('DomTranslatorAdapter', () => {
         setTimeout(() => {
           streamCallbacks.onStreamUpdate({
             success: false,
-            error: { message: 'Fatal API Error', type: 'API_ERROR' }
+            error: {
+              message: 'Fatal API Error',
+              type: 'API_ERROR',
+              originalType: 'UPSTREAM_ERROR',
+              statusCode: 503,
+              context: 'select-element',
+              providerName: 'Provider',
+              providerId: 'provider-id',
+              code: 'UPSTREAM_FAILURE',
+              errorCode: 'E_UPSTREAM',
+              translationOutcome: { partial: true },
+              cause: 'unsafe cause',
+              arbitrary: { unsafe: true }
+            }
           });
         }, 10);
         return { success: true, streaming: true };
       });
 
-      await expect(adapter.translateElement(testElement)).rejects.toThrow('Fatal API Error');
+      const rejection = adapter.translateElement(testElement);
+      await expect(rejection).rejects.toThrow('Fatal API Error');
+      try {
+        await rejection;
+      } catch (error) {
+        expect(error).toMatchObject({
+          type: 'API_ERROR',
+          originalType: 'UPSTREAM_ERROR',
+          statusCode: 503,
+          context: 'select-element',
+          providerName: 'Provider',
+          providerId: 'provider-id',
+          code: 'UPSTREAM_FAILURE',
+          errorCode: 'E_UPSTREAM',
+          isFatal: true,
+          translationOutcome: {
+            committedParentCount: 0,
+            totalParentCount: 1,
+            cancelled: false
+          }
+        });
+        expect(error).not.toHaveProperty('cause');
+        expect(error).not.toHaveProperty('arbitrary');
+      }
+    });
+
+    it('reconstructs direct DTO errors canonically', async () => {
+      contentScriptIntegration.sendTranslationRequest.mockResolvedValue({
+        success: false,
+        streaming: false,
+        error: {
+          message: 'Direct API Error',
+          type: 'API_ERROR',
+          originalType: 'UPSTREAM_ERROR',
+          statusCode: 503,
+          context: 'select-element',
+          providerName: 'Provider',
+          providerId: 'provider-id',
+          code: 'UPSTREAM_FAILURE',
+          errorCode: 'E_UPSTREAM',
+          translationOutcome: { partial: true },
+          cause: 'unsafe cause',
+          arbitrary: { unsafe: true }
+        }
+      });
+
+      const rejection = adapter.translateElement(testElement);
+      await expect(rejection).rejects.toThrow('Direct API Error');
+      try {
+        await rejection;
+      } catch (error) {
+        expect(error).toMatchObject({
+          type: 'API_ERROR',
+          originalType: 'UPSTREAM_ERROR',
+          statusCode: 503,
+          context: 'select-element',
+          providerName: 'Provider',
+          providerId: 'provider-id',
+          code: 'UPSTREAM_FAILURE',
+          errorCode: 'E_UPSTREAM',
+          translationOutcome: {
+            committedParentCount: 0,
+            totalParentCount: 1,
+            cancelled: false
+          }
+        });
+        expect(error).not.toHaveProperty('cause');
+        expect(error).not.toHaveProperty('arbitrary');
+        expect(error).not.toHaveProperty('isFatal');
+      }
     });
 
     it('should handle stream cancellation', async () => {

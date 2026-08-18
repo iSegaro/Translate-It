@@ -28,7 +28,11 @@ import { TRANSLATION_STATUS } from '@/shared/constants/translation.js';
 import { sendRegularMessage } from '@/shared/messaging/core/UnifiedMessaging.js';
 import { MessageActions } from '@/shared/messaging/core/MessageActions.js';
 import { TranslationMode } from '@/shared/config/config.js';
-import { MessageContexts, ActionReasons } from '@/shared/messaging/core/MessagingCore.js';
+import {
+  MessageContexts,
+  ActionReasons,
+  reconstructTranslationError
+} from '@/shared/messaging/core/MessagingCore.js';
 import { registerTranslation, contentScriptIntegration } from '@/shared/messaging/core/ContentScriptIntegration.js';
 import { ErrorHandler } from '@/shared/error-management/ErrorHandler.js';
 import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
@@ -78,6 +82,15 @@ function attachTranslationOutcome(error, outcome) {
     : Object.assign(new Error(String(meaningfulError || 'Translation failed')), { cause: error });
   normalizedError.translationOutcome = outcome;
   return normalizedError;
+}
+
+function reconstructSelectElementError(errorLike) {
+  if (errorLike instanceof Error) return errorLike;
+  if (errorLike && typeof errorLike === 'object') {
+    const prototype = Object.getPrototypeOf(errorLike);
+    if (prototype !== Object.prototype && prototype !== null) return errorLike;
+  }
+  return reconstructTranslationError(errorLike);
 }
 
 /**
@@ -624,8 +637,9 @@ export class DomTranslatorAdapter extends ResourceTracker {
               if (data.success === false || data.error) {
                 if (isFatalError(data.error)) {
                   const errObj = typeof data.error === 'object' ? data.error : { message: data.error, type: matchErrorToType(data.error) };
-                  const error = new Error(errObj.message || 'Fatal error');
-                  Object.assign(error, errObj);
+                  const error = reconstructSelectElementError(errObj);
+                  // Select Element owns fatal stream termination state; keep it explicit
+                  // after canonical reconstruction instead of copying transport fields.
                   error.isFatal = true;
                   safeResolve({ success: false, error }); // Resolve with error data
                 }
@@ -749,10 +763,9 @@ export class DomTranslatorAdapter extends ResourceTracker {
              if (data.cancelled) return safeResolve({ success: false, cancelled: true });
              if (data.success === false || data.error) {
                terminalStreamFailure = true;
-               const errObj = typeof data.error === 'object' ? data.error : { message: data.error, type: matchErrorToType(data.error) };
-               const error = new Error(errObj.message || 'Stream failed');
-              Object.assign(error, errObj);
-              return safeResolve({ success: false, error });
+                const errObj = typeof data.error === 'object' ? data.error : { message: data.error, type: matchErrorToType(data.error) };
+                const error = reconstructSelectElementError(errObj);
+               return safeResolve({ success: false, error });
             }
 
             // Capture final language from stream end metadata if available
@@ -857,7 +870,7 @@ export class DomTranslatorAdapter extends ResourceTracker {
            });
            result = { success: true, targetLanguage: result.targetLanguage };
          } else {
-           throw attachTranslationOutcome(result.error, outcome);
+            throw attachTranslationOutcome(reconstructSelectElementError(result.error), outcome);
          }
        }
 
