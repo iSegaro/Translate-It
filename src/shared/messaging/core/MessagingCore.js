@@ -202,6 +202,24 @@ export const MessageFormat = {
 };
 
 /**
+ * Reconstruct a native Error while keeping canonical translation identity fields.
+ * @param {Error|Object|string} errorLike - Serialized error or error-like value
+ * @returns {Error} Error with canonical identity fields
+ */
+export function reconstructTranslationError(errorLike) {
+  const serialized = MessageFormat.serializeTranslationError(errorLike);
+  const error = new Error(serialized.message);
+
+  for (const field of TRANSLATION_ERROR_FIELDS) {
+    if (Object.prototype.hasOwnProperty.call(serialized, field)) {
+      error[field] = serialized[field];
+    }
+  }
+
+  return error;
+}
+
+/**
  * Unique ID generator for messages
  * @returns {string} Unique message ID
  */

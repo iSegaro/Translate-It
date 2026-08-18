@@ -201,6 +201,16 @@ describe('StreamingManager', () => {
       
       const error = new Error('Network timeout');
       error.type = 'NETWORK_ERROR';
+      error.originalType = 'HTTP_ERROR';
+      error.statusCode = 503;
+      error.context = 'provider-request';
+      error.providerName = 'Source Provider';
+      error.providerId = 'source-provider';
+      error.code = 'NETWORK_TIMEOUT';
+      error.errorCode = 'E_NETWORK';
+      error.translationOutcome = { partial: true };
+      error.cause = new Error('private cause');
+      error.arbitrary = { unsupported: true };
       
       await streamingManager.streamBatchError(messageId, error, 0);
 
@@ -210,10 +220,25 @@ describe('StreamingManager', () => {
           success: false,
           error: expect.objectContaining({
             message: 'Network timeout',
-            type: 'NETWORK_ERROR'
+            type: 'NETWORK_ERROR',
+            originalType: 'HTTP_ERROR',
+            statusCode: 503,
+            context: 'provider-request',
+            providerName: 'Source Provider',
+            providerId: 'source-provider',
+            code: 'NETWORK_TIMEOUT',
+            errorCode: 'E_NETWORK',
+            translationOutcome: { partial: true }
           })
         })
       }));
+
+      const streamedData = browser.tabs.sendMessage.mock.calls[0][1].data;
+      expect(streamedData.timestamp).toEqual(expect.any(Number));
+      const streamedError = streamedData.error;
+      expect(streamedError).not.toHaveProperty('cause');
+      expect(streamedError).not.toHaveProperty('arbitrary');
+      expect(streamedError).not.toHaveProperty('timestamp');
     });
 
     it('should target the originating iframe on error', async () => {
@@ -293,11 +318,29 @@ describe('StreamingManager', () => {
       
       const completeSpy = vi.spyOn(streamingManager, 'completeStream');
       const error = new Error('Fatal provider error');
-      
+      error.type = 'PROVIDER_ERROR';
+      error.originalType = 'HTTP_ERROR';
+      error.statusCode = 502;
+      error.providerName = 'Provider';
+      error.providerId = 'provider-id';
+      error.code = 'UPSTREAM_FAILURE';
+      error.errorCode = 'E_UPSTREAM';
+
       await streamingManager.handleStreamError(messageId, error);
-      
+
       expect(streamingManager.stats.errorSessions).toBe(1);
       expect(completeSpy).toHaveBeenCalledWith(messageId, false, expect.any(Object));
+      expect(completeSpy.mock.calls[0][2].error).toMatchObject({
+        message: 'Fatal provider error',
+        type: 'PROVIDER_ERROR',
+        originalType: 'HTTP_ERROR',
+        statusCode: 502,
+        providerName: 'Provider',
+        providerId: 'provider-id',
+        code: 'UPSTREAM_FAILURE',
+        errorCode: 'E_UPSTREAM'
+      });
+      expect(completeSpy.mock.calls[0][2].error.timestamp).toEqual(expect.any(Number));
     });
   });
 

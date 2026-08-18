@@ -4413,6 +4413,50 @@ describe('OptimizedJsonHandler', () => {
       expect(end).toEqual([123, expect.objectContaining({ action: MessageActions.TRANSLATION_STREAM_END }), { frameId: 3 }]);
     });
 
+    it('serializes optimized stream errors with canonical identity fields', async () => {
+      const browser = (await import('webextension-polyfill')).default;
+      browser.tabs.sendMessage.mockClear();
+      const error = new Error('structured provider failure');
+      Object.assign(error, {
+        type: 'PROVIDER_ERROR',
+        originalType: 'HTTP_ERROR',
+        statusCode: 503,
+        context: 'select-element-stream',
+        providerName: 'Provider',
+        providerId: 'provider-id',
+        code: 'UPSTREAM_FAILURE',
+        errorCode: 'E_UPSTREAM',
+        cause: new Error('private cause'),
+        arbitrary: { ignored: true }
+      });
+
+      await handler._sendStreamError(123, 'msg-optimized-error', error, 'fa', 'en', 'select_element');
+
+      const message = browser.tabs.sendMessage.mock.calls[0][1];
+      expect(message).toMatchObject({
+        action: MessageActions.TRANSLATION_STREAM_END,
+        data: {
+          success: false,
+          sourceLanguage: 'en',
+          targetLanguage: 'fa',
+          translationMode: 'select_element',
+          error: {
+            message: 'structured provider failure',
+            type: 'PROVIDER_ERROR',
+            originalType: 'HTTP_ERROR',
+            statusCode: 503,
+            context: 'select-element-stream',
+            providerName: 'Provider',
+            providerId: 'provider-id',
+            code: 'UPSTREAM_FAILURE',
+            errorCode: 'E_UPSTREAM'
+          }
+        }
+      });
+      expect(message.data.error).not.toHaveProperty('cause');
+      expect(message.data.error).not.toHaveProperty('arbitrary');
+    });
+
     it('targets the top frame explicitly with frameId 0', async () => {
       const browser = (await import('webextension-polyfill')).default;
       browser.tabs.sendMessage.mockClear();

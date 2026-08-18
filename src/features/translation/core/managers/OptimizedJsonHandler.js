@@ -4,6 +4,7 @@
  */
 
 import { MessageActions } from "@/shared/messaging/core/MessageActions.js";
+import { MessageFormat } from "@/shared/messaging/core/MessagingCore.js";
 import { ResponseFormat } from "@/shared/config/translationConstants.js";
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
@@ -862,11 +863,7 @@ const parentError = createParentValidationError(parentIdStr, sourceText, transla
             return { 
               success: false, 
               streaming: true, 
-              error: {
-                message: lastError.message || String(lastError),
-                type: lastError.type || matchErrorToType(lastError),
-                statusCode: lastError.statusCode
-              },
+              error: MessageFormat.serializeTranslationError(lastError),
               results: batchResults.flat()
             };
           }
@@ -1197,11 +1194,7 @@ hasErrors = true;
           return {
             success: false,
             streaming: true,
-            error: {
-              message: lastError.message || String(lastError),
-              type: lastError.type || matchErrorToType(lastError),
-              statusCode: lastError.statusCode
-            },
+            error: MessageFormat.serializeTranslationError(lastError),
             results: batchResults.flat()
           };
         }
@@ -1218,11 +1211,7 @@ hasErrors = true;
 
       statsManager.printSummary(sessionId, { status: 'Streaming', success: !hasErrors, clear: true });
 
-      const formattedError = lastError ? {
-        message: lastError.message || String(lastError),
-        type: lastError.type || matchErrorToType(lastError),
-        statusCode: lastError.statusCode
-      } : null;
+      const formattedError = lastError ? MessageFormat.serializeTranslationError(lastError) : null;
 
       return {
         success: !hasErrors,
@@ -1476,11 +1465,7 @@ hasErrors = true;
       messageId,
       data: {
         success: false,
-        error: lastError ? { 
-          message: lastError.message || String(lastError), 
-          type: lastError.type || matchErrorToType(lastError),
-          statusCode: lastError.statusCode
-        } : null,
+        error: lastError ? MessageFormat.serializeTranslationError(lastError) : null,
         sourceLanguage,
         targetLanguage,
         translationMode,

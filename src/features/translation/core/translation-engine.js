@@ -6,7 +6,7 @@
 
 import { ProviderFactory } from "@/features/translation/providers/ProviderFactory.js";
 import { MessageActions } from "@/shared/messaging/core/MessageActions.js";
-import { MessageFormat } from "@/shared/messaging/core/MessagingCore.js";
+import { MessageFormat, reconstructTranslationError } from "@/shared/messaging/core/MessagingCore.js";
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { isEmptyTranslationInput, isStructuredBatchInput } from "./translationInputHelpers.js";
@@ -27,29 +27,6 @@ import { OptimizedJsonHandler } from "./managers/OptimizedJsonHandler.js";
 import { TranslationBatcher } from "./utils/TranslationBatcher.js";
 
 const logger = getScopedLogger(LOG_COMPONENTS.TRANSLATION, 'translation-engine');
-
-function reconstructTranslationError(errorLike) {
-  const serialized = MessageFormat.serializeTranslationError(errorLike);
-  const error = new Error(serialized.message);
-
-  for (const field of [
-    'type',
-    'originalType',
-    'statusCode',
-    'context',
-    'providerName',
-    'providerId',
-    'code',
-    'errorCode',
-    'translationOutcome',
-  ]) {
-    if (Object.prototype.hasOwnProperty.call(serialized, field)) {
-      error[field] = serialized[field];
-    }
-  }
-
-  return error;
-}
 
 export class TranslationEngine {
   constructor() {

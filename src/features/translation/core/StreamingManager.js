@@ -223,10 +223,10 @@ export class StreamingManager extends ResourceTracker {
         MessageActions.TRANSLATION_STREAM_UPDATE,
         {
           success: false,
-          error: {
-            message: error.message || 'Translation failed',
-            type: error.type || matchErrorToType(error) || 'TRANSLATION_ERROR'
-          },
+          error: MessageFormat.serializeTranslationError(error, {
+            type: error?.type ?? matchErrorToType(error) ?? 'TRANSLATION_ERROR',
+            providerName: error?.providerName ?? streamInfo.providerName
+          }),
           batchIndex: batchIndex,
           provider: streamInfo.providerName,
           timestamp: Date.now()
@@ -350,8 +350,10 @@ export class StreamingManager extends ResourceTracker {
     // Complete stream with error - status will be updated to 'error' inside completeStream
     await this.completeStream(messageId, false, {
       error: {
-        message: error.message,
-        type: error.type || errorType || 'STREAMING_ERROR',
+        ...MessageFormat.serializeTranslationError(error, {
+          type: error?.type ?? errorType ?? 'STREAMING_ERROR',
+          providerName: error?.providerName ?? streamInfo.providerName
+        }),
         timestamp: Date.now()
       }
     });
