@@ -230,7 +230,11 @@ describe('translateFieldViaSmartHandler translation ownership', () => {
       if (messageId) mocks.trackerRequests.set(messageId, { messageId, data, status: 'pending' });
       return data;
     });
-    mocks.clearPendingTranslationData.mockImplementation((toastId) => {
+    mocks.clearPendingTranslationData.mockImplementation((toastId, ownership) => {
+      if (ownership?.target && ownership.data
+        && mocks.pendingTranslationData.get(ownership.target) === ownership.data) {
+        mocks.pendingTranslationData.delete(ownership.target);
+      }
       window.pendingTranslationTarget = null;
       window.pendingTranslationToastId = null;
       if (!toastId) return;
@@ -253,7 +257,10 @@ describe('translateFieldViaSmartHandler translation ownership', () => {
       translatedText: 'translated text',
       originalText: 'original text',
     });
-    mocks.applyTranslationToTextField.mockResolvedValue({ applied: true, mode: 'replace' });
+    mocks.applyTranslationToTextField.mockImplementation(async (_translatedText, _originalText, _mode, toastId, _messageId, _notifier, ownership) => {
+      mocks.clearPendingTranslationData(toastId, ownership);
+      return { applied: true, mode: 'replace' };
+    });
   });
 
   it('marks failed provider responses after existing failure cleanup', async () => {
@@ -271,6 +278,7 @@ describe('translateFieldViaSmartHandler translation ownership', () => {
     expect(mocks.clearPendingTranslationData).toHaveBeenCalled();
     expect(mocks.clearPendingNotificationData).toHaveBeenCalled();
     expect(mocks.applyTranslationToTextField).not.toHaveBeenCalled();
+    expect(mocks.pendingTranslationData.get(target)).toBeUndefined();
     const request = [...mocks.trackerRequests.values()][0];
     expect(request.status).toBe('failed');
     expect(mocks.tracker.failRequest).toHaveBeenCalledWith(request.messageId, error);
@@ -288,6 +296,7 @@ describe('translateFieldViaSmartHandler translation ownership', () => {
 
     expect(isFieldTranslationRequestError(error)).toBe(true);
     expect(mocks.applyTranslationToTextField).not.toHaveBeenCalled();
+    expect(mocks.pendingTranslationData.get(target)).toBeUndefined();
     expect([...mocks.trackerRequests.values()][0].status).toBe('failed');
   });
 
@@ -309,6 +318,7 @@ describe('translateFieldViaSmartHandler translation ownership', () => {
     expect(isFieldTranslationRequestError(thrownError)).toBe(true);
     expect(mocks.dismiss).toHaveBeenCalled();
     expect(mocks.clearPendingTranslationData).toHaveBeenCalled();
+    expect(mocks.pendingTranslationData.get(target)).toBeUndefined();
     expect([...mocks.trackerRequests.values()][0].status).toBe('timeout');
     expect(mocks.tracker.markTimeout).toHaveBeenCalledTimes(1);
     expect(mocks.tracker.failRequest).not.toHaveBeenCalled();
@@ -333,6 +343,17 @@ describe('translateFieldViaSmartHandler translation ownership', () => {
     expect(isFieldTranslationRequestError(error)).toBe(false);
   });
 
+  it('clears current data after application failure', async () => {
+    const error = new Error('application failed');
+    mocks.applyTranslation.mockRejectedValue(error);
+
+    await expect(translateFieldViaSmartHandler({ text: 'hello', target }))
+      .resolves.toBeUndefined();
+
+    expect(mocks.pendingTranslationData.get(target)).toBeUndefined();
+    expect([...mocks.trackerRequests.values()][0].status).toBe('failed');
+  });
+
   it('does not mark clipboard failure after request succeeds', async () => {
     const error = new Error('clipboard write failed');
     mocks.applyTranslation.mockRejectedValue(error);
@@ -353,6 +374,7 @@ describe('translateFieldViaSmartHandler translation ownership', () => {
       success: true,
       result: { applied: true, mode: 'replace' },
     }));
+    expect(mocks.pendingTranslationData.get(target)).toBeUndefined();
   });
 
   it('completes successful clipboard application', async () => {
@@ -368,6 +390,7 @@ describe('translateFieldViaSmartHandler translation ownership', () => {
     const request = [...mocks.trackerRequests.values()][0];
     expect(request.status).toBe('completed');
     expect(writeText).toHaveBeenCalledWith('translated text');
+    expect(mocks.pendingTranslationData.get(target)).toBeUndefined();
   });
 
   it('completes accepted already-completed application result', async () => {
@@ -753,6 +776,7 @@ describe('translateFieldViaSmartHandler translation ownership', () => {
       .rejects.toBe(error);
 
     expect(isFieldTranslationRequestError(error)).toBe(false);
+    expect(mocks.pendingTranslationData.get(target)).toBeUndefined();
     expect([...mocks.trackerRequests.values()][0].status).toBe('cancelled');
     expect(mocks.tracker.cancelRequest).toHaveBeenCalledWith(
       [...mocks.trackerRequests.keys()][0],
@@ -769,6 +793,7 @@ describe('translateFieldViaSmartHandler translation ownership', () => {
     expect(mocks.dismiss).toHaveBeenCalled();
     expect(mocks.clearPendingTranslationData).toHaveBeenCalled();
     expect(mocks.applyTranslationToTextField).not.toHaveBeenCalled();
+    expect(mocks.pendingTranslationData.get(target)).toBeUndefined();
     expect([...mocks.trackerRequests.values()][0].status).toBe('cancelled');
     expect(mocks.tracker.cancelRequest).toHaveBeenCalledWith(
       [...mocks.trackerRequests.keys()][0],

@@ -348,6 +348,11 @@ export function getPendingTranslationData(fallbackTarget, toastId, ownership = n
 export function clearPendingTranslationData(specificToastId, ownership = null) {
   if (ownership && !isCurrentFieldTranslationRequest(ownership.target, ownership)) return;
 
+  if (ownership?.target && ownership.data
+    && pendingTranslationData.get(ownership.target) === ownership.data) {
+    pendingTranslationData.delete(ownership.target);
+  }
+
   if (!ownership || window.pendingTranslationOwner === ownership) {
     window.pendingTranslationOwner = null;
   }

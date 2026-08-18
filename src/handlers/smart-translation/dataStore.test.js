@@ -90,12 +90,73 @@ describe('Field request ownership data store', () => {
 
     expect(storePendingTranslationData(target, 'field', 'default', null, null, Date.now(), 'toast-a', 'message-a', first)).toBeNull();
     expect(pendingTranslationByToastId.get('toast-b')).toBe(data);
+    expect(pendingTranslationData.get(target)).toBe(data);
 
     clearPendingTranslationData('toast-b', first);
     clearPendingNotificationData('stale', first);
 
     expect(pendingTranslationByToastId.get('toast-b')).toBe(data);
+    expect(pendingTranslationData.get(target)).toBe(data);
     expect(window.pendingTranslationOwner).toBe(second);
+  });
+
+  it('clears current ownership data by exact WeakMap identity', () => {
+    const target = document.createElement('textarea');
+    const ownership = beginFieldTranslationRequest(target).ownership;
+    const data = storePendingTranslationData(target, 'field', 'default', null, null, Date.now(), 'toast-current', 'message-current', ownership);
+
+    clearPendingTranslationData('toast-current', ownership);
+
+    expect(pendingTranslationData.has(target)).toBe(false);
+    expect(pendingTranslationByToastId.has('toast-current')).toBe(false);
+    expect(window.pendingTranslationOwner).toBeNull();
+    expect(data).toBeDefined();
+  });
+
+  it('does not infer WeakMap cleanup without ownership', () => {
+    const target = document.createElement('textarea');
+    const ownership = beginFieldTranslationRequest(target).ownership;
+    const data = storePendingTranslationData(target, 'field', 'default', null, null, Date.now(), 'toast-owned', 'message-owned', ownership);
+
+    clearPendingTranslationData('toast-owned');
+
+    expect(pendingTranslationData.get(target)).toBe(data);
+  });
+
+  it('removes active data while preserving processed toast history', () => {
+    const target = document.createElement('textarea');
+    const ownership = beginFieldTranslationRequest(target).ownership;
+    const data = storePendingTranslationData(target, 'field', 'default', null, null, Date.now(), 'toast-processed', 'message-processed', ownership);
+    data.processed = true;
+
+    clearPendingTranslationData('toast-processed', ownership);
+
+    expect(pendingTranslationData.has(target)).toBe(false);
+    expect(pendingTranslationByToastId.get('toast-processed')).toBe(data);
+    expect(window.pendingTranslationOwner).toBeNull();
+  });
+
+  it('does not recover terminal data after current cleanup', () => {
+    const target = document.createElement('textarea');
+    const ownership = beginFieldTranslationRequest(target).ownership;
+    storePendingTranslationData(target, 'field', 'default', null, null, Date.now(), 'toast-terminal', 'message-terminal', ownership);
+
+    clearPendingTranslationData('toast-terminal', ownership);
+
+    expect(getPendingTranslationData(target, null)).toBeNull();
+  });
+
+  it('keeps newer target data when stale ownership cleans up', () => {
+    const target = document.createElement('textarea');
+    const first = beginFieldTranslationRequest(target).ownership;
+    const firstData = storePendingTranslationData(target, 'field', 'default', null, null, Date.now(), 'toast-first', 'message-first', first);
+    const second = beginFieldTranslationRequest(target).ownership;
+    const secondData = storePendingTranslationData(target, 'field', 'default', null, null, Date.now(), 'toast-second', 'message-second', second);
+
+    clearPendingTranslationData('toast-first', first);
+
+    expect(firstData).not.toBe(secondData);
+    expect(pendingTranslationData.get(target)).toBe(secondData);
   });
 
   it('only current owner can release controller and ownership', () => {

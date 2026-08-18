@@ -448,6 +448,7 @@ async function processTranslationToTextFieldInternal(translatedText, originalTex
           successfullyCompletedToastIds.add(toastId);
         }
       }
+      clearPendingTranslationData(toastId, ownership);
       return { applied: wasApplied, mode: 'replace' };
     } else {
       if (ownership && !isCurrentFieldTranslationRequest(ownership.target, ownership)) {
