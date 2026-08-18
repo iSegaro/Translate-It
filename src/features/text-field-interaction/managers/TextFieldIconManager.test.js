@@ -153,6 +153,7 @@ vi.mock('../utils/FieldTranslationErrorPresenter.js', () => ({
 import { TextFieldIconManager } from './TextFieldIconManager.js';
 import { ExtensionContextManager } from '@/core/extensionContext.js';
 import { state } from '@/shared/config/config.js';
+import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
 
 describe('TextFieldIconManager', () => {
   let manager;
@@ -163,6 +164,7 @@ describe('TextFieldIconManager', () => {
     manager = TextFieldIconManager.getInstance();
     mockIsFieldTranslationRequestError.mockReturnValue(false);
     mockGetFieldTranslationErrorPresentation.mockResolvedValue(null);
+    ExtensionContextManager.isContextError.mockReturnValue(false);
     
     // Mock location properly
     vi.stubGlobal('location', { protocol: 'https:' });
@@ -358,16 +360,38 @@ describe('TextFieldIconManager', () => {
       });
     });
 
+    it.each([
+      ['USER_CANCELLED', Object.assign(new Error('cancelled'), { type: ErrorTypes.USER_CANCELLED }), false],
+      ['TRANSLATION_CANCELLED', Object.assign(new Error('translation cancelled'), { type: ErrorTypes.TRANSLATION_CANCELLED }), false],
+      ['AbortError', Object.assign(new Error('aborted'), { name: 'AbortError' }), false],
+      ['CONTEXT', Object.assign(new Error('context'), { type: ErrorTypes.CONTEXT }), false],
+      ['EXTENSION_CONTEXT_INVALIDATED', Object.assign(new Error('extension context invalidated'), { type: ErrorTypes.EXTENSION_CONTEXT_INVALIDATED }), false],
+      ['recognized context error', new Error('message channel closed'), true],
+    ])('silences %s without presentation or cleanup', async (_name, error, recognizedContextError) => {
+      const { translateFieldViaSmartHandler } = await import('@/handlers/smartTranslationIntegration.js');
+      const cleanup = vi.spyOn(manager, 'cleanupElement');
+      ExtensionContextManager.isContextError.mockReturnValue(recognizedContextError);
+      translateFieldViaSmartHandler.mockRejectedValue(error);
+
+      await expect(manager.executeTranslation({
+        targetElement: Object.assign(document.createElement('textarea'), { value: 'hello' }),
+      })).resolves.toBeUndefined();
+
+      expect(mockGetFieldTranslationErrorPresentation).not.toHaveBeenCalled();
+      expect(mockErrorHandler.handle).not.toHaveBeenCalled();
+      expect(cleanup).not.toHaveBeenCalled();
+    });
+
     it('does not present when marked error has no presentation', async () => {
       const { translateFieldViaSmartHandler } = await import('@/handlers/smartTranslationIntegration.js');
-      const cancellation = Object.assign(new Error('cancelled'), { type: 'USER_CANCELLED' });
+      const requestError = Object.assign(new Error('request failed'), { type: 'API_CONFIG_INVALID' });
       mockIsFieldTranslationRequestError.mockReturnValue(true);
       mockGetFieldTranslationErrorPresentation.mockResolvedValue(null);
-      translateFieldViaSmartHandler.mockRejectedValue(cancellation);
+      translateFieldViaSmartHandler.mockRejectedValue(requestError);
 
       await manager.executeTranslation({ targetElement: Object.assign(document.createElement('textarea'), { value: 'hello' }) });
 
-      expect(mockGetFieldTranslationErrorPresentation).toHaveBeenCalledWith(cancellation);
+      expect(mockGetFieldTranslationErrorPresentation).toHaveBeenCalledWith(requestError);
       expect(mockErrorHandler.handle).not.toHaveBeenCalled();
     });
 

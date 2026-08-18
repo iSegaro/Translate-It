@@ -18,6 +18,8 @@ import { ExclusionChecker } from '@/features/exclusion/core/ExclusionChecker.js'
 
 import ElementDetectionService from '@/shared/services/ElementDetectionService.js';
 import { settingsManager } from '@/shared/managers/SettingsManager.js';
+import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
+import { isCancellationError } from '@/shared/error-management/ErrorMatcher.js';
 import { getFieldTranslationErrorPresentation } from '../utils/FieldTranslationErrorPresenter.js';
 import { isFieldTranslationRequestError } from '@/handlers/smart-translation/translationErrorOwnership.js';
 
@@ -101,6 +103,13 @@ export class TextFieldIconManager extends ResourceTracker {
       this.cleanupElement(iconData.targetElement);
     } catch (error) {
       this.logger.error('Failed to execute translation:', error);
+
+      const isSilentFailure = isCancellationError(error)
+        || error?.type === ErrorTypes.CONTEXT
+        || error?.type === ErrorTypes.EXTENSION_CONTEXT_INVALIDATED
+        || ExtensionContextManager.isContextError(error);
+
+      if (isSilentFailure) return;
       
       const { ErrorHandler } = await import('@/shared/error-management/ErrorHandler.js');
       const errorHandler = ErrorHandler.getInstance();
