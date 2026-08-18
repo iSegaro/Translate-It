@@ -1,11 +1,16 @@
-import { getScopedLogger } from '@/shared/logging/logger.js';
+import { getScopedLogger } from "@/shared/logging/logger.js";
 import { LOG_COMPONENTS } from "@/shared/logging/logConstants.js";
-import { WINDOWS_MANAGER_EVENTS, WindowsManagerEvents, pageEventBus } from '@/core/PageEventBus.js';
-import { SELECTION_EVENTS } from '@/features/text-selection/events/SelectionEvents.js';
+import {
+  WINDOWS_MANAGER_EVENTS,
+  WindowsManagerEvents,
+  pageEventBus,
+} from "@/core/PageEventBus.js";
+import { SELECTION_EVENTS } from "@/features/text-selection/events/SelectionEvents.js";
 import { WindowsConfig } from "../core/WindowsConfig.js";
 import { state as globalState } from "@/shared/config/config.js";
 import { adjustForDirectChild } from "../crossframe/coordinateUtils.js";
 import { getTextSelectionWindowRelay } from "../crossframe/TextSelectionWindowRelay.js";
+import { getSelectionWindowErrorPresentation } from "../display/SelectionWindowErrorPresenter.js";
 
 /**
  * Handles internal Vue events and cross-frame messages
@@ -13,8 +18,8 @@ import { getTextSelectionWindowRelay } from "../crossframe/TextSelectionWindowRe
 export class EventCoordinator {
   constructor(facade, dependencies) {
     this.facade = facade;
-    this.logger = getScopedLogger(LOG_COMPONENTS.WINDOWS, 'EventCoordinator');
-    
+    this.logger = getScopedLogger(LOG_COMPONENTS.WINDOWS, "EventCoordinator");
+
     // Inject dependencies from facade
     this.state = dependencies.state;
     this.crossFrameManager = dependencies.crossFrameManager;
@@ -29,7 +34,7 @@ export class EventCoordinator {
     this.crossFrameManager.setEventHandlers({
       onOutsideClick: this._handleCrossFrameOutsideClick.bind(this),
       onWindowCreationRequest: this._handleWindowCreationRequest.bind(this),
-      onWindowCreatedResponse: this._handleWindowCreatedResponse.bind(this)
+      onWindowCreatedResponse: this._handleWindowCreatedResponse.bind(this),
     });
 
     if (window === window.top) {
@@ -45,7 +50,7 @@ export class EventCoordinator {
 
     this.clickManager.setHandlers({
       onOutsideClick: this._handleOutsideClick.bind(this),
-      onIconClick: this._handleIconClick.bind(this)
+      onIconClick: this._handleIconClick.bind(this),
     });
 
     if (pageEventBus) {
@@ -54,12 +59,25 @@ export class EventCoordinator {
       };
       this.facade._speakRequestHandler = this._handleSpeakRequest.bind(this);
       this.facade._retryRequestHandler = this._handleRetryRequest.bind(this);
-      this.facade._changeProviderRequestHandler = this._handleChangeProviderRequest.bind(this);
-      
-      pageEventBus.on(WINDOWS_MANAGER_EVENTS.ICON_CLICKED, this.facade._iconClickHandler);
-      pageEventBus.on('translation-window-speak', this.facade._speakRequestHandler);
-      pageEventBus.on('translation-window-retry', this.facade._retryRequestHandler);
-      pageEventBus.on('translation-window-change-provider', this.facade._changeProviderRequestHandler);
+      this.facade._changeProviderRequestHandler =
+        this._handleChangeProviderRequest.bind(this);
+
+      pageEventBus.on(
+        WINDOWS_MANAGER_EVENTS.ICON_CLICKED,
+        this.facade._iconClickHandler,
+      );
+      pageEventBus.on(
+        "translation-window-speak",
+        this.facade._speakRequestHandler,
+      );
+      pageEventBus.on(
+        "translation-window-retry",
+        this.facade._retryRequestHandler,
+      );
+      pageEventBus.on(
+        "translation-window-change-provider",
+        this.facade._changeProviderRequestHandler,
+      );
 
       this.facade._dismissRequestHandler = () => {
         if (this.facade._isIconToWindowTransition) {
@@ -67,14 +85,23 @@ export class EventCoordinator {
         }
         this.facade.dismiss(false);
       };
-      
-      pageEventBus.on(WINDOWS_MANAGER_EVENTS.DISMISS_WINDOW, this.facade._dismissRequestHandler);
-      pageEventBus.on(WINDOWS_MANAGER_EVENTS.DISMISS_ICON, this.facade._dismissRequestHandler);
+
+      pageEventBus.on(
+        WINDOWS_MANAGER_EVENTS.DISMISS_WINDOW,
+        this.facade._dismissRequestHandler,
+      );
+      pageEventBus.on(
+        WINDOWS_MANAGER_EVENTS.DISMISS_ICON,
+        this.facade._dismissRequestHandler,
+      );
 
       this.facade._selectionTriggerHandler = (payload) => {
         this._handleSelectionTrigger(payload);
       };
-      pageEventBus.on(SELECTION_EVENTS.GLOBAL_SELECTION_TRIGGER, this.facade._selectionTriggerHandler);
+      pageEventBus.on(
+        SELECTION_EVENTS.GLOBAL_SELECTION_TRIGGER,
+        this.facade._selectionTriggerHandler,
+      );
 
       this.facade._selectionClearHandler = () => {
         if (this.state.isVisible || this.state.isIconMode) {
@@ -82,12 +109,18 @@ export class EventCoordinator {
           this.facade.dismiss(false);
         }
       };
-      pageEventBus.on(SELECTION_EVENTS.GLOBAL_SELECTION_CLEAR, this.facade._selectionClearHandler);
+      pageEventBus.on(
+        SELECTION_EVENTS.GLOBAL_SELECTION_CLEAR,
+        this.facade._selectionClearHandler,
+      );
 
       this.facade._selectionChangeHandler = (detail) => {
         this.facade.show(detail.text, detail.position, detail.options);
       };
-      pageEventBus.on(SELECTION_EVENTS.GLOBAL_SELECTION_CHANGE, this.facade._selectionChangeHandler);
+      pageEventBus.on(
+        SELECTION_EVENTS.GLOBAL_SELECTION_CHANGE,
+        this.facade._selectionChangeHandler,
+      );
     }
   }
 
@@ -121,12 +154,15 @@ export class EventCoordinator {
     try {
       const tts = await this.facade._ensureTTSLoaded();
       if (detail.isSpeaking) {
-        await tts.speak(detail.text, detail.language || 'auto');
+        await tts.speak(detail.text, detail.language || "auto");
       } else {
         await tts.stop();
       }
     } catch (error) {
-      await this.errorHandler.handle(error, { context: 'windows-tts', showToast: true });
+      await this.errorHandler.handle(error, {
+        context: "windows-tts",
+        showToast: true,
+      });
     }
   }
 
@@ -139,10 +175,17 @@ export class EventCoordinator {
 
     if (!windowId || !textToTranslate) return;
 
-    WindowsManagerEvents.updateWindow(windowId, { isLoading: true, isError: false, initialTranslatedText: '' });
+    WindowsManagerEvents.updateWindow(windowId, {
+      isLoading: true,
+      isError: false,
+      initialTranslatedText: "",
+    });
 
     try {
-      const translationResult = await this.facade._startTranslationProcess(textToTranslate, windowId);
+      const translationResult = await this.facade._startTranslationProcess(
+        textToTranslate,
+        windowId,
+      );
       if (!translationResult) return;
 
       WindowsManagerEvents.updateWindow(windowId, {
@@ -150,13 +193,19 @@ export class EventCoordinator {
         isStreaming: false,
         isError: false,
         initialTranslatedText: translationResult.translatedText,
-        sourceLanguage: translationResult.sourceLanguage || 'auto',
+        sourceLanguage: translationResult.sourceLanguage || "auto",
         detectedSourceLanguage: translationResult.sourceLanguage,
-        provider: translationResult.provider
+        provider: translationResult.provider,
       });
     } catch (error) {
-      const errorInfo = await this.errorHandler.getErrorForUI(error, 'windows-translation');
-      const fallbackProvider = this.translationHandler.getEffectiveProvider(textToTranslate, { provider: this.state.provider });
+      const errorInfo = await this.errorHandler.getErrorForUI(
+        error,
+        "windows-translation",
+      );
+      const fallbackProvider = this.translationHandler.getEffectiveProvider(
+        textToTranslate,
+        { provider: this.state.provider },
+      );
       WindowsManagerEvents.updateWindow(windowId, {
         isLoading: false,
         isStreaming: false,
@@ -165,7 +214,7 @@ export class EventCoordinator {
         canRetry: errorInfo.canRetry,
         needsSettings: errorInfo.needsSettings,
         initialTranslatedText: errorInfo.message,
-        provider: fallbackProvider
+        provider: fallbackProvider,
       });
     }
   }
@@ -181,10 +230,18 @@ export class EventCoordinator {
     if (!windowId || !textToTranslate || !newProvider) return;
 
     this.state.setProvider(newProvider);
-    WindowsManagerEvents.updateWindow(windowId, { isLoading: true, isError: false, initialTranslatedText: '', provider: newProvider });
+    WindowsManagerEvents.updateWindow(windowId, {
+      isLoading: true,
+      isError: false,
+      initialTranslatedText: "",
+      provider: newProvider,
+    });
 
     try {
-      const translationResult = await this.facade._startTranslationProcess(textToTranslate, windowId);
+      const translationResult = await this.facade._startTranslationProcess(
+        textToTranslate,
+        windowId,
+      );
       if (!translationResult) return;
 
       WindowsManagerEvents.updateWindow(windowId, {
@@ -192,13 +249,16 @@ export class EventCoordinator {
         isStreaming: false,
         isError: false,
         initialTranslatedText: translationResult.translatedText,
-        sourceLanguage: translationResult.sourceLanguage || 'auto',
+        sourceLanguage: translationResult.sourceLanguage || "auto",
         detectedSourceLanguage: translationResult.sourceLanguage,
         targetLanguage: translationResult.targetLanguage,
-        provider: translationResult.provider
+        provider: translationResult.provider,
       });
     } catch (error) {
-      const errorInfo = await this.errorHandler.getErrorForUI(error, 'windows-translation-retry');      
+      const errorInfo = await this.errorHandler.getErrorForUI(
+        error,
+        "windows-translation-retry",
+      );
       WindowsManagerEvents.updateWindow(windowId, {
         isLoading: false,
         isStreaming: false,
@@ -207,7 +267,7 @@ export class EventCoordinator {
         canRetry: errorInfo.canRetry,
         needsSettings: errorInfo.needsSettings,
         initialTranslatedText: errorInfo.message,
-        provider: newProvider
+        provider: newProvider,
       });
     }
   }
@@ -216,7 +276,11 @@ export class EventCoordinator {
    * Handle cross-frame outside click
    */
   async _handleCrossFrameOutsideClick() {
-    if (window.__TRANSLATION_WINDOW_IS_DRAGGING === true || window.__TRANSLATION_WINDOW_JUST_DRAGGED === true) return;
+    if (
+      window.__TRANSLATION_WINDOW_IS_DRAGGING === true ||
+      window.__TRANSLATION_WINDOW_JUST_DRAGGED === true
+    )
+      return;
     if (this.state.hasActiveElements) {
       await this.facade.dismiss(true);
     }
@@ -227,7 +291,11 @@ export class EventCoordinator {
    */
   async _handleOutsideClick() {
     if (this.state.shouldPreventDismissal) return;
-    if (window.__TRANSLATION_WINDOW_IS_DRAGGING === true || window.__TRANSLATION_WINDOW_JUST_DRAGGED === true) return;
+    if (
+      window.__TRANSLATION_WINDOW_IS_DRAGGING === true ||
+      window.__TRANSLATION_WINDOW_JUST_DRAGGED === true
+    )
+      return;
 
     let textSelectionManager = null;
     if (window.textSelectionManager) {
@@ -236,11 +304,17 @@ export class EventCoordinator {
       textSelectionManager = window.TranslateItTextSelectionManager;
     }
 
-    if (textSelectionManager && (textSelectionManager.isDragging || textSelectionManager.justFinishedDrag || textSelectionManager.preventDismissOnNextClear)) {
+    if (
+      textSelectionManager &&
+      (textSelectionManager.isDragging ||
+        textSelectionManager.justFinishedDrag ||
+        textSelectionManager.preventDismissOnNextClear)
+    ) {
       return;
     }
 
-    const hasStoredMobileText = this.facade.displayManager.shouldUseMobileUI() && this.state.originalText;
+    const hasStoredMobileText =
+      this.facade.displayManager.shouldUseMobileUI() && this.state.originalText;
     if (this.state.hasActiveElements || hasStoredMobileText) {
       await this.facade.dismiss(true);
     }
@@ -250,23 +324,29 @@ export class EventCoordinator {
    * Handle icon click
    */
   _handleIconClick() {
-    const context = this.clickManager.handleIconClick(this.state.iconClickContext);
+    const context = this.clickManager.handleIconClick(
+      this.state.iconClickContext,
+    );
     if (!context) return;
 
-    if (globalState && typeof globalState === 'object') {
+    if (globalState && typeof globalState === "object") {
       globalState.preventTextFieldIconCreation = true;
     }
 
     if (context.iconId) {
-      WindowsManagerEvents.iconClicked({ id: context.iconId, text: context.text, position: context.position });
+      WindowsManagerEvents.iconClicked({
+        id: context.iconId,
+        text: context.text,
+        position: context.position,
+      });
     }
 
     this.facade.dismissalManager._cleanupIcon(false);
     this.facade.displayManager._showWindow(context.text, context.position);
     this.clickManager.completeIconTransition();
-    
+
     setTimeout(() => {
-      if (globalState && typeof globalState === 'object') {
+      if (globalState && typeof globalState === "object") {
         globalState.preventTextFieldIconCreation = false;
       }
     }, WindowsConfig.TIMEOUTS.PENDING_WINDOW_RESET);
@@ -280,7 +360,11 @@ export class EventCoordinator {
     if (this.state.isProcessing) return;
 
     const now = Date.now();
-    if (this.facade._lastProcessedClick && this.facade._lastProcessedClick.id === detail.id && (now - this.facade._lastProcessedClick.timestamp) < 500) {
+    if (
+      this.facade._lastProcessedClick &&
+      this.facade._lastProcessedClick.id === detail.id &&
+      now - this.facade._lastProcessedClick.timestamp < 500
+    ) {
       return;
     }
 
@@ -288,7 +372,7 @@ export class EventCoordinator {
     this.facade._lastProcessedClick = { id, timestamp: now };
     this.state.setProcessing(true);
 
-    if (globalState && typeof globalState === 'object') {
+    if (globalState && typeof globalState === "object") {
       globalState.preventTextFieldIconCreation = true;
     }
 
@@ -303,7 +387,7 @@ export class EventCoordinator {
 
     await showPromise;
     setTimeout(() => {
-      if (globalState && typeof globalState === 'object') {
+      if (globalState && typeof globalState === "object") {
         globalState.preventTextFieldIconCreation = false;
       }
       this.state.setProcessing(false);
@@ -322,50 +406,63 @@ export class EventCoordinator {
       let adjustedPosition = { ...data.position };
       // Note: positionCalculator logic was removed from WM but kept in sub-modules if needed
       // Here it seems we need it for iframe support
-      
+
       const windowId = `translation-window-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-      
+
       WindowsManagerEvents.showWindow({
         id: windowId,
         selectedText: data.selectedText,
         position: adjustedPosition,
-        mode: 'window'
+        mode: "window",
       });
-      
+
       this.state.setOriginalText(data.selectedText);
       this.state.setTranslationCancelled(false);
       this.state.setIconMode(false);
       this.state.setVisible(true);
-      
-      this.facade._startTranslationProcess(data.selectedText, windowId)
-        .then(result => {
+
+      this.facade
+        ._startTranslationProcess(data.selectedText, windowId)
+        .then((result) => {
           if (result) {
             WindowsManagerEvents.updateWindow(windowId, {
-              initialSize: 'normal',
+              initialSize: "normal",
               isLoading: false,
               initialTranslatedText: result.translatedText,
-              sourceLanguage: result.sourceLanguage || 'auto',
+              sourceLanguage: result.sourceLanguage || "auto",
               detectedSourceLanguage: result.sourceLanguage,
               targetLanguage: result.targetLanguage,
-              provider: result.provider
+              provider: result.provider,
             });
           }
         })
         .catch(async (error) => {
-          const errorInfo = await this.errorHandler.getErrorForUI(error, 'windows-translation');
+          const presentation = await getSelectionWindowErrorPresentation(
+            error,
+            "windows-translation",
+            this.errorHandler,
+          );
+          if (!presentation) return;
+
+          const { errorInfo } = presentation;
           WindowsManagerEvents.updateWindow(windowId, {
-            initialSize: 'normal',
+            initialSize: "normal",
             isLoading: false,
             isStreaming: false,
             isError: true,
             errorType: errorInfo.type,
-            initialTranslatedText: errorInfo.message
+            initialTranslatedText: errorInfo.message,
           });
         });
-      
+
       this.crossFrameManager.notifyWindowCreated(data.frameId, true, windowId);
     } catch (error) {
-      this.crossFrameManager.notifyWindowCreated(data.frameId, false, null, error.message);
+      this.crossFrameManager.notifyWindowCreated(
+        data.frameId,
+        false,
+        null,
+        error.message,
+      );
     }
   }
 
@@ -391,11 +488,17 @@ export class EventCoordinator {
     if (!this.crossFrameManager.isTopFrame) return;
 
     try {
-      const adjustedPosition = adjustForDirectChild(sourceWindow, data.position) ?? { ...data.position };
+      const adjustedPosition = adjustForDirectChild(
+        sourceWindow,
+        data.position,
+      ) ?? { ...data.position };
 
       await this.facade.show(data.selectedText, adjustedPosition, data.options);
     } catch (error) {
-      this.logger.warn('Failed to handle text selection window request from iframe:', error.message);
+      this.logger.warn(
+        "Failed to handle text selection window request from iframe:",
+        error.message,
+      );
     }
   }
 }

@@ -1,0 +1,287 @@
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { ErrorTypes } from "@/shared/error-management/ErrorTypes.js";
+import { DisplayManager } from "./DisplayManager.js";
+
+const mocks = vi.hoisted(() => ({
+  events: {
+    showWindow: vi.fn(),
+    updateWindow: vi.fn(),
+    showMobileSheet: vi.fn(),
+  },
+  getPresentation: vi.fn(),
+}));
+
+vi.mock("@/shared/logging/logger.js", () => ({
+  getScopedLogger: vi.fn(() => ({
+    debug: vi.fn(),
+    info: vi.fn(),
+    warn: vi.fn(),
+  })),
+}));
+
+vi.mock("@/shared/logging/logConstants.js", () => ({
+  LOG_COMPONENTS: { WINDOWS: "windows" },
+}));
+
+vi.mock("../core/WindowsConfig.js", () => ({
+  WindowsConfig: {
+    TIMEOUTS: {
+      OUTSIDE_CLICK_DELAY: 1,
+    },
+  },
+}));
+
+vi.mock("@/core/PageEventBus.js", () => ({
+  WindowsManagerEvents: mocks.events,
+}));
+
+vi.mock("@/shared/managers/SettingsManager.js", () => ({
+  default: { get: vi.fn((key, fallback) => fallback) },
+}));
+
+vi.mock("@/shared/config/config.js", () => ({
+  SelectionTranslationMode: {
+    IMMEDIATE: "immediate",
+    ON_CLICK: "onClick",
+    ON_FAB_CLICK: "onFabClick",
+  },
+  TranslationMode: {
+    ScreenCapture: "screenCapture",
+  },
+}));
+
+vi.mock("@/core/extensionContext.js", () => ({
+  default: {
+    isValidSync: vi.fn(() => true),
+  },
+}));
+
+vi.mock("@/utils/browser/compatibility.js", () => ({
+  deviceDetector: { shouldEnableMobileUI: vi.fn(() => false) },
+}));
+
+vi.mock("@/features/exclusion/core/ExclusionChecker.js", () => ({
+  default: {
+    getInstance: vi.fn(() => ({
+      isFeatureAllowed: vi.fn().mockResolvedValue(true),
+    })),
+  },
+}));
+
+vi.mock("@/shared/constants/mobile.js", () => ({
+  MOBILE_CONSTANTS: {
+    UI_MODE: { AUTO: "auto", MOBILE: "mobile", DESKTOP: "desktop" },
+    VIEWS: { SELECTION: "selection" },
+    SHEET_STATE: { PEEK: "peek" },
+  },
+}));
+
+vi.mock("./SelectionWindowErrorPresenter.js", () => ({
+  getSelectionWindowErrorPresentation: mocks.getPresentation,
+}));
+
+const createState = () => ({
+  isProcessing: false,
+  isVisible: false,
+  isIconMode: false,
+  isPinned: false,
+  dockMode: "none",
+  activeWindowId: null,
+  originalText: null,
+  provider: "original-provider",
+  isTranslationCancelled: false,
+  pendingTranslationWindow: false,
+  hasActiveElements: true,
+  setActiveWindowId: vi.fn((id) => {
+    state.activeWindowId = id;
+  }),
+  setOriginalText: vi.fn(),
+  setTranslationCancelled: vi.fn(),
+  setVisible: vi.fn(),
+  setIconMode: vi.fn(),
+  setProcessing: vi.fn(),
+  setProvider: vi.fn(),
+});
+
+let state;
+let facade;
+let errorHandler;
+let translationHandler;
+let manager;
+
+const canonicalError = (type = ErrorTypes.API_ERROR) =>
+  Object.assign(new Error(`raw ${type} detail`), {
+    type,
+    statusCode: 502,
+    providerName: "Private Provider",
+    providerId: "private-provider",
+  });
+
+const safePresentation = (overrides = {}) => ({
+  displayError: Object.assign(new Error("safe localized message"), {
+    type: ErrorTypes.API_ERROR,
+  }),
+  errorInfo: {
+    message: "safe localized message",
+    type: ErrorTypes.API_ERROR,
+    canRetry: true,
+    needsSettings: true,
+  },
+  canonicalType: ErrorTypes.API_ERROR,
+  ...overrides,
+});
+
+beforeEach(() => {
+  vi.clearAllMocks();
+  state = createState();
+  facade = {
+    _isIconToWindowTransition: false,
+    _lastDismissedText: null,
+    _lastDismissTime: 0,
+    dismiss: vi.fn().mockResolvedValue(),
+    _addDismissListener: vi.fn(),
+    _startTranslationProcess: vi.fn().mockRejectedValue(canonicalError()),
+  };
+  errorHandler = {
+    getErrorForUI: vi.fn(),
+    handle: vi.fn().mockResolvedValue(),
+  };
+  translationHandler = {
+    getEffectiveProvider: vi.fn(() => "fallback-provider"),
+    cancelAllTranslations: vi.fn(),
+  };
+  manager = new DisplayManager(facade, {
+    state,
+    crossFrameManager: { frameId: "frame-1", isTopFrame: true },
+    translationHandler,
+    errorHandler,
+    clickManager: { addOutsideClickListener: vi.fn() },
+    themeManager: { currentTheme: "dark" },
+  });
+  mocks.getPresentation.mockResolvedValue(safePresentation());
+});
+
+describe("DisplayManager Selection Window error boundary", () => {
+  it("sanitizes desktop initial failure and updates same window once", async () => {
+    const error = canonicalError(ErrorTypes.HTTP_ERROR);
+    facade._startTranslationProcess.mockRejectedValue(error);
+
+    await manager._showWindow("selected text", { x: 10, y: 20 });
+
+    const windowId = mocks.events.showWindow.mock.calls[0][0].id;
+    expect(mocks.getPresentation).toHaveBeenCalledWith(
+      error,
+      "windows-translation",
+      errorHandler,
+    );
+    expect(mocks.events.updateWindow).toHaveBeenCalledTimes(1);
+    expect(mocks.events.updateWindow).toHaveBeenCalledWith(
+      windowId,
+      expect.objectContaining({
+        isLoading: false,
+        isStreaming: false,
+        isError: true,
+        initialTranslatedText: "safe localized message",
+        errorType: ErrorTypes.API_ERROR,
+        canRetry: true,
+        needsSettings: true,
+        provider: "fallback-provider",
+      }),
+    );
+    expect(
+      mocks.events.updateWindow.mock.calls[0][1].initialTranslatedText,
+    ).not.toContain("raw");
+  });
+
+  it("uses safe presentation for existing-window update and preserves action fields", async () => {
+    state.activeWindowId = "existing-window";
+    state.originalText = "old text";
+    const error = canonicalError(ErrorTypes.API_RESPONSE_INVALID);
+    facade._startTranslationProcess.mockRejectedValue(error);
+
+    await manager._updateExistingWindow("new text");
+
+    expect(mocks.getPresentation).toHaveBeenCalledWith(
+      error,
+      "windows-translation",
+      errorHandler,
+    );
+    expect(mocks.events.updateWindow).toHaveBeenCalledTimes(2);
+    expect(mocks.events.updateWindow.mock.calls[1]).toEqual([
+      "existing-window",
+      expect.objectContaining({
+        initialTranslatedText: "safe localized message",
+        errorType: ErrorTypes.API_ERROR,
+        canRetry: true,
+        needsSettings: true,
+      }),
+    ]);
+    expect(
+      mocks.events.updateWindow.mock.calls[1][1].initialTranslatedText,
+    ).not.toContain("raw");
+  });
+
+  it("sanitizes mobile sheet error payload without creating a toast", async () => {
+    const error = canonicalError(ErrorTypes.NETWORK_ERROR);
+    facade._startTranslationProcess.mockRejectedValue(error);
+
+    await manager._showMobileSheet("selected text");
+
+    expect(mocks.getPresentation).toHaveBeenCalledWith(
+      error,
+      "mobile-translation",
+      errorHandler,
+    );
+    expect(mocks.events.showMobileSheet).toHaveBeenCalledTimes(2);
+    const errorPayload = mocks.events.showMobileSheet.mock.calls[1][0];
+    expect(errorPayload).toMatchObject({
+      isLoading: false,
+      isStreaming: false,
+      isError: true,
+      error: "safe localized message",
+    });
+    expect(errorPayload.error).not.toContain("raw");
+    expect(errorHandler.handle).not.toHaveBeenCalled();
+  });
+
+  it("passes adapted Error to legacy ErrorHandler without visible UI", async () => {
+    const error = canonicalError(ErrorTypes.API_ERROR);
+    const presentation = safePresentation();
+    mocks.getPresentation.mockResolvedValue(presentation);
+
+    await manager._handleTranslationError(error, "selected text", {
+      x: 10,
+      y: 20,
+    });
+
+    expect(errorHandler.handle).toHaveBeenCalledWith(
+      presentation.displayError,
+      {
+        type: ErrorTypes.API_ERROR,
+        context: "windows-manager-translate",
+        isSilent: true,
+        showInUI: false,
+      },
+    );
+    expect(errorHandler.handle).not.toHaveBeenCalledWith(
+      error,
+      expect.anything(),
+    );
+    expect(mocks.events.showWindow).toHaveBeenCalledTimes(1);
+    expect(mocks.events.showWindow.mock.calls[0][0].initialTranslatedText).toBe(
+      "safe localized message",
+    );
+  });
+
+  it("does not emit error UI when presenter excludes failure", async () => {
+    mocks.getPresentation.mockResolvedValue(null);
+    facade._startTranslationProcess.mockRejectedValue(
+      canonicalError(ErrorTypes.TRANSLATION_CANCELLED),
+    );
+
+    await manager._showWindow("selected text", { x: 10, y: 20 });
+
+    expect(mocks.events.showWindow).toHaveBeenCalledTimes(1);
+    expect(mocks.events.updateWindow).not.toHaveBeenCalled();
+  });
+});
