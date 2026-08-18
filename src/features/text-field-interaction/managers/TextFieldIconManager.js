@@ -24,15 +24,6 @@ import { isFieldTranslationRequestError } from '@/handlers/smart-translation/tra
 // Singleton instance for TextFieldIconManager
 let textFieldIconManagerInstance = null;
 
-// Global fail-safe listener for cross-bundle communication
-if (typeof window !== 'undefined') {
-  window.addEventListener('text-field-icon-clicked', (event) => {
-    if (textFieldIconManagerInstance && event.detail) {
-      textFieldIconManagerInstance.executeTranslationFromEvent(event.detail);
-    }
-  });
-}
-
 export class TextFieldIconManager extends ResourceTracker {
   constructor(options = {}) {
     super('text-field-icon-manager')

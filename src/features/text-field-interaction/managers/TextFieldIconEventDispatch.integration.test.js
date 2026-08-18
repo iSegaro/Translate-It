@@ -13,6 +13,10 @@ const mockStore = {
   getInfo: vi.fn(() => ({})),
 };
 
+const { mockTranslateFieldViaSmartHandler } = vi.hoisted(() => ({
+  mockTranslateFieldViaSmartHandler: vi.fn(() => Promise.resolve()),
+}));
+
 vi.mock('@/shared/logging/logger.js', () => ({
   getScopedLogger: vi.fn(() => ({
     debug: vi.fn(),
@@ -109,7 +113,7 @@ vi.mock('@/shared/managers/SettingsManager.js', () => ({
 }));
 
 vi.mock('@/handlers/smartTranslationIntegration.js', () => ({
-  translateFieldViaSmartHandler: vi.fn(),
+  translateFieldViaSmartHandler: mockTranslateFieldViaSmartHandler,
 }));
 
 vi.mock('@/handlers/smart-translation/translationErrorOwnership.js', () => ({
@@ -142,6 +146,7 @@ describe('TextFieldIconManager event dispatch characterization', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    mockTranslateFieldViaSmartHandler.mockResolvedValue(undefined);
     TextFieldIconManager.resetInstance();
     manager = TextFieldIconManager.getInstance();
     executeFromEvent = vi.spyOn(manager, 'executeTranslationFromEvent');
@@ -159,44 +164,47 @@ describe('TextFieldIconManager event dispatch characterization', () => {
     manager.activeIcons.set(targetElement, { id, targetElement });
   }
 
-  it('characterizes Vue text-field producer dispatch count', () => {
+  it('characterizes Vue text-field producer dispatch count', async () => {
     registerIcon('icon-vue');
     const icon = useTextFieldIcon();
     icon.initialize(pageEventBus);
 
     icon.handleIconClick('icon-vue');
+    await new Promise(resolve => setTimeout(resolve, 0));
 
-    expect(executeFromEvent).toHaveBeenCalledTimes(2);
+    expect(executeFromEvent).toHaveBeenCalledTimes(1);
     expect(executeFromEvent).toHaveBeenNthCalledWith(1, { id: 'icon-vue' });
-    expect(executeFromEvent).toHaveBeenNthCalledWith(2, { id: 'icon-vue' });
-    expect(executeTranslation).toHaveBeenCalledTimes(2);
+    expect(executeTranslation).toHaveBeenCalledTimes(1);
+    expect(mockTranslateFieldViaSmartHandler).toHaveBeenCalledTimes(1);
   });
 
-  it('characterizes ContentApp producer dispatch count', () => {
+  it('characterizes ContentApp producer dispatch count', async () => {
     registerIcon('icon-content-app');
     const icon = useContentAppTextFieldIcons({ addEventListener: vi.fn() });
 
     icon.onIconClick('icon-content-app');
+    await new Promise(resolve => setTimeout(resolve, 0));
 
-    expect(executeFromEvent).toHaveBeenCalledTimes(2);
+    expect(executeFromEvent).toHaveBeenCalledTimes(1);
     expect(executeFromEvent).toHaveBeenNthCalledWith(1, { id: 'icon-content-app' });
-    expect(executeFromEvent).toHaveBeenNthCalledWith(2, { id: 'icon-content-app' });
-    expect(executeTranslation).toHaveBeenCalledTimes(2);
+    expect(executeTranslation).toHaveBeenCalledTimes(1);
+    expect(mockTranslateFieldViaSmartHandler).toHaveBeenCalledTimes(1);
   });
 
-  it('characterizes direct window dispatch through both listeners', () => {
+  it('characterizes direct window dispatch through PageEventBus listener', async () => {
     const detail = { id: 'icon-raw-window', source: 'external' };
     registerIcon(detail.id);
 
     window.dispatchEvent(new CustomEvent('text-field-icon-clicked', { detail }));
+    await new Promise(resolve => setTimeout(resolve, 0));
 
-    expect(executeFromEvent).toHaveBeenCalledTimes(2);
+    expect(executeFromEvent).toHaveBeenCalledTimes(1);
     expect(executeFromEvent).toHaveBeenNthCalledWith(1, detail);
-    expect(executeFromEvent).toHaveBeenNthCalledWith(2, detail);
-    expect(executeTranslation).toHaveBeenCalledTimes(2);
+    expect(executeTranslation).toHaveBeenCalledTimes(1);
+    expect(mockTranslateFieldViaSmartHandler).toHaveBeenCalledTimes(1);
   });
 
-  it('does not accumulate PageEventBus listeners across destroy and reinitialize', () => {
+  it('does not accumulate PageEventBus listeners across destroy and reinitialize', async () => {
     TextFieldIconManager.resetInstance();
     manager = TextFieldIconManager.getInstance();
     executeFromEvent = vi.spyOn(manager, 'executeTranslationFromEvent');
@@ -204,8 +212,10 @@ describe('TextFieldIconManager event dispatch characterization', () => {
     registerIcon('icon-reinitialized');
 
     pageEventBus.emit('text-field-icon-clicked', { id: 'icon-reinitialized' });
+    await new Promise(resolve => setTimeout(resolve, 0));
 
-    expect(executeFromEvent).toHaveBeenCalledTimes(2);
-    expect(executeTranslation).toHaveBeenCalledTimes(2);
+    expect(executeFromEvent).toHaveBeenCalledTimes(1);
+    expect(executeTranslation).toHaveBeenCalledTimes(1);
+    expect(mockTranslateFieldViaSmartHandler).toHaveBeenCalledTimes(1);
   });
 });
