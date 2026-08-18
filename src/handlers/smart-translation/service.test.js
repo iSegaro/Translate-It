@@ -9,18 +9,22 @@ const mocks = vi.hoisted(() => ({
   getTargetLanguageAsync: vi.fn(() => Promise.resolve('fa')),
   applyTranslationToTextField: vi.fn(),
   determineReplaceMode: vi.fn(),
+  applyTranslation: vi.fn(),
+  getPendingTranslationData: vi.fn(),
   showStatus: vi.fn(() => 'toast-1'),
   update: vi.fn(),
   dismiss: vi.fn(),
   show: vi.fn(),
   clearPendingTranslationData: vi.fn(),
   clearPendingNotificationData: vi.fn(),
-  abortExistingRequest: vi.fn(() => null),
-  registerAbortController: vi.fn(),
+  beginFieldTranslationRequest: vi.fn(),
+  isCurrentFieldTranslationRequest: vi.fn(),
+  releaseFieldTranslationRequest: vi.fn(),
   storePendingTranslationData: vi.fn(),
   pendingTranslationData: new WeakMap(),
   pendingTranslationByToastId: new Map(),
   activeAbortControllers: new WeakMap(),
+  fieldRequestOwners: new WeakMap(),
   trackerRequests: new Map(),
   trackTimeout: vi.fn((callback, delay) => setTimeout(callback, delay)),
   clearTimer: vi.fn((timer) => clearTimeout(timer)),
@@ -92,18 +96,19 @@ vi.mock('./state.js', () => ({
 
 vi.mock('./dataStore.js', () => ({
   storePendingTranslationData: (...args) => mocks.storePendingTranslationData(...args),
-  getPendingTranslationData: vi.fn(),
+  getPendingTranslationData: (...args) => mocks.getPendingTranslationData(...args),
   clearPendingTranslationData: (...args) => mocks.clearPendingTranslationData(...args),
   clearPendingNotificationData: (...args) => mocks.clearPendingNotificationData(...args),
   pendingTranslationByToastId: mocks.pendingTranslationByToastId,
-  abortExistingRequest: (...args) => mocks.abortExistingRequest(...args),
-  registerAbortController: (...args) => mocks.registerAbortController(...args),
+  beginFieldTranslationRequest: (...args) => mocks.beginFieldTranslationRequest(...args),
+  isCurrentFieldTranslationRequest: (...args) => mocks.isCurrentFieldTranslationRequest(...args),
+  releaseFieldTranslationRequest: (...args) => mocks.releaseFieldTranslationRequest(...args),
   activeAbortControllers: mocks.activeAbortControllers,
 }));
 
 vi.mock('./executor.js', () => ({
   determineReplaceMode: (...args) => mocks.determineReplaceMode(...args),
-  applyTranslation: vi.fn(),
+  applyTranslation: (...args) => mocks.applyTranslation(...args),
 }));
 
 vi.mock('@/shared/utils/text/markdown.js', () => ({
@@ -121,8 +126,36 @@ describe('translateFieldViaSmartHandler translation ownership', () => {
     mocks.pendingTranslationByToastId.clear();
     mocks.pendingTranslationData = new WeakMap();
     mocks.activeAbortControllers.delete(target);
+    mocks.fieldRequestOwners = new WeakMap();
     mocks.trackerRequests.clear();
-    mocks.storePendingTranslationData.mockImplementation((target, mode, platform, tabId, selectionRange, timestamp, toastId, messageId) => {
+    mocks.beginFieldTranslationRequest.mockImplementation((requestTarget) => {
+      const previous = mocks.fieldRequestOwners.get(requestTarget) || null;
+      if (previous) {
+        previous.replaced = true;
+        previous.controller.abort('New request started');
+      }
+      const ownership = {
+        target: requestTarget,
+        controller: new AbortController(),
+        replaced: false,
+        data: null,
+        toastId: null,
+        messageId: null,
+      };
+      mocks.fieldRequestOwners.set(requestTarget, ownership);
+      mocks.activeAbortControllers.set(requestTarget, ownership.controller);
+      return { ownership, previous };
+    });
+    mocks.isCurrentFieldTranslationRequest.mockImplementation((requestTarget, ownership) => (
+      mocks.fieldRequestOwners.get(requestTarget) === ownership && !ownership.replaced
+    ));
+    mocks.releaseFieldTranslationRequest.mockImplementation((requestTarget, ownership) => {
+      if (!mocks.isCurrentFieldTranslationRequest(requestTarget, ownership)) return false;
+      mocks.fieldRequestOwners.delete(requestTarget);
+      mocks.activeAbortControllers.delete(requestTarget);
+      return true;
+    });
+    mocks.storePendingTranslationData.mockImplementation((target, mode, platform, tabId, selectionRange, timestamp, toastId, messageId, ownership) => {
       const data = {
         target,
         mode,
@@ -132,23 +165,17 @@ describe('translateFieldViaSmartHandler translation ownership', () => {
         timestamp,
         toastId,
         messageId,
+        ownership,
       };
+      if (ownership) {
+        ownership.data = data;
+        ownership.toastId = toastId;
+        ownership.messageId = messageId;
+      }
       mocks.pendingTranslationData.set(target, data);
       if (toastId) mocks.pendingTranslationByToastId.set(toastId, data);
       if (messageId) mocks.trackerRequests.set(messageId, { data, status: 'pending' });
       return data;
-    });
-    mocks.registerAbortController.mockImplementation((target, controller) => {
-      mocks.activeAbortControllers.set(target, controller);
-    });
-    mocks.abortExistingRequest.mockImplementation((target) => {
-      const controller = mocks.activeAbortControllers.get(target);
-      if (!controller) return null;
-      const data = mocks.pendingTranslationData.get(target);
-      if (data) data.abortedForReplacement = true;
-      controller.abort('New request started');
-      mocks.activeAbortControllers.delete(target);
-      return data || null;
     });
     mocks.clearPendingTranslationData.mockImplementation((toastId) => {
       window.pendingTranslationTarget = null;
@@ -161,6 +188,10 @@ describe('translateFieldViaSmartHandler translation ownership', () => {
     mocks.getSourceLanguageAsync.mockImplementation(() => Promise.resolve('auto'));
     mocks.getTargetLanguageAsync.mockImplementation(() => Promise.resolve('fa'));
     mocks.determineReplaceMode.mockResolvedValue(true);
+    mocks.applyTranslation.mockResolvedValue(true);
+    mocks.getPendingTranslationData.mockImplementation((_target, toastId, ownership) => (
+      ownership?.data || (toastId ? mocks.pendingTranslationByToastId.get(toastId) : null)
+    ));
     mocks.safeSendMessage.mockResolvedValue({
       success: true,
       translatedText: 'translated text',
@@ -280,6 +311,7 @@ describe('translateFieldViaSmartHandler translation ownership', () => {
     const [messageIdA] = translationRequests.keys();
     const dataA = mocks.pendingTranslationData.get(target);
     const controllerA = mocks.activeAbortControllers.get(target);
+    const ownershipA = mocks.fieldRequestOwners.get(target);
     const toastIdA = dataA.toastId;
 
     const promiseB = translateFieldViaSmartHandler(requestB);
@@ -287,11 +319,12 @@ describe('translateFieldViaSmartHandler translation ownership', () => {
     const messageIdB = [...translationRequests.keys()].find((id) => id !== messageIdA);
     const dataB = mocks.pendingTranslationData.get(target);
     const controllerB = mocks.activeAbortControllers.get(target);
+    const ownershipB = mocks.fieldRequestOwners.get(target);
 
     expect(controllerB).not.toBe(controllerA);
     expect(dataB).not.toBe(dataA);
-    expect(dataA.abortedForReplacement).toBe(true);
-    expect(dataB.abortedForReplacement).not.toBe(true);
+    expect(ownershipA.replaced).toBe(true);
+    expect(ownershipB.replaced).not.toBe(true);
     expect(dataB.toastId).toBe(toastIdA);
     expect(mocks.pendingTranslationByToastId.get(toastIdA)).toBe(dataB);
     expect(mocks.activeAbortControllers.get(target)).toBe(controllerB);
@@ -320,13 +353,13 @@ describe('translateFieldViaSmartHandler translation ownership', () => {
 
     await expect(promiseB).resolves.toBeUndefined();
     expect(mocks.dismiss).toHaveBeenCalledWith(toastIdA);
-    expect(mocks.pendingTranslationByToastId.has(toastIdA)).toBe(false);
+    expect(mocks.pendingTranslationByToastId.get(toastIdA).processed).toBe(true);
     expect(mocks.activeAbortControllers.get(target)).toBeUndefined();
     expect(mocks.trackerRequests.get(messageIdA).status).toBe('pending');
     expect(mocks.trackerRequests.get(messageIdB).status).toBe('pending');
   });
 
-  it('characterizes pre-registration race where both requests issue work', async () => {
+  it('prevents pre-registration stale request from issuing work', async () => {
     let toastCount = 0;
     mocks.showStatus.mockImplementation(() => `toast-${++toastCount}`);
     let resolveProviderA;
@@ -349,40 +382,173 @@ describe('translateFieldViaSmartHandler translation ownership', () => {
 
     const promiseA = translateFieldViaSmartHandler({ text: 'request A', target });
     await Promise.resolve();
-    expect(mocks.activeAbortControllers.get(target)).toBeUndefined();
+    const controllerA = mocks.activeAbortControllers.get(target);
+    const ownershipA = mocks.fieldRequestOwners.get(target);
+    expect(controllerA).toBeDefined();
 
     const promiseB = translateFieldViaSmartHandler({ text: 'request B', target });
+    const controllerB = mocks.activeAbortControllers.get(target);
+    const ownershipB = mocks.fieldRequestOwners.get(target);
+    expect(controllerB).not.toBe(controllerA);
+    expect(ownershipA.replaced).toBe(true);
+    expect(ownershipB).not.toBe(ownershipA);
+
     resolveProviderB('provider-B');
     await vi.waitFor(() => expect(translationRequests.size).toBe(1));
     const messageIdB = [...translationRequests.keys()][0];
-    const controllerB = mocks.activeAbortControllers.get(target);
     const dataB = mocks.pendingTranslationData.get(target);
 
     resolveProviderA('provider-A');
-    await vi.waitFor(() => expect(translationRequests.size).toBe(2));
-    const messageIdA = [...translationRequests.keys()].find((id) => id !== messageIdB);
-    const dataA = mocks.pendingTranslationData.get(target);
-
-    expect(controllerB).not.toBe(mocks.activeAbortControllers.get(target));
-    expect(dataA).not.toBe(dataB);
-    expect(dataB.abortedForReplacement).not.toBe(true);
+    await Promise.resolve();
+    expect(translationRequests.size).toBe(1);
+    expect(mocks.pendingTranslationData.get(target)).toBe(dataB);
     expect(mocks.pendingTranslationByToastId.get(dataB.toastId)).toBe(dataB);
-    expect(mocks.pendingTranslationByToastId.get(dataA.toastId)).toBe(dataA);
 
     translationRequests.get(messageIdB)({
       success: true,
       translatedText: 'translated B',
       originalText: 'request B',
     });
+
+    await expect(promiseB).resolves.toBeUndefined();
+    await expect(promiseA).resolves.toBeUndefined();
+    expect(mocks.activeAbortControllers.get(target)).toBeUndefined();
+  });
+
+  it('prevents stale mid-setup request from creating state or sending work', async () => {
+    let resolveSourceA;
+    let resolveSourceB;
+    const sourceA = new Promise((resolve) => { resolveSourceA = resolve; });
+    const sourceB = new Promise((resolve) => { resolveSourceB = resolve; });
+    let sourceCall = 0;
+    mocks.getSourceLanguageAsync.mockImplementation(() => {
+      sourceCall += 1;
+      return sourceCall === 1 ? sourceA : sourceB;
+    });
+
+    const translationRequests = new Map();
+    mocks.safeSendMessage.mockImplementation((message) => {
+      if (message?.action === 'CANCEL_TRANSLATION') return Promise.resolve(null);
+      return new Promise((resolve) => translationRequests.set(message.data.options.messageId, resolve));
+    });
+
+    const promiseA = translateFieldViaSmartHandler({ text: 'request A', target });
+    await vi.waitFor(() => expect(sourceCall).toBe(1));
+
+    const promiseB = translateFieldViaSmartHandler({ text: 'request B', target });
+    resolveSourceB('source-B');
+    await vi.waitFor(() => expect(translationRequests.size).toBe(1));
+
+    const dataB = mocks.pendingTranslationData.get(target);
+    const showCountAfterB = mocks.showStatus.mock.calls.length;
+
+    resolveSourceA('source-A');
+    await expect(promiseA).resolves.toBeUndefined();
+    expect(translationRequests.size).toBe(1);
+    expect(mocks.pendingTranslationData.get(target)).toBe(dataB);
+    expect(mocks.showStatus).toHaveBeenCalledTimes(showCountAfterB);
+
+    const [messageIdB] = translationRequests.keys();
+    translationRequests.get(messageIdB)({
+      success: true,
+      translatedText: 'translated B',
+      originalText: 'request B',
+    });
+    await expect(promiseB).resolves.toBeUndefined();
+  });
+
+  it('rejects stale response application when B replaces sent A', async () => {
+    const field = document.createElement('textarea');
+    field.value = 'original';
+    document.body.appendChild(field);
+    field.focus();
+
+    const translationRequests = new Map();
+    mocks.safeSendMessage.mockImplementation((message) => {
+      if (message?.action === 'CANCEL_TRANSLATION') return Promise.resolve(null);
+      return new Promise((resolve) => translationRequests.set(message.data.options.messageId, resolve));
+    });
+    mocks.applyTranslation.mockImplementation(async (text, _range, _platform, _tabId, element) => {
+      element.value = text;
+      return true;
+    });
+
+    const promiseA = translateFieldViaSmartHandler({ text: 'request A', target: field });
+    await vi.waitFor(() => expect(translationRequests.size).toBe(1));
+    const messageIdA = [...translationRequests.keys()][0];
+
+    const promiseB = translateFieldViaSmartHandler({ text: 'request B', target: field });
+    await vi.waitFor(() => expect(translationRequests.size).toBe(2));
+    const messageIdB = [...translationRequests.keys()].find((id) => id !== messageIdA);
+
+    translationRequests.get(messageIdB)({
+      success: true,
+      translatedText: 'translated B',
+      originalText: 'request B',
+    });
+    await expect(promiseB).resolves.toBeUndefined();
+
     translationRequests.get(messageIdA)({
       success: true,
       translatedText: 'translated A',
       originalText: 'request A',
     });
-
-    await expect(promiseB).resolves.toBeUndefined();
     await expect(promiseA).resolves.toBeUndefined();
-    expect(isFieldTranslationRequestError(await promiseB)).toBe(false);
-    expect(isFieldTranslationRequestError(await promiseA)).toBe(false);
+
+    expect(field.value).toBe('translated B');
+    expect(mocks.applyTranslation).toHaveBeenCalledTimes(1);
+    document.body.removeChild(field);
+  });
+
+  it('stops stale A before application after B replaces it', async () => {
+    const field = document.createElement('textarea');
+    field.value = 'original';
+    document.body.appendChild(field);
+    field.focus();
+
+    let resolveReplaceModeA;
+    const replaceModeA = new Promise((resolve) => { resolveReplaceModeA = resolve; });
+    let replaceModeCall = 0;
+    mocks.determineReplaceMode.mockImplementation(() => {
+      replaceModeCall += 1;
+      return replaceModeCall === 1 ? replaceModeA : Promise.resolve(true);
+    });
+
+    const translationRequests = new Map();
+    mocks.safeSendMessage.mockImplementation((message) => {
+      if (message?.action === 'CANCEL_TRANSLATION') return Promise.resolve(null);
+      return new Promise((resolve) => translationRequests.set(message.data.options.messageId, resolve));
+    });
+    mocks.applyTranslation.mockImplementation(async (text, _range, _platform, _tabId, element) => {
+      element.value = text;
+      return true;
+    });
+
+    const promiseA = translateFieldViaSmartHandler({ text: 'request A', target: field });
+    await vi.waitFor(() => expect(translationRequests.size).toBe(1));
+    const messageIdA = [...translationRequests.keys()][0];
+    translationRequests.get(messageIdA)({
+      success: true,
+      translatedText: 'translated A',
+      originalText: 'request A',
+    });
+    await vi.waitFor(() => expect(replaceModeCall).toBe(1));
+
+    const promiseB = translateFieldViaSmartHandler({ text: 'request B', target: field });
+    await vi.waitFor(() => expect(translationRequests.size).toBe(2));
+    const messageIdB = [...translationRequests.keys()].find((id) => id !== messageIdA);
+    translationRequests.get(messageIdB)({
+      success: true,
+      translatedText: 'translated B',
+      originalText: 'request B',
+    });
+    await expect(promiseB).resolves.toBeUndefined();
+
+    resolveReplaceModeA(true);
+    await expect(promiseA).resolves.toBeUndefined();
+
+    expect(field.value).toBe('translated B');
+    expect(mocks.applyTranslation).toHaveBeenCalledTimes(1);
+    document.body.removeChild(field);
   });
 });

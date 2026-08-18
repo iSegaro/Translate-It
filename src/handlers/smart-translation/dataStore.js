@@ -16,8 +16,72 @@ export const pendingTranslationData = new WeakMap();
 // Track active AbortControllers for elements to allow cancellation of previous requests
 export const activeAbortControllers = new WeakMap();
 
+// Authoritative latest-request ownership per target element.
+export const fieldRequestOwners = new WeakMap();
+
 // Reference with toast ID as fallback
 export const pendingTranslationByToastId = new Map();
+
+/**
+ * Begin latest-request ownership for a target and abort its previous owner.
+ * @param {HTMLElement} target
+ * @returns {{ ownership: Object, previous: Object|null }} Ownership state.
+ */
+export function beginFieldTranslationRequest(target) {
+  const previous = target ? fieldRequestOwners.get(target) || null : null;
+
+  if (previous) {
+    previous.replaced = true;
+    previous.controller.abort('New request started');
+  }
+
+  const ownership = {
+    target,
+    controller: new AbortController(),
+    replaced: false,
+    data: null,
+    toastId: null,
+    messageId: null,
+  };
+
+  if (target) {
+    fieldRequestOwners.set(target, ownership);
+    activeAbortControllers.set(target, ownership.controller);
+  }
+
+  return { ownership, previous };
+}
+
+/**
+ * Check whether request still owns target-scoped Field state.
+ * @param {HTMLElement} target
+ * @param {Object} ownership
+ * @returns {boolean}
+ */
+export function isCurrentFieldTranslationRequest(target, ownership) {
+  return Boolean(
+    target
+    && ownership
+    && !ownership.replaced
+    && fieldRequestOwners.get(target) === ownership
+  );
+}
+
+/**
+ * Release target ownership only when caller still owns it.
+ * @param {HTMLElement} target
+ * @param {Object} ownership
+ * @returns {boolean}
+ */
+export function releaseFieldTranslationRequest(target, ownership) {
+  if (!isCurrentFieldTranslationRequest(target, ownership)) return false;
+
+  fieldRequestOwners.delete(target);
+  if (activeAbortControllers.get(target) === ownership.controller) {
+    activeAbortControllers.delete(target);
+  }
+  return true;
+}
 
 /**
  * Register an AbortController for a target element
@@ -26,7 +90,10 @@ export const pendingTranslationByToastId = new Map();
  */
 export function registerAbortController(target, controller) {
   if (!target) return;
-  activeAbortControllers.set(target, controller);
+  const ownership = fieldRequestOwners.get(target);
+  if (ownership && ownership.controller === controller && !ownership.replaced) {
+    activeAbortControllers.set(target, controller);
+  }
 }
 
 /**
@@ -37,6 +104,17 @@ export function registerAbortController(target, controller) {
  */
 export function abortExistingRequest(target, reason = 'New request started') {
   if (!target) return null;
+
+  const ownership = fieldRequestOwners.get(target);
+  if (ownership) {
+    ownership.replaced = true;
+    ownership.controller.abort(reason);
+    if (fieldRequestOwners.get(target) === ownership) fieldRequestOwners.delete(target);
+    if (activeAbortControllers.get(target) === ownership.controller) {
+      activeAbortControllers.delete(target);
+    }
+    return ownership.data;
+  }
   
   const controller = activeAbortControllers.get(target);
   if (controller) {
@@ -57,7 +135,9 @@ export function abortExistingRequest(target, reason = 'New request started') {
  * Clear pending notification data and timeout
  * @param {string} context - Context of cleanup
  */
-export function clearPendingNotificationData(context = 'cleanup') {
+export function clearPendingNotificationData(context = 'cleanup', ownership = null) {
+  if (ownership && !isCurrentFieldTranslationRequest(ownership.target, ownership)) return;
+
   if (window.pendingTranslationDismissTimeout) {
     resourceTracker.clearTimer(window.pendingTranslationDismissTimeout);
     window.pendingTranslationDismissTimeout = null;
@@ -68,7 +148,9 @@ export function clearPendingNotificationData(context = 'cleanup') {
 /**
  * Store pending translation data
  */
-export function storePendingTranslationData(target, mode, platform, tabId, selectionRange, timestamp, toastId, messageId = null) {
+export function storePendingTranslationData(target, mode, platform, tabId, selectionRange, timestamp, toastId, messageId = null, ownership = null) {
+  if (ownership && !isCurrentFieldTranslationRequest(target, ownership)) return null;
+
   let targetId = target?.id || null;
   let targetSelector = null;
 
@@ -118,8 +200,14 @@ export function storePendingTranslationData(target, mode, platform, tabId, selec
   }
 
   const data = {
-    target, mode, platform, tabId, selectionRange, timestamp, toastId, messageId, targetId, targetSelector
+    target, mode, platform, tabId, selectionRange, timestamp, toastId, messageId, targetId, targetSelector, ownership
   };
+
+  if (ownership) {
+    ownership.data = data;
+    ownership.toastId = toastId;
+    ownership.messageId = messageId;
+  }
 
   if (target) {
     pendingTranslationData.set(target, data);
@@ -141,6 +229,7 @@ export function storePendingTranslationData(target, mode, platform, tabId, selec
   window.pendingSelectionRange = selectionRange;
   window.pendingTranslationTimestamp = timestamp;
   window.pendingTranslationToastId = toastId;
+  window.pendingTranslationOwner = ownership;
 
   logger.debug('Stored pending translation data', { targetId, targetSelector, toastId, messageId });
   
@@ -150,7 +239,11 @@ export function storePendingTranslationData(target, mode, platform, tabId, selec
 /**
  * Retrieve pending translation data
  */
-export function getPendingTranslationData(fallbackTarget, toastId) {
+export function getPendingTranslationData(fallbackTarget, toastId, ownership = null) {
+  if (ownership && !isCurrentFieldTranslationRequest(fallbackTarget, ownership)) return null;
+
+  if (ownership?.data) return ownership.data;
+
   // 1. Try TranslationRequestTracker by toastId
   if (toastId) {
     const request = translationRequestTracker.getRequestByToastId(toastId);
@@ -221,7 +314,13 @@ export function getPendingTranslationData(fallbackTarget, toastId) {
 /**
  * Clear pending translation data
  */
-export function clearPendingTranslationData(specificToastId) {
+export function clearPendingTranslationData(specificToastId, ownership = null) {
+  if (ownership && !isCurrentFieldTranslationRequest(ownership.target, ownership)) return;
+
+  if (!ownership || window.pendingTranslationOwner === ownership) {
+    window.pendingTranslationOwner = null;
+  }
+
   window.pendingTranslationTarget = null;
   window.pendingTranslationMode = null;
   window.pendingTranslationPlatform = null;
@@ -232,7 +331,7 @@ export function clearPendingTranslationData(specificToastId) {
 
   if (specificToastId) {
     const data = pendingTranslationByToastId.get(specificToastId);
-    if (data && !data.processed) {
+    if (data && (!ownership || data.ownership === ownership) && !data.processed) {
       pendingTranslationByToastId.delete(specificToastId);
     }
   } else {

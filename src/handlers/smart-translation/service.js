@@ -22,9 +22,9 @@ import {
   clearPendingTranslationData, 
   clearPendingNotificationData, 
   pendingTranslationByToastId,
-  abortExistingRequest,
-  registerAbortController,
-  activeAbortControllers
+  beginFieldTranslationRequest,
+  isCurrentFieldTranslationRequest,
+  releaseFieldTranslationRequest
 } from './dataStore.js';
 import { isEditableElement, recoverTargetElement } from './elementHelper.js';
 import { determineReplaceMode, applyTranslation } from './executor.js';
@@ -51,23 +51,17 @@ export async function translateFieldViaSmartHandler({ text, target, selectionRan
     return;
   }
 
-  // Abort any existing request for this target element and capture its data
-  const abortedData = abortExistingRequest(target);
+  // Establish latest-request ownership before asynchronous setup.
+  const { ownership, previous } = beginFieldTranslationRequest(target);
+  const isCurrent = () => isCurrentFieldTranslationRequest(target, ownership);
   
   const mode = TranslationMode.Field;
   const platform = detectSite();
   const timestamp = Date.now();
-  let currentToastId = toastId;
-  
-  // Reuse existing toast ID if we're replacing a previous request
-  if (!currentToastId && abortedData && abortedData.toastId) {
-    currentToastId = abortedData.toastId;
-    logger.debug('Reusing existing toast ID for replacement request', { toastId: currentToastId });
-  }
+  let currentToastId = toastId || previous?.toastId || null;
 
   let timerId = null;
   let myData = null;
-  const abortController = new AbortController();
 
   try {
     const currentProvider = await getEffectiveProviderAsync(TranslationMode.Field);
@@ -76,6 +70,9 @@ export async function translateFieldViaSmartHandler({ text, target, selectionRan
 
     const messageId = `msg-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
     const translatingMessage = await getTranslationString('SELECT_ELEMENT_TRANSLATING') || 'Translating...';
+
+    if (!isCurrent()) return;
+    ownership.messageId = messageId;
     
     if (!currentToastId) {
       currentToastId = localNotificationManager.showStatus(translatingMessage, { id: `status-${Date.now()}` });
@@ -87,9 +84,11 @@ export async function translateFieldViaSmartHandler({ text, target, selectionRan
       // Ensure the reused toast still shows the translating message
       localNotificationManager.update(currentToastId, translatingMessage, { type: 'status', persistent: true });
     }
-
-    myData = storePendingTranslationData(target, mode, platform, tabId, selectionRange, timestamp, currentToastId, messageId);
-    registerAbortController(target, abortController);
+    ownership.toastId = currentToastId;
+    
+    if (!isCurrent()) return;
+    myData = storePendingTranslationData(target, mode, platform, tabId, selectionRange, timestamp, currentToastId, messageId, ownership);
+    if (!myData || !isCurrent()) return;
 
     // Create a catchable timeout promise
     const timeoutPromise = new Promise((_, reject) => {
@@ -97,7 +96,7 @@ export async function translateFieldViaSmartHandler({ text, target, selectionRan
         logger.debug('Translation request timeout reached');
         const timeoutError = new Error('Translation request timed out');
         timeoutError.type = ErrorTypes.TRANSLATION_TIMEOUT;
-        abortController.abort();
+        ownership.controller.abort();
         void safeSendMessage({
           action: MessageActions.CANCEL_TRANSLATION,
           data: { messageId, reason: 'Translation timed out', timeout: true }
@@ -108,7 +107,7 @@ export async function translateFieldViaSmartHandler({ text, target, selectionRan
 
     // Create an abort promise
     const abortPromise = new Promise((_, reject) => {
-      abortController.signal.addEventListener('abort', () => {
+      ownership.controller.signal.addEventListener('abort', () => {
         const abortError = new Error('Translation request aborted by user');
         abortError.type = ErrorTypes.USER_CANCELLED;
         reject(abortError);
@@ -127,6 +126,8 @@ export async function translateFieldViaSmartHandler({ text, target, selectionRan
       MessagingContexts.CONTENT,
       messageId
     );
+
+    if (!isCurrent()) return;
     
     // Race between the message, the timeout, and the abort signal
     let messageResult;
@@ -144,6 +145,8 @@ export async function translateFieldViaSmartHandler({ text, target, selectionRan
       throw markFieldTranslationRequestError(error);
     }
 
+    if (!isCurrent()) return;
+
     if (timerId) {
       resourceTracker.clearTimer(timerId);
       timerId = null;
@@ -151,8 +154,8 @@ export async function translateFieldViaSmartHandler({ text, target, selectionRan
 
     if (messageResult === null) {
       if (currentToastId) localNotificationManager.dismiss(currentToastId);
-      clearPendingNotificationData('context-invalid');
-      clearPendingTranslationData(currentToastId);
+      clearPendingNotificationData('context-invalid', ownership);
+      clearPendingTranslationData(currentToastId, ownership);
       return;
     }
 
@@ -163,12 +166,14 @@ export async function translateFieldViaSmartHandler({ text, target, selectionRan
         messageResult.mode || TranslationMode.Field,
         currentToastId,
         messageId,
-        localNotificationManager
+        localNotificationManager,
+        ownership
       );
     } else if (messageResult && messageResult.success === false) {
+      if (!isCurrent()) return;
       if (currentToastId) localNotificationManager.dismiss(currentToastId);
-      clearPendingNotificationData('error-response');
-      clearPendingTranslationData(currentToastId);
+      clearPendingNotificationData('error-response', ownership);
+      clearPendingTranslationData(currentToastId, ownership);
       
       // Small delay to ensure status toast dismissal is processed before error toast appears
       await new Promise(r => setTimeout(r, 10));
@@ -180,8 +185,9 @@ export async function translateFieldViaSmartHandler({ text, target, selectionRan
   } catch (err) {
     if (timerId) resourceTracker.clearTimer(timerId);
     
-    // Check if THIS specific request was aborted for replacement using our local reference
-    const isAbortedForReplacement = myData && myData.abortedForReplacement === true;
+    const isAbortedForReplacement = ownership.replaced || !isCurrent();
+
+    if (isAbortedForReplacement) return;
 
     if (isCancellationError(err)) {
       logger.debug('Text field translation request cancelled:', err.message);
@@ -199,27 +205,28 @@ export async function translateFieldViaSmartHandler({ text, target, selectionRan
        await new Promise(r => setTimeout(r, 10));
     }
 
-    clearPendingTranslationData(currentToastId);
-    clearPendingNotificationData('error');
+    clearPendingTranslationData(currentToastId, ownership);
+    clearPendingNotificationData('error', ownership);
     throw err;
   } finally {
     if (timerId) resourceTracker.clearTimer(timerId);
     
-    // Only cleanup the controller if it's still OURS (hasn't been replaced by a newer request)
-    if (target && activeAbortControllers.get(target) === abortController) {
-      activeAbortControllers.delete(target);
-    }
+    releaseFieldTranslationRequest(target, ownership);
   }
 }
 
 /**
  * Apply translation result to active text field
  */
-export async function applyTranslationToTextField(translatedText, originalText, translationMode, toastId, messageId, notifier = null) {
+export async function applyTranslationToTextField(translatedText, originalText, translationMode, toastId, messageId, notifier = null, ownership = null) {
   const localNotifier = notifier || new NotificationManager();
   logger.info('Applying translation to text field', { toastId, messageId });
 
   try {
+    if (ownership && !isCurrentFieldTranslationRequest(ownership.target, ownership)) {
+      return { applied: false, mode: 'stale' };
+    }
+
     if (toastId && successfullyCompletedToastIds.has(toastId)) {
       return { applied: false, mode: 'already-completed' };
     }
@@ -234,7 +241,7 @@ export async function applyTranslationToTextField(translatedText, originalText, 
     if (messageId) {
       processingPromise = (async () => {
         try {
-          const result = await processTranslationToTextFieldInternal(translatedText, originalText, translationMode, toastId, messageId, localNotifier);
+          const result = await processTranslationToTextFieldInternal(translatedText, originalText, translationMode, toastId, messageId, localNotifier, ownership);
           processedMessageIds.add(messageId);
           return result;
         } finally {
@@ -244,7 +251,7 @@ export async function applyTranslationToTextField(translatedText, originalText, 
       activeProcessing.set(messageId, { promise: processingPromise });
       return await processingPromise;
     } else {
-      return await processTranslationToTextFieldInternal(translatedText, originalText, translationMode, toastId, messageId, localNotifier);
+      return await processTranslationToTextFieldInternal(translatedText, originalText, translationMode, toastId, messageId, localNotifier, ownership);
     }
   } catch (error) {
     logger.warn('Error in applyTranslationToTextField:', error.message || error);
@@ -256,7 +263,11 @@ export async function applyTranslationToTextField(translatedText, originalText, 
 /**
  * Internal implementation of processing
  */
-async function processTranslationToTextFieldInternal(translatedText, originalText, translationMode, toastId, messageId, notifier) {
+async function processTranslationToTextFieldInternal(translatedText, originalText, translationMode, toastId, messageId, notifier, ownership = null) {
+  if (ownership && !isCurrentFieldTranslationRequest(ownership.target, ownership)) {
+    return { applied: false, mode: 'stale' };
+  }
+
   if (messageId && processedMessageIds.has(messageId)) return { applied: false, mode: 'already-processed' };
 
   if (toastId && pendingTranslationByToastId.has(toastId)) {
@@ -271,7 +282,7 @@ async function processTranslationToTextFieldInternal(translatedText, originalTex
   if (!translatedText || translatedText === 'undefined' || translatedText.trim() === '') {
     const errorMessage = 'Translation failed or returned empty result';
     if (toastId) notifier.update(toastId, errorMessage, { type: 'error', duration: 4000 });
-    clearPendingNotificationData('failed');
+    clearPendingNotificationData('failed', ownership);
     throw new Error(errorMessage);
   }
 
@@ -284,10 +295,10 @@ async function processTranslationToTextFieldInternal(translatedText, originalTex
     const pendingTimestamp = window.pendingTranslationTimestamp;
     
     if (pendingTimestamp && (currentTime - pendingTimestamp) > STALE_DATA_THRESHOLD) {
-      clearPendingTranslationData(toastId);
+      clearPendingTranslationData(toastId, ownership);
     }
 
-    const pendingData = getPendingTranslationData(document.activeElement, toastId);
+    const pendingData = getPendingTranslationData(document.activeElement, toastId, ownership);
     let target = pendingData?.target || document.activeElement;
     const mode = pendingData?.mode || translationMode;
     const platform = detectSite();
@@ -295,7 +306,7 @@ async function processTranslationToTextFieldInternal(translatedText, originalTex
     const tabId = pendingData?.tabId || null;
 
     if (toastId) notifier.dismiss(toastId);
-    clearPendingNotificationData('success');
+    clearPendingNotificationData('success', ownership);
     
     const isDictionaryMode = mode === TranslationMode.Dictionary_Translation || mode === TranslationMode.LEGACY_DICTIONARY;
 
@@ -306,42 +317,60 @@ async function processTranslationToTextFieldInternal(translatedText, originalTex
     }
     
     if (isDictionaryMode) {
-      clearPendingTranslationData(toastId);
+      clearPendingTranslationData(toastId, ownership);
       return { applied: true, mode: TranslationMode.Dictionary_Translation };
     }
     
     const isReplaceMode = await determineReplaceMode(mode, platform);
-    
+
+    if (ownership && !isCurrentFieldTranslationRequest(ownership.target, ownership)) {
+      return { applied: false, mode: 'stale' };
+    }
+
     if (isReplaceMode && target && isEditableElement(target)) {
+      if (ownership && !isCurrentFieldTranslationRequest(ownership.target, ownership)) {
+        return { applied: false, mode: 'stale' };
+      }
       const wasApplied = await applyTranslation(cleanTranslatedText, selectionRange, platform, tabId, target, toastId);
 
-      if (wasApplied && toastId && pendingTranslationByToastId.has(toastId)) {
+      if (wasApplied && toastId && pendingTranslationByToastId.has(toastId)
+        && (!ownership || isCurrentFieldTranslationRequest(ownership.target, ownership))) {
         const data = pendingTranslationByToastId.get(toastId);
-        data.processed = true;
-        data.applied = true;
-        data.processedAt = Date.now();
-        data.processing = false;
-        successfullyCompletedToastIds.add(toastId);
+        if (!ownership || data.ownership === ownership) {
+          data.processed = true;
+          data.applied = true;
+          data.processedAt = Date.now();
+          data.processing = false;
+          successfullyCompletedToastIds.add(toastId);
+        }
       }
       return { applied: wasApplied, mode: 'replace' };
     } else {
-      await copyToClipboard(cleanTranslatedText, toastId, notifier);
-      clearPendingTranslationData(toastId);
+      if (ownership && !isCurrentFieldTranslationRequest(ownership.target, ownership)) {
+        return { applied: false, mode: 'stale' };
+      }
+      await copyToClipboard(cleanTranslatedText, toastId, notifier, ownership);
+      clearPendingTranslationData(toastId, ownership);
       return { applied: true, mode: 'copy' };
     }
   } catch (error) {
-    if (toastId && pendingTranslationByToastId.has(toastId)) {
+    if ((!ownership || isCurrentFieldTranslationRequest(ownership.target, ownership))
+      && toastId && pendingTranslationByToastId.has(toastId)) {
       pendingTranslationByToastId.get(toastId).processing = false;
     }
-    if (toastId) notifier.dismiss(toastId);
-    clearPendingTranslationData(toastId);
+    if (!ownership || isCurrentFieldTranslationRequest(ownership.target, ownership)) {
+      if (toastId) notifier.dismiss(toastId);
+      clearPendingTranslationData(toastId, ownership);
+    }
     throw error;
   }
 }
 
-async function copyToClipboard(text, toastId, notifier) {
+async function copyToClipboard(text, toastId, notifier, ownership = null) {
   try {
+    if (ownership && !isCurrentFieldTranslationRequest(ownership.target, ownership)) return;
     await navigator.clipboard.writeText(text);
+    if (ownership && !isCurrentFieldTranslationRequest(ownership.target, ownership)) return;
     const successMessage = await getTranslationString("STATUS_SMARTTRANSLATE_COPIED") || "متن ترجمه شده در حافظه کپی شد";
     if (toastId) notifier.update(toastId, successMessage, { type: 'success', duration: 4000 });
     else notifier.show(successMessage, 'success');
