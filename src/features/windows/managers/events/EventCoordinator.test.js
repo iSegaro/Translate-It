@@ -307,3 +307,258 @@ describe("EventCoordinator iframe window creation error boundary", () => {
     expect(mockUpdateWindow).not.toHaveBeenCalled();
   });
 });
+
+describe("EventCoordinator retry error boundary", () => {
+  let facade;
+  let coordinator;
+  let state;
+  let translationHandler;
+  let errorHandler;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    state = {
+      activeWindowId: "window-1",
+      originalText: "original text",
+      provider: "old-provider",
+    };
+    state.setProvider = vi.fn((provider) => {
+      state.provider = provider;
+    });
+    translationHandler = {
+      getEffectiveProvider: vi.fn(() => "fallback-provider"),
+    };
+    errorHandler = {};
+    facade = {
+      _startTranslationProcess: vi.fn(),
+    };
+    coordinator = new EventCoordinator(facade, {
+      state,
+      crossFrameManager: { isTopFrame: true },
+      translationHandler,
+      errorHandler,
+      clickManager: {},
+      themeManager: {},
+      positionCalculator: {},
+    });
+  });
+
+  it.each([
+    ["HTTP_ERROR", "raw retry HTTP body", "safe retry HTTP message"],
+    ["API_RESPONSE_INVALID", "raw retry parser detail", "safe retry parser message"],
+    [undefined, "raw retry unknown detail", "safe retry fallback message"],
+  ])("sanitizes retry failure for %s", async (type, rawMessage, safeMessage) => {
+    const canonicalError = new Error(rawMessage);
+    if (type) canonicalError.type = type;
+    facade._startTranslationProcess.mockRejectedValue(canonicalError);
+    mockGetPresentation.mockResolvedValue({
+      displayError: new Error(safeMessage),
+      errorInfo: {
+        message: safeMessage,
+        type: type || "TRANSLATION_FAILED",
+        canRetry: true,
+        needsSettings: true,
+      },
+      canonicalType: type || null,
+    });
+
+    await coordinator._handleRetryRequest({
+      id: "window-1",
+      text: "original text",
+    });
+
+    expect(mockGetPresentation).toHaveBeenCalledTimes(1);
+    expect(mockGetPresentation).toHaveBeenCalledWith(
+      canonicalError,
+      "windows-translation",
+      errorHandler,
+    );
+    expect(mockUpdateWindow).toHaveBeenCalledTimes(2);
+    expect(mockUpdateWindow.mock.calls[0][0]).toBe("window-1");
+    expect(mockUpdateWindow.mock.calls[1]).toEqual([
+      "window-1",
+      expect.objectContaining({
+        isLoading: false,
+        isStreaming: false,
+        isError: true,
+        initialTranslatedText: safeMessage,
+        errorType: type || "TRANSLATION_FAILED",
+        canRetry: true,
+        needsSettings: true,
+        provider: "fallback-provider",
+      }),
+    ]);
+    expect(mockUpdateWindow.mock.calls[1][1].initialTranslatedText).not.toContain(rawMessage);
+    expect(mockShowWindow).not.toHaveBeenCalled();
+  });
+
+  it("does not emit retry error update when presenter excludes cancellation", async () => {
+    const canonicalError = Object.assign(new Error("cancelled"), {
+      type: "TRANSLATION_CANCELLED",
+    });
+    facade._startTranslationProcess.mockRejectedValue(canonicalError);
+    mockGetPresentation.mockResolvedValue(null);
+
+    await coordinator._handleRetryRequest({ id: "window-1", text: "original text" });
+
+    expect(mockGetPresentation).toHaveBeenCalledTimes(1);
+    expect(mockUpdateWindow).toHaveBeenCalledTimes(1);
+    expect(mockUpdateWindow.mock.calls[0]).toEqual([
+      "window-1",
+      { isLoading: true, isError: false, initialTranslatedText: "" },
+    ]);
+    expect(mockShowWindow).not.toHaveBeenCalled();
+  });
+
+  it("keeps successful retry behavior unchanged", async () => {
+    facade._startTranslationProcess.mockResolvedValue({
+      translatedText: "translated text",
+      sourceLanguage: "en",
+      provider: "fallback-provider",
+    });
+
+    await coordinator._handleRetryRequest({ id: "window-1", text: "original text" });
+
+    expect(mockGetPresentation).not.toHaveBeenCalled();
+    expect(mockUpdateWindow).toHaveBeenCalledTimes(2);
+    expect(mockUpdateWindow.mock.calls[1]).toEqual([
+      "window-1",
+      expect.objectContaining({
+        isLoading: false,
+        isStreaming: false,
+        isError: false,
+        initialTranslatedText: "translated text",
+        provider: "fallback-provider",
+      }),
+    ]);
+  });
+});
+
+describe("EventCoordinator provider-change error boundary", () => {
+  let facade;
+  let coordinator;
+  let state;
+  let errorHandler;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    state = {
+      activeWindowId: "window-1",
+      originalText: "original text",
+      provider: "old-provider",
+      setProvider: vi.fn((provider) => {
+        state.provider = provider;
+      }),
+    };
+    errorHandler = {};
+    facade = { _startTranslationProcess: vi.fn() };
+    coordinator = new EventCoordinator(facade, {
+      state,
+      crossFrameManager: { isTopFrame: true },
+      translationHandler: {},
+      errorHandler,
+      clickManager: {},
+      themeManager: {},
+      positionCalculator: {},
+    });
+  });
+
+  it.each([
+    ["API_ERROR", "raw provider API detail", "safe provider API message"],
+    ["MODEL_MISSING", "raw model detail", "safe model message"],
+  ])("sanitizes provider-change failure for %s", async (type, rawMessage, safeMessage) => {
+    const canonicalError = Object.assign(new Error(rawMessage), { type });
+    facade._startTranslationProcess.mockRejectedValue(canonicalError);
+    mockGetPresentation.mockResolvedValue({
+      displayError: new Error(safeMessage),
+      errorInfo: {
+        message: safeMessage,
+        type,
+        canRetry: false,
+        needsSettings: type === "MODEL_MISSING",
+      },
+      canonicalType: type,
+    });
+
+    await coordinator._handleChangeProviderRequest({
+      id: "window-1",
+      provider: "new-provider",
+    });
+
+    expect(mockGetPresentation).toHaveBeenCalledTimes(1);
+    expect(mockGetPresentation).toHaveBeenCalledWith(
+      canonicalError,
+      "windows-translation-retry",
+      errorHandler,
+    );
+    expect(state.setProvider).toHaveBeenCalledWith("new-provider");
+    expect(state.provider).toBe("new-provider");
+    expect(mockUpdateWindow).toHaveBeenCalledTimes(2);
+    expect(mockUpdateWindow.mock.calls[1]).toEqual([
+      "window-1",
+      expect.objectContaining({
+        isLoading: false,
+        isStreaming: false,
+        isError: true,
+        errorType: type,
+        initialTranslatedText: safeMessage,
+        canRetry: false,
+        needsSettings: type === "MODEL_MISSING",
+        provider: "new-provider",
+      }),
+    ]);
+    expect(mockUpdateWindow.mock.calls[1][1].initialTranslatedText).not.toContain(rawMessage);
+    expect(mockShowWindow).not.toHaveBeenCalled();
+  });
+
+  it("does not emit provider-change error update when presenter excludes context failure", async () => {
+    const canonicalError = new Error("extension context invalidated");
+    facade._startTranslationProcess.mockRejectedValue(canonicalError);
+    mockGetPresentation.mockResolvedValue(null);
+
+    await coordinator._handleChangeProviderRequest({
+      id: "window-1",
+      provider: "new-provider",
+    });
+
+    expect(mockGetPresentation).toHaveBeenCalledTimes(1);
+    expect(mockUpdateWindow).toHaveBeenCalledTimes(1);
+    expect(mockUpdateWindow.mock.calls[0]).toEqual([
+      "window-1",
+      expect.objectContaining({
+        isLoading: true,
+        isError: false,
+        initialTranslatedText: "",
+        provider: "new-provider",
+      }),
+    ]);
+    expect(state.provider).toBe("new-provider");
+  });
+
+  it("keeps successful provider-change behavior unchanged", async () => {
+    facade._startTranslationProcess.mockResolvedValue({
+      translatedText: "translated with new provider",
+      sourceLanguage: "en",
+      targetLanguage: "fa",
+      provider: "new-provider",
+    });
+
+    await coordinator._handleChangeProviderRequest({
+      id: "window-1",
+      provider: "new-provider",
+    });
+
+    expect(mockGetPresentation).not.toHaveBeenCalled();
+    expect(mockUpdateWindow).toHaveBeenCalledTimes(2);
+    expect(mockUpdateWindow.mock.calls[1]).toEqual([
+      "window-1",
+      expect.objectContaining({
+        isLoading: false,
+        isStreaming: false,
+        isError: false,
+        initialTranslatedText: "translated with new provider",
+        provider: "new-provider",
+      }),
+    ]);
+  });
+});

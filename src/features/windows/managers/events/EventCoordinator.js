@@ -198,10 +198,14 @@ export class EventCoordinator {
         provider: translationResult.provider,
       });
     } catch (error) {
-      const errorInfo = await this.errorHandler.getErrorForUI(
+      const presentation = await getSelectionWindowErrorPresentation(
         error,
         "windows-translation",
+        this.errorHandler,
       );
+      if (!presentation) return;
+
+      const { errorInfo } = presentation;
       const fallbackProvider = this.translationHandler.getEffectiveProvider(
         textToTranslate,
         { provider: this.state.provider },
@@ -255,10 +259,14 @@ export class EventCoordinator {
         provider: translationResult.provider,
       });
     } catch (error) {
-      const errorInfo = await this.errorHandler.getErrorForUI(
+      const presentation = await getSelectionWindowErrorPresentation(
         error,
         "windows-translation-retry",
+        this.errorHandler,
       );
+      if (!presentation) return;
+
+      const { errorInfo } = presentation;
       WindowsManagerEvents.updateWindow(windowId, {
         isLoading: false,
         isStreaming: false,
