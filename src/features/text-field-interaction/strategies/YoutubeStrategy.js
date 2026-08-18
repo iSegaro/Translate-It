@@ -51,7 +51,8 @@ export default class YoutubeStrategy extends PlatformStrategy {
     }
   }
 
-  async updateElement(element, translatedText) {
+  async updateElement(element, translatedText, applicationContext = null) {
+    const isCurrent = this.getApplicationGuard(applicationContext);
     if (!translatedText || !element || !element.isConnected) {
       return false;
     }
@@ -59,11 +60,13 @@ export default class YoutubeStrategy extends PlatformStrategy {
     try {
       // اعمال فیدبک بصری
       await this.applyVisualFeedback(element);
+      if (!isCurrent()) return false;
 
       // استفاده از جایگزینی هوشمند متن (سیستم یکپارچه و بهینه)
-      const success = await smartTextReplacement(element, translatedText);
+      const success = await smartTextReplacement(element, translatedText, null, null, undefined, applicationContext);
 
       if (success) {
+        if (!isCurrent()) return false;
         this.applyTextDirection(element, translatedText);
         await smartDelay(100);
         logger.debug('Youtube field updated successfully using smartTextReplacement');

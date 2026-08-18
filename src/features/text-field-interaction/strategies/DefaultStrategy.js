@@ -116,7 +116,8 @@ export default class DefaultStrategy extends PlatformStrategy {
     }
   }
 
-  async updateElement(element, translatedText) {
+  async updateElement(element, translatedText, applicationContext = null) {
+    const isCurrent = this.getApplicationGuard(applicationContext);
     try {
       if (translatedText === undefined || translatedText === null) {
         return false;
@@ -129,6 +130,7 @@ export default class DefaultStrategy extends PlatformStrategy {
       });
 
       await this.applyVisualFeedback(element);
+      if (!isCurrent()) return false;
 
       // بررسی وجود انتخاب متن
       const hasSelection = this._hasTextSelection(element);
@@ -149,11 +151,14 @@ export default class DefaultStrategy extends PlatformStrategy {
         translatedText,
         selectionStart,
         selectionEnd,
+        undefined,
+        applicationContext,
       );
 
       this.logger.debug('Smart replacement completed', { success });
 
       if (success) {
+        if (!isCurrent()) return false;
         this.applyTextDirection(element, translatedText);
         await smartDelay(200);
         this.logger.info('Update completed successfully');

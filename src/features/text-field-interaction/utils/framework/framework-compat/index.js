@@ -25,9 +25,12 @@ export async function smartTextReplacement(
   newValue,
   start = null,
   end = null,
-  useNaturalTyping = true
+  useNaturalTyping = true,
+  applicationContext = null
 ) {
   if (!element) return false;
+  const isCurrent = applicationContext?.isCurrent || (() => true);
+  if (!isCurrent()) return false;
 
   try {
     logger.debug('Starting text replacement with strategies', {
@@ -43,20 +46,24 @@ export async function smartTextReplacement(
       element,
       newValue,
       start,
-      end
+      end,
+      applicationContext
     );
+    if (!isCurrent()) return false;
     if (optimizedSuccess) {
       logger.debug('Optimized text insertion succeeded');
       return true;
     }
 
     // استراتژی 2: Universal Text Insertion (fallback کامل)
-    const universalSuccess = await universalTextInsertion(
-      element,
-      newValue,
-      start,
-      end
-    );
+      const universalSuccess = await universalTextInsertion(
+        element,
+        newValue,
+        start,
+        end,
+        applicationContext
+      );
+      if (!isCurrent()) return false;
     if (universalSuccess) {
       logger.debug('Universal text insertion succeeded');
       return true;
@@ -87,7 +94,8 @@ export async function smartTextReplacement(
         if (start !== null && end !== null && !element.isContentEditable) {
           element.setSelectionRange(start, end);
         }
-        const success = await simulateNaturalTyping(element, newValue, 5, true);
+        const success = await simulateNaturalTyping(element, newValue, 5, true, applicationContext);
+        if (!isCurrent()) return false;
         if (success) {
           logger.debug('Natural typing (partial replacement) succeeded');
           return true;
@@ -97,8 +105,10 @@ export async function smartTextReplacement(
           element,
           newValue,
           5,
-          false
+          false,
+          applicationContext
         );
+        if (!isCurrent()) return false;
         if (success) {
           logger.debug('Natural typing (full replacement) succeeded');
           return true;
@@ -108,7 +118,7 @@ export async function smartTextReplacement(
 
     // استراتژی 4: Simple Replacement (fallback نهایی)
     logger.debug('Falling back to simple replacement');
-    return handleSimpleReplacement(element, newValue, start, end);
+    return handleSimpleReplacement(element, newValue, start, end, applicationContext);
   } catch (error) {
     logger.warn('Error in smart replacement:', error);
     return false;

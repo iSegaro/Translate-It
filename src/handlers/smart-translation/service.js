@@ -435,7 +435,19 @@ async function processTranslationToTextFieldInternal(translatedText, originalTex
       if (ownership && !isCurrentFieldTranslationRequest(ownership.target, ownership)) {
         return { applied: false, mode: 'stale' };
       }
-      const wasApplied = await applyTranslation(cleanTranslatedText, selectionRange, platform, tabId, target, toastId);
+       const applicationResult = await applyTranslation(
+         cleanTranslatedText,
+         selectionRange,
+         platform,
+         tabId,
+         target,
+         toastId,
+         ownership ? {
+           isCurrent: () => isCurrentFieldTranslationRequest(ownership.target, ownership)
+         } : null
+       );
+       if (applicationResult?.mode === 'stale') return applicationResult;
+       const wasApplied = applicationResult === true || applicationResult?.applied === true;
 
       if (wasApplied && toastId && pendingTranslationByToastId.has(toastId)
         && (!ownership || isCurrentFieldTranslationRequest(ownership.target, ownership))) {
@@ -449,12 +461,15 @@ async function processTranslationToTextFieldInternal(translatedText, originalTex
         }
       }
       clearPendingTranslationData(toastId, ownership);
-      return { applied: wasApplied, mode: 'replace' };
+       return { applied: wasApplied, mode: 'replace' };
     } else {
       if (ownership && !isCurrentFieldTranslationRequest(ownership.target, ownership)) {
         return { applied: false, mode: 'stale' };
       }
       await copyToClipboard(cleanTranslatedText, toastId, notifier, ownership);
+      if (ownership && !isCurrentFieldTranslationRequest(ownership.target, ownership)) {
+        return { applied: false, mode: 'stale' };
+      }
       clearPendingTranslationData(toastId, ownership);
       return { applied: true, mode: 'copy' };
     }

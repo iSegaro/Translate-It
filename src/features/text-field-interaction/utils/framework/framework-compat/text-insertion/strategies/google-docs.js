@@ -9,7 +9,7 @@ const logger = getScopedLogger(LOG_COMPONENTS.FRAMEWORK, 'google-docs');
 /**
  * روش خاص Google Docs
  */
-export async function tryGoogleDocsInsertion(element, text) {
+export async function tryGoogleDocsInsertion(element, text, applicationContext = null) {
   try {
   logger.debug('Attempting Google Docs specific method');
 
@@ -21,13 +21,13 @@ export async function tryGoogleDocsInsertion(element, text) {
       );
       if (editableElement) {
         // استفاده از روش بهینه‌شده paste برای Google Docs
-        return await tryOptimizedPasteInsertion(editableElement, text, false);
+        return await tryOptimizedPasteInsertion(editableElement, text, false, applicationContext);
       }
     }
 
     // fallback: تلاش روی المان اصلی
     if (element && typeof window !== 'undefined' && window.location.hostname.includes("docs.google.com")) {
-      return await tryOptimizedPasteInsertion(element, text, false);
+      return await tryOptimizedPasteInsertion(element, text, false, applicationContext);
     }
 
     return false;

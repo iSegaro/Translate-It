@@ -393,6 +393,63 @@ describe('translateFieldViaSmartHandler translation ownership', () => {
     expect(mocks.pendingTranslationData.get(target)).toBeUndefined();
   });
 
+  it('does not start clipboard write after ownership is lost', async () => {
+    let current = false;
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, 'clipboard', {
+      configurable: true,
+      value: { writeText },
+    });
+    mocks.determineReplaceMode.mockResolvedValue(false);
+    const ownership = { target, data: { target, mode: 'field' } };
+    mocks.fieldRequestOwners.set(target, ownership);
+    mocks.isCurrentFieldTranslationRequest.mockImplementation(() => current);
+
+    const result = await applyTranslationToTextField(
+      'translated text',
+      'original text',
+      'field',
+      'clipboard-toast',
+      'clipboard-message',
+      { update() {}, dismiss() {} },
+      ownership
+    );
+
+    expect(result).toMatchObject({ applied: false, mode: 'stale' });
+    expect(writeText).not.toHaveBeenCalled();
+  });
+
+  it('does not report stale clipboard success after write has started', async () => {
+    let current = true;
+    let resolveWrite;
+    const writeText = vi.fn(() => new Promise((resolve) => { resolveWrite = resolve; }));
+    Object.defineProperty(navigator, 'clipboard', {
+      configurable: true,
+      value: { writeText },
+    });
+    mocks.determineReplaceMode.mockResolvedValue(false);
+    const ownership = { target, data: { target, mode: 'field' } };
+    mocks.fieldRequestOwners.set(target, ownership);
+    mocks.isCurrentFieldTranslationRequest.mockImplementation(() => current);
+
+    const application = applyTranslationToTextField(
+      'translated text',
+      'original text',
+      'field',
+      'clipboard-toast',
+      'clipboard-message',
+      { update() {}, dismiss() {} },
+      ownership
+    );
+
+    await vi.waitFor(() => expect(writeText).toHaveBeenCalledTimes(1));
+    current = false;
+    resolveWrite();
+
+    await expect(application).resolves.toMatchObject({ applied: false, mode: 'stale' });
+    expect(writeText).toHaveBeenCalledTimes(1);
+  });
+
   it('completes accepted already-completed application result', async () => {
     const toastId = 'already-completed-toast';
     mocks.showStatus.mockReturnValue(toastId);

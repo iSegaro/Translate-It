@@ -53,7 +53,8 @@ export default class TwitterStrategy extends PlatformStrategy {
     }
   }
 
-  async updateElement(element, translatedText) {
+  async updateElement(element, translatedText, applicationContext = null) {
+    const isCurrent = this.getApplicationGuard(applicationContext);
     if (!translatedText || !element) {
       return false;
     }
@@ -68,6 +69,7 @@ export default class TwitterStrategy extends PlatformStrategy {
 
       if (isSearchInput) {
         await this.applyVisualFeedback(element);
+        if (!isCurrent()) return false;
         element.value = translatedText;
         element.dispatchEvent(new Event("input", { bubbles: true }));
         element.dispatchEvent(new Event("change", { bubbles: true }));
@@ -91,8 +93,10 @@ export default class TwitterStrategy extends PlatformStrategy {
       if (field) {
         field.focus();
         await this.applyVisualFeedback(field);
+        if (!isCurrent()) return false;
         
         await smartDelay(50);
+        if (!isCurrent()) return false;
         
         const isDraftJS = this.isTwitterElement(element) || this.isDMElement(element);
         
@@ -101,12 +105,14 @@ export default class TwitterStrategy extends PlatformStrategy {
           // به جای حذف جداگانه، اجازه می‌دهیم insertText خودش جایگزین کند تا State ادیتور به هم نریزد
           document.execCommand('selectAll', false, null);
           await smartDelay(20);
+          if (!isCurrent()) return false;
         }
 
         // استفاده از جایگزینی هوشمند متن (جایگزین clearTweetField و pasteText)
-        const success = await smartTextReplacement(field, translatedText);
+        const success = await smartTextReplacement(field, translatedText, null, null, undefined, applicationContext);
 
         if (success) {
+          if (!isCurrent()) return false;
           // برای توییتر/Draft.js، فقط اگر لازم بود مکان‌نما را تنظیم می‌کنیم
           if (!isDraftJS) {
             this.setCursorToEnd(field);

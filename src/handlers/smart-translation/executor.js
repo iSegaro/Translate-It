@@ -44,10 +44,12 @@ export async function determineReplaceMode(mode, platform) {
 /**
  * Apply translation directly to element using a strategy
  */
-export async function applyTranslation(translatedText, selectionRange, platform, tabId, targetElement = null, toastId = null) {
+export async function applyTranslation(translatedText, selectionRange, platform, tabId, targetElement = null, toastId = null, applicationContext = null) {
   logger.debug('Applying translation directly to element', { platform, tabId });
+  const isCurrent = applicationContext?.isCurrent || (() => true);
   
   try {
+    if (!isCurrent()) return { applied: false, mode: 'stale' };
     const pendingData = getPendingTranslationData(document.activeElement, toastId);
     const target = targetElement || pendingData?.target || document.activeElement;
     
@@ -59,6 +61,7 @@ export async function applyTranslation(translatedText, selectionRange, platform,
     if (target.focus && typeof target.focus === 'function') {
       target.focus();
       await new Promise(resolve => resourceTracker.trackTimeout(resolve, 10));
+      if (!isCurrent()) return { applied: false, mode: 'stale' };
     }
     
     let strategyName;
@@ -78,11 +81,13 @@ export async function applyTranslation(translatedText, selectionRange, platform,
     
     // eslint-disable-next-line noUnsanitized/method
     const strategyModule = await import(`@/features/text-field-interaction/strategies/${strategyName}.js`);
+    if (!isCurrent()) return { applied: false, mode: 'stale' };
     const strategy = new strategyModule.default();
     
-    const success = await strategy.updateElement(target, translatedText);
+    const success = await strategy.updateElement(target, translatedText, applicationContext);
     logger.debug('Translation strategy completed', { success });
     
+    if (!isCurrent()) return { applied: false, mode: 'stale' };
     return success;
   } catch (err) {
     logger.error('Error in applyTranslation', err);

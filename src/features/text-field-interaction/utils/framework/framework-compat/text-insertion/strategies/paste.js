@@ -9,7 +9,9 @@ const logger = getScopedLogger(LOG_COMPONENTS.FRAMEWORK, 'paste');
 /**
  * تلاش برای جایگذاری با Paste Event (روش قدیمی)
  */
-export async function tryPasteInsertion(element, text, hasSelection) {
+export async function tryPasteInsertion(element, text, hasSelection, applicationContext = null) {
+  const isCurrent = applicationContext?.isCurrent || (() => true);
+  if (!isCurrent()) return false;
   try {
   logger.debug('Attempting paste event simulation');
 
@@ -47,10 +49,12 @@ export async function tryPasteInsertion(element, text, hasSelection) {
     }
 
     // ارسال event
+    if (!isCurrent()) return false;
     element.dispatchEvent(pasteEvent);
 
     // تأیید موفقیت
     await smartDelay(100);
+    if (!isCurrent()) return false;
 
     // بررسی اینکه متن واقعاً اضافه شده
     const currentText =

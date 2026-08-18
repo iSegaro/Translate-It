@@ -9,13 +9,16 @@ const logger = getScopedLogger(LOG_COMPONENTS.FRAMEWORK, 'content-editable');
 /**
  * روش عمومی contentEditable (با حفظ undo)
  */
-export async function tryContentEditableInsertion(element, text, hasSelection) {
+export async function tryContentEditableInsertion(element, text, hasSelection, applicationContext = null) {
+  const isCurrent = applicationContext?.isCurrent || (() => true);
+  if (!isCurrent()) return false;
   try {
   logger.debug('Attempting contentEditable insertion with undo preservation');
 
     // Focus element
     element.focus();
     await smartDelay(10);
+    if (!isCurrent()) return false;
 
     if (typeof window === 'undefined') {
       return false;
@@ -30,6 +33,7 @@ export async function tryContentEditableInsertion(element, text, hasSelection) {
       selection.removeAllRanges();
       selection.addRange(range);
       await smartDelay(10);
+      if (!isCurrent()) return false;
   logger.debug('Selected all content for full replacement');
     }
 
@@ -41,6 +45,7 @@ export async function tryContentEditableInsertion(element, text, hasSelection) {
       // حذف محتوای انتخاب شده
       const deleteResult = document.execCommand("delete", false);
       await smartDelay(10);
+      if (!isCurrent()) return false;
 
       if (deleteResult) {
         // درج متن جدید با حفظ خطوط جدید
@@ -66,6 +71,7 @@ export async function tryContentEditableInsertion(element, text, hasSelection) {
         }
 
         if (insertSuccess) {
+          if (!isCurrent()) return false;
           logger.init('Used execCommand for undo preservation');
 
           // رویدادهای ضروری
@@ -78,9 +84,11 @@ export async function tryContentEditableInsertion(element, text, hasSelection) {
     }
 
     // fallback: جایگزینی مستقیم (بدون undo)
+    if (!isCurrent()) return false;
   logger.debug('Falling back to direct DOM manipulation (no undo)');
 
     if (hasSelection && selection.rangeCount > 0) {
+      if (!isCurrent()) return false;
       // جایگزینی انتخاب
       const range = selection.getRangeAt(0);
       range.deleteContents();
@@ -107,6 +115,7 @@ export async function tryContentEditableInsertion(element, text, hasSelection) {
       selection.addRange(range);
     } else {
       // جایگزینی کل محتوا
+      if (!isCurrent()) return false;
       element.textContent = "";
       const lines = text.split("\n");
 
