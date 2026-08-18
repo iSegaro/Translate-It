@@ -11,6 +11,8 @@ import { MessageContexts, MessageFormat } from '@/shared/messaging/core/Messagin
 import { ElementDetectionService } from '@/shared/services/ElementDetectionService.js';
 import { ExtensionContextManager } from '@/core/extensionContext.js';
 import { isEditable } from '@/core/helpers.js';
+import { mapCanonicalTranslationError } from '@/shared/error-management/PublicTranslationErrorPolicy.js';
+import { createLegacyDisplayError } from '@/shared/error-management/PublicTranslationErrorAdapter.js';
 
 // Import CSS as inline string
 import hoverStyles from './HoverHighlight.scss?inline';
@@ -433,7 +435,11 @@ export class HoverTranslationManager extends ResourceTracker {
         showToast: false
       }).catch(() => {});
 
-      this._emitPageEvent('MOUSE_HOVER_TRANSLATION_ERROR', { error });
+      const publicError = mapCanonicalTranslationError(error);
+      const displayError = await createLegacyDisplayError(error, publicError);
+      if (displayError) {
+        this._emitPageEvent('MOUSE_HOVER_TRANSLATION_ERROR', { error: displayError });
+      }
       this._cleanupActiveHoverRequest(messageId);
     }
   }

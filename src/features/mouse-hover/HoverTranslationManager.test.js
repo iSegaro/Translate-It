@@ -4,6 +4,16 @@ import { HoverTextDetector } from './HoverTextDetector.js';
 import { pageEventBus } from '@/core/PageEventBus.js';
 import { settingsManager } from '@/shared/managers/SettingsManager.js';
 import { contentScriptIntegration } from '@/shared/messaging/core/ContentScriptIntegration.js';
+import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
+import { getErrorMessage } from '@/shared/error-management/ErrorMessages.js';
+import { mapCanonicalTranslationError } from '@/shared/error-management/PublicTranslationErrorPolicy.js';
+import { createLegacyDisplayError } from '@/shared/error-management/PublicTranslationErrorAdapter.js';
+
+const { mockErrorHandler } = vi.hoisted(() => ({
+  mockErrorHandler: {
+    handle: vi.fn().mockResolvedValue(undefined)
+  }
+}));
 
 // Mock dependencies
 vi.mock('@/shared/logging/logger.js', () => ({
@@ -35,6 +45,12 @@ vi.mock('@/shared/messaging/core/ContentScriptIntegration.js', () => ({
   registerTranslation: vi.fn()
 }));
 
+vi.mock('@/shared/error-management/ErrorHandler.js', () => ({
+  ErrorHandler: {
+    getInstance: vi.fn(() => mockErrorHandler)
+  }
+}));
+
 vi.mock('@/shared/services/ElementDetectionService.js', () => ({
   ElementDetectionService: {
     getInstance: vi.fn(() => ({
@@ -54,6 +70,7 @@ describe('HoverTranslationManager', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    mockErrorHandler.handle.mockClear();
     isEditable.mockReset();
     isEditable.mockReturnValue(false);
     vi.useFakeTimers();
@@ -213,6 +230,22 @@ describe('HoverTranslationManager', () => {
   });
 
   describe('_processHover', () => {
+    const runRejectedHover = async (error) => {
+      HoverTextDetector.detect.mockReturnValue({
+        text: 'Hello world',
+        rect: { top: 10, left: 10, bottom: 20, right: 100 },
+        element: document.createElement('p')
+      });
+      contentScriptIntegration.sendTranslationRequest.mockRejectedValueOnce(error);
+
+      const emitSpy = vi.spyOn(pageEventBus, 'emit');
+      await manager._processHover({ clientX: 15, clientY: 15 });
+      const errorEvent = emitSpy.mock.calls.find(([type]) => type === 'MOUSE_HOVER_TRANSLATION_ERROR');
+      emitSpy.mockRestore();
+
+      return errorEvent?.[1]?.error;
+    };
+
     it('should send translation request and emit event', async () => {
       await manager.activate();
       HoverTextDetector.detect.mockReturnValue({
@@ -241,16 +274,112 @@ describe('HoverTranslationManager', () => {
       }));
     });
 
-    it('sanitizes canonical error identity for iframe transport while preserving local error event', () => {
+    it('sanitizes generic HTTP errors before local presentation', async () => {
+      const canonicalError = Object.assign(new Error('raw provider HTTP body secret'), {
+        type: ErrorTypes.HTTP_ERROR,
+        statusCode: 404,
+        providerName: 'custom'
+      });
+
+      const displayError = await runRejectedHover(canonicalError);
+
+      expect(displayError.type).toBe(ErrorTypes.HTTP_ERROR);
+      expect(displayError.message).toBe(await getErrorMessage('ERRORS_HTTP_ERROR'));
+      expect(displayError.message).not.toContain('raw provider HTTP body secret');
+      expect(displayError).not.toHaveProperty('statusCode');
+      expect(displayError).not.toHaveProperty('providerName');
+      expect(displayError).not.toHaveProperty('originalType');
+      expect(displayError.cause).toBe(canonicalError);
+      expect(Object.prototype.propertyIsEnumerable.call(displayError, 'cause')).toBe(false);
+    });
+
+    it.each([
+      [ErrorTypes.API_ERROR, ErrorTypes.API_ERROR, 'ERRORS_API_ERROR', 'raw provider detail secret'],
+      [ErrorTypes.JSON_PARSING_ERROR, ErrorTypes.API_RESPONSE_INVALID, 'ERRORS_API_RESPONSE_INVALID', 'raw parser response secret'],
+      [ErrorTypes.TRANSLATION_TIMEOUT, ErrorTypes.TRANSLATION_TIMEOUT, 'ERRORS_TRANSLATION_TIMEOUT', 'raw timeout detail secret'],
+      [ErrorTypes.MODEL_MISSING, ErrorTypes.MODEL_MISSING, 'ERRORS_MODEL_MISSING', 'raw model detail secret'],
+      [ErrorTypes.API_KEY_INVALID, ErrorTypes.API_KEY_INVALID, 'ERRORS_API_KEY_INVALID', 'raw key detail secret'],
+      [ErrorTypes.CIRCUIT_BREAKER_OPEN, ErrorTypes.CIRCUIT_BREAKER_OPEN, 'ERRORS_CIRCUIT_BREAKER_OPEN', 'raw underlying network reason secret'],
+      [undefined, ErrorTypes.TRANSLATION_FAILED, 'ERRORS_TRANSLATION_FAILED', 'raw unknown provider detail secret']
+    ])('keeps %s tooltip output localized and metadata-free', async (type, expectedType, messageKey, rawMessage) => {
+      const canonicalError = new Error(rawMessage);
+      if (type) canonicalError.type = type;
+      if (type === ErrorTypes.CIRCUIT_BREAKER_OPEN) {
+        canonicalError.originalType = ErrorTypes.NETWORK_ERROR;
+        canonicalError.providerName = 'custom';
+        canonicalError.statusCode = 503;
+      }
+
+      const displayError = await runRejectedHover(canonicalError);
+
+      expect(displayError.type).toBe(expectedType);
+      expect(displayError.message).toBe(await getErrorMessage(messageKey));
+      expect(displayError.message).not.toContain(rawMessage);
+      expect(displayError).not.toHaveProperty('statusCode');
+      expect(displayError).not.toHaveProperty('originalType');
+      expect(displayError).not.toHaveProperty('providerName');
+      expect(displayError).not.toHaveProperty('providerId');
+      expect(displayError).not.toHaveProperty('translationOutcome');
+      expect(displayError.cause).toBe(canonicalError);
+      expect(Object.prototype.propertyIsEnumerable.call(displayError, 'cause')).toBe(false);
+    });
+
+    it('passes canonical error to ErrorHandler and emits exactly one adapted error event', async () => {
+      const canonicalError = Object.assign(new Error('raw provider message'), {
+        type: ErrorTypes.API_ERROR
+      });
+      HoverTextDetector.detect.mockReturnValue({
+        text: 'Hello world',
+        rect: { top: 10, left: 10, bottom: 20, right: 100 },
+        element: document.createElement('p')
+      });
+      contentScriptIntegration.sendTranslationRequest.mockRejectedValueOnce(canonicalError);
+      const emitSpy = vi.spyOn(pageEventBus, 'emit');
+
+      await manager._processHover({ clientX: 15, clientY: 15 });
+
+      expect(mockErrorHandler.handle).toHaveBeenCalledTimes(1);
+      expect(mockErrorHandler.handle).toHaveBeenCalledWith(canonicalError, {
+        context: 'hover',
+        showToast: false
+      });
+      const errorEvents = emitSpy.mock.calls.filter(([type]) => type === 'MOUSE_HOVER_TRANSLATION_ERROR');
+      expect(errorEvents).toHaveLength(1);
+      expect(errorEvents[0][1].error).not.toBe(canonicalError);
+      expect(errorEvents[0][1].error.message).not.toContain('raw provider message');
+      emitSpy.mockRestore();
+    });
+
+    it.each([
+      new Error('Handler cancelled'),
+      Object.assign(new Error('cancelled'), { type: ErrorTypes.USER_CANCELLED }),
+      Object.assign(new Error('aborted'), { isCancelled: true })
+    ])('does not emit tooltip error for intentional cancellation', async (error) => {
+      const emitSpy = vi.spyOn(pageEventBus, 'emit');
+      HoverTextDetector.detect.mockReturnValue({
+        text: 'Hello world',
+        rect: { top: 10, left: 10, bottom: 20, right: 100 },
+        element: document.createElement('p')
+      });
+      contentScriptIntegration.sendTranslationRequest.mockRejectedValueOnce(error);
+
+      await manager._processHover({ clientX: 15, clientY: 15 });
+
+      expect(emitSpy).not.toHaveBeenCalledWith('MOUSE_HOVER_TRANSLATION_ERROR', expect.anything());
+      expect(mockErrorHandler.handle).not.toHaveBeenCalled();
+      emitSpy.mockRestore();
+    });
+
+    it('transports only adapted error identity through iframe events', async () => {
       const originalTop = Object.getOwnPropertyDescriptor(window, 'top');
       const postMessage = vi.fn();
       Object.defineProperty(window, 'top', { configurable: true, value: { postMessage } });
 
       try {
-        const error = new Error('Provider failed');
-        Object.assign(error, {
-          type: 'PROVIDER_ERROR',
-          originalType: 'HTTP_ERROR',
+        const canonicalError = new Error('raw provider HTTP body secret');
+        Object.assign(canonicalError, {
+          type: ErrorTypes.HTTP_ERROR,
+          originalType: ErrorTypes.API_ERROR,
           statusCode: 503,
           context: 'hover',
           providerName: 'Provider',
@@ -261,31 +390,29 @@ describe('HoverTranslationManager', () => {
           cause: 'private',
           arbitrary: { ignored: true }
         });
+        const publicError = mapCanonicalTranslationError(canonicalError);
+        const displayError = await createLegacyDisplayError(canonicalError, publicError);
         const localEmit = vi.spyOn(pageEventBus, 'emit');
 
-        manager._emitPageEvent('MOUSE_HOVER_TRANSLATION_ERROR', { error });
+        manager._emitPageEvent('MOUSE_HOVER_TRANSLATION_ERROR', { error: displayError });
 
-        expect(localEmit).toHaveBeenCalledWith('MOUSE_HOVER_TRANSLATION_ERROR', { error });
+        expect(localEmit).toHaveBeenCalledWith('MOUSE_HOVER_TRANSLATION_ERROR', { error: displayError });
         expect(postMessage).toHaveBeenCalledWith(expect.objectContaining({
           source: 'translate-it-iframe',
           type: 'MOUSE_HOVER_TRANSLATION_ERROR',
           data: {
-            error: 'Provider failed',
+            error: displayError.message,
             errorDetails: {
-              message: 'Provider failed',
-              type: 'PROVIDER_ERROR',
-              originalType: 'HTTP_ERROR',
-              statusCode: 503,
-              context: 'hover',
-              providerName: 'Provider',
-              providerId: 'provider-id',
-              code: 'UPSTREAM_FAILURE',
-              errorCode: 'E_UPSTREAM',
-              translationOutcome: { partial: true }
+              message: displayError.message,
+              type: ErrorTypes.HTTP_ERROR
             }
           }
         }), '*');
+        expect(postMessage.mock.calls[0][0].data.error).not.toContain('raw provider HTTP body secret');
         expect(postMessage.mock.calls[0][0].data.errorDetails).not.toHaveProperty('cause');
+        expect(postMessage.mock.calls[0][0].data.errorDetails).not.toHaveProperty('providerName');
+        expect(postMessage.mock.calls[0][0].data.errorDetails).not.toHaveProperty('statusCode');
+        expect(postMessage.mock.calls[0][0].data.errorDetails).not.toHaveProperty('originalType');
         expect(postMessage.mock.calls[0][0].data.errorDetails).not.toHaveProperty('arbitrary');
       } finally {
         Object.defineProperty(window, 'top', originalTop);
