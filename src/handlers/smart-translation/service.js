@@ -30,6 +30,7 @@ import { isEditableElement, recoverTargetElement } from './elementHelper.js';
 import { determineReplaceMode, applyTranslation } from './executor.js';
 import { TRANSLATION_TIMEOUT, STALE_DATA_THRESHOLD } from './constants.js';
 import { SimpleMarkdown, ExtractionStrategy } from "@/shared/utils/text/markdown.js";
+import { markFieldTranslationRequestError } from './translationErrorOwnership.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.TRANSLATION, 'SmartTranslationService');
 
@@ -128,15 +129,20 @@ export async function translateFieldViaSmartHandler({ text, target, selectionRan
     );
     
     // Race between the message, the timeout, and the abort signal
-    const messageResult = await Promise.race([
-      safeSendMessage(
-        translationMessage, 
-        { forceRegular: true, silent: true }, 
-        'text-field-translation'
-      ),
-      timeoutPromise,
-      abortPromise
-    ]);
+    let messageResult;
+    try {
+      messageResult = await Promise.race([
+        safeSendMessage(
+          translationMessage, 
+          { forceRegular: true, silent: true }, 
+          'text-field-translation'
+        ),
+        timeoutPromise,
+        abortPromise
+      ]);
+    } catch (error) {
+      throw markFieldTranslationRequestError(error);
+    }
 
     if (timerId) {
       resourceTracker.clearTimer(timerId);
@@ -168,7 +174,7 @@ export async function translateFieldViaSmartHandler({ text, target, selectionRan
       await new Promise(r => setTimeout(r, 10));
 
       if (messageResult.error) {
-        throw messageResult.error;
+        throw markFieldTranslationRequestError(messageResult.error);
       }
     }
   } catch (err) {
