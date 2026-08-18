@@ -64,10 +64,17 @@ const SAFE_PUBLIC_TRANSLATION_ERROR_TYPES = new Set([
   ErrorTypes.INVALID_REQUEST,
   ErrorTypes.TRANSLATION_FAILED,
   ErrorTypes.UNKNOWN,
+  ErrorTypes.API_RESPONSE_INVALID,
+  ErrorTypes.JSON_PARSING_ERROR,
+  ErrorTypes.UNEXPECTED_RESPONSE_FORMAT,
 ]);
 
 function shouldUsePublicTranslationContract(error) {
-  return SAFE_PUBLIC_TRANSLATION_ERROR_TYPES.has(error?.type);
+  return SAFE_PUBLIC_TRANSLATION_ERROR_TYPES.has(error?.type)
+    || (
+      error?.type === ErrorTypes.HTTP_ERROR
+      && error?.originalType === ErrorTypes.MODEL_MISSING
+    );
 }
 
 const SELECT_ELEMENT_UNSUPPORTED_TRANSLATION_MODE_KEY = 'SELECT_ELEMENT_UNSUPPORTED_TRANSLATION_MODE';
