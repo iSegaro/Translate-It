@@ -241,6 +241,57 @@ describe('HoverTranslationManager', () => {
       }));
     });
 
+    it('sanitizes canonical error identity for iframe transport while preserving local error event', () => {
+      const originalTop = Object.getOwnPropertyDescriptor(window, 'top');
+      const postMessage = vi.fn();
+      Object.defineProperty(window, 'top', { configurable: true, value: { postMessage } });
+
+      try {
+        const error = new Error('Provider failed');
+        Object.assign(error, {
+          type: 'PROVIDER_ERROR',
+          originalType: 'HTTP_ERROR',
+          statusCode: 503,
+          context: 'hover',
+          providerName: 'Provider',
+          providerId: 'provider-id',
+          code: 'UPSTREAM_FAILURE',
+          errorCode: 'E_UPSTREAM',
+          translationOutcome: { partial: true },
+          cause: 'private',
+          arbitrary: { ignored: true }
+        });
+        const localEmit = vi.spyOn(pageEventBus, 'emit');
+
+        manager._emitPageEvent('MOUSE_HOVER_TRANSLATION_ERROR', { error });
+
+        expect(localEmit).toHaveBeenCalledWith('MOUSE_HOVER_TRANSLATION_ERROR', { error });
+        expect(postMessage).toHaveBeenCalledWith(expect.objectContaining({
+          source: 'translate-it-iframe',
+          type: 'MOUSE_HOVER_TRANSLATION_ERROR',
+          data: {
+            error: 'Provider failed',
+            errorDetails: {
+              message: 'Provider failed',
+              type: 'PROVIDER_ERROR',
+              originalType: 'HTTP_ERROR',
+              statusCode: 503,
+              context: 'hover',
+              providerName: 'Provider',
+              providerId: 'provider-id',
+              code: 'UPSTREAM_FAILURE',
+              errorCode: 'E_UPSTREAM',
+              translationOutcome: { partial: true }
+            }
+          }
+        }), '*');
+        expect(postMessage.mock.calls[0][0].data.errorDetails).not.toHaveProperty('cause');
+        expect(postMessage.mock.calls[0][0].data.errorDetails).not.toHaveProperty('arbitrary');
+      } finally {
+        Object.defineProperty(window, 'top', originalTop);
+      }
+    });
+
     it('should clean up highlight and caches on context invalidation error without sending cancellation to background', async () => {
       await manager.activate();
       settingsManager.get.mockImplementation((key, def) => {

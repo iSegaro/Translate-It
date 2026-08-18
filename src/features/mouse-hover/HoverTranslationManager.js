@@ -7,7 +7,7 @@ import { registerTranslation, contentScriptIntegration } from '@/shared/messagin
 import { MessageActions } from '@/shared/messaging/core/MessageActions.js';
 import { TranslationMode } from '@/shared/config/config.js';
 import { settingsManager } from '@/shared/managers/SettingsManager.js';
-import { MessageContexts } from '@/shared/messaging/core/MessagingCore.js';
+import { MessageContexts, MessageFormat } from '@/shared/messaging/core/MessagingCore.js';
 import { ElementDetectionService } from '@/shared/services/ElementDetectionService.js';
 import { ExtensionContextManager } from '@/core/extensionContext.js';
 import { isEditable } from '@/core/helpers.js';
@@ -453,10 +453,17 @@ export class HoverTranslationManager extends ResourceTracker {
     // 2. If in an iframe, notify the top frame
     if (window !== window.top) {
       try {
+        const transportData = type === 'MOUSE_HOVER_TRANSLATION_ERROR' && data?.error
+          ? {
+              ...data,
+              error: data.error.message || String(data.error),
+              errorDetails: MessageFormat.serializeTranslationError(data.error)
+            }
+          : data;
         window.top.postMessage({
           source: 'translate-it-iframe',
           type: type,
-          data: data,
+          data: transportData,
           timestamp: Date.now()
         }, '*');
       } catch (error) {
@@ -515,4 +522,3 @@ export class HoverTranslationManager extends ResourceTracker {
 }
 
 export const hoverTranslationManager = HoverTranslationManager.getInstance();
-
