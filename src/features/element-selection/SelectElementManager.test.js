@@ -48,14 +48,6 @@ vi.mock('@/shared/error-management/ErrorHandler.js', () => ({
     getInstance: vi.fn()
   }
 }));
-vi.mock('@/shared/error-management/PublicErrorPolicy.js', () => ({
-  createPublicDisplayError: vi.fn(async (originalError) => {
-    const displayError = new Error('Translation failed');
-    displayError.type = 'TRANSLATION_FAILED';
-    displayError.cause = originalError;
-    return displayError;
-  })
-}));
 vi.mock('@/shared/error-management/PublicTranslationErrorPolicy.js', () => ({
   mapCanonicalTranslationError: vi.fn((error) => ({
     type: {
@@ -585,8 +577,6 @@ describe('SelectElementManager', () => {
       await manager.startTranslation(document.createElement('div'));
 
       expect(errorHandler.handle).not.toHaveBeenCalled();
-      const { createPublicDisplayError } = await import('@/shared/error-management/PublicErrorPolicy.js');
-      expect(createPublicDisplayError).not.toHaveBeenCalled();
       const ExtensionContextManager = (await import('@/core/extensionContext.js')).default;
       expect(ExtensionContextManager.handleContextError).not.toHaveBeenCalled();
       expect(cleanupSpy).toHaveBeenCalledWith({ reason: 'no-content' });
@@ -611,8 +601,6 @@ describe('SelectElementManager', () => {
       await manager.startTranslation(document.createElement('div'));
 
       expect(errorHandler.handle).not.toHaveBeenCalled();
-      const { createPublicDisplayError } = await import('@/shared/error-management/PublicErrorPolicy.js');
-      expect(createPublicDisplayError).not.toHaveBeenCalled();
       const ExtensionContextManager = (await import('@/core/extensionContext.js')).default;
       expect(ExtensionContextManager.handleContextError).not.toHaveBeenCalled();
       expect(cleanupSpy).toHaveBeenCalledWith({ reason: 'no-content' });
@@ -671,8 +659,6 @@ describe('SelectElementManager', () => {
       expect(pageEventBus.emit).not.toHaveBeenCalledWith('show-select-element-info', expect.anything());
       const ExtensionContextManager = (await import('@/core/extensionContext.js')).default;
       expect(ExtensionContextManager.handleContextError).not.toHaveBeenCalled();
-      const { createPublicDisplayError } = await import('@/shared/error-management/PublicErrorPolicy.js');
-      expect(createPublicDisplayError).not.toHaveBeenCalled();
     });
 
     it('keeps stale cancellation results silent', async () => {
@@ -691,11 +677,9 @@ describe('SelectElementManager', () => {
 
       await manager.startTranslation(document.createElement('div'));
 
-      const { createPublicDisplayError } = await import('@/shared/error-management/PublicErrorPolicy.js');
       const { mapCanonicalTranslationError } = await import('@/shared/error-management/PublicTranslationErrorPolicy.js');
       const { createLegacyDisplayError } = await import('@/shared/error-management/PublicTranslationErrorAdapter.js');
       expect(errorHandler.handle).not.toHaveBeenCalled();
-      expect(createPublicDisplayError).not.toHaveBeenCalled();
       expect(mapCanonicalTranslationError).not.toHaveBeenCalled();
       expect(createLegacyDisplayError).not.toHaveBeenCalled();
       expect(cleanupSpy).toHaveBeenCalledWith({ reason: 'error' });
@@ -707,11 +691,9 @@ describe('SelectElementManager', () => {
 
       await manager.startTranslation(document.createElement('div'));
 
-      const { createPublicDisplayError } = await import('@/shared/error-management/PublicErrorPolicy.js');
       const { mapCanonicalTranslationError } = await import('@/shared/error-management/PublicTranslationErrorPolicy.js');
       const { createLegacyDisplayError } = await import('@/shared/error-management/PublicTranslationErrorAdapter.js');
       const ExtensionContextManager = (await import('@/core/extensionContext.js')).default;
-      expect(createPublicDisplayError).not.toHaveBeenCalled();
       expect(mapCanonicalTranslationError).toHaveBeenCalledWith(error);
       expect(createLegacyDisplayError).toHaveBeenCalledWith(error, expect.objectContaining({ type: 'NETWORK_ERROR' }));
       expect(errorHandler.handle).toHaveBeenCalledWith(expect.objectContaining({ cause: error }), expect.objectContaining({ showToast: true }));
@@ -738,10 +720,8 @@ describe('SelectElementManager', () => {
 
       await manager.startTranslation(document.createElement('div'));
 
-      const { createPublicDisplayError } = await import('@/shared/error-management/PublicErrorPolicy.js');
       const { mapCanonicalTranslationError } = await import('@/shared/error-management/PublicTranslationErrorPolicy.js');
       const { createLegacyDisplayError } = await import('@/shared/error-management/PublicTranslationErrorAdapter.js');
-      expect(createPublicDisplayError).not.toHaveBeenCalled();
       expect(mapCanonicalTranslationError).toHaveBeenCalledWith(error);
       expect(createLegacyDisplayError).toHaveBeenCalled();
       expect(errorHandler.handle).toHaveBeenCalledWith(
@@ -767,10 +747,8 @@ describe('SelectElementManager', () => {
 
       await manager.startTranslation(document.createElement('div'));
 
-      const { createPublicDisplayError } = await import('@/shared/error-management/PublicErrorPolicy.js');
       const { mapCanonicalTranslationError } = await import('@/shared/error-management/PublicTranslationErrorPolicy.js');
       const { createLegacyDisplayError } = await import('@/shared/error-management/PublicTranslationErrorAdapter.js');
-      expect(createPublicDisplayError).not.toHaveBeenCalled();
       expect(mapCanonicalTranslationError).toHaveBeenCalledWith(error);
       expect(createLegacyDisplayError).toHaveBeenCalledWith(error, expect.objectContaining({
         type: 'PROVIDER_TEMPORARILY_UNAVAILABLE',
@@ -809,11 +787,9 @@ describe('SelectElementManager', () => {
 
       await manager.startTranslation(document.createElement('div'));
 
-      const { createPublicDisplayError } = await import('@/shared/error-management/PublicErrorPolicy.js');
       const { mapCanonicalTranslationError } = await import('@/shared/error-management/PublicTranslationErrorPolicy.js');
       const { createLegacyDisplayError } = await import('@/shared/error-management/PublicTranslationErrorAdapter.js');
       const { getErrorDisplayStrategy } = await import('@/shared/error-management/ErrorDisplayStrategies.js');
-      expect(createPublicDisplayError).not.toHaveBeenCalled();
       expect(mapCanonicalTranslationError).toHaveBeenCalledWith(error);
       expect(createLegacyDisplayError).toHaveBeenCalledWith(error, expect.objectContaining({
         type: 'TRANSLATION_NOT_FOUND',
@@ -852,10 +828,8 @@ describe('SelectElementManager', () => {
 
       await manager.startTranslation(document.createElement('div'));
 
-      const { createPublicDisplayError } = await import('@/shared/error-management/PublicErrorPolicy.js');
       const { mapCanonicalTranslationError } = await import('@/shared/error-management/PublicTranslationErrorPolicy.js');
       const { createLegacyDisplayError } = await import('@/shared/error-management/PublicTranslationErrorAdapter.js');
-      expect(createPublicDisplayError).not.toHaveBeenCalled();
       expect(mapCanonicalTranslationError).toHaveBeenCalledWith(error);
       expect(createLegacyDisplayError).toHaveBeenCalled();
       expect(errorHandler.handle).toHaveBeenCalledWith(
@@ -877,11 +851,9 @@ describe('SelectElementManager', () => {
 
       await manager.startTranslation(document.createElement('div'));
 
-      const { createPublicDisplayError } = await import('@/shared/error-management/PublicErrorPolicy.js');
       const { mapCanonicalTranslationError } = await import('@/shared/error-management/PublicTranslationErrorPolicy.js');
       const { createLegacyDisplayError } = await import('@/shared/error-management/PublicTranslationErrorAdapter.js');
       const { getErrorDisplayStrategy } = await import('@/shared/error-management/ErrorDisplayStrategies.js');
-      expect(createPublicDisplayError).not.toHaveBeenCalled();
       expect(mapCanonicalTranslationError).toHaveBeenCalledWith(error);
       expect(createLegacyDisplayError).toHaveBeenCalledWith(error, expect.objectContaining({
         type: 'LANGUAGE_PAIR_UNSUPPORTED',
@@ -950,7 +922,6 @@ describe('SelectElementManager', () => {
 
       await manager.startTranslation(document.createElement('div'));
 
-      const { createPublicDisplayError } = await import('@/shared/error-management/PublicErrorPolicy.js');
       const { mapCanonicalTranslationError } = await import('@/shared/error-management/PublicTranslationErrorPolicy.js');
       const { createLegacyDisplayError } = await import('@/shared/error-management/PublicTranslationErrorAdapter.js');
       const expectedPublicType = {
@@ -988,7 +959,6 @@ describe('SelectElementManager', () => {
         CIRCUIT_BREAKER_OPEN: 'PROVIDER_TEMPORARILY_UNAVAILABLE',
         TRANSLATION_NOT_FOUND: 'TRANSLATION_NOT_FOUND',
        }[type] || type;
-      expect(createPublicDisplayError).not.toHaveBeenCalled();
       expect(mapCanonicalTranslationError).toHaveBeenCalledWith(error);
       expect(createLegacyDisplayError).toHaveBeenCalledWith(error, expect.objectContaining({ type: expectedPublicType }));
       expect(errorHandler.handle).toHaveBeenCalledTimes(1);
@@ -1016,10 +986,8 @@ describe('SelectElementManager', () => {
 
       await manager.startTranslation(document.createElement('div'));
 
-      const { createPublicDisplayError } = await import('@/shared/error-management/PublicErrorPolicy.js');
       const { mapCanonicalTranslationError } = await import('@/shared/error-management/PublicTranslationErrorPolicy.js');
       const { createLegacyDisplayError } = await import('@/shared/error-management/PublicTranslationErrorAdapter.js');
-      expect(createPublicDisplayError).not.toHaveBeenCalled();
       expect(mapCanonicalTranslationError).toHaveBeenCalledWith(error);
       expect(createLegacyDisplayError).toHaveBeenCalledWith(error, expect.objectContaining({
         type: 'REQUEST_FAILURE',
@@ -1046,10 +1014,8 @@ describe('SelectElementManager', () => {
 
       await manager.startTranslation(document.createElement('div'));
 
-      const { createPublicDisplayError } = await import('@/shared/error-management/PublicErrorPolicy.js');
       const { mapCanonicalTranslationError } = await import('@/shared/error-management/PublicTranslationErrorPolicy.js');
       const { createLegacyDisplayError } = await import('@/shared/error-management/PublicTranslationErrorAdapter.js');
-      expect(createPublicDisplayError).not.toHaveBeenCalled();
       expect(mapCanonicalTranslationError).toHaveBeenCalledWith(error);
       expect(mapCanonicalTranslationError.mock.results[0].value).toMatchObject({
         type: 'MODEL_UNAVAILABLE',
@@ -1074,7 +1040,6 @@ describe('SelectElementManager', () => {
       const error = Object.assign(new Error('API key is invalid'), {
         type: ErrorTypes.API_KEY_INVALID,
       });
-      const { createPublicDisplayError } = await import('@/shared/error-management/PublicErrorPolicy.js');
       const { mapCanonicalTranslationError } = await import('@/shared/error-management/PublicTranslationErrorPolicy.js');
       const { createLegacyDisplayError } = await import('@/shared/error-management/PublicTranslationErrorAdapter.js');
       const { isFatalError } = await import('@/shared/error-management/ErrorMatcher.js');
@@ -1084,7 +1049,6 @@ describe('SelectElementManager', () => {
 
       await manager.startTranslation(document.createElement('div'));
 
-      expect(createPublicDisplayError).not.toHaveBeenCalled();
       expect(mapCanonicalTranslationError).toHaveBeenCalledWith(error);
       expect(createLegacyDisplayError).toHaveBeenCalledWith(error, expect.objectContaining({ type: ErrorTypes.API_KEY_INVALID }));
       expect(errorHandler.handle).toHaveBeenCalledTimes(1);
@@ -1111,7 +1075,6 @@ describe('SelectElementManager', () => {
       const deactivateSpy = vi.spyOn(manager, 'deactivate').mockResolvedValue(undefined);
       ExtensionContextManager.isContextError.mockReturnValue(true);
       const { isFatalError } = await import('@/shared/error-management/ErrorMatcher.js');
-      const { createPublicDisplayError } = await import('@/shared/error-management/PublicErrorPolicy.js');
 
       try {
         isFatalError.mockReturnValue(true);
@@ -1120,7 +1083,6 @@ describe('SelectElementManager', () => {
         await manager.startTranslation(document.createElement('div'));
 
         expect(ExtensionContextManager.handleContextError).toHaveBeenCalledWith(error, 'element-selection');
-        expect(createPublicDisplayError).not.toHaveBeenCalled();
         expect(errorHandler.handle).not.toHaveBeenCalled();
         expect(deactivateSpy).not.toHaveBeenCalled();
         expect(cleanupSpy).toHaveBeenCalledWith({ reason: 'cancel' });
@@ -1134,12 +1096,10 @@ describe('SelectElementManager', () => {
       const error = Object.assign(new Error('Translation already in progress for this element'), {
         type: ErrorTypes.FEATURE_BLOCKED,
       });
-      const { createPublicDisplayError } = await import('@/shared/error-management/PublicErrorPolicy.js');
       manager.domTranslatorAdapter.translateElement.mockRejectedValue(error);
 
       await manager.startTranslation(document.createElement('div'));
 
-      expect(createPublicDisplayError).not.toHaveBeenCalled();
       expect(errorHandler.handle).not.toHaveBeenCalled();
       expect(cleanupSpy).toHaveBeenCalledWith({ reason: 'cancel' });
       expect(manager.domTranslatorAdapter.revertTranslation).not.toHaveBeenCalled();
@@ -1162,10 +1122,8 @@ describe('SelectElementManager', () => {
 
       await manager.startTranslation(document.createElement('div'));
 
-      const { createPublicDisplayError } = await import('@/shared/error-management/PublicErrorPolicy.js');
       const { mapCanonicalTranslationError } = await import('@/shared/error-management/PublicTranslationErrorPolicy.js');
       const { createLegacyDisplayError } = await import('@/shared/error-management/PublicTranslationErrorAdapter.js');
-      expect(createPublicDisplayError).not.toHaveBeenCalled();
       expect(mapCanonicalTranslationError).toHaveBeenCalledWith(error);
       expect(createLegacyDisplayError).toHaveBeenCalledWith(error, expect.objectContaining({
         type: type === 'RATE_LIMIT_REACHED' ? 'RATE_LIMITED' : type,
@@ -1179,10 +1137,8 @@ describe('SelectElementManager', () => {
 
       await manager.startTranslation(document.createElement('div'));
 
-      const { createPublicDisplayError } = await import('@/shared/error-management/PublicErrorPolicy.js');
       const { mapCanonicalTranslationError } = await import('@/shared/error-management/PublicTranslationErrorPolicy.js');
       const { createLegacyDisplayError } = await import('@/shared/error-management/PublicTranslationErrorAdapter.js');
-      expect(createPublicDisplayError).not.toHaveBeenCalled();
       expect(mapCanonicalTranslationError).toHaveBeenCalledWith(error);
       expect(createLegacyDisplayError).toHaveBeenCalledWith(error, expect.objectContaining({ type: 'TRANSLATION_TIMEOUT' }));
       expect(errorHandler.handle).toHaveBeenCalledWith(expect.objectContaining({ cause: error }), expect.objectContaining({ showToast: true }));
@@ -1192,14 +1148,12 @@ describe('SelectElementManager', () => {
       const error = Object.assign(new Error('Element is too large to translate (1001 text segments). Please select a smaller element.'), {
         type: ErrorTypes.ELEMENT_TOO_LARGE,
       });
-      const { createPublicDisplayError } = await import('@/shared/error-management/PublicErrorPolicy.js');
       const { mapCanonicalTranslationError } = await import('@/shared/error-management/PublicTranslationErrorPolicy.js');
       const { createLegacyDisplayError } = await import('@/shared/error-management/PublicTranslationErrorAdapter.js');
       manager.domTranslatorAdapter.translateElement.mockRejectedValue(error);
 
       await manager.startTranslation(document.createElement('div'));
 
-      expect(createPublicDisplayError).not.toHaveBeenCalled();
       expect(mapCanonicalTranslationError).toHaveBeenCalledWith(error);
       expect(createLegacyDisplayError).toHaveBeenCalledWith(error, expect.objectContaining({
         type: 'ELEMENT_TOO_LARGE',
@@ -1231,10 +1185,8 @@ describe('SelectElementManager', () => {
 
       await manager.startTranslation(document.createElement('div'));
 
-      const { createPublicDisplayError } = await import('@/shared/error-management/PublicErrorPolicy.js');
       const { mapCanonicalTranslationError } = await import('@/shared/error-management/PublicTranslationErrorPolicy.js');
       const { createLegacyDisplayError } = await import('@/shared/error-management/PublicTranslationErrorAdapter.js');
-      expect(createPublicDisplayError).not.toHaveBeenCalled();
       expect(mapCanonicalTranslationError).toHaveBeenCalledWith(error);
       expect(createLegacyDisplayError).toHaveBeenCalledWith(error, expect.objectContaining({
         messageKey: 'ERRORS_TRANSLATION_FAILED',
@@ -1257,10 +1209,8 @@ describe('SelectElementManager', () => {
 
       await manager.startTranslation(document.createElement('div'));
 
-      const { createPublicDisplayError } = await import('@/shared/error-management/PublicErrorPolicy.js');
       const { mapCanonicalTranslationError } = await import('@/shared/error-management/PublicTranslationErrorPolicy.js');
       const { createLegacyDisplayError } = await import('@/shared/error-management/PublicTranslationErrorAdapter.js');
-      expect(createPublicDisplayError).not.toHaveBeenCalled();
       expect(mapCanonicalTranslationError).toHaveBeenCalledWith(error);
       expect(createLegacyDisplayError).toHaveBeenCalledWith(error, expect.objectContaining({
         type: 'TRANSLATION_FAILED',
@@ -1314,8 +1264,6 @@ describe('SelectElementManager', () => {
         expect.objectContaining({ context: 'select-element', showToast: true })
       );
       expect(errorHandler.handle).toHaveBeenCalledTimes(1);
-      const { createPublicDisplayError } = await import('@/shared/error-management/PublicErrorPolicy.js');
-      expect(createPublicDisplayError).not.toHaveBeenCalled();
       expect(errorHandler.handle.mock.calls[0][0].message).not.toContain('V3');
       const { pageEventBus } = await import('@/core/PageEventBus.js');
       expect(pageEventBus.emit).not.toHaveBeenCalledWith('show-select-element-info', expect.anything());
@@ -1337,8 +1285,6 @@ describe('SelectElementManager', () => {
       expect(pageEventBus.emit).not.toHaveBeenCalledWith('show-select-element-info', expect.anything());
       const ExtensionContextManager = (await import('@/core/extensionContext.js')).default;
       expect(ExtensionContextManager.handleContextError).not.toHaveBeenCalled();
-      const { createPublicDisplayError } = await import('@/shared/error-management/PublicErrorPolicy.js');
-      expect(createPublicDisplayError).not.toHaveBeenCalled();
     });
 
     it('keeps successful translation cleanup unchanged', async () => {
@@ -1347,8 +1293,6 @@ describe('SelectElementManager', () => {
       await manager.startTranslation(document.createElement('div'));
 
       expect(errorHandler.handle).not.toHaveBeenCalled();
-      const { createPublicDisplayError } = await import('@/shared/error-management/PublicErrorPolicy.js');
-      expect(createPublicDisplayError).not.toHaveBeenCalled();
       const { pageEventBus } = await import('@/core/PageEventBus.js');
       expect(pageEventBus.emit).not.toHaveBeenCalledWith('show-select-element-info', expect.anything());
       const ExtensionContextManager = (await import('@/core/extensionContext.js')).default;
@@ -1389,8 +1333,6 @@ describe('SelectElementManager', () => {
       const { pageEventBus } = await import('@/core/PageEventBus.js');
       expect(pageEventBus.emit).toHaveBeenCalledWith('ELEMENT_TRANSLATIONS_AVAILABLE');
       expect(pageEventBus.emit).not.toHaveBeenCalledWith('show-select-element-info', expect.anything());
-      const { createPublicDisplayError } = await import('@/shared/error-management/PublicErrorPolicy.js');
-      expect(createPublicDisplayError).not.toHaveBeenCalled();
       const ExtensionContextManager = (await import('@/core/extensionContext.js')).default;
       expect(ExtensionContextManager.handleContextError).not.toHaveBeenCalled();
     });
@@ -1415,8 +1357,6 @@ describe('SelectElementManager', () => {
         expect.objectContaining({ context: 'select-element', showToast: true })
       );
       expect(failureSpy).not.toHaveBeenCalled();
-      const { createPublicDisplayError } = await import('@/shared/error-management/PublicErrorPolicy.js');
-      expect(createPublicDisplayError).not.toHaveBeenCalled();
       const ExtensionContextManager = (await import('@/core/extensionContext.js')).default;
       expect(ExtensionContextManager.handleContextError).not.toHaveBeenCalled();
       expect(cleanupSpy).toHaveBeenCalledWith({ reason: 'success' });
@@ -1687,8 +1627,6 @@ describe('SelectElementManager', () => {
 
         expect(ExtensionContextManager.handleContextError).toHaveBeenCalledTimes(1);
         expect(ExtensionContextManager.handleContextError).toHaveBeenCalledWith(error, 'element-selection');
-        const { createPublicDisplayError } = await import('@/shared/error-management/PublicErrorPolicy.js');
-        expect(createPublicDisplayError).not.toHaveBeenCalled();
         expect(errorHandler.handle).not.toHaveBeenCalled();
         const { pageEventBus } = await import('@/core/PageEventBus.js');
         expect(pageEventBus.emit).not.toHaveBeenCalledWith('show-select-element-info', expect.anything());

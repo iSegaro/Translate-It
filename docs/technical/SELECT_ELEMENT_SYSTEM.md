@@ -70,7 +70,7 @@ Ownership is intentionally split:
 | Mode routing and priority | `UnifiedModeCoordinator` |
 | Provider execution and structured orchestration | `TranslationEngine`, `ProviderCoordinator`, `OptimizedJsonHandler` |
 | Conversation acceptance | `ConversationAcceptanceCoordinator` |
-| Public terminal error display | `PublicErrorPolicy`, `ErrorHandler`, and feature-owned feedback |
+| Public terminal error display | `PublicTranslationErrorPolicy`, `PublicTranslationErrorAdapter`, `ErrorHandler`, and feature-owned feedback |
 | Extension context recovery | `ExtensionContextManager` |
 | Select Element toast lifecycle | `SelectElementNotificationManager` |
 
@@ -380,7 +380,8 @@ Select Element separates diagnostics from public feedback.
 ```text
 internal typed failure
   -> SelectElementManager classification
-  -> PublicErrorPolicy
+  -> mapCanonicalTranslationError()
+  -> createLegacyDisplayError()
   -> localized safe display error
   -> ErrorHandler
 ```
@@ -389,10 +390,11 @@ Feature-owned paths:
 
 | Condition | Feedback owner |
 | --- | --- |
-| Public translation failure | `PublicErrorPolicy` then `ErrorHandler` |
+| Public translation failure | `mapCanonicalTranslationError()` then `createLegacyDisplayError()` then `ErrorHandler` |
 | Partial outcome | Select Element partial message through existing renderer |
 | No translatable content | `show-select-element-info` feature info channel |
 | Unsupported extraction mode | Feature info channel with capability-specific message |
+| `NODE_ALREADY_TRANSLATED` | Silent feature-owned skip; cleanup reason `error` |
 | `FEATURE_BLOCKED` | Silent defensive skip |
 | Context invalidation | `ExtensionContextManager` |
 | Activation failure | Safe activation-error contract |
