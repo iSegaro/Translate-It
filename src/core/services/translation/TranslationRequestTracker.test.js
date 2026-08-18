@@ -107,6 +107,53 @@ describe('TranslationRequestTracker', () => {
       expect(tracker.getRequest('field-request-a')).toBeUndefined();
       expect(tracker.getRequest('field-request-b')).toBeUndefined();
     });
+
+    it.each([
+      ['completed', (messageId) => tracker.completeRequest(messageId, { success: true })],
+      ['failed', (messageId) => tracker.failRequest(messageId, new Error('failed'))],
+      ['cancelled', (messageId) => tracker.cancelRequest(messageId)],
+      ['timeout', (messageId) => tracker.markTimeout(messageId)],
+    ])('keeps newer shared-toast request indexed when older request is %s', (_status, terminalize) => {
+      tracker.createRequest({
+        messageId: 'shared-request-a',
+        data: { toastId: 'shared-toast' },
+        sender: { tab: { id: 1 } },
+      });
+      const second = tracker.createRequest({
+        messageId: 'shared-request-b',
+        data: { toastId: 'shared-toast' },
+        sender: { tab: { id: 1 } },
+      });
+
+      expect(tracker.getRequestByToastId('shared-toast')).toBe(second);
+      expect(terminalize('shared-request-a')).toMatchObject({ accepted: true });
+      expect(tracker.getRequestByToastId('shared-toast')).toBe(second);
+      expect(tracker.getTabRequests(1)).toEqual([expect.objectContaining({ messageId: 'shared-request-b' })]);
+    });
+
+    it('deletes current toast index without restoring older request', () => {
+      tracker.createRequest({ messageId: 'shared-request-a', data: { toastId: 'shared-toast' } });
+      tracker.createRequest({ messageId: 'shared-request-b', data: { toastId: 'shared-toast' } });
+
+      tracker.cancelRequest('shared-request-b');
+
+      expect(tracker.getRequestByToastId('shared-toast')).toBeNull();
+    });
+
+    it('isolates different toast indexes and preserves repeated terminalization', () => {
+      tracker.createRequest({ messageId: 'request-a', data: { toastId: 'toast-a' }, sender: { tab: { id: 1 } } });
+      tracker.createRequest({ messageId: 'request-b', data: { toastId: 'toast-b' }, sender: { tab: { id: 1 } } });
+
+      expect(tracker.completeRequest('request-a', { success: true })).toMatchObject({ accepted: true });
+      expect(tracker.getRequestByToastId('toast-a')).toBeNull();
+      expect(tracker.getRequestByToastId('toast-b')).toMatchObject({ messageId: 'request-b' });
+      expect(tracker.getTabRequests(1)).toEqual([expect.objectContaining({ messageId: 'request-b' })]);
+      expect(tracker.completeRequest('request-a', { success: true })).toMatchObject({
+        accepted: false,
+        reason: 'already_terminal',
+      });
+      expect(tracker.getRequestByToastId('toast-b')).toMatchObject({ messageId: 'request-b' });
+    });
   });
 
   describe('updateRequest', () => {

@@ -303,7 +303,10 @@ export class TranslationRequestTracker {
     }
 
     if (request.metadata?.toastId) {
-      this.toastRequests.delete(request.metadata.toastId);
+      const toastId = request.metadata.toastId;
+      if (this.toastRequests.get(toastId) === request.messageId) {
+        this.toastRequests.delete(toastId);
+      }
     }
   }
 
