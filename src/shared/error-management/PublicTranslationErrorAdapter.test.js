@@ -56,6 +56,7 @@ describe('PublicTranslationErrorAdapter', () => {
     [PublicTranslationErrorTypes.TEXT_TOO_LONG, ErrorTypes.TEXT_TOO_LONG],
     [PublicTranslationErrorTypes.PROMPT_INVALID, ErrorTypes.PROMPT_INVALID],
     [PublicTranslationErrorTypes.LANGUAGE_PAIR_UNSUPPORTED, ErrorTypes.LANGUAGE_PAIR_NOT_SUPPORTED],
+    [PublicTranslationErrorTypes.PROVIDER_TEMPORARILY_UNAVAILABLE, ErrorTypes.CIRCUIT_BREAKER_OPEN],
     [PublicTranslationErrorTypes.TRANSLATION_FAILED, ErrorTypes.TRANSLATION_FAILED],
   ])('maps %s to legacy type %s', async (publicType, legacyType) => {
     const displayError = await createLegacyDisplayError(canonicalError(), {
@@ -128,6 +129,25 @@ describe('PublicTranslationErrorAdapter', () => {
     expect(displayError).not.toHaveProperty('arbitrary');
     expect(displayError).not.toHaveProperty('statusCode');
     expect(displayError).not.toHaveProperty('providerName');
+  });
+
+  it('keeps circuit-breaker metadata out of legacy display Error', async () => {
+    const source = Object.assign(canonicalError(), {
+      originalType: ErrorTypes.NETWORK_ERROR,
+    });
+    const displayError = await createLegacyDisplayError(source, {
+      type: PublicTranslationErrorTypes.PROVIDER_TEMPORARILY_UNAVAILABLE,
+      messageKey: 'ERRORS_CIRCUIT_BREAKER_OPEN',
+    });
+
+    expect(displayError.type).toBe(ErrorTypes.CIRCUIT_BREAKER_OPEN);
+    expect(displayError.message).toBe('Localized ERRORS_CIRCUIT_BREAKER_OPEN');
+    expect(displayError.cause).toBe(source);
+    expect(displayError).not.toHaveProperty('originalType');
+    expect(displayError).not.toHaveProperty('statusCode');
+    expect(displayError).not.toHaveProperty('providerName');
+    expect(displayError).not.toHaveProperty('translationOutcome');
+    expect(Object.keys(displayError)).toEqual(['type']);
   });
 
   it('uses temporary translation-failed localization for INVALID_INPUT', async () => {

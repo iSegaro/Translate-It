@@ -81,6 +81,7 @@ const SAFE_PUBLIC_TRANSLATION_ERROR_TYPES = new Set([
   ErrorTypes.TEXT_TOO_LONG,
   ErrorTypes.PROMPT_INVALID,
   ErrorTypes.LANGUAGE_PAIR_NOT_SUPPORTED,
+  ErrorTypes.CIRCUIT_BREAKER_OPEN,
 ]);
 
 function shouldUsePublicTranslationContract(error) {

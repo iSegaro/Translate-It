@@ -35,6 +35,7 @@ export const PUBLIC_TO_LEGACY_ERROR_TYPES = Object.freeze({
   [PublicTranslationErrorTypes.TEXT_TOO_LONG]: ErrorTypes.TEXT_TOO_LONG,
   [PublicTranslationErrorTypes.PROMPT_INVALID]: ErrorTypes.PROMPT_INVALID,
   [PublicTranslationErrorTypes.LANGUAGE_PAIR_UNSUPPORTED]: ErrorTypes.LANGUAGE_PAIR_NOT_SUPPORTED,
+  [PublicTranslationErrorTypes.PROVIDER_TEMPORARILY_UNAVAILABLE]: ErrorTypes.CIRCUIT_BREAKER_OPEN,
   [PublicTranslationErrorTypes.TRANSLATION_FAILED]: ErrorTypes.TRANSLATION_FAILED,
 });
 

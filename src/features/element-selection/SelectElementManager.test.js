@@ -79,11 +79,12 @@ vi.mock('@/shared/error-management/PublicTranslationErrorPolicy.js', () => ({
        TEXT_EMPTY: 'TEXT_EMPTY',
        TEXT_TOO_LONG: 'TEXT_TOO_LONG',
        PROMPT_INVALID: 'PROMPT_INVALID',
-       LANGUAGE_PAIR_NOT_SUPPORTED: 'LANGUAGE_PAIR_UNSUPPORTED',
-       HTTP_ERROR: error?.originalType === 'MODEL_MISSING' ? 'MODEL_UNAVAILABLE' : 'REQUEST_FAILURE',
+        LANGUAGE_PAIR_NOT_SUPPORTED: 'LANGUAGE_PAIR_UNSUPPORTED',
+        CIRCUIT_BREAKER_OPEN: 'PROVIDER_TEMPORARILY_UNAVAILABLE',
+        HTTP_ERROR: error?.originalType === 'MODEL_MISSING' ? 'MODEL_UNAVAILABLE' : 'REQUEST_FAILURE',
       UNKNOWN: 'TRANSLATION_FAILED',
     }[error?.type] || error?.type,
-    messageKey: {
+     messageKey: {
       API_ERROR: 'ERRORS_API_ERROR',
       VALIDATION: 'ERRORS_INVALID_INPUT',
       ELEMENT_TOO_LARGE: 'ERRORS_ELEMENT_TOO_LARGE',
@@ -100,10 +101,12 @@ vi.mock('@/shared/error-management/PublicTranslationErrorPolicy.js', () => ({
        TEXT_EMPTY: 'ERRORS_TEXT_EMPTY',
        TEXT_TOO_LONG: 'ERRORS_TEXT_TOO_LONG',
        PROMPT_INVALID: 'ERRORS_PROMPT_INVALID',
-       LANGUAGE_PAIR_NOT_SUPPORTED: 'ERRORS_LANGUAGE_PAIR_NOT_SUPPORTED',
-       HTTP_ERROR: error?.originalType === 'MODEL_MISSING' ? 'ERRORS_MODEL_MISSING' : 'ERRORS_HTTP_ERROR',
-     }[error?.type] || 'ERRORS_TRANSLATION_FAILED',
-    silent: false,
+        LANGUAGE_PAIR_NOT_SUPPORTED: 'ERRORS_LANGUAGE_PAIR_NOT_SUPPORTED',
+        CIRCUIT_BREAKER_OPEN: 'ERRORS_CIRCUIT_BREAKER_OPEN',
+        HTTP_ERROR: error?.originalType === 'MODEL_MISSING' ? 'ERRORS_MODEL_MISSING' : 'ERRORS_HTTP_ERROR',
+      }[error?.type] || 'ERRORS_TRANSLATION_FAILED',
+     severity: error?.type === 'CIRCUIT_BREAKER_OPEN' ? 'warning' : undefined,
+     silent: false,
   }))
 }));
 vi.mock('@/shared/error-management/PublicTranslationErrorAdapter.js', () => ({
@@ -124,8 +127,9 @@ vi.mock('@/shared/error-management/PublicTranslationErrorAdapter.js', () => ({
        TEXT_EMPTY: 'TEXT_EMPTY',
        TEXT_TOO_LONG: 'TEXT_TOO_LONG',
        PROMPT_INVALID: 'PROMPT_INVALID',
-       LANGUAGE_PAIR_UNSUPPORTED: 'LANGUAGE_PAIR_NOT_SUPPORTED',
-       TRANSLATION_FAILED: 'TRANSLATION_FAILED',
+        LANGUAGE_PAIR_UNSUPPORTED: 'LANGUAGE_PAIR_NOT_SUPPORTED',
+        PROVIDER_TEMPORARILY_UNAVAILABLE: 'CIRCUIT_BREAKER_OPEN',
+        TRANSLATION_FAILED: 'TRANSLATION_FAILED',
     }[publicError?.type] || publicError?.type || 'TRANSLATION_FAILED';
     const message = {
       ERRORS_API_ERROR: 'Translation service API error.',
@@ -144,8 +148,9 @@ vi.mock('@/shared/error-management/PublicTranslationErrorAdapter.js', () => ({
        ERRORS_TEXT_EMPTY: 'Text is empty',
        ERRORS_TEXT_TOO_LONG: 'Text is too long',
        ERRORS_PROMPT_INVALID: 'Prompt is invalid',
-       ERRORS_LANGUAGE_PAIR_NOT_SUPPORTED: 'Language pair not supported by the selected translation service',
-    }[publicError?.messageKey] || 'Translation failed';
+        ERRORS_LANGUAGE_PAIR_NOT_SUPPORTED: 'Language pair not supported by the selected translation service',
+        ERRORS_CIRCUIT_BREAKER_OPEN: 'Circuit breaker is open. This provider is temporarily disabled due to too many failures.',
+     }[publicError?.messageKey] || 'Translation failed';
     const displayError = new Error(message);
     displayError.type = legacyType;
     displayError.cause = canonicalError;
@@ -678,6 +683,7 @@ describe('SelectElementManager', () => {
       [ErrorTypes.API_ENDPOINT_INVALID, 'API_ENDPOINT_INVALID', 'API Endpoint not found (404). Please check your URL.'],
       [ErrorTypes.BROWSER_API_UNAVAILABLE, 'BROWSER_API_UNAVAILABLE', 'The translation API is not available or supported in this browser'],
       [ErrorTypes.FORBIDDEN_ERROR, 'FORBIDDEN_ERROR', 'Access denied. Check permissions or potential content moderation.'],
+      [ErrorTypes.CIRCUIT_BREAKER_OPEN, 'CIRCUIT_BREAKER_OPEN', 'Circuit breaker is open. This provider is temporarily disabled due to too many failures.'],
     ])('preserves localized config/access display for %s', async (type, legacyType, message) => {
       const error = Object.assign(new Error(`raw canonical detail for ${type}`), { type });
       manager.domTranslatorAdapter.translateElement.mockRejectedValue(error);
@@ -698,6 +704,49 @@ describe('SelectElementManager', () => {
         expect.objectContaining({ context: 'select-element', showToast: true })
       );
       expect(errorHandler.handle.mock.calls[0][0].message).not.toContain('raw canonical detail');
+      expect(errorHandler.handle).toHaveBeenCalledTimes(1);
+      expect(deactivateSpy).toHaveBeenCalledWith({ preserveTranslations: true, reason: 'error' });
+    });
+
+    it('migrates circuit-breaker failures without copying reason metadata', async () => {
+      const error = Object.assign(new Error('raw provider detail'), {
+        type: ErrorTypes.CIRCUIT_BREAKER_OPEN,
+        originalType: ErrorTypes.NETWORK_ERROR,
+        statusCode: 503,
+        providerName: 'Provider',
+      });
+      manager.domTranslatorAdapter.translateElement.mockRejectedValue(error);
+      const { isFatalError } = await import('@/shared/error-management/ErrorMatcher.js');
+      isFatalError.mockReturnValueOnce(true);
+      const deactivateSpy = vi.spyOn(manager, 'deactivate').mockResolvedValue(undefined);
+
+      await manager.startTranslation(document.createElement('div'));
+
+      const { createPublicDisplayError } = await import('@/shared/error-management/PublicErrorPolicy.js');
+      const { mapCanonicalTranslationError } = await import('@/shared/error-management/PublicTranslationErrorPolicy.js');
+      const { createLegacyDisplayError } = await import('@/shared/error-management/PublicTranslationErrorAdapter.js');
+      expect(createPublicDisplayError).not.toHaveBeenCalled();
+      expect(mapCanonicalTranslationError).toHaveBeenCalledWith(error);
+      expect(createLegacyDisplayError).toHaveBeenCalledWith(error, expect.objectContaining({
+        type: 'PROVIDER_TEMPORARILY_UNAVAILABLE',
+        messageKey: 'ERRORS_CIRCUIT_BREAKER_OPEN',
+        severity: 'warning',
+        silent: false,
+      }));
+      const displayError = errorHandler.handle.mock.calls[0][0];
+      expect(displayError).toMatchObject({
+        type: ErrorTypes.CIRCUIT_BREAKER_OPEN,
+        message: 'Circuit breaker is open. This provider is temporarily disabled due to too many failures.',
+        cause: error,
+      });
+      expect(displayError).not.toHaveProperty('originalType');
+      expect(displayError).not.toHaveProperty('statusCode');
+      expect(displayError).not.toHaveProperty('providerName');
+      expect(displayError.message).not.toContain('raw provider detail');
+      expect(errorHandler.handle).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.objectContaining({ context: 'select-element', showToast: true })
+      );
       expect(errorHandler.handle).toHaveBeenCalledTimes(1);
       expect(deactivateSpy).toHaveBeenCalledWith({ preserveTranslations: true, reason: 'error' });
     });

@@ -39,6 +39,7 @@ describe('PublicTranslationErrorPolicy', () => {
     [errorWithType(ErrorTypes.TEXT_TOO_LONG), PublicTranslationErrorTypes.TEXT_TOO_LONG],
     [errorWithType(ErrorTypes.PROMPT_INVALID), PublicTranslationErrorTypes.PROMPT_INVALID],
     [errorWithType(ErrorTypes.LANGUAGE_PAIR_NOT_SUPPORTED), PublicTranslationErrorTypes.LANGUAGE_PAIR_UNSUPPORTED],
+    [errorWithType(ErrorTypes.CIRCUIT_BREAKER_OPEN), PublicTranslationErrorTypes.PROVIDER_TEMPORARILY_UNAVAILABLE],
   ])('maps %o to %s', (error, type) => {
     expect(mapCanonicalTranslationError(error)).toMatchObject({ type, silent: false });
   });
@@ -89,6 +90,26 @@ describe('PublicTranslationErrorPolicy', () => {
       silent: false,
     });
     expect(result).not.toHaveProperty('action');
+    expect(result).not.toHaveProperty('message');
+  });
+
+  it('preserves circuit-breaker presentation without public action or raw details', () => {
+    const result = mapCanonicalTranslationError({
+      type: ErrorTypes.CIRCUIT_BREAKER_OPEN,
+      originalType: ErrorTypes.NETWORK_ERROR,
+      statusCode: 503,
+      message: 'raw provider detail',
+    });
+
+    expect(result).toMatchObject({
+      type: PublicTranslationErrorTypes.PROVIDER_TEMPORARILY_UNAVAILABLE,
+      messageKey: 'ERRORS_CIRCUIT_BREAKER_OPEN',
+      severity: 'warning',
+      silent: false,
+    });
+    expect(result).not.toHaveProperty('action');
+    expect(result).not.toHaveProperty('originalType');
+    expect(result).not.toHaveProperty('statusCode');
     expect(result).not.toHaveProperty('message');
   });
 
