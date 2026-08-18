@@ -302,6 +302,46 @@ describe('PdfTranslationAdapter', () => {
     })
   })
 
+  it('preserves canonical failure identity while excluding unsafe metadata', () => {
+    const adapter = new PdfTranslationAdapter()
+    const batchItems = adapter.toProviderItems([{ id: 'block-a', text: 'Hello', sourceTextHash: 'hash-a' }])
+    const mapped = adapter.mapBatchResponse(batchItems, {
+      success: false,
+      error: {
+        message: 'Provider failed',
+        type: 'PROVIDER_ERROR',
+        originalType: 'HTTP_ERROR',
+        statusCode: 503,
+        context: 'pdf-translation',
+        providerName: 'Provider',
+        providerId: 'provider-id',
+        code: 'UPSTREAM_FAILURE',
+        errorCode: 'E_UPSTREAM',
+        translationOutcome: { partial: true },
+        cause: 'private',
+        arbitrary: { ignored: true }
+      }
+    })
+
+    expect(mapped[0]).toMatchObject({
+      error: 'Provider failed',
+      errorDetails: {
+        message: 'Provider failed',
+        type: 'PROVIDER_ERROR',
+        originalType: 'HTTP_ERROR',
+        statusCode: 503,
+        context: 'pdf-translation',
+        providerName: 'Provider',
+        providerId: 'provider-id',
+        code: 'UPSTREAM_FAILURE',
+        errorCode: 'E_UPSTREAM',
+        translationOutcome: { partial: true }
+      }
+    })
+    expect(mapped[0].errorDetails).not.toHaveProperty('cause')
+    expect(mapped[0].errorDetails).not.toHaveProperty('arbitrary')
+  })
+
   describe('structured block cell-aware translation', () => {
     it('emits per-cell items for multi-item structured lines', () => {
       const adapter = new PdfTranslationAdapter()

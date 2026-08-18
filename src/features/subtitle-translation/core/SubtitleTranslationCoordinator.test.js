@@ -141,6 +141,64 @@ describe('SubtitleTranslationCoordinator Stability', () => {
     expect(result.isFatal).toBe(true);
     expect(batch[0].translatedText).toBeUndefined();
   });
+
+  it('preserves canonical provider error identity across batch result boundary', async () => {
+    const jobId = 'test-job-canonical-error';
+    const mockTracker = { update: vi.fn() };
+    const batch = [{ id: '1', text: 'Hello', index: 1, warnings: [] }];
+    subtitleTranslationCoordinator.activeJobs.set(jobId, {
+      cues: batch,
+      status: 'running',
+      progressTracker: mockTracker
+    });
+    unifiedTranslationService.handleTranslationRequest.mockResolvedValue({
+      success: false,
+      error: {
+        message: 'Provider failed',
+        type: 'PROVIDER_ERROR',
+        originalType: 'HTTP_ERROR',
+        statusCode: 503,
+        context: 'subtitle-batch',
+        providerName: 'Provider',
+        providerId: 'provider-id',
+        code: 'UPSTREAM_FAILURE',
+        errorCode: 'E_UPSTREAM',
+        translationOutcome: { partial: true },
+        cause: 'private',
+        arbitrary: { ignored: true }
+      }
+    });
+
+    const result = await subtitleTranslationCoordinator._processBatch(
+      jobId,
+      batch,
+      'en',
+      'fa',
+      'google',
+      {}
+    );
+
+    expect(result).toMatchObject({
+      success: false,
+      error: 'Provider failed',
+      errorDetails: {
+        message: 'Provider failed',
+        type: 'PROVIDER_ERROR',
+        originalType: 'HTTP_ERROR',
+        statusCode: 503,
+        context: 'subtitle-batch',
+        providerName: 'Provider',
+        providerId: 'provider-id',
+        code: 'UPSTREAM_FAILURE',
+        errorCode: 'E_UPSTREAM',
+        translationOutcome: { partial: true }
+      }
+    });
+    expect(result.errorDetails).not.toHaveProperty('cause');
+    expect(result.errorDetails).not.toHaveProperty('arbitrary');
+    expect(batch[0].status).toBe('failed');
+    expect(batch[0].translatedText).toBeUndefined();
+  });
 });
 
 describe('SubtitleTranslationCoordinator Source-Preservation Contract', () => {

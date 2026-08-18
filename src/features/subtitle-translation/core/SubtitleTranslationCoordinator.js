@@ -17,7 +17,7 @@ import { MessagingBus } from '@/shared/messaging/core/MessagingBus.js';
 import { MessageActions } from '@/shared/messaging/core/MessageActions.js';
 import { MessageContexts } from '@/shared/messaging/core/MessagingConstants.js';
 import { unifiedTranslationService } from '@/core/services/translation/UnifiedTranslationService.js';
-import { MessageFormat } from '@/shared/messaging/core/MessagingCore.js';
+import { MessageFormat, reconstructTranslationError } from '@/shared/messaging/core/MessagingCore.js';
 import { ErrorMatcher } from '@/shared/error-management/ErrorMatcher.js';
 import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
 
@@ -77,7 +77,7 @@ export class SubtitleTranslationCoordinator {
       const progressTracker = new SubtitleProgressTracker(cues.length);
       // activeBatchMessageId tracks the in-flight service request so the outer
       // batch timeout and cancelJob can terminate its lifecycle (no zombie).
-      this.activeJobs.set(jobId, { cues, progressTracker, adapter, status: 'running', activeBatchMessageId: null });
+      this.activeJobs.set(jobId, { cues, progressTracker, adapter, status: 'running', activeBatchMessageId: null, lastErrorDetails: null });
 
       // 2. Resolve Limits
       const limits = SubtitleProviderLimitsResolver.resolve(providerId);
@@ -97,6 +97,10 @@ export class SubtitleTranslationCoordinator {
         
         // Notify progress
         this._notifyProgress(jobId, result.updatedCues);
+        if (result?.errorDetails) {
+          const job = this.activeJobs.get(jobId);
+          if (job && !job.lastErrorDetails) job.lastErrorDetails = result.errorDetails;
+        }
 
         // Fail fast on fatal errors (e.g., Invalid API Key) to prevent wasteful retries
         // while still allowing the user to download partially translated progress.
@@ -105,6 +109,7 @@ export class SubtitleTranslationCoordinator {
           if (job.progressTracker) {
             job.progressTracker.setTerminalError(result.error || 'Fatal translation error occurred');
           }
+          job.lastErrorDetails = result.errorDetails || null;
           break;
         }
       }
@@ -114,7 +119,7 @@ export class SubtitleTranslationCoordinator {
 
     } catch (error) {
       logger.error(`Subtitle job ${jobId} failed:`, error);
-      this._notifyError(jobId, error.message);
+      this._notifyError(jobId, error.message, error);
     }
   }
 
@@ -234,10 +239,10 @@ export class SubtitleTranslationCoordinator {
         // UnifiedTranslationService returns error details inside a response.error object
         const errorInfo = response.error && typeof response.error === 'object' ? response.error : { message: response.error };
         
-        const error = new Error(errorInfo.message || 'Translation failed');
-        error.type = errorInfo.type || errorInfo.errorType || response.type;
-        error.statusCode = errorInfo.statusCode || errorInfo.status || response.statusCode;
-        error.providerName = providerId;
+        const error = reconstructTranslationError(errorInfo);
+        error.type = error.type || errorInfo.type || response.type;
+        error.statusCode = error.statusCode || errorInfo.statusCode || errorInfo.status || response.statusCode;
+        error.providerName = error.providerName || providerId;
         throw error;
       }
 
@@ -269,6 +274,7 @@ export class SubtitleTranslationCoordinator {
         success: false, 
         isFatal, 
         error: error.message,
+        errorDetails: MessageFormat.serializeTranslationError(error),
         updatedCues: batch
       };
     }
@@ -329,18 +335,23 @@ export class SubtitleTranslationCoordinator {
       payload: {
         jobId,
         content: translatedContent,
-        stats: job.progressTracker.getProgress()
+        stats: job.progressTracker.getProgress(),
+        ...(job.lastErrorDetails && { errorDetails: job.lastErrorDetails })
       }
     });
 
     this.activeJobs.delete(jobId);
   }
 
-  _notifyError(jobId, error) {
+  _notifyError(jobId, error, errorLike = error) {
     MessagingBus.broadcast({
       context: MessageContexts.SUBTITLE_TRANSLATION,
       action: MessageActions.SUBTITLE_TRANSLATE_ERROR,
-      payload: { jobId, error }
+      payload: {
+        jobId,
+        error,
+        errorDetails: MessageFormat.serializeTranslationError(errorLike)
+      }
     });
     this.activeJobs.delete(jobId);
   }

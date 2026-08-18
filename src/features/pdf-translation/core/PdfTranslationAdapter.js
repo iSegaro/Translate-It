@@ -1,6 +1,7 @@
 import { MessageActions } from '@/shared/messaging/core/MessageActions.js'
 import { TranslationMode } from '@/shared/config/config.js'
 import { MessageContexts } from '@/shared/messaging/core/MessagingConstants.js'
+import { MessageFormat } from '@/shared/messaging/core/MessagingCore.js'
 import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js'
 import { normalizePdfText } from './PdfBlockIdentity.js'
 
@@ -476,6 +477,11 @@ export class PdfTranslationAdapter {
     if (!response || response.success === false) {
       const errorMessage = response?.error?.message || response?.error || 'PDF translation failed'
       const failureReason = getPdfTranslationFailureReason(response?.error)
+      const errorDetails = response?.errorDetails
+        ? MessageFormat.serializeTranslationError(response.errorDetails)
+        : (response?.error && typeof response.error === 'object'
+          ? MessageFormat.serializeTranslationError(response.error)
+          : null)
       return batchItems.map((item) => ({
         blockId: item.blockId,
         status: 'error',
@@ -485,7 +491,8 @@ export class PdfTranslationAdapter {
         targetLanguage: targetLanguage || response?.targetLanguage || '',
         sourceTextHash: item.sourceTextHash || '',
         error: errorMessage,
-        failureReason
+        failureReason,
+        ...(errorDetails && { errorDetails })
       }))
     }
 
