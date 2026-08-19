@@ -12,6 +12,18 @@ import { isEditableElement } from './elementHelper.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.TRANSLATION, 'SmartTranslationExecutor');
 
+export const strategyLoaders = {
+  DefaultStrategy: () => import('@/features/text-field-interaction/strategies/DefaultStrategy.js'),
+  ChatGPTStrategy: () => import('@/features/text-field-interaction/strategies/ChatGPTStrategy.js'),
+  InstagramStrategy: () => import('@/features/text-field-interaction/strategies/InstagramStrategy.js'),
+  YoutubeStrategy: () => import('@/features/text-field-interaction/strategies/YoutubeStrategy.js'),
+  TwitterStrategy: () => import('@/features/text-field-interaction/strategies/TwitterStrategy.js'),
+  WhatsAppStrategy: () => import('@/features/text-field-interaction/strategies/WhatsAppStrategy.js'),
+  TelegramStrategy: () => import('@/features/text-field-interaction/strategies/TelegramStrategy.js'),
+  MediumStrategy: () => import('@/features/text-field-interaction/strategies/MediumStrategy.js'),
+  DiscordStrategy: () => import('@/features/text-field-interaction/strategies/DiscordStrategy.js'),
+};
+
 /**
  * Determine if we should replace text or copy to clipboard
  */
@@ -79,8 +91,7 @@ export async function applyTranslation(translatedText, selectionRange, platform,
 
     logger.debug('Translation strategy selected', { strategy: strategyName, platform });
     
-    // eslint-disable-next-line noUnsanitized/method
-    const strategyModule = await import(`@/features/text-field-interaction/strategies/${strategyName}.js`);
+    const strategyModule = await strategyLoaders[strategyName]();
     if (!isCurrent()) return { applied: false, mode: 'stale' };
     const strategy = new strategyModule.default();
     
