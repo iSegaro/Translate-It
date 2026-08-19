@@ -6,8 +6,6 @@ import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import ExtensionContextManager from '@/core/extensionContext.js';
 import { ErrorHandler } from '@/shared/error-management/ErrorHandler.js';
 import SmartCache from '@/core/memory/SmartCache.js';
-import { sendMessage } from '@/shared/messaging/core/UnifiedMessaging.js';
-import { MessageFormat } from '@/shared/messaging/core/MessagingCore.js';
 import { MessageActions } from '@/shared/messaging/core/MessageActions.js';
 import { getSelectElementActivationErrorMessage } from '@/features/element-selection/utils/activationError.js';
 
@@ -250,9 +248,6 @@ export class IFrameManager extends ResourceTracker {
         case MessageActions.IFRAME_ACTIVATE_SELECT_ELEMENT:
           return await this._activateSelectElementMode(message.data);
           
-        case MessageActions.IFRAME_TRANSLATE_SELECTION:
-          return await this._handleTranslationRequest(message.data);
-          
         case MessageActions.IFRAME_GET_FRAME_INFO:
           return this._getFrameInfo();
           
@@ -359,38 +354,6 @@ export class IFrameManager extends ResourceTracker {
       });
       const message = await getSelectElementActivationErrorMessage();
       return { success: false, message, error: message };
-    }
-  }
-
-  /**
-   * Handle translation requests across frames
-   */
-  async _handleTranslationRequest(data) {
-    try {
-      // Use existing translation system
-      const response = await sendMessage({
-        action: MessageActions.TRANSLATE,
-        data: {
-          text: data.text,
-          sourceLang: data.sourceLang || 'auto',
-          targetLang: data.targetLang,
-          frameId: this.frameId,
-          ...data
-        }
-      });
-      
-      return response;
-      
-    } catch (error) {
-      await this.errorHandler.handle(error, {
-        context: 'iframe-translation-request',
-        showToast: false
-      });
-      return {
-        success: false,
-        error: error.message,
-        errorDetails: MessageFormat.serializeTranslationError(error),
-      };
     }
   }
 

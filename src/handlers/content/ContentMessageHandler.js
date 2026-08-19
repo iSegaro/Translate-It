@@ -204,7 +204,6 @@ export class ContentMessageHandler extends ResourceTracker {
 
     // IFrame support handlers
     this.registerHandler(MessageActions.IFRAME_ACTIVATE_SELECT_ELEMENT, this.handleIFrameActivateSelectElement.bind(this));
-    this.registerHandler(MessageActions.IFRAME_TRANSLATE_SELECTION, this.handleIFrameTranslateSelection.bind(this));
     this.registerHandler(MessageActions.IFRAME_GET_FRAME_INFO, this.handleIFrameGetFrameInfo.bind(this));
     this.registerHandler(MessageActions.IFRAME_COORDINATE_OPERATION, this.handleIFrameCoordinateOperation.bind(this));
     this.registerHandler(MessageActions.IFRAME_DETECT_TEXT_FIELDS, this.handleIFrameDetectTextFields.bind(this));
@@ -582,13 +581,6 @@ export class ContentMessageHandler extends ResourceTracker {
         errorType: ErrorTypes.SELECT_ELEMENT,
       };
     }
-  }
-
-  async handleIFrameTranslateSelection(data) {
-    this.logger.info('IFrame translate selection request');
-    // Delegate to WindowsManager through page event bus
-    pageEventBus.emit('iframe-translate-selection', data);
-    return { success: true };
   }
 
   async handleIFrameGetFrameInfo(/* data */) {
