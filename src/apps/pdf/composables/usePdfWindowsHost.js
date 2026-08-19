@@ -19,6 +19,10 @@ import { usePdfWindowPlacement } from './usePdfWindowPlacement.js'
 import { AUTO_DETECT_VALUE } from '@/shared/constants/core.js'
 import { getLanguageNameFromCode } from '@/shared/config/languageConstants.js'
 import { buildPdfSelectionIconStyle, PDF_WINDOW_LAYOUT, getViewportSize } from '@/apps/pdf/utils/pdfWindowGeometry.js'
+import {
+  isTranslationDomainError,
+  presentPdfWindowsHostTranslationError
+} from '@/apps/pdf/presentation/PdfWindowsHostErrorPresenter.js'
 
 const logger = getScopedLogger(LOG_COMPONENTS.PDF, 'usePdfWindowsHost')
 function isPdfSelectionContext(context) {
@@ -693,7 +697,9 @@ export function usePdfWindowsHost(options = {}) {
         return true
       }
 
-      translationError.value = response?.error?.message || response?.message || 'Translation failed'
+      translationError.value = await presentPdfWindowsHostTranslationError(
+        response?.errorDetails || response?.error || response?.message || 'Translation failed'
+      ) || ''
       translatedText.value = ''
       detectedSourceLanguage.value = ''
       translationTargetLanguage.value = resolvedTargetLanguage
@@ -704,7 +710,11 @@ export function usePdfWindowsHost(options = {}) {
       }
 
       logger.error('PDF selection translation failed:', error)
-      translationError.value = error?.message || 'Translation failed'
+      if (isTranslationDomainError(error)) {
+        translationError.value = await presentPdfWindowsHostTranslationError(error) || ''
+      } else {
+        translationError.value = error?.message || 'Translation failed'
+      }
       translatedText.value = ''
       detectedSourceLanguage.value = ''
       translationTargetLanguage.value = resolvedTargetLanguage

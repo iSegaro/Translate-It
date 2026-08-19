@@ -2,6 +2,16 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { mount } from '@vue/test-utils'
 import { reactive, ref, nextTick } from 'vue'
 import InputView from './InputView.vue'
+import { getErrorMessage } from '@/shared/error-management/ErrorMessages.js'
+
+const mocks = vi.hoisted(() => ({
+  sendMessage: vi.fn(),
+  createMessage: vi.fn(),
+  getErrorForDisplay: vi.fn(),
+  handleError: vi.fn(),
+  isContextError: vi.fn(() => false),
+  handleContextError: vi.fn()
+}))
 
 let mockMobileStore
 let mockSettingsStore
@@ -28,15 +38,15 @@ vi.mock('@/composables/shared/useUnifiedI18n.js', () => ({
 
 vi.mock('@/shared/messaging/composables/useMessaging.js', () => ({
   useMessaging: () => ({
-    sendMessage: vi.fn().mockResolvedValue({ success: true, result: { translatedText: 'hello' } }),
-    createMessage: vi.fn((action, payload) => ({ action, payload }))
+    sendMessage: mocks.sendMessage,
+    createMessage: mocks.createMessage
   })
 }))
 
 vi.mock('@/composables/shared/useErrorHandler.js', () => ({
   useErrorHandler: () => ({
-    getErrorForDisplay: vi.fn().mockResolvedValue({ message: 'error' }),
-    handleError: vi.fn().mockResolvedValue(undefined)
+    getErrorForDisplay: mocks.getErrorForDisplay,
+    handleError: mocks.handleError
   })
 }))
 
@@ -47,7 +57,8 @@ vi.mock('@/features/tts/composables/useTTSSmart.js', () => ({
 vi.mock('@/components/shared/TranslationDisplay.vue', () => ({
   default: {
     name: 'TranslationDisplay',
-    template: '<div class="translation-display-stub" />'
+    props: ['error', 'content'],
+    template: '<div class="translation-display-stub" :data-error="error">{{ error || content }}</div>'
   }
 }))
 
@@ -89,16 +100,28 @@ vi.mock('@/core/PageEventBus.js', () => ({
   }
 }))
 
-vi.mock('@/shared/messaging/core/MessagingCore.js', () => ({
-  MessageActions: {
-    SHOW_NOTIFICATION_SIMPLE: 'SHOW_NOTIFICATION_SIMPLE',
-    TRANSLATE: 'TRANSLATE',
-    CANCEL_TRANSLATION: 'CANCEL_TRANSLATION'
-  },
-  MessageContexts: {
-    MOBILE_TRANSLATE: 'MOBILE_TRANSLATE'
+vi.mock('@/utils/UtilsFactory.js', () => ({
+  utilsFactory: {
+    getI18nUtils: vi.fn().mockResolvedValue({
+      getTranslationString: vi.fn(() => undefined)
+    })
   }
 }))
+
+vi.mock('@/shared/messaging/core/MessagingCore.js', async () => {
+  const actual = await vi.importActual('@/shared/messaging/core/MessagingCore.js')
+  return {
+    MessageActions: {
+      SHOW_NOTIFICATION_SIMPLE: 'SHOW_NOTIFICATION_SIMPLE',
+      TRANSLATE: 'TRANSLATE',
+      CANCEL_TRANSLATION: 'CANCEL_TRANSLATION'
+    },
+    MessageContexts: {
+      MOBILE_TRANSLATE: 'MOBILE_TRANSLATE'
+    },
+    reconstructTranslationError: actual.reconstructTranslationError
+  }
+})
 
 vi.mock('@/shared/utils/text/textAnalysis.js', () => ({
   shouldApplyRtl: vi.fn(() => false)
@@ -128,8 +151,8 @@ vi.mock('@/shared/config/config.js', () => ({
 
 vi.mock('@/core/extensionContext.js', () => ({
   default: {
-    isContextError: vi.fn(() => false),
-    handleContextError: vi.fn()
+    isContextError: mocks.isContextError,
+    handleContextError: mocks.handleContextError
   }
 }))
 
@@ -154,6 +177,14 @@ const flushPromises = () => new Promise((resolve) => setTimeout(resolve, 0))
 
 describe('InputView', () => {
   beforeEach(() => {
+    vi.clearAllMocks()
+
+    mocks.sendMessage.mockResolvedValue({ success: true, result: { translatedText: 'hello' } })
+    mocks.createMessage.mockImplementation((action, payload) => ({ action, payload }))
+    mocks.getErrorForDisplay.mockResolvedValue({ message: 'error' })
+    mocks.handleError.mockResolvedValue(undefined)
+    mocks.isContextError.mockReturnValue(false)
+
     mockMobileStore = reactive({
       selectionData: {
         text: 'hello',
@@ -239,5 +270,121 @@ describe('InputView', () => {
     expect(mockLanguageDefaults.setTargetLanguageAsDefault).toHaveBeenCalledWith('de')
     expect(selector.props('sourceLanguage')).toBe('fr')
     expect(selector.props('targetLanguage')).toBe('de')
+  })
+
+  const settle = () => new Promise((resolve) => setTimeout(resolve, 30))
+
+  const translate = async (wrapper) => {
+    await wrapper.get('.ti-m-translate-main-btn').trigger('click')
+    await flushPromises()
+    await settle()
+  }
+
+  const displayError = (wrapper) => wrapper.findComponent({ name: 'TranslationDisplay' }).props('error')
+
+  it('does not expose raw provider diagnostics for structured MODEL_MISSING failures', async () => {
+    mocks.sendMessage.mockResolvedValueOnce({
+      success: false,
+      error: {
+        type: 'MODEL_MISSING',
+        message: 'raw model detail: gemini-2.5-flash not found for key acct_12345'
+      }
+    })
+
+    const wrapper = mount(InputView)
+    await translate(wrapper)
+
+    expect(displayError(wrapper)).toContain(await getErrorMessage('ERRORS_MODEL_MISSING'))
+    expect(displayError(wrapper)).not.toContain('gemini-2.5-flash')
+    expect(displayError(wrapper)).not.toContain('acct_12345')
+  })
+
+  it('does not expose raw provider bodies for API_ERROR failures', async () => {
+    mocks.sendMessage.mockResolvedValueOnce({
+      success: false,
+      error: {
+        type: 'API_ERROR',
+        statusCode: 502,
+        message: 'Provider said: upstream 502 with body {\\"error\\":\\"private payload\\"}'
+      }
+    })
+
+    const wrapper = mount(InputView)
+    await translate(wrapper)
+
+    expect(displayError(wrapper)).toContain(await getErrorMessage('ERRORS_API_ERROR'))
+    expect(displayError(wrapper)).not.toContain('502')
+    expect(displayError(wrapper)).not.toContain('private payload')
+    expect(displayError(wrapper)).not.toContain('Provider said')
+  })
+
+  it('prefers errorDetails over the legacy error string', async () => {
+    mocks.sendMessage.mockResolvedValueOnce({
+      success: false,
+      error: 'raw legacy provider string',
+      errorDetails: {
+        type: 'QUOTA_EXCEEDED',
+        message: 'raw quota detail'
+      }
+    })
+
+    const wrapper = mount(InputView)
+    await translate(wrapper)
+
+    expect(displayError(wrapper)).toContain(await getErrorMessage('ERRORS_QUOTA_EXCEEDED'))
+    expect(displayError(wrapper)).not.toContain('raw legacy provider string')
+    expect(displayError(wrapper)).not.toContain('raw quota detail')
+  })
+
+  it('keeps user cancellation silent in the manual input view', async () => {
+    mocks.sendMessage.mockResolvedValueOnce({
+      success: false,
+      error: { type: 'USER_CANCELLED', message: 'Translation cancelled by user' }
+    })
+
+    const wrapper = mount(InputView)
+    await translate(wrapper)
+
+    expect(wrapper.find('.ti-m-result-wrapper').exists()).toBe(false)
+  })
+
+  it('keeps context invalidation silent in the manual input view', async () => {
+    mocks.isContextError.mockReturnValue(true)
+    mocks.sendMessage.mockResolvedValueOnce({
+      success: false,
+      error: 'Context error: extension context invalidated',
+      isContextInvalidated: true
+    })
+
+    const wrapper = mount(InputView)
+    await translate(wrapper)
+
+    expect(wrapper.find('.ti-m-result-wrapper').exists()).toBe(false)
+    expect(mocks.isContextError).toHaveBeenCalled()
+  })
+
+  it('routes translation-domain exceptions through the canonical chain without raw details', async () => {
+    mocks.sendMessage.mockRejectedValueOnce(
+      Object.assign(new Error('raw provider detail from transport'), { type: 'API_ERROR' })
+    )
+
+    const wrapper = mount(InputView)
+    await translate(wrapper)
+
+    expect(displayError(wrapper)).toContain(await getErrorMessage('ERRORS_API_ERROR'))
+    expect(displayError(wrapper)).not.toContain('raw provider detail from transport')
+  })
+
+  it('preserves existing presentation for ordinary local errors', async () => {
+    mocks.sendMessage.mockRejectedValueOnce(new Error('local non-translation failure'))
+
+    const wrapper = mount(InputView)
+    await translate(wrapper)
+
+    expect(displayError(wrapper)).toBe('error')
+    expect(mocks.getErrorForDisplay).toHaveBeenCalledWith(
+      expect.any(Error),
+      'mobile-input'
+    )
   })
 })

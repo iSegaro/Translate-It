@@ -7,6 +7,7 @@ import { ref } from 'vue'
 const eventHandlers = {}
 const unsubscribeMocks = []
 let windowsManagerImported = false
+const getI18nUtilsMock = vi.fn(async () => ({ getTranslationString: vi.fn(() => undefined) }))
 const storageSetMock = vi.fn(async (data) => {
   globalThis.__pdfWindowsHostStorageState = {
     ...(globalThis.__pdfWindowsHostStorageState || {}),
@@ -79,6 +80,12 @@ vi.mock('@/core/PageEventBus.js', () => ({
 vi.mock('@/shared/messaging/core/UnifiedMessaging.js', () => ({
   sendRegularMessage: sendRegularMessageMock,
   sendMessage: sendMessageMock
+}))
+
+vi.mock('@/utils/UtilsFactory.js', () => ({
+  utilsFactory: {
+    getI18nUtils: getI18nUtilsMock
+  }
 }))
 
 const getEffectiveProviderAsyncMock = vi.fn(async () => 'googlev2')
@@ -225,6 +232,7 @@ vi.mock('@/features/windows/composables/useWindowsManager.js', () => {
 })
 
 const { default: PdfWindowsHost } = await import('./PdfWindowsHost.vue')
+const { getErrorMessage } = await import('@/shared/error-management/ErrorMessages.js')
 
 function emitSelection(detail) {
   eventHandlers['global-selection-change']?.(detail)
@@ -1657,7 +1665,8 @@ describe('PdfWindowsHost', () => {
     await showSelectionIcon('Retry me')
     await openWindowFromSelectionIcon(wrapper)
 
-    expect(wrapper.find('[data-testid="pdf-windows-host-error"]').text()).toContain('Provider unavailable')
+    expect(wrapper.find('[data-testid="pdf-windows-host-error"]').text()).toContain(await getErrorMessage('ERRORS_TRANSLATION_FAILED'))
+    expect(wrapper.find('[data-testid="pdf-windows-host-error"]').text()).not.toContain('Provider unavailable')
 
     await wrapper.get('[data-testid="translation-window-footer-retry"]').trigger('click')
     await flushPromises()
@@ -1673,6 +1682,85 @@ describe('PdfWindowsHost', () => {
       })
     }))
     expect(wrapper.find('[data-testid="pdf-windows-host-result"]').text()).toContain('Recovered result')
+  })
+
+  it('renders structured MODEL_MISSING failures as safe localized errors without raw diagnostics', async () => {
+    sendRegularMessageMock.mockResolvedValueOnce({
+      success: false,
+      error: {
+        type: 'MODEL_MISSING',
+        message: 'raw provider model detail: gemini-2.5-flash not found for key acct_12345'
+      }
+    })
+
+    await showSelectionIcon('Model check')
+    await openWindowFromSelectionIcon(wrapper)
+
+    const error = wrapper.get('[data-testid="pdf-windows-host-error"]')
+    expect(error.text()).toContain(await getErrorMessage('ERRORS_MODEL_MISSING'))
+    expect(error.text()).not.toContain('gemini-2.5-flash')
+    expect(error.text()).not.toContain('acct_12345')
+  })
+
+  it('never renders raw API provider response bodies', async () => {
+    sendRegularMessageMock.mockResolvedValueOnce({
+      success: false,
+      error: {
+        type: 'API_ERROR',
+        statusCode: 502,
+        message: 'Provider said: upstream 502 with body {\\"error\\":\\"private payload\\"}'
+      }
+    })
+
+    await showSelectionIcon('Api check')
+    await openWindowFromSelectionIcon(wrapper)
+
+    const error = wrapper.get('[data-testid="pdf-windows-host-error"]')
+    expect(error.text()).toContain(await getErrorMessage('ERRORS_API_ERROR'))
+    expect(error.text()).not.toContain('502')
+    expect(error.text()).not.toContain('private payload')
+    expect(error.text()).not.toContain('Provider said')
+  })
+
+  it('prefers errorDetails over the legacy error string', async () => {
+    sendRegularMessageMock.mockResolvedValueOnce({
+      success: false,
+      error: 'raw legacy provider string',
+      errorDetails: {
+        type: 'QUOTA_EXCEEDED',
+        message: 'raw quota detail'
+      }
+    })
+
+    await showSelectionIcon('Precedence check')
+    await openWindowFromSelectionIcon(wrapper)
+
+    const error = wrapper.get('[data-testid="pdf-windows-host-error"]')
+    expect(error.text()).toContain(await getErrorMessage('ERRORS_QUOTA_EXCEEDED'))
+    expect(error.text()).not.toContain('raw legacy provider string')
+    expect(error.text()).not.toContain('raw quota detail')
+  })
+
+  it('keeps user cancellation silent in the windows host', async () => {
+    sendRegularMessageMock.mockResolvedValueOnce({
+      success: false,
+      error: { type: 'USER_CANCELLED', message: 'Translation cancelled by user' }
+    })
+
+    await showSelectionIcon('Cancel check')
+    await openWindowFromSelectionIcon(wrapper)
+
+    expect(wrapper.find('[data-testid="pdf-windows-host-error"]').exists()).toBe(false)
+  })
+
+  it('preserves raw presentation for local operational errors', async () => {
+    sendRegularMessageMock.mockRejectedValueOnce(new Error('local windows host failure'))
+
+    await showSelectionIcon('Local error')
+    await openWindowFromSelectionIcon(wrapper)
+
+    const error = wrapper.get('[data-testid="pdf-windows-host-error"]')
+    expect(error.text()).toContain('local windows host failure')
   })
 
   it('updates the detected language badge on retry using the latest response', async () => {
@@ -1870,7 +1958,8 @@ describe('PdfWindowsHost', () => {
     await flushPromises()
 
     expect(host.element.style.minHeight).toBe('')
-    expect(wrapper.get('[data-testid="pdf-windows-host-error"]').text()).toContain('Provider unavailable')
+    expect(wrapper.get('[data-testid="pdf-windows-host-error"]').text()).toContain(await getErrorMessage('ERRORS_TRANSLATION_FAILED'))
+    expect(wrapper.get('[data-testid="pdf-windows-host-error"]').text()).not.toContain('Provider unavailable')
   })
 
   it('clears pinned loading height when a pending replacement is dismissed', async () => {
