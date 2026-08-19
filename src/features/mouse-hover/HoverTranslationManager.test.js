@@ -4,6 +4,7 @@ import { HoverTextDetector } from './HoverTextDetector.js';
 import { pageEventBus } from '@/core/PageEventBus.js';
 import { settingsManager } from '@/shared/managers/SettingsManager.js';
 import { contentScriptIntegration } from '@/shared/messaging/core/ContentScriptIntegration.js';
+import ExtensionContextManager from '@/core/extensionContext.js';
 import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
 import { getErrorMessage } from '@/shared/error-management/ErrorMessages.js';
 import { mapCanonicalTranslationError } from '@/shared/error-management/PublicTranslationErrorPolicy.js';
@@ -370,6 +371,38 @@ describe('HoverTranslationManager', () => {
       emitSpy.mockRestore();
     });
 
+    it('suppresses TRANSLATION_CANCELLED through the existing public adapter path', async () => {
+      const emitSpy = vi.spyOn(pageEventBus, 'emit');
+      HoverTextDetector.detect.mockReturnValue({
+        text: 'Hello world',
+        rect: { top: 10, left: 10, bottom: 20, right: 100 },
+        element: document.createElement('p')
+      });
+      contentScriptIntegration.sendTranslationRequest.mockRejectedValueOnce(
+        Object.assign(new Error('Translation cancelled'), { type: ErrorTypes.TRANSLATION_CANCELLED })
+      );
+
+      await manager._processHover({ clientX: 15, clientY: 15 });
+
+      expect(emitSpy).not.toHaveBeenCalledWith('MOUSE_HOVER_TRANSLATION_ERROR', expect.anything());
+      emitSpy.mockRestore();
+    });
+
+    it('suppresses plain AbortError through the existing public adapter path', async () => {
+      const emitSpy = vi.spyOn(pageEventBus, 'emit');
+      HoverTextDetector.detect.mockReturnValue({
+        text: 'Hello world',
+        rect: { top: 10, left: 10, bottom: 20, right: 100 },
+        element: document.createElement('p')
+      });
+      contentScriptIntegration.sendTranslationRequest.mockRejectedValueOnce(new DOMException('Aborted', 'AbortError'));
+
+      await manager._processHover({ clientX: 15, clientY: 15 });
+
+      expect(emitSpy).not.toHaveBeenCalledWith('MOUSE_HOVER_TRANSLATION_ERROR', expect.anything());
+      emitSpy.mockRestore();
+    });
+
     it('transports only adapted error identity through iframe events', async () => {
       const originalTop = Object.getOwnPropertyDescriptor(window, 'top');
       const postMessage = vi.fn();
@@ -421,6 +454,8 @@ describe('HoverTranslationManager', () => {
 
     it('should clean up highlight and caches on context invalidation error without sending cancellation to background', async () => {
       await manager.activate();
+      const emitSpy = vi.spyOn(pageEventBus, 'emit');
+      const contextErrorSpy = vi.spyOn(ExtensionContextManager, 'isContextError').mockReturnValue(true);
       settingsManager.get.mockImplementation((key, def) => {
         if (key === 'MOUSE_HOVER_SCOPE') return 'container';
         if (key === 'MOUSE_HOVER_SHOW_CONTAINER_BORDER') return true;
@@ -446,7 +481,30 @@ describe('HoverTranslationManager', () => {
       expect(manager.currentText).toBeNull();
       expect(manager.currentElement).toBeNull();
       expect(contentScriptIntegration.cancelTranslationRequest).not.toHaveBeenCalled();
+      expect(emitSpy).not.toHaveBeenCalledWith('MOUSE_HOVER_TRANSLATION_ERROR', expect.anything());
+      contextErrorSpy.mockRestore();
+      emitSpy.mockRestore();
     });
+
+    it.each([ErrorTypes.CONTEXT, ErrorTypes.EXTENSION_CONTEXT_INVALIDATED])(
+      'characterizes recognized context error type %s reaching Hover error presentation',
+      async (type) => {
+        HoverTextDetector.detect.mockReturnValue({
+          text: 'Hello world',
+          rect: { top: 10, left: 10, bottom: 20, right: 100 },
+          element: document.createElement('p')
+        });
+        contentScriptIntegration.sendTranslationRequest.mockRejectedValueOnce(
+          Object.assign(new Error('context failure'), { type })
+        );
+        const emitSpy = vi.spyOn(pageEventBus, 'emit');
+
+        await manager._processHover({ clientX: 15, clientY: 15 });
+
+        expect(emitSpy).not.toHaveBeenCalledWith('MOUSE_HOVER_TRANSLATION_ERROR', expect.anything());
+        emitSpy.mockRestore();
+      }
+    );
 
     it('should clean up highlight and caches on standard translation error without sending cancellation to background', async () => {
       await manager.activate();

@@ -11,6 +11,7 @@ import { MessageContexts, MessageFormat } from '@/shared/messaging/core/Messagin
 import { ElementDetectionService } from '@/shared/services/ElementDetectionService.js';
 import { ExtensionContextManager } from '@/core/extensionContext.js';
 import { isEditable } from '@/core/helpers.js';
+import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
 import { mapCanonicalTranslationError } from '@/shared/error-management/PublicTranslationErrorPolicy.js';
 import { createLegacyDisplayError } from '@/shared/error-management/PublicTranslationErrorAdapter.js';
 
@@ -415,7 +416,8 @@ export class HoverTranslationManager extends ResourceTracker {
         this.currentMessageId = null;
       }
     } catch (error) {
-      if (ExtensionContextManager.isContextError(error)) {
+      if (ExtensionContextManager.isContextError(error)
+        || [ErrorTypes.CONTEXT, ErrorTypes.EXTENSION_CONTEXT_INVALIDATED].includes(error?.type)) {
         logger.debug('Hover translation skipped: Extension context invalidated');
         this._cleanupActiveHoverRequest(messageId);
         return;
