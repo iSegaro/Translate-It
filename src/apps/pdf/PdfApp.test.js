@@ -65,7 +65,9 @@ const pdfTranslationErrorPresenterMock = vi.hoisted(() => vi.fn(async ({ errorDe
   if (['CONTEXT', 'EXTENSION_CONTEXT_INVALIDATED', 'TRANSLATION_CANCELLED'].includes(errorDetails?.type)) {
     return { kind: 'silent' }
   }
-  return errorDetails ? { kind: 'display', message: 'Localized model error' } : { kind: 'legacy' }
+  return errorDetails
+    ? { kind: 'display', message: 'Localized model error' }
+    : { kind: 'display', message: 'Generic PDF translation error' }
 }))
 const pageContentSourceMock = vi.hoisted(() => Object.freeze({
   PDF_TEXT: 'pdf-text',
@@ -791,7 +793,12 @@ describe('PdfApp', () => {
     wrapper.findComponent({ name: 'PdfToolbar' }).vm.$emit('translate-visible')
     await vi.waitFor(() => expect(translationPartialMock).toHaveBeenCalledOnce())
 
-    expect(translationPartialMock).toHaveBeenCalledWith(expect.objectContaining({ occurrenceId: 7, error: 'Provider failed' }))
+    expect(translationPartialMock).toHaveBeenCalledWith(expect.objectContaining({
+      occurrenceId: 7,
+      error: 'Generic PDF translation error',
+      reason: 'provider-error',
+    }))
+    expect(translationPartialMock.mock.calls[0][0].error).not.toContain('Provider failed')
   })
 
   it('presents failed page translation through its canonical event', async () => {
@@ -810,7 +817,12 @@ describe('PdfApp', () => {
     wrapper.findComponent({ name: 'PdfToolbar' }).vm.$emit('translate-visible')
     await vi.waitFor(() => expect(translationFailedMock).toHaveBeenCalledOnce())
 
-    expect(translationFailedMock).toHaveBeenCalledWith(expect.objectContaining({ occurrenceId: 8, error: 'Translation request failed' }))
+    expect(translationFailedMock).toHaveBeenCalledWith(expect.objectContaining({
+      occurrenceId: 8,
+      error: 'Generic PDF translation error',
+      reason: 'provider-error',
+    }))
+    expect(translationFailedMock.mock.calls[0][0].error).not.toContain('Translation request failed')
   })
 
   it('uses structured PDF error identity for summary presentation', async () => {

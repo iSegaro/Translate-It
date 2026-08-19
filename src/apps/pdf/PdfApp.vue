@@ -1303,10 +1303,10 @@ async function commitTransitionPage(targetPage, transitionDocumentGeneration) {
 }
 
 async function getTranslationPresentationError(summary) {
-  const presentation = await presentPdfTranslationError(summary)
+  const presentation = await presentPdfTranslationError({ ...summary, translationDomain: true })
   if (presentation.kind === 'silent') return null
   if (presentation.kind === 'display') return presentation.message
-  return summary?.error
+  return 'Translation failed. Try again.'
 }
 
 function handleTranslateVisiblePages() {

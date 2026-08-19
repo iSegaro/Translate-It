@@ -17,6 +17,22 @@ function isSilentError(error) {
     || ExtensionContextManager.isContextError(error)
 }
 
+function isTranslationDomainFailure(detail) {
+  return detail.translationDomain === true
+    || ['timeout', 'provider-unavailable', 'empty-response', 'provider-error', 'unknown'].includes(detail.failureReason)
+}
+
+async function createGenericTranslationPresentation() {
+  const canonicalError = new Error('PDF translation failed')
+  canonicalError.type = ErrorTypes.TRANSLATION_FAILED
+  const publicError = mapCanonicalTranslationError(canonicalError)
+  const displayError = await createLegacyDisplayError(canonicalError, publicError)
+
+  return displayError
+    ? { kind: 'display', message: displayError.message, error: displayError }
+    : { kind: 'silent' }
+}
+
 /**
  * Prepares PDF translation failure presentation without changing PDF domain state.
  * failureReason remains PDF operational metadata and never replaces canonical type.
@@ -26,6 +42,13 @@ function isSilentError(error) {
  */
 export async function presentPdfTranslationError(detail = {}) {
   if (!hasValidErrorDetails(detail.errorDetails)) {
+    if (detail.failureReason === 'cancelled') return { kind: 'silent' }
+    if (detail.error && typeof detail.error === 'object' && isSilentError(detail.error)) {
+      return { kind: 'silent' }
+    }
+    if (isTranslationDomainFailure(detail)) {
+      return createGenericTranslationPresentation()
+    }
     return { kind: 'legacy' }
   }
 

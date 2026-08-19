@@ -3,8 +3,10 @@ import { mount } from '@vue/test-utils'
 import PdfTranslatedBlock from './PdfTranslatedBlock.vue'
 
 const presentPdfTranslationErrorMock = vi.hoisted(() => vi.fn(async (detail) => {
-  if (detail.errorDetails?.type === 'TRANSLATION_CANCELLED') return { kind: 'silent' }
+  if (detail.failureReason === 'cancelled') return { kind: 'silent' }
+  if (['CONTEXT', 'EXTENSION_CONTEXT_INVALIDATED', 'TRANSLATION_CANCELLED'].includes(detail.errorDetails?.type)) return { kind: 'silent' }
   if (detail.errorDetails) return { kind: 'display', message: 'Localized block error' }
+  if (detail.translationDomain) return { kind: 'display', message: 'Generic block error' }
   return { kind: 'legacy' }
 }))
 
@@ -69,7 +71,7 @@ describe('PdfTranslatedBlock', () => {
     expect(wrapper.find('.pdf-translated-block__spinner').exists()).toBe(true)
   })
 
-  it('renders error message when status is error', () => {
+  it('renders generic safe message for string-only translation error', async () => {
     const wrapper = mount(PdfTranslatedBlock, {
       props: {
         block: defaultBlock,
@@ -81,8 +83,26 @@ describe('PdfTranslatedBlock', () => {
       }
     })
 
-    expect(wrapper.text()).toContain('Provider limit reached')
+    await vi.waitFor(() => expect(wrapper.text()).toContain('Generic block error'))
+    expect(wrapper.text()).not.toContain('Provider limit reached')
     expect(wrapper.classes()).toContain('pdf-translated-block--error')
+  })
+
+  it('renders generic safe message for empty response without DTO', async () => {
+    const wrapper = mount(PdfTranslatedBlock, {
+      props: {
+        block: defaultBlock,
+        translationState: {
+          ...defaultTranslationState,
+          status: 'error',
+          error: 'Empty translation result',
+          failureReason: 'empty-response',
+        }
+      }
+    })
+
+    await vi.waitFor(() => expect(wrapper.find('.pdf-translated-block__error').text()).toBe('Generic block error'))
+    expect(wrapper.text()).not.toContain('Empty translation result')
   })
 
   it('renders safe structured block error instead of raw provider text', async () => {
@@ -140,7 +160,7 @@ describe('PdfTranslatedBlock', () => {
     expect(wrapper.text()).not.toContain('raw cancellation diagnostic')
   })
 
-  it('renders default error message when error is null', () => {
+  it('renders generic error message when error is null', async () => {
     const wrapper = mount(PdfTranslatedBlock, {
       props: {
         block: defaultBlock,
@@ -152,7 +172,7 @@ describe('PdfTranslatedBlock', () => {
       }
     })
 
-    expect(wrapper.text()).toContain('Translation failed')
+    await vi.waitFor(() => expect(wrapper.text()).toContain('Generic block error'))
   })
 
   it('applies role-based classes', () => {

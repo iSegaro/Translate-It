@@ -54,23 +54,46 @@ describe('presentPdfTranslationError', () => {
     expect(createLegacyDisplayError).toHaveBeenCalledWith(canonicalError, expect.any(Object))
   })
 
-  it('returns legacy fallback for missing or malformed details', async () => {
+  it('uses generic safe display for missing or malformed translation details', async () => {
     await expect(presentPdfTranslationError({ error: 'legacy failure', failureReason: 'provider-error' }))
-      .resolves.toEqual({ kind: 'legacy' })
+      .resolves.toMatchObject({ kind: 'display' })
     await expect(presentPdfTranslationError({
       error: 'legacy failure',
       errorDetails: { arbitrary: true },
       failureReason: 'provider-error',
-    })).resolves.toEqual({ kind: 'legacy' })
-    expect(mapCanonicalTranslationError).not.toHaveBeenCalled()
+    })).resolves.toMatchObject({ kind: 'display' })
+    expect(mapCanonicalTranslationError).toHaveBeenCalledWith(expect.objectContaining({
+      type: ErrorTypes.TRANSLATION_FAILED,
+    }))
+  })
+
+  it('uses generic safe display for empty responses without DTO', async () => {
+    const result = await presentPdfTranslationError({
+      error: 'Empty translation result',
+      failureReason: 'empty-response',
+    })
+
+    expect(result.kind).toBe('display')
+    expect(result.message).not.toContain('Empty translation result')
+  })
+
+  it('keeps non-translation local errors on legacy path', async () => {
+    await expect(presentPdfTranslationError({ error: 'Document failed to load' }))
+      .resolves.toEqual({ kind: 'legacy' })
   })
 
   it.each([
+    'cancelled',
     ErrorTypes.USER_CANCELLED,
     ErrorTypes.TRANSLATION_CANCELLED,
     ErrorTypes.CONTEXT,
     ErrorTypes.EXTENSION_CONTEXT_INVALIDATED,
   ])('silences %s', async (type) => {
+    if (type === 'cancelled') {
+      await expect(presentPdfTranslationError({ error: 'cancelled', failureReason: type }))
+        .resolves.toEqual({ kind: 'silent' })
+      return
+    }
     const result = await presentPdfTranslationError({
       error: 'raw context diagnostic',
       errorDetails: { message: 'raw context diagnostic', type },

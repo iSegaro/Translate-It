@@ -75,13 +75,8 @@ watch(
     }
 
     const state = props.translationState
-    if (!state.errorDetails || typeof state.errorDetails.message !== 'string') {
-      errorMessage.value = state.error || 'Translation failed'
-      return
-    }
-
     errorMessage.value = ''
-    const presentation = await presentPdfTranslationError(state)
+    const presentation = await presentPdfTranslationError({ ...state, translationDomain: true })
     if (requestId !== presentationRequestId) return
 
     if (presentation.kind === 'display') {
