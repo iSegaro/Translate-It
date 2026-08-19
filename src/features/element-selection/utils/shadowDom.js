@@ -47,7 +47,9 @@ export function resolveSelectInteractionElement(event, isExcluded = () => false,
  */
 export function* iterateSelectElementAncestors(start) {
   const seen = new Set();
-  let current = isElement(start) ? start : start?.parentElement || null;
+  let current = isElement(start)
+    ? start
+    : start?.parentElement || start?.parentNode?.host || null;
 
   while (current && !seen.has(current)) {
     seen.add(current);
@@ -61,6 +63,20 @@ export function* iterateSelectElementAncestors(start) {
     const root = current.getRootNode?.();
     current = root?.host || null;
   }
+}
+
+/**
+ * Check composed-tree ownership without using event paths or slot distribution.
+ * @param {Node|null} root
+ * @param {Node|null} candidate
+ * @returns {boolean}
+ */
+export function isComposedDescendant(root, candidate) {
+  if (!root || !candidate) return false;
+  for (const ancestor of iterateSelectElementAncestors(candidate)) {
+    if (ancestor === root) return true;
+  }
+  return root === candidate;
 }
 
 /**

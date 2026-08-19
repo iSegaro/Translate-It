@@ -447,6 +447,28 @@ describe('DomTranslatorUtils', () => {
   });
 
   describe('collectBlockGroups', () => {
+    it('inherits direction hint through nested open shadow hosts without merging groups', () => {
+      const outerHost = document.createElement('x-outer');
+      outerHost.setAttribute('dir', 'rtl');
+      const outerShadow = outerHost.attachShadow({ mode: 'open' });
+      outerShadow.appendChild(document.createTextNode('Outer shadow text'));
+      const innerHost = document.createElement('x-inner');
+      const innerShadow = innerHost.attachShadow({ mode: 'open' });
+      innerShadow.appendChild(document.createTextNode('Nested shadow text'));
+      outerShadow.appendChild(innerHost);
+
+      const units = collectBlockGroups(outerHost, {
+        blockMap: new WeakMap(),
+        blockCounter: { value: 0 },
+      }, {
+        extractionMode: SelectElementExtractionMode.V3,
+        includeOpenShadowRoots: true,
+      });
+
+      expect(units.every(unit => unit.directionHint === 'rtl')).toBe(true);
+      expect(new Set(units.map(unit => unit.blockId)).size).toBe(2);
+    });
+
     it('keeps nested shadow groups independent without exposing ShadowRoot as a mutation target', () => {
       const host = document.createElement('x-host');
       const shadow = host.attachShadow({ mode: 'open' });

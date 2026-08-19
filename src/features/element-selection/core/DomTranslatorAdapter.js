@@ -57,7 +57,9 @@ import { PAGE_TRANSLATION_ATTRIBUTES } from '@/features/page-translation/PageTra
 import { runBestEffortRollback } from '@/utils/dom/DomRollback.js';
 import {
   isSelectShadowNode,
+  isComposedDescendant,
   SELECT_ELEMENT_SHADOW_DOM_ENABLED,
+  iterateSelectElementAncestors,
 } from '../utils/shadowDom.js';
 
 export { getSelectElementTranslationState, revertSelectElementTranslation } from './DomTranslatorState.js';
@@ -181,7 +183,7 @@ export class DomTranslatorAdapter extends ResourceTracker {
 
       // Strategy X - Subtree Exclusion Check
       for (const root of activeTranslationRoots) {
-        if (root === element || root.contains(element) || element.contains(root)) {
+        if (root === element || isComposedDescendant(root, element) || isComposedDescendant(element, root)) {
           const error = new Error('Translation already in progress for this element');
           error.isFatal = false;
           error.type = ErrorTypes.FEATURE_BLOCKED;
@@ -298,6 +300,7 @@ export class DomTranslatorAdapter extends ResourceTracker {
         error.type = ErrorTypes.NO_TRANSLATABLE_CONTENT;
         throw error;
       }
+      const shadowSpanning = textNodesData.some(({ node }) => isSelectShadowNode(node));
 
       // Validate segment count to prevent timeout issues
       const MAX_SEGMENTS = 1000; // Prevent excessive API calls and timeouts
@@ -441,7 +444,11 @@ export class DomTranslatorAdapter extends ResourceTracker {
               value: parentElement.getAttribute(PAGE_TRANSLATION_ATTRIBUTES.HAS_ORIGINAL),
             });
           }
-          for (const snapshot of DirectionManager.captureNodeDirectionState(nodeData.node, element)) {
+          for (const snapshot of DirectionManager.captureNodeDirectionState(
+            nodeData.node,
+            element,
+            SELECT_ELEMENT_SHADOW_DOM_ENABLED ? { shadowAware: true } : undefined
+          )) {
             if (!directionElements.has(snapshot.element)) {
               directionElements.add(snapshot.element);
               mutationSnapshot.directionSnapshots.push(snapshot);
@@ -595,7 +602,8 @@ export class DomTranslatorAdapter extends ResourceTracker {
         })), 
         targetLanguage,
         sessionId: this.currentSessionId,
-        partial: true
+        partial: true,
+        shadowSpanning,
       });
 
       const messageId = `m${Math.random().toString(36).substr(2, 6)}`;
@@ -922,7 +930,7 @@ export class DomTranslatorAdapter extends ResourceTracker {
       });
 
       const finalResult = await this._finalizeTranslation({
-        result, element, elementId, targetLanguage: effectiveTargetLanguage, onComplete, sessionId: this.currentSessionId, translationToken, committedParentCount, totalParentCount: getCurrentOutcome().totalParentCount
+        result, element, elementId, targetLanguage: effectiveTargetLanguage, onComplete, sessionId: this.currentSessionId, translationToken, committedParentCount, totalParentCount: getCurrentOutcome().totalParentCount, shadowSpanning
       });
 
       // --- Phase 6 Shadow Mode Validation Gate ---
@@ -1001,13 +1009,11 @@ export class DomTranslatorAdapter extends ResourceTracker {
   }
 
   _shouldInjectBidi(node, translation) {
-    if (!node || !node.parentElement) return false;
-    let parent = node.parentElement;
-    while (parent) {
+    if (!node) return false;
+    for (const parent of iterateSelectElementAncestors(node)) {
       const tag = parent.tagName.toUpperCase();
       if (['PRE', 'CODE', 'INPUT', 'TEXTAREA'].includes(tag)) return false;
       if (parent.contentEditable === 'true' || parent.getAttribute('contenteditable') === 'true') return false;
-      parent = parent.parentElement;
     }
     
     if (!translation || typeof translation !== 'string') return false;
@@ -1021,7 +1027,8 @@ export class DomTranslatorAdapter extends ResourceTracker {
     let parentDir = 'ltr';
     try {
       // Avoid getComputedStyle layout flush by reading attributes directly
-      const dirNode = node.parentElement.closest('[dir]');
+      const dirNode = iterateSelectElementAncestors(node)
+        .find(parent => parent.hasAttribute('dir'));
       if (dirNode) {
         parentDir = (dirNode.dir || dirNode.getAttribute('dir')).toLowerCase();
       } else {
@@ -1136,7 +1143,9 @@ export class DomTranslatorAdapter extends ResourceTracker {
     }
 
     textNode.nodeValue = finalValue;
-    DirectionManager.applyNodeDirection(textNode, targetLanguage, rootElement);
+    DirectionManager.applyNodeDirection(textNode, targetLanguage, rootElement, {
+      shadowAware: isSelectShadowNode(textNode),
+    });
   }
 
   _commitBlockGroup(group, reconstruction, translatedText, processedUids, translationToken) {
@@ -1330,7 +1339,7 @@ export class DomTranslatorAdapter extends ResourceTracker {
     }
   }
 
-  async _finalizeTranslation({ result, element, elementId, targetLanguage, onComplete, sessionId, translationToken, committedParentCount = 0, totalParentCount = 0 }) {
+  async _finalizeTranslation({ result, element, elementId, targetLanguage, onComplete, sessionId, translationToken, committedParentCount = 0, totalParentCount = 0, shadowSpanning = false }) {
     this._assertCurrentTranslationContext(translationToken);
 
     const translationOutcome = {
@@ -1370,7 +1379,9 @@ export class DomTranslatorAdapter extends ResourceTracker {
     
     // Non-streaming fallback already applied translations in _handleDirectResponse
     
-    DirectionManager.applyElementDirection(element, finalTarget);
+      if (!shadowSpanning) {
+        DirectionManager.applyElementDirection(element, finalTarget);
+      }
     
     // Update the existing state entry with finalized metadata
     if (globalSelectElementState.currentTranslation) {
@@ -1443,6 +1454,22 @@ export class DomTranslatorAdapter extends ResourceTracker {
       }));
     }
 
+    const directionSnapshots = [];
+    const directionElements = new Set();
+    if (data.shadowSpanning) {
+      for (const nodeData of frozenTextNodesData || []) {
+        for (const snapshot of DirectionManager.captureNodeDirectionState(
+          nodeData.node,
+          element,
+          { shadowAware: true }
+        )) {
+          if (directionElements.has(snapshot.element)) continue;
+          directionElements.add(snapshot.element);
+          directionSnapshots.push(snapshot);
+        }
+      }
+    }
+
     // Enforce namespaced and session-scoped snapshots for rollback safety
     if (frozenTextNodesData && sessionId) {
       if (!globalSelectElementState.snapshots) {
@@ -1464,6 +1491,7 @@ export class DomTranslatorAdapter extends ResourceTracker {
       ...data, 
       originalTextNodesData: frozenTextNodesData,
       originalMetadataSnapshots: Object.freeze(metadataSnapshots),
+      originalDirectionSnapshots: Object.freeze(directionSnapshots),
       originalDir: element.getAttribute('dir'),
       originalStyleDirection: element.style.direction,
       originalTextAlign: element.style.textAlign,

@@ -24,7 +24,8 @@ vi.mock('@/core/PageEventBus.js', () => ({
 }));
 
 vi.mock('@/utils/dom/DomDirectionManager.js', () => ({
-  restoreElementDirection: vi.fn()
+  restoreElementDirection: vi.fn(),
+  restoreNodeDirectionState: vi.fn(() => [])
 }));
 
 vi.mock('@/features/page-translation/PageTranslationConstants.js', () => ({
@@ -455,6 +456,34 @@ describe('DomTranslatorState', () => {
       expect(count).toBe(0);
       expect(oldText.nodeValue).toBe('Translated old');
       expect(replacement.getAttribute('data-ti-has-original')).toBe('replacement');
+      document.body.removeChild(host);
+    });
+
+    it('restores only connected captured shadow direction Elements', async () => {
+      const { restoreNodeDirectionState } = await import('@/utils/dom/DomDirectionManager.js');
+      const host = document.createElement('x-host');
+      const shadow = host.attachShadow({ mode: 'open' });
+      const oldOwner = document.createElement('span');
+      const oldText = document.createTextNode('Translated');
+      oldOwner.appendChild(oldText);
+      shadow.appendChild(oldOwner);
+      document.body.appendChild(host);
+
+      globalSelectElementState.translationHistory = [{
+        element: host,
+        shadowSpanning: true,
+        originalTextNodesData: [{ node: oldText, originalText: 'Original' }],
+        originalMetadataSnapshots: [],
+        originalDirectionSnapshots: [{ element: oldOwner }],
+      }];
+      const replacement = document.createElement('span');
+      replacement.setAttribute('data-dir-original-saved', 'true');
+      shadow.replaceChildren(replacement);
+
+      await revertSelectElementTranslation();
+
+      expect(restoreNodeDirectionState).toHaveBeenCalledWith([]);
+      expect(replacement.hasAttribute('data-dir-original-saved')).toBe(true);
       document.body.removeChild(host);
     });
 

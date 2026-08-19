@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   getSelectEventElements,
   iterateSelectElementAncestors,
+  isComposedDescendant,
   resolveSelectInteractionElement,
 } from './shadowDom.js';
 
@@ -69,5 +70,23 @@ describe('Select Element Shadow DOM helpers', () => {
     document.body.appendChild(host);
 
     expect([...iterateSelectElementAncestors(internal)]).toEqual([internal, host, document.body, document.documentElement]);
+  });
+
+  it('checks composed ownership without crossing into sibling trees or upward', () => {
+    const outerHost = document.createElement('x-outer');
+    const outerShadow = outerHost.attachShadow({ mode: 'open' });
+    const innerHost = document.createElement('x-inner');
+    const innerShadow = innerHost.attachShadow({ mode: 'open' });
+    const internal = document.createElement('span');
+    innerShadow.appendChild(internal);
+    outerShadow.appendChild(innerHost);
+    const siblingHost = document.createElement('x-sibling');
+    document.body.append(outerHost, siblingHost);
+
+    expect(isComposedDescendant(outerHost, internal)).toBe(true);
+    expect(isComposedDescendant(innerHost, internal)).toBe(true);
+    expect(isComposedDescendant(internal, outerHost)).toBe(false);
+    expect(isComposedDescendant(siblingHost, internal)).toBe(false);
+    expect(isComposedDescendant(outerHost, outerHost)).toBe(true);
   });
 });

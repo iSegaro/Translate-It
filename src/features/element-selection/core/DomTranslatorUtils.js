@@ -10,6 +10,7 @@ import { DOM_FILTERS } from '@/utils/dom/DomFilters.js';
 import { TranslationUnit } from '@/features/translation/ir/TranslationUnit.js';
 import { detectDirectionFromContent } from '@/utils/dom/DomDirectionManager.js';
 import { isSelectElementTraversable, SelectElementReason } from '@/features/element-selection/core/SelectElementPolicy.js';
+import { iterateSelectElementAncestors } from '../utils/shadowDom.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.ELEMENT_SELECTION, 'DomTranslatorUtils');
 
@@ -95,8 +96,7 @@ function walkSelectTree(root, filter, onNode, options = {}) {
  * @returns {boolean}
  */
 function isPreformatted(node) {
-  let parent = node.parentElement;
-  while (parent) {
+  for (const parent of iterateSelectElementAncestors(node)) {
     const tagName = parent.tagName.toUpperCase();
     if (['PRE', 'CODE', 'TEXTAREA', 'SAMP', 'KBD'].includes(tagName)) {
       return true;
@@ -109,7 +109,6 @@ function isPreformatted(node) {
     } catch {
       // computed style check failed, traverse parent
     }
-    parent = parent.parentElement;
   }
   return false;
 }
@@ -121,13 +120,11 @@ function isPreformatted(node) {
  * @returns {'rtl'|'ltr'|null}
  */
 function getDirectionHint(node) {
-  let parent = node.parentElement;
-  while (parent) {
+  for (const parent of iterateSelectElementAncestors(node)) {
     const dir = parent.getAttribute('dir');
     if (dir === 'rtl' || dir === 'ltr') {
       return dir;
     }
-    parent = parent.parentElement;
   }
   const text = node.textContent || '';
   try {

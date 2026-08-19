@@ -3467,6 +3467,43 @@ describe('DomTranslatorAdapter', () => {
   });
 
   describe('_applyTranslationToNode', () => {
+    it('uses composed dir ancestry for direct shadow BiDi decisions', async () => {
+      const host = document.createElement('x-host');
+      host.setAttribute('dir', 'rtl');
+      const shadow = host.attachShadow({ mode: 'open' });
+      const owner = document.createElement('span');
+      const textNode = document.createTextNode('Original');
+      owner.appendChild(textNode);
+      shadow.appendChild(owner);
+      document.body.appendChild(host);
+      const { detectDirectionFromContent } = await import('@/utils/dom/DomDirectionManager.js');
+      detectDirectionFromContent.mockReturnValue('rtl');
+
+      expect(adapter._shouldInjectBidi(textNode, 'Translated')).toBe(false);
+      owner.setAttribute('dir', 'ltr');
+      expect(adapter._shouldInjectBidi(textNode, 'Translated')).toBe(true);
+      document.body.removeChild(host);
+    });
+
+    it('uses host direction for direct ShadowRoot text and nested hosts', async () => {
+      const outerHost = document.createElement('x-outer');
+      outerHost.setAttribute('dir', 'ltr');
+      const outerShadow = outerHost.attachShadow({ mode: 'open' });
+      const innerHost = document.createElement('x-inner');
+      const innerShadow = innerHost.attachShadow({ mode: 'open' });
+      const textNode = document.createTextNode('Original');
+      innerShadow.appendChild(textNode);
+      outerShadow.appendChild(innerHost);
+      document.body.appendChild(outerHost);
+      const { detectDirectionFromContent } = await import('@/utils/dom/DomDirectionManager.js');
+      detectDirectionFromContent.mockReturnValue('rtl');
+
+      expect(adapter._shouldInjectBidi(textNode, 'Translated')).toBe(true);
+      outerHost.setAttribute('dir', 'rtl');
+      expect(adapter._shouldInjectBidi(textNode, 'Translated')).toBe(false);
+      document.body.removeChild(outerHost);
+    });
+
     it('should apply translation with BIDI marks and register for hover preview', () => {
       const textNode = testElement.firstChild;
       const originalText = textNode.textContent;

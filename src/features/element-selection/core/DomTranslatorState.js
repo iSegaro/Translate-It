@@ -6,7 +6,7 @@
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { pageEventBus } from '@/core/PageEventBus.js';
-import { restoreElementDirection } from '@/utils/dom/DomDirectionManager.js';
+import { restoreElementDirection, restoreNodeDirectionState } from '@/utils/dom/DomDirectionManager.js';
 import { PAGE_TRANSLATION_ATTRIBUTES } from '@/features/page-translation/PageTranslationConstants.js';
 
 // Global translation state registry to ensure singleton behavior across chunks
@@ -196,10 +196,16 @@ export async function revertSelectElementTranslation(targetSessionId = null) {
         }
       }
 
-      try {
-        restoreElementDirection(element);
-      } catch (error) {
-        logRestoreFailure('Direction/style restoration', error, { tagName: element.tagName });
+      if (translation.shadowSpanning && Array.isArray(translation.originalDirectionSnapshots)) {
+        const directionSnapshots = translation.originalDirectionSnapshots.filter(snapshot => snapshot?.element?.isConnected);
+        const directionFailures = restoreNodeDirectionState(directionSnapshots) || [];
+        directionFailures.forEach(failure => logRestoreFailure('Direction/style restoration', failure.error, failure));
+      } else {
+        try {
+          restoreElementDirection(element);
+        } catch (error) {
+          logRestoreFailure('Direction/style restoration', error, { tagName: element.tagName });
+        }
       }
 
       try {
