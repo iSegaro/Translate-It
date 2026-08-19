@@ -1,7 +1,6 @@
 // s../error-management/ErrorMessages.js
 
 import { ErrorTypes } from "./ErrorTypes.js";
-import { matchErrorToType } from "./ErrorMatcher.js";
 import ExtensionContextManager from '@/core/extensionContext.js';
 import { utilsFactory } from '@/utils/UtilsFactory.js';
 
@@ -114,36 +113,4 @@ export async function getErrorMessage(type, skipI18n = false) {
 export function getErrorMessageByKey(key) {
   if (typeof key !== "string") return null;
   return errorMessages[key] ?? null;
-}
-
-/**
- * Translates an error object or message to a user-friendly string.
- * Consolidates logic from previous ErrorMessagesLocalize.js
- * 
- * @param {string|Error|object} error 
- * @returns {Promise<string>}
- */
-export async function translateErrorMessage(error) {
-  if (!error) return errorMessages[ErrorTypes.UNKNOWN];
-
-  const type = (typeof error === 'object' && error.type) ? error.type : matchErrorToType(error);
-  
-  try {
-    const translated = await getErrorMessage(type);
-    if (translated && translated !== errorMessages[ErrorTypes.UNKNOWN]) return translated;
-  } catch {
-    // Fallback if i18n fails
-  }
-
-  // If we have a known error type message, use it before falling back to raw error
-  if (type && errorMessages[type]) {
-    return errorMessages[type];
-  }
-
-  // Final fallback to raw message
-  if (error instanceof Error) return error.message;
-  if (typeof error === 'string') return error;
-  if (typeof error === 'object' && error.message) return error.message;
-  
-  return errorMessages[ErrorTypes.UNKNOWN];
 }
