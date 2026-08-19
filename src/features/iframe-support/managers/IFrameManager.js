@@ -7,6 +7,7 @@ import ExtensionContextManager from '@/core/extensionContext.js';
 import { ErrorHandler } from '@/shared/error-management/ErrorHandler.js';
 import SmartCache from '@/core/memory/SmartCache.js';
 import { sendMessage } from '@/shared/messaging/core/UnifiedMessaging.js';
+import { MessageFormat } from '@/shared/messaging/core/MessagingCore.js';
 import { MessageActions } from '@/shared/messaging/core/MessageActions.js';
 import { getSelectElementActivationErrorMessage } from '@/features/element-selection/utils/activationError.js';
 
@@ -385,7 +386,11 @@ export class IFrameManager extends ResourceTracker {
         context: 'iframe-translation-request',
         showToast: false
       });
-      return { success: false, error: error.message };
+      return {
+        success: false,
+        error: error.message,
+        errorDetails: MessageFormat.serializeTranslationError(error),
+      };
     }
   }
 
