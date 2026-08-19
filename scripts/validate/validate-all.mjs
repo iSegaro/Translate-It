@@ -41,8 +41,23 @@ async function validateAll() {
       logError('Firefox validation failed')
       totalErrors++
     }
+
+    console.log('\n' + '─'.repeat(66) + '\n')
+
+    // Step 3: Validate production bundle invariants
+    logStep('Validating production bundle invariants...')
+    try {
+      execSync('node scripts/validate/validate-production-bundle.mjs', {
+        stdio: 'inherit',
+        cwd: process.cwd()
+      })
+      logSuccess('Production bundle validation completed successfully')
+    } catch (error) {
+      logError('Production bundle validation failed')
+      totalErrors++
+    }
     
-    // Step 3: Final summary
+    // Step 4: Final summary
     const duration = ((Date.now() - startTime) / 1000).toFixed(1)
     
     console.log('\n╔════════════════════════════════════════════════════════════════╗')
