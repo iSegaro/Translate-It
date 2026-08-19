@@ -21,7 +21,7 @@ To prevent "Log Storms" and redundant red logs, the system follows a strict prop
 
 ## Public Error Boundary
 
-The system distinguishes **internal errors** (diagnostic/runtime errors used inside the system) from **public errors** (sanitized Errors that are safe to cross a user-facing boundary). Features normally pass errors directly to `ErrorHandler`, which applies the existing classification, message-resolution, and display-strategy behavior. Select Element uses the explicit public translation contract before forwarding ordinary terminal failures.
+The system distinguishes **internal errors** (diagnostic/runtime errors used inside the system) from **public errors** (sanitized Errors that are safe to cross a user-facing boundary). Features normally pass errors directly to `ErrorHandler`, which applies the existing classification, message-resolution, and display-strategy behavior. Translation-facing consumers use the explicit public translation contract before forwarding ordinary terminal failures: Page Translation, PDF, Subtitles, Mouse Hover, Field translation, Selection Window, Select Element, shared translation UI/composable boundaries, and provider-settings translation/provider-test presentation where applicable.
 
 ```text
 internal/runtime Error
@@ -143,7 +143,7 @@ try {
 
 ### 2. Error Sanitization (Public Boundary)
 
-Select Element passes ordinary terminal errors through `mapCanonicalTranslationError()` and `createLegacyDisplayError()` before `ErrorHandler`.
+Translation-facing consumers pass ordinary terminal errors through `mapCanonicalTranslationError()` and `createLegacyDisplayError()` before `ErrorHandler`. Select Element below; other consumers use the same helpers.
 
 ```javascript
 import { mapCanonicalTranslationError } from '@/shared/error-management/PublicTranslationErrorPolicy.js'
@@ -163,7 +163,7 @@ if (displayError) {
 - A `null` return means the public DTO is silent; never pass the canonical error to `ErrorHandler` in that case.
 - **Never** fall back to the original raw `Error` when `null` is returned.
 - Feature-specific policy (such as partial-outcome handling) may run before this boundary.
-- This is **not** mandatory for every feature yet; features that directly use `ErrorHandler` keep their existing behavior.
+- Not every subsystem uses the translation public-error contract. Local and non-translation errors may remain feature-local and pass directly to `ErrorHandler`, which keeps its existing classification, message-resolution, and display-strategy behavior.
 
 ### 3. ExtensionContextManager
 The `ExtensionContextManager` provides automatic protection against "Extension Context Invalidated" errors and ensures the UI remains stable after an update.

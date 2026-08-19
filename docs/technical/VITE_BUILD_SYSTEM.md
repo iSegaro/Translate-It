@@ -171,6 +171,39 @@ rollupOptions: {
 *   **`pnpm run watch:chrome`**: Development watch compiler for Chrome. Instantly compiles changes in the background, mutes intentional logger warnings, and keeps the terminal completely clean.
 *   **`pnpm run watch:firefox`**: Tailored watch mode with live hot-reloading path corrections for Firefox.
 *   **`pnpm run build`**: Production compiler, applying minification via Terser, dropping console logs, and splitting static assets.
+*   **`pnpm run validate:production-bundle`**: Validates the production bundle against release invariants (see [Production Bundle Invariants](#production-bundle-invariants)).
+
+---
+
+## Production Bundle Invariants
+
+The production bundles are the release artifact. A dedicated validation step
+guards them against test/mock runtime artifacts and TDZ failures:
+
+```bash
+pnpm run validate:production-bundle
+```
+
+Required invariants:
+
+- **Build directories exist and are populated.** Chrome and Firefox production
+  build directories must exist and contain executable JavaScript.
+- **No test/mock runtime artifacts.** Production JavaScript must not contain
+  Vitest/mock runtime artifacts (`Vitest mocker`, `queueMock`, `vi.mock(`,
+  `@vitest`) or known test modules (e.g. `*.staleGuard.test.js`).
+- **Static `styleInjector` import.** Affected style consumers statically import
+  `styleInjector` so the generated lazy-indirection (`Promise.resolve().then(() => styleInjector)`)
+  TDZ failure can never ship. Lazy style payload loading itself remains allowed.
+- **Explicit strategy loader map.** Smart Translation strategy loading uses an
+  explicit production loader map (`strategyLoaders` in
+  `src/handlers/smart-translation/executor.js`) so test modules cannot enter the
+  production graph through broad variable dynamic imports.
+- **Wired into canonical validation.** `pnpm run validate` includes this
+  production-bundle validation as a step, so release/publish validation cannot
+  silently skip a missing build.
+
+Run the production build before this validation. The invariant is a release
+gate, not a development-time check.
 
 ---
 

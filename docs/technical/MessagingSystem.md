@@ -228,6 +228,23 @@ MessageActions.CANCEL_TRANSLATION           // Cancel ongoing translations
 }
 ```
 
+### Error Identity and Compatibility
+
+The transport preserves a compatibility model for error fields:
+
+- **Legacy `error` fields may still exist.** Existing string-based fields remain
+  available during the compatibility period; they have not all been removed.
+- **Canonical structured identity** is carried through the `errorDetails` field
+  where the transport shape uses compatibility fields. When present, structured
+  identity takes precedence over legacy raw strings.
+- `MessageFormat.serializeTranslationError()` creates the safe structured DTO at
+  the sending boundary.
+- `reconstructTranslationError()` reconstructs the Error-like identity at
+  consumer boundaries.
+- Arbitrary/native Error internals (such as `stack` or `cause`) are **not** part
+  of the public transport contract and must not be relied on across message
+  boundaries.
+
 ## Context Types
 
 ```javascript
