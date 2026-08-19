@@ -1,5 +1,6 @@
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
+import { MessageFormat } from '@/shared/messaging/core/MessagingCore.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.BACKGROUND, 'handleTranslationLazy');
 
@@ -23,7 +24,12 @@ export async function handleTranslateTextLazy(message, sender, sendResponse) {
         return handleTranslateText(message, sender, sendResponse);
     } catch (error) {
         logger.error('Failed to load TranslateText handler:', error);
-        return { success: false, error: 'Failed to load text translation functionality' };
+        const errorMessage = 'Failed to load text translation functionality';
+        return {
+            success: false,
+            error: errorMessage,
+            errorDetails: MessageFormat.serializeTranslationError(error, { message: errorMessage })
+        };
     }
 }
 
