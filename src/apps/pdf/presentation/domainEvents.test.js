@@ -30,6 +30,13 @@ describe('DomainEvents', () => {
     expect(DomainEvents.translationFailed({ occurrenceId: 4, reason: 'provider-error', error: 'Failed' })).toEqual({
       name: 'translation-failed', occurrenceId: 4, reason: 'provider-error', error: 'Failed'
     })
+    const errorDetails = { message: 'Provider failed', type: 'MODEL_NOT_FOUND' }
+    expect(DomainEvents.translationPartial({ occurrenceId: 5, reason: 'provider-error', error: 'Failed', errorDetails })).toEqual({
+      name: 'translation-partial', occurrenceId: 5, reason: 'provider-error', error: 'Failed', errorDetails
+    })
+    expect(DomainEvents.translationFailed({ occurrenceId: 6, reason: 'provider-error', error: 'Failed', errorDetails })).toEqual({
+      name: 'translation-failed', occurrenceId: 6, reason: 'provider-error', error: 'Failed', errorDetails
+    })
     expect(DomainEvents.translationOutcomeCleared()).toEqual({ name: 'translation-outcome-cleared' })
   })
 

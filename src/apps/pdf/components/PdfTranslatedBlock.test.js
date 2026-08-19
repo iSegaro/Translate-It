@@ -1,8 +1,20 @@
-import { describe, expect, it } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { mount } from '@vue/test-utils'
 import PdfTranslatedBlock from './PdfTranslatedBlock.vue'
 
+const presentPdfTranslationErrorMock = vi.hoisted(() => vi.fn(async (detail) => {
+  if (detail.errorDetails?.type === 'TRANSLATION_CANCELLED') return { kind: 'silent' }
+  if (detail.errorDetails) return { kind: 'display', message: 'Localized block error' }
+  return { kind: 'legacy' }
+}))
+
+vi.mock('../presentation/PdfTranslationErrorPresenter.js', () => ({
+  presentPdfTranslationError: presentPdfTranslationErrorMock,
+}))
+
 describe('PdfTranslatedBlock', () => {
+  beforeEach(() => vi.clearAllMocks())
+
   const defaultBlock = {
     id: 'block-1',
     text: 'Hello world',
@@ -71,6 +83,61 @@ describe('PdfTranslatedBlock', () => {
 
     expect(wrapper.text()).toContain('Provider limit reached')
     expect(wrapper.classes()).toContain('pdf-translated-block--error')
+  })
+
+  it('renders safe structured block error instead of raw provider text', async () => {
+    const wrapper = mount(PdfTranslatedBlock, {
+      props: {
+        block: defaultBlock,
+        translationState: {
+          ...defaultTranslationState,
+          status: 'error',
+          error: 'raw provider response with model list',
+          errorDetails: { message: 'raw diagnostic', type: 'MODEL_NOT_FOUND' },
+        }
+      }
+    })
+
+    await vi.waitFor(() => expect(wrapper.find('.pdf-translated-block__error').text()).toBe('Localized block error'))
+    expect(wrapper.text()).not.toContain('raw provider response')
+    expect(wrapper.text()).not.toContain('raw diagnostic')
+  })
+
+  it('uses block-owned errorDetails rather than summary-like data', async () => {
+    const wrapper = mount(PdfTranslatedBlock, {
+      props: {
+        block: defaultBlock,
+        translationState: {
+          ...defaultTranslationState,
+          status: 'error',
+          error: 'block legacy error',
+          errorDetails: { message: 'block diagnostic', type: 'API_KEY_INVALID' },
+        }
+      }
+    })
+
+    await vi.waitFor(() => expect(wrapper.find('.pdf-translated-block__error').text()).toBe('Localized block error'))
+    expect(presentPdfTranslationErrorMock).toHaveBeenCalledWith(expect.objectContaining({
+      error: 'block legacy error',
+      errorDetails: { message: 'block diagnostic', type: 'API_KEY_INVALID' },
+    }))
+  })
+
+  it('does not expose structured cancellation diagnostics', async () => {
+    const wrapper = mount(PdfTranslatedBlock, {
+      props: {
+        block: defaultBlock,
+        translationState: {
+          ...defaultTranslationState,
+          status: 'error',
+          error: 'raw cancellation diagnostic',
+          errorDetails: { message: 'raw cancellation diagnostic', type: 'TRANSLATION_CANCELLED' },
+        }
+      }
+    })
+
+    await vi.waitFor(() => expect(wrapper.find('.pdf-translated-block__error').text()).toBe(''))
+    expect(wrapper.text()).not.toContain('raw cancellation diagnostic')
   })
 
   it('renders default error message when error is null', () => {
