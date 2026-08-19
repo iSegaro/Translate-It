@@ -42,6 +42,7 @@
 <script setup>
 import './MobileFab.scss';
 import { ref, computed, onMounted, onUnmounted } from 'vue';
+import { injectStylesToShadowRoot } from '@/utils/ui/styleInjector.js';
 import { useMobileStore } from '@/store/modules/mobile.js';
 import { useSettingsStore } from '@/features/settings/stores/settings.js';
 import { storageManager } from '@/shared/storage/core/StorageCore.js';
@@ -155,8 +156,6 @@ onMounted(async () => {
   // Inject Sheet-specific styles lazily into shadow root
   try {
     const { sheetUiStyles } = await import('@/core/content-scripts/chunks/lazy-styles.js');
-    const { injectStylesToShadowRoot } = await import('@/utils/ui/styleInjector.js');
-    
     if (sheetUiStyles && injectStylesToShadowRoot) {
       injectStylesToShadowRoot(sheetUiStyles, 'vue-sheet-specific-styles');
     }
