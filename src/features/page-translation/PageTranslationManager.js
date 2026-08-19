@@ -8,6 +8,7 @@ import { ActionReasons, MessageFormat } from '@/shared/messaging/core/MessagingC
 
 import { ErrorHandler } from '@/shared/error-management/ErrorHandler.js';
 import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
+import { getPageTranslationErrorPresentation } from './utils/PageTranslationErrorPresenter.js';
 import ExtensionContextManager from '@/core/extensionContext.js';
 import { NOTIFICATION_TIME } from '@/shared/constants/ui.js';
 import { pageEventBus } from '@/core/PageEventBus.js';
@@ -451,14 +452,19 @@ export class PageTranslationManager extends ResourceTracker {
     this.isAutoTranslating = false;
     this.isFatalErrorHandling = false;
 
-    // Use centralized ErrorHandler to manage notification and logging
-    ErrorHandler.getInstance().handle(error, {
-      type: errorType || ErrorTypes.TRANSLATION_FAILED,
-      context: 'page-translation-fatal',
-      showToast: !isContextError // Don't show toast for context errors
-    }).catch(err => {
-      this.logger.error('ErrorHandler failed in _handleFatalError:', err);
-    });
+    // Use Page's public presentation boundary before centralized ErrorHandler.
+    if (!isContextError) {
+      void getPageTranslationErrorPresentation({ error, errorType }).then((displayError) => {
+        if (!displayError) return;
+        return ErrorHandler.getInstance().handle(displayError, {
+          type: errorType || displayError.type || ErrorTypes.TRANSLATION_FAILED,
+          context: 'page-translation-fatal',
+          showToast: true
+        });
+      }).catch(err => {
+        this.logger.error('ErrorHandler failed in _handleFatalError:', err);
+      });
+    }
 
     // Don't broadcast UI error for context errors to keep it silent
     if (!isContextError) {
