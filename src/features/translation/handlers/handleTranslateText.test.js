@@ -3,7 +3,12 @@ import { handleTranslateText } from './handleTranslateText.js';
 import { unifiedTranslationService } from '@/core/services/translation/UnifiedTranslationService.js';
 
 vi.mock('@/shared/logging/logger.js', () => ({
-  getScopedLogger: () => ({ debug: vi.fn(), error: vi.fn() })
+  getScopedLogger: () => ({
+    debug: vi.fn(),
+    error: vi.fn(),
+    info: vi.fn(),
+    warn: vi.fn()
+  })
 }));
 
 vi.mock('@/shared/error-management/ErrorHandler.js', () => ({
@@ -79,7 +84,10 @@ describe('handleTranslateText', () => {
     expect(response).toEqual({
       success: false,
       error: 'Translation failed',
-      errorDetails: { message: 'Translation failed' }
+      errorDetails: {
+        message: 'Translation failed',
+        type: 'UNKNOWN'
+      }
     });
   });
 

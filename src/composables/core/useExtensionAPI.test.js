@@ -11,7 +11,12 @@ vi.mock('@/shared/messaging/composables/useMessaging.js', () => ({
 }));
 
 vi.mock('@/shared/logging/logger.js', () => ({
-  getScopedLogger: () => ({ error: vi.fn() })
+  getScopedLogger: () => ({
+    debug: vi.fn(),
+    error: vi.fn(),
+    info: vi.fn(),
+    warn: vi.fn()
+  })
 }));
 
 import { useExtensionAPI } from './useExtensionAPI.js';
@@ -31,5 +36,26 @@ describe('useExtensionAPI.translateText', () => {
     sendMessage.mockRejectedValue(new Error('Provider failed'));
 
     await expect(useExtensionAPI().translateText('Hello')).rejects.toThrow('Provider failed');
+  });
+
+  it('preserves canonical identity on reconstructed translation failures', async () => {
+    sendMessage.mockRejectedValue(Object.assign(new Error('Model unavailable'), {
+      type: 'MODEL_NOT_FOUND',
+      statusCode: 404,
+      providerName: 'Provider',
+      providerId: 'provider-id',
+      code: 'MODEL_MISSING',
+      errorCode: 'E_MODEL'
+    }));
+
+    await expect(useExtensionAPI().translateText('Hello')).rejects.toMatchObject({
+      message: 'Model unavailable',
+      type: 'MODEL_NOT_FOUND',
+      statusCode: 404,
+      providerName: 'Provider',
+      providerId: 'provider-id',
+      code: 'MODEL_MISSING',
+      errorCode: 'E_MODEL'
+    });
   });
 });

@@ -111,25 +111,39 @@ function getFailureMessage(response, responseError) {
     || 'Unknown technical error';
 }
 
+function isStructuredTranslationError(value) {
+  return Boolean(
+    value
+    && typeof value === 'object'
+    && !Array.isArray(value)
+    && typeof value.message === 'string'
+  );
+}
+
 function reconstructResponseError(response) {
   const responseError = response.error;
-  const message = getFailureMessage(response, responseError);
+  const canonicalError = typeof responseError === 'object' && responseError !== null
+    ? responseError
+    : isStructuredTranslationError(response.errorDetails)
+      ? response.errorDetails
+      : responseError;
+  const message = getFailureMessage(response, canonicalError);
 
-  if (!responseError || typeof responseError !== 'object') {
+  if (!canonicalError || typeof canonicalError !== 'object') {
     return reconstructTranslationError(message);
   }
 
   return reconstructTranslationError({
     message,
-    type: responseError.type,
-    originalType: responseError.originalType,
-    statusCode: responseError.statusCode,
-    context: responseError.context,
-    providerName: responseError.providerName,
-    providerId: responseError.providerId,
-    code: responseError.code,
-    errorCode: responseError.errorCode,
-    translationOutcome: responseError.translationOutcome
+    type: canonicalError.type,
+    originalType: canonicalError.originalType,
+    statusCode: canonicalError.statusCode,
+    context: canonicalError.context,
+    providerName: canonicalError.providerName,
+    providerId: canonicalError.providerId,
+    code: canonicalError.code,
+    errorCode: canonicalError.errorCode,
+    translationOutcome: canonicalError.translationOutcome
   });
 }
 

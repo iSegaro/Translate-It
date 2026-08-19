@@ -219,6 +219,96 @@ describe('UnifiedMessaging', () => {
       await expect(sendRegularMessage({ action: 'FAIL' })).rejects.toThrow('String failure');
     });
 
+    it('reconstructs top-level errorDetails when legacy error is a string', async () => {
+      browser.runtime.sendMessage.mockResolvedValue({
+        success: false,
+        error: 'raw legacy provider message',
+        errorDetails: {
+          message: 'canonical message',
+          type: 'MODEL_NOT_FOUND',
+          originalType: 'PROVIDER_ERROR',
+          statusCode: 404,
+          context: 'translate-text',
+          providerName: 'Provider',
+          providerId: 'provider-id',
+          code: 'MODEL_MISSING',
+          errorCode: 'E_MODEL',
+          translationOutcome: { partial: true },
+          arbitrary: { ignored: true }
+        }
+      });
+
+      const rejection = sendRegularMessage({ action: 'TRANSLATE_TEXT' });
+      await expect(rejection).rejects.toThrow('canonical message');
+      await rejection.catch((error) => {
+        expect(error).toMatchObject({
+          message: 'canonical message',
+          type: 'MODEL_NOT_FOUND',
+          originalType: 'PROVIDER_ERROR',
+          statusCode: 404,
+          context: 'translate-text',
+          providerName: 'Provider',
+          providerId: 'provider-id',
+          code: 'MODEL_MISSING',
+          errorCode: 'E_MODEL',
+          translationOutcome: { partial: true }
+        });
+        expect(error.message).not.toBe('raw legacy provider message');
+        expect(error).not.toHaveProperty('arbitrary');
+      });
+    });
+
+    it('reconstructs errorDetails when no legacy error is present', async () => {
+      browser.runtime.sendMessage.mockResolvedValue({
+        success: false,
+        errorDetails: {
+          message: 'canonical failure',
+          type: 'NETWORK_ERROR',
+          statusCode: 503
+        }
+      });
+
+      await expect(sendRegularMessage({ action: 'TRANSLATE_TEXT' })).rejects.toMatchObject({
+        message: 'canonical failure',
+        type: 'NETWORK_ERROR',
+        statusCode: 503
+      });
+    });
+
+    it('keeps structured response.error authoritative over errorDetails', async () => {
+      browser.runtime.sendMessage.mockResolvedValue({
+        success: false,
+        error: {
+          message: 'response error',
+          type: 'RESPONSE_ERROR',
+          statusCode: 400
+        },
+        errorDetails: {
+          message: 'secondary details',
+          type: 'DETAILS_ERROR',
+          statusCode: 500
+        }
+      });
+
+      await expect(sendRegularMessage({ action: 'TRANSLATE_TEXT' })).rejects.toMatchObject({
+        message: 'response error',
+        type: 'RESPONSE_ERROR',
+        statusCode: 400
+      });
+    });
+
+    it('falls back to legacy error when errorDetails is malformed', async () => {
+      browser.runtime.sendMessage.mockResolvedValue({
+        success: false,
+        error: 'legacy failure',
+        errorDetails: { arbitrary: true }
+      });
+
+      await expect(sendRegularMessage({ action: 'TRANSLATE_TEXT' })).rejects.toMatchObject({
+        message: 'legacy failure'
+      });
+    });
+
     it.each([
       ['object error', { error: 'nested error' }, 'nested error'],
       ['object reason', { reason: 'reason failure' }, 'reason failure'],
