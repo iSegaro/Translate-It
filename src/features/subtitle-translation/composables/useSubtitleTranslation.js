@@ -2,6 +2,40 @@ import { ref, reactive } from 'vue';
 import { MessagingBus } from '@/shared/messaging/core/MessagingBus.js';
 import { MessageActions } from '@/shared/messaging/core/MessageActions.js';
 import { MessageContexts } from '@/shared/messaging/core/MessagingConstants.js';
+import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
+import { MessageFormat } from '@/shared/messaging/core/MessagingCore.js';
+import { presentSubtitleTranslationError } from '../presentation/SubtitleTranslationErrorPresenter.js';
+
+const CANONICAL_ERROR_TYPES = new Set([
+  ...Object.values(ErrorTypes),
+  'MODEL_NOT_FOUND',
+  'PROVIDER_ERROR'
+]);
+
+function hasValidErrorDetails(errorDetails) {
+  return errorDetails
+    && typeof errorDetails === 'object'
+    && typeof errorDetails.message === 'string';
+}
+
+function isCanonicalTranslationError(error) {
+  if (!error || typeof error !== 'object') return false;
+
+  if (CANONICAL_ERROR_TYPES.has(error.type) || CANONICAL_ERROR_TYPES.has(error.originalType)) {
+    return true;
+  }
+
+  return Boolean(
+    (error.type || error.originalType)
+    && ['statusCode', 'code', 'errorCode', 'providerName', 'providerId'].some((field) => error[field] !== undefined)
+  );
+}
+
+function getRejectedErrorDetails(error) {
+  if (hasValidErrorDetails(error?.errorDetails)) return error.errorDetails;
+  if (isCanonicalTranslationError(error)) return MessageFormat.serializeTranslationError(error);
+  return undefined;
+}
 
 export function useSubtitleTranslation() {
   const jobId = ref(`job-${Date.now()}`);
@@ -18,8 +52,10 @@ export function useSubtitleTranslation() {
   
   const translatedContent = ref('');
   const error = ref(null);
+  const errorDetails = ref(null);
   const currentFile = ref(null);
   const cues = ref([]);
+  let presentationVersion = 0;
 
   // Subscribe to background updates
   const unsubscribe = MessagingBus.subscribe(MessageContexts.SUBTITLE_TRANSLATION, (message) => {
@@ -29,6 +65,7 @@ export function useSubtitleTranslation() {
 
     switch (action) {
       case MessageActions.SUBTITLE_TRANSLATE_PROGRESS:
+        presentationVersion++;
         Object.assign(progress, data.progress);
         status.value = 'translating';
         
@@ -45,9 +82,11 @@ export function useSubtitleTranslation() {
         break;
 
       case MessageActions.SUBTITLE_TRANSLATE_COMPLETE:
+        presentationVersion++;
         status.value = 'completed';
         translatedContent.value = data.content;
         Object.assign(progress, data.stats);
+        errorDetails.value = data.errorDetails || progress.terminalErrorDetails || null;
         
         // Final status update for any remaining cues if needed
         // (Coordinator handles serialization, but we want UI to reflect completion)
@@ -61,15 +100,31 @@ export function useSubtitleTranslation() {
         break;
 
       case MessageActions.SUBTITLE_TRANSLATE_ERROR:
-        status.value = 'error';
-        error.value = data.error;
+        void applyTranslationError(data);
         break;
     }
   });
 
+  const applyTranslationError = async (detail = {}) => {
+    const version = ++presentationVersion;
+    errorDetails.value = detail.errorDetails || null;
+    const presentation = await presentSubtitleTranslationError(detail);
+    if (version !== presentationVersion) return;
+    if (presentation.kind === 'silent') {
+      status.value = 'idle';
+      error.value = null;
+      return;
+    }
+
+    status.value = 'error';
+    error.value = presentation.kind === 'display' ? presentation.message : detail.error;
+  };
+
   const startTranslation = async (fileContent, filename, config) => {
+    presentationVersion++;
     status.value = 'translating';
     error.value = null;
+    errorDetails.value = null;
     translatedContent.value = '';
     
     // Reset progress
@@ -99,15 +154,22 @@ export function useSubtitleTranslation() {
       });
 
       if (response && response.success === false) {
-        throw new Error(response.error || 'Failed to start subtitle translation');
+        const detail = {
+          error: typeof response.error === 'string' ? response.error : response.error?.message,
+          errorDetails: response.errorDetails || (typeof response.error === 'object' ? response.error : undefined)
+        };
+        await applyTranslationError({
+          ...detail,
+          error: detail.error || 'Failed to start subtitle translation'
+        });
       }
     } catch (err) {
-      status.value = 'error';
-      error.value = err.message;
+      await applyTranslationError({ error: err.message, errorDetails: getRejectedErrorDetails(err) });
     }
   };
 
   const cancelTranslation = () => {
+    presentationVersion++;
     MessagingBus.sendToBackground({
       context: MessageContexts.SUBTITLE_TRANSLATION,
       action: MessageActions.SUBTITLE_TRANSLATE_CANCEL,
@@ -139,6 +201,7 @@ export function useSubtitleTranslation() {
     status,
     progress,
     error,
+    errorDetails,
     currentFile,
     cues,
     translatedContent,

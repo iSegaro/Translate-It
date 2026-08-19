@@ -107,7 +107,10 @@ export class SubtitleTranslationCoordinator {
         if (result && result.isFatal) {
           logger.warn(`Stopping job ${jobId} due to fatal error. Rescuing progress...`);
           if (job.progressTracker) {
-            job.progressTracker.setTerminalError(result.error || 'Fatal translation error occurred');
+              job.progressTracker.setTerminalError(
+                result.error || 'Fatal translation error occurred',
+                result.errorDetails
+              );
           }
           job.lastErrorDetails = result.errorDetails || null;
           break;
