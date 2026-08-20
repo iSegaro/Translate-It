@@ -202,6 +202,28 @@ describe('useTranslationError', () => {
     expect(mockUseErrorHandler.handleTranslationError.mock.calls[0][0].message).toBe(messageKey);
   });
 
+  it('presents a reconstructed canonical errorDetails through the public boundary', async () => {
+    const { reconstructTranslationError } = await import('@/shared/messaging/core/MessagingCore.js');
+    const [composable] = withSetup(() => useTranslationError('popup'));
+    const canonicalError = reconstructTranslationError({
+      message: 'raw timeout detail',
+      type: ErrorTypes.TRANSLATION_TIMEOUT,
+      statusCode: 504,
+    });
+    matchErrorToType.mockReturnValue(ErrorTypes.TRANSLATION_TIMEOUT);
+
+    await composable.handleError(canonicalError);
+
+    expect(composable.errorType.value).toBe(ErrorTypes.TRANSLATION_TIMEOUT);
+    expect(composable.errorMessage.value).toBe('ERRORS_TRANSLATION_TIMEOUT');
+    const [displayError, displayContext, options] = mockUseErrorHandler.handleTranslationError.mock.calls[0];
+    expect(displayContext).toBe('popup');
+    expect(displayError.message).toBe('ERRORS_TRANSLATION_TIMEOUT');
+    expect(displayError.message).not.toContain('raw timeout detail');
+    expect(displayError.cause).toBe(canonicalError);
+    expect(options.type).toBe(ErrorTypes.TRANSLATION_TIMEOUT);
+  });
+
   it.each(['popup', 'sidepanel'])('preserves critical toast strategy for %s', async (context) => {
     const [composable] = withSetup(() => useTranslationError(context));
     const testError = Object.assign(new Error('raw API key detail'), {
