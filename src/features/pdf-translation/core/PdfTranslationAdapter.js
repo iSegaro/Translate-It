@@ -43,6 +43,9 @@ export function getPdfTranslationFailureReason(error) {
   if (CANCELLATION_ERROR_TYPES.has(type)) return PDF_TRANSLATION_FAILURE_REASON.CANCELLED
   if (TIMEOUT_ERROR_TYPES.has(type)) return PDF_TRANSLATION_FAILURE_REASON.TIMEOUT
   if (PROVIDER_UNAVAILABLE_ERROR_TYPES.has(type)) return PDF_TRANSLATION_FAILURE_REASON.PROVIDER_UNAVAILABLE
+  if (type === ErrorTypes.UNKNOWN || type === PDF_TRANSLATION_FAILURE_REASON.UNKNOWN) {
+    return PDF_TRANSLATION_FAILURE_REASON.UNKNOWN
+  }
   if (type) return PDF_TRANSLATION_FAILURE_REASON.PROVIDER_ERROR
   return PDF_TRANSLATION_FAILURE_REASON.UNKNOWN
 }
@@ -476,9 +479,15 @@ export class PdfTranslationAdapter {
 
     if (!response || response.success === false) {
       const errorMessage = response?.error?.message || response?.error || 'PDF translation failed'
-      const failureReason = getPdfTranslationFailureReason(response?.error)
       const errorDetails = response?.errorDetails
-        ? MessageFormat.serializeTranslationError(response.errorDetails)
+        && typeof response.errorDetails === 'object'
+        && !Array.isArray(response.errorDetails)
+        && typeof response.errorDetails.message === 'string'
+        ? response.errorDetails
+        : null
+      const failureReason = getPdfTranslationFailureReason(errorDetails || response?.error)
+      const serializedErrorDetails = errorDetails
+        ? MessageFormat.serializeTranslationError(errorDetails)
         : (response?.error && typeof response.error === 'object'
           ? MessageFormat.serializeTranslationError(response.error)
           : null)
@@ -492,7 +501,7 @@ export class PdfTranslationAdapter {
         sourceTextHash: item.sourceTextHash || '',
         error: errorMessage,
         failureReason,
-        ...(errorDetails && { errorDetails })
+        ...(serializedErrorDetails && { errorDetails: serializedErrorDetails })
       }))
     }
 

@@ -681,7 +681,7 @@ describe('PdfTranslationCoordinator', () => {
         errorCode: 'E_QUOTA',
         translationOutcome: { partial: true }
       },
-      failureReason: 'unknown'
+      failureReason: 'provider-error'
     })
   })
 
