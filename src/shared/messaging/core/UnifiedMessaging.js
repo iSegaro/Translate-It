@@ -163,11 +163,13 @@ export async function sendMessage(message, options = {}) {
     try {
       return await unifiedTranslationCoordinator.coordinateTranslation(message, options);
     } catch (error) {
+      const errorType = matchErrorToType(error);
       if (isFatalError(error)) throw error;
       if (isCancellationError(error)) throw error;
       
-      const isStreamingTimeout = error.message && typeof error.message === 'string' && error.message.includes('timed out');
-      if (isStreamingTimeout && message.messageId && !String(message.messageId).startsWith('fallback-')) {
+      const isTimeout = errorType === ErrorTypes.TRANSLATION_TIMEOUT
+        || errorType === ErrorTypes.OPERATION_TIMEOUT;
+      if (isTimeout && message.messageId && !String(message.messageId).startsWith('fallback-')) {
         try {
           const checkResponse = await browser.runtime.sendMessage({
             action: 'CHECK_TRANSLATION_STATUS',

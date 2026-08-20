@@ -490,16 +490,75 @@ describe('UnifiedMessaging', () => {
       );
     });
 
-    it('preserves timeout identity instead of converting it to cancellation', async () => {
+    it('probes status and falls back for typed TRANSLATION_TIMEOUT', async () => {
       const { unifiedTranslationCoordinator } = await import('./UnifiedTranslationCoordinator.js');
       const timeout = Object.assign(new Error('Translation timed out'), {
         type: ErrorTypes.TRANSLATION_TIMEOUT,
       });
       unifiedTranslationCoordinator.coordinateTranslation.mockRejectedValueOnce(timeout);
-      browser.runtime.sendMessage.mockResolvedValue({ success: true, recovered: true });
+      browser.runtime.sendMessage
+        .mockResolvedValueOnce({ completed: false })
+        .mockResolvedValueOnce({ success: true, recovered: true });
 
       await expect(sendMessage({ action: 'TRANSLATE', messageId: 'timeout' }))
         .resolves.toMatchObject({ success: true, recovered: true });
+      expect(browser.runtime.sendMessage).toHaveBeenNthCalledWith(1, {
+        action: 'CHECK_TRANSLATION_STATUS',
+        data: { messageId: 'timeout' }
+      });
+    });
+
+    it('probes status and falls back for typed OPERATION_TIMEOUT', async () => {
+      const { unifiedTranslationCoordinator } = await import('./UnifiedTranslationCoordinator.js');
+      const timeout = Object.assign(new Error('Operation timed out'), {
+        type: ErrorTypes.OPERATION_TIMEOUT,
+      });
+      unifiedTranslationCoordinator.coordinateTranslation.mockRejectedValueOnce(timeout);
+      browser.runtime.sendMessage
+        .mockResolvedValueOnce({ completed: false })
+        .mockResolvedValueOnce({ success: true, recovered: true });
+
+      await expect(sendMessage({ action: 'TRANSLATE', messageId: 'operation-timeout' }))
+        .resolves.toMatchObject({ success: true, recovered: true });
+      expect(browser.runtime.sendMessage).toHaveBeenNthCalledWith(1, {
+        action: 'CHECK_TRANSLATION_STATUS',
+        data: { messageId: 'operation-timeout' }
+      });
+    });
+
+    it('does not probe status for explicit NETWORK_ERROR timeout wording', async () => {
+      const { unifiedTranslationCoordinator } = await import('./UnifiedTranslationCoordinator.js');
+      const networkError = Object.assign(new Error('upstream request timed out'), {
+        type: ErrorTypes.NETWORK_ERROR,
+      });
+      unifiedTranslationCoordinator.coordinateTranslation.mockRejectedValueOnce(networkError);
+      browser.runtime.sendMessage.mockResolvedValue({ success: true, recovered: true });
+
+      await expect(sendMessage({ action: 'TRANSLATE', messageId: 'network-timeout-wording' }))
+        .resolves.toMatchObject({ success: true, recovered: true });
+      expect(browser.runtime.sendMessage).toHaveBeenCalledTimes(1);
+      expect(browser.runtime.sendMessage).not.toHaveBeenCalledWith(
+        expect.objectContaining({ action: 'CHECK_TRANSLATION_STATUS' })
+      );
+    });
+
+    it('probes status for an untyped legacy timeout', async () => {
+      const { unifiedTranslationCoordinator } = await import('./UnifiedTranslationCoordinator.js');
+      unifiedTranslationCoordinator.coordinateTranslation.mockRejectedValueOnce(
+        new Error('Translation timed out')
+      );
+      browser.runtime.sendMessage.mockResolvedValueOnce({
+        completed: true,
+        results: ['recovered']
+      });
+
+      await expect(sendMessage({ action: 'TRANSLATE', messageId: 'legacy-timeout' }))
+        .resolves.toEqual(['recovered']);
+      expect(browser.runtime.sendMessage).toHaveBeenCalledTimes(1);
+      expect(browser.runtime.sendMessage).toHaveBeenCalledWith({
+        action: 'CHECK_TRANSLATION_STATUS',
+        data: { messageId: 'legacy-timeout' }
+      });
     });
   });
 });
