@@ -287,4 +287,44 @@ describe('TranslationHandler', () => {
       errorCode: 'E_ABORT'
     });
   });
+
+  it('prefers canonical errorDetails over legacy error on stream end', async () => {
+    let callbacks;
+    registerTranslation.mockImplementation((id, registeredCallbacks) => {
+      callbacks = registeredCallbacks;
+    });
+    sendUnifiedTranslation.mockResolvedValue({ success: true, streaming: true });
+
+    const translationPromise = handler.performTranslation('hello');
+    callbacks.onStreamEnd({
+      success: false,
+      error: { message: 'legacy failure', type: 'LEGACY_ERROR' },
+      errorDetails: { message: 'canonical failure', type: 'MODEL_NOT_FOUND' }
+    });
+
+    await expect(translationPromise).rejects.toMatchObject({
+      message: 'canonical failure',
+      type: 'MODEL_NOT_FOUND'
+    });
+  });
+
+  it('falls back to legacy error when stream-end errorDetails is malformed', async () => {
+    let callbacks;
+    registerTranslation.mockImplementation((id, registeredCallbacks) => {
+      callbacks = registeredCallbacks;
+    });
+    sendUnifiedTranslation.mockResolvedValue({ success: true, streaming: true });
+
+    const translationPromise = handler.performTranslation('hello');
+    callbacks.onStreamEnd({
+      success: false,
+      error: { message: 'legacy failure', type: 'LEGACY_ERROR' },
+      errorDetails: { arbitrary: true }
+    });
+
+    await expect(translationPromise).rejects.toMatchObject({
+      message: 'legacy failure',
+      type: 'LEGACY_ERROR'
+    });
+  });
 });

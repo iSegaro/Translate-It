@@ -220,6 +220,16 @@ export function reconstructTranslationError(errorLike) {
 }
 
 /**
+ * Validate a candidate canonical errorDetails DTO.
+ * Minimal contract: non-null object (not array) with a string message.
+ * @param {*} value - Candidate errorDetails value
+ * @returns {boolean} True when the value is a usable canonical error DTO
+ */
+export function isStructuredTranslationError(value) {
+  return typeof value === 'object' && value !== null && !Array.isArray(value) && typeof value.message === 'string';
+}
+
+/**
  * Unique ID generator for messages
  * @returns {string} Unique message ID
  */

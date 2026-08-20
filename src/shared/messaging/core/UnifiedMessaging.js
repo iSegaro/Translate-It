@@ -9,7 +9,7 @@ import { streamingTimeoutManager } from './StreamingTimeoutManager.js';
 import { isFatalError, matchErrorToType, isSilentError } from '@/shared/error-management/ErrorMatcher.js';
 import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
 import { isRestrictedUrl } from '@/core/tabPermissions.js';
-import { reconstructTranslationError } from './MessagingCore.js';
+import { reconstructTranslationError, isStructuredTranslationError } from './MessagingCore.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.MESSAGING, 'UnifiedMessaging');
 
@@ -109,15 +109,6 @@ function getFailureMessage(response, responseError) {
     || response.message
     || response.statusText
     || 'Unknown technical error';
-}
-
-function isStructuredTranslationError(value) {
-  return Boolean(
-    value
-    && typeof value === 'object'
-    && !Array.isArray(value)
-    && typeof value.message === 'string'
-  );
 }
 
 function reconstructResponseError(response) {

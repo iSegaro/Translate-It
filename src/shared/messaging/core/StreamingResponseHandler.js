@@ -11,7 +11,7 @@
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { MessageActions } from './MessageActions.js';
-import { reconstructTranslationError } from './MessagingCore.js';
+import { reconstructTranslationError, isStructuredTranslationError } from './MessagingCore.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.MESSAGING, 'StreamingResponseHandler');
 
@@ -159,7 +159,10 @@ export class StreamingResponseHandler {
         data
       });
     } else {
-      const error = reconstructTranslationError(data?.error || 'Streaming ended with error');
+      const errorSource = isStructuredTranslationError(data?.errorDetails)
+        ? data.errorDetails
+        : (data?.error || 'Streaming ended with error');
+      const error = reconstructTranslationError(errorSource);
       error.streamData = data;
       this.coordinator.handleStreamingError(messageId, error);
     }
@@ -204,7 +207,10 @@ export class StreamingResponseHandler {
         data
       });
     } else {
-      const error = reconstructTranslationError(data?.error || 'Translation failed');
+      const errorSource = isStructuredTranslationError(data?.errorDetails)
+        ? data.errorDetails
+        : (data?.error || 'Translation failed');
+      const error = reconstructTranslationError(errorSource);
       error.translationData = data;
       this.coordinator.handleStreamingError(messageId, error);
     }
