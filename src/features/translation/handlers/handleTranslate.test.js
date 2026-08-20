@@ -71,6 +71,14 @@ describe('handleTranslate failure routing', () => {
         errorCode: 'E_UPSTREAM',
         translationOutcome: { partial: true },
       },
+      translatedText: 'partial translation',
+      actualCharCount: 0,
+      originalCharCount: 7,
+      hasError: true,
+      isFatal: false,
+      errorType: ErrorTypes.HTTP_ERROR,
+      batchMetadata: { batchIndex: 1 },
+      conversationAcceptance: true,
     };
     unifiedTranslationService.handleTranslationRequest.mockResolvedValueOnce(result);
 
@@ -91,6 +99,17 @@ describe('handleTranslate failure routing', () => {
       translationOutcome: result.errorDetails.translationOutcome,
     });
     expect(response.error.context).toBe(message.context);
+    expect(response.error).toMatchObject({
+      translatedText: 'partial translation',
+      actualCharCount: 0,
+      originalCharCount: 7,
+      hasError: true,
+      isFatal: false,
+      errorType: ErrorTypes.HTTP_ERROR,
+      batchMetadata: { batchIndex: 1 },
+      conversationAcceptance: true,
+    });
+    expect(response.error).not.toHaveProperty('errorDetails');
     expect(response.errorDetails).toMatchObject({
       ...result.errorDetails,
       context: message.context,
@@ -118,6 +137,7 @@ describe('handleTranslate failure routing', () => {
       errorDetails: result.errorDetails,
       messageId: message.messageId,
     });
+    expect(response.error).not.toHaveProperty('errorDetails');
   });
 
   it('falls back to legacy error when errorDetails is malformed', async () => {

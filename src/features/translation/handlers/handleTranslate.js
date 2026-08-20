@@ -49,11 +49,13 @@ export async function handleTranslate(message, sender) {
       : result?.error;
     if (result && result.success === false && errorSource) {
       logger.debug('[Handler:TRANSLATE] Formatting failure result for transmission');
+      const legacyOptions = { ...result };
+      delete legacyOptions.errorDetails;
       return MessageFormat.createErrorResponse(
         errorSource,
         message.messageId, 
         { 
-          ...result, 
+          ...legacyOptions,
           context: message.context || 'unknown'
         }
       );
