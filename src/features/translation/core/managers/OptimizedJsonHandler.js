@@ -860,10 +860,12 @@ const parentError = createParentValidationError(parentIdStr, sourceText, transla
           
           // If first batch failed fatally, don't continue
           if (hasErrors && lastError && isFatalError(lastError)) {
+            const serializedError = MessageFormat.serializeTranslationError(lastError);
             return { 
               success: false, 
               streaming: true, 
-              error: MessageFormat.serializeTranslationError(lastError),
+              error: serializedError,
+              errorDetails: serializedError,
               results: batchResults.flat()
             };
           }
@@ -1199,10 +1201,12 @@ hasErrors = true;
       if (abortController.signal.aborted || engine.isCancelled(messageId)) {
         logger.debug(`[JsonHandler] Skipping stream end markers for cancelled request: ${messageId}`);
         if (hasErrors && lastError && abortInitiator === 'fatal-error') {
+          const serializedError = MessageFormat.serializeTranslationError(lastError);
           return {
             success: false,
             streaming: true,
-            error: MessageFormat.serializeTranslationError(lastError),
+            error: serializedError,
+            errorDetails: serializedError,
             results: batchResults.flat()
           };
         }
@@ -1225,6 +1229,7 @@ hasErrors = true;
         success: !hasErrors,
         streaming: true,
         error: formattedError,
+        ...(formattedError && { errorDetails: formattedError }),
         results: batchResults.flat(),
         metadata: {
           batchCount: batches.length
@@ -1468,12 +1473,14 @@ hasErrors = true;
 
   async _sendStreamError(tabId, messageId, lastError, targetLanguage, sourceLanguage, translationMode, frameId = null) {
     if (!tabId) return;
+    const serializedError = lastError ? MessageFormat.serializeTranslationError(lastError) : null;
     const endMessage = {
       action: MessageActions.TRANSLATION_STREAM_END,
       messageId,
       data: {
         success: false,
-        error: lastError ? MessageFormat.serializeTranslationError(lastError) : null,
+        error: serializedError,
+        errorDetails: serializedError,
         sourceLanguage,
         targetLanguage,
         translationMode,

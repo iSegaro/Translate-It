@@ -219,14 +219,16 @@ export class StreamingManager extends ResourceTracker {
 
     try {
       // Create stream error message
+      const serializedError = MessageFormat.serializeTranslationError(error, {
+        type: error?.type ?? matchErrorToType(error) ?? 'TRANSLATION_ERROR',
+        providerName: error?.providerName ?? streamInfo.providerName
+      });
       const streamErrorMessage = MessageFormat.create(
         MessageActions.TRANSLATION_STREAM_UPDATE,
         {
           success: false,
-          error: MessageFormat.serializeTranslationError(error, {
-            type: error?.type ?? matchErrorToType(error) ?? 'TRANSLATION_ERROR',
-            providerName: error?.providerName ?? streamInfo.providerName
-          }),
+          error: serializedError,
+          errorDetails: serializedError,
           batchIndex: batchIndex,
           provider: streamInfo.providerName,
           timestamp: Date.now()
@@ -347,15 +349,18 @@ export class StreamingManager extends ResourceTracker {
     
     streamInfo.error = error.message;
 
+    const serializedError = {
+      ...MessageFormat.serializeTranslationError(error, {
+        type: error?.type ?? errorType ?? 'STREAMING_ERROR',
+        providerName: error?.providerName ?? streamInfo.providerName
+      }),
+      timestamp: Date.now()
+    };
+
     // Complete stream with error - status will be updated to 'error' inside completeStream
     await this.completeStream(messageId, false, {
-      error: {
-        ...MessageFormat.serializeTranslationError(error, {
-          type: error?.type ?? errorType ?? 'STREAMING_ERROR',
-          providerName: error?.providerName ?? streamInfo.providerName
-        }),
-        timestamp: Date.now()
-      }
+      error: serializedError,
+      errorDetails: serializedError
     });
   }
 

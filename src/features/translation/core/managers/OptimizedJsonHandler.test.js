@@ -4532,6 +4532,8 @@ describe('OptimizedJsonHandler', () => {
       );
 
       expect(result.success).toBe(false);
+      expect(result.errorDetails).toEqual(result.error);
+      expect(result.errorDetails).toMatchObject({ message: 'provider down', type: 'NETWORK_ERROR' });
       const calls = browser.tabs.sendMessage.mock.calls;
       const end = calls.find(([, m]) => m.action === MessageActions.TRANSLATION_STREAM_END);
       expect(end).toEqual([123, expect.objectContaining({ action: MessageActions.TRANSLATION_STREAM_END }), { frameId: 3 }]);
@@ -4579,6 +4581,18 @@ describe('OptimizedJsonHandler', () => {
       });
       expect(message.data.error).not.toHaveProperty('cause');
       expect(message.data.error).not.toHaveProperty('arbitrary');
+      expect(message.data.errorDetails).toEqual(message.data.error);
+      expect(message.data.errorDetails).toMatchObject({
+        message: 'structured provider failure',
+        type: 'PROVIDER_ERROR',
+        originalType: 'HTTP_ERROR',
+        statusCode: 503,
+        context: 'select-element-stream',
+        providerName: 'Provider',
+        providerId: 'provider-id',
+        code: 'UPSTREAM_FAILURE',
+        errorCode: 'E_UPSTREAM'
+      });
     });
 
     it('targets the top frame explicitly with frameId 0', async () => {

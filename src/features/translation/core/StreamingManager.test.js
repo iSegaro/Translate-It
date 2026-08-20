@@ -239,6 +239,19 @@ describe('StreamingManager', () => {
       expect(streamedError).not.toHaveProperty('cause');
       expect(streamedError).not.toHaveProperty('arbitrary');
       expect(streamedError).not.toHaveProperty('timestamp');
+      expect(streamedData.errorDetails).toEqual(streamedError);
+      expect(streamedData.errorDetails).toMatchObject({
+        message: 'Network timeout',
+        type: 'NETWORK_ERROR',
+        originalType: 'HTTP_ERROR',
+        statusCode: 503,
+        context: 'provider-request',
+        providerName: 'Source Provider',
+        providerId: 'source-provider',
+        code: 'NETWORK_TIMEOUT',
+        errorCode: 'E_NETWORK',
+        translationOutcome: { partial: true }
+      });
     });
 
     it('should target the originating iframe on error', async () => {
@@ -341,6 +354,7 @@ describe('StreamingManager', () => {
         errorCode: 'E_UPSTREAM'
       });
       expect(completeSpy.mock.calls[0][2].error.timestamp).toEqual(expect.any(Number));
+      expect(completeSpy.mock.calls[0][2].errorDetails).toEqual(completeSpy.mock.calls[0][2].error);
     });
   });
 
