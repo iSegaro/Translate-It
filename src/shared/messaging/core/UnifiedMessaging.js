@@ -116,9 +116,7 @@ function reconstructResponseError(response) {
   const responseError = response.error;
   const canonicalError = isStructuredTranslationError(response.errorDetails)
     ? response.errorDetails
-    : typeof responseError === 'object' && responseError !== null
-      ? responseError
-      : responseError;
+    : responseError;
   const message = getFailureMessage(response, canonicalError);
 
   if (!canonicalError || typeof canonicalError !== 'object') {
