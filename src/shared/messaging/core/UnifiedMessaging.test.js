@@ -67,7 +67,8 @@ vi.mock('./UnifiedTranslationCoordinator.js', () => ({
 
 vi.mock('./StreamingTimeoutManager.js', () => ({
   streamingTimeoutManager: {
-    shouldContinue: vi.fn().mockReturnValue(true)
+    shouldContinue: vi.fn().mockReturnValue(true),
+    getOperationState: vi.fn().mockReturnValue(null)
   }
 }));
 
@@ -369,9 +370,14 @@ describe('UnifiedMessaging', () => {
       await expect(sendRegularMessage({ action: 'FAIL' })).rejects.toBe(runtimeError);
     });
 
-    it('keeps cancellation behavior unchanged', async () => {
+    it('maps explicit cancelled lifecycle state to USER_CANCELLED before sending', async () => {
       const { streamingTimeoutManager } = await import('./StreamingTimeoutManager.js');
       streamingTimeoutManager.shouldContinue.mockReturnValue(false);
+      streamingTimeoutManager.getOperationState.mockReturnValue({
+        isCancelled: true,
+        hasTimedOut: false,
+        isCompleted: false
+      });
 
       try {
         await expect(sendRegularMessage({ action: 'TRANSLATE', messageId: 'cancelled' }))
@@ -379,6 +385,64 @@ describe('UnifiedMessaging', () => {
         expect(browser.runtime.sendMessage).not.toHaveBeenCalled();
       } finally {
         streamingTimeoutManager.shouldContinue.mockReturnValue(true);
+        streamingTimeoutManager.getOperationState.mockReturnValue(null);
+      }
+    });
+
+    it('maps explicit timed-out lifecycle state to TRANSLATION_TIMEOUT before sending', async () => {
+      const { streamingTimeoutManager } = await import('./StreamingTimeoutManager.js');
+      streamingTimeoutManager.shouldContinue.mockReturnValue(false);
+      streamingTimeoutManager.getOperationState.mockReturnValue({
+        isCancelled: false,
+        hasTimedOut: true,
+        isCompleted: false
+      });
+
+      try {
+        await expect(sendRegularMessage({ action: 'TRANSLATE', messageId: 'timed-out' }))
+          .rejects.toMatchObject({ type: ErrorTypes.TRANSLATION_TIMEOUT });
+        expect(browser.runtime.sendMessage).not.toHaveBeenCalled();
+      } finally {
+        streamingTimeoutManager.shouldContinue.mockReturnValue(true);
+        streamingTimeoutManager.getOperationState.mockReturnValue(null);
+      }
+    });
+
+    it('does not fabricate terminal identity for unknown lifecycle state', async () => {
+      const { streamingTimeoutManager } = await import('./StreamingTimeoutManager.js');
+      streamingTimeoutManager.shouldContinue.mockReturnValue(false);
+      streamingTimeoutManager.getOperationState.mockReturnValue(null);
+      const response = { success: true, data: 'continued' };
+      browser.runtime.sendMessage.mockResolvedValue(response);
+
+      try {
+        await expect(sendRegularMessage({ action: 'TRANSLATE', messageId: 'unknown-state' }))
+          .resolves.toBe(response);
+      } finally {
+        streamingTimeoutManager.shouldContinue.mockReturnValue(true);
+      }
+    });
+
+    it('maps explicit timed-out lifecycle state during polling', async () => {
+      const { streamingTimeoutManager } = await import('./StreamingTimeoutManager.js');
+      streamingTimeoutManager.shouldContinue
+        .mockReturnValueOnce(true)
+        .mockReturnValueOnce(false);
+      streamingTimeoutManager.getOperationState.mockReturnValue({
+        isCancelled: false,
+        hasTimedOut: true,
+        isCompleted: false
+      });
+      browser.runtime.sendMessage.mockReturnValue(new Promise(() => {}));
+
+      try {
+        const promise = sendRegularMessage({ action: 'TRANSLATE', messageId: 'poll-timeout' });
+        await vi.advanceTimersByTimeAsync(50);
+
+        await expect(promise).rejects.toMatchObject({ type: ErrorTypes.TRANSLATION_TIMEOUT });
+      } finally {
+        streamingTimeoutManager.shouldContinue.mockReturnValue(true);
+        streamingTimeoutManager.getOperationState.mockReturnValue(null);
       }
     });
 

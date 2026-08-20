@@ -138,6 +138,23 @@ function reconstructResponseError(response) {
   });
 }
 
+function getLifecycleTerminalError(messageId) {
+  const state = streamingTimeoutManager.getOperationState(messageId);
+  if (state?.isCancelled) {
+    const cancelError = new Error(ErrorTypes.USER_CANCELLED);
+    cancelError.type = ErrorTypes.USER_CANCELLED;
+    return cancelError;
+  }
+
+  if (state?.hasTimedOut) {
+    const timeoutError = new Error(ErrorTypes.TRANSLATION_TIMEOUT);
+    timeoutError.type = ErrorTypes.TRANSLATION_TIMEOUT;
+    return timeoutError;
+  }
+
+  return null;
+}
+
 export async function sendMessage(message, options = {}) {
   const { forceRegular = false } = options;
   if (!message) return null;
@@ -185,9 +202,8 @@ export async function sendRegularMessage(message, options = {}) {
     }
 
     if (message.messageId && streamingTimeoutManager.shouldContinue(message.messageId) === false) {
-      const cancelError = new Error(ErrorTypes.USER_CANCELLED);
-      cancelError.type = ErrorTypes.USER_CANCELLED;
-      throw cancelError;
+      const lifecycleError = getLifecycleTerminalError(message.messageId);
+      if (lifecycleError) throw lifecycleError;
     }
 
     const sendPromise = browser.runtime.sendMessage(message);
@@ -197,10 +213,11 @@ export async function sendRegularMessage(message, options = {}) {
     const cancellationPromise = new Promise((_, reject) => {
       cancellationInterval = setInterval(() => {
         if (message.messageId && streamingTimeoutManager.shouldContinue(message.messageId) === false) {
-          if (cancellationInterval) clearInterval(cancellationInterval);
-          const cancelError = new Error(ErrorTypes.USER_CANCELLED);
-          cancelError.type = ErrorTypes.USER_CANCELLED;
-          reject(cancelError);
+          const lifecycleError = getLifecycleTerminalError(message.messageId);
+          if (lifecycleError) {
+            if (cancellationInterval) clearInterval(cancellationInterval);
+            reject(lifecycleError);
+          }
         } else if (typeof window !== 'undefined' && window.selectElementHandlingESC === true) {
           if (cancellationInterval) clearInterval(cancellationInterval);
           const cancelError = new Error('Translation cancelled by user ESC');
