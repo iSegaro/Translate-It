@@ -352,7 +352,6 @@ export class SubtitleTranslationCoordinator {
       action: MessageActions.SUBTITLE_TRANSLATE_ERROR,
       payload: {
         jobId,
-        error,
         errorDetails: MessageFormat.serializeTranslationError(errorLike)
       }
     });

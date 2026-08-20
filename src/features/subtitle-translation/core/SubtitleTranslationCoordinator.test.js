@@ -5,6 +5,7 @@ import { unifiedTranslationService } from '@/core/services/translation/UnifiedTr
 import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
 import { SubtitleParserFactory } from '../parsers/SubtitleParserFactory.js';
 import { SubtitleBatchPlanner } from './SubtitleBatchPlanner.js';
+import { MessagingBus } from '@/shared/messaging/core/MessagingBus.js';
 
 vi.mock('../parsers/SubtitleParserFactory.js', () => ({
   SubtitleParserFactory: {
@@ -198,6 +199,32 @@ describe('SubtitleTranslationCoordinator Stability', () => {
     expect(result.errorDetails).not.toHaveProperty('arbitrary');
     expect(batch[0].status).toBe('failed');
     expect(batch[0].translatedText).toBeUndefined();
+  });
+
+  it('emits structured error events without the legacy error field', () => {
+    const error = Object.assign(new Error('Provider failed'), {
+      type: 'PROVIDER_ERROR',
+      originalType: 'HTTP_ERROR',
+      statusCode: 503,
+      providerName: 'Provider',
+      providerId: 'provider-id'
+    });
+
+    subtitleTranslationCoordinator._notifyError('job-error-event', error.message, error);
+
+    const payload = MessagingBus.broadcast.mock.calls.at(-1)[0].payload;
+    expect(payload).toEqual({
+      jobId: 'job-error-event',
+      errorDetails: {
+        message: 'Provider failed',
+        type: 'PROVIDER_ERROR',
+        originalType: 'HTTP_ERROR',
+        statusCode: 503,
+        providerName: 'Provider',
+        providerId: 'provider-id'
+      }
+    });
+    expect(payload).not.toHaveProperty('error');
   });
 });
 
