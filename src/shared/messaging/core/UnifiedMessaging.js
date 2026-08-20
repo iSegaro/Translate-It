@@ -122,10 +122,10 @@ function isStructuredTranslationError(value) {
 
 function reconstructResponseError(response) {
   const responseError = response.error;
-  const canonicalError = typeof responseError === 'object' && responseError !== null
-    ? responseError
-    : isStructuredTranslationError(response.errorDetails)
-      ? response.errorDetails
+  const canonicalError = isStructuredTranslationError(response.errorDetails)
+    ? response.errorDetails
+    : typeof responseError === 'object' && responseError !== null
+      ? responseError
       : responseError;
   const message = getFailureMessage(response, canonicalError);
 

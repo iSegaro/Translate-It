@@ -275,7 +275,7 @@ describe('UnifiedMessaging', () => {
       });
     });
 
-    it('keeps structured response.error authoritative over errorDetails', async () => {
+    it('keeps canonical errorDetails authoritative over structured response.error', async () => {
       browser.runtime.sendMessage.mockResolvedValue({
         success: false,
         error: {
@@ -286,14 +286,18 @@ describe('UnifiedMessaging', () => {
         errorDetails: {
           message: 'secondary details',
           type: 'DETAILS_ERROR',
-          statusCode: 500
+          statusCode: 500,
+          providerName: 'Provider',
+          translationOutcome: { partial: true }
         }
       });
 
       await expect(sendRegularMessage({ action: 'TRANSLATE_TEXT' })).rejects.toMatchObject({
-        message: 'response error',
-        type: 'RESPONSE_ERROR',
-        statusCode: 400
+        message: 'secondary details',
+        type: 'DETAILS_ERROR',
+        statusCode: 500,
+        providerName: 'Provider',
+        translationOutcome: { partial: true }
       });
     });
 
