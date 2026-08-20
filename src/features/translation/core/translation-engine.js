@@ -6,7 +6,7 @@
 
 import { ProviderFactory } from "@/features/translation/providers/ProviderFactory.js";
 import { MessageActions } from "@/shared/messaging/core/MessageActions.js";
-import { MessageFormat, reconstructTranslationError } from "@/shared/messaging/core/MessagingCore.js";
+import { MessageFormat, reconstructTranslationError, isStructuredTranslationError } from "@/shared/messaging/core/MessagingCore.js";
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { isEmptyTranslationInput, isStructuredBatchInput } from "./translationInputHelpers.js";
@@ -170,7 +170,10 @@ export class TranslationEngine {
     }
 
     if (result.success === false) {
-      throw reconstructTranslationError(result.error || result);
+      const errorSource = isStructuredTranslationError(result.errorDetails)
+        ? result.errorDetails
+        : result.error || result;
+      throw reconstructTranslationError(errorSource);
     }
 
     // Extract values from the unified coordinator response

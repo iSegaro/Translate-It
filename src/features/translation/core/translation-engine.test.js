@@ -204,6 +204,116 @@ describe('TranslationEngine', () => {
     });
   });
 
+  it('prefers errorDetails over conflicting legacy error', async () => {
+    const mockProvider = await engine.getProvider('google');
+    mockProvider.translate.mockResolvedValue({
+      success: false,
+      error: { message: 'legacy failure', type: 'LEGACY_ERROR' },
+      errorDetails: {
+        message: 'canonical failure',
+        type: ErrorTypes.HTTP_ERROR,
+        originalType: ErrorTypes.MODEL_MISSING,
+        statusCode: 503,
+        context: 'provider-request',
+        providerName: 'Provider',
+        providerId: 'provider-id',
+        code: 'UPSTREAM_FAILURE',
+        errorCode: 'E_UPSTREAM',
+        translationOutcome: { partial: true },
+      },
+    });
+
+    await expect(engine.executeTranslation({
+      text: 'Hello',
+      provider: 'google',
+      sourceLanguage: 'en',
+      targetLanguage: 'fa',
+      mode: 'selection',
+    }, {})).rejects.toMatchObject({
+      message: 'canonical failure',
+      type: ErrorTypes.HTTP_ERROR,
+      originalType: ErrorTypes.MODEL_MISSING,
+      statusCode: 503,
+      context: 'provider-request',
+      providerName: 'Provider',
+      providerId: 'provider-id',
+      code: 'UPSTREAM_FAILURE',
+      errorCode: 'E_UPSTREAM',
+      translationOutcome: { partial: true },
+    });
+  });
+
+  it('preserves canonical identity for errorDetails-only failures', async () => {
+    const mockProvider = await engine.getProvider('google');
+    mockProvider.translate.mockResolvedValue({
+      success: false,
+      errorDetails: {
+        message: 'API key invalid',
+        type: ErrorTypes.API_KEY_INVALID,
+        statusCode: 401,
+        providerName: 'Provider',
+      },
+    });
+
+    await expect(engine.executeTranslation({
+      text: 'Hello',
+      provider: 'google',
+      sourceLanguage: 'en',
+      targetLanguage: 'fa',
+      mode: 'selection',
+    }, {})).rejects.toMatchObject({
+      message: 'API key invalid',
+      type: ErrorTypes.API_KEY_INVALID,
+      statusCode: 401,
+      providerName: 'Provider',
+    });
+  });
+
+  it('falls back to legacy error when errorDetails is malformed', async () => {
+    const mockProvider = await engine.getProvider('google');
+    mockProvider.translate.mockResolvedValue({
+      success: false,
+      error: {
+        message: 'legacy failure',
+        type: ErrorTypes.NETWORK_ERROR,
+        statusCode: 502,
+      },
+      errorDetails: { arbitrary: true },
+    });
+
+    await expect(engine.executeTranslation({
+      text: 'Hello',
+      provider: 'google',
+      sourceLanguage: 'en',
+      targetLanguage: 'fa',
+      mode: 'selection',
+    }, {})).rejects.toMatchObject({
+      message: 'legacy failure',
+      type: ErrorTypes.NETWORK_ERROR,
+      statusCode: 502,
+    });
+  });
+
+  it('keeps whole-result fallback for failure envelopes without error fields', async () => {
+    const mockProvider = await engine.getProvider('google');
+    mockProvider.translate.mockResolvedValue({
+      success: false,
+      type: ErrorTypes.VALIDATION,
+      message: 'invalid provider result',
+    });
+
+    await expect(engine.executeTranslation({
+      text: 'Hello',
+      provider: 'google',
+      sourceLanguage: 'en',
+      targetLanguage: 'fa',
+      mode: 'selection',
+    }, {})).rejects.toMatchObject({
+      message: 'invalid provider result',
+      type: ErrorTypes.VALIDATION,
+    });
+  });
+
   describe('handleMessage', () => {
     it('should process TRANSLATE message successfully', async () => {
       const request = {
