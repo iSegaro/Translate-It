@@ -227,6 +227,79 @@ describe('PageTranslationBridge stale settlement integration', () => {
     expect(failed).not.toHaveBeenCalled();
   });
 
+  it('preserves user edit after stale update and restore', async () => {
+    const node = document.createTextNode('Original');
+    document.body.appendChild(node);
+    const { pending } = await startDeferredTranslation();
+
+    pending[0].resolve(settlement('Translated'));
+    await vi.waitFor(() => expect(node.nodeValue).toContain('Translated'));
+
+    node.nodeValue = 'Edited';
+    bridge.session.nodesTranslator.update(node);
+    await vi.waitFor(() => expect(pending.length).toBe(2));
+    node.nodeValue = 'Edited again';
+    const stale = vi.fn();
+    pending[1].resolve(settlement('Stale update', stale));
+    await vi.waitFor(() => expect(stale).toHaveBeenCalledWith('stale'));
+
+    bridge.restore(document.body);
+    expect(node.nodeValue).toBe('Edited again');
+  });
+
+  it.each(['a-first', 'b-first'])('preserves Task B restore baseline when %s settles', async (order) => {
+    const node = document.createTextNode('Original');
+    document.body.appendChild(node);
+    const { pending } = await startDeferredTranslation({ autoTranslateOnDOMChanges: true });
+
+    pending[0].resolve(settlement('Initial'));
+    await vi.waitFor(() => expect(node.nodeValue).toContain('Initial'));
+    node.nodeValue = 'A';
+    await vi.waitFor(() => expect(pending.length).toBe(2));
+    node.nodeValue = 'B';
+    await vi.waitFor(() => expect(pending.length).toBe(3));
+
+    const stale = vi.fn();
+    const accepted = vi.fn();
+    if (order === 'a-first') {
+      pending[1].resolve(settlement('A translation', stale));
+      await vi.waitFor(() => expect(stale).toHaveBeenCalledWith('stale'));
+      pending[2].resolve(settlement('B translation', accepted));
+    } else {
+      pending[2].resolve(settlement('B translation', accepted));
+      await vi.waitFor(() => expect(accepted).toHaveBeenCalledWith('accepted'));
+      pending[1].resolve(settlement('A translation', stale));
+    }
+
+    await vi.waitFor(() => expect(accepted).toHaveBeenCalledWith('accepted'));
+    await vi.waitFor(() => expect(node.nodeValue).toContain('B translation'));
+    bridge.restore(document.body);
+    expect(node.nodeValue).toBe('B');
+    expect(stale).toHaveBeenCalledWith('stale');
+  });
+
+  it('preserves changed attribute after stale update and restore', async () => {
+    const element = document.createElement('div');
+    element.setAttribute('title', 'Original');
+    document.body.appendChild(element);
+    const { pending } = await startDeferredTranslation();
+
+    pending[0].resolve(settlement('Translated title'));
+    await vi.waitFor(() => expect(element.getAttribute('title')).toContain('Translated title'));
+
+    element.setAttribute('title', 'Edited');
+    const attribute = element.getAttributeNode('title');
+    bridge.session.nodesTranslator.update(attribute);
+    await vi.waitFor(() => expect(pending.length).toBe(2));
+    element.setAttribute('title', 'Edited again');
+    const stale = vi.fn();
+    pending[1].resolve(settlement('Stale title', stale));
+    await vi.waitFor(() => expect(stale).toHaveBeenCalledWith('stale'));
+
+    bridge.restore(document.body);
+    expect(element.getAttribute('title')).toBe('Edited again');
+  });
+
   it('skips stale post-processing and hover registration', async () => {
     const node = document.createTextNode('Original');
     document.body.appendChild(node);

@@ -107,6 +107,13 @@ export class PageTranslationBridge extends ResourceTracker {
       return Boolean(owner?.isConnected && (!root || (root.isConnected && root.contains(owner))));
     };
 
+    const isConnectedTarget = (node) => {
+      if (!node) return false;
+      const owner = node.nodeType === Node.ATTRIBUTE_NODE ? node.ownerElement : node;
+      const root = currentSession.root;
+      return Boolean(owner?.isConnected && (!root || (root.isConnected && root.contains(owner))));
+    };
+
     if (settings.lazyLoading) {
       currentSession.intersectionScheduler = new IntersectionScheduler({ rootMargin: settings.rootMargin });
     }
@@ -249,6 +256,14 @@ export class PageTranslationBridge extends ResourceTracker {
                 && decision.generation === targetGenerations.get(node)
                 && this.nodeStorage.get(node) === nodeData) {
               this.nodeStorage.delete(node);
+            }
+            if (!decision?.ownsStorage
+                && (decision?.outcome === 'stale' || decision?.outcome === 'cancelled')
+                && decision.generation === targetGenerations.get(node)
+                && this.nodeStorage.get(node) === nodeData
+                && isConnectedTarget(node)) {
+              // Current-generation update owns restore baseline; obsolete updates do not.
+              nodeData.originalText = getCurrentNodeValue(node);
             }
             if (decision) decision.outcome = decision.session === currentSession && currentSession.active
               ? 'stale'
