@@ -100,7 +100,7 @@ export function useSubtitleTranslation() {
         break;
 
       case MessageActions.SUBTITLE_TRANSLATE_ERROR:
-        void applyTranslationError(data);
+        void applyTranslationError({ errorDetails: data.errorDetails });
         break;
     }
   });
@@ -154,17 +154,10 @@ export function useSubtitleTranslation() {
       });
 
       if (response && response.success === false) {
-        const detail = {
-          error: typeof response.error === 'string' ? response.error : response.error?.message,
-          errorDetails: response.errorDetails || (typeof response.error === 'object' ? response.error : undefined)
-        };
-        await applyTranslationError({
-          ...detail,
-          error: detail.error || 'Failed to start subtitle translation'
-        });
+        await applyTranslationError({ errorDetails: response.errorDetails });
       }
     } catch (err) {
-      await applyTranslationError({ error: err.message, errorDetails: getRejectedErrorDetails(err) });
+      await applyTranslationError({ errorDetails: getRejectedErrorDetails(err) });
     }
   };
 
