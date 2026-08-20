@@ -96,7 +96,7 @@ function copyLegacyOptions(target, options) {
     if (LEGACY_ERROR_OPTION_FIELDS.has(key)) continue;
 
     const cloned = cloneSafeValue(value);
-    if (cloned !== UNSUPPORTED_VALUE) target[key] = cloned;
+    if (cloned !== UNSUPPORTED_VALUE && cloned !== CIRCULAR_VALUE) target[key] = cloned;
   }
 }
 
@@ -178,12 +178,14 @@ export const MessageFormat = {
   createErrorResponse(error, messageId = null, options = {}) {
     // Keep legacy non-error options for compatibility, but never recursively
     // spread error objects or duplicate the outer failure envelope.
-    const errorData = this.serializeTranslationError(error, options);
+    const errorDetails = this.serializeTranslationError(error, options);
+    const errorData = cloneSafeValue(errorDetails);
     copyLegacyOptions(errorData, options);
 
     return {
       success: false,
       error: errorData,
+      errorDetails,
       messageId,
       timestamp: Date.now()
     };

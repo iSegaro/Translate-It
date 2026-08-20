@@ -83,6 +83,10 @@ describe('handleBatchTranslate failure routing', () => {
     expect(response.error).toMatchObject(errorDetails);
     expect(response.error.context).toBe(message.context);
     expect(response.error).not.toHaveProperty('errorDetails');
+    expect(response.errorDetails).toMatchObject(errorDetails);
+    expect(response.errorDetails).not.toHaveProperty('translatedText');
+    expect(response.errorDetails).not.toHaveProperty('actualCharCount');
+    expect(response.errorDetails).not.toHaveProperty('isFatal');
   });
 
   it('formats errorDetails-only failures', async () => {
@@ -100,6 +104,7 @@ describe('handleBatchTranslate failure routing', () => {
     await expect(handleBatchTranslate(message, {})).resolves.toMatchObject({
       success: false,
       error: errorDetails,
+      errorDetails,
       messageId: message.messageId,
     });
   });
@@ -182,6 +187,13 @@ describe('handleBatchTranslate failure routing', () => {
       isFatal: true,
       batchMetadata: { batchIndex: 2 },
     });
+    expect(response.errorDetails).toMatchObject({
+      message: 'canonical failure',
+      type: 'PROVIDER_ERROR',
+    });
+    expect(response.errorDetails).not.toHaveProperty('translatedText');
+    expect(response.errorDetails).not.toHaveProperty('isFatal');
+    expect(response.errorDetails).not.toHaveProperty('batchMetadata');
     expect(response.error).not.toHaveProperty('errorDetails');
   });
 

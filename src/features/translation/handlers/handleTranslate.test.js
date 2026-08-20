@@ -91,7 +91,11 @@ describe('handleTranslate failure routing', () => {
       translationOutcome: result.errorDetails.translationOutcome,
     });
     expect(response.error.context).toBe(message.context);
-    expect(response).not.toHaveProperty('errorDetails');
+    expect(response.errorDetails).toMatchObject({
+      ...result.errorDetails,
+      context: message.context,
+    });
+    expect(response.errorDetails).not.toHaveProperty('translatedText');
   });
 
   it('normalizes errorDetails-only results through createErrorResponse', async () => {
@@ -111,9 +115,9 @@ describe('handleTranslate failure routing', () => {
     expect(response).toMatchObject({
       success: false,
       error: result.errorDetails,
+      errorDetails: result.errorDetails,
       messageId: message.messageId,
     });
-    expect(response).not.toHaveProperty('errorDetails');
   });
 
   it('falls back to legacy error when errorDetails is malformed', async () => {

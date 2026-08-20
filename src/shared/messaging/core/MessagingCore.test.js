@@ -55,11 +55,13 @@ describe('MessagingCore', () => {
       expect(response.error.message).toBe('Test error');
       expect(response.error.type).toBe('CUSTOM_TYPE');
       expect(response.error.statusCode).toBe(500);
+      expect(response.errorDetails).toEqual(response.error);
     });
 
     it('should format string errors correctly', () => {
       const response = MessageFormat.createErrorResponse('Simple error string');
       expect(response.error.message).toBe('Simple error string');
+      expect(response.errorDetails.message).toBe('Simple error string');
       expect(MessageFormat.serializeTranslationError('Simple error string')).toMatchObject({
         message: 'Simple error string',
       });
@@ -207,6 +209,77 @@ describe('MessagingCore', () => {
       });
       expect(response.error).not.toHaveProperty('error');
       expect(response.error).not.toHaveProperty('success');
+    });
+
+    it('keeps canonical details separate from legacy-enriched error data', () => {
+      const error = new Error('Provider failure');
+      Object.assign(error, {
+        type: 'HTTP_ERROR',
+        originalType: 'MODEL_MISSING',
+        statusCode: 503,
+        context: 'translation',
+        providerName: 'Provider',
+        providerId: 'provider-id',
+        code: 'UPSTREAM_FAILURE',
+        errorCode: 'E_UPSTREAM',
+        translationOutcome: { partial: true },
+        cause: new Error('private cause'),
+        arbitrary: { private: true },
+      });
+
+      const circular = {};
+      circular.self = circular;
+      const response = MessageFormat.createErrorResponse(error, 'msg-4', {
+        translatedText: 'partial',
+        isFatal: true,
+        batchMetadata: { batchIndex: 2 },
+        arbitrary: circular,
+        cause: new Error('private option cause'),
+        stack: 'private stack',
+      });
+
+      expect(response.error).toMatchObject({
+        message: 'Provider failure',
+        type: 'HTTP_ERROR',
+        originalType: 'MODEL_MISSING',
+        statusCode: 503,
+        context: 'translation',
+        providerName: 'Provider',
+        providerId: 'provider-id',
+        code: 'UPSTREAM_FAILURE',
+        errorCode: 'E_UPSTREAM',
+        translationOutcome: { partial: true },
+        translatedText: 'partial',
+        isFatal: true,
+        batchMetadata: { batchIndex: 2 },
+      });
+      expect(response.errorDetails).toEqual({
+        message: 'Provider failure',
+        type: 'HTTP_ERROR',
+        originalType: 'MODEL_MISSING',
+        statusCode: 503,
+        context: 'translation',
+        providerName: 'Provider',
+        providerId: 'provider-id',
+        code: 'UPSTREAM_FAILURE',
+        errorCode: 'E_UPSTREAM',
+        translationOutcome: { partial: true },
+      });
+      expect(response.error).not.toBe(response.errorDetails);
+      expect(response.errorDetails).not.toHaveProperty('translatedText');
+      expect(response.errorDetails).not.toHaveProperty('isFatal');
+      expect(response.errorDetails).not.toHaveProperty('batchMetadata');
+      expect(response.error).not.toHaveProperty('cause');
+      expect(response.error).not.toHaveProperty('stack');
+      expect(response.error).not.toHaveProperty('arbitrary');
+      expect(response.errorDetails).not.toHaveProperty('cause');
+      expect(response.errorDetails).not.toHaveProperty('stack');
+      expect(response.errorDetails).not.toHaveProperty('arbitrary');
+
+      response.error.message = 'legacy mutation';
+      response.error.translationOutcome.partial = false;
+      expect(response.errorDetails.message).toBe('Provider failure');
+      expect(response.errorDetails.translationOutcome.partial).toBe(true);
     });
   });
 
