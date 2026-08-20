@@ -3,6 +3,7 @@ import { subtitleTranslationCoordinator } from './SubtitleTranslationCoordinator
 import { SubtitleProgressTracker } from './SubtitleProgressTracker.js';
 import { unifiedTranslationService } from '@/core/services/translation/UnifiedTranslationService.js';
 import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
+import { MessageActions } from '@/shared/messaging/core/MessageActions.js';
 import { SubtitleParserFactory } from '../parsers/SubtitleParserFactory.js';
 import { SubtitleBatchPlanner } from './SubtitleBatchPlanner.js';
 import { MessagingBus } from '@/shared/messaging/core/MessagingBus.js';
@@ -66,6 +67,24 @@ describe('SubtitleTranslationCoordinator Stability', () => {
     expect(result.success).toBe(false);
     expect(result.errorDetails.message).toBe('Job cancelled before batch request');
     expect(unifiedTranslationService.handleTranslationRequest).not.toHaveBeenCalled();
+  });
+
+  it.each([undefined, null])('owns %s startup payload failure and emits canonical details', async (payload) => {
+    await expect(subtitleTranslationCoordinator.startJob(payload)).resolves.toBeUndefined();
+
+    expect(MessagingBus.broadcast).toHaveBeenCalledWith(expect.objectContaining({
+      action: MessageActions.SUBTITLE_TRANSLATE_ERROR,
+      payload: expect.objectContaining({
+        jobId: undefined,
+        errorDetails: expect.objectContaining({
+          message: expect.any(String),
+          type: expect.any(String)
+        })
+      })
+    }));
+    const errorPayload = MessagingBus.broadcast.mock.calls.at(-1)[0].payload;
+    expect(errorPayload).not.toHaveProperty('error');
+    expect(subtitleTranslationCoordinator.activeJobs.size).toBe(0);
   });
 
   it('should handle timeout protection using Promise.race', async () => {
