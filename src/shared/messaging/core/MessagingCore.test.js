@@ -188,6 +188,120 @@ describe('MessagingCore', () => {
       expect(roundTrip).toEqual(serialized);
     });
 
+    it('isolates reconstructed translationOutcome from its source DTO', () => {
+      const sourceDto = {
+        message: 'Source failure',
+        type: 'PROVIDER_ERROR',
+        translationOutcome: {
+          partial: true,
+          metadata: { committed: 1 },
+          items: [{ id: 1, accepted: true }],
+        },
+      };
+
+      const error = reconstructTranslationError(sourceDto);
+      error.translationOutcome.metadata.committed = 2;
+      error.translationOutcome.items[0].accepted = false;
+      error.translationOutcome.items.push({ id: 2, accepted: true });
+
+      expect(sourceDto.translationOutcome).toEqual({
+        partial: true,
+        metadata: { committed: 1 },
+        items: [{ id: 1, accepted: true }],
+      });
+    });
+
+    it('isolates serialized translationOutcome from its Error source', () => {
+      const error = new Error('Provider failure');
+      error.translationOutcome = {
+        partial: true,
+        metadata: { committed: 1 },
+        items: [{ id: 1, accepted: true }],
+      };
+
+      const serialized = MessageFormat.serializeTranslationError(error);
+      serialized.translationOutcome.metadata.committed = 2;
+      serialized.translationOutcome.items[0].accepted = false;
+      serialized.translationOutcome.items.push({ id: 2, accepted: true });
+
+      expect(error.translationOutcome).toEqual({
+        partial: true,
+        metadata: { committed: 1 },
+        items: [{ id: 1, accepted: true }],
+      });
+
+      error.translationOutcome.metadata.committed = 3;
+      error.translationOutcome.items[0].accepted = false;
+
+      expect(serialized.translationOutcome).toEqual({
+        partial: true,
+        metadata: { committed: 2 },
+        items: [{ id: 1, accepted: false }, { id: 2, accepted: true }],
+      });
+    });
+
+    it('keeps source DTO, reconstructed Error, and round-trip DTO independent', () => {
+      const sourceDto = {
+        message: 'Round-trip failure',
+        type: 'PROVIDER_ERROR',
+        translationOutcome: {
+          partial: true,
+          metadata: { committed: 1, batches: [[1, 2]] },
+          items: [{ id: 1, accepted: true }],
+        },
+      };
+      const reconstructedError = reconstructTranslationError(sourceDto);
+      const roundTripDto = MessageFormat.serializeTranslationError(reconstructedError);
+
+      expect(reconstructedError.translationOutcome).toEqual(sourceDto.translationOutcome);
+      expect(roundTripDto.translationOutcome).toEqual(sourceDto.translationOutcome);
+
+      sourceDto.translationOutcome.metadata.batches[0].push(3);
+      reconstructedError.translationOutcome.items[0].accepted = false;
+      roundTripDto.translationOutcome.metadata.committed = 2;
+
+      expect(sourceDto.translationOutcome.metadata.batches).toEqual([[1, 2, 3]]);
+      expect(sourceDto.translationOutcome.metadata.committed).toBe(1);
+      expect(sourceDto.translationOutcome.items[0].accepted).toBe(true);
+      expect(reconstructedError.translationOutcome.metadata.committed).toBe(1);
+      expect(reconstructedError.translationOutcome.metadata.batches).toEqual([[1, 2]]);
+      expect(reconstructedError.translationOutcome.items[0].accepted).toBe(false);
+      expect(roundTripDto.translationOutcome.metadata.committed).toBe(2);
+      expect(roundTripDto.translationOutcome.metadata.batches).toEqual([[1, 2]]);
+    });
+
+    it('isolates createErrorResponse source, canonical details, and legacy error', () => {
+      const sourceError = new Error('Provider failure');
+      sourceError.type = 'PROVIDER_ERROR';
+      sourceError.translationOutcome = {
+        partial: true,
+        metadata: { committed: 1, batches: [[1, 2]] },
+        items: [{ id: 1, accepted: true }],
+      };
+
+      const response = MessageFormat.createErrorResponse(sourceError);
+
+      sourceError.translationOutcome.metadata.committed = 2;
+      response.errorDetails.translationOutcome.metadata.batches[0].push(3);
+      response.error.translationOutcome.items[0].accepted = false;
+
+      expect(sourceError.translationOutcome).toEqual({
+        partial: true,
+        metadata: { committed: 2, batches: [[1, 2]] },
+        items: [{ id: 1, accepted: true }],
+      });
+      expect(response.errorDetails.translationOutcome).toEqual({
+        partial: true,
+        metadata: { committed: 1, batches: [[1, 2, 3]] },
+        items: [{ id: 1, accepted: true }],
+      });
+      expect(response.error.translationOutcome).toEqual({
+        partial: true,
+        metadata: { committed: 1, batches: [[1, 2]] },
+        items: [{ id: 1, accepted: false }],
+      });
+    });
+
     it('does not classify an explicitly null type, but classifies an absent type', () => {
       const explicitNull = MessageFormat.serializeTranslationError({
         message: 'No type supplied intentionally',
