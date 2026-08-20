@@ -220,7 +220,11 @@ MessageActions.CANCEL_TRANSLATION           // Cancel ongoing translations
 {
   success: false,
   error: {
-    message: 'Translation failed',
+    message: 'Translation failed', // Legacy compatibility field
+    type: 'PROVIDER_ERROR'
+  },
+  errorDetails: {
+    message: 'Translation failed', // Canonical structured error identity
     type: 'PROVIDER_ERROR'
   },
   messageId: 'original-id',
@@ -232,18 +236,18 @@ MessageActions.CANCEL_TRANSLATION           // Cancel ongoing translations
 
 The transport preserves a compatibility model for error fields:
 
-- **Legacy `error` fields may still exist.** Existing string-based fields remain
-  available during the compatibility period; they have not all been removed.
-- **Canonical structured identity** is carried through the `errorDetails` field
-  where the transport shape uses compatibility fields. When present, structured
-  identity takes precedence over legacy raw strings.
+- **Canonical structured identity** is carried through the `errorDetails` field.
+  Consumers should prefer valid `errorDetails` and fall back to `error` when it
+  is missing or malformed.
+- **Legacy `error` fields may still exist.** The field is retained for
+  compatibility and may include legacy or feature metadata.
 - `MessageFormat.serializeTranslationError()` creates the safe structured DTO at
   the sending boundary.
 - `reconstructTranslationError()` reconstructs the Error-like identity at
   consumer boundaries.
-- Arbitrary/native Error internals (such as `stack` or `cause`) are **not** part
-  of the public transport contract and must not be relied on across message
-  boundaries.
+- Native Error objects and arbitrary unsafe internals, including `stack` and
+  `cause`, are **not** part of the public transport contract and must not be
+  relied on across message boundaries.
 
 ## Context Types
 
