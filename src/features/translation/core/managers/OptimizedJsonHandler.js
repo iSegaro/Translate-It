@@ -933,11 +933,17 @@ const parentError = createParentValidationError(parentIdStr, sourceText, transla
               if (!abortController.signal.aborted) abortController.abort();
             }, remainingMs);
             
-            // Link timeout cleanup to abort signal
-            onAbort = () => clearTimeout(timeoutId);
+            // Shared abort must settle local wait immediately, even when the
+            // provider ignores the signal and leaves its promise pending.
+            onAbort = () => {
+              clearTimeout(timeoutId);
+              resolve({ __kind: 'abort' });
+            };
             abortController.signal.addEventListener('abort', onAbort);
+            if (abortController.signal.aborted) onAbort();
           });
-
+          if (abortController.signal.aborted) checkCancellation();
+            
            batchPayload = hasManifestMembership ? batch.map(({ payload }) => payload) : batch;
            const explicitParentIds = batch.map(item => item && typeof item === 'object'
              ? (item.parentId ?? item.blockId)
@@ -1031,6 +1037,8 @@ const parentError = createParentValidationError(parentIdStr, sourceText, transla
             throw translatedBatchResponse.error;
           } else if (translatedBatchResponse && typeof translatedBatchResponse === 'object' && translatedBatchResponse.__kind === 'provider-success') {
             translatedBatchResponse = translatedBatchResponse.value;
+          } else if (translatedBatchResponse && typeof translatedBatchResponse === 'object' && translatedBatchResponse.__kind === 'abort') {
+            checkCancellation();
           }
 
           checkCancellation();

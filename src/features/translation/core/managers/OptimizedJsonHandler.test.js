@@ -2710,6 +2710,130 @@ describe('OptimizedJsonHandler', () => {
       }
     });
 
+    it('should settle immediately when abort occurs at listener registration', async () => {
+      const browser = (await import('webextension-polyfill')).default;
+      const pending = createDeferred();
+
+      mockAbortController.signal.addEventListener.mockImplementation(() => {
+        mockAbortController.signal.aborted = true;
+      });
+      mockProvider.translate.mockImplementation(() => pending.promise);
+      browser.tabs.sendMessage.mockClear();
+
+      const execution = handler.execute(mockEngine, mockData, mockProvider, 'en', 'fa', 'msg-abort-registration', mockSender);
+      const result = await execution;
+
+      expect(result).toMatchObject({
+        success: false,
+        error: { type: ErrorTypes.USER_CANCELLED }
+      });
+      expect(mockProvider.translate).not.toHaveBeenCalled();
+      expect(mockEngine.lifecycleRegistry.unregisterRequest).toHaveBeenCalledWith('msg-abort-registration');
+      expect(browser.tabs.sendMessage).not.toHaveBeenCalled();
+
+      pending.resolve({ translatedText: ['late'] });
+      await Promise.resolve();
+      expect(browser.tabs.sendMessage).not.toHaveBeenCalled();
+    });
+
+    it('should detach a non-cooperative parallel sibling after timeout', async () => {
+      vi.useFakeTimers();
+      const { getAIConversationHistoryEnabledAsync } = await import('@/shared/config/config.js');
+      const sibling = createDeferred();
+      const abortListeners = new Set();
+      const browser = (await import('webextension-polyfill')).default;
+
+      try {
+        getAIConversationHistoryEnabledAsync.mockResolvedValue(false);
+        mockAbortController.signal.addEventListener.mockImplementation((_type, listener) => {
+          abortListeners.add(listener);
+        });
+        mockAbortController.signal.removeEventListener.mockImplementation((_type, listener) => {
+          abortListeners.delete(listener);
+        });
+        mockAbortController.abort.mockImplementation(() => {
+          mockAbortController.signal.aborted = true;
+          for (const listener of abortListeners) listener();
+        });
+        mockProvider.translate
+          .mockResolvedValueOnce({ translatedText: ['first'] })
+          .mockImplementationOnce(() => sibling.promise);
+        browser.tabs.sendMessage.mockClear();
+
+        const execution = handler.execute(mockEngine, mockData, mockProvider, 'en', 'fa', 'msg-parallel-timeout', mockSender);
+        execution.catch(() => {});
+        await vi.waitFor(() => expect(mockProvider.translate).toHaveBeenCalledTimes(2));
+
+        await vi.advanceTimersByTimeAsync(TRANSLATION_BATCH_EXECUTION_TIMEOUT_MS);
+        await expect(execution).rejects.toMatchObject({ type: ErrorTypes.TRANSLATION_TIMEOUT });
+        expect(mockEngine.lifecycleRegistry.unregisterRequest).toHaveBeenCalledWith('msg-parallel-timeout');
+        expect(browser.tabs.sendMessage).toHaveBeenCalledTimes(1);
+
+        sibling.resolve({ translatedText: ['late sibling'] });
+        await Promise.resolve();
+        await Promise.resolve();
+
+        const messages = browser.tabs.sendMessage.mock.calls.map(([, message]) => message);
+        expect(messages).not.toContainEqual(expect.objectContaining({
+          data: expect.objectContaining({ data: ['late sibling'] })
+        }));
+        expect(appendTranslationDiagnostic).not.toHaveBeenCalledWith(
+          expect.anything(),
+          expect.objectContaining({ type: 'STRUCTURED_BATCH_FAILURE', reason: 'late sibling' })
+        );
+      } finally {
+        sibling.resolve({ translatedText: ['late sibling'] });
+        getAIConversationHistoryEnabledAsync.mockResolvedValue(false);
+        vi.useRealTimers();
+      }
+    });
+
+    it('consumes a detached sibling rejection after timeout without a second terminal outcome', async () => {
+      vi.useFakeTimers();
+      const { getAIConversationHistoryEnabledAsync } = await import('@/shared/config/config.js');
+      const sibling = createDeferred();
+      const abortListeners = new Set();
+
+      try {
+        getAIConversationHistoryEnabledAsync.mockResolvedValue(false);
+        mockAbortController.signal.addEventListener.mockImplementation((_type, listener) => {
+          abortListeners.add(listener);
+        });
+        mockAbortController.signal.removeEventListener.mockImplementation((_type, listener) => {
+          abortListeners.delete(listener);
+        });
+        mockAbortController.abort.mockImplementation(() => {
+          mockAbortController.signal.aborted = true;
+          for (const listener of abortListeners) listener();
+        });
+        mockProvider.translate
+          .mockResolvedValueOnce({ translatedText: ['first'] })
+          .mockImplementationOnce(() => sibling.promise);
+
+        const execution = handler.execute(mockEngine, mockData, mockProvider, 'en', 'fa', 'msg-parallel-reject', mockSender);
+        execution.catch(() => {});
+        await vi.waitFor(() => expect(mockProvider.translate).toHaveBeenCalledTimes(2));
+
+        await vi.advanceTimersByTimeAsync(TRANSLATION_BATCH_EXECUTION_TIMEOUT_MS);
+        await expect(execution).rejects.toMatchObject({ type: ErrorTypes.TRANSLATION_TIMEOUT });
+        const unregisterCalls = mockEngine.lifecycleRegistry.unregisterRequest.mock.calls.length;
+
+        sibling.reject(new Error('late sibling failure'));
+        await Promise.resolve();
+        await Promise.resolve();
+
+        expect(mockEngine.lifecycleRegistry.unregisterRequest).toHaveBeenCalledTimes(unregisterCalls);
+        expect(appendTranslationDiagnostic).not.toHaveBeenCalledWith(
+          expect.anything(),
+          expect.objectContaining({ type: 'STRUCTURED_BATCH_FAILURE', reason: 'late sibling failure' })
+        );
+      } finally {
+        sibling.resolve({ translatedText: ['late sibling'] });
+        getAIConversationHistoryEnabledAsync.mockResolvedValue(false);
+        vi.useRealTimers();
+      }
+    });
+
     it('should emit one assembled V2 node after all fragments succeed', async () => {
       const browser = (await import('webextension-polyfill')).default;
       const fragments = [
