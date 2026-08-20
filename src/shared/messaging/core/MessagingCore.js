@@ -163,7 +163,9 @@ export const MessageFormat = {
     copyScalar(serialized, 'errorCode', getFieldValue(error, options, 'errorCode'), ['string', 'number']);
 
     const translationOutcome = cloneSafeValue(getFieldValue(error, options, 'translationOutcome'));
-    if (translationOutcome !== UNSUPPORTED_VALUE) serialized.translationOutcome = translationOutcome;
+    if (translationOutcome !== UNSUPPORTED_VALUE && translationOutcome !== CIRCULAR_VALUE) {
+      serialized.translationOutcome = translationOutcome;
+    }
 
     return serialized;
   },

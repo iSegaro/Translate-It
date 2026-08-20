@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { MessageFormat, generateMessageId } from './MessagingCore.js';
+import { MessageFormat, generateMessageId, reconstructTranslationError } from './MessagingCore.js';
 import { MessageActions } from './MessageActions.js';
 import { MessageContexts } from './MessagingConstants.js';
 
@@ -155,6 +155,37 @@ describe('MessagingCore', () => {
       ]);
       expect(serialized.translationOutcome).toEqual({ committedParentCount: 1 });
       expect(serialized).not.toHaveProperty('arbitrary');
+    });
+
+    it('omits a root circular translationOutcome', () => {
+      const outcome = {};
+      outcome.self = outcome;
+
+      const serialized = MessageFormat.serializeTranslationError({
+        message: 'Circular outcome',
+        type: 'PROVIDER_ERROR',
+        translationOutcome: outcome,
+      });
+
+      expect(serialized).not.toHaveProperty('translationOutcome');
+      expect(Object.values(serialized).some(value => typeof value === 'symbol')).toBe(false);
+    });
+
+    it('preserves valid translationOutcome through reconstruction and re-serialization', () => {
+      const serialized = MessageFormat.serializeTranslationError({
+        message: 'Stable outcome',
+        type: 'PROVIDER_ERROR',
+        translationOutcome: {
+          partial: true,
+          committedParentCount: 1,
+          metadata: { source: 'test' },
+        },
+      });
+
+      const reconstructed = reconstructTranslationError(serialized);
+      const roundTrip = MessageFormat.serializeTranslationError(reconstructed);
+
+      expect(roundTrip).toEqual(serialized);
     });
 
     it('does not classify an explicitly null type, but classifies an absent type', () => {
