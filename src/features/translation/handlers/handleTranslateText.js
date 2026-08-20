@@ -1,6 +1,6 @@
 import { ErrorHandler } from '@/shared/error-management/ErrorHandler.js';
 import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
-import { MessageFormat } from '@/shared/messaging/core/MessagingCore.js';
+import { MessageFormat, isStructuredTranslationError } from '@/shared/messaging/core/MessagingCore.js';
 import { MessageActions } from '@/shared/messaging/core/MessageActions.js';
 import { ProviderRegistryIds } from '@/features/translation/providers/ProviderConstants.js';
 import { getScopedLogger } from '@/shared/logging/logger.js';
@@ -73,12 +73,15 @@ export async function handleTranslateText(message, sender, sendResponse) {
       return response;
     } else {
       const errorMessage = result.error?.message || 'Translation failed';
+      const hasCanonicalDetails = isStructuredTranslationError(result.errorDetails);
+      const canonicalSource = hasCanonicalDetails ? result.errorDetails : result.error ?? errorMessage;
       const response = {
         success: false,
         error: errorMessage,
-        errorDetails: MessageFormat.serializeTranslationError(result.error ?? errorMessage, {
-          message: errorMessage
-        })
+        errorDetails: MessageFormat.serializeTranslationError(
+          canonicalSource,
+          hasCanonicalDetails ? {} : { message: errorMessage }
+        )
       };
       logger.debug(`[TRANSLATE_TEXT] Returning error response:`, response);
       return response;

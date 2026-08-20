@@ -91,6 +91,85 @@ describe('handleTranslateText', () => {
     });
   });
 
+  it('preserves canonical identity when legacy and canonical failures conflict', async () => {
+    unifiedTranslationService.handleTranslationRequest.mockResolvedValue({
+      success: false,
+      error: {
+        message: 'legacy failure',
+        type: 'LEGACY_ERROR',
+        context: 'legacy-context',
+      },
+      errorDetails: {
+        message: 'canonical failure',
+        type: 'API_ERROR',
+        statusCode: 503,
+        code: 'UPSTREAM_FAILURE',
+        context: 'canonical-context',
+        cause: 'private',
+        arbitrary: { ignored: true },
+      },
+    });
+
+    const response = await handleTranslateText(message);
+
+    expect(response).toMatchObject({
+      success: false,
+      error: 'legacy failure',
+      errorDetails: {
+        message: 'canonical failure',
+        type: 'API_ERROR',
+        statusCode: 503,
+        code: 'UPSTREAM_FAILURE',
+        context: 'canonical-context',
+      },
+    });
+    expect(response.errorDetails).not.toHaveProperty('cause');
+    expect(response.errorDetails).not.toHaveProperty('arbitrary');
+  });
+
+  it('preserves canonical details for details-only failures', async () => {
+    unifiedTranslationService.handleTranslationRequest.mockResolvedValue({
+      success: false,
+      errorDetails: {
+        message: 'Canonical failure',
+        type: 'API_ERROR',
+        statusCode: 503,
+        code: 'UPSTREAM_FAILURE',
+      },
+    });
+
+    await expect(handleTranslateText(message)).resolves.toMatchObject({
+      success: false,
+      error: 'Translation failed',
+      errorDetails: {
+        message: 'Canonical failure',
+        type: 'API_ERROR',
+        statusCode: 503,
+        code: 'UPSTREAM_FAILURE',
+      },
+    });
+  });
+
+  it('falls back to legacy error when errorDetails is malformed', async () => {
+    unifiedTranslationService.handleTranslationRequest.mockResolvedValue({
+      success: false,
+      error: {
+        message: 'Legacy failure',
+        type: 'NETWORK_ERROR',
+      },
+      errorDetails: { arbitrary: true },
+    });
+
+    await expect(handleTranslateText(message)).resolves.toMatchObject({
+      success: false,
+      error: 'Legacy failure',
+      errorDetails: {
+        message: 'Legacy failure',
+        type: 'NETWORK_ERROR',
+      },
+    });
+  });
+
   it('adds canonical identity to catch failures without changing message', async () => {
     const error = new Error('Transport failed');
     error.type = 'NETWORK_ERROR';
