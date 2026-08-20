@@ -28,7 +28,6 @@ const createProgress = (overrides = {}) => reactive({
   failed: 1,
   total: 2,
   etaMs: 0,
-  terminalError: null,
   terminalErrorDetails: null,
   ...overrides
 });
@@ -46,20 +45,6 @@ describe('SubtitleProgressPanel terminal errors', () => {
 
     expect(wrapper.find('.error-msg').text()).toBe('Safe terminal error');
     expect(wrapper.text()).not.toContain('raw diagnostic');
-  });
-
-  it('does not render string-only terminal errors', async () => {
-    const wrapper = mount(SubtitleProgressPanel, {
-      props: {
-        progress: createProgress({ terminalError: 'legacy terminal failure' }),
-        status: 'completed'
-      }
-    });
-
-    await nextTick();
-    await Promise.resolve();
-
-    expect(wrapper.find('.terminal-error-alert').exists()).toBe(false);
   });
 
   it('does not render cancellation terminal errors', async () => {
@@ -90,7 +75,7 @@ describe('SubtitleProgressPanel terminal errors', () => {
 
   it.each([
     ['missing', {}],
-    ['malformed', { terminalErrorDetails: { arbitrary: true }, terminalError: 'legacy failure' }]
+    ['malformed', { terminalErrorDetails: { arbitrary: true } }]
   ])('does not render %s terminal details', async (_label, overrides) => {
     const wrapper = mount(SubtitleProgressPanel, {
       props: { progress: createProgress(overrides), status: 'completed' }

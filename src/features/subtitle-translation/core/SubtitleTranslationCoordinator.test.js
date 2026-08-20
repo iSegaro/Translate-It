@@ -226,6 +226,40 @@ describe('SubtitleTranslationCoordinator Stability', () => {
     });
     expect(payload).not.toHaveProperty('error');
   });
+
+  it('passes only canonical details to the tracker on fatal batch failure', async () => {
+    const cue = { id: 'fatal-1', text: 'Hello', index: 1, warnings: [] };
+    SubtitleParserFactory.getAdapter.mockReturnValue({
+      parse: vi.fn(() => ({ cues: [cue] })),
+      serialize: vi.fn(() => 'serialized')
+    });
+    SubtitleBatchPlanner.plan.mockReturnValue([[cue]]);
+    unifiedTranslationService.handleTranslationRequest.mockResolvedValue({
+      success: false,
+      error: { message: 'Provider failed', type: ErrorTypes.API_KEY_INVALID }
+    });
+    const setTerminalError = vi.spyOn(SubtitleProgressTracker.prototype, 'setTerminalError');
+
+    try {
+      await subtitleTranslationCoordinator.startJob({
+        jobId: 'job-fatal-details',
+        content: 'subtitle',
+        filename: 'sample.srt',
+        sourceLanguage: 'en',
+        targetLanguage: 'fa',
+        providerId: 'google',
+        options: {}
+      });
+
+      expect(setTerminalError).toHaveBeenCalledWith(expect.objectContaining({
+        message: 'Provider failed',
+        type: ErrorTypes.API_KEY_INVALID
+      }));
+      expect(setTerminalError.mock.calls[0]).toHaveLength(1);
+    } finally {
+      setTerminalError.mockRestore();
+    }
+  });
 });
 
 describe('SubtitleTranslationCoordinator Source-Preservation Contract', () => {

@@ -182,7 +182,6 @@ describe('useSubtitleTranslation error presentation', () => {
           translated: 1,
           failed: 1,
           total: 2,
-          terminalError: 'raw provider body',
           terminalErrorDetails: errorDetails
         }
       }
