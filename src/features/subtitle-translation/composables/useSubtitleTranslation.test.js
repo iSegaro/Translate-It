@@ -112,6 +112,23 @@ describe('useSubtitleTranslation error presentation', () => {
     expect(state.error.value).toBe('Localized TRANSLATION_FAILED');
   });
 
+  it('rejects rejected array details carrying a message as malformed', async () => {
+    const state = useSubtitleTranslation();
+    const malformedDetails = [];
+    malformedDetails.message = 'malformed canonical details';
+
+    sendToBackgroundMock.mockRejectedValueOnce(malformedDetails);
+
+    await state.startTranslation('subtitle', 'sample.srt', {
+      sourceLanguage: 'en',
+      targetLanguage: 'fa',
+      providerId: 'provider'
+    });
+
+    expect(presentSubtitleTranslationErrorMock).toHaveBeenCalledWith({ errorDetails: undefined });
+    expect(state.error.value).toBe('Localized TRANSLATION_FAILED');
+  });
+
   it('uses response errorDetails and ignores conflicting raw response error', async () => {
     const state = useSubtitleTranslation();
     const errorDetails = { message: 'structured start failure', type: 'MODEL_NOT_FOUND' };

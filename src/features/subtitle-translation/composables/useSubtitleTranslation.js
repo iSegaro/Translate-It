@@ -3,7 +3,7 @@ import { MessagingBus } from '@/shared/messaging/core/MessagingBus.js';
 import { MessageActions } from '@/shared/messaging/core/MessageActions.js';
 import { MessageContexts } from '@/shared/messaging/core/MessagingConstants.js';
 import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
-import { MessageFormat } from '@/shared/messaging/core/MessagingCore.js';
+import { MessageFormat, isStructuredTranslationError } from '@/shared/messaging/core/MessagingCore.js';
 import { presentSubtitleTranslationError } from '../presentation/SubtitleTranslationErrorPresenter.js';
 
 const CANONICAL_ERROR_TYPES = new Set([
@@ -11,12 +11,6 @@ const CANONICAL_ERROR_TYPES = new Set([
   'MODEL_NOT_FOUND',
   'PROVIDER_ERROR'
 ]);
-
-function hasValidErrorDetails(errorDetails) {
-  return errorDetails
-    && typeof errorDetails === 'object'
-    && typeof errorDetails.message === 'string';
-}
 
 function isCanonicalTranslationError(error) {
   if (!error || typeof error !== 'object') return false;
@@ -32,7 +26,7 @@ function isCanonicalTranslationError(error) {
 }
 
 function getRejectedErrorDetails(error) {
-  if (hasValidErrorDetails(error?.errorDetails)) return error.errorDetails;
+  if (isStructuredTranslationError(error?.errorDetails)) return error.errorDetails;
   if (isCanonicalTranslationError(error)) return MessageFormat.serializeTranslationError(error);
   return undefined;
 }

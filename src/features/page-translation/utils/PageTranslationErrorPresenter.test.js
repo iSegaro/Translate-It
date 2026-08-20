@@ -75,6 +75,23 @@ describe('getPageTranslationErrorPresentation', () => {
     });
   });
 
+  it('rejects array details carrying a message and uses legacy fallback', async () => {
+    const malformedDetails = [];
+    malformedDetails.message = 'malformed canonical details';
+    malformedDetails.type = ErrorTypes.USER_CANCELLED;
+
+    await getPageTranslationErrorPresentation({
+      error: 'legacy failure',
+      errorDetails: malformedDetails,
+      errorType: 'MODEL_MISSING',
+    });
+
+    expect(mapCanonicalTranslationError.mock.calls[0][0]).toMatchObject({
+      message: 'legacy failure',
+      type: 'MODEL_MISSING',
+    });
+  });
+
   it('silently ignores cancellation errors', async () => {
     const result = await getPageTranslationErrorPresentation({
       errorDetails: {

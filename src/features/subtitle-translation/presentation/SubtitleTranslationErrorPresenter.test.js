@@ -68,6 +68,20 @@ describe('presentSubtitleTranslationError', () => {
     );
   });
 
+  it('rejects array details carrying a message as malformed', async () => {
+    const malformedDetails = [];
+    malformedDetails.message = 'malformed canonical details';
+    malformedDetails.type = ErrorTypes.USER_CANCELLED;
+
+    await expect(presentSubtitleTranslationError({
+      error: 'legacy failure',
+      errorDetails: malformedDetails
+    })).resolves.toMatchObject({
+      kind: 'display',
+      message: 'Localized TRANSLATION_FAILED'
+    });
+  });
+
   it('uses generic display for legacy cancellation strings without typed details', async () => {
     await expect(presentSubtitleTranslationError({ error: 'Translation cancelled' }))
       .resolves.toMatchObject({ kind: 'display', message: 'Localized TRANSLATION_FAILED' });

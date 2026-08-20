@@ -3,13 +3,7 @@ import { isCancellationError } from '@/shared/error-management/ErrorMatcher.js'
 import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js'
 import { mapCanonicalTranslationError } from '@/shared/error-management/PublicTranslationErrorPolicy.js'
 import { createLegacyDisplayError } from '@/shared/error-management/PublicTranslationErrorAdapter.js'
-import { reconstructTranslationError } from '@/shared/messaging/core/MessagingCore.js'
-
-function hasValidErrorDetails(errorDetails) {
-  return errorDetails
-    && typeof errorDetails === 'object'
-    && typeof errorDetails.message === 'string'
-}
+import { reconstructTranslationError, isStructuredTranslationError } from '@/shared/messaging/core/MessagingCore.js'
 
 function isSilentError(error) {
   return [ErrorTypes.CONTEXT, ErrorTypes.EXTENSION_CONTEXT_INVALIDATED].includes(error.type)
@@ -41,7 +35,7 @@ async function createGenericTranslationPresentation() {
  * @returns {Promise<{kind: 'display', message: string, error: Error}|{kind: 'silent'}|{kind: 'legacy'}>}
  */
 export async function presentPdfTranslationError(detail = {}) {
-  if (!hasValidErrorDetails(detail.errorDetails)) {
+  if (!isStructuredTranslationError(detail.errorDetails)) {
     if (detail.failureReason === 'cancelled') return { kind: 'silent' }
     if (detail.error && typeof detail.error === 'object' && isSilentError(detail.error)) {
       return { kind: 'silent' }

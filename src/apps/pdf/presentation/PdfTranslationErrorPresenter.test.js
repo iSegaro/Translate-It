@@ -67,6 +67,23 @@ describe('presentPdfTranslationError', () => {
     }))
   })
 
+  it('rejects array details carrying a message as malformed', async () => {
+    const malformedDetails = []
+    malformedDetails.message = 'malformed canonical details'
+    malformedDetails.type = ErrorTypes.USER_CANCELLED
+
+    const result = await presentPdfTranslationError({
+      error: 'legacy failure',
+      errorDetails: malformedDetails,
+      failureReason: 'provider-error',
+    })
+
+    expect(result).toMatchObject({ kind: 'display' })
+    expect(mapCanonicalTranslationError).toHaveBeenCalledWith(expect.objectContaining({
+      type: ErrorTypes.TRANSLATION_FAILED,
+    }))
+  })
+
   it('uses generic safe display for empty responses without DTO', async () => {
     const result = await presentPdfTranslationError({
       error: 'Empty translation result',

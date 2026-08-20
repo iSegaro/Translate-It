@@ -3,14 +3,10 @@ import { isCancellationError } from '@/shared/error-management/ErrorMatcher.js';
 import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
 import { mapCanonicalTranslationError } from '@/shared/error-management/PublicTranslationErrorPolicy.js';
 import { createLegacyDisplayError } from '@/shared/error-management/PublicTranslationErrorAdapter.js';
-import { reconstructTranslationError } from '@/shared/messaging/core/MessagingCore.js';
+import { reconstructTranslationError, isStructuredTranslationError } from '@/shared/messaging/core/MessagingCore.js';
 
 function getCanonicalSource(detail) {
-  if (
-    detail?.errorDetails
-    && typeof detail.errorDetails === 'object'
-    && typeof detail.errorDetails.message === 'string'
-  ) {
+  if (isStructuredTranslationError(detail?.errorDetails)) {
     return detail.errorDetails;
   }
 
