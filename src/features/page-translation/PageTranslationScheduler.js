@@ -60,6 +60,8 @@ export class PageTranslationScheduler extends ResourceTracker {
     this._lastReportTime = 0;
     this._reportInterval = 300; // ms
     this._reportPending = false;
+    this._completionTimer = null;
+    this.pendingSettlements = new Set();
 
     // Register queue for automatic memory management via ResourceTracker
     this.trackResource('translation-queue', () => {
@@ -133,19 +135,60 @@ export class PageTranslationScheduler extends ResourceTracker {
       clearTimeout(this.batchTimer);
       this.batchTimer = null;
     }
+    if (this._completionTimer) {
+      clearTimeout(this._completionTimer);
+      this._completionTimer = null;
+    }
     
     if (this.queue.length > 0) {
       const itemsToReject = [...this.queue];
       this.queue = [];
       this.highPriorityCount = 0;
       itemsToReject.forEach(item => {
-        try { item.resolve(item.text); } catch {
-          // Ignore resolution errors
-        }
+        this._resolveItem(item, item.text, 'cancelled');
       });
     }
+    [...this.pendingSettlements].forEach(settlement => settlement.settle('cancelled'));
     this.activeFlushes = 0;
     this.isFirstBatch = true;
+  }
+
+  _createSettlement(item, text) {
+    // Provider success stays pending until Bridge validates its DOM target.
+    let state = 'pending';
+    const settlement = {
+      __pageTranslationSettlement: true,
+      text,
+      get state() {
+        return state;
+      },
+      settle: (outcome) => {
+        if (state !== 'pending') return false;
+        state = outcome;
+        this.pendingSettlements.delete(settlement);
+        if (outcome === 'accepted') this.translatedCount++;
+        if (outcome === 'stale' || outcome === 'failed') this.failedCount++;
+        if (outcome === 'accepted' || outcome === 'stale') {
+          this._reportProgress();
+          this._checkCompletion();
+        }
+        return true;
+      },
+    };
+    this.pendingSettlements.add(settlement);
+    return settlement;
+  }
+
+  _resolveItem(item, text, outcome) {
+    if (!item || item.settled) return;
+    item.settled = true;
+    const settlement = this._createSettlement(item, text);
+    if (outcome !== 'success') settlement.settle(outcome);
+    try {
+      item.resolve(settlement);
+    } catch {
+      // Ignore resolution errors
+    }
   }
 
   /**
@@ -349,8 +392,7 @@ export class PageTranslationScheduler extends ResourceTracker {
               if (item.isHighPriority) {
                 this.highPriorityCount = Math.max(0, this.highPriorityCount - 1);
               }
-              try { item.resolve(item.text); } catch { /* ignore */ }
-              this.failedCount++;
+              this._resolveItem(item, item.text, 'failed');
             });
           }
         } else {
@@ -418,7 +460,7 @@ export class PageTranslationScheduler extends ResourceTracker {
       // Validation after async call
       if (!this.isTranslated || (flushContext && flushContext !== this.sessionContext)) {
         this.logger.debug('Batch discarded: session changed or stopped');
-        batch.forEach(item => { try { item.resolve(item.text); } catch { /* ignore */ } });
+        batch.forEach(item => this._resolveItem(item, item.text, 'cancelled'));
         return;
       }
 
@@ -479,13 +521,11 @@ export class PageTranslationScheduler extends ResourceTracker {
         // Blank and non-string results are unresolved. Identity translations
         // remain valid because only usability, not source equality, is checked.
         if (isExplicitlySkipped || typeof translatedText !== 'string' || !translatedText.trim()) {
-          item.resolve(item.text);
-          this.failedCount++;
+          this._resolveItem(item, item.text, 'failed');
           return;
         }
 
-        item.resolve(translatedText);
-        this.translatedCount++;
+        this._resolveItem(item, translatedText, 'success');
       });
 
       this._reportProgress();
@@ -570,10 +610,7 @@ export class PageTranslationScheduler extends ResourceTracker {
     }
 
     // Resolve current batch items with original text to unblock domtranslator
-    batch.forEach(item => { 
-      try { item.resolve(item.text); } catch { /* ignore */ } 
-      this.failedCount++;
-    });
+    batch.forEach(item => this._resolveItem(item, item.text, 'failed'));
 
     // Emit internal event for the Manager to handle feedback and broadcasting
     pageEventBus.emit('page-translation-internal-error', { 
@@ -622,8 +659,10 @@ export class PageTranslationScheduler extends ResourceTracker {
    * Check if translation is complete or temporarily idle (waiting for more visible content)
    */
   _checkCompletion() {
+    if (this._completionTimer) return;
     // Small delay to ensure no more immediate tasks are coming
-    this.trackTimeout(() => {
+    this._completionTimer = this.trackTimeout(() => {
+      this._completionTimer = null;
       if (!this.isTranslated || this.activeFlushes > 0) return;
 
       const processedCount = this.translatedCount + this.failedCount;

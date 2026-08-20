@@ -30,6 +30,7 @@ import { PageTranslationQueueFilter } from './utils/PageTranslationQueueFilter.j
 import { PageTranslationFluidFilter } from './utils/PageTranslationFluidFilter.js';
 import { safeSendMessage } from '@/shared/messaging/core/UnifiedMessaging.js';
 import { pageEventBus } from '@/core/PageEventBus.js';
+import { MessageActions } from '@/shared/messaging/core/MessageActions.js';
 
 // 3. Mock other dependencies
 vi.mock('./utils/PageTranslationQueueFilter.js', () => ({
@@ -72,6 +73,14 @@ vi.mock('@/config.js', () => ({
 
 describe('PageTranslationScheduler', () => {
   let scheduler;
+
+  const getSettlement = (resolver) => resolver.mock.calls.at(-1)[0];
+  const expectSettlement = (resolver, text) => {
+    expect(getSettlement(resolver)).toEqual(expect.objectContaining({
+      __pageTranslationSettlement: true,
+      text,
+    }));
+  };
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -133,6 +142,72 @@ describe('PageTranslationScheduler', () => {
   });
 
   describe('Batch Execution (Fluid Mode)', () => {
+    it('defers success accounting until settlement acceptance', async () => {
+      const mockItem = { text: 'Hello', resolve: vi.fn(), score: 1 };
+      scheduler.queue.push(mockItem);
+      PageTranslationFluidFilter.process.mockReturnValue({ batchItems: [mockItem], remainingItems: [] });
+      vi.spyOn(scheduler, '_getBatchConfig').mockResolvedValue({ providerRegistryId: 'google', targetLanguage: 'fa' });
+      safeSendMessage.mockResolvedValue({
+        success: true,
+        translatedText: JSON.stringify(['سلام'])
+      });
+
+      await scheduler.flush();
+
+      const settlement = getSettlement(mockItem.resolve);
+      expect(settlement.state).toBe('pending');
+      expect(scheduler.translatedCount).toBe(0);
+      settlement.settle('stale');
+      expect(scheduler.translatedCount).toBe(0);
+      expect(scheduler.failedCount).toBe(1);
+    });
+
+    it('cancels pending settlements without manufacturing failure counts', async () => {
+      const mockItem = { text: 'Hello', resolve: vi.fn(), score: 1 };
+      scheduler.queue.push(mockItem);
+      PageTranslationFluidFilter.process.mockReturnValue({ batchItems: [mockItem], remainingItems: [] });
+      vi.spyOn(scheduler, '_getBatchConfig').mockResolvedValue({ providerRegistryId: 'google', targetLanguage: 'fa' });
+      safeSendMessage.mockResolvedValue({
+        success: true,
+        translatedText: JSON.stringify(['سلام'])
+      });
+
+      await scheduler.flush();
+
+      const settlement = getSettlement(mockItem.resolve);
+      scheduler.stop();
+      expect(settlement.state).toBe('cancelled');
+      expect(scheduler.translatedCount).toBe(0);
+      expect(scheduler.failedCount).toBe(0);
+      expect(settlement.settle('accepted')).toBe(false);
+    });
+
+    it('emits completion once after stale settlement', async () => {
+      vi.useFakeTimers();
+      try {
+        const emitSpy = vi.spyOn(pageEventBus, 'emit');
+        const mockItem = { text: 'Hello', resolve: vi.fn(), score: 1 };
+        scheduler.queue.push(mockItem);
+        scheduler.totalTasks = 1;
+        PageTranslationFluidFilter.process.mockReturnValue({ batchItems: [mockItem], remainingItems: [] });
+        vi.spyOn(scheduler, '_getBatchConfig').mockResolvedValue({ providerRegistryId: 'google', targetLanguage: 'fa' });
+        safeSendMessage.mockResolvedValue({
+          success: true,
+          translatedText: JSON.stringify(['سلام'])
+        });
+
+        await scheduler.flush();
+        getSettlement(mockItem.resolve).settle('stale');
+        await vi.advanceTimersByTimeAsync(600);
+
+        expect(emitSpy.mock.calls.filter(([event]) => event === MessageActions.PAGE_TRANSLATE_COMPLETE))
+          .toHaveLength(1);
+        emitSpy.mockRestore();
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
     it('should process a successful batch translation', async () => {
       const mockItem = { text: 'Hello', resolve: vi.fn(), score: 1 };
       scheduler.queue.push(mockItem);
@@ -157,8 +232,9 @@ describe('PageTranslationScheduler', () => {
       await scheduler.flush();
 
       expect(safeSendMessage).toHaveBeenCalled();
-      expect(mockItem.resolve).toHaveBeenCalledWith('سلام');
-      expect(scheduler.translatedCount).toBe(1);
+       expectSettlement(mockItem.resolve, 'سلام');
+       getSettlement(mockItem.resolve).settle('accepted');
+       expect(scheduler.translatedCount).toBe(1);
     });
 
     it.each(['', '   ', '\n\t'])('should preserve original and count blank result as failed: %j', async (blankText) => {
@@ -174,7 +250,7 @@ describe('PageTranslationScheduler', () => {
 
       await scheduler.flush();
 
-      expect(mockItem.resolve).toHaveBeenCalledWith('Original');
+       expectSettlement(mockItem.resolve, 'Original');
       expect(scheduler.translatedCount).toBe(0);
       expect(scheduler.failedCount).toBe(1);
     });
@@ -192,7 +268,7 @@ describe('PageTranslationScheduler', () => {
 
       await scheduler.flush();
 
-      expect(mockItem.resolve).toHaveBeenCalledWith('Original');
+       expectSettlement(mockItem.resolve, 'Original');
       expect(scheduler.translatedCount).toBe(0);
       expect(scheduler.failedCount).toBe(1);
     });
@@ -212,9 +288,11 @@ describe('PageTranslationScheduler', () => {
 
       await scheduler.flush();
 
-      expect(itemA.resolve).toHaveBeenCalledWith('A2');
-      expect(itemB.resolve).toHaveBeenCalledWith('B');
-      expect(itemC.resolve).toHaveBeenCalledWith('C2');
+       expectSettlement(itemA.resolve, 'A2');
+       expectSettlement(itemB.resolve, 'B');
+       expectSettlement(itemC.resolve, 'C2');
+       getSettlement(itemA.resolve).settle('accepted');
+       getSettlement(itemC.resolve).settle('accepted');
       expect(scheduler.translatedCount).toBe(2);
       expect(scheduler.failedCount).toBe(1);
     });
@@ -234,8 +312,8 @@ describe('PageTranslationScheduler', () => {
 
       await scheduler.flush();
 
-      expect(itemA.resolve).toHaveBeenCalledWith('A');
-      expect(itemB.resolve).toHaveBeenCalledWith('B');
+       expectSettlement(itemA.resolve, 'A');
+       expectSettlement(itemB.resolve, 'B');
       expect(scheduler.translatedCount).toBe(0);
       expect(scheduler.failedCount).toBe(2);
       expect(scheduler.translatedCount + scheduler.failedCount).toBe(scheduler.totalTasks);
@@ -258,9 +336,9 @@ describe('PageTranslationScheduler', () => {
       await scheduler.flush();
 
       expect(itemA.resolve).toHaveBeenCalledTimes(1);
-      expect(itemA.resolve).toHaveBeenCalledWith('A');
+       expectSettlement(itemA.resolve, 'A');
       expect(itemB.resolve).toHaveBeenCalledTimes(1);
-      expect(itemB.resolve).toHaveBeenCalledWith('B');
+       expectSettlement(itemB.resolve, 'B');
       expect(scheduler.translatedCount).toBe(0);
       expect(scheduler.failedCount).toBe(2);
     });
@@ -281,9 +359,11 @@ describe('PageTranslationScheduler', () => {
 
       await scheduler.flush();
 
-      expect(itemA.resolve).toHaveBeenCalledWith('A2');
-      expect(itemB.resolve).toHaveBeenCalledWith('B');
-      expect(itemC.resolve).toHaveBeenCalledWith('C2');
+       expectSettlement(itemA.resolve, 'A2');
+       expectSettlement(itemB.resolve, 'B');
+       expectSettlement(itemC.resolve, 'C2');
+       getSettlement(itemA.resolve).settle('accepted');
+       getSettlement(itemC.resolve).settle('accepted');
       expect(scheduler.translatedCount).toBe(2);
       expect(scheduler.failedCount).toBe(1);
     });
@@ -303,8 +383,8 @@ describe('PageTranslationScheduler', () => {
 
       await scheduler.flush();
 
-      expect(itemA.resolve).toHaveBeenCalledWith('A');
-      expect(itemB.resolve).toHaveBeenCalledWith('B');
+       expectSettlement(itemA.resolve, 'A');
+       expectSettlement(itemB.resolve, 'B');
       expect(scheduler.translatedCount).toBe(0);
       expect(scheduler.failedCount).toBe(2);
     });
@@ -323,8 +403,9 @@ describe('PageTranslationScheduler', () => {
 
       await scheduler.flush();
 
-      expect(mockItem.resolve).toHaveBeenCalledWith('URL');
-      expect(scheduler.translatedCount).toBe(1);
+       expectSettlement(mockItem.resolve, 'URL');
+       getSettlement(mockItem.resolve).settle('accepted');
+       expect(scheduler.translatedCount).toBe(1);
       expect(scheduler.failedCount).toBe(0);
     });
 
@@ -344,7 +425,7 @@ describe('PageTranslationScheduler', () => {
 
       await scheduler.flush();
 
-      expect(mockItem.resolve).toHaveBeenCalledWith('Failed Text');
+       expectSettlement(mockItem.resolve, 'Failed Text');
       expect(scheduler.translatedCount).toBe(0);
       const internalError = emitSpy.mock.calls.find(([event]) => event === 'page-translation-internal-error')?.[1];
       expect(internalError.error.type).toBe('SERVER_ERROR');
@@ -404,7 +485,7 @@ describe('PageTranslationScheduler', () => {
       expect(internalError.errorType).toBe('SERVER_ERROR');
       expect(internalError.isFatal).toBe(true);
       expect(scheduler.fatalErrorOccurred).toBe(true);
-      expect(mockItem.resolve).toHaveBeenCalledWith('Failed Text');
+       expectSettlement(mockItem.resolve, 'Failed Text');
       emitSpy.mockRestore();
     });
   });
@@ -429,7 +510,7 @@ describe('PageTranslationScheduler', () => {
       await scheduler.flush();
 
       expect(PageTranslationQueueFilter.process).toHaveBeenCalled();
-      expect(mockItem.resolve).toHaveBeenCalledWith('صف');
+       expectSettlement(mockItem.resolve, 'صف');
     });
   });
 
@@ -451,7 +532,7 @@ describe('PageTranslationScheduler', () => {
       await scheduler.flush();
 
       expect(scheduler.fatalErrorOccurred).toBe(true);
-      expect(mockItem.resolve).toHaveBeenCalledWith('Fatal');
+       expectSettlement(mockItem.resolve, 'Fatal');
     });
 
     it('should discard and resolve original if context changes during request', async () => {
@@ -471,7 +552,7 @@ describe('PageTranslationScheduler', () => {
 
       await scheduler.flush();
 
-      expect(mockItem.resolve).toHaveBeenCalledWith('Old Context');
+       expectSettlement(mockItem.resolve, 'Old Context');
       expect(scheduler.translatedCount).toBe(0);
     });
   });

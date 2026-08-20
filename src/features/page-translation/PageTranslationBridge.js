@@ -37,7 +37,74 @@ export class PageTranslationBridge extends ResourceTracker {
       intersectionScheduler: null,
       domTranslator: null,
       persistentTranslator: null,
-      context: sessionContext
+      context: sessionContext,
+      root: null,
+      active: true,
+    };
+    const targetGenerations = new WeakMap();
+    const applyDecisions = new WeakMap();
+
+    const nextTargetGeneration = (node) => {
+      const generation = (targetGenerations.get(node) || 0) + 1;
+      targetGenerations.set(node, generation);
+      return generation;
+    };
+
+    const getCurrentNodeValue = (node) => {
+      if (!node) return '';
+      if (node.nodeType === Node.ATTRIBUTE_NODE) return node.value ?? node.nodeValue ?? '';
+      return node.nodeValue ?? '';
+    };
+
+    const isFreshTarget = (node, sourceValue, generation) => {
+      if (!currentSession.active || this.session !== currentSession || !node) return false;
+
+      const owner = node.nodeType === Node.ATTRIBUTE_NODE ? node.ownerElement : node;
+      const root = currentSession.root;
+      if (!owner?.isConnected || (root && (!root.isConnected || !root.contains(owner)))) return false;
+
+      if (node.nodeType === Node.ATTRIBUTE_NODE) {
+        const currentAttribute = owner.getAttributeNode(node.name);
+        if (currentAttribute !== node || node.nodeValue !== sourceValue) return false;
+      } else if (!node.isConnected || node.nodeValue !== sourceValue) {
+        return false;
+      }
+
+      return generation === undefined || targetGenerations.get(node) === generation;
+    };
+
+    const recordApplyDecision = (node, generation, outcome, settlement = null, ownsStorage = false) => {
+      if (!node) return;
+      let decisions = applyDecisions.get(node);
+      if (!decisions) {
+        decisions = new Map();
+        applyDecisions.set(node, decisions);
+      }
+      decisions.set(generation, {
+        generation,
+        outcome,
+        settlement,
+        ownsStorage,
+        session: currentSession,
+      });
+    };
+
+    const getApplyDecision = (node, generation = targetGenerations.get(node)) => (
+      applyDecisions.get(node)?.get(generation)
+    );
+
+    const forgetApplyDecision = (node, generation) => {
+      const decisions = applyDecisions.get(node);
+      if (!decisions) return;
+      decisions.delete(generation);
+      if (decisions.size === 0) applyDecisions.delete(node);
+    };
+
+    const isActiveTarget = (node) => {
+      if (!currentSession.active || this.session !== currentSession || !node) return false;
+      const owner = node.nodeType === Node.ATTRIBUTE_NODE ? node.ownerElement : node;
+      const root = currentSession.root;
+      return Boolean(owner?.isConnected && (!root || (root.isConnected && root.contains(owner))));
     };
 
     if (settings.lazyLoading) {
@@ -54,8 +121,14 @@ export class PageTranslationBridge extends ResourceTracker {
       // Since domtranslator's walk is synchronous, this is the only safe way 
       // to link the text to the node before the event loop yields.
       const node = nodesTranslator.currentNode;
+      const sourceValue = getCurrentNodeValue(node);
+      const generation = nodesTranslator.currentTaskGeneration;
+      const ownsStorage = nodesTranslator.currentTaskOwnsStorage === true;
 
-      if (!text || !text.trim()) return text;
+      if (!text || !text.trim()) {
+        recordApplyDecision(node, generation, 'accepted-pending', null, ownsStorage);
+        return text;
+      }
 
       // 1. Capture original whitespace to preserve formatting
       const leadingMatch = text.match(/^(\s*)/);
@@ -66,7 +139,30 @@ export class PageTranslationBridge extends ResourceTracker {
 
       // 2. Request translation for trimmed text
       // We pass the node as the 4th argument
-      const translated = await onTranslateCallback(trimmedText, sessionContext, score, node);
+      const settlement = await onTranslateCallback(trimmedText, sessionContext, score, node);
+      const hasSettlement = settlement && settlement.__pageTranslationSettlement === true;
+      const translated = hasSettlement ? settlement.text : settlement;
+
+      // Validate before NodesTranslator receives provider output. Its own updateId
+      // protects DOM writes, but cannot correct page-level settlement accounting.
+      if (node && (!currentSession.active || this.session !== currentSession)) {
+        settlement?.settle?.('cancelled');
+        recordApplyDecision(node, generation, 'cancelled', settlement, ownsStorage);
+        return getCurrentNodeValue(node);
+      }
+
+      if (node && hasSettlement && settlement.state !== 'pending') {
+        recordApplyDecision(node, generation, settlement.state, settlement, ownsStorage);
+        return getCurrentNodeValue(node);
+      }
+
+      if (node && !isFreshTarget(node, sourceValue, generation)) {
+        settlement?.settle?.('stale');
+        recordApplyDecision(node, generation, 'stale', settlement, ownsStorage);
+        return getCurrentNodeValue(node);
+      }
+
+      recordApplyDecision(node, generation, 'accepted-pending', settlement, ownsStorage);
       
       // OPTIMIZATION: Preserve ZWNJ, Tatweel, Dashes and BiDi marks if the provider 
       // returned a "cleaned" version of the same text.
@@ -88,7 +184,106 @@ export class PageTranslationBridge extends ResourceTracker {
       return leadingWhitespace + (isFunctionallyIdentical ? trimmedText : (translated ? translated.trim() : trimmedText)) + trailingWhitespace;
     };
 
-    const nodesTranslator = new NodesTranslator(translateWithContext);
+    class GuardedNodesTranslator extends NodesTranslator {
+      translateNodeContent(node, callback) {
+        const nodeData = this.nodeStorage.get(node);
+        if (!nodeData) throw new Error('Node is not register');
+        if (node.nodeValue === null) return;
+
+        const nodeId = nodeData.id;
+        const nodeContext = nodeData.updateId;
+        const taskGeneration = this.currentTaskGeneration;
+        return this.translateCallback(node.nodeValue, nodeData.importanceScore).then((text) => {
+          const actualNodeData = this.nodeStorage.get(node);
+          const decision = getApplyDecision(node, taskGeneration);
+          const isCurrentStorage = actualNodeData
+            && nodeId === actualNodeData.id
+            && nodeContext === actualNodeData.updateId;
+
+          if (!isCurrentStorage) {
+            if (decision?.settlement?.state === 'pending') {
+              const outcome = decision.session === currentSession && currentSession.active
+                ? 'stale'
+                : 'cancelled';
+              decision.settlement.settle(outcome);
+            }
+            if (decision) decision.outcome = decision.session === currentSession && currentSession.active
+              ? 'stale'
+              : 'cancelled';
+            forgetApplyDecision(node, taskGeneration);
+            return;
+          }
+
+          const canPreserveProviderFailure = decision?.outcome === 'failed'
+            && decision.session === currentSession
+            && isActiveTarget(node)
+            && decision.generation === targetGenerations.get(node)
+            && decision.settlement?.state === 'failed';
+
+          if (canPreserveProviderFailure) {
+            actualNodeData.originalText = node.nodeValue !== null ? node.nodeValue : '';
+            node.nodeValue = text;
+            decision.outcome = 'failed-applied';
+            try {
+              if (callback) callback(node);
+            } finally {
+              forgetApplyDecision(node, taskGeneration);
+            }
+            return;
+          }
+
+          const canApply = decision
+            && decision.session === currentSession
+            && currentSession.active
+            && decision.generation === targetGenerations.get(node)
+            && decision.outcome === 'accepted-pending'
+            && (!decision.settlement || decision.settlement.state === 'pending');
+
+          if (!canApply) {
+            if (decision?.settlement?.state === 'pending') {
+              decision.settlement.settle(
+                decision.session === currentSession && currentSession.active ? 'stale' : 'cancelled'
+              );
+            }
+            if (decision?.ownsStorage
+                && decision.generation === targetGenerations.get(node)
+                && this.nodeStorage.get(node) === nodeData) {
+              this.nodeStorage.delete(node);
+            }
+            if (decision) decision.outcome = decision.session === currentSession && currentSession.active
+              ? 'stale'
+              : 'cancelled';
+            forgetApplyDecision(node, taskGeneration);
+            return;
+          }
+
+          try {
+            actualNodeData.originalText = node.nodeValue !== null ? node.nodeValue : '';
+            node.nodeValue = text;
+          } catch (error) {
+            if (decision.settlement?.state === 'pending') {
+              decision.settlement.settle(
+                decision.session === currentSession && currentSession.active ? 'stale' : 'cancelled'
+              );
+            }
+            decision.outcome = decision.session === currentSession && currentSession.active
+              ? 'stale'
+              : 'cancelled';
+            forgetApplyDecision(node, taskGeneration);
+            throw error;
+          }
+          decision.outcome = 'applied';
+          decision.settlement?.settle?.('accepted');
+          try {
+            if (callback) callback(node);
+          } finally {
+            forgetApplyDecision(node, taskGeneration);
+          }
+        });
+      }
+    }
+
+    const nodesTranslator = new GuardedNodesTranslator(translateWithContext);
 
     /**
      * MONKEY-PATCH: Capture the node being processed by NodesTranslator.
@@ -98,12 +293,16 @@ export class PageTranslationBridge extends ResourceTracker {
     const originalTranslate = nodesTranslator.translate;
     nodesTranslator.translate = function(node, callback) {
       this.currentNode = node;
+      this.currentTaskGeneration = nextTargetGeneration(node);
+      this.currentTaskOwnsStorage = typeof this.has === 'function' ? !this.has(node) : true;
       return originalTranslate.call(this, node, callback);
     };
 
     const originalUpdate = nodesTranslator.update;
     nodesTranslator.update = function(node, callback) {
       this.currentNode = node;
+      this.currentTaskGeneration = nextTargetGeneration(node);
+      this.currentTaskOwnsStorage = false;
       return originalUpdate.call(this, node, callback);
     };
 
@@ -115,20 +314,34 @@ export class PageTranslationBridge extends ResourceTracker {
     const wrapWithDirection = (originalFn) => {
       const bridge = this;
       return function(node, callback) {
-        // 1. CAPTURE: Store original text before domtranslator replaces it.
-        // This is used for the "Show original on hover" feature.
-        if (bridge.showOriginalOnHover && node) {
-          if (node.nodeType === Node.TEXT_NODE) {
-            hoverPreviewLookup.add(node, node.textContent);
-          } else if (node.nodeType === Node.ATTRIBUTE_NODE) {
-            hoverPreviewLookup.add(node, node.value);
-          }
-        }
+        const originalValue = node?.nodeType === Node.ATTRIBUTE_NODE
+          ? node.value
+          : node?.textContent;
 
         // Wrap the processed node callback
         const wrappedCallback = (processedNode) => {
+          const decision = getApplyDecision(node);
+          const shouldPostProcess = !decision
+            || (
+              decision.session === currentSession
+              && currentSession.active
+              && decision.generation === targetGenerations.get(node)
+              && decision.outcome === 'applied'
+            );
+
+          if (!shouldPostProcess) {
+            // PersistentDOMTranslator uses callback to mark its own write as handled.
+            // Keep that internal bookkeeping, but suppress semantic page effects.
+            if (callback) callback(processedNode);
+            return;
+          }
+
           if (processedNode) {
             const { TRANSLATED_MARKER, HAS_ORIGINAL } = PAGE_TRANSLATION_ATTRIBUTES;
+
+            if (bridge.showOriginalOnHover && node) {
+              hoverPreviewLookup.add(node, originalValue);
+            }
             
             // Determine if it was actually translated by checking for the BiDi mark
             const textContent = processedNode.nodeType === Node.TEXT_NODE ? processedNode.textContent : processedNode.value;
@@ -211,6 +424,8 @@ export class PageTranslationBridge extends ResourceTracker {
 
   translate(element) {
     if (!this.session) return;
+    this.session.root = element;
+    this.session.active = true;
     
     // Respect auto-translate setting: 
     // Use persistentTranslator (MutationObserver) only if enabled.
@@ -275,6 +490,8 @@ export class PageTranslationBridge extends ResourceTracker {
 
   cleanup() {
     if (!this.session) return;
+
+    this.session.active = false;
 
     try {
       // 1. Manually disconnect all internal observers just in case
