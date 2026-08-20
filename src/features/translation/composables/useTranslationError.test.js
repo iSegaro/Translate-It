@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { createApp } from 'vue';
 import { useTranslationError } from './useTranslationError.js';
 import * as ErrorDisplayStrategies from '@/shared/error-management/ErrorDisplayStrategies.js';
-import { matchErrorToType } from '@/shared/error-management/ErrorMatcher.js';
+import { isCancellationError, matchErrorToType } from '@/shared/error-management/ErrorMatcher.js';
 import { mockErrorHandlerInstance } from '@/shared/error-management/ErrorHandler.js';
 import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
 
@@ -71,6 +71,7 @@ describe('useTranslationError', () => {
     ErrorDisplayStrategies.shouldShowSettings.mockReturnValue(false);
     
     matchErrorToType.mockReturnValue('API_ERROR');
+    isCancellationError.mockReturnValue(false);
     
     // Ensure mock implementation for addUIErrorListener returns a function
     mockErrorHandlerInstance.addUIErrorListener.mockReturnValue(vi.fn());
@@ -125,11 +126,54 @@ describe('useTranslationError', () => {
   it('should ignore user cancellation errors', async () => {
     const [composable] = withSetup(() => useTranslationError('popup'));
     matchErrorToType.mockReturnValue('USER_CANCELLED');
+    isCancellationError.mockReturnValue(true);
     
     await composable.handleError(new Error('cancelled'));
 
     expect(composable.hasError.value).toBe(false);
     expect(mockUseErrorHandler.handleTranslationError).not.toHaveBeenCalled();
+  });
+
+  it.each([ErrorTypes.USER_CANCELLED, ErrorTypes.TRANSLATION_CANCELLED])(
+    'silently suppresses typed %s cancellation',
+    async (type) => {
+      const [composable] = withSetup(() => useTranslationError('popup'));
+      const error = Object.assign(new Error('anything'), { type });
+      matchErrorToType.mockReturnValue(type);
+      isCancellationError.mockReturnValue(true);
+
+      await composable.handleError(error);
+
+      expect(composable.hasError.value).toBe(false);
+      expect(mockUseErrorHandler.handleTranslationError).not.toHaveBeenCalled();
+    }
+  );
+
+  it('preserves legacy untyped cancellation compatibility through ErrorMatcher', async () => {
+    const [composable] = withSetup(() => useTranslationError('popup'));
+    const error = new Error('Translation cancelled by user');
+    matchErrorToType.mockReturnValue(ErrorTypes.USER_CANCELLED);
+    isCancellationError.mockReturnValue(true);
+
+    await composable.handleError(error);
+
+    expect(composable.hasError.value).toBe(false);
+    expect(mockUseErrorHandler.handleTranslationError).not.toHaveBeenCalled();
+  });
+
+  it('does not suppress typed provider errors containing cancellation wording', async () => {
+    const [composable] = withSetup(() => useTranslationError('popup'));
+    const error = Object.assign(new Error('Request cancelled by upstream provider'), {
+      type: ErrorTypes.NETWORK_ERROR,
+    });
+    matchErrorToType.mockReturnValue(ErrorTypes.NETWORK_ERROR);
+    isCancellationError.mockReturnValue(false);
+
+    await composable.handleError(error);
+
+    expect(mockUseErrorHandler.handleTranslationError).toHaveBeenCalled();
+    expect(mockUseErrorHandler.handleTranslationError.mock.calls[0][0].message)
+      .not.toContain('Request cancelled by upstream provider');
   });
 
   it.each([

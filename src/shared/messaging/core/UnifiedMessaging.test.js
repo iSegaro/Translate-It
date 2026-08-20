@@ -400,7 +400,42 @@ describe('UnifiedMessaging', () => {
       expect(browser.runtime.sendMessage).toHaveBeenCalled();
     });
 
-    // Translation routing and coordinator tests would go here, 
-    // but they require mocking unifiedTranslationCoordinator behavior
+    it('preserves typed user cancellation from the coordinator', async () => {
+      const { unifiedTranslationCoordinator } = await import('./UnifiedTranslationCoordinator.js');
+      const cancellation = Object.assign(new Error('Translation cancelled by user'), {
+        type: ErrorTypes.USER_CANCELLED,
+      });
+      unifiedTranslationCoordinator.coordinateTranslation.mockRejectedValueOnce(cancellation);
+
+      await expect(sendMessage({ action: 'TRANSLATE', messageId: 'cancelled' }))
+        .rejects.toBe(cancellation);
+      expect(browser.runtime.sendMessage).not.toHaveBeenCalled();
+    });
+
+    it('does not fabricate cancellation for a generic coordinator failure', async () => {
+      const { unifiedTranslationCoordinator } = await import('./UnifiedTranslationCoordinator.js');
+      const { streamingTimeoutManager } = await import('./StreamingTimeoutManager.js');
+      unifiedTranslationCoordinator.coordinateTranslation.mockRejectedValueOnce(new Error('generic failure'));
+      streamingTimeoutManager.shouldContinue.mockReturnValue(true);
+      browser.runtime.sendMessage.mockResolvedValue({ success: true, fallback: true });
+
+      await expect(sendMessage({ action: 'TRANSLATE', messageId: 'completed' }))
+        .resolves.toMatchObject({ success: true, fallback: true });
+      expect(browser.runtime.sendMessage).toHaveBeenCalledWith(
+        expect.objectContaining({ messageId: expect.stringMatching(/^fb-/) })
+      );
+    });
+
+    it('preserves timeout identity instead of converting it to cancellation', async () => {
+      const { unifiedTranslationCoordinator } = await import('./UnifiedTranslationCoordinator.js');
+      const timeout = Object.assign(new Error('Translation timed out'), {
+        type: ErrorTypes.TRANSLATION_TIMEOUT,
+      });
+      unifiedTranslationCoordinator.coordinateTranslation.mockRejectedValueOnce(timeout);
+      browser.runtime.sendMessage.mockResolvedValue({ success: true, recovered: true });
+
+      await expect(sendMessage({ action: 'TRANSLATE', messageId: 'timeout' }))
+        .resolves.toMatchObject({ success: true, recovered: true });
+    });
   });
 });

@@ -7,7 +7,7 @@ import { ErrorHandler } from '@/shared/error-management/ErrorHandler.js'
 import ExtensionContextManager from '@/core/extensionContext.js'
 import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js'
 import { getErrorDisplayStrategy, processErrorMessage, shouldShowRetry, shouldShowSettings } from '@/shared/error-management/ErrorDisplayStrategies.js'
-import { matchErrorToType } from '@/shared/error-management/ErrorMatcher.js'
+import { isCancellationError, matchErrorToType } from '@/shared/error-management/ErrorMatcher.js'
 import { mapCanonicalTranslationError } from '@/shared/error-management/PublicTranslationErrorPolicy.js'
 import { createLegacyDisplayError } from '@/shared/error-management/PublicTranslationErrorAdapter.js'
 import { getScopedLogger } from '@/shared/logging/logger.js'
@@ -70,7 +70,7 @@ export function useTranslationError(context = 'unknown') {
 
     // Identify and ignore user cancellation errors
     const errorTypeValue = matchErrorToType(error)
-    if (errorTypeValue === 'USER_CANCELLED' || error.message?.includes('cancelled')) {
+    if (isCancellationError(error)) {
       logger.debug(`[${context}] Silently ignoring user cancellation error`);
       return;
     }

@@ -292,6 +292,22 @@ export class StreamingTimeoutManager {
   }
 
   /**
+   * Read terminal state for lifecycle owners that need to preserve identity.
+   * @param {string} messageId - Unique message ID
+   * @returns {{isCancelled: boolean, hasTimedOut: boolean, isCompleted: boolean}|null}
+   */
+  getOperationState(messageId) {
+    const streamState = this.activeStreams.get(messageId);
+    if (!streamState) return null;
+
+    return {
+      isCancelled: streamState.isCancelled,
+      hasTimedOut: streamState.hasTimedOut,
+      isCompleted: streamState.isCompleted,
+    };
+  }
+
+  /**
    * Get abort signal for a streaming operation
    * @param {string} messageId - Message ID
    * @returns {AbortSignal|null} - Abort signal if available

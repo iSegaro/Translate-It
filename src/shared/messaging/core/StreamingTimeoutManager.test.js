@@ -42,6 +42,43 @@ describe('StreamingTimeoutManager', () => {
     expect(manager.isStreaming(messageId)).toBe(false);
   });
 
+  it('exposes cancellation, timeout, and completion state without collapsing it', async () => {
+    const messageId = 'state-query';
+    manager.activeStreams.set(messageId, {
+      isCancelled: true,
+      hasTimedOut: false,
+      isCompleted: false,
+    });
+
+    expect(manager.getOperationState(messageId)).toEqual({
+      isCancelled: true,
+      hasTimedOut: false,
+      isCompleted: false,
+    });
+
+    manager.activeStreams.set(messageId, {
+      isCancelled: false,
+      hasTimedOut: true,
+      isCompleted: false,
+    });
+    expect(manager.getOperationState(messageId)).toEqual({
+      isCancelled: false,
+      hasTimedOut: true,
+      isCompleted: false,
+    });
+
+    manager.activeStreams.set(messageId, {
+      isCancelled: false,
+      hasTimedOut: false,
+      isCompleted: true,
+    });
+    expect(manager.getOperationState(messageId)).toEqual({
+      isCancelled: false,
+      hasTimedOut: false,
+      isCompleted: true,
+    });
+  });
+
   it('settles completion when its observer throws', async () => {
     const onComplete = vi.fn(() => { throw new Error('completion observer failed'); });
     const onTimeout = vi.fn();
