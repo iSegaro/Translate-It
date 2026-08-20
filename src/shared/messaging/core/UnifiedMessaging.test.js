@@ -302,6 +302,43 @@ describe('UnifiedMessaging', () => {
       });
     });
 
+    it('preserves an empty canonical errorDetails message over legacy error', async () => {
+      browser.runtime.sendMessage.mockResolvedValue({
+        success: false,
+        error: { message: 'legacy failure', type: 'LEGACY_ERROR' },
+        errorDetails: { message: '', type: 'PROVIDER_ERROR' }
+      });
+
+      await expect(sendRegularMessage({ action: 'TRANSLATE_TEXT' })).rejects.toMatchObject({
+        message: '',
+        type: 'PROVIDER_ERROR'
+      });
+    });
+
+    it('preserves an empty message in details-only failures', async () => {
+      browser.runtime.sendMessage.mockResolvedValue({
+        success: false,
+        errorDetails: { message: '', type: 'PROVIDER_ERROR' }
+      });
+
+      await expect(sendRegularMessage({ action: 'TRANSLATE_TEXT' })).rejects.toMatchObject({
+        message: '',
+        type: 'PROVIDER_ERROR'
+      });
+    });
+
+    it('preserves an empty message from an object-valued legacy error', async () => {
+      browser.runtime.sendMessage.mockResolvedValue({
+        success: false,
+        error: { message: '', type: 'PROVIDER_ERROR' }
+      });
+
+      await expect(sendRegularMessage({ action: 'TRANSLATE_TEXT' })).rejects.toMatchObject({
+        message: '',
+        type: 'PROVIDER_ERROR'
+      });
+    });
+
     it('falls back to legacy error when errorDetails is malformed', async () => {
       browser.runtime.sendMessage.mockResolvedValue({
         success: false,

@@ -96,8 +96,9 @@ function createTimeout(ms, action) {
 
 function getFailureMessage(response, responseError) {
   if (responseError && typeof responseError === 'object') {
-    return responseError.message
-      || responseError.error
+    if (typeof responseError.message === 'string') return responseError.message;
+
+    return responseError.error
       || responseError.statusText
       || responseError.reason
       || response.message
