@@ -37,7 +37,7 @@ import {
 import { registerTranslation, contentScriptIntegration } from '@/shared/messaging/core/ContentScriptIntegration.js';
 import { ErrorHandler } from '@/shared/error-management/ErrorHandler.js';
 import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
-import { isFatalError, matchErrorToType } from '@/shared/error-management/ErrorMatcher.js';
+import { isCancellationError, isFatalError, isTransientError, matchErrorToType } from '@/shared/error-management/ErrorMatcher.js';
 import ExtensionContextManager from '@/core/extensionContext.js';
 
 import { registryIdToName, isProviderType, ProviderTypes } from '@/features/translation/providers/ProviderConstants.js';
@@ -67,6 +67,9 @@ export { getSelectElementTranslationState, revertSelectElementTranslation } from
 
 // Strategy X - Subtree Exclusion Active Set
 const activeTranslationRoots = new Set();
+const ACCEPTANCE_ACK_TIMEOUT_MS = 500;
+const ACCEPTANCE_ACK_RETRY_DELAYS_MS = [25, 50];
+const ACCEPTANCE_ACK_TERMINAL_STATUSES = new Set(['ACCEPTED', 'DUPLICATE', 'STALE', 'UNKNOWN_PARENT', 'CONFLICT']);
 class DirectMutationFailure {
   constructor(cause, rollbackFailures = []) {
     this.cause = cause;
@@ -122,6 +125,8 @@ export class DomTranslatorAdapter extends ResourceTracker {
     // Operation-local: mirrors the background ConversationAcceptanceCoordinator
     // registration decision for the current translation. Reset per operation.
     this._conversationAcceptanceEnabled = false;
+    this._pendingAcceptanceAcks = new Set();
+    this._acceptanceAckControllers = new Set();
 
     // Cache for original settings
     this.originalSettings = null;
@@ -464,12 +469,12 @@ export class DomTranslatorAdapter extends ResourceTracker {
           parent.applied = true;
           if (!parent.acknowledged) {
             parent.acknowledged = true;
-            this._sendParentAcceptanceAck(
+            this._queueParentAcceptanceAck(
               parent.parentId,
               plan.map(({ translatedText }) => translatedText).join(''),
               true,
               translationToken
-            ).catch(() => {});
+             );
           }
         } catch (error) {
           parent.invalid = true;
@@ -1014,6 +1019,7 @@ export class DomTranslatorAdapter extends ResourceTracker {
       if (ownsActiveTranslationRoot) {
         activeTranslationRoots.delete(element);
       }
+      await this._drainAcceptanceAcks();
       this._cleanupCurrentSession(true, translationToken);
     }
   }
@@ -1186,7 +1192,7 @@ export class DomTranslatorAdapter extends ResourceTracker {
       }
       reconstruction.transaction.finalize();
       group.applied = true;
-      this._sendParentAcceptanceAck(group.blockId, reconstruction.cleanResult, true, translationToken).catch(() => {});
+      this._queueParentAcceptanceAck(group.blockId, reconstruction.cleanResult, true, translationToken);
     } catch (error) {
       for (const [uid, state] of previousMap) {
         if (state.present) this.translatedSegmentMap.set(uid, state.value);
@@ -1431,11 +1437,113 @@ export class DomTranslatorAdapter extends ResourceTracker {
       });
       return;
     }
-    await sendRegularMessage({
+    return await sendRegularMessage({
       action: MessageActions.PARENT_ACCEPTANCE_ACK,
       messageId: this.currentMessageId,
       data: { parentId, cleanResult: accepted ? cleanResult : undefined, accepted },
-    }, { silent: true });
+    }, { silent: true, timeout: ACCEPTANCE_ACK_TIMEOUT_MS });
+  }
+
+  _queueParentAcceptanceAck(parentId, cleanResult, accepted, translationToken = null) {
+    if (!accepted) {
+      this._sendParentAcceptanceAck(parentId, cleanResult, false, translationToken).catch(() => {});
+      return;
+    }
+
+    const controller = new AbortController();
+    this._acceptanceAckControllers.add(controller);
+    const delivery = this._deliverParentAcceptanceAck(
+      parentId,
+      cleanResult,
+      translationToken,
+      controller.signal,
+    ).finally(() => {
+      this._acceptanceAckControllers.delete(controller);
+      this._pendingAcceptanceAcks.delete(delivery);
+    });
+    this._pendingAcceptanceAcks.add(delivery);
+  }
+
+  async _deliverParentAcceptanceAck(parentId, cleanResult, translationToken, signal) {
+    for (let attempt = 0; attempt <= ACCEPTANCE_ACK_RETRY_DELAYS_MS.length; attempt++) {
+      if (signal.aborted || !this._isAcceptanceAckActive(translationToken)) return;
+
+      try {
+        const response = await this._sendParentAcceptanceAck(parentId, cleanResult, true, translationToken);
+        if (response?.isContextInvalidated) {
+          this.logger.warn('[DomTranslatorAdapter] Parent acceptance ACK skipped after context invalidation', {
+            code: 'PARENT_ACCEPTANCE_ACK_CONTEXT_INVALIDATED',
+            parentId,
+          });
+          return;
+        }
+        if (response?.success === false) {
+          const error = new Error(response.error?.message || response.error || 'Parent acceptance ACK rejected');
+          error.type = response.error?.type || response.errorType;
+          throw error;
+        }
+        const status = response?.status;
+        if (!status || status === 'ACCEPTED' || status === 'DUPLICATE') return;
+        if (ACCEPTANCE_ACK_TERMINAL_STATUSES.has(status)) {
+          this.logger.warn('[DomTranslatorAdapter] Parent acceptance ACK reached terminal coordinator state', {
+            code: 'PARENT_ACCEPTANCE_ACK_TERMINAL',
+            status,
+            parentId,
+          });
+          return;
+        }
+        throw new Error(`Unexpected parent acceptance ACK status: ${status}`);
+      } catch (error) {
+        if (
+          signal.aborted
+          || !this._isAcceptanceAckActive(translationToken)
+          || isCancellationError(error)
+          || this._contextInvalidated
+          || !ExtensionContextManager.isValidSync()
+        ) return;
+
+        const errorType = matchErrorToType(error);
+        const retryable = isTransientError(errorType) || !error?.type;
+        if (!retryable || attempt === ACCEPTANCE_ACK_RETRY_DELAYS_MS.length) {
+          this.logger.warn('[DomTranslatorAdapter] Parent acceptance ACK delivery failed', {
+            code: 'PARENT_ACCEPTANCE_ACK_DELIVERY_FAILED',
+            attempts: attempt + 1,
+            errorType,
+            parentId,
+          });
+          return;
+        }
+
+        await this._waitForAcceptanceAckRetry(ACCEPTANCE_ACK_RETRY_DELAYS_MS[attempt], signal);
+      }
+    }
+  }
+
+  _isAcceptanceAckActive(translationToken) {
+    return translationToken
+      ? this._isCurrentTranslation(translationToken)
+      : !this._contextInvalidated && ExtensionContextManager.isValidSync();
+  }
+
+  _waitForAcceptanceAckRetry(delay, signal) {
+    if (signal.aborted) return Promise.resolve();
+    return new Promise(resolve => {
+      const timer = setTimeout(() => {
+        signal.removeEventListener('abort', onAbort);
+        resolve();
+      }, delay);
+      const onAbort = () => {
+        clearTimeout(timer);
+        signal.removeEventListener('abort', onAbort);
+        resolve();
+      };
+      signal.addEventListener('abort', onAbort, { once: true });
+    });
+  }
+
+  async _drainAcceptanceAcks() {
+    if (this._pendingAcceptanceAcks.size === 0) return;
+    await Promise.all([...this._pendingAcceptanceAcks]);
   }
 
   _storeTranslationState(data) {
@@ -1533,6 +1641,8 @@ export class DomTranslatorAdapter extends ResourceTracker {
     }
 
     this.isTranslating = false;
+    this._acceptanceAckControllers.forEach(controller => controller.abort());
+    this._acceptanceAckControllers.clear();
     const messageId = this.currentMessageId;
     if (token && !isSuccess) token.cancelled = true;
     if (messageId) {

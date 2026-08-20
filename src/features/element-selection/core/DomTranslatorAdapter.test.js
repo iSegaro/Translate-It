@@ -73,6 +73,7 @@ vi.mock('@/core/extensionContext.js', () => ({
 import { ErrorHandler } from '@/shared/error-management/ErrorHandler.js';
 const errorHandlerMock = ErrorHandler.getInstance();
 const { default: ExtensionContextManager } = await import('@/core/extensionContext.js');
+const { isTransientError } = await import('@/shared/error-management/ErrorMatcher.js');
 
 vi.mock('@/utils/dom/DomDirectionManager.js', () => ({
   detectDirectionFromContent: vi.fn(() => 'rtl'),
@@ -832,7 +833,7 @@ describe('DomTranslatorAdapter', () => {
       streamCallbacks.onStreamUpdate({ success: true, data: [{ t: 'Uno', i: 'n1' }] });
       expect(sendRegularMessage).not.toHaveBeenCalledWith(expect.objectContaining({
         data: expect.objectContaining({ parentId: 'b1', accepted: true })
-      }), { silent: true });
+      }), { silent: true, timeout: 500 });
       streamCallbacks.onStreamUpdate({ success: true, data: [{ t: 'Dos', i: 'n2' }] });
       streamCallbacks.onStreamEnd({ success: true });
       await translation;
@@ -869,7 +870,7 @@ describe('DomTranslatorAdapter', () => {
       expect(second.nodeValue).toBe('B');
       expect(sendRegularMessage).not.toHaveBeenCalledWith(expect.objectContaining({
         data: expect.objectContaining({ parentId: 'b1', accepted: true })
-      }), { silent: true });
+      }), { silent: true, timeout: 500 });
     });
 
     it('should order unique conversation parents by earliest source unit', async () => {
@@ -996,7 +997,7 @@ describe('DomTranslatorAdapter', () => {
       expect(second.nodeValue).toBe('B');
       expect(sendRegularMessage).not.toHaveBeenCalledWith(expect.objectContaining({
         data: expect.objectContaining({ parentId: 'b1', accepted: true })
-      }), { silent: true });
+      }), { silent: true, timeout: 500 });
     });
 
     it('should reject conflicting identity aliases without mutation', async () => {
@@ -1266,7 +1267,7 @@ describe('DomTranslatorAdapter', () => {
 
       expect(sendRegularMessage).toHaveBeenCalledWith(expect.objectContaining({
         data: expect.objectContaining({ parentId: 'b1', cleanResult: 'سلام', accepted: true })
-      }), { silent: true });
+      }), { silent: true, timeout: 500 });
     });
 
     it('should not ACK a parent when blockId is missing', async () => {
@@ -1284,7 +1285,7 @@ describe('DomTranslatorAdapter', () => {
 
       expect(sendRegularMessage).not.toHaveBeenCalledWith(expect.objectContaining({
         data: expect.objectContaining({ parentId: 'node-only' })
-      }), { silent: true });
+      }), { silent: true, timeout: 500 });
     });
 
     it('should suppress a raw V2 fragment without mutating its node', async () => {
@@ -2110,10 +2111,10 @@ describe('DomTranslatorAdapter', () => {
       expect(validNode.nodeValue).toBe('B');
       expect(sendRegularMessage).not.toHaveBeenCalledWith(expect.objectContaining({
         data: expect.objectContaining({ parentId: 'b2', accepted: true })
-      }), { silent: true });
+      }), { silent: true, timeout: 500 });
       expect(sendRegularMessage).not.toHaveBeenCalledWith(expect.objectContaining({
         data: expect.objectContaining({ parentId: 'b1', accepted: true })
-      }), { silent: true });
+      }), { silent: true, timeout: 500 });
     });
 
     it('skips stale streaming unit while applying later valid unit', async () => {
@@ -2147,10 +2148,10 @@ describe('DomTranslatorAdapter', () => {
       expect(validNode.nodeValue).toContain('Translated B');
       expect(sendRegularMessage).toHaveBeenCalledWith(expect.objectContaining({
         data: expect.objectContaining({ parentId: 'b2', accepted: true })
-      }), { silent: true });
+      }), { silent: true, timeout: 500 });
       expect(sendRegularMessage).not.toHaveBeenCalledWith(expect.objectContaining({
         data: expect.objectContaining({ parentId: 'b1', accepted: true })
-      }), { silent: true });
+      }), { silent: true, timeout: 500 });
     });
 
     it('should keep all units original while fragmented parent stream fails', async () => {
@@ -2407,7 +2408,7 @@ describe('DomTranslatorAdapter', () => {
       callbacks.onStreamUpdate({ success: true, data: [{ t: 'Uno', i: 'n1' }] });
       await vi.waitFor(() => expect(sendRegularMessage).toHaveBeenCalledWith(
         expect.objectContaining({ data: expect.objectContaining({ parentId: 'b1', accepted: true }) }),
-        { silent: true }
+        { silent: true, timeout: 500 }
       ));
 
       ExtensionContextManager.isValidSync.mockReturnValue(false);
@@ -2619,7 +2620,7 @@ describe('DomTranslatorAdapter', () => {
       expect(second.nodeValue).toBe('B');
       expect(sendRegularMessage).not.toHaveBeenCalledWith(expect.objectContaining({
         data: expect.objectContaining({ parentId: 'b1', accepted: true })
-      }), { silent: true });
+      }), { silent: true, timeout: 500 });
       apply.mockRestore();
     });
 
@@ -2650,7 +2651,7 @@ describe('DomTranslatorAdapter', () => {
       expect(second.nodeValue).toBe('B');
       expect(sendRegularMessage).not.toHaveBeenCalledWith(expect.objectContaining({
         data: expect.objectContaining({ parentId: 'b1', accepted: true })
-      }), { silent: true });
+      }), { silent: true, timeout: 500 });
       apply.mockRestore();
     });
 
@@ -2775,7 +2776,7 @@ describe('DomTranslatorAdapter', () => {
       expect(restoreNodeDirectionState).toHaveBeenCalled();
       expect(sendRegularMessage).not.toHaveBeenCalledWith(expect.objectContaining({
         data: expect.objectContaining({ parentId: 'b1', accepted: true })
-      }), { silent: true });
+      }), { silent: true, timeout: 500 });
     });
 
     it('logs direction rollback failures while preserving mutation error', async () => {
@@ -3273,7 +3274,7 @@ describe('DomTranslatorAdapter', () => {
       streamCallbacks.onStreamUpdate({ success: true, data: [{ t: 'Uno', i: 'n1' }] });
       await vi.waitFor(() => expect(sendRegularMessage).toHaveBeenCalledWith(
         expect.objectContaining({ data: expect.objectContaining({ parentId: 'b1', accepted: true }) }),
-        { silent: true }
+        { silent: true, timeout: 500 }
       ));
       const acceptedBeforeConflict = sendRegularMessage.mock.calls.filter(([message]) => (
         message?.data?.accepted === true
@@ -3518,7 +3519,7 @@ describe('DomTranslatorAdapter', () => {
       expect(processedUids.has('n1')).toBe(false);
       expect(sendRegularMessage).not.toHaveBeenCalledWith(expect.objectContaining({
         data: expect.objectContaining({ parentId: 'g1', accepted: true })
-      }), { silent: true });
+      }), { silent: true, timeout: 500 });
     });
 
     it('accepts canonical grouped result when optional shadow refinement fails', async () => {
@@ -3545,7 +3546,7 @@ describe('DomTranslatorAdapter', () => {
       expect(finalize).toHaveBeenCalledOnce();
       expect(sendRegularMessage).toHaveBeenCalledWith(expect.objectContaining({
         data: expect.objectContaining({ parentId: 'g1', accepted: true })
-      }), { silent: true });
+      }), { silent: true, timeout: 500 });
     });
 
     it('skips optional shadow refinement for V2 passthrough groups', async () => {
@@ -3718,7 +3719,7 @@ describe('DomTranslatorAdapter', () => {
       expect(nodes.map(node => node.nodeValue)).toEqual(['A', 'B']);
       expect(sendRegularMessage).not.toHaveBeenCalledWith(expect.objectContaining({
         data: expect.objectContaining({ parentId: 'g1', accepted: true })
-      }), { silent: true });
+      }), { silent: true, timeout: 500 });
     });
 
     it('accepts distinct V2 passthrough block parents independently', async () => {
@@ -4324,6 +4325,216 @@ describe('DomTranslatorAdapter', () => {
       await translation;
 
       expect(sendRegularMessage.mock.calls.filter(([message]) => message.data?.accepted === true)).toHaveLength(1);
+    });
+
+    it('retries transient accepted ACK delivery and awaits success', async () => {
+      vi.useFakeTimers();
+      try {
+        sendRegularMessage
+          .mockRejectedValueOnce(new Error('temporary transport failure'))
+          .mockResolvedValueOnce({ status: 'ACCEPTED' });
+        contentScriptIntegration.sendTranslationRequest.mockResolvedValueOnce({
+          success: true,
+          streaming: false,
+          translatedText: [{ t: 'سلام', i: 'n1' }],
+          conversationAcceptance: true
+        });
+
+        const translation = adapter.translateElement(testElement);
+        await vi.waitFor(() => expect(sendRegularMessage).toHaveBeenCalledTimes(1));
+        expect(testElement.textContent).toContain('سلام');
+        await vi.advanceTimersByTimeAsync(25);
+        await expect(translation).resolves.toMatchObject({ success: true });
+
+        expect(sendRegularMessage).toHaveBeenCalledTimes(2);
+        expect(sendRegularMessage.mock.calls[0][0]).toEqual(sendRegularMessage.mock.calls[1][0]);
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it('bounds hung ACK attempts with the ACK-specific timeout', async () => {
+      vi.useFakeTimers();
+      try {
+        isTransientError.mockReturnValue(true);
+        sendRegularMessage.mockImplementation((_message, options) => new Promise((_, reject) => {
+          expect(options.timeout).toBe(500);
+          setTimeout(() => {
+            const error = new Error('ACK attempt timed out');
+            error.type = ErrorTypes.OPERATION_TIMEOUT;
+            reject(error);
+          }, options.timeout);
+        }));
+        contentScriptIntegration.sendTranslationRequest.mockResolvedValueOnce({
+          success: true,
+          streaming: false,
+          translatedText: [{ t: 'سلام', i: 'n1' }],
+          conversationAcceptance: true
+        });
+
+        const translation = adapter.translateElement(testElement);
+        await vi.waitFor(() => expect(sendRegularMessage).toHaveBeenCalledTimes(1));
+        await vi.advanceTimersByTimeAsync(500);
+        await vi.advanceTimersByTimeAsync(25);
+        await vi.advanceTimersByTimeAsync(500);
+        await vi.advanceTimersByTimeAsync(50);
+        await vi.advanceTimersByTimeAsync(500);
+        await expect(translation).resolves.toMatchObject({ success: true });
+
+        expect(sendRegularMessage).toHaveBeenCalledTimes(3);
+        expect(testElement.textContent).toContain('سلام');
+        expect(adapter._pendingAcceptanceAcks.size).toBe(0);
+        expect(adapter._acceptanceAckControllers.size).toBe(0);
+      } finally {
+        isTransientError.mockReset();
+        vi.useRealTimers();
+      }
+    });
+
+    it('retries streaming parent ACK without delaying DOM commit', async () => {
+      vi.useFakeTimers();
+      try {
+        sendRegularMessage
+          .mockRejectedValueOnce(new Error('temporary transport failure'))
+          .mockResolvedValueOnce({ status: 'ACCEPTED' });
+        contentScriptIntegration.sendTranslationRequest.mockResolvedValueOnce({
+          success: true,
+          streaming: true,
+          conversationAcceptance: true
+        });
+        let streamCallbacks;
+        registerTranslation.mockImplementationOnce((_id, callbacks) => { streamCallbacks = callbacks; });
+
+        const translation = adapter.translateElement(testElement);
+        await vi.waitFor(() => expect(streamCallbacks).toBeDefined());
+        streamCallbacks.onStreamUpdate({ success: true, data: [{ t: 'سلام', i: 'n1' }] });
+        await vi.waitFor(() => expect(sendRegularMessage).toHaveBeenCalledTimes(1));
+        expect(testElement.textContent).toContain('سلام');
+        streamCallbacks.onStreamEnd({ success: true });
+        await vi.advanceTimersByTimeAsync(25);
+        await expect(translation).resolves.toMatchObject({ success: true });
+
+        expect(sendRegularMessage).toHaveBeenCalledTimes(2);
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it.each(['DUPLICATE', 'STALE', 'UNKNOWN_PARENT', 'CONFLICT'])(
+      'stops retrying after terminal ACK status %s',
+      async (status) => {
+        vi.useFakeTimers();
+        try {
+          sendRegularMessage.mockResolvedValueOnce({ status });
+          contentScriptIntegration.sendTranslationRequest.mockResolvedValueOnce({
+            success: true,
+            streaming: false,
+            translatedText: [{ t: 'سلام', i: 'n1' }],
+            conversationAcceptance: true
+          });
+
+          await adapter.translateElement(testElement);
+          await vi.advanceTimersByTimeAsync(1000);
+
+          expect(sendRegularMessage).toHaveBeenCalledOnce();
+          expect(testElement.textContent).toContain('سلام');
+        } finally {
+          vi.useRealTimers();
+        }
+      },
+    );
+
+    it('keeps committed DOM after accepted ACK retry exhaustion', async () => {
+      vi.useFakeTimers();
+      try {
+        sendRegularMessage
+          .mockRejectedValueOnce(new Error('transport unavailable'))
+          .mockRejectedValueOnce(new Error('transport unavailable'))
+          .mockRejectedValueOnce(new Error('transport unavailable'));
+        contentScriptIntegration.sendTranslationRequest.mockResolvedValueOnce({
+          success: true,
+          streaming: false,
+          translatedText: [{ t: 'سلام', i: 'n1' }],
+          conversationAcceptance: true
+        });
+
+        const translation = adapter.translateElement(testElement);
+        await vi.waitFor(() => expect(sendRegularMessage).toHaveBeenCalledTimes(1));
+        await vi.advanceTimersByTimeAsync(75);
+        await expect(translation).resolves.toMatchObject({ success: true });
+
+        expect(sendRegularMessage).toHaveBeenCalledTimes(3);
+        expect(sendRegularMessage.mock.calls.filter(([message]) => message.data?.accepted === false)).toHaveLength(0);
+        expect(testElement.textContent).toContain('سلام');
+        expect(adapter._pendingAcceptanceAcks.size).toBe(0);
+        expect(adapter._acceptanceAckControllers.size).toBe(0);
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it('stops accepted ACK retry when translation is cancelled', async () => {
+      vi.useFakeTimers();
+      try {
+        sendRegularMessage.mockImplementationOnce((_message, options) => new Promise((_, reject) => {
+          setTimeout(() => {
+            const error = new Error('ACK attempt timed out');
+            error.type = ErrorTypes.OPERATION_TIMEOUT;
+            reject(error);
+          }, options.timeout);
+        }));
+        contentScriptIntegration.sendTranslationRequest.mockResolvedValueOnce({
+          success: true,
+          streaming: false,
+          translatedText: [{ t: 'سلام', i: 'n1' }],
+          conversationAcceptance: true
+        });
+
+        const translation = adapter.translateElement(testElement);
+        await vi.waitFor(() => expect(sendRegularMessage).toHaveBeenCalledTimes(1));
+        await adapter.cancelTranslation({ silent: true });
+        await vi.advanceTimersByTimeAsync(500);
+        await expect(translation).resolves.toMatchObject({ success: true });
+
+        expect(sendRegularMessage.mock.calls.filter(([message]) => message.data?.accepted === true)).toHaveLength(1);
+        expect(testElement.textContent).toContain('سلام');
+        expect(adapter._pendingAcceptanceAcks.size).toBe(0);
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it('stops a timed-out ACK after context invalidation', async () => {
+      vi.useFakeTimers();
+      try {
+        sendRegularMessage.mockImplementation((_message, options) => new Promise((_, reject) => {
+          setTimeout(() => {
+            const error = new Error('ACK attempt timed out');
+            error.type = ErrorTypes.OPERATION_TIMEOUT;
+            reject(error);
+          }, options.timeout);
+        }));
+        contentScriptIntegration.sendTranslationRequest.mockResolvedValueOnce({
+          success: true,
+          streaming: false,
+          translatedText: [{ t: 'سلام', i: 'n1' }],
+          conversationAcceptance: true
+        });
+
+        const translation = adapter.translateElement(testElement);
+        await vi.waitFor(() => expect(sendRegularMessage).toHaveBeenCalledTimes(1));
+        ExtensionContextManager.isValidSync.mockReturnValue(false);
+        adapter.invalidateContext();
+        await vi.advanceTimersByTimeAsync(500);
+        await expect(translation).resolves.toMatchObject({ success: true });
+
+        expect(sendRegularMessage).toHaveBeenCalledTimes(1);
+        expect(testElement.textContent).toContain('سلام');
+        expect(adapter._pendingAcceptanceAcks.size).toBe(0);
+        expect(adapter._acceptanceAckControllers.size).toBe(0);
+      } finally {
+        vi.useRealTimers();
+      }
     });
 
     it('F: resets acceptance state between consecutive operations', async () => {
