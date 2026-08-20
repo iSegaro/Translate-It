@@ -17,6 +17,29 @@ describe('MessagingBus.sendToBackground error details', () => {
     vi.clearAllMocks();
   });
 
+  it.each([
+    ['ordinary Error', new Error('failed')],
+    ['typed Error', Object.assign(new Error('invalid key'), { type: 'API_KEY_INVALID' })],
+    ['plain object with message', { message: 'plain failure' }],
+    ['plain object without message', { reason: 'missing message' }],
+    ['string', 'string failure'],
+    ['number', 42],
+    ['boolean', true],
+    ['null', null],
+    ['undefined', undefined]
+  ])('normalizes %s rejection into one canonical failure envelope', async (_label, rejection) => {
+    sendMessage.mockRejectedValueOnce(rejection);
+
+    const response = await MessagingBus.sendToBackground({ action: 'TEST_ACTION' });
+
+    expect(response).toMatchObject({
+      success: false,
+      errorDetails: expect.any(Object)
+    });
+
+    expect(response.error).toBe(response.errorDetails.message);
+  });
+
   it('keeps legacy message and adds serializer fallback identity', async () => {
     sendMessage.mockRejectedValueOnce(new Error('failed'));
 

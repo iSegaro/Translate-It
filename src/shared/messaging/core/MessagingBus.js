@@ -22,10 +22,12 @@ export class MessagingBus {
       return await sendMessage(message, options);
     } catch (error) {
       logger.error(`Failed to send message ${action} to background:`, error);
+      const errorDetails = MessageFormat.serializeTranslationError(error);
+
       return {
         success: false,
-        error: error.message,
-        errorDetails: MessageFormat.serializeTranslationError(error)
+        error: errorDetails.message,
+        errorDetails
       };
     }
   }
