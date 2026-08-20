@@ -219,6 +219,203 @@ describe('SubtitleTranslationCoordinator Stability', () => {
     expect(batch[0].translatedText).toBeUndefined();
   });
 
+  it('prefers canonical errorDetails over a conflicting object error', async () => {
+    const jobId = 'test-job-details-vs-object';
+    const mockTracker = { update: vi.fn() };
+    const batch = [{ id: '1', text: 'Hello', index: 1, warnings: [] }];
+    subtitleTranslationCoordinator.activeJobs.set(jobId, {
+      cues: batch,
+      status: 'running',
+      progressTracker: mockTracker
+    });
+    unifiedTranslationService.handleTranslationRequest.mockResolvedValue({
+      success: false,
+      error: { message: 'legacy failure', type: 'LEGACY_ERROR' },
+      errorDetails: {
+        message: 'canonical failure',
+        type: 'PROVIDER_ERROR',
+        originalType: 'HTTP_ERROR',
+        statusCode: 503,
+        context: 'subtitle-batch',
+        providerName: 'Provider',
+        providerId: 'provider-id',
+        code: 'UPSTREAM_FAILURE',
+        errorCode: 'E_UPSTREAM',
+        translationOutcome: { partial: true }
+      }
+    });
+
+    const result = await subtitleTranslationCoordinator._processBatch(
+      jobId,
+      batch,
+      'en',
+      'fa',
+      'google',
+      {}
+    );
+
+    expect(result.success).toBe(false);
+    expect(result.errorDetails).toMatchObject({
+      message: 'canonical failure',
+      type: 'PROVIDER_ERROR',
+      originalType: 'HTTP_ERROR',
+      statusCode: 503,
+      context: 'subtitle-batch',
+      providerName: 'Provider',
+      providerId: 'provider-id',
+      code: 'UPSTREAM_FAILURE',
+      errorCode: 'E_UPSTREAM',
+      translationOutcome: { partial: true }
+    });
+    expect(result.errorDetails).not.toHaveProperty('cause');
+    expect(result.errorDetails).not.toHaveProperty('arbitrary');
+    expect(batch[0].status).toBe('failed');
+  });
+
+  it('prefers canonical errorDetails over a string error', async () => {
+    const jobId = 'test-job-details-vs-string';
+    const mockTracker = { update: vi.fn() };
+    const batch = [{ id: '1', text: 'Hello', index: 1, warnings: [] }];
+    subtitleTranslationCoordinator.activeJobs.set(jobId, {
+      cues: batch,
+      status: 'running',
+      progressTracker: mockTracker
+    });
+    unifiedTranslationService.handleTranslationRequest.mockResolvedValue({
+      success: false,
+      error: 'legacy/raw failure',
+      errorDetails: {
+        message: 'canonical failure',
+        type: 'API_KEY_INVALID',
+        originalType: 'AUTH_ERROR',
+        statusCode: 401,
+        providerName: 'Provider',
+        providerId: 'provider-id',
+        code: 'INVALID_CREDENTIALS',
+        errorCode: 'E_AUTH'
+      }
+    });
+
+    const result = await subtitleTranslationCoordinator._processBatch(
+      jobId,
+      batch,
+      'en',
+      'fa',
+      'google',
+      {}
+    );
+
+    expect(result.success).toBe(false);
+    expect(result.errorDetails).toMatchObject({
+      message: 'canonical failure',
+      type: 'API_KEY_INVALID',
+      originalType: 'AUTH_ERROR',
+      statusCode: 401,
+      providerName: 'Provider',
+      providerId: 'provider-id',
+      code: 'INVALID_CREDENTIALS',
+      errorCode: 'E_AUTH'
+    });
+    expect(result.errorDetails).not.toHaveProperty('cause');
+    expect(result.errorDetails).not.toHaveProperty('arbitrary');
+  });
+
+  it('keeps canonical identity for an errorDetails-only failure, never degrading to Unknown error', async () => {
+    const jobId = 'test-job-details-only';
+    const mockTracker = { update: vi.fn() };
+    const batch = [{ id: '1', text: 'Hello', index: 1, warnings: [] }];
+    subtitleTranslationCoordinator.activeJobs.set(jobId, {
+      cues: batch,
+      status: 'running',
+      progressTracker: mockTracker
+    });
+    unifiedTranslationService.handleTranslationRequest.mockResolvedValue({
+      success: false,
+      errorDetails: {
+        message: 'canonical failure',
+        type: 'PROVIDER_ERROR',
+        originalType: 'HTTP_ERROR',
+        statusCode: 503,
+        providerName: 'Provider',
+        providerId: 'provider-id',
+        code: 'UPSTREAM_FAILURE',
+        errorCode: 'E_UPSTREAM'
+      }
+    });
+
+    const result = await subtitleTranslationCoordinator._processBatch(
+      jobId,
+      batch,
+      'en',
+      'fa',
+      'google',
+      {}
+    );
+
+    expect(result.success).toBe(false);
+    expect(result.errorDetails).toMatchObject({
+      message: 'canonical failure',
+      type: 'PROVIDER_ERROR',
+      originalType: 'HTTP_ERROR',
+      statusCode: 503,
+      providerName: 'Provider',
+      providerId: 'provider-id',
+      code: 'UPSTREAM_FAILURE',
+      errorCode: 'E_UPSTREAM'
+    });
+    expect(result.errorDetails.message).not.toBe('Unknown error');
+    expect(result.errorDetails).not.toHaveProperty('cause');
+    expect(result.errorDetails).not.toHaveProperty('arbitrary');
+  });
+
+  it('falls back to the legacy error when errorDetails is malformed', async () => {
+    const jobId = 'test-job-malformed-details';
+    const mockTracker = { update: vi.fn() };
+    const batch = [{ id: '1', text: 'Hello', index: 1, warnings: [] }];
+    subtitleTranslationCoordinator.activeJobs.set(jobId, {
+      cues: batch,
+      status: 'running',
+      progressTracker: mockTracker
+    });
+    unifiedTranslationService.handleTranslationRequest.mockResolvedValue({
+      success: false,
+      error: {
+        message: 'legacy failure',
+        type: 'LEGACY_ERROR',
+        originalType: 'LEGACY_ORIGIN',
+        statusCode: 502,
+        providerName: 'Legacy',
+        providerId: 'legacy-id',
+        code: 'LEGACY_CODE',
+        errorCode: 'E_LEGACY'
+      },
+      errorDetails: { arbitrary: true }
+    });
+
+    const result = await subtitleTranslationCoordinator._processBatch(
+      jobId,
+      batch,
+      'en',
+      'fa',
+      'google',
+      {}
+    );
+
+    expect(result.success).toBe(false);
+    expect(result.errorDetails).toMatchObject({
+      message: 'legacy failure',
+      type: 'LEGACY_ERROR',
+      originalType: 'LEGACY_ORIGIN',
+      statusCode: 502,
+      providerName: 'Legacy',
+      providerId: 'legacy-id',
+      code: 'LEGACY_CODE',
+      errorCode: 'E_LEGACY'
+    });
+    expect(result.errorDetails).not.toHaveProperty('cause');
+    expect(result.errorDetails).not.toHaveProperty('arbitrary');
+  });
+
   it('emits structured error events without the legacy error field', () => {
     const error = Object.assign(new Error('Provider failed'), {
       type: 'PROVIDER_ERROR',

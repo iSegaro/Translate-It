@@ -17,7 +17,7 @@ import { MessagingBus } from '@/shared/messaging/core/MessagingBus.js';
 import { MessageActions } from '@/shared/messaging/core/MessageActions.js';
 import { MessageContexts } from '@/shared/messaging/core/MessagingConstants.js';
 import { unifiedTranslationService } from '@/core/services/translation/UnifiedTranslationService.js';
-import { MessageFormat, reconstructTranslationError } from '@/shared/messaging/core/MessagingCore.js';
+import { MessageFormat, reconstructTranslationError, isStructuredTranslationError } from '@/shared/messaging/core/MessagingCore.js';
 import { ErrorMatcher } from '@/shared/error-management/ErrorMatcher.js';
 import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
 
@@ -239,8 +239,13 @@ export class SubtitleTranslationCoordinator {
       }
 
       if (!response.success) {
-        // UnifiedTranslationService returns error details inside a response.error object
-        const errorInfo = response.error && typeof response.error === 'object' ? response.error : { message: response.error };
+        // Canonical errorDetails own identity when present; otherwise fall back
+        // to the legacy error slot (object DTO or raw message string).
+        const errorInfo = isStructuredTranslationError(response?.errorDetails)
+          ? response.errorDetails
+          : response.error && typeof response.error === 'object'
+            ? response.error
+            : { message: response.error };
         
         const error = reconstructTranslationError(errorInfo);
         error.type = error.type || errorInfo.type || response.type;
