@@ -338,6 +338,8 @@ describe('StreamingManager', () => {
       error.providerId = 'provider-id';
       error.code = 'UPSTREAM_FAILURE';
       error.errorCode = 'E_UPSTREAM';
+      error.cause = new Error('private');
+      error.arbitrary = { secret: true };
 
       await streamingManager.handleStreamError(messageId, error);
 
@@ -355,6 +357,17 @@ describe('StreamingManager', () => {
       });
       expect(completeSpy.mock.calls[0][2].error.timestamp).toEqual(expect.any(Number));
       expect(completeSpy.mock.calls[0][2].errorDetails).toEqual(completeSpy.mock.calls[0][2].error);
+      expect(completeSpy.mock.calls[0][2].error).not.toHaveProperty('cause');
+      expect(completeSpy.mock.calls[0][2].error).not.toHaveProperty('arbitrary');
+
+      const { default: browser } = await import('webextension-polyfill');
+      const terminalMessages = browser.tabs.sendMessage.mock.calls
+        .map(([, message]) => message)
+        .filter(message => message.action === MessageActions.TRANSLATION_STREAM_END);
+      expect(terminalMessages).toHaveLength(1);
+      expect(terminalMessages[0].data.error).toBe(terminalMessages[0].data.errorDetails);
+      expect(terminalMessages[0].data.error).not.toHaveProperty('cause');
+      expect(terminalMessages[0].data.error).not.toHaveProperty('arbitrary');
     });
   });
 
@@ -464,6 +477,7 @@ describe('StreamingManager', () => {
     });
 
     it('preserves error when a late provider completion arrives', async () => {
+      const { default: browser } = await import('webextension-polyfill');
       const messageId = 'msg-error-late-complete';
       streamingManager.initializeStream(messageId, { tab: { id: 1 } }, { providerName: 'P' }, ['s1']);
 
@@ -471,6 +485,10 @@ describe('StreamingManager', () => {
       await streamingManager.completeStream(messageId, true);
 
       expect(streamingManager.getStreamInfo(messageId).status).toBe('error');
+      const terminalMessages = browser.tabs.sendMessage.mock.calls
+        .map(([, message]) => message)
+        .filter(message => message.action === MessageActions.TRANSLATION_STREAM_END);
+      expect(terminalMessages).toHaveLength(1);
     });
 
     it('keeps cancellation idempotent and schedules delayed cleanup', async () => {
