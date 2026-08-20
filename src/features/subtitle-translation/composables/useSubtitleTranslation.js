@@ -117,7 +117,7 @@ export function useSubtitleTranslation() {
     }
 
     status.value = 'error';
-    error.value = presentation.kind === 'display' ? presentation.message : detail.error;
+    error.value = presentation.kind === 'display' ? presentation.message : null;
   };
 
   const startTranslation = async (fileContent, filename, config) => {

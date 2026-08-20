@@ -16,11 +16,14 @@ vi.mock('@/shared/messaging/core/MessagingBus.js', () => ({
 }));
 
 vi.mock('../presentation/SubtitleTranslationErrorPresenter.js', () => ({
-  presentSubtitleTranslationError: presentSubtitleTranslationErrorMock.mockImplementation(async ({ errorDetails, error }) => {
+  presentSubtitleTranslationError: presentSubtitleTranslationErrorMock.mockImplementation(async ({ errorDetails }) => {
     if (['USER_CANCELLED', 'TRANSLATION_CANCELLED', 'CONTEXT', 'EXTENSION_CONTEXT_INVALIDATED'].includes(errorDetails?.type)) {
       return { kind: 'silent' };
     }
-    return errorDetails ? { kind: 'display', message: 'Safe subtitle error' } : { kind: 'legacy', message: error };
+    return {
+      kind: 'display',
+      message: errorDetails ? 'Safe subtitle error' : 'Localized TRANSLATION_FAILED'
+    };
   })
 }));
 
@@ -54,7 +57,7 @@ describe('useSubtitleTranslation error presentation', () => {
     expect(state.errorDetails.value.type).toBe('MODEL_NOT_FOUND');
   });
 
-  it('keeps string-only failures compatible', async () => {
+  it('uses safe generic presentation for string-only failures', async () => {
     const state = useSubtitleTranslation();
 
     await onMessage({
@@ -64,7 +67,7 @@ describe('useSubtitleTranslation error presentation', () => {
     await Promise.resolve();
 
     expect(state.status.value).toBe('error');
-    expect(state.error.value).toBe('legacy failure');
+    expect(state.error.value).toBe('Localized TRANSLATION_FAILED');
   });
 
   it('keeps cancellation/context failures invisible', async () => {
@@ -162,7 +165,7 @@ describe('useSubtitleTranslation error presentation', () => {
     expect(detail.errorDetails.type).toBe('API_KEY_INVALID');
   });
 
-  it('keeps ordinary local rejection on legacy fallback', async () => {
+  it('uses safe generic presentation for ordinary local rejection', async () => {
     const state = useSubtitleTranslation();
     sendToBackgroundMock.mockRejectedValueOnce(new Error('Failed to read subtitle file'));
 
@@ -174,7 +177,7 @@ describe('useSubtitleTranslation error presentation', () => {
 
     const detail = presentSubtitleTranslationErrorMock.mock.calls.at(-1)[0];
     expect(detail.errorDetails).toBeUndefined();
-    expect(state.error.value).toBe('Failed to read subtitle file');
+    expect(state.error.value).toBe('Localized TRANSLATION_FAILED');
   });
 
   it.each(['USER_CANCELLED', 'CONTEXT', 'EXTENSION_CONTEXT_INVALIDATED'])('silences direct %s rejection', async (type) => {
