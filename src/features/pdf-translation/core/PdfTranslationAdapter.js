@@ -1,7 +1,7 @@
 import { MessageActions } from '@/shared/messaging/core/MessageActions.js'
 import { TranslationMode } from '@/shared/config/config.js'
 import { MessageContexts } from '@/shared/messaging/core/MessagingConstants.js'
-import { MessageFormat } from '@/shared/messaging/core/MessagingCore.js'
+import { MessageFormat, isStructuredTranslationError } from '@/shared/messaging/core/MessagingCore.js'
 import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js'
 import { normalizePdfText } from './PdfBlockIdentity.js'
 
@@ -479,10 +479,7 @@ export class PdfTranslationAdapter {
 
     if (!response || response.success === false) {
       const errorMessage = response?.error?.message || response?.error || 'PDF translation failed'
-      const errorDetails = response?.errorDetails
-        && typeof response.errorDetails === 'object'
-        && !Array.isArray(response.errorDetails)
-        && typeof response.errorDetails.message === 'string'
+      const errorDetails = isStructuredTranslationError(response?.errorDetails)
         ? response.errorDetails
         : null
       const failureReason = getPdfTranslationFailureReason(errorDetails || response?.error)

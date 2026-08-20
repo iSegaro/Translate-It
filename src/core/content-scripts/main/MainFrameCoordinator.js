@@ -3,22 +3,15 @@
  * Handles cross-frame communication and synchronization between the main frame and iframes.
  */
 import { pageEventBus } from '@/core/PageEventBus.js';
-import { reconstructTranslationError } from '@/shared/messaging/core/MessagingCore.js';
+import { reconstructTranslationError, isStructuredTranslationError } from '@/shared/messaging/core/MessagingCore.js';
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.IFRAME, 'MainFrameCoordinator');
 const MOUSE_HOVER_TRANSLATION_ERROR = 'MOUSE_HOVER_TRANSLATION_ERROR';
 
-function hasValidHoverErrorDetails(errorDetails) {
-  return errorDetails
-    && typeof errorDetails === 'object'
-    && !Array.isArray(errorDetails)
-    && typeof errorDetails.message === 'string';
-}
-
 function normalizeHoverErrorData(type, data) {
-  if (type !== MOUSE_HOVER_TRANSLATION_ERROR || !hasValidHoverErrorDetails(data?.errorDetails)) {
+  if (type !== MOUSE_HOVER_TRANSLATION_ERROR || !isStructuredTranslationError(data?.errorDetails)) {
     return data;
   }
 

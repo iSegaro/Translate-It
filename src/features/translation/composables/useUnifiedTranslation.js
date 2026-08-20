@@ -10,7 +10,7 @@ import { isSingleWordOrShortPhrase } from "@/shared/utils/text/textAnalysis.js";
 import { TranslationMode } from "@/shared/config/config.js";
 import { ProviderRegistryIds } from "@/features/translation/providers/ProviderConstants.js";
 import { MessageActions } from "@/shared/messaging/core/MessageActions.js";
-import { MessagingContexts, reconstructTranslationError } from "@/shared/messaging/core/MessagingCore.js";
+import { MessagingContexts, reconstructTranslationError, isStructuredTranslationError } from "@/shared/messaging/core/MessagingCore.js";
 import { ErrorTypes } from "@/shared/error-management/ErrorTypes.js";
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
@@ -33,17 +33,8 @@ const logger = new Proxy({}, {
   }
 });
 
-// Canonical error identity: valid structured details always outrank the legacy
-// error string for popup/sidepanel presentation.
-function hasValidErrorDetails(errorDetails) {
-  return errorDetails
-    && typeof errorDetails === 'object'
-    && !Array.isArray(errorDetails)
-    && typeof errorDetails.message === 'string';
-}
-
 function resolveFailureError(payload) {
-  if (hasValidErrorDetails(payload?.errorDetails)) {
+  if (isStructuredTranslationError(payload?.errorDetails)) {
     return reconstructTranslationError(payload.errorDetails);
   }
   if (payload?.error !== undefined && payload?.error !== null) {
