@@ -5,7 +5,6 @@ import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { proxyManager } from "@/shared/proxy/ProxyManager.js";
 import { ProviderRequestEngine } from "@/features/translation/providers/utils/ProviderRequestEngine.js";
-import { TraditionalBatchProcessor } from "@/features/translation/providers/utils/TraditionalBatchProcessor.js";
 import { providerCoordinator } from "@/features/translation/core/ProviderCoordinator.js";
 import { getSettingsAsync } from "@/shared/config/config.js";
 import { rateLimitManager, TranslationPriority } from "@/features/translation/core/RateLimitManager.js";
@@ -175,10 +174,4 @@ export class BaseProvider {
     }
   }
 
-  /**
-   * Processes segments in batches - Delegated to TraditionalBatchProcessor
-   */
-  async _processInBatches(segments, translateChunk, limits, abortController = null, priority = null) {
-    return TraditionalBatchProcessor.processInBatches(this, segments, translateChunk, limits, abortController, priority);
-  }
 }
