@@ -26,7 +26,6 @@ export class MessagingBus {
 
       return {
         success: false,
-        error: errorDetails.message,
         errorDetails
       };
     }

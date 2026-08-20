@@ -37,15 +37,32 @@ describe('MessagingBus.sendToBackground error details', () => {
       errorDetails: expect.any(Object)
     });
 
-    expect(response.error).toBe(response.errorDetails.message);
+    expect(response).not.toHaveProperty('error');
+
+    expect(response.errorDetails.message).toBeDefined();
+    expect(typeof response.errorDetails.message).toBe('string');
   });
 
-  it('keeps legacy message and adds serializer fallback identity', async () => {
+  it('returns a canonical-only envelope with no legacy error', async () => {
+    sendMessage.mockRejectedValueOnce(new Error('failed'));
+
+    const response = await MessagingBus.sendToBackground({ action: 'TEST_ACTION' });
+
+    expect(response).toEqual({
+      success: false,
+      errorDetails: {
+        message: 'failed',
+        type: 'TRANSLATION_ERROR'
+      }
+    });
+    expect(response).not.toHaveProperty('error');
+  });
+
+  it('normalizes a plain Error into the canonical envelope', async () => {
     sendMessage.mockRejectedValueOnce(new Error('failed'));
 
     await expect(MessagingBus.sendToBackground({ action: 'TEST_ACTION' })).resolves.toEqual({
       success: false,
-      error: 'failed',
       errorDetails: {
         message: 'failed',
         type: 'TRANSLATION_ERROR'
@@ -61,7 +78,6 @@ describe('MessagingBus.sendToBackground error details', () => {
 
     await expect(MessagingBus.sendToBackground({ action: 'TEST_ACTION' })).resolves.toMatchObject({
       success: false,
-      error: 'invalid key',
       errorDetails: {
         message: 'invalid key',
         type: 'API_KEY_INVALID'
@@ -88,7 +104,6 @@ describe('MessagingBus.sendToBackground error details', () => {
 
     expect(response).toEqual({
       success: false,
-      error: 'provider failed',
       errorDetails: {
         message: 'provider failed',
         type: 'PROVIDER_ERROR',
@@ -114,7 +129,6 @@ describe('MessagingBus.sendToBackground error details', () => {
 
     await expect(MessagingBus.sendToBackground({ action: 'TEST_ACTION' })).resolves.toMatchObject({
       success: false,
-      error: message,
       errorDetails: { message, type }
     });
   });
