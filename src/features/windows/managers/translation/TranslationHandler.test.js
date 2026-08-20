@@ -254,6 +254,137 @@ describe('TranslationHandler', () => {
     expect(reconstructed).not.toHaveProperty('arbitrary');
   });
 
+  it('prefers canonical errorDetails over conflicting legacy error', () => {
+    const request = {
+      reject: vi.fn(),
+      resolve: vi.fn(),
+      timeout: setTimeout(() => {}, 1000),
+      startTime: Date.now()
+    };
+    handler.activeRequests.set('canonical-error', request);
+
+    expect(handler.handleTranslationResult({
+      messageId: 'canonical-error',
+      data: {
+        error: { message: 'legacy failure', type: 'LEGACY_ERROR' },
+        errorDetails: {
+          message: 'canonical failure',
+          type: 'PROVIDER_ERROR',
+          statusCode: 503,
+          providerName: 'Provider',
+          code: 'UPSTREAM_FAILURE',
+          errorCode: 'E_UPSTREAM',
+          translationOutcome: { partial: true }
+        }
+      }
+    })).toBe(true);
+
+    expect(request.reject).toHaveBeenCalledWith(expect.objectContaining({
+      message: 'canonical failure',
+      type: 'PROVIDER_ERROR',
+      statusCode: 503,
+      providerName: 'Provider',
+      code: 'UPSTREAM_FAILURE',
+      errorCode: 'E_UPSTREAM',
+      translationOutcome: { partial: true }
+    }));
+    expect(handler.activeRequests.has('canonical-error')).toBe(false);
+  });
+
+  it('rejects details-only failures and cleans up the active request', () => {
+    const request = {
+      reject: vi.fn(),
+      resolve: vi.fn(),
+      timeout: setTimeout(() => {}, 1000),
+      startTime: Date.now()
+    };
+    handler.activeRequests.set('details-only', request);
+
+    expect(handler.handleTranslationResult({
+      messageId: 'details-only',
+      data: {
+        errorDetails: {
+          message: 'details-only failure',
+          type: 'MODEL_NOT_FOUND'
+        }
+      }
+    })).toBe(true);
+
+    expect(request.reject).toHaveBeenCalledWith(expect.objectContaining({
+      message: 'details-only failure',
+      type: 'MODEL_NOT_FOUND'
+    }));
+    expect(handler.activeRequests.has('details-only')).toBe(false);
+  });
+
+  it('falls back to legacy error when errorDetails is malformed', () => {
+    const request = {
+      reject: vi.fn(),
+      resolve: vi.fn(),
+      timeout: setTimeout(() => {}, 1000),
+      startTime: Date.now()
+    };
+    handler.activeRequests.set('malformed-details', request);
+
+    expect(handler.handleTranslationResult({
+      messageId: 'malformed-details',
+      data: {
+        error: { message: 'legacy failure', type: 'LEGACY_ERROR' },
+        errorDetails: { arbitrary: true }
+      }
+    })).toBe(true);
+
+    expect(request.reject).toHaveBeenCalledWith(expect.objectContaining({
+      message: 'legacy failure',
+      type: 'LEGACY_ERROR'
+    }));
+    expect(handler.activeRequests.has('malformed-details')).toBe(false);
+  });
+
+  it('preserves false behavior when result has neither error nor translatedText', () => {
+    const request = {
+      reject: vi.fn(),
+      resolve: vi.fn(),
+      timeout: setTimeout(() => {}, 1000),
+      startTime: Date.now()
+    };
+    handler.activeRequests.set('empty-result', request);
+
+    expect(handler.handleTranslationResult({
+      messageId: 'empty-result',
+      data: { success: false }
+    })).toBe(false);
+    expect(handler.activeRequests.has('empty-result')).toBe(true);
+
+    handler._cleanupRequest('empty-result');
+  });
+
+  it('preserves translatedText success resolution', () => {
+    const request = {
+      reject: vi.fn(),
+      resolve: vi.fn(),
+      timeout: setTimeout(() => {}, 1000),
+      startTime: Date.now()
+    };
+    handler.activeRequests.set('success-result', request);
+
+    expect(handler.handleTranslationResult({
+      messageId: 'success-result',
+      data: {
+        translatedText: 'translated',
+        sourceLanguage: 'en',
+        targetLanguage: 'fa'
+      }
+    })).toBe(true);
+
+    expect(request.resolve).toHaveBeenCalledWith(expect.objectContaining({
+      translatedText: 'translated',
+      sourceLanguage: 'en',
+      targetLanguage: 'fa'
+    }));
+    expect(handler.activeRequests.has('success-result')).toBe(false);
+  });
+
   it('reconstructs stream-end DTO errors and preserves cancellation behavior', async () => {
     let callbacks;
     registerTranslation.mockImplementation((id, registeredCallbacks) => {

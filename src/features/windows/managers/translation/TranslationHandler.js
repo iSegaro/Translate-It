@@ -284,8 +284,12 @@ export class TranslationHandler {
 
     if (!request) return false;
 
-    if (message.data?.error) {
-      request.reject(reconstructTranslationError(message.data.error));
+    const errorSource = isStructuredTranslationError(message.data?.errorDetails)
+      ? message.data.errorDetails
+      : message.data?.error;
+
+    if (errorSource) {
+      request.reject(reconstructTranslationError(errorSource));
       this._cleanupRequest(messageId);
       return true;
     } else if (message.data?.translatedText) {
