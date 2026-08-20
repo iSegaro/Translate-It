@@ -64,7 +64,7 @@ describe('SubtitleTranslationCoordinator Stability', () => {
     const result = await subtitleTranslationCoordinator._processBatch(jobId, [{ id: '1', text: 'Hello', index: 1, warnings: [] }], 'en', 'fa', 'google', {});
 
     expect(result.success).toBe(false);
-    expect(result.error).toBe('Job cancelled before batch request');
+    expect(result.errorDetails.message).toBe('Job cancelled before batch request');
     expect(unifiedTranslationService.handleTranslationRequest).not.toHaveBeenCalled();
   });
 
@@ -97,8 +97,8 @@ describe('SubtitleTranslationCoordinator Stability', () => {
       const assertion = promise.then((result) => {
         expect(result.success).toBe(false);
         expect(result.isFatal).toBe(false);
-        expect(result.error).toMatch(/timed out/);
-        expect(result.error).not.toMatch(/cancell/i);
+        expect(result.errorDetails.message).toMatch(/timed out/);
+        expect(result.errorDetails.message).not.toMatch(/cancell/i);
         // Source preserved: cue is failed, never translated, never cancelled
         expect(batch[0].status).toBe('failed');
         expect(batch[0].translatedText).toBeUndefined();
@@ -136,8 +136,8 @@ describe('SubtitleTranslationCoordinator Stability', () => {
     );
 
     expect(result.success).toBe(false);
-    expect(result.error).toMatch(/cancell/i);
-    expect(result.error).not.toMatch(/timed out/);
+    expect(result.errorDetails.message).toMatch(/cancell/i);
+    expect(result.errorDetails.message).not.toMatch(/timed out/);
     // SUBTITLE coordinator keeps cancellation typed as USER_CANCELLED (fatal)
     expect(result.isFatal).toBe(true);
     expect(batch[0].translatedText).toBeUndefined();
@@ -181,7 +181,6 @@ describe('SubtitleTranslationCoordinator Stability', () => {
 
     expect(result).toMatchObject({
       success: false,
-      error: 'Provider failed',
       errorDetails: {
         message: 'Provider failed',
         type: 'PROVIDER_ERROR',
@@ -421,7 +420,7 @@ describe('SubtitleTranslationCoordinator Timeout Ownership', () => {
 
       expect(result.success).toBe(false);
       expect(result.isFatal).toBe(false);
-      expect(result.error).toMatch(/timed out/);
+      expect(result.errorDetails.message).toMatch(/timed out/);
 
       const sentMessage = unifiedTranslationService.handleTranslationRequest.mock.calls[0][0];
       expect(unifiedTranslationService.handleTimeout).toHaveBeenCalledWith(sentMessage.messageId);
@@ -506,7 +505,7 @@ describe('SubtitleTranslationCoordinator Timeout Ownership', () => {
       const result = await promise;
 
       expect(result.success).toBe(false);
-      expect(result.error).toMatch(/timed out/);
+      expect(result.errorDetails.message).toMatch(/timed out/);
       expect(unifiedTranslationService.handleTimeout).toHaveBeenCalled();
       expect(subtitleTranslationCoordinator.activeJobs.get(jobId).activeBatchMessageId).toBeNull();
     } finally {
@@ -614,7 +613,7 @@ describe('SubtitleTranslationCoordinator Timeout Ownership', () => {
 
       expect(result.success).toBe(false);
       expect(result.isFatal).toBe(false);
-      expect(result.error).toMatch(/timed out/);
+      expect(result.errorDetails.message).toMatch(/timed out/);
       const sentMessage = unifiedTranslationService.handleTranslationRequest.mock.calls[0][0];
       expect(unifiedTranslationService.handleTimeout).toHaveBeenCalledWith(sentMessage.messageId);
     } finally {
@@ -687,7 +686,7 @@ describe('SubtitleTranslationCoordinator Timeout Ownership', () => {
 
       expect(result.success).toBe(false);
       expect(result.isFatal).toBe(false);
-      expect(result.error).toMatch(/timed out/);
+      expect(result.errorDetails.message).toMatch(/timed out/);
       expect(unifiedTranslationService.cancelRequest).toHaveBeenCalled();
     } finally {
       vi.useRealTimers();
@@ -713,7 +712,7 @@ describe('SubtitleTranslationCoordinator Timeout Ownership', () => {
       await vi.advanceTimersByTimeAsync(301000);
       const result = await promise;
 
-      expect(result.error).toMatch(/timed out/);
+      expect(result.errorDetails.message).toMatch(/timed out/);
       expect(unifiedTranslationService.handleTimeout).toHaveBeenCalled();
       expect(unifiedTranslationService.cancelRequest).not.toHaveBeenCalled();
     } finally {

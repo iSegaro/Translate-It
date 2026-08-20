@@ -273,7 +273,6 @@ export class SubtitleTranslationCoordinator {
       return { 
         success: false, 
         isFatal, 
-        error: error.message,
         errorDetails: MessageFormat.serializeTranslationError(error),
         updatedCues: batch
       };
