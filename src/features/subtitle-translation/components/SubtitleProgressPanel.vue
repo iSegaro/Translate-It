@@ -91,19 +91,17 @@ const displayTerminalError = ref(null);
 let presentationVersion = 0;
 
 watch(
-  () => [props.progress.terminalError, props.progress.terminalErrorDetails],
-  async ([terminalError, errorDetails]) => {
+  () => props.progress.terminalErrorDetails,
+  async (errorDetails) => {
     const version = ++presentationVersion;
-    if (!terminalError && !errorDetails) {
+    if (!errorDetails) {
       displayTerminalError.value = null;
       return;
     }
 
-    const presentation = await presentSubtitleTranslationError({ error: terminalError, errorDetails });
+    const presentation = await presentSubtitleTranslationError({ errorDetails });
     if (version !== presentationVersion) return;
-    displayTerminalError.value = presentation.kind === 'silent'
-      ? null
-      : presentation.kind === 'display' ? presentation.message : terminalError;
+    displayTerminalError.value = presentation.kind === 'display' ? presentation.message : null;
   },
   { immediate: true }
 );

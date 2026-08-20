@@ -1693,6 +1693,107 @@ describe('DomTranslatorAdapter', () => {
       }
     });
 
+    it('takes fatal path from canonical errorDetails over nonfatal legacy error on stream update', async () => {
+      let streamCallbacks;
+      registerTranslation.mockImplementation((id, callbacks) => {
+        streamCallbacks = callbacks;
+      });
+
+      const { isFatalError } = await import('@/shared/error-management/ErrorMatcher.js');
+      isFatalError.mockImplementation((err) => err?.type === 'FATAL_ERROR');
+
+      contentScriptIntegration.sendTranslationRequest.mockImplementation(async () => {
+        setTimeout(() => {
+          streamCallbacks.onStreamUpdate({
+            success: false,
+            error: { message: 'legacy nonfatal', type: 'NONFATAL' },
+            errorDetails: { message: 'canonical failure', type: 'FATAL_ERROR' }
+          });
+        }, 10);
+        return { success: true, streaming: true };
+      });
+
+      const rejection = adapter.translateElement(testElement);
+      await expect(rejection).rejects.toThrow('canonical failure');
+      try {
+        await rejection;
+      } catch (error) {
+        expect(error).toMatchObject({ type: 'FATAL_ERROR', isFatal: true });
+      }
+    });
+
+    it('still takes fatal path from legacy error when errorDetails is malformed on stream update', async () => {
+      let streamCallbacks;
+      registerTranslation.mockImplementation((id, callbacks) => {
+        streamCallbacks = callbacks;
+      });
+
+      const { isFatalError } = await import('@/shared/error-management/ErrorMatcher.js');
+      isFatalError.mockImplementation((err) => err?.type === 'FATAL_ERROR');
+
+      contentScriptIntegration.sendTranslationRequest.mockImplementation(async () => {
+        setTimeout(() => {
+          streamCallbacks.onStreamUpdate({
+            success: false,
+            error: { message: 'legacy fatal', type: 'FATAL_ERROR' },
+            errorDetails: { arbitrary: true }
+          });
+        }, 10);
+        return { success: true, streaming: true };
+      });
+
+      const rejection = adapter.translateElement(testElement);
+      await expect(rejection).rejects.toThrow('legacy fatal');
+      try {
+        await rejection;
+      } catch (error) {
+        expect(error).toMatchObject({ type: 'FATAL_ERROR', isFatal: true });
+      }
+    });
+
+    it('prefers canonical errorDetails over legacy error on stream end', async () => {
+      let streamCallbacks;
+      registerTranslation.mockImplementation((id, callbacks) => {
+        streamCallbacks = callbacks;
+      });
+
+      contentScriptIntegration.sendTranslationRequest.mockImplementation(async () => {
+        setTimeout(() => {
+          streamCallbacks.onStreamEnd({
+            success: false,
+            error: { message: 'legacy failure', type: 'LEGACY_ERROR' },
+            errorDetails: { message: 'canonical failure', type: 'MODEL_NOT_FOUND' }
+          });
+        }, 10);
+        return { success: true, streaming: true };
+      });
+
+      const rejection = adapter.translateElement(testElement);
+      await expect(rejection).rejects.toThrow('canonical failure');
+      try {
+        await rejection;
+      } catch (error) {
+        expect(error).toMatchObject({ type: 'MODEL_NOT_FOUND' });
+      }
+    });
+
+    it('prefers canonical errorDetails over legacy error on direct response', async () => {
+      contentScriptIntegration.sendTranslationRequest.mockResolvedValue({
+        success: false,
+        streaming: false,
+        error: { message: 'legacy failure', type: 'LEGACY_ERROR' },
+        errorDetails: { message: 'canonical failure', type: 'MODEL_NOT_FOUND' }
+      });
+
+      const rejection = adapter.translateElement(testElement);
+      await expect(rejection).rejects.toThrow('canonical failure');
+      try {
+        await rejection;
+      } catch (error) {
+        expect(error).toMatchObject({ type: 'MODEL_NOT_FOUND' });
+      }
+    });
+
     it('reconstructs direct DTO errors canonically', async () => {
       contentScriptIntegration.sendTranslationRequest.mockResolvedValue({
         success: false,

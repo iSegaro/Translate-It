@@ -8,15 +8,13 @@ export class SubtitleProgressTracker {
     this.failedCount = 0;
     this.skippedCount = 0;
     this.startTime = Date.now();
-    this.terminalError = null;
     this.terminalErrorDetails = null;
   }
 
   /**
-   * Sets a terminal error message that caused the job to stop prematurely.
+   * Stores canonical terminal error details for a job stopped prematurely.
    */
-  setTerminalError(error, errorDetails = null) {
-    this.terminalError = error;
+  setTerminalError(errorDetails) {
     this.terminalErrorDetails = errorDetails;
   }
 
@@ -47,7 +45,6 @@ export class SubtitleProgressTracker {
       percent: Math.round(percent),
       etaMs: Math.round(etaMs),
       elapsedMs: elapsed,
-      terminalError: this.terminalError,
       terminalErrorDetails: this.terminalErrorDetails
     };
   }

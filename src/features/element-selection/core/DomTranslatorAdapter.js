@@ -31,7 +31,8 @@ import { TranslationMode } from '@/shared/config/config.js';
 import {
   MessageContexts,
   ActionReasons,
-  reconstructTranslationError
+  reconstructTranslationError,
+  isStructuredTranslationError
 } from '@/shared/messaging/core/MessagingCore.js';
 import { registerTranslation, contentScriptIntegration } from '@/shared/messaging/core/ContentScriptIntegration.js';
 import { ErrorHandler } from '@/shared/error-management/ErrorHandler.js';
@@ -676,8 +677,11 @@ export class DomTranslatorAdapter extends ResourceTracker {
             }
             try {
               if (data.success === false || data.error) {
-                if (isFatalError(data.error)) {
-                  const errObj = typeof data.error === 'object' ? data.error : { message: data.error, type: matchErrorToType(data.error) };
+                const canonicalErrorSource = isStructuredTranslationError(data?.errorDetails)
+                  ? data.errorDetails
+                  : data.error;
+                if (isFatalError(canonicalErrorSource)) {
+                  const errObj = typeof canonicalErrorSource === 'object' ? canonicalErrorSource : { message: canonicalErrorSource, type: matchErrorToType(canonicalErrorSource) };
                   const error = reconstructSelectElementError(errObj);
                   // Select Element owns fatal stream termination state; keep it explicit
                   // after canonical reconstruction instead of copying transport fields.
@@ -804,7 +808,10 @@ export class DomTranslatorAdapter extends ResourceTracker {
              if (data.cancelled) return safeResolve({ success: false, cancelled: true });
              if (data.success === false || data.error) {
                terminalStreamFailure = true;
-                const errObj = typeof data.error === 'object' ? data.error : { message: data.error, type: matchErrorToType(data.error) };
+               const canonicalErrorSource = isStructuredTranslationError(data?.errorDetails)
+                 ? data.errorDetails
+                 : data.error;
+                const errObj = typeof canonicalErrorSource === 'object' ? canonicalErrorSource : { message: canonicalErrorSource, type: matchErrorToType(canonicalErrorSource) };
                 const error = reconstructSelectElementError(errObj);
                return safeResolve({ success: false, error });
             }
@@ -899,7 +906,7 @@ export class DomTranslatorAdapter extends ResourceTracker {
       }
 
        // If the result contains an error, throw it now
-       if (result && result.success === false && result.error) {
+       if (result && result.success === false && (result.error || result.errorDetails)) {
          const outcome = getCurrentOutcome(Boolean(result.cancelled));
          if (terminalStreamFailure
              && !outcome.cancelled
@@ -911,7 +918,10 @@ export class DomTranslatorAdapter extends ResourceTracker {
            });
            result = { success: true, targetLanguage: result.targetLanguage };
          } else {
-            throw attachTranslationOutcome(reconstructSelectElementError(result.error), outcome);
+           const canonicalErrorSource = isStructuredTranslationError(result?.errorDetails)
+             ? result.errorDetails
+             : result.error;
+            throw attachTranslationOutcome(reconstructSelectElementError(canonicalErrorSource), outcome);
          }
        }
 

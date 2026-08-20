@@ -860,10 +860,12 @@ const parentError = createParentValidationError(parentIdStr, sourceText, transla
           
           // If first batch failed fatally, don't continue
           if (hasErrors && lastError && isFatalError(lastError)) {
+            const serializedError = MessageFormat.serializeTranslationError(lastError);
             return { 
               success: false, 
               streaming: true, 
-              error: MessageFormat.serializeTranslationError(lastError),
+              error: serializedError,
+              errorDetails: serializedError,
               results: batchResults.flat()
             };
           }
@@ -933,11 +935,17 @@ const parentError = createParentValidationError(parentIdStr, sourceText, transla
               if (!abortController.signal.aborted) abortController.abort();
             }, remainingMs);
             
-            // Link timeout cleanup to abort signal
-            onAbort = () => clearTimeout(timeoutId);
+            // Shared abort must settle local wait immediately, even when the
+            // provider ignores the signal and leaves its promise pending.
+            onAbort = () => {
+              clearTimeout(timeoutId);
+              resolve({ __kind: 'abort' });
+            };
             abortController.signal.addEventListener('abort', onAbort);
+            if (abortController.signal.aborted) onAbort();
           });
-
+          if (abortController.signal.aborted) checkCancellation();
+            
            batchPayload = hasManifestMembership ? batch.map(({ payload }) => payload) : batch;
            const explicitParentIds = batch.map(item => item && typeof item === 'object'
              ? (item.parentId ?? item.blockId)
@@ -1031,6 +1039,8 @@ const parentError = createParentValidationError(parentIdStr, sourceText, transla
             throw translatedBatchResponse.error;
           } else if (translatedBatchResponse && typeof translatedBatchResponse === 'object' && translatedBatchResponse.__kind === 'provider-success') {
             translatedBatchResponse = translatedBatchResponse.value;
+          } else if (translatedBatchResponse && typeof translatedBatchResponse === 'object' && translatedBatchResponse.__kind === 'abort') {
+            checkCancellation();
           }
 
           checkCancellation();
@@ -1191,10 +1201,12 @@ hasErrors = true;
       if (abortController.signal.aborted || engine.isCancelled(messageId)) {
         logger.debug(`[JsonHandler] Skipping stream end markers for cancelled request: ${messageId}`);
         if (hasErrors && lastError && abortInitiator === 'fatal-error') {
+          const serializedError = MessageFormat.serializeTranslationError(lastError);
           return {
             success: false,
             streaming: true,
-            error: MessageFormat.serializeTranslationError(lastError),
+            error: serializedError,
+            errorDetails: serializedError,
             results: batchResults.flat()
           };
         }
@@ -1217,6 +1229,7 @@ hasErrors = true;
         success: !hasErrors,
         streaming: true,
         error: formattedError,
+        ...(formattedError && { errorDetails: formattedError }),
         results: batchResults.flat(),
         metadata: {
           batchCount: batches.length
@@ -1460,12 +1473,14 @@ hasErrors = true;
 
   async _sendStreamError(tabId, messageId, lastError, targetLanguage, sourceLanguage, translationMode, frameId = null) {
     if (!tabId) return;
+    const serializedError = lastError ? MessageFormat.serializeTranslationError(lastError) : null;
     const endMessage = {
       action: MessageActions.TRANSLATION_STREAM_END,
       messageId,
       data: {
         success: false,
-        error: lastError ? MessageFormat.serializeTranslationError(lastError) : null,
+        error: serializedError,
+        errorDetails: serializedError,
         sourceLanguage,
         targetLanguage,
         translationMode,

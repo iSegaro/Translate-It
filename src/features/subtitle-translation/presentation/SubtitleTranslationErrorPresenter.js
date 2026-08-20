@@ -19,14 +19,24 @@ function isSilentError(error) {
 
 /**
  * Prepares subtitle translation failure presentation without changing job state.
- * Legacy fields remain available for older subtitle responses.
+ * Missing or malformed details use a safe generic translation failure message.
  *
  * @param {Object} detail - Subtitle translation failure data
- * @returns {Promise<{kind: 'display', message: string, error: Error}|{kind: 'silent'}|{kind: 'legacy'}>}
+ * @returns {Promise<{kind: 'display', message: string, error: Error}|{kind: 'silent'}>}
  */
 export async function presentSubtitleTranslationError(detail = {}) {
   if (!hasValidErrorDetails(detail.errorDetails)) {
-    return { kind: 'legacy' };
+    const fallbackError = new Error();
+    fallbackError.type = ErrorTypes.TRANSLATION_FAILED;
+    const publicError = mapCanonicalTranslationError(fallbackError);
+    const displayError = await createLegacyDisplayError(fallbackError, publicError);
+    if (!displayError) return { kind: 'silent' };
+
+    return {
+      kind: 'display',
+      message: displayError.message,
+      error: displayError
+    };
   }
 
   const canonicalError = reconstructTranslationError(detail.errorDetails);

@@ -16,11 +16,16 @@ vi.mock('@/shared/messaging/core/MessagingBus.js', () => ({
 }));
 
 vi.mock('../presentation/SubtitleTranslationErrorPresenter.js', () => ({
-  presentSubtitleTranslationError: presentSubtitleTranslationErrorMock.mockImplementation(async ({ errorDetails, error }) => {
+  presentSubtitleTranslationError: presentSubtitleTranslationErrorMock.mockImplementation(async ({ errorDetails }) => {
     if (['USER_CANCELLED', 'TRANSLATION_CANCELLED', 'CONTEXT', 'EXTENSION_CONTEXT_INVALIDATED'].includes(errorDetails?.type)) {
       return { kind: 'silent' };
     }
-    return errorDetails ? { kind: 'display', message: 'Safe subtitle error' } : { kind: 'legacy', message: error };
+    return {
+      kind: 'display',
+      message: typeof errorDetails?.message === 'string'
+        ? 'Safe subtitle error'
+        : 'Localized TRANSLATION_FAILED'
+    };
   })
 }));
 
@@ -54,7 +59,26 @@ describe('useSubtitleTranslation error presentation', () => {
     expect(state.errorDetails.value.type).toBe('MODEL_NOT_FOUND');
   });
 
-  it('keeps string-only failures compatible', async () => {
+  it('uses structured event details and ignores the transport error string', async () => {
+    const state = useSubtitleTranslation();
+    const errorDetails = { message: 'structured diagnostic', type: 'API_KEY_INVALID' };
+
+    await onMessage({
+      action: MessageActions.SUBTITLE_TRANSLATE_ERROR,
+      data: {
+        jobId: state.jobId.value,
+        error: 'raw transport diagnostic',
+        errorDetails
+      }
+    });
+    await Promise.resolve();
+
+    expect(presentSubtitleTranslationErrorMock).toHaveBeenCalledWith({ errorDetails });
+    expect(presentSubtitleTranslationErrorMock.mock.calls.at(-1)[0]).not.toHaveProperty('error');
+    expect(state.error.value).toBe('Safe subtitle error');
+  });
+
+  it('uses safe generic presentation for string-only failures', async () => {
     const state = useSubtitleTranslation();
 
     await onMessage({
@@ -63,8 +87,67 @@ describe('useSubtitleTranslation error presentation', () => {
     });
     await Promise.resolve();
 
+    expect(presentSubtitleTranslationErrorMock).toHaveBeenCalledWith({ errorDetails: undefined });
     expect(state.status.value).toBe('error');
-    expect(state.error.value).toBe('legacy failure');
+    expect(state.error.value).toBe('Localized TRANSLATION_FAILED');
+  });
+
+  it('uses safe generic presentation for malformed details without reading raw error', async () => {
+    const state = useSubtitleTranslation();
+
+    await onMessage({
+      action: MessageActions.SUBTITLE_TRANSLATE_ERROR,
+      data: {
+        jobId: state.jobId.value,
+        error: 'raw malformed diagnostic',
+        errorDetails: { arbitrary: true }
+      }
+    });
+    await Promise.resolve();
+
+    expect(presentSubtitleTranslationErrorMock).toHaveBeenCalledWith({
+      errorDetails: { arbitrary: true }
+    });
+    expect(presentSubtitleTranslationErrorMock.mock.calls.at(-1)[0]).not.toHaveProperty('error');
+    expect(state.error.value).toBe('Localized TRANSLATION_FAILED');
+  });
+
+  it('uses response errorDetails and ignores conflicting raw response error', async () => {
+    const state = useSubtitleTranslation();
+    const errorDetails = { message: 'structured start failure', type: 'MODEL_NOT_FOUND' };
+    sendToBackgroundMock.mockResolvedValueOnce({
+      success: false,
+      error: 'raw start failure',
+      errorDetails
+    });
+
+    await state.startTranslation('subtitle', 'sample.srt', {
+      sourceLanguage: 'en',
+      targetLanguage: 'fa',
+      providerId: 'provider'
+    });
+
+    expect(presentSubtitleTranslationErrorMock).toHaveBeenCalledWith({ errorDetails });
+    expect(presentSubtitleTranslationErrorMock.mock.calls.at(-1)[0]).not.toHaveProperty('error');
+    expect(state.error.value).toBe('Safe subtitle error');
+  });
+
+  it('uses generic presentation when start response has only raw error', async () => {
+    const state = useSubtitleTranslation();
+    sendToBackgroundMock.mockResolvedValueOnce({
+      success: false,
+      error: 'raw start failure'
+    });
+
+    await state.startTranslation('subtitle', 'sample.srt', {
+      sourceLanguage: 'en',
+      targetLanguage: 'fa',
+      providerId: 'provider'
+    });
+
+    expect(presentSubtitleTranslationErrorMock).toHaveBeenCalledWith({ errorDetails: undefined });
+    expect(presentSubtitleTranslationErrorMock.mock.calls.at(-1)[0]).not.toHaveProperty('error');
+    expect(state.error.value).toBe('Localized TRANSLATION_FAILED');
   });
 
   it('keeps cancellation/context failures invisible', async () => {
@@ -99,7 +182,6 @@ describe('useSubtitleTranslation error presentation', () => {
           translated: 1,
           failed: 1,
           total: 2,
-          terminalError: 'raw provider body',
           terminalErrorDetails: errorDetails
         }
       }
@@ -127,7 +209,7 @@ describe('useSubtitleTranslation error presentation', () => {
     });
 
     const detail = presentSubtitleTranslationErrorMock.mock.calls.at(-1)[0];
-    expect(detail.error).toBe('raw model diagnostic');
+    expect(detail).not.toHaveProperty('error');
     expect(detail.errorDetails).toMatchObject({
       message: 'raw model diagnostic',
       type: 'MODEL_NOT_FOUND',
@@ -158,11 +240,12 @@ describe('useSubtitleTranslation error presentation', () => {
     });
 
     const detail = presentSubtitleTranslationErrorMock.mock.calls.at(-1)[0];
+    expect(detail).not.toHaveProperty('error');
     expect(detail.errorDetails).toBe(errorDetails);
     expect(detail.errorDetails.type).toBe('API_KEY_INVALID');
   });
 
-  it('keeps ordinary local rejection on legacy fallback', async () => {
+  it('uses safe generic presentation for ordinary local rejection', async () => {
     const state = useSubtitleTranslation();
     sendToBackgroundMock.mockRejectedValueOnce(new Error('Failed to read subtitle file'));
 
@@ -174,7 +257,7 @@ describe('useSubtitleTranslation error presentation', () => {
 
     const detail = presentSubtitleTranslationErrorMock.mock.calls.at(-1)[0];
     expect(detail.errorDetails).toBeUndefined();
-    expect(state.error.value).toBe('Failed to read subtitle file');
+    expect(state.error.value).toBe('Localized TRANSLATION_FAILED');
   });
 
   it.each(['USER_CANCELLED', 'CONTEXT', 'EXTENSION_CONTEXT_INVALIDATED'])('silences direct %s rejection', async (type) => {

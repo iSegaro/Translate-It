@@ -6,10 +6,10 @@ import { isValidSync, isContextError } from '@/core/contextCore.js';
 import { handleContextError } from '@/core/contextErrorHandler.js';
 import { unifiedTranslationCoordinator } from './UnifiedTranslationCoordinator.js';
 import { streamingTimeoutManager } from './StreamingTimeoutManager.js';
-import { isFatalError, matchErrorToType, isSilentError } from '@/shared/error-management/ErrorMatcher.js';
+import { isCancellationError, isFatalError, matchErrorToType, isSilentError } from '@/shared/error-management/ErrorMatcher.js';
 import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
 import { isRestrictedUrl } from '@/core/tabPermissions.js';
-import { reconstructTranslationError } from './MessagingCore.js';
+import { reconstructTranslationError, isStructuredTranslationError } from './MessagingCore.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.MESSAGING, 'UnifiedMessaging');
 
@@ -111,21 +111,12 @@ function getFailureMessage(response, responseError) {
     || 'Unknown technical error';
 }
 
-function isStructuredTranslationError(value) {
-  return Boolean(
-    value
-    && typeof value === 'object'
-    && !Array.isArray(value)
-    && typeof value.message === 'string'
-  );
-}
-
 function reconstructResponseError(response) {
   const responseError = response.error;
-  const canonicalError = typeof responseError === 'object' && responseError !== null
-    ? responseError
-    : isStructuredTranslationError(response.errorDetails)
-      ? response.errorDetails
+  const canonicalError = isStructuredTranslationError(response.errorDetails)
+    ? response.errorDetails
+    : typeof responseError === 'object' && responseError !== null
+      ? responseError
       : responseError;
   const message = getFailureMessage(response, canonicalError);
 
@@ -147,6 +138,23 @@ function reconstructResponseError(response) {
   });
 }
 
+function getLifecycleTerminalError(messageId) {
+  const state = streamingTimeoutManager.getOperationState(messageId);
+  if (state?.isCancelled) {
+    const cancelError = new Error(ErrorTypes.USER_CANCELLED);
+    cancelError.type = ErrorTypes.USER_CANCELLED;
+    return cancelError;
+  }
+
+  if (state?.hasTimedOut) {
+    const timeoutError = new Error(ErrorTypes.TRANSLATION_TIMEOUT);
+    timeoutError.type = ErrorTypes.TRANSLATION_TIMEOUT;
+    return timeoutError;
+  }
+
+  return null;
+}
+
 export async function sendMessage(message, options = {}) {
   const { forceRegular = false } = options;
   if (!message) return null;
@@ -156,6 +164,7 @@ export async function sendMessage(message, options = {}) {
       return await unifiedTranslationCoordinator.coordinateTranslation(message, options);
     } catch (error) {
       if (isFatalError(error)) throw error;
+      if (isCancellationError(error)) throw error;
       
       const isStreamingTimeout = error.message && typeof error.message === 'string' && error.message.includes('timed out');
       if (isStreamingTimeout && message.messageId && !String(message.messageId).startsWith('fallback-')) {
@@ -166,10 +175,6 @@ export async function sendMessage(message, options = {}) {
           });
           if (checkResponse && checkResponse.completed) return checkResponse.results;
         } catch { /* ignore */ }
-      }
-
-      if (message.messageId && streamingTimeoutManager.shouldContinue(message.messageId) === false) {
-        throw new Error('Translation cancelled by user');
       }
 
       const fallbackMessage = {
@@ -197,9 +202,8 @@ export async function sendRegularMessage(message, options = {}) {
     }
 
     if (message.messageId && streamingTimeoutManager.shouldContinue(message.messageId) === false) {
-      const cancelError = new Error(ErrorTypes.USER_CANCELLED);
-      cancelError.type = ErrorTypes.USER_CANCELLED;
-      throw cancelError;
+      const lifecycleError = getLifecycleTerminalError(message.messageId);
+      if (lifecycleError) throw lifecycleError;
     }
 
     const sendPromise = browser.runtime.sendMessage(message);
@@ -209,10 +213,11 @@ export async function sendRegularMessage(message, options = {}) {
     const cancellationPromise = new Promise((_, reject) => {
       cancellationInterval = setInterval(() => {
         if (message.messageId && streamingTimeoutManager.shouldContinue(message.messageId) === false) {
-          if (cancellationInterval) clearInterval(cancellationInterval);
-          const cancelError = new Error(ErrorTypes.USER_CANCELLED);
-          cancelError.type = ErrorTypes.USER_CANCELLED;
-          reject(cancelError);
+          const lifecycleError = getLifecycleTerminalError(message.messageId);
+          if (lifecycleError) {
+            if (cancellationInterval) clearInterval(cancellationInterval);
+            reject(lifecycleError);
+          }
         } else if (typeof window !== 'undefined' && window.selectElementHandlingESC === true) {
           if (cancellationInterval) clearInterval(cancellationInterval);
           const cancelError = new Error('Translation cancelled by user ESC');

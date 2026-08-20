@@ -45,6 +45,7 @@ import { TranslationCallPurpose } from './ProviderConstants.js';
 import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
 import { translationSessionManager } from '../core/TranslationSessionManager.js';
 import { AIResponseParser } from './utils/AIResponseParser.js';
+import { AIStreamManager } from './utils/AIStreamManager.js';
 
 // Mock AIResponseParser
 vi.mock("./utils/AIResponseParser.js", () => ({
@@ -389,6 +390,78 @@ beforeEach(() => {
       });
       expect(options.callPurpose).not.toBe(TranslationCallPurpose.PARENT_RECOVERY);
       expect(options.expectedFormat).not.toBe(ResponseFormat.JSON_OBJECT);
+    });
+  });
+
+  describe('streaming terminal errors', () => {
+    it('emits one terminal error after a provider batch failure', async () => {
+      const messageId = 'ai-stream-failure';
+      const engine = { isCancelled: vi.fn().mockReturnValue(false) };
+      const error = Object.assign(new Error('Provider failed'), {
+        type: 'PROVIDER_ERROR',
+      });
+      const activeSpy = vi.spyOn(AIStreamManager, 'isStreamActive').mockReturnValue(true);
+      const updateSpy = vi.spyOn(AIStreamManager, 'streamErrorResults').mockResolvedValue(undefined);
+      const endSpy = vi.spyOn(AIStreamManager, 'sendStreamEnd').mockResolvedValue(undefined);
+      const batchingSpy = vi.spyOn(provider, 'getBatchingConfig').mockResolvedValue({
+        strategy: 'single',
+        optimalSize: 10,
+        maxComplexity: 100,
+      });
+      const batchSpy = vi.spyOn(provider, '_translateBatch').mockRejectedValue(error);
+
+      try {
+        await expect(provider._streamingBatchTranslate(
+          ['source'], 'en', 'fa', 'selection', engine, messageId,
+          null, null, null, ResponseFormat.JSON_OBJECT
+        )).rejects.toBe(error);
+
+        expect(updateSpy).toHaveBeenCalledWith('MockAI', error, 0, messageId, engine);
+        expect(endSpy).toHaveBeenCalledWith('MockAI', messageId, engine, { error });
+        expect(endSpy).toHaveBeenCalledTimes(1);
+        expect(batchSpy).toHaveBeenCalledTimes(1);
+      } finally {
+        activeSpy.mockRestore();
+        updateSpy.mockRestore();
+        endSpy.mockRestore();
+        batchingSpy.mockRestore();
+        batchSpy.mockRestore();
+      }
+    });
+
+    it.each([
+      ['cancellation', Object.assign(new Error('cancelled'), { type: ErrorTypes.USER_CANCELLED }), true],
+      ['timeout', Object.assign(new Error('timed out'), { type: ErrorTypes.TRANSLATION_TIMEOUT }), false],
+    ])('does not emit a provider terminal error for %s', async (_name, error, isCancellation) => {
+      const messageId = `ai-stream-${_name}`;
+      const engine = { isCancelled: vi.fn().mockReturnValue(false) };
+      const activeSpy = vi.spyOn(AIStreamManager, 'isStreamActive').mockReturnValue(true);
+      const updateSpy = vi.spyOn(AIStreamManager, 'streamErrorResults').mockResolvedValue(undefined);
+      const endSpy = vi.spyOn(AIStreamManager, 'sendStreamEnd').mockResolvedValue(undefined);
+      const batchingSpy = vi.spyOn(provider, 'getBatchingConfig').mockResolvedValue({
+        strategy: 'single',
+        optimalSize: 10,
+        maxComplexity: 100,
+      });
+      const batchSpy = vi.spyOn(provider, '_translateBatch').mockRejectedValue(error);
+      vi.mocked(isCancellationError).mockReturnValue(isCancellation);
+
+      try {
+        await expect(provider._streamingBatchTranslate(
+          ['source'], 'en', 'fa', 'selection', engine, messageId,
+          null, null, null, ResponseFormat.JSON_OBJECT
+        )).rejects.toBe(error);
+
+        expect(updateSpy).toHaveBeenCalledTimes(1);
+        expect(endSpy).not.toHaveBeenCalled();
+        expect(batchSpy).toHaveBeenCalledTimes(1);
+      } finally {
+        activeSpy.mockRestore();
+        updateSpy.mockRestore();
+        endSpy.mockRestore();
+        batchingSpy.mockRestore();
+        batchSpy.mockRestore();
+      }
     });
   });
 

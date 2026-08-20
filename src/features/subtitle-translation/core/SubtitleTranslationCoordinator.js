@@ -17,7 +17,7 @@ import { MessagingBus } from '@/shared/messaging/core/MessagingBus.js';
 import { MessageActions } from '@/shared/messaging/core/MessageActions.js';
 import { MessageContexts } from '@/shared/messaging/core/MessagingConstants.js';
 import { unifiedTranslationService } from '@/core/services/translation/UnifiedTranslationService.js';
-import { MessageFormat, reconstructTranslationError } from '@/shared/messaging/core/MessagingCore.js';
+import { MessageFormat, reconstructTranslationError, isStructuredTranslationError } from '@/shared/messaging/core/MessagingCore.js';
 import { ErrorMatcher } from '@/shared/error-management/ErrorMatcher.js';
 import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
 
@@ -35,25 +35,28 @@ export class SubtitleTranslationCoordinator {
    * Starts a new subtitle translation job.
    */
   async startJob(payload) {
-    const { 
-      jobId, 
-      content, 
-      filename, 
-      sourceLanguage, 
-      targetLanguage, 
-      providerId,
-      options = {} 
-    } = payload;
-
-    logger.info(`Starting subtitle job ${jobId} for ${filename} using ${providerId}`);
-
-    // Ensure translation engine is available (Lazy Init for Background Service Worker)
-    if (!unifiedTranslationService.translationEngine) {
-      unifiedTranslationService.translationEngine = unifiedTranslationService.translationEngine || globalThis.backgroundService?.translationEngine;
-      unifiedTranslationService.backgroundService = unifiedTranslationService.backgroundService || globalThis.backgroundService;
-    }
+    let jobId;
 
     try {
+      const {
+        jobId: extractedJobId,
+        content,
+        filename,
+        sourceLanguage,
+        targetLanguage,
+        providerId,
+        options = {}
+      } = payload;
+      jobId = extractedJobId;
+
+      logger.info(`Starting subtitle job ${jobId} for ${filename} using ${providerId}`);
+
+      // Ensure translation engine is available (Lazy Init for Background Service Worker)
+      if (!unifiedTranslationService.translationEngine) {
+        unifiedTranslationService.translationEngine = unifiedTranslationService.translationEngine || globalThis.backgroundService?.translationEngine;
+        unifiedTranslationService.backgroundService = unifiedTranslationService.backgroundService || globalThis.backgroundService;
+      }
+
       // 0. Reset Provider State (Circuit Breaker) before starting a new job
       // This ensures a fresh start if the user tries again after an error
       const translationEngine = unifiedTranslationService.translationEngine;
@@ -107,10 +110,7 @@ export class SubtitleTranslationCoordinator {
         if (result && result.isFatal) {
           logger.warn(`Stopping job ${jobId} due to fatal error. Rescuing progress...`);
           if (job.progressTracker) {
-              job.progressTracker.setTerminalError(
-                result.error || 'Fatal translation error occurred',
-                result.errorDetails
-              );
+            job.progressTracker.setTerminalError(result.errorDetails);
           }
           job.lastErrorDetails = result.errorDetails || null;
           break;
@@ -239,8 +239,13 @@ export class SubtitleTranslationCoordinator {
       }
 
       if (!response.success) {
-        // UnifiedTranslationService returns error details inside a response.error object
-        const errorInfo = response.error && typeof response.error === 'object' ? response.error : { message: response.error };
+        // Canonical errorDetails own identity when present; otherwise fall back
+        // to the legacy error slot (object DTO or raw message string).
+        const errorInfo = isStructuredTranslationError(response?.errorDetails)
+          ? response.errorDetails
+          : response.error && typeof response.error === 'object'
+            ? response.error
+            : { message: response.error };
         
         const error = reconstructTranslationError(errorInfo);
         error.type = error.type || errorInfo.type || response.type;
@@ -276,7 +281,6 @@ export class SubtitleTranslationCoordinator {
       return { 
         success: false, 
         isFatal, 
-        error: error.message,
         errorDetails: MessageFormat.serializeTranslationError(error),
         updatedCues: batch
       };
@@ -352,7 +356,6 @@ export class SubtitleTranslationCoordinator {
       action: MessageActions.SUBTITLE_TRANSLATE_ERROR,
       payload: {
         jobId,
-        error,
         errorDetails: MessageFormat.serializeTranslationError(errorLike)
       }
     });

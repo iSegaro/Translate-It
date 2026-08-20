@@ -126,6 +126,14 @@ describe('ErrorMatcher', () => {
       expect(isCancellationError(new Error('cancelled by user'))).toBe(true);
       expect(isCancellationError(ErrorTypes.NETWORK_ERROR)).toBe(false);
     });
+
+    it('should keep explicit provider types authoritative over cancellation wording', () => {
+      const error = Object.assign(new Error('Request cancelled by upstream provider'), {
+        type: ErrorTypes.NETWORK_ERROR,
+      });
+
+      expect(isCancellationError(error)).toBe(false);
+    });
   });
 
   describe('ErrorMatcher Class', () => {

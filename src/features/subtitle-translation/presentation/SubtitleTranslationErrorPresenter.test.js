@@ -51,11 +51,26 @@ describe('presentSubtitleTranslationError', () => {
     expect(createLegacyDisplayError).toHaveBeenCalledWith(canonicalError, expect.any(Object));
   });
 
-  it('preserves legacy fallback for missing or malformed details', async () => {
-    await expect(presentSubtitleTranslationError({ error: 'legacy failure' }))
-      .resolves.toEqual({ kind: 'legacy' });
-    await expect(presentSubtitleTranslationError({ error: 'legacy failure', errorDetails: { arbitrary: true } }))
-      .resolves.toEqual({ kind: 'legacy' });
+  it('uses safe generic display for missing or malformed details', async () => {
+    await expect(presentSubtitleTranslationError({ error: 'raw legacy failure' }))
+      .resolves.toMatchObject({ kind: 'display', message: 'Localized TRANSLATION_FAILED' });
+    await expect(presentSubtitleTranslationError({
+      error: 'raw malformed failure',
+      errorDetails: { arbitrary: true }
+    })).resolves.toMatchObject({ kind: 'display', message: 'Localized TRANSLATION_FAILED' });
+
+    expect(mapCanonicalTranslationError).toHaveBeenCalledWith(expect.objectContaining({
+      type: ErrorTypes.TRANSLATION_FAILED
+    }));
+    expect(createLegacyDisplayError).not.toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ type: 'raw legacy failure' })
+    );
+  });
+
+  it('uses generic display for legacy cancellation strings without typed details', async () => {
+    await expect(presentSubtitleTranslationError({ error: 'Translation cancelled' }))
+      .resolves.toMatchObject({ kind: 'display', message: 'Localized TRANSLATION_FAILED' });
   });
 
   it.each([

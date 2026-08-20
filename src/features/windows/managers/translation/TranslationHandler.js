@@ -9,7 +9,7 @@ import { ProviderRegistryIds } from "@/features/translation/providers/ProviderCo
 import { settingsManager } from '@/shared/managers/SettingsManager.js';
 import { AUTO_DETECT_VALUE } from "@/shared/constants/core.js";
 import { MessageActions } from "@/shared/messaging/core/MessageActions.js";
-import { reconstructTranslationError } from "@/shared/messaging/core/MessagingCore.js";
+import { reconstructTranslationError, isStructuredTranslationError } from "@/shared/messaging/core/MessagingCore.js";
 import { ErrorTypes } from "@/shared/error-management/ErrorTypes.js";
 import ExtensionContextManager from "@/core/extensionContext.js";
 import { registerTranslation, sendUnifiedTranslation } from "@/shared/messaging/core/ContentScriptIntegration.js";
@@ -131,7 +131,10 @@ export class TranslationHandler {
           },
           onStreamEnd: (data) => {
             if (!data.success) {
-              reject(reconstructTranslationError(data.error || 'Streaming failed'));
+              const errorSource = isStructuredTranslationError(data?.errorDetails)
+                ? data.errorDetails
+                : (data.error || 'Streaming failed');
+              reject(reconstructTranslationError(errorSource));
               return;
             }
             
@@ -155,7 +158,10 @@ export class TranslationHandler {
             if (data.success && (data.translatedText || !data.streaming)) {
               resolve(data);
             } else if (!data.success) {
-              reject(reconstructTranslationError(data.error || 'Translation failed'));
+              const errorSource = isStructuredTranslationError(data?.errorDetails)
+                ? data.errorDetails
+                : (data.error || 'Translation failed');
+              reject(reconstructTranslationError(errorSource));
             }
           },
           onError: (error) => {

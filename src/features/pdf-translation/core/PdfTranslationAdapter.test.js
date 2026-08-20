@@ -302,6 +302,75 @@ describe('PdfTranslationAdapter', () => {
     })
   })
 
+  it('prefers canonical errorDetails over conflicting legacy error', () => {
+    const adapter = new PdfTranslationAdapter()
+    const batchItems = adapter.toProviderItems([{ id: 'block-a', text: 'Hello' }])
+
+    const mapped = adapter.mapBatchResponse(batchItems, {
+      success: false,
+      error: { message: 'Legacy timeout', type: 'TIMEOUT' },
+      errorDetails: { message: 'Canonical provider failure', type: 'API_ERROR' }
+    })
+
+    expect(mapped[0]).toMatchObject({
+      error: 'Legacy timeout',
+      failureReason: 'provider-error',
+      errorDetails: {
+        message: 'Canonical provider failure',
+        type: 'API_ERROR'
+      }
+    })
+  })
+
+  it('falls back to legacy error when errorDetails is missing', () => {
+    const adapter = new PdfTranslationAdapter()
+    const batchItems = adapter.toProviderItems([{ id: 'block-a', text: 'Hello' }])
+
+    const mapped = adapter.mapBatchResponse(batchItems, {
+      success: false,
+      error: { message: 'Timed out', type: 'TIMEOUT' }
+    })
+
+    expect(mapped[0].failureReason).toBe('timeout')
+  })
+
+  it('falls back to legacy error when errorDetails is malformed', () => {
+    const adapter = new PdfTranslationAdapter()
+    const batchItems = adapter.toProviderItems([{ id: 'block-a', text: 'Hello' }])
+
+    const mapped = adapter.mapBatchResponse(batchItems, {
+      success: false,
+      error: { message: 'Cancelled', type: 'USER_CANCELLED' },
+      errorDetails: { message: 42, type: 'TIMEOUT' }
+    })
+
+    expect(mapped[0].failureReason).toBe('cancelled')
+  })
+
+  it.each([
+    ['TRANSLATION_TIMEOUT', 'timeout'],
+    ['USER_CANCELLED', 'cancelled'],
+    ['BROWSER_API_UNAVAILABLE', 'provider-unavailable'],
+    ['CIRCUIT_BREAKER_OPEN', 'provider-unavailable'],
+    ['API_KEY_INVALID', 'provider-error'],
+    ['UNKNOWN', 'unknown']
+  ])('classifies canonical %s as %s', (type, failureReason) => {
+    const adapter = new PdfTranslationAdapter()
+    const batchItems = adapter.toProviderItems([{ id: 'block-a', text: 'Hello' }])
+    const errorDetails = { message: 'Canonical failure', type }
+
+    const mapped = adapter.mapBatchResponse(batchItems, {
+      success: false,
+      error: 'Legacy failure',
+      errorDetails
+    })
+
+    expect(mapped[0]).toMatchObject({
+      failureReason,
+      errorDetails
+    })
+  })
+
   it('preserves canonical failure identity while excluding unsafe metadata', () => {
     const adapter = new PdfTranslationAdapter()
     const batchItems = adapter.toProviderItems([{ id: 'block-a', text: 'Hello', sourceTextHash: 'hash-a' }])

@@ -184,6 +184,170 @@ describe("useUnifiedTranslation", () => {
     expect(mockErrorManager.handleError).toHaveBeenCalled();
   });
 
+  it("should prefer canonical errorDetails over raw error for direct failures", async () => {
+    const [composable] = withSetup(() => useUnifiedTranslation("popup"));
+    const { sendMessage } = await import("@/shared/messaging/core/UnifiedMessaging.js");
+
+    sendMessage.mockResolvedValue({
+      success: false,
+      error: "RAW PROVIDER BODY",
+      errorDetails: {
+        message: "provider diagnostic",
+        type: "MODEL_NOT_FOUND",
+        statusCode: 404,
+        providerName: "Provider",
+      },
+    });
+
+    composable.sourceText.value = "Hello world";
+    await composable.triggerTranslation();
+
+    expect(mockErrorManager.handleError).toHaveBeenCalledTimes(1);
+    const handled = mockErrorManager.handleError.mock.calls[0][0];
+    expect(handled).toBeInstanceOf(Error);
+    expect(handled.type).toBe("MODEL_NOT_FOUND");
+    expect(handled.statusCode).toBe(404);
+    expect(handled.providerName).toBe("Provider");
+    expect(handled.message).not.toContain("RAW PROVIDER BODY");
+    expect(composable.isTranslating.value).toBe(false);
+  });
+
+  it("should handle failures with only valid errorDetails present", async () => {
+    const [composable] = withSetup(() => useUnifiedTranslation("popup"));
+    const { sendMessage } = await import("@/shared/messaging/core/UnifiedMessaging.js");
+
+    sendMessage.mockResolvedValue({
+      success: false,
+      errorDetails: {
+        message: "provider diagnostic",
+        type: "NETWORK_ERROR",
+      },
+    });
+
+    composable.sourceText.value = "Hello world";
+    await composable.triggerTranslation();
+
+    expect(mockErrorManager.handleError).toHaveBeenCalledTimes(1);
+    expect(mockErrorManager.handleError.mock.calls[0][0].type).toBe("NETWORK_ERROR");
+    expect(composable.isTranslating.value).toBe(false);
+  });
+
+  it("should preserve structured cancellation identity", async () => {
+    const [composable] = withSetup(() => useUnifiedTranslation("popup"));
+    const { sendMessage } = await import("@/shared/messaging/core/UnifiedMessaging.js");
+
+    sendMessage.mockResolvedValue({
+      success: false,
+      error: "Operation cancelled",
+      errorDetails: {
+        message: "Operation cancelled",
+        type: "USER_CANCELLED",
+      },
+    });
+
+    composable.sourceText.value = "Hello world";
+    await composable.triggerTranslation();
+
+    expect(mockErrorManager.handleError).toHaveBeenCalledTimes(1);
+    const handled = mockErrorManager.handleError.mock.calls[0][0];
+    expect(handled.type).toBe("USER_CANCELLED");
+    expect(handled.message).toContain("cancelled");
+  });
+
+  it("should preserve structured context-invalidation identity", async () => {
+    const [composable] = withSetup(() => useUnifiedTranslation("popup"));
+    const { sendMessage } = await import("@/shared/messaging/core/UnifiedMessaging.js");
+
+    sendMessage.mockResolvedValue({
+      success: false,
+      error: "Extension context invalidated: Receiving end does not exist",
+      errorDetails: {
+        message: "Extension context invalidated: Receiving end does not exist",
+        type: "EXTENSION_CONTEXT_INVALIDATED",
+      },
+    });
+
+    composable.sourceText.value = "Hello world";
+    await composable.triggerTranslation();
+
+    expect(mockErrorManager.handleError).toHaveBeenCalledTimes(1);
+    const handled = mockErrorManager.handleError.mock.calls[0][0];
+    expect(handled.type).toBe("EXTENSION_CONTEXT_INVALIDATED");
+    expect(handled.message.toLowerCase()).toContain("extension context invalidated");
+  });
+
+  it("should preserve structured timeout identity", async () => {
+    const [composable] = withSetup(() => useUnifiedTranslation("popup"));
+    const { sendMessage } = await import("@/shared/messaging/core/UnifiedMessaging.js");
+
+    sendMessage.mockResolvedValue({
+      success: false,
+      error: "Timed out",
+      errorDetails: {
+        message: "Timed out",
+        type: "TRANSLATION_TIMEOUT",
+      },
+    });
+
+    composable.sourceText.value = "Hello world";
+    await composable.triggerTranslation();
+
+    expect(mockErrorManager.handleError).toHaveBeenCalledTimes(1);
+    expect(mockErrorManager.handleError.mock.calls[0][0].type).toBe("TRANSLATION_TIMEOUT");
+  });
+
+  it("should route legacy error-only failures through canonical handling", async () => {
+    const [composable] = withSetup(() => useUnifiedTranslation("popup"));
+    const { sendMessage } = await import("@/shared/messaging/core/UnifiedMessaging.js");
+
+    sendMessage.mockResolvedValue({
+      success: false,
+      error: "legacy raw message",
+    });
+
+    composable.sourceText.value = "Hello world";
+    await composable.triggerTranslation();
+
+    expect(mockErrorManager.handleError).toHaveBeenCalledTimes(1);
+    const handled = mockErrorManager.handleError.mock.calls[0][0];
+    expect(handled).toBeInstanceOf(Error);
+    expect(handled.message).toBe("legacy raw message");
+    expect(handled.type).toBe("UNKNOWN");
+  });
+
+  it("should not let malformed errorDetails override a valid fallback error", async () => {
+    const [composable] = withSetup(() => useUnifiedTranslation("popup"));
+    const { sendMessage } = await import("@/shared/messaging/core/UnifiedMessaging.js");
+
+    sendMessage.mockResolvedValue({
+      success: false,
+      error: "safer fallback",
+      errorDetails: "not-an-object",
+    });
+
+    composable.sourceText.value = "Hello world";
+    await composable.triggerTranslation();
+
+    expect(mockErrorManager.handleError).toHaveBeenCalledTimes(1);
+    expect(mockErrorManager.handleError.mock.calls[0][0].message).toBe("safer fallback");
+  });
+
+  it("should fall back to a safe generic error for unusable failure payloads", async () => {
+    const [composable] = withSetup(() => useUnifiedTranslation("popup"));
+    const { sendMessage } = await import("@/shared/messaging/core/UnifiedMessaging.js");
+
+    sendMessage.mockResolvedValue({
+      success: false,
+      errorDetails: { statusCode: 500 },
+    });
+
+    composable.sourceText.value = "Hello world";
+    await composable.triggerTranslation();
+
+    expect(mockErrorManager.handleError).toHaveBeenCalledTimes(1);
+    expect(mockErrorManager.handleError.mock.calls[0][0].message).toBe("Translation failed");
+  });
+
   it("should clear translation", async () => {
     const [composable] = withSetup(() => useUnifiedTranslation("popup"));
     composable.sourceText.value = "Some text";
