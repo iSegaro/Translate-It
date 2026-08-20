@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ContentMessageHandler } from './ContentMessageHandler.js';
 import { TranslationMode } from '@/shared/config/config.js';
 import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
+import { applyTranslationToTextField } from '../smartTranslationIntegration.js';
 
 vi.mock('@/shared/logging/logger.js', () => ({
   getScopedLogger: vi.fn(() => ({
@@ -172,6 +173,87 @@ describe('ContentMessageHandler iframe Select Element activation', () => {
       type: ErrorTypes.API_ERROR,
       showToast: true,
     });
+  });
+
+  it('prefers canonical errorDetails over conflicting legacy error', async () => {
+    handler.errorHandler = {
+      getErrorForUI: vi.fn(),
+      handle: vi.fn().mockResolvedValue(undefined),
+    };
+
+    const thrown = await handler.handleTranslationResult({
+      data: {
+        translationMode: TranslationMode.Field,
+        success: false,
+        error: { message: 'legacy failure', type: 'LEGACY_ERROR' },
+        errorDetails: {
+          message: 'canonical failure',
+          type: ErrorTypes.MODEL_MISSING,
+          statusCode: 404,
+          providerName: 'Provider',
+          code: 'MODEL_NOT_FOUND',
+          errorCode: 'E_MODEL',
+        },
+      },
+    }).catch((value) => value);
+
+    expect(handler.errorHandler.handle).toHaveBeenCalledTimes(1);
+    expect(handler.errorHandler.handle.mock.calls[0][1]).toMatchObject({
+      type: ErrorTypes.MODEL_MISSING,
+      context: 'text-field-translation',
+    });
+    expect(thrown.message).not.toContain('legacy failure');
+    expect(applyTranslationToTextField).not.toHaveBeenCalled();
+  });
+
+  it('handles errorDetails-only Field failures without applying text', async () => {
+    handler.errorHandler = {
+      getErrorForUI: vi.fn(),
+      handle: vi.fn().mockResolvedValue(undefined),
+    };
+
+    const thrown = await handler.handleTranslationResult({
+      data: {
+        translationMode: TranslationMode.Field,
+        success: false,
+        errorDetails: {
+          message: 'canonical failure',
+          type: ErrorTypes.API_KEY_INVALID,
+        },
+      },
+    }).catch((value) => value);
+
+    expect(handler.errorHandler.handle).toHaveBeenCalledTimes(1);
+    expect(handler.errorHandler.handle.mock.calls[0][1]).toMatchObject({
+      type: ErrorTypes.API_KEY_INVALID,
+      context: 'text-field-translation',
+    });
+    expect(thrown).toBeInstanceOf(Error);
+    expect(applyTranslationToTextField).not.toHaveBeenCalled();
+  });
+
+  it('falls back to legacy error when errorDetails is malformed', async () => {
+    handler.errorHandler = {
+      getErrorForUI: vi.fn(),
+      handle: vi.fn().mockResolvedValue(undefined),
+    };
+
+    const thrown = await handler.handleTranslationResult({
+      data: {
+        translationMode: TranslationMode.Field,
+        success: false,
+        error: { message: 'legacy failure', type: ErrorTypes.NETWORK_ERROR },
+        errorDetails: { arbitrary: true },
+      },
+    }).catch((value) => value);
+
+    expect(handler.errorHandler.handle).toHaveBeenCalledTimes(1);
+    expect(handler.errorHandler.handle.mock.calls[0][1]).toMatchObject({
+      type: ErrorTypes.NETWORK_ERROR,
+      context: 'text-field-translation',
+    });
+    expect(thrown.message).not.toContain('legacy failure');
+    expect(applyTranslationToTextField).not.toHaveBeenCalled();
   });
 
   it.each([

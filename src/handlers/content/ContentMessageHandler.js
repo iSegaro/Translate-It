@@ -1,5 +1,5 @@
 import { MessageActions } from '@/shared/messaging/core/MessageActions.js';
-import { MessagingContexts, reconstructTranslationError } from '@/shared/messaging/core/MessagingCore.js';
+import { MessagingContexts, reconstructTranslationError, isStructuredTranslationError } from '@/shared/messaging/core/MessagingCore.js';
 import { TranslationMode } from '@/shared/config/config.js';
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
@@ -431,7 +431,7 @@ export class ContentMessageHandler extends ResourceTracker {
   }
 
   async handleTranslationResult(message) {
-    const { translationMode, translatedText, originalText, options, success, error } = message.data;
+    const { translationMode, translatedText, originalText, options, success, error, errorDetails } = message.data;
     const toastId = options?.toastId;
     this.logger.info(`Handling translation result for mode: ${translationMode}`, {
       success,
@@ -455,10 +455,12 @@ export class ContentMessageHandler extends ResourceTracker {
 
       case TranslationMode.Field:
       case TranslationMode.LEGACY_FIELD: // Handle both enum and legacy string for robustness
+      {
         this.logger.info('Processing Text Field translation result');
         
         // Check if translation failed at background level
-        if (success === false && error) {
+      const failureSource = isStructuredTranslationError(errorDetails) ? errorDetails : error;
+      if (success === false && failureSource) {
           // logger.trace('Text Field translation failed in background, handling error');
           
           // Dismiss status notification if exists
@@ -471,7 +473,7 @@ export class ContentMessageHandler extends ResourceTracker {
             window.pendingTranslationToastId = null;
           }
           
-          const presentation = await getFieldTranslationErrorPresentation(error);
+          const presentation = await getFieldTranslationErrorPresentation(failureSource);
           if (presentation) {
             await this.errorHandler.handle(presentation.displayError, {
               context: 'text-field-translation',
@@ -484,7 +486,7 @@ export class ContentMessageHandler extends ResourceTracker {
           }
 
           // Preserve silent cancellation/context control flow without presenting.
-          const translationError = reconstructTranslationError(error);
+          const translationError = reconstructTranslationError(failureSource);
           translationError.alreadyHandled = true;
           throw translationError;
         }
@@ -514,6 +516,7 @@ export class ContentMessageHandler extends ResourceTracker {
           error.alreadyHandled = true;
           throw error;
         }
+      }
 
       case TranslationMode.Selection:
       case TranslationMode.Dictionary_Translation:
