@@ -50,12 +50,25 @@ const matchesAnySelector = (element, selectors) => selectors.some((selector) => 
   }
 });
 
-const isComposedExcluded = (node, selectors) => {
-  let current = getFilterElement(node);
+const isShadowRoot = (root) => Boolean(
+  root
+  && root.nodeType === Node.DOCUMENT_FRAGMENT_NODE
+  && root.host
+);
 
-  while (current) {
-    if (matchesAnySelector(current, selectors)) return true;
-    current = getComposedParent(current);
+const isExcludedAcrossShadowHosts = (owner, selectors) => {
+  let root = owner?.getRootNode?.();
+
+  while (isShadowRoot(root)) {
+    const host = root.host;
+    let current = host;
+
+    while (current) {
+      if (matchesAnySelector(current, selectors)) return true;
+      current = current.parentElement;
+    }
+
+    root = host.getRootNode?.();
   }
 
   return false;
@@ -524,16 +537,6 @@ export class PageTranslationBridge extends ResourceTracker {
     nodesTranslator.translate = wrapWithDirection(nodesTranslator.translate);
     nodesTranslator.update = wrapWithDirection(nodesTranslator.update);
 
-    const domTranslatorFilter = createNodesFilter({
-      ignoredSelectors: [
-        ...(settings.excludedSelectors || []),
-        `#${PAGE_TRANSLATION_SELECTORS.UI_HOST_MAIN}`,
-        `#${PAGE_TRANSLATION_SELECTORS.UI_HOST_IFRAME}`,
-        `#${PAGE_TRANSLATION_SELECTORS.TOOLTIP_ID}`,
-        `.${PAGE_TRANSLATION_SELECTORS.INTERNAL_IGNORE_CLASS}`
-      ],
-      attributesList: settings.attributesToTranslate || ['title', 'alt', 'placeholder'],
-    });
     const composedExcludedSelectors = [
       ...(settings.excludedSelectors || []),
       `#${PAGE_TRANSLATION_SELECTORS.UI_HOST_MAIN}`,
@@ -543,9 +546,17 @@ export class PageTranslationBridge extends ResourceTracker {
       `.${PAGE_TRANSLATION_SELECTORS.STANDARD_NO_TRANSLATE_CLASS}`,
       `[translate='${PAGE_TRANSLATION_SELECTORS.TRANSLATE_NO_VALUE}']`
     ];
-    const filter = (node) => !isComposedExcluded(node, composedExcludedSelectors)
-      && domTranslatorFilter(node)
-      && !isMutableEditableNode(node);
+    const domTranslatorFilter = createNodesFilter({
+      ignoredSelectors: composedExcludedSelectors,
+      attributesList: settings.attributesToTranslate || ['title', 'alt', 'placeholder'],
+    });
+    const filter = (node) => {
+      if (!domTranslatorFilter(node) || isMutableEditableNode(node)) return false;
+
+      const owner = getFilterElement(node);
+      const root = owner?.getRootNode?.();
+      return !isShadowRoot(root) || !isExcludedAcrossShadowHosts(owner, composedExcludedSelectors);
+    };
 
     currentSession.nodesTranslator = nodesTranslator;
     currentSession.filter = filter;

@@ -130,6 +130,44 @@ describe('PageTranslationBridge Shadow DOM ownership', () => {
     await vi.waitFor(() => expect(span.textContent).toContain('Translated Nested shadow text'));
   });
 
+  it('preserves local light-DOM exclusion semantics for text and attributes', async () => {
+    const excludedClass = document.createElement('span');
+    excludedClass.className = 'notranslate';
+    excludedClass.title = 'Excluded class title';
+    excludedClass.textContent = 'Excluded class text';
+
+    const excludedAttribute = document.createElement('span');
+    excludedAttribute.setAttribute('translate', 'no');
+    excludedAttribute.title = 'Excluded attribute title';
+    excludedAttribute.textContent = 'Excluded attribute text';
+
+    const configured = document.createElement('span');
+    configured.className = 'custom-excluded';
+    configured.title = 'Configured title';
+    configured.textContent = 'Configured text';
+
+    const allowed = document.createElement('span');
+    allowed.title = 'Allowed title';
+    allowed.textContent = 'Allowed text';
+    document.body.append(excludedClass, excludedAttribute, configured, allowed);
+
+    const { bridge, onTranslate } = await startTranslation(document.body, {
+      excludedSelectors: ['.custom-excluded'],
+    });
+    track(bridge);
+
+    const translatedTexts = onTranslate.mock.calls.map(([text]) => text);
+    expect(translatedTexts).not.toEqual(expect.arrayContaining([
+      'Excluded class text',
+      'Excluded class title',
+      'Excluded attribute text',
+      'Excluded attribute title',
+      'Configured text',
+      'Configured title',
+    ]));
+    expect(translatedTexts).toEqual(expect.arrayContaining(['Allowed text', 'Allowed title']));
+  });
+
   it('translates visible BUTTON text while protecting its machine value', async () => {
     const { shadow } = createShadowHost();
     const button = document.createElement('button');
@@ -204,6 +242,22 @@ describe('PageTranslationBridge Shadow DOM ownership', () => {
     await Promise.resolve();
     expect(onTranslate).not.toHaveBeenCalled();
     expect(text.textContent).toBe('Nested excluded text');
+  });
+
+  it('propagates an intermediate host exclusion through nested ShadowRoots', async () => {
+    const { shadow } = createShadowHost();
+    const { host: intermediateHost, shadow: nestedShadow } = createShadowHost(shadow);
+    intermediateHost.classList.add('notranslate');
+    const text = document.createElement('span');
+    text.textContent = 'Intermediate excluded text';
+    nestedShadow.appendChild(text);
+
+    const { bridge, onTranslate } = await startTranslation(document.body);
+    track(bridge);
+
+    await Promise.resolve();
+    expect(onTranslate).not.toHaveBeenCalled();
+    expect(text.textContent).toBe('Intermediate excluded text');
   });
 
   it('restores initial ShadowRoot text and attributes', async () => {
