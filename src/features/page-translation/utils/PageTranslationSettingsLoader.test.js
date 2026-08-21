@@ -75,6 +75,15 @@ describe('PageTranslationSettingsLoader', () => {
     });
   });
 
+  it('should preserve configured editable selectors unchanged', async () => {
+    const selectors = ['textarea', "[contenteditable='true']", '.custom'];
+    config.getWholePageExcludedSelectorsAsync.mockResolvedValue(selectors);
+
+    const settings = await PageTranslationSettingsLoader.load();
+
+    expect(settings.excludedSelectors).toEqual(selectors);
+  });
+
   it('should handle rootMargin with units', async () => {
     config.getWholePageRootMarginAsync.mockResolvedValue('20%');
     const settings = await PageTranslationSettingsLoader.load();

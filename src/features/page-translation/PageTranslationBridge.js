@@ -15,6 +15,40 @@ import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import ResourceTracker from '@/core/memory/ResourceTracker.js';
 
+const FORM_VALUE_TAGS = new Set(['INPUT', 'TEXTAREA']);
+
+const getEditableState = (element) => {
+  let current = element;
+
+  while (current) {
+    const value = current.getAttribute?.('contenteditable');
+    if (value !== null && value !== undefined) {
+      const normalized = value.trim().toLowerCase();
+      if (normalized === 'false') return false;
+      if (normalized === '' || normalized === 'true' || normalized === 'plaintext-only') return true;
+    }
+    current = current.parentElement;
+  }
+
+  return false;
+};
+
+const isMutableEditableNode = (node) => {
+  if (!node) return false;
+
+  if (node.nodeType === Node.TEXT_NODE) {
+    const owner = node.parentElement;
+    return Boolean(owner?.closest('textarea') || getEditableState(owner));
+  }
+
+  if (node.nodeType === Node.ATTRIBUTE_NODE) {
+    const owner = node.ownerElement;
+    return node.name.toLowerCase() === 'value' && FORM_VALUE_TAGS.has(owner?.tagName);
+  }
+
+  return false;
+};
+
 export class PageTranslationBridge extends ResourceTracker {
   constructor() {
     super('page-translation-bridge');
@@ -56,6 +90,14 @@ export class PageTranslationBridge extends ResourceTracker {
       return node.nodeValue ?? '';
     };
 
+    const setCurrentNodeValue = (node, value) => {
+      if (node?.nodeType === Node.ATTRIBUTE_NODE) {
+        node.value = value;
+        return;
+      }
+      node.nodeValue = value;
+    };
+
     const isFreshTarget = (node, sourceValue, generation) => {
       if (!currentSession.active || this.session !== currentSession || !node) return false;
 
@@ -65,7 +107,7 @@ export class PageTranslationBridge extends ResourceTracker {
 
       if (node.nodeType === Node.ATTRIBUTE_NODE) {
         const currentAttribute = owner.getAttributeNode(node.name);
-        if (currentAttribute !== node || node.nodeValue !== sourceValue) return false;
+        if (currentAttribute !== node || getCurrentNodeValue(node) !== sourceValue) return false;
       } else if (!node.isConnected || node.nodeValue !== sourceValue) {
         return false;
       }
@@ -228,8 +270,8 @@ export class PageTranslationBridge extends ResourceTracker {
             && decision.settlement?.state === 'failed';
 
           if (canPreserveProviderFailure) {
-            actualNodeData.originalText = node.nodeValue !== null ? node.nodeValue : '';
-            node.nodeValue = text;
+            actualNodeData.originalText = getCurrentNodeValue(node);
+            setCurrentNodeValue(node, text);
             decision.outcome = 'failed-applied';
             try {
               if (callback) callback(node);
@@ -273,8 +315,8 @@ export class PageTranslationBridge extends ResourceTracker {
           }
 
           try {
-            actualNodeData.originalText = node.nodeValue !== null ? node.nodeValue : '';
-            node.nodeValue = text;
+            actualNodeData.originalText = getCurrentNodeValue(node);
+            setCurrentNodeValue(node, text);
           } catch (error) {
             if (decision.settlement?.state === 'pending') {
               decision.settlement.settle(
@@ -295,6 +337,18 @@ export class PageTranslationBridge extends ResourceTracker {
             forgetApplyDecision(node, taskGeneration);
           }
         });
+      }
+
+      restore(node, callback) {
+        const nodeData = this.nodeStorage.get(node);
+        if (node?.nodeType === Node.ATTRIBUTE_NODE && nodeData) {
+          if (nodeData.originalText !== null) setCurrentNodeValue(node, nodeData.originalText);
+          this.nodeStorage.delete(node);
+          callback?.(node);
+          return;
+        }
+        super.restore(node);
+        callback?.(node);
       }
     }
 
@@ -411,9 +465,9 @@ export class PageTranslationBridge extends ResourceTracker {
     nodesTranslator.translate = wrapWithDirection(nodesTranslator.translate);
     nodesTranslator.update = wrapWithDirection(nodesTranslator.update);
 
-    const filter = createNodesFilter({
+    const domTranslatorFilter = createNodesFilter({
       ignoredSelectors: [
-        ...(settings.excludedSelectors || []), 
+        ...(settings.excludedSelectors || []),
         `#${PAGE_TRANSLATION_SELECTORS.UI_HOST_MAIN}`,
         `#${PAGE_TRANSLATION_SELECTORS.UI_HOST_IFRAME}`,
         `#${PAGE_TRANSLATION_SELECTORS.TOOLTIP_ID}`,
@@ -421,6 +475,7 @@ export class PageTranslationBridge extends ResourceTracker {
       ],
       attributesList: settings.attributesToTranslate || ['title', 'alt', 'placeholder'],
     });
+    const filter = (node) => domTranslatorFilter(node) && !isMutableEditableNode(node);
 
     currentSession.nodesTranslator = nodesTranslator;
     currentSession.filter = filter;
