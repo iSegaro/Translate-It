@@ -78,6 +78,18 @@ describe('PublicTranslationErrorAdapter', () => {
     expect(displayError.message).toBe('Localized ERRORS_NETWORK_ERROR');
   });
 
+  it('uses safe API failure localization for invalid provider responses', async () => {
+    const displayError = await createLegacyDisplayError(canonicalError(), {
+      type: PublicTranslationErrorTypes.INVALID_RESPONSE,
+      messageKey: PublicTranslationErrorMessageKeys[PublicTranslationErrorTypes.INVALID_RESPONSE],
+    });
+
+    expect(getErrorMessage).toHaveBeenCalledWith('ERRORS_API_ERROR');
+    expect(displayError.type).toBe(ErrorTypes.API_RESPONSE_INVALID);
+    expect(displayError.message).toBe('Localized ERRORS_API_ERROR');
+    expect(displayError.message).not.toContain('raw provider response');
+  });
+
   it('preserves generic HTTP display semantics through REQUEST_FAILURE', async () => {
     const displayError = await createLegacyDisplayError(canonicalError(), {
       type: PublicTranslationErrorTypes.REQUEST_FAILURE,

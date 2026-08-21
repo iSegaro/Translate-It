@@ -28,6 +28,7 @@ describe('presentPdfTranslationError', () => {
     ['NETWORK_ERROR', 'Localized NETWORK_ERROR'],
     ['SERVER_ERROR', 'Localized SERVER_ERROR'],
     ['TRANSLATION_TIMEOUT', 'Localized TRANSLATION_TIMEOUT'],
+    ['API_RESPONSE_INVALID', 'Localized API_RESPONSE_INVALID'],
   ])('maps %s to safe display text', async (type, message) => {
     const result = await presentPdfTranslationError({
       error: 'raw provider body with model list',

@@ -7,6 +7,23 @@ import { normalizePdfText } from './PdfBlockIdentity.js'
 
 const STRUCTURED_MAX_CELLS_PER_LINE = 10
 
+function getStructuredChildIdentity(block, child, lineIndex, cellIndex = null) {
+  const upstreamId = child?.cellId ?? child?.structuredCell?.cellId ?? child?.structuredCell?.id
+  if (upstreamId !== null && upstreamId !== undefined && upstreamId !== '') return upstreamId
+
+  if (cellIndex != null) {
+    return `${block.id}|line:${lineIndex}|cell:${cellIndex}`
+  }
+
+  // Parent blocks can emit multiple line segments when table metadata is absent.
+  const sourceItemIndex = child?.sourceItemIndex
+    ?? child?.sourceReferences?.sourceItemIndices?.[0]
+    ?? child?.index
+    ?? 0
+
+  return `${block.id}|line:${lineIndex}|item:${sourceItemIndex}`
+}
+
 const READING_ROLE_KPI = 'metric'
 const READING_ROLE_KV = 'summary'
 const RELATIONSHIP_ROLE_PARENT = 'parent'
@@ -320,7 +337,7 @@ export class PdfTranslationAdapter {
                 columnIndex: block.columnIndex,
                 readingOrderIndex: block.readingOrderIndex,
                 position: items.length,
-                cellId: cell.cellId ?? null,
+                cellId: getStructuredChildIdentity(block, cell, lineIndex, cellIndex),
                 tableRowIndex: cell.rowIndex ?? null,
                 tableColumnIndex: cell.columnIndex ?? null,
                 colSpanCandidate: cell.colSpanCandidate || false,
@@ -330,6 +347,7 @@ export class PdfTranslationAdapter {
               })
             }
           } else {
+            const lineItem = line.items?.[0]
             items.push({
               i: block.id,
               b: block.id,
@@ -342,9 +360,10 @@ export class PdfTranslationAdapter {
               sourceTextHash: block.sourceTextHash,
               pageNumber: block.pageNumber,
               columnIndex: block.columnIndex,
-              readingOrderIndex: block.readingOrderIndex,
-              position: items.length,
-              ...(hasStructuredCellMetadata(line.items?.[0]) && { structuredCell: line.items[0].structuredCell }),
+                readingOrderIndex: block.readingOrderIndex,
+                position: items.length,
+                cellId: getStructuredChildIdentity(block, lineItem, lineIndex),
+                ...(hasStructuredCellMetadata(line.items?.[0]) && { structuredCell: line.items[0].structuredCell }),
               ...(semanticContext && { semanticContext })
             })
           }

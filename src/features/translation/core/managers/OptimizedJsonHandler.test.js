@@ -4241,6 +4241,25 @@ describe('OptimizedJsonHandler', () => {
         expect(result.results.map((r) => r.cellId)).toEqual(['c-a', 'c-b']);
       });
 
+      it('structured PDF fallback child identities survive provider mapping', async () => {
+        const cellA = { i: 'sched-fallback', b: 'sched-fallback', blockId: 'sched-fallback', cellId: 'sched-fallback|line:0|cell:0', lineIndex: 0, cellIndex: 0, t: 'A' };
+        const cellB = { i: 'sched-fallback', b: 'sched-fallback', blockId: 'sched-fallback', cellId: 'sched-fallback|line:0|cell:1', lineIndex: 0, cellIndex: 1, t: 'B' };
+        mockEngine.createIntelligentBatches = vi.fn(() => [[cellA, cellB]]);
+        mockProvider.translate.mockResolvedValueOnce({ translatedText: ['TA', 'TB'] });
+
+        const result = await handler.execute(
+          mockEngine,
+          { ...mockData, sourceLanguage: 'en', mode: 'pdf-translation', text: JSON.stringify([cellA, cellB]) },
+          mockProvider, 'en', 'fa', 'msg-pdf-fallback-cellid', mockSender
+        );
+
+        expect(result.success).toBe(true);
+        expect(result.results.map((item) => item.cellId)).toEqual([
+          'sched-fallback|line:0|cell:0',
+          'sched-fallback|line:0|cell:1'
+        ]);
+      });
+
       it('structured PDF duplicate cellId still fails with typed error', async () => {
         const browser = (await import('webextension-polyfill')).default;
         browser.tabs.sendMessage.mockClear();

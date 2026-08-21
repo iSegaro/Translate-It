@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { PdfTranslationAdapter } from './PdfTranslationAdapter.js'
+import { TranslationBatcher } from '@/features/translation/core/utils/TranslationBatcher.js'
 
 function makeStructuredBlock(id, lines, extra = {}) {
   return {
@@ -429,11 +430,27 @@ describe('PdfTranslationAdapter', () => {
       const items = adapter.toProviderItems([block])
 
       expect(items).toHaveLength(4)
-      expect(items[0]).toMatchObject({ blockId: 'sched-1', lineIndex: 0, t: 'Low-Intermediate Level (A2+)', isStructured: true })
+      expect(items[0]).toMatchObject({ blockId: 'sched-1', lineIndex: 0, t: 'Low-Intermediate Level (A2+)', isStructured: true, cellId: 'sched-1|line:0|item:0' })
       expect(items[0].cellIndex).toBeUndefined()
-      expect(items[1]).toMatchObject({ blockId: 'sched-1', lineIndex: 1, cellIndex: 0, t: 'Mon 30 Mar', isStructured: true })
-      expect(items[2]).toMatchObject({ blockId: 'sched-1', lineIndex: 1, cellIndex: 1, t: '6.00-8.15pm', isStructured: true })
-      expect(items[3]).toMatchObject({ blockId: 'sched-1', lineIndex: 1, cellIndex: 2, t: 'Classes', isStructured: true })
+      expect(items[1]).toMatchObject({ blockId: 'sched-1', lineIndex: 1, cellIndex: 0, t: 'Mon 30 Mar', isStructured: true, cellId: 'sched-1|line:1|cell:0' })
+      expect(items[2]).toMatchObject({ blockId: 'sched-1', lineIndex: 1, cellIndex: 1, t: '6.00-8.15pm', isStructured: true, cellId: 'sched-1|line:1|cell:1' })
+      expect(items[3]).toMatchObject({ blockId: 'sched-1', lineIndex: 1, cellIndex: 2, t: 'Classes', isStructured: true, cellId: 'sched-1|line:1|cell:2' })
+      expect(new Set(items.map((item) => item.cellId)).size).toBe(items.length)
+    })
+
+    it('uses adapter cellIndex over conflicting source occurrence metadata', () => {
+      const adapter = new PdfTranslationAdapter()
+      const block = makeStructuredBlockWithCells('conflicting-indexes', ['A B'], [[
+        { text: 'A', x: 40, y: 200, width: 60, height: 14, sourceItemIndex: 0, index: 0, sourceReferences: { sourceItemIndices: [0] } },
+        { text: 'B', x: 120, y: 200, width: 60, height: 14, sourceItemIndex: 0, index: 0, sourceReferences: { sourceItemIndices: [0] } }
+      ]])
+
+      const items = adapter.toProviderItems([block])
+
+      expect(items.map((item) => item.cellId)).toEqual([
+        'conflicting-indexes|line:0|cell:0',
+        'conflicting-indexes|line:0|cell:1'
+      ])
     })
 
     it('emits per-line items for structured single-item lines', () => {
@@ -445,6 +462,23 @@ describe('PdfTranslationAdapter', () => {
       expect(items).toHaveLength(3)
       expect(items.every((i) => i.isStructured === true)).toBe(true)
       expect(items.every((i) => i.cellIndex == null)).toBe(true)
+      expect(items.map((item) => item.cellId)).toEqual([
+        'sched-2|line:0|item:0',
+        'sched-2|line:1|item:0',
+        'sched-2|line:2|item:0'
+      ])
+    })
+
+    it('preserves deterministic child identities through 24/8 intelligent batches', () => {
+      const adapter = new PdfTranslationAdapter()
+      const lineTexts = Array.from({ length: 4 }, (_, index) => `Row ${index}`)
+      const lineItems = Array.from({ length: 4 }, () => Array.from({ length: 8 }, (_, index) => ({ text: `Cell ${index}`, x: index * 20, y: 200, width: 10, height: 14 })))
+      const items = adapter.toProviderItems([makeStructuredBlockWithCells('table-32', lineTexts, lineItems)])
+      const batches = TranslationBatcher.createIntelligentBatches(items, 24, 5000)
+
+      expect(batches.map((batch) => batch.length)).toEqual([24, 8])
+      expect(batches.flat().map((item) => item.cellId)).toEqual(items.map((item) => item.cellId))
+      expect(new Set(batches.flat().map((item) => item.cellId)).size).toBe(32)
     })
 
     it('returns translatedCells for structured blocks with multi-item lines', () => {
@@ -474,7 +508,11 @@ describe('PdfTranslationAdapter', () => {
       expect(mapped[0].translatedCells).toBeDefined()
       expect(mapped[0].translatedCells).toHaveLength(2)
       expect(mapped[0].translatedCells[0]).toEqual({ lineIndex: 0, cells: ['هدر'] })
-      expect(mapped[0].translatedCells[1]).toEqual({ lineIndex: 1, cells: ['ردیف الف', 'ستون ب'] })
+      expect(mapped[0].translatedCells[1]).toEqual({
+        lineIndex: 1,
+        cells: ['ردیف الف', 'ستون ب'],
+        cellIds: ['sched-3|line:1|cell:0', 'sched-3|line:1|cell:1']
+      })
       expect(mapped[0].translatedText).toBe('هدر\nردیف الف ستون ب')
     })
 
@@ -788,7 +826,11 @@ describe('PdfTranslationAdapter', () => {
       expect(mapped).toHaveLength(1)
       expect(mapped[0].translatedCells).toBeDefined()
       expect(mapped[0].translatedCells).toHaveLength(1)
-      expect(mapped[0].translatedCells[0]).toEqual({ lineIndex: 0, cells: ['هدف', 'هدف سالانه'] })
+      expect(mapped[0].translatedCells[0]).toEqual({
+        lineIndex: 0,
+        cells: ['هدف', 'هدف سالانه'],
+        cellIds: ['tc-2|line:0|cell:0', 'tc-2|line:0|cell:1']
+      })
       expect(mapped[0].translatedText).toBe('هدف هدف سالانه')
     })
 
@@ -945,7 +987,10 @@ describe('PdfTranslationAdapter', () => {
 
       expect(mapped[0].translatedCells).toBeDefined()
       expect(mapped[0].translatedCells[0].cells).toEqual(['X', 'Y'])
-      expect(mapped[0].translatedCells[0].cellIds).toBeUndefined()
+      expect(mapped[0].translatedCells[0].cellIds).toEqual([
+        'blk-no-meta|line:0|cell:0',
+        'blk-no-meta|line:0|cell:1'
+      ])
       expect(mapped[0].translatedCells[0].columnIndices).toBeUndefined()
     })
 

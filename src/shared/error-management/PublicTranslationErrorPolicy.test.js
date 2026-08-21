@@ -50,6 +50,7 @@ describe('PublicTranslationErrorPolicy', () => {
     [ErrorTypes.GEMINI_QUOTA_REGION, PublicTranslationErrorTypes.GEMINI_QUOTA_REGION, 'ERRORS_GEMINI_QUOTA_REGION'],
     [ErrorTypes.DEEPL_QUOTA_EXCEEDED, PublicTranslationErrorTypes.DEEPL_QUOTA_EXCEEDED, 'ERRORS_DEEPL_QUOTA_EXCEEDED'],
     [ErrorTypes.API_ERROR, PublicTranslationErrorTypes.API_FAILURE, 'ERRORS_API_ERROR'],
+    [ErrorTypes.API_RESPONSE_INVALID, PublicTranslationErrorTypes.INVALID_RESPONSE, 'ERRORS_API_ERROR'],
   ])('uses existing message key for %s', (internalType, type, messageKey) => {
     expect(mapCanonicalTranslationError({ type: internalType })).toMatchObject({ type, messageKey });
   });

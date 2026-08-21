@@ -23,7 +23,7 @@ export const PublicTranslationErrorMessageKeys = Object.freeze({
   [PublicTranslationErrorTypes.NETWORK_ERROR]: 'ERRORS_NETWORK_ERROR',
   [PublicTranslationErrorTypes.SERVER_ERROR]: 'ERRORS_SERVER_ERROR',
   [PublicTranslationErrorTypes.TRANSLATION_TIMEOUT]: 'ERRORS_TRANSLATION_TIMEOUT',
-  [PublicTranslationErrorTypes.INVALID_RESPONSE]: 'ERRORS_API_RESPONSE_INVALID',
+  [PublicTranslationErrorTypes.INVALID_RESPONSE]: 'ERRORS_API_ERROR',
   [PublicTranslationErrorTypes.INVALID_INPUT]: 'ERRORS_INVALID_INPUT',
   [PublicTranslationErrorTypes.INVALID_REQUEST]: 'ERRORS_INVALID_REQUEST',
   [PublicTranslationErrorTypes.REQUEST_FAILURE]: 'ERRORS_HTTP_ERROR',
