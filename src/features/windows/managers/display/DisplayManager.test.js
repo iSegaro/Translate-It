@@ -207,66 +207,42 @@ describe("DisplayManager Selection Window error boundary", () => {
   });
 
   it("cancels delayed click activation during cleanup", async () => {
-    vi.useFakeTimers();
+    await manager._showWindow("selected text", { x: 10, y: 20 });
 
-    try {
-      await manager._showWindow("selected text", { x: 10, y: 20 });
+    manager.cleanup();
+    manager.cleanup();
+    await vi.runAllTimersAsync();
 
-      manager.cleanup();
-      manager.cleanup();
-      await vi.runAllTimersAsync();
-
-      expect(manager.clickManager.addOutsideClickListener).not.toHaveBeenCalled();
-    } finally {
-      vi.useRealTimers();
-    }
+    expect(manager.clickManager.addOutsideClickListener).not.toHaveBeenCalled();
   });
 
   it("activates outside-click handling once after the delay", async () => {
-    vi.useFakeTimers();
+    await manager._showWindow("selected text", { x: 10, y: 20 });
+    await vi.advanceTimersByTimeAsync(1);
 
-    try {
-      await manager._showWindow("selected text", { x: 10, y: 20 });
-      await vi.advanceTimersByTimeAsync(1);
-
-      expect(manager.clickManager.addOutsideClickListener).toHaveBeenCalledTimes(1);
-      expect(mocks.messageRouter._broadcastToAllIframes).toHaveBeenCalledTimes(1);
-    } finally {
-      vi.useRealTimers();
-    }
+    expect(manager.clickManager.addOutsideClickListener).toHaveBeenCalledTimes(1);
+    expect(mocks.messageRouter._broadcastToAllIframes).toHaveBeenCalledTimes(1);
   });
 
   it("replaces pending activation when a newer window is shown", async () => {
-    vi.useFakeTimers();
+    const firstShow = manager._showWindow("first text", { x: 10, y: 20 });
+    const secondShow = manager._showWindow("second text", { x: 30, y: 40 });
 
-    try {
-      const firstShow = manager._showWindow("first text", { x: 10, y: 20 });
-      const secondShow = manager._showWindow("second text", { x: 30, y: 40 });
+    await Promise.all([firstShow, secondShow]);
+    await vi.advanceTimersByTimeAsync(1);
 
-      await Promise.all([firstShow, secondShow]);
-      await vi.advanceTimersByTimeAsync(1);
-
-      expect(manager.clickManager.addOutsideClickListener).toHaveBeenCalledTimes(1);
-      expect(mocks.messageRouter._broadcastToAllIframes).toHaveBeenCalledTimes(1);
-    } finally {
-      vi.useRealTimers();
-    }
+    expect(manager.clickManager.addOutsideClickListener).toHaveBeenCalledTimes(1);
+    expect(mocks.messageRouter._broadcastToAllIframes).toHaveBeenCalledTimes(1);
   });
 
   it("cancels pending activation during icon-to-window transition", async () => {
-    vi.useFakeTimers();
+    await manager._showWindow("initial text", { x: 10, y: 20 });
+    facade._isIconToWindowTransition = true;
+    await manager._showWindow("transition text", { x: 30, y: 40 });
+    await vi.advanceTimersByTimeAsync(1);
 
-    try {
-      await manager._showWindow("initial text", { x: 10, y: 20 });
-      facade._isIconToWindowTransition = true;
-      await manager._showWindow("transition text", { x: 30, y: 40 });
-      await vi.advanceTimersByTimeAsync(1);
-
-      expect(manager.clickManager.addOutsideClickListener).not.toHaveBeenCalled();
-      expect(mocks.messageRouter._broadcastToAllIframes).not.toHaveBeenCalled();
-    } finally {
-      vi.useRealTimers();
-    }
+    expect(manager.clickManager.addOutsideClickListener).not.toHaveBeenCalled();
+    expect(mocks.messageRouter._broadcastToAllIframes).not.toHaveBeenCalled();
   });
 
   it("uses safe presentation for existing-window update and preserves action fields", async () => {
