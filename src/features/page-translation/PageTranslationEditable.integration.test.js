@@ -235,4 +235,91 @@ describe('PageTranslationBridge editable policy', () => {
     expect(ignored.getAttribute('title')).toBe('Ignored title');
     expect(ignored.textContent).toBe('Ignored text');
   });
+
+  it('translates button text and descriptive attributes but protects value and identity', async () => {
+    const button = document.createElement('button');
+    button.setAttribute('value', 'save');
+    button.setAttribute('title', 'Save document');
+    button.setAttribute('aria-label', 'Save document');
+    button.textContent = 'Save';
+    const originalButton = button;
+    let clicks = 0;
+    button.addEventListener('click', () => { clicks += 1; });
+    document.body.appendChild(button);
+
+    const onTranslate = await translate(button);
+    await vi.waitFor(() => expect(onTranslate).toHaveBeenCalledTimes(3));
+    await vi.waitFor(() => expect(button.textContent).toContain('Translated Save'));
+
+    expect(onTranslate.mock.calls.map(([text]) => text)).toEqual(
+      expect.arrayContaining(['Save document', 'Save document', 'Save'])
+    );
+    expect(button).toBe(originalButton);
+    expect(button.getAttribute('value')).toBe('save');
+    expect(button.title).toContain('Translated Save document');
+    expect(button.getAttribute('aria-label')).toContain('Translated Save document');
+
+    button.click();
+    expect(clicks).toBe(1);
+
+    bridge.restore(button);
+    expect(button.textContent).toBe('Save');
+    expect(button.getAttribute('value')).toBe('save');
+    expect(button.title).toBe('Save document');
+    expect(button.getAttribute('aria-label')).toBe('Save document');
+  });
+
+  it('translates nested visible button markup while preserving machine value', async () => {
+    const button = document.createElement('button');
+    button.setAttribute('value', 'save');
+    const label = document.createElement('span');
+    label.textContent = 'Save';
+    const emphasis = document.createElement('strong');
+    emphasis.textContent = 'now';
+    button.append(label, emphasis);
+    document.body.appendChild(button);
+
+    const onTranslate = await translate(document.body);
+    await vi.waitFor(() => expect(onTranslate).toHaveBeenCalledTimes(2));
+    await vi.waitFor(() => expect(label.textContent).toContain('Translated Save'));
+
+    expect(emphasis.textContent).toContain('Translated now');
+    expect(button.getAttribute('value')).toBe('save');
+    expect(button.querySelector('span')).toBe(label);
+    expect(button.querySelector('strong')).toBe(emphasis);
+  });
+
+  it('translates surrounding and nested button text', async () => {
+    const container = document.createElement('div');
+    const button = document.createElement('button');
+    button.setAttribute('value', 'save');
+    button.textContent = 'Save';
+    container.append('Before', button, 'After');
+    document.body.appendChild(container);
+
+    const onTranslate = await translate(document.body);
+    await vi.waitFor(() => expect(onTranslate).toHaveBeenCalledTimes(3));
+    await vi.waitFor(() => expect(container.textContent).toContain('Translated Before'));
+
+    expect(container.textContent).toContain('Translated Save');
+    expect(container.textContent).toContain('Translated After');
+    expect(button.getAttribute('value')).toBe('save');
+  });
+
+  it('keeps input button, submit, and reset values protected', async () => {
+    const controls = ['button', 'submit', 'reset'].map((type) => {
+      const input = document.createElement('input');
+      input.type = type;
+      input.value = type;
+      return input;
+    });
+    document.body.append(...controls);
+
+    const onTranslate = await translate(document.body);
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(onTranslate).not.toHaveBeenCalled();
+    expect(controls.map((input) => input.value)).toEqual(['button', 'submit', 'reset']);
+  });
 });

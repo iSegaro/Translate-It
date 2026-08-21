@@ -15,7 +15,7 @@ import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import ResourceTracker from '@/core/memory/ResourceTracker.js';
 
-const FORM_VALUE_TAGS = new Set(['INPUT', 'TEXTAREA']);
+const FORM_VALUE_TAGS = new Set(['INPUT', 'TEXTAREA', 'BUTTON']);
 
 const getEditableState = (element) => {
   let current = element;
