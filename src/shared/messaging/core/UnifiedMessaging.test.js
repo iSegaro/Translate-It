@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { sendMessage, sendRegularMessage } from './UnifiedMessaging.js';
 import browser from 'webextension-polyfill';
 import ExtensionContextManager from '@/core/extensionContext.js';
@@ -89,6 +89,10 @@ describe('UnifiedMessaging', () => {
     vi.useFakeTimers();
     contextCore.isValidSync.mockReturnValue(true);
     ExtensionContextManager.isValidSync.mockReturnValue(true);
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
   });
 
   describe('sendRegularMessage', () => {
@@ -474,9 +478,10 @@ describe('UnifiedMessaging', () => {
 
       try {
         const promise = sendRegularMessage({ action: 'TRANSLATE', messageId: 'poll-timeout' });
+        const expectation = expect(promise).rejects.toMatchObject({ type: ErrorTypes.TRANSLATION_TIMEOUT });
         await vi.advanceTimersByTimeAsync(50);
 
-        await expect(promise).rejects.toMatchObject({ type: ErrorTypes.TRANSLATION_TIMEOUT });
+        await expectation;
       } finally {
         streamingTimeoutManager.shouldContinue.mockReturnValue(true);
         streamingTimeoutManager.getOperationState.mockReturnValue(null);

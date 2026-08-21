@@ -8,6 +8,9 @@ const mocks = vi.hoisted(() => ({
     updateWindow: vi.fn(),
     showMobileSheet: vi.fn(),
   },
+  messageRouter: {
+    _broadcastToAllIframes: vi.fn(),
+  },
   getPresentation: vi.fn(),
 }));
 
@@ -152,7 +155,11 @@ beforeEach(() => {
   };
   manager = new DisplayManager(facade, {
     state,
-    crossFrameManager: { frameId: "frame-1", isTopFrame: true },
+    crossFrameManager: {
+      frameId: "frame-1",
+      isTopFrame: true,
+      messageRouter: mocks.messageRouter,
+    },
     translationHandler,
     errorHandler,
     clickManager: { addOutsideClickListener: vi.fn() },
