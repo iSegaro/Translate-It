@@ -28,6 +28,40 @@ export class DisplayManager {
     this.errorHandler = dependencies.errorHandler;
     this.clickManager = dependencies.clickManager;
     this.themeManager = dependencies.themeManager;
+    this._outsideClickActivationTimer = null;
+  }
+
+  _clearOutsideClickActivationTimer() {
+    if (this._outsideClickActivationTimer === null) return;
+
+    clearTimeout(this._outsideClickActivationTimer);
+    this._outsideClickActivationTimer = null;
+  }
+
+  _scheduleOutsideClickActivation() {
+    this._clearOutsideClickActivationTimer();
+    this._outsideClickActivationTimer = setTimeout(() => {
+      this._outsideClickActivationTimer = null;
+
+      if (
+        this.state.hasActiveElements &&
+        !this.state.pendingTranslationWindow
+      ) {
+        this.clickManager.addOutsideClickListener();
+
+        if (this.crossFrameManager && this.crossFrameManager.isTopFrame) {
+          this.crossFrameManager.messageRouter._broadcastToAllIframes({
+            type: "translateit-activate-click-listeners",
+            frameId: this.crossFrameManager.frameId,
+            timestamp: Date.now(),
+          });
+        }
+      }
+    }, WindowsConfig.TIMEOUTS.OUTSIDE_CLICK_DELAY);
+  }
+
+  cleanup() {
+    this._clearOutsideClickActivationTimer();
   }
 
   /**
@@ -426,23 +460,9 @@ export class DisplayManager {
       iconId,
     });
 
+    this._clearOutsideClickActivationTimer();
     if (!this.facade._isIconToWindowTransition) {
-      setTimeout(() => {
-        if (
-          this.state.hasActiveElements &&
-          !this.state.pendingTranslationWindow
-        ) {
-          this.clickManager.addOutsideClickListener();
-
-          if (this.crossFrameManager && this.crossFrameManager.isTopFrame) {
-            this.crossFrameManager.messageRouter._broadcastToAllIframes({
-              type: "translateit-activate-click-listeners",
-              frameId: this.crossFrameManager.frameId,
-              timestamp: Date.now(),
-            });
-          }
-        }
-      }, WindowsConfig.TIMEOUTS.OUTSIDE_CLICK_DELAY);
+      this._scheduleOutsideClickActivation();
     }
 
     this.logger.info("Translation icon created successfully", { iconId });
@@ -485,23 +505,9 @@ export class DisplayManager {
       this.state.setIconMode(false);
     }
 
+    this._clearOutsideClickActivationTimer();
     if (!this.facade._isIconToWindowTransition) {
-      setTimeout(() => {
-        if (
-          this.state.hasActiveElements &&
-          !this.state.pendingTranslationWindow
-        ) {
-          this.clickManager.addOutsideClickListener();
-
-          if (this.crossFrameManager && this.crossFrameManager.isTopFrame) {
-            this.crossFrameManager.messageRouter._broadcastToAllIframes({
-              type: "translateit-activate-click-listeners",
-              frameId: this.crossFrameManager.frameId,
-              timestamp: Date.now(),
-            });
-          }
-        }
-      }, WindowsConfig.TIMEOUTS.OUTSIDE_CLICK_DELAY);
+      this._scheduleOutsideClickActivation();
     }
 
     this.logger.info("Translation window created successfully", { windowId });

@@ -273,6 +273,18 @@ describe('WindowsManager', () => {
       await promise;
       expect(mockWindowsManagerEvents.updateWindow).toHaveBeenCalledWith(expect.any(String), expect.objectContaining({ isLoading: false, initialTranslatedText: 'translated content' }));
     });
+
+    it('cleans DisplayManager delayed activation before destroy', async () => {
+      const displayManager = windowsManager.displayManager;
+      const cleanupSpy = vi.spyOn(displayManager, 'cleanup');
+
+      await windowsManager._showWindow('text', { x: 1, y: 1 });
+      windowsManager.destroy();
+      await vi.runAllTimersAsync();
+
+      expect(cleanupSpy).toHaveBeenCalledTimes(1);
+      expect(windowsManager.clickManager.addOutsideClickListener).not.toHaveBeenCalled();
+    });
   });
 
   describe('Mobile', () => {
