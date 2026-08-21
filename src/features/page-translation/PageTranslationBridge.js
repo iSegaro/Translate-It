@@ -14,6 +14,7 @@ import {
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import ResourceTracker from '@/core/memory/ResourceTracker.js';
+import { walkOpenShadowTree } from '@/utils/dom/walkOpenShadowTree.js';
 
 const FORM_VALUE_TAGS = new Set(['INPUT', 'TEXTAREA', 'BUTTON']);
 
@@ -117,6 +118,11 @@ export class PageTranslationBridge extends ResourceTracker {
       context: sessionContext,
       root: null,
       active: true,
+      shadowDiscoveryObserver: null,
+      shadowRoots: new Map(),
+      shadowMutatedNodes: new WeakSet(),
+      shadowMovedNodes: new WeakSet(),
+      shadowPersistenceStarted: false,
     };
     const targetGenerations = new WeakMap();
     const applyDecisions = new WeakMap();
@@ -496,7 +502,10 @@ export class PageTranslationBridge extends ResourceTracker {
           }
           
           // Call original callback if provided (e.g., from PersistentDOMTranslator)
-          if (callback) callback(processedNode);
+          if (callback) {
+            currentSession.shadowMutatedNodes.add(processedNode);
+            callback(processedNode);
+          }
         };
         
         try {
@@ -547,6 +556,177 @@ export class PageTranslationBridge extends ResourceTracker {
       filter: filter
     });
 
+    const restoreDomNode = currentSession.domTranslator.restore.bind(currentSession.domTranslator);
+    currentSession.domTranslator.restore = (node, callback) => {
+      if (currentSession.shadowMovedNodes.has(node)) return;
+      return restoreDomNode(node, callback);
+    };
+
+    const markShadowMutation = (node) => currentSession.shadowMutatedNodes.add(node);
+
+    const unregisterShadowRoot = (shadowRoot) => {
+      const registration = currentSession.shadowRoots.get(shadowRoot);
+      if (!registration) return;
+      registration.observer.disconnect();
+      currentSession.shadowRoots.delete(shadowRoot);
+    };
+
+    const unregisterShadowRootsUnder = (subtree) => {
+      for (const [shadowRoot, registration] of currentSession.shadowRoots) {
+        if (isComposedDescendant(subtree, registration.host)) {
+          unregisterShadowRoot(shadowRoot);
+        }
+      }
+    };
+
+    const discoverShadowRoots = (subtree) => {
+      walkOpenShadowTree(subtree, (element) => {
+        if (element.shadowRoot) registerShadowRoot(element.shadowRoot, element);
+      });
+    };
+
+    const translateAddedNode = (node) => {
+      if (node.nodeType === Node.TEXT_NODE) {
+        if (!node.parentElement) return;
+        if (currentSession.domTranslator.has(node)) return;
+      } else if (node.nodeType !== Node.ELEMENT_NODE) {
+        return;
+      }
+
+      currentSession.domTranslator.translate(node, markShadowMutation);
+    };
+
+    const restoreRemovedNode = (node) => {
+      if (isOwnedTarget(node, currentSession.root)) return;
+      if (node.nodeType !== Node.ELEMENT_NODE && node.nodeType !== Node.TEXT_NODE) return;
+      currentSession.domTranslator.restore(node);
+      unregisterShadowRootsUnder(node);
+    };
+
+    const processShadowMutations = (shadowRoot, mutations) => {
+      const registration = currentSession.shadowRoots.get(shadowRoot);
+      if (!registration) return;
+      if (!currentSession.active
+          || this.session !== currentSession
+          || !isOwnedTarget(registration.host, currentSession.root)) {
+        unregisterShadowRoot(shadowRoot);
+        return;
+      }
+
+      const childChanges = new Map();
+      for (const mutation of mutations) {
+        if (mutation.type === 'characterData') {
+          if (currentSession.shadowMutatedNodes.has(mutation.target)) {
+            currentSession.shadowMutatedNodes.delete(mutation.target);
+          } else if (currentSession.domTranslator.has(mutation.target)) {
+            currentSession.domTranslator.update(mutation.target, markShadowMutation);
+          } else if (mutation.target.parentElement) {
+            currentSession.domTranslator.translate(mutation.target, markShadowMutation);
+          }
+          continue;
+        }
+
+        if (mutation.type === 'attributes') {
+          const attribute = mutation.target.attributes.getNamedItem(mutation.attributeName);
+          if (!attribute) continue;
+          if (currentSession.shadowMutatedNodes.has(attribute)) {
+            currentSession.shadowMutatedNodes.delete(attribute);
+          } else if (currentSession.domTranslator.has(attribute)) {
+            currentSession.domTranslator.update(attribute, markShadowMutation);
+          } else {
+            currentSession.domTranslator.translate(attribute, markShadowMutation);
+          }
+          continue;
+        }
+
+        if (mutation.type !== 'childList') continue;
+        for (const node of mutation.addedNodes) {
+          const change = childChanges.get(node) || { added: 0, removed: 0 };
+          change.added++;
+          childChanges.set(node, change);
+        }
+        for (const node of mutation.removedNodes) {
+          const change = childChanges.get(node) || { added: 0, removed: 0 };
+          change.removed++;
+          childChanges.set(node, change);
+        }
+      }
+
+      for (const [node, change] of childChanges) {
+        if (change.added > change.removed) {
+          translateAddedNode(node);
+          discoverShadowRoots(node);
+        } else if (change.removed > change.added) {
+          restoreRemovedNode(node);
+        }
+      }
+    };
+
+    const registerShadowRoot = (shadowRoot, host) => {
+      if (currentSession.shadowRoots.has(shadowRoot)
+          || !currentSession.active
+          || this.session !== currentSession
+          || !isOwnedTarget(host, currentSession.root)) return;
+
+      const observer = new MutationObserver((mutations) => {
+        processShadowMutations(shadowRoot, mutations);
+      });
+      currentSession.shadowRoots.set(shadowRoot, { host, observer });
+      observer.observe(shadowRoot, {
+        childList: true,
+        subtree: true,
+        characterData: true,
+        attributes: true,
+      });
+    };
+
+    const processDiscoveryMutations = (mutations) => {
+      if (!currentSession.active || this.session !== currentSession) return;
+      const childChanges = new Map();
+      for (const mutation of mutations) {
+        if (mutation.type !== 'childList') continue;
+        for (const node of mutation.addedNodes) {
+          const change = childChanges.get(node) || { added: 0, removed: 0 };
+          change.added++;
+          childChanges.set(node, change);
+        }
+        for (const node of mutation.removedNodes) {
+          const change = childChanges.get(node) || { added: 0, removed: 0 };
+          change.removed++;
+          childChanges.set(node, change);
+        }
+      }
+      for (const [node, change] of childChanges) {
+        if (change.added > change.removed) discoverShadowRoots(node);
+        else if (change.removed > change.added) {
+          if (isOwnedTarget(node, currentSession.root)) {
+            currentSession.shadowMovedNodes.add(node);
+            queueMicrotask(() => currentSession.shadowMovedNodes.delete(node));
+          } else {
+            unregisterShadowRootsUnder(node);
+          }
+        }
+      }
+    };
+
+    currentSession.startShadowPersistence = (root) => {
+      if (currentSession.shadowPersistenceStarted) return;
+      currentSession.shadowPersistenceStarted = true;
+      currentSession.shadowDiscoveryObserver = new MutationObserver(processDiscoveryMutations);
+      currentSession.shadowDiscoveryObserver.observe(root, { childList: true, subtree: true });
+      discoverShadowRoots(root);
+    };
+
+    currentSession.stopShadowPersistence = () => {
+      currentSession.shadowDiscoveryObserver?.disconnect();
+      currentSession.shadowDiscoveryObserver = null;
+      for (const registration of currentSession.shadowRoots.values()) {
+        registration.observer.disconnect();
+      }
+      currentSession.shadowRoots.clear();
+      currentSession.shadowPersistenceStarted = false;
+    };
+
     // We always wrap in PersistentDOMTranslator to handle dynamic content consistently
     currentSession.persistentTranslator = new PersistentDOMTranslator(currentSession.domTranslator);
 
@@ -563,6 +743,7 @@ export class PageTranslationBridge extends ResourceTracker {
     // Otherwise, use basic domTranslator for a single-pass translation.
     if (this.session.autoTranslateOnDOMChanges && this.session.persistentTranslator) {
       this.logger.debug('Starting persistent translation (Auto-translate enabled)');
+      this.session.startShadowPersistence?.(element);
       this.session.persistentTranslator.translate(element);
     } else if (this.session.domTranslator) {
       this.logger.debug('Starting single-pass translation (Auto-translate disabled)');
@@ -577,6 +758,7 @@ export class PageTranslationBridge extends ResourceTracker {
   stopPersistence() {
     if (this.session && this.session.persistentTranslator) {
       try {
+        this.session.stopShadowPersistence?.();
         const pt = this.session.persistentTranslator;
         // Search for the observer in observedNodesStorage (it's a Map of node -> XMutationObserver)
         if (pt.observedNodesStorage) {
@@ -596,6 +778,7 @@ export class PageTranslationBridge extends ResourceTracker {
 
     try {
       const ownedRoot = this.session.root || element;
+      this.session.stopShadowPersistence?.();
 
       // 1. Surgical Restore: Revert all direction and alignment changes
       restoreElementDirection(ownedRoot, { shadowAware: true });
@@ -631,6 +814,7 @@ export class PageTranslationBridge extends ResourceTracker {
     this.session.active = false;
 
     try {
+      this.session.stopShadowPersistence?.();
       // 1. Manually disconnect all internal observers just in case
       const pt = this.session.persistentTranslator;
       if (pt && pt.observedNodesStorage) {

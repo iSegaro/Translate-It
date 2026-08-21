@@ -51,7 +51,7 @@ const translate = async (root, options = {}) => {
 };
 
 const startTranslation = async (root, options = {}) => {
-  const onTranslate = vi.fn(async (text) => `Translated ${text}`);
+  const onTranslate = vi.fn((text) => settlement(`Translated ${text}`));
   const bridge = new PageTranslationBridge();
   await bridge.initialize(settings(options), onTranslate);
   bridge.translate(root);
@@ -327,7 +327,7 @@ describe('PageTranslationBridge Shadow DOM ownership', () => {
     expect(span.textContent).toBe('Dynamic shadow text');
   });
 
-  it('does not claim support for later mutations inside an existing ShadowRoot', async () => {
+  it('translates later mutations inside an existing ShadowRoot', async () => {
     const { shadow } = createShadowHost();
     const { bridge, onTranslate } = await startTranslation(document.body, { autoTranslateOnDOMChanges: true });
     track(bridge);
@@ -335,8 +335,7 @@ describe('PageTranslationBridge Shadow DOM ownership', () => {
     span.textContent = 'Later shadow text';
     shadow.appendChild(span);
 
-    await new Promise(resolve => setTimeout(resolve, 0));
-    expect(onTranslate).not.toHaveBeenCalled();
-    expect(span.textContent).toBe('Later shadow text');
+    await vi.waitFor(() => expect(span.textContent).toContain('Translated Later shadow text'));
+    expect(onTranslate.mock.calls.map(([text]) => text)).toContain('Later shadow text');
   });
 });
