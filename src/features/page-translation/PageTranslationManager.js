@@ -271,11 +271,13 @@ export class PageTranslationManager extends ResourceTracker {
       this.isTranslated = false;
       this.isAutoTranslating = false;
 
+      const translationRoot = this.bridge.getTranslationRoot?.() || document.documentElement;
+
       // 2. Use standard library restore
       this.bridge.restore(document.documentElement);
 
       // 3. Deep clean any remaining markers
-      PageTranslationHelper.deepCleanDOM();
+      PageTranslationHelper.deepCleanDOM(translationRoot);
 
       // 4. Get the count before resetting
       const restoredCount = this.scheduler.translatedCount || 0;

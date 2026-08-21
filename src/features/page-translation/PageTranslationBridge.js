@@ -17,6 +17,49 @@ import ResourceTracker from '@/core/memory/ResourceTracker.js';
 
 const FORM_VALUE_TAGS = new Set(['INPUT', 'TEXTAREA', 'BUTTON']);
 
+const getComposedParent = (node) => {
+  if (!node) return null;
+  if (node.parentElement) return node.parentElement;
+  if (node.parentNode?.nodeType === Node.ELEMENT_NODE) return node.parentNode;
+  return node.parentNode?.host || null;
+};
+
+const isComposedDescendant = (root, node) => {
+  let current = node;
+
+  while (current) {
+    if (current === root) return true;
+    current = getComposedParent(current);
+  }
+
+  return false;
+};
+
+const getFilterElement = (node) => {
+  if (node?.nodeType === Node.ELEMENT_NODE) return node;
+  if (node?.nodeType === Node.ATTRIBUTE_NODE) return node.ownerElement;
+  return getComposedParent(node);
+};
+
+const matchesAnySelector = (element, selectors) => selectors.some((selector) => {
+  try {
+    return element.matches(selector);
+  } catch {
+    return false;
+  }
+});
+
+const isComposedExcluded = (node, selectors) => {
+  let current = getFilterElement(node);
+
+  while (current) {
+    if (matchesAnySelector(current, selectors)) return true;
+    current = getComposedParent(current);
+  }
+
+  return false;
+};
+
 const getEditableState = (element) => {
   let current = element;
 
@@ -103,7 +146,7 @@ export class PageTranslationBridge extends ResourceTracker {
 
       const owner = node.nodeType === Node.ATTRIBUTE_NODE ? node.ownerElement : node;
       const root = currentSession.root;
-      if (!owner?.isConnected || (root && (!root.isConnected || !root.contains(owner)))) return false;
+      if (!isOwnedTarget(owner, root)) return false;
 
       if (node.nodeType === Node.ATTRIBUTE_NODE) {
         const currentAttribute = owner.getAttributeNode(node.name);
@@ -146,15 +189,21 @@ export class PageTranslationBridge extends ResourceTracker {
       if (!currentSession.active || this.session !== currentSession || !node) return false;
       const owner = node.nodeType === Node.ATTRIBUTE_NODE ? node.ownerElement : node;
       const root = currentSession.root;
-      return Boolean(owner?.isConnected && (!root || (root.isConnected && root.contains(owner))));
+      return isOwnedTarget(owner, root);
     };
 
     const isConnectedTarget = (node) => {
       if (!node) return false;
       const owner = node.nodeType === Node.ATTRIBUTE_NODE ? node.ownerElement : node;
       const root = currentSession.root;
-      return Boolean(owner?.isConnected && (!root || (root.isConnected && root.contains(owner))));
+      return isOwnedTarget(owner, root);
     };
+
+    function isOwnedTarget(owner, root) {
+      return Boolean(owner?.isConnected
+        && (!root || (root.isConnected && isComposedDescendant(root, owner))));
+    }
+
 
     if (settings.lazyLoading) {
       currentSession.intersectionScheduler = new IntersectionScheduler({ rootMargin: settings.rootMargin });
@@ -212,6 +261,7 @@ export class PageTranslationBridge extends ResourceTracker {
       }
 
       recordApplyDecision(node, generation, 'accepted-pending', settlement, ownsStorage);
+
       
       // OPTIMIZATION: Preserve ZWNJ, Tatweel, Dashes and BiDi marks if the provider 
       // returned a "cleaned" version of the same text.
@@ -475,7 +525,18 @@ export class PageTranslationBridge extends ResourceTracker {
       ],
       attributesList: settings.attributesToTranslate || ['title', 'alt', 'placeholder'],
     });
-    const filter = (node) => domTranslatorFilter(node) && !isMutableEditableNode(node);
+    const composedExcludedSelectors = [
+      ...(settings.excludedSelectors || []),
+      `#${PAGE_TRANSLATION_SELECTORS.UI_HOST_MAIN}`,
+      `#${PAGE_TRANSLATION_SELECTORS.UI_HOST_IFRAME}`,
+      `#${PAGE_TRANSLATION_SELECTORS.TOOLTIP_ID}`,
+      `.${PAGE_TRANSLATION_SELECTORS.INTERNAL_IGNORE_CLASS}`,
+      `.${PAGE_TRANSLATION_SELECTORS.STANDARD_NO_TRANSLATE_CLASS}`,
+      `[translate='${PAGE_TRANSLATION_SELECTORS.TRANSLATE_NO_VALUE}']`
+    ];
+    const filter = (node) => !isComposedExcluded(node, composedExcludedSelectors)
+      && domTranslatorFilter(node)
+      && !isMutableEditableNode(node);
 
     currentSession.nodesTranslator = nodesTranslator;
     currentSession.filter = filter;
@@ -509,6 +570,10 @@ export class PageTranslationBridge extends ResourceTracker {
     }
   }
 
+  getTranslationRoot() {
+    return this.session?.root || null;
+  }
+
   stopPersistence() {
     if (this.session && this.session.persistentTranslator) {
       try {
@@ -530,8 +595,10 @@ export class PageTranslationBridge extends ResourceTracker {
     if (!this.session) return;
 
     try {
+      const ownedRoot = this.session.root || element;
+
       // 1. Surgical Restore: Revert all direction and alignment changes
-      restoreElementDirection(element);
+      restoreElementDirection(ownedRoot, { shadowAware: true });
 
       const pt = this.session.persistentTranslator;
       const dt = this.session.domTranslator;
@@ -540,16 +607,16 @@ export class PageTranslationBridge extends ResourceTracker {
       const isObserved = pt && pt.observedNodesStorage && pt.observedNodesStorage.has(element);
 
       if (isObserved) {
-        pt.restore(element);
+        pt.restore(ownedRoot);
       } else if (dt) {
         // Fallback to direct DOM restore if persistence was stopped or node is not in observer storage
-        dt.restore(element);
+        dt.restore(ownedRoot);
       }
     } catch (e) {
       this.logger.warn('[Bridge] Restore failed:', e.message);
       // Last resort fallback directly on domTranslator
       if (this.session.domTranslator) {
-        try { this.session.domTranslator.restore(element); } catch {
+        try { this.session.domTranslator.restore(this.session.root || element); } catch {
           // Silent fallback
         }
       }

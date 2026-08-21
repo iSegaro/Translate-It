@@ -14,6 +14,7 @@ import {
   INTERACTIVE_TAGS
 } from './DomTranslatorConstants.js';
 import { LanguageDetectionService } from '@/shared/services/LanguageDetectionService.js';
+import { walkOpenShadowTree } from './walkOpenShadowTree.js';
 
 // --- 1. Core Utilities ---
 
@@ -375,7 +376,7 @@ export function applyElementDirection(element, targetLanguage) {
 /**
  * Reverts CSS direction changes.
  */
-export function restoreElementDirection(element) {
+export function restoreElementDirection(element, options = {}) {
   if (!element || element.nodeType !== Node.ELEMENT_NODE) return;
 
   const restore = (el) => {
@@ -414,8 +415,12 @@ export function restoreElementDirection(element) {
     }
   };
 
-  restore(element);
-  element.querySelectorAll('[data-dir-original-saved]').forEach(restore);
+  if (options.shadowAware) {
+    walkOpenShadowTree(element, restore);
+  } else {
+    restore(element);
+    element.querySelectorAll('[data-dir-original-saved]').forEach(restore);
+  }
   
   let parent = element.parentElement;
   while (parent) {
