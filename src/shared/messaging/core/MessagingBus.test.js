@@ -6,11 +6,19 @@ vi.mock('./UnifiedMessaging.js', () => ({
   sendMessage: vi.fn()
 }));
 
-vi.mock('@/shared/logging/logger.js', () => ({
-  getScopedLogger: () => ({
-    error: vi.fn()
-  })
-}));
+vi.mock('@/shared/logging/logger.js', async (importOriginal) => {
+  const actual = await importOriginal();
+
+  return {
+    ...actual,
+    getScopedLogger: vi.fn(() => ({
+      debug: vi.fn(),
+      info: vi.fn(),
+      warn: vi.fn(),
+      error: vi.fn(),
+    }))
+  };
+});
 
 describe('MessagingBus.sendToBackground error details', () => {
   beforeEach(() => {
