@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
 import { isFieldTranslationRequestError } from './translationErrorOwnership.js';
+import { TRANSLATION_TIMEOUT } from './constants.js';
 
 const mocks = vi.hoisted(() => ({
   safeSendMessage: vi.fn(),
@@ -331,6 +332,88 @@ describe('translateFieldViaSmartHandler translation ownership', () => {
     expect(mocks.releaseFieldTranslationRequest).toHaveBeenCalled();
     expect(mocks.tracker.markTimeout.mock.invocationCallOrder[0])
       .toBeLessThan(mocks.releaseFieldTranslationRequest.mock.invocationCallOrder[0]);
+  });
+
+  it('preserves timeout ownership when abort listener is already registered', async () => {
+    vi.useFakeTimers();
+
+    try {
+      mocks.safeSendMessage.mockImplementation((message) => (
+        message?.action === 'CANCEL_TRANSLATION'
+          ? Promise.resolve(null)
+          : new Promise(() => {})
+      ));
+
+      const promise = translateFieldViaSmartHandler({ text: 'hello', target });
+      await vi.waitFor(() => expect(mocks.trackTimeout).toHaveBeenCalled());
+      const ownership = mocks.fieldRequestOwners.get(target);
+      const removeAbortListener = vi.spyOn(ownership.controller.signal, 'removeEventListener');
+      await vi.advanceTimersByTimeAsync(TRANSLATION_TIMEOUT + 20);
+
+      const error = await promise.catch((caught) => caught);
+      expect(error).toMatchObject({ type: ErrorTypes.TRANSLATION_TIMEOUT });
+      expect(error.type).not.toBe(ErrorTypes.USER_CANCELLED);
+      expect([...mocks.trackerRequests.values()][0].status).toBe('timeout');
+      expect(mocks.tracker.markTimeout).toHaveBeenCalledTimes(1);
+      expect(mocks.tracker.cancelRequest).not.toHaveBeenCalled();
+      expect(removeAbortListener).toHaveBeenCalledWith('abort', expect.any(Function));
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('ignores provider resolution after timeout ownership', async () => {
+    vi.useFakeTimers();
+
+    try {
+      let resolveProvider;
+      mocks.safeSendMessage.mockImplementation((message) => {
+        if (message?.action === 'CANCEL_TRANSLATION') return Promise.resolve(null);
+        return new Promise((resolve) => { resolveProvider = resolve; });
+      });
+
+      const promise = translateFieldViaSmartHandler({ text: 'hello', target });
+      await vi.waitFor(() => expect(mocks.trackTimeout).toHaveBeenCalled());
+      await vi.advanceTimersByTimeAsync(TRANSLATION_TIMEOUT + 20);
+      await expect(promise).rejects.toMatchObject({ type: ErrorTypes.TRANSLATION_TIMEOUT });
+
+      resolveProvider({
+        success: true,
+        translatedText: 'late result',
+        originalText: 'hello',
+      });
+      await Promise.resolve();
+
+      expect(mocks.applyTranslationToTextField).not.toHaveBeenCalled();
+      expect([...mocks.trackerRequests.values()][0].status).toBe('timeout');
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('ignores provider rejection after timeout ownership', async () => {
+    vi.useFakeTimers();
+
+    try {
+      let rejectProvider;
+      mocks.safeSendMessage.mockImplementation((message) => {
+        if (message?.action === 'CANCEL_TRANSLATION') return Promise.resolve(null);
+        return new Promise((_, reject) => { rejectProvider = reject; });
+      });
+
+      const promise = translateFieldViaSmartHandler({ text: 'hello', target });
+      await vi.waitFor(() => expect(mocks.trackTimeout).toHaveBeenCalled());
+      await vi.advanceTimersByTimeAsync(TRANSLATION_TIMEOUT + 20);
+      await expect(promise).rejects.toMatchObject({ type: ErrorTypes.TRANSLATION_TIMEOUT });
+
+      rejectProvider(new Error('late provider failure'));
+      await Promise.resolve();
+
+      expect([...mocks.trackerRequests.values()][0].status).toBe('timeout');
+      expect(mocks.tracker.failRequest).not.toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('does not mark application failure after request succeeds', async () => {

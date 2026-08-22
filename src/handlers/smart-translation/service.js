@@ -94,6 +94,15 @@ export async function translateFieldViaSmartHandler({ text, target, selectionRan
   let setupPhase = 'pre-request';
   let inheritedToastAdopted = !inheritedState?.toastId;
   let inheritedPendingAdopted = !inheritedState?.data;
+  let terminalOwner = null;
+  let terminalError = null;
+  let abortHandler = null;
+  const claimTerminalOwner = (owner, error = null) => {
+    if (terminalOwner) return false;
+    terminalOwner = owner;
+    terminalError = error;
+    return true;
+  };
 
   try {
     terminalizeFieldRequest(previous, 'replacement');
@@ -155,6 +164,8 @@ export async function translateFieldViaSmartHandler({ text, target, selectionRan
         logger.debug('Translation request timeout reached');
         const timeoutError = new Error('Translation request timed out');
         timeoutError.type = ErrorTypes.TRANSLATION_TIMEOUT;
+        if (!claimTerminalOwner('timeout', timeoutError)) return;
+
         ownership.controller.abort();
         void safeSendMessage({
           action: MessageActions.CANCEL_TRANSLATION,
@@ -166,11 +177,22 @@ export async function translateFieldViaSmartHandler({ text, target, selectionRan
 
     // Create an abort promise
     const abortPromise = new Promise((_, reject) => {
-      ownership.controller.signal.addEventListener('abort', () => {
-        const abortError = new Error('Translation request aborted by user');
-        abortError.type = ErrorTypes.USER_CANCELLED;
+      abortHandler = () => {
+        // Timeout owns semantic settlement; abort only stops transport.
+        if (terminalOwner === 'timeout') return;
+
+        const isReplacement = ownership.replaced || !isCurrent();
+        if (!claimTerminalOwner(isReplacement ? 'replacement' : 'operation-abort')) return;
+
+        const abortError = new Error(
+          isReplacement ? 'Translation request replaced' : 'Translation request aborted'
+        );
+        abortError.operationAborted = true;
+        abortError.cancellationReason = isReplacement ? 'replacement' : 'operation-abort';
         reject(abortError);
-      });
+      };
+
+      ownership.controller.signal.addEventListener('abort', abortHandler);
     });
 
     const translationMessage = MessageFormat.create(
@@ -274,6 +296,16 @@ export async function translateFieldViaSmartHandler({ text, target, selectionRan
     const isTimeout = errorForCaller?.type === ErrorTypes.TRANSLATION_TIMEOUT;
     const isCancellation = isCancellationError(errorForCaller);
 
+    if (terminalOwner === 'timeout' && !isTimeout) {
+      throw terminalError;
+    }
+    if (!terminalOwner) {
+      claimTerminalOwner(
+        isTimeout ? 'timeout' : isCancellation ? 'user-cancellation' : 'provider-error',
+        errorForCaller
+      );
+    }
+
     if (isCancellation) {
       logger.debug('Text field translation request cancelled:', errorForCaller.message);
       
@@ -314,6 +346,9 @@ export async function translateFieldViaSmartHandler({ text, target, selectionRan
     throw errorForCaller;
   } finally {
     if (timerId) resourceTracker.clearTimer(timerId);
+    if (abortHandler) {
+      ownership.controller.signal.removeEventListener('abort', abortHandler);
+    }
     
     releaseFieldTranslationRequest(target, ownership);
   }
