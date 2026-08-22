@@ -15,6 +15,23 @@ import { getProviderOptimizationLevelAsync } from '@/shared/config/config.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.TRANSLATION, 'RateLimitManager');
 
+function createAbortError(signal, message = 'Request aborted') {
+  const isUserAbort = signal?.aborted
+    && (signal.reason === 'user-cancelled' || signal.reason === 'user_cancelled');
+  const error = new Error(isUserAbort ? 'Request cancelled' : message);
+  error.name = 'AbortError';
+
+  if (isUserAbort) {
+    error.type = ErrorTypes.USER_CANCELLED;
+    error.isCancelled = true;
+  } else {
+    error.operationAborted = true;
+    error.cancellationReason = 'operation-abort';
+  }
+
+  return error;
+}
+
 /**
  * Priority levels for translation requests
  */
@@ -191,20 +208,14 @@ export class RateLimitManager {
           const index = queue.indexOf(request);
           if (index !== -1) {
             queue.splice(index, 1);
-            const abortError = new Error('Request aborted while in queue');
-            abortError.name = 'AbortError';
-            abortError.isCancelled = true;
-            reject(abortError);
+            reject(createAbortError(abortSignal, 'Request aborted while in queue'));
           }
         };
         abortSignal.addEventListener('abort', onAbort, { once: true });
         
         // If already aborted
         if (abortSignal.aborted) {
-          const abortError = new Error('Request aborted before enqueuing');
-          abortError.name = 'AbortError';
-          abortError.isCancelled = true;
-          reject(abortError);
+          reject(createAbortError(abortSignal, 'Request aborted before enqueuing'));
           return;
         }
       }
@@ -316,10 +327,7 @@ export class RateLimitManager {
     // Check if aborted before starting
     if (request.options?.abortController?.signal?.aborted) {
       state.activeRequests--; // Decrease because it was increased before calling _executeRequest
-      const abortError = new Error('Request aborted before execution');
-      abortError.name = 'AbortError';
-      abortError.isCancelled = true;
-      request.reject(abortError);
+      request.reject(createAbortError(request.options.abortController.signal, 'Request aborted before execution'));
       // Immediately process next to keep concurrency high
       this._processQueue(providerName);
       return;
@@ -479,10 +487,7 @@ export class RateLimitManager {
           const reqMessageId = request.options?.messageId || request.options?.abortController?.messageId;
           
           if (!messageId || reqMessageId === messageId) {
-            const error = new Error(messageId ? 'Request cancelled' : 'All requests cleared');
-            error.name = 'AbortError';
-            error.isCancelled = true;
-            request.reject(error);
+            request.reject(createAbortError(null, messageId ? 'Request cancelled' : 'All requests cleared'));
           } else {
             remaining.push(request);
           }

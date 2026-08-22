@@ -231,6 +231,115 @@ describe('RateLimitManager', () => {
     });
   });
 
+  describe('Abort provenance', () => {
+    const createDeferred = () => {
+      let resolve;
+      const promise = new Promise((res) => { resolve = res; });
+      return { promise, resolve };
+    };
+
+    const blockQueue = async () => {
+      const blocker = createDeferred();
+      const blockerPromise = manager.executeWithRateLimit('TestProvider', () => blocker.promise);
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      return { blocker, blockerPromise };
+    };
+
+    it('preserves explicit user cancellation for queued requests', async () => {
+      const { blocker, blockerPromise } = await blockQueue();
+      const controller = new AbortController();
+      const request = manager.executeWithRateLimit('TestProvider', () => 'not-run', '', TranslationPriority.NORMAL, {
+        abortController: controller,
+      });
+
+      controller.abort('user-cancelled');
+
+      await expect(request).rejects.toMatchObject({
+        type: ErrorTypes.USER_CANCELLED,
+        isCancelled: true,
+      });
+      blocker.resolve();
+      await blockerPromise;
+    });
+
+    it.each([['timeout', (controller) => controller.abort('timeout')], ['bare', (controller) => controller.abort()]])(
+      'classifies queued %s abort as an internal operation abort', async (_label, abort) => {
+        const { blocker, blockerPromise } = await blockQueue();
+        const controller = new AbortController();
+        const request = manager.executeWithRateLimit('TestProvider', () => 'not-run', '', TranslationPriority.NORMAL, {
+          abortController: controller,
+        });
+
+        abort(controller);
+
+        const error = await request.catch((caughtError) => caughtError);
+        expect(error).toMatchObject({
+          operationAborted: true,
+          cancellationReason: 'operation-abort',
+        });
+        expect(error.type).not.toBe(ErrorTypes.USER_CANCELLED);
+        expect(error.isCancelled).not.toBe(true);
+        blocker.resolve();
+        await blockerPromise;
+      }
+    );
+
+    it('classifies already-aborted signals before enqueue as internal operation abort', async () => {
+      const controller = new AbortController();
+      controller.abort();
+
+      const error = await manager.executeWithRateLimit('TestProvider', () => 'not-run', '', TranslationPriority.NORMAL, {
+        abortController: controller,
+      }).catch((caughtError) => caughtError);
+      expect(error).toMatchObject({
+        operationAborted: true,
+        cancellationReason: 'operation-abort',
+      });
+      expect(error.type).not.toBe(ErrorTypes.USER_CANCELLED);
+      expect(error.isCancelled).not.toBe(true);
+    });
+
+    it('classifies pre-start abort as an internal operation abort', async () => {
+      const controller = new AbortController();
+      const state = manager.providerStates.get('TestProvider');
+      const request = {
+        options: { abortController: controller },
+        reject: vi.fn(),
+      };
+      controller.abort('timeout');
+
+      state.activeRequests++;
+      await manager._executeRequest(state, request, 'TestProvider');
+
+      const [error] = request.reject.mock.calls[0];
+      expect(error).toMatchObject({
+        operationAborted: true,
+        cancellationReason: 'operation-abort',
+      });
+      expect(error.type).not.toBe(ErrorTypes.USER_CANCELLED);
+      expect(error.isCancelled).not.toBe(true);
+    });
+
+    it('classifies cleanup cancellation without signal as an internal operation abort', async () => {
+      const state = manager.providerStates.get('TestProvider');
+      const reject = vi.fn();
+      state.queues[TranslationPriority.NORMAL].push({
+        options: { messageId: 'cleanup-abort' },
+        reject,
+      });
+
+      manager.clearPendingRequests('cleanup-abort');
+
+      const [error] = reject.mock.calls[0];
+      expect(error).toMatchObject({
+        operationAborted: true,
+        cancellationReason: 'operation-abort',
+      });
+      expect(error.type).not.toBe(ErrorTypes.USER_CANCELLED);
+      expect(error.isCancelled).not.toBe(true);
+    });
+  });
+
   describe('Concurrency Control', () => {
     it('should respect maxConcurrent limit', async () => {
       manager._initializeProvider('ConcurrentProvider', { maxConcurrent: 2, delayBetweenRequests: 0 });
