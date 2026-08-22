@@ -11,7 +11,7 @@ import { rateLimitManager, TranslationPriority } from "@/features/translation/co
 
 const logger = getScopedLogger(LOG_COMPONENTS.TRANSLATION, 'BaseProvider');
 
-function createOperationAbortError(signal, message = 'Translation operation aborted') {
+export function createOperationAbortError(signal, message = 'Translation operation aborted') {
   const isUserAbort = signal?.reason === 'user-cancelled' || signal?.reason === 'user_cancelled';
   const error = new Error(isUserAbort ? 'Translation cancelled by user' : message);
   error.name = 'AbortError';
