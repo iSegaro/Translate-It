@@ -209,7 +209,7 @@ export class BingTranslateProvider extends BaseTranslateProvider {
       // for BingApiError (which is usually a 400 bad request that can be fixed by splitting).
       if (error.name === 'BingHtmlResponseError' || error.name === 'BingJsonParseError' || error.name === 'BingApiError') {
         const maxRetries = providerConfig?.batching?.maxRetries ?? 3;
-        const adaptiveChunking = providerConfig?.batching?.adaptiveChunking || true;
+        const adaptiveChunking = providerConfig?.batching?.adaptiveChunking ?? true;
 
         logger.warn(`[Bing] ${error.name} on attempt ${retryAttempt + 1}/${maxRetries + 1}. Chunk size: ${chunkTexts.length}. Reason: ${error.message}`);
 

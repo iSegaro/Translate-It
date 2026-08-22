@@ -190,6 +190,21 @@ describe('BingTranslateProvider', () => {
       expect(provider._executeApiCall).toHaveBeenCalledTimes(1);
     });
 
+    it('does not adaptively retry when adaptiveChunking is false', async () => {
+      getProviderConfiguration.mockReturnValue({
+        ...defaultProviderConfig,
+        batching: { ...defaultProviderConfig.batching, adaptiveChunking: false, maxRetries: 3 },
+      });
+      const originalError = Object.assign(new Error('Bing adaptive failure'), {
+        name: 'BingApiError',
+      });
+      provider._executeApiCall.mockRejectedValue(originalError);
+
+      await expect(provider._translateChunk(['first', 'second'], 'en', 'fa', 'selection', null, 0, 2, 0, 1))
+        .rejects.toBe(originalError);
+      expect(provider._executeApiCall).toHaveBeenCalledTimes(1);
+    });
+
     it('preserves one adaptive retry when maxRetries is one', async () => {
       getProviderConfiguration.mockReturnValue({
         ...defaultProviderConfig,
