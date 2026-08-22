@@ -268,6 +268,27 @@ describe('useTranslationError', () => {
     expect(options.type).toBe(ErrorTypes.TRANSLATION_TIMEOUT);
   });
 
+  it('presents structured HTTP 402 as localized insufficient balance', async () => {
+    const { reconstructTranslationError } = await import('@/shared/messaging/core/MessagingCore.js');
+    const [composable] = withSetup(() => useTranslationError('sidepanel'));
+    const canonicalError = reconstructTranslationError({
+      message: 'HTTP 402',
+      type: ErrorTypes.INSUFFICIENT_BALANCE,
+      statusCode: 402,
+    });
+    matchErrorToType.mockReturnValue(ErrorTypes.INSUFFICIENT_BALANCE);
+
+    await composable.handleError(canonicalError);
+
+    expect(composable.errorType.value).toBe(ErrorTypes.INSUFFICIENT_BALANCE);
+    expect(composable.errorMessage.value).toBe('ERRORS_INSUFFICIENT_BALANCE');
+    const [displayError, displayContext, options] = mockUseErrorHandler.handleTranslationError.mock.calls[0];
+    expect(displayContext).toBe('sidepanel');
+    expect(displayError.message).toBe('ERRORS_INSUFFICIENT_BALANCE');
+    expect(displayError.message).not.toContain('HTTP 402');
+    expect(options.type).toBe(ErrorTypes.INSUFFICIENT_BALANCE);
+  });
+
   it.each(['popup', 'sidepanel'])('preserves critical toast strategy for %s', async (context) => {
     const [composable] = withSetup(() => useTranslationError(context));
     const testError = Object.assign(new Error('raw API key detail'), {

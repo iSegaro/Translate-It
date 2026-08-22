@@ -23,6 +23,7 @@ vi.mock('@/shared/error-management/ValidationPolicy.js', () => ({
 import { RateLimitManager, TranslationPriority } from './RateLimitManager.js';
 import { isFatalError } from '@/shared/error-management/ErrorMatcher.js';
 import { isLocalDeterministicValidationError } from '@/shared/error-management/ValidationPolicy.js';
+import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
 
 // Mock dependencies
 vi.mock('@/shared/config/config.js', () => ({
@@ -140,6 +141,22 @@ describe('RateLimitManager', () => {
   });
 
   describe('Circuit Breaker', () => {
+    it('preserves HTTP 402 semantic type when opening circuit', async () => {
+      const error = Object.assign(new Error('HTTP 402'), {
+        type: ErrorTypes.INSUFFICIENT_BALANCE,
+        statusCode: 402,
+      });
+      isFatalError.mockReturnValue(true);
+
+      await expect(manager.executeWithRateLimit(
+        'TestProvider',
+        () => Promise.reject(error)
+      )).rejects.toBe(error);
+
+      expect(manager.providerStates.get('TestProvider').lastCircuitError).toBe(error);
+      expect(error.type).toBe(ErrorTypes.INSUFFICIENT_BALANCE);
+    });
+
     it('should open the circuit after 5 consecutive failures', async () => {
       const failingTask = () => Promise.reject(new Error('API Error'));
       

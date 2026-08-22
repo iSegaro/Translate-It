@@ -142,6 +142,18 @@ describe('QueueManager', () => {
       await expect(promise).rejects.toThrow('Network');
       expect(mockRequest).toHaveBeenCalledTimes(4);
     });
+
+    it('preserves HTTP 402 semantic type on permanent failure', async () => {
+      const paymentError = Object.assign(new Error('HTTP 402'), {
+        type: ErrorTypes.INSUFFICIENT_BALANCE,
+        statusCode: 402,
+      });
+      const request = vi.fn().mockRejectedValue(paymentError);
+      const promise = queueManager.enqueue('payment-provider', request);
+
+      await expect(promise).rejects.toBe(paymentError);
+      expect(request).toHaveBeenCalledTimes(1);
+    });
   });
 
   describe('Cancellation', () => {

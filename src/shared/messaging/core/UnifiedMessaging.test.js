@@ -218,6 +218,24 @@ describe('UnifiedMessaging', () => {
       });
     });
 
+    it('reconstructs HTTP 402 as insufficient balance', async () => {
+      browser.runtime.sendMessage.mockResolvedValue({
+        success: false,
+        error: 'HTTP 402',
+        errorDetails: {
+          message: 'HTTP 402',
+          type: ErrorTypes.INSUFFICIENT_BALANCE,
+          statusCode: 402,
+        },
+      });
+
+      const rejection = sendRegularMessage({ action: 'TRANSLATE' });
+      await expect(rejection).rejects.toMatchObject({
+        type: ErrorTypes.INSUFFICIENT_BALANCE,
+        statusCode: 402,
+      });
+    });
+
     it('reconstructs string response errors', async () => {
       browser.runtime.sendMessage.mockResolvedValue({ success: false, error: 'String failure' });
 

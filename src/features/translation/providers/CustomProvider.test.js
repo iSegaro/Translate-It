@@ -133,6 +133,16 @@ describe('CustomProvider Error Handling', () => {
     expect(error).toMatchObject({
       type: ErrorTypes.MODEL_MISSING,
       statusCode: 404,
+      });
+  });
+
+  it('preserves insufficient-balance identity for HTTP 402', async () => {
+    const error = await runHttpError({ error: { code: 'billing_required' } }, 402);
+
+    expect(error).toMatchObject({
+      type: ErrorTypes.INSUFFICIENT_BALANCE,
+      statusCode: 402,
+      providerName: 'Custom',
     });
   });
 

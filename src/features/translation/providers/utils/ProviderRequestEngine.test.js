@@ -215,6 +215,29 @@ describe('ProviderRequestEngine', () => {
         providerName: 'TestProvider',
       });
     });
+
+    it('classifies a real HTTP 402 response as insufficient balance', async () => {
+      proxyManager.fetch.mockResolvedValue(httpErrorResponse(
+        { error: { code: 'billing_required', privateDetail: 'must not escape' } },
+        402,
+        'Payment Required'
+      ));
+
+      const error = await ProviderRequestEngine.executeApiCall(mockProvider, {
+        url: 'https://api.test.com',
+        fetchOptions: { headers: {} },
+      }).catch((value) => value);
+
+      expect(error).toMatchObject({
+        message: 'Payment Required',
+        type: ErrorTypes.INSUFFICIENT_BALANCE,
+        statusCode: 402,
+        providerName: 'TestProvider',
+      });
+      expect(error).not.toHaveProperty('privateDetail');
+      expect(error).not.toHaveProperty('providerErrorInfo');
+      expect(error).not.toHaveProperty('errorCode');
+    });
   });
 
   describe('executeRequest - Failover Logic', () => {

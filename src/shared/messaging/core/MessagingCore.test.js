@@ -58,6 +58,25 @@ describe('MessagingCore', () => {
       expect(response.errorDetails).toEqual(response.error);
     });
 
+    it('serializes and reconstructs HTTP 402 without semantic downgrade', () => {
+      const error = Object.assign(new Error('HTTP 402'), {
+        type: 'INSUFFICIENT_BALANCE',
+        statusCode: 402,
+      });
+
+      const response = MessageFormat.createErrorResponse(error, '402-message');
+      const reconstructed = reconstructTranslationError(response.errorDetails);
+
+      expect(response.errorDetails).toMatchObject({
+        type: 'INSUFFICIENT_BALANCE',
+        statusCode: 402,
+      });
+      expect(reconstructed).toMatchObject({
+        type: 'INSUFFICIENT_BALANCE',
+        statusCode: 402,
+      });
+    });
+
     it('should format string errors correctly', () => {
       const response = MessageFormat.createErrorResponse('Simple error string');
       expect(response.error.message).toBe('Simple error string');
