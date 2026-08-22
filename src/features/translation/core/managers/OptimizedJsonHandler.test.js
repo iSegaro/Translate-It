@@ -123,7 +123,10 @@ describe('OptimizedJsonHandler', () => {
         addEventListener: vi.fn(),
         removeEventListener: vi.fn()
       },
-      abort: vi.fn(function() { this.signal.aborted = true; })
+       abort: vi.fn(function(reason) {
+         this.signal.aborted = true;
+         this.signal.reason = reason;
+       })
     };
 
     mockEngine = {
@@ -2173,7 +2176,7 @@ describe('OptimizedJsonHandler', () => {
       await vi.waitFor(() => expect(mockProvider.translate).toHaveBeenCalledTimes(2));
 
       firstBatch.resolve({ translatedText: ['t1'] });
-      mockAbortController.signal.aborted = true;
+       mockAbortController.abort('user-cancelled');
       secondBatch.resolve({ translatedText: ['t2'] });
 
       const result = await execution;
@@ -2242,7 +2245,7 @@ describe('OptimizedJsonHandler', () => {
       await Promise.resolve();
 
       // User cancels after error
-      mockAbortController.signal.aborted = true;
+      mockAbortController.abort('user-cancelled');
       secondBatch.resolve({ translatedText: ['t2'] });
 
       const result = await execution;
@@ -2272,13 +2275,117 @@ describe('OptimizedJsonHandler', () => {
       firstBatch.resolve({ translatedText: ['t1'] });
 
       // User cancels before second batch settles
-      mockAbortController.signal.aborted = true;
+      mockAbortController.abort('user-cancelled');
       secondBatch.resolve({ translatedText: ['t2'] });
 
       const result = await execution;
 
       expect(result.success).toBe(false);
       expect(result.error.type).toBe(ErrorTypes.USER_CANCELLED);
+    });
+
+    it('treats lifecycle tombstone without signal reason as operation abort', async () => {
+      mockEngine.isCancelled.mockReturnValue(true);
+
+      const result = await handler.execute(
+        mockEngine,
+        { ...mockData, sourceLanguage: 'en' },
+        mockProvider,
+        'en',
+        'fa',
+        'msg-tombstone-stop',
+        mockSender,
+      );
+
+      expect(result.success).toBe(false);
+      expect(result.error).toMatchObject({
+        operationAborted: true,
+        cancellationReason: 'operation-abort',
+      });
+      expect(result.error.type).not.toBe(ErrorTypes.USER_CANCELLED);
+      expect(result.error.isCancelled).not.toBe(true);
+      expect(mockProvider.translate).not.toHaveBeenCalled();
+    });
+
+    it('keeps parent recovery tombstone as operation abort', async () => {
+      const marker = '@@TI_SEG_e_s_n1@@';
+      const source = `A${marker}B ${marker}C`;
+      const fragment0 = { t: `A${marker}B`, i: 'n1', blockId: 'g1', isV3Fragment: true, parentId: 'g1', fragmentIndex: 0, fragmentCount: 2, fragmentJoinerBefore: '' };
+      const fragment1 = { t: `${marker}C`, i: 'n1', blockId: 'g1', isV3Fragment: true, parentId: 'g1', fragmentIndex: 1, fragmentCount: 2, fragmentJoinerBefore: ' ' };
+      mockEngine.createIntelligentBatches = vi.fn(() => [[fragment0, fragment1]]);
+      mockEngine.isCancelled
+        .mockReturnValueOnce(false)
+        .mockReturnValueOnce(false)
+        .mockReturnValue(true);
+      mockProvider.translate.mockResolvedValueOnce({ translatedText: [`A${marker}B`, `${marker}${marker}C`] });
+
+      const result = await handler.execute(
+        mockEngine,
+        { ...mockData, sourceLanguage: 'en', text: JSON.stringify([{ t: source, blockId: 'g1', i: 'n1' }]) },
+        mockProvider,
+        'en',
+        'fa',
+        'msg-parent-tombstone',
+        mockSender,
+      );
+
+      expect(result.success).toBe(false);
+      expect(result.error).toMatchObject({
+        operationAborted: true,
+        cancellationReason: 'operation-abort',
+      });
+      expect(result.error.type).not.toBe(ErrorTypes.USER_CANCELLED);
+      expect(result.error.isCancelled).not.toBe(true);
+    });
+
+    it('preserves canonical type on typed AbortError', async () => {
+      mockEngine.createIntelligentBatches = vi.fn(() => [[{ t: 'timeout me' }]]);
+      matchErrorToType.mockImplementation(() => {
+        throw new Error('typed canonical errors must bypass matcher');
+      });
+      mockProvider.translate.mockRejectedValueOnce(Object.assign(new Error('typed timeout'), {
+        name: 'AbortError',
+        type: ErrorTypes.TRANSLATION_TIMEOUT,
+      }));
+
+      const result = await handler.execute(
+        mockEngine,
+        { ...mockData, sourceLanguage: 'en', text: JSON.stringify([{ t: 'timeout me' }]) },
+        mockProvider,
+        'en',
+        'fa',
+        'msg-typed-abort-timeout',
+        mockSender,
+      );
+
+      expect(result.success).toBe(false);
+      expect(result.error.type).toBe(ErrorTypes.TRANSLATION_TIMEOUT);
+      expect(result.error.operationAborted).not.toBe(true);
+      expect(result.error.type).not.toBe(ErrorTypes.USER_CANCELLED);
+    });
+
+    it('keeps diagnostic classification for untyped non-abort failures', async () => {
+      matchErrorToType.mockImplementation((error) => (
+        error?.message === 'ordinary failure' ? ErrorTypes.NETWORK_ERROR : error?.type || 'UNKNOWN_ERROR'
+      ));
+      mockEngine.createIntelligentBatches = vi.fn(() => [[{ t: 'ordinary failure' }]]);
+      mockProvider.translate.mockRejectedValueOnce(new Error('ordinary failure'));
+
+      const result = await handler.execute(
+        mockEngine,
+        { ...mockData, sourceLanguage: 'en', text: JSON.stringify([{ t: 'ordinary failure' }]) },
+        mockProvider,
+        'en',
+        'fa',
+        'msg-diagnostic-classification',
+        mockSender,
+      );
+
+      expect(result.success).toBe(false);
+      expect(appendTranslationDiagnostic).toHaveBeenCalledWith(null, expect.objectContaining({
+        type: 'STRUCTURED_BATCH_FAILURE',
+        code: ErrorTypes.NETWORK_ERROR,
+      }));
     });
 
     it('fatal validation error preserves original error type through abort', async () => {
@@ -2757,10 +2864,15 @@ describe('OptimizedJsonHandler', () => {
       const execution = handler.execute(mockEngine, mockData, mockProvider, 'en', 'fa', 'msg-abort-registration', mockSender);
       const result = await execution;
 
-      expect(result).toMatchObject({
-        success: false,
-        error: { type: ErrorTypes.USER_CANCELLED }
-      });
+       expect(result).toMatchObject({
+         success: false,
+         error: {
+           operationAborted: true,
+           cancellationReason: 'operation-abort',
+         }
+       });
+       expect(result.error.type).not.toBe(ErrorTypes.USER_CANCELLED);
+       expect(result.error.isCancelled).not.toBe(true);
       expect(mockProvider.translate).not.toHaveBeenCalled();
       expect(mockEngine.lifecycleRegistry.unregisterRequest).toHaveBeenCalledWith('msg-abort-registration');
       expect(browser.tabs.sendMessage).not.toHaveBeenCalled();
@@ -3137,7 +3249,7 @@ describe('OptimizedJsonHandler', () => {
       );
       await vi.waitFor(() => expect(mockProvider.translate).toHaveBeenCalledTimes(2));
 
-      mockAbortController.abort();
+       mockAbortController.abort('user-cancelled');
       pending.resolve({ translatedText: ['Translated two.'] });
 
       await expect(execution).resolves.toMatchObject({ success: false, error: { type: 'USER_CANCELLED' } });
@@ -4448,7 +4560,7 @@ describe('OptimizedJsonHandler', () => {
 
         await vi.waitFor(() => expect(mockProvider.translate).toHaveBeenCalledTimes(1));
 
-        mockAbortController.signal.aborted = true;
+         mockAbortController.abort('user-cancelled');
         firstBatch.resolve({ translatedText: ['Hello.'] });
 
         const result = await execution;
@@ -4526,7 +4638,7 @@ describe('OptimizedJsonHandler', () => {
         );
 
         await vi.waitFor(() => expect(mockProvider.translate).toHaveBeenCalledTimes(1));
-        mockAbortController.signal.aborted = true;
+         mockAbortController.abort('user-cancelled');
         firstBatch.resolve({ translatedText: ['Hello.'] });
 
         const result = await execution;
