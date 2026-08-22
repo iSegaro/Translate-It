@@ -550,6 +550,26 @@ describe('UnifiedMessaging', () => {
       );
     });
 
+    it('does not fallback after terminal rate limit for an explicit provider', async () => {
+      const { unifiedTranslationCoordinator } = await import('./UnifiedTranslationCoordinator.js');
+      const terminalError = Object.assign(new Error('Rate limit exhausted'), {
+        type: ErrorTypes.RATE_LIMIT_REACHED,
+        statusCode: 429,
+        providerName: 'OpenAI',
+        errorDetails: { retryable: false },
+      });
+      unifiedTranslationCoordinator.coordinateTranslation.mockRejectedValueOnce(terminalError);
+
+      const message = {
+        action: 'TRANSLATE',
+        messageId: 'openai-rate-limit',
+        data: { provider: 'openai', text: 'Test' },
+      };
+
+      await expect(sendMessage(message)).rejects.toBe(terminalError);
+      expect(browser.runtime.sendMessage).not.toHaveBeenCalled();
+    });
+
     it('does not start fallback operation for terminal SERVER_ERROR', async () => {
       const { unifiedTranslationCoordinator } = await import('./UnifiedTranslationCoordinator.js');
       const serverError = Object.assign(new Error('HTTP 500'), {
