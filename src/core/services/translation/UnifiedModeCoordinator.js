@@ -102,6 +102,10 @@ export class UnifiedModeCoordinator {
       }),
       handleError: async (error, items) => {
         const { isFatalError, matchErrorToType } = await import('@/shared/error-management/ErrorMatcher.js');
+        const errorType = error?.type || matchErrorToType(error);
+        const classificationError = error && typeof error === 'object'
+          ? { type: errorType, statusCode: error.statusCode }
+          : errorType;
         const fallbackResults = items.map(item => ({ text: item.text || item }));
         return {
           success: false,
@@ -110,9 +114,9 @@ export class UnifiedModeCoordinator {
           originalCharCount: items.reduce((sum, i) => sum + (i.text?.length || i.length || 0), 0),
           hasError: true,
           error: error.message,
-          errorDetails: MessageFormat.serializeTranslationError(error),
-          errorType: matchErrorToType(error),
-          isFatal: isFatalError(error)
+          errorDetails: MessageFormat.serializeTranslationError(error, { type: errorType }),
+          errorType,
+          isFatal: isFatalError(classificationError)
         };
       }
     });
@@ -523,6 +527,14 @@ export class UnifiedModeCoordinator {
       // session slot so a later batch may establish a fresh resolver.
       if (sourceResolution?.isOwner) {
         this._failPageSourceResolution(sessionId, sourceResolution, error);
+      }
+      if (error?.operationAborted === true) {
+        logger.debug(`[UnifiedCoordinator] ${mode} batch stopped: operation abort`);
+        return {
+          success: false,
+          suppressed: true,
+          messageId
+        };
       }
       if (handleError) {
         return await handleError(error, items);

@@ -4,6 +4,7 @@ import { TranslationMode } from '@/shared/config/config.js';
 import { RequestStatus } from './TranslationRequestTracker.js';
 import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
 import { TRANSLATION_BATCH_EXECUTION_TIMEOUT_MS } from '@/shared/constants/translation.js';
+import { isFatalError, matchErrorToType } from '@/shared/error-management/ErrorMatcher.js';
 
 // Mock RateLimitManager
 vi.mock('@/features/translation/core/RateLimitManager.js', () => ({
@@ -959,6 +960,98 @@ describe('UnifiedModeCoordinator', () => {
       result.forEach(item => expect(item.isSkipped).toBeUndefined());
       expect(result[0].text).toBe('ترجمهٔ A');
       expect(result[1].text).toBe('ترجمهٔ B');
+    });
+  });
+
+  describe('generic batch abort ownership', () => {
+    const operationAbort = () => Object.assign(new Error('operation stopped'), {
+      name: 'AbortError',
+      operationAborted: true,
+      cancellationReason: 'operation-abort',
+    });
+
+    it.each([TranslationMode.Page, TranslationMode.Subtitle])(
+      'suppresses operation abort for %s without public cancellation error',
+      async (mode) => {
+        const provider = { translate: vi.fn().mockRejectedValue(operationAbort()) };
+        mockEngine.getProvider.mockResolvedValue(provider);
+        matchErrorToType.mockClear();
+        isFatalError.mockClear();
+
+        const request = mode === TranslationMode.Page
+          ? {
+            mode,
+            messageId: `abort-${mode}`,
+            data: { text: JSON.stringify([{ text: 'source' }]), provider: 'google', sourceLanguage: 'en', targetLanguage: 'fa' },
+          }
+          : {
+            mode,
+            messageId: `abort-${mode}`,
+            data: { items: [{ id: 'cue-1', text: 'source' }], provider: 'google', sourceLanguage: 'en', targetLanguage: 'fa' },
+          };
+
+        const result = await coordinator.processRequest(request, { translationEngine: mockEngine });
+
+        expect(result).toMatchObject({ success: false, suppressed: true });
+        expect(result).not.toHaveProperty('error');
+        expect(result).not.toHaveProperty('errorDetails');
+        expect(result).not.toHaveProperty('cancelled');
+        expect(result).not.toHaveProperty('status');
+        expect(result).not.toHaveProperty('operationAborted');
+        expect(result).not.toHaveProperty('cancellationReason');
+        expect(matchErrorToType).not.toHaveBeenCalled();
+        expect(isFatalError).not.toHaveBeenCalled();
+      },
+    );
+
+    it('preserves typed timeout AbortError in Page error details', async () => {
+      const timeoutError = Object.assign(new Error('timed out'), {
+        name: 'AbortError',
+        type: ErrorTypes.TRANSLATION_TIMEOUT,
+      });
+      mockEngine.getProvider.mockResolvedValue({ translate: vi.fn().mockRejectedValue(timeoutError) });
+      matchErrorToType.mockClear();
+
+      const result = await coordinator.processPageTranslation({
+        mode: TranslationMode.Page,
+        messageId: 'typed-timeout-page',
+        data: { text: JSON.stringify([{ text: 'source' }]), provider: 'google', sourceLanguage: 'en', targetLanguage: 'fa' },
+      }, { translationEngine: mockEngine });
+
+      expect(result.errorDetails.type).toBe(ErrorTypes.TRANSLATION_TIMEOUT);
+      expect(result.errorDetails.type).not.toBe(ErrorTypes.USER_CANCELLED);
+      expect(matchErrorToType).not.toHaveBeenCalled();
+    });
+
+    it('preserves explicit USER_CANCELLED in Page error details', async () => {
+      const userError = Object.assign(new Error('cancelled'), { type: ErrorTypes.USER_CANCELLED });
+      mockEngine.getProvider.mockResolvedValue({ translate: vi.fn().mockRejectedValue(userError) });
+      matchErrorToType.mockClear();
+
+      const result = await coordinator.processPageTranslation({
+        mode: TranslationMode.Page,
+        messageId: 'user-cancel-page',
+        data: { text: JSON.stringify([{ text: 'source' }]), provider: 'google', sourceLanguage: 'en', targetLanguage: 'fa' },
+      }, { translationEngine: mockEngine });
+
+      expect(result.errorDetails.type).toBe(ErrorTypes.USER_CANCELLED);
+      expect(matchErrorToType).not.toHaveBeenCalled();
+    });
+
+    it('keeps matcher classification for ordinary untyped Page failures', async () => {
+      const ordinaryError = new Error('ordinary failure');
+      mockEngine.getProvider.mockResolvedValue({ translate: vi.fn().mockRejectedValue(ordinaryError) });
+      matchErrorToType.mockReturnValue(ErrorTypes.NETWORK_ERROR);
+      matchErrorToType.mockClear();
+
+      const result = await coordinator.processPageTranslation({
+        mode: TranslationMode.Page,
+        messageId: 'ordinary-page-failure',
+        data: { text: JSON.stringify([{ text: 'source' }]), provider: 'google', sourceLanguage: 'en', targetLanguage: 'fa' },
+      }, { translationEngine: mockEngine });
+
+      expect(result.errorDetails.type).toBe(ErrorTypes.NETWORK_ERROR);
+      expect(matchErrorToType).toHaveBeenCalledWith(ordinaryError);
     });
   });
 
