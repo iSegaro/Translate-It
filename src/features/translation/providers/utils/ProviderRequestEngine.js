@@ -344,11 +344,10 @@ export const ProviderRequestEngine = {
           ...extractProviderHttpErrorInfo(body),
         });
         const providerErrorType = classifyProviderHttpError(provider, providerErrorInfo);
-        const errorType = providerErrorType || matchErrorToType({ 
-          statusCode: response.status, 
-          message: msg, 
+        const errorType = providerErrorType || matchErrorToType({
+          statusCode: response.status,
+          message: msg,
           providerType: provider.constructor.type,
-          ...body 
         });
 
         const err = new Error(msg);

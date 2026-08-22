@@ -216,12 +216,11 @@ describe('ProviderRequestEngine', () => {
       });
     });
 
-    it('classifies a real HTTP 402 response as insufficient balance', async () => {
-      proxyManager.fetch.mockResolvedValue(httpErrorResponse(
-        { error: { code: 'billing_required', privateDetail: 'must not escape' } },
-        402,
-        'Payment Required'
-      ));
+    it.each([
+      ['top-level provider type', { type: 'payment_required_error' }],
+      ['nested provider type', { error: { type: 'payment_required_error' } }],
+    ])('classifies HTTP 402 as insufficient balance despite %s', async (_label, body) => {
+      proxyManager.fetch.mockResolvedValue(httpErrorResponse(body, 402, 'Payment Required'));
 
       const error = await ProviderRequestEngine.executeApiCall(mockProvider, {
         url: 'https://api.test.com',
@@ -234,9 +233,28 @@ describe('ProviderRequestEngine', () => {
         statusCode: 402,
         providerName: 'TestProvider',
       });
-      expect(error).not.toHaveProperty('privateDetail');
+      expect(error.type).not.toBe('payment_required_error');
       expect(error).not.toHaveProperty('providerErrorInfo');
       expect(error).not.toHaveProperty('errorCode');
+    });
+
+    it.each([
+      [401, ErrorTypes.API_KEY_INVALID],
+      [403, ErrorTypes.FORBIDDEN_ERROR],
+      [429, ErrorTypes.RATE_LIMIT_REACHED],
+      [500, ErrorTypes.SERVER_ERROR],
+      [503, ErrorTypes.SERVER_ERROR],
+    ])('keeps HTTP %s canonical when provider type is arbitrary', async (status, expectedType) => {
+      proxyManager.fetch.mockResolvedValue(httpErrorResponse(
+        { type: 'payment_required_error' },
+        status,
+        `HTTP ${status}`
+      ));
+
+      await expect(ProviderRequestEngine.executeApiCall(mockProvider, {
+        url: 'https://api.test.com',
+        fetchOptions: { headers: {} },
+      })).rejects.toMatchObject({ type: expectedType, statusCode: status });
     });
   });
 
