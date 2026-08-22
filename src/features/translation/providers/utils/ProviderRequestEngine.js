@@ -154,14 +154,14 @@ export const ProviderRequestEngine = {
       } catch (error) {
         lastError = error;
 
-        const errorType = error.type || matchErrorToType(error);
-        if (errorType === ErrorTypes.USER_CANCELLED || errorType === ErrorTypes.TRANSLATION_CANCELLED) {
+        const errorType = error.type || (error.operationAborted ? null : matchErrorToType(error));
+        if (error.operationAborted || errorType === ErrorTypes.USER_CANCELLED || errorType === ErrorTypes.TRANSLATION_CANCELLED) {
           appendTranslationDiagnostic(executionContext, {
             type: 'PROVIDER_CANCELLED',
             stage: 'provider-request',
             provider: provider.providerName,
             reason: error.message,
-            code: errorType,
+            code: errorType || error.cancellationReason,
             cancelled: true,
           });
           throw error;
@@ -412,9 +412,9 @@ export const ProviderRequestEngine = {
       }
 
       if (err.name === 'AbortError') {
-        const isUserAbort = !abortController?.signal
-          || abortController.signal.reason === 'user-cancelled'
-          || abortController?.signal?.reason === 'user_cancelled';
+        const signal = abortController?.signal;
+        const isUserAbort = signal?.aborted
+          && (signal.reason === 'user-cancelled' || signal.reason === 'user_cancelled');
         const abortErr = new Error(isUserAbort ? 'Translation cancelled by user' : 'Translation operation aborted');
         if (isUserAbort) {
           abortErr.type = ErrorTypes.USER_CANCELLED;

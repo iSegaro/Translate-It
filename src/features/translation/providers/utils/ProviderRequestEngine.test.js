@@ -384,6 +384,25 @@ describe('ProviderRequestEngine', () => {
       expect(apiCallSpy.mock.calls.every(([, params]) => params.callPurpose === TranslationCallPurpose.STRUCTURED_RECOVERY)).toBe(true);
       apiCallSpy.mockRestore();
     });
+
+    it.each([
+      ['user cancellation', Object.assign(new Error('cancelled'), { type: ErrorTypes.USER_CANCELLED })],
+      ['operation abort', Object.assign(new Error('aborted'), { name: 'AbortError', operationAborted: true, cancellationReason: 'operation-abort' })],
+    ])('does not fail over after %s', async (_label, error) => {
+      ApiKeyManager.getKeys.mockResolvedValue(['key1', 'key2']);
+      ApiKeyManager.shouldFailover.mockReturnValue(true);
+      const apiCallSpy = vi.spyOn(ProviderRequestEngine, 'executeApiCall').mockRejectedValue(error);
+
+      await expect(ProviderRequestEngine.executeRequest(mockProvider, {
+        url: 'https://api.test.com',
+        fetchOptions: { headers: {} },
+        extractResponse: mockExtractResponse,
+        updateApiKey: vi.fn(),
+      })).rejects.toBe(error);
+
+      expect(apiCallSpy).toHaveBeenCalledTimes(1);
+      apiCallSpy.mockRestore();
+    });
   });
 
   describe('prepareHeaders', () => {
@@ -458,15 +477,50 @@ describe('ProviderRequestEngine', () => {
       expect(statsManager.recordError).toHaveBeenCalledWith('TestProvider', 's1', TranslationCallPurpose.PRIMARY_TRANSLATION);
     });
 
-    it('should not record an error for an aborted transport call', async () => {
+    it('preserves explicit user cancellation for an aborted transport call', async () => {
+      const controller = new AbortController();
+      controller.abort('user-cancelled');
       proxyManager.fetch.mockRejectedValue(new DOMException('Aborted', 'AbortError'));
       const { statsManager } = await import('../../core/TranslationStatsManager.js');
 
-      await expect(ProviderRequestEngine.executeApiCall(mockProvider, baseParams()))
-        .rejects.toThrow('Translation cancelled by user');
+      await expect(ProviderRequestEngine.executeApiCall(mockProvider, { ...baseParams(), abortController: controller }))
+        .rejects.toMatchObject({ type: ErrorTypes.USER_CANCELLED });
 
       expect(statsManager.recordRequest).toHaveBeenCalledTimes(1);
       expect(statsManager.recordError).not.toHaveBeenCalled();
+    });
+
+    it('classifies a bare aborted signal as an internal operation abort', async () => {
+      const controller = new AbortController();
+      controller.abort();
+      proxyManager.fetch.mockRejectedValue(new DOMException('Aborted', 'AbortError'));
+
+      await expect(ProviderRequestEngine.executeApiCall(mockProvider, { ...baseParams(), abortController: controller }))
+        .rejects.toMatchObject({
+          operationAborted: true,
+          cancellationReason: 'operation-abort',
+        });
+    });
+
+    it('classifies AbortError with a non-aborted signal as an internal operation abort', async () => {
+      const controller = new AbortController();
+      proxyManager.fetch.mockRejectedValue(new DOMException('Aborted', 'AbortError'));
+
+      await expect(ProviderRequestEngine.executeApiCall(mockProvider, { ...baseParams(), abortController: controller }))
+        .rejects.toMatchObject({
+          operationAborted: true,
+          cancellationReason: 'operation-abort',
+        });
+    });
+
+    it('classifies controller-less AbortError as an internal operation abort', async () => {
+      proxyManager.fetch.mockRejectedValue(new DOMException('Aborted', 'AbortError'));
+
+      await expect(ProviderRequestEngine.executeApiCall(mockProvider, baseParams()))
+        .rejects.toMatchObject({
+          operationAborted: true,
+          cancellationReason: 'operation-abort',
+        });
     });
 
     it('attributes a recovery transport failure to recovery exactly once', async () => {
@@ -494,7 +548,10 @@ describe('ProviderRequestEngine', () => {
       const { statsManager } = await import('../../core/TranslationStatsManager.js');
       await expect(ProviderRequestEngine.executeApiCall(mockProvider, {
         ...baseParams(), callPurpose: TranslationCallPurpose.STRUCTURED_RECOVERY
-      })).rejects.toThrow('Translation cancelled by user');
+      })).rejects.toMatchObject({
+        operationAborted: true,
+        cancellationReason: 'operation-abort',
+      });
       expect(statsManager.recordRequest).toHaveBeenCalledWith('TestProvider', 's1', 10, 5, TranslationCallPurpose.STRUCTURED_RECOVERY);
       expect(statsManager.recordError).not.toHaveBeenCalled();
     });
