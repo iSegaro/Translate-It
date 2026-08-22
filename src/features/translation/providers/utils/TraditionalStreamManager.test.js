@@ -60,6 +60,19 @@ describe('TraditionalStreamManager', () => {
   });
 
   describe('streamChunkError', () => {
+    it('suppresses operation-abort chunk errors', async () => {
+      const { streamingManager } = await import("@/features/translation/core/StreamingManager.js");
+      const error = Object.assign(new Error('operation stopped'), {
+        name: 'AbortError',
+        operationAborted: true,
+        cancellationReason: 'operation-abort',
+      });
+
+      await TraditionalStreamManager.streamChunkError(provider, error, 1, messageId);
+
+      expect(streamingManager.streamBatchError).not.toHaveBeenCalled();
+    });
+
     it('should delegate error streaming to streamingManager', async () => {
       const { streamingManager } = await import("@/features/translation/core/StreamingManager.js");
       const error = new Error('Chunk failed');
@@ -75,6 +88,19 @@ describe('TraditionalStreamManager', () => {
   });
 
   describe('sendStreamEnd', () => {
+    it('suppresses terminal publication for operation-abort error', async () => {
+      const { streamingManager } = await import("@/features/translation/core/StreamingManager.js");
+      const error = Object.assign(new Error('operation stopped'), {
+        name: 'AbortError',
+        operationAborted: true,
+        cancellationReason: 'operation-abort',
+      });
+
+      await TraditionalStreamManager.sendStreamEnd(provider, messageId, { error });
+
+      expect(streamingManager.completeStream).not.toHaveBeenCalled();
+    });
+
     it('should delegate stream completion to streamingManager', async () => {
       const { streamingManager } = await import("@/features/translation/core/StreamingManager.js");
       const options = { targetLanguage: 'fa' };

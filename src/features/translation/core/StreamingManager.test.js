@@ -1,5 +1,17 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
+const matchErrorToTypeMock = vi.hoisted(() => vi.fn(() => 'TRANSLATION_ERROR'));
+
+vi.mock('@/shared/error-management/ErrorMatcher.js', () => {
+  class ErrorMatcher {
+    static matchErrorToType(error) {
+      return matchErrorToTypeMock(error);
+    }
+  }
+
+  return { ErrorMatcher, matchErrorToType: matchErrorToTypeMock };
+});
+
 // Mock dependencies
 vi.mock('webextension-polyfill', () => ({
   default: {
@@ -51,7 +63,8 @@ describe('StreamingManager', () => {
 
   beforeEach(async () => {
     vi.useFakeTimers();
-    vi.clearAllMocks();
+      vi.clearAllMocks();
+      matchErrorToTypeMock.mockClear();
     vi.resetModules();
     
     // Import modules dynamically to ensure mocks are applied
@@ -192,6 +205,41 @@ describe('StreamingManager', () => {
   });
 
   describe('streamBatchError', () => {
+    it('suppresses operation-abort errors before classification and serialization', async () => {
+      const { default: browser } = await import('webextension-polyfill');
+      const { MessageFormat } = await import('@/shared/messaging/core/MessagingCore.js');
+      const serializeSpy = vi.spyOn(MessageFormat, 'serializeTranslationError');
+      const messageId = 'msg-operation-abort';
+      const error = Object.assign(new Error('operation stopped'), {
+        name: 'AbortError',
+        operationAborted: true,
+        cancellationReason: 'operation-abort',
+      });
+
+      streamingManager.initializeStream(messageId, { tab: { id: 123 } }, { providerName: 'P' }, ['s1']);
+      await streamingManager.streamBatchError(messageId, error, 0);
+
+      expect(browser.tabs.sendMessage).not.toHaveBeenCalled();
+      expect(matchErrorToTypeMock).not.toHaveBeenCalled();
+      expect(serializeSpy).not.toHaveBeenCalled();
+    });
+
+    it('publishes typed timeout AbortError without suppressing it', async () => {
+      const { default: browser } = await import('webextension-polyfill');
+      const messageId = 'msg-typed-timeout';
+      const error = Object.assign(new Error('timed out'), {
+        name: 'AbortError',
+        type: 'TRANSLATION_TIMEOUT',
+      });
+
+      streamingManager.initializeStream(messageId, { tab: { id: 123 } }, { providerName: 'P' }, ['s1']);
+      await streamingManager.streamBatchError(messageId, error, 0);
+
+      const message = browser.tabs.sendMessage.mock.calls[0][1];
+      expect(message.data.error).toMatchObject({ type: 'TRANSLATION_TIMEOUT' });
+      expect(matchErrorToTypeMock).not.toHaveBeenCalled();
+    });
+
     it('should send error update message', async () => {
       const { default: browser } = await import('webextension-polyfill');
       const messageId = 'msg-error';

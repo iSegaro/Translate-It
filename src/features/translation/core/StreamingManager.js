@@ -217,6 +217,11 @@ export class StreamingManager extends ResourceTracker {
       return;
     }
 
+    if (error?.operationAborted === true) {
+      logger.debug(`[StreamingManager] Suppressed operation abort for batch ${batchIndex}`);
+      return;
+    }
+
     try {
       // Create stream error message
       const serializedError = MessageFormat.serializeTranslationError(error, {

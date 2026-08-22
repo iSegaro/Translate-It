@@ -35,6 +35,8 @@ export const TraditionalStreamManager = {
    * Stream error for a chunk
    */
   async streamChunkError(providerName, error, chunkIndex, messageId) {
+    if (error?.operationAborted === true) return;
+
     try {
       await streamingManager.streamBatchError(messageId, error, chunkIndex);
       logger.debug(`[${providerName}] Error streamed for chunk ${chunkIndex + 1}`);
@@ -47,6 +49,8 @@ export const TraditionalStreamManager = {
    * Send streaming end notification
    */
   async sendStreamEnd(providerName, messageId, options = {}) {
+    if (options.error?.operationAborted === true) return;
+
     try {
       let streamEndOptions = options;
       if (options.error) {
