@@ -550,6 +550,19 @@ describe('UnifiedMessaging', () => {
       );
     });
 
+    it('does not start fallback operation for terminal SERVER_ERROR', async () => {
+      const { unifiedTranslationCoordinator } = await import('./UnifiedTranslationCoordinator.js');
+      const serverError = Object.assign(new Error('HTTP 500'), {
+        type: ErrorTypes.SERVER_ERROR,
+        statusCode: 500,
+      });
+      unifiedTranslationCoordinator.coordinateTranslation.mockRejectedValueOnce(serverError);
+
+      await expect(sendMessage({ action: 'TRANSLATE', messageId: 'server-error' }))
+        .rejects.toBe(serverError);
+      expect(browser.runtime.sendMessage).not.toHaveBeenCalled();
+    });
+
     it('probes status and falls back for typed TRANSLATION_TIMEOUT', async () => {
       const { unifiedTranslationCoordinator } = await import('./UnifiedTranslationCoordinator.js');
       const timeout = Object.assign(new Error('Translation timed out'), {

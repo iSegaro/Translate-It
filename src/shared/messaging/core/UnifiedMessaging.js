@@ -165,6 +165,9 @@ export async function sendMessage(message, options = {}) {
       const errorType = matchErrorToType(error);
       if (isFatalError(error)) throw error;
       if (isCancellationError(error)) throw error;
+      if ([ErrorTypes.SERVER_ERROR, ErrorTypes.CIRCUIT_BREAKER_OPEN].includes(errorType)) {
+        throw error;
+      }
       
       const isTimeout = errorType === ErrorTypes.TRANSLATION_TIMEOUT
         || errorType === ErrorTypes.OPERATION_TIMEOUT;

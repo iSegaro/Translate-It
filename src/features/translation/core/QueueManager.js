@@ -107,7 +107,6 @@ class QueueItem {
     this.createdAt = Date.now();
     this.attempts = 0;
     this.lastAttemptAt = null;
-    this.firstError = null; // Store the first error that occurred
     this.lastError = null;
     this.result = null;
     this.callbacks = {
@@ -180,6 +179,25 @@ class QueueItem {
     
     return Math.round(delay);
   }
+}
+
+function selectTerminalError(error) {
+  if (error?.type !== ErrorTypes.CIRCUIT_BREAKER_OPEN) return error;
+
+  const originalType = error.originalType;
+  if (
+    typeof originalType !== 'string'
+    || originalType === ErrorTypes.CIRCUIT_BREAKER_OPEN
+    || !Object.values(ErrorTypes).includes(originalType)
+  ) {
+    return error;
+  }
+
+  const terminalError = new Error(error.message);
+  terminalError.type = originalType;
+  if (typeof error.statusCode === 'number') terminalError.statusCode = error.statusCode;
+  if (typeof error.providerName === 'string') terminalError.providerName = error.providerName;
+  return terminalError;
 }
 
 /**
@@ -367,9 +385,6 @@ export class QueueManager {
       }
 
       item.lastError = error;
-      if (!item.firstError) {
-        item.firstError = error;
-      }
       
       if (item.shouldRetry()) {
         // Schedule retry
@@ -407,13 +422,7 @@ export class QueueManager {
         item.status = QueueStatus.FAILED;
         
         if (item.callbacks.reject) {
-          // If we hit a circuit breaker during a retry, prefer showing the original error
-          // that caused the problem in the first place.
-          const errorToReport = (item.attempts > 1 && error.type === ErrorTypes.CIRCUIT_BREAKER_OPEN && item.firstError)
-            ? item.firstError
-            : error;
-          
-          item.callbacks.reject(errorToReport);
+          item.callbacks.reject(selectTerminalError(error));
         }
         
         // FIX: Log cancellations as debug instead of error to prevent log noise

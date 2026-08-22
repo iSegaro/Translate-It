@@ -143,6 +143,60 @@ describe('QueueManager', () => {
       expect(mockRequest).toHaveBeenCalledTimes(4);
     });
 
+    it.each([
+      ['mixed network/server', () => [
+        Object.assign(new Error('Failed to fetch'), { type: ErrorTypes.NETWORK_ERROR }),
+        Object.assign(new Error('HTTP 500'), { type: ErrorTypes.SERVER_ERROR, statusCode: 500 }),
+        Object.assign(new Error('Circuit open'), {
+          type: ErrorTypes.CIRCUIT_BREAKER_OPEN,
+          originalType: ErrorTypes.SERVER_ERROR,
+          statusCode: 500,
+        }),
+      ], ErrorTypes.SERVER_ERROR, 500],
+      ['pure network', () => [
+        Object.assign(new Error('Failed to fetch'), { type: ErrorTypes.NETWORK_ERROR }),
+        Object.assign(new Error('Failed to fetch'), { type: ErrorTypes.NETWORK_ERROR }),
+        Object.assign(new Error('Circuit open'), {
+          type: ErrorTypes.CIRCUIT_BREAKER_OPEN,
+          originalType: ErrorTypes.NETWORK_ERROR,
+        }),
+      ], ErrorTypes.NETWORK_ERROR, undefined],
+      ['pure server', () => [
+        Object.assign(new Error('HTTP 500'), { type: ErrorTypes.SERVER_ERROR, statusCode: 500 }),
+        Object.assign(new Error('HTTP 500'), { type: ErrorTypes.SERVER_ERROR, statusCode: 500 }),
+        Object.assign(new Error('Circuit open'), {
+          type: ErrorTypes.CIRCUIT_BREAKER_OPEN,
+          originalType: ErrorTypes.SERVER_ERROR,
+          statusCode: 500,
+        }),
+      ], ErrorTypes.SERVER_ERROR, 500],
+    ])('selects canonical terminal cause for %s', async (_label, createErrors, expectedType, expectedStatus) => {
+      const errors = createErrors();
+      const request = vi.fn()
+        .mockRejectedValueOnce(errors[0])
+        .mockRejectedValueOnce(errors[1])
+        .mockRejectedValueOnce(errors[2]);
+      const promise = queueManager.enqueue('terminal-cause-provider', request);
+
+      await vi.advanceTimersByTimeAsync(10000);
+      const terminalError = await promise.catch(error => error);
+      expect(terminalError).toMatchObject({ type: expectedType });
+      if (expectedStatus === undefined) {
+        expect(terminalError).not.toHaveProperty('statusCode');
+      } else {
+        expect(terminalError).toMatchObject({ statusCode: expectedStatus });
+      }
+      expect(request).toHaveBeenCalledTimes(3);
+
+      if (_label === 'mixed network/server') {
+        const { mapCanonicalTranslationError } = await import('@/shared/error-management/PublicTranslationErrorPolicy.js');
+        expect(mapCanonicalTranslationError(terminalError)).toMatchObject({
+          type: 'SERVER_ERROR',
+          messageKey: 'ERRORS_SERVER_ERROR',
+        });
+      }
+    });
+
     it('preserves HTTP 402 semantic type on permanent failure', async () => {
       const paymentError = Object.assign(new Error('HTTP 402'), {
         type: ErrorTypes.INSUFFICIENT_BALANCE,
