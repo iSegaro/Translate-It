@@ -50,6 +50,112 @@ describe('SubtitleTranslationCoordinator Stability', () => {
     subtitleTranslationCoordinator.activeJobs.clear();
   });
 
+  const makeCue = (id, text, index) => ({ id, text, index, warnings: [] });
+
+  it('continues to next batch after an exhausted SERVER_ERROR', async () => {
+    const firstCue = makeCue('server-error-cue', 'First source', 1);
+    const secondCue = makeCue('next-cue', 'Second source', 2);
+    SubtitleParserFactory.getAdapter.mockReturnValue({
+      parse: vi.fn(() => ({ cues: [firstCue, secondCue] })),
+      serialize: vi.fn(() => 'serialized')
+    });
+    SubtitleBatchPlanner.plan.mockReturnValue([[firstCue], [secondCue]]);
+    unifiedTranslationService.handleTranslationRequest
+      .mockResolvedValueOnce({
+        success: false,
+        errorDetails: {
+          message: 'HTTP 500',
+          type: ErrorTypes.SERVER_ERROR,
+          statusCode: 500,
+          providerName: 'Lingva'
+        }
+      })
+      .mockResolvedValueOnce({
+        success: true,
+        results: [{ id: secondCue.id, text: 'Second translated' }]
+      });
+
+    await subtitleTranslationCoordinator.startJob({
+      jobId: 'job-server-error-continue',
+      content: 'subtitle',
+      filename: 'sample.srt',
+      sourceLanguage: 'en',
+      targetLanguage: 'fa',
+      providerId: 'google',
+      options: {}
+    });
+
+    expect(unifiedTranslationService.handleTranslationRequest).toHaveBeenCalledTimes(2);
+    expect(firstCue.status).toBe('failed');
+    expect(firstCue.text).toBe('First source');
+    expect(firstCue.translatedText).toBeUndefined();
+    expect(secondCue.status).toBe('translated');
+    expect(secondCue.translatedText).toBe('Second translated');
+
+    const complete = MessagingBus.broadcast.mock.calls
+      .map(([message]) => message)
+      .find(message => message.action === MessageActions.SUBTITLE_TRANSLATE_COMPLETE);
+    expect(complete.payload.stats).toMatchObject({ translated: 1, failed: 1, skipped: 0 });
+    expect(complete.payload.errorDetails).toMatchObject({
+      type: ErrorTypes.SERVER_ERROR,
+      statusCode: 500
+    });
+  });
+
+  it('stops after SERVER_ERROR becomes CIRCUIT_BREAKER_OPEN and rescues prior progress', async () => {
+    const firstCue = makeCue('translated-cue', 'Translated source', 1);
+    const failedCue = makeCue('circuit-cue', 'Circuit source', 2);
+    const untouchedCue = makeCue('untouched-cue', 'Untouched source', 3);
+    SubtitleParserFactory.getAdapter.mockReturnValue({
+      parse: vi.fn(() => ({ cues: [firstCue, failedCue, untouchedCue] })),
+      serialize: vi.fn(() => 'serialized')
+    });
+    SubtitleBatchPlanner.plan.mockReturnValue([[firstCue], [failedCue], [untouchedCue]]);
+    unifiedTranslationService.handleTranslationRequest
+      .mockResolvedValueOnce({
+        success: true,
+        results: [{ id: firstCue.id, text: 'Translated result' }]
+      })
+      .mockResolvedValueOnce({
+        success: false,
+        errorDetails: {
+          message: 'Circuit breaker open',
+          type: ErrorTypes.CIRCUIT_BREAKER_OPEN,
+          originalType: ErrorTypes.SERVER_ERROR,
+          statusCode: 500,
+          providerName: 'Lingva'
+        }
+      });
+
+    await subtitleTranslationCoordinator.startJob({
+      jobId: 'job-server-circuit-stop',
+      content: 'subtitle',
+      filename: 'sample.srt',
+      sourceLanguage: 'en',
+      targetLanguage: 'fa',
+      providerId: 'google',
+      options: {}
+    });
+
+    expect(unifiedTranslationService.handleTranslationRequest).toHaveBeenCalledTimes(2);
+    expect(firstCue.status).toBe('translated');
+    expect(firstCue.translatedText).toBe('Translated result');
+    expect(failedCue.status).toBe('failed');
+    expect(failedCue.text).toBe('Circuit source');
+    expect(untouchedCue.status).toBeUndefined();
+    expect(untouchedCue.translatedText).toBeUndefined();
+
+    const complete = MessagingBus.broadcast.mock.calls
+      .map(([message]) => message)
+      .find(message => message.action === MessageActions.SUBTITLE_TRANSLATE_COMPLETE);
+    expect(complete.payload.stats).toMatchObject({ translated: 1, failed: 1, skipped: 1 });
+    expect(complete.payload.errorDetails).toMatchObject({
+      type: ErrorTypes.CIRCUIT_BREAKER_OPEN,
+      originalType: ErrorTypes.SERVER_ERROR,
+      statusCode: 500
+    });
+  });
+
   it('should check for job cancellation before starting a batch', async () => {
     const jobId = 'test-job-cancel';
     
