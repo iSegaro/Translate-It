@@ -156,11 +156,10 @@ describe('FieldTranslationErrorPresenter', () => {
     expect(result.displayError.message).not.toContain('raw provider string detail');
   });
 
-  it('returns null for cancellation identities', async () => {
+  it('returns null for explicit cancellation identities', async () => {
     const cases = [
       Object.assign(new Error('cancelled'), { type: ErrorTypes.USER_CANCELLED }),
       Object.assign(new Error('cancelled'), { type: ErrorTypes.TRANSLATION_CANCELLED }),
-      Object.assign(new Error('aborted'), { name: 'AbortError' }),
     ];
 
     for (const error of cases) {

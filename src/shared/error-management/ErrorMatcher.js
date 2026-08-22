@@ -159,9 +159,15 @@ export function isConfigError(errorOrType) {
  */
 export function isCancellationError(error) {
   if (!error) return false;
-  if (error.isCancelled) return true;
-  
-  const type = typeof error === 'string' ? error : (error.type || matchErrorToType(error));
+  if (isOperationAborted(error)) return false;
+
+  if (typeof error !== 'string' && error.type) {
+    return error.type === ErrorTypes.USER_CANCELLED || error.type === ErrorTypes.TRANSLATION_CANCELLED;
+  }
+
+  if (typeof error !== 'string' && error.isCancelled) return true;
+
+  const type = typeof error === 'string' ? error : matchErrorToType(error);
   return type === ErrorTypes.USER_CANCELLED || type === ErrorTypes.TRANSLATION_CANCELLED;
 }
 
@@ -170,6 +176,7 @@ export function isCancellationError(error) {
  */
 export function isFatalError(errorOrType) {
   if (!errorOrType) return false;
+  if (isOperationAborted(errorOrType)) return false;
   
   const type = typeof errorOrType === 'string' 
     ? errorOrType 
@@ -187,6 +194,7 @@ export function isFatalError(errorOrType) {
  */
 export function isTransientError(errorOrType) {
   if (!errorOrType) return false;
+  if (isOperationAborted(errorOrType)) return false;
   const type = typeof errorOrType === 'string' ? errorOrType : (errorOrType.type || matchErrorToType(errorOrType));
   
   const isTransientStatusCode = errorOrType && typeof errorOrType === 'object' && 
@@ -199,6 +207,7 @@ export function isTransientError(errorOrType) {
  * Determines if an error should trigger a retry or fallback
  */
 export function isRetryableError(errorOrType) {
+  if (isOperationAborted(errorOrType) || isCancellationError(errorOrType)) return false;
   return isTransientError(errorOrType) || !isFatalError(errorOrType);
 }
 
@@ -237,24 +246,26 @@ export function needsSettings(errorOrType) {
  * @returns {string} One of the keys from ErrorTypes.
  */
 export function matchErrorToType(rawOrError = "") {
-  // Priority 0: Check for AbortError (user cancellation)
-  if (rawOrError && typeof rawOrError === "object" && rawOrError.name === 'AbortError') {
-    return ErrorTypes.USER_CANCELLED;
+  // Internal execution provenance must not become public user cancellation.
+  if (isOperationAborted(rawOrError)) {
+    return ErrorTypes.TRANSLATION_ERROR;
   }
 
-  // اولویت ۱: اگر نوع خطا به صراحت در آبجکت مشخص شده است
+  // Specific canonical types are authoritative; generic placeholders remain refinable.
   if (rawOrError && typeof rawOrError === "object" && rawOrError.type) {
     const type = rawOrError.type;
-    
-    if (type === ErrorTypes.API_RESPONSE_INVALID) return ErrorTypes.API_RESPONSE_INVALID;
-    
-    if (type !== ErrorTypes.TRANSLATION_ERROR && 
-        type !== ErrorTypes.TRANSLATION_FAILED && 
-        type !== ErrorTypes.UNKNOWN &&
-        type !== 'TRANSLATION_ERROR' && 
-        type !== 'TRANSLATION_FAILED') {
-      return type;
-    }
+    const isGenericType = type === ErrorTypes.TRANSLATION_ERROR
+      || type === ErrorTypes.TRANSLATION_FAILED
+      || type === ErrorTypes.UNKNOWN
+      || type === "TRANSLATION_ERROR"
+      || type === "TRANSLATION_FAILED";
+
+    if (!isGenericType) return type;
+  }
+
+  // Keep legacy user-owned cancellation metadata after canonical provenance.
+  if (rawOrError && typeof rawOrError === "object" && rawOrError.isCancelled === true) {
+    return ErrorTypes.USER_CANCELLED;
   }
 
   // اولویت ۲: تشخیص دقیق خطا بر اساس کد وضعیت HTTP
@@ -350,14 +361,9 @@ export function matchErrorToType(rawOrError = "") {
   if (msg.includes("translation failed") || msg.includes("translation_failed") || msg.includes("batch translation failed") || msg === "translation failed") return ErrorTypes.TRANSLATION_FAILED;
   if (msg.includes("translation error") || msg.includes("translation_error")) return ErrorTypes.TRANSLATION_ERROR;
 
-  if (msg.includes("cancelled by user") || 
-      msg.includes("translation cancelled") || 
-      msg.includes("user cancelled") || 
-      msg.includes("user_cancelled") || 
-      msg.includes("operation cancelled") ||
-      msg === "cancelled" ||
-      msg === "handler cancelled" ||
-      msg === "request cancelled") return ErrorTypes.USER_CANCELLED;
+  if (msg.includes("cancelled by user") ||
+      msg.includes("user cancelled") ||
+      msg.includes("user_cancelled")) return ErrorTypes.USER_CANCELLED;
 
   if (msg.includes("html response") || msg.includes("returned html") || msg.includes("html instead of json")) return ErrorTypes.HTML_RESPONSE_ERROR;
   if (msg.includes("json parsing") || msg.includes("json parse") || msg.includes("unexpected end of json input")) return ErrorTypes.JSON_PARSING_ERROR;
@@ -404,6 +410,11 @@ export function matchErrorToType(rawOrError = "") {
   
   if (msg.includes("no sw") || msg.includes("no service worker") || (msg.includes("service worker") && msg.includes("not available"))) return ErrorTypes.CONTEXT;
 
+  // AbortError name alone carries no user-intent provenance.
+  if (rawOrError && typeof rawOrError === "object" && rawOrError.name === "AbortError") {
+    return ErrorTypes.TRANSLATION_ERROR;
+  }
+
   // Final fallback: If we still don't have a match but the error object HAD an explicit type, use it.
   if (rawOrError && typeof rawOrError === "object" && rawOrError.type) {
     return rawOrError.type;
@@ -418,3 +429,7 @@ export function matchErrorToType(rawOrError = "") {
 }
 
 export default ErrorMatcher;
+
+function isOperationAborted(error) {
+  return Boolean(error && typeof error === "object" && error.operationAborted === true);
+}

@@ -57,7 +57,6 @@ describe('Field translation request error ownership', () => {
   it.each([
     Object.assign(new Error('cancelled'), { type: ErrorTypes.USER_CANCELLED }),
     Object.assign(new Error('cancelled'), { type: ErrorTypes.TRANSLATION_CANCELLED }),
-    Object.assign(new Error('aborted'), { name: 'AbortError' }),
   ])('does not mark cancellation: %s', (error) => {
     const result = markFieldTranslationRequestError(error);
 

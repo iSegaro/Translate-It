@@ -388,7 +388,7 @@ describe('HoverTranslationManager', () => {
       emitSpy.mockRestore();
     });
 
-    it('suppresses plain AbortError through the existing public adapter path', async () => {
+    it('reports plain AbortError as a generic translation failure', async () => {
       const emitSpy = vi.spyOn(pageEventBus, 'emit');
       HoverTextDetector.detect.mockReturnValue({
         text: 'Hello world',
@@ -399,7 +399,7 @@ describe('HoverTranslationManager', () => {
 
       await manager._processHover({ clientX: 15, clientY: 15 });
 
-      expect(emitSpy).not.toHaveBeenCalledWith('MOUSE_HOVER_TRANSLATION_ERROR', expect.anything());
+      expect(emitSpy).toHaveBeenCalledWith('MOUSE_HOVER_TRANSLATION_ERROR', expect.anything());
       emitSpy.mockRestore();
     });
 

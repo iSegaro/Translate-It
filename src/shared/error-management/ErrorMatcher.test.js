@@ -28,9 +28,80 @@ describe('ErrorMatcher', () => {
   });
 
   describe('matchErrorToType', () => {
-    it('should match AbortError to USER_CANCELLED', () => {
+    it('should classify bare AbortError as a generic translation error', () => {
       const error = { name: 'AbortError' };
-      expect(matchErrorToType(error)).toBe(ErrorTypes.USER_CANCELLED);
+      expect(matchErrorToType(error)).toBe(ErrorTypes.TRANSLATION_ERROR);
+      expect(matchErrorToType(error)).not.toBe(ErrorTypes.USER_CANCELLED);
+    });
+
+    it('should preserve canonical type over AbortError name', () => {
+      expect(matchErrorToType({
+        name: 'AbortError',
+        type: ErrorTypes.API_ERROR,
+      })).toBe(ErrorTypes.API_ERROR);
+
+      expect(matchErrorToType({
+        name: 'AbortError',
+        type: ErrorTypes.TRANSLATION_TIMEOUT,
+      })).toBe(ErrorTypes.TRANSLATION_TIMEOUT);
+    });
+
+    it('should refine generic type from status code', () => {
+      expect(matchErrorToType({
+        type: ErrorTypes.TRANSLATION_ERROR,
+        statusCode: 429,
+      })).toBe(ErrorTypes.RATE_LIMIT_REACHED);
+    });
+
+    it('should refine UNKNOWN type from recognizable message', () => {
+      expect(matchErrorToType({
+        type: ErrorTypes.UNKNOWN,
+        message: 'Too many requests',
+      })).toBe(ErrorTypes.RATE_LIMIT_REACHED);
+    });
+
+    it('should keep generic typed AbortError generic without stronger evidence', () => {
+      expect(matchErrorToType({
+        name: 'AbortError',
+        type: ErrorTypes.TRANSLATION_ERROR,
+      })).toBe(ErrorTypes.TRANSLATION_ERROR);
+    });
+
+    it('should keep operation aborts generic regardless of cancellation metadata', () => {
+      const error = {
+        name: 'AbortError',
+        operationAborted: true,
+        cancellationReason: 'operation-abort',
+        isCancelled: true,
+      };
+
+      expect(matchErrorToType(error)).toBe(ErrorTypes.TRANSLATION_ERROR);
+      expect(isCancellationError(error)).toBe(false);
+      expect(isFatalError(error)).toBe(false);
+      expect(isTransientError(error)).toBe(false);
+      expect(isRetryableError(error)).toBe(false);
+    });
+
+    it('should preserve explicit user cancellation', () => {
+      expect(matchErrorToType({ type: ErrorTypes.USER_CANCELLED })).toBe(ErrorTypes.USER_CANCELLED);
+      expect(matchErrorToType({ isCancelled: true })).toBe(ErrorTypes.USER_CANCELLED);
+    });
+
+    it.each(['Translation cancelled', 'Operation cancelled', 'Request cancelled'])(
+      'should not infer user cancellation from ambiguous message: %s',
+      (message) => {
+        expect(matchErrorToType(new Error(message))).not.toBe(ErrorTypes.USER_CANCELLED);
+      },
+    );
+
+    it('should classify a DOM-style AbortError as generic', () => {
+      const error = new DOMException('Aborted', 'AbortError');
+      expect(matchErrorToType(error)).toBe(ErrorTypes.TRANSLATION_ERROR);
+    });
+
+    it('should preserve recognizable message classification over AbortError name', () => {
+      const error = Object.assign(new Error('Too many requests'), { name: 'AbortError' });
+      expect(matchErrorToType(error)).toBe(ErrorTypes.RATE_LIMIT_REACHED);
     });
 
     it('should respect explicit .type in error object', () => {

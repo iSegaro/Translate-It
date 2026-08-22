@@ -496,7 +496,6 @@ describe('translateFieldViaSmartHandler translation ownership', () => {
     ['extension context', { type: ErrorTypes.EXTENSION_CONTEXT_INVALIDATED }],
     ['user cancellation', { type: ErrorTypes.USER_CANCELLED }],
     ['translation cancellation', { type: ErrorTypes.TRANSLATION_CANCELLED }],
-    ['abort', { name: 'AbortError' }],
   ])('keeps %s setup failure unmarked', async (_name, details) => {
     const error = Object.assign(new Error('setup stopped'), details);
     mocks.getEffectiveProviderAsync.mockRejectedValue(error);
@@ -505,6 +504,16 @@ describe('translateFieldViaSmartHandler translation ownership', () => {
       .rejects.toBe(error);
 
     expect(isFieldTranslationRequestError(error)).toBe(false);
+  });
+
+  it('marks bare AbortError setup failure as a generic translation error', async () => {
+    const error = Object.assign(new Error('setup stopped'), { name: 'AbortError' });
+    mocks.getEffectiveProviderAsync.mockRejectedValue(error);
+
+    await expect(translateFieldViaSmartHandler({ text: 'hello', target }))
+      .rejects.toBe(error);
+
+    expect(isFieldTranslationRequestError(error)).toBe(true);
   });
 
   it('keeps i18n failure unmarked', async () => {

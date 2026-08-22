@@ -363,7 +363,6 @@ describe('TextFieldIconManager', () => {
     it.each([
       ['USER_CANCELLED', Object.assign(new Error('cancelled'), { type: ErrorTypes.USER_CANCELLED }), false],
       ['TRANSLATION_CANCELLED', Object.assign(new Error('translation cancelled'), { type: ErrorTypes.TRANSLATION_CANCELLED }), false],
-      ['AbortError', Object.assign(new Error('aborted'), { name: 'AbortError' }), false],
       ['CONTEXT', Object.assign(new Error('context'), { type: ErrorTypes.CONTEXT }), false],
       ['EXTENSION_CONTEXT_INVALIDATED', Object.assign(new Error('extension context invalidated'), { type: ErrorTypes.EXTENSION_CONTEXT_INVALIDATED }), false],
       ['recognized context error', new Error('message channel closed'), true],

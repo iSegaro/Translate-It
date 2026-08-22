@@ -419,7 +419,6 @@ describe('FieldShortcutManager', () => {
     it.each([
       { type: 'USER_CANCELLED', message: 'cancelled by user' },
       { type: 'TRANSLATION_CANCELLED', message: 'translation cancelled' },
-      { name: 'AbortError', message: 'aborted' },
       { type: 'CONTEXT', message: 'context invalidated' },
       { type: 'EXTENSION_CONTEXT_INVALIDATED', message: 'extension context invalidated' },
     ])('keeps $type failures silent', async (details) => {
