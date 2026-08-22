@@ -23,6 +23,7 @@ vi.mock('@/shared/logging/logger.js', () => ({
 
 import { BaseTranslateProvider } from './BaseTranslateProvider.js';
 import { TranslationMode } from '@/shared/config/config.js';
+import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
 import { streamingManager } from '@/features/translation/core/StreamingManager.js';
 import { TraditionalTextProcessor } from './utils/TraditionalTextProcessor.js';
 import { TraditionalStreamManager } from './utils/TraditionalStreamManager.js';
@@ -318,16 +319,42 @@ describe('BaseTranslateProvider', () => {
       );
     });
 
-    it('should detect user cancellation via AbortController', async () => {
+    it('should detect explicit user cancellation via AbortController', async () => {
       const controller = new AbortController();
-      controller.abort();
+      controller.abort('user-cancelled');
       
       const texts = ['Test'];
       const engine = { isCancelled: vi.fn(() => false) };
 
       await expect(provider._streamingBatchTranslate(
         texts, 'en', 'fa', TranslationMode.Popup, engine, 'msg-1', controller
-      )).rejects.toThrow('Translation cancelled by user');
+      )).rejects.toMatchObject({ type: ErrorTypes.USER_CANCELLED });
+    });
+
+    it('should classify bare streaming abort as an internal operation abort', async () => {
+      const controller = new AbortController();
+      controller.abort();
+
+      const engine = { isCancelled: vi.fn(() => false) };
+
+      await expect(provider._streamingBatchTranslate(
+        ['Test'], 'en', 'fa', TranslationMode.Popup, engine, 'msg-1', controller
+      )).rejects.toMatchObject({
+        operationAborted: true,
+        cancellationReason: 'operation-abort',
+      });
+    });
+
+    it('should classify a cancellation tombstone without signal abort as an internal operation abort', async () => {
+      const controller = new AbortController();
+      const engine = { isCancelled: vi.fn(() => true) };
+
+      await expect(provider._streamingBatchTranslate(
+        ['Test'], 'en', 'fa', TranslationMode.Popup, engine, 'msg-1', controller
+      )).rejects.toMatchObject({
+        operationAborted: true,
+        cancellationReason: 'operation-abort',
+      });
     });
   });
 

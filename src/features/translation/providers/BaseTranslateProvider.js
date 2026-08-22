@@ -3,7 +3,7 @@
  * Provides streaming support for chunk-based translation with real-time DOM updates
  */
 
-import { BaseProvider } from "@/features/translation/providers/BaseProvider.js";
+import { BaseProvider, createOperationAbortError } from "@/features/translation/providers/BaseProvider.js";
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { TranslationMode, getProviderOptimizationLevelAsync } from "@/shared/config/config.js";
@@ -106,9 +106,7 @@ export class BaseTranslateProvider extends BaseProvider {
     
     for (let chunkIndex = 0; chunkIndex < chunks.length; chunkIndex++) {
       if ((abortController && abortController.signal.aborted) || (engine && engine.isCancelled(messageId))) {
-        const error = new Error('Translation cancelled by user');
-        error.type = ErrorTypes.USER_CANCELLED;
-        throw error;
+        throw createOperationAbortError(abortController?.signal);
       }
 
       const chunk = chunks[chunkIndex];
