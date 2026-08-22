@@ -123,6 +123,61 @@ describe('QueueManager', () => {
       expect(result).toBe('Success');
     });
 
+    it('does not start a scheduled retry after operation abort', async () => {
+      const abortController = new AbortController();
+      const serverError = Object.assign(new Error('HTTP 500'), {
+        type: ErrorTypes.SERVER_ERROR,
+        statusCode: 500,
+      });
+      const request = vi.fn().mockRejectedValue(serverError);
+      const promise = queueManager.enqueue('aborted-operation-provider', request, 0, 'select_element', {
+        messageId: 'aborted-operation',
+        abortController,
+      });
+      promise.catch(() => {});
+
+      await vi.advanceTimersByTimeAsync(150);
+      expect(request).toHaveBeenCalledTimes(1);
+      expect(queueManager.retryTimeouts.size).toBe(1);
+
+      abortController.abort('provider-fail-fast');
+      await vi.advanceTimersByTimeAsync(10000);
+
+      expect(request).toHaveBeenCalledTimes(1);
+      expect(queueManager.retryTimeouts.size).toBe(0);
+      await expect(promise).rejects.toMatchObject({
+        operationAborted: true,
+        cancellationReason: 'operation-abort',
+      });
+    });
+
+    it('detaches root circuit item before fail-fast abort reaches its signal', async () => {
+      const abortController = new AbortController();
+      const circuitError = Object.assign(new Error('Circuit open'), {
+        type: ErrorTypes.CIRCUIT_BREAKER_OPEN,
+        originalType: ErrorTypes.SERVER_ERROR,
+        statusCode: 500,
+      });
+      const request = vi.fn().mockRejectedValue(circuitError);
+      const promise = queueManager.enqueue('root-circuit-provider', request, 0, 'select_element', {
+        messageId: 'root-circuit-operation',
+        abortController,
+      });
+
+      const rejection = await promise.catch((error) => error);
+      expect(rejection).toMatchObject({
+        type: ErrorTypes.CIRCUIT_BREAKER_OPEN,
+        originalType: ErrorTypes.SERVER_ERROR,
+        statusCode: 500,
+      });
+
+      abortController.abort('provider-fail-fast');
+
+      expect(rejection).not.toHaveProperty('operationAborted');
+      expect(queueManager.retryTimeouts.size).toBe(0);
+      expect(request).toHaveBeenCalledTimes(1);
+    });
+
     it('should fail permanently after max retries', async () => {
       const mockError = new Error('Network');
       mockError.type = ErrorTypes.NETWORK_ERROR;

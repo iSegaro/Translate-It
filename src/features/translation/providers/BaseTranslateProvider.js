@@ -188,9 +188,16 @@ export class BaseTranslateProvider extends BaseProvider {
 
     for (let i = 0; i < chunks.length; i++) {
       if (abortController && abortController.signal.aborted) {
-        const cancelError = new Error('Translation cancelled by user');
+        const isUserAbort = abortController.signal.reason === 'user-cancelled'
+          || abortController.signal.reason === 'user_cancelled';
+        const cancelError = new Error(isUserAbort ? 'Translation cancelled by user' : 'Translation operation aborted');
         cancelError.name = 'AbortError';
-        cancelError.type = ErrorTypes.USER_CANCELLED;
+        if (isUserAbort) {
+          cancelError.type = ErrorTypes.USER_CANCELLED;
+        } else {
+          cancelError.operationAborted = true;
+          cancelError.cancellationReason = 'operation-abort';
+        }
         throw cancelError;
       }
 

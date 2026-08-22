@@ -412,8 +412,16 @@ export const ProviderRequestEngine = {
       }
 
       if (err.name === 'AbortError') {
-        const abortErr = new Error('Translation cancelled by user');
-        abortErr.type = ErrorTypes.USER_CANCELLED;
+        const isUserAbort = !abortController?.signal
+          || abortController.signal.reason === 'user-cancelled'
+          || abortController?.signal?.reason === 'user_cancelled';
+        const abortErr = new Error(isUserAbort ? 'Translation cancelled by user' : 'Translation operation aborted');
+        if (isUserAbort) {
+          abortErr.type = ErrorTypes.USER_CANCELLED;
+        } else {
+          abortErr.operationAborted = true;
+          abortErr.cancellationReason = 'operation-abort';
+        }
         abortErr.context = context;
         throw abortErr;
       }

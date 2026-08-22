@@ -67,10 +67,13 @@ vi.mock('@/shared/config/config.js', async (importOriginal) => {
 
 import { OptimizedJsonHandler } from './OptimizedJsonHandler.js';
 import { BaseProvider } from '@/features/translation/providers/BaseProvider.js';
+import { queueManager } from '@/features/translation/core/QueueManager.js';
+import { rateLimitManager } from '@/features/translation/core/RateLimitManager.js';
 import { LanguageSwappingService } from '@/features/translation/providers/LanguageSwappingService.js';
 import { LanguageDetectionService } from '@/shared/services/LanguageDetectionService.js';
 import { proxyManager } from '@/shared/proxy/ProxyManager.js';
 import { TranslationMode, getBilingualTranslationEnabledAsync, getBilingualTranslationModesAsync } from '@/shared/config/config.js';
+import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
 
 // 'select-element' is the real MessageContexts.SELECT_ELEMENT value that
 // TranslationMode.Select_Element maps to.
@@ -116,6 +119,31 @@ class FetchSignalProvider extends BaseProvider {
       sessionId,
       callPurpose: options.callPurpose,
     });
+  }
+}
+
+class CircuitFailureProvider extends BaseProvider {
+  static batchStrategy = 'none';
+  static isAI = false;
+
+  constructor() {
+    super('CircuitIntegrationProvider');
+    this.physicalAttempts = 0;
+  }
+
+  async _batchTranslate(_texts, _sourceLang, _targetLang, _mode, _engine, messageId, abortController, priority, sessionId) {
+    return this._executeWithRateLimit(
+      async () => {
+        this.physicalAttempts++;
+        throw Object.assign(new Error('HTTP 500'), {
+          type: ErrorTypes.SERVER_ERROR,
+          statusCode: 500,
+        });
+      },
+      'circuit-integration',
+      priority,
+      { messageId, abortController, sessionId },
+    );
   }
 }
 
@@ -329,5 +357,118 @@ describe('OptimizedJsonHandler physical abort propagation', () => {
     // The same signal object handed to fetch transitioned to aborted.
     expect(proxyManager.fetch.mock.calls[0][1].signal.aborted).toBe(true);
     expect(engine.lifecycleRegistry.unregisterRequest).toHaveBeenCalledWith('msg-fetch-abort');
+  });
+
+  it('keeps timeout canonical when physical fetch rejects from shared abort', async () => {
+    const provider = new FetchSignalProvider();
+    const abortController = new AbortController();
+    const engine = {
+      lifecycleRegistry: {
+        getAbortController: vi.fn(() => abortController),
+        registerRequest: vi.fn(() => abortController),
+        unregisterRequest: vi.fn(),
+      },
+      createIntelligentBatches: vi.fn((segments) => segments.map((segment) => [segment])),
+      isCancelled: vi.fn(() => false),
+    };
+
+    proxyManager.fetch.mockImplementation((_url, { signal }) => new Promise((_, reject) => {
+      signal.addEventListener('abort', () => reject(new DOMException('Aborted', 'AbortError')), { once: true });
+    }));
+
+    const execution = new OptimizedJsonHandler().execute(
+      engine,
+      {
+        text: JSON.stringify(['timeout me']),
+        sourceLanguage: 'en',
+        targetLanguage: 'fa',
+        mode: TranslationMode.Select_Element,
+        messageId: 'msg-timeout-abort-race',
+        sessionId: 'sess-timeout-abort-race',
+        options: {},
+      },
+      provider,
+      'en',
+      'fa',
+      'msg-timeout-abort-race',
+      { tab: { id: 1 }, frameId: 0 },
+      'unknown',
+      { deadlineAt: Date.now() + 25 },
+    );
+
+    await expect(execution).rejects.toMatchObject({ type: ErrorTypes.TRANSLATION_TIMEOUT });
+    expect(abortController.signal.reason?.name).toBe('AbortError');
+  });
+
+  it('preserves circuit root cause and stops QueueManager retries after fail-fast abort', async () => {
+    vi.useFakeTimers();
+    const provider = new CircuitFailureProvider();
+    const abortController = new AbortController();
+    const providerName = provider.providerName;
+    const queueName = `${providerName}::parallel`;
+    const state = rateLimitManager._initializeProvider(providerName, { maxConcurrent: 3, delayBetweenRequests: 0 });
+    state.isManualConfig = true;
+    state.circuitBreakThreshold = 5;
+    state.circuitRecoveryTime = 30000;
+
+    const engine = {
+      lifecycleRegistry: {
+        getAbortController: vi.fn(() => abortController),
+        registerRequest: vi.fn(() => abortController),
+        unregisterRequest: vi.fn(),
+      },
+      createIntelligentBatches: vi.fn((segments) => segments.map((segment) => [segment])),
+      isCancelled: vi.fn(() => false),
+    };
+    const handler = new OptimizedJsonHandler();
+    const execution = handler.execute(
+      engine,
+      {
+        text: JSON.stringify(['one', 'two', 'three']),
+        sourceLanguage: 'en',
+        targetLanguage: 'fa',
+        mode: TranslationMode.Select_Element,
+        messageId: 'msg-circuit-integration',
+        sessionId: 'sess-circuit-integration',
+        options: {},
+      },
+      provider,
+      'en',
+      'fa',
+      'msg-circuit-integration',
+      { tab: { id: 1 }, frameId: 0 },
+    );
+    execution.catch(() => {});
+
+    try {
+      for (let attempt = 0; attempt < 10; attempt++) {
+        await vi.advanceTimersByTimeAsync(10000);
+        await Promise.resolve();
+      }
+
+      const result = await execution;
+      expect(result).toMatchObject({
+        success: false,
+        error: {
+          type: ErrorTypes.CIRCUIT_BREAKER_OPEN,
+          originalType: ErrorTypes.SERVER_ERROR,
+          statusCode: 500,
+        },
+      });
+      expect(result.success).not.toBe(true);
+
+      const attemptsAtTerminality = provider.physicalAttempts;
+      await vi.advanceTimersByTimeAsync(60000);
+      expect(provider.physicalAttempts).toBe(attemptsAtTerminality);
+      expect(abortController.signal.aborted).toBe(true);
+      expect(queueManager.retryTimeouts.size).toBe(0);
+    } finally {
+      queueManager.retryTimeouts.forEach((timeout) => clearTimeout(timeout));
+      queueManager.retryTimeouts.clear();
+      queueManager.queues.delete(queueName);
+      queueManager.processing.delete(queueName);
+      rateLimitManager.providerStates.delete(providerName);
+      vi.useRealTimers();
+    }
   });
 });

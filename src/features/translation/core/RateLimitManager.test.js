@@ -202,8 +202,32 @@ describe('RateLimitManager', () => {
           type: 'CIRCUIT_BREAKER_OPEN',
           originalType: 'SERVER_ERROR',
           statusCode: 500,
-          providerName: 'TestProvider',
-        });
+         providerName: 'TestProvider',
+         });
+    });
+
+    it.each([
+      ['server', ErrorTypes.SERVER_ERROR, 500],
+      ['network', ErrorTypes.NETWORK_ERROR, undefined],
+    ])('keeps %s circuit rejections out of cancellation classification', async (_label, originalType, statusCode) => {
+      const state = manager.providerStates.get('TestProvider');
+      const circuitError = Object.assign(new Error('Circuit breaker open for TestProvider'), {
+        type: ErrorTypes.CIRCUIT_BREAKER_OPEN,
+        originalType,
+        ...(statusCode === undefined ? {} : { statusCode }),
+        providerName: 'TestProvider',
+      });
+      const reject = vi.fn();
+      state.queues[TranslationPriority.NORMAL].push({ reject });
+
+      manager._rejectQueue(state, circuitError);
+
+      const [rejection] = reject.mock.calls[0];
+      expect(rejection).toMatchObject({ type: ErrorTypes.CIRCUIT_BREAKER_OPEN, originalType });
+      expect(rejection.name).not.toBe('AbortError');
+      expect(rejection.isCancelled).not.toBe(true);
+      if (statusCode === undefined) expect(rejection).not.toHaveProperty('statusCode');
+      else expect(rejection.statusCode).toBe(statusCode);
     });
   });
 

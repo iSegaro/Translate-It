@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 const loggerDebug = vi.hoisted(() => vi.fn());
 const resolveOperationSourceLanguage = vi.hoisted(() => vi.fn());
+const queueCancelMock = vi.hoisted(() => vi.fn());
 
 // Mock webextension-polyfill
 vi.mock('webextension-polyfill', () => ({
@@ -71,6 +72,10 @@ vi.mock('@/features/translation/core/ProviderConfigurations.js', async (importOr
   };
 });
 
+vi.mock('@/features/translation/core/QueueManager.js', () => ({
+  queueManager: { cancelByMessageId: queueCancelMock }
+}));
+
 vi.mock('@/shared/config/config.js', () => ({
   TranslationMode: {
     Select_Element: 'select_element',
@@ -100,6 +105,7 @@ describe('OptimizedJsonHandler', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     loggerDebug.mockClear();
+    queueCancelMock.mockClear();
     resolveOperationSourceLanguage.mockResolvedValue({
       canBypassSequentialGate: false,
       bypassReason: 'LOW_CONFIDENCE',
@@ -2187,6 +2193,33 @@ describe('OptimizedJsonHandler', () => {
       expect(mockAbortController.abort).toHaveBeenCalled();
     });
 
+    it('preserves parallel provider failure when sibling observes internal cancellation', async () => {
+      const circuitError = Object.assign(new Error('Circuit open'), {
+        type: ErrorTypes.CIRCUIT_BREAKER_OPEN,
+        originalType: ErrorTypes.SERVER_ERROR,
+        isFatal: true,
+      });
+      const data = { ...mockData, sourceLanguage: 'en' };
+
+      mockProvider.translate
+        .mockRejectedValueOnce(circuitError)
+        .mockResolvedValueOnce({ translatedText: ['late sibling'] });
+
+      const result = await handler.execute(mockEngine, data, mockProvider, 'en', 'fa', 'msg-provider-failure', mockSender);
+
+      expect(result).toMatchObject({
+        success: false,
+        error: {
+          type: ErrorTypes.CIRCUIT_BREAKER_OPEN,
+          originalType: ErrorTypes.SERVER_ERROR,
+        },
+      });
+      expect(result.success).not.toBe(true);
+      expect(result.error.type).not.toBe(ErrorTypes.USER_CANCELLED);
+      expect(result.error.type).not.toBe(ErrorTypes.TRANSLATION_CANCELLED);
+      expect(queueCancelMock).not.toHaveBeenCalled();
+    });
+
     it('genuine cancellation after a non-fatal error returns USER_CANCELLED (not lastError)', async () => {
       vi.useRealTimers();
       const { getAIConversationHistoryEnabledAsync } = await import('@/shared/config/config.js');
@@ -2216,6 +2249,7 @@ describe('OptimizedJsonHandler', () => {
 
       expect(result.success).toBe(false);
       expect(result.error.type).toBe(ErrorTypes.USER_CANCELLED);
+      expect(queueCancelMock).not.toHaveBeenCalled();
     });
 
     it('genuine cancellation with no earlier error returns USER_CANCELLED', async () => {

@@ -1131,6 +1131,7 @@ const parentError = createParentValidationError(parentIdStr, sourceText, transla
 
           const errorType = matchErrorToType(batchError);
           const isCancellation = batchError.name === 'AbortError' || 
+                               batchError.operationAborted ||
                                batchError.isCancelled || 
                                errorType === ErrorTypes.USER_CANCELLED || 
                                errorType === ErrorTypes.TRANSLATION_CANCELLED;
@@ -1138,25 +1139,10 @@ const parentError = createParentValidationError(parentIdStr, sourceText, transla
           if (isCancellation) {
             fragmentedUnits.clear();
             logger.debug(`[JsonHandler] Batch ${i + 1} cancelled for messageId: ${messageId}`);
-            
-            // FIX: Explicitly cancel any other pending batches for this provider in the QueueManager
-            // to prevent them from even attempting to start.
-            if (providerInstance.providerName) {
-              import('@/features/translation/core/ProviderCoordinator.js').then(({ providerCoordinator }) => {
-                if (providerCoordinator && providerCoordinator.queueManager) {
-                  // Actually, QueueManager is a singleton, we can use it directly
-                }
-              }).catch(() => { /* ignore */ });
-              
-              // More robust way: Use the QueueManager singleton directly
-              import('@/features/translation/core/QueueManager.js').then(({ queueManager }) => {
-                if (queueManager) {
-                  queueManager.cancelByMessageId(messageId);
-                }
-              }).catch(() => { /* ignore */ });
-            }
-            
-            return; // Exit silently on cancellation
+
+            // Queue cancellation is owned by handleCancelTranslation. Cancelling
+            // here races provider failures and rewrites them as USER_CANCELLED.
+            return;
           }
           
            logger.debug(`[JsonHandler] Batch ${i + 1} failed:`, batchError.message);

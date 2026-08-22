@@ -11,6 +11,19 @@ import { rateLimitManager, TranslationPriority } from "@/features/translation/co
 
 const logger = getScopedLogger(LOG_COMPONENTS.TRANSLATION, 'BaseProvider');
 
+function createOperationAbortError(signal, message = 'Translation operation aborted') {
+  const isUserAbort = signal?.reason === 'user-cancelled' || signal?.reason === 'user_cancelled';
+  const error = new Error(isUserAbort ? 'Translation cancelled by user' : message);
+  error.name = 'AbortError';
+  if (isUserAbort) {
+    error.type = ErrorTypes.USER_CANCELLED;
+  } else {
+    error.operationAborted = true;
+    error.cancellationReason = 'operation-abort';
+  }
+  return error;
+}
+
 /**
  * Base class for all translation providers.
  * Provides a centralized translation workflow, error handling, and common utilities.
@@ -102,7 +115,7 @@ export class BaseProvider {
 
     // Pre-check
     if (options.abortController?.signal?.aborted) {
-      throw new Error('Task aborted before execution');
+      throw createOperationAbortError(options.abortController.signal, 'Task aborted before execution');
     }
 
     const result = await rateLimitManager.executeWithRateLimit(
@@ -115,7 +128,7 @@ export class BaseProvider {
 
     // Post-check
     if (options.abortController?.signal?.aborted) {
-      throw new Error('Task aborted during execution');
+      throw createOperationAbortError(options.abortController.signal, 'Task aborted during execution');
     }
 
     return result;

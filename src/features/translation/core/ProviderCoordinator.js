@@ -176,8 +176,9 @@ export class ProviderCoordinator {
 
       // Enqueue the task - QueueManager handles retries and prioritization
       const result = await queueManager.enqueue(queueProviderName, executeTask, numericPriority, translateMode, {
-        messageId: options.messageId,
-        uiContext: options.uiContext,
+         messageId: options.messageId,
+         abortController: options.abortController,
+         uiContext: options.uiContext,
         parallelExecution: !!options.parallelExecution,
         executionContext: options.executionContext,
       });
