@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { BingTranslateProvider } from './BingTranslate.js';
 import { ProviderNames } from '@/features/translation/providers/ProviderConstants.js';
+import { getProviderConfiguration } from '@/features/translation/core/ProviderConfigurations.js';
 
 // Mock dependencies
 vi.mock('webextension-polyfill', () => ({
@@ -45,9 +46,14 @@ vi.mock('@/features/translation/core/ProviderConfigurations.js', async (importOr
 
 describe('BingTranslateProvider', () => {
   let provider;
+  const defaultProviderConfig = {
+    rateLimit: { maxConcurrent: 1, delayBetweenRequests: 0 },
+    batching: { strategy: 'character_limit', characterLimit: 1000, maxChunksPerBatch: 10 },
+  };
 
   beforeEach(() => {
     vi.clearAllMocks();
+    getProviderConfiguration.mockReturnValue(defaultProviderConfig);
     provider = new BingTranslateProvider();
     
     // Initialize static property to avoid null pointer
@@ -166,6 +172,50 @@ describe('BingTranslateProvider', () => {
       }));
 
       await expect(provider._translateChunk(['URL'], 'en', 'fa')).resolves.toEqual(['URL']);
+    });
+
+    it('does not adaptively retry when maxRetries is zero', async () => {
+      getProviderConfiguration.mockReturnValue({
+        ...defaultProviderConfig,
+        batching: { ...defaultProviderConfig.batching, maxRetries: 0 },
+      });
+      provider._executeApiCall.mockImplementation(async (request) => request.extractResponse({
+        statusCode: 400,
+        headers: { get: () => 'application/json' },
+        text: async () => JSON.stringify({ statusCode: 400 }),
+      }));
+
+      await expect(provider._translateChunk(['first', 'second'], 'en', 'fa', 'selection', null, 0, 2, 0, 1))
+        .rejects.toMatchObject({ name: 'BingApiError' });
+      expect(provider._executeApiCall).toHaveBeenCalledTimes(1);
+    });
+
+    it('preserves one adaptive retry when maxRetries is one', async () => {
+      getProviderConfiguration.mockReturnValue({
+        ...defaultProviderConfig,
+        batching: { ...defaultProviderConfig.batching, maxRetries: 1 },
+      });
+      provider._executeApiCall.mockImplementation(async (request) => request.extractResponse({
+        statusCode: 400,
+        headers: { get: () => 'application/json' },
+        text: async () => JSON.stringify({ statusCode: 400 }),
+      }));
+
+      await expect(provider._translateChunk(['a', 'b', 'c', 'd'], 'en', 'fa', 'selection', null, 0, 4, 0, 1))
+        .rejects.toMatchObject({ name: 'BingApiError' });
+      expect(provider._executeApiCall).toHaveBeenCalledTimes(2);
+    });
+
+    it('keeps default adaptive retry behavior when maxRetries is absent', async () => {
+      provider._executeApiCall.mockImplementation(async (request) => request.extractResponse({
+        statusCode: 400,
+        headers: { get: () => 'application/json' },
+        text: async () => JSON.stringify({ statusCode: 400 }),
+      }));
+
+      await expect(provider._translateChunk(['a', 'b', 'c', 'd'], 'en', 'fa', 'selection', null, 0, 4, 0, 1))
+        .rejects.toMatchObject({ name: 'BingApiError' });
+      expect(provider._executeApiCall).toHaveBeenCalledTimes(3);
     });
   });
 });
