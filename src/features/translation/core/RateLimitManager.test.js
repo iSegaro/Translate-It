@@ -21,7 +21,7 @@ vi.mock('@/shared/error-management/ValidationPolicy.js', () => ({
 }));
 
 import { RateLimitManager, TranslationPriority } from './RateLimitManager.js';
-import { isFatalError } from '@/shared/error-management/ErrorMatcher.js';
+import { isConfigError, isFatalError } from '@/shared/error-management/ErrorMatcher.js';
 import { isLocalDeterministicValidationError } from '@/shared/error-management/ValidationPolicy.js';
 import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
 
@@ -91,6 +91,7 @@ describe('RateLimitManager', () => {
 
     // Default mock behavior for ErrorMatcher
     isFatalError.mockImplementation((err) => err.message === 'FATAL');
+    isConfigError.mockReturnValue(false);
 
     // Reset singleton instance for clean tests
     RateLimitManager.instance = null;
@@ -141,6 +142,25 @@ describe('RateLimitManager', () => {
   });
 
   describe('Circuit Breaker', () => {
+    it('does not count insufficient balance as transient circuit failure', async () => {
+      const error = Object.assign(new Error('No credits remaining'), {
+        type: ErrorTypes.INSUFFICIENT_BALANCE,
+        statusCode: 429,
+      });
+      isFatalError.mockReturnValue(true);
+      isConfigError.mockImplementation(candidate => candidate?.type === ErrorTypes.INSUFFICIENT_BALANCE);
+
+      await expect(manager.executeWithRateLimit(
+        'TestProvider',
+        () => Promise.reject(error)
+      )).rejects.toBe(error);
+
+      const state = manager.providerStates.get('TestProvider');
+      expect(state.performanceStats.failedRequests).toBe(1);
+      expect(state.consecutiveFailures).toBe(0);
+      expect(state.isCircuitOpen).toBe(false);
+    });
+
     it('preserves HTTP 402 semantic type when opening circuit', async () => {
       const error = Object.assign(new Error('HTTP 402'), {
         type: ErrorTypes.INSUFFICIENT_BALANCE,

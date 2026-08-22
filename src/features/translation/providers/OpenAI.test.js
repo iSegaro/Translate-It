@@ -501,6 +501,28 @@ describe('OpenAIProvider Error Handling', () => {
     }
   });
 
+  it('should classify structured insufficient quota as insufficient balance', async () => {
+    proxyManager.fetch.mockResolvedValue({
+      ok: false,
+      status: 429,
+      statusText: 'Too Many Requests',
+      headers: new Map([['content-type', 'application/json']]),
+      json: () => Promise.resolve({
+        error: {
+          message: 'You have no credits remaining.',
+          type: 'insufficient_quota',
+          code: 'insufficient_quota',
+        },
+      }),
+      clone: function() { return this; }
+    });
+
+    await expect(provider._callAI('system', 'text')).rejects.toMatchObject({
+      type: ErrorTypes.INSUFFICIENT_BALANCE,
+      statusCode: 429,
+    });
+  });
+
   it('should handle HTTP 500 Server Error', async () => {
     proxyManager.fetch.mockResolvedValue({
       ok: false,

@@ -175,7 +175,7 @@ describe('QueueManager', () => {
 
     it('should retry a failed request with exponential backoff', async () => {
       // RATE_LIMIT_REACHED: baseDelay 2000. Jittered (0.75x) = 1500ms.
-      const mockError = { type: ErrorTypes.RATE_LIMIT_REACHED, message: 'Rate limit' };
+      const mockError = { type: ErrorTypes.RATE_LIMIT_REACHED, statusCode: 429, message: 'Rate limit' };
       
       const mockRequest = vi.fn()
         .mockRejectedValueOnce(mockError)
@@ -356,6 +356,19 @@ describe('QueueManager', () => {
 
       await expect(promise).rejects.toBe(paymentError);
       expect(request).toHaveBeenCalledTimes(1);
+    });
+
+    it('does not retry insufficient balance when status is 429', async () => {
+      const paymentError = Object.assign(new Error('No credits remaining'), {
+        type: ErrorTypes.INSUFFICIENT_BALANCE,
+        statusCode: 429,
+      });
+      const request = vi.fn().mockRejectedValue(paymentError);
+      const promise = queueManager.enqueue('quota-provider', request);
+
+      await expect(promise).rejects.toBe(paymentError);
+      expect(request).toHaveBeenCalledTimes(1);
+      expect(queueManager.retryTimeouts.size).toBe(0);
     });
   });
 

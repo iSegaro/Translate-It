@@ -156,8 +156,9 @@ class QueueItem {
         ErrorTypes.API_ERROR
       ];
 
-      if (!retryableFatalTypes.includes(this.lastError.type) && 
-          this.lastError.statusCode !== 429) {
+      // Canonical semantic type wins over raw HTTP status. Only explicitly
+      // retryable fatal types may bypass the fatal stop condition.
+      if (!retryableFatalTypes.includes(this.lastError.type)) {
         return false;
       }
     }
