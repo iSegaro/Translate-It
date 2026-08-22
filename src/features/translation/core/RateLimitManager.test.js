@@ -21,8 +21,9 @@ vi.mock('@/shared/error-management/ValidationPolicy.js', () => ({
 }));
 
 import { RateLimitManager, TranslationPriority } from './RateLimitManager.js';
-import { isFatalError } from '@/shared/error-management/ErrorMatcher.js';
+import { isConfigError, isFatalError } from '@/shared/error-management/ErrorMatcher.js';
 import { isLocalDeterministicValidationError } from '@/shared/error-management/ValidationPolicy.js';
+import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
 
 // Mock dependencies
 vi.mock('@/shared/config/config.js', () => ({
@@ -90,6 +91,7 @@ describe('RateLimitManager', () => {
 
     // Default mock behavior for ErrorMatcher
     isFatalError.mockImplementation((err) => err.message === 'FATAL');
+    isConfigError.mockReturnValue(false);
 
     // Reset singleton instance for clean tests
     RateLimitManager.instance = null;
@@ -140,6 +142,41 @@ describe('RateLimitManager', () => {
   });
 
   describe('Circuit Breaker', () => {
+    it('does not count insufficient balance as transient circuit failure', async () => {
+      const error = Object.assign(new Error('No credits remaining'), {
+        type: ErrorTypes.INSUFFICIENT_BALANCE,
+        statusCode: 429,
+      });
+      isFatalError.mockReturnValue(true);
+      isConfigError.mockImplementation(candidate => candidate?.type === ErrorTypes.INSUFFICIENT_BALANCE);
+
+      await expect(manager.executeWithRateLimit(
+        'TestProvider',
+        () => Promise.reject(error)
+      )).rejects.toBe(error);
+
+      const state = manager.providerStates.get('TestProvider');
+      expect(state.performanceStats.failedRequests).toBe(1);
+      expect(state.consecutiveFailures).toBe(0);
+      expect(state.isCircuitOpen).toBe(false);
+    });
+
+    it('preserves HTTP 402 semantic type when opening circuit', async () => {
+      const error = Object.assign(new Error('HTTP 402'), {
+        type: ErrorTypes.INSUFFICIENT_BALANCE,
+        statusCode: 402,
+      });
+      isFatalError.mockReturnValue(true);
+
+      await expect(manager.executeWithRateLimit(
+        'TestProvider',
+        () => Promise.reject(error)
+      )).rejects.toBe(error);
+
+      expect(manager.providerStates.get('TestProvider').lastCircuitError).toBe(error);
+      expect(error.type).toBe(ErrorTypes.INSUFFICIENT_BALANCE);
+    });
+
     it('should open the circuit after 5 consecutive failures', async () => {
       const failingTask = () => Promise.reject(new Error('API Error'));
       
@@ -168,6 +205,158 @@ describe('RateLimitManager', () => {
 
       await expect(manager.executeWithRateLimit('TestProvider', () => Promise.resolve('ok')))
         .rejects.toThrow(/Circuit breaker open/);
+    });
+
+    it('preserves provider identity and original cause on circuit rejection', async () => {
+      const state = manager.providerStates.get('TestProvider');
+      const serverError = Object.assign(new Error('HTTP 500'), {
+        type: 'SERVER_ERROR',
+        statusCode: 500,
+      });
+      state.isCircuitOpen = true;
+      state.circuitOpenTime = Date.now();
+      state.lastCircuitError = serverError;
+
+      await expect(manager.executeWithRateLimit('TestProvider', () => Promise.resolve('ok')))
+        .rejects.toMatchObject({
+          type: 'CIRCUIT_BREAKER_OPEN',
+          originalType: 'SERVER_ERROR',
+          statusCode: 500,
+         providerName: 'TestProvider',
+         });
+    });
+
+    it.each([
+      ['server', ErrorTypes.SERVER_ERROR, 500],
+      ['network', ErrorTypes.NETWORK_ERROR, undefined],
+    ])('keeps %s circuit rejections out of cancellation classification', async (_label, originalType, statusCode) => {
+      const state = manager.providerStates.get('TestProvider');
+      const circuitError = Object.assign(new Error('Circuit breaker open for TestProvider'), {
+        type: ErrorTypes.CIRCUIT_BREAKER_OPEN,
+        originalType,
+        ...(statusCode === undefined ? {} : { statusCode }),
+        providerName: 'TestProvider',
+      });
+      const reject = vi.fn();
+      state.queues[TranslationPriority.NORMAL].push({ reject });
+
+      manager._rejectQueue(state, circuitError);
+
+      const [rejection] = reject.mock.calls[0];
+      expect(rejection).toMatchObject({ type: ErrorTypes.CIRCUIT_BREAKER_OPEN, originalType });
+      expect(rejection.name).not.toBe('AbortError');
+      expect(rejection.isCancelled).not.toBe(true);
+      if (statusCode === undefined) expect(rejection).not.toHaveProperty('statusCode');
+      else expect(rejection.statusCode).toBe(statusCode);
+    });
+  });
+
+  describe('Abort provenance', () => {
+    const createDeferred = () => {
+      let resolve;
+      const promise = new Promise((res) => { resolve = res; });
+      return { promise, resolve };
+    };
+
+    const blockQueue = async () => {
+      const blocker = createDeferred();
+      const blockerPromise = manager.executeWithRateLimit('TestProvider', () => blocker.promise);
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      return { blocker, blockerPromise };
+    };
+
+    it('preserves explicit user cancellation for queued requests', async () => {
+      const { blocker, blockerPromise } = await blockQueue();
+      const controller = new AbortController();
+      const request = manager.executeWithRateLimit('TestProvider', () => 'not-run', '', TranslationPriority.NORMAL, {
+        abortController: controller,
+      });
+
+      controller.abort('user-cancelled');
+
+      await expect(request).rejects.toMatchObject({
+        type: ErrorTypes.USER_CANCELLED,
+        isCancelled: true,
+      });
+      blocker.resolve();
+      await blockerPromise;
+    });
+
+    it.each([['timeout', (controller) => controller.abort('timeout')], ['bare', (controller) => controller.abort()]])(
+      'classifies queued %s abort as an internal operation abort', async (_label, abort) => {
+        const { blocker, blockerPromise } = await blockQueue();
+        const controller = new AbortController();
+        const request = manager.executeWithRateLimit('TestProvider', () => 'not-run', '', TranslationPriority.NORMAL, {
+          abortController: controller,
+        });
+
+        abort(controller);
+
+        const error = await request.catch((caughtError) => caughtError);
+        expect(error).toMatchObject({
+          operationAborted: true,
+          cancellationReason: 'operation-abort',
+        });
+        expect(error.type).not.toBe(ErrorTypes.USER_CANCELLED);
+        expect(error.isCancelled).not.toBe(true);
+        blocker.resolve();
+        await blockerPromise;
+      }
+    );
+
+    it('classifies already-aborted signals before enqueue as internal operation abort', async () => {
+      const controller = new AbortController();
+      controller.abort();
+
+      const error = await manager.executeWithRateLimit('TestProvider', () => 'not-run', '', TranslationPriority.NORMAL, {
+        abortController: controller,
+      }).catch((caughtError) => caughtError);
+      expect(error).toMatchObject({
+        operationAborted: true,
+        cancellationReason: 'operation-abort',
+      });
+      expect(error.type).not.toBe(ErrorTypes.USER_CANCELLED);
+      expect(error.isCancelled).not.toBe(true);
+    });
+
+    it('classifies pre-start abort as an internal operation abort', async () => {
+      const controller = new AbortController();
+      const state = manager.providerStates.get('TestProvider');
+      const request = {
+        options: { abortController: controller },
+        reject: vi.fn(),
+      };
+      controller.abort('timeout');
+
+      state.activeRequests++;
+      await manager._executeRequest(state, request, 'TestProvider');
+
+      const [error] = request.reject.mock.calls[0];
+      expect(error).toMatchObject({
+        operationAborted: true,
+        cancellationReason: 'operation-abort',
+      });
+      expect(error.type).not.toBe(ErrorTypes.USER_CANCELLED);
+      expect(error.isCancelled).not.toBe(true);
+    });
+
+    it('classifies cleanup cancellation without signal as an internal operation abort', async () => {
+      const state = manager.providerStates.get('TestProvider');
+      const reject = vi.fn();
+      state.queues[TranslationPriority.NORMAL].push({
+        options: { messageId: 'cleanup-abort' },
+        reject,
+      });
+
+      manager.clearPendingRequests('cleanup-abort');
+
+      const [error] = reject.mock.calls[0];
+      expect(error).toMatchObject({
+        operationAborted: true,
+        cancellationReason: 'operation-abort',
+      });
+      expect(error.type).not.toBe(ErrorTypes.USER_CANCELLED);
+      expect(error.isCancelled).not.toBe(true);
     });
   });
 

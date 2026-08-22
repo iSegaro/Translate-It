@@ -162,15 +162,14 @@ export class BingTranslateProvider extends BaseTranslateProvider {
             throw err;
           }
 
-          // Capture detected source language from metadata if available
-          this._setDetectedLanguage(data?.[0]?.detectedLanguage?.language);
-          
           const targetText = data?.[0]?.translations?.[0]?.text;
           if (typeof targetText !== 'string' || !targetText.trim()) {
             const error = new Error('Bing response contained no translation text');
             error.type = ErrorTypes.API_RESPONSE_INVALID;
             throw error;
           }
+
+          this._setExecutionDetectedLanguage(options, data?.[0]?.detectedLanguage?.language);
           
           // Return raw text string. 
           // Centralized TranslationSegmentMapper will handle robust splitting, 
@@ -182,7 +181,8 @@ export class BingTranslateProvider extends BaseTranslateProvider {
         abortController,
         charCount: TraditionalTextProcessor.calculateTraditionalCharCount(chunkTexts),
         sessionId: options.sessionId,
-        originalCharCount: options.originalCharCount || TraditionalTextProcessor.calculateTraditionalCharCount(chunkTexts)
+        originalCharCount: options.originalCharCount || TraditionalTextProcessor.calculateTraditionalCharCount(chunkTexts),
+        callPurpose: options.callPurpose
       });
 
       // If result is a string and we have multiple segments, let Coordinator split it.
@@ -208,8 +208,8 @@ export class BingTranslateProvider extends BaseTranslateProvider {
       // We check these BEFORE the fatal check to allow adaptive chunking/retries
       // for BingApiError (which is usually a 400 bad request that can be fixed by splitting).
       if (error.name === 'BingHtmlResponseError' || error.name === 'BingJsonParseError' || error.name === 'BingApiError') {
-        const maxRetries = providerConfig?.batching?.maxRetries || 3;
-        const adaptiveChunking = providerConfig?.batching?.adaptiveChunking || true;
+        const maxRetries = providerConfig?.batching?.maxRetries ?? 3;
+        const adaptiveChunking = providerConfig?.batching?.adaptiveChunking ?? true;
 
         logger.warn(`[Bing] ${error.name} on attempt ${retryAttempt + 1}/${maxRetries + 1}. Chunk size: ${chunkTexts.length}. Reason: ${error.message}`);
 

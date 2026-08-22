@@ -501,6 +501,28 @@ describe('OpenAIProvider Error Handling', () => {
     }
   });
 
+  it('should classify structured insufficient quota as insufficient balance', async () => {
+    proxyManager.fetch.mockResolvedValue({
+      ok: false,
+      status: 429,
+      statusText: 'Too Many Requests',
+      headers: new Map([['content-type', 'application/json']]),
+      json: () => Promise.resolve({
+        error: {
+          message: 'You have no credits remaining.',
+          type: 'insufficient_quota',
+          code: 'insufficient_quota',
+        },
+      }),
+      clone: function() { return this; }
+    });
+
+    await expect(provider._callAI('system', 'text')).rejects.toMatchObject({
+      type: ErrorTypes.INSUFFICIENT_BALANCE,
+      statusCode: 429,
+    });
+  });
+
   it('should handle HTTP 500 Server Error', async () => {
     proxyManager.fetch.mockResolvedValue({
       ok: false,
@@ -548,6 +570,7 @@ describe('OpenAIProvider Error Handling', () => {
     const controller = new AbortController();
     const abortError = new Error('The user aborted a request.');
     abortError.name = 'AbortError';
+    controller.abort('user-cancelled');
     
     proxyManager.fetch.mockRejectedValue(abortError);
 
@@ -555,6 +578,22 @@ describe('OpenAIProvider Error Handling', () => {
       await provider._callAI('system', 'text', { abortController: controller });
     } catch (error) {
       expect(error.type).toBe(ErrorTypes.USER_CANCELLED);
+    }
+  });
+
+  it('does not classify an ambiguous operation AbortError as user cancellation', async () => {
+    const controller = new AbortController();
+    const abortError = new Error('The operation was aborted.');
+    abortError.name = 'AbortError';
+
+    proxyManager.fetch.mockRejectedValue(abortError);
+
+    try {
+      await provider._callAI('system', 'text', { abortController: controller });
+    } catch (error) {
+      expect(error.type).not.toBe(ErrorTypes.USER_CANCELLED);
+      expect(error.operationAborted).toBe(true);
+      expect(error.cancellationReason).toBe('operation-abort');
     }
   });
 });

@@ -14,6 +14,97 @@ import {
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import ResourceTracker from '@/core/memory/ResourceTracker.js';
+import { walkOpenShadowTree } from '@/utils/dom/walkOpenShadowTree.js';
+
+const FORM_VALUE_TAGS = new Set(['INPUT', 'TEXTAREA', 'BUTTON']);
+
+const getComposedParent = (node) => {
+  if (!node) return null;
+  if (node.parentElement) return node.parentElement;
+  if (node.parentNode?.nodeType === Node.ELEMENT_NODE) return node.parentNode;
+  return node.parentNode?.host || null;
+};
+
+const isComposedDescendant = (root, node) => {
+  let current = node;
+
+  while (current) {
+    if (current === root) return true;
+    current = getComposedParent(current);
+  }
+
+  return false;
+};
+
+const getFilterElement = (node) => {
+  if (node?.nodeType === Node.ELEMENT_NODE) return node;
+  if (node?.nodeType === Node.ATTRIBUTE_NODE) return node.ownerElement;
+  return getComposedParent(node);
+};
+
+const matchesAnySelector = (element, selectors) => selectors.some((selector) => {
+  try {
+    return element.matches(selector);
+  } catch {
+    return false;
+  }
+});
+
+const isShadowRoot = (root) => Boolean(
+  root
+  && root.nodeType === Node.DOCUMENT_FRAGMENT_NODE
+  && root.host
+);
+
+const isExcludedAcrossShadowHosts = (owner, selectors) => {
+  let root = owner?.getRootNode?.();
+
+  while (isShadowRoot(root)) {
+    const host = root.host;
+    let current = host;
+
+    while (current) {
+      if (matchesAnySelector(current, selectors)) return true;
+      current = current.parentElement;
+    }
+
+    root = host.getRootNode?.();
+  }
+
+  return false;
+};
+
+const getEditableState = (element) => {
+  let current = element;
+
+  while (current) {
+    const value = current.getAttribute?.('contenteditable');
+    if (value !== null && value !== undefined) {
+      const normalized = value.trim().toLowerCase();
+      if (normalized === 'false') return false;
+      if (normalized === '' || normalized === 'true' || normalized === 'plaintext-only') return true;
+    }
+    current = current.parentElement;
+  }
+
+  return false;
+};
+
+const isMutableEditableNode = (node) => {
+  if (!node) return false;
+
+  if (node.nodeType === Node.TEXT_NODE) {
+    const owner = node.parentElement;
+    return Boolean(owner?.closest('textarea') || getEditableState(owner));
+  }
+
+  if (node.nodeType === Node.ATTRIBUTE_NODE) {
+    const owner = node.ownerElement;
+    return node.name.toLowerCase() === 'value' && FORM_VALUE_TAGS.has(owner?.tagName);
+  }
+
+  return false;
+};
 
 export class PageTranslationBridge extends ResourceTracker {
   constructor() {
@@ -37,8 +128,101 @@ export class PageTranslationBridge extends ResourceTracker {
       intersectionScheduler: null,
       domTranslator: null,
       persistentTranslator: null,
-      context: sessionContext
+      context: sessionContext,
+      root: null,
+      active: true,
+      shadowDiscoveryObserver: null,
+      shadowRoots: new Map(),
+      shadowMutatedNodes: new WeakSet(),
+      shadowMovedNodes: new WeakSet(),
+      shadowPersistenceStarted: false,
     };
+    const targetGenerations = new WeakMap();
+    const applyDecisions = new WeakMap();
+
+    const nextTargetGeneration = (node) => {
+      const generation = (targetGenerations.get(node) || 0) + 1;
+      targetGenerations.set(node, generation);
+      return generation;
+    };
+
+    const getCurrentNodeValue = (node) => {
+      if (!node) return '';
+      if (node.nodeType === Node.ATTRIBUTE_NODE) return node.value ?? node.nodeValue ?? '';
+      return node.nodeValue ?? '';
+    };
+
+    const setCurrentNodeValue = (node, value) => {
+      if (node?.nodeType === Node.ATTRIBUTE_NODE) {
+        node.value = value;
+        return;
+      }
+      node.nodeValue = value;
+    };
+
+    const isFreshTarget = (node, sourceValue, generation) => {
+      if (!currentSession.active || this.session !== currentSession || !node) return false;
+
+      const owner = node.nodeType === Node.ATTRIBUTE_NODE ? node.ownerElement : node;
+      const root = currentSession.root;
+      if (!isOwnedTarget(owner, root)) return false;
+
+      if (node.nodeType === Node.ATTRIBUTE_NODE) {
+        const currentAttribute = owner.getAttributeNode(node.name);
+        if (currentAttribute !== node || getCurrentNodeValue(node) !== sourceValue) return false;
+      } else if (!node.isConnected || node.nodeValue !== sourceValue) {
+        return false;
+      }
+
+      return generation === undefined || targetGenerations.get(node) === generation;
+    };
+
+    const recordApplyDecision = (node, generation, outcome, settlement = null, ownsStorage = false) => {
+      if (!node) return;
+      let decisions = applyDecisions.get(node);
+      if (!decisions) {
+        decisions = new Map();
+        applyDecisions.set(node, decisions);
+      }
+      decisions.set(generation, {
+        generation,
+        outcome,
+        settlement,
+        ownsStorage,
+        session: currentSession,
+      });
+    };
+
+    const getApplyDecision = (node, generation = targetGenerations.get(node)) => (
+      applyDecisions.get(node)?.get(generation)
+    );
+
+    const forgetApplyDecision = (node, generation) => {
+      const decisions = applyDecisions.get(node);
+      if (!decisions) return;
+      decisions.delete(generation);
+      if (decisions.size === 0) applyDecisions.delete(node);
+    };
+
+    const isActiveTarget = (node) => {
+      if (!currentSession.active || this.session !== currentSession || !node) return false;
+      const owner = node.nodeType === Node.ATTRIBUTE_NODE ? node.ownerElement : node;
+      const root = currentSession.root;
+      return isOwnedTarget(owner, root);
+    };
+
+    const isConnectedTarget = (node) => {
+      if (!node) return false;
+      const owner = node.nodeType === Node.ATTRIBUTE_NODE ? node.ownerElement : node;
+      const root = currentSession.root;
+      return isOwnedTarget(owner, root);
+    };
+
+    function isOwnedTarget(owner, root) {
+      return Boolean(owner?.isConnected
+        && (!root || (root.isConnected && isComposedDescendant(root, owner))));
+    }
+
 
     if (settings.lazyLoading) {
       currentSession.intersectionScheduler = new IntersectionScheduler({ rootMargin: settings.rootMargin });
@@ -54,8 +238,14 @@ export class PageTranslationBridge extends ResourceTracker {
       // Since domtranslator's walk is synchronous, this is the only safe way 
       // to link the text to the node before the event loop yields.
       const node = nodesTranslator.currentNode;
+      const sourceValue = getCurrentNodeValue(node);
+      const generation = nodesTranslator.currentTaskGeneration;
+      const ownsStorage = nodesTranslator.currentTaskOwnsStorage === true;
 
-      if (!text || !text.trim()) return text;
+      if (!text || !text.trim()) {
+        recordApplyDecision(node, generation, 'accepted-pending', null, ownsStorage);
+        return text;
+      }
 
       // 1. Capture original whitespace to preserve formatting
       const leadingMatch = text.match(/^(\s*)/);
@@ -66,7 +256,31 @@ export class PageTranslationBridge extends ResourceTracker {
 
       // 2. Request translation for trimmed text
       // We pass the node as the 4th argument
-      const translated = await onTranslateCallback(trimmedText, sessionContext, score, node);
+      const settlement = await onTranslateCallback(trimmedText, sessionContext, score, node);
+      const hasSettlement = settlement && settlement.__pageTranslationSettlement === true;
+      const translated = hasSettlement ? settlement.text : settlement;
+
+      // Validate before NodesTranslator receives provider output. Its own updateId
+      // protects DOM writes, but cannot correct page-level settlement accounting.
+      if (node && (!currentSession.active || this.session !== currentSession)) {
+        settlement?.settle?.('cancelled');
+        recordApplyDecision(node, generation, 'cancelled', settlement, ownsStorage);
+        return getCurrentNodeValue(node);
+      }
+
+      if (node && hasSettlement && settlement.state !== 'pending') {
+        recordApplyDecision(node, generation, settlement.state, settlement, ownsStorage);
+        return getCurrentNodeValue(node);
+      }
+
+      if (node && !isFreshTarget(node, sourceValue, generation)) {
+        settlement?.settle?.('stale');
+        recordApplyDecision(node, generation, 'stale', settlement, ownsStorage);
+        return getCurrentNodeValue(node);
+      }
+
+      recordApplyDecision(node, generation, 'accepted-pending', settlement, ownsStorage);
+
       
       // OPTIMIZATION: Preserve ZWNJ, Tatweel, Dashes and BiDi marks if the provider 
       // returned a "cleaned" version of the same text.
@@ -88,7 +302,126 @@ export class PageTranslationBridge extends ResourceTracker {
       return leadingWhitespace + (isFunctionallyIdentical ? trimmedText : (translated ? translated.trim() : trimmedText)) + trailingWhitespace;
     };
 
-    const nodesTranslator = new NodesTranslator(translateWithContext);
+    class GuardedNodesTranslator extends NodesTranslator {
+      translateNodeContent(node, callback) {
+        const nodeData = this.nodeStorage.get(node);
+        if (!nodeData) throw new Error('Node is not register');
+        if (node.nodeValue === null) return;
+
+        const nodeId = nodeData.id;
+        const nodeContext = nodeData.updateId;
+        const taskGeneration = this.currentTaskGeneration;
+        return this.translateCallback(node.nodeValue, nodeData.importanceScore).then((text) => {
+          const actualNodeData = this.nodeStorage.get(node);
+          const decision = getApplyDecision(node, taskGeneration);
+          const isCurrentStorage = actualNodeData
+            && nodeId === actualNodeData.id
+            && nodeContext === actualNodeData.updateId;
+
+          if (!isCurrentStorage) {
+            if (decision?.settlement?.state === 'pending') {
+              const outcome = decision.session === currentSession && currentSession.active
+                ? 'stale'
+                : 'cancelled';
+              decision.settlement.settle(outcome);
+            }
+            if (decision) decision.outcome = decision.session === currentSession && currentSession.active
+              ? 'stale'
+              : 'cancelled';
+            forgetApplyDecision(node, taskGeneration);
+            return;
+          }
+
+          const canPreserveProviderFailure = decision?.outcome === 'failed'
+            && decision.session === currentSession
+            && isActiveTarget(node)
+            && decision.generation === targetGenerations.get(node)
+            && decision.settlement?.state === 'failed';
+
+          if (canPreserveProviderFailure) {
+            actualNodeData.originalText = getCurrentNodeValue(node);
+            setCurrentNodeValue(node, text);
+            decision.outcome = 'failed-applied';
+            try {
+              if (callback) callback(node);
+            } finally {
+              forgetApplyDecision(node, taskGeneration);
+            }
+            return;
+          }
+
+          const canApply = decision
+            && decision.session === currentSession
+            && currentSession.active
+            && decision.generation === targetGenerations.get(node)
+            && decision.outcome === 'accepted-pending'
+            && (!decision.settlement || decision.settlement.state === 'pending');
+
+          if (!canApply) {
+            if (decision?.settlement?.state === 'pending') {
+              decision.settlement.settle(
+                decision.session === currentSession && currentSession.active ? 'stale' : 'cancelled'
+              );
+            }
+            if (decision?.ownsStorage
+                && decision.generation === targetGenerations.get(node)
+                && this.nodeStorage.get(node) === nodeData) {
+              this.nodeStorage.delete(node);
+            }
+            if (!decision?.ownsStorage
+                && (decision?.outcome === 'stale' || decision?.outcome === 'cancelled')
+                && decision.generation === targetGenerations.get(node)
+                && this.nodeStorage.get(node) === nodeData
+                && isConnectedTarget(node)) {
+              // Current-generation update owns restore baseline; obsolete updates do not.
+              nodeData.originalText = getCurrentNodeValue(node);
+            }
+            if (decision) decision.outcome = decision.session === currentSession && currentSession.active
+              ? 'stale'
+              : 'cancelled';
+            forgetApplyDecision(node, taskGeneration);
+            return;
+          }
+
+          try {
+            actualNodeData.originalText = getCurrentNodeValue(node);
+            setCurrentNodeValue(node, text);
+          } catch (error) {
+            if (decision.settlement?.state === 'pending') {
+              decision.settlement.settle(
+                decision.session === currentSession && currentSession.active ? 'stale' : 'cancelled'
+              );
+            }
+            decision.outcome = decision.session === currentSession && currentSession.active
+              ? 'stale'
+              : 'cancelled';
+            forgetApplyDecision(node, taskGeneration);
+            throw error;
+          }
+          decision.outcome = 'applied';
+          decision.settlement?.settle?.('accepted');
+          try {
+            if (callback) callback(node);
+          } finally {
+            forgetApplyDecision(node, taskGeneration);
+          }
+        });
+      }
+
+      restore(node, callback) {
+        const nodeData = this.nodeStorage.get(node);
+        if (node?.nodeType === Node.ATTRIBUTE_NODE && nodeData) {
+          if (nodeData.originalText !== null) setCurrentNodeValue(node, nodeData.originalText);
+          this.nodeStorage.delete(node);
+          callback?.(node);
+          return;
+        }
+        super.restore(node);
+        callback?.(node);
+      }
+    }
+
+    const nodesTranslator = new GuardedNodesTranslator(translateWithContext);
 
     /**
      * MONKEY-PATCH: Capture the node being processed by NodesTranslator.
@@ -98,12 +431,16 @@ export class PageTranslationBridge extends ResourceTracker {
     const originalTranslate = nodesTranslator.translate;
     nodesTranslator.translate = function(node, callback) {
       this.currentNode = node;
+      this.currentTaskGeneration = nextTargetGeneration(node);
+      this.currentTaskOwnsStorage = typeof this.has === 'function' ? !this.has(node) : true;
       return originalTranslate.call(this, node, callback);
     };
 
     const originalUpdate = nodesTranslator.update;
     nodesTranslator.update = function(node, callback) {
       this.currentNode = node;
+      this.currentTaskGeneration = nextTargetGeneration(node);
+      this.currentTaskOwnsStorage = false;
       return originalUpdate.call(this, node, callback);
     };
 
@@ -115,20 +452,34 @@ export class PageTranslationBridge extends ResourceTracker {
     const wrapWithDirection = (originalFn) => {
       const bridge = this;
       return function(node, callback) {
-        // 1. CAPTURE: Store original text before domtranslator replaces it.
-        // This is used for the "Show original on hover" feature.
-        if (bridge.showOriginalOnHover && node) {
-          if (node.nodeType === Node.TEXT_NODE) {
-            hoverPreviewLookup.add(node, node.textContent);
-          } else if (node.nodeType === Node.ATTRIBUTE_NODE) {
-            hoverPreviewLookup.add(node, node.value);
-          }
-        }
+        const originalValue = node?.nodeType === Node.ATTRIBUTE_NODE
+          ? node.value
+          : node?.textContent;
 
         // Wrap the processed node callback
         const wrappedCallback = (processedNode) => {
+          const decision = getApplyDecision(node);
+          const shouldPostProcess = !decision
+            || (
+              decision.session === currentSession
+              && currentSession.active
+              && decision.generation === targetGenerations.get(node)
+              && decision.outcome === 'applied'
+            );
+
+          if (!shouldPostProcess) {
+            // PersistentDOMTranslator uses callback to mark its own write as handled.
+            // Keep that internal bookkeeping, but suppress semantic page effects.
+            if (callback) callback(processedNode);
+            return;
+          }
+
           if (processedNode) {
             const { TRANSLATED_MARKER, HAS_ORIGINAL } = PAGE_TRANSLATION_ATTRIBUTES;
+
+            if (bridge.showOriginalOnHover && node) {
+              hoverPreviewLookup.add(node, originalValue);
+            }
             
             // Determine if it was actually translated by checking for the BiDi mark
             const textContent = processedNode.nodeType === Node.TEXT_NODE ? processedNode.textContent : processedNode.value;
@@ -164,7 +515,10 @@ export class PageTranslationBridge extends ResourceTracker {
           }
           
           // Call original callback if provided (e.g., from PersistentDOMTranslator)
-          if (callback) callback(processedNode);
+          if (callback) {
+            currentSession.shadowMutatedNodes.add(processedNode);
+            callback(processedNode);
+          }
         };
         
         try {
@@ -183,16 +537,26 @@ export class PageTranslationBridge extends ResourceTracker {
     nodesTranslator.translate = wrapWithDirection(nodesTranslator.translate);
     nodesTranslator.update = wrapWithDirection(nodesTranslator.update);
 
-    const filter = createNodesFilter({
-      ignoredSelectors: [
-        ...(settings.excludedSelectors || []), 
-        `#${PAGE_TRANSLATION_SELECTORS.UI_HOST_MAIN}`,
-        `#${PAGE_TRANSLATION_SELECTORS.UI_HOST_IFRAME}`,
-        `#${PAGE_TRANSLATION_SELECTORS.TOOLTIP_ID}`,
-        `.${PAGE_TRANSLATION_SELECTORS.INTERNAL_IGNORE_CLASS}`
-      ],
+    const composedExcludedSelectors = [
+      ...(settings.excludedSelectors || []),
+      `#${PAGE_TRANSLATION_SELECTORS.UI_HOST_MAIN}`,
+      `#${PAGE_TRANSLATION_SELECTORS.UI_HOST_IFRAME}`,
+      `#${PAGE_TRANSLATION_SELECTORS.TOOLTIP_ID}`,
+      `.${PAGE_TRANSLATION_SELECTORS.INTERNAL_IGNORE_CLASS}`,
+      `.${PAGE_TRANSLATION_SELECTORS.STANDARD_NO_TRANSLATE_CLASS}`,
+      `[translate='${PAGE_TRANSLATION_SELECTORS.TRANSLATE_NO_VALUE}']`
+    ];
+    const domTranslatorFilter = createNodesFilter({
+      ignoredSelectors: composedExcludedSelectors,
       attributesList: settings.attributesToTranslate || ['title', 'alt', 'placeholder'],
     });
+    const filter = (node) => {
+      if (!domTranslatorFilter(node) || isMutableEditableNode(node)) return false;
+
+      const owner = getFilterElement(node);
+      const root = owner?.getRootNode?.();
+      return !isShadowRoot(root) || !isExcludedAcrossShadowHosts(owner, composedExcludedSelectors);
+    };
 
     currentSession.nodesTranslator = nodesTranslator;
     currentSession.filter = filter;
@@ -203,6 +567,177 @@ export class PageTranslationBridge extends ResourceTracker {
       filter: filter
     });
 
+    const restoreDomNode = currentSession.domTranslator.restore.bind(currentSession.domTranslator);
+    currentSession.domTranslator.restore = (node, callback) => {
+      if (currentSession.shadowMovedNodes.has(node)) return;
+      return restoreDomNode(node, callback);
+    };
+
+    const markShadowMutation = (node) => currentSession.shadowMutatedNodes.add(node);
+
+    const unregisterShadowRoot = (shadowRoot) => {
+      const registration = currentSession.shadowRoots.get(shadowRoot);
+      if (!registration) return;
+      registration.observer.disconnect();
+      currentSession.shadowRoots.delete(shadowRoot);
+    };
+
+    const unregisterShadowRootsUnder = (subtree) => {
+      for (const [shadowRoot, registration] of currentSession.shadowRoots) {
+        if (isComposedDescendant(subtree, registration.host)) {
+          unregisterShadowRoot(shadowRoot);
+        }
+      }
+    };
+
+    const discoverShadowRoots = (subtree) => {
+      walkOpenShadowTree(subtree, (element) => {
+        if (element.shadowRoot) registerShadowRoot(element.shadowRoot, element);
+      });
+    };
+
+    const translateAddedNode = (node) => {
+      if (node.nodeType === Node.TEXT_NODE) {
+        if (!node.parentElement) return;
+        if (currentSession.domTranslator.has(node)) return;
+      } else if (node.nodeType !== Node.ELEMENT_NODE) {
+        return;
+      }
+
+      currentSession.domTranslator.translate(node, markShadowMutation);
+    };
+
+    const restoreRemovedNode = (node) => {
+      if (isOwnedTarget(node, currentSession.root)) return;
+      if (node.nodeType !== Node.ELEMENT_NODE && node.nodeType !== Node.TEXT_NODE) return;
+      currentSession.domTranslator.restore(node);
+      unregisterShadowRootsUnder(node);
+    };
+
+    const processShadowMutations = (shadowRoot, mutations) => {
+      const registration = currentSession.shadowRoots.get(shadowRoot);
+      if (!registration) return;
+      if (!currentSession.active
+          || this.session !== currentSession
+          || !isOwnedTarget(registration.host, currentSession.root)) {
+        unregisterShadowRoot(shadowRoot);
+        return;
+      }
+
+      const childChanges = new Map();
+      for (const mutation of mutations) {
+        if (mutation.type === 'characterData') {
+          if (currentSession.shadowMutatedNodes.has(mutation.target)) {
+            currentSession.shadowMutatedNodes.delete(mutation.target);
+          } else if (currentSession.domTranslator.has(mutation.target)) {
+            currentSession.domTranslator.update(mutation.target, markShadowMutation);
+          } else if (mutation.target.parentElement) {
+            currentSession.domTranslator.translate(mutation.target, markShadowMutation);
+          }
+          continue;
+        }
+
+        if (mutation.type === 'attributes') {
+          const attribute = mutation.target.attributes.getNamedItem(mutation.attributeName);
+          if (!attribute) continue;
+          if (currentSession.shadowMutatedNodes.has(attribute)) {
+            currentSession.shadowMutatedNodes.delete(attribute);
+          } else if (currentSession.domTranslator.has(attribute)) {
+            currentSession.domTranslator.update(attribute, markShadowMutation);
+          } else {
+            currentSession.domTranslator.translate(attribute, markShadowMutation);
+          }
+          continue;
+        }
+
+        if (mutation.type !== 'childList') continue;
+        for (const node of mutation.addedNodes) {
+          const change = childChanges.get(node) || { added: 0, removed: 0 };
+          change.added++;
+          childChanges.set(node, change);
+        }
+        for (const node of mutation.removedNodes) {
+          const change = childChanges.get(node) || { added: 0, removed: 0 };
+          change.removed++;
+          childChanges.set(node, change);
+        }
+      }
+
+      for (const [node, change] of childChanges) {
+        if (change.added > change.removed) {
+          translateAddedNode(node);
+          discoverShadowRoots(node);
+        } else if (change.removed > change.added) {
+          restoreRemovedNode(node);
+        }
+      }
+    };
+
+    const registerShadowRoot = (shadowRoot, host) => {
+      if (currentSession.shadowRoots.has(shadowRoot)
+          || !currentSession.active
+          || this.session !== currentSession
+          || !isOwnedTarget(host, currentSession.root)) return;
+
+      const observer = new MutationObserver((mutations) => {
+        processShadowMutations(shadowRoot, mutations);
+      });
+      currentSession.shadowRoots.set(shadowRoot, { host, observer });
+      observer.observe(shadowRoot, {
+        childList: true,
+        subtree: true,
+        characterData: true,
+        attributes: true,
+      });
+    };
+
+    const processDiscoveryMutations = (mutations) => {
+      if (!currentSession.active || this.session !== currentSession) return;
+      const childChanges = new Map();
+      for (const mutation of mutations) {
+        if (mutation.type !== 'childList') continue;
+        for (const node of mutation.addedNodes) {
+          const change = childChanges.get(node) || { added: 0, removed: 0 };
+          change.added++;
+          childChanges.set(node, change);
+        }
+        for (const node of mutation.removedNodes) {
+          const change = childChanges.get(node) || { added: 0, removed: 0 };
+          change.removed++;
+          childChanges.set(node, change);
+        }
+      }
+      for (const [node, change] of childChanges) {
+        if (change.added > change.removed) discoverShadowRoots(node);
+        else if (change.removed > change.added) {
+          if (isOwnedTarget(node, currentSession.root)) {
+            currentSession.shadowMovedNodes.add(node);
+            queueMicrotask(() => currentSession.shadowMovedNodes.delete(node));
+          } else {
+            unregisterShadowRootsUnder(node);
+          }
+        }
+      }
+    };
+
+    currentSession.startShadowPersistence = (root) => {
+      if (currentSession.shadowPersistenceStarted) return;
+      currentSession.shadowPersistenceStarted = true;
+      currentSession.shadowDiscoveryObserver = new MutationObserver(processDiscoveryMutations);
+      currentSession.shadowDiscoveryObserver.observe(root, { childList: true, subtree: true });
+      discoverShadowRoots(root);
+    };
+
+    currentSession.stopShadowPersistence = () => {
+      currentSession.shadowDiscoveryObserver?.disconnect();
+      currentSession.shadowDiscoveryObserver = null;
+      for (const registration of currentSession.shadowRoots.values()) {
+        registration.observer.disconnect();
+      }
+      currentSession.shadowRoots.clear();
+      currentSession.shadowPersistenceStarted = false;
+    };
+
     // We always wrap in PersistentDOMTranslator to handle dynamic content consistently
     currentSession.persistentTranslator = new PersistentDOMTranslator(currentSession.domTranslator);
 
@@ -211,12 +746,15 @@ export class PageTranslationBridge extends ResourceTracker {
 
   translate(element) {
     if (!this.session) return;
+    this.session.root = element;
+    this.session.active = true;
     
     // Respect auto-translate setting: 
     // Use persistentTranslator (MutationObserver) only if enabled.
     // Otherwise, use basic domTranslator for a single-pass translation.
     if (this.session.autoTranslateOnDOMChanges && this.session.persistentTranslator) {
       this.logger.debug('Starting persistent translation (Auto-translate enabled)');
+      this.session.startShadowPersistence?.(element);
       this.session.persistentTranslator.translate(element);
     } else if (this.session.domTranslator) {
       this.logger.debug('Starting single-pass translation (Auto-translate disabled)');
@@ -224,9 +762,14 @@ export class PageTranslationBridge extends ResourceTracker {
     }
   }
 
+  getTranslationRoot() {
+    return this.session?.root || null;
+  }
+
   stopPersistence() {
     if (this.session && this.session.persistentTranslator) {
       try {
+        this.session.stopShadowPersistence?.();
         const pt = this.session.persistentTranslator;
         // Search for the observer in observedNodesStorage (it's a Map of node -> XMutationObserver)
         if (pt.observedNodesStorage) {
@@ -245,8 +788,11 @@ export class PageTranslationBridge extends ResourceTracker {
     if (!this.session) return;
 
     try {
+      const ownedRoot = this.session.root || element;
+      this.session.stopShadowPersistence?.();
+
       // 1. Surgical Restore: Revert all direction and alignment changes
-      restoreElementDirection(element);
+      restoreElementDirection(ownedRoot, { shadowAware: true });
 
       const pt = this.session.persistentTranslator;
       const dt = this.session.domTranslator;
@@ -255,16 +801,16 @@ export class PageTranslationBridge extends ResourceTracker {
       const isObserved = pt && pt.observedNodesStorage && pt.observedNodesStorage.has(element);
 
       if (isObserved) {
-        pt.restore(element);
+        pt.restore(ownedRoot);
       } else if (dt) {
         // Fallback to direct DOM restore if persistence was stopped or node is not in observer storage
-        dt.restore(element);
+        dt.restore(ownedRoot);
       }
     } catch (e) {
       this.logger.warn('[Bridge] Restore failed:', e.message);
       // Last resort fallback directly on domTranslator
       if (this.session.domTranslator) {
-        try { this.session.domTranslator.restore(element); } catch {
+        try { this.session.domTranslator.restore(this.session.root || element); } catch {
           // Silent fallback
         }
       }
@@ -276,7 +822,10 @@ export class PageTranslationBridge extends ResourceTracker {
   cleanup() {
     if (!this.session) return;
 
+    this.session.active = false;
+
     try {
+      this.session.stopShadowPersistence?.();
       // 1. Manually disconnect all internal observers just in case
       const pt = this.session.persistentTranslator;
       if (pt && pt.observedNodesStorage) {

@@ -22,6 +22,53 @@ function normalizeCallPurpose(callPurpose) {
     : TranslationCallPurpose.PRIMARY_TRANSLATION;
 }
 
+const PROVIDER_ERROR_FIELD_MAX_LENGTH = 128;
+
+function getBoundedProviderErrorField(value) {
+  if (typeof value === 'number') return Number.isSafeInteger(value) ? value : undefined;
+  if (typeof value !== 'string') return undefined;
+
+  const normalized = value.trim();
+  return normalized.length > 0 && normalized.length <= PROVIDER_ERROR_FIELD_MAX_LENGTH
+    ? normalized
+    : undefined;
+}
+
+function extractProviderHttpErrorInfo(body) {
+  const topLevel = body && typeof body === 'object' && !Array.isArray(body) ? body : {};
+  const nestedError = topLevel.error && typeof topLevel.error === 'object' && !Array.isArray(topLevel.error)
+    ? topLevel.error
+    : {};
+  const info = {};
+
+  const fields = [
+    ['topLevelCode', topLevel.code],
+    ['nestedErrorCode', nestedError.code],
+    ['topLevelType', topLevel.type],
+    ['nestedErrorType', nestedError.type],
+  ];
+
+  for (const [field, value] of fields) {
+    const boundedValue = getBoundedProviderErrorField(value);
+    if (boundedValue !== undefined) info[field] = boundedValue;
+  }
+
+  return Object.freeze(info);
+}
+
+function classifyProviderHttpError(provider, errorInfo) {
+  if (typeof provider?.classifyProviderHttpError !== 'function') return null;
+
+  try {
+    const result = provider.classifyProviderHttpError(errorInfo);
+    const normalizedResult = typeof result === 'string' ? result.trim() : '';
+    return Object.values(ErrorTypes).includes(normalizedResult) ? normalizedResult : null;
+  } catch (error) {
+    logger.debug(`[${provider.providerName}] Provider HTTP error classification failed; using generic classification`, error);
+    return null;
+  }
+}
+
 export const ProviderRequestEngine = {
   /**
    * Internal helper to adapt request headers based on the environment (Browser/Platform)
@@ -107,14 +154,14 @@ export const ProviderRequestEngine = {
       } catch (error) {
         lastError = error;
 
-        const errorType = error.type || matchErrorToType(error);
-        if (errorType === ErrorTypes.USER_CANCELLED || errorType === ErrorTypes.TRANSLATION_CANCELLED) {
+        const errorType = error.type || (error.operationAborted ? null : matchErrorToType(error));
+        if (error.operationAborted || errorType === ErrorTypes.USER_CANCELLED || errorType === ErrorTypes.TRANSLATION_CANCELLED) {
           appendTranslationDiagnostic(executionContext, {
             type: 'PROVIDER_CANCELLED',
             stage: 'provider-request',
             provider: provider.providerName,
             reason: error.message,
-            code: errorType,
+            code: errorType || error.cancellationReason,
             cancelled: true,
           });
           throw error;
@@ -292,11 +339,15 @@ export const ProviderRequestEngine = {
           url: sanitizedUrl,
         });
 
-        const errorType = matchErrorToType({ 
-          statusCode: response.status, 
-          message: msg, 
+        const providerErrorInfo = Object.freeze({
+          statusCode: response.status,
+          ...extractProviderHttpErrorInfo(body),
+        });
+        const providerErrorType = classifyProviderHttpError(provider, providerErrorInfo);
+        const errorType = providerErrorType || matchErrorToType({
+          statusCode: response.status,
+          message: msg,
           providerType: provider.constructor.type,
-          ...body 
         });
 
         const err = new Error(msg);
@@ -361,8 +412,16 @@ export const ProviderRequestEngine = {
       }
 
       if (err.name === 'AbortError') {
-        const abortErr = new Error('Translation cancelled by user');
-        abortErr.type = ErrorTypes.USER_CANCELLED;
+        const signal = abortController?.signal;
+        const isUserAbort = signal?.aborted
+          && (signal.reason === 'user-cancelled' || signal.reason === 'user_cancelled');
+        const abortErr = new Error(isUserAbort ? 'Translation cancelled by user' : 'Translation operation aborted');
+        if (isUserAbort) {
+          abortErr.type = ErrorTypes.USER_CANCELLED;
+        } else {
+          abortErr.operationAborted = true;
+          abortErr.cancellationReason = 'operation-abort';
+        }
         abortErr.context = context;
         throw abortErr;
       }

@@ -335,9 +335,9 @@ const Healers = {
       if (expectedFormat === ResponseFormat.JSON_OBJECT && Array.isArray(parsed)) {
         const bridged = {};
         parsed.forEach((val, idx) => {
-          const text = (typeof val === 'object' && val !== null) 
-            ? (val.t || val.text || val.translation || '') 
-            : String(val);
+          const text = (typeof val === 'object' && val !== null)
+            ? (val.t || val.text || val.translation || '')
+            : val;
           bridged[idx + 1] = text;
         });
         return bridged;

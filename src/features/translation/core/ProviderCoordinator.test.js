@@ -14,8 +14,10 @@ vi.mock("@/shared/error-management/ErrorMatcher.js");
 import { providerCoordinator } from './ProviderCoordinator.js';
 import { ResponseFormat } from "@/shared/config/translationConstants.js";
 import { AUTO_DETECT_VALUE } from "@/shared/constants/core.js";
+import { ErrorTypes } from "@/shared/error-management/ErrorTypes.js";
 import { isFatalError, isTransientError, matchErrorToType } from "@/shared/error-management/ErrorMatcher.js";
 import { TranslationCallPurpose } from '@/features/translation/providers/ProviderConstants.js';
+import { createTranslationOperation } from '@/features/translation/ir/TranslationOperation.js';
 
 // Mock dependencies
 vi.mock('@/shared/logging/logger.js', () => ({
@@ -119,24 +121,81 @@ describe('ProviderCoordinator', () => {
       expect(result.targetLanguage).toBe('de');
     });
 
-    it('should register detection feedback when source is auto', async () => {
+    it('should not feed provider metadata into language detection caches', async () => {
       const { LanguageDetectionService } = await import("@/shared/services/LanguageDetectionService.js");
-      mockProvider.lastDetectedLanguage = 'de';
+      LanguageDetectionService.detect.mockResolvedValue('en');
 
-      await providerCoordinator.execute(
+      const result = await providerCoordinator.execute(
         mockProvider, 'Guten Tag', AUTO_DETECT_VALUE, 'en'
       );
 
-      expect(LanguageDetectionService.registerDetectionResult).toHaveBeenCalledWith(
-        'Guten Tag', 'de', expect.anything()
+      expect(result.detectedLanguage).toBe('en');
+      expect(LanguageDetectionService.registerDetectionResult).not.toHaveBeenCalled();
+    });
+
+    it('keeps provider metadata out of the public coordinator result', async () => {
+      const operation = createTranslationOperation('coordinator-internal-metadata');
+      mockProvider.translate.mockImplementation(async (_text, _source, _target, options) => {
+        options.executionContext.operation.recordProviderExecutionMetadata({ detectedLanguage: 'en' });
+        return 'Translated Text';
+      });
+
+      const result = await providerCoordinator.execute(
+        mockProvider,
+        'Hello',
+        'en',
+        'fa',
+        { executionContext: { operation }, languagePairResolved: true },
       );
+
+      expect(operation.snapshotAggregatedProviderMetadata()).toEqual({ detectedLanguage: 'en' });
+      expect(result).not.toHaveProperty('providerMetadata');
+      expect(result).not.toHaveProperty('metadata.provider');
+    });
+
+    it('does not leak stale detection state into explicit-source metadata', async () => {
+      const result = await providerCoordinator.execute(
+        mockProvider,
+        'Guten Tag',
+        'de',
+        'en',
+        { languagePairResolved: true },
+      );
+
+      expect(result.sourceLanguage).toBe('de');
+      expect(result.detectedLanguage).toBe('de');
+    });
+
+    it('keeps concurrent response metadata request-local', async () => {
+      const sharedProvider = {
+        ...mockProvider,
+        translate: vi.fn(async (text) => {
+          if (text === 'request-a') {
+            await new Promise(resolve => setTimeout(resolve, 10));
+          }
+          return `translated-${text}`;
+        }),
+      };
+
+      const [requestA, requestB] = await Promise.all([
+        providerCoordinator.execute(sharedProvider, 'request-a', 'ja', 'en', {
+          languagePairResolved: true,
+          parallelExecution: true,
+        }),
+        providerCoordinator.execute(sharedProvider, 'request-b', 'ko', 'en', {
+          languagePairResolved: true,
+          parallelExecution: true,
+        }),
+      ]);
+
+      expect(requestA.detectedLanguage).toBe('ja');
+      expect(requestB.detectedLanguage).toBe('ko');
     });
 
     it('should not register feedback for Vajehyab auto lookups without verified detection', async () => {
       const { LanguageDetectionService } = await import("@/shared/services/LanguageDetectionService.js");
 
       mockProvider.providerName = 'Vajehyab';
-      mockProvider.lastDetectedLanguage = null;
       LanguageDetectionService.detect.mockResolvedValue('en');
 
       const result = await providerCoordinator.execute(
@@ -227,9 +286,162 @@ describe('ProviderCoordinator', () => {
       expect(result.translatedText).toEqual(['Bonjour']);
       expect(result.translatedText).not.toBe('');
     });
+
+    describe('JSON-wrapped output validation', () => {
+      const executeWrapped = (source, providerResult) => {
+        mockProvider.translate.mockResolvedValue(providerResult);
+        return providerCoordinator._executeJsonWrapped(
+          mockProvider,
+          source,
+          'en',
+          'fa',
+          'selection',
+          {},
+        );
+      };
+
+      it('reconstructs valid results while preserving metadata', async () => {
+        const source = [
+          { i: 'a', t: 'A', blockId: 'x' },
+          { i: 'b', t: 'B', blockId: 'y' },
+        ];
+
+        const result = await executeWrapped(source, ['A2', 'B2']);
+
+        expect(JSON.parse(result)).toEqual([
+          { i: 'a', t: 'A2', blockId: 'x' },
+          { i: 'b', t: 'B2', blockId: 'y' },
+        ]);
+      });
+
+      it('accepts identity translation', async () => {
+        const result = await executeWrapped([{ t: 'URL' }], ['URL']);
+
+        expect(JSON.parse(result)).toEqual([{ t: 'URL' }]);
+      });
+
+      it.each(['', '   ', null, undefined, 0, 42, false, true, {}, []])(
+        'rejects invalid nonblank result %p',
+        async (value) => {
+          await expect(executeWrapped([{ t: 'SOURCE' }], [value]))
+            .rejects.toMatchObject({ type: ErrorTypes.API_RESPONSE_INVALID });
+        },
+      );
+
+      it('rejects a sparse result slot', async () => {
+        const results = [];
+        results.length = 1;
+
+        await expect(executeWrapped([{ t: 'SOURCE' }], results))
+          .rejects.toMatchObject({ type: ErrorTypes.API_RESPONSE_INVALID });
+      });
+
+      it('preserves blank-source blank-output compatibility', async () => {
+        const result = await executeWrapped([{ t: '' }], ['']);
+
+        expect(JSON.parse(result)).toEqual([{ t: '' }]);
+      });
+
+      it.each([
+        [[{ t: 'A' }, { t: 'B' }, { t: 'C' }], ['A2', 'B2']],
+        [[{ t: 'A' }, { t: 'B' }], ['A2', 'B2', 'C2']],
+      ])('rejects cardinality mismatch', async (source, providerResult) => {
+        await expect(executeWrapped(source, providerResult))
+          .rejects.toMatchObject({ type: ErrorTypes.API_RESPONSE_INVALID });
+      });
+
+      it('keeps rawJsonPayload calls on standard execution path', async () => {
+        const jsonInput = JSON.stringify([{ t: 'SOURCE' }]);
+        mockProvider.translate.mockResolvedValue('TRANSLATED');
+
+        const result = await providerCoordinator.execute(
+          mockProvider,
+          jsonInput,
+          'en',
+          'fa',
+          { rawJsonPayload: true },
+        );
+
+        expect(mockProvider.translate).toHaveBeenCalledWith(
+          jsonInput,
+          'en',
+          'fa',
+          expect.objectContaining({ rawJsonPayload: true }),
+        );
+        expect(result.translatedText).toBe('TRANSLATED');
+      });
+    });
   });
 
   describe('Error Resilience', () => {
+    it('propagates operation abort without matcher classification', async () => {
+      const operationAbort = Object.assign(new Error('operation stopped'), {
+        name: 'AbortError',
+        operationAborted: true,
+        cancellationReason: 'operation-abort',
+      });
+      mockProvider.translate.mockRejectedValue(operationAbort);
+
+      await expect(providerCoordinator.execute(
+        mockProvider, 'Original Text', 'en', 'fa'
+      )).rejects.toBe(operationAbort);
+
+      expect(matchErrorToType).not.toHaveBeenCalled();
+      expect(isTransientError).not.toHaveBeenCalled();
+      expect(isFatalError).not.toHaveBeenCalled();
+      expect(operationAbort).toMatchObject({
+        operationAborted: true,
+        cancellationReason: 'operation-abort',
+      });
+      expect(operationAbort.type).not.toBe(ErrorTypes.USER_CANCELLED);
+    });
+
+    it('preserves typed timeout AbortError without matcher classification', async () => {
+      const timeoutError = Object.assign(new Error('timed out'), {
+        name: 'AbortError',
+        type: ErrorTypes.TRANSLATION_TIMEOUT,
+      });
+      mockProvider.translate.mockRejectedValue(timeoutError);
+
+      await expect(providerCoordinator.execute(
+        mockProvider, 'Original Text', 'en', 'fa'
+      )).rejects.toBe(timeoutError);
+
+      expect(matchErrorToType).not.toHaveBeenCalled();
+      expect(timeoutError.type).toBe(ErrorTypes.TRANSLATION_TIMEOUT);
+      expect(timeoutError.operationAborted).not.toBe(true);
+      expect(isTransientError).toHaveBeenCalledWith(expect.objectContaining({
+        type: ErrorTypes.TRANSLATION_TIMEOUT,
+      }));
+      expect(isFatalError).toHaveBeenCalledWith(expect.objectContaining({
+        type: ErrorTypes.TRANSLATION_TIMEOUT,
+      }));
+    });
+
+    it('continues matching ordinary untyped provider errors', async () => {
+      const ordinaryError = new Error('Temporary API Error');
+      mockProvider.translate.mockRejectedValue(ordinaryError);
+
+      await expect(providerCoordinator.execute(
+        mockProvider, 'Original Text', 'en', 'fa'
+      )).rejects.toBe(ordinaryError);
+
+      expect(matchErrorToType).toHaveBeenCalledWith(ordinaryError);
+    });
+
+    it('propagates explicit USER_CANCELLED without matcher classification', async () => {
+      const userError = Object.assign(new Error('cancelled'), {
+        type: ErrorTypes.USER_CANCELLED,
+      });
+      mockProvider.translate.mockRejectedValue(userError);
+
+      await expect(providerCoordinator.execute(
+        mockProvider, 'Original Text', 'en', 'fa'
+      )).rejects.toBe(userError);
+
+      expect(matchErrorToType).not.toHaveBeenCalled();
+    });
+
     it('should throw if provider fails with a non-fatal non-transient error instead of fabricating success', async () => {
       mockProvider.translate.mockRejectedValue(new Error('Temporary API Error'));
 

@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import browser from 'webextension-polyfill';
+import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
 
 // Mock webextension-polyfill
 vi.mock('webextension-polyfill', () => ({
@@ -102,6 +103,7 @@ describe('handleActivateSelectElementMode', () => {
 
     expect(response.success).toBe(false);
     expect(response.isRestrictedPage).toBe(true);
+    expect(response).not.toHaveProperty('errorDetails');
     expect(browser.tabs.sendMessage).not.toHaveBeenCalled();
   });
 
@@ -113,6 +115,10 @@ describe('handleActivateSelectElementMode', () => {
 
     expect(response.success).toBe(false);
     expect(response.message).toContain('Failed to communicate');
+    expect(response.errorDetails).toEqual({
+      message: 'Could not activate Select Element mode.',
+      type: ErrorTypes.SELECT_ELEMENT,
+    });
   });
 
   it('should handle legacy boolean responses (true)', async () => {
@@ -140,6 +146,7 @@ describe('handleActivateSelectElementMode', () => {
     browser.tabs.sendMessage.mockResolvedValue({ 
       success: false, 
       error: 'Already active',
+      errorType: 'MODEL_MISSING',
       isCompatibilityIssue: true 
     });
     
@@ -150,6 +157,11 @@ describe('handleActivateSelectElementMode', () => {
     expect(response.message).toBe('Could not activate Select Element mode.');
     expect(response.error).toBe('Could not activate Select Element mode.');
     expect(response.isCompatibilityIssue).toBe(true);
+    expect(response.errorType).toBe('MODEL_MISSING');
+    expect(response.errorDetails).toEqual({
+      message: 'Could not activate Select Element mode.',
+      type: 'MODEL_MISSING',
+    });
   });
 
   it('sanitizes unknown activation exceptions while retaining diagnostics in logs', async () => {
@@ -162,6 +174,10 @@ describe('handleActivateSelectElementMode', () => {
       success: false,
       message: 'Could not activate Select Element mode.',
       error: 'Could not activate Select Element mode.',
+      errorDetails: {
+        message: 'Could not activate Select Element mode.',
+        type: ErrorTypes.SELECT_ELEMENT,
+      },
     });
     expect(JSON.stringify(response)).not.toContain('INTERNAL_PORT_9f81');
     expect(JSON.stringify(response)).not.toContain('Receiving end does not exist');

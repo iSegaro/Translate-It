@@ -4,6 +4,8 @@ import { storageManager } from '@/shared/storage/core/StorageCore.js';
 import { TranslationMode } from '@/config.js';
 import ExtensionContextManager from '@/core/extensionContext.js';
 import { ErrorHandler } from '@/shared/error-management/ErrorHandler.js';
+import { MessageFormat } from '@/shared/messaging/core/MessagingCore.js';
+import { getPageTranslationErrorPresentation } from './PageTranslationErrorPresenter.js';
 
 /**
  * PageTranslationEventManager - Specialized class to handle external events
@@ -146,21 +148,31 @@ export class PageTranslationEventManager {
     bus.on('page-translation-fatal-error', ({ error, errorType, localizedMessage }) => 
       this.manager._handleFatalError(error, errorType, localizedMessage));
 
-    bus.on('page-translation-internal-error', (data) => {
+    bus.on('page-translation-internal-error', async (data) => {
       if (data.isFatal || ExtensionContextManager.isContextError(data.error)) return;
 
       this.logger.debug('Non-fatal page translation error received', data.error);
 
-      ErrorHandler.getInstance().handle(data.error, {
-        context: data.context || 'page-translation',
-        showToast: true
-      }).catch(err => this.logger.warn('ErrorHandler failed for non-fatal error:', err));
+      const presentationPromise = getPageTranslationErrorPresentation({
+        error: data.error,
+        errorDetails: data.errorDetails,
+        errorType: data.errorType,
+      });
 
       this.manager._broadcastEvent(MessageActions.PAGE_TRANSLATE_ERROR, {
         error: data.error?.message || String(data.error),
+        errorDetails: MessageFormat.serializeTranslationError(data.error),
         errorType: data.errorType,
         isFatal: false
       });
+
+      const displayError = await presentationPromise;
+      if (displayError) {
+        ErrorHandler.getInstance().handle(displayError, {
+          context: data.context || 'page-translation',
+          showToast: true
+        }).catch(err => this.logger.warn('ErrorHandler failed for non-fatal error:', err));
+      }
     });
 
     // 4. Conflict Resolution

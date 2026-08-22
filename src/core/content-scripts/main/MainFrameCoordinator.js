@@ -3,10 +3,23 @@
  * Handles cross-frame communication and synchronization between the main frame and iframes.
  */
 import { pageEventBus } from '@/core/PageEventBus.js';
+import { reconstructTranslationError, isStructuredTranslationError } from '@/shared/messaging/core/MessagingCore.js';
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.IFRAME, 'MainFrameCoordinator');
+const MOUSE_HOVER_TRANSLATION_ERROR = 'MOUSE_HOVER_TRANSLATION_ERROR';
+
+function normalizeHoverErrorData(type, data) {
+  if (type !== MOUSE_HOVER_TRANSLATION_ERROR || !isStructuredTranslationError(data?.errorDetails)) {
+    return data;
+  }
+
+  return {
+    ...data,
+    error: reconstructTranslationError(data.errorDetails)
+  };
+}
 
 export class MainFrameCoordinator {
   constructor(aggregator, MessageActions, contentScriptCore) {
@@ -179,21 +192,23 @@ export class MainFrameCoordinator {
 
         // Forward other events to the local PageEventBus
         if (type && pageEventBus) {
+          const eventData = normalizeHoverErrorData(type, data);
+
           // Special handling for positions from iframes:
           // Transform iframe-relative coordinates to top-frame coordinates
-          if (data && data.position && !data.position._isTransformed) {
+          if (eventData && eventData.position && !eventData.position._isTransformed) {
             const iframeElement = this._getIframeElement(event.source);
             if (iframeElement) {
               const rect = iframeElement.getBoundingClientRect();
-              data.position.x += rect.left;
-              data.position.y += rect.top;
-              data.position._isTransformed = true; // Avoid double transformation
+              eventData.position.x += rect.left;
+              eventData.position.y += rect.top;
+              eventData.position._isTransformed = true; // Avoid double transformation
               
-              logger.debug(`Transformed iframe position for ${type}:`, data.position);
+              logger.debug(`Transformed iframe position for ${type}:`, eventData.position);
             }
           }
           
-          pageEventBus.emit(type, data);
+          pageEventBus.emit(type, eventData);
         }
       }
 

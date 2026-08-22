@@ -8,6 +8,7 @@ import {
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { ProviderNames } from "@/features/translation/providers/ProviderConstants.js";
+import { ErrorTypes } from "@/shared/error-management/ErrorTypes.js";
 import { AIConversationHelper } from "./utils/AIConversationHelper.js";
 import { AITextProcessor } from "./utils/AITextProcessor.js";
 import { ResponseFormat } from "@/shared/config/translationConstants.js";
@@ -28,6 +29,13 @@ const OPENAI_REQUEST_CAPABILITIES = Object.freeze({
 
 const getRequestCapabilities = (model) => OPENAI_REQUEST_CAPABILITIES[model] || { supportsTemperature: false };
 
+const OPENAI_PERMANENT_QUOTA_CODES = new Set([
+  'billing_hard_limit_reached',
+  'credit_balance_exhausted',
+  'insufficient_credits',
+  'insufficient_quota',
+]);
+
 export class OpenAIProvider extends BaseAIProvider {
   static type = "ai";
   static description = "OpenAI's GPT models (GPT-4, GPT-3.5)";
@@ -36,6 +44,21 @@ export class OpenAIProvider extends BaseAIProvider {
   constructor() {
     super(ProviderNames.OPENAI);
     this.providerSettingKey = 'OPENAI_API_KEY';
+  }
+
+  classifyProviderHttpError(errorInfo) {
+    const structuredValues = [
+      errorInfo?.topLevelCode,
+      errorInfo?.nestedErrorCode,
+      errorInfo?.topLevelType,
+      errorInfo?.nestedErrorType,
+    ]
+      .filter(value => typeof value === 'string')
+      .map(value => value.trim().toLowerCase());
+
+    return structuredValues.some(value => OPENAI_PERMANENT_QUOTA_CODES.has(value))
+      ? ErrorTypes.INSUFFICIENT_BALANCE
+      : null;
   }
 
   /**

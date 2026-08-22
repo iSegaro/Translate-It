@@ -58,6 +58,83 @@ describe('StreamingResponseHandler', () => {
     }));
   });
 
+  it('reconstructs stream-end errors with canonical identity on Error', () => {
+    const messageId = 'msg-stream-error';
+    handler.registerHandler(messageId);
+    const errorData = {
+      message: 'Provider failed',
+      type: 'PROVIDER_ERROR',
+      originalType: 'HTTP_ERROR',
+      statusCode: 502,
+      context: 'stream',
+      providerName: 'Provider',
+      providerId: 'provider-id',
+      code: 'UPSTREAM_FAILURE',
+      errorCode: 'E_UPSTREAM',
+      cause: 'private',
+      arbitrary: { ignored: true }
+    };
+
+    handler.handleMessage({
+      action: MessageActions.TRANSLATION_STREAM_END,
+      messageId,
+      data: { success: false, error: errorData }
+    });
+
+    const error = mockCoordinator.handleStreamingError.mock.calls[0][1];
+    expect(error).toBeInstanceOf(Error);
+    expect(error).toMatchObject({
+      message: 'Provider failed',
+      type: 'PROVIDER_ERROR',
+      originalType: 'HTTP_ERROR',
+      statusCode: 502,
+      context: 'stream',
+      providerName: 'Provider',
+      providerId: 'provider-id',
+      code: 'UPSTREAM_FAILURE',
+      errorCode: 'E_UPSTREAM'
+    });
+    expect(error).not.toHaveProperty('cause');
+    expect(error).not.toHaveProperty('arbitrary');
+    expect(error.streamData.error).toEqual(errorData);
+  });
+
+  it('prefers canonical errorDetails over legacy error on stream end', () => {
+    const messageId = 'msg-details-wins';
+    handler.registerHandler(messageId);
+
+    handler.handleMessage({
+      action: MessageActions.TRANSLATION_STREAM_END,
+      messageId,
+      data: {
+        success: false,
+        error: { message: 'legacy failure', type: 'LEGACY_ERROR' },
+        errorDetails: { message: 'canonical failure', type: 'MODEL_NOT_FOUND' }
+      }
+    });
+
+    const error = mockCoordinator.handleStreamingError.mock.calls[0][1];
+    expect(error).toMatchObject({ message: 'canonical failure', type: 'MODEL_NOT_FOUND' });
+  });
+
+  it('falls back to legacy error when errorDetails is malformed on stream end', () => {
+    const messageId = 'msg-malformed-details';
+    handler.registerHandler(messageId);
+
+    handler.handleMessage({
+      action: MessageActions.TRANSLATION_STREAM_END,
+      messageId,
+      data: {
+        success: false,
+        error: { message: 'legacy failure', type: 'LEGACY_ERROR' },
+        errorDetails: { arbitrary: true }
+      }
+    });
+
+    const error = mockCoordinator.handleStreamingError.mock.calls[0][1];
+    expect(error).toMatchObject({ message: 'legacy failure', type: 'LEGACY_ERROR' });
+  });
+
   it('should handle TRANSLATION_RESULT_UPDATE messages', () => {
     const messageId = 'msg-4';
     const onTranslationResult = vi.fn();
@@ -71,6 +148,62 @@ describe('StreamingResponseHandler', () => {
       success: true,
       type: 'translation_result'
     }));
+  });
+
+  it('reconstructs translation-result errors with canonical identity on Error', () => {
+    const messageId = 'msg-result-error';
+    handler.registerHandler(messageId);
+
+    handler.handleMessage({
+      action: MessageActions.TRANSLATION_RESULT_UPDATE,
+      messageId,
+      data: {
+        success: false,
+        error: {
+          message: 'Invalid response',
+          type: 'VALIDATION',
+          originalType: 'PROVIDER_ERROR',
+          statusCode: 422,
+          context: 'translation-result',
+          providerName: 'Provider',
+          providerId: 'provider-id',
+          code: 'INVALID_RESULT',
+          errorCode: 'E_RESULT'
+        }
+      }
+    });
+
+    const error = mockCoordinator.handleStreamingError.mock.calls[0][1];
+    expect(error).toMatchObject({
+      message: 'Invalid response',
+      type: 'VALIDATION',
+      originalType: 'PROVIDER_ERROR',
+      statusCode: 422,
+      context: 'translation-result',
+      providerName: 'Provider',
+      providerId: 'provider-id',
+      code: 'INVALID_RESULT',
+      errorCode: 'E_RESULT'
+    });
+    expect(error.translationData.error).toEqual(expect.objectContaining({ type: 'VALIDATION' }));
+  });
+
+  it('prefers canonical errorDetails over legacy error on translation result', () => {
+    const messageId = 'msg-result-details';
+    handler.registerHandler(messageId);
+
+    handler.handleMessage({
+      action: MessageActions.TRANSLATION_RESULT_UPDATE,
+      messageId,
+      data: {
+        success: false,
+        error: { message: 'legacy failure', type: 'LEGACY_ERROR' },
+        errorDetails: { message: 'canonical failure', type: 'MODEL_NOT_FOUND' }
+      }
+    });
+
+    const error = mockCoordinator.handleStreamingError.mock.calls[0][1];
+    expect(error).toMatchObject({ message: 'canonical failure', type: 'MODEL_NOT_FOUND' });
   });
 
   it('should handle errors in handlers gracefully', () => {

@@ -126,6 +126,37 @@ describe('usePageTranslation Composable', () => {
     });
   });
   describe('Event Bus Handling', () => {
+    it('stores safe canonical display text for structured errors', async () => {
+      const pageTranslation = usePageTranslation();
+
+      const errorListener = pageEventBus.on.mock.calls.find(c => c[0] === 'page-translation-error')[1];
+      const raw = 'raw provider response body';
+      await errorListener({
+        error: raw,
+        errorDetails: { type: 'MODEL_NOT_FOUND', message: raw },
+      });
+
+      expect(pageTranslation.error.value).toBeInstanceOf(Error);
+      expect(pageTranslation.message.value).not.toContain(raw);
+    });
+
+    it('does not mutate visible state for structured context errors', async () => {
+      const pageTranslation = usePageTranslation();
+      const errorListener = pageEventBus.on.mock.calls.find(c => c[0] === 'page-translation-error')[1];
+
+      await errorListener({
+        error: 'context invalidated',
+        errorDetails: {
+          type: 'EXTENSION_CONTEXT_INVALIDATED',
+          message: 'context invalidated',
+        },
+      });
+
+      expect(pageTranslation.error.value).toBeNull();
+      expect(pageTranslation.message.value).toBe('');
+      expect(pageTranslation.isTranslating.value).toBe(false);
+    });
+
     it('should update progress when pageEventBus emits', () => {
       // Manual trigger of the listener if we were testing the live component
       // But we can test the internal updateProgress logic by getting the listener

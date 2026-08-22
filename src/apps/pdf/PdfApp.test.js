@@ -61,6 +61,14 @@ const regionComparisonRunnerMock = vi.hoisted(() => ({
 const activityCompletedMock = vi.hoisted(() => vi.fn(() => ({ name: 'activity-completed' })))
 const translationPartialMock = vi.hoisted(() => vi.fn())
 const translationFailedMock = vi.hoisted(() => vi.fn())
+const pdfTranslationErrorPresenterMock = vi.hoisted(() => vi.fn(async ({ errorDetails }) => {
+  if (['CONTEXT', 'EXTENSION_CONTEXT_INVALIDATED', 'TRANSLATION_CANCELLED'].includes(errorDetails?.type)) {
+    return { kind: 'silent' }
+  }
+  return errorDetails
+    ? { kind: 'display', message: 'Localized model error' }
+    : { kind: 'display', message: 'Generic PDF translation error' }
+}))
 const pageContentSourceMock = vi.hoisted(() => Object.freeze({
   PDF_TEXT: 'pdf-text',
   OCR: 'ocr',
@@ -135,6 +143,10 @@ vi.mock('./presentation/domainEvents.js', async (importOriginal) => {
     })
   }
 })
+
+vi.mock('./presentation/PdfTranslationErrorPresenter.js', () => ({
+  presentPdfTranslationError: pdfTranslationErrorPresenterMock,
+}))
 
 vi.mock('./composables/usePdfOcr.js', () => ({
   usePdfOcr: (options) => {
@@ -555,6 +567,7 @@ describe('PdfApp', () => {
     activityCompletedMock.mockClear()
     translationPartialMock.mockClear()
     translationFailedMock.mockClear()
+    pdfTranslationErrorPresenterMock.mockClear()
     settingsStoreMock.settings = reactive({ THEME: 'auto', DEBUG_MODE: false })
     settingsStoreMock.settings.DEBUG_MODE = false
     settingsStoreMock.settings.OCR_DEFAULT_LANG = 'eng'
@@ -778,9 +791,14 @@ describe('PdfApp', () => {
     const wrapper = mount(PdfApp)
 
     wrapper.findComponent({ name: 'PdfToolbar' }).vm.$emit('translate-visible')
-    await flushPromises()
+    await vi.waitFor(() => expect(translationPartialMock).toHaveBeenCalledOnce())
 
-    expect(translationPartialMock).toHaveBeenCalledWith(expect.objectContaining({ occurrenceId: 7, error: 'Provider failed' }))
+    expect(translationPartialMock).toHaveBeenCalledWith(expect.objectContaining({
+      occurrenceId: 7,
+      error: 'Generic PDF translation error',
+      reason: 'provider-error',
+    }))
+    expect(translationPartialMock.mock.calls[0][0].error).not.toContain('Provider failed')
   })
 
   it('presents failed page translation through its canonical event', async () => {
@@ -797,10 +815,65 @@ describe('PdfApp', () => {
     const wrapper = mount(PdfApp)
 
     wrapper.findComponent({ name: 'PdfToolbar' }).vm.$emit('translate-visible')
+    await vi.waitFor(() => expect(translationFailedMock).toHaveBeenCalledOnce())
+
+    expect(translationFailedMock).toHaveBeenCalledWith(expect.objectContaining({
+      occurrenceId: 8,
+      error: 'Generic PDF translation error',
+      reason: 'provider-error',
+    }))
+    expect(translationFailedMock.mock.calls[0][0].error).not.toContain('Translation request failed')
+  })
+
+  it('uses structured PDF error identity for summary presentation', async () => {
+    createMocks()
+    mockViewerController.translationSummary.value = {
+      status: 'error',
+      translatedCount: 0,
+      failedCount: 1,
+      totalCount: 1,
+      translationOccurrenceId: 11,
+      error: 'raw provider body with model list',
+      errorDetails: { message: 'raw provider diagnostic', type: 'MODEL_NOT_FOUND' },
+      failureReason: 'provider-error'
+    }
+    const wrapper = mount(PdfApp)
+
+    wrapper.findComponent({ name: 'PdfToolbar' }).vm.$emit('translate-visible')
+    await vi.waitFor(() => expect(translationFailedMock).toHaveBeenCalledOnce())
+
+    expect(pdfTranslationErrorPresenterMock).toHaveBeenCalledWith(expect.objectContaining({
+      error: 'raw provider body with model list',
+      errorDetails: { message: 'raw provider diagnostic', type: 'MODEL_NOT_FOUND' },
+      failureReason: 'provider-error'
+    }))
+    expect(translationFailedMock).toHaveBeenCalledWith(expect.objectContaining({
+      error: 'Localized model error',
+      errorDetails: { message: 'raw provider diagnostic', type: 'MODEL_NOT_FOUND' },
+      reason: 'provider-error'
+    }))
+    expect(translationFailedMock.mock.calls[0][0].error).not.toContain('raw provider')
+  })
+
+  it('keeps structured context failure silent at summary boundary', async () => {
+    createMocks()
+    mockViewerController.translationSummary.value = {
+      status: 'error',
+      translatedCount: 0,
+      failedCount: 1,
+      totalCount: 1,
+      translationOccurrenceId: 12,
+      error: 'raw context diagnostic',
+      errorDetails: { message: 'raw context diagnostic', type: 'EXTENSION_CONTEXT_INVALIDATED' },
+      failureReason: 'provider-error'
+    }
+    const wrapper = mount(PdfApp)
+
+    wrapper.findComponent({ name: 'PdfToolbar' }).vm.$emit('translate-visible')
     await flushPromises()
     await flushPromises()
 
-    expect(translationFailedMock).toHaveBeenCalledWith(expect.objectContaining({ occurrenceId: 8, error: 'Translation request failed' }))
+    expect(translationFailedMock).not.toHaveBeenCalled()
   })
 
   it('completes page translation once when cancelled from the progress bar', async () => {
@@ -919,9 +992,7 @@ describe('PdfApp', () => {
     const wrapper = mount(PdfApp)
 
     wrapper.findComponent({ name: 'PdfToolbar' }).vm.$emit('translate-visible')
-    await flushPromises()
-    await flushPromises()
-    await flushPromises()
+    await vi.waitFor(() => expect(mockViewerMode.setLayoutMode).toHaveBeenCalledWith('side-by-side'))
     await vi.waitFor(() => expect(activityCompletedMock).toHaveBeenCalledOnce())
 
     expect(mockViewerMode.setContentView).toHaveBeenCalledWith('translation')
@@ -938,9 +1009,7 @@ describe('PdfApp', () => {
     const wrapper = mount(PdfApp)
 
     wrapper.findComponent({ name: 'PdfToolbar' }).vm.$emit('translate-visible')
-    await flushPromises()
-    await flushPromises()
-    await flushPromises()
+    await vi.waitFor(() => expect(mockViewerMode.setLayoutMode).toHaveBeenCalledWith('side-by-side'))
 
     expect(mockViewerMode.setContentView).toHaveBeenCalledWith('translation')
     expect(mockViewerMode.setLayoutMode).toHaveBeenCalledWith('side-by-side')

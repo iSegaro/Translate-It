@@ -70,16 +70,45 @@ describe('AIStreamManager', () => {
     });
 
     it('should pass success=false to completeStream if error is provided', async () => {
-      const error = new Error('Quota Exceeded');
+      const error = Object.assign(new Error('Quota Exceeded'), {
+        type: 'PROVIDER_ERROR',
+        originalType: 'HTTP_ERROR',
+        statusCode: 503,
+        context: 'translation',
+        providerName: 'Upstream Provider',
+        providerId: 'provider-id',
+        code: 'UPSTREAM_FAILURE',
+        errorCode: 'E_UPSTREAM',
+        translationOutcome: { partial: true },
+        cause: new Error('private'),
+        arbitrary: { secret: true },
+      });
       await AIStreamManager.sendStreamEnd('Gemini', messageId, mockEngine, { error });
 
+      const streamEndOptions = streamingManager.completeStream.mock.calls[0][2];
       expect(streamingManager.completeStream).toHaveBeenCalledWith(
         messageId,
         false,
         expect.objectContaining({
-          error
+          error: streamEndOptions.error,
+          errorDetails: streamEndOptions.errorDetails,
         })
       );
+      expect(streamEndOptions.error).toBe(streamEndOptions.errorDetails);
+      expect(streamEndOptions.error).toMatchObject({
+        message: 'Quota Exceeded',
+        type: 'PROVIDER_ERROR',
+        originalType: 'HTTP_ERROR',
+        statusCode: 503,
+        context: 'translation',
+        providerName: 'Upstream Provider',
+        providerId: 'provider-id',
+        code: 'UPSTREAM_FAILURE',
+        errorCode: 'E_UPSTREAM',
+        translationOutcome: { partial: true },
+      });
+      expect(streamEndOptions.error).not.toHaveProperty('cause');
+      expect(streamEndOptions.error).not.toHaveProperty('arbitrary');
     });
   });
 

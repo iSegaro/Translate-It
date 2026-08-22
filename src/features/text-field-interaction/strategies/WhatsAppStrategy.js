@@ -72,7 +72,8 @@ export default class WhatsAppStrategy extends PlatformStrategy {
     );
   }
 
-  async updateElement(element, translatedText) {
+  async updateElement(element, translatedText, applicationContext = null) {
+    const isCurrent = this.getApplicationGuard(applicationContext);
     if (!translatedText || !element) {
       return false;
     }
@@ -88,6 +89,7 @@ export default class WhatsAppStrategy extends PlatformStrategy {
       const SELECTORS = '[role="textbox"], .copyable-text.selectable-text, [contenteditable="true"]';
 
       await smartDelay(100);
+      if (!isCurrent()) return false;
 
       // Find WhatsApp field using multiple approaches
       const whatsappField =
@@ -115,9 +117,10 @@ export default class WhatsAppStrategy extends PlatformStrategy {
 
       // اعمال فیدبک بصری
       await this.applyVisualFeedback(whatsappField);
+      if (!isCurrent()) return false;
 
       // استفاده از جایگزینی هوشمند متن (جایگزین تمام متدهای قبلی)
-      const success = await smartTextReplacement(whatsappField, translatedText);
+      const success = await smartTextReplacement(whatsappField, translatedText, null, null, undefined, applicationContext);
 
       if (success) {
         logger.debug('WhatsApp field updated successfully using smartTextReplacement');

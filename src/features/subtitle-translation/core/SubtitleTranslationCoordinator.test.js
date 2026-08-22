@@ -3,8 +3,10 @@ import { subtitleTranslationCoordinator } from './SubtitleTranslationCoordinator
 import { SubtitleProgressTracker } from './SubtitleProgressTracker.js';
 import { unifiedTranslationService } from '@/core/services/translation/UnifiedTranslationService.js';
 import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
+import { MessageActions } from '@/shared/messaging/core/MessageActions.js';
 import { SubtitleParserFactory } from '../parsers/SubtitleParserFactory.js';
 import { SubtitleBatchPlanner } from './SubtitleBatchPlanner.js';
+import { MessagingBus } from '@/shared/messaging/core/MessagingBus.js';
 
 vi.mock('../parsers/SubtitleParserFactory.js', () => ({
   SubtitleParserFactory: {
@@ -48,6 +50,112 @@ describe('SubtitleTranslationCoordinator Stability', () => {
     subtitleTranslationCoordinator.activeJobs.clear();
   });
 
+  const makeCue = (id, text, index) => ({ id, text, index, warnings: [] });
+
+  it('continues to next batch after an exhausted SERVER_ERROR', async () => {
+    const firstCue = makeCue('server-error-cue', 'First source', 1);
+    const secondCue = makeCue('next-cue', 'Second source', 2);
+    SubtitleParserFactory.getAdapter.mockReturnValue({
+      parse: vi.fn(() => ({ cues: [firstCue, secondCue] })),
+      serialize: vi.fn(() => 'serialized')
+    });
+    SubtitleBatchPlanner.plan.mockReturnValue([[firstCue], [secondCue]]);
+    unifiedTranslationService.handleTranslationRequest
+      .mockResolvedValueOnce({
+        success: false,
+        errorDetails: {
+          message: 'HTTP 500',
+          type: ErrorTypes.SERVER_ERROR,
+          statusCode: 500,
+          providerName: 'Lingva'
+        }
+      })
+      .mockResolvedValueOnce({
+        success: true,
+        results: [{ id: secondCue.id, text: 'Second translated' }]
+      });
+
+    await subtitleTranslationCoordinator.startJob({
+      jobId: 'job-server-error-continue',
+      content: 'subtitle',
+      filename: 'sample.srt',
+      sourceLanguage: 'en',
+      targetLanguage: 'fa',
+      providerId: 'google',
+      options: {}
+    });
+
+    expect(unifiedTranslationService.handleTranslationRequest).toHaveBeenCalledTimes(2);
+    expect(firstCue.status).toBe('failed');
+    expect(firstCue.text).toBe('First source');
+    expect(firstCue.translatedText).toBeUndefined();
+    expect(secondCue.status).toBe('translated');
+    expect(secondCue.translatedText).toBe('Second translated');
+
+    const complete = MessagingBus.broadcast.mock.calls
+      .map(([message]) => message)
+      .find(message => message.action === MessageActions.SUBTITLE_TRANSLATE_COMPLETE);
+    expect(complete.payload.stats).toMatchObject({ translated: 1, failed: 1, skipped: 0 });
+    expect(complete.payload.errorDetails).toMatchObject({
+      type: ErrorTypes.SERVER_ERROR,
+      statusCode: 500
+    });
+  });
+
+  it('stops after SERVER_ERROR becomes CIRCUIT_BREAKER_OPEN and rescues prior progress', async () => {
+    const firstCue = makeCue('translated-cue', 'Translated source', 1);
+    const failedCue = makeCue('circuit-cue', 'Circuit source', 2);
+    const untouchedCue = makeCue('untouched-cue', 'Untouched source', 3);
+    SubtitleParserFactory.getAdapter.mockReturnValue({
+      parse: vi.fn(() => ({ cues: [firstCue, failedCue, untouchedCue] })),
+      serialize: vi.fn(() => 'serialized')
+    });
+    SubtitleBatchPlanner.plan.mockReturnValue([[firstCue], [failedCue], [untouchedCue]]);
+    unifiedTranslationService.handleTranslationRequest
+      .mockResolvedValueOnce({
+        success: true,
+        results: [{ id: firstCue.id, text: 'Translated result' }]
+      })
+      .mockResolvedValueOnce({
+        success: false,
+        errorDetails: {
+          message: 'Circuit breaker open',
+          type: ErrorTypes.CIRCUIT_BREAKER_OPEN,
+          originalType: ErrorTypes.SERVER_ERROR,
+          statusCode: 500,
+          providerName: 'Lingva'
+        }
+      });
+
+    await subtitleTranslationCoordinator.startJob({
+      jobId: 'job-server-circuit-stop',
+      content: 'subtitle',
+      filename: 'sample.srt',
+      sourceLanguage: 'en',
+      targetLanguage: 'fa',
+      providerId: 'google',
+      options: {}
+    });
+
+    expect(unifiedTranslationService.handleTranslationRequest).toHaveBeenCalledTimes(2);
+    expect(firstCue.status).toBe('translated');
+    expect(firstCue.translatedText).toBe('Translated result');
+    expect(failedCue.status).toBe('failed');
+    expect(failedCue.text).toBe('Circuit source');
+    expect(untouchedCue.status).toBeUndefined();
+    expect(untouchedCue.translatedText).toBeUndefined();
+
+    const complete = MessagingBus.broadcast.mock.calls
+      .map(([message]) => message)
+      .find(message => message.action === MessageActions.SUBTITLE_TRANSLATE_COMPLETE);
+    expect(complete.payload.stats).toMatchObject({ translated: 1, failed: 1, skipped: 1 });
+    expect(complete.payload.errorDetails).toMatchObject({
+      type: ErrorTypes.CIRCUIT_BREAKER_OPEN,
+      originalType: ErrorTypes.SERVER_ERROR,
+      statusCode: 500
+    });
+  });
+
   it('should check for job cancellation before starting a batch', async () => {
     const jobId = 'test-job-cancel';
     
@@ -63,8 +171,26 @@ describe('SubtitleTranslationCoordinator Stability', () => {
     const result = await subtitleTranslationCoordinator._processBatch(jobId, [{ id: '1', text: 'Hello', index: 1, warnings: [] }], 'en', 'fa', 'google', {});
 
     expect(result.success).toBe(false);
-    expect(result.error).toBe('Job cancelled before batch request');
+    expect(result.errorDetails.message).toBe('Job cancelled before batch request');
     expect(unifiedTranslationService.handleTranslationRequest).not.toHaveBeenCalled();
+  });
+
+  it.each([undefined, null])('owns %s startup payload failure and emits canonical details', async (payload) => {
+    await expect(subtitleTranslationCoordinator.startJob(payload)).resolves.toBeUndefined();
+
+    expect(MessagingBus.broadcast).toHaveBeenCalledWith(expect.objectContaining({
+      action: MessageActions.SUBTITLE_TRANSLATE_ERROR,
+      payload: expect.objectContaining({
+        jobId: undefined,
+        errorDetails: expect.objectContaining({
+          message: expect.any(String),
+          type: expect.any(String)
+        })
+      })
+    }));
+    const errorPayload = MessagingBus.broadcast.mock.calls.at(-1)[0].payload;
+    expect(errorPayload).not.toHaveProperty('error');
+    expect(subtitleTranslationCoordinator.activeJobs.size).toBe(0);
   });
 
   it('should handle timeout protection using Promise.race', async () => {
@@ -96,8 +222,8 @@ describe('SubtitleTranslationCoordinator Stability', () => {
       const assertion = promise.then((result) => {
         expect(result.success).toBe(false);
         expect(result.isFatal).toBe(false);
-        expect(result.error).toMatch(/timed out/);
-        expect(result.error).not.toMatch(/cancell/i);
+        expect(result.errorDetails.message).toMatch(/timed out/);
+        expect(result.errorDetails.message).not.toMatch(/cancell/i);
         // Source preserved: cue is failed, never translated, never cancelled
         expect(batch[0].status).toBe('failed');
         expect(batch[0].translatedText).toBeUndefined();
@@ -135,11 +261,325 @@ describe('SubtitleTranslationCoordinator Stability', () => {
     );
 
     expect(result.success).toBe(false);
-    expect(result.error).toMatch(/cancell/i);
-    expect(result.error).not.toMatch(/timed out/);
+    expect(result.errorDetails.message).toMatch(/cancell/i);
+    expect(result.errorDetails.message).not.toMatch(/timed out/);
     // SUBTITLE coordinator keeps cancellation typed as USER_CANCELLED (fatal)
     expect(result.isFatal).toBe(true);
     expect(batch[0].translatedText).toBeUndefined();
+  });
+
+  it('preserves canonical provider error identity across batch result boundary', async () => {
+    const jobId = 'test-job-canonical-error';
+    const mockTracker = { update: vi.fn() };
+    const batch = [{ id: '1', text: 'Hello', index: 1, warnings: [] }];
+    subtitleTranslationCoordinator.activeJobs.set(jobId, {
+      cues: batch,
+      status: 'running',
+      progressTracker: mockTracker
+    });
+    unifiedTranslationService.handleTranslationRequest.mockResolvedValue({
+      success: false,
+      error: {
+        message: 'Provider failed',
+        type: 'PROVIDER_ERROR',
+        originalType: 'HTTP_ERROR',
+        statusCode: 503,
+        context: 'subtitle-batch',
+        providerName: 'Provider',
+        providerId: 'provider-id',
+        code: 'UPSTREAM_FAILURE',
+        errorCode: 'E_UPSTREAM',
+        translationOutcome: { partial: true },
+        cause: 'private',
+        arbitrary: { ignored: true }
+      }
+    });
+
+    const result = await subtitleTranslationCoordinator._processBatch(
+      jobId,
+      batch,
+      'en',
+      'fa',
+      'google',
+      {}
+    );
+
+    expect(result).toMatchObject({
+      success: false,
+      errorDetails: {
+        message: 'Provider failed',
+        type: 'PROVIDER_ERROR',
+        originalType: 'HTTP_ERROR',
+        statusCode: 503,
+        context: 'subtitle-batch',
+        providerName: 'Provider',
+        providerId: 'provider-id',
+        code: 'UPSTREAM_FAILURE',
+        errorCode: 'E_UPSTREAM',
+        translationOutcome: { partial: true }
+      }
+    });
+    expect(result.errorDetails).not.toHaveProperty('cause');
+    expect(result.errorDetails).not.toHaveProperty('arbitrary');
+    expect(batch[0].status).toBe('failed');
+    expect(batch[0].translatedText).toBeUndefined();
+  });
+
+  it('prefers canonical errorDetails over a conflicting object error', async () => {
+    const jobId = 'test-job-details-vs-object';
+    const mockTracker = { update: vi.fn() };
+    const batch = [{ id: '1', text: 'Hello', index: 1, warnings: [] }];
+    subtitleTranslationCoordinator.activeJobs.set(jobId, {
+      cues: batch,
+      status: 'running',
+      progressTracker: mockTracker
+    });
+    unifiedTranslationService.handleTranslationRequest.mockResolvedValue({
+      success: false,
+      error: { message: 'legacy failure', type: 'LEGACY_ERROR' },
+      errorDetails: {
+        message: 'canonical failure',
+        type: 'PROVIDER_ERROR',
+        originalType: 'HTTP_ERROR',
+        statusCode: 503,
+        context: 'subtitle-batch',
+        providerName: 'Provider',
+        providerId: 'provider-id',
+        code: 'UPSTREAM_FAILURE',
+        errorCode: 'E_UPSTREAM',
+        translationOutcome: { partial: true }
+      }
+    });
+
+    const result = await subtitleTranslationCoordinator._processBatch(
+      jobId,
+      batch,
+      'en',
+      'fa',
+      'google',
+      {}
+    );
+
+    expect(result.success).toBe(false);
+    expect(result.errorDetails).toMatchObject({
+      message: 'canonical failure',
+      type: 'PROVIDER_ERROR',
+      originalType: 'HTTP_ERROR',
+      statusCode: 503,
+      context: 'subtitle-batch',
+      providerName: 'Provider',
+      providerId: 'provider-id',
+      code: 'UPSTREAM_FAILURE',
+      errorCode: 'E_UPSTREAM',
+      translationOutcome: { partial: true }
+    });
+    expect(result.errorDetails).not.toHaveProperty('cause');
+    expect(result.errorDetails).not.toHaveProperty('arbitrary');
+    expect(batch[0].status).toBe('failed');
+  });
+
+  it('prefers canonical errorDetails over a string error', async () => {
+    const jobId = 'test-job-details-vs-string';
+    const mockTracker = { update: vi.fn() };
+    const batch = [{ id: '1', text: 'Hello', index: 1, warnings: [] }];
+    subtitleTranslationCoordinator.activeJobs.set(jobId, {
+      cues: batch,
+      status: 'running',
+      progressTracker: mockTracker
+    });
+    unifiedTranslationService.handleTranslationRequest.mockResolvedValue({
+      success: false,
+      error: 'legacy/raw failure',
+      errorDetails: {
+        message: 'canonical failure',
+        type: 'API_KEY_INVALID',
+        originalType: 'AUTH_ERROR',
+        statusCode: 401,
+        providerName: 'Provider',
+        providerId: 'provider-id',
+        code: 'INVALID_CREDENTIALS',
+        errorCode: 'E_AUTH'
+      }
+    });
+
+    const result = await subtitleTranslationCoordinator._processBatch(
+      jobId,
+      batch,
+      'en',
+      'fa',
+      'google',
+      {}
+    );
+
+    expect(result.success).toBe(false);
+    expect(result.errorDetails).toMatchObject({
+      message: 'canonical failure',
+      type: 'API_KEY_INVALID',
+      originalType: 'AUTH_ERROR',
+      statusCode: 401,
+      providerName: 'Provider',
+      providerId: 'provider-id',
+      code: 'INVALID_CREDENTIALS',
+      errorCode: 'E_AUTH'
+    });
+    expect(result.errorDetails).not.toHaveProperty('cause');
+    expect(result.errorDetails).not.toHaveProperty('arbitrary');
+  });
+
+  it('keeps canonical identity for an errorDetails-only failure, never degrading to Unknown error', async () => {
+    const jobId = 'test-job-details-only';
+    const mockTracker = { update: vi.fn() };
+    const batch = [{ id: '1', text: 'Hello', index: 1, warnings: [] }];
+    subtitleTranslationCoordinator.activeJobs.set(jobId, {
+      cues: batch,
+      status: 'running',
+      progressTracker: mockTracker
+    });
+    unifiedTranslationService.handleTranslationRequest.mockResolvedValue({
+      success: false,
+      errorDetails: {
+        message: 'canonical failure',
+        type: 'PROVIDER_ERROR',
+        originalType: 'HTTP_ERROR',
+        statusCode: 503,
+        providerName: 'Provider',
+        providerId: 'provider-id',
+        code: 'UPSTREAM_FAILURE',
+        errorCode: 'E_UPSTREAM'
+      }
+    });
+
+    const result = await subtitleTranslationCoordinator._processBatch(
+      jobId,
+      batch,
+      'en',
+      'fa',
+      'google',
+      {}
+    );
+
+    expect(result.success).toBe(false);
+    expect(result.errorDetails).toMatchObject({
+      message: 'canonical failure',
+      type: 'PROVIDER_ERROR',
+      originalType: 'HTTP_ERROR',
+      statusCode: 503,
+      providerName: 'Provider',
+      providerId: 'provider-id',
+      code: 'UPSTREAM_FAILURE',
+      errorCode: 'E_UPSTREAM'
+    });
+    expect(result.errorDetails.message).not.toBe('Unknown error');
+    expect(result.errorDetails).not.toHaveProperty('cause');
+    expect(result.errorDetails).not.toHaveProperty('arbitrary');
+  });
+
+  it('falls back to the legacy error when errorDetails is malformed', async () => {
+    const jobId = 'test-job-malformed-details';
+    const mockTracker = { update: vi.fn() };
+    const batch = [{ id: '1', text: 'Hello', index: 1, warnings: [] }];
+    subtitleTranslationCoordinator.activeJobs.set(jobId, {
+      cues: batch,
+      status: 'running',
+      progressTracker: mockTracker
+    });
+    unifiedTranslationService.handleTranslationRequest.mockResolvedValue({
+      success: false,
+      error: {
+        message: 'legacy failure',
+        type: 'LEGACY_ERROR',
+        originalType: 'LEGACY_ORIGIN',
+        statusCode: 502,
+        providerName: 'Legacy',
+        providerId: 'legacy-id',
+        code: 'LEGACY_CODE',
+        errorCode: 'E_LEGACY'
+      },
+      errorDetails: { arbitrary: true }
+    });
+
+    const result = await subtitleTranslationCoordinator._processBatch(
+      jobId,
+      batch,
+      'en',
+      'fa',
+      'google',
+      {}
+    );
+
+    expect(result.success).toBe(false);
+    expect(result.errorDetails).toMatchObject({
+      message: 'legacy failure',
+      type: 'LEGACY_ERROR',
+      originalType: 'LEGACY_ORIGIN',
+      statusCode: 502,
+      providerName: 'Legacy',
+      providerId: 'legacy-id',
+      code: 'LEGACY_CODE',
+      errorCode: 'E_LEGACY'
+    });
+    expect(result.errorDetails).not.toHaveProperty('cause');
+    expect(result.errorDetails).not.toHaveProperty('arbitrary');
+  });
+
+  it('emits structured error events without the legacy error field', () => {
+    const error = Object.assign(new Error('Provider failed'), {
+      type: 'PROVIDER_ERROR',
+      originalType: 'HTTP_ERROR',
+      statusCode: 503,
+      providerName: 'Provider',
+      providerId: 'provider-id'
+    });
+
+    subtitleTranslationCoordinator._notifyError('job-error-event', error.message, error);
+
+    const payload = MessagingBus.broadcast.mock.calls.at(-1)[0].payload;
+    expect(payload).toEqual({
+      jobId: 'job-error-event',
+      errorDetails: {
+        message: 'Provider failed',
+        type: 'PROVIDER_ERROR',
+        originalType: 'HTTP_ERROR',
+        statusCode: 503,
+        providerName: 'Provider',
+        providerId: 'provider-id'
+      }
+    });
+    expect(payload).not.toHaveProperty('error');
+  });
+
+  it('passes only canonical details to the tracker on fatal batch failure', async () => {
+    const cue = { id: 'fatal-1', text: 'Hello', index: 1, warnings: [] };
+    SubtitleParserFactory.getAdapter.mockReturnValue({
+      parse: vi.fn(() => ({ cues: [cue] })),
+      serialize: vi.fn(() => 'serialized')
+    });
+    SubtitleBatchPlanner.plan.mockReturnValue([[cue]]);
+    unifiedTranslationService.handleTranslationRequest.mockResolvedValue({
+      success: false,
+      error: { message: 'Provider failed', type: ErrorTypes.API_KEY_INVALID }
+    });
+    const setTerminalError = vi.spyOn(SubtitleProgressTracker.prototype, 'setTerminalError');
+
+    try {
+      await subtitleTranslationCoordinator.startJob({
+        jobId: 'job-fatal-details',
+        content: 'subtitle',
+        filename: 'sample.srt',
+        sourceLanguage: 'en',
+        targetLanguage: 'fa',
+        providerId: 'google',
+        options: {}
+      });
+
+      expect(setTerminalError).toHaveBeenCalledWith(expect.objectContaining({
+        message: 'Provider failed',
+        type: ErrorTypes.API_KEY_INVALID
+      }));
+      expect(setTerminalError.mock.calls[0]).toHaveLength(1);
+    } finally {
+      setTerminalError.mockRestore();
+    }
   });
 });
 
@@ -302,7 +742,7 @@ describe('SubtitleTranslationCoordinator Timeout Ownership', () => {
 
       expect(result.success).toBe(false);
       expect(result.isFatal).toBe(false);
-      expect(result.error).toMatch(/timed out/);
+      expect(result.errorDetails.message).toMatch(/timed out/);
 
       const sentMessage = unifiedTranslationService.handleTranslationRequest.mock.calls[0][0];
       expect(unifiedTranslationService.handleTimeout).toHaveBeenCalledWith(sentMessage.messageId);
@@ -387,7 +827,7 @@ describe('SubtitleTranslationCoordinator Timeout Ownership', () => {
       const result = await promise;
 
       expect(result.success).toBe(false);
-      expect(result.error).toMatch(/timed out/);
+      expect(result.errorDetails.message).toMatch(/timed out/);
       expect(unifiedTranslationService.handleTimeout).toHaveBeenCalled();
       expect(subtitleTranslationCoordinator.activeJobs.get(jobId).activeBatchMessageId).toBeNull();
     } finally {
@@ -495,7 +935,7 @@ describe('SubtitleTranslationCoordinator Timeout Ownership', () => {
 
       expect(result.success).toBe(false);
       expect(result.isFatal).toBe(false);
-      expect(result.error).toMatch(/timed out/);
+      expect(result.errorDetails.message).toMatch(/timed out/);
       const sentMessage = unifiedTranslationService.handleTranslationRequest.mock.calls[0][0];
       expect(unifiedTranslationService.handleTimeout).toHaveBeenCalledWith(sentMessage.messageId);
     } finally {
@@ -568,7 +1008,7 @@ describe('SubtitleTranslationCoordinator Timeout Ownership', () => {
 
       expect(result.success).toBe(false);
       expect(result.isFatal).toBe(false);
-      expect(result.error).toMatch(/timed out/);
+      expect(result.errorDetails.message).toMatch(/timed out/);
       expect(unifiedTranslationService.cancelRequest).toHaveBeenCalled();
     } finally {
       vi.useRealTimers();
@@ -594,7 +1034,7 @@ describe('SubtitleTranslationCoordinator Timeout Ownership', () => {
       await vi.advanceTimersByTimeAsync(301000);
       const result = await promise;
 
-      expect(result.error).toMatch(/timed out/);
+      expect(result.errorDetails.message).toMatch(/timed out/);
       expect(unifiedTranslationService.handleTimeout).toHaveBeenCalled();
       expect(unifiedTranslationService.cancelRequest).not.toHaveBeenCalled();
     } finally {

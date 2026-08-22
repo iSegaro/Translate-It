@@ -653,7 +653,9 @@ describe('usePdfViewerController error lifecycle', () => {
 
     controller.error.value = 'Stale error'
 
-    translateVisibleBlocksMock.mockRejectedValue(new Error('Translation failed'))
+    const translationError = new Error('Translation failed')
+    translationError.type = 'API_RESPONSE_INVALID'
+    translateVisibleBlocksMock.mockRejectedValue(translationError)
 
     session.getVisibleLogicalBlocks.mockResolvedValue([block])
     session.getPageLayout.mockReturnValue(null)
@@ -663,7 +665,11 @@ describe('usePdfViewerController error lifecycle', () => {
     expect(controller.error.value).toBe('')
     expect(controller.translationSummary.value).toMatchObject({
       status: 'error',
-      error: 'Translation failed'
+      error: 'Translation failed',
+      errorDetails: {
+        message: 'Translation failed',
+        type: 'API_RESPONSE_INVALID'
+      }
     })
   })
 

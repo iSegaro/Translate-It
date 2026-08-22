@@ -7,10 +7,13 @@ import { registerTranslation, contentScriptIntegration } from '@/shared/messagin
 import { MessageActions } from '@/shared/messaging/core/MessageActions.js';
 import { TranslationMode } from '@/shared/config/config.js';
 import { settingsManager } from '@/shared/managers/SettingsManager.js';
-import { MessageContexts } from '@/shared/messaging/core/MessagingCore.js';
+import { MessageContexts, MessageFormat } from '@/shared/messaging/core/MessagingCore.js';
 import { ElementDetectionService } from '@/shared/services/ElementDetectionService.js';
 import { ExtensionContextManager } from '@/core/extensionContext.js';
 import { isEditable } from '@/core/helpers.js';
+import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
+import { mapCanonicalTranslationError } from '@/shared/error-management/PublicTranslationErrorPolicy.js';
+import { createLegacyDisplayError } from '@/shared/error-management/PublicTranslationErrorAdapter.js';
 
 // Import CSS as inline string
 import hoverStyles from './HoverHighlight.scss?inline';
@@ -413,7 +416,8 @@ export class HoverTranslationManager extends ResourceTracker {
         this.currentMessageId = null;
       }
     } catch (error) {
-      if (ExtensionContextManager.isContextError(error)) {
+      if (ExtensionContextManager.isContextError(error)
+        || [ErrorTypes.CONTEXT, ErrorTypes.EXTENSION_CONTEXT_INVALIDATED].includes(error?.type)) {
         logger.debug('Hover translation skipped: Extension context invalidated');
         this._cleanupActiveHoverRequest(messageId);
         return;
@@ -433,7 +437,11 @@ export class HoverTranslationManager extends ResourceTracker {
         showToast: false
       }).catch(() => {});
 
-      this._emitPageEvent('MOUSE_HOVER_TRANSLATION_ERROR', { error });
+      const publicError = mapCanonicalTranslationError(error);
+      const displayError = await createLegacyDisplayError(error, publicError);
+      if (displayError) {
+        this._emitPageEvent('MOUSE_HOVER_TRANSLATION_ERROR', { error: displayError });
+      }
       this._cleanupActiveHoverRequest(messageId);
     }
   }
@@ -453,10 +461,17 @@ export class HoverTranslationManager extends ResourceTracker {
     // 2. If in an iframe, notify the top frame
     if (window !== window.top) {
       try {
+        const transportData = type === 'MOUSE_HOVER_TRANSLATION_ERROR' && data?.error
+          ? {
+              ...data,
+              error: data.error.message || String(data.error),
+              errorDetails: MessageFormat.serializeTranslationError(data.error)
+            }
+          : data;
         window.top.postMessage({
           source: 'translate-it-iframe',
           type: type,
-          data: data,
+          data: transportData,
           timestamp: Date.now()
         }, '*');
       } catch (error) {
@@ -515,4 +530,3 @@ export class HoverTranslationManager extends ResourceTracker {
 }
 
 export const hoverTranslationManager = HoverTranslationManager.getInstance();
-

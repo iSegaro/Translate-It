@@ -45,6 +45,7 @@ import { TranslationCallPurpose } from './ProviderConstants.js';
 import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
 import { translationSessionManager } from '../core/TranslationSessionManager.js';
 import { AIResponseParser } from './utils/AIResponseParser.js';
+import { AIStreamManager } from './utils/AIStreamManager.js';
 
 // Mock AIResponseParser
 vi.mock("./utils/AIResponseParser.js", () => ({
@@ -99,6 +100,121 @@ beforeEach(() => {
   });
 
   describe('explicit batch execution APIs', () => {
+    it('gives concurrent physical AI calls distinct metadata slots', async () => {
+      const operation = createTranslationOperation('ai-slots');
+      const refs = [];
+      provider._callAI = vi.fn().mockImplementation(async (_system, userText, options) => {
+        refs.push(options.providerMetadataRef);
+        options.providerMetadataRef.metadata.detectedLanguage = userText.includes('first') ? 'en' : 'de';
+        await Promise.resolve();
+        return userText;
+      });
+
+      await Promise.all([
+        provider._translateBatch(['first'], 'en', 'fa', 'selection', null, null, null, null, { executionContext: { operation } }),
+        provider._translateBatch(['second'], 'en', 'fa', 'selection', null, null, null, null, { executionContext: { operation } }),
+      ]);
+
+      expect(refs[0]).not.toBe(refs[1]);
+      expect(operation.snapshotProviderExecutionMetadata().map(({ metadata }) => metadata.detectedLanguage).sort())
+        .toEqual(['de', 'en']);
+    });
+
+    it('does not publish metadata from failed physical AI calls', async () => {
+      const operation = createTranslationOperation('ai-failure');
+      provider._callAI = vi.fn().mockImplementation(async (_system, _text, options) => {
+        options.providerMetadataRef.metadata.request = 'failed';
+        throw new Error('physical failure');
+      });
+
+      await expect(provider._translateBatch(['source'], 'en', 'fa', 'selection', null, null, null, null, { executionContext: { operation } }))
+        .rejects.toThrow('physical failure');
+
+      expect(operation.snapshotProviderExecutionMetadata()).toEqual([]);
+    });
+
+    it('discards failed attempt metadata before a successful AI retry', async () => {
+      const operation = createTranslationOperation('ai-retry-isolation');
+      const refs = [];
+      let attempt = 0;
+      provider._callAI = vi.fn().mockImplementation(async (_system, _text, options) => {
+        refs.push(options.providerMetadataRef);
+        attempt++;
+        if (attempt === 1) {
+          options.providerMetadataRef.metadata.detectedLanguage = 'de';
+          throw new Error('first attempt failed');
+        }
+        return 'response';
+      });
+      provider._executeWithRateLimit = vi.fn(async (task) => {
+        await task({ attempt: 1 }).catch(() => {});
+        return task({ attempt: 2 });
+      });
+
+      await provider._translateBatch(['source'], 'en', 'fa', 'selection', null, null, null, null, {
+        executionContext: { operation },
+      });
+
+      expect(refs[0]).toBe(refs[1]);
+      expect(operation.snapshotProviderExecutionMetadata()).toEqual([]);
+      expect(operation.snapshotAggregatedProviderMetadata()).toEqual({});
+    });
+
+    it('does not publish metadata when structured parsing fails after provider success', async () => {
+      const operation = createTranslationOperation('ai-parse-failure');
+      provider._callAI = vi.fn().mockImplementation(async (_system, _text, options) => {
+        options.providerMetadataRef.metadata.detectedLanguage = 'en';
+        return 'response';
+      });
+      AIResponseParser.parseBatchResult.mockImplementationOnce(() => {
+        throw new Error('parse failure');
+      });
+
+      await expect(provider._translateBatch(['source'], 'en', 'fa', 'selection', null, null, null, null, {
+        executionContext: { operation },
+      })).rejects.toThrow('parse failure');
+
+      expect(operation.snapshotProviderExecutionMetadata()).toEqual([]);
+    });
+
+    it('publishes one metadata record after successful AI validation', async () => {
+      const operation = createTranslationOperation('ai-success');
+      provider._callAI = vi.fn().mockImplementation(async (_system, _text, options) => {
+        options.providerMetadataRef.metadata.detectedLanguage = ' EN ';
+        return 'response';
+      });
+
+      await provider._translateBatch(['source'], 'en', 'fa', 'selection', null, null, null, null, {
+        executionContext: { operation },
+      });
+
+      expect(operation.snapshotProviderExecutionMetadata()).toEqual([
+        { callPurpose: TranslationCallPurpose.PRIMARY_TRANSLATION, metadata: { detectedLanguage: ' EN ' } },
+      ]);
+    });
+
+    it('keeps recovery metadata separate from primary metadata', async () => {
+      const operation = createTranslationOperation('ai-recovery-slots');
+      provider._callAI = vi.fn().mockImplementation(async (_system, _text, options) => {
+        options.providerMetadataRef.metadata.request = options.callPurpose;
+        return 'response';
+      });
+
+      await provider._translateBatch(['primary'], 'en', 'fa', 'selection', null, null, null, null, {
+        executionContext: { operation },
+        callPurpose: TranslationCallPurpose.PRIMARY_TRANSLATION,
+      });
+      await provider._translateBatch(['recovery'], 'en', 'fa', 'selection', null, null, null, null, {
+        executionContext: { operation },
+        callPurpose: TranslationCallPurpose.STRUCTURED_RECOVERY,
+      });
+
+      expect(operation.snapshotProviderExecutionMetadata()).toEqual([
+        { callPurpose: TranslationCallPurpose.PRIMARY_TRANSLATION, metadata: { request: TranslationCallPurpose.PRIMARY_TRANSLATION } },
+        { callPurpose: TranslationCallPurpose.STRUCTURED_RECOVERY, metadata: { request: TranslationCallPurpose.STRUCTURED_RECOVERY } },
+      ]);
+    });
+
     it('executeStructuredBatch returns raw primary response unchanged', async () => {
       provider._callAI = vi.fn().mockResolvedValue('raw structured response');
 
@@ -132,6 +248,66 @@ beforeEach(() => {
         TranslationCallPurpose.STRUCTURED_RECOVERY,
         TranslationCallPurpose.STRUCTURED_RECOVERY,
       ]);
+    });
+
+    describe('STRING output contract', () => {
+      const runSequential = (source, response, options = {}) => {
+        provider._callAI = vi.fn().mockResolvedValue(response);
+        return provider.executeSequentialBatch([source], 'en', 'fa', {
+          translateMode: 'selection',
+          expectedFormat: ResponseFormat.STRING,
+          ...options,
+        });
+      };
+
+      it.each([null, undefined, 0, 42, false, true, {}, { text: 'translation' }, [], ['translation']])(
+        'rejects native non-string response %p',
+        async (response) => {
+          await expect(runSequential('source', response))
+            .rejects.toMatchObject({ type: ErrorTypes.API_RESPONSE_INVALID });
+        },
+      );
+
+      it.each(['', '   ', '\n\t'])('rejects blank response %j for nonblank source', async (response) => {
+        await expect(runSequential('source', response))
+          .rejects.toMatchObject({ type: ErrorTypes.API_RESPONSE_INVALID });
+      });
+
+      it.each(['42', 'true', 'null', 'translation'])('accepts valid STRING response %j', async (response) => {
+        await expect(runSequential('source', response)).resolves.toBe(response);
+      });
+
+      it('accepts identity translation', async () => {
+        await expect(runSequential('URL', 'URL')).resolves.toBe('URL');
+      });
+
+      it('preserves blank-source blank-output compatibility', async () => {
+        await expect(runSequential('', '')).resolves.toBe('');
+      });
+
+      it('rejects malformed sequential strategy output before coordinator normalization', async () => {
+        provider.getBatchStrategy = vi.fn().mockResolvedValue('sequential');
+        provider._callAI = vi.fn().mockResolvedValue(42);
+
+        await expect(provider._batchTranslate(
+          ['source'],
+          'en',
+          'fa',
+          'selection',
+          null,
+          null,
+          null,
+          null,
+          null,
+          ResponseFormat.STRING,
+        )).rejects.toMatchObject({ type: ErrorTypes.API_RESPONSE_INVALID });
+      });
+
+      it('rejects malformed scalar structured recovery output at the same boundary', async () => {
+        await expect(runSequential('source', { text: 'translation' }, {
+          callPurpose: TranslationCallPurpose.STRUCTURED_RECOVERY,
+        })).rejects.toMatchObject({ type: ErrorTypes.API_RESPONSE_INVALID });
+      });
     });
 
     it('unwraps object sources before structured recovery sequential translation', async () => {
@@ -214,6 +390,125 @@ beforeEach(() => {
       });
       expect(options.callPurpose).not.toBe(TranslationCallPurpose.PARENT_RECOVERY);
       expect(options.expectedFormat).not.toBe(ResponseFormat.JSON_OBJECT);
+    });
+  });
+
+  describe('streaming terminal errors', () => {
+    it('emits one terminal error after a provider batch failure', async () => {
+      const messageId = 'ai-stream-failure';
+      const engine = { isCancelled: vi.fn().mockReturnValue(false) };
+      const error = Object.assign(new Error('Provider failed'), {
+        type: 'PROVIDER_ERROR',
+      });
+      const activeSpy = vi.spyOn(AIStreamManager, 'isStreamActive').mockReturnValue(true);
+      const updateSpy = vi.spyOn(AIStreamManager, 'streamErrorResults').mockResolvedValue(undefined);
+      const endSpy = vi.spyOn(AIStreamManager, 'sendStreamEnd').mockResolvedValue(undefined);
+      const batchingSpy = vi.spyOn(provider, 'getBatchingConfig').mockResolvedValue({
+        strategy: 'single',
+        optimalSize: 10,
+        maxComplexity: 100,
+      });
+      const batchSpy = vi.spyOn(provider, '_translateBatch').mockRejectedValue(error);
+
+      try {
+        await expect(provider._streamingBatchTranslate(
+          ['source'], 'en', 'fa', 'selection', engine, messageId,
+          null, null, null, ResponseFormat.JSON_OBJECT
+        )).rejects.toBe(error);
+
+        expect(updateSpy).toHaveBeenCalledWith('MockAI', error, 0, messageId, engine);
+        expect(endSpy).toHaveBeenCalledWith('MockAI', messageId, engine, { error });
+        expect(endSpy).toHaveBeenCalledTimes(1);
+        expect(batchSpy).toHaveBeenCalledTimes(1);
+      } finally {
+        activeSpy.mockRestore();
+        updateSpy.mockRestore();
+        endSpy.mockRestore();
+        batchingSpy.mockRestore();
+        batchSpy.mockRestore();
+      }
+    });
+
+    it.each([
+      ['cancellation', Object.assign(new Error('cancelled'), { type: ErrorTypes.USER_CANCELLED }), true],
+      ['timeout', Object.assign(new Error('timed out'), { type: ErrorTypes.TRANSLATION_TIMEOUT }), false],
+    ])('does not emit a provider terminal error for %s', async (_name, error, isCancellation) => {
+      const messageId = `ai-stream-${_name}`;
+      const engine = { isCancelled: vi.fn().mockReturnValue(false) };
+      const activeSpy = vi.spyOn(AIStreamManager, 'isStreamActive').mockReturnValue(true);
+      const updateSpy = vi.spyOn(AIStreamManager, 'streamErrorResults').mockResolvedValue(undefined);
+      const endSpy = vi.spyOn(AIStreamManager, 'sendStreamEnd').mockResolvedValue(undefined);
+      const batchingSpy = vi.spyOn(provider, 'getBatchingConfig').mockResolvedValue({
+        strategy: 'single',
+        optimalSize: 10,
+        maxComplexity: 100,
+      });
+      const batchSpy = vi.spyOn(provider, '_translateBatch').mockRejectedValue(error);
+      vi.mocked(isCancellationError).mockReturnValue(isCancellation);
+
+      try {
+        await expect(provider._streamingBatchTranslate(
+          ['source'], 'en', 'fa', 'selection', engine, messageId,
+          null, null, null, ResponseFormat.JSON_OBJECT
+        )).rejects.toBe(error);
+
+        expect(updateSpy).toHaveBeenCalledTimes(1);
+        expect(endSpy).not.toHaveBeenCalled();
+        expect(batchSpy).toHaveBeenCalledTimes(1);
+      } finally {
+        activeSpy.mockRestore();
+        updateSpy.mockRestore();
+        endSpy.mockRestore();
+        batchingSpy.mockRestore();
+        batchSpy.mockRestore();
+      }
+    });
+
+    it('does not classify an internally aborted streaming batch as USER_CANCELLED', async () => {
+      const abortController = new AbortController();
+      abortController.abort();
+      const engine = { isCancelled: vi.fn().mockReturnValue(false) };
+      const activeSpy = vi.spyOn(AIStreamManager, 'isStreamActive').mockReturnValue(true);
+      const batchingSpy = vi.spyOn(provider, 'getBatchingConfig').mockResolvedValue({
+        characterLimit: 5000,
+        optimalSize: 10,
+      });
+
+      try {
+        await expect(provider._streamingBatchTranslate(
+          ['source'], 'en', 'fa', 'selection', engine, 'internal-stream-abort',
+          abortController, null, null, ResponseFormat.JSON_OBJECT
+        )).rejects.toMatchObject({ operationAborted: true, cancellationReason: 'operation-abort' });
+      } finally {
+        activeSpy.mockRestore();
+        batchingSpy.mockRestore();
+      }
+    });
+
+    it('treats a cancellation tombstone without signal abort as internal operation abort', async () => {
+      const abortController = new AbortController();
+      const engine = { isCancelled: vi.fn().mockReturnValue(true) };
+      const activeSpy = vi.spyOn(AIStreamManager, 'isStreamActive').mockReturnValue(true);
+      const batchingSpy = vi.spyOn(provider, 'getBatchingConfig').mockResolvedValue({
+        characterLimit: 5000,
+        optimalSize: 10,
+      });
+
+      try {
+        const error = await provider._streamingBatchTranslate(
+          ['source'], 'en', 'fa', 'selection', engine, 'tombstone-stream-stop',
+          abortController, null, null, ResponseFormat.JSON_OBJECT
+        ).catch((caughtError) => caughtError);
+        expect(error).toMatchObject({
+          operationAborted: true,
+          cancellationReason: 'operation-abort',
+        });
+        expect(error.type).not.toBe(ErrorTypes.USER_CANCELLED);
+        expect(abortController.signal.aborted).toBe(false);
+      } finally {
+        activeSpy.mockRestore();
+        batchingSpy.mockRestore();
+      }
     });
   });
 
@@ -611,7 +906,7 @@ beforeEach(() => {
       }
     });
 
-    it('discards the staged candidate and rejects with USER_CANCELLED when the signal aborts immediately before commit', async () => {
+    it('discards the staged candidate and rejects with USER_CANCELLED for explicit user cancellation', async () => {
       const { AIResponseParser } = await import("./utils/AIResponseParser.js");
       const abortController = new AbortController();
       const session = translationSessionManager.getOrCreateSession('late-abort-session', 'MockAI');
@@ -623,7 +918,7 @@ beforeEach(() => {
         commitSpy = vi.spyOn(candidate, 'commit');
         discardSpy = vi.spyOn(candidate, 'discard');
         candidate.stage({ sessionId: options.sessionId, userContent: userText, assistantContent: 'raw' });
-        abortController.abort();
+        abortController.abort('user-cancelled');
         return 'raw';
       });
       AIResponseParser.parseBatchResult.mockReturnValue({ results: ['translated'], contractViolation: false });
@@ -633,6 +928,33 @@ beforeEach(() => {
            provider._translateBatch(['source'], 'en', 'fa', 'select-element', abortController, null, 'm', 'late-abort-session', { conversationParticipates: true }, ResponseFormat.JSON_ARRAY)
         ).rejects.toMatchObject({ type: ErrorTypes.USER_CANCELLED });
         expect(commitSpy).not.toHaveBeenCalled();
+        expect(discardSpy).toHaveBeenCalledTimes(1);
+        expect(writeSpy).not.toHaveBeenCalled();
+        expect(session.history).toHaveLength(0);
+      } finally {
+        writeSpy.mockRestore();
+      }
+    });
+
+    it('discards the staged candidate without fabricating USER_CANCELLED for internal abort', async () => {
+      const { AIResponseParser } = await import("./utils/AIResponseParser.js");
+      const abortController = new AbortController();
+      const session = translationSessionManager.getOrCreateSession('late-internal-abort-session', 'MockAI');
+      const writeSpy = vi.spyOn((await import('./utils/AIConversationHelper.js')).AIConversationHelper, 'updateSessionHistory');
+      let discardSpy;
+      provider._callAI = vi.fn(async (_system, userText, options) => {
+        const candidate = options.conversationCommitCandidate;
+        discardSpy = vi.spyOn(candidate, 'discard');
+        candidate.stage({ sessionId: options.sessionId, userContent: userText, assistantContent: 'raw' });
+        abortController.abort();
+        return 'raw';
+      });
+      AIResponseParser.parseBatchResult.mockReturnValue({ results: ['translated'], contractViolation: false });
+
+      try {
+        await expect(
+          provider._translateBatch(['source'], 'en', 'fa', 'select-element', abortController, null, 'm', 'late-internal-abort-session', { conversationParticipates: true }, ResponseFormat.JSON_ARRAY)
+        ).rejects.toMatchObject({ operationAborted: true, cancellationReason: 'operation-abort' });
         expect(discardSpy).toHaveBeenCalledTimes(1);
         expect(writeSpy).not.toHaveBeenCalled();
         expect(session.history).toHaveLength(0);
@@ -669,16 +991,16 @@ beforeEach(() => {
       }
     });
 
-    it('throws a typed USER_CANCELLED error when the signal aborts in the sequential pass', async () => {
+    it('throws an internal operation abort when the signal has no user reason in the sequential pass', async () => {
       const abortController = new AbortController();
       abortController.abort();
 
       await expect(
         provider._traditionalBatchTranslate(['seg'], 'en', 'fa', 'selection', null, null, abortController, null, 'recovery-session', null, {})
-      ).rejects.toMatchObject({ type: ErrorTypes.USER_CANCELLED });
+      ).rejects.toMatchObject({ operationAborted: true, cancellationReason: 'operation-abort' });
     });
 
-    it('aborting during sequential recovery retains no conversation write and rejects with typed USER_CANCELLED', async () => {
+    it('aborting during sequential recovery retains no conversation write without USER_CANCELLED', async () => {
       const { AIResponseParser } = await import("./utils/AIResponseParser.js");
       const abortController = new AbortController();
       const session = translationSessionManager.getOrCreateSession('recovery-abort-session', 'MockAI');
@@ -696,7 +1018,7 @@ beforeEach(() => {
       try {
         await expect(
           provider._translateBatch(['source'], 'en', 'fa', 'select-element', abortController, null, 'm', 'recovery-abort-session', { conversationParticipates: true }, ResponseFormat.JSON_ARRAY)
-        ).rejects.toMatchObject({ type: ErrorTypes.USER_CANCELLED });
+        ).rejects.toMatchObject({ operationAborted: true, cancellationReason: 'operation-abort' });
         expect(commitSpy).toBeDefined();
         expect(commitSpy).not.toHaveBeenCalled();
         expect(writeSpy).not.toHaveBeenCalled();
@@ -982,7 +1304,7 @@ beforeEach(() => {
       });
 
       await expect(provider._translateBatch(['source'], 'en', 'fa', 'selection', abortController))
-        .rejects.toMatchObject({ type: ErrorTypes.USER_CANCELLED });
+        .rejects.toMatchObject({ operationAborted: true, cancellationReason: 'operation-abort' });
       expect(provider._callAI).toHaveBeenCalledTimes(1);
     });
 

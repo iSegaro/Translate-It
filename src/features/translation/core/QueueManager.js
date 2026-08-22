@@ -103,11 +103,12 @@ class QueueItem {
     this.messageId = options.messageId || null;
     this.uiContext = options.uiContext || null; // popup, sidepanel, etc.
     this.executionContext = options.executionContext || null;
+    this.abortSignal = options.abortController?.signal || options.abortSignal || null;
+    this.abortListener = null;
     this.status = QueueStatus.PENDING;
     this.createdAt = Date.now();
     this.attempts = 0;
     this.lastAttemptAt = null;
-    this.firstError = null; // Store the first error that occurred
     this.lastError = null;
     this.result = null;
     this.callbacks = {
@@ -130,6 +131,7 @@ class QueueItem {
    * Check if item should be retried
    */
   shouldRetry() {
+    if (this.lastError?.operationAborted) return false;
     if (isCancellationError(this.lastError)) return false;
 
     // Local deterministic validation errors (e.g., TEXT_TOO_LONG) must never be retried
@@ -154,8 +156,9 @@ class QueueItem {
         ErrorTypes.API_ERROR
       ];
 
-      if (!retryableFatalTypes.includes(this.lastError.type) && 
-          this.lastError.statusCode !== 429) {
+      // Canonical semantic type wins over raw HTTP status. Only explicitly
+      // retryable fatal types may bypass the fatal stop condition.
+      if (!retryableFatalTypes.includes(this.lastError.type)) {
         return false;
       }
     }
@@ -240,6 +243,7 @@ export class QueueManager {
       
       const queue = this.queues.get(providerName);
       queue.push(item);
+      this._attachAbortSignal(item);
       
       // Sort queue by priority (higher priority first)
       queue.sort((a, b) => b.priority - a.priority);
@@ -330,6 +334,10 @@ export class QueueManager {
       this._removeItemFromQueue(item);
       return; // Already cancelled/failed
     }
+    if (item.abortSignal?.aborted) {
+      this._handleOperationAbort(item);
+      return;
+    }
 
     item.status = QueueStatus.PROCESSING;
     item.attempts++;
@@ -341,7 +349,11 @@ export class QueueManager {
       attempt: item.attempts,
     });
     
-    logger.debug(`Processing item ${item.id} (attempt ${item.attempts}/${item.getRetryStrategy().maxRetries})`);
+    const strategy = item.getRetryStrategy();
+    const attemptLabel = item.lastError
+      ? `${item.attempts}/${strategy.maxRetries}`
+      : `${item.attempts}`;
+    logger.debug(`Processing item ${item.id} (attempt ${attemptLabel})`);
     
     try {
       const result = await item.requestFunction();
@@ -367,16 +379,15 @@ export class QueueManager {
       }
 
       item.lastError = error;
-      if (!item.firstError) {
-        item.firstError = error;
-      }
       
       if (item.shouldRetry()) {
         // Schedule retry
         item.status = QueueStatus.RETRYING;
         const delay = item.getNextRetryDelay();
         
-        logger.warn(`Item ${item.id} failed, retrying in ${delay}ms (attempt ${item.attempts}/${item.getRetryStrategy().maxRetries})`, error);
+        const nextAttemptNumber = item.attempts + 1;
+        const maxAttempts = item.getRetryStrategy().maxRetries;
+        logger.warn(`Item ${item.id} failed, retrying in ${delay}ms (next attempt ${nextAttemptNumber}/${maxAttempts})`, error);
         appendTranslationDiagnostic(item.executionContext, {
           type: 'QUEUE_RETRY',
           stage: 'queue',
@@ -386,13 +397,14 @@ export class QueueManager {
           code: error.type,
         });
         
-        this.retryTimeouts.set(item.id, setTimeout(() => {
-          this.retryTimeouts.delete(item.id);
-          
-          // Final check before moving to PENDING: has it been cancelled during the timeout?
-          if (item.status === QueueStatus.FAILED) {
-            return;
-          }
+         this.retryTimeouts.set(item.id, setTimeout(() => {
+           this.retryTimeouts.delete(item.id);
+
+           // Final check before moving to PENDING: has it been cancelled during the timeout?
+           if (item.status === QueueStatus.FAILED || item.abortSignal?.aborted) {
+             if (item.status !== QueueStatus.FAILED) this._handleOperationAbort(item);
+             return;
+           }
 
           item.status = QueueStatus.PENDING;
           
@@ -405,20 +417,16 @@ export class QueueManager {
       } else {
         // Permanent failure
         item.status = QueueStatus.FAILED;
-        
+
         if (item.callbacks.reject) {
-          // If we hit a circuit breaker during a retry, prefer showing the original error
-          // that caused the problem in the first place.
-          const errorToReport = (item.attempts > 1 && error.type === ErrorTypes.CIRCUIT_BREAKER_OPEN && item.firstError)
-            ? item.firstError
-            : error;
-          
-          item.callbacks.reject(errorToReport);
+          item.callbacks.reject(error);
         }
         
         // FIX: Log cancellations as debug instead of error to prevent log noise
-        if (isCancellationError(error)) {
-          logger.debug(`Item ${item.id} cancelled by user`);
+         if (error.operationAborted) {
+           logger.debug(`Item ${item.id} cancelled (operation aborted)`);
+         } else if (isCancellationError(error)) {
+           logger.debug(`Item ${item.id} cancelled by user`);
         } else {
           logger.debug(`Item ${item.id} failed permanently after ${item.attempts} attempts:`, error);
         }
@@ -436,6 +444,45 @@ export class QueueManager {
     if (index > -1 && (item.status === QueueStatus.COMPLETED || item.status === QueueStatus.FAILED)) {
       queue.splice(index, 1);
     }
+    this._detachAbortSignal(item);
+  }
+
+  _attachAbortSignal(item) {
+    const signal = item.abortSignal;
+    if (!signal) return;
+
+    item.abortListener = () => {
+      if (signal.reason === 'user-cancelled' || signal.reason === 'user_cancelled') {
+        this._cancelItemInternal(item);
+      } else {
+        this._handleOperationAbort(item);
+      }
+    };
+    signal.addEventListener('abort', item.abortListener, { once: true });
+    if (signal.aborted) item.abortListener();
+  }
+
+  _detachAbortSignal(item) {
+    if (!item.abortSignal || !item.abortListener) return;
+    item.abortSignal.removeEventListener('abort', item.abortListener);
+    item.abortListener = null;
+  }
+
+  _handleOperationAbort(item) {
+    if (item.status === QueueStatus.FAILED || item.status === QueueStatus.COMPLETED) return;
+    item.status = QueueStatus.FAILED;
+    const error = new Error('Translation operation aborted');
+    error.operationAborted = true;
+    error.cancellationReason = 'operation-abort';
+    if (item.callbacks.reject) item.callbacks.reject(error);
+    this._clearRetryTimeout(item);
+    this._removeItemFromQueue(item);
+  }
+
+  _clearRetryTimeout(item) {
+    if (!this.retryTimeouts.has(item.id)) return;
+    clearTimeout(this.retryTimeouts.get(item.id));
+    this.retryTimeouts.delete(item.id);
   }
   
   /**
@@ -584,8 +631,7 @@ export class QueueManager {
     // Cancel retry timeout if exists
     if (this.retryTimeouts.has(item.id)) {
       logger.debug(`[QueueManager] Clearing retry timeout for item ${item.id}`);
-      clearTimeout(this.retryTimeouts.get(item.id));
-      this.retryTimeouts.delete(item.id);
+      this._clearRetryTimeout(item);
     }
 
     this._removeItemFromQueue(item);
@@ -599,6 +645,12 @@ export class QueueManager {
     
     for (const [providerName, queue] of this.queues) {
       const originalLength = queue.length;
+
+      queue.forEach((item) => {
+        if (item.status === QueueStatus.PENDING || item.status === QueueStatus.PROCESSING || item.status === QueueStatus.RETRYING) return;
+        this._clearRetryTimeout(item);
+        this._detachAbortSignal(item);
+      });
       
       // Remove completed and permanently failed items
       this.queues.set(providerName, queue.filter(item => 

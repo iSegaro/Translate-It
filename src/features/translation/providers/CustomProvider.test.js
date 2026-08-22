@@ -8,6 +8,9 @@ import { AIConversationHelper } from './utils/AIConversationHelper.js';
 import { CompletionTermination } from '@/features/translation/ir/CompletionContract.js';
 import { createTranslationOperation } from '@/features/translation/ir/TranslationOperation.js';
 import { ResponseFormat } from '@/shared/config/translationConstants.js';
+import { AIResponseParser } from './utils/AIResponseParser.js';
+import { mapCanonicalTranslationError } from '@/shared/error-management/PublicTranslationErrorPolicy.js';
+import { PublicTranslationErrorTypes } from '@/shared/error-management/PublicTranslationError.js';
 
 // Mock Dependencies
 vi.mock('@/shared/proxy/ProxyManager.js', () => ({
@@ -95,6 +98,19 @@ describe('CustomProvider Error Handling', () => {
     provider = new CustomProvider();
   });
 
+  const runHttpError = async (body, status = 404) => {
+    proxyManager.fetch.mockResolvedValue({
+      ok: false,
+      status,
+      statusText: status === 404 ? 'Not Found' : 'Bad Request',
+      headers: new Map([['content-type', 'application/json']]),
+      json: () => Promise.resolve(body),
+      clone: function() { return this; }
+    });
+
+    return provider._callAI('system', 'Hello World').catch(error => error);
+  };
+
   it('should handle successful translation', async () => {
     proxyManager.fetch.mockResolvedValue({
       ok: true,
@@ -106,6 +122,60 @@ describe('CustomProvider Error Handling', () => {
 
     const result = await provider._callAI('system', 'Hello World');
     expect(result).toBe('Custom AI Result');
+  });
+
+  it.each([
+    { label: 'top-level', body: { code: 'model_not_found' } },
+    { label: 'nested', body: { error: { code: 'model_not_found' } } },
+  ])('classifies proven $label model code as MODEL_MISSING', async ({ body }) => {
+    const error = await runHttpError(body);
+
+    expect(error).toMatchObject({
+      type: ErrorTypes.MODEL_MISSING,
+      statusCode: 404,
+      });
+  });
+
+  it('preserves insufficient-balance identity for HTTP 402', async () => {
+    const error = await runHttpError({ error: { code: 'billing_required' } }, 402);
+
+    expect(error).toMatchObject({
+      type: ErrorTypes.INSUFFICIENT_BALANCE,
+      statusCode: 402,
+      providerName: 'Custom',
+    });
+  });
+
+  it.each([
+    { label: 'route-not-found', body: { code: 'route_not_found' } },
+    { label: 'endpoint-not-found', body: { code: 'endpoint_not_found' } },
+    { label: 'generic not-found', body: { code: 'not_found' } },
+    { label: 'generic invalid-request type', body: { error: { type: 'invalid_request_error' } } },
+    { label: 'empty body', body: {} },
+    { label: 'malformed fields', body: { code: { value: 'model_not_found' }, error: { code: ['model_not_found'], type: 404 } } },
+  ])('keeps $label 404 as HTTP_ERROR', async ({ body }) => {
+    const error = await runHttpError(body);
+
+    expect(error).toMatchObject({
+      type: ErrorTypes.HTTP_ERROR,
+      statusCode: 404,
+    });
+  });
+
+  it('maps confirmed model failure to public model unavailable', async () => {
+    const error = await runHttpError({ error: { code: 'model_not_found' } });
+
+    expect(mapCanonicalTranslationError(error).type)
+      .toBe(PublicTranslationErrorTypes.MODEL_UNAVAILABLE);
+  });
+
+  it('does not restore MODEL_MISSING through global fallback for ambiguous 404', async () => {
+    const error = await runHttpError({ code: 'not_found' });
+
+    expect(error.type).toBe(ErrorTypes.HTTP_ERROR);
+    expect(error.originalType).toBeUndefined();
+    expect(mapCanonicalTranslationError(error).type)
+      .not.toBe(PublicTranslationErrorTypes.MODEL_UNAVAILABLE);
   });
 
   it('forwards call purpose outside the provider payload', async () => {
@@ -205,11 +275,13 @@ describe('CustomProvider Error Handling', () => {
     expect(fetchOptions.headers.Authorization).toBeUndefined();
   });
 
-  it('preserves the Custom translation request contract for anonymous calls', async () => {
+  it.each([ResponseFormat.JSON_OBJECT, ResponseFormat.JSON_ARRAY])(
+    'sends json_object response format for %s anonymous calls',
+    async (expectedFormat) => {
     vi.mocked(getCustomApiKeysAsync).mockResolvedValueOnce([]);
     const executeRequest = vi.spyOn(provider, '_executeRequest').mockResolvedValue('translated');
 
-    await provider._callAI('system', 'source', { expectedFormat: ResponseFormat.JSON_OBJECT });
+    await provider._callAI('system', 'source', { expectedFormat });
 
     const request = executeRequest.mock.calls[0][0];
     expect(request.fetchOptions.headers.Authorization).toBeUndefined();
@@ -219,6 +291,317 @@ describe('CustomProvider Error Handling', () => {
       max_tokens: 4096,
       response_format: { type: 'json_object' }
     });
+    },
+  );
+
+  it('omits response format for STRING calls', async () => {
+    const executeRequest = vi.spyOn(provider, '_executeRequest').mockResolvedValue('translated');
+
+    await provider._callAI('system', 'source', { expectedFormat: ResponseFormat.STRING });
+
+    const payload = JSON.parse(executeRequest.mock.calls[0][0].fetchOptions.body);
+    expect(payload).not.toHaveProperty('response_format');
+  });
+
+  it.each([400, 422])(
+    'falls back once when HTTP %s explicitly rejects response_format',
+    async (statusCode) => {
+      const unsupported = Object.assign(new Error('Unknown parameter `response_format`'), {
+        statusCode,
+        type: ErrorTypes.HTTP_ERROR,
+      });
+      const executeRequest = vi.spyOn(provider, '_executeRequest')
+        .mockRejectedValueOnce(unsupported)
+        .mockResolvedValueOnce('translated');
+
+      await expect(provider._callAI('system', 'source', { expectedFormat: ResponseFormat.JSON_OBJECT }))
+        .resolves.toBe('translated');
+
+      expect(executeRequest).toHaveBeenCalledTimes(2);
+      const firstRequest = executeRequest.mock.calls[0][0];
+      const fallbackRequest = executeRequest.mock.calls[1][0];
+      const firstPayload = JSON.parse(firstRequest.fetchOptions.body);
+      const fallbackPayload = JSON.parse(fallbackRequest.fetchOptions.body);
+
+      expect(firstPayload.response_format).toEqual({ type: 'json_object' });
+      expect(fallbackPayload).not.toHaveProperty('response_format');
+      expect(fallbackRequest.url).toBe(firstRequest.url);
+      expect(fallbackRequest.charCount).toBe(firstRequest.charCount);
+      expect(fallbackRequest.originalCharCount).toBe(firstRequest.originalCharCount);
+      expect(fallbackRequest.callPurpose).toBe(firstRequest.callPurpose);
+      expect(fallbackRequest.executionContext).toBe(firstRequest.executionContext);
+      expect(fallbackRequest.fetchOptions.headers).toBe(firstRequest.fetchOptions.headers);
+      expect(fallbackPayload).toMatchObject({
+        model: firstPayload.model,
+        messages: firstPayload.messages,
+        max_tokens: firstPayload.max_tokens,
+      });
+    },
+  );
+
+  it('reuses learned response_format capability across internal retries', async () => {
+    const unsupported = Object.assign(new Error('Unknown parameter `response_format`'), {
+      statusCode: 400,
+      type: ErrorTypes.HTTP_ERROR,
+    });
+    const capabilityRef = { responseFormatUnsupported: false };
+    const executeRequest = vi.spyOn(provider, '_executeRequest')
+      .mockRejectedValueOnce(unsupported)
+      .mockResolvedValue('translated');
+
+    await expect(provider._callAI('system', 'source', {
+      expectedFormat: ResponseFormat.JSON_OBJECT,
+      customResponseFormatCapabilityRef: capabilityRef,
+    })).resolves.toBe('translated');
+    await expect(provider._callAI('system', 'retry', {
+      expectedFormat: ResponseFormat.JSON_OBJECT,
+      customResponseFormatCapabilityRef: capabilityRef,
+    })).resolves.toBe('translated');
+
+    expect(capabilityRef.responseFormatUnsupported).toBe(true);
+    expect(executeRequest).toHaveBeenCalledTimes(3);
+    expect(JSON.parse(executeRequest.mock.calls[0][0].fetchOptions.body)).toHaveProperty('response_format');
+    expect(JSON.parse(executeRequest.mock.calls[1][0].fetchOptions.body)).not.toHaveProperty('response_format');
+    expect(JSON.parse(executeRequest.mock.calls[2][0].fetchOptions.body)).not.toHaveProperty('response_format');
+  });
+
+  it('probes response_format again for a fresh capability scope', async () => {
+    const unsupported = Object.assign(new Error('Unknown parameter `response_format`'), {
+      statusCode: 400,
+      type: ErrorTypes.HTTP_ERROR,
+    });
+    const firstCapabilityRef = { responseFormatUnsupported: false };
+    const secondCapabilityRef = { responseFormatUnsupported: false };
+    const executeRequest = vi.spyOn(provider, '_executeRequest')
+      .mockRejectedValueOnce(unsupported)
+      .mockResolvedValueOnce('first')
+      .mockResolvedValueOnce('second');
+
+    await provider._callAI('system', 'first', {
+      expectedFormat: ResponseFormat.JSON_OBJECT,
+      customResponseFormatCapabilityRef: firstCapabilityRef,
+    });
+    await provider._callAI('system', 'second', {
+      expectedFormat: ResponseFormat.JSON_OBJECT,
+      customResponseFormatCapabilityRef: secondCapabilityRef,
+    });
+
+    expect(executeRequest).toHaveBeenCalledTimes(3);
+    expect(JSON.parse(executeRequest.mock.calls[2][0].fetchOptions.body)).toHaveProperty('response_format');
+  });
+
+  it('reuses capability state across the actual BaseAI rate-limit retry boundary', async () => {
+    const unsupported = Object.assign(new Error('Unknown parameter `response_format`'), {
+      statusCode: 400,
+      type: ErrorTypes.HTTP_ERROR,
+    });
+    const transientFailure = Object.assign(new Error('Temporary failure'), {
+      statusCode: 503,
+      type: ErrorTypes.SERVER_ERROR,
+    });
+    const executeRequest = vi.spyOn(provider, '_executeRequest')
+      .mockRejectedValueOnce(unsupported)
+      .mockRejectedValueOnce(transientFailure)
+      .mockResolvedValueOnce('translated');
+    const executeWithRateLimit = vi.spyOn(provider, '_executeWithRateLimit')
+      .mockImplementation(async (task) => {
+        await task({ attempt: 1 }).catch(() => {});
+        return task({ attempt: 2 });
+      });
+    const parseBatchResult = vi.spyOn(AIResponseParser, 'parseBatchResult')
+      .mockReturnValue({ results: ['translated'], contractViolation: false });
+
+    try {
+      await expect(provider._translateBatch(
+        [{ id: 'unit-1', text: 'source' }],
+        'en',
+        'fa',
+        'selection',
+        null,
+        null,
+        null,
+        null,
+        null,
+        ResponseFormat.JSON_OBJECT,
+      )).resolves.toEqual(['translated']);
+
+      expect(executeWithRateLimit).toHaveBeenCalledTimes(1);
+      expect(executeRequest).toHaveBeenCalledTimes(3);
+      expect(JSON.parse(executeRequest.mock.calls[0][0].fetchOptions.body)).toHaveProperty('response_format');
+      expect(JSON.parse(executeRequest.mock.calls[1][0].fetchOptions.body)).not.toHaveProperty('response_format');
+      expect(JSON.parse(executeRequest.mock.calls[2][0].fetchOptions.body)).not.toHaveProperty('response_format');
+    } finally {
+      parseBatchResult.mockRestore();
+      executeWithRateLimit.mockRestore();
+    }
+  });
+
+  it('starts fresh capability scope for a new BaseAI structured execution', async () => {
+    const unsupported = Object.assign(new Error('Unsupported parameter: response_format'), {
+      statusCode: 422,
+      type: ErrorTypes.HTTP_ERROR,
+    });
+    const executeRequest = vi.spyOn(provider, '_executeRequest')
+      .mockRejectedValueOnce(unsupported)
+      .mockResolvedValue('translated');
+    const executeWithRateLimit = vi.spyOn(provider, '_executeWithRateLimit')
+      .mockImplementation(async (task) => task({}));
+    const parseBatchResult = vi.spyOn(AIResponseParser, 'parseBatchResult')
+      .mockReturnValue({ results: ['translated'], contractViolation: false });
+
+    try {
+      const args = [
+        [{ id: 'unit-1', text: 'source' }],
+        'en',
+        'fa',
+        'selection',
+        null,
+        null,
+        null,
+        null,
+        null,
+        ResponseFormat.JSON_OBJECT,
+      ];
+      await provider._translateBatch(...args);
+      await provider._translateBatch(...args);
+
+      expect(executeRequest).toHaveBeenCalledTimes(3);
+      expect(JSON.parse(executeRequest.mock.calls[0][0].fetchOptions.body)).toHaveProperty('response_format');
+      expect(JSON.parse(executeRequest.mock.calls[1][0].fetchOptions.body)).not.toHaveProperty('response_format');
+      expect(JSON.parse(executeRequest.mock.calls[2][0].fetchOptions.body)).toHaveProperty('response_format');
+    } finally {
+      parseBatchResult.mockRestore();
+      executeWithRateLimit.mockRestore();
+    }
+  });
+
+  it('gives each sequential item an independent capability scope', async () => {
+    const unsupported = Object.assign(new Error('Unknown parameter `response_format`'), {
+      statusCode: 400,
+      type: ErrorTypes.HTTP_ERROR,
+    });
+    const executeRequest = vi.spyOn(provider, '_executeRequest')
+      .mockRejectedValueOnce(unsupported)
+      .mockResolvedValue('translated');
+    const executeWithRateLimit = vi.spyOn(provider, '_executeWithRateLimit')
+      .mockImplementation(async (task) => task({}));
+
+    try {
+      await expect(provider._traditionalBatchTranslate(
+        ['first', 'second'],
+        'en',
+        'fa',
+        'selection',
+        null,
+        null,
+        null,
+        null,
+        null,
+        ResponseFormat.JSON_OBJECT,
+      )).resolves.toBeDefined();
+
+      expect(executeRequest).toHaveBeenCalledTimes(3);
+      expect(JSON.parse(executeRequest.mock.calls[0][0].fetchOptions.body)).toHaveProperty('response_format');
+      expect(JSON.parse(executeRequest.mock.calls[1][0].fetchOptions.body)).not.toHaveProperty('response_format');
+      expect(JSON.parse(executeRequest.mock.calls[2][0].fetchOptions.body)).toHaveProperty('response_format');
+    } finally {
+      executeWithRateLimit.mockRestore();
+    }
+  });
+
+  it.each([
+    [400, 'Bad request'],
+    [422, 'Invalid request'],
+    [404, 'Unknown parameter `response_format`'],
+    [401, 'Unknown parameter `response_format`'],
+    [429, 'Unknown parameter `response_format`'],
+    [500, 'Unknown parameter `response_format`'],
+    [400, 'Unsupported parameter `temperature`'],
+  ])('does not fallback for HTTP %s: %s', async (statusCode, message) => {
+    const error = Object.assign(new Error(message), {
+      statusCode,
+      type: ErrorTypes.HTTP_ERROR,
+    });
+    const executeRequest = vi.spyOn(provider, '_executeRequest').mockRejectedValue(error);
+
+    await expect(provider._callAI('system', 'source', { expectedFormat: ResponseFormat.JSON_OBJECT }))
+      .rejects.toBe(error);
+
+    expect(executeRequest).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not fallback for STRING even when response_format appears in the error', async () => {
+    const error = Object.assign(new Error('Unknown parameter `response_format`'), {
+      statusCode: 400,
+      type: ErrorTypes.HTTP_ERROR,
+    });
+    const executeRequest = vi.spyOn(provider, '_executeRequest').mockRejectedValue(error);
+
+    await expect(provider._callAI('system', 'source', { expectedFormat: ResponseFormat.STRING }))
+      .rejects.toBe(error);
+
+    expect(executeRequest).toHaveBeenCalledTimes(1);
+    expect(JSON.parse(executeRequest.mock.calls[0][0].fetchOptions.body)).not.toHaveProperty('response_format');
+  });
+
+  it('propagates fallback failure without a third capability attempt', async () => {
+    const unsupported = Object.assign(new Error('Unsupported parameter: response_format'), {
+      statusCode: 400,
+      type: ErrorTypes.HTTP_ERROR,
+    });
+    const fallbackFailure = Object.assign(new Error('Server unavailable'), {
+      statusCode: 503,
+      type: ErrorTypes.SERVER_ERROR,
+    });
+    const executeRequest = vi.spyOn(provider, '_executeRequest')
+      .mockRejectedValueOnce(unsupported)
+      .mockRejectedValueOnce(fallbackFailure);
+
+    await expect(provider._callAI('system', 'source', { expectedFormat: ResponseFormat.JSON_ARRAY }))
+      .rejects.toBe(fallbackFailure);
+
+    expect(executeRequest).toHaveBeenCalledTimes(2);
+  });
+
+  it('passes fallback output through structured parser validation', async () => {
+    const unsupported = Object.assign(new Error('`response_format` is not supported'), {
+      statusCode: 400,
+      type: ErrorTypes.HTTP_ERROR,
+    });
+    const parseBatchResult = vi.spyOn(AIResponseParser, 'parseBatchResult');
+    vi.spyOn(provider, '_executeRequest')
+      .mockRejectedValueOnce(unsupported)
+      .mockResolvedValue('plain text');
+
+    try {
+      const operation = createTranslationOperation('custom-response-format-fallback-parser');
+      const originalBatch = [{ id: 'unit-1', text: 'source' }];
+      await expect(provider._translateBatch(
+        originalBatch,
+        'en',
+        'fa',
+        'selection',
+        null,
+        null,
+        null,
+        null,
+        { executionContext: { operation } },
+        ResponseFormat.JSON_OBJECT,
+      )).rejects.toThrow();
+
+      expect(parseBatchResult).toHaveBeenCalledWith(
+        'plain text',
+        1,
+        originalBatch,
+        provider.providerName,
+        ResponseFormat.JSON_OBJECT,
+        expect.any(Object),
+        undefined,
+        null,
+      );
+    } finally {
+      parseBatchResult.mockRestore();
+    }
   });
 
   it('should detect API_ERROR wrapped in 200 OK response', async () => {

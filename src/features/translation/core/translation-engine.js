@@ -6,6 +6,7 @@
 
 import { ProviderFactory } from "@/features/translation/providers/ProviderFactory.js";
 import { MessageActions } from "@/shared/messaging/core/MessageActions.js";
+import { MessageFormat, reconstructTranslationError, isStructuredTranslationError } from "@/shared/messaging/core/MessagingCore.js";
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { isEmptyTranslationInput, isStructuredBatchInput } from "./translationInputHelpers.js";
@@ -18,7 +19,6 @@ import {
   getSelectionMaxCharsAsync,
   getSelectElementMaxCharsAsync
 } from "@/shared/config/config.js";
-import { matchErrorToType } from '@/shared/error-management/ErrorMatcher.js';
 import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
 import { resolveTranslationMode } from "../utils/translationModeHelper.js";
 import { TranslationLifecycleRegistry } from "./managers/TranslationLifecycleRegistry.js";
@@ -170,9 +170,10 @@ export class TranslationEngine {
     }
 
     if (result.success === false) {
-      const failed = new Error(result.error?.message || 'Translation failed');
-      failed.type = result.error?.type || matchErrorToType(result.error);
-      throw failed;
+      const errorSource = isStructuredTranslationError(result.errorDetails)
+        ? result.errorDetails
+        : result.error || result;
+      throw reconstructTranslationError(errorSource);
     }
 
     // Extract values from the unified coordinator response
@@ -273,15 +274,11 @@ export class TranslationEngine {
    * Utility to format error responses consistently.
    */
   formatError(error, context) {
-    const errorType = error.type || matchErrorToType(error);
     return { 
       success: false, 
-      error: { 
-        type: errorType, 
-        message: error.message || "Translation failed", 
-        context: context || "unknown", 
-        timestamp: Date.now() 
-      } 
+      error: MessageFormat.serializeTranslationError(error, {
+        context: error?.context || context || "unknown",
+      })
     };
   }
 

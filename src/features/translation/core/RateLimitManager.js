@@ -7,12 +7,30 @@
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { registryIdToName } from '@/features/translation/providers/ProviderConstants.js';
+import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
 import { isFatalError, isConfigError, matchErrorToType } from '@/shared/error-management/ErrorMatcher.js';
 import { isLocalDeterministicValidationError } from '@/shared/error-management/ValidationPolicy.js';
 import { PROVIDER_CONFIGURATIONS, getProviderConfiguration } from '@/features/translation/core/ProviderConfigurations.js';
 import { getProviderOptimizationLevelAsync } from '@/shared/config/config.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.TRANSLATION, 'RateLimitManager');
+
+function createAbortError(signal, message = 'Request aborted') {
+  const isUserAbort = signal?.aborted
+    && (signal.reason === 'user-cancelled' || signal.reason === 'user_cancelled');
+  const error = new Error(isUserAbort ? 'Request cancelled' : message);
+  error.name = 'AbortError';
+
+  if (isUserAbort) {
+    error.type = ErrorTypes.USER_CANCELLED;
+    error.isCancelled = true;
+  } else {
+    error.operationAborted = true;
+    error.cancellationReason = 'operation-abort';
+  }
+
+  return error;
+}
 
 /**
  * Priority levels for translation requests
@@ -160,18 +178,7 @@ export class RateLimitManager {
 
     // Check circuit breaker
     if (this._isCircuitOpen(state)) {
-      const lastError = state.lastCircuitError;
-      const reason = lastError ? `: ${lastError.message || lastError}` : '';
-      const error = new Error(`Circuit breaker open for ${name}. Too many failures${reason}`);
-      error.type = 'CIRCUIT_BREAKER_OPEN';
-      
-      // If the underlying error was fatal/retryable, preserve its characteristics safely
-      if (lastError) {
-        error.originalType = lastError.type || matchErrorToType(lastError);
-        if (lastError.statusCode) error.statusCode = lastError.statusCode;
-      }
-      
-      throw error;
+      throw this._createCircuitOpenError(name, state);
     }
 
     const startTime = Date.now();
@@ -201,20 +208,14 @@ export class RateLimitManager {
           const index = queue.indexOf(request);
           if (index !== -1) {
             queue.splice(index, 1);
-            const abortError = new Error('Request aborted while in queue');
-            abortError.name = 'AbortError';
-            abortError.isCancelled = true;
-            reject(abortError);
+            reject(createAbortError(abortSignal, 'Request aborted while in queue'));
           }
         };
         abortSignal.addEventListener('abort', onAbort, { once: true });
         
         // If already aborted
         if (abortSignal.aborted) {
-          const abortError = new Error('Request aborted before enqueuing');
-          abortError.name = 'AbortError';
-          abortError.isCancelled = true;
-          reject(abortError);
+          reject(createAbortError(abortSignal, 'Request aborted before enqueuing'));
           return;
         }
       }
@@ -233,7 +234,7 @@ export class RateLimitManager {
 
     // Stop processing if circuit is open
     if (this._isCircuitOpen(state)) {
-      this._rejectQueue(state, new Error(`Circuit breaker open for ${providerName}`));
+      this._rejectQueue(state, this._createCircuitOpenError(providerName, state));
       return;
     }
 
@@ -289,17 +290,35 @@ export class RateLimitManager {
       while (state.queues[p].length > 0) {
         const req = state.queues[p].shift();
         
-        // If it's a circuit breaker reject, we want it to be fatal enough to stop but 
-        // also recognizable as a cancellation if the user/handler decides so.
-        // For now, let's keep the error as provided but add Abort properties if it's a clear stop.
-        if (isCircuitBreaker) {
-          error.name = 'AbortError';
-          error.isCancelled = true;
-        }
-        
-        req.reject(error);
+        const rejection = isCircuitBreaker
+          ? this._copyCircuitError(error)
+          : error;
+        req.reject(rejection);
       }
     });
+  }
+
+  _createCircuitOpenError(providerName, state) {
+    const lastError = state.lastCircuitError;
+    const reason = lastError ? `: ${lastError.message || lastError}` : '';
+    const error = new Error(`Circuit breaker open for ${providerName}. Too many failures${reason}`);
+    error.type = ErrorTypes.CIRCUIT_BREAKER_OPEN;
+    error.providerName = providerName;
+
+    if (lastError) {
+      error.originalType = lastError.type || matchErrorToType(lastError);
+      if (lastError.statusCode) error.statusCode = lastError.statusCode;
+    }
+
+    return error;
+  }
+
+  _copyCircuitError(error) {
+    const rejection = new Error(error.message);
+    for (const field of ['type', 'originalType', 'statusCode', 'providerName']) {
+      if (error[field] !== undefined) rejection[field] = error[field];
+    }
+    return rejection;
   }
 
   async _executeRequest(state, request, providerName, options = {}) {
@@ -308,10 +327,7 @@ export class RateLimitManager {
     // Check if aborted before starting
     if (request.options?.abortController?.signal?.aborted) {
       state.activeRequests--; // Decrease because it was increased before calling _executeRequest
-      const abortError = new Error('Request aborted before execution');
-      abortError.name = 'AbortError';
-      abortError.isCancelled = true;
-      request.reject(abortError);
+      request.reject(createAbortError(request.options.abortController.signal, 'Request aborted before execution'));
       // Immediately process next to keep concurrency high
       this._processQueue(providerName);
       return;
@@ -329,7 +345,8 @@ export class RateLimitManager {
       request.resolve(result);
     } catch (error) {
       // Don't count cancellations as failures
-      const isCancellation = error.name === 'AbortError' || 
+      const isCancellation = error.name === 'AbortError' ||
+                           error.operationAborted ||
                            error.isCancelled || 
                            error.message?.includes('cancelled') ||
                            error.message?.includes('aborted');
@@ -470,10 +487,7 @@ export class RateLimitManager {
           const reqMessageId = request.options?.messageId || request.options?.abortController?.messageId;
           
           if (!messageId || reqMessageId === messageId) {
-            const error = new Error(messageId ? 'Request cancelled' : 'All requests cleared');
-            error.name = 'AbortError';
-            error.isCancelled = true;
-            request.reject(error);
+            request.reject(createAbortError(null, messageId ? 'Request cancelled' : 'All requests cleared'));
           } else {
             remaining.push(request);
           }

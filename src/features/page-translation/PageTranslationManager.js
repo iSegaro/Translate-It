@@ -4,10 +4,11 @@ import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import ResourceTracker from '@/core/memory/ResourceTracker.js';
 import { sendRegularMessage } from '@/shared/messaging/core/UnifiedMessaging.js';
 import { MessageActions } from '@/shared/messaging/core/MessageActions.js';
-import { ActionReasons } from '@/shared/messaging/core/MessagingCore.js';
+import { ActionReasons, MessageFormat } from '@/shared/messaging/core/MessagingCore.js';
 
 import { ErrorHandler } from '@/shared/error-management/ErrorHandler.js';
 import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
+import { getPageTranslationErrorPresentation } from './utils/PageTranslationErrorPresenter.js';
 import ExtensionContextManager from '@/core/extensionContext.js';
 import { NOTIFICATION_TIME } from '@/shared/constants/ui.js';
 import { pageEventBus } from '@/core/PageEventBus.js';
@@ -247,7 +248,10 @@ export class PageTranslationManager extends ResourceTracker {
       this.logger.error('translatePage failed', error);
       this.isTranslating = false;
       this.isAutoTranslating = false;
-      this._broadcastEvent(MessageActions.PAGE_TRANSLATE_ERROR, { error: error.message });
+      this._broadcastEvent(MessageActions.PAGE_TRANSLATE_ERROR, {
+        error: error.message,
+        errorDetails: MessageFormat.serializeTranslationError(error)
+      });
       throw error;
     }
   }
@@ -267,11 +271,13 @@ export class PageTranslationManager extends ResourceTracker {
       this.isTranslated = false;
       this.isAutoTranslating = false;
 
+      const translationRoot = this.bridge.getTranslationRoot?.() || document.documentElement;
+
       // 2. Use standard library restore
       this.bridge.restore(document.documentElement);
 
       // 3. Deep clean any remaining markers
-      PageTranslationHelper.deepCleanDOM();
+      PageTranslationHelper.deepCleanDOM(translationRoot);
 
       // 4. Get the count before resetting
       const restoredCount = this.scheduler.translatedCount || 0;
@@ -287,7 +293,10 @@ export class PageTranslationManager extends ResourceTracker {
       return { success: true, ...resultData };
     } catch (error) {
       this.logger.error('Restore failed', error);
-      this._broadcastEvent(MessageActions.PAGE_RESTORE_ERROR, { error: error.message });
+      this._broadcastEvent(MessageActions.PAGE_RESTORE_ERROR, {
+        error: error.message,
+        errorDetails: MessageFormat.serializeTranslationError(error)
+      });
       throw error;
     }
   }
@@ -445,19 +454,25 @@ export class PageTranslationManager extends ResourceTracker {
     this.isAutoTranslating = false;
     this.isFatalErrorHandling = false;
 
-    // Use centralized ErrorHandler to manage notification and logging
-    ErrorHandler.getInstance().handle(error, {
-      type: errorType || ErrorTypes.TRANSLATION_FAILED,
-      context: 'page-translation-fatal',
-      showToast: !isContextError // Don't show toast for context errors
-    }).catch(err => {
-      this.logger.error('ErrorHandler failed in _handleFatalError:', err);
-    });
+    // Use Page's public presentation boundary before centralized ErrorHandler.
+    if (!isContextError) {
+      void getPageTranslationErrorPresentation({ error, errorType }).then((displayError) => {
+        if (!displayError) return;
+        return ErrorHandler.getInstance().handle(displayError, {
+          type: errorType || displayError.type || ErrorTypes.TRANSLATION_FAILED,
+          context: 'page-translation-fatal',
+          showToast: true
+        });
+      }).catch(err => {
+        this.logger.error('ErrorHandler failed in _handleFatalError:', err);
+      });
+    }
 
     // Don't broadcast UI error for context errors to keep it silent
     if (!isContextError) {
       this._broadcastEvent(MessageActions.PAGE_TRANSLATE_ERROR, {
         error: localizedMessage || error.message || String(error),
+        errorDetails: MessageFormat.serializeTranslationError(error),
         errorType: errorType || ErrorTypes.TRANSLATION_FAILED,
         isFatal: true
       });

@@ -566,7 +566,7 @@ const ocrModel = computed(() => props.ocrViewModel || {})
 
 function buildPrimaryLabel(state, compact = false) {
   const actionText = state.action === 'cancel'
-    ? t('ocr.cancel', 'Cancel')
+    ? t('cancel', 'Cancel')
     : (state.action === 'page'
       ? t(compact ? 'ocr_page_compact' : 'ocr_page', compact ? 'Page' : 'OCR Page')
       : t(compact ? 'ocr_region_compact' : 'ocr_region', compact ? 'Region' : 'OCR Region'))

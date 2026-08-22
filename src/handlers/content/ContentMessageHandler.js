@@ -1,5 +1,5 @@
 import { MessageActions } from '@/shared/messaging/core/MessageActions.js';
-import { MessagingContexts } from '@/shared/messaging/core/MessagingCore.js';
+import { MessagingContexts, reconstructTranslationError, isStructuredTranslationError } from '@/shared/messaging/core/MessagingCore.js';
 import { TranslationMode } from '@/shared/config/config.js';
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
@@ -10,6 +10,7 @@ import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
 import { getSelectElementActivationErrorMessage } from '@/features/element-selection/utils/activationError.js';
 import { pageEventBus } from '@/core/PageEventBus.js';
 import ResourceTracker from '@/core/memory/ResourceTracker.js';
+import { getFieldTranslationErrorPresentation } from '@/features/text-field-interaction/utils/FieldTranslationErrorPresenter.js';
 
 // Singleton instance for ContentMessageHandler
 let contentMessageHandlerInstance = null;
@@ -203,7 +204,6 @@ export class ContentMessageHandler extends ResourceTracker {
 
     // IFrame support handlers
     this.registerHandler(MessageActions.IFRAME_ACTIVATE_SELECT_ELEMENT, this.handleIFrameActivateSelectElement.bind(this));
-    this.registerHandler(MessageActions.IFRAME_TRANSLATE_SELECTION, this.handleIFrameTranslateSelection.bind(this));
     this.registerHandler(MessageActions.IFRAME_GET_FRAME_INFO, this.handleIFrameGetFrameInfo.bind(this));
     this.registerHandler(MessageActions.IFRAME_COORDINATE_OPERATION, this.handleIFrameCoordinateOperation.bind(this));
     this.registerHandler(MessageActions.IFRAME_DETECT_TEXT_FIELDS, this.handleIFrameDetectTextFields.bind(this));
@@ -431,7 +431,7 @@ export class ContentMessageHandler extends ResourceTracker {
   }
 
   async handleTranslationResult(message) {
-    const { translationMode, translatedText, originalText, options, success, error } = message.data;
+    const { translationMode, translatedText, originalText, options, success, error, errorDetails } = message.data;
     const toastId = options?.toastId;
     this.logger.info(`Handling translation result for mode: ${translationMode}`, {
       success,
@@ -455,10 +455,12 @@ export class ContentMessageHandler extends ResourceTracker {
 
       case TranslationMode.Field:
       case TranslationMode.LEGACY_FIELD: // Handle both enum and legacy string for robustness
+      {
         this.logger.info('Processing Text Field translation result');
         
         // Check if translation failed at background level
-        if (success === false && error) {
+      const failureSource = isStructuredTranslationError(errorDetails) ? errorDetails : error;
+      if (success === false && failureSource) {
           // logger.trace('Text Field translation failed in background, handling error');
           
           // Dismiss status notification if exists
@@ -471,18 +473,20 @@ export class ContentMessageHandler extends ResourceTracker {
             window.pendingTranslationToastId = null;
           }
           
-          // Use centralized error handling system to get localized message and correct type
-          const errorInfo = await this.errorHandler.getErrorForUI(error, 'text-field-translation');
-          
-          // Log the error with proper context
-          await this.errorHandler.handle(error, {
-            context: 'text-field-translation',
-            type: errorInfo.type,
-            showToast: true
-          });
-          
-          const translationError = new Error(errorInfo.message);
-          translationError.type = errorInfo.type;
+          const presentation = await getFieldTranslationErrorPresentation(failureSource);
+          if (presentation) {
+            await this.errorHandler.handle(presentation.displayError, {
+              context: 'text-field-translation',
+              type: presentation.canonicalType || presentation.displayError.type,
+              showToast: true
+            });
+
+            presentation.displayError.alreadyHandled = true;
+            throw presentation.displayError;
+          }
+
+          // Preserve silent cancellation/context control flow without presenting.
+          const translationError = reconstructTranslationError(failureSource);
           translationError.alreadyHandled = true;
           throw translationError;
         }
@@ -512,6 +516,7 @@ export class ContentMessageHandler extends ResourceTracker {
           error.alreadyHandled = true;
           throw error;
         }
+      }
 
       case TranslationMode.Selection:
       case TranslationMode.Dictionary_Translation:
@@ -579,13 +584,6 @@ export class ContentMessageHandler extends ResourceTracker {
         errorType: ErrorTypes.SELECT_ELEMENT,
       };
     }
-  }
-
-  async handleIFrameTranslateSelection(data) {
-    this.logger.info('IFrame translate selection request');
-    // Delegate to WindowsManager through page event bus
-    pageEventBus.emit('iframe-translate-selection', data);
-    return { success: true };
   }
 
   async handleIFrameGetFrameInfo(/* data */) {

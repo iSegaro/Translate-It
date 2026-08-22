@@ -73,6 +73,7 @@ vi.mock('@/core/extensionContext.js', () => ({
 import { ErrorHandler } from '@/shared/error-management/ErrorHandler.js';
 const errorHandlerMock = ErrorHandler.getInstance();
 const { default: ExtensionContextManager } = await import('@/core/extensionContext.js');
+const { isTransientError } = await import('@/shared/error-management/ErrorMatcher.js');
 
 vi.mock('@/utils/dom/DomDirectionManager.js', () => ({
   detectDirectionFromContent: vi.fn(() => 'rtl'),
@@ -186,6 +187,20 @@ describe('DomTranslatorAdapter', () => {
       );
     });
 
+    it('rejects direct internal shadow roots before extraction while shadow support is disabled', async () => {
+      const host = document.createElement('x-host');
+      const shadow = host.attachShadow({ mode: 'open' });
+      const internal = document.createElement('div');
+      internal.textContent = 'Shadow content';
+      shadow.appendChild(internal);
+
+      await expect(adapter.translateElement(internal)).rejects.toMatchObject({
+        type: ErrorTypes.FEATURE_BLOCKED,
+        reason: 'shadow-dom-disabled',
+      });
+      expect(contentScriptIntegration.sendTranslationRequest).not.toHaveBeenCalled();
+    });
+
     it('rejects elements above the local segment limit with a typed error before requesting translation', async () => {
       const { collectTextNodes } = await import('./DomTranslatorUtils.js');
       const { ErrorTypes } = await import('@/shared/error-management/ErrorTypes.js');
@@ -296,7 +311,10 @@ describe('DomTranslatorAdapter', () => {
       await translation;
 
       expect(collectTextNodes).toHaveBeenCalledTimes(1);
-      expect(collectTextNodes).toHaveBeenCalledWith(testElement, { extractionMode: 'v2' });
+      expect(collectTextNodes).toHaveBeenCalledWith(testElement, {
+        extractionMode: 'v2',
+        includeOpenShadowRoots: false,
+      });
     });
 
     it('maps the grouping strategy to V3 extraction mode exactly once', async () => {
@@ -315,7 +333,10 @@ describe('DomTranslatorAdapter', () => {
       await translation;
 
       expect(collectBlockGroups).toHaveBeenCalledTimes(1);
-      expect(collectBlockGroups).toHaveBeenCalledWith(testElement, expect.any(Object), { extractionMode: 'v3' });
+      expect(collectBlockGroups).toHaveBeenCalledWith(testElement, expect.any(Object), {
+        extractionMode: 'v3',
+        includeOpenShadowRoots: false,
+      });
     });
 
     it('translates an explicitly selected BUTTON root through the normal flow', async () => {
@@ -812,7 +833,7 @@ describe('DomTranslatorAdapter', () => {
       streamCallbacks.onStreamUpdate({ success: true, data: [{ t: 'Uno', i: 'n1' }] });
       expect(sendRegularMessage).not.toHaveBeenCalledWith(expect.objectContaining({
         data: expect.objectContaining({ parentId: 'b1', accepted: true })
-      }), { silent: true });
+      }), { silent: true, timeout: 500 });
       streamCallbacks.onStreamUpdate({ success: true, data: [{ t: 'Dos', i: 'n2' }] });
       streamCallbacks.onStreamEnd({ success: true });
       await translation;
@@ -849,7 +870,7 @@ describe('DomTranslatorAdapter', () => {
       expect(second.nodeValue).toBe('B');
       expect(sendRegularMessage).not.toHaveBeenCalledWith(expect.objectContaining({
         data: expect.objectContaining({ parentId: 'b1', accepted: true })
-      }), { silent: true });
+      }), { silent: true, timeout: 500 });
     });
 
     it('should order unique conversation parents by earliest source unit', async () => {
@@ -976,7 +997,7 @@ describe('DomTranslatorAdapter', () => {
       expect(second.nodeValue).toBe('B');
       expect(sendRegularMessage).not.toHaveBeenCalledWith(expect.objectContaining({
         data: expect.objectContaining({ parentId: 'b1', accepted: true })
-      }), { silent: true });
+      }), { silent: true, timeout: 500 });
     });
 
     it('should reject conflicting identity aliases without mutation', async () => {
@@ -1246,7 +1267,7 @@ describe('DomTranslatorAdapter', () => {
 
       expect(sendRegularMessage).toHaveBeenCalledWith(expect.objectContaining({
         data: expect.objectContaining({ parentId: 'b1', cleanResult: 'سلام', accepted: true })
-      }), { silent: true });
+      }), { silent: true, timeout: 500 });
     });
 
     it('should not ACK a parent when blockId is missing', async () => {
@@ -1264,7 +1285,7 @@ describe('DomTranslatorAdapter', () => {
 
       expect(sendRegularMessage).not.toHaveBeenCalledWith(expect.objectContaining({
         data: expect.objectContaining({ parentId: 'node-only' })
-      }), { silent: true });
+      }), { silent: true, timeout: 500 });
     });
 
     it('should suppress a raw V2 fragment without mutating its node', async () => {
@@ -1536,7 +1557,10 @@ describe('DomTranslatorAdapter', () => {
         const result = await adapter.translateElement(pre);
         expect(result.success).toBe(true);
         expect(collectBlockGroups).toHaveBeenCalledTimes(1);
-        expect(collectBlockGroups).toHaveBeenCalledWith(pre, expect.any(Object), { extractionMode: 'v3' });
+        expect(collectBlockGroups).toHaveBeenCalledWith(pre, expect.any(Object), {
+          extractionMode: 'v3',
+          includeOpenShadowRoots: false,
+        });
         expect(pre.textContent).toContain('x');
         document.body.removeChild(pre);
       });
@@ -1571,7 +1595,10 @@ describe('DomTranslatorAdapter', () => {
         const result = await adapter.translateElement(code);
         expect(result.success).toBe(true);
         expect(collectBlockGroups).toHaveBeenCalledTimes(1);
-        expect(collectBlockGroups).toHaveBeenCalledWith(code, expect.any(Object), { extractionMode: 'v3' });
+        expect(collectBlockGroups).toHaveBeenCalledWith(code, expect.any(Object), {
+          extractionMode: 'v3',
+          includeOpenShadowRoots: false,
+        });
         expect(code.textContent).toContain('y');
         document.body.removeChild(code);
       });
@@ -1600,7 +1627,10 @@ describe('DomTranslatorAdapter', () => {
 
         const result = await adapter.translateElement(div);
         expect(result.success).toBe(true);
-        expect(collectTextNodes).toHaveBeenCalledWith(div, { extractionMode: 'v2' });
+        expect(collectTextNodes).toHaveBeenCalledWith(div, {
+          extractionMode: 'v2',
+          includeOpenShadowRoots: false,
+        });
         expect(div.textContent).toContain('پاراگراف');
         document.body.removeChild(div);
       });
@@ -1619,13 +1649,196 @@ describe('DomTranslatorAdapter', () => {
         setTimeout(() => {
           streamCallbacks.onStreamUpdate({
             success: false,
-            error: { message: 'Fatal API Error', type: 'API_ERROR' }
+            error: {
+              message: 'Fatal API Error',
+              type: 'API_ERROR',
+              originalType: 'UPSTREAM_ERROR',
+              statusCode: 503,
+              context: 'select-element',
+              providerName: 'Provider',
+              providerId: 'provider-id',
+              code: 'UPSTREAM_FAILURE',
+              errorCode: 'E_UPSTREAM',
+              translationOutcome: { partial: true },
+              cause: 'unsafe cause',
+              arbitrary: { unsafe: true }
+            }
           });
         }, 10);
         return { success: true, streaming: true };
       });
 
-      await expect(adapter.translateElement(testElement)).rejects.toThrow('Fatal API Error');
+      const rejection = adapter.translateElement(testElement);
+      await expect(rejection).rejects.toThrow('Fatal API Error');
+      try {
+        await rejection;
+      } catch (error) {
+        expect(error).toMatchObject({
+          type: 'API_ERROR',
+          originalType: 'UPSTREAM_ERROR',
+          statusCode: 503,
+          context: 'select-element',
+          providerName: 'Provider',
+          providerId: 'provider-id',
+          code: 'UPSTREAM_FAILURE',
+          errorCode: 'E_UPSTREAM',
+          isFatal: true,
+          translationOutcome: {
+            committedParentCount: 0,
+            totalParentCount: 1,
+            cancelled: false
+          }
+        });
+        expect(error).not.toHaveProperty('cause');
+        expect(error).not.toHaveProperty('arbitrary');
+      }
+    });
+
+    it('takes fatal path from canonical errorDetails over nonfatal legacy error on stream update', async () => {
+      let streamCallbacks;
+      registerTranslation.mockImplementation((id, callbacks) => {
+        streamCallbacks = callbacks;
+      });
+
+      const { isFatalError } = await import('@/shared/error-management/ErrorMatcher.js');
+      isFatalError.mockImplementation((err) => err?.type === 'FATAL_ERROR');
+
+      contentScriptIntegration.sendTranslationRequest.mockImplementation(async () => {
+        setTimeout(() => {
+          streamCallbacks.onStreamUpdate({
+            success: false,
+            error: { message: 'legacy nonfatal', type: 'NONFATAL' },
+            errorDetails: { message: 'canonical failure', type: 'FATAL_ERROR' }
+          });
+        }, 10);
+        return { success: true, streaming: true };
+      });
+
+      const rejection = adapter.translateElement(testElement);
+      await expect(rejection).rejects.toThrow('canonical failure');
+      try {
+        await rejection;
+      } catch (error) {
+        expect(error).toMatchObject({ type: 'FATAL_ERROR', isFatal: true });
+      }
+    });
+
+    it('still takes fatal path from legacy error when errorDetails is malformed on stream update', async () => {
+      let streamCallbacks;
+      registerTranslation.mockImplementation((id, callbacks) => {
+        streamCallbacks = callbacks;
+      });
+
+      const { isFatalError } = await import('@/shared/error-management/ErrorMatcher.js');
+      isFatalError.mockImplementation((err) => err?.type === 'FATAL_ERROR');
+
+      contentScriptIntegration.sendTranslationRequest.mockImplementation(async () => {
+        setTimeout(() => {
+          streamCallbacks.onStreamUpdate({
+            success: false,
+            error: { message: 'legacy fatal', type: 'FATAL_ERROR' },
+            errorDetails: { arbitrary: true }
+          });
+        }, 10);
+        return { success: true, streaming: true };
+      });
+
+      const rejection = adapter.translateElement(testElement);
+      await expect(rejection).rejects.toThrow('legacy fatal');
+      try {
+        await rejection;
+      } catch (error) {
+        expect(error).toMatchObject({ type: 'FATAL_ERROR', isFatal: true });
+      }
+    });
+
+    it('prefers canonical errorDetails over legacy error on stream end', async () => {
+      let streamCallbacks;
+      registerTranslation.mockImplementation((id, callbacks) => {
+        streamCallbacks = callbacks;
+      });
+
+      contentScriptIntegration.sendTranslationRequest.mockImplementation(async () => {
+        setTimeout(() => {
+          streamCallbacks.onStreamEnd({
+            success: false,
+            error: { message: 'legacy failure', type: 'LEGACY_ERROR' },
+            errorDetails: { message: 'canonical failure', type: 'MODEL_NOT_FOUND' }
+          });
+        }, 10);
+        return { success: true, streaming: true };
+      });
+
+      const rejection = adapter.translateElement(testElement);
+      await expect(rejection).rejects.toThrow('canonical failure');
+      try {
+        await rejection;
+      } catch (error) {
+        expect(error).toMatchObject({ type: 'MODEL_NOT_FOUND' });
+      }
+    });
+
+    it('prefers canonical errorDetails over legacy error on direct response', async () => {
+      contentScriptIntegration.sendTranslationRequest.mockResolvedValue({
+        success: false,
+        streaming: false,
+        error: { message: 'legacy failure', type: 'LEGACY_ERROR' },
+        errorDetails: { message: 'canonical failure', type: 'MODEL_NOT_FOUND' }
+      });
+
+      const rejection = adapter.translateElement(testElement);
+      await expect(rejection).rejects.toThrow('canonical failure');
+      try {
+        await rejection;
+      } catch (error) {
+        expect(error).toMatchObject({ type: 'MODEL_NOT_FOUND' });
+      }
+    });
+
+    it('reconstructs direct DTO errors canonically', async () => {
+      contentScriptIntegration.sendTranslationRequest.mockResolvedValue({
+        success: false,
+        streaming: false,
+        error: {
+          message: 'Direct API Error',
+          type: 'API_ERROR',
+          originalType: 'UPSTREAM_ERROR',
+          statusCode: 503,
+          context: 'select-element',
+          providerName: 'Provider',
+          providerId: 'provider-id',
+          code: 'UPSTREAM_FAILURE',
+          errorCode: 'E_UPSTREAM',
+          translationOutcome: { partial: true },
+          cause: 'unsafe cause',
+          arbitrary: { unsafe: true }
+        }
+      });
+
+      const rejection = adapter.translateElement(testElement);
+      await expect(rejection).rejects.toThrow('Direct API Error');
+      try {
+        await rejection;
+      } catch (error) {
+        expect(error).toMatchObject({
+          type: 'API_ERROR',
+          originalType: 'UPSTREAM_ERROR',
+          statusCode: 503,
+          context: 'select-element',
+          providerName: 'Provider',
+          providerId: 'provider-id',
+          code: 'UPSTREAM_FAILURE',
+          errorCode: 'E_UPSTREAM',
+          translationOutcome: {
+            committedParentCount: 0,
+            totalParentCount: 1,
+            cancelled: false
+          }
+        });
+        expect(error).not.toHaveProperty('cause');
+        expect(error).not.toHaveProperty('arbitrary');
+        expect(error).not.toHaveProperty('isFatal');
+      }
     });
 
     it('should handle stream cancellation', async () => {
@@ -1898,10 +2111,10 @@ describe('DomTranslatorAdapter', () => {
       expect(validNode.nodeValue).toBe('B');
       expect(sendRegularMessage).not.toHaveBeenCalledWith(expect.objectContaining({
         data: expect.objectContaining({ parentId: 'b2', accepted: true })
-      }), { silent: true });
+      }), { silent: true, timeout: 500 });
       expect(sendRegularMessage).not.toHaveBeenCalledWith(expect.objectContaining({
         data: expect.objectContaining({ parentId: 'b1', accepted: true })
-      }), { silent: true });
+      }), { silent: true, timeout: 500 });
     });
 
     it('skips stale streaming unit while applying later valid unit', async () => {
@@ -1935,10 +2148,10 @@ describe('DomTranslatorAdapter', () => {
       expect(validNode.nodeValue).toContain('Translated B');
       expect(sendRegularMessage).toHaveBeenCalledWith(expect.objectContaining({
         data: expect.objectContaining({ parentId: 'b2', accepted: true })
-      }), { silent: true });
+      }), { silent: true, timeout: 500 });
       expect(sendRegularMessage).not.toHaveBeenCalledWith(expect.objectContaining({
         data: expect.objectContaining({ parentId: 'b1', accepted: true })
-      }), { silent: true });
+      }), { silent: true, timeout: 500 });
     });
 
     it('should keep all units original while fragmented parent stream fails', async () => {
@@ -2195,7 +2408,7 @@ describe('DomTranslatorAdapter', () => {
       callbacks.onStreamUpdate({ success: true, data: [{ t: 'Uno', i: 'n1' }] });
       await vi.waitFor(() => expect(sendRegularMessage).toHaveBeenCalledWith(
         expect.objectContaining({ data: expect.objectContaining({ parentId: 'b1', accepted: true }) }),
-        { silent: true }
+        { silent: true, timeout: 500 }
       ));
 
       ExtensionContextManager.isValidSync.mockReturnValue(false);
@@ -2407,7 +2620,7 @@ describe('DomTranslatorAdapter', () => {
       expect(second.nodeValue).toBe('B');
       expect(sendRegularMessage).not.toHaveBeenCalledWith(expect.objectContaining({
         data: expect.objectContaining({ parentId: 'b1', accepted: true })
-      }), { silent: true });
+      }), { silent: true, timeout: 500 });
       apply.mockRestore();
     });
 
@@ -2438,7 +2651,7 @@ describe('DomTranslatorAdapter', () => {
       expect(second.nodeValue).toBe('B');
       expect(sendRegularMessage).not.toHaveBeenCalledWith(expect.objectContaining({
         data: expect.objectContaining({ parentId: 'b1', accepted: true })
-      }), { silent: true });
+      }), { silent: true, timeout: 500 });
       apply.mockRestore();
     });
 
@@ -2563,7 +2776,7 @@ describe('DomTranslatorAdapter', () => {
       expect(restoreNodeDirectionState).toHaveBeenCalled();
       expect(sendRegularMessage).not.toHaveBeenCalledWith(expect.objectContaining({
         data: expect.objectContaining({ parentId: 'b1', accepted: true })
-      }), { silent: true });
+      }), { silent: true, timeout: 500 });
     });
 
     it('logs direction rollback failures while preserving mutation error', async () => {
@@ -2745,6 +2958,113 @@ describe('DomTranslatorAdapter', () => {
       expect(b1Acks).toEqual([
         expect.objectContaining({ data: expect.objectContaining({ accepted: false }) })
       ]);
+    });
+
+    it('continues direction and hover rollback after attribute restoration fails', async () => {
+      const first = document.createTextNode('A');
+      const second = document.createTextNode('B');
+      testElement.replaceChildren(first, second);
+      const originalRemoveAttribute = testElement.removeAttribute.bind(testElement);
+      vi.spyOn(testElement, 'removeAttribute').mockImplementation((name) => {
+        if (name === 'data-has-original') throw new Error('attribute restore failure');
+        return originalRemoveAttribute(name);
+      });
+      const { collectTextNodes } = await import('./DomTranslatorUtils.js');
+      collectTextNodes.mockReturnValueOnce([
+        { node: first, text: 'A', uid: 'n1', blockId: 'b1', role: 'div' },
+        { node: second, text: 'B', uid: 'n2', blockId: 'b1', role: 'div' }
+      ]);
+      const { restoreNodeDirectionState } = await import('@/utils/dom/DomDirectionManager.js');
+      restoreNodeDirectionState.mockReturnValueOnce([]);
+      const hoverDeletes = [];
+      hoverPreviewLookup.delete.mockImplementation(node => hoverDeletes.push(node));
+      let streamCallbacks;
+      registerTranslation.mockImplementationOnce((_id, callbacks) => { streamCallbacks = callbacks; });
+      vi.spyOn(adapter, '_applyTranslationToNode')
+        .mockImplementationOnce((...args) => DomTranslatorAdapter.prototype._applyTranslationToNode.call(adapter, ...args))
+        .mockImplementationOnce(() => { throw new Error('primary mutation failure'); });
+      contentScriptIntegration.sendTranslationRequest.mockResolvedValueOnce({
+        success: true,
+        streaming: true,
+      });
+
+      const translation = adapter.translateElement(testElement);
+      await vi.waitFor(() => expect(streamCallbacks).toBeDefined());
+      streamCallbacks.onStreamUpdate({ success: true, data: [{ t: 'Uno', i: 'n1' }, { t: 'Dos', i: 'n2' }] });
+      streamCallbacks.onStreamEnd({ success: true });
+      const rejection = await translation.catch(error => error);
+
+      expect(rejection.cause.rollbackFailures).toEqual([
+        expect.objectContaining({ kind: 'attribute', element: testElement, error: expect.objectContaining({ message: 'attribute restore failure' }) })
+      ]);
+      expect(restoreNodeDirectionState).toHaveBeenCalled();
+      expect(hoverDeletes).toEqual([first, second]);
+    });
+
+    it('preserves multiple direction rollback failures in returned order', async () => {
+      const { collectTextNodes } = await import('./DomTranslatorUtils.js');
+      collectTextNodes.mockReturnValueOnce([
+        { node: testElement.firstChild, text: 'Hello', uid: 'n1', blockId: 'b1', role: 'div' }
+      ]);
+      const { restoreNodeDirectionState } = await import('@/utils/dom/DomDirectionManager.js');
+      const firstFailure = { kind: 'style', name: 'direction', error: new Error('direction one') };
+      const secondFailure = { kind: 'attribute', name: 'data-translate-dir', error: new Error('direction two') };
+      restoreNodeDirectionState.mockReturnValueOnce([firstFailure, secondFailure]);
+      let streamCallbacks;
+      registerTranslation.mockImplementationOnce((_id, callbacks) => { streamCallbacks = callbacks; });
+      vi.spyOn(adapter, '_applyTranslationToNode').mockImplementationOnce(() => {
+        throw new Error('primary mutation failure');
+      });
+      contentScriptIntegration.sendTranslationRequest.mockResolvedValueOnce({
+        success: true,
+        streaming: true,
+      });
+
+      const translation = adapter.translateElement(testElement);
+      await vi.waitFor(() => expect(streamCallbacks).toBeDefined());
+      streamCallbacks.onStreamUpdate({ success: true, data: [{ t: 'Uno', i: 'n1' }] });
+      streamCallbacks.onStreamEnd({ success: true });
+      const rejection = await translation.catch(error => error);
+
+      expect(rejection.cause.rollbackFailures).toEqual([firstFailure, secondFailure]);
+      expect(rejection.cause.cause).toEqual(expect.objectContaining({ message: 'primary mutation failure' }));
+    });
+
+    it('continues later hover rollback when an earlier hover restore fails', async () => {
+      const first = document.createTextNode('A');
+      const second = document.createTextNode('B');
+      testElement.replaceChildren(first, second);
+      const { collectTextNodes } = await import('./DomTranslatorUtils.js');
+      collectTextNodes.mockReturnValueOnce([
+        { node: first, text: 'A', uid: 'n1', blockId: 'b1', role: 'div' },
+        { node: second, text: 'B', uid: 'n2', blockId: 'b1', role: 'div' }
+      ]);
+      let deleteCalls = 0;
+      hoverPreviewLookup.delete.mockImplementation(() => {
+        deleteCalls++;
+        if (deleteCalls === 1) throw new Error('hover restore failure');
+      });
+      let streamCallbacks;
+      registerTranslation.mockImplementationOnce((_id, callbacks) => { streamCallbacks = callbacks; });
+      vi.spyOn(adapter, '_applyTranslationToNode')
+        .mockImplementationOnce((...args) => DomTranslatorAdapter.prototype._applyTranslationToNode.call(adapter, ...args))
+        .mockImplementationOnce(() => { throw new Error('primary mutation failure'); });
+      contentScriptIntegration.sendTranslationRequest.mockResolvedValueOnce({
+        success: true,
+        streaming: true,
+      });
+
+      const translation = adapter.translateElement(testElement);
+      await vi.waitFor(() => expect(streamCallbacks).toBeDefined());
+      streamCallbacks.onStreamUpdate({ success: true, data: [{ t: 'Uno', i: 'n1' }, { t: 'Dos', i: 'n2' }] });
+      streamCallbacks.onStreamEnd({ success: true });
+      const rejection = await translation.catch(error => error);
+
+      expect(deleteCalls).toBe(2);
+      expect(rejection.cause.rollbackFailures).toEqual([
+        expect.objectContaining({ kind: 'hover', node: first, error: expect.objectContaining({ message: 'hover restore failure' }) })
+      ]);
+      expect(rejection.cause.cause).toEqual(expect.objectContaining({ message: 'primary mutation failure' }));
     });
 
     it('commits independent parents around a failed middle parent', async () => {
@@ -2954,7 +3274,7 @@ describe('DomTranslatorAdapter', () => {
       streamCallbacks.onStreamUpdate({ success: true, data: [{ t: 'Uno', i: 'n1' }] });
       await vi.waitFor(() => expect(sendRegularMessage).toHaveBeenCalledWith(
         expect.objectContaining({ data: expect.objectContaining({ parentId: 'b1', accepted: true }) }),
-        { silent: true }
+        { silent: true, timeout: 500 }
       ));
       const acceptedBeforeConflict = sendRegularMessage.mock.calls.filter(([message]) => (
         message?.data?.accepted === true
@@ -3076,6 +3396,67 @@ describe('DomTranslatorAdapter', () => {
     document.body.removeChild(secondElement);
   });
 
+  it('captures exact metadata owners for later shadow-safe manual revert', async () => {
+    const host = document.createElement('x-host');
+    const shadow = host.attachShadow({ mode: 'open' });
+    const firstOwner = document.createElement('span');
+    const secondOwner = document.createElement('span');
+    const firstNode = document.createTextNode('First translated');
+    const secondNode = document.createTextNode('Second translated');
+    firstOwner.appendChild(firstNode);
+    secondOwner.appendChild(secondNode);
+    secondOwner.setAttribute('data-has-original', 'existing');
+    shadow.append(firstOwner, secondOwner);
+    document.body.appendChild(host);
+
+    adapter._storeTranslationState({
+      element: host,
+      originalTextNodesData: [
+        { node: firstNode, originalText: 'First original', blockId: 'v2-parent' },
+        { node: secondNode, originalText: 'Second original', blockId: 'v3-parent' },
+        { node: firstNode, originalText: 'First original', blockId: 'v2-parent' },
+      ],
+      sessionId: 'shadow-state',
+    });
+    firstOwner.setAttribute('data-has-original', 'true');
+    secondOwner.setAttribute('data-has-original', 'true');
+
+    const entry = globalSelectElementState.translationHistory.at(-1);
+    expect(entry.originalMetadataSnapshots).toHaveLength(2);
+    expect(entry.originalMetadataSnapshots.map(snapshot => snapshot.element)).toEqual([firstOwner, secondOwner]);
+    expect(entry.originalMetadataSnapshots[0].present).toBe(false);
+    expect(entry.originalMetadataSnapshots[1]).toMatchObject({ present: true, value: 'existing' });
+
+    const { revertSelectElementTranslation } = await import('./DomTranslatorState.js');
+    await revertSelectElementTranslation('shadow-state');
+
+    expect(firstOwner.hasAttribute('data-has-original')).toBe(false);
+    expect(secondOwner.getAttribute('data-has-original')).toBe('existing');
+    document.body.removeChild(host);
+  });
+
+  it('restores connected shadow text in _rollbackBlockGroup and skips detached text', () => {
+    const host = document.createElement('x-host');
+    const shadow = host.attachShadow({ mode: 'open' });
+    const connectedNode = document.createTextNode('Translated connected');
+    const detachedNode = document.createTextNode('Translated detached');
+    shadow.append(connectedNode, detachedNode);
+    document.body.appendChild(host);
+    globalSelectElementState.snapshots = new Map([
+      ['shadow-session:block', [
+        { node: connectedNode, originalText: 'Original connected' },
+        { node: detachedNode, originalText: 'Original detached' },
+      ]]
+    ]);
+    shadow.removeChild(detachedNode);
+
+    adapter._rollbackBlockGroup('shadow-session', 'block');
+
+    expect(connectedNode.nodeValue).toBe('Original connected');
+    expect(detachedNode.nodeValue).toBe('Translated detached');
+    document.body.removeChild(host);
+  });
+
   describe('revertTranslation', () => {
     it('should call revertSelectElementTranslation', async () => {
       const { revertSelectElementTranslation } = await import('./DomTranslatorState.js');
@@ -3138,7 +3519,7 @@ describe('DomTranslatorAdapter', () => {
       expect(processedUids.has('n1')).toBe(false);
       expect(sendRegularMessage).not.toHaveBeenCalledWith(expect.objectContaining({
         data: expect.objectContaining({ parentId: 'g1', accepted: true })
-      }), { silent: true });
+      }), { silent: true, timeout: 500 });
     });
 
     it('accepts canonical grouped result when optional shadow refinement fails', async () => {
@@ -3165,7 +3546,7 @@ describe('DomTranslatorAdapter', () => {
       expect(finalize).toHaveBeenCalledOnce();
       expect(sendRegularMessage).toHaveBeenCalledWith(expect.objectContaining({
         data: expect.objectContaining({ parentId: 'g1', accepted: true })
-      }), { silent: true });
+      }), { silent: true, timeout: 500 });
     });
 
     it('skips optional shadow refinement for V2 passthrough groups', async () => {
@@ -3188,6 +3569,43 @@ describe('DomTranslatorAdapter', () => {
   });
 
   describe('_applyTranslationToNode', () => {
+    it('uses composed dir ancestry for direct shadow BiDi decisions', async () => {
+      const host = document.createElement('x-host');
+      host.setAttribute('dir', 'rtl');
+      const shadow = host.attachShadow({ mode: 'open' });
+      const owner = document.createElement('span');
+      const textNode = document.createTextNode('Original');
+      owner.appendChild(textNode);
+      shadow.appendChild(owner);
+      document.body.appendChild(host);
+      const { detectDirectionFromContent } = await import('@/utils/dom/DomDirectionManager.js');
+      detectDirectionFromContent.mockReturnValue('rtl');
+
+      expect(adapter._shouldInjectBidi(textNode, 'Translated')).toBe(false);
+      owner.setAttribute('dir', 'ltr');
+      expect(adapter._shouldInjectBidi(textNode, 'Translated')).toBe(true);
+      document.body.removeChild(host);
+    });
+
+    it('uses host direction for direct ShadowRoot text and nested hosts', async () => {
+      const outerHost = document.createElement('x-outer');
+      outerHost.setAttribute('dir', 'ltr');
+      const outerShadow = outerHost.attachShadow({ mode: 'open' });
+      const innerHost = document.createElement('x-inner');
+      const innerShadow = innerHost.attachShadow({ mode: 'open' });
+      const textNode = document.createTextNode('Original');
+      innerShadow.appendChild(textNode);
+      outerShadow.appendChild(innerHost);
+      document.body.appendChild(outerHost);
+      const { detectDirectionFromContent } = await import('@/utils/dom/DomDirectionManager.js');
+      detectDirectionFromContent.mockReturnValue('rtl');
+
+      expect(adapter._shouldInjectBidi(textNode, 'Translated')).toBe(true);
+      outerHost.setAttribute('dir', 'rtl');
+      expect(adapter._shouldInjectBidi(textNode, 'Translated')).toBe(false);
+      document.body.removeChild(outerHost);
+    });
+
     it('should apply translation with BIDI marks and register for hover preview', () => {
       const textNode = testElement.firstChild;
       const originalText = textNode.textContent;
@@ -3301,7 +3719,7 @@ describe('DomTranslatorAdapter', () => {
       expect(nodes.map(node => node.nodeValue)).toEqual(['A', 'B']);
       expect(sendRegularMessage).not.toHaveBeenCalledWith(expect.objectContaining({
         data: expect.objectContaining({ parentId: 'g1', accepted: true })
-      }), { silent: true });
+      }), { silent: true, timeout: 500 });
     });
 
     it('accepts distinct V2 passthrough block parents independently', async () => {
@@ -3907,6 +4325,216 @@ describe('DomTranslatorAdapter', () => {
       await translation;
 
       expect(sendRegularMessage.mock.calls.filter(([message]) => message.data?.accepted === true)).toHaveLength(1);
+    });
+
+    it('retries transient accepted ACK delivery and awaits success', async () => {
+      vi.useFakeTimers();
+      try {
+        sendRegularMessage
+          .mockRejectedValueOnce(new Error('temporary transport failure'))
+          .mockResolvedValueOnce({ status: 'ACCEPTED' });
+        contentScriptIntegration.sendTranslationRequest.mockResolvedValueOnce({
+          success: true,
+          streaming: false,
+          translatedText: [{ t: 'سلام', i: 'n1' }],
+          conversationAcceptance: true
+        });
+
+        const translation = adapter.translateElement(testElement);
+        await vi.waitFor(() => expect(sendRegularMessage).toHaveBeenCalledTimes(1));
+        expect(testElement.textContent).toContain('سلام');
+        await vi.advanceTimersByTimeAsync(25);
+        await expect(translation).resolves.toMatchObject({ success: true });
+
+        expect(sendRegularMessage).toHaveBeenCalledTimes(2);
+        expect(sendRegularMessage.mock.calls[0][0]).toEqual(sendRegularMessage.mock.calls[1][0]);
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it('bounds hung ACK attempts with the ACK-specific timeout', async () => {
+      vi.useFakeTimers();
+      try {
+        isTransientError.mockReturnValue(true);
+        sendRegularMessage.mockImplementation((_message, options) => new Promise((_, reject) => {
+          expect(options.timeout).toBe(500);
+          setTimeout(() => {
+            const error = new Error('ACK attempt timed out');
+            error.type = ErrorTypes.OPERATION_TIMEOUT;
+            reject(error);
+          }, options.timeout);
+        }));
+        contentScriptIntegration.sendTranslationRequest.mockResolvedValueOnce({
+          success: true,
+          streaming: false,
+          translatedText: [{ t: 'سلام', i: 'n1' }],
+          conversationAcceptance: true
+        });
+
+        const translation = adapter.translateElement(testElement);
+        await vi.waitFor(() => expect(sendRegularMessage).toHaveBeenCalledTimes(1));
+        await vi.advanceTimersByTimeAsync(500);
+        await vi.advanceTimersByTimeAsync(25);
+        await vi.advanceTimersByTimeAsync(500);
+        await vi.advanceTimersByTimeAsync(50);
+        await vi.advanceTimersByTimeAsync(500);
+        await expect(translation).resolves.toMatchObject({ success: true });
+
+        expect(sendRegularMessage).toHaveBeenCalledTimes(3);
+        expect(testElement.textContent).toContain('سلام');
+        expect(adapter._pendingAcceptanceAcks.size).toBe(0);
+        expect(adapter._acceptanceAckControllers.size).toBe(0);
+      } finally {
+        isTransientError.mockReset();
+        vi.useRealTimers();
+      }
+    });
+
+    it('retries streaming parent ACK without delaying DOM commit', async () => {
+      vi.useFakeTimers();
+      try {
+        sendRegularMessage
+          .mockRejectedValueOnce(new Error('temporary transport failure'))
+          .mockResolvedValueOnce({ status: 'ACCEPTED' });
+        contentScriptIntegration.sendTranslationRequest.mockResolvedValueOnce({
+          success: true,
+          streaming: true,
+          conversationAcceptance: true
+        });
+        let streamCallbacks;
+        registerTranslation.mockImplementationOnce((_id, callbacks) => { streamCallbacks = callbacks; });
+
+        const translation = adapter.translateElement(testElement);
+        await vi.waitFor(() => expect(streamCallbacks).toBeDefined());
+        streamCallbacks.onStreamUpdate({ success: true, data: [{ t: 'سلام', i: 'n1' }] });
+        await vi.waitFor(() => expect(sendRegularMessage).toHaveBeenCalledTimes(1));
+        expect(testElement.textContent).toContain('سلام');
+        streamCallbacks.onStreamEnd({ success: true });
+        await vi.advanceTimersByTimeAsync(25);
+        await expect(translation).resolves.toMatchObject({ success: true });
+
+        expect(sendRegularMessage).toHaveBeenCalledTimes(2);
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it.each(['DUPLICATE', 'STALE', 'UNKNOWN_PARENT', 'CONFLICT'])(
+      'stops retrying after terminal ACK status %s',
+      async (status) => {
+        vi.useFakeTimers();
+        try {
+          sendRegularMessage.mockResolvedValueOnce({ status });
+          contentScriptIntegration.sendTranslationRequest.mockResolvedValueOnce({
+            success: true,
+            streaming: false,
+            translatedText: [{ t: 'سلام', i: 'n1' }],
+            conversationAcceptance: true
+          });
+
+          await adapter.translateElement(testElement);
+          await vi.advanceTimersByTimeAsync(1000);
+
+          expect(sendRegularMessage).toHaveBeenCalledOnce();
+          expect(testElement.textContent).toContain('سلام');
+        } finally {
+          vi.useRealTimers();
+        }
+      },
+    );
+
+    it('keeps committed DOM after accepted ACK retry exhaustion', async () => {
+      vi.useFakeTimers();
+      try {
+        sendRegularMessage
+          .mockRejectedValueOnce(new Error('transport unavailable'))
+          .mockRejectedValueOnce(new Error('transport unavailable'))
+          .mockRejectedValueOnce(new Error('transport unavailable'));
+        contentScriptIntegration.sendTranslationRequest.mockResolvedValueOnce({
+          success: true,
+          streaming: false,
+          translatedText: [{ t: 'سلام', i: 'n1' }],
+          conversationAcceptance: true
+        });
+
+        const translation = adapter.translateElement(testElement);
+        await vi.waitFor(() => expect(sendRegularMessage).toHaveBeenCalledTimes(1));
+        await vi.advanceTimersByTimeAsync(75);
+        await expect(translation).resolves.toMatchObject({ success: true });
+
+        expect(sendRegularMessage).toHaveBeenCalledTimes(3);
+        expect(sendRegularMessage.mock.calls.filter(([message]) => message.data?.accepted === false)).toHaveLength(0);
+        expect(testElement.textContent).toContain('سلام');
+        expect(adapter._pendingAcceptanceAcks.size).toBe(0);
+        expect(adapter._acceptanceAckControllers.size).toBe(0);
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it('stops accepted ACK retry when translation is cancelled', async () => {
+      vi.useFakeTimers();
+      try {
+        sendRegularMessage.mockImplementationOnce((_message, options) => new Promise((_, reject) => {
+          setTimeout(() => {
+            const error = new Error('ACK attempt timed out');
+            error.type = ErrorTypes.OPERATION_TIMEOUT;
+            reject(error);
+          }, options.timeout);
+        }));
+        contentScriptIntegration.sendTranslationRequest.mockResolvedValueOnce({
+          success: true,
+          streaming: false,
+          translatedText: [{ t: 'سلام', i: 'n1' }],
+          conversationAcceptance: true
+        });
+
+        const translation = adapter.translateElement(testElement);
+        await vi.waitFor(() => expect(sendRegularMessage).toHaveBeenCalledTimes(1));
+        await adapter.cancelTranslation({ silent: true });
+        await vi.advanceTimersByTimeAsync(500);
+        await expect(translation).resolves.toMatchObject({ success: true });
+
+        expect(sendRegularMessage.mock.calls.filter(([message]) => message.data?.accepted === true)).toHaveLength(1);
+        expect(testElement.textContent).toContain('سلام');
+        expect(adapter._pendingAcceptanceAcks.size).toBe(0);
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it('stops a timed-out ACK after context invalidation', async () => {
+      vi.useFakeTimers();
+      try {
+        sendRegularMessage.mockImplementation((_message, options) => new Promise((_, reject) => {
+          setTimeout(() => {
+            const error = new Error('ACK attempt timed out');
+            error.type = ErrorTypes.OPERATION_TIMEOUT;
+            reject(error);
+          }, options.timeout);
+        }));
+        contentScriptIntegration.sendTranslationRequest.mockResolvedValueOnce({
+          success: true,
+          streaming: false,
+          translatedText: [{ t: 'سلام', i: 'n1' }],
+          conversationAcceptance: true
+        });
+
+        const translation = adapter.translateElement(testElement);
+        await vi.waitFor(() => expect(sendRegularMessage).toHaveBeenCalledTimes(1));
+        ExtensionContextManager.isValidSync.mockReturnValue(false);
+        adapter.invalidateContext();
+        await vi.advanceTimersByTimeAsync(500);
+        await expect(translation).resolves.toMatchObject({ success: true });
+
+        expect(sendRegularMessage).toHaveBeenCalledTimes(1);
+        expect(testElement.textContent).toContain('سلام');
+        expect(adapter._pendingAcceptanceAcks.size).toBe(0);
+        expect(adapter._acceptanceAckControllers.size).toBe(0);
+      } finally {
+        vi.useRealTimers();
+      }
     });
 
     it('F: resets acceptance state between consecutive operations', async () => {

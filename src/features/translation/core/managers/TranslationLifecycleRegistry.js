@@ -105,7 +105,7 @@ export class TranslationLifecycleRegistry {
     
     if (this.activeTranslations.has(messageId)) {
       logger.info(`[LifecycleRegistry] Aborting active translation: ${messageId}`);
-      this.activeTranslations.get(messageId).controller.abort();
+      this.activeTranslations.get(messageId).controller.abort(timeout ? 'timeout' : 'user-cancelled');
     }
 
     try {

@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { BingTranslateProvider } from './BingTranslate.js';
 import { ProviderNames } from '@/features/translation/providers/ProviderConstants.js';
+import { getProviderConfiguration } from '@/features/translation/core/ProviderConfigurations.js';
 
 // Mock dependencies
 vi.mock('webextension-polyfill', () => ({
@@ -45,9 +46,14 @@ vi.mock('@/features/translation/core/ProviderConfigurations.js', async (importOr
 
 describe('BingTranslateProvider', () => {
   let provider;
+  const defaultProviderConfig = {
+    rateLimit: { maxConcurrent: 1, delayBetweenRequests: 0 },
+    batching: { strategy: 'character_limit', characterLimit: 1000, maxChunksPerBatch: 10 },
+  };
 
   beforeEach(() => {
     vi.clearAllMocks();
+    getProviderConfiguration.mockReturnValue(defaultProviderConfig);
     provider = new BingTranslateProvider();
     
     // Initialize static property to avoid null pointer
@@ -69,6 +75,19 @@ describe('BingTranslateProvider', () => {
     expect(provider.providerName).toBe(ProviderNames.BING_TRANSLATE);
   });
 
+  it('resetSessionContext clears shared cached token state', () => {
+    BingTranslateProvider.bingAccessToken = {
+      token: 'cached-token',
+      tokenTs: Date.now(),
+      tokenExpiryInterval: 60000,
+      count: 3,
+    };
+
+    provider.resetSessionContext();
+
+    expect(BingTranslateProvider.bingAccessToken).toBeNull();
+  });
+
   it('should correctly map language codes', () => {
     expect(provider._getLangCode('auto')).toBe('auto-detect');
     expect(provider._getLangCode('en')).toBe('en');
@@ -76,6 +95,39 @@ describe('BingTranslateProvider', () => {
   });
 
   describe('_translateChunk', () => {
+    const runResponse = (response, options) => {
+      provider._executeApiCall.mockImplementation(async (request) => request.extractResponse({
+        headers: { get: () => 'application/json' },
+        text: () => Promise.resolve(JSON.stringify(response)),
+      }));
+      return provider._translateChunk(['Hello'], 'en', 'fa', 'selection', null, 0, 1, 0, 1, options);
+    };
+
+    it('writes valid response detection into execution metadata', async () => {
+      const options = { providerMetadataRef: { metadata: {} } };
+      await runResponse([
+        { translations: [{ text: 'translated' }], detectedLanguage: { language: 'en' } },
+      ], options);
+
+      expect(options.providerMetadataRef.metadata.detectedLanguage).toBe('en');
+      expect(provider).not.toHaveProperty('lastDetectedLanguage');
+    });
+
+    it('does not write missing or invalid response detection', async () => {
+      const missingOptions = { providerMetadataRef: { metadata: {} } };
+      await runResponse([
+        { translations: [{ text: 'translated' }] },
+      ], missingOptions);
+      expect(missingOptions.providerMetadataRef.metadata).toEqual({});
+
+      const invalidOptions = { providerMetadataRef: { metadata: {} } };
+      await expect(runResponse([
+        { detectedLanguage: { language: 'en' } },
+      ], invalidOptions))
+        .rejects.toMatchObject({ type: 'API_RESPONSE_INVALID' });
+      expect(invalidOptions.providerMetadataRef.metadata).toEqual({});
+    });
+
     it('should call API with correctly formatted body', async () => {
       const texts = ['Hello', 'World'];
       await provider._translateChunk(texts, 'en', 'fa');
@@ -120,6 +172,65 @@ describe('BingTranslateProvider', () => {
       }));
 
       await expect(provider._translateChunk(['URL'], 'en', 'fa')).resolves.toEqual(['URL']);
+    });
+
+    it('does not adaptively retry when maxRetries is zero', async () => {
+      getProviderConfiguration.mockReturnValue({
+        ...defaultProviderConfig,
+        batching: { ...defaultProviderConfig.batching, maxRetries: 0 },
+      });
+      provider._executeApiCall.mockImplementation(async (request) => request.extractResponse({
+        statusCode: 400,
+        headers: { get: () => 'application/json' },
+        text: async () => JSON.stringify({ statusCode: 400 }),
+      }));
+
+      await expect(provider._translateChunk(['first', 'second'], 'en', 'fa', 'selection', null, 0, 2, 0, 1))
+        .rejects.toMatchObject({ name: 'BingApiError' });
+      expect(provider._executeApiCall).toHaveBeenCalledTimes(1);
+    });
+
+    it('does not adaptively retry when adaptiveChunking is false', async () => {
+      getProviderConfiguration.mockReturnValue({
+        ...defaultProviderConfig,
+        batching: { ...defaultProviderConfig.batching, adaptiveChunking: false, maxRetries: 3 },
+      });
+      const originalError = Object.assign(new Error('Bing adaptive failure'), {
+        name: 'BingApiError',
+      });
+      provider._executeApiCall.mockRejectedValue(originalError);
+
+      await expect(provider._translateChunk(['first', 'second'], 'en', 'fa', 'selection', null, 0, 2, 0, 1))
+        .rejects.toBe(originalError);
+      expect(provider._executeApiCall).toHaveBeenCalledTimes(1);
+    });
+
+    it('preserves one adaptive retry when maxRetries is one', async () => {
+      getProviderConfiguration.mockReturnValue({
+        ...defaultProviderConfig,
+        batching: { ...defaultProviderConfig.batching, maxRetries: 1 },
+      });
+      provider._executeApiCall.mockImplementation(async (request) => request.extractResponse({
+        statusCode: 400,
+        headers: { get: () => 'application/json' },
+        text: async () => JSON.stringify({ statusCode: 400 }),
+      }));
+
+      await expect(provider._translateChunk(['a', 'b', 'c', 'd'], 'en', 'fa', 'selection', null, 0, 4, 0, 1))
+        .rejects.toMatchObject({ name: 'BingApiError' });
+      expect(provider._executeApiCall).toHaveBeenCalledTimes(2);
+    });
+
+    it('keeps default adaptive retry behavior when maxRetries is absent', async () => {
+      provider._executeApiCall.mockImplementation(async (request) => request.extractResponse({
+        statusCode: 400,
+        headers: { get: () => 'application/json' },
+        text: async () => JSON.stringify({ statusCode: 400 }),
+      }));
+
+      await expect(provider._translateChunk(['a', 'b', 'c', 'd'], 'en', 'fa', 'selection', null, 0, 4, 0, 1))
+        .rejects.toMatchObject({ name: 'BingApiError' });
+      expect(provider._executeApiCall).toHaveBeenCalledTimes(3);
     });
   });
 });

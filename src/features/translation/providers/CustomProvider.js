@@ -8,6 +8,7 @@ import {
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { ProviderNames } from "@/features/translation/providers/ProviderConstants.js";
+import { ErrorTypes } from "@/shared/error-management/ErrorTypes.js";
 import { AIConversationHelper } from "./utils/AIConversationHelper.js";
 import { AITextProcessor } from "./utils/AITextProcessor.js";
 import { ResponseFormat } from "@/shared/config/translationConstants.js";
@@ -21,6 +22,38 @@ import { recordProviderCompletion } from "@/features/translation/ir/TranslationO
 
 const logger = getScopedLogger(LOG_COMPONENTS.PROVIDERS, 'Custom');
 
+const STRUCTURED_RESPONSE_FORMATS = new Set([
+  ResponseFormat.JSON_OBJECT,
+  ResponseFormat.JSON_ARRAY,
+]);
+
+const UNSUPPORTED_RESPONSE_FORMAT_PATTERNS = [
+  /\b(?:unknown|unsupported|unrecognized)\s+(?:parameter|field|property|key)?\s*[:=]?\s*[`'" ]*response_format\b/i,
+  /[`'"]?response_format[`'"]?\s+(?:is\s+)?(?:not\s+supported|unsupported|unrecognized|unknown)\b/i,
+];
+
+const CUSTOM_MODEL_NOT_FOUND_CODES = new Set(['model_not_found']);
+
+function isUnsupportedResponseFormatError(error) {
+  const statusCode = Number(error?.statusCode);
+  if (statusCode !== 400 && statusCode !== 422) return false;
+
+  const message = typeof error?.message === 'string' ? error.message : '';
+  return UNSUPPORTED_RESPONSE_FORMAT_PATTERNS.some((pattern) => pattern.test(message));
+}
+
+function removeResponseFormat(fetchOptions) {
+  if (typeof fetchOptions?.body !== 'string') return null;
+
+  try {
+    const payload = JSON.parse(fetchOptions.body);
+    delete payload.response_format;
+    return { ...fetchOptions, body: JSON.stringify(payload) };
+  } catch {
+    return null;
+  }
+}
+
 export class CustomProvider extends BaseAIProvider {
   static type = "ai";
   static description = "Custom OpenAI-compatible API";
@@ -29,6 +62,21 @@ export class CustomProvider extends BaseAIProvider {
   constructor() {
     super(ProviderNames.CUSTOM);
     this.providerSettingKey = 'CUSTOM_API_KEY';
+  }
+
+  /**
+   * Classify only explicit OpenAI-compatible model-not-found responses.
+   * Route and ambiguous 404 responses remain generic HTTP failures.
+   * @param {Object} errorInfo - Bounded transport error facts.
+   * @returns {string|null}
+   */
+  classifyProviderHttpError(errorInfo) {
+    if (Number(errorInfo?.statusCode) !== 404) return null;
+
+    const codes = [errorInfo.topLevelCode, errorInfo.nestedErrorCode];
+    return codes.some(code => CUSTOM_MODEL_NOT_FOUND_CODES.has(code))
+      ? ErrorTypes.MODEL_MISSING
+      : ErrorTypes.HTTP_ERROR;
   }
 
   /**
@@ -63,7 +111,18 @@ export class CustomProvider extends BaseAIProvider {
    * @protected
    */
   async _callAI(systemPrompt, userText, options = {}) {
-    const { abortController, sessionId, expectedFormat, isBatch, executionContext, callPurpose, conversationCommitCandidate, conversationParticipates: participationOverride, mode } = options;
+    const {
+      abortController,
+      sessionId,
+      expectedFormat,
+      isBatch,
+      executionContext,
+      callPurpose,
+      conversationCommitCandidate,
+      conversationParticipates: participationOverride,
+      mode,
+      customResponseFormatCapabilityRef,
+    } = options;
     const conversationParticipates = typeof participationOverride === 'boolean'
       ? participationOverride
       : await AIConversationHelper.getConversationParticipation({ callPurpose, translateMode: mode, sessionId });
@@ -101,11 +160,13 @@ export class CustomProvider extends BaseAIProvider {
         messages: messages,
         max_tokens: 4096,
         // Apply JSON mode if requested by the contract
-        ...(expectedFormat === ResponseFormat.JSON_OBJECT && { response_format: { type: "json_object" } })
+        ...((STRUCTURED_RESPONSE_FORMATS.has(expectedFormat)
+          && customResponseFormatCapabilityRef?.responseFormatUnsupported !== true)
+          && { response_format: { type: "json_object" } })
       }),
     };
 
-    const result = await this._executeRequest({
+    const request = {
       url: apiUrl,
       fetchOptions,
       charCount: fetchOptions.body.length,
@@ -127,7 +188,28 @@ export class CustomProvider extends BaseAIProvider {
           options.headers.Authorization = `Bearer ${newKey}`;
         }
       }
-    });
+    };
+
+    let result;
+    try {
+      result = await this._executeRequest(request);
+    } catch (error) {
+      if (!STRUCTURED_RESPONSE_FORMATS.has(expectedFormat) || !isUnsupportedResponseFormatError(error)) {
+        throw error;
+      }
+
+      if (customResponseFormatCapabilityRef) {
+        customResponseFormatCapabilityRef.responseFormatUnsupported = true;
+      }
+
+      const fallbackFetchOptions = removeResponseFormat(fetchOptions);
+      if (!fallbackFetchOptions) throw error;
+
+      result = await this._executeRequest({
+        ...request,
+        fetchOptions: fallbackFetchOptions,
+      });
+    }
 
     if (sessionId && result && conversationParticipates) {
       if (conversationCommitCandidate) conversationCommitCandidate.stage({ sessionId, userContent: userText, assistantContent: result });

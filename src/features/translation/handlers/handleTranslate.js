@@ -1,6 +1,6 @@
 import { ErrorHandler } from '@/shared/error-management/ErrorHandler.js';
 import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
-import { MessageFormat } from '@/shared/messaging/core/MessagingCore.js';
+import { MessageFormat, isStructuredTranslationError } from '@/shared/messaging/core/MessagingCore.js';
 import { MessageActions } from '@/shared/messaging/core/MessageActions.js';
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
@@ -44,14 +44,19 @@ export async function handleTranslate(message, sender) {
 
     // If the service returned a failure result with a raw Error object, 
     // we must format it before sending it via messaging to prevent serialization issues (empty {} errors)
-    if (result && result.success === false && result.error) {
+    const errorSource = isStructuredTranslationError(result?.errorDetails)
+      ? result.errorDetails
+      : result?.error;
+    if (result && result.success === false && errorSource) {
       logger.debug('[Handler:TRANSLATE] Formatting failure result for transmission');
+      const legacyOptions = { ...result };
+      delete legacyOptions.errorDetails;
       return MessageFormat.createErrorResponse(
-        result.error, 
+        errorSource,
         message.messageId, 
         { 
-          ...result, 
-          context: message.context || 'unknown' 
+          ...legacyOptions,
+          context: message.context || 'unknown'
         }
       );
     }

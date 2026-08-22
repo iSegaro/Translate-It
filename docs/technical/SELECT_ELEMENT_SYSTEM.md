@@ -70,7 +70,7 @@ Ownership is intentionally split:
 | Mode routing and priority | `UnifiedModeCoordinator` |
 | Provider execution and structured orchestration | `TranslationEngine`, `ProviderCoordinator`, `OptimizedJsonHandler` |
 | Conversation acceptance | `ConversationAcceptanceCoordinator` |
-| Public terminal error display | `PublicErrorPolicy`, `ErrorHandler`, and feature-owned feedback |
+| Public terminal error display | `PublicTranslationErrorPolicy`, `PublicTranslationErrorAdapter`, `ErrorHandler`, and feature-owned feedback |
 | Extension context recovery | `ExtensionContextManager` |
 | Select Element toast lifecycle | `SelectElementNotificationManager` |
 
@@ -215,11 +215,27 @@ Direct-parent and BlockGroup paths use parent-local transactional behavior:
 
 - connected node and source-content validation occur before mutation;
 - identity and content validation occur before acceptance;
+- direct source-drift validation prevents stale captured source from being
+  mutated;
 - reconstruction calculates the commit plan before DOM writes;
 - a failed parent mutation rolls back that parent transaction;
 - previously committed sibling parents are not globally rolled back;
 - stale source nodes remain original;
 - invalid, missing, blank, or suppressed results do not replace source content.
+
+Rollback uses the shared `runBestEffortRollback()` helper in
+`src/utils/dom/DomRollback.js`. Restoration runs in order and continues after an
+individual restoration failure; rollback failures are aggregated and preserved
+as secondary diagnostics while the primary mutation error remains authoritative.
+
+Mutation failures surface as typed errors:
+
+- `DirectMutationFailure` — direct-parent mutation failure;
+- `BlockGroupMutationFailure` — block-group mutation failure.
+
+A failed parent mutation results in parent rejection rather than leaving
+acceptance pending, so the background coordinator settles the parent and does
+not block later parents.
 
 `BlockGroupReconstructor` performs atomic group application and restores its
 own text, attributes, direction, hover state, and temporary class state on
@@ -231,6 +247,27 @@ perform late direction or state finalization.
 
 `DomTranslatorState` stores immutable session-scoped original snapshots and
 translation history for explicit revert. It is not the provider result store.
+
+## Shadow DOM Readiness
+
+Production Select Element Shadow DOM translation is **gated off**
+(`SELECT_ELEMENT_SHADOW_DOM_ENABLED = false` in
+`src/features/element-selection/utils/shadowDom.js`). This must not be
+interpreted as production Shadow DOM translation support.
+
+Established preparation includes:
+
+- composed interaction-target resolution across available event paths
+  (`getSelectEventElements`, `resolveSelectInteractionElement`);
+- open-shadow traversal infrastructure for future extraction support;
+- composed ownership and ancestry checks (`isComposedDescendant`,
+  `isSelectShadowNode`, `iterateSelectElementAncestors`);
+- shadow-aware direction/BiDi preparation;
+- revert and mutation-safety preparation.
+
+Until the gate is enabled, Select Element does not extract or translate
+shadow-contained content. Shadow-DOM interactions may still resolve to their
+retargeted host through the normal Select Element interaction path.
 
 ## Provider and Recovery Integration
 
@@ -380,7 +417,8 @@ Select Element separates diagnostics from public feedback.
 ```text
 internal typed failure
   -> SelectElementManager classification
-  -> PublicErrorPolicy
+  -> mapCanonicalTranslationError()
+  -> createLegacyDisplayError()
   -> localized safe display error
   -> ErrorHandler
 ```
@@ -389,10 +427,11 @@ Feature-owned paths:
 
 | Condition | Feedback owner |
 | --- | --- |
-| Public translation failure | `PublicErrorPolicy` then `ErrorHandler` |
+| Public translation failure | `mapCanonicalTranslationError()` then `createLegacyDisplayError()` then `ErrorHandler` |
 | Partial outcome | Select Element partial message through existing renderer |
 | No translatable content | `show-select-element-info` feature info channel |
 | Unsupported extraction mode | Feature info channel with capability-specific message |
+| `NODE_ALREADY_TRANSLATED` | Silent feature-owned skip; cleanup reason `error` |
 | `FEATURE_BLOCKED` | Silent defensive skip |
 | Context invalidation | `ExtensionContextManager` |
 | Activation failure | Safe activation-error contract |
@@ -584,6 +623,7 @@ src/features/element-selection/
 └── utils/
     ├── activationError.js
     ├── elementHelpers.js
+    ├── shadowDom.js
     └── textDirection.js
 ```
 

@@ -5,12 +5,24 @@ import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { proxyManager } from "@/shared/proxy/ProxyManager.js";
 import { ProviderRequestEngine } from "@/features/translation/providers/utils/ProviderRequestEngine.js";
-import { TraditionalBatchProcessor } from "@/features/translation/providers/utils/TraditionalBatchProcessor.js";
 import { providerCoordinator } from "@/features/translation/core/ProviderCoordinator.js";
 import { getSettingsAsync } from "@/shared/config/config.js";
 import { rateLimitManager, TranslationPriority } from "@/features/translation/core/RateLimitManager.js";
 
 const logger = getScopedLogger(LOG_COMPONENTS.TRANSLATION, 'BaseProvider');
+
+export function createOperationAbortError(signal, message = 'Translation operation aborted') {
+  const isUserAbort = signal?.reason === 'user-cancelled' || signal?.reason === 'user_cancelled';
+  const error = new Error(isUserAbort ? 'Translation cancelled by user' : message);
+  error.name = 'AbortError';
+  if (isUserAbort) {
+    error.type = ErrorTypes.USER_CANCELLED;
+  } else {
+    error.operationAborted = true;
+    error.cancellationReason = 'operation-abort';
+  }
+  return error;
+}
 
 /**
  * Base class for all translation providers.
@@ -19,7 +31,6 @@ const logger = getScopedLogger(LOG_COMPONENTS.TRANSLATION, 'BaseProvider');
 export class BaseProvider {
   constructor(providerName) {
     this.providerName = providerName;
-    this.sessionContext = null;
     this.providerSettingKey = null; // To be set by subclasses that use API keys
     this._initializeProxy();
   }
@@ -104,7 +115,7 @@ export class BaseProvider {
 
     // Pre-check
     if (options.abortController?.signal?.aborted) {
-      throw new Error('Task aborted before execution');
+      throw createOperationAbortError(options.abortController.signal, 'Task aborted before execution');
     }
 
     const result = await rateLimitManager.executeWithRateLimit(
@@ -117,7 +128,7 @@ export class BaseProvider {
 
     // Post-check
     if (options.abortController?.signal?.aborted) {
-      throw new Error('Task aborted during execution');
+      throw createOperationAbortError(options.abortController.signal, 'Task aborted during execution');
     }
 
     return result;
@@ -154,11 +165,9 @@ export class BaseProvider {
   }
 
   /**
-   * Session context management
+   * Provider cleanup hook retained for subclasses and factory dispatch.
    */
-  storeSessionContext(ctx) { this.sessionContext = { ...ctx, timestamp: Date.now() }; }
-  resetSessionContext() { this.sessionContext = null; }
-  shouldResetSession() { return this.sessionContext && Date.now() - this.sessionContext.lastUsed > 300000; }
+  resetSessionContext() {}
 
   /**
    * Check if source and target languages are the same
@@ -178,10 +187,4 @@ export class BaseProvider {
     }
   }
 
-  /**
-   * Processes segments in batches - Delegated to TraditionalBatchProcessor
-   */
-  async _processInBatches(segments, translateChunk, limits, abortController = null, priority = null) {
-    return TraditionalBatchProcessor.processInBatches(this, segments, translateChunk, limits, abortController, priority);
-  }
 }

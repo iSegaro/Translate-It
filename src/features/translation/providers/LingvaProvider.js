@@ -7,6 +7,7 @@ import { AUTO_DETECT_VALUE } from "@/shared/constants/core.js";
 import { getLingvaApiUrlAsync } from "@/shared/config/config.js";
 import { getProviderLanguageCode } from "@/shared/config/languageConstants.js";
 import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
+import { TranslationSegmentMapper } from '@/utils/translation/TranslationSegmentMapper.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.TRANSLATION, 'LingvaProvider');
 
@@ -107,7 +108,7 @@ export class LingvaProvider extends BaseTranslateProvider {
    * @returns {Promise<string>}
    * @private
    */
-  async _executeLingvaRequest(url, context, abortController, charCount, originalCharCount) {
+  async _executeLingvaRequest(url, context, abortController, charCount, originalCharCount, options = {}) {
     return this._executeRequest({
       url,
       fetchOptions: {
@@ -120,8 +121,50 @@ export class LingvaProvider extends BaseTranslateProvider {
       context,
       abortController,
       charCount,
-      originalCharCount
+      originalCharCount,
+      callPurpose: options.callPurpose
     });
+  }
+
+  /**
+   * Validate mapped output before returning the joined provider result.
+   *
+   * @param {string} translatedText - Joined Lingva response.
+   * @param {Array} sourceTexts - Source items for the physical chunk.
+   * @throws {Error} with type API_RESPONSE_INVALID for invalid mapped output.
+   * @private
+   */
+  _validateMappedOutput(translatedText, sourceTexts) {
+    // No delimiter means BaseTranslateProvider owns fallback word-ratio mapping.
+    if (sourceTexts.length <= 1 || !translatedText.includes(LingvaProvider.TEXT_DELIMITER)) return;
+
+    let mappedTexts;
+    try {
+      mappedTexts = TranslationSegmentMapper.mapTranslationToOriginalSegments(
+        translatedText,
+        sourceTexts,
+        TranslationSegmentMapper.STANDARD_DELIMITER,
+        this.providerName
+      );
+    } catch (error) {
+      // Preserve BaseTranslateProvider's existing cardinality conversion path.
+      if (error.type === TranslationSegmentMapper.INCOMPLETE_CARDINALITY) return;
+      throw error;
+    }
+
+    const invalidIndex = mappedTexts.findIndex((translatedItem, index) => {
+      const sourceText = getTextInfo(sourceTexts[index]).text;
+      return sourceText.trim() !== ''
+        && (typeof translatedItem !== 'string' || translatedItem.trim() === '');
+    });
+
+    if (invalidIndex !== -1) {
+      const invalidResponse = new Error(
+        `[${this.providerName}] Invalid mapped translation at index ${invalidIndex}`
+      );
+      invalidResponse.type = ErrorTypes.API_RESPONSE_INVALID;
+      throw invalidResponse;
+    }
   }
 
   /**
@@ -194,7 +237,7 @@ export class LingvaProvider extends BaseTranslateProvider {
    * @param {number} totalChunks - Total number of chunks
    * @returns {Promise<string>}
    */
-  async _translateChunk(chunkTexts, sourceLang, targetLang, translateMode, abortController, retryAttempt, segmentCount, chunkIndex, totalChunks) {
+  async _translateChunk(chunkTexts, sourceLang, targetLang, translateMode, abortController, retryAttempt, segmentCount, chunkIndex, totalChunks, options = {}) {
     const rawApiPath = await this._getApiPath();
     const apiPath = this._normalizeApiPath(rawApiPath);
     const sl = this._getLangCode(sourceLang);
@@ -224,8 +267,10 @@ export class LingvaProvider extends BaseTranslateProvider {
       const url = this._buildRequestUrl(apiPath, sl, tl, joinedText);
 
       const result = await this._executeLingvaRequest(
-        url, 'lingva-standard-chunk', abortController, joinedText.length, originalCharCount
+        url, 'lingva-standard-chunk', abortController, joinedText.length, originalCharCount, options
       );
+
+      this._validateMappedOutput(result, chunkTexts);
 
       if (result) {
         logger.info(`[Lingva] Translation completed successfully`);
@@ -248,9 +293,11 @@ export class LingvaProvider extends BaseTranslateProvider {
         `lingva-rebatched-subgroup-${i + 1}/${subgroups.length}`,
         abortController,
         joinedText.length,
-        subgroupOriginalCharCount
+        subgroupOriginalCharCount,
+        options
       );
 
+      this._validateMappedOutput(subgroupResult, subgroup);
       subgroupResponses.push(subgroupResult);
     }
 

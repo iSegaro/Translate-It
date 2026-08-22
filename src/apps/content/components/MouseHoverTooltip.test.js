@@ -73,6 +73,22 @@ describe('MouseHoverTooltip', () => {
     expect(wrapper.text()).toContain('سلام');
   });
 
+  it('renders only message and type from adapted hover error payload', async () => {
+    const wrapper = mount(MouseHoverTooltip);
+    const errorCall = pageEventBus.on.mock.calls.find(call => call[0] === 'MOUSE_HOVER_TRANSLATION_ERROR');
+    const listener = errorCall[1];
+    const displayError = Object.assign(new Error('Localized safe message'), {
+      type: 'HTTP_ERROR'
+    });
+
+    listener({ error: displayError });
+    await wrapper.vm.$nextTick();
+
+    expect(wrapper.vm.isVisible).toBe(true);
+    expect(wrapper.vm.errorMessage).toBe('Localized safe message');
+    expect(wrapper.vm.errorType).toBe('HTTP_ERROR');
+  });
+
   it('should hide when MOUSE_HOVER_HIDE_TOOLTIP is emitted', async () => {
     const wrapper = mount(MouseHoverTooltip);
     wrapper.vm.isVisible = true;

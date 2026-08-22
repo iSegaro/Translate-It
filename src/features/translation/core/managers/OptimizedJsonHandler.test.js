@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 const loggerDebug = vi.hoisted(() => vi.fn());
 const resolveOperationSourceLanguage = vi.hoisted(() => vi.fn());
+const queueCancelMock = vi.hoisted(() => vi.fn());
 
 // Mock webextension-polyfill
 vi.mock('webextension-polyfill', () => ({
@@ -71,6 +72,10 @@ vi.mock('@/features/translation/core/ProviderConfigurations.js', async (importOr
   };
 });
 
+vi.mock('@/features/translation/core/QueueManager.js', () => ({
+  queueManager: { cancelByMessageId: queueCancelMock }
+}));
+
 vi.mock('@/shared/config/config.js', () => ({
   TranslationMode: {
     Select_Element: 'select_element',
@@ -100,6 +105,7 @@ describe('OptimizedJsonHandler', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     loggerDebug.mockClear();
+    queueCancelMock.mockClear();
     resolveOperationSourceLanguage.mockResolvedValue({
       canBypassSequentialGate: false,
       bypassReason: 'LOW_CONFIDENCE',
@@ -117,7 +123,10 @@ describe('OptimizedJsonHandler', () => {
         addEventListener: vi.fn(),
         removeEventListener: vi.fn()
       },
-      abort: vi.fn(function() { this.signal.aborted = true; })
+       abort: vi.fn(function(reason) {
+         this.signal.aborted = true;
+         this.signal.reason = reason;
+       })
     };
 
     mockEngine = {
@@ -2167,7 +2176,7 @@ describe('OptimizedJsonHandler', () => {
       await vi.waitFor(() => expect(mockProvider.translate).toHaveBeenCalledTimes(2));
 
       firstBatch.resolve({ translatedText: ['t1'] });
-      mockAbortController.signal.aborted = true;
+       mockAbortController.abort('user-cancelled');
       secondBatch.resolve({ translatedText: ['t2'] });
 
       const result = await execution;
@@ -2185,6 +2194,33 @@ describe('OptimizedJsonHandler', () => {
       await handler.execute(mockEngine, mockData, mockProvider, 'en', 'fa', 'msg-1', mockSender);
 
       expect(mockAbortController.abort).toHaveBeenCalled();
+    });
+
+    it('preserves parallel provider failure when sibling observes internal cancellation', async () => {
+      const circuitError = Object.assign(new Error('Circuit open'), {
+        type: ErrorTypes.CIRCUIT_BREAKER_OPEN,
+        originalType: ErrorTypes.SERVER_ERROR,
+        isFatal: true,
+      });
+      const data = { ...mockData, sourceLanguage: 'en' };
+
+      mockProvider.translate
+        .mockRejectedValueOnce(circuitError)
+        .mockResolvedValueOnce({ translatedText: ['late sibling'] });
+
+      const result = await handler.execute(mockEngine, data, mockProvider, 'en', 'fa', 'msg-provider-failure', mockSender);
+
+      expect(result).toMatchObject({
+        success: false,
+        error: {
+          type: ErrorTypes.CIRCUIT_BREAKER_OPEN,
+          originalType: ErrorTypes.SERVER_ERROR,
+        },
+      });
+      expect(result.success).not.toBe(true);
+      expect(result.error.type).not.toBe(ErrorTypes.USER_CANCELLED);
+      expect(result.error.type).not.toBe(ErrorTypes.TRANSLATION_CANCELLED);
+      expect(queueCancelMock).not.toHaveBeenCalled();
     });
 
     it('genuine cancellation after a non-fatal error returns USER_CANCELLED (not lastError)', async () => {
@@ -2209,13 +2245,14 @@ describe('OptimizedJsonHandler', () => {
       await Promise.resolve();
 
       // User cancels after error
-      mockAbortController.signal.aborted = true;
+      mockAbortController.abort('user-cancelled');
       secondBatch.resolve({ translatedText: ['t2'] });
 
       const result = await execution;
 
       expect(result.success).toBe(false);
       expect(result.error.type).toBe(ErrorTypes.USER_CANCELLED);
+      expect(queueCancelMock).not.toHaveBeenCalled();
     });
 
     it('genuine cancellation with no earlier error returns USER_CANCELLED', async () => {
@@ -2238,13 +2275,117 @@ describe('OptimizedJsonHandler', () => {
       firstBatch.resolve({ translatedText: ['t1'] });
 
       // User cancels before second batch settles
-      mockAbortController.signal.aborted = true;
+      mockAbortController.abort('user-cancelled');
       secondBatch.resolve({ translatedText: ['t2'] });
 
       const result = await execution;
 
       expect(result.success).toBe(false);
       expect(result.error.type).toBe(ErrorTypes.USER_CANCELLED);
+    });
+
+    it('treats lifecycle tombstone without signal reason as operation abort', async () => {
+      mockEngine.isCancelled.mockReturnValue(true);
+
+      const result = await handler.execute(
+        mockEngine,
+        { ...mockData, sourceLanguage: 'en' },
+        mockProvider,
+        'en',
+        'fa',
+        'msg-tombstone-stop',
+        mockSender,
+      );
+
+      expect(result.success).toBe(false);
+      expect(result.error).toMatchObject({
+        operationAborted: true,
+        cancellationReason: 'operation-abort',
+      });
+      expect(result.error.type).not.toBe(ErrorTypes.USER_CANCELLED);
+      expect(result.error.isCancelled).not.toBe(true);
+      expect(mockProvider.translate).not.toHaveBeenCalled();
+    });
+
+    it('keeps parent recovery tombstone as operation abort', async () => {
+      const marker = '@@TI_SEG_e_s_n1@@';
+      const source = `A${marker}B ${marker}C`;
+      const fragment0 = { t: `A${marker}B`, i: 'n1', blockId: 'g1', isV3Fragment: true, parentId: 'g1', fragmentIndex: 0, fragmentCount: 2, fragmentJoinerBefore: '' };
+      const fragment1 = { t: `${marker}C`, i: 'n1', blockId: 'g1', isV3Fragment: true, parentId: 'g1', fragmentIndex: 1, fragmentCount: 2, fragmentJoinerBefore: ' ' };
+      mockEngine.createIntelligentBatches = vi.fn(() => [[fragment0, fragment1]]);
+      mockEngine.isCancelled
+        .mockReturnValueOnce(false)
+        .mockReturnValueOnce(false)
+        .mockReturnValue(true);
+      mockProvider.translate.mockResolvedValueOnce({ translatedText: [`A${marker}B`, `${marker}${marker}C`] });
+
+      const result = await handler.execute(
+        mockEngine,
+        { ...mockData, sourceLanguage: 'en', text: JSON.stringify([{ t: source, blockId: 'g1', i: 'n1' }]) },
+        mockProvider,
+        'en',
+        'fa',
+        'msg-parent-tombstone',
+        mockSender,
+      );
+
+      expect(result.success).toBe(false);
+      expect(result.error).toMatchObject({
+        operationAborted: true,
+        cancellationReason: 'operation-abort',
+      });
+      expect(result.error.type).not.toBe(ErrorTypes.USER_CANCELLED);
+      expect(result.error.isCancelled).not.toBe(true);
+    });
+
+    it('preserves canonical type on typed AbortError', async () => {
+      mockEngine.createIntelligentBatches = vi.fn(() => [[{ t: 'timeout me' }]]);
+      matchErrorToType.mockImplementation(() => {
+        throw new Error('typed canonical errors must bypass matcher');
+      });
+      mockProvider.translate.mockRejectedValueOnce(Object.assign(new Error('typed timeout'), {
+        name: 'AbortError',
+        type: ErrorTypes.TRANSLATION_TIMEOUT,
+      }));
+
+      const result = await handler.execute(
+        mockEngine,
+        { ...mockData, sourceLanguage: 'en', text: JSON.stringify([{ t: 'timeout me' }]) },
+        mockProvider,
+        'en',
+        'fa',
+        'msg-typed-abort-timeout',
+        mockSender,
+      );
+
+      expect(result.success).toBe(false);
+      expect(result.error.type).toBe(ErrorTypes.TRANSLATION_TIMEOUT);
+      expect(result.error.operationAborted).not.toBe(true);
+      expect(result.error.type).not.toBe(ErrorTypes.USER_CANCELLED);
+    });
+
+    it('keeps diagnostic classification for untyped non-abort failures', async () => {
+      matchErrorToType.mockImplementation((error) => (
+        error?.message === 'ordinary failure' ? ErrorTypes.NETWORK_ERROR : error?.type || 'UNKNOWN_ERROR'
+      ));
+      mockEngine.createIntelligentBatches = vi.fn(() => [[{ t: 'ordinary failure' }]]);
+      mockProvider.translate.mockRejectedValueOnce(new Error('ordinary failure'));
+
+      const result = await handler.execute(
+        mockEngine,
+        { ...mockData, sourceLanguage: 'en', text: JSON.stringify([{ t: 'ordinary failure' }]) },
+        mockProvider,
+        'en',
+        'fa',
+        'msg-diagnostic-classification',
+        mockSender,
+      );
+
+      expect(result.success).toBe(false);
+      expect(appendTranslationDiagnostic).toHaveBeenCalledWith(null, expect.objectContaining({
+        type: 'STRUCTURED_BATCH_FAILURE',
+        code: ErrorTypes.NETWORK_ERROR,
+      }));
     });
 
     it('fatal validation error preserves original error type through abort', async () => {
@@ -2710,6 +2851,135 @@ describe('OptimizedJsonHandler', () => {
       }
     });
 
+    it('should settle immediately when abort occurs at listener registration', async () => {
+      const browser = (await import('webextension-polyfill')).default;
+      const pending = createDeferred();
+
+      mockAbortController.signal.addEventListener.mockImplementation(() => {
+        mockAbortController.signal.aborted = true;
+      });
+      mockProvider.translate.mockImplementation(() => pending.promise);
+      browser.tabs.sendMessage.mockClear();
+
+      const execution = handler.execute(mockEngine, mockData, mockProvider, 'en', 'fa', 'msg-abort-registration', mockSender);
+      const result = await execution;
+
+       expect(result).toMatchObject({
+         success: false,
+         error: {
+           operationAborted: true,
+           cancellationReason: 'operation-abort',
+         }
+       });
+       expect(result.error.type).not.toBe(ErrorTypes.USER_CANCELLED);
+       expect(result.error.isCancelled).not.toBe(true);
+      expect(mockProvider.translate).not.toHaveBeenCalled();
+      expect(mockEngine.lifecycleRegistry.unregisterRequest).toHaveBeenCalledWith('msg-abort-registration');
+      expect(browser.tabs.sendMessage).not.toHaveBeenCalled();
+
+      pending.resolve({ translatedText: ['late'] });
+      await Promise.resolve();
+      expect(browser.tabs.sendMessage).not.toHaveBeenCalled();
+    });
+
+    it('should detach a non-cooperative parallel sibling after timeout', async () => {
+      vi.useFakeTimers();
+      const { getAIConversationHistoryEnabledAsync } = await import('@/shared/config/config.js');
+      const sibling = createDeferred();
+      const abortListeners = new Set();
+      const browser = (await import('webextension-polyfill')).default;
+
+      try {
+        getAIConversationHistoryEnabledAsync.mockResolvedValue(false);
+        mockAbortController.signal.addEventListener.mockImplementation((_type, listener) => {
+          abortListeners.add(listener);
+        });
+        mockAbortController.signal.removeEventListener.mockImplementation((_type, listener) => {
+          abortListeners.delete(listener);
+        });
+        mockAbortController.abort.mockImplementation(() => {
+          mockAbortController.signal.aborted = true;
+          for (const listener of abortListeners) listener();
+        });
+        mockProvider.translate
+          .mockResolvedValueOnce({ translatedText: ['first'] })
+          .mockImplementationOnce(() => sibling.promise);
+        browser.tabs.sendMessage.mockClear();
+
+        const execution = handler.execute(mockEngine, mockData, mockProvider, 'en', 'fa', 'msg-parallel-timeout', mockSender);
+        execution.catch(() => {});
+        await vi.waitFor(() => expect(mockProvider.translate).toHaveBeenCalledTimes(2));
+
+        await vi.advanceTimersByTimeAsync(TRANSLATION_BATCH_EXECUTION_TIMEOUT_MS);
+        await expect(execution).rejects.toMatchObject({ type: ErrorTypes.TRANSLATION_TIMEOUT });
+        expect(mockEngine.lifecycleRegistry.unregisterRequest).toHaveBeenCalledWith('msg-parallel-timeout');
+        expect(browser.tabs.sendMessage).toHaveBeenCalledTimes(1);
+
+        sibling.resolve({ translatedText: ['late sibling'] });
+        await Promise.resolve();
+        await Promise.resolve();
+
+        const messages = browser.tabs.sendMessage.mock.calls.map(([, message]) => message);
+        expect(messages).not.toContainEqual(expect.objectContaining({
+          data: expect.objectContaining({ data: ['late sibling'] })
+        }));
+        expect(appendTranslationDiagnostic).not.toHaveBeenCalledWith(
+          expect.anything(),
+          expect.objectContaining({ type: 'STRUCTURED_BATCH_FAILURE', reason: 'late sibling' })
+        );
+      } finally {
+        sibling.resolve({ translatedText: ['late sibling'] });
+        getAIConversationHistoryEnabledAsync.mockResolvedValue(false);
+        vi.useRealTimers();
+      }
+    });
+
+    it('consumes a detached sibling rejection after timeout without a second terminal outcome', async () => {
+      vi.useFakeTimers();
+      const { getAIConversationHistoryEnabledAsync } = await import('@/shared/config/config.js');
+      const sibling = createDeferred();
+      const abortListeners = new Set();
+
+      try {
+        getAIConversationHistoryEnabledAsync.mockResolvedValue(false);
+        mockAbortController.signal.addEventListener.mockImplementation((_type, listener) => {
+          abortListeners.add(listener);
+        });
+        mockAbortController.signal.removeEventListener.mockImplementation((_type, listener) => {
+          abortListeners.delete(listener);
+        });
+        mockAbortController.abort.mockImplementation(() => {
+          mockAbortController.signal.aborted = true;
+          for (const listener of abortListeners) listener();
+        });
+        mockProvider.translate
+          .mockResolvedValueOnce({ translatedText: ['first'] })
+          .mockImplementationOnce(() => sibling.promise);
+
+        const execution = handler.execute(mockEngine, mockData, mockProvider, 'en', 'fa', 'msg-parallel-reject', mockSender);
+        execution.catch(() => {});
+        await vi.waitFor(() => expect(mockProvider.translate).toHaveBeenCalledTimes(2));
+
+        await vi.advanceTimersByTimeAsync(TRANSLATION_BATCH_EXECUTION_TIMEOUT_MS);
+        await expect(execution).rejects.toMatchObject({ type: ErrorTypes.TRANSLATION_TIMEOUT });
+        const unregisterCalls = mockEngine.lifecycleRegistry.unregisterRequest.mock.calls.length;
+
+        sibling.reject(new Error('late sibling failure'));
+        await Promise.resolve();
+        await Promise.resolve();
+
+        expect(mockEngine.lifecycleRegistry.unregisterRequest).toHaveBeenCalledTimes(unregisterCalls);
+        expect(appendTranslationDiagnostic).not.toHaveBeenCalledWith(
+          expect.anything(),
+          expect.objectContaining({ type: 'STRUCTURED_BATCH_FAILURE', reason: 'late sibling failure' })
+        );
+      } finally {
+        sibling.resolve({ translatedText: ['late sibling'] });
+        getAIConversationHistoryEnabledAsync.mockResolvedValue(false);
+        vi.useRealTimers();
+      }
+    });
+
     it('should emit one assembled V2 node after all fragments succeed', async () => {
       const browser = (await import('webextension-polyfill')).default;
       const fragments = [
@@ -2979,7 +3249,7 @@ describe('OptimizedJsonHandler', () => {
       );
       await vi.waitFor(() => expect(mockProvider.translate).toHaveBeenCalledTimes(2));
 
-      mockAbortController.abort();
+       mockAbortController.abort('user-cancelled');
       pending.resolve({ translatedText: ['Translated two.'] });
 
       await expect(execution).resolves.toMatchObject({ success: false, error: { type: 'USER_CANCELLED' } });
@@ -4117,6 +4387,25 @@ describe('OptimizedJsonHandler', () => {
         expect(result.results.map((r) => r.cellId)).toEqual(['c-a', 'c-b']);
       });
 
+      it('structured PDF fallback child identities survive provider mapping', async () => {
+        const cellA = { i: 'sched-fallback', b: 'sched-fallback', blockId: 'sched-fallback', cellId: 'sched-fallback|line:0|cell:0', lineIndex: 0, cellIndex: 0, t: 'A' };
+        const cellB = { i: 'sched-fallback', b: 'sched-fallback', blockId: 'sched-fallback', cellId: 'sched-fallback|line:0|cell:1', lineIndex: 0, cellIndex: 1, t: 'B' };
+        mockEngine.createIntelligentBatches = vi.fn(() => [[cellA, cellB]]);
+        mockProvider.translate.mockResolvedValueOnce({ translatedText: ['TA', 'TB'] });
+
+        const result = await handler.execute(
+          mockEngine,
+          { ...mockData, sourceLanguage: 'en', mode: 'pdf-translation', text: JSON.stringify([cellA, cellB]) },
+          mockProvider, 'en', 'fa', 'msg-pdf-fallback-cellid', mockSender
+        );
+
+        expect(result.success).toBe(true);
+        expect(result.results.map((item) => item.cellId)).toEqual([
+          'sched-fallback|line:0|cell:0',
+          'sched-fallback|line:0|cell:1'
+        ]);
+      });
+
       it('structured PDF duplicate cellId still fails with typed error', async () => {
         const browser = (await import('webextension-polyfill')).default;
         browser.tabs.sendMessage.mockClear();
@@ -4271,7 +4560,7 @@ describe('OptimizedJsonHandler', () => {
 
         await vi.waitFor(() => expect(mockProvider.translate).toHaveBeenCalledTimes(1));
 
-        mockAbortController.signal.aborted = true;
+         mockAbortController.abort('user-cancelled');
         firstBatch.resolve({ translatedText: ['Hello.'] });
 
         const result = await execution;
@@ -4349,7 +4638,7 @@ describe('OptimizedJsonHandler', () => {
         );
 
         await vi.waitFor(() => expect(mockProvider.translate).toHaveBeenCalledTimes(1));
-        mockAbortController.signal.aborted = true;
+         mockAbortController.abort('user-cancelled');
         firstBatch.resolve({ translatedText: ['Hello.'] });
 
         const result = await execution;
@@ -4408,9 +4697,67 @@ describe('OptimizedJsonHandler', () => {
       );
 
       expect(result.success).toBe(false);
+      expect(result.errorDetails).toEqual(result.error);
+      expect(result.errorDetails).toMatchObject({ message: 'provider down', type: 'NETWORK_ERROR' });
       const calls = browser.tabs.sendMessage.mock.calls;
       const end = calls.find(([, m]) => m.action === MessageActions.TRANSLATION_STREAM_END);
       expect(end).toEqual([123, expect.objectContaining({ action: MessageActions.TRANSLATION_STREAM_END }), { frameId: 3 }]);
+    });
+
+    it('serializes optimized stream errors with canonical identity fields', async () => {
+      const browser = (await import('webextension-polyfill')).default;
+      browser.tabs.sendMessage.mockClear();
+      const error = new Error('structured provider failure');
+      Object.assign(error, {
+        type: 'PROVIDER_ERROR',
+        originalType: 'HTTP_ERROR',
+        statusCode: 503,
+        context: 'select-element-stream',
+        providerName: 'Provider',
+        providerId: 'provider-id',
+        code: 'UPSTREAM_FAILURE',
+        errorCode: 'E_UPSTREAM',
+        cause: new Error('private cause'),
+        arbitrary: { ignored: true }
+      });
+
+      await handler._sendStreamError(123, 'msg-optimized-error', error, 'fa', 'en', 'select_element');
+
+      const message = browser.tabs.sendMessage.mock.calls[0][1];
+      expect(message).toMatchObject({
+        action: MessageActions.TRANSLATION_STREAM_END,
+        data: {
+          success: false,
+          sourceLanguage: 'en',
+          targetLanguage: 'fa',
+          translationMode: 'select_element',
+          error: {
+            message: 'structured provider failure',
+            type: 'PROVIDER_ERROR',
+            originalType: 'HTTP_ERROR',
+            statusCode: 503,
+            context: 'select-element-stream',
+            providerName: 'Provider',
+            providerId: 'provider-id',
+            code: 'UPSTREAM_FAILURE',
+            errorCode: 'E_UPSTREAM'
+          }
+        }
+      });
+      expect(message.data.error).not.toHaveProperty('cause');
+      expect(message.data.error).not.toHaveProperty('arbitrary');
+      expect(message.data.errorDetails).toEqual(message.data.error);
+      expect(message.data.errorDetails).toMatchObject({
+        message: 'structured provider failure',
+        type: 'PROVIDER_ERROR',
+        originalType: 'HTTP_ERROR',
+        statusCode: 503,
+        context: 'select-element-stream',
+        providerName: 'Provider',
+        providerId: 'provider-id',
+        code: 'UPSTREAM_FAILURE',
+        errorCode: 'E_UPSTREAM'
+      });
     });
 
     it('targets the top frame explicitly with frameId 0', async () => {

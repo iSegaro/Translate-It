@@ -3,7 +3,7 @@
  * Provides centralized batching, prompt preparation, and streaming support for AI models.
  */
 
-import { BaseProvider } from "@/features/translation/providers/BaseProvider.js";
+import { BaseProvider, createOperationAbortError } from "@/features/translation/providers/BaseProvider.js";
 import {
   getProviderStreaming,
   getProviderBatching
@@ -18,7 +18,13 @@ import { TranslationMode, getProviderOptimizationLevelAsync } from "@/shared/con
 import { AIStreamManager } from "./utils/AIStreamManager.js";
 import { isCancellationError } from "@/shared/error-management/ErrorMatcher.js";
 import { ErrorTypes } from "@/shared/error-management/ErrorTypes.js";
-import { appendTranslationDiagnostic } from "@/features/translation/ir/TranslationOperation.js";
+import {
+  appendTranslationDiagnostic,
+  createProviderExecutionMetadataRef,
+  discardProviderExecutionMetadata,
+  executeProviderExecutionAttempt,
+  publishProviderExecutionMetadata,
+} from "@/features/translation/ir/TranslationOperation.js";
 import { TranslationCallPurpose } from "@/features/translation/providers/ProviderConstants.js";
 import { classifyRecoveryFailure } from "@/features/translation/ir/RecoveryClassification.js";
 import { TranslationContractValidator } from "@/features/translation/core/TranslationContractValidator.js";
@@ -208,6 +214,42 @@ function validateRecoveredResults(sourceTexts, recoveredResults) {
   }
 }
 
+function createInvalidStringResultError(providerName, index) {
+  const error = new Error(`[${providerName}] Invalid STRING response at index ${index}`);
+  error.type = ErrorTypes.API_RESPONSE_INVALID;
+  return error;
+}
+
+function isBlankSource(source) {
+  const sourceText = getSourceText(source);
+  return typeof sourceText === 'string' && sourceText.trim() === '';
+}
+
+function validateStringResponseValue(value, source, providerName, index) {
+  if (typeof value !== 'string' || (value.trim() === '' && !isBlankSource(source))) {
+    throw createInvalidStringResultError(providerName, index);
+  }
+}
+
+function validateSequentialStringResponse(response, sourceTexts, providerName) {
+  if (Array.isArray(response)) {
+    // A single STRING request must not accept an array-shaped native value.
+    if (sourceTexts.length === 1) {
+      throw createInvalidStringResultError(providerName, 0);
+    }
+
+    response.forEach((value, index) => {
+      validateStringResponseValue(value, sourceTexts[index], providerName, index);
+    });
+    return;
+  }
+
+  const allSourcesBlank = sourceTexts.every(isBlankSource);
+  if (typeof response !== 'string' || (response.trim() === '' && !allSourcesBlank)) {
+    throw createInvalidStringResultError(providerName, 0);
+  }
+}
+
 export class BaseAIProvider extends BaseProvider {
   // AI-specific capabilities - to be overridden by subclasses
   static isAI = true;
@@ -303,6 +345,7 @@ export class BaseAIProvider extends BaseProvider {
    */
   async _translateBatch(texts, sourceLang, targetLang, translateMode, abortController, engine, messageId, sessionId, contextMetadata = null, expectedFormat = null, priority = null) {
     const structuredFormat = expectedFormat || ResponseFormat.JSON_ARRAY;
+    const customResponseFormatCapabilityRef = contextMetadata?.customResponseFormatCapabilityRef || { responseFormatUnsupported: false };
     const callPurpose = contextMetadata?.callPurpose || TranslationCallPurpose.PRIMARY_TRANSLATION;
     const isPrimaryCall = callPurpose === TranslationCallPurpose.PRIMARY_TRANSLATION;
     const conversationParticipates = callPurpose === TranslationCallPurpose.PRIMARY_TRANSLATION
@@ -314,14 +357,14 @@ export class BaseAIProvider extends BaseProvider {
           sessionId,
         }));
     // Per-call completion slot: the adapter records the completion during its
-    // physical response, and recordProviderCompletion publishes the frozen
-    // record into this fresh per-call slot. Parallel batches share one
-    // operation, so the slot is derived per call to keep the correlation
-    // response-scoped (no "latest completion" shared state).
+    // provider execution, and recordProviderCompletion publishes the frozen
+    // record into this fresh execution slot. Parallel batches share one
+    // operation, so each execution owns its own metadata state.
     const baseExecutionContext = contextMetadata?.executionContext;
     const completionRef = baseExecutionContext ? { record: null } : null;
+    const providerMetadataRef = createProviderExecutionMetadataRef();
     const callExecutionContext = baseExecutionContext
-      ? { ...baseExecutionContext, completionRef }
+      ? { ...baseExecutionContext, completionRef, providerMetadataRef }
       : null;
     const callContextMetadata = {
       ...contextMetadata,
@@ -329,6 +372,8 @@ export class BaseAIProvider extends BaseProvider {
       expectedFormat: structuredFormat,
       useParentConversationLifecycle: isPrimaryCall && contextMetadata?.useParentConversationLifecycle === true,
       ...(callExecutionContext && { executionContext: callExecutionContext }),
+      providerMetadataRef,
+      customResponseFormatCapabilityRef,
     };
     const conversationCommitCandidate = (
       (structuredFormat === ResponseFormat.JSON_ARRAY || structuredFormat === ResponseFormat.JSON_OBJECT)
@@ -336,17 +381,19 @@ export class BaseAIProvider extends BaseProvider {
     ) ? createConversationCommitCandidate(translateMode) : null;
     let acceptedResults;
     try {
-      const response = await this.executeStructuredBatch(texts, sourceLang, targetLang, {
-        translateMode,
-        abortController,
-        messageId,
-        sessionId,
-        contextMetadata: callContextMetadata,
-        expectedFormat,
-        priority,
-        conversationCommitCandidate,
-        callPurpose,
-      });
+      const response = await executeProviderExecutionAttempt(providerMetadataRef, () => this.executeStructuredBatch(
+        texts, sourceLang, targetLang, {
+          translateMode,
+          abortController,
+          messageId,
+          sessionId,
+          contextMetadata: callContextMetadata,
+          expectedFormat,
+          priority,
+          conversationCommitCandidate,
+          callPurpose,
+        },
+      ));
 
       // Stats recording is handled by ProviderRequestEngine. 
       // Orchestrators (like OptimizedJsonHandler or UnifiedService) handle the reporting.
@@ -482,10 +529,7 @@ export class BaseAIProvider extends BaseProvider {
 
         if (!selectivePlan) {
           if (abortController?.signal?.aborted) {
-            const error = new Error('Translation cancelled by user');
-            error.name = 'AbortError';
-            error.type = ErrorTypes.USER_CANCELLED;
-            throw error;
+            throw createOperationAbortError(abortController.signal);
           }
           logger.warn(`[${this.providerName}] Full structured recovery retry started`);
           try {
@@ -503,6 +547,7 @@ export class BaseAIProvider extends BaseProvider {
                 callPurpose: TranslationCallPurpose.STRUCTURED_RECOVERY,
                 conversationParticipates: false,
                 useParentConversationLifecycle: false,
+                customResponseFormatCapabilityRef: undefined,
                 repairContext: parsed.repairContext,
                 fullParseRecoveryRetry: true,
               },
@@ -555,10 +600,7 @@ export class BaseAIProvider extends BaseProvider {
 
         if (subsetPlan) {
           if (abortController?.signal?.aborted) {
-            const error = new Error('Translation cancelled by user');
-            error.name = 'AbortError';
-            error.type = ErrorTypes.USER_CANCELLED;
-            throw error;
+            throw createOperationAbortError(abortController.signal);
           }
           const subsetExpectedFormat = expectedFormat || ResponseFormat.JSON_ARRAY;
           const subsetExecutionContext = contextMetadata?.executionContext;
@@ -582,6 +624,7 @@ export class BaseAIProvider extends BaseProvider {
                 callPurpose: TranslationCallPurpose.STRUCTURED_RECOVERY,
                 conversationParticipates: false,
                 useParentConversationLifecycle: false,
+                customResponseFormatCapabilityRef: undefined,
                 expectedFormat: subsetExpectedFormat,
                 repairContext: parsed.repairContext,
                 isSubsetRecoveryAttempt: true,
@@ -675,6 +718,7 @@ export class BaseAIProvider extends BaseProvider {
             sessionId,
             expectedFormat: ResponseFormat.STRING,
             contextMetadata,
+            customResponseFormatCapabilityRef: undefined,
             repairContext: parsed.repairContext,
             callPurpose: TranslationCallPurpose.STRUCTURED_RECOVERY,
           });
@@ -787,6 +831,7 @@ export class BaseAIProvider extends BaseProvider {
 
       acceptedResults = parsed.results;
     } catch (error) {
+      discardProviderExecutionMetadata(providerMetadataRef);
       conversationCommitCandidate?.discard();
       // Error accounting is owned exclusively by ProviderRequestEngine.executeApiCall:
       // TranslationStatsManager.errors counts failed physical HTTP calls only.
@@ -811,10 +856,7 @@ export class BaseAIProvider extends BaseProvider {
     // candidate and fail loudly as USER_CANCELLED.
     if (abortController?.signal?.aborted) {
       conversationCommitCandidate?.discard();
-      const cancelError = new Error('Translation cancelled by user');
-      cancelError.name = 'AbortError';
-      cancelError.type = ErrorTypes.USER_CANCELLED;
-      throw cancelError;
+      throw createOperationAbortError(abortController.signal);
     }
 
     if (!contextMetadata?.useParentConversationLifecycle) {
@@ -822,6 +864,7 @@ export class BaseAIProvider extends BaseProvider {
     } else {
       conversationCommitCandidate?.discard();
     }
+    publishProviderExecutionMetadata(callExecutionContext || contextMetadata?.executionContext, providerMetadataRef, callPurpose);
     return acceptedResults;
   }
 
@@ -843,8 +886,9 @@ export class BaseAIProvider extends BaseProvider {
     }]);
     const finalUserText = typeof userText === 'string' ? userText : JSON.stringify(userText);
     const context = `${this.providerName.toLowerCase()}-batch-translation`;
-    return this._executeWithRateLimit(
-      (opts) => this._callAI(systemPrompt, finalUserText, {
+    const providerMetadataRef = contextMetadata?.providerMetadataRef || createProviderExecutionMetadataRef();
+    const result = await this._executeWithRateLimit(
+      (opts) => executeProviderExecutionAttempt(providerMetadataRef, () => this._callAI(systemPrompt, finalUserText, {
         ...opts,
         abortController,
         messageId,
@@ -853,19 +897,22 @@ export class BaseAIProvider extends BaseProvider {
         sourceLang,
         targetLang,
         isBatch: true,
-         expectedFormat: expectedFormat || ResponseFormat.JSON_ARRAY,
-         executionContext: contextMetadata?.executionContext,
-          callPurpose,
-          conversationParticipates: callPurpose === TranslationCallPurpose.PRIMARY_TRANSLATION
-            && contextMetadata?.conversationParticipates === true,
-          useParentConversationLifecycle: callPurpose === TranslationCallPurpose.PRIMARY_TRANSLATION
-            && contextMetadata?.useParentConversationLifecycle === true,
-         conversationCommitCandidate,
-      }),
+        expectedFormat: expectedFormat || ResponseFormat.JSON_ARRAY,
+        executionContext: contextMetadata?.executionContext,
+        callPurpose,
+        conversationParticipates: callPurpose === TranslationCallPurpose.PRIMARY_TRANSLATION
+          && contextMetadata?.conversationParticipates === true,
+        useParentConversationLifecycle: callPurpose === TranslationCallPurpose.PRIMARY_TRANSLATION
+          && contextMetadata?.useParentConversationLifecycle === true,
+        conversationCommitCandidate,
+        providerMetadataRef,
+        customResponseFormatCapabilityRef: contextMetadata?.customResponseFormatCapabilityRef,
+      })),
       context,
       priority,
       { sessionId, abortController, messageId, executionContext: contextMetadata?.executionContext }
     );
+    return result;
   }
 
   async executeSequentialBatch(texts, sourceLang, targetLang, {
@@ -903,6 +950,7 @@ export class BaseAIProvider extends BaseProvider {
     const results = [];
     const context = `${this.providerName.toLowerCase()}-traditional-sequential`;
     const callPurpose = options.callPurpose || TranslationCallPurpose.PRIMARY_TRANSLATION;
+    const isStringContract = (expectedFormat || ResponseFormat.STRING) === ResponseFormat.STRING;
     const isPrimaryCall = callPurpose === TranslationCallPurpose.PRIMARY_TRANSLATION;
     const conversationParticipates = await AIConversationHelper.getConversationParticipation({
       callPurpose,
@@ -923,10 +971,7 @@ export class BaseAIProvider extends BaseProvider {
 
     for (let i = 0; i < texts.length; i++) {
       if (abortController?.signal?.aborted) {
-        const cancelError = new Error('Translation cancelled by user');
-        cancelError.name = 'AbortError';
-        cancelError.type = ErrorTypes.USER_CANCELLED;
-        throw cancelError;
+        throw createOperationAbortError(abortController.signal);
       }
       
       const text = texts[i];
@@ -936,8 +981,10 @@ export class BaseAIProvider extends BaseProvider {
       const chunkContext = `${context}-segment-${i + 1}/${texts.length}`;
 
       try {
+        const customResponseFormatCapabilityRef = { responseFormatUnsupported: false };
+        const providerMetadataRef = createProviderExecutionMetadataRef();
         const response = await this._executeWithRateLimit(
-          (opts) => this._callAI(systemPrompt, userText, {
+          (opts) => executeProviderExecutionAttempt(providerMetadataRef, () => this._callAI(systemPrompt, userText, {
             ...opts,
             abortController,
             messageId,
@@ -950,13 +997,21 @@ export class BaseAIProvider extends BaseProvider {
             callPurpose,
             conversationParticipates,
             useParentConversationLifecycle: effectiveContextMetadata.useParentConversationLifecycle,
-          }),
+            providerMetadataRef,
+            customResponseFormatCapabilityRef,
+          })),
           chunkContext,
           priority,
           { sessionId, abortController, messageId }
         );
-        
-        results.push(AIResponseParser.cleanAIResponse(response, expectedFormat || ResponseFormat.STRING));
+
+        if (isStringContract) {
+          validateSequentialStringResponse(response, [text], this.providerName);
+        }
+
+        const cleanedResponse = AIResponseParser.cleanAIResponse(response, expectedFormat || ResponseFormat.STRING);
+        publishProviderExecutionMetadata(effectiveContextMetadata.executionContext, providerMetadataRef, callPurpose);
+        results.push(cleanedResponse);
       } catch (error) {
         logger.error(`[${this.providerName}] Traditional segment translation failed:`, error.message);
         // No silent success: a failed segment fails the batch loudly. The error
@@ -1025,9 +1080,7 @@ export class BaseAIProvider extends BaseProvider {
 
     for (let batchIndex = 0; batchIndex < batches.length; batchIndex++) {
       if (abortController?.signal?.aborted || (engine && engine.isCancelled?.(messageId))) {
-        const cancelError = new Error('Translation cancelled by user');
-        cancelError.type = 'USER_CANCELLED';
-        throw cancelError;
+        throw createOperationAbortError(abortController?.signal);
       }
 
       const batch = batches[batchIndex];
@@ -1071,6 +1124,13 @@ export class BaseAIProvider extends BaseProvider {
         // Stream error to content script
         if (engine && messageId) {
           await AIStreamManager.streamErrorResults(this.providerName, error, batchIndex, messageId, engine);
+
+          const isLifecycleError = isCancellationError(error)
+            || error?.type === ErrorTypes.TRANSLATION_TIMEOUT
+            || error?.type === ErrorTypes.OPERATION_TIMEOUT;
+          if (!isLifecycleError) {
+            await AIStreamManager.sendStreamEnd(this.providerName, messageId, engine, { error });
+          }
         }
 
         throw error;

@@ -86,5 +86,31 @@ describe('ProviderFactory', () => {
       factory.resetProviders();
       expect(factory.providerInstances.size).toBe(0);
     });
+
+    it('resets only selected cached provider', () => {
+      const selected = { resetSessionContext: vi.fn() };
+      const other = { resetSessionContext: vi.fn() };
+      factory.providerInstances.set('selected', selected);
+      factory.providerInstances.set('other', other);
+
+      factory.resetSessionContext('selected');
+
+      expect(selected.resetSessionContext).toHaveBeenCalledOnce();
+      expect(other.resetSessionContext).not.toHaveBeenCalled();
+    });
+
+    it('resets all cached providers without instantiating missing providers', async () => {
+      const first = { resetSessionContext: vi.fn() };
+      const second = { resetSessionContext: vi.fn() };
+      const { providerRegistry } = await import("./ProviderRegistry.js");
+      factory.providerInstances.set('first', first);
+      factory.providerInstances.set('second', second);
+
+      factory.resetSessionContext();
+
+      expect(first.resetSessionContext).toHaveBeenCalledOnce();
+      expect(second.resetSessionContext).toHaveBeenCalledOnce();
+      expect(providerRegistry.get).not.toHaveBeenCalled();
+    });
   });
 });

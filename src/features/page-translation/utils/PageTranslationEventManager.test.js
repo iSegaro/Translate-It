@@ -3,6 +3,8 @@ import { PageTranslationEventManager } from './PageTranslationEventManager.js';
 import { MessageActions } from '@/shared/messaging/core/MessageActions.js';
 import { storageManager } from '@/shared/storage/core/StorageCore.js';
 import { sendRegularMessage } from '@/shared/messaging/core/UnifiedMessaging.js';
+import { ErrorHandler } from '@/shared/error-management/ErrorHandler.js';
+import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
 
 // Mock storageManager
 vi.mock('@/shared/storage/core/StorageCore.js', () => ({
@@ -127,6 +129,45 @@ describe('PageTranslationEventManager', () => {
       callback(errorData);
       expect(mockManager._handleFatalError).toHaveBeenCalledWith('Failed', 'network', undefined);
     });
+
+    it('presents structured provider failures safely before ErrorHandler', async () => {
+      const callback = mockBus.on.mock.calls.find(c => c[0] === 'page-translation-internal-error')[1];
+      const error = Object.assign(new Error('raw provider diagnostic'), {
+        type: ErrorTypes.MODEL_MISSING,
+        providerName: 'Provider',
+      });
+
+      await callback({ error, errorType: error.type, isFatal: false, context: 'page-translation-batch' });
+
+      const handledError = ErrorHandler.getInstance().handle.mock.calls[0][0];
+      expect(handledError.message).not.toContain('raw provider diagnostic');
+      expect(handledError.type).toBe(ErrorTypes.MODEL_MISSING);
+      expect(ErrorHandler.getInstance().handle).toHaveBeenCalledTimes(1);
+    });
+
+    it('keeps legacy string failures compatible while using safe display text', async () => {
+      const callback = mockBus.on.mock.calls.find(c => c[0] === 'page-translation-internal-error')[1];
+
+      await callback({
+        error: 'legacy provider diagnostic',
+        errorType: ErrorTypes.MODEL_MISSING,
+        isFatal: false,
+      });
+
+      const handledError = ErrorHandler.getInstance().handle.mock.calls[0][0];
+      expect(handledError.message).not.toContain('legacy provider diagnostic');
+      expect(ErrorHandler.getInstance().handle).toHaveBeenCalledTimes(1);
+    });
+
+    it.each([ErrorTypes.USER_CANCELLED, ErrorTypes.TRANSLATION_CANCELLED, ErrorTypes.CONTEXT, ErrorTypes.EXTENSION_CONTEXT_INVALIDATED])(
+      'does not present silent translation error %s', async (type) => {
+        const callback = mockBus.on.mock.calls.find(c => c[0] === 'page-translation-internal-error')[1];
+
+        await callback({ error: Object.assign(new Error('silent failure'), { type }), isFatal: false });
+
+        expect(ErrorHandler.getInstance().handle).not.toHaveBeenCalled();
+      }
+    );
 
     it('should handle STOP_CONFLICTING_FEATURES', () => {
       mockManager.isTranslating = true;

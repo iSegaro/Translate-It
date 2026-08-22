@@ -117,6 +117,24 @@ describe('OpenRouterProvider Error Handling', () => {
     });
   });
 
+  it('sends json_object response format for JSON_ARRAY', async () => {
+    const executeRequest = vi.spyOn(provider, '_executeRequest').mockResolvedValue('translated');
+
+    await provider._callAI('system', 'source', { expectedFormat: ResponseFormat.JSON_ARRAY });
+
+    const payload = JSON.parse(executeRequest.mock.calls[0][0].fetchOptions.body);
+    expect(payload.response_format).toEqual({ type: 'json_object' });
+  });
+
+  it('omits response format for STRING calls', async () => {
+    const executeRequest = vi.spyOn(provider, '_executeRequest').mockResolvedValue('translated');
+
+    await provider._callAI('system', 'source', { expectedFormat: ResponseFormat.STRING });
+
+    const payload = JSON.parse(executeRequest.mock.calls[0][0].fetchOptions.body);
+    expect(payload).not.toHaveProperty('response_format');
+  });
+
   it('uses CONFIG default for missing text model selection', async () => {
     getOpenRouterApiModelAsync.mockResolvedValue(undefined);
     const executeRequest = vi.spyOn(provider, '_executeRequest').mockResolvedValue('translated');

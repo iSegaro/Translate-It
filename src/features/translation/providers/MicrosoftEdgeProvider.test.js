@@ -104,10 +104,12 @@ describe('MicrosoftEdgeProvider', () => {
         return opts.extractResponse(mockApiResponse);
       });
 
-      const result = await provider._translateChunk(['Hello'], 'en', 'fa', 'selection', null);
+      const options = { providerMetadataRef: { metadata: {} } };
+      const result = await provider._translateChunk(['Hello'], 'en', 'fa', 'selection', null, 0, 1, 0, 1, options);
 
       expect(result).toEqual(['سلام']);
-      expect(provider.lastDetectedLanguage).toBe('en');
+      expect(options.providerMetadataRef.metadata.detectedLanguage).toBe('en');
+      expect(provider).not.toHaveProperty('lastDetectedLanguage');
     });
 
     it('should throw API_RESPONSE_INVALID for malformed API response', async () => {
@@ -119,8 +121,10 @@ describe('MicrosoftEdgeProvider', () => {
         return opts.extractResponse(malformedResponse);
       });
 
-      await expect(provider._translateChunk(['Hello'], 'en', 'fa', 'selection', null))
+      const options = { providerMetadataRef: { metadata: {} } };
+      await expect(provider._translateChunk(['Hello'], 'en', 'fa', 'selection', null, 0, 1, 0, 1, options))
         .rejects.toMatchObject({ type: 'API_RESPONSE_INVALID' });
+      expect(options.providerMetadataRef.metadata).toEqual({});
     });
 
     it.each([

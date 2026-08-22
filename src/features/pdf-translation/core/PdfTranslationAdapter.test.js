@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { PdfTranslationAdapter } from './PdfTranslationAdapter.js'
+import { TranslationBatcher } from '@/features/translation/core/utils/TranslationBatcher.js'
 
 function makeStructuredBlock(id, lines, extra = {}) {
   return {
@@ -302,6 +303,137 @@ describe('PdfTranslationAdapter', () => {
     })
   })
 
+  it('prefers canonical errorDetails over conflicting legacy error', () => {
+    const adapter = new PdfTranslationAdapter()
+    const batchItems = adapter.toProviderItems([{ id: 'block-a', text: 'Hello' }])
+
+    const mapped = adapter.mapBatchResponse(batchItems, {
+      success: false,
+      error: { message: 'Legacy timeout', type: 'TIMEOUT' },
+      errorDetails: { message: 'Canonical provider failure', type: 'API_ERROR' }
+    })
+
+    expect(mapped[0]).toMatchObject({
+      error: 'Legacy timeout',
+      failureReason: 'provider-error',
+      errorDetails: {
+        message: 'Canonical provider failure',
+        type: 'API_ERROR'
+      }
+    })
+  })
+
+  it('falls back to legacy error when errorDetails is missing', () => {
+    const adapter = new PdfTranslationAdapter()
+    const batchItems = adapter.toProviderItems([{ id: 'block-a', text: 'Hello' }])
+
+    const mapped = adapter.mapBatchResponse(batchItems, {
+      success: false,
+      error: { message: 'Timed out', type: 'TIMEOUT' }
+    })
+
+    expect(mapped[0].failureReason).toBe('timeout')
+  })
+
+  it('falls back to legacy error when errorDetails is malformed', () => {
+    const adapter = new PdfTranslationAdapter()
+    const batchItems = adapter.toProviderItems([{ id: 'block-a', text: 'Hello' }])
+
+    const mapped = adapter.mapBatchResponse(batchItems, {
+      success: false,
+      error: { message: 'Cancelled', type: 'USER_CANCELLED' },
+      errorDetails: { message: 42, type: 'TIMEOUT' }
+    })
+
+    expect(mapped[0].failureReason).toBe('cancelled')
+  })
+
+  it.each([
+    ['TRANSLATION_TIMEOUT', 'timeout'],
+    ['USER_CANCELLED', 'cancelled'],
+    ['BROWSER_API_UNAVAILABLE', 'provider-unavailable'],
+    ['CIRCUIT_BREAKER_OPEN', 'provider-unavailable'],
+    ['API_KEY_INVALID', 'provider-error'],
+    ['UNKNOWN', 'unknown']
+  ])('classifies canonical %s as %s', (type, failureReason) => {
+    const adapter = new PdfTranslationAdapter()
+    const batchItems = adapter.toProviderItems([{ id: 'block-a', text: 'Hello' }])
+    const errorDetails = { message: 'Canonical failure', type }
+
+    const mapped = adapter.mapBatchResponse(batchItems, {
+      success: false,
+      error: 'Legacy failure',
+      errorDetails
+    })
+
+    expect(mapped[0]).toMatchObject({
+      failureReason,
+      errorDetails
+    })
+  })
+
+  it('keeps circuit operational identity for server-caused breaker failures', () => {
+    const adapter = new PdfTranslationAdapter()
+    const batchItems = adapter.toProviderItems([{ id: 'block-a', text: 'Hello' }])
+    const errorDetails = {
+      message: 'Circuit breaker open',
+      type: 'CIRCUIT_BREAKER_OPEN',
+      originalType: 'SERVER_ERROR',
+      statusCode: 500,
+    }
+
+    const mapped = adapter.mapBatchResponse(batchItems, {
+      success: false,
+      error: 'Legacy failure',
+      errorDetails,
+    })
+
+    expect(mapped[0]).toMatchObject({
+      failureReason: 'provider-unavailable',
+      errorDetails,
+    })
+  })
+
+  it('preserves canonical failure identity while excluding unsafe metadata', () => {
+    const adapter = new PdfTranslationAdapter()
+    const batchItems = adapter.toProviderItems([{ id: 'block-a', text: 'Hello', sourceTextHash: 'hash-a' }])
+    const mapped = adapter.mapBatchResponse(batchItems, {
+      success: false,
+      error: {
+        message: 'Provider failed',
+        type: 'PROVIDER_ERROR',
+        originalType: 'HTTP_ERROR',
+        statusCode: 503,
+        context: 'pdf-translation',
+        providerName: 'Provider',
+        providerId: 'provider-id',
+        code: 'UPSTREAM_FAILURE',
+        errorCode: 'E_UPSTREAM',
+        translationOutcome: { partial: true },
+        cause: 'private',
+        arbitrary: { ignored: true }
+      }
+    })
+
+    expect(mapped[0]).toMatchObject({
+      error: 'Provider failed',
+      errorDetails: {
+        message: 'Provider failed',
+        type: 'PROVIDER_ERROR',
+        originalType: 'HTTP_ERROR',
+        statusCode: 503,
+        context: 'pdf-translation',
+        providerName: 'Provider',
+        providerId: 'provider-id',
+        code: 'UPSTREAM_FAILURE',
+        errorCode: 'E_UPSTREAM',
+        translationOutcome: { partial: true }
+      }
+    })
+    expect(mapped[0].errorDetails).not.toHaveProperty('cause')
+    expect(mapped[0].errorDetails).not.toHaveProperty('arbitrary')
+  })
+
   describe('structured block cell-aware translation', () => {
     it('emits per-cell items for multi-item structured lines', () => {
       const adapter = new PdfTranslationAdapter()
@@ -320,11 +452,27 @@ describe('PdfTranslationAdapter', () => {
       const items = adapter.toProviderItems([block])
 
       expect(items).toHaveLength(4)
-      expect(items[0]).toMatchObject({ blockId: 'sched-1', lineIndex: 0, t: 'Low-Intermediate Level (A2+)', isStructured: true })
+      expect(items[0]).toMatchObject({ blockId: 'sched-1', lineIndex: 0, t: 'Low-Intermediate Level (A2+)', isStructured: true, cellId: 'sched-1|line:0|item:0' })
       expect(items[0].cellIndex).toBeUndefined()
-      expect(items[1]).toMatchObject({ blockId: 'sched-1', lineIndex: 1, cellIndex: 0, t: 'Mon 30 Mar', isStructured: true })
-      expect(items[2]).toMatchObject({ blockId: 'sched-1', lineIndex: 1, cellIndex: 1, t: '6.00-8.15pm', isStructured: true })
-      expect(items[3]).toMatchObject({ blockId: 'sched-1', lineIndex: 1, cellIndex: 2, t: 'Classes', isStructured: true })
+      expect(items[1]).toMatchObject({ blockId: 'sched-1', lineIndex: 1, cellIndex: 0, t: 'Mon 30 Mar', isStructured: true, cellId: 'sched-1|line:1|cell:0' })
+      expect(items[2]).toMatchObject({ blockId: 'sched-1', lineIndex: 1, cellIndex: 1, t: '6.00-8.15pm', isStructured: true, cellId: 'sched-1|line:1|cell:1' })
+      expect(items[3]).toMatchObject({ blockId: 'sched-1', lineIndex: 1, cellIndex: 2, t: 'Classes', isStructured: true, cellId: 'sched-1|line:1|cell:2' })
+      expect(new Set(items.map((item) => item.cellId)).size).toBe(items.length)
+    })
+
+    it('uses adapter cellIndex over conflicting source occurrence metadata', () => {
+      const adapter = new PdfTranslationAdapter()
+      const block = makeStructuredBlockWithCells('conflicting-indexes', ['A B'], [[
+        { text: 'A', x: 40, y: 200, width: 60, height: 14, sourceItemIndex: 0, index: 0, sourceReferences: { sourceItemIndices: [0] } },
+        { text: 'B', x: 120, y: 200, width: 60, height: 14, sourceItemIndex: 0, index: 0, sourceReferences: { sourceItemIndices: [0] } }
+      ]])
+
+      const items = adapter.toProviderItems([block])
+
+      expect(items.map((item) => item.cellId)).toEqual([
+        'conflicting-indexes|line:0|cell:0',
+        'conflicting-indexes|line:0|cell:1'
+      ])
     })
 
     it('emits per-line items for structured single-item lines', () => {
@@ -336,6 +484,23 @@ describe('PdfTranslationAdapter', () => {
       expect(items).toHaveLength(3)
       expect(items.every((i) => i.isStructured === true)).toBe(true)
       expect(items.every((i) => i.cellIndex == null)).toBe(true)
+      expect(items.map((item) => item.cellId)).toEqual([
+        'sched-2|line:0|item:0',
+        'sched-2|line:1|item:0',
+        'sched-2|line:2|item:0'
+      ])
+    })
+
+    it('preserves deterministic child identities through 24/8 intelligent batches', () => {
+      const adapter = new PdfTranslationAdapter()
+      const lineTexts = Array.from({ length: 4 }, (_, index) => `Row ${index}`)
+      const lineItems = Array.from({ length: 4 }, () => Array.from({ length: 8 }, (_, index) => ({ text: `Cell ${index}`, x: index * 20, y: 200, width: 10, height: 14 })))
+      const items = adapter.toProviderItems([makeStructuredBlockWithCells('table-32', lineTexts, lineItems)])
+      const batches = TranslationBatcher.createIntelligentBatches(items, 24, 5000)
+
+      expect(batches.map((batch) => batch.length)).toEqual([24, 8])
+      expect(batches.flat().map((item) => item.cellId)).toEqual(items.map((item) => item.cellId))
+      expect(new Set(batches.flat().map((item) => item.cellId)).size).toBe(32)
     })
 
     it('returns translatedCells for structured blocks with multi-item lines', () => {
@@ -365,7 +530,11 @@ describe('PdfTranslationAdapter', () => {
       expect(mapped[0].translatedCells).toBeDefined()
       expect(mapped[0].translatedCells).toHaveLength(2)
       expect(mapped[0].translatedCells[0]).toEqual({ lineIndex: 0, cells: ['هدر'] })
-      expect(mapped[0].translatedCells[1]).toEqual({ lineIndex: 1, cells: ['ردیف الف', 'ستون ب'] })
+      expect(mapped[0].translatedCells[1]).toEqual({
+        lineIndex: 1,
+        cells: ['ردیف الف', 'ستون ب'],
+        cellIds: ['sched-3|line:1|cell:0', 'sched-3|line:1|cell:1']
+      })
       expect(mapped[0].translatedText).toBe('هدر\nردیف الف ستون ب')
     })
 
@@ -679,7 +848,11 @@ describe('PdfTranslationAdapter', () => {
       expect(mapped).toHaveLength(1)
       expect(mapped[0].translatedCells).toBeDefined()
       expect(mapped[0].translatedCells).toHaveLength(1)
-      expect(mapped[0].translatedCells[0]).toEqual({ lineIndex: 0, cells: ['هدف', 'هدف سالانه'] })
+      expect(mapped[0].translatedCells[0]).toEqual({
+        lineIndex: 0,
+        cells: ['هدف', 'هدف سالانه'],
+        cellIds: ['tc-2|line:0|cell:0', 'tc-2|line:0|cell:1']
+      })
       expect(mapped[0].translatedText).toBe('هدف هدف سالانه')
     })
 
@@ -836,7 +1009,10 @@ describe('PdfTranslationAdapter', () => {
 
       expect(mapped[0].translatedCells).toBeDefined()
       expect(mapped[0].translatedCells[0].cells).toEqual(['X', 'Y'])
-      expect(mapped[0].translatedCells[0].cellIds).toBeUndefined()
+      expect(mapped[0].translatedCells[0].cellIds).toEqual([
+        'blk-no-meta|line:0|cell:0',
+        'blk-no-meta|line:0|cell:1'
+      ])
       expect(mapped[0].translatedCells[0].columnIndices).toBeUndefined()
     })
 

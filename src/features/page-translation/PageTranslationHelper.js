@@ -1,5 +1,6 @@
 import { PAGE_TRANSLATION_ATTRIBUTES } from './PageTranslationConstants.js';
 import { DOM_FILTERS } from '@/utils/dom/DomFilters.js';
+import { walkOpenShadowTree } from '@/utils/dom/walkOpenShadowTree.js';
 
 /**
  * PageTranslationHelper - Utility methods for whole page translation
@@ -48,17 +49,19 @@ export class PageTranslationHelper {
    * Deeply clean all translation-related markers from the DOM.
    * This is crucial for allowing re-translation and clean restoration.
    */
-  static deepCleanDOM() {
+  static deepCleanDOM(root = document.documentElement) {
     const { TRANSLATED_MARKER, TRANSLATE_DIR, HAS_ORIGINAL } = PAGE_TRANSLATION_ATTRIBUTES;
 
     // 1. Remove our own markers and direction attributes from all elements
     // We do NOT touch 'dir' here because restoreElementDirection (called by bridge.restore)
     // should have already handled it properly using saved original state.
-    const elementsWithMarkers = document.querySelectorAll(`[${TRANSLATED_MARKER}], [${TRANSLATE_DIR}], [${HAS_ORIGINAL}]`);
-    elementsWithMarkers.forEach(el => {
-      el.removeAttribute(TRANSLATED_MARKER);
-      el.removeAttribute(TRANSLATE_DIR);
-      el.removeAttribute(HAS_ORIGINAL);
+    walkOpenShadowTree(root, (element) => {
+      if (!element.hasAttribute(TRANSLATED_MARKER)
+          && !element.hasAttribute(TRANSLATE_DIR)
+          && !element.hasAttribute(HAS_ORIGINAL)) return;
+      element.removeAttribute(TRANSLATED_MARKER);
+      element.removeAttribute(TRANSLATE_DIR);
+      element.removeAttribute(HAS_ORIGINAL);
     });
 
     // 2. Specific reset for common containers (just the markers)

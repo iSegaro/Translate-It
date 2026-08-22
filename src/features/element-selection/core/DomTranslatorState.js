@@ -6,7 +6,7 @@
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { pageEventBus } from '@/core/PageEventBus.js';
-import { restoreElementDirection } from '@/utils/dom/DomDirectionManager.js';
+import { restoreElementDirection, restoreNodeDirectionState } from '@/utils/dom/DomDirectionManager.js';
 import { PAGE_TRANSLATION_ATTRIBUTES } from '@/features/page-translation/PageTranslationConstants.js';
 
 // Global translation state registry to ensure singleton behavior across chunks
@@ -33,6 +33,18 @@ const getGlobalState = () => {
 };
 
 export const globalSelectElementState = getGlobalState();
+
+function restoreMetadataSnapshot(snapshot, logger) {
+  const element = snapshot?.element;
+  if (!element?.isConnected) return;
+
+  try {
+    if (snapshot.present) element.setAttribute(PAGE_TRANSLATION_ATTRIBUTES.HAS_ORIGINAL, snapshot.value);
+    else element.removeAttribute(PAGE_TRANSLATION_ATTRIBUTES.HAS_ORIGINAL);
+  } catch (error) {
+    logger.error('[Rollback] Metadata restoration failed', { element, error });
+  }
+}
 
 /**
  * Get the global Select Element translation state
@@ -86,6 +98,10 @@ export async function revertSelectElementTranslation(targetSessionId = null) {
   const logger = getScopedLogger(LOG_COMPONENTS.ELEMENT_SELECTION, 'GlobalRevert');
   let revertedCount = 0;
 
+  const logRestoreFailure = (phase, error, details = {}) => {
+    logger.error(`[Rollback] ${phase} failed`, { ...details, error });
+  };
+
   try {
     // Process all translations in reverse order (newest first)
     const translationsToRevert = [...globalSelectElementState.translationHistory].reverse();
@@ -105,7 +121,7 @@ export async function revertSelectElementTranslation(targetSessionId = null) {
       }
 
       // Skip if element no longer exists in DOM
-      if (!document.documentElement.contains(element)) {
+      if (!element?.isConnected) {
         logger.debug('Element no longer in DOM, skipping', { tagName: element?.tagName });
         continue;
       }
@@ -113,31 +129,89 @@ export async function revertSelectElementTranslation(targetSessionId = null) {
       // 1. Restore content - SURGICAL RESTORATION ONLY
       if (originalTextNodesData && originalTextNodesData.length > 0) {
         let restoredNodes = 0;
-        originalTextNodesData.forEach(({ node, originalText }) => {
+        for (const { node, originalText } of originalTextNodesData) {
           // Verify the node still exists and is attached to the document
-          if (node && node.parentNode && document.documentElement.contains(node)) {
+          let isAttached = false;
+          try {
+            isAttached = Boolean(node?.isConnected);
+          } catch (error) {
+            logRestoreFailure('Text attachment check', error);
+            continue;
+          }
+
+          if (!isAttached) continue;
+
+          try {
             node.nodeValue = originalText;
             restoredNodes++;
+          } catch (error) {
+            logRestoreFailure('Text restoration', error, { tagName: element?.tagName });
           }
-        });
-        
+        }
+
+        if (restoredNodes === 0) {
+          logger.debug('No valid text nodes found to restore for this element');
+        }
         if (restoredNodes > 0) {
           revertedCount++;
-        } else {
-          logger.debug('No valid text nodes found to restore for this element');
         }
       } else {
         logger.debug('Missing originalTextNodesData for surgical revert. Skipping content restoration.');
       }
 
       // 2. Restore direction and styles
-      if (element) {
-        const attr = PAGE_TRANSLATION_ATTRIBUTES.HAS_ORIGINAL;
-        element.removeAttribute(attr);
-        element.querySelectorAll(`[${attr}]`).forEach(el => el.removeAttribute(attr));
+      if (!element) continue;
 
-        restoreElementDirection(element);
+      if (Array.isArray(translation.originalMetadataSnapshots)) {
+        const restoredMetadataElements = new Set();
+        for (const snapshot of translation.originalMetadataSnapshots) {
+          if (!snapshot?.element || restoredMetadataElements.has(snapshot.element)) continue;
+          restoredMetadataElements.add(snapshot.element);
+          restoreMetadataSnapshot(snapshot, logger);
+        }
+      } else {
+        // Legacy entries predate identity-captured metadata. Keep fallback scoped
+        // to light DOM so it cannot mutate replacement shadow content.
+        const attr = PAGE_TRANSLATION_ATTRIBUTES.HAS_ORIGINAL;
+        const isShadowRootElement = Boolean(element.getRootNode?.()?.host);
+        if (!isShadowRootElement) {
+          try {
+            element.removeAttribute(attr);
+          } catch (error) {
+            logRestoreFailure('Root metadata cleanup', error, { tagName: element.tagName });
+          }
+
+          try {
+            const descendants = element.querySelectorAll(`[${attr}]`);
+            descendants.forEach((descendant) => {
+              try {
+                descendant.removeAttribute(attr);
+              } catch (error) {
+                logRestoreFailure('Descendant metadata cleanup', error, { tagName: descendant?.tagName });
+              }
+            });
+          } catch (error) {
+            logRestoreFailure('Descendant metadata discovery', error, { tagName: element.tagName });
+          }
+        }
+      }
+
+      if (translation.shadowSpanning && Array.isArray(translation.originalDirectionSnapshots)) {
+        const directionSnapshots = translation.originalDirectionSnapshots.filter(snapshot => snapshot?.element?.isConnected);
+        const directionFailures = restoreNodeDirectionState(directionSnapshots) || [];
+        directionFailures.forEach(failure => logRestoreFailure('Direction/style restoration', failure.error, failure));
+      } else {
+        try {
+          restoreElementDirection(element);
+        } catch (error) {
+          logRestoreFailure('Direction/style restoration', error, { tagName: element.tagName });
+        }
+      }
+
+      try {
         pageEventBus.emit('hide-translation', { element });
+      } catch (error) {
+        logRestoreFailure('Hide translation event', error, { tagName: element.tagName });
       }
     }
 

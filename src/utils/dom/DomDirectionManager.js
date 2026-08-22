@@ -14,6 +14,7 @@ import {
   INTERACTIVE_TAGS
 } from './DomTranslatorConstants.js';
 import { LanguageDetectionService } from '@/shared/services/LanguageDetectionService.js';
+import { walkOpenShadowTree } from './walkOpenShadowTree.js';
 
 // --- 1. Core Utilities ---
 
@@ -103,6 +104,42 @@ function isLayoutBarrier(el) {
   return false;
 }
 
+function* iterateDirectionAncestors(start, shadowAware = false) {
+  const seen = new Set();
+  let current = start;
+
+  while (current && !seen.has(current)) {
+    seen.add(current);
+    yield current;
+
+    if (current.parentElement) {
+      current = current.parentElement;
+    } else if (shadowAware) {
+      current = current.getRootNode?.()?.host || null;
+    } else {
+      current = null;
+    }
+  }
+}
+
+function isWithinDirectionRoot(rootElement, candidate, shadowAware) {
+  if (!rootElement) return true;
+  if (!shadowAware) return rootElement.contains(candidate);
+  for (const ancestor of iterateDirectionAncestors(candidate, true)) {
+    if (ancestor === rootElement) return true;
+  }
+  return false;
+}
+
+function crossedShadowBoundary(previous, current, shadowAware) {
+  return Boolean(
+    shadowAware
+    && previous
+    && !previous.parentElement
+    && previous.getRootNode?.()?.host === current
+  );
+}
+
 /**
  * Determines if text alignment should be preserved based on explicit styles.
  */
@@ -162,21 +199,25 @@ function saveOriginalStyles(element) {
 /**
  * Surgical Application: Applies isolated direction to text containers.
  */
-export function applyNodeDirection(textNode, targetLanguage, rootElement = null) {
+export function applyNodeDirection(textNode, targetLanguage, rootElement = null, options = {}) {
   const isTargetRTL = isRTL(targetLanguage);
   const detectedDir = detectDirectionFromContent(textNode.textContent, targetLanguage);
   const targetDir = detectedDir || (isTargetRTL ? 'rtl' : 'ltr');
+  const shadowAware = options.shadowAware === true;
   
-  let container = textNode.parentElement;
   let level = 0;
+  let previous = null;
 
-  while (container && container !== document.body && container !== document.documentElement) {
+  for (const container of iterateDirectionAncestors(textNode.parentElement, shadowAware)) {
+    if (crossedShadowBoundary(previous, container, shadowAware)) break;
+    if (container === document.body || container === document.documentElement) break;
+    if (shadowAware && !isWithinDirectionRoot(rootElement, container, true)) break;
     const tag = container.tagName.toUpperCase();
     const isBlock = BLOCK_TAGS.has(tag);
     
     // Stop if we hit a layout barrier (like a flex row with an avatar)
     // But allow at least 1 level of application to the immediate parent.
-    if (level > 0 && isLayoutBarrier(container)) break;
+    if (level > 0 && isLayoutBarrier(container) && container !== rootElement) break;
     
     const currentAppliedDir = container.getAttribute('data-translate-dir');
 
@@ -209,9 +250,8 @@ export function applyNodeDirection(textNode, targetLanguage, rootElement = null)
 
     // Surgical stops
     if (rootElement && container === rootElement) break;
-    if (rootElement && !rootElement.contains(container)) break;
-    
-    container = container.parentElement;
+    if (rootElement && !shadowAware && !rootElement.contains(container)) break;
+    previous = container;
     level++;
   }
 }
@@ -246,23 +286,29 @@ function captureElementDirectionState(element) {
  * Captures exact direction state touched by applyNodeDirection without mutating DOM.
  * @param {Node} textNode - Text node whose direction path will be applied
  * @param {HTMLElement|null} rootElement - Optional traversal boundary
+ * @param {Object} [options] - Optional traversal behavior
+ * @param {boolean} [options.shadowAware=false] - Cross available ShadowRoot hosts
  * @returns {Object[]} Deduplicated element snapshots
  */
-export function captureNodeDirectionState(textNode, rootElement = null) {
+export function captureNodeDirectionState(textNode, rootElement = null, options = {}) {
   const snapshots = [];
   const seen = new Set();
-  let container = textNode?.parentElement;
+  const shadowAware = options.shadowAware === true;
   let level = 0;
+  let previous = null;
 
-  while (container && container !== document.body && container !== document.documentElement) {
-    if (level > 0 && isLayoutBarrier(container)) break;
+  for (const container of iterateDirectionAncestors(textNode?.parentElement, shadowAware)) {
+    if (crossedShadowBoundary(previous, container, shadowAware)) break;
+    if (container === document.body || container === document.documentElement) break;
+    if (shadowAware && !isWithinDirectionRoot(rootElement, container, true)) break;
+    if (level > 0 && isLayoutBarrier(container) && container !== rootElement) break;
     if (!seen.has(container)) {
       snapshots.push(captureElementDirectionState(container));
       seen.add(container);
     }
     if (rootElement && container === rootElement) break;
-    if (rootElement && !rootElement.contains(container)) break;
-    container = container.parentElement;
+    if (rootElement && !shadowAware && !rootElement.contains(container)) break;
+    previous = container;
     level++;
   }
 
@@ -330,7 +376,7 @@ export function applyElementDirection(element, targetLanguage) {
 /**
  * Reverts CSS direction changes.
  */
-export function restoreElementDirection(element) {
+export function restoreElementDirection(element, options = {}) {
   if (!element || element.nodeType !== Node.ELEMENT_NODE) return;
 
   const restore = (el) => {
@@ -369,8 +415,12 @@ export function restoreElementDirection(element) {
     }
   };
 
-  restore(element);
-  element.querySelectorAll('[data-dir-original-saved]').forEach(restore);
+  if (options.shadowAware) {
+    walkOpenShadowTree(element, restore);
+  } else {
+    restore(element);
+    element.querySelectorAll('[data-dir-original-saved]').forEach(restore);
+  }
   
   let parent = element.parentElement;
   while (parent) {

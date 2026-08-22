@@ -270,6 +270,7 @@
 
 <script setup>
 import { ref, computed, onMounted, onUnmounted } from 'vue';
+import { injectStylesToShadowRoot } from '@/utils/ui/styleInjector.js';
 import { useUnifiedI18n } from '@/composables/shared/useUnifiedI18n';
 import { MessageActions } from '@/shared/messaging/core/MessageActions.js';
 import { getScopedLogger } from '@/shared/logging/logger.js';
@@ -902,8 +903,6 @@ onMounted(async () => {
   // Inject FAB-specific styles lazily into shadow root
   try {
     const { fabUiStyles } = await import('@/core/content-scripts/chunks/lazy-styles.js');
-    const { injectStylesToShadowRoot } = await import('@/utils/ui/styleInjector.js');
-    
     if (fabUiStyles && injectStylesToShadowRoot) {
       injectStylesToShadowRoot(fabUiStyles, 'vue-fab-specific-styles');
     }

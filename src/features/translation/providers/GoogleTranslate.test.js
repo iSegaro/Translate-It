@@ -237,6 +237,7 @@ describe('GoogleTranslateProvider newline chunk isolation', () => {
     });
 
     it('returns translation only when dictionary data is absent', async () => {
+      const options = { providerMetadataRef: { metadata: {} } };
       vi.spyOn(provider, '_executeRequest').mockImplementation(async (opts) =>
         opts.extractResponse({
           sentences: [{ trans: 'translated text' }],
@@ -254,10 +255,12 @@ describe('GoogleTranslateProvider newline chunk isolation', () => {
         1,
         0,
         1,
-        {}
+         options
       );
 
       expect(result).toBe('translated text');
+      expect(options.providerMetadataRef.metadata.detectedLanguage).toBe('en');
+      expect(provider).not.toHaveProperty('lastDetectedLanguage');
     });
 
     it.each([
@@ -268,8 +271,10 @@ describe('GoogleTranslateProvider newline chunk isolation', () => {
     ])('throws API_RESPONSE_INVALID for %s', async (_label, response) => {
       vi.spyOn(provider, '_executeRequest').mockImplementation(async (opts) => opts.extractResponse(response));
 
-      await expect(provider._translateChunk(['source'], 'en', 'fa', 'page', null, 0, 1, 0, 1, {}))
+      const options = { providerMetadataRef: { metadata: {} } };
+      await expect(provider._translateChunk(['source'], 'en', 'fa', 'page', null, 0, 1, 0, 1, options))
         .rejects.toMatchObject({ type: 'API_RESPONSE_INVALID' });
+      expect(options.providerMetadataRef.metadata).toEqual({});
     });
 
     it('accepts valid legacy and source-equal responses', async () => {

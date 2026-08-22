@@ -9,6 +9,7 @@ import { pageEventBus } from '@/core/PageEventBus.js';
 import browser from 'webextension-polyfill';
 
 import { useTranslationStore } from '@/features/translation/stores/translation.js';
+import { getPageTranslationErrorPresentation } from '@/features/page-translation/utils/PageTranslationErrorPresenter.js';
 
 /**
  * Composable for page translation UI
@@ -344,11 +345,14 @@ export function usePageTranslation() {
   /**
    * Handle translation error
    */
-  function handleError(data) {
+  async function handleError(data) {
+    const displayError = await getPageTranslationErrorPresentation(data);
+    if (!displayError) return;
+
     isTranslating.value = false;
     isAutoTranslating.value = false;
-    error.value = data.error;
-    message.value = `Error: ${data.error?.message || data.error}`;
+    error.value = displayError;
+    message.value = `Error: ${displayError.message}`;
   }
 
   /**

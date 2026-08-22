@@ -120,6 +120,10 @@ export async function handleActivateSelectElementMode(message, sender) {
         activated: false,
         error: safeMessage,
         errorType: ErrorTypes.SELECT_ELEMENT,
+        errorDetails: {
+          message: safeMessage,
+          type: ErrorTypes.SELECT_ELEMENT,
+        },
       };
     }
     
@@ -183,6 +187,10 @@ export async function handleActivateSelectElementMode(message, sender) {
         isRestrictedPage: access.isRestricted, // Use actual permission check, not content script's guess
         isCompatibilityIssue: response.isCompatibilityIssue || false,
         errorType: response.errorType || ErrorTypes.SELECT_ELEMENT,
+        errorDetails: {
+          message: safeMessage,
+          type: response.errorType || ErrorTypes.SELECT_ELEMENT,
+        },
         tabUrl: access.fullUrl
       };
     }
@@ -251,6 +259,10 @@ export async function handleActivateSelectElementMode(message, sender) {
       message: safeMessage,
       error: safeMessage,
       errorType: ErrorTypes.SELECT_ELEMENT,
+      errorDetails: {
+        message: safeMessage,
+        type: ErrorTypes.SELECT_ELEMENT,
+      },
     };
     logger.debug('Returning error response:', response);
     return response;

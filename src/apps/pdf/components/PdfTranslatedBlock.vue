@@ -16,7 +16,7 @@
       v-else-if="status === 'error'"
       class="pdf-translated-block__error"
     >
-      {{ translationState.error || 'Translation failed' }}
+      {{ errorMessage }}
     </div>
 
     <div
@@ -36,7 +36,8 @@
 </template>
 
 <script setup>
-import { computed } from 'vue'
+import { computed, ref, watch } from 'vue'
+import { presentPdfTranslationError } from '../presentation/PdfTranslationErrorPresenter.js'
 
 const props = defineProps({
   block: {
@@ -56,6 +57,36 @@ const props = defineProps({
 const status = computed(() => props.translationState.status || 'idle')
 
 const translatedText = computed(() => props.translationState.translatedText || '')
+const errorMessage = ref('')
+let presentationRequestId = 0
+
+watch(
+  () => [
+    props.translationState.status,
+    props.translationState.error,
+    props.translationState.errorDetails,
+    props.translationState.failureReason,
+  ],
+  async () => {
+    const requestId = ++presentationRequestId
+    if (status.value !== 'error') {
+      errorMessage.value = ''
+      return
+    }
+
+    const state = props.translationState
+    errorMessage.value = ''
+    const presentation = await presentPdfTranslationError({ ...state, translationDomain: true })
+    if (requestId !== presentationRequestId) return
+
+    if (presentation.kind === 'display') {
+      errorMessage.value = presentation.message
+    } else if (presentation.kind === 'legacy') {
+      errorMessage.value = state.error || 'Translation failed'
+    }
+  },
+  { immediate: true, deep: true },
+)
 
 const textDirection = computed(() => {
   if (status.value !== 'translated') return undefined

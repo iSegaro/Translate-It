@@ -165,6 +165,8 @@ import { PageTranslationManager } from './PageTranslationManager.js';
 import { PageTranslationHelper } from './PageTranslationHelper.js';
 import { pageEventBus } from '@/core/PageEventBus.js';
 import { MessageActions } from '@/shared/messaging/core/MessageActions.js';
+import { ErrorHandler } from '@/shared/error-management/ErrorHandler.js';
+import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
 
 describe('PageTranslationManager', () => {
   let manager;
@@ -269,13 +271,76 @@ describe('PageTranslationManager', () => {
   });
 
   describe('Error Handling', () => {
-    it('should handle fatal errors by stopping translation', () => {
+    it('should handle fatal errors by stopping translation and presenting safely', async () => {
       const error = new Error('Fatal failure');
-      manager._handleFatalError(error, 'TEST_ERROR');
+      Object.assign(error, {
+        type: ErrorTypes.API_ERROR,
+        originalType: 'HTTP_ERROR',
+        statusCode: 503,
+        providerName: 'Provider',
+        providerId: 'provider-id',
+        code: 'UPSTREAM_FAILURE',
+        errorCode: 'E_UPSTREAM',
+        cause: 'private',
+        arbitrary: { ignored: true }
+      });
+      manager._handleFatalError(error, ErrorTypes.API_ERROR);
       
       expect(manager.isTranslating).toBe(false);
       expect(manager.isAutoTranslating).toBe(false);
       expect(pageEventBus.emit).toHaveBeenCalledWith(MessageActions.PAGE_TRANSLATE_PROGRESS, expect.objectContaining({ status: 'idle' }));
+      expect(pageEventBus.emit).toHaveBeenCalledWith(MessageActions.PAGE_TRANSLATE_ERROR, expect.objectContaining({
+        error: 'Fatal failure',
+         errorType: ErrorTypes.API_ERROR,
+        isFatal: true,
+        errorDetails: expect.objectContaining({
+          message: 'Fatal failure',
+           type: ErrorTypes.API_ERROR,
+          originalType: 'HTTP_ERROR',
+          statusCode: 503,
+          providerName: 'Provider',
+          providerId: 'provider-id',
+          code: 'UPSTREAM_FAILURE',
+          errorCode: 'E_UPSTREAM'
+        })
+      }));
+      const errorEvent = pageEventBus.emit.mock.calls.find(([action]) => action === MessageActions.PAGE_TRANSLATE_ERROR)[1];
+      expect(errorEvent.errorDetails).not.toHaveProperty('cause');
+      expect(errorEvent.errorDetails).not.toHaveProperty('arbitrary');
+
+      await vi.waitFor(() => expect(ErrorHandler.getInstance().handle).toHaveBeenCalledTimes(1));
+      const handledError = ErrorHandler.getInstance().handle.mock.calls[0][0];
+      expect(handledError.message).not.toContain('Fatal failure');
+      expect(handledError.message).not.toContain('private');
+      expect(ErrorHandler.getInstance().handle.mock.calls[0][1]).toMatchObject({
+        type: ErrorTypes.API_ERROR,
+        context: 'page-translation-fatal',
+        showToast: true,
+      });
+    });
+
+    it('does not present cancellation or context fatal errors', async () => {
+      manager._handleFatalError(Object.assign(new Error('cancelled'), {
+        type: ErrorTypes.USER_CANCELLED,
+      }), ErrorTypes.USER_CANCELLED);
+      manager._handleFatalError(Object.assign(new Error('context lost'), {
+        type: ErrorTypes.EXTENSION_CONTEXT_INVALIDATED,
+      }), ErrorTypes.EXTENSION_CONTEXT_INVALIDATED);
+
+      await Promise.resolve();
+      expect(ErrorHandler.getInstance().handle).not.toHaveBeenCalled();
+    });
+
+    it('preserves local restore failure behavior outside translation presentation', async () => {
+      const error = new Error('local restore failure');
+      manager.bridge.restore.mockImplementationOnce(() => { throw error; });
+
+      await expect(manager.restorePage()).rejects.toBe(error);
+      expect(ErrorHandler.getInstance().handle).not.toHaveBeenCalled();
+      expect(pageEventBus.emit).toHaveBeenCalledWith(MessageActions.PAGE_RESTORE_ERROR, {
+        error: error.message,
+        errorDetails: expect.objectContaining({ message: error.message }),
+      });
     });
   });
 

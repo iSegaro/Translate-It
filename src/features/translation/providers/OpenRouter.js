@@ -95,7 +95,8 @@ export class OpenRouterProvider extends BaseAIProvider {
         messages: messages,
         max_tokens: 4096,
         // Enforce JSON Mode if requested
-        ...(expectedFormat === ResponseFormat.JSON_OBJECT && { response_format: { type: "json_object" } })
+        ...((expectedFormat === ResponseFormat.JSON_OBJECT || expectedFormat === ResponseFormat.JSON_ARRAY)
+          && { response_format: { type: "json_object" } })
       }),
     };
 

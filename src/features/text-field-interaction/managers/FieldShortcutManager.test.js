@@ -17,8 +17,16 @@ vi.mock('webextension-polyfill', () => ({
   }
 }));
 
-const { mockSendMessage } = vi.hoisted(() => ({
-  mockSendMessage: vi.fn(() => Promise.resolve({ success: true }))
+const {
+  mockTranslateFieldViaSmartHandler,
+  mockIsFieldTranslationRequestError,
+  mockGetFieldTranslationErrorPresentation,
+  errorHandler,
+} = vi.hoisted(() => ({
+  mockTranslateFieldViaSmartHandler: vi.fn(() => Promise.resolve()),
+  mockIsFieldTranslationRequestError: vi.fn(() => false),
+  mockGetFieldTranslationErrorPresentation: vi.fn(),
+  errorHandler: { handle: vi.fn(() => Promise.resolve()) },
 }));
 
 // Mock dependencies
@@ -32,8 +40,11 @@ vi.mock('@/shared/logging/logger.js', () => ({
   }))
 }));
 
-vi.mock('@/shared/error-management/ErrorHandler.js');
-vi.mock('@/shared/error-management/ErrorTypes.js');
+vi.mock('@/shared/error-management/ErrorHandler.js', () => ({
+  ErrorHandler: {
+    getInstance: vi.fn(() => errorHandler),
+  },
+}));
 
 vi.mock('@/shared/managers/SettingsManager.js', () => ({
   settingsManager: {
@@ -47,27 +58,21 @@ vi.mock('@/shared/managers/SettingsManager.js', () => ({
   }
 }));
 
-vi.mock('@/shared/messaging/core/UnifiedMessaging.js', () => ({
-  sendMessage: mockSendMessage
+vi.mock('@/handlers/smartTranslationIntegration.js', () => ({
+  translateFieldViaSmartHandler: mockTranslateFieldViaSmartHandler
 }));
 
-vi.mock('@/shared/messaging/core/MessagingCore.js', () => ({
-  MessageFormat: {
-    create: vi.fn((action, data) => ({ action, data }))
-  },
-  MessagingContexts: { CONTENT: 'content' }
+vi.mock('@/handlers/smart-translation/translationErrorOwnership.js', () => ({
+  isFieldTranslationRequestError: mockIsFieldTranslationRequestError,
+}));
+
+vi.mock('@/features/text-field-interaction/utils/FieldTranslationErrorPresenter.js', () => ({
+  getFieldTranslationErrorPresentation: mockGetFieldTranslationErrorPresentation,
 }));
 
 vi.mock('@/shared/constants/detection.js', () => ({
   INPUT_TYPES: {
     ALL_TEXT_FIELDS: ['text', 'search', 'tel', 'url', 'email', 'password', 'number']
-  }
-}));
-
-vi.mock('@/shared/config/config.js', () => ({
-  getEffectiveProviderAsync: vi.fn(() => Promise.resolve('google')),
-  TranslationMode: {
-    Field: 'field'
   }
 }));
 
@@ -79,6 +84,9 @@ describe('FieldShortcutManager', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    mockTranslateFieldViaSmartHandler.mockResolvedValue(undefined);
+    mockIsFieldTranslationRequestError.mockReturnValue(false);
+    mockGetFieldTranslationErrorPresentation.mockResolvedValue(null);
     
     // Re-apply default mock implementations
     vi.mocked(settingsManager.get).mockImplementation((key, def) => {
@@ -285,7 +293,7 @@ describe('FieldShortcutManager', () => {
   });
 
   describe('execute', () => {
-    it('should send translation message and return success', async () => {
+    it('should use Smart Translation and return success', async () => {
       const el = document.createElement('textarea');
       el.value = 'hello';
       document.body.appendChild(el);
@@ -295,40 +303,143 @@ describe('FieldShortcutManager', () => {
       
       expect(result.success).toBe(true);
       expect(result.type).toBe('ctrl-slash');
-      expect(mockSendMessage).toHaveBeenCalled();
+      expect(mockTranslateFieldViaSmartHandler).toHaveBeenCalledWith({
+        text: 'hello',
+        target: el
+      });
+      expect(errorHandler.handle).not.toHaveBeenCalled();
       
       document.body.removeChild(el);
     });
 
-    it('should return failure if sendMessage fails', async () => {
+    it('presents marked request failures with safe message and canonical type', async () => {
       const el = document.createElement('textarea');
       el.value = 'hello';
       document.body.appendChild(el);
       el.focus();
 
-      mockSendMessage.mockResolvedValueOnce({ success: false, error: 'API Error' });
+      const rawError = Object.assign(new Error('raw provider setup details'), { type: 'API_CONFIG_INVALID' });
+      const displayError = Object.assign(new Error('safe localized setup message'), { type: 'DISPLAY_TYPE' });
+      mockIsFieldTranslationRequestError.mockReturnValue(true);
+      mockGetFieldTranslationErrorPresentation.mockResolvedValue({
+        canonicalError: rawError,
+        displayError,
+        canonicalType: 'API_CONFIG_INVALID',
+      });
+      mockTranslateFieldViaSmartHandler.mockRejectedValueOnce(rawError);
 
       const result = await manager.execute();
       
       expect(result.success).toBe(false);
-      expect(result.error).toBe('API Error');
+      expect(result.error).toBe('safe localized setup message');
+      expect(result.error).not.toContain('raw provider setup details');
+      expect(mockGetFieldTranslationErrorPresentation).toHaveBeenCalledWith(rawError);
+      expect(errorHandler.handle).toHaveBeenCalledTimes(1);
+      expect(errorHandler.handle).toHaveBeenCalledWith(displayError, {
+        context: 'ctrl-slash-shortcut',
+        showToast: true,
+        type: 'API_CONFIG_INVALID',
+      });
+      expect(errorHandler.handle.mock.calls[0][0]).not.toBe(rawError);
       
       document.body.removeChild(el);
     });
 
-    it('should handle exceptions and return failure', async () => {
+    it.each([
+      'API_ERROR',
+      'HTTP_ERROR',
+      'NETWORK_ERROR',
+      'SERVER_ERROR',
+      'TRANSLATION_TIMEOUT',
+      'API_RESPONSE_INVALID',
+      'JSON_PARSING_ERROR',
+      'MODEL_MISSING',
+      'API_KEY_INVALID',
+      'RATE_LIMIT_REACHED',
+      'CIRCUIT_BREAKER_OPEN',
+      'UNKNOWN_REQUEST_ERROR',
+    ])('keeps raw %s details out of marked failure output', async (type) => {
       const el = document.createElement('textarea');
       el.value = 'hello';
       document.body.appendChild(el);
       el.focus();
 
-      mockSendMessage.mockRejectedValueOnce(new Error('Network Error'));
+      const rawMessage = `raw ${type} provider details`;
+      const rawError = Object.assign(new Error(rawMessage), { type });
+      const displayError = new Error(`safe ${type} message`);
+      mockIsFieldTranslationRequestError.mockReturnValue(true);
+      mockGetFieldTranslationErrorPresentation.mockResolvedValue({
+        canonicalError: rawError,
+        displayError,
+        canonicalType: type,
+      });
+      mockTranslateFieldViaSmartHandler.mockRejectedValueOnce(rawError);
 
       const result = await manager.execute();
       
       expect(result.success).toBe(false);
-      expect(result.error).toBe('Network Error');
+      expect(result.error).toBe(`safe ${type} message`);
+      expect(result.error).not.toContain(rawMessage);
+      expect(errorHandler).toBeDefined();
+      expect(errorHandler.handle).toHaveBeenCalledWith(displayError, {
+        context: 'ctrl-slash-shortcut',
+        showToast: true,
+        type,
+      });
       
+      document.body.removeChild(el);
+    });
+
+    it('does not present unmarked Field-owned errors', async () => {
+      const el = document.createElement('textarea');
+      el.value = 'hello';
+      document.body.appendChild(el);
+      el.focus();
+
+      const fieldError = new Error('DOM mutation failed');
+      mockTranslateFieldViaSmartHandler.mockRejectedValueOnce(fieldError);
+
+      const result = await manager.execute();
+
+      expect(result).toEqual({
+        success: false,
+        error: 'DOM mutation failed',
+        type: 'ctrl-slash',
+      });
+      expect(mockGetFieldTranslationErrorPresentation).not.toHaveBeenCalled();
+      expect(errorHandler.handle).toHaveBeenCalledWith(fieldError, {
+        type: 'TRANSLATION_FAILED',
+        context: 'ctrl-slash-shortcut',
+        showToast: true,
+      });
+
+      document.body.removeChild(el);
+    });
+
+    it.each([
+      { type: 'USER_CANCELLED', message: 'cancelled by user' },
+      { type: 'TRANSLATION_CANCELLED', message: 'translation cancelled' },
+      { type: 'CONTEXT', message: 'context invalidated' },
+      { type: 'EXTENSION_CONTEXT_INVALIDATED', message: 'extension context invalidated' },
+    ])('keeps $type failures silent', async (details) => {
+      const el = document.createElement('textarea');
+      el.value = 'hello';
+      document.body.appendChild(el);
+      el.focus();
+
+      const cancellation = Object.assign(new Error(details.message), details);
+      mockTranslateFieldViaSmartHandler.mockRejectedValueOnce(cancellation);
+
+      const result = await manager.execute();
+
+      expect(result).toEqual({
+        success: false,
+        error: details.message,
+        type: 'ctrl-slash',
+      });
+      expect(mockGetFieldTranslationErrorPresentation).not.toHaveBeenCalled();
+      expect(errorHandler.handle).not.toHaveBeenCalled();
+
       document.body.removeChild(el);
     });
   });

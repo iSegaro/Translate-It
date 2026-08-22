@@ -59,6 +59,7 @@ import BaseSelect from '@/components/base/BaseSelect.vue'
 import ApiKeyInput from './ApiKeyInput.vue'
 import { useRTLSelect } from '@/composables/ui/useRTLSelect.js'
 import { ApiKeyManager } from '@/features/translation/providers/ApiKeyManager.js'
+import { presentProviderSettingsError } from '@/features/settings/presentation/ProviderSettingsErrorPresenter.js'
 
 const { t } = useI18n()
 const { rtlSelectStyle } = useRTLSelect()
@@ -145,8 +146,7 @@ const testKeys = async (providerName) => {
   } catch (error) {
     testResult.value = {
       allInvalid: true,
-      messageKey: 'api_test_failed',
-      params: { error: error.message }
+      ...presentProviderSettingsError(error)
     }
   } finally {
     testingKeys.value = false

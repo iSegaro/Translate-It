@@ -6,9 +6,10 @@ import { isValidSync, isContextError } from '@/core/contextCore.js';
 import { handleContextError } from '@/core/contextErrorHandler.js';
 import { unifiedTranslationCoordinator } from './UnifiedTranslationCoordinator.js';
 import { streamingTimeoutManager } from './StreamingTimeoutManager.js';
-import { isFatalError, matchErrorToType, isSilentError } from '@/shared/error-management/ErrorMatcher.js';
+import { isCancellationError, isFatalError, matchErrorToType, isSilentError } from '@/shared/error-management/ErrorMatcher.js';
 import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
 import { isRestrictedUrl } from '@/core/tabPermissions.js';
+import { reconstructTranslationError, isStructuredTranslationError } from './MessagingCore.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.MESSAGING, 'UnifiedMessaging');
 
@@ -93,6 +94,66 @@ function createTimeout(ms, action) {
   };
 }
 
+function getFailureMessage(response, responseError) {
+  if (responseError && typeof responseError === 'object') {
+    if (typeof responseError.message === 'string') return responseError.message;
+
+    return responseError.error
+      || responseError.statusText
+      || responseError.reason
+      || response.message
+      || response.statusText
+      || 'Unknown technical error';
+  }
+
+  return responseError
+    || response.message
+    || response.statusText
+    || 'Unknown technical error';
+}
+
+function reconstructResponseError(response) {
+  const responseError = response.error;
+  const canonicalError = isStructuredTranslationError(response.errorDetails)
+    ? response.errorDetails
+    : responseError;
+  const message = getFailureMessage(response, canonicalError);
+
+  if (!canonicalError || typeof canonicalError !== 'object') {
+    return reconstructTranslationError(message);
+  }
+
+  return reconstructTranslationError({
+    message,
+    type: canonicalError.type,
+    originalType: canonicalError.originalType,
+    statusCode: canonicalError.statusCode,
+    context: canonicalError.context,
+    providerName: canonicalError.providerName,
+    providerId: canonicalError.providerId,
+    code: canonicalError.code,
+    errorCode: canonicalError.errorCode,
+    translationOutcome: canonicalError.translationOutcome
+  });
+}
+
+function getLifecycleTerminalError(messageId) {
+  const state = streamingTimeoutManager.getOperationState(messageId);
+  if (state?.isCancelled) {
+    const cancelError = new Error(ErrorTypes.USER_CANCELLED);
+    cancelError.type = ErrorTypes.USER_CANCELLED;
+    return cancelError;
+  }
+
+  if (state?.hasTimedOut) {
+    const timeoutError = new Error(ErrorTypes.TRANSLATION_TIMEOUT);
+    timeoutError.type = ErrorTypes.TRANSLATION_TIMEOUT;
+    return timeoutError;
+  }
+
+  return null;
+}
+
 export async function sendMessage(message, options = {}) {
   const { forceRegular = false } = options;
   if (!message) return null;
@@ -101,10 +162,20 @@ export async function sendMessage(message, options = {}) {
     try {
       return await unifiedTranslationCoordinator.coordinateTranslation(message, options);
     } catch (error) {
+      const errorType = matchErrorToType(error);
       if (isFatalError(error)) throw error;
+      if (isCancellationError(error)) throw error;
+      if ([
+        ErrorTypes.SERVER_ERROR,
+        ErrorTypes.CIRCUIT_BREAKER_OPEN,
+        ErrorTypes.RATE_LIMIT_REACHED,
+      ].includes(errorType)) {
+        throw error;
+      }
       
-      const isStreamingTimeout = error.message && typeof error.message === 'string' && error.message.includes('timed out');
-      if (isStreamingTimeout && message.messageId && !String(message.messageId).startsWith('fallback-')) {
+      const isTimeout = errorType === ErrorTypes.TRANSLATION_TIMEOUT
+        || errorType === ErrorTypes.OPERATION_TIMEOUT;
+      if (isTimeout && message.messageId && !String(message.messageId).startsWith('fallback-')) {
         try {
           const checkResponse = await browser.runtime.sendMessage({
             action: 'CHECK_TRANSLATION_STATUS',
@@ -112,10 +183,6 @@ export async function sendMessage(message, options = {}) {
           });
           if (checkResponse && checkResponse.completed) return checkResponse.results;
         } catch { /* ignore */ }
-      }
-
-      if (message.messageId && streamingTimeoutManager.shouldContinue(message.messageId) === false) {
-        throw new Error('Translation cancelled by user');
       }
 
       const fallbackMessage = {
@@ -143,9 +210,8 @@ export async function sendRegularMessage(message, options = {}) {
     }
 
     if (message.messageId && streamingTimeoutManager.shouldContinue(message.messageId) === false) {
-      const cancelError = new Error(ErrorTypes.USER_CANCELLED);
-      cancelError.type = ErrorTypes.USER_CANCELLED;
-      throw cancelError;
+      const lifecycleError = getLifecycleTerminalError(message.messageId);
+      if (lifecycleError) throw lifecycleError;
     }
 
     const sendPromise = browser.runtime.sendMessage(message);
@@ -155,10 +221,11 @@ export async function sendRegularMessage(message, options = {}) {
     const cancellationPromise = new Promise((_, reject) => {
       cancellationInterval = setInterval(() => {
         if (message.messageId && streamingTimeoutManager.shouldContinue(message.messageId) === false) {
-          if (cancellationInterval) clearInterval(cancellationInterval);
-          const cancelError = new Error(ErrorTypes.USER_CANCELLED);
-          cancelError.type = ErrorTypes.USER_CANCELLED;
-          reject(cancelError);
+          const lifecycleError = getLifecycleTerminalError(message.messageId);
+          if (lifecycleError) {
+            if (cancellationInterval) clearInterval(cancellationInterval);
+            reject(lifecycleError);
+          }
         } else if (typeof window !== 'undefined' && window.selectElementHandlingESC === true) {
           if (cancellationInterval) clearInterval(cancellationInterval);
           const cancelError = new Error('Translation cancelled by user ESC');
@@ -185,55 +252,7 @@ export async function sendRegularMessage(message, options = {}) {
         return response;
       }
 
-      // Safe error extraction
-      let errorMessage = '';
-      if (response.error) {
-        if (typeof response.error === 'string') {
-          errorMessage = response.error;
-        } else if (typeof response.error === 'object') {
-          // Try to find the most descriptive error message in common fields
-          errorMessage = response.error.message || 
-                         response.error.error || 
-                         response.error.statusText ||
-                         response.error.reason ||
-                         response.message || 
-                         response.statusText;
-          
-          // If still no message but it's an object, try to stringify it (excluding large partial results)
-          if (!errorMessage && response.error !== null) {
-            try {
-              const cleanError = { ...response.error };
-              delete cleanError.partialResults;
-              errorMessage = JSON.stringify(cleanError);
-              if (errorMessage === '{}') errorMessage = '';
-            } catch {
-              errorMessage = '';
-            }
-          }
-        }
-      } else if (response.message) {
-        errorMessage = response.message;
-      }
-      
-      if (!errorMessage) {
-        errorMessage = (response.error && typeof response.error.toString === 'function' && response.error.toString() !== '[object Object]') 
-                        ? response.error.toString() 
-                        : 'Unknown technical error';
-      }
-      
-      const error = new Error(String(errorMessage));
-
-      // Safe property copy
-      if (response.error && typeof response.error === 'object') {
-        Object.keys(response.error).forEach(key => {
-          if (key !== 'partialResults') error[key] = response.error[key];
-        });
-      }
-      Object.keys(response).forEach(key => {
-        if (key !== 'partialResults' && key !== 'error') error[key] = response[key];
-      });
-
-      throw error;
+      throw reconstructResponseError(response);
     }
 
     return response;

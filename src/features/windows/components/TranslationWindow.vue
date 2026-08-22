@@ -104,6 +104,7 @@
 
 <script setup>
 import { ref, computed, onMounted, onUnmounted, watch, nextTick } from 'vue';
+import { injectStylesToShadowRoot } from '@/utils/ui/styleInjector.js';
 import { pageEventBus, WINDOWS_MANAGER_EVENTS } from '@/core/PageEventBus.js';
 import { useUnifiedI18n } from '@/composables/shared/useUnifiedI18n.js';
 import { usePositioning } from '@/composables/ui/usePositioning.js';
@@ -399,8 +400,6 @@ onMounted(async () => {
   // Inject Windows-specific styles lazily
   try {
     const { windowsUiStyles } = await import('@/core/content-scripts/chunks/lazy-styles.js');
-    const { injectStylesToShadowRoot } = await import('@/utils/ui/styleInjector.js');
-    
     if (windowsUiStyles && injectStylesToShadowRoot) {
       injectStylesToShadowRoot(windowsUiStyles, 'vue-windows-specific-styles');
     }

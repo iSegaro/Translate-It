@@ -1,4 +1,13 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
+
+const loggerMock = vi.hoisted(() => ({
+  init: vi.fn(),
+  debug: vi.fn(),
+  info: vi.fn(),
+  warn: vi.fn(),
+  error: vi.fn(),
+}));
 
 // Mock extension polyfill
 vi.mock('webextension-polyfill', () => ({
@@ -10,18 +19,11 @@ vi.mock('webextension-polyfill', () => ({
 
 // Mock logger
 vi.mock('@/shared/logging/logger.js', () => ({
-  getScopedLogger: () => ({
-    init: vi.fn(),
-    debug: vi.fn(),
-    info: vi.fn(),
-    warn: vi.fn(),
-    error: vi.fn()
-  })
+  getScopedLogger: () => loggerMock,
 }));
 
 describe('QueueManager', () => {
   let queueManager;
-  let ErrorTypes;
 
   const createDeferred = () => {
     let resolve;
@@ -41,9 +43,6 @@ describe('QueueManager', () => {
     
     const mod = await import('./QueueManager.js');
     queueManager = mod.queueManager;
-    
-    const errMod = await import('@/shared/error-management/ErrorTypes.js');
-    ErrorTypes = errMod.ErrorTypes;
     
     vi.spyOn(Math, 'random').mockReturnValue(0.5); // Predictable jitter (0.75x)
   });
@@ -96,9 +95,87 @@ describe('QueueManager', () => {
   });
 
   describe('Retry Logic', () => {
+    it('does not claim a strategy denominator for initial processing', async () => {
+      const request = vi.fn().mockResolvedValue('Success');
+      const promise = queueManager.enqueue('initial-attempt-provider', request);
+
+      await vi.advanceTimersByTimeAsync(150);
+      await promise;
+
+      const processingLog = loggerMock.debug.mock.calls.find(([message]) => (
+        message.startsWith('Processing item initial-attempt-provider-')
+      ));
+      expect(processingLog?.[0]).toMatch(/\(attempt 1\)$/);
+      expect(processingLog?.[0]).not.toContain('attempt 1/');
+    });
+
+    it('logs retry scheduling as the next execution attempt', async () => {
+      const networkError = { type: ErrorTypes.NETWORK_ERROR, message: 'network failure' };
+      const executionContext = { operation: { appendDiagnostic: vi.fn() } };
+      const request = vi.fn()
+        .mockRejectedValueOnce(networkError)
+        .mockResolvedValueOnce('Success');
+      const promise = queueManager.enqueue('single-retry-observability-provider', request, 0, 'context', { executionContext });
+
+      await vi.advanceTimersByTimeAsync(150);
+      await vi.advanceTimersByTimeAsync(2000);
+      await promise;
+
+      const processingLogs = loggerMock.debug.mock.calls
+        .filter(([message]) => message.startsWith('Processing item single-retry-observability-provider-'))
+        .map(([message]) => message);
+      const retryLog = loggerMock.warn.mock.calls
+        .find(([message]) => message.startsWith('Item single-retry-observability-provider-'));
+
+      expect(processingLogs[0]).toMatch(/\(attempt 1\)$/);
+      expect(processingLogs[1]).toMatch(/\(attempt 2\/4\)$/);
+      expect(retryLog?.[0]).toMatch(/next attempt 2\/4/);
+      expect(executionContext.operation.appendDiagnostic).toHaveBeenCalledWith(expect.objectContaining({
+        type: 'QUEUE_RETRY',
+        attempt: 1,
+      }));
+      expect(request).toHaveBeenCalledTimes(2);
+    });
+
+    it('uses current strategy denominator when error type changes', async () => {
+      const networkError = { type: ErrorTypes.NETWORK_ERROR, message: 'network failure' };
+      const serverError = { type: ErrorTypes.SERVER_ERROR, message: 'server failure' };
+      const request = vi.fn()
+        .mockRejectedValueOnce(networkError)
+        .mockRejectedValueOnce(serverError)
+        .mockResolvedValueOnce('Success');
+      const promise = queueManager.enqueue('mixed-retry-observability-provider', request);
+      const outcome = promise.then(
+        value => ({ value }),
+        error => ({ error }),
+      );
+
+      await vi.advanceTimersByTimeAsync(150);
+      await vi.advanceTimersByTimeAsync(10000);
+      await vi.advanceTimersByTimeAsync(10000);
+      await expect(outcome).resolves.toEqual({ value: 'Success' });
+
+      const processingLogs = loggerMock.debug.mock.calls
+        .filter(([message]) => message.startsWith('Processing item mixed-retry-observability-provider-'))
+        .map(([message]) => message);
+      const retryLogs = loggerMock.warn.mock.calls
+        .filter(([message]) => message.startsWith('Item mixed-retry-observability-provider-'))
+        .map(([message]) => message);
+
+      expect(processingLogs).toHaveLength(3);
+      expect(processingLogs[0]).toMatch(/\(attempt 1\)$/);
+      expect(processingLogs[1]).toMatch(/\(attempt 2\/4\)$/);
+      expect(processingLogs[2]).toMatch(/\(attempt 3\/3\)$/);
+      expect(retryLogs).toEqual([
+        expect.stringMatching(/next attempt 2\/4/),
+        expect.stringMatching(/next attempt 3\/3/),
+      ]);
+      expect(request).toHaveBeenCalledTimes(3);
+    });
+
     it('should retry a failed request with exponential backoff', async () => {
       // RATE_LIMIT_REACHED: baseDelay 2000. Jittered (0.75x) = 1500ms.
-      const mockError = { type: ErrorTypes.RATE_LIMIT_REACHED, message: 'Rate limit' };
+      const mockError = { type: ErrorTypes.RATE_LIMIT_REACHED, statusCode: 429, message: 'Rate limit' };
       
       const mockRequest = vi.fn()
         .mockRejectedValueOnce(mockError)
@@ -123,6 +200,61 @@ describe('QueueManager', () => {
       expect(result).toBe('Success');
     });
 
+    it('does not start a scheduled retry after operation abort', async () => {
+      const abortController = new AbortController();
+      const serverError = Object.assign(new Error('HTTP 500'), {
+        type: ErrorTypes.SERVER_ERROR,
+        statusCode: 500,
+      });
+      const request = vi.fn().mockRejectedValue(serverError);
+      const promise = queueManager.enqueue('aborted-operation-provider', request, 0, 'select_element', {
+        messageId: 'aborted-operation',
+        abortController,
+      });
+      promise.catch(() => {});
+
+      await vi.advanceTimersByTimeAsync(150);
+      expect(request).toHaveBeenCalledTimes(1);
+      expect(queueManager.retryTimeouts.size).toBe(1);
+
+      abortController.abort('provider-fail-fast');
+      await vi.advanceTimersByTimeAsync(10000);
+
+      expect(request).toHaveBeenCalledTimes(1);
+      expect(queueManager.retryTimeouts.size).toBe(0);
+      await expect(promise).rejects.toMatchObject({
+        operationAborted: true,
+        cancellationReason: 'operation-abort',
+      });
+    });
+
+    it('detaches root circuit item before fail-fast abort reaches its signal', async () => {
+      const abortController = new AbortController();
+      const circuitError = Object.assign(new Error('Circuit open'), {
+        type: ErrorTypes.CIRCUIT_BREAKER_OPEN,
+        originalType: ErrorTypes.SERVER_ERROR,
+        statusCode: 500,
+      });
+      const request = vi.fn().mockRejectedValue(circuitError);
+      const promise = queueManager.enqueue('root-circuit-provider', request, 0, 'select_element', {
+        messageId: 'root-circuit-operation',
+        abortController,
+      });
+
+      const rejection = await promise.catch((error) => error);
+      expect(rejection).toMatchObject({
+        type: ErrorTypes.CIRCUIT_BREAKER_OPEN,
+        originalType: ErrorTypes.SERVER_ERROR,
+        statusCode: 500,
+      });
+
+      abortController.abort('provider-fail-fast');
+
+      expect(rejection).not.toHaveProperty('operationAborted');
+      expect(queueManager.retryTimeouts.size).toBe(0);
+      expect(request).toHaveBeenCalledTimes(1);
+    });
+
     it('should fail permanently after max retries', async () => {
       const mockError = new Error('Network');
       mockError.type = ErrorTypes.NETWORK_ERROR;
@@ -141,6 +273,102 @@ describe('QueueManager', () => {
 
       await expect(promise).rejects.toThrow('Network');
       expect(mockRequest).toHaveBeenCalledTimes(4);
+    });
+
+    it.each([
+      ['mixed network/server', () => [
+        Object.assign(new Error('Failed to fetch'), { type: ErrorTypes.NETWORK_ERROR }),
+        Object.assign(new Error('HTTP 500'), { type: ErrorTypes.SERVER_ERROR, statusCode: 500 }),
+        Object.assign(new Error('Circuit open'), {
+          type: ErrorTypes.CIRCUIT_BREAKER_OPEN,
+          originalType: ErrorTypes.SERVER_ERROR,
+          statusCode: 500,
+        }),
+      ], ErrorTypes.CIRCUIT_BREAKER_OPEN, ErrorTypes.SERVER_ERROR, 500],
+      ['pure network', () => [
+        Object.assign(new Error('Failed to fetch'), { type: ErrorTypes.NETWORK_ERROR }),
+        Object.assign(new Error('Failed to fetch'), { type: ErrorTypes.NETWORK_ERROR }),
+        Object.assign(new Error('Circuit open'), {
+          type: ErrorTypes.CIRCUIT_BREAKER_OPEN,
+          originalType: ErrorTypes.NETWORK_ERROR,
+        }),
+      ], ErrorTypes.CIRCUIT_BREAKER_OPEN, ErrorTypes.NETWORK_ERROR, undefined],
+      ['pure server', () => [
+        Object.assign(new Error('HTTP 500'), { type: ErrorTypes.SERVER_ERROR, statusCode: 500 }),
+        Object.assign(new Error('HTTP 500'), { type: ErrorTypes.SERVER_ERROR, statusCode: 500 }),
+        Object.assign(new Error('Circuit open'), {
+          type: ErrorTypes.CIRCUIT_BREAKER_OPEN,
+          originalType: ErrorTypes.SERVER_ERROR,
+          statusCode: 500,
+        }),
+      ], ErrorTypes.CIRCUIT_BREAKER_OPEN, ErrorTypes.SERVER_ERROR, 500],
+    ])('preserves operational circuit identity for %s', async (_label, createErrors, expectedType, expectedOriginalType, expectedStatus) => {
+      const errors = createErrors();
+      const request = vi.fn()
+        .mockRejectedValueOnce(errors[0])
+        .mockRejectedValueOnce(errors[1])
+        .mockRejectedValueOnce(errors[2]);
+      const promise = queueManager.enqueue('terminal-cause-provider', request);
+      const rejection = promise.catch(error => error);
+
+      await vi.advanceTimersByTimeAsync(10000);
+      const terminalError = await rejection;
+      expect(terminalError).toMatchObject({ type: expectedType, originalType: expectedOriginalType });
+      expect(terminalError).not.toBe(errors[0]);
+      if (expectedStatus === undefined) {
+        expect(terminalError).not.toHaveProperty('statusCode');
+      } else {
+        expect(terminalError).toMatchObject({ statusCode: expectedStatus });
+      }
+      expect(request).toHaveBeenCalledTimes(3);
+
+      if (_label === 'mixed network/server') {
+        const { mapCanonicalTranslationError } = await import('@/shared/error-management/PublicTranslationErrorPolicy.js');
+        expect(mapCanonicalTranslationError(terminalError)).toMatchObject({
+          type: 'PROVIDER_TEMPORARILY_UNAVAILABLE',
+          messageKey: 'ERRORS_CIRCUIT_BREAKER_OPEN',
+        });
+      }
+    });
+
+    it('returns non-circuit SERVER_ERROR unchanged after bounded retries', async () => {
+      const serverError = Object.assign(new Error('HTTP 500'), {
+        type: ErrorTypes.SERVER_ERROR,
+        statusCode: 500,
+      });
+      const request = vi.fn().mockRejectedValue(serverError);
+      const promise = queueManager.enqueue('server-only-provider', request);
+      const rejection = expect(promise).rejects.toBe(serverError);
+
+      await vi.advanceTimersByTimeAsync(10000);
+
+      await rejection;
+      expect(request).toHaveBeenCalledTimes(3);
+    });
+
+    it('preserves HTTP 402 semantic type on permanent failure', async () => {
+      const paymentError = Object.assign(new Error('HTTP 402'), {
+        type: ErrorTypes.INSUFFICIENT_BALANCE,
+        statusCode: 402,
+      });
+      const request = vi.fn().mockRejectedValue(paymentError);
+      const promise = queueManager.enqueue('payment-provider', request);
+
+      await expect(promise).rejects.toBe(paymentError);
+      expect(request).toHaveBeenCalledTimes(1);
+    });
+
+    it('does not retry insufficient balance when status is 429', async () => {
+      const paymentError = Object.assign(new Error('No credits remaining'), {
+        type: ErrorTypes.INSUFFICIENT_BALANCE,
+        statusCode: 429,
+      });
+      const request = vi.fn().mockRejectedValue(paymentError);
+      const promise = queueManager.enqueue('quota-provider', request);
+
+      await expect(promise).rejects.toBe(paymentError);
+      expect(request).toHaveBeenCalledTimes(1);
+      expect(queueManager.retryTimeouts.size).toBe(0);
     });
   });
 

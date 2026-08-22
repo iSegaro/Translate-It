@@ -15,9 +15,9 @@ describe('DeepLTranslateProvider response contract', () => {
     vi.spyOn(provider, '_getConfig').mockResolvedValue({ apiKey: 'key', apiUrl: 'https://api.deepl.test' });
   });
 
-  const translate = async (response, texts = ['source']) => {
+  const translate = async (response, texts = ['source'], options = {}) => {
     vi.spyOn(provider, '_executeRequest').mockImplementation(async (options) => options.extractResponse(response));
-    return provider._translateChunk(texts, 'en', 'fa', 'selection', null, 0, texts.length, 0, 1, {});
+    return provider._translateChunk(texts, 'en', 'fa', 'selection', null, 0, texts.length, 0, 1, options);
   };
 
   it('accepts valid source-equal output', async () => {
@@ -29,12 +29,43 @@ describe('DeepLTranslateProvider response contract', () => {
       .resolves.toEqual(['one translated', '', 'two translated']);
   });
 
+  it('writes one detected source when all reported sources agree', async () => {
+    const options = { providerMetadataRef: { metadata: {} } };
+
+    await translate({
+      translations: [
+        { text: 'one translated', detected_source_language: 'EN' },
+        { text: 'two translated', detected_source_language: 'en' },
+      ],
+    }, ['one', 'two'], options);
+
+    expect(options.providerMetadataRef.metadata.detectedLanguage).toBe('en');
+    expect(provider).not.toHaveProperty('lastDetectedLanguage');
+  });
+
+  it('does not publish conflicting or missing detected sources', async () => {
+    const conflictingOptions = { providerMetadataRef: { metadata: {} } };
+    await translate({
+      translations: [
+        { text: 'one translated', detected_source_language: 'en' },
+        { text: 'two translated', detected_source_language: 'de' },
+      ],
+    }, ['one', 'two'], conflictingOptions);
+    expect(conflictingOptions.providerMetadataRef.metadata).toEqual({});
+
+    const missingOptions = { providerMetadataRef: { metadata: {} } };
+    await translate({ translations: [{ text: 'translated' }] }, ['source'], missingOptions);
+    expect(missingOptions.providerMetadataRef.metadata).toEqual({});
+  });
+
   it.each([
     ['missing translations', {}],
     ['blank item', { translations: [{ text: '  ' }] }],
     ['wrong cardinality', { translations: [{ text: 'one' }] }],
   ])('throws API_RESPONSE_INVALID for %s', async (_label, response) => {
-    await expect(translate(response, ['one', 'two'])).rejects.toMatchObject({ type: ErrorTypes.API_RESPONSE_INVALID });
+    const options = { providerMetadataRef: { metadata: {} } };
+    await expect(translate(response, ['one', 'two'], options)).rejects.toMatchObject({ type: ErrorTypes.API_RESPONSE_INVALID });
+    expect(options.providerMetadataRef.metadata).toEqual({});
   });
 
   it.each([

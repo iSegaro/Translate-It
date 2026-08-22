@@ -13,7 +13,9 @@ const logger = getScopedLogger(LOG_COMPONENTS.FRAMEWORK, 'naturalTyping');
  * @param {number} delay - تاخیر بین کاراکترها (میلی‌ثانیه)
  * @param {boolean} replaceSelection - آیا فقط متن انتخاب شده جایگزین شود
  */
-export async function simulateNaturalTyping(element, text, delay = 10, replaceSelection = false) {
+export async function simulateNaturalTyping(element, text, delay = 10, replaceSelection = false, applicationContext = null) {
+  const isCurrent = applicationContext?.isCurrent || (() => true);
+  if (!isCurrent()) return false;
   if (!element || !text) {
   logger.debug('Invalid params:', { element: !!element, text: !!text });
     return false;
@@ -41,7 +43,8 @@ export async function simulateNaturalTyping(element, text, delay = 10, replaceSe
     
     // برای Reddit و contentEditable، از روش ساده‌تر استفاده کن
     if (element.isContentEditable && typeof window !== 'undefined' && window.location.hostname.includes('reddit.com')) {
-      const simpleSuccess = await handleContentEditableReplacementSimple(element, text, hasSelection, replaceSelection);
+      const simpleSuccess = await handleContentEditableReplacementSimple(element, text, hasSelection, replaceSelection, isCurrent);
+      if (!isCurrent()) return false;
       if (simpleSuccess) {
         return true;
       }
@@ -55,13 +58,15 @@ export async function simulateNaturalTyping(element, text, delay = 10, replaceSe
     if (!hasSelection && !replaceSelection) {
       // پاک کردن کل محتوا فقط اگر متن انتخاب نشده باشد
   logger.debug('Clearing element content (full replacement mode)');
-      await clearElementContent(element);
+      await clearElementContent(element, isCurrent);
+      if (!isCurrent()) return false;
     } else if (replaceSelection && hasSelection) {
   logger.debug('Selection replacement mode - will replace selected text only');
     }
     
     // تایپ کردن کاراکتر به کاراکتر
     for (let i = 0; i < text.length; i++) {
+      if (!isCurrent()) return false;
       const char = text[i];
       
       // شبیه‌سازی keydown
@@ -206,6 +211,7 @@ export async function simulateNaturalTyping(element, text, delay = 10, replaceSe
       // تاخیر کوتاه بین کاراکترها
       if (delay > 0) {
         await new Promise(resolve => setTimeout(resolve, delay));
+        if (!isCurrent()) return false;
       }
     }
     
@@ -232,7 +238,7 @@ export async function simulateNaturalTyping(element, text, delay = 10, replaceSe
  * @param {boolean} replaceSelection - آیا باید فقط انتخاب جایگزین شود
  * @returns {Promise<boolean>}
  */
-async function handleContentEditableReplacementSimple(element, text, hasSelection, replaceSelection) {
+async function handleContentEditableReplacementSimple(element, text, hasSelection, replaceSelection, isCurrent) {
   try {
   logger.debug('Starting Reddit-specific replacement:', {
       hasSelection,
@@ -246,6 +252,7 @@ async function handleContentEditableReplacementSimple(element, text, hasSelectio
 
     const selection = window.getSelection();
     
+    if (!isCurrent()) return false;
     if (hasSelection && selection.rangeCount > 0) {
       // جایگزینی انتخاب
       const range = selection.getRangeAt(0);
@@ -266,6 +273,7 @@ async function handleContentEditableReplacementSimple(element, text, hasSelectio
       
       // بررسی اینکه آیا متن واقعاً جایگزین شده است
       await new Promise(resolve => setTimeout(resolve, 50)); // تاخیر کوتاه برای اطمینان
+      if (!isCurrent()) return false;
       
       const currentText = element.textContent || element.innerText;
       const replacementWorked = currentText.includes(text) && !currentText.includes(originalText);
@@ -283,6 +291,7 @@ async function handleContentEditableReplacementSimple(element, text, hasSelectio
       }
     } else {
       // جایگزینی کل محتوا
+      if (!isCurrent()) return false;
       const originalText = element.textContent || element.innerText;
       logger.debug('Replacing all content');
       element.textContent = text;
@@ -297,6 +306,7 @@ async function handleContentEditableReplacementSimple(element, text, hasSelectio
       
       // بررسی اینکه آیا متن واقعاً جایگزین شده است
       await new Promise(resolve => setTimeout(resolve, 50));
+      if (!isCurrent()) return false;
       
       const currentText = element.textContent || element.innerText;
       const replacementWorked = currentText === text;
@@ -341,8 +351,9 @@ async function handleContentEditableReplacementSimple(element, text, hasSelectio
  * پاک کردن محتوای المان به صورت طبیعی
  * @param {HTMLElement} element - المان هدف
  */
-async function clearElementContent(element) {
+async function clearElementContent(element, isCurrent = () => true) {
   if (!element) return;
+  if (!isCurrent()) return;
   
   try {
     const currentContent = element.isContentEditable ? 
@@ -372,6 +383,7 @@ async function clearElementContent(element) {
     element.dispatchEvent(deleteEvent);
     
     // پاک کردن محتوا
+    if (!isCurrent()) return;
     if (element.isContentEditable && typeof window !== 'undefined') {
       const selection = window.getSelection();
       if (selection.rangeCount > 0) {
