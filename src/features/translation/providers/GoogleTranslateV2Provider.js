@@ -20,6 +20,26 @@ import { formatGoogleDictionaryMarkdown } from "./utils/GoogleDictionaryMarkdown
 
 const logger = getScopedLogger(LOG_COMPONENTS.PROVIDERS, 'GoogleTranslateV2');
 
+function countExactDelimiters(value, delimiter) {
+  if (typeof value !== 'string' || !delimiter) return 0;
+  return value.split(delimiter).length - 1;
+}
+
+function isCollapsedResponseCandidate(translated, original, delimiter) {
+  if (typeof translated !== 'string' || typeof original !== 'string') return false;
+  if (original.trim() === delimiter.trim()) return false;
+  return countExactDelimiters(original, delimiter) > 0
+    && countExactDelimiters(translated, delimiter) > 0;
+}
+
+function normalizeCollapsedSourceText(value) {
+  return String(value ?? '')
+    .replace(/\u00A0/g, ' ')
+    .replace(/[\u200B-\u200D\uFEFF\u200E\u200F]/gu, '')
+    .replace(/\s+/gu, ' ')
+    .trim();
+}
+
 /**
  * Stable TKK value for Google Translate token generation.
  * This value is relatively stable and Google currently accepts it.
@@ -227,11 +247,28 @@ export class GoogleTranslateV2Provider extends BaseTranslateProvider {
           const results = new Array(chunkTexts.length).fill("");
           let currentIdx = 0;
           let inDelimiterZone = false;
+          const collapsedCandidates = [];
+          let malformedResponseRow = false;
 
           const delimiterToken = TRANSLATION_CONSTANTS.TEXT_DELIMITER.trim();
           for (const segment of segments) {
+            if (segment == null) continue;
+            if (!Array.isArray(segment)) {
+              malformedResponseRow = true;
+              continue;
+            }
+
             const trans = segment[0] || "";
             const orig = segment[1] || "";
+
+            if (isCollapsedResponseCandidate(trans, orig, TRANSLATION_CONSTANTS.TEXT_DELIMITER)) {
+              collapsedCandidates.push({
+                startIndex: currentIdx,
+                original: orig,
+                translated: trans,
+              });
+              continue;
+            }
 
             const isStructuralDelimiter = orig.trim() === delimiterToken;
 
@@ -253,8 +290,39 @@ export class GoogleTranslateV2Provider extends BaseTranslateProvider {
             }
           }
 
-          const hasEmpty = results.some((r, i) => !r.trim() && chunkTexts[i] && getTextInfo(chunkTexts[i]).text.trim());
-          if (hasEmpty) {
+          let hasEmpty = results.some((r, i) => !r.trim() && chunkTexts[i] && getTextInfo(chunkTexts[i]).text.trim());
+          if (hasEmpty && collapsedCandidates.length === 1 && !malformedResponseRow) {
+            const candidate = collapsedCandidates[0];
+            const originalParts = candidate.original.split(TRANSLATION_CONSTANTS.TEXT_DELIMITER);
+            const translatedParts = candidate.translated.split(TRANSLATION_CONSTANTS.TEXT_DELIMITER);
+            const spanLength = originalParts.length;
+            const spanEnd = candidate.startIndex + spanLength;
+            const sourceCollision = chunkTexts
+              .slice(candidate.startIndex, spanEnd)
+              .some((item) => getTextInfo(item).text.includes(TRANSLATION_CONSTANTS.TEXT_DELIMITER));
+            const sourceSpan = chunkTexts.slice(candidate.startIndex, spanEnd);
+            const originalMatchesSource = sourceSpan.length === originalParts.length
+              && originalParts.every((part, index) => normalizeCollapsedSourceText(part)
+                === normalizeCollapsedSourceText(getTextInfo(sourceSpan[index]).text));
+            const overlapsOwnedOutput = results
+              .slice(candidate.startIndex, spanEnd)
+              .some((result) => result.trim().length > 0);
+            const validCounts = spanLength > 1
+              && translatedParts.length === spanLength
+              && originalParts.length - 1 === countExactDelimiters(candidate.original, TRANSLATION_CONSTANTS.TEXT_DELIMITER)
+              && translatedParts.length - 1 === countExactDelimiters(candidate.translated, TRANSLATION_CONSTANTS.TEXT_DELIMITER)
+              && spanEnd <= chunkTexts.length
+              && originalMatchesSource;
+
+            if (validCounts && !sourceCollision && !overlapsOwnedOutput) {
+              translatedParts.forEach((part, index) => {
+                results[candidate.startIndex + index] = TraditionalTextProcessor.scrubBidiArtifacts(part);
+              });
+              hasEmpty = results.some((r, i) => !r.trim() && chunkTexts[i] && getTextInfo(chunkTexts[i]).text.trim());
+            }
+          }
+
+          if (hasEmpty || malformedResponseRow) {
             const error = new Error('Google V2 response omitted a translated segment');
             error.type = ErrorTypes.API_RESPONSE_INVALID;
             throw error;
@@ -283,9 +351,14 @@ export class GoogleTranslateV2Provider extends BaseTranslateProvider {
 
       // Return translated text. Coordinator will handle robust splitting for multiple segments.
       const finalResult = chunkResponse?.translatedText;
+      const hasInvalidArrayResult = Array.isArray(finalResult)
+        && finalResult.some((item, index) => {
+          if (typeof item !== 'string') return true;
+          return !item.trim() && getTextInfo(chunkTexts[index]).text.trim();
+        });
       if ((typeof finalResult !== 'string' && !Array.isArray(finalResult)) ||
           (typeof finalResult === 'string' && !finalResult.trim()) ||
-          (Array.isArray(finalResult) && (finalResult.length === 0 || finalResult.some(item => typeof item !== 'string' || !item.trim())))) {
+          (Array.isArray(finalResult) && (finalResult.length === 0 || hasInvalidArrayResult))) {
         const error = new Error('Google V2 response has no translation text');
         error.type = ErrorTypes.API_RESPONSE_INVALID;
         throw error;
