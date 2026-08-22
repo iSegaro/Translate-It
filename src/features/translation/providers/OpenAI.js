@@ -36,6 +36,8 @@ const OPENAI_PERMANENT_QUOTA_CODES = new Set([
   'insufficient_quota',
 ]);
 
+const OPENAI_REQUEST_INVALID_CODES = new Set(['invalid_request_error']);
+
 export class OpenAIProvider extends BaseAIProvider {
   static type = "ai";
   static description = "OpenAI's GPT models (GPT-4, GPT-3.5)";
@@ -56,9 +58,17 @@ export class OpenAIProvider extends BaseAIProvider {
       .filter(value => typeof value === 'string')
       .map(value => value.trim().toLowerCase());
 
-    return structuredValues.some(value => OPENAI_PERMANENT_QUOTA_CODES.has(value))
-      ? ErrorTypes.INSUFFICIENT_BALANCE
-      : null;
+    if (structuredValues.some(value => OPENAI_PERMANENT_QUOTA_CODES.has(value))) {
+      return ErrorTypes.INSUFFICIENT_BALANCE;
+    }
+
+    const statusCode = Number(errorInfo?.statusCode);
+    if ([400, 422].includes(statusCode)
+        && structuredValues.some(value => OPENAI_REQUEST_INVALID_CODES.has(value))) {
+      return ErrorTypes.INVALID_REQUEST;
+    }
+
+    return null;
   }
 
   /**

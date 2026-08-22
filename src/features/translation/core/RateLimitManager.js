@@ -407,10 +407,12 @@ export class RateLimitManager {
   _recordFailure(state, error, providerName) {
     state.performanceStats.failedRequests++;
     
-    // Config errors (API key missing, etc.) should NOT count towards circuit breaking
-    // because they are client-side issues, not provider health issues.
+    // Configuration/account failures and proven request-local failures should NOT
+    // count towards circuit breaking. Request fatality and provider health
+    // eligibility are separate decisions.
     const isConfig = isConfigError(error);
-    if (!isConfig) {
+    const isProviderHealthFailure = !isConfig && error?.type !== ErrorTypes.INVALID_REQUEST;
+    if (isProviderHealthFailure) {
       state.consecutiveFailures++;
     }
     
@@ -421,10 +423,12 @@ export class RateLimitManager {
       logger.warn(`Rate limit detected for ${providerName}, increasing backoff to ${state.currentBackoffMultiplier}x`);
     }
 
-    // CRITICAL: Open circuit breaker immediately on fatal errors (excluding config errors)
+    // Provider-health-eligible fatal errors open the circuit immediately. Fatality
+    // alone is not sufficient because request-local INVALID_REQUEST is terminal
+    // for its request but says nothing about provider health.
     const isFatal = isFatalError(error);
 
-    if ((isFatal && !isConfig) || state.consecutiveFailures >= state.circuitBreakThreshold) {
+    if ((isFatal && isProviderHealthFailure) || state.consecutiveFailures >= state.circuitBreakThreshold) {
       if (!state.isCircuitOpen) {
         state.isCircuitOpen = true;
         state.circuitOpenTime = Date.now();

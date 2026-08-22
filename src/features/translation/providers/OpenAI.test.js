@@ -523,6 +523,49 @@ describe('OpenAIProvider Error Handling', () => {
     });
   });
 
+  it.each([400, 422])('should classify structured request errors as invalid requests for HTTP %s', async (status) => {
+    proxyManager.fetch.mockResolvedValue({
+      ok: false,
+      status,
+      statusText: 'Bad Request',
+      headers: new Map([['content-type', 'application/json']]),
+      json: () => Promise.resolve({
+        error: {
+          message: 'Invalid request parameters.',
+          type: 'invalid_request_error',
+        },
+      }),
+      clone: function() { return this; }
+    });
+
+    await expect(provider._callAI('system', 'text')).rejects.toMatchObject({
+      type: ErrorTypes.INVALID_REQUEST,
+      statusCode: status,
+    });
+  });
+
+  it('keeps unmatched structured HTTP 400 errors generic', async () => {
+    proxyManager.fetch.mockResolvedValue({
+      ok: false,
+      status: 400,
+      statusText: 'Bad Request',
+      headers: new Map([['content-type', 'application/json']]),
+      json: () => Promise.resolve({
+        error: {
+          message: 'Provider rejected request.',
+          type: 'provider_specific_error',
+          code: 'request_rejected',
+        },
+      }),
+      clone: function() { return this; }
+    });
+
+    await expect(provider._callAI('system', 'text')).rejects.toMatchObject({
+      type: ErrorTypes.HTTP_ERROR,
+      statusCode: 400,
+    });
+  });
+
   it('should handle HTTP 500 Server Error', async () => {
     proxyManager.fetch.mockResolvedValue({
       ok: false,

@@ -161,6 +161,28 @@ describe('RateLimitManager', () => {
       expect(state.isCircuitOpen).toBe(false);
     });
 
+    it('does not count invalid requests and allows the next operation', async () => {
+      const error = Object.assign(new Error('Invalid request parameters'), {
+        type: ErrorTypes.INVALID_REQUEST,
+        statusCode: 400,
+      });
+      isFatalError.mockReturnValue(true);
+
+      await expect(manager.executeWithRateLimit(
+        'TestProvider',
+        () => Promise.reject(error)
+      )).rejects.toBe(error);
+
+      const state = manager.providerStates.get('TestProvider');
+      expect(state.performanceStats.failedRequests).toBe(1);
+      expect(state.consecutiveFailures).toBe(0);
+      expect(state.isCircuitOpen).toBe(false);
+
+      const nextTask = vi.fn().mockResolvedValue('healthy');
+      await expect(manager.executeWithRateLimit('TestProvider', nextTask)).resolves.toBe('healthy');
+      expect(nextTask).toHaveBeenCalledTimes(1);
+    });
+
     it('preserves HTTP 402 semantic type when opening circuit', async () => {
       const error = Object.assign(new Error('HTTP 402'), {
         type: ErrorTypes.INSUFFICIENT_BALANCE,
