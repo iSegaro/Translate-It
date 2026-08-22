@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
 
 // Mock extension polyfill
 vi.mock('webextension-polyfill', () => ({
@@ -21,7 +22,6 @@ vi.mock('@/shared/logging/logger.js', () => ({
 
 describe('QueueManager', () => {
   let queueManager;
-  let ErrorTypes;
 
   const createDeferred = () => {
     let resolve;
@@ -41,9 +41,6 @@ describe('QueueManager', () => {
     
     const mod = await import('./QueueManager.js');
     queueManager = mod.queueManager;
-    
-    const errMod = await import('@/shared/error-management/ErrorTypes.js');
-    ErrorTypes = errMod.ErrorTypes;
     
     vi.spyOn(Math, 'random').mockReturnValue(0.5); // Predictable jitter (0.75x)
   });

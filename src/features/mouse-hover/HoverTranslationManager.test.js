@@ -296,7 +296,7 @@ describe('HoverTranslationManager', () => {
 
     it.each([
       [ErrorTypes.API_ERROR, ErrorTypes.API_ERROR, 'ERRORS_API_ERROR', 'raw provider detail secret'],
-      [ErrorTypes.JSON_PARSING_ERROR, ErrorTypes.API_RESPONSE_INVALID, 'ERRORS_API_RESPONSE_INVALID', 'raw parser response secret'],
+      [ErrorTypes.JSON_PARSING_ERROR, ErrorTypes.API_RESPONSE_INVALID, 'ERRORS_API_ERROR', 'raw parser response secret'],
       [ErrorTypes.TRANSLATION_TIMEOUT, ErrorTypes.TRANSLATION_TIMEOUT, 'ERRORS_TRANSLATION_TIMEOUT', 'raw timeout detail secret'],
       [ErrorTypes.MODEL_MISSING, ErrorTypes.MODEL_MISSING, 'ERRORS_MODEL_MISSING', 'raw model detail secret'],
       [ErrorTypes.API_KEY_INVALID, ErrorTypes.API_KEY_INVALID, 'ERRORS_API_KEY_INVALID', 'raw key detail secret'],

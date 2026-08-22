@@ -548,6 +548,7 @@ describe('OpenAIProvider Error Handling', () => {
     const controller = new AbortController();
     const abortError = new Error('The user aborted a request.');
     abortError.name = 'AbortError';
+    controller.abort('user-cancelled');
     
     proxyManager.fetch.mockRejectedValue(abortError);
 
@@ -555,6 +556,22 @@ describe('OpenAIProvider Error Handling', () => {
       await provider._callAI('system', 'text', { abortController: controller });
     } catch (error) {
       expect(error.type).toBe(ErrorTypes.USER_CANCELLED);
+    }
+  });
+
+  it('does not classify an ambiguous operation AbortError as user cancellation', async () => {
+    const controller = new AbortController();
+    const abortError = new Error('The operation was aborted.');
+    abortError.name = 'AbortError';
+
+    proxyManager.fetch.mockRejectedValue(abortError);
+
+    try {
+      await provider._callAI('system', 'text', { abortController: controller });
+    } catch (error) {
+      expect(error.type).not.toBe(ErrorTypes.USER_CANCELLED);
+      expect(error.operationAborted).toBe(true);
+      expect(error.cancellationReason).toBe('operation-abort');
     }
   });
 });
