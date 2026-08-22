@@ -183,6 +183,28 @@ describe('RateLimitManager', () => {
       expect(nextTask).toHaveBeenCalledTimes(1);
     });
 
+    it.each([400, 422])('keeps HTTP %s TEXT_EMPTY out of provider health while recording failure', async (statusCode) => {
+      const error = Object.assign(new Error('Text is empty'), {
+        type: ErrorTypes.TEXT_EMPTY,
+        statusCode,
+      });
+      isFatalError.mockReturnValue(true);
+
+      await expect(manager.executeWithRateLimit(
+        'TestProvider',
+        () => Promise.reject(error)
+      )).rejects.toBe(error);
+
+      const state = manager.providerStates.get('TestProvider');
+      expect(state.performanceStats.failedRequests).toBe(1);
+      expect(state.consecutiveFailures).toBe(0);
+      expect(state.isCircuitOpen).toBe(false);
+
+      const nextTask = vi.fn().mockResolvedValue('healthy');
+      await expect(manager.executeWithRateLimit('TestProvider', nextTask)).resolves.toBe('healthy');
+      expect(nextTask).toHaveBeenCalledTimes(1);
+    });
+
     it('preserves HTTP 402 semantic type when opening circuit', async () => {
       const error = Object.assign(new Error('HTTP 402'), {
         type: ErrorTypes.INSUFFICIENT_BALANCE,

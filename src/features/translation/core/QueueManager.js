@@ -134,6 +134,10 @@ class QueueItem {
     if (this.lastError?.operationAborted) return false;
     if (isCancellationError(this.lastError)) return false;
 
+    const isProviderHttpTextEmpty = this.lastError?.type === ErrorTypes.TEXT_EMPTY
+      && [400, 422].includes(this.lastError?.statusCode);
+    if (isProviderHttpTextEmpty) return false;
+
     // Local deterministic validation errors (e.g., TEXT_TOO_LONG) must never be retried
     if (isLocalDeterministicValidationError(this.lastError)) return false;
 

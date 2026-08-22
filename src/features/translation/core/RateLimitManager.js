@@ -411,7 +411,11 @@ export class RateLimitManager {
     // count towards circuit breaking. Request fatality and provider health
     // eligibility are separate decisions.
     const isConfig = isConfigError(error);
-    const isProviderHealthFailure = !isConfig && error?.type !== ErrorTypes.INVALID_REQUEST;
+    const isProviderHttpTextEmpty = error?.type === ErrorTypes.TEXT_EMPTY
+      && [400, 422].includes(error?.statusCode);
+    const isProviderHealthFailure = !isConfig
+      && error?.type !== ErrorTypes.INVALID_REQUEST
+      && !isProviderHttpTextEmpty;
     if (isProviderHealthFailure) {
       state.consecutiveFailures++;
     }
@@ -424,8 +428,8 @@ export class RateLimitManager {
     }
 
     // Provider-health-eligible fatal errors open the circuit immediately. Fatality
-    // alone is not sufficient because request-local INVALID_REQUEST is terminal
-    // for its request but says nothing about provider health.
+    // alone is not sufficient because request-local INVALID_REQUEST and provider
+    // HTTP TEXT_EMPTY are terminal for their requests but say nothing about provider health.
     const isFatal = isFatalError(error);
 
     if ((isFatal && isProviderHealthFailure) || state.consecutiveFailures >= state.circuitBreakThreshold) {

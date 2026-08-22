@@ -619,6 +619,26 @@ describe('QueueManager', () => {
     });
   });
 
+  describe('provider HTTP TEXT_EMPTY', () => {
+    it.each([400, 422])('does not retry HTTP %s TEXT_EMPTY errors', async (statusCode) => {
+      const error = { type: ErrorTypes.TEXT_EMPTY, statusCode, message: 'Text is empty' };
+      const request = vi.fn().mockRejectedValue(error);
+      const executionContext = { operation: { appendDiagnostic: vi.fn() } };
+
+      const promise = queueManager.enqueue('provider-empty', request, 0, 'context', { executionContext });
+
+      await vi.advanceTimersByTimeAsync(150);
+      await expect(promise).rejects.toBe(error);
+      await vi.advanceTimersByTimeAsync(10000);
+
+      expect(request).toHaveBeenCalledTimes(1);
+      expect(queueManager.retryTimeouts.size).toBe(0);
+      expect(executionContext.operation.appendDiagnostic).not.toHaveBeenCalledWith(
+        expect.objectContaining({ type: 'QUEUE_RETRY' })
+      );
+    });
+  });
+
   describe('Parallel queue lane', () => {
     it('should dispatch all pending parallel-queue requests without serializing them', async () => {
       const first = createDeferred();
