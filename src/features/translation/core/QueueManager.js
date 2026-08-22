@@ -348,7 +348,11 @@ export class QueueManager {
       attempt: item.attempts,
     });
     
-    logger.debug(`Processing item ${item.id} (attempt ${item.attempts}/${item.getRetryStrategy().maxRetries})`);
+    const strategy = item.getRetryStrategy();
+    const attemptLabel = item.lastError
+      ? `${item.attempts}/${strategy.maxRetries}`
+      : `${item.attempts}`;
+    logger.debug(`Processing item ${item.id} (attempt ${attemptLabel})`);
     
     try {
       const result = await item.requestFunction();
@@ -380,7 +384,9 @@ export class QueueManager {
         item.status = QueueStatus.RETRYING;
         const delay = item.getNextRetryDelay();
         
-        logger.warn(`Item ${item.id} failed, retrying in ${delay}ms (attempt ${item.attempts}/${item.getRetryStrategy().maxRetries})`, error);
+        const nextAttemptNumber = item.attempts + 1;
+        const maxAttempts = item.getRetryStrategy().maxRetries;
+        logger.warn(`Item ${item.id} failed, retrying in ${delay}ms (next attempt ${nextAttemptNumber}/${maxAttempts})`, error);
         appendTranslationDiagnostic(item.executionContext, {
           type: 'QUEUE_RETRY',
           stage: 'queue',

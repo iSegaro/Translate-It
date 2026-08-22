@@ -1,6 +1,14 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
 
+const loggerMock = vi.hoisted(() => ({
+  init: vi.fn(),
+  debug: vi.fn(),
+  info: vi.fn(),
+  warn: vi.fn(),
+  error: vi.fn(),
+}));
+
 // Mock extension polyfill
 vi.mock('webextension-polyfill', () => ({
   default: {
@@ -11,13 +19,7 @@ vi.mock('webextension-polyfill', () => ({
 
 // Mock logger
 vi.mock('@/shared/logging/logger.js', () => ({
-  getScopedLogger: () => ({
-    init: vi.fn(),
-    debug: vi.fn(),
-    info: vi.fn(),
-    warn: vi.fn(),
-    error: vi.fn()
-  })
+  getScopedLogger: () => loggerMock,
 }));
 
 describe('QueueManager', () => {
@@ -93,6 +95,84 @@ describe('QueueManager', () => {
   });
 
   describe('Retry Logic', () => {
+    it('does not claim a strategy denominator for initial processing', async () => {
+      const request = vi.fn().mockResolvedValue('Success');
+      const promise = queueManager.enqueue('initial-attempt-provider', request);
+
+      await vi.advanceTimersByTimeAsync(150);
+      await promise;
+
+      const processingLog = loggerMock.debug.mock.calls.find(([message]) => (
+        message.startsWith('Processing item initial-attempt-provider-')
+      ));
+      expect(processingLog?.[0]).toMatch(/\(attempt 1\)$/);
+      expect(processingLog?.[0]).not.toContain('attempt 1/');
+    });
+
+    it('logs retry scheduling as the next execution attempt', async () => {
+      const networkError = { type: ErrorTypes.NETWORK_ERROR, message: 'network failure' };
+      const executionContext = { operation: { appendDiagnostic: vi.fn() } };
+      const request = vi.fn()
+        .mockRejectedValueOnce(networkError)
+        .mockResolvedValueOnce('Success');
+      const promise = queueManager.enqueue('single-retry-observability-provider', request, 0, 'context', { executionContext });
+
+      await vi.advanceTimersByTimeAsync(150);
+      await vi.advanceTimersByTimeAsync(2000);
+      await promise;
+
+      const processingLogs = loggerMock.debug.mock.calls
+        .filter(([message]) => message.startsWith('Processing item single-retry-observability-provider-'))
+        .map(([message]) => message);
+      const retryLog = loggerMock.warn.mock.calls
+        .find(([message]) => message.startsWith('Item single-retry-observability-provider-'));
+
+      expect(processingLogs[0]).toMatch(/\(attempt 1\)$/);
+      expect(processingLogs[1]).toMatch(/\(attempt 2\/4\)$/);
+      expect(retryLog?.[0]).toMatch(/next attempt 2\/4/);
+      expect(executionContext.operation.appendDiagnostic).toHaveBeenCalledWith(expect.objectContaining({
+        type: 'QUEUE_RETRY',
+        attempt: 1,
+      }));
+      expect(request).toHaveBeenCalledTimes(2);
+    });
+
+    it('uses current strategy denominator when error type changes', async () => {
+      const networkError = { type: ErrorTypes.NETWORK_ERROR, message: 'network failure' };
+      const serverError = { type: ErrorTypes.SERVER_ERROR, message: 'server failure' };
+      const request = vi.fn()
+        .mockRejectedValueOnce(networkError)
+        .mockRejectedValueOnce(serverError)
+        .mockResolvedValueOnce('Success');
+      const promise = queueManager.enqueue('mixed-retry-observability-provider', request);
+      const outcome = promise.then(
+        value => ({ value }),
+        error => ({ error }),
+      );
+
+      await vi.advanceTimersByTimeAsync(150);
+      await vi.advanceTimersByTimeAsync(10000);
+      await vi.advanceTimersByTimeAsync(10000);
+      await expect(outcome).resolves.toEqual({ value: 'Success' });
+
+      const processingLogs = loggerMock.debug.mock.calls
+        .filter(([message]) => message.startsWith('Processing item mixed-retry-observability-provider-'))
+        .map(([message]) => message);
+      const retryLogs = loggerMock.warn.mock.calls
+        .filter(([message]) => message.startsWith('Item mixed-retry-observability-provider-'))
+        .map(([message]) => message);
+
+      expect(processingLogs).toHaveLength(3);
+      expect(processingLogs[0]).toMatch(/\(attempt 1\)$/);
+      expect(processingLogs[1]).toMatch(/\(attempt 2\/4\)$/);
+      expect(processingLogs[2]).toMatch(/\(attempt 3\/3\)$/);
+      expect(retryLogs).toEqual([
+        expect.stringMatching(/next attempt 2\/4/),
+        expect.stringMatching(/next attempt 3\/3/),
+      ]);
+      expect(request).toHaveBeenCalledTimes(3);
+    });
+
     it('should retry a failed request with exponential backoff', async () => {
       // RATE_LIMIT_REACHED: baseDelay 2000. Jittered (0.75x) = 1500ms.
       const mockError = { type: ErrorTypes.RATE_LIMIT_REACHED, message: 'Rate limit' };
