@@ -237,10 +237,19 @@ export class ProviderCoordinator {
         targetLanguage: processedTargetLang
       };
     } catch (error) {
-      const errorType = matchErrorToType(error);
+      if (error?.operationAborted === true) {
+        logger.debug(`[Coordinator] Execution stopped for ${providerName}: operation abort`);
+        throw error;
+      }
+
+      const errorType = error?.type || matchErrorToType(error);
+      const classificationError = error && typeof error === 'object'
+        ? { type: errorType, message: error.message, statusCode: error.statusCode }
+        : errorType;
       
       // Treat UNKNOWN errors from Error instances as transient to trigger retries/proper failure reporting
-      const isTransient = isTransientError(error) || isTransientError(errorType) || (errorType === ErrorTypes.UNKNOWN && error instanceof Error);
+      const isTransient = isTransientError(classificationError)
+        || (errorType === ErrorTypes.UNKNOWN && error instanceof Error);
       
       if (errorType === ErrorTypes.USER_CANCELLED) {
         logger.debug(`[Coordinator] Execution cancelled by user for ${providerName}`);
@@ -249,7 +258,7 @@ export class ProviderCoordinator {
       }
 
       // Throw if it's a recognized fatal/transient error or a generic system Error
-      if (isFatalError(error) || isTransient) throw error;
+      if (isFatalError(classificationError) || isTransient) throw error;
 
       // Non-fatal, non-transient: previously fell back to returning the original text
       // wrapped in a "successful" result. That is silent success - the caller believes

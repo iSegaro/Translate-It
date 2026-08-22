@@ -374,6 +374,74 @@ describe('ProviderCoordinator', () => {
   });
 
   describe('Error Resilience', () => {
+    it('propagates operation abort without matcher classification', async () => {
+      const operationAbort = Object.assign(new Error('operation stopped'), {
+        name: 'AbortError',
+        operationAborted: true,
+        cancellationReason: 'operation-abort',
+      });
+      mockProvider.translate.mockRejectedValue(operationAbort);
+
+      await expect(providerCoordinator.execute(
+        mockProvider, 'Original Text', 'en', 'fa'
+      )).rejects.toBe(operationAbort);
+
+      expect(matchErrorToType).not.toHaveBeenCalled();
+      expect(isTransientError).not.toHaveBeenCalled();
+      expect(isFatalError).not.toHaveBeenCalled();
+      expect(operationAbort).toMatchObject({
+        operationAborted: true,
+        cancellationReason: 'operation-abort',
+      });
+      expect(operationAbort.type).not.toBe(ErrorTypes.USER_CANCELLED);
+    });
+
+    it('preserves typed timeout AbortError without matcher classification', async () => {
+      const timeoutError = Object.assign(new Error('timed out'), {
+        name: 'AbortError',
+        type: ErrorTypes.TRANSLATION_TIMEOUT,
+      });
+      mockProvider.translate.mockRejectedValue(timeoutError);
+
+      await expect(providerCoordinator.execute(
+        mockProvider, 'Original Text', 'en', 'fa'
+      )).rejects.toBe(timeoutError);
+
+      expect(matchErrorToType).not.toHaveBeenCalled();
+      expect(timeoutError.type).toBe(ErrorTypes.TRANSLATION_TIMEOUT);
+      expect(timeoutError.operationAborted).not.toBe(true);
+      expect(isTransientError).toHaveBeenCalledWith(expect.objectContaining({
+        type: ErrorTypes.TRANSLATION_TIMEOUT,
+      }));
+      expect(isFatalError).toHaveBeenCalledWith(expect.objectContaining({
+        type: ErrorTypes.TRANSLATION_TIMEOUT,
+      }));
+    });
+
+    it('continues matching ordinary untyped provider errors', async () => {
+      const ordinaryError = new Error('Temporary API Error');
+      mockProvider.translate.mockRejectedValue(ordinaryError);
+
+      await expect(providerCoordinator.execute(
+        mockProvider, 'Original Text', 'en', 'fa'
+      )).rejects.toBe(ordinaryError);
+
+      expect(matchErrorToType).toHaveBeenCalledWith(ordinaryError);
+    });
+
+    it('propagates explicit USER_CANCELLED without matcher classification', async () => {
+      const userError = Object.assign(new Error('cancelled'), {
+        type: ErrorTypes.USER_CANCELLED,
+      });
+      mockProvider.translate.mockRejectedValue(userError);
+
+      await expect(providerCoordinator.execute(
+        mockProvider, 'Original Text', 'en', 'fa'
+      )).rejects.toBe(userError);
+
+      expect(matchErrorToType).not.toHaveBeenCalled();
+    });
+
     it('should throw if provider fails with a non-fatal non-transient error instead of fabricating success', async () => {
       mockProvider.translate.mockRejectedValue(new Error('Temporary API Error'));
 
