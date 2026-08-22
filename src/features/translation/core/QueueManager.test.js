@@ -229,9 +229,10 @@ describe('QueueManager', () => {
         .mockRejectedValueOnce(errors[1])
         .mockRejectedValueOnce(errors[2]);
       const promise = queueManager.enqueue('terminal-cause-provider', request);
+      const rejection = promise.catch(error => error);
 
       await vi.advanceTimersByTimeAsync(10000);
-      const terminalError = await promise.catch(error => error);
+      const terminalError = await rejection;
       expect(terminalError).toMatchObject({ type: expectedType, originalType: expectedOriginalType });
       expect(terminalError).not.toBe(errors[0]);
       if (expectedStatus === undefined) {
@@ -257,10 +258,11 @@ describe('QueueManager', () => {
       });
       const request = vi.fn().mockRejectedValue(serverError);
       const promise = queueManager.enqueue('server-only-provider', request);
+      const rejection = expect(promise).rejects.toBe(serverError);
 
       await vi.advanceTimersByTimeAsync(10000);
 
-      await expect(promise).rejects.toBe(serverError);
+      await rejection;
       expect(request).toHaveBeenCalledTimes(3);
     });
 

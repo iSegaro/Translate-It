@@ -345,11 +345,13 @@ describe('translateFieldViaSmartHandler translation ownership', () => {
       ));
 
       const promise = translateFieldViaSmartHandler({ text: 'hello', target });
+      const rejection = expect(promise).rejects.toMatchObject({ type: ErrorTypes.TRANSLATION_TIMEOUT });
       await vi.waitFor(() => expect(mocks.trackTimeout).toHaveBeenCalled());
       const ownership = mocks.fieldRequestOwners.get(target);
       const removeAbortListener = vi.spyOn(ownership.controller.signal, 'removeEventListener');
       await vi.advanceTimersByTimeAsync(TRANSLATION_TIMEOUT + 20);
 
+      await rejection;
       const error = await promise.catch((caught) => caught);
       expect(error).toMatchObject({ type: ErrorTypes.TRANSLATION_TIMEOUT });
       expect(error.type).not.toBe(ErrorTypes.USER_CANCELLED);
@@ -373,9 +375,10 @@ describe('translateFieldViaSmartHandler translation ownership', () => {
       });
 
       const promise = translateFieldViaSmartHandler({ text: 'hello', target });
+      const rejection = expect(promise).rejects.toMatchObject({ type: ErrorTypes.TRANSLATION_TIMEOUT });
       await vi.waitFor(() => expect(mocks.trackTimeout).toHaveBeenCalled());
       await vi.advanceTimersByTimeAsync(TRANSLATION_TIMEOUT + 20);
-      await expect(promise).rejects.toMatchObject({ type: ErrorTypes.TRANSLATION_TIMEOUT });
+      await rejection;
 
       resolveProvider({
         success: true,
@@ -402,9 +405,10 @@ describe('translateFieldViaSmartHandler translation ownership', () => {
       });
 
       const promise = translateFieldViaSmartHandler({ text: 'hello', target });
+      const rejection = expect(promise).rejects.toMatchObject({ type: ErrorTypes.TRANSLATION_TIMEOUT });
       await vi.waitFor(() => expect(mocks.trackTimeout).toHaveBeenCalled());
       await vi.advanceTimersByTimeAsync(TRANSLATION_TIMEOUT + 20);
-      await expect(promise).rejects.toMatchObject({ type: ErrorTypes.TRANSLATION_TIMEOUT });
+      await rejection;
 
       rejectProvider(new Error('late provider failure'));
       await Promise.resolve();
