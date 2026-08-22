@@ -152,7 +152,7 @@ describe('QueueManager', () => {
           originalType: ErrorTypes.SERVER_ERROR,
           statusCode: 500,
         }),
-      ], ErrorTypes.SERVER_ERROR, 500],
+      ], ErrorTypes.CIRCUIT_BREAKER_OPEN, ErrorTypes.SERVER_ERROR, 500],
       ['pure network', () => [
         Object.assign(new Error('Failed to fetch'), { type: ErrorTypes.NETWORK_ERROR }),
         Object.assign(new Error('Failed to fetch'), { type: ErrorTypes.NETWORK_ERROR }),
@@ -160,7 +160,7 @@ describe('QueueManager', () => {
           type: ErrorTypes.CIRCUIT_BREAKER_OPEN,
           originalType: ErrorTypes.NETWORK_ERROR,
         }),
-      ], ErrorTypes.NETWORK_ERROR, undefined],
+      ], ErrorTypes.CIRCUIT_BREAKER_OPEN, ErrorTypes.NETWORK_ERROR, undefined],
       ['pure server', () => [
         Object.assign(new Error('HTTP 500'), { type: ErrorTypes.SERVER_ERROR, statusCode: 500 }),
         Object.assign(new Error('HTTP 500'), { type: ErrorTypes.SERVER_ERROR, statusCode: 500 }),
@@ -169,8 +169,8 @@ describe('QueueManager', () => {
           originalType: ErrorTypes.SERVER_ERROR,
           statusCode: 500,
         }),
-      ], ErrorTypes.SERVER_ERROR, 500],
-    ])('selects canonical terminal cause for %s', async (_label, createErrors, expectedType, expectedStatus) => {
+      ], ErrorTypes.CIRCUIT_BREAKER_OPEN, ErrorTypes.SERVER_ERROR, 500],
+    ])('preserves operational circuit identity for %s', async (_label, createErrors, expectedType, expectedOriginalType, expectedStatus) => {
       const errors = createErrors();
       const request = vi.fn()
         .mockRejectedValueOnce(errors[0])
@@ -180,7 +180,8 @@ describe('QueueManager', () => {
 
       await vi.advanceTimersByTimeAsync(10000);
       const terminalError = await promise.catch(error => error);
-      expect(terminalError).toMatchObject({ type: expectedType });
+      expect(terminalError).toMatchObject({ type: expectedType, originalType: expectedOriginalType });
+      expect(terminalError).not.toBe(errors[0]);
       if (expectedStatus === undefined) {
         expect(terminalError).not.toHaveProperty('statusCode');
       } else {
@@ -191,10 +192,24 @@ describe('QueueManager', () => {
       if (_label === 'mixed network/server') {
         const { mapCanonicalTranslationError } = await import('@/shared/error-management/PublicTranslationErrorPolicy.js');
         expect(mapCanonicalTranslationError(terminalError)).toMatchObject({
-          type: 'SERVER_ERROR',
-          messageKey: 'ERRORS_SERVER_ERROR',
+          type: 'PROVIDER_TEMPORARILY_UNAVAILABLE',
+          messageKey: 'ERRORS_CIRCUIT_BREAKER_OPEN',
         });
       }
+    });
+
+    it('returns non-circuit SERVER_ERROR unchanged after bounded retries', async () => {
+      const serverError = Object.assign(new Error('HTTP 500'), {
+        type: ErrorTypes.SERVER_ERROR,
+        statusCode: 500,
+      });
+      const request = vi.fn().mockRejectedValue(serverError);
+      const promise = queueManager.enqueue('server-only-provider', request);
+
+      await vi.advanceTimersByTimeAsync(10000);
+
+      await expect(promise).rejects.toBe(serverError);
+      expect(request).toHaveBeenCalledTimes(3);
     });
 
     it('preserves HTTP 402 semantic type on permanent failure', async () => {

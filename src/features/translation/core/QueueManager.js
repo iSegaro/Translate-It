@@ -181,25 +181,6 @@ class QueueItem {
   }
 }
 
-function selectTerminalError(error) {
-  if (error?.type !== ErrorTypes.CIRCUIT_BREAKER_OPEN) return error;
-
-  const originalType = error.originalType;
-  if (
-    typeof originalType !== 'string'
-    || originalType === ErrorTypes.CIRCUIT_BREAKER_OPEN
-    || !Object.values(ErrorTypes).includes(originalType)
-  ) {
-    return error;
-  }
-
-  const terminalError = new Error(error.message);
-  terminalError.type = originalType;
-  if (typeof error.statusCode === 'number') terminalError.statusCode = error.statusCode;
-  if (typeof error.providerName === 'string') terminalError.providerName = error.providerName;
-  return terminalError;
-}
-
 /**
  * Queue Manager - Handles request queuing with intelligent retry
  */
@@ -420,9 +401,9 @@ export class QueueManager {
       } else {
         // Permanent failure
         item.status = QueueStatus.FAILED;
-        
+
         if (item.callbacks.reject) {
-          item.callbacks.reject(selectTerminalError(error));
+          item.callbacks.reject(error);
         }
         
         // FIX: Log cancellations as debug instead of error to prevent log noise

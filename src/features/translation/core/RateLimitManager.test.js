@@ -186,6 +186,25 @@ describe('RateLimitManager', () => {
       await expect(manager.executeWithRateLimit('TestProvider', () => Promise.resolve('ok')))
         .rejects.toThrow(/Circuit breaker open/);
     });
+
+    it('preserves provider identity and original cause on circuit rejection', async () => {
+      const state = manager.providerStates.get('TestProvider');
+      const serverError = Object.assign(new Error('HTTP 500'), {
+        type: 'SERVER_ERROR',
+        statusCode: 500,
+      });
+      state.isCircuitOpen = true;
+      state.circuitOpenTime = Date.now();
+      state.lastCircuitError = serverError;
+
+      await expect(manager.executeWithRateLimit('TestProvider', () => Promise.resolve('ok')))
+        .rejects.toMatchObject({
+          type: 'CIRCUIT_BREAKER_OPEN',
+          originalType: 'SERVER_ERROR',
+          statusCode: 500,
+          providerName: 'TestProvider',
+        });
+    });
   });
 
   describe('Concurrency Control', () => {

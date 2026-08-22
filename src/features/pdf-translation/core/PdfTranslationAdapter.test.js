@@ -372,6 +372,28 @@ describe('PdfTranslationAdapter', () => {
     })
   })
 
+  it('keeps circuit operational identity for server-caused breaker failures', () => {
+    const adapter = new PdfTranslationAdapter()
+    const batchItems = adapter.toProviderItems([{ id: 'block-a', text: 'Hello' }])
+    const errorDetails = {
+      message: 'Circuit breaker open',
+      type: 'CIRCUIT_BREAKER_OPEN',
+      originalType: 'SERVER_ERROR',
+      statusCode: 500,
+    }
+
+    const mapped = adapter.mapBatchResponse(batchItems, {
+      success: false,
+      error: 'Legacy failure',
+      errorDetails,
+    })
+
+    expect(mapped[0]).toMatchObject({
+      failureReason: 'provider-unavailable',
+      errorDetails,
+    })
+  })
+
   it('preserves canonical failure identity while excluding unsafe metadata', () => {
     const adapter = new PdfTranslationAdapter()
     const batchItems = adapter.toProviderItems([{ id: 'block-a', text: 'Hello', sourceTextHash: 'hash-a' }])

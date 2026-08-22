@@ -115,6 +115,17 @@ describe('PublicTranslationErrorPolicy', () => {
     expect(result).not.toHaveProperty('message');
   });
 
+  it('keeps circuit-breaker presentation when underlying cause is SERVER_ERROR', () => {
+    expect(mapCanonicalTranslationError({
+      type: ErrorTypes.CIRCUIT_BREAKER_OPEN,
+      originalType: ErrorTypes.SERVER_ERROR,
+      statusCode: 500,
+    })).toMatchObject({
+      type: PublicTranslationErrorTypes.PROVIDER_TEMPORARILY_UNAVAILABLE,
+      messageKey: 'ERRORS_CIRCUIT_BREAKER_OPEN',
+    });
+  });
+
   it('preserves translation-not-found presentation without action or raw details', () => {
     const result = mapCanonicalTranslationError({
       type: ErrorTypes.TRANSLATION_NOT_FOUND,

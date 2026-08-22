@@ -164,6 +164,7 @@ export class RateLimitManager {
       const reason = lastError ? `: ${lastError.message || lastError}` : '';
       const error = new Error(`Circuit breaker open for ${name}. Too many failures${reason}`);
       error.type = 'CIRCUIT_BREAKER_OPEN';
+      error.providerName = name;
       
       // If the underlying error was fatal/retryable, preserve its characteristics safely
       if (lastError) {
