@@ -840,7 +840,7 @@ describe('UnifiedTranslationService', () => {
 
       expect(result).toEqual({ handled: true, success: true });
       expect(translationRequestTracker.cancelRequest).toHaveBeenCalledWith('m1', ActionReasons.USER_CANCELLED);
-      expect(mockEngine.cancelTranslation).toHaveBeenCalledWith('m1');
+       expect(mockEngine.cancelTranslation).toHaveBeenCalledWith('m1', false, undefined, ActionReasons.USER_CANCELLED);
       expect(service.resultDispatcher.dispatchCancellation).toHaveBeenCalled();
     });
 

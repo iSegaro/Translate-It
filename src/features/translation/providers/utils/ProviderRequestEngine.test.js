@@ -650,6 +650,20 @@ describe('ProviderRequestEngine', () => {
         });
     });
 
+    it('preserves internal abort provenance from the signal reason', async () => {
+      const controller = new AbortController();
+      controller.abort('document-replaced');
+      proxyManager.fetch.mockRejectedValue(new DOMException('Aborted', 'AbortError'));
+
+      await expect(ProviderRequestEngine.executeApiCall(mockProvider, {
+        ...baseParams(),
+        abortController: controller,
+      })).rejects.toMatchObject({
+        operationAborted: true,
+        cancellationReason: 'document-replaced',
+      });
+    });
+
     it('classifies AbortError with a non-aborted signal as an internal operation abort', async () => {
       const controller = new AbortController();
       proxyManager.fetch.mockRejectedValue(new DOMException('Aborted', 'AbortError'));

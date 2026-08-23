@@ -29,7 +29,8 @@ describe('UnifiedModeCoordinator', () => {
       handleTranslateMessage: vi.fn(),
       lifecycleRegistry: {
         registerRequest: vi.fn(() => new AbortController()),
-        unregisterRequest: vi.fn()
+        unregisterRequest: vi.fn(),
+        getCancellationReason: vi.fn(() => null)
       }
     };
   });
@@ -142,7 +143,32 @@ describe('UnifiedModeCoordinator', () => {
 
       const result = await coordinator.processRequest(request, { translationEngine: mockEngine });
 
-      expect(result).toMatchObject({ success: false, cancelled: true });
+       expect(result).toMatchObject({
+         success: false,
+         cancelled: true,
+         error: { operationAborted: true, cancellationReason: 'operation-abort' },
+       });
+      expect(mockEngine.getProvider).not.toHaveBeenCalled();
+      expect(provider.translate).not.toHaveBeenCalled();
+    });
+
+    it.each([
+      ['document-replaced', { operationAborted: true, cancellationReason: 'document-replaced' }],
+      ['user-cancelled', { type: 'USER_CANCELLED' }],
+    ])('preserves %s pre-cancel provenance without dispatching provider work', async (reason, expectedError) => {
+      const request = {
+        mode: TranslationMode.Page,
+        messageId: `pre-cancelled-${reason}`,
+        data: { text: JSON.stringify([{ text: 'hello' }]), provider: 'google' }
+      };
+      const provider = { translate: vi.fn() };
+      mockEngine.getProvider.mockResolvedValue(provider);
+      mockEngine.lifecycleRegistry.registerRequest.mockReturnValue(null);
+      mockEngine.lifecycleRegistry.getCancellationReason.mockReturnValue(reason);
+
+      const result = await coordinator.processRequest(request, { translationEngine: mockEngine });
+
+      expect(result).toMatchObject({ success: false, cancelled: true, error: expectedError });
       expect(mockEngine.getProvider).not.toHaveBeenCalled();
       expect(provider.translate).not.toHaveBeenCalled();
     });
@@ -929,7 +955,7 @@ describe('UnifiedModeCoordinator', () => {
       }
     });
 
-    it('reports a pre-execution cancellation as USER_CANCELLED, never a timeout', async () => {
+    it('reports a pre-execution cancellation as operation abort, never a timeout', async () => {
       mockEngine.lifecycleRegistry.registerRequest.mockReturnValue(undefined);
 
       const items = [{ id: 'A', text: 'A' }];
@@ -940,7 +966,9 @@ describe('UnifiedModeCoordinator', () => {
       );
 
       expect(result.cancelled).toBe(true);
-      expect(result.error.type).toBe(ErrorTypes.USER_CANCELLED);
+      expect(result.error.operationAborted).toBe(true);
+      expect(result.error.cancellationReason).toBe('operation-abort');
+      expect(result.error.type).not.toBe(ErrorTypes.USER_CANCELLED);
       expect(result.error.type).not.toBe(ErrorTypes.TRANSLATION_TIMEOUT);
     });
 

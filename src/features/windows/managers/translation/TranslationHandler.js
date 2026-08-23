@@ -259,7 +259,7 @@ export class TranslationHandler {
   /**
    * Cancel active translation request
    */
-  cancelTranslation(messageId) {
+  cancelTranslation(messageId, reason = 'User cancelled') {
     const request = this.activeRequests.get(messageId);
     if (!request) return;
 
@@ -267,7 +267,7 @@ export class TranslationHandler {
     
     // Notify unified system to cancel
     import("@/shared/messaging/core/ContentScriptIntegration.js").then(m => {
-      m.cancelTranslation(messageId);
+      m.cancelTranslation(messageId, reason);
     }).catch(() => {});
 
     request.resolve({ cancelled: true });
@@ -311,7 +311,7 @@ export class TranslationHandler {
    */
   cancelAllTranslations() {
     for (const [messageId] of this.activeRequests) {
-      this.cancelTranslation(messageId);
+      this.cancelTranslation(messageId, 'lifecycle-cleanup');
     }
     this.logger.debug('All translations cancelled');
   }

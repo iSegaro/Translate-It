@@ -34,7 +34,11 @@ function createAbortError(signal, message = 'Translation task cancelled') {
     error.isCancelled = true;
   } else {
     error.operationAborted = true;
-    error.cancellationReason = 'operation-abort';
+    error.cancellationReason = typeof signal?.reason === 'string'
+      && signal.reason
+      && signal.reason !== 'timeout'
+      ? signal.reason
+      : 'operation-abort';
   }
   return error;
 }
@@ -100,6 +104,18 @@ export class OptimizedJsonHandler {
     const frameId = typeof sender?.frameId === 'number' ? sender.frameId : null;
     const abortController = engine.lifecycleRegistry.getAbortController(messageId) || 
                              engine.lifecycleRegistry.registerRequest(messageId, typeof text === 'string' ? text.substring(0, 100) : '', uiContext);
+    if (!abortController) {
+      const cancellationReason = engine.lifecycleRegistry.getCancellationReason?.(messageId)
+        || 'operation-abort';
+      const error = new Error('Translation operation aborted before execution');
+      if (cancellationReason === 'user-cancelled') {
+        error.type = ErrorTypes.USER_CANCELLED;
+      } else {
+        error.operationAborted = true;
+        error.cancellationReason = cancellationReason;
+      }
+      throw error;
+    }
 
     let hasErrors = false;
     let lastError = null;

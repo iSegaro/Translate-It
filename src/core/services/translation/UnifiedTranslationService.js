@@ -361,7 +361,9 @@ export class UnifiedTranslationService {
       reason: cancellation.reason,
       cancelled: true,
     });
-    if (this.translationEngine) this.translationEngine.cancelTranslation(messageId);
+    if (this.translationEngine) {
+      this.translationEngine.cancelTranslation(messageId, false, undefined, reason);
+    }
     
     await this.resultDispatcher.dispatchCancellation({ messageId, request });
     return { handled: true, success: true };

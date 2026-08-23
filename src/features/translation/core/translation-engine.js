@@ -28,6 +28,40 @@ import { TranslationBatcher } from "./utils/TranslationBatcher.js";
 
 const logger = getScopedLogger(LOG_COMPONENTS.TRANSLATION, 'translation-engine');
 
+function createPreCancelledResult(reason) {
+  if (reason === 'user-cancelled') {
+    return {
+      success: false,
+      cancelled: true,
+      error: {
+        type: ErrorTypes.USER_CANCELLED,
+        message: 'Translation cancelled by user',
+      },
+    };
+  }
+
+  if (reason === 'timeout') {
+    return {
+      success: false,
+      timedOut: true,
+      error: {
+        type: ErrorTypes.TRANSLATION_TIMEOUT,
+        message: 'Translation timed out',
+      },
+    };
+  }
+
+  return {
+    success: false,
+    cancelled: true,
+    error: {
+      operationAborted: true,
+      cancellationReason: reason || 'operation-abort',
+      message: 'Translation operation aborted before execution',
+    },
+  };
+}
+
 export class TranslationEngine {
   constructor() {
     this.factory = new ProviderFactory();
@@ -79,9 +113,7 @@ export class TranslationEngine {
     // Register and detect duplicate with context awareness
     const registration = this.lifecycleRegistry.registerRequest(messageId, data.text, context);
     if (registration === null) {
-      const cancellationError = new Error('Translation cancelled by user');
-      cancellationError.type = ErrorTypes.USER_CANCELLED;
-      return this.formatError(cancellationError, context);
+      return createPreCancelledResult(this.lifecycleRegistry.getCancellationReason(messageId));
     }
 
     try {
@@ -290,6 +322,7 @@ export class TranslationEngine {
   async cancelAllTranslations(context = null) { return await this.lifecycleRegistry.cancelAllTranslations(context); }
   getActiveTranslationIds(context = null) { return this.lifecycleRegistry.getActiveTranslationIds(context); }
   getAbortController(messageId) { return this.lifecycleRegistry.getAbortController(messageId); }
+  getCancellationReason(messageId) { return this.lifecycleRegistry.getCancellationReason(messageId); }
   registerStreamingSender(messageId, sender) { return this.lifecycleRegistry.registerStreamingSender(messageId, sender); }
   getStreamingSender(messageId) { return this.lifecycleRegistry.getStreamingSender(messageId); }
   isCancelled(messageId) { return this.lifecycleRegistry.isCancelled(messageId); }

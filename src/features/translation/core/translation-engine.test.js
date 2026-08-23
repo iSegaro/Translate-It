@@ -31,6 +31,7 @@ vi.mock("./managers/TranslationLifecycleRegistry.js", () => {
       this.registerRequest = vi.fn();
       this.unregisterRequest = vi.fn();
       this.getAbortController = vi.fn();
+      this.getCancellationReason = vi.fn(() => null);
     }
   };
 });
@@ -335,8 +336,28 @@ describe('TranslationEngine', () => {
       expect(result.mode).toBe('selection'); // Not upgraded because multi-word
     });
 
-    it('returns cancellation without starting translation when registration was pre-cancelled', async () => {
+    it.each([
+      ['document-replaced', {
+        success: false,
+        cancelled: true,
+        error: {
+          operationAborted: true,
+          cancellationReason: 'document-replaced',
+        },
+      }],
+      ['user-cancelled', {
+        success: false,
+        cancelled: true,
+        error: { type: ErrorTypes.USER_CANCELLED },
+      }],
+      ['timeout', {
+        success: false,
+        timedOut: true,
+        error: { type: ErrorTypes.TRANSLATION_TIMEOUT },
+      }],
+    ])('returns %s lifecycle result without starting translation', async (reason, expectedResult) => {
       engine.lifecycleRegistry.registerRequest.mockReturnValue(null);
+      engine.lifecycleRegistry.getCancellationReason.mockReturnValue(reason);
       const executeTranslation = vi.spyOn(engine, 'executeTranslation');
       const request = {
         action: MessageActions.TRANSLATE,
@@ -352,7 +373,8 @@ describe('TranslationEngine', () => {
 
       const result = await engine.handleMessage(request, {});
 
-      expect(result).toMatchObject({ success: false, error: { type: 'USER_CANCELLED' } });
+      expect(result).toMatchObject(expectedResult);
+      expect(result.error.type).not.toBe(ErrorTypes.TRANSLATION_ERROR);
       expect(executeTranslation).not.toHaveBeenCalled();
       expect(engine.jsonHandler.execute).not.toHaveBeenCalled();
       expect(engine.factory.getProvider).not.toHaveBeenCalled();

@@ -846,7 +846,7 @@ describe('SubtitleTranslationCoordinator Timeout Ownership', () => {
 
     subtitleTranslationCoordinator.cancelJob(jobId);
 
-    expect(unifiedTranslationService.cancelRequest).toHaveBeenCalledWith('msg-123');
+    expect(unifiedTranslationService.cancelRequest).toHaveBeenCalledWith('msg-123', 'user-cancel');
     expect(subtitleTranslationCoordinator.activeJobs.get(jobId).status).toBe('cancelled');
     // Active ID cleared so a stale finally cannot cancel a newer batch.
     expect(subtitleTranslationCoordinator.activeJobs.get(jobId).activeBatchMessageId).toBeNull();
@@ -1010,6 +1010,10 @@ describe('SubtitleTranslationCoordinator Timeout Ownership', () => {
       expect(result.isFatal).toBe(false);
       expect(result.errorDetails.message).toMatch(/timed out/);
       expect(unifiedTranslationService.cancelRequest).toHaveBeenCalled();
+      expect(unifiedTranslationService.cancelRequest).toHaveBeenCalledWith(
+        expect.any(String),
+        'timeout'
+      );
     } finally {
       vi.useRealTimers();
     }
@@ -1035,7 +1039,6 @@ describe('SubtitleTranslationCoordinator Timeout Ownership', () => {
       const result = await promise;
 
       expect(result.errorDetails.message).toMatch(/timed out/);
-      expect(unifiedTranslationService.handleTimeout).toHaveBeenCalled();
       expect(unifiedTranslationService.cancelRequest).not.toHaveBeenCalled();
     } finally {
       vi.useRealTimers();

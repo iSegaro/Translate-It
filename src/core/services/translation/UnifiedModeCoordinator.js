@@ -388,10 +388,19 @@ export class UnifiedModeCoordinator {
     const sampleText = (items[0]?.text || items[0] || '').substring(0, 100);
     const abortController = translationEngine.lifecycleRegistry.registerRequest(messageId, sampleText, mode.toLowerCase());
     if (!abortController) {
+      const cancellationReason = translationEngine.lifecycleRegistry.getCancellationReason?.(messageId)
+        || 'operation-abort';
+      const isUserCancellation = cancellationReason === 'user-cancelled';
       return {
         success: false,
         cancelled: true,
-        error: { type: 'USER_CANCELLED', message: 'Translation cancelled before execution' }
+        error: isUserCancellation
+          ? { type: ErrorTypes.USER_CANCELLED, message: 'Translation cancelled before execution' }
+          : {
+              operationAborted: true,
+              cancellationReason,
+              message: 'Translation operation aborted before execution',
+            }
       };
     }
 

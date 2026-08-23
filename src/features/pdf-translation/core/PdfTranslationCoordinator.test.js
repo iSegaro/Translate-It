@@ -306,6 +306,13 @@ describe('PdfTranslationCoordinator', () => {
     })
 
     await coordinator.cancelActiveTranslation('document-replaced')
+    expect(sendRegularMessageMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: 'CANCEL_TRANSLATION',
+        data: expect.objectContaining({ reason: 'document-replaced' }),
+      }),
+      expect.objectContaining({ silent: true })
+    )
     deferred.resolve({
       success: true,
       translatedText: JSON.stringify([{ blockId: 'block-a', text: 'Hola' }]),

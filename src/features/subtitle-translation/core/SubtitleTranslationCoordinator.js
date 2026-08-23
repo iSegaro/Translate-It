@@ -207,7 +207,7 @@ export class SubtitleTranslationCoordinator {
           } catch (error) {
             logger.warn(`Batch timeout cleanup failed for ${message.messageId}:`, error);
             try {
-              await unifiedTranslationService.cancelRequest(message.messageId);
+              await unifiedTranslationService.cancelRequest(message.messageId, 'timeout');
             } catch (fallbackError) {
               logger.warn(`Batch timeout fallback cancel failed for ${message.messageId}:`, fallbackError);
             }
@@ -299,7 +299,7 @@ export class SubtitleTranslationCoordinator {
     if (job.activeBatchMessageId) {
       const messageId = job.activeBatchMessageId;
       job.activeBatchMessageId = null;
-      unifiedTranslationService.cancelRequest(messageId).catch(() => {});
+      unifiedTranslationService.cancelRequest(messageId, 'user-cancel').catch(() => {});
     }
 
     logger.info(`Subtitle job ${jobId} cancelled.`);

@@ -444,7 +444,11 @@ export const ProviderRequestEngine = {
           abortErr.type = ErrorTypes.USER_CANCELLED;
         } else {
           abortErr.operationAborted = true;
-          abortErr.cancellationReason = 'operation-abort';
+          abortErr.cancellationReason = typeof signal?.reason === 'string'
+            && signal.reason
+            && signal.reason !== 'timeout'
+            ? signal.reason
+            : 'operation-abort';
         }
         abortErr.context = context;
         throw abortErr;

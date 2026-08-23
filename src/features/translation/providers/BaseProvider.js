@@ -19,7 +19,11 @@ export function createOperationAbortError(signal, message = 'Translation operati
     error.type = ErrorTypes.USER_CANCELLED;
   } else {
     error.operationAborted = true;
-    error.cancellationReason = 'operation-abort';
+    error.cancellationReason = typeof signal?.reason === 'string'
+      && signal.reason
+      && signal.reason !== 'timeout'
+      ? signal.reason
+      : 'operation-abort';
   }
   return error;
 }

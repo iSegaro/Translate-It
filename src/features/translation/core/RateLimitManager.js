@@ -71,7 +71,11 @@ function createAbortError(signal, message = 'Request aborted') {
     error.isCancelled = true;
   } else {
     error.operationAborted = true;
-    error.cancellationReason = 'operation-abort';
+    error.cancellationReason = typeof signal?.reason === 'string'
+      && signal.reason
+      && signal.reason !== 'timeout'
+      ? signal.reason
+      : 'operation-abort';
   }
 
   return error;
