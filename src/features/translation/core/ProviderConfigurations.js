@@ -414,6 +414,11 @@ export const PROVIDER_CONFIGURATIONS = {
 
   // Yandex Translate - Free translation service settings
   YandexTranslate: {
+    queueRetryPolicy: {
+      maxExecutions: {
+        [ErrorTypes.RATE_LIMIT_REACHED]: 3,
+      },
+    },
     rateLimit: {
       maxConcurrent: 4, // Moderate concurrent requests
       delayBetweenRequests: 0, // No delay for first request
@@ -456,6 +461,11 @@ export const PROVIDER_CONFIGURATIONS = {
 
   // DeepL Translate - Premium translation service settings
   DeepLTranslate: {
+    queueRetryPolicy: {
+      maxExecutions: {
+        [ErrorTypes.RATE_LIMIT_REACHED]: 3,
+      },
+    },
     rateLimit: {
       maxConcurrent: 5, // Higher for paid API
       delayBetweenRequests: 0, // No delay for first request
@@ -499,6 +509,11 @@ export const PROVIDER_CONFIGURATIONS = {
 
   // Bing Translate - Microsoft translation service settings
   BingTranslate: {
+    queueRetryPolicy: {
+      maxExecutions: {
+        [ErrorTypes.RATE_LIMIT_REACHED]: 3,
+      },
+    },
     rateLimit: {
       maxConcurrent: 3, // Conservative due to HTML response issues
       delayBetweenRequests: 0, // No delay for first request
@@ -546,6 +561,11 @@ export const PROVIDER_CONFIGURATIONS = {
 
   // Microsoft Edge - Official Edge Browser translation service
   MicrosoftEdge: {
+    queueRetryPolicy: {
+      maxExecutions: {
+        [ErrorTypes.RATE_LIMIT_REACHED]: 3,
+      },
+    },
     rateLimit: {
       maxConcurrent: 5, // Increased from 4
       delayBetweenRequests: 0,
@@ -617,6 +637,11 @@ export const PROVIDER_CONFIGURATIONS = {
 
   // Vajehyab - Persian dictionary service
   Vajehyab: {
+    queueRetryPolicy: {
+      maxExecutions: {
+        [ErrorTypes.RATE_LIMIT_REACHED]: 3,
+      },
+    },
     rateLimit: {
       maxConcurrent: 2,
       delayBetweenRequests: 1000,
@@ -648,6 +673,11 @@ export const PROVIDER_CONFIGURATIONS = {
 
   // Lingva - Open-source Google Translate front-end settings
   Lingva: {
+    queueRetryPolicy: {
+      maxExecutions: {
+        [ErrorTypes.RATE_LIMIT_REACHED]: 3,
+      },
+    },
     rateLimit: {
       maxConcurrent: 3, // Conservative for public instances
       delayBetweenRequests: 0,

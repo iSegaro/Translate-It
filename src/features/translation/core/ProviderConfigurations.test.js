@@ -17,15 +17,27 @@ import {
 } from './ProviderConfigurations.js';
 
 describe('ProviderConfigurations optimization scaling', () => {
-  it('configures Google Classic and V2 rate-limit Queue budgets independently', () => {
-    expect(getProviderConfiguration('GoogleTranslate').queueRetryPolicy.maxExecutions.RATE_LIMIT_REACHED)
-      .toBe(3);
-    expect(getProviderConfiguration('GoogleTranslateV2').queueRetryPolicy.maxExecutions.RATE_LIMIT_REACHED)
-      .toBe(3);
+  it('configures explicit traditional network Queue budgets without affecting BrowserAPI', () => {
+    for (const providerName of [
+      'GoogleTranslate',
+      'GoogleTranslateV2',
+      'BingTranslate',
+      'DeepLTranslate',
+      'YandexTranslate',
+      'MicrosoftEdge',
+      'Lingva',
+      'Vajehyab',
+    ]) {
+      expect(getProviderConfiguration(providerName).queueRetryPolicy.maxExecutions.RATE_LIMIT_REACHED)
+        .toBe(3);
+    }
+
+    expect(getProviderConfiguration('BrowserAPI').queueRetryPolicy).toBeUndefined();
     expect(getProviderConfiguration('OpenAI').queueRetryPolicy).toBeUndefined();
   });
 
-  it('declares Bing explicit circuit threshold override', () => {
+  it('preserves Bing internal retry and circuit settings', () => {
+    expect(PROVIDER_CONFIGURATIONS.BingTranslate.batching.maxRetries).toBe(3);
     expect(PROVIDER_CONFIGURATIONS.BingTranslate.errorHandling.circuitBreakThreshold).toBe(3);
   });
 
