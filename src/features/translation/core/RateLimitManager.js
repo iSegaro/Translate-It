@@ -8,7 +8,7 @@ import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { registryIdToName } from '@/features/translation/providers/ProviderConstants.js';
 import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
-import { isFatalError, isConfigError, matchErrorToType } from '@/shared/error-management/ErrorMatcher.js';
+import { isFatalError, isConfigError, isProviderRequestSizeError, matchErrorToType } from '@/shared/error-management/ErrorMatcher.js';
 import { isLocalDeterministicValidationError } from '@/shared/error-management/ValidationPolicy.js';
 import { PROVIDER_CONFIGURATIONS, getProviderConfiguration } from '@/features/translation/core/ProviderConfigurations.js';
 import { getProviderOptimizationLevelAsync } from '@/shared/config/config.js';
@@ -351,7 +351,7 @@ export class RateLimitManager {
                            error.message?.includes('cancelled') ||
                            error.message?.includes('aborted');
       
-      if (!isCancellation && !isLocalDeterministicValidationError(error)) {
+      if (!isCancellation && (!isLocalDeterministicValidationError(error) || isProviderRequestSizeError(error))) {
         this._recordFailure(state, error, providerName);
       }
       
@@ -411,10 +411,12 @@ export class RateLimitManager {
     // count towards circuit breaking. Request fatality and provider health
     // eligibility are separate decisions.
     const isConfig = isConfigError(error);
+    const isProviderRequestSize = isProviderRequestSizeError(error);
     const isProviderHttpTextEmpty = error?.type === ErrorTypes.TEXT_EMPTY
       && [400, 422].includes(error?.statusCode);
     const isProviderHealthFailure = !isConfig
       && error?.type !== ErrorTypes.INVALID_REQUEST
+      && !isProviderRequestSize
       && !isProviderHttpTextEmpty;
     if (isProviderHealthFailure) {
       state.consecutiveFailures++;

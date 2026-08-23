@@ -6,7 +6,7 @@
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { ErrorTypes } from "@/shared/error-management/ErrorTypes.js";
-import { isFatalError, isCancellationError } from "@/shared/error-management/ErrorMatcher.js";
+import { isFatalError, isCancellationError, isProviderRequestSizeError } from "@/shared/error-management/ErrorMatcher.js";
 import { isLocalDeterministicValidationError } from "@/shared/error-management/ValidationPolicy.js";
 import { appendTranslationDiagnostic } from '@/features/translation/ir/TranslationOperation.js';
 
@@ -133,6 +133,8 @@ class QueueItem {
   shouldRetry() {
     if (this.lastError?.operationAborted) return false;
     if (isCancellationError(this.lastError)) return false;
+
+    if (isProviderRequestSizeError(this.lastError)) return false;
 
     const isProviderHttpTextEmpty = this.lastError?.type === ErrorTypes.TEXT_EMPTY
       && [400, 422].includes(this.lastError?.statusCode);

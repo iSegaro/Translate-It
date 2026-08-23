@@ -639,6 +639,43 @@ describe('QueueManager', () => {
     });
   });
 
+  describe('provider request-size HTTP_ERROR', () => {
+    it.each([
+      [400, 'request is too long'],
+      [422, 'maximum context length exceeded'],
+      [413, 'Payload Too Large'],
+    ])('does not retry HTTP %s remote-size errors', async (statusCode, message) => {
+      const error = { type: ErrorTypes.HTTP_ERROR, statusCode, message };
+      const request = vi.fn().mockRejectedValue(error);
+      const executionContext = { operation: { appendDiagnostic: vi.fn() } };
+
+      const promise = queueManager.enqueue('provider-size', request, 0, 'context', { executionContext });
+
+      await vi.advanceTimersByTimeAsync(150);
+      await expect(promise).rejects.toBe(error);
+      await vi.advanceTimersByTimeAsync(10000);
+
+      expect(request).toHaveBeenCalledTimes(1);
+      expect(queueManager.retryTimeouts.size).toBe(0);
+      expect(executionContext.operation.appendDiagnostic).not.toHaveBeenCalledWith(
+        expect.objectContaining({ type: 'QUEUE_RETRY' })
+      );
+    });
+
+    it('retains retries for ordinary HTTP_ERROR', async () => {
+      const error = { type: ErrorTypes.HTTP_ERROR, statusCode: 400, message: 'Bad Request' };
+      const request = vi.fn().mockRejectedValueOnce(error).mockResolvedValue('healthy');
+
+      const promise = queueManager.enqueue('ordinary-http', request);
+      await vi.advanceTimersByTimeAsync(150);
+      expect(request).toHaveBeenCalledTimes(1);
+      await vi.advanceTimersByTimeAsync(3000);
+
+      await expect(promise).resolves.toBe('healthy');
+      expect(request).toHaveBeenCalledTimes(2);
+    });
+  });
+
   describe('Parallel queue lane', () => {
     it('should dispatch all pending parallel-queue requests without serializing them', async () => {
       const first = createDeferred();

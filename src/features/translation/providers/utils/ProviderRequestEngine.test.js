@@ -217,6 +217,22 @@ describe('ProviderRequestEngine', () => {
     });
 
     it.each([
+      [400, 'request is too long'],
+      [422, 'maximum context length exceeded'],
+      [413, 'Payload Too Large'],
+    ])('preserves HTTP %s remote-size errors as HTTP_ERROR', async (status, message) => {
+      proxyManager.fetch.mockResolvedValue(httpErrorResponse({ error: { message } }, status, message));
+
+      await expect(ProviderRequestEngine.executeApiCall(mockProvider, {
+        url: 'https://api.test.com',
+        fetchOptions: { headers: {} },
+      })).rejects.toMatchObject({
+        type: ErrorTypes.HTTP_ERROR,
+        statusCode: status,
+      });
+    });
+
+    it.each([
       ['top-level provider type', { type: 'payment_required_error' }],
       ['nested provider type', { error: { type: 'payment_required_error' } }],
     ])('classifies HTTP 402 as insufficient balance despite %s', async (_label, body) => {

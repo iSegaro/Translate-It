@@ -21,7 +21,7 @@ vi.mock('@/shared/error-management/ValidationPolicy.js', () => ({
 }));
 
 import { RateLimitManager, TranslationPriority } from './RateLimitManager.js';
-import { isConfigError, isFatalError } from '@/shared/error-management/ErrorMatcher.js';
+import { isConfigError, isFatalError, isProviderRequestSizeError } from '@/shared/error-management/ErrorMatcher.js';
 import { isLocalDeterministicValidationError } from '@/shared/error-management/ValidationPolicy.js';
 import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
 
@@ -92,6 +92,14 @@ describe('RateLimitManager', () => {
     // Default mock behavior for ErrorMatcher
     isFatalError.mockImplementation((err) => err.message === 'FATAL');
     isConfigError.mockReturnValue(false);
+    isProviderRequestSizeError.mockImplementation((error) => {
+      const statusCode = Number(error?.statusCode);
+      const message = typeof error?.message === 'string' ? error.message.toLowerCase() : '';
+      return error?.type === ErrorTypes.HTTP_ERROR
+        && (statusCode === 413
+          || ((statusCode === 400 || statusCode === 422)
+            && /\btoo\s+long\b|\bmaximum\s+length\b|\bcontext\s+length\b/.test(message)));
+    });
 
     // Reset singleton instance for clean tests
     RateLimitManager.instance = null;
@@ -189,6 +197,32 @@ describe('RateLimitManager', () => {
         statusCode,
       });
       isFatalError.mockReturnValue(true);
+
+      await expect(manager.executeWithRateLimit(
+        'TestProvider',
+        () => Promise.reject(error)
+      )).rejects.toBe(error);
+
+      const state = manager.providerStates.get('TestProvider');
+      expect(state.performanceStats.failedRequests).toBe(1);
+      expect(state.consecutiveFailures).toBe(0);
+      expect(state.isCircuitOpen).toBe(false);
+
+      const nextTask = vi.fn().mockResolvedValue('healthy');
+      await expect(manager.executeWithRateLimit('TestProvider', nextTask)).resolves.toBe('healthy');
+      expect(nextTask).toHaveBeenCalledTimes(1);
+    });
+
+    it.each([
+      [400, 'request is too long'],
+      [422, 'maximum context length exceeded'],
+      [413, 'Payload Too Large'],
+    ])('records HTTP %s remote-size failure without health penalty', async (statusCode, message) => {
+      const error = Object.assign(new Error(message), {
+        type: ErrorTypes.HTTP_ERROR,
+        statusCode,
+      });
+      isFatalError.mockReturnValue(false);
 
       await expect(manager.executeWithRateLimit(
         'TestProvider',

@@ -7,6 +7,7 @@ import {
   isRetryableError, 
   isCancellationError,
   needsSettings,
+  isProviderRequestSizeError,
   ErrorMatcher
 } from './ErrorMatcher.js';
 import { ErrorTypes } from './ErrorTypes.js';
@@ -122,7 +123,10 @@ describe('ErrorMatcher', () => {
     it('should match specific messages for HTTP 400', () => {
       expect(matchErrorToType({ statusCode: 400, message: 'invalid api key' })).toBe(ErrorTypes.API_KEY_INVALID);
       expect(matchErrorToType({ statusCode: 400, message: 'text is empty' })).toBe(ErrorTypes.TEXT_EMPTY);
-      expect(matchErrorToType({ statusCode: 400, message: 'too long' })).toBe(ErrorTypes.TEXT_TOO_LONG);
+      expect(matchErrorToType({ statusCode: 400, message: 'too long' })).toBe(ErrorTypes.HTTP_ERROR);
+      expect(matchErrorToType({ statusCode: 422, message: 'maximum length exceeded' })).toBe(ErrorTypes.HTTP_ERROR);
+      expect(matchErrorToType({ statusCode: 413, message: 'Payload Too Large' })).toBe(ErrorTypes.HTTP_ERROR);
+      expect(matchErrorToType({ statusCode: 400, message: 'rate limit for this parameter' })).toBe(ErrorTypes.HTTP_ERROR);
     });
 
     it('should match specific messages for HTTP 404', () => {
@@ -153,6 +157,21 @@ describe('ErrorMatcher', () => {
   });
 
   describe('Classification Functions', () => {
+    it.each([
+      [{ type: ErrorTypes.HTTP_ERROR, statusCode: 413 }, true],
+      [{ type: ErrorTypes.HTTP_ERROR, statusCode: 400, message: 'request is too long' }, true],
+      [{ type: ErrorTypes.HTTP_ERROR, statusCode: 422, message: 'maximum context length exceeded' }, true],
+      [{ type: ErrorTypes.HTTP_ERROR, statusCode: 400, message: 'rate limit for this parameter' }, false],
+      [{ type: ErrorTypes.HTTP_ERROR, statusCode: 500, message: 'request is too long' }, false],
+      [{ type: ErrorTypes.HTTP_ERROR, statusCode: 400, message: 'bad request' }, false],
+    ])('should identify provider request-size failures narrowly', (error, expected) => {
+      expect(isProviderRequestSizeError(error)).toBe(expected);
+    });
+
+    it('keeps unqualified TEXT_TOO_LONG message classification unchanged', () => {
+      expect(matchErrorToType('text is too long')).toBe(ErrorTypes.TEXT_TOO_LONG);
+    });
+
     it('isSilentError should return true for silent types', () => {
       expect(isSilentError(ErrorTypes.USER_CANCELLED)).toBe(true);
       expect(isSilentError(ErrorTypes.TAB_RESTRICTED)).toBe(true);

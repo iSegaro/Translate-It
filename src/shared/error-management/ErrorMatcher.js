@@ -212,6 +212,21 @@ export function isRetryableError(errorOrType) {
 }
 
 /**
+ * Identifies provider HTTP failures caused by request-size limits.
+ * This is execution-policy metadata; canonical public type remains HTTP_ERROR.
+ */
+export function isProviderRequestSizeError(error) {
+  if (error?.type !== ErrorTypes.HTTP_ERROR) return false;
+
+  const statusCode = Number(error.statusCode);
+  if (statusCode === 413) return true;
+  if (statusCode !== 400 && statusCode !== 422) return false;
+
+  const message = typeof error.message === 'string' ? error.message.toLowerCase() : '';
+  return /\btoo\s+long\b|\bmaximum\s+length\b|\bcontext\s+length\b/.test(message);
+}
+
+/**
  * Determines if an error should be handled silently
  */
 export function isSilentError(errorOrType) {
@@ -277,7 +292,6 @@ export function matchErrorToType(rawOrError = "") {
       if (code === 400 || code === 422) {
         if (errorMsg.includes("api key") || errorMsg.includes("auth") || errorMsg.includes("invalid key")) return ErrorTypes.API_KEY_INVALID;
         if (errorMsg.includes("text is empty") || errorMsg.includes("empty text")) return ErrorTypes.TEXT_EMPTY;
-        if (errorMsg.includes("too long") || errorMsg.includes("limit") || errorMsg.includes("maximum length")) return ErrorTypes.TEXT_TOO_LONG;
       }
 
       if (code === 404) {
