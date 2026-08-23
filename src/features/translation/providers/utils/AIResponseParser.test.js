@@ -197,6 +197,16 @@ describe('AIResponseParser', () => {
       expect(result).toEqual({ results: ['AA', 'BB', 'CC'], contractViolation: false });
     });
 
+    it('restores shuffled plain-string response IDs to canonical request order', () => {
+      const result = AIResponseParser.parseBatchResult(
+        '[{"id":2,"text":"TC"},{"id":0,"text":"TA"},{"id":1,"text":"TB"}]',
+        3,
+        ['A', 'B', 'C'],
+      );
+
+      expect(result).toEqual({ results: ['TA', 'TB', 'TC'], contractViolation: false });
+    });
+
     it('keeps object batch mapping identity-based', () => {
       const result = AIResponseParser.parseBatchResult(
         '[{"id":"y","text":"BB"},{"id":"x","text":"AA"}]',

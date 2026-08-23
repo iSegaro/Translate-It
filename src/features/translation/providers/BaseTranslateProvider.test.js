@@ -387,6 +387,17 @@ describe('BaseTranslateProvider', () => {
       expect(TraditionalTextProcessor.scrubBidiArtifacts).toHaveBeenCalledTimes(2);
     });
 
+    it('preserves same-cardinality traditional output order without identity checks', async () => {
+      const texts = ['A', 'B', 'C'];
+      vi.spyOn(provider, '_translateChunk').mockResolvedValue(['TA', 'TC', 'TB']);
+
+      const result = await provider._traditionalBatchTranslate(
+        texts, 'en', 'fa', TranslationMode.Page
+      );
+
+      expect(result).toEqual(['TA', 'TC', 'TB']);
+    });
+
     it('should handle mismatch case using SegmentMapper', async () => {
       const texts = ['A', 'B'];
       // Mock _translateChunk to return a single string (merged result)

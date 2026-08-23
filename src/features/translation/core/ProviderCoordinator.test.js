@@ -311,6 +311,18 @@ describe('ProviderCoordinator', () => {
       expect(result.translatedText).toBe('Extracted Text');
     });
 
+    it('accepts same-cardinality traditional arrays positionally without provenance checks', async () => {
+      mockProvider.constructor.isAI = false;
+      mockProvider.providerName = 'GoogleTranslate';
+      mockProvider.translate.mockResolvedValue(['TA', 'TC', 'TB']);
+
+      const result = await providerCoordinator.execute(
+        mockProvider, ['A', 'B', 'C'], 'en', 'fa'
+      );
+
+      expect(result.translatedText).toEqual(['TA', 'TC', 'TB']);
+    });
+
     it('should handle array results by joining them if expected format is STRING', async () => {
       mockProvider.translate.mockResolvedValue(['Part 1', 'Part 2']);
       

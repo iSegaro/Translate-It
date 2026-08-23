@@ -220,6 +220,21 @@ describe('TranslationSegmentMapper', () => {
       expect(mapAsLingvaWould('A B', ['A', 'B'])).toEqual(['A', 'B']);
     });
 
+    it('uses source character ratios when merged output has no recoverable boundaries', () => {
+      const source = [
+        'SEGMENT_ALPHA',
+        'SEGMENT_BRAVO_WITH_LONG_CONTEXT',
+        'SEGMENT_CHARLIE',
+      ];
+      const merged = 'ALPHA_T1 ALPHA_T2 BRAVO_T1 BRAVO_T2 CHARLIE_T1 CHARLIE_T2';
+
+      expect(mapAsLingvaWould(merged, source)).toEqual([
+        'ALPHA_T1',
+        'ALPHA_T2 BRAVO_T1 BRAVO_T2',
+        'CHARLIE_T1 CHARLIE_T2',
+      ]);
+    });
+
     it('blank originals preserved alongside full coverage', () => {
       expect(mapAsLingvaWould('TA TB', ['A', '', 'B'])).toEqual(['TA', '', 'TB']);
     });

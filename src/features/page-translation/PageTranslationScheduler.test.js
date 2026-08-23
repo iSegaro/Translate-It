@@ -605,6 +605,66 @@ describe('PageTranslationScheduler', () => {
       expect(scheduler.activeFlushes).toBe(0);
     });
 
+    it('keeps independent batch results attached to their own items when completion reverses', async () => {
+      const itemA = { text: 'A1', resolve: vi.fn(), score: 1 };
+      const itemB = { text: 'B1', resolve: vi.fn(), score: 1 };
+      const resolveA = {};
+      const resolveB = {};
+      const responseA = new Promise(resolve => { resolveA.resolve = resolve; });
+      const responseB = new Promise(resolve => { resolveB.resolve = resolve; });
+
+      scheduler.settings.maxConcurrentFlushes = 2;
+      scheduler.queue.push(itemA, itemB);
+      PageTranslationFluidFilter.process.mockImplementation(queue => ({
+        batchItems: [queue[0]],
+        remainingItems: queue.slice(1),
+      }));
+      vi.spyOn(scheduler, '_getBatchConfig').mockResolvedValue({
+        providerRegistryId: 'google',
+        targetLanguage: 'fa',
+      });
+      safeSendMessage
+        .mockImplementationOnce(() => responseA)
+        .mockImplementationOnce(() => responseB);
+
+      const flushA = scheduler.flush();
+      const flushB = scheduler.flush();
+      await vi.waitFor(() => expect(safeSendMessage).toHaveBeenCalledTimes(2));
+
+      resolveB.resolve({ success: true, translatedText: JSON.stringify(['TB1']) });
+      await flushB;
+      expectSettlement(itemB.resolve, 'TB1');
+      expect(itemA.resolve).not.toHaveBeenCalled();
+
+      resolveA.resolve({ success: true, translatedText: JSON.stringify(['TA1']) });
+      await flushA;
+      expectSettlement(itemA.resolve, 'TA1');
+    });
+
+    it('applies same-batch positional results to corresponding scheduler items', async () => {
+      const items = [
+        { text: 'A', resolve: vi.fn(), score: 1 },
+        { text: 'B', resolve: vi.fn(), score: 1 },
+        { text: 'C', resolve: vi.fn(), score: 1 },
+      ];
+      scheduler.queue.push(...items);
+      PageTranslationFluidFilter.process.mockReturnValue({ batchItems: items, remainingItems: [] });
+      vi.spyOn(scheduler, '_getBatchConfig').mockResolvedValue({
+        providerRegistryId: 'google',
+        targetLanguage: 'fa',
+      });
+      safeSendMessage.mockResolvedValue({
+        success: true,
+        translatedText: JSON.stringify(['TA', 'TC', 'TB']),
+      });
+
+      await scheduler.flush();
+
+      expectSettlement(items[0].resolve, 'TA');
+      expectSettlement(items[1].resolve, 'TC');
+      expectSettlement(items[2].resolve, 'TB');
+    });
+
     it('ignores multiple stopped flush finalizers while preserving current-session accounting', async () => {
       const oldRequests = [];
       const resolveOld = [];
