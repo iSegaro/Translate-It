@@ -32,6 +32,8 @@ describe('useContentAppPageTranslation', () => {
         isAutoTranslating: false,
         isTranslated: false,
         status: 'translating',
+        errorMessage: 'stale error',
+        canRetry: true,
       },
       setPageTranslation: vi.fn((state) => Object.assign(mobileStore.pageTranslationData, state)),
       resetPageTranslation: vi.fn(),
@@ -61,6 +63,85 @@ describe('useContentAppPageTranslation', () => {
     expect(state.errorMessage).not.toBe(raw);
     expect(state.status).toBe('error');
     expect(state.isTranslating).toBe(false);
+  });
+
+  it('marks partial completion without entering error state', async () => {
+    await listeners.get(MessageActions.PAGE_TRANSLATE_COMPLETE)({
+      translatedCount: 2,
+      failedCount: 1,
+      totalCount: 3,
+    });
+
+    expect(mobileStore.setPageTranslation).toHaveBeenCalledWith(expect.objectContaining({
+      status: 'completed',
+      isTranslated: true,
+      translatedCount: 2,
+      failedCount: 1,
+      totalCount: 3,
+    }));
+  });
+
+  it('ignores non-fatal page errors at presentation-state boundary', async () => {
+    const before = { ...mobileStore.pageTranslationData };
+
+    await listeners.get(MessageActions.PAGE_TRANSLATE_ERROR)({
+      errorDetails: { type: 'HTTP_ERROR', statusCode: 409, message: 'retryable' },
+      isFatal: false,
+    });
+
+    expect(mobileStore.setPageTranslation).not.toHaveBeenCalled();
+    expect(mobileStore.pageTranslationData).toEqual(before);
+  });
+
+  it('clears stale retry state when translation starts', () => {
+    listeners.get(MessageActions.PAGE_TRANSLATE_START)({});
+
+    expect(mobileStore.setPageTranslation).toHaveBeenCalledWith(expect.objectContaining({
+      errorMessage: null,
+      canRetry: false,
+      failedCount: 0,
+    }));
+  });
+
+  it('clears stale retry state after partial completion', async () => {
+    await listeners.get(MessageActions.PAGE_TRANSLATE_ERROR)({
+      errorDetails: { type: 'HTTP_ERROR', statusCode: 409, message: 'retryable' },
+      isFatal: false,
+    });
+    await listeners.get(MessageActions.PAGE_TRANSLATE_COMPLETE)({
+      translatedCount: 2,
+      failedCount: 1,
+      totalCount: 3,
+    });
+
+    expect(mobileStore.setPageTranslation).toHaveBeenLastCalledWith(expect.objectContaining({
+      status: 'completed',
+      canRetry: false,
+    }));
+  });
+
+  it('marks zero-result completion as terminal failure', async () => {
+    await listeners.get(MessageActions.PAGE_TRANSLATE_ERROR)({
+      errorDetails: { type: 'HTTP_ERROR', statusCode: 409, message: 'retryable' },
+      isFatal: false,
+    });
+    await listeners.get(MessageActions.PAGE_TRANSLATE_COMPLETE)({
+      translatedCount: 0,
+      failedCount: 3,
+      totalCount: 3,
+    });
+
+    expect(mobileStore.setPageTranslation).toHaveBeenCalledWith(expect.objectContaining({
+      status: 'error',
+      isTranslated: false,
+      translatedCount: 0,
+      failedCount: 3,
+      totalCount: 3,
+    }));
+    expect(mobileStore.setPageTranslation).toHaveBeenLastCalledWith(expect.objectContaining({
+      status: 'error',
+      canRetry: false,
+    }));
   });
 
   it('does not surface structured cancellation/context errors', async () => {

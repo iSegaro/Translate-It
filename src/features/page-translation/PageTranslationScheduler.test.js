@@ -208,6 +208,37 @@ describe('PageTranslationScheduler', () => {
       }
     });
 
+    it('continues after a non-fatal batch failure and completes once', async () => {
+      const failedItem = { text: 'Failed', resolve: vi.fn(), score: 1 };
+      const translatedItem = { text: 'Translated', resolve: vi.fn(), score: 1 };
+      scheduler.queue.push(failedItem, translatedItem);
+      scheduler.totalTasks = 2;
+
+      PageTranslationFluidFilter.process
+        .mockReturnValueOnce({ batchItems: [failedItem], remainingItems: [translatedItem] })
+        .mockReturnValueOnce({ batchItems: [translatedItem], remainingItems: [] });
+      vi.spyOn(scheduler, '_getBatchConfig').mockResolvedValue({ providerRegistryId: 'google', targetLanguage: 'fa' });
+      safeSendMessage
+        .mockResolvedValueOnce({ success: false, error: 'Temporary provider failure', errorType: 'UNKNOWN' })
+        .mockResolvedValueOnce({ success: true, translatedText: JSON.stringify(['translated']) });
+      const emitSpy = vi.spyOn(pageEventBus, 'emit');
+
+      await scheduler.flush();
+
+      expect(safeSendMessage).toHaveBeenCalledTimes(2);
+      expect(scheduler.fatalErrorOccurred).toBe(false);
+      expectSettlement(failedItem.resolve, 'Failed');
+      expectSettlement(translatedItem.resolve, 'translated');
+      getSettlement(failedItem.resolve).settle('failed');
+      getSettlement(translatedItem.resolve).settle('accepted');
+      await new Promise(resolve => setTimeout(resolve, 600));
+
+      expect(scheduler.failedCount).toBe(1);
+      expect(scheduler.translatedCount).toBe(1);
+      expect(emitSpy.mock.calls.filter(([event]) => event === MessageActions.PAGE_TRANSLATE_COMPLETE)).toHaveLength(1);
+      emitSpy.mockRestore();
+    });
+
     it('should process a successful batch translation', async () => {
       const mockItem = { text: 'Hello', resolve: vi.fn(), score: 1 };
       scheduler.queue.push(mockItem);

@@ -5,6 +5,7 @@ import { TranslationMode } from '@/config.js';
 import ExtensionContextManager from '@/core/extensionContext.js';
 import { ErrorHandler } from '@/shared/error-management/ErrorHandler.js';
 import { MessageFormat } from '@/shared/messaging/core/MessagingCore.js';
+import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
 import { getPageTranslationErrorPresentation } from './PageTranslationErrorPresenter.js';
 
 /**
@@ -103,6 +104,22 @@ export class PageTranslationEventManager {
         }, 
         context: 'page-translation-complete-forward' 
       }, { silent: true }).catch(() => {});
+
+      if (data.translatedCount === 0 && data.failedCount > 0) {
+        void getPageTranslationErrorPresentation({
+          error: Object.assign(new Error('Translation failed'), {
+            type: ErrorTypes.TRANSLATION_FAILED,
+          }),
+          errorType: ErrorTypes.TRANSLATION_FAILED,
+        }).then((displayError) => {
+          if (!displayError) return;
+          return ErrorHandler.getInstance().handle(displayError, {
+            type: ErrorTypes.TRANSLATION_FAILED,
+            context: 'page-translation-zero-result',
+            showToast: true,
+          });
+        }).catch(err => this.logger.warn('ErrorHandler failed for zero-result page translation:', err));
+      }
     });
 
     // 2. Lifecycle Commands (Translate, Restore, Stop, Cancel)
@@ -167,12 +184,7 @@ export class PageTranslationEventManager {
       });
 
       const displayError = await presentationPromise;
-      if (displayError) {
-        ErrorHandler.getInstance().handle(displayError, {
-          context: data.context || 'page-translation',
-          showToast: true
-        }).catch(err => this.logger.warn('ErrorHandler failed for non-fatal error:', err));
-      }
+      if (displayError) this.logger.debug('Non-fatal page translation failure kept silent', displayError.type);
     });
 
     // 4. Conflict Resolution

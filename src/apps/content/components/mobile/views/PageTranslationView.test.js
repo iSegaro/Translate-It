@@ -78,10 +78,42 @@ describe('PageTranslationView retry action', () => {
     expect(wrapper.text()).not.toContain('Retry Translation')
   })
 
+  it('does not expose Retry Translation for zero-result completion', () => {
+    mobileStore.pageTranslationData.value = {
+      ...mobileStore.pageTranslationData.value,
+      status: 'error',
+      canRetry: false,
+      errorMessage: null,
+      translatedCount: 0,
+      failedCount: 3,
+      totalCount: 3,
+    }
+
+    const wrapper = mount(PageTranslationView)
+
+    expect(wrapper.get('.ti-m-header-primary-btn').text()).toBe('Close')
+    expect(wrapper.text()).not.toContain('Retry Translation')
+  })
+
   it('keeps Retry Translation for retryable error', async () => {
     mobileStore.pageTranslationData.value.canRetry = true
     const wrapper = mount(PageTranslationView)
 
     expect(wrapper.get('.ti-m-header-primary-btn').text()).toBe('Retry Translation')
+  })
+
+  it('shows passive wording for partial completion', () => {
+    mobileStore.pageTranslationData.value = {
+      ...mobileStore.pageTranslationData.value,
+      status: 'completed',
+      isTranslated: true,
+      translatedCount: 2,
+      failedCount: 1,
+      totalCount: 3,
+    }
+
+    const wrapper = mount(PageTranslationView)
+
+    expect(wrapper.text()).toContain('Completed with some content untranslated')
   })
 })

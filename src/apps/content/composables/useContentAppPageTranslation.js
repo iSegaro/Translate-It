@@ -62,8 +62,10 @@ export function useContentAppPageTranslation(mobileStore, tracker) {
         isAutoTranslating: detail.isAutoTranslating || false,
         status: TRANSLATION_STATUS.TRANSLATING,
         translatedCount: 0,
+        failedCount: 0,
         totalCount: 0,
-        errorMessage: null
+        errorMessage: null,
+        canRetry: false,
       });
 
       if (deviceDetector.isMobile()) {
@@ -83,9 +85,9 @@ export function useContentAppPageTranslation(mobileStore, tracker) {
         return;
       }
 
-      const translatedCount = detail.translatedCount || detail.translated || mobileStore.pageTranslationData.translatedCount;
-      const failedCount = detail.failedCount || detail.failed || 0;
-      const totalCount = detail.totalCount || mobileStore.pageTranslationData.totalCount;
+      const translatedCount = detail.translatedCount ?? detail.translated ?? mobileStore.pageTranslationData.translatedCount;
+      const failedCount = detail.failedCount ?? detail.failed ?? 0;
+      const totalCount = detail.totalCount ?? mobileStore.pageTranslationData.totalCount;
 
       // Use status from aggregator if available, otherwise calculate based on counts
       let finalStatus = detail.status || ((translatedCount + failedCount) >= totalCount ? TRANSLATION_STATUS.COMPLETED : TRANSLATION_STATUS.TRANSLATING);
@@ -113,9 +115,9 @@ export function useContentAppPageTranslation(mobileStore, tracker) {
         return;
       }
 
-      const translatedCount = detail.translatedCount || detail.translated || mobileStore.pageTranslationData.translatedCount;
-      const failedCount = detail.failedCount || detail.failed || 0;
-      const totalCount = detail.totalCount || mobileStore.pageTranslationData.totalCount;
+      const translatedCount = detail.translatedCount ?? detail.translated ?? mobileStore.pageTranslationData.translatedCount;
+      const failedCount = detail.failedCount ?? detail.failed ?? 0;
+      const totalCount = detail.totalCount ?? mobileStore.pageTranslationData.totalCount;
 
       // IDLE means visible content is done but more might be hidden - show as COMPLETED for UI
       mobileStore.setPageTranslation({
@@ -137,31 +139,35 @@ export function useContentAppPageTranslation(mobileStore, tracker) {
         return;
       }
 
-      const translatedCount = detail.translatedCount || mobileStore.pageTranslationData.translatedCount;
-      const failedCount = detail.failedCount || detail.failed || 0;
+      const translatedCount = detail.translatedCount ?? mobileStore.pageTranslationData.translatedCount;
+      const failedCount = detail.failedCount ?? detail.failed ?? 0;
+      const totalCount = detail.totalCount ?? mobileStore.pageTranslationData.totalCount ?? (translatedCount + failedCount);
+      const isZeroResult = translatedCount === 0 && failedCount > 0;
 
       mobileStore.setPageTranslation({
         isTranslating: false,
         isTranslated: translatedCount > 0,
         isAutoTranslating: detail.isAutoTranslating !== undefined ? detail.isAutoTranslating : mobileStore.pageTranslationData.isAutoTranslating,
-        status: TRANSLATION_STATUS.COMPLETED,
+        status: isZeroResult ? TRANSLATION_STATUS.ERROR : TRANSLATION_STATUS.COMPLETED,
         translatedCount,
         failedCount,
-        totalCount: detail.totalCount || mobileStore.pageTranslationData.totalCount || (translatedCount + failedCount)
+        totalCount,
+        errorMessage: null,
+        canRetry: false,
       });
     });
 
     tracker.addEventListener(pageEventBus, MessageActions.PAGE_TRANSLATE_ERROR, async (detail) => {
+      if (detail.isFatal === false) return;
+
       const presentation = await getPageTranslationErrorDecision(detail);
       if (!presentation) return;
 
-      const isFatal = detail.isFatal !== false;
-
       mobileStore.setPageTranslation({ 
-        isTranslating: isFatal ? false : mobileStore.pageTranslationData.isTranslating, 
-        isAutoTranslating: isFatal ? false : mobileStore.pageTranslationData.isAutoTranslating,
-        isTranslated: isFatal ? false : mobileStore.pageTranslationData.isTranslated,
-        status: isFatal ? TRANSLATION_STATUS.ERROR : mobileStore.pageTranslationData.status,
+        isTranslating: false,
+        isAutoTranslating: false,
+        isTranslated: false,
+        status: TRANSLATION_STATUS.ERROR,
         errorMessage: presentation.displayError.message,
         canRetry: presentation.canRetry,
       });

@@ -130,7 +130,7 @@ describe('PageTranslationEventManager', () => {
       expect(mockManager._handleFatalError).toHaveBeenCalledWith('Failed', 'network', undefined);
     });
 
-    it('presents structured provider failures safely before ErrorHandler', async () => {
+    it('keeps non-fatal provider failures silent while preserving the internal event', async () => {
       const callback = mockBus.on.mock.calls.find(c => c[0] === 'page-translation-internal-error')[1];
       const error = Object.assign(new Error('raw provider diagnostic'), {
         type: ErrorTypes.MODEL_MISSING,
@@ -139,13 +139,14 @@ describe('PageTranslationEventManager', () => {
 
       await callback({ error, errorType: error.type, isFatal: false, context: 'page-translation-batch' });
 
-      const handledError = ErrorHandler.getInstance().handle.mock.calls[0][0];
-      expect(handledError.message).not.toContain('raw provider diagnostic');
-      expect(handledError.type).toBe(ErrorTypes.MODEL_MISSING);
-      expect(ErrorHandler.getInstance().handle).toHaveBeenCalledTimes(1);
+      expect(mockManager._broadcastEvent).toHaveBeenCalledWith(MessageActions.PAGE_TRANSLATE_ERROR, expect.objectContaining({
+        errorType: ErrorTypes.MODEL_MISSING,
+        isFatal: false,
+      }));
+      expect(ErrorHandler.getInstance().handle).not.toHaveBeenCalled();
     });
 
-    it('keeps legacy string failures compatible while using safe display text', async () => {
+    it('keeps legacy non-fatal failures silent', async () => {
       const callback = mockBus.on.mock.calls.find(c => c[0] === 'page-translation-internal-error')[1];
 
       await callback({
@@ -154,9 +155,33 @@ describe('PageTranslationEventManager', () => {
         isFatal: false,
       });
 
-      const handledError = ErrorHandler.getInstance().handle.mock.calls[0][0];
-      expect(handledError.message).not.toContain('legacy provider diagnostic');
-      expect(ErrorHandler.getInstance().handle).toHaveBeenCalledTimes(1);
+      expect(ErrorHandler.getInstance().handle).not.toHaveBeenCalled();
+    });
+
+    it('keeps multiple non-fatal batch failures silent', async () => {
+      const callback = mockBus.on.mock.calls.find(c => c[0] === 'page-translation-internal-error')[1];
+
+      await Promise.all([
+        callback({ error: 'batch 1', errorType: ErrorTypes.MODEL_MISSING, isFatal: false }),
+        callback({ error: 'batch 2', errorType: ErrorTypes.MODEL_MISSING, isFatal: false }),
+        callback({ error: 'batch 3', errorType: ErrorTypes.MODEL_MISSING, isFatal: false }),
+      ]);
+
+      expect(mockManager._broadcastEvent).toHaveBeenCalledTimes(3);
+      expect(ErrorHandler.getInstance().handle).not.toHaveBeenCalled();
+    });
+
+    it('presents one terminal error when completion has zero useful results', async () => {
+      const callback = mockBus.on.mock.calls.find(c => c[0] === MessageActions.PAGE_TRANSLATE_COMPLETE)[1];
+
+      callback({ translatedCount: 0, failedCount: 3, totalCount: 3 });
+      await vi.waitFor(() => expect(ErrorHandler.getInstance().handle).toHaveBeenCalledTimes(1));
+
+      expect(ErrorHandler.getInstance().handle.mock.calls[0][1]).toMatchObject({
+        type: ErrorTypes.TRANSLATION_FAILED,
+        context: 'page-translation-zero-result',
+        showToast: true,
+      });
     });
 
     it.each([ErrorTypes.USER_CANCELLED, ErrorTypes.TRANSLATION_CANCELLED, ErrorTypes.CONTEXT, ErrorTypes.EXTENSION_CONTEXT_INVALIDATED])(

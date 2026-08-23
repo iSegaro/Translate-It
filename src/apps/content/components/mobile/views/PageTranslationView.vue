@@ -89,12 +89,19 @@
         </div>
       </div>
 
+      <div
+        v-if="isPartialCompletion"
+        class="ti-m-partial-completion-message"
+      >
+        {{ t('mobile_page_partial_completion', 'Completed with some content untranslated') }}
+      </div>
+
       <!-- Error Message in Progress Card -->
       <div
         v-if="pageTranslationData.status === 'error'"
         class="ti-m-error-message"
       >
-        {{ pageTranslationData.errorMessage || t('mobile_page_unknown_error', 'Unknown translation error') }}
+        {{ pageTranslationData.errorMessage || (isZeroResult ? t('mobile_page_no_result_error', 'No content was translated') : t('mobile_page_unknown_error', 'Unknown translation error')) }}
       </div>
 
       <div class="ti-m-progress-bar-container">
@@ -242,6 +249,18 @@ const computedProgress = computed(() => {
   const processed = (pageTranslationData.value.translatedCount || 0) + (pageTranslationData.value.failedCount || 0);
   return Math.min(100, Math.round((processed / pageTranslationData.value.totalCount) * 100));
 })
+
+const isPartialCompletion = computed(() => (
+  pageTranslationData.value.status === 'completed'
+  && pageTranslationData.value.translatedCount > 0
+  && pageTranslationData.value.failedCount > 0
+));
+
+const isZeroResult = computed(() => (
+  pageTranslationData.value.status === 'error'
+  && pageTranslationData.value.translatedCount === 0
+  && pageTranslationData.value.failedCount > 0
+));
 
 const primaryAction = computed(() => {
   const isError = pageTranslationData.value.status === 'error';

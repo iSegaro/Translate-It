@@ -755,6 +755,12 @@
   "mobile_page_failed_status": {
     "message": "Failed"
   },
+  "mobile_page_partial_completion": {
+    "message": "Completed with some content untranslated"
+  },
+  "mobile_page_no_result_error": {
+    "message": "No content was translated"
+  },
   "mobile_page_unknown_error": {
     "message": "Unknown translation error"
   },

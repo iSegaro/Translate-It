@@ -755,6 +755,12 @@
   "mobile_page_failed_status": {
     "message": "ناموفق"
   },
+  "mobile_page_partial_completion": {
+    "message": "ترجمه کامل شد، اما بخشی از محتوا ترجمه نشد"
+  },
+  "mobile_page_no_result_error": {
+    "message": "هیچ محتوایی ترجمه نشد"
+  },
   "mobile_page_unknown_error": {
     "message": "خطای ناشناخته در ترجمه"
   },
