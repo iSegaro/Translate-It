@@ -625,6 +625,22 @@ describe('ProviderRequestEngine', () => {
       expect(statsManager.recordError).toHaveBeenCalledWith('TestProvider', 's1', TranslationCallPurpose.PRIMARY_TRANSLATION);
     });
 
+    it('preserves typed SOCKS timeout provenance through request classification', async () => {
+      const error = Object.assign(new Error('SOCKS proxy connection timed out'), {
+        type: ErrorTypes.NETWORK_ERROR,
+        transportFailure: 'socks-proxy-timeout',
+        cause: new Error('native timeout'),
+      });
+      proxyManager.fetch.mockRejectedValue(error);
+
+      await expect(ProviderRequestEngine.executeRequest(mockProvider, baseParams()))
+        .rejects.toBe(error);
+
+      expect(error.type).toBe(ErrorTypes.NETWORK_ERROR);
+      expect(error.transportFailure).toBe('socks-proxy-timeout');
+      expect(error.cause).toBeDefined();
+    });
+
     it('preserves explicit user cancellation for an aborted transport call', async () => {
       const controller = new AbortController();
       controller.abort('user-cancelled');

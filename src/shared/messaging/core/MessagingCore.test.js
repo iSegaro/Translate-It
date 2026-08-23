@@ -102,6 +102,7 @@ describe('MessagingCore', () => {
       error.code = 400;
       error.errorCode = 'MODEL_UNKNOWN';
       error.translationOutcome = { committedParentCount: 0, totalParentCount: 1 };
+      error.transportFailure = 'socks-proxy-timeout';
       error.cause = new Error('private cause');
 
       const serialized = MessageFormat.serializeTranslationError(error);
@@ -118,6 +119,7 @@ describe('MessagingCore', () => {
         errorCode: 'MODEL_UNKNOWN',
         translationOutcome: { committedParentCount: 0, totalParentCount: 1 },
       });
+      expect(serialized).not.toHaveProperty('transportFailure');
       expect(serialized).not.toHaveProperty('cause');
       expect(serialized).not.toHaveProperty('stack');
       expect(serialized).not.toBeInstanceOf(Error);

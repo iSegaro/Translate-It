@@ -335,6 +335,40 @@ describe('RateLimitManager', () => {
       expect(nextTask).toHaveBeenCalledTimes(1);
     });
 
+    it('keeps SOCKS timeout transport failures out of provider health', async () => {
+      const error = Object.assign(new Error('SOCKS proxy connection timed out'), {
+        type: ErrorTypes.NETWORK_ERROR,
+        transportFailure: 'socks-proxy-timeout',
+      });
+      const state = manager.providerStates.get('TestProvider');
+      isFatalError.mockReturnValue(true);
+
+      await expect(manager.executeWithRateLimit(
+        'TestProvider',
+        () => Promise.reject(error)
+      )).rejects.toBe(error);
+
+      expect(state.performanceStats.failedRequests).toBe(1);
+      expect(state.consecutiveFailures).toBe(0);
+      expect(state.isCircuitOpen).toBe(false);
+    });
+
+    it('keeps ordinary NETWORK_ERROR provider-health behavior unchanged', async () => {
+      const error = Object.assign(new Error('Network failure'), {
+        type: ErrorTypes.NETWORK_ERROR,
+      });
+      const state = manager.providerStates.get('TestProvider');
+      isFatalError.mockReturnValue(true);
+
+      await expect(manager.executeWithRateLimit(
+        'TestProvider',
+        () => Promise.reject(error)
+      )).rejects.toBe(error);
+
+      expect(state.performanceStats.failedRequests).toBe(1);
+      expect(state.consecutiveFailures).toBe(1);
+    });
+
     it('keeps fatal FORBIDDEN_ERROR out of provider health and allows the next operation', async () => {
       const error = Object.assign(new Error('Access denied'), {
         type: ErrorTypes.FORBIDDEN_ERROR,

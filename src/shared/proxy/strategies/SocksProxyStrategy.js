@@ -1,4 +1,32 @@
 import { BaseProxyStrategy } from './BaseProxyStrategy.js';
+import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
+
+const SOCKS_PREFLIGHT_TIMEOUT_MS = 5000;
+const SOCKS_TIMEOUT_FAILURE = 'socks-proxy-timeout';
+
+function createAbortError(message = 'The operation was aborted') {
+  const error = new Error(message);
+  error.name = 'AbortError';
+  return error;
+}
+
+function createTimeoutError() {
+  if (typeof DOMException === 'function') {
+    return new DOMException('The operation timed out', 'TimeoutError');
+  }
+
+  const error = new Error('The operation timed out');
+  error.name = 'TimeoutError';
+  return error;
+}
+
+function preserveCallerAbortReason(reason) {
+  return reason instanceof Error ? reason : createAbortError();
+}
+
+function isAbortError(error, signal) {
+  return signal?.aborted || error?.name === 'AbortError';
+}
 
 /**
  * SOCKS Proxy Strategy
@@ -32,6 +60,10 @@ export class SocksProxyStrategy extends BaseProxyStrategy {
     try {
       return await this._socksProxy(url, options);
     } catch (error) {
+      if (error?.type || error?.transportFailure || error?.operationAborted || error?.name === 'AbortError') {
+        throw error;
+      }
+
       this.logger.error(`[SocksProxy] Request failed: ${this._sanitizeUrl(url)} - ${error.message}`);
       this.logger.debug('SOCKS proxy failure details', {
         ...this._getStrategyInfo(),
@@ -63,23 +95,65 @@ export class SocksProxyStrategy extends BaseProxyStrategy {
       method: options.method || 'GET'
     });
 
-    // First, validate that we can reach the proxy server itself
-    // This helps distinguish between invalid proxy host vs proxy connectivity issues
+    // First, validate that we can reach the proxy server itself.
+    // This helps distinguish between invalid proxy host vs proxy connectivity issues.
     try {
       const proxyUrl = `http://${this.config.host}:${this.config.port}`;
+      const callerSignal = options.signal;
+      const preflightController = new AbortController();
+      let timeoutId = null;
+      let callerAbortHandler = null;
+      let timeoutWon = false;
+      let callerAbortWon = false;
+
+      const abortFromCaller = () => {
+        if (preflightController.signal.aborted) return;
+        callerAbortWon = true;
+        preflightController.abort(preserveCallerAbortReason(callerSignal.reason));
+      };
+
+      if (callerSignal?.aborted) {
+        throw preserveCallerAbortReason(callerSignal.reason);
+      } else if (callerSignal) {
+        callerAbortHandler = abortFromCaller;
+        callerSignal.addEventListener('abort', callerAbortHandler, { once: true });
+      }
+
+      timeoutId = setTimeout(() => {
+        if (preflightController.signal.aborted) return;
+        timeoutWon = true;
+        preflightController.abort(createTimeoutError());
+      }, SOCKS_PREFLIGHT_TIMEOUT_MS);
 
       // Test basic connectivity to the proxy
-      await fetch(proxyUrl, {
-        method: 'HEAD',
-        signal: AbortSignal.timeout(5000) // 5 second timeout
-      });
+      try {
+        await fetch(proxyUrl, {
+          method: 'HEAD',
+          signal: preflightController.signal
+        });
+      } catch (error) {
+        if (callerAbortWon) throw error;
+        if (timeoutWon) {
+          const timeoutError = new Error('SOCKS proxy connection timed out');
+          timeoutError.type = ErrorTypes.NETWORK_ERROR;
+          timeoutError.transportFailure = SOCKS_TIMEOUT_FAILURE;
+          timeoutError.cause = error;
+          throw timeoutError;
+        }
+        throw error;
+      } finally {
+        if (timeoutId !== null) clearTimeout(timeoutId);
+        if (callerSignal && callerAbortHandler) {
+          callerSignal.removeEventListener('abort', callerAbortHandler);
+        }
+      }
 
       // If we can reach the proxy, continue with proxy attempt
       return await this._attemptProxyRequest(url, options, proxyUrl);
 
     } catch (error) {
-      if (error.name === 'AbortError') {
-        throw new Error(`Cannot connect to SOCKS proxy at ${this.config.host}:${this.config.port}. Connection timed out.`);
+      if (error?.transportFailure === SOCKS_TIMEOUT_FAILURE || error?.type || isAbortError(error, options.signal)) {
+        throw error;
       } else if (error.message.includes('Failed to fetch') || error.message.includes('NetworkError')) {
         throw new Error(`Cannot connect to SOCKS proxy at ${this.config.host}:${this.config.port}. Please check the proxy address and port.`);
       } else {
@@ -129,6 +203,7 @@ export class SocksProxyStrategy extends BaseProxyStrategy {
 
       throw new Error('Unsupported URL scheme for SOCKS proxy');
     } catch (error) {
+      if (isAbortError(error, options.signal)) throw error;
       this.logger.debug('[SocksProxy] HTTP-over-SOCKS failed', {
         error: error.message,
         url: this._sanitizeUrl(url)
@@ -187,6 +262,7 @@ export class SocksProxyStrategy extends BaseProxyStrategy {
         throw new Error(`Proxy returned error status: ${response.status}`);
       }
     } catch (error) {
+      if (isAbortError(error, options.signal)) throw error;
       this.logger.debug('[SocksProxy] HTTPS through SOCKS failed', {
         error: error.message,
         targetHost: targetUrl.hostname

@@ -504,7 +504,9 @@ export class RateLimitManager {
       ErrorTypes.API_ENDPOINT_INVALID,
       ErrorTypes.LANGUAGE_PAIR_NOT_SUPPORTED,
     ].includes(error?.type);
-    const isProviderHealthFailure = !isConfig
+    const isSocksProxyTimeout = error?.transportFailure === 'socks-proxy-timeout';
+    const isProviderHealthFailure = !isSocksProxyTimeout
+      && !isConfig
       && error?.type !== ErrorTypes.INVALID_REQUEST
       && !isProviderRequestSize
       && !isDeterministicClientHttp
