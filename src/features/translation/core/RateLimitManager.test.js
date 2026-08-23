@@ -272,6 +272,28 @@ describe('RateLimitManager', () => {
       expect(nextTask).toHaveBeenCalledTimes(1);
     });
 
+    it.each([
+      ErrorTypes.API_ENDPOINT_INVALID,
+      ErrorTypes.LANGUAGE_PAIR_NOT_SUPPORTED,
+    ])('keeps request-local %s out of provider health and allows the next operation', async (type) => {
+      const error = Object.assign(new Error(type), { type });
+      const state = manager.providerStates.get('TestProvider');
+      isFatalError.mockReturnValue(true);
+
+      await expect(manager.executeWithRateLimit(
+        'TestProvider',
+        () => Promise.reject(error)
+      )).rejects.toBe(error);
+
+      expect(state.performanceStats.failedRequests).toBe(1);
+      expect(state.consecutiveFailures).toBe(0);
+      expect(state.isCircuitOpen).toBe(false);
+
+      const nextTask = vi.fn().mockResolvedValue('healthy');
+      await expect(manager.executeWithRateLimit('TestProvider', nextTask)).resolves.toBe('healthy');
+      expect(nextTask).toHaveBeenCalledTimes(1);
+    });
+
     it('keeps fatal FORBIDDEN_ERROR out of provider health and allows the next operation', async () => {
       const error = Object.assign(new Error('Access denied'), {
         type: ErrorTypes.FORBIDDEN_ERROR,
@@ -352,6 +374,24 @@ describe('RateLimitManager', () => {
       const error = Object.assign(new Error('Conflict'), {
         type: ErrorTypes.HTTP_ERROR,
         statusCode: 409,
+      });
+      const state = manager.providerStates.get('TestProvider');
+      isFatalError.mockReturnValue(false);
+
+      await expect(manager.executeWithRateLimit(
+        'TestProvider',
+        () => Promise.reject(error)
+      )).rejects.toBe(error);
+
+      expect(state.performanceStats.failedRequests).toBe(1);
+      expect(state.consecutiveFailures).toBe(1);
+      expect(state.isCircuitOpen).toBe(false);
+    });
+
+    it('still counts genuine SERVER_ERROR provider health failures', async () => {
+      const error = Object.assign(new Error('Server failure'), {
+        type: ErrorTypes.SERVER_ERROR,
+        statusCode: 500,
       });
       const state = manager.providerStates.get('TestProvider');
       isFatalError.mockReturnValue(false);

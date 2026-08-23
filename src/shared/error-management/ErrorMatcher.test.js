@@ -199,6 +199,8 @@ describe('ErrorMatcher', () => {
 
     it('isFatalError should identify fatal errors', () => {
       expect(isFatalError(ErrorTypes.API_KEY_INVALID)).toBe(true);
+      expect(isFatalError(ErrorTypes.API_ENDPOINT_INVALID)).toBe(true);
+      expect(isFatalError(ErrorTypes.LANGUAGE_PAIR_NOT_SUPPORTED)).toBe(true);
       expect(isFatalError(ErrorTypes.NETWORK_ERROR)).toBe(false); // Changed: Network is now transient
       expect(isFatalError({ statusCode: 429 })).toBe(false); // Changed: Rate limit is now transient
       expect(isFatalError({ statusCode: 401 })).toBe(true);
