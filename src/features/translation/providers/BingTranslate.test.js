@@ -15,6 +15,7 @@ vi.mock('webextension-polyfill', () => ({
 vi.mock('@/shared/logging/logger.js', () => ({
   getScopedLogger: () => ({
     debug: vi.fn(),
+    debugLazy: vi.fn(),
     info: vi.fn(),
     warn: vi.fn(),
     error: vi.fn(),
@@ -22,6 +23,14 @@ vi.mock('@/shared/logging/logger.js', () => ({
     operation: vi.fn(),
     performance: vi.fn(),
   }),
+}));
+
+const proxyFetch = vi.hoisted(() => vi.fn());
+vi.mock('@/shared/proxy/ProxyManager.js', () => ({
+  proxyManager: {
+    fetch: proxyFetch,
+    setConfig: vi.fn(),
+  },
 }));
 
 vi.mock('@/shared/config/config.js', () => ({
@@ -205,11 +214,7 @@ describe('BingTranslateProvider', () => {
       await expect(provider._translateChunk(['URL'], 'en', 'fa')).resolves.toEqual(['URL']);
     });
 
-    it('does not adaptively retry when maxRetries is zero', async () => {
-      getProviderConfiguration.mockReturnValue({
-        ...defaultProviderConfig,
-        batching: { ...defaultProviderConfig.batching, maxRetries: 0 },
-      });
+    it('normalizes application 400 and does not adaptively retry', async () => {
       provider._executeApiCall.mockImplementation(async (request) => request.extractResponse({
         statusCode: 400,
         headers: { get: () => 'application/json' },
@@ -217,22 +222,42 @@ describe('BingTranslateProvider', () => {
       }));
 
       await expect(provider._translateChunk(['first', 'second'], 'en', 'fa', 'selection', null, 0, 2, 0, 1))
-        .rejects.toMatchObject({ name: 'BingApiError' });
+        .rejects.toMatchObject({
+          name: 'BingApiError',
+          type: ErrorTypes.HTTP_ERROR,
+          statusCode: 400,
+        });
       expect(provider._executeApiCall).toHaveBeenCalledTimes(1);
     });
 
-    it('does not adaptively retry when adaptiveChunking is false', async () => {
-      getProviderConfiguration.mockReturnValue({
-        ...defaultProviderConfig,
-        batching: { ...defaultProviderConfig.batching, adaptiveChunking: false, maxRetries: 3 },
+    it('preserves application 400 identity for a single text', async () => {
+      let producedError;
+      provider._executeApiCall.mockImplementation(async (request) => {
+        try {
+          return await request.extractResponse({
+            statusCode: 400,
+            headers: { get: () => 'application/json' },
+            text: async () => JSON.stringify({ statusCode: 400 }),
+          });
+        } catch (error) {
+          producedError = error;
+          throw error;
+        }
       });
-      const originalError = Object.assign(new Error('Bing adaptive failure'), {
-        name: 'BingApiError',
-      });
-      provider._executeApiCall.mockRejectedValue(originalError);
 
-      await expect(provider._translateChunk(['first', 'second'], 'en', 'fa', 'selection', null, 0, 2, 0, 1))
-        .rejects.toBe(originalError);
+      let caughtError;
+      try {
+        await provider._translateChunk(['single'], 'en', 'fa', 'selection', null, 0, 1, 0, 1);
+      } catch (error) {
+        caughtError = error;
+      }
+
+      expect(caughtError).toBe(producedError);
+      expect(producedError).toMatchObject({
+        name: 'BingApiError',
+        type: ErrorTypes.HTTP_ERROR,
+        statusCode: 400,
+      });
       expect(provider._executeApiCall).toHaveBeenCalledTimes(1);
     });
 
@@ -242,26 +267,40 @@ describe('BingTranslateProvider', () => {
         batching: { ...defaultProviderConfig.batching, maxRetries: 1 },
       });
       provider._executeApiCall.mockImplementation(async (request) => request.extractResponse({
-        statusCode: 400,
-        headers: { get: () => 'application/json' },
-        text: async () => JSON.stringify({ statusCode: 400 }),
+        headers: { get: () => 'text/html' },
+        text: async () => '<html>blocked</html>',
       }));
 
       await expect(provider._translateChunk(['a', 'b', 'c', 'd'], 'en', 'fa', 'selection', null, 0, 4, 0, 1))
-        .rejects.toMatchObject({ name: 'BingApiError' });
+        .rejects.toMatchObject({ name: 'BingHtmlResponseError' });
       expect(provider._executeApiCall).toHaveBeenCalledTimes(2);
     });
 
     it('keeps default adaptive retry behavior when maxRetries is absent', async () => {
       provider._executeApiCall.mockImplementation(async (request) => request.extractResponse({
-        statusCode: 400,
         headers: { get: () => 'application/json' },
-        text: async () => JSON.stringify({ statusCode: 400 }),
+        text: async () => 'not-json',
       }));
 
       await expect(provider._translateChunk(['a', 'b', 'c', 'd'], 'en', 'fa', 'selection', null, 0, 4, 0, 1))
-        .rejects.toMatchObject({ name: 'BingApiError' });
+        .rejects.toMatchObject({ name: 'BingJsonParseError' });
       expect(provider._executeApiCall).toHaveBeenCalledTimes(3);
+    });
+
+    it('keeps transport HTTP 400 canonical identity', async () => {
+      provider._executeApiCall.mockRestore();
+      proxyFetch.mockResolvedValue({
+        ok: false,
+        status: 400,
+        statusText: 'Bad Request',
+        headers: { get: () => 'application/json' },
+        clone() { return this; },
+        json: async () => ({ error: { message: 'Bad Request' } }),
+      });
+
+      await expect(provider._translateChunk(['source'], 'en', 'fa', 'selection'))
+        .rejects.toMatchObject({ type: ErrorTypes.HTTP_ERROR, statusCode: 400 });
+      expect(proxyFetch).toHaveBeenCalledTimes(1);
     });
   });
 

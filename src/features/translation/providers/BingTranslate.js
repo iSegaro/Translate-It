@@ -194,6 +194,8 @@ export class BingTranslateProvider extends BaseTranslateProvider {
           if (data?.statusCode === 400) {
             const err = new Error('Bing API returned status 400');
             err.name = 'BingApiError';
+            err.type = ErrorTypes.HTTP_ERROR;
+            err.statusCode = 400;
             throw err;
           }
 
@@ -239,17 +241,13 @@ export class BingTranslateProvider extends BaseTranslateProvider {
     } catch (error) {
       const errorType = error.type || matchErrorToType(error);
       
-      // Handle HTML response, JSON parsing errors, and Status 400 with retry
-      // We check these BEFORE the fatal check to allow adaptive chunking/retries
-      // for BingApiError (which is usually a 400 bad request that can be fixed by splitting).
-      if (error.name === 'BingHtmlResponseError' || error.name === 'BingJsonParseError' || error.name === 'BingApiError') {
+      // Handle HTML response and JSON parsing errors with existing adaptive recovery.
+      if (error.name === 'BingHtmlResponseError' || error.name === 'BingJsonParseError') {
         const maxRetries = providerConfig?.batching?.maxRetries ?? 3;
         const adaptiveChunking = providerConfig?.batching?.adaptiveChunking ?? true;
 
         logger.warn(`[Bing] ${error.name} on attempt ${retryAttempt + 1}/${maxRetries + 1}. Chunk size: ${chunkTexts.length}. Reason: ${error.message}`);
 
-        // For BingApiError (Status 400), we MUST reduce chunk size as it often means the request was too large, 
-        // complex, or had language detection issues (like the 'ny' detection bug).
         if (adaptiveChunking && retryAttempt < maxRetries && chunkTexts.length > 1) {
           // Calculate new chunk size - halving it is usually the most effective way to bypass Bing's 400 errors
           const newChunkSize = Math.max(
