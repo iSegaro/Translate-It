@@ -5,8 +5,7 @@
 
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
-import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
-import { ActionReasons } from '@/shared/messaging/core/MessagingConstants.js';
+import { isUserCancellationReason, normalizeOperationAbortReason } from '@/shared/error-management/CancellationPolicy.js';
 import { streamingManager } from "../StreamingManager.js";
 import { getTranslationInputPreview } from "../translationInputHelpers.js";
 
@@ -14,21 +13,11 @@ const logger = getScopedLogger(LOG_COMPONENTS.TRANSLATION, 'TranslationLifecycle
 // Retain out-of-order cancellation intent long enough for extension messaging to register its request.
 const CANCELLATION_TOMBSTONE_TTL_MS = 60_000;
 const INTERNAL_ABORT_REASON = 'operation-abort';
-const USER_CANCELLATION_REASONS = new Set([
-  ErrorTypes.USER_CANCELLED,
-  ActionReasons.USER_CANCELLED,
-  'user-cancelled',
-  'user-cancel',
-  'User cancelled',
-  'User clicked stop',
-  ActionReasons.ESC_KEY_PRESSED,
-  ActionReasons.USER_STOPPED_PAGE_TRANSLATION,
-]);
 
 function getAbortReason(reason, timeout) {
   if (timeout) return 'timeout';
-  if (USER_CANCELLATION_REASONS.has(reason)) return 'user-cancelled';
-  return typeof reason === 'string' && reason ? reason : INTERNAL_ABORT_REASON;
+  if (isUserCancellationReason(reason)) return 'user-cancelled';
+  return normalizeOperationAbortReason(reason) || INTERNAL_ABORT_REASON;
 }
 
 export class TranslationLifecycleRegistry {

@@ -105,8 +105,8 @@ describe('StreamingTimeoutManager', () => {
     expect(manager.isStreaming('error-observer-error')).toBe(false);
 
     const cancelled = manager.registerStreamingOperation('cancel-observer-error', 5000, { onError });
-    manager.cancelStreaming('cancel-observer-error', 'cancelled by test');
-    await expect(cancelled).resolves.toMatchObject({ success: false, cancelled: true, reason: 'cancelled by test' });
+    manager.cancelStreaming('cancel-observer-error', 'user-cancelled');
+    await expect(cancelled).resolves.toMatchObject({ success: false, cancelled: true, reason: 'user-cancelled' });
     expect(loggerMock.warn).toHaveBeenCalled();
   });
 
@@ -346,7 +346,7 @@ describe('StreamingTimeoutManager', () => {
     const messageId = 'msg-7';
     const promise = manager.registerStreamingOperation(messageId, 5000);
     
-    manager.cancelStreaming(messageId, 'Cancelled by test');
+    manager.cancelStreaming(messageId, 'user-cancelled');
     
     const result = await promise;
     expect(result).toMatchObject({
@@ -354,8 +354,29 @@ describe('StreamingTimeoutManager', () => {
       cancelled: true,
       timedOut: false,
       type: 'USER_CANCELLED',
-      reason: 'Cancelled by test'
+      reason: 'user-cancelled'
     });
+    expect(manager.isStreaming(messageId)).toBe(false);
+  });
+
+  it('preserves internal lifecycle cancellation provenance', async () => {
+    const messageId = 'internal-cleanup';
+    const promise = manager.registerStreamingOperation(messageId, 5000);
+
+    manager.cancelStreaming(messageId, 'lifecycle-cleanup');
+
+    const result = await promise;
+    expect(result).toMatchObject({
+      success: false,
+      cancelled: false,
+      timedOut: false,
+      error: {
+        operationAborted: true,
+        cancellationReason: 'lifecycle-cleanup',
+      },
+    });
+    expect(result.error.type).not.toBe('USER_CANCELLED');
+    expect(manager.isStreaming(messageId)).toBe(false);
   });
 
   it('should return true for shouldContinue when messageId is unknown', () => {
