@@ -370,6 +370,7 @@ export class PageTranslationScheduler extends ResourceTracker {
       this.batchTimer = null;
     }
     
+    const flushSessionId = this.translationSessionId;
     const flushContext = this.sessionContext;
     this.activeFlushes++;
 
@@ -424,8 +425,14 @@ export class PageTranslationScheduler extends ResourceTracker {
     } catch (error) {
       this.logger.error('Critical error in scheduler flush loop:', error);
     } finally {
-      this.activeFlushes--;
-      this._checkCompletion();
+      // A stopped flush may settle after a newer session has started. Its
+      // finalizer must not decrement the newer session's accounting.
+      const ownsAccounting = this.translationSessionId === flushSessionId
+        && this.sessionContext === flushContext;
+      if (ownsAccounting) {
+        this.activeFlushes--;
+        this._checkCompletion();
+      }
     }
   }
 

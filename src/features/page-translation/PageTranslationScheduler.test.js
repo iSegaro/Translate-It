@@ -555,5 +555,150 @@ describe('PageTranslationScheduler', () => {
        expectSettlement(mockItem.resolve, 'Old Context');
       expect(scheduler.translatedCount).toBe(0);
     });
+
+    it('does not let a stopped flush decrement a newer session counter', async () => {
+      const oldResponse = {};
+      const newResponse = {};
+      let resolveOld;
+      let resolveNew;
+      const oldRequest = new Promise(resolve => { resolveOld = resolve; });
+      const newRequest = new Promise(resolve => { resolveNew = resolve; });
+      const oldItem = { text: 'Old', resolve: vi.fn(), score: 1 };
+      const newItem = { text: 'New', resolve: vi.fn(), score: 1 };
+
+      scheduler.queue.push(oldItem);
+      scheduler.totalTasks = 1;
+      PageTranslationFluidFilter.process.mockImplementation(queue => ({
+        batchItems: [queue[0]],
+        remainingItems: queue.slice(1),
+      }));
+      vi.spyOn(scheduler, '_getBatchConfig').mockResolvedValue({
+        providerRegistryId: 'google',
+        targetLanguage: 'fa',
+      });
+      safeSendMessage
+        .mockImplementationOnce(() => oldRequest)
+        .mockImplementationOnce(() => newRequest);
+
+      const oldFlush = scheduler.flush();
+      await vi.waitFor(() => expect(safeSendMessage).toHaveBeenCalledTimes(1));
+      expect(scheduler.activeFlushes).toBe(1);
+      const completionSpy = vi.spyOn(scheduler, '_checkCompletion');
+
+      scheduler.stop();
+      scheduler.setTranslationState(true, 'new-session', { session: 'new' });
+      scheduler.queue.push(newItem);
+      scheduler.totalTasks = 1;
+
+      const newFlush = scheduler.flush();
+      await vi.waitFor(() => expect(safeSendMessage).toHaveBeenCalledTimes(2));
+      expect(scheduler.activeFlushes).toBe(1);
+
+      resolveOld(oldResponse);
+      await oldFlush;
+      expect(scheduler.activeFlushes).toBe(1);
+      expect(completionSpy).not.toHaveBeenCalled();
+      expect(newItem.resolve).not.toHaveBeenCalled();
+
+      resolveNew(newResponse);
+      await newFlush;
+      expect(scheduler.activeFlushes).toBe(0);
+    });
+
+    it('ignores multiple stopped flush finalizers while preserving current-session accounting', async () => {
+      const oldRequests = [];
+      const resolveOld = [];
+      const rejectOld = [];
+      const newResponse = {};
+      let resolveNew;
+      const newRequest = new Promise(resolve => { resolveNew = resolve; });
+      const oldItems = [
+        { text: 'Old A', resolve: vi.fn(), score: 1 },
+        { text: 'Old B', resolve: vi.fn(), score: 1 },
+      ];
+      const newItem = { text: 'New', resolve: vi.fn(), score: 1 };
+
+      oldItems.forEach(item => scheduler.queue.push(item));
+      scheduler.totalTasks = oldItems.length;
+      scheduler.settings.maxConcurrentFlushes = 2;
+      PageTranslationFluidFilter.process.mockImplementation(queue => ({
+        batchItems: [queue[0]],
+        remainingItems: queue.slice(1),
+      }));
+      vi.spyOn(scheduler, '_getBatchConfig').mockResolvedValue({
+        providerRegistryId: 'google',
+        targetLanguage: 'fa',
+      });
+      oldItems.forEach(() => {
+        oldRequests.push(new Promise((resolve, reject) => {
+          resolveOld.push(resolve);
+          rejectOld.push(reject);
+        }));
+      });
+      safeSendMessage
+        .mockImplementationOnce(() => oldRequests[0])
+        .mockImplementationOnce(() => oldRequests[1])
+        .mockImplementationOnce(() => newRequest);
+
+      const oldFlushes = [scheduler.flush(), scheduler.flush()];
+      await vi.waitFor(() => expect(safeSendMessage).toHaveBeenCalledTimes(2));
+      expect(scheduler.activeFlushes).toBe(2);
+
+      scheduler.stop();
+      scheduler.setTranslationState(true, 'new-session', { session: 'new' });
+      scheduler.queue.push(newItem);
+      scheduler.totalTasks = 1;
+      const newFlush = scheduler.flush();
+      await vi.waitFor(() => expect(safeSendMessage).toHaveBeenCalledTimes(3));
+      expect(scheduler.activeFlushes).toBe(1);
+
+      resolveOld[0]({});
+      rejectOld[1](new Error('old-session failure'));
+      await Promise.all(oldFlushes);
+      expect(scheduler.activeFlushes).toBe(1);
+
+      resolveNew(newResponse);
+      await newFlush;
+      expect(scheduler.activeFlushes).toBe(0);
+    });
+
+    it('decrements active flushes for current-session success and failure', async () => {
+      const requests = [];
+      const resolvers = [];
+      const items = [
+        { text: 'A', resolve: vi.fn(), score: 1 },
+        { text: 'B', resolve: vi.fn(), score: 1 },
+      ];
+
+      items.forEach(item => scheduler.queue.push(item));
+      scheduler.totalTasks = items.length;
+      scheduler.settings.maxConcurrentFlushes = 2;
+      PageTranslationFluidFilter.process.mockImplementation(queue => ({
+        batchItems: [queue[0]],
+        remainingItems: queue.slice(1),
+      }));
+      vi.spyOn(scheduler, '_getBatchConfig').mockResolvedValue({
+        providerRegistryId: 'google',
+        targetLanguage: 'fa',
+      });
+      items.forEach(() => {
+        requests.push(new Promise((resolve, reject) => resolvers.push({ resolve, reject })));
+      });
+      safeSendMessage
+        .mockImplementationOnce(() => requests[0])
+        .mockImplementationOnce(() => requests[1]);
+
+      const flushes = [scheduler.flush(), scheduler.flush()];
+      await vi.waitFor(() => expect(safeSendMessage).toHaveBeenCalledTimes(2));
+      expect(scheduler.activeFlushes).toBe(2);
+
+      resolvers[0].resolve({});
+      await flushes[0];
+      expect(scheduler.activeFlushes).toBe(1);
+
+      resolvers[1].reject(new Error('current-session failure'));
+      await flushes[1];
+      expect(scheduler.activeFlushes).toBe(0);
+    });
   });
 });
