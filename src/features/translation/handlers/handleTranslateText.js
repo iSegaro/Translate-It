@@ -37,6 +37,12 @@ export async function handleTranslateText(message, sender, sendResponse) {
     
     const { text, from, to, provider } = message.data || {};
     
+    if (typeof text === 'string' && text.trim() === '') {
+      const error = new Error('Text is required for translation');
+      error.type = ErrorTypes.TEXT_EMPTY;
+      throw error;
+    }
+
     if (!text) {
       throw new Error('Text is required for translation');
     }

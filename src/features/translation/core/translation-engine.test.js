@@ -112,6 +112,80 @@ describe('TranslationEngine', () => {
     getEnableDictionaryAsync.mockResolvedValue(true);
   });
 
+  describe('scalar empty input validation', () => {
+    it.each(['', ' ', '\n', '\t', ' \n\t '])('returns TEXT_EMPTY for %j', async (text) => {
+      const response = await engine.handleMessage({
+        action: MessageActions.TRANSLATE,
+        messageId: `empty-${JSON.stringify(text)}`,
+        data: {
+          text,
+          provider: 'google',
+          sourceLanguage: 'en',
+          targetLanguage: 'fa',
+          mode: 'selection',
+        },
+      }, {});
+
+      expect(response.error.type).toBe(ErrorTypes.TEXT_EMPTY);
+      expect(engine.factory.getProvider).not.toHaveBeenCalled();
+    });
+
+    it('keeps non-empty scalar input on the provider path', async () => {
+      const provider = await engine.getProvider('google');
+
+      const result = await engine.executeTranslation({
+        text: 'Hello',
+        provider: 'google',
+        sourceLanguage: 'en',
+        targetLanguage: 'fa',
+        mode: 'selection',
+      }, {});
+
+      expect(result.success).toBe(true);
+      expect(provider.translate).toHaveBeenCalled();
+    });
+
+    it.each([null, undefined, [], {}])('does not reclassify %j as TEXT_EMPTY', async (text) => {
+      const response = await engine.handleMessage({
+        action: MessageActions.TRANSLATE,
+        messageId: `non-scalar-${String(text)}`,
+        data: {
+          text,
+          provider: 'google',
+          sourceLanguage: 'en',
+          targetLanguage: 'fa',
+          mode: 'selection',
+        },
+      }, {});
+
+      expect(response.error.type).not.toBe(ErrorTypes.TEXT_EMPTY);
+    });
+
+    it('preserves non-empty structured input behavior', async () => {
+      getEnableDictionaryAsync.mockResolvedValue(false);
+      engine.jsonHandler.execute.mockResolvedValue({
+        success: true,
+        translatedText: ['translated'],
+      });
+
+      const result = await engine.handleMessage({
+        action: MessageActions.TRANSLATE,
+        messageId: 'structured-non-empty',
+        data: {
+          text: [''],
+          provider: 'google',
+          sourceLanguage: 'en',
+          targetLanguage: 'fa',
+          mode: 'select_element',
+          options: { rawJsonPayload: true },
+        },
+      }, {});
+
+      expect(result.success).toBe(true);
+      expect(engine.jsonHandler.execute).toHaveBeenCalled();
+    });
+  });
+
   it('forwards timeout classification and reason to lifecycle', async () => {
     engine.lifecycleRegistry.cancelTranslation = vi.fn().mockResolvedValue(true);
 

@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { handleTranslateText } from './handleTranslateText.js';
 import { unifiedTranslationService } from '@/core/services/translation/UnifiedTranslationService.js';
+import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
 
 vi.mock('@/shared/logging/logger.js', () => ({
   getScopedLogger: () => ({
@@ -33,6 +34,29 @@ describe('handleTranslateText', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.stubGlobal('backgroundService', { translationEngine: {} });
+  });
+
+  it.each(['', ' ', '\n', '\t', ' \n\t '])('returns TEXT_EMPTY for scalar %j', async (text) => {
+    const response = await handleTranslateText({
+      ...message,
+      data: { ...message.data, text },
+    });
+
+    expect(response.errorDetails.type).toBe(ErrorTypes.TEXT_EMPTY);
+    expect(unifiedTranslationService.handleTranslationRequest).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ['null text', { text: null }],
+    ['missing text', {}],
+  ])('preserves generic malformed behavior for %s', async (_label, data) => {
+    const response = await handleTranslateText({
+      ...message,
+      data: { ...data, from: 'en', to: 'fa' },
+    });
+
+    expect(response.errorDetails.type).not.toBe(ErrorTypes.TEXT_EMPTY);
+    expect(unifiedTranslationService.handleTranslationRequest).not.toHaveBeenCalled();
   });
 
   it('keeps legacy error string and adds sanitized canonical identity', async () => {

@@ -142,6 +142,12 @@ export class TranslationEngine {
     const { text, provider, sourceLanguage, targetLanguage } = data;
     let { mode } = data;
 
+    if (typeof text === 'string' && text.trim() === '') {
+      const error = new Error("Text to translate is required");
+      error.type = ErrorTypes.TEXT_EMPTY;
+      throw error;
+    }
+
     if (isEmptyTranslationInput(text)) {
       throw new Error("Text to translate is required");
     }
