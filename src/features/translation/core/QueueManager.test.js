@@ -200,6 +200,24 @@ describe('QueueManager', () => {
       expect(result).toBe('Success');
     });
 
+    it.each([ErrorTypes.TRANSLATION_TIMEOUT, ErrorTypes.OPERATION_TIMEOUT])(
+      'does not retry terminal %s',
+      async (timeoutType) => {
+        const timeoutError = Object.assign(new Error(`${timeoutType} deadline`), {
+          type: timeoutType,
+        });
+        const request = vi.fn().mockRejectedValue(timeoutError);
+        const promise = queueManager.enqueue(`terminal-${timeoutType}`, request);
+
+        await expect(promise).rejects.toBe(timeoutError);
+        await vi.advanceTimersByTimeAsync(10000);
+
+        expect(request).toHaveBeenCalledTimes(1);
+        expect(queueManager.retryTimeouts.size).toBe(0);
+        expect(queueManager.getQueueStatus(`terminal-${timeoutType}`).total).toBe(0);
+      },
+    );
+
     it('waits for Retry-After when it exceeds client retry delay', async () => {
       const retryableError = {
         type: ErrorTypes.RATE_LIMIT_REACHED,

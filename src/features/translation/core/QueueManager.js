@@ -33,6 +33,24 @@ export const QueueStatus = {
  * Retry strategies based on error types
  */
 const RETRY_STRATEGIES = {
+  // Operation-owned timeouts are terminal for current Queue work. A future
+  // provider-owned timeout needs an ownership-distinct classification.
+  [ErrorTypes.TRANSLATION_TIMEOUT]: {
+    maxRetries: 1,
+    baseDelay: 0,
+    maxDelay: 0,
+    exponentialFactor: 1,
+    jitter: false
+  },
+
+  [ErrorTypes.OPERATION_TIMEOUT]: {
+    maxRetries: 1,
+    baseDelay: 0,
+    maxDelay: 0,
+    exponentialFactor: 1,
+    jitter: false
+  },
+
   // Rate limiting errors - longer exponential backoff
   [ErrorTypes.RATE_LIMIT_REACHED]: {
     maxRetries: 5,

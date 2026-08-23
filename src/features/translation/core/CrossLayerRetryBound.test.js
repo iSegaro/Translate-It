@@ -246,6 +246,28 @@ describe('Cross-Layer Retry Bound Integration', () => {
     });
   });
 
+  describe('control: operation timeout', () => {
+    it.each([ErrorTypes.TRANSLATION_TIMEOUT, ErrorTypes.OPERATION_TIMEOUT])(
+      'keeps %s terminal at QueueManager boundary',
+      async (timeoutType) => {
+        const timeoutError = Object.assign(new Error(`${timeoutType} deadline`), {
+          type: timeoutType,
+        });
+        const request = vi.fn().mockRejectedValue(timeoutError);
+        const promise = queueManager.enqueue(`timeout-${timeoutType}`, request, 0, 'select_element', {
+          messageId: `timeout-${timeoutType}`,
+        });
+
+        await expect(promise).rejects.toBe(timeoutError);
+        await vi.advanceTimersByTimeAsync(30000);
+
+        expect(request).toHaveBeenCalledTimes(1);
+        expect(queueManager.retryTimeouts.size).toBe(0);
+        expect(queueManager.getQueueStatus(`timeout-${timeoutType}`).total).toBe(0);
+      },
+    );
+  });
+
   describe('control: TEXT_TOO_LONG', () => {
     it('zero transport calls, no failover, QueueManager does not retry', async () => {
       installFetch(() => make429Response());
