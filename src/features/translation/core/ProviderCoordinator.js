@@ -12,6 +12,7 @@ import { LanguageSwappingService } from "@/features/translation/providers/Langua
 import { LanguageDetectionService } from "@/shared/services/LanguageDetectionService.js";
 import { AIResponseParser } from "@/features/translation/providers/utils/AIResponseParser.js";
 import { TranslationMode } from "@/shared/config/config.js";
+import { getProviderConfiguration } from "@/features/translation/core/ProviderConfigurations.js";
 import { isFatalError, isTransientError, matchErrorToType } from "@/shared/error-management/ErrorMatcher.js";
 import { ErrorTypes } from "@/shared/error-management/ErrorTypes.js";
 import { AUTO_DETECT_VALUE } from "@/shared/constants/core.js";
@@ -173,14 +174,20 @@ export class ProviderCoordinator {
       };
 
       const queueProviderName = options.parallelExecution ? `${providerName}::parallel` : providerName;
+      const providerConfig = getProviderConfiguration(providerName);
+      const configuredMaxExecutions = providerConfig?.queueRetryPolicy?.maxExecutions;
+      const queueRetryPolicy = configuredMaxExecutions
+        ? { maxExecutions: { ...configuredMaxExecutions } }
+        : undefined;
 
       // Enqueue the task - QueueManager handles retries and prioritization
       const result = await queueManager.enqueue(queueProviderName, executeTask, numericPriority, translateMode, {
          messageId: options.messageId,
          abortController: options.abortController,
          uiContext: options.uiContext,
-        parallelExecution: !!options.parallelExecution,
-        executionContext: options.executionContext,
+         parallelExecution: !!options.parallelExecution,
+         executionContext: options.executionContext,
+         ...(queueRetryPolicy && { queueRetryPolicy }),
       });
 
       // 7. Post-processing & Normalization

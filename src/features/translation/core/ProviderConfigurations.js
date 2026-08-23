@@ -6,6 +6,7 @@
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { ProviderNames } from "@/features/translation/providers/ProviderConstants.js";
+import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.TRANSLATION, 'ProviderConfigurations');
 
@@ -321,6 +322,11 @@ export const PROVIDER_CONFIGURATIONS = {
 
   // Google Translate - Free translation service settings
   GoogleTranslate: {
+    queueRetryPolicy: {
+      maxExecutions: {
+        [ErrorTypes.RATE_LIMIT_REACHED]: 3,
+      },
+    },
     rateLimit: {
       maxConcurrent: 4, // Moderate concurrent requests
       delayBetweenRequests: 0, // No delay for first request
@@ -362,6 +368,11 @@ export const PROVIDER_CONFIGURATIONS = {
 
   // Google Translate V2 - Robust translation service settings
   GoogleTranslateV2: {
+    queueRetryPolicy: {
+      maxExecutions: {
+        [ErrorTypes.RATE_LIMIT_REACHED]: 3,
+      },
+    },
     rateLimit: {
       maxConcurrent: 4,
       delayBetweenRequests: 0,

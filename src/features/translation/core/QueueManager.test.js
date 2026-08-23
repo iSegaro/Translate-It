@@ -200,6 +200,65 @@ describe('QueueManager', () => {
       expect(result).toBe('Success');
     });
 
+    it('uses request-local RATE_LIMIT_REACHED maxExecutions without changing generic strategy', async () => {
+      const rateLimitError = { type: ErrorTypes.RATE_LIMIT_REACHED, message: 'Rate limit' };
+      const request = vi.fn().mockRejectedValue(rateLimitError);
+      const queueRetryPolicy = { maxExecutions: { RATE_LIMIT_REACHED: 3 } };
+      const promise = queueManager.enqueue('configured-rate-limit-provider', request, 0, 'unknown', {
+        queueRetryPolicy,
+      });
+      const outcome = promise.then(
+        value => ({ value }),
+        error => ({ error }),
+      );
+      promise.catch(() => {});
+
+      queueRetryPolicy.maxExecutions.RATE_LIMIT_REACHED = 5;
+      await vi.advanceTimersByTimeAsync(10000);
+
+      await expect(outcome).resolves.toEqual({ error: rateLimitError });
+      expect(request).toHaveBeenCalledTimes(3);
+
+      const genericRequest = vi.fn()
+        .mockRejectedValueOnce(rateLimitError)
+        .mockRejectedValueOnce(rateLimitError)
+        .mockRejectedValueOnce(rateLimitError)
+        .mockRejectedValueOnce(rateLimitError)
+        .mockResolvedValue('Success');
+      const genericPromise = queueManager.enqueue('generic-rate-limit-provider', genericRequest);
+      const genericOutcome = genericPromise.then(
+        value => ({ value }),
+        error => ({ error }),
+      );
+      genericPromise.catch(() => {});
+
+      await vi.advanceTimersByTimeAsync(30000);
+      await expect(genericOutcome).resolves.toEqual({ value: 'Success' });
+      expect(genericRequest).toHaveBeenCalledTimes(5);
+    });
+
+    it.each([
+      [ErrorTypes.SERVER_ERROR, 3],
+      [ErrorTypes.NETWORK_ERROR, 4],
+      [ErrorTypes.MODEL_OVERLOADED, 4],
+      [ErrorTypes.TRANSLATION_TIMEOUT, 1],
+      [ErrorTypes.OPERATION_TIMEOUT, 1],
+    ])('keeps generic %s budget with a RATE_LIMIT_REACHED-only override', async (errorType, expectedExecutions) => {
+      const error = { type: errorType, message: errorType };
+      const request = vi.fn().mockRejectedValue(error);
+      const promise = queueManager.enqueue(`unrelated-${errorType}`, request, 0, 'unknown', {
+        queueRetryPolicy: { maxExecutions: { RATE_LIMIT_REACHED: 3 } },
+      });
+      const outcome = promise.then(
+        value => ({ value }),
+        error => ({ error }),
+      );
+
+      await vi.advanceTimersByTimeAsync(30000);
+      await expect(outcome).resolves.toEqual({ error });
+      expect(request).toHaveBeenCalledTimes(expectedExecutions);
+    });
+
     it.each([ErrorTypes.TRANSLATION_TIMEOUT, ErrorTypes.OPERATION_TIMEOUT])(
       'does not retry terminal %s',
       async (timeoutType) => {

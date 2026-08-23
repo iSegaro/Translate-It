@@ -12,6 +12,8 @@ vi.mock('webextension-polyfill', () => ({
 vi.mock("@/shared/error-management/ErrorMatcher.js");
 
 import { providerCoordinator } from './ProviderCoordinator.js';
+import { queueManager } from './QueueManager.js';
+import { PROVIDER_CONFIGURATIONS } from './ProviderConfigurations.js';
 import { ResponseFormat } from "@/shared/config/translationConstants.js";
 import { AUTO_DETECT_VALUE } from "@/shared/constants/core.js";
 import { ErrorTypes } from "@/shared/error-management/ErrorTypes.js";
@@ -237,6 +239,49 @@ describe('ProviderCoordinator', () => {
         'en',
         expect.anything()
       );
+    });
+  });
+
+  describe('Queue retry policy snapshot', () => {
+    it.each([
+      ['GoogleTranslate', 3],
+      ['GoogleTranslateV2', 3],
+    ])('passes configured RATE_LIMIT_REACHED budget for %s', async (providerName, maxExecutions) => {
+      mockProvider.providerName = providerName;
+
+      await providerCoordinator.execute(mockProvider, 'hello', 'en', 'fa');
+
+      const options = queueManager.enqueue.mock.calls.at(-1)[4];
+      expect(options.queueRetryPolicy).toEqual({
+        maxExecutions: { RATE_LIMIT_REACHED: maxExecutions },
+      });
+    });
+
+    it('does not pass Google policy to unrelated providers', async () => {
+      mockProvider.providerName = 'OpenAI';
+
+      await providerCoordinator.execute(mockProvider, 'hello', 'en', 'fa');
+
+      const options = queueManager.enqueue.mock.calls.at(-1)[4];
+      expect(options.queueRetryPolicy).toBeUndefined();
+    });
+
+    it('snapshots policy instead of retaining provider configuration reference', async () => {
+      mockProvider.providerName = 'GoogleTranslate';
+      const original = PROVIDER_CONFIGURATIONS.GoogleTranslate.queueRetryPolicy.maxExecutions.RATE_LIMIT_REACHED;
+
+      try {
+        await providerCoordinator.execute(mockProvider, 'hello', 'en', 'fa');
+        const options = queueManager.enqueue.mock.calls.at(-1)[4];
+        PROVIDER_CONFIGURATIONS.GoogleTranslate.queueRetryPolicy.maxExecutions.RATE_LIMIT_REACHED = 5;
+
+        expect(options.queueRetryPolicy.maxExecutions.RATE_LIMIT_REACHED).toBe(3);
+        expect(options.queueRetryPolicy).not.toBe(PROVIDER_CONFIGURATIONS.GoogleTranslate.queueRetryPolicy);
+        expect(options.queueRetryPolicy.maxExecutions)
+          .not.toBe(PROVIDER_CONFIGURATIONS.GoogleTranslate.queueRetryPolicy.maxExecutions);
+      } finally {
+        PROVIDER_CONFIGURATIONS.GoogleTranslate.queueRetryPolicy.maxExecutions.RATE_LIMIT_REACHED = original;
+      }
     });
   });
 

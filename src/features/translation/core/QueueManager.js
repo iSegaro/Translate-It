@@ -128,6 +128,9 @@ class QueueItem {
     this.uiContext = options.uiContext || null; // popup, sidepanel, etc.
     this.executionContext = options.executionContext || null;
     this.abortSignal = options.abortController?.signal || options.abortSignal || null;
+    this.queueRetryPolicy = options.queueRetryPolicy?.maxExecutions
+      ? { maxExecutions: { ...options.queueRetryPolicy.maxExecutions } }
+      : null;
     this.abortListener = null;
     this.status = QueueStatus.PENDING;
     this.createdAt = Date.now();
@@ -145,10 +148,14 @@ class QueueItem {
    * Get retry strategy for the current error
    */
   getRetryStrategy() {
-    if (!this.lastError || !this.lastError.type) {
-      return RETRY_STRATEGIES.default;
-    }
-    return RETRY_STRATEGIES[this.lastError.type] || RETRY_STRATEGIES.default;
+    const strategy = (!this.lastError || !this.lastError.type)
+      ? RETRY_STRATEGIES.default
+      : RETRY_STRATEGIES[this.lastError.type] || RETRY_STRATEGIES.default;
+    const maxExecutions = this.queueRetryPolicy?.maxExecutions?.[this.lastError?.type];
+
+    if (!Number.isInteger(maxExecutions) || maxExecutions < 1) return strategy;
+
+    return { ...strategy, maxRetries: maxExecutions };
   }
   
   /**
