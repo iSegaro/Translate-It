@@ -21,6 +21,45 @@ import { getProviderOptimizationLevelAsync } from '@/shared/config/config.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.TRANSLATION, 'RateLimitManager');
 
+const LEGACY_ADAPTIVE_BACKOFF = Object.freeze({
+  enabled: true,
+  baseMultiplier: 2,
+  maxMultiplier: 10,
+  resetAfterSuccess: 1,
+});
+
+const EXPLICIT_ADAPTIVE_BACKOFF_DEFAULTS = Object.freeze({
+  enabled: true,
+  baseMultiplier: 2,
+  maxDelay: 30000,
+  resetAfterSuccess: 1,
+});
+
+function getAdaptiveBackoffConfig(config = {}) {
+  const raw = config.adaptiveBackoff;
+  if (!raw || typeof raw !== 'object') {
+    return { ...LEGACY_ADAPTIVE_BACKOFF, explicit: false };
+  }
+
+  const baseMultiplier = Number(raw.baseMultiplier);
+  const maxDelay = Number(raw.maxDelay);
+  const resetAfterSuccess = Number(raw.resetAfterSuccess);
+
+  return {
+    explicit: true,
+    enabled: raw.enabled !== false,
+    baseMultiplier: Number.isFinite(baseMultiplier) && baseMultiplier > 1
+      ? baseMultiplier
+      : EXPLICIT_ADAPTIVE_BACKOFF_DEFAULTS.baseMultiplier,
+    maxDelay: Number.isFinite(maxDelay) && maxDelay > 0
+      ? maxDelay
+      : EXPLICIT_ADAPTIVE_BACKOFF_DEFAULTS.maxDelay,
+    resetAfterSuccess: Number.isFinite(resetAfterSuccess) && resetAfterSuccess >= 1
+      ? resetAfterSuccess
+      : EXPLICIT_ADAPTIVE_BACKOFF_DEFAULTS.resetAfterSuccess,
+  };
+}
+
 function createAbortError(signal, message = 'Request aborted') {
   const isUserAbort = signal?.aborted
     && (signal.reason === 'user-cancelled' || signal.reason === 'user_cancelled');
@@ -137,6 +176,7 @@ export class RateLimitManager {
       circuitRecoveryTime: 30000,
       // Adaptive backoff
       currentBackoffMultiplier: 1,
+      successfulRequestsSinceBackoff: 0,
       // Performance monitoring (Crucial for AI providers)
       performanceStats: {
         totalRequests: 0,
@@ -249,7 +289,13 @@ export class RateLimitManager {
       // Check delay between requests
       const now = Date.now();
       const baseDelay = state.config.delayBetweenRequests || 0;
-      const adjustedDelay = baseDelay * (state.currentBackoffMultiplier || 1);
+      const adaptiveBackoff = getAdaptiveBackoffConfig(state.config);
+      const effectiveDelay = baseDelay * (state.currentBackoffMultiplier || 1);
+      const adjustedDelay = adaptiveBackoff.enabled === false
+        ? baseDelay
+        : adaptiveBackoff.explicit
+          ? Math.min(effectiveDelay, adaptiveBackoff.maxDelay)
+          : Math.min(effectiveDelay, baseDelay * adaptiveBackoff.maxMultiplier);
       const timeSinceLast = now - state.lastRequestTime;
 
       if (timeSinceLast < adjustedDelay) {
@@ -407,7 +453,17 @@ export class RateLimitManager {
   _recordSuccess(state) {
     state.consecutiveFailures = 0;
     state.isCircuitOpen = false;
+
+    const adaptiveBackoff = getAdaptiveBackoffConfig(state.config);
+    if (adaptiveBackoff.enabled !== false
+        && adaptiveBackoff.resetAfterSuccess > 1
+        && state.currentBackoffMultiplier > 1) {
+      state.successfulRequestsSinceBackoff++;
+      if (state.successfulRequestsSinceBackoff < adaptiveBackoff.resetAfterSuccess) return;
+    }
+
     state.currentBackoffMultiplier = 1;
+    state.successfulRequestsSinceBackoff = 0;
   }
 
   _recordFailure(state, error, providerName) {
@@ -432,10 +488,16 @@ export class RateLimitManager {
       state.consecutiveFailures++;
     }
     
-    // Adaptive Backoff: Increase delay on 429 or quota errors
-    const isRateLimit = error.message?.includes('429') || error.message?.includes('quota');
-    if (isRateLimit) {
-      state.currentBackoffMultiplier = Math.min(state.currentBackoffMultiplier * 2, 10);
+    // Adaptive Backoff: canonical rate-limit errors own rate-limit backoff.
+    // Status-only fallback is limited to unclassified 429s entering this layer.
+    const isRateLimit = error?.type === ErrorTypes.RATE_LIMIT_REACHED
+      || (!error?.type && Number(error?.statusCode) === 429);
+    const adaptiveBackoff = getAdaptiveBackoffConfig(state.config);
+    if (isRateLimit && adaptiveBackoff.enabled !== false) {
+      state.currentBackoffMultiplier = adaptiveBackoff.explicit
+        ? state.currentBackoffMultiplier * adaptiveBackoff.baseMultiplier
+        : Math.min(state.currentBackoffMultiplier * adaptiveBackoff.baseMultiplier, adaptiveBackoff.maxMultiplier);
+      state.successfulRequestsSinceBackoff = 0;
       logger.warn(`Rate limit detected for ${providerName}, increasing backoff to ${state.currentBackoffMultiplier}x`);
     }
 

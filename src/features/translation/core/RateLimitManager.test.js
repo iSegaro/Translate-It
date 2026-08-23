@@ -649,17 +649,199 @@ describe('RateLimitManager', () => {
   });
 
   describe('Adaptive Backoff', () => {
-    it('should increase delay multiplier on 429 error', async () => {
+    it('uses canonical RATE_LIMIT_REACHED identity for adaptive backoff', async () => {
       const state = manager.providerStates.get('TestProvider');
       expect(state.currentBackoffMultiplier).toBe(1);
 
       try {
-        await manager.executeWithRateLimit('TestProvider', () => Promise.reject(new Error('Error 429: Too Many Requests')));
+        await manager.executeWithRateLimit('TestProvider', () => Promise.reject(
+          Object.assign(new Error('temporarily unavailable'), { type: ErrorTypes.RATE_LIMIT_REACHED })
+        ));
       } catch {
         // ignore
       }
 
       expect(state.currentBackoffMultiplier).toBe(2);
+    });
+
+    it('does not use quota wording from unrelated canonical errors', async () => {
+      const state = manager.providerStates.get('TestProvider');
+      const error = Object.assign(new Error('quota is unavailable'), {
+        type: ErrorTypes.INSUFFICIENT_BALANCE,
+        statusCode: 429,
+      });
+      isConfigError.mockReturnValueOnce(true);
+
+      try {
+        await manager.executeWithRateLimit('TestProvider', () => Promise.reject(error));
+      } catch {
+        // ignore
+      }
+
+      expect(state.currentBackoffMultiplier).toBe(1);
+      expect(state.performanceStats.failedRequests).toBe(1);
+      expect(state.consecutiveFailures).toBe(0);
+      expect(state.isCircuitOpen).toBe(false);
+    });
+
+    it('uses configured multiplier progression and success reset threshold', async () => {
+      const state = manager._initializeProvider('ConfiguredProvider', {
+        maxConcurrent: 1,
+        delayBetweenRequests: 0,
+        adaptiveBackoff: {
+          enabled: true,
+          baseMultiplier: 1.5,
+          maxDelay: 2500,
+          resetAfterSuccess: 2,
+        },
+      });
+      const rateLimitError = Object.assign(new Error('temporarily unavailable'), {
+        type: ErrorTypes.RATE_LIMIT_REACHED,
+      });
+
+      manager._recordFailure(state, rateLimitError, 'ConfiguredProvider');
+      manager._recordFailure(state, rateLimitError, 'ConfiguredProvider');
+      expect(state.currentBackoffMultiplier).toBe(2.25);
+
+      manager._recordSuccess(state);
+      expect(state.currentBackoffMultiplier).toBe(2.25);
+      manager._recordSuccess(state);
+      expect(state.currentBackoffMultiplier).toBe(1);
+    });
+
+    it('caps effective dispatch delay in milliseconds', async () => {
+      vi.useFakeTimers();
+      try {
+        const state = manager._initializeProvider('CappedProvider', {
+          maxConcurrent: 1,
+          delayBetweenRequests: 1000,
+          adaptiveBackoff: {
+            enabled: true,
+            baseMultiplier: 2,
+            maxDelay: 2500,
+            resetAfterSuccess: 1,
+          },
+        });
+        const error = Object.assign(new Error('temporarily unavailable'), {
+          type: ErrorTypes.RATE_LIMIT_REACHED,
+        });
+        manager._recordFailure(state, error, 'CappedProvider');
+        manager._recordFailure(state, error, 'CappedProvider');
+        state.lastRequestTime = Date.now();
+
+        const task = vi.fn().mockResolvedValue('ok');
+        const result = manager.executeWithRateLimit('CappedProvider', task);
+        await Promise.resolve();
+
+        expect(task).not.toHaveBeenCalled();
+        await vi.advanceTimersByTimeAsync(2499);
+        expect(task).not.toHaveBeenCalled();
+        await vi.advanceTimersByTimeAsync(1);
+        await expect(result).resolves.toBe('ok');
+        expect(task).toHaveBeenCalledTimes(1);
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it('preserves zero effective delay for Google-style configuration', async () => {
+      const state = manager._initializeProvider('GoogleStyleProvider', {
+        maxConcurrent: 1,
+        delayBetweenRequests: 0,
+        adaptiveBackoff: {
+          enabled: true,
+          baseMultiplier: 1.5,
+          maxDelay: 10000,
+          resetAfterSuccess: 2,
+        },
+      });
+      const error = Object.assign(new Error('temporarily unavailable'), {
+        type: ErrorTypes.RATE_LIMIT_REACHED,
+      });
+      manager._recordFailure(state, error, 'GoogleStyleProvider');
+
+      const task = vi.fn().mockResolvedValue('ok');
+      await expect(manager.executeWithRateLimit('GoogleStyleProvider', task)).resolves.toBe('ok');
+      expect(task).toHaveBeenCalledTimes(1);
+    });
+
+    it('does not increase backoff when adaptive backoff is disabled', async () => {
+      const state = manager._initializeProvider('DisabledBackoffProvider', {
+        maxConcurrent: 1,
+        delayBetweenRequests: 1000,
+        adaptiveBackoff: { enabled: false, baseMultiplier: 1.5, maxDelay: 2500, resetAfterSuccess: 2 },
+      });
+      const error = Object.assign(new Error('temporarily unavailable'), {
+        type: ErrorTypes.RATE_LIMIT_REACHED,
+      });
+
+      manager._recordFailure(state, error, 'DisabledBackoffProvider');
+
+      expect(state.currentBackoffMultiplier).toBe(1);
+    });
+
+    it('preserves legacy multiplier cap when adaptive configuration is missing', async () => {
+      vi.useFakeTimers();
+      try {
+        const state = manager._initializeProvider('LegacyProvider', {
+          maxConcurrent: 1,
+          delayBetweenRequests: 1000,
+        });
+        state.circuitBreakThreshold = 99;
+        const error = Object.assign(new Error('temporarily unavailable'), {
+          type: ErrorTypes.RATE_LIMIT_REACHED,
+        });
+
+        for (let i = 0; i < 5; i++) {
+          manager._recordFailure(state, error, 'LegacyProvider');
+        }
+
+        expect(state.currentBackoffMultiplier).toBe(10);
+        state.lastRequestTime = Date.now();
+        const task = vi.fn().mockResolvedValue('ok');
+        const result = manager.executeWithRateLimit('LegacyProvider', task);
+        await Promise.resolve();
+
+        await vi.advanceTimersByTimeAsync(9999);
+        expect(task).not.toHaveBeenCalled();
+        await vi.advanceTimersByTimeAsync(1);
+        await expect(result).resolves.toBe('ok');
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it('preserves zero effective delay for legacy configuration', async () => {
+      const state = manager._initializeProvider('LegacyZeroDelayProvider', {
+        maxConcurrent: 1,
+        delayBetweenRequests: 0,
+      });
+      const error = Object.assign(new Error('temporarily unavailable'), {
+        type: ErrorTypes.RATE_LIMIT_REACHED,
+      });
+      manager._recordFailure(state, error, 'LegacyZeroDelayProvider');
+
+      const task = vi.fn().mockResolvedValue('ok');
+      await expect(manager.executeWithRateLimit('LegacyZeroDelayProvider', task)).resolves.toBe('ok');
+      expect(task).toHaveBeenCalledTimes(1);
+    });
+
+    it('normalizes partial adaptive configuration per field', () => {
+      const state = manager._initializeProvider('PartialProvider', {
+        maxConcurrent: 1,
+        delayBetweenRequests: 1000,
+        adaptiveBackoff: {
+          enabled: true,
+          baseMultiplier: 1.5,
+        },
+      });
+      const error = Object.assign(new Error('temporarily unavailable'), {
+        type: ErrorTypes.RATE_LIMIT_REACHED,
+      });
+
+      manager._recordFailure(state, error, 'PartialProvider');
+
+      expect(state.currentBackoffMultiplier).toBe(1.5);
     });
   });
 
