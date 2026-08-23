@@ -159,6 +159,78 @@ describe('RateLimitManager', () => {
   });
 
   describe('Circuit Breaker', () => {
+    it('keeps circuit open when an in-flight success arrives during cooldown', async () => {
+      vi.useFakeTimers();
+      try {
+        const state = manager._initializeProvider('CooldownProvider', {
+          maxConcurrent: 2,
+          delayBetweenRequests: 0,
+          adaptiveBackoff: {
+            enabled: true,
+            baseMultiplier: 2,
+            maxDelay: 1000,
+            resetAfterSuccess: 2,
+          },
+        });
+        state.circuitBreakThreshold = 1;
+        state.circuitRecoveryTime = 30000;
+        state.currentBackoffMultiplier = 2;
+
+        let rejectFirst;
+        let resolveSecond;
+        const firstTask = vi.fn(() => new Promise((resolve, reject) => {
+          rejectFirst = reject;
+        }));
+        const secondTask = vi.fn(() => new Promise(resolve => {
+          resolveSecond = resolve;
+        }));
+
+        const firstRequest = manager.executeWithRateLimit('CooldownProvider', firstTask);
+        const secondRequest = manager.executeWithRateLimit('CooldownProvider', secondTask);
+        await Promise.resolve();
+        await Promise.resolve();
+
+        expect(firstTask).toHaveBeenCalledTimes(1);
+        expect(secondTask).toHaveBeenCalledTimes(1);
+
+        const openingError = Object.assign(new Error('network failure'), {
+          type: ErrorTypes.NETWORK_ERROR,
+        });
+        rejectFirst(openingError);
+        await expect(firstRequest).rejects.toBe(openingError);
+        expect(state.isCircuitOpen).toBe(true);
+        const openingTime = state.circuitOpenTime;
+
+        resolveSecond('in-flight success');
+        await expect(secondRequest).resolves.toBe('in-flight success');
+        expect(state.isCircuitOpen).toBe(true);
+        expect(state.circuitOpenTime).toBe(openingTime);
+        expect(state.lastCircuitError).toBe(openingError);
+        expect(state.successfulRequestsSinceBackoff).toBe(1);
+        expect(state.currentBackoffMultiplier).toBe(2);
+
+        const blockedTask = vi.fn().mockResolvedValue('blocked');
+        await expect(manager.executeWithRateLimit('CooldownProvider', blockedTask))
+          .rejects.toMatchObject({
+            type: ErrorTypes.CIRCUIT_BREAKER_OPEN,
+            originalType: ErrorTypes.NETWORK_ERROR,
+          });
+        expect(blockedTask).not.toHaveBeenCalled();
+
+        await vi.advanceTimersByTimeAsync(30001);
+
+        const recoveryTask = vi.fn().mockResolvedValue('recovered');
+        await expect(manager.executeWithRateLimit('CooldownProvider', recoveryTask))
+          .resolves.toBe('recovered');
+        expect(recoveryTask).toHaveBeenCalledTimes(1);
+        expect(state.isCircuitOpen).toBe(false);
+        expect(state.currentBackoffMultiplier).toBe(1);
+        expect(state.successfulRequestsSinceBackoff).toBe(0);
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
     it('does not count insufficient balance as transient circuit failure', async () => {
       const error = Object.assign(new Error('No credits remaining'), {
         type: ErrorTypes.INSUFFICIENT_BALANCE,

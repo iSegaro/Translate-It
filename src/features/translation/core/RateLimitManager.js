@@ -451,8 +451,11 @@ export class RateLimitManager {
   }
 
   _recordSuccess(state) {
+    const isCoolingDown = state.isCircuitOpen
+      && Date.now() - state.circuitOpenTime <= state.circuitRecoveryTime;
+
     state.consecutiveFailures = 0;
-    state.isCircuitOpen = false;
+    if (!isCoolingDown) state.isCircuitOpen = false;
 
     const adaptiveBackoff = getAdaptiveBackoffConfig(state.config);
     if (adaptiveBackoff.enabled !== false
