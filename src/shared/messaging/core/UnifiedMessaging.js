@@ -162,7 +162,11 @@ export async function sendMessage(message, options = {}) {
     try {
       return await unifiedTranslationCoordinator.coordinateTranslation(message, options);
     } catch (error) {
-      const errorType = matchErrorToType(error);
+      const hasAuthoritativeTimeout = error?.type === ErrorTypes.TRANSLATION_TIMEOUT
+        || error?.type === ErrorTypes.OPERATION_TIMEOUT;
+      if (error?.operationAborted === true && !hasAuthoritativeTimeout) throw error;
+
+      const errorType = hasAuthoritativeTimeout ? error.type : matchErrorToType(error);
       if (isFatalError(error)) throw error;
       if (isCancellationError(error)) throw error;
       if ([

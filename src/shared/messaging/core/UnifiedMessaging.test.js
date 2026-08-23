@@ -536,6 +536,27 @@ describe('UnifiedMessaging', () => {
       expect(browser.runtime.sendMessage).not.toHaveBeenCalled();
     });
 
+    it('propagates internal operation abort without creating fallback work', async () => {
+      const { unifiedTranslationCoordinator } = await import('./UnifiedTranslationCoordinator.js');
+      const operationAbort = Object.assign(new Error('Translation operation aborted'), {
+        operationAborted: true,
+        cancellationReason: 'document-replaced',
+      });
+      unifiedTranslationCoordinator.coordinateTranslation.mockRejectedValueOnce(operationAbort);
+
+      const rejection = sendMessage({ action: 'TRANSLATE', messageId: 'document-replaced' });
+      await expect(rejection).rejects.toBe(operationAbort);
+      await rejection.catch((error) => {
+        expect(error).toMatchObject({
+          operationAborted: true,
+          cancellationReason: 'document-replaced',
+        });
+      });
+      expect(browser.runtime.sendMessage).not.toHaveBeenCalledWith(
+        expect.objectContaining({ messageId: expect.stringMatching(/^fb-/) })
+      );
+    });
+
     it('does not fabricate cancellation for a generic coordinator failure', async () => {
       const { unifiedTranslationCoordinator } = await import('./UnifiedTranslationCoordinator.js');
       const { streamingTimeoutManager } = await import('./StreamingTimeoutManager.js');
@@ -598,6 +619,26 @@ describe('UnifiedMessaging', () => {
       expect(browser.runtime.sendMessage).toHaveBeenNthCalledWith(1, {
         action: 'CHECK_TRANSLATION_STATUS',
         data: { messageId: 'timeout' }
+      });
+    });
+
+    it('preserves authoritative timeout over incidental operation abort metadata', async () => {
+      const { unifiedTranslationCoordinator } = await import('./UnifiedTranslationCoordinator.js');
+      const timeout = Object.assign(new Error('Translation timed out'), {
+        type: ErrorTypes.TRANSLATION_TIMEOUT,
+        operationAborted: true,
+        cancellationReason: 'operation-abort',
+      });
+      unifiedTranslationCoordinator.coordinateTranslation.mockRejectedValueOnce(timeout);
+      browser.runtime.sendMessage
+        .mockResolvedValueOnce({ completed: false })
+        .mockResolvedValueOnce({ success: true, recovered: true });
+
+      await expect(sendMessage({ action: 'TRANSLATE', messageId: 'timeout-with-abort' }))
+        .resolves.toMatchObject({ success: true, recovered: true });
+      expect(browser.runtime.sendMessage).toHaveBeenNthCalledWith(1, {
+        action: 'CHECK_TRANSLATION_STATUS',
+        data: { messageId: 'timeout-with-abort' }
       });
     });
 
