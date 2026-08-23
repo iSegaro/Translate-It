@@ -571,6 +571,26 @@ describe('UnifiedMessaging', () => {
       );
     });
 
+    it.each(['fb-generated', 'fallback-legacy'])(
+      'does not probe status for fallback request ID %s',
+      async (messageId) => {
+        const { unifiedTranslationCoordinator } = await import('./UnifiedTranslationCoordinator.js');
+        const timeout = Object.assign(new Error('Translation timed out'), {
+          type: ErrorTypes.TRANSLATION_TIMEOUT,
+        });
+        unifiedTranslationCoordinator.coordinateTranslation.mockRejectedValueOnce(timeout);
+        browser.runtime.sendMessage.mockResolvedValue({ success: true, recovered: true });
+
+        await expect(sendMessage({ action: 'TRANSLATE', messageId }))
+          .resolves.toMatchObject({ success: true, recovered: true });
+
+        expect(browser.runtime.sendMessage).toHaveBeenCalledTimes(1);
+        expect(browser.runtime.sendMessage).not.toHaveBeenCalledWith(
+          expect.objectContaining({ action: 'CHECK_TRANSLATION_STATUS' }),
+        );
+      },
+    );
+
     it('does not fallback after terminal rate limit for an explicit provider', async () => {
       const { unifiedTranslationCoordinator } = await import('./UnifiedTranslationCoordinator.js');
       const terminalError = Object.assign(new Error('Rate limit exhausted'), {

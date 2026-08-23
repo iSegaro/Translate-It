@@ -109,4 +109,29 @@ describe('handleCheckTranslationStatus', () => {
     expect(result.inProgress).toBe(false);
     expect(result.reason).toBe('not_found');
   });
+
+  it.each(['fb-generated', 'fallback-legacy'])(
+    'should treat %s as fallback without querying lifecycle state',
+    async (messageId) => {
+      mockStreamingStatus.mockReturnValue({
+        status: 'completed',
+        hasResults: true,
+        isComplete: true,
+        results: ['must not be returned'],
+      });
+      mockEngine.getAbortController.mockReturnValue({});
+
+      const result = await handleCheckTranslationStatus({ data: { messageId } }, {});
+
+      expect(result).toEqual({
+        success: true,
+        completed: false,
+        messageId,
+        isFallback: true,
+        reason: 'fallback_requests_never_completed',
+      });
+      expect(mockStreamingStatus).not.toHaveBeenCalled();
+      expect(mockEngine.getAbortController).not.toHaveBeenCalled();
+    },
+  );
 });

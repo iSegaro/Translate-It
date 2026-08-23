@@ -194,7 +194,9 @@ export async function sendMessage(message, options = {}) {
       
       const isTimeout = errorType === ErrorTypes.TRANSLATION_TIMEOUT
         || errorType === ErrorTypes.OPERATION_TIMEOUT;
-      if (isTimeout && message.messageId && !String(message.messageId).startsWith('fallback-')) {
+      const isFallbackMessage = typeof message.messageId === 'string'
+        && (message.messageId.startsWith('fb-') || message.messageId.startsWith('fallback-'));
+      if (isTimeout && message.messageId && !isFallbackMessage) {
         try {
           const checkResponse = await browser.runtime.sendMessage({
             action: 'CHECK_TRANSLATION_STATUS',
