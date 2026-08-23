@@ -200,6 +200,64 @@ describe('QueueManager', () => {
       expect(result).toBe('Success');
     });
 
+    it('waits for Retry-After when it exceeds client retry delay', async () => {
+      const retryableError = {
+        type: ErrorTypes.RATE_LIMIT_REACHED,
+        retryAt: Date.now() + 10000,
+      };
+      const request = vi.fn()
+        .mockRejectedValueOnce(retryableError)
+        .mockResolvedValue('Success');
+      const promise = queueManager.enqueue('retry-after-provider', request);
+
+      await vi.advanceTimersByTimeAsync(150);
+      expect(request).toHaveBeenCalledTimes(1);
+      await vi.advanceTimersByTimeAsync(9849);
+      expect(request).toHaveBeenCalledTimes(1);
+      await vi.advanceTimersByTimeAsync(1);
+
+      await expect(promise).resolves.toBe('Success');
+      expect(request).toHaveBeenCalledTimes(2);
+    });
+
+    it('keeps client retry delay when Retry-After expires sooner', async () => {
+      const retryableError = {
+        type: ErrorTypes.RATE_LIMIT_REACHED,
+        retryAt: Date.now() + 500,
+      };
+      const request = vi.fn()
+        .mockRejectedValueOnce(retryableError)
+        .mockResolvedValue('Success');
+      const promise = queueManager.enqueue('short-retry-after-provider', request);
+
+      await vi.advanceTimersByTimeAsync(150);
+      expect(request).toHaveBeenCalledTimes(1);
+      await vi.advanceTimersByTimeAsync(1349);
+      expect(request).toHaveBeenCalledTimes(1);
+      await vi.advanceTimersByTimeAsync(1);
+
+      await expect(promise).resolves.toBe('Success');
+      expect(request).toHaveBeenCalledTimes(2);
+    });
+
+    it('does not retry earlier than a very long Retry-After', async () => {
+      const retryableError = {
+        type: ErrorTypes.RATE_LIMIT_REACHED,
+        retryAt: Date.now() + 2_147_483_648,
+      };
+      const request = vi.fn()
+        .mockRejectedValueOnce(retryableError)
+        .mockResolvedValue('Success');
+      const promise = queueManager.enqueue('long-retry-after-provider', request);
+
+      await vi.advanceTimersByTimeAsync(150);
+      expect(request).toHaveBeenCalledTimes(1);
+      await vi.advanceTimersByTimeAsync(1000);
+      expect(request).toHaveBeenCalledTimes(1);
+      queueManager.cancelProvider('long-retry-after-provider');
+      await expect(promise).rejects.toMatchObject({ type: ErrorTypes.USER_CANCELLED });
+    });
+
     it('does not start a scheduled retry after operation abort', async () => {
       const abortController = new AbortController();
       const serverError = Object.assign(new Error('HTTP 500'), {

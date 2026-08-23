@@ -16,6 +16,7 @@ import { isLocalDeterministicValidationError } from "@/shared/error-management/V
 import { appendTranslationDiagnostic } from '@/features/translation/ir/TranslationOperation.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.TRANSLATION, 'QueueManager');
+const MAX_TIMER_DELAY = 2_147_483_647;
 
 /**
  * Queue item status types
@@ -395,7 +396,11 @@ export class QueueManager {
       if (item.shouldRetry()) {
         // Schedule retry
         item.status = QueueStatus.RETRYING;
-        const delay = item.getNextRetryDelay();
+        const clientDelay = item.getNextRetryDelay();
+        const serverDelay = Number.isFinite(item.lastError?.retryAt)
+          ? Math.max(0, item.lastError.retryAt - Date.now())
+          : 0;
+        const delay = Math.max(clientDelay, serverDelay);
         
         const nextAttemptNumber = item.attempts + 1;
         const maxAttempts = item.getRetryStrategy().maxRetries;
@@ -409,22 +414,34 @@ export class QueueManager {
           code: error.type,
         });
         
-         this.retryTimeouts.set(item.id, setTimeout(() => {
-           this.retryTimeouts.delete(item.id);
+        const scheduleRetry = (waitTime) => {
+          this.retryTimeouts.set(item.id, setTimeout(() => {
+            this.retryTimeouts.delete(item.id);
 
-           // Final check before moving to PENDING: has it been cancelled during the timeout?
-           if (item.status === QueueStatus.FAILED || item.abortSignal?.aborted) {
-             if (item.status !== QueueStatus.FAILED) this._handleOperationAbort(item);
-             return;
-           }
+            // Final check before moving to PENDING: has it been cancelled during the timeout?
+            if (item.status === QueueStatus.FAILED || item.abortSignal?.aborted) {
+              if (item.status !== QueueStatus.FAILED) this._handleOperationAbort(item);
+              return;
+            }
 
-          item.status = QueueStatus.PENDING;
-          
-          // Continue processing queue
-          if (!this.processing.get(item.providerName)) {
-            this._processQueue(item.providerName);
-          }
-        }, delay));
+            const remainingServerDelay = Number.isFinite(item.lastError?.retryAt)
+              ? item.lastError.retryAt - Date.now()
+              : 0;
+            if (remainingServerDelay > 0) {
+              scheduleRetry(remainingServerDelay);
+              return;
+            }
+
+            item.status = QueueStatus.PENDING;
+            
+            // Continue processing queue
+            if (!this.processing.get(item.providerName)) {
+              this._processQueue(item.providerName);
+            }
+          }, Math.min(Math.max(0, waitTime), MAX_TIMER_DELAY)));
+        };
+
+        scheduleRetry(delay);
         
       } else {
         // Permanent failure

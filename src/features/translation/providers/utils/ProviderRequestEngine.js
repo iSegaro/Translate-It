@@ -69,6 +69,26 @@ function classifyProviderHttpError(provider, errorInfo) {
   }
 }
 
+function parseRetryAt(response, now = Date.now()) {
+  const header = response?.headers?.get?.('Retry-After')
+    ?? response?.headers?.get?.('retry-after');
+  if (typeof header !== 'string') return undefined;
+
+  const value = header.trim();
+  if (!value) return undefined;
+
+  if (/^\d+$/.test(value)) {
+    const seconds = Number(value);
+    const retryAt = now + seconds * 1000;
+    return Number.isSafeInteger(seconds) && Number.isSafeInteger(retryAt)
+      ? retryAt
+      : undefined;
+  }
+
+  const retryAt = Date.parse(value);
+  return Number.isFinite(retryAt) && retryAt > now ? retryAt : undefined;
+}
+
 export const ProviderRequestEngine = {
   /**
    * Internal helper to adapt request headers based on the environment (Browser/Platform)
@@ -264,6 +284,7 @@ export const ProviderRequestEngine = {
 
       const response = await proxyManager.fetch(url, finalFetchOptions);
       const duration = Date.now() - startTime;
+      const retryAt = parseRetryAt(response);
       
       let responseData = null;
 
@@ -355,6 +376,9 @@ export const ProviderRequestEngine = {
         err.statusCode = response.status;
         err.context = context;
         err.providerName = provider.providerName;
+        if (errorType === ErrorTypes.RATE_LIMIT_REACHED && retryAt !== undefined) {
+          err.retryAt = retryAt;
+        }
         throw err;
       }
 

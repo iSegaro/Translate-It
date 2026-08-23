@@ -63,13 +63,107 @@ describe('ProviderRequestEngine', () => {
   });
 
   describe('HTTP error classification hook', () => {
-    const httpErrorResponse = (body, status = 400, statusText = 'Bad Request') => ({
+    const httpErrorResponse = (body, status = 400, statusText = 'Bad Request', extraHeaders = {}) => ({
       ok: false,
       status,
       statusText,
-      headers: new Map([['content-type', 'application/json']]),
+      headers: new Map([
+        ['content-type', 'application/json'],
+        ...Object.entries(extraHeaders),
+      ]),
       json: async () => body,
       clone() { return this; },
+    });
+
+    it('normalizes Retry-After seconds on canonical rate-limit errors', async () => {
+      vi.useFakeTimers();
+      const now = new Date('2026-01-01T00:00:00.000Z');
+      vi.setSystemTime(now);
+      proxyManager.fetch.mockResolvedValue(
+        httpErrorResponse({}, 429, 'Too Many Requests', { 'Retry-After': '5' })
+      );
+
+      try {
+        const error = await ProviderRequestEngine.executeApiCall(mockProvider, {
+          url: 'https://api.test.com',
+          fetchOptions: { headers: {} },
+        }).catch(value => value);
+
+        expect(error).toMatchObject({
+          type: ErrorTypes.RATE_LIMIT_REACHED,
+          statusCode: 429,
+          retryAt: now.getTime() + 5000,
+        });
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it('normalizes Retry-After HTTP dates', async () => {
+      vi.useFakeTimers();
+      vi.setSystemTime(new Date('2026-01-01T00:00:00.000Z'));
+      const retryAt = Date.parse('Thu, 01 Jan 2026 00:00:05 GMT');
+      proxyManager.fetch.mockResolvedValue(
+        httpErrorResponse({}, 429, 'Too Many Requests', { 'retry-after': 'Thu, 01 Jan 2026 00:00:05 GMT' })
+      );
+
+      try {
+        const error = await ProviderRequestEngine.executeApiCall(mockProvider, {
+          url: 'https://api.test.com',
+          fetchOptions: { headers: {} },
+        }).catch(value => value);
+
+        expect(error.retryAt).toBe(retryAt);
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it.each(['', '-5', 'not-a-delay'])('ignores invalid Retry-After value %j', async (retryAfter) => {
+      proxyManager.fetch.mockResolvedValue(
+        httpErrorResponse({}, 429, 'Too Many Requests', { 'Retry-After': retryAfter })
+      );
+
+      const error = await ProviderRequestEngine.executeApiCall(mockProvider, {
+        url: 'https://api.test.com',
+        fetchOptions: { headers: {} },
+      }).catch(value => value);
+
+      expect(error.type).toBe(ErrorTypes.RATE_LIMIT_REACHED);
+      expect(error).not.toHaveProperty('retryAt');
+    });
+
+    it('ignores past Retry-After dates', async () => {
+      vi.useFakeTimers();
+      vi.setSystemTime(new Date('2026-01-01T00:00:05.000Z'));
+      proxyManager.fetch.mockResolvedValue(
+        httpErrorResponse({}, 429, 'Too Many Requests', { 'Retry-After': 'Thu, 01 Jan 2026 00:00:00 GMT' })
+      );
+
+      try {
+        const error = await ProviderRequestEngine.executeApiCall(mockProvider, {
+          url: 'https://api.test.com',
+          fetchOptions: { headers: {} },
+        }).catch(value => value);
+
+        expect(error).not.toHaveProperty('retryAt');
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it('does not attach Retry-After to unrelated HTTP failures', async () => {
+      proxyManager.fetch.mockResolvedValue(
+        httpErrorResponse({}, 500, 'Server Error', { 'Retry-After': '5' })
+      );
+
+      const error = await ProviderRequestEngine.executeApiCall(mockProvider, {
+        url: 'https://api.test.com',
+        fetchOptions: { headers: {} },
+      }).catch(value => value);
+
+      expect(error.type).toBe(ErrorTypes.SERVER_ERROR);
+      expect(error).not.toHaveProperty('retryAt');
     });
 
     it('passes only bounded structured fields to provider hook', async () => {
@@ -338,6 +432,44 @@ describe('ProviderRequestEngine', () => {
       expect(statsManager.recordError).toHaveBeenCalledTimes(1);
       expect(statsManager.recordRequest.mock.calls.every(([, , , , purpose]) => purpose === TranslationCallPurpose.STRUCTURED_RECOVERY)).toBe(true);
       expect(statsManager.recordError).toHaveBeenCalledWith('TestProvider', null, TranslationCallPurpose.STRUCTURED_RECOVERY);
+    });
+
+    it('does not delay key failover for Retry-After from the first key', async () => {
+      vi.useFakeTimers();
+      vi.setSystemTime(new Date('2026-01-01T00:00:00.000Z'));
+      ApiKeyManager.getKeys.mockResolvedValue(['bad-key', 'good-key']);
+      ApiKeyManager.shouldFailover.mockReturnValue(true);
+      proxyManager.fetch
+        .mockResolvedValueOnce({
+          ok: false,
+          status: 429,
+          statusText: 'Too Many Requests',
+          json: async () => ({}),
+          headers: new Map([
+            ['content-type', 'application/json'],
+            ['Retry-After', '120'],
+          ]),
+          clone() { return this; },
+        })
+        .mockResolvedValueOnce({
+          ok: true,
+          status: 200,
+          json: async () => ({ translated: 'ok' }),
+          headers: new Map([['content-type', 'application/json']]),
+          clone() { return this; },
+        });
+
+      try {
+        await expect(ProviderRequestEngine.executeRequest(mockProvider, {
+          url: 'https://api.test.com/translate?key=bad-key',
+          fetchOptions: { headers: {} },
+          extractResponse: mockExtractResponse,
+          updateApiKey: vi.fn(),
+        })).resolves.toBe('ok');
+        expect(proxyManager.fetch).toHaveBeenCalledTimes(2);
+      } finally {
+        vi.useRealTimers();
+      }
     });
 
     it('should throw error immediately if shouldFailover is false', async () => {
