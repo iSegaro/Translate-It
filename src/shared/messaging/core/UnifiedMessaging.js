@@ -6,7 +6,14 @@ import { isValidSync, isContextError } from '@/core/contextCore.js';
 import { handleContextError } from '@/core/contextErrorHandler.js';
 import { unifiedTranslationCoordinator } from './UnifiedTranslationCoordinator.js';
 import { streamingTimeoutManager } from './StreamingTimeoutManager.js';
-import { isCancellationError, isFatalError, matchErrorToType, isSilentError } from '@/shared/error-management/ErrorMatcher.js';
+import {
+  isCancellationError,
+  isDeterministicClientHttpError,
+  isFatalError,
+  isProviderRequestSizeError,
+  matchErrorToType,
+  isSilentError,
+} from '@/shared/error-management/ErrorMatcher.js';
 import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
 import { isRestrictedUrl } from '@/core/tabPermissions.js';
 import { reconstructTranslationError, isStructuredTranslationError } from './MessagingCore.js';
@@ -176,6 +183,14 @@ export async function sendMessage(message, options = {}) {
       ].includes(errorType)) {
         throw error;
       }
+
+      const isDeterministicRequestFailure = [
+        ErrorTypes.TEXT_EMPTY,
+        ErrorTypes.TEXT_TOO_LONG,
+      ].includes(errorType)
+        || isDeterministicClientHttpError(error)
+        || isProviderRequestSizeError(error);
+      if (isDeterministicRequestFailure) throw error;
       
       const isTimeout = errorType === ErrorTypes.TRANSLATION_TIMEOUT
         || errorType === ErrorTypes.OPERATION_TIMEOUT;

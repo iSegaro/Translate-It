@@ -604,6 +604,82 @@ describe('UnifiedMessaging', () => {
       expect(browser.runtime.sendMessage).not.toHaveBeenCalled();
     });
 
+    it.each([ErrorTypes.TEXT_EMPTY, ErrorTypes.TEXT_TOO_LONG])(
+      'propagates deterministic %s without fallback',
+      async (errorType) => {
+        const { unifiedTranslationCoordinator } = await import('./UnifiedTranslationCoordinator.js');
+        const deterministicError = Object.assign(new Error(errorType), { type: errorType });
+        unifiedTranslationCoordinator.coordinateTranslation.mockRejectedValueOnce(deterministicError);
+
+        await expect(sendMessage({ action: 'TRANSLATE', messageId: `local-${errorType}` }))
+          .rejects.toBe(deterministicError);
+        expect(browser.runtime.sendMessage).not.toHaveBeenCalled();
+      },
+    );
+
+    it.each([400, 422])(
+      'does not fallback for deterministic HTTP_ERROR %s',
+      async (statusCode) => {
+        const { unifiedTranslationCoordinator } = await import('./UnifiedTranslationCoordinator.js');
+        const deterministicError = Object.assign(new Error(`HTTP ${statusCode}`), {
+          type: ErrorTypes.HTTP_ERROR,
+          statusCode,
+        });
+        unifiedTranslationCoordinator.coordinateTranslation.mockRejectedValueOnce(deterministicError);
+
+        await expect(sendMessage({ action: 'TRANSLATE', messageId: `http-${statusCode}` }))
+          .rejects.toBe(deterministicError);
+        expect(browser.runtime.sendMessage).not.toHaveBeenCalled();
+      },
+    );
+
+    it.each([
+      [400, 'request is too long'],
+      [422, 'maximum context length exceeded'],
+      [413, 'Payload Too Large'],
+    ])('does not fallback for request-size HTTP_ERROR %s', async (statusCode, message) => {
+      const { unifiedTranslationCoordinator } = await import('./UnifiedTranslationCoordinator.js');
+      const requestSizeError = Object.assign(new Error(message), {
+        type: ErrorTypes.HTTP_ERROR,
+        statusCode,
+      });
+      unifiedTranslationCoordinator.coordinateTranslation.mockRejectedValueOnce(requestSizeError);
+
+      await expect(sendMessage({ action: 'TRANSLATE', messageId: `size-${statusCode}` }))
+        .rejects.toBe(requestSizeError);
+      expect(browser.runtime.sendMessage).not.toHaveBeenCalled();
+    });
+
+    it('keeps HTTP_ERROR 409 fallback-eligible', async () => {
+      const { unifiedTranslationCoordinator } = await import('./UnifiedTranslationCoordinator.js');
+      const conflictError = Object.assign(new Error('Conflict'), {
+        type: ErrorTypes.HTTP_ERROR,
+        statusCode: 409,
+      });
+      unifiedTranslationCoordinator.coordinateTranslation.mockRejectedValueOnce(conflictError);
+      browser.runtime.sendMessage.mockResolvedValue({ success: true, recovered: true });
+
+      await expect(sendMessage({ action: 'TRANSLATE', messageId: 'http-409' }))
+        .resolves.toMatchObject({ success: true, recovered: true });
+      expect(browser.runtime.sendMessage).toHaveBeenCalledWith(
+        expect.objectContaining({ messageId: expect.stringMatching(/^fb-/) }),
+      );
+    });
+
+    it.each([
+      ErrorTypes.INVALID_REQUEST,
+      ErrorTypes.API_ENDPOINT_INVALID,
+      ErrorTypes.LANGUAGE_PAIR_NOT_SUPPORTED,
+    ])('keeps fatal %s fallback-terminal', async (errorType) => {
+      const { unifiedTranslationCoordinator } = await import('./UnifiedTranslationCoordinator.js');
+      const fatalError = Object.assign(new Error(errorType), { type: errorType });
+      unifiedTranslationCoordinator.coordinateTranslation.mockRejectedValueOnce(fatalError);
+
+      await expect(sendMessage({ action: 'TRANSLATE', messageId: `fatal-${errorType}` }))
+        .rejects.toBe(fatalError);
+      expect(browser.runtime.sendMessage).not.toHaveBeenCalled();
+    });
+
     it('probes status and falls back for typed TRANSLATION_TIMEOUT', async () => {
       const { unifiedTranslationCoordinator } = await import('./UnifiedTranslationCoordinator.js');
       const timeout = Object.assign(new Error('Translation timed out'), {
