@@ -6,7 +6,9 @@ import { MessageActions } from '@/shared/messaging/core/MessageActions.js';
 import { WINDOWS_MANAGER_EVENTS } from '@/core/PageEventBus.js';
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
-import { getPageTranslationErrorPresentation } from '@/features/page-translation/utils/PageTranslationErrorPresenter.js';
+import {
+  getPageTranslationErrorDecision,
+} from '@/features/page-translation/utils/PageTranslationErrorPresenter.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.CONTENT_APP, 'useContentAppPageTranslation');
 
@@ -150,8 +152,8 @@ export function useContentAppPageTranslation(mobileStore, tracker) {
     });
 
     tracker.addEventListener(pageEventBus, MessageActions.PAGE_TRANSLATE_ERROR, async (detail) => {
-      const displayError = await getPageTranslationErrorPresentation(detail);
-      if (!displayError) return;
+      const presentation = await getPageTranslationErrorDecision(detail);
+      if (!presentation) return;
 
       const isFatal = detail.isFatal !== false;
 
@@ -160,7 +162,8 @@ export function useContentAppPageTranslation(mobileStore, tracker) {
         isAutoTranslating: isFatal ? false : mobileStore.pageTranslationData.isAutoTranslating,
         isTranslated: isFatal ? false : mobileStore.pageTranslationData.isTranslated,
         status: isFatal ? TRANSLATION_STATUS.ERROR : mobileStore.pageTranslationData.status,
-        errorMessage: displayError.message
+        errorMessage: presentation.displayError.message,
+        canRetry: presentation.canRetry,
       });
     });
 

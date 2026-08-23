@@ -194,7 +194,7 @@ describe('PublicTranslationErrorPolicy', () => {
   });
 
   it.each([400, 422, 404, 500, undefined])(
-    'maps generic HTTP %s to REQUEST_FAILURE without status inference',
+    'maps generic HTTP %s to REQUEST_FAILURE with status-aware action',
     (statusCode) => {
       const fields = statusCode === undefined ? {} : { statusCode };
       const result = mapCanonicalTranslationError(errorWithType(ErrorTypes.HTTP_ERROR, fields));
@@ -202,12 +202,26 @@ describe('PublicTranslationErrorPolicy', () => {
       expect(result).toMatchObject({
         type: PublicTranslationErrorTypes.REQUEST_FAILURE,
         messageKey: 'ERRORS_HTTP_ERROR',
-        action: PublicTranslationErrorActions.RETRY,
         severity: 'warning',
         silent: false,
       });
+      if ([400, 404, 422].includes(statusCode)) {
+        expect(result).not.toHaveProperty('action');
+      } else {
+        expect(result.action).toBe(PublicTranslationErrorActions.RETRY);
+      }
     },
   );
+
+  it('keeps generic HTTP 413 terminal in presentation', () => {
+    expect(mapCanonicalTranslationError(errorWithType(ErrorTypes.HTTP_ERROR, { statusCode: 413 })))
+      .not.toHaveProperty('action');
+  });
+
+  it('keeps generic HTTP 409 retryable in presentation', () => {
+    expect(mapCanonicalTranslationError(errorWithType(ErrorTypes.HTTP_ERROR, { statusCode: 409 })))
+      .toMatchObject({ action: PublicTranslationErrorActions.RETRY });
+  });
 
   it.each([ErrorTypes.TRANSLATION_ERROR, ErrorTypes.TRANSLATION_FAILED, ErrorTypes.UNKNOWN])(
     'does not apply HTTP status fallback to %s',

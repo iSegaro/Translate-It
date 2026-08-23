@@ -11,6 +11,7 @@ import { getSelectElementActivationErrorMessage } from '@/features/element-selec
 import { pageEventBus } from '@/core/PageEventBus.js';
 import ResourceTracker from '@/core/memory/ResourceTracker.js';
 import { getFieldTranslationErrorPresentation } from '@/features/text-field-interaction/utils/FieldTranslationErrorPresenter.js';
+import { getPageTranslationErrorPresentation } from '@/features/page-translation/utils/PageTranslationErrorPresenter.js';
 
 // Singleton instance for ContentMessageHandler
 let contentMessageHandlerInstance = null;
@@ -732,9 +733,10 @@ export class ContentMessageHandler extends ResourceTracker {
       this.logger.error('Page translation failed:', error);
 
       // Use centralized error handling system
-      const errorInfo = await this.errorHandler.getErrorForUI(error, 'page-translation');
+      const displayError = await getPageTranslationErrorPresentation({ error, errorType: error.type });
+      const errorInfo = await this.errorHandler.getErrorForUI(displayError || error, 'page-translation');
 
-      await this.errorHandler.handle(error, {
+      await this.errorHandler.handle(displayError || error, {
         type: errorInfo.type,
         context: 'page-translation',
         showToast: true

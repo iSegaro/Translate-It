@@ -2,6 +2,7 @@ import ExtensionContextManager from '@/core/extensionContext.js';
 import { isCancellationError } from '@/shared/error-management/ErrorMatcher.js';
 import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
 import { mapCanonicalTranslationError } from '@/shared/error-management/PublicTranslationErrorPolicy.js';
+import { PublicTranslationErrorActions } from '@/shared/error-management/PublicTranslationError.js';
 import { createLegacyDisplayError } from '@/shared/error-management/PublicTranslationErrorAdapter.js';
 import { reconstructTranslationError, isStructuredTranslationError } from '@/shared/messaging/core/MessagingCore.js';
 
@@ -27,7 +28,7 @@ function getCanonicalSource(detail) {
  * @param {Object} detail - Page translation error event data
  * @returns {Promise<Error|null>} Safe localized display Error, or null for silent errors
  */
-export async function getPageTranslationErrorPresentation(detail) {
+export async function getPageTranslationErrorDecision(detail) {
   const canonicalError = reconstructTranslationError(getCanonicalSource(detail));
 
   if (
@@ -39,5 +40,16 @@ export async function getPageTranslationErrorPresentation(detail) {
   }
 
   const publicError = mapCanonicalTranslationError(canonicalError);
-  return createLegacyDisplayError(canonicalError, publicError);
+  const displayError = await createLegacyDisplayError(canonicalError, publicError);
+  if (!displayError) return null;
+
+  return {
+    displayError,
+    canRetry: publicError.action === PublicTranslationErrorActions.RETRY,
+  };
+}
+
+export async function getPageTranslationErrorPresentation(detail) {
+  const presentation = await getPageTranslationErrorDecision(detail);
+  return presentation?.displayError || null;
 }

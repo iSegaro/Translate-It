@@ -202,7 +202,7 @@
       :show-detected-language="!!detectedLanguageName"
       :target-language-label="targetLanguageName"
       :show-target-language="!!targetLanguageName"
-      :show-retry="hasTranslatedResult || hasError"
+      :show-retry="hasTranslatedResult || (hasError && translationCanRetry)"
       :retry-disabled="isTranslating || !selectedText"
       :retry-title="t('action_retry')"
       :retry-aria-label="t('action_retry')"
@@ -272,6 +272,7 @@ const {
   detectedLanguageName,
   targetLanguageName,
   translationError,
+  translationCanRetry,
   isTranslating,
   hasTranslatedResult,
   hasError,

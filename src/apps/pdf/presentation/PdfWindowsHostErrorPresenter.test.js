@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js'
 import { getErrorMessage } from '@/shared/error-management/ErrorMessages.js'
 import {
+  getPdfWindowsHostTranslationPresentation,
   isTranslationDomainError,
   presentPdfWindowsHostTranslationError
 } from './PdfWindowsHostErrorPresenter.js'
@@ -60,6 +61,17 @@ describe('PdfWindowsHostErrorPresenter', () => {
     expect(message).toBe(await getErrorMessage('ERRORS_MODEL_MISSING'))
     expect(message).not.toContain('gemini-2.5-flash')
     expect(message).not.toContain('Private Provider')
+  })
+
+  it.each([
+    [400, false],
+    [404, false],
+    [409, true],
+    [500, true],
+  ])('resolves retry action for HTTP %s', async (statusCode, canRetry) => {
+    const presentation = await getPdfWindowsHostTranslationPresentation(canonicalError(ErrorTypes.HTTP_ERROR, 'http', { statusCode }))
+
+    expect(presentation.canRetry).toBe(canRetry)
   })
 
   it('maps raw API errors to safe localized messages without leaking the body', async () => {

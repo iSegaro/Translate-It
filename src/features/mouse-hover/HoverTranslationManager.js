@@ -431,15 +431,14 @@ export class HoverTranslationManager extends ResourceTracker {
         return;
       }
 
-      // Standard error handling via the Golden Chain architecture
-      ErrorHandler.getInstance().handle(error, {
-        context: 'hover',
-        showToast: false
-      }).catch(() => {});
-
       const publicError = mapCanonicalTranslationError(error);
       const displayError = await createLegacyDisplayError(error, publicError);
       if (displayError) {
+        // Keep canonical action available through legacy display error cause.
+        ErrorHandler.getInstance().handle(displayError, {
+          context: 'hover',
+          showToast: false
+        }).catch(() => {});
         this._emitPageEvent('MOUSE_HOVER_TRANSLATION_ERROR', { error: displayError });
       }
       this._cleanupActiveHoverRequest(messageId);

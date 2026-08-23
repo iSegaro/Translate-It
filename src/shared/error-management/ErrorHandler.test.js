@@ -21,6 +21,7 @@ vi.mock('@/core/extensionContext.js', () => ({
 vi.mock('./ErrorMatcher.js', () => ({
   matchErrorToType: vi.fn(() => 'UNKNOWN'),
   isSilentError: vi.fn(() => false),
+  isCancellationError: vi.fn(() => false),
   shouldSuppressConsole: vi.fn(() => false),
   needsSettings: vi.fn(() => false),
   CRITICAL_CONFIG_ERRORS: new Set(['API_KEY_INVALID', 'API_KEY_MISSING']),
@@ -83,6 +84,25 @@ describe('ErrorHandler', () => {
     const instance1 = ErrorHandler.getInstance();
     const instance2 = new ErrorHandler();
     expect(instance1).toBe(instance2);
+  });
+
+  it.each([
+    [400, false],
+    [404, false],
+    [409, true],
+    [500, true],
+  ])('derives canonical HTTP %s retry action from display error cause', async (statusCode, canRetry) => {
+    const canonicalError = Object.assign(new Error(`HTTP ${statusCode}`), {
+      type: 'HTTP_ERROR',
+      statusCode,
+    });
+    const displayError = new Error('HTTP error');
+    Object.defineProperty(displayError, 'cause', { value: canonicalError });
+    ErrorMatcher.matchErrorToType.mockReturnValue('HTTP_ERROR');
+
+    const result = await errorHandler.getErrorForUI(displayError, 'selection');
+
+    expect(result.canRetry).toBe(canRetry);
   });
 
   describe('handle', () => {

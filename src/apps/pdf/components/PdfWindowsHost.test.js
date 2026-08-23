@@ -1702,6 +1702,19 @@ describe('PdfWindowsHost', () => {
     expect(error.text()).not.toContain('acct_12345')
   })
 
+  it('hides retry for deterministic HTTP translation failures', async () => {
+    sendRegularMessageMock.mockResolvedValueOnce({
+      success: false,
+      error: { type: 'HTTP_ERROR', statusCode: 404, message: 'HTTP 404' },
+    })
+
+    await showSelectionIcon('HTTP failure')
+    await openWindowFromSelectionIcon(wrapper)
+
+    expect(wrapper.find('[data-testid="pdf-windows-host-error"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="translation-window-footer-retry"]').exists()).toBe(false)
+  })
+
   it('never renders raw API provider response bodies', async () => {
     sendRegularMessageMock.mockResolvedValueOnce({
       success: false,

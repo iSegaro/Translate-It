@@ -21,7 +21,7 @@ import { getLanguageNameFromCode } from '@/shared/config/languageConstants.js'
 import { buildPdfSelectionIconStyle, PDF_WINDOW_LAYOUT, getViewportSize } from '@/apps/pdf/utils/pdfWindowGeometry.js'
 import {
   isTranslationDomainError,
-  presentPdfWindowsHostTranslationError
+  getPdfWindowsHostTranslationPresentation,
 } from '@/apps/pdf/presentation/PdfWindowsHostErrorPresenter.js'
 
 const logger = getScopedLogger(LOG_COMPONENTS.PDF, 'usePdfWindowsHost')
@@ -113,6 +113,7 @@ export function usePdfWindowsHost(options = {}) {
   const selectionPosition = ref(null)
   const translatedText = ref('')
   const translationError = ref('')
+  const translationCanRetry = ref(false)
   const isTranslating = ref(false)
   const isCopying = ref(false)
   const selectedProvider = ref('')
@@ -306,6 +307,7 @@ export function usePdfWindowsHost(options = {}) {
   function clearWindowContent() {
     translatedText.value = ''
     translationError.value = ''
+    translationCanRetry.value = false
     detectedSourceLanguage.value = ''
     isTranslating.value = false
     isCopying.value = false
@@ -365,6 +367,7 @@ export function usePdfWindowsHost(options = {}) {
     activeRequestSessionId = 0
     translatedText.value = ''
     translationError.value = ''
+    translationCanRetry.value = false
     detectedSourceLanguage.value = ''
     isTranslating.value = false
     translationMode.value = TranslationMode.Selection
@@ -659,6 +662,7 @@ export function usePdfWindowsHost(options = {}) {
 
     isTranslating.value = true
     translationError.value = ''
+    translationCanRetry.value = false
     translatedText.value = ''
     detectedSourceLanguage.value = ''
     translationTargetLanguage.value = resolvedTargetLanguage
@@ -697,9 +701,11 @@ export function usePdfWindowsHost(options = {}) {
         return true
       }
 
-      translationError.value = await presentPdfWindowsHostTranslationError(
+      const presentation = await getPdfWindowsHostTranslationPresentation(
         response?.errorDetails || response?.error || response?.message || 'Translation failed'
-      ) || ''
+      )
+      translationError.value = presentation?.message || ''
+      translationCanRetry.value = presentation?.canRetry === true
       translatedText.value = ''
       detectedSourceLanguage.value = ''
       translationTargetLanguage.value = resolvedTargetLanguage
@@ -711,9 +717,12 @@ export function usePdfWindowsHost(options = {}) {
 
       logger.error('PDF selection translation failed:', error)
       if (isTranslationDomainError(error)) {
-        translationError.value = await presentPdfWindowsHostTranslationError(error) || ''
+        const presentation = await getPdfWindowsHostTranslationPresentation(error)
+        translationError.value = presentation?.message || ''
+        translationCanRetry.value = presentation?.canRetry === true
       } else {
         translationError.value = error?.message || 'Translation failed'
+        translationCanRetry.value = false
       }
       translatedText.value = ''
       detectedSourceLanguage.value = ''
@@ -952,6 +961,7 @@ export function usePdfWindowsHost(options = {}) {
     targetLanguageName,
     translatedText,
     translationError,
+    translationCanRetry,
     isTranslating,
     isCopying,
     hasTranslatedResult,

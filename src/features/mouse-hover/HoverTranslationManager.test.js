@@ -340,7 +340,10 @@ describe('HoverTranslationManager', () => {
       await manager._processHover({ clientX: 15, clientY: 15 });
 
       expect(mockErrorHandler.handle).toHaveBeenCalledTimes(1);
-      expect(mockErrorHandler.handle).toHaveBeenCalledWith(canonicalError, {
+      expect(mockErrorHandler.handle).toHaveBeenCalledWith(expect.objectContaining({
+        type: canonicalError.type,
+        cause: canonicalError,
+      }), {
         context: 'hover',
         showToast: false
       });

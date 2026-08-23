@@ -6,6 +6,7 @@
 import ExtensionContextManager from '@/core/extensionContext.js'
 import { isCancellationError } from '@/shared/error-management/ErrorMatcher.js'
 import { mapCanonicalTranslationError } from '@/shared/error-management/PublicTranslationErrorPolicy.js'
+import { PublicTranslationErrorActions } from '@/shared/error-management/PublicTranslationError.js'
 import { createLegacyDisplayError } from '@/shared/error-management/PublicTranslationErrorAdapter.js'
 import { reconstructTranslationError } from '@/shared/messaging/core/MessagingCore.js'
 
@@ -42,12 +43,22 @@ function isSilentError(error) {
  * @param {Error|object|string} errorLike - Confirmed translation-request failure
  * @returns {Promise<string|null>}
  */
-export async function presentPdfWindowsHostTranslationError(errorLike) {
+export async function getPdfWindowsHostTranslationPresentation(errorLike) {
   const canonicalError = reconstructTranslationError(errorLike)
 
   if (isSilentError(canonicalError)) return null
 
   const publicError = mapCanonicalTranslationError(canonicalError)
   const displayError = await createLegacyDisplayError(canonicalError, publicError)
-  return displayError ? displayError.message : null
+  if (!displayError) return null
+
+  return {
+    message: displayError.message,
+    canRetry: publicError.action === PublicTranslationErrorActions.RETRY,
+  }
+}
+
+export async function presentPdfWindowsHostTranslationError(errorLike) {
+  const presentation = await getPdfWindowsHostTranslationPresentation(errorLike)
+  return presentation?.message || null
 }

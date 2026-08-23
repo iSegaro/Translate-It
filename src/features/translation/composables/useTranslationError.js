@@ -9,6 +9,7 @@ import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js'
 import { getErrorDisplayStrategy, processErrorMessage, shouldShowRetry, shouldShowSettings } from '@/shared/error-management/ErrorDisplayStrategies.js'
 import { isCancellationError, matchErrorToType } from '@/shared/error-management/ErrorMatcher.js'
 import { mapCanonicalTranslationError } from '@/shared/error-management/PublicTranslationErrorPolicy.js'
+import { PublicTranslationErrorActions } from '@/shared/error-management/PublicTranslationError.js'
 import { createLegacyDisplayError } from '@/shared/error-management/PublicTranslationErrorAdapter.js'
 import { getScopedLogger } from '@/shared/logging/logger.js'
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js'
@@ -83,9 +84,10 @@ export function useTranslationError(context = 'unknown') {
       const usePublicBoundary = !isContextError && !isLocalValidationError
       let displayError = error
       let errorInfo
+      let publicError = null
 
       if (usePublicBoundary) {
-        const publicError = mapCanonicalTranslationError(error)
+        publicError = mapCanonicalTranslationError(error)
         displayError = await createLegacyDisplayError(error, publicError)
         if (!displayError) return
 
@@ -106,7 +108,9 @@ export function useTranslationError(context = 'unknown') {
       errorMessage.value = errorInfo.message
       errorType.value = errorTypeValue
       errorTimestamp.value = errorInfo.timestamp
-      canRetry.value = shouldShowRetry(errorTypeValue, strategy)
+      canRetry.value = publicError
+        ? publicError.action === PublicTranslationErrorActions.RETRY
+        : shouldShowRetry(errorTypeValue, strategy)
       canOpenSettings.value = shouldShowSettings(errorTypeValue, strategy)
       
       // Handle error with appropriate strategy
@@ -226,7 +230,9 @@ export function useTranslationError(context = 'unknown') {
       errorTimestamp.value = errorData.timestamp
       
       const strategy = getErrorDisplayStrategy(context, errorData.type)
-      canRetry.value = shouldShowRetry(errorData.type, strategy)
+      canRetry.value = typeof errorData.canRetry === 'boolean'
+        ? errorData.canRetry
+        : shouldShowRetry(errorData.type, strategy)
       canOpenSettings.value = shouldShowSettings(errorData.type, strategy)
     }
     

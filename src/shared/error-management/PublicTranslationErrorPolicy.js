@@ -85,6 +85,8 @@ const GENERIC_INTERNAL_TYPES = new Set([
   ErrorTypes.UNKNOWN,
 ]);
 
+const NON_RETRYABLE_HTTP_STATUSES = new Set([400, 404, 413, 422]);
+
 // Only canonical semantic identities may refine generic transport identities.
 export const PUBLIC_TRANSLATION_ORIGINAL_TYPE_ALLOWLIST = new Set([
   ErrorTypes.MODEL_MISSING,
@@ -125,7 +127,7 @@ function resolvePublicType(error) {
   return directType || PublicTranslationErrorTypes.TRANSLATION_FAILED;
 }
 
-function getAction(type) {
+function getAction(type, error) {
   switch (type) {
     case PublicTranslationErrorTypes.MODEL_UNAVAILABLE:
     case PublicTranslationErrorTypes.API_KEY_MISSING:
@@ -138,6 +140,11 @@ function getAction(type) {
     case PublicTranslationErrorTypes.ENDPOINT_INVALID:
       return PublicTranslationErrorActions.OPEN_SETTINGS;
     case PublicTranslationErrorTypes.REQUEST_FAILURE:
+      if (
+        error?.type === ErrorTypes.HTTP_ERROR
+        && NON_RETRYABLE_HTTP_STATUSES.has(Number(error.statusCode))
+      ) return undefined;
+      return PublicTranslationErrorActions.RETRY;
     case PublicTranslationErrorTypes.MODEL_OVERLOADED:
     case PublicTranslationErrorTypes.NETWORK_ERROR:
     case PublicTranslationErrorTypes.SERVER_ERROR:
@@ -195,7 +202,7 @@ export function mapCanonicalTranslationError(error) {
     type,
     messageKey: PublicTranslationErrorMessageKeys[type],
     detail,
-    action: getAction(type),
+    action: getAction(type, error),
     severity: getSeverity(type),
     silent: false,
   });

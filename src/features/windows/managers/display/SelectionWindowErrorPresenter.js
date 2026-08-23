@@ -2,6 +2,7 @@ import ExtensionContextManager from '@/core/extensionContext.js';
 import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
 import { isCancellationError } from '@/shared/error-management/ErrorMatcher.js';
 import { mapCanonicalTranslationError } from '@/shared/error-management/PublicTranslationErrorPolicy.js';
+import { PublicTranslationErrorActions } from '@/shared/error-management/PublicTranslationError.js';
 import { createLegacyDisplayError } from '@/shared/error-management/PublicTranslationErrorAdapter.js';
 
 const EXCLUDED_ERROR_TYPES = new Set([
@@ -34,6 +35,7 @@ export async function getSelectionWindowErrorPresentation(canonicalError, contex
   if (!displayError) return null;
 
   const errorInfo = await errorHandler.getErrorForUI(displayError, context);
+  errorInfo.canRetry = publicError.action === PublicTranslationErrorActions.RETRY;
 
   return {
     displayError,

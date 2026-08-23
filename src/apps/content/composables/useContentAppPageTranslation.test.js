@@ -82,4 +82,16 @@ describe('useContentAppPageTranslation', () => {
 
     expect(mobileStore.setPageTranslation).not.toHaveBeenCalled();
   });
+
+  it.each([
+    [{ type: 'HTTP_ERROR', statusCode: 404, message: 'HTTP 404' }, false],
+    [{ type: 'HTTP_ERROR', statusCode: 409, message: 'HTTP 409' }, true],
+  ])('stores public retry decision for %s', async (errorDetails, canRetry) => {
+    await listeners.get(MessageActions.PAGE_TRANSLATE_ERROR)({
+      errorDetails,
+      isFatal: true,
+    });
+
+    expect(mobileStore.setPageTranslation).toHaveBeenCalledWith(expect.objectContaining({ canRetry }));
+  });
 });

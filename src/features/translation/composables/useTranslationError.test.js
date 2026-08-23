@@ -102,7 +102,7 @@ describe('useTranslationError', () => {
     expect(composable.currentError.value).toBe(testError);
     expect(composable.errorMessage.value).toBe('ERRORS_API_ERROR');
     expect(composable.errorType.value).toBe('API_ERROR');
-    expect(composable.canRetry.value).toBe(true);
+    expect(composable.canRetry.value).toBe(false);
     expect(composable.errorTimestamp.value).toEqual(expect.any(Number));
     
     expect(mockUseErrorHandler.handleTranslationError).toHaveBeenCalledWith(
@@ -121,6 +121,23 @@ describe('useTranslationError', () => {
     expect(mockUseErrorHandler.handleTranslationError.mock.calls[0][0].message).not.toContain('raw provider detail');
     expect(mockUseErrorHandler.handleTranslationError.mock.calls[0][0]).not.toHaveProperty('providerName');
     expect(mockUseErrorHandler.handleTranslationError.mock.calls[0][0]).not.toHaveProperty('statusCode');
+  });
+
+  it.each([
+    [ErrorTypes.HTTP_ERROR, { statusCode: 404 }, false],
+    [ErrorTypes.HTTP_ERROR, { statusCode: 409 }, true],
+    [ErrorTypes.HTTP_ERROR, { statusCode: 500 }, true],
+    [ErrorTypes.SERVER_ERROR, { statusCode: 500 }, true],
+    [ErrorTypes.RATE_LIMIT_REACHED, { statusCode: 429 }, false],
+    [ErrorTypes.INVALID_REQUEST, { statusCode: 400 }, false],
+  ])('derives canRetry from public action for %s', async (type, fields, expected) => {
+    const [composable] = withSetup(() => useTranslationError('popup'));
+    const error = Object.assign(new Error(type), { type, ...fields });
+    matchErrorToType.mockReturnValue(type);
+
+    await composable.handleError(error);
+
+    expect(composable.canRetry.value).toBe(expected);
   });
 
   it('should ignore user cancellation errors', async () => {
