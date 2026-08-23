@@ -626,9 +626,10 @@ describe('QueueManager', () => {
       const executionContext = { operation: { appendDiagnostic: vi.fn() } };
 
       const promise = queueManager.enqueue('provider-empty', request, 0, 'context', { executionContext });
+      const rejection = expect(promise).rejects.toBe(error);
 
       await vi.advanceTimersByTimeAsync(150);
-      await expect(promise).rejects.toBe(error);
+      await rejection;
       await vi.advanceTimersByTimeAsync(10000);
 
       expect(request).toHaveBeenCalledTimes(1);
@@ -646,9 +647,10 @@ describe('QueueManager', () => {
       const executionContext = { operation: { appendDiagnostic: vi.fn() } };
 
       const promise = queueManager.enqueue(`deterministic-http-${statusCode}`, request, 0, 'context', { executionContext });
+      const rejection = expect(promise).rejects.toBe(error);
 
       await vi.advanceTimersByTimeAsync(150);
-      await expect(promise).rejects.toBe(error);
+      await rejection;
       await vi.advanceTimersByTimeAsync(10000);
 
       expect(request).toHaveBeenCalledTimes(1);
@@ -670,9 +672,10 @@ describe('QueueManager', () => {
       const executionContext = { operation: { appendDiagnostic: vi.fn() } };
 
       const promise = queueManager.enqueue('provider-size', request, 0, 'context', { executionContext });
+      const rejection = expect(promise).rejects.toBe(error);
 
       await vi.advanceTimersByTimeAsync(150);
-      await expect(promise).rejects.toBe(error);
+      await rejection;
       await vi.advanceTimersByTimeAsync(10000);
 
       expect(request).toHaveBeenCalledTimes(1);
