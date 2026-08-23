@@ -50,6 +50,7 @@ import { usePageTranslation } from './usePageTranslation.js';
 import { sendRegularMessage } from '@/shared/messaging/core/UnifiedMessaging.js';
 import { pageEventBus } from '@/core/PageEventBus.js';
 import { MessageActions } from '@/shared/messaging/core/MessageActions.js';
+import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
 import { onMounted } from 'vue';
 
 describe('usePageTranslation Composable', () => {
@@ -107,6 +108,38 @@ describe('usePageTranslation Composable', () => {
         data: expect.objectContaining({ some: 'data' })
       }));
       expect(isAutoTranslating.value).toBe(true);
+    });
+
+    it.each([
+      ErrorTypes.SERVER_ERROR,
+      ErrorTypes.RATE_LIMIT_REACHED,
+      ErrorTypes.API_KEY_INVALID,
+      undefined,
+    ])('translatePage presents %s failures instead of raw provider diagnostics', async (type) => {
+      const rawDiagnostic = `provider raw internal diagnostic for ${type || 'unknown'}`;
+      const providerError = Object.assign(new Error(rawDiagnostic), type ? { type } : {});
+      sendRegularMessage.mockRejectedValue(providerError);
+
+      const { translatePage, error, message } = usePageTranslation();
+      await translatePage();
+
+      expect(error.value).toBeInstanceOf(Error);
+      expect(error.value.message).not.toContain(rawDiagnostic);
+      expect(message.value).not.toContain(rawDiagnostic);
+      expect(message.value).toContain('Error:');
+    });
+
+    it('keeps direct user cancellation silent', async () => {
+      sendRegularMessage.mockRejectedValue(Object.assign(new Error('cancelled'), {
+        type: ErrorTypes.USER_CANCELLED,
+      }));
+
+      const { translatePage, error, isTranslating, message } = usePageTranslation();
+      await translatePage();
+
+      expect(error.value).toBeNull();
+      expect(isTranslating.value).toBe(false);
+      expect(message.value).toBe('Starting translation...');
     });
 
     it('restorePage should reset state on success', async () => {

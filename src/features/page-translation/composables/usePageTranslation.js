@@ -150,7 +150,11 @@ export function usePageTranslation() {
     } catch (e) {
       // Only reset if it's a real failure, not just a state transition
       if (e.message !== 'silent_error') {
-        error.value = e.message || 'Translation failed';
+        const displayError = await getPageTranslationErrorPresentation({ error: e });
+        if (!displayError) return;
+
+        error.value = displayError;
+        message.value = `Error: ${displayError.message}`;
         isTranslated.value = false;
         isAutoTranslating.value = false;
       }
@@ -566,4 +570,3 @@ export function usePageTranslation() {
     }),
   };
 }
-
