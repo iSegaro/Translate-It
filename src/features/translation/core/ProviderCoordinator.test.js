@@ -323,6 +323,55 @@ describe('ProviderCoordinator', () => {
       expect(result.translatedText).toEqual(['TA', 'TC', 'TB']);
     });
 
+    it('accepts deterministic structural reconstruction for traditional multi-input strings', async () => {
+      mockProvider.constructor.isAI = false;
+      mockProvider.providerName = 'GoogleTranslate';
+      mockProvider.translate.mockResolvedValue('TA\n[[---]]\nTB');
+
+      const result = await providerCoordinator.execute(
+        mockProvider, ['A', 'B'], 'en', 'fa'
+      );
+
+      expect(result.translatedText).toEqual(['TA', 'TB']);
+    });
+
+    it.each([
+      ['ambiguous mapping', 'TA TB', ['A', 'B']],
+      ['incomplete structural mapping', 'TA\n[[---]]\nTB', ['A', 'B', 'C']],
+    ])('converts %s to API_RESPONSE_INVALID', async (_label, translatedText, source) => {
+      mockProvider.constructor.isAI = false;
+      mockProvider.providerName = 'GoogleTranslate';
+      mockProvider.translate.mockResolvedValue(translatedText);
+
+      await expect(providerCoordinator.execute(
+        mockProvider, source, 'en', 'fa'
+      )).rejects.toMatchObject({ type: ErrorTypes.API_RESPONSE_INVALID });
+    });
+
+    it('does not classify ambiguous mapping as UNKNOWN transient failure', async () => {
+      mockProvider.constructor.isAI = false;
+      mockProvider.providerName = 'GoogleTranslate';
+      mockProvider.translate.mockResolvedValue('TA TB');
+      isTransientError.mockReturnValue(true);
+
+      await expect(providerCoordinator.execute(
+        mockProvider, ['A', 'B'], 'en', 'fa'
+      )).rejects.toMatchObject({ type: ErrorTypes.API_RESPONSE_INVALID });
+      expect(matchErrorToType).not.toHaveBeenCalled();
+    });
+
+    it('keeps single-input multi-part array normalization', async () => {
+      mockProvider.constructor.isAI = false;
+      mockProvider.providerName = 'GoogleTranslate';
+      mockProvider.translate.mockResolvedValue(['Part 1', 'Part 2']);
+
+      const result = await providerCoordinator.execute(
+        mockProvider, 'Input', 'en', 'fa'
+      );
+
+      expect(result.translatedText).toBe('Part 1\nPart 2');
+    });
+
     it('should handle array results by joining them if expected format is STRING', async () => {
       mockProvider.translate.mockResolvedValue(['Part 1', 'Part 2']);
       

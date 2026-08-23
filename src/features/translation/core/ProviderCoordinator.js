@@ -206,12 +206,24 @@ export class ProviderCoordinator {
           if (typeof finalResult === 'string' && inputCount > 1) {
             const { TranslationSegmentMapper } = await import("@/utils/translation/TranslationSegmentMapper.js");
             const segments = Array.isArray(text) ? text : [text];
-            finalResult = TranslationSegmentMapper.mapTranslationToOriginalSegments(
-              finalResult, 
-              segments, 
-              TranslationSegmentMapper.STANDARD_DELIMITER,
-              providerName
-            );
+            try {
+              finalResult = TranslationSegmentMapper.mapTranslationToOriginalSegments(
+                finalResult,
+                segments,
+                TranslationSegmentMapper.STANDARD_DELIMITER,
+                providerName,
+                { requireDeterministic: true }
+              );
+            } catch (mappingError) {
+              if (mappingError.type === TranslationSegmentMapper.INCOMPLETE_CARDINALITY
+                  || mappingError.type === TranslationSegmentMapper.AMBIGUOUS_MAPPING) {
+                const invalidResponse = new Error(`[${providerName}] Invalid deterministic segment mapping: ${mappingError.message}`);
+                invalidResponse.type = ErrorTypes.API_RESPONSE_INVALID;
+                invalidResponse.cause = mappingError;
+                throw invalidResponse;
+              }
+              throw mappingError;
+            }
           }
         }
       }

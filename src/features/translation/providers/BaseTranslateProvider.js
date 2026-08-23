@@ -230,7 +230,7 @@ export class BaseTranslateProvider extends BaseProvider {
           { sessionId, abortController, messageId }
         );
 
-      // Handle different response formats and CRITICAL: Split joined strings back into segments
+        // Handle different response formats and reconstruct only deterministic mappings.
       let chunkResults = [];
       const { TRANSLATION_CONSTANTS } = await import("@/shared/config/translationConstants.js");
 
@@ -244,8 +244,8 @@ export class BaseTranslateProvider extends BaseProvider {
           return TraditionalTextProcessor.scrubBidiArtifacts(text);
         });
       } else {
-        // MISMATCH CASE: Provider did internal splitting or merged segments
-        // Join everything and let the SegmentMapper redistribute it correctly
+        // MISMATCH CASE: Provider did internal splitting or merged segments.
+        // Strict mapping rejects output without provable source ownership.
         const joinedResult = responseArray
           .map(r => {
             if (typeof r === 'string') return r;
@@ -255,16 +255,19 @@ export class BaseTranslateProvider extends BaseProvider {
           .join(TRANSLATION_CONSTANTS.TEXT_DELIMITER);
 
         try {
-          chunkResults = TranslationSegmentMapper.mapTranslationToOriginalSegments(
-            joinedResult,
-            chunk.texts,
-            TRANSLATION_CONSTANTS.TEXT_DELIMITER,
-            this.providerName
-          ).map(text => TraditionalTextProcessor.scrubBidiArtifacts(text));
+            chunkResults = TranslationSegmentMapper.mapTranslationToOriginalSegments(
+              joinedResult,
+              chunk.texts,
+              TRANSLATION_CONSTANTS.TEXT_DELIMITER,
+              this.providerName,
+              { requireDeterministic: true }
+            ).map(text => TraditionalTextProcessor.scrubBidiArtifacts(text));
         } catch (mapperError) {
-          if (mapperError.type === TranslationSegmentMapper.INCOMPLETE_CARDINALITY) {
+          if (mapperError.type === TranslationSegmentMapper.INCOMPLETE_CARDINALITY
+              || mapperError.type === TranslationSegmentMapper.AMBIGUOUS_MAPPING) {
             const err = new Error(`[${this.providerName}] Incomplete translation: ${mapperError.message}`);
             err.type = ErrorTypes.API_RESPONSE_INVALID;
+            err.cause = mapperError;
             throw err;
           }
           throw mapperError;
@@ -282,6 +285,13 @@ export class BaseTranslateProvider extends BaseProvider {
     
     // Final safety check: if somehow we still have a mismatch, log it
     if (allResults.length !== texts.length) {
+      if (texts.length > 1) {
+        const err = new Error(
+          `[${this.providerName}] Incomplete translation: expected ${texts.length} logical results, received ${allResults.length}`
+        );
+        err.type = ErrorTypes.API_RESPONSE_INVALID;
+        throw err;
+      }
       logger.warn(`[${this.providerName}] Final batch result count mismatch! Expected ${texts.length}, got ${allResults.length}`);
     }
 

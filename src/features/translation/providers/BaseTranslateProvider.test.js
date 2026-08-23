@@ -409,6 +409,65 @@ describe('BaseTranslateProvider', () => {
 
       // Result comes from SegmentMapper mock
       expect(result).toEqual(['mapped-A', 'mapped-B']);
+      expect(TranslationSegmentMapper.mapTranslationToOriginalSegments).toHaveBeenCalledWith(
+        expect.anything(), texts, '|||', 'TestProvider', { requireDeterministic: true }
+      );
+    });
+
+    it('rejects ambiguous multi-unit reconstruction as API_RESPONSE_INVALID', async () => {
+      vi.spyOn(provider, '_translateChunk').mockResolvedValue('merged output');
+      vi.mocked(TranslationSegmentMapper.mapTranslationToOriginalSegments).mockImplementationOnce(() => {
+        const error = new Error('ambiguous mapping');
+        error.type = TranslationSegmentMapper.AMBIGUOUS_MAPPING;
+        throw error;
+      });
+
+      await expect(provider._traditionalBatchTranslate(
+        ['A', 'B'], 'en', 'fa', TranslationMode.Popup
+      )).rejects.toMatchObject({ type: ErrorTypes.API_RESPONSE_INVALID });
+    });
+
+    it('rejects structurally incomplete reconstruction as API_RESPONSE_INVALID', async () => {
+      vi.spyOn(provider, '_translateChunk').mockResolvedValue('merged output');
+      vi.mocked(TranslationSegmentMapper.mapTranslationToOriginalSegments).mockImplementationOnce(() => {
+        const error = new Error('incomplete mapping');
+        error.type = TranslationSegmentMapper.INCOMPLETE_CARDINALITY;
+        throw error;
+      });
+
+      await expect(provider._traditionalBatchTranslate(
+        ['A', 'B'], 'en', 'fa', TranslationMode.Popup
+      )).rejects.toMatchObject({ type: ErrorTypes.API_RESPONSE_INVALID });
+    });
+
+    it('fails closed when transport flattening changes multi-unit cardinality', async () => {
+      TraditionalTextProcessor.createChunks.mockReturnValue([
+        { texts: ['A'] },
+        { texts: ['B part 1'] },
+        { texts: ['B part 2'] },
+        { texts: ['C'] },
+      ]);
+      vi.spyOn(provider, '_translateChunk').mockImplementation(async (texts) => (
+        texts.map(text => `translated-${text}`)
+      ));
+
+      await expect(provider._traditionalBatchTranslate(
+        ['A', 'VERY_LONG_B', 'C'], 'en', 'fa', TranslationMode.Page
+      )).rejects.toMatchObject({ type: ErrorTypes.API_RESPONSE_INVALID });
+    });
+
+    it('preserves ordered transport results for one oversized logical source', async () => {
+      TraditionalTextProcessor.createChunks.mockReturnValue([
+        { texts: ['B part 1'] },
+        { texts: ['B part 2'] },
+      ]);
+      vi.spyOn(provider, '_translateChunk').mockImplementation(async (texts) => (
+        texts.map(text => `translated-${text}`)
+      ));
+
+      await expect(provider._traditionalBatchTranslate(
+        ['VERY_LONG_B'], 'en', 'fa', TranslationMode.Page
+      )).resolves.toEqual(['translated-B part 1', 'translated-B part 2']);
     });
 
     it('publishes separate metadata slots for separate physical chunks', async () => {
