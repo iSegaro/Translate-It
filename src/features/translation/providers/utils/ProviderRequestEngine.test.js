@@ -240,6 +240,29 @@ describe('ProviderRequestEngine', () => {
       });
     });
 
+    it.each(['OpenAI', 'Gemini', 'OpenRouter', 'DeepSeek', 'WebAI'])(
+      'classifies generic %s AI 404 as HTTP_ERROR',
+      async (providerName) => {
+        const aiProvider = {
+          ...mockProvider,
+          providerName,
+          constructor: { type: 'ai' },
+        };
+        proxyManager.fetch.mockResolvedValue(httpErrorResponse({
+          error: { message: 'model not found' },
+        }, 404, 'Not Found'));
+
+        await expect(ProviderRequestEngine.executeApiCall(aiProvider, {
+          url: 'https://api.test.com',
+          fetchOptions: { headers: {} },
+        })).rejects.toMatchObject({
+          type: ErrorTypes.HTTP_ERROR,
+          statusCode: 404,
+          providerName,
+        });
+      },
+    );
+
     it.each([null, undefined])('falls back to ErrorMatcher for %s hook result', async (result) => {
       mockProvider.classifyProviderHttpError = vi.fn(() => result);
       proxyManager.fetch.mockResolvedValue(httpErrorResponse({ error: { message: 'Invalid API key' } }, 401, 'Unauthorized'));

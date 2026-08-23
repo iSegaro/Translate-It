@@ -149,6 +149,28 @@ describe('ErrorMatcher', () => {
       expect(matchErrorToType({ statusCode: 404, message: 'endpoint' })).toBe(ErrorTypes.API_URL_MISSING);
     });
 
+    it('should keep generic AI HTTP 404 neutral despite model wording', () => {
+      expect(matchErrorToType({
+        providerType: 'ai',
+        statusCode: 404,
+        message: 'model not found',
+      })).toBe(ErrorTypes.HTTP_ERROR);
+    });
+
+    it.each([400, 401, 403, 429, 500])('should preserve non-404 AI status classification for %s', (statusCode) => {
+      expect(matchErrorToType({ providerType: 'ai', statusCode })).toBe(
+        statusCode === 400
+          ? ErrorTypes.HTTP_ERROR
+          : statusCode === 401
+            ? ErrorTypes.API_KEY_INVALID
+            : statusCode === 403
+              ? ErrorTypes.FORBIDDEN_ERROR
+              : statusCode === 429
+                ? ErrorTypes.RATE_LIMIT_REACHED
+                : ErrorTypes.SERVER_ERROR,
+      );
+    });
+
     it('should match string messages to ErrorTypes', () => {
       expect(matchErrorToType('quota exceeded')).toBe(ErrorTypes.QUOTA_EXCEEDED);
       expect(matchErrorToType('api key is missing')).toBe(ErrorTypes.API_KEY_MISSING);

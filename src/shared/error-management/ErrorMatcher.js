@@ -308,7 +308,8 @@ export function matchErrorToType(rawOrError = "") {
 
       if (code === 404) {
         const providerType = rawOrError.providerType;
-        if (providerType === ProviderTypes.AI || errorMsg.includes('model')) return ErrorTypes.MODEL_MISSING;
+        if (providerType === ProviderTypes.AI) return ErrorTypes.HTTP_ERROR;
+        if (errorMsg.includes('model')) return ErrorTypes.MODEL_MISSING;
         if (errorMsg.includes('chrome') || errorMsg.includes('translator')) return ErrorTypes.BROWSER_API_UNAVAILABLE;
         return ErrorTypes.API_URL_MISSING;
       }
