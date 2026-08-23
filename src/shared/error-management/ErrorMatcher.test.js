@@ -121,6 +121,19 @@ describe('ErrorMatcher', () => {
       expect(matchErrorToType({ statusCode: 503 })).toBe(ErrorTypes.SERVER_ERROR);
     });
 
+    it.each([
+      [{ statusCode: 503, message: 'Service Unavailable' }, ErrorTypes.SERVER_ERROR],
+      [{ statusCode: 503, message: 'Server is overloaded' }, ErrorTypes.SERVER_ERROR],
+      [{ statusCode: 500, message: 'Service busy' }, ErrorTypes.SERVER_ERROR],
+      [{ statusCode: 504, message: 'Upstream unavailable' }, ErrorTypes.SERVER_ERROR],
+      [{ message: 'The model is overloaded' }, ErrorTypes.MODEL_OVERLOADED],
+      [{ statusCode: 503, message: 'The model is overloaded' }, ErrorTypes.MODEL_OVERLOADED],
+      [{ statusCode: 429, message: 'High demand' }, ErrorTypes.RATE_LIMIT_REACHED],
+      [{ type: ErrorTypes.SERVER_ERROR, message: 'The model is overloaded' }, ErrorTypes.SERVER_ERROR],
+    ])('keeps generic server failures distinct from explicit model overload: %o', (error, expectedType) => {
+      expect(matchErrorToType(error)).toBe(expectedType);
+    });
+
     it('should match specific messages for HTTP 400', () => {
       expect(matchErrorToType({ statusCode: 400, message: 'invalid api key' })).toBe(ErrorTypes.API_KEY_INVALID);
       expect(matchErrorToType({ statusCode: 400, message: 'text is empty' })).toBe(ErrorTypes.TEXT_EMPTY);

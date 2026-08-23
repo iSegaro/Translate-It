@@ -617,7 +617,7 @@ describe('CustomProvider Error Handling', () => {
       .rejects.toThrow('API_ERROR: Internal Model Error');
   });
 
-  it('should handle HTTP 503 Service Unavailable', async () => {
+  it('should handle generic HTTP 503 Service Unavailable as SERVER_ERROR', async () => {
     proxyManager.fetch.mockResolvedValue({
       ok: false,
       status: 503,
@@ -632,7 +632,7 @@ describe('CustomProvider Error Handling', () => {
     try {
       await provider._callAI('system', 'text');
     } catch (error) {
-      expect(error.type).toBe(ErrorTypes.MODEL_OVERLOADED);
+       expect(error.type).toBe(ErrorTypes.SERVER_ERROR);
     }
   });
 

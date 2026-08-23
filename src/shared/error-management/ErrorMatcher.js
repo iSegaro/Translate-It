@@ -130,6 +130,8 @@ export const TRANSIENT_ERRORS = new Set([
   ErrorTypes.OPERATION_TIMEOUT
 ]);
 
+const MODEL_OVERLOAD_MESSAGE_PATTERN = /\bmodel(?:\s+is(?:\s+currently)?|\s+currently)?\s+overloaded\b|\bmodel_overloaded\b/i;
+
 /**
  * ErrorMatcher - Centralizes the logic for identifying and classifying errors
  * based on their messages, codes, or types.
@@ -317,13 +319,10 @@ export function matchErrorToType(rawOrError = "") {
       if (code === 429) return ErrorTypes.RATE_LIMIT_REACHED;
       if (code === 456) return ErrorTypes.DEEPL_QUOTA_EXCEEDED;
       
-      if (code === 503 || code === 504 || code === 500) {
-        if (errorMsg.includes("overloaded") || errorMsg.includes("high demand") || errorMsg.includes("busy") || errorMsg.includes("unavailable")) {
-          return ErrorTypes.MODEL_OVERLOADED;
-        }
+      if (code >= 500 && code <= 599) {
+        if (MODEL_OVERLOAD_MESSAGE_PATTERN.test(errorMsg)) return ErrorTypes.MODEL_OVERLOADED;
+        return ErrorTypes.SERVER_ERROR;
       }
-
-      if (code >= 500 && code <= 599) return ErrorTypes.SERVER_ERROR;
       return ErrorTypes.HTTP_ERROR;
     }
   }
@@ -416,7 +415,7 @@ export function matchErrorToType(rawOrError = "") {
 
   if ((msg.includes("api url") && msg.includes("missing")) || msg.includes("no endpoints found") || msg === "api_url_missing") return ErrorTypes.API_URL_MISSING;
   if (msg.includes("not a valid model id") || msg.includes("invalid model") || msg.includes("model not found") || msg.includes("model_missing")) return ErrorTypes.MODEL_MISSING;
-  if (msg.includes("the model is overloaded") || msg.includes("overloaded") || msg.includes("model_overloaded") || msg.includes("high demand") || msg.includes("service unavailable")) return ErrorTypes.MODEL_OVERLOADED;
+  if (MODEL_OVERLOAD_MESSAGE_PATTERN.test(msg)) return ErrorTypes.MODEL_OVERLOADED;
 
   if ((msg.includes("quota exceeded") && msg.includes("region")) || msg.includes("location is not supported") || msg.includes("gemini_quota_region")) return ErrorTypes.GEMINI_QUOTA_REGION;
   if (msg.includes("quota exceeded") || msg.includes("resource has been exhausted") || msg.includes("quota_exceeded") || msg.includes("limit exceeded")) return ErrorTypes.QUOTA_EXCEEDED;
