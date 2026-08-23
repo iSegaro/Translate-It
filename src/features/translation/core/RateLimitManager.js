@@ -8,7 +8,13 @@ import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { registryIdToName } from '@/features/translation/providers/ProviderConstants.js';
 import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
-import { isFatalError, isConfigError, isProviderRequestSizeError, matchErrorToType } from '@/shared/error-management/ErrorMatcher.js';
+import {
+  isFatalError,
+  isConfigError,
+  isProviderRequestSizeError,
+  isDeterministicClientHttpError,
+  matchErrorToType,
+} from '@/shared/error-management/ErrorMatcher.js';
 import { isLocalDeterministicValidationError } from '@/shared/error-management/ValidationPolicy.js';
 import { PROVIDER_CONFIGURATIONS, getProviderConfiguration } from '@/features/translation/core/ProviderConfigurations.js';
 import { getProviderOptimizationLevelAsync } from '@/shared/config/config.js';
@@ -412,12 +418,14 @@ export class RateLimitManager {
     // count as provider-health evidence.
     const isConfig = isConfigError(error);
     const isProviderRequestSize = isProviderRequestSizeError(error);
+    const isDeterministicClientHttp = isDeterministicClientHttpError(error);
     const isProviderHttpTextEmpty = error?.type === ErrorTypes.TEXT_EMPTY
       && [400, 422].includes(error?.statusCode);
     const isForbidden = error?.type === ErrorTypes.FORBIDDEN_ERROR;
     const isProviderHealthFailure = !isConfig
       && error?.type !== ErrorTypes.INVALID_REQUEST
       && !isProviderRequestSize
+      && !isDeterministicClientHttp
       && !isProviderHttpTextEmpty
       && !isForbidden;
     if (isProviderHealthFailure) {

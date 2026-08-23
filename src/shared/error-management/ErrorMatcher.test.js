@@ -8,6 +8,7 @@ import {
   isCancellationError,
   needsSettings,
   isProviderRequestSizeError,
+  isDeterministicClientHttpError,
   ErrorMatcher
 } from './ErrorMatcher.js';
 import { ErrorTypes } from './ErrorTypes.js';
@@ -157,6 +158,19 @@ describe('ErrorMatcher', () => {
   });
 
   describe('Classification Functions', () => {
+    it.each([
+      [{ type: ErrorTypes.HTTP_ERROR, statusCode: 400 }, true],
+      [{ type: ErrorTypes.HTTP_ERROR, statusCode: '404' }, true],
+      [{ type: ErrorTypes.HTTP_ERROR, statusCode: 422 }, true],
+      [{ type: ErrorTypes.HTTP_ERROR, statusCode: 409 }, false],
+      [{ type: ErrorTypes.HTTP_ERROR, statusCode: 500 }, false],
+      [{ type: ErrorTypes.HTTP_ERROR }, false],
+      [{ type: ErrorTypes.SERVER_ERROR, statusCode: 400 }, false],
+      [{ type: ErrorTypes.INVALID_REQUEST, statusCode: 400 }, false],
+    ])('identifies deterministic client HTTP failures narrowly', (error, expected) => {
+      expect(isDeterministicClientHttpError(error)).toBe(expected);
+    });
+
     it.each([
       [{ type: ErrorTypes.HTTP_ERROR, statusCode: 413 }, true],
       [{ type: ErrorTypes.HTTP_ERROR, statusCode: 400, message: 'request is too long' }, true],

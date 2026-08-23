@@ -639,6 +639,26 @@ describe('QueueManager', () => {
     });
   });
 
+  describe('deterministic client HTTP_ERROR', () => {
+    it.each([400, 404, 422])('does not retry HTTP %s errors', async (statusCode) => {
+      const error = { type: ErrorTypes.HTTP_ERROR, statusCode, message: `HTTP ${statusCode}` };
+      const request = vi.fn().mockRejectedValue(error);
+      const executionContext = { operation: { appendDiagnostic: vi.fn() } };
+
+      const promise = queueManager.enqueue(`deterministic-http-${statusCode}`, request, 0, 'context', { executionContext });
+
+      await vi.advanceTimersByTimeAsync(150);
+      await expect(promise).rejects.toBe(error);
+      await vi.advanceTimersByTimeAsync(10000);
+
+      expect(request).toHaveBeenCalledTimes(1);
+      expect(queueManager.retryTimeouts.size).toBe(0);
+      expect(executionContext.operation.appendDiagnostic).not.toHaveBeenCalledWith(
+        expect.objectContaining({ type: 'QUEUE_RETRY' })
+      );
+    });
+  });
+
   describe('provider request-size HTTP_ERROR', () => {
     it.each([
       [400, 'request is too long'],
@@ -662,8 +682,8 @@ describe('QueueManager', () => {
       );
     });
 
-    it('retains retries for ordinary HTTP_ERROR', async () => {
-      const error = { type: ErrorTypes.HTTP_ERROR, statusCode: 400, message: 'Bad Request' };
+    it('retains retries for HTTP_ERROR 409', async () => {
+      const error = { type: ErrorTypes.HTTP_ERROR, statusCode: 409, message: 'Conflict' };
       const request = vi.fn().mockRejectedValueOnce(error).mockResolvedValue('healthy');
 
       const promise = queueManager.enqueue('ordinary-http', request);

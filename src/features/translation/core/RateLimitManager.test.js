@@ -21,7 +21,12 @@ vi.mock('@/shared/error-management/ValidationPolicy.js', () => ({
 }));
 
 import { RateLimitManager, TranslationPriority } from './RateLimitManager.js';
-import { isConfigError, isFatalError, isProviderRequestSizeError } from '@/shared/error-management/ErrorMatcher.js';
+import {
+  isConfigError,
+  isFatalError,
+  isProviderRequestSizeError,
+  isDeterministicClientHttpError,
+} from '@/shared/error-management/ErrorMatcher.js';
 import { isLocalDeterministicValidationError } from '@/shared/error-management/ValidationPolicy.js';
 import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
 
@@ -99,6 +104,10 @@ describe('RateLimitManager', () => {
         && (statusCode === 413
           || ((statusCode === 400 || statusCode === 422)
             && /\btoo\s+long\b|\bmaximum\s+length\b|\bcontext\s+length\b/.test(message)));
+    });
+    isDeterministicClientHttpError.mockImplementation((error) => {
+      return error?.type === ErrorTypes.HTTP_ERROR
+        && [400, 404, 422].includes(Number(error?.statusCode));
     });
 
     // Reset singleton instance for clean tests
@@ -233,6 +242,56 @@ describe('RateLimitManager', () => {
       const nextTask = vi.fn().mockResolvedValue('healthy');
       await expect(manager.executeWithRateLimit('TestProvider', nextTask)).resolves.toBe('healthy');
       expect(nextTask).toHaveBeenCalledTimes(1);
+    });
+
+    it.each([
+      [400, true],
+      [404, true],
+      [422, true],
+      [409, false],
+    ])('keeps HTTP %s deterministic-client predicate expectation', (statusCode, expected) => {
+      const error = { type: ErrorTypes.HTTP_ERROR, statusCode };
+      expect(isDeterministicClientHttpError(error)).toBe(expected);
+    });
+
+    it.each([400, 404, 422])('excludes HTTP %s from provider health and allows the next operation', async (statusCode) => {
+      const error = Object.assign(new Error(`HTTP ${statusCode}`), {
+        type: ErrorTypes.HTTP_ERROR,
+        statusCode,
+      });
+      const state = manager.providerStates.get('TestProvider');
+      isFatalError.mockImplementation((candidate) => candidate === error || candidate?.statusCode === 404);
+
+      await expect(manager.executeWithRateLimit(
+        'TestProvider',
+        () => Promise.reject(error)
+      )).rejects.toBe(error);
+
+      expect(state.performanceStats.failedRequests).toBe(1);
+      expect(state.consecutiveFailures).toBe(0);
+      expect(state.isCircuitOpen).toBe(false);
+
+      const nextTask = vi.fn().mockResolvedValue('healthy');
+      await expect(manager.executeWithRateLimit('TestProvider', nextTask)).resolves.toBe('healthy');
+      expect(nextTask).toHaveBeenCalledTimes(1);
+    });
+
+    it('keeps HTTP 409 provider-health accounting unchanged', async () => {
+      const error = Object.assign(new Error('Conflict'), {
+        type: ErrorTypes.HTTP_ERROR,
+        statusCode: 409,
+      });
+      const state = manager.providerStates.get('TestProvider');
+      isFatalError.mockReturnValue(false);
+
+      await expect(manager.executeWithRateLimit(
+        'TestProvider',
+        () => Promise.reject(error)
+      )).rejects.toBe(error);
+
+      expect(state.performanceStats.failedRequests).toBe(1);
+      expect(state.consecutiveFailures).toBe(1);
+      expect(state.isCircuitOpen).toBe(false);
     });
 
     it.each([

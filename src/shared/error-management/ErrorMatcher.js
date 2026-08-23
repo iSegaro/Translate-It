@@ -227,6 +227,16 @@ export function isProviderRequestSizeError(error) {
 }
 
 /**
+ * Identifies deterministic client HTTP failures for execution policy only.
+ * Canonical error type remains HTTP_ERROR.
+ */
+export function isDeterministicClientHttpError(error) {
+  if (error?.type !== ErrorTypes.HTTP_ERROR) return false;
+
+  return [400, 404, 422].includes(Number(error.statusCode));
+}
+
+/**
  * Determines if an error should be handled silently
  */
 export function isSilentError(errorOrType) {
