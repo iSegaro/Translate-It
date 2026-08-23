@@ -191,6 +191,28 @@ describe('RateLimitManager', () => {
       expect(nextTask).toHaveBeenCalledTimes(1);
     });
 
+    it('keeps fatal FORBIDDEN_ERROR out of provider health and allows the next operation', async () => {
+      const error = Object.assign(new Error('Access denied'), {
+        type: ErrorTypes.FORBIDDEN_ERROR,
+        statusCode: 403,
+      });
+      const state = manager.providerStates.get('TestProvider');
+      isFatalError.mockReturnValue(true);
+
+      await expect(manager.executeWithRateLimit(
+        'TestProvider',
+        () => Promise.reject(error)
+      )).rejects.toBe(error);
+
+      expect(state.performanceStats.failedRequests).toBe(1);
+      expect(state.consecutiveFailures).toBe(0);
+      expect(state.isCircuitOpen).toBe(false);
+
+      const nextTask = vi.fn().mockResolvedValue('healthy');
+      await expect(manager.executeWithRateLimit('TestProvider', nextTask)).resolves.toBe('healthy');
+      expect(nextTask).toHaveBeenCalledTimes(1);
+    });
+
     it.each([400, 422])('keeps HTTP %s TEXT_EMPTY out of provider health while recording failure', async (statusCode) => {
       const error = Object.assign(new Error('Text is empty'), {
         type: ErrorTypes.TEXT_EMPTY,
