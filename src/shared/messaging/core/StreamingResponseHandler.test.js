@@ -135,19 +135,48 @@ describe('StreamingResponseHandler', () => {
     expect(error).toMatchObject({ message: 'legacy failure', type: 'LEGACY_ERROR' });
   });
 
-  it('should handle TRANSLATION_RESULT_UPDATE messages', () => {
+  it('returns true when active handler accepts TRANSLATION_RESULT_UPDATE', () => {
     const messageId = 'msg-4';
     const onTranslationResult = vi.fn();
     handler.registerHandler(messageId, { onTranslationResult });
     
     const message = { action: MessageActions.TRANSLATION_RESULT_UPDATE, messageId, data: { success: true, text: 'final' } };
-    handler.handleMessage(message);
+    const handled = handler.handleMessage(message);
     
+    expect(handled).toBe(true);
     expect(onTranslationResult).toHaveBeenCalledWith(message.data);
     expect(mockCoordinator.completeStreamingOperation).toHaveBeenCalledWith(messageId, expect.objectContaining({
       success: true,
       type: 'translation_result'
     }));
+  });
+
+  it('buffers result when no active handler exists and replays after registration', () => {
+    const message = {
+      action: MessageActions.TRANSLATION_RESULT_UPDATE,
+      messageId: 'unknown-result',
+      data: { success: true },
+    };
+
+    expect(handler.handleMessage(message)).toBe(false);
+
+    const onTranslationResult = vi.fn();
+    handler.registerHandler(message.messageId, { onTranslationResult });
+
+    expect(onTranslationResult).toHaveBeenCalledWith(message.data);
+  });
+
+  it('returns false when completed handler receives duplicate result', () => {
+    const messageId = 'completed-result';
+    handler.registerHandler(messageId);
+    const message = {
+      action: MessageActions.TRANSLATION_RESULT_UPDATE,
+      messageId,
+      data: { success: true },
+    };
+
+    expect(handler.handleMessage(message)).toBe(true);
+    expect(handler.handleMessage(message)).toBe(false);
   });
 
   it('reconstructs translation-result errors with canonical identity on Error', () => {

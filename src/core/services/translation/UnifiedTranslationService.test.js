@@ -516,6 +516,37 @@ describe('UnifiedTranslationService', () => {
       expect(service.resultDispatcher.dispatchResult).toHaveBeenCalled();
     });
 
+    it('returns delivery failure without activating conversation acceptance', async () => {
+      const message = {
+        messageId: 'delivery-failure',
+        data: {
+          text: 'source',
+          mode: 'select-element',
+          provider: 'openai',
+          sessionId: 'delivery-failure',
+          conversationParents: [{ parentId: 'g1', cleanSource: 'source' }],
+        },
+        context: 'select-element',
+      };
+      const request = { messageId: message.messageId, data: message.data };
+      const deliveryError = Object.assign(new Error('Select Element result delivery failed'), {
+        type: ErrorTypes.CONNECTION_LOST,
+      });
+      translationRequestTracker.createRequest.mockReturnValue(request);
+      service.modeCoordinator.processRequest.mockResolvedValue({ success: true, translatedText: 'translated' });
+      service.resultDispatcher.dispatchResult.mockRejectedValue(deliveryError);
+      const activate = vi.spyOn(service.conversationAcceptanceCoordinator, 'activate');
+      const remove = vi.spyOn(service.conversationAcceptanceCoordinator, 'remove');
+
+      const result = await service.handleTranslationRequest(message);
+
+      expect(result).toMatchObject({ success: false, error: deliveryError.message });
+      expect(remove).toHaveBeenCalledWith(message.messageId);
+      expect(activate).not.toHaveBeenCalled();
+      expect(service.modeCoordinator.processRequest).toHaveBeenCalledTimes(1);
+      expect(translationRequestTracker.completeRequest).toHaveBeenCalledWith(message.messageId, expect.objectContaining({ success: true }));
+    });
+
     it('records OPERATION_FAILED with reason and code when the tracker transition is FAILED', async () => {
       const message = {
         messageId: 'm-fail',

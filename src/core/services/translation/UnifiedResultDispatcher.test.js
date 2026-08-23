@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { UnifiedResultDispatcher } from './UnifiedResultDispatcher.js';
 import { TranslationMode } from '@/shared/config/config.js';
+import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
 import browser from 'webextension-polyfill';
 
 // Mock webextension-polyfill
@@ -25,6 +26,7 @@ describe('UnifiedResultDispatcher', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    browser.tabs.sendMessage.mockResolvedValue(true);
     dispatcher = new UnifiedResultDispatcher();
     
     // Mock backgroundService for history
@@ -124,8 +126,72 @@ describe('UnifiedResultDispatcher', () => {
   });
 
   describe('dispatchSelectElementResult', () => {
+    const request = { mode: TranslationMode.Select_Element, sender: { tab: { id: 1 }, frameId: 0 } };
+
+    it('retains processed marker after confirmed recipient handoff', async () => {
+      await dispatcher.dispatchResult({ messageId: 'm-success', result: { success: true }, request });
+
+      expect(dispatcher.processedResults.has('m-success')).toBe(true);
+    });
+
+    it('keeps ambiguous false recipient response non-terminal', async () => {
+      browser.tabs.sendMessage.mockResolvedValueOnce(false);
+
+      await expect(dispatcher.dispatchResult({
+        messageId: 'm-rejected',
+        result: { success: true },
+        request,
+      })).resolves.toBeUndefined();
+
+      expect(dispatcher.processedResults.has('m-rejected')).toBe(true);
+    });
+
+    it('normalizes transport rejection and rolls back processed marker', async () => {
+      browser.tabs.sendMessage.mockRejectedValueOnce(new Error('Socket handoff failed'));
+
+      await expect(dispatcher.dispatchResult({
+        messageId: 'm-transport-failure',
+        result: { success: true },
+        request,
+      })).rejects.toMatchObject({ type: ErrorTypes.CONNECTION_LOST });
+
+      expect(dispatcher.processedResults.has('m-transport-failure')).toBe(false);
+    });
+
+    it('allows explicit redispatch after failed delivery', async () => {
+      browser.tabs.sendMessage
+        .mockRejectedValueOnce(new Error('Socket handoff failed'))
+        .mockResolvedValueOnce(true);
+
+      await expect(dispatcher.dispatchResult({
+        messageId: 'm-redispatch',
+        result: { success: true },
+        request,
+      })).rejects.toMatchObject({ type: ErrorTypes.CONNECTION_LOST });
+
+      await expect(dispatcher.dispatchResult({
+        messageId: 'm-redispatch',
+        result: { success: true },
+        request,
+      })).resolves.toBeUndefined();
+
+      expect(browser.tabs.sendMessage).toHaveBeenCalledTimes(2);
+      expect(dispatcher.processedResults.has('m-redispatch')).toBe(true);
+    });
+
+    it('preserves context-invalidated classification', async () => {
+      browser.tabs.sendMessage.mockRejectedValueOnce(new Error('Extension context invalidated'));
+
+      await expect(dispatcher.dispatchResult({
+        messageId: 'm-context-failure',
+        result: { success: true },
+        request,
+      })).rejects.toMatchObject({ type: ErrorTypes.EXTENSION_CONTEXT_INVALIDATED });
+
+      expect(dispatcher.processedResults.has('m-context-failure')).toBe(false);
+    });
+
     it('should send direct result to originating top frame', async () => {
-      const request = { mode: TranslationMode.Select_Element, sender: { tab: { id: 1 }, frameId: 0 } };
       await dispatcher.dispatchSelectElementResult({ messageId: 'm1', result: { success: true }, request });
       expect(browser.tabs.sendMessage).toHaveBeenCalledWith(1, expect.objectContaining({
         data: expect.objectContaining({ context: 'select-element-direct' })
@@ -140,11 +206,24 @@ describe('UnifiedResultDispatcher', () => {
       expect(browser.tabs.sendMessage).toHaveBeenCalledWith(1, expect.anything(), { frameId: 7 });
     });
 
-    it('should not send or broadcast when frame identity is missing', async () => {
+    it('rejects when frame identity is missing', async () => {
       const request = { mode: TranslationMode.Select_Element, sender: { tab: { id: 1 } } };
-      await dispatcher.dispatchSelectElementResult({ messageId: 'm-missing-frame', result: { success: true }, request });
+      await expect(dispatcher.dispatchSelectElementResult({
+        messageId: 'm-missing-frame',
+        result: { success: true },
+        request,
+      })).rejects.toMatchObject({ type: ErrorTypes.CONNECTION_LOST });
       expect(browser.tabs.query).not.toHaveBeenCalled();
       expect(browser.tabs.sendMessage).not.toHaveBeenCalled();
+    });
+
+    it('rejects when tab identity is missing', async () => {
+      const request = { mode: TranslationMode.Select_Element, sender: { frameId: 0 } };
+      await expect(dispatcher.dispatchSelectElementResult({
+        messageId: 'm-missing-tab',
+        result: { success: true },
+        request,
+      })).rejects.toMatchObject({ type: ErrorTypes.CONNECTION_LOST });
     });
   });
 
@@ -187,7 +266,11 @@ describe('UnifiedResultDispatcher', () => {
         sender: { tab: { id: 456 }, frameId: 7 }
       };
 
-      await dispatcher.dispatchStreamingUpdate({ messageId: 'm-gone', data: { chunk: '..' }, request });
+      await expect(dispatcher.dispatchStreamingUpdate({
+        messageId: 'm-gone',
+        data: { chunk: '..' },
+        request,
+      })).rejects.toMatchObject({ type: ErrorTypes.EXTENSION_CONTEXT_INVALIDATED });
 
       expect(browser.tabs.query).not.toHaveBeenCalled();
       expect(browser.tabs.sendMessage).toHaveBeenCalledTimes(1);
