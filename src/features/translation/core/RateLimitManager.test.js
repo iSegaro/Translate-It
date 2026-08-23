@@ -70,7 +70,10 @@ vi.mock('@/features/translation/core/ProviderConfigurations.js', () => ({
             maxConcurrent: 8,
           },
         },
-      }
+      },
+      ...(providerName === 'BingTranslate' && {
+        errorHandling: { circuitBreakThreshold: 3 },
+      }),
     };
   })
 }));
@@ -119,6 +122,44 @@ describe('RateLimitManager', () => {
   });
 
   const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+
+  describe('provider circuit threshold configuration', () => {
+    it('uses Bing explicit threshold and opens after third eligible failure', async () => {
+      const state = await manager._initializeProviderWithLevel('BingTranslate');
+
+      expect(state.circuitBreakThreshold).toBe(3);
+
+      for (let attempt = 0; attempt < 3; attempt++) {
+        manager._recordFailure(
+          state,
+          Object.assign(new Error('Bing server failure'), { type: ErrorTypes.SERVER_ERROR }),
+          'BingTranslate'
+        );
+      }
+
+      expect(state.isCircuitOpen).toBe(true);
+
+      const task = vi.fn().mockResolvedValue('unexpected');
+      await expect(manager.executeWithRateLimit('BingTranslate', task))
+        .rejects.toMatchObject({ type: ErrorTypes.CIRCUIT_BREAKER_OPEN });
+      expect(task).not.toHaveBeenCalled();
+    });
+
+    it('keeps default threshold for providers without explicit override', async () => {
+      const state = await manager._initializeProviderWithLevel('TestProvider');
+
+      expect(state.circuitBreakThreshold).toBe(5);
+    });
+
+    it.each([0, -1, 1.5, NaN, Infinity, '3'])('falls back for invalid explicit threshold %p', (threshold) => {
+      const state = manager._initializeProvider('InvalidThresholdProvider', {
+        maxConcurrent: 1,
+        delayBetweenRequests: 0,
+      }, { circuitBreakThreshold: threshold });
+
+      expect(state.circuitBreakThreshold).toBe(5);
+    });
+  });
 
   describe('Priority Queueing', () => {
     it('should execute HIGH priority tasks before NORMAL and LOW', async () => {

@@ -35,6 +35,17 @@ const EXPLICIT_ADAPTIVE_BACKOFF_DEFAULTS = Object.freeze({
   resetAfterSuccess: 1,
 });
 
+const DEFAULT_CIRCUIT_BREAK_THRESHOLD = 5;
+
+function resolveCircuitBreakThreshold(value) {
+  return typeof value === 'number'
+    && Number.isFinite(value)
+    && Number.isInteger(value)
+    && value >= 1
+    ? value
+    : DEFAULT_CIRCUIT_BREAK_THRESHOLD;
+}
+
 function getAdaptiveBackoffConfig(config = {}) {
   const raw = config.adaptiveBackoff;
   if (!raw || typeof raw !== 'object') {
@@ -123,7 +134,8 @@ export class RateLimitManager {
       this._initializeProvider(name, optimizedConfig.rateLimit, {
         isManualConfig: false,
         optimizationLevel: level,
-        configSource: 'fresh-load'
+        configSource: 'fresh-load',
+        circuitBreakThreshold: optimizedConfig.errorHandling?.circuitBreakThreshold,
       });
     }
   }
@@ -143,7 +155,8 @@ export class RateLimitManager {
     return this._initializeProvider(providerName, optimizedConfig.rateLimit, {
       isManualConfig: false,
       optimizationLevel: level,
-      configSource: 'fresh-load'
+      configSource: 'fresh-load',
+      circuitBreakThreshold: optimizedConfig.errorHandling?.circuitBreakThreshold,
     });
   }
 
@@ -176,7 +189,9 @@ export class RateLimitManager {
       consecutiveFailures: 0,
       isCircuitOpen: false,
       circuitOpenTime: 0,
-      circuitBreakThreshold: 5,
+      circuitBreakThreshold: resolveCircuitBreakThreshold(
+        options.circuitBreakThreshold ?? config.circuitBreakThreshold
+      ),
       circuitRecoveryTime: 30000,
       // Adaptive backoff
       currentBackoffMultiplier: 1,

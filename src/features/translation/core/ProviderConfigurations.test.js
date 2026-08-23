@@ -16,6 +16,10 @@ import {
 } from './ProviderConfigurations.js';
 
 describe('ProviderConfigurations optimization scaling', () => {
+  it('declares Bing explicit circuit threshold override', () => {
+    expect(PROVIDER_CONFIGURATIONS.BingTranslate.errorHandling.circuitBreakThreshold).toBe(3);
+  });
+
   it('should give base-2 providers a distinct Level 2 concurrency step', () => {
     const levels = [1, 2, 3, 4, 5];
     const expected = [1, 2, 2, 3, 4];
