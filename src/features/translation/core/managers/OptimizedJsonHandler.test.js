@@ -34,6 +34,7 @@ import { TranslationBatcher } from '@/features/translation/core/utils/Translatio
 import { createManifestView, createRequestUnitManifest } from '@/features/translation/ir/RequestUnitManifest.js';
 import { TRANSLATION_BATCH_EXECUTION_TIMEOUT_MS } from '@/shared/constants/translation.js';
 import { TranslationCallPurpose } from '@/features/translation/providers/ProviderConstants.js';
+import { AIResponseParser } from '@/features/translation/providers/utils/AIResponseParser.js';
 
 // Mock dependencies
 vi.mock('@/shared/logging/logger.js', () => ({
@@ -155,6 +156,135 @@ describe('OptimizedJsonHandler', () => {
       const translated = ['t1', 't2'];
       const result = handler._mapResults(original, translated);
       expect(result).toEqual(['t1', 't2']);
+    });
+
+    it('characterizes traditional Select Element positional mapping for same-cardinality results', () => {
+      const original = [
+        { t: 'A', i: 'n1', blockId: 'b1' },
+        { t: 'B', i: 'n2', blockId: 'b2' },
+        { t: 'C', i: 'n3', blockId: 'b3' },
+      ];
+
+      expect(handler._mapResults(original, ['TA', 'TB', 'TC'])).toEqual([
+        { t: 'TA', text: 'TA', i: 'n1', blockId: 'b1' },
+        { t: 'TB', text: 'TB', i: 'n2', blockId: 'b2' },
+        { t: 'TC', text: 'TC', i: 'n3', blockId: 'b3' },
+      ]);
+    });
+
+    it('characterizes shuffled traditional results as weak positional ownership', () => {
+      const original = [
+        { t: 'A', i: 'n1', blockId: 'b1' },
+        { t: 'B', i: 'n2', blockId: 'b2' },
+        { t: 'C', i: 'n3', blockId: 'b3' },
+      ];
+
+      expect(handler._mapResults(original, ['TA', 'TC', 'TB'])).toEqual([
+        { t: 'TA', text: 'TA', i: 'n1', blockId: 'b1' },
+        { t: 'TC', text: 'TC', i: 'n2', blockId: 'b2' },
+        { t: 'TB', text: 'TB', i: 'n3', blockId: 'b3' },
+      ]);
+    });
+
+    it('restores Select Element AI positional-wire IDs before positional reattachment', async () => {
+      mockEngine.createIntelligentBatches = vi.fn((segments) => [segments]);
+      mockProvider.translate.mockImplementation(async (texts) => {
+        const parsed = AIResponseParser.parseBatchResult(
+          JSON.stringify([
+            { id: 2, text: 'TC' },
+            { id: 0, text: 'TA' },
+            { id: 1, text: 'TB' },
+          ]),
+          texts.length,
+          texts,
+        );
+        return { translatedText: parsed.results };
+      });
+
+      const result = await handler.execute(
+        mockEngine,
+        {
+          text: JSON.stringify([
+            { t: 'A', i: 'n1', blockId: 'b1' },
+            { t: 'B', i: 'n2', blockId: 'b2' },
+            { t: 'C', i: 'n3', blockId: 'b3' },
+          ]),
+          sourceLanguage: 'en',
+          targetLanguage: 'fa',
+          mode: 'select_element',
+          options: {},
+        },
+        mockProvider,
+        'en',
+        'fa',
+        'select-element-wire-order',
+        { tab: { id: 123 } },
+      );
+
+      expect(result.results).toEqual([
+        { t: 'TA', text: 'TA', i: 'n1', blockId: 'b1' },
+        { t: 'TB', text: 'TB', i: 'n2', blockId: 'b2' },
+        { t: 'TC', text: 'TC', i: 'n3', blockId: 'b3' },
+      ]);
+    });
+
+    it('characterizes ID-less AI responses as positional fallback', async () => {
+      mockEngine.createIntelligentBatches = vi.fn((segments) => [segments]);
+      mockProvider.translate.mockImplementation(async (texts) => {
+        const parsed = AIResponseParser.parseBatchResult(
+          JSON.stringify([{ text: 'TC' }, { text: 'TA' }, { text: 'TB' }]),
+          texts.length,
+          texts,
+        );
+        return { translatedText: parsed.results };
+      });
+
+      const result = await handler.execute(
+        mockEngine,
+        {
+          text: JSON.stringify([
+            { t: 'A', i: 'n1', blockId: 'b1' },
+            { t: 'B', i: 'n2', blockId: 'b2' },
+            { t: 'C', i: 'n3', blockId: 'b3' },
+          ]),
+          sourceLanguage: 'en',
+          targetLanguage: 'fa',
+          mode: 'select_element',
+          options: {},
+        },
+        mockProvider,
+        'en',
+        'fa',
+        'select-element-idless-order',
+        { tab: { id: 123 } },
+      );
+
+      expect(result.results).toEqual([
+        { t: 'TC', text: 'TC', i: 'n1', blockId: 'b1' },
+        { t: 'TA', text: 'TA', i: 'n2', blockId: 'b2' },
+        { t: 'TB', text: 'TB', i: 'n3', blockId: 'b3' },
+      ]);
+    });
+
+    it('rejects Select Element traditional under-return without shifting later units', () => {
+      const original = [
+        { t: 'A', i: 'n1', blockId: 'b1' },
+        { t: 'B', i: 'n2', blockId: 'b2' },
+        { t: 'C', i: 'n3', blockId: 'b3' },
+      ];
+
+      expect(() => handler._mapResults(original, ['TA', 'TB'])).toThrow(/Segment count mismatch/);
+    });
+
+    it('rejects Select Element traditional over-return without attaching an extra unit', () => {
+      const original = [
+        { t: 'A', i: 'n1', blockId: 'b1' },
+        { t: 'B', i: 'n2', blockId: 'b2' },
+        { t: 'C', i: 'n3', blockId: 'b3' },
+      ];
+
+      expect(() => handler._mapResults(original, ['TA', 'TB', 'TC', 'TD']))
+        .toThrow(/Segment count mismatch/);
     });
 
     it('should reject malformed JSON-like strings as a typed failure with a preserved diagnostic', () => {

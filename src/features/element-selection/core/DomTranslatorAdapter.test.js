@@ -920,6 +920,40 @@ describe('DomTranslatorAdapter', () => {
       expect(acceptedParents).toEqual(['b1', 'b2']);
     });
 
+    it('keeps reverse parent completion attached to canonical parent identities', async () => {
+      const first = document.createTextNode('A');
+      const second = document.createTextNode('B');
+      testElement.replaceChildren(first, second);
+      const { collectTextNodes } = await import('./DomTranslatorUtils.js');
+      collectTextNodes.mockReturnValueOnce([
+        { node: first, text: 'A', uid: 'n1', blockId: 'b1', role: 'div' },
+        { node: second, text: 'B', uid: 'n2', blockId: 'b2', role: 'div' },
+      ]);
+
+      let streamCallbacks;
+      registerTranslation.mockImplementationOnce((_id, callbacks) => { streamCallbacks = callbacks; });
+      contentScriptIntegration.sendTranslationRequest.mockResolvedValueOnce({
+        success: true,
+        streaming: true,
+        conversationAcceptance: true,
+      });
+
+      const translation = adapter.translateElement(testElement);
+      await vi.waitFor(() => expect(streamCallbacks).toBeDefined());
+      streamCallbacks.onStreamUpdate({ success: true, data: [{ t: 'Dos', i: 'n2' }] });
+      streamCallbacks.onStreamUpdate({ success: true, data: [{ t: 'Uno', i: 'n1' }] });
+      streamCallbacks.onStreamEnd({ success: true });
+
+      await translation;
+
+      expect(first.nodeValue).toContain('Uno');
+      expect(second.nodeValue).toContain('Dos');
+      expect(sendRegularMessage.mock.calls
+        .filter(([message, options]) => options?.silent === true && message?.data?.accepted === true)
+        .map(([message]) => message.data.parentId))
+        .toEqual(['b2', 'b1']);
+    });
+
     it('should apply complete direct parent only after all units pass preflight', async () => {
       const first = document.createTextNode('A');
       const second = document.createTextNode('B');
