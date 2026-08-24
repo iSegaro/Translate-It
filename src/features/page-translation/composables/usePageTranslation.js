@@ -107,14 +107,6 @@ export function usePageTranslation() {
       return;
     }
 
-    isTranslating.value = true;
-    // Don't set isAutoTranslating here based on data.isAuto
-    // Wait for manager response to confirm persistence state
-    translatedCount.value = 0;
-    failedCount.value = 0;
-    message.value = 'Starting translation...';
-    error.value = null;
-
     try {
       // Determine synced provider if any
       const syncedProvider = translationStore.ephemeralSync.page && translationStore.selectedProvider
@@ -135,34 +127,15 @@ export function usePageTranslation() {
         return;
       }
 
-      if (result.success) {
-        isTranslated.value = true;
-        translatedCount.value = result.translatedCount || 0;
-        failedCount.value = result.failedCount || 0;
-        totalNodes.value = result.totalNodes || result.totalCount || 0;
-        // Only update if the result explicitly tells us the state
-        if (result.isAutoTranslating !== undefined) {
-          isAutoTranslating.value = !!result.isAutoTranslating;
-        }
-      } else {
-        throw new Error(result.reason || 'Translation failed');
-      }
+      if (!result?.success) throw new Error(result?.reason || 'Translation failed');
     } catch (e) {
-      // Only reset if it's a real failure, not just a state transition
+      // Preserve lifecycle state; only update presentation for real failures.
       if (e.message !== 'silent_error') {
         const displayError = await getPageTranslationErrorPresentation({ error: e });
         if (!displayError) return;
 
         error.value = displayError;
         message.value = `Error: ${displayError.message}`;
-        isTranslated.value = false;
-        isAutoTranslating.value = false;
-      }
-    } finally {
-      // Only clear isTranslating if we're not in auto-translating mode
-      // If auto-translating, the runtime messages will handle the state
-      if (!isAutoTranslating.value) {
-        isTranslating.value = false;
       }
     }
   }
@@ -434,33 +407,38 @@ export function usePageTranslation() {
   /**
    * Handle incoming messages from other extension components (broadcasting)
    */
-  const handleRuntimeMessage = (message) => {
-    if (!message || !message.action) return;
+  const handleRuntimeMessage = (runtimeMessage) => {
+    if (!runtimeMessage || !runtimeMessage.action) return;
 
     // We only care about page translation events
-    switch (message.action) {
+    switch (runtimeMessage.action) {
       case MessageActions.PAGE_TRANSLATE_START:
         isTranslating.value = true;
         isTranslated.value = false;
-        if (message.data && message.data.isAutoTranslating !== undefined) {
-          isAutoTranslating.value = message.data.isAutoTranslating;
+        if (runtimeMessage.data?.isAutoTranslating !== undefined) {
+          isAutoTranslating.value = !!runtimeMessage.data.isAutoTranslating;
         }
+        translatedCount.value = 0;
+        failedCount.value = 0;
+        totalNodes.value = 0;
+        error.value = null;
+        message.value = 'Starting translation...';
         break;
       case MessageActions.PAGE_TRANSLATE_PROGRESS:
       case MessageActions.PAGE_TRANSLATE_IDLE:
-        updateProgress(message.data || {});
+        updateProgress(runtimeMessage.data || {});
         break;
       case MessageActions.PAGE_TRANSLATE_COMPLETE:
-        handleComplete(message.data || {});
+        handleComplete(runtimeMessage.data || {});
         break;
       case MessageActions.PAGE_TRANSLATE_ERROR:
-        handleError(message.data || {});
+        handleError(runtimeMessage.data || {});
         break;
       case MessageActions.PAGE_RESTORE_COMPLETE:
-        handleRestoreComplete(message.data || {});
+        handleRestoreComplete(runtimeMessage.data || {});
         break;
       case MessageActions.PAGE_AUTO_RESTORE_COMPLETE:
-        handleAutoRestoreComplete(message.data || {});
+        handleAutoRestoreComplete(runtimeMessage.data || {});
         break;
       case MessageActions.PAGE_TRANSLATE_CANCELLED:
         handleCancelled();
@@ -543,6 +521,7 @@ export function usePageTranslation() {
     isAutoTranslating,
     progress,
     translatedCount,
+    failedCount,
     totalNodes,
     message,
     error,
