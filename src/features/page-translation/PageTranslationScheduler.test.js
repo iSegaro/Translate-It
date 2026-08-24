@@ -31,6 +31,8 @@ import { PageTranslationFluidFilter } from './utils/PageTranslationFluidFilter.j
 import { safeSendMessage } from '@/shared/messaging/core/UnifiedMessaging.js';
 import { pageEventBus } from '@/core/PageEventBus.js';
 import { MessageActions } from '@/shared/messaging/core/MessageActions.js';
+import { MessageFormat } from '@/shared/messaging/core/MessagingCore.js';
+import ExtensionContextManager from '@/core/extensionContext.js';
 
 // 3. Mock other dependencies
 vi.mock('./utils/PageTranslationQueueFilter.js', () => ({
@@ -97,6 +99,7 @@ describe('PageTranslationScheduler', () => {
 
     scheduler = new PageTranslationScheduler();
     scheduler.setTranslationState(true, 'test-session-123', { pageTitle: 'Test Page' });
+    vi.spyOn(pageEventBus, 'emit');
     
     // Default mock behavior for filters
     const defaultResult = {
@@ -585,6 +588,200 @@ describe('PageTranslationScheduler', () => {
 
        expectSettlement(mockItem.resolve, 'Old Context');
       expect(scheduler.translatedCount).toBe(0);
+    });
+
+    it('settles queued items and escalates once when batch config fails', async () => {
+      const item = { text: 'Config failure', resolve: vi.fn(), score: 1 };
+      const error = new Error('config unavailable');
+      scheduler.queue.push(item);
+      scheduler.totalTasks = 1;
+      vi.spyOn(scheduler, '_getBatchConfig').mockRejectedValueOnce(error);
+
+      await scheduler.flush();
+
+      expect(getSettlement(item.resolve).state).toBe('failed');
+      expect(scheduler.queue).toHaveLength(0);
+      expect(scheduler.isTranslated).toBe(false);
+      expect(scheduler.activeFlushes).toBe(0);
+      expect(pageEventBus.emit.mock.calls.filter(([event]) => event === 'page-translation-fatal-error'))
+        .toHaveLength(1);
+      expect(pageEventBus.emit).not.toHaveBeenCalledWith(MessageActions.PAGE_TRANSLATE_COMPLETE, expect.anything());
+      expect(pageEventBus.emit).not.toHaveBeenCalledWith(MessageActions.PAGE_TRANSLATE_IDLE, expect.anything());
+    });
+
+    it('cancels owned items silently when batch config loses context', async () => {
+      const item = { text: 'Context failure', resolve: vi.fn(), score: 1 };
+      const error = Object.assign(new Error('context invalidated'), { type: 'EXTENSION_CONTEXT_INVALIDATED' });
+      scheduler.queue.push(item);
+      scheduler.totalTasks = 1;
+      ExtensionContextManager.isContextError.mockReturnValueOnce(true);
+      vi.spyOn(scheduler, '_getBatchConfig').mockRejectedValueOnce(error);
+
+      await scheduler.flush();
+
+      expect(getSettlement(item.resolve).state).toBe('cancelled');
+      expect(scheduler.failedCount).toBe(0);
+      expect(pageEventBus.emit.mock.calls.filter(([event]) => event === 'page-translation-fatal-error'))
+        .toHaveLength(1);
+    });
+
+    it.each([
+      ['fluid', false, PageTranslationFluidFilter],
+      ['queue', true, PageTranslationQueueFilter],
+    ])('settles items when %s filter throws', async (_name, translateAfterScrollStop, filter) => {
+      const item = { text: 'Filter failure', resolve: vi.fn(), score: 1 };
+      const error = new Error('filter invariant failed');
+      scheduler.settings.translateAfterScrollStop = translateAfterScrollStop;
+      scheduler.queue.push(item);
+      scheduler.totalTasks = 1;
+      vi.spyOn(scheduler, '_getBatchConfig').mockResolvedValue({
+        providerRegistryId: 'google',
+        targetLanguage: 'fa',
+      });
+      filter.process.mockImplementationOnce(() => { throw error; });
+
+      await scheduler.flush();
+
+      expect(getSettlement(item.resolve).state).toBe('failed');
+      expect(scheduler.queue).toHaveLength(0);
+      expect(scheduler.activeFlushes).toBe(0);
+    });
+
+    it('settles items when a filter returns malformed ownership data', async () => {
+      const item = { text: 'Malformed result', resolve: vi.fn(), score: 1 };
+      scheduler.queue.push(item);
+      scheduler.totalTasks = 1;
+      vi.spyOn(scheduler, '_getBatchConfig').mockResolvedValue({
+        providerRegistryId: 'google',
+        targetLanguage: 'fa',
+      });
+      PageTranslationFluidFilter.process.mockReturnValueOnce({ batchItems: [item] });
+
+      await scheduler.flush();
+
+      expect(getSettlement(item.resolve).state).toBe('failed');
+      expect(scheduler.queue).toHaveLength(0);
+      expect(pageEventBus.emit.mock.calls.filter(([event]) => event === 'page-translation-fatal-error'))
+        .toHaveLength(1);
+    });
+
+    it('settles a batch after it leaves queue ownership and execution fails outside its handler', async () => {
+      const item = { text: 'Owned batch', resolve: vi.fn(), score: 1 };
+      const error = new Error('batch boundary failure');
+      scheduler.queue.push(item);
+      scheduler.totalTasks = 1;
+      PageTranslationFluidFilter.process.mockReturnValueOnce({ batchItems: [item], remainingItems: [] });
+      vi.spyOn(scheduler, '_getBatchConfig').mockResolvedValue({
+        providerRegistryId: 'google',
+        targetLanguage: 'fa',
+      });
+      vi.spyOn(scheduler, '_executeBatchRequest').mockRejectedValueOnce(error);
+
+      await scheduler.flush();
+
+      expect(getSettlement(item.resolve).state).toBe('failed');
+      expect(scheduler.activeBatches.size).toBe(0);
+      expect(pageEventBus.emit.mock.calls.filter(([event]) => event === 'page-translation-fatal-error'))
+        .toHaveLength(1);
+    });
+
+    it('settles a batch when MessageFormat fails before batch error handling', async () => {
+      const item = { text: 'Message failure', resolve: vi.fn(), score: 1 };
+      scheduler.queue.push(item);
+      scheduler.totalTasks = 1;
+      PageTranslationFluidFilter.process.mockReturnValueOnce({ batchItems: [item], remainingItems: [] });
+      vi.spyOn(scheduler, '_getBatchConfig').mockResolvedValue({
+        providerRegistryId: 'google',
+        targetLanguage: 'fa',
+      });
+      vi.spyOn(MessageFormat, 'create').mockImplementationOnce(() => {
+        throw new Error('message construction failure');
+      });
+
+      await scheduler.flush();
+
+      expect(getSettlement(item.resolve).state).toBe('failed');
+      expect(scheduler.activeBatches.size).toBe(0);
+      expect(pageEventBus.emit.mock.calls.filter(([event]) => event === 'page-translation-fatal-error'))
+        .toHaveLength(1);
+    });
+
+    it('preserves partial accounting during outer failure', async () => {
+      const item = { text: 'Remaining work', resolve: vi.fn(), score: 1 };
+      scheduler.translatedCount = 2;
+      scheduler.failedCount = 1;
+      scheduler.totalTasks = 4;
+      scheduler.queue.push(item);
+      vi.spyOn(scheduler, '_getBatchConfig').mockRejectedValueOnce(new Error('infrastructure failure'));
+
+      await scheduler.flush();
+
+      expect(scheduler.translatedCount).toBe(2);
+      expect(scheduler.failedCount).toBe(2);
+      expect(scheduler.totalTasks).toBe(4);
+      expect(getSettlement(item.resolve).state).toBe('failed');
+    });
+
+    it('terminates concurrent session flushes with one fatal escalation', async () => {
+      const itemA = { text: 'A', resolve: vi.fn(), score: 1 };
+      const itemB = { text: 'B', resolve: vi.fn(), score: 1 };
+      let releaseSecond;
+      const secondRequest = new Promise(resolve => { releaseSecond = resolve; });
+      scheduler.settings.maxConcurrentFlushes = 2;
+      scheduler.queue.push(itemA, itemB);
+      scheduler.totalTasks = 2;
+      PageTranslationFluidFilter.process.mockImplementation(queue => ({
+        batchItems: [queue[0]],
+        remainingItems: queue.slice(1),
+      }));
+      vi.spyOn(scheduler, '_getBatchConfig').mockResolvedValue({
+        providerRegistryId: 'google',
+        targetLanguage: 'fa',
+      });
+      vi.spyOn(scheduler, '_executeBatchRequest')
+        .mockRejectedValueOnce(new Error('shared infrastructure failure'))
+        .mockImplementationOnce(() => secondRequest);
+
+      const firstFlush = scheduler.flush();
+      const secondFlush = scheduler.flush();
+      await vi.waitFor(() => expect(pageEventBus.emit.mock.calls.filter(([event]) => event === 'page-translation-fatal-error')).toHaveLength(1));
+
+      expect(getSettlement(itemA.resolve).state).toBe('failed');
+      expect(getSettlement(itemB.resolve).state).toBe('failed');
+      expect(scheduler.activeFlushes).toBe(0);
+      releaseSecond({});
+      await Promise.all([firstFlush, secondFlush]);
+      expect(pageEventBus.emit.mock.calls.filter(([event]) => event === 'page-translation-fatal-error'))
+        .toHaveLength(1);
+    });
+
+    it('does not let an old flush touch a newer session after config resolves', async () => {
+      const oldItem = { text: 'Old', resolve: vi.fn(), score: 1 };
+      let resolveConfig;
+      const config = new Promise(resolve => { resolveConfig = resolve; });
+      scheduler.queue.push(oldItem);
+      scheduler.totalTasks = 1;
+      vi.spyOn(scheduler, '_getBatchConfig').mockReturnValueOnce(config);
+      const filterSpy = vi.spyOn(PageTranslationFluidFilter, 'process');
+
+      const oldFlush = scheduler.flush();
+      await vi.waitFor(() => expect(scheduler._getBatchConfig).toHaveBeenCalled());
+
+      scheduler.stop();
+      scheduler.setTranslationState(true, 'new-session', { session: 'new' });
+      const newItem = { text: 'New', resolve: vi.fn(), score: 1 };
+      scheduler.queue.push(newItem);
+      scheduler.totalTasks = 1;
+
+      resolveConfig({ providerRegistryId: 'google', targetLanguage: 'fa' });
+      await oldFlush;
+
+      expect(filterSpy).not.toHaveBeenCalled();
+      expect(scheduler.queue).toEqual([newItem]);
+      expect(newItem.resolve).not.toHaveBeenCalled();
+      expect(scheduler.activeFlushes).toBe(0);
+      expect(pageEventBus.emit.mock.calls.filter(([event]) => event === 'page-translation-fatal-error'))
+        .toHaveLength(0);
     });
 
     it('does not let a stopped flush decrement a newer session counter', async () => {

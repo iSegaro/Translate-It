@@ -62,6 +62,7 @@ export class PageTranslationScheduler extends ResourceTracker {
     this._reportPending = false;
     this._completionTimer = null;
     this.pendingSettlements = new Set();
+    this.activeBatches = new Set();
 
     // Register queue for automatic memory management via ResourceTracker
     this.trackResource('translation-queue', () => {
@@ -104,7 +105,7 @@ export class PageTranslationScheduler extends ResourceTracker {
     this._nextContextId = 1;
   }
 
-  stop() {
+  stop(settlementOutcome = 'cancelled') {
     const wasTranslating = this.isTranslated;
     this.isTranslated = false;
     this.sessionContext = null;
@@ -144,11 +145,16 @@ export class PageTranslationScheduler extends ResourceTracker {
       const itemsToReject = [...this.queue];
       this.queue = [];
       this.highPriorityCount = 0;
-      itemsToReject.forEach(item => {
-        this._resolveItem(item, item.text, 'cancelled');
-      });
+      itemsToReject.forEach(item => this._resolveItem(item, item.text, settlementOutcome));
     }
-    [...this.pendingSettlements].forEach(settlement => settlement.settle('cancelled'));
+
+    const activeBatches = [...this.activeBatches];
+    this.activeBatches.clear();
+    activeBatches.forEach(({ items }) => {
+      items.forEach(item => this._resolveItem(item, item.text, settlementOutcome));
+    });
+
+    [...this.pendingSettlements].forEach(settlement => settlement.settle(settlementOutcome));
     this.activeFlushes = 0;
     this.isFirstBatch = true;
   }
@@ -373,23 +379,28 @@ export class PageTranslationScheduler extends ResourceTracker {
     const flushSessionId = this.translationSessionId;
     const flushContext = this.sessionContext;
     this.activeFlushes++;
+    let activeBatch = null;
 
     try {
       // Process batches in a loop as long as there are items and we are still translating
       while (this.queue.length > 0 && this.isTranslated && flushContext === this.sessionContext) {
         const config = await this._getBatchConfig();
+        if (!this._ownsFlushSession(flushSessionId, flushContext)) return;
         let currentBatch = [];
 
         // 1. SELECT BATCH: Use specialized filters based on the mode
         if (this.settings.translateAfterScrollStop) {
           const result = PageTranslationQueueFilter.process(this.queue, config);
+          this._validateFilterResult(result);
           currentBatch = result.batchItems;
+          const ejectedItems = Array.isArray(result.ejectedItems) ? result.ejectedItems : [];
+          activeBatch = this._trackBatch(currentBatch, ejectedItems);
           this.queue = result.remainingItems;
 
           // HANDLE EJECTED ITEMS: These were too far, so we remove them from the 
           // scheduler's responsibility by resolving them with original text.
           if (result.purgedCount > 0) {
-            result.ejectedItems.forEach(item => {
+            ejectedItems.forEach(item => {
               if (item.isHighPriority) {
                 this.highPriorityCount = Math.max(0, this.highPriorityCount - 1);
               }
@@ -398,11 +409,15 @@ export class PageTranslationScheduler extends ResourceTracker {
           }
         } else {
           const result = PageTranslationFluidFilter.process(this.queue, config);
+          this._validateFilterResult(result);
           currentBatch = result.batchItems;
+          activeBatch = this._trackBatch(currentBatch);
           this.queue = result.remainingItems;
         }
 
         if (currentBatch.length === 0) {
+          this.activeBatches.delete(activeBatch);
+          activeBatch = null;
           this.logger.debug('No visible content in queue, stopping flush loop');
           this.isWaitingForVisibility = true; // No visible content found
           break;
@@ -416,6 +431,8 @@ export class PageTranslationScheduler extends ResourceTracker {
         // 2. EXECUTE BATCH: Process the selected items
         this.isFirstBatch = false;
         await this._executeBatchRequest(currentBatch, config, flushContext);
+        this.activeBatches.delete(activeBatch);
+        activeBatch = null;
 
         // 3. YIELD: Give event loop a breath if there's more work
         if (this.queue.length > 0) {
@@ -424,7 +441,9 @@ export class PageTranslationScheduler extends ResourceTracker {
       }
     } catch (error) {
       this.logger.error('Critical error in scheduler flush loop:', error);
+      this._handleOuterFlushFailure(error, flushSessionId, flushContext);
     } finally {
+      if (activeBatch) this.activeBatches.delete(activeBatch);
       // A stopped flush may settle after a newer session has started. Its
       // finalizer must not decrement the newer session's accounting.
       const ownsAccounting = this.translationSessionId === flushSessionId
@@ -434,6 +453,45 @@ export class PageTranslationScheduler extends ResourceTracker {
         this._checkCompletion();
       }
     }
+  }
+
+  _ownsFlushSession(sessionId, sessionContext) {
+    return this.isTranslated
+      && this.translationSessionId === sessionId
+      && this.sessionContext === sessionContext;
+  }
+
+  _validateFilterResult(result) {
+    if (!result || !Array.isArray(result.batchItems) || !Array.isArray(result.remainingItems)) {
+      throw new TypeError('Page translation filter returned an invalid result');
+    }
+    if (result.purgedCount > 0 && !Array.isArray(result.ejectedItems)) {
+      throw new TypeError('Page translation filter omitted ejected items');
+    }
+  }
+
+  _trackBatch(batch, additionalItems = []) {
+    const activeBatch = {
+      items: [...batch, ...additionalItems]
+    };
+    this.activeBatches.add(activeBatch);
+    return activeBatch;
+  }
+
+  _handleOuterFlushFailure(error, sessionId, sessionContext) {
+    if (!this._ownsFlushSession(sessionId, sessionContext) || this.fatalErrorOccurred) return false;
+
+    this.fatalErrorOccurred = true;
+    const isContextError = ExtensionContextManager.isContextError(error);
+    this.stop(isContextError ? 'cancelled' : 'failed');
+
+    pageEventBus.emit('page-translation-fatal-error', {
+      error,
+      errorType: matchErrorToType(error),
+      context: 'page-translation-scheduler',
+      sessionId
+    });
+    return true;
   }
 
   /**
