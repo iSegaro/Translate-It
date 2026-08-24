@@ -163,6 +163,7 @@ vi.stubGlobal('location', {
 
 import { PageTranslationManager } from './PageTranslationManager.js';
 import { PageTranslationHelper } from './PageTranslationHelper.js';
+import { PageTranslationSettingsLoader } from './utils/PageTranslationSettingsLoader.js';
 import { pageEventBus } from '@/core/PageEventBus.js';
 import { MessageActions } from '@/shared/messaging/core/MessageActions.js';
 import { ErrorHandler } from '@/shared/error-management/ErrorHandler.js';
@@ -267,6 +268,150 @@ describe('PageTranslationManager', () => {
       await callback('Hello', { id: 'ctx' }, 1, mockNode);
       
       expect(manager.scheduler.enqueue).toHaveBeenCalledWith('Hello', { id: 'ctx' }, 1, mockNode);
+    });
+
+    it('settles silently when bridge initialization fails after START', async () => {
+      const error = Object.assign(new Error('context lost'), { type: ErrorTypes.CONTEXT });
+      manager.bridge.initialize.mockRejectedValueOnce(error);
+
+      await manager.activate();
+      const result = await manager.translatePage();
+
+      expect(result).toEqual({ success: false, reason: 'silent_error' });
+      expect(manager.isTranslating).toBe(false);
+      expect(manager.isAutoTranslating).toBe(false);
+      expect(manager.scheduler.setTranslationState).toHaveBeenCalledWith(false);
+      expect(manager.scrollTracker.stop).toHaveBeenCalled();
+      expect(manager.bridge.stopPersistence).toHaveBeenCalled();
+      expect(pageEventBus.emit).toHaveBeenCalledWith(MessageActions.PAGE_TRANSLATE_IDLE, expect.objectContaining({
+        translatedCount: 0,
+        failedCount: 0,
+        totalCount: 0,
+        isTranslated: false,
+        isTranslating: false,
+        isAutoTranslating: false
+      }));
+      expect(pageEventBus.emit).not.toHaveBeenCalledWith(MessageActions.PAGE_TRANSLATE_ERROR, expect.anything());
+      expect(ErrorHandler.getInstance().handle).not.toHaveBeenCalled();
+    });
+
+    it('does not emit IDLE for silent failure before START', async () => {
+      await manager.activate();
+      PageTranslationSettingsLoader.load.mockRejectedValueOnce(
+        Object.assign(new Error('context lost'), { type: ErrorTypes.CONTEXT })
+      );
+      const result = await manager.translatePage();
+
+      expect(result).toEqual({ success: false, reason: 'silent_error' });
+      expect(manager.isTranslating).toBe(false);
+      expect(pageEventBus.emit).not.toHaveBeenCalledWith(MessageActions.PAGE_TRANSLATE_START, expect.anything());
+      expect(pageEventBus.emit).not.toHaveBeenCalledWith(MessageActions.PAGE_TRANSLATE_IDLE, expect.anything());
+    });
+
+    it('does not leak a prior START into a later pre-START silent failure', async () => {
+      await manager.activate();
+      await manager.translatePage();
+      manager.isTranslating = false;
+      manager.isTranslated = true;
+
+      PageTranslationSettingsLoader.load.mockRejectedValueOnce(
+        Object.assign(new Error('context lost'), { type: ErrorTypes.CONTEXT })
+      );
+      const emittedBeforeSecondAttempt = pageEventBus.emit.mock.calls.length;
+
+      const result = await manager.translatePage({ isAuto: true });
+      const secondAttemptEvents = pageEventBus.emit.mock.calls.slice(emittedBeforeSecondAttempt);
+
+      expect(result).toEqual({ success: false, reason: 'silent_error' });
+      expect(secondAttemptEvents).not.toContainEqual([MessageActions.PAGE_TRANSLATE_START, expect.anything()]);
+      expect(secondAttemptEvents).not.toContainEqual([MessageActions.PAGE_TRANSLATE_IDLE, expect.anything()]);
+      expect(manager.isTranslating).toBe(false);
+    });
+
+    it('settles silently when bridge translation fails after initialization', async () => {
+      const error = Object.assign(new Error('context lost'), { type: ErrorTypes.EXTENSION_CONTEXT_INVALIDATED });
+      manager.bridge.translate.mockImplementationOnce(() => { throw error; });
+
+      await manager.activate();
+      const result = await manager.translatePage();
+
+      expect(result).toEqual({ success: false, reason: 'silent_error' });
+      expect(manager.isTranslating).toBe(false);
+      expect(manager.scheduler.setTranslationState).toHaveBeenCalledWith(false);
+      expect(pageEventBus.emit).toHaveBeenCalledWith(MessageActions.PAGE_TRANSLATE_IDLE, expect.objectContaining({
+        translatedCount: 0,
+        isTranslated: false
+      }));
+      expect(pageEventBus.emit).not.toHaveBeenCalledWith(MessageActions.PAGE_TRANSLATE_ERROR, expect.anything());
+    });
+
+    it('preserves partial counts and DOM state during silent settlement', async () => {
+      manager.scheduler.translatedCount = 2;
+      manager.scheduler.failedCount = 1;
+      manager.scheduler.totalTasks = 3;
+      manager.bridge.translate.mockImplementationOnce(() => {
+        throw Object.assign(new Error('context lost'), { type: ErrorTypes.CONTEXT });
+      });
+
+      await manager.activate();
+      const result = await manager.translatePage();
+
+      expect(result.reason).toBe('silent_error');
+      expect(manager.isTranslated).toBe(true);
+      expect(manager.bridge.restore).not.toHaveBeenCalled();
+      expect(pageEventBus.emit).toHaveBeenCalledWith(MessageActions.PAGE_TRANSLATE_IDLE, expect.objectContaining({
+        translatedCount: 2,
+        failedCount: 1,
+        totalCount: 3,
+        isTranslated: true,
+        isTranslating: false,
+        isAutoTranslating: false
+      }));
+    });
+
+    it('settles non-lazy zero-work translation without error presentation', async () => {
+      manager.scheduler.totalTasks = 0;
+
+      await manager.activate();
+      const result = await manager.translatePage();
+
+      expect(result.success).toBe(true);
+      expect(manager.isTranslating).toBe(false);
+      expect(manager.isTranslated).toBe(false);
+      expect(pageEventBus.emit).toHaveBeenCalledWith(MessageActions.PAGE_TRANSLATE_IDLE, expect.objectContaining({
+        translatedCount: 0,
+        failedCount: 0,
+        totalCount: 0,
+        isTranslated: false
+      }));
+      expect(pageEventBus.emit).not.toHaveBeenCalledWith(MessageActions.PAGE_TRANSLATE_ERROR, expect.anything());
+    });
+
+    it('keeps non-silent setup failures on the existing error path', async () => {
+      const error = Object.assign(new Error('provider failure'), { type: ErrorTypes.API_ERROR });
+      manager.bridge.initialize.mockRejectedValueOnce(error);
+
+      await manager.activate();
+      await expect(manager.translatePage()).rejects.toBe(error);
+
+      expect(pageEventBus.emit).toHaveBeenCalledWith(MessageActions.PAGE_TRANSLATE_ERROR, expect.objectContaining({
+        error: error.message
+      }));
+      expect(pageEventBus.emit).not.toHaveBeenCalledWith(MessageActions.PAGE_TRANSLATE_IDLE, expect.anything());
+    });
+
+    it('keeps explicit cancellation on restore lifecycle', async () => {
+      await manager.activate();
+      await manager.translatePage();
+
+      manager.cancelTranslation();
+
+      expect(manager.bridge.restore).toHaveBeenCalled();
+      expect(pageEventBus.emit).toHaveBeenCalledWith(MessageActions.PAGE_TRANSLATE_CANCELLED, expect.any(Object));
+      await vi.waitFor(() => expect(pageEventBus.emit).toHaveBeenCalledWith(
+        MessageActions.PAGE_RESTORE_COMPLETE,
+        expect.any(Object)
+      ));
     });
   });
 

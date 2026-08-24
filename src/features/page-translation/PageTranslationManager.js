@@ -102,6 +102,8 @@ export class PageTranslationManager extends ResourceTracker {
   }
 
   async translatePage(options = {}) {
+    let hasAcceptedStart = false;
+
     // 1. Check for URL change - ALWAYS reset for a clean slate in SPAs
     if (this.currentUrl !== window.location.href) {
       this.resetLocalState();
@@ -160,6 +162,7 @@ export class PageTranslationManager extends ResourceTracker {
         messageId: this.translationMessageId,
         isAutoTranslating: !!this.settings.autoTranslateOnDOMChanges
       });
+      hasAcceptedStart = true;
 
       this.isTranslated = false;
       this.isTranslating = true;
@@ -227,6 +230,18 @@ export class PageTranslationManager extends ResourceTracker {
       // CRITICAL: Translate only document.body to prevent scroll jumps and HEAD-tag interference.
       // Translating documentElement causes jumps to top on sites with complex scrollers (like Twitter).
       this.bridge.translate(document.body);
+
+      // Non-lazy, non-auto translation has no future work when no task was scheduled.
+      if (!this.isAutoTranslating && !this.settings.lazyLoading && this.scheduler.totalTasks === 0) {
+        const result = {
+          success: true,
+          url: this.currentUrl,
+          messageId: this.translationMessageId,
+          isAutoTranslating: false
+        };
+        this._settleSilentPostStart();
+        return result;
+      }
       
       this.isTranslated = false;
       this.isTranslating = true;
@@ -241,7 +256,12 @@ export class PageTranslationManager extends ResourceTracker {
     } catch (error) {
       if (isSilentError(error)) {
         this.logger.debug('translatePage: Silent error caught', error.message);
-        this.isTranslating = false;
+        if (hasAcceptedStart) {
+          this._settleSilentPostStart();
+        } else {
+          this.isTranslating = false;
+          this.isAutoTranslating = false;
+        }
         return { success: false, reason: ActionReasons.SILENT_ERROR };
       }
       
@@ -254,6 +274,46 @@ export class PageTranslationManager extends ResourceTracker {
       });
       throw error;
     }
+  }
+
+  _settleSilentPostStart() {
+    if (!this.isTranslating) return false;
+
+    const translatedCount = this.scheduler.translatedCount || 0;
+    const failedCount = this.scheduler.failedCount || 0;
+    const totalCount = this.scheduler.totalTasks || 0;
+    const isTranslated = translatedCount > 0;
+    const messageId = this.translationMessageId;
+
+    this.scrollTracker.stop();
+    this.bridge.stopPersistence();
+    this.scheduler.setTranslationState(false);
+    if (this.abortController) {
+      this.abortController.abort();
+      this.abortController = null;
+    }
+    this._cleanupSession();
+
+    this.isTranslating = false;
+    this.isAutoTranslating = false;
+    this.isTranslated = isTranslated;
+    this.sessionContext = null;
+
+    // Keep layout protection with preserved translated DOM; remove it for empty output.
+    if (!isTranslated) this._removeLayoutFix();
+
+    this._broadcastEvent(MessageActions.PAGE_TRANSLATE_IDLE, {
+      url: this.currentUrl,
+      messageId,
+      translatedCount,
+      failedCount,
+      totalCount,
+      isTranslated,
+      isTranslating: false,
+      isAutoTranslating: false
+    });
+
+    return true;
   }
 
   async restorePage(options = {}) {
