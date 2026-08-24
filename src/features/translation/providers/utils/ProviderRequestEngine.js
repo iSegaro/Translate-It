@@ -22,6 +22,17 @@ function normalizeCallPurpose(callPurpose) {
     : TranslationCallPurpose.PRIMARY_TRANSLATION;
 }
 
+const REFINABLE_ERROR_TYPES = new Set([
+  ErrorTypes.TRANSLATION_ERROR,
+  ErrorTypes.TRANSLATION_FAILED,
+  ErrorTypes.UNKNOWN,
+]);
+
+function isAuthoritativeErrorType(error) {
+  const type = typeof error?.type === 'string' ? error.type.trim() : '';
+  return Boolean(type) && !REFINABLE_ERROR_TYPES.has(type);
+}
+
 const PROVIDER_ERROR_FIELD_MAX_LENGTH = 128;
 
 function getBoundedProviderErrorField(value) {
@@ -426,16 +437,21 @@ export const ProviderRequestEngine = {
       const responseText = await response.text();
       return await extractResponse(responseText, response.status);
     } catch (err) {
+      const hasAuthoritativeType = isAuthoritativeErrorType(err);
+
       // Record error in stats if it's not a cancellation
-      const isCancellation = err.type === ErrorTypes.USER_CANCELLED || 
-                             err.type === ErrorTypes.TRANSLATION_CANCELLED ||
-                             err.name === 'AbortError';
+      const isCancellation = err.operationAborted === true
+        || err.type === ErrorTypes.USER_CANCELLED
+        || err.type === ErrorTypes.TRANSLATION_CANCELLED
+        || (!hasAuthoritativeType && err.name === 'AbortError');
       
       if (!isCancellation) {
         statsManager.recordError(provider.providerName, finalSessionId, normalizedCallPurpose);
       }
 
       if (err.name === 'AbortError') {
+        if (hasAuthoritativeType) throw err;
+
         const signal = abortController?.signal;
         const isUserAbort = signal?.aborted
           && (signal.reason === 'user-cancelled' || signal.reason === 'user_cancelled');

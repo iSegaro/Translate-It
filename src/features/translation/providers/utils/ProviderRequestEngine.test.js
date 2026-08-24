@@ -724,6 +724,194 @@ describe('ProviderRequestEngine', () => {
         });
     });
 
+    describe('typed AbortError provenance', () => {
+      it.each([
+        [ErrorTypes.TRANSLATION_TIMEOUT, true],
+        [ErrorTypes.NETWORK_ERROR, true],
+        [ErrorTypes.HTTP_ERROR, true],
+        [ErrorTypes.SERVER_ERROR, true],
+        [ErrorTypes.USER_CANCELLED, false],
+        [ErrorTypes.TRANSLATION_CANCELLED, false],
+      ])('preserves authoritative %s AbortError identity and stats semantics', async (type, recordsError) => {
+        const error = Object.assign(new Error(type), {
+          name: 'AbortError',
+          type,
+        });
+        proxyManager.fetch.mockRejectedValue(error);
+        const { statsManager } = await import('../../core/TranslationStatsManager.js');
+
+        await expect(ProviderRequestEngine.executeApiCall(mockProvider, baseParams()))
+          .rejects.toBe(error);
+
+        expect(error).toMatchObject({ name: 'AbortError', type });
+        expect(error.operationAborted).toBeUndefined();
+        expect(statsManager.recordRequest).toHaveBeenCalledTimes(1);
+        expect(statsManager.recordError).toHaveBeenCalledTimes(recordsError ? 1 : 0);
+      });
+
+      it('preserves typed AbortError metadata and identity', async () => {
+        const cause = new Error('native timeout');
+        const error = Object.assign(new Error('typed network failure'), {
+          name: 'AbortError',
+          type: ErrorTypes.NETWORK_ERROR,
+          statusCode: 503,
+          providerName: 'Source Provider',
+          providerId: 'source-provider',
+          code: 'NETWORK_TIMEOUT',
+          errorCode: 'E_NETWORK',
+          transportFailure: 'provider-timeout',
+          cause,
+          context: 'original-context',
+          customMetadata: { preserved: true },
+        });
+        proxyManager.fetch.mockRejectedValue(error);
+
+        await expect(ProviderRequestEngine.executeApiCall(mockProvider, baseParams()))
+          .rejects.toBe(error);
+
+        expect(error).toMatchObject({
+          type: ErrorTypes.NETWORK_ERROR,
+          statusCode: 503,
+          providerName: 'Source Provider',
+          providerId: 'source-provider',
+          code: 'NETWORK_TIMEOUT',
+          errorCode: 'E_NETWORK',
+          transportFailure: 'provider-timeout',
+          cause,
+          context: 'original-context',
+          customMetadata: { preserved: true },
+        });
+      });
+
+      it.each([
+        ErrorTypes.TRANSLATION_TIMEOUT,
+        ErrorTypes.NETWORK_ERROR,
+      ])('preserves operation-abort control with typed %s', async (type) => {
+        const error = Object.assign(new Error(type), {
+          name: 'AbortError',
+          type,
+          operationAborted: true,
+          cancellationReason: 'document-replaced',
+        });
+        proxyManager.fetch.mockRejectedValue(error);
+        const { statsManager } = await import('../../core/TranslationStatsManager.js');
+
+        await expect(ProviderRequestEngine.executeApiCall(mockProvider, baseParams()))
+          .rejects.toBe(error);
+
+        expect(error).toMatchObject({
+          type,
+          operationAborted: true,
+          cancellationReason: 'document-replaced',
+        });
+        expect(statsManager.recordError).not.toHaveBeenCalled();
+      });
+
+      it('keeps executeRequest operation-abort short-circuit for typed AbortError', async () => {
+        const error = Object.assign(new Error('typed network failure'), {
+          name: 'AbortError',
+          type: ErrorTypes.NETWORK_ERROR,
+          operationAborted: true,
+        });
+        const apiCallSpy = vi.spyOn(ProviderRequestEngine, 'executeApiCall').mockRejectedValue(error);
+
+        try {
+          await expect(ProviderRequestEngine.executeRequest(mockProvider, {
+            ...baseParams(),
+            extractResponse: mockExtractResponse,
+          })).rejects.toBe(error);
+          expect(apiCallSpy).toHaveBeenCalledTimes(1);
+        } finally {
+          apiCallSpy.mockRestore();
+        }
+      });
+
+      it.each([
+        ErrorTypes.TRANSLATION_ERROR,
+        ErrorTypes.TRANSLATION_FAILED,
+        ErrorTypes.UNKNOWN,
+      ])('continues normalizing generic %s AbortError with internal signal', async (type) => {
+        const controller = new AbortController();
+        controller.abort('document-replaced');
+        const error = Object.assign(new Error(type), {
+          name: 'AbortError',
+          type,
+        });
+        proxyManager.fetch.mockRejectedValue(error);
+
+        await expect(ProviderRequestEngine.executeApiCall(mockProvider, {
+          ...baseParams(),
+          abortController: controller,
+        })).rejects.toMatchObject({
+          operationAborted: true,
+          cancellationReason: 'document-replaced',
+        });
+      });
+
+      it.each([
+        ErrorTypes.TRANSLATION_ERROR,
+        ErrorTypes.TRANSLATION_FAILED,
+        ErrorTypes.UNKNOWN,
+      ])('continues normalizing generic %s AbortError with user signal', async (type) => {
+        const controller = new AbortController();
+        controller.abort('user-cancelled');
+        const error = Object.assign(new Error(type), {
+          name: 'AbortError',
+          type,
+        });
+        proxyManager.fetch.mockRejectedValue(error);
+
+        await expect(ProviderRequestEngine.executeApiCall(mockProvider, {
+          ...baseParams(),
+          abortController: controller,
+        })).rejects.toMatchObject({ type: ErrorTypes.USER_CANCELLED });
+      });
+
+      it('keeps timeout signal reason as generic operation abort', async () => {
+        const controller = new AbortController();
+        controller.abort('timeout');
+        proxyManager.fetch.mockRejectedValue(new DOMException('Aborted', 'AbortError'));
+
+        await expect(ProviderRequestEngine.executeApiCall(mockProvider, {
+          ...baseParams(),
+          abortController: controller,
+        })).rejects.toMatchObject({
+          operationAborted: true,
+          cancellationReason: 'operation-abort',
+        });
+      });
+
+      it('preserves failover-eligible typed AbortError through executeRequest', async () => {
+        const error = Object.assign(new Error('Invalid API key'), {
+          name: 'AbortError',
+          type: ErrorTypes.API_KEY_INVALID,
+        });
+        ApiKeyManager.getKeys.mockResolvedValue(['bad-key', 'good-key']);
+        ApiKeyManager.shouldFailover.mockReturnValue(true);
+        proxyManager.fetch
+          .mockRejectedValueOnce(error)
+          .mockResolvedValueOnce({
+            ok: true,
+            status: 200,
+            headers: new Map([['content-type', 'application/json']]),
+            clone() { return this; },
+            json: async () => ({ translated: 'translated' }),
+          });
+        const updateApiKey = vi.fn();
+        const { statsManager } = await import('../../core/TranslationStatsManager.js');
+
+        await expect(ProviderRequestEngine.executeRequest(mockProvider, {
+          ...baseParams(),
+          updateApiKey,
+        })).resolves.toBe('translated');
+
+        expect(proxyManager.fetch).toHaveBeenCalledTimes(2);
+        expect(ApiKeyManager.shouldFailover).toHaveBeenCalledWith(error);
+        expect(updateApiKey).toHaveBeenCalledWith('good-key', expect.any(Object));
+        expect(statsManager.recordError).toHaveBeenCalledTimes(1);
+      });
+    });
+
     it('attributes a recovery transport failure to recovery exactly once', async () => {
       proxyManager.fetch.mockRejectedValue(new TypeError('NetworkError: Failed to fetch'));
       const { statsManager } = await import('../../core/TranslationStatsManager.js');
