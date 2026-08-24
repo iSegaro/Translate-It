@@ -61,6 +61,11 @@ async function getPartialCompletionMessage() {
     || SELECT_ELEMENT_PARTIAL_ERROR_FALLBACK;
 }
 
+function hasUsefulCommittedOutput(outcome) {
+  return Number.isInteger(outcome?.committedParentCount)
+    && outcome.committedParentCount > 0;
+}
+
 /**
  * SelectElementManager - Coordinates the interactive Select Element mode.
  * Uses a specialized DomTranslatorAdapter optimized for AI/DeepL context and token efficiency.
@@ -562,7 +567,7 @@ class SelectElementManager extends ResourceTracker {
         pageEventBus.emit('hide-translation', { element: targetElement });
         pageEventBus.emit('ELEMENT_TRANSLATIONS_AVAILABLE'); // Notify that revert is now possible
 
-        if (result.partial === true) {
+        if (result.partial === true && !hasUsefulCommittedOutput(result)) {
           // Non-terminal partial completion: stream/provider completed normally but
           // some requested logical parents remain uncommitted. Committed translations
           // are valid and preserved; this is feature outcome UX, not a terminal error.
@@ -607,6 +612,7 @@ class SelectElementManager extends ResourceTracker {
       ? outcome.totalParentCount
       : 0;
     const isCancellation = Boolean(outcome?.cancelled) || isCancellationError(error);
+    const hasCommittedOutput = hasUsefulCommittedOutput(outcome);
     const isPartialFailure = !isCancellation
       && committedParentCount > 0
       && committedParentCount < totalParentCount;
@@ -620,7 +626,7 @@ class SelectElementManager extends ResourceTracker {
       this.logger.debug('Select Element translation cancelled:', error.message);
     } else if (isNoTranslatableContent) {
       await this._handleNoTranslatableContent(error);
-    } else if (isSilentSkip || isAlreadyTranslated) {
+    } else if (isSilentSkip || isAlreadyTranslated || hasCommittedOutput) {
       this.logger.debug('Select Element translation skipped:', error.message);
     } else {
       this.logger.warn('Select Element translation failed:', error);

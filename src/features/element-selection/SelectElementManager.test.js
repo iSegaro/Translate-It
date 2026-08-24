@@ -1266,22 +1266,13 @@ describe('SelectElementManager', () => {
       ['V3 failure', Object.assign(new Error('V3 marker contract violation'), { type: 'VALIDATION' })],
       ['timeout', Object.assign(new Error('Batch translation timed out'), { type: 'TRANSLATION_TIMEOUT' })],
       ['provider failure', Object.assign(new Error('Network failed'), { type: 'NETWORK_ERROR' })],
-    ])('uses generic partial-failure display for %s', async (_label, error) => {
+    ])('suppresses partial-failure display when committed output exists for %s', async (_label, error) => {
       error.translationOutcome = { committedParentCount: 1, totalParentCount: 2, cancelled: false };
       manager.domTranslatorAdapter.translateElement.mockRejectedValue(error);
 
       await manager.startTranslation(document.createElement('div'));
 
-      expect(errorHandler.handle).toHaveBeenCalledWith(
-        expect.objectContaining({
-          message: 'Some content could not be translated.',
-          type: 'TRANSLATION_FAILED',
-          cause: error,
-        }),
-        expect.objectContaining({ context: 'select-element', showToast: true })
-      );
-      expect(errorHandler.handle).toHaveBeenCalledTimes(1);
-      expect(errorHandler.handle.mock.calls[0][0].message).not.toContain('V3');
+      expect(errorHandler.handle).not.toHaveBeenCalled();
       const { pageEventBus } = await import('@/core/PageEventBus.js');
       expect(pageEventBus.emit).not.toHaveBeenCalledWith('show-select-element-info', expect.anything());
       const ExtensionContextManager = (await import('@/core/extensionContext.js')).default;
@@ -1354,7 +1345,7 @@ describe('SelectElementManager', () => {
       expect(ExtensionContextManager.handleContextError).not.toHaveBeenCalled();
     });
 
-    it('shows the partial message once and keeps success cleanup for PARTIAL_SUCCESS', async () => {
+    it('suppresses partial message and keeps success cleanup for PARTIAL_SUCCESS', async () => {
       const failureSpy = vi.spyOn(manager, '_handleTranslationFailure').mockImplementation(() => Promise.resolve());
       manager.domTranslatorAdapter.translateElement.mockResolvedValue({
         success: true,
@@ -1365,14 +1356,7 @@ describe('SelectElementManager', () => {
 
       await manager.startTranslation(document.createElement('div'));
 
-      expect(errorHandler.handle).toHaveBeenCalledTimes(1);
-      expect(errorHandler.handle).toHaveBeenCalledWith(
-        expect.objectContaining({
-          message: 'Some content could not be translated.',
-          type: 'TRANSLATION_FAILED',
-        }),
-        expect.objectContaining({ context: 'select-element', showToast: true })
-      );
+      expect(errorHandler.handle).not.toHaveBeenCalled();
       expect(failureSpy).not.toHaveBeenCalled();
       const ExtensionContextManager = (await import('@/core/extensionContext.js')).default;
       expect(ExtensionContextManager.handleContextError).not.toHaveBeenCalled();
@@ -1383,6 +1367,38 @@ describe('SelectElementManager', () => {
       expect(manager.domTranslatorAdapter.revertTranslation).not.toHaveBeenCalled();
       expect(pageEventBus.emit).not.toHaveBeenCalledWith('show-select-element-info', expect.anything());
       failureSpy.mockRestore();
+    });
+
+    it('keeps one terminal presentation for zero committed output', async () => {
+      const error = Object.assign(new Error('No translation results were accepted'), {
+        type: ErrorTypes.NO_ACCEPTED_TRANSLATION_RESULTS,
+        translationOutcome: { committedParentCount: 0, totalParentCount: 2, cancelled: false },
+      });
+      manager.domTranslatorAdapter.translateElement.mockRejectedValue(error);
+
+      await manager.startTranslation(document.createElement('div'));
+
+      expect(errorHandler.handle).toHaveBeenCalledTimes(1);
+      expect(errorHandler.handle).toHaveBeenCalledWith(
+        expect.objectContaining({ message: 'Translation failed', type: 'TRANSLATION_FAILED' }),
+        expect.objectContaining({ context: 'select-element', showToast: true })
+      );
+      expect(errorHandler.handle.mock.calls[0][0].message).not.toContain('No translation results were accepted');
+      expect(cleanupSpy).toHaveBeenCalledWith({ reason: 'error' });
+    });
+
+    it('preserves terminal presentation when outcome metadata is missing', async () => {
+      const error = Object.assign(new Error('Network failed'), { type: ErrorTypes.NETWORK_ERROR });
+      manager.domTranslatorAdapter.translateElement.mockRejectedValue(error);
+
+      await manager.startTranslation(document.createElement('div'));
+
+      expect(errorHandler.handle).toHaveBeenCalledTimes(1);
+      expect(errorHandler.handle).toHaveBeenCalledWith(
+        expect.objectContaining({ cause: error }),
+        expect.objectContaining({ context: 'select-element', showToast: true })
+      );
+      expect(cleanupSpy).toHaveBeenCalledWith({ reason: 'error' });
     });
   });
 
