@@ -21,6 +21,8 @@ const logger = getScopedLogger(LOG_COMPONENTS.CONTENT_APP, 'useContentAppPageTra
  * @returns {void}
  */
 export function useContentAppPageTranslation(mobileStore, tracker) {
+  let errorPresentationRevision = 0;
+
   onMounted(() => {
     const pageEventBus = window.pageEventBus;
     if (!pageEventBus) return;
@@ -163,7 +165,9 @@ export function useContentAppPageTranslation(mobileStore, tracker) {
       const isMainFrame = window.self === window.top;
       if (isMainFrame && detail.isAggregated !== true) return;
 
+      const revision = errorPresentationRevision;
       const presentation = await getPageTranslationErrorDecision(detail);
+      if (revision !== errorPresentationRevision) return;
       if (!presentation) return;
 
       const translatedCount = typeof detail.translatedCount === 'number'
@@ -195,7 +199,10 @@ export function useContentAppPageTranslation(mobileStore, tracker) {
     });
 
     tracker.addEventListener(pageEventBus, MessageActions.PAGE_TRANSLATE_RESET_ERROR, () => {
+      errorPresentationRevision++;
       const currentState = mobileStore.pageTranslationData;
+      if (currentState.status !== TRANSLATION_STATUS.ERROR) return;
+
       const hasTranslatedContent = currentState.isTranslated === true
         || currentState.translatedCount > 0;
 

@@ -17,9 +17,26 @@ vi.mock('@/shared/logging/logger.js', () => ({
   getScopedLogger: () => ({ debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() }),
 }));
 
+const getPageTranslationErrorDecisionMock = vi.hoisted(() => vi.fn());
+
+vi.mock('@/features/page-translation/utils/PageTranslationErrorPresenter.js', async (importOriginal) => {
+  const actual = await importOriginal();
+  getPageTranslationErrorDecisionMock.mockImplementation(actual.getPageTranslationErrorDecision);
+  return { ...actual, getPageTranslationErrorDecision: getPageTranslationErrorDecisionMock };
+});
+
 import { useContentAppPageTranslation } from './useContentAppPageTranslation.js';
 import { MessageActions } from '@/shared/messaging/core/MessageActions.js';
 import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
+import { getPageTranslationErrorDecision } from '@/features/page-translation/utils/PageTranslationErrorPresenter.js';
+
+const createDeferred = () => {
+  let resolve;
+  const promise = new Promise((promiseResolve) => {
+    resolve = promiseResolve;
+  });
+  return { promise, resolve };
+};
 
 describe('useContentAppPageTranslation', () => {
   let listeners;
@@ -191,6 +208,48 @@ describe('useContentAppPageTranslation', () => {
     }));
   });
 
+  it('does not reset active zero-progress translation on error reset', () => {
+    mobileStore.pageTranslationData = {
+      isTranslating: true,
+      isAutoTranslating: false,
+      isTranslated: false,
+      translatedCount: 0,
+      failedCount: 0,
+      totalCount: 4,
+      status: 'translating',
+      errorMessage: null,
+      canRetry: false,
+    };
+    const before = { ...mobileStore.pageTranslationData };
+
+    listeners.get(MessageActions.PAGE_TRANSLATE_RESET_ERROR)();
+
+    expect(mobileStore.resetPageTranslation).not.toHaveBeenCalled();
+    expect(mobileStore.setPageTranslation).not.toHaveBeenCalled();
+    expect(mobileStore.pageTranslationData).toEqual(before);
+  });
+
+  it('does not complete active partial translation on error reset', () => {
+    mobileStore.pageTranslationData = {
+      isTranslating: true,
+      isAutoTranslating: true,
+      isTranslated: true,
+      translatedCount: 2,
+      failedCount: 1,
+      totalCount: 4,
+      status: 'translating',
+      errorMessage: null,
+      canRetry: false,
+    };
+    const before = { ...mobileStore.pageTranslationData };
+
+    listeners.get(MessageActions.PAGE_TRANSLATE_RESET_ERROR)();
+
+    expect(mobileStore.resetPageTranslation).not.toHaveBeenCalled();
+    expect(mobileStore.setPageTranslation).not.toHaveBeenCalled();
+    expect(mobileStore.pageTranslationData).toEqual(before);
+  });
+
   it('fully resets zero-commit state when fatal presentation is dismissed', () => {
     mobileStore.pageTranslationData = {
       isTranslating: false,
@@ -320,6 +379,146 @@ describe('useContentAppPageTranslation', () => {
       isTranslated: true,
       canRetry: false,
       status: 'error',
+    });
+  });
+
+  it('discards a pending error decision after reset', async () => {
+    const decision = createDeferred();
+    getPageTranslationErrorDecision.mockReturnValueOnce(decision.promise);
+    mobileStore.pageTranslationData = {
+      isTranslating: true,
+      isAutoTranslating: false,
+      isTranslated: false,
+      translatedCount: 0,
+      failedCount: 0,
+      totalCount: 4,
+      status: 'translating',
+      errorMessage: null,
+      canRetry: false,
+    };
+
+    const errorPromise = listeners.get(MessageActions.PAGE_TRANSLATE_ERROR)({
+      errorDetails: { type: ErrorTypes.NETWORK_ERROR, message: 'stale failure' },
+      isFatal: true,
+      isAggregated: true,
+    });
+    listeners.get(MessageActions.PAGE_TRANSLATE_RESET_ERROR)();
+
+    decision.resolve({ displayError: new Error('stale failure'), canRetry: true });
+    await errorPromise;
+
+    expect(mobileStore.pageTranslationData).toMatchObject({
+      status: 'translating',
+      errorMessage: null,
+      canRetry: false,
+    });
+    expect(mobileStore.setPageTranslation).not.toHaveBeenCalled();
+  });
+
+  it('keeps a later error authoritative after reset invalidates an earlier one', async () => {
+    const firstDecision = createDeferred();
+    const secondDecision = createDeferred();
+    getPageTranslationErrorDecision
+      .mockReturnValueOnce(firstDecision.promise)
+      .mockReturnValueOnce(secondDecision.promise);
+    mobileStore.pageTranslationData = {
+      isTranslating: true,
+      isAutoTranslating: false,
+      isTranslated: false,
+      translatedCount: 0,
+      failedCount: 0,
+      totalCount: 4,
+      status: 'translating',
+      errorMessage: null,
+      canRetry: false,
+    };
+
+    const firstError = listeners.get(MessageActions.PAGE_TRANSLATE_ERROR)({
+      errorDetails: { type: ErrorTypes.NETWORK_ERROR, message: 'error A' },
+      isFatal: true,
+      isAggregated: true,
+    });
+    listeners.get(MessageActions.PAGE_TRANSLATE_RESET_ERROR)();
+    const secondError = listeners.get(MessageActions.PAGE_TRANSLATE_ERROR)({
+      errorDetails: { type: ErrorTypes.NETWORK_ERROR, message: 'error B' },
+      isFatal: true,
+      isAggregated: true,
+    });
+
+    secondDecision.resolve({ displayError: new Error('error B'), canRetry: true });
+    await secondError;
+    firstDecision.resolve({ displayError: new Error('error A'), canRetry: true });
+    await firstError;
+
+    expect(mobileStore.pageTranslationData).toMatchObject({
+      status: 'error',
+      errorMessage: 'error B',
+      canRetry: true,
+    });
+  });
+
+  it('keeps duplicate zero-output resets deterministic', () => {
+    mobileStore.resetPageTranslation.mockImplementation(() => {
+      Object.assign(mobileStore.pageTranslationData, {
+        isTranslating: false,
+        isAutoTranslating: false,
+        isTranslated: false,
+        translatedCount: 0,
+        failedCount: 0,
+        totalCount: 0,
+        status: 'idle',
+        errorMessage: null,
+        canRetry: false,
+      });
+    });
+    mobileStore.pageTranslationData = {
+      isTranslating: false,
+      isAutoTranslating: false,
+      isTranslated: false,
+      translatedCount: 0,
+      failedCount: 2,
+      totalCount: 2,
+      status: 'error',
+      errorMessage: 'fatal failure',
+      canRetry: true,
+    };
+
+    listeners.get(MessageActions.PAGE_TRANSLATE_RESET_ERROR)();
+    listeners.get(MessageActions.PAGE_TRANSLATE_RESET_ERROR)();
+
+    expect(mobileStore.resetPageTranslation).toHaveBeenCalledOnce();
+    expect(mobileStore.pageTranslationData).toMatchObject({
+      status: 'idle',
+      isTranslated: false,
+      translatedCount: 0,
+      errorMessage: null,
+    });
+  });
+
+  it('keeps duplicate partial-output resets deterministic', () => {
+    mobileStore.pageTranslationData = {
+      isTranslating: false,
+      isAutoTranslating: false,
+      isTranslated: true,
+      translatedCount: 2,
+      failedCount: 1,
+      totalCount: 3,
+      status: 'error',
+      errorMessage: 'fatal failure',
+      canRetry: false,
+    };
+
+    listeners.get(MessageActions.PAGE_TRANSLATE_RESET_ERROR)();
+    listeners.get(MessageActions.PAGE_TRANSLATE_RESET_ERROR)();
+
+    expect(mobileStore.pageTranslationData).toMatchObject({
+      status: 'completed',
+      isTranslated: true,
+      translatedCount: 2,
+      failedCount: 1,
+      totalCount: 3,
+      errorMessage: null,
+      canRetry: false,
     });
   });
 
