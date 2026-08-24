@@ -27,15 +27,17 @@ const MessageActions = {
 
 describe('MainFrameCoordinator Hover error normalization', () => {
   let emitSpy;
+  let aggregator;
 
   beforeEach(() => {
     vi.clearAllMocks();
     emitSpy = vi.spyOn(pageEventBus, 'emit');
-    new MainFrameCoordinator({
+    aggregator = {
       clearAll: vi.fn(),
       updateFrameData: vi.fn(),
       emitAggregateProgress: vi.fn()
-    }, MessageActions, null);
+    };
+    new MainFrameCoordinator(aggregator, MessageActions, null);
   });
 
   const dispatchIframeEvent = (type, data) => {
@@ -127,5 +129,71 @@ describe('MainFrameCoordinator Hover error normalization', () => {
     });
 
     expect(emitSpy.mock.calls.at(-1)).toEqual(['OTHER_IFRAME_EVENT', data]);
+  });
+
+  it('keeps PAGE_TRANSLATE command intent out of aggregate state', () => {
+    pageEventBus.emit(MessageActions.PAGE_TRANSLATE, { isAuto: false });
+
+    expect(aggregator.updateFrameData).not.toHaveBeenCalled();
+    expect(aggregator.clearAll).not.toHaveBeenCalled();
+  });
+
+  it('starts only main frame on accepted local START', () => {
+    const data = { messageId: 'main-session', isAutoTranslating: false };
+
+    pageEventBus.emit(MessageActions.PAGE_TRANSLATE_START, data);
+
+    expect(aggregator.updateFrameData).toHaveBeenCalledWith('main', expect.objectContaining({
+      isTranslating: true,
+      isTranslated: false,
+      isAutoTranslating: false,
+      translatedCount: 0,
+      failedCount: 0,
+      totalCount: 0,
+      status: 'translating'
+    }));
+    expect(aggregator.clearAll).not.toHaveBeenCalled();
+  });
+
+  it('starts only iframe frame on accepted iframe START', () => {
+    const data = {
+      frameUrl: 'https://frame.example/',
+      messageId: 'iframe-session',
+      isAutoTranslating: true
+    };
+
+    dispatchIframeEvent('TRANSLATE_IT_PAGE_EVENT', {
+      source: 'translate-it-iframe',
+      type: 'TRANSLATE_IT_PAGE_EVENT',
+      action: MessageActions.PAGE_TRANSLATE_START,
+      data
+    });
+
+    expect(aggregator.updateFrameData).toHaveBeenCalledWith('https://frame.example/', expect.objectContaining({
+      isTranslating: true,
+      isTranslated: false,
+      isAutoTranslating: true,
+      translatedCount: 0,
+      failedCount: 0,
+      totalCount: 0,
+      status: 'translating'
+    }));
+    expect(aggregator.clearAll).not.toHaveBeenCalled();
+  });
+
+  it('reconciles main-frame errors without clearing other frame state', () => {
+    const data = { error: 'translation failed', isFatal: true };
+
+    pageEventBus.emit(MessageActions.PAGE_TRANSLATE_ERROR, data);
+
+    expect(aggregator.updateFrameData).toHaveBeenCalledWith('main', expect.objectContaining({
+      isTranslating: false,
+      status: 'error'
+    }));
+    expect(aggregator.emitAggregateProgress).not.toHaveBeenCalledWith(
+      MessageActions.PAGE_TRANSLATE_ERROR,
+      data
+    );
+    expect(aggregator.clearAll).not.toHaveBeenCalled();
   });
 });

@@ -60,8 +60,7 @@ export class MainFrameCoordinator {
    * @param {Object} data - Payload data.
    */
   broadcastPageAction(action, data = {}) {
-    if (action === this.MessageActions.PAGE_TRANSLATE || 
-        action === this.MessageActions.PAGE_RESTORE) {
+    if (action === this.MessageActions.PAGE_RESTORE) {
       this.aggregator.clearAll();
     }
 
@@ -76,6 +75,20 @@ export class MainFrameCoordinator {
       try {
         iframe.contentWindow.postMessage(broadcastMessage, '*');
       } catch { /* ignore cross-origin */ }
+    });
+  }
+
+  _recordFrameStart(frameId, data = {}) {
+    this.aggregator.updateFrameData(frameId, {
+      ...data,
+      isTranslating: true,
+      isTranslated: false,
+      isAutoTranslating: data.isAutoTranslating === true,
+      translatedCount: 0,
+      failedCount: 0,
+      totalCount: 0,
+      failed: 0,
+      status: 'translating'
     });
   }
 
@@ -101,11 +114,7 @@ export class MainFrameCoordinator {
           
           // Update frame data based on action type
           if (action === this.MessageActions.PAGE_TRANSLATE_START) {
-            this.aggregator.updateFrameData(frameId, {
-              ...data,
-              isTranslating: true,
-              status: 'translating'
-            });
+            this._recordFrameStart(frameId, data);
             this.aggregator.emitAggregateProgress(this.MessageActions.PAGE_TRANSLATE_START, data);
           } else if (action === this.MessageActions.PAGE_TRANSLATE_PROGRESS) {
             this.aggregator.updateFrameData(frameId, data);
@@ -286,12 +295,15 @@ export class MainFrameCoordinator {
 
     // Page Translation start
     pageEventBus.on(this.MessageActions.PAGE_TRANSLATE, (options) => {
-      this.aggregator.updateFrameData('main', { 
-        isAutoTranslating: true, 
-        isTranslating: true, 
-        status: 'translating' 
-      });
       this.broadcastPageAction(this.MessageActions.PAGE_TRANSLATE, options);
+    });
+
+    // Page Translation start (Main Frame)
+    pageEventBus.on(this.MessageActions.PAGE_TRANSLATE_START, (data) => {
+      if (data.isAggregated) return;
+
+      this._recordFrameStart('main', data);
+      this.aggregator.emitAggregateProgress(this.MessageActions.PAGE_TRANSLATE_START, data);
     });
 
     // Main frame local progress tracking
@@ -324,6 +336,17 @@ export class MainFrameCoordinator {
           status: 'idle' 
         });
         this.aggregator.emitAggregateProgress(this.MessageActions.PAGE_TRANSLATE_IDLE, data);
+      }
+    });
+
+    // Page Translation error (Main Frame)
+    pageEventBus.on(this.MessageActions.PAGE_TRANSLATE_ERROR, (data) => {
+      if (!data.isAggregated) {
+        this.aggregator.updateFrameData('main', {
+          ...data,
+          isTranslating: false,
+          status: 'error'
+        });
       }
     });
 
