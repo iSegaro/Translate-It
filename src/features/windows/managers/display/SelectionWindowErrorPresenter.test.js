@@ -181,8 +181,8 @@ describe('SelectionWindowErrorPresenter', () => {
     expect(sourceError.providerName).toBe('Private Provider');
   });
 
-  it('returns ErrorHandler action and localization fields unchanged', async () => {
-    const sourceError = canonicalError(ErrorTypes.HTTP_ERROR);
+  it('preserves message fields while replacing legacy capabilities with public action', async () => {
+    const sourceError = canonicalError(ErrorTypes.HTTP_ERROR, { statusCode: 409 });
     const errorInfo = {
       message: 'safe HTTP message',
       type: ErrorTypes.HTTP_ERROR,
@@ -194,5 +194,34 @@ describe('SelectionWindowErrorPresenter', () => {
     const result = await getSelectionWindowErrorPresentation(sourceError, 'windows-translation', errorHandler);
 
     expect(result.errorInfo).toBe(errorInfo);
+    expect(result.errorInfo.canRetry).toBe(true);
+    expect(result.errorInfo.needsSettings).toBe(false);
+  });
+
+  it.each([
+    [400, false, false],
+    [404, false, false],
+    [408, true, false],
+    [409, true, false],
+  ])('maps HTTP %s capabilities from public action', async (statusCode, canRetry, needsSettings) => {
+    const result = await getSelectionWindowErrorPresentation(
+      canonicalError(ErrorTypes.HTTP_ERROR, { statusCode }),
+      'windows-translation',
+      errorHandler,
+    );
+
+    expect(result.errorInfo.canRetry).toBe(canRetry);
+    expect(result.errorInfo.needsSettings).toBe(needsSettings);
+  });
+
+  it('exposes Settings only for public OPEN_SETTINGS action', async () => {
+    const result = await getSelectionWindowErrorPresentation(
+      canonicalError(ErrorTypes.API_KEY_INVALID),
+      'windows-translation',
+      errorHandler,
+    );
+
+    expect(result.errorInfo.canRetry).toBe(false);
+    expect(result.errorInfo.needsSettings).toBe(true);
   });
 });

@@ -35,6 +35,10 @@
       :is-streaming="isStreaming"
       :error="translationError"
       :error-type="errorType"
+      :can-retry="canRetry"
+      :can-open-settings="canOpenSettings"
+      :on-retry="retryTranslation"
+      :on-open-settings="openSettings"
       :placeholder="t('popup_target_text_placeholder') || 'Translation result will appear here'"
       :copy-title="t('popup_copy_target_title_icon') || 'کپی نتیجه'"
       :copy-alt="t('popup_copy_target_alt_icon') || 'Copy Result'"
@@ -108,14 +112,25 @@ const {
   translationError,
   errorType,
   canTranslate,
+  canRetry,
+  canOpenSettings,
   actualSourceLanguage,
   actualTargetLanguage,
   lastTranslation,
   triggerTranslation,
+  getRetryCallback,
+  getSettingsCallback,
   cancelTranslation,
   clearTranslation,
   loadLastTranslation
 } = translation
+
+const retryTranslation = getRetryCallback(() => triggerTranslation(
+  props.sourceLanguage,
+  props.targetLanguage,
+  props.provider
+))
+const openSettings = getSettingsCallback()
 
 // Watch canTranslate and emit changes to parent
 watch(canTranslate, (newValue) => {

@@ -126,7 +126,6 @@ describe('useTranslationError', () => {
   it.each([
     [ErrorTypes.HTTP_ERROR, { statusCode: 404 }, false],
     [ErrorTypes.HTTP_ERROR, { statusCode: 409 }, true],
-    [ErrorTypes.HTTP_ERROR, { statusCode: 500 }, true],
     [ErrorTypes.SERVER_ERROR, { statusCode: 500 }, true],
     [ErrorTypes.RATE_LIMIT_REACHED, { statusCode: 429 }, false],
     [ErrorTypes.INVALID_REQUEST, { statusCode: 400 }, false],
@@ -138,6 +137,31 @@ describe('useTranslationError', () => {
     await composable.handleError(error);
 
     expect(composable.canRetry.value).toBe(expected);
+  });
+
+  it.each([
+    [ErrorTypes.HTTP_ERROR, 400, false, false],
+    [ErrorTypes.HTTP_ERROR, 404, false, false],
+    [ErrorTypes.HTTP_ERROR, 408, true, false],
+    [ErrorTypes.HTTP_ERROR, 409, true, false],
+    [ErrorTypes.SERVER_ERROR, 500, true, false],
+    [ErrorTypes.API_KEY_INVALID, undefined, false, true],
+    [ErrorTypes.RATE_LIMIT_REACHED, 429, false, false],
+    [ErrorTypes.API_ERROR, undefined, false, false],
+  ])('derives both capabilities from public action for %s', async (type, statusCode, expectedRetry, expectedSettings) => {
+    const [composable] = withSetup(() => useTranslationError('popup'));
+    const error = Object.assign(new Error(type), {
+      type,
+      ...(statusCode !== undefined && { statusCode }),
+    });
+    matchErrorToType.mockReturnValue(type);
+    ErrorDisplayStrategies.shouldShowRetry.mockReturnValue(true);
+    ErrorDisplayStrategies.shouldShowSettings.mockReturnValue(true);
+
+    await composable.handleError(error);
+
+    expect(composable.canRetry.value).toBe(expectedRetry);
+    expect(composable.canOpenSettings.value).toBe(expectedSettings);
   });
 
   it('should ignore user cancellation errors', async () => {
@@ -384,13 +408,95 @@ describe('useTranslationError', () => {
     const [composable] = withSetup(() => useTranslationError('popup'));
     
     // Mock strategy to allow settings
+    matchErrorToType.mockReturnValue(ErrorTypes.TEXT_TOO_LONG);
     ErrorDisplayStrategies.shouldShowSettings.mockReturnValue(true);
-    await composable.handleError(new Error('fail'));
+    await composable.handleError(Object.assign(new Error('fail'), {
+      type: ErrorTypes.TEXT_TOO_LONG,
+    }));
     
     const settingsCallback = composable.getSettingsCallback();
     settingsCallback();
 
     expect(mockErrorHandlerInstance.openOptionsPageCallback).toHaveBeenCalled();
+  });
+
+  it.each([
+    [409, true, true, false],
+    [400, false, true, false],
+  ])('keeps HTTP public echo capabilities from canRetry for status %s', (statusCode, canRetry, legacySettings, expectedSettings) => {
+    const [composable] = withSetup(() => useTranslationError('popup'));
+    ErrorDisplayStrategies.shouldShowSettings.mockReturnValue(legacySettings);
+    const listener = mockErrorHandlerInstance.addUIErrorListener.mock.calls[0][0];
+
+    listener({
+      context: 'translation-popup',
+      message: 'HTTP error',
+      type: ErrorTypes.HTTP_ERROR,
+      statusCode,
+      canRetry,
+      timestamp: 999,
+    });
+
+    expect(composable.canRetry.value).toBe(canRetry);
+    expect(composable.canOpenSettings.value).toBe(expectedSettings);
+  });
+
+  it('keeps Settings for API_KEY_INVALID public echo without legacy inference', () => {
+    const [composable] = withSetup(() => useTranslationError('popup'));
+    ErrorDisplayStrategies.shouldShowSettings.mockReturnValue(false);
+    const listener = mockErrorHandlerInstance.addUIErrorListener.mock.calls[0][0];
+
+    listener({
+      context: 'translation-popup',
+      message: 'API key invalid',
+      type: ErrorTypes.API_KEY_INVALID,
+      canRetry: false,
+      timestamp: 999,
+    });
+
+    expect(composable.canRetry.value).toBe(false);
+    expect(composable.canOpenSettings.value).toBe(true);
+  });
+
+  it('handles public echo when canonical and emitted display types differ', async () => {
+    const [composable] = withSetup(() => useTranslationError('popup'));
+    const error = Object.assign(new Error('raw parser detail'), {
+      type: ErrorTypes.JSON_PARSING_ERROR,
+    });
+    matchErrorToType.mockReturnValue(ErrorTypes.JSON_PARSING_ERROR);
+    ErrorDisplayStrategies.shouldShowRetry.mockReturnValue(true);
+    ErrorDisplayStrategies.shouldShowSettings.mockReturnValue(true);
+
+    await composable.handleError(error);
+
+    const listener = mockErrorHandlerInstance.addUIErrorListener.mock.calls[0][0];
+    listener({
+      context: 'translation-popup',
+      message: 'Invalid API response',
+      type: ErrorTypes.API_RESPONSE_INVALID,
+      canRetry: false,
+      timestamp: 999,
+    });
+
+    expect(composable.canRetry.value).toBe(false);
+    expect(composable.canOpenSettings.value).toBe(false);
+  });
+
+  it('keeps legacy capability fallback for listener events without canRetry', () => {
+    const [composable] = withSetup(() => useTranslationError('popup'));
+    ErrorDisplayStrategies.shouldShowRetry.mockReturnValue(true);
+    ErrorDisplayStrategies.shouldShowSettings.mockReturnValue(true);
+    const listener = mockErrorHandlerInstance.addUIErrorListener.mock.calls[0][0];
+
+    listener({
+      context: 'popup',
+      message: 'Legacy listener error',
+      type: ErrorTypes.NETWORK_ERROR,
+      timestamp: 999,
+    });
+
+    expect(composable.canRetry.value).toBe(true);
+    expect(composable.canOpenSettings.value).toBe(true);
   });
 
   it('should update state from UI error listener', async () => {

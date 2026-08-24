@@ -111,7 +111,9 @@ export function useTranslationError(context = 'unknown') {
       canRetry.value = publicError
         ? publicError.action === PublicTranslationErrorActions.RETRY
         : shouldShowRetry(errorTypeValue, strategy)
-      canOpenSettings.value = shouldShowSettings(errorTypeValue, strategy)
+      canOpenSettings.value = publicError
+        ? publicError.action === PublicTranslationErrorActions.OPEN_SETTINGS
+        : shouldShowSettings(errorTypeValue, strategy)
       
       // Handle error with appropriate strategy
       const enhancedOptions = {
@@ -220,20 +222,27 @@ export function useTranslationError(context = 'unknown') {
       if (errorData.context && !errorData.context.includes(context)) {
         return
       }
-      
+
       logger.debug(`[${context}] Received UI error update:`, errorData)
-      
+
+      const hasPublicEcho = typeof errorData.canRetry === 'boolean'
+      const publicError = hasPublicEcho
+        ? mapCanonicalTranslationError({ type: errorData.type })
+        : null
+
       // Update error state from listener
       currentError.value = errorData
       errorMessage.value = errorData.message
       errorType.value = errorData.type
       errorTimestamp.value = errorData.timestamp
-      
+
       const strategy = getErrorDisplayStrategy(context, errorData.type)
-      canRetry.value = typeof errorData.canRetry === 'boolean'
+      canRetry.value = hasPublicEcho
         ? errorData.canRetry
         : shouldShowRetry(errorData.type, strategy)
-      canOpenSettings.value = shouldShowSettings(errorData.type, strategy)
+      canOpenSettings.value = hasPublicEcho
+        ? publicError.action === PublicTranslationErrorActions.OPEN_SETTINGS
+        : shouldShowSettings(errorData.type, strategy)
     }
     
     unsubscribeListener = errorHandler.addUIErrorListener(listener)

@@ -132,6 +132,10 @@
           :is-streaming="isStreaming"
           :error="translationError"
           :error-type="errorType"
+          :can-retry="canRetry"
+          :can-open-settings="canOpenSettings"
+          :on-retry="retryTranslation"
+          :on-open-settings="openSettings"
           :placeholder="t('SIDEPANEL_TARGET_TEXT_PLACEHOLDER', 'Translation result will appear here')"
           :copy-title="t('SIDEPANEL_COPY_TARGET_TITLE_ICON', 'Copy translation')"
           :copy-alt="t('SIDEPANEL_COPY_TARGET_ALT_ICON', 'Copy Result')"
@@ -183,10 +187,14 @@ const {
   translationError,
   errorType,
   canTranslate,
+  canRetry,
+  canOpenSettings,
   actualSourceLanguage,
   actualTargetLanguage,
   lastTranslation,
   triggerTranslation,
+  getRetryCallback,
+  getSettingsCallback,
   cancelTranslation,
   clearTranslation,
   loadLastTranslation
@@ -224,6 +232,13 @@ const currentProviderLocal = computed({
   get: () => props.provider,
   set: (value) => emit('update:provider', value)
 })
+
+const retryTranslation = getRetryCallback(() => triggerTranslation(
+  sourceLanguage.value,
+  targetLanguage.value,
+  currentProviderLocal.value
+))
+const openSettings = getSettingsCallback()
 
 // Language state management
 const autoTranslateOnPaste = ref(false)

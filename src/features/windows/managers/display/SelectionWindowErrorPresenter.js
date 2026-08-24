@@ -36,6 +36,7 @@ export async function getSelectionWindowErrorPresentation(canonicalError, contex
 
   const errorInfo = await errorHandler.getErrorForUI(displayError, context);
   errorInfo.canRetry = publicError.action === PublicTranslationErrorActions.RETRY;
+  errorInfo.needsSettings = publicError.action === PublicTranslationErrorActions.OPEN_SETTINGS;
 
   return {
     displayError,

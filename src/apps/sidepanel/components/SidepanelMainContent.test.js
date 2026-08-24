@@ -14,6 +14,8 @@ const mockUnifiedTranslation = {
   translationError: ref(''),
   errorType: ref(null),
   canTranslate: ref(true),
+  canRetry: ref(false),
+  canOpenSettings: ref(false),
   actualSourceLanguage: ref('en'),
   actualTargetLanguage: ref('fa'),
   lastTranslation: ref({
@@ -26,6 +28,8 @@ const mockUnifiedTranslation = {
     timestamp: 1,
   }),
   triggerTranslation: vi.fn().mockResolvedValue(true),
+  getRetryCallback: vi.fn((retryFunction) => retryFunction),
+  getSettingsCallback: vi.fn(() => vi.fn()),
   cancelTranslation: vi.fn(),
   clearTranslation: vi.fn(),
   loadLastTranslation: vi.fn().mockResolvedValue(undefined),
@@ -113,6 +117,10 @@ vi.mock('@/components/shared/TranslationDisplay.vue', () => ({
     props: {
       lastTranslation: { type: Object, default: null },
       mode: { type: String, default: '' },
+      canRetry: { type: Boolean, default: false },
+      canOpenSettings: { type: Boolean, default: false },
+      onRetry: { type: Function, default: null },
+      onOpenSettings: { type: Function, default: null },
     },
     template: '<div class="translation-display-stub" />',
   },
@@ -168,5 +176,25 @@ describe('SidepanelMainContent.vue', () => {
 
     expect(mockLanguageDefaults.setSourceLanguageAsDefault).toHaveBeenCalledWith('en');
     expect(mockLanguageDefaults.setTargetLanguageAsDefault).toHaveBeenCalledWith('fa');
+  });
+
+  it('passes public action capabilities and existing callbacks to TranslationDisplay', async () => {
+    mockUnifiedTranslation.canRetry.value = true;
+    mockUnifiedTranslation.canOpenSettings.value = false;
+
+    const wrapper = mount(SidepanelMainContent, {
+      props: {
+        provider: 'gemini',
+      },
+    });
+
+    const display = wrapper.findComponent({ name: 'TranslationDisplay' });
+    expect(display.props('canRetry')).toBe(true);
+    expect(display.props('canOpenSettings')).toBe(false);
+
+    await display.props('onRetry')();
+    expect(mockUnifiedTranslation.triggerTranslation).toHaveBeenCalledWith('en', 'fa', 'gemini');
+    expect(mockUnifiedTranslation.getRetryCallback).toHaveBeenCalledWith(expect.any(Function));
+    expect(mockUnifiedTranslation.getSettingsCallback).toHaveBeenCalledTimes(1);
   });
 });
