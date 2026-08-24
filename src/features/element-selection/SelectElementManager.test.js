@@ -678,6 +678,123 @@ describe('SelectElementManager', () => {
       expect(ExtensionContextManager.handleContextError).not.toHaveBeenCalled();
     });
 
+    it.each(['operation-abort', 'System cleanup', 'lifecycle-cleanup', 'document-replaced', 'replacement'])('keeps internal operation abort silent for %s', async (cancellationReason) => {
+        const error = Object.assign(new Error('Translation operation aborted'), {
+          operationAborted: true,
+          cancellationReason,
+          translationOutcome: {
+            committedParentCount: 0,
+            totalParentCount: 1,
+            cancelled: false,
+          },
+        });
+        manager.domTranslatorAdapter.translateElement.mockRejectedValue(error);
+
+        await manager.startTranslation(document.createElement('div'));
+
+        expect(errorHandler.handle).not.toHaveBeenCalled();
+        expect(cleanupSpy).toHaveBeenCalledWith({ reason: 'cancel' });
+        const ExtensionContextManager = (await import('@/core/extensionContext.js')).default;
+        expect(ExtensionContextManager.handleContextError).not.toHaveBeenCalled();
+      });
+
+    it.each([ErrorTypes.TRANSLATION_ERROR, ErrorTypes.TRANSLATION_FAILED, ErrorTypes.UNKNOWN])('keeps operation abort silent with generic placeholder type %s', async (type) => {
+        const error = Object.assign(new Error('Translation operation aborted'), {
+          type,
+          operationAborted: true,
+          cancellationReason: 'operation-abort',
+          translationOutcome: {
+            committedParentCount: 0,
+            totalParentCount: 1,
+            cancelled: false,
+          },
+        });
+        manager.domTranslatorAdapter.translateElement.mockRejectedValue(error);
+
+        await manager.startTranslation(document.createElement('div'));
+
+        expect(errorHandler.handle).not.toHaveBeenCalled();
+        expect(cleanupSpy).toHaveBeenCalledWith({ reason: 'cancel' });
+      });
+
+    it('keeps internal operation abort silent after positive commit', async () => {
+      const error = Object.assign(new Error('Translation operation aborted'), {
+        operationAborted: true,
+        cancellationReason: 'System cleanup',
+        translationOutcome: {
+          committedParentCount: 1,
+          totalParentCount: 2,
+          cancelled: false,
+        },
+      });
+      manager.domTranslatorAdapter.translateElement.mockRejectedValue(error);
+
+      await manager.startTranslation(document.createElement('div'));
+
+      expect(errorHandler.handle).not.toHaveBeenCalled();
+      expect(cleanupSpy).toHaveBeenCalledWith({ reason: 'cancel' });
+    });
+
+    it('keeps typed timeout visible when operation abort provenance is present', async () => {
+      const error = Object.assign(new Error('Timed out'), {
+        name: 'AbortError',
+        type: ErrorTypes.TRANSLATION_TIMEOUT,
+        operationAborted: true,
+        cancellationReason: 'operation-abort',
+        translationOutcome: {
+          committedParentCount: 0,
+          totalParentCount: 1,
+          cancelled: false,
+        },
+      });
+      manager.domTranslatorAdapter.translateElement.mockRejectedValue(error);
+
+      await manager.startTranslation(document.createElement('div'));
+
+      expect(errorHandler.handle).toHaveBeenCalledTimes(1);
+      expect(errorHandler.handle).toHaveBeenCalledWith(expect.objectContaining({ cause: error }), expect.objectContaining({ showToast: true }));
+      expect(cleanupSpy).toHaveBeenCalledWith({ reason: 'error' });
+    });
+
+    it.each([ErrorTypes.NETWORK_ERROR, ErrorTypes.HTTP_ERROR, ErrorTypes.API_CONFIG_INVALID])('keeps typed terminal error visible with operation abort provenance: %s', async (type) => {
+        const error = Object.assign(new Error('Typed terminal failure'), {
+          name: 'AbortError',
+          type,
+          operationAborted: true,
+          cancellationReason: 'operation-abort',
+          translationOutcome: {
+            committedParentCount: 0,
+            totalParentCount: 1,
+            cancelled: false,
+          },
+        });
+        manager.domTranslatorAdapter.translateElement.mockRejectedValue(error);
+
+        await manager.startTranslation(document.createElement('div'));
+
+        expect(errorHandler.handle).toHaveBeenCalledTimes(1);
+        expect(errorHandler.handle).toHaveBeenCalledWith(expect.objectContaining({ cause: error }), expect.objectContaining({ showToast: true }));
+        expect(cleanupSpy).toHaveBeenCalledWith({ reason: 'error' });
+      });
+
+    it('keeps a bare AbortError visible without operation abort provenance', async () => {
+      const error = Object.assign(new Error('Aborted request'), {
+        name: 'AbortError',
+        translationOutcome: {
+          committedParentCount: 0,
+          totalParentCount: 1,
+          cancelled: false,
+        },
+      });
+      manager.domTranslatorAdapter.translateElement.mockRejectedValue(error);
+
+      await manager.startTranslation(document.createElement('div'));
+
+      expect(errorHandler.handle).toHaveBeenCalledTimes(1);
+      expect(errorHandler.handle).toHaveBeenCalledWith(expect.objectContaining({ cause: error }), expect.objectContaining({ showToast: true }));
+      expect(cleanupSpy).toHaveBeenCalledWith({ reason: 'error' });
+    });
+
     it('keeps stale cancellation results silent', async () => {
       const deactivateSpy = vi.spyOn(manager, 'deactivate').mockImplementation(() => {});
       manager.domTranslatorAdapter.translateElement.mockResolvedValue({ success: false, cancelled: true });

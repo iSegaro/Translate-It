@@ -49,6 +49,11 @@ const SELECT_ELEMENT_NO_TRANSLATABLE_CONTENT_FALLBACK = 'No translatable text wa
 
 const SELECT_ELEMENT_UNSUPPORTED_TRANSLATION_MODE_KEY = 'SELECT_ELEMENT_UNSUPPORTED_TRANSLATION_MODE';
 const SELECT_ELEMENT_UNSUPPORTED_TRANSLATION_MODE_FALLBACK = 'This content cannot be translated with the current translation mode.';
+const GENERIC_TRANSLATION_ERROR_TYPES = new Set([
+  ErrorTypes.TRANSLATION_ERROR,
+  ErrorTypes.TRANSLATION_FAILED,
+  ErrorTypes.UNKNOWN,
+]);
 
 /**
  * Resolves the localized partial-completion message shared by non-terminal
@@ -64,6 +69,12 @@ async function getPartialCompletionMessage() {
 function hasUsefulCommittedOutput(outcome) {
   return Number.isInteger(outcome?.committedParentCount)
     && outcome.committedParentCount > 0;
+}
+
+function isSilentInternalOperationAbort(error) {
+  const type = error?.type;
+  return error?.operationAborted === true
+    && (!type || GENERIC_TRANSLATION_ERROR_TYPES.has(type));
 }
 
 /**
@@ -612,6 +623,7 @@ class SelectElementManager extends ResourceTracker {
       ? outcome.totalParentCount
       : 0;
     const isCancellation = Boolean(outcome?.cancelled) || isCancellationError(error);
+    const isInternalOperationAbort = !isCancellation && isSilentInternalOperationAbort(error);
     const hasCommittedOutput = hasUsefulCommittedOutput(outcome);
     const isPartialFailure = !isCancellation
       && committedParentCount > 0
@@ -619,6 +631,7 @@ class SelectElementManager extends ResourceTracker {
     const isNoTranslatableContent = error.type === ErrorTypes.NO_TRANSLATABLE_CONTENT;
     const isAlreadyTranslated = error.type === ErrorTypes.NODE_ALREADY_TRANSLATED;
     const isSilentSkip = isCancellation
+      || isInternalOperationAbort
       || error.type === ErrorTypes.FEATURE_BLOCKED
       || ExtensionContextManager.isContextError(error);
 
