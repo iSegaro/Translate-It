@@ -82,15 +82,29 @@ vi.mock('@/core/extensionContext.js', () => ({
 }));
 
 vi.mock('@/utils/UtilsFactory.js', () => ({
-  utilsFactory: {},
+  utilsFactory: {
+    getBrowserUtils: vi.fn(async () => ({
+      detectSite: () => 'default',
+      Site: { Youtube: 'youtube' },
+    })),
+  },
 }));
 
 vi.mock('../utils/PositionCalculator.js', () => ({
-  PositionCalculator: {},
+  PositionCalculator: {
+    calculateOptimalPosition: vi.fn(() => ({
+      top: 10,
+      left: 10,
+      placement: 'top-right',
+    })),
+  },
 }));
 
 vi.mock('../utils/ElementAttachment.js', () => ({
-  ElementAttachment: class {},
+  ElementAttachment: class {
+    attach() {}
+    detach() {}
+  },
 }));
 
 vi.mock('../config/positioning.js', () => ({
@@ -214,6 +228,91 @@ describe('TextFieldIconManager event dispatch characterization', () => {
     pageEventBus.emit('text-field-icon-clicked', { id: 'icon-reinitialized' });
     await new Promise(resolve => setTimeout(resolve, 0));
 
+    expect(executeFromEvent).toHaveBeenCalledTimes(1);
+    expect(executeTranslation).toHaveBeenCalledTimes(1);
+    expect(mockTranslateFieldViaSmartHandler).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps manager listeners during ordinary visual cleanup', async () => {
+    manager.initialize();
+    manager.cleanup();
+
+    pageEventBus.emit('windows-manager-show-icon', {});
+    expect(manager._windowsManagerIconActive).toBe(true);
+    pageEventBus.emit('windows-manager-dismiss-icon', {});
+    expect(manager._windowsManagerIconActive).toBe(false);
+
+    registerIcon('icon-after-cleanup');
+    pageEventBus.emit('text-field-icon-clicked', { id: 'icon-after-cleanup' });
+    await new Promise(resolve => setTimeout(resolve, 0));
+
+    expect(executeFromEvent).toHaveBeenCalledTimes(1);
+    expect(executeTranslation).toHaveBeenCalledTimes(1);
+    expect(mockTranslateFieldViaSmartHandler).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps command listener through processEditableElement cleanup', async () => {
+    const targetElement = document.createElement('textarea');
+    targetElement.value = 'hello';
+    document.body.appendChild(targetElement);
+
+    vi.spyOn(manager, 'shouldProcessTextField').mockResolvedValue(true);
+    vi.spyOn(manager, 'applyPlatformFiltering').mockResolvedValue(true);
+
+    const icon = await manager.processEditableElement(targetElement);
+    expect(icon?.id).toBeDefined();
+
+    pageEventBus.emit('text-field-icon-clicked', { id: icon.id });
+    await new Promise(resolve => setTimeout(resolve, 0));
+
+    expect(executeFromEvent).toHaveBeenCalledTimes(1);
+    expect(executeTranslation).toHaveBeenCalledTimes(1);
+    expect(mockTranslateFieldViaSmartHandler).toHaveBeenCalledTimes(1);
+
+    targetElement.remove();
+  });
+
+  it('keeps command listener after blur cleanup and supports a later icon', async () => {
+    const targetElement = document.createElement('textarea');
+    document.body.appendChild(targetElement);
+
+    manager.handleEditableBlur(targetElement);
+    await Promise.resolve();
+
+    registerIcon('icon-after-blur');
+    pageEventBus.emit('text-field-icon-clicked', { id: 'icon-after-blur' });
+    await new Promise(resolve => setTimeout(resolve, 0));
+
+    expect(mockTranslateFieldViaSmartHandler).toHaveBeenCalledTimes(1);
+    targetElement.remove();
+  });
+
+  it('removes manager command listener on destroy', async () => {
+    registerIcon('icon-before-destroy');
+    manager.destroy();
+
+    pageEventBus.emit('text-field-icon-clicked', { id: 'icon-before-destroy' });
+    await new Promise(resolve => setTimeout(resolve, 0));
+
+    expect(executeFromEvent).not.toHaveBeenCalled();
+    expect(executeTranslation).not.toHaveBeenCalled();
+    expect(mockTranslateFieldViaSmartHandler).not.toHaveBeenCalled();
+  });
+
+  it('removes old listener before singleton recreation', async () => {
+    registerIcon('icon-recreated');
+    const oldExecuteFromEvent = executeFromEvent;
+
+    TextFieldIconManager.resetInstance();
+    manager = TextFieldIconManager.getInstance();
+    executeFromEvent = vi.spyOn(manager, 'executeTranslationFromEvent');
+    executeTranslation = vi.spyOn(manager, 'executeTranslation');
+    registerIcon('icon-recreated');
+
+    pageEventBus.emit('text-field-icon-clicked', { id: 'icon-recreated' });
+    await new Promise(resolve => setTimeout(resolve, 0));
+
+    expect(oldExecuteFromEvent).not.toHaveBeenCalled();
     expect(executeFromEvent).toHaveBeenCalledTimes(1);
     expect(executeTranslation).toHaveBeenCalledTimes(1);
     expect(mockTranslateFieldViaSmartHandler).toHaveBeenCalledTimes(1);

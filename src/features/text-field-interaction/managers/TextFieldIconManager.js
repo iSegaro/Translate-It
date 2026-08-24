@@ -740,9 +740,6 @@ export class TextFieldIconManager extends ResourceTracker {
     // Clear tracked icons
     this.activeIcons.clear();
 
-    // Call parent cleanup to handle ResourceTracker resources
-    super.cleanup();
-
     this.logger.debug('Enhanced cleanup completed');
   }
 
@@ -761,6 +758,9 @@ export class TextFieldIconManager extends ResourceTracker {
 
     // Clean up all icons and attachments
     this.cleanup();
+
+    // Release manager-lifetime listeners only when manager is destroyed
+    super.cleanup();
 
     // Reset singleton instance
     if (textFieldIconManagerInstance === this) {

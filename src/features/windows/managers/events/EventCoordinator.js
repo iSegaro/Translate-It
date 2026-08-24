@@ -129,6 +129,76 @@ export class EventCoordinator {
    * coordinator. Ownership-aware: a late cleanup never clears a replacement sink.
    */
   cleanup() {
+    if (pageEventBus) {
+      if (this.facade._iconClickHandler) {
+        pageEventBus.off(
+          WINDOWS_MANAGER_EVENTS.ICON_CLICKED,
+          this.facade._iconClickHandler,
+        );
+        this.facade._iconClickHandler = null;
+      }
+
+      if (this.facade._speakRequestHandler) {
+        pageEventBus.off(
+          "translation-window-speak",
+          this.facade._speakRequestHandler,
+        );
+        this.facade._speakRequestHandler = null;
+      }
+
+      if (this.facade._retryRequestHandler) {
+        pageEventBus.off(
+          "translation-window-retry",
+          this.facade._retryRequestHandler,
+        );
+        this.facade._retryRequestHandler = null;
+      }
+
+      if (this.facade._changeProviderRequestHandler) {
+        pageEventBus.off(
+          "translation-window-change-provider",
+          this.facade._changeProviderRequestHandler,
+        );
+        this.facade._changeProviderRequestHandler = null;
+      }
+
+      if (this.facade._dismissRequestHandler) {
+        pageEventBus.off(
+          WINDOWS_MANAGER_EVENTS.DISMISS_WINDOW,
+          this.facade._dismissRequestHandler,
+        );
+        pageEventBus.off(
+          WINDOWS_MANAGER_EVENTS.DISMISS_ICON,
+          this.facade._dismissRequestHandler,
+        );
+        this.facade._dismissRequestHandler = null;
+      }
+
+      if (this.facade._selectionTriggerHandler) {
+        pageEventBus.off(
+          SELECTION_EVENTS.GLOBAL_SELECTION_TRIGGER,
+          this.facade._selectionTriggerHandler,
+        );
+        this.facade._selectionTriggerHandler = null;
+      }
+
+      if (this.facade._selectionClearHandler) {
+        pageEventBus.off(
+          SELECTION_EVENTS.GLOBAL_SELECTION_CLEAR,
+          this.facade._selectionClearHandler,
+        );
+        this.facade._selectionClearHandler = null;
+      }
+
+      if (this.facade._selectionChangeHandler) {
+        pageEventBus.off(
+          SELECTION_EVENTS.GLOBAL_SELECTION_CHANGE,
+          this.facade._selectionChangeHandler,
+        );
+        this.facade._selectionChangeHandler = null;
+      }
+    }
+
     if (this._textSelectionWindowSink) {
       getTextSelectionWindowRelay().clearSink(this._textSelectionWindowSink);
       this._textSelectionWindowSink = null;

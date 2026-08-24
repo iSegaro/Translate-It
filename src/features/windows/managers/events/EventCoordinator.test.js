@@ -1,12 +1,36 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
-const { mockGetPresentation, mockShowWindow, mockUpdateWindow } = vi.hoisted(
-  () => ({
+const {
+  mockGetPresentation,
+  mockShowWindow,
+  mockUpdateWindow,
+  mockPageEventBus,
+} = vi.hoisted(() => {
+  const listeners = new Map();
+  const pageEventBus = {
+    on: vi.fn((event, callback) => {
+      const eventListeners = listeners.get(event) || [];
+      eventListeners.push(callback);
+      listeners.set(event, eventListeners);
+    }),
+    off: vi.fn((event, callback) => {
+      const eventListeners = listeners.get(event) || [];
+      const index = eventListeners.indexOf(callback);
+      if (index >= 0) eventListeners.splice(index, 1);
+    }),
+    emit: vi.fn((event, detail) =>
+      [...(listeners.get(event) || [])].map((callback) => callback(detail)),
+    ),
+    reset: () => listeners.clear(),
+  };
+
+  return {
     mockGetPresentation: vi.fn(),
     mockShowWindow: vi.fn(),
     mockUpdateWindow: vi.fn(),
-  }),
-);
+    mockPageEventBus: pageEventBus,
+  };
+});
 
 vi.mock("../display/SelectionWindowErrorPresenter.js", () => ({
   getSelectionWindowErrorPresentation: mockGetPresentation,
@@ -26,20 +50,31 @@ vi.mock("@/shared/config/config.js", () => ({
 }));
 
 vi.mock("@/core/PageEventBus.js", () => ({
-  pageEventBus: { on: vi.fn(), off: vi.fn() },
+  pageEventBus: mockPageEventBus,
   WindowsManagerEvents: {
     showWindow: mockShowWindow,
     updateWindow: mockUpdateWindow,
+    dismissIcon: vi.fn(),
   },
-  WINDOWS_MANAGER_EVENTS: {},
+  WINDOWS_MANAGER_EVENTS: {
+    ICON_CLICKED: "windows-manager-icon-clicked",
+    DISMISS_WINDOW: "windows-manager-dismiss-window",
+    DISMISS_ICON: "windows-manager-dismiss-icon",
+  },
 }));
 
 vi.mock("@/features/text-selection/events/SelectionEvents.js", () => ({
-  SELECTION_EVENTS: {},
+  SELECTION_EVENTS: {
+    GLOBAL_SELECTION_TRIGGER: "global-selection-trigger",
+    GLOBAL_SELECTION_CLEAR: "global-selection-clear",
+    GLOBAL_SELECTION_CHANGE: "global-selection-change",
+  },
 }));
 
 import { EventCoordinator } from "./EventCoordinator.js";
 import { getTextSelectionWindowRelay } from "../crossframe/TextSelectionWindowRelay.js";
+import { pageEventBus, WINDOWS_MANAGER_EVENTS } from "@/core/PageEventBus.js";
+import { SELECTION_EVENTS } from "@/features/text-selection/events/SelectionEvents.js";
 
 describe("EventCoordinator cross-frame coordinate adjustment", () => {
   let facade;
@@ -47,6 +82,7 @@ describe("EventCoordinator cross-frame coordinate adjustment", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    mockPageEventBus.reset();
     facade = { show: vi.fn() };
     coordinator = new EventCoordinator(facade, {
       state: {},
@@ -60,6 +96,7 @@ describe("EventCoordinator cross-frame coordinate adjustment", () => {
   });
 
   afterEach(() => {
+    mockPageEventBus.reset();
     getTextSelectionWindowRelay().destroy();
     vi.restoreAllMocks();
   });
@@ -168,6 +205,7 @@ describe("EventCoordinator relay sink ownership", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    mockPageEventBus.reset();
     facade = { show: vi.fn() };
     coordinator = new EventCoordinator(facade, {
       state: {},
@@ -181,6 +219,7 @@ describe("EventCoordinator relay sink ownership", () => {
   });
 
   afterEach(() => {
+    mockPageEventBus.reset();
     getTextSelectionWindowRelay().destroy();
     vi.restoreAllMocks();
   });
@@ -205,6 +244,164 @@ describe("EventCoordinator relay sink ownership", () => {
 
     coordinator.cleanup();
     expect(relay._sink).toBe(replacement);
+  });
+});
+
+describe("EventCoordinator PageEventBus listener ownership", () => {
+  let coordinators;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockPageEventBus.reset();
+    vi.useFakeTimers();
+    coordinators = [];
+  });
+
+  afterEach(() => {
+    coordinators.forEach((coordinator) => coordinator.cleanup());
+    mockPageEventBus.reset();
+    getTextSelectionWindowRelay().destroy();
+    vi.runOnlyPendingTimers();
+    vi.useRealTimers();
+    vi.restoreAllMocks();
+  });
+
+  const createCoordinator = () => {
+    const state = {
+      isProcessing: false,
+      isVisible: false,
+      isIconMode: false,
+      isPinned: false,
+      setProcessing: vi.fn((value) => {
+        state.isProcessing = value;
+      }),
+      setIconMode: vi.fn((value) => {
+        state.isIconMode = value;
+      }),
+    };
+    const facade = {
+      _isIconToWindowTransition: false,
+      _lastProcessedClick: null,
+      dismiss: vi.fn(),
+      show: vi.fn(),
+      displayManager: {
+        _showWindow: vi.fn().mockResolvedValue(undefined),
+      },
+      dismissalManager: {
+        _removeDismissListener: vi.fn(),
+      },
+    };
+    const coordinator = new EventCoordinator(facade, {
+      state,
+      crossFrameManager: {
+        isTopFrame: true,
+        setEventHandlers: vi.fn(),
+      },
+      translationHandler: {},
+      errorHandler: {},
+      clickManager: { setHandlers: vi.fn() },
+      themeManager: {},
+      positionCalculator: {},
+    });
+
+    coordinators.push(coordinator);
+    return { coordinator, facade };
+  };
+
+  it("unregisters all handlers registered by setup", () => {
+    const { coordinator, facade } = createCoordinator();
+    coordinator.setup();
+
+    const registrations = [
+      [WINDOWS_MANAGER_EVENTS.ICON_CLICKED, facade._iconClickHandler],
+      ["translation-window-speak", facade._speakRequestHandler],
+      ["translation-window-retry", facade._retryRequestHandler],
+      ["translation-window-change-provider", facade._changeProviderRequestHandler],
+      [WINDOWS_MANAGER_EVENTS.DISMISS_WINDOW, facade._dismissRequestHandler],
+      [WINDOWS_MANAGER_EVENTS.DISMISS_ICON, facade._dismissRequestHandler],
+      [SELECTION_EVENTS.GLOBAL_SELECTION_TRIGGER, facade._selectionTriggerHandler],
+      [SELECTION_EVENTS.GLOBAL_SELECTION_CLEAR, facade._selectionClearHandler],
+      [SELECTION_EVENTS.GLOBAL_SELECTION_CHANGE, facade._selectionChangeHandler],
+    ];
+
+    coordinator.cleanup();
+
+    expect(pageEventBus.off).toHaveBeenCalledTimes(registrations.length);
+    registrations.forEach(([event, handler]) => {
+      expect(pageEventBus.off).toHaveBeenCalledWith(event, handler);
+    });
+    expect(facade._iconClickHandler).toBeNull();
+    expect(facade._selectionChangeHandler).toBeNull();
+  });
+
+  it("handles one ICON_CLICKED after coordinator reactivation", async () => {
+    const old = createCoordinator();
+    old.coordinator.setup();
+    old.coordinator.cleanup();
+
+    const live = createCoordinator();
+    live.coordinator.setup();
+
+    mockPageEventBus.emit(WINDOWS_MANAGER_EVENTS.ICON_CLICKED, {
+      id: "icon-1",
+      text: "hello",
+      position: { x: 1, y: 2 },
+    });
+    await Promise.resolve();
+
+    expect(old.facade.displayManager._showWindow).not.toHaveBeenCalled();
+    expect(live.facade.displayManager._showWindow).toHaveBeenCalledTimes(1);
+  });
+
+  it.each([
+    [SELECTION_EVENTS.GLOBAL_SELECTION_CHANGE, "show"],
+    [SELECTION_EVENTS.GLOBAL_SELECTION_TRIGGER, "show"],
+  ])("routes one %s event only to live coordinator", async (event) => {
+    const old = createCoordinator();
+    old.coordinator.setup();
+    old.coordinator.cleanup();
+
+    const live = createCoordinator();
+    live.coordinator.setup();
+
+    mockPageEventBus.emit(event, {
+      text: "hello",
+      position: { x: 1, y: 2 },
+      options: { immediate: true },
+    });
+    await Promise.resolve();
+
+    expect(old.facade.show).not.toHaveBeenCalled();
+    expect(live.facade.show).toHaveBeenCalledTimes(1);
+  });
+
+  it("makes cleanup idempotent without removing replacement listeners", async () => {
+    const old = createCoordinator();
+    old.coordinator.setup();
+    const oldTriggerHandler = old.facade._selectionTriggerHandler;
+    old.coordinator.cleanup();
+
+    const live = createCoordinator();
+    live.coordinator.setup();
+    const liveTriggerHandler = live.facade._selectionTriggerHandler;
+
+    old.coordinator.cleanup();
+    mockPageEventBus.emit(SELECTION_EVENTS.GLOBAL_SELECTION_TRIGGER, {
+      text: "hello",
+      position: { x: 1, y: 2 },
+    });
+    await Promise.resolve();
+
+    expect(pageEventBus.off).toHaveBeenCalledWith(
+      SELECTION_EVENTS.GLOBAL_SELECTION_TRIGGER,
+      oldTriggerHandler,
+    );
+    expect(pageEventBus.off).not.toHaveBeenCalledWith(
+      SELECTION_EVENTS.GLOBAL_SELECTION_TRIGGER,
+      liveTriggerHandler,
+    );
+    expect(old.facade.show).not.toHaveBeenCalled();
+    expect(live.facade.show).toHaveBeenCalledTimes(1);
   });
 });
 
