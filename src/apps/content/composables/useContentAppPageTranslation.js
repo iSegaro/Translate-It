@@ -185,14 +185,28 @@ export function useContentAppPageTranslation(mobileStore, tracker) {
     });
 
     tracker.addEventListener(pageEventBus, MessageActions.PAGE_TRANSLATE_RESET_ERROR, () => {
+      const currentState = mobileStore.pageTranslationData;
+      const hasTranslatedContent = currentState.isTranslated === true
+        || currentState.translatedCount > 0;
+
+      if (hasTranslatedContent) {
+        mobileStore.setPageTranslation({
+          isTranslating: false,
+          isAutoTranslating: false,
+          isTranslated: true,
+          status: TRANSLATION_STATUS.COMPLETED,
+          errorMessage: null,
+          canRetry: false,
+        });
+        return;
+      }
+
       mobileStore.resetPageTranslation();
     });
 
     tracker.addEventListener(pageEventBus, MessageActions.PAGE_RESTORE_COMPLETE, () => {
       logger.debug('PAGE_RESTORE_COMPLETE received, resetting page translation state');
-      if (mobileStore.pageTranslationData.status !== TRANSLATION_STATUS.ERROR) {
-        mobileStore.resetPageTranslation();
-      }
+      mobileStore.resetPageTranslation();
     });
 
     tracker.addEventListener(pageEventBus, MessageActions.PAGE_AUTO_RESTORE_COMPLETE, (detail) => {

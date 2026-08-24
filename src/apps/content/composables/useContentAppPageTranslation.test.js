@@ -84,6 +84,41 @@ describe('useContentAppPageTranslation', () => {
     }));
   });
 
+  it.each([true, false])('clears fatal presentation while preserving translated content when isTranslated=%s', (isTranslated) => {
+    mobileStore.pageTranslationData = {
+      isTranslating: false,
+      isAutoTranslating: false,
+      isTranslated,
+      translatedCount: 2,
+      failedCount: 1,
+      totalCount: 3,
+      status: 'error',
+      errorMessage: 'fatal failure',
+      canRetry: false,
+    };
+
+    listeners.get(MessageActions.PAGE_TRANSLATE_RESET_ERROR)();
+
+    expect(mobileStore.resetPageTranslation).not.toHaveBeenCalled();
+    expect(mobileStore.setPageTranslation).toHaveBeenCalledWith({
+      isTranslating: false,
+      isAutoTranslating: false,
+      isTranslated: true,
+      status: 'completed',
+      errorMessage: null,
+      canRetry: false,
+    });
+    expect(mobileStore.pageTranslationData).toMatchObject({
+      isTranslated: true,
+      translatedCount: 2,
+      failedCount: 1,
+      totalCount: 3,
+      status: 'completed',
+      errorMessage: null,
+      canRetry: false,
+    });
+  });
+
   it('keeps Retry available for fatal zero-commit output', async () => {
     await listeners.get(MessageActions.PAGE_TRANSLATE_ERROR)({
       errorDetails: { type: ErrorTypes.NETWORK_ERROR, message: 'network failure' },
@@ -96,6 +131,44 @@ describe('useContentAppPageTranslation', () => {
       canRetry: true,
       status: 'error',
     }));
+  });
+
+  it('fully resets zero-commit state when fatal presentation is dismissed', () => {
+    mobileStore.pageTranslationData = {
+      isTranslating: false,
+      isAutoTranslating: false,
+      isTranslated: false,
+      translatedCount: 0,
+      failedCount: 3,
+      totalCount: 3,
+      status: 'error',
+      errorMessage: 'fatal failure',
+      canRetry: false,
+    };
+
+    listeners.get(MessageActions.PAGE_TRANSLATE_RESET_ERROR)();
+
+    expect(mobileStore.resetPageTranslation).toHaveBeenCalledOnce();
+    expect(mobileStore.setPageTranslation).not.toHaveBeenCalled();
+  });
+
+  it.each(['error', 'completed'])('fully resets state after restore completion from %s state', (status) => {
+    mobileStore.pageTranslationData = {
+      isTranslating: false,
+      isAutoTranslating: false,
+      isTranslated: true,
+      translatedCount: 2,
+      failedCount: 1,
+      totalCount: 3,
+      status,
+      errorMessage: status === 'error' ? 'fatal failure' : null,
+      canRetry: false,
+    };
+
+    listeners.get(MessageActions.PAGE_RESTORE_COMPLETE)();
+
+    expect(mobileStore.resetPageTranslation).toHaveBeenCalledOnce();
+    expect(mobileStore.setPageTranslation).not.toHaveBeenCalled();
   });
 
   it('marks partial completion without entering error state', async () => {
