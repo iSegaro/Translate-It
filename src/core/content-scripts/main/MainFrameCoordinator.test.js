@@ -190,10 +190,25 @@ describe('MainFrameCoordinator Hover error normalization', () => {
       isTranslating: false,
       status: 'error'
     }));
-    expect(aggregator.emitAggregateProgress).not.toHaveBeenCalledWith(
+    expect(aggregator.emitAggregateProgress).toHaveBeenCalledWith(
       MessageActions.PAGE_TRANSLATE_ERROR,
       data
     );
     expect(aggregator.clearAll).not.toHaveBeenCalled();
+  });
+
+  it('keeps non-fatal main-frame errors out of aggregate fatal presentation', () => {
+    const data = { error: 'retryable failure', isFatal: false };
+
+    pageEventBus.emit(MessageActions.PAGE_TRANSLATE_ERROR, data);
+
+    expect(aggregator.updateFrameData).toHaveBeenCalledWith('main', expect.objectContaining({
+      isTranslating: false,
+      status: 'error'
+    }));
+    expect(aggregator.emitAggregateProgress).not.toHaveBeenCalledWith(
+      MessageActions.PAGE_TRANSLATE_ERROR,
+      data
+    );
   });
 });

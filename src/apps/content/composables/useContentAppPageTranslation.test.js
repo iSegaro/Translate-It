@@ -58,6 +58,9 @@ describe('useContentAppPageTranslation', () => {
       error: raw,
       errorDetails: { type: 'MODEL_NOT_FOUND', message: raw },
       isFatal: true,
+      isAggregated: true,
+      isTranslating: false,
+      isAutoTranslating: false,
     });
 
     const state = mobileStore.setPageTranslation.mock.calls[0][0];
@@ -74,6 +77,7 @@ describe('useContentAppPageTranslation', () => {
       errorDetails: { type: ErrorTypes.NETWORK_ERROR, message: 'network failure' },
       translatedCount: 1,
       isFatal: true,
+      isAggregated: true,
     });
 
     expect(mobileStore.setPageTranslation).toHaveBeenCalledWith(expect.objectContaining({
@@ -124,11 +128,65 @@ describe('useContentAppPageTranslation', () => {
       errorDetails: { type: ErrorTypes.NETWORK_ERROR, message: 'network failure' },
       translatedCount: 0,
       isFatal: true,
+      isAggregated: true,
     });
 
     expect(mobileStore.setPageTranslation).toHaveBeenCalledWith(expect.objectContaining({
       isTranslated: false,
       canRetry: true,
+      status: 'error',
+    }));
+  });
+
+  it('ignores raw main fatal errors until aggregate delivery', async () => {
+    const before = { ...mobileStore.pageTranslationData };
+
+    await listeners.get(MessageActions.PAGE_TRANSLATE_ERROR)({
+      errorDetails: { type: ErrorTypes.NETWORK_ERROR, message: 'network failure' },
+      translatedCount: 0,
+      isFatal: true,
+    });
+
+    expect(mobileStore.setPageTranslation).not.toHaveBeenCalled();
+    expect(mobileStore.pageTranslationData).toEqual(before);
+  });
+
+  it('consumes aggregate fatal counts and preserves active sibling state', async () => {
+    await listeners.get(MessageActions.PAGE_TRANSLATE_ERROR)({
+      errorDetails: { type: ErrorTypes.NETWORK_ERROR, message: 'network failure' },
+      translatedCount: 3,
+      failedCount: 1,
+      totalCount: 4,
+      isFatal: true,
+      isAggregated: true,
+      isTranslating: true,
+      isAutoTranslating: true,
+    });
+
+    expect(mobileStore.setPageTranslation).toHaveBeenCalledWith(expect.objectContaining({
+      translatedCount: 3,
+      isTranslated: true,
+      canRetry: false,
+      isTranslating: true,
+      isAutoTranslating: true,
+      status: 'error',
+    }));
+  });
+
+  it('suppresses Retry for aggregate iframe failure with main committed output', async () => {
+    await listeners.get(MessageActions.PAGE_TRANSLATE_ERROR)({
+      errorDetails: { type: ErrorTypes.NETWORK_ERROR, message: 'iframe failure' },
+      translatedCount: 5,
+      failedCount: 1,
+      totalCount: 6,
+      isFatal: true,
+      isAggregated: true,
+    });
+
+    expect(mobileStore.setPageTranslation).toHaveBeenCalledWith(expect.objectContaining({
+      translatedCount: 5,
+      isTranslated: true,
+      canRetry: false,
       status: 'error',
     }));
   });
@@ -185,6 +243,84 @@ describe('useContentAppPageTranslation', () => {
       failedCount: 1,
       totalCount: 3,
     }));
+  });
+
+  it('ignores raw main auto-restore state', () => {
+    mobileStore.pageTranslationData = {
+      ...mobileStore.pageTranslationData,
+      isTranslated: true,
+      translatedCount: 3,
+      status: 'completed',
+    };
+    const before = { ...mobileStore.pageTranslationData };
+
+    listeners.get(MessageActions.PAGE_AUTO_RESTORE_COMPLETE)({
+      translatedCount: 0,
+      isTranslated: false,
+      isAggregated: false,
+    });
+
+    expect(mobileStore.setPageTranslation).not.toHaveBeenCalled();
+    expect(mobileStore.pageTranslationData).toEqual(before);
+  });
+
+  it('consumes aggregate auto-restore state without losing global counts', () => {
+    listeners.get(MessageActions.PAGE_AUTO_RESTORE_COMPLETE)({
+      translatedCount: 3,
+      failedCount: 1,
+      totalCount: 4,
+      isTranslated: true,
+      isTranslating: true,
+      isAutoTranslating: true,
+      isAggregated: true,
+    });
+
+    expect(mobileStore.setPageTranslation).toHaveBeenCalledWith({
+      isTranslating: true,
+      isAutoTranslating: true,
+      isTranslated: true,
+      status: 'translating',
+      translatedCount: 3,
+      failedCount: 1,
+      totalCount: 4,
+    });
+  });
+
+  it('does not regress aggregate truth when raw fatal events follow aggregate events', async () => {
+    await listeners.get(MessageActions.PAGE_AUTO_RESTORE_COMPLETE)({
+      translatedCount: 3,
+      failedCount: 1,
+      totalCount: 4,
+      isTranslated: true,
+      isTranslating: false,
+      isAutoTranslating: false,
+      isAggregated: true,
+    });
+    await listeners.get(MessageActions.PAGE_AUTO_RESTORE_COMPLETE)({
+      translatedCount: 0,
+      isTranslated: false,
+      isAggregated: false,
+    });
+    await listeners.get(MessageActions.PAGE_TRANSLATE_ERROR)({
+      errorDetails: { type: ErrorTypes.NETWORK_ERROR, message: 'main failure' },
+      translatedCount: 0,
+      isFatal: true,
+    });
+    await listeners.get(MessageActions.PAGE_TRANSLATE_ERROR)({
+      errorDetails: { type: ErrorTypes.NETWORK_ERROR, message: 'main failure' },
+      translatedCount: 3,
+      failedCount: 1,
+      totalCount: 4,
+      isFatal: true,
+      isAggregated: true,
+    });
+
+    expect(mobileStore.pageTranslationData).toMatchObject({
+      translatedCount: 3,
+      isTranslated: true,
+      canRetry: false,
+      status: 'error',
+    });
   });
 
   it('ignores non-fatal page errors at presentation-state boundary', async () => {
@@ -278,6 +414,7 @@ describe('useContentAppPageTranslation', () => {
     await listeners.get(MessageActions.PAGE_TRANSLATE_ERROR)({
       errorDetails,
       isFatal: true,
+      isAggregated: true,
     });
 
     expect(mobileStore.setPageTranslation).toHaveBeenCalledWith(expect.objectContaining({ canRetry }));

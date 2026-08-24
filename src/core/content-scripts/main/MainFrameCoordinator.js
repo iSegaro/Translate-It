@@ -347,6 +347,10 @@ export class MainFrameCoordinator {
           isTranslating: false,
           status: 'error'
         });
+
+        if (data.isFatal !== false) {
+          this.aggregator.emitAggregateProgress(this.MessageActions.PAGE_TRANSLATE_ERROR, data);
+        }
       }
     });
 

@@ -135,4 +135,99 @@ describe('MainFrameCoordinator per-frame admission', () => {
       translatedCount: 3
     });
   });
+
+  it('emits main fatal errors with aggregate counts and frame error identity', () => {
+    aggregator.updateFrameData('main', {
+      isTranslated: false,
+      isTranslating: true,
+      translatedCount: 0,
+      failedCount: 0,
+      totalCount: 3,
+      status: 'translating'
+    });
+    aggregator.updateFrameData('frame-1', {
+      isTranslated: true,
+      isTranslating: false,
+      translatedCount: 3,
+      failedCount: 0,
+      totalCount: 3,
+      status: 'idle'
+    });
+
+    const emitSpy = vi.spyOn(pageEventBus, 'emit');
+    const errorDetails = { type: 'NETWORK_ERROR', message: 'network failure' };
+
+    pageEventBus.emit(MessageActions.PAGE_TRANSLATE_ERROR, {
+      error: 'network failure',
+      errorDetails,
+      errorType: 'NETWORK_ERROR',
+      isFatal: true
+    });
+
+    const aggregateCall = emitSpy.mock.calls.find(([, data]) => (
+      data?.isAggregated === true && data.errorDetails === errorDetails
+    ));
+    expect(aggregateCall?.[0]).toBe(MessageActions.PAGE_TRANSLATE_ERROR);
+    expect(aggregateCall?.[1]).toMatchObject({
+      isAggregated: true,
+      errorDetails,
+      translatedCount: 3,
+      failedCount: 0,
+      totalCount: 6,
+      isTranslating: false,
+      isFatal: true
+    });
+
+    emitSpy.mockRestore();
+  });
+
+  it('keeps main committed output in an iframe fatal aggregate error', () => {
+    aggregator.updateFrameData('main', {
+      isTranslated: true,
+      isTranslating: false,
+      translatedCount: 5,
+      failedCount: 0,
+      totalCount: 5,
+      status: 'idle'
+    });
+    aggregator.updateFrameData('frame-1', {
+      isTranslated: false,
+      isTranslating: true,
+      translatedCount: 0,
+      failedCount: 0,
+      totalCount: 1,
+      status: 'translating'
+    });
+
+    const emitSpy = vi.spyOn(pageEventBus, 'emit');
+    const errorDetails = { type: 'NETWORK_ERROR', message: 'iframe failure' };
+
+    window.dispatchEvent(new MessageEvent('message', {
+      data: {
+        source: 'translate-it-iframe',
+        type: 'TRANSLATE_IT_PAGE_EVENT',
+        action: MessageActions.PAGE_TRANSLATE_ERROR,
+        data: {
+          frameUrl: 'frame-1',
+          error: 'iframe failure',
+          errorDetails,
+          errorType: 'NETWORK_ERROR',
+          translatedCount: 0,
+          isFatal: true
+        }
+      },
+      source: null
+    }));
+
+    const aggregateCall = emitSpy.mock.calls.find(([, data]) => (
+      data?.isAggregated === true && data.errorDetails === errorDetails
+    ));
+    expect(aggregateCall?.[1]).toMatchObject({
+      translatedCount: 5,
+      isFatal: true,
+      errorDetails
+    });
+
+    emitSpy.mockRestore();
+  });
 });

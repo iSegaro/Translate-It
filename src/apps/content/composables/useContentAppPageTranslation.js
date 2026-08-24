@@ -160,6 +160,9 @@ export function useContentAppPageTranslation(mobileStore, tracker) {
     tracker.addEventListener(pageEventBus, MessageActions.PAGE_TRANSLATE_ERROR, async (detail) => {
       if (detail.isFatal === false) return;
 
+      const isMainFrame = window.self === window.top;
+      if (isMainFrame && detail.isAggregated !== true) return;
+
       const presentation = await getPageTranslationErrorDecision(detail);
       if (!presentation) return;
 
@@ -172,10 +175,17 @@ export function useContentAppPageTranslation(mobileStore, tracker) {
         ? translatedCount > 0
         : mobileStore.pageTranslationData.isTranslated
           || mobileStore.pageTranslationData.translatedCount > 0;
+      const currentState = mobileStore.pageTranslationData;
+      const isTranslating = detail.isTranslating !== undefined
+        ? detail.isTranslating
+        : currentState.isTranslating;
+      const isAutoTranslating = detail.isAutoTranslating !== undefined
+        ? detail.isAutoTranslating
+        : currentState.isAutoTranslating;
 
       mobileStore.setPageTranslation({ 
-        isTranslating: false,
-        isAutoTranslating: false,
+        isTranslating,
+        isAutoTranslating,
         isTranslated: hasCommittedContent,
         ...(translatedCount !== null && { translatedCount }),
         status: TRANSLATION_STATUS.ERROR,
@@ -210,35 +220,56 @@ export function useContentAppPageTranslation(mobileStore, tracker) {
     });
 
     tracker.addEventListener(pageEventBus, MessageActions.PAGE_AUTO_RESTORE_COMPLETE, (detail) => {
-      const hasTranslations = detail.translatedCount > 0;
       const currentState = mobileStore.pageTranslationData;
       const isMainFrame = window.self === window.top;
+
+      if (!detail.isAggregated && isMainFrame) return;
+
+      const translatedCount = typeof detail.translatedCount === 'number'
+        ? detail.translatedCount
+        : currentState.translatedCount;
+      const failedCount = typeof detail.failedCount === 'number'
+        ? detail.failedCount
+        : typeof detail.failed === 'number'
+          ? detail.failed
+          : currentState.failedCount;
+      const totalCount = typeof detail.totalCount === 'number'
+        ? detail.totalCount
+        : currentState.totalCount;
+      const hasTranslations = detail.isTranslated !== undefined
+        ? detail.isTranslated
+        : translatedCount > 0;
 
       // Skip empty messages if we already have active/valid translation state
       // This prevents individual iframe messages from overwriting main frame translation data
       // BUT: Allow aggregated messages to pass through as they represent the whole page state
-      // AND: Allow messages from the main frame as it is the authoritative source
       if (!detail.isAggregated && !isMainFrame && !hasTranslations && (currentState.isTranslated || currentState.isTranslating || currentState.isAutoTranslating)) {
         logger.debug('Skipping empty auto-restore message from iframe, keeping current state:', currentState);
         return;
       }
 
+      const isTranslating = detail.isTranslating !== undefined
+        ? detail.isTranslating
+        : false;
+      const isAutoTranslating = detail.isAutoTranslating !== undefined
+        ? detail.isAutoTranslating
+        : false;
+
       const baseState = {
-        isTranslating: false,
-        isAutoTranslating: false,
+        isTranslating,
+        isAutoTranslating,
         isTranslated: hasTranslations,
-        status: hasTranslations ? TRANSLATION_STATUS.COMPLETED : TRANSLATION_STATUS.IDLE
+        status: isTranslating || isAutoTranslating
+          ? TRANSLATION_STATUS.TRANSLATING
+          : hasTranslations
+            ? TRANSLATION_STATUS.COMPLETED
+            : TRANSLATION_STATUS.IDLE,
+        translatedCount,
+        failedCount,
+        totalCount
       };
 
-      if (hasTranslations) {
-        mobileStore.setPageTranslation({
-          ...baseState,
-          translatedCount: detail.translatedCount,
-          totalCount: detail.totalCount || detail.translatedCount
-        });
-      } else {
-        mobileStore.setPageTranslation(baseState);
-      }
+      mobileStore.setPageTranslation(baseState);
     });
 
     // Element Translation Sync
