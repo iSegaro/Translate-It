@@ -547,6 +547,120 @@ describe('UnifiedTranslationService', () => {
       expect(translationRequestTracker.completeRequest).toHaveBeenCalledWith(message.messageId, expect.objectContaining({ success: true }));
     });
 
+    it.each([
+      ['operation abort', {
+        success: false,
+        cancelled: false,
+        error: {
+          operationAborted: true,
+          cancellationReason: 'operation-abort',
+          message: 'Translation operation aborted',
+        },
+      }],
+      ['provider failure', {
+        success: false,
+        error: { type: ErrorTypes.API_ERROR, message: 'Provider rejected request' },
+      }],
+      ['pre-cancelled tombstone', {
+        success: false,
+        cancelled: true,
+        error: { type: ErrorTypes.USER_CANCELLED, message: 'Translation cancelled by user' },
+      }],
+    ])('removes acceptance without activating for terminal %s result', async (_label, failedResult) => {
+      const { getAIConversationHistoryEnabledAsync } = await import('../../../shared/config/config.js');
+      getAIConversationHistoryEnabledAsync.mockResolvedValue(true);
+      const message = {
+        messageId: `failed-result-${_label}`,
+        data: {
+          text: 'source',
+          mode: 'select-element',
+          provider: 'openai',
+          sessionId: `failed-result-${_label}`,
+          conversationParents: [{ parentId: 'g1', cleanSource: 'source' }],
+        },
+        context: 'select-element',
+      };
+      const request = { messageId: message.messageId, data: message.data, mode: 'select-element' };
+      translationRequestTracker.createRequest.mockReturnValue(request);
+      translationRequestTracker.completeRequest.mockReturnValue({ accepted: true, status: 'failed' });
+      service.modeCoordinator.processRequest.mockResolvedValue(failedResult);
+      const activate = vi.spyOn(service.conversationAcceptanceCoordinator, 'activate');
+      const remove = vi.spyOn(service.conversationAcceptanceCoordinator, 'remove');
+
+      const result = await service.handleTranslationRequest(message);
+
+      expect(service.resultDispatcher.dispatchResult).toHaveBeenCalledWith(expect.objectContaining({
+        messageId: message.messageId,
+        result: expect.objectContaining(failedResult),
+      }));
+      expect(result).toMatchObject(failedResult);
+      expect(activate).not.toHaveBeenCalled();
+      expect(remove).toHaveBeenCalledWith(message.messageId);
+      expect(service.conversationAcceptanceCoordinator.lookup(message.messageId)).toBeNull();
+      expect(result.error).toMatchObject(failedResult.error);
+    });
+
+    it('activates acceptance exactly once for successful partial results', async () => {
+      const { getAIConversationHistoryEnabledAsync } = await import('../../../shared/config/config.js');
+      getAIConversationHistoryEnabledAsync.mockResolvedValue(true);
+      const message = {
+        messageId: 'successful-partial-result',
+        data: {
+          text: 'source',
+          mode: 'select-element',
+          provider: 'openai',
+          sessionId: 'successful-partial-result',
+          conversationParents: [{ parentId: 'g1', cleanSource: 'source' }],
+        },
+        context: 'select-element',
+      };
+      const request = { messageId: message.messageId, data: message.data, mode: 'select-element' };
+      translationRequestTracker.createRequest.mockReturnValue(request);
+      service.modeCoordinator.processRequest.mockResolvedValue({
+        success: true,
+        partial: true,
+        committedParentCount: 1,
+        translatedText: 'translated',
+      });
+      const activate = vi.spyOn(service.conversationAcceptanceCoordinator, 'activate');
+      const remove = vi.spyOn(service.conversationAcceptanceCoordinator, 'remove');
+
+      await service.handleTranslationRequest(message);
+
+      expect(activate).toHaveBeenCalledTimes(1);
+      expect(activate).toHaveBeenCalledWith(message.messageId);
+      expect(remove).not.toHaveBeenCalled();
+      expect(service.conversationAcceptanceCoordinator.lookup(message.messageId)).not.toBeNull();
+      service.conversationAcceptanceCoordinator.remove(message.messageId);
+    });
+
+    it('does not touch acceptance for successful Field direct results', async () => {
+      const { getAIConversationHistoryEnabledAsync } = await import('../../../shared/config/config.js');
+      getAIConversationHistoryEnabledAsync.mockResolvedValue(true);
+      const message = {
+        messageId: 'field-direct-result',
+        data: {
+          text: 'source',
+          mode: 'field',
+          provider: 'openai',
+          sessionId: 'field-direct-result',
+          conversationParents: [{ parentId: 'g1', cleanSource: 'source' }],
+        },
+        context: 'content',
+      };
+      const request = { messageId: message.messageId, data: message.data, mode: 'field' };
+      translationRequestTracker.createRequest.mockReturnValue(request);
+      service.modeCoordinator.processRequest.mockResolvedValue({ success: true, translatedText: 'translated' });
+      const activate = vi.spyOn(service.conversationAcceptanceCoordinator, 'activate');
+      const remove = vi.spyOn(service.conversationAcceptanceCoordinator, 'remove');
+
+      await service.handleTranslationRequest(message);
+
+      expect(activate).not.toHaveBeenCalled();
+      expect(remove).not.toHaveBeenCalled();
+      expect(service.conversationAcceptanceCoordinator.lookup(message.messageId)).toBeNull();
+    });
+
     it('records OPERATION_FAILED with reason and code when the tracker transition is FAILED', async () => {
       const message = {
         messageId: 'm-fail',
