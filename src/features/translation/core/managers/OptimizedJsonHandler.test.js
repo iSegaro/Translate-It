@@ -25,7 +25,7 @@ vi.mock('webextension-polyfill', () => ({
 vi.mock('@/shared/error-management/ErrorMatcher.js');
 
 import { OptimizedJsonHandler } from './OptimizedJsonHandler.js';
-import { isFatalError, matchErrorToType } from '@/shared/error-management/ErrorMatcher.js';
+import { ErrorMatcher, isFatalError, matchErrorToType } from '@/shared/error-management/ErrorMatcher.js';
 import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
 import { MessageActions } from '@/shared/messaging/core/MessageActions.js';
 import { appendTranslationDiagnostic } from '@/features/translation/ir/TranslationOperation.js';
@@ -115,6 +115,9 @@ describe('OptimizedJsonHandler', () => {
     // Default mock behavior for ErrorMatcher
     isFatalError.mockImplementation((err) => err?.isFatal || false);
     matchErrorToType.mockImplementation((err) => err?.type || 'UNKNOWN_ERROR');
+    ErrorMatcher.matchErrorToType.mockImplementation((err) => (
+      err?.operationAborted ? ErrorTypes.TRANSLATION_ERROR : err?.type || 'UNKNOWN_ERROR'
+    ));
 
     handler = new OptimizedJsonHandler();
 
@@ -2466,6 +2469,178 @@ describe('OptimizedJsonHandler', () => {
       });
       expect(result.error.type).not.toBe(ErrorTypes.USER_CANCELLED);
       expect(result.error.isCancelled).not.toBe(true);
+    });
+
+    it.each([
+      [undefined, 'lifecycle-cleanup'],
+      [ErrorTypes.TRANSLATION_ERROR, 'operation-abort'],
+      [ErrorTypes.UNKNOWN, 'document-replaced'],
+    ])('keeps generic operation abort control for %s', async (type, cancellationReason) => {
+      mockEngine.createIntelligentBatches = vi.fn(() => [[{ t: 'abort me' }]]);
+      mockProvider.translate.mockImplementationOnce(() => {
+        mockAbortController.signal.aborted = true;
+        mockAbortController.signal.reason = cancellationReason;
+        return Promise.reject(Object.assign(new Error('operation aborted'), {
+          name: 'AbortError',
+          ...(type ? { type } : {}),
+          operationAborted: true,
+          cancellationReason,
+        }));
+      });
+
+      const result = await handler.execute(
+        mockEngine,
+        { ...mockData, sourceLanguage: 'en', text: JSON.stringify([{ t: 'abort me' }]) },
+        mockProvider,
+        'en',
+        'fa',
+        `msg-generic-abort-${type || 'none'}`,
+        mockSender,
+      );
+
+      expect(result).toMatchObject({
+        success: false,
+        streaming: true,
+        error: {
+          type: ErrorTypes.TRANSLATION_ERROR,
+          operationAborted: true,
+          cancellationReason,
+        },
+        errorDetails: {
+          type: ErrorTypes.TRANSLATION_ERROR,
+          operationAborted: true,
+          cancellationReason,
+        },
+      });
+      expect(result.error).not.toHaveProperty('isCancelled', true);
+      expect(result.error).not.toHaveProperty('type', ErrorTypes.TRANSLATION_TIMEOUT);
+      expect(result.error).not.toHaveProperty('type', ErrorTypes.USER_CANCELLED);
+    });
+
+    it.each(['lifecycle-cleanup', 'document-replaced'])(
+      'serializes generic operation abort when signal remains live: %s',
+      async (cancellationReason) => {
+        const browser = (await import('webextension-polyfill')).default;
+        browser.tabs.sendMessage.mockClear();
+        mockEngine.createIntelligentBatches = vi.fn(() => [[{ t: 'abort me' }]]);
+        mockProvider.translate.mockRejectedValueOnce(Object.assign(new Error('operation aborted'), {
+          name: 'AbortError',
+          operationAborted: true,
+          cancellationReason,
+        }));
+
+        expect(mockAbortController.signal.aborted).toBe(false);
+        expect(mockEngine.isCancelled('msg-live-generic-abort')).toBe(false);
+
+        const result = await handler.execute(
+          mockEngine,
+          { ...mockData, sourceLanguage: 'en', text: JSON.stringify([{ t: 'abort me' }]) },
+          mockProvider,
+          'en',
+          'fa',
+          'msg-live-generic-abort',
+          mockSender,
+        );
+
+        expect(mockAbortController.signal.aborted).toBe(true);
+        expect(result).toMatchObject({
+          success: false,
+          streaming: true,
+          error: {
+            type: ErrorTypes.TRANSLATION_ERROR,
+            operationAborted: true,
+            cancellationReason,
+          },
+          errorDetails: {
+            type: ErrorTypes.TRANSLATION_ERROR,
+            operationAborted: true,
+            cancellationReason,
+          },
+        });
+        expect(result.error.type).not.toBe(ErrorTypes.USER_CANCELLED);
+        expect(result.error.type).not.toBe(ErrorTypes.TRANSLATION_TIMEOUT);
+        expect(browser.tabs.sendMessage.mock.calls.filter(([, message]) => (
+          message.action === MessageActions.TRANSLATION_STREAM_END
+            && message.data?.success === true
+        ))).toHaveLength(0);
+      },
+    );
+
+    it('preserves explicit user cancellation result shape', async () => {
+      mockEngine.createIntelligentBatches = vi.fn(() => [[{ t: 'cancel me' }]]);
+      mockAbortController.signal.aborted = true;
+      mockAbortController.signal.reason = 'user-cancelled';
+      mockProvider.translate.mockRejectedValueOnce(Object.assign(new Error('Cancelled by user'), {
+        name: 'AbortError',
+        type: ErrorTypes.USER_CANCELLED,
+        isCancelled: true,
+      }));
+
+      const result = await handler.execute(
+        mockEngine,
+        { ...mockData, sourceLanguage: 'en', text: JSON.stringify([{ t: 'cancel me' }]) },
+        mockProvider,
+        'en',
+        'fa',
+        'msg-user-cancel-shape',
+        mockSender,
+      );
+
+      expect(result).toMatchObject({
+        success: false,
+        streaming: true,
+        error: {
+          type: ErrorTypes.USER_CANCELLED,
+          isCancelled: true,
+        },
+      });
+      expect(result).not.toHaveProperty('errorDetails');
+    });
+
+    it.each([
+      ErrorTypes.TRANSLATION_TIMEOUT,
+      ErrorTypes.NETWORK_ERROR,
+      ErrorTypes.API_KEY_INVALID,
+    ])('keeps strong typed %s failure with operation abort provenance', async (type) => {
+      mockEngine.createIntelligentBatches = vi.fn(() => [[{ t: 'typed abort' }]]);
+      mockProvider.translate.mockRejectedValueOnce(Object.assign(new Error(`${type} failure`), {
+        name: 'AbortError',
+        type,
+        operationAborted: true,
+        cancellationReason: 'operation-abort',
+      }));
+
+      const result = await handler.execute(
+        mockEngine,
+        { ...mockData, sourceLanguage: 'en', text: JSON.stringify([{ t: 'typed abort' }]) },
+        mockProvider,
+        'en',
+        'fa',
+        `msg-strong-abort-${type}`,
+        mockSender,
+      );
+
+      expect(result).toMatchObject({
+        success: false,
+        error: {
+          type,
+          operationAborted: true,
+          cancellationReason: 'operation-abort',
+        },
+        errorDetails: {
+          type,
+          operationAborted: true,
+          cancellationReason: 'operation-abort',
+        },
+      });
+      expect(result.error.type).not.toBe(ErrorTypes.USER_CANCELLED);
+      expect(result.error.type).not.toBe(ErrorTypes.TRANSLATION_CANCELLED);
+
+      const browser = (await import('webextension-polyfill')).default;
+      expect(browser.tabs.sendMessage.mock.calls.filter(([, message]) => (
+        message.action === MessageActions.TRANSLATION_STREAM_END
+          && message.data?.success === false
+      ))).toHaveLength(0);
     });
 
     it('preserves canonical type on typed AbortError', async () => {

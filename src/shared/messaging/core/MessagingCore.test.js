@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { MessageFormat, generateMessageId, reconstructTranslationError } from './MessagingCore.js';
 import { MessageActions } from './MessageActions.js';
 import { MessageContexts } from './MessagingConstants.js';
+import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
 
 describe('MessagingCore', () => {
   describe('MessageFormat.create', () => {
@@ -125,6 +126,42 @@ describe('MessagingCore', () => {
       expect(serialized).not.toBeInstanceOf(Error);
     });
 
+    it.each([
+      ErrorTypes.TRANSLATION_TIMEOUT,
+      ErrorTypes.NETWORK_ERROR,
+    ])('round-trips internal abort provenance with %s', (type) => {
+      const serialized = MessageFormat.serializeTranslationError({
+        message: 'Operation stopped',
+        type,
+        operationAborted: true,
+        cancellationReason: 'operation-abort',
+      });
+
+      expect(serialized).toMatchObject({
+        type,
+        operationAborted: true,
+        cancellationReason: 'operation-abort',
+      });
+
+      const reconstructed = reconstructTranslationError(serialized);
+      expect(reconstructed).toMatchObject({
+        type,
+        operationAborted: true,
+        cancellationReason: 'operation-abort',
+      });
+    });
+
+    it('preserves user cancellation without fabricating internal abort provenance', () => {
+      const reconstructed = reconstructTranslationError(MessageFormat.serializeTranslationError({
+        message: 'Cancelled by user',
+        type: 'USER_CANCELLED',
+      }));
+
+      expect(reconstructed).toMatchObject({ type: 'USER_CANCELLED' });
+      expect(reconstructed).not.toHaveProperty('operationAborted');
+      expect(reconstructed).not.toHaveProperty('cancellationReason');
+    });
+
     it('serializes plain DTOs and ignores unsupported metadata', () => {
       const controller = typeof AbortController === 'function' ? new AbortController() : null;
       const circular = {};
@@ -140,6 +177,8 @@ describe('MessagingCore', () => {
         providerId: 'webai',
         code: 503,
         errorCode: 'OVERLOADED',
+        operationAborted: 'true',
+        cancellationReason: 42,
         translationOutcome: {
           committedParentCount: 1,
           nestedError: new Error('unsupported'),

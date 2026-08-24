@@ -180,8 +180,9 @@ export class StreamingResponseHandler {
   _handleTranslationResult(handler, message) {
     const { messageId, data } = message;
 
-    // If this is just a streaming acknowledgement, don't complete or cleanup
-    if (data?.streaming) {
+    // A failed streaming result is terminal even when it carries the streaming
+    // marker. Successful streaming acknowledgements remain non-terminal.
+    if (data?.streaming && data?.success !== false) {
       try {
         handler.onTranslationResult(data);
       } catch (error) {

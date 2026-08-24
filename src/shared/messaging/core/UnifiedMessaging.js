@@ -140,6 +140,8 @@ function reconstructResponseError(response) {
     providerId: canonicalError.providerId,
     code: canonicalError.code,
     errorCode: canonicalError.errorCode,
+    operationAborted: canonicalError.operationAborted,
+    cancellationReason: canonicalError.cancellationReason,
     translationOutcome: canonicalError.translationOutcome
   });
 }

@@ -151,6 +151,72 @@ describe('StreamingResponseHandler', () => {
     }));
   });
 
+  it('keeps successful streaming acknowledgements non-terminal', () => {
+    const messageId = 'msg-streaming-ack';
+    const onTranslationResult = vi.fn();
+    handler.registerHandler(messageId, { onTranslationResult });
+
+    handler.handleMessage({
+      action: MessageActions.TRANSLATION_RESULT_UPDATE,
+      messageId,
+      data: { success: true, streaming: true },
+    });
+
+    expect(onTranslationResult).toHaveBeenCalledOnce();
+    expect(mockCoordinator.completeStreamingOperation).not.toHaveBeenCalled();
+    expect(mockCoordinator.handleStreamingError).not.toHaveBeenCalled();
+    expect(handler.getHandlerInfo(messageId)).not.toBeNull();
+  });
+
+  it('treats failed streaming result as terminal and cleans handler', () => {
+    const messageId = 'msg-streaming-failure';
+    const onTranslationResult = vi.fn();
+    handler.registerHandler(messageId, { onTranslationResult });
+
+    handler.handleMessage({
+      action: MessageActions.TRANSLATION_RESULT_UPDATE,
+      messageId,
+      data: {
+        success: false,
+        streaming: true,
+        error: { message: 'stream failed', type: 'NETWORK_ERROR' },
+      },
+    });
+
+    expect(onTranslationResult).toHaveBeenCalledOnce();
+    expect(mockCoordinator.handleStreamingError).toHaveBeenCalledOnce();
+    expect(mockCoordinator.completeStreamingOperation).not.toHaveBeenCalled();
+    expect(handler.getHandlerInfo(messageId)).toBeNull();
+  });
+
+  it('preserves typed internal abort provenance on terminal streaming result', () => {
+    const messageId = 'msg-streaming-typed-abort';
+    handler.registerHandler(messageId);
+
+    handler.handleMessage({
+      action: MessageActions.TRANSLATION_RESULT_UPDATE,
+      messageId,
+      data: {
+        success: false,
+        streaming: true,
+        errorDetails: {
+          message: 'timed out',
+          type: 'TRANSLATION_TIMEOUT',
+          operationAborted: true,
+          cancellationReason: 'operation-abort',
+        },
+      },
+    });
+
+    const error = mockCoordinator.handleStreamingError.mock.calls[0][1];
+    expect(error).toMatchObject({
+      type: 'TRANSLATION_TIMEOUT',
+      operationAborted: true,
+      cancellationReason: 'operation-abort',
+    });
+    expect(handler.getHandlerInfo(messageId)).toBeNull();
+  });
+
   it('buffers result when no active handler exists and replays after registration', () => {
     const message = {
       action: MessageActions.TRANSLATION_RESULT_UPDATE,

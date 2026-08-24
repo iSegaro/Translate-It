@@ -151,6 +151,8 @@ describe('UnifiedMessaging', () => {
           providerId: 'provider-id',
           code: 'UPSTREAM_FAILURE',
           errorCode: 'E_UPSTREAM',
+          operationAborted: true,
+          cancellationReason: 'operation-abort',
           translationOutcome: { committedParentCount: 1 },
           isFatal: true,
           cancelled: true,
@@ -177,6 +179,8 @@ describe('UnifiedMessaging', () => {
           providerId: 'provider-id',
           code: 'UPSTREAM_FAILURE',
           errorCode: 'E_UPSTREAM',
+          operationAborted: true,
+          cancellationReason: 'operation-abort',
           translationOutcome: { committedParentCount: 1 }
         });
         expect(error).not.toHaveProperty('success');
@@ -194,6 +198,28 @@ describe('UnifiedMessaging', () => {
         expect(error).not.toHaveProperty('originalError');
         expect(error).not.toHaveProperty('arbitrary');
       }
+    });
+
+    it.each([
+      [undefined, 'lifecycle-cleanup'],
+      [ErrorTypes.TRANSLATION_TIMEOUT, 'operation-abort'],
+    ])('reconstructs %s internal abort provenance from response DTO', async (type, cancellationReason) => {
+      browser.runtime.sendMessage.mockResolvedValue({
+        success: false,
+        error: {
+          message: 'Translation operation aborted',
+          ...(type ? { type } : {}),
+          operationAborted: true,
+          cancellationReason,
+        },
+      });
+
+      const rejection = sendRegularMessage({ action: 'TRANSLATE' });
+      await expect(rejection).rejects.toMatchObject({
+        ...(type ? { type } : {}),
+        operationAborted: true,
+        cancellationReason,
+      });
     });
 
     it('keeps canonical error fields authoritative over conflicting envelope fields', async () => {

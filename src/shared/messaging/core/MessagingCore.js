@@ -17,6 +17,8 @@ const TRANSLATION_ERROR_FIELDS = [
   'providerId',
   'code',
   'errorCode',
+  'operationAborted',
+  'cancellationReason',
   'translationOutcome',
 ];
 
@@ -161,6 +163,8 @@ export const MessageFormat = {
     copyScalar(serialized, 'providerId', getFieldValue(error, options, 'providerId'), ['string', 'number']);
     copyScalar(serialized, 'code', getFieldValue(error, options, 'code'), ['string', 'number']);
     copyScalar(serialized, 'errorCode', getFieldValue(error, options, 'errorCode'), ['string', 'number']);
+    copyScalar(serialized, 'operationAborted', getFieldValue(error, options, 'operationAborted'), ['boolean']);
+    copyScalar(serialized, 'cancellationReason', getFieldValue(error, options, 'cancellationReason'), ['string']);
 
     const translationOutcome = cloneSafeValue(getFieldValue(error, options, 'translationOutcome'));
     if (translationOutcome !== UNSUPPORTED_VALUE && translationOutcome !== CIRCULAR_VALUE) {

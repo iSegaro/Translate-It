@@ -24,6 +24,28 @@ import { resolveOperationSourceLanguage } from '@/features/translation/core/Oper
 
 const logger = getScopedLogger(LOG_COMPONENTS.TRANSLATION, 'OptimizedJsonHandler');
 const MAX_PARENT_RECOVERIES_PER_BATCH = 2;
+const GENERIC_TRANSLATION_ERROR_TYPES = new Set([
+  ErrorTypes.TRANSLATION_ERROR,
+  ErrorTypes.TRANSLATION_FAILED,
+  ErrorTypes.UNKNOWN,
+]);
+
+function isGenericOperationAbort(error) {
+  const type = error?.type;
+  return error?.operationAborted === true
+    && (!type || GENERIC_TRANSLATION_ERROR_TYPES.has(type));
+}
+
+function hasStrongTerminalType(error) {
+  const type = error?.type;
+  return error?.operationAborted === true
+    && typeof type === 'string'
+    && type.length > 0
+    && !GENERIC_TRANSLATION_ERROR_TYPES.has(type)
+    && type !== ErrorTypes.USER_CANCELLED
+    && type !== ErrorTypes.TRANSLATION_CANCELLED
+    && error?.isCancelled !== true;
+}
 
 function createAbortError(signal, message = 'Translation task cancelled') {
   const isUserCancellation = signal?.reason === 'user-cancelled' || signal?.reason === 'user_cancelled';
@@ -1171,11 +1193,9 @@ const parentError = createParentValidationError(parentIdStr, sourceText, transla
             && !batchError?.operationAborted
             ? createAbortError(abortController.signal, batchError.message)
             : batchError;
-          const errorType = normalizedBatchError.operationAborted
-            ? null
-            : normalizedBatchError.type || matchErrorToType(normalizedBatchError);
+          const errorType = normalizedBatchError.type || matchErrorToType(normalizedBatchError);
           const isCancellation = (normalizedBatchError.name === 'AbortError' && !normalizedBatchError.type) ||
-                               normalizedBatchError.operationAborted ||
+                               isGenericOperationAbort(normalizedBatchError) ||
                                normalizedBatchError.isCancelled || 
                                errorType === ErrorTypes.USER_CANCELLED || 
                                errorType === ErrorTypes.TRANSLATION_CANCELLED;
@@ -1183,6 +1203,10 @@ const parentError = createParentValidationError(parentIdStr, sourceText, transla
           if (isCancellation) {
             fragmentedUnits.clear();
             logger.debug(`[JsonHandler] Batch ${i + 1} cancelled for messageId: ${messageId}`);
+
+            if (isGenericOperationAbort(normalizedBatchError) && !abortController.signal.aborted) {
+              abortController.abort(normalizedBatchError.cancellationReason || 'operation-abort');
+            }
 
             // Queue cancellation is owned by handleCancelTranslation. Cancelling
             // here races provider failures and rewrites them as USER_CANCELLED.
@@ -1217,10 +1241,14 @@ hasErrors = true;
            }
           
           // Stop all other batches if error is fatal (429, etc.)
-           if (isFatalError(normalizedBatchError)) {
-            abortInitiator = 'fatal-error';
-            if (!abortController.signal.aborted) abortController.abort();
-          }
+            const fatalClassification = normalizedBatchError.operationAborted
+              && !isGenericOperationAbort(normalizedBatchError)
+              ? errorType
+              : normalizedBatchError;
+            if (isFatalError(fatalClassification)) {
+             abortInitiator = 'fatal-error';
+             if (!abortController.signal.aborted) abortController.abort();
+           }
         } finally {
           clearTimeout(timeoutId);
           abortController.signal.removeEventListener('abort', onAbort);
@@ -1232,6 +1260,16 @@ hasErrors = true;
       // Final check for cancellation before sending end-of-stream markers
       if (abortController.signal.aborted || engine.isCancelled(messageId)) {
         logger.debug(`[JsonHandler] Skipping stream end markers for cancelled request: ${messageId}`);
+        if (lastError && hasStrongTerminalType(lastError)) {
+          const serializedError = MessageFormat.serializeTranslationError(lastError);
+          return {
+            success: false,
+            streaming: true,
+            error: serializedError,
+            errorDetails: serializedError,
+            results: batchResults.flat()
+          };
+        }
         if (hasErrors && lastError && abortInitiator === 'fatal-error') {
           const serializedError = MessageFormat.serializeTranslationError(lastError);
           return {
@@ -1253,12 +1291,25 @@ hasErrors = true;
             results: batchResults.flat()
           };
         }
+        if (cancellation.isCancelled !== true) {
+          const serializedError = MessageFormat.serializeTranslationError(cancellation);
+          return {
+            success: false,
+            streaming: true,
+            error: serializedError,
+            errorDetails: serializedError,
+          };
+        }
         return { success: false, streaming: true, error: cancellation };
       }
 
       if (!skipStreaming) {
         if (hasErrors) {
-          await this._sendStreamError(tabId, messageId, lastError, targetLanguage, detectedSourceLanguage, mode, frameId);
+          // Strong typed operation aborts return a terminal result below. Do not
+          // also publish a stream-end error; one terminal delivery is enough.
+          if (!hasStrongTerminalType(lastError)) {
+            await this._sendStreamError(tabId, messageId, lastError, targetLanguage, detectedSourceLanguage, mode, frameId);
+          }
         } else {
           await this._sendStreamEnd(tabId, messageId, providerInstance.providerName, targetLanguage, detectedSourceLanguage, mode, frameId);
         }
