@@ -43,9 +43,16 @@ export async function getPageTranslationErrorDecision(detail) {
   const displayError = await createLegacyDisplayError(canonicalError, publicError);
   if (!displayError) return null;
 
+  const translatedCount = typeof detail?.translatedCount === 'number'
+    ? detail.translatedCount
+    : typeof detail?.committedCount === 'number'
+      ? detail.committedCount
+      : null;
+
   return {
     displayError,
-    canRetry: publicError.action === PublicTranslationErrorActions.RETRY,
+    canRetry: publicError.action === PublicTranslationErrorActions.RETRY
+      && (translatedCount === null || translatedCount === 0),
   };
 }
 

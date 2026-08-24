@@ -163,13 +163,24 @@ export function useContentAppPageTranslation(mobileStore, tracker) {
       const presentation = await getPageTranslationErrorDecision(detail);
       if (!presentation) return;
 
+      const translatedCount = typeof detail.translatedCount === 'number'
+        ? detail.translatedCount
+        : typeof detail.committedCount === 'number'
+          ? detail.committedCount
+          : null;
+      const hasCommittedContent = translatedCount !== null
+        ? translatedCount > 0
+        : mobileStore.pageTranslationData.isTranslated
+          || mobileStore.pageTranslationData.translatedCount > 0;
+
       mobileStore.setPageTranslation({ 
         isTranslating: false,
         isAutoTranslating: false,
-        isTranslated: false,
+        isTranslated: hasCommittedContent,
+        ...(translatedCount !== null && { translatedCount }),
         status: TRANSLATION_STATUS.ERROR,
         errorMessage: presentation.displayError.message,
-        canRetry: presentation.canRetry,
+        canRetry: presentation.canRetry && !hasCommittedContent,
       });
     });
 

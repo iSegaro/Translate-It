@@ -434,6 +434,7 @@ export class PageTranslationManager extends ResourceTracker {
   _handleFatalError(error, errorType, localizedMessage = null) {
     if (this.isFatalErrorHandling) return;
     this.isFatalErrorHandling = true;
+    const translatedCount = this.scheduler.translatedCount;
 
     const isContextError = ExtensionContextManager.isContextError(error);
 
@@ -474,6 +475,7 @@ export class PageTranslationManager extends ResourceTracker {
         error: localizedMessage || error.message || String(error),
         errorDetails: MessageFormat.serializeTranslationError(error),
         errorType: errorType || ErrorTypes.TRANSLATION_FAILED,
+        translatedCount,
         isFatal: true
       });
     }

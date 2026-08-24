@@ -19,6 +19,7 @@ vi.mock('@/shared/logging/logger.js', () => ({
 
 import { useContentAppPageTranslation } from './useContentAppPageTranslation.js';
 import { MessageActions } from '@/shared/messaging/core/MessageActions.js';
+import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
 
 describe('useContentAppPageTranslation', () => {
   let listeners;
@@ -63,6 +64,38 @@ describe('useContentAppPageTranslation', () => {
     expect(state.errorMessage).not.toBe(raw);
     expect(state.status).toBe('error');
     expect(state.isTranslating).toBe(false);
+  });
+
+  it('suppresses Retry and preserves translated state after fatal partial output', async () => {
+    mobileStore.pageTranslationData.isTranslated = true;
+    mobileStore.pageTranslationData.translatedCount = 1;
+
+    await listeners.get(MessageActions.PAGE_TRANSLATE_ERROR)({
+      errorDetails: { type: ErrorTypes.NETWORK_ERROR, message: 'network failure' },
+      translatedCount: 1,
+      isFatal: true,
+    });
+
+    expect(mobileStore.setPageTranslation).toHaveBeenCalledWith(expect.objectContaining({
+      isTranslated: true,
+      translatedCount: 1,
+      canRetry: false,
+      status: 'error',
+    }));
+  });
+
+  it('keeps Retry available for fatal zero-commit output', async () => {
+    await listeners.get(MessageActions.PAGE_TRANSLATE_ERROR)({
+      errorDetails: { type: ErrorTypes.NETWORK_ERROR, message: 'network failure' },
+      translatedCount: 0,
+      isFatal: true,
+    });
+
+    expect(mobileStore.setPageTranslation).toHaveBeenCalledWith(expect.objectContaining({
+      isTranslated: false,
+      canRetry: true,
+      status: 'error',
+    }));
   });
 
   it('marks partial completion without entering error state', async () => {
@@ -167,6 +200,7 @@ describe('useContentAppPageTranslation', () => {
   it.each([
     [{ type: 'HTTP_ERROR', statusCode: 404, message: 'HTTP 404' }, false],
     [{ type: 'HTTP_ERROR', statusCode: 409, message: 'HTTP 409' }, true],
+    [{ type: ErrorTypes.API_KEY_INVALID, message: 'invalid key' }, false],
   ])('stores public retry decision for %s', async (errorDetails, canRetry) => {
     await listeners.get(MessageActions.PAGE_TRANSLATE_ERROR)({
       errorDetails,

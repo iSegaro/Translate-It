@@ -2,6 +2,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { mount } from '@vue/test-utils'
 import { reactive, ref } from 'vue'
 import PageTranslationView from './PageTranslationView.vue'
+import { pageEventBus } from '@/core/PageEventBus.js'
+import { MessageActions } from '@/shared/messaging/core/MessageActions.js'
 
 let mobileStore
 let settingsStore
@@ -49,6 +51,7 @@ vi.mock('@/shared/logging/logger.js', () => ({
 
 describe('PageTranslationView retry action', () => {
   beforeEach(() => {
+    vi.clearAllMocks()
     mobileStore = {
       pageTranslationData: ref({
         status: 'error',
@@ -100,6 +103,31 @@ describe('PageTranslationView retry action', () => {
     const wrapper = mount(PageTranslationView)
 
     expect(wrapper.get('.ti-m-header-primary-btn').text()).toBe('Retry Translation')
+  })
+
+  it('dispatches PAGE_TRANSLATE for zero-commit Retry', async () => {
+    mobileStore.pageTranslationData.value.canRetry = true
+    const wrapper = mount(PageTranslationView)
+
+    await wrapper.get('.ti-m-header-primary-btn').trigger('click')
+
+    expect(pageEventBus.emit).toHaveBeenCalledWith(MessageActions.PAGE_TRANSLATE, { provider: 'google' })
+  })
+
+  it('does not expose Retry for fatal partial output', () => {
+    mobileStore.pageTranslationData.value = {
+      ...mobileStore.pageTranslationData.value,
+      isTranslated: true,
+      translatedCount: 1,
+      failedCount: 1,
+      totalCount: 2,
+      canRetry: false,
+    }
+    const wrapper = mount(PageTranslationView)
+
+    expect(wrapper.get('.ti-m-header-primary-btn').text()).toBe('Close')
+    expect(wrapper.text()).not.toContain('Retry Translation')
+    expect(pageEventBus.emit).not.toHaveBeenCalledWith(MessageActions.PAGE_TRANSLATE, expect.anything())
   })
 
   it('shows passive wording for partial completion', () => {

@@ -319,6 +319,22 @@ describe('PageTranslationManager', () => {
       });
     });
 
+    it('preserves translated state and publishes committed count after fatal partial termination', async () => {
+      manager.scheduler.translatedCount = 1;
+      manager.isTranslating = true;
+      const error = Object.assign(new Error('Fatal failure'), {
+        type: ErrorTypes.NETWORK_ERROR,
+      });
+
+      manager._handleFatalError(error, ErrorTypes.NETWORK_ERROR);
+
+      expect(manager.isTranslated).toBe(true);
+      expect(pageEventBus.emit).toHaveBeenCalledWith(MessageActions.PAGE_TRANSLATE_ERROR, expect.objectContaining({
+        translatedCount: 1,
+        isFatal: true,
+      }));
+    });
+
     it('does not present cancellation or context fatal errors', async () => {
       manager._handleFatalError(Object.assign(new Error('cancelled'), {
         type: ErrorTypes.USER_CANCELLED,
