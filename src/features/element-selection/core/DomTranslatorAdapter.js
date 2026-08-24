@@ -273,6 +273,7 @@ export class DomTranslatorAdapter extends ResourceTracker {
               pendingResultsByUid: new Map(),
               invalid: false,
               applied: false,
+              acceptanceSettled: false,
             };
             blockMap.set(unit.blockId, group);
             groups.push(group);
@@ -395,6 +396,7 @@ export class DomTranslatorAdapter extends ResourceTracker {
                 invalid: false,
                 applied: false,
                 acknowledged: false,
+                acceptanceSettled: false,
               };
               directParentStates.set(parentId, parent);
               parents.push(parent.handoffParent);
@@ -467,15 +469,12 @@ export class DomTranslatorAdapter extends ResourceTracker {
             this._applyTranslationToNode(nodeData.node, translatedText, targetLanguage, element);
           }
           parent.applied = true;
-          if (!parent.acknowledged) {
-            parent.acknowledged = true;
-            this._queueParentAcceptanceAck(
-              parent.parentId,
-              plan.map(({ translatedText }) => translatedText).join(''),
-              true,
-              translationToken
-             );
-          }
+          this._settleParentAcceptance(
+            parent,
+            true,
+            plan.map(({ translatedText }) => translatedText).join(''),
+            translationToken
+          );
         } catch (error) {
           parent.invalid = true;
           parent.applied = false;
@@ -531,7 +530,7 @@ export class DomTranslatorAdapter extends ResourceTracker {
           // Mutation failure lifecycle: best-effort rollback performed above, then
           // emit a rejection ACK for the failed canonical parent so the background
           // coordinator marks it REJECTED (never left PENDING blocking later parents).
-          this._sendParentAcceptanceAck(parent.parentId, null, false, translationToken).catch(() => {});
+          this._settleParentAcceptance(parent, false, null, translationToken);
           throw new DirectMutationFailure(error, rollbackFailures);
         }
       };
@@ -586,7 +585,19 @@ export class DomTranslatorAdapter extends ResourceTracker {
             if (!firstFailure) firstFailure = error;
           }
         }
-        if (firstFailure) throw firstFailure;
+        if (firstFailure) {
+          settleTerminalParents(translationToken);
+          throw firstFailure;
+        }
+      };
+
+      const settleTerminalParents = (translationToken) => {
+        if (!this._isCurrentTranslation(translationToken)) return;
+        const parents = isBlockGroupingEnabled ? groups : Array.from(directParentStates.values());
+        parents.forEach(parent => {
+          if (parent.applied || parent.acceptanceSettled) return;
+          this._settleParentAcceptance(parent, false, null, translationToken);
+        });
       };
 
       // Context
@@ -743,8 +754,9 @@ export class DomTranslatorAdapter extends ResourceTracker {
                            if (error instanceof BlockGroupMutationFailure) {
                              error.rollbackFailures.forEach(failure => this.logger.error('[Reconstructor] Group rollback failed', failure));
                            }
-                           this._sendParentAcceptanceAck(group.blockId, null, false, translationToken).catch(() => {});
-                           throw error;
+                            this._settleParentAcceptance(group, false, null, translationToken);
+                            settleTerminalParents(translationToken);
+                            throw error;
                          }
                     } else {
                       if (contentResult.status !== 'valid') {
@@ -766,8 +778,9 @@ export class DomTranslatorAdapter extends ResourceTracker {
                           } else {
                             this._rollbackBlockGroup(this.currentSessionId, group.blockId);
                           }
-                           this._sendParentAcceptanceAck(group.blockId, null, false, translationToken).catch(() => {});
-                           throw error;
+                          this._settleParentAcceptance(group, false, null, translationToken);
+                          settleTerminalParents(translationToken);
+                          throw error;
                         }
                       }
                     }
@@ -796,10 +809,13 @@ export class DomTranslatorAdapter extends ResourceTracker {
                   }
                 }
               }
-            } catch (err) {
-              this.logger.error('Error during onStreamUpdate processing:', err);
-              safeResolve({ success: false, error: err });
-            }
+             } catch (err) {
+               this.logger.error('Error during onStreamUpdate processing:', err);
+               if (err instanceof BlockGroupMutationFailure) {
+                 settleTerminalParents(translationToken);
+               }
+               safeResolve({ success: false, error: err });
+             }
           },
            onStreamEnd: (data) => {
              if (isSettled) return;
@@ -895,10 +911,11 @@ export class DomTranslatorAdapter extends ResourceTracker {
           effectiveTargetLanguage,
           element,
           translationToken,
-          ingestDirectResult,
-          finalizeDirectParents,
-          ingestPassthroughResult
-        );
+           ingestDirectResult,
+           finalizeDirectParents,
+           ingestPassthroughResult,
+           settleTerminalParents
+         );
       } else {
         result = response;
       }
@@ -943,6 +960,8 @@ export class DomTranslatorAdapter extends ResourceTracker {
         rejectedParentCount,
         zeroCommit: committedParentCount === 0,
       });
+
+      if (result?.success) settleTerminalParents(translationToken);
 
       const finalResult = await this._finalizeTranslation({
         result, element, elementId, targetLanguage: effectiveTargetLanguage, onComplete, sessionId: this.currentSessionId, translationToken, committedParentCount, totalParentCount: getCurrentOutcome().totalParentCount, shadowSpanning
@@ -1192,7 +1211,7 @@ export class DomTranslatorAdapter extends ResourceTracker {
       }
       reconstruction.transaction.finalize();
       group.applied = true;
-      this._queueParentAcceptanceAck(group.blockId, reconstruction.cleanResult, true, translationToken);
+      this._settleParentAcceptance(group, true, reconstruction.cleanResult, translationToken);
     } catch (error) {
       for (const [uid, state] of previousMap) {
         if (state.present) this.translatedSegmentMap.set(uid, state.value);
@@ -1206,7 +1225,7 @@ export class DomTranslatorAdapter extends ResourceTracker {
     }
   }
 
-  async _handleDirectResponse(response, textNodesData, nodeMap, targetLanguage, element, translationToken, ingestDirectResult, finalizeDirectParents, ingestPassthroughResult) {
+  async _handleDirectResponse(response, textNodesData, nodeMap, targetLanguage, element, translationToken, ingestDirectResult, finalizeDirectParents, ingestPassthroughResult, settleTerminalParents) {
     this.logger.debug(`[DomTranslatorAdapter] _handleDirectResponse called (batchCount: ${this.batchCount})`);
 
     if (this.sessionContext === undefined && (!ingestDirectResult || !finalizeDirectParents)) {
@@ -1278,9 +1297,10 @@ export class DomTranslatorAdapter extends ResourceTracker {
                  this.logger.error(`[Reconstructor] Apply failed for V2 group ${group.blockId}:`, originalError);
                  if (error instanceof BlockGroupMutationFailure) {
                    error.rollbackFailures.forEach(failure => this.logger.error('[Reconstructor] Group rollback failed', failure));
-                 }
-                 this._sendParentAcceptanceAck(group.blockId, null, false, translationToken).catch(() => {});
-                 throw error;
+                  }
+                  this._settleParentAcceptance(group, false, null, translationToken);
+                  settleTerminalParents?.(translationToken);
+                  throw error;
                }
           } else {
             if (contentResult.status !== 'valid') {
@@ -1301,8 +1321,9 @@ export class DomTranslatorAdapter extends ResourceTracker {
                    error.rollbackFailures.forEach(failure => this.logger.error('[Reconstructor] Group rollback failed', failure));
                  } else {
                    this._rollbackBlockGroup(this.currentSessionId, group.blockId);
-                 }
-                  this._sendParentAcceptanceAck(group.blockId, null, false, translationToken).catch(() => {});
+                  }
+                  this._settleParentAcceptance(group, false, null, translationToken);
+                  settleTerminalParents?.(translationToken);
                   throw error;
               }
             }
@@ -1336,6 +1357,9 @@ export class DomTranslatorAdapter extends ResourceTracker {
         targetLanguage: finalTargetLanguage
       };
     } catch (err) {
+      if (err instanceof BlockGroupMutationFailure) {
+        settleTerminalParents?.(translationToken);
+      }
       this.logger.error('Direct translation handling failed:', err);
       const errorType = matchErrorToType(err);
       if (
@@ -1444,9 +1468,25 @@ export class DomTranslatorAdapter extends ResourceTracker {
     }, { silent: true, timeout: ACCEPTANCE_ACK_TIMEOUT_MS });
   }
 
+  _settleParentAcceptance(parent, accepted, cleanResult, translationToken = null) {
+    if (!parent || parent.acceptanceSettled) return;
+    if (translationToken && !this._isCurrentTranslation(translationToken)) return;
+    if (!ExtensionContextManager.isValidSync()) return;
+
+    const parentId = parent.parentId || parent.blockId;
+    if (!parentId) return;
+
+    parent.acceptanceSettled = true;
+    parent.acknowledged = accepted;
+    this._queueParentAcceptanceAck(parentId, accepted ? cleanResult : null, accepted, translationToken);
+  }
+
   _queueParentAcceptanceAck(parentId, cleanResult, accepted, translationToken = null) {
     if (!accepted) {
-      this._sendParentAcceptanceAck(parentId, cleanResult, false, translationToken).catch(() => {});
+      const delivery = this._sendParentAcceptanceAck(parentId, cleanResult, false, translationToken)
+        .catch(() => {})
+        .finally(() => this._pendingAcceptanceAcks.delete(delivery));
+      this._pendingAcceptanceAcks.add(delivery);
       return;
     }
 
