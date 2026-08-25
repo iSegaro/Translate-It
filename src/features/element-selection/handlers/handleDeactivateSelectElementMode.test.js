@@ -51,9 +51,16 @@ describe('handleDeactivateSelectElementMode', () => {
 
     expect(response.success).toBe(true);
     expect(setStateForTab).toHaveBeenCalledWith(123, false);
-    expect(browser.tabs.sendMessage).toHaveBeenCalledWith(123, expect.objectContaining({
-      action: 'DEACTIVATE_SELECT_ELEMENT_MODE'
-    }));
+    expect(browser.tabs.sendMessage).toHaveBeenCalledWith(
+      123,
+      expect.objectContaining({
+        action: 'DEACTIVATE_SELECT_ELEMENT_MODE',
+        data: expect.objectContaining({
+          fromBackground: true,
+          isExplicitDeactivation: true,
+        }),
+      })
+    );
   });
 
   it('should return error if no tabId', async () => {

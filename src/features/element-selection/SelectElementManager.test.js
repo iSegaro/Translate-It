@@ -350,6 +350,9 @@ vi.mock('@/utils/browser/compatibility.js', () => ({
 vi.mock('@/shared/messaging/core/MessageActions.js', () => ({
   MessageActions: {
     ACTIVATE_SELECT_ELEMENT_MODE: 'ACTIVATE_SELECT_ELEMENT_MODE',
+    DEACTIVATE_SELECT_ELEMENT_MODE: 'DEACTIVATE_SELECT_ELEMENT_MODE',
+    SET_SELECT_ELEMENT_STATE: 'SET_SELECT_ELEMENT_STATE',
+    IFRAME_SELECT_ELEMENT_FINISHED: 'IFRAME_SELECT_ELEMENT_FINISHED',
     TRANSLATE: 'TRANSLATE'
   }
 }));
@@ -1617,7 +1620,7 @@ describe('SelectElementManager', () => {
       expect(pageEventBus.emit).toHaveBeenCalledWith('show-select-element-notification', expect.any(Object));
     });
 
-    it('should listen to global deactivation message', async () => {
+    it('should ignore legacy global deactivation messages', async () => {
       await manager.initialize();
       await manager.activateSelectElementMode();
       
@@ -1625,7 +1628,7 @@ describe('SelectElementManager', () => {
         data: { type: 'DEACTIVATE_ALL_SELECT_MANAGERS' }
       }));
       
-      expect(manager.isActive).toBe(false);
+      expect(manager.isActive).toBe(true);
     });
   });
 
@@ -1823,15 +1826,60 @@ describe('SelectElementManager', () => {
       expect(manager.elementSelector.handleMouseOver).not.toHaveBeenCalled();
     });
 
-    it('should handle deactivation message from iframe', () => {
+    it('should ignore legacy iframe deactivation messages', async () => {
       manager.isTopFrame = true;
-      manager.setupEventListeners(); // Re-setup to bind iframeMessageHandler
+      await manager.initialize();
+      await manager.activateSelectElementMode();
       
       window.dispatchEvent(new MessageEvent('message', {
         data: { type: 'translate-it-deactivate-select-element' }
       }));
       
-      expect(manager.isActive).toBe(false);
+      expect(manager.isActive).toBe(true);
+      expect(manager.domTranslatorAdapter.cancelTranslation).not.toHaveBeenCalled();
+      const { sendMessage } = await import('@/shared/messaging/core/UnifiedMessaging.js');
+      expect(sendMessage).not.toHaveBeenCalledWith({
+        action: 'DEACTIVATE_SELECT_ELEMENT_MODE',
+      });
+    });
+
+    it('reports child-frame terminal cleanup through runtime messaging', async () => {
+      const { sendRegularMessage } = await import('@/shared/messaging/core/UnifiedMessaging.js');
+      manager.isTopFrame = false;
+
+      manager.performPostTranslationCleanup({ reason: 'success' });
+      await Promise.resolve();
+
+      expect(sendRegularMessage).toHaveBeenCalledWith({
+        action: 'IFRAME_SELECT_ELEMENT_FINISHED',
+        data: { reason: 'success' },
+      }, { silent: true });
+    });
+
+    it('keeps local cleanup successful when runtime completion reporting fails', async () => {
+      const { sendRegularMessage } = await import('@/shared/messaging/core/UnifiedMessaging.js');
+      sendRegularMessage.mockRejectedValueOnce(new Error('Background unavailable'));
+      manager.isTopFrame = false;
+
+      expect(() => manager.performPostTranslationCleanup({ reason: 'success' })).not.toThrow();
+      await Promise.resolve();
+      expect(manager.isProcessingClick).toBe(false);
+    });
+
+    it('uses trusted background deactivation for top-frame cleanup', async () => {
+      const { sendMessage, sendRegularMessage } = await import('@/shared/messaging/core/UnifiedMessaging.js');
+      manager.isTopFrame = true;
+      manager.isActive = true;
+
+      await manager.deactivate({ reason: 'manual' });
+
+      expect(sendMessage).toHaveBeenCalledWith({
+        action: 'DEACTIVATE_SELECT_ELEMENT_MODE',
+      });
+      expect(sendRegularMessage).not.toHaveBeenCalledWith(
+        expect.objectContaining({ action: 'IFRAME_SELECT_ELEMENT_FINISHED' }),
+        expect.anything(),
+      );
     });
 
     it('should emit progress events during translation', async () => {

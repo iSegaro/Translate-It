@@ -36,13 +36,15 @@ async function loadElementSelectionHandlers() {
     import('@/features/element-selection/handlers/handleActivateSelectElementMode.js'),
     import('@/features/element-selection/handlers/handleDeactivateSelectElementMode.js'),
     import('@/features/element-selection/handlers/handleGetSelectElementState.js'),
-    import('@/features/element-selection/handlers/handleSetSelectElementState.js')
-  ]).then(([activate, deactivate, getState, setState]) => {
+    import('@/features/element-selection/handlers/handleSetSelectElementState.js'),
+    import('@/features/element-selection/handlers/handleIframeSelectElementFinished.js')
+  ]).then(([activate, deactivate, getState, setState, iframeFinished]) => {
     const handlers = {
       handleActivateSelectElementMode: activate.handleActivateSelectElementMode,
       handleDeactivateSelectElementMode: deactivate.handleDeactivateSelectElementMode,
       handleGetSelectElementState: getState.handleGetSelectElementState,
-      handleSetSelectElementState: setState.handleSetSelectElementState
+      handleSetSelectElementState: setState.handleSetSelectElementState,
+      handleIframeSelectElementFinished: iframeFinished.handleIframeSelectElementFinished
     };
 
     handlerCache.set(cacheKey, handlers);
@@ -142,6 +144,29 @@ export const handleSetSelectElementStateLazy = async (message, sender, sendRespo
     return await handleSetSelectElementState(message, sender, sendResponse);
   } catch (error) {
     logger.error('Failed to handle setSelectElementState:', error);
+    return {
+      success: false,
+      error: {
+        message: 'Failed to load Element Selection functionality',
+        type: 'ELEMENT_SELECTION_LOADING_ERROR'
+      }
+    };
+  }
+};
+
+/**
+ * Lazy handler for extension-owned iframe Select Element completion.
+ */
+export const handleIframeSelectElementFinishedLazy = async (message, sender, sendResponse) => {
+  try {
+    logger.debug('iframe Select Element completion requested, loading handlers...');
+
+    const { handleIframeSelectElementFinished } = await loadElementSelectionHandlers();
+
+    logger.debug('Delegating to handleIframeSelectElementFinished');
+    return await handleIframeSelectElementFinished(message, sender, sendResponse);
+  } catch (error) {
+    logger.error('Failed to handle iframe Select Element completion:', error);
     return {
       success: false,
       error: {

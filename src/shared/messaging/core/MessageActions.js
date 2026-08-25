@@ -64,6 +64,7 @@ export class MessageActions {
   static IFRAME_INSERT_TEXT = 'IFRAME_INSERT_TEXT';
   static IFRAME_SYNC_REQUEST = 'IFRAME_SYNC_REQUEST';
   static IFRAME_SYNC_RESPONSE = 'IFRAME_SYNC_RESPONSE';
+  static IFRAME_SELECT_ELEMENT_FINISHED = 'IFRAME_SELECT_ELEMENT_FINISHED';
   
   // Floating Window
   static TRANSLATION_COMPLETE = 'translationComplete';

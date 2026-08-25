@@ -5,7 +5,7 @@ import ResourceTracker from '@/core/memory/ResourceTracker.js';
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { pageEventBus, WINDOWS_MANAGER_EVENTS } from '@/core/PageEventBus.js';
-import { sendMessage } from '@/shared/messaging/core/UnifiedMessaging.js';
+import { sendMessage, sendRegularMessage } from '@/shared/messaging/core/UnifiedMessaging.js';
 import { MessageActions } from '@/shared/messaging/core/MessageActions.js';
 import ExtensionContextManager from '@/core/extensionContext.js';
 import { ErrorHandler } from '@/shared/error-management/ErrorHandler.js';
@@ -152,8 +152,6 @@ class SelectElementManager extends ResourceTracker {
 
       this.setupKeyboardListeners();
       this.setupCancelListener();
-      this.setupCrossFrameCommunication();
-
       // Initialize hover manager for original text preview if enabled
       getSelectElementShowOriginalOnHoverAsync().then(enabled => {
         if (enabled) {
@@ -329,7 +327,15 @@ class SelectElementManager extends ResourceTracker {
         await this.domTranslatorAdapter.revertTranslation();
       }
 
-      if (!fromBackground) await this.notifyBackgroundDeactivation();
+      if (!fromBackground) {
+        if (this.isTopFrame) {
+          try {
+            await sendMessage({ action: MessageActions.DEACTIVATE_SELECT_ELEMENT_MODE });
+          } catch { /* ignore */ }
+        } else {
+          await this.notifyBackgroundDeactivation();
+        }
+      }
       pageEventBus.emit('select-mode-deactivated');
 
     } catch (error) {
@@ -371,14 +377,6 @@ class SelectElementManager extends ResourceTracker {
 
       window.addEventListener('keydown', this.handleKeyDown, true);
 
-      if (this.isTopFrame) {
-        this.iframeMessageHandler = (event) => {
-          if (event.data?.type === 'translate-it-deactivate-select-element') {
-            this.deactivate({ fromIframe: true, reason: 'manual' }).catch(() => {});
-          }
-        };
-        window.addEventListener('message', this.iframeMessageHandler);
-      }
     }
   }
 
@@ -396,10 +394,6 @@ class SelectElementManager extends ResourceTracker {
     });
 
     window.removeEventListener('keydown', this.handleKeyDown, true);
-    if (this.isTopFrame && this.iframeMessageHandler) {
-      window.removeEventListener('message', this.iframeMessageHandler);
-      this.iframeMessageHandler = null;
-    }
   }
 
   isCooldownActive() { return Date.now() - (this.activationTime || 0) < 100; }
@@ -713,13 +707,12 @@ class SelectElementManager extends ResourceTracker {
 
     if (!this.isTopFrame) {
       try {
-        // Notify top frame that this iframe has finished its selection/translation
-        // This will trigger a global deactivation to clean up all other iframes
-        window.top.postMessage({
-          type: 'translate-it-deactivate-select-element',
-          source: 'iframe-translation-complete',
-          instanceId: this.instanceId
-        }, '*');
+        void sendRegularMessage({
+          action: MessageActions.IFRAME_SELECT_ELEMENT_FINISHED,
+          data: { reason },
+        }, { silent: true }).catch((error) => {
+          this.logger.debug('Failed to report iframe Select Element completion:', error);
+        });
       } catch { /* ignore */ }
 
       // Also locally deactivate to ensure clean state
@@ -766,15 +759,6 @@ class SelectElementManager extends ResourceTracker {
   setupCancelListener() {
     this.addEventListener(pageEventBus, 'cancel-select-element-mode', () => {
       if (this.isActive) this.deactivate({ fromCancel: true, silent: true, reason: 'cancel' });
-    });
-  }
-
-  setupCrossFrameCommunication() {
-    this.addEventListener(window, 'message', (event) => {
-      // Respond to global deactivation signals
-      if (event.data?.type === 'DEACTIVATE_ALL_SELECT_MANAGERS') {
-        this.deactivate({ fromBackground: true, reason: 'manual' });
-      }
     });
   }
 

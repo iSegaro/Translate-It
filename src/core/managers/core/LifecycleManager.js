@@ -164,6 +164,7 @@ class LifecycleManager {
       'deactivateSelectElementMode': Handlers.handleDeactivateSelectElementModeLazy,
       'setSelectElementState': Handlers.handleSetSelectElementStateLazy,
       'getSelectElementState': Handlers.handleGetSelectElementStateLazy,
+      [MessageActions.IFRAME_SELECT_ELEMENT_FINISHED]: Handlers.handleIframeSelectElementFinishedLazy,
       'SELECT_ELEMENT_STATE_CHANGED': Handlers.handleSelectElement,
       'clearElementSelectionHandlerCache': Handlers.clearElementSelectionHandlerCache,
       'getElementSelectionHandlerStats': Handlers.getElementSelectionHandlerStats,

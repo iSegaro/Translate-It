@@ -28,6 +28,7 @@ const MessageActions = {
 describe('MainFrameCoordinator Hover error normalization', () => {
   let emitSpy;
   let aggregator;
+  let coordinator;
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -37,7 +38,7 @@ describe('MainFrameCoordinator Hover error normalization', () => {
       updateFrameData: vi.fn(),
       emitAggregateProgress: vi.fn()
     };
-    new MainFrameCoordinator(aggregator, MessageActions, null);
+    coordinator = new MainFrameCoordinator(aggregator, MessageActions, null);
   });
 
   const dispatchIframeEvent = (type, data) => {
@@ -129,6 +130,23 @@ describe('MainFrameCoordinator Hover error normalization', () => {
     });
 
     expect(emitSpy.mock.calls.at(-1)).toEqual(['OTHER_IFRAME_EVENT', data]);
+  });
+
+  it('ignores legacy Select Element deactivation window messages', () => {
+    const manager = { deactivate: vi.fn() };
+    const previousManager = window.selectElementManagerInstance;
+    window.selectElementManagerInstance = manager;
+
+    try {
+      window.dispatchEvent(new MessageEvent('message', {
+        data: { type: 'translate-it-deactivate-select-element' },
+      }));
+
+      expect(manager.deactivate).not.toHaveBeenCalled();
+      expect(coordinator.broadcastDeactivation).toBeUndefined();
+    } finally {
+      window.selectElementManagerInstance = previousManager;
+    }
   });
 
   it('keeps PAGE_TRANSLATE command intent out of aggregate state', () => {

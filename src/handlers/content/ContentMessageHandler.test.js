@@ -108,6 +108,18 @@ describe('ContentMessageHandler iframe Select Element activation', () => {
     });
   });
 
+  it('deactivates once for trusted background Select Element messages', async () => {
+    const deactivate = vi.fn().mockResolvedValue(undefined);
+    handler.setSelectElementManager({ deactivate });
+
+    await handler.handleDeactivateSelectElementMode({
+      data: { fromBackground: true, isExplicitDeactivation: true },
+    });
+
+    expect(deactivate).toHaveBeenCalledTimes(1);
+    expect(deactivate).toHaveBeenCalledWith({ fromBackground: true });
+  });
+
   it('leaves generic non-activation error responses unchanged', async () => {
     const technicalMessage = 'unrelated internal failure';
     handler.registerHandler('UNRELATED_ACTION', async () => {

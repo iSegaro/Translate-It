@@ -39,22 +39,6 @@ export class MainFrameCoordinator {
   }
 
   /**
-   * Broadcasts a deactivation signal to all child iframes.
-   */
-  broadcastDeactivation() {
-    const broadcastMessage = { 
-      type: 'DEACTIVATE_ALL_SELECT_MANAGERS', 
-      source: 'translate-it-main' 
-    };
-    
-    document.querySelectorAll('iframe').forEach(iframe => {
-      try {
-        iframe.contentWindow.postMessage(broadcastMessage, '*');
-      } catch { /* ignore cross-origin */ }
-    });
-  }
-
-  /**
    * Broadcasts a specific page translation action to all iframes.
    * @param {string} action - MessageAction constant.
    * @param {Object} data - Payload data.
@@ -246,21 +230,11 @@ export class MainFrameCoordinator {
   }
 
   /**
-   * Handles interaction-specific messages like deactivation, selection, and clicks.
+   * Handles interaction-specific messages like selection and clicks.
    * @param {Object} messageData - Data from the message event.
    */
   handleInteractionSignals(messageData) {
     if (!messageData) return;
-
-    // Deactivation request
-    if (messageData.type === 'translate-it-deactivate-select-element') {
-      if (window.selectElementManagerInstance) {
-        window.selectElementManagerInstance.deactivate({ 
-          fromIframe: true, 
-          reason: 'manual' 
-        }).catch(() => {});
-      }
-    }
 
     // Text selection detection (to show UI in main frame)
     if (messageData.type === 'TRANSLATE_IT_TEXT_SELECTION_DETECTED') {
@@ -287,11 +261,6 @@ export class MainFrameCoordinator {
    */
   setupBusSynchronizers() {
     if (!pageEventBus) return;
-
-    // Select Element deactivation sync
-    pageEventBus.on('select-mode-deactivated', () => {
-      this.broadcastDeactivation();
-    });
 
     // Page Translation start
     pageEventBus.on(this.MessageActions.PAGE_TRANSLATE, (options) => {
