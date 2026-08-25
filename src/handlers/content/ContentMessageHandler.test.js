@@ -146,6 +146,31 @@ describe('ContentMessageHandler iframe Select Element activation', () => {
     });
 
     await expect(handler.handlePageTranslate({ data: {} })).resolves.toBe(rejection);
+    expect(handler.pageTranslationManager.translatePage).toHaveBeenCalledWith({});
+  });
+
+  it('keeps restore and stop-auto commands on trusted runtime handlers', async () => {
+    const restorePage = vi.fn().mockResolvedValue({ success: true });
+    const stopAutoTranslation = vi.fn().mockResolvedValue({ success: true });
+    handler.setPageTranslationManager({ restorePage, stopAutoTranslation });
+
+    await expect(handler.handlePageRestore()).resolves.toEqual({ success: true });
+    await expect(handler.handlePageStopAuto()).resolves.toEqual({ success: true });
+
+    expect(restorePage).toHaveBeenCalledTimes(1);
+    expect(stopAutoTranslation).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps cancellation on trusted runtime translation handling', async () => {
+    const cancelTranslation = vi.fn().mockResolvedValue({ success: true });
+    handler.setPageTranslationManager({ cancelTranslation });
+
+    await expect(handler.handlePageTranslate({ data: { cancel: true } })).resolves.toEqual({
+      success: true,
+      cancelled: true,
+    });
+
+    expect(cancelTranslation).toHaveBeenCalledTimes(1);
   });
 
   it('preserves canonical details for thrown Page Translation failures', async () => {

@@ -122,26 +122,7 @@ export class PageTranslationEventManager {
       }
     });
 
-    // 2. Lifecycle Commands (Translate, Restore, Stop, Cancel)
-    bus.on(MessageActions.PAGE_TRANSLATE, (options) => {
-      this.manager.translatePage(options || {}).catch(err => {
-        this.logger.error('Failed to translate page from PageEventBus:', err);
-      });
-    });
-
-    bus.on(MessageActions.PAGE_RESTORE, () => {
-      this.manager.restorePage({ manual: true }).catch(() => {});
-    });
-
-    bus.on(MessageActions.PAGE_TRANSLATE_CANCELLED, () => {
-      this.manager.cancelTranslation({ manual: true });
-    });
-
-    bus.on(MessageActions.PAGE_TRANSLATE_STOP_AUTO, () => {
-      this.manager.stopAutoTranslation().catch(() => {});
-    });
-
-    // 3. Error Handling
+    // 2. Error Handling
     bus.on(MessageActions.PAGE_TRANSLATE_RESET_ERROR, (data) => {
       if (!data?.isInternal) this.manager.resetError();
     });
@@ -187,7 +168,7 @@ export class PageTranslationEventManager {
       if (displayError) this.logger.debug('Non-fatal page translation failure kept silent', displayError.type);
     });
 
-    // 4. Conflict Resolution
+    // 3. Conflict Resolution
     bus.on('STOP_CONFLICTING_FEATURES', (data) => {
       if ((this.manager.isTranslating || this.manager.isTranslated) && data?.source !== 'page-translation') {
         this.logger.info('Stopping/Restoring Page Translation due to conflicting feature:', data?.source);

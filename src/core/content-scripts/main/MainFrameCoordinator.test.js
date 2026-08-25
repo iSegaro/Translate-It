@@ -156,6 +156,33 @@ describe('MainFrameCoordinator Hover error normalization', () => {
     expect(aggregator.clearAll).not.toHaveBeenCalled();
   });
 
+  it('does not fan out page commands through iframe windows', () => {
+    const iframe = document.createElement('iframe');
+    document.body.appendChild(iframe);
+    const postMessageSpy = vi.spyOn(iframe.contentWindow, 'postMessage').mockImplementation(() => {});
+
+    try {
+      pageEventBus.emit(MessageActions.PAGE_TRANSLATE, { isAuto: false });
+      pageEventBus.emit(MessageActions.PAGE_RESTORE);
+      pageEventBus.emit(MessageActions.PAGE_TRANSLATE_STOP_AUTO);
+
+      expect(postMessageSpy).not.toHaveBeenCalled();
+      expect(aggregator.clearAll).not.toHaveBeenCalled();
+    } finally {
+      postMessageSpy.mockRestore();
+      iframe.remove();
+    }
+  });
+
+  it('clears aggregate state only after restore completes', () => {
+    pageEventBus.emit(MessageActions.PAGE_RESTORE);
+    expect(aggregator.clearAll).not.toHaveBeenCalled();
+
+    pageEventBus.emit(MessageActions.PAGE_RESTORE_COMPLETE, {});
+
+    expect(aggregator.clearAll).toHaveBeenCalledTimes(1);
+  });
+
   it('starts only main frame on accepted local START', () => {
     const data = { messageId: 'main-session', isAutoTranslating: false };
 

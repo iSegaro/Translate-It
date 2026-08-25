@@ -5,6 +5,7 @@ import { storageManager } from '@/shared/storage/core/StorageCore.js';
 import { sendRegularMessage } from '@/shared/messaging/core/UnifiedMessaging.js';
 import { ErrorHandler } from '@/shared/error-management/ErrorHandler.js';
 import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
+import { pageEventBus } from '@/core/PageEventBus.js';
 
 // Mock storageManager
 vi.mock('@/shared/storage/core/StorageCore.js', () => ({
@@ -95,22 +96,38 @@ describe('PageTranslationEventManager', () => {
 
   describe('PageEventBus Listeners', () => {
     it('should register event bus listeners', () => {
-      expect(mockBus.on).toHaveBeenCalledWith(MessageActions.PAGE_TRANSLATE, expect.any(Function));
-      expect(mockBus.on).toHaveBeenCalledWith(MessageActions.PAGE_RESTORE, expect.any(Function));
-      expect(mockBus.on).toHaveBeenCalledWith(MessageActions.PAGE_TRANSLATE_CANCELLED, expect.any(Function));
+      expect(mockBus.on).not.toHaveBeenCalledWith(MessageActions.PAGE_TRANSLATE, expect.any(Function));
+      expect(mockBus.on).not.toHaveBeenCalledWith(MessageActions.PAGE_RESTORE, expect.any(Function));
+      expect(mockBus.on).not.toHaveBeenCalledWith(MessageActions.PAGE_TRANSLATE_STOP_AUTO, expect.any(Function));
+      expect(mockBus.on).not.toHaveBeenCalledWith(MessageActions.PAGE_TRANSLATE_CANCELLED, expect.any(Function));
     });
 
-    it('should call translatePage when PAGE_TRANSLATE is received', () => {
-      const callback = mockBus.on.mock.calls.find(c => c[0] === MessageActions.PAGE_TRANSLATE)[1];
-      const options = { targetLanguage: 'en' };
-      callback(options);
-      expect(mockManager.translatePage).toHaveBeenCalledWith(options);
+    it('does not register state-changing command listeners', () => {
+      expect(mockManager.translatePage).not.toHaveBeenCalled();
+      expect(mockManager.restorePage).not.toHaveBeenCalled();
+      expect(mockManager.stopAutoTranslation).not.toHaveBeenCalled();
+      expect(mockManager.cancelTranslation).not.toHaveBeenCalled();
     });
 
-    it('should call restorePage when PAGE_RESTORE is received', () => {
-      const callback = mockBus.on.mock.calls.find(c => c[0] === MessageActions.PAGE_RESTORE)[1];
-      callback();
-      expect(mockManager.restorePage).toHaveBeenCalled();
+    it('ignores page-visible command CustomEvents', () => {
+      delete window._translateItPageTranslationListenersSet;
+      window.pageEventBus = pageEventBus;
+
+      new PageTranslationEventManager(mockManager);
+
+      for (const action of [
+        MessageActions.PAGE_TRANSLATE,
+        MessageActions.PAGE_RESTORE,
+        MessageActions.PAGE_TRANSLATE_STOP_AUTO,
+        MessageActions.PAGE_TRANSLATE_CANCELLED,
+      ]) {
+        window.dispatchEvent(new CustomEvent(action, { detail: {} }));
+      }
+
+      expect(mockManager.translatePage).not.toHaveBeenCalled();
+      expect(mockManager.restorePage).not.toHaveBeenCalled();
+      expect(mockManager.stopAutoTranslation).not.toHaveBeenCalled();
+      expect(mockManager.cancelTranslation).not.toHaveBeenCalled();
     });
 
     it('should forward progress events to background', () => {

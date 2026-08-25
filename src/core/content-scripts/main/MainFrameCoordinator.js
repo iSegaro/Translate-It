@@ -38,30 +38,6 @@ export class MainFrameCoordinator {
     this.setupBusSynchronizers();
   }
 
-  /**
-   * Broadcasts a specific page translation action to all iframes.
-   * @param {string} action - MessageAction constant.
-   * @param {Object} data - Payload data.
-   */
-  broadcastPageAction(action, data = {}) {
-    if (action === this.MessageActions.PAGE_RESTORE) {
-      this.aggregator.clearAll();
-    }
-
-    const broadcastMessage = { 
-      type: 'TRANSLATE_IT_PAGE_ACTION', 
-      source: 'translate-it-main',
-      action,
-      data
-    };
-
-    document.querySelectorAll('iframe').forEach(iframe => {
-      try {
-        iframe.contentWindow.postMessage(broadcastMessage, '*');
-      } catch { /* ignore cross-origin */ }
-    });
-  }
-
   _recordFrameStart(frameId, data = {}) {
     this.aggregator.updateFrameData(frameId, {
       ...data,
@@ -257,15 +233,10 @@ export class MainFrameCoordinator {
   }
 
   /**
-   * Synchronizes PageEventBus actions with cross-frame broadcasts.
+   * Synchronizes main-frame lifecycle events with aggregate state.
    */
   setupBusSynchronizers() {
     if (!pageEventBus) return;
-
-    // Page Translation start
-    pageEventBus.on(this.MessageActions.PAGE_TRANSLATE, (options) => {
-      this.broadcastPageAction(this.MessageActions.PAGE_TRANSLATE, options);
-    });
 
     // Page Translation start (Main Frame)
     pageEventBus.on(this.MessageActions.PAGE_TRANSLATE_START, (data) => {
@@ -336,11 +307,6 @@ export class MainFrameCoordinator {
       }
     });
 
-    // General commands to broadcast
-    pageEventBus.on(this.MessageActions.PAGE_RESTORE, () => {
-      this.broadcastPageAction(this.MessageActions.PAGE_RESTORE);
-    });
-
     // Page Restore complete - clear aggregator data
     pageEventBus.on(this.MessageActions.PAGE_RESTORE_COMPLETE, (data) => {
       if (!data.isAggregated) {
@@ -357,8 +323,5 @@ export class MainFrameCoordinator {
       }
     });
 
-    pageEventBus.on(this.MessageActions.PAGE_TRANSLATE_STOP_AUTO, () => {
-      this.broadcastPageAction(this.MessageActions.PAGE_TRANSLATE_STOP_AUTO);
-    });
   }
 }

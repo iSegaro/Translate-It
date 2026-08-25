@@ -79,7 +79,7 @@ if (!window.translateItContentScriptCore) {
       }
 
       // 8. INITIALIZE MESSAGE LISTENERS (Modular)
-      setupIFrameMessageListeners(contentScriptCore);
+      setupIFrameMessageListeners();
 
       if (process.env.NODE_ENV === 'development') {
         console.log('[IFrame] Lite mode initialized', window.location.href);
@@ -95,7 +95,7 @@ if (!window.translateItContentScriptCore) {
 /**
  * Encapsulated message listeners for subframes
  */
-async function setupIFrameMessageListeners(contentScriptCore) {
+function setupIFrameMessageListeners() {
   // --- CROSS-FRAME CLICK SYNC (IFRAME) ---
   window.addEventListener('message', (event) => {
     if (event.data?.type === 'translateit-activate-click-listeners') {
@@ -115,36 +115,15 @@ async function setupIFrameMessageListeners(contentScriptCore) {
     }
   });
 
-  // --- PAGE TRANSLATION COORDINATOR (IFRAME) ---
-  window.addEventListener('message', async (event) => {
-    if (event.data?.source === 'translate-it-main' && event.data?.type === 'TRANSLATE_IT_PAGE_ACTION') {
-      const { action, data } = event.data;
-      const { MessageActions } = await import('@/shared/messaging/core/MessageActions.js');
-      
-      const manager = await contentScriptCore.loadFeature('pageTranslation');
-      if (!manager) return;
-
-      switch (action) {
-        case MessageActions.PAGE_TRANSLATE:
-          if (!window._translateItProgressForwarderSet) {
-            setupProgressForwarder(window.pageEventBus);
-            window._translateItProgressForwarderSet = true;
-          }
-          manager.translatePage(data || {}).catch(() => {});
-          break;
-        case MessageActions.PAGE_RESTORE:
-          manager.restorePage({ manual: true }).catch(() => {});
-          break;
-        case MessageActions.PAGE_TRANSLATE_STOP_AUTO:
-          manager.stopAutoTranslation().catch(() => {});
-          break;
-      }
-    }
-  });
+  // Lifecycle forwarding remains active without page-visible command handling.
+  if (!window._translateItProgressForwarderSet) {
+    setupProgressForwarder(window.pageEventBus);
+    window._translateItProgressForwarderSet = true;
+  }
 }
 
 /**
- * Handles forwarding page translation progress to the top frame
+ * Handles forwarding page translation progress and completion to the top frame
  */
 async function setupProgressForwarder(bus) {
   if (!bus) return;
@@ -171,5 +150,4 @@ async function setupProgressForwarder(bus) {
 
   bus.on(MessageActions.PAGE_TRANSLATE_PROGRESS, (data) => forwardToTop('TRANSLATE_IT_PAGE_PROGRESS', data));
   bus.on(MessageActions.PAGE_TRANSLATE_COMPLETE, (data) => forwardToTop('TRANSLATE_IT_PAGE_COMPLETE', data));
-  bus.on(MessageActions.PAGE_AUTO_RESTORE_COMPLETE, (data) => forwardToTop('TRANSLATE_IT_PAGE_STOPPED', data));
 }
