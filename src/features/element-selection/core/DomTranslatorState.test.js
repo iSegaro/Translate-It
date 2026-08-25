@@ -38,7 +38,17 @@ describe('DomTranslatorState', () => {
   const createTranslationEntry = (element, nodes, sessionId = 'session') => ({
     element,
     sessionId,
-    originalTextNodesData: nodes.map(({ node, originalText }) => ({ node, originalText }))
+    originalTextNodesData: nodes.map((nodeData) => {
+      const snapshot = {
+        node: nodeData.node,
+        originalText: nodeData.originalText,
+        appliedText: nodeData.node.nodeValue,
+      };
+      if (Object.prototype.hasOwnProperty.call(nodeData, 'appliedText')) {
+        snapshot.appliedText = nodeData.appliedText;
+      }
+      return snapshot;
+    })
   });
 
   const appendTextNodes = (values) => {
@@ -82,7 +92,7 @@ describe('DomTranslatorState', () => {
       globalSelectElementState.translationHistory = [{
         element: container,
         originalTextNodesData: [
-          { node: textNode, originalText: 'Original Text' }
+          { node: textNode, originalText: 'Original Text', appliedText: 'Translated Text' }
         ]
       }];
 
@@ -142,7 +152,7 @@ describe('DomTranslatorState', () => {
         element: container,
         sessionId: 's_owner',
         originalTextNodesData: [
-          { node: textNode, originalText: 'Original' }
+          { node: textNode, originalText: 'Original', appliedText: 'Translated' }
         ]
       }];
 
@@ -352,14 +362,57 @@ describe('DomTranslatorState', () => {
       nodes[0].nodeValue = 'A';
       nodes[0].nodeValue = 'B';
       globalSelectElementState.translationHistory = [
-        createTranslationEntry(container, [{ node: nodes[0], originalText: 'Original' }], 'original'),
-        createTranslationEntry(container, [{ node: nodes[0], originalText: 'A' }], 'a'),
+        createTranslationEntry(container, [{ node: nodes[0], originalText: 'Original', appliedText: 'A' }], 'original'),
+        createTranslationEntry(container, [{ node: nodes[0], originalText: 'A', appliedText: 'B' }], 'a'),
       ];
 
       const count = await revertSelectElementTranslation();
 
       expect(count).toBe(2);
       expect(nodes[0].nodeValue).toBe('Original');
+      document.body.removeChild(container);
+    });
+
+    it('preserves external drift across repeated translation generations', async () => {
+      const { container, nodes } = appendTextNodes(['X']);
+      globalSelectElementState.translationHistory = [
+        createTranslationEntry(container, [{ node: nodes[0], originalText: 'A', appliedText: 'B' }], 'first'),
+        createTranslationEntry(container, [{ node: nodes[0], originalText: 'B', appliedText: 'C' }], 'second'),
+      ];
+
+      const count = await revertSelectElementTranslation();
+
+      expect(count).toBe(0);
+      expect(nodes[0].nodeValue).toBe('X');
+      expect(globalSelectElementState.translationHistory).toHaveLength(0);
+      document.body.removeChild(container);
+    });
+
+    it('restores only committed nodes in a partial translation', async () => {
+      const { container, nodes } = appendTextNodes(['Translated A', 'Original B']);
+      globalSelectElementState.translationHistory = [createTranslationEntry(container, [
+        { node: nodes[0], originalText: 'A', appliedText: 'Translated A' },
+        { node: nodes[1], originalText: 'B', appliedText: undefined },
+      ])];
+
+      const count = await revertSelectElementTranslation();
+
+      expect(count).toBe(1);
+      expect(nodes.map(node => node.nodeValue)).toEqual(['A', 'Original B']);
+      document.body.removeChild(container);
+    });
+
+    it('restores owned nodes without overwriting a drifted sibling', async () => {
+      const { container, nodes } = appendTextNodes(['Translated A', 'External B']);
+      globalSelectElementState.translationHistory = [createTranslationEntry(container, [
+        { node: nodes[0], originalText: 'A', appliedText: 'Translated A' },
+        { node: nodes[1], originalText: 'B', appliedText: 'Translated B' },
+      ])];
+
+      const count = await revertSelectElementTranslation();
+
+      expect(count).toBe(1);
+      expect(nodes.map(node => node.nodeValue)).toEqual(['A', 'External B']);
       document.body.removeChild(container);
     });
 
@@ -396,7 +449,7 @@ describe('DomTranslatorState', () => {
 
       globalSelectElementState.translationHistory = [{
         element: owner,
-        originalTextNodesData: [{ node: textNode, originalText: 'Original shadow text' }],
+        originalTextNodesData: [{ node: textNode, originalText: 'Original shadow text', appliedText: 'Translated shadow text' }],
         originalMetadataSnapshots: [{ element: owner, present: false, value: null }],
       }];
 
@@ -420,7 +473,7 @@ describe('DomTranslatorState', () => {
 
       globalSelectElementState.translationHistory = [{
         element: owner,
-        originalTextNodesData: [{ node: textNode, originalText: 'Original' }],
+        originalTextNodesData: [{ node: textNode, originalText: 'Original', appliedText: 'Translated' }],
         originalMetadataSnapshots: [{ element: owner, present: false, value: null }],
       }];
 
@@ -459,7 +512,7 @@ describe('DomTranslatorState', () => {
       document.body.removeChild(host);
     });
 
-    it('restores only connected captured shadow direction Elements', async () => {
+    it('skips auxiliary shadow restoration after captured text ownership is lost', async () => {
       const { restoreNodeDirectionState } = await import('@/utils/dom/DomDirectionManager.js');
       const host = document.createElement('x-host');
       const shadow = host.attachShadow({ mode: 'open' });
@@ -482,7 +535,7 @@ describe('DomTranslatorState', () => {
 
       await revertSelectElementTranslation();
 
-      expect(restoreNodeDirectionState).toHaveBeenCalledWith([]);
+      expect(restoreNodeDirectionState).not.toHaveBeenCalled();
       expect(replacement.hasAttribute('data-dir-original-saved')).toBe(true);
       document.body.removeChild(host);
     });
@@ -507,7 +560,7 @@ describe('DomTranslatorState', () => {
       });
       globalSelectElementState.translationHistory = [{
         element: host,
-        originalTextNodesData: [{ node: textNode, originalText: 'Original' }],
+        originalTextNodesData: [{ node: textNode, originalText: 'Original', appliedText: 'Translated' }],
         originalMetadataSnapshots: [
           { element: failingOwner, present: false, value: null },
           { element: owner, present: false, value: null },
@@ -539,16 +592,17 @@ describe('DomTranslatorState', () => {
       document.body.removeChild(container);
     });
 
-    it('restores captured source over connected external changes', async () => {
+    it('preserves connected external changes and consumes history', async () => {
       const { container, nodes } = appendTextNodes(['External change']);
       globalSelectElementState.translationHistory = [createTranslationEntry(container, [
-        { node: nodes[0], originalText: 'Captured source' },
+        { node: nodes[0], originalText: 'Captured source', appliedText: 'Translated source' },
       ])];
 
       const count = await revertSelectElementTranslation();
 
-      expect(count).toBe(1);
-      expect(nodes[0].nodeValue).toBe('Captured source');
+      expect(count).toBe(0);
+      expect(nodes[0].nodeValue).toBe('External change');
+      expect(globalSelectElementState.translationHistory).toHaveLength(0);
       document.body.removeChild(container);
     });
 

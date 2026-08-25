@@ -45,6 +45,8 @@ import { registryIdToName, isProviderType, ProviderTypes } from '@/features/tran
 import {
   globalSelectElementState,
   pruneDisconnectedSelectElementTranslations,
+  publishSelectElementTranslationOwnership,
+  removeSelectElementTranslation,
   revertSelectElementTranslation
 } from './DomTranslatorState.js';
 import { collectTextNodes, collectBlockGroups, generateElementId, extractContextMetadata } from './DomTranslatorUtils.js';
@@ -468,6 +470,10 @@ export class DomTranslatorAdapter extends ResourceTracker {
           for (const { nodeData, translatedText } of plan) {
             this._applyTranslationToNode(nodeData.node, translatedText, targetLanguage, element);
           }
+          this._publishCommittedOwnership(plan.map(({ nodeData }) => ({
+            node: nodeData.node,
+            appliedText: nodeData.node.nodeValue,
+          })));
           parent.applied = true;
           this._settleParentAcceptance(
             parent,
@@ -1026,6 +1032,9 @@ export class DomTranslatorAdapter extends ResourceTracker {
       const type = matchErrorToType(originalError);
       const isCancellation = type === ErrorTypes.USER_CANCELLED || type === ErrorTypes.TRANSLATION_CANCELLED;
       const outcome = getCurrentOutcome(isCancellation);
+      if (outcome.committedParentCount === 0) {
+        removeSelectElementTranslation(this.currentSessionId);
+      }
       const finalError = attachTranslationOutcome(originalError, outcome);
 
       if (!isCancellation) {
@@ -1210,6 +1219,17 @@ export class DomTranslatorAdapter extends ResourceTracker {
         throw new Error('Grouped translation became stale before acceptance');
       }
       reconstruction.transaction.finalize();
+      try {
+        this._publishCommittedOwnership(group.units.map(unit => ({
+          node: unit.node,
+          appliedText: unit.node.nodeValue,
+        })));
+      } catch (error) {
+        // Finalization has closed the reconstructor rollback window. Use the
+        // session snapshot fallback if ownership publication itself fails.
+        this._rollbackBlockGroup(this.currentSessionId, group.blockId);
+        throw error;
+      }
       group.applied = true;
       this._settleParentAcceptance(group, true, reconstruction.cleanResult, translationToken);
     } catch (error) {
@@ -1388,14 +1408,19 @@ export class DomTranslatorAdapter extends ResourceTracker {
       cancelled: Boolean(result?.cancelled),
     };
     if (!result?.success) {
-      if (result.cancelled) return {
-        success: false,
-        cancelled: true,
-        element,
-        committedParentCount,
-        totalParentCount,
-        translationOutcome,
-      };
+      if (result.cancelled) {
+        if (committedParentCount === 0) {
+          removeSelectElementTranslation(sessionId);
+        }
+        return {
+          success: false,
+          cancelled: true,
+          element,
+          committedParentCount,
+          totalParentCount,
+          translationOutcome,
+        };
+      }
       const error = attachTranslationOutcome(result.error || new Error('Translation failed'), translationOutcome);
       throw error;
     }
@@ -1405,6 +1430,7 @@ export class DomTranslatorAdapter extends ResourceTracker {
     if (committedParentCount === 0) {
       const error = new Error('No translation results were accepted');
       error.type = ErrorTypes.NO_ACCEPTED_TRANSLATION_RESULTS;
+      removeSelectElementTranslation(sessionId);
       return {
         success: false,
         error: attachTranslationOutcome(error, translationOutcome),
@@ -1591,6 +1617,7 @@ export class DomTranslatorAdapter extends ResourceTracker {
     pruneDisconnectedSelectElementTranslations();
     
     // Ensure absolute immutability of the rollback text node snapshots and register them
+    // appliedText is intentionally published only after a node commit succeeds.
     const frozenTextNodesData = originalTextNodesData
       ? originalTextNodesData.map(d => Object.freeze({
           node: d.node,
@@ -1658,6 +1685,13 @@ export class DomTranslatorAdapter extends ResourceTracker {
     
     globalSelectElementState.translationHistory.push(stateEntry);
     globalSelectElementState.currentTranslation = stateEntry; // IMPORTANT: Set current translation pointer
+  }
+
+  _publishCommittedOwnership(ownershipRecords) {
+    if (!this.currentSessionId) return;
+    if (!publishSelectElementTranslationOwnership(this.currentSessionId, ownershipRecords)) {
+      throw new Error('Select Element revert ownership publication failed');
+    }
   }
 
   _rollbackBlockGroup(sessionId, blockId) {

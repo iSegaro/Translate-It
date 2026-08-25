@@ -55,6 +55,77 @@ export function getSelectElementTranslationState() {
 }
 
 /**
+ * Publishes exact applied text for successfully committed nodes without
+ * mutating the immutable source snapshots captured before translation.
+ *
+ * @param {string} sessionId - Translation generation owner
+ * @param {Array<{node: Node, appliedText: string}>} ownershipRecords - Committed node values
+ * @returns {boolean} Whether ownership was published
+ */
+export function publishSelectElementTranslationOwnership(sessionId, ownershipRecords = []) {
+  if (!sessionId || !Array.isArray(ownershipRecords) || ownershipRecords.length === 0) return false;
+
+  const history = globalSelectElementState.translationHistory;
+  const historyIndex = history.findIndex(entry => entry.sessionId === sessionId);
+  if (historyIndex < 0) return false;
+
+  const ownershipByNode = new Map();
+  for (const record of ownershipRecords) {
+    if (!record?.node || typeof record.appliedText !== 'string') return false;
+    ownershipByNode.set(record.node, record.appliedText);
+  }
+
+  const entry = history[historyIndex];
+  const snapshots = Array.isArray(entry.originalTextNodesData) ? entry.originalTextNodesData : [];
+  const snapshotNodes = new Set(snapshots.map(snapshot => snapshot?.node));
+  if ([...ownershipByNode.keys()].some(node => !snapshotNodes.has(node))) return false;
+
+  const updatedSnapshots = snapshots.map(snapshot => {
+    if (!ownershipByNode.has(snapshot.node)) return snapshot;
+    return Object.freeze({
+      ...snapshot,
+      appliedText: ownershipByNode.get(snapshot.node),
+    });
+  });
+  const updatedEntry = {
+    ...entry,
+    originalTextNodesData: Object.freeze(updatedSnapshots),
+  };
+  const updatedHistory = history.slice();
+  updatedHistory[historyIndex] = updatedEntry;
+  globalSelectElementState.translationHistory = updatedHistory;
+
+  if (globalSelectElementState.currentTranslation?.sessionId === sessionId) {
+    globalSelectElementState.currentTranslation = updatedEntry;
+  }
+
+  return true;
+}
+
+/**
+ * Removes one translation generation and its session-scoped rollback snapshots.
+ *
+ * @param {string} sessionId - Translation generation owner
+ * @returns {boolean} Whether a history entry was removed
+ */
+export function removeSelectElementTranslation(sessionId) {
+  if (!sessionId) return false;
+
+  const history = globalSelectElementState.translationHistory;
+  const remainingHistory = history.filter(entry => entry.sessionId !== sessionId);
+  if (remainingHistory.length === history.length) return false;
+
+  globalSelectElementState.translationHistory = remainingHistory;
+  for (const key of globalSelectElementState.snapshots?.keys() || []) {
+    if (key.startsWith(`${sessionId}:`)) globalSelectElementState.snapshots.delete(key);
+  }
+  if (globalSelectElementState.currentTranslation?.sessionId === sessionId) {
+    globalSelectElementState.currentTranslation = remainingHistory.at(-1) || null;
+  }
+  return true;
+}
+
+/**
  * Releases revert records whose owning element is no longer connected.
  * Connected records remain available for explicit user revert.
  */
@@ -97,6 +168,7 @@ export async function revertSelectElementTranslation(targetSessionId = null) {
 
   const logger = getScopedLogger(LOG_COMPONENTS.ELEMENT_SELECTION, 'GlobalRevert');
   let revertedCount = 0;
+  const invalidatedNodes = new Set();
 
   const logRestoreFailure = (phase, error, details = {}) => {
     logger.error(`[Rollback] ${phase} failed`, { ...details, error });
@@ -127,9 +199,12 @@ export async function revertSelectElementTranslation(targetSessionId = null) {
       }
 
       // 1. Restore content - SURGICAL RESTORATION ONLY
+      let hasOwnedCurrentNode = false;
       if (originalTextNodesData && originalTextNodesData.length > 0) {
         let restoredNodes = 0;
-        for (const { node, originalText } of originalTextNodesData) {
+        for (const { node, originalText, appliedText } of originalTextNodesData) {
+          if (invalidatedNodes.has(node)) continue;
+
           // Verify the node still exists and is attached to the document
           let isAttached = false;
           try {
@@ -139,12 +214,26 @@ export async function revertSelectElementTranslation(targetSessionId = null) {
             continue;
           }
 
-          if (!isAttached) continue;
+          if (!isAttached) {
+            invalidatedNodes.add(node);
+            continue;
+          }
+
+          if (typeof appliedText !== 'string') continue;
+          if (node.nodeValue !== appliedText) {
+            invalidatedNodes.add(node);
+            logger.debug('Skipping externally changed translated node during revert', {
+              tagName: element?.tagName,
+            });
+            continue;
+          }
+          hasOwnedCurrentNode = true;
 
           try {
             node.nodeValue = originalText;
             restoredNodes++;
           } catch (error) {
+            invalidatedNodes.add(node);
             logRestoreFailure('Text restoration', error, { tagName: element?.tagName });
           }
         }
@@ -157,6 +246,20 @@ export async function revertSelectElementTranslation(targetSessionId = null) {
         }
       } else {
         logger.debug('Missing originalTextNodesData for surgical revert. Skipping content restoration.');
+      }
+
+      // Do not restore extension-owned metadata or direction when no captured
+      // node still belongs to this generation; page/framework state may own it.
+      if (originalTextNodesData?.length > 0 && !hasOwnedCurrentNode) {
+        logger.debug('Skipping auxiliary revert state after node ownership drift', {
+          tagName: element?.tagName,
+        });
+        try {
+          pageEventBus.emit('hide-translation', { element });
+        } catch (error) {
+          logRestoreFailure('Hide translation event', error, { tagName: element?.tagName });
+        }
+        continue;
       }
 
       // 2. Restore direction and styles

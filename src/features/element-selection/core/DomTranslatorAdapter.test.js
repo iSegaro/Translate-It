@@ -178,6 +178,9 @@ describe('DomTranslatorAdapter', () => {
 
       expect(result.success).toBe(true);
       expect(testElement.textContent).toContain('سلام');
+      const ownership = globalSelectElementState.translationHistory.at(-1).originalTextNodesData[0];
+      expect(ownership.appliedText).toBe(testElement.firstChild.nodeValue);
+      expect(Object.isFrozen(ownership)).toBe(true);
       expect(contentScriptIntegration.sendTranslationRequest).toHaveBeenCalledWith(
         expect.objectContaining({
           data: expect.objectContaining({
@@ -383,6 +386,7 @@ describe('DomTranslatorAdapter', () => {
       const result = await adapter.translateElement(testElement);
 
       expect(result).toMatchObject({ success: false, committedParentCount: 0 });
+      expect(globalSelectElementState.translationHistory).toHaveLength(0);
     });
 
     it('B: counts committed parent for accepted streaming result', async () => {
@@ -495,6 +499,8 @@ describe('DomTranslatorAdapter', () => {
         committedParentCount: 2,
         totalParentCount: 2,
       });
+      const ownership = globalSelectElementState.translationHistory.at(-1).originalTextNodesData;
+      expect(ownership.map(snapshot => snapshot.appliedText)).toEqual([first.nodeValue, second.nodeValue]);
     });
 
     it('reports PARTIAL_SUCCESS for direct 1 committed + 1 invalid parent', async () => {
@@ -522,6 +528,9 @@ describe('DomTranslatorAdapter', () => {
       });
       expect(first.nodeValue).toContain('Uno');
       expect(second.nodeValue).toBe('B');
+      const ownership = globalSelectElementState.translationHistory.at(-1).originalTextNodesData;
+      expect(ownership.find(snapshot => snapshot.node === first).appliedText).toBe(first.nodeValue);
+      expect(ownership.find(snapshot => snapshot.node === second).appliedText).toBeUndefined();
     });
 
     it('reports PARTIAL_SUCCESS when a direct parent receives no accepted result', async () => {
@@ -611,6 +620,8 @@ describe('DomTranslatorAdapter', () => {
         committedParentCount: 2,
         totalParentCount: 2,
       });
+      const ownership = globalSelectElementState.translationHistory.at(-1).originalTextNodesData;
+      expect(ownership.map(snapshot => snapshot.appliedText)).toEqual([first.nodeValue, second.nodeValue]);
     });
 
     it('marks grouped non-passthrough rejected content invalid and reports PARTIAL_SUCCESS', async () => {
@@ -677,6 +688,9 @@ describe('DomTranslatorAdapter', () => {
       applySpy.mockRestore();
       expect(first.nodeValue).toContain('Uno');
       expect(second.nodeValue).toBe('B');
+      const ownership = globalSelectElementState.translationHistory.at(-1).originalTextNodesData;
+      expect(ownership.find(snapshot => snapshot.node === first).appliedText).toBe(first.nodeValue);
+      expect(ownership.find(snapshot => snapshot.node === second).appliedText).toBeUndefined();
 
       const accepted = sendRegularMessage.mock.calls
         .map(([message]) => message?.data)
@@ -2056,9 +2070,21 @@ describe('DomTranslatorAdapter', () => {
         return { success: true, streaming: true };
       });
 
-      const result = await adapter.translateElement(testElement);
+      const translation = adapter.translateElement(testElement);
+      await vi.waitFor(() => expect(streamCallbacks).toBeDefined());
+      const cancelledSessionId = adapter.currentSessionId;
+      streamCallbacks.onStreamEnd({ cancelled: true });
+      const result = await translation;
+
       expect(result.success).toBe(false);
       expect(result.cancelled).toBe(true);
+      expect(result.committedParentCount).toBe(0);
+      expect(globalSelectElementState.translationHistory).not.toContain(
+        expect.objectContaining({ sessionId: cancelledSessionId })
+      );
+      expect([...globalSelectElementState.snapshots.keys()]
+        .some(key => key.startsWith(`${cancelledSessionId}:`))).toBe(false);
+      expect(globalSelectElementState.currentTranslation?.sessionId).not.toBe(cancelledSessionId);
     });
 
     it('should update effective target language if provided in stream', async () => {
@@ -2186,6 +2212,8 @@ describe('DomTranslatorAdapter', () => {
 
       await expect(translation).resolves.toMatchObject({ success: true, committedParentCount: 1 });
       expect(testElement.textContent).toContain('سلام');
+      expect(globalSelectElementState.translationHistory.at(-1).originalTextNodesData[0].appliedText)
+        .toBe(testElement.firstChild.nodeValue);
     });
 
     it('keeps committed parent when cancellation follows non-fatal update', async () => {
@@ -2207,6 +2235,13 @@ describe('DomTranslatorAdapter', () => {
       const result = await translation;
       expect(result).toMatchObject({ success: false, cancelled: true });
       expect(testElement.textContent).toContain('سلام');
+      const entry = globalSelectElementState.translationHistory.at(-1);
+      expect(entry).toBeDefined();
+      expect(entry.originalTextNodesData[0].appliedText).toBe(testElement.firstChild.nodeValue);
+
+      const { revertSelectElementTranslation } = await import('./DomTranslatorState.js');
+      await revertSelectElementTranslation(entry.sessionId);
+      expect(testElement.textContent).toBe('Hello');
     });
 
     it.each([
@@ -3614,6 +3649,10 @@ describe('DomTranslatorAdapter', () => {
     const secondElement = document.createElement('div');
     secondElement.textContent = 'World';
     document.body.appendChild(secondElement);
+    const { collectTextNodes } = await import('./DomTranslatorUtils.js');
+    collectTextNodes
+      .mockReturnValueOnce([{ node: testElement.firstChild, text: 'Hello', uid: 'n1', blockId: 'b1', role: 'div' }])
+      .mockReturnValueOnce([{ node: secondElement.firstChild, text: 'World', uid: 'n1', blockId: 'b1', role: 'div' }]);
     contentScriptIntegration.sendTranslationRequest.mockResolvedValue({
       success: true,
       streaming: false,
@@ -3656,6 +3695,11 @@ describe('DomTranslatorAdapter', () => {
       ],
       sessionId: 'shadow-state',
     });
+    adapter.currentSessionId = 'shadow-state';
+    adapter._publishCommittedOwnership([
+      { node: firstNode, appliedText: firstNode.nodeValue },
+      { node: secondNode, appliedText: secondNode.nodeValue },
+    ]);
     firstOwner.setAttribute('data-has-original', 'true');
     secondOwner.setAttribute('data-has-original', 'true');
 
