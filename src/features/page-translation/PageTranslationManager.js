@@ -107,6 +107,12 @@ export class PageTranslationManager extends ResourceTracker {
     // 1. Check for URL change - ALWAYS reset for a clean slate in SPAs
     if (this.currentUrl !== window.location.href) {
       this.resetLocalState();
+      if (this.abortController) {
+        this.abortController.abort();
+        this.abortController = null;
+      }
+      this.translationMessageId = null;
+      this.sessionContext = null;
       this.currentUrl = window.location.href;
       this.userRestoredOverride = false;
     }
@@ -115,21 +121,44 @@ export class PageTranslationManager extends ResourceTracker {
     if (!PageTranslationHelper.isSuitableForTranslation(this.logger)) return { success: false, reason: ActionReasons.NOT_SUITABLE };
 
     // Inject layout fixes to the host page
-    this._injectLayoutFix();
-
-    // Emit event to stop conflicting features (e.g., Select Element Mode)
-    pageEventBus.emit('STOP_CONFLICTING_FEATURES', { source: 'page-translation' });
-
-    this.isTranslating = true;
-    this.abortController = new AbortController();
-    this.translationMessageId = `page-translate-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
-    this.sessionContext = Symbol('translation-session');
-
-    // Reset scheduler for a fresh session
-    this.scheduler.reset();
+    const layoutBeforeAttempt = {
+      classActive: document.documentElement.classList.contains('ti-translation-active'),
+      styleActive: Boolean(document.getElementById('ti-translation-layout-fix')),
+    };
+    const attempt = {
+      controller: null,
+      messageId: null,
+      sessionContext: null,
+      url: window.location.href,
+      previousState: {
+        isTranslated: this.isTranslated,
+        isTranslating: this.isTranslating,
+        isAutoTranslating: this.isAutoTranslating,
+        layoutAlreadyActive: layoutBeforeAttempt.classActive || layoutBeforeAttempt.styleActive,
+        layoutOwnedByAcceptedState: (this.isTranslated || this.isTranslating)
+          && (layoutBeforeAttempt.classActive || layoutBeforeAttempt.styleActive),
+        abortController: this.abortController,
+        translationMessageId: this.translationMessageId,
+        sessionContext: this.sessionContext,
+      },
+    };
 
     try {
+      this._injectLayoutFix();
+
+      // Emit event to stop conflicting features (e.g., Select Element Mode)
+      pageEventBus.emit('STOP_CONFLICTING_FEATURES', { source: 'page-translation' });
+
+      this.isTranslating = true;
+      attempt.controller = new AbortController();
+      attempt.messageId = `page-translate-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+      attempt.sessionContext = Symbol('translation-session');
+      this.abortController = attempt.controller;
+      this.translationMessageId = attempt.messageId;
+      this.sessionContext = attempt.sessionContext;
+
       this.settings = await PageTranslationSettingsLoader.load(options);
+      if (!this._isCurrentPreStartAttempt(attempt)) return this._settleStalePreStartAttempt(attempt);
 
       // Token Usage Warning: AI and DeepL providers consume tokens/credits.
       // Whole Page Translation is very heavy, so we warn the user to avoid surprise costs.
@@ -146,20 +175,22 @@ export class PageTranslationManager extends ResourceTracker {
       // We show it even for auto-translation to ensure user is aware, but limited to 2 times total.
       if (isTokenHeavy) {
         const confirmed = await this._confirmTokenUsage(providerId, provider.displayName);
+        if (!this._isCurrentPreStartAttempt(attempt)) return this._settleStalePreStartAttempt(attempt);
         if (!confirmed) {
           this.logger.info('Page translation cancelled: User declined token usage');
-          this.isTranslating = false;
-          this.isAutoTranslating = false;
           if (options.isAuto) {
-            this.autoStartCancelledUrls.add(window.location.href);
+            this.autoStartCancelledUrls.add(attempt.url);
           }
+          this._cleanupFailedPreStartAttempt(attempt);
           return { success: false, reason: ActionReasons.USER_CANCELLED };
         }
       }
 
+      if (!this._isCurrentPreStartAttempt(attempt)) return this._settleStalePreStartAttempt(attempt);
+
       this._broadcastEvent(MessageActions.PAGE_TRANSLATE_START, { 
         url: this.currentUrl, 
-        messageId: this.translationMessageId,
+        messageId: attempt.messageId,
         isAutoTranslating: !!this.settings.autoTranslateOnDOMChanges
       });
       hasAcceptedStart = true;
@@ -168,6 +199,9 @@ export class PageTranslationManager extends ResourceTracker {
       this.isTranslating = true;
       this.isAutoTranslating = !!this.settings.autoTranslateOnDOMChanges;
 
+      // Reset only after admission so failed pre-START attempts cannot erase
+      // scheduler state belonging to a previously accepted auto-translation.
+      this.scheduler.reset();
       this.scheduler.setSettings(this.settings);
 
       // Update hover manager based on current settings
@@ -224,7 +258,7 @@ export class PageTranslationManager extends ResourceTracker {
           }
           return this.scheduler.enqueue(text, context, score, node);
         },
-        this.sessionContext
+        attempt.sessionContext
       );
       
       // CRITICAL: Translate only document.body to prevent scroll jumps and HEAD-tag interference.
@@ -236,7 +270,7 @@ export class PageTranslationManager extends ResourceTracker {
         const result = {
           success: true,
           url: this.currentUrl,
-          messageId: this.translationMessageId,
+          messageId: attempt.messageId,
           isAutoTranslating: false
         };
         this._settleSilentPostStart();
@@ -250,7 +284,7 @@ export class PageTranslationManager extends ResourceTracker {
       return { 
         success: true, 
         url: this.currentUrl, 
-        messageId: this.translationMessageId,
+        messageId: attempt.messageId,
         isAutoTranslating: this.isAutoTranslating 
       };
     } catch (error) {
@@ -259,20 +293,96 @@ export class PageTranslationManager extends ResourceTracker {
         if (hasAcceptedStart) {
           this._settleSilentPostStart();
         } else {
-          this.isTranslating = false;
-          this.isAutoTranslating = false;
+          this._cleanupFailedPreStartAttempt(attempt, {
+            restorePreviousState: this._canRestorePreStartState(attempt),
+          });
         }
         return { success: false, reason: ActionReasons.SILENT_ERROR };
       }
       
       this.logger.error('translatePage failed', error);
-      this.isTranslating = false;
-      this.isAutoTranslating = false;
+      if (!hasAcceptedStart) {
+        this._cleanupFailedPreStartAttempt(attempt, {
+          restorePreviousState: this._canRestorePreStartState(attempt),
+        });
+      } else {
+        this.isTranslating = false;
+        this.isAutoTranslating = false;
+      }
       this._broadcastEvent(MessageActions.PAGE_TRANSLATE_ERROR, {
         error: error.message,
         errorDetails: MessageFormat.serializeTranslationError(error)
       });
       throw error;
+    }
+  }
+
+  _isCurrentPreStartAttempt(attempt) {
+    return Boolean(
+      attempt?.controller
+      && !attempt.controller.signal.aborted
+      && this.abortController === attempt.controller
+      && this.translationMessageId === attempt.messageId
+      && this.sessionContext === attempt.sessionContext
+      && this.currentUrl === attempt.url
+      && window.location.href === attempt.url
+    );
+  }
+
+  _canRestorePreStartState(attempt) {
+    return this._isCurrentPreStartAttempt(attempt);
+  }
+
+  _settleStalePreStartAttempt(attempt) {
+    const isUserCancelled = attempt.controller?.signal?.reason === ActionReasons.USER_CANCELLED
+      || attempt.controller?.signal?.reason === 'user-cancelled';
+    this._cleanupFailedPreStartAttempt(attempt, {
+      restorePreviousState: this._canRestorePreStartState(attempt),
+    });
+    return {
+      success: false,
+      reason: isUserCancelled ? ActionReasons.USER_CANCELLED : ActionReasons.SILENT_ERROR,
+    };
+  }
+
+  _cleanupFailedPreStartAttempt(attempt, { restorePreviousState = true } = {}) {
+    if (!attempt) return;
+
+    const ownsController = !attempt.controller || this.abortController === attempt.controller;
+    const ownsMessageId = !attempt.messageId || this.translationMessageId === attempt.messageId;
+    const ownsSessionContext = !attempt.sessionContext || this.sessionContext === attempt.sessionContext;
+    const ownsAttemptState = ownsController && ownsMessageId && ownsSessionContext;
+
+    if (attempt.controller && !attempt.controller.signal.aborted) {
+      attempt.controller.abort();
+    }
+    if (ownsController && this.abortController === attempt.controller) {
+      this.abortController = null;
+    }
+    if (ownsMessageId && this.translationMessageId === attempt.messageId) {
+      this.translationMessageId = null;
+    }
+    if (ownsSessionContext && this.sessionContext === attempt.sessionContext) {
+      this.sessionContext = null;
+    }
+
+    if (ownsAttemptState) {
+      if (restorePreviousState) {
+        this.isTranslated = attempt.previousState.isTranslated;
+        this.isTranslating = attempt.previousState.isTranslating;
+        this.isAutoTranslating = attempt.previousState.isAutoTranslating;
+        this.abortController = attempt.previousState.abortController;
+        this.translationMessageId = attempt.previousState.translationMessageId;
+        this.sessionContext = attempt.previousState.sessionContext;
+      } else {
+        this.isTranslated = false;
+        this.isTranslating = false;
+        this.isAutoTranslating = false;
+      }
+
+      if (!restorePreviousState || !attempt.previousState.layoutOwnedByAcceptedState) {
+        this._removeLayoutFix();
+      }
     }
   }
 
@@ -320,7 +430,7 @@ export class PageTranslationManager extends ResourceTracker {
     if (options.manual) {
       this.userRestoredOverride = true;
     }
-    this._cleanupSession();
+    this._cleanupAdmittedSession();
     this._removeLayoutFix();
     try {
       // 0. Stop scroll tracker
@@ -418,7 +528,7 @@ export class PageTranslationManager extends ResourceTracker {
     this._isCancelling = true;
 
     try {
-      this._cleanupSession();
+      this._cleanupAdmittedSession();
       this.restorePage(options); // Use full restore for cancel
       
       if (this.abortController) {
@@ -450,44 +560,41 @@ export class PageTranslationManager extends ResourceTracker {
 
     this.logger.info(`Showing token usage warning for provider: ${providerName}`);
 
-    return new Promise((resolve) => {
-      (async () => {
-        const rawMessage = await getTranslationString('page_translation_token_warning');
-        const message = (rawMessage || 'The selected provider ({provider}) uses tokens/credits. Do you want to proceed?')
-          .replace('{provider}', providerName);
-        
-        const confirmLabel = await getTranslationString('page_translation_token_confirm');
-        const cancelLabel = await getTranslationString('page_translation_token_cancel');
-        const dontShowAgainLabel = await getTranslationString('dont_show_again');
+    const rawMessage = await getTranslationString('page_translation_token_warning');
+    const message = (rawMessage || 'The selected provider ({provider}) uses tokens/credits. Do you want to proceed?')
+      .replace('{provider}', providerName);
+    const confirmLabel = await getTranslationString('page_translation_token_confirm');
+    const cancelLabel = await getTranslationString('page_translation_token_cancel');
+    const dontShowAgainLabel = await getTranslationString('dont_show_again');
 
-        this.notificationManager.show(message, 'warning', Infinity, {
-          persistent: true,
-          hasCheckbox: true,
-          checkboxLabel: dontShowAgainLabel || "Don't show again",
-          actions: [
-            {
-              label: confirmLabel || 'Translate Anyway',
-              onClick: (dontShowAgain) => {
-                this.logger.info('User confirmed token usage', { dontShowAgain });
-                if (dontShowAgain) {
-                  storageManager.set({ WHOLE_PAGE_TOKEN_WARNING_HIDDEN: true });
-                }
-                resolve(true);
+    return new Promise((resolve) => {
+      this.notificationManager.show(message, 'warning', Infinity, {
+        persistent: true,
+        hasCheckbox: true,
+        checkboxLabel: dontShowAgainLabel || "Don't show again",
+        actions: [
+          {
+            label: confirmLabel || 'Translate Anyway',
+            onClick: (dontShowAgain) => {
+              this.logger.info('User confirmed token usage', { dontShowAgain });
+              if (dontShowAgain) {
+                storageManager.set({ WHOLE_PAGE_TOKEN_WARNING_HIDDEN: true });
               }
-            },
-            {
-              label: cancelLabel || 'Cancel',
-              onClick: (dontShowAgain) => {
-                this.logger.info('User cancelled translation due to token warning', { dontShowAgain });
-                if (dontShowAgain) {
-                  storageManager.set({ WHOLE_PAGE_TOKEN_WARNING_HIDDEN: true });
-                }
-                resolve(false);
-              }
+              resolve(true);
             }
-          ]
-        });
-      })();
+          },
+          {
+            label: cancelLabel || 'Cancel',
+            onClick: (dontShowAgain) => {
+              this.logger.info('User cancelled translation due to token warning', { dontShowAgain });
+              if (dontShowAgain) {
+                storageManager.set({ WHOLE_PAGE_TOKEN_WARNING_HIDDEN: true });
+              }
+              resolve(false);
+            }
+          }
+        ]
+      });
     });
   }
 
@@ -553,12 +660,21 @@ export class PageTranslationManager extends ResourceTracker {
 
   _cleanupSession() {
     if (this.translationMessageId) {
+      const sessionId = this.translationMessageId;
+      this.translationMessageId = null;
       sendRegularMessage({
         action: MessageActions.CANCEL_SESSION,
-        data: { sessionId: this.translationMessageId }
+        data: { sessionId }
       }).catch(() => {});
-      this.translationMessageId = null;
     }
+  }
+
+  _cleanupAdmittedSession() {
+    if (this.translationMessageId && this.translationMessageId !== this.scheduler.translationSessionId) {
+      this.translationMessageId = null;
+      return;
+    }
+    this._cleanupSession();
   }
 
   /**
