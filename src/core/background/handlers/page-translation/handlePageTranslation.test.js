@@ -60,8 +60,8 @@ vi.mock('@/core/tabPermissions.js', () => ({
 
 const sender = { tab: { id: 42 } };
 
-function setupFrames(frameResults) {
-  browser.tabs.query.mockResolvedValue([{ id: 42 }]);
+function setupFrames(frameResults, { activeTabId = 42 } = {}) {
+  browser.tabs.query.mockResolvedValue([{ id: activeTabId }]);
   tabPermissionChecker.checkTabAccess.mockResolvedValue({
     isAccessible: true,
   });
@@ -249,5 +249,127 @@ describe('handlePageTranslation response projection', () => {
       responses: [mainResponse],
     });
     expect(result.reason).toBeUndefined();
+  });
+});
+
+describe('handlePageTranslation target tab ownership', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it.each([
+    MessageActions.PAGE_TRANSLATE,
+    MessageActions.PAGE_RESTORE,
+    MessageActions.PAGE_TRANSLATE_GET_STATUS,
+    MessageActions.PAGE_TRANSLATE_STOP_AUTO,
+  ])('uses sender tab for %s instead of active tab', async (action) => {
+    setupFrames([
+      { frameId: 0, response: { success: true, isAggregated: action === MessageActions.PAGE_TRANSLATE_GET_STATUS } },
+      { frameId: 1, response: { success: true } },
+    ], { activeTabId: 20 });
+
+    const message = {
+      action,
+      tabId: 20,
+      ...(action === MessageActions.PAGE_TRANSLATE
+        ? { data: { cancel: true, tabId: 20 } }
+        : {}),
+    };
+    const result = await handlePageTranslation(message, { tab: { id: 10 } });
+
+    expect(result.success).toBe(true);
+    expect(browser.tabs.query).not.toHaveBeenCalled();
+    expect(tabPermissionChecker.checkTabAccess).toHaveBeenCalledWith(10);
+    expect(browser.webNavigation.getAllFrames).toHaveBeenCalledWith({ tabId: 10 });
+    expect(browser.tabs.sendMessage).toHaveBeenCalledTimes(2);
+    expect(browser.tabs.sendMessage.mock.calls.every(([tabId]) => tabId === 10)).toBe(true);
+    expect(browser.tabs.sendMessage.mock.calls.some(([tabId]) => tabId === 20)).toBe(false);
+  });
+
+  it.each([{}, { tab: null }])('preserves active-tab fallback without sender tab: %o', async (sender) => {
+    setupFrames([
+      { frameId: 0, response: { success: true } },
+      { frameId: 1, response: { success: true } },
+    ], { activeTabId: 20 });
+
+    const result = await handlePageTranslation(
+      { action: MessageActions.PAGE_TRANSLATE },
+      sender
+    );
+
+    expect(result.success).toBe(true);
+    expect(browser.tabs.query).toHaveBeenCalledWith({ active: true, currentWindow: true });
+    expect(tabPermissionChecker.checkTabAccess).toHaveBeenCalledWith(20);
+    expect(browser.webNavigation.getAllFrames).toHaveBeenCalledWith({ tabId: 20 });
+    expect(browser.tabs.sendMessage.mock.calls.every(([tabId]) => tabId === 20)).toBe(true);
+  });
+
+  it.each([
+    { tab: {} },
+    { tab: { id: null } },
+    { tab: { id: '10' } },
+    { tab: { id: Number.NaN } },
+    { tab: { id: 1.5 } },
+  ])('rejects malformed sender tab without active-tab fallback: %o', async (sender) => {
+    browser.tabs.query.mockResolvedValue([{ id: 20 }]);
+
+    const result = await handlePageTranslation(
+      { action: MessageActions.PAGE_TRANSLATE },
+      sender
+    );
+
+    expect(result).toEqual({ success: false, error: 'Invalid sender tab' });
+    expect(browser.tabs.query).not.toHaveBeenCalled();
+    expect(tabPermissionChecker.checkTabAccess).not.toHaveBeenCalled();
+    expect(browser.webNavigation.getAllFrames).not.toHaveBeenCalled();
+    expect(browser.tabs.sendMessage).not.toHaveBeenCalled();
+  });
+
+  it('reports restricted sender tab metadata without inspecting active tab', async () => {
+    setupFrames([{ frameId: 0, response: { success: true } }], { activeTabId: 20 });
+    tabPermissionChecker.checkTabAccess.mockResolvedValueOnce({
+      isAccessible: false,
+      errorMessage: 'Restricted tab',
+      fullUrl: 'about:blank',
+    });
+
+    const result = await handlePageTranslation(
+      { action: MessageActions.PAGE_TRANSLATE },
+      { tab: { id: 10 } }
+    );
+
+    expect(result).toEqual({
+      success: false,
+      message: 'Restricted tab',
+      isRestrictedPage: true,
+      tabId: 10,
+      tabUrl: 'about:blank',
+    });
+    expect(browser.tabs.query).not.toHaveBeenCalled();
+    expect(browser.webNavigation.getAllFrames).not.toHaveBeenCalled();
+    expect(browser.tabs.sendMessage).not.toHaveBeenCalled();
+  });
+
+  it('preserves status aggregation while targeting sender tab', async () => {
+    const aggregatedResponse = {
+      success: true,
+      isAggregated: true,
+      translatedCount: 4,
+    };
+    setupFrames([
+      { frameId: 0, response: aggregatedResponse },
+      { frameId: 1, response: { success: true, translatedCount: 2 } },
+    ], { activeTabId: 20 });
+
+    const result = await handlePageTranslation(
+      { action: MessageActions.PAGE_TRANSLATE_GET_STATUS },
+      { tab: { id: 10 } }
+    );
+
+    expect(result).toBe(aggregatedResponse);
+    expect(browser.tabs.query).not.toHaveBeenCalled();
+    expect(tabPermissionChecker.checkTabAccess).toHaveBeenCalledWith(10);
+    expect(browser.webNavigation.getAllFrames).toHaveBeenCalledWith({ tabId: 10 });
+    expect(browser.tabs.sendMessage.mock.calls.every(([tabId]) => tabId === 10)).toBe(true);
   });
 });

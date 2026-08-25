@@ -39,7 +39,7 @@ function projectPageTranslationFailure(response, responses) {
  */
 export async function handlePageTranslation(message, sender) {
   try {
-    const tabId = sender?.tab?.id;
+    const senderTabId = sender?.tab?.id;
 
     // Handle batch translation request via UnifiedTranslationService
     if (message.action === MessageActions.PAGE_TRANSLATE_BATCH) {
@@ -48,21 +48,21 @@ export async function handlePageTranslation(message, sender) {
 
     // Capture state change: Start Auto-Translation
     if (message.action === MessageActions.PAGE_TRANSLATE_COMPLETE && message.data?.isAutoTranslating) {
-      if (tabId) {
-        autoTranslateRegistry.set(tabId, { 
+      if (senderTabId) {
+        autoTranslateRegistry.set(senderTabId, { 
           active: true, 
           url: message.data.url,
           timestamp: Date.now()
         });
-        logger.debug(`Tab ${tabId} added to auto-translate registry`);
+        logger.debug(`Tab ${senderTabId} added to auto-translate registry`);
       }
     }
 
     // Capture state change: Stop/Restore Auto-Translation
     if (message.action === MessageActions.PAGE_RESTORE_COMPLETE || message.action === MessageActions.PAGE_AUTO_RESTORE_COMPLETE) {
-      if (tabId) {
-        autoTranslateRegistry.delete(tabId);
-        logger.debug(`Tab ${tabId} removed from auto-translate registry`);
+      if (senderTabId) {
+        autoTranslateRegistry.delete(senderTabId);
+        logger.debug(`Tab ${senderTabId} removed from auto-translate registry`);
       }
     }
 
@@ -162,22 +162,31 @@ export async function handlePageTranslation(message, sender) {
       return { success: false, error: 'Unknown page translation action' };
     }
 
-    // Get the active tab
-    const tabs = await browser.tabs.query({ active: true, currentWindow: true });
-    if (!tabs.length) {
-      return { success: false, error: 'No active tab found' };
+    const senderTab = sender?.tab;
+    let targetTabId;
+
+    if (senderTab !== undefined && senderTab !== null) {
+      if (!Number.isInteger(senderTab.id)) {
+        return { success: false, error: 'Invalid sender tab' };
+      }
+      targetTabId = senderTab.id;
+    } else {
+      // Extension UI callers without sender.tab retain active-tab behavior.
+      const tabs = await browser.tabs.query({ active: true, currentWindow: true });
+      if (!tabs.length) {
+        return { success: false, error: 'No active tab found' };
+      }
+      targetTabId = tabs[0].id;
     }
 
-    const tab = tabs[0];
-
-    const access = await tabPermissionChecker.checkTabAccess(tab.id);
+    const access = await tabPermissionChecker.checkTabAccess(targetTabId);
     if (!access.isAccessible) {
-      logger.debug(`Page translation blocked on restricted tab ${tab.id}: ${access.errorMessage}`);
+      logger.debug(`Page translation blocked on restricted tab ${targetTabId}: ${access.errorMessage}`);
       return {
         success: false,
         message: access.errorMessage,
         isRestrictedPage: true,
-        tabId: tab.id,
+        tabId: targetTabId,
         tabUrl: access.fullUrl,
       };
     }
@@ -186,7 +195,7 @@ export async function handlePageTranslation(message, sender) {
       // Get all frames in the tab to ensure we reach every part of the page (especially iframes)
       const hasWebNav = typeof browser !== 'undefined' && browser.webNavigation;
       let allFrames = hasWebNav 
-        ? await browser.webNavigation.getAllFrames({ tabId: tab.id }).catch(() => [{ frameId: 0 }])
+        ? await browser.webNavigation.getAllFrames({ tabId: targetTabId }).catch(() => [{ frameId: 0 }])
         : [{ frameId: 0 }];
       
       // Filter frames to skip common ad domains and non-content frames
@@ -203,7 +212,7 @@ export async function handlePageTranslation(message, sender) {
       if (message.action === MessageActions.PAGE_TRANSLATE_GET_STATUS) {
         const statusResponses = await Promise.all(
           allFrames.map(frame => 
-            browser.tabs.sendMessage(tab.id, message, { frameId: frame.frameId }).catch(() => null)
+            browser.tabs.sendMessage(targetTabId, message, { frameId: frame.frameId }).catch(() => null)
           )
         );
         
@@ -235,7 +244,7 @@ export async function handlePageTranslation(message, sender) {
       const frameResults = await Promise.all(
         allFrames.map(async (frame) => {
           try {
-            const response = await browser.tabs.sendMessage(tab.id, message, { frameId: frame.frameId });
+            const response = await browser.tabs.sendMessage(targetTabId, message, { frameId: frame.frameId });
             return { frameId: frame.frameId, response };
           } catch (err) {
             logger.debug(`Could not send to frame ${frame.frameId}:`, err.message);
