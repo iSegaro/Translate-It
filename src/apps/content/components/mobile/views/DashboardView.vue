@@ -183,7 +183,7 @@ import { useErrorHandler } from '@/composables/shared/useErrorHandler.js'
 import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js'
 import { findProviderById } from '@/features/translation/providers/ProviderManifest.js';
 import { MessageActions } from '@/shared/messaging/core/MessageActions.js'
-import { sendMessage } from '@/shared/messaging/core/UnifiedMessaging.js'
+import { sendMessage, sendRegularMessage } from '@/shared/messaging/core/UnifiedMessaging.js'
 import { WINDOWS_MANAGER_EVENTS } from '@/core/PageEventBus.js'
 import { SELECTION_EVENTS } from '@/features/text-selection/events/SelectionEvents.js'
 import { MOBILE_CONSTANTS } from '@/shared/constants/mobile.js'
@@ -212,6 +212,22 @@ const { handleError } = useErrorHandler();
 const pageEventBus = window.pageEventBus
 const tts = useTTSSmart();
 const exclusionChecker = ExclusionChecker.getInstance();
+
+const sendPageCommand = (message) => {
+  void sendRegularMessage(message, { returnFailureResponse: true })
+    .then((response) => {
+      if (response?.success === false) {
+        logger.debug('Page translation command rejected', response);
+      }
+    })
+    .catch((error) => {
+      if (ExtensionContextManager.isContextError(error)) {
+        ExtensionContextManager.handleContextError(error, 'mobile-dashboard:page-translation');
+      } else {
+        logger.error('Page translation command failed:', error);
+      }
+    });
+};
 
 const getProviderForMode = (mode) => {
   return settingsStore.settings.MODE_PROVIDERS?.[mode] || settingsStore.settings.TRANSLATION_API || 'googlev2';
@@ -281,7 +297,10 @@ const translatePage = (event) => {
     if (isCurrentlyTranslating) {
       mobileStore.navigate(MOBILE_CONSTANTS.VIEWS.PAGE_TRANSLATION);
     } else {
-      pageEventBus.emit(MessageActions.PAGE_TRANSLATE, { provider });
+      sendPageCommand({
+        action: MessageActions.PAGE_TRANSLATE,
+        data: { provider },
+      });
       mobileStore.navigate(MOBILE_CONSTANTS.VIEWS.PAGE_TRANSLATION);
 
       // Respect the auto-close setting

@@ -571,9 +571,15 @@ export class FeatureManager extends ResourceTracker {
                 }
                 if (!manager.userRestoredOverride && !manager.autoStartCancelledUrls?.has(newUrl)) {
                   logger.info('Auto-translate rule matched on SPA URL change. Triggering translation...');
-                  const { pageEventBus } = await import('@/core/PageEventBus.js');
                   const { MessageActions } = await import('@/shared/messaging/core/MessageActions.js');
-                  pageEventBus.emit(MessageActions.PAGE_TRANSLATE, { isAuto: true });
+                  const { sendRegularMessage } = await import('@/shared/messaging/core/UnifiedMessaging.js');
+                  const response = await sendRegularMessage({
+                    action: MessageActions.PAGE_TRANSLATE,
+                    data: { isAuto: true },
+                  }, { returnFailureResponse: true });
+                  if (response?.success === false) {
+                    logger.debug('SPA auto page translation command rejected', response);
+                  }
                 }
               }
             }

@@ -180,11 +180,13 @@ import { findProviderById } from '@/features/translation/providers/ProviderManif
 import { TranslationMode } from '@/shared/config/config.js'
 import { pageEventBus } from '@/core/PageEventBus.js'
 import { MessageActions } from '@/shared/messaging/core/MessageActions.js'
+import { sendRegularMessage } from '@/shared/messaging/core/UnifiedMessaging.js'
 import { MOBILE_CONSTANTS } from '@/shared/constants/mobile.js'
 import { getScopedLogger } from '@/shared/logging/logger.js'
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js'
 import PageTranslationStatus from '@/components/shared/PageTranslationStatus.vue'
 import { useAutoTranslateRules } from '@/features/page-translation/composables/useAutoTranslateRules.js'
+import ExtensionContextManager from '@/core/extensionContext.js'
 
 import wholePageIcon from '@/icons/ui/whole-page.png';
 import closeIcon from '@/icons/ui/close.png';
@@ -197,6 +199,22 @@ const { pageTranslationData } = storeToRefs(mobileStore)
 const { t } = useUnifiedI18n()
 const { handleError } = useErrorHandler();
 const logger = getScopedLogger(LOG_COMPONENTS.MOBILE, 'PageTranslationView')
+
+const sendPageCommand = (message) => {
+  void sendRegularMessage(message, { returnFailureResponse: true })
+    .then((response) => {
+      if (response?.success === false) {
+        logger.debug('Page translation command rejected', response);
+      }
+    })
+    .catch((error) => {
+      if (ExtensionContextManager.isContextError(error)) {
+        ExtensionContextManager.handleContextError(error, 'mobile-page-translation:command');
+      } else {
+        logger.error('Page translation command failed:', error);
+      }
+    });
+};
 
 const currentUrl = computed(() => (typeof window !== 'undefined' ? window.location.href : ''));
 
@@ -339,7 +357,10 @@ const startTranslation = () => {
     pageEventBus.emit(MessageActions.PAGE_TRANSLATE_RESET_ERROR);
   }
 
-  pageEventBus.emit(MessageActions.PAGE_TRANSLATE, { provider }); 
+  sendPageCommand({
+    action: MessageActions.PAGE_TRANSLATE,
+    data: { provider },
+  });
   if (settingsStore.settings.MOBILE_PAGE_TRANSLATION_AUTO_CLOSE) {
     mobileStore.closeSheet() 
   }
@@ -347,10 +368,10 @@ const startTranslation = () => {
 
 const stopAutoTranslation = () => { 
   logger.info('Stopping auto-translation from Mobile View');
-  pageEventBus.emit(MessageActions.PAGE_TRANSLATE_STOP_AUTO) 
+  sendPageCommand({ action: MessageActions.PAGE_TRANSLATE_STOP_AUTO });
 }
 const restorePage = () => { 
   logger.info('Restoring original page from Mobile View');
-  pageEventBus.emit(MessageActions.PAGE_RESTORE) 
+  sendPageCommand({ action: MessageActions.PAGE_RESTORE });
 }
 </script>

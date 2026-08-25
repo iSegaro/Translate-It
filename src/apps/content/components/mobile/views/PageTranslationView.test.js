@@ -4,6 +4,7 @@ import { reactive, ref } from 'vue'
 import PageTranslationView from './PageTranslationView.vue'
 import { pageEventBus } from '@/core/PageEventBus.js'
 import { MessageActions } from '@/shared/messaging/core/MessageActions.js'
+import { sendRegularMessage } from '@/shared/messaging/core/UnifiedMessaging.js'
 
 let mobileStore
 let settingsStore
@@ -41,6 +42,10 @@ vi.mock('@/core/PageEventBus.js', () => ({
   pageEventBus: { emit: vi.fn() },
 }))
 
+vi.mock('@/shared/messaging/core/UnifiedMessaging.js', () => ({
+  sendRegularMessage: vi.fn(),
+}))
+
 vi.mock('@/components/shared/PageTranslationStatus.vue', () => ({
   default: { template: '<span />' },
 }))
@@ -52,6 +57,7 @@ vi.mock('@/shared/logging/logger.js', () => ({
 describe('PageTranslationView retry action', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    sendRegularMessage.mockResolvedValue({ success: true })
     mobileStore = {
       pageTranslationData: ref({
         status: 'error',
@@ -105,13 +111,52 @@ describe('PageTranslationView retry action', () => {
     expect(wrapper.get('.ti-m-header-primary-btn').text()).toBe('Retry Translation')
   })
 
-  it('dispatches PAGE_TRANSLATE for zero-commit Retry', async () => {
+  it('sends PAGE_TRANSLATE through runtime for zero-commit Retry', async () => {
     mobileStore.pageTranslationData.value.canRetry = true
     const wrapper = mount(PageTranslationView)
 
     await wrapper.get('.ti-m-header-primary-btn').trigger('click')
 
-    expect(pageEventBus.emit).toHaveBeenCalledWith(MessageActions.PAGE_TRANSLATE, { provider: 'google' })
+    expect(sendRegularMessage).toHaveBeenCalledWith({
+      action: MessageActions.PAGE_TRANSLATE,
+      data: { provider: 'google' },
+    }, { returnFailureResponse: true })
+    expect(pageEventBus.emit).not.toHaveBeenCalledWith(
+      MessageActions.PAGE_TRANSLATE,
+      expect.anything(),
+    )
+  })
+
+  it('sends STOP_AUTO through runtime', async () => {
+    mobileStore.pageTranslationData.value = {
+      ...mobileStore.pageTranslationData.value,
+      status: 'translating',
+      isTranslating: true,
+    }
+    const wrapper = mount(PageTranslationView)
+
+    await wrapper.get('.ti-m-header-primary-btn').trigger('click')
+
+    expect(sendRegularMessage).toHaveBeenCalledWith({
+      action: MessageActions.PAGE_TRANSLATE_STOP_AUTO,
+    }, { returnFailureResponse: true })
+    expect(pageEventBus.emit).not.toHaveBeenCalledWith(MessageActions.PAGE_TRANSLATE_STOP_AUTO)
+  })
+
+  it('sends PAGE_RESTORE through runtime', async () => {
+    mobileStore.pageTranslationData.value = {
+      ...mobileStore.pageTranslationData.value,
+      status: 'completed',
+      isTranslated: true,
+    }
+    const wrapper = mount(PageTranslationView)
+
+    await wrapper.get('.ti-m-header-primary-btn').trigger('click')
+
+    expect(sendRegularMessage).toHaveBeenCalledWith({
+      action: MessageActions.PAGE_RESTORE,
+    }, { returnFailureResponse: true })
+    expect(pageEventBus.emit).not.toHaveBeenCalledWith(MessageActions.PAGE_RESTORE)
   })
 
   it('does not expose Retry for fatal partial output', () => {

@@ -178,8 +178,14 @@ async function initializeLogger(subComponent = 'Main') {
                         await manager.activate();
                       }
                       if (!manager.userRestoredOverride && !manager.autoStartCancelledUrls?.has(currentUrl)) {
-                        const { pageEventBus } = await import('@/core/PageEventBus.js');
-                        pageEventBus.emit(MessageActions.PAGE_TRANSLATE, { isAuto: true });
+                        const { sendRegularMessage } = await import('@/shared/messaging/core/UnifiedMessaging.js');
+                        const response = await sendRegularMessage({
+                          action: MessageActions.PAGE_TRANSLATE,
+                          data: { isAuto: true },
+                        }, { returnFailureResponse: true });
+                        if (response?.success === false) {
+                          scriptLogger.debug('Initial auto page translation command rejected', response);
+                        }
                       }
                     }
                   }
