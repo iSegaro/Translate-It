@@ -222,7 +222,11 @@ export async function sendMessage(message, options = {}) {
 
 export async function sendRegularMessage(message, options = {}) {
   if (!message) return null;
-  const { timeout: customTimeout, silent = false } = options;
+  const {
+    timeout: customTimeout,
+    silent = false,
+    returnFailureResponse = false,
+  } = options;
   const actionTimeout = customTimeout || getTimeoutForAction(message.action, message.context || message.data);
 
   try {
@@ -274,6 +278,8 @@ export async function sendRegularMessage(message, options = {}) {
       if (response.isRestrictedPage || (response.tabUrl && isRestrictedUrl(response.tabUrl))) {
         return response;
       }
+
+      if (returnFailureResponse && response.isTransportFailure !== true) return response;
 
       throw reconstructResponseError(response);
     }

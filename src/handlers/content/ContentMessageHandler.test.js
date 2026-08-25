@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ContentMessageHandler } from './ContentMessageHandler.js';
 import { TranslationMode } from '@/shared/config/config.js';
 import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
+import { ActionReasons } from '@/shared/messaging/core/MessagingConstants.js';
 import { applyTranslationToTextField } from '../smartTranslationIntegration.js';
 
 vi.mock('@/shared/logging/logger.js', () => ({
@@ -52,6 +53,7 @@ describe('ContentMessageHandler iframe Select Element activation', () => {
     handler = new ContentMessageHandler();
     handler.handlers.clear();
     handler.setSelectElementManager(null);
+    handler.setPageTranslationManager(null);
   });
 
   it('sanitizes direct iframe activation failures', async () => {
@@ -119,6 +121,70 @@ describe('ContentMessageHandler iframe Select Element activation', () => {
       success: false,
       error: technicalMessage,
     });
+  });
+
+  it('returns normal Page Translation admission rejection unchanged', async () => {
+    const rejection = {
+      success: false,
+      reason: ActionReasons.BUSY_OR_DONE,
+    };
+    handler.setPageTranslationManager({
+      isActive: true,
+      translatePage: vi.fn().mockResolvedValue(rejection),
+    });
+
+    await expect(handler.handlePageTranslate({ data: {} })).resolves.toBe(rejection);
+  });
+
+  it('preserves canonical details for thrown Page Translation failures', async () => {
+    const originalError = Object.assign(new Error('raw provider response'), {
+      type: ErrorTypes.NETWORK_ERROR,
+      originalType: ErrorTypes.HTTP_ERROR,
+      statusCode: 503,
+      context: 'page-translation',
+      providerName: 'Provider',
+      providerId: 'provider-id',
+      code: 'UPSTREAM_FAILURE',
+      errorCode: 'E_UPSTREAM',
+      operationAborted: false,
+      cancellationReason: 'user_action',
+      translationOutcome: { committedParentCount: 0 },
+    });
+    handler.setPageTranslationManager({
+      isActive: true,
+      translatePage: vi.fn().mockRejectedValue(originalError),
+    });
+    handler.errorHandler = {
+      getErrorForUI: vi.fn().mockResolvedValue({
+        message: 'Safe provider failure',
+        type: ErrorTypes.NETWORK_ERROR,
+      }),
+      handle: vi.fn().mockResolvedValue(undefined),
+    };
+
+    const response = await handler.handlePageTranslate({ data: {} });
+
+    expect(response).toMatchObject({
+      success: false,
+      error: 'Safe provider failure',
+      errorType: ErrorTypes.NETWORK_ERROR,
+      errorDetails: {
+        message: 'raw provider response',
+        type: ErrorTypes.NETWORK_ERROR,
+        originalType: ErrorTypes.HTTP_ERROR,
+        statusCode: 503,
+        context: 'page-translation',
+        providerName: 'Provider',
+        providerId: 'provider-id',
+        code: 'UPSTREAM_FAILURE',
+        errorCode: 'E_UPSTREAM',
+        operationAborted: false,
+        cancellationReason: 'user_action',
+        translationOutcome: { committedParentCount: 0 },
+      },
+    });
+    expect(response.errorDetails).not.toHaveProperty('cause');
+    expect(handler.errorHandler.handle).toHaveBeenCalledTimes(1);
   });
 
   it('sanitizes ordinary Field response failures before ErrorHandler', async () => {

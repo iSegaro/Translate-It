@@ -50,6 +50,7 @@ import { usePageTranslation } from './usePageTranslation.js';
 import { sendRegularMessage } from '@/shared/messaging/core/UnifiedMessaging.js';
 import { pageEventBus } from '@/core/PageEventBus.js';
 import { MessageActions } from '@/shared/messaging/core/MessageActions.js';
+import { ActionReasons } from '@/shared/messaging/core/MessagingConstants.js';
 import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
 import { onMounted } from 'vue';
 import browser from 'webextension-polyfill';
@@ -126,7 +127,9 @@ describe('usePageTranslation Composable', () => {
       expect(sendRegularMessage).toHaveBeenCalledWith(expect.objectContaining({
         action: MessageActions.PAGE_TRANSLATE,
         data: expect.objectContaining({ some: 'data' })
-      }));
+      }), {
+        returnFailureResponse: true,
+      });
       expect(isTranslated.value).toBe(false);
       expect(isAutoTranslating.value).toBe(false);
     });
@@ -181,7 +184,7 @@ describe('usePageTranslation Composable', () => {
   });
 
   describe('Admission ownership', () => {
-    it.each(['BUSY_OR_DONE', 'NOT_SUITABLE'])('preserves existing lifecycle state for %s rejection', async (reason) => {
+    it.each([ActionReasons.BUSY_OR_DONE, ActionReasons.NOT_SUITABLE])('preserves existing lifecycle state for %s rejection', async (reason) => {
       sendRegularMessage.mockImplementation(({ action }) => {
         if (action === MessageActions.PAGE_TRANSLATE_GET_STATUS) return Promise.resolve({ success: false });
         return Promise.resolve({ success: false, reason });
@@ -204,6 +207,47 @@ describe('usePageTranslation Composable', () => {
       expect(pageTranslation.failedCount.value).toBe(2);
       expect(pageTranslation.totalNodes.value).toBe(25);
       expect(pageTranslation.canRestore.value).toBe(true);
+    });
+
+    it.each([ActionReasons.USER_CANCELLED, ActionReasons.SILENT_ERROR])('keeps %s admission rejection silent', async (reason) => {
+      sendRegularMessage.mockImplementation(({ action }) => {
+        if (action === MessageActions.PAGE_TRANSLATE_GET_STATUS) return Promise.resolve({ success: false });
+        return Promise.resolve({ success: false, reason });
+      });
+
+      const pageTranslation = await createPageTranslation();
+      pageTranslation.isTranslated.value = true;
+      pageTranslation.isAutoTranslating.value = true;
+      pageTranslation.translatedCount.value = 20;
+
+      await pageTranslation.translatePage();
+
+      expect(pageTranslation.error.value).toBeNull();
+      expect(pageTranslation.message.value).toBe('');
+      expect(pageTranslation.isTranslated.value).toBe(true);
+      expect(pageTranslation.isAutoTranslating.value).toBe(true);
+    });
+
+    it('uses structured details for resolved domain failures', async () => {
+      sendRegularMessage.mockImplementation(({ action }) => {
+        if (action === MessageActions.PAGE_TRANSLATE_GET_STATUS) return Promise.resolve({ success: false });
+        return Promise.resolve({
+          success: false,
+          error: 'raw provider response',
+          errorType: ErrorTypes.NETWORK_ERROR,
+          errorDetails: {
+            message: 'raw canonical response',
+            type: ErrorTypes.NETWORK_ERROR,
+          },
+        });
+      });
+
+      const pageTranslation = await createPageTranslation();
+      await pageTranslation.translatePage();
+
+      expect(pageTranslation.error.value).toBeInstanceOf(Error);
+      expect(pageTranslation.error.value.message).not.toContain('raw provider response');
+      expect(pageTranslation.error.value.message).not.toContain('raw canonical response');
     });
 
     it('preserves lifecycle state when transport rejects', async () => {
@@ -316,7 +360,7 @@ describe('usePageTranslation Composable', () => {
     it('does not refresh status to repair a rejected request', async () => {
       sendRegularMessage.mockImplementation(({ action }) => {
         if (action === MessageActions.PAGE_TRANSLATE_GET_STATUS) return Promise.resolve({ success: false });
-        return Promise.resolve({ success: false, reason: 'BUSY_OR_DONE' });
+        return Promise.resolve({ success: false, reason: ActionReasons.BUSY_OR_DONE });
       });
 
       const pageTranslation = await createPageTranslation();

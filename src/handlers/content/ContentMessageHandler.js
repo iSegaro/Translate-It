@@ -1,5 +1,5 @@
 import { MessageActions } from '@/shared/messaging/core/MessageActions.js';
-import { MessagingContexts, reconstructTranslationError, isStructuredTranslationError } from '@/shared/messaging/core/MessagingCore.js';
+import { MessageFormat, MessagingContexts, reconstructTranslationError, isStructuredTranslationError } from '@/shared/messaging/core/MessagingCore.js';
 import { TranslationMode } from '@/shared/config/config.js';
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
@@ -742,7 +742,12 @@ export class ContentMessageHandler extends ResourceTracker {
         showToast: true
       });
 
-      return { success: false, error: errorInfo.message, errorType: errorInfo.type };
+      return {
+        success: false,
+        error: errorInfo.message,
+        errorType: errorInfo.type,
+        errorDetails: MessageFormat.serializeTranslationError(error),
+      };
     }
   }
 

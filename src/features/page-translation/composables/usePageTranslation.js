@@ -4,7 +4,7 @@
 import { ref, computed, onMounted, onUnmounted } from 'vue';
 import { sendRegularMessage } from '@/shared/messaging/core/UnifiedMessaging.js';
 import { MessageActions } from '@/shared/messaging/core/MessageActions.js';
-import { MessageContexts } from '@/shared/messaging/core/MessagingCore.js';
+import { ActionReasons, MessageContexts } from '@/shared/messaging/core/MessagingCore.js';
 import { pageEventBus } from '@/core/PageEventBus.js';
 import browser from 'webextension-polyfill';
 
@@ -120,10 +120,34 @@ export function usePageTranslation() {
           provider: syncedProvider // اضافه کردن پرووایدرِ همگام‌سازی شده
         },
         context: MessageContexts.PAGE_TRANSLATION_UI,
+      }, {
+        returnFailureResponse: true,
       });
 
       if (result?.isRestrictedPage) {
         applyRestrictedPageState(result);
+        return;
+      }
+
+      if (result?.success === false) {
+        if ([
+          ActionReasons.USER_CANCELLED,
+          ActionReasons.SILENT_ERROR,
+          ActionReasons.BUSY_OR_DONE,
+          ActionReasons.NOT_SUITABLE,
+        ].includes(result.reason)) {
+          return;
+        }
+
+        const displayError = await getPageTranslationErrorPresentation({
+          error: result.error || result.message,
+          errorDetails: result.errorDetails,
+          errorType: result.errorType,
+        });
+        if (!displayError) return;
+
+        error.value = displayError;
+        message.value = `Error: ${displayError.message}`;
         return;
       }
 

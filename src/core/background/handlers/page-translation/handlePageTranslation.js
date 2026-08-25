@@ -13,6 +13,27 @@ const logger = getScopedLogger(LOG_COMPONENTS.PAGE_TRANSLATION, 'handlePageTrans
 // Map<tabId, { targetLanguage: string, settings: object }>
 const autoTranslateRegistry = new Map();
 
+const PAGE_TRANSLATION_FAILURE_FIELDS = [
+  'reason',
+  'error',
+  'errorType',
+  'errorDetails',
+  'message',
+  'isRestrictedPage',
+  'tabId',
+  'tabUrl',
+];
+
+function projectPageTranslationFailure(response, responses) {
+  const projected = { success: false };
+
+  for (const field of PAGE_TRANSLATION_FAILURE_FIELDS) {
+    if (response[field] !== undefined) projected[field] = response[field];
+  }
+
+  return { ...projected, responses };
+}
+
 /**
  * Handle page translation related messages
  */
@@ -211,17 +232,41 @@ export async function handlePageTranslation(message, sender) {
       }
 
       // Forward TRANSLATE and RESTORE to all frames
-      const responses = await Promise.all(
-        allFrames.map(frame => 
-          browser.tabs.sendMessage(tab.id, message, { frameId: frame.frameId }).catch(err => {
+      const frameResults = await Promise.all(
+        allFrames.map(async (frame) => {
+          try {
+            const response = await browser.tabs.sendMessage(tab.id, message, { frameId: frame.frameId });
+            return { frameId: frame.frameId, response };
+          } catch (err) {
             logger.debug(`Could not send to frame ${frame.frameId}:`, err.message);
-            return null;
-          })
-        )
+            return { frameId: frame.frameId, response: null };
+          }
+        })
       );
 
-      const success = responses.some(r => r && r.success);
-      return { success, responses: responses.filter(Boolean) };
+      const responses = frameResults
+        .map(({ response }) => response)
+        .filter(response => response != null);
+      const success = responses.some(response => response.success);
+
+      if (message.action !== MessageActions.PAGE_TRANSLATE || success) {
+        return { success, responses };
+      }
+
+      const canonicalFailure = frameResults.find(({ frameId, response }) => (
+        frameId === 0 && response != null
+      ))?.response || frameResults.find(({ response }) => response != null)?.response;
+
+      if (canonicalFailure) {
+        return projectPageTranslationFailure(canonicalFailure, responses);
+      }
+
+      return {
+        success: false,
+        error: 'Content script not available',
+        isTransportFailure: true,
+        responses,
+      };
     } catch (sendError) {
       if (ExtensionContextManager.isContextError(sendError)) {
         ExtensionContextManager.handleContextError(sendError, 'page-translation-handler');

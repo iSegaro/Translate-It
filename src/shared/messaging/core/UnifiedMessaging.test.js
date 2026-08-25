@@ -129,6 +129,65 @@ describe('UnifiedMessaging', () => {
       await expect(sendRegularMessage(message)).rejects.toThrow('Something went wrong');
     });
 
+    it('returns resolved failure responses when explicitly requested', async () => {
+      const response = {
+        success: false,
+        reason: 'busy_or_done',
+        responses: [{ success: false, reason: 'busy_or_done' }],
+      };
+      browser.runtime.sendMessage.mockResolvedValue(response);
+
+      await expect(sendRegularMessage({ action: 'page-translate' }, {
+        returnFailureResponse: true,
+      })).resolves.toBe(response);
+    });
+
+    it('throws marked transport failures even when resolved failures are enabled', async () => {
+      const response = {
+        success: false,
+        error: 'Content script not available',
+        isTransportFailure: true,
+        responses: [],
+      };
+      browser.runtime.sendMessage.mockResolvedValue(response);
+
+      await expect(sendRegularMessage({ action: 'page-translate' }, {
+        returnFailureResponse: true,
+      })).rejects.toThrow('Content script not available');
+    });
+
+    it('does not swallow runtime rejection when resolved failures are enabled', async () => {
+      const runtimeError = new Error('Receiving end does not exist');
+      browser.runtime.sendMessage.mockRejectedValue(runtimeError);
+
+      await expect(sendRegularMessage({ action: 'page-translate' }, {
+        returnFailureResponse: true,
+      })).rejects.toBe(runtimeError);
+    });
+
+    it('does not swallow timeout when resolved failures are enabled', async () => {
+      browser.runtime.sendMessage.mockReturnValue(new Promise(() => {}));
+
+      const promise = sendRegularMessage({ action: 'page-translate' }, {
+        returnFailureResponse: true,
+        timeout: 100,
+      });
+      const expectation = expect(promise).rejects.toThrow(/timed out/);
+      await vi.advanceTimersByTimeAsync(150);
+
+      await expectation;
+    });
+
+    it('does not swallow invalid context when resolved failures are enabled', async () => {
+      contextCore.isValidSync.mockReturnValue(false);
+
+      await expect(sendRegularMessage({ action: 'page-translate' }, {
+        returnFailureResponse: true,
+      })).rejects.toMatchObject({
+        type: ErrorTypes.EXTENSION_CONTEXT_INVALIDATED,
+      });
+    });
+
     it('reconstructs canonical error identity and drops transport metadata', async () => {
       browser.runtime.sendMessage.mockResolvedValue({
         success: false,
