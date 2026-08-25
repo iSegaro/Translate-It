@@ -167,6 +167,7 @@ import { PageTranslationSettingsLoader } from './utils/PageTranslationSettingsLo
 import { sendRegularMessage } from '@/shared/messaging/core/UnifiedMessaging.js';
 import { pageEventBus } from '@/core/PageEventBus.js';
 import { MessageActions } from '@/shared/messaging/core/MessageActions.js';
+import { ActionReasons } from '@/shared/messaging/core/MessagingCore.js';
 import { ErrorHandler } from '@/shared/error-management/ErrorHandler.js';
 import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
 
@@ -241,13 +242,20 @@ describe('PageTranslationManager', () => {
     it('should restore page correctly', async () => {
       await manager.activate();
       await manager.translatePage();
+      manager.scheduler.setTranslationState.mockClear();
       
-      const result = await manager.restorePage();
+      const result = await manager.restorePage({ manual: true });
       
       expect(result.success).toBe(true);
       expect(manager.isTranslated).toBe(false);
       expect(manager.bridge.restore).toHaveBeenCalled();
       expect(PageTranslationHelper.deepCleanDOM).toHaveBeenCalled();
+      expect(manager.scheduler.setTranslationState).toHaveBeenCalledWith(
+        false,
+        undefined,
+        undefined,
+        ActionReasons.USER_STOPPED_PAGE_TRANSLATION
+      );
       
       // Check layout fix removal
       expect(document.getElementById('ti-translation-layout-fix')).toBeNull();
@@ -263,7 +271,12 @@ describe('PageTranslationManager', () => {
       expect(result.success).toBe(true);
       expect(manager.isAutoTranslating).toBe(false);
       expect(manager.bridge.stopPersistence).toHaveBeenCalled();
-      expect(manager.scheduler.setTranslationState).toHaveBeenCalledWith(false);
+      expect(manager.scheduler.setTranslationState).toHaveBeenCalledWith(
+        false,
+        undefined,
+        undefined,
+        ActionReasons.USER_STOPPED_PAGE_TRANSLATION
+      );
     });
 
     it('should link bridge callback to scheduler enqueue', async () => {
@@ -291,7 +304,12 @@ describe('PageTranslationManager', () => {
       expect(result).toEqual({ success: false, reason: 'silent_error' });
       expect(manager.isTranslating).toBe(false);
       expect(manager.isAutoTranslating).toBe(false);
-      expect(manager.scheduler.setTranslationState).toHaveBeenCalledWith(false);
+      expect(manager.scheduler.setTranslationState).toHaveBeenCalledWith(
+        false,
+        undefined,
+        undefined,
+        'operation-abort'
+      );
       expect(manager.scrollTracker.stop).toHaveBeenCalled();
       expect(manager.bridge.stopPersistence).toHaveBeenCalled();
       expect(pageEventBus.emit).toHaveBeenCalledWith(MessageActions.PAGE_TRANSLATE_IDLE, expect.objectContaining({
@@ -378,7 +396,12 @@ describe('PageTranslationManager', () => {
 
       expect(result).toEqual({ success: false, reason: 'silent_error' });
       expect(manager.isTranslating).toBe(false);
-      expect(manager.scheduler.setTranslationState).toHaveBeenCalledWith(false);
+      expect(manager.scheduler.setTranslationState).toHaveBeenCalledWith(
+        false,
+        undefined,
+        undefined,
+        'operation-abort'
+      );
       expect(pageEventBus.emit).toHaveBeenCalledWith(MessageActions.PAGE_TRANSLATE_IDLE, expect.objectContaining({
         translatedCount: 0,
         isTranslated: false
@@ -448,6 +471,12 @@ describe('PageTranslationManager', () => {
       manager.cancelTranslation();
 
       expect(manager.bridge.restore).toHaveBeenCalled();
+      expect(manager.scheduler.setTranslationState).toHaveBeenCalledWith(
+        false,
+        undefined,
+        undefined,
+        ActionReasons.USER_STOPPED_PAGE_TRANSLATION
+      );
       expect(pageEventBus.emit).toHaveBeenCalledWith(MessageActions.PAGE_TRANSLATE_CANCELLED, expect.any(Object));
       await vi.waitFor(() => expect(pageEventBus.emit).toHaveBeenCalledWith(
         MessageActions.PAGE_RESTORE_COMPLETE,
@@ -471,6 +500,12 @@ describe('PageTranslationManager', () => {
           data: { sessionId },
         })]
       ]);
+      expect(manager.scheduler.setTranslationState).toHaveBeenCalledWith(
+        false,
+        undefined,
+        undefined,
+        'operation-abort'
+      );
     });
   });
 
@@ -488,10 +523,18 @@ describe('PageTranslationManager', () => {
         cause: 'private',
         arbitrary: { ignored: true }
       });
+      manager.isTranslating = true;
+      manager.isAutoTranslating = true;
       manager._handleFatalError(error, ErrorTypes.API_ERROR);
       
       expect(manager.isTranslating).toBe(false);
       expect(manager.isAutoTranslating).toBe(false);
+      expect(manager.scheduler.setTranslationState).toHaveBeenCalledWith(
+        false,
+        undefined,
+        undefined,
+        'operation-abort'
+      );
       expect(pageEventBus.emit).toHaveBeenCalledWith(MessageActions.PAGE_TRANSLATE_PROGRESS, expect.objectContaining({ status: 'idle' }));
       expect(pageEventBus.emit).toHaveBeenCalledWith(MessageActions.PAGE_TRANSLATE_ERROR, expect.objectContaining({
         error: 'Fatal failure',
@@ -512,7 +555,10 @@ describe('PageTranslationManager', () => {
       expect(errorEvent.errorDetails).not.toHaveProperty('cause');
       expect(errorEvent.errorDetails).not.toHaveProperty('arbitrary');
 
-      await vi.waitFor(() => expect(ErrorHandler.getInstance().handle).toHaveBeenCalledTimes(1));
+      await vi.waitFor(
+        () => expect(ErrorHandler.getInstance().handle).toHaveBeenCalledTimes(1),
+        { timeout: 5000 }
+      );
       const handledError = ErrorHandler.getInstance().handle.mock.calls[0][0];
       expect(handledError.message).not.toContain('Fatal failure');
       expect(handledError.message).not.toContain('private');

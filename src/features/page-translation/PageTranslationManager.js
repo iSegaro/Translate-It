@@ -33,6 +33,8 @@ import NotificationManager from '@/core/managers/core/NotificationManager.js';
 import { PageTranslationSettingsLoader } from './utils/PageTranslationSettingsLoader.js';
 import { PageTranslationEventManager } from './utils/PageTranslationEventManager.js';
 
+const INTERNAL_CANCELLATION_REASON = 'operation-abort';
+
 export class PageTranslationManager extends ResourceTracker {
   constructor() {
     super('page-translation-manager');
@@ -397,7 +399,7 @@ export class PageTranslationManager extends ResourceTracker {
 
     this.scrollTracker.stop();
     this.bridge.stopPersistence();
-    this.scheduler.setTranslationState(false);
+    this.scheduler.setTranslationState(false, undefined, undefined, INTERNAL_CANCELLATION_REASON);
     if (this.abortController) {
       this.abortController.abort();
       this.abortController = null;
@@ -430,6 +432,8 @@ export class PageTranslationManager extends ResourceTracker {
     if (options.manual) {
       this.userRestoredOverride = true;
     }
+    const cancellationReason = options.cancellationReason
+      ?? (options.manual ? ActionReasons.USER_STOPPED_PAGE_TRANSLATION : INTERNAL_CANCELLATION_REASON);
     this._cleanupAdmittedSession();
     this._removeLayoutFix();
     try {
@@ -437,7 +441,7 @@ export class PageTranslationManager extends ResourceTracker {
       this.scrollTracker.stop();
 
       // 1. First stop batcher to prevent loop during library's restore
-      this.scheduler.setTranslationState(false);
+      this.scheduler.setTranslationState(false, undefined, undefined, cancellationReason);
       this.isTranslated = false;
       this.isAutoTranslating = false;
 
@@ -489,8 +493,10 @@ export class PageTranslationManager extends ResourceTracker {
 
   /**
    * Stop auto-translation (persistence) or current pass without restoring
+   * @param {Object} [options] - Stop provenance options
+   * @param {string} [options.cancellationReason] - Remote cancellation reason
    */
-  async stopAutoTranslation() {
+  async stopAutoTranslation({ cancellationReason = ActionReasons.USER_STOPPED_PAGE_TRANSLATION } = {}) {
     // Allow stopping if either we are in initial pass OR auto-translating changes
     if (!this.isAutoTranslating && !this.isTranslating) {
       return { success: false, reason: ActionReasons.NOT_AUTO_TRANSLATING };
@@ -506,7 +512,7 @@ export class PageTranslationManager extends ResourceTracker {
       this.isTranslated = this.scheduler.translatedCount > 0;
 
       // Stop the scheduler from processing more batches
-      this.scheduler.setTranslationState(false);
+      this.scheduler.setTranslationState(false, undefined, undefined, cancellationReason);
 
       const resultData = {
         url: this.currentUrl,
@@ -529,7 +535,10 @@ export class PageTranslationManager extends ResourceTracker {
 
     try {
       this._cleanupAdmittedSession();
-      this.restorePage(options); // Use full restore for cancel
+      this.restorePage({
+        ...options,
+        cancellationReason: options.cancellationReason ?? ActionReasons.USER_STOPPED_PAGE_TRANSLATION,
+      }); // Use full restore for cancel
       
       if (this.abortController) {
         this.abortController.abort();
@@ -614,7 +623,7 @@ export class PageTranslationManager extends ResourceTracker {
 
     // CRITICAL: Stop further translation without restoring the page.
     // We call this BEFORE resetting local flags to ensure its internal guards pass.
-    this.stopAutoTranslation().catch(err => {
+    this.stopAutoTranslation({ cancellationReason: INTERNAL_CANCELLATION_REASON }).catch(err => {
       this.logger.debug('stopAutoTranslation failed in fatal handler (expected if already stopped):', err);
     });
 
@@ -816,7 +825,7 @@ export class PageTranslationManager extends ResourceTracker {
   }
 
   async cleanup() {
-    this.cancelTranslation();
+    this.cancelTranslation({ cancellationReason: INTERNAL_CANCELLATION_REASON });
     if (this.isTranslated) await this.restorePage();
     this.isAutoTranslating = false;
     this.scrollTracker.destroy();

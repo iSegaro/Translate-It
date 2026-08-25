@@ -28,10 +28,10 @@ import { PageTranslationScheduler } from './PageTranslationScheduler.js';
 import { isFatalError, matchErrorToType } from '@/shared/error-management/ErrorMatcher.js';
 import { PageTranslationQueueFilter } from './utils/PageTranslationQueueFilter.js';
 import { PageTranslationFluidFilter } from './utils/PageTranslationFluidFilter.js';
-import { safeSendMessage } from '@/shared/messaging/core/UnifiedMessaging.js';
+import { safeSendMessage, sendRegularMessage } from '@/shared/messaging/core/UnifiedMessaging.js';
 import { pageEventBus } from '@/core/PageEventBus.js';
 import { MessageActions } from '@/shared/messaging/core/MessageActions.js';
-import { MessageFormat } from '@/shared/messaging/core/MessagingCore.js';
+import { ActionReasons, MessageFormat } from '@/shared/messaging/core/MessagingCore.js';
 import ExtensionContextManager from '@/core/extensionContext.js';
 
 // 3. Mock other dependencies
@@ -141,6 +141,93 @@ describe('PageTranslationScheduler', () => {
       
       scheduler.enqueue('High priority', null, 2); // score 2 > threshold 1
       expect(scheduler.highPriorityCount).toBe(1);
+    });
+  });
+
+  describe('Cancellation Provenance', () => {
+    const getCancelMessage = () => sendRegularMessage.mock.calls
+      .map(([message]) => message)
+      .find(message => message.action === MessageActions.CANCEL_TRANSLATION);
+
+    it('uses internal provenance for default stop', () => {
+      sendRegularMessage.mockClear();
+
+      scheduler.stop();
+
+      expect(getCancelMessage()).toMatchObject({
+        action: MessageActions.CANCEL_TRANSLATION,
+        data: {
+          cancelAll: true,
+          context: 'page-translation-batch',
+          sessionId: 'test-session-123',
+          reason: 'operation-abort',
+        },
+      });
+    });
+
+    it('preserves explicit user provenance', () => {
+      sendRegularMessage.mockClear();
+
+      scheduler.stop('cancelled', ActionReasons.USER_STOPPED_PAGE_TRANSLATION);
+
+      expect(getCancelMessage()?.data.reason).toBe(ActionReasons.USER_STOPPED_PAGE_TRANSLATION);
+    });
+
+    it('uses internal provenance for outer infrastructure failure', () => {
+      const item = { text: 'Infrastructure failure', resolve: vi.fn(), score: 1 };
+      const error = Object.assign(new Error('infrastructure failure'), { type: 'NETWORK_ERROR' });
+      scheduler.queue.push(item);
+      scheduler.totalTasks = 1;
+      sendRegularMessage.mockClear();
+
+      expect(scheduler._handleOuterFlushFailure(error, 'test-session-123', scheduler.sessionContext)).toBe(true);
+      expect(getSettlement(item.resolve).state).toBe('failed');
+      expect(scheduler.failedCount).toBe(1);
+      expect(getCancelMessage()?.data.reason).toBe('operation-abort');
+      expect(pageEventBus.emit).toHaveBeenCalledWith('page-translation-fatal-error', expect.objectContaining({
+        error,
+        errorType: 'NETWORK_ERROR',
+      }));
+    });
+
+    it('uses internal provenance for context invalidation', () => {
+      const item = { text: 'Context failure', resolve: vi.fn(), score: 1 };
+      const error = Object.assign(new Error('context invalidated'), { type: 'EXTENSION_CONTEXT_INVALIDATED' });
+      scheduler.queue.push(item);
+      scheduler.totalTasks = 1;
+      ExtensionContextManager.isContextError.mockReturnValueOnce(true);
+      sendRegularMessage.mockClear();
+
+      expect(scheduler._handleOuterFlushFailure(error, 'test-session-123', scheduler.sessionContext)).toBe(true);
+      expect(getSettlement(item.resolve).state).toBe('cancelled');
+      expect(scheduler.failedCount).toBe(0);
+      expect(getCancelMessage()?.data.reason).toBe('operation-abort');
+      expect(pageEventBus.emit).toHaveBeenCalledWith('page-translation-fatal-error', expect.objectContaining({
+        error,
+        errorType: 'EXTENSION_CONTEXT_INVALIDATED',
+      }));
+    });
+
+    it('uses internal provenance for reset session replacement', () => {
+      sendRegularMessage.mockClear();
+
+      scheduler.reset();
+
+      expect(getCancelMessage()?.data).toMatchObject({
+        sessionId: 'test-session-123',
+        reason: 'operation-abort',
+      });
+      expect(scheduler.translationSessionId).toBeNull();
+    });
+
+    it('does not send remote cancellation without an active session', () => {
+      scheduler.isTranslated = false;
+      scheduler.translationSessionId = null;
+      sendRegularMessage.mockClear();
+
+      scheduler.stop();
+
+      expect(sendRegularMessage).not.toHaveBeenCalled();
     });
   });
 

@@ -1,5 +1,5 @@
 import { MessageActions } from '@/shared/messaging/core/MessageActions.js';
-import { MessageFormat, MessageContexts, ActionReasons, reconstructTranslationError } from '@/shared/messaging/core/MessagingCore.js';
+import { MessageFormat, MessageContexts, reconstructTranslationError } from '@/shared/messaging/core/MessagingCore.js';
 import { TranslationMode } from '@/shared/config/config.js';
 import { 
   getTranslationApiAsync, 
@@ -22,6 +22,8 @@ import { PageTranslationFluidFilter } from './utils/PageTranslationFluidFilter.j
 import ResourceTracker from '@/core/memory/ResourceTracker.js';
 import { sendRegularMessage, safeSendMessage } from '@/shared/messaging/core/UnifiedMessaging.js';
 import { registryIdToName, isProviderType, ProviderTypes } from '@/features/translation/providers/ProviderConstants.js';
+
+const INTERNAL_CANCELLATION_REASON = 'operation-abort';
 
 /**
  * PageTranslationScheduler - Optimized translation scheduler inspired by AnyLang.
@@ -79,9 +81,9 @@ export class PageTranslationScheduler extends ResourceTracker {
     this.settings = { ...this.settings, ...settings };
   }
 
-  setTranslationState(isTranslated, sessionId, sessionContext = null) {
+  setTranslationState(isTranslated, sessionId, sessionContext = null, cancellationReason) {
     if (!isTranslated) {
-      this.stop();
+      this.stop('cancelled', cancellationReason);
     } else {
       this.isTranslated = isTranslated;
       this.translationSessionId = sessionId;
@@ -105,7 +107,7 @@ export class PageTranslationScheduler extends ResourceTracker {
     this._nextContextId = 1;
   }
 
-  stop(settlementOutcome = 'cancelled') {
+  stop(settlementOutcome = 'cancelled', cancellationReason = INTERNAL_CANCELLATION_REASON) {
     const wasTranslating = this.isTranslated;
     this.isTranslated = false;
     this.sessionContext = null;
@@ -123,7 +125,7 @@ export class PageTranslationScheduler extends ResourceTracker {
           cancelAll: true,
           context: MessageContexts.PAGE_TRANSLATION_BATCH,
           sessionId: this.translationSessionId,
-          reason: ActionReasons.USER_STOPPED_PAGE_TRANSLATION
+          reason: cancellationReason
         }
       }).then(response => {
         this.logger.debug('[Scheduler] Cancel signal acknowledged by background:', response);
@@ -483,7 +485,10 @@ export class PageTranslationScheduler extends ResourceTracker {
 
     this.fatalErrorOccurred = true;
     const isContextError = ExtensionContextManager.isContextError(error);
-    this.stop(isContextError ? 'cancelled' : 'failed');
+    this.stop(
+      isContextError ? 'cancelled' : 'failed',
+      INTERNAL_CANCELLATION_REASON
+    );
 
     pageEventBus.emit('page-translation-fatal-error', {
       error,
