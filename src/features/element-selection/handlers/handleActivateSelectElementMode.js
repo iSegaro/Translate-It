@@ -90,12 +90,17 @@ export async function handleActivateSelectElementMode(message, sender) {
     
     logger.debug(`Sending ${action} to tab ${targetTabId} with mode: ${modeForContentScript}`);
     
+    const contentData = typeof message.data === 'object' && message.data !== null
+      ? { ...message.data }
+      : {};
+    delete contentData.activate;
+
     const contentMessage = MessageFormat.create(
       action,
       {
+        ...contentData,
         mode: modeForContentScript,
-        activate: isActivating,
-        ...(typeof message.data === 'object' ? message.data : {})
+        active: isActivating,
       },
       MessagingContexts.CONTENT // Context for content script
     );
@@ -132,38 +137,22 @@ export async function handleActivateSelectElementMode(message, sender) {
     
     // Handle different response types from content script
     if (response === false) {
-      // Content script returned false - legacy behavior
-      logger.debug(`Tab ${targetTabId} returned false - legacy response`, {
+      // A false response means content did not confirm the requested state.
+      logger.debug(`Tab ${targetTabId} returned false without confirming Select Element state`, {
         tabId: targetTabId,
         url: access.fullUrl.substring(0, 80) + (access.fullUrl.length > 80 ? '...' : ''),
         isRestrictedByUrl: access.isRestricted,
         isAccessible: access.isAccessible
       });
-      
-      // If tab is accessible but returned false, it's likely a legacy content script
-      // In this case, treat false as success for backwards compatibility
-      if (access.isAccessible && !access.isRestricted) {
-        logger.debug(`Tab ${targetTabId} is accessible, treating false as success`);
-        return {
-          success: true,
-          message: isActivating ? "Select Element mode activated" : "Select Element mode deactivated",
-          tabId: targetTabId,
-          activated: isActivating,
-          isLegacyResponse: true,
-          tabUrl: access.fullUrl
-        };
-      } else {
-        // Tab is actually restricted
-        return {
-          success: false,
-          message: 'Feature not available on this page',
-          tabId: targetTabId,
-          activated: false,
-          isRestrictedPage: access.isRestricted,
-          isLegacyResponse: true,
-          tabUrl: access.fullUrl
-        };
-      }
+      return {
+        success: false,
+        message: 'Content script did not confirm Select Element state',
+        tabId: targetTabId,
+        activated: false,
+        isLegacyResponse: true,
+        isRestrictedPage: access.isRestricted,
+        tabUrl: access.fullUrl
+      };
     }
     
     // Handle structured error response from content script
@@ -195,11 +184,22 @@ export async function handleActivateSelectElementMode(message, sender) {
       };
     }
     
-    // Check for successful responses (true, {success: true}, {handled: true}, etc.)
-    const wasSuccessful = response === true || 
-                         (response && response.success === true) || 
-                         (response && response.handled === true) ||
-                         (response && typeof response === 'object' && response.activated === true);
+    const hasExplicitActivationState = response
+      && typeof response === 'object'
+      && typeof response.activated === 'boolean';
+    const reportedActive = hasExplicitActivationState ? response.activated : null;
+
+    // Activation is successful only after content confirms the requested state.
+    // Bare true remains supported for legacy content scripts.
+    const wasSuccessful = response === true || (
+      hasExplicitActivationState
+      && response.success !== false
+      && reportedActive === isActivating
+    );
+
+    if (hasExplicitActivationState && reportedActive === false && response.success !== false) {
+      setStateForTab(targetTabId, false);
+    }
     
     if (!wasSuccessful) {
       // Only treat as communication failure if response is undefined/null or indicates actual failure
@@ -212,7 +212,9 @@ export async function handleActivateSelectElementMode(message, sender) {
       
       return { 
         success: false, 
-        message: 'Tab is not accessible - try refreshing the page',
+         message: isActivating
+           ? 'Content script did not confirm Select Element activation'
+           : 'Content script did not confirm Select Element deactivation',
         tabId: targetTabId,
         activated: false,
         isRestrictedPage: access.isRestricted,

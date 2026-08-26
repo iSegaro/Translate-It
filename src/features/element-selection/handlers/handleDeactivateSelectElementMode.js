@@ -33,7 +33,7 @@ export async function handleDeactivateSelectElementMode(message, sender) {
         MessageActions.DEACTIVATE_SELECT_ELEMENT_MODE,
         {
           mode: 'normal',
-          activate: false,
+          active: false,
           fromBackground: true,
           // Mark this as an explicit deactivation request
           isExplicitDeactivation: true

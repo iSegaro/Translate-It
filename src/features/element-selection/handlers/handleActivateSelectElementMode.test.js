@@ -76,8 +76,10 @@ describe('handleActivateSelectElementMode', () => {
 
     expect(response.success).toBe(true);
     expect(browser.tabs.sendMessage).toHaveBeenCalledWith(1, expect.objectContaining({
-      action: 'ACTIVATE_SELECT_ELEMENT_MODE'
+      action: 'ACTIVATE_SELECT_ELEMENT_MODE',
+      data: expect.objectContaining({ active: true })
     }));
+    expect(browser.tabs.sendMessage.mock.calls[0][1].data).not.toHaveProperty('activate');
     expect(setStateForTab).toHaveBeenCalledWith(1, true);
   });
 
@@ -137,9 +139,9 @@ describe('handleActivateSelectElementMode', () => {
     const message = { data: { tabId: 1, active: true } };
     const response = await handleActivateSelectElementMode(message, {});
 
-    // For accessible pages, false is treated as success for legacy reasons
-    expect(response.success).toBe(true);
+    expect(response.success).toBe(false);
     expect(response.isLegacyResponse).toBe(true);
+    expect(setStateForTab).not.toHaveBeenCalledWith(1, true);
   });
 
   it('should handle structured error response from content script', async () => {
@@ -185,6 +187,7 @@ describe('handleActivateSelectElementMode', () => {
 
   it('should deactivate mode', async () => {
     const message = { data: { tabId: 1, active: false } };
+    browser.tabs.sendMessage.mockResolvedValueOnce({ success: true, activated: false });
     const response = await handleActivateSelectElementMode(message, {});
 
     expect(response.success).toBe(true);
@@ -192,5 +195,31 @@ describe('handleActivateSelectElementMode', () => {
       action: 'DEACTIVATE_SELECT_ELEMENT_MODE'
     }));
     expect(setStateForTab).toHaveBeenCalledWith(1, false);
+  });
+
+  it('should keep background state inactive when content confirms activation=false', async () => {
+    browser.tabs.sendMessage.mockResolvedValueOnce({ success: true, activated: false });
+
+    const response = await handleActivateSelectElementMode(
+      { data: { tabId: 1, active: true } },
+      {},
+    );
+
+    expect(response.success).toBe(false);
+    expect(response.activated).toBe(false);
+    expect(setStateForTab).toHaveBeenCalledWith(1, false);
+    expect(setStateForTab).not.toHaveBeenCalledWith(1, true);
+  });
+
+  it('should reject an activation response without confirmed state', async () => {
+    browser.tabs.sendMessage.mockResolvedValueOnce({ success: true });
+
+    const response = await handleActivateSelectElementMode(
+      { data: { tabId: 1, active: true } },
+      {},
+    );
+
+    expect(response.success).toBe(false);
+    expect(setStateForTab).not.toHaveBeenCalledWith(1, true);
   });
 });

@@ -316,13 +316,26 @@ export function useSelectElementTranslation() {
 
   const deactivateSelectMode = async () => {
     try {
+      const [activeTab] = await browser.tabs.query({ active: true, currentWindow: true });
+      const tabId = activeTab?.id;
+      if (!Number.isInteger(tabId)) {
+        error.value = 'Could not determine active tab';
+        return false;
+      }
+
       logger.debug('Deactivating select element mode');
-      await sendMessage({
+      const result = await sendMessage({
         action: MessageActions.DEACTIVATE_SELECT_ELEMENT_MODE,
         context: MessageContexts.SIDEPANEL,
         timestamp: Date.now(),
-        data: { active: false }
+        data: { active: false, tabId }
       });
+
+      if (result?.success === false) {
+        error.value = result.error || 'Failed to deactivate select element mode';
+        return false;
+      }
+
       logger.debug('Select element mode deactivated');
       return true;
     } catch (err) {

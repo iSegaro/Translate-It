@@ -12,11 +12,16 @@ const logger = getScopedLogger(LOG_COMPONENTS.ELEMENT_SELECTION, 'handleSetSelec
  * Handle setting select element state for a tab
  */
 export async function handleSetSelectElementState(message, sender) {
-  const activate = message?.data?.activate === true;
+  const data = message?.data;
+  const hasCanonicalActive = data !== null
+    && typeof data === 'object'
+    && Object.prototype.hasOwnProperty.call(data, 'active');
+  // `active` is canonical; accept `activate` only for legacy callers.
+  const active = hasCanonicalActive ? data.active === true : data?.activate === true;
   const tabId = sender?.tab?.id || message?.data?.tabId;
 
   // Log meaningful state changes with proper context
-  if (activate) {
+  if (active) {
     logger.info(`Select Element mode activated for tab ${tabId} from ${sender?.tab?.id ? 'content' : 'internal'} source`);
   } else {
     logger.info(`Select Element mode deactivated for tab ${tabId} from ${sender?.tab?.id ? 'content' : 'internal'} source`);
@@ -33,19 +38,19 @@ export async function handleSetSelectElementState(message, sender) {
   }
 
   try {
-    setStateForTab(tabId, activate);
+    setStateForTab(tabId, active);
 
     // 🆕 BROADCAST STATE CHANGE TO ALL FRAMES IN THE TAB
     // Only broadcast deactivation when it's an explicit deactivation request
     // Don't broadcast when frames are reporting their state after activation
-    if (!activate && message?.data?.isExplicitDeactivation) {
+    if (!active && message?.data?.isExplicitDeactivation) {
       try {
         // Use the same message format as handleActivateSelectElementMode for consistency
         const broadcastMessage = MessageFormat.create(
           MessageActions.DEACTIVATE_SELECT_ELEMENT_MODE,
           {
             mode: 'normal',
-            activate: false,
+            active: false,
             fromBackground: true,
             // This is an explicit deactivation request (e.g., user clicked deactivate)
             isExplicitDeactivation: true
@@ -61,7 +66,7 @@ export async function handleSetSelectElementState(message, sender) {
       }
     }
 
-    return { success: true, tabId, active: activate };
+    return { success: true, tabId, active };
   } catch (err) {
     return { success: false, error: err?.message || String(err) };
   }

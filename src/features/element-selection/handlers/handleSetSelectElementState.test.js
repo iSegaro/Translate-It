@@ -55,6 +55,24 @@ describe('handleSetSelectElementState', () => {
     expect(setStateForTab).toHaveBeenCalledWith(123, true);
   });
 
+  it('should use canonical active when both state fields are present', async () => {
+    const response = await handleSetSelectElementState({
+      data: { active: false, activate: true, tabId: 321 },
+    }, {});
+
+    expect(response).toMatchObject({ success: true, tabId: 321, active: false });
+    expect(setStateForTab).toHaveBeenCalledWith(321, false);
+  });
+
+  it('should accept legacy activate only when active is absent', async () => {
+    const response = await handleSetSelectElementState({
+      data: { activate: true, tabId: 654 },
+    }, {});
+
+    expect(response).toMatchObject({ success: true, tabId: 654, active: true });
+    expect(setStateForTab).toHaveBeenCalledWith(654, true);
+  });
+
   it('should set state for a tab from data tabId', async () => {
     const message = { data: { activate: false, tabId: 456 } };
     
@@ -71,7 +89,7 @@ describe('handleSetSelectElementState', () => {
 
     expect(browser.tabs.sendMessage).toHaveBeenCalledWith(789, expect.objectContaining({
       action: 'DEACTIVATE_SELECT_ELEMENT_MODE',
-      data: expect.objectContaining({ isExplicitDeactivation: true })
+      data: expect.objectContaining({ active: false, isExplicitDeactivation: true })
     }));
   });
 

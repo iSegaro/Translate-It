@@ -56,6 +56,7 @@ describe('handleDeactivateSelectElementMode', () => {
       expect.objectContaining({
         action: 'DEACTIVATE_SELECT_ELEMENT_MODE',
         data: expect.objectContaining({
+          active: false,
           fromBackground: true,
           isExplicitDeactivation: true,
         }),

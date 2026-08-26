@@ -399,6 +399,17 @@ describe('SelectElementManager', () => {
     expect(pageEventBus.emit).toHaveBeenCalledWith('show-select-element-notification', expect.any(Object));
   });
 
+  it('publishes canonical active state on direct activation', async () => {
+    await manager.initialize();
+    await manager.activateSelectElementMode();
+
+    const { sendMessage } = await import('@/shared/messaging/core/UnifiedMessaging.js');
+    expect(sendMessage).toHaveBeenCalledWith({
+      action: 'SET_SELECT_ELEMENT_STATE',
+      data: { active: true },
+    });
+  });
+
   it('resolves Whole Page conflict before activating Select Element', async () => {
     const resolveFeatureConflict = vi.fn().mockImplementation(async () => {
       expect(manager.isActive).toBe(false);

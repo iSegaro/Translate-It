@@ -17,7 +17,7 @@ vi.mock('webextension-polyfill', () => ({
 // Mock Messaging dependencies
 vi.mock('@/shared/messaging/core/MessageActions.js', () => ({
   MessageActions: {
-    SELECT_ELEMENT_STATE_CHANGED: 'SELECT_ELEMENT_STATE_CHANGED'
+    SELECT_ELEMENT_STATE_CHANGED: 'selectElementStateChanged'
   }
 }));
 
@@ -60,7 +60,7 @@ describe('selectElementStateManager', () => {
       await new Promise(resolve => setTimeout(resolve, 10));
       
       expect(browser.runtime.sendMessage).toHaveBeenCalledWith(expect.objectContaining({
-        action: 'SELECT_ELEMENT_STATE_CHANGED',
+        action: 'selectElementStateChanged',
         data: { tabId, active: true }
       }));
     });

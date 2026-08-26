@@ -8,14 +8,15 @@ const selectElementStateByTab = new Map();
 
 function setStateForTab(tabId, active) {
   if (!tabId) return;
-  selectElementStateByTab.set(tabId, { active: !!active, updatedAt: Date.now() });
+  const canonicalActive = active === true;
+  selectElementStateByTab.set(tabId, { active: canonicalActive, updatedAt: Date.now() });
 
   // Notify all parts of the extension about the state change
   (async () => {
     try {
       const message = MessageFormat.create(
         MessageActions.SELECT_ELEMENT_STATE_CHANGED,
-        { tabId, active },
+        { tabId, active: canonicalActive },
         MessagingContexts.BACKGROUND
       );
       // Use runtime.sendMessage to broadcast to all parts of the extension (sidepanel, content scripts, etc.)
