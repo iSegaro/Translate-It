@@ -143,9 +143,6 @@ export class PageTranslationEventManager {
       }
     });
 
-    bus.on('page-translation-fatal-error', ({ error, errorType, localizedMessage }) => 
-      this.manager._handleFatalError(error, errorType, localizedMessage));
-
     bus.on('page-translation-internal-error', async (data) => {
       if (data.isFatal || ExtensionContextManager.isContextError(data.error)) return;
 

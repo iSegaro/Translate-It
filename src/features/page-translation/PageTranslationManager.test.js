@@ -42,12 +42,15 @@ vi.mock('./PageTranslationHelper.js', () => ({
 
 vi.mock('./PageTranslationScheduler.js', () => ({
   PageTranslationScheduler: class {
-    constructor() {
+    constructor({ onFatalError } = {}) {
+      this.onFatalError = onFatalError;
       this.reset = vi.fn();
       this.setSettings = vi.fn();
       this.setTranslationState = vi.fn();
       this.enqueue = vi.fn();
       this.translatedCount = 0;
+      this.translationSessionId = null;
+      this.sessionContext = null;
       this.signalScrollStop = vi.fn();
       this.signalScrollStart = vi.fn();
     }
@@ -222,6 +225,71 @@ describe('PageTranslationManager', () => {
       // Check for layout fix injection
       expect(document.getElementById('ti-translation-layout-fix')).not.toBeNull();
       expect(document.documentElement.classList.contains('ti-translation-active')).toBe(true);
+    });
+
+    it('handles matching scheduler fatal callback once', () => {
+      const sessionContext = Symbol('session-context');
+      manager.isTranslating = true;
+      manager.translationMessageId = 'session-b';
+      manager.sessionContext = sessionContext;
+      manager.scheduler.translationSessionId = 'session-b';
+      const handleFatalError = vi.spyOn(manager, '_handleFatalError').mockImplementation(() => {});
+
+      expect(manager.scheduler.onFatalError({
+        error: new Error('fatal'),
+        errorType: ErrorTypes.SERVER_ERROR,
+        sessionId: 'session-b',
+        sessionContext,
+        context: 'page-translation-batch',
+      })).toBe(true);
+
+      expect(handleFatalError).toHaveBeenCalledOnce();
+      expect(handleFatalError).toHaveBeenCalledWith(expect.any(Error), ErrorTypes.SERVER_ERROR, undefined);
+    });
+
+    it('ignores stale scheduler fatal callback from an older session', () => {
+      const currentContext = Symbol('current-context');
+      manager.isTranslating = true;
+      manager.translationMessageId = 'session-b';
+      manager.sessionContext = currentContext;
+      manager.scheduler.translationSessionId = 'session-b';
+      const handleFatalError = vi.spyOn(manager, '_handleFatalError').mockImplementation(() => {});
+
+      expect(manager.scheduler.onFatalError({
+        error: new Error('stale fatal'),
+        errorType: ErrorTypes.SERVER_ERROR,
+        sessionId: 'session-a',
+        sessionContext: Symbol('stale-context'),
+        context: 'page-translation-scheduler',
+      })).toBe(false);
+
+      expect(handleFatalError).not.toHaveBeenCalled();
+      expect(manager.isTranslating).toBe(true);
+      expect(manager.translationMessageId).toBe('session-b');
+    });
+
+    it('requires matching session context and accepted scheduler identity', () => {
+      const currentContext = Symbol('current-context');
+      manager.isTranslating = true;
+      manager.translationMessageId = 'session-b';
+      manager.sessionContext = currentContext;
+      const handleFatalError = vi.spyOn(manager, '_handleFatalError').mockImplementation(() => {});
+
+      expect(manager.scheduler.onFatalError({
+        error: new Error('wrong context'),
+        errorType: ErrorTypes.SERVER_ERROR,
+        sessionId: 'session-b',
+        sessionContext: Symbol('wrong-context'),
+      })).toBe(false);
+
+      expect(manager.scheduler.onFatalError({
+        error: new Error('pre-start'),
+        errorType: ErrorTypes.SERVER_ERROR,
+        sessionId: 'session-b',
+        sessionContext: currentContext,
+      })).toBe(false);
+
+      expect(handleFatalError).not.toHaveBeenCalled();
     });
 
     it('resolves Select Element conflict before Whole Page admission', async () => {

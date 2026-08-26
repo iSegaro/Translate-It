@@ -30,9 +30,10 @@ const INTERNAL_CANCELLATION_REASON = 'operation-abort';
  * Handles batching, prioritization (Viewport first), and fault tolerance.
  */
 export class PageTranslationScheduler extends ResourceTracker {
-  constructor() {
+  constructor({ onFatalError } = {}) {
     super('page-translation-scheduler');
     this.logger = getScopedLogger(LOG_COMPONENTS.PAGE_TRANSLATION, 'Scheduler');
+    this.onFatalError = typeof onFatalError === 'function' ? onFatalError : null;
     this.queue = []; // Tasks: { text, score, resolve, reject, context, node }
     this.batchTimer = null;
     this.translatedCount = 0;
@@ -432,7 +433,7 @@ export class PageTranslationScheduler extends ResourceTracker {
 
         // 2. EXECUTE BATCH: Process the selected items
         this.isFirstBatch = false;
-        await this._executeBatchRequest(currentBatch, config, flushContext);
+        await this._executeBatchRequest(currentBatch, config, flushContext, flushSessionId);
         this.activeBatches.delete(activeBatch);
         activeBatch = null;
 
@@ -490,11 +491,12 @@ export class PageTranslationScheduler extends ResourceTracker {
       INTERNAL_CANCELLATION_REASON
     );
 
-    pageEventBus.emit('page-translation-fatal-error', {
+    this.onFatalError?.({
       error,
       errorType: matchErrorToType(error),
       context: 'page-translation-scheduler',
-      sessionId
+      sessionId,
+      sessionContext,
     });
     return true;
   }
@@ -502,7 +504,7 @@ export class PageTranslationScheduler extends ResourceTracker {
   /**
    * Internal method to handle the actual translation request and resolution.
    */
-  async _executeBatchRequest(batch, config, flushContext) {
+  async _executeBatchRequest(batch, config, flushContext, flushSessionId) {
     const textsToTranslate = batch.map(item => ({ text: item.text }));
     
     const batchMessage = MessageFormat.create(
@@ -550,7 +552,7 @@ export class PageTranslationScheduler extends ResourceTracker {
         if (!batchError.type && pageErrorType) batchError.type = pageErrorType;
         if (result?.isFatal) batchError.isFatal = true;
 
-        await this._handleBatchError(batchError, batch, pageErrorType);
+        await this._handleBatchError(batchError, batch, pageErrorType, flushSessionId, flushContext);
         return;
       }
 
@@ -601,7 +603,7 @@ export class PageTranslationScheduler extends ResourceTracker {
       this._reportProgress();
     } catch (error) {
       this.logger.error('Batch execution error:', error);
-      await this._handleBatchError(error, batch);
+      await this._handleBatchError(error, batch, null, flushSessionId, flushContext);
     }  }
 
   async _getBatchConfig() {
@@ -662,7 +664,18 @@ export class PageTranslationScheduler extends ResourceTracker {
     };
   }
 
-  async _handleBatchError(error, batch, pageErrorType = null) {
+  async _handleBatchError(
+    error,
+    batch,
+    pageErrorType = null,
+    sessionId = this.translationSessionId,
+    sessionContext = this.sessionContext
+  ) {
+    if (!this._ownsFlushSession(sessionId, sessionContext)) {
+      batch.forEach(item => this._resolveItem(item, item.text, 'cancelled'));
+      return false;
+    }
+
     if (this.fatalErrorOccurred) return;
 
     // Preserve original error identity as per guidelines
@@ -692,10 +705,15 @@ export class PageTranslationScheduler extends ResourceTracker {
 
     // Also emit specific fatal event for the Manager's circuit breaker
     if (isFatal) {
-      pageEventBus.emit('page-translation-fatal-error', { 
-        error, 
-        errorType
-      });
+      if (this._ownsFlushSession(sessionId, sessionContext)) {
+        this.onFatalError?.({
+          error,
+          errorType,
+          context: 'page-translation-batch',
+          sessionId,
+          sessionContext,
+        });
+      }
     }
   }
 

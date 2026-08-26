@@ -75,6 +75,7 @@ vi.mock('@/config.js', () => ({
 
 describe('PageTranslationScheduler', () => {
   let scheduler;
+  let onFatalError;
 
   const getSettlement = (resolver) => resolver.mock.calls.at(-1)[0];
   const expectSettlement = (resolver, text) => {
@@ -97,7 +98,8 @@ describe('PageTranslationScheduler', () => {
       return type === 'EXTENSION_CONTEXT_INVALIDATED';
     });
 
-    scheduler = new PageTranslationScheduler();
+    onFatalError = vi.fn();
+    scheduler = new PageTranslationScheduler({ onFatalError });
     scheduler.setTranslationState(true, 'test-session-123', { pageTitle: 'Test Page' });
     vi.spyOn(pageEventBus, 'emit');
     
@@ -176,36 +178,58 @@ describe('PageTranslationScheduler', () => {
     it('uses internal provenance for outer infrastructure failure', () => {
       const item = { text: 'Infrastructure failure', resolve: vi.fn(), score: 1 };
       const error = Object.assign(new Error('infrastructure failure'), { type: 'NETWORK_ERROR' });
+      const sessionContext = scheduler.sessionContext;
       scheduler.queue.push(item);
       scheduler.totalTasks = 1;
       sendRegularMessage.mockClear();
 
-      expect(scheduler._handleOuterFlushFailure(error, 'test-session-123', scheduler.sessionContext)).toBe(true);
+      expect(scheduler._handleOuterFlushFailure(error, 'test-session-123', sessionContext)).toBe(true);
       expect(getSettlement(item.resolve).state).toBe('failed');
       expect(scheduler.failedCount).toBe(1);
       expect(getCancelMessage()?.data.reason).toBe('operation-abort');
-      expect(pageEventBus.emit).toHaveBeenCalledWith('page-translation-fatal-error', expect.objectContaining({
+      expect(onFatalError).toHaveBeenCalledWith(expect.objectContaining({
         error,
         errorType: 'NETWORK_ERROR',
+        sessionId: 'test-session-123',
+        sessionContext,
+        context: 'page-translation-scheduler',
       }));
+      expect(onFatalError).toHaveBeenCalledOnce();
     });
 
     it('uses internal provenance for context invalidation', () => {
       const item = { text: 'Context failure', resolve: vi.fn(), score: 1 };
       const error = Object.assign(new Error('context invalidated'), { type: 'EXTENSION_CONTEXT_INVALIDATED' });
+      const sessionContext = scheduler.sessionContext;
       scheduler.queue.push(item);
       scheduler.totalTasks = 1;
       ExtensionContextManager.isContextError.mockReturnValueOnce(true);
       sendRegularMessage.mockClear();
 
-      expect(scheduler._handleOuterFlushFailure(error, 'test-session-123', scheduler.sessionContext)).toBe(true);
+      expect(scheduler._handleOuterFlushFailure(error, 'test-session-123', sessionContext)).toBe(true);
       expect(getSettlement(item.resolve).state).toBe('cancelled');
       expect(scheduler.failedCount).toBe(0);
       expect(getCancelMessage()?.data.reason).toBe('operation-abort');
-      expect(pageEventBus.emit).toHaveBeenCalledWith('page-translation-fatal-error', expect.objectContaining({
+      expect(onFatalError).toHaveBeenCalledWith(expect.objectContaining({
         error,
         errorType: 'EXTENSION_CONTEXT_INVALIDATED',
+        sessionId: 'test-session-123',
+        sessionContext,
+        context: 'page-translation-scheduler',
       }));
+      expect(onFatalError).toHaveBeenCalledOnce();
+    });
+
+    it('does not call fatal callback for a stale outer flush', () => {
+      const sessionContext = scheduler.sessionContext;
+
+      expect(scheduler._handleOuterFlushFailure(
+        new Error('stale failure'),
+        'stale-session',
+        sessionContext
+      )).toBe(false);
+
+      expect(onFatalError).not.toHaveBeenCalled();
     });
 
     it('uses internal provenance for reset session replacement', () => {
@@ -552,6 +576,13 @@ describe('PageTranslationScheduler', () => {
       expect(internalError.error.type).toBe('SERVER_ERROR');
       expect(internalError.errorType).toBe('SERVER_ERROR');
       expect(internalError.isFatal).toBe(true);
+      expect(onFatalError).toHaveBeenCalledWith(expect.objectContaining({
+        error: expect.objectContaining({ type: 'SERVER_ERROR' }),
+        errorType: 'SERVER_ERROR',
+        sessionId: 'test-session-123',
+        sessionContext: { pageTitle: 'Test Page' },
+        context: 'page-translation-batch',
+      }));
       emitSpy.mockRestore();
     });
 
@@ -690,8 +721,7 @@ describe('PageTranslationScheduler', () => {
       expect(scheduler.queue).toHaveLength(0);
       expect(scheduler.isTranslated).toBe(false);
       expect(scheduler.activeFlushes).toBe(0);
-      expect(pageEventBus.emit.mock.calls.filter(([event]) => event === 'page-translation-fatal-error'))
-        .toHaveLength(1);
+      expect(onFatalError).toHaveBeenCalledTimes(1);
       expect(pageEventBus.emit).not.toHaveBeenCalledWith(MessageActions.PAGE_TRANSLATE_COMPLETE, expect.anything());
       expect(pageEventBus.emit).not.toHaveBeenCalledWith(MessageActions.PAGE_TRANSLATE_IDLE, expect.anything());
     });
@@ -708,8 +738,7 @@ describe('PageTranslationScheduler', () => {
 
       expect(getSettlement(item.resolve).state).toBe('cancelled');
       expect(scheduler.failedCount).toBe(0);
-      expect(pageEventBus.emit.mock.calls.filter(([event]) => event === 'page-translation-fatal-error'))
-        .toHaveLength(1);
+      expect(onFatalError).toHaveBeenCalledTimes(1);
     });
 
     it.each([
@@ -748,8 +777,7 @@ describe('PageTranslationScheduler', () => {
 
       expect(getSettlement(item.resolve).state).toBe('failed');
       expect(scheduler.queue).toHaveLength(0);
-      expect(pageEventBus.emit.mock.calls.filter(([event]) => event === 'page-translation-fatal-error'))
-        .toHaveLength(1);
+      expect(onFatalError).toHaveBeenCalledTimes(1);
     });
 
     it('settles a batch after it leaves queue ownership and execution fails outside its handler', async () => {
@@ -768,8 +796,7 @@ describe('PageTranslationScheduler', () => {
 
       expect(getSettlement(item.resolve).state).toBe('failed');
       expect(scheduler.activeBatches.size).toBe(0);
-      expect(pageEventBus.emit.mock.calls.filter(([event]) => event === 'page-translation-fatal-error'))
-        .toHaveLength(1);
+      expect(onFatalError).toHaveBeenCalledTimes(1);
     });
 
     it('settles a batch when MessageFormat fails before batch error handling', async () => {
@@ -789,8 +816,7 @@ describe('PageTranslationScheduler', () => {
 
       expect(getSettlement(item.resolve).state).toBe('failed');
       expect(scheduler.activeBatches.size).toBe(0);
-      expect(pageEventBus.emit.mock.calls.filter(([event]) => event === 'page-translation-fatal-error'))
-        .toHaveLength(1);
+      expect(onFatalError).toHaveBeenCalledTimes(1);
     });
 
     it('preserves partial accounting during outer failure', async () => {
@@ -831,15 +857,14 @@ describe('PageTranslationScheduler', () => {
 
       const firstFlush = scheduler.flush();
       const secondFlush = scheduler.flush();
-      await vi.waitFor(() => expect(pageEventBus.emit.mock.calls.filter(([event]) => event === 'page-translation-fatal-error')).toHaveLength(1));
+      await vi.waitFor(() => expect(onFatalError).toHaveBeenCalledTimes(1));
 
       expect(getSettlement(itemA.resolve).state).toBe('failed');
       expect(getSettlement(itemB.resolve).state).toBe('failed');
       expect(scheduler.activeFlushes).toBe(0);
       releaseSecond({});
       await Promise.all([firstFlush, secondFlush]);
-      expect(pageEventBus.emit.mock.calls.filter(([event]) => event === 'page-translation-fatal-error'))
-        .toHaveLength(1);
+      expect(onFatalError).toHaveBeenCalledTimes(1);
     });
 
     it('does not let an old flush touch a newer session after config resolves', async () => {
@@ -867,8 +892,60 @@ describe('PageTranslationScheduler', () => {
       expect(scheduler.queue).toEqual([newItem]);
       expect(newItem.resolve).not.toHaveBeenCalled();
       expect(scheduler.activeFlushes).toBe(0);
-      expect(pageEventBus.emit.mock.calls.filter(([event]) => event === 'page-translation-fatal-error'))
-        .toHaveLength(0);
+      expect(onFatalError).not.toHaveBeenCalled();
+    });
+
+    it('settles stale batch failure without poisoning newer session state', async () => {
+      const oldItem = { text: 'Old', resolve: vi.fn(), score: 1 };
+      const newItem = { text: 'New', resolve: vi.fn(), score: 1 };
+      let rejectOld;
+      let resolveNew;
+      const oldRequest = new Promise((_resolve, reject) => { rejectOld = reject; });
+      const newRequest = new Promise(resolve => { resolveNew = resolve; });
+      const newContext = { session: 'new' };
+      scheduler.queue.push(oldItem);
+      scheduler.totalTasks = 1;
+      PageTranslationFluidFilter.process.mockImplementation(queue => ({
+        batchItems: [queue[0]],
+        remainingItems: queue.slice(1),
+      }));
+      vi.spyOn(scheduler, '_getBatchConfig').mockResolvedValue({
+        providerRegistryId: 'google',
+        targetLanguage: 'fa',
+      });
+      safeSendMessage
+        .mockImplementationOnce(() => oldRequest)
+        .mockImplementationOnce(() => newRequest);
+
+      const oldFlush = scheduler.flush();
+      await vi.waitFor(() => expect(safeSendMessage).toHaveBeenCalledTimes(1));
+
+      scheduler.stop();
+      scheduler.setTranslationState(true, 'new-session', newContext);
+      scheduler.queue.push(newItem);
+      scheduler.totalTasks = 1;
+      const newFlush = scheduler.flush();
+      await vi.waitFor(() => expect(safeSendMessage).toHaveBeenCalledTimes(2));
+
+      const queueBeforeStaleFailure = [...scheduler.queue];
+      const activeBatchesBeforeStaleFailure = scheduler.activeBatches.size;
+      const failedCountBeforeStaleFailure = scheduler.failedCount;
+      rejectOld(new Error('stale Session A failure'));
+      await oldFlush;
+
+      expect(getSettlement(oldItem.resolve).state).toBe('cancelled');
+      expect(scheduler.fatalErrorOccurred).toBe(false);
+      expect(onFatalError).not.toHaveBeenCalled();
+      expect(pageEventBus.emit.mock.calls.some(([event]) => event === 'page-translation-internal-error')).toBe(false);
+      expect(scheduler.translationSessionId).toBe('new-session');
+      expect(scheduler.sessionContext).toBe(newContext);
+      expect(scheduler.queue).toEqual(queueBeforeStaleFailure);
+      expect(scheduler.activeBatches.size).toBe(activeBatchesBeforeStaleFailure);
+      expect(scheduler.failedCount).toBe(failedCountBeforeStaleFailure);
+      expect(newItem.resolve).not.toHaveBeenCalled();
+
+      resolveNew({ success: true, translatedText: JSON.stringify(['new']) });
+      await newFlush;
     });
 
     it('does not let a stopped flush decrement a newer session counter', async () => {

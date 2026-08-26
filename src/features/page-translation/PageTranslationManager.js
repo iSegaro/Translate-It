@@ -58,7 +58,9 @@ export class PageTranslationManager extends ResourceTracker {
     this.autoStartCancelledUrls = new Set();
 
     
-    this.scheduler = new PageTranslationScheduler();
+    this.scheduler = new PageTranslationScheduler({
+      onFatalError: (fatal) => this._handleSchedulerFatalError(fatal),
+    });
     this.bridge = new PageTranslationBridge();
     this.hoverManager = hoverPreviewManager;
     this.scrollTracker = new PageTranslationScrollTracker(
@@ -606,6 +608,18 @@ export class PageTranslationManager extends ResourceTracker {
         ]
       });
     });
+  }
+
+  _handleSchedulerFatalError(fatal = {}) {
+    const { error, errorType, sessionId, sessionContext, localizedMessage } = fatal || {};
+
+    if (sessionId == null || sessionContext == null) return false;
+    if (sessionId !== this.translationMessageId || sessionContext !== this.sessionContext) return false;
+    if (this.scheduler.translationSessionId !== sessionId) return false;
+    if (!this.isTranslating && !this.isAutoTranslating) return false;
+
+    this._handleFatalError(error, errorType, localizedMessage);
+    return true;
   }
 
   _handleFatalError(error, errorType, localizedMessage = null) {

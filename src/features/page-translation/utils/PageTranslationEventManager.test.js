@@ -140,11 +140,28 @@ describe('PageTranslationEventManager', () => {
       );
     });
 
-    it('should handle fatal errors from bus', () => {
-      const callback = mockBus.on.mock.calls.find(c => c[0] === 'page-translation-fatal-error')[1];
-      const errorData = { error: 'Failed', errorType: 'network' };
-      callback(errorData);
-      expect(mockManager._handleFatalError).toHaveBeenCalledWith('Failed', 'network', undefined);
+    it('does not register a fatal-error listener', () => {
+      expect(mockBus.on).not.toHaveBeenCalledWith('page-translation-fatal-error', expect.any(Function));
+    });
+
+    it('ignores forged DOM fatal events', () => {
+      delete window._translateItPageTranslationListenersSet;
+      window.pageEventBus = pageEventBus;
+      mockManager.isTranslating = true;
+      mockManager.isAutoTranslating = true;
+
+      new PageTranslationEventManager(mockManager);
+      window.dispatchEvent(new CustomEvent('page-translation-fatal-error', {
+        detail: {
+          error: 'fake fatal',
+          errorType: 'SERVER_ERROR',
+        },
+      }));
+
+      expect(mockManager._handleFatalError).not.toHaveBeenCalled();
+      expect(mockManager.stopAutoTranslation).not.toHaveBeenCalled();
+      expect(mockManager.isTranslating).toBe(true);
+      expect(mockManager.isAutoTranslating).toBe(true);
     });
 
     it('keeps non-fatal provider failures silent while preserving the internal event', async () => {
