@@ -18,6 +18,7 @@ const mocks = vi.hoisted(() => ({
 vi.mock('@/features/exclusion/core/ExclusionChecker.js', () => ({
   ExclusionChecker: {
     getInstance: () => mocks.exclusionChecker,
+    resetInstance: vi.fn(),
   },
 }));
 
@@ -99,5 +100,80 @@ describe('FeatureManager SPA auto page command transport', () => {
       action: MessageActions.PAGE_TRANSLATE,
       data: { isAuto: true },
     }, { returnFailureResponse: true });
+  });
+});
+
+describe('FeatureManager conflict resolution', () => {
+  let manager;
+
+  beforeEach(() => {
+    manager = FeatureManager.getInstance();
+    manager.featureHandlers.clear();
+    manager.activeFeatures.clear();
+    manager.requestedFeatures.clear();
+  });
+
+  it('silently deactivates active Select Element for Whole Page', async () => {
+    const deactivate = vi.fn().mockResolvedValue(undefined);
+    manager.featureHandlers.set('selectElement', { isActive: true, deactivate });
+    manager.requestFeatureActivation = vi.fn();
+    manager.activateFeature = vi.fn();
+
+    await expect(manager.resolveFeatureConflict('pageTranslation')).resolves.toBe(true);
+
+    expect(deactivate).toHaveBeenCalledOnce();
+    expect(deactivate).toHaveBeenCalledWith({ silent: true, reason: 'conflict' });
+    expect(manager.requestFeatureActivation).not.toHaveBeenCalled();
+    expect(manager.activateFeature).not.toHaveBeenCalled();
+  });
+
+  it('leaves inactive Select Element untouched', async () => {
+    const deactivate = vi.fn();
+    manager.featureHandlers.set('selectElement', { isActive: false, deactivate });
+
+    await expect(manager.resolveFeatureConflict('pageTranslation')).resolves.toBe(false);
+
+    expect(deactivate).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ['translating', { isTranslating: true, isTranslated: false }],
+    ['translated', { isTranslating: false, isTranslated: true }],
+  ])('restores %s Whole Page for Select Element', async (_state, state) => {
+    const restorePage = vi.fn().mockResolvedValue(undefined);
+    manager.featureHandlers.set('pageTranslation', { ...state, restorePage });
+
+    await expect(manager.resolveFeatureConflict('selectElement')).resolves.toBe(true);
+
+    expect(restorePage).toHaveBeenCalledOnce();
+    expect(restorePage).toHaveBeenCalledWith();
+  });
+
+  it('leaves idle Whole Page untouched', async () => {
+    const restorePage = vi.fn();
+    manager.featureHandlers.set('pageTranslation', {
+      isTranslating: false,
+      isTranslated: false,
+      restorePage,
+    });
+
+    await expect(manager.resolveFeatureConflict('selectElement')).resolves.toBe(false);
+
+    expect(restorePage).not.toHaveBeenCalled();
+  });
+
+  it('propagates trusted Whole Page restore failures', async () => {
+    const error = new Error('restore failed');
+    manager.featureHandlers.set('pageTranslation', {
+      isTranslating: true,
+      isTranslated: false,
+      restorePage: vi.fn().mockRejectedValue(error),
+    });
+
+    await expect(manager.resolveFeatureConflict('selectElement')).rejects.toBe(error);
+  });
+
+  it('ignores unsupported conflict requesters', async () => {
+    await expect(manager.resolveFeatureConflict('unknown')).resolves.toBe(false);
   });
 });

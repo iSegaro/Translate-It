@@ -224,6 +224,33 @@ describe('PageTranslationManager', () => {
       expect(document.documentElement.classList.contains('ti-translation-active')).toBe(true);
     });
 
+    it('resolves Select Element conflict before Whole Page admission', async () => {
+      const resolveFeatureConflict = vi.fn().mockResolvedValue(undefined);
+      manager = new PageTranslationManager({ featureManager: { resolveFeatureConflict } });
+      await manager.activate();
+
+      await manager.translatePage();
+
+      expect(resolveFeatureConflict).toHaveBeenCalledWith('pageTranslation');
+      expect(resolveFeatureConflict.mock.invocationCallOrder[0]).toBeLessThan(
+        pageEventBus.emit.mock.invocationCallOrder.find((callOrder, index) => (
+          pageEventBus.emit.mock.calls[index][0] === MessageActions.PAGE_TRANSLATE_START
+            ? callOrder
+            : false
+        ))
+      );
+    });
+
+    it('propagates trusted conflict failures through translatePage error handling', async () => {
+      const error = Object.assign(new Error('Select Element teardown failed'), { type: ErrorTypes.API_ERROR });
+      manager = new PageTranslationManager({
+        featureManager: { resolveFeatureConflict: vi.fn().mockRejectedValue(error) },
+      });
+      await manager.activate();
+
+      await expect(manager.translatePage()).rejects.toBe(error);
+    });
+
     it('should not translate if already translating', async () => {
       manager.currentUrl = window.location.href; // Prevent reset due to URL mismatch
       manager.isTranslating = true;

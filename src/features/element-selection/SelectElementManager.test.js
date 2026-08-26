@@ -399,6 +399,42 @@ describe('SelectElementManager', () => {
     expect(pageEventBus.emit).toHaveBeenCalledWith('show-select-element-notification', expect.any(Object));
   });
 
+  it('resolves Whole Page conflict before activating Select Element', async () => {
+    const resolveFeatureConflict = vi.fn().mockImplementation(async () => {
+      expect(manager.isActive).toBe(false);
+    });
+    manager = new SelectElementManager({ featureManager: { resolveFeatureConflict } });
+    await manager.initialize();
+
+    await manager.activateSelectElementMode();
+
+    expect(resolveFeatureConflict).toHaveBeenCalledWith('selectElement');
+    expect(manager.isActive).toBe(true);
+  });
+
+  it('fails activation when trusted Whole Page conflict resolution fails', async () => {
+    const error = new Error('restore failed');
+    manager = new SelectElementManager({
+      featureManager: { resolveFeatureConflict: vi.fn().mockRejectedValue(error) },
+    });
+    await manager.initialize();
+
+    await expect(manager.activateSelectElementMode()).rejects.toBe(error);
+    expect(manager.isActive).toBe(false);
+  });
+
+  it('ignores forged DOM conflict events', async () => {
+    await manager.initialize();
+    manager.isActive = true;
+    const deactivate = vi.spyOn(manager, 'deactivate');
+
+    window.dispatchEvent(new CustomEvent('STOP_CONFLICTING_FEATURES', {
+      detail: { source: 'malicious-page' },
+    }));
+
+    expect(deactivate).not.toHaveBeenCalled();
+  });
+
   it('should deactivate select element mode', async () => {
     await manager.initialize();
     await manager.activateSelectElementMode();

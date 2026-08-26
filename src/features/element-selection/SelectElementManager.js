@@ -82,8 +82,9 @@ function isSilentInternalOperationAbort(error) {
  * Uses a specialized DomTranslatorAdapter optimized for AI/DeepL context and token efficiency.
  */
 class SelectElementManager extends ResourceTracker {
-  constructor() {
+  constructor({ featureManager } = {}) {
     super('select-element-manager');
+    this.featureManager = featureManager || null;
 
     // Core state
     this.isActive = false;
@@ -164,12 +165,6 @@ class SelectElementManager extends ResourceTracker {
         this.activateSelectElementMode(data || {}).catch(() => {});
       });
 
-      this.addEventListener(pageEventBus, 'STOP_CONFLICTING_FEATURES', (data) => {
-        if (this.isActive && data?.source !== 'select-element') {
-          this.deactivate({ silent: true, reason: 'conflict' });
-        }
-      });
-
       // Listen for translation progress events
       this.addEventListener(pageEventBus, 'select-element-translation-progress', (data) => {
         if (data?.completed !== undefined && data?.total !== undefined) {
@@ -209,9 +204,10 @@ class SelectElementManager extends ResourceTracker {
     this._startContextWatchdog();
 
     const activationOptions = { targetLanguage: options.targetLanguage || null, ...options };
-    pageEventBus.emit('STOP_CONFLICTING_FEATURES', { source: 'select-element' });
 
     try {
+      await this.featureManager?.resolveFeatureConflict?.('selectElement');
+
       this.isActive = true;
       this.isProcessingClick = false;
       this.hasInitialMovementOccurred = false; 

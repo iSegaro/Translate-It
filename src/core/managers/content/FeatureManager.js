@@ -327,6 +327,32 @@ export class FeatureManager extends ResourceTracker {
     }
   }
 
+  /**
+   * Resolves the two mutually exclusive in-page translation modes without
+   * routing state-changing commands through the DOM event bus.
+   * @param {'pageTranslation'|'selectElement'} requestingFeature
+   * @returns {Promise<boolean>} Whether a conflicting active feature was stopped.
+   */
+  async resolveFeatureConflict(requestingFeature) {
+    if (requestingFeature === 'pageTranslation') {
+      const selectElementManager = this.featureHandlers.get('selectElement');
+      if (!selectElementManager?.isActive) return false;
+
+      await selectElementManager.deactivate({ silent: true, reason: 'conflict' });
+      return true;
+    }
+
+    if (requestingFeature === 'selectElement') {
+      const pageTranslationManager = this.featureHandlers.get('pageTranslation');
+      if (!pageTranslationManager?.isTranslating && !pageTranslationManager?.isTranslated) return false;
+
+      await pageTranslationManager.restorePage();
+      return true;
+    }
+
+    return false;
+  }
+
   async loadFeatureHandler(featureName) {
     try {
       let HandlerClass;

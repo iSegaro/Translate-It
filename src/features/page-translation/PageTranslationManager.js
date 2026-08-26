@@ -36,9 +36,10 @@ import { PageTranslationEventManager } from './utils/PageTranslationEventManager
 const INTERNAL_CANCELLATION_REASON = 'operation-abort';
 
 export class PageTranslationManager extends ResourceTracker {
-  constructor() {
+  constructor({ featureManager } = {}) {
     super('page-translation-manager');
     this.logger = getScopedLogger(LOG_COMPONENTS.PAGE_TRANSLATION, 'Manager');
+    this.featureManager = featureManager || null;
 
     this.toastIntegration = new ToastIntegration(pageEventBus);
     this.notificationManager = new NotificationManager();
@@ -148,8 +149,8 @@ export class PageTranslationManager extends ResourceTracker {
     try {
       this._injectLayoutFix();
 
-      // Emit event to stop conflicting features (e.g., Select Element Mode)
-      pageEventBus.emit('STOP_CONFLICTING_FEATURES', { source: 'page-translation' });
+      // Stop active Select Element mode before accepting this translation session.
+      await this.featureManager?.resolveFeatureConflict?.('pageTranslation');
 
       this.isTranslating = true;
       attempt.controller = new AbortController();

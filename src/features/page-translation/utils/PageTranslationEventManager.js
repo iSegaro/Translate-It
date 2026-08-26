@@ -168,14 +168,6 @@ export class PageTranslationEventManager {
       if (displayError) this.logger.debug('Non-fatal page translation failure kept silent', displayError.type);
     });
 
-    // 3. Conflict Resolution
-    bus.on('STOP_CONFLICTING_FEATURES', (data) => {
-      if ((this.manager.isTranslating || this.manager.isTranslated) && data?.source !== 'page-translation') {
-        this.logger.info('Stopping/Restoring Page Translation due to conflicting feature:', data?.source);
-        this.manager.restorePage();
-      }
-    });
-
     window._translateItPageTranslationListenersSet = true;
   }
 }

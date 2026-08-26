@@ -211,11 +211,21 @@ describe('PageTranslationEventManager', () => {
       }
     );
 
-    it('should handle STOP_CONFLICTING_FEATURES', () => {
+    it('does not register a DOM conflict command listener', () => {
+      expect(mockBus.on).not.toHaveBeenCalledWith('STOP_CONFLICTING_FEATURES', expect.any(Function));
+    });
+
+    it('ignores forged DOM conflict events', () => {
+      delete window._translateItPageTranslationListenersSet;
+      window.pageEventBus = pageEventBus;
       mockManager.isTranslating = true;
-      const callback = mockBus.on.mock.calls.find(c => c[0] === 'STOP_CONFLICTING_FEATURES')[1];
-      callback({ source: 'select-element' });
-      expect(mockManager.restorePage).toHaveBeenCalled();
+
+      new PageTranslationEventManager(mockManager);
+      window.dispatchEvent(new CustomEvent('STOP_CONFLICTING_FEATURES', {
+        detail: { source: 'malicious-page' },
+      }));
+
+      expect(mockManager.restorePage).not.toHaveBeenCalled();
     });
   });
 });
