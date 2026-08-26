@@ -697,6 +697,7 @@ export class DomTranslatorAdapter extends ResourceTracker {
               }
               return;
             }
+            this._latchConversationAcceptance(data);
             try {
               if (data.success === false || data.error) {
                 const canonicalErrorSource = isStructuredTranslationError(data?.errorDetails)
@@ -823,16 +824,17 @@ export class DomTranslatorAdapter extends ResourceTracker {
                safeResolve({ success: false, error: err });
              }
           },
-           onStreamEnd: (data) => {
-             if (isSettled) return;
-             if (!this._isCurrentTranslation(translationToken)) {
-               return safeResolve(
-                 ExtensionContextManager.isValidSync()
-                   ? { success: false, cancelled: true }
-                   : { success: false, error: this._createContextInvalidationError() }
-               );
-             }
-             if (data.cancelled) return safeResolve({ success: false, cancelled: true });
+          onStreamEnd: (data) => {
+            if (isSettled) return;
+            if (!this._isCurrentTranslation(translationToken)) {
+              return safeResolve(
+                ExtensionContextManager.isValidSync()
+                  ? { success: false, cancelled: true }
+                  : { success: false, error: this._createContextInvalidationError() }
+              );
+            }
+            this._latchConversationAcceptance(data);
+            if (data.cancelled) return safeResolve({ success: false, cancelled: true });
              if (data.success === false || data.error) {
                terminalStreamFailure = true;
                const canonicalErrorSource = isStructuredTranslationError(data?.errorDetails)
@@ -899,8 +901,11 @@ export class DomTranslatorAdapter extends ResourceTracker {
 
       // Authoritative background signal: parent acceptance ACKs are only emitted
       // when the ConversationAcceptanceCoordinator registered a handle for this
-      // request (mirrors the background participation decision).
-      this._conversationAcceptanceEnabled = response?.conversationAcceptance === true;
+      // request (mirrors the background participation decision). Stream metadata
+      // may have enabled this earlier, so latch instead of overwriting it.
+      if (this._isCurrentTranslation(translationToken)) {
+        this._latchConversationAcceptance(response);
+      }
 
       // CRITICAL: Await stream completion if streaming was used, otherwise process direct response
       let result;
@@ -1492,6 +1497,12 @@ export class DomTranslatorAdapter extends ResourceTracker {
       messageId: this.currentMessageId,
       data: { parentId, cleanResult: accepted ? cleanResult : undefined, accepted },
     }, { silent: true, timeout: ACCEPTANCE_ACK_TIMEOUT_MS });
+  }
+
+  _latchConversationAcceptance(response) {
+    if (response?.conversationAcceptance === true) {
+      this._conversationAcceptanceEnabled = true;
+    }
   }
 
   _settleParentAcceptance(parent, accepted, cleanResult, translationToken = null) {

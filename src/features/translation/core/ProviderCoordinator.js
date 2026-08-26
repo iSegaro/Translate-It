@@ -146,7 +146,9 @@ export class ProviderCoordinator {
       if (engine && typeof engine.registerStreamingSender === 'function') {
         engine.registerStreamingSender(messageId, options.sender);
       }
-      await this._initializeStreaming(provider, text, messageId, engine, sessionId, options.sender);
+      const streamingArgs = [provider, text, messageId, engine, sessionId, options.sender];
+      if (options.executionContext?.conversationAcceptanceRegistered === true) streamingArgs.push(true);
+      await this._initializeStreaming(...streamingArgs);
     }
 
     // 6. Execute based on strategy via QueueManager for retry and priority support
@@ -356,13 +358,15 @@ export class ProviderCoordinator {
    * Initializes the streaming session using the global streaming manager.
    * @private
    */
-  async _initializeStreaming(provider, text, messageId, engine, sessionId, sender) {
+  async _initializeStreaming(provider, text, messageId, engine, sessionId, sender, conversationAcceptanceRegistered = false) {
     if (!messageId || !engine) return;
 
     try {
       const segments = Array.isArray(text) ? text : [text];
       
-      streamingManager.initializeStream(messageId, sender, provider, segments, sessionId);
+      const streamArgs = [messageId, sender, provider, segments, sessionId];
+      if (conversationAcceptanceRegistered) streamArgs.push(true);
+      streamingManager.initializeStream(...streamArgs);
       logger.debug(`[Coordinator] Streaming initialized for messageId: ${messageId}`);
     } catch (error) {
       logger.error(`[Coordinator] Failed to initialize streaming:`, error.message);

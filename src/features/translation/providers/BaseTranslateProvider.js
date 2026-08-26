@@ -93,7 +93,9 @@ export class BaseTranslateProvider extends BaseProvider {
       try {
         const sender = typeof engine.getStreamingSender === 'function' ? engine.getStreamingSender(messageId) : null;
         if (sender) {
-          streamingManager.initializeStream(messageId, sender, this, texts, sessionId);
+          const streamArgs = [messageId, sender, this, texts, sessionId];
+          if (options.executionContext?.conversationAcceptanceRegistered === true) streamArgs.push(true);
+          streamingManager.initializeStream(...streamArgs);
         } else {
           logger.debug(`[${this.providerName}] No sender found for streaming messageId: ${messageId}`);
         }

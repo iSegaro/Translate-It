@@ -121,6 +121,7 @@ export class OptimizedJsonHandler {
       ...(executionContext || {}),
       deadlineAt: operationDeadlineAt,
     };
+    const conversationAcceptanceRegistered = operationExecutionContext.conversationAcceptanceRegistered === true;
     const sessionId = data.sessionId || messageId;
     const tabId = sender?.tab?.id;
     const frameId = typeof sender?.frameId === 'number' ? sender.frameId : null;
@@ -734,7 +735,8 @@ export class OptimizedJsonHandler {
               completedBatchCount,
               abortController,
               engine,
-              frameId
+              frameId,
+              operationExecutionContext
             );
           }
         };
@@ -1311,7 +1313,16 @@ hasErrors = true;
             await this._sendStreamError(tabId, messageId, lastError, targetLanguage, detectedSourceLanguage, mode, frameId);
           }
         } else {
-          await this._sendStreamEnd(tabId, messageId, providerInstance.providerName, targetLanguage, detectedSourceLanguage, mode, frameId);
+            await this._sendStreamEnd(
+              tabId,
+              messageId,
+              providerInstance.providerName,
+              targetLanguage,
+              detectedSourceLanguage,
+              mode,
+              frameId,
+              operationExecutionContext
+            );
         }
       }
 
@@ -1327,7 +1338,8 @@ hasErrors = true;
         results: batchResults.flat(),
         metadata: {
           batchCount: batches.length
-        }
+        },
+        ...(conversationAcceptanceRegistered && { conversationAcceptance: true })
       };
     } finally {
       fragmentedUnits?.clear();
@@ -1504,7 +1516,7 @@ hasErrors = true;
     });
   }
 
-  async _streamResults(tabId, messageId, translatedData, batchIndex, totalBatches, targetLanguage, sourceLanguage, translationMode, completedCount = null, abortController = null, engine = null, frameId = null) {
+  async _streamResults(tabId, messageId, translatedData, batchIndex, totalBatches, targetLanguage, sourceLanguage, translationMode, completedCount = null, abortController = null, engine = null, frameId = null, executionContext = null) {
     if (!tabId) return;
     const isCancelled = () => {
       if (abortController?.signal?.aborted) return true;
@@ -1529,7 +1541,8 @@ hasErrors = true;
         sourceLanguage,
         targetLanguage,
         translationMode,
-        timestamp: Date.now()
+        timestamp: Date.now(),
+        ...(executionContext?.conversationAcceptanceRegistered === true && { conversationAcceptance: true })
       }
     };
     try {
@@ -1543,7 +1556,7 @@ hasErrors = true;
     }
   }
 
-  async _sendStreamEnd(tabId, messageId, providerName, targetLanguage, sourceLanguage, translationMode, frameId = null) {
+  async _sendStreamEnd(tabId, messageId, providerName, targetLanguage, sourceLanguage, translationMode, frameId = null, executionContext = null) {
     if (!tabId) return;
     const endMessage = {
       action: MessageActions.TRANSLATION_STREAM_END,
@@ -1555,7 +1568,8 @@ hasErrors = true;
         sourceLanguage,
         targetLanguage,
         translationMode,
-        timestamp: Date.now()
+        timestamp: Date.now(),
+        ...(executionContext?.conversationAcceptanceRegistered === true && { conversationAcceptance: true })
       }
     };
     try {

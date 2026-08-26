@@ -43,9 +43,11 @@ export class StreamingManager extends ResourceTracker {
    * @param {object} sender - Sender information from message
    * @param {object} provider - Translation provider instance
    * @param {string[]} segments - Text segments to translate
+   * @param {string|null} sessionId - Conversation/session identifier
+   * @param {boolean} conversationAcceptanceRegistered - Whether Background registered an acceptance handle
    * @returns {object} - Stream session info
    */
-  initializeStream(messageId, sender, provider, segments, sessionId = null) {
+  initializeStream(messageId, sender, provider, segments, sessionId = null, conversationAcceptanceRegistered = false) {
     if (this.activeStreams.has(messageId)) {
       logger.debug(`[StreamingManager] Stream already exists for messageId: ${messageId}`);
       return this.activeStreams.get(messageId);
@@ -60,7 +62,8 @@ export class StreamingManager extends ResourceTracker {
       startTime: Date.now(),
       status: 'active',
       batches: [],
-      results: []
+      results: [],
+      conversationAcceptanceRegistered: conversationAcceptanceRegistered === true
     };
 
     // Store sender information for streaming updates
@@ -174,7 +177,8 @@ export class StreamingManager extends ResourceTracker {
           totalSegments: streamInfo.totalSegments,
           sourceLanguage,
           targetLanguage,
-          timestamp: Date.now()
+          timestamp: Date.now(),
+          ...(streamInfo.conversationAcceptanceRegistered && { conversationAcceptance: true })
         },
         'background-streaming',
         messageId
@@ -291,6 +295,8 @@ export class StreamingManager extends ResourceTracker {
 
     try {
       // Send stream end message
+      const completionData = { ...additionalData };
+      delete completionData.conversationAcceptance;
       const streamEndMessage = MessageFormat.create(
         MessageActions.TRANSLATION_STREAM_END,
         {
@@ -301,7 +307,8 @@ export class StreamingManager extends ResourceTracker {
           totalSegments: streamInfo.totalSegments,
           duration: streamInfo.duration,
           timestamp: Date.now(),
-          ...additionalData
+          ...completionData,
+          ...(success && streamInfo.conversationAcceptanceRegistered && { conversationAcceptance: true })
         },
         'background-streaming',
         messageId

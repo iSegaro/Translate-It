@@ -190,6 +190,16 @@ export class UnifiedTranslationCoordinator {
           throw streamingResult.error || new Error('Streaming failed without explicit error');
         }
 
+        if (streamingResult && typeof streamingResult === 'object') {
+          const hasConversationAcceptance = initialResponse?.conversationAcceptance === true
+            || streamingResult.conversationAcceptance === true
+            || streamingResult.data?.conversationAcceptance === true;
+          const finalResult = { ...streamingResult };
+          delete finalResult.conversationAcceptance;
+          if (hasConversationAcceptance) finalResult.conversationAcceptance = true;
+          return finalResult;
+        }
+
         return streamingResult;
       } else {
         // Not streaming, return regular response

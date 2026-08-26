@@ -122,6 +122,26 @@ describe('UnifiedTranslationCoordinator', () => {
       expect(result).toEqual(streamingResult);
     });
 
+    it('preserves acceptance metadata from the initial streaming response', async () => {
+      const message = {
+        action: MessageActions.TRANSLATE,
+        messageId: 'stream-acceptance',
+        context: 'select-element',
+        data: { text: 'a'.repeat(300), mode: 'select-element' },
+      };
+      sendRegularMessage.mockResolvedValue({
+        success: true,
+        streaming: true,
+        conversationAcceptance: true,
+      });
+      const streamingResult = { success: true, type: 'stream_end', data: { success: true } };
+      streamingTimeoutManager.registerStreamingOperation.mockResolvedValue(streamingResult);
+
+      const result = await coordinator.coordinateTranslation(message);
+
+      expect(result).toEqual({ ...streamingResult, conversationAcceptance: true });
+    });
+
     it('should fallback to regular translation if streaming is not initiated', async () => {
       const longText = 'a'.repeat(300);
       const message = { 

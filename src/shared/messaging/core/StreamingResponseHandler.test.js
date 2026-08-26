@@ -58,6 +58,22 @@ describe('StreamingResponseHandler', () => {
     }));
   });
 
+  it('promotes acceptance metadata from stream end data', () => {
+    const messageId = 'msg-acceptance-end';
+    handler.registerHandler(messageId, { onStreamEnd: vi.fn() });
+
+    handler.handleMessage({
+      action: MessageActions.TRANSLATION_STREAM_END,
+      messageId,
+      data: { success: true, conversationAcceptance: true },
+    });
+
+    expect(mockCoordinator.completeStreamingOperation).toHaveBeenCalledWith(messageId, expect.objectContaining({
+      conversationAcceptance: true,
+      data: expect.objectContaining({ conversationAcceptance: true }),
+    }));
+  });
+
   it('reconstructs stream-end errors with canonical identity on Error', () => {
     const messageId = 'msg-stream-error';
     handler.registerHandler(messageId);

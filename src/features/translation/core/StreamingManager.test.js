@@ -180,6 +180,50 @@ describe('StreamingManager', () => {
       expect(statsManager.printSummary).toHaveBeenCalled();
     });
 
+    it('includes acceptance metadata for registered sessions', async () => {
+      const { default: browser } = await import('webextension-polyfill');
+      const messageId = 'msg-acceptance';
+      streamingManager.initializeStream(
+        messageId,
+        { tab: { id: 999 } },
+        { providerName: 'TestProvider' },
+        ['s1'],
+        null,
+        true
+      );
+
+      await streamingManager.streamBatchResults(messageId, ['res'], ['s1'], 0);
+      await streamingManager.completeStream(messageId, true);
+
+      const messages = browser.tabs.sendMessage.mock.calls.map(([, message]) => message);
+      const update = messages.find(message => message.action === MessageActions.TRANSLATION_STREAM_UPDATE);
+      const end = messages.find(message => message.action === MessageActions.TRANSLATION_STREAM_END);
+      expect(update.data).toHaveProperty('conversationAcceptance', true);
+      expect(end.data).toHaveProperty('conversationAcceptance', true);
+    });
+
+    it('omits acceptance metadata for unregistered sessions', async () => {
+      const { default: browser } = await import('webextension-polyfill');
+      const messageId = 'msg-no-acceptance';
+      streamingManager.initializeStream(
+        messageId,
+        { tab: { id: 999 } },
+        { providerName: 'TestProvider' },
+        ['s1'],
+        null,
+        false
+      );
+
+      await streamingManager.streamBatchResults(messageId, ['res'], ['s1'], 0);
+      await streamingManager.completeStream(messageId, true);
+
+      const messages = browser.tabs.sendMessage.mock.calls.map(([, message]) => message);
+      expect(messages).not.toContainEqual(expect.objectContaining({
+        data: expect.objectContaining({ conversationAcceptance: false })
+      }));
+      expect(messages.every(message => !Object.hasOwn(message.data, 'conversationAcceptance'))).toBe(true);
+    });
+
     it('should handle missing sender info gracefully', async () => {
       const { default: browser } = await import('webextension-polyfill');
       const messageId = 'msg-123';

@@ -3595,9 +3595,10 @@ describe('DomTranslatorAdapter', () => {
       callbacks[1].onStreamEnd({ success: true });
       await secondTranslation;
 
-      callbacks[0].onStreamUpdate({ success: true, data: [{ t: 'stale', i: 'n1' }] });
+      callbacks[0].onStreamUpdate({ success: true, conversationAcceptance: true, data: [{ t: 'stale', i: 'n1' }] });
       expect(firstElement.textContent).toBe('Hello');
       expect(secondElement.textContent).toContain('active');
+      expect(adapter._conversationAcceptanceEnabled).toBe(false);
 
       callbacks[0].onStreamEnd({ success: true });
       await firstTranslation;
@@ -4508,6 +4509,70 @@ describe('DomTranslatorAdapter', () => {
       await translation;
 
       expect(sendRegularMessage.mock.calls.filter(([message]) => message.data?.accepted === true)).toHaveLength(0);
+    });
+
+    it('latches acceptance from an early stream update before the request response', async () => {
+      let streamCallbacks;
+      let resolveRequest;
+      registerTranslation.mockImplementationOnce((_id, callbacks) => { streamCallbacks = callbacks; });
+      contentScriptIntegration.sendTranslationRequest.mockImplementationOnce(() => new Promise(resolve => {
+        resolveRequest = resolve;
+      }));
+
+      const translation = adapter.translateElement(testElement);
+      await vi.waitFor(() => expect(streamCallbacks).toBeDefined());
+
+      streamCallbacks.onStreamUpdate({
+        success: true,
+        conversationAcceptance: true,
+        data: [{ t: 'سلام', i: 'n1' }],
+      });
+      await vi.waitFor(() => expect(
+        sendRegularMessage.mock.calls.filter(([message]) => message.data?.accepted === true)
+      ).toHaveLength(1));
+
+      streamCallbacks.onStreamEnd({ success: true });
+      resolveRequest({ success: true, streaming: true });
+
+      await expect(translation).resolves.toMatchObject({ success: true });
+      expect(adapter._conversationAcceptanceEnabled).toBe(true);
+    });
+
+    it('ignores acceptance metadata from a stale final response', async () => {
+      const firstElement = testElement;
+      const secondElement = document.createElement('div');
+      secondElement.textContent = 'Hello';
+      document.body.appendChild(secondElement);
+
+      let resolveFirstResponse;
+      const firstResponse = new Promise(resolve => { resolveFirstResponse = resolve; });
+      const streamCallbacks = [];
+      registerTranslation.mockImplementation((_id, callbacks) => { streamCallbacks.push(callbacks); });
+      contentScriptIntegration.sendTranslationRequest
+        .mockImplementationOnce(() => firstResponse)
+        .mockResolvedValueOnce({ success: true, streaming: true });
+
+      const firstTranslation = adapter.translateElement(firstElement);
+      await vi.waitFor(() => expect(streamCallbacks).toHaveLength(1));
+      await adapter.cancelTranslation({ silent: true });
+
+      const secondTranslation = adapter.translateElement(secondElement);
+      await vi.waitFor(() => expect(streamCallbacks).toHaveLength(2));
+
+      resolveFirstResponse({ success: true, streaming: true, conversationAcceptance: true });
+      await Promise.resolve();
+
+      expect(adapter._conversationAcceptanceEnabled).toBe(false);
+
+      streamCallbacks[1].onStreamUpdate({ success: true, data: [{ t: 'active', i: 'n1' }] });
+      streamCallbacks[1].onStreamEnd({ success: true });
+      await expect(secondTranslation).resolves.toMatchObject({ success: true });
+      expect(adapter._conversationAcceptanceEnabled).toBe(false);
+
+      streamCallbacks[0].onStreamEnd({ success: true });
+      await firstTranslation.catch(() => undefined);
+      expect(sendRegularMessage.mock.calls.filter(([message]) => message.data?.accepted === true)).toHaveLength(0);
+      secondElement.remove();
     });
 
     it('A-direct: emits no parent acceptance ACK when conversation acceptance is not registered (direct)', async () => {

@@ -272,6 +272,43 @@ describe('Select Element streaming provenance integration', () => {
     element.remove();
   });
 
+  it('latches acceptance from an early streamed parent through real routing', async () => {
+    browser.runtime.sendMessage.mockImplementation((message) => {
+      if (message.action === MessageActions.TRANSLATE) {
+        return new Promise(resolve => {
+          setTimeout(async () => {
+            await route(message.messageId, [
+              {
+                action: MessageActions.TRANSLATION_STREAM_UPDATE,
+                data: {
+                  success: true,
+                  conversationAcceptance: true,
+                  data: [{ t: 'Hola', i: 'n1' }],
+                },
+              },
+              { action: MessageActions.TRANSLATION_STREAM_END, data: { success: true } },
+            ]);
+            resolve({ success: true, streaming: true });
+          }, 0);
+        });
+      }
+      if (message.action === MessageActions.PARENT_ACCEPTANCE_ACK) {
+        return Promise.resolve({ success: true, status: 'ACCEPTED' });
+      }
+      return Promise.resolve({ success: true });
+    });
+
+    const element = createElement('Hello');
+    await expect(adapter.translateElement(element)).resolves.toMatchObject({ success: true });
+
+    const acceptedAcks = browser.runtime.sendMessage.mock.calls
+      .map(([message]) => message)
+      .filter(message => message.action === MessageActions.PARENT_ACCEPTANCE_ACK && message.data?.accepted === true);
+    expect(acceptedAcks).toHaveLength(1);
+    expect(element.textContent).toBe('Hola');
+    element.remove();
+  });
+
   it('preserves explicit user cancellation through real routing', async () => {
     routeStream.mockImplementation((messageId) => route(messageId, [{
       success: false,

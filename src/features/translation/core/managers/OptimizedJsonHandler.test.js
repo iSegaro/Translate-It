@@ -4986,6 +4986,55 @@ describe('OptimizedJsonHandler', () => {
       expect(end).toEqual([123, expect.objectContaining({ action: MessageActions.TRANSLATION_STREAM_END }), { frameId: 3 }]);
     });
 
+    it('propagates acceptance metadata through optimized stream and final result', async () => {
+      const browser = (await import('webextension-polyfill')).default;
+      browser.tabs.sendMessage.mockClear();
+      mockEngine.createIntelligentBatches = vi.fn(() => [[{ i: 'n1', t: 'Hello.' }]]);
+      mockProvider.translate.mockResolvedValueOnce({ translatedText: ['Bonjour.'] });
+
+      const result = await handler.execute(
+        mockEngine,
+        mockData,
+        mockProvider,
+        'en',
+        'fa',
+        'msg-optimized-acceptance',
+        { tab: { id: 123 } },
+        'unknown',
+        { conversationAcceptanceRegistered: true }
+      );
+
+      const messages = browser.tabs.sendMessage.mock.calls.map(([, message]) => message);
+      const update = messages.find(message => message.action === MessageActions.TRANSLATION_STREAM_UPDATE);
+      const end = messages.find(message => message.action === MessageActions.TRANSLATION_STREAM_END);
+      expect(update.data).toHaveProperty('conversationAcceptance', true);
+      expect(end.data).toHaveProperty('conversationAcceptance', true);
+      expect(result).toHaveProperty('conversationAcceptance', true);
+    });
+
+    it('omits acceptance metadata from optimized streams without registration', async () => {
+      const browser = (await import('webextension-polyfill')).default;
+      browser.tabs.sendMessage.mockClear();
+      mockEngine.createIntelligentBatches = vi.fn(() => [[{ i: 'n1', t: 'Hello.' }]]);
+      mockProvider.translate.mockResolvedValueOnce({ translatedText: ['Bonjour.'] });
+
+      const result = await handler.execute(
+        mockEngine,
+        mockData,
+        mockProvider,
+        'en',
+        'fa',
+        'msg-optimized-no-acceptance',
+        { tab: { id: 123 } },
+        'unknown',
+        { conversationAcceptanceRegistered: false }
+      );
+
+      const messages = browser.tabs.sendMessage.mock.calls.map(([, message]) => message);
+      expect(messages.every(message => !Object.hasOwn(message.data, 'conversationAcceptance'))).toBe(true);
+      expect(result).not.toHaveProperty('conversationAcceptance');
+    });
+
     it('targets the originating iframe for error sends', async () => {
       const browser = (await import('webextension-polyfill')).default;
       browser.tabs.sendMessage.mockClear();

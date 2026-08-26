@@ -1037,7 +1037,9 @@ export class BaseAIProvider extends BaseProvider {
         if (sender) {
           // If we have sender info, we can safely initialize the stream even if coordinator skipped it
           const { streamingManager } = await import("@/features/translation/core/StreamingManager.js");
-          streamingManager.initializeStream(messageId, sender, this, texts, sessionId);
+          const streamArgs = [messageId, sender, this, texts, sessionId];
+          if (options.executionContext?.conversationAcceptanceRegistered === true) streamArgs.push(true);
+          streamingManager.initializeStream(...streamArgs);
           logger.debug(`[${this.providerName}] Late-initialized stream for messageId: ${messageId}`);
         }
       } catch (err) {

@@ -156,7 +156,8 @@ export class StreamingResponseHandler {
         updateCount: handler.updateCount,
         targetLanguage: data.targetLanguage,
         sourceLanguage: data.sourceLanguage,
-        data
+        data,
+        ...(data?.conversationAcceptance === true && { conversationAcceptance: true })
       });
     } else {
       const errorSource = isStructuredTranslationError(data?.errorDetails)
@@ -205,7 +206,8 @@ export class StreamingResponseHandler {
       this.coordinator.completeStreamingOperation(messageId, {
         success: true,
         type: 'translation_result',
-        data
+        data,
+        ...(data?.conversationAcceptance === true && { conversationAcceptance: true })
       });
     } else {
       const errorSource = isStructuredTranslationError(data?.errorDetails)

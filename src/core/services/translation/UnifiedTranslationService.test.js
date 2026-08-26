@@ -185,7 +185,9 @@ describe('UnifiedTranslationService', () => {
       translationRequestTracker.createRequest.mockReturnValue(mockRequest);
       const registrationSpy = vi.spyOn(service, '_registerConversationAcceptance');
       let handleDuringProcessing;
-      service.modeCoordinator.processRequest.mockImplementation(async () => {
+      let executionContextDuringProcessing;
+      service.modeCoordinator.processRequest.mockImplementation(async (_request, { executionContext }) => {
+        executionContextDuringProcessing = executionContext;
         handleDuringProcessing = service.conversationAcceptanceCoordinator.lookup(message.messageId);
         return { success: true, translatedText: 'translated' };
       });
@@ -195,6 +197,7 @@ describe('UnifiedTranslationService', () => {
       const handle = service.conversationAcceptanceCoordinator.lookup(message.messageId);
       expect(handle).not.toBeNull();
       expect(handleDuringProcessing).toBe(handle);
+      expect(executionContextDuringProcessing.conversationAcceptanceRegistered).toBe(true);
       expect(registrationSpy).toHaveBeenCalledTimes(1);
       expect(handle.snapshot()).toMatchObject({
         messageId: message.messageId,
@@ -242,7 +245,8 @@ describe('UnifiedTranslationService', () => {
       service.modeCoordinator.processRequest.mockResolvedValueOnce({ success: true, translatedText: 'translated' });
 
       const resultOff = await service.handleTranslationRequest(messageOff);
-      expect(resultOff).toMatchObject({ success: true, conversationAcceptance: false });
+      expect(resultOff).toMatchObject({ success: true });
+      expect(resultOff).not.toHaveProperty('conversationAcceptance');
     });
 
     it('accepts ACK before execution completes without activating timeout', async () => {
