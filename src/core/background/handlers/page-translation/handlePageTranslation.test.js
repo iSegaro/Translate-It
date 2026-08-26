@@ -98,6 +98,7 @@ describe('handlePageTranslation response projection', () => {
       success: false,
       reason,
       responses: [mainResponse],
+      frames: [{ frameId: 0, success: true }],
     });
   });
 
@@ -113,6 +114,10 @@ describe('handlePageTranslation response projection', () => {
 
     expect(result.reason).toBe(ActionReasons.NOT_SUITABLE);
     expect(result.responses).toEqual([mainResponse, childResponse]);
+    expect(result.frames).toEqual([
+      { frameId: 0, success: true },
+      { frameId: 1, success: true },
+    ]);
   });
 
   it('uses first resolved child rejection when main frame transport fails', async () => {
@@ -128,6 +133,10 @@ describe('handlePageTranslation response projection', () => {
       success: false,
       reason: ActionReasons.NOT_SUITABLE,
       responses: [childResponse],
+      frames: [
+        { frameId: 0, success: false },
+        { frameId: 1, success: true },
+      ],
     });
     expect(result.isTransportFailure).toBeUndefined();
   });
@@ -180,6 +189,10 @@ describe('handlePageTranslation response projection', () => {
     expect(result).toEqual({
       success: true,
       responses: [mainResponse, childResponse],
+      frames: [
+        { frameId: 0, success: true },
+        { frameId: 1, success: true },
+      ],
     });
     expect(result).not.toHaveProperty('reason');
     expect(result.isTransportFailure).toBeUndefined();
@@ -212,6 +225,10 @@ describe('handlePageTranslation response projection', () => {
       error: 'Content script not available',
       isTransportFailure: true,
       responses: [],
+      frames: [
+        { frameId: 0, success: false },
+        { frameId: 1, success: false },
+      ],
     });
     expect(result.reason).toBeUndefined();
   });
@@ -247,6 +264,7 @@ describe('handlePageTranslation response projection', () => {
     expect(result).toEqual({
       success: false,
       responses: [mainResponse],
+      frames: [{ frameId: 0, success: true }],
     });
     expect(result.reason).toBeUndefined();
   });
@@ -307,6 +325,11 @@ describe('handlePageTranslation target tab ownership', () => {
     expect(result).toEqual({
       success: true,
       responses: [{ success: true }, { success: true }],
+      frames: [
+        { frameId: 0, success: true },
+        { frameId: 1, success: false },
+        { frameId: 2, success: true },
+      ],
     });
   });
 
@@ -483,5 +506,226 @@ describe('trusted frame lifecycle relay', () => {
 
     expect(result).toEqual({ success: false, error: 'Unsupported page lifecycle action' });
     expect(browser.tabs.sendMessage).not.toHaveBeenCalled();
+  });
+});
+
+describe('bounded frame command response deadline', () => {
+  const RESPONSE_TIMEOUT_MS = 6000;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.useFakeTimers();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  function setupBoundedFrames(frameHandlers, { activeTabId = 42 } = {}) {
+    browser.tabs.query.mockResolvedValue([{ id: activeTabId }]);
+    tabPermissionChecker.checkTabAccess.mockResolvedValue({ isAccessible: true });
+    browser.webNavigation.getAllFrames.mockResolvedValue(
+      frameHandlers.map((_, index) => ({
+        frameId: index === 0 ? 0 : index * 7,
+        url: `https://frame-${index}.example`,
+      }))
+    );
+    browser.tabs.sendMessage.mockImplementation((_tabId, _message, { frameId }) => {
+      const handler = frameHandlers.find(candidate => candidate.frameId === frameId);
+      return handler ? handler.run() : Promise.resolve({ success: true });
+    });
+  }
+
+  const never = () => new Promise(() => {});
+  const deferred = () => {
+    let resolve;
+    let reject;
+    const promise = new Promise((res, rej) => { resolve = res; reject = rej; });
+    return { promise, resolve, reject };
+  };
+
+  it.each([
+    ['translates', MessageActions.PAGE_TRANSLATE],
+    ['restores', MessageActions.PAGE_RESTORE],
+    ['stops', MessageActions.PAGE_TRANSLATE_STOP_AUTO],
+  ])('settles a hanging child after the inner deadline and preserves successful siblings for %s', async (_name, action) => {
+    setupBoundedFrames([
+      { frameId: 0, run: () => Promise.resolve({ success: true, messageId: 'main' }) },
+      { frameId: 7, run: never },
+      { frameId: 14, run: () => Promise.resolve({ success: true, messageId: 'child' }) },
+    ]);
+
+    const resultPromise = handlePageTranslation({ action }, sender);
+    await vi.advanceTimersByTimeAsync(RESPONSE_TIMEOUT_MS + 100);
+    const result = await resultPromise;
+
+    expect(result.success).toBe(true);
+    expect(result.responses).toEqual([
+      { success: true, messageId: 'main' },
+      { success: true, messageId: 'child' },
+    ]);
+    expect(result.frames).toEqual([
+      { frameId: 0, success: true },
+      { frameId: 7, success: false, isResponseTimeout: true, reason: 'frame_command_response_timeout' },
+      { frameId: 14, success: true },
+    ]);
+  });
+
+  it('classifies immediate transport rejection distinctly from response timeout', async () => {
+    setupBoundedFrames([
+      { frameId: 0, run: () => Promise.resolve({ success: true }) },
+      { frameId: 7, run: () => Promise.reject(new Error('Could not establish connection. Receiving end does not exist.')) },
+    ]);
+
+    const result = await handlePageTranslation({ action: MessageActions.PAGE_RESTORE }, sender);
+
+    expect(result.success).toBe(true);
+    expect(result.frames).toEqual([
+      { frameId: 0, success: true },
+      { frameId: 7, success: false },
+    ]);
+    expect(result.frames.some(frame => frame.isResponseTimeout)).toBe(false);
+  });
+
+  it('returns an uncertainty result when every frame response times out', async () => {
+    setupBoundedFrames([
+      { frameId: 0, run: never },
+      { frameId: 7, run: never },
+    ]);
+
+    const resultPromise = handlePageTranslation({ action: MessageActions.PAGE_RESTORE }, sender);
+    await vi.advanceTimersByTimeAsync(RESPONSE_TIMEOUT_MS + 100);
+    const result = await resultPromise;
+
+    expect(result).toEqual({
+      success: false,
+      reason: 'frame_command_response_timeout',
+      isTransportFailure: true,
+      responses: [],
+      frames: [
+        { frameId: 0, success: false, isResponseTimeout: true, reason: 'frame_command_response_timeout' },
+        { frameId: 7, success: false, isResponseTimeout: true, reason: 'frame_command_response_timeout' },
+      ],
+    });
+    // No lifecycle may be synthesized by response timeouts.
+    expect(browser.runtime.sendMessage).not.toHaveBeenCalled();
+  });
+
+  it('keeps Translate all-timeout semantics free of deterministic failure classification', async () => {
+    setupBoundedFrames([
+      { frameId: 0, run: never },
+    ]);
+
+    const resultPromise = handlePageTranslation({ action: MessageActions.PAGE_TRANSLATE }, sender);
+    await vi.advanceTimersByTimeAsync(RESPONSE_TIMEOUT_MS + 100);
+    const result = await resultPromise;
+
+    expect(result.reason).toBe('frame_command_response_timeout');
+    expect(result.isTransportFailure).toBe(true);
+    expect(JSON.stringify(result)).not.toContain('TRANSLATION_TIMEOUT');
+    expect(JSON.stringify(result)).not.toContain('TRANSLATION_FAILED');
+  });
+
+  it('returns usable top-frame aggregated status while a child hangs', async () => {
+    const aggregatedResponse = { success: true, isAggregated: true, translatedCount: 4 };
+    setupBoundedFrames([
+      { frameId: 0, run: () => Promise.resolve(aggregatedResponse) },
+      { frameId: 7, run: never },
+    ]);
+
+    const resultPromise = handlePageTranslation({ action: MessageActions.PAGE_TRANSLATE_GET_STATUS }, sender);
+    await vi.advanceTimersByTimeAsync(RESPONSE_TIMEOUT_MS + 100);
+    const result = await resultPromise;
+
+    expect(result).toBe(aggregatedResponse);
+    expect(browser.tabs.sendMessage).toHaveBeenCalledTimes(2);
+  });
+
+  it('reports Status uncertainty instead of no-active-translation when every frame times out', async () => {
+    setupBoundedFrames([
+      { frameId: 0, run: never },
+      { frameId: 7, run: never },
+    ]);
+
+    const resultPromise = handlePageTranslation({ action: MessageActions.PAGE_TRANSLATE_GET_STATUS }, sender);
+    await vi.advanceTimersByTimeAsync(RESPONSE_TIMEOUT_MS + 100);
+    const result = await resultPromise;
+
+    expect(result).toEqual({
+      success: false,
+      reason: 'frame_command_response_timeout',
+      isTransportFailure: true,
+    });
+    expect(result.error).not.toBe('No active translation found');
+  });
+
+  it('keeps Status uncertainty when response timeout mixes with immediate rejection', async () => {
+    setupBoundedFrames([
+      { frameId: 0, run: () => Promise.reject(new Error('Receiving end does not exist')) },
+      { frameId: 7, run: never },
+    ]);
+
+    const resultPromise = handlePageTranslation({ action: MessageActions.PAGE_TRANSLATE_GET_STATUS }, sender);
+    await vi.advanceTimersByTimeAsync(RESPONSE_TIMEOUT_MS + 100);
+    const result = await resultPromise;
+
+    expect(result).toEqual({
+      success: false,
+      reason: 'frame_command_response_timeout',
+      isTransportFailure: true,
+    });
+  });
+
+  it('preserves legacy no-active-translation fallback for all-immediate rejections', async () => {
+    setupBoundedFrames([
+      { frameId: 0, run: () => Promise.reject(new Error('Receiving end does not exist')) },
+      { frameId: 7, run: () => Promise.reject(new Error('Frame unavailable')) },
+    ]);
+
+    const result = await handlePageTranslation({ action: MessageActions.PAGE_TRANSLATE_GET_STATUS }, sender);
+
+    expect(result).toEqual({
+      success: false,
+      error: 'No active translation found',
+    });
+    expect(result.isResponseTimeout).toBeUndefined();
+    expect(result.reason).toBeUndefined();
+  });
+
+  it('ignores late responses after the fan-out has settled', async () => {
+    const lateChild = deferred();
+    setupBoundedFrames([
+      { frameId: 0, run: () => Promise.resolve({ success: true }) },
+      { frameId: 7, run: () => lateChild.promise },
+    ]);
+
+    const resultPromise = handlePageTranslation({ action: MessageActions.PAGE_RESTORE }, sender);
+    await vi.advanceTimersByTimeAsync(RESPONSE_TIMEOUT_MS + 100);
+    const settledResult = await resultPromise;
+    const snapshot = JSON.stringify(settledResult);
+    const sendCallCount = browser.tabs.sendMessage.mock.calls.length;
+
+    lateChild.resolve({ success: true, restoredCount: 9 });
+    await Promise.resolve();
+    await Promise.resolve();
+    await vi.advanceTimersByTimeAsync(1000);
+
+    expect(JSON.stringify(settledResult)).toBe(snapshot);
+    expect(browser.tabs.sendMessage).toHaveBeenCalledTimes(sendCallCount);
+    expect(browser.runtime.sendMessage).not.toHaveBeenCalled();
+  });
+
+  it('clears pending timers once frames acknowledge before the deadline', async () => {
+    setupBoundedFrames([
+      { frameId: 0, run: () => Promise.resolve({ success: true }) },
+      { frameId: 7, run: () => Promise.resolve({ success: true }) },
+    ]);
+
+    await handlePageTranslation({ action: MessageActions.PAGE_TRANSLATE_STOP_AUTO }, sender);
+
+    expect(vi.getTimerCount()).toBe(0);
+
+    await vi.advanceTimersByTimeAsync(RESPONSE_TIMEOUT_MS + 100);
+    expect(browser.tabs.sendMessage).toHaveBeenCalledTimes(2);
   });
 });

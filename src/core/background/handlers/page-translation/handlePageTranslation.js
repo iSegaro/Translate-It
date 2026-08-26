@@ -34,6 +34,69 @@ function projectPageTranslationFailure(response, responses) {
   return { ...projected, responses };
 }
 
+// Bounded frame command response deadline. Must stay below the outer caller
+// deadline (OPERATION_TIMEOUTS.DEFAULT = 8000ms) so the background can still
+// deliver an aggregated result before the caller stops waiting.
+const FRAME_COMMAND_RESPONSE_TIMEOUT_MS = 6000;
+const FRAME_COMMAND_RESPONSE_TIMEOUT_REASON = 'frame_command_response_timeout';
+
+/**
+ * Sends a Whole Page command to a single frame with a bounded response wait.
+ *
+ * A response timeout is an uncertainty state only: it means the background did
+ * not receive the frame's response within the deadline. It does NOT mean the
+ * command was undelivered, unexecuted, or that any translation/restore/stop
+ * operation failed. Late resolutions/rejections of the underlying send are
+ * observed but ignored once this wrapper has settled.
+ *
+ * @param {number} tabId Target tab id
+ * @param {Object} message Command message forwarded unchanged
+ * @param {number} frameId Target frame id
+ * @returns {Promise<{frameId: number, response: Object|null, isResponseTimeout: boolean}>}
+ */
+async function sendFrameCommandWithResponseDeadline(tabId, message, frameId) {
+  let timeoutId;
+  try {
+    const response = await Promise.race([
+      browser.tabs.sendMessage(tabId, message, { frameId }),
+      new Promise((_, reject) => {
+        timeoutId = setTimeout(() => {
+          const timeoutError = new Error(`Frame ${frameId} command response timed out`);
+          timeoutError.isResponseTimeout = true;
+          reject(timeoutError);
+        }, FRAME_COMMAND_RESPONSE_TIMEOUT_MS);
+      }),
+    ]);
+    return { frameId, response, isResponseTimeout: false };
+  } catch (error) {
+    // Promise.race keeps handlers attached to the losing send promise, so late
+    // rejections after a timeout settle here without becoming unhandled.
+    if (error?.isResponseTimeout === true) {
+      return { frameId, response: null, isResponseTimeout: true };
+    }
+    logger.debug(`Could not send to frame ${frameId}:`, error.message);
+    return { frameId, response: null, isResponseTimeout: false };
+  } finally {
+    clearTimeout(timeoutId);
+  }
+}
+
+/**
+ * Projects a bounded frame send result into an additive per-frame delivery
+ * record. `success` reflects delivery-level acknowledgement; application
+ * failures remain visible inside the acknowledged `responses` collection.
+ */
+function projectFrameDelivery({ frameId, response, isResponseTimeout }) {
+  return {
+    frameId,
+    success: response !== null,
+    ...(isResponseTimeout && {
+      isResponseTimeout: true,
+      reason: FRAME_COMMAND_RESPONSE_TIMEOUT_REASON,
+    }),
+  };
+}
+
 /**
  * Handle page translation related messages
  */
@@ -241,11 +304,12 @@ export async function handlePageTranslation(message, sender) {
       });
 
       if (message.action === MessageActions.PAGE_TRANSLATE_GET_STATUS) {
-        const statusResponses = await Promise.all(
-          allFrames.map(frame => 
-            browser.tabs.sendMessage(targetTabId, message, { frameId: frame.frameId }).catch(() => null)
+        const statusResults = await Promise.all(
+          allFrames.map(frame =>
+            sendFrameCommandWithResponseDeadline(targetTabId, message, frame.frameId)
           )
         );
+        const statusResponses = statusResults.map(({ response }) => response);
         
         // 1. Check for an aggregated response (usually from the top frame)
         // This response already contains consolidated stats from all frames
@@ -253,6 +317,20 @@ export async function handlePageTranslation(message, sender) {
         if (aggregatedResponse) {
           logger.debug('Returning aggregated translation status from main frame');
           return aggregatedResponse;
+        }
+
+        // Response timeouts leave status unknown. Never report
+        // "No active translation found" purely because bounded sends timed
+        // out; that fallback stays valid only for acknowledged responses.
+        if (
+          !statusResponses.some(response => response != null)
+          && statusResults.some(({ isResponseTimeout }) => isResponseTimeout)
+        ) {
+          return {
+            success: false,
+            reason: FRAME_COMMAND_RESPONSE_TIMEOUT_REASON,
+            isTransportFailure: true,
+          };
         }
 
         // 2. Fallback: Aggregate manually if no aggregated response was found
@@ -271,26 +349,36 @@ export async function handlePageTranslation(message, sender) {
         return bestResponse;
       }
 
-      // Forward TRANSLATE and RESTORE to all frames
+      // Forward TRANSLATE, RESTORE and STOP to all frames with a bounded
+      // per-frame response deadline so one stalled frame cannot hang the
+      // whole fan-out.
       const frameResults = await Promise.all(
-        allFrames.map(async (frame) => {
-          try {
-            const response = await browser.tabs.sendMessage(targetTabId, message, { frameId: frame.frameId });
-            return { frameId: frame.frameId, response };
-          } catch (err) {
-            logger.debug(`Could not send to frame ${frame.frameId}:`, err.message);
-            return { frameId: frame.frameId, response: null };
-          }
-        })
+        allFrames.map(frame =>
+          sendFrameCommandWithResponseDeadline(targetTabId, message, frame.frameId)
+        )
       );
 
       const responses = frameResults
         .map(({ response }) => response)
         .filter(response => response != null);
+      const frames = frameResults.map(projectFrameDelivery);
       const success = responses.some(response => response.success);
 
+      // Every frame timed out without a single acknowledged response: return
+      // an uncertainty result. For PAGE_TRANSLATE this does NOT prove the
+      // command did not execute; lifecycle events remain authoritative.
+      if (!responses.length && frameResults.some(({ isResponseTimeout }) => isResponseTimeout)) {
+        return {
+          success: false,
+          reason: FRAME_COMMAND_RESPONSE_TIMEOUT_REASON,
+          isTransportFailure: true,
+          responses,
+          frames,
+        };
+      }
+
       if (message.action !== MessageActions.PAGE_TRANSLATE || success) {
-        return { success, responses };
+        return { success, responses, frames };
       }
 
       const canonicalFailure = frameResults.find(({ frameId, response }) => (
@@ -298,7 +386,7 @@ export async function handlePageTranslation(message, sender) {
       ))?.response || frameResults.find(({ response }) => response != null)?.response;
 
       if (canonicalFailure) {
-        return projectPageTranslationFailure(canonicalFailure, responses);
+        return { ...projectPageTranslationFailure(canonicalFailure, responses), frames };
       }
 
       return {
@@ -306,6 +394,7 @@ export async function handlePageTranslation(message, sender) {
         error: 'Content script not available',
         isTransportFailure: true,
         responses,
+        frames,
       };
     } catch (sendError) {
       if (ExtensionContextManager.isContextError(sendError)) {
