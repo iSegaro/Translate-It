@@ -79,6 +79,7 @@ vi.mock('@/utils/dom/DomDirectionManager.js', () => ({
   detectDirectionFromContent: vi.fn(() => 'rtl'),
   applyNodeDirection: vi.fn(),
   captureNodeDirectionState: vi.fn(() => []),
+  captureElementDirectionState: vi.fn(() => null),
   restoreNodeDirectionState: vi.fn(() => []),
   applyElementDirection: vi.fn(),
   BIDI_MARKS: { RLM: '\u200f', LRM: '\u200e' }
@@ -143,6 +144,7 @@ describe('DomTranslatorAdapter', () => {
     vi.clearAllMocks();
     ExtensionContextManager.isValidSync.mockReturnValue(true);
     globalSelectElementState.translationHistory = [];
+    globalSelectElementState.auxiliaryOwnership = new Map();
     adapter = new DomTranslatorAdapter();
     testElement = document.createElement('div');    testElement.textContent = 'Hello';
     document.body.appendChild(testElement);
@@ -181,6 +183,15 @@ describe('DomTranslatorAdapter', () => {
       const ownership = globalSelectElementState.translationHistory.at(-1).originalTextNodesData[0];
       expect(ownership.appliedText).toBe(testElement.firstChild.nodeValue);
       expect(Object.isFrozen(ownership)).toBe(true);
+      expect(globalSelectElementState.translationHistory.at(-1).auxiliaryOwnershipRecords)
+        .toEqual(expect.arrayContaining([
+          expect.objectContaining({
+            element: testElement,
+            property: 'attribute:data-has-original',
+            original: { present: false, value: null },
+            applied: { present: true, value: 'true' },
+          }),
+        ]));
       expect(contentScriptIntegration.sendTranslationRequest).toHaveBeenCalledWith(
         expect.objectContaining({
           data: expect.objectContaining({

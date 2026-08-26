@@ -257,6 +257,7 @@ export function applyNodeDirection(textNode, targetLanguage, rootElement = null,
 }
 
 const DIRECTION_STATE_ATTRIBUTES = [
+  'dir',
   'data-dir-original-saved',
   'data-original-direction',
   'data-original-text-align',
@@ -268,7 +269,15 @@ const DIRECTION_STATE_ATTRIBUTES = [
 
 const DIRECTION_STATE_STYLES = ['direction', 'unicode-bidi', 'max-width', 'text-align'];
 
-function captureElementDirectionState(element) {
+/**
+ * Captures exact direction state for one element without mutating the DOM.
+ *
+ * @param {HTMLElement} element - Element whose direction state is captured
+ * @returns {Object|null} Exact attribute and inline-style state
+ */
+export function captureElementDirectionState(element) {
+  if (!element || element.nodeType !== Node.ELEMENT_NODE) return null;
+
   return {
     element,
     attributes: Object.fromEntries(DIRECTION_STATE_ATTRIBUTES.map(name => [

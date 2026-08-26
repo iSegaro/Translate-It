@@ -309,6 +309,7 @@ export class BlockGroupReconstructor {
         success: true,
         cleanResult: parsedSegments.map(segment => segment.text).join(''),
         segments: parsedSegments,
+        auxiliarySnapshots: { attributeParents, directionSnapshots },
         transaction: {
           rollback,
           finalize() { active = false; },

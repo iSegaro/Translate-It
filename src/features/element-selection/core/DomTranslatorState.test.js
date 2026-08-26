@@ -66,6 +66,8 @@ describe('DomTranslatorState', () => {
     globalSelectElementState.isTranslating = false;
     globalSelectElementState.currentTranslation = null;
     globalSelectElementState.snapshots = new Map();
+    globalSelectElementState.auxiliaryOwnership = new Map();
+    globalSelectElementState.auxiliaryInvalidations = new Map();
   });
 
   describe('getSelectElementTranslationState', () => {
@@ -603,6 +605,274 @@ describe('DomTranslatorState', () => {
       expect(count).toBe(0);
       expect(nodes[0].nodeValue).toBe('External change');
       expect(globalSelectElementState.translationHistory).toHaveLength(0);
+      document.body.removeChild(container);
+    });
+
+    it('restores owned auxiliary properties independently after text drift', async () => {
+      const { container, nodes } = appendTextNodes(['External text']);
+      container.setAttribute('data-ti-has-original', 'true');
+      container.style.setProperty('direction', 'rtl');
+      container.setAttribute('dir', 'rtl');
+      globalSelectElementState.translationHistory = [{
+        element: container,
+        sessionId: 'auxiliary-session',
+        originalTextNodesData: [{
+          node: nodes[0],
+          originalText: 'Original text',
+          appliedText: 'Translated text',
+        }],
+        auxiliaryOwnershipRecords: [
+          {
+            element: container,
+            property: 'attribute:data-ti-has-original',
+            original: { present: false, value: null },
+            applied: { present: true, value: 'true' },
+          },
+          {
+            element: container,
+            property: 'style:direction',
+            original: { present: true, value: 'ltr', priority: 'important' },
+            applied: { present: true, value: 'rtl', priority: '' },
+          },
+          {
+            element: container,
+            property: 'attribute:dir',
+            original: { present: true, value: '' },
+            applied: { present: true, value: 'rtl' },
+          },
+        ],
+      }];
+
+      const count = await revertSelectElementTranslation('auxiliary-session');
+
+      expect(count).toBe(0);
+      expect(nodes[0].nodeValue).toBe('External text');
+      expect(container.hasAttribute('data-ti-has-original')).toBe(false);
+      expect(container.style.getPropertyValue('direction')).toBe('ltr');
+      expect(container.style.getPropertyPriority('direction')).toBe('important');
+      expect(container.getAttribute('dir')).toBe('');
+      document.body.removeChild(container);
+    });
+
+    it('reverts shared auxiliary properties in generation order', async () => {
+      const { container, nodes } = appendTextNodes(['Generation two']);
+      container.style.setProperty('direction', 'ltr');
+      globalSelectElementState.translationHistory = [
+        {
+          element: container,
+          sessionId: 'generation-one',
+          originalTextNodesData: [{ node: nodes[0], originalText: 'Original', appliedText: 'Generation one' }],
+          auxiliaryOwnershipRecords: [{
+            element: container,
+            property: 'style:direction',
+            original: { present: false, value: '', priority: '' },
+            applied: { present: true, value: 'rtl', priority: '' },
+          }],
+        },
+        {
+          element: container,
+          sessionId: 'generation-two',
+          originalTextNodesData: [{ node: nodes[0], originalText: 'Generation one', appliedText: 'Generation two' }],
+          auxiliaryOwnershipRecords: [{
+            element: container,
+            property: 'style:direction',
+            original: { present: true, value: 'rtl', priority: '' },
+            applied: { present: true, value: 'ltr', priority: '' },
+          }],
+        },
+      ];
+
+      const count = await revertSelectElementTranslation();
+
+      expect(count).toBe(2);
+      expect(nodes[0].nodeValue).toBe('Original');
+      expect(container.style.getPropertyValue('direction')).toBe('');
+      expect(globalSelectElementState.auxiliaryOwnership.size).toBe(0);
+      document.body.removeChild(container);
+    });
+
+    it('retires all style owners when external state aliases an older applied value', async () => {
+      const { container, nodes } = appendTextNodes(['Generation two']);
+      container.style.setProperty('direction', 'rtl');
+      globalSelectElementState.translationHistory = [
+        {
+          element: container,
+          sessionId: 'style-generation-one',
+          originalTextNodesData: [{ node: nodes[0], originalText: 'Original', appliedText: 'Generation one' }],
+          auxiliaryOwnershipRecords: [{
+            element: container,
+            property: 'style:direction',
+            original: { present: false, value: '', priority: '' },
+            applied: { present: true, value: 'rtl', priority: '' },
+          }],
+        },
+        {
+          element: container,
+          sessionId: 'style-generation-two',
+          originalTextNodesData: [{ node: nodes[0], originalText: 'Generation one', appliedText: 'Generation two' }],
+          auxiliaryOwnershipRecords: [{
+            element: container,
+            property: 'style:direction',
+            original: { present: true, value: 'rtl', priority: '' },
+            applied: { present: true, value: 'ltr', priority: '' },
+          }],
+        },
+      ];
+
+      const count = await revertSelectElementTranslation();
+
+      expect(count).toBe(2);
+      expect(nodes[0].nodeValue).toBe('Original');
+      expect(container.style.getPropertyValue('direction')).toBe('rtl');
+      expect(globalSelectElementState.auxiliaryOwnership.size).toBe(0);
+      expect(globalSelectElementState.auxiliaryInvalidations.size).toBe(0);
+      document.body.removeChild(container);
+    });
+
+    it('retires all attribute owners when external state aliases an older applied value', async () => {
+      const { container, nodes } = appendTextNodes(['Generation two']);
+      container.setAttribute('data-translate-dir', 'rtl');
+      globalSelectElementState.translationHistory = [
+        {
+          element: container,
+          sessionId: 'attribute-generation-one',
+          originalTextNodesData: [{ node: nodes[0], originalText: 'Original', appliedText: 'Generation one' }],
+          auxiliaryOwnershipRecords: [{
+            element: container,
+            property: 'attribute:data-translate-dir',
+            original: { present: false, value: null },
+            applied: { present: true, value: 'rtl' },
+          }],
+        },
+        {
+          element: container,
+          sessionId: 'attribute-generation-two',
+          originalTextNodesData: [{ node: nodes[0], originalText: 'Generation one', appliedText: 'Generation two' }],
+          auxiliaryOwnershipRecords: [{
+            element: container,
+            property: 'attribute:data-translate-dir',
+            original: { present: true, value: 'rtl' },
+            applied: { present: true, value: 'ltr' },
+          }],
+        },
+      ];
+
+      await revertSelectElementTranslation();
+
+      expect(nodes[0].nodeValue).toBe('Original');
+      expect(container.getAttribute('data-translate-dir')).toBe('rtl');
+      expect(globalSelectElementState.auxiliaryOwnership.size).toBe(0);
+      expect(globalSelectElementState.auxiliaryInvalidations.size).toBe(0);
+      document.body.removeChild(container);
+    });
+
+    it('invalidates only the drifted auxiliary property', async () => {
+      const { container, nodes } = appendTextNodes(['Translated']);
+      container.style.setProperty('direction', 'ltr');
+      container.style.setProperty('text-align', 'right');
+      globalSelectElementState.translationHistory = [{
+        element: container,
+        sessionId: 'property-specific-session',
+        originalTextNodesData: [{ node: nodes[0], originalText: 'Original', appliedText: 'Translated' }],
+        auxiliaryOwnershipRecords: [
+          {
+            element: container,
+            property: 'style:direction',
+            original: { present: false, value: '', priority: '' },
+            applied: { present: true, value: 'rtl', priority: '' },
+          },
+          {
+            element: container,
+            property: 'style:text-align',
+            original: { present: true, value: 'center', priority: '' },
+            applied: { present: true, value: 'right', priority: '' },
+          },
+        ],
+      }];
+
+      await revertSelectElementTranslation();
+
+      expect(container.style.getPropertyValue('direction')).toBe('ltr');
+      expect(container.style.getPropertyValue('text-align')).toBe('center');
+      expect(globalSelectElementState.auxiliaryOwnership.size).toBe(0);
+      document.body.removeChild(container);
+    });
+
+    it('does not restore auxiliary state owned by a newer generation', async () => {
+      const { container, nodes } = appendTextNodes(['Newer translation']);
+      container.style.setProperty('direction', 'ltr');
+      globalSelectElementState.translationHistory = [
+        {
+          element: container,
+          sessionId: 'older-generation',
+          originalTextNodesData: [{ node: nodes[0], originalText: 'Original', appliedText: 'Older translation' }],
+          auxiliaryOwnershipRecords: [{
+            element: container,
+            property: 'style:direction',
+            original: { present: false, value: '', priority: '' },
+            applied: { present: true, value: 'rtl', priority: '' },
+          }],
+        },
+        {
+          element: container,
+          sessionId: 'newer-generation',
+          originalTextNodesData: [{ node: nodes[0], originalText: 'Older translation', appliedText: 'Newer translation' }],
+          auxiliaryOwnershipRecords: [{
+            element: container,
+            property: 'style:direction',
+            original: { present: true, value: 'rtl', priority: '' },
+            applied: { present: true, value: 'ltr', priority: '' },
+          }],
+        },
+      ];
+
+      await revertSelectElementTranslation('older-generation');
+
+      expect(nodes[0].nodeValue).toBe('Newer translation');
+      expect(container.style.getPropertyValue('direction')).toBe('ltr');
+      expect(globalSelectElementState.translationHistory).toHaveLength(1);
+      expect(globalSelectElementState.translationHistory[0].sessionId).toBe('newer-generation');
+      document.body.removeChild(container);
+    });
+
+    it('does not let an invalidated targeted generation restore older attribute state', async () => {
+      const { container, nodes } = appendTextNodes(['Generation two']);
+      container.setAttribute('data-translate-dir', 'rtl');
+      globalSelectElementState.translationHistory = [
+        {
+          element: container,
+          sessionId: 'target-generation-one',
+          originalTextNodesData: [{ node: nodes[0], originalText: 'Original', appliedText: 'Generation one' }],
+          auxiliaryOwnershipRecords: [{
+            element: container,
+            property: 'attribute:data-translate-dir',
+            original: { present: false, value: null },
+            applied: { present: true, value: 'rtl' },
+          }],
+        },
+        {
+          element: container,
+          sessionId: 'target-generation-two',
+          originalTextNodesData: [{ node: nodes[0], originalText: 'Generation one', appliedText: 'Generation two' }],
+          auxiliaryOwnershipRecords: [{
+            element: container,
+            property: 'attribute:data-translate-dir',
+            original: { present: true, value: 'rtl' },
+            applied: { present: true, value: 'ltr' },
+          }],
+        },
+      ];
+
+      await revertSelectElementTranslation('target-generation-two');
+      expect(container.getAttribute('data-translate-dir')).toBe('rtl');
+      expect(globalSelectElementState.translationHistory).toHaveLength(1);
+
+      await revertSelectElementTranslation('target-generation-one');
+
+      expect(nodes[0].nodeValue).toBe('Original');
+      expect(container.getAttribute('data-translate-dir')).toBe('rtl');
+      expect(globalSelectElementState.auxiliaryOwnership.size).toBe(0);
+      expect(globalSelectElementState.auxiliaryInvalidations.size).toBe(0);
       document.body.removeChild(container);
     });
 

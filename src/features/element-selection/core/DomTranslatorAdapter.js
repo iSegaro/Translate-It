@@ -85,6 +85,61 @@ function unwrapMutationFailure(error) {
     : error;
 }
 
+function readAuxiliaryState(element, property) {
+  const separator = property.indexOf(':');
+  const kind = property.slice(0, separator);
+  const name = property.slice(separator + 1);
+  if (!element || separator <= 0 || !name) return null;
+
+  if (kind === 'style') {
+    const value = element.style.getPropertyValue(name);
+    return {
+      present: value !== '',
+      value,
+      priority: element.style.getPropertyPriority(name),
+    };
+  }
+  if (kind !== 'attribute') return null;
+
+  return {
+    present: element.hasAttribute(name),
+    value: element.getAttribute(name),
+  };
+}
+
+function auxiliaryStatesEqual(original, applied, property) {
+  if (!original || !applied || original.present !== applied.present) return false;
+  if (!original.present) return true;
+  if (original.value !== applied.value) return false;
+  return !property.startsWith('style:') || original.priority === applied.priority;
+}
+
+function createAuxiliaryOwnershipRecords({ attributeParents = new Map(), directionSnapshots = [] } = {}) {
+  const records = [];
+  const addRecord = (element, property, original) => {
+    const applied = readAuxiliaryState(element, property);
+    if (!applied || !auxiliaryStatesEqual(original, applied, property)) {
+      if (applied) records.push({ element, property, original, applied });
+    }
+  };
+
+  for (const [element, original] of attributeParents || []) {
+    addRecord(element, `attribute:${PAGE_TRANSLATION_ATTRIBUTES.HAS_ORIGINAL}`, original);
+  }
+
+  for (const snapshot of directionSnapshots || []) {
+    if (!snapshot?.element) continue;
+    for (const [name, original] of Object.entries(snapshot.attributes || {})) {
+      addRecord(snapshot.element, `attribute:${name}`, original);
+    }
+    for (const [name, original] of Object.entries(snapshot.styles || {})) {
+      addRecord(snapshot.element, `style:${name}`, original);
+    }
+  }
+
+  return records;
+}
+
 function attachTranslationOutcome(error, outcome) {
   const meaningfulError = error && typeof error === 'object' && 'cause' in error
     ? error.cause
@@ -470,10 +525,13 @@ export class DomTranslatorAdapter extends ResourceTracker {
           for (const { nodeData, translatedText } of plan) {
             this._applyTranslationToNode(nodeData.node, translatedText, targetLanguage, element);
           }
-          this._publishCommittedOwnership(plan.map(({ nodeData }) => ({
-            node: nodeData.node,
-            appliedText: nodeData.node.nodeValue,
-          })));
+           this._publishCommittedOwnership(
+             plan.map(({ nodeData }) => ({
+               node: nodeData.node,
+               appliedText: nodeData.node.nodeValue,
+             })),
+             createAuxiliaryOwnershipRecords(mutationSnapshot),
+           );
           parent.applied = true;
           this._settleParentAcceptance(
             parent,
@@ -1224,11 +1282,14 @@ export class DomTranslatorAdapter extends ResourceTracker {
         throw new Error('Grouped translation became stale before acceptance');
       }
       reconstruction.transaction.finalize();
-      try {
-        this._publishCommittedOwnership(group.units.map(unit => ({
-          node: unit.node,
-          appliedText: unit.node.nodeValue,
-        })));
+       try {
+         this._publishCommittedOwnership(
+           group.units.map(unit => ({
+             node: unit.node,
+             appliedText: unit.node.nodeValue,
+           })),
+           createAuxiliaryOwnershipRecords(reconstruction.auxiliarySnapshots),
+         );
       } catch (error) {
         // Finalization has closed the reconstructor rollback window. Use the
         // session snapshot fallback if ownership publication itself fails.
@@ -1451,7 +1512,14 @@ export class DomTranslatorAdapter extends ResourceTracker {
     // Non-streaming fallback already applied translations in _handleDirectResponse
     
       if (!shadowSpanning) {
+        const directionSnapshot = DirectionManager.captureElementDirectionState(element);
         DirectionManager.applyElementDirection(element, finalTarget);
+        const auxiliaryRecords = createAuxiliaryOwnershipRecords({
+          directionSnapshots: directionSnapshot ? [directionSnapshot] : [],
+        });
+        if (auxiliaryRecords.length > 0) {
+          this._publishCommittedOwnership([], auxiliaryRecords);
+        }
       }
     
     // Update the existing state entry with finalized metadata
@@ -1698,9 +1766,9 @@ export class DomTranslatorAdapter extends ResourceTracker {
     globalSelectElementState.currentTranslation = stateEntry; // IMPORTANT: Set current translation pointer
   }
 
-  _publishCommittedOwnership(ownershipRecords) {
+  _publishCommittedOwnership(ownershipRecords, auxiliaryRecords = []) {
     if (!this.currentSessionId) return;
-    if (!publishSelectElementTranslationOwnership(this.currentSessionId, ownershipRecords)) {
+    if (!publishSelectElementTranslationOwnership(this.currentSessionId, ownershipRecords, auxiliaryRecords)) {
       throw new Error('Select Element revert ownership publication failed');
     }
   }

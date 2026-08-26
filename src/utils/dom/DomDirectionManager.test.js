@@ -5,6 +5,7 @@ import {
   applyNodeDirection, 
   applyElementDirection,
   restoreElementDirection,
+  captureElementDirectionState,
   captureNodeDirectionState,
   restoreNodeDirectionState
 } from './DomDirectionManager.js';
@@ -107,6 +108,24 @@ describe('DomDirectionManager', () => {
   });
 
   describe('Restoration', () => {
+    it('captures raw dir and exact inline style priority', () => {
+      const div = document.createElement('div');
+      const text = document.createTextNode('Original');
+      div.appendChild(text);
+      div.setAttribute('dir', '');
+      div.style.setProperty('direction', 'ltr', 'important');
+      document.body.appendChild(div);
+
+      const snapshot = captureElementDirectionState(div);
+      div.setAttribute('dir', 'rtl');
+      div.style.setProperty('direction', 'rtl');
+      restoreNodeDirectionState([snapshot]);
+
+      expect(div.getAttribute('dir')).toBe('');
+      expect(div.style.getPropertyValue('direction')).toBe('ltr');
+      expect(div.style.getPropertyPriority('direction')).toBe('important');
+    });
+
     it('captures and restores exact node direction state', () => {
       const div = document.createElement('div');
       const span = document.createElement('span');

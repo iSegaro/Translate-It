@@ -88,6 +88,7 @@ vi.mock('@/utils/dom/DomDirectionManager.js', () => ({
   applyNodeDirection: vi.fn(),
   applyElementDirection: vi.fn(),
   captureNodeDirectionState: vi.fn(() => []),
+  captureElementDirectionState: vi.fn(() => null),
   restoreNodeDirectionState: vi.fn(() => []),
 }));
 
