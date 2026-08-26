@@ -57,6 +57,7 @@ describe('MainFrameCoordinator Hover error normalization', () => {
     emitSpy = vi.spyOn(pageEventBus, 'emit');
     aggregator = {
       clearAll: vi.fn(),
+      removeFrame: vi.fn(),
       updateFrameData: vi.fn(),
       emitAggregateProgress: vi.fn()
     };
@@ -226,21 +227,33 @@ describe('MainFrameCoordinator Hover error normalization', () => {
     expect(aggregator.emitAggregateProgress).not.toHaveBeenCalled();
   });
 
-  it('clears aggregate state only after trusted top restore completes', () => {
+  it('retires only matching frame state on trusted restore completion', () => {
     pageEventBus.emit(MessageActions.PAGE_RESTORE);
     expect(aggregator.clearAll).not.toHaveBeenCalled();
 
     coordinator.handleTrustedPageLifecycle({
       frameId: 0,
+      action: MessageActions.PAGE_TRANSLATE_START,
+      data: { sessionId: 'main-session' },
+    });
+    vi.clearAllMocks();
+
+    coordinator.handleTrustedPageLifecycle({
+      frameId: 0,
       action: MessageActions.PAGE_RESTORE_COMPLETE,
-      data: {},
+      data: { sessionId: 'main-session' },
     });
 
-    expect(aggregator.clearAll).toHaveBeenCalledTimes(1);
+    expect(aggregator.clearAll).not.toHaveBeenCalled();
+    expect(aggregator.removeFrame).toHaveBeenCalledWith(0);
+    expect(aggregator.emitAggregateProgress).toHaveBeenCalledWith(
+      MessageActions.PAGE_RESTORE_COMPLETE,
+      expect.objectContaining({ sessionId: 'main-session' })
+    );
   });
 
   it('starts only main frame on trusted frame-zero START', () => {
-    const data = { messageId: 'main-session', isAutoTranslating: false };
+    const data = { messageId: 'main-session', sessionId: 'main-session', isAutoTranslating: false };
 
     coordinator.handleTrustedPageLifecycle({
       frameId: 0,
@@ -265,6 +278,7 @@ describe('MainFrameCoordinator Hover error normalization', () => {
       frameUrl: 'https://frame.example/',
       frameId: 9,
       messageId: 'iframe-session',
+      sessionId: 'iframe-session',
       isAutoTranslating: true
     };
 
@@ -289,8 +303,15 @@ describe('MainFrameCoordinator Hover error normalization', () => {
   it('updates aggregate exactly once per trusted lifecycle message', () => {
     coordinator.handleTrustedPageLifecycle({
       frameId: 7,
+      action: MessageActions.PAGE_TRANSLATE_START,
+      data: { sessionId: 'frame-session' },
+    });
+    vi.clearAllMocks();
+
+    coordinator.handleTrustedPageLifecycle({
+      frameId: 7,
       action: MessageActions.PAGE_TRANSLATE_PROGRESS,
-      data: { translatedCount: 2, totalCount: 3 },
+      data: { sessionId: 'frame-session', translatedCount: 2, totalCount: 3 },
     });
 
     expect(aggregator.updateFrameData).toHaveBeenCalledTimes(1);
@@ -302,7 +323,13 @@ describe('MainFrameCoordinator Hover error normalization', () => {
   });
 
   it('preserves trusted child completion semantics', () => {
-    const data = { translatedCount: 3, totalCount: 3, frameUrl: 'fake' };
+    const data = { sessionId: 'frame-session', translatedCount: 3, totalCount: 3, frameUrl: 'fake' };
+    coordinator.handleTrustedPageLifecycle({
+      frameId: 7,
+      action: MessageActions.PAGE_TRANSLATE_START,
+      data: { sessionId: 'frame-session' },
+    });
+    vi.clearAllMocks();
 
     coordinator.handleTrustedPageLifecycle({
       frameId: 7,
@@ -322,7 +349,13 @@ describe('MainFrameCoordinator Hover error normalization', () => {
   });
 
   it('reconciles trusted main-frame errors without clearing other frame state', () => {
-    const data = { error: 'translation failed', isFatal: true };
+    const data = { sessionId: 'main-session', error: 'translation failed', isFatal: true };
+    coordinator.handleTrustedPageLifecycle({
+      frameId: 0,
+      action: MessageActions.PAGE_TRANSLATE_START,
+      data: { sessionId: 'main-session' },
+    });
+    vi.clearAllMocks();
 
     coordinator.handleTrustedPageLifecycle({
       frameId: 0,
@@ -342,7 +375,13 @@ describe('MainFrameCoordinator Hover error normalization', () => {
   });
 
   it('keeps non-fatal main-frame errors out of aggregate fatal presentation', () => {
-    const data = { error: 'retryable failure', isFatal: false };
+    const data = { sessionId: 'main-session', error: 'retryable failure', isFatal: false };
+    coordinator.handleTrustedPageLifecycle({
+      frameId: 0,
+      action: MessageActions.PAGE_TRANSLATE_START,
+      data: { sessionId: 'main-session' },
+    });
+    vi.clearAllMocks();
 
     coordinator.handleTrustedPageLifecycle({
       frameId: 0,

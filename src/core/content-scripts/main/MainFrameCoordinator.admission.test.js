@@ -96,6 +96,7 @@ describe('MainFrameCoordinator per-frame admission', () => {
       data: {
         frameUrl: 'https://frame.example/',
         messageId: 'iframe-session',
+        sessionId: 'iframe-session',
         isAutoTranslating: false,
       },
     });
@@ -109,11 +110,17 @@ describe('MainFrameCoordinator per-frame admission', () => {
 
   it('stores trusted lifecycle state under numeric browser frame ID', () => {
     const coordinator = new MainFrameCoordinator(aggregator, MessageActions, null);
+    coordinator.handleTrustedPageLifecycle({
+      frameId: 7,
+      action: MessageActions.PAGE_TRANSLATE_START,
+      data: { sessionId: 'frame-session' },
+    });
 
     coordinator.handleTrustedPageLifecycle({
       frameId: 7,
       action: MessageActions.PAGE_TRANSLATE_PROGRESS,
       data: {
+        sessionId: 'frame-session',
         translatedCount: 2,
         totalCount: 3,
         frameId: 99,
@@ -131,6 +138,8 @@ describe('MainFrameCoordinator per-frame admission', () => {
 
   it('marks aggregate stopped only after trusted Stop lifecycle from every active frame', () => {
     const coordinator = new MainFrameCoordinator(aggregator, MessageActions, null);
+    coordinator.handleTrustedPageLifecycle({ frameId: 0, action: MessageActions.PAGE_TRANSLATE_START, data: { sessionId: 'main-session' } });
+    coordinator.handleTrustedPageLifecycle({ frameId: 1, action: MessageActions.PAGE_TRANSLATE_START, data: { sessionId: 'child-session' } });
     aggregator.updateFrameData(0, {
       isTranslated: true,
       isTranslating: true,
@@ -151,12 +160,12 @@ describe('MainFrameCoordinator per-frame admission', () => {
     coordinator.handleTrustedPageLifecycle({
       frameId: 0,
       action: MessageActions.PAGE_AUTO_RESTORE_COMPLETE,
-      data: { translatedCount: 2, isTranslated: true, isAutoTranslating: false },
+      data: { sessionId: 'main-session', translatedCount: 2, isTranslated: true, isAutoTranslating: false },
     });
     coordinator.handleTrustedPageLifecycle({
       frameId: 1,
       action: MessageActions.PAGE_AUTO_RESTORE_COMPLETE,
-      data: { translatedCount: 1, isTranslated: true, isAutoTranslating: false },
+      data: { sessionId: 'child-session', translatedCount: 1, isTranslated: true, isAutoTranslating: false },
     });
 
     expect(aggregator.getGlobalPageTranslationStatus()).toMatchObject({
@@ -183,6 +192,7 @@ describe('MainFrameCoordinator per-frame admission', () => {
       action: MessageActions.PAGE_TRANSLATE_START,
       data: {
         messageId: 'main-session',
+        sessionId: 'main-session',
         isAutoTranslating: false,
       },
     });
@@ -208,12 +218,12 @@ describe('MainFrameCoordinator per-frame admission', () => {
     coordinator.handleTrustedPageLifecycle({
       frameId: 0,
       action: MessageActions.PAGE_TRANSLATE_START,
-      data: { messageId: 'main-session', isAutoTranslating: false },
+      data: { messageId: 'main-session', sessionId: 'main-session', isAutoTranslating: false },
     });
     coordinator.handleTrustedPageLifecycle({
       frameId: 0,
       action: MessageActions.PAGE_TRANSLATE_ERROR,
-      data: { error: 'main failure', isFatal: true },
+      data: { sessionId: 'main-session', error: 'main failure', isFatal: true },
     });
 
     expect(aggregator.getGlobalPageTranslationStatus()).toMatchObject({
@@ -224,6 +234,8 @@ describe('MainFrameCoordinator per-frame admission', () => {
   });
 
   it('emits main fatal errors with aggregate counts and frame error identity', () => {
+    const coordinator = new MainFrameCoordinator(aggregator, MessageActions, null);
+    coordinator.handleTrustedPageLifecycle({ frameId: 0, action: MessageActions.PAGE_TRANSLATE_START, data: { sessionId: 'main-session' } });
     aggregator.updateFrameData(0, {
       isTranslated: false,
       isTranslating: true,
@@ -244,11 +256,11 @@ describe('MainFrameCoordinator per-frame admission', () => {
     const emitSpy = vi.spyOn(pageEventBus, 'emit');
     const errorDetails = { type: 'NETWORK_ERROR', message: 'network failure' };
 
-    const coordinator = new MainFrameCoordinator(aggregator, MessageActions, null);
     coordinator.handleTrustedPageLifecycle({
       frameId: 0,
       action: MessageActions.PAGE_TRANSLATE_ERROR,
       data: {
+        sessionId: 'main-session',
         error: 'network failure',
         errorDetails,
         errorType: 'NETWORK_ERROR',
@@ -274,6 +286,8 @@ describe('MainFrameCoordinator per-frame admission', () => {
   });
 
   it('keeps main committed output in an iframe fatal aggregate error', () => {
+    const coordinator = new MainFrameCoordinator(aggregator, MessageActions, null);
+    coordinator.handleTrustedPageLifecycle({ frameId: 1, action: MessageActions.PAGE_TRANSLATE_START, data: { sessionId: 'child-session' } });
     aggregator.updateFrameData(0, {
       isTranslated: true,
       isTranslating: false,
@@ -294,11 +308,11 @@ describe('MainFrameCoordinator per-frame admission', () => {
     const emitSpy = vi.spyOn(pageEventBus, 'emit');
     const errorDetails = { type: 'NETWORK_ERROR', message: 'iframe failure' };
 
-    const coordinator = new MainFrameCoordinator(aggregator, MessageActions, null);
     coordinator.handleTrustedPageLifecycle({
       frameId: 1,
       action: MessageActions.PAGE_TRANSLATE_ERROR,
       data: {
+        sessionId: 'child-session',
         frameUrl: 'frame-1',
         error: 'iframe failure',
         errorDetails,
@@ -317,6 +331,129 @@ describe('MainFrameCoordinator per-frame admission', () => {
       errorDetails
     });
 
+    emitSpy.mockRestore();
+  });
+
+  it('replaces only one frame owner and rejects stale lifecycle before aggregation', () => {
+    const coordinator = new MainFrameCoordinator(aggregator, MessageActions, null);
+    coordinator.handleTrustedPageLifecycle({ frameId: 7, action: MessageActions.PAGE_TRANSLATE_START, data: { sessionId: 'A7' } });
+    coordinator.handleTrustedPageLifecycle({ frameId: 8, action: MessageActions.PAGE_TRANSLATE_START, data: { sessionId: 'A8' } });
+    coordinator.handleTrustedPageLifecycle({ frameId: 7, action: MessageActions.PAGE_TRANSLATE_START, data: { sessionId: 'B7' } });
+
+    const stale = coordinator.handleTrustedPageLifecycle({
+      frameId: 7,
+      action: MessageActions.PAGE_TRANSLATE_COMPLETE,
+      data: { sessionId: 'A7', translatedCount: 99, totalCount: 99 },
+    });
+    coordinator.handleTrustedPageLifecycle({
+      frameId: 8,
+      action: MessageActions.PAGE_TRANSLATE_PROGRESS,
+      data: { sessionId: 'A8', translatedCount: 2, totalCount: 3 },
+    });
+    coordinator.handleTrustedPageLifecycle({
+      frameId: 7,
+      action: MessageActions.PAGE_TRANSLATE_PROGRESS,
+      data: { sessionId: 'B7', translatedCount: 1, totalCount: 2 },
+    });
+
+    expect(stale).toMatchObject({ ignored: true, reason: 'stale-session' });
+    expect(coordinator.frameSessionOwners).toEqual(new Map([[7, 'B7'], [8, 'A8']]));
+    expect(aggregator.frameProgressMap.get(7)).toMatchObject({ translatedCount: 1 });
+    expect(aggregator.frameProgressMap.get(8)).toMatchObject({ translatedCount: 2 });
+  });
+
+  it('retains ownership through COMPLETE and IDLE', () => {
+    const coordinator = new MainFrameCoordinator(aggregator, MessageActions, null);
+    coordinator.handleTrustedPageLifecycle({ frameId: 7, action: MessageActions.PAGE_TRANSLATE_START, data: { sessionId: 'A7' } });
+    coordinator.handleTrustedPageLifecycle({ frameId: 7, action: MessageActions.PAGE_TRANSLATE_COMPLETE, data: { sessionId: 'A7', translatedCount: 2 } });
+    coordinator.handleTrustedPageLifecycle({ frameId: 7, action: MessageActions.PAGE_TRANSLATE_IDLE, data: { sessionId: 'A7', translatedCount: 2 } });
+
+    expect(coordinator.frameSessionOwners.get(7)).toBe('A7');
+  });
+
+  it('keeps existing aggregate state when a new attempt errors before START', () => {
+    const coordinator = new MainFrameCoordinator(aggregator, MessageActions, null);
+    coordinator.handleTrustedPageLifecycle({ frameId: 7, action: MessageActions.PAGE_TRANSLATE_START, data: { sessionId: 'A7' } });
+    coordinator.handleTrustedPageLifecycle({ frameId: 7, action: MessageActions.PAGE_TRANSLATE_PROGRESS, data: { sessionId: 'A7', translatedCount: 2, totalCount: 3 } });
+
+    const result = coordinator.handleTrustedPageLifecycle({
+      frameId: 7,
+      action: MessageActions.PAGE_TRANSLATE_ERROR,
+      data: { error: 'pre-start failure', isFatal: true },
+    });
+
+    expect(result).toMatchObject({ ignored: true, reason: 'missing-session' });
+    expect(coordinator.frameSessionOwners.get(7)).toBe('A7');
+    expect(aggregator.frameProgressMap.get(7)).toMatchObject({ translatedCount: 2, totalCount: 3 });
+  });
+
+  it('ignores stale cancelled and restore error presentation', () => {
+    const coordinator = new MainFrameCoordinator(aggregator, MessageActions, null);
+    const emitSpy = vi.spyOn(pageEventBus, 'emit');
+    coordinator.handleTrustedPageLifecycle({ frameId: 7, action: MessageActions.PAGE_TRANSLATE_START, data: { sessionId: 'A7' } });
+    coordinator.handleTrustedPageLifecycle({ frameId: 7, action: MessageActions.PAGE_TRANSLATE_START, data: { sessionId: 'B7' } });
+    emitSpy.mockClear();
+
+    const cancelled = coordinator.handleTrustedPageLifecycle({ frameId: 7, action: MessageActions.PAGE_TRANSLATE_CANCELLED, data: { sessionId: 'A7' } });
+    const restoreError = coordinator.handleTrustedPageLifecycle({ frameId: 7, action: MessageActions.PAGE_RESTORE_ERROR, data: { sessionId: 'A7', error: 'old restore failed' } });
+
+    expect(cancelled).toMatchObject({ ignored: true });
+    expect(restoreError).toMatchObject({ ignored: true });
+    expect(emitSpy).not.toHaveBeenCalled();
+    expect(coordinator.frameSessionOwners.get(7)).toBe('B7');
+    emitSpy.mockRestore();
+  });
+
+  it('settles restore per frame and emits canonical restore only on final retirement', () => {
+    const coordinator = new MainFrameCoordinator(aggregator, MessageActions, null);
+    const emitSpy = vi.spyOn(pageEventBus, 'emit');
+    coordinator.handleTrustedPageLifecycle({ frameId: 0, action: MessageActions.PAGE_TRANSLATE_START, data: { sessionId: 'A0' } });
+    coordinator.handleTrustedPageLifecycle({ frameId: 7, action: MessageActions.PAGE_TRANSLATE_START, data: { sessionId: 'A7' } });
+    coordinator.handleTrustedPageLifecycle({ frameId: 0, action: MessageActions.PAGE_TRANSLATE_IDLE, data: { sessionId: 'A0' } });
+    coordinator.handleTrustedPageLifecycle({ frameId: 7, action: MessageActions.PAGE_TRANSLATE_IDLE, data: { sessionId: 'A7' } });
+    emitSpy.mockClear();
+
+    coordinator.handleTrustedPageLifecycle({ frameId: 0, action: MessageActions.PAGE_RESTORE_COMPLETE, data: { sessionId: 'A0' } });
+    expect(coordinator.frameSessionOwners).toEqual(new Map([[7, 'A7']]));
+    expect(aggregator.frameProgressMap.has(0)).toBe(false);
+    expect(emitSpy).not.toHaveBeenCalledWith(MessageActions.PAGE_RESTORE_COMPLETE, expect.anything());
+
+    coordinator.handleTrustedPageLifecycle({ frameId: 7, action: MessageActions.PAGE_RESTORE_COMPLETE, data: { sessionId: 'A7' } });
+    expect(coordinator.frameSessionOwners.size).toBe(0);
+    expect(emitSpy.mock.calls.filter(([action]) => action === MessageActions.PAGE_RESTORE_COMPLETE)).toHaveLength(1);
+    emitSpy.mockRestore();
+  });
+
+  it('preserves replacement and failed restore owners without false global settlement', () => {
+    const coordinator = new MainFrameCoordinator(aggregator, MessageActions, null);
+    const emitSpy = vi.spyOn(pageEventBus, 'emit');
+    coordinator.handleTrustedPageLifecycle({ frameId: 0, action: MessageActions.PAGE_TRANSLATE_START, data: { sessionId: 'A0' } });
+    coordinator.handleTrustedPageLifecycle({ frameId: 7, action: MessageActions.PAGE_TRANSLATE_START, data: { sessionId: 'A7' } });
+    coordinator.handleTrustedPageLifecycle({ frameId: 7, action: MessageActions.PAGE_TRANSLATE_START, data: { sessionId: 'B7' } });
+    emitSpy.mockClear();
+
+    const staleRestore = coordinator.handleTrustedPageLifecycle({ frameId: 7, action: MessageActions.PAGE_RESTORE_COMPLETE, data: { sessionId: 'A7' } });
+    coordinator.handleTrustedPageLifecycle({ frameId: 0, action: MessageActions.PAGE_RESTORE_COMPLETE, data: { sessionId: 'A0' } });
+    const failedRestore = coordinator.handleTrustedPageLifecycle({ frameId: 7, action: MessageActions.PAGE_RESTORE_ERROR, data: { sessionId: 'B7', error: 'restore failed' } });
+
+    expect(staleRestore).toMatchObject({ ignored: true });
+    expect(failedRestore).toMatchObject({ aggregated: false });
+    expect(coordinator.frameSessionOwners).toEqual(new Map([[7, 'B7']]));
+    expect(aggregator.frameProgressMap.has(7)).toBe(true);
+    expect(emitSpy).not.toHaveBeenCalledWith(MessageActions.PAGE_RESTORE_COMPLETE, expect.anything());
+    emitSpy.mockRestore();
+  });
+
+  it('settles child-only restore without requiring a top-frame owner', () => {
+    const coordinator = new MainFrameCoordinator(aggregator, MessageActions, null);
+    const emitSpy = vi.spyOn(pageEventBus, 'emit');
+    coordinator.handleTrustedPageLifecycle({ frameId: 7, action: MessageActions.PAGE_TRANSLATE_START, data: { sessionId: 'A7' } });
+    emitSpy.mockClear();
+
+    coordinator.handleTrustedPageLifecycle({ frameId: 7, action: MessageActions.PAGE_RESTORE_COMPLETE, data: { sessionId: 'A7' } });
+
+    expect(coordinator.frameSessionOwners.size).toBe(0);
+    expect(emitSpy).toHaveBeenCalledWith(MessageActions.PAGE_RESTORE_COMPLETE, expect.anything());
     emitSpy.mockRestore();
   });
 });

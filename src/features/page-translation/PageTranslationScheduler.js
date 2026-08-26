@@ -84,14 +84,18 @@ export class PageTranslationScheduler extends ResourceTracker {
     this.settings = { ...this.settings, ...settings };
   }
 
-  _emitLifecycle(action, data) {
+  _emitLifecycle(action, data, sessionId = this.translationSessionId) {
+    const lifecycleData = typeof sessionId === 'string' && sessionId.length > 0
+      ? { ...data, sessionId }
+      : data;
+
     if (this.onLifecycleEvent) {
-      this.onLifecycleEvent(action, data);
+      this.onLifecycleEvent(action, lifecycleData);
       return;
     }
 
     // Standalone scheduler consumers retain local presentation behavior.
-    pageEventBus.emit(action, data);
+    pageEventBus.emit(action, lifecycleData);
   }
 
   setTranslationState(isTranslated, sessionId, sessionContext = null, cancellationReason) {
@@ -719,6 +723,7 @@ export class PageTranslationScheduler extends ResourceTracker {
       errorType,
       isFatal,
       context: 'page-translation-batch',
+      sessionId,
     });
 
     // Also emit specific fatal event for the Manager's circuit breaker

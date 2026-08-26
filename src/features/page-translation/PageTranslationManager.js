@@ -51,6 +51,7 @@ export class PageTranslationManager extends ResourceTracker {
     this.currentUrl = null;
     this.abortController = null;
     this.translationMessageId = null;
+    this.acceptedLifecycleSessionId = null;
     this.sessionContext = null;
     this.isFatalErrorHandling = false;
     this._isCancelling = false;
@@ -119,6 +120,7 @@ export class PageTranslationManager extends ResourceTracker {
         this.abortController = null;
       }
       this.translationMessageId = null;
+      this.acceptedLifecycleSessionId = null;
       this.sessionContext = null;
       this.currentUrl = window.location.href;
       this.userRestoredOverride = false;
@@ -195,11 +197,13 @@ export class PageTranslationManager extends ResourceTracker {
 
       if (!this._isCurrentPreStartAttempt(attempt)) return this._settleStalePreStartAttempt(attempt);
 
+      this.acceptedLifecycleSessionId = attempt.messageId;
       this._broadcastEvent(MessageActions.PAGE_TRANSLATE_START, { 
         url: this.currentUrl, 
         messageId: attempt.messageId,
+        sessionId: attempt.messageId,
         isAutoTranslating: !!this.settings.autoTranslateOnDOMChanges
-      });
+      }, attempt.messageId);
       hasAcceptedStart = true;
 
       this.isTranslated = false;
@@ -256,7 +260,7 @@ export class PageTranslationManager extends ResourceTracker {
               status: 'translating',
               isTranslating: true,
               isAutoTranslating: true
-            });
+            }, attempt.messageId);
           }
 
           // If we are in "On Stop" mode, notify activity to reset the timer
@@ -319,7 +323,7 @@ export class PageTranslationManager extends ResourceTracker {
       this._broadcastEvent(MessageActions.PAGE_TRANSLATE_ERROR, {
         error: error.message,
         errorDetails: MessageFormat.serializeTranslationError(error)
-      });
+      }, hasAcceptedStart ? attempt.messageId : null);
       throw error;
     }
   }
@@ -400,7 +404,7 @@ export class PageTranslationManager extends ResourceTracker {
     const failedCount = this.scheduler.failedCount || 0;
     const totalCount = this.scheduler.totalTasks || 0;
     const isTranslated = translatedCount > 0;
-    const messageId = this.translationMessageId;
+    const sessionId = this.acceptedLifecycleSessionId ?? this.translationMessageId;
 
     this.scrollTracker.stop();
     this.bridge.stopPersistence();
@@ -421,14 +425,15 @@ export class PageTranslationManager extends ResourceTracker {
 
     this._broadcastEvent(MessageActions.PAGE_TRANSLATE_IDLE, {
       url: this.currentUrl,
-      messageId,
+      messageId: sessionId,
+      sessionId,
       translatedCount,
       failedCount,
       totalCount,
       isTranslated,
       isTranslating: false,
       isAutoTranslating: false
-    });
+    }, sessionId);
 
     return true;
   }
@@ -439,6 +444,7 @@ export class PageTranslationManager extends ResourceTracker {
     }
     const cancellationReason = options.cancellationReason
       ?? (options.manual ? ActionReasons.USER_STOPPED_PAGE_TRANSLATION : INTERNAL_CANCELLATION_REASON);
+    const restoringSessionId = options.sessionId ?? this.acceptedLifecycleSessionId;
     this._cleanupAdmittedSession();
     this._removeLayoutFix();
     try {
@@ -467,15 +473,22 @@ export class PageTranslationManager extends ResourceTracker {
       // Small delay for DOM to stabilize
       await delay(PAGE_TRANSLATION_TIMING.DOM_STABILIZATION_DELAY);
 
-      const resultData = { url: this.currentUrl, restoredCount };
-      this._broadcastEvent(MessageActions.PAGE_RESTORE_COMPLETE, resultData);
+      const resultData = {
+        url: this.currentUrl,
+        restoredCount,
+        ...(restoringSessionId && { sessionId: restoringSessionId }),
+      };
+      this._broadcastEvent(MessageActions.PAGE_RESTORE_COMPLETE, resultData, restoringSessionId);
+      if (this.acceptedLifecycleSessionId === restoringSessionId) {
+        this.acceptedLifecycleSessionId = null;
+      }
       return { success: true, ...resultData };
     } catch (error) {
       this.logger.error('Restore failed', error);
       this._broadcastEvent(MessageActions.PAGE_RESTORE_ERROR, {
         error: error.message,
         errorDetails: MessageFormat.serializeTranslationError(error)
-      });
+      }, restoringSessionId);
       throw error;
     }
   }
@@ -509,6 +522,7 @@ export class PageTranslationManager extends ResourceTracker {
 
     try {
       this.logger.info('Stopping page translation/persistence without restoring');
+      const stoppingSessionId = this.acceptedLifecycleSessionId ?? this.translationMessageId;
 
       this.scrollTracker.stop();
       this.bridge.stopPersistence();
@@ -523,10 +537,11 @@ export class PageTranslationManager extends ResourceTracker {
         url: this.currentUrl,
         translatedCount: this.scheduler.translatedCount,
         isTranslated: this.isTranslated,
-        isAutoTranslating: false
+        isAutoTranslating: false,
+        ...(stoppingSessionId && { sessionId: stoppingSessionId }),
       };
 
-      this._broadcastEvent(MessageActions.PAGE_AUTO_RESTORE_COMPLETE, resultData);
+      this._broadcastEvent(MessageActions.PAGE_AUTO_RESTORE_COMPLETE, resultData, stoppingSessionId);
       return { success: true, ...resultData };
     } catch (error) {
       this.logger.error('Failed to stop auto-translation', error);
@@ -539,17 +554,19 @@ export class PageTranslationManager extends ResourceTracker {
     this._isCancelling = true;
 
     try {
+      const cancellingSessionId = this.acceptedLifecycleSessionId ?? this.translationMessageId;
       this._cleanupAdmittedSession();
       this.restorePage({
         ...options,
+        sessionId: cancellingSessionId,
         cancellationReason: options.cancellationReason ?? ActionReasons.USER_STOPPED_PAGE_TRANSLATION,
       }); // Use full restore for cancel
       
       if (this.abortController) {
         this.abortController.abort();
         this._broadcastEvent(MessageActions.PAGE_TRANSLATE_CANCELLED, {
-          sessionId: this.translationMessageId
-        });
+          ...(cancellingSessionId && { sessionId: cancellingSessionId }),
+        }, cancellingSessionId);
       }
     } finally {
       this._isCancelling = false;
@@ -620,11 +637,11 @@ export class PageTranslationManager extends ResourceTracker {
     if (this.scheduler.translationSessionId !== sessionId) return false;
     if (!this.isTranslating && !this.isAutoTranslating) return false;
 
-    this._handleFatalError(error, errorType, localizedMessage);
+    this._handleFatalError(error, errorType, localizedMessage, sessionId);
     return true;
   }
 
-  _handleSchedulerInternalError({ error, errorType, isFatal } = {}) {
+  _handleSchedulerInternalError({ error, errorType, isFatal, sessionId } = {}) {
     if (isFatal || ExtensionContextManager.isContextError(error)) return;
 
     this._publishLifecycle(MessageActions.PAGE_TRANSLATE_ERROR, {
@@ -632,7 +649,7 @@ export class PageTranslationManager extends ResourceTracker {
       errorDetails: MessageFormat.serializeTranslationError(error),
       errorType,
       isFatal: false,
-    });
+    }, sessionId);
   }
 
   _handleSchedulerLifecycle(action, data = {}) {
@@ -644,10 +661,10 @@ export class PageTranslationManager extends ResourceTracker {
       this.isTranslated = (data.translatedCount || 0) > 0;
     }
 
-    this._publishLifecycle(action, data);
+    this._publishLifecycle(action, data, data.sessionId);
   }
 
-  _handleFatalError(error, errorType, localizedMessage = null) {
+  _handleFatalError(error, errorType, localizedMessage = null, sessionId = this.translationMessageId) {
     if (this.isFatalErrorHandling) return;
     this.isFatalErrorHandling = true;
     const translatedCount = this.scheduler.translatedCount;
@@ -693,7 +710,7 @@ export class PageTranslationManager extends ResourceTracker {
         errorType: errorType || ErrorTypes.TRANSLATION_FAILED,
         translatedCount,
         isFatal: true
-      });
+      }, sessionId);
     }
 
     // ALWAYS broadcast local state update via PageEventBus to ensure UI (FAB, Sidepanel) 
@@ -704,7 +721,7 @@ export class PageTranslationManager extends ResourceTracker {
       isAutoTranslating: false,
       percent: 0,
       isInternal: true
-    });
+    }, sessionId);
   }
 
   _cleanupSession() {
@@ -813,8 +830,11 @@ export class PageTranslationManager extends ResourceTracker {
     }
   }
 
-  _publishLifecycle(action, data = {}) {
-    pageEventBus.emit(action, data);
+  _publishLifecycle(action, data = {}, sessionId = null) {
+    const lifecycleData = typeof sessionId === 'string' && sessionId.length > 0
+      ? { ...data, sessionId }
+      : data;
+    pageEventBus.emit(action, lifecycleData);
 
     if (!MessageActions.PAGE_TRANSLATION_FRAME_LIFECYCLE_ACTIONS.includes(action)) {
       return;
@@ -822,19 +842,19 @@ export class PageTranslationManager extends ResourceTracker {
 
     sendRegularMessage({
       action: MessageActions.PAGE_TRANSLATION_FRAME_LIFECYCLE,
-      data: { action, data },
+      data: { action, data: lifecycleData },
       context: 'page-translation-frame-lifecycle',
     }, { silent: true }).catch(() => {});
   }
 
-  async _broadcastEvent(action, data = {}) {
-    this._publishLifecycle(action, data);
+  async _broadcastEvent(action, data = {}, sessionId = null) {
+    this._publishLifecycle(action, data, sessionId);
 
     if (
       !MessageActions.PAGE_TRANSLATION_AGGREGATE_ACTIONS.includes(action)
       && window.self === window.top
     ) {
-      sendRegularMessage({ action, data, context: 'page-translation-broadcast' }, { silent: true }).catch(() => {});
+      sendRegularMessage({ action, data: typeof sessionId === 'string' && sessionId.length > 0 ? { ...data, sessionId } : data, context: 'page-translation-broadcast' }, { silent: true }).catch(() => {});
     }
   }
 
@@ -861,6 +881,7 @@ export class PageTranslationManager extends ResourceTracker {
     this.scrollTracker.destroy();
     this.bridge.cleanup();
     this.scheduler.reset();
+    this.acceptedLifecycleSessionId = null;
     if (this.hoverManager) {
       this.hoverManager.destroy();
     }

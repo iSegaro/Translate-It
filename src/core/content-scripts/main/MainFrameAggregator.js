@@ -30,6 +30,10 @@ export class MainFrameAggregator {
     this.frameProgressMap.set(frameId, { ...existing, ...newData });
   }
 
+  removeFrame(frameId) {
+    this.frameProgressMap.delete(frameId);
+  }
+
   /**
    * Clears all progress data (usually on a fresh translation start).
    */

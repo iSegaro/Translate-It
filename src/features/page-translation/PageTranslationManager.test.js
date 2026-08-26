@@ -257,6 +257,11 @@ describe('PageTranslationManager', () => {
       expect(manager.bridge.initialize).toHaveBeenCalled();
       expect(manager.bridge.translate).toHaveBeenCalledWith(document.body);
       expect(pageEventBus.emit).toHaveBeenCalledWith(MessageActions.PAGE_TRANSLATE_START, expect.any(Object));
+      const startData = pageEventBus.emit.mock.calls.find(([action]) => action === MessageActions.PAGE_TRANSLATE_START)[1];
+      expect(startData).toMatchObject({
+        messageId: result.messageId,
+        sessionId: result.messageId,
+      });
       
       // Check for layout fix injection
       expect(document.getElementById('ti-translation-layout-fix')).not.toBeNull();
@@ -280,7 +285,7 @@ describe('PageTranslationManager', () => {
       })).toBe(true);
 
       expect(handleFatalError).toHaveBeenCalledOnce();
-      expect(handleFatalError).toHaveBeenCalledWith(expect.any(Error), ErrorTypes.SERVER_ERROR, undefined);
+      expect(handleFatalError).toHaveBeenCalledWith(expect.any(Error), ErrorTypes.SERVER_ERROR, undefined, 'session-b');
     });
 
     it('ignores stale scheduler fatal callback from an older session', () => {
@@ -372,7 +377,7 @@ describe('PageTranslationManager', () => {
 
     it('should restore page correctly', async () => {
       await manager.activate();
-      await manager.translatePage();
+      const { messageId } = await manager.translatePage();
       manager.scheduler.setTranslationState.mockClear();
       
       const result = await manager.restorePage({ manual: true });
@@ -391,11 +396,18 @@ describe('PageTranslationManager', () => {
       // Check layout fix removal
       expect(document.getElementById('ti-translation-layout-fix')).toBeNull();
       expect(document.documentElement.classList.contains('ti-translation-active')).toBe(false);
+      expect(pageEventBus.emit).toHaveBeenCalledWith(
+        MessageActions.PAGE_RESTORE_COMPLETE,
+        expect.objectContaining({ sessionId: messageId })
+      );
+      expect(manager.acceptedLifecycleSessionId).toBeNull();
     });
 
     it('should stop auto-translation without full restore', async () => {
       manager.isAutoTranslating = true;
       manager.isTranslating = true;
+      manager.translationMessageId = 'stop-session';
+      manager.acceptedLifecycleSessionId = 'stop-session';
       
       const result = await manager.stopAutoTranslation();
       
@@ -414,9 +426,17 @@ describe('PageTranslationManager', () => {
           action: MessageActions.PAGE_AUTO_RESTORE_COMPLETE,
           data: expect.objectContaining({
             isAutoTranslating: false,
+            sessionId: 'stop-session',
           }),
         }),
       }), { silent: true });
+      expect(manager.acceptedLifecycleSessionId).toBe('stop-session');
+
+      await manager.restorePage();
+      expect(pageEventBus.emit).toHaveBeenCalledWith(
+        MessageActions.PAGE_RESTORE_COMPLETE,
+        expect.objectContaining({ sessionId: 'stop-session' })
+      );
     });
 
     it('updates completion state through trusted scheduler callback', () => {
@@ -424,6 +444,7 @@ describe('PageTranslationManager', () => {
       manager.isTranslated = false;
 
       manager.scheduler.onLifecycleEvent(MessageActions.PAGE_TRANSLATE_COMPLETE, {
+        sessionId: 'scheduler-session',
         translatedCount: 2,
         totalCount: 2,
         failedCount: 0,
@@ -431,6 +452,12 @@ describe('PageTranslationManager', () => {
 
       expect(manager.isTranslating).toBe(false);
       expect(manager.isTranslated).toBe(true);
+      expect(sendRegularMessage).toHaveBeenCalledWith(expect.objectContaining({
+        data: expect.objectContaining({
+          action: MessageActions.PAGE_TRANSLATE_COMPLETE,
+          data: expect.objectContaining({ sessionId: 'scheduler-session' }),
+        }),
+      }), { silent: true });
     });
 
     it('preserves auto mode while trusted scheduler idle clears active translation', () => {
@@ -439,6 +466,7 @@ describe('PageTranslationManager', () => {
       manager.isAutoTranslating = true;
 
       manager.scheduler.onLifecycleEvent(MessageActions.PAGE_TRANSLATE_IDLE, {
+        sessionId: 'scheduler-session',
         translatedCount: 2,
         totalCount: 2,
         failedCount: 0,
@@ -448,6 +476,12 @@ describe('PageTranslationManager', () => {
       expect(manager.isTranslating).toBe(false);
       expect(manager.isTranslated).toBe(true);
       expect(manager.isAutoTranslating).toBe(true);
+      expect(sendRegularMessage).toHaveBeenCalledWith(expect.objectContaining({
+        data: expect.objectContaining({
+          action: MessageActions.PAGE_TRANSLATE_IDLE,
+          data: expect.objectContaining({ sessionId: 'scheduler-session' }),
+        }),
+      }), { silent: true });
     });
 
     it('should link bridge callback to scheduler enqueue', async () => {
@@ -602,6 +636,14 @@ describe('PageTranslationManager', () => {
         isTranslating: false,
         isAutoTranslating: false
       }));
+
+      const sessionId = manager.acceptedLifecycleSessionId;
+      await manager.restorePage();
+      expect(pageEventBus.emit).toHaveBeenCalledWith(
+        MessageActions.PAGE_RESTORE_COMPLETE,
+        expect.objectContaining({ sessionId })
+      );
+      expect(manager.acceptedLifecycleSessionId).toBeNull();
     });
 
     it('settles non-lazy zero-work translation without error presentation', async () => {
@@ -620,6 +662,14 @@ describe('PageTranslationManager', () => {
         isTranslated: false
       }));
       expect(pageEventBus.emit).not.toHaveBeenCalledWith(MessageActions.PAGE_TRANSLATE_ERROR, expect.anything());
+      expect(manager.acceptedLifecycleSessionId).toBe(result.messageId);
+
+      await manager.restorePage();
+      expect(pageEventBus.emit).toHaveBeenCalledWith(
+        MessageActions.PAGE_RESTORE_COMPLETE,
+        expect.objectContaining({ sessionId: result.messageId })
+      );
+      expect(manager.acceptedLifecycleSessionId).toBeNull();
     });
 
     it('keeps non-silent setup failures on the existing error path', async () => {
@@ -637,7 +687,7 @@ describe('PageTranslationManager', () => {
 
     it('keeps explicit cancellation on restore lifecycle', async () => {
       await manager.activate();
-      await manager.translatePage();
+      const { messageId } = await manager.translatePage();
 
       manager.cancelTranslation();
 
@@ -648,10 +698,13 @@ describe('PageTranslationManager', () => {
         undefined,
         ActionReasons.USER_STOPPED_PAGE_TRANSLATION
       );
-      expect(pageEventBus.emit).toHaveBeenCalledWith(MessageActions.PAGE_TRANSLATE_CANCELLED, expect.any(Object));
+      expect(pageEventBus.emit).toHaveBeenCalledWith(
+        MessageActions.PAGE_TRANSLATE_CANCELLED,
+        expect.objectContaining({ sessionId: messageId })
+      );
       await vi.waitFor(() => expect(pageEventBus.emit).toHaveBeenCalledWith(
         MessageActions.PAGE_RESTORE_COMPLETE,
-        expect.any(Object)
+        expect.objectContaining({ sessionId: messageId })
       ));
     });
 
@@ -676,6 +729,22 @@ describe('PageTranslationManager', () => {
         undefined,
         undefined,
         'operation-abort'
+      );
+    });
+
+    it('replaces a silently settled lifecycle identity without clearing the replacement during stale restore completion', async () => {
+      manager.scheduler.totalTasks = 0;
+      await manager.activate();
+      const first = await manager.translatePage();
+      const restoring = manager.restorePage();
+      const second = await manager.translatePage();
+
+      await restoring;
+
+      expect(manager.acceptedLifecycleSessionId).toBe(second.messageId);
+      expect(pageEventBus.emit).toHaveBeenCalledWith(
+        MessageActions.PAGE_RESTORE_COMPLETE,
+        expect.objectContaining({ sessionId: first.messageId })
       );
     });
   });
@@ -770,14 +839,22 @@ describe('PageTranslationManager', () => {
 
     it('preserves local restore failure behavior outside translation presentation', async () => {
       const error = new Error('local restore failure');
+      manager.translationMessageId = 'restore-session';
+      manager.acceptedLifecycleSessionId = 'restore-session';
+      manager.scheduler.translationSessionId = 'restore-session';
       manager.bridge.restore.mockImplementationOnce(() => { throw error; });
 
       await expect(manager.restorePage()).rejects.toBe(error);
       expect(ErrorHandler.getInstance().handle).not.toHaveBeenCalled();
-      expect(pageEventBus.emit).toHaveBeenCalledWith(MessageActions.PAGE_RESTORE_ERROR, {
+      expect(pageEventBus.emit).toHaveBeenCalledWith(MessageActions.PAGE_RESTORE_ERROR, expect.objectContaining({
         error: error.message,
         errorDetails: expect.objectContaining({ message: error.message }),
-      });
+        sessionId: 'restore-session',
+      }));
+      expect(manager.acceptedLifecycleSessionId).toBe('restore-session');
+
+      await manager.restorePage();
+      expect(manager.acceptedLifecycleSessionId).toBeNull();
     });
   });
 

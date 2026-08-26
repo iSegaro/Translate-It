@@ -131,12 +131,33 @@ describe('PageTranslationScheduler', () => {
 
       expect(onLifecycleEvent).toHaveBeenCalledWith(
         MessageActions.PAGE_TRANSLATE_PROGRESS,
-        expect.objectContaining({ translatedCount: 2, totalCount: 3 })
+        expect.objectContaining({ translatedCount: 2, totalCount: 3, sessionId: 'direct-session' })
       );
       expect(pageEventBus.emit).not.toHaveBeenCalledWith(
         MessageActions.PAGE_TRANSLATE_PROGRESS,
         expect.anything()
       );
+      directScheduler.reset();
+    });
+
+    it('attaches scheduler-owned identity to progress, complete, and idle lifecycle events', () => {
+      const onLifecycleEvent = vi.fn();
+      const directScheduler = new PageTranslationScheduler({ onLifecycleEvent });
+      directScheduler.setTranslationState(true, 'direct-session', {});
+
+      for (const action of [
+        MessageActions.PAGE_TRANSLATE_PROGRESS,
+        MessageActions.PAGE_TRANSLATE_COMPLETE,
+        MessageActions.PAGE_TRANSLATE_IDLE,
+      ]) {
+        directScheduler._emitLifecycle(action, {});
+      }
+
+      expect(onLifecycleEvent.mock.calls).toEqual(expect.arrayContaining([
+        [MessageActions.PAGE_TRANSLATE_PROGRESS, { sessionId: 'direct-session' }],
+        [MessageActions.PAGE_TRANSLATE_COMPLETE, { sessionId: 'direct-session' }],
+        [MessageActions.PAGE_TRANSLATE_IDLE, { sessionId: 'direct-session' }],
+      ]));
       directScheduler.reset();
     });
 

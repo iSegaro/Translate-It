@@ -26,6 +26,7 @@ export class MainFrameCoordinator {
     this.aggregator = aggregator;
     this.MessageActions = MessageActions;
     this.contentScriptCore = contentScriptCore;
+    this.frameSessionOwners = new Map();
 
     if (this.contentScriptCore) {
       this.contentScriptCore.mainFrameCoordinator = this;
@@ -107,20 +108,41 @@ export class MainFrameCoordinator {
       return { success: false, error: 'Unsupported page lifecycle action' };
     }
 
+    const { sessionId, ...aggregateData } = data || {};
+    const hasSessionId = typeof sessionId === 'string' && sessionId.length > 0;
+    const ownedSession = this.frameSessionOwners.get(frameId);
+
     if (!this.MessageActions.PAGE_TRANSLATION_AGGREGATE_ACTIONS.includes(action)) {
+      if (!hasSessionId) {
+        pageEventBus.emit(action, data);
+        return { success: true, aggregated: false };
+      }
+      if (ownedSession !== sessionId) {
+        return { success: true, ignored: true, reason: 'stale-session' };
+      }
       pageEventBus.emit(action, data);
       return { success: true, aggregated: false };
     }
 
     if (action === this.MessageActions.PAGE_TRANSLATE_START) {
-      this._recordFrameStart(frameId, data);
+      if (!hasSessionId) {
+        return { success: true, ignored: true, reason: 'missing-session' };
+      }
+      this.frameSessionOwners.set(frameId, sessionId);
+      this._recordFrameStart(frameId, aggregateData);
       this.aggregator.emitAggregateProgress(action, data);
+    } else if (ownedSession !== sessionId || !hasSessionId) {
+      if (action === this.MessageActions.PAGE_TRANSLATE_ERROR && !hasSessionId) {
+        pageEventBus.emit(action, data);
+        return { success: true, aggregated: false, ignored: true, reason: 'missing-session' };
+      }
+      return { success: true, ignored: true, reason: 'stale-session' };
     } else if (action === this.MessageActions.PAGE_TRANSLATE_PROGRESS) {
-      this.aggregator.updateFrameData(frameId, data);
+      this.aggregator.updateFrameData(frameId, aggregateData);
       this.aggregator.emitAggregateProgress(null, data);
     } else if (action === this.MessageActions.PAGE_TRANSLATE_COMPLETE) {
       this.aggregator.updateFrameData(frameId, {
-        ...data,
+        ...aggregateData,
         isTranslating: false,
         status: 'idle',
         isTranslated: true,
@@ -128,7 +150,7 @@ export class MainFrameCoordinator {
       this.aggregator.emitAggregateProgress(action, data);
     } else if (action === this.MessageActions.PAGE_TRANSLATE_IDLE) {
       this.aggregator.updateFrameData(frameId, {
-        ...data,
+        ...aggregateData,
         isTranslating: false,
         status: 'idle',
         isTranslated: (data.translatedCount || 0) > 0,
@@ -136,29 +158,22 @@ export class MainFrameCoordinator {
       this.aggregator.emitAggregateProgress(action, data);
     } else if (action === this.MessageActions.PAGE_AUTO_RESTORE_COMPLETE) {
       this.aggregator.updateFrameData(frameId, {
-        ...data,
+        ...aggregateData,
         isTranslating: false,
         status: 'idle',
       });
       this.aggregator.emitAggregateProgress(action, data);
     } else if (action === this.MessageActions.PAGE_RESTORE_COMPLETE) {
-      if (frameId === 0) {
-        this.aggregator.clearAll();
+      this.frameSessionOwners.delete(frameId);
+      this.aggregator.removeFrame(frameId);
+      if (this.frameSessionOwners.size === 0) {
+        this.aggregator.emitAggregateProgress(action, data);
       } else {
-        this.aggregator.updateFrameData(frameId, {
-          isTranslating: false,
-          isTranslated: false,
-          isAutoTranslating: false,
-          status: 'idle',
-          translatedCount: 0,
-          failedCount: 0,
-          totalCount: 0,
-        });
+        this.aggregator.emitAggregateProgress();
       }
-      this.aggregator.emitAggregateProgress(action, data);
     } else if (action === this.MessageActions.PAGE_TRANSLATE_ERROR) {
       this.aggregator.updateFrameData(frameId, {
-        ...data,
+        ...aggregateData,
         isTranslating: false,
         status: 'error',
       });
