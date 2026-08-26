@@ -30,10 +30,12 @@ const INTERNAL_CANCELLATION_REASON = 'operation-abort';
  * Handles batching, prioritization (Viewport first), and fault tolerance.
  */
 export class PageTranslationScheduler extends ResourceTracker {
-  constructor({ onFatalError } = {}) {
+  constructor({ onFatalError, onLifecycleEvent, onInternalError } = {}) {
     super('page-translation-scheduler');
     this.logger = getScopedLogger(LOG_COMPONENTS.PAGE_TRANSLATION, 'Scheduler');
     this.onFatalError = typeof onFatalError === 'function' ? onFatalError : null;
+    this.onLifecycleEvent = typeof onLifecycleEvent === 'function' ? onLifecycleEvent : null;
+    this.onInternalError = typeof onInternalError === 'function' ? onInternalError : null;
     this.queue = []; // Tasks: { text, score, resolve, reject, context, node }
     this.batchTimer = null;
     this.translatedCount = 0;
@@ -80,6 +82,16 @@ export class PageTranslationScheduler extends ResourceTracker {
 
   setSettings(settings) {
     this.settings = { ...this.settings, ...settings };
+  }
+
+  _emitLifecycle(action, data) {
+    if (this.onLifecycleEvent) {
+      this.onLifecycleEvent(action, data);
+      return;
+    }
+
+    // Standalone scheduler consumers retain local presentation behavior.
+    pageEventBus.emit(action, data);
   }
 
   setTranslationState(isTranslated, sessionId, sessionContext = null, cancellationReason) {
@@ -702,6 +714,12 @@ export class PageTranslationScheduler extends ResourceTracker {
       isFatal: isFatal,
       context: 'page-translation-batch'
     });
+    this.onInternalError?.({
+      error,
+      errorType,
+      isFatal,
+      context: 'page-translation-batch',
+    });
 
     // Also emit specific fatal event for the Manager's circuit breaker
     if (isFatal) {
@@ -724,7 +742,7 @@ export class PageTranslationScheduler extends ResourceTracker {
     if (force || timeSinceLastReport >= this._reportInterval) {
       this._lastReportTime = now;
       this._reportPending = false;
-      pageEventBus.emit(MessageActions.PAGE_TRANSLATE_PROGRESS, { 
+      this._emitLifecycle(MessageActions.PAGE_TRANSLATE_PROGRESS, { 
         translatedCount: this.translatedCount, 
         totalCount: this.totalTasks,
         failedCount: this.failedCount,
@@ -761,7 +779,7 @@ export class PageTranslationScheduler extends ResourceTracker {
         // If auto-translating, we are never "truly" complete, just idle/watching
         if (isAuto) {
           this.logger.debug('Scheduler detected completion of current queue in Auto mode, signaling idle');
-          pageEventBus.emit(MessageActions.PAGE_TRANSLATE_IDLE, {
+          this._emitLifecycle(MessageActions.PAGE_TRANSLATE_IDLE, {
             translatedCount: this.translatedCount,
             totalCount: this.totalTasks,
             failedCount: this.failedCount,
@@ -773,7 +791,7 @@ export class PageTranslationScheduler extends ResourceTracker {
             total: this.totalTasks,
             failed: this.failedCount
           });
-          pageEventBus.emit(MessageActions.PAGE_TRANSLATE_COMPLETE, {
+          this._emitLifecycle(MessageActions.PAGE_TRANSLATE_COMPLETE, {
             translatedCount: this.translatedCount,
             totalCount: this.totalTasks,
             failedCount: this.failedCount,
@@ -789,7 +807,7 @@ export class PageTranslationScheduler extends ResourceTracker {
       // We allow idle even if some failed or nothing successfully translated yet.
       if (this.isWaitingForVisibility && processedCount >= 0) {
         this.logger.debug('Scheduler entering idle state (Visible content processed)');
-        pageEventBus.emit(MessageActions.PAGE_TRANSLATE_IDLE, {
+        this._emitLifecycle(MessageActions.PAGE_TRANSLATE_IDLE, {
           translatedCount: this.translatedCount,
           totalCount: this.totalTasks,
           failedCount: this.failedCount,

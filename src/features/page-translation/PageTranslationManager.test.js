@@ -40,22 +40,24 @@ vi.mock('./PageTranslationHelper.js', () => ({
   }
 }));
 
-vi.mock('./PageTranslationScheduler.js', () => ({
-  PageTranslationScheduler: class {
-    constructor({ onFatalError } = {}) {
-      this.onFatalError = onFatalError;
-      this.reset = vi.fn();
-      this.setSettings = vi.fn();
-      this.setTranslationState = vi.fn();
-      this.enqueue = vi.fn();
-      this.translatedCount = 0;
-      this.translationSessionId = null;
-      this.sessionContext = null;
-      this.signalScrollStop = vi.fn();
-      this.signalScrollStart = vi.fn();
+  vi.mock('./PageTranslationScheduler.js', () => ({
+    PageTranslationScheduler: class {
+      constructor({ onFatalError, onLifecycleEvent, onInternalError } = {}) {
+        this.onFatalError = onFatalError;
+        this.onLifecycleEvent = onLifecycleEvent;
+        this.onInternalError = onInternalError;
+        this.reset = vi.fn();
+        this.setSettings = vi.fn();
+        this.setTranslationState = vi.fn();
+        this.enqueue = vi.fn();
+        this.translatedCount = 0;
+        this.translationSessionId = null;
+        this.sessionContext = null;
+        this.signalScrollStop = vi.fn();
+        this.signalScrollStart = vi.fn();
+      }
     }
-  }
-}));
+  }));
 
 vi.mock('./PageTranslationBridge.js', () => ({
   PageTranslationBridge: class {
@@ -212,6 +214,40 @@ describe('PageTranslationManager', () => {
   });
 
   describe('Translation Lifecycle', () => {
+    it('publishes aggregate lifecycle through trusted runtime transport', async () => {
+      const data = { translatedCount: 2, totalCount: 3, frameUrl: 'fake' };
+
+      await manager._broadcastEvent(MessageActions.PAGE_TRANSLATE_PROGRESS, data);
+
+      expect(sendRegularMessage).toHaveBeenCalledWith({
+        action: MessageActions.PAGE_TRANSLATION_FRAME_LIFECYCLE,
+        data: {
+          action: MessageActions.PAGE_TRANSLATE_PROGRESS,
+          data,
+        },
+        context: 'page-translation-frame-lifecycle',
+      }, { silent: true });
+      expect(pageEventBus.emit).toHaveBeenCalledWith(MessageActions.PAGE_TRANSLATE_PROGRESS, data);
+    });
+
+    it('publishes non-fatal scheduler errors through trusted lifecycle transport', () => {
+      const error = Object.assign(new Error('provider failure'), { type: ErrorTypes.MODEL_MISSING });
+
+      manager.scheduler.onInternalError({
+        error,
+        errorType: ErrorTypes.MODEL_MISSING,
+        isFatal: false,
+      });
+
+      expect(sendRegularMessage).toHaveBeenCalledWith(expect.objectContaining({
+        action: MessageActions.PAGE_TRANSLATION_FRAME_LIFECYCLE,
+        data: expect.objectContaining({
+          action: MessageActions.PAGE_TRANSLATE_ERROR,
+          data: expect.objectContaining({ isFatal: false }),
+        }),
+      }), { silent: true });
+    });
+
     it('should start translation successfully', async () => {
       await manager.activate();
       const result = await manager.translatePage();
@@ -372,6 +408,46 @@ describe('PageTranslationManager', () => {
         undefined,
         ActionReasons.USER_STOPPED_PAGE_TRANSLATION
       );
+      expect(sendRegularMessage).toHaveBeenCalledWith(expect.objectContaining({
+        action: MessageActions.PAGE_TRANSLATION_FRAME_LIFECYCLE,
+        data: expect.objectContaining({
+          action: MessageActions.PAGE_AUTO_RESTORE_COMPLETE,
+          data: expect.objectContaining({
+            isAutoTranslating: false,
+          }),
+        }),
+      }), { silent: true });
+    });
+
+    it('updates completion state through trusted scheduler callback', () => {
+      manager.isTranslating = true;
+      manager.isTranslated = false;
+
+      manager.scheduler.onLifecycleEvent(MessageActions.PAGE_TRANSLATE_COMPLETE, {
+        translatedCount: 2,
+        totalCount: 2,
+        failedCount: 0,
+      });
+
+      expect(manager.isTranslating).toBe(false);
+      expect(manager.isTranslated).toBe(true);
+    });
+
+    it('preserves auto mode while trusted scheduler idle clears active translation', () => {
+      manager.isTranslating = true;
+      manager.isTranslated = false;
+      manager.isAutoTranslating = true;
+
+      manager.scheduler.onLifecycleEvent(MessageActions.PAGE_TRANSLATE_IDLE, {
+        translatedCount: 2,
+        totalCount: 2,
+        failedCount: 0,
+        isAutoTranslating: true,
+      });
+
+      expect(manager.isTranslating).toBe(false);
+      expect(manager.isTranslated).toBe(true);
+      expect(manager.isAutoTranslating).toBe(true);
     });
 
     it('should link bridge callback to scheduler enqueue', async () => {

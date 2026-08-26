@@ -23,7 +23,29 @@ const MessageActions = {
   PAGE_AUTO_RESTORE_COMPLETE: 'PAGE_AUTO_RESTORE_COMPLETE',
   PAGE_RESTORE_COMPLETE: 'PAGE_RESTORE_COMPLETE',
   PAGE_TRANSLATE_ERROR: 'PAGE_TRANSLATE_ERROR',
-  PAGE_TRANSLATE_STOP_AUTO: 'PAGE_TRANSLATE_STOP_AUTO'
+  PAGE_TRANSLATE_STOP_AUTO: 'PAGE_TRANSLATE_STOP_AUTO',
+  PAGE_TRANSLATE_CANCELLED: 'PAGE_TRANSLATE_CANCELLED',
+  PAGE_RESTORE_ERROR: 'PAGE_RESTORE_ERROR',
+  PAGE_TRANSLATION_FRAME_LIFECYCLE_ACTIONS: [
+    'PAGE_TRANSLATE_START',
+    'PAGE_TRANSLATE_PROGRESS',
+    'PAGE_TRANSLATE_COMPLETE',
+    'PAGE_TRANSLATE_IDLE',
+    'PAGE_TRANSLATE_ERROR',
+    'PAGE_RESTORE_COMPLETE',
+    'PAGE_AUTO_RESTORE_COMPLETE',
+    'PAGE_TRANSLATE_CANCELLED',
+    'PAGE_RESTORE_ERROR',
+  ],
+  PAGE_TRANSLATION_AGGREGATE_ACTIONS: [
+    'PAGE_TRANSLATE_START',
+    'PAGE_TRANSLATE_PROGRESS',
+    'PAGE_TRANSLATE_COMPLETE',
+    'PAGE_TRANSLATE_IDLE',
+    'PAGE_TRANSLATE_ERROR',
+    'PAGE_RESTORE_COMPLETE',
+    'PAGE_AUTO_RESTORE_COMPLETE',
+  ],
 };
 
 describe('MainFrameCoordinator per-frame admission', () => {
@@ -39,7 +61,7 @@ describe('MainFrameCoordinator per-frame admission', () => {
   });
 
   it('preserves existing aggregate state when PAGE_TRANSLATE is only intent', () => {
-    aggregator.updateFrameData('main', {
+    aggregator.updateFrameData(0, {
       isTranslated: true,
       isTranslating: false,
       translatedCount: 5,
@@ -58,7 +80,7 @@ describe('MainFrameCoordinator per-frame admission', () => {
   });
 
   it('preserves main state when iframe accepts after main rejection', () => {
-    aggregator.updateFrameData('main', {
+    aggregator.updateFrameData(0, {
       isTranslated: true,
       isTranslating: false,
       translatedCount: 5,
@@ -67,19 +89,16 @@ describe('MainFrameCoordinator per-frame admission', () => {
       status: 'idle'
     });
 
-    window.dispatchEvent(new MessageEvent('message', {
+    const coordinator = new MainFrameCoordinator(aggregator, MessageActions, null);
+    coordinator.handleTrustedPageLifecycle({
+      frameId: 7,
+      action: MessageActions.PAGE_TRANSLATE_START,
       data: {
-        source: 'translate-it-iframe',
-        type: 'TRANSLATE_IT_PAGE_EVENT',
-        action: MessageActions.PAGE_TRANSLATE_START,
-        data: {
-          frameUrl: 'https://frame.example/',
-          messageId: 'iframe-session',
-          isAutoTranslating: false
-        }
+        frameUrl: 'https://frame.example/',
+        messageId: 'iframe-session',
+        isAutoTranslating: false,
       },
-      source: null
-    }));
+    });
 
     expect(aggregator.getGlobalPageTranslationStatus()).toMatchObject({
       isTranslated: true,
@@ -88,8 +107,68 @@ describe('MainFrameCoordinator per-frame admission', () => {
     });
   });
 
+  it('stores trusted lifecycle state under numeric browser frame ID', () => {
+    const coordinator = new MainFrameCoordinator(aggregator, MessageActions, null);
+
+    coordinator.handleTrustedPageLifecycle({
+      frameId: 7,
+      action: MessageActions.PAGE_TRANSLATE_PROGRESS,
+      data: {
+        translatedCount: 2,
+        totalCount: 3,
+        frameId: 99,
+        frameUrl: 'https://other-frame.example',
+      },
+    });
+
+    expect(aggregator.frameProgressMap.get(7)).toMatchObject({
+      translatedCount: 2,
+      totalCount: 3,
+    });
+    expect(aggregator.frameProgressMap.has(99)).toBe(false);
+    expect(aggregator.frameProgressMap.has('https://other-frame.example')).toBe(false);
+  });
+
+  it('marks aggregate stopped only after trusted Stop lifecycle from every active frame', () => {
+    const coordinator = new MainFrameCoordinator(aggregator, MessageActions, null);
+    aggregator.updateFrameData(0, {
+      isTranslated: true,
+      isTranslating: true,
+      isAutoTranslating: true,
+      translatedCount: 2,
+      totalCount: 3,
+      status: 'translating',
+    });
+    aggregator.updateFrameData(1, {
+      isTranslated: true,
+      isTranslating: true,
+      isAutoTranslating: true,
+      translatedCount: 1,
+      totalCount: 2,
+      status: 'translating',
+    });
+
+    coordinator.handleTrustedPageLifecycle({
+      frameId: 0,
+      action: MessageActions.PAGE_AUTO_RESTORE_COMPLETE,
+      data: { translatedCount: 2, isTranslated: true, isAutoTranslating: false },
+    });
+    coordinator.handleTrustedPageLifecycle({
+      frameId: 1,
+      action: MessageActions.PAGE_AUTO_RESTORE_COMPLETE,
+      data: { translatedCount: 1, isTranslated: true, isAutoTranslating: false },
+    });
+
+    expect(aggregator.getGlobalPageTranslationStatus()).toMatchObject({
+      isTranslating: false,
+      isAutoTranslating: false,
+      isTranslated: true,
+      translatedCount: 3,
+    });
+  });
+
   it('preserves iframe state when main frame accepts a new cycle', () => {
-    aggregator.updateFrameData('frame-1', {
+    aggregator.updateFrameData(1, {
       isTranslated: true,
       isTranslating: false,
       translatedCount: 2,
@@ -98,9 +177,14 @@ describe('MainFrameCoordinator per-frame admission', () => {
       status: 'idle'
     });
 
-    pageEventBus.emit(MessageActions.PAGE_TRANSLATE_START, {
-      messageId: 'main-session',
-      isAutoTranslating: false
+    const coordinator = new MainFrameCoordinator(aggregator, MessageActions, null);
+    coordinator.handleTrustedPageLifecycle({
+      frameId: 0,
+      action: MessageActions.PAGE_TRANSLATE_START,
+      data: {
+        messageId: 'main-session',
+        isAutoTranslating: false,
+      },
     });
 
     expect(aggregator.getGlobalPageTranslationStatus()).toMatchObject({
@@ -111,7 +195,7 @@ describe('MainFrameCoordinator per-frame admission', () => {
   });
 
   it('keeps iframe state when main START is followed by main ERROR', () => {
-    aggregator.updateFrameData('frame-1', {
+    aggregator.updateFrameData(1, {
       isTranslated: true,
       isTranslating: false,
       translatedCount: 3,
@@ -120,13 +204,16 @@ describe('MainFrameCoordinator per-frame admission', () => {
       status: 'idle'
     });
 
-    pageEventBus.emit(MessageActions.PAGE_TRANSLATE_START, {
-      messageId: 'main-session',
-      isAutoTranslating: false
+    const coordinator = new MainFrameCoordinator(aggregator, MessageActions, null);
+    coordinator.handleTrustedPageLifecycle({
+      frameId: 0,
+      action: MessageActions.PAGE_TRANSLATE_START,
+      data: { messageId: 'main-session', isAutoTranslating: false },
     });
-    pageEventBus.emit(MessageActions.PAGE_TRANSLATE_ERROR, {
-      error: 'main failure',
-      isFatal: true
+    coordinator.handleTrustedPageLifecycle({
+      frameId: 0,
+      action: MessageActions.PAGE_TRANSLATE_ERROR,
+      data: { error: 'main failure', isFatal: true },
     });
 
     expect(aggregator.getGlobalPageTranslationStatus()).toMatchObject({
@@ -137,7 +224,7 @@ describe('MainFrameCoordinator per-frame admission', () => {
   });
 
   it('emits main fatal errors with aggregate counts and frame error identity', () => {
-    aggregator.updateFrameData('main', {
+    aggregator.updateFrameData(0, {
       isTranslated: false,
       isTranslating: true,
       translatedCount: 0,
@@ -145,7 +232,7 @@ describe('MainFrameCoordinator per-frame admission', () => {
       totalCount: 3,
       status: 'translating'
     });
-    aggregator.updateFrameData('frame-1', {
+    aggregator.updateFrameData(1, {
       isTranslated: true,
       isTranslating: false,
       translatedCount: 3,
@@ -157,11 +244,16 @@ describe('MainFrameCoordinator per-frame admission', () => {
     const emitSpy = vi.spyOn(pageEventBus, 'emit');
     const errorDetails = { type: 'NETWORK_ERROR', message: 'network failure' };
 
-    pageEventBus.emit(MessageActions.PAGE_TRANSLATE_ERROR, {
-      error: 'network failure',
-      errorDetails,
-      errorType: 'NETWORK_ERROR',
-      isFatal: true
+    const coordinator = new MainFrameCoordinator(aggregator, MessageActions, null);
+    coordinator.handleTrustedPageLifecycle({
+      frameId: 0,
+      action: MessageActions.PAGE_TRANSLATE_ERROR,
+      data: {
+        error: 'network failure',
+        errorDetails,
+        errorType: 'NETWORK_ERROR',
+        isFatal: true,
+      },
     });
 
     const aggregateCall = emitSpy.mock.calls.find(([, data]) => (
@@ -182,7 +274,7 @@ describe('MainFrameCoordinator per-frame admission', () => {
   });
 
   it('keeps main committed output in an iframe fatal aggregate error', () => {
-    aggregator.updateFrameData('main', {
+    aggregator.updateFrameData(0, {
       isTranslated: true,
       isTranslating: false,
       translatedCount: 5,
@@ -190,7 +282,7 @@ describe('MainFrameCoordinator per-frame admission', () => {
       totalCount: 5,
       status: 'idle'
     });
-    aggregator.updateFrameData('frame-1', {
+    aggregator.updateFrameData(1, {
       isTranslated: false,
       isTranslating: true,
       translatedCount: 0,
@@ -202,22 +294,19 @@ describe('MainFrameCoordinator per-frame admission', () => {
     const emitSpy = vi.spyOn(pageEventBus, 'emit');
     const errorDetails = { type: 'NETWORK_ERROR', message: 'iframe failure' };
 
-    window.dispatchEvent(new MessageEvent('message', {
+    const coordinator = new MainFrameCoordinator(aggregator, MessageActions, null);
+    coordinator.handleTrustedPageLifecycle({
+      frameId: 1,
+      action: MessageActions.PAGE_TRANSLATE_ERROR,
       data: {
-        source: 'translate-it-iframe',
-        type: 'TRANSLATE_IT_PAGE_EVENT',
-        action: MessageActions.PAGE_TRANSLATE_ERROR,
-        data: {
-          frameUrl: 'frame-1',
-          error: 'iframe failure',
-          errorDetails,
-          errorType: 'NETWORK_ERROR',
-          translatedCount: 0,
-          isFatal: true
-        }
+        frameUrl: 'frame-1',
+        error: 'iframe failure',
+        errorDetails,
+        errorType: 'NETWORK_ERROR',
+        translatedCount: 0,
+        isFatal: true,
       },
-      source: null
-    }));
+    });
 
     const aggregateCall = emitSpy.mock.calls.find(([, data]) => (
       data?.isAggregated === true && data.errorDetails === errorDetails

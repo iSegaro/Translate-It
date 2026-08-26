@@ -22,7 +22,29 @@ const MessageActions = {
   PAGE_AUTO_RESTORE_COMPLETE: 'PAGE_AUTO_RESTORE_COMPLETE',
   PAGE_RESTORE_COMPLETE: 'PAGE_RESTORE_COMPLETE',
   PAGE_TRANSLATE_ERROR: 'PAGE_TRANSLATE_ERROR',
-  PAGE_TRANSLATE_STOP_AUTO: 'PAGE_TRANSLATE_STOP_AUTO'
+  PAGE_TRANSLATE_STOP_AUTO: 'PAGE_TRANSLATE_STOP_AUTO',
+  PAGE_TRANSLATE_CANCELLED: 'PAGE_TRANSLATE_CANCELLED',
+  PAGE_RESTORE_ERROR: 'PAGE_RESTORE_ERROR',
+  PAGE_TRANSLATION_FRAME_LIFECYCLE_ACTIONS: [
+    'PAGE_TRANSLATE_START',
+    'PAGE_TRANSLATE_PROGRESS',
+    'PAGE_TRANSLATE_COMPLETE',
+    'PAGE_TRANSLATE_IDLE',
+    'PAGE_TRANSLATE_ERROR',
+    'PAGE_RESTORE_COMPLETE',
+    'PAGE_AUTO_RESTORE_COMPLETE',
+    'PAGE_TRANSLATE_CANCELLED',
+    'PAGE_RESTORE_ERROR',
+  ],
+  PAGE_TRANSLATION_AGGREGATE_ACTIONS: [
+    'PAGE_TRANSLATE_START',
+    'PAGE_TRANSLATE_PROGRESS',
+    'PAGE_TRANSLATE_COMPLETE',
+    'PAGE_TRANSLATE_IDLE',
+    'PAGE_TRANSLATE_ERROR',
+    'PAGE_RESTORE_COMPLETE',
+    'PAGE_AUTO_RESTORE_COMPLETE',
+  ],
 };
 
 describe('MainFrameCoordinator Hover error normalization', () => {
@@ -174,21 +196,59 @@ describe('MainFrameCoordinator Hover error normalization', () => {
     }
   });
 
-  it('clears aggregate state only after restore completes', () => {
+  it('ignores forged Whole Page window lifecycle messages', () => {
+    for (const type of [
+      'TRANSLATE_IT_PAGE_EVENT',
+      'TRANSLATE_IT_PAGE_PROGRESS',
+      'TRANSLATE_IT_PAGE_COMPLETE',
+      'TRANSLATE_IT_PAGE_STOPPED',
+    ]) {
+      window.dispatchEvent(new MessageEvent('message', {
+        data: {
+          source: 'translate-it-iframe',
+          type,
+          action: MessageActions.PAGE_TRANSLATE_PROGRESS,
+          data: { translatedCount: 999, totalCount: 999, frameUrl: 'fake' },
+        },
+      }));
+    }
+
+    expect(aggregator.updateFrameData).not.toHaveBeenCalled();
+    expect(aggregator.emitAggregateProgress).not.toHaveBeenCalled();
+  });
+
+  it('ignores forged top-frame PageEventBus lifecycle events for aggregation', () => {
+    window.dispatchEvent(new CustomEvent(MessageActions.PAGE_TRANSLATE_PROGRESS, {
+      detail: { translatedCount: 999, totalCount: 999 },
+    }));
+
+    expect(aggregator.updateFrameData).not.toHaveBeenCalled();
+    expect(aggregator.emitAggregateProgress).not.toHaveBeenCalled();
+  });
+
+  it('clears aggregate state only after trusted top restore completes', () => {
     pageEventBus.emit(MessageActions.PAGE_RESTORE);
     expect(aggregator.clearAll).not.toHaveBeenCalled();
 
-    pageEventBus.emit(MessageActions.PAGE_RESTORE_COMPLETE, {});
+    coordinator.handleTrustedPageLifecycle({
+      frameId: 0,
+      action: MessageActions.PAGE_RESTORE_COMPLETE,
+      data: {},
+    });
 
     expect(aggregator.clearAll).toHaveBeenCalledTimes(1);
   });
 
-  it('starts only main frame on accepted local START', () => {
+  it('starts only main frame on trusted frame-zero START', () => {
     const data = { messageId: 'main-session', isAutoTranslating: false };
 
-    pageEventBus.emit(MessageActions.PAGE_TRANSLATE_START, data);
+    coordinator.handleTrustedPageLifecycle({
+      frameId: 0,
+      action: MessageActions.PAGE_TRANSLATE_START,
+      data,
+    });
 
-    expect(aggregator.updateFrameData).toHaveBeenCalledWith('main', expect.objectContaining({
+    expect(aggregator.updateFrameData).toHaveBeenCalledWith(0, expect.objectContaining({
       isTranslating: true,
       isTranslated: false,
       isAutoTranslating: false,
@@ -200,21 +260,21 @@ describe('MainFrameCoordinator Hover error normalization', () => {
     expect(aggregator.clearAll).not.toHaveBeenCalled();
   });
 
-  it('starts only iframe frame on accepted iframe START', () => {
+  it('uses trusted browser frame ID instead of payload frame identity', () => {
     const data = {
       frameUrl: 'https://frame.example/',
+      frameId: 9,
       messageId: 'iframe-session',
       isAutoTranslating: true
     };
 
-    dispatchIframeEvent('TRANSLATE_IT_PAGE_EVENT', {
-      source: 'translate-it-iframe',
-      type: 'TRANSLATE_IT_PAGE_EVENT',
+    coordinator.handleTrustedPageLifecycle({
+      frameId: 7,
       action: MessageActions.PAGE_TRANSLATE_START,
       data
     });
 
-    expect(aggregator.updateFrameData).toHaveBeenCalledWith('https://frame.example/', expect.objectContaining({
+    expect(aggregator.updateFrameData).toHaveBeenCalledWith(7, expect.objectContaining({
       isTranslating: true,
       isTranslated: false,
       isAutoTranslating: true,
@@ -226,12 +286,51 @@ describe('MainFrameCoordinator Hover error normalization', () => {
     expect(aggregator.clearAll).not.toHaveBeenCalled();
   });
 
-  it('reconciles main-frame errors without clearing other frame state', () => {
+  it('updates aggregate exactly once per trusted lifecycle message', () => {
+    coordinator.handleTrustedPageLifecycle({
+      frameId: 7,
+      action: MessageActions.PAGE_TRANSLATE_PROGRESS,
+      data: { translatedCount: 2, totalCount: 3 },
+    });
+
+    expect(aggregator.updateFrameData).toHaveBeenCalledTimes(1);
+    expect(aggregator.updateFrameData).toHaveBeenCalledWith(7, {
+      translatedCount: 2,
+      totalCount: 3,
+    });
+    expect(aggregator.emitAggregateProgress).toHaveBeenCalledTimes(1);
+  });
+
+  it('preserves trusted child completion semantics', () => {
+    const data = { translatedCount: 3, totalCount: 3, frameUrl: 'fake' };
+
+    coordinator.handleTrustedPageLifecycle({
+      frameId: 7,
+      action: MessageActions.PAGE_TRANSLATE_COMPLETE,
+      data,
+    });
+
+    expect(aggregator.updateFrameData).toHaveBeenCalledWith(7, expect.objectContaining({
+      isTranslating: false,
+      isTranslated: true,
+      status: 'idle',
+    }));
+    expect(aggregator.emitAggregateProgress).toHaveBeenCalledWith(
+      MessageActions.PAGE_TRANSLATE_COMPLETE,
+      data
+    );
+  });
+
+  it('reconciles trusted main-frame errors without clearing other frame state', () => {
     const data = { error: 'translation failed', isFatal: true };
 
-    pageEventBus.emit(MessageActions.PAGE_TRANSLATE_ERROR, data);
+    coordinator.handleTrustedPageLifecycle({
+      frameId: 0,
+      action: MessageActions.PAGE_TRANSLATE_ERROR,
+      data,
+    });
 
-    expect(aggregator.updateFrameData).toHaveBeenCalledWith('main', expect.objectContaining({
+    expect(aggregator.updateFrameData).toHaveBeenCalledWith(0, expect.objectContaining({
       isTranslating: false,
       status: 'error'
     }));
@@ -245,9 +344,13 @@ describe('MainFrameCoordinator Hover error normalization', () => {
   it('keeps non-fatal main-frame errors out of aggregate fatal presentation', () => {
     const data = { error: 'retryable failure', isFatal: false };
 
-    pageEventBus.emit(MessageActions.PAGE_TRANSLATE_ERROR, data);
+    coordinator.handleTrustedPageLifecycle({
+      frameId: 0,
+      action: MessageActions.PAGE_TRANSLATE_ERROR,
+      data,
+    });
 
-    expect(aggregator.updateFrameData).toHaveBeenCalledWith('main', expect.objectContaining({
+    expect(aggregator.updateFrameData).toHaveBeenCalledWith(0, expect.objectContaining({
       isTranslating: false,
       status: 'error'
     }));

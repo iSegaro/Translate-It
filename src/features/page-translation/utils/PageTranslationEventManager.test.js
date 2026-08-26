@@ -2,7 +2,6 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { PageTranslationEventManager } from './PageTranslationEventManager.js';
 import { MessageActions } from '@/shared/messaging/core/MessageActions.js';
 import { storageManager } from '@/shared/storage/core/StorageCore.js';
-import { sendRegularMessage } from '@/shared/messaging/core/UnifiedMessaging.js';
 import { ErrorHandler } from '@/shared/error-management/ErrorHandler.js';
 import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
 import { pageEventBus } from '@/core/PageEventBus.js';
@@ -13,11 +12,6 @@ vi.mock('@/shared/storage/core/StorageCore.js', () => ({
     on: vi.fn(),
     off: vi.fn()
   }
-}));
-
-// Mock UnifiedMessaging
-vi.mock('@/shared/messaging/core/UnifiedMessaging.js', () => ({
-  sendRegularMessage: vi.fn(() => Promise.resolve())
 }));
 
 // Mock ExtensionContextManager
@@ -130,13 +124,53 @@ describe('PageTranslationEventManager', () => {
       expect(mockManager.cancelTranslation).not.toHaveBeenCalled();
     });
 
-    it('should forward progress events to background', () => {
-      const callback = mockBus.on.mock.calls.find(c => c[0] === MessageActions.PAGE_TRANSLATE_PROGRESS)[1];
-      const data = { progress: 50 };
-      callback(data);
-      expect(sendRegularMessage).toHaveBeenCalledWith(
-        expect.objectContaining({ action: MessageActions.PAGE_TRANSLATE_PROGRESS, data }),
-        { silent: true }
+    it('does not install a PageEventBus-to-background lifecycle forwarder', () => {
+      expect(mockBus.on).not.toHaveBeenCalledWith(
+        MessageActions.PAGE_TRANSLATE_PROGRESS,
+        expect.any(Function)
+      );
+    });
+
+    it('keeps manager lifecycle state unchanged for forged COMPLETE and IDLE DOM events', () => {
+      delete window._translateItPageTranslationListenersSet;
+      window.pageEventBus = pageEventBus;
+      mockManager.isTranslating = true;
+      mockManager.isTranslated = false;
+
+      new PageTranslationEventManager(mockManager);
+      window.dispatchEvent(new CustomEvent(MessageActions.PAGE_TRANSLATE_COMPLETE, {
+        detail: { translatedCount: 100, totalCount: 100 },
+      }));
+      window.dispatchEvent(new CustomEvent(MessageActions.PAGE_TRANSLATE_IDLE, {
+        detail: { translatedCount: 100, totalCount: 100 },
+      }));
+
+      expect(mockManager.isTranslating).toBe(true);
+      expect(mockManager.isTranslated).toBe(false);
+    });
+
+    it('keeps top manager eligible to stop after trusted child aggregate completion', () => {
+      const callback = mockBus.on.mock.calls.find(c => c[0] === MessageActions.PAGE_TRANSLATE_COMPLETE)[1];
+      mockManager.isTranslating = true;
+      mockManager.isTranslated = false;
+
+      callback({
+        isAggregated: true,
+        isTranslating: false,
+        isAutoTranslating: false,
+        translatedCount: 3,
+        totalCount: 3,
+        failedCount: 0,
+      });
+
+      expect(mockManager.isTranslating).toBe(true);
+      expect(mockManager.isTranslated).toBe(false);
+    });
+
+    it('does not register an IDLE lifecycle state listener', () => {
+      expect(mockBus.on).not.toHaveBeenCalledWith(
+        MessageActions.PAGE_TRANSLATE_IDLE,
+        expect.any(Function)
       );
     });
 
@@ -164,7 +198,7 @@ describe('PageTranslationEventManager', () => {
       expect(mockManager.isAutoTranslating).toBe(true);
     });
 
-    it('keeps non-fatal provider failures silent while preserving the internal event', async () => {
+    it('keeps non-fatal provider failures presentation-only at PageEventBus boundary', async () => {
       const callback = mockBus.on.mock.calls.find(c => c[0] === 'page-translation-internal-error')[1];
       const error = Object.assign(new Error('raw provider diagnostic'), {
         type: ErrorTypes.MODEL_MISSING,
@@ -173,10 +207,7 @@ describe('PageTranslationEventManager', () => {
 
       await callback({ error, errorType: error.type, isFatal: false, context: 'page-translation-batch' });
 
-      expect(mockManager._broadcastEvent).toHaveBeenCalledWith(MessageActions.PAGE_TRANSLATE_ERROR, expect.objectContaining({
-        errorType: ErrorTypes.MODEL_MISSING,
-        isFatal: false,
-      }));
+      expect(mockManager._broadcastEvent).not.toHaveBeenCalled();
       expect(ErrorHandler.getInstance().handle).not.toHaveBeenCalled();
     });
 
@@ -201,14 +232,30 @@ describe('PageTranslationEventManager', () => {
         callback({ error: 'batch 3', errorType: ErrorTypes.MODEL_MISSING, isFatal: false }),
       ]);
 
-      expect(mockManager._broadcastEvent).toHaveBeenCalledTimes(3);
+      expect(mockManager._broadcastEvent).not.toHaveBeenCalled();
       expect(ErrorHandler.getInstance().handle).not.toHaveBeenCalled();
     });
 
-    it('presents one terminal error when completion has zero useful results', async () => {
+    it('presents one terminal aggregate error after all frames settle with zero useful results', async () => {
       const callback = mockBus.on.mock.calls.find(c => c[0] === MessageActions.PAGE_TRANSLATE_COMPLETE)[1];
 
       callback({ translatedCount: 0, failedCount: 3, totalCount: 3 });
+      callback({
+        isAggregated: true,
+        isTranslating: true,
+        isAutoTranslating: false,
+        translatedCount: 0,
+        failedCount: 3,
+        totalCount: 3,
+      });
+      callback({
+        isAggregated: true,
+        isTranslating: false,
+        isAutoTranslating: false,
+        translatedCount: 0,
+        failedCount: 3,
+        totalCount: 3,
+      });
       await vi.waitFor(() => expect(ErrorHandler.getInstance().handle).toHaveBeenCalledTimes(1));
 
       expect(ErrorHandler.getInstance().handle.mock.calls[0][1]).toMatchObject({

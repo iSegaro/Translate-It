@@ -187,6 +187,7 @@ class LifecycleManager {
       [MessageActions.PAGE_TRANSLATE_GET_STATUS]: Handlers.handlePageTranslation,
       [MessageActions.PAGE_TRANSLATE_START]: Handlers.handlePageTranslation,
       [MessageActions.PAGE_TRANSLATE_PROGRESS]: Handlers.handlePageTranslation,
+      [MessageActions.PAGE_TRANSLATE_IDLE]: Handlers.handlePageTranslation,
       [MessageActions.PAGE_TRANSLATE_COMPLETE]: Handlers.handlePageTranslation,
       [MessageActions.PAGE_TRANSLATE_ERROR]: Handlers.handlePageTranslation,
       [MessageActions.PAGE_TRANSLATE_RESET_ERROR]: Handlers.handlePageTranslation,
@@ -195,6 +196,7 @@ class LifecycleManager {
       [MessageActions.PAGE_RESTORE_ERROR]: Handlers.handlePageTranslation,
       [MessageActions.PAGE_TRANSLATE_CANCELLED]: Handlers.handlePageTranslation,
       [MessageActions.PAGE_TRANSLATE_STOP_AUTO]: Handlers.handlePageTranslation, // NEW
+      [MessageActions.PAGE_TRANSLATION_FRAME_LIFECYCLE]: Handlers.handlePageTranslation,
 
       // Sidepanel handlers
       'openSidePanel': Handlers.handleOpenSidePanel,

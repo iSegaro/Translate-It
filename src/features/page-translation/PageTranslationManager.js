@@ -60,6 +60,8 @@ export class PageTranslationManager extends ResourceTracker {
     
     this.scheduler = new PageTranslationScheduler({
       onFatalError: (fatal) => this._handleSchedulerFatalError(fatal),
+      onLifecycleEvent: (action, data) => this._handleSchedulerLifecycle(action, data),
+      onInternalError: (details) => this._handleSchedulerInternalError(details),
     });
     this.bridge = new PageTranslationBridge();
     this.hoverManager = hoverPreviewManager;
@@ -622,6 +624,29 @@ export class PageTranslationManager extends ResourceTracker {
     return true;
   }
 
+  _handleSchedulerInternalError({ error, errorType, isFatal } = {}) {
+    if (isFatal || ExtensionContextManager.isContextError(error)) return;
+
+    this._publishLifecycle(MessageActions.PAGE_TRANSLATE_ERROR, {
+      error: error?.message || String(error),
+      errorDetails: MessageFormat.serializeTranslationError(error),
+      errorType,
+      isFatal: false,
+    });
+  }
+
+  _handleSchedulerLifecycle(action, data = {}) {
+    if (
+      action === MessageActions.PAGE_TRANSLATE_COMPLETE
+      || action === MessageActions.PAGE_TRANSLATE_IDLE
+    ) {
+      this.isTranslating = false;
+      this.isTranslated = (data.translatedCount || 0) > 0;
+    }
+
+    this._publishLifecycle(action, data);
+  }
+
   _handleFatalError(error, errorType, localizedMessage = null) {
     if (this.isFatalErrorHandling) return;
     this.isFatalErrorHandling = true;
@@ -673,7 +698,7 @@ export class PageTranslationManager extends ResourceTracker {
 
     // ALWAYS broadcast local state update via PageEventBus to ensure UI (FAB, Sidepanel) 
     // resets its state even on non-silent fatal errors.
-    pageEventBus.emit(MessageActions.PAGE_TRANSLATE_PROGRESS, {
+    this._publishLifecycle(MessageActions.PAGE_TRANSLATE_PROGRESS, {
       status: 'idle',
       isTranslating: false,
       isAutoTranslating: false,
@@ -788,38 +813,28 @@ export class PageTranslationManager extends ResourceTracker {
     }
   }
 
+  _publishLifecycle(action, data = {}) {
+    pageEventBus.emit(action, data);
+
+    if (!MessageActions.PAGE_TRANSLATION_FRAME_LIFECYCLE_ACTIONS.includes(action)) {
+      return;
+    }
+
+    sendRegularMessage({
+      action: MessageActions.PAGE_TRANSLATION_FRAME_LIFECYCLE,
+      data: { action, data },
+      context: 'page-translation-frame-lifecycle',
+    }, { silent: true }).catch(() => {});
+  }
+
   async _broadcastEvent(action, data = {}) {
-    try {
-      const isTopFrame = window.self === window.top;
+    this._publishLifecycle(action, data);
 
-      // Always emit to pageEventBus (both main frame and iframes)
-      // This ensures content app receives messages from all frames
-      pageEventBus.emit(action, data);
-
-      // Only broadcast to background from the main frame (top-level window)
-      // This prevents duplicate messages from iframes to other contexts
-      if (isTopFrame) {
-        sendRegularMessage({ action, data, context: 'page-translation-broadcast' }, { silent: true }).catch(() => {});
-      } else {
-        // IFrame: Send to Main Frame for aggregation
-        this.logger.debug(`IFrame sending event to main frame: ${action}`, data);
-        try {
-          window.top.postMessage({
-            type: 'TRANSLATE_IT_PAGE_EVENT',
-            action,
-            data: {
-              ...data,
-              frameUrl: window.location.href
-            },
-            source: 'translate-it-iframe'
-          }, '*');
-          this.logger.debug(`IFrame successfully sent event to main frame`);
-        } catch (e) {
-          this.logger.warn('IFrame failed to send event to main frame:', e);
-        }
-      }
-    } catch (error) {
-      this.logger.debug('Broadcast event failed - iframe or background unavailable:', error);
+    if (
+      !MessageActions.PAGE_TRANSLATION_AGGREGATE_ACTIONS.includes(action)
+      && window.self === window.top
+    ) {
+      sendRegularMessage({ action, data, context: 'page-translation-broadcast' }, { silent: true }).catch(() => {});
     }
   }
 

@@ -1,10 +1,8 @@
 import { MessageActions } from '@/shared/messaging/core/MessageActions.js';
-import { sendRegularMessage } from '@/shared/messaging/core/UnifiedMessaging.js';
 import { storageManager } from '@/shared/storage/core/StorageCore.js';
 import { TranslationMode } from '@/config.js';
 import ExtensionContextManager from '@/core/extensionContext.js';
 import { ErrorHandler } from '@/shared/error-management/ErrorHandler.js';
-import { MessageFormat } from '@/shared/messaging/core/MessagingCore.js';
 import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
 import { getPageTranslationErrorPresentation } from './PageTranslationErrorPresenter.js';
 
@@ -81,31 +79,16 @@ export class PageTranslationEventManager {
 
     this.logger.info('Setting up GLOBAL PageEventBus listeners for PageTranslationManager');
 
-    // 1. Progress & Completion Forwarding (Forward to background for UI updates)
-    bus.on(MessageActions.PAGE_TRANSLATE_PROGRESS, (data) => {
-      sendRegularMessage({ 
-        action: MessageActions.PAGE_TRANSLATE_PROGRESS, 
-        data, 
-        context: 'page-translation-progress-forward' 
-      }, { silent: true }).catch(() => {});
-    });
-
+    // Aggregate completion is canonical presentation because child-only failures
+    // have no top-frame local completion event.
     bus.on(MessageActions.PAGE_TRANSLATE_COMPLETE, (data) => {
-      this.manager.isTranslating = false;
-      this.manager.isTranslated = data.translatedCount > 0;
-      
-      sendRegularMessage({ 
-        action: MessageActions.PAGE_TRANSLATE_COMPLETE, 
-        data: {
-          ...data,
-          url: this.manager.currentUrl,
-          isAutoTranslating: this.manager.isAutoTranslating,
-          sessionId: this.manager.translationMessageId
-        }, 
-        context: 'page-translation-complete-forward' 
-      }, { silent: true }).catch(() => {});
-
-      if (data.translatedCount === 0 && data.failedCount > 0) {
+      if (
+        data?.isAggregated
+        && data.isTranslating === false
+        && data.isAutoTranslating === false
+        && data.translatedCount === 0
+        && data.failedCount > 0
+      ) {
         void getPageTranslationErrorPresentation({
           error: Object.assign(new Error('Translation failed'), {
             type: ErrorTypes.TRANSLATION_FAILED,
@@ -127,22 +110,6 @@ export class PageTranslationEventManager {
       if (!data?.isInternal) this.manager.resetError();
     });
 
-    bus.on(MessageActions.PAGE_TRANSLATE_IDLE, (data) => {
-      if (this.manager.isTranslating) {
-        this.manager.isTranslating = false;
-        this.manager.isTranslated = data.translatedCount > 0;
-        
-        this.manager._broadcastEvent(MessageActions.PAGE_TRANSLATE_PROGRESS, {
-          status: 'idle',
-          isTranslating: false,
-          isAutoTranslating: this.manager.isAutoTranslating,
-          isTranslated: this.manager.isTranslated,
-          translatedCount: data.translatedCount,
-          totalCount: data.totalCount
-        });
-      }
-    });
-
     bus.on('page-translation-internal-error', async (data) => {
       if (data.isFatal || ExtensionContextManager.isContextError(data.error)) return;
 
@@ -152,13 +119,6 @@ export class PageTranslationEventManager {
         error: data.error,
         errorDetails: data.errorDetails,
         errorType: data.errorType,
-      });
-
-      this.manager._broadcastEvent(MessageActions.PAGE_TRANSLATE_ERROR, {
-        error: data.error?.message || String(data.error),
-        errorDetails: MessageFormat.serializeTranslationError(data.error),
-        errorType: data.errorType,
-        isFatal: false
       });
 
       const displayError = await presentationPromise;

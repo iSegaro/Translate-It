@@ -55,6 +55,27 @@ export class MessageActions {
   static PAGE_TRANSLATE_GET_STATUS = 'page-translate-get-status';
   static PAGE_TRANSLATE_STOP_AUTO = 'page-translate-stop-auto'; // Stop auto-translation (NEW)
   static PAGE_AUTO_RESTORE_COMPLETE = 'page-auto-restore-complete'; // Auto-restore complete (NEW)
+  static PAGE_TRANSLATION_FRAME_LIFECYCLE = 'page-translation-frame-lifecycle';
+  static PAGE_TRANSLATION_FRAME_LIFECYCLE_ACTIONS = Object.freeze([
+    'page-translate-start',
+    'page-translate-progress',
+    'page-translate-complete',
+    'page-translate-idle',
+    'page-translate-error',
+    'page-restore-complete',
+    'page-auto-restore-complete',
+    'page-translate-cancelled',
+    'page-restore-error',
+  ]);
+  static PAGE_TRANSLATION_AGGREGATE_ACTIONS = Object.freeze([
+    'page-translate-start',
+    'page-translate-progress',
+    'page-translate-complete',
+    'page-translate-idle',
+    'page-translate-error',
+    'page-restore-complete',
+    'page-auto-restore-complete',
+  ]);
 
   // IFrame Support actions
   static IFRAME_ACTIVATE_SELECT_ELEMENT = 'IFRAME_ACTIVATE_SELECT_ELEMENT';

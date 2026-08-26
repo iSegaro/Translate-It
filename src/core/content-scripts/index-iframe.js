@@ -115,39 +115,4 @@ function setupIFrameMessageListeners() {
     }
   });
 
-  // Lifecycle forwarding remains active without page-visible command handling.
-  if (!window._translateItProgressForwarderSet) {
-    setupProgressForwarder(window.pageEventBus);
-    window._translateItProgressForwarderSet = true;
-  }
-}
-
-/**
- * Handles forwarding page translation progress and completion to the top frame
- */
-async function setupProgressForwarder(bus) {
-  if (!bus) return;
-  const { MessageActions } = await import('@/shared/messaging/core/MessageActions.js');
-
-  const forwardToTop = (type, data) => {
-    try {
-      window.top.postMessage({
-        type,
-        source: 'translate-it-iframe',
-        frameUrl: window.location.href,
-        data: {
-          translatedCount: data.translatedCount || 0,
-          failedCount: data.failedCount || data.failed || 0,
-          totalCount: data.totalCount || 0,
-          isTranslated: data.isTranslated,
-          isAutoTranslating: data.isAutoTranslating,
-          isTranslating: data.isTranslating,
-          status: data.status
-        }
-      }, '*');
-    } catch { /* ignore */ }
-  };
-
-  bus.on(MessageActions.PAGE_TRANSLATE_PROGRESS, (data) => forwardToTop('TRANSLATE_IT_PAGE_PROGRESS', data));
-  bus.on(MessageActions.PAGE_TRANSLATE_COMPLETE, (data) => forwardToTop('TRANSLATE_IT_PAGE_COMPLETE', data));
 }

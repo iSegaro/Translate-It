@@ -120,6 +120,26 @@ describe('PageTranslationScheduler', () => {
   });
 
   describe('Initialization & State', () => {
+    it('uses trusted lifecycle callback instead of aggregate PageEventBus transport', () => {
+      const onLifecycleEvent = vi.fn();
+      const directScheduler = new PageTranslationScheduler({ onLifecycleEvent });
+      directScheduler.setTranslationState(true, 'direct-session', {});
+      directScheduler.totalTasks = 3;
+      directScheduler.translatedCount = 2;
+
+      directScheduler._reportProgress(true);
+
+      expect(onLifecycleEvent).toHaveBeenCalledWith(
+        MessageActions.PAGE_TRANSLATE_PROGRESS,
+        expect.objectContaining({ translatedCount: 2, totalCount: 3 })
+      );
+      expect(pageEventBus.emit).not.toHaveBeenCalledWith(
+        MessageActions.PAGE_TRANSLATE_PROGRESS,
+        expect.anything()
+      );
+      directScheduler.reset();
+    });
+
     it('should initialize with correct default state', () => {
       expect(scheduler.isTranslated).toBe(true);
       expect(scheduler.queue).toHaveLength(0);

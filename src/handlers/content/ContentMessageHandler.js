@@ -217,6 +217,7 @@ export class ContentMessageHandler extends ResourceTracker {
     this.registerHandler(MessageActions.PAGE_RESTORE, this.handlePageRestore.bind(this));
     this.registerHandler(MessageActions.PAGE_TRANSLATE_GET_STATUS, this.handlePageGetStatus.bind(this));
     this.registerHandler(MessageActions.PAGE_TRANSLATE_STOP_AUTO, this.handlePageStopAuto.bind(this));
+    this.registerHandler(MessageActions.PAGE_TRANSLATION_FRAME_LIFECYCLE, this.handlePageTranslationLifecycle.bind(this));
   }
 
   registerHandler(action, handler) {
@@ -831,6 +832,19 @@ export class ContentMessageHandler extends ResourceTracker {
       this.logger.error('Page stop auto failed:', error);
       return { success: false, error: error.message };
     }
+  }
+
+  async handlePageTranslationLifecycle(message) {
+    if (window !== window.top) {
+      return { success: false, error: 'Page lifecycle relay requires top frame' };
+    }
+
+    const coordinator = window.translateItContentCore?.mainFrameCoordinator;
+    if (!coordinator?.handleTrustedPageLifecycle) {
+      return { success: false, error: 'Main frame coordinator unavailable' };
+    }
+
+    return coordinator.handleTrustedPageLifecycle(message.data || {});
   }
 
   async cleanup() {

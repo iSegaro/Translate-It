@@ -84,43 +84,20 @@ describe('iframe page translation transport', () => {
     });
   });
 
-  it('keeps progress and completion forwarding without page-visible commands', async () => {
+  it('does not install page-visible lifecycle forwarders', async () => {
     await import('./index-iframe.js');
 
-    await vi.waitFor(() => expect(mocks.pageEventBus.on).toHaveBeenCalledWith(
+    expect(mocks.pageEventBus.on).not.toHaveBeenCalledWith(
       'PAGE_TRANSLATE_PROGRESS',
-      expect.any(Function)
-    ));
-    expect(mocks.pageEventBus.on).toHaveBeenCalledWith(
-      'PAGE_TRANSLATE_COMPLETE',
       expect.any(Function)
     );
     expect(mocks.pageEventBus.on).not.toHaveBeenCalledWith(
-      'PAGE_AUTO_RESTORE_COMPLETE',
+      'PAGE_TRANSLATE_COMPLETE',
       expect.any(Function)
     );
-
-    window.dispatchEvent(new MessageEvent('message', {
-      data: {
-        source: 'translate-it-main',
-        type: 'TRANSLATE_IT_PAGE_ACTION',
-        action: 'PAGE_TRANSLATE',
-        data: { isAuto: false },
-      },
+    window.dispatchEvent(new CustomEvent('page-translate-progress', {
+      detail: { translatedCount: 999, totalCount: 999 },
     }));
-
-    await new Promise(resolve => setTimeout(resolve, 0));
-
-    expect(mocks.loadFeature).not.toHaveBeenCalledWith('pageTranslation');
-
-    const progressCallback = mocks.pageEventBus.on.mock.calls.find(
-      ([action]) => action === 'PAGE_TRANSLATE_PROGRESS'
-    )[1];
-    progressCallback({ translatedCount: 2, totalCount: 3, status: 'translating' });
-
-    expect(mocks.topPostMessage).toHaveBeenCalledWith(expect.objectContaining({
-      type: 'TRANSLATE_IT_PAGE_PROGRESS',
-      source: 'translate-it-iframe',
-    }), '*');
+    expect(mocks.topPostMessage).not.toHaveBeenCalled();
   });
 });

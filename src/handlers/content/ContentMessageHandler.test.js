@@ -4,6 +4,7 @@ import { TranslationMode } from '@/shared/config/config.js';
 import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
 import { ActionReasons } from '@/shared/messaging/core/MessagingConstants.js';
 import { applyTranslationToTextField } from '../smartTranslationIntegration.js';
+import { MessageActions } from '@/shared/messaging/core/MessageActions.js';
 
 vi.mock('@/shared/logging/logger.js', () => ({
   getScopedLogger: vi.fn(() => ({
@@ -171,6 +172,48 @@ describe('ContentMessageHandler iframe Select Element activation', () => {
     });
 
     expect(cancelTranslation).toHaveBeenCalledTimes(1);
+  });
+
+  it('routes trusted top-frame lifecycle to MainFrameCoordinator', async () => {
+    const handleTrustedPageLifecycle = vi.fn().mockReturnValue({ success: true, aggregated: true });
+    const previousCore = window.translateItContentCore;
+    window.translateItContentCore = { mainFrameCoordinator: { handleTrustedPageLifecycle } };
+
+    try {
+      const relay = {
+        frameId: 7,
+        action: MessageActions.PAGE_TRANSLATE_PROGRESS,
+        data: { translatedCount: 2, totalCount: 3, frameId: 99 },
+      };
+      await expect(handler.handlePageTranslationLifecycle(
+        { data: relay },
+        {}
+      )).resolves.toEqual({ success: true, aggregated: true });
+
+      expect(handleTrustedPageLifecycle).toHaveBeenCalledWith(relay);
+    } finally {
+      window.translateItContentCore = previousCore;
+    }
+  });
+
+  it('rejects lifecycle relay outside the top frame', async () => {
+    const previousTop = window.top;
+    const previousCore = window.translateItContentCore;
+    const handleTrustedPageLifecycle = vi.fn();
+    window.translateItContentCore = { mainFrameCoordinator: { handleTrustedPageLifecycle } };
+
+    try {
+      Object.defineProperty(window, 'top', { configurable: true, value: {} });
+
+      await expect(handler.handlePageTranslationLifecycle(
+        { data: {} },
+        {}
+      )).resolves.toEqual({ success: false, error: 'Page lifecycle relay requires top frame' });
+      expect(handleTrustedPageLifecycle).not.toHaveBeenCalled();
+    } finally {
+      window.translateItContentCore = previousCore;
+      Object.defineProperty(window, 'top', { configurable: true, value: previousTop });
+    }
   });
 
   it('preserves canonical details for thrown Page Translation failures', async () => {

@@ -41,6 +41,36 @@ export async function handlePageTranslation(message, sender) {
   try {
     const senderTabId = sender?.tab?.id;
 
+    if (message.action === MessageActions.PAGE_TRANSLATION_FRAME_LIFECYCLE) {
+      const senderFrameId = sender?.frameId;
+      const lifecycleAction = message.data?.action;
+
+      if (!Number.isInteger(senderTabId) || !Number.isInteger(senderFrameId) || senderFrameId < 0) {
+        return { success: false, error: 'Invalid lifecycle sender' };
+      }
+
+      if (!MessageActions.PAGE_TRANSLATION_FRAME_LIFECYCLE_ACTIONS.includes(lifecycleAction)) {
+        return { success: false, error: 'Unsupported page lifecycle action' };
+      }
+
+      try {
+        const response = await browser.tabs.sendMessage(senderTabId, {
+          action: MessageActions.PAGE_TRANSLATION_FRAME_LIFECYCLE,
+          data: {
+            frameId: senderFrameId,
+            action: lifecycleAction,
+            data: message.data?.data,
+          },
+          context: 'page-translation-frame-lifecycle-relay',
+        }, { frameId: 0 });
+
+        return response || { success: true };
+      } catch (error) {
+        logger.debug('Could not relay page lifecycle to top frame:', error.message);
+        return { success: false, error: 'Top frame lifecycle relay failed' };
+      }
+    }
+
     // Handle batch translation request via UnifiedTranslationService
     if (message.action === MessageActions.PAGE_TRANSLATE_BATCH) {
       return await unifiedTranslationService.handleTranslationRequest(message, sender);
@@ -70,6 +100,7 @@ export async function handlePageTranslation(message, sender) {
     const eventActions = [
       MessageActions.PAGE_TRANSLATE_START,
       MessageActions.PAGE_TRANSLATE_PROGRESS,
+      MessageActions.PAGE_TRANSLATE_IDLE,
       MessageActions.PAGE_TRANSLATE_COMPLETE,
       MessageActions.PAGE_TRANSLATE_ERROR,
       MessageActions.PAGE_TRANSLATE_RESET_ERROR,

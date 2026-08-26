@@ -286,6 +286,30 @@ describe('handlePageTranslation target tab ownership', () => {
     expect(browser.tabs.sendMessage.mock.calls.some(([tabId]) => tabId === 20)).toBe(false);
   });
 
+  it('keeps Stop as command fan-out when one frame is unavailable', async () => {
+    setupFrames([
+      { frameId: 0, response: { success: true } },
+      { frameId: 1, error: new Error('child frame unavailable') },
+      { frameId: 2, response: { success: true } },
+    ]);
+
+    const result = await handlePageTranslation(
+      { action: MessageActions.PAGE_TRANSLATE_STOP_AUTO },
+      sender
+    );
+
+    expect(browser.tabs.sendMessage).toHaveBeenCalledTimes(3);
+    expect(browser.tabs.sendMessage.mock.calls).toEqual(expect.arrayContaining([
+      [42, expect.objectContaining({ action: MessageActions.PAGE_TRANSLATE_STOP_AUTO }), { frameId: 0 }],
+      [42, expect.objectContaining({ action: MessageActions.PAGE_TRANSLATE_STOP_AUTO }), { frameId: 1 }],
+      [42, expect.objectContaining({ action: MessageActions.PAGE_TRANSLATE_STOP_AUTO }), { frameId: 2 }],
+    ]));
+    expect(result).toEqual({
+      success: true,
+      responses: [{ success: true }, { success: true }],
+    });
+  });
+
   it.each([{}, { tab: null }])('preserves active-tab fallback without sender tab: %o', async (sender) => {
     setupFrames([
       { frameId: 0, response: { success: true } },
@@ -371,5 +395,93 @@ describe('handlePageTranslation target tab ownership', () => {
     expect(tabPermissionChecker.checkTabAccess).toHaveBeenCalledWith(10);
     expect(browser.webNavigation.getAllFrames).toHaveBeenCalledWith({ tabId: 10 });
     expect(browser.tabs.sendMessage.mock.calls.every(([tabId]) => tabId === 10)).toBe(true);
+  });
+});
+
+describe('trusted frame lifecycle relay', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    browser.tabs.sendMessage.mockResolvedValue({ success: true, aggregated: true });
+  });
+
+  it('authenticates sender tab/frame and ignores payload frame identity', async () => {
+    const data = {
+      translatedCount: 2,
+      totalCount: 3,
+      frameId: 99,
+      frameUrl: 'https://attacker.example',
+    };
+
+    const result = await handlePageTranslation({
+      action: MessageActions.PAGE_TRANSLATION_FRAME_LIFECYCLE,
+      data: {
+        action: MessageActions.PAGE_TRANSLATE_PROGRESS,
+        data,
+      },
+    }, { tab: { id: 42 }, frameId: 7 });
+
+    expect(result).toEqual({ success: true, aggregated: true });
+    expect(browser.tabs.sendMessage).toHaveBeenCalledWith(42, {
+      action: MessageActions.PAGE_TRANSLATION_FRAME_LIFECYCLE,
+      data: {
+        frameId: 7,
+        action: MessageActions.PAGE_TRANSLATE_PROGRESS,
+        data,
+      },
+      context: 'page-translation-frame-lifecycle-relay',
+    }, { frameId: 0 });
+  });
+
+  it('relays top-frame lifecycle with sender frame zero', async () => {
+    await handlePageTranslation({
+      action: MessageActions.PAGE_TRANSLATION_FRAME_LIFECYCLE,
+      data: {
+        action: MessageActions.PAGE_TRANSLATE_START,
+        data: { messageId: 'top-session' },
+      },
+    }, { tab: { id: 42 }, frameId: 0 });
+
+    expect(browser.tabs.sendMessage).toHaveBeenCalledWith(
+      42,
+      expect.objectContaining({ data: expect.objectContaining({ frameId: 0 }) }),
+      { frameId: 0 }
+    );
+  });
+
+  it.each([
+    {},
+    { tab: null },
+    { tab: { id: '42' }, frameId: 7 },
+    { tab: { id: 42 }, frameId: undefined },
+    { tab: { id: 42 }, frameId: -1 },
+  ])('fails closed for malformed lifecycle sender: %o', async (sender) => {
+    const result = await handlePageTranslation({
+      action: MessageActions.PAGE_TRANSLATION_FRAME_LIFECYCLE,
+      data: { action: MessageActions.PAGE_TRANSLATE_PROGRESS, data: {} },
+    }, sender);
+
+    expect(result).toEqual({ success: false, error: 'Invalid lifecycle sender' });
+    expect(browser.tabs.sendMessage).not.toHaveBeenCalled();
+    expect(browser.tabs.query).not.toHaveBeenCalled();
+  });
+
+  it('rejects lifecycle actions outside allowlist', async () => {
+    const result = await handlePageTranslation({
+      action: MessageActions.PAGE_TRANSLATION_FRAME_LIFECYCLE,
+      data: { action: 'PAGE_TRANSLATE', data: {} },
+    }, { tab: { id: 42 }, frameId: 7 });
+
+    expect(result).toEqual({ success: false, error: 'Unsupported page lifecycle action' });
+    expect(browser.tabs.sendMessage).not.toHaveBeenCalled();
+  });
+
+  it('does not classify Stop as frame lifecycle', async () => {
+    const result = await handlePageTranslation({
+      action: MessageActions.PAGE_TRANSLATION_FRAME_LIFECYCLE,
+      data: { action: MessageActions.PAGE_TRANSLATE_STOP_AUTO, data: {} },
+    }, { tab: { id: 42 }, frameId: 7 });
+
+    expect(result).toEqual({ success: false, error: 'Unsupported page lifecycle action' });
+    expect(browser.tabs.sendMessage).not.toHaveBeenCalled();
   });
 });
